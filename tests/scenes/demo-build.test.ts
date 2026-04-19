@@ -190,6 +190,34 @@ describe('demo-only build', () => {
       mode: 'watch',
       profile: 'mobile'
     });
+    expect(resolveBootPresentationConfig('?content=full')).toEqual({
+      presentation: 'title',
+      chrome: 'full',
+      mood: 'auto',
+      title: 'show',
+      theme: 'auto',
+      mode: 'watch',
+      contentProfile: 'full'
+    });
+    expect(resolveBootPresentationConfig('?profile=core-only')).toEqual({
+      presentation: 'title',
+      chrome: 'full',
+      mood: 'auto',
+      title: 'show',
+      theme: 'auto',
+      mode: 'watch',
+      contentProfile: 'core-only'
+    });
+    expect(resolveBootPresentationConfig('?profile=tv&content=full')).toEqual({
+      presentation: 'ambient',
+      chrome: 'minimal',
+      mood: 'auto',
+      title: 'hide',
+      theme: 'auto',
+      mode: 'watch',
+      profile: 'tv',
+      contentProfile: 'full'
+    });
     expect(resolveBootPresentationConfig('?presentation=loading&chrome=minimal&mood=scan&theme=aurora&seed=42&size=large&difficulty=spicy&title=hide')).toEqual({
       presentation: 'loading',
       chrome: 'minimal',
@@ -479,12 +507,12 @@ describe('demo-only build', () => {
       safeBounds: boardFrame
     });
 
-    expect(boardFrame.top - titleBand.bottom).toBe(5);
+    expect(boardFrame.top - titleBand.bottom).toBe(12);
     expect(installFrame.top - boardFrame.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
-    expect(layout.boardY - titleBand.bottom).toBeGreaterThanOrEqual(5);
-    expect(layout.boardY - titleBand.bottom).toBeLessThanOrEqual(18);
+    expect(layout.boardY - titleBand.bottom).toBeGreaterThanOrEqual(12);
+    expect(layout.boardY - titleBand.bottom).toBeLessThanOrEqual(40);
     expect(installFrame.top - layout.boardBounds.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
-    expect(layout.boardHeight).toBeGreaterThan(430);
+    expect(layout.boardHeight).toBeGreaterThan(390);
 
     disposeMazeEpisode(episode);
   });
@@ -646,7 +674,7 @@ describe('demo-only build', () => {
       safeBounds: boardFrame
     });
 
-    expect(boardFrame.top - titleBand.bottom).toBe(6);
+    expect(boardFrame.top - titleBand.bottom).toBe(9);
     expect(installFrame.top - boardFrame.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
     expect(layout.tileSize).toBe(6);
     expect(layout.boardWidth).toBe(300);
@@ -1102,17 +1130,17 @@ describe('demo-only build', () => {
       expect(['noir', 'ember', 'aurora', 'vellum', 'monolith']).toContain(presentation.theme);
       expect(['solve', 'scan', 'blueprint']).toContain(presentation.mood);
       expect([
-        'generating',
-        'solving',
-        'pattern sync',
-        'routing',
-        'live system',
-        'staging board',
+        'setting the board',
+        'finding the route',
         'building maze',
-        'settling read',
+        'following the route',
+        'holding the clear',
+        'watching the exit',
+        'settling the view',
         'holding clear',
-        'reading clear',
-        'deconstructing maze'
+        'reading the route',
+        'folding the maze',
+        'starting again'
       ]).toContain(presentation.phaseLabel);
       expect([
         'pre-roll',
@@ -1297,6 +1325,138 @@ describe('demo-only build', () => {
     disposeMazeEpisode(episode);
   });
 
+  test('fade presentation separates clear hold, route reflection, and reverse deconstruction', () => {
+    const cycle = resolveMenuDemoCycle(4401, 1);
+    const resolved = generateMazeForDifficulty({
+      scale: 50,
+      seed: 4401,
+      size: cycle.size,
+      family: cycle.family,
+      presentationPreset: cycle.presentationPreset,
+      checkPointModifier: cycle.entropy.checkPointModifier,
+      shortcutCountModifier: cycle.entropy.shortcutCountModifier
+    }, cycle.difficulty, 0, 1);
+    const episode = resolved.episode;
+    const config = resolveDemoConfig(episode, cycle);
+    const traverseMs = (episode.raster.pathIndices.length - 1) * config.cadence.exploreStepMs;
+    const fadeStartMs = config.cadence.spawnHoldMs + traverseMs + config.cadence.goalHoldMs;
+    const clearPresentation = resolveMenuDemoPresentation(
+      episode,
+      cycle,
+      fadeStartMs + Math.max(1, Math.floor(config.cadence.resetHoldMs * 0.16)),
+      config,
+      'loading'
+    );
+    const reflectionPresentation = resolveMenuDemoPresentation(
+      episode,
+      cycle,
+      fadeStartMs + Math.max(1, Math.floor(config.cadence.resetHoldMs * 0.58)),
+      config,
+      'loading'
+    );
+    const erasePresentation = resolveMenuDemoPresentation(
+      episode,
+      cycle,
+      fadeStartMs + Math.max(1, Math.floor(config.cadence.resetHoldMs * 0.9)),
+      config,
+      'loading'
+    );
+
+    expect(config.cadence.resetHoldMs).toBeGreaterThanOrEqual(560);
+    expect(clearPresentation.lifecyclePhase).toBe('clear-hold');
+    expect(clearPresentation.phaseLabel).toBe('holding clear');
+    expect(clearPresentation.showActor).toBe(true);
+    expect(clearPresentation.showTrail).toBe(true);
+    expect(clearPresentation.ritualPhase).toBe('success');
+
+    expect(reflectionPresentation.lifecyclePhase).toBe('reflection-beat');
+    expect(reflectionPresentation.phaseLabel).toBe('reading the route');
+    expect(reflectionPresentation.showActor).toBe(true);
+    expect(reflectionPresentation.showTrail).toBe(true);
+    expect(reflectionPresentation.ritualPhase).toBe('success');
+
+    expect(erasePresentation.lifecyclePhase).toBe('erase-wipe');
+    expect(erasePresentation.phaseLabel).toBe('folding the maze');
+    expect(erasePresentation.showActor).toBe(false);
+    expect(erasePresentation.showTrail).toBe(false);
+    expect(erasePresentation.ritualPhase).toBe('retry');
+    expect(erasePresentation.eraseWipeProgress).toBeGreaterThan(0);
+
+    disposeMazeEpisode(episode);
+  });
+
+  test('demo config keeps cycle pacing size-aware instead of pinning every maze to one hold length', () => {
+    const smallCycle = resolveMenuDemoCycle(5511, 0, {
+      size: 'small',
+      difficulty: 'chill'
+    });
+    const hugeCycle = resolveMenuDemoCycle(5512, 0, {
+      size: 'huge',
+      difficulty: 'brutal'
+    });
+    const smallResolved = generateMazeForDifficulty({
+      scale: 50,
+      seed: 5511,
+      size: smallCycle.size,
+      family: smallCycle.family,
+      presentationPreset: smallCycle.presentationPreset,
+      checkPointModifier: smallCycle.entropy.checkPointModifier,
+      shortcutCountModifier: smallCycle.entropy.shortcutCountModifier
+    }, smallCycle.difficulty, 0, 1);
+    const hugeResolved = generateMazeForDifficulty({
+      scale: 50,
+      seed: 5512,
+      size: hugeCycle.size,
+      family: hugeCycle.family,
+      presentationPreset: hugeCycle.presentationPreset,
+      checkPointModifier: hugeCycle.entropy.checkPointModifier,
+      shortcutCountModifier: hugeCycle.entropy.shortcutCountModifier
+    }, hugeCycle.difficulty, 0, 1);
+
+    const smallWatchConfig = resolveDemoConfig(smallResolved.episode, smallCycle, 'watch');
+    const hugeWatchConfig = resolveDemoConfig(hugeResolved.episode, hugeCycle, 'watch');
+    const smallPlayConfig = resolveDemoConfig(smallResolved.episode, smallCycle, 'play');
+    const hugePlayConfig = resolveDemoConfig(hugeResolved.episode, hugeCycle, 'play');
+
+    expect(smallWatchConfig.cadence.goalHoldMs).toBeLessThan(hugeWatchConfig.cadence.goalHoldMs);
+    expect(smallWatchConfig.cadence.resetHoldMs).toBeLessThan(hugeWatchConfig.cadence.resetHoldMs);
+    expect(smallPlayConfig.cadence.goalHoldMs).toBeLessThan(hugePlayConfig.cadence.goalHoldMs);
+    expect(smallPlayConfig.cadence.resetHoldMs).toBeLessThan(hugePlayConfig.cadence.resetHoldMs);
+    expect(smallPlayConfig.cadence.goalHoldMs).toBeLessThan(smallWatchConfig.cadence.goalHoldMs);
+    expect(hugePlayConfig.cadence.resetHoldMs).toBeLessThan(hugeWatchConfig.cadence.resetHoldMs);
+
+    disposeMazeEpisode(hugeResolved.episode);
+    disposeMazeEpisode(smallResolved.episode);
+  });
+
+  test('intro leaves a short settle-in beat after the build reveal finishes', () => {
+    const cycle = resolveMenuDemoCycle(5521, 0);
+    const resolved = generateMazeForDifficulty({
+      scale: 50,
+      seed: 5521,
+      size: cycle.size,
+      family: cycle.family,
+      presentationPreset: cycle.presentationPreset,
+      checkPointModifier: cycle.entropy.checkPointModifier,
+      shortcutCountModifier: cycle.entropy.shortcutCountModifier
+    }, cycle.difficulty, 0, 1);
+    const episode = resolved.episode;
+    const config = resolveDemoConfig(episode, cycle);
+    const settlePresentation = resolveMenuDemoPresentation(
+      episode,
+      cycle,
+      Math.max(1, Math.floor(config.cadence.spawnHoldMs * 0.94)),
+      config,
+      'loading'
+    );
+
+    expect(settlePresentation.sequence).toBe('intro');
+    expect(settlePresentation.lifecyclePhase).toBe('settle-in');
+    expect(settlePresentation.phaseLabel).toBe('settling the view');
+
+    disposeMazeEpisode(episode);
+  });
+
   test('play mode trims build and hold pacing without changing the shared episode contract', () => {
     const cycle = resolveMenuDemoCycle(3311, 2);
     const resolved = generateMazeForDifficulty({
@@ -1417,12 +1577,14 @@ describe('demo-only build', () => {
     expect(menuSceneSource).toContain("this.nextSignatureWindowAt = this.resolveTierCooldown('signature')");
     expect(menuSceneSource).toContain('episodePresentationShell = createEpisodePresentationShell(patternFrame.episode, demoCyclePlan.theme);');
     expect(menuSceneSource).toContain('const scheduleIntentRuntimeSession = (episode: MazeEpisode): void => {');
-    expect(menuSceneSource).toContain('intentRuntimeSession = createMenuIntentRuntimeSession(episode);');
+    expect(menuSceneSource).toContain('const contentProfileId: PresentationContentProfile = launchConfig.contentProfile ?? DEFAULT_PRESENTATION_CONTENT_PROFILE;');
+    expect(menuSceneSource).toContain('intentRuntimeSession = createMenuIntentRuntimeSession(episode, contentProfileId);');
     expect(menuSceneSource).toContain('createIntentFeedHud(this, {');
     expect(menuSceneSource).toContain('ritualCard');
     expect(menuSceneSource).toContain('resolvePresentationElapsedMs');
     expect(menuSceneSource).toContain('const telegraphs = boardState?.telegraphs ?? [];');
-    expect(menuSceneSource).toContain('shell.boardRenderer.drawMechanicLegend(telegraphs);');
+    expect(menuSceneSource).toContain('shell.boardRenderer.drawMechanicTelegraphs(telegraphs, {');
+    expect(menuSceneSource).toContain("compact: presentationMode === 'play'");
     expect(menuSceneSource).toContain("presentation.ritualPhase === 'fail'");
     expect(menuSceneSource).toContain("this.scale.off(Phaser.Scale.Events.RESIZE, handleResize);");
     expect(menuSceneSource).toContain("this.events.off(Phaser.Scenes.Events.UPDATE, updateDemo);");

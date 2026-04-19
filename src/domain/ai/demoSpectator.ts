@@ -1,5 +1,7 @@
 import type { MazeEpisode } from '../maze';
 
+export type DemoSpectatorContentProfile = 'full' | 'core-only';
+
 export type DemoMechanicKind =
   | 'key-item'
   | 'pressure-plate'
@@ -102,6 +104,25 @@ export interface DemoSpectatorPlan {
   failureReasonSubtitle: string;
 }
 
+const buildCoreOnlySpectatorPlan = (
+  pathLength: number,
+  segmentCount: number,
+  failureReasonTitle = 'Route clipped',
+  failureReasonSubtitle = 'The route looked clean, but it still needed another pass.'
+): DemoSpectatorPlan => ({
+  pathLength,
+  segmentCount,
+  keyItem: null,
+  pressurePlate: null,
+  pressureDoor: null,
+  hazardTile: null,
+  timedGate: null,
+  patrolLane: null,
+  riskWindows: [],
+  failureReasonTitle,
+  failureReasonSubtitle
+});
+
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 const resolveCursor = (
@@ -149,23 +170,28 @@ const buildRiskWindows = (
   }
 ];
 
-export const createDemoSpectatorPlan = (episode: MazeEpisode): DemoSpectatorPlan => {
+export const createDemoSpectatorPlan = (
+  episode: MazeEpisode,
+  contentProfile: DemoSpectatorContentProfile = 'full'
+): DemoSpectatorPlan => {
   const path = episode.raster.pathIndices;
   const segmentCount = Math.max(0, path.length - 1);
-  if (segmentCount < 6) {
-    return {
-      pathLength: path.length,
+  if (contentProfile === 'core-only') {
+    return buildCoreOnlySpectatorPlan(
+      path.length,
       segmentCount,
-      keyItem: null,
-      pressurePlate: null,
-      pressureDoor: null,
-      hazardTile: null,
-      timedGate: null,
-      patrolLane: null,
-      riskWindows: [],
-      failureReasonTitle: 'Route clipped',
-      failureReasonSubtitle: 'The route never showed enough danger to justify a trap ritual.'
-    };
+      'Route reset',
+      'The line stayed readable, but the run still needed another pass.'
+    );
+  }
+
+  if (segmentCount < 6) {
+    return buildCoreOnlySpectatorPlan(
+      path.length,
+      segmentCount,
+      'Route clipped',
+      'The route stayed too short to justify a longer ritual pass.'
+    );
   }
 
   const keyCursor = resolveCursor(segmentCount, 0.18, 1, Math.max(1, segmentCount - 5));

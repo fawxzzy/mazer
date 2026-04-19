@@ -3,6 +3,7 @@ import type {
   AmbientPresentationVariant,
   AmbientFamilyThemePairingPolicy,
   PresentationChrome,
+  PresentationContentProfile,
   PresentationDeploymentProfile,
   PresentationLaunchConfig,
   PresentationMode,
@@ -12,6 +13,7 @@ import type {
 import {
   AMBIENT_FAMILY_THEME_PAIRING_POLICY,
   DEFAULT_PRESENTATION_CHROME,
+  DEFAULT_PRESENTATION_CONTENT_PROFILE,
   DEFAULT_PRESENTATION_LAUNCH_CONFIG,
   PRESENTATION_THEME_FAMILIES,
   DEFAULT_PRESENTATION_VARIANT,
@@ -67,6 +69,7 @@ import {
 } from '../render/boardRenderer';
 import { createDemoStatusHud, type HudThemeStyle } from '../render/hudRenderer';
 import {
+  clampIntentFeedSummary,
   createIntentFeedHud,
   resolveIntentFeedPanelMetrics,
   type IntentFeedHudLayoutSnapshot
@@ -86,13 +89,16 @@ import {
 import {
   HumanInputRepeatGate,
   createTouchInputState,
+  isMovementActionKind,
   resolveHumanKeyboardAction,
   resolveHumanTouchAction,
   resolveTouchControlLayout,
   resolveTouchInputCapability,
   releaseTouchPointer,
   resetTouchInputState,
-  type HumanInputAction
+  type HumanInputAction,
+  type HumanInputDropReason,
+  type HumanInputTimingSnapshot
 } from '../input-human';
 import {
   summarizeTelemetrySemantics,
@@ -132,10 +138,10 @@ export const TITLE_SIGNATURE_TEXT = '\u00b0 by fawxzzy';
 const ROTATING_DIFFICULTIES: readonly MazeDifficulty[] = ['chill', 'standard', 'spicy', 'brutal'];
 const ROTATING_SIZES: readonly MazeSize[] = MAZE_SIZE_ORDER;
 const LOADING_PHASE_LABELS: Record<MenuDemoSequence, readonly string[]> = {
-  intro: ['generating', 'routing'],
-  reveal: ['solving', 'pattern sync'],
-  arrival: ['live system', 'pattern sync'],
-  fade: ['routing', 'generating']
+  intro: ['setting the board', 'finding the route'],
+  reveal: ['building the maze', 'following the route'],
+  arrival: ['holding the clear', 'watching the exit'],
+  fade: ['folding the maze', 'starting again']
 };
 type DemoRitualPhase = 'none' | 'decision' | 'fail' | 'success' | 'retry';
 type DemoLifecyclePhase =
@@ -146,17 +152,17 @@ type DemoLifecyclePhase =
   | 'clear-hold'
   | 'reflection-beat'
   | 'erase-wipe';
-const RETRY_RITUAL_TITLES = ['Retrying run', 'Resetting route'] as const;
+const RETRY_RITUAL_TITLES = ['Building again', 'Starting fresh'] as const;
 const RETRY_RITUAL_SUBTITLES: Record<DemoMood, readonly string[]> = {
-  solve: ['Centering the line and rolling a calmer retry.'],
-  scan: ['Reopening the branch read before the next commit.'],
-  blueprint: ['Re-syncing the timing sketch before the next pass.']
+  solve: ['The maze folds back and opens a new route.'],
+  scan: ['The board folds back and starts the path again.'],
+  blueprint: ['The maze folds back and starts fresh.']
 };
-export const SUCCESS_RITUAL_TITLES = ['Run cleared', 'Route held', 'Board solved'] as const;
+export const SUCCESS_RITUAL_TITLES = ['Exit found', 'Route clear', 'Maze cleared'] as const;
 export const SUCCESS_RITUAL_SUBTITLES: Record<DemoMood, readonly string[]> = {
-  solve: ['Holding the clear long enough to read the full route.'],
-  scan: ['The next risk stayed readable, and the route stayed calm.'],
-  blueprint: ['The full pattern resolved before the board folded away.']
+  solve: ['Hold the route for one more beat.'],
+  scan: ['The way out stayed clear.'],
+  blueprint: ['The full maze is easy to read.']
 };
 
 export type DemoMood = 'solve' | 'scan' | 'blueprint';
@@ -313,10 +319,10 @@ const resolveRunProjectionProgressPct = (
   }
 };
 
-const PLAY_MODE_TOGGLE_CODES = new Set(['KeyM', 'Tab']);
+const PLAY_MODE_TOGGLE_CODES = new Set(['Tab']);
 const PLAY_MOVE_ANIMATION_RATIO = 0.72;
-const PLAY_MODE_ONBOARDING_LABEL = 'WASD/Arrows move | P pause | R retry | T thoughts | M watch';
-const PLAY_MODE_TOUCH_ONBOARDING_LABEL = 'Tap D-pad | P pause | R retry | T thoughts | M watch';
+const PLAY_MODE_ONBOARDING_LABEL = 'Move WASD/Arrows | P pause | R retry | T thoughts | Tab watch';
+const PLAY_MODE_TOUCH_ONBOARDING_LABEL = 'Tap D-pad | P pause | R retry | T thoughts';
 const TOUCH_CONTROL_LABELS: Record<HumanInputAction['kind'], string> = {
   move_up: '↑',
   move_down: '↓',
@@ -348,6 +354,21 @@ const createPlayLoopState = (mode: PresentationMode): PlayLoopState => ({
   motion: null,
   paused: false,
   thoughtsVisible: mode !== 'play'
+});
+
+const createPlayInputDiagnostics = (): PlayInputDiagnostics => ({
+  acceptedCount: 0,
+  droppedCount: 0,
+  mergedCount: 0,
+  lastAcceptedActionKind: null,
+  lastAcceptedSource: null,
+  lastAcceptedAtMs: null,
+  lastConsumedAtMs: null,
+  lastDroppedActionKind: null,
+  lastDroppedReason: null,
+  lastDroppedAtMs: null,
+  queueDepth: 0,
+  maxQueueDepth: 0
 });
 
 const resetPlayLoopState = (state: PlayLoopState, mode: PresentationMode): PlayLoopState => ({
@@ -555,6 +576,11 @@ interface PlayLoopState {
   motion: PlayMotionState | null;
   paused: boolean;
   thoughtsVisible: boolean;
+}
+
+interface PlayInputDiagnostics extends HumanInputTimingSnapshot {
+  queueDepth: number;
+  maxQueueDepth: number;
 }
 
 interface TouchControlButtonChrome {
@@ -1255,7 +1281,7 @@ const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
         ...adjusted,
         board: {
           ...adjusted.board,
-          trail: 0x5974aa,
+          trail: 0x506999,
           goal: 0x944d67,
           player: 0x053545
         }
@@ -1756,8 +1782,8 @@ const resolveTitleBandMetrics = (
   return {
     bandInset: compact ? COMPACT_TITLE_BAND_INSET_PX : DEFAULT_TITLE_BAND_INSET_PX,
     bandHeight: (compact ? COMPACT_TITLE_BAND_HEIGHT_PX : DEFAULT_TITLE_BAND_HEIGHT_PX) + (sceneLayout.isPortrait ? 2 : 0),
-    minHeight: compact ? 48 : 52,
-    boardGap: resolveBoardEdgeBufferPx(sceneLayout, profile)
+    minHeight: compact ? 44 : 48,
+    boardGap: resolveBoardEdgeBufferPx(sceneLayout, profile) + (compact ? 2 : 4)
   };
 };
 
@@ -1911,8 +1937,8 @@ const DEMO_MOOD_PROFILES: Record<DemoMood, {
     solutionPathAlpha: 1,
     trailWindowOffset: 10,
     trailWindowScale: 1.04,
-    ambientDriftPx: 2,
-    ambientDriftMs: 3600,
+    ambientDriftPx: 1.4,
+    ambientDriftMs: 4600,
     actorPulseBoost: 0.04,
     persistentFadeFloor: 0.38,
     trailPulseBoost: 0.018,
@@ -1925,8 +1951,8 @@ const DEMO_MOOD_PROFILES: Record<DemoMood, {
     solutionPathAlpha: 0.16,
     trailWindowOffset: -12,
     trailWindowScale: 0.36,
-    ambientDriftPx: 2.5,
-    ambientDriftMs: 4200,
+    ambientDriftPx: 1.8,
+    ambientDriftMs: 5200,
     actorPulseBoost: 0.018,
     persistentFadeFloor: 0.28,
     trailPulseBoost: 0.01,
@@ -1939,8 +1965,8 @@ const DEMO_MOOD_PROFILES: Record<DemoMood, {
     solutionPathAlpha: 0.42,
     trailWindowOffset: -2,
     trailWindowScale: 0.62,
-    ambientDriftPx: 1.6,
-    ambientDriftMs: 4400,
+    ambientDriftPx: 1.2,
+    ambientDriftMs: 5400,
     actorPulseBoost: 0.026,
     persistentFadeFloor: 0.33,
     trailPulseBoost: 0.014,
@@ -2058,16 +2084,16 @@ const VARIANT_PROFILES: Record<AmbientPresentationVariant, VariantProfile> = {
 
 const CHROME_PROFILES: Record<PresentationChrome, ChromeProfile> = {
   full: {
-    boardScaleBias: 0,
-    topReserveBias: 0,
-    bottomPaddingBias: 0,
-    sidePaddingBias: 0,
-    titleScale: 1,
-    titleAlpha: 1,
-    signatureAlpha: 1,
-    passiveAlpha: 1,
-    plateAlpha: 1,
-    panelAlpha: 1
+    boardScaleBias: -0.002,
+    topReserveBias: 4,
+    bottomPaddingBias: 6,
+    sidePaddingBias: 2,
+    titleScale: 0.98,
+    titleAlpha: 0.94,
+    signatureAlpha: 0.9,
+    passiveAlpha: 0.92,
+    plateAlpha: 0.84,
+    panelAlpha: 0.86
   },
   minimal: {
     boardScaleBias: 0.004,
@@ -2288,14 +2314,14 @@ export interface InstallChromeFrame {
   centerY: number;
 }
 
-const TARGET_BOARD_EDGE_BUFFER_PX = 5;
-const MOBILE_BOARD_EDGE_BUFFER_PX = 6;
-const DEFAULT_TITLE_BAND_INSET_PX = 0;
-const COMPACT_TITLE_BAND_INSET_PX = 0;
-const DEFAULT_TITLE_BAND_HEIGHT_PX = 64;
-const COMPACT_TITLE_BAND_HEIGHT_PX = 60;
-const DEFAULT_INSTALL_EDGE_INSET_PX = 14;
-const COMPACT_INSTALL_EDGE_INSET_PX = 12;
+const TARGET_BOARD_EDGE_BUFFER_PX = 8;
+const MOBILE_BOARD_EDGE_BUFFER_PX = 7;
+const DEFAULT_TITLE_BAND_INSET_PX = 10;
+const COMPACT_TITLE_BAND_INSET_PX = 8;
+const DEFAULT_TITLE_BAND_HEIGHT_PX = 58;
+const COMPACT_TITLE_BAND_HEIGHT_PX = 54;
+const DEFAULT_INSTALL_EDGE_INSET_PX = 18;
+const COMPACT_INSTALL_EDGE_INSET_PX = 16;
 
 interface TitleBandMetrics {
   bandInset: number;
@@ -2375,8 +2401,13 @@ export interface MenuSceneVisualDiagnostics {
     dock?: IntentFeedHudLayoutSnapshot['dock'];
     compact: boolean;
     statusVisible: boolean;
+    statusText?: string | null;
     quickThoughtCount: number;
     maxVisibleEvents: number;
+    onboardingVisible?: boolean;
+    onboardingLabel?: string | null;
+    riskVisible?: boolean;
+    nextRiskLabel?: string | null;
     bounds?: VisualSceneBounds;
   };
   trail: {
@@ -3671,31 +3702,37 @@ export function resolveTitleLockupLayout(
   const variantProfile = VARIANT_PROFILES[safeVariant];
   const chromeProfile = CHROME_PROFILES[safeChrome];
   const deploymentProfile = profile ? DEPLOYMENT_PRESENTATION_PROFILES[profile] : DEFAULT_DEPLOYMENT_PRESENTATION_PROFILE;
-  const titlePlateMaxWidth = Math.max(112, titleBandFrame.width - 18);
+  const titlePlateMaxWidth = Math.max(112, titleBandFrame.width - 24);
   const plateWidth = Phaser.Math.Clamp(
     Math.round(
       boardLayout.boardSize
-        * (sceneLayout.isNarrow ? 0.5 : legacyTuning.menu.title.plateWidthRatio + 0.01)
+        * (sceneLayout.isNarrow ? 0.46 : legacyTuning.menu.title.plateWidthRatio - 0.015)
         * variantProfile.titleScale
         * chromeProfile.titleScale
         * deploymentProfile.titlePlateWidthScale
     ),
-    Math.min(variantProfile.titleAnchor === 'left' ? 212 : 224, titlePlateMaxWidth),
-    Math.max(Math.min(sceneLayout.isPortrait ? 332 : 388, titlePlateMaxWidth), 112)
+    Math.min(variantProfile.titleAnchor === 'left' ? 196 : 212, titlePlateMaxWidth),
+    Math.max(Math.min(sceneLayout.isPortrait ? 320 : 368, titlePlateMaxWidth), 112)
   );
   const basePlateHeight = Phaser.Math.Clamp(
     Math.round(
       boardLayout.boardSize
         * legacyTuning.menu.title.plateHeightRatio
         * Phaser.Math.Linear(0.86, 0.98, variantProfile.titleScale * Math.max(0.72, chromeProfile.titleScale))
+        * 0.88
         * deploymentProfile.titlePlateHeightScale
     ),
-    sceneLayout.isTiny ? 32 : 38,
-    Math.max(legacyTuning.menu.title.plateHeightMaxPx - 2, 52)
+    sceneLayout.isTiny ? 28 : 34,
+    Math.max(legacyTuning.menu.title.plateHeightMaxPx - 6, 48)
   );
+  const plateLaneInset = sceneLayout.isTiny
+    ? 10
+    : safeChrome === 'minimal'
+      ? 16
+      : 12;
   const plateHeight = Math.min(
     basePlateHeight,
-    Math.max(sceneLayout.isTiny ? 30 : 34, titleBandFrame.height - (sceneLayout.isTiny ? 12 : 14))
+    Math.max(sceneLayout.isTiny ? 26 : 30, titleBandFrame.height - plateLaneInset)
   );
   const titleFontSize = Phaser.Math.Clamp(
     Math.round(
@@ -3703,10 +3740,10 @@ export function resolveTitleLockupLayout(
         * legacyTuning.menu.title.fontScaleToBoard
         * variantProfile.titleScale
         * chromeProfile.titleScale
-        * 0.94
+        * 0.9
     ),
-    sceneLayout.isNarrow ? 22 : 28,
-    Math.max(sceneLayout.isNarrow ? 24 : 28, Math.round(plateHeight * 0.78))
+    sceneLayout.isNarrow ? 20 : 26,
+    Math.max(sceneLayout.isNarrow ? 22 : 26, Math.round(plateHeight * 0.74))
   );
   const titleLetterSpacing = sceneLayout.isNarrow
     ? variantProfile.titleLetterSpacingNarrow
@@ -3718,8 +3755,8 @@ export function resolveTitleLockupLayout(
   );
   const subtitleLetterSpacing = sceneLayout.isNarrow ? 0.8 : 1.2;
   const minSubtitleGap = Math.max(
-    sceneLayout.isTiny ? 4 : 5,
-    Math.round(titleBandFrame.height * (sceneLayout.isPortrait ? 0.08 : 0.1))
+    sceneLayout.isTiny ? 5 : 6,
+    Math.round(titleBandFrame.height * (sceneLayout.isPortrait ? 0.09 : 0.11))
   );
   const desiredTitleTopInset = Math.round(
     Math.max(
@@ -3743,7 +3780,14 @@ export function resolveTitleLockupLayout(
     desiredTitleTopInset,
     titleBandFrame.height - plateHeight - subtitleGap - estimatedSubtitleHeight
   ));
-  const titleY = titleBandFrame.top + titleTopInset + (plateHeight / 2);
+  const unclampedTitleY = titleBandFrame.top + titleTopInset + (plateHeight / 2);
+  const titleBottom = unclampedTitleY + (plateHeight / 2);
+  const subtitleBottom = titleBottom + subtitleGap + estimatedSubtitleHeight;
+  const titleOverflow = Math.max(0, subtitleBottom - titleBandFrame.bottom);
+  const titleY = Math.max(
+    titleBandFrame.top + (plateHeight / 2),
+    unclampedTitleY - titleOverflow
+  );
   const titleX = variantProfile.titleAnchor === 'left'
     ? titleBandFrame.left + (plateWidth / 2)
     : titleBandFrame.centerX;
@@ -3753,7 +3797,7 @@ export function resolveTitleLockupLayout(
     plateHeight,
     titleX,
     titleY,
-    titleShadowY: titleY + 2,
+    titleShadowY: titleY + 1,
     titleFontSize,
     titleLetterSpacing,
     subtitleTopOffsetY: (plateHeight / 2) + subtitleGap,
@@ -3778,8 +3822,8 @@ export function resolveInstallChromeFrame(
   const compact = sceneLayout.isTiny || sceneLayout.isNarrow;
   const safeWidth = sanitizePositive(viewportWidth, DEFAULT_VIEWPORT_WIDTH, 1);
   const safeHeight = sanitizePositive(viewportHeight, DEFAULT_VIEWPORT_HEIGHT, 1);
-  const horizontalInset = Math.max(viewportSafeInsets.left, viewportSafeInsets.right) + (compact ? 10 : 12);
-  const bottomInset = Math.max(viewportSafeInsets.bottom + resolveInstallEdgeInsetPx(sceneLayout), 12);
+  const horizontalInset = Math.max(viewportSafeInsets.left, viewportSafeInsets.right) + (compact ? 12 : 16);
+  const bottomInset = Math.max(viewportSafeInsets.bottom + resolveInstallEdgeInsetPx(sceneLayout) + (compact ? 2 : 4), 14);
   const centerX = Phaser.Math.Clamp(
     safeWidth / 2,
     horizontalInset + (chipWidth / 2),
@@ -3814,16 +3858,17 @@ export function resolveBoardCompositionFrame(
   const safeWidth = sanitizePositive(viewportWidth, DEFAULT_VIEWPORT_WIDTH, 1);
   const safeHeight = sanitizePositive(viewportHeight, DEFAULT_VIEWPORT_HEIGHT, 1);
   const boardBuffer = resolveBoardEdgeBufferPx(sceneLayout, profile);
+  const boardLaneGap = boardBuffer + (sceneLayout.isTiny || sceneLayout.isNarrow ? 2 : 4);
   const left = Math.max(viewportSafeInsets.left + boardBuffer, boardBuffer);
   let right = Math.max(
     left + 24,
     safeWidth - Math.max(viewportSafeInsets.right + boardBuffer, boardBuffer)
   );
   let top = titleFrame
-    ? titleFrame.bottom + boardBuffer
+    ? titleFrame.bottom + boardLaneGap
     : Math.max(viewportSafeInsets.top + boardBuffer, boardBuffer);
   let bottom = installFrame
-    ? installFrame.top - boardBuffer
+    ? installFrame.top - boardLaneGap
     : safeHeight - Math.max(viewportSafeInsets.bottom + boardBuffer, boardBuffer);
 
   const presentationMode = resolveIntentFeedPresentationMode(
@@ -3847,7 +3892,7 @@ export function resolveBoardCompositionFrame(
         viewportSafeInsets.bottom + legacyTuning.menu.intentFeed.insetYPx,
         legacyTuning.menu.intentFeed.insetYPx
       );
-    const reservedBottom = feedBottom - feedMetrics.height - legacyTuning.menu.intentFeed.boardGapPx;
+    const reservedBottom = feedBottom - feedMetrics.height - legacyTuning.menu.intentFeed.boardGapPx - Math.max(2, Math.round(boardBuffer * 0.5));
     if (reservedBottom >= top + 24) {
       bottom = Math.min(bottom, reservedBottom);
     }
@@ -3945,6 +3990,7 @@ export class MenuScene extends Phaser.Scene {
     const variant = sanitizePresentationVariant(launchConfig.presentation);
     const chrome = resolveEffectivePresentationChrome(launchConfig);
     const titleVisible = shouldShowPresentationTitle(launchConfig);
+    const contentProfileId: PresentationContentProfile = launchConfig.contentProfile ?? DEFAULT_PRESENTATION_CONTENT_PROFILE;
     const deploymentProfileId = launchConfig.profile;
     const deploymentProfile = resolveDeploymentPresentationProfile(deploymentProfileId);
     const deterministicCapture = isDeterministicPresentationCapture(launchConfig);
@@ -4067,9 +4113,11 @@ export class MenuScene extends Phaser.Scene {
     let lastHeapPressureActive = false;
     let renderDemo: () => void = () => undefined;
     let playLoopState = createPlayLoopState(presentationMode);
+    let playInputDiagnostics = createPlayInputDiagnostics();
+    let playOnboardingDismissed = false;
     const pendingHumanActions: HumanInputAction[] = [];
     const inputRepeatGate = new HumanInputRepeatGate({
-      moveRepeatMinIntervalMs: Math.max(72, Math.round(legacyTuning.demo.cadence.exploreStepMs * 0.82))
+      moveRepeatMinIntervalMs: Math.max(56, Math.round(legacyTuning.demo.cadence.exploreStepMs * 0.62))
     });
     const touchInputSupported = resolveTouchInputCapability(typeof window !== 'undefined' ? window : undefined)
       || Boolean((this.game as { device?: { input?: { touch?: boolean } } }).device?.input?.touch);
@@ -4078,6 +4126,75 @@ export class MenuScene extends Phaser.Scene {
     let touchInputState = createTouchInputState();
     let removeKeyboardInputListener: (() => void) | undefined;
     let removeTouchInputListeners: (() => void) | undefined;
+
+    const resetPlayInputDiagnostics = (): void => {
+      playInputDiagnostics = createPlayInputDiagnostics();
+      inputRepeatGate.reset();
+    };
+
+    const syncPlayInputQueueDepth = (): void => {
+      playInputDiagnostics.queueDepth = pendingHumanActions.length;
+      playInputDiagnostics.maxQueueDepth = Math.max(playInputDiagnostics.maxQueueDepth, pendingHumanActions.length);
+    };
+
+    const recordAcceptedInput = (action: HumanInputAction): void => {
+      playInputDiagnostics.acceptedCount += 1;
+      playInputDiagnostics.lastAcceptedActionKind = action.kind;
+      playInputDiagnostics.lastAcceptedSource = action.source;
+      playInputDiagnostics.lastAcceptedAtMs = Number.isFinite(action.atMs) ? Math.max(0, Math.round(action.atMs ?? 0)) : this.time.now;
+    };
+
+    const recordDroppedInput = (
+      action: Pick<HumanInputAction, 'kind'> | null,
+      reason: HumanInputDropReason,
+      merged = false
+    ): void => {
+      if (merged) {
+        playInputDiagnostics.mergedCount += 1;
+      } else {
+        playInputDiagnostics.droppedCount += 1;
+      }
+      playInputDiagnostics.lastDroppedActionKind = action?.kind ?? null;
+      playInputDiagnostics.lastDroppedReason = reason;
+      playInputDiagnostics.lastDroppedAtMs = this.time.now;
+    };
+
+    const enqueueHumanAction = (action: HumanInputAction): boolean => {
+      if (!isMovementActionKind(action.kind)) {
+        if (action.kind === 'restart_attempt') {
+          pendingHumanActions.length = 0;
+        }
+
+        const firstMovementIndex = pendingHumanActions.findIndex((entry) => isMovementActionKind(entry.kind));
+        if (firstMovementIndex === -1) {
+          pendingHumanActions.push(action);
+        } else {
+          pendingHumanActions.splice(firstMovementIndex, 0, action);
+        }
+        syncPlayInputQueueDepth();
+        playOnboardingDismissed = true;
+        recordAcceptedInput(action);
+        return true;
+      }
+
+      const movementQueue = pendingHumanActions.filter((entry) => isMovementActionKind(entry.kind));
+      const lastQueuedMovement = movementQueue.at(-1) ?? null;
+      if (lastQueuedMovement?.kind === action.kind) {
+        recordDroppedInput(action, 'queue_merged', true);
+        return false;
+      }
+
+      if (movementQueue.length >= 2) {
+        recordDroppedInput(action, 'queue_full');
+        return false;
+      }
+
+      pendingHumanActions.push(action);
+      syncPlayInputQueueDepth();
+      playOnboardingDismissed = true;
+      recordAcceptedInput(action);
+      return true;
+    };
 
     const toRuntimeFeedEntries = (
       feedState: IntentFeedState | null
@@ -4167,6 +4284,9 @@ export class MenuScene extends Phaser.Scene {
       lastMemoryEventSignature = '';
       lastHazardEventSignature = '';
       runEndedForCurrentAttempt = false;
+      playOnboardingDismissed = false;
+      resetPlayInputDiagnostics();
+      syncPlayInputQueueDepth();
       appendTelemetryEvent('run_started', {
         phase,
         mode: presentationMode
@@ -4353,6 +4473,11 @@ export class MenuScene extends Phaser.Scene {
           saveData: runtimeConfig.saveData
         },
         feed: lastIntentFeedDiagnostics,
+        input: {
+          ...playInputDiagnostics,
+          queueDepth: pendingHumanActions.length,
+          maxQueueDepth: Math.max(playInputDiagnostics.maxQueueDepth, pendingHumanActions.length)
+        },
         projection: lastProjection,
         telemetry: {
           eventLogVersion: telemetryEventLogVersion,
@@ -4668,7 +4793,7 @@ export class MenuScene extends Phaser.Scene {
             return;
           }
 
-          intentRuntimeSession = createMenuIntentRuntimeSession(episode);
+          intentRuntimeSession = createMenuIntentRuntimeSession(episode, contentProfileId);
           renderDemo();
         });
       };
@@ -4765,8 +4890,13 @@ export class MenuScene extends Phaser.Scene {
             dock: intentFeedLayout.dock,
             compact: intentFeedLayout.compact,
             statusVisible: intentFeedLayout.statusVisible,
+            statusText: intentFeedLayout.statusText,
             quickThoughtCount: intentFeedLayout.quickThoughtCount,
             maxVisibleEvents: intentFeedLayout.maxVisibleEvents,
+            onboardingVisible: intentFeedLayout.onboardingVisible,
+            onboardingLabel: intentFeedLayout.onboardingLabel,
+            riskVisible: intentFeedLayout.riskVisible,
+            nextRiskLabel: intentFeedLayout.nextRiskLabel,
             ...(intentFeedBounds ? { bounds: intentFeedBounds } : {})
           },
           trail: {
@@ -4886,12 +5016,12 @@ export class MenuScene extends Phaser.Scene {
         const boardCenterY = layout.boardY + (layout.boardHeight / 2);
         // Keep the backdrop field viewport-filling while the board itself stays inside the safe frame.
         const backdropFrame = resolvePresentationBackdropFrame(width, height, boardCenterX, boardCenterY);
-        const boardShellWidth = Math.max(24, Math.round(layout.boardWidth + (layout.tileSize * 10)));
-        const boardShellHeight = Math.max(24, Math.round(layout.boardHeight + (layout.tileSize * 10)));
-        const boardAuraWidth = Math.max(24, Math.round(layout.boardWidth * 1.22));
-        const boardAuraHeight = Math.max(24, Math.round(layout.boardHeight * 1.18));
-        const boardHaloWidth = Math.max(20, Math.round(layout.boardWidth * 1.08));
-        const boardHaloHeight = Math.max(20, Math.round(layout.boardHeight * 1.08));
+        const boardShellWidth = Math.max(24, Math.round(layout.boardWidth + (layout.tileSize * 8)));
+        const boardShellHeight = Math.max(24, Math.round(layout.boardHeight + (layout.tileSize * 8)));
+        const boardAuraWidth = Math.max(24, Math.round(layout.boardWidth * 1.18));
+        const boardAuraHeight = Math.max(24, Math.round(layout.boardHeight * 1.14));
+        const boardHaloWidth = Math.max(20, Math.round(layout.boardWidth * 1.06));
+        const boardHaloHeight = Math.max(20, Math.round(layout.boardHeight * 1.06));
         const signalPriority = legacyTuning.menu.signalPriority;
         const boardRenderer = new BoardRenderer(this, episode, layout, {
           theme: {
@@ -4912,7 +5042,7 @@ export class MenuScene extends Phaser.Scene {
           boardAuraWidth,
           boardAuraHeight,
           themeProfile.shell.auraColor,
-          0.032
+          0.022
         ).setOrigin(0.5).setDepth(-2.5).setBlendMode(Phaser.BlendModes.SCREEN);
         const boardHalo = this.add.ellipse(
           backdropFrame.centerX,
@@ -4920,7 +5050,7 @@ export class MenuScene extends Phaser.Scene {
           boardHaloWidth,
           boardHaloHeight,
           themeProfile.shell.haloColor,
-          0.012
+          0.008
         ).setOrigin(0.5).setDepth(-1.8).setBlendMode(Phaser.BlendModes.SCREEN);
         const boardShade = this.add.rectangle(
           backdropFrame.centerX,
@@ -4928,7 +5058,7 @@ export class MenuScene extends Phaser.Scene {
           boardShellWidth,
           boardShellHeight,
           themeProfile.shell.shadeColor,
-          0.012
+          0.01
         ).setOrigin(0.5).setDepth(-1.2);
         const boardVeil = this.add.rectangle(
           backdropFrame.centerX,
@@ -4961,13 +5091,13 @@ export class MenuScene extends Phaser.Scene {
         ).setOrigin(0.5).setDepth(10.74).setStrokeStyle(1, themeProfile.palette.ui.overlayStroke, 0);
         const ritualTitle = this.add.text(boardCenterX, ritualCardY - 13, '', {
           color: `#${themeProfile.palette.ui.text.toString(16).padStart(6, '0')}`,
-          fontFamily: '"Courier New", monospace',
+          fontFamily: themeProfile.title.fontFamily,
           fontSize: `${ritualTuning.cardTitleFontPx}px`,
           fontStyle: 'bold'
         }).setOrigin(0.5).setAlpha(0).setDepth(10.76);
         const ritualSubtitle = this.add.text(boardCenterX, ritualCardY + 9, '', {
           color: `#${themeProfile.palette.ui.textDim.toString(16).padStart(6, '0')}`,
-          fontFamily: '"Courier New", monospace',
+          fontFamily: themeProfile.title.fontFamily,
           fontSize: `${ritualTuning.cardSubtitleFontPx}px`,
           align: 'center',
           wordWrap: { width: ritualCardWidth - 28, useAdvancedWrap: true }
@@ -5054,7 +5184,7 @@ export class MenuScene extends Phaser.Scene {
         installChrome.setVisible(true);
         installChrome.setPosition(installFrame.centerX, installFrame.centerY);
 
-        const shadow = this.add.rectangle(0, 3, chipWidth + 6, chipHeight + 6, sceneThemeProfile.title.plateShadowColor, 0.18);
+        const shadow = this.add.rectangle(0, 2, chipWidth + 4, chipHeight + 4, sceneThemeProfile.title.plateShadowColor, 0.12);
         const chip = this.add.rectangle(
           0,
           0,
@@ -5062,35 +5192,35 @@ export class MenuScene extends Phaser.Scene {
           chipHeight,
           sceneThemeProfile.title.buttonFillColor,
           resolvedState.mode === 'manual'
-            ? 0.22
+            ? 0.18
             : installPromptPending
-              ? 0.24
-              : 0.32
+              ? 0.2
+              : 0.26
         ).setStrokeStyle(
           1,
           sceneThemeProfile.title.buttonStrokeColor,
           resolvedState.mode === 'manual'
-            ? 0.18
+            ? 0.14
             : installPromptPending
-              ? 0.16
-              : 0.32
+              ? 0.14
+              : 0.24
         );
         const accent = this.add.rectangle(
           0,
           -(chipHeight / 2) + 3,
-          Math.max(18, chipWidth - 14),
-          2,
+          Math.max(18, chipWidth - 18),
+          1,
           sceneThemeProfile.title.buttonStrokeColor,
-          resolvedState.mode === 'manual' ? 0.1 : 0.16
+          resolvedState.mode === 'manual' ? 0.06 : 0.1
         );
 
         if (resolvedState.mode === 'available' && !installPromptPending) {
           const setChipState = (hovered: boolean): void => {
             chip.setFillStyle(
               sceneThemeProfile.title.buttonFillColor,
-              hovered ? 0.42 : 0.32
+              hovered ? 0.34 : 0.26
             );
-            chip.setStrokeStyle(1, sceneThemeProfile.title.buttonStrokeColor, hovered ? 0.42 : 0.32);
+            chip.setStrokeStyle(1, sceneThemeProfile.title.buttonStrokeColor, hovered ? 0.32 : 0.24);
             label.setAlpha(hovered ? 1 : 0.96);
           };
 
@@ -5150,21 +5280,21 @@ export class MenuScene extends Phaser.Scene {
         const signatureAlpha = variantProfile.signatureAlpha * chromeProfile.signatureAlpha * deploymentProfile.signatureAlphaScale;
         const plateAlpha = variantProfile.plateAlpha * chromeProfile.plateAlpha * deploymentProfile.plateAlphaScale;
         const panelAlpha = variantProfile.panelAlpha * chromeProfile.panelAlpha * deploymentProfile.panelAlphaScale;
-        const titleShadowAlpha = Math.min(0.12, 0.08 * titleAlpha);
+        const titleShadowAlpha = Math.min(0.08, 0.05 * titleAlpha);
         const titleFontStyle = sceneThemeProfile.id === 'vellum' ? 'normal' : 'bold';
         const titleStrokeWidth = 1;
         titlePlateContainer.add([
           this.add.rectangle(0, 0, titleLockup.plateWidth, titleLockup.plateHeight, sceneThemeProfile.title.plateOuterColor, plateAlpha)
-            .setStrokeStyle(1, sceneThemeProfile.palette.board.innerStroke, 0.28 * titleAlpha),
-          this.add.rectangle(0, 0, titleLockup.plateWidth - 12, titleLockup.plateHeight - 10, sceneThemeProfile.title.plateInnerColor, panelAlpha)
-            .setStrokeStyle(1, sceneThemeProfile.title.plateLineColor, 0.28 * titleAlpha),
+            .setStrokeStyle(1, sceneThemeProfile.palette.board.innerStroke, 0.18 * titleAlpha),
+          this.add.rectangle(0, 0, titleLockup.plateWidth - 14, titleLockup.plateHeight - 12, sceneThemeProfile.title.plateInnerColor, panelAlpha)
+            .setStrokeStyle(1, sceneThemeProfile.title.plateLineColor, 0.16 * titleAlpha),
           this.add.rectangle(
             0,
             -(titleLockup.plateHeight / 2) + 8,
-            titleLockup.plateWidth - 24,
+            titleLockup.plateWidth - 30,
             1,
             sceneThemeProfile.title.plateLineColor,
-            0.3 * titleAlpha
+            0.16 * titleAlpha
           )
         ]);
         titleShadowContainer.add([
@@ -5263,7 +5393,7 @@ export class MenuScene extends Phaser.Scene {
       };
 
       let lastCue: DemoWalkerCue = 'spawn';
-      let demoConfig = resolveDemoConfig(patternFrame.episode, demoCyclePlan);
+      let demoConfig = resolveDemoConfig(patternFrame.episode, demoCyclePlan, presentationMode, contentProfileId);
       let demoPresentation = resolveMenuDemoPresentation(
         patternFrame.episode,
         demoCyclePlan,
@@ -5393,8 +5523,9 @@ export class MenuScene extends Phaser.Scene {
         }
 
         const telegraphs = boardState?.telegraphs ?? [];
-        shell.boardRenderer.drawMechanicTelegraphs(telegraphs);
-        shell.boardRenderer.drawMechanicLegend(telegraphs);
+        shell.boardRenderer.drawMechanicTelegraphs(telegraphs, {
+          compact: presentationMode === 'play'
+        });
 
         if (!presentation.showActor) {
           shell.boardRenderer.clearActor();
@@ -5433,7 +5564,7 @@ export class MenuScene extends Phaser.Scene {
         }
         syncAmbientSkyReservedFrames();
         playLoopState = resetPlayLoopState(playLoopState, presentationMode);
-        demoConfig = resolveDemoConfig(patternFrame.episode, demoCyclePlan, presentationMode);
+        demoConfig = resolveDemoConfig(patternFrame.episode, demoCyclePlan, presentationMode, contentProfileId);
         demoPresentation = resolveMenuDemoPresentation(
           patternFrame.episode,
           demoCyclePlan,
@@ -5551,6 +5682,9 @@ export class MenuScene extends Phaser.Scene {
 
         finalizeTelemetryRun('aborted');
         playLoopState = resetPlayLoopState(playLoopState, presentationMode);
+        playOnboardingDismissed = false;
+        resetPlayInputDiagnostics();
+        syncPlayInputQueueDepth();
         lastProjectionState = null;
         lastThoughtEventSignature = '';
         lastMemoryEventSignature = '';
@@ -5567,6 +5701,9 @@ export class MenuScene extends Phaser.Scene {
         presentationMode = nextMode;
         playLoopState = resetPlayLoopState(playLoopState, presentationMode);
         pendingHumanActions.length = 0;
+        playOnboardingDismissed = false;
+        resetPlayInputDiagnostics();
+        syncPlayInputQueueDepth();
         resetTouchInputState(touchInputState);
         touchControlsVisible = false;
         touchControlsChrome?.root.setVisible(false);
@@ -5684,20 +5821,31 @@ export class MenuScene extends Phaser.Scene {
         const path = episode.raster.pathIndices;
         const lastCursor = Math.max(0, path.length - 1);
         const safeDeltaMs = Math.max(0, deltaMs);
+        const prioritizedControlIndex = pendingHumanActions.findIndex((action) => !isMovementActionKind(action.kind));
+        if (prioritizedControlIndex > 0) {
+          const [prioritizedControl] = pendingHumanActions.splice(prioritizedControlIndex, 1);
+          if (prioritizedControl) {
+            pendingHumanActions.unshift(prioritizedControl);
+          }
+        }
+        syncPlayInputQueueDepth();
 
         while (pendingHumanActions.length > 0) {
           const queuedAction = pendingHumanActions[0];
           if (!queuedAction) {
             pendingHumanActions.shift();
+            syncPlayInputQueueDepth();
             continue;
           }
 
           if (queuedAction.kind === 'pause') {
             pendingHumanActions.shift();
+            syncPlayInputQueueDepth();
             playLoopState = {
               ...playLoopState,
               paused: !playLoopState.paused
             };
+            playInputDiagnostics.lastConsumedAtMs = this.time.now;
             appendControlTelemetry('pause', queuedAction.kind);
             if (playLoopState.paused) {
               return;
@@ -5707,6 +5855,8 @@ export class MenuScene extends Phaser.Scene {
 
           if (queuedAction.kind === 'restart_attempt') {
             pendingHumanActions.shift();
+            syncPlayInputQueueDepth();
+            playInputDiagnostics.lastConsumedAtMs = this.time.now;
             appendControlTelemetry('restart', queuedAction.kind);
             restartPlayAttempt();
             return;
@@ -5714,10 +5864,12 @@ export class MenuScene extends Phaser.Scene {
 
           if (queuedAction.kind === 'toggle_thoughts') {
             pendingHumanActions.shift();
+            syncPlayInputQueueDepth();
             playLoopState = {
               ...playLoopState,
               thoughtsVisible: !playLoopState.thoughtsVisible
             };
+            playInputDiagnostics.lastConsumedAtMs = this.time.now;
             appendControlTelemetry('toggle_thoughts', queuedAction.kind);
             continue;
           }
@@ -5727,6 +5879,7 @@ export class MenuScene extends Phaser.Scene {
 
         if (playLoopState.paused) {
           pendingHumanActions.length = 0;
+          syncPlayInputQueueDepth();
           return;
         }
 
@@ -5771,6 +5924,7 @@ export class MenuScene extends Phaser.Scene {
 
         while (pendingHumanActions.length > 0) {
           const action = pendingHumanActions.shift();
+          syncPlayInputQueueDepth();
           if (!action) {
             continue;
           }
@@ -5806,6 +5960,7 @@ export class MenuScene extends Phaser.Scene {
                 direction: forwardDirection
               }
             };
+            playInputDiagnostics.lastConsumedAtMs = this.time.now;
             return;
           }
 
@@ -5819,6 +5974,7 @@ export class MenuScene extends Phaser.Scene {
                 direction: backwardDirection
               }
             };
+            playInputDiagnostics.lastConsumedAtMs = this.time.now;
             return;
           }
         }
@@ -5840,6 +5996,25 @@ export class MenuScene extends Phaser.Scene {
 
         return demoConfig.cadence.spawnHoldMs + ((Math.max(0, progressCursor) / pathSegments) * traverseMs);
       };
+      const resolvePlayHudStatusLabel = (
+        feedState: IntentFeedState | null,
+        boardState: MenuRuntimeBoardState | null
+      ): string | null => {
+        const candidate = feedState?.status?.summary
+          ?? boardState?.nextRiskLabel?.replace(/^(Next risk|Next turn|Next branch|Closer route|Goal path|Exit path):\s*/iu, '')
+          ?? null;
+        if (!candidate || candidate.trim().length === 0) {
+          return null;
+        }
+
+        return clampIntentFeedSummary(candidate, touchInputSupported ? 34 : 46);
+      };
+
+      const resolvePlayOnboardingLabel = (): string | null => (
+        presentationMode === 'play' && !playOnboardingDismissed
+          ? (touchInputSupported ? PLAY_MODE_TOUCH_ONBOARDING_LABEL : PLAY_MODE_ONBOARDING_LABEL)
+          : null
+      );
       renderDemo = (): void => {
         const shell = episodePresentationShell;
         if (!patternFrame || !shell) {
@@ -5904,22 +6079,62 @@ export class MenuScene extends Phaser.Scene {
         const rawFeedState = resolvedPresentation.showIntentFeed
           ? (intentRuntimeSession?.getDisplayFeedState(intentStep, this.time.now) ?? null)
           : null;
+        const normalizedRawFeedState = rawFeedState && contentProfileId === 'core-only'
+          ? (() => {
+              const coreEntries = (rawFeedState.events ?? rawFeedState.entries ?? [])
+                .slice(0, 1)
+                .map((entry, slot) => ({
+                  ...entry,
+                  slot,
+                  summary: clampIntentFeedSummary(entry.summary, touchInputSupported ? 30 : 42)
+                }));
+              return {
+                ...rawFeedState,
+                status: rawFeedState.status
+                  ? {
+                      ...rawFeedState.status,
+                      summary: clampIntentFeedSummary(rawFeedState.status.summary, touchInputSupported ? 36 : 54)
+                    }
+                  : rawFeedState.status,
+                entries: coreEntries,
+                events: coreEntries
+              };
+            })()
+          : rawFeedState;
         const feedState = presentationMode === 'play'
           ? (
               playLoopState.thoughtsVisible
                 ? (
-                    rawFeedState
-                      ? {
-                          ...rawFeedState,
-                          entries: rawFeedState.entries.slice(0, 1),
-                          events: rawFeedState.events?.slice(0, 1) ?? []
-                        }
+                    normalizedRawFeedState
+                      ? (() => {
+                        const playEntries = (normalizedRawFeedState.events?.slice(0, 1) ?? normalizedRawFeedState.entries.slice(0, 1))
+                          .map((entry, slot) => ({
+                            ...entry,
+                            slot,
+                            summary: clampIntentFeedSummary(entry.summary, touchInputSupported ? 28 : 36)
+                          }));
+                        return {
+                          ...normalizedRawFeedState,
+                          status: normalizedRawFeedState.status
+                            ? {
+                                ...normalizedRawFeedState.status,
+                                summary: clampIntentFeedSummary(normalizedRawFeedState.status.summary, touchInputSupported ? 34 : 46)
+                              }
+                            : normalizedRawFeedState.status,
+                          entries: playEntries,
+                          events: playEntries
+                        };
+                      })()
                       : null
                   )
                 : (
-                    rawFeedState?.status
+                    normalizedRawFeedState?.status
                       ? {
-                          ...rawFeedState,
+                          ...normalizedRawFeedState,
+                          status: {
+                            ...normalizedRawFeedState.status,
+                            summary: clampIntentFeedSummary(normalizedRawFeedState.status.summary, touchInputSupported ? 34 : 46)
+                          },
                           entries: [],
                           events: [],
                           pings: []
@@ -5927,7 +6142,7 @@ export class MenuScene extends Phaser.Scene {
                       : null
                   )
             )
-          : rawFeedState;
+          : normalizedRawFeedState;
 
         runOptional('hud metadata', () => {
           shell.demoStatusHud.setState(
@@ -6027,8 +6242,9 @@ export class MenuScene extends Phaser.Scene {
           }, {
             nextRiskLabel: boardState?.nextRiskLabel ?? null,
             statusLabel: presentationMode === 'play'
-              ? (touchInputSupported ? PLAY_MODE_TOUCH_ONBOARDING_LABEL : PLAY_MODE_ONBOARDING_LABEL)
-              : null
+              ? resolvePlayHudStatusLabel(feedState, boardState)
+              : null,
+            onboardingLabel: resolvePlayOnboardingLabel()
           });
           renderTouchControls();
         });
@@ -6250,15 +6466,22 @@ export class MenuScene extends Phaser.Scene {
           }
 
           const action = resolveHumanKeyboardAction(event, this.time.now);
-          if (!action || !inputRepeatGate.accept(action, this.time.now)) {
+          if (!action) {
+            return;
+          }
+
+          const decision = inputRepeatGate.inspect(action, this.time.now);
+          if (!decision.accepted) {
+            recordDroppedInput(action, decision.reason ?? 'repeat_blocked', decision.reason === 'repeat_merged');
             return;
           }
 
           if (presentationMode === 'watch') {
+            recordDroppedInput(action, 'watch_ignored');
             return;
           }
 
-          pendingHumanActions.push(action);
+          enqueueHumanAction(action);
         };
 
         keyboardManager.on('keydown', handleKeydown);
@@ -6289,7 +6512,7 @@ export class MenuScene extends Phaser.Scene {
             return;
           }
 
-          pendingHumanActions.push(action);
+          enqueueHumanAction(action);
           renderTouchControls();
         };
         const handlePointerRelease = (pointer: Phaser.Input.Pointer): void => {
@@ -6659,10 +6882,11 @@ const resolveTargetBuildMs = (episode: MazeEpisode, cycle: MenuDemoCycle): numbe
 export const resolveDemoConfig = (
   episode: MazeEpisode,
   cycle: MenuDemoCycle,
-  mode: PresentationMode = 'watch'
+  mode: PresentationMode = 'watch',
+  contentProfile: PresentationContentProfile = 'full'
 ): DemoWalkerConfig => {
   const pathSegments = Math.max(1, episode.raster.pathIndices.length - 1);
-  const spectatorPlan = createDemoSpectatorPlan(episode);
+  const spectatorPlan = createDemoSpectatorPlan(episode, contentProfile);
   const watchSlowdownFactor = mode === 'play' ? 1 : (1 / 0.75);
   const buildSlowdownFactor = mode === 'play' ? 1.1 : 2;
   const baseSpawnHoldMs = legacyTuning.demo.cadence.spawnHoldMs + cycle.pacing.spawnHoldMs + (cycle.mood === 'blueprint' ? 60 : 0);
@@ -6687,18 +6911,20 @@ export const resolveDemoConfig = (
     mode === 'play' ? 132 : 176
   );
   const goalHoldMs = roundClampedCadenceMs(
-    baseGoalHoldMs
-      + Math.min(420, pathSegments * 9)
-      + (episode.difficulty === 'chill' ? -90 : episode.difficulty === 'brutal' ? 120 : 0),
-    mode === 'play' ? 840 : 2400,
-    mode === 'play' ? 1900 : 3900
+    (baseGoalHoldMs * (mode === 'play' ? 0.42 : 0.72))
+      + Math.min(mode === 'play' ? 180 : 260, pathSegments * (mode === 'play' ? 6 : 7))
+      + (episode.size === 'small' ? -120 : episode.size === 'large' ? 30 : episode.size === 'huge' ? 50 : 0)
+      + (episode.difficulty === 'chill' ? -60 : episode.difficulty === 'brutal' ? 90 : 0),
+    mode === 'play' ? 980 : 2600,
+    mode === 'play' ? 1950 : 3600
   );
   const resetHoldMs = roundClampedCadenceMs(
-    baseResetHoldMs
-      + (pathSegments <= 10 ? 52 : 82)
-      + (cycle.mood === 'blueprint' ? 24 : 0),
-    mode === 'play' ? 220 : 320,
-    mode === 'play' ? 420 : 520
+    (baseResetHoldMs * (mode === 'play' ? 0.92 : 1.58))
+      + (pathSegments <= 10 ? 40 : pathSegments >= 28 ? 180 : 110)
+      + (cycle.mood === 'blueprint' ? 36 : cycle.mood === 'scan' ? -20 : 0)
+      + (episode.size === 'small' ? -40 : episode.size === 'huge' ? 90 : 0),
+    mode === 'play' ? 520 : 820,
+    mode === 'play' ? 760 : 1320
   );
   const totalTraverseMs = exploreStepMs * pathSegments;
   const segmentWeights = Array.from({ length: pathSegments }, () => 1);
@@ -6871,9 +7097,13 @@ export const resolveMenuDemoPresentation = (
   let ritualSubtitle = '';
   const ritualTuning = legacyTuning.demo.ritual;
   const lifecycleTuning = legacyTuning.demo.lifecycle;
-  const reflectionRatio = clamp(ritualTuning.failReflectionRatio, 0.2, 0.8);
-  const clearHoldRatio = clamp(lifecycleTuning.clearHoldRatio, 0.08, reflectionRatio);
+  const clearHoldRatio = clamp(lifecycleTuning.clearHoldRatio, 0.12, 0.58);
   const eraseStartRatio = clamp(lifecycleTuning.eraseStartRatio, Math.max(clearHoldRatio + 0.08, 0.42), 0.92);
+  const reflectionRatio = clamp(
+    ritualTuning.failReflectionRatio,
+    Math.max(clearHoldRatio + 0.08, 0.24),
+    eraseStartRatio
+  );
   let lifecyclePhase: DemoLifecyclePhase = 'active-watch';
   let buildRevealProgress = 1;
   let eraseWipeProgress = 0;
@@ -6925,10 +7155,11 @@ export const resolveMenuDemoPresentation = (
 
   if (sequenceState.sequence === 'intro') {
     const buildRevealStart = clamp(lifecycleTuning.buildRevealStartRatio, 0, 0.72);
+    const settleInRatio = clamp(lifecycleTuning.settleInRatio, 0.08, 0.28);
     const buildRevealEnd = clamp(
       lifecycleTuning.buildRevealEndRatio,
       Math.max(buildRevealStart + 0.08, 0.3),
-      0.96
+      1 - settleInRatio
     );
     buildRevealProgress = clamp(
       (progress - buildRevealStart) / Math.max(0.01, buildRevealEnd - buildRevealStart),
@@ -7050,17 +7281,17 @@ export const resolveMenuDemoPresentation = (
     showTrail: lifecyclePhase === 'active-watch' || lifecyclePhase === 'clear-hold' || lifecyclePhase === 'reflection-beat',
     showIntentFeed: lifecyclePhase !== 'pre-roll',
     phaseLabel: lifecyclePhase === 'pre-roll'
-      ? 'staging board'
+      ? 'setting the board'
       : lifecyclePhase === 'build-reveal'
         ? 'building maze'
         : lifecyclePhase === 'settle-in'
-          ? 'settling read'
+          ? 'settling the view'
           : lifecyclePhase === 'clear-hold'
             ? 'holding clear'
             : lifecyclePhase === 'reflection-beat'
-              ? 'reading clear'
+              ? 'reading the route'
               : lifecyclePhase === 'erase-wipe'
-                ? 'deconstructing maze'
+                ? 'folding the maze'
                 : resolvePhaseLabel(sequenceState.sequence, episode.seed, cycle.mood, safeVariant),
     solutionPathAlpha: showSolutionPathPreview
       ? clamp(

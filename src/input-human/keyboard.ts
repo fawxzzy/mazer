@@ -1,12 +1,29 @@
 import {
+  type HumanInputDropReason,
   isMovementActionKind,
   type KeyboardInputLike,
   type HumanInputAction,
   type HumanInputActionKind
-} from './actions';
+} from './actions.ts';
 
 export interface HumanInputRepeatGateOptions {
   moveRepeatMinIntervalMs?: number;
+}
+
+export interface HumanInputRepeatGateDecision {
+  accepted: boolean;
+  reason: HumanInputDropReason | null;
+}
+
+export interface HumanInputRepeatGateSnapshot {
+  acceptedCount: number;
+  droppedCount: number;
+  mergedCount: number;
+  lastAcceptedActionKind: HumanInputActionKind | null;
+  lastAcceptedAtMs: number | null;
+  lastDroppedActionKind: HumanInputActionKind | null;
+  lastDroppedReason: HumanInputDropReason | null;
+  lastDroppedAtMs: number | null;
 }
 
 const KEYBOARD_CODE_TO_ACTION: Record<string, HumanInputActionKind> = {
@@ -86,29 +103,100 @@ export class HumanInputRepeatGate {
 
   private readonly lastAcceptedAtMs = new Map<HumanInputActionKind, number>();
 
+  private acceptedCount = 0;
+
+  private droppedCount = 0;
+
+  private mergedCount = 0;
+
+  private lastAcceptedActionKind: HumanInputActionKind | null = null;
+
+  private lastAcceptedAtMsValue: number | null = null;
+
+  private lastDroppedActionKind: HumanInputActionKind | null = null;
+
+  private lastDroppedReason: HumanInputDropReason | null = null;
+
+  private lastDroppedAtMs: number | null = null;
+
   constructor(options: HumanInputRepeatGateOptions = {}) {
-    this.moveRepeatMinIntervalMs = Math.max(48, Math.round(options.moveRepeatMinIntervalMs ?? 132));
+    this.moveRepeatMinIntervalMs = Math.max(42, Math.round(options.moveRepeatMinIntervalMs ?? 112));
   }
 
-  accept(action: HumanInputAction, nowMs = action.atMs ?? Date.now()): boolean {
+  inspect(action: HumanInputAction, nowMs = action.atMs ?? Date.now()): HumanInputRepeatGateDecision {
     const acceptedAtMs = Number.isFinite(nowMs) ? Math.max(0, Math.round(nowMs)) : Date.now();
     const lastAcceptedAt = this.lastAcceptedAtMs.get(action.kind) ?? null;
 
     if (!action.repeat) {
+      this.acceptedCount += 1;
       this.lastAcceptedAtMs.set(action.kind, acceptedAtMs);
-      return true;
+      this.lastAcceptedActionKind = action.kind;
+      this.lastAcceptedAtMsValue = acceptedAtMs;
+      return {
+        accepted: true,
+        reason: null
+      };
     }
 
     if (!isMovementActionKind(action.kind)) {
-      return false;
+      this.droppedCount += 1;
+      this.lastDroppedActionKind = action.kind;
+      this.lastDroppedReason = 'repeat_blocked';
+      this.lastDroppedAtMs = acceptedAtMs;
+      return {
+        accepted: false,
+        reason: 'repeat_blocked'
+      };
     }
 
     if (lastAcceptedAt !== null && (acceptedAtMs - lastAcceptedAt) < this.moveRepeatMinIntervalMs) {
-      return false;
+      this.mergedCount += 1;
+      this.lastDroppedActionKind = action.kind;
+      this.lastDroppedReason = 'repeat_merged';
+      this.lastDroppedAtMs = acceptedAtMs;
+      return {
+        accepted: false,
+        reason: 'repeat_merged'
+      };
     }
 
+    this.acceptedCount += 1;
     this.lastAcceptedAtMs.set(action.kind, acceptedAtMs);
-    return true;
+    this.lastAcceptedActionKind = action.kind;
+    this.lastAcceptedAtMsValue = acceptedAtMs;
+    return {
+      accepted: true,
+      reason: null
+    };
+  }
+
+  accept(action: HumanInputAction, nowMs = action.atMs ?? Date.now()): boolean {
+    return this.inspect(action, nowMs).accepted;
+  }
+
+  getSnapshot(): HumanInputRepeatGateSnapshot {
+    return {
+      acceptedCount: this.acceptedCount,
+      droppedCount: this.droppedCount,
+      mergedCount: this.mergedCount,
+      lastAcceptedActionKind: this.lastAcceptedActionKind,
+      lastAcceptedAtMs: this.lastAcceptedAtMsValue,
+      lastDroppedActionKind: this.lastDroppedActionKind,
+      lastDroppedReason: this.lastDroppedReason,
+      lastDroppedAtMs: this.lastDroppedAtMs
+    };
+  }
+
+  reset(): void {
+    this.lastAcceptedAtMs.clear();
+    this.acceptedCount = 0;
+    this.droppedCount = 0;
+    this.mergedCount = 0;
+    this.lastAcceptedActionKind = null;
+    this.lastAcceptedAtMsValue = null;
+    this.lastDroppedActionKind = null;
+    this.lastDroppedReason = null;
+    this.lastDroppedAtMs = null;
   }
 }
 

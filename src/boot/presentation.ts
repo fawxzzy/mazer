@@ -13,6 +13,7 @@ export type AmbientPresentationVariant = 'title' | 'ambient' | 'loading';
 export type PresentationChrome = 'full' | 'minimal' | 'none';
 export type PresentationMood = 'auto' | 'solve' | 'scan' | 'blueprint';
 export type PresentationTitleMode = 'show' | 'hide';
+export type PresentationContentProfile = 'core-only' | 'full';
 export type PresentationDeploymentProfile = 'tv' | 'obs' | 'mobile';
 export type PresentationMode = 'watch' | 'play';
 export type PresentationTheme = 'auto' | 'noir' | 'ember' | 'aurora' | 'vellum' | 'monolith';
@@ -25,6 +26,7 @@ export interface PresentationLaunchConfig {
   title: PresentationTitleMode;
   theme: PresentationTheme;
   mode: PresentationMode;
+  contentProfile?: PresentationContentProfile;
   profile?: PresentationDeploymentProfile;
   seed?: number;
   size?: MazeSize;
@@ -38,6 +40,7 @@ export const DEFAULT_PRESENTATION_MOOD: PresentationMood = 'auto';
 export const DEFAULT_PRESENTATION_TITLE_MODE: PresentationTitleMode = 'show';
 export const DEFAULT_PRESENTATION_THEME: PresentationTheme = 'auto';
 export const DEFAULT_PRESENTATION_MODE: PresentationMode = 'watch';
+export const DEFAULT_PRESENTATION_CONTENT_PROFILE: PresentationContentProfile = 'core-only';
 export const PRESENTATION_THEME_FAMILIES: readonly PresentationThemeFamily[] = [
   'noir',
   'ember',
@@ -230,6 +233,7 @@ export const DEFAULT_PRESENTATION_LAUNCH_CONFIG: PresentationLaunchConfig = {
 
 const PRESENTATION_QUERY_KEYS = {
   profile: 'profile',
+  content: 'content',
   presentation: 'presentation',
   chrome: 'chrome',
   mood: 'mood',
@@ -248,6 +252,12 @@ export const isPresentationDeploymentProfile = (
   value: string | null | undefined
 ): value is PresentationDeploymentProfile => (
   value === 'tv' || value === 'obs' || value === 'mobile'
+);
+
+export const isPresentationContentProfile = (
+  value: string | null | undefined
+): value is PresentationContentProfile => (
+  value === 'core-only' || value === 'full'
 );
 
 export const isAmbientPresentationVariant = (value: string | null | undefined): value is AmbientPresentationVariant => (
@@ -314,6 +324,11 @@ const normalizeString = (value: unknown): string | undefined => (
 export const sanitizePresentationDeploymentProfile = (value: unknown): PresentationDeploymentProfile | undefined => {
   const normalized = normalizeString(value);
   return isPresentationDeploymentProfile(normalized) ? normalized : undefined;
+};
+
+export const sanitizePresentationContentProfile = (value: unknown): PresentationContentProfile | undefined => {
+  const normalized = normalizeString(value);
+  return isPresentationContentProfile(normalized) ? normalized : undefined;
 };
 
 export const sanitizePresentationVariant = (value: unknown): AmbientPresentationVariant => {
@@ -385,6 +400,7 @@ export const sanitizePresentationLaunchConfig = (value: unknown): PresentationLa
   }
 
   const candidate = value as Partial<PresentationLaunchConfig>;
+  const contentProfile = sanitizePresentationContentProfile(candidate.contentProfile);
   const profile = sanitizePresentationDeploymentProfile(candidate.profile);
   const seed = sanitizePresentationSeed(candidate.seed);
   const size = sanitizePresentationSize(candidate.size);
@@ -398,6 +414,7 @@ export const sanitizePresentationLaunchConfig = (value: unknown): PresentationLa
     title: sanitizePresentationTitleMode(candidate.title),
     theme: sanitizePresentationTheme(candidate.theme),
     mode: sanitizePresentationMode(candidate.mode),
+    ...(contentProfile ? { contentProfile } : {}),
     ...(profile ? { profile } : {}),
     ...(seed !== undefined ? { seed } : {}),
     ...(size ? { size } : {}),
@@ -463,10 +480,15 @@ export const resolveBootPresentationConfig = (
 ): PresentationLaunchConfig => {
   try {
     const params = toSearchParams(search);
-    const profile = sanitizePresentationDeploymentProfile(params.get(PRESENTATION_QUERY_KEYS.profile));
+    const rawProfile = params.get(PRESENTATION_QUERY_KEYS.profile);
+    const profile = sanitizePresentationDeploymentProfile(rawProfile);
+    const shorthandContentProfile = profile ? undefined : sanitizePresentationContentProfile(rawProfile);
+    const explicitContentProfile = sanitizePresentationContentProfile(params.get(PRESENTATION_QUERY_KEYS.content));
+    const baseContentProfile = explicitContentProfile ?? shorthandContentProfile;
     const baseConfig: PresentationLaunchConfig = {
       ...DEFAULT_PRESENTATION_LAUNCH_CONFIG,
       ...resolvePresentationProfileDefaults(profile),
+      ...(baseContentProfile ? { contentProfile: baseContentProfile } : {}),
       ...(profile ? { profile } : {})
     };
 
@@ -476,6 +498,7 @@ export const resolveBootPresentationConfig = (
     const mood = params.get(PRESENTATION_QUERY_KEYS.mood);
     const theme = params.get(PRESENTATION_QUERY_KEYS.theme);
     const mode = params.get(PRESENTATION_QUERY_KEYS.mode);
+    const content = params.get(PRESENTATION_QUERY_KEYS.content);
     const title = params.get(PRESENTATION_QUERY_KEYS.title);
     const seed = params.get(PRESENTATION_QUERY_KEYS.seed);
     const size = params.get(PRESENTATION_QUERY_KEYS.size);
@@ -496,6 +519,14 @@ export const resolveBootPresentationConfig = (
     }
     if (mode !== null) {
       resolved.mode = sanitizePresentationMode(mode);
+    }
+    if (content !== null) {
+      const sanitizedContentProfile = sanitizePresentationContentProfile(content);
+      if (!sanitizedContentProfile) {
+        delete resolved.contentProfile;
+      } else {
+        resolved.contentProfile = sanitizedContentProfile;
+      }
     }
     if (title !== null) {
       resolved.title = sanitizePresentationTitleMode(title);

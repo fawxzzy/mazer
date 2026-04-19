@@ -128,9 +128,11 @@ export const INTENT_PING_LABELS: Record<IntentKind, string> = Object.freeze({
 export const INTENT_SUMMARY_VERB_FIRST_WORDS = Object.freeze([
   'scanning',
   'screening',
+  'seeing',
   'watching',
   'reading',
   'spotting',
+  'taking',
   'valuing',
   'checking',
   'parsing',

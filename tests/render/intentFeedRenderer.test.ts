@@ -2,7 +2,9 @@ import { describe, expect, test, vi } from 'vitest';
 import { resolveIntentSemanticTag } from '../../src/mazer-core/intent/IntentFeed';
 import {
   clampIntentFeedSummary,
+  formatIntentHudSummary,
   resolveIntentFeedLayout,
+  resolveIntentFeedPanelMetrics,
   resolveIntentFeedRoleLabel,
   resolveNextRiskLabel
 } from '../../src/render/intentFeedRenderer';
@@ -52,6 +54,15 @@ describe('intent feed renderer', () => {
     expect(layout.rect.left + layout.rect.width).toBeLessThanOrEqual(390);
     expect(layout.rect.top + layout.rect.height).toBeLessThanOrEqual(844);
     expect(layout.rect.top).toBeGreaterThanOrEqual(328 + (278 / 2) + 10);
+  });
+
+  test('reserves space for the play onboarding strip without changing the bottom-docked HUD contract', () => {
+    const withOnboarding = resolveIntentFeedPanelMetrics({ width: 390, height: 844 }, true, true);
+    const withoutOnboarding = resolveIntentFeedPanelMetrics({ width: 390, height: 844 }, true, false);
+
+    expect(withOnboarding.mode).toBe('bottom');
+    expect(withOnboarding.height).toBeGreaterThan(withoutOnboarding.height);
+    expect(withOnboarding.maxVisibleEvents).toBe(withoutOnboarding.maxVisibleEvents);
   });
 
   test('keeps landscape desktops in a bottom-docked panel with a wider readable line', () => {
@@ -199,6 +210,13 @@ describe('intent feed renderer', () => {
       clampIntentFeedSummary('  scanning   a long branch note that should not stay as a full sentence on the HUD  ', 32)
     ).toBe('scanning a long branch note t...');
     expect(clampIntentFeedSummary('short note', 32)).toBe('short note');
+  });
+
+  test('rewrites visible HUD copy into plain route guidance without changing the feed contract', () => {
+    expect(formatIntentHudSummary('Replanning at Junction A; try West branch.')).toBe('Try West branch from Junction A');
+    expect(formatIntentHudSummary('Recalling the dead end at Dead branch 2:3.')).toBe('Dead end at Dead branch 2:3. Turn back');
+    expect(formatIntentHudSummary('Seeing the exit from Junction A.')).toBe('Exit ahead from Junction A');
+    expect(formatIntentHudSummary('Taking the exit from Junction A.')).toBe('Take the exit from Junction A');
   });
 
   test('maps roles onto the scan hypothesis commit and recall grammar', () => {

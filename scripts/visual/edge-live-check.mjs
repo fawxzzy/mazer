@@ -43,11 +43,14 @@ const INTERACTIVE_PLAY_FAILURE_CODE = 'EDGE_LIVE_PLAY_INTERACTION';
 const INTERACTIVE_PLAY_MODE_RUN_ID = 'play-mode-interactive';
 const MOBILE_TOUCH_SMOKE_RUN_ID = 'mobile-touch-smoke';
 const EDGE_LIVE_SPECIAL_ROUTES = Object.freeze({
-  'watch-play-shell': '/?mode=play&theme=aurora',
-  'play-mode-smoke': '/?mode=play&theme=ember',
-  'play-hud-trim': '/?mode=play&theme=aurora',
-  'play-mode-interactive': '/?theme=aurora',
-  'mobile-touch-smoke': '/?mode=play&theme=aurora'
+  'watch-play-shell': '/?content=core-only&mode=play&theme=aurora',
+  'play-mode-smoke': '/?content=core-only&mode=play&theme=ember',
+  'play-hud-trim': '/?content=core-only&mode=play&theme=aurora',
+  'play-mode-interactive': '/?content=core-only&theme=aurora',
+  'mobile-touch-smoke': '/?content=core-only&mode=play&theme=aurora',
+  'core-only-watch': '/?content=core-only&theme=aurora',
+  'core-only-play': '/?content=core-only&mode=play&theme=aurora',
+  'core-only-cycle': '/?content=core-only&theme=aurora'
 });
 const EDGE_LIVE_RUN_VIEWPORT_IDS = Object.freeze({
   'play-mode-interactive': ['desktop'],
@@ -288,6 +291,7 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
   const telemetryEvents = Array.isArray(runtime?.telemetry?.events) ? runtime.telemetry.events : [];
   const projection = runtime?.projection ?? null;
   const feed = runtime?.feed ?? null;
+  const playMetrics = telemetrySummary?.playMetrics ?? null;
   const controlUsedCount = Math.max(
     telemetrySummary?.eventCounts?.control_used ?? 0,
     telemetryEvents.filter((event) => event?.kind === 'control_used').length
@@ -314,6 +318,33 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
           visibleEntryCount: feed.visibleEntryCount ?? null
         }
       : null,
+    input: runtime?.input
+      ? {
+          acceptedCount: runtime.input.acceptedCount ?? 0,
+          droppedCount: runtime.input.droppedCount ?? 0,
+          mergedCount: runtime.input.mergedCount ?? 0,
+          queueDepth: runtime.input.queueDepth ?? 0,
+          maxQueueDepth: runtime.input.maxQueueDepth ?? 0,
+          lastDroppedReason: runtime.input.lastDroppedReason ?? null
+        }
+      : null,
+    hud: visual?.intentFeed
+      ? {
+          visible: visual.intentFeed.visible ?? null,
+          compact: visual.intentFeed.compact ?? null,
+          statusVisible: visual.intentFeed.statusVisible ?? null,
+          statusText: visual.intentFeed.statusText ?? null,
+          quickThoughtCount: visual.intentFeed.quickThoughtCount ?? null,
+          onboardingVisible: visual.intentFeed.onboardingVisible ?? null,
+          onboardingLabel: visual.intentFeed.onboardingLabel ?? null,
+          riskVisible: visual.intentFeed.riskVisible ?? null,
+          nextRiskLabel: visual.intentFeed.nextRiskLabel ?? null
+        }
+      : null,
+    controlUsedBreakdown: playMetrics?.controlUsedByControl ?? null,
+    controlActionBreakdown: playMetrics?.controlUsedByAction ?? null,
+    watchToPlaySwitchCount: playMetrics?.watchToPlaySwitchCount ?? 0,
+    failToRetryContinuation: telemetrySummary?.failToRetryContinuation ?? null,
     trail: visual?.trail
       ? {
           currentIndex: visual.trail.currentIndex ?? null,
@@ -325,31 +356,42 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
   };
 };
 
-export const resolvePlayModeMovementKeyFromTrail = (trail, rasterWidth) => {
+const MOVEMENT_KEY_TO_TOUCH_CONTROL = Object.freeze({
+  ArrowUp: 'move_up',
+  ArrowDown: 'move_down',
+  ArrowLeft: 'move_left',
+  ArrowRight: 'move_right'
+});
+
+export const resolvePlayModeMovementKeyFromTrail = (trail, rasterWidth = null) => {
   const currentIndex = Number.isFinite(trail?.currentIndex) ? Math.max(0, Math.trunc(trail.currentIndex)) : null;
   const nextIndex = Number.isFinite(trail?.nextIndex) ? Math.max(0, Math.trunc(trail.nextIndex)) : null;
   const width = Number.isFinite(rasterWidth) ? Math.max(1, Math.trunc(rasterWidth)) : null;
-  if (currentIndex === null || nextIndex === null || width === null || currentIndex === nextIndex) {
+  if (currentIndex === null || nextIndex === null || currentIndex === nextIndex) {
     return null;
   }
 
-  const currentX = currentIndex % width;
-  const currentY = Math.floor(currentIndex / width);
-  const nextX = nextIndex % width;
-  const nextY = Math.floor(nextIndex / width);
-  const dx = nextX - currentX;
-  const dy = nextY - currentY;
-
-  if (dx === 1 && dy === 0) {
+  const delta = nextIndex - currentIndex;
+  if (delta === 1) {
     return 'ArrowRight';
   }
-  if (dx === -1 && dy === 0) {
+  if (delta === -1) {
     return 'ArrowLeft';
   }
-  if (dx === 0 && dy === 1) {
+
+  if (width !== null) {
+    if (delta === width) {
+      return 'ArrowDown';
+    }
+    if (delta === -width) {
+      return 'ArrowUp';
+    }
+  }
+
+  if (delta > 0) {
     return 'ArrowDown';
   }
-  if (dx === 0 && dy === -1) {
+  if (delta < 0) {
     return 'ArrowUp';
   }
 
@@ -359,6 +401,58 @@ export const resolvePlayModeMovementKeyFromTrail = (trail, rasterWidth) => {
 const buildInteractiveStateSignature = (state) => JSON.stringify(state ?? null);
 
 const hasInteractiveStateDelta = (before, after) => buildInteractiveStateSignature(before) !== buildInteractiveStateSignature(after);
+
+const buildMovementDelta = (before, after) => {
+  const beforeTrail = before?.trail ?? null;
+  const afterTrail = after?.trail ?? null;
+  const currentIndexDelta = Number.isFinite(afterTrail?.currentIndex) && Number.isFinite(beforeTrail?.currentIndex)
+    ? afterTrail.currentIndex - beforeTrail.currentIndex
+    : null;
+  const nextIndexDelta = Number.isFinite(afterTrail?.nextIndex) && Number.isFinite(beforeTrail?.nextIndex)
+    ? afterTrail.nextIndex - beforeTrail.nextIndex
+    : null;
+  const progressDelta = Number.isFinite(afterTrail?.progress) && Number.isFinite(beforeTrail?.progress)
+    ? round(afterTrail.progress - beforeTrail.progress, 3)
+    : null;
+
+  return {
+    currentIndexDelta,
+    nextIndexDelta,
+    progressDelta,
+    moved: Boolean(
+      (currentIndexDelta ?? 0) !== 0
+      || (nextIndexDelta ?? 0) !== 0
+      || (progressDelta ?? 0) !== 0
+    )
+  };
+};
+
+export const resolvePreferredMovementCandidate = (state, interaction, candidates) => {
+  const preferredKey = resolvePlayModeMovementKeyFromTrail(state?.trail ?? null);
+  if (!preferredKey) {
+    return null;
+  }
+
+  const preferredCandidate = interaction.kind === 'touch'
+    ? MOVEMENT_KEY_TO_TOUCH_CONTROL[preferredKey] ?? null
+    : preferredKey;
+
+  return preferredCandidate && candidates.includes(preferredCandidate)
+    ? preferredCandidate
+    : null;
+};
+
+export const prioritizeMovementCandidates = (state, interaction, candidates) => {
+  const preferredCandidate = resolvePreferredMovementCandidate(state, interaction, candidates);
+  if (!preferredCandidate) {
+    return [...candidates];
+  }
+
+  return [
+    preferredCandidate,
+    ...candidates.filter((candidate) => candidate !== preferredCandidate)
+  ];
+};
 
 const resolveEdgeLiveInteraction = (runId) => (
   typeof runId === 'string' ? EDGE_LIVE_INTERACTION_RUNS[runId] ?? null : null
@@ -442,6 +536,7 @@ const runEdgeLiveInteraction = async ({
   let currentDiagnostics = await readDiagnostics(page);
   const baselineState = summarizeEdgeLiveInteractiveState(currentDiagnostics);
   const timeline = [];
+  const movementDeltas = [];
 
   if (interaction.requiredMode && baselineState.mode !== interaction.requiredMode) {
     if (interaction.kind !== 'keyboard' || typeof interaction.ensureModeKey !== 'string') {
@@ -511,7 +606,11 @@ const runEdgeLiveInteraction = async ({
 
       before = movementReadyState;
       after = movementReadyState;
-      const candidates = Array.isArray(step.candidates) ? step.candidates : [];
+      const candidates = prioritizeMovementCandidates(
+        movementReadyState,
+        interaction,
+        Array.isArray(step.candidates) ? step.candidates : []
+      );
       attempted = candidates;
       for (const candidate of candidates) {
         const beforeCandidateDiagnostics = await readDiagnostics(page);
@@ -523,7 +622,7 @@ const runEdgeLiveInteraction = async ({
         currentDiagnostics = await waitAfterInput(step.waitMs ?? interaction.movementWaitMs ?? 220);
         after = summarizeEdgeLiveInteractiveState(currentDiagnostics);
         usedInput = candidate;
-        if (hasInteractiveStateDelta(before, after)) {
+        if (buildMovementDelta(before, after).moved) {
           movementChanged = true;
           break;
         }
@@ -557,8 +656,16 @@ const runEdgeLiveInteraction = async ({
       attempted,
       before,
       after,
-      changed: hasInteractiveStateDelta(before, after)
+      changed: hasInteractiveStateDelta(before, after),
+      ...(step.kind === 'movement'
+        ? {
+            movementDelta: buildMovementDelta(before, after)
+          }
+        : {})
     });
+    if (step.kind === 'movement') {
+      movementDeltas.push(buildMovementDelta(before, after));
+    }
   }
 
   const finalDiagnostics = await waitAfterInput(Math.max(200, interaction.controlWaitMs ?? 180), { requireActiveTrail: true });
@@ -589,6 +696,19 @@ const runEdgeLiveInteraction = async ({
     throw error;
   }
 
+  if (!movementDeltas.some((delta) => delta.moved)) {
+    const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} never produced a measurable movement delta.`);
+    error.code = INTERACTIVE_PLAY_FAILURE_CODE;
+    error.failureStage = 'interaction-movement-delta';
+    error.interaction = {
+      runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
+      baseline: baselineState,
+      timeline,
+      final: finalState
+    };
+    throw error;
+  }
+
   if ((finalState.controlUsedCount ?? 0) <= 0) {
     const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not record any control_used events.`);
     error.code = INTERACTIVE_PLAY_FAILURE_CODE;
@@ -609,7 +729,14 @@ const runEdgeLiveInteraction = async ({
     final: finalState,
     finalDiagnostics,
     keyTimeline: timeline,
+    movementDeltas,
     controlUsedCount: finalState.controlUsedCount,
+    controlUsedBreakdown: finalState.controlUsedBreakdown,
+    controlActionBreakdown: finalState.controlActionBreakdown,
+    watchToPlaySwitchCount: finalState.watchToPlaySwitchCount,
+    failToRetryContinuation: finalState.failToRetryContinuation,
+    hud: finalState.hud,
+    input: finalState.input,
     changed: hasInteractiveStateDelta(baselineState, finalState),
     mode: finalState.mode
   };
@@ -874,8 +1001,13 @@ const createSnapshot = (stage, diagnostics, screenshotPath) => {
       dock: visual?.intentFeed?.dock ?? null,
       compact: visual?.intentFeed?.compact ?? null,
       statusVisible: visual?.intentFeed?.statusVisible ?? null,
+      statusText: visual?.intentFeed?.statusText ?? null,
       quickThoughtCount: visual?.intentFeed?.quickThoughtCount ?? null,
-      maxVisibleEvents: visual?.intentFeed?.maxVisibleEvents ?? null
+      maxVisibleEvents: visual?.intentFeed?.maxVisibleEvents ?? null,
+      onboardingVisible: visual?.intentFeed?.onboardingVisible ?? null,
+      onboardingLabel: visual?.intentFeed?.onboardingLabel ?? null,
+      riskVisible: visual?.intentFeed?.riskVisible ?? null,
+      nextRiskLabel: visual?.intentFeed?.nextRiskLabel ?? null
     },
     trail: visual?.trail
       ? {
@@ -1165,6 +1297,11 @@ const buildMarkdownSummary = ({ runId, sourceMode, baseUrl, explicitUrl, presetG
       `- Mode: ${interaction.mode ?? 'n/a'}`,
       `- Input: ${interaction.inputKind ?? 'n/a'}`,
       `- Control used count: ${interaction.controlUsedCount ?? 0}`,
+      `- Control breakdown: ${interaction.controlUsedBreakdown ? JSON.stringify(interaction.controlUsedBreakdown) : 'n/a'}`,
+      `- Movement deltas: ${Array.isArray(interaction.movementDeltas) ? interaction.movementDeltas.filter((delta) => delta.moved).length : 0}`,
+      `- Watch -> play switches: ${interaction.watchToPlaySwitchCount ?? 0}`,
+      `- Input timing: ${interaction.input ? `accepted ${interaction.input.acceptedCount}, dropped ${interaction.input.droppedCount}, merged ${interaction.input.mergedCount}` : 'n/a'}`,
+      `- HUD state: ${interaction.hud ? `${interaction.hud.statusText ?? 'status-hidden'} | ${interaction.hud.nextRiskLabel ?? 'risk-hidden'}` : 'n/a'}`,
       `- State changed: ${interaction.changed ? 'yes' : 'no'}`,
       '- Input timeline:'
     );
@@ -1562,6 +1699,8 @@ const buildProofSurfaceMarkdownSummary = ({ workflowId, runId, sourceMode, baseU
       '',
       `- Mode: ${interaction.mode ?? 'n/a'}`,
       `- Control used count: ${interaction.controlUsedCount ?? 0}`,
+      `- Movement deltas: ${Array.isArray(interaction.movementDeltas) ? interaction.movementDeltas.filter((delta) => delta.moved).length : 0}`,
+      `- Input timing: ${interaction.input ? `accepted ${interaction.input.acceptedCount}, dropped ${interaction.input.droppedCount}, merged ${interaction.input.mergedCount}` : 'n/a'}`,
       `- State changed: ${interaction.changed ? 'yes' : 'no'}`,
       '- Key timeline:'
     );

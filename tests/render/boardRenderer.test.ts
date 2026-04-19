@@ -527,6 +527,77 @@ describe('board renderer', () => {
     expect(lateFillRects).toBeGreaterThan(earlyFillRects);
   });
 
+  test('erases board surface in the reverse order of the build reveal', () => {
+    const { scene } = createSceneStub(1_000);
+    const renderer = new BoardRenderer(scene, {
+      ...createEpisode(),
+      generationTrace: {
+        rootTileIndex: 0,
+        uniqueTileCount: 4,
+        steps: [
+          { phase: 'seed', tileIndices: [0] },
+          { phase: 'carve', tileIndices: [1] },
+          { phase: 'carve', tileIndices: [2] },
+          { phase: 'carve', tileIndices: [3] }
+        ]
+      },
+      pathLength: 4,
+      raster: {
+        scale: 50,
+        width: 4,
+        height: 1,
+        tiles: new Uint8Array([1, 1, 1, 1]),
+        startIndex: 0,
+        endIndex: 3,
+        pathIndices: [0, 1, 2, 3]
+      }
+    } as unknown as MazeEpisode, {
+      ...createLayout(),
+      boardWidth: 40,
+      boardSize: 40,
+      safeBounds: {
+        left: 0,
+        top: 0,
+        right: 40,
+        bottom: 10,
+        width: 40,
+        height: 10,
+        centerX: 20,
+        centerY: 5
+      },
+      boardBounds: {
+        left: 0,
+        top: 0,
+        right: 40,
+        bottom: 10,
+        width: 40,
+        height: 10,
+        centerX: 20,
+        centerY: 5
+      }
+    });
+
+    const earlyBuildLead = (renderer as any).resolveTileLifecycleAlpha(0, {
+      phase: 'build',
+      progress: 0.18
+    });
+    const earlyBuildTail = (renderer as any).resolveTileLifecycleAlpha(3, {
+      phase: 'build',
+      progress: 0.18
+    });
+    const earlyEraseLead = (renderer as any).resolveTileLifecycleAlpha(0, {
+      phase: 'erase',
+      progress: 0.18
+    });
+    const earlyEraseTail = (renderer as any).resolveTileLifecycleAlpha(3, {
+      phase: 'erase',
+      progress: 0.18
+    });
+
+    expect(earlyBuildLead).toBeGreaterThan(earlyBuildTail);
+    expect(earlyEraseLead).toBeGreaterThan(earlyEraseTail);
+  });
+
   test('clears trail and actor layers when the lifecycle hides them', () => {
     const { scene, graphics } = createSceneStub(1_000);
     const renderer = new BoardRenderer(scene, createEpisode(), createLayout());
@@ -616,5 +687,55 @@ describe('board renderer', () => {
     expect(guideText?.text).toContain('NEXT RISK: gate cycle');
     expect(guideText?.text).toContain('G gate');
     expect(guideText?.text).toContain('H hazard');
+  });
+
+  test('trims the mechanic guide copy in compact play mode', () => {
+    const { scene, texts } = createSceneStub(1_000);
+    const renderer = new BoardRenderer(scene, createEpisode(), createLayout());
+
+    renderer.drawMechanicLegend([
+      {
+        id: 'timed-gate',
+        kind: 'timed-gate',
+        label: 'Timed gate',
+        primaryTileIndex: 0,
+        secondaryTileIndex: 1,
+        pathCursor: 0,
+        active: true,
+        visible: true,
+        readiness: 1,
+        cycleProgress: 0.5
+      }
+    ], { compact: true });
+
+    const guideText = texts.at(0);
+    expect(guideText?.text).toContain('RISK: gate cycle');
+    expect(guideText?.text).toContain('G gate');
+    expect(guideText?.text).not.toContain('active/open');
+  });
+
+  test('clears the mechanic guide when no visible telegraphs remain', () => {
+    const { scene, texts } = createSceneStub(1_000);
+    const renderer = new BoardRenderer(scene, createEpisode(), createLayout());
+
+    renderer.drawMechanicLegend([
+      {
+        id: 'timed-gate',
+        kind: 'timed-gate',
+        label: 'Timed gate',
+        primaryTileIndex: 0,
+        secondaryTileIndex: 1,
+        pathCursor: 0,
+        active: true,
+        visible: true,
+        readiness: 1,
+        cycleProgress: 0.5
+      }
+    ]);
+    const guideText = texts.at(0);
+    expect(guideText?.visible).toBe(true);
+
+    renderer.drawMechanicTelegraphs([]);
+    expect(guideText?.visible).toBe(false);
   });
 });

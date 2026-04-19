@@ -51,11 +51,14 @@ describe('edge live check', () => {
       screenshotsDir: expect.stringContaining('screenshots'),
       videosDir: expect.stringContaining('videos')
     });
-    expect(resolveEdgeLiveDefaultRoute('watch-play-shell')).toBe('/?mode=play&theme=aurora');
-    expect(resolveEdgeLiveDefaultRoute('play-mode-smoke')).toBe('/?mode=play&theme=ember');
-    expect(resolveEdgeLiveDefaultRoute('play-hud-trim')).toBe('/?mode=play&theme=aurora');
-    expect(resolveEdgeLiveDefaultRoute('play-mode-interactive')).toBe('/?theme=aurora');
-    expect(resolveEdgeLiveDefaultRoute('mobile-touch-smoke')).toBe('/?mode=play&theme=aurora');
+    expect(resolveEdgeLiveDefaultRoute('watch-play-shell')).toBe('/?content=core-only&mode=play&theme=aurora');
+    expect(resolveEdgeLiveDefaultRoute('play-mode-smoke')).toBe('/?content=core-only&mode=play&theme=ember');
+    expect(resolveEdgeLiveDefaultRoute('play-hud-trim')).toBe('/?content=core-only&mode=play&theme=aurora');
+    expect(resolveEdgeLiveDefaultRoute('play-mode-interactive')).toBe('/?content=core-only&theme=aurora');
+    expect(resolveEdgeLiveDefaultRoute('mobile-touch-smoke')).toBe('/?content=core-only&mode=play&theme=aurora');
+    expect(resolveEdgeLiveDefaultRoute('core-only-watch')).toBe('/?content=core-only&theme=aurora');
+    expect(resolveEdgeLiveDefaultRoute('core-only-play')).toBe('/?content=core-only&mode=play&theme=aurora');
+    expect(resolveEdgeLiveDefaultRoute('core-only-cycle')).toBe('/?content=core-only&theme=aurora');
     expect(resolveEdgeLiveDefaultRoute('legend-risk-telegraph')).toBeUndefined();
   }, 15_000);
 
@@ -141,19 +144,75 @@ describe('edge live check', () => {
   }, 15_000);
 
   test('summarizes interactive state and resolves movement keys from trail deltas', async () => {
-    const { resolvePlayModeMovementKeyFromTrail, summarizeEdgeLiveInteractiveState } = await loadEdgeLiveHelpers();
+    const {
+      prioritizeMovementCandidates,
+      resolvePlayModeMovementKeyFromTrail,
+      summarizeEdgeLiveInteractiveState
+    } = await loadEdgeLiveHelpers();
 
     expect(resolvePlayModeMovementKeyFromTrail({ currentIndex: 4, nextIndex: 5 }, 4)).toBe('ArrowRight');
     expect(resolvePlayModeMovementKeyFromTrail({ currentIndex: 4, nextIndex: 8 }, 4)).toBe('ArrowDown');
+    expect(resolvePlayModeMovementKeyFromTrail({ currentIndex: 12, nextIndex: 62 })).toBe('ArrowDown');
+    expect(resolvePlayModeMovementKeyFromTrail({ currentIndex: 62, nextIndex: 12 })).toBe('ArrowUp');
     expect(resolvePlayModeMovementKeyFromTrail({ currentIndex: 4, nextIndex: 4 }, 4)).toBeNull();
+    expect(prioritizeMovementCandidates({
+      trail: {
+        currentIndex: 12,
+        nextIndex: 13
+      }
+    }, {
+      kind: 'keyboard'
+    }, ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'])).toEqual([
+      'ArrowRight',
+      'ArrowUp',
+      'ArrowDown',
+      'ArrowLeft'
+    ]);
+    expect(prioritizeMovementCandidates({
+      trail: {
+        currentIndex: 12,
+        nextIndex: 62
+      }
+    }, {
+      kind: 'touch'
+    }, ['move_up', 'move_right', 'move_down', 'move_left'])).toEqual([
+      'move_down',
+      'move_up',
+      'move_right',
+      'move_left'
+    ]);
 
     expect(summarizeEdgeLiveInteractiveState({
       runtime: {
+        input: {
+          acceptedCount: 4,
+          droppedCount: 1,
+          mergedCount: 2,
+          queueDepth: 0,
+          maxQueueDepth: 2,
+          lastDroppedReason: 'queue_merged'
+        },
         telemetry: {
           summary: {
             mode: 'play',
             eventCounts: {
               control_used: 3
+            },
+            playMetrics: {
+              controlUsedByControl: {
+                keyboard: 2,
+                touch: 0,
+                restart: 0,
+                pause: 1,
+                toggle_thoughts: 0
+              },
+              controlUsedByAction: {
+                move: 2,
+                pause: 1,
+                restart: 0,
+                toggle_thoughts: 0
+              },
+              watchToPlaySwitchCount: 1
             }
           }
         },
@@ -173,6 +232,17 @@ describe('edge live check', () => {
         }
       },
       visual: {
+        intentFeed: {
+          visible: true,
+          compact: true,
+          statusVisible: true,
+          statusText: 'Gate timing ahead',
+          quickThoughtCount: 1,
+          onboardingVisible: false,
+          onboardingLabel: null,
+          riskVisible: true,
+          nextRiskLabel: 'Next risk: gate timing ahead'
+        },
         trail: {
           currentIndex: 9,
           nextIndex: 10,
@@ -183,6 +253,16 @@ describe('edge live check', () => {
     })).toMatchObject({
       mode: 'play',
       controlUsedCount: 3,
+      input: {
+        mergedCount: 2
+      },
+      hud: {
+        statusText: 'Gate timing ahead'
+      },
+      controlUsedBreakdown: {
+        keyboard: 2
+      },
+      watchToPlaySwitchCount: 1,
       projection: {
         state: 'watching'
       },

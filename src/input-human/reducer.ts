@@ -1,4 +1,8 @@
-import type { HumanInputAction, HumanInputActionKind } from './actions';
+import type {
+  HumanInputAction,
+  HumanInputActionKind,
+  HumanInputSource
+} from './actions.ts';
 
 export interface HumanRunState {
   step: number;
@@ -6,6 +10,8 @@ export interface HumanRunState {
   attempt: number;
   thoughtsVisible: boolean;
   lastActionKind: HumanInputActionKind | null;
+  lastActionSource: HumanInputSource | null;
+  lastActionAtMs: number | null;
   movementCount: number;
 }
 
@@ -15,6 +21,8 @@ export const createHumanRunState = (overrides: Partial<HumanRunState> = {}): Hum
   attempt: 1,
   thoughtsVisible: true,
   lastActionKind: null,
+  lastActionSource: null,
+  lastActionAtMs: null,
   movementCount: 0,
   ...overrides
 });
@@ -26,7 +34,9 @@ export const applyHumanInputAction = (
   const nextState: HumanRunState = {
     ...state,
     step: state.step + 1,
-    lastActionKind: action.kind
+    lastActionKind: action.kind,
+    lastActionSource: action.source,
+    lastActionAtMs: Number.isFinite(action.atMs) ? Math.max(0, Math.round(action.atMs ?? 0)) : state.lastActionAtMs
   };
 
   switch (action.kind) {
@@ -59,4 +69,3 @@ export const applyHumanInputAction = (
       return nextState;
   }
 };
-

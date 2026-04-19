@@ -140,7 +140,7 @@ describe('menu intent runtime', () => {
     expect(secondState?.status).not.toBeNull();
     expect(secondState?.status?.kind).toBe('goal-observed');
     expect(secondState?.events?.length ?? secondState?.entries.length).toBeLessThanOrEqual(4);
-    expect(secondState?.status?.summary).toContain('exit line');
+    expect(secondState?.status?.summary).toContain('exit');
   });
 
   test('holds feed entries for a minimum dwell and coalesces rapid replacements', () => {
@@ -283,5 +283,28 @@ describe('menu intent runtime', () => {
     expect(allKinds).toContain('enemy-seen');
     expect(allKinds).toContain('item-spotted');
     expect(allKinds).toContain('puzzle-state-observed');
+  });
+
+  test('keeps the core-only profile on route guidance without mechanic telegraphs', () => {
+    const session = createMenuIntentRuntimeSession(createSpectatorEpisode(), 'core-only');
+
+    session.advanceToStep(6);
+    const boardState = session.getBoardState(6);
+    const allKinds = new Set(
+      session.intentDeliveries.flatMap((delivery) => delivery.bus.records.map((record) => record.kind))
+    );
+
+    expect(boardState).not.toBeNull();
+    expect(boardState?.telegraphs).toEqual([]);
+    expect(
+      boardState?.nextRiskLabel.startsWith('Next turn:')
+      || boardState?.nextRiskLabel.startsWith('Next branch:')
+      || boardState?.nextRiskLabel.startsWith('Closer route:')
+      || boardState?.nextRiskLabel.startsWith('Exit path:')
+    ).toBe(true);
+    expect(allKinds).not.toContain('trap-inferred');
+    expect(allKinds).not.toContain('enemy-seen');
+    expect(allKinds).not.toContain('item-spotted');
+    expect(allKinds).toContain('goal-observed');
   });
 });

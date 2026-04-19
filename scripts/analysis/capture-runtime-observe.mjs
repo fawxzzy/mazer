@@ -37,8 +37,8 @@ const DEFAULT_SCREENSHOT_COUNT = 2;
 const DEFAULT_CAPTURE_SCREENSHOTS = false;
 const DEFAULT_VIEWPORT = Object.freeze({ width: 1440, height: 1024 });
 const RUNTIME_OBSERVE_SPECIAL_ROUTES = Object.freeze({
-  'play-mode-a': '/?mode=play&theme=aurora',
-  'play-mode-b': '/?mode=play&theme=aurora'
+  'play-mode-a': '/?content=core-only&mode=play&theme=aurora',
+  'play-mode-b': '/?content=core-only&mode=play&theme=aurora'
 });
 
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
@@ -399,6 +399,16 @@ export const buildRuntimeSummary = (samples) => {
           endUsedBytes: heapValues.at(-1),
           minUsedBytes: Math.min(...heapValues),
           peakUsedBytes: Math.max(...heapValues)
+        }
+      : null,
+    input: last?.input
+      ? {
+          acceptedCount: last.input.acceptedCount ?? 0,
+          droppedCount: last.input.droppedCount ?? 0,
+          mergedCount: last.input.mergedCount ?? 0,
+          queueDepth: last.input.queueDepth ?? 0,
+          maxQueueDepth: last.input.maxQueueDepth ?? 0,
+          lastDroppedReason: last.input.lastDroppedReason ?? null
         }
       : null,
     initial: first,
@@ -792,6 +802,7 @@ const buildMarkdownSummary = ({
     `- Frame time: start ${runtime.frame.startAverageMs}ms, end ${endFrame}ms, worst ${worstFrame}ms, spikes ${runtime.frame.spikeCount}`,
     `- Pressure: tweens ${runtime.pressure.tweens.start} -> ${runtime.pressure.tweens.end}, timers ${runtime.pressure.timers.start} -> ${runtime.pressure.timers.end}, listeners ${runtime.pressure.listeners.start} -> ${runtime.pressure.listeners.end}`,
     `- Bounded counts: trail ${runtime.pressure.trailSegments.max}, feed ${runtime.pressure.visibleIntentEntries.max}, deferred ${runtime.pressure.deferredVisualTasks.max}, moving background ${runtime.pressure.movingBackgroundActors.max}`,
+    `- Input timing: ${runtime.input ? `accepted ${runtime.input.acceptedCount}, dropped ${runtime.input.droppedCount}, merged ${runtime.input.mergedCount}, queue ${runtime.input.queueDepth}/${runtime.input.maxQueueDepth}` : 'not published'}`,
     heapLine,
     '',
     '## Thought Feed',

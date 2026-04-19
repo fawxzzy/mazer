@@ -1,4 +1,8 @@
-import type { HumanInputAction, HumanInputActionKind } from './actions';
+import {
+  type HumanInputAction,
+  type HumanInputActionKind,
+  type HumanMovementActionKind
+} from './actions.ts';
 
 export interface TouchViewportLike {
   width: number;
@@ -55,12 +59,9 @@ export interface TouchControlLayoutOptions {
   compact?: boolean;
 }
 
-const MOVE_CONTROLS: readonly HumanInputActionKind[] = [
-  'move_up',
-  'move_down',
-  'move_left',
-  'move_right'
-] as const;
+const TOUCH_DPAD_HIT_SLOP_RATIO = 0.32;
+const TOUCH_DPAD_DEADZONE_RATIO = 0.24;
+const TOUCH_DPAD_AXIS_LOCK_RATIO = 0.12;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
@@ -78,6 +79,62 @@ const createRect = (left: number, top: number, width: number, height: number): T
 const normalizeInset = (value: unknown): number => (
   typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0
 );
+
+const resolveTouchDpadRect = (layout: TouchControlLayout): TouchRect => {
+  const up = layout.controls.move_up;
+  const down = layout.controls.move_down;
+  const left = layout.controls.move_left;
+  const right = layout.controls.move_right;
+  const size = Math.max(up.width, down.width, left.width, right.width);
+  const hitSlop = Math.max(8, Math.round(size * TOUCH_DPAD_HIT_SLOP_RATIO));
+
+  return createRect(
+    left.left - hitSlop,
+    up.top - hitSlop,
+    (right.right - left.left) + (hitSlop * 2),
+    (down.bottom - up.top) + (hitSlop * 2)
+  );
+};
+
+const resolveTouchDpadDirectionAtPoint = (
+  layout: TouchControlLayout,
+  x: number,
+  y: number
+): HumanMovementActionKind | null => {
+  const dpadRect = resolveTouchDpadRect(layout);
+  if (x < dpadRect.left || x > dpadRect.right || y < dpadRect.top || y > dpadRect.bottom) {
+    return null;
+  }
+
+  const centerX = (layout.controls.move_left.centerX + layout.controls.move_right.centerX) / 2;
+  const centerY = (layout.controls.move_up.centerY + layout.controls.move_down.centerY) / 2;
+  const radius = Math.max(
+    layout.controls.move_up.width,
+    layout.controls.move_down.width,
+    layout.controls.move_left.height,
+    layout.controls.move_right.height
+  );
+  const dx = x - centerX;
+  const dy = y - centerY;
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
+  const deadzone = Math.max(10, Math.round(radius * TOUCH_DPAD_DEADZONE_RATIO));
+  const axisLock = Math.max(4, Math.round(radius * TOUCH_DPAD_AXIS_LOCK_RATIO));
+
+  if (absDx <= deadzone && absDy <= deadzone) {
+    return null;
+  }
+
+  if (Math.abs(absDx - absDy) <= axisLock) {
+    return absDx >= absDy
+      ? (dx < 0 ? 'move_left' : 'move_right')
+      : (dy < 0 ? 'move_up' : 'move_down');
+  }
+
+  return absDx > absDy
+    ? (dx < 0 ? 'move_left' : 'move_right')
+    : (dy < 0 ? 'move_up' : 'move_down');
+};
 
 export const resolveTouchInputCapability = (runtime: TouchRuntimeLike | undefined): boolean => {
   if (!runtime) {
@@ -107,8 +164,8 @@ export const resolveTouchControlLayout = (
     left: normalizeInset(options.safeInsets?.left)
   };
   const minDim = Math.max(1, Math.min(viewport.width, viewport.height));
-  const buttonSize = clamp(Math.round(minDim * (compact ? 0.12 : 0.1)), compact ? 42 : 48, compact ? 72 : 86);
-  const gap = Math.max(8, Math.round(buttonSize * 0.22));
+  const buttonSize = clamp(Math.round(minDim * (compact ? 0.138 : 0.112)), compact ? 52 : 58, compact ? 82 : 94);
+  const gap = Math.max(10, Math.round(buttonSize * 0.18));
   const frameWidth = Math.max(buttonSize * 4 + gap * 5, Math.min(viewport.width - safeInsets.left - safeInsets.right, buttonSize * 8));
   const frameHeight = Math.max(buttonSize * 3 + gap * 4, buttonSize * 4);
   const frameLeft = clamp(Math.round(safeInsets.left + Math.max(12, buttonSize * 0.35)), 0, Math.max(0, viewport.width - frameWidth));
@@ -141,18 +198,16 @@ export const resolveTouchControlKindAtPoint = (
   x: number,
   y: number
 ): HumanInputActionKind | null => {
-  for (const kind of MOVE_CONTROLS) {
+  for (const kind of ['pause', 'restart_attempt', 'toggle_thoughts'] as const) {
     const rect = layout.controls[kind];
     if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
       return kind;
     }
   }
 
-  for (const kind of ['pause', 'restart_attempt', 'toggle_thoughts'] as const) {
-    const rect = layout.controls[kind];
-    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-      return kind;
-    }
+  const dpadDirection = resolveTouchDpadDirectionAtPoint(layout, x, y);
+  if (dpadDirection) {
+    return dpadDirection;
   }
 
   return null;

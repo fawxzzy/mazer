@@ -370,7 +370,7 @@ describe('intent bus', () => {
     expect(summaries.some((summary) => summary.includes('West branch'))).toBe(true);
     expect(summaries.some((summary) => summary.includes('Signal post'))).toBe(true);
     expect(summaries.some((summary) => summary.includes('hazard'))).toBe(true);
-    expect(summaries.some((summary) => summary.includes('exit'))).toBe(true);
+    expect(summaries.some((summary) => summary.toLowerCase().includes('exit'))).toBe(true);
     expect(feed.metrics.verbFirstPass).toBe(true);
   });
 });

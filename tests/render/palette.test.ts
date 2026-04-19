@@ -63,8 +63,8 @@ describe('presentation palette', () => {
     expect(goalVsPlayer?.ratio).toBeGreaterThan(rawGoalPlayerRatio);
   });
 
-  test('keeps shipping theme palettes readable for ember and adjacent board palettes', () => {
-    for (const theme of ['ember', 'aurora', 'vellum', 'monolith'] as const) {
+  test('keeps shipping theme palettes readable across every core-only theme', () => {
+    for (const theme of ['noir', 'ember', 'aurora', 'vellum', 'monolith'] as const) {
       const report = getPaletteReadabilityReport(resolveAmbientThemeProfile(theme).palette);
       const trailVsPlayer = report.checkpoints.find((checkpoint) => checkpoint.key === 'trail-vs-player');
       const goalVsPlayer = report.checkpoints.find((checkpoint) => checkpoint.key === 'goal-vs-player');
@@ -77,6 +77,13 @@ describe('presentation palette', () => {
       expect(goalVsPlayer?.passes, `${theme}: goal-vs-player`).toBe(true);
       expect(trailVsPlayerLuminance?.passes, `${theme}: trail-vs-player-luminance`).toBe(true);
     }
+  });
+
+  test('keeps the light-board trail readable instead of washing into the floor', () => {
+    const vellum = getPaletteReadabilityReport(resolveAmbientThemeProfile('vellum').palette);
+    const vellumFloorVsTrail = vellum.checkpoints.find((checkpoint) => checkpoint.key === 'floor-vs-trail');
+
+    expect(vellumFloorVsTrail?.ratio).toBeGreaterThanOrEqual(4.1);
   });
 
   test('selects opposing local support colors for light and dark board luminance', () => {

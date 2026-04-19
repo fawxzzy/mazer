@@ -76,4 +76,21 @@ describe('input-human bridge', () => {
     expect(aiFirst.state.thoughtsVisible).toBe(true);
     expect(aiSecond.state.attempt).toBe(2);
   });
+
+  test('lets controls jump ahead of queued moves in the shared keyboard policy', () => {
+    const policy = createKeyboardSimulationPolicy({ maxRepeatBurst: 3 });
+
+    expect(policy.handleKeyDown({ key: 'ArrowUp' })?.kind).toBe('move_up');
+    expect(policy.handleKeyDown({ key: 'ArrowUp', repeat: true })?.kind).toBe('move_up');
+    expect(policy.handleKeyDown({ key: 'p' })?.kind).toBe('pause');
+    expect(policy.handleKeyDown({ key: ' ' })?.kind).toBe('pause');
+
+    const first = advanceSimulationPolicy(createHumanRunState(), policy, applyHumanInputAction);
+    const second = advanceSimulationPolicy(first.state, policy, applyHumanInputAction);
+    const third = advanceSimulationPolicy(second.state, policy, applyHumanInputAction);
+
+    expect(first.action?.kind).toBe('pause');
+    expect(second.action?.kind).toBe('pause');
+    expect(third.action?.kind).toBe('move_up');
+  });
 });

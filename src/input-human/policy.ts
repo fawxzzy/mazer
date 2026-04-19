@@ -1,9 +1,9 @@
-import type { HumanInputAction, KeyboardInputLike } from './actions';
+import type { HumanInputAction, KeyboardInputLike } from './actions.ts';
 import {
   isMovementActionKind
-} from './actions';
-import { resolveHumanInputActionKindFromKeyboard } from './keyboard';
-import type { HumanRunState } from './reducer';
+} from './actions.ts';
+import { resolveHumanInputActionKindFromKeyboard } from './keyboard.ts';
+import type { HumanRunState } from './reducer.ts';
 
 export interface SimulationPolicy<TState, TAction> {
   readonly id: string;
@@ -57,17 +57,31 @@ export const createKeyboardSimulationPolicy = (
   const heldKeys = new Map<string, { kind: HumanInputAction['kind']; repeatCount: number }>();
   const maxRepeatBurst = Math.max(0, Math.trunc(options.maxRepeatBurst ?? 2));
 
+  const enqueueAction = (action: HumanInputAction): HumanInputAction | null => {
+    if (!isMovementActionKind(action.kind)) {
+      const firstMovementIndex = queue.findIndex((entry) => isMovementActionKind(entry.kind));
+      if (firstMovementIndex === -1) {
+        queue.push(action);
+      } else {
+        queue.splice(firstMovementIndex, 0, action);
+      }
+      return action;
+    }
+
+    queue.push(action);
+    return action;
+  };
+
   const emitAction = (
     kind: HumanInputAction['kind'],
     repeatIndex: number
-  ): HumanInputAction => {
+  ): HumanInputAction | null => {
     const action: HumanInputAction = {
       kind,
       source: 'keyboard',
       repeatIndex
     };
-    queue.push(action);
-    return action;
+    return enqueueAction(action);
   };
 
   const handleKeyDown = (input: KeyboardInputLike): HumanInputAction | null => {

@@ -29,9 +29,20 @@ describe('input-human touch bridge', () => {
     });
 
     expect(layout.frame.width).toBeGreaterThan(0);
+    expect(layout.controls.move_up.width).toBeGreaterThanOrEqual(52);
     expect(layout.controls.move_up.centerY).toBeLessThan(layout.controls.move_down.centerY);
     expect(layout.controls.move_left.centerX).toBeLessThan(layout.controls.move_right.centerX);
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.pause.centerX, layout.controls.pause.centerY)).toBe('pause');
+    expect(resolveTouchControlKindAtPoint(
+      layout,
+      (layout.controls.move_left.centerX + layout.controls.move_right.centerX) / 2,
+      (layout.controls.move_up.centerY + layout.controls.move_down.centerY) / 2
+    )).toBeNull();
+    expect(resolveTouchControlKindAtPoint(
+      layout,
+      layout.controls.move_right.centerX - 6,
+      layout.controls.move_up.centerY + 12
+    )).toBe('move_right');
   });
 
   test('maps touch points into the shared human action schema and releases held pointers', () => {

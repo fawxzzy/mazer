@@ -4,6 +4,7 @@ import type { HeadingToken, LocalObservation, TileId, VisibleLandmark } from '..
 import { legacyTuning } from '../config/tuning';
 import {
   createDemoSpectatorPlan,
+  type DemoSpectatorContentProfile,
   type DemoBoardTelegraph,
   type DemoHazardPlacement,
   type DemoSpectatorPlan,
@@ -655,8 +656,34 @@ const resolveBoardRiskSignal = (
   telegraphs: readonly DemoBoardTelegraph[],
   currentPathCursor: number,
   keyAcquired: boolean,
-  plateActive: boolean
+  plateActive: boolean,
+  contentProfile: DemoSpectatorContentProfile,
+  pathLength: number
 ): Pick<MenuRuntimeBoardState, 'nextRiskLabel' | 'nextRiskTone'> => {
+  if (contentProfile === 'core-only') {
+    const lastCursor = Math.max(0, pathLength - 1);
+    if (currentPathCursor >= Math.max(0, lastCursor - 1)) {
+      return {
+        nextRiskLabel: 'Exit path: keep going',
+        nextRiskTone: 'low'
+      };
+    }
+
+    if (currentPathCursor <= 0) {
+      return {
+        nextRiskLabel: 'Next turn: leave the start lane',
+        nextRiskTone: 'low'
+      };
+    }
+
+    return {
+      nextRiskLabel: currentPathCursor >= Math.max(1, Math.floor(lastCursor * 0.6))
+        ? 'Closer route: stay on the clear line'
+        : 'Next branch: take the clear branch',
+      nextRiskTone: 'low'
+    };
+  }
+
   const ordered = [...telegraphs].sort((left, right) => (
     Math.abs(left.pathCursor - currentPathCursor) - Math.abs(right.pathCursor - currentPathCursor)
     || right.readiness - left.readiness
@@ -742,6 +769,8 @@ class MazeIntentRuntimeHost implements RuntimeAdapterHost {
 
   private readonly spectatorPlan: DemoSpectatorPlan;
 
+  private readonly contentProfile: DemoSpectatorContentProfile;
+
   private readonly trapSystem: TrapTopologySystem;
 
   private readonly itemLedger: ItemTopologyLedger;
@@ -752,7 +781,10 @@ class MazeIntentRuntimeHost implements RuntimeAdapterHost {
 
   private readonly boardStateByStep = new Map<number, MenuRuntimeBoardState>();
 
-  constructor(private readonly episode: MazeEpisode) {
+  constructor(
+    private readonly episode: MazeEpisode,
+    contentProfile: DemoSpectatorContentProfile = 'full'
+  ) {
     const startIndex = episode.raster.startIndex;
     const startTileId = toTileId(startIndex);
     const width = episode.raster.width;
@@ -763,7 +795,8 @@ class MazeIntentRuntimeHost implements RuntimeAdapterHost {
     this.currentTileId = startTileId;
     this.currentHeading = initialHeading;
     this.goalTileId = toTileId(episode.raster.endIndex);
-    this.spectatorPlan = createDemoSpectatorPlan(episode);
+    this.contentProfile = contentProfile;
+    this.spectatorPlan = createDemoSpectatorPlan(episode, contentProfile);
     this.trapSystem = new TrapTopologySystem(buildTrapContracts(this.spectatorPlan));
     this.itemLedger = new ItemTopologyLedger(buildItemDefinitions(this.spectatorPlan));
     this.puzzleState = new PuzzleTopologyState(buildPuzzleDefinitions(this.spectatorPlan));
@@ -1230,7 +1263,14 @@ class MazeIntentRuntimeHost implements RuntimeAdapterHost {
       });
     }
 
-    const riskSignal = resolveBoardRiskSignal(telegraphs, currentPathCursor, keyAcquired, plateActive);
+    const riskSignal = resolveBoardRiskSignal(
+      telegraphs,
+      currentPathCursor,
+      keyAcquired,
+      plateActive,
+      this.contentProfile,
+      this.episode.raster.pathIndices.length
+    );
 
     return {
       step,
@@ -1292,8 +1332,11 @@ export class MenuIntentRuntimeSession {
 
   private feedVersion = -1;
 
-  constructor(episode: MazeEpisode) {
-    this.host = new MazeIntentRuntimeHost(episode);
+  constructor(
+    episode: MazeEpisode,
+    contentProfile: DemoSpectatorContentProfile = 'full'
+  ) {
+    this.host = new MazeIntentRuntimeHost(episode, contentProfile);
     this.bridge = new RuntimeAdapterBridge(this.host, new EpisodicPolicyScorer());
     this.maxSteps = Math.max(8, episode.raster.pathIndices.length * 4);
   }
@@ -1368,6 +1411,9 @@ export class MenuIntentRuntimeSession {
   }
 }
 
-export const createMenuIntentRuntimeSession = (episode: MazeEpisode): MenuIntentRuntimeSession => (
-  new MenuIntentRuntimeSession(episode)
+export const createMenuIntentRuntimeSession = (
+  episode: MazeEpisode,
+  contentProfile: DemoSpectatorContentProfile = 'full'
+): MenuIntentRuntimeSession => (
+  new MenuIntentRuntimeSession(episode, contentProfile)
 );

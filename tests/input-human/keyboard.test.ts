@@ -43,5 +43,13 @@ describe('input-human keyboard bridge', () => {
     expect(gate.accept(earlyRepeat)).toBe(false);
     expect(gate.accept(lateRepeat)).toBe(true);
     expect(gate.accept(pauseRepeat)).toBe(false);
+    expect(gate.getSnapshot()).toMatchObject({
+      acceptedCount: 2,
+      droppedCount: 1,
+      mergedCount: 1,
+      lastAcceptedActionKind: 'move_right',
+      lastDroppedActionKind: 'pause',
+      lastDroppedReason: 'repeat_blocked'
+    });
   });
 });

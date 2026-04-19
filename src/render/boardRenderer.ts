@@ -195,6 +195,10 @@ interface MechanicGuideEntry {
   score: number;
 }
 
+export interface MechanicLegendOptions {
+  compact?: boolean;
+}
+
 const formatReadinessPct = (value: number): string => `${String(Math.round(Phaser.Math.Clamp(value, 0, 1) * 100)).padStart(3, ' ')}%`;
 
 const resolveMechanicStateLabel = (telegraph: DemoBoardTelegraph): string => {
@@ -742,16 +746,18 @@ export class BoardRenderer {
     const totalChunks = Math.max(1, Math.ceil(this.revealStepCount / chunkSize));
     const rank = Math.max(0, this.revealRanks[index] ?? index);
     const chunkIndex = Math.min(totalChunks - 1, Math.floor(rank / chunkSize));
-    const chunkProgress = chunkIndex / totalChunks;
-    const fadeWindow = lifecycle.reducedMotion ? 0.18 : 0.08;
+    const phaseChunkIndex = lifecycle.phase === 'erase'
+      ? (totalChunks - 1) - chunkIndex
+      : chunkIndex;
+    const chunkProgress = phaseChunkIndex / totalChunks;
+    const fadeWindow = lifecycle.reducedMotion ? 0.26 : 0.16;
     const progress = Phaser.Math.Clamp(lifecycle.progress, 0, 1);
 
     if (lifecycle.phase === 'build') {
       return Phaser.Math.Clamp((progress - chunkProgress) / Math.max(0.01, fadeWindow), 0, 1);
     }
 
-    const eraseStart = chunkIndex / totalChunks;
-    return 1 - Phaser.Math.Clamp((progress - eraseStart) / Math.max(0.01, fadeWindow), 0, 1);
+    return 1 - Phaser.Math.Clamp((progress - chunkProgress) / Math.max(0.01, fadeWindow), 0, 1);
   }
 
   private resolveTrailCompetingSignalScale(
@@ -1372,7 +1378,7 @@ export class BoardRenderer {
     this.guideText.setText('').setVisible(false);
   }
 
-  public drawMechanicLegend(telegraphs: readonly DemoBoardTelegraph[]): void {
+  public drawMechanicLegend(telegraphs: readonly DemoBoardTelegraph[], options: MechanicLegendOptions = {}): void {
     if (!isRenderableLayout(this.layout) || telegraphs.length === 0) {
       this.clearMechanicLegend();
       return;
@@ -1386,21 +1392,24 @@ export class BoardRenderer {
 
     const { boardX, boardY, boardWidth, boardHeight, safeBounds, tileSize } = this.layout;
     const colors = this.colors;
+    const compact = options.compact === true;
     const riskEntry = entries.reduce((best, entry) => (entry.score > best.score ? entry : best), entries[0]);
     const labelWidth = Math.max(5, ...entries.map((entry) => entry.label.length));
-    const stateWidth = Math.max(16, ...entries.map((entry) => entry.stateLabel.length));
-    const bodyLines = entries.map((entry) => (
-      `${entry.glyph} ${entry.label.padEnd(labelWidth, ' ')} ${entry.stateLabel.padEnd(stateWidth, ' ')} ${formatReadinessPct(entry.readiness)}`
-    ));
-    const titleLine = `NEXT RISK: ${riskEntry.riskLabel}`;
+    const stateWidth = compact ? 0 : Math.max(16, ...entries.map((entry) => entry.stateLabel.length));
+    const bodyLines = compact
+      ? entries.map((entry) => `${entry.glyph} ${entry.label.padEnd(labelWidth, ' ')} ${entry.active ? 'live' : 'read'} ${formatReadinessPct(entry.readiness)}`)
+      : entries.map((entry) => (
+        `${entry.glyph} ${entry.label.padEnd(labelWidth, ' ')} ${entry.stateLabel.padEnd(stateWidth, ' ')} ${formatReadinessPct(entry.readiness)}`
+      ));
+    const titleLine = compact ? `RISK: ${riskEntry.riskLabel}` : `NEXT RISK: ${riskEntry.riskLabel}`;
     const combinedLines = [titleLine, ...bodyLines];
-    let fontSize = Math.max(10, Math.min(16, Math.round(tileSize * 0.36)));
+    let fontSize = Math.max(10, Math.min(compact ? 14 : 16, Math.round(tileSize * (compact ? 0.32 : 0.36))));
     const lineGap = Math.max(2, Math.round(fontSize * 0.16));
     const titleGap = Math.max(4, Math.round(fontSize * 0.22));
     const paddingX = Math.max(8, Math.round(tileSize * 0.32));
     const paddingY = Math.max(7, Math.round(tileSize * 0.26));
     const panelGap = Math.max(4, Math.round(tileSize * 0.2));
-    const maxPanelWidth = Math.max(180, Math.round(boardWidth - (tileSize * 0.5)));
+    const maxPanelWidth = Math.max(compact ? 160 : 180, Math.round(boardWidth - (tileSize * 0.5)));
     const topGap = Math.max(0, boardY - safeBounds.top);
     const bottomGap = Math.max(0, safeBounds.bottom - (boardY + boardHeight));
     const dockTop = topGap >= bottomGap;
@@ -1443,13 +1452,13 @@ export class BoardRenderer {
     this.guideText.setName('mechanic-guide');
   }
 
-  public drawMechanicTelegraphs(telegraphs: readonly DemoBoardTelegraph[]): void {
+  public drawMechanicTelegraphs(telegraphs: readonly DemoBoardTelegraph[], options: MechanicLegendOptions = {}): void {
     if (!isRenderableLayout(this.layout) || telegraphs.length === 0) {
       this.clearMechanicLegend();
       return;
     }
 
-    this.drawMechanicLegend(telegraphs);
+    this.drawMechanicLegend(telegraphs, options);
 
     const { tileSize } = this.layout;
     const telegraphTuning = legacyTuning.board.telegraph;

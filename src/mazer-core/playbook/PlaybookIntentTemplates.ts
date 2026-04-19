@@ -50,10 +50,6 @@ const normalizeLabel = (value: string | null | undefined, fallback: string): str
   return value.trim();
 };
 
-const describeCount = (value: number, singular: string, plural: string): string => (
-  value === 1 ? singular : plural
-);
-
 const describeMechanicCue = (cue: string | null | undefined, fallback: string): string => {
   const normalized = cue?.trim().toLowerCase() ?? '';
   if (normalized.includes('gate')) {
@@ -122,7 +118,7 @@ export class PlaybookIntentTemplates {
           kind: 'goal-observed',
           category: 'goal',
           importance: 'high',
-          summary: `Committing the exit line from ${currentLabel}.`,
+          summary: `Seeing the exit from ${currentLabel}.`,
           confidence: 0.99,
           anchor: {
             kind: 'objective',
@@ -183,13 +179,12 @@ export class PlaybookIntentTemplates {
         };
       case 'dead-end-confirmed':
         {
-          const backtrackCount = Math.max(1, input.state.backtrackCount ?? 1);
           return {
             speaker: 'Runner',
             kind: 'dead-end-confirmed',
             category: 'infer',
             importance: 'medium',
-            summary: `Recalling ${currentLabel}; backing out after ${describeCount(backtrackCount, '1 retry', `${backtrackCount} retries`)}.`,
+            summary: `Recalling the dead end at ${currentLabel}.`,
             confidence: 0.89
           };
         }
@@ -199,7 +194,7 @@ export class PlaybookIntentTemplates {
           kind: 'landmark-spotted',
           category: 'observe',
           importance: 'medium',
-          summary: `Noting ${input.landmark?.label ?? 'landmark'} from ${currentLabel}.`,
+          summary: `Noting ${input.landmark?.label ?? 'landmark'} near ${currentLabel}.`,
           confidence: 0.68,
           anchor: {
             kind: 'landmark',
@@ -207,18 +202,15 @@ export class PlaybookIntentTemplates {
           }
         };
       case 'replan-triggered':
-        {
-          const frontierCount = Math.max(1, input.state.frontierCount ?? 1);
-          return {
-            speaker: 'Runner',
-            kind: 'replan-triggered',
-            category: 'replan',
-            importance: 'medium',
-            summary: `Replanning from ${currentLabel}; trying ${targetLabel} with ${describeCount(frontierCount, '1 option', `${frontierCount} options`)}.`,
-            confidence: 0.79,
-            anchor: aggressiveMode ? buildRunnerAnchor(input.state) : undefined
-          };
-        }
+        return {
+          speaker: 'Runner',
+          kind: 'replan-triggered',
+          category: 'replan',
+          importance: 'medium',
+          summary: `Replanning at ${currentLabel}; try ${targetLabel}.`,
+          confidence: 0.79,
+          anchor: aggressiveMode ? buildRunnerAnchor(input.state) : undefined
+        };
       case 'route-commitment-changed': {
         const goalCommit = input.state.targetKind === 'goal';
         return {
@@ -227,8 +219,8 @@ export class PlaybookIntentTemplates {
           category: goalCommit ? 'goal' : 'replan',
           importance: goalCommit ? 'high' : 'medium',
           summary: goalCommit
-            ? `Committing ${targetLabel} from ${currentLabel}.`
-            : `Committing ${targetLabel} after ${currentLabel}.`,
+            ? `Taking the exit from ${currentLabel}.`
+            : `Taking ${targetLabel} from ${currentLabel}.`,
           confidence: goalCommit ? 0.91 : 0.73,
           anchor: aggressiveMode
             ? buildRunnerAnchor(input.state, goalCommit ? 'objective' : 'tile')
@@ -254,7 +246,7 @@ export class PlaybookIntentTemplates {
           kind: 'frontier-chosen',
           category: 'observe',
           importance: 'low',
-          summary: `Scanning ${targetLabel} from ${currentLabel}.`,
+          summary: `Checking ${targetLabel} from ${currentLabel}.`,
           confidence: 0.61,
           anchor: aggressiveMode ? buildRunnerAnchor(input.state) : undefined
         };

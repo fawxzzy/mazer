@@ -42,17 +42,22 @@ npm run projection:export-pack
 `npm run visual:matrix -- --url https://<preview-host>` reuses a hosted preview instead of launching a local preview server.
 `npm run edge:live -- --base-url http://127.0.0.1:4173` runs the same core viewport set through Microsoft Edge (`channel: msedge`) and saves screenshots, videos, and JSON summaries under `../tmp/captures/mazer-edge-live/<run-id>/`.
 `npm run edge:live -- --url https://<preview-host>` targets an explicit preview URL instead of launching a local preview server.
-`/?mode=play` switches the shared simulation shell into desktop keyboard play without forking the watcher core. Controls are `WASD` or arrows to move, `P` or `Space` to pause, `R` to restart the attempt, `T` to toggle thoughts, and `M` or `Tab` to return to watch mode.
+`/?content=core-only` is the current focus shell: maze, player, and thought box only, starting in watch/demo by default.
+`/?content=core-only&mode=play` switches that same shared simulation shell into desktop keyboard play without forking the watcher core. Controls are `WASD` or arrows to move, `P` or `Space` to pause, `R` to restart the attempt, `T` to toggle thoughts, and `M` or `Tab` to return to watch mode.
+`/?content=full` restores the mechanic-heavy spectator profile for comparison or legacy proof work.
 `/proof-surfaces.html?surface=all&fixture=watching&skin=ios&mode=all` hosts the reduced proof-surface pack for Snapshot Card, Active-Run Tracker, and Ambient Tile on the dedicated proof route.
 `/watch-pass-preview.html` hosts the Watch Pass preview + settings shell on top of those same reduced surfaces, with local-only privacy, reduced-motion, thought-density, and pacing controls.
 `/watch-pass-paywall.html` hosts the local-first Watch Pass paywall shell with monthly/yearly plan selection, a quiet dismiss path, and the same reduced preview surfaces.
 `/watch-pass-setup.html` hosts the Watch Pass setup shell for Snapshot Card, Active-Run Tracker, and Ambient Tile with platform framing, privacy mode, reduced motion, thought density, and pacing controls.
 `npm run edge:live -- --run projection-proof-shell --skip-build true --headless true` captures the proof-surface shell routes through the same repo-owned Edge harness, and the sibling `projection-proof-snapshot`, `projection-proof-active`, and `projection-proof-ambient` runs target each reduced surface directly.
 `npm run edge:live -- --run watch-pass-preview --skip-build true --headless true` captures the Watch Pass preview route across full, compact, and private shells.
-`npm run edge:live -- --run watch-play-shell --skip-build true --headless true` and `npm run edge:live -- --run play-mode-smoke --skip-build true --headless true` now resolve to play-mode captures automatically.
-`npm run edge:live -- --run play-mode-interactive --skip-build true --headless true` actively switches into play mode, presses desktop controls, and fails if live receipts do not record non-zero `control_used` events.
-`npm run edge:live -- --run mobile-touch-smoke --skip-build true --headless true` emulates a phone-touch play shell, taps the on-screen D-pad and control buttons, and records the same shared play-mode receipts.
-`npm run runtime:observe -- --duration-seconds 120 --label play-mode-a` now targets the play shell automatically so receipts carry `mode=play` without a manual URL override.
+`npm run edge:live -- --run core-only-watch --skip-build true --headless true` captures the simplified watch/demo shell directly.
+`npm run edge:live -- --run core-only-play --skip-build true --headless true` captures the simplified play shell directly.
+`npm run edge:live -- --run core-only-cycle --skip-build true --headless true` captures the simplified watch loop for build -> watch -> clear -> rebuild validation.
+`npm run edge:live -- --run watch-play-shell --skip-build true --headless true` and `npm run edge:live -- --run play-mode-smoke --skip-build true --headless true` now resolve to the core-only play shell automatically.
+`npm run edge:live -- --run play-mode-interactive --skip-build true --headless true` actively switches into core-only play mode, presses desktop controls, and fails if live receipts do not record non-zero `control_used` events plus real movement deltas.
+`npm run edge:live -- --run mobile-touch-smoke --skip-build true --headless true` emulates a phone-touch core-only play shell, taps the on-screen D-pad and control buttons, and records the same shared play-mode receipts.
+`npm run runtime:observe -- --duration-seconds 120 --label play-mode-a` now targets the core-only play shell automatically so receipts carry `mode=play` without a manual URL override.
 `npm run runtime:observe -- --duration-seconds 120 --label play-mode-b` reuses that same play shell label for active-play KPI follow-through.
 `npm run runtime:observe -- --duration-seconds 120 --label pacing-a` captures a repo-owned runtime observe receipt under `../tmp/captures/mazer-runtime-observe/` and now includes experiment metadata plus a stable variant id.
 `npm run projection:export-pack -- --fixture watching --label watch-pass-preview` emits iOS and Android projection export packs under `../tmp/captures/mazer-projections/`.
@@ -87,6 +92,9 @@ Use the production preview for freeze validation:
 - `http://127.0.0.1:4173/?profile=tv&title=show`
 - `http://127.0.0.1:4173/?profile=obs&chrome=none`
 - `http://127.0.0.1:4173/?profile=mobile`
+- `http://127.0.0.1:4173/?content=core-only`
+- `http://127.0.0.1:4173/?content=core-only&mode=play`
+- `http://127.0.0.1:4173/?content=full`
 - `http://127.0.0.1:4173/?theme=auto`
 - `http://127.0.0.1:4173/?theme=noir`
 - `http://127.0.0.1:4173/?theme=ember`
@@ -98,6 +106,7 @@ Use the production preview for freeze validation:
 - `http://127.0.0.1:4173/?family=sparse`
 
 Defaults stay unchanged. Launch profiles tune packaging and presentation for deployment surfaces without changing app logic.
+The current focus content profile is `core-only`; use `?content=full` when you explicitly need the mechanic-heavy spectator layer.
 `theme=auto` uses curated family rotation. Explicit theme values lock the presentation family without adding storage or a settings UI.
 `family=auto|classic|braided|sparse|dense|framed|split-flow` locks maze topology families for local comparison or deterministic captures without adding storage or a settings UI.
 

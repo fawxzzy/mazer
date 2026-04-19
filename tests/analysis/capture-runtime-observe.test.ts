@@ -33,7 +33,7 @@ describe('capture-runtime-observe', () => {
 
   test('maps play-mode labels to the play shell without overriding explicit routes', () => {
     expect(resolveRuntimeObserveBaseUrl('http://127.0.0.1:4173', 'play-mode-a')).toBe(
-      'http://127.0.0.1:4173/?mode=play&theme=aurora'
+      'http://127.0.0.1:4173/?content=core-only&mode=play&theme=aurora'
     );
     expect(resolveRuntimeObserveBaseUrl('http://127.0.0.1:4173/?theme=noir', 'play-mode-a')).toBe(
       'http://127.0.0.1:4173/?theme=noir'
@@ -159,6 +159,14 @@ describe('capture-runtime-observe', () => {
           hidden: false,
           changeCount: 1,
           suspendCount: 0
+        },
+        input: {
+          acceptedCount: 1,
+          droppedCount: 0,
+          mergedCount: 0,
+          queueDepth: 0,
+          maxQueueDepth: 1,
+          lastDroppedReason: null
         }
       },
       {
@@ -188,6 +196,14 @@ describe('capture-runtime-observe', () => {
           hidden: true,
           changeCount: 3,
           suspendCount: 2
+        },
+        input: {
+          acceptedCount: 3,
+          droppedCount: 1,
+          mergedCount: 1,
+          queueDepth: 1,
+          maxQueueDepth: 2,
+          lastDroppedReason: 'queue_merged'
         }
       },
       {
@@ -217,6 +233,14 @@ describe('capture-runtime-observe', () => {
           hidden: false,
           changeCount: 0,
           suspendCount: 0
+        },
+        input: {
+          acceptedCount: 0,
+          droppedCount: 0,
+          mergedCount: 0,
+          queueDepth: 0,
+          maxQueueDepth: 0,
+          lastDroppedReason: null
         }
       },
       {
@@ -246,6 +270,14 @@ describe('capture-runtime-observe', () => {
           hidden: true,
           changeCount: 2,
           suspendCount: 1
+        },
+        input: {
+          acceptedCount: 2,
+          droppedCount: 1,
+          mergedCount: 1,
+          queueDepth: 0,
+          maxQueueDepth: 2,
+          lastDroppedReason: 'repeat_merged'
         }
       }
     ]);
@@ -266,8 +298,16 @@ describe('capture-runtime-observe', () => {
         captureEpoch: 1,
         changeCount: 2,
         suspendCount: 1
-      })
+        })
     ]);
+    expect((summary as any).input).toEqual({
+      acceptedCount: 2,
+      droppedCount: 1,
+      mergedCount: 1,
+      queueDepth: 0,
+      maxQueueDepth: 2,
+      lastDroppedReason: 'repeat_merged'
+    });
   });
 
   test('collects semantic telemetry summaries from sampled runtime diagnostics', () => {
@@ -415,7 +455,7 @@ describe('capture-runtime-observe', () => {
   test('routes play-mode-b labels onto the shared play shell', async () => {
     const { resolveRuntimeObserveBaseUrl } = await import('../../scripts/analysis/capture-runtime-observe.mjs');
 
-    expect(resolveRuntimeObserveBaseUrl('http://127.0.0.1:4173', 'play-mode-b')).toBe('http://127.0.0.1:4173/?mode=play&theme=aurora');
+    expect(resolveRuntimeObserveBaseUrl('http://127.0.0.1:4173', 'play-mode-b')).toBe('http://127.0.0.1:4173/?content=core-only&mode=play&theme=aurora');
   });
 
   test('threads watch-pass funnel data through runtime observe summaries', () => {
