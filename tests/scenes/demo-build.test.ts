@@ -37,6 +37,7 @@ let resolveMenuDemoPreset: typeof import('../../src/scenes/MenuScene').resolveMe
 let resolveMenuDemoPresentation: typeof import('../../src/scenes/MenuScene').resolveMenuDemoPresentation;
 let resolveMenuDemoSequence: typeof import('../../src/scenes/MenuScene').resolveMenuDemoSequence;
 let resolveDemoConfig: typeof import('../../src/scenes/MenuScene').resolveDemoConfig;
+let resolveDemoPresentationElapsedMs: typeof import('../../src/scenes/MenuScene').resolveDemoPresentationElapsedMs;
 let resolveMenuPresentationModel: typeof import('../../src/scenes/MenuScene').resolveMenuPresentationModel;
 let resolveDemoTrailRenderBounds: typeof import('../../src/scenes/MenuScene').resolveDemoTrailRenderBounds;
 let resolveBoardCompositionFrame: typeof import('../../src/scenes/MenuScene').resolveBoardCompositionFrame;
@@ -89,6 +90,7 @@ beforeAll(async () => {
     resolveMenuDemoPresentation,
     resolveMenuDemoSequence,
     resolveDemoConfig,
+    resolveDemoPresentationElapsedMs,
     resolveMenuPresentationModel,
     resolveDemoTrailRenderBounds,
     resolveBoardCompositionFrame,
@@ -1544,6 +1546,38 @@ describe('demo-only build', () => {
     expect(renderedTrail.limit - renderedTrail.start).toBeLessThanOrEqual(visibleWindow);
     expect(episode.raster.pathIndices[renderedTrail.limit - 1]).toBe(episode.raster.endIndex);
     expect(renderedTrail.start).toBeGreaterThanOrEqual(0);
+
+    disposeMazeEpisode(episode);
+  });
+
+  test('clear and erase phases only begin after the actor has visually reached the exit tile', () => {
+    const cycle = resolveMenuDemoCycle(1_707, 2);
+    const resolved = generateMazeForDifficulty({
+      scale: 50,
+      seed: 1_707,
+      size: cycle.size,
+      family: cycle.family,
+      presentationPreset: cycle.presentationPreset,
+      checkPointModifier: cycle.entropy.checkPointModifier,
+      shortcutCountModifier: cycle.entropy.shortcutCountModifier
+    }, cycle.difficulty, 0, 1);
+    const episode = resolved.episode;
+    const config = createDemoConfig(episode, cycle);
+    const segmentCount = Math.max(1, config.behavior.segmentDurationsMs?.length ?? (episode.raster.pathIndices.length - 1));
+    const traverseMs = config.behavior.segmentDurationsMs?.reduce((total, value) => total + value, 0)
+      ?? (segmentCount * config.cadence.exploreStepMs);
+    const clearPhaseElapsed = config.cadence.spawnHoldMs + traverseMs + config.cadence.goalHoldMs + 1;
+    const presentation = resolveMenuDemoPresentation(episode, cycle, clearPhaseElapsed, config);
+    const visualElapsed = resolveDemoPresentationElapsedMs(episode, clearPhaseElapsed, config, presentation);
+    const view = resolveDemoWalkerViewFrame(episode, visualElapsed, config, presentation.trailWindow);
+
+    expect(['clear-hold', 'reflection-beat', 'erase-wipe']).toContain(presentation.lifecyclePhase);
+    expect(view.nextIndex).toBe(episode.raster.endIndex);
+    expect(view.progress).toBe(1);
+    expect(
+      view.currentIndex === episode.raster.endIndex
+      || (view.nextIndex === episode.raster.endIndex && view.progress === 1)
+    ).toBe(true);
 
     disposeMazeEpisode(episode);
   });

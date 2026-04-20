@@ -408,8 +408,7 @@ describe('PlaybookAdapter', () => {
 
     expect(summary.speaker).toBe('Runner');
     expect(summary.kind).toBe('frontier-chosen');
-    expect(summary.summary).toContain('Checking West branch');
-    expect(summary.summary).toContain('Junction A');
+    expect(summary.summary).toBe('Left looks better.');
     expect('id' in summary).toBe(false);
     expect('ttlSteps' in summary).toBe(false);
   });

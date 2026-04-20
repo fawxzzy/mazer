@@ -95,10 +95,10 @@ describe('mazer-core IntentBus', () => {
     ]);
 
     const speakers = new Set(bus.records.map((record) => record.speaker));
-    const verbFirstPattern = /^(Scanning|Screening|Watching|Reading|Spotting|Valuing|Checking|Parsing|Marking|Noting|Replanning|Tracking|Committing|Waiting|Rejecting|Recalling)\b/;
+    const humanThoughtPattern = /^(I|That|There|Wait|Dead|This|Left|Right|Up|Down|No|Okay)\b/;
 
     expect(speakers).toEqual(new Set(['Runner', 'TrapNet', 'Warden', 'Inventory', 'Puzzle']));
-    expect(bus.records.every((record) => verbFirstPattern.test(record.summary))).toBe(true);
+    expect(bus.records.every((record) => humanThoughtPattern.test(record.summary))).toBe(true);
     expect(bus.records.filter((record) => record.step === 1).map((record) => record.speaker)).toEqual(['TrapNet', 'Inventory']);
     expect(bus.records.filter((record) => record.step === 4).map((record) => record.speaker)).toEqual(['Runner']);
   });

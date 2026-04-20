@@ -9,6 +9,7 @@ import type {
 export interface PlaybookIntentReference {
   id: string;
   label: string;
+  cue?: string;
 }
 
 export interface PlaybookIntentState {
@@ -50,28 +51,26 @@ const normalizeLabel = (value: string | null | undefined, fallback: string): str
   return value.trim();
 };
 
-const describeMechanicCue = (cue: string | null | undefined, fallback: string): string => {
-  const normalized = cue?.trim().toLowerCase() ?? '';
-  if (normalized.includes('gate')) {
-    return 'gate';
+const normalizeCue = (value: string | null | undefined): string => (
+  typeof value === 'string' ? value.trim().toLowerCase() : ''
+);
+
+const resolveFrontierThought = (targetLabel: string): string => {
+  const normalized = normalizeCue(targetLabel);
+  if (normalized.includes('west') || normalized.includes('left')) {
+    return 'Left looks better.';
   }
-  if (normalized.includes('patrol') || normalized.includes('warden') || normalized.includes('enemy')) {
-    return 'patrol';
+  if (normalized.includes('east') || normalized.includes('right')) {
+    return 'Right looks better.';
   }
-  if (normalized.includes('hazard') || normalized.includes('trap')) {
-    return 'hazard tile';
+  if (normalized.includes('north') || normalized.includes('up')) {
+    return 'Up looks better.';
   }
-  if (normalized.includes('switch') || normalized.includes('plate')) {
-    return 'switch';
-  }
-  if (normalized.includes('door')) {
-    return 'door';
-  }
-  if (normalized.includes('key')) {
-    return 'key';
+  if (normalized.includes('south') || normalized.includes('down')) {
+    return 'Down looks better.';
   }
 
-  return fallback;
+  return 'This side looks better.';
 };
 
 const buildRunnerAnchor = (
@@ -108,7 +107,6 @@ const buildRunnerAnchor = (
 export class PlaybookIntentTemplates {
   summarizeIntent(input: PlaybookIntentSummaryInput): PlaybookIntentSummary {
     const targetLabel = normalizeLabel(input.state.targetTileLabel, 'the next frontier');
-    const currentLabel = normalizeLabel(input.state.currentTileLabel, 'this branch');
     const aggressiveMode = input.aggressiveMode === true;
 
     switch (input.kind) {
@@ -118,7 +116,7 @@ export class PlaybookIntentTemplates {
           kind: 'goal-observed',
           category: 'goal',
           importance: 'high',
-          summary: `Seeing the exit from ${currentLabel}.`,
+          summary: 'I can see the exit.',
           confidence: 0.99,
           anchor: {
             kind: 'objective',
@@ -131,7 +129,7 @@ export class PlaybookIntentTemplates {
           kind: 'enemy-seen',
           category: 'danger',
           importance: 'high',
-          summary: `Watching ${describeMechanicCue(input.cue, 'patrol')} pressure near ${currentLabel}.`,
+          summary: 'That patrol is too close.',
           confidence: 0.86,
           anchor: {
             kind: 'tile',
@@ -144,7 +142,7 @@ export class PlaybookIntentTemplates {
           kind: 'trap-inferred',
           category: 'danger',
           importance: 'high',
-          summary: `Spotting ${describeMechanicCue(input.cue, 'hazard tile')} timing at ${currentLabel}.`,
+          summary: 'That timing looks bad.',
           confidence: 0.78,
           anchor: {
             kind: 'tile',
@@ -157,7 +155,7 @@ export class PlaybookIntentTemplates {
           kind: 'item-spotted',
           category: 'item',
           importance: 'medium',
-          summary: `Checking the ${describeMechanicCue(input.cue, 'key')} near ${currentLabel}.`,
+          summary: 'There might be something here.',
           confidence: 0.74,
           anchor: {
             kind: 'tile',
@@ -170,7 +168,7 @@ export class PlaybookIntentTemplates {
           kind: 'puzzle-state-observed',
           category: 'infer',
           importance: 'medium',
-          summary: `Reading the ${describeMechanicCue(input.cue, 'gate')} timing at ${currentLabel}.`,
+          summary: 'Wait. Not yet.',
           confidence: 0.72,
           anchor: {
             kind: 'tile',
@@ -184,30 +182,49 @@ export class PlaybookIntentTemplates {
             kind: 'dead-end-confirmed',
             category: 'infer',
             importance: 'medium',
-            summary: `Recalling the dead end at ${currentLabel}.`,
+            summary: 'Dead end. Back up.',
             confidence: 0.89
           };
         }
       case 'landmark-spotted':
+      {
+        const landmarkCue = normalizeCue(input.landmark?.cue);
+        const landmarkLabel = normalizeCue(input.landmark?.label);
+        const summary = landmarkCue.includes('junction')
+          ? 'This turn feels tighter.'
+          : landmarkCue.includes('gate')
+            ? 'Wait. The gate will open.'
+            : landmarkCue.includes('hazard')
+              ? 'That timing looks bad.'
+              : landmarkCue.includes('key') || landmarkCue.includes('item')
+                ? 'There might be something here.'
+                : landmarkCue.includes('pressure') || landmarkCue.includes('door')
+                  ? 'That part does something.'
+                  : landmarkLabel.includes('junction')
+                    ? 'This turn feels tighter.'
+                    : landmarkLabel.includes('exit')
+                      ? 'I can see the exit.'
+                      : 'This spot looks useful.';
         return {
           speaker: 'Runner',
           kind: 'landmark-spotted',
           category: 'observe',
           importance: 'medium',
-          summary: `Noting ${input.landmark?.label ?? 'landmark'} near ${currentLabel}.`,
+          summary,
           confidence: 0.68,
           anchor: {
             kind: 'landmark',
             landmarkId: input.landmark?.id
           }
         };
+      }
       case 'replan-triggered':
         return {
           speaker: 'Runner',
           kind: 'replan-triggered',
           category: 'replan',
           importance: 'medium',
-          summary: `Replanning at ${currentLabel}; try ${targetLabel}.`,
+          summary: 'That path wasted time.',
           confidence: 0.79,
           anchor: aggressiveMode ? buildRunnerAnchor(input.state) : undefined
         };
@@ -219,8 +236,8 @@ export class PlaybookIntentTemplates {
           category: goalCommit ? 'goal' : 'replan',
           importance: goalCommit ? 'high' : 'medium',
           summary: goalCommit
-            ? `Taking the exit from ${currentLabel}.`
-            : `Taking ${targetLabel} from ${currentLabel}.`,
+            ? 'I am close. Keep going.'
+            : 'I am closer this way.',
           confidence: goalCommit ? 0.91 : 0.73,
           anchor: aggressiveMode
             ? buildRunnerAnchor(input.state, goalCommit ? 'objective' : 'tile')
@@ -233,7 +250,7 @@ export class PlaybookIntentTemplates {
           kind: 'gate-aligned',
           category: 'observe',
           importance: 'medium',
-          summary: `Waiting for the gate at ${currentLabel}.`,
+          summary: 'Wait. The gate will open.',
           confidence: 0.83,
           anchor: {
             kind: 'connector',
@@ -246,7 +263,7 @@ export class PlaybookIntentTemplates {
           kind: 'frontier-chosen',
           category: 'observe',
           importance: 'low',
-          summary: `Checking ${targetLabel} from ${currentLabel}.`,
+          summary: resolveFrontierThought(targetLabel),
           confidence: 0.61,
           anchor: aggressiveMode ? buildRunnerAnchor(input.state) : undefined
         };

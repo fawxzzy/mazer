@@ -71,6 +71,14 @@ export interface MazeMetrics {
   coverage: number;
 }
 
+export interface MazeRouteMotifs {
+  falseShortcutBranches: number;
+  nearGoalBranches: number;
+  hubJunctions: number;
+  chokeCorridors: number;
+  loopDetours: number;
+}
+
 export type MazeGenerationPhase =
   | 'seed'
   | 'carve'
@@ -112,6 +120,7 @@ export interface MazeEpisode {
   generationTrace: MazeGenerationTrace;
   raster: TileBoard;
   metrics: MazeMetrics;
+  routeMotifs: MazeRouteMotifs;
   shortcutsCreated: number;
   accepted: boolean;
   difficulty: MazeDifficulty;

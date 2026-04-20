@@ -21,6 +21,7 @@ import type {
   MazeGenerationTrace,
   MazeGenerationState,
   MazeMetrics,
+  MazeRouteMotifs,
   MazePresentationPreset,
   MazeSize,
   MazeSolveResult,
@@ -582,8 +583,9 @@ const rasterizeMaze = (options: RasterizeOptions): MazeEpisode => {
   raster.tiles[raster.endIndex] |= TILE_END;
 
   const metrics = measureTileMaze(raster.tiles, raster.width, raster.height, raster.pathIndices);
+  const routeMotifs = measureTileMazeRouteMotifs(raster.tiles, raster.width, raster.height, raster.pathIndices);
   const rasterMinSolutionLength = Math.max(1, (minSolutionLength * 2) - 1);
-  const difficultyResult = classifyMazeDifficulty(metrics, raster.width, raster.height, shortcutsCreated);
+  const difficultyResult = classifyMazeDifficulty(metrics, raster.width, raster.height, shortcutsCreated, routeMotifs);
 
   return {
     seed,
@@ -594,6 +596,7 @@ const rasterizeMaze = (options: RasterizeOptions): MazeEpisode => {
       ...raster
     },
     metrics,
+    routeMotifs,
     shortcutsCreated,
     accepted: acceptedCore && solution.found && passesRasterQualityGate(metrics, rasterMinSolutionLength),
     difficulty: difficultyResult.difficulty,
@@ -821,6 +824,83 @@ const measureTileMaze = (
   };
 };
 
+const measureTileMazeRouteMotifs = (
+  tiles: Uint8Array,
+  width: number,
+  height: number,
+  pathIndices: ArrayLike<number>
+): MazeRouteMotifs => {
+  const canonical = new Set<number>(Array.from(pathIndices));
+  let falseShortcutBranches = 0;
+  let nearGoalBranches = 0;
+  let hubJunctions = 0;
+  let chokeCorridors = 0;
+  let loopDetours = 0;
+  let currentChokeRun = 0;
+
+  for (let cursor = 0; cursor < pathIndices.length; cursor += 1) {
+    const index = pathIndices[cursor];
+    const degree = countOpenFloorNeighbors(tiles, width, height, index);
+    const offPathNeighbors = collectOffPathFloorNeighbors(tiles, width, height, canonical, index);
+    const progress = cursor / Math.max(1, pathIndices.length - 1);
+
+    if (degree >= 3 && progress >= 0.24 && progress <= 0.76) {
+      hubJunctions += 1;
+    }
+
+    if (offPathNeighbors.length > 0 && progress >= 0.18 && progress <= 0.82) {
+      falseShortcutBranches += 1;
+    }
+
+    if (offPathNeighbors.length > 0 && progress >= 0.7 && cursor < pathIndices.length - 1) {
+      nearGoalBranches += 1;
+    }
+
+    if (offPathNeighbors.length >= 2 || degree >= 4) {
+      loopDetours += 1;
+    }
+
+    const boundaryOrJunction = degree >= 3 || cursor === 0 || cursor === pathIndices.length - 1;
+    if (!boundaryOrJunction && degree === 2) {
+      currentChokeRun += 1;
+    } else {
+      if (currentChokeRun >= 3) {
+        chokeCorridors += 1;
+      }
+      currentChokeRun = 0;
+    }
+  }
+
+  if (currentChokeRun >= 3) {
+    chokeCorridors += 1;
+  }
+
+  return {
+    falseShortcutBranches,
+    nearGoalBranches,
+    hubJunctions,
+    chokeCorridors,
+    loopDetours
+  };
+};
+
+const collectOffPathFloorNeighbors = (
+  tiles: Uint8Array,
+  width: number,
+  height: number,
+  canonical: ReadonlySet<number>,
+  index: number
+): number[] => {
+  const neighbors: number[] = [];
+  for (let direction = 0; direction < 4; direction += 1) {
+    const neighbor = getNeighborIndex(index, width, height, direction as 0 | 1 | 2 | 3);
+    if (neighbor !== -1 && isTileFloor(tiles, neighbor) && !canonical.has(neighbor)) {
+      neighbors.push(neighbor);
+    }
+  }
+  return neighbors;
+};
+
 const countOpenFloorNeighbors = (tiles: Uint8Array, width: number, height: number, index: number): number => {
   let count = 0;
 
@@ -979,7 +1059,14 @@ export const classifyMazeDifficulty = (
   metrics: MazeMetrics,
   width: number,
   height: number,
-  shortcutsCreated: number
+  shortcutsCreated: number,
+  routeMotifs: MazeRouteMotifs = {
+    falseShortcutBranches: 0,
+    nearGoalBranches: 0,
+    hubJunctions: 0,
+    chokeCorridors: 0,
+    loopDetours: 0
+  }
 ): { difficulty: MazeDifficulty; score: number } => {
   const scale = Math.max(width, height);
   const pathPressure = metrics.solutionLength / Math.max(1, scale * 1.18);
@@ -989,13 +1076,21 @@ export const classifyMazeDifficulty = (
   const coveragePressure = metrics.coverage * 2.7;
   const turnPressure = (1 - metrics.straightness) * 1.65;
   const shortcutPressure = shortcutsCreated / Math.max(1, scale * 0.11);
+  const motifPressure = (
+    (routeMotifs.falseShortcutBranches * 0.42)
+    + (routeMotifs.nearGoalBranches * 0.34)
+    + (routeMotifs.hubJunctions * 0.3)
+    + (routeMotifs.chokeCorridors * 0.28)
+    + (routeMotifs.loopDetours * 0.4)
+  ) / Math.max(1, scale * 0.08);
   const score = pathPressure
     + branchPressure
     + branchDensityPressure
     + (deadEndPressure * 0.62)
     + coveragePressure
     + turnPressure
-    + (shortcutPressure * 0.84);
+    + (shortcutPressure * 0.84)
+    + motifPressure;
 
   if (score < 9) {
     return { difficulty: 'chill', score };

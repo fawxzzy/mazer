@@ -121,6 +121,11 @@ export interface MenuSceneRuntimeDiagnostics {
     };
     trailSegmentCount: number;
     trailSegmentCap: number;
+    runnerPolicy: {
+      wrongBranchCount: number;
+      backtrackCount: number;
+      recoveryCount: number;
+    };
     intentEntryCount: number;
     intentEntryCap: number;
     deferredVisualTasksRemaining: number;

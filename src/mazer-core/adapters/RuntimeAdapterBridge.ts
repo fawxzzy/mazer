@@ -139,7 +139,8 @@ const buildIntentSourceState = (
   goalObservedStep: snapshot.counters.goalObservedStep,
   visibleLandmarks: projection.observation.visibleLandmarks.map((landmark) => ({
     id: landmark.id,
-    label: landmark.label
+    label: landmark.label,
+    cue: landmark.cue
   })),
   observedLandmarkIds: [...snapshot.observedLandmarkIds],
   localCues: [...projection.observation.localCues],

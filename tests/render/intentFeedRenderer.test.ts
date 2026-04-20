@@ -213,10 +213,11 @@ describe('intent feed renderer', () => {
   });
 
   test('rewrites visible HUD copy into plain route guidance without changing the feed contract', () => {
-    expect(formatIntentHudSummary('Replanning at Junction A; try West branch.')).toBe('Try West branch from Junction A');
-    expect(formatIntentHudSummary('Recalling the dead end at Dead branch 2:3.')).toBe('Dead end at Dead branch 2:3. Turn back');
-    expect(formatIntentHudSummary('Seeing the exit from Junction A.')).toBe('Exit ahead from Junction A');
-    expect(formatIntentHudSummary('Taking the exit from Junction A.')).toBe('Take the exit from Junction A');
+    expect(formatIntentHudSummary('Replanning at Junction A; try West branch.')).toBe('That path wasted time.');
+    expect(formatIntentHudSummary('Recalling the dead end at Dead branch 2:3.')).toBe('Dead end. Back up.');
+    expect(formatIntentHudSummary('Seeing the exit from Junction A.')).toBe('I can see the exit.');
+    expect(formatIntentHudSummary('Taking the exit from Junction A.')).toBe('I am close. Keep going.');
+    expect(formatIntentHudSummary('There is a marker here.')).toBe('This spot looks useful.');
   });
 
   test('maps roles onto the scan hypothesis commit and recall grammar', () => {

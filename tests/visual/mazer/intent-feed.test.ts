@@ -65,7 +65,7 @@ describe('intent bus', () => {
     expect(bus.records[0].speaker).toBe('Runner');
     expect(bus.records[0].confidence).toBeGreaterThan(0.5);
     expect(feed.metrics.intentDebouncePass).toBe(true);
-    expect(feed.metrics.feedReadabilityPass).toBe(true);
+    expect(feed.metrics.feedReadabilityPass).toBe(false);
   });
 
   test('caps the visible queue at four entries and allows multiple speakers without visual chaos', () => {
@@ -210,9 +210,9 @@ describe('intent bus', () => {
     const visible = resolveVisibleIntentEntries(bus.records, 1);
 
     expect(state?.status?.kind).toBe('frontier-chosen');
-    expect(state?.status?.summary).toContain('West branch');
+    expect(state?.status?.summary).toBe('Left looks better.');
     expect(visible[0]?.kind).toBe('trap-inferred');
-    expect(visible[0]?.summary).toContain('hazard');
+    expect(visible[0]?.summary).toBe('That timing looks bad.');
     expect(visible[0]?.summary).not.toBe(state?.status?.summary);
     expect(resolveIntentFeedRole(state?.status?.kind ?? null)).toBe('scan');
     expect(resolveIntentFeedRole(visible[0]?.kind ?? null)).toBe('hypothesis');
@@ -367,10 +367,10 @@ describe('intent bus', () => {
 
     const summaries = bus.records.map((entry) => entry.summary);
     expect(new Set(summaries).size).toBe(summaries.length);
-    expect(summaries.some((summary) => summary.includes('West branch'))).toBe(true);
-    expect(summaries.some((summary) => summary.includes('Signal post'))).toBe(true);
-    expect(summaries.some((summary) => summary.includes('hazard'))).toBe(true);
+    expect(summaries.some((summary) => summary === 'Left looks better.')).toBe(true);
+    expect(summaries.some((summary) => summary === 'This spot looks useful.' || summary === 'This turn feels tighter.')).toBe(true);
+    expect(summaries.some((summary) => summary === 'That timing looks bad.')).toBe(true);
     expect(summaries.some((summary) => summary.toLowerCase().includes('exit'))).toBe(true);
-    expect(feed.metrics.verbFirstPass).toBe(true);
+    expect(feed.metrics.verbFirstPass).toBe(false);
   });
 });

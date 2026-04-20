@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
-import { advanceDemoWalker, createDemoWalkerState, resolveDemoWalkerViewFrame } from '../../src/domain/ai';
+import {
+  advanceDemoWalker,
+  createDemoWalkerState,
+  resolveDemoWalkerViewFrame
+} from '../../src/domain/ai';
 import { legacyTuning } from '../../src/config/tuning';
 import { generateMaze } from '../../src/domain/maze';
 
@@ -19,6 +23,7 @@ describe('demo walker', () => {
 
     expect(state.currentIndex).toBe(episode.raster.pathIndices[1]);
     expect(state.pathCursor).toBe(1);
+    expect(state.canonicalCursor).toBe(1);
     expect(state.cue).toBe('explore');
     expect(state.trailSteps).toEqual([
       { index: episode.raster.startIndex, mode: 'explore' },
@@ -123,6 +128,7 @@ describe('demo walker', () => {
     expect(frame.trailLimit - frame.trailStart).toBeLessThanOrEqual(4);
     expect(frame.progress).toBeGreaterThan(0);
     expect(frame.progress).toBeLessThan(1);
+    expect(frame.canonicalCursor).toBeGreaterThanOrEqual(0);
   });
 
   test('final traversal segment reveals the goal tile before arrival settles', () => {
@@ -141,5 +147,42 @@ describe('demo walker', () => {
     expect(frame.nextIndex).toBe(episode.raster.endIndex);
     expect(frame.trailLimit).toBe(episode.raster.pathIndices.length);
     expect(frame.progress).toBeGreaterThan(0);
+  });
+
+  test('core-only watch mode can make deterministic wrong turns and recoveries without changing solver truth', () => {
+    const episode = generateMaze({
+      scale: 50,
+      seed: 902,
+      size: 'large',
+      family: 'split-flow',
+      checkPointModifier: 0.35,
+      shortcutCountModifier: 0.18
+    });
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    const firstFrame = resolveDemoWalkerViewFrame(
+      episode,
+      config.cadence.spawnHoldMs + Math.floor(config.cadence.exploreStepMs * 0.5),
+      config,
+      8
+    );
+    const lateFrame = resolveDemoWalkerViewFrame(
+      episode,
+      config.cadence.spawnHoldMs + Math.floor(config.cadence.exploreStepMs * 6.5),
+      config,
+      8
+    );
+
+    expect(lateFrame.telemetry.wrongBranchCount).toBeGreaterThan(0);
+    expect(lateFrame.telemetry.backtrackCount).toBeGreaterThan(0);
+    expect(lateFrame.telemetry.recoveryCount).toBeGreaterThan(0);
+    expect(lateFrame.canonicalCursor).toBeLessThanOrEqual(episode.raster.pathIndices.length - 1);
+    expect(firstFrame.canonicalCursor).toBeGreaterThanOrEqual(0);
   });
 });

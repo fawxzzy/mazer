@@ -141,6 +141,11 @@ export const assertMazeInvariants = (
 
   assertInvariant(episode.metrics.coverage > 0, `coverage must be positive, received ${episode.metrics.coverage}`);
   assertInvariant(episode.metrics.coverage <= 1, `coverage must not exceed 1, received ${episode.metrics.coverage}`);
+  assertInvariant(episode.routeMotifs.falseShortcutBranches >= 0, 'falseShortcutBranches must be non-negative');
+  assertInvariant(episode.routeMotifs.nearGoalBranches >= 0, 'nearGoalBranches must be non-negative');
+  assertInvariant(episode.routeMotifs.hubJunctions >= 0, 'hubJunctions must be non-negative');
+  assertInvariant(episode.routeMotifs.chokeCorridors >= 0, 'chokeCorridors must be non-negative');
+  assertInvariant(episode.routeMotifs.loopDetours >= 0, 'loopDetours must be non-negative');
 };
 
 export const serializeMaze = (episode: MazeEpisode) => ({
@@ -155,6 +160,7 @@ export const serializeMaze = (episode: MazeEpisode) => ({
   startIndex: episode.raster.startIndex,
   endIndex: episode.raster.endIndex,
   pathIndices: episode.raster.pathIndices.slice(),
+  routeMotifs: { ...episode.routeMotifs },
   shortcutsCreated: episode.shortcutsCreated,
   accepted: episode.accepted,
   tiles: episode.raster.tiles.slice()

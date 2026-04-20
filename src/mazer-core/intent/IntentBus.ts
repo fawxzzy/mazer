@@ -13,6 +13,7 @@ import {
 interface NamedReference {
   id: string;
   label: string;
+  cue?: string;
 }
 
 export interface IntentSourceState {
@@ -165,6 +166,12 @@ const selectIntentCandidates = (
   const semanticCues = toSemanticCues(state.localCues);
   const previousLandmarkIds = new Set(previous?.observedLandmarkIds ?? []);
   const newlyObservedLandmark = state.visibleLandmarks.find((landmark) => !previousLandmarkIds.has(landmark.id)) ?? null;
+  const landmarkCue = newlyObservedLandmark?.cue?.trim().toLowerCase() ?? '';
+  const landmarkIsMeaningful = Boolean(
+    newlyObservedLandmark
+    && landmarkCue !== 'start anchor'
+    && landmarkCue !== 'exit beacon'
+  );
   const newDangerCue = includesKeyword(semanticCues, DANGER_CUE_KEYWORDS);
   const newEnemyCue = includesKeyword(semanticCues, ENEMY_CUE_KEYWORDS);
   const newItemCue = includesKeyword(semanticCues, ITEM_CUE_KEYWORDS);
@@ -173,7 +180,7 @@ const selectIntentCandidates = (
   const confirmedDeadEnd = state.targetKind === 'backtrack'
     && (sawDeadEndCue || state.traversableTileIds.length <= 1);
   const hasHigherSignalObservation = Boolean(
-    newlyObservedLandmark
+    landmarkIsMeaningful
     || newDangerCue
     || newEnemyCue
     || newItemCue
@@ -257,7 +264,11 @@ const selectIntentCandidates = (
     }));
   }
 
-  if (newlyObservedLandmark && state.targetKind !== 'goal' && !state.goalVisible) {
+  if (
+    landmarkIsMeaningful
+    && state.targetKind !== 'goal'
+    && !state.goalVisible
+  ) {
     candidates.push(makePlaybookIntentCandidate(state.step, 66, 'landmark-spotted', {
       kind: 'landmark-spotted',
       state,

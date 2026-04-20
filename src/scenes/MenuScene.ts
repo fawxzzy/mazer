@@ -34,7 +34,10 @@ import {
 import { buildBootTimingReport, logBootTimingReport, markBootTiming } from '../boot/bootTiming';
 import {
   createDemoSpectatorPlan,
+  resolveDemoWalkerCueOverrides,
+  resolveDemoWalkerTraverseMs,
   resolveDemoWalkerViewFrame,
+  type DemoRunnerTelemetry,
   type DemoWalkerConfig,
   type DemoWalkerCue,
   type DemoSegmentCue,
@@ -343,6 +346,104 @@ const TOUCH_CONTROL_TEXT: Record<HumanInputAction['kind'], string> = {
 };
 void TOUCH_CONTROL_LABELS;
 
+const WATCH_CORE_ONLY_RUNNER_THOUGHTS: Partial<Record<DemoWalkerCue, readonly string[]>> = {
+  anticipate: ['Left looks better.', 'This side might open up.'],
+  'dead-end': ['No. That ends here.', 'Dead end. Back up.'],
+  backtrack: ['Back up. Try the other side.', 'No good. Back up.'],
+  reacquire: ['I am closer this way.', 'Okay. This route feels better.']
+};
+
+const resolveRunnerCueThought = (
+  cue: DemoWalkerCue,
+  seed: number,
+  canonicalCursor: number
+): string | null => {
+  const options = WATCH_CORE_ONLY_RUNNER_THOUGHTS[cue];
+  if (!options || options.length === 0) {
+    return null;
+  }
+
+  const index = Math.abs(Math.imul((seed >>> 0) ^ ((canonicalCursor + 1) * 1103515245), 1597334677)) % options.length;
+  return options[index] ?? options[0] ?? null;
+};
+
+const applyRunnerThoughtOverlay = (
+  state: IntentFeedState | null,
+  cue: DemoWalkerCue,
+  seed: number,
+  canonicalCursor: number
+): IntentFeedState | null => {
+  const summary = resolveRunnerCueThought(cue, seed, canonicalCursor);
+  if (!summary) {
+    return state;
+  }
+
+  const entryKind: IntentFeedState['entries'][number]['kind'] = cue === 'reacquire'
+    ? 'route-commitment-changed'
+    : cue === 'anticipate'
+      ? 'frontier-chosen'
+      : cue === 'backtrack'
+        ? 'replan-triggered'
+        : 'dead-end-confirmed';
+  const entry = {
+    id: `runner-thought-${cue}-${canonicalCursor}`,
+    speaker: 'Runner' as const,
+    category: cue === 'anticipate' ? 'observe' as const : cue === 'reacquire' ? 'goal' as const : 'replan' as const,
+    kind: entryKind,
+    importance: cue === 'dead-end' || cue === 'backtrack' ? 'medium' as const : 'low' as const,
+    summary,
+    confidence: 0.72,
+    step: canonicalCursor,
+    ttlSteps: 4,
+    ageSteps: 0,
+    slot: 0,
+    opacity: 1
+  };
+
+  return {
+    ...(state ?? {
+      step: canonicalCursor,
+      pings: [],
+      metrics: {
+        emittedCount: 1,
+        highImportanceEventCount: 0,
+        speakerCount: 1,
+        totalSteps: Math.max(1, canonicalCursor + 1),
+        intentEmissionRate: 0,
+        worldPingCount: 0,
+        worldPingEmissionRate: 0,
+        maxConsecutiveEmissionStreak: 1,
+        maxVisibleWorldPings: 0,
+        debouncedEventCount: 0,
+        debouncedWorldPingCount: 0,
+        statusRepeatCount: 0,
+        verbFirstPass: true,
+        statusPresencePass: true,
+        importanceTtlPass: true,
+        slotOpacityPass: true,
+        feedReadabilityPass: true,
+        intentDebouncePass: true,
+        worldPingSpamPass: true,
+        highImportanceStickyPass: true,
+        intentStackOverlapPass: true
+      }
+    }),
+    step: canonicalCursor,
+    status: {
+      speaker: 'Runner',
+      category: entry.category,
+      kind: entry.kind,
+      importance: entry.importance,
+      summary,
+      confidence: entry.confidence,
+      step: canonicalCursor
+    },
+    entries: [entry],
+    events: [entry],
+    pings: state?.pings ?? []
+  };
+};
+
 const isModeToggleKey = (event: { code?: string | null }): boolean => (
   typeof event.code === 'string' && PLAY_MODE_TOGGLE_CODES.has(event.code)
 );
@@ -411,6 +512,12 @@ const buildPlayViewFrame = (
     cue: currentCursor <= 0 && !motion ? 'spawn' : currentCursor >= lastCursor ? 'goal' : 'explore',
     trailStart: start,
     trailLimit: limit,
+    canonicalCursor: currentCursor,
+    telemetry: {
+      wrongBranchCount: 0,
+      backtrackCount: 0,
+      recoveryCount: 0
+    },
     cycleComplete: currentCursor >= lastCursor && !motion
   };
 };
@@ -4084,6 +4191,11 @@ export class MenuScene extends Phaser.Scene {
     let activeTimerCount = 0;
     let activeListenerCount = 0;
     let lastTrailSegmentCount = 0;
+    let lastRunnerPolicyTelemetry: DemoRunnerTelemetry = {
+      wrongBranchCount: 0,
+      backtrackCount: 0,
+      recoveryCount: 0
+    };
     let lastIntentEntryCount = 0;
     let lastIntentFeedDiagnostics: MenuSceneRuntimeDiagnostics['feed'] = {
       step: null,
@@ -4506,6 +4618,11 @@ export class MenuScene extends Phaser.Scene {
           },
           trailSegmentCount: lastTrailSegmentCount,
           trailSegmentCap: legacyTuning.demo.behavior.trailMaxLength,
+          runnerPolicy: {
+            wrongBranchCount: lastRunnerPolicyTelemetry.wrongBranchCount,
+            backtrackCount: lastRunnerPolicyTelemetry.backtrackCount,
+            recoveryCount: lastRunnerPolicyTelemetry.recoveryCount
+          },
           intentEntryCount: lastIntentEntryCount,
           intentEntryCap: legacyTuning.menu.intentFeed.maxVisibleEntries,
           deferredVisualTasksRemaining: deferredVisualTaskQueue.length,
@@ -5640,33 +5757,9 @@ export class MenuScene extends Phaser.Scene {
           pulseBoard(0.1, 0.08, 0.1, 280, 1.012);
         }
       };
-      const resolvePresentationElapsedMs = (episode: MazeEpisode, elapsedMs: number, presentation: MenuDemoPresentation): number => {
-        const spawnHoldMs = Math.max(1, demoConfig.cadence.spawnHoldMs);
-        const traverseMs = Math.max(1, (Math.max(1, episode.raster.pathIndices.length) - 1) * Math.max(1, demoConfig.cadence.exploreStepMs));
-        const ritualTuning = legacyTuning.demo.ritual;
-        const commitWindowStart = spawnHoldMs + Math.max(1, Math.floor(traverseMs * ritualTuning.decisionWindowStartRatio));
-        const commitWindowEnd = spawnHoldMs + Math.max(1, Math.floor(traverseMs * ritualTuning.decisionWindowEndRatio));
-
-        if (presentation.ritualPhase === 'decision' && elapsedMs >= commitWindowStart) {
-          const slowedElapsed = Math.min(elapsedMs, commitWindowEnd);
-          const commitOffset = slowedElapsed - commitWindowStart;
-          const reducedCommit = Math.floor(commitOffset * ritualTuning.decisionSlowdownFactor);
-          return commitWindowStart + reducedCommit;
-        }
-
-        if (
-          presentation.lifecyclePhase === 'clear-hold'
-          || presentation.lifecyclePhase === 'reflection-beat'
-          || presentation.lifecyclePhase === 'erase-wipe'
-        ) {
-          return Math.max(
-            spawnHoldMs,
-            (spawnHoldMs + traverseMs) - Math.max(1, Math.floor(demoConfig.cadence.exploreStepMs * 0.45))
-          );
-        }
-
-        return elapsedMs;
-      };
+      const resolvePresentationElapsedMs = (episode: MazeEpisode, elapsedMs: number, presentation: MenuDemoPresentation): number => (
+        resolveDemoPresentationElapsedMs(episode, elapsedMs, demoConfig, presentation)
+      );
       const appendControlTelemetry = (
         control: 'keyboard' | 'touch' | 'restart' | 'pause' | 'toggle_thoughts',
         actionKind?: HumanInputAction['kind']
@@ -6062,8 +6155,9 @@ export class MenuScene extends Phaser.Scene {
               limit: view.trailLimit
             }
           : resolveDemoTrailRenderBounds(path, view, demoPresentation.trailWindow);
-        const intentStep = Math.max(0, renderedTrail.limit - 1);
+        const intentStep = Math.max(0, view.canonicalCursor);
         lastTrailSegmentCount = Math.max(0, renderedTrail.limit - renderedTrail.start);
+        lastRunnerPolicyTelemetry = view.telemetry;
         intentRuntimeSession?.advanceToStep(intentStep);
         const boardState = intentRuntimeSession?.getBoardState(intentStep) ?? null;
         const resolvedPresentation = boardState
@@ -6103,7 +6197,7 @@ export class MenuScene extends Phaser.Scene {
               };
             })()
           : rawFeedState;
-        const feedState = presentationMode === 'play'
+        const feedStateBase = presentationMode === 'play'
           ? (
               playLoopState.thoughtsVisible
                 ? (
@@ -6141,10 +6235,13 @@ export class MenuScene extends Phaser.Scene {
                           events: [],
                           pings: []
                         }
-                      : null
+              : null
                   )
             )
           : normalizedRawFeedState;
+        const feedState = contentProfileId === 'core-only' && presentationMode !== 'play'
+          ? applyRunnerThoughtOverlay(feedStateBase, view.cue, episode.seed, view.canonicalCursor)
+          : feedStateBase;
 
         runOptional('hud metadata', () => {
           shell.demoStatusHud.setState(
@@ -6887,7 +6984,16 @@ export const resolveDemoConfig = (
   mode: PresentationMode = 'watch',
   contentProfile: PresentationContentProfile = 'full'
 ): DemoWalkerConfig => {
-  const pathSegments = Math.max(1, episode.raster.pathIndices.length - 1);
+  const runnerPolicyEnabled = mode !== 'play' && contentProfile === 'core-only';
+  const runnerPolicySeedConfig: DemoWalkerConfig = {
+    ...legacyTuning.demo,
+    behavior: {
+      ...legacyTuning.demo.behavior,
+      enableRunnerMistakes: runnerPolicyEnabled
+    }
+  };
+  const routeCueOverrides = resolveDemoWalkerCueOverrides(episode, runnerPolicySeedConfig);
+  const pathSegments = Math.max(1, routeCueOverrides.length || (episode.raster.pathIndices.length - 1));
   const spectatorPlan = createDemoSpectatorPlan(episode, contentProfile);
   const watchSlowdownFactor = mode === 'play' ? 1 : (1 / 0.75);
   const buildSlowdownFactor = mode === 'play' ? 1.1 : 2;
@@ -6930,20 +7036,67 @@ export const resolveDemoConfig = (
   );
   const totalTraverseMs = exploreStepMs * pathSegments;
   const segmentWeights = Array.from({ length: pathSegments }, () => 1);
-  const segmentCues: DemoSegmentCue[] = Array.from({ length: pathSegments }, () => 'explore');
+  const segmentCues: Array<DemoSegmentCue | DemoWalkerCue> = Array.from({ length: pathSegments }, () => 'explore');
+
+  const canonicalToRouteSegment = (canonicalSegmentIndex: number): number => {
+    if (canonicalSegmentIndex <= 0) {
+      return 0;
+    }
+
+    let canonicalProgress = 0;
+    for (let routeSegmentIndex = 0; routeSegmentIndex < routeCueOverrides.length; routeSegmentIndex += 1) {
+      const cueOverride = routeCueOverrides[routeSegmentIndex];
+      if (cueOverride === 'anticipate' || cueOverride === 'dead-end' || cueOverride === 'backtrack') {
+        continue;
+      }
+
+      canonicalProgress += 1;
+      if (canonicalProgress >= canonicalSegmentIndex) {
+        return routeSegmentIndex;
+      }
+    }
+
+    return Math.max(0, pathSegments - 1);
+  };
 
   spectatorPlan.riskWindows.forEach((window) => {
-    if (window.segmentIndex < 0 || window.segmentIndex >= pathSegments) {
+    const routeSegmentIndex = canonicalToRouteSegment(window.segmentIndex);
+    if (routeSegmentIndex < 0 || routeSegmentIndex >= pathSegments) {
       return;
     }
 
-    segmentWeights[window.segmentIndex] = Math.max(segmentWeights[window.segmentIndex], window.weight);
-    segmentCues[window.segmentIndex] = window.cue;
-    if (window.segmentIndex > 0 && window.cue === 'anticipate') {
-      segmentWeights[window.segmentIndex - 1] = Math.max(segmentWeights[window.segmentIndex - 1], 1 + ((window.weight - 1) * 0.42));
-      if (segmentCues[window.segmentIndex - 1] === 'explore') {
-        segmentCues[window.segmentIndex - 1] = 'anticipate';
+    segmentWeights[routeSegmentIndex] = Math.max(segmentWeights[routeSegmentIndex], window.weight);
+    segmentCues[routeSegmentIndex] = window.cue;
+    if (routeSegmentIndex > 0 && window.cue === 'anticipate') {
+      segmentWeights[routeSegmentIndex - 1] = Math.max(segmentWeights[routeSegmentIndex - 1], 1 + ((window.weight - 1) * 0.42));
+      if (segmentCues[routeSegmentIndex - 1] === 'explore') {
+        segmentCues[routeSegmentIndex - 1] = 'anticipate';
       }
+    }
+  });
+
+  routeCueOverrides.forEach((cueOverride, segmentIndex) => {
+    if (!cueOverride || segmentIndex >= pathSegments) {
+      return;
+    }
+
+    if (
+      cueOverride === 'anticipate'
+      || cueOverride === 'reacquire'
+      || cueOverride === 'dead-end'
+      || cueOverride === 'backtrack'
+    ) {
+      segmentCues[segmentIndex] = cueOverride;
+      segmentWeights[segmentIndex] = Math.max(
+        segmentWeights[segmentIndex],
+        cueOverride === 'backtrack'
+          ? 0.92
+          : cueOverride === 'reacquire'
+            ? 1.08
+            : cueOverride === 'dead-end'
+              ? 1.18
+              : 1.12
+      );
     }
   });
 
@@ -6965,10 +7118,42 @@ export const resolveDemoConfig = (
     },
     behavior: {
       ...legacyTuning.demo.behavior,
+      enableRunnerMistakes: runnerPolicyEnabled,
       segmentDurationsMs,
       segmentCues
     }
   };
+};
+
+export const resolveDemoPresentationElapsedMs = (
+  episode: MazeEpisode,
+  elapsedMs: number,
+  config: DemoWalkerConfig,
+  presentation: MenuDemoPresentation
+): number => {
+  const spawnHoldMs = Math.max(1, config.cadence.spawnHoldMs);
+  const segmentCount = Math.max(1, (config.behavior.segmentDurationsMs?.length ?? 0) || (episode.raster.pathIndices.length - 1));
+  const traverseMs = Math.max(1, resolveDemoWalkerTraverseMs(config, segmentCount));
+  const ritualTuning = legacyTuning.demo.ritual;
+  const commitWindowStart = spawnHoldMs + Math.max(1, Math.floor(traverseMs * ritualTuning.decisionWindowStartRatio));
+  const commitWindowEnd = spawnHoldMs + Math.max(1, Math.floor(traverseMs * ritualTuning.decisionWindowEndRatio));
+
+  if (presentation.ritualPhase === 'decision' && elapsedMs >= commitWindowStart) {
+    const slowedElapsed = Math.min(elapsedMs, commitWindowEnd);
+    const commitOffset = slowedElapsed - commitWindowStart;
+    const reducedCommit = Math.floor(commitOffset * ritualTuning.decisionSlowdownFactor);
+    return commitWindowStart + reducedCommit;
+  }
+
+  if (
+    presentation.lifecyclePhase === 'clear-hold'
+    || presentation.lifecyclePhase === 'reflection-beat'
+    || presentation.lifecyclePhase === 'erase-wipe'
+  ) {
+    return spawnHoldMs + traverseMs;
+  }
+
+  return elapsedMs;
 };
 
 export const resolveDemoTrailRenderBounds = (
@@ -7033,7 +7218,8 @@ export const resolveMenuDemoSequence = (
   config: DemoWalkerConfig
 ): { sequence: MenuDemoSequence; progress: number } => {
   const spawnHoldMs = Math.max(1, config.cadence.spawnHoldMs);
-  const traverseMs = Math.max(1, (Math.max(1, episode.raster.pathIndices.length) - 1) * Math.max(1, config.cadence.exploreStepMs));
+  const segmentCount = Math.max(1, (config.behavior.segmentDurationsMs?.length ?? 0) || (episode.raster.pathIndices.length - 1));
+  const traverseMs = Math.max(1, resolveDemoWalkerTraverseMs(config, segmentCount));
   const goalHoldMs = Math.max(1, config.cadence.goalHoldMs);
   const resetHoldMs = Math.max(1, config.cadence.resetHoldMs);
 

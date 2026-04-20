@@ -103,6 +103,11 @@ interface MazeTopologyStats {
   readonly perimeterPathShare: number;
   readonly centerCrossings: number;
   readonly quadrantCoverage: number;
+  readonly falseShortcutBranches: number;
+  readonly nearGoalBranches: number;
+  readonly hubJunctions: number;
+  readonly chokeCorridors: number;
+  readonly loopDetours: number;
   readonly startGoalSpan: number;
   readonly startGoalEdgeBias: number;
   readonly endpointBranchReachMean: number;
@@ -201,6 +206,11 @@ interface MazeFamilyTopologyProfile {
   readonly minQuadrantCoverage?: number;
   readonly minCenterCrossings?: number;
   readonly maxCenterCrossings?: number;
+  readonly minFalseShortcutBranches?: number;
+  readonly minNearGoalBranches?: number;
+  readonly minHubJunctions?: number;
+  readonly minChokeCorridors?: number;
+  readonly minLoopDetours?: number;
   readonly antiStraightness?: AntiStraightnessPassOptions;
 }
 
@@ -257,6 +267,8 @@ const FAMILY_TOPOLOGY_TUNING: Record<MazeFamily, MazeFamilyTopologyProfile> = {
     minBranchDensity: 0.08,
     maxDeadEndDensity: 0.19,
     minTurnRate: 0.22,
+    minFalseShortcutBranches: 1,
+    minChokeCorridors: 1,
     antiStraightness: {
       minCorridorLength: 6,
       maxInterventions: 2,
@@ -293,6 +305,8 @@ const FAMILY_TOPOLOGY_TUNING: Record<MazeFamily, MazeFamilyTopologyProfile> = {
     minBranchDensity: 0.095,
     maxDeadEndDensity: 0.14,
     minTurnRate: 0.26,
+    minFalseShortcutBranches: 2,
+    minLoopDetours: 2,
     antiStraightness: {
       minCorridorLength: 5,
       maxInterventions: 4,
@@ -330,6 +344,7 @@ const FAMILY_TOPOLOGY_TUNING: Record<MazeFamily, MazeFamilyTopologyProfile> = {
     maxBranchDensity: 0.1,
     maxDeadEndDensity: 0.24,
     minTurnRate: 0.18,
+    minChokeCorridors: 1,
     antiStraightness: {
       minCorridorLength: 7,
       maxInterventions: 2,
@@ -366,6 +381,8 @@ const FAMILY_TOPOLOGY_TUNING: Record<MazeFamily, MazeFamilyTopologyProfile> = {
     minBranchDensity: 0.125,
     maxDeadEndDensity: 0.16,
     minTurnRate: 0.28,
+    minHubJunctions: 2,
+    minChokeCorridors: 1,
     antiStraightness: {
       minCorridorLength: 4,
       maxInterventions: 5,
@@ -403,6 +420,8 @@ const FAMILY_TOPOLOGY_TUNING: Record<MazeFamily, MazeFamilyTopologyProfile> = {
     maxDeadEndDensity: 0.2,
     minTurnRate: 0.2,
     minPerimeterPathShare: 0.16,
+    minNearGoalBranches: 1,
+    minChokeCorridors: 1,
     antiStraightness: {
       minCorridorLength: 5,
       maxInterventions: 3,
@@ -442,6 +461,9 @@ const FAMILY_TOPOLOGY_TUNING: Record<MazeFamily, MazeFamilyTopologyProfile> = {
     minQuadrantCoverage: 4,
     minCenterCrossings: 1,
     maxCenterCrossings: 3,
+    minFalseShortcutBranches: 2,
+    minNearGoalBranches: 1,
+    minHubJunctions: 1,
     antiStraightness: {
       minCorridorLength: 5,
       maxInterventions: 4,
@@ -1186,10 +1208,18 @@ const measureTopology = (maze: MazeCore, pathIndices: ArrayLike<number>): MazeTo
   const graph = buildCorridorGraph(maze, maze.start, maze.goal);
   const pools = collectPlacementPools(maze);
   const corridorLengths = graph.edges.map((edge) => Math.max(1, edge.cost));
+  const canonicalPath = Array.from(pathIndices);
+  const canonicalSet = new Set<number>(canonicalPath);
   let branchDegreeTotal = 0;
   let branchNodeCount = 0;
   let perimeterPathCount = 0;
   let centerCrossings = 0;
+  let falseShortcutBranches = 0;
+  let nearGoalBranches = 0;
+  let hubJunctions = 0;
+  let chokeCorridors = 0;
+  let loopDetours = 0;
+  let currentChokeRun = 0;
   const quadrants = new Set<number>();
   const centerX = (maze.width - 1) / 2;
   const centerY = (maze.height - 1) / 2;
@@ -1203,25 +1233,52 @@ const measureTopology = (maze: MazeCore, pathIndices: ArrayLike<number>): MazeTo
     branchNodeCount += 1;
   }
 
-  for (let index = 0; index < pathIndices.length; index += 1) {
-    const cellIndex = pathIndices[index];
+  for (let index = 0; index < canonicalPath.length; index += 1) {
+    const cellIndex = canonicalPath[index];
     const x = xFromIndex(cellIndex, maze.width);
     const y = yFromIndex(cellIndex, maze.width);
+    const degree = countOpenNeighbors(maze, cellIndex);
+    const offPathNeighbors = getOpenNeighbors(maze, cellIndex).filter((neighbor) => !canonicalSet.has(neighbor));
+    const progress = index / Math.max(1, canonicalPath.length - 1);
     if (isOnPerimeter(x, y, maze.width, maze.height)) {
       perimeterPathCount += 1;
     }
 
     quadrants.add(resolveQuadrant(x, y, maze.width, maze.height));
+    if (degree >= 3 && progress >= 0.24 && progress <= 0.76) {
+      hubJunctions += 1;
+    }
+    if (offPathNeighbors.length > 0 && progress >= 0.18 && progress <= 0.82) {
+      falseShortcutBranches += 1;
+    }
+    if (offPathNeighbors.length > 0 && progress >= 0.7 && index < canonicalPath.length - 1) {
+      nearGoalBranches += 1;
+    }
+    if (offPathNeighbors.length >= 2 || degree >= 4) {
+      loopDetours += 1;
+    }
+    if (degree === 2 && index > 0 && index < canonicalPath.length - 1) {
+      currentChokeRun += 1;
+    } else {
+      if (currentChokeRun >= 3) {
+        chokeCorridors += 1;
+      }
+      currentChokeRun = 0;
+    }
     if (index === 0) {
       continue;
     }
 
-    const previous = pathIndices[index - 1];
+    const previous = canonicalPath[index - 1];
     const previousX = xFromIndex(previous, maze.width);
     const previousY = yFromIndex(previous, maze.width);
     if (crossesAxis(previousX, x, centerX) || crossesAxis(previousY, y, centerY)) {
       centerCrossings += 1;
     }
+  }
+
+  if (currentChokeRun >= 3) {
+    chokeCorridors += 1;
   }
 
   const dx = Math.abs(maze.goal.x - maze.start.x) / Math.max(1, maze.width - 1);
@@ -1239,6 +1296,11 @@ const measureTopology = (maze: MazeCore, pathIndices: ArrayLike<number>): MazeTo
     perimeterPathShare: perimeterPathCount / Math.max(1, pathIndices.length),
     centerCrossings,
     quadrantCoverage: quadrants.size,
+    falseShortcutBranches,
+    nearGoalBranches,
+    hubJunctions,
+    chokeCorridors,
+    loopDetours,
     startGoalSpan: dx + dy,
     startGoalEdgeBias: (
       Number(isOnPerimeter(maze.start.x, maze.start.y, maze.width, maze.height))
@@ -1268,6 +1330,11 @@ const scoreFamilyCandidate = (result: CoreBuildResult, attempt: number): number 
   const endpointDepthScore = result.topology.endpointRegionDepthMean * 2.8;
   const endpointTurnScore = result.topology.endpointTurnPotentialMean * 3.2;
   const endpointCorridorScore = result.topology.endpointCorridorLeadMean * 1.8;
+  const motifScore = (result.topology.falseShortcutBranches * 0.48)
+    + (result.topology.nearGoalBranches * 0.42)
+    + (result.topology.hubJunctions * 0.36)
+    + (result.topology.chokeCorridors * 0.3)
+    + (result.topology.loopDetours * 0.44);
   const recencyPenalty = attempt * 0.015;
 
   switch (result.maze.family) {
@@ -1277,6 +1344,7 @@ const scoreFamilyCandidate = (result: CoreBuildResult, attempt: number): number 
         + (turnScore * 0.8)
         + (shortcutScore * 1.15)
         + (branchScore * 0.12)
+        + (motifScore * 0.22)
         + (endpointAsymmetryScore * 0.78)
         + (endpointBranchScore * 0.62)
         + (endpointTurnScore * 0.68)
@@ -1293,6 +1361,7 @@ const scoreFamilyCandidate = (result: CoreBuildResult, attempt: number): number 
         + (endpointDepthScore * 0.84)
         + (endpointCorridorScore * 0.62)
         + (endpointAsymmetryScore * 0.44)
+        + (motifScore * 0.16)
         - (junctionScore * 0.4)
         - (result.topology.endpointStraightCorridorRisk * 0.42)
         - penalizeAbove(result.topology.corridorP90, 6.6, 0.55)
@@ -1305,6 +1374,7 @@ const scoreFamilyCandidate = (result: CoreBuildResult, attempt: number): number 
         + (turnScore * 0.95)
         + coverageScore
         + (shortcutScore * 0.55)
+        + (motifScore * 0.24)
         + (endpointAsymmetryScore * 0.78)
         + (endpointBranchScore * 0.74)
         + (endpointTurnScore * 0.76)
@@ -1321,6 +1391,7 @@ const scoreFamilyCandidate = (result: CoreBuildResult, attempt: number): number 
         + (endpointAsymmetryScore * 0.56)
         + (endpointDepthScore * 0.34)
         + (endpointTurnScore * 0.42)
+        + (motifScore * 0.18)
         + rewardWindow(result.topology.corridorMean, 3.0, 3.25, 0.9)
         - (result.topology.endpointStraightCorridorRisk * 0.58)
         - penalizeAbove(result.metrics.straightness, 0.79, 1.7)
@@ -1333,6 +1404,7 @@ const scoreFamilyCandidate = (result: CoreBuildResult, attempt: number): number 
         + (result.topology.quadrantCoverage * 0.6)
         + (result.topology.startGoalSpan * 1.1)
         + (turnScore * 0.7)
+        + (motifScore * 0.24)
         + (endpointAsymmetryScore * 0.82)
         + (endpointDepthScore * 0.62)
         + (endpointTurnScore * 0.52)
@@ -1347,6 +1419,7 @@ const scoreFamilyCandidate = (result: CoreBuildResult, attempt: number): number 
         + (turnScore * 0.78)
         + (coverageScore * 0.9)
         + (result.topology.startGoalSpan * 0.74)
+        + (motifScore * 0.18)
         + (endpointAsymmetryScore * 0.5)
         + (endpointBranchScore * 0.28)
         + (endpointTurnScore * 0.34)
@@ -2537,6 +2610,11 @@ const passesQualityGate = (
   const corridorP90Okay = tuning.maxCorridorP90 === undefined || topology.corridorP90 <= tuning.maxCorridorP90;
   const turnRateOkay = tuning.minTurnRate === undefined || topology.turnRate >= tuning.minTurnRate;
   const straightnessOkay = metrics.straightness <= tuning.maxStraightness;
+  const falseShortcutOkay = tuning.minFalseShortcutBranches === undefined || topology.falseShortcutBranches >= tuning.minFalseShortcutBranches;
+  const nearGoalBranchOkay = tuning.minNearGoalBranches === undefined || topology.nearGoalBranches >= tuning.minNearGoalBranches;
+  const hubJunctionOkay = tuning.minHubJunctions === undefined || topology.hubJunctions >= tuning.minHubJunctions;
+  const chokeCorridorOkay = tuning.minChokeCorridors === undefined || topology.chokeCorridors >= tuning.minChokeCorridors;
+  const loopDetourOkay = tuning.minLoopDetours === undefined || topology.loopDetours >= tuning.minLoopDetours;
   switch (family) {
     case 'braided':
       return metrics.solutionLength >= Math.floor(minSolutionLength * 0.84)
@@ -2546,7 +2624,9 @@ const passesQualityGate = (
         && branchDensityOkay
         && corridorMeanOkay
         && corridorP90Okay
-        && turnRateOkay;
+        && turnRateOkay
+        && falseShortcutOkay
+        && loopDetourOkay;
     case 'sparse':
       return metrics.solutionLength >= Math.floor(minSolutionLength * 0.96)
         && metrics.coverage >= 0.12
@@ -2556,7 +2636,8 @@ const passesQualityGate = (
         && sparseBranchingOkay
         && deadEndDensityOkay
         && topology.startGoalSpan >= 1.05
-        && turnRateOkay;
+        && turnRateOkay
+        && chokeCorridorOkay;
     case 'dense':
       return metrics.solutionLength >= Math.floor(minSolutionLength * 0.9)
         && metrics.coverage >= 0.18
@@ -2565,7 +2646,9 @@ const passesQualityGate = (
         && corridorMeanOkay
         && corridorP90Okay
         && turnRateOkay
-        && topology.branchingFactor >= 3.06;
+        && topology.branchingFactor >= 3.06
+        && hubJunctionOkay
+        && chokeCorridorOkay;
     case 'framed':
       return metrics.solutionLength >= Math.floor(minSolutionLength * 0.92)
         && metrics.coverage >= 0.15
@@ -2575,7 +2658,9 @@ const passesQualityGate = (
         && corridorP90Okay
         && turnRateOkay
         && topology.perimeterPathShare >= (tuning.minPerimeterPathShare ?? 0)
-        && topology.startGoalEdgeBias >= 0.5;
+        && topology.startGoalEdgeBias >= 0.5
+        && nearGoalBranchOkay
+        && chokeCorridorOkay;
     case 'split-flow':
       return metrics.solutionLength >= Math.floor(minSolutionLength * 0.96)
         && metrics.coverage >= 0.16
@@ -2586,7 +2671,10 @@ const passesQualityGate = (
         && turnRateOkay
         && topology.quadrantCoverage >= (tuning.minQuadrantCoverage ?? 0)
         && topology.centerCrossings >= (tuning.minCenterCrossings ?? 0)
-        && topology.centerCrossings <= (tuning.maxCenterCrossings ?? Number.POSITIVE_INFINITY);
+        && topology.centerCrossings <= (tuning.maxCenterCrossings ?? Number.POSITIVE_INFINITY)
+        && falseShortcutOkay
+        && nearGoalBranchOkay
+        && hubJunctionOkay;
     case 'classic':
     default:
       return metrics.solutionLength >= minSolutionLength
@@ -2596,7 +2684,9 @@ const passesQualityGate = (
         && corridorMeanOkay
         && corridorP90Okay
         && deadEndDensityOkay
-        && turnRateOkay;
+        && turnRateOkay
+        && falseShortcutOkay
+        && chokeCorridorOkay;
   }
 };
 

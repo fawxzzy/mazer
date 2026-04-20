@@ -122,42 +122,27 @@ export const formatIntentHudSummary = (summary: string): string => {
     return matches ? formatter(...matches) : null;
   };
 
-  return rewrite(/^Seeing the exit(?: line)? from (.+)$/u, (_, from) => `Exit ahead from ${from}`)
-    ?? rewrite(/^Watching (.+) pressure near (.+)$/u, (_, cue, where) => `Watch ${cue} near ${where}`)
-    ?? rewrite(/^Spotting (.+) timing at (.+)$/u, (_, cue, where) => `Watch ${cue} timing at ${where}`)
-    ?? rewrite(/^Checking the (.+) near (.+)$/u, (_, item, where) => `Check ${item} near ${where}`)
-    ?? rewrite(/^Reading the (.+) timing at (.+)$/u, (_, cue, where) => `Watch ${cue} timing at ${where}`)
-    ?? rewrite(/^Recalling the dead end at (.+)$/u, (_, where) => `Dead end at ${where}. Turn back`)
-    ?? rewrite(/^Dead end at (.+); back out$/u, (_, where) => `Dead end at ${where}. Turn back`)
-    ?? rewrite(/^Noting (.+) near (.+)$/u, (_, landmark, where) => `${landmark} near ${where}`)
-    ?? rewrite(/^Replanning at (.+); try (.+)$/u, (_, where, target) => `Try ${target} from ${where}`)
-    ?? rewrite(/^Taking the exit from (.+)$/u, (_, where) => `Take the exit from ${where}`)
-    ?? rewrite(/^Taking (.+) from (.+)$/u, (_, target, where) => `Take ${target} from ${where}`)
-    ?? rewrite(/^Waiting for the gate at (.+)$/u, (_, where) => `Wait for the gate at ${where}`)
-    ?? rewrite(/^Checking (.+) from (.+)$/u, (_, target, where) => `Check ${target} from ${where}`)
+  return rewrite(/^Seeing the exit(?: line)? from (.+)$/u, () => 'I can see the exit.')
+    ?? rewrite(/^Watching (.+) pressure near (.+)$/u, () => 'That side feels risky.')
+    ?? rewrite(/^Spotting (.+) timing at (.+)$/u, () => 'That timing looks bad.')
+    ?? rewrite(/^Checking the (.+) near (.+)$/u, () => 'There might be something here.')
+    ?? rewrite(/^Reading the (.+) timing at (.+)$/u, () => 'Wait. Not yet.')
+    ?? rewrite(/^Recalling the dead end at (.+)$/u, () => 'Dead end. Back up.')
+    ?? rewrite(/^Dead end at (.+); back out$/u, () => 'Dead end. Back up.')
+    ?? rewrite(/^Noting (.+) near (.+)$/u, () => 'This spot looks useful.')
+    ?? rewrite(/^Replanning at (.+); try (.+)$/u, () => 'That path wasted time.')
+    ?? rewrite(/^Taking the exit from (.+)$/u, () => 'I am close. Keep going.')
+    ?? rewrite(/^Taking (.+) from (.+)$/u, () => 'I am closer this way.')
+    ?? rewrite(/^Waiting for the gate at (.+)$/u, () => 'Wait. The gate will open.')
+    ?? rewrite(/^Checking (.+) from (.+)$/u, () => 'This side looks better.')
+    ?? rewrite(/^There is a marker here$/u, () => 'This spot looks useful.')
     ?? normalized;
 };
 
-const INTENT_HUD_STATUS_LEADS: Partial<Record<IntentKind, string>> = {
-  'frontier-chosen': 'Next branch',
-  'landmark-spotted': 'Landmark',
-  'item-spotted': 'Nearby',
-  'trap-inferred': 'Watch ahead',
-  'enemy-seen': 'Watch ahead',
-  'puzzle-state-observed': 'Watch ahead',
-  'replan-triggered': 'Next turn',
-  'route-commitment-changed': 'Closer route',
-  'goal-observed': 'Exit path',
-  'gate-aligned': 'Watch ahead',
-  'dead-end-confirmed': 'Turn back'
-};
+const INTENT_HUD_STATUS_LEADS: Partial<Record<IntentKind, string>> = {};
 
 const resolveIntentHudStatusLead = (kind: IntentKind | null | undefined): string => (
-  kind ? INTENT_HUD_STATUS_LEADS[kind] ?? 'Route' : 'Route'
-);
-
-const resolveIntentHudEntryLead = (index: number): string => (
-  index <= 0 ? 'Now' : index === 1 ? 'Next' : 'Then'
+  kind ? INTENT_HUD_STATUS_LEADS[kind] ?? '' : ''
 );
 
 const normalizeAnchorRect = (
@@ -644,7 +629,11 @@ export const createIntentFeedHud = (
         ? clampIntentFeedSummary(formatIntentHudSummary(riskMeta.statusLabel ?? ''), statusMaxChars)
         : visibleStatus
           ? clampIntentFeedSummary(
-            `${resolveIntentHudStatusLead(visibleStatus.kind)}: ${formatIntentHudSummary(visibleStatus.summary)}`,
+            (() => {
+              const lead = resolveIntentHudStatusLead(visibleStatus.kind);
+              const summary = formatIntentHudSummary(visibleStatus.summary);
+              return lead ? `${lead}: ${summary}` : summary;
+            })(),
             statusMaxChars
           )
           : '';
@@ -723,9 +712,7 @@ export const createIntentFeedHud = (
             eventStartY + (index * (lineHeight + tuning.entryGapPx))
           )
           .setFixedSize(layout.rect.width - (tuning.paddingXPx * 2), 0)
-          .setText(
-            `${resolveIntentHudEntryLead(index)}: ${clampIntentFeedSummary(formatIntentHudSummary(record.summary), entryMaxChars)}`
-          )
+          .setText(clampIntentFeedSummary(formatIntentHudSummary(record.summary), entryMaxChars))
           .setAlpha(record.opacity * transitionAlpha);
         entry.setName(isMicroThought ? 'micro-thought' : 'quick-thought');
         entry.setDataEnabled();

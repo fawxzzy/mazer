@@ -140,7 +140,7 @@ describe('menu intent runtime', () => {
     expect(secondState?.status).not.toBeNull();
     expect(secondState?.status?.kind).toBe('goal-observed');
     expect(secondState?.events?.length ?? secondState?.entries.length).toBeLessThanOrEqual(4);
-    expect(secondState?.status?.summary).toContain('exit');
+    expect(secondState?.status?.summary.toLowerCase()).toContain('exit');
   });
 
   test('holds feed entries for a minimum dwell and coalesces rapid replacements', () => {
