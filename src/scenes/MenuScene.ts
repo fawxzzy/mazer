@@ -855,13 +855,13 @@ const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
       veilAlphaBias: -0.004,
       auraScaleBias: -0.01,
       haloScaleBias: -0.003,
-      motifPrimaryAlpha: 0.07,
-      motifSecondaryAlpha: 0.03,
+      motifPrimaryAlpha: 0.045,
+      motifSecondaryAlpha: 0.018,
       blueprintAccentAlphaScale: 0.82
     },
     presentation: {
-      driftScale: 0.92,
-      offsetScale: 0.84,
+      driftScale: 0.74,
+      offsetScale: 0.72,
       solutionPathAlphaScale: 1.06,
       metadataAlphaBias: -0.02,
       flashAlphaBias: -0.02,
@@ -878,19 +878,19 @@ const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
       ufoColor: 0x8fdcff,
       driftMoteColor: 0x66758a,
       staticStarDensityScale: 0.76,
-      twinkleDensityScale: 0.78,
-      hazeAlphaScale: 0.72,
-      driftMoteDensityScale: 0.18,
-      shootingIntervalScale: 1.18,
-      cometIntervalScale: 1.22,
-      satelliteIntervalScale: 0.96,
-      ufoIntervalScale: 1.24,
+      twinkleDensityScale: 0.62,
+      hazeAlphaScale: 0.56,
+      driftMoteDensityScale: 0.08,
+      shootingIntervalScale: 1.42,
+      cometIntervalScale: 1.48,
+      satelliteIntervalScale: 1.28,
+      ufoIntervalScale: 1.58,
       heroCooldownScale: 1.08,
       signatureCooldownScale: 1.18,
-      motifAlphaScale: 0.72,
+      motifAlphaScale: 0.5,
       veilWidthScale: 1.14,
       veilHeightScale: 0.74,
-      veilRotationRange: 10,
+      veilRotationRange: 7,
       allowSatellite: true,
       allowUfo: true
     },
@@ -1008,13 +1008,13 @@ const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
       veilAlphaBias: -0.004,
       auraScaleBias: 0.01,
       haloScaleBias: 0.006,
-      motifPrimaryAlpha: 0.08,
-      motifSecondaryAlpha: 0.04,
+      motifPrimaryAlpha: 0.048,
+      motifSecondaryAlpha: 0.024,
       blueprintAccentAlphaScale: 0.92
     },
     presentation: {
-      driftScale: 1.02,
-      offsetScale: 1,
+      driftScale: 0.78,
+      offsetScale: 0.76,
       solutionPathAlphaScale: 0.98,
       metadataAlphaBias: 0.02,
       flashAlphaBias: 0.02,
@@ -1031,19 +1031,19 @@ const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
       ufoColor: 0xffa062,
       driftMoteColor: 0xf18f4d,
       staticStarDensityScale: 0.7,
-      twinkleDensityScale: 0.74,
-      hazeAlphaScale: 0.94,
-      driftMoteDensityScale: 0.96,
-      shootingIntervalScale: 0.96,
-      cometIntervalScale: 0.88,
+      twinkleDensityScale: 0.58,
+      hazeAlphaScale: 0.7,
+      driftMoteDensityScale: 0.46,
+      shootingIntervalScale: 1.24,
+      cometIntervalScale: 1.18,
       satelliteIntervalScale: 1.28,
       ufoIntervalScale: 1.42,
       heroCooldownScale: 0.92,
       signatureCooldownScale: 1.08,
-      motifAlphaScale: 0.9,
+      motifAlphaScale: 0.62,
       veilWidthScale: 0.96,
       veilHeightScale: 0.84,
-      veilRotationRange: 13,
+      veilRotationRange: 9,
       allowSatellite: false,
       allowUfo: false
     },
@@ -1161,13 +1161,13 @@ const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
       veilAlphaBias: -0.008,
       auraScaleBias: 0.014,
       haloScaleBias: 0.008,
-      motifPrimaryAlpha: 0.08,
-      motifSecondaryAlpha: 0.05,
+      motifPrimaryAlpha: 0.05,
+      motifSecondaryAlpha: 0.028,
       blueprintAccentAlphaScale: 1
     },
     presentation: {
-      driftScale: 1.06,
-      offsetScale: 1.04,
+      driftScale: 0.8,
+      offsetScale: 0.78,
       solutionPathAlphaScale: 0.92,
       metadataAlphaBias: 0.03,
       flashAlphaBias: 0.04,
@@ -1184,19 +1184,19 @@ const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
       ufoColor: 0xb391ff,
       driftMoteColor: 0x6fe6ff,
       staticStarDensityScale: 0.86,
-      twinkleDensityScale: 0.96,
-      hazeAlphaScale: 1,
-      driftMoteDensityScale: 0.42,
-      shootingIntervalScale: 0.86,
-      cometIntervalScale: 0.82,
-      satelliteIntervalScale: 1,
-      ufoIntervalScale: 0.92,
+      twinkleDensityScale: 0.68,
+      hazeAlphaScale: 0.74,
+      driftMoteDensityScale: 0.24,
+      shootingIntervalScale: 1.18,
+      cometIntervalScale: 1.14,
+      satelliteIntervalScale: 1.24,
+      ufoIntervalScale: 1.28,
       heroCooldownScale: 0.88,
       signatureCooldownScale: 0.96,
-      motifAlphaScale: 1.04,
+      motifAlphaScale: 0.68,
       veilWidthScale: 0.74,
       veilHeightScale: 1.46,
-      veilRotationRange: 8,
+      veilRotationRange: 6,
       allowSatellite: true,
       allowUfo: true
     },
@@ -1323,13 +1323,13 @@ const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
       veilAlphaBias: -0.02,
       auraScaleBias: -0.012,
       haloScaleBias: -0.008,
-      motifPrimaryAlpha: 0.06,
-      motifSecondaryAlpha: 0.04,
+      motifPrimaryAlpha: 0.04,
+      motifSecondaryAlpha: 0.022,
       blueprintAccentAlphaScale: 1.18
     },
     presentation: {
-      driftScale: 0.88,
-      offsetScale: 0.9,
+      driftScale: 0.72,
+      offsetScale: 0.74,
       solutionPathAlphaScale: 1.02,
       metadataAlphaBias: 0.01,
       flashAlphaBias: -0.04,
@@ -1346,19 +1346,19 @@ const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
       ufoColor: 0xa2b5c8,
       driftMoteColor: 0xa89066,
       staticStarDensityScale: 0.54,
-      twinkleDensityScale: 0.62,
-      hazeAlphaScale: 0.58,
-      driftMoteDensityScale: 0.92,
-      shootingIntervalScale: 1.36,
-      cometIntervalScale: 1.42,
+      twinkleDensityScale: 0.46,
+      hazeAlphaScale: 0.46,
+      driftMoteDensityScale: 0.42,
+      shootingIntervalScale: 1.58,
+      cometIntervalScale: 1.64,
       satelliteIntervalScale: 1.64,
       ufoIntervalScale: 1.8,
       heroCooldownScale: 1.18,
       signatureCooldownScale: 1.3,
-      motifAlphaScale: 0.58,
+      motifAlphaScale: 0.42,
       veilWidthScale: 1.22,
       veilHeightScale: 0.72,
-      veilRotationRange: 6,
+      veilRotationRange: 4,
       allowSatellite: false,
       allowUfo: false
     },
@@ -1476,13 +1476,13 @@ const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
       veilAlphaBias: 0.01,
       auraScaleBias: -0.016,
       haloScaleBias: -0.01,
-      motifPrimaryAlpha: 0.08,
-      motifSecondaryAlpha: 0.02,
+      motifPrimaryAlpha: 0.05,
+      motifSecondaryAlpha: 0.014,
       blueprintAccentAlphaScale: 0.72
     },
     presentation: {
-      driftScale: 0.82,
-      offsetScale: 0.7,
+      driftScale: 0.68,
+      offsetScale: 0.62,
       solutionPathAlphaScale: 0.94,
       metadataAlphaBias: -0.04,
       flashAlphaBias: -0.06,
@@ -1499,16 +1499,16 @@ const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
       ufoColor: 0xadb7c4,
       driftMoteColor: 0x7c8794,
       staticStarDensityScale: 0.52,
-      twinkleDensityScale: 0.58,
-      hazeAlphaScale: 0.66,
+      twinkleDensityScale: 0.44,
+      hazeAlphaScale: 0.5,
       driftMoteDensityScale: 0.22,
-      shootingIntervalScale: 1.12,
-      cometIntervalScale: 1.18,
-      satelliteIntervalScale: 0.9,
+      shootingIntervalScale: 1.34,
+      cometIntervalScale: 1.42,
+      satelliteIntervalScale: 1.24,
       ufoIntervalScale: 1.8,
       heroCooldownScale: 1.04,
       signatureCooldownScale: 1.18,
-      motifAlphaScale: 0.66,
+      motifAlphaScale: 0.48,
       veilWidthScale: 1.34,
       veilHeightScale: 0.42,
       veilRotationRange: 4,
@@ -1648,12 +1648,12 @@ export const resolveAmbientSkyProfileTuning = (
 ): AmbientSkyProfileTuning => {
   const safeVariant = sanitizePresentationVariant(variant);
   let tuning: AmbientSkyProfileTuning = {
-    densityScale: 1.08,
-    motionScale: 1.06,
-    eventIntervalScale: 0.94,
+    densityScale: 0.88,
+    motionScale: 0.72,
+    eventIntervalScale: 1.22,
     twinkleCount: legacyTuning.menu.ambientSky.twinkleCount,
     driftMoteCount: legacyTuning.menu.ambientSky.driftMoteCount,
-    movingEventCap: 2,
+    movingEventCap: 1,
     signatureEventCap: 1,
     clearZoneScale: 1
   };
@@ -1662,40 +1662,40 @@ export const resolveAmbientSkyProfileTuning = (
     case 'tv':
       tuning = {
         ...tuning,
-        densityScale: 1.32,
-        motionScale: 1.14,
-        eventIntervalScale: 0.74,
-        twinkleCount: 28,
-        driftMoteCount: 11,
-        movingEventCap: 2,
+        densityScale: 1.04,
+        motionScale: 0.8,
+        eventIntervalScale: 1,
+        twinkleCount: 18,
+        driftMoteCount: 6,
+        movingEventCap: 1,
         signatureEventCap: 1,
-        clearZoneScale: 0.94
+        clearZoneScale: 1.04
       };
       break;
     case 'obs':
       tuning = {
         ...tuning,
-        densityScale: 0.72,
-        motionScale: 0.82,
-        eventIntervalScale: 1.14,
-        twinkleCount: 12,
-        driftMoteCount: 4,
-        movingEventCap: 1,
-        signatureEventCap: 1,
-        clearZoneScale: 1.28
+        densityScale: 0.56,
+        motionScale: 0.54,
+        eventIntervalScale: 1.48,
+        twinkleCount: 8,
+        driftMoteCount: 2,
+        movingEventCap: 0,
+        signatureEventCap: 0,
+        clearZoneScale: 1.34
       };
       break;
     case 'mobile':
       tuning = {
         ...tuning,
-        densityScale: 0.84,
-        motionScale: 0.86,
-        eventIntervalScale: 1.04,
-        twinkleCount: 15,
-        driftMoteCount: 5,
-        movingEventCap: 1,
-        signatureEventCap: 1,
-        clearZoneScale: 1.18
+        densityScale: 0.7,
+        motionScale: 0.64,
+        eventIntervalScale: 1.32,
+        twinkleCount: 10,
+        driftMoteCount: 3,
+        movingEventCap: 0,
+        signatureEventCap: 0,
+        clearZoneScale: 1.24
       };
       break;
     default:
@@ -1706,16 +1706,16 @@ export const resolveAmbientSkyProfileTuning = (
     case 'title':
       tuning = {
         ...tuning,
-        densityScale: tuning.densityScale * 1.14,
-        eventIntervalScale: tuning.eventIntervalScale * 0.82
+        densityScale: tuning.densityScale * 1.04,
+        eventIntervalScale: tuning.eventIntervalScale * 0.96
       };
       break;
     case 'loading':
       tuning = {
         ...tuning,
-        densityScale: tuning.densityScale * 0.9,
-        motionScale: tuning.motionScale * 0.92,
-        eventIntervalScale: tuning.eventIntervalScale * 1.06
+        densityScale: tuning.densityScale * 0.84,
+        motionScale: tuning.motionScale * 0.84,
+        eventIntervalScale: tuning.eventIntervalScale * 1.14
       };
       break;
     case 'ambient':
@@ -1726,14 +1726,14 @@ export const resolveAmbientSkyProfileTuning = (
   if (reducedMotion) {
     tuning = {
       ...tuning,
-      densityScale: tuning.densityScale * 0.94,
-      motionScale: tuning.motionScale * 0.56,
-      eventIntervalScale: tuning.eventIntervalScale * 1.22,
-      twinkleCount: Math.max(6, Math.round(tuning.twinkleCount)),
-      driftMoteCount: Math.max(1, Math.round(tuning.driftMoteCount * 0.82)),
-      movingEventCap: Math.min(tuning.movingEventCap, 1),
+      densityScale: tuning.densityScale * 0.8,
+      motionScale: tuning.motionScale * 0.28,
+      eventIntervalScale: tuning.eventIntervalScale * 1.6,
+      twinkleCount: Math.max(4, Math.round(tuning.twinkleCount * 0.56)),
+      driftMoteCount: 0,
+      movingEventCap: 0,
       signatureEventCap: 0,
-      clearZoneScale: tuning.clearZoneScale * 1.06
+      clearZoneScale: tuning.clearZoneScale * 1.1
     };
   }
 
@@ -1937,43 +1937,43 @@ const DEMO_MOOD_PROFILES: Record<DemoMood, {
     solutionPathAlpha: 1,
     trailWindowOffset: 10,
     trailWindowScale: 1.04,
-    ambientDriftPx: 1.4,
-    ambientDriftMs: 4600,
+    ambientDriftPx: 0.9,
+    ambientDriftMs: 6200,
     actorPulseBoost: 0.04,
     persistentFadeFloor: 0.38,
     trailPulseBoost: 0.018,
     metadataAlpha: 0.54,
-    auraAlpha: 0.094,
-    haloAlpha: 0.036,
-    shadeAlpha: 0.024
+    auraAlpha: 0.078,
+    haloAlpha: 0.028,
+    shadeAlpha: 0.02
   },
   scan: {
     solutionPathAlpha: 0.16,
     trailWindowOffset: -12,
     trailWindowScale: 0.36,
-    ambientDriftPx: 1.8,
-    ambientDriftMs: 5200,
+    ambientDriftPx: 1,
+    ambientDriftMs: 7000,
     actorPulseBoost: 0.018,
     persistentFadeFloor: 0.28,
     trailPulseBoost: 0.01,
     metadataAlpha: 0.44,
-    auraAlpha: 0.106,
-    haloAlpha: 0.038,
-    shadeAlpha: 0.038
+    auraAlpha: 0.082,
+    haloAlpha: 0.028,
+    shadeAlpha: 0.028
   },
   blueprint: {
     solutionPathAlpha: 0.42,
     trailWindowOffset: -2,
     trailWindowScale: 0.62,
-    ambientDriftPx: 1.2,
-    ambientDriftMs: 5400,
+    ambientDriftPx: 0.8,
+    ambientDriftMs: 7200,
     actorPulseBoost: 0.026,
     persistentFadeFloor: 0.33,
     trailPulseBoost: 0.014,
     metadataAlpha: 0.62,
-    auraAlpha: 0.088,
-    haloAlpha: 0.03,
-    shadeAlpha: 0.024
+    auraAlpha: 0.074,
+    haloAlpha: 0.024,
+    shadeAlpha: 0.02
   }
 };
 
@@ -2001,15 +2001,15 @@ const VARIANT_PROFILES: Record<AmbientPresentationVariant, VariantProfile> = {
     solutionPathScale: 1.04,
     metadataAlphaScale: 0.84,
     flashAlphaScale: 0.92,
-    boardAuraBias: -0.004,
-    boardHaloBias: 0.006,
+    boardAuraBias: -0.006,
+    boardHaloBias: 0.004,
     boardShadeBias: -0.004,
     boardVeilBias: 0.01,
-    boardOffsetRangeX: 6,
-    boardOffsetRangeY: 4,
-    hudOffsetRangeX: 8,
-    hudOffsetRangeY: 4,
-    driftScale: 0.88,
+    boardOffsetRangeX: 4,
+    boardOffsetRangeY: 2,
+    hudOffsetRangeX: 5,
+    hudOffsetRangeY: 2,
+    driftScale: 0.72,
     actorPulseBias: 0.012
   },
   ambient: {
@@ -2035,15 +2035,15 @@ const VARIANT_PROFILES: Record<AmbientPresentationVariant, VariantProfile> = {
     solutionPathScale: 0.78,
     metadataAlphaScale: 0.62,
     flashAlphaScale: 0,
-    boardAuraBias: 0.022,
-    boardHaloBias: 0.014,
+    boardAuraBias: 0.012,
+    boardHaloBias: 0.008,
     boardShadeBias: -0.006,
     boardVeilBias: -0.012,
-    boardOffsetRangeX: 9,
-    boardOffsetRangeY: 5,
-    hudOffsetRangeX: 10,
-    hudOffsetRangeY: 6,
-    driftScale: 1.06,
+    boardOffsetRangeX: 6,
+    boardOffsetRangeY: 3,
+    hudOffsetRangeX: 6,
+    hudOffsetRangeY: 4,
+    driftScale: 0.78,
     actorPulseBias: 0.004
   },
   loading: {
@@ -2069,15 +2069,15 @@ const VARIANT_PROFILES: Record<AmbientPresentationVariant, VariantProfile> = {
     solutionPathScale: 0.92,
     metadataAlphaScale: 1.16,
     flashAlphaScale: 1.08,
-    boardAuraBias: 0.022,
-    boardHaloBias: 0.018,
-    boardShadeBias: 0.014,
+    boardAuraBias: 0.012,
+    boardHaloBias: 0.01,
+    boardShadeBias: 0.008,
     boardVeilBias: 0.02,
-    boardOffsetRangeX: 8,
-    boardOffsetRangeY: 5,
-    hudOffsetRangeX: 10,
-    hudOffsetRangeY: 4,
-    driftScale: 0.86,
+    boardOffsetRangeX: 5,
+    boardOffsetRangeY: 3,
+    hudOffsetRangeX: 6,
+    hudOffsetRangeY: 2,
+    driftScale: 0.68,
     actorPulseBias: 0.01
   }
 };
@@ -2982,6 +2982,7 @@ class AmbientSkyLayer {
   }
 
   private createVeils(): void {
+    const motionAmplitudeScale = Math.max(this.reducedMotion ? 0.08 : 0.22, Math.min(1, this.tuning.motionScale));
     const veilCount = Math.max(
       1,
       Math.round(legacyTuning.menu.ambientSky.hazeLayerCount * this.tuning.densityScale)
@@ -3002,18 +3003,18 @@ class AmbientSkyLayer {
         graphics,
         anchorX: anchor.x,
         anchorY: anchor.y,
-        rangeX: this.range(legacyTuning.menu.ambientSky.hazeDriftRangePx * 0.45, legacyTuning.menu.ambientSky.hazeDriftRangePx),
-        rangeY: this.range(legacyTuning.menu.ambientSky.hazeDriftRangePx * 0.18, legacyTuning.menu.ambientSky.hazeDriftRangePx * 0.58),
+        rangeX: this.range(legacyTuning.menu.ambientSky.hazeDriftRangePx * 0.45, legacyTuning.menu.ambientSky.hazeDriftRangePx) * motionAmplitudeScale,
+        rangeY: this.range(legacyTuning.menu.ambientSky.hazeDriftRangePx * 0.18, legacyTuning.menu.ambientSky.hazeDriftRangePx * 0.58) * motionAmplitudeScale,
         pulseMs: this.range(
           legacyTuning.menu.ambientSky.hazeDriftDurationMinMs,
           legacyTuning.menu.ambientSky.hazeDriftDurationMaxMs
         ) / Math.max(0.25, this.tuning.motionScale),
         phase: this.range(0, Math.PI * 2),
         baseAlpha: graphics.alpha,
-        amplitude: 0.08,
-        scaleAmplitudeX: this.range(0.02, 0.07),
-        scaleAmplitudeY: this.range(0.02, 0.09),
-        rotationRange: (this.themeProfile.ambientSky.veilRotationRange * (Math.PI / 180)) * this.range(0.72, 1.08),
+        amplitude: 0.05 * motionAmplitudeScale,
+        scaleAmplitudeX: this.range(0.02, 0.07) * motionAmplitudeScale,
+        scaleAmplitudeY: this.range(0.02, 0.09) * motionAmplitudeScale,
+        rotationRange: (this.themeProfile.ambientSky.veilRotationRange * (Math.PI / 180)) * this.range(0.72, 1.08) * motionAmplitudeScale,
         rotationPhase: this.range(0, Math.PI * 2)
       });
     }
@@ -3123,7 +3124,11 @@ class AmbientSkyLayer {
   }
 
   private createTwinkles(): void {
-    const count = Math.max(6, Math.round(this.tuning.twinkleCount * this.themeProfile.ambientSky.twinkleDensityScale));
+    const motionAmplitudeScale = Math.max(this.reducedMotion ? 0.08 : 0.22, Math.min(1, this.tuning.motionScale));
+    const count = Math.max(
+      this.reducedMotion ? 4 : 6,
+      Math.round(this.tuning.twinkleCount * this.themeProfile.ambientSky.twinkleDensityScale)
+    );
     for (let index = 0; index < count; index += 1) {
       const anchor = this.sampleOpenSkyPoint(true);
       const sprite = this.scene.add.image(anchor.x, anchor.y, AMBIENT_SKY_TEXTURES.twinkle)
@@ -3136,19 +3141,20 @@ class AmbientSkyLayer {
         anchorX: anchor.x,
         anchorY: anchor.y,
         baseAlpha: sprite.alpha,
-        amplitude: this.range(0.06, 0.16),
+        amplitude: this.range(0.06, 0.16) * motionAmplitudeScale,
         pulseMs: this.range(
           legacyTuning.menu.ambientSky.twinklePulseDurationMinMs,
           legacyTuning.menu.ambientSky.twinklePulseDurationMaxMs
         ) / Math.max(0.25, this.tuning.motionScale),
-        driftX: this.range(-legacyTuning.menu.ambientSky.twinkleDriftRangePx, legacyTuning.menu.ambientSky.twinkleDriftRangePx),
-        driftY: this.range(-legacyTuning.menu.ambientSky.twinkleDriftRangePx * 0.45, legacyTuning.menu.ambientSky.twinkleDriftRangePx * 0.45),
+        driftX: this.range(-legacyTuning.menu.ambientSky.twinkleDriftRangePx, legacyTuning.menu.ambientSky.twinkleDriftRangePx) * motionAmplitudeScale,
+        driftY: this.range(-legacyTuning.menu.ambientSky.twinkleDriftRangePx * 0.45, legacyTuning.menu.ambientSky.twinkleDriftRangePx * 0.45) * motionAmplitudeScale,
         phase: this.range(0, Math.PI * 2)
       });
     }
   }
 
   private createDriftMotes(): void {
+    const motionAmplitudeScale = Math.max(this.reducedMotion ? 0.08 : 0.22, Math.min(1, this.tuning.motionScale));
     const count = Math.max(
       0,
       Math.round(this.tuning.driftMoteCount * this.themeProfile.ambientSky.driftMoteDensityScale)
@@ -3176,7 +3182,7 @@ class AmbientSkyLayer {
         ) / 1000,
         phase: this.range(0, Math.PI * 2),
         baseAlpha: sprite.alpha,
-        amplitude: this.range(0.02, 0.06)
+        amplitude: this.range(0.02, 0.06) * motionAmplitudeScale
       });
     }
   }
@@ -3412,7 +3418,7 @@ class AmbientSkyLayer {
       toY: segment.endY,
       maxAlpha: this.range(tuning.alphaMin, tuning.alphaMax),
       blinkMs: this.range(tuning.blinkDurationMinMs, tuning.blinkDurationMaxMs),
-      wobblePx: ufo ? 1.4 : 0.8,
+      wobblePx: (ufo ? 1.4 : 0.8) * Math.max(this.reducedMotion ? 0.08 : 0.22, Math.min(1, this.tuning.motionScale)),
       wobbleSpeed: ufo ? 0.0046 : 0.0034,
       phase: this.range(0, Math.PI * 2),
       width,
@@ -5631,11 +5637,7 @@ export class MenuScene extends Phaser.Scene {
         };
 
         if (cue === 'goal') {
-          pulseBoard(0.18, 0.16, 0.2, 360, 1.024);
-        } else if (cue === 'reset') {
-          pulseBoard(0.1, 0.08, 0.12, 220, 1.014);
-        } else if (cue === 'spawn') {
-          pulseBoard(0.11, 0.12, 0.16, 240, 1.014);
+          pulseBoard(0.1, 0.08, 0.1, 280, 1.012);
         }
       };
       const resolvePresentationElapsedMs = (episode: MazeEpisode, elapsedMs: number, presentation: MenuDemoPresentation): number => {
@@ -7111,43 +7113,43 @@ export const resolveMenuDemoPresentation = (
   switch (sequenceState.sequence) {
     case 'intro':
       boardVeilAlpha = lerp(cycle.mood === 'scan' ? 0.18 : 0.22, 0.04, progress);
-      boardAuraAlpha = moodProfile.auraAlpha + ((1 - progress) * 0.05);
-      boardHaloAlpha = moodProfile.haloAlpha + ((1 - progress) * 0.045);
-      boardShadeAlpha = moodProfile.shadeAlpha + ((1 - progress) * 0.03);
-      boardAuraScale = lerp(1.035, 1, progress);
-      boardHaloScale = lerp(1.022, 1, progress);
+      boardAuraAlpha = moodProfile.auraAlpha + ((1 - progress) * 0.028);
+      boardHaloAlpha = moodProfile.haloAlpha + ((1 - progress) * 0.024);
+      boardShadeAlpha = moodProfile.shadeAlpha + ((1 - progress) * 0.018);
+      boardAuraScale = lerp(1.018, 1, progress);
+      boardHaloScale = lerp(1.012, 1, progress);
       metadataAlpha = clamp((moodProfile.metadataAlpha * 0.82 * variantProfile.metadataAlphaScale) + (progress * 0.08), 0.18, 0.82);
       flashAlpha = cycle.mood === 'blueprint' ? lerp(0.82, 0.24, progress) : flashAlpha;
       break;
     case 'reveal':
-      boardVeilAlpha = clamp((cycle.mood === 'scan' ? 0.04 : 0.024) + (wave * (cycle.mood === 'scan' ? 0.016 : 0.008)), 0, 0.24);
-      boardAuraAlpha = moodProfile.auraAlpha + (wave * (cycle.mood === 'scan' ? 0.05 : 0.028));
-      boardHaloAlpha = moodProfile.haloAlpha + (wave * (cycle.mood === 'scan' ? 0.032 : 0.018));
-      boardShadeAlpha = moodProfile.shadeAlpha + (wave * (cycle.mood === 'scan' ? 0.032 : 0.015));
-      boardAuraScale = 1 + (wave * 0.012);
-      boardHaloScale = 1 + (wave * 0.008);
+      boardVeilAlpha = clamp((cycle.mood === 'scan' ? 0.036 : 0.022) + (wave * (cycle.mood === 'scan' ? 0.01 : 0.005)), 0, 0.24);
+      boardAuraAlpha = moodProfile.auraAlpha + (wave * (cycle.mood === 'scan' ? 0.024 : 0.014));
+      boardHaloAlpha = moodProfile.haloAlpha + (wave * (cycle.mood === 'scan' ? 0.016 : 0.009));
+      boardShadeAlpha = moodProfile.shadeAlpha + (wave * (cycle.mood === 'scan' ? 0.018 : 0.01));
+      boardAuraScale = 1 + (wave * 0.006);
+      boardHaloScale = 1 + (wave * 0.004);
       metadataAlpha = clamp((moodProfile.metadataAlpha + (cycle.mood === 'blueprint' ? 0.08 : 0.04)) * variantProfile.metadataAlphaScale, 0.18, 0.82);
       flashAlpha = cycle.mood === 'blueprint' ? Math.max(0, 0.46 - (progress * 0.46)) : flashAlpha;
       break;
     case 'arrival': {
       const arrivalGlow = 1 - Math.abs((progress * 2) - 1);
       boardVeilAlpha = 0.022;
-      boardAuraAlpha = moodProfile.auraAlpha + 0.03 + (arrivalGlow * 0.07);
-      boardHaloAlpha = moodProfile.haloAlpha + 0.02 + (arrivalGlow * 0.06);
-      boardShadeAlpha = moodProfile.shadeAlpha + (arrivalGlow * 0.025);
-      boardAuraScale = 1.01 + (arrivalGlow * 0.016);
-      boardHaloScale = 1.008 + (arrivalGlow * 0.012);
+      boardAuraAlpha = moodProfile.auraAlpha + 0.012 + (arrivalGlow * 0.028);
+      boardHaloAlpha = moodProfile.haloAlpha + 0.008 + (arrivalGlow * 0.022);
+      boardShadeAlpha = moodProfile.shadeAlpha + (arrivalGlow * 0.014);
+      boardAuraScale = 1.004 + (arrivalGlow * 0.008);
+      boardHaloScale = 1.003 + (arrivalGlow * 0.006);
       metadataAlpha = clamp((moodProfile.metadataAlpha + 0.12) * variantProfile.metadataAlphaScale, 0.18, 0.82);
       flashAlpha = cycle.mood === 'blueprint' ? 0.14 * (1 - progress) : Math.max(flashAlpha, 0.28 + (arrivalGlow * 0.24));
       break;
     }
     case 'fade':
       boardVeilAlpha = lerp(0.06, 0.22, progress);
-      boardAuraAlpha = lerp(moodProfile.auraAlpha + 0.02, 0.08, progress);
-      boardHaloAlpha = lerp(moodProfile.haloAlpha + 0.024, 0.018, progress);
-      boardShadeAlpha = lerp(moodProfile.shadeAlpha + 0.018, 0.012, progress);
-      boardAuraScale = lerp(1.014, 1.024, progress);
-      boardHaloScale = lerp(1.01, 1.018, progress);
+      boardAuraAlpha = lerp(moodProfile.auraAlpha + 0.012, 0.068, progress);
+      boardHaloAlpha = lerp(moodProfile.haloAlpha + 0.014, 0.018, progress);
+      boardShadeAlpha = lerp(moodProfile.shadeAlpha + 0.012, 0.012, progress);
+      boardAuraScale = lerp(1.008, 1.014, progress);
+      boardHaloScale = lerp(1.006, 1.012, progress);
       metadataAlpha = clamp(lerp(moodProfile.metadataAlpha * 0.9, 0.28, progress) * variantProfile.metadataAlphaScale, 0.18, 0.82);
       flashAlpha = safeVariant === 'loading' ? lerp(0.22, 0.12, progress) : 0;
       break;
@@ -7182,21 +7184,21 @@ export const resolveMenuDemoPresentation = (
 
   if (safeVariant === 'title') {
     boardVeilAlpha += sequenceState.sequence === 'intro' ? 0.02 : 0.01;
-    boardAuraAlpha -= 0.006;
-    boardHaloAlpha += 0.004;
+    boardAuraAlpha -= 0.008;
+    boardHaloAlpha += 0.002;
     metadataAlpha -= 0.04;
   } else if (safeVariant === 'ambient') {
     boardVeilAlpha -= 0.012;
-    boardAuraAlpha += 0.012;
-    boardHaloAlpha += 0.01;
-    boardAuraScale += 0.008;
-    boardHaloScale += 0.006;
+    boardAuraAlpha += 0.004;
+    boardHaloAlpha += 0.004;
+    boardAuraScale += 0.002;
+    boardHaloScale += 0.002;
     metadataAlpha -= 0.02;
   } else {
     boardVeilAlpha += 0.02;
-    boardAuraAlpha += 0.008;
-    boardHaloAlpha += 0.01;
-    boardShadeAlpha += 0.014;
+    boardAuraAlpha += 0.004;
+    boardHaloAlpha += 0.006;
+    boardShadeAlpha += 0.008;
     metadataAlpha += 0.04;
     flashAlpha = Math.max(
       flashAlpha,

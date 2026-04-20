@@ -32,7 +32,12 @@ describe('edge live check', () => {
   }, 15_000);
 
   test('reuses the core layout matrix preset set', async () => {
-    const { resolveEdgeLiveDefaultRoute, resolveEdgeLiveRunPaths } = await loadEdgeLiveHelpers();
+    const {
+      resolveEdgeLiveDefaultRoute,
+      resolveEdgeLiveRunPaths,
+      resolveEdgeLiveTimeoutMs,
+      resolveEdgeLiveViewports
+    } = await loadEdgeLiveHelpers();
     // @ts-expect-error The helper module is plain .mjs without TS declarations.
     const { resolveLayoutMatrixViewports } = await import('../../scripts/visual/layout-matrix.config.mjs');
 
@@ -60,6 +65,16 @@ describe('edge live check', () => {
     expect(resolveEdgeLiveDefaultRoute('core-only-play')).toBe('/?content=core-only&mode=play&theme=aurora');
     expect(resolveEdgeLiveDefaultRoute('core-only-cycle')).toBe('/?content=core-only&theme=aurora');
     expect(resolveEdgeLiveDefaultRoute('legend-risk-telegraph')).toBeUndefined();
+    expect(resolveEdgeLiveViewports('core', 'core-only-watch').map((viewport: { id: string }) => viewport.id)).toEqual([
+      'phone-portrait',
+      'desktop'
+    ]);
+    expect(resolveEdgeLiveViewports('core', 'core-only-play').map((viewport: { id: string }) => viewport.id)).toEqual([
+      'phone-portrait',
+      'desktop'
+    ]);
+    expect(resolveEdgeLiveTimeoutMs('core-only-watch')).toBe(60_000);
+    expect(resolveEdgeLiveTimeoutMs('core-only-play')).toBe(60_000);
   }, 15_000);
 
   test('prefers explicit urls and derives board/hud verdicts from bounds', async () => {

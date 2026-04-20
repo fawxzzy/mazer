@@ -34,6 +34,8 @@ const DEFAULT_PRESET_GROUP = 'core';
 const DEFAULT_HEADLESS = true;
 const EDGE_LIVE_DEFAULT_CAPTURE_TIMEOUT_MS = 45_000;
 const EDGE_LIVE_DEFAULT_PREVIEW_TIMEOUT_MS = 60_000;
+const EDGE_LIVE_CAPTURE_RETRIES = 2;
+const EDGE_LIVE_CAPTURE_RETRY_DELAY_MS = 1_000;
 const CAPTURE_CONFIG = Object.freeze({
   enabled: true,
   forceInstallMode: 'available'
@@ -54,7 +56,9 @@ const EDGE_LIVE_SPECIAL_ROUTES = Object.freeze({
 });
 const EDGE_LIVE_RUN_VIEWPORT_IDS = Object.freeze({
   'play-mode-interactive': ['desktop'],
-  'mobile-touch-smoke': ['phone-portrait']
+  'mobile-touch-smoke': ['phone-portrait'],
+  'core-only-watch': ['phone-portrait', 'desktop'],
+  'core-only-play': ['phone-portrait', 'desktop']
 });
 const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
   'play-mode-interactive': Object.freeze({
@@ -458,7 +462,18 @@ const resolveEdgeLiveInteraction = (runId) => (
   typeof runId === 'string' ? EDGE_LIVE_INTERACTION_RUNS[runId] ?? null : null
 );
 
-const resolveEdgeLiveViewports = (presetGroup, runId) => {
+const EDGE_LIVE_RUN_TIMEOUTS_MS = Object.freeze({
+  'core-only-watch': 60_000,
+  'core-only-play': 60_000
+});
+
+export const resolveEdgeLiveTimeoutMs = (runId, defaultTimeoutMs = EDGE_LIVE_DEFAULT_CAPTURE_TIMEOUT_MS) => (
+  typeof runId === 'string' && Number.isFinite(EDGE_LIVE_RUN_TIMEOUTS_MS[runId])
+    ? EDGE_LIVE_RUN_TIMEOUTS_MS[runId]
+    : defaultTimeoutMs
+);
+
+export const resolveEdgeLiveViewports = (presetGroup, runId) => {
   const viewports = resolveLayoutMatrixViewports(presetGroup);
   const allowedViewportIds = typeof runId === 'string' ? EDGE_LIVE_RUN_VIEWPORT_IDS[runId] : null;
   if (!Array.isArray(allowedViewportIds) || allowedViewportIds.length === 0) {
@@ -981,6 +996,15 @@ const waitForDiagnostics = async (page, timeoutMs, { requireActiveTrail = false 
   throw error;
 };
 
+export const isRetriableEdgeLiveCaptureError = (error) => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return (
+    message.includes('Timed out waiting for edge live diagnostics')
+    || message.includes('Timed out waiting for an active attempt lifecycle frame')
+    || (error?.name === 'TimeoutError')
+  );
+};
+
 const createSnapshot = (stage, diagnostics, screenshotPath) => {
   const visual = diagnostics.visual;
   const runtime = diagnostics.runtime;
@@ -1149,6 +1173,10 @@ const captureViewport = async ({
 
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    await page.waitForLoadState('networkidle', {
+      timeout: Math.min(10_000, timeoutMs)
+    }).catch(() => {});
+    await page.waitForTimeout(250);
     const firstDiagnostics = await waitForDiagnostics(page, timeoutMs);
     await page.screenshot({
       path: firstLoadPath,
@@ -1157,6 +1185,10 @@ const captureViewport = async ({
     });
 
     await page.reload({ waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    await page.waitForLoadState('networkidle', {
+      timeout: Math.min(10_000, timeoutMs)
+    }).catch(() => {});
+    await page.waitForTimeout(250);
     const secondDiagnostics = await waitForDiagnostics(page, timeoutMs);
     await page.screenshot({
       path: secondLoadPath,
@@ -1836,6 +1868,24 @@ export const captureEdgeLiveProofWorkflow = async ({
   }
 };
 
+const captureViewportWithRetries = async (options) => {
+  let lastError;
+
+  for (let attempt = 1; attempt <= EDGE_LIVE_CAPTURE_RETRIES; attempt += 1) {
+    try {
+      return await captureViewport(options);
+    } catch (error) {
+      lastError = error;
+      if (!isRetriableEdgeLiveCaptureError(error) || attempt >= EDGE_LIVE_CAPTURE_RETRIES) {
+        break;
+      }
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, EDGE_LIVE_CAPTURE_RETRY_DELAY_MS * attempt));
+    }
+  }
+
+  throw lastError;
+};
+
 export const captureEdgeLive = async ({
   baseUrl = DEFAULT_BASE_URL,
   url,
@@ -1854,6 +1904,7 @@ export const captureEdgeLive = async ({
   const resolvedRoute = route ?? resolveEdgeLiveDefaultRoute(runId);
   const runPaths = resolveEdgeLiveRunPaths(resolvedRunId);
   const viewports = resolveEdgeLiveViewports(presetGroup, resolvedRunId);
+  const resolvedTimeoutMs = resolveEdgeLiveTimeoutMs(resolvedRunId, timeoutMs);
 
   await ensureDir(EDGE_LIVE_ROOT);
   await ensureDir(runPaths.runDir);
@@ -1906,14 +1957,14 @@ export const captureEdgeLive = async ({
     const captures = [];
 
     for (const viewport of viewports) {
-      captures.push(await captureViewport({
+      captures.push(await captureViewportWithRetries({
         browser,
         baseUrl: resolvedBaseUrl,
         explicitUrl,
         viewport,
         route: resolvedRoute,
         runId: resolvedRunId,
-        timeoutMs,
+        timeoutMs: resolvedTimeoutMs,
         runDir: runPaths.runDir,
         screenshotsDir: runPaths.screenshotsDir,
         videosDir: runPaths.videosDir,

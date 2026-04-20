@@ -149,18 +149,18 @@ const BOARD_READABILITY_MINIMUMS = Object.freeze({
   wallVsTrail: 1.95,
   wallVsPlayer: 1.2,
   floorVsRoute: 2.85,
-  floorVsTrail: 3.1,
+  floorVsTrail: 3.16,
   floorVsPlayer: 2.85,
   floorVsStart: 1.85,
   floorVsGoal: 3,
   routeVsTrail: 1.22,
-  trailVsPlayer: 1.88,
+  trailVsPlayer: 1.96,
   startVsGoal: 1.6,
   startVsPlayer: 1.52,
   goalVsPlayer: 2.05,
   goalVsBackground: 2.1,
   trailVsWallLuminance: 0.055,
-  trailVsPlayerLuminance: 0.08
+  trailVsPlayerLuminance: 0.082
 });
 
 const COLOR_REPAIR_STEPS = 18;

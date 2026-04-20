@@ -51,7 +51,7 @@ describe('layout matrix readiness', () => {
   }, 15_000);
 
   test('reports the first missing layout-specific readiness field', async () => {
-    const { resolveLayoutMatrixReadiness } = await loadHelpers();
+    const { isRetriableLayoutMatrixCaptureError, resolveLayoutMatrixReadiness } = await loadHelpers();
 
     const readiness = resolveLayoutMatrixReadiness({
       route,
@@ -77,5 +77,10 @@ describe('layout matrix readiness', () => {
       hudBoundsReady: true,
       dockModeReady: false
     });
+
+    expect(isRetriableLayoutMatrixCaptureError({
+      code: 'LAYOUT_MATRIX_READINESS_TIMEOUT'
+    })).toBe(true);
+    expect(isRetriableLayoutMatrixCaptureError(new Error('not retriable'))).toBe(false);
   }, 15_000);
 });

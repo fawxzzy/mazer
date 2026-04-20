@@ -874,11 +874,15 @@ describe('demo-only build', () => {
     expect(obs.densityScale).toBeLessThan(ambient.densityScale);
     expect(obs.clearZoneScale).toBeGreaterThan(ambient.clearZoneScale);
     expect(mobile.movingEventCap).toBeLessThanOrEqual(ambient.movingEventCap);
+    expect(obs.movingEventCap).toBe(0);
+    expect(mobile.movingEventCap).toBe(0);
     expect(reduced.motionScale).toBeLessThan(tv.motionScale);
     expect(reduced.eventIntervalScale).toBeGreaterThan(tv.eventIntervalScale);
     expect(reduced.signatureEventCap).toBe(0);
-    expect(reduced.twinkleCount).toBeGreaterThanOrEqual(6);
-    expect(reduced.driftMoteCount).toBeGreaterThanOrEqual(1);
+    expect(reduced.movingEventCap).toBe(0);
+    expect(reduced.twinkleCount).toBeLessThan(tv.twinkleCount);
+    expect(reduced.twinkleCount).toBeGreaterThanOrEqual(4);
+    expect(reduced.driftMoteCount).toBe(0);
   });
 
   test('BootScene falls back to title when presentation resolution throws', () => {

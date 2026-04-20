@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, test, vi } from 'vitest';
 import {
   applyPresentationContrastFloors,
   getContrastRatio,
+  getRelativeLuminance,
   getPaletteReadabilityReport,
   resolveLocalBoardSupportColors
 } from '../../src/render/palette';
@@ -86,6 +87,49 @@ describe('presentation palette', () => {
     expect(vellumFloorVsTrail?.ratio).toBeGreaterThanOrEqual(4.1);
   });
 
+  test('repairs trail and player separation on both light and dark edge-case boards', () => {
+    const cases = [
+      {
+        name: 'light-board',
+        board: {
+          ...palette.board,
+          wall: 0x29384a,
+          floor: 0xe4ebf2,
+          trail: 0x7685bc,
+          player: 0x6d7f90
+        }
+      },
+      {
+        name: 'dark-board',
+        board: {
+          ...palette.board,
+          wall: 0x04070c,
+          floor: 0x2b3a4a,
+          trail: 0x89a0db,
+          player: 0xb6d7e5
+        }
+      }
+    ] as const;
+
+    for (const entry of cases) {
+      const repaired = applyPresentationContrastFloors({
+        ...palette,
+        board: entry.board
+      });
+      const report = getPaletteReadabilityReport(repaired);
+      const floorVsTrail = report.checkpoints.find((checkpoint) => checkpoint.key === 'floor-vs-trail');
+      const trailVsPlayer = report.checkpoints.find((checkpoint) => checkpoint.key === 'trail-vs-player');
+      const trailVsPlayerLuminance = report.checkpoints.find((checkpoint) => checkpoint.key === 'trail-vs-player-luminance');
+
+      expect(floorVsTrail?.passes, `${entry.name}: floor-vs-trail`).toBe(true);
+      expect(floorVsTrail?.ratio, `${entry.name}: floor-vs-trail ratio`).toBeGreaterThanOrEqual(3.16);
+      expect(trailVsPlayer?.passes, `${entry.name}: trail-vs-player`).toBe(true);
+      expect(trailVsPlayer?.ratio, `${entry.name}: trail-vs-player ratio`).toBeGreaterThanOrEqual(1.96);
+      expect(trailVsPlayerLuminance?.passes, `${entry.name}: trail-vs-player-luminance`).toBe(true);
+      expect(trailVsPlayerLuminance?.ratio, `${entry.name}: trail-vs-player-luminance ratio`).toBeGreaterThanOrEqual(0.082);
+    }
+  });
+
   test('selects opposing local support colors for light and dark board luminance', () => {
     const lightPlayerSupport = resolveLocalBoardSupportColors(palette.board, 'player', 0.62);
     const darkPlayerSupport = resolveLocalBoardSupportColors(palette.board, 'player', 0.08);
@@ -96,6 +140,21 @@ describe('presentation palette', () => {
     expect(darkPlayerSupport.mode).toBe('light');
     expect(lightTrailSupport.mode).toBe('dark');
     expect(darkTrailSupport.mode).toBe('light');
+  });
+
+  test('keeps player local support stronger than trail local support on the same tile neighborhood', () => {
+    const backgrounds = [0xe6edf4, 0x0a1220];
+
+    for (const background of backgrounds) {
+      const backgroundLuminance = getRelativeLuminance(background);
+      const playerSupport = resolveLocalBoardSupportColors(palette.board, 'player', backgroundLuminance);
+      const trailSupport = resolveLocalBoardSupportColors(palette.board, 'trail', backgroundLuminance);
+
+      expect(
+        getContrastRatio(playerSupport.line, background),
+        `player line should dominate on ${background.toString(16)}`
+      ).toBeGreaterThan(getContrastRatio(trailSupport.line, background));
+    }
   });
 
   test('holds the prior local support mode inside the deadband', () => {

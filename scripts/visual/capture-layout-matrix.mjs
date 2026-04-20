@@ -26,6 +26,7 @@ const VISUAL_DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__';
 const LAYOUT_MATRIX_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-layout-matrix');
 const DEFAULT_ROUTE = '/';
 const CAPTURE_RETRIES = 3;
+const CAPTURE_RETRY_DELAY_MS = 750;
 export const LAYOUT_MATRIX_READYNESS_TIMEOUT_CODE = 'LAYOUT_MATRIX_READINESS_TIMEOUT';
 const LAYOUT_MATRIX_CAPTURE_CONFIG = Object.freeze({
   enabled: true,
@@ -206,6 +207,14 @@ const waitForLayoutDiagnostics = async (page, timeoutMs, context) => {
   throw error;
 };
 
+export const isRetriableLayoutMatrixCaptureError = (error) => (
+  Boolean(error)
+  && (
+    error.code === 'LAYOUT_MATRIX_READINESS_TIMEOUT'
+    || error.name === 'TimeoutError'
+  )
+);
+
 const relativeToRun = (runDir, filePath) => relative(runDir, filePath).replace(/\\/g, '/');
 
 const formatBounds = (bounds) => (
@@ -325,6 +334,10 @@ const captureViewport = async ({
 
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    await page.waitForLoadState('networkidle', {
+      timeout: Math.min(10_000, timeoutMs)
+    }).catch(() => {});
+    await page.waitForTimeout(250);
     const diagnostics = await waitForLayoutDiagnostics(page, timeoutMs, {
       route,
       url,
@@ -393,9 +406,10 @@ const captureViewportWithRetries = async (options) => {
       return await captureViewport(options);
     } catch (error) {
       lastError = error;
-      if (error?.code === LAYOUT_MATRIX_READYNESS_TIMEOUT_CODE) {
+      if (!isRetriableLayoutMatrixCaptureError(error) || attempt >= CAPTURE_RETRIES) {
         break;
       }
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, CAPTURE_RETRY_DELAY_MS * attempt));
     }
   }
 

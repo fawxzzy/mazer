@@ -481,6 +481,41 @@ describe('board renderer', () => {
     expect(darkShellColor).toBe(mixColor(darkSupport.underlay, darkPalette.board.panel, 0.18));
   });
 
+  test('adds a local support underlay behind active trail segments before drawing the readable trail body', () => {
+    const trail: Array<number | DemoTrailStep> = [0, 1];
+    const lightPalette = createThemePalette({
+      floor: 0xf2f6fb,
+      path: 0xe0e7f0,
+      wall: 0x334051
+    });
+    const { scene, graphics } = createSceneStub(1_000);
+    const renderer = new BoardRenderer(scene, createEpisode(), createLayout(), {
+      theme: { palette: lightPalette }
+    });
+    const trailSupport = resolveLocalBoardSupportColors(
+      lightPalette.board,
+      'trail',
+      (renderer as any).resolveTileNeighborhoodLuminance(1)
+    );
+
+    renderer.drawTrail(trail, { cue: 'anticipate' });
+
+    const trailGraphics = graphics.at(7);
+    const supportSegmentIndex = trailGraphics?.calls.findIndex((call, index, calls) => (
+      call.method === 'fillStyle'
+      && call.args[0] === trailSupport.underlay
+      && calls[index + 1]?.method === 'fillRect'
+    ));
+    const laterTrailBodyIndex = trailGraphics?.calls.findIndex((call, index) => (
+      index > (supportSegmentIndex ?? -1)
+      && call.method === 'fillStyle'
+      && call.args[0] !== trailSupport.underlay
+    ));
+
+    expect(supportSegmentIndex).toBeGreaterThanOrEqual(0);
+    expect(laterTrailBodyIndex).toBeGreaterThan(supportSegmentIndex ?? -1);
+  });
+
   test('exposes a live trail head when committed trail and motion head match', () => {
     const { scene } = createSceneStub(1_000);
     const renderer = new BoardRenderer(scene, createEpisode(), createLayout());

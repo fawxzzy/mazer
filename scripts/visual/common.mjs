@@ -9,8 +9,8 @@ export const REPO_ROOT = resolve(SCRIPT_DIR, '..', '..');
 export const STACK_ROOT = resolve(REPO_ROOT, '..', '..');
 export const CAPTURE_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-visual');
 export const DEFAULT_BASE_URL = 'http://127.0.0.1:4173';
-export const DEFAULT_CAPTURE_TIMEOUT_MS = 20_000;
-export const DEFAULT_PREVIEW_TIMEOUT_MS = 30_000;
+export const DEFAULT_CAPTURE_TIMEOUT_MS = 45_000;
+export const DEFAULT_PREVIEW_TIMEOUT_MS = 60_000;
 export const SESSION_POINTER_PATH = resolve(CAPTURE_ROOT, 'latest-session.txt');
 export const VISUAL_CAPTURE_CONFIG = Object.freeze({
   enabled: true,
@@ -142,4 +142,3 @@ export const round = (value, digits = 2) => {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
 };
-

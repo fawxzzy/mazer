@@ -1950,15 +1950,15 @@ export class BoardRenderer {
         ? colors.board.goalCore
         : isBacktrack
           ? colors.board.topHighlight
-          : mixHexColor(colors.board.trailCore, trailSupport?.line ?? colors.board.trailCore, 0.58);
+          : mixHexColor(colors.board.trailCore, trailSupport?.line ?? colors.board.trailCore, 0.46);
       const segmentGlowColor = isGoalStep
         ? colors.board.goal
         : isBacktrack
           ? colors.board.innerStroke
-          : mixHexColor(colors.board.trailGlow, trailSupport?.glow ?? colors.board.trailGlow, 0.72);
+          : mixHexColor(colors.board.trailGlow, trailSupport?.glow ?? colors.board.trailGlow, 0.58);
       const segmentFillColor = isGoalStep
         ? colors.board.goal
-        : mixHexColor(colors.board.trail, trailSupport?.accent ?? colors.board.trail, 0.24);
+        : mixHexColor(colors.board.trail, trailSupport?.accent ?? colors.board.trail, 0.18);
       if (isHead) {
         headCenterX = renderCenterX;
         headCenterY = renderCenterY;
@@ -1973,6 +1973,26 @@ export class BoardRenderer {
           1,
           tileSize * (isBacktrack ? legacyTuning.board.trail.backtrackLineWidthRatio : legacyTuning.board.trail.lineWidthRatio)
         );
+        if (trailSupport !== null) {
+          const supportBodyWidth = Math.max(bodyGlowWidth * 1.18, bodyCoreWidth + Math.max(1, tileSize * 0.08));
+          const supportBodyAlpha = Phaser.Math.Clamp(
+            (0.12 + (t * 0.05) + (isHead ? 0.05 : 0) + (movingHead ? 0.03 : 0))
+              * trailCoreScale
+              * competingSignalScale,
+            0.08,
+            0.28
+          );
+          this.fillAxisAlignedSegment(
+            this.trail,
+            previousCenterX,
+            previousCenterY,
+            renderCenterX,
+            renderCenterY,
+            supportBodyWidth,
+            trailSupport.underlay,
+            supportBodyAlpha
+          );
+        }
         this.fillAxisAlignedSegment(
           this.trail,
           previousCenterX,
@@ -1998,6 +2018,17 @@ export class BoardRenderer {
             1
           ) * (isBacktrack ? legacyTuning.board.trail.backtrackLineAlphaScale : 1) * trailCoreScale * competingSignalScale
         );
+      }
+
+      if (trailSupport !== null && (isHead || movingHead)) {
+        const supportHeadRadius = nodeRadius * (movingHead ? 1.34 : 1.52);
+        const supportHeadAlpha = Phaser.Math.Clamp(
+          (movingHead ? 0.16 : 0.2) * trailGlowScale * competingSignalScale,
+          0.08,
+          0.26
+        );
+        this.trail.fillStyle(trailSupport.underlay, supportHeadAlpha);
+        this.trail.fillCircle(renderCenterX, renderCenterY, supportHeadRadius);
       }
 
       if (isBacktrack) {
@@ -2358,6 +2389,8 @@ export class BoardRenderer {
     this.actor.fillCircle(bodyCenterX, bodyCenterY, neighborhoodRadius);
     this.actor.fillStyle(actorSupport.glow, actorTuning.emphasisFloorAlpha);
     this.actor.fillCircle(bodyCenterX, bodyCenterY, emphasisFloorRadius);
+    this.actor.lineStyle(Math.max(1, focusRingWidth * 0.84), actorSupport.accent, 0.56);
+    this.actor.strokeCircle(bodyCenterX, bodyCenterY, focusRingRadius * 0.98);
     this.actor.lineStyle(focusRingWidth, colors.board.playerCore, actorTuning.focusRingAlpha);
     this.actor.strokeCircle(bodyCenterX, bodyCenterY, focusRingRadius);
     this.actor.fillStyle(actorSupport.line, 0.94);
