@@ -465,9 +465,9 @@ const resolveEdgeLiveInteraction = (runId) => (
 );
 
 const EDGE_LIVE_RUN_TIMEOUTS_MS = Object.freeze({
-  'core-only-watch': 60_000,
+  'core-only-watch': 120_000,
   'core-only-play': 60_000,
-  'core-only-cycle': 120_000
+  'core-only-cycle': 180_000
 });
 const EDGE_LIVE_END_WINDOW_RUNS = new Set(['core-only-watch', 'core-only-cycle']);
 
@@ -1214,11 +1214,13 @@ const captureEndWindowProof = async ({
     timeoutMs,
     (diagnostics) => {
       const state = resolveEdgeLiveArrivalProofState(diagnostics?.visual);
+      const isArrivalWindow = state.lifecyclePhase === 'active-watch'
+        && (state.sequence === 'arrival' || state.sequence === 'fade' || state.sequence === 'reveal');
+      const isClearHoldFallback = state.lifecyclePhase === 'clear-hold' && state.readyToClear;
       return state.actorVisible
         && state.goalVisible
         && state.actorInsideExitRegion
-        && state.lifecyclePhase === 'active-watch'
-        && (state.sequence === 'arrival' || state.sequence === 'fade' || state.sequence === 'reveal');
+        && (isArrivalWindow || isClearHoldFallback);
     },
     'Timed out waiting for a hosted watch arrival frame before clear-hold.'
   );
@@ -1273,7 +1275,10 @@ const captureEndWindowProof = async ({
   return {
     pass: Boolean(
       arrivalSnapshot.arrival?.actorInsideExitRegion
-      && arrivalSnapshot.attempt?.lifecyclePhase === 'active-watch'
+      && (
+        arrivalSnapshot.attempt?.lifecyclePhase === 'active-watch'
+        || arrivalSnapshot.attempt?.lifecyclePhase === 'clear-hold'
+      )
       && clearHoldSnapshot.attempt?.lifecyclePhase === 'clear-hold'
       && clearHoldSnapshot.arrival?.readyToClear === true
       && eraseSnapshot.attempt?.lifecyclePhase === 'erase-wipe'

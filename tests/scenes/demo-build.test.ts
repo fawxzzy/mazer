@@ -445,7 +445,7 @@ describe('demo-only build', () => {
     disposeMazeEpisode(episode);
   });
 
-  test('install chrome anchors bottom-center inside the safe bottom lane', () => {
+  test('install chrome anchors into the title-band action lane', () => {
     const resolved = generateMazeForDifficulty({
       scale: 50,
       seed: 7788,
@@ -460,6 +460,19 @@ describe('demo-only build', () => {
       bottom: 34,
       left: 0
     });
+    const titleBand = resolveTitleBandFrame(
+      presentationModel.viewport.width,
+      presentationModel.layout,
+      undefined,
+      {
+        top: 48,
+        right: 0,
+        bottom: 34,
+        left: 0
+      },
+      'mobile',
+      164
+    );
     const installFrame = resolveInstallChromeFrame(
       presentationModel.viewport.width,
       presentationModel.viewport.height,
@@ -472,17 +485,19 @@ describe('demo-only build', () => {
         right: 0,
         bottom: 34,
         left: 0
-      }
+      },
+      titleBand
     );
 
-    expect(installFrame.centerX).toBeCloseTo(presentationModel.viewport.width / 2, 1);
-    expect(installFrame.top).toBeGreaterThan(presentationModel.viewport.height * 0.85);
-    expect(installFrame.bottom).toBeLessThanOrEqual(presentationModel.viewport.height - 34);
+    expect(installFrame.right).toBeLessThanOrEqual(presentationModel.viewport.width);
+    expect(installFrame.left).toBeGreaterThanOrEqual(titleBand.right);
+    expect(installFrame.centerY).toBeCloseTo(titleBand.centerY, 1);
+    expect(installFrame.bottom).toBeLessThanOrEqual(titleBand.bottom);
 
     disposeMazeEpisode(episode);
   });
 
-  test('board composition frame keeps the title tight while reserving a dedicated HUD lane above the CTA', () => {
+  test('board composition frame keeps the title tight while reserving a dedicated bottom HUD lane', () => {
     const resolved = generateMazeForDifficulty({
       scale: 50,
       seed: 9124,
@@ -495,7 +510,10 @@ describe('demo-only build', () => {
     const titleBand = resolveTitleBandFrame(
       presentationModel.viewport.width,
       presentationModel.layout,
-      undefined
+      undefined,
+      undefined,
+      undefined,
+      140
     );
     const installFrame = resolveInstallChromeFrame(
       presentationModel.viewport.width,
@@ -503,7 +521,9 @@ describe('demo-only build', () => {
       presentationModel.layout,
       undefined,
       126,
-      25
+      25,
+      undefined,
+      titleBand
     );
     const boardFrame = resolveBoardCompositionFrame(
       presentationModel.viewport.width,
@@ -519,10 +539,11 @@ describe('demo-only build', () => {
 
     expect(boardFrame.top - titleBand.bottom).toBeGreaterThanOrEqual(8);
     expect(boardFrame.top - titleBand.bottom).toBeLessThanOrEqual(16);
-    expect(installFrame.top - boardFrame.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
+    expect(presentationModel.viewport.height - boardFrame.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
+    expect(installFrame.bottom).toBeLessThanOrEqual(titleBand.bottom);
     expect(layout.boardY - titleBand.bottom).toBeGreaterThanOrEqual(12);
     expect(layout.boardY - titleBand.bottom).toBeLessThanOrEqual(40);
-    expect(installFrame.top - layout.boardBounds.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
+    expect(presentationModel.viewport.height - layout.boardBounds.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
     expect(layout.boardHeight).toBeGreaterThan(390);
 
     disposeMazeEpisode(episode);
@@ -572,7 +593,10 @@ describe('demo-only build', () => {
     const titleBand = resolveTitleBandFrame(
       presentationModel.viewport.width,
       presentationModel.layout,
-      undefined
+      undefined,
+      undefined,
+      undefined,
+      140
     );
     const installFrame = resolveInstallChromeFrame(
       presentationModel.viewport.width,
@@ -580,7 +604,9 @@ describe('demo-only build', () => {
       presentationModel.layout,
       undefined,
       126,
-      25
+      25,
+      undefined,
+      titleBand
     );
     const boardFrame = resolveBoardCompositionFrame(
       presentationModel.viewport.width,
@@ -596,7 +622,8 @@ describe('demo-only build', () => {
 
     expect(boardFrame.left).toBeGreaterThanOrEqual(0);
     expect(boardFrame.right).toBeLessThanOrEqual(presentationModel.viewport.width);
-    expect(installFrame.top - boardFrame.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
+    expect(presentationModel.viewport.height - boardFrame.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
+    expect(installFrame.bottom).toBeLessThanOrEqual(titleBand.bottom);
     expect(Math.abs(layout.boardBounds.centerX - (presentationModel.viewport.width / 2))).toBeLessThanOrEqual(0.5);
     expect(layout.boardBounds.bottom).toBeLessThanOrEqual(boardFrame.bottom);
     expect(layout.boardHeight).toBeGreaterThan(420);
@@ -640,7 +667,8 @@ describe('demo-only build', () => {
 
     expect(Math.abs(layout.boardBounds.centerX - (presentationModel.viewport.width / 2))).toBeLessThanOrEqual(0.5);
     expect(Math.abs(layout.boardBounds.centerY - (presentationModel.viewport.height / 2))).toBeLessThanOrEqual(0.5);
-    expect(installFrame.top - layout.boardBounds.bottom).toBeGreaterThanOrEqual(5);
+    expect(installFrame.bottom).toBeLessThanOrEqual(Math.max(56, Math.round(presentationModel.viewport.height * 0.12)));
+    expect(presentationModel.viewport.height - layout.boardBounds.bottom).toBeGreaterThanOrEqual(5);
     expect(layout.boardHeight).toBeGreaterThan(400);
 
     disposeMazeEpisode(episode);
@@ -661,7 +689,8 @@ describe('demo-only build', () => {
       presentationModel.layout,
       undefined,
       undefined,
-      'mobile'
+      'mobile',
+      108
     );
     const installFrame = resolveInstallChromeFrame(
       presentationModel.viewport.width,
@@ -669,7 +698,9 @@ describe('demo-only build', () => {
       presentationModel.layout,
       undefined,
       96,
-      23
+      23,
+      undefined,
+      titleBand
     );
     const boardFrame = resolveBoardCompositionFrame(
       presentationModel.viewport.width,
@@ -687,7 +718,8 @@ describe('demo-only build', () => {
 
     expect(boardFrame.top - titleBand.bottom).toBeGreaterThanOrEqual(6);
     expect(boardFrame.top - titleBand.bottom).toBeLessThanOrEqual(14);
-    expect(installFrame.top - boardFrame.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
+    expect(presentationModel.viewport.height - boardFrame.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
+    expect(installFrame.bottom).toBeLessThanOrEqual(titleBand.bottom);
     expect(layout.tileSize).toBeGreaterThanOrEqual(5);
     expect(layout.boardWidth).toBeGreaterThanOrEqual(250);
     expect(layout.boardHeight).toBeGreaterThanOrEqual(250);
@@ -712,7 +744,10 @@ describe('demo-only build', () => {
     const titleBand = resolveTitleBandFrame(
       presentationModel.viewport.width,
       presentationModel.layout,
-      undefined
+      undefined,
+      undefined,
+      undefined,
+      140
     );
     const installFrame = resolveInstallChromeFrame(
       presentationModel.viewport.width,
@@ -720,7 +755,9 @@ describe('demo-only build', () => {
       presentationModel.layout,
       undefined,
       126,
-      25
+      25,
+      undefined,
+      titleBand
     );
     const boardFrame = resolveBoardCompositionFrame(
       presentationModel.viewport.width,

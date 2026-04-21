@@ -115,6 +115,22 @@ describe('intent feed renderer', () => {
     expect(layout.rect.top + layout.rect.height).toBeLessThanOrEqual(932);
   });
 
+  test('keeps the spectator feed bottom-docked when install chrome moves into the top band', () => {
+    const layout = resolveIntentFeedLayout(
+      { width: 390, height: 844 },
+      4,
+      {
+        board: { x: 195, y: 328, width: 278, height: 278 },
+        title: { x: 128, y: 54, width: 180, height: 48 },
+        install: { x: 318, y: 54, width: 148, height: 30 }
+      }
+    );
+
+    expect(layout.dock).toBe('bottom-center');
+    expect(layout.rect.top).toBeGreaterThanOrEqual(720);
+    expect(layout.rect.top + layout.rect.height).toBeLessThanOrEqual(844);
+  });
+
   test('keeps the next-risk strip compact and mechanic-first', () => {
     const nextRisk = resolveNextRiskLabel({
       step: 4,

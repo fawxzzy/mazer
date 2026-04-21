@@ -213,6 +213,18 @@ const resolveRailDock = (rect: IntentFeedRect, viewportWidth: number): FeedDock 
   rectCenterX(rect) >= (viewportWidth / 2) ? 'right-rail' : 'left-rail'
 );
 
+const isBottomDockedAnchorRect = (
+  rect: WeightedIntentFeedRect | null | undefined,
+  viewportHeight: number
+): boolean => {
+  if (!rect) {
+    return false;
+  }
+
+  const centerY = rect.top + (rect.height / 2);
+  return rect.top >= viewportHeight * 0.58 || centerY >= viewportHeight * 0.62;
+};
+
 export const resolveIntentFeedRoleLabel = (kind: Parameters<typeof resolveIntentFeedRole>[0]): string => (
   formatIntentFeedRole(kind)
 );
@@ -434,6 +446,7 @@ export const resolveIntentFeedLayout = (
   const boardRect = normalizeAnchorRect('board', anchors.board, 0);
   const titleRect = normalizeAnchorRect('title', anchors.title, 0);
   const installRect = normalizeAnchorRect('install', anchors.install, 0);
+  const bottomInstallRect = isBottomDockedAnchorRect(installRect, viewport.height) ? installRect : null;
   const criticalRects = dedupeRects([
     normalizeAnchorRect('player', anchors.player, tuning.occlusionPadPx),
     normalizeAnchorRect('objective', anchors.objective, tuning.occlusionPadPx),
@@ -448,21 +461,19 @@ export const resolveIntentFeedLayout = (
   const preferredCenterX = railMode
     ? viewport.width - insetX - (feedWidth / 2)
     : boardRect ? rectCenterX(boardRect) : viewport.width / 2;
+  const laneBottom = railMode
+    ? Math.max(insetY + feedHeight, viewport.height - insetY)
+    : bottomInstallRect
+      ? bottomInstallRect.top - tuning.installGapPx
+      : viewport.height - insetY;
   const preferredTop = railMode
     ? Math.max(insetY, Math.round((viewport.height - feedHeight) / 2))
-    : installRect
-      ? installRect.top - tuning.installGapPx - feedHeight
-      : Math.max(insetY, Math.round(viewport.height * 0.62));
+    : Math.max(insetY, laneBottom - feedHeight);
   const laneTop = railMode
     ? Math.max(insetY, Math.round((viewport.height - feedHeight) / 2))
     : boardRect
       ? rectBottom(boardRect) + tuning.boardGapPx
       : Math.max(insetY, Math.round(viewport.height * 0.62));
-  const laneBottom = railMode
-    ? Math.max(laneTop + feedHeight, viewport.height - insetY)
-    : installRect
-      ? installRect.top - tuning.installGapPx
-      : viewport.height - insetY;
   const candidateCenters = railMode
     ? [
         viewport.width - insetX - (feedWidth / 2),
@@ -489,6 +500,7 @@ export const resolveIntentFeedLayout = (
       ]
     : [
         Math.max(insetY, preferredTop),
+        Math.max(insetY, preferredTop - Math.max(8, Math.round(feedHeight * 0.08))),
         Math.max(insetY, laneTop)
       ].filter((value, index, array) => array.indexOf(value) === index);
   const candidates = candidateCenters.flatMap((centerX) => candidateTops.map((top) => {
@@ -512,6 +524,7 @@ export const resolveIntentFeedLayout = (
       overlapCount: overlaps.length,
       overlapScore,
       laneOverflow,
+      bottomSlack: Math.max(0, laneBottom - rectBottom(rect)),
       centerDrift: Math.abs(rectCenterX(rect) - preferredCenterX),
       dockOrder: DOCK_ORDER.indexOf(dock)
     };
@@ -526,6 +539,9 @@ export const resolveIntentFeedLayout = (
     }
     if (left.overlapScore !== right.overlapScore) {
       return left.overlapScore - right.overlapScore;
+    }
+    if (left.bottomSlack !== right.bottomSlack) {
+      return left.bottomSlack - right.bottomSlack;
     }
     if (left.dockOrder !== right.dockOrder) {
       return left.dockOrder - right.dockOrder;

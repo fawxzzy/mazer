@@ -80,8 +80,8 @@ Use [`docs/ops/MAZER_HOSTED_PREVIEW_PROOF.md`](docs/ops/MAZER_HOSTED_PREVIEW_PRO
 - The latest local baseline is only production truth after that visual pass is committed and deployed.
 - Local proof green and hosted-preview closure are separate states. If the deployed preview still needs its manual or authenticated browser pass, the lane is healthy-but-held rather than broken.
 - Trail attach plus no-future-preview is the active trail contract.
-- Desktop, TV, and OBS composition now targets the tight 5px board-fit between the title band and the bottom-center install CTA lane.
-- Player readability stays permanent, and the bottom panel remains the universal shell lane for now.
+- Desktop, TV, and OBS composition now keeps the board tight beneath the title band while the optional install action lives in the top action lane.
+- Player readability stays permanent, and the bottom panel remains the universal supporting-info lane.
 - Demo build/rebuild is part of the spectator story now. The live reveal consumes a real bounded generator trace from `buildMaze` instead of a presentation-only fake reveal.
 - Generator-side endpoint strategy spread is improved but still unfinished; variety work is not closed.
 - Runtime observe/soak visibility rollup work remains repo-local analysis WIP and is not part of the shipping claim yet.
@@ -114,7 +114,7 @@ The current focus content profile is `core-only`; use `?content=full` when you e
 `family=auto|classic|braided|sparse|dense|framed|split-flow` locks maze topology families for local comparison or deterministic captures without adding storage or a settings UI.
 
 ## Install Mazer
-- The install surface lives in the bottom-center shell lane when the browser actually exposes `beforeinstallprompt`.
+- The install surface lives in the top action/title band when the browser actually exposes `beforeinstallprompt`.
 - Installed or standalone launches hide the action cleanly and keep the ambient presentation running unchanged.
 
 ## Layout Matrix
@@ -122,7 +122,7 @@ The current focus content profile is `core-only`; use `?content=full` when you e
 - Extended presets add `2560x1080` and `1280x720` when you need wider or shorter shells.
 - Each matrix run emits full-frame screenshots, gameplay-only board clips, per-viewport metadata, a markdown summary, and one contact sheet under `../tmp/captures/mazer-layout-matrix/<run-id>/`.
 - Use `npm run visual:matrix -- --route "/?theme=ember"` to lock the route or theme without changing the preset file.
-- Unsupported/manual-install surfaces fail open. On iOS-style browsers the bottom-center lane swaps to `Use Share > Add to Home Screen`.
+- Unsupported/manual-install surfaces fail open. On iOS-style browsers the top action lane swaps to `Use Share > Add to Home Screen`.
 - Install UX is optional by rule: if install APIs are unavailable or throw, the title/demo shell still renders normally.
 
 ## Testing surfaces

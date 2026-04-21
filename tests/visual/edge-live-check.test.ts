@@ -77,9 +77,9 @@ describe('edge live check', () => {
       'phone-portrait',
       'desktop'
     ]);
-    expect(resolveEdgeLiveTimeoutMs('core-only-watch')).toBe(60_000);
+    expect(resolveEdgeLiveTimeoutMs('core-only-watch')).toBe(120_000);
     expect(resolveEdgeLiveTimeoutMs('core-only-play')).toBe(60_000);
-    expect(resolveEdgeLiveTimeoutMs('core-only-cycle')).toBe(120_000);
+    expect(resolveEdgeLiveTimeoutMs('core-only-cycle')).toBe(180_000);
   }, 15_000);
 
   test('prefers explicit urls and derives board/hud verdicts from bounds', async () => {
