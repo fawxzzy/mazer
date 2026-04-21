@@ -12,6 +12,7 @@ import {
   resolveIntentSemanticTag
 } from '../mazer-core/intent/IntentFeed';
 import { palette } from './palette';
+import { applyTextResolution, resolveHudTextResolution } from './textCrispness';
 import { resolveSceneViewport } from './viewport';
 
 type FeedDock = 'bottom-center' | 'bottom-left' | 'bottom-right' | 'right-rail' | 'left-rail';
@@ -255,11 +256,9 @@ export const shouldRenderIntentFeedStatusLine = (
 ): boolean => visibleEntryCount === 0 && statusLabel.trim().length > 0;
 
 const resolveIntentFeedLineAlphaScale = (slot: number): number => (
-  slot <= 0
-    ? legacyTuning.menu.intentFeed.lineAlphaScaleTop
-    : slot === 1
-      ? legacyTuning.menu.intentFeed.lineAlphaScaleMiddle
-      : legacyTuning.menu.intentFeed.lineAlphaScaleBottom
+  legacyTuning.menu.intentFeed.lineAlphaScales[
+    Math.max(0, Math.min(slot, legacyTuning.menu.intentFeed.lineAlphaScales.length - 1))
+  ] ?? legacyTuning.menu.intentFeed.lineAlphaScales[legacyTuning.menu.intentFeed.lineAlphaScales.length - 1] ?? 1
 );
 
 export const resolveNextRiskLabel = (state: IntentFeedState | null): string | null => {
@@ -322,23 +321,21 @@ const resolveMaxVisibleEvents = (
   compact: boolean
 ): number => {
   const tuning = legacyTuning.menu.intentFeed;
-  const compactThreeThoughtViewport = compact
-    && viewport.width >= tuning.compactThreeThoughtMinWidthPx
-    && viewport.height >= tuning.compactThreeThoughtMinHeightPx;
-  const wideThreeThoughtViewport = !compact
-    && viewport.width >= tuning.microThoughtThirdMinWidthPx
-    && viewport.height >= tuning.microThoughtThirdMinHeightPx;
-  if (compactThreeThoughtViewport || wideThreeThoughtViewport) {
-    return 3;
+  const isPortrait = viewport.height >= viewport.width;
+  const expandedViewport = viewport.width >= tuning.expandedVisibleEntriesMinWidthPx
+    && viewport.height >= tuning.expandedVisibleEntriesMinHeightPx;
+  if (expandedViewport) {
+    return tuning.expandedVisibleEntries;
   }
 
-  const tallEnough = viewport.height >= tuning.microThoughtMinHeightPx;
-  const wideEnough = viewport.width >= tuning.microThoughtMinWidthPx && viewport.height >= 640;
-  if (tallEnough || wideEnough) {
-    return 2;
+  const landscapeViewport = !isPortrait
+    && viewport.width >= tuning.compactLandscapeVisibleEntriesMinWidthPx
+    && viewport.height >= tuning.compactLandscapeVisibleEntriesMinHeightPx;
+  if (landscapeViewport) {
+    return compact ? tuning.landscapeVisibleEntries : Math.max(tuning.landscapeVisibleEntries, tuning.portraitVisibleEntries);
   }
 
-  return 1;
+  return tuning.portraitVisibleEntries;
 };
 
 const resolveFeedWidth = (
@@ -385,14 +382,16 @@ const resolveFeedHeight = (
   void hasOnboarding;
   const tuning = legacyTuning.menu.intentFeed;
   const lineHeight = compact ? tuning.compactLineHeightPx : tuning.lineHeightPx;
+  const paddingY = compact ? tuning.compactPaddingYPx : tuning.paddingYPx;
+  const entryGap = compact ? tuning.compactEntryGapPx : tuning.entryGapPx;
   const lineCount = Math.max(0, quickThoughtCount) + (hasStatus ? 1 : 0);
   const gaps = Math.max(0, lineCount - 1);
 
   return Math.max(
     compact ? tuning.compactMinHeightPx : tuning.minHeightPx,
-    (tuning.paddingYPx * 2)
+    (paddingY * 2)
       + (lineCount * lineHeight)
-      + (gaps * tuning.entryGapPx)
+      + (gaps * entryGap)
   );
 };
 
@@ -569,26 +568,27 @@ export const createIntentFeedHud = (
     hintText: options.palette?.hud.hintText ?? palette.hud.hintText
   };
   const root = scene.add.container(0, 0).setDepth(10.6).setVisible(false);
-  const intentFontFamily = '"Segoe UI", "Trebuchet MS", sans-serif';
-  const status = scene.add.text(0, 0, '', {
+  const intentFontFamily = '"Bahnschrift SemiCondensed", "Trebuchet MS", "Segoe UI", sans-serif';
+  const initialResolution = resolveHudTextResolution(resolveSceneViewport(scene));
+  const status = applyTextResolution(scene.add.text(0, 0, '', {
     color: `#${colors.accent.toString(16).padStart(6, '0')}`,
     fontFamily: intentFontFamily,
     fontSize: `${legacyTuning.menu.intentFeed.statusFontPx}px`,
     fontStyle: 'bold'
-  }).setOrigin(0.5, 1).setAlign('center');
+  }).setOrigin(0.5, 1).setAlign('center'), initialResolution);
   const entries = Array.from({ length: MAX_INTENT_VISIBLE_ENTRIES }, () => (
-    scene.add.text(0, 0, '', {
+    applyTextResolution(scene.add.text(0, 0, '', {
       color: `#${colors.hintText.toString(16).padStart(6, '0')}`,
       fontFamily: intentFontFamily,
       fontSize: `${legacyTuning.menu.intentFeed.entryFontPx}px`
-    }).setOrigin(0.5, 1).setAlign('center')
+    }).setOrigin(0.5, 1).setAlign('center'), initialResolution)
   ));
-  const risk = scene.add.text(0, 0, '', {
+  const risk = applyTextResolution(scene.add.text(0, 0, '', {
     color: `#${colors.accent.toString(16).padStart(6, '0')}`,
     fontFamily: intentFontFamily,
     fontSize: `${Math.max(9, legacyTuning.menu.intentFeed.statusFontPx - 1)}px`,
     fontStyle: 'bold'
-  }).setOrigin(0.5, 1).setAlign('center');
+  }).setOrigin(0.5, 1).setAlign('center'), initialResolution);
   let entryTransitions = new Map<string, {
     slot: number;
     changedAtMs: number;
@@ -618,6 +618,7 @@ export const createIntentFeedHud = (
       const visibleStatus = state?.status ?? null;
       const rawEntries = state?.events ?? state?.entries ?? [];
       const viewport = resolveSceneViewport(scene);
+      const textResolution = resolveHudTextResolution(viewport);
       const hasStatusOverride = typeof riskMeta.statusLabel === 'string' && riskMeta.statusLabel.trim().length > 0;
       const wideDesktopLine = viewport.width >= 1200;
       const reserveStatusLine = rawEntries.length === 0 && (hasStatusOverride || Boolean(visibleStatus));
@@ -668,23 +669,28 @@ export const createIntentFeedHud = (
       }
 
       const lineHeight = layout.compact ? tuning.compactLineHeightPx : tuning.lineHeightPx;
+      const entryGap = layout.compact ? tuning.compactEntryGapPx : tuning.entryGapPx;
+      const paddingY = layout.compact ? tuning.compactPaddingYPx : tuning.paddingYPx;
       const statusFontPx = (layout.compact ? tuning.compactStatusFontPx : tuning.statusFontPx) + 1;
       const entryFontPx = (layout.compact ? tuning.compactEntryFontPx : tuning.entryFontPx) + 1;
-      const transitionMs = Math.max(1, Math.round(tuning.transitionMs * 1.25));
-      const transitionStartAlpha = Phaser.Math.Clamp(tuning.transitionStartAlpha + 0.08, 0, 1);
+      const fadeDurationMs = Math.max(1, Math.round(tuning.fadeDurationMs ?? (tuning.transitionMs * 1.25)));
+      const transitionStartAlpha = Phaser.Math.Clamp(tuning.transitionStartAlpha, 0, 1);
+      const replacementOverlapMs = Math.max(0, Math.round(tuning.replacementOverlapMs ?? 0));
       const nowMs = scene.time.now;
       const laneCenterX = layout.rect.width / 2;
-      const baselineY = layout.rect.height - tuning.paddingYPx;
-      const perspectiveInsetStep = layout.compact ? 8 : 12;
-      const perspectiveRiseStep = layout.compact ? 4 : 6;
+      const baselineY = layout.rect.height - paddingY;
+      const perspectiveInsetStep = layout.compact ? 7 : 10;
+      const perspectiveRiseStep = layout.compact ? tuning.compactUpwardDriftPx : tuning.upwardDriftPx;
 
       root.setPosition(layout.rect.left, layout.rect.top).setVisible(true);
 
       status
+        .setResolution(textResolution)
         .setVisible(hasStatusLine)
         .setFontSize(statusFontPx)
-        .setPosition(laneCenterX, baselineY)
+        .setPosition(Math.round(laneCenterX), Math.round(baselineY))
         .setFixedSize(layout.rect.width - (tuning.paddingXPx * 2), 0)
+        .setWordWrapWidth(layout.rect.width - (tuning.paddingXPx * 2), true)
         .setText(statusLabel)
         .setAlpha(0.98);
       status.setName('intent-status');
@@ -705,37 +711,45 @@ export const createIntentFeedHud = (
         }
 
         const previousTransition = entryTransitions.get(record.id);
+        const previousSlot = previousTransition?.slot ?? null;
         const changedAtMs = previousTransition && previousTransition.slot === index
           ? previousTransition.changedAtMs
           : nowMs;
-        const transitionProgress = Phaser.Math.Clamp((nowMs - changedAtMs) / transitionMs, 0, 1);
-        const transitionAlpha = Phaser.Math.Linear(transitionStartAlpha, 1, transitionProgress);
+        const transitionLeadMs = previousSlot === null ? 0 : Math.min(replacementOverlapMs, fadeDurationMs - 1);
+        const transitionProgress = Phaser.Math.Clamp((nowMs - changedAtMs + transitionLeadMs) / fadeDurationMs, 0, 1);
         const roleToken = resolveIntentFeedRoleLabel(record.kind);
-        const targetY = baselineY - (index * (lineHeight + tuning.entryGapPx + perspectiveRiseStep));
-        const previousY = previousTransition
-          ? baselineY - (previousTransition.slot * (lineHeight + tuning.entryGapPx + perspectiveRiseStep))
-          : targetY + Math.round(lineHeight * tuning.slideOffsetLines);
+        const targetY = baselineY - (index * (lineHeight + entryGap + perspectiveRiseStep));
+        const previousY = previousSlot === null
+          ? targetY + Math.round(lineHeight * tuning.slideOffsetLines) + perspectiveRiseStep
+          : baselineY - (previousSlot * (lineHeight + entryGap + perspectiveRiseStep));
         const slotWidth = Math.max(
           120,
           layout.rect.width - ((tuning.paddingXPx + (index * perspectiveInsetStep)) * 2)
         );
-        const slotScale = index <= 0 ? 1 : index === 1 ? 0.92 : 0.84;
+        const slotScale = index <= 0 ? 1 : index === 1 ? 0.97 : index === 2 ? 0.94 : index === 3 ? 0.91 : 0.88;
+        const targetAlphaScale = resolveIntentFeedLineAlphaScale(index);
+        const fromAlphaScale = previousSlot === null
+          ? Math.min(targetAlphaScale, Math.max(0.16, transitionStartAlpha * targetAlphaScale))
+          : resolveIntentFeedLineAlphaScale(previousSlot);
+        const resolvedAlpha = Phaser.Math.Linear(fromAlphaScale, targetAlphaScale, transitionProgress);
         nextEntryTransitions.set(record.id, {
           slot: index,
           changedAtMs
         });
 
         entry
+          .setResolution(textResolution)
           .setVisible(true)
           .setFontSize(entryFontPx)
           .setPosition(
-            laneCenterX,
-            Phaser.Math.Linear(previousY, targetY, transitionProgress)
+            Math.round(laneCenterX),
+            Math.round(Phaser.Math.Linear(previousY, targetY, transitionProgress))
           )
           .setFixedSize(slotWidth, 0)
+          .setWordWrapWidth(slotWidth, true)
           .setText(clampIntentFeedSummary(formatIntentHudSummary(record.summary), entryMaxChars))
           .setScale(slotScale)
-          .setAlpha(Phaser.Math.Clamp((record.opacity ?? 1) * resolveIntentFeedLineAlphaScale(index) * transitionAlpha, 0, 1));
+          .setAlpha(Phaser.Math.Clamp((record.opacity ?? 1) * resolvedAlpha, 0, 1));
         entry.setName('thought-line');
         entry.setDataEnabled();
         entry.setData('intent-role', resolveIntentFeedRole(record.kind));
@@ -743,7 +757,7 @@ export const createIntentFeedHud = (
         entry.setData('intent-semantic-tag', resolveIntentSemanticTag(record.kind));
       }
       entryTransitions = nextEntryTransitions;
-      risk.setVisible(false);
+      risk.setResolution(textResolution).setVisible(false);
       risk.setName('next-risk');
       risk.setDataEnabled();
       risk.setData('intent-risk-label', null);

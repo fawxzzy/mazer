@@ -13,6 +13,7 @@ import { getMazeSizeLabel } from '../domain/maze';
 import { legacyTuning } from '../config/tuning';
 import type { BoardLayout } from './boardRenderer';
 import { palette } from './palette';
+import { applyTextResolution, resolveHudTextResolution } from './textCrispness';
 import { resolveSceneViewport } from './viewport';
 
 type DemoMood = 'solve' | 'scan' | 'blueprint';
@@ -307,6 +308,7 @@ export const createDemoStatusHud = (
   let lastVariant: AmbientPresentationVariant = DEFAULT_PRESENTATION_VARIANT;
 
   const root = scene.add.container(0, 0).setDepth(10);
+  const textResolution = resolveHudTextResolution(resolveSceneViewport(scene));
   const railBack = scene.add.rectangle(
     boardX + (boardWidth / 2),
     baselineY - (compact ? 12 : 13),
@@ -323,23 +325,23 @@ export const createDemoStatusHud = (
     colors.hud.panelStroke,
     0.18
   ).setOrigin(0.5);
-  const modeText = scene.add.text(leftX, baselineY, '', {
+  const modeText = applyTextResolution(scene.add.text(leftX, baselineY, '', {
     color: toCssColor(colors.hud.accent),
     fontFamily: '"Courier New", monospace',
     fontSize: `${Math.round((compact ? 8 : 9) * deploymentProfile.modeFontScale)}px`,
     fontStyle: 'bold'
-  }).setOrigin(0, 0.5).setLetterSpacing(compact ? 1 : 2).setFixedSize(modeWidth, 0);
-  const metaText = scene.add.text(rightX, baselineY, '', {
+  }).setOrigin(0, 0.5).setLetterSpacing(compact ? 1 : 2).setFixedSize(modeWidth, 0), textResolution);
+  const metaText = applyTextResolution(scene.add.text(rightX, baselineY, '', {
     color: toCssColor(colors.hud.hintText),
     fontFamily: '"Courier New", monospace',
     fontSize: `${Math.round((compact ? 7 : 8) * deploymentProfile.metaFontScale)}px`
-  }).setOrigin(1, 0.5).setLetterSpacing(compactMeta ? 0 : 1).setFixedSize(metaWidth, 0).setAlign('right');
-  const flashText = scene.add.text(flashX, flashY, '', {
+  }).setOrigin(1, 0.5).setLetterSpacing(compactMeta ? 0 : 1).setFixedSize(metaWidth, 0).setAlign('right'), textResolution);
+  const flashText = applyTextResolution(scene.add.text(flashX, flashY, '', {
     color: toCssColor(colors.hud.accent),
     fontFamily: '"Courier New", monospace',
     fontSize: `${Math.round((compact ? 8 : 9) * deploymentProfile.flashFontScale)}px`,
     fontStyle: 'bold'
-  }).setOrigin(1, 0).setLetterSpacing(1);
+  }).setOrigin(1, 0).setLetterSpacing(1), textResolution);
   root.add([railBack, rail, modeText, metaText, flashText]);
 
   const pulseTween = reducedMotion ? undefined : scene.tweens.add({

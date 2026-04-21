@@ -86,6 +86,7 @@ import {
   palette,
   type PaletteReadabilityReport
 } from '../render/palette';
+import { applyTextResolution, resolveHudTextResolution } from '../render/textCrispness';
 import {
   createRunProjection,
   type RunProjectionMode,
@@ -5285,6 +5286,7 @@ export class MenuScene extends Phaser.Scene {
           }
           : undefined
       });
+      const resolveChromeTextResolution = (): number => resolveHudTextResolution({ width, height });
       const measureInstallChromeMetrics = (
         themeProfile: AmbientThemeProfile,
         state: InstallSurfaceState = activeInstallState
@@ -5295,11 +5297,11 @@ export class MenuScene extends Phaser.Scene {
         }
 
         const labelText = resolveInstallChromeLabel(state);
-        const label = this.add.text(-4096, -4096, labelText, createInstallChromeLabelStyle(state))
+        const label = applyTextResolution(this.add.text(-4096, -4096, labelText, createInstallChromeLabelStyle(state))
           .setOrigin(0.5)
           .setLetterSpacing(compactInstallChrome ? 0 : 2)
           .setVisible(false)
-          .setAlpha(0);
+          .setAlpha(0), resolveChromeTextResolution());
         const horizontalChrome = compactInstallChrome ? 58 : 74;
         const chipWidth = Phaser.Math.Clamp(
           Math.ceil(label.width + horizontalChrome),
@@ -5439,19 +5441,19 @@ export class MenuScene extends Phaser.Scene {
           ritualCardWidth,
           ritualTuning.cardHeightPx
         ).setOrigin(0.5).setDepth(10.74).setStrokeStyle(1, themeProfile.palette.ui.overlayStroke, 0);
-        const ritualTitle = this.add.text(boardCenterX, ritualCardY - 13, '', {
+        const ritualTitle = applyTextResolution(this.add.text(boardCenterX, ritualCardY - 13, '', {
           color: `#${themeProfile.palette.ui.text.toString(16).padStart(6, '0')}`,
           fontFamily: themeProfile.title.fontFamily,
           fontSize: `${ritualTuning.cardTitleFontPx}px`,
           fontStyle: 'bold'
-        }).setOrigin(0.5).setAlpha(0).setDepth(10.76);
-        const ritualSubtitle = this.add.text(boardCenterX, ritualCardY + 9, '', {
+        }).setOrigin(0.5).setAlpha(0).setDepth(10.76), resolveHudTextResolution(resolveSceneViewport(this)));
+        const ritualSubtitle = applyTextResolution(this.add.text(boardCenterX, ritualCardY + 9, '', {
           color: `#${themeProfile.palette.ui.textDim.toString(16).padStart(6, '0')}`,
           fontFamily: themeProfile.title.fontFamily,
           fontSize: `${ritualTuning.cardSubtitleFontPx}px`,
           align: 'center',
           wordWrap: { width: ritualCardWidth - 28, useAdvancedWrap: true }
-        }).setOrigin(0.5).setAlpha(0).setDepth(10.76);
+        }).setOrigin(0.5).setAlpha(0).setDepth(10.76), resolveHudTextResolution(resolveSceneViewport(this)));
         const blueprintAccent = this.add.graphics().setDepth(7.1).setBlendMode(Phaser.BlendModes.SCREEN);
         const motifPrimary = this.add.graphics().setDepth(5.8);
         const motifSecondary = this.add.graphics().setDepth(6.15);
@@ -5521,9 +5523,9 @@ export class MenuScene extends Phaser.Scene {
         }
 
         const { compactInstall, labelText, chipWidth, chipHeight } = installMetrics;
-        const label = this.add.text(0, 0, labelText, createInstallChromeLabelStyle(resolvedState))
+        const label = applyTextResolution(this.add.text(0, 0, labelText, createInstallChromeLabelStyle(resolvedState))
           .setOrigin(0, 0.5)
-          .setLetterSpacing(compactInstall ? 1 : 2);
+          .setLetterSpacing(compactInstall ? 1 : 2), resolveChromeTextResolution());
         const installFrame = resolveInstallChromeFrame(
           width,
           height,
@@ -5548,7 +5550,7 @@ export class MenuScene extends Phaser.Scene {
         const closeX = (chipWidth / 2) - closeInset;
         const labelMaxWidth = Math.max(72, closeX - labelX - (compactInstall ? 10 : 14));
 
-        const shadow = this.add.rectangle(0, 2, chipWidth + 2, chipHeight + 2, sceneThemeProfile.title.plateShadowColor, 0.05);
+        const shadow = this.add.rectangle(0, 2, chipWidth + 2, chipHeight + 2, sceneThemeProfile.title.plateShadowColor, 0.03);
         const chip = this.add.rectangle(
           0,
           0,
@@ -5556,18 +5558,18 @@ export class MenuScene extends Phaser.Scene {
           chipHeight,
           MAZER_BRAND_COLORS.shell,
           resolvedState.mode === 'manual'
-            ? 0.84
+            ? 0.82
             : installPromptPending
-              ? 0.88
-              : 0.89
+              ? 0.86
+              : 0.87
         ).setStrokeStyle(
           1,
           MAZER_BRAND_COLORS.frame,
           resolvedState.mode === 'manual'
-            ? 0.34
+            ? 0.4
             : installPromptPending
-              ? 0.58
-              : 0.46
+              ? 0.62
+              : 0.52
         );
         const accent = this.add.rectangle(
           0,
@@ -5575,7 +5577,7 @@ export class MenuScene extends Phaser.Scene {
           Math.max(18, chipWidth - 20),
           2,
           MAZER_BRAND_COLORS.route,
-          resolvedState.mode === 'manual' ? 0.12 : 0.2
+          resolvedState.mode === 'manual' ? 0.16 : 0.24
         );
         const brandMark = createMazerBrandMark(this, markSize, 0.98)
           .setPosition(markX, 0)
@@ -5584,12 +5586,15 @@ export class MenuScene extends Phaser.Scene {
         const closeButton = this.add.container(closeX, 0);
         const closeHit = this.add.circle(0, 0, closeDiameter / 2, MAZER_BRAND_COLORS.shell, 0.01)
           .setStrokeStyle(1, MAZER_BRAND_COLORS.muted, 0.24);
-        const closeGlyph = this.add.text(0, -1, '×', {
-          color: toColorString(MAZER_BRAND_COLORS.support),
-          fontFamily: '"Bahnschrift SemiCondensed", "Trebuchet MS", "Segoe UI", sans-serif',
-          fontSize: `${compactInstall ? 12 : 14}px`,
-          fontStyle: 'bold'
-        }).setOrigin(0.5).setAlpha(0.84);
+        const closeGlyph = applyTextResolution(
+          this.add.text(0, -1, '×', {
+            color: toColorString(MAZER_BRAND_COLORS.support),
+            fontFamily: '"Bahnschrift SemiCondensed", "Trebuchet MS", "Segoe UI", sans-serif',
+            fontSize: `${compactInstall ? 12 : 14}px`,
+            fontStyle: 'bold'
+          }).setOrigin(0.5).setAlpha(0.84),
+          resolveChromeTextResolution()
+        );
         closeButton.add([closeHit, closeGlyph]);
 
         if (resolvedState.mode === 'available' && !installPromptPending) {
@@ -5694,9 +5699,9 @@ export class MenuScene extends Phaser.Scene {
         const titlePlateContainer = this.add.container(0, 0);
         const titleAlpha = variantProfile.titleAlpha * chromeProfile.titleAlpha * deploymentProfile.titleAlphaScale;
         const signatureAlpha = variantProfile.signatureAlpha * chromeProfile.signatureAlpha * deploymentProfile.signatureAlphaScale;
-        const plateAlpha = Math.min(0.16, variantProfile.plateAlpha * chromeProfile.plateAlpha * deploymentProfile.plateAlphaScale * 0.94);
-        const panelAlpha = Math.min(0.14, variantProfile.panelAlpha * chromeProfile.panelAlpha * deploymentProfile.panelAlphaScale * 0.72);
-        const titleShadowAlpha = Math.min(0.12, 0.08 * titleAlpha);
+        const plateAlpha = Math.min(0.14, variantProfile.plateAlpha * chromeProfile.plateAlpha * deploymentProfile.plateAlphaScale * 0.9);
+        const panelAlpha = Math.min(0.11, variantProfile.panelAlpha * chromeProfile.panelAlpha * deploymentProfile.panelAlphaScale * 0.64);
+        const titleShadowAlpha = Math.min(0.07, 0.05 * titleAlpha);
         const titleFontFamily = '"Bahnschrift SemiCondensed", "Trebuchet MS", "Segoe UI", sans-serif';
         const supportFontFamily = '"Consolas", "Courier New", monospace';
         const titleStrokeWidth = 1;
@@ -5705,16 +5710,16 @@ export class MenuScene extends Phaser.Scene {
         const titleOffsetX = Math.round(titleLockup.plateWidth * 0.065);
         titlePlateContainer.add([
           this.add.rectangle(0, 0, titleLockup.plateWidth, titleLockup.plateHeight, MAZER_BRAND_COLORS.shell, plateAlpha)
-            .setStrokeStyle(1, MAZER_BRAND_COLORS.frame, 0.52 * titleAlpha),
+            .setStrokeStyle(1, MAZER_BRAND_COLORS.frame, 0.62 * titleAlpha),
           this.add.rectangle(0, 0, titleLockup.plateWidth - 12, titleLockup.plateHeight - 10, sceneThemeProfile.title.plateInnerColor, panelAlpha)
-            .setStrokeStyle(1, MAZER_BRAND_COLORS.frameHighlight, 0.18 * titleAlpha),
+            .setStrokeStyle(1, MAZER_BRAND_COLORS.frameHighlight, 0.26 * titleAlpha),
           this.add.rectangle(
             0,
             -(titleLockup.plateHeight / 2) + 5,
             titleLockup.plateWidth - 20,
             2,
             MAZER_BRAND_COLORS.route,
-            0.16 * titleAlpha
+            0.22 * titleAlpha
           )
         ]);
         titlePlateContainer.add(
@@ -5722,28 +5727,28 @@ export class MenuScene extends Phaser.Scene {
             .setPosition(emblemOffsetX, -Math.round(titleLockup.plateHeight * 0.02))
         );
         titleShadowContainer.add([
-          this.add.text(titleOffsetX + 1, 1, legacyTuning.menu.title.text, {
+          applyTextResolution(this.add.text(titleOffsetX + 1, 1, legacyTuning.menu.title.text, {
             color: toColorString(MAZER_BRAND_COLORS.wordmarkShadow),
             fontFamily: titleFontFamily,
             fontSize: `${titleLockup.titleFontSize}px`,
             fontStyle: 'bold'
-          }).setOrigin(0.5).setLetterSpacing(titleLockup.titleLetterSpacing).setAlpha(titleShadowAlpha)
+          }).setOrigin(0.5).setLetterSpacing(titleLockup.titleLetterSpacing).setAlpha(titleShadowAlpha), resolveChromeTextResolution())
         ]);
-        const title = this.add.text(titleOffsetX, -Math.round(titleLockup.plateHeight * 0.08), legacyTuning.menu.title.text, {
+        const title = applyTextResolution(this.add.text(titleOffsetX, -Math.round(titleLockup.plateHeight * 0.08), legacyTuning.menu.title.text, {
           color: toColorString(MAZER_BRAND_COLORS.wordmark),
           fontFamily: titleFontFamily,
           fontSize: `${titleLockup.titleFontSize}px`,
           fontStyle: 'bold'
         }).setOrigin(0.5).setLetterSpacing(titleLockup.titleLetterSpacing)
           .setAlpha(Math.min(1, titleAlpha * 1.04))
-          .setStroke(toColorString(MAZER_BRAND_COLORS.wordmarkShadow), titleStrokeWidth);
-        const subtitle = this.add.text(0, titleLockup.subtitleTopOffsetY, TITLE_SIGNATURE_TEXT, {
+          .setStroke(toColorString(MAZER_BRAND_COLORS.wordmarkShadow), titleStrokeWidth), resolveChromeTextResolution());
+        const subtitle = applyTextResolution(this.add.text(0, titleLockup.subtitleTopOffsetY, TITLE_SIGNATURE_TEXT, {
           color: toColorString(MAZER_BRAND_COLORS.support),
           fontFamily: supportFontFamily,
           fontSize: `${titleLockup.subtitleFontSize}px`
         }).setOrigin(0.5, 0)
           .setAlpha(Math.min(0.74, signatureAlpha))
-          .setLetterSpacing(titleLockup.subtitleLetterSpacing);
+          .setLetterSpacing(titleLockup.subtitleLetterSpacing), resolveChromeTextResolution());
 
         titlePlateContainer.add(title);
         titleContainer.add([titlePlateContainer, subtitle]);
@@ -6124,15 +6129,15 @@ export class MenuScene extends Phaser.Scene {
         control: HumanInputAction['kind']
       ): TouchControlButtonChrome => {
         const container = this.add.container(0, 0);
-        const shadow = this.add.rectangle(0, 3, 48, 48, sceneThemeProfile.title.plateShadowColor, 0.16);
-        const body = this.add.rectangle(0, 0, 48, 48, sceneThemeProfile.title.buttonFillColor, 0.24)
-          .setStrokeStyle(1, sceneThemeProfile.title.buttonStrokeColor, 0.24);
-        const label = this.add.text(0, 0, TOUCH_CONTROL_TEXT[control], {
+        const shadow = this.add.rectangle(0, 3, 48, 48, sceneThemeProfile.title.plateShadowColor, 0.1);
+        const body = this.add.rectangle(0, 0, 48, 48, sceneThemeProfile.title.buttonFillColor, 0.2)
+          .setStrokeStyle(1, sceneThemeProfile.title.buttonStrokeColor, 0.32);
+        const label = applyTextResolution(this.add.text(0, 0, TOUCH_CONTROL_TEXT[control], {
           color: sceneThemeProfile.title.signatureColor,
           fontFamily: sceneThemeProfile.title.fontFamily,
           fontSize: `${Math.max(12, Math.round(legacyTuning.menu.intentFeed.statusFontPx * 0.94))}px`,
           fontStyle: 'bold'
-        }).setOrigin(0.5);
+        }).setOrigin(0.5), resolveChromeTextResolution());
 
         container.add([shadow, body, label]);
         return {

@@ -110,7 +110,7 @@ export interface IntentFeedState {
   layout?: IntentFeedLayoutMetrics;
 }
 
-export const MAX_INTENT_VISIBLE_ENTRIES = 4;
+export const MAX_INTENT_VISIBLE_ENTRIES = 5;
 export const MAX_WORLD_PINGS = 2;
 export const INTENT_PING_LABELS: Record<IntentKind, string> = Object.freeze({
   'goal-observed': 'Exit seen',
@@ -151,7 +151,7 @@ export const INTENT_SUMMARY_VERB_FIRST_WORDS = Object.freeze([
   'learning',
   'prioritizing'
 ]);
-export const INTENT_SLOT_OPACITIES = Object.freeze([1, 0.7, 0.4, 0.15]);
+export const INTENT_SLOT_OPACITIES = Object.freeze([1, 0.72, 0.5, 0.32, 0.18]);
 export const WORLD_PING_OPACITIES = Object.freeze([1, 0.72]);
 export const INTENT_TTL_STEPS: Record<IntentImportance, number> = Object.freeze({
   low: 2,

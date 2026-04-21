@@ -67,7 +67,7 @@ describe('intent feed renderer', () => {
     expect(withOnboarding.maxVisibleEvents).toBe(withoutOnboarding.maxVisibleEvents);
   });
 
-  test('keeps landscape desktops in a bottom-docked panel with a wider readable line', () => {
+  test('keeps landscape desktops in a bottom-docked panel with the full five-line stack', () => {
     const layout = resolveIntentFeedLayout(
       { width: 1440, height: 900 },
       4,
@@ -82,7 +82,7 @@ describe('intent feed renderer', () => {
     expect(layout.dock).toBe('bottom-center');
     expect(layout.rect.width).toBeGreaterThanOrEqual(700);
     expect(layout.rect.top).toBeGreaterThan(600);
-    expect(layout.maxVisibleEvents).toBe(3);
+    expect(layout.maxVisibleEvents).toBe(5);
   });
 
   test('keeps short phone landscape layouts in the bottom panel instead of forcing a rail', () => {

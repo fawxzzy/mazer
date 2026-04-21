@@ -68,7 +68,7 @@ describe('intent bus', () => {
     expect(feed.metrics.feedReadabilityPass).toBe(false);
   });
 
-  test('caps the visible queue at four entries and allows multiple speakers without visual chaos', () => {
+  test('caps the visible queue at five entries and allows multiple speakers without visual chaos', () => {
     const { bus, feed } = buildFeedFromStates([
       makeState({
         step: 0,
@@ -117,10 +117,10 @@ describe('intent bus', () => {
       })
     ]);
 
-    const visible = resolveVisibleIntentEntries(bus.records, 4);
+    const visible = resolveVisibleIntentEntries(bus.records, 5);
     const stepOneSpeakers = new Set(bus.records.filter((record) => record.step === 1).map((record) => record.speaker));
 
-    expect(visible).toHaveLength(4);
+    expect(visible).toHaveLength(5);
     expect(visible.map((entry) => entry.opacity)).toEqual(INTENT_SLOT_OPACITIES);
     expect(stepOneSpeakers).toEqual(new Set(['TrapNet', 'Inventory']));
     expect(feed.metrics.speakerCount).toBe(5);

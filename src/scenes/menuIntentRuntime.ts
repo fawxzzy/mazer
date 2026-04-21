@@ -250,7 +250,10 @@ export class MenuIntentFeedDisplayController {
         Math.trunc(options.maxVisibleEntries ?? legacyTuning.menu.intentFeed.maxVisibleEntries)
       )
     );
-    this.minimumDwellMs = Math.max(0, Math.trunc(options.minimumDwellMs ?? legacyTuning.menu.intentFeed.minimumDwellMs));
+    this.minimumDwellMs = Math.max(
+      0,
+      Math.trunc(options.minimumDwellMs ?? legacyTuning.menu.intentFeed.holdDurationMs ?? legacyTuning.menu.intentFeed.minimumDwellMs)
+    );
     this.replacementDebounceMs = Math.max(
       0,
       Math.trunc(options.replacementDebounceMs ?? legacyTuning.menu.intentFeed.replacementDebounceMs)
