@@ -191,7 +191,7 @@ export class PlaybookIntentTemplates {
         const landmarkCue = normalizeCue(input.landmark?.cue);
         const landmarkLabel = normalizeCue(input.landmark?.label);
         const summary = landmarkCue.includes('junction')
-          ? 'This turn feels tighter.'
+          ? 'This looks closer.'
           : landmarkCue.includes('gate')
             ? 'Wait. The gate will open.'
             : landmarkCue.includes('hazard')
@@ -201,7 +201,7 @@ export class PlaybookIntentTemplates {
                 : landmarkCue.includes('pressure') || landmarkCue.includes('door')
                   ? 'That part does something.'
                   : landmarkLabel.includes('junction')
-                    ? 'This turn feels tighter.'
+                    ? 'This looks closer.'
                     : landmarkLabel.includes('exit')
                       ? 'I can see the exit.'
                       : 'This spot looks useful.';

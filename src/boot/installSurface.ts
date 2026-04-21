@@ -10,6 +10,7 @@ export interface InstallSurfaceSnapshot {
   standalone: boolean;
   installed: boolean;
   canPrompt: boolean;
+  dismissed?: boolean;
   instruction?: string;
 }
 
@@ -32,6 +33,7 @@ interface InstallSurfaceNavigatorLike {
 
 interface InstallSurfaceWindowLike {
   addEventListener(type: string, listener: EventListenerOrEventListenerObject): void;
+  localStorage?: Pick<Storage, 'getItem' | 'removeItem' | 'setItem'>;
   matchMedia?(query: string): Pick<MediaQueryList, 'matches'>;
   navigator?: InstallSurfaceNavigatorLike;
   removeEventListener?(type: string, listener: EventListenerOrEventListenerObject): void;
@@ -40,6 +42,7 @@ interface InstallSurfaceWindowLike {
 export type InstallPromptOutcome = DeferredInstallPromptChoice['outcome'] | 'unavailable';
 
 const IOS_MANUAL_INSTALL_INSTRUCTION = 'Use Share > Add to Home Screen';
+const INSTALL_SURFACE_DISMISSED_STORAGE_KEY = 'mazer-install-surface-dismissed-v1';
 
 let installState: InstallSurfaceState = {
   mode: 'hidden',
@@ -51,6 +54,7 @@ let deferredPrompt: DeferredInstallPromptEvent | undefined;
 let installRuntimeWindow: InstallSurfaceWindowLike | undefined;
 let initialized = false;
 let installed = false;
+let dismissed = false;
 
 const subscribers = new Set<(state: InstallSurfaceState) => void>();
 
@@ -61,6 +65,26 @@ const isDeferredInstallPromptEvent = (event: Event): event is DeferredInstallPro
 const resolveGlobalWindow = (): InstallSurfaceWindowLike | undefined => (
   typeof window === 'undefined' ? undefined : window
 );
+
+const readDismissedPreference = (runtime: InstallSurfaceWindowLike | undefined): boolean => {
+  try {
+    return runtime?.localStorage?.getItem(INSTALL_SURFACE_DISMISSED_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+const writeDismissedPreference = (runtime: InstallSurfaceWindowLike | undefined, value: boolean): void => {
+  try {
+    if (value) {
+      runtime?.localStorage?.setItem(INSTALL_SURFACE_DISMISSED_STORAGE_KEY, '1');
+    } else {
+      runtime?.localStorage?.removeItem(INSTALL_SURFACE_DISMISSED_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage failures; the in-memory state is enough to keep the chrome quiet.
+  }
+};
 
 const resolveStandaloneState = (runtime: InstallSurfaceWindowLike | undefined): boolean => {
   if (!runtime) {
@@ -104,6 +128,15 @@ export const resolveInstallSurfaceState = (snapshot: InstallSurfaceSnapshot): In
     };
   }
 
+  if (snapshot.dismissed) {
+    return {
+      mode: 'hidden',
+      canPrompt: false,
+      installed: false,
+      standalone: false
+    };
+  }
+
   if (snapshot.canPrompt) {
     return {
       mode: 'available',
@@ -136,6 +169,7 @@ const publishInstallSurfaceState = (): InstallSurfaceState => {
   installState = resolveInstallSurfaceState({
     standalone,
     installed: installed || standalone,
+    dismissed: dismissed && !standalone && !installed,
     canPrompt: !standalone && !installed && deferredPrompt !== undefined,
     instruction: standalone || installed ? undefined : resolveManualInstallInstruction(installRuntimeWindow?.navigator)
   });
@@ -164,7 +198,9 @@ const handleBeforeInstallPrompt = (event: Event): void => {
 
 const handleAppInstalled = (): void => {
   installed = true;
+  dismissed = false;
   deferredPrompt = undefined;
+  writeDismissedPreference(installRuntimeWindow, false);
   publishInstallSurfaceState();
 };
 
@@ -182,6 +218,7 @@ export const initializeInstallSurface = (
   installRuntimeWindow = runtime;
   initialized = true;
   installed = resolveStandaloneState(runtime);
+  dismissed = !installed && readDismissedPreference(runtime);
   runtime.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt as EventListener);
   runtime.addEventListener('appinstalled', handleAppInstalled as EventListener);
 
@@ -198,6 +235,17 @@ export const subscribeInstallSurface = (
   return () => {
     subscribers.delete(listener);
   };
+};
+
+export const dismissInstallSurface = (): InstallSurfaceState => {
+  if (installState.mode === 'hidden' || installed) {
+    return installState;
+  }
+
+  dismissed = true;
+  deferredPrompt = undefined;
+  writeDismissedPreference(installRuntimeWindow, true);
+  return publishInstallSurfaceState();
 };
 
 export const promptInstallSurface = async (): Promise<InstallPromptOutcome> => {
@@ -219,6 +267,8 @@ export const promptInstallSurface = async (): Promise<InstallPromptOutcome> => {
   }
 
   installed = choice.outcome === 'accepted';
+  dismissed = choice.outcome !== 'accepted';
+  writeDismissedPreference(installRuntimeWindow, dismissed);
   publishInstallSurfaceState();
 
   return choice.outcome;
@@ -233,6 +283,7 @@ export const resetInstallSurfaceRuntimeForTests = (): void => {
   subscribers.clear();
   initialized = false;
   installed = false;
+  dismissed = false;
   deferredPrompt = undefined;
   installRuntimeWindow = undefined;
   installState = {

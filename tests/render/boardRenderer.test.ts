@@ -5,6 +5,8 @@ import type { DemoTrailStep } from '../../src/domain/ai';
 import { palette, resolveLocalBoardSupportColors } from '../../src/render/palette';
 import {
   BoardRenderer,
+  isPointInsideTileArrivalRegion,
+  resolveActorBodyCenterPoint,
   resolveTrailHeadRenderState,
   type BoardLayout
 } from '../../src/render/boardRenderer';
@@ -62,6 +64,10 @@ const createGraphicsStub = () => {
     }),
     setVisible: vi.fn((...args: unknown[]) => {
       calls.push({ method: 'setVisible', args });
+      return stub;
+    }),
+    setAlpha: vi.fn((...args: unknown[]) => {
+      calls.push({ method: 'setAlpha', args });
       return stub;
     }),
     lineBetween: vi.fn((...args: unknown[]) => {
@@ -539,6 +545,26 @@ describe('board renderer', () => {
     expect(diagnostics.headCenter).toEqual(diagnostics.motionHeadCenter);
   });
 
+  test('treats the exit latch as the actor body center entering the padded exit tile region', () => {
+    const settledCenter = resolveActorBodyCenterPoint(1.5, 0.5, 1, 3, 'goal', 1_000);
+    const approachingCenter = resolveActorBodyCenterPoint(0.92, 0.5, 1, 3, 'anticipate', 1_000);
+
+    expect(isPointInsideTileArrivalRegion(settledCenter, 1, 0, 1)).toBe(true);
+    expect(isPointInsideTileArrivalRegion(approachingCenter, 1, 0, 1)).toBe(false);
+  });
+
+  test('fades trail and actor overlays during erase instead of forcing a hard clear', () => {
+    const { scene, graphics } = createSceneStub(1_000);
+    const renderer = new BoardRenderer(scene, createEpisode(), createLayout());
+
+    renderer.drawTrail([0, 1], { cue: 'goal', alphaScale: 0.42 });
+    renderer.drawActor(1, 3, 'goal', 0, 0.42);
+
+    expect(graphics.at(2)?.calls.find((call) => call.method === 'setAlpha')?.args[0]).toBe(0.42);
+    expect(graphics.at(7)?.calls.find((call) => call.method === 'setAlpha')?.args[0]).toBe(0.42);
+    expect(graphics.at(8)?.calls.find((call) => call.method === 'setAlpha')?.args[0]).toBe(0.42);
+  });
+
   test('reveals more board surface as lifecycle build progress advances', () => {
     const { scene, graphics } = createSceneStub(1_000);
     const renderer = new BoardRenderer(scene, createEpisode(), createLayout());
@@ -631,6 +657,28 @@ describe('board renderer', () => {
 
     expect(earlyBuildLead).toBeGreaterThan(earlyBuildTail);
     expect(earlyEraseLead).toBeGreaterThan(earlyEraseTail);
+  });
+
+  test('keeps board chrome as a light frame instead of repainting a full board-sized backplate', () => {
+    const { scene, graphics } = createSceneStub(1_000);
+    const layout = createLayout();
+    const renderer = new BoardRenderer(scene, createEpisode(), layout);
+
+    renderer.drawBoardChrome();
+
+    const chromeBack = graphics.at(0);
+    const chromeFront = graphics.at(9);
+    const fullBoardFill = chromeBack?.calls.find((call) => (
+      call.method === 'fillRect'
+      && call.args[0] === layout.boardX
+      && call.args[1] === layout.boardY
+      && call.args[2] === layout.boardWidth
+      && call.args[3] === layout.boardHeight
+    ));
+
+    expect(fullBoardFill).toBeUndefined();
+    expect(chromeBack?.calls.some((call) => call.method === 'strokeRect')).toBe(true);
+    expect(chromeFront?.calls.some((call) => call.method === 'lineBetween')).toBe(true);
   });
 
   test('clears trail and actor layers when the lifecycle hides them', () => {

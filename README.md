@@ -62,6 +62,8 @@ npm run projection:export-pack
 `npm run runtime:observe -- --duration-seconds 120 --label pacing-a` captures a repo-owned runtime observe receipt under `../tmp/captures/mazer-runtime-observe/` and now includes experiment metadata plus a stable variant id.
 `npm run projection:export-pack -- --fixture watching --label watch-pass-preview` emits iOS and Android projection export packs under `../tmp/captures/mazer-projections/`.
 `npm run edge:live -- --base-url http://127.0.0.1:4173 --run experiment-smoke --pacing 0.7x` carries the same experiment metadata into Edge live receipts so visual decisions can be compared against explicit toggles instead of ad hoc notes.
+The canonical closure order is serial-only: `npm run visual:matrix -- --preset core --skip-build true`, `npm run edge:live -- --skip-build true --headless true --run core-only-watch`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, then `npm run verify`.
+Use [`docs/ops/MAZER_HOSTED_PREVIEW_PROOF.md`](docs/ops/MAZER_HOSTED_PREVIEW_PROOF.md) for the hosted-preview closure rule and manual stop state.
 
 ## Branch lanes
 
@@ -71,11 +73,12 @@ npm run projection:export-pack
 
 ## Current truth
 - The active shipping lane is the 2D Phaser build.
-- The repo-owned proof path is green locally as of April 17, 2026: `npm run verify` passed after the active theme readability repairs.
-- The immediate next-step lane is repo-owned verification and visibility follow-through, not a 3D reopen.
+- The repo-owned proof path is green locally as of April 20, 2026: the canonical serial closure order passed again with `npm run visual:matrix -- --preset core --skip-build true`, `npm run edge:live -- --skip-build true --headless true --run core-only-watch`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, and `npm run verify`.
+- The immediate next-step closure lane is hosted-preview proof and proof receipt hygiene, not a 3D reopen or another palette churn pass.
 - Future-runtime and rotating-planet work remain parked behind isolated entrypoints and future-facing docs.
 - Visual truth is owned by the screenshot gate first, then `tests/scenes/demo-build.test.ts`, then older prose.
 - The latest local baseline is only production truth after that visual pass is committed and deployed.
+- Local proof green and hosted-preview closure are separate states. If the deployed preview still needs its manual or authenticated browser pass, the lane is healthy-but-held rather than broken.
 - Trail attach plus no-future-preview is the active trail contract.
 - Desktop, TV, and OBS composition now targets the tight 5px board-fit between the title band and the bottom-center install CTA lane.
 - Player readability stays permanent, and the bottom panel remains the universal shell lane for now.

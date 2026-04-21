@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from 'vitest';
 import {
+  dismissInstallSurface,
   getInstallSurfaceState,
   initializeInstallSurface,
   promptInstallSurface,
@@ -13,6 +14,15 @@ import {
 
 class FakeWindow {
   public listeners = new Map<string, Set<(event: Event) => void>>();
+  public localStorage = {
+    getItem: (key: string): string | null => this.storage.get(key) ?? null,
+    removeItem: (key: string): void => {
+      this.storage.delete(key);
+    },
+    setItem: (key: string, value: string): void => {
+      this.storage.set(key, value);
+    }
+  };
   public navigator: {
     maxTouchPoints?: number;
     platform?: string;
@@ -21,6 +31,7 @@ class FakeWindow {
   } = {};
 
   private readonly standalone: boolean;
+  private readonly storage = new Map<string, string>();
 
   public constructor(standalone = false) {
     this.standalone = standalone;
@@ -143,6 +154,32 @@ describe('install surface runtime', () => {
     });
     expect(snapshots.some((state) => state.mode === 'available')).toBe(true);
     unsubscribe();
+  });
+
+  test('dismissed install prompts stay hidden until the runtime is reset', async () => {
+    const runtime = new FakeWindow();
+    initializeInstallSurface(runtime);
+    runtime.dispatchEvent('beforeinstallprompt', createPromptEvent('dismissed'));
+
+    expect(getInstallSurfaceState().mode).toBe('available');
+    await expect(promptInstallSurface()).resolves.toBe('dismissed');
+    expect(getInstallSurfaceState().mode).toBe('hidden');
+
+    resetInstallSurfaceRuntimeForTests();
+
+    expect(initializeInstallSurface(runtime).mode).toBe('hidden');
+  });
+
+  test('manual install fallback can be dismissed explicitly', () => {
+    const runtime = new FakeWindow(false);
+    runtime.navigator = {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
+      platform: 'iPhone'
+    };
+
+    expect(initializeInstallSurface(runtime).mode).toBe('manual');
+    expect(dismissInstallSurface().mode).toBe('hidden');
+    expect(initializeInstallSurface(runtime).mode).toBe('hidden');
   });
 
   test('standalone mode stays hidden and manual iOS fallback remains fail-open', () => {

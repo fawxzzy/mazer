@@ -71,6 +71,7 @@ export interface BoardCueOptions {
   persistentTrail?: boolean;
   persistentFadeFloor?: number;
   pulseBoost?: number;
+  alphaScale?: number;
   activeMotion?: {
     fromIndex: number;
     toIndex: number;
@@ -134,6 +135,45 @@ const ACTOR_PERPENDICULAR_OFFSETS = [
   { x: 0, y: 1 },
   { x: 0, y: 1 }
 ] as const;
+
+export const resolveActorBodyCenterPoint = (
+  centerX: number,
+  centerY: number,
+  tileSize: number,
+  direction: 0 | 1 | 2 | 3 | null,
+  cue: DemoWalkerCue,
+  now: number
+): { x: number; y: number } => {
+  const actorTuning = legacyTuning.board.actor;
+  const facingVector = direction === null ? null : ACTOR_DIRECTION_OFFSETS[direction];
+  const nudgeRatio = cue === 'anticipate'
+    ? actorTuning.anticipationNudgeRatio
+    : cue === 'reacquire'
+      ? actorTuning.reacquireNudgeRatio
+      : 0;
+  const nudgeScale = facingVector === null ? 0 : (0.62 + (Math.sin(now * 0.012) * 0.38));
+
+  return {
+    x: centerX + ((facingVector?.x ?? 0) * tileSize * nudgeRatio * nudgeScale),
+    y: centerY + ((facingVector?.y ?? 0) * tileSize * nudgeRatio * nudgeScale)
+  };
+};
+
+export const isPointInsideTileArrivalRegion = (
+  point: { x: number; y: number },
+  tileX: number,
+  tileY: number,
+  tileSize: number,
+  insetRatio = legacyTuning.demo.lifecycle.exitArrivalInsetRatio
+): boolean => {
+  const inset = Math.max(0, Math.min(tileSize * 0.48, tileSize * insetRatio));
+  return (
+    point.x >= tileX + inset
+    && point.x <= tileX + tileSize - inset
+    && point.y >= tileY + inset
+    && point.y <= tileY + tileSize - inset
+  );
+};
 
 const MIN_BOARD_SIZE = 24;
 const ANIMATION_TIME_WRAP_MS = 600_000;
@@ -894,19 +934,7 @@ export class BoardRenderer {
     cue: DemoWalkerCue,
     now: number
   ): { x: number; y: number } {
-    const actorTuning = legacyTuning.board.actor;
-    const facingVector = direction === null ? null : ACTOR_DIRECTION_OFFSETS[direction];
-    const nudgeRatio = cue === 'anticipate'
-      ? actorTuning.anticipationNudgeRatio
-      : cue === 'reacquire'
-        ? actorTuning.reacquireNudgeRatio
-        : 0;
-    const nudgeScale = facingVector === null ? 0 : (0.62 + (Math.sin(now * 0.012) * 0.38));
-
-    return {
-      x: centerX + ((facingVector?.x ?? 0) * tileSize * nudgeRatio * nudgeScale),
-      y: centerY + ((facingVector?.y ?? 0) * tileSize * nudgeRatio * nudgeScale)
-    };
+    return resolveActorBodyCenterPoint(centerX, centerY, tileSize, direction, cue, now);
   }
 
   private drawTileBrackets(
@@ -1097,13 +1125,10 @@ export class BoardRenderer {
       topHighlightHeightPx,
       topHighlightAlpha
     } = legacyTuning.board.frame;
-    const outerAlphaGlass = Math.min(0.26, outerAlpha * 0.17);
-    const panelAlphaGlass = Math.min(0.2, panelAlpha * 0.24);
-    const wellAlphaGlass = Math.min(0.08, (wellAlpha * 0.34) + 0.006);
-    const shadowAlphaGlass = Math.min(0.14, shadowAlpha * 0.24);
-    const glowAlphaGlass = Math.min(0.032, glowAlpha * 0.14);
-    const edgeShadeAlphaGlass = edgeShadeAlpha * 0.08;
-    const topHighlightAlphaGlass = topHighlightAlpha * 0.14;
+    const outerAlphaGlass = Math.min(0.16, outerAlpha * 0.1);
+    const shadowAlphaGlass = Math.min(0.08, shadowAlpha * 0.12);
+    const glowAlphaGlass = Math.min(0.024, glowAlpha * 0.1);
+    const topHighlightAlphaGlass = Math.min(0.08, topHighlightAlpha * 0.24);
 
     this.chromeBack.clear();
     this.chromeFront.clear();
@@ -1124,21 +1149,14 @@ export class BoardRenderer {
       boardHeight + scaleMetric(glowExpandPx)
     );
 
-    this.chromeBack.fillStyle(colors.board.outer, outerAlphaGlass);
-    this.chromeBack.fillRect(
-      centerX - (boardWidth + scaleMetric(outerExpandPx)) / 2,
-      centerY - (boardHeight + scaleMetric(outerExpandPx)) / 2,
-      boardWidth + scaleMetric(outerExpandPx),
-      boardHeight + scaleMetric(outerExpandPx)
-    );
-    this.chromeBack.lineStyle(scaleMetric(outerStrokeWidth), colors.board.outerStroke, 0.82);
+    this.chromeBack.lineStyle(scaleMetric(outerStrokeWidth), colors.board.outerStroke, 0.44);
     this.chromeBack.strokeRect(
       centerX - (boardWidth + scaleMetric(outerExpandPx)) / 2,
       centerY - (boardHeight + scaleMetric(outerExpandPx)) / 2,
       boardWidth + scaleMetric(outerExpandPx),
       boardHeight + scaleMetric(outerExpandPx)
     );
-    this.chromeBack.lineStyle(1, colors.board.panelStroke, 0.14);
+    this.chromeBack.lineStyle(1, colors.board.outer, outerAlphaGlass);
     this.chromeBack.strokeRect(
       centerX - (boardWidth + scaleMetric(outerExpandPx - 6)) / 2,
       centerY - (boardHeight + scaleMetric(outerExpandPx - 6)) / 2,
@@ -1146,33 +1164,16 @@ export class BoardRenderer {
       boardHeight + scaleMetric(outerExpandPx - 6)
     );
 
-    this.chromeBack.fillStyle(colors.board.panel, panelAlphaGlass);
-    this.chromeBack.fillRect(boardX, boardY, boardWidth, boardHeight);
-    this.chromeBack.lineStyle(1, colors.board.panelStroke, 0.2);
-    this.chromeBack.strokeRect(
-      boardX + scaleMetric(5),
-      boardY + scaleMetric(5),
-      boardWidth - scaleMetric(10),
-      boardHeight - scaleMetric(10)
-    );
-    this.chromeBack.lineStyle(scaleMetric(innerStrokeWidth), colors.board.innerStroke, 0.26);
+    this.chromeBack.lineStyle(scaleMetric(innerStrokeWidth), colors.board.innerStroke, 0.2);
     this.chromeBack.strokeRect(boardX + 1, boardY + 1, boardWidth - 2, boardHeight - 2);
 
-    this.chromeBack.fillStyle(colors.board.well, wellAlphaGlass);
-    this.chromeBack.fillRect(
-      boardX + scaleMetric(wellInsetPx),
-      boardY + scaleMetric(wellInsetPx),
-      boardWidth - (scaleMetric(wellInsetPx) * 2),
-      boardHeight - (scaleMetric(wellInsetPx) * 2)
-    );
-
-    const sheenInset = scaleMetric(Math.max(wellInsetPx + 4, 10));
+    const sheenInset = scaleMetric(Math.max(wellInsetPx + 6, 12));
     const sheenWidth = Math.max(12, boardWidth - (sheenInset * 2));
-    const upperSheenHeight = Math.max(2, scaleMetric(12));
-    const lowerShadeHeight = Math.max(2, scaleMetric(8));
-    this.chromeBack.fillStyle(colors.board.topHighlight, 0.022);
+    const upperSheenHeight = Math.max(1, scaleMetric(Math.max(2, topHighlightHeightPx - 1)));
+    const lowerShadeHeight = Math.max(1, scaleMetric(4));
+    this.chromeBack.fillStyle(colors.board.topHighlight, topHighlightAlphaGlass);
     this.chromeBack.fillRect(boardX + sheenInset, boardY + sheenInset, sheenWidth, upperSheenHeight);
-    this.chromeBack.fillStyle(colors.board.shadow, 0.024);
+    this.chromeBack.fillStyle(colors.board.shadow, shadowAlphaGlass * 0.72);
     this.chromeBack.fillRect(
       boardX + sheenInset,
       boardY + boardHeight - sheenInset - lowerShadeHeight,
@@ -1180,22 +1181,7 @@ export class BoardRenderer {
       lowerShadeHeight
     );
 
-    this.chromeBack.fillStyle(colors.board.shadow, edgeShadeAlphaGlass);
-    this.chromeBack.fillRect(boardX, boardY, scaleMetric(edgeShadeWidthPx), boardHeight);
-    this.chromeBack.fillRect(
-      boardX,
-      boardY + boardHeight - scaleMetric(edgeShadeWidthPx),
-      boardWidth,
-      scaleMetric(edgeShadeWidthPx)
-    );
-    this.chromeBack.fillRect(
-      boardX + boardWidth - scaleMetric(edgeShadeWidthPx),
-      boardY,
-      scaleMetric(edgeShadeWidthPx),
-      boardHeight
-    );
-
-    this.chromeBack.fillStyle(colors.board.topHighlight, topHighlightAlphaGlass);
+    this.chromeBack.fillStyle(colors.board.topHighlight, topHighlightAlphaGlass * 0.82);
     this.chromeBack.fillRect(
       boardX + scaleMetric(topHighlightInsetPx + 2),
       boardY + scaleMetric(topHighlightInsetPx + 2),
@@ -1205,7 +1191,11 @@ export class BoardRenderer {
 
     const tickInset = scaleMetric(cornerTickInsetPx);
     const tickLength = scaleMetric(cornerTickLengthPx);
-    this.chromeFront.lineStyle(scaleMetric(1), colors.board.outerStroke, cornerTickAlpha * 0.42);
+    void edgeShadeWidthPx;
+    void edgeShadeAlpha;
+    void panelAlpha;
+    void wellAlpha;
+    this.chromeFront.lineStyle(scaleMetric(1), colors.board.outerStroke, cornerTickAlpha * 0.3);
     this.chromeFront.lineBetween(boardX + tickInset, boardY + tickInset, boardX + tickInset + tickLength, boardY + tickInset);
     this.chromeFront.lineBetween(boardX + tickInset, boardY + tickInset, boardX + tickInset, boardY + tickInset + tickLength);
     this.chromeFront.lineBetween(boardX + boardWidth - tickInset, boardY + tickInset, boardX + boardWidth - tickInset - tickLength, boardY + tickInset);
@@ -1772,6 +1762,7 @@ export class BoardRenderer {
     const trailFillScale = this.getScale(this.theme.trailFillAlphaScale);
     const trailGlowScale = this.getScale(this.theme.trailGlowAlphaScale);
     const trailCoreScale = this.getScale(this.theme.trailCoreAlphaScale);
+    const alphaScale = Phaser.Math.Clamp(options.alphaScale ?? 1, 0, 1);
     const cue = options.cue ?? 'explore';
     const now = normalizeAnimationTime(this.scene.time.now);
     const trailLength = Math.min(options.limit ?? trail.length, trail.length);
@@ -1783,6 +1774,8 @@ export class BoardRenderer {
     const drawVisitedFloor = persistentTrail || trailLength > 1;
     const pulseBoost = Phaser.Math.Clamp(options.pulseBoost ?? 0, -0.08, 0.18);
     const activeMotion = options.activeMotion;
+    this.visitedFloor.setAlpha(alphaScale);
+    this.trail.setAlpha(alphaScale);
     const hasActiveMotion = activeMotion !== undefined
       && activeMotion.fromIndex !== activeMotion.toIndex
       && cue !== 'goal'
@@ -2216,7 +2209,8 @@ export class BoardRenderer {
     index: number,
     direction: 0 | 1 | 2 | 3 | null = null,
     cue: DemoWalkerCue = 'explore',
-    pulseBoost = 0
+    pulseBoost = 0,
+    alphaScale = 1
   ): void {
     if (!isRenderableLayout(this.layout)) {
       this.actor.clear();
@@ -2239,7 +2233,8 @@ export class BoardRenderer {
       cue,
       now,
       pulseBoost,
-      this.resolveTileNeighborhoodLuminance(index)
+      this.resolveTileNeighborhoodLuminance(index),
+      alphaScale
     );
   }
 
@@ -2249,7 +2244,8 @@ export class BoardRenderer {
     progress: number,
     direction: 0 | 1 | 2 | 3 | null = null,
     cue: DemoWalkerCue = 'explore',
-    pulseBoost = 0
+    pulseBoost = 0,
+    alphaScale = 1
   ): void {
     if (!isRenderableLayout(this.layout)) {
       this.actor.clear();
@@ -2278,7 +2274,8 @@ export class BoardRenderer {
       cue,
       now,
       pulseBoost,
-      this.resolveBlendedNeighborhoodLuminance(fromIndex, toIndex, easedProgress)
+      this.resolveBlendedNeighborhoodLuminance(fromIndex, toIndex, easedProgress),
+      alphaScale
     );
   }
 
@@ -2288,7 +2285,8 @@ export class BoardRenderer {
     offsetY: number,
     direction: 0 | 1 | 2 | 3 | null = null,
     cue: DemoWalkerCue = 'dead-end',
-    pulseBoost = 0
+    pulseBoost = 0,
+    alphaScale = 1
   ): void {
     if (!isRenderableLayout(this.layout)) {
       this.actor.clear();
@@ -2311,7 +2309,8 @@ export class BoardRenderer {
       cue,
       now,
       pulseBoost,
-      this.resolveTileNeighborhoodLuminance(index)
+      this.resolveTileNeighborhoodLuminance(index),
+      alphaScale
     );
   }
 
@@ -2325,7 +2324,8 @@ export class BoardRenderer {
     cue: DemoWalkerCue,
     now: number,
     pulseBoost: number,
-    supportBackgroundLuminance: number
+    supportBackgroundLuminance: number,
+    alphaScale: number
   ): void {
     const actorTuning = legacyTuning.board.actor;
     const colors = this.colors;
@@ -2385,6 +2385,7 @@ export class BoardRenderer {
     this.playerSupportMode = actorSupport.mode;
 
     this.actor.clear();
+    this.actor.setAlpha(Phaser.Math.Clamp(alphaScale, 0, 1));
     this.actor.fillStyle(actorSupport.underlay, neighborhoodAlpha);
     this.actor.fillCircle(bodyCenterX, bodyCenterY, neighborhoodRadius);
     this.actor.fillStyle(actorSupport.glow, actorTuning.emphasisFloorAlpha);

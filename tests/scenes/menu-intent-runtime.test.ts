@@ -145,28 +145,34 @@ describe('menu intent runtime', () => {
 
   test('holds feed entries for a minimum dwell and coalesces rapid replacements', () => {
     const controller = new MenuIntentFeedDisplayController({
-      maxVisibleEntries: 2,
+      maxVisibleEntries: 3,
       minimumDwellMs: 1_600,
       replacementDebounceMs: 700
     });
 
     const first = controller.advance(createFeedState(['a', 'b', 'c'], 1), 0);
-    expect(first?.events?.map((entry) => entry.id) ?? first?.entries.map((entry) => entry.id)).toEqual(['a', 'b']);
+    expect(first?.events?.map((entry) => entry.id) ?? first?.entries.map((entry) => entry.id)).toEqual(['a']);
     expect(first?.status?.summary).toBe('scanning a');
 
     const held = controller.advance(createFeedState(['d', 'e', 'f'], 2), 500);
-    expect(held?.events?.map((entry) => entry.id) ?? held?.entries.map((entry) => entry.id)).toEqual(['a', 'b']);
+    expect(held?.events?.map((entry) => entry.id) ?? held?.entries.map((entry) => entry.id)).toEqual(['a']);
 
     const coalesced = controller.advance(createFeedState(['g', 'h', 'i'], 3), 900);
-    expect(coalesced?.events?.map((entry) => entry.id) ?? coalesced?.entries.map((entry) => entry.id)).toEqual(['a', 'b']);
+    expect(coalesced?.events?.map((entry) => entry.id) ?? coalesced?.entries.map((entry) => entry.id)).toEqual(['a']);
 
     const swapped = controller.advance(createFeedState(['g', 'h', 'i'], 3), 1_650);
-    expect(swapped?.events?.map((entry) => entry.id) ?? swapped?.entries.map((entry) => entry.id)).toEqual(['g', 'h']);
+    expect(swapped?.events?.map((entry) => entry.id) ?? swapped?.entries.map((entry) => entry.id)).toEqual(['g', 'a']);
+
+    const queuedStack = controller.advance(createFeedState(['j', 'k', 'l'], 4), 3_400);
+    expect(queuedStack?.events?.map((entry) => entry.id) ?? queuedStack?.entries.map((entry) => entry.id)).toEqual(['g', 'a']);
+
+    const stacked = controller.advance(createFeedState(['j', 'k', 'l'], 4), 4_200);
+    expect(stacked?.events?.map((entry) => entry.id) ?? stacked?.entries.map((entry) => entry.id)).toEqual(['j', 'g', 'a']);
   });
 
   test('keeps semantically identical text stable even when the raw ids change', () => {
     const controller = new MenuIntentFeedDisplayController({
-      maxVisibleEntries: 2,
+      maxVisibleEntries: 3,
       minimumDwellMs: 1_600,
       replacementDebounceMs: 700
     });
@@ -175,32 +181,32 @@ describe('menu intent runtime', () => {
       createFeedState(['a', 'b', 'c'], 1, ['scanning west branch', 'waiting on gate timing', 'ignored tail']),
       0
     );
-    expect(first?.events?.map((entry) => entry.summary) ?? first?.entries.map((entry) => entry.summary)).toEqual(['scanning west branch', 'waiting on gate timing']);
+    expect(first?.events?.map((entry) => entry.summary) ?? first?.entries.map((entry) => entry.summary)).toEqual(['scanning west branch']);
 
     const identical = controller.advance(
       createFeedState(['x', 'y', 'z'], 2, ['scanning west branch', 'waiting on gate timing', 'ignored tail']),
       1_400
     );
-    expect(identical?.events?.map((entry) => entry.summary) ?? identical?.entries.map((entry) => entry.summary)).toEqual(['scanning west branch', 'waiting on gate timing']);
-    expect(identical?.events?.map((entry) => entry.id) ?? identical?.entries.map((entry) => entry.id)).toEqual(['a', 'b']);
+    expect(identical?.events?.map((entry) => entry.summary) ?? identical?.entries.map((entry) => entry.summary)).toEqual(['scanning west branch']);
+    expect(identical?.events?.map((entry) => entry.id) ?? identical?.entries.map((entry) => entry.id)).toEqual(['a']);
 
     const queued = controller.advance(
       createFeedState(['m', 'n', 'o'], 3, ['scanning east gate', 'committing exit line', 'ignored tail']),
       2_200
     );
-    expect(queued?.events?.map((entry) => entry.summary) ?? queued?.entries.map((entry) => entry.summary)).toEqual(['scanning west branch', 'waiting on gate timing']);
+    expect(queued?.events?.map((entry) => entry.summary) ?? queued?.entries.map((entry) => entry.summary)).toEqual(['scanning west branch']);
 
     const changed = controller.advance(
       createFeedState(['m', 'n', 'o'], 3, ['scanning east gate', 'committing exit line', 'ignored tail']),
       3_000
     );
-    expect(changed?.events?.map((entry) => entry.summary) ?? changed?.entries.map((entry) => entry.summary)).toEqual(['scanning east gate', 'committing exit line']);
-    expect(changed?.events?.map((entry) => entry.id) ?? changed?.entries.map((entry) => entry.id)).toEqual(['m', 'n']);
+    expect(changed?.events?.map((entry) => entry.summary) ?? changed?.entries.map((entry) => entry.summary)).toEqual(['scanning east gate', 'scanning west branch']);
+    expect(changed?.events?.map((entry) => entry.id) ?? changed?.entries.map((entry) => entry.id)).toEqual(['m', 'a']);
   });
 
   test('updates the status line independently while keeping the event list held during dwell', () => {
     const controller = new MenuIntentFeedDisplayController({
-      maxVisibleEntries: 2,
+      maxVisibleEntries: 3,
       minimumDwellMs: 1_600,
       replacementDebounceMs: 700
     });
@@ -210,7 +216,49 @@ describe('menu intent runtime', () => {
 
     const held = controller.advance(createFeedState(['x', 'y', 'z'], 2, ['scanning west branch', 'waiting on gate timing', 'ignored tail'], 'committing exit line'), 500);
     expect(held?.status?.summary).toBe('committing exit line');
-    expect(held?.events?.map((entry) => entry.id) ?? held?.entries.map((entry) => entry.id)).toEqual(['a', 'b']);
+    expect(held?.events?.map((entry) => entry.id) ?? held?.entries.map((entry) => entry.id)).toEqual(['a']);
+  });
+
+  test('coalesces visible duplicates when the thought text repeats across different anchors', () => {
+    const controller = new MenuIntentFeedDisplayController({
+      maxVisibleEntries: 3,
+      minimumDwellMs: 0,
+      replacementDebounceMs: 0
+    });
+
+    const initial = createFeedState(['a', 'b'], 1, ['this looks closer', 'that path wasted time'], 'this looks closer', 'landmark-spotted');
+    const initialEntries = initial.events ?? initial.entries;
+    initialEntries[0]!.anchor = { kind: 'tile', tileId: 'tile-1' };
+    initial.status = createStatus(initialEntries[0]!, initialEntries[0]!.summary);
+    initial.status.kind = 'landmark-spotted';
+    controller.advance(initial, 0);
+
+    const replan = createFeedState(['c', 'd'], 2, ['that path wasted time', 'this looks closer'], 'that path wasted time', 'replan-triggered');
+    const replanEntries = replan.events ?? replan.entries;
+    replanEntries[0]!.kind = 'replan-triggered';
+    replanEntries[1]!.kind = 'landmark-spotted';
+    replanEntries[1]!.anchor = { kind: 'tile', tileId: 'tile-2' };
+    replan.status = createStatus(replanEntries[0]!, replanEntries[0]!.summary);
+    replan.status.kind = 'replan-triggered';
+
+    const stacked = controller.advance(replan, 1);
+    expect(stacked?.events?.map((entry) => entry.summary) ?? stacked?.entries.map((entry) => entry.summary)).toEqual([
+      'that path wasted time',
+      'this looks closer'
+    ]);
+
+    const repeatedCloser = createFeedState(['e', 'f'], 3, ['this looks closer', 'that path wasted time'], 'this looks closer', 'landmark-spotted');
+    const repeatedCloserEntries = repeatedCloser.events ?? repeatedCloser.entries;
+    repeatedCloserEntries[0]!.anchor = { kind: 'tile', tileId: 'tile-3' };
+    repeatedCloserEntries[1]!.kind = 'replan-triggered';
+    repeatedCloser.status = createStatus(repeatedCloserEntries[0]!, repeatedCloserEntries[0]!.summary);
+    repeatedCloser.status.kind = 'landmark-spotted';
+
+    const held = controller.advance(repeatedCloser, 2);
+    expect(held?.events?.map((entry) => entry.summary) ?? held?.entries.map((entry) => entry.summary)).toEqual([
+      'that path wasted time',
+      'this looks closer'
+    ]);
   });
 
   test('keeps quick thoughts stable while the route status advances independently', () => {
@@ -236,12 +284,12 @@ describe('menu intent runtime', () => {
 
   test('holds commit and recall narratives longer than scan narratives', () => {
     const scanController = new MenuIntentFeedDisplayController({
-      maxVisibleEntries: 2,
+      maxVisibleEntries: 3,
       minimumDwellMs: 1_600,
       replacementDebounceMs: 700
     });
     const commitController = new MenuIntentFeedDisplayController({
-      maxVisibleEntries: 2,
+      maxVisibleEntries: 3,
       minimumDwellMs: 1_600,
       replacementDebounceMs: 700
     });
@@ -260,8 +308,8 @@ describe('menu intent runtime', () => {
     const scanReleased = scanController.advance(scanReplacement, 1_900);
     const commitHeld = commitController.advance(commitReplacement, 1_900);
 
-    expect(scanReleased?.events?.map((entry) => entry.id) ?? scanReleased?.entries.map((entry) => entry.id)).toEqual(['scan-c', 'scan-d']);
-    expect(commitHeld?.events?.map((entry) => entry.id) ?? commitHeld?.entries.map((entry) => entry.id)).toEqual(['commit-a', 'commit-b']);
+    expect(scanReleased?.events?.map((entry) => entry.id) ?? scanReleased?.entries.map((entry) => entry.id)).toEqual(['scan-c', 'scan-a']);
+    expect(commitHeld?.events?.map((entry) => entry.id) ?? commitHeld?.entries.map((entry) => entry.id)).toEqual(['commit-a']);
   });
 
   test('emits spectator-first trap, patrol, plate, and key semantics for longer shipping paths', () => {
@@ -296,12 +344,12 @@ describe('menu intent runtime', () => {
 
     expect(boardState).not.toBeNull();
     expect(boardState?.telegraphs).toEqual([]);
-    expect(
-      boardState?.nextRiskLabel.startsWith('Next turn:')
-      || boardState?.nextRiskLabel.startsWith('Next branch:')
-      || boardState?.nextRiskLabel.startsWith('Closer route:')
-      || boardState?.nextRiskLabel.startsWith('Exit path:')
-    ).toBe(true);
+    expect([
+      'Move off the start.',
+      'Take the clear branch.',
+      'Stay on the clear line.',
+      'Keep going.'
+    ]).toContain(boardState?.nextRiskLabel);
     expect(allKinds).not.toContain('trap-inferred');
     expect(allKinds).not.toContain('enemy-seen');
     expect(allKinds).not.toContain('item-spotted');

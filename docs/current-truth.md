@@ -17,7 +17,9 @@ If an older note conflicts with the screenshot gate or `demo-build.test.ts`, tre
 
 - The screenshot gate is the primary visual source of truth now. Exact target URLs, diagnostics, and before/after artifacts are repo-owned.
 - The active shipping lane is the 2D Phaser runtime. Future-runtime and planet/3D proof work stay parked and non-authoritative for shipping claims.
-- The repo-owned proof path is green locally as of April 18, 2026: `npm run verify` passed with the lower-lane thought HUD contract, the status-vs-quick-thought split, and the current runtime visibility rollup coverage in place.
+- The repo-owned proof path is green locally as of April 20, 2026. The canonical serial proof order passed again: `npm run visual:matrix -- --preset core --skip-build true`, then `npm run edge:live -- --skip-build true --headless true --run core-only-watch`, then `npm run edge:live -- --skip-build true --headless true --run core-only-play`, then `npm run verify`.
+- The closure lane uses that same serial local proof order now: `npm run visual:matrix -- --preset core --skip-build true`, then `npm run edge:live -- --skip-build true --headless true --run core-only-watch`, then `npm run edge:live -- --skip-build true --headless true --run core-only-play`, then `npm run verify`.
+- Browser-heavy proof runs are non-canonical when they overlap. Parallel preview/browser proof is a false-failure source, not a release requirement.
 - The live 2D receipt root is `tmp/captures/mazer-visual-proof/`. The committed baseline pointer at `artifacts/visual/baseline.json` is promoted explicitly from that repo-owned root.
 - Trail attach and no-future-preview are the live contract now. The trail should promote into the moving head tile and stop previewing ahead of the actor.
 - The player must remain the dominant local visual signal in the shipping 2D runtime, including worst-case high-contrast or noisy board states.
@@ -41,6 +43,8 @@ If an older note conflicts with the screenshot gate or `demo-build.test.ts`, tre
 ## Release rule
 
 - Local repo health is green when the latest visual pass and repo verify pass are green.
+- Hosted-preview closure is a separate manual stop rule. Local green does not close the hosted lane by itself.
+- If the repo-owned proof path is green and the hosted preview still needs its manual or authenticated browser pass, describe the lane as healthy-but-held.
 - Production is only considered current when that latest local visual pass is committed and deployed.
 - A local-only visual win does not upgrade production truth by itself.
 

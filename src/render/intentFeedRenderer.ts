@@ -131,8 +131,8 @@ export const formatIntentHudSummary = (summary: string): string => {
     ?? rewrite(/^Dead end at (.+); back out$/u, () => 'Dead end. Back up.')
     ?? rewrite(/^Noting (.+) near (.+)$/u, () => 'This spot looks useful.')
     ?? rewrite(/^Replanning at (.+); try (.+)$/u, () => 'That path wasted time.')
-    ?? rewrite(/^Taking the exit from (.+)$/u, () => 'I am close. Keep going.')
-    ?? rewrite(/^Taking (.+) from (.+)$/u, () => 'I am closer this way.')
+    ?? rewrite(/^Taking the exit from (.+)$/u, () => 'Almost there.')
+    ?? rewrite(/^Taking (.+) from (.+)$/u, () => 'Closer this way.')
     ?? rewrite(/^Waiting for the gate at (.+)$/u, () => 'Wait. The gate will open.')
     ?? rewrite(/^Checking (.+) from (.+)$/u, () => 'This side looks better.')
     ?? rewrite(/^There is a marker here$/u, () => 'This spot looks useful.')
@@ -232,6 +232,24 @@ type RiskRecord = {
   step: number;
 };
 
+export const resolveIntentFeedVisibleEntries = (
+  state: IntentFeedState | null,
+  maxVisibleEntries: number
+): IntentFeedState['entries'] => (state?.events ?? state?.entries ?? []).slice(0, Math.max(0, maxVisibleEntries));
+
+export const shouldRenderIntentFeedStatusLine = (
+  visibleEntryCount: number,
+  statusLabel: string
+): boolean => visibleEntryCount === 0 && statusLabel.trim().length > 0;
+
+const resolveIntentFeedLineAlphaScale = (slot: number): number => (
+  slot <= 0
+    ? legacyTuning.menu.intentFeed.lineAlphaScaleTop
+    : slot === 1
+      ? legacyTuning.menu.intentFeed.lineAlphaScaleMiddle
+      : legacyTuning.menu.intentFeed.lineAlphaScaleBottom
+);
+
 export const resolveNextRiskLabel = (state: IntentFeedState | null): string | null => {
   const records: RiskRecord[] = state
     ? [
@@ -292,20 +310,23 @@ const resolveMaxVisibleEvents = (
   compact: boolean
 ): number => {
   const tuning = legacyTuning.menu.intentFeed;
-  const wideThreeThoughtViewport = viewport.width >= tuning.microThoughtThirdMinWidthPx
+  const compactThreeThoughtViewport = compact
+    && viewport.width >= tuning.compactThreeThoughtMinWidthPx
+    && viewport.height >= tuning.compactThreeThoughtMinHeightPx;
+  const wideThreeThoughtViewport = !compact
+    && viewport.width >= tuning.microThoughtThirdMinWidthPx
     && viewport.height >= tuning.microThoughtThirdMinHeightPx;
-  const tallEnough = viewport.height >= tuning.microThoughtMinHeightPx;
-  const wideEnough = viewport.width >= tuning.microThoughtMinWidthPx && viewport.height >= 640;
-
-  if (wideThreeThoughtViewport) {
+  if (compactThreeThoughtViewport || wideThreeThoughtViewport) {
     return 3;
   }
 
+  const tallEnough = viewport.height >= tuning.microThoughtMinHeightPx;
+  const wideEnough = viewport.width >= tuning.microThoughtMinWidthPx && viewport.height >= 640;
   if (tallEnough || wideEnough) {
     return 2;
   }
 
-  return compact ? 1 : 1;
+  return 1;
 };
 
 const resolveFeedWidth = (
@@ -349,9 +370,10 @@ const resolveFeedHeight = (
   hasStatus: boolean,
   hasOnboarding = false
 ): number => {
+  void hasOnboarding;
   const tuning = legacyTuning.menu.intentFeed;
   const lineHeight = compact ? tuning.compactLineHeightPx : tuning.lineHeightPx;
-  const lineCount = Math.max(0, quickThoughtCount) + (hasStatus ? 1 : 0) + (hasOnboarding ? 1 : 0) + 1;
+  const lineCount = Math.max(0, quickThoughtCount) + (hasStatus ? 1 : 0);
   const gaps = Math.max(0, lineCount - 1);
 
   return Math.max(
@@ -531,38 +553,30 @@ export const createIntentFeedHud = (
     hintText: options.palette?.hud.hintText ?? palette.hud.hintText
   };
   const root = scene.add.container(0, 0).setDepth(10.6).setVisible(false);
-  const background = scene.add.rectangle(0, 0, 0, 0, colors.panel, 0.84).setOrigin(0);
-  const border = scene.add.rectangle(0, 0, 0, 0).setOrigin(0).setStrokeStyle(1, colors.panelStroke, 0.94);
   const intentFontFamily = '"Segoe UI", "Trebuchet MS", sans-serif';
   const status = scene.add.text(0, 0, '', {
     color: `#${colors.accent.toString(16).padStart(6, '0')}`,
     fontFamily: intentFontFamily,
     fontSize: `${legacyTuning.menu.intentFeed.statusFontPx}px`,
     fontStyle: 'bold'
-  }).setOrigin(0, 0);
+  }).setOrigin(0.5, 1).setAlign('center');
   const entries = Array.from({ length: MAX_INTENT_VISIBLE_ENTRIES }, () => (
     scene.add.text(0, 0, '', {
       color: `#${colors.hintText.toString(16).padStart(6, '0')}`,
       fontFamily: intentFontFamily,
       fontSize: `${legacyTuning.menu.intentFeed.entryFontPx}px`
-    }).setOrigin(0, 0)
+    }).setOrigin(0.5, 1).setAlign('center')
   ));
   const risk = scene.add.text(0, 0, '', {
     color: `#${colors.accent.toString(16).padStart(6, '0')}`,
     fontFamily: intentFontFamily,
     fontSize: `${Math.max(9, legacyTuning.menu.intentFeed.statusFontPx - 1)}px`,
     fontStyle: 'bold'
-  }).setOrigin(0, 0);
-  const onboarding = scene.add.text(0, 0, '', {
-    color: `#${colors.hintText.toString(16).padStart(6, '0')}`,
-    fontFamily: intentFontFamily,
-    fontSize: `${Math.max(9, legacyTuning.menu.intentFeed.statusFontPx - 1)}px`,
-    fontStyle: 'bold'
-  }).setOrigin(0, 0);
-  const entryTransitions = entries.map(() => ({
-    key: '',
-    changedAtMs: Number.NEGATIVE_INFINITY
-  }));
+  }).setOrigin(0.5, 1).setAlign('center');
+  let entryTransitions = new Map<string, {
+    slot: number;
+    changedAtMs: number;
+  }>();
   let lastSnapshot: IntentFeedHudLayoutSnapshot = {
       visible: false,
       compact: false,
@@ -576,7 +590,7 @@ export const createIntentFeedHud = (
       nextRiskLabel: null
     };
 
-  root.add([background, border, status, ...entries, onboarding, risk]);
+  root.add([status, ...entries, risk]);
 
   return {
     setState(
@@ -590,35 +604,15 @@ export const createIntentFeedHud = (
       const viewport = resolveSceneViewport(scene);
       const hasStatusOverride = typeof riskMeta.statusLabel === 'string' && riskMeta.statusLabel.trim().length > 0;
       const wideDesktopLine = viewport.width >= 1200;
-      const onboardingLabel = typeof riskMeta.onboardingLabel === 'string' && riskMeta.onboardingLabel.trim().length > 0
-        ? clampIntentFeedSummary(
-          riskMeta.onboardingLabel,
-          viewport.width <= legacyTuning.menu.layout.narrowBreakpoint
-            ? 56
-            : wideDesktopLine
-              ? 96
-              : 80
-        )
-        : '';
+      const reserveStatusLine = rawEntries.length === 0 && (hasStatusOverride || Boolean(visibleStatus));
       const layout = resolveIntentFeedLayout(
         viewport,
         rawEntries.length,
         anchors,
-        hasStatusOverride || Boolean(visibleStatus),
-        onboardingLabel.length > 0
+        reserveStatusLine,
+        false
       );
-      const preferredVisibleEntryCount = layout.maxVisibleEvents >= 3
-        ? (
-            rawEntries.length >= 3
-            && (
-              rawEntries[2]?.importance === 'high'
-              || resolveIntentFeedRole(rawEntries[2]?.kind ?? null) !== 'scan'
-            )
-          )
-          ? 3
-          : Math.min(2, layout.maxVisibleEvents)
-        : layout.maxVisibleEvents;
-      const visibleEntries = rawEntries.slice(0, preferredVisibleEntryCount);
+      const visibleEntries = resolveIntentFeedVisibleEntries(state, layout.maxVisibleEvents);
       const statusMaxChars = layout.compact
         ? tuning.compactStatusMaxChars
         : Math.max(tuning.statusMaxChars, wideDesktopLine ? 58 : tuning.statusMaxChars);
@@ -637,10 +631,9 @@ export const createIntentFeedHud = (
             statusMaxChars
           )
           : '';
-      const hasStatusLine = statusLabel.length > 0;
+      const hasStatusLine = shouldRenderIntentFeedStatusLine(visibleEntries.length, statusLabel);
 
-      const nextRiskLabel = riskMeta.nextRiskLabel ?? resolveNextRiskLabel(state);
-      if (!hasStatusLine && visibleEntries.length === 0 && onboardingLabel.length === 0 && !nextRiskLabel) {
+      if (!hasStatusLine && visibleEntries.length === 0) {
         root.setVisible(false);
         lastSnapshot = {
           visible: false,
@@ -662,17 +655,19 @@ export const createIntentFeedHud = (
       const statusFontPx = (layout.compact ? tuning.compactStatusFontPx : tuning.statusFontPx) + 1;
       const entryFontPx = (layout.compact ? tuning.compactEntryFontPx : tuning.entryFontPx) + 1;
       const transitionMs = Math.max(1, Math.round(tuning.transitionMs * 1.25));
-      const transitionStartAlpha = Phaser.Math.Clamp(tuning.transitionStartAlpha + 0.14, 0, 1);
+      const transitionStartAlpha = Phaser.Math.Clamp(tuning.transitionStartAlpha + 0.08, 0, 1);
       const nowMs = scene.time.now;
+      const laneCenterX = layout.rect.width / 2;
+      const baselineY = layout.rect.height - tuning.paddingYPx;
+      const perspectiveInsetStep = layout.compact ? 8 : 12;
+      const perspectiveRiseStep = layout.compact ? 4 : 6;
 
       root.setPosition(layout.rect.left, layout.rect.top).setVisible(true);
-      background.setSize(layout.rect.width, layout.rect.height);
-      border.setSize(layout.rect.width, layout.rect.height);
 
       status
         .setVisible(hasStatusLine)
         .setFontSize(statusFontPx)
-        .setPosition(tuning.paddingXPx, tuning.paddingYPx)
+        .setPosition(laneCenterX, baselineY)
         .setFixedSize(layout.rect.width - (tuning.paddingXPx * 2), 0)
         .setText(statusLabel)
         .setAlpha(0.98);
@@ -680,69 +675,62 @@ export const createIntentFeedHud = (
       status.setDataEnabled();
       status.setData('intent-role', resolveIntentFeedRole(visibleStatus?.kind ?? null));
       status.setData('intent-semantic-tag', resolveIntentSemanticTag(visibleStatus?.kind ?? null));
-
-      const eventStartY = tuning.paddingYPx + (hasStatusLine ? lineHeight + tuning.entryGapPx : 0);
-      const onboardingY = eventStartY + (visibleEntries.length * (lineHeight + tuning.entryGapPx));
+      const nextEntryTransitions = new Map<string, {
+        slot: number;
+        changedAtMs: number;
+      }>();
 
       for (let index = 0; index < entries.length; index += 1) {
         const entry = entries[index];
         const record = visibleEntries[index];
         if (!record) {
-          entryTransitions[index].key = '';
-          entryTransitions[index].changedAtMs = Number.NEGATIVE_INFINITY;
           entry.setVisible(false);
           continue;
         }
 
-        const transition = entryTransitions[index];
-        if (transition.key !== record.id) {
-          transition.key = record.id;
-          transition.changedAtMs = nowMs;
-        }
-        const transitionProgress = Phaser.Math.Clamp((nowMs - transition.changedAtMs) / transitionMs, 0, 1);
+        const previousTransition = entryTransitions.get(record.id);
+        const changedAtMs = previousTransition && previousTransition.slot === index
+          ? previousTransition.changedAtMs
+          : nowMs;
+        const transitionProgress = Phaser.Math.Clamp((nowMs - changedAtMs) / transitionMs, 0, 1);
         const transitionAlpha = Phaser.Math.Linear(transitionStartAlpha, 1, transitionProgress);
         const roleToken = resolveIntentFeedRoleLabel(record.kind);
-        const isMicroThought = index >= 2;
+        const targetY = baselineY - (index * (lineHeight + tuning.entryGapPx + perspectiveRiseStep));
+        const previousY = previousTransition
+          ? baselineY - (previousTransition.slot * (lineHeight + tuning.entryGapPx + perspectiveRiseStep))
+          : targetY + Math.round(lineHeight * tuning.slideOffsetLines);
+        const slotWidth = Math.max(
+          120,
+          layout.rect.width - ((tuning.paddingXPx + (index * perspectiveInsetStep)) * 2)
+        );
+        const slotScale = index <= 0 ? 1 : index === 1 ? 0.92 : 0.84;
+        nextEntryTransitions.set(record.id, {
+          slot: index,
+          changedAtMs
+        });
 
         entry
           .setVisible(true)
           .setFontSize(entryFontPx)
           .setPosition(
-            tuning.paddingXPx,
-            eventStartY + (index * (lineHeight + tuning.entryGapPx))
+            laneCenterX,
+            Phaser.Math.Linear(previousY, targetY, transitionProgress)
           )
-          .setFixedSize(layout.rect.width - (tuning.paddingXPx * 2), 0)
+          .setFixedSize(slotWidth, 0)
           .setText(clampIntentFeedSummary(formatIntentHudSummary(record.summary), entryMaxChars))
-          .setAlpha(record.opacity * transitionAlpha);
-        entry.setName(isMicroThought ? 'micro-thought' : 'quick-thought');
+          .setScale(slotScale)
+          .setAlpha(Phaser.Math.Clamp((record.opacity ?? 1) * resolveIntentFeedLineAlphaScale(index) * transitionAlpha, 0, 1));
+        entry.setName('thought-line');
         entry.setDataEnabled();
         entry.setData('intent-role', resolveIntentFeedRole(record.kind));
         entry.setData('intent-role-token', roleToken);
         entry.setData('intent-semantic-tag', resolveIntentSemanticTag(record.kind));
       }
-
-      onboarding
-        .setVisible(onboardingLabel.length > 0)
-        .setFontSize(Math.max(9, statusFontPx - 1))
-        .setPosition(tuning.paddingXPx, onboardingY)
-        .setFixedSize(layout.rect.width - (tuning.paddingXPx * 2), 0)
-        .setText(onboardingLabel)
-        .setAlpha(onboardingLabel.length > 0 ? 0.92 : 0);
-      onboarding.setName('play-onboarding');
-
-      risk
-        .setVisible(Boolean(nextRiskLabel))
-        .setFontSize(Math.max(9, statusFontPx - 1))
-        .setPosition(
-          tuning.paddingXPx,
-          onboardingY + (onboardingLabel.length > 0 ? lineHeight + tuning.entryGapPx : 0)
-        )
-        .setFixedSize(layout.rect.width - (tuning.paddingXPx * 2), 0)
-        .setText(nextRiskLabel ?? '')
-        .setAlpha(0.9);
+      entryTransitions = nextEntryTransitions;
+      risk.setVisible(false);
       risk.setName('next-risk');
       risk.setDataEnabled();
-      risk.setData('intent-risk-label', nextRiskLabel);
+      risk.setData('intent-risk-label', null);
 
       lastSnapshot = {
         visible: true,
@@ -754,10 +742,10 @@ export const createIntentFeedHud = (
         statusText: hasStatusLine ? statusLabel : null,
         quickThoughtCount: visibleEntries.length,
         maxVisibleEvents: layout.maxVisibleEvents,
-        onboardingVisible: onboardingLabel.length > 0,
-        onboardingLabel: onboardingLabel.length > 0 ? onboardingLabel : null,
-        riskVisible: Boolean(nextRiskLabel),
-        nextRiskLabel
+        onboardingVisible: false,
+        onboardingLabel: null,
+        riskVisible: false,
+        nextRiskLabel: null
       };
     },
     getLayoutSnapshot(): IntentFeedHudLayoutSnapshot {

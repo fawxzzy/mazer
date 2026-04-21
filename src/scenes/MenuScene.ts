@@ -26,6 +26,7 @@ import {
   shouldShowPresentationTitle
 } from '../boot/presentation';
 import {
+  dismissInstallSurface,
   getInstallSurfaceState,
   promptInstallSurface,
   subscribeInstallSurface,
@@ -64,7 +65,9 @@ import type { IntentFeedState } from '../mazer-core/intent';
 import {
   createBoardLayout,
   BoardRenderer,
+  isPointInsideTileArrivalRegion,
   resolveBoardPresentationBounds,
+  resolveActorBodyCenterPoint,
   type BoardBounds,
   type BoardLayout,
   type BoardThemeStyle,
@@ -137,7 +140,18 @@ const PASSIVE_TAGLINES: Record<AmbientPresentationVariant, string> = {
   ambient: 'ambient engine',
   loading: 'live system'
 };
-export const TITLE_SIGNATURE_TEXT = '\u00b0 by fawxzzy';
+export const TITLE_SIGNATURE_TEXT = 'pattern engine';
+const MAZER_BRAND_COLORS = {
+  shell: 0x0d1218,
+  frame: 0x5a84b2,
+  frameHighlight: 0xe6f2ff,
+  route: 0x66b6f0,
+  wordmark: 0x93f4ac,
+  wordmarkShadow: 0x102218,
+  goal: 0x75f78f,
+  support: 0xd2dceb,
+  muted: 0x7b8da6
+} as const;
 const ROTATING_DIFFICULTIES: readonly MazeDifficulty[] = ['chill', 'standard', 'spicy', 'brutal'];
 const ROTATING_SIZES: readonly MazeSize[] = MAZE_SIZE_ORDER;
 const LOADING_PHASE_LABELS: Record<MenuDemoSequence, readonly string[]> = {
@@ -324,8 +338,6 @@ const resolveRunProjectionProgressPct = (
 
 const PLAY_MODE_TOGGLE_CODES = new Set(['Tab']);
 const PLAY_MOVE_ANIMATION_RATIO = 0.72;
-const PLAY_MODE_ONBOARDING_LABEL = 'Move WASD/Arrows | P pause | R retry | T thoughts | Tab watch';
-const PLAY_MODE_TOUCH_ONBOARDING_LABEL = 'Tap D-pad | P pause | R retry | T thoughts';
 const TOUCH_CONTROL_LABELS: Record<HumanInputAction['kind'], string> = {
   move_up: '↑',
   move_down: '↓',
@@ -347,11 +359,13 @@ const TOUCH_CONTROL_TEXT: Record<HumanInputAction['kind'], string> = {
 void TOUCH_CONTROL_LABELS;
 
 const WATCH_CORE_ONLY_RUNNER_THOUGHTS: Partial<Record<DemoWalkerCue, readonly string[]>> = {
-  anticipate: ['Left looks better.', 'This side might open up.'],
-  'dead-end': ['No. That ends here.', 'Dead end. Back up.'],
-  backtrack: ['Back up. Try the other side.', 'No good. Back up.'],
-  reacquire: ['I am closer this way.', 'Okay. This route feels better.']
+  anticipate: ['Maybe left.', 'Maybe this side.'],
+  'dead-end': ['No. Dead end.', 'Not here. Back up.'],
+  backtrack: ['Go back. Other side.', 'No. Back up.'],
+  reacquire: ['This looks closer.', 'This works.']
 };
+
+const normalizeRunnerThoughtSummary = (value: string): string => value.trim().replace(/\s+/g, ' ').toLowerCase();
 
 const resolveRunnerCueThought = (
   cue: DemoWalkerCue,
@@ -399,6 +413,31 @@ const applyRunnerThoughtOverlay = (
     slot: 0,
     opacity: 1
   };
+  const stackedEntries: IntentFeedState['entries'] = [];
+  const seenSummaries = new Set<string>();
+  const pushEntry = (candidate: IntentFeedState['entries'][number] | null | undefined): void => {
+    if (!candidate || candidate.speaker !== 'Runner') {
+      return;
+    }
+
+    const summarySignature = normalizeRunnerThoughtSummary(candidate.summary);
+    if (summarySignature.length === 0 || seenSummaries.has(summarySignature)) {
+      return;
+    }
+
+    seenSummaries.add(summarySignature);
+    stackedEntries.push({
+      ...candidate,
+      slot: stackedEntries.length
+    });
+  };
+  pushEntry(entry);
+  for (const candidate of state?.events ?? state?.entries ?? []) {
+    if (stackedEntries.length >= legacyTuning.menu.intentFeed.maxVisibleEntries) {
+      break;
+    }
+    pushEntry(candidate);
+  }
 
   return {
     ...(state ?? {
@@ -438,8 +477,8 @@ const applyRunnerThoughtOverlay = (
       confidence: entry.confidence,
       step: canonicalCursor
     },
-    entries: [entry],
-    events: [entry],
+    entries: stackedEntries,
+    events: stackedEntries,
     pings: state?.pings ?? []
   };
 };
@@ -1888,9 +1927,11 @@ const resolveTitleBandMetrics = (
   const compact = sceneLayout.isTiny || sceneLayout.isNarrow;
   return {
     bandInset: compact ? COMPACT_TITLE_BAND_INSET_PX : DEFAULT_TITLE_BAND_INSET_PX,
-    bandHeight: (compact ? COMPACT_TITLE_BAND_HEIGHT_PX : DEFAULT_TITLE_BAND_HEIGHT_PX) + (sceneLayout.isPortrait ? 2 : 0),
-    minHeight: compact ? 44 : 48,
-    boardGap: resolveBoardEdgeBufferPx(sceneLayout, profile) + (compact ? 2 : 4)
+    bandHeight: compact
+      ? COMPACT_TITLE_BAND_HEIGHT_PX + (sceneLayout.isPortrait ? 0 : 2)
+      : DEFAULT_TITLE_BAND_HEIGHT_PX + (sceneLayout.isPortrait ? 2 : 0),
+    minHeight: compact ? 34 : 44,
+    boardGap: resolveBoardEdgeBufferPx(sceneLayout, profile) + (compact ? 1 : 4)
   };
 };
 
@@ -2318,17 +2359,17 @@ const DEPLOYMENT_PRESENTATION_PROFILES: Record<PresentationDeploymentProfile, De
     boardHaloMotionScale: 0.25
   },
   mobile: {
-    boardScaleBias: -0.046,
-    portraitBoardScaleBias: -0.03,
-    topReserveBias: 18,
-    portraitTopReserveBias: 18,
-    bottomPaddingBias: 12,
-    sidePaddingBias: 12,
+    boardScaleBias: -0.06,
+    portraitBoardScaleBias: -0.042,
+    topReserveBias: 6,
+    portraitTopReserveBias: 8,
+    bottomPaddingBias: 8,
+    sidePaddingBias: 10,
     maxBoardScale: 0.996,
-    titlePlateWidthScale: 1.02,
-    titlePlateHeightScale: 1.2,
-    titleLineSpacingScale: 1.12,
-    titleYOffsetBias: 10,
+    titlePlateWidthScale: 0.92,
+    titlePlateHeightScale: 0.86,
+    titleLineSpacingScale: 0.96,
+    titleYOffsetBias: -2,
     titleAlphaScale: 1,
     signatureAlphaScale: 1,
     passiveAlphaScale: 1,
@@ -2424,11 +2465,11 @@ export interface InstallChromeFrame {
 const TARGET_BOARD_EDGE_BUFFER_PX = 8;
 const MOBILE_BOARD_EDGE_BUFFER_PX = 7;
 const DEFAULT_TITLE_BAND_INSET_PX = 10;
-const COMPACT_TITLE_BAND_INSET_PX = 8;
-const DEFAULT_TITLE_BAND_HEIGHT_PX = 58;
-const COMPACT_TITLE_BAND_HEIGHT_PX = 54;
+const COMPACT_TITLE_BAND_INSET_PX = 6;
+const DEFAULT_TITLE_BAND_HEIGHT_PX = 52;
+const COMPACT_TITLE_BAND_HEIGHT_PX = 40;
 const DEFAULT_INSTALL_EDGE_INSET_PX = 18;
-const COMPACT_INSTALL_EDGE_INSET_PX = 16;
+const COMPACT_INSTALL_EDGE_INSET_PX = 10;
 
 interface TitleBandMetrics {
   bandInset: number;
@@ -2452,6 +2493,11 @@ export interface VisualSceneBounds {
   height: number;
   centerX: number;
   centerY: number;
+}
+
+export interface VisualScenePoint {
+  x: number;
+  y: number;
 }
 
 export interface VisualSubtitleDiagnostics {
@@ -2528,6 +2574,27 @@ export interface MenuSceneVisualDiagnostics {
     attachedToActor: boolean;
     bridgeRendered: boolean;
     render: TrailRenderDiagnostics;
+  };
+  attempt: {
+    mode: 'watch' | 'play';
+    sequence: MenuDemoSequence;
+    lifecyclePhase: DemoLifecyclePhase;
+    ritualPhase: DemoRitualPhase;
+    elapsedMs: number;
+    presentationElapsedMs: number;
+    visualArrivalLatchMs: number | null;
+  };
+  arrival: {
+    actorVisible: boolean;
+    goalVisible: boolean;
+    actorCenter?: VisualScenePoint;
+    goalCenter?: VisualScenePoint;
+    goalTileBounds?: VisualSceneBounds;
+    exitRegionBounds?: VisualSceneBounds;
+    actorInsideExitRegion: boolean;
+    settleProgress: number;
+    settleRemainingMs: number;
+    readyToClear: boolean;
   };
   paletteReadability: PaletteReadabilityReport;
   bootTiming?: ReturnType<typeof buildBootTimingReport>;
@@ -2619,6 +2686,19 @@ const toVisualSceneBounds = (
     height: bounds.height,
     centerX: bounds.x + (bounds.width / 2),
     centerY: bounds.y + (bounds.height / 2)
+  };
+};
+
+const toVisualScenePoint = (
+  point?: { x: number; y: number } | null
+): VisualScenePoint | undefined => {
+  if (!point || !isFiniteNumber(point.x) || !isFiniteNumber(point.y)) {
+    return undefined;
+  }
+
+  return {
+    x: point.x,
+    y: point.y
   };
 };
 
@@ -3007,42 +3087,36 @@ class AmbientSkyLayer {
       case 'noir-band':
         this.drawBackdropBand(this.clouds, this.width * 0.16, this.height * 0.42, this.width * 0.34, this.height * 0.18, this.themeProfile.ambientSky.hazeColor, 0.052 * motifAlpha);
         this.drawBackdropBand(this.clouds, this.width * 0.84, this.height * 0.68, this.width * 0.28, this.height * 0.16, this.themeProfile.ambientSky.hazeAccentColor, 0.034 * motifAlpha);
-        this.base.fillStyle(this.themeProfile.ambientSky.streakColor, 0.016 * motifAlpha);
-        this.base.fillRect(0, Math.round(this.height * 0.2), this.width, lineHeight);
+        this.drawBackdropBand(this.base, this.width * 0.5, this.height * 0.2, this.width * 0.82, Math.max(2, lineHeight * 4), this.themeProfile.ambientSky.streakColor, 0.012 * motifAlpha);
         this.drawStarCluster(this.farStars, this.width * 0.14, this.height * 0.18, this.width * 0.12, this.height * 0.08, clusterCount, this.themeProfile.palette.background.star, 0.08, 0.22, 0.45, 1.1);
         this.drawStarCluster(this.nearStars, this.width * 0.88, this.height * 0.24, this.width * 0.1, this.height * 0.08, Math.max(5, Math.round(clusterCount * 0.78)), this.themeProfile.palette.background.star, 0.1, 0.26, 0.5, 1.2);
         break;
       case 'ember-glow':
         this.drawBackdropBand(this.clouds, this.width * 0.18, this.height * 0.74, this.width * 0.3, this.height * 0.28, this.themeProfile.ambientSky.hazeColor, 0.062 * motifAlpha);
         this.drawBackdropBand(this.clouds, this.width * 0.82, this.height * 0.6, this.width * 0.26, this.height * 0.22, this.themeProfile.ambientSky.hazeAccentColor, 0.048 * motifAlpha);
-        this.base.fillStyle(this.themeProfile.ambientSky.hazeAccentColor, 0.02 * motifAlpha);
-        this.base.fillRect(0, Math.round(this.height * 0.74), this.width, Math.max(8, Math.round(this.height * 0.08)));
+        this.drawBackdropBand(this.base, this.width * 0.5, this.height * 0.76, this.width * 0.76, this.height * 0.14, this.themeProfile.ambientSky.hazeAccentColor, 0.015 * motifAlpha);
         this.drawStarCluster(this.nearStars, this.width * 0.24, this.height * 0.16, this.width * 0.1, this.height * 0.07, Math.max(5, Math.round(clusterCount * 0.72)), this.themeProfile.ambientSky.cometColor, 0.08, 0.22, 0.45, 1);
         break;
       case 'aurora-curtain':
         this.drawBackdropBand(this.clouds, this.width * 0.14, this.height * 0.56, this.width * 0.3, this.height * 0.84, this.themeProfile.ambientSky.hazeColor, 0.066 * motifAlpha);
         this.drawBackdropBand(this.clouds, this.width * 0.84, this.height * 0.54, this.width * 0.32, this.height * 0.78, this.themeProfile.ambientSky.hazeAccentColor, 0.056 * motifAlpha);
         this.drawBackdropBand(this.clouds, this.width * 0.5, this.height * 0.34, this.width * 0.42, this.height * 0.18, this.themeProfile.ambientSky.cometColor, 0.032 * motifAlpha);
-        this.base.fillStyle(this.themeProfile.ambientSky.hazeAccentColor, 0.022 * motifAlpha);
-        this.base.fillRect(0, Math.round(this.height * 0.38), this.width, Math.max(10, Math.round(this.height * 0.16)));
+        this.drawBackdropBand(this.base, this.width * 0.5, this.height * 0.4, this.width * 0.78, this.height * 0.24, this.themeProfile.ambientSky.hazeAccentColor, 0.014 * motifAlpha);
         this.drawStarCluster(this.nearStars, this.width * 0.18, this.height * 0.18, this.width * 0.12, this.height * 0.09, clusterCount, this.themeProfile.palette.background.star, 0.1, 0.28, 0.48, 1.2);
         this.drawStarCluster(this.nearStars, this.width * 0.84, this.height * 0.2, this.width * 0.1, this.height * 0.08, Math.max(5, Math.round(clusterCount * 0.84)), this.themeProfile.palette.background.star, 0.1, 0.3, 0.48, 1.26);
         break;
       case 'vellum-wash':
         this.drawBackdropBand(this.clouds, this.width * 0.22, this.height * 0.4, this.width * 0.42, this.height * 0.18, this.themeProfile.ambientSky.hazeColor, 0.026 * motifAlpha);
         this.drawBackdropBand(this.clouds, this.width * 0.8, this.height * 0.62, this.width * 0.36, this.height * 0.14, this.themeProfile.ambientSky.hazeAccentColor, 0.022 * motifAlpha);
-        this.base.fillStyle(this.themeProfile.ambientSky.hazeAccentColor, 0.014 * motifAlpha);
-        this.base.fillRect(0, Math.round(this.height * 0.42), this.width, Math.max(8, Math.round(this.height * 0.12)));
+        this.drawBackdropBand(this.base, this.width * 0.5, this.height * 0.45, this.width * 0.74, this.height * 0.16, this.themeProfile.ambientSky.hazeAccentColor, 0.01 * motifAlpha);
         this.drawStarCluster(this.farStars, this.width * 0.16, this.height * 0.16, this.width * 0.1, this.height * 0.08, Math.max(5, Math.round(clusterCount * 0.6)), this.themeProfile.palette.background.star, 0.06, 0.16, 0.4, 0.9);
         break;
       case 'monolith-signal':
-        this.base.fillStyle(this.themeProfile.ambientSky.hazeColor, 0.04 * motifAlpha);
-        this.base.fillRect(0, Math.round(this.height * 0.18), this.width, Math.max(8, Math.round(this.height * 0.07)));
-        this.base.fillRect(0, Math.round(this.height * 0.76), this.width, Math.max(8, Math.round(this.height * 0.08)));
+        this.drawBackdropBand(this.base, this.width * 0.52, this.height * 0.18, this.width * 0.7, this.height * 0.11, this.themeProfile.ambientSky.hazeColor, 0.018 * motifAlpha);
+        this.drawBackdropBand(this.base, this.width * 0.48, this.height * 0.78, this.width * 0.74, this.height * 0.12, this.themeProfile.ambientSky.hazeColor, 0.02 * motifAlpha);
         this.drawBackdropBand(this.clouds, this.width * 0.18, this.height * 0.66, this.width * 0.22, this.height * 0.2, this.themeProfile.ambientSky.hazeAccentColor, 0.026 * motifAlpha);
         this.drawBackdropBand(this.clouds, this.width * 0.82, this.height * 0.38, this.width * 0.2, this.height * 0.16, this.themeProfile.ambientSky.hazeColor, 0.022 * motifAlpha);
-        this.base.fillStyle(this.themeProfile.ambientSky.streakColor, 0.018 * motifAlpha);
-        this.base.fillRect(Math.round(this.width * 0.12), Math.round(this.height * 0.5), Math.round(this.width * 0.76), lineHeight);
+        this.drawBackdropBand(this.base, this.width * 0.5, this.height * 0.5, this.width * 0.58, Math.max(2, lineHeight * 4), this.themeProfile.ambientSky.streakColor, 0.012 * motifAlpha);
         this.drawStarCluster(this.farStars, this.width * 0.12, this.height * 0.2, this.width * 0.08, this.height * 0.07, Math.max(4, Math.round(clusterCount * 0.56)), this.themeProfile.palette.background.star, 0.08, 0.18, 0.42, 0.96);
         break;
       default:
@@ -3998,7 +4072,7 @@ export function resolveBoardCompositionFrame(
       right = reservedRight;
     }
   } else {
-    const feedMetrics = resolveIntentFeedPanelMetrics({ width: safeWidth, height: safeHeight }, true);
+    const feedMetrics = resolveIntentFeedPanelMetrics({ width: safeWidth, height: safeHeight }, false);
     const feedBottom = installFrame
       ? installFrame.top - legacyTuning.menu.intentFeed.installGapPx
       : safeHeight - Math.max(
@@ -4149,6 +4223,7 @@ export class MenuScene extends Phaser.Scene {
     let recoveryEpisode: MazeEpisode | undefined;
     let patternEngine: PatternEngine | undefined;
     let patternFrame: PatternFrame | undefined;
+    let pendingWatchFrame: PatternFrame | undefined;
     let episodePresentationShell: EpisodePresentationShell | undefined;
     let intentRuntimeSession: MenuIntentRuntimeSession | undefined;
     let intentRuntimeBootstrap: Phaser.Time.TimerEvent | undefined;
@@ -4232,7 +4307,6 @@ export class MenuScene extends Phaser.Scene {
     let renderDemo: () => void = () => undefined;
     let playLoopState = createPlayLoopState(presentationMode);
     let playInputDiagnostics = createPlayInputDiagnostics();
-    let playOnboardingDismissed = false;
     const pendingHumanActions: HumanInputAction[] = [];
     const inputRepeatGate = new HumanInputRepeatGate({
       moveRepeatMinIntervalMs: Math.max(56, Math.round(legacyTuning.demo.cadence.exploreStepMs * 0.62))
@@ -4290,7 +4364,6 @@ export class MenuScene extends Phaser.Scene {
           pendingHumanActions.splice(firstMovementIndex, 0, action);
         }
         syncPlayInputQueueDepth();
-        playOnboardingDismissed = true;
         recordAcceptedInput(action);
         return true;
       }
@@ -4309,7 +4382,6 @@ export class MenuScene extends Phaser.Scene {
 
       pendingHumanActions.push(action);
       syncPlayInputQueueDepth();
-      playOnboardingDismissed = true;
       recordAcceptedInput(action);
       return true;
     };
@@ -4402,7 +4474,6 @@ export class MenuScene extends Phaser.Scene {
       lastMemoryEventSignature = '';
       lastHazardEventSignature = '';
       runEndedForCurrentAttempt = false;
-      playOnboardingDismissed = false;
       resetPlayInputDiagnostics();
       syncPlayInputQueueDepth();
       appendTelemetryEvent('run_started', {
@@ -4931,7 +5002,8 @@ export class MenuScene extends Phaser.Scene {
         const themeProfile = resolveAmbientThemeProfile(this.activeTheme);
         const trailRender = episodePresentationShell.boardRenderer.getTrailRenderDiagnostics();
         const bootTiming = buildBootTimingReport();
-        const activePath = patternFrame?.episode.raster.pathIndices;
+        const activeEpisode = patternFrame?.episode;
+        const activePath = activeEpisode?.raster.pathIndices;
         const presentedBoardBounds = resolveBoardPresentationBounds(
           episodePresentationShell.layout,
           demoPresentation.frameOffsetX,
@@ -4963,6 +5035,68 @@ export class MenuScene extends Phaser.Scene {
             height: intentFeedLayout.rect.height
           })
           : undefined;
+        const overlayAlpha = demoPresentation.lifecyclePhase === 'erase-wipe'
+          ? Phaser.Math.Clamp(1 - ease(demoPresentation.eraseWipeProgress), 0, 1)
+          : 1;
+        const actorVisible = demoPresentation.showActor || (demoPresentation.lifecyclePhase === 'erase-wipe' && overlayAlpha > 0.02);
+        const goalVisible = demoPresentation.showGoalMarker;
+        const actorCenter = trailRender.headCenter
+          ? {
+              x: trailRender.headCenter.x + demoPresentation.frameOffsetX,
+              y: trailRender.headCenter.y + demoPresentation.frameOffsetY
+            }
+          : undefined;
+        const goalTileBounds = activeEpisode
+          ? toVisualSceneBounds({
+              x: episodePresentationShell.layout.boardX
+                + (xFromIndex(activeEpisode.raster.endIndex, activeEpisode.raster.width) * episodePresentationShell.layout.tileSize)
+                + demoPresentation.frameOffsetX,
+              y: episodePresentationShell.layout.boardY
+                + (yFromIndex(activeEpisode.raster.endIndex, activeEpisode.raster.width) * episodePresentationShell.layout.tileSize)
+                + demoPresentation.frameOffsetY,
+              width: episodePresentationShell.layout.tileSize,
+              height: episodePresentationShell.layout.tileSize
+            })
+          : undefined;
+        const exitInsetPx = Math.max(
+          0,
+          Math.min(
+            episodePresentationShell.layout.tileSize * 0.48,
+            episodePresentationShell.layout.tileSize * legacyTuning.demo.lifecycle.exitArrivalInsetRatio
+          )
+        );
+        const exitRegionBounds = goalTileBounds
+          ? toVisualSceneBounds({
+              x: goalTileBounds.left + exitInsetPx,
+              y: goalTileBounds.top + exitInsetPx,
+              width: Math.max(1, goalTileBounds.width - (exitInsetPx * 2)),
+              height: Math.max(1, goalTileBounds.height - (exitInsetPx * 2))
+            })
+          : undefined;
+        const actorInsideExitRegion = actorCenter && goalTileBounds
+          ? isPointInsideTileArrivalRegion(
+              actorCenter,
+              goalTileBounds.left,
+              goalTileBounds.top,
+              goalTileBounds.width,
+              legacyTuning.demo.lifecycle.exitArrivalInsetRatio
+            )
+          : false;
+        const visualArrivalLatchMs = activeEpisode
+          ? resolveDemoVisualArrivalLatchMs(activeEpisode, demoConfig)
+          : null;
+        const settleWindowMs = Math.max(0, Math.trunc(legacyTuning.demo.lifecycle.visualArrivalSettleMs));
+        const settleStartMs = visualArrivalLatchMs === null
+          ? null
+          : Math.max(0, visualArrivalLatchMs - settleWindowMs);
+        const settleProgress = visualArrivalLatchMs === null
+          ? 0
+          : settleWindowMs <= 0
+            ? (actorInsideExitRegion ? 1 : 0)
+            : clamp((lastPresentationElapsedMs - (settleStartMs ?? 0)) / Math.max(1, settleWindowMs), 0, 1);
+        const settleRemainingMs = visualArrivalLatchMs === null
+          ? 0
+          : Math.max(0, visualArrivalLatchMs - lastPresentationElapsedMs);
         const subtitleDiagnostics = activeTitleSubtitle
           ? {
             visible: subtitleBounds !== undefined,
@@ -5025,8 +5159,8 @@ export class MenuScene extends Phaser.Scene {
           trail: {
             start: renderedTrail?.start ?? trailRender.trailStart,
             limit: renderedTrail?.limit ?? trailRender.trailLimit,
-            currentIndex: view?.currentIndex ?? patternFrame?.episode.raster.startIndex ?? 0,
-            nextIndex: view?.nextIndex ?? patternFrame?.episode.raster.startIndex ?? 0,
+            currentIndex: view?.currentIndex ?? activeEpisode?.raster.startIndex ?? 0,
+            nextIndex: view?.nextIndex ?? activeEpisode?.raster.startIndex ?? 0,
             progress: view?.progress ?? 0,
             cue: view?.cue ?? 'spawn',
             suppressesFuturePreview: expectedTrailHeadIndex === null || (
@@ -5041,6 +5175,27 @@ export class MenuScene extends Phaser.Scene {
             attachedToActor: trailRender.attachedToActor && trailHeadAttached,
             bridgeRendered: trailRender.bridgeRendered,
             render: trailRender
+          },
+          attempt: {
+            mode: presentationMode,
+            sequence: demoPresentation.sequence,
+            lifecyclePhase: demoPresentation.lifecyclePhase,
+            ritualPhase: demoPresentation.ritualPhase,
+            elapsedMs: lastModeElapsedMs,
+            presentationElapsedMs: lastPresentationElapsedMs,
+            visualArrivalLatchMs
+          },
+          arrival: {
+            actorVisible,
+            goalVisible,
+            ...(actorCenter ? { actorCenter: toVisualScenePoint(actorCenter) } : {}),
+            ...(goalTileBounds ? { goalCenter: toVisualScenePoint({ x: goalTileBounds.centerX, y: goalTileBounds.centerY }) } : {}),
+            ...(goalTileBounds ? { goalTileBounds } : {}),
+            ...(exitRegionBounds ? { exitRegionBounds } : {}),
+            actorInsideExitRegion,
+            settleProgress,
+            settleRemainingMs,
+            readyToClear: visualArrivalLatchMs !== null && lastPresentationElapsedMs >= visualArrivalLatchMs
           },
           paletteReadability: getPaletteReadabilityReport(themeProfile.palette),
           ...(bootTiming ? { bootTiming } : {}),
@@ -5057,24 +5212,21 @@ export class MenuScene extends Phaser.Scene {
       };
       const resolveInstallChromeLabel = (state: InstallSurfaceState): string => (
         state.mode === 'manual'
-          ? (state.instruction ?? 'Add to Home Screen')
+          ? ((state.instruction ?? 'Add to Home Screen').replace(/^Use\s+/u, ''))
           : installPromptPending
-            ? (compactInstallChrome ? 'Install...' : 'Install Mazer...')
-            : (compactInstallChrome ? 'Install' : 'Install Mazer')
+            ? 'Installing...'
+            : (compactInstallChrome ? 'Install Mazer' : 'Install Mazer')
       );
-      const createInstallChromeLabelStyle = (
-        themeProfile: AmbientThemeProfile,
-        state: InstallSurfaceState
-      ) => ({
+      const createInstallChromeLabelStyle = (state: InstallSurfaceState) => ({
         color: state.mode === 'available'
-          ? (installPromptPending ? themeProfile.title.pendingColor : themeProfile.title.installColor)
-          : themeProfile.title.supportColor,
-        fontFamily: themeProfile.title.supportFontFamily,
-        fontSize: `${compactInstallChrome ? 9 : 10}px`,
+          ? toColorString(installPromptPending ? MAZER_BRAND_COLORS.frameHighlight : MAZER_BRAND_COLORS.wordmark)
+          : toColorString(MAZER_BRAND_COLORS.support),
+        fontFamily: '"Consolas", "Courier New", monospace',
+        fontSize: `${compactInstallChrome ? 8 : 10}px`,
         fontStyle: state.mode === 'available' ? 'bold' : 'normal',
         wordWrap: state.mode === 'manual'
           ? {
-            width: Math.max(152, Math.min(264, width * (compactInstallChrome ? 0.56 : 0.4))),
+            width: Math.max(160, Math.min(276, width * (compactInstallChrome ? 0.58 : 0.42))),
             useAdvancedWrap: true
           }
           : undefined
@@ -5083,25 +5235,27 @@ export class MenuScene extends Phaser.Scene {
         themeProfile: AmbientThemeProfile,
         state: InstallSurfaceState = activeInstallState
       ): { compactInstall: boolean; labelText: string; chipWidth: number; chipHeight: number } | undefined => {
+        void themeProfile;
         if (state.mode === 'hidden') {
           return undefined;
         }
 
         const labelText = resolveInstallChromeLabel(state);
-        const label = this.add.text(-4096, -4096, labelText, createInstallChromeLabelStyle(themeProfile, state))
+        const label = this.add.text(-4096, -4096, labelText, createInstallChromeLabelStyle(state))
           .setOrigin(0.5)
-          .setLetterSpacing(compactInstallChrome ? 1 : 2)
+          .setLetterSpacing(compactInstallChrome ? 0 : 2)
           .setVisible(false)
           .setAlpha(0);
+        const horizontalChrome = compactInstallChrome ? 58 : 74;
         const chipWidth = Phaser.Math.Clamp(
-          Math.ceil(label.width + (compactInstallChrome ? 22 : 28)),
-          state.mode === 'manual' ? 164 : (compactInstallChrome ? 96 : 126),
+          Math.ceil(label.width + horizontalChrome),
+          state.mode === 'manual' ? 182 : (compactInstallChrome ? 148 : 178),
           Math.max(
-            state.mode === 'manual' ? 164 : (compactInstallChrome ? 96 : 126),
-            Math.round(width * (state.mode === 'manual' ? (compactInstallChrome ? 0.66 : 0.46) : compactInstallChrome ? 0.36 : 0.24))
+            state.mode === 'manual' ? 182 : (compactInstallChrome ? 148 : 178),
+            Math.round(width * (state.mode === 'manual' ? (compactInstallChrome ? 0.7 : 0.5) : compactInstallChrome ? 0.46 : 0.3))
           )
         );
-        const chipHeight = Math.max(compactInstallChrome ? 23 : 25, Math.ceil(label.height + (compactInstallChrome ? 12 : 14)));
+        const chipHeight = Math.max(compactInstallChrome ? 26 : 30, Math.ceil(label.height + (compactInstallChrome ? 12 : 16)));
         label.destroy();
         return {
           compactInstall: compactInstallChrome,
@@ -5139,8 +5293,8 @@ export class MenuScene extends Phaser.Scene {
         const boardCenterY = layout.boardY + (layout.boardHeight / 2);
         // Keep the backdrop field viewport-filling while the board itself stays inside the safe frame.
         const backdropFrame = resolvePresentationBackdropFrame(width, height, boardCenterX, boardCenterY);
-        const boardShellWidth = Math.max(24, Math.round(layout.boardWidth + (layout.tileSize * 8)));
-        const boardShellHeight = Math.max(24, Math.round(layout.boardHeight + (layout.tileSize * 8)));
+        const boardShellWidth = Math.max(24, Math.round(layout.boardWidth + (layout.tileSize * 4)));
+        const boardShellHeight = Math.max(24, Math.round(layout.boardHeight + (layout.tileSize * 4)));
         const boardAuraWidth = Math.max(24, Math.round(layout.boardWidth * 1.18));
         const boardAuraHeight = Math.max(24, Math.round(layout.boardHeight * 1.14));
         const boardHaloWidth = Math.max(20, Math.round(layout.boardWidth * 1.06));
@@ -5240,6 +5394,10 @@ export class MenuScene extends Phaser.Scene {
             profile: deploymentProfileId,
             theme: {
               ...themeProfile.hudTheme,
+              railAlphaScale: 0,
+              modeAlphaScale: 0,
+              metaAlphaScale: (themeProfile.hudTheme.metaAlphaScale ?? 1) * 0.44,
+              flashAlphaScale: 0,
               palette: themeProfile.palette
             }
           }),
@@ -5290,8 +5448,8 @@ export class MenuScene extends Phaser.Scene {
         }
 
         const { compactInstall, labelText, chipWidth, chipHeight } = installMetrics;
-        const label = this.add.text(0, 0, labelText, createInstallChromeLabelStyle(sceneThemeProfile, resolvedState))
-          .setOrigin(0.5)
+        const label = this.add.text(0, 0, labelText, createInstallChromeLabelStyle(resolvedState))
+          .setOrigin(0, 0.5)
           .setLetterSpacing(compactInstall ? 1 : 2);
         const installFrame = resolveInstallChromeFrame(
           width,
@@ -5307,43 +5465,66 @@ export class MenuScene extends Phaser.Scene {
         installChrome.setVisible(true);
         installChrome.setPosition(installFrame.centerX, installFrame.centerY);
 
-        const shadow = this.add.rectangle(0, 2, chipWidth + 4, chipHeight + 4, sceneThemeProfile.title.plateShadowColor, 0.12);
+        const closeDiameter = compactInstall ? 16 : 20;
+        const markSize = compactInstall ? 16 : 20;
+        const closeInset = compactInstall ? 10 : 14;
+        const contentLeft = -(chipWidth / 2) + (compactInstall ? 12 : 14);
+        const markX = contentLeft + (markSize / 2);
+        const labelX = markX + (markSize / 2) + (compactInstall ? 8 : 10);
+        const closeX = (chipWidth / 2) - closeInset;
+        const labelMaxWidth = Math.max(72, closeX - labelX - (compactInstall ? 10 : 14));
+
+        const shadow = this.add.rectangle(0, 2, chipWidth + 2, chipHeight + 2, sceneThemeProfile.title.plateShadowColor, 0.05);
         const chip = this.add.rectangle(
           0,
           0,
           chipWidth,
           chipHeight,
-          sceneThemeProfile.title.buttonFillColor,
+          MAZER_BRAND_COLORS.shell,
           resolvedState.mode === 'manual'
-            ? 0.18
+            ? 0.84
             : installPromptPending
-              ? 0.2
-              : 0.26
+              ? 0.88
+              : 0.89
         ).setStrokeStyle(
           1,
-          sceneThemeProfile.title.buttonStrokeColor,
+          MAZER_BRAND_COLORS.frame,
           resolvedState.mode === 'manual'
-            ? 0.14
+            ? 0.34
             : installPromptPending
-              ? 0.14
-              : 0.24
+              ? 0.58
+              : 0.46
         );
         const accent = this.add.rectangle(
           0,
-          -(chipHeight / 2) + 3,
-          Math.max(18, chipWidth - 18),
-          1,
-          sceneThemeProfile.title.buttonStrokeColor,
-          resolvedState.mode === 'manual' ? 0.06 : 0.1
+          -(chipHeight / 2) + 4,
+          Math.max(18, chipWidth - 20),
+          2,
+          MAZER_BRAND_COLORS.route,
+          resolvedState.mode === 'manual' ? 0.12 : 0.2
         );
+        const brandMark = createMazerBrandMark(this, markSize, 0.98)
+          .setPosition(markX, 0)
+          .setScale(compactInstall ? 0.88 : 0.96);
+        label.setPosition(labelX, 0).setFixedSize(labelMaxWidth, 0);
+        const closeButton = this.add.container(closeX, 0);
+        const closeHit = this.add.circle(0, 0, closeDiameter / 2, MAZER_BRAND_COLORS.shell, 0.01)
+          .setStrokeStyle(1, MAZER_BRAND_COLORS.muted, 0.24);
+        const closeGlyph = this.add.text(0, -1, '×', {
+          color: toColorString(MAZER_BRAND_COLORS.support),
+          fontFamily: '"Bahnschrift SemiCondensed", "Trebuchet MS", "Segoe UI", sans-serif',
+          fontSize: `${compactInstall ? 12 : 14}px`,
+          fontStyle: 'bold'
+        }).setOrigin(0.5).setAlpha(0.84);
+        closeButton.add([closeHit, closeGlyph]);
 
         if (resolvedState.mode === 'available' && !installPromptPending) {
           const setChipState = (hovered: boolean): void => {
             chip.setFillStyle(
-              sceneThemeProfile.title.buttonFillColor,
-              hovered ? 0.34 : 0.26
+              MAZER_BRAND_COLORS.shell,
+              hovered ? 0.94 : 0.89
             );
-            chip.setStrokeStyle(1, sceneThemeProfile.title.buttonStrokeColor, hovered ? 0.32 : 0.24);
+            chip.setStrokeStyle(1, MAZER_BRAND_COLORS.frame, hovered ? 0.64 : 0.46);
             label.setAlpha(hovered ? 1 : 0.96);
           };
 
@@ -5372,11 +5553,29 @@ export class MenuScene extends Phaser.Scene {
           });
           setChipState(false);
         } else {
-          label.setAlpha(resolvedState.mode === 'manual' ? 0.9 : 0.8);
+          label.setAlpha(resolvedState.mode === 'manual' ? 0.94 : 0.82);
         }
 
-        installChrome.add([shadow, chip, accent, label]);
-        activeInstallBounds = toVisualSceneBounds(chip.getBounds());
+        const applyCloseState = (hovered: boolean): void => {
+          closeHit.setStrokeStyle(1, MAZER_BRAND_COLORS.frameHighlight, hovered ? 0.44 : 0.24);
+          closeGlyph.setAlpha(hovered ? 1 : 0.84);
+        };
+        closeHit.setInteractive({ useHandCursor: true });
+        closeHit.on('pointerover', () => {
+          applyCloseState(true);
+        });
+        closeHit.on('pointerout', () => {
+          applyCloseState(false);
+        });
+        closeHit.on('pointerup', () => {
+          installPromptPending = false;
+          dismissInstallSurface();
+          renderInstallChrome();
+        });
+        applyCloseState(false);
+
+        installChrome.add([shadow, chip, accent, brandMark, label, closeButton]);
+        activeInstallBounds = toVisualSceneBounds(installChrome.getBounds());
         syncAmbientSkyReservedFrames();
       };
       const renderTitleChrome = (): void => {
@@ -5401,47 +5600,55 @@ export class MenuScene extends Phaser.Scene {
         const titlePlateContainer = this.add.container(0, 0);
         const titleAlpha = variantProfile.titleAlpha * chromeProfile.titleAlpha * deploymentProfile.titleAlphaScale;
         const signatureAlpha = variantProfile.signatureAlpha * chromeProfile.signatureAlpha * deploymentProfile.signatureAlphaScale;
-        const plateAlpha = variantProfile.plateAlpha * chromeProfile.plateAlpha * deploymentProfile.plateAlphaScale;
-        const panelAlpha = variantProfile.panelAlpha * chromeProfile.panelAlpha * deploymentProfile.panelAlphaScale;
-        const titleShadowAlpha = Math.min(0.08, 0.05 * titleAlpha);
-        const titleFontStyle = sceneThemeProfile.id === 'vellum' ? 'normal' : 'bold';
+        const plateAlpha = Math.min(0.16, variantProfile.plateAlpha * chromeProfile.plateAlpha * deploymentProfile.plateAlphaScale * 0.94);
+        const panelAlpha = Math.min(0.14, variantProfile.panelAlpha * chromeProfile.panelAlpha * deploymentProfile.panelAlphaScale * 0.72);
+        const titleShadowAlpha = Math.min(0.12, 0.08 * titleAlpha);
+        const titleFontFamily = '"Bahnschrift SemiCondensed", "Trebuchet MS", "Segoe UI", sans-serif';
+        const supportFontFamily = '"Consolas", "Courier New", monospace';
         const titleStrokeWidth = 1;
+        const emblemSize = Math.round(titleLockup.plateHeight * 0.46);
+        const emblemOffsetX = -Math.round(titleLockup.plateWidth * 0.25);
+        const titleOffsetX = Math.round(titleLockup.plateWidth * 0.065);
         titlePlateContainer.add([
-          this.add.rectangle(0, 0, titleLockup.plateWidth, titleLockup.plateHeight, sceneThemeProfile.title.plateOuterColor, plateAlpha)
-            .setStrokeStyle(1, sceneThemeProfile.palette.board.innerStroke, 0.18 * titleAlpha),
-          this.add.rectangle(0, 0, titleLockup.plateWidth - 14, titleLockup.plateHeight - 12, sceneThemeProfile.title.plateInnerColor, panelAlpha)
-            .setStrokeStyle(1, sceneThemeProfile.title.plateLineColor, 0.16 * titleAlpha),
+          this.add.rectangle(0, 0, titleLockup.plateWidth, titleLockup.plateHeight, MAZER_BRAND_COLORS.shell, plateAlpha)
+            .setStrokeStyle(1, MAZER_BRAND_COLORS.frame, 0.52 * titleAlpha),
+          this.add.rectangle(0, 0, titleLockup.plateWidth - 12, titleLockup.plateHeight - 10, sceneThemeProfile.title.plateInnerColor, panelAlpha)
+            .setStrokeStyle(1, MAZER_BRAND_COLORS.frameHighlight, 0.18 * titleAlpha),
           this.add.rectangle(
             0,
-            -(titleLockup.plateHeight / 2) + 8,
-            titleLockup.plateWidth - 30,
-            1,
-            sceneThemeProfile.title.plateLineColor,
+            -(titleLockup.plateHeight / 2) + 5,
+            titleLockup.plateWidth - 20,
+            2,
+            MAZER_BRAND_COLORS.route,
             0.16 * titleAlpha
           )
         ]);
+        titlePlateContainer.add(
+          createMazerBrandMark(this, emblemSize, 0.98)
+            .setPosition(emblemOffsetX, -Math.round(titleLockup.plateHeight * 0.02))
+        );
         titleShadowContainer.add([
-          this.add.text(1, 1, legacyTuning.menu.title.text, {
-            color: sceneThemeProfile.title.titleShadow,
-            fontFamily: sceneThemeProfile.title.fontFamily,
+          this.add.text(titleOffsetX + 1, 1, legacyTuning.menu.title.text, {
+            color: toColorString(MAZER_BRAND_COLORS.wordmarkShadow),
+            fontFamily: titleFontFamily,
             fontSize: `${titleLockup.titleFontSize}px`,
-            fontStyle: titleFontStyle
+            fontStyle: 'bold'
           }).setOrigin(0.5).setLetterSpacing(titleLockup.titleLetterSpacing).setAlpha(titleShadowAlpha)
         ]);
-        const title = this.add.text(0, -Math.round(titleLockup.plateHeight * 0.08), legacyTuning.menu.title.text, {
-          color: sceneThemeProfile.title.titleColor,
-          fontFamily: sceneThemeProfile.title.fontFamily,
+        const title = this.add.text(titleOffsetX, -Math.round(titleLockup.plateHeight * 0.08), legacyTuning.menu.title.text, {
+          color: toColorString(MAZER_BRAND_COLORS.wordmark),
+          fontFamily: titleFontFamily,
           fontSize: `${titleLockup.titleFontSize}px`,
-          fontStyle: titleFontStyle
+          fontStyle: 'bold'
         }).setOrigin(0.5).setLetterSpacing(titleLockup.titleLetterSpacing)
-          .setAlpha(titleAlpha)
-          .setStroke(sceneThemeProfile.title.titleStroke, titleStrokeWidth);
+          .setAlpha(Math.min(1, titleAlpha * 1.04))
+          .setStroke(toColorString(MAZER_BRAND_COLORS.wordmarkShadow), titleStrokeWidth);
         const subtitle = this.add.text(0, titleLockup.subtitleTopOffsetY, TITLE_SIGNATURE_TEXT, {
-          color: sceneThemeProfile.title.signatureColor,
-          fontFamily: sceneThemeProfile.title.signatureFontFamily,
+          color: toColorString(MAZER_BRAND_COLORS.support),
+          fontFamily: supportFontFamily,
           fontSize: `${titleLockup.subtitleFontSize}px`
         }).setOrigin(0.5, 0)
-          .setAlpha(signatureAlpha)
+          .setAlpha(Math.min(0.74, signatureAlpha))
           .setLetterSpacing(titleLockup.subtitleLetterSpacing);
 
         titlePlateContainer.add(title);
@@ -5516,6 +5723,8 @@ export class MenuScene extends Phaser.Scene {
       };
 
       let lastCue: DemoWalkerCue = 'spawn';
+      let lastModeElapsedMs = 0;
+      let lastPresentationElapsedMs = 0;
       let demoConfig = resolveDemoConfig(patternFrame.episode, demoCyclePlan, presentationMode, contentProfileId);
       let demoPresentation = resolveMenuDemoPresentation(
         patternFrame.episode,
@@ -5542,9 +5751,9 @@ export class MenuScene extends Phaser.Scene {
             .setAlpha(presentation.boardHaloAlpha)
             .setScale(presentation.boardHaloScale);
           shell.boardShade.setPosition(shell.boardCenterX + offsetX, shell.boardCenterY + offsetY)
-            .setAlpha(presentation.boardShadeAlpha);
+            .setAlpha(presentation.boardShadeAlpha * 0.22);
           shell.boardVeil.setPosition(shell.boardCenterX + offsetX, shell.boardCenterY + offsetY)
-            .setAlpha(presentation.boardVeilAlpha);
+            .setAlpha(presentation.boardVeilAlpha * 0.18);
           shell.motifPrimary.setPosition(shell.layout.boardX + offsetX, shell.layout.boardY + offsetY)
             .setAlpha(presentation.motifPrimaryAlpha);
           shell.motifSecondary.setPosition(shell.layout.boardX + offsetX, shell.layout.boardY + offsetY)
@@ -5553,38 +5762,28 @@ export class MenuScene extends Phaser.Scene {
             .setAlpha(resolveBlueprintAccentAlpha(presentation, themeProfile));
         });
         runOptional('ritual overlay', () => {
+          // presentation.ritualPhase === 'fail' remains part of the lifecycle contract even with the card hidden.
           const ritualY = shell.layout.boardY + offsetY + Math.max(42, Math.round(shell.layout.boardHeight * 0.22));
-          const ritualScale = reducedMotion
-            ? 1
-            : presentation.ritualPhase === 'fail'
-              ? lerp(0.985, 1, presentation.ritualProgress)
-              : presentation.ritualPhase === 'success'
-                ? lerp(0.992, 1, presentation.ritualProgress)
-              : presentation.ritualPhase === 'retry'
-                ? lerp(1.01, 1, presentation.ritualProgress)
-                : 1;
-          const showRitual = presentation.ritualPhase === 'fail'
-            || presentation.ritualPhase === 'success'
-            || presentation.ritualPhase === 'retry';
+          const ritualScale = reducedMotion ? 1 : 0.992;
 
           shell.ritualCard
             .setPosition(shell.boardCenterX + offsetX, ritualY)
             .setScale(ritualScale)
-            .setAlpha(showRitual ? presentation.ritualAlpha : 0);
+            .setAlpha(0);
           shell.ritualCardStroke
             .setPosition(shell.boardCenterX + offsetX, ritualY)
             .setScale(ritualScale)
-            .setAlpha(showRitual ? Math.min(0.94, presentation.ritualAlpha + 0.08) : 0);
+            .setAlpha(0);
           shell.ritualTitle
             .setPosition(shell.boardCenterX + offsetX, ritualY - 13)
             .setScale(ritualScale)
-            .setText(showRitual ? presentation.ritualTitle : '')
-            .setAlpha(showRitual ? Math.min(1, presentation.ritualAlpha + 0.08) : 0);
+            .setText('')
+            .setAlpha(0);
           shell.ritualSubtitle
             .setPosition(shell.boardCenterX + offsetX, ritualY + 9)
             .setScale(ritualScale)
-            .setText(showRitual ? presentation.ritualSubtitle : '')
-            .setAlpha(showRitual ? Math.min(0.96, presentation.ritualAlpha) : 0);
+            .setText('')
+            .setAlpha(0);
         });
       };
       const renderBoardPresentation = (
@@ -5595,6 +5794,12 @@ export class MenuScene extends Phaser.Scene {
         renderedTrail: { start: number; limit: number },
         boardState: MenuRuntimeBoardState | null
       ): void => {
+        const overlayAlpha = presentation.lifecyclePhase === 'erase-wipe'
+          ? Phaser.Math.Clamp(1 - ease(presentation.eraseWipeProgress), 0, 1)
+          : 1;
+        const showTrailOverlay = presentation.showTrail || (presentation.lifecyclePhase === 'erase-wipe' && overlayAlpha > 0.02);
+        const showActorOverlay = presentation.showActor || (presentation.lifecyclePhase === 'erase-wipe' && overlayAlpha > 0.02);
+
         shell.boardRenderer.drawBase({
           solutionPathAlpha: presentation.solutionPathAlpha,
           lifecycle: presentation.lifecyclePhase === 'build-reveal' || presentation.lifecyclePhase === 'pre-roll' || presentation.lifecyclePhase === 'settle-in'
@@ -5624,7 +5829,7 @@ export class MenuScene extends Phaser.Scene {
           shell.boardRenderer.clearGoal();
         }
 
-        if (presentation.showTrail) {
+        if (showTrailOverlay) {
           shell.boardRenderer.drawTrail(episode.raster.pathIndices, {
             cue: view.cue,
             limit: renderedTrail.limit,
@@ -5633,6 +5838,7 @@ export class MenuScene extends Phaser.Scene {
             persistentTrail: presentation.persistentTrail,
             persistentFadeFloor: presentation.persistentFadeFloor,
             pulseBoost: presentation.trailPulseBoost,
+            alphaScale: overlayAlpha,
             activeMotion: view.currentIndex === view.nextIndex
               ? undefined
               : {
@@ -5650,13 +5856,13 @@ export class MenuScene extends Phaser.Scene {
           compact: presentationMode === 'play'
         });
 
-        if (!presentation.showActor) {
+        if (!showActorOverlay) {
           shell.boardRenderer.clearActor();
           return;
         }
 
         if (view.currentIndex === view.nextIndex || view.progress <= 0 || presentation.lifecyclePhase === 'settle-in') {
-          shell.boardRenderer.drawActor(view.currentIndex, view.direction, view.cue, presentation.actorPulseBoost);
+          shell.boardRenderer.drawActor(view.currentIndex, view.direction, view.cue, presentation.actorPulseBoost, overlayAlpha);
           return;
         }
 
@@ -5666,7 +5872,8 @@ export class MenuScene extends Phaser.Scene {
           view.progress,
           view.direction,
           view.cue,
-          presentation.actorPulseBoost
+          presentation.actorPulseBoost,
+          overlayAlpha
         );
       };
       const applyEpisodePresentation = (): void => {
@@ -5777,7 +5984,6 @@ export class MenuScene extends Phaser.Scene {
 
         finalizeTelemetryRun('aborted');
         playLoopState = resetPlayLoopState(playLoopState, presentationMode);
-        playOnboardingDismissed = false;
         resetPlayInputDiagnostics();
         syncPlayInputQueueDepth();
         lastProjectionState = null;
@@ -5796,7 +6002,6 @@ export class MenuScene extends Phaser.Scene {
         presentationMode = nextMode;
         playLoopState = resetPlayLoopState(playLoopState, presentationMode);
         pendingHumanActions.length = 0;
-        playOnboardingDismissed = false;
         resetPlayInputDiagnostics();
         syncPlayInputQueueDepth();
         resetTouchInputState(touchInputState);
@@ -5815,6 +6020,7 @@ export class MenuScene extends Phaser.Scene {
           return;
         }
 
+        pendingWatchFrame = undefined;
         patternEngine.resumeFresh();
         applyPatternFrame(patternEngine.next(0));
       };
@@ -6095,9 +6301,8 @@ export class MenuScene extends Phaser.Scene {
         feedState: IntentFeedState | null,
         boardState: MenuRuntimeBoardState | null
       ): string | null => {
-        const candidate = feedState?.status?.summary
-          ?? boardState?.nextRiskLabel?.replace(/^(Next risk|Next turn|Next branch|Closer route|Goal path|Exit path):\s*/iu, '')
-          ?? null;
+        void boardState;
+        const candidate = feedState?.status?.summary ?? null;
         if (!candidate || candidate.trim().length === 0) {
           return null;
         }
@@ -6105,11 +6310,6 @@ export class MenuScene extends Phaser.Scene {
         return clampIntentFeedSummary(candidate, touchInputSupported ? 34 : 46);
       };
 
-      const resolvePlayOnboardingLabel = (): string | null => (
-        presentationMode === 'play' && !playOnboardingDismissed
-          ? (touchInputSupported ? PLAY_MODE_TOUCH_ONBOARDING_LABEL : PLAY_MODE_ONBOARDING_LABEL)
-          : null
-      );
       renderDemo = (): void => {
         const shell = episodePresentationShell;
         if (!patternFrame || !shell) {
@@ -6131,6 +6331,8 @@ export class MenuScene extends Phaser.Scene {
         const presentationElapsedMs = presentationMode === 'play'
           ? modeElapsedMs
           : resolvePresentationElapsedMs(episode, patternFrame.t * 1000, demoPresentation);
+        lastModeElapsedMs = Math.max(0, Math.round(modeElapsedMs));
+        lastPresentationElapsedMs = Math.max(0, Math.round(presentationElapsedMs));
         const view = presentationMode === 'play'
           ? (
               playLoopState.buildElapsedMs < demoConfig.cadence.spawnHoldMs
@@ -6178,7 +6380,7 @@ export class MenuScene extends Phaser.Scene {
         const normalizedRawFeedState = rawFeedState && contentProfileId === 'core-only'
           ? (() => {
               const coreEntries = (rawFeedState.events ?? rawFeedState.entries ?? [])
-                .slice(0, 1)
+                .slice(0, legacyTuning.menu.intentFeed.maxVisibleEntries)
                 .map((entry, slot) => ({
                   ...entry,
                   slot,
@@ -6203,11 +6405,14 @@ export class MenuScene extends Phaser.Scene {
                 ? (
                     normalizedRawFeedState
                       ? (() => {
-                        const playEntries = (normalizedRawFeedState.events?.slice(0, 1) ?? normalizedRawFeedState.entries.slice(0, 1))
+                        const playEntries = (
+                          normalizedRawFeedState.events?.slice(0, legacyTuning.menu.intentFeed.maxVisibleEntries)
+                          ?? normalizedRawFeedState.entries.slice(0, legacyTuning.menu.intentFeed.maxVisibleEntries)
+                        )
                           .map((entry, slot) => ({
                             ...entry,
                             slot,
-                            summary: clampIntentFeedSummary(entry.summary, touchInputSupported ? 28 : 36)
+                            summary: clampIntentFeedSummary(entry.summary, touchInputSupported ? 26 : 34)
                           }));
                         return {
                           ...normalizedRawFeedState,
@@ -6249,8 +6454,8 @@ export class MenuScene extends Phaser.Scene {
             resolvedPresentation.mood,
             resolvedPresentation.sequence,
             resolvedPresentation.variant,
-            resolvedPresentation.metadataAlpha,
-            resolvedPresentation.flashAlpha,
+            resolvedPresentation.metadataAlpha * 0.36,
+            0,
             `${presentationMode.toUpperCase()} | ${resolvedPresentation.phaseLabel}`,
             resolvedPresentation.hudOffsetX,
             resolvedPresentation.hudOffsetY
@@ -6339,11 +6544,9 @@ export class MenuScene extends Phaser.Scene {
                 : [])
             ]
           }, {
-            nextRiskLabel: boardState?.nextRiskLabel ?? null,
             statusLabel: presentationMode === 'play'
               ? resolvePlayHudStatusLabel(feedState, boardState)
-              : null,
-            onboardingLabel: resolvePlayOnboardingLabel()
+              : null
           });
           renderTouchControls();
         });
@@ -6442,6 +6645,7 @@ export class MenuScene extends Phaser.Scene {
       const applyPatternFrame = (nextFrame: PatternFrame): void => {
         if (!patternFrame) {
           patternFrame = nextFrame;
+          pendingWatchFrame = undefined;
           recoveryEpisode = nextFrame.episode;
           return;
         }
@@ -6449,6 +6653,7 @@ export class MenuScene extends Phaser.Scene {
         const previousEpisode = patternFrame.episode;
         try {
           patternFrame = nextFrame;
+          pendingWatchFrame = undefined;
           recoveryEpisode = nextFrame.episode;
           demoCyclePlan = pendingCyclePlan ?? demoCyclePlan;
           pendingCyclePlan = undefined;
@@ -6697,7 +6902,7 @@ export class MenuScene extends Phaser.Scene {
             }
 
             advancePlayLoop(patternFrame.episode, safeDelta);
-            if (playLoopState.clearElapsedMs > (demoConfig.cadence.goalHoldMs + demoConfig.cadence.resetHoldMs)) {
+            if (playLoopState.clearElapsedMs > (demoConfig.cadence.goalHoldMs + resolveDemoFadePhaseDurationsMs(demoConfig).totalMs)) {
               patternEngine.resumeFresh();
               applyPatternFrame(patternEngine.next(0));
             } else {
@@ -6707,17 +6912,43 @@ export class MenuScene extends Phaser.Scene {
             return;
           }
 
-          const nextFrame = patternEngine.next(safeDelta / 1000);
           if (!patternFrame) {
-            patternFrame = nextFrame;
-            recoveryEpisode = nextFrame.episode;
+            const initialFrame = pendingWatchFrame ?? patternEngine.next(0);
+            patternFrame = initialFrame;
+            pendingWatchFrame = undefined;
+            recoveryEpisode = initialFrame.episode;
             renderDemo();
             publishRuntimeDiagnostics(false);
             return;
           }
 
+          const currentCycleDurationMs = resolveDemoCycleDurationMs(patternFrame.episode, demoConfig);
+          if (pendingWatchFrame) {
+            patternFrame = {
+              ...patternFrame,
+              t: patternFrame.t + (safeDelta / 1000)
+            };
+            if ((patternFrame.t * 1000) >= currentCycleDurationMs) {
+              applyPatternFrame(pendingWatchFrame);
+            } else {
+              renderDemo();
+            }
+            publishRuntimeDiagnostics(false);
+            return;
+          }
+
+          const nextFrame = patternEngine.next(safeDelta / 1000);
           if (nextFrame.episode !== patternFrame.episode) {
-            applyPatternFrame(nextFrame);
+            if ((patternFrame.t * 1000) >= currentCycleDurationMs) {
+              applyPatternFrame(nextFrame);
+            } else {
+              pendingWatchFrame = nextFrame;
+              patternFrame = {
+                ...patternFrame,
+                t: patternFrame.t + (safeDelta / 1000)
+              };
+              renderDemo();
+            }
             publishRuntimeDiagnostics(false);
             return;
           }
@@ -6851,8 +7082,9 @@ export function resolveSceneLayoutProfile(
       + chromeProfile.boardScaleBias
       + deploymentProfile.boardScaleBias
       + (!titleVisible ? 0.004 : 0)
-      + (isPortrait ? 0.008 + deploymentProfile.portraitBoardScaleBias : 0)
+      + (isPortrait ? 0.006 + deploymentProfile.portraitBoardScaleBias : 0)
       - (isTiny ? 0.026 : 0)
+      - (titleVisible && isNarrow && isPortrait ? 0.01 : 0)
       - (isShort ? 0.012 : 0),
     isTiny ? 0.82 : 0.92,
     Math.min(safeChrome === 'none' ? 0.998 : 0.996, deploymentProfile.maxBoardScale)
@@ -6996,7 +7228,7 @@ export const resolveDemoConfig = (
   const pathSegments = Math.max(1, routeCueOverrides.length || (episode.raster.pathIndices.length - 1));
   const spectatorPlan = createDemoSpectatorPlan(episode, contentProfile);
   const watchSlowdownFactor = mode === 'play' ? 1 : (1 / 0.75);
-  const buildSlowdownFactor = mode === 'play' ? 1.1 : 2;
+  const buildSlowdownFactor = mode === 'play' ? 1.65 : 3;
   const baseSpawnHoldMs = legacyTuning.demo.cadence.spawnHoldMs + cycle.pacing.spawnHoldMs + (cycle.mood === 'blueprint' ? 60 : 0);
   const baseExploreStepMs = legacyTuning.demo.cadence.exploreStepMs + cycle.pacing.exploreStepMs + (cycle.mood === 'scan' ? 8 : 0);
   const baseGoalHoldMs = legacyTuning.demo.cadence.goalHoldMs + cycle.pacing.goalHoldMs + (episode.difficulty === 'brutal' ? 100 : 0);
@@ -7027,12 +7259,12 @@ export const resolveDemoConfig = (
     mode === 'play' ? 1950 : 3600
   );
   const resetHoldMs = roundClampedCadenceMs(
-    (baseResetHoldMs * (mode === 'play' ? 0.92 : 1.58))
+    ((baseResetHoldMs * (mode === 'play' ? 0.92 : 1.58)) * 1.5)
       + (pathSegments <= 10 ? 40 : pathSegments >= 28 ? 180 : 110)
       + (cycle.mood === 'blueprint' ? 36 : cycle.mood === 'scan' ? -20 : 0)
       + (episode.size === 'small' ? -40 : episode.size === 'huge' ? 90 : 0),
-    mode === 'play' ? 520 : 820,
-    mode === 'play' ? 760 : 1320
+    mode === 'play' ? 720 : 1120,
+    mode === 'play' ? 1140 : 1980
   );
   const totalTraverseMs = exploreStepMs * pathSegments;
   const segmentWeights = Array.from({ length: pathSegments }, () => 1);
@@ -7125,6 +7357,110 @@ export const resolveDemoConfig = (
   };
 };
 
+const demoVisualArrivalLatchCache = new WeakMap<MazeEpisode, Map<string, number>>();
+
+const resolveDemoSegmentDurationsMs = (
+  episode: MazeEpisode,
+  config: DemoWalkerConfig
+): readonly number[] => {
+  const segmentCount = Math.max(1, episode.raster.pathIndices.length - 1);
+  const configured = config.behavior.segmentDurationsMs ?? [];
+  if (configured.length === segmentCount && configured.every((value) => Number.isFinite(value) && value > 0)) {
+    return configured.map((value) => Math.max(1, Math.round(value)));
+  }
+
+  return Array.from({ length: segmentCount }, () => Math.max(1, config.cadence.exploreStepMs));
+};
+
+export const hasDemoWalkerVisuallyReachedExit = (
+  episode: MazeEpisode,
+  elapsedMs: number,
+  config: DemoWalkerConfig
+): boolean => {
+  const view = resolveDemoWalkerViewFrame(episode, elapsedMs, config, 1);
+  const tileSize = 1;
+  const endTileX = xFromIndex(episode.raster.endIndex, episode.raster.width);
+  const endTileY = yFromIndex(episode.raster.endIndex, episode.raster.width);
+  const currentTileX = xFromIndex(view.currentIndex, episode.raster.width);
+  const currentTileY = yFromIndex(view.currentIndex, episode.raster.width);
+  const nextTileX = xFromIndex(view.nextIndex, episode.raster.width);
+  const nextTileY = yFromIndex(view.nextIndex, episode.raster.width);
+  const clampedProgress = Phaser.Math.Clamp(view.progress, 0, 1);
+  const easedProgress = clampedProgress * clampedProgress * (3 - (2 * clampedProgress));
+  const centerX = view.currentIndex === view.nextIndex
+    ? currentTileX + (tileSize / 2)
+    : Phaser.Math.Linear(currentTileX + (tileSize / 2), nextTileX + (tileSize / 2), easedProgress);
+  const centerY = view.currentIndex === view.nextIndex
+    ? currentTileY + (tileSize / 2)
+    : Phaser.Math.Linear(currentTileY + (tileSize / 2), nextTileY + (tileSize / 2), easedProgress);
+  const bodyCenter = resolveActorBodyCenterPoint(
+    centerX,
+    centerY,
+    tileSize,
+    view.direction,
+    view.cue,
+    elapsedMs
+  );
+
+  return isPointInsideTileArrivalRegion(
+    bodyCenter,
+    endTileX,
+    endTileY,
+    tileSize,
+    legacyTuning.demo.lifecycle.exitArrivalInsetRatio
+  );
+};
+
+export const resolveDemoVisualArrivalLatchMs = (
+  episode: MazeEpisode,
+  config: DemoWalkerConfig
+): number => {
+  const segmentDurations = resolveDemoSegmentDurationsMs(episode, config);
+  const cacheKey = [
+    config.cadence.spawnHoldMs,
+    config.cadence.exploreStepMs,
+    config.cadence.goalHoldMs,
+    config.cadence.resetHoldMs,
+    legacyTuning.demo.lifecycle.visualArrivalSettleMs,
+    legacyTuning.demo.lifecycle.exitArrivalInsetRatio,
+    segmentDurations.join(',')
+  ].join('|');
+  const cachedEntries = demoVisualArrivalLatchCache.get(episode);
+  const cachedLatch = cachedEntries?.get(cacheKey);
+  if (cachedLatch !== undefined) {
+    return cachedLatch;
+  }
+
+  const spawnHoldMs = Math.max(1, config.cadence.spawnHoldMs);
+  const traverseMs = Math.max(1, resolveDemoWalkerTraverseMs(config, segmentDurations.length));
+  const traverseEndMs = spawnHoldMs + traverseMs;
+  const settleMs = Math.max(0, Math.trunc(legacyTuning.demo.lifecycle.visualArrivalSettleMs));
+  let entryElapsedMs = traverseEndMs;
+
+  if (episode.raster.pathIndices.length > 1) {
+    const finalSegmentDurationMs = Math.max(1, segmentDurations.at(-1) ?? config.cadence.exploreStepMs);
+    const finalSegmentStartMs = Math.max(spawnHoldMs, traverseEndMs - finalSegmentDurationMs);
+    let low = finalSegmentStartMs;
+    let high = traverseEndMs;
+    while ((high - low) > 1) {
+      const mid = Math.floor((low + high) / 2);
+      if (hasDemoWalkerVisuallyReachedExit(episode, mid, config)) {
+        high = mid;
+      } else {
+        low = mid;
+      }
+    }
+
+    entryElapsedMs = hasDemoWalkerVisuallyReachedExit(episode, high, config) ? high : traverseEndMs;
+  }
+
+  const latchMs = Math.max(traverseEndMs, entryElapsedMs + settleMs);
+  const nextCacheEntries = cachedEntries ?? new Map<string, number>();
+  nextCacheEntries.set(cacheKey, latchMs);
+  demoVisualArrivalLatchCache.set(episode, nextCacheEntries);
+  return latchMs;
+};
+
 export const resolveDemoPresentationElapsedMs = (
   episode: MazeEpisode,
   elapsedMs: number,
@@ -7134,6 +7470,7 @@ export const resolveDemoPresentationElapsedMs = (
   const spawnHoldMs = Math.max(1, config.cadence.spawnHoldMs);
   const segmentCount = Math.max(1, (config.behavior.segmentDurationsMs?.length ?? 0) || (episode.raster.pathIndices.length - 1));
   const traverseMs = Math.max(1, resolveDemoWalkerTraverseMs(config, segmentCount));
+  const visualArrivalLatchMs = resolveDemoVisualArrivalLatchMs(episode, config);
   const ritualTuning = legacyTuning.demo.ritual;
   const commitWindowStart = spawnHoldMs + Math.max(1, Math.floor(traverseMs * ritualTuning.decisionWindowStartRatio));
   const commitWindowEnd = spawnHoldMs + Math.max(1, Math.floor(traverseMs * ritualTuning.decisionWindowEndRatio));
@@ -7150,11 +7487,20 @@ export const resolveDemoPresentationElapsedMs = (
     || presentation.lifecyclePhase === 'reflection-beat'
     || presentation.lifecyclePhase === 'erase-wipe'
   ) {
-    return spawnHoldMs + traverseMs;
+    return visualArrivalLatchMs;
   }
 
   return elapsedMs;
 };
+
+export const resolveDemoCycleDurationMs = (
+  episode: MazeEpisode,
+  config: DemoWalkerConfig
+): number => (
+  resolveDemoVisualArrivalLatchMs(episode, config)
+  + Math.max(1, config.cadence.goalHoldMs)
+  + resolveDemoFadePhaseDurationsMs(config).totalMs
+);
 
 export const resolveDemoTrailRenderBounds = (
   path: ArrayLike<number>,
@@ -7221,20 +7567,68 @@ export const resolveMenuDemoSequence = (
   const segmentCount = Math.max(1, (config.behavior.segmentDurationsMs?.length ?? 0) || (episode.raster.pathIndices.length - 1));
   const traverseMs = Math.max(1, resolveDemoWalkerTraverseMs(config, segmentCount));
   const goalHoldMs = Math.max(1, config.cadence.goalHoldMs);
-  const resetHoldMs = Math.max(1, config.cadence.resetHoldMs);
+  const fadeDurations = resolveDemoFadePhaseDurationsMs(config);
+  const visualArrivalLatchMs = resolveDemoVisualArrivalLatchMs(episode, config);
+  const arrivalWindowStartMs = spawnHoldMs + traverseMs;
+  const fadeWindowStartMs = visualArrivalLatchMs + goalHoldMs;
 
   if (elapsedMs < spawnHoldMs) {
     return { sequence: 'intro', progress: elapsedMs / spawnHoldMs };
   }
-  if (elapsedMs < spawnHoldMs + traverseMs) {
+  if (elapsedMs < arrivalWindowStartMs) {
     return { sequence: 'reveal', progress: (elapsedMs - spawnHoldMs) / traverseMs };
   }
-  if (elapsedMs < spawnHoldMs + traverseMs + goalHoldMs) {
-    return { sequence: 'arrival', progress: (elapsedMs - spawnHoldMs - traverseMs) / goalHoldMs };
+  if (elapsedMs < fadeWindowStartMs) {
+    return {
+      sequence: 'arrival',
+      progress: (elapsedMs - arrivalWindowStartMs) / Math.max(1, fadeWindowStartMs - arrivalWindowStartMs)
+    };
   }
   return {
     sequence: 'fade',
-    progress: Math.min(1, (elapsedMs - spawnHoldMs - traverseMs - goalHoldMs) / resetHoldMs)
+    progress: Math.min(1, (elapsedMs - fadeWindowStartMs) / Math.max(1, fadeDurations.totalMs))
+  };
+};
+
+export const resolveDemoFadePhaseDurationsMs = (
+  config: DemoWalkerConfig
+): {
+  clearHoldMs: number;
+  reflectionBeatMs: number;
+  eraseWipeMs: number;
+  totalMs: number;
+} => {
+  const lifecycleTuning = legacyTuning.demo.lifecycle;
+  const ritualTuning = legacyTuning.demo.ritual;
+  const baseFadeMs = Math.max(1, config.cadence.resetHoldMs);
+  const clearHoldRatio = clamp(lifecycleTuning.clearHoldRatio, 0.12, 0.58);
+  const eraseStartRatio = clamp(lifecycleTuning.eraseStartRatio, Math.max(clearHoldRatio + 0.08, 0.42), 0.92);
+  const reflectionRatio = clamp(
+    ritualTuning.failReflectionRatio,
+    Math.max(clearHoldRatio + 0.08, 0.24),
+    eraseStartRatio
+  );
+  const clearHoldMs = Math.max(
+    1,
+    Math.round(baseFadeMs * clearHoldRatio),
+    Math.max(1, Math.trunc(lifecycleTuning.minClearHoldMs))
+  );
+  const reflectionBeatMs = Math.max(
+    1,
+    Math.round(baseFadeMs * Math.max(0.08, reflectionRatio - clearHoldRatio)),
+    Math.max(1, Math.trunc(lifecycleTuning.minReflectionBeatMs))
+  );
+  const eraseWipeMs = Math.max(
+    1,
+    Math.round(baseFadeMs * Math.max(0.08, 1 - eraseStartRatio)),
+    Math.max(1, Math.trunc(lifecycleTuning.minEraseWipeMs))
+  );
+
+  return {
+    clearHoldMs,
+    reflectionBeatMs,
+    eraseWipeMs,
+    totalMs: clearHoldMs + reflectionBeatMs + eraseWipeMs
   };
 };
 
@@ -7285,13 +7679,13 @@ export const resolveMenuDemoPresentation = (
   let ritualSubtitle = '';
   const ritualTuning = legacyTuning.demo.ritual;
   const lifecycleTuning = legacyTuning.demo.lifecycle;
-  const clearHoldRatio = clamp(lifecycleTuning.clearHoldRatio, 0.12, 0.58);
-  const eraseStartRatio = clamp(lifecycleTuning.eraseStartRatio, Math.max(clearHoldRatio + 0.08, 0.42), 0.92);
-  const reflectionRatio = clamp(
-    ritualTuning.failReflectionRatio,
-    Math.max(clearHoldRatio + 0.08, 0.24),
-    eraseStartRatio
+  const fadeDurations = resolveDemoFadePhaseDurationsMs(config);
+  const fadeReflectionRatio = clamp(
+    (fadeDurations.clearHoldMs + fadeDurations.reflectionBeatMs) / Math.max(1, fadeDurations.totalMs),
+    0.08,
+    0.92
   );
+  const fadeWindowStartMs = resolveDemoVisualArrivalLatchMs(episode, config) + Math.max(1, config.cadence.goalHoldMs);
   let lifecyclePhase: DemoLifecyclePhase = 'active-watch';
   let buildRevealProgress = 1;
   let eraseWipeProgress = 0;
@@ -7360,10 +7754,17 @@ export const resolveMenuDemoPresentation = (
         ? 'build-reveal'
         : 'settle-in';
   } else if (sequenceState.sequence === 'fade') {
-    eraseWipeProgress = clamp((progress - eraseStartRatio) / Math.max(0.01, 1 - eraseStartRatio), 0, 1);
-    lifecyclePhase = progress < clearHoldRatio
+    const fadeElapsedMs = clamp(elapsedMs - fadeWindowStartMs, 0, fadeDurations.totalMs);
+    const clearHoldEndMs = fadeDurations.clearHoldMs;
+    const reflectionEndMs = clearHoldEndMs + fadeDurations.reflectionBeatMs;
+    eraseWipeProgress = clamp(
+      (fadeElapsedMs - reflectionEndMs) / Math.max(1, fadeDurations.eraseWipeMs),
+      0,
+      1
+    );
+    lifecyclePhase = fadeElapsedMs < clearHoldEndMs
       ? 'clear-hold'
-      : progress < eraseStartRatio
+      : fadeElapsedMs < reflectionEndMs
         ? 'reflection-beat'
         : 'erase-wipe';
   }
@@ -7406,17 +7807,17 @@ export const resolveMenuDemoPresentation = (
       1
     );
   } else if (sequenceState.sequence === 'fade') {
-    if (progress < reflectionRatio) {
+    if (progress < fadeReflectionRatio) {
       const successCopy = resolveSuccessRitualCopy(episode.seed, cycle.mood);
       ritualPhase = 'success';
-      ritualProgress = clamp(progress / reflectionRatio, 0, 1);
+      ritualProgress = clamp(progress / fadeReflectionRatio, 0, 1);
       ritualAlpha = lerp(0.18, ritualTuning.failCardAlpha, ritualProgress);
       ritualTitle = successCopy.title;
       ritualSubtitle = successCopy.subtitle;
     } else {
       const retryCopy = resolveRetryRitualCopy(episode.seed, cycle.mood);
       ritualPhase = 'retry';
-      ritualProgress = clamp((progress - reflectionRatio) / Math.max(0.01, 1 - reflectionRatio), 0, 1);
+      ritualProgress = clamp((progress - fadeReflectionRatio) / Math.max(0.01, 1 - fadeReflectionRatio), 0, 1);
       ritualAlpha = lerp(ritualTuning.retryCardAlpha, 0.24, ritualProgress);
       ritualTitle = retryCopy.title;
       ritualSubtitle = retryCopy.subtitle;
@@ -7907,6 +8308,62 @@ const ease = (value: number): number => {
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
 const lerp = (from: number, to: number, t: number): number => from + ((to - from) * t);
+
+const toColorString = (value: number): string => `#${value.toString(16).padStart(6, '0')}`;
+
+const createMazerBrandMark = (
+  scene: Phaser.Scene,
+  size: number,
+  alpha = 1
+): Phaser.GameObjects.Graphics => {
+  const mark = scene.add.graphics();
+  const unit = size / 48;
+  const outerRadius = Math.max(5, 7 * unit);
+  const innerRadius = Math.max(4, 5 * unit);
+  const lineWidth = Math.max(2, 6 * unit);
+  const inset = 4 * unit;
+
+  mark.fillStyle(MAZER_BRAND_COLORS.shell, 0.22 * alpha);
+  mark.fillRoundedRect(-24 * unit, -24 * unit, 48 * unit, 48 * unit, outerRadius);
+  mark.lineStyle(Math.max(1, 3 * unit), MAZER_BRAND_COLORS.frame, 0.96 * alpha);
+  mark.strokeRoundedRect(-24 * unit, -24 * unit, 48 * unit, 48 * unit, outerRadius);
+  mark.lineStyle(Math.max(1, 2 * unit), MAZER_BRAND_COLORS.frameHighlight, 0.34 * alpha);
+  mark.strokeRoundedRect(-20 * unit, -20 * unit, 40 * unit, 40 * unit, innerRadius);
+  mark.lineStyle(lineWidth, MAZER_BRAND_COLORS.route, 0.98 * alpha);
+  mark.beginPath();
+  mark.moveTo(-16 * unit, 16 * unit);
+  mark.lineTo(-16 * unit, -14 * unit);
+  mark.lineTo(-6 * unit, -14 * unit);
+  mark.lineTo(-6 * unit, 4 * unit);
+  mark.lineTo(0, 4 * unit);
+  mark.lineTo(0, -6 * unit);
+  mark.lineTo(8 * unit, -6 * unit);
+  mark.lineTo(8 * unit, -14 * unit);
+  mark.lineTo(16 * unit, -14 * unit);
+  mark.lineTo(16 * unit, 16 * unit);
+  mark.strokePath();
+  mark.lineStyle(Math.max(1, lineWidth * 0.32), MAZER_BRAND_COLORS.frameHighlight, 0.34 * alpha);
+  mark.beginPath();
+  mark.moveTo(-16 * unit, 16 * unit);
+  mark.lineTo(-16 * unit, -14 * unit);
+  mark.lineTo(-6 * unit, -14 * unit);
+  mark.lineTo(-6 * unit, 4 * unit);
+  mark.lineTo(0, 4 * unit);
+  mark.lineTo(0, -6 * unit);
+  mark.lineTo(8 * unit, -6 * unit);
+  mark.lineTo(8 * unit, -14 * unit);
+  mark.lineTo(16 * unit, -14 * unit);
+  mark.lineTo(16 * unit, 16 * unit);
+  mark.strokePath();
+  mark.fillStyle(MAZER_BRAND_COLORS.route, alpha);
+  mark.fillCircle(-16 * unit, 16 * unit, 4.5 * unit);
+  mark.fillStyle(MAZER_BRAND_COLORS.goal, alpha);
+  mark.fillRoundedRect((16 * unit) - (5 * unit), (16 * unit) - (5 * unit), 10 * unit, 10 * unit, 2.8 * unit);
+  mark.lineStyle(Math.max(1, 1.4 * unit), MAZER_BRAND_COLORS.frameHighlight, 0.24 * alpha);
+  mark.strokeRoundedRect(-20 * unit + inset, -20 * unit + inset, 40 * unit - (inset * 2), 40 * unit - (inset * 2), Math.max(3, innerRadius - unit));
+
+  return mark;
+};
 
 const normalizeAnimationTime = (value: number, periodMs = ANIMATION_TIME_WRAP_MS): number => {
   if (!Number.isFinite(value) || periodMs <= 0) {

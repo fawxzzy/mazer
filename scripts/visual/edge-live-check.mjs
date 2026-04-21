@@ -36,6 +36,7 @@ const EDGE_LIVE_DEFAULT_CAPTURE_TIMEOUT_MS = 45_000;
 const EDGE_LIVE_DEFAULT_PREVIEW_TIMEOUT_MS = 60_000;
 const EDGE_LIVE_CAPTURE_RETRIES = 2;
 const EDGE_LIVE_CAPTURE_RETRY_DELAY_MS = 1_000;
+const EDGE_LIVE_END_WINDOW_POLL_MS = 80;
 const CAPTURE_CONFIG = Object.freeze({
   enabled: true,
   forceInstallMode: 'available'
@@ -58,7 +59,8 @@ const EDGE_LIVE_RUN_VIEWPORT_IDS = Object.freeze({
   'play-mode-interactive': ['desktop'],
   'mobile-touch-smoke': ['phone-portrait'],
   'core-only-watch': ['phone-portrait', 'desktop'],
-  'core-only-play': ['phone-portrait', 'desktop']
+  'core-only-play': ['phone-portrait', 'desktop'],
+  'core-only-cycle': ['phone-portrait', 'desktop']
 });
 const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
   'play-mode-interactive': Object.freeze({
@@ -464,8 +466,10 @@ const resolveEdgeLiveInteraction = (runId) => (
 
 const EDGE_LIVE_RUN_TIMEOUTS_MS = Object.freeze({
   'core-only-watch': 60_000,
-  'core-only-play': 60_000
+  'core-only-play': 60_000,
+  'core-only-cycle': 120_000
 });
+const EDGE_LIVE_END_WINDOW_RUNS = new Set(['core-only-watch', 'core-only-cycle']);
 
 export const resolveEdgeLiveTimeoutMs = (runId, defaultTimeoutMs = EDGE_LIVE_DEFAULT_CAPTURE_TIMEOUT_MS) => (
   typeof runId === 'string' && Number.isFinite(EDGE_LIVE_RUN_TIMEOUTS_MS[runId])
@@ -954,6 +958,36 @@ export const resolveEdgeLiveVerdicts = (diagnostics) => {
   };
 };
 
+export const isEdgeLiveEndWindowRun = (runId) => (
+  typeof runId === 'string' && EDGE_LIVE_END_WINDOW_RUNS.has(runId)
+);
+
+export const resolveEdgeLiveArrivalProofState = (diagnostics) => {
+  const visual = diagnostics?.visual ?? diagnostics ?? null;
+  const attempt = visual?.attempt ?? null;
+  const arrival = visual?.arrival ?? null;
+
+  return {
+    mode: attempt?.mode ?? null,
+    sequence: attempt?.sequence ?? null,
+    lifecyclePhase: attempt?.lifecyclePhase ?? null,
+    ritualPhase: attempt?.ritualPhase ?? null,
+    elapsedMs: attempt?.elapsedMs ?? null,
+    presentationElapsedMs: attempt?.presentationElapsedMs ?? null,
+    visualArrivalLatchMs: attempt?.visualArrivalLatchMs ?? null,
+    actorVisible: arrival?.actorVisible ?? false,
+    goalVisible: arrival?.goalVisible ?? false,
+    actorInsideExitRegion: arrival?.actorInsideExitRegion ?? false,
+    settleProgress: arrival?.settleProgress ?? 0,
+    settleRemainingMs: arrival?.settleRemainingMs ?? null,
+    readyToClear: arrival?.readyToClear ?? false,
+    actorCenter: arrival?.actorCenter ?? null,
+    goalCenter: arrival?.goalCenter ?? null,
+    goalTileBounds: arrival?.goalTileBounds ?? null,
+    exitRegionBounds: arrival?.exitRegionBounds ?? null
+  };
+};
+
 const readDiagnostics = async (page) => page.evaluate((keys) => ({
   visual: window[keys.visual] ?? null,
   runtime: window[keys.runtime] ?? null
@@ -996,6 +1030,24 @@ const waitForDiagnostics = async (page, timeoutMs, { requireActiveTrail = false 
   throw error;
 };
 
+const waitForDiagnosticsMatch = async (page, timeoutMs, predicate, errorMessage) => {
+  const startedAt = Date.now();
+  let lastDiagnostics = null;
+
+  while ((Date.now() - startedAt) < timeoutMs) {
+    lastDiagnostics = await readDiagnostics(page);
+    if (predicate(lastDiagnostics)) {
+      return lastDiagnostics;
+    }
+
+    await page.waitForTimeout(EDGE_LIVE_END_WINDOW_POLL_MS);
+  }
+
+  const error = new Error(errorMessage);
+  error.lastDiagnostics = lastDiagnostics;
+  throw error;
+};
+
 export const isRetriableEdgeLiveCaptureError = (error) => {
   const message = error instanceof Error ? error.message : String(error ?? '');
   return (
@@ -1009,6 +1061,7 @@ const createSnapshot = (stage, diagnostics, screenshotPath) => {
   const visual = diagnostics.visual;
   const runtime = diagnostics.runtime;
   const verdicts = resolveEdgeLiveVerdicts(visual);
+  const arrivalProof = resolveEdgeLiveArrivalProofState(visual);
 
   return {
     stage,
@@ -1043,6 +1096,18 @@ const createSnapshot = (stage, diagnostics, screenshotPath) => {
           cue: visual.trail.cue
         }
       : null,
+    attempt: visual?.attempt
+      ? {
+          mode: visual.attempt.mode ?? null,
+          sequence: visual.attempt.sequence ?? null,
+          lifecyclePhase: visual.attempt.lifecyclePhase ?? null,
+          ritualPhase: visual.attempt.ritualPhase ?? null,
+          elapsedMs: visual.attempt.elapsedMs ?? null,
+          presentationElapsedMs: visual.attempt.presentationElapsedMs ?? null,
+          visualArrivalLatchMs: visual.attempt.visualArrivalLatchMs ?? null
+        }
+      : null,
+    arrival: arrivalProof,
     runtime: runtime?.feed
       ? {
           step: runtime.feed.step ?? null,
@@ -1111,6 +1176,122 @@ export const buildEdgeLiveReceiptFromCaptures = ({
     privacyMode: 'full',
     sessionCount: 1
   });
+};
+
+export const resolveEdgeLiveAttemptKey = (diagnostics) => {
+  const projection = diagnostics?.runtime?.projection ?? null;
+  if (!projection) {
+    return null;
+  }
+
+  const runId = typeof projection.runId === 'string' ? projection.runId : '';
+  const mazeId = typeof projection.mazeId === 'string' ? projection.mazeId : '';
+  const attemptNo = Number.isFinite(projection.attemptNo) ? projection.attemptNo : '';
+  if (!runId && !mazeId && attemptNo === '') {
+    return null;
+  }
+
+  return `${runId}|${mazeId}|${attemptNo}`;
+};
+
+const captureEndWindowProof = async ({
+  page,
+  runId,
+  timeoutMs,
+  runDir,
+  screenshotsDir,
+  viewport
+}) => {
+  if (!isEdgeLiveEndWindowRun(runId)) {
+    return null;
+  }
+
+  const arrivalPath = resolve(screenshotsDir, `${viewport.id}-end-window-arrival.png`);
+  const clearHoldPath = resolve(screenshotsDir, `${viewport.id}-end-window-clear-hold.png`);
+  const erasePath = resolve(screenshotsDir, `${viewport.id}-end-window-erase.png`);
+  const arrivalDiagnostics = await waitForDiagnosticsMatch(
+    page,
+    timeoutMs,
+    (diagnostics) => {
+      const state = resolveEdgeLiveArrivalProofState(diagnostics?.visual);
+      return state.actorVisible
+        && state.goalVisible
+        && state.actorInsideExitRegion
+        && state.lifecyclePhase === 'active-watch'
+        && (state.sequence === 'arrival' || state.sequence === 'fade' || state.sequence === 'reveal');
+    },
+    'Timed out waiting for a hosted watch arrival frame before clear-hold.'
+  );
+  await page.screenshot({
+    path: arrivalPath,
+    fullPage: false,
+    animations: 'disabled'
+  });
+  const arrivalAttemptKey = resolveEdgeLiveAttemptKey(arrivalDiagnostics);
+
+  const clearHoldDiagnostics = await waitForDiagnosticsMatch(
+    page,
+    timeoutMs,
+    (diagnostics) => {
+      const state = resolveEdgeLiveArrivalProofState(diagnostics?.visual);
+      const attemptKey = resolveEdgeLiveAttemptKey(diagnostics);
+      return state.lifecyclePhase === 'clear-hold'
+        && state.actorVisible
+        && state.readyToClear
+        && (!arrivalAttemptKey || attemptKey === arrivalAttemptKey);
+    },
+    'Timed out waiting for clear-hold after hosted watch arrival.'
+  );
+  await page.screenshot({
+    path: clearHoldPath,
+    fullPage: false,
+    animations: 'disabled'
+  });
+
+  const eraseDiagnostics = await waitForDiagnosticsMatch(
+    page,
+    timeoutMs,
+    (diagnostics) => {
+      const attemptKey = resolveEdgeLiveAttemptKey(diagnostics);
+      return resolveEdgeLiveArrivalProofState(diagnostics?.visual).lifecyclePhase === 'erase-wipe'
+        && (!arrivalAttemptKey || attemptKey === arrivalAttemptKey);
+    },
+    'Timed out waiting for erase-wipe after hosted watch clear-hold.'
+  );
+  await page.screenshot({
+    path: erasePath,
+    fullPage: false,
+    animations: 'disabled'
+  });
+
+  const arrivalSnapshot = createSnapshot('end-window-arrival', arrivalDiagnostics, relativeToRun(runDir, arrivalPath));
+  const clearHoldSnapshot = createSnapshot('end-window-clear-hold', clearHoldDiagnostics, relativeToRun(runDir, clearHoldPath));
+  const eraseSnapshot = createSnapshot('end-window-erase', eraseDiagnostics, relativeToRun(runDir, erasePath));
+  const clearHoldAttemptKey = resolveEdgeLiveAttemptKey(clearHoldDiagnostics);
+  const eraseAttemptKey = resolveEdgeLiveAttemptKey(eraseDiagnostics);
+
+  return {
+    pass: Boolean(
+      arrivalSnapshot.arrival?.actorInsideExitRegion
+      && arrivalSnapshot.attempt?.lifecyclePhase === 'active-watch'
+      && clearHoldSnapshot.attempt?.lifecyclePhase === 'clear-hold'
+      && clearHoldSnapshot.arrival?.readyToClear === true
+      && eraseSnapshot.attempt?.lifecyclePhase === 'erase-wipe'
+      && (!arrivalAttemptKey || arrivalAttemptKey === clearHoldAttemptKey)
+      && (!arrivalAttemptKey || arrivalAttemptKey === eraseAttemptKey)
+      && (arrivalSnapshot.attempt?.elapsedMs ?? -1) <= (clearHoldSnapshot.attempt?.elapsedMs ?? -1)
+      && (clearHoldSnapshot.attempt?.elapsedMs ?? -1) <= (eraseSnapshot.attempt?.elapsedMs ?? -1)
+    ),
+    attemptKey: arrivalAttemptKey,
+    arrival: arrivalSnapshot,
+    clearHold: clearHoldSnapshot,
+    erase: eraseSnapshot,
+    files: {
+      arrival: relativeToRun(runDir, arrivalPath),
+      clearHold: relativeToRun(runDir, clearHoldPath),
+      erase: relativeToRun(runDir, erasePath)
+    }
+  };
 };
 
 const captureViewport = async ({
@@ -1198,6 +1379,7 @@ const captureViewport = async ({
 
     let lifecycle = null;
     let interactionRecord = null;
+    let endWindow = null;
     try {
       let lifecycleDiagnostics = null;
       if (interaction) {
@@ -1226,6 +1408,17 @@ const captureViewport = async ({
       };
     }
 
+    if (!interaction) {
+      endWindow = await captureEndWindowProof({
+        page,
+        runId,
+        timeoutMs,
+        runDir,
+        screenshotsDir,
+        viewport
+      });
+    }
+
     const record = {
       viewport,
       url,
@@ -1235,6 +1428,7 @@ const captureViewport = async ({
       firstLoad: createSnapshot('first-load', firstDiagnostics, relativeToRun(runDir, firstLoadPath)),
       secondLoad: createSnapshot('second-load', secondDiagnostics, relativeToRun(runDir, secondLoadPath)),
       lifecycle,
+      endWindow,
       interaction: interactionRecord
         ? {
             ...interactionRecord,
@@ -1245,6 +1439,7 @@ const captureViewport = async ({
         firstLoad: relativeToRun(runDir, firstLoadPath),
         secondLoad: relativeToRun(runDir, secondLoadPath),
         lifecycle: lifecycle?.available === false ? null : relativeToRun(runDir, lifecyclePath),
+        endWindow: endWindow?.files ?? null,
         video: relativeToRun(runDir, videoPath),
         metadata: relativeToRun(runDir, metadataPath)
       }
@@ -1290,6 +1485,11 @@ const buildMarkdownSummary = ({ runId, sourceMode, baseUrl, explicitUrl, presetG
       `| ${capture.viewport.id} | ${capture.route ?? '-'} | ${formatBounds(capture.board.bounds)} | ${formatBounds(capture.hud.bounds)} | ${capture.verdicts.boardOverflow.pass ? 'pass' : 'fail'} | ${capture.verdicts.hudOverlap.pass ? 'pass' : 'fail'} | ${capture.verdicts.hudClip.pass ? 'pass' : 'fail'} | ${capture.files.video} |`
     );
     lines.push(`  Events: ${telemetry.eventCount}, thought density ${telemetry.thoughtDwell?.densityPerMinute ?? 0}/min`);
+    if (capture.endWindow) {
+      lines.push(
+        `  End window: ${capture.endWindow.pass ? 'pass' : 'fail'} | arrival ${capture.endWindow.arrival?.attempt?.lifecyclePhase ?? 'n/a'} @ ${capture.endWindow.arrival?.attempt?.elapsedMs ?? 'n/a'}ms -> clear ${capture.endWindow.clearHold?.attempt?.lifecyclePhase ?? 'n/a'} -> erase ${capture.endWindow.erase?.attempt?.lifecyclePhase ?? 'n/a'}`
+      );
+    }
   }
 
   lines.push(
@@ -1348,6 +1548,7 @@ const buildMarkdownSummary = ({ runId, sourceMode, baseUrl, explicitUrl, presetG
     '## Notes',
     '',
     '- First load, second load, and an active-motion attempt frame are captured when available.',
+    '- Core watch and cycle runs also capture arrival, clear-hold, and erase end-window proof frames.',
     '- Board overflow compares the published board bounds against the safe frame.',
     '- HUD overlap checks the intent feed rectangle against the maze board bounds.',
     '- HUD clip checks the intent feed rectangle against the viewport bounds.'
@@ -2035,6 +2236,7 @@ export const captureEdgeLive = async ({
         telemetry: capture.secondLoad.telemetry,
         projection: capture.secondLoad.projection,
         lifecycle: capture.lifecycle,
+        endWindow: capture.endWindow,
         interaction: capture.interaction,
         consoleMessageCount: capture.consoleMessages.length
       }))

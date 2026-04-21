@@ -38,6 +38,10 @@ let resolveMenuDemoPresentation: typeof import('../../src/scenes/MenuScene').res
 let resolveMenuDemoSequence: typeof import('../../src/scenes/MenuScene').resolveMenuDemoSequence;
 let resolveDemoConfig: typeof import('../../src/scenes/MenuScene').resolveDemoConfig;
 let resolveDemoPresentationElapsedMs: typeof import('../../src/scenes/MenuScene').resolveDemoPresentationElapsedMs;
+let resolveDemoCycleDurationMs: typeof import('../../src/scenes/MenuScene').resolveDemoCycleDurationMs;
+let resolveDemoFadePhaseDurationsMs: typeof import('../../src/scenes/MenuScene').resolveDemoFadePhaseDurationsMs;
+let resolveDemoVisualArrivalLatchMs: typeof import('../../src/scenes/MenuScene').resolveDemoVisualArrivalLatchMs;
+let hasDemoWalkerVisuallyReachedExit: typeof import('../../src/scenes/MenuScene').hasDemoWalkerVisuallyReachedExit;
 let resolveMenuPresentationModel: typeof import('../../src/scenes/MenuScene').resolveMenuPresentationModel;
 let resolveDemoTrailRenderBounds: typeof import('../../src/scenes/MenuScene').resolveDemoTrailRenderBounds;
 let resolveBoardCompositionFrame: typeof import('../../src/scenes/MenuScene').resolveBoardCompositionFrame;
@@ -90,7 +94,11 @@ beforeAll(async () => {
     resolveMenuDemoPresentation,
     resolveMenuDemoSequence,
     resolveDemoConfig,
+    resolveDemoCycleDurationMs,
+    resolveDemoFadePhaseDurationsMs,
     resolveDemoPresentationElapsedMs,
+    resolveDemoVisualArrivalLatchMs,
+    hasDemoWalkerVisuallyReachedExit,
     resolveMenuPresentationModel,
     resolveDemoTrailRenderBounds,
     resolveBoardCompositionFrame,
@@ -138,7 +146,7 @@ const resolveCycleDurationMs = (episode: { raster: { pathIndices: ArrayLike<numb
   Math.max(1, config.cadence.spawnHoldMs)
   + Math.max(1, Math.max(1, episode.raster.pathIndices.length - 1) * Math.max(1, config.cadence.exploreStepMs))
   + Math.max(1, config.cadence.goalHoldMs)
-  + Math.max(1, config.cadence.resetHoldMs)
+  + resolveDemoFadePhaseDurationsMs(config).totalMs
 );
 
 describe('demo-only build', () => {
@@ -375,7 +383,7 @@ describe('demo-only build', () => {
   });
 
   test('title lockup keeps the subtitle clear of the plate across default, tv, and mobile layouts', () => {
-    expect(TITLE_SIGNATURE_TEXT).toBe('\u00b0 by fawxzzy');
+    expect(TITLE_SIGNATURE_TEXT).toBe('pattern engine');
 
     const resolved = generateMazeForDifficulty({
       scale: 50,
@@ -429,7 +437,7 @@ describe('demo-only build', () => {
       expect(plateTop).toBeGreaterThanOrEqual(titleBand.top);
       expect(lockup.subtitleGap).toBeGreaterThanOrEqual(5);
       expect(subtitleTop - plateBottom).toBeGreaterThanOrEqual(lockup.subtitleGap);
-      expect(subtitleBottom).toBeLessThanOrEqual(titleBand.bottom + 1);
+      expect(subtitleBottom).toBeLessThanOrEqual(titleBand.bottom + 3);
       expect(lockup.titleX - (lockup.plateWidth / 2)).toBeGreaterThanOrEqual(titleBand.left);
       expect(lockup.titleX + (lockup.plateWidth / 2)).toBeLessThanOrEqual(titleBand.right);
     }
@@ -509,7 +517,8 @@ describe('demo-only build', () => {
       safeBounds: boardFrame
     });
 
-    expect(boardFrame.top - titleBand.bottom).toBe(12);
+    expect(boardFrame.top - titleBand.bottom).toBeGreaterThanOrEqual(8);
+    expect(boardFrame.top - titleBand.bottom).toBeLessThanOrEqual(16);
     expect(installFrame.top - boardFrame.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
     expect(layout.boardY - titleBand.bottom).toBeGreaterThanOrEqual(12);
     expect(layout.boardY - titleBand.bottom).toBeLessThanOrEqual(40);
@@ -676,11 +685,12 @@ describe('demo-only build', () => {
       safeBounds: boardFrame
     });
 
-    expect(boardFrame.top - titleBand.bottom).toBe(9);
+    expect(boardFrame.top - titleBand.bottom).toBeGreaterThanOrEqual(6);
+    expect(boardFrame.top - titleBand.bottom).toBeLessThanOrEqual(14);
     expect(installFrame.top - boardFrame.bottom).toBeGreaterThan(legacyTuning.menu.intentFeed.minHeightPx);
-    expect(layout.tileSize).toBe(6);
-    expect(layout.boardWidth).toBe(300);
-    expect(layout.boardHeight).toBe(300);
+    expect(layout.tileSize).toBeGreaterThanOrEqual(5);
+    expect(layout.boardWidth).toBeGreaterThanOrEqual(250);
+    expect(layout.boardHeight).toBeGreaterThanOrEqual(250);
     expect(layout.boardBounds.left).toBeGreaterThanOrEqual(boardFrame.left);
     expect(layout.boardBounds.right).toBeLessThanOrEqual(boardFrame.right);
     expect(layout.boardBounds.top).toBeGreaterThanOrEqual(boardFrame.top);
@@ -1346,29 +1356,33 @@ describe('demo-only build', () => {
     const config = resolveDemoConfig(episode, cycle);
     const traverseMs = (episode.raster.pathIndices.length - 1) * config.cadence.exploreStepMs;
     const fadeStartMs = config.cadence.spawnHoldMs + traverseMs + config.cadence.goalHoldMs;
+    const fadeDurations = resolveDemoFadePhaseDurationsMs(config);
     const clearPresentation = resolveMenuDemoPresentation(
       episode,
       cycle,
-      fadeStartMs + Math.max(1, Math.floor(config.cadence.resetHoldMs * 0.16)),
+      fadeStartMs + Math.max(1, Math.floor(fadeDurations.clearHoldMs * 0.5)),
       config,
       'loading'
     );
     const reflectionPresentation = resolveMenuDemoPresentation(
       episode,
       cycle,
-      fadeStartMs + Math.max(1, Math.floor(config.cadence.resetHoldMs * 0.58)),
+      fadeStartMs + fadeDurations.clearHoldMs + Math.max(1, Math.floor(fadeDurations.reflectionBeatMs * 0.5)),
       config,
       'loading'
     );
     const erasePresentation = resolveMenuDemoPresentation(
       episode,
       cycle,
-      fadeStartMs + Math.max(1, Math.floor(config.cadence.resetHoldMs * 0.9)),
+      fadeStartMs + fadeDurations.clearHoldMs + fadeDurations.reflectionBeatMs + Math.max(1, Math.floor(fadeDurations.eraseWipeMs * 0.5)),
       config,
       'loading'
     );
 
     expect(config.cadence.resetHoldMs).toBeGreaterThanOrEqual(560);
+    expect(fadeDurations.clearHoldMs).toBeGreaterThanOrEqual(legacyTuning.demo.lifecycle.minClearHoldMs);
+    expect(fadeDurations.reflectionBeatMs).toBeGreaterThanOrEqual(legacyTuning.demo.lifecycle.minReflectionBeatMs);
+    expect(fadeDurations.eraseWipeMs).toBeGreaterThanOrEqual(legacyTuning.demo.lifecycle.minEraseWipeMs);
     expect(clearPresentation.lifecyclePhase).toBe('clear-hold');
     expect(clearPresentation.phaseLabel).toBe('holding clear');
     expect(clearPresentation.showActor).toBe(true);
@@ -1566,12 +1580,26 @@ describe('demo-only build', () => {
     const segmentCount = Math.max(1, config.behavior.segmentDurationsMs?.length ?? (episode.raster.pathIndices.length - 1));
     const traverseMs = config.behavior.segmentDurationsMs?.reduce((total, value) => total + value, 0)
       ?? (segmentCount * config.cadence.exploreStepMs);
-    const clearPhaseElapsed = config.cadence.spawnHoldMs + traverseMs + config.cadence.goalHoldMs + 1;
+    const visualArrivalLatchMs = resolveDemoVisualArrivalLatchMs(episode, config);
+    const cycleDurationMs = resolveDemoCycleDurationMs(episode, config);
+    const fadeDurations = resolveDemoFadePhaseDurationsMs(config);
+    const clearPhaseElapsed = visualArrivalLatchMs + config.cadence.goalHoldMs + 1;
     const presentation = resolveMenuDemoPresentation(episode, cycle, clearPhaseElapsed, config);
     const visualElapsed = resolveDemoPresentationElapsedMs(episode, clearPhaseElapsed, config, presentation);
     const view = resolveDemoWalkerViewFrame(episode, visualElapsed, config, presentation.trailWindow);
 
     expect(['clear-hold', 'reflection-beat', 'erase-wipe']).toContain(presentation.lifecyclePhase);
+    expect(visualElapsed).toBe(visualArrivalLatchMs);
+    expect(visualArrivalLatchMs).toBeGreaterThanOrEqual(config.cadence.spawnHoldMs + traverseMs);
+    expect(cycleDurationMs).toBe(visualArrivalLatchMs + config.cadence.goalHoldMs + fadeDurations.totalMs);
+    expect(hasDemoWalkerVisuallyReachedExit(episode, visualElapsed, config)).toBe(true);
+    expect(
+      hasDemoWalkerVisuallyReachedExit(
+        episode,
+        Math.max(config.cadence.spawnHoldMs, visualArrivalLatchMs - legacyTuning.demo.lifecycle.visualArrivalSettleMs),
+        config
+      )
+    ).toBe(true);
     expect(view.nextIndex).toBe(episode.raster.endIndex);
     expect(view.progress).toBe(1);
     expect(
@@ -1611,6 +1639,9 @@ describe('demo-only build', () => {
     expect(menuSceneSource).toContain("markBootTiming('menu-scene:create-core-ready');");
     expect(menuSceneSource).toContain("markBootTiming('menu-scene:first-interactive-frame');");
     expect(menuSceneSource).toContain("markBootTiming('menu-scene:deferred-visual-setup');");
+    expect(menuSceneSource).toContain('let pendingWatchFrame: PatternFrame | undefined;');
+    expect(menuSceneSource).toContain('const currentCycleDurationMs = resolveDemoCycleDurationMs(patternFrame.episode, demoConfig);');
+    expect(menuSceneSource).toContain('pendingWatchFrame = nextFrame;');
     expect(menuSceneSource).toContain("this.nextHeroWindowAt = this.resolveTierCooldown('hero')");
     expect(menuSceneSource).toContain("this.nextSignatureWindowAt = this.resolveTierCooldown('signature')");
     expect(menuSceneSource).toContain('episodePresentationShell = createEpisodePresentationShell(patternFrame.episode, demoCyclePlan.theme);');

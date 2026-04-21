@@ -6,7 +6,9 @@ import {
   resolveIntentFeedLayout,
   resolveIntentFeedPanelMetrics,
   resolveIntentFeedRoleLabel,
-  resolveNextRiskLabel
+  resolveIntentFeedVisibleEntries,
+  resolveNextRiskLabel,
+  shouldRenderIntentFeedStatusLine
 } from '../../src/render/intentFeedRenderer';
 
 vi.mock('phaser', () => ({
@@ -29,7 +31,7 @@ const overlaps = (
 );
 
 describe('intent feed renderer', () => {
-  test('reserves one persistent status line above the bounded quick-thought stack', () => {
+  test('only reserves a status row when the feed has no visible thoughts', () => {
     const withStatus = resolveIntentFeedLayout({ width: 1280, height: 720 }, 4, {}, true);
     const withoutStatus = resolveIntentFeedLayout({ width: 1280, height: 720 }, 4, {}, false);
 
@@ -38,7 +40,7 @@ describe('intent feed renderer', () => {
     expect(withoutStatus.mode).toBe('bottom');
   });
 
-  test('defaults to a bottom-center dock and uses one quick-thought line on standard phone heights', () => {
+  test('defaults to a bottom-center dock and keeps room for three thought lines on standard phone heights', () => {
     const layout = resolveIntentFeedLayout(
       { width: 390, height: 844 },
       4,
@@ -50,18 +52,18 @@ describe('intent feed renderer', () => {
 
     expect(layout.dock).toBe('bottom-center');
     expect(layout.mode).toBe('bottom');
-    expect(layout.maxVisibleEvents).toBe(1);
+    expect(layout.maxVisibleEvents).toBe(3);
     expect(layout.rect.left + layout.rect.width).toBeLessThanOrEqual(390);
     expect(layout.rect.top + layout.rect.height).toBeLessThanOrEqual(844);
     expect(layout.rect.top).toBeGreaterThanOrEqual(328 + (278 / 2) + 10);
   });
 
-  test('reserves space for the play onboarding strip without changing the bottom-docked HUD contract', () => {
+  test('does not grow the feed panel for removed helper rows', () => {
     const withOnboarding = resolveIntentFeedPanelMetrics({ width: 390, height: 844 }, true, true);
     const withoutOnboarding = resolveIntentFeedPanelMetrics({ width: 390, height: 844 }, true, false);
 
     expect(withOnboarding.mode).toBe('bottom');
-    expect(withOnboarding.height).toBeGreaterThan(withoutOnboarding.height);
+    expect(withOnboarding.height).toBe(withoutOnboarding.height);
     expect(withOnboarding.maxVisibleEvents).toBe(withoutOnboarding.maxVisibleEvents);
   });
 
@@ -98,7 +100,7 @@ describe('intent feed renderer', () => {
     expect(layout.rect.top + layout.rect.height).toBeLessThanOrEqual(390);
   });
 
-  test('adds the optional micro-thought line only on taller mobile viewports', () => {
+  test('keeps taller mobile viewports on the full three-line rolling feed', () => {
     const layout = resolveIntentFeedLayout(
       { width: 430, height: 932 },
       4,
@@ -109,7 +111,7 @@ describe('intent feed renderer', () => {
     );
 
     expect(layout.dock).toBe('bottom-center');
-    expect(layout.maxVisibleEvents).toBe(2);
+    expect(layout.maxVisibleEvents).toBe(3);
     expect(layout.rect.top + layout.rect.height).toBeLessThanOrEqual(932);
   });
 
@@ -185,6 +187,95 @@ describe('intent feed renderer', () => {
     expect(nextRisk).toBe('Next risk: hazard');
   });
 
+  test('treats the thought box as a newest-first feed and only falls back to a status row when no thoughts are visible', () => {
+    const state = {
+      step: 6,
+      status: {
+        speaker: 'Runner',
+        category: 'goal',
+        kind: 'route-commitment-changed',
+        importance: 'medium',
+        summary: 'Committing the safer route.',
+        confidence: 0.8,
+        step: 6
+      },
+      events: [
+        {
+          id: 'latest',
+          speaker: 'Runner',
+          category: 'goal',
+          kind: 'route-commitment-changed',
+          importance: 'medium',
+          summary: 'This way is cleaner.',
+          confidence: 0.82,
+          step: 6,
+          ttlSteps: 4,
+          ageSteps: 0,
+          slot: 0,
+          opacity: 1
+        },
+        {
+          id: 'older',
+          speaker: 'Runner',
+          category: 'replan',
+          kind: 'replan-triggered',
+          importance: 'medium',
+          summary: 'Back up and try the other side.',
+          confidence: 0.74,
+          step: 5,
+          ttlSteps: 4,
+          ageSteps: 1,
+          slot: 1,
+          opacity: 0.78
+        },
+        {
+          id: 'oldest',
+          speaker: 'Runner',
+          category: 'observe',
+          kind: 'frontier-chosen',
+          importance: 'low',
+          summary: 'Left still looks better.',
+          confidence: 0.7,
+          step: 4,
+          ttlSteps: 4,
+          ageSteps: 2,
+          slot: 2,
+          opacity: 0.58
+        }
+      ],
+      entries: [],
+      pings: [],
+      metrics: {
+        emittedCount: 3,
+        highImportanceEventCount: 0,
+        speakerCount: 1,
+        totalSteps: 6,
+        intentEmissionRate: 0.5,
+        worldPingCount: 0,
+        worldPingEmissionRate: 0,
+        maxConsecutiveEmissionStreak: 1,
+        maxVisibleWorldPings: 0,
+        debouncedEventCount: 0,
+        debouncedWorldPingCount: 0,
+        statusRepeatCount: 0,
+        verbFirstPass: true,
+        statusPresencePass: true,
+        importanceTtlPass: true,
+        slotOpacityPass: true,
+        feedReadabilityPass: true,
+        intentDebouncePass: true,
+        worldPingSpamPass: true,
+        highImportanceStickyPass: true,
+        intentStackOverlapPass: true
+      }
+    } as never;
+
+    const visibleEntries = resolveIntentFeedVisibleEntries(state, 3);
+    expect(visibleEntries.map((entry) => entry.id)).toEqual(['latest', 'older', 'oldest']);
+    expect(shouldRenderIntentFeedStatusLine(visibleEntries.length, 'Committing the safer route.')).toBe(false);
+    expect(shouldRenderIntentFeedStatusLine(0, 'Committing the safer route.')).toBe(true);
+  });
+
   test('shifts off dead-center when the lower board lane would cover the player or objective', () => {
     const playerRect = { left: 196 - 28 - 36, top: 708 - 28 - 36, width: 56 + 72, height: 56 + 72 };
     const objectiveRect = { left: 224 - 28 - 36, top: 684 - 28 - 36, width: 56 + 72, height: 56 + 72 };
@@ -216,7 +307,7 @@ describe('intent feed renderer', () => {
     expect(formatIntentHudSummary('Replanning at Junction A; try West branch.')).toBe('That path wasted time.');
     expect(formatIntentHudSummary('Recalling the dead end at Dead branch 2:3.')).toBe('Dead end. Back up.');
     expect(formatIntentHudSummary('Seeing the exit from Junction A.')).toBe('I can see the exit.');
-    expect(formatIntentHudSummary('Taking the exit from Junction A.')).toBe('I am close. Keep going.');
+    expect(formatIntentHudSummary('Taking the exit from Junction A.')).toBe('Almost there.');
     expect(formatIntentHudSummary('There is a marker here.')).toBe('This spot looks useful.');
   });
 

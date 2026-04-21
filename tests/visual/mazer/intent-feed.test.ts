@@ -368,7 +368,7 @@ describe('intent bus', () => {
     const summaries = bus.records.map((entry) => entry.summary);
     expect(new Set(summaries).size).toBe(summaries.length);
     expect(summaries.some((summary) => summary === 'Left looks better.')).toBe(true);
-    expect(summaries.some((summary) => summary === 'This spot looks useful.' || summary === 'This turn feels tighter.')).toBe(true);
+    expect(summaries.some((summary) => summary === 'This spot looks useful.' || summary === 'This looks closer.')).toBe(true);
     expect(summaries.some((summary) => summary === 'That timing looks bad.')).toBe(true);
     expect(summaries.some((summary) => summary.toLowerCase().includes('exit'))).toBe(true);
     expect(feed.metrics.verbFirstPass).toBe(false);

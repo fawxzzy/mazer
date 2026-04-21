@@ -55,7 +55,7 @@ const GOAL_VISIBILITY_RADIUS = 1;
 
 interface MenuIntentFeedDisplaySnapshot {
   statusSignature: string;
-  eventsSignature: string;
+  topEntrySignature: string;
   state: IntentFeedState;
 }
 
@@ -142,10 +142,15 @@ const resolveDebounceMultiplier = (role: IntentFeedRole): number => {
   }
 };
 
-const normalizeFeedStateForDisplay = (
-  state: IntentFeedState,
+const resolveDisplayWarmupScale = (
+  role: IntentFeedRole,
+  visibleEntryCount: number,
   maxVisibleEntries: number
-): IntentFeedState => cloneFeedState(state, (state.events ?? state.entries).slice(0, maxVisibleEntries));
+): number => (
+  (role === 'scan' || role === 'hypothesis') && visibleEntryCount < maxVisibleEntries
+    ? 0.75
+    : 1
+);
 
 const normalizeText = (value: string): string => value.trim().replace(/\s+/g, ' ').toLowerCase();
 
@@ -175,32 +180,47 @@ const createStatusSignature = (state: IntentFeedState | null): string => (
     : ''
 );
 
-const createEventsSignature = (state: IntentFeedState | null, maxVisibleEntries: number): string => {
-  const entries = state?.events ?? state?.entries ?? [];
-  return entries
-    .slice(0, maxVisibleEntries)
-    .map((entry) => [
-      entry.speaker,
-      entry.kind,
-      entry.importance,
-      normalizeText(entry.summary),
-      serializeAnchor(entry)
-    ].join('|'))
-    .join('|');
-};
+const createEntrySignature = (
+  entry: IntentFeedState['entries'][number] | null | undefined
+): string => (
+  entry
+    ? [
+        entry.speaker,
+        entry.kind,
+        normalizeText(entry.summary)
+      ].join('|')
+    : ''
+);
 
-const mergeDisplayState = (
-  current: IntentFeedState,
-  next: IntentFeedState,
-  preserveCurrentEvents: boolean
+const assembleDisplayState = (
+  rawState: IntentFeedState,
+  entries: readonly IntentFeedState['entries'][number][]
 ): IntentFeedState => cloneFeedState(
   {
-    ...next,
-    status: cloneFeedStateStatus(next),
-    pings: cloneFeedPings(next.pings)
+    ...rawState,
+    status: cloneFeedStateStatus(rawState),
+    pings: cloneFeedPings(rawState.pings)
   },
-  preserveCurrentEvents ? (current.events ?? current.entries) : (next.events ?? next.entries)
+  entries
 );
+
+const resolveNextUsefulDisplayEntry = (
+  rawState: IntentFeedState,
+  displayedEntries: readonly IntentFeedState['entries'][number][]
+): IntentFeedState['entries'][number] | null => {
+  const displayedSignatures = new Set(displayedEntries.map((entry) => createEntrySignature(entry)));
+  const currentTopSignature = createEntrySignature(displayedEntries[0]);
+  for (const entry of (rawState.events ?? rawState.entries)) {
+    const signature = createEntrySignature(entry);
+    if (signature.length === 0 || signature === currentTopSignature || displayedSignatures.has(signature)) {
+      continue;
+    }
+
+    return entry;
+  }
+
+  return null;
+};
 
 export class MenuIntentFeedDisplayController {
   private readonly maxVisibleEntries: number;
@@ -209,9 +229,18 @@ export class MenuIntentFeedDisplayController {
 
   private readonly replacementDebounceMs: number;
 
-  private current: (MenuIntentFeedDisplaySnapshot & { shownAtMs: number }) | null = null;
+  private current: (MenuIntentFeedDisplaySnapshot & {
+    displayedEntries: IntentFeedState['entries'];
+    shownAtMs: number;
+  }) | null = null;
 
-  private pending: (MenuIntentFeedDisplaySnapshot & { queuedAtMs: number }) | null = null;
+  private pending: {
+    baseState: IntentFeedState;
+    entry: IntentFeedState['entries'][number];
+    entrySignature: string;
+    statusSignature: string;
+    queuedAtMs: number;
+  } | null = null;
 
   constructor(options: MenuIntentFeedDisplayControllerOptions = {}) {
     this.maxVisibleEntries = Math.max(
@@ -232,62 +261,64 @@ export class MenuIntentFeedDisplayController {
     const rawEntries = rawState?.events ?? rawState?.entries ?? [];
     if (!rawState || (rawEntries.length === 0 && !rawState.status)) {
       this.pending = null;
-      const currentRole = resolveFeedRole(this.current?.state ?? null);
-      const currentMinimumDwellMs = Math.round(this.minimumDwellMs * resolvePacingMultiplier(currentRole));
-      if (this.current && (nowMs - this.current.shownAtMs) >= currentMinimumDwellMs) {
-        this.current = null;
-      }
-      return this.current?.state ?? null;
+      this.current = null;
+      return null;
     }
 
     const statusSignature = createStatusSignature(rawState);
-    const eventsSignature = createEventsSignature(rawState, this.maxVisibleEntries);
-    const state = normalizeFeedStateForDisplay(rawState, this.maxVisibleEntries);
-    const nextRole = resolveFeedRole(state);
+    if (rawEntries.length === 0) {
+      this.pending = null;
+      this.current = null;
+      return assembleDisplayState(rawState, []);
+    }
+
+    const nextRole = resolveFeedRole(rawState);
     const currentRole = resolveFeedRole(this.current?.state ?? null);
-    const currentMinimumDwellMs = Math.round(this.minimumDwellMs * resolvePacingMultiplier(currentRole));
-    const currentReplacementDebounceMs = Math.round(this.replacementDebounceMs * resolveDebounceMultiplier(currentRole));
-    const pendingMinimumDebounceMs = Math.round(this.replacementDebounceMs * resolveDebounceMultiplier(nextRole));
+    const warmupScale = resolveDisplayWarmupScale(currentRole, this.current?.displayedEntries.length ?? 0, this.maxVisibleEntries);
+    const currentMinimumDwellMs = Math.round(this.minimumDwellMs * resolvePacingMultiplier(currentRole) * warmupScale);
+    const currentReplacementDebounceMs = Math.round(this.replacementDebounceMs * resolveDebounceMultiplier(currentRole) * warmupScale);
+    const pendingMinimumDebounceMs = Math.round(this.replacementDebounceMs * resolveDebounceMultiplier(nextRole) * warmupScale);
+    const nextUsefulEntry = this.current
+      ? resolveNextUsefulDisplayEntry(rawState, this.current.displayedEntries)
+      : rawEntries[0] ?? null;
+    const nextEntrySignature = createEntrySignature(nextUsefulEntry);
 
     if (!this.current) {
+      const displayedEntries = cloneFeedEntries(rawEntries.slice(0, 1));
+      const state = assembleDisplayState(rawState, displayedEntries);
       this.current = {
         statusSignature,
-        eventsSignature,
+        topEntrySignature: createEntrySignature(displayedEntries[0]),
         state,
+        displayedEntries,
         shownAtMs: nowMs
       };
       return state;
     }
 
-    if (eventsSignature === this.current.eventsSignature) {
-      if (statusSignature !== this.current.statusSignature) {
-        this.current = {
-          ...this.current,
-          statusSignature,
-          state: mergeDisplayState(this.current.state, state, true)
-        };
-      } else {
-        this.current = {
-          ...this.current,
-          state: mergeDisplayState(this.current.state, state, true)
-        };
-      }
-
+    if (!nextUsefulEntry || nextEntrySignature.length === 0) {
       this.pending = null;
+      this.current = {
+        ...this.current,
+        statusSignature,
+        state: assembleDisplayState(rawState, this.current.displayedEntries)
+      };
       return this.current.state;
     }
 
-    if (!this.pending || this.pending.eventsSignature !== eventsSignature) {
+    if (!this.pending || this.pending.entrySignature !== nextEntrySignature) {
       this.pending = {
+        baseState: rawState,
+        entry: nextUsefulEntry,
+        entrySignature: nextEntrySignature,
         statusSignature,
-        eventsSignature,
-        state,
         queuedAtMs: nowMs
       };
     } else {
       this.pending = {
         ...this.pending,
-        state,
+        baseState: rawState,
+        entry: nextUsefulEntry,
         statusSignature
       };
     }
@@ -295,26 +326,26 @@ export class MenuIntentFeedDisplayController {
     const currentDwellElapsed = nowMs - this.current.shownAtMs;
     const pendingDebounceElapsed = nowMs - this.pending.queuedAtMs;
     if (currentDwellElapsed >= currentMinimumDwellMs && pendingDebounceElapsed >= Math.min(currentReplacementDebounceMs, pendingMinimumDebounceMs)) {
+      const displayedEntries = cloneFeedEntries(
+        [
+          this.pending.entry,
+          ...this.current.displayedEntries.filter((entry) => createEntrySignature(entry) !== this.pending?.entrySignature)
+        ].slice(0, this.maxVisibleEntries)
+      );
+      const state = assembleDisplayState(this.pending.baseState, displayedEntries);
       this.current = {
         statusSignature: this.pending.statusSignature,
-        eventsSignature: this.pending.eventsSignature,
-        state: this.pending.state,
+        topEntrySignature: this.pending.entrySignature,
+        state,
+        displayedEntries,
         shownAtMs: nowMs
       };
       this.pending = null;
-      return this.current.state;
-    }
-
-    if (statusSignature !== this.current.statusSignature) {
-      this.current = {
-        ...this.current,
-        statusSignature,
-        state: mergeDisplayState(this.current.state, state, true)
-      };
     } else {
       this.current = {
         ...this.current,
-        state: mergeDisplayState(this.current.state, state, true)
+        statusSignature,
+        state: assembleDisplayState(rawState, this.current.displayedEntries)
       };
     }
 
@@ -664,22 +695,22 @@ const resolveBoardRiskSignal = (
     const lastCursor = Math.max(0, pathLength - 1);
     if (currentPathCursor >= Math.max(0, lastCursor - 1)) {
       return {
-        nextRiskLabel: 'Exit path: keep going',
+        nextRiskLabel: 'Keep going.',
         nextRiskTone: 'low'
       };
     }
 
     if (currentPathCursor <= 0) {
       return {
-        nextRiskLabel: 'Next turn: leave the start lane',
+        nextRiskLabel: 'Move off the start.',
         nextRiskTone: 'low'
       };
     }
 
     return {
       nextRiskLabel: currentPathCursor >= Math.max(1, Math.floor(lastCursor * 0.6))
-        ? 'Closer route: stay on the clear line'
-        : 'Next branch: take the clear branch',
+        ? 'Stay on the clear line.'
+        : 'Take the clear branch.',
       nextRiskTone: 'low'
     };
   }

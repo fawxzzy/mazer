@@ -73,12 +73,23 @@ describe('edge live check', () => {
       'phone-portrait',
       'desktop'
     ]);
+    expect(resolveEdgeLiveViewports('core', 'core-only-cycle').map((viewport: { id: string }) => viewport.id)).toEqual([
+      'phone-portrait',
+      'desktop'
+    ]);
     expect(resolveEdgeLiveTimeoutMs('core-only-watch')).toBe(60_000);
     expect(resolveEdgeLiveTimeoutMs('core-only-play')).toBe(60_000);
+    expect(resolveEdgeLiveTimeoutMs('core-only-cycle')).toBe(120_000);
   }, 15_000);
 
   test('prefers explicit urls and derives board/hud verdicts from bounds', async () => {
-    const { resolveEdgeLiveTargetUrl, resolveEdgeLiveVerdicts } = await loadEdgeLiveHelpers();
+    const {
+      resolveEdgeLiveAttemptKey,
+      resolveEdgeLiveArrivalProofState,
+      resolveEdgeLiveTargetUrl,
+      resolveEdgeLiveVerdicts,
+      isEdgeLiveEndWindowRun
+    } = await loadEdgeLiveHelpers();
     const viewport = { id: 'desktop', label: 'Desktop', width: 1440, height: 900 };
 
     expect(resolveEdgeLiveTargetUrl(viewport, {
@@ -121,6 +132,49 @@ describe('edge live check', () => {
     expect(overlapVerdicts.boardOverflow.pass).toBe(true);
     expect(overlapVerdicts.hudOverlap.pass).toBe(false);
     expect(overlapVerdicts.hudClip.pass).toBe(true);
+
+    expect(isEdgeLiveEndWindowRun('core-only-watch')).toBe(true);
+    expect(isEdgeLiveEndWindowRun('core-only-cycle')).toBe(true);
+    expect(isEdgeLiveEndWindowRun('core-only-play')).toBe(false);
+    expect(resolveEdgeLiveAttemptKey({
+      runtime: {
+        projection: {
+          runId: 'scene-1-attempt-4',
+          mazeId: 'maze-7c5',
+          attemptNo: 4
+        }
+      }
+    })).toBe('scene-1-attempt-4|maze-7c5|4');
+    expect(resolveEdgeLiveArrivalProofState({
+      attempt: {
+        mode: 'watch',
+        sequence: 'arrival',
+        lifecyclePhase: 'active-watch',
+        ritualPhase: 'none',
+        elapsedMs: 12_040,
+        presentationElapsedMs: 12_040,
+        visualArrivalLatchMs: 12_160
+      },
+      arrival: {
+        actorVisible: true,
+        goalVisible: true,
+        actorInsideExitRegion: true,
+        settleProgress: 0.5,
+        settleRemainingMs: 120,
+        readyToClear: false,
+        actorCenter: { x: 640, y: 360 },
+        goalCenter: { x: 648, y: 356 },
+        goalTileBounds: { left: 620, top: 330, right: 676, bottom: 386, width: 56, height: 56, centerX: 648, centerY: 358 },
+        exitRegionBounds: { left: 630, top: 340, right: 666, bottom: 376, width: 36, height: 36, centerX: 648, centerY: 358 }
+      }
+    })).toMatchObject({
+      mode: 'watch',
+      sequence: 'arrival',
+      lifecyclePhase: 'active-watch',
+      actorInsideExitRegion: true,
+      readyToClear: false,
+      settleRemainingMs: 120
+    });
   }, 15_000);
 
   test('resolves proof-surface workflows for the reduced projection routes', async () => {
