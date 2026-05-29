@@ -8,6 +8,7 @@ export function clampMetric(value: number): number;
 export function createDefaultPlaybookTuningWeights(): PlaybookTuningWeights;
 export function parseCliArgs(argv?: string[]): Record<string, string | boolean>;
 export function readJson<T = unknown>(filePath: string): Promise<T>;
+export function resolveStoredRepoPath(repoRoot: string, value: string | null | undefined): string | null;
 export function writeJson(filePath: string, value: unknown): Promise<void>;
 export function resolveRuntimeBenchmarkPack(): { packId: string; scenarios: readonly import('../../src/mazer-core/eval/RuntimeBenchmarkPack').RuntimeBenchmarkScenarioContract[] };
 export function resolveRuntimeBenchmarkScenarioById(scenarioId: string): import('../../src/mazer-core/eval/RuntimeBenchmarkPack').RuntimeBenchmarkScenarioContract | null;
