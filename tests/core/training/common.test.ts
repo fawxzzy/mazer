@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const writeFileMock = vi.fn();
 
@@ -47,5 +50,24 @@ describe('training common helpers', () => {
 
     await expect(writePromise).rejects.toBe(permissionError);
     expect(writeFileMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('resolveStoredRepoPath rebases stale repo-root absolute paths into the current repo root', async () => {
+    const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+    const liveRelativePath = 'tmp/training/resolve-stored-repo-path/rebased.json';
+    const liveAbsolutePath = path.resolve(repoRoot, liveRelativePath);
+    const staleAbsolutePath = 'C:/ATLAS/repos/old-mazer/tmp/training/resolve-stored-repo-path/rebased.json';
+
+    rmSync(path.dirname(liveAbsolutePath), { recursive: true, force: true });
+    mkdirSync(path.dirname(liveAbsolutePath), { recursive: true });
+    writeFileSync(liveAbsolutePath, '{}\n', 'utf8');
+
+    const { resolveStoredRepoPath } = await import('../../../scripts/training/common.mjs');
+
+    expect(existsSync(staleAbsolutePath)).toBe(false);
+    expect(resolveStoredRepoPath(repoRoot, staleAbsolutePath)).toBe(liveAbsolutePath);
+    expect(resolveStoredRepoPath(repoRoot, liveRelativePath)).toBe(liveAbsolutePath);
+
+    rmSync(path.dirname(liveAbsolutePath), { recursive: true, force: true });
   });
 });

@@ -28,6 +28,7 @@ declare module '../training/common.mjs' {
   export function hashStableValue(value: unknown): string;
   export function parseCliArgs(argv?: string[]): Record<string, string | boolean>;
   export function readJson<T = unknown>(filePath: string): Promise<T>;
+  export function resolveStoredRepoPath(repoRoot: string, value: string | null | undefined): string | null;
   export function resolveBlessedPlaybookWeights(registryPath?: string): Promise<{
     registryPath: string;
     registry: unknown;
@@ -49,6 +50,7 @@ declare module '../training/common.mjs' {
 }
 
 declare module '../../../scripts/training/common.mjs' {
+  export function resolveStoredRepoPath(repoRoot: string, value: string | null | undefined): string | null;
   export function resolveBlessedPlaybookWeights(registryPath?: string): Promise<{
     registryPath: string;
     registry: unknown;

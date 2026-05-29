@@ -7,6 +7,7 @@ import {
   getCurrentBlessedWeightRecord,
   parseCliArgs,
   readJson,
+  resolveStoredRepoPath,
   resolveRuntimeBenchmarkPack,
   runCommand,
   stableSerialize,
@@ -20,14 +21,6 @@ const DEFAULT_DIAGNOSTICS_PACK_PATH = resolve(REPO_ROOT, 'artifacts', 'training'
 const DEFAULT_REGISTRY_PATH = resolve(REPO_ROOT, 'artifacts', 'training', 'playbook-weight-registry.json');
 
 const toRepoPath = (absolutePath) => relative(REPO_ROOT, absolutePath).replace(/\\/g, '/');
-
-const resolveRepoPath = (value) => {
-  if (typeof value !== 'string' || value.length === 0) {
-    return null;
-  }
-
-  return resolve(REPO_ROOT, value);
-};
 
 const loadCandidateDiagnosticsPack = async (packPath = DEFAULT_DIAGNOSTICS_PACK_PATH) => {
   const pack = await readJson(packPath);
@@ -62,7 +55,8 @@ const loadCandidateDiagnosticsPack = async (packPath = DEFAULT_DIAGNOSTICS_PACK_
   };
 };
 
-const resolveCandidateEvalSummaryPath = (record) => resolveRepoPath(
+const resolveCandidateEvalSummaryPath = (record) => resolveStoredRepoPath(
+  REPO_ROOT,
   record?.metadata?.artifactPaths?.evalSummaryPath
   ?? record?.metadata?.evalSummary?.path
 );
