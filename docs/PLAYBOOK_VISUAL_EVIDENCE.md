@@ -9,6 +9,8 @@ Use screenshots as the primary machine input for Codex. Treat video as secondary
 - Do not capture from production accounts or production sessions.
 - Keep disposable artifacts under `tmp/`.
 - Commit only durable pointers, docs, and indexes.
+- Mutating Codex tasks are not governed unless they declare `Acceptance Criteria`, `Expected Changed Paths`, `Expected Unchanged Paths`, and `Blocked / Skipped Reporting Rules`.
+- Summary text is not proof. Visual packets prove UI state; the final repo diff still has to prove the requested source edits.
 
 ## Packet Schema
 
@@ -51,4 +53,3 @@ For the rotating planet maze lane, use screenshots from the isolated visual-proo
 ## Auth-App Example
 
 For an auth-enabled app, capture from a preview or staging host with a resettable temp account. Never use a production account, production credentials, or a live user session. If login state matters, seed a disposable test user and make the capture reproducible before taking screenshots.
-

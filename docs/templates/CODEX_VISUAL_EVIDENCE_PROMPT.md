@@ -36,6 +36,24 @@ Workflow
 3. Review the ranked regressions and the failed gates.
 4. Promote the run to baseline only after it passes.
 
+Acceptance Criteria
+- [packet-completeness] The final lane produces the declared packet artifacts needed for the target surface.
+- [baseline-discipline] Baseline promotion remains explicit and only happens after the contract passes.
+- [bounded-capture] Captures stay on preview or staging only and use disposable fixtures or temp users.
+- [durable-proof] Durable docs or indexes point to the approved packet path without treating summary text as proof.
+
+Expected Changed Paths
+- Declare only the repo-relative visual-lane code, docs, fixture, and durable pointer paths the final diff actually needs.
+
+Expected Unchanged Paths
+- Any repo path outside the declared visual-lane surfaces.
+- Raw packet artifacts under `tmp/` unless the lane explicitly promotes a durable pointer or index.
+
+Blocked / Skipped Reporting Rules
+- Mutating Codex tasks are not governed unless they declare explicit acceptance criteria.
+- Summary text is not proof. Do not claim the lane passed unless the packet artifacts, visual comparison, and final diff prove each satisfied criterion.
+- If any expected unchanged path must change or any criterion cannot be completed, report it as blocked, skipped, or failed with the exact reason.
+
 Output
 Return the packet path, the comparison result, the baseline pointer, and the top regressions by scenario and viewport.
 ```
@@ -60,4 +78,3 @@ Auth: resettable temp user only
 Never use a production account or a real user session.
 Use the packet to prove the login and post-login flow without depending on live data.
 ```
-
