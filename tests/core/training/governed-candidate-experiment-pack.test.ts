@@ -279,8 +279,8 @@ describe('governed candidate experiment pack', () => {
           bandsGreen: true
         }),
         artifactPaths: {
-          weightsPath: 'C:/ATLAS/repos/fawxzzy-mazer/tmp/training/governed-candidate-experiment-pack/connector-recovery-biased/weights.json',
-          evalSummaryPath: 'C:/ATLAS/repos/fawxzzy-mazer/tmp/eval/governed-candidate-experiment-pack/connector-recovery-biased/runtime-eval-summary.json'
+          weightsPath: 'tmp/training/governed-candidate-experiment-pack/connector-recovery-biased/weights.json',
+          evalSummaryPath: 'tmp/eval/governed-candidate-experiment-pack/connector-recovery-biased/runtime-eval-summary.json'
         }
       },
       'warden-cautious-biased': {
@@ -291,8 +291,8 @@ describe('governed candidate experiment pack', () => {
           ]
         }),
         artifactPaths: {
-          weightsPath: 'C:/ATLAS/repos/fawxzzy-mazer/tmp/training/governed-candidate-experiment-pack/warden-cautious-biased/weights.json',
-          evalSummaryPath: 'C:/ATLAS/repos/fawxzzy-mazer/tmp/eval/governed-candidate-experiment-pack/warden-cautious-biased/runtime-eval-summary.json'
+          weightsPath: 'tmp/training/governed-candidate-experiment-pack/warden-cautious-biased/weights.json',
+          evalSummaryPath: 'tmp/eval/governed-candidate-experiment-pack/warden-cautious-biased/runtime-eval-summary.json'
         }
       }
     };

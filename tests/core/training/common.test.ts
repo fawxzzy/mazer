@@ -56,7 +56,7 @@ describe('training common helpers', () => {
     const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
     const liveRelativePath = 'tmp/training/resolve-stored-repo-path/rebased.json';
     const liveAbsolutePath = path.resolve(repoRoot, liveRelativePath);
-    const staleAbsolutePath = 'C:/ATLAS/repos/old-mazer/tmp/training/resolve-stored-repo-path/rebased.json';
+    const staleAbsolutePath = 'C:/workspace/repos/old-mazer/tmp/training/resolve-stored-repo-path/rebased.json';
 
     rmSync(path.dirname(liveAbsolutePath), { recursive: true, force: true });
     mkdirSync(path.dirname(liveAbsolutePath), { recursive: true });
