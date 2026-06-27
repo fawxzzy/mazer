@@ -28,6 +28,15 @@ export const LAYOUT_MATRIX_PRESET_GROUPS = Object.freeze({
   ])
 });
 
+const appendQueryParam = (route, key, value) => {
+  const normalizedRoute = typeof route === 'string' && route.trim().length > 0
+    ? route.trim()
+    : '/';
+  const url = new URL(normalizedRoute.startsWith('/') ? normalizedRoute : `/${normalizedRoute}`, 'https://mazer.local');
+  url.searchParams.set(key, value);
+  return `${url.pathname}${url.search}`;
+};
+
 export const resolveLayoutMatrixViewports = (presetGroup = 'core') => {
   const normalizedPresetGroup = typeof presetGroup === 'string' ? presetGroup.trim().toLowerCase() : 'core';
   const selectedIds = normalizedPresetGroup === 'all'
@@ -44,28 +53,43 @@ export const resolveLayoutMatrixViewports = (presetGroup = 'core') => {
   });
 };
 
-export const resolveLayoutMatrixRoute = (viewport, explicitRoute) => {
+export const resolveLayoutMatrixRoute = (viewport, explicitRoute, options = {}) => {
+  const design = typeof options?.design === 'string' ? options.design.trim().toLowerCase() : null;
+
   if (typeof explicitRoute === 'string' && explicitRoute.trim().length > 0) {
-    return explicitRoute.trim();
+    const route = explicitRoute.trim();
+    return design === 'recovery'
+      ? appendQueryParam(route, 'design', 'recovery')
+      : route;
   }
 
   if (!viewport || typeof viewport.id !== 'string') {
-    return '/';
+    return design === 'recovery'
+      ? appendQueryParam('/', 'design', 'recovery')
+      : '/';
   }
 
   if (
     viewport.id.startsWith('phone-')
     || viewport.id.startsWith('tablet-')
   ) {
-    return '/?profile=mobile&theme=aurora';
+    const route = '/?profile=mobile&theme=aurora';
+    return design === 'recovery'
+      ? appendQueryParam(route, 'design', 'recovery')
+      : route;
   }
 
   if (
     viewport.id === 'desktop-wide'
     || viewport.id === 'ultrawide'
   ) {
-    return '/?profile=tv&theme=noir';
+    const route = '/?profile=tv&theme=noir';
+    return design === 'recovery'
+      ? appendQueryParam(route, 'design', 'recovery')
+      : route;
   }
 
-  return '/';
+  return design === 'recovery'
+    ? appendQueryParam('/', 'design', 'recovery')
+    : '/';
 };

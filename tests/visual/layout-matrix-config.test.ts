@@ -36,5 +36,8 @@ describe('layout matrix config', () => {
     expect(resolveLayoutMatrixRoute(all[0])).toBe('/?profile=mobile&theme=aurora');
     expect(resolveLayoutMatrixRoute(all[7])).toBe('/?profile=tv&theme=noir');
     expect(resolveLayoutMatrixRoute(all[5], '/?theme=ember')).toBe('/?theme=ember');
+    expect(resolveLayoutMatrixRoute(all[0], undefined, { design: 'recovery' })).toBe('/?profile=mobile&theme=aurora&design=recovery');
+    expect(resolveLayoutMatrixRoute(all[7], undefined, { design: 'recovery' })).toBe('/?profile=tv&theme=noir&design=recovery');
+    expect(resolveLayoutMatrixRoute(all[5], '/?theme=ember', { design: 'recovery' })).toBe('/?theme=ember&design=recovery');
   });
 });

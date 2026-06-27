@@ -53,14 +53,18 @@ const EDGE_LIVE_SPECIAL_ROUTES = Object.freeze({
   'mobile-touch-smoke': '/?content=core-only&mode=play&theme=aurora',
   'core-only-watch': '/?content=core-only&theme=aurora',
   'core-only-play': '/?content=core-only&mode=play&theme=aurora',
-  'core-only-cycle': '/?content=core-only&theme=aurora'
+  'core-only-cycle': '/?content=core-only&theme=aurora',
+  'core-only-watch-recovery': '/?content=core-only&theme=aurora&design=recovery',
+  'core-only-play-recovery': '/?content=core-only&mode=play&theme=aurora&design=recovery'
 });
 const EDGE_LIVE_RUN_VIEWPORT_IDS = Object.freeze({
   'play-mode-interactive': ['desktop'],
   'mobile-touch-smoke': ['phone-portrait'],
   'core-only-watch': ['phone-portrait', 'desktop'],
   'core-only-play': ['phone-portrait', 'desktop'],
-  'core-only-cycle': ['phone-portrait', 'desktop']
+  'core-only-cycle': ['phone-portrait', 'desktop'],
+  'core-only-watch-recovery': ['phone-portrait', 'desktop'],
+  'core-only-play-recovery': ['phone-portrait', 'desktop']
 });
 const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
   'play-mode-interactive': Object.freeze({
@@ -467,9 +471,11 @@ const resolveEdgeLiveInteraction = (runId) => (
 const EDGE_LIVE_RUN_TIMEOUTS_MS = Object.freeze({
   'core-only-watch': 120_000,
   'core-only-play': 60_000,
-  'core-only-cycle': 180_000
+  'core-only-cycle': 180_000,
+  'core-only-watch-recovery': 120_000,
+  'core-only-play-recovery': 60_000
 });
-const EDGE_LIVE_END_WINDOW_RUNS = new Set(['core-only-watch', 'core-only-cycle']);
+const EDGE_LIVE_END_WINDOW_RUNS = new Set(['core-only-watch', 'core-only-cycle', 'core-only-watch-recovery']);
 
 export const resolveEdgeLiveTimeoutMs = (runId, defaultTimeoutMs = EDGE_LIVE_DEFAULT_CAPTURE_TIMEOUT_MS) => (
   typeof runId === 'string' && Number.isFinite(EDGE_LIVE_RUN_TIMEOUTS_MS[runId])

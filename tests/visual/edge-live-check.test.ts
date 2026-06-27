@@ -64,6 +64,8 @@ describe('edge live check', () => {
     expect(resolveEdgeLiveDefaultRoute('core-only-watch')).toBe('/?content=core-only&theme=aurora');
     expect(resolveEdgeLiveDefaultRoute('core-only-play')).toBe('/?content=core-only&mode=play&theme=aurora');
     expect(resolveEdgeLiveDefaultRoute('core-only-cycle')).toBe('/?content=core-only&theme=aurora');
+    expect(resolveEdgeLiveDefaultRoute('core-only-watch-recovery')).toBe('/?content=core-only&theme=aurora&design=recovery');
+    expect(resolveEdgeLiveDefaultRoute('core-only-play-recovery')).toBe('/?content=core-only&mode=play&theme=aurora&design=recovery');
     expect(resolveEdgeLiveDefaultRoute('legend-risk-telegraph')).toBeUndefined();
     expect(resolveEdgeLiveViewports('core', 'core-only-watch').map((viewport: { id: string }) => viewport.id)).toEqual([
       'phone-portrait',
@@ -77,9 +79,19 @@ describe('edge live check', () => {
       'phone-portrait',
       'desktop'
     ]);
+    expect(resolveEdgeLiveViewports('core', 'core-only-watch-recovery').map((viewport: { id: string }) => viewport.id)).toEqual([
+      'phone-portrait',
+      'desktop'
+    ]);
+    expect(resolveEdgeLiveViewports('core', 'core-only-play-recovery').map((viewport: { id: string }) => viewport.id)).toEqual([
+      'phone-portrait',
+      'desktop'
+    ]);
     expect(resolveEdgeLiveTimeoutMs('core-only-watch')).toBe(120_000);
     expect(resolveEdgeLiveTimeoutMs('core-only-play')).toBe(60_000);
     expect(resolveEdgeLiveTimeoutMs('core-only-cycle')).toBe(180_000);
+    expect(resolveEdgeLiveTimeoutMs('core-only-watch-recovery')).toBe(120_000);
+    expect(resolveEdgeLiveTimeoutMs('core-only-play-recovery')).toBe(60_000);
   }, 15_000);
 
   test('prefers explicit urls and derives board/hud verdicts from bounds', async () => {
@@ -136,6 +148,8 @@ describe('edge live check', () => {
     expect(isEdgeLiveEndWindowRun('core-only-watch')).toBe(true);
     expect(isEdgeLiveEndWindowRun('core-only-cycle')).toBe(true);
     expect(isEdgeLiveEndWindowRun('core-only-play')).toBe(false);
+    expect(isEdgeLiveEndWindowRun('core-only-watch-recovery')).toBe(true);
+    expect(isEdgeLiveEndWindowRun('core-only-play-recovery')).toBe(false);
     expect(resolveEdgeLiveAttemptKey({
       runtime: {
         projection: {

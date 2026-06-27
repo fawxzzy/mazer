@@ -39,6 +39,7 @@ npm run projection:export-pack
 `npm run preview` serves the production build locally on port `4173`.
 `dist/` is generated build output and is ignored by git.
 `npm run visual:matrix` captures the shipping layout across the core viewport matrix into `../tmp/captures/mazer-layout-matrix/<run-id>/`.
+`npm run visual:matrix:recovery` captures that same core matrix with `design=recovery` appended to each repo-owned route so recovery inspection stays additive instead of replacing the shipping default.
 `npm run visual:matrix -- --url https://<preview-host>` reuses a hosted preview instead of launching a local preview server.
 `npm run edge:live -- --base-url http://127.0.0.1:4173` runs the same core viewport set through Microsoft Edge (`channel: msedge`) and saves screenshots, videos, and JSON summaries under `../tmp/captures/mazer-edge-live/<run-id>/`.
 `npm run edge:live -- --url https://<preview-host>` targets an explicit preview URL instead of launching a local preview server.
@@ -53,6 +54,8 @@ npm run projection:export-pack
 `npm run edge:live -- --run watch-pass-preview --skip-build true --headless true` captures the Watch Pass preview route across full, compact, and private shells.
 `npm run edge:live -- --run core-only-watch --skip-build true --headless true` captures the simplified watch/demo shell directly.
 `npm run edge:live -- --run core-only-play --skip-build true --headless true` captures the simplified play shell directly.
+`npm run edge:live:recovery:watch -- --skip-build true --headless true` captures the same watch shell with `design=recovery` enabled for design-recovery inspection.
+`npm run edge:live:recovery:play -- --skip-build true --headless true` captures the same play shell with `design=recovery` enabled for design-recovery inspection.
 `npm run edge:live -- --run core-only-cycle --skip-build true --headless true` captures the simplified watch loop for build -> watch -> clear -> rebuild validation.
 `npm run edge:live -- --run watch-play-shell --skip-build true --headless true` and `npm run edge:live -- --run play-mode-smoke --skip-build true --headless true` now resolve to the core-only play shell automatically.
 `npm run edge:live -- --run play-mode-interactive --skip-build true --headless true` actively switches into core-only play mode, presses desktop controls, and fails if live receipts do not record non-zero `control_used` events plus real movement deltas.
@@ -63,6 +66,7 @@ npm run projection:export-pack
 `npm run projection:export-pack -- --fixture watching --label watch-pass-preview` emits iOS and Android projection export packs under `../tmp/captures/mazer-projections/`.
 `npm run edge:live -- --base-url http://127.0.0.1:4173 --run experiment-smoke --pacing 0.7x` carries the same experiment metadata into Edge live receipts so visual decisions can be compared against explicit toggles instead of ad hoc notes.
 The canonical closure order is serial-only: `npm run visual:matrix -- --preset core --skip-build true`, `npm run edge:live -- --skip-build true --headless true --run core-only-watch`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, then `npm run verify`.
+The recovery inspection order is additive only: `npm run visual:matrix:recovery -- --skip-build true`, `npm run edge:live:recovery:watch -- --skip-build true --headless true`, `npm run edge:live:recovery:play -- --skip-build true --headless true`. It informs recovery design work but does not replace the shipping closure order.
 Use [`docs/ops/MAZER_HOSTED_PREVIEW_PROOF.md`](docs/ops/MAZER_HOSTED_PREVIEW_PROOF.md) for the hosted-preview closure rule and manual stop state.
 
 ## Branch lanes
@@ -125,6 +129,7 @@ The current focus content profile is `core-only`; use `?content=full` when you e
 - Extended presets add `2560x1080` and `1280x720` when you need wider or shorter shells.
 - Each matrix run emits full-frame screenshots, gameplay-only board clips, per-viewport metadata, a markdown summary, and one contact sheet under `../tmp/captures/mazer-layout-matrix/<run-id>/`.
 - Use `npm run visual:matrix -- --route "/?theme=ember"` to lock the route or theme without changing the preset file.
+- Use `npm run visual:matrix -- --design recovery` or the `visual:matrix:recovery` alias when you need board-first recovery inspection across the standard viewport matrix without changing the shipping preset definitions.
 - Unsupported/manual-install surfaces fail open. On iOS-style browsers the top action lane swaps to `Use Share > Add to Home Screen`.
 - Install UX is optional by rule: if install APIs are unavailable or throw, the title/demo shell still renders normally.
 
