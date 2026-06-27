@@ -14,7 +14,7 @@ export type PresentationChrome = 'full' | 'minimal' | 'none';
 export type PresentationMood = 'auto' | 'solve' | 'scan' | 'blueprint';
 export type PresentationTitleMode = 'show' | 'hide';
 export type PresentationContentProfile = 'core-only' | 'full';
-export type PresentationDeploymentProfile = 'tv' | 'obs' | 'mobile';
+export type PresentationDeploymentProfile = 'tv' | 'obs' | 'mobile' | 'recovery';
 export type PresentationMode = 'watch' | 'play';
 export type PresentationTheme = 'auto' | 'noir' | 'ember' | 'aurora' | 'vellum' | 'monolith';
 export type PresentationThemeFamily = Exclude<PresentationTheme, 'auto'>;
@@ -251,7 +251,7 @@ const MAX_PRESENTATION_SEED = 0x7fffffff;
 export const isPresentationDeploymentProfile = (
   value: string | null | undefined
 ): value is PresentationDeploymentProfile => (
-  value === 'tv' || value === 'obs' || value === 'mobile'
+  value === 'tv' || value === 'obs' || value === 'mobile' || value === 'recovery'
 );
 
 export const isPresentationContentProfile = (
@@ -450,6 +450,15 @@ const PRESENTATION_PROFILE_DEFAULTS: Record<PresentationDeploymentProfile, Omit<
     theme: DEFAULT_PRESENTATION_THEME,
     mode: DEFAULT_PRESENTATION_MODE,
     profile: 'mobile'
+  },
+  recovery: {
+    presentation: 'title',
+    chrome: 'full',
+    mood: DEFAULT_PRESENTATION_MOOD,
+    title: 'show',
+    theme: DEFAULT_PRESENTATION_THEME,
+    mode: DEFAULT_PRESENTATION_MODE,
+    profile: 'recovery'
   }
 };
 

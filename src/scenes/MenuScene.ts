@@ -1845,6 +1845,19 @@ export const resolveAmbientSkyProfileTuning = (
         clearZoneScale: 1.24
       };
       break;
+    case 'recovery':
+      tuning = {
+        ...tuning,
+        densityScale: 0.62,
+        motionScale: 0.56,
+        eventIntervalScale: 1.38,
+        twinkleCount: 9,
+        driftMoteCount: 2,
+        movingEventCap: 0,
+        signatureEventCap: 0,
+        clearZoneScale: 1.18
+      };
+      break;
     default:
       break;
   }
@@ -2396,6 +2409,35 @@ const DEPLOYMENT_PRESENTATION_PROFILES: Record<PresentationDeploymentProfile, De
     boardVeilBiasScale: 1,
     boardAuraMotionScale: 1,
     boardHaloMotionScale: 1
+  },
+  recovery: {
+    boardScaleBias: 0.016,
+    portraitBoardScaleBias: 0,
+    topReserveBias: -14,
+    portraitTopReserveBias: -4,
+    bottomPaddingBias: -6,
+    sidePaddingBias: -2,
+    maxBoardScale: 0.992,
+    titlePlateWidthScale: 0.86,
+    titlePlateHeightScale: 0.92,
+    titleLineSpacingScale: 0.96,
+    titleYOffsetBias: -2,
+    titleAlphaScale: 1.04,
+    signatureAlphaScale: 0.94,
+    passiveAlphaScale: 0.92,
+    plateAlphaScale: 0.92,
+    panelAlphaScale: 0.8,
+    offsetScale: 0.42,
+    driftScale: 0.6,
+    driftDurationScale: 1.14,
+    metadataAlphaScale: 0.82,
+    flashAlphaScale: 0.78,
+    boardAuraBiasScale: 0.36,
+    boardHaloBiasScale: 0.32,
+    boardShadeBiasScale: 0.78,
+    boardVeilBiasScale: 0.72,
+    boardAuraMotionScale: 0.5,
+    boardHaloMotionScale: 0.46
   }
 };
 
@@ -3903,6 +3945,12 @@ export function resolveTitleLockupLayout(
   const chromeProfile = CHROME_PROFILES[safeChrome];
   const deploymentProfile = profile ? DEPLOYMENT_PRESENTATION_PROFILES[profile] : DEFAULT_DEPLOYMENT_PRESENTATION_PROFILE;
   const titlePlateMaxWidth = Math.max(112, titleBandFrame.width - 24);
+  const titlePlateMinWidth = Math.min(
+    profile === 'recovery'
+      ? (variantProfile.titleAnchor === 'left' ? 180 : 192)
+      : (variantProfile.titleAnchor === 'left' ? 196 : 212),
+    titlePlateMaxWidth
+  );
   const plateWidth = Phaser.Math.Clamp(
     Math.round(
       boardLayout.boardSize
@@ -3911,7 +3959,7 @@ export function resolveTitleLockupLayout(
         * chromeProfile.titleScale
         * deploymentProfile.titlePlateWidthScale
     ),
-    Math.min(variantProfile.titleAnchor === 'left' ? 196 : 212, titlePlateMaxWidth),
+    titlePlateMinWidth,
     Math.max(Math.min(sceneLayout.isPortrait ? 320 : 368, titlePlateMaxWidth), 112)
   );
   const basePlateHeight = Phaser.Math.Clamp(
@@ -4125,7 +4173,7 @@ export function resolveBoardCompositionFrame(
       right = reservedRight;
     }
   } else {
-    const feedMetrics = resolveIntentFeedPanelMetrics({ width: safeWidth, height: safeHeight }, false);
+    const feedMetrics = resolveIntentFeedPanelMetrics({ width: safeWidth, height: safeHeight }, false, false, profile);
     const feedBottom = bottomDockedInstall && installFrame
       ? installFrame.top - legacyTuning.menu.intentFeed.installGapPx
       : safeHeight - Math.max(
@@ -4167,6 +4215,7 @@ export function resolveIntentFeedPresentationMode(
   const wideEnough = safeWidth >= tuning.commentaryRailMinViewportWidthPx;
   const tallEnough = safeHeight >= tuning.commentaryRailMinViewportHeightPx;
   const landscapeEnough = aspectRatio >= tuning.commentaryRailMinAspectRatio;
+  const railEnabled = profile === 'recovery' || legacyTuning.menu.intentFeed.commentaryRailEnabled;
 
   if (profile === 'obs') {
     return 'bottom-panel';
@@ -4177,7 +4226,7 @@ export function resolveIntentFeedPresentationMode(
     || sceneLayout.isTiny
     || sceneLayout.isNarrow
     || sceneLayout.isShort
-    || !legacyTuning.menu.intentFeed.commentaryRailEnabled
+    || !railEnabled
   ) {
     return 'bottom-panel';
   }
@@ -5477,7 +5526,8 @@ export class MenuScene extends Phaser.Scene {
             }
           }),
           intentFeedHud: createIntentFeedHud(this, {
-            palette: themeProfile.palette
+            palette: themeProfile.palette,
+            profile: deploymentProfileId
           }),
           boardAura,
           boardHalo,

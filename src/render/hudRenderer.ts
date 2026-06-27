@@ -176,6 +176,15 @@ const HUD_DEPLOYMENT_PROFILES: Record<PresentationDeploymentProfile, HudDeployme
     modeFontScale: 1.08,
     metaFontScale: 1.08,
     flashFontScale: 1.04
+  },
+  recovery: {
+    railInset: 10,
+    baselineGap: 4,
+    flashInsetX: 6,
+    flashInsetY: 2,
+    modeFontScale: 0.96,
+    metaFontScale: 0.92,
+    flashFontScale: 0.92
   }
 };
 

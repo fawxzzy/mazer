@@ -169,6 +169,7 @@ describe('demo-only build', () => {
     expect(resolveBootPresentationVariant('?profile=tv')).toBe('ambient');
     expect(resolveBootPresentationVariant('?profile=obs')).toBe('ambient');
     expect(resolveBootPresentationVariant('?profile=mobile')).toBe('ambient');
+    expect(resolveBootPresentationVariant('?profile=recovery')).toBe('title');
     expect(resolveBootPresentationVariant('?presentation=unknown')).toBe('title');
     expect(resolveBootPresentationVariant({} as unknown as string)).toBe('title');
 
@@ -199,6 +200,15 @@ describe('demo-only build', () => {
       theme: 'auto',
       mode: 'watch',
       profile: 'mobile'
+    });
+    expect(resolveBootPresentationConfig('?profile=recovery')).toEqual({
+      presentation: 'title',
+      chrome: 'full',
+      mood: 'auto',
+      title: 'show',
+      theme: 'auto',
+      mode: 'watch',
+      profile: 'recovery'
     });
     expect(resolveBootPresentationConfig('?content=full')).toEqual({
       presentation: 'title',
@@ -288,6 +298,7 @@ describe('demo-only build', () => {
     })).toBe(false);
     expect(shouldShowPresentationTitle(resolveBootPresentationConfig('?profile=tv'))).toBe(false);
     expect(shouldShowPresentationTitle(resolveBootPresentationConfig('?profile=mobile'))).toBe(true);
+    expect(shouldShowPresentationTitle(resolveBootPresentationConfig('?profile=recovery'))).toBe(true);
     expect(shouldShowPresentationTitle(resolveBootPresentationConfig('?profile=mobile&chrome=none'))).toBe(false);
   });
 
@@ -578,6 +589,61 @@ describe('demo-only build', () => {
       desktopLandscape.viewport.height,
       desktopLandscape.layout
     )).toBe('bottom-panel');
+  });
+
+  test('recovery widescreen moves the intent feed to a rail and grows the board lane', () => {
+    const resolved = generateMazeForDifficulty({
+      scale: 50,
+      seed: 9041,
+      size: 'medium',
+      checkPointModifier: 0.35,
+      shortcutCountModifier: 0.13
+    }, 'standard', 0, 1);
+    const episode = resolved.episode;
+    const defaultModel = resolveMenuPresentationModel(1920, 1080, 'title', 'full', true);
+    const recoveryModel = resolveMenuPresentationModel(1920, 1080, 'title', 'full', true, 'recovery');
+    const defaultTitleBand = resolveTitleBandFrame(defaultModel.viewport.width, defaultModel.layout);
+    const recoveryTitleBand = resolveTitleBandFrame(recoveryModel.viewport.width, recoveryModel.layout, undefined, undefined, 'recovery');
+    const defaultBoardFrame = resolveBoardCompositionFrame(
+      defaultModel.viewport.width,
+      defaultModel.viewport.height,
+      defaultModel.layout,
+      defaultTitleBand
+    );
+    const recoveryBoardFrame = resolveBoardCompositionFrame(
+      recoveryModel.viewport.width,
+      recoveryModel.viewport.height,
+      recoveryModel.layout,
+      recoveryTitleBand,
+      undefined,
+      undefined,
+      'recovery'
+    );
+    const defaultLayout = createBoardLayout(createViewportSceneStub(defaultModel.viewport.width, defaultModel.viewport.height), episode, {
+      boardScale: defaultModel.layout.boardScale,
+      safeBounds: defaultBoardFrame
+    });
+    const recoveryLayout = createBoardLayout(createViewportSceneStub(recoveryModel.viewport.width, recoveryModel.viewport.height), episode, {
+      boardScale: recoveryModel.layout.boardScale,
+      safeBounds: recoveryBoardFrame
+    });
+
+    expect(resolveIntentFeedPresentationMode(
+      defaultModel.viewport.width,
+      defaultModel.viewport.height,
+      defaultModel.layout
+    )).toBe('bottom-panel');
+    expect(resolveIntentFeedPresentationMode(
+      recoveryModel.viewport.width,
+      recoveryModel.viewport.height,
+      recoveryModel.layout,
+      'recovery'
+    )).toBe('commentary-rail');
+    expect(recoveryBoardFrame.height).toBeGreaterThan(defaultBoardFrame.height);
+    expect(recoveryBoardFrame.width).toBeLessThan(defaultBoardFrame.width);
+    expect(recoveryLayout.boardHeight).toBeGreaterThan(defaultLayout.boardHeight);
+
+    disposeMazeEpisode(episode);
   });
 
   test('desktop board composition reserves a bottom HUD lane while keeping the maze centered on the action', () => {
@@ -1936,6 +2002,7 @@ describe('demo-only build', () => {
   test('default presentation layout stays unchanged unless board-first chrome is requested', () => {
     const defaultModel = resolveMenuPresentationModel(1280, 720, DEFAULT_PRESENTATION_VARIANT);
     const explicitDefaultModel = resolveMenuPresentationModel(1280, 720, 'title', 'full', true);
+    const recoveryModel = resolveMenuPresentationModel(1280, 720, 'title', 'full', true, 'recovery');
     const boardFirstModel = resolveMenuPresentationModel(1280, 720, 'ambient', 'none', false);
     const tvModel = resolveMenuPresentationModel(1920, 1080, 'ambient', 'minimal', false, 'tv');
     const defaultAmbientModel = resolveMenuPresentationModel(1920, 1080, 'ambient', 'minimal', false);
@@ -1944,12 +2011,51 @@ describe('demo-only build', () => {
     const mobileModel = resolveMenuPresentationModel(390, 844, 'ambient', 'full', true, 'mobile');
 
     expect(defaultModel).toEqual(explicitDefaultModel);
+    expect(recoveryModel.layout.topReserve).toBeLessThan(defaultModel.layout.topReserve);
+    expect(recoveryModel.layout.boardScale).toBeGreaterThan(defaultModel.layout.boardScale);
+    expect(recoveryModel.layout.boardScale).toBeLessThan(boardFirstModel.layout.boardScale);
     expect(defaultModel.layout.topReserve).toBeGreaterThan(boardFirstModel.layout.topReserve);
     expect(defaultModel.layout.boardScale).toBeLessThan(boardFirstModel.layout.boardScale);
     expect(tvModel.layout.topReserve).toBeLessThan(defaultAmbientModel.layout.topReserve);
     expect(obsModel.layout.sidePadding).toBeGreaterThan(defaultAmbientModel.layout.sidePadding);
     expect(mobileModel.layout.topReserve).toBeGreaterThan(portraitBaseModel.layout.topReserve);
     expect(mobileModel.layout.boardScale).toBeLessThan(portraitBaseModel.layout.boardScale);
+  });
+
+  test('recovery profile narrows chrome while keeping the title lockup inside the band', () => {
+    const resolved = generateMazeForDifficulty({
+      scale: 50,
+      seed: 8844,
+      size: 'medium',
+      checkPointModifier: 0.35,
+      shortcutCountModifier: 0.13
+    }, 'standard', 0, 1);
+    const episode = resolved.episode;
+    const defaultModel = resolveMenuPresentationModel(1280, 720, 'title', 'full', true);
+    const recoveryModel = resolveMenuPresentationModel(1280, 720, 'title', 'full', true, 'recovery');
+    const defaultLayout = createBoardLayout(createViewportSceneStub(defaultModel.viewport.width, defaultModel.viewport.height), episode, {
+      boardScale: defaultModel.layout.boardScale,
+      topReserve: defaultModel.layout.topReserve,
+      sidePadding: defaultModel.layout.sidePadding,
+      bottomPadding: defaultModel.layout.bottomPadding
+    });
+    const recoveryLayout = createBoardLayout(createViewportSceneStub(recoveryModel.viewport.width, recoveryModel.viewport.height), episode, {
+      boardScale: recoveryModel.layout.boardScale,
+      topReserve: recoveryModel.layout.topReserve,
+      sidePadding: recoveryModel.layout.sidePadding,
+      bottomPadding: recoveryModel.layout.bottomPadding
+    });
+    const defaultBand = resolveTitleBandFrame(defaultModel.viewport.width, defaultModel.layout, defaultLayout);
+    const recoveryBand = resolveTitleBandFrame(recoveryModel.viewport.width, recoveryModel.layout, recoveryLayout, undefined, 'recovery');
+    const defaultLockup = resolveTitleLockupLayout(defaultLayout, defaultModel.layout, defaultBand, 'title', 'full');
+    const recoveryLockup = resolveTitleLockupLayout(recoveryLayout, recoveryModel.layout, recoveryBand, 'title', 'full', 'recovery');
+
+    expect(recoveryLockup.plateWidth).toBeLessThan(defaultLockup.plateWidth);
+    expect(recoveryLockup.titleX - (recoveryLockup.plateWidth / 2)).toBeGreaterThanOrEqual(recoveryBand.left);
+    expect(recoveryLockup.titleX + (recoveryLockup.plateWidth / 2)).toBeLessThanOrEqual(recoveryBand.right);
+    expect(recoveryLayout.safeBounds.width).toBeGreaterThanOrEqual(defaultLayout.safeBounds.width);
+
+    disposeMazeEpisode(episode);
   });
 
   test('play, options, and win scene files are removed and the menu stays ambient-first', () => {
