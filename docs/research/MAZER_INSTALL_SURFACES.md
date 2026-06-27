@@ -9,7 +9,7 @@ Mazer already has a solid baseline install lane for a browser-first ambient prod
 - iPhone/iPad-style browsers fall back to manual text: `Use Share > Add to Home Screen`.
 - Windows already has a practical non-store launcher lane via `scripts/windows/Launch-Mazer.ps1` and `scripts/windows/Prepare-MazerShortcut.ps1`.
 
-That means Mazer does **not** currently have an install problem so much as an install-surface expectations problem. The current button can legitimately "skip" because `beforeinstallprompt` is not a universal install API. It is a Chromium-centric, non-standard event that only appears when the browser decides the app is installable on that device and session. The runtime in [`src/boot/installSurface.ts`](C:/ATLAS/repos/fawxzzy-mazer/src/boot/installSurface.ts) already handles that correctly by failing open instead of blocking the ambient product.
+That means Mazer does **not** currently have an install problem so much as an install-surface expectations problem. The current button can legitimately "skip" because `beforeinstallprompt` is not a universal install API. It is a Chromium-centric, non-standard event that only appears when the browser decides the app is installable on that device and session. The runtime in `src/boot/installSurface.ts` already handles that correctly by failing open instead of blocking the ambient product.
 
 My recommendation is to stay disciplined:
 
@@ -21,26 +21,26 @@ My recommendation is to stay disciplined:
 
 ## Current repo state
 
-This document is based on the current repo implementation in `C:\ATLAS\repos\fawxzzy-mazer`.
+This document is based on the current `repos/mazer` implementation.
 
 ### Current install surface
 
-- [`src/boot/installSurface.ts`](C:/ATLAS/repos/fawxzzy-mazer/src/boot/installSurface.ts) captures `beforeinstallprompt`, stores the deferred event, clears it after use, listens for `appinstalled`, and resolves a three-state UI model: `hidden`, `available`, or `manual`.
-- [`src/scenes/MenuScene.ts`](C:/ATLAS/repos/fawxzzy-mazer/src/scenes/MenuScene.ts) renders exactly one title-plate install affordance: either `Install Mazer`, the manual iOS instruction, or passive text.
-- [`tests/boot/install-surface.test.ts`](C:/ATLAS/repos/fawxzzy-mazer/tests/boot/install-surface.test.ts) covers accepted install, standalone hiding, and iOS manual fallback behavior.
+- `src/boot/installSurface.ts` captures `beforeinstallprompt`, stores the deferred event, clears it after use, listens for `appinstalled`, and resolves a three-state UI model: `hidden`, `available`, or `manual`.
+- `src/scenes/MenuScene.ts` renders exactly one title-plate install affordance: either `Install Mazer`, the manual iOS instruction, or passive text.
+- `tests/boot/install-surface.test.ts` covers accepted install, standalone hiding, and iOS manual fallback behavior.
 
 ### Current PWA wiring
 
-- [`index.html`](C:/ATLAS/repos/fawxzzy-mazer/index.html) links the manifest, touch icon, theme color, and mobile web app meta tags.
-- [`public/manifest.webmanifest`](C:/ATLAS/repos/fawxzzy-mazer/public/manifest.webmanifest) sets `display: "standalone"`, `orientation: "landscape"`, and repository-owned icon assets.
-- [`vite.config.ts`](C:/ATLAS/repos/fawxzzy-mazer/vite.config.ts) uses `vite-plugin-pwa` with `registerType: "autoUpdate"` and `devOptions.enabled = false`.
-- [`src/boot/main.ts`](C:/ATLAS/repos/fawxzzy-mazer/src/boot/main.ts) explicitly unregisters localhost service workers to avoid stale development state.
+- `index.html` links the manifest, touch icon, theme color, and mobile web app meta tags.
+- `public/manifest.webmanifest` sets `display: "standalone"`, `orientation: "landscape"`, and repository-owned icon assets.
+- `vite.config.ts` uses `vite-plugin-pwa` with `registerType: "autoUpdate"` and `devOptions.enabled = false`.
+- `src/boot/main.ts` explicitly unregisters localhost service workers to avoid stale development state.
 
 ### Current Windows lane
 
-- [`scripts/windows/Launch-Mazer.ps1`](C:/ATLAS/repos/fawxzzy-mazer/scripts/windows/Launch-Mazer.ps1) builds the preview URL, prefers Microsoft Edge, and launches `--app=<url>` when available.
-- [`scripts/windows/Prepare-MazerShortcut.ps1`](C:/ATLAS/repos/fawxzzy-mazer/scripts/windows/Prepare-MazerShortcut.ps1) creates a desktop shortcut that points to the repo-owned launcher and uses the repo icon.
-- [`README.md`](C:/ATLAS/repos/fawxzzy-mazer/README.md) already tells users to create a shortcut, launch once, then pin the Edge app window or shortcut to the taskbar.
+- `scripts/windows/Launch-Mazer.ps1` builds the preview URL, prefers Microsoft Edge, and launches `--app=<url>` when available.
+- `scripts/windows/Prepare-MazerShortcut.ps1` creates a desktop shortcut that points to the repo-owned launcher and uses the repo icon.
+- `README.md` already tells users to create a shortcut, launch once, then pin the Edge app window or shortcut to the taskbar.
 
 ## Why the current install button can "skip"
 
@@ -221,7 +221,7 @@ If the next business goal were "ship on phones," I would choose **Capacitor** in
 - There is no current native shell or packaging scaffold for Tauri, Electron, Capacitor, or Bubblewrap.
 - The repo is landscape-first and ambient-first; mobile-store work would require a stronger device QA and interaction decision than the current docs imply.
 - Roku would require a separate product lane and technology stack.
-- [`docs/mobile-plan.md`](C:/ATLAS/repos/fawxzzy-mazer/docs/mobile-plan.md) still references older asset paths such as `/public/favicon.svg` and `/public/apple-touch-icon.png`, while the current repo uses [`index.html`](C:/ATLAS/repos/fawxzzy-mazer/index.html) plus [`public/icons/icon-192.png`](C:/ATLAS/repos/fawxzzy-mazer/public/icons/icon-192.png). I did not change that file in this pass, but the mismatch should be cleaned up before a future packaging implementation wave.
+- `docs/mobile-plan.md` still references older asset paths such as `/public/favicon.svg` and `/public/apple-touch-icon.png`, while the current repo uses `index.html` plus `public/icons/icon-192.png`. I did not change that file in this pass, but the mismatch should be cleaned up before a future packaging implementation wave.
 
 ## Sources
 

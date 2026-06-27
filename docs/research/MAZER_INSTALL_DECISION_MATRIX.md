@@ -95,14 +95,14 @@ If I score these lanes against the current repo state, the ranking is:
 
 ## Mazer-specific evidence anchors
 
-- Current install runtime: [`src/boot/installSurface.ts`](C:/ATLAS/repos/fawxzzy-mazer/src/boot/installSurface.ts)
-- Current title-plate install UX: [`src/scenes/MenuScene.ts`](C:/ATLAS/repos/fawxzzy-mazer/src/scenes/MenuScene.ts)
-- Current manifest: [`public/manifest.webmanifest`](C:/ATLAS/repos/fawxzzy-mazer/public/manifest.webmanifest)
-- Current HTML wiring: [`index.html`](C:/ATLAS/repos/fawxzzy-mazer/index.html)
-- Current PWA plugin and SW stance: [`vite.config.ts`](C:/ATLAS/repos/fawxzzy-mazer/vite.config.ts)
-- Current localhost SW cleanup: [`src/boot/main.ts`](C:/ATLAS/repos/fawxzzy-mazer/src/boot/main.ts)
-- Current Windows launcher lane: [`scripts/windows/Launch-Mazer.ps1`](C:/ATLAS/repos/fawxzzy-mazer/scripts/windows/Launch-Mazer.ps1)
-- Current Windows shortcut lane: [`scripts/windows/Prepare-MazerShortcut.ps1`](C:/ATLAS/repos/fawxzzy-mazer/scripts/windows/Prepare-MazerShortcut.ps1)
+- Current install runtime: `src/boot/installSurface.ts`
+- Current title-plate install UX: `src/scenes/MenuScene.ts`
+- Current manifest: `public/manifest.webmanifest`
+- Current HTML wiring: `index.html`
+- Current PWA plugin and SW stance: `vite.config.ts`
+- Current localhost SW cleanup: `src/boot/main.ts`
+- Current Windows launcher lane: `scripts/windows/Launch-Mazer.ps1`
+- Current Windows shortcut lane: `scripts/windows/Prepare-MazerShortcut.ps1`
 
 ## External references
 

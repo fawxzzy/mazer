@@ -21,7 +21,7 @@ That means the current system is polished and coherent, but it is over-curated f
 
 ## Repo Truth
 
-This diagnosis is based on current code in `C:\ATLAS\repos\fawxzzy-mazer`.
+This diagnosis is based on the current `repos/mazer` implementation.
 
 - `src/scenes/MenuScene.ts`
   - Owns the ambient loop.

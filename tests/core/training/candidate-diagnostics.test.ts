@@ -265,7 +265,7 @@ describe('candidate diagnostics', () => {
       baselineSummary,
       candidateRecords,
       candidateEvalSummaries,
-      baselineEvalSummaryPath: 'C:/ATLAS/repos/fawxzzy-mazer/tmp/eval/candidate-diagnostics/current-blessed/runtime-eval-summary.json',
+      baselineEvalSummaryPath: 'tmp/eval/candidate-diagnostics/current-blessed/runtime-eval-summary.json',
       createdAt: '2026-04-16T01:00:00.000Z'
     });
     const markdown = renderCandidateDiagnosticsMarkdown(report);
