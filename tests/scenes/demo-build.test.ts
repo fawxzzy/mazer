@@ -603,7 +603,7 @@ describe('demo-only build', () => {
     const defaultModel = resolveMenuPresentationModel(1920, 1080, 'title', 'full', true);
     const recoveryModel = resolveMenuPresentationModel(1920, 1080, 'title', 'full', true, 'recovery');
     const defaultTitleBand = resolveTitleBandFrame(defaultModel.viewport.width, defaultModel.layout);
-    const recoveryTitleBand = resolveTitleBandFrame(recoveryModel.viewport.width, recoveryModel.layout, undefined, undefined, 'recovery');
+    const recoveryTitleBand = resolveTitleBandFrame(recoveryModel.viewport.width, recoveryModel.layout, undefined, undefined, 'recovery', 490);
     const defaultBoardFrame = resolveBoardCompositionFrame(
       defaultModel.viewport.width,
       defaultModel.viewport.height,
@@ -642,6 +642,8 @@ describe('demo-only build', () => {
     expect(recoveryBoardFrame.height).toBeGreaterThan(defaultBoardFrame.height);
     expect(recoveryBoardFrame.width).toBeLessThan(defaultBoardFrame.width);
     expect(recoveryLayout.boardHeight).toBeGreaterThan(defaultLayout.boardHeight);
+    expect(Math.abs(recoveryTitleBand.centerX - recoveryBoardFrame.centerX)).toBeLessThanOrEqual(2);
+    expect(recoveryTitleBand.right).toBeLessThan(defaultTitleBand.right);
 
     disposeMazeEpisode(episode);
   });
