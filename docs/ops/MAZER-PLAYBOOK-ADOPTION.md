@@ -1,6 +1,6 @@
 # Mazer Playbook Adoption
 
-This repo claims the Playbook owner contract `playbook_convergence_contract` at version `1.0.0` from `repos/fawxzzy-playbook/exports/playbook.contract.example.v1.json`.
+This repo claims the Playbook owner contract `playbook_convergence_contract` at version `1.0.0` from `repos/playbook/exports/playbook.contract.example.v1.json`.
 
 It does not copy the Playbook contract locally. Repo-owned evidence for this tranche lives in:
 

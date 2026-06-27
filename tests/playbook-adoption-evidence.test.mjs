@@ -13,7 +13,7 @@ const schemaPath = path.join(exportsDir, "repo.playbook.adoption.evidence.schema
 const playbookContractPath = path.resolve(
   repoRoot,
   "..",
-  "fawxzzy-playbook",
+  "playbook",
   "exports",
   "playbook.contract.example.v1.json"
 );

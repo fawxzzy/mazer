@@ -15,7 +15,7 @@
     "contract_id": "playbook_convergence_contract",
     "contract_version": "1.0.0",
     "source_repo_id": "playbook",
-    "source_export_path": "repos/fawxzzy-playbook/exports/playbook.contract.example.v1.json",
+    "source_export_path": "repos/playbook/exports/playbook.contract.example.v1.json",
     "claim_state": "declared",
     "notes": [
       "The repo references the Playbook owner export directly instead of copying the contract into local doctrine.",
