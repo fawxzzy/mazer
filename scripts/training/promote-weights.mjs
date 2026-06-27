@@ -1,11 +1,12 @@
 import { mkdir } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   compareMetrics,
   getCurrentBlessedWeightRecord,
   parseCliArgs,
   readJson,
+  resolveStoredRepoPath,
   resolveRuntimeBenchmarkPack,
   stableSerialize,
   writeJson
@@ -61,15 +62,8 @@ const createEmptyRegistry = () => ({
   blessed: []
 });
 
-const resolveRepoPath = (value) => {
-  if (typeof value !== 'string' || value.length === 0) {
-    return null;
-  }
-
-  return isAbsolute(value) ? value : resolve(REPO_ROOT, value);
-};
-
-const resolveCandidateEvalSummaryPath = (record) => resolveRepoPath(
+const resolveCandidateEvalSummaryPath = (record) => resolveStoredRepoPath(
+  REPO_ROOT,
   record?.metadata?.artifactPaths?.evalSummaryPath
   ?? record?.metadata?.evalSummary?.path
 );

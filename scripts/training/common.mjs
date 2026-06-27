@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
+import { isAbsolute, resolve } from 'node:path';
 import {
   resolveLifelineBenchmarkPack,
   resolveLifelineBenchmarkScenarioById,
@@ -114,6 +116,46 @@ const parseCliArgs = (argv = process.argv.slice(2)) => {
 };
 
 const readJson = async (filePath) => JSON.parse(await readFile(filePath, 'utf8'));
+
+const normalizePathSlashes = (value) => value.replace(/\\/g, '/');
+
+const rebaseStoredRepoAbsolutePath = (repoRoot, value) => {
+  const normalizedValue = normalizePathSlashes(value);
+  const reposMarker = '/repos/';
+  const reposIndex = normalizedValue.indexOf(reposMarker);
+  if (reposIndex < 0) {
+    return null;
+  }
+
+  const repoNameStart = reposIndex + reposMarker.length;
+  const repoNameEnd = normalizedValue.indexOf('/', repoNameStart);
+  if (repoNameEnd < 0 || repoNameEnd >= normalizedValue.length - 1) {
+    return null;
+  }
+
+  return resolve(repoRoot, normalizedValue.slice(repoNameEnd + 1));
+};
+
+const resolveStoredRepoPath = (repoRoot, value) => {
+  if (typeof value !== 'string' || value.length === 0) {
+    return null;
+  }
+
+  if (!isAbsolute(value)) {
+    return resolve(repoRoot, value);
+  }
+
+  if (existsSync(value)) {
+    return value;
+  }
+
+  const rebasedPath = rebaseStoredRepoAbsolutePath(repoRoot, value);
+  if (rebasedPath && existsSync(rebasedPath)) {
+    return rebasedPath;
+  }
+
+  return value;
+};
 
 const sleep = (ms) => new Promise((resolve) => {
   setTimeout(resolve, ms);
@@ -304,6 +346,7 @@ export {
   hashStableValue,
   parseCliArgs,
   readJson,
+  resolveStoredRepoPath,
   resolveBlessedPlaybookWeights,
   resolvePlaybookTuningWeights,
   resolveRuntimeBenchmarkPack,

@@ -1,6 +1,5 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
-import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   build: {
@@ -29,29 +28,5 @@ export default defineConfig({
         }
       }
     }
-  },
-  plugins: [
-    VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
-      manifestFilename: 'manifest.webmanifest',
-      includeAssets: [
-        'icons/icon-192.png',
-        'icons/icon-512.png',
-        'icons/icon-192-maskable.png',
-        'icons/icon-512-maskable.png'
-      ],
-      manifest: false,
-      // Keep localhost development SW-free to prevent stale caches while iterating.
-      devOptions: {
-        enabled: false
-      },
-      workbox: {
-        cacheId: 'mazer-v1',
-        navigateFallbackDenylist: [/^\/__/, /^\/@vite\//],
-        skipWaiting: true,
-        clientsClaim: true
-      }
-    })
-  ]
+  }
 });

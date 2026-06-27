@@ -495,7 +495,7 @@ describe('manual blessing review pack', () => {
     const nextRegistry = applyManualBlessing({
       registry,
       candidateRecord: registry.candidates[0],
-      reviewArtifactPath: 'C:/ATLAS/repos/fawxzzy-mazer/tmp/training/manual-blessing-review-pack-v5/connector-recovery-biased.review.json',
+      reviewArtifactPath: 'tmp/training/manual-blessing-review-pack-v5/connector-recovery-biased.review.json',
       updatedAt: '2026-04-15T02:00:00.000Z'
     });
 

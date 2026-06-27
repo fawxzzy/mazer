@@ -1,14 +1,8 @@
 import Phaser from 'phaser';
 import '../styles/base.css';
 import { startBootTiming } from './bootTiming';
-import { initializeInstallSurface } from './installSurface';
 import { phaserConfig } from './phaserConfig';
 import { resolveBrowserViewport } from '../render/viewport';
-
-const isLocalhost =
-  window.location.hostname === 'localhost' ||
-  window.location.hostname === '127.0.0.1' ||
-  window.location.hostname === '[::1]';
 
 const VIEWPORT_WIDTH_CSS_VAR = '--mazer-viewport-width';
 const VIEWPORT_HEIGHT_CSS_VAR = '--mazer-viewport-height';
@@ -66,17 +60,7 @@ const installViewportSurfaceSync = (game: Phaser.Game): (() => void) => {
 
 startBootTiming('boot:main-start');
 
-if ('serviceWorker' in navigator && isLocalhost) {
-  navigator.serviceWorker
-    .getRegistrations()
-    .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
-    .catch(() => {
-      // no-op: we explicitly avoid stale local SW state during development
-    });
-}
-
 applyViewportSurface();
-initializeInstallSurface();
 const game = new Phaser.Game(phaserConfig);
 const removeViewportSurfaceSync = installViewportSurfaceSync(game);
 const hot = (import.meta as ImportMeta & { hot?: { dispose(callback: () => void): void } }).hot;

@@ -476,9 +476,9 @@ describe('edge live check', () => {
           text: 'Failed to load resource: the server responded with a status of 404 (Not Found)'
         }
       ],
-      runDir: 'C:/ATLAS/tmp/captures/mazer-edge-live/watch-pass-preview',
-      metadataPath: 'C:/ATLAS/tmp/captures/mazer-edge-live/watch-pass-preview/metadata/watch-pass-ios-full-phone-portrait.failure.json',
-      screenshotPath: 'C:/ATLAS/tmp/captures/mazer-edge-live/watch-pass-preview/screenshots/watch-pass-ios-full-phone-portrait.failure.png'
+      runDir: 'C:/example/tmp/captures/mazer-edge-live/watch-pass-preview',
+      metadataPath: 'C:/example/tmp/captures/mazer-edge-live/watch-pass-preview/metadata/watch-pass-ios-full-phone-portrait.failure.json',
+      screenshotPath: 'C:/example/tmp/captures/mazer-edge-live/watch-pass-preview/screenshots/watch-pass-ios-full-phone-portrait.failure.png'
     });
 
     expect(artifact.workflowId).toBe('watch-pass-preview');
