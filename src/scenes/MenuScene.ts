@@ -4,6 +4,7 @@ import type {
   AmbientFamilyThemePairingPolicy,
   PresentationChrome,
   PresentationContentProfile,
+  PresentationDesignProfile,
   PresentationDeploymentProfile,
   PresentationLaunchConfig,
   PresentationMode,
@@ -903,6 +904,106 @@ const createThemePalette = (overrides: ThemePaletteOverrides): typeof palette =>
   },
   ui: palette.ui
 });
+
+const toRgb = (value: number): { r: number; g: number; b: number } => ({
+  r: (value >> 16) & 0xff,
+  g: (value >> 8) & 0xff,
+  b: value & 0xff
+});
+
+const fromRgb = (r: number, g: number, b: number): number => (
+  ((Math.round(r) & 0xff) << 16)
+  | ((Math.round(g) & 0xff) << 8)
+  | (Math.round(b) & 0xff)
+);
+
+const mixSceneColor = (from: number, to: number, amount: number): number => {
+  const safeAmount = clamp(amount, 0, 1);
+  const start = toRgb(from);
+  const end = toRgb(to);
+  return fromRgb(
+    start.r + ((end.r - start.r) * safeAmount),
+    start.g + ((end.g - start.g) * safeAmount),
+    start.b + ((end.b - start.b) * safeAmount)
+  );
+};
+
+const buildRecoveryThemeProfile = (base: AmbientThemeProfile): AmbientThemeProfile => {
+  const recoveredPalette = base.palette;
+
+  return {
+    ...base,
+    label: `${base.label} RECOVERY`,
+    palette: recoveredPalette,
+    boardTheme: {
+      ...base.boardTheme,
+      trailFillAlphaScale: (base.boardTheme.trailFillAlphaScale ?? 1) * 0.84,
+      trailGlowAlphaScale: (base.boardTheme.trailGlowAlphaScale ?? 1) * 0.78,
+      trailCoreAlphaScale: (base.boardTheme.trailCoreAlphaScale ?? 1) * 0.88,
+      actorHaloAlphaScale: (base.boardTheme.actorHaloAlphaScale ?? 1) * 1.12,
+      goalGlowAlphaScale: (base.boardTheme.goalGlowAlphaScale ?? 1) * 1.1
+    },
+    hudTheme: {
+      ...base.hudTheme,
+      railAlphaScale: (base.hudTheme.railAlphaScale ?? 1) * 0.82,
+      modeAlphaScale: (base.hudTheme.modeAlphaScale ?? 1) * 0.78,
+      metaAlphaScale: (base.hudTheme.metaAlphaScale ?? 1) * 0.74,
+      flashAlphaScale: (base.hudTheme.flashAlphaScale ?? 1) * 0.72
+    },
+    background: {
+      ...base.background,
+      cloudAlphaScale: base.background.cloudAlphaScale * 0.72,
+      farStarAlphaScale: base.background.farStarAlphaScale * 0.82,
+      nearStarAlphaScale: base.background.nearStarAlphaScale * 0.78,
+      vignetteAlphaScale: base.background.vignetteAlphaScale * 0.94
+    },
+    shell: {
+      ...base.shell,
+      auraAlphaBias: base.shell.auraAlphaBias - 0.016,
+      haloAlphaBias: base.shell.haloAlphaBias - 0.014,
+      shadeAlphaBias: base.shell.shadeAlphaBias - 0.01,
+      veilAlphaBias: base.shell.veilAlphaBias - 0.018,
+      motifPrimaryAlpha: base.shell.motifPrimaryAlpha * 0.72,
+      motifSecondaryAlpha: base.shell.motifSecondaryAlpha * 0.64,
+      blueprintAccentAlphaScale: base.shell.blueprintAccentAlphaScale * 0.84
+    },
+    presentation: {
+      ...base.presentation,
+      driftScale: base.presentation.driftScale * 0.84,
+      offsetScale: base.presentation.offsetScale * 0.78,
+      metadataAlphaBias: base.presentation.metadataAlphaBias - 0.04,
+      flashAlphaBias: base.presentation.flashAlphaBias - 0.02,
+      actorPulseBias: base.presentation.actorPulseBias + 0.004
+    },
+    ambientSky: {
+      ...base.ambientSky,
+      staticStarDensityScale: base.ambientSky.staticStarDensityScale * 0.84,
+      twinkleDensityScale: base.ambientSky.twinkleDensityScale * 0.82,
+      hazeAlphaScale: base.ambientSky.hazeAlphaScale * 0.76,
+      driftMoteDensityScale: base.ambientSky.driftMoteDensityScale * 0.74,
+      shootingIntervalScale: base.ambientSky.shootingIntervalScale * 1.12,
+      cometIntervalScale: base.ambientSky.cometIntervalScale * 1.16,
+      satelliteIntervalScale: base.ambientSky.satelliteIntervalScale * 1.18,
+      ufoIntervalScale: base.ambientSky.ufoIntervalScale * 1.18,
+      motifAlphaScale: base.ambientSky.motifAlphaScale * 0.78,
+      veilWidthScale: base.ambientSky.veilWidthScale * 0.92,
+      veilHeightScale: base.ambientSky.veilHeightScale * 0.88
+    },
+    title: {
+      ...base.title,
+      plateOuterColor: mixSceneColor(base.title.plateOuterColor, recoveredPalette.board.outer, 0.34),
+      plateInnerColor: mixSceneColor(base.title.plateInnerColor, recoveredPalette.board.panel, 0.28),
+      plateLineColor: mixSceneColor(base.title.plateLineColor, recoveredPalette.board.outerStroke, 0.12),
+      buttonFillColor: mixSceneColor(base.title.buttonFillColor, recoveredPalette.board.panel, 0.22)
+    }
+  };
+};
+
+const RECOVERY_THEME_PROFILE_CACHE: Partial<Record<PresentationThemeFamily, AmbientThemeProfile>> = {};
+
+const isRecoveryDesignProfile = (
+  design: PresentationDesignProfile | null | undefined
+): boolean => design === 'recovery';
 
 const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
   noir: {
@@ -1936,16 +2037,18 @@ const resolveBoardEdgeBufferPx = (
 
 const resolveTitleBandMetrics = (
   sceneLayout: SceneLayoutProfile,
-  profile?: PresentationDeploymentProfile
+  profile?: PresentationDeploymentProfile,
+  design?: PresentationDesignProfile
 ): TitleBandMetrics => {
   const compact = sceneLayout.isTiny || sceneLayout.isNarrow;
+  const recovery = isRecoveryDesignProfile(design);
   return {
-    bandInset: compact ? COMPACT_TITLE_BAND_INSET_PX : DEFAULT_TITLE_BAND_INSET_PX,
+    bandInset: Math.max(4, (compact ? COMPACT_TITLE_BAND_INSET_PX : DEFAULT_TITLE_BAND_INSET_PX) - (recovery ? 1 : 0)),
     bandHeight: compact
-      ? COMPACT_TITLE_BAND_HEIGHT_PX + (sceneLayout.isPortrait ? 0 : 2)
-      : DEFAULT_TITLE_BAND_HEIGHT_PX + (sceneLayout.isPortrait ? 2 : 0),
-    minHeight: compact ? 34 : 44,
-    boardGap: resolveBoardEdgeBufferPx(sceneLayout, profile) + (compact ? 1 : 4)
+      ? (COMPACT_TITLE_BAND_HEIGHT_PX + (sceneLayout.isPortrait ? 0 : 2) - (recovery ? 6 : 0))
+      : (DEFAULT_TITLE_BAND_HEIGHT_PX + (sceneLayout.isPortrait ? 2 : 0) - (recovery ? 8 : 0)),
+    minHeight: compact ? (recovery ? 30 : 34) : (recovery ? 38 : 44),
+    boardGap: Math.max(4, resolveBoardEdgeBufferPx(sceneLayout, profile) + (compact ? 1 : 4) - (recovery ? 2 : 0))
   };
 };
 
@@ -2494,8 +2597,24 @@ const resolveDeploymentPresentationProfile = (
   profile ? DEPLOYMENT_PRESENTATION_PROFILES[profile] : DEFAULT_DEPLOYMENT_PRESENTATION_PROFILE
 );
 
-export const resolveAmbientThemeProfile = (theme: PresentationThemeFamily): AmbientThemeProfile => (
-  THEME_PROFILES[theme]
+const resolveRecoveredAmbientThemeProfile = (theme: PresentationThemeFamily): AmbientThemeProfile => {
+  const cached = RECOVERY_THEME_PROFILE_CACHE[theme];
+  if (cached) {
+    return cached;
+  }
+
+  const recovered = buildRecoveryThemeProfile(THEME_PROFILES[theme]);
+  RECOVERY_THEME_PROFILE_CACHE[theme] = recovered;
+  return recovered;
+};
+
+export const resolveAmbientThemeProfile = (
+  theme: PresentationThemeFamily,
+  design?: PresentationDesignProfile
+): AmbientThemeProfile => (
+  isRecoveryDesignProfile(design)
+    ? resolveRecoveredAmbientThemeProfile(theme)
+    : THEME_PROFILES[theme]
 );
 
 export interface TitleBandFrame {
@@ -2595,6 +2714,7 @@ export interface MenuSceneVisualDiagnostics {
   variant: AmbientPresentationVariant;
   chrome: PresentationChrome;
   profile?: PresentationDeploymentProfile;
+  design?: PresentationDesignProfile;
   theme: PresentationThemeFamily;
   viewport: {
     width: number;
@@ -3893,13 +4013,14 @@ export function resolveMenuPresentationModel(
   chrome: PresentationChrome = DEFAULT_PRESENTATION_CHROME,
   titleVisible = true,
   profile?: PresentationDeploymentProfile,
-  safeInsets?: Partial<ViewportSafeInsets> | null
+  safeInsets?: Partial<ViewportSafeInsets> | null,
+  design?: PresentationDesignProfile
 ): MenuPresentationModel {
   const viewport = resolveViewportSize(width, height, DEFAULT_VIEWPORT_WIDTH, DEFAULT_VIEWPORT_HEIGHT);
 
   return {
     viewport,
-    layout: resolveSceneLayoutProfile(viewport.width, viewport.height, variant, chrome, titleVisible, profile, safeInsets)
+    layout: resolveSceneLayoutProfile(viewport.width, viewport.height, variant, chrome, titleVisible, profile, safeInsets, design)
   };
 }
 
@@ -3909,11 +4030,12 @@ export function resolveTitleBandFrame(
   boardLayout?: BoardLayout | null,
   safeInsets?: Partial<ViewportSafeInsets> | null,
   profile?: PresentationDeploymentProfile,
-  reservedRightPx = 0
+  reservedRightPx = 0,
+  design?: PresentationDesignProfile
 ): TitleBandFrame {
   const viewportSafeInsets = sanitizeViewportSafeInsets(safeInsets);
   const compact = sceneLayout.isTiny || sceneLayout.isNarrow;
-  const metrics = resolveTitleBandMetrics(sceneLayout, profile);
+  const metrics = resolveTitleBandMetrics(sceneLayout, profile, design);
   const bandInset = metrics.bandInset;
   const safeRightInset = Math.max(viewportSafeInsets.right + bandInset, sceneLayout.sidePadding + bandInset);
   const reservedRight = Math.max(0, Math.round(reservedRightPx));
@@ -3959,13 +4081,15 @@ export function resolveTitleLockupLayout(
   titleBandFrame: TitleBandFrame,
   variant: AmbientPresentationVariant,
   chrome: PresentationChrome = DEFAULT_PRESENTATION_CHROME,
-  profile?: PresentationDeploymentProfile
+  profile?: PresentationDeploymentProfile,
+  design?: PresentationDesignProfile
 ): TitleLockupLayout {
   const safeVariant = sanitizePresentationVariant(variant);
   const safeChrome = CHROME_PROFILES[chrome] ? chrome : DEFAULT_PRESENTATION_CHROME;
   const variantProfile = VARIANT_PROFILES[safeVariant];
   const chromeProfile = CHROME_PROFILES[safeChrome];
   const deploymentProfile = profile ? DEPLOYMENT_PRESENTATION_PROFILES[profile] : DEFAULT_DEPLOYMENT_PRESENTATION_PROFILE;
+  const recoveryScale = isRecoveryDesignProfile(design) ? 0.92 : 1;
   const titlePlateMaxWidth = Math.max(112, titleBandFrame.width - 24);
   const titlePlateMinWidth = Math.min(
     profile === 'recovery'
@@ -3980,6 +4104,7 @@ export function resolveTitleLockupLayout(
         * variantProfile.titleScale
         * chromeProfile.titleScale
         * deploymentProfile.titlePlateWidthScale
+        * recoveryScale
     ),
     titlePlateMinWidth,
     Math.max(Math.min(sceneLayout.isPortrait ? 320 : 368, titlePlateMaxWidth), 112)
@@ -3991,6 +4116,7 @@ export function resolveTitleLockupLayout(
         * Phaser.Math.Linear(0.86, 0.98, variantProfile.titleScale * Math.max(0.72, chromeProfile.titleScale))
         * 0.88
         * deploymentProfile.titlePlateHeightScale
+        * recoveryScale
     ),
     sceneLayout.isTiny ? 28 : 34,
     Math.max(legacyTuning.menu.title.plateHeightMaxPx - 6, 48)
@@ -4006,11 +4132,12 @@ export function resolveTitleLockupLayout(
   );
   const titleFontSize = Phaser.Math.Clamp(
     Math.round(
-      boardLayout.boardSize
-        * legacyTuning.menu.title.fontScaleToBoard
-        * variantProfile.titleScale
-        * chromeProfile.titleScale
-        * 0.9
+        boardLayout.boardSize
+          * legacyTuning.menu.title.fontScaleToBoard
+          * variantProfile.titleScale
+          * chromeProfile.titleScale
+          * 0.9
+          * recoveryScale
     ),
     sceneLayout.isNarrow ? 20 : 26,
     Math.max(sceneLayout.isNarrow ? 22 : 26, Math.round(plateHeight * 0.74))
@@ -4021,7 +4148,7 @@ export function resolveTitleLockupLayout(
   const subtitleLineHeightScale = sceneLayout.isTiny ? 1.08 : 1.18;
   const subtitleBaseFontSize = Math.max(
     8,
-    Math.round((sceneLayout.isTiny ? 8 : sceneLayout.isNarrow ? 9 : 10) * deploymentProfile.titleLineSpacingScale)
+    Math.round((sceneLayout.isTiny ? 8 : sceneLayout.isNarrow ? 9 : 10) * deploymentProfile.titleLineSpacingScale * recoveryScale)
   );
   const subtitleLetterSpacing = sceneLayout.isNarrow ? 0.8 : 1.2;
   const minSubtitleGap = Math.max(
@@ -4315,7 +4442,8 @@ export class MenuScene extends Phaser.Scene {
       chrome,
       titleVisible,
       deploymentProfileId,
-      viewportSafeInsets
+      viewportSafeInsets,
+      launchConfig.design
     );
     const { width, height } = presentationModel.viewport;
     const visualCaptureConfig = resolveMenuSceneVisualCaptureConfig();
@@ -4991,7 +5119,7 @@ export class MenuScene extends Phaser.Scene {
       });
       pendingCyclePlan = undefined;
       this.activeTheme = demoCyclePlan.theme;
-      const sceneThemeProfile = resolveAmbientThemeProfile(demoCyclePlan.theme);
+      const sceneThemeProfile = resolveAmbientThemeProfile(demoCyclePlan.theme, launchConfig.design);
       this.add.rectangle(0, 0, width, height, sceneThemeProfile.palette.background.deepSpace, 1)
         .setOrigin(0)
         .setDepth(AMBIENT_SKY_DEPTHS.base - 1);
@@ -5125,7 +5253,7 @@ export class MenuScene extends Phaser.Scene {
           return;
         }
 
-        const themeProfile = resolveAmbientThemeProfile(this.activeTheme);
+        const themeProfile = resolveAmbientThemeProfile(this.activeTheme, launchConfig.design);
         const trailRender = episodePresentationShell.boardRenderer.getTrailRenderDiagnostics();
         const bootTiming = buildBootTimingReport();
         const activeEpisode = patternFrame?.episode;
@@ -5240,6 +5368,7 @@ export class MenuScene extends Phaser.Scene {
           variant,
           chrome,
           ...(deploymentProfileId ? { profile: deploymentProfileId } : {}),
+          ...(launchConfig.design ? { design: launchConfig.design } : {}),
           theme: this.activeTheme,
           viewport: {
             width,
@@ -5395,7 +5524,7 @@ export class MenuScene extends Phaser.Scene {
         episode: MazeEpisode,
         themeId: PresentationThemeFamily
       ): EpisodePresentationShell => {
-        const themeProfile = resolveAmbientThemeProfile(themeId);
+        const themeProfile = resolveAmbientThemeProfile(themeId, launchConfig.design);
         const installMetrics = measureInstallChromeMetrics(sceneThemeProfile, activeInstallState);
         const installTitleReserveRight = installMetrics
           ? resolveInstallChromeTitleReservePx(sceneLayout, installMetrics.chipWidth)
@@ -5414,7 +5543,8 @@ export class MenuScene extends Phaser.Scene {
             undefined,
             viewportSafeInsets,
             deploymentProfileId,
-            titleReserveRight
+            titleReserveRight,
+            launchConfig.design
           )
           : undefined;
         const installFrame = installMetrics
@@ -5773,9 +5903,18 @@ export class MenuScene extends Phaser.Scene {
           layout,
           viewportSafeInsets,
           deploymentProfileId,
-          titleReserveRight
+          titleReserveRight,
+          launchConfig.design
         );
-        const titleLockup = resolveTitleLockupLayout(layout, sceneLayout, titleBandFrame, variant, chrome, deploymentProfileId);
+        const titleLockup = resolveTitleLockupLayout(
+          layout,
+          sceneLayout,
+          titleBandFrame,
+          variant,
+          chrome,
+          deploymentProfileId,
+          launchConfig.design
+        );
         let titleY = titleLockup.titleY;
         let titleShadowY = titleLockup.titleShadowY;
         activeTitleBandFrame = titleBandFrame;
@@ -5926,7 +6065,7 @@ export class MenuScene extends Phaser.Scene {
           return;
         }
 
-        const themeProfile = resolveAmbientThemeProfile(presentation.theme);
+        const themeProfile = resolveAmbientThemeProfile(presentation.theme, launchConfig.design);
         const offsetX = sanitizeOffset(presentation.frameOffsetX);
         const offsetY = sanitizeOffset(presentation.frameOffsetY);
         shell.boardRenderer.setPresentationOffset(offsetX, offsetY);
@@ -6076,7 +6215,7 @@ export class MenuScene extends Phaser.Scene {
         if (deferredVisualSetupComplete) {
           hydrateEpisodePresentationDecorations(
             episodePresentationShell,
-            resolveAmbientThemeProfile(demoCyclePlan.theme)
+            resolveAmbientThemeProfile(demoCyclePlan.theme, launchConfig.design)
           );
         }
         syncAmbientSkyReservedFrames();
@@ -7185,7 +7324,7 @@ export class MenuScene extends Phaser.Scene {
   private renderRecoveryShell(width: number, height: number, episode?: MazeEpisode): void {
     const safeWidth = sanitizePositive(width, DEFAULT_VIEWPORT_WIDTH);
     const safeHeight = sanitizePositive(height, DEFAULT_VIEWPORT_HEIGHT);
-    const themeProfile = resolveAmbientThemeProfile(this.activeTheme);
+    const themeProfile = resolveAmbientThemeProfile(this.activeTheme, this.launchConfig.design);
     const viewportSafeInsets = resolveViewportSafeInsets();
     const layoutModel = resolveMenuPresentationModel(
       safeWidth,
@@ -7194,7 +7333,8 @@ export class MenuScene extends Phaser.Scene {
       'full',
       true,
       this.launchConfig.profile,
-      viewportSafeInsets
+      viewportSafeInsets,
+      this.launchConfig.design
     );
 
     this.drawStarfield(safeWidth, safeHeight, themeProfile, legacyTuning.demo.seed, this.presentationVariant, this.launchConfig.profile, true);
@@ -7249,13 +7389,15 @@ export function resolveSceneLayoutProfile(
   chrome: PresentationChrome = DEFAULT_PRESENTATION_CHROME,
   titleVisible = true,
   deploymentProfileId?: PresentationDeploymentProfile,
-  safeInsets?: Partial<ViewportSafeInsets> | null
+  safeInsets?: Partial<ViewportSafeInsets> | null,
+  design?: PresentationDesignProfile
 ): SceneLayoutProfile {
   const safeVariant = sanitizePresentationVariant(variant);
   const safeChrome = CHROME_PROFILES[chrome] ? chrome : DEFAULT_PRESENTATION_CHROME;
   const chromeProfile = CHROME_PROFILES[safeChrome];
   const profile = VARIANT_PROFILES[safeVariant];
   const deploymentProfile = resolveDeploymentPresentationProfile(deploymentProfileId);
+  const recovery = isRecoveryDesignProfile(design);
   const viewportSafeInsets = sanitizeViewportSafeInsets(safeInsets);
   const safeWidth = sanitizePositive(width, DEFAULT_VIEWPORT_WIDTH);
   const safeHeight = sanitizePositive(height, DEFAULT_VIEWPORT_HEIGHT);
@@ -7270,6 +7412,7 @@ export function resolveSceneLayoutProfile(
       + deploymentProfile.boardScaleBias
       + (!titleVisible ? 0.004 : 0)
       + (isPortrait ? 0.006 + deploymentProfile.portraitBoardScaleBias : 0)
+      + (recovery ? 0.01 : 0)
       - (isTiny ? 0.026 : 0)
       - (titleVisible && isNarrow && isPortrait ? 0.01 : 0)
       - (isShort ? 0.012 : 0),
@@ -7279,18 +7422,19 @@ export function resolveSceneLayoutProfile(
   let topReserve = Math.max(
     Math.max(
       12,
-      profile.topReserveMinPx
-        + chromeProfile.topReserveBias
-        + deploymentProfile.topReserveBias
-        + (isPortrait ? 12 + deploymentProfile.portraitTopReserveBias : 0)
-        - (safeVariant === 'ambient' ? 6 : 0)
-        - (isTiny ? 28 : 0)
+        profile.topReserveMinPx
+          + chromeProfile.topReserveBias
+          + deploymentProfile.topReserveBias
+          - (recovery ? 10 : 0)
+          + (isPortrait ? 12 + deploymentProfile.portraitTopReserveBias : 0)
+          - (safeVariant === 'ambient' ? 6 : 0)
+          - (isTiny ? 28 : 0)
         - (!titleVisible ? 12 : 0)
     ),
     Math.round(
       safeHeight
         * (profile.topReserveRatio + (isPortrait ? 0.024 : 0) - (isShort ? 0.016 : 0) - (isTiny ? 0.04 : 0))
-    ) + chromeProfile.topReserveBias + deploymentProfile.topReserveBias
+    ) + chromeProfile.topReserveBias + deploymentProfile.topReserveBias - (recovery ? 10 : 0)
   ) + viewportSafeInsets.top;
   let bottomPadding = Math.max(
     6,
@@ -7300,6 +7444,7 @@ export function resolveSceneLayoutProfile(
       + (isPortrait ? 4 : 0)
       + (titleVisible && (deploymentProfileId === 'mobile' || isPortrait) ? 6 : 0)
       + (safeVariant === 'loading' ? 4 : 0)
+      - (recovery ? 4 : 0)
       - (isTiny ? 12 : 0)
   ) + viewportSafeInsets.bottom;
   const minimumBoardSpan = Math.max(24, Math.round(Math.min(safeWidth, safeHeight) * 0.2));
@@ -7318,6 +7463,7 @@ export function resolveSceneLayoutProfile(
       + deploymentProfile.sidePaddingBias
       + (isPortrait ? 2 : 0)
       + (isNarrow ? -2 : 0)
+      - (recovery ? 1 : 0)
       - (isTiny ? 4 : 0)
   ) + safeSideInset;
   const obsSafeVerticalPadding = Math.max(

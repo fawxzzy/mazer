@@ -204,11 +204,33 @@ describe('demo-only build', () => {
     expect(resolveBootPresentationConfig('?profile=recovery')).toEqual({
       presentation: 'title',
       chrome: 'full',
+    expect(resolveBootPresentationConfig('?design=recovery')).toEqual({
+      presentation: 'ambient',
+      chrome: 'minimal',
       mood: 'auto',
       title: 'show',
       theme: 'auto',
       mode: 'watch',
       profile: 'recovery'
+    });
+    expect(resolveBootPresentationConfig('?design=recovery')).toEqual({
+      presentation: 'ambient',
+      chrome: 'minimal',
+      mood: 'auto',
+      title: 'show',
+      theme: 'auto',
+      mode: 'watch',
+      design: 'recovery'
+    });
+    expect(resolveBootPresentationConfig('?design=recovery&profile=mobile')).toEqual({
+      presentation: 'ambient',
+      chrome: 'minimal',
+      mood: 'auto',
+      title: 'show',
+      theme: 'auto',
+      mode: 'watch',
+      profile: 'mobile',
+      design: 'recovery'
     });
     expect(resolveBootPresentationConfig('?content=full')).toEqual({
       presentation: 'title',
@@ -2004,8 +2026,9 @@ describe('demo-only build', () => {
   test('default presentation layout stays unchanged unless board-first chrome is requested', () => {
     const defaultModel = resolveMenuPresentationModel(1280, 720, DEFAULT_PRESENTATION_VARIANT);
     const explicitDefaultModel = resolveMenuPresentationModel(1280, 720, 'title', 'full', true);
-    const recoveryModel = resolveMenuPresentationModel(1280, 720, 'title', 'full', true, 'recovery');
+    const recoveryProfileModel = resolveMenuPresentationModel(1280, 720, 'title', 'full', true, 'recovery');
     const boardFirstModel = resolveMenuPresentationModel(1280, 720, 'ambient', 'none', false);
+    const recoveryDesignModel = resolveMenuPresentationModel(1280, 720, 'ambient', 'minimal', true, undefined, undefined, 'recovery');
     const tvModel = resolveMenuPresentationModel(1920, 1080, 'ambient', 'minimal', false, 'tv');
     const defaultAmbientModel = resolveMenuPresentationModel(1920, 1080, 'ambient', 'minimal', false);
     const obsModel = resolveMenuPresentationModel(1920, 1080, 'ambient', 'minimal', false, 'obs');
@@ -2013,11 +2036,13 @@ describe('demo-only build', () => {
     const mobileModel = resolveMenuPresentationModel(390, 844, 'ambient', 'full', true, 'mobile');
 
     expect(defaultModel).toEqual(explicitDefaultModel);
-    expect(recoveryModel.layout.topReserve).toBeLessThan(defaultModel.layout.topReserve);
-    expect(recoveryModel.layout.boardScale).toBeGreaterThan(defaultModel.layout.boardScale);
-    expect(recoveryModel.layout.boardScale).toBeLessThan(boardFirstModel.layout.boardScale);
+    expect(recoveryProfileModel.layout.topReserve).toBeLessThan(defaultModel.layout.topReserve);
+    expect(recoveryProfileModel.layout.boardScale).toBeGreaterThan(defaultModel.layout.boardScale);
+    expect(recoveryProfileModel.layout.boardScale).toBeLessThan(boardFirstModel.layout.boardScale);
     expect(defaultModel.layout.topReserve).toBeGreaterThan(boardFirstModel.layout.topReserve);
     expect(defaultModel.layout.boardScale).toBeLessThan(boardFirstModel.layout.boardScale);
+    expect(recoveryDesignModel.layout.topReserve).toBeLessThan(defaultModel.layout.topReserve);
+    expect(recoveryDesignModel.layout.boardScale).toBeGreaterThan(defaultModel.layout.boardScale);
     expect(tvModel.layout.topReserve).toBeLessThan(defaultAmbientModel.layout.topReserve);
     expect(obsModel.layout.sidePadding).toBeGreaterThan(defaultAmbientModel.layout.sidePadding);
     expect(mobileModel.layout.topReserve).toBeGreaterThan(portraitBaseModel.layout.topReserve);
