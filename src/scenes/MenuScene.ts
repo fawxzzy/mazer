@@ -1964,6 +1964,28 @@ const resolveInstallChromeTitleReservePx = (
   return Math.max(0, Math.round(chipWidth + gapPx));
 };
 
+const resolveTitleBandReservedRightPx = (
+  viewportWidth: number,
+  viewportHeight: number,
+  sceneLayout: SceneLayoutProfile,
+  installReservePx: number,
+  profile?: PresentationDeploymentProfile
+): number => {
+  const installReserve = Math.max(0, Math.round(installReservePx));
+
+  if (
+    profile !== 'recovery'
+    || resolveIntentFeedPresentationMode(viewportWidth, viewportHeight, sceneLayout, profile) !== 'commentary-rail'
+  ) {
+    return installReserve;
+  }
+
+  const railReserve = resolveIntentFeedCommentaryRailWidth(viewportWidth, sceneLayout)
+    + legacyTuning.menu.intentFeed.commentaryRailGapPx;
+
+  return Math.max(installReserve, railReserve);
+};
+
 const createSceneBounds = (
   left: number,
   top: number,
@@ -5375,9 +5397,16 @@ export class MenuScene extends Phaser.Scene {
       ): EpisodePresentationShell => {
         const themeProfile = resolveAmbientThemeProfile(themeId);
         const installMetrics = measureInstallChromeMetrics(sceneThemeProfile, activeInstallState);
-        const titleReserveRight = installMetrics
+        const installTitleReserveRight = installMetrics
           ? resolveInstallChromeTitleReservePx(sceneLayout, installMetrics.chipWidth)
           : 0;
+        const titleReserveRight = resolveTitleBandReservedRightPx(
+          width,
+          height,
+          sceneLayout,
+          installTitleReserveRight,
+          deploymentProfileId
+        );
         const titleFrame = titleVisible
           ? resolveTitleBandFrame(
             width,
@@ -5728,9 +5757,16 @@ export class MenuScene extends Phaser.Scene {
         }
 
         const installMetrics = measureInstallChromeMetrics(sceneThemeProfile, activeInstallState);
-        const titleReserveRight = installMetrics
+        const installTitleReserveRight = installMetrics
           ? resolveInstallChromeTitleReservePx(sceneLayout, installMetrics.chipWidth)
           : 0;
+        const titleReserveRight = resolveTitleBandReservedRightPx(
+          width,
+          height,
+          sceneLayout,
+          installTitleReserveRight,
+          deploymentProfileId
+        );
         const titleBandFrame = resolveTitleBandFrame(
           width,
           sceneLayout,
