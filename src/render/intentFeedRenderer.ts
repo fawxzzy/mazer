@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { legacyTuning } from '../config/tuning';
+import type { PresentationDeploymentProfile } from '../boot/presentation';
 import {
   MAX_INTENT_VISIBLE_ENTRIES,
   type IntentFeedState
@@ -82,6 +83,7 @@ interface IntentFeedPalette {
 
 interface IntentFeedHudOptions {
   palette?: typeof palette;
+  profile?: PresentationDeploymentProfile;
 }
 
 interface IntentFeedRiskMeta {
@@ -395,11 +397,16 @@ const resolveFeedHeight = (
   );
 };
 
-const resolveRailMode = (viewport: { width: number; height: number }): boolean => {
+const canUseRailMode = (
+  viewport: { width: number; height: number },
+  profile?: PresentationDeploymentProfile
+): boolean => {
   const tuning = legacyTuning.menu.intentFeed;
   const aspectRatio = viewport.width / Math.max(1, viewport.height);
+  const recoveryOverride = profile === 'recovery';
+  const railEnabled = recoveryOverride || tuning.commentaryRailEnabled;
 
-  if (!tuning.commentaryRailEnabled) {
+  if (!railEnabled) {
     return false;
   }
 
@@ -413,10 +420,11 @@ const resolveRailMode = (viewport: { width: number; height: number }): boolean =
 export const resolveIntentFeedPanelMetrics = (
   viewport: { width: number; height: number },
   hasStatus = true,
-  hasOnboarding = false
+  hasOnboarding = false,
+  profile?: PresentationDeploymentProfile
 ): IntentFeedPanelMetrics => {
   const compact = viewport.width <= legacyTuning.menu.layout.narrowBreakpoint;
-  const railMode = resolveRailMode(viewport);
+  const railMode = canUseRailMode(viewport, profile);
   const maxVisibleEvents = resolveMaxVisibleEvents(viewport, compact);
 
   return {
@@ -433,10 +441,11 @@ export const resolveIntentFeedLayout = (
   entryCount: number,
   anchors: IntentFeedLayoutAnchors = {},
   hasStatus = true,
-  hasOnboarding = false
+  hasOnboarding = false,
+  profile?: PresentationDeploymentProfile
 ): IntentFeedLayout => {
   const tuning = legacyTuning.menu.intentFeed;
-  const metrics = resolveIntentFeedPanelMetrics(viewport, hasStatus, hasOnboarding);
+  const metrics = resolveIntentFeedPanelMetrics(viewport, hasStatus, hasOnboarding, profile);
   const compact = metrics.compact;
   const railMode = metrics.mode === 'rail';
   const visibleEventCount = Math.max(0, Math.min(metrics.maxVisibleEvents, Math.trunc(entryCount)));
@@ -627,7 +636,8 @@ export const createIntentFeedHud = (
         rawEntries.length,
         anchors,
         reserveStatusLine,
-        false
+        false,
+        options.profile
       );
       const visibleEntries = resolveIntentFeedVisibleEntries(state, layout.maxVisibleEvents);
       const statusMaxChars = layout.compact

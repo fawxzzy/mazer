@@ -68,8 +68,9 @@ No Phaser scene code is used inside this lane.
 
 ### Deployment profiles
 
-- `profile=tv|obs|mobile` is a presentation-only resolver that sits on top of the existing URL param launch path.
+- `profile=tv|obs|mobile|recovery` is a presentation-only resolver that sits on top of the existing URL param launch path.
 - Profiles may adjust ambient defaults, chrome bias, spacing, drift, and safe framing, but they do not create alternate maze generation, solver, or retention paths.
+- `profile=recovery` is the current design-recovery inspection surface for the shipping 2D shell. It gives the board more weight, narrows the title chrome, quiets background motion, and on wide screens can shift the spectator feed to a side rail so the board gets more vertical room without opening the parked planet/3D lane.
 - The menu scene remains single-source for board state, hidden-tab suspend/resume, and current-episode-only retention.
 
 ## Scene map

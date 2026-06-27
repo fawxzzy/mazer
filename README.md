@@ -95,6 +95,7 @@ Use the production preview for freeze validation:
 - `http://127.0.0.1:4173/?profile=tv&title=show`
 - `http://127.0.0.1:4173/?profile=obs&chrome=none`
 - `http://127.0.0.1:4173/?profile=mobile`
+- `http://127.0.0.1:4173/?profile=recovery`
 - `http://127.0.0.1:4173/?content=core-only`
 - `http://127.0.0.1:4173/?content=core-only&mode=play`
 - `http://127.0.0.1:4173/?content=full`
@@ -109,6 +110,8 @@ Use the production preview for freeze validation:
 - `http://127.0.0.1:4173/?family=sparse`
 
 Defaults stay unchanged. Launch profiles tune packaging and presentation for deployment surfaces without changing app logic.
+`?profile=recovery` is the current design-recovery inspection surface: it keeps the title visible, narrows shell chrome, and gives the board more of the frame without switching to a different runtime lane.
+On wide layouts it may move the spectator feed into a side rail so the board can reclaim vertical space without mutating game logic.
 The current focus content profile is `core-only`; use `?content=full` when you explicitly need the mechanic-heavy spectator layer.
 `theme=auto` uses curated family rotation. Explicit theme values lock the presentation family without adding storage or a settings UI.
 `family=auto|classic|braided|sparse|dense|framed|split-flow` locks maze topology families for local comparison or deterministic captures without adding storage or a settings UI.
@@ -130,6 +133,7 @@ The current focus content profile is `core-only`; use `?content=full` when you e
 - OBS: start with `?profile=obs&chrome=none` in a Browser Source sized to the scene. Check for clean edges, no odd padding, and stable refresh behavior.
 - OBS-safe profile centers the board, preserves full board visibility, and minimizes chrome for overlays.
 - Mobile: use `?profile=mobile`, then try `?profile=mobile&chrome=none` for a board-first shell check. Test portrait and landscape, resize, reload, and tab away/back.
+- Design recovery: use `?profile=recovery` when you want the current 2D Phaser shell biased toward the recovered board-first composition without touching the parked future-runtime lane. Expect bottom feed on narrow screens and a rail feed on sufficiently wide screens.
 
 ## Windows launcher
 - `scripts/windows/Launch-Mazer.cmd` opens the current preview URL in an Edge app-style window by default and falls back to the browser when Edge is unavailable.
