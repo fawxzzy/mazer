@@ -1357,6 +1357,15 @@ describe('demo-only build', () => {
     const titlePresentation = resolveMenuDemoPresentation(episode, cycle, checkpoints[1].elapsedMs, config, 'title');
     const ambientPresentation = resolveMenuDemoPresentation(episode, cycle, checkpoints[1].elapsedMs, config, 'ambient');
     const loadingPresentation = resolveMenuDemoPresentation(episode, cycle, checkpoints[1].elapsedMs, config, 'loading');
+    const recoveryPresentation = resolveMenuDemoPresentation(
+      episode,
+      cycle,
+      checkpoints[1].elapsedMs,
+      config,
+      'ambient',
+      undefined,
+      'recovery'
+    );
     const tvPresentation = resolveMenuDemoPresentation(episode, cycle, checkpoints[1].elapsedMs, config, 'ambient', 'tv');
     const obsPresentation = resolveMenuDemoPresentation(episode, cycle, checkpoints[1].elapsedMs, config, 'ambient', 'obs');
     const mobilePresentation = resolveMenuDemoPresentation(episode, cycle, checkpoints[1].elapsedMs, config, 'ambient', 'mobile');
@@ -1371,6 +1380,9 @@ describe('demo-only build', () => {
     expect(loadingPresentation.metadataAlpha).toBeGreaterThan(ambientPresentation.metadataAlpha);
     expect(loadingPresentation.flashAlpha).toBeGreaterThan(0);
     expect(ambientPresentation.flashAlpha).toBe(0);
+    expect(recoveryPresentation.metadataAlpha).toBeLessThan(ambientPresentation.metadataAlpha);
+    expect(recoveryPresentation.boardAuraAlpha).toBeLessThan(ambientPresentation.boardAuraAlpha);
+    expect(recoveryPresentation.actorPulseBoost).toBeGreaterThan(ambientPresentation.actorPulseBoost);
     expect(tvPresentation.metadataAlpha).toBeLessThan(ambientPresentation.metadataAlpha);
     expect(tvPresentation.ambientDriftMs).toBeGreaterThan(ambientPresentation.ambientDriftMs);
     expect(obsPresentation.frameOffsetX).toBe(0);

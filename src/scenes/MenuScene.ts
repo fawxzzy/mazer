@@ -6057,7 +6057,9 @@ export class MenuScene extends Phaser.Scene {
         demoCyclePlan,
         0,
         demoConfig,
-        variant
+        variant,
+        deploymentProfileId,
+        launchConfig.design
       );
       const applyPresentationLayer = (presentation: MenuDemoPresentation): void => {
         const shell = episodePresentationShell;
@@ -6227,7 +6229,8 @@ export class MenuScene extends Phaser.Scene {
           0,
           demoConfig,
           variant,
-          deploymentProfileId
+          deploymentProfileId,
+          launchConfig.design
         );
         lastCue = 'spawn';
         recoveryEpisode = patternFrame.episode;
@@ -6652,7 +6655,8 @@ export class MenuScene extends Phaser.Scene {
           modeElapsedMs,
           demoConfig,
           variant,
-          deploymentProfileId
+          deploymentProfileId,
+          launchConfig.design
         );
         const presentationElapsedMs = presentationMode === 'play'
           ? modeElapsedMs
@@ -7981,14 +7985,15 @@ export const resolveMenuDemoPresentation = (
   elapsedMs: number,
   config: DemoWalkerConfig,
   variant: AmbientPresentationVariant = DEFAULT_PRESENTATION_VARIANT,
-  deploymentProfileId?: PresentationDeploymentProfile
+  deploymentProfileId?: PresentationDeploymentProfile,
+  design?: PresentationDesignProfile
 ): MenuDemoPresentation => {
   const moodProfile = DEMO_MOOD_PROFILES[cycle.mood];
   const safeVariant = sanitizePresentationVariant(variant);
   const showSolutionPathPreview = safeVariant === 'loading';
   const variantProfile = VARIANT_PROFILES[safeVariant];
   const deploymentProfile = resolveDeploymentPresentationProfile(deploymentProfileId);
-  const themeProfile = resolveAmbientThemeProfile(cycle.theme);
+  const themeProfile = resolveAmbientThemeProfile(cycle.theme, design);
   const sequenceState = resolveMenuDemoSequence(episode, elapsedMs, config);
   const progress = ease(sequenceState.progress);
   const oscillationTimeMs = normalizeAnimationTime(elapsedMs);
