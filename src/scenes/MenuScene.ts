@@ -1,8727 +1,979 @@
 import Phaser from 'phaser';
-import type {
-  AmbientPresentationVariant,
-  AmbientFamilyThemePairingPolicy,
-  PresentationChrome,
-  PresentationContentProfile,
-  PresentationDesignProfile,
-  PresentationDeploymentProfile,
-  PresentationLaunchConfig,
-  PresentationMode,
-  PresentationMood,
-  PresentationThemeFamily
-} from '../boot/presentation';
 import {
-  AMBIENT_FAMILY_THEME_PAIRING_POLICY,
-  DEFAULT_PRESENTATION_CHROME,
-  DEFAULT_PRESENTATION_CONTENT_PROFILE,
-  DEFAULT_PRESENTATION_LAUNCH_CONFIG,
-  PRESENTATION_THEME_FAMILIES,
-  DEFAULT_PRESENTATION_VARIANT,
-  isDeterministicPresentationCapture,
-  resolveAmbientFamilyTheme,
-  resolveEffectivePresentationChrome,
-  resolvePatternEngineMode,
-  sanitizePresentationLaunchConfig,
-  sanitizePresentationVariant,
-  shouldShowPresentationTitle
-} from '../boot/presentation';
+  LEGACY_DEFAULTS,
+  MAIN_MENU_BUTTONS,
+  clampInteger,
+  clampUnit,
+  copyLegacySettings,
+  linearColorToHex,
+  linearColorToNumber,
+  type LegacySettings
+} from '../legacy-runtime/legacyDefaults';
 import {
-  dismissInstallSurface,
-  getInstallSurfaceState,
-  promptInstallSurface,
-  subscribeInstallSurface,
-  type InstallSurfaceState
-} from '../boot/installSurface';
-import { buildBootTimingReport, logBootTimingReport, markBootTiming } from '../boot/bootTiming';
-import {
-  createDemoSpectatorPlan,
-  resolveDemoWalkerCueOverrides,
-  resolveDemoWalkerTraverseMs,
-  resolveDemoWalkerViewFrame,
-  type DemoRunnerTelemetry,
-  type DemoWalkerConfig,
-  type DemoWalkerCue,
-  type DemoSegmentCue,
-  type DemoWalkerViewFrame
-} from '../domain/ai';
-import {
-  disposeMazeEpisode,
-  generateMazeForDifficulty,
-  resolveDirectionBetween,
-  xFromIndex,
-  yFromIndex,
-  type MazeFamily,
-  MAZE_SIZE_ORDER,
-  type MazePresentationPreset,
-  PatternEngine,
-  type MazeDifficulty,
-  type MazeEpisode,
-  type MazeSize,
-  type PatternFrame,
-  resolveCuratedFamilyRotation
-} from '../domain/maze';
-import { legacyTuning } from '../config/tuning';
-import type { IntentFeedState } from '../mazer-core/intent';
-import {
-  createBoardLayout,
-  BoardRenderer,
-  isPointInsideTileArrivalRegion,
-  resolveBoardPresentationBounds,
-  resolveActorBodyCenterPoint,
-  type BoardBounds,
-  type BoardLayout,
-  type BoardThemeStyle,
-  type TrailRenderDiagnostics
-} from '../render/boardRenderer';
-import { createDemoStatusHud, type HudThemeStyle } from '../render/hudRenderer';
-import {
-  clampIntentFeedSummary,
-  createIntentFeedHud,
-  resolveIntentFeedPanelMetrics,
-  type IntentFeedHudLayoutSnapshot
-} from '../render/intentFeedRenderer';
-import {
-  applyPresentationContrastFloors,
-  getPaletteReadabilityReport,
-  palette,
-  type PaletteReadabilityReport
-} from '../render/palette';
-import { applyTextResolution, resolveHudTextResolution } from '../render/textCrispness';
-import {
-  createRunProjection,
-  type RunProjectionMode,
-  type RunProjection,
-  type RunProjectionState
-} from '../projections/runProjection.ts';
-import {
-  HumanInputRepeatGate,
-  createTouchInputState,
-  isMovementActionKind,
-  resolveHumanKeyboardAction,
-  resolveHumanTouchAction,
-  resolveTouchControlLayout,
-  resolveTouchInputCapability,
-  releaseTouchPointer,
-  resetTouchInputState,
-  type HumanInputAction,
-  type HumanInputDropReason,
-  type HumanInputTimingSnapshot
-} from '../input-human';
-import {
-  summarizeTelemetrySemantics,
-  type TelemetryEvent,
-  type TelemetryEventKind
-} from '../telemetry';
-import {
-  createMenuIntentRuntimeSession,
-  type MenuIntentRuntimeSession,
-  type MenuRuntimeBoardState
-} from './menuIntentRuntime';
-import {
-  clearMenuSceneRuntimeDiagnostics,
-  nextMenuSceneInstanceId,
-  publishMenuSceneRuntimeDiagnostics,
-  resolveMenuScenePerformanceMode,
-  resolveMenuSceneRuntimeConfig,
-  summarizeMenuSceneRuntimeFeed,
-  summarizeMenuSceneFrameWindow,
-  type MenuScenePerformanceMode,
-  type MenuSceneRuntimeDiagnostics
-} from './menuRuntimeDiagnostics';
-import {
-  DEFAULT_VIEWPORT_HEIGHT,
-  DEFAULT_VIEWPORT_WIDTH,
-  resolveSceneViewport,
-  resolveViewportSize,
-  type ViewportSize
-} from '../render/viewport';
+  createLegacyMaze,
+  isWalkableTile,
+  movePoint,
+  type LegacyMazeSnapshot,
+  type LegacyPoint
+} from '../legacy-runtime/legacyMaze';
 
-const PASSIVE_TAGLINES: Record<AmbientPresentationVariant, string> = {
-  title: 'pattern engine',
-  ambient: 'ambient engine',
-  loading: 'live system'
-};
-export const TITLE_SIGNATURE_TEXT = 'pattern engine';
-const MAZER_BRAND_COLORS = {
-  shell: 0x0d1218,
-  frame: 0x5a84b2,
-  frameHighlight: 0xe6f2ff,
-  route: 0x66b6f0,
-  wordmark: 0x93f4ac,
-  wordmarkShadow: 0x102218,
-  goal: 0x75f78f,
-  support: 0xd2dceb,
-  muted: 0x7b8da6
-} as const;
-const ROTATING_DIFFICULTIES: readonly MazeDifficulty[] = ['chill', 'standard', 'spicy', 'brutal'];
-const ROTATING_SIZES: readonly MazeSize[] = MAZE_SIZE_ORDER;
-const LOADING_PHASE_LABELS: Record<MenuDemoSequence, readonly string[]> = {
-  intro: ['setting the board', 'finding the route'],
-  reveal: ['building the maze', 'following the route'],
-  arrival: ['holding the clear', 'watching the exit'],
-  fade: ['folding the maze', 'starting again']
-};
-type DemoRitualPhase = 'none' | 'decision' | 'fail' | 'success' | 'retry';
-type DemoLifecyclePhase =
-  | 'pre-roll'
-  | 'build-reveal'
-  | 'settle-in'
-  | 'active-watch'
-  | 'clear-hold'
-  | 'reflection-beat'
-  | 'erase-wipe';
-const RETRY_RITUAL_TITLES = ['Building again', 'Starting fresh'] as const;
-const RETRY_RITUAL_SUBTITLES: Record<DemoMood, readonly string[]> = {
-  solve: ['The maze folds back and opens a new route.'],
-  scan: ['The board folds back and starts the path again.'],
-  blueprint: ['The maze folds back and starts fresh.']
-};
-export const SUCCESS_RITUAL_TITLES = ['Exit found', 'Route clear', 'Maze cleared'] as const;
-export const SUCCESS_RITUAL_SUBTITLES: Record<DemoMood, readonly string[]> = {
-  solve: ['Hold the route for one more beat.'],
-  scan: ['The way out stayed clear.'],
-  blueprint: ['The full maze is easy to read.']
-};
+type RuntimeMode = 'menu' | 'play';
+type OverlayKind = 'none' | 'options' | 'features' | 'gameModes' | 'pause' | 'message';
 
-export type DemoMood = 'solve' | 'scan' | 'blueprint';
-export type MenuDemoSequence = 'intro' | 'reveal' | 'arrival' | 'fade';
-
-export type MenuSceneInitData = Partial<PresentationLaunchConfig>;
-
-export interface MenuDemoCycle {
-  difficulty: MazeDifficulty;
-  size: MazeSize;
-  mood: DemoMood;
-  theme: PresentationThemeFamily;
-  family: MazeFamily;
-  presentationPreset: MazePresentationPreset;
-  entropy: {
-    checkPointModifier: number;
-    shortcutCountModifier: number;
-  };
-  pacing: {
-    exploreStepMs: number;
-    goalHoldMs: number;
-    resetHoldMs: number;
-    spawnHoldMs: number;
-  };
-}
-
-export interface MenuDemoPresentation {
-  variant: AmbientPresentationVariant;
-  mood: DemoMood;
-  theme: PresentationThemeFamily;
-  sequence: MenuDemoSequence;
-  lifecyclePhase: DemoLifecyclePhase;
-  buildRevealProgress: number;
-  eraseWipeProgress: number;
-  showStartMarker: boolean;
-  showGoalMarker: boolean;
-  showActor: boolean;
-  showTrail: boolean;
-  showIntentFeed: boolean;
-  phaseLabel: string;
-  solutionPathAlpha: number;
-  trailWindow: number;
-  ambientDriftPxX: number;
-  ambientDriftPxY: number;
-  ambientDriftMs: number;
-  frameOffsetX: number;
-  frameOffsetY: number;
-  hudOffsetX: number;
-  hudOffsetY: number;
-  boardVeilAlpha: number;
-  boardAuraAlpha: number;
-  boardHaloAlpha: number;
-  boardShadeAlpha: number;
-  boardAuraScale: number;
-  boardHaloScale: number;
-  motifPrimaryAlpha: number;
-  motifSecondaryAlpha: number;
-  actorPulseBoost: number;
-  persistentTrail: boolean;
-  persistentFadeFloor: number;
-  trailPulseBoost: number;
-  metadataAlpha: number;
-  flashAlpha: number;
-  ritualPhase: DemoRitualPhase;
-  ritualProgress: number;
-  ritualAlpha: number;
-  ritualTitle: string;
-  ritualSubtitle: string;
-}
-
-const hashProjectionSignature = (...parts: Array<string | number | boolean | null | undefined>): string => {
-  const signature = parts
-    .map((part) => String(part ?? ''))
-    .join('|');
-  let hash = 2166136261;
-
-  for (let index = 0; index < signature.length; index += 1) {
-    hash ^= signature.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-
-  return Math.abs(hash >>> 0).toString(16).padStart(8, '0');
-};
-
-const resolveRunProjectionStateFromPresentation = (
-  presentation: MenuDemoPresentation
-): RunProjectionState => {
-  switch (presentation.lifecyclePhase) {
-    case 'pre-roll':
-      return 'preroll';
-    case 'build-reveal':
-      return 'building';
-    case 'settle-in':
-      return 'waiting';
-    case 'active-watch':
-      return presentation.sequence === 'arrival' ? 'cleared' : 'watching';
-    case 'clear-hold':
-    case 'reflection-beat':
-      return 'cleared';
-    case 'erase-wipe':
-      return 'retrying';
-  }
-};
-
-const resolveRunProjectionRiskLevel = (
-  projectionState: RunProjectionState,
-  boardState: MenuRuntimeBoardState | null
-): RunProjection['riskLevel'] => {
-  if (projectionState === 'failed') {
-    return 'critical';
-  }
-  if (projectionState === 'retrying') {
-    return 'high';
-  }
-
-  const highestReadiness = boardState?.telegraphs.reduce((highest, telegraph) => (
-    Math.max(highest, telegraph.active ? 1 : telegraph.readiness)
-  ), 0) ?? 0;
-
-  if (highestReadiness >= 0.92 || projectionState === 'cleared') {
-    return 'high';
-  }
-  if (highestReadiness >= 0.6 || projectionState === 'watching') {
-    return 'medium';
-  }
-
-  return 'low';
-};
-
-const resolveRunProjectionProgressPct = (
-  presentation: MenuDemoPresentation,
-  pathLength: number,
-  renderedTrailLimit: number
-): number => {
-  const watchProgress = pathLength > 1
-    ? ((Math.max(0, renderedTrailLimit - 1)) / Math.max(1, pathLength - 1)) * 100
-    : 0;
-
-  switch (resolveRunProjectionStateFromPresentation(presentation)) {
-    case 'preroll':
-      return Math.max(0, Math.min(100, presentation.buildRevealProgress * 8));
-    case 'building':
-      return Math.max(6, Math.min(38, 10 + (presentation.buildRevealProgress * 28)));
-    case 'waiting':
-      return 42;
-    case 'watching':
-      return Math.max(18, Math.min(92, watchProgress));
-    case 'failed':
-      return Math.max(20, Math.min(96, watchProgress));
-    case 'retrying':
-      return Math.max(0, Math.min(100, 100 - (presentation.eraseWipeProgress * 100)));
-    case 'cleared':
-      return 100;
-  }
-};
-
-const PLAY_MODE_TOGGLE_CODES = new Set(['Tab']);
-const PLAY_MOVE_ANIMATION_RATIO = 0.72;
-const TOUCH_CONTROL_LABELS: Record<HumanInputAction['kind'], string> = {
-  move_up: '↑',
-  move_down: '↓',
-  move_left: '←',
-  move_right: '→',
-  pause: 'P',
-  restart_attempt: 'R',
-  toggle_thoughts: 'T'
-};
-const TOUCH_CONTROL_TEXT: Record<HumanInputAction['kind'], string> = {
-  move_up: '^',
-  move_down: 'v',
-  move_left: '<',
-  move_right: '>',
-  pause: 'P',
-  restart_attempt: 'R',
-  toggle_thoughts: 'T'
-};
-void TOUCH_CONTROL_LABELS;
-
-const WATCH_CORE_ONLY_RUNNER_THOUGHTS: Partial<Record<DemoWalkerCue, readonly string[]>> = {
-  anticipate: ['Maybe left.', 'Maybe this side.'],
-  'dead-end': ['No. Dead end.', 'Not here. Back up.'],
-  backtrack: ['Go back. Other side.', 'No. Back up.'],
-  reacquire: ['This looks closer.', 'This works.']
-};
-
-const normalizeRunnerThoughtSummary = (value: string): string => value.trim().replace(/\s+/g, ' ').toLowerCase();
-
-const resolveRunnerCueThought = (
-  cue: DemoWalkerCue,
-  seed: number,
-  canonicalCursor: number
-): string | null => {
-  const options = WATCH_CORE_ONLY_RUNNER_THOUGHTS[cue];
-  if (!options || options.length === 0) {
-    return null;
-  }
-
-  const index = Math.abs(Math.imul((seed >>> 0) ^ ((canonicalCursor + 1) * 1103515245), 1597334677)) % options.length;
-  return options[index] ?? options[0] ?? null;
-};
-
-const applyRunnerThoughtOverlay = (
-  state: IntentFeedState | null,
-  cue: DemoWalkerCue,
-  seed: number,
-  canonicalCursor: number
-): IntentFeedState | null => {
-  const summary = resolveRunnerCueThought(cue, seed, canonicalCursor);
-  if (!summary) {
-    return state;
-  }
-
-  const entryKind: IntentFeedState['entries'][number]['kind'] = cue === 'reacquire'
-    ? 'route-commitment-changed'
-    : cue === 'anticipate'
-      ? 'frontier-chosen'
-      : cue === 'backtrack'
-        ? 'replan-triggered'
-        : 'dead-end-confirmed';
-  const entry = {
-    id: `runner-thought-${cue}-${canonicalCursor}`,
-    speaker: 'Runner' as const,
-    category: cue === 'anticipate' ? 'observe' as const : cue === 'reacquire' ? 'goal' as const : 'replan' as const,
-    kind: entryKind,
-    importance: cue === 'dead-end' || cue === 'backtrack' ? 'medium' as const : 'low' as const,
-    summary,
-    confidence: 0.72,
-    step: canonicalCursor,
-    ttlSteps: 4,
-    ageSteps: 0,
-    slot: 0,
-    opacity: 1
-  };
-  const stackedEntries: IntentFeedState['entries'] = [];
-  const seenSummaries = new Set<string>();
-  const pushEntry = (candidate: IntentFeedState['entries'][number] | null | undefined): void => {
-    if (!candidate || candidate.speaker !== 'Runner') {
-      return;
-    }
-
-    const summarySignature = normalizeRunnerThoughtSummary(candidate.summary);
-    if (summarySignature.length === 0 || seenSummaries.has(summarySignature)) {
-      return;
-    }
-
-    seenSummaries.add(summarySignature);
-    stackedEntries.push({
-      ...candidate,
-      slot: stackedEntries.length
-    });
-  };
-  pushEntry(entry);
-  for (const candidate of state?.events ?? state?.entries ?? []) {
-    if (stackedEntries.length >= legacyTuning.menu.intentFeed.maxVisibleEntries) {
-      break;
-    }
-    pushEntry(candidate);
-  }
-
-  return {
-    ...(state ?? {
-      step: canonicalCursor,
-      pings: [],
-      metrics: {
-        emittedCount: 1,
-        highImportanceEventCount: 0,
-        speakerCount: 1,
-        totalSteps: Math.max(1, canonicalCursor + 1),
-        intentEmissionRate: 0,
-        worldPingCount: 0,
-        worldPingEmissionRate: 0,
-        maxConsecutiveEmissionStreak: 1,
-        maxVisibleWorldPings: 0,
-        debouncedEventCount: 0,
-        debouncedWorldPingCount: 0,
-        statusRepeatCount: 0,
-        verbFirstPass: true,
-        statusPresencePass: true,
-        importanceTtlPass: true,
-        slotOpacityPass: true,
-        feedReadabilityPass: true,
-        intentDebouncePass: true,
-        worldPingSpamPass: true,
-        highImportanceStickyPass: true,
-        intentStackOverlapPass: true
-      }
-    }),
-    step: canonicalCursor,
-    status: {
-      speaker: 'Runner',
-      category: entry.category,
-      kind: entry.kind,
-      importance: entry.importance,
-      summary,
-      confidence: entry.confidence,
-      step: canonicalCursor
-    },
-    entries: stackedEntries,
-    events: stackedEntries,
-    pings: state?.pings ?? []
-  };
-};
-
-const isModeToggleKey = (event: { code?: string | null }): boolean => (
-  typeof event.code === 'string' && PLAY_MODE_TOGGLE_CODES.has(event.code)
-);
-
-const createPlayLoopState = (mode: PresentationMode): PlayLoopState => ({
-  buildElapsedMs: 0,
-  clearElapsedMs: 0,
-  pathCursor: 0,
-  motion: null,
-  paused: false,
-  thoughtsVisible: mode !== 'play'
-});
-
-const createPlayInputDiagnostics = (): PlayInputDiagnostics => ({
-  acceptedCount: 0,
-  droppedCount: 0,
-  mergedCount: 0,
-  lastAcceptedActionKind: null,
-  lastAcceptedSource: null,
-  lastAcceptedAtMs: null,
-  lastConsumedAtMs: null,
-  lastDroppedActionKind: null,
-  lastDroppedReason: null,
-  lastDroppedAtMs: null,
-  queueDepth: 0,
-  maxQueueDepth: 0
-});
-
-const resetPlayLoopState = (state: PlayLoopState, mode: PresentationMode): PlayLoopState => ({
-  ...createPlayLoopState(mode),
-  thoughtsVisible: state.thoughtsVisible
-});
-
-const resolvePlayRunMode = (mode: PresentationMode): RunProjectionMode => (
-  mode === 'play' ? 'play' : 'watch'
-);
-
-const buildPlayViewFrame = (
-  episode: MazeEpisode,
-  state: PlayLoopState,
-  trailWindow: number
-): DemoWalkerViewFrame => {
-  const path = episode.raster.pathIndices;
-  const lastCursor = Math.max(0, path.length - 1);
-  const currentCursor = Math.max(0, Math.min(state.pathCursor, lastCursor));
-  const motion = state.motion;
-  const currentIndex = path[currentCursor] ?? episode.raster.startIndex;
-  const nextCursor = motion ? Math.max(0, Math.min(motion.toCursor, lastCursor)) : currentCursor;
-  const nextIndex = path[nextCursor] ?? currentIndex;
-  const previousIndex = path[Math.max(0, currentCursor - 1)] ?? currentIndex;
-  const limit = Math.max(
-    1,
-    Math.min(
-      path.length,
-      motion ? Math.max(currentCursor + 1, nextCursor + 1) : currentCursor + 1
-    )
-  );
-  const start = Math.max(0, limit - Math.max(1, trailWindow));
-
-  return {
-    currentIndex,
-    nextIndex,
-    previousIndex,
-    direction: motion?.direction ?? null,
-    progress: motion ? Math.max(0, Math.min(1, motion.progress)) : 1,
-    cue: currentCursor <= 0 && !motion ? 'spawn' : currentCursor >= lastCursor ? 'goal' : 'explore',
-    trailStart: start,
-    trailLimit: limit,
-    canonicalCursor: currentCursor,
-    telemetry: {
-      wrongBranchCount: 0,
-      backtrackCount: 0,
-      recoveryCount: 0
-    },
-    cycleComplete: currentCursor >= lastCursor && !motion
-  };
-};
-
-interface VariantProfile {
-  boardScaleWide: number;
-  boardScaleNarrow: number;
-  topReserveRatio: number;
-  topReserveMinPx: number;
-  bottomPaddingPx: number;
-  sidePaddingPx: number;
-  titleScale: number;
-  titleAlpha: number;
-  signatureAlpha: number;
-  passiveAlpha: number;
-  plateAlpha: number;
-  panelAlpha: number;
-  titleYOffsetRatio: number;
-  titleAnchor: 'center' | 'left';
-  titleDriftX: number;
-  titleDriftY: number;
-  titleDriftMs: number;
-  titleLetterSpacingWide: number;
-  titleLetterSpacingNarrow: number;
-  solutionPathScale: number;
-  metadataAlphaScale: number;
-  flashAlphaScale: number;
-  boardAuraBias: number;
-  boardHaloBias: number;
-  boardShadeBias: number;
-  boardVeilBias: number;
-  boardOffsetRangeX: number;
-  boardOffsetRangeY: number;
-  hudOffsetRangeX: number;
-  hudOffsetRangeY: number;
-  driftScale: number;
-  actorPulseBias: number;
-}
-
-export interface SceneLayoutProfile {
-  isNarrow: boolean;
-  isPortrait: boolean;
-  isShort: boolean;
-  isTiny: boolean;
-  boardScale: number;
-  topReserve: number;
-  bottomPadding: number;
-  sidePadding: number;
-}
-
-export interface ViewportSafeInsets {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
-}
-
-export type IntentFeedPresentationMode = 'bottom-panel' | 'commentary-rail';
-
-interface PresentationOffsets {
-  frameOffsetX: number;
-  frameOffsetY: number;
-  hudOffsetX: number;
-  hudOffsetY: number;
-  driftX: number;
-  driftY: number;
-}
-
-interface EpisodePresentationShell {
-  layout: ReturnType<typeof createBoardLayout>;
-  boardCenterX: number;
-  boardCenterY: number;
-  boardRenderer: BoardRenderer;
-  demoStatusHud: ReturnType<typeof createDemoStatusHud>;
-  intentFeedHud: ReturnType<typeof createIntentFeedHud>;
-  boardAura: Phaser.GameObjects.Ellipse;
-  boardHalo: Phaser.GameObjects.Ellipse;
-  boardShade: Phaser.GameObjects.Rectangle;
-  boardVeil: Phaser.GameObjects.Rectangle;
-  ritualCard: Phaser.GameObjects.Rectangle;
-  ritualCardStroke: Phaser.GameObjects.Rectangle;
-  ritualTitle: Phaser.GameObjects.Text;
-  ritualSubtitle: Phaser.GameObjects.Text;
-  blueprintAccent: Phaser.GameObjects.Graphics;
-  motifPrimary: Phaser.GameObjects.Graphics;
-  motifSecondary: Phaser.GameObjects.Graphics;
-}
-
-interface MenuDemoCycleOverrides {
-  difficulty?: MazeDifficulty;
-  size?: MazeSize;
-  mood?: DemoMood;
-  theme?: PresentationThemeFamily;
-  family?: MazeFamily;
-}
-
-interface ChromeProfile {
-  boardScaleBias: number;
-  topReserveBias: number;
-  bottomPaddingBias: number;
-  sidePaddingBias: number;
-  titleScale: number;
-  titleAlpha: number;
-  signatureAlpha: number;
-  passiveAlpha: number;
-  plateAlpha: number;
-  panelAlpha: number;
-}
-
-interface DeploymentPresentationProfile {
-  boardScaleBias: number;
-  portraitBoardScaleBias: number;
-  topReserveBias: number;
-  portraitTopReserveBias: number;
-  bottomPaddingBias: number;
-  sidePaddingBias: number;
-  maxBoardScale: number;
-  titlePlateWidthScale: number;
-  titlePlateHeightScale: number;
-  titleLineSpacingScale: number;
-  titleYOffsetBias: number;
-  titleAlphaScale: number;
-  signatureAlphaScale: number;
-  passiveAlphaScale: number;
-  plateAlphaScale: number;
-  panelAlphaScale: number;
-  offsetScale: number;
-  driftScale: number;
-  driftDurationScale: number;
-  metadataAlphaScale: number;
-  flashAlphaScale: number;
-  boardAuraBiasScale: number;
-  boardHaloBiasScale: number;
-  boardShadeBiasScale: number;
-  boardVeilBiasScale: number;
-  boardAuraMotionScale: number;
-  boardHaloMotionScale: number;
-}
-
-type MoodPattern = readonly [DemoMood, DemoMood, DemoMood, DemoMood, DemoMood, DemoMood, DemoMood, DemoMood];
-interface ThemePaletteOverrides {
-  background?: Partial<typeof palette.background>;
-  board?: Partial<typeof palette.board>;
-  hud?: Partial<typeof palette.hud>;
-}
-
-interface ResizeRecoveryDecision {
-  shouldRestart: boolean;
-  restartKey?: string;
-}
-
-interface PlayMotionState {
-  fromCursor: number;
-  toCursor: number;
-  progress: number;
-  direction: 0 | 1 | 2 | 3 | null;
-}
-
-interface PlayLoopState {
-  buildElapsedMs: number;
-  clearElapsedMs: number;
-  pathCursor: number;
-  motion: PlayMotionState | null;
-  paused: boolean;
-  thoughtsVisible: boolean;
-}
-
-interface PlayInputDiagnostics extends HumanInputTimingSnapshot {
-  queueDepth: number;
-  maxQueueDepth: number;
-}
-
-interface TouchControlButtonChrome {
-  control: HumanInputAction['kind'];
-  container: Phaser.GameObjects.Container;
-  shadow: Phaser.GameObjects.Rectangle;
-  body: Phaser.GameObjects.Rectangle;
+interface UiButton {
+  background: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
+  setActive(active: boolean): void;
+  destroy(): void;
 }
 
-interface TouchControlChrome {
-  root: Phaser.GameObjects.Container;
-  buttons: Record<HumanInputAction['kind'], TouchControlButtonChrome>;
-}
-
-type AmbientSkyMovingFamily = 'shooting-star' | 'comet' | 'satellite' | 'ufo';
-type AmbientSkyBackdropMotif = 'noir-band' | 'ember-glow' | 'aurora-curtain' | 'vellum-wash' | 'monolith-signal';
-type AmbientSkyEventTier = 'occasional' | 'hero' | 'signature';
-
-interface AmbientSkyThemeStyle {
-  configuredFamilies: readonly string[];
-  backdropMotif: AmbientSkyBackdropMotif;
-  hazeColor: number;
-  hazeAccentColor: number;
-  streakColor: number;
-  cometColor: number;
-  satelliteColor: number;
-  ufoColor: number;
-  driftMoteColor: number;
-  staticStarDensityScale: number;
-  twinkleDensityScale: number;
-  hazeAlphaScale: number;
-  driftMoteDensityScale: number;
-  shootingIntervalScale: number;
-  cometIntervalScale: number;
-  satelliteIntervalScale: number;
-  ufoIntervalScale: number;
-  heroCooldownScale: number;
-  signatureCooldownScale: number;
-  motifAlphaScale: number;
-  veilWidthScale: number;
-  veilHeightScale: number;
-  veilRotationRange: number;
-  allowSatellite: boolean;
-  allowUfo: boolean;
-}
-
-interface AmbientSkyProfileTuning {
-  densityScale: number;
-  motionScale: number;
-  eventIntervalScale: number;
-  twinkleCount: number;
-  driftMoteCount: number;
-  movingEventCap: number;
-  signatureEventCap: number;
-  clearZoneScale: number;
-}
-
-interface AmbientSkyDepths {
-  base: number;
-  haze: number;
-  stars: number;
-  twinkles: number;
-  motes: number;
-  events: number;
-}
-
-interface AmbientSkyDiagnostics {
-  reducedMotion: boolean;
-  configuredFamilies: readonly string[];
-  activeCounts: {
-    clouds: number;
-    farStars: number;
-    nearStars: number;
-    twinkles: number;
-    veils: number;
-    driftMotes: number;
-    moving: number;
-    shootingStars: number;
-    comets: number;
-    satellites: number;
-    ufos: number;
-  };
-  caps: {
-    twinkles: number;
-    driftMotes: number;
-    moving: number;
-    signatureEvents: number;
-  };
-  reservedZoneBreaches: number;
-  uncluttered: boolean;
-  behindBoard: boolean;
-  depths: {
-    backgroundMax: number;
-    boardMin: number;
-    title?: number;
-    install?: number;
-  };
-}
-
-interface AmbientThemeProfile {
-  id: PresentationThemeFamily;
-  label: string;
-  palette: typeof palette;
-  boardTheme: BoardThemeStyle;
-  hudTheme: HudThemeStyle;
-  background: {
-    topLeft: number;
-    topRight: number;
-    bottomLeft: number;
-    bottomRight: number;
-    cloudAlphaScale: number;
-    farStarAlphaScale: number;
-    nearStarAlphaScale: number;
-    vignetteAlphaScale: number;
-  };
-  shell: {
-    auraColor: number;
-    haloColor: number;
-    shadeColor: number;
-    veilColor: number;
-    auraAlphaBias: number;
-    haloAlphaBias: number;
-    shadeAlphaBias: number;
-    veilAlphaBias: number;
-    auraScaleBias: number;
-    haloScaleBias: number;
-    motifPrimaryAlpha: number;
-    motifSecondaryAlpha: number;
-    blueprintAccentAlphaScale: number;
-  };
-  presentation: {
-    driftScale: number;
-    offsetScale: number;
-    solutionPathAlphaScale: number;
-    metadataAlphaBias: number;
-    flashAlphaBias: number;
-    actorPulseBias: number;
-  };
-  ambientSky: AmbientSkyThemeStyle;
-  title: {
-    fontFamily: string;
-    signatureFontFamily: string;
-    supportFontFamily: string;
-    titleColor: string;
-    titleStroke: string;
-    titleShadow: string;
-    signatureColor: string;
-    supportColor: string;
-    installColor: string;
-    pendingColor: string;
-    plateShadowColor: number;
-    plateOuterColor: number;
-    plateInnerColor: number;
-    plateLineColor: number;
-    buttonFillColor: number;
-    buttonStrokeColor: number;
-  };
-}
-
-const createThemePalette = (overrides: ThemePaletteOverrides): typeof palette => applyPresentationContrastFloors({
-  background: {
-    ...palette.background,
-    ...overrides.background
-  },
-  board: {
-    ...palette.board,
-    ...overrides.board
-  },
-  hud: {
-    ...palette.hud,
-    ...overrides.hud
-  },
-  ui: palette.ui
-});
-
-const toRgb = (value: number): { r: number; g: number; b: number } => ({
-  r: (value >> 16) & 0xff,
-  g: (value >> 8) & 0xff,
-  b: value & 0xff
-});
-
-const fromRgb = (r: number, g: number, b: number): number => (
-  ((Math.round(r) & 0xff) << 16)
-  | ((Math.round(g) & 0xff) << 8)
-  | (Math.round(b) & 0xff)
-);
-
-const mixSceneColor = (from: number, to: number, amount: number): number => {
-  const safeAmount = clamp(amount, 0, 1);
-  const start = toRgb(from);
-  const end = toRgb(to);
-  return fromRgb(
-    start.r + ((end.r - start.r) * safeAmount),
-    start.g + ((end.g - start.g) * safeAmount),
-    start.b + ((end.b - start.b) * safeAmount)
-  );
-};
-
-const buildRecoveryThemeProfile = (base: AmbientThemeProfile): AmbientThemeProfile => {
-  const recoveredPalette = base.palette;
-
-  return {
-    ...base,
-    label: `${base.label} RECOVERY`,
-    palette: recoveredPalette,
-    boardTheme: {
-      ...base.boardTheme,
-      trailFillAlphaScale: (base.boardTheme.trailFillAlphaScale ?? 1) * 0.84,
-      trailGlowAlphaScale: (base.boardTheme.trailGlowAlphaScale ?? 1) * 0.78,
-      trailCoreAlphaScale: (base.boardTheme.trailCoreAlphaScale ?? 1) * 0.88,
-      actorHaloAlphaScale: (base.boardTheme.actorHaloAlphaScale ?? 1) * 1.12,
-      goalGlowAlphaScale: (base.boardTheme.goalGlowAlphaScale ?? 1) * 1.1
-    },
-    hudTheme: {
-      ...base.hudTheme,
-      railAlphaScale: (base.hudTheme.railAlphaScale ?? 1) * 0.82,
-      modeAlphaScale: (base.hudTheme.modeAlphaScale ?? 1) * 0.78,
-      metaAlphaScale: (base.hudTheme.metaAlphaScale ?? 1) * 0.74,
-      flashAlphaScale: (base.hudTheme.flashAlphaScale ?? 1) * 0.72
-    },
-    background: {
-      ...base.background,
-      cloudAlphaScale: base.background.cloudAlphaScale * 0.72,
-      farStarAlphaScale: base.background.farStarAlphaScale * 0.82,
-      nearStarAlphaScale: base.background.nearStarAlphaScale * 0.78,
-      vignetteAlphaScale: base.background.vignetteAlphaScale * 0.94
-    },
-    shell: {
-      ...base.shell,
-      auraAlphaBias: base.shell.auraAlphaBias - 0.016,
-      haloAlphaBias: base.shell.haloAlphaBias - 0.014,
-      shadeAlphaBias: base.shell.shadeAlphaBias - 0.01,
-      veilAlphaBias: base.shell.veilAlphaBias - 0.018,
-      motifPrimaryAlpha: base.shell.motifPrimaryAlpha * 0.72,
-      motifSecondaryAlpha: base.shell.motifSecondaryAlpha * 0.64,
-      blueprintAccentAlphaScale: base.shell.blueprintAccentAlphaScale * 0.84
-    },
-    presentation: {
-      ...base.presentation,
-      driftScale: base.presentation.driftScale * 0.84,
-      offsetScale: base.presentation.offsetScale * 0.78,
-      metadataAlphaBias: base.presentation.metadataAlphaBias - 0.04,
-      flashAlphaBias: base.presentation.flashAlphaBias - 0.02,
-      actorPulseBias: base.presentation.actorPulseBias + 0.004
-    },
-    ambientSky: {
-      ...base.ambientSky,
-      staticStarDensityScale: base.ambientSky.staticStarDensityScale * 0.84,
-      twinkleDensityScale: base.ambientSky.twinkleDensityScale * 0.82,
-      hazeAlphaScale: base.ambientSky.hazeAlphaScale * 0.76,
-      driftMoteDensityScale: base.ambientSky.driftMoteDensityScale * 0.74,
-      shootingIntervalScale: base.ambientSky.shootingIntervalScale * 1.12,
-      cometIntervalScale: base.ambientSky.cometIntervalScale * 1.16,
-      satelliteIntervalScale: base.ambientSky.satelliteIntervalScale * 1.18,
-      ufoIntervalScale: base.ambientSky.ufoIntervalScale * 1.18,
-      motifAlphaScale: base.ambientSky.motifAlphaScale * 0.78,
-      veilWidthScale: base.ambientSky.veilWidthScale * 0.92,
-      veilHeightScale: base.ambientSky.veilHeightScale * 0.88
-    },
-    title: {
-      ...base.title,
-      plateOuterColor: mixSceneColor(base.title.plateOuterColor, recoveredPalette.board.outer, 0.34),
-      plateInnerColor: mixSceneColor(base.title.plateInnerColor, recoveredPalette.board.panel, 0.28),
-      plateLineColor: mixSceneColor(base.title.plateLineColor, recoveredPalette.board.outerStroke, 0.12),
-      buttonFillColor: mixSceneColor(base.title.buttonFillColor, recoveredPalette.board.panel, 0.22)
-    }
-  };
-};
-
-const RECOVERY_THEME_PROFILE_CACHE: Partial<Record<PresentationThemeFamily, AmbientThemeProfile>> = {};
-
-const isRecoveryDesignProfile = (
-  design: PresentationDesignProfile | null | undefined
-): boolean => design === 'recovery';
-
-const THEME_PROFILES: Record<PresentationThemeFamily, AmbientThemeProfile> = {
-  noir: {
-    id: 'noir',
-    label: 'NOIR',
-    palette: (() => {
-      const resolved = createThemePalette({
-      background: {
-        deepSpace: 0x040507,
-        nebula: 0x0b0e12,
-        nebulaCore: 0x151920,
-        vignette: 0x010101,
-        star: 0xe4e8ee,
-        cloud: 0x171b22
-      },
-      board: {
-        glow: 0x0d1115,
-        panel: 0x0b1015,
-        panelStroke: 0x74879f,
-        well: 0x040608,
-        shadow: 0x000000,
-        outer: 0x0f141b,
-        outerStroke: 0xdce8f4,
-        innerStroke: 0x8c9fb4,
-        topHighlight: 0xf2f7ff,
-        wall: 0x12171d,
-        floor: 0xc7d0d8,
-        path: 0x97a5b2,
-        route: 0x2d784c,
-        routeCore: 0xf6fff9,
-        routeGlow: 0x173f2c,
-        trail: 0x233f90,
-        trailCore: 0xf2f6ff,
-        trailGlow: 0x6f87ee,
-        start: 0xca9021,
-        startCore: 0xfff3d0,
-        startGlow: 0x825618,
-        goal: 0x901d45,
-        goalCore: 0xfff0f4,
-        player: 0x066491,
-        playerCore: 0xf8feff,
-        playerHalo: 0xa5f3ff,
-        playerShadow: 0x030303
-      },
-      hud: {
-        panelStroke: 0xa2b7cd,
-        accent: 0xf4f8ff,
-        hintText: 0xb8cad9
-      }
-      });
-
-      return {
-        ...resolved,
-        board: {
-          ...resolved.board,
-          route: 0x2a8758,
-          trail: 0x2e4191,
-          player: 0x1e7da3,
-          start: 0xc28a1f,
-          goal: 0x7f1f43
-        }
-      };
-    })(),
-    boardTheme: {
-      solutionPathGlowAlphaScale: 0.56,
-      solutionPathCoreAlphaScale: 0.8,
-      trailFillAlphaScale: 1.02,
-      trailGlowAlphaScale: 0.86,
-      trailCoreAlphaScale: 1.12,
-      actorHaloAlphaScale: 1.08,
-      goalGlowAlphaScale: 0.96
-    },
-    hudTheme: {
-      railAlphaScale: 0.76,
-      modeAlphaScale: 0.96,
-      metaAlphaScale: 0.78,
-      flashAlphaScale: 0.88
-    },
-    background: {
-      topLeft: 0x050608,
-      topRight: 0x06080b,
-      bottomLeft: 0x10151a,
-      bottomRight: 0x171c22,
-      cloudAlphaScale: 0.72,
-      farStarAlphaScale: 0.88,
-      nearStarAlphaScale: 0.96,
-      vignetteAlphaScale: 1.1
-    },
-    shell: {
-      auraColor: 0x6da6ff,
-      haloColor: 0xe5f3ff,
-      shadeColor: 0x7d8a99,
-      veilColor: 0x050607,
-      auraAlphaBias: -0.018,
-      haloAlphaBias: -0.008,
-      shadeAlphaBias: -0.012,
-      veilAlphaBias: -0.004,
-      auraScaleBias: -0.01,
-      haloScaleBias: -0.003,
-      motifPrimaryAlpha: 0.045,
-      motifSecondaryAlpha: 0.018,
-      blueprintAccentAlphaScale: 0.82
-    },
-    presentation: {
-      driftScale: 0.74,
-      offsetScale: 0.72,
-      solutionPathAlphaScale: 1.06,
-      metadataAlphaBias: -0.02,
-      flashAlphaBias: -0.02,
-      actorPulseBias: 0.004
-    },
-    ambientSky: {
-      configuredFamilies: ['micro-twinkle', 'cold-streak', 'satellite-blink', 'ufo-blink', 'distant-galaxy-band'],
-      backdropMotif: 'noir-band',
-      hazeColor: 0x10213c,
-      hazeAccentColor: 0x365f8a,
-      streakColor: 0xf1f6ff,
-      cometColor: 0x9bc8ff,
-      satelliteColor: 0xcde8ff,
-      ufoColor: 0x8fdcff,
-      driftMoteColor: 0x66758a,
-      staticStarDensityScale: 0.76,
-      twinkleDensityScale: 0.62,
-      hazeAlphaScale: 0.56,
-      driftMoteDensityScale: 0.08,
-      shootingIntervalScale: 1.42,
-      cometIntervalScale: 1.48,
-      satelliteIntervalScale: 1.28,
-      ufoIntervalScale: 1.58,
-      heroCooldownScale: 1.08,
-      signatureCooldownScale: 1.18,
-      motifAlphaScale: 0.5,
-      veilWidthScale: 1.14,
-      veilHeightScale: 0.74,
-      veilRotationRange: 7,
-      allowSatellite: true,
-      allowUfo: true
-    },
-    title: {
-      fontFamily: '"Bahnschrift SemiCondensed", "Trebuchet MS", "Segoe UI", sans-serif',
-      signatureFontFamily: '"Consolas", "Courier New", monospace',
-      supportFontFamily: '"Consolas", "Courier New", monospace',
-      titleColor: '#f2f4f8',
-      titleStroke: '#0b1117',
-      titleShadow: '#0a1016',
-      signatureColor: '#b9cfe4',
-      supportColor: '#dce8f4',
-      installColor: '#f2f4f8',
-      pendingColor: '#c7d0db',
-      plateShadowColor: 0x000000,
-      plateOuterColor: 0x060a10,
-      plateInnerColor: 0x0d1620,
-      plateLineColor: 0xd8e9ff,
-      buttonFillColor: 0x0a131c,
-      buttonStrokeColor: 0xb7d4f0
-    }
-  },
-  ember: {
-    id: 'ember',
-    label: 'EMBER',
-    palette: (() => {
-      const resolved = createThemePalette({
-        background: {
-          deepSpace: 0x120b09,
-          nebula: 0x241412,
-          nebulaCore: 0x3a201b,
-          vignette: 0x060302,
-          star: 0xffddc2,
-          cloud: 0x4a271d
-        },
-        board: {
-          glow: 0x29140f,
-          panel: 0x190d09,
-          panelStroke: 0xae7550,
-          well: 0x120907,
-          shadow: 0x050201,
-          outer: 0x301610,
-          outerStroke: 0xd7a073,
-          innerStroke: 0xc98557,
-          topHighlight: 0xffd19d,
-          wall: 0x2d170e,
-          floor: 0xe8c7a8,
-          path: 0xb27653,
-          route: 0x238652,
-          routeCore: 0xf4ffef,
-          routeGlow: 0x1f3f2a,
-          trail: 0x576bde,
-          trailCore: 0xf6f1ff,
-          trailGlow: 0x97a6ff,
-          start: 0xd39a2c,
-          startCore: 0xfff0ca,
-          startGlow: 0x794d1c,
-          goal: 0xa33050,
-          goalCore: 0xffefef,
-          player: 0x11c8ea,
-          playerCore: 0xf0fdff,
-          playerHalo: 0x92ebff,
-          playerShadow: 0x1b0c07
-        },
-        hud: {
-          panelStroke: 0xcd8f60,
-          accent: 0xffd1a5,
-          hintText: 0xeac59e
-        }
-      });
-
-      return {
-        ...resolved,
-        board: {
-          ...resolved.board,
-          trail: 0x466299,
-          goal: 0xa24f68,
-          player: 0x063848
-        }
-      };
-    })(),
-    boardTheme: {
-      solutionPathGlowAlphaScale: 1.08,
-      solutionPathCoreAlphaScale: 1.04,
-      trailFillAlphaScale: 1.02,
-      trailGlowAlphaScale: 1.1,
-      trailCoreAlphaScale: 1,
-      actorHaloAlphaScale: 1.04,
-      goalGlowAlphaScale: 1.08
-    },
-    hudTheme: {
-      railAlphaScale: 0.94,
-      modeAlphaScale: 1,
-      metaAlphaScale: 0.92,
-      flashAlphaScale: 1
-    },
-    background: {
-      topLeft: 0x140b08,
-      topRight: 0x22110d,
-      bottomLeft: 0x3b1d15,
-      bottomRight: 0x4d2618,
-      cloudAlphaScale: 0.92,
-      farStarAlphaScale: 0.72,
-      nearStarAlphaScale: 0.82,
-      vignetteAlphaScale: 1.04
-    },
-    shell: {
-      auraColor: 0xb65b2f,
-      haloColor: 0xffc07a,
-      shadeColor: 0xff8e4a,
-      veilColor: 0x130907,
-      auraAlphaBias: 0.008,
-      haloAlphaBias: 0.002,
-      shadeAlphaBias: -0.004,
-      veilAlphaBias: -0.004,
-      auraScaleBias: 0.01,
-      haloScaleBias: 0.006,
-      motifPrimaryAlpha: 0.048,
-      motifSecondaryAlpha: 0.024,
-      blueprintAccentAlphaScale: 0.92
-    },
-    presentation: {
-      driftScale: 0.78,
-      offsetScale: 0.76,
-      solutionPathAlphaScale: 0.98,
-      metadataAlphaBias: 0.02,
-      flashAlphaBias: 0.02,
-      actorPulseBias: 0.01
-    },
-    ambientSky: {
-      configuredFamilies: ['micro-twinkle', 'warm-meteor', 'comet', 'ember-dust', 'deep-cinder-glow'],
-      backdropMotif: 'ember-glow',
-      hazeColor: 0x5b2b18,
-      hazeAccentColor: 0xc06e37,
-      streakColor: 0xffd4a1,
-      cometColor: 0xff9d57,
-      satelliteColor: 0xffc483,
-      ufoColor: 0xffa062,
-      driftMoteColor: 0xf18f4d,
-      staticStarDensityScale: 0.7,
-      twinkleDensityScale: 0.58,
-      hazeAlphaScale: 0.7,
-      driftMoteDensityScale: 0.46,
-      shootingIntervalScale: 1.24,
-      cometIntervalScale: 1.18,
-      satelliteIntervalScale: 1.28,
-      ufoIntervalScale: 1.42,
-      heroCooldownScale: 0.92,
-      signatureCooldownScale: 1.08,
-      motifAlphaScale: 0.62,
-      veilWidthScale: 0.96,
-      veilHeightScale: 0.84,
-      veilRotationRange: 9,
-      allowSatellite: false,
-      allowUfo: false
-    },
-    title: {
-      fontFamily: '"Trebuchet MS", "Segoe UI", sans-serif',
-      signatureFontFamily: '"Consolas", "Courier New", monospace',
-      supportFontFamily: '"Consolas", "Courier New", monospace',
-      titleColor: '#ffd3a3',
-      titleStroke: '#3d1e10',
-      titleShadow: '#31150b',
-      signatureColor: '#efc097',
-      supportColor: '#f7d3b1',
-      installColor: '#ffd39e',
-      pendingColor: '#e0b390',
-      plateShadowColor: 0x0a0403,
-      plateOuterColor: 0x160906,
-      plateInnerColor: 0x2a140f,
-      plateLineColor: 0xffcb98,
-      buttonFillColor: 0x2a140e,
-      buttonStrokeColor: 0xffbb74
-    }
-  },
-  aurora: {
-    id: 'aurora',
-    label: 'AURORA',
-    palette: (() => {
-      const resolved = createThemePalette({
-        background: {
-          deepSpace: 0x07111f,
-          nebula: 0x12243f,
-          nebulaCore: 0x1d3560,
-          vignette: 0x02050a,
-          star: 0xdffcff,
-          cloud: 0x244c74
-        },
-        board: {
-          glow: 0x0d1b33,
-          panel: 0x0a1426,
-          panelStroke: 0x5ea0ff,
-          well: 0x09101f,
-          shadow: 0x02050c,
-          outer: 0x13233e,
-          outerStroke: 0xb89cff,
-          innerStroke: 0x90c2ef,
-          topHighlight: 0xcffeff,
-          wall: 0x112848,
-          floor: 0xd8f1ff,
-          path: 0x69a9cf,
-          route: 0x24c979,
-          routeCore: 0xf0fff8,
-          routeGlow: 0x195f46,
-          trail: 0x5b5fe0,
-          trailCore: 0xf0fbff,
-          trailGlow: 0xa8a4ff,
-          start: 0xc99733,
-          startCore: 0xfff1d1,
-          startGlow: 0x7a5b22,
-          goal: 0xc84a7f,
-          goalCore: 0xfff4fa,
-          player: 0x1adfff,
-          playerCore: 0xf3ffff,
-          playerHalo: 0x9aefff,
-          playerShadow: 0x040916
-        },
-        hud: {
-          panelStroke: 0x85c3f5,
-          accent: 0xd8fcff,
-          hintText: 0xbad7ef
-        }
-      });
-
-      return {
-        ...resolved,
-        board: {
-          ...resolved.board,
-          trail: 0x5969ba,
-          goal: 0xaa568c,
-          player: 0x06465a
-        }
-      };
-    })(),
-    boardTheme: {
-      solutionPathGlowAlphaScale: 1.12,
-      solutionPathCoreAlphaScale: 1.08,
-      trailFillAlphaScale: 0.98,
-      trailGlowAlphaScale: 1.16,
-      trailCoreAlphaScale: 1.08,
-      actorHaloAlphaScale: 1.08,
-      goalGlowAlphaScale: 1.08
-    },
-    hudTheme: {
-      railAlphaScale: 1,
-      modeAlphaScale: 1,
-      metaAlphaScale: 0.94,
-      flashAlphaScale: 1
-    },
-    background: {
-      topLeft: 0x08111f,
-      topRight: 0x102043,
-      bottomLeft: 0x182f57,
-      bottomRight: 0x30215a,
-      cloudAlphaScale: 0.88,
-      farStarAlphaScale: 0.84,
-      nearStarAlphaScale: 0.92,
-      vignetteAlphaScale: 1
-    },
-    shell: {
-      auraColor: 0x4cc9ff,
-      haloColor: 0xd0c3ff,
-      shadeColor: 0x7af5ff,
-      veilColor: 0x08111f,
-      auraAlphaBias: 0.008,
-      haloAlphaBias: 0.004,
-      shadeAlphaBias: -0.006,
-      veilAlphaBias: -0.008,
-      auraScaleBias: 0.014,
-      haloScaleBias: 0.008,
-      motifPrimaryAlpha: 0.05,
-      motifSecondaryAlpha: 0.028,
-      blueprintAccentAlphaScale: 1
-    },
-    presentation: {
-      driftScale: 0.8,
-      offsetScale: 0.78,
-      solutionPathAlphaScale: 0.92,
-      metadataAlphaBias: 0.03,
-      flashAlphaBias: 0.04,
-      actorPulseBias: 0.006
-    },
-    ambientSky: {
-      configuredFamilies: ['micro-twinkle', 'cool-streak', 'comet', 'aurora-curtain', 'ion-veil', 'ufo-flyby'],
-      backdropMotif: 'aurora-curtain',
-      hazeColor: 0x214a82,
-      hazeAccentColor: 0x7f59df,
-      streakColor: 0xd9fbff,
-      cometColor: 0x8be7ff,
-      satelliteColor: 0xbbe0ff,
-      ufoColor: 0xb391ff,
-      driftMoteColor: 0x6fe6ff,
-      staticStarDensityScale: 0.86,
-      twinkleDensityScale: 0.68,
-      hazeAlphaScale: 0.74,
-      driftMoteDensityScale: 0.24,
-      shootingIntervalScale: 1.18,
-      cometIntervalScale: 1.14,
-      satelliteIntervalScale: 1.24,
-      ufoIntervalScale: 1.28,
-      heroCooldownScale: 0.88,
-      signatureCooldownScale: 0.96,
-      motifAlphaScale: 0.68,
-      veilWidthScale: 0.74,
-      veilHeightScale: 1.46,
-      veilRotationRange: 6,
-      allowSatellite: true,
-      allowUfo: true
-    },
-    title: {
-      fontFamily: '"Segoe UI", "Trebuchet MS", sans-serif',
-      signatureFontFamily: '"Consolas", "Courier New", monospace',
-      supportFontFamily: '"Consolas", "Courier New", monospace',
-      titleColor: '#c5fbff',
-      titleStroke: '#13203f',
-      titleShadow: '#0d1831',
-      signatureColor: '#b8d4f3',
-      supportColor: '#dcfbff',
-      installColor: '#c7f9ff',
-      pendingColor: '#a8ccf0',
-      plateShadowColor: 0x030914,
-      plateOuterColor: 0x091422,
-      plateInnerColor: 0x15253f,
-      plateLineColor: 0xc9f8ff,
-      buttonFillColor: 0x14233c,
-      buttonStrokeColor: 0x92f5ff
-    }
-  },
-  vellum: {
-    id: 'vellum',
-    label: 'VELLUM',
-    palette: (() => {
-      const resolved = createThemePalette({
-        background: {
-          deepSpace: 0xe6dcc5,
-          nebula: 0xd5cbb5,
-          nebulaCore: 0xc4d6de,
-          vignette: 0xb59f7b,
-          star: 0x526887,
-          cloud: 0xd8d1c1
-        },
-        board: {
-          glow: 0xd3cab7,
-          panel: 0xebe1cc,
-          panelStroke: 0x5b7591,
-          well: 0xf4eee1,
-          shadow: 0xb49f82,
-          outer: 0xdfd4c1,
-          outerStroke: 0x58708a,
-          innerStroke: 0x7f96ad,
-          topHighlight: 0x466789,
-          wall: 0x171c22,
-          floor: 0xe7dfcf,
-          path: 0x9eb0bf,
-          route: 0x214f35,
-          routeCore: 0xf7fbf2,
-          routeGlow: 0x3b4b3d,
-          trail: 0x3550ae,
-          trailCore: 0xfbfdff,
-          trailGlow: 0x6880dd,
-          start: 0xb87d1d,
-          startCore: 0xfff2d6,
-          startGlow: 0x7a5418,
-          goal: 0x74203b,
-          goalCore: 0xfff6f9,
-          player: 0x0e7cb6,
-          playerCore: 0xfafbff,
-          playerHalo: 0x7bd1ef,
-          playerShadow: 0xb4a487
-        },
-        hud: {
-          panelStroke: 0x7790ab,
-          accent: 0xdeebf7,
-          hintText: 0xeaf2fb
-        }
-      });
-
-      const adjusted = applyPresentationContrastFloors({
-        ...resolved,
-        board: {
-          ...resolved.board,
-          wall: 0x171c22,
-          floor: 0xe7dfcf
-        }
-      });
-
-      return {
-        ...adjusted,
-        board: {
-          ...adjusted.board,
-          trail: 0x506999,
-          goal: 0x944d67,
-          player: 0x053545
-        }
-      };
-    })(),
-    boardTheme: {
-      solutionPathGlowAlphaScale: 0.48,
-      solutionPathCoreAlphaScale: 0.72,
-      trailFillAlphaScale: 1.02,
-      trailGlowAlphaScale: 0.9,
-      trailCoreAlphaScale: 1.12,
-      actorHaloAlphaScale: 1.08,
-      goalGlowAlphaScale: 1.02
-    },
-    hudTheme: {
-      railAlphaScale: 0.9,
-      modeAlphaScale: 0.98,
-      metaAlphaScale: 0.98,
-      flashAlphaScale: 0.86
-    },
-    background: {
-      topLeft: 0xede5d2,
-      topRight: 0xe3dbc8,
-      bottomLeft: 0xc4d5dd,
-      bottomRight: 0xd4cab7,
-      cloudAlphaScale: 0.52,
-      farStarAlphaScale: 0.26,
-      nearStarAlphaScale: 0.32,
-      vignetteAlphaScale: 0.56
-    },
-    shell: {
-      auraColor: 0xb5c6d2,
-      haloColor: 0x7292b0,
-      shadeColor: 0xf2e8d3,
-      veilColor: 0xf4efe1,
-      auraAlphaBias: -0.018,
-      haloAlphaBias: -0.012,
-      shadeAlphaBias: -0.018,
-      veilAlphaBias: -0.02,
-      auraScaleBias: -0.012,
-      haloScaleBias: -0.008,
-      motifPrimaryAlpha: 0.04,
-      motifSecondaryAlpha: 0.022,
-      blueprintAccentAlphaScale: 1.18
-    },
-    presentation: {
-      driftScale: 0.72,
-      offsetScale: 0.74,
-      solutionPathAlphaScale: 1.02,
-      metadataAlphaBias: 0.01,
-      flashAlphaBias: -0.04,
-      actorPulseBias: -0.004
-    },
-    ambientSky: {
-      configuredFamilies: ['paper-sky-dust', 'pinprick-stars', 'quiet-streak', 'vellum-sky-wash', 'soft-galaxy'],
-      backdropMotif: 'vellum-wash',
-      hazeColor: 0xd8d0be,
-      hazeAccentColor: 0xb1c5d7,
-      streakColor: 0x7a91b0,
-      cometColor: 0x8aa4bf,
-      satelliteColor: 0xa2b5c8,
-      ufoColor: 0xa2b5c8,
-      driftMoteColor: 0xa89066,
-      staticStarDensityScale: 0.54,
-      twinkleDensityScale: 0.46,
-      hazeAlphaScale: 0.46,
-      driftMoteDensityScale: 0.42,
-      shootingIntervalScale: 1.58,
-      cometIntervalScale: 1.64,
-      satelliteIntervalScale: 1.64,
-      ufoIntervalScale: 1.8,
-      heroCooldownScale: 1.18,
-      signatureCooldownScale: 1.3,
-      motifAlphaScale: 0.42,
-      veilWidthScale: 1.22,
-      veilHeightScale: 0.72,
-      veilRotationRange: 4,
-      allowSatellite: false,
-      allowUfo: false
-    },
-    title: {
-      fontFamily: '"Garamond", Georgia, serif',
-      signatureFontFamily: '"Consolas", "Courier New", monospace',
-      supportFontFamily: '"Consolas", "Courier New", monospace',
-      titleColor: '#33485f',
-      titleStroke: '#f3ead7',
-      titleShadow: '#b7a488',
-      signatureColor: '#58708a',
-      supportColor: '#496079',
-      installColor: '#38506a',
-      pendingColor: '#64778d',
-      plateShadowColor: 0xbca98a,
-      plateOuterColor: 0xf0e7d7,
-      plateInnerColor: 0xe4d9c5,
-      plateLineColor: 0x64829f,
-      buttonFillColor: 0xd8ccb5,
-      buttonStrokeColor: 0x7490ac
-    }
-  },
-  monolith: {
-    id: 'monolith',
-    label: 'MONOLITH',
-    palette: (() => {
-      const resolved = createThemePalette({
-        background: {
-          deepSpace: 0x0c0d10,
-          nebula: 0x16181d,
-          nebulaCore: 0x21242a,
-          vignette: 0x020202,
-          star: 0xd7d9dd,
-          cloud: 0x25282d
-        },
-        board: {
-          glow: 0x111317,
-          panel: 0x0d0f13,
-          panelStroke: 0x8d949d,
-          well: 0x07080b,
-          shadow: 0x000000,
-          outer: 0x181a1f,
-          outerStroke: 0xd4d9df,
-          innerStroke: 0x979ea8,
-          topHighlight: 0xf1f4f8,
-          wall: 0x17191e,
-          floor: 0xc9d1d7,
-          path: 0x8a929b,
-          route: 0x2d7550,
-          routeCore: 0xf7fff9,
-          routeGlow: 0x18422f,
-          trail: 0x324ead,
-          trailCore: 0xf7f9ff,
-          trailGlow: 0x738af0,
-          start: 0xc1841a,
-          startCore: 0xfff2d1,
-          startGlow: 0x7c5314,
-          goal: 0xb0365e,
-          goalCore: 0xfff0f4,
-          player: 0x0f78b2,
-          playerCore: 0xfcffff,
-          playerHalo: 0x9df1ff,
-          playerShadow: 0x020202
-        },
-        hud: {
-          panelStroke: 0xa3a8b0,
-          accent: 0xf4f6f8,
-          hintText: 0xc0c6ce
-        }
-      });
-
-      return {
-        ...resolved,
-        board: {
-          ...resolved.board,
-          trail: 0x42599d,
-          goal: 0x8f4564,
-          player: 0x052f41
-        }
-      };
-    })(),
-    boardTheme: {
-      solutionPathGlowAlphaScale: 0.54,
-      solutionPathCoreAlphaScale: 0.78,
-      trailFillAlphaScale: 1.04,
-      trailGlowAlphaScale: 0.88,
-      trailCoreAlphaScale: 1.1,
-      actorHaloAlphaScale: 0.98,
-      goalGlowAlphaScale: 0.9
-    },
-    hudTheme: {
-      railAlphaScale: 0.68,
-      modeAlphaScale: 0.8,
-      metaAlphaScale: 0.74,
-      flashAlphaScale: 0.62
-    },
-    background: {
-      topLeft: 0x0c0d10,
-      topRight: 0x121419,
-      bottomLeft: 0x1d2025,
-      bottomRight: 0x26292e,
-      cloudAlphaScale: 0.62,
-      farStarAlphaScale: 0.58,
-      nearStarAlphaScale: 0.64,
-      vignetteAlphaScale: 1.08
-    },
-    shell: {
-      auraColor: 0x6a7078,
-      haloColor: 0xe6e8ec,
-      shadeColor: 0x484d56,
-      veilColor: 0x090a0d,
-      auraAlphaBias: -0.034,
-      haloAlphaBias: -0.02,
-      shadeAlphaBias: 0.002,
-      veilAlphaBias: 0.01,
-      auraScaleBias: -0.016,
-      haloScaleBias: -0.01,
-      motifPrimaryAlpha: 0.05,
-      motifSecondaryAlpha: 0.014,
-      blueprintAccentAlphaScale: 0.72
-    },
-    presentation: {
-      driftScale: 0.68,
-      offsetScale: 0.62,
-      solutionPathAlphaScale: 0.94,
-      metadataAlphaBias: -0.04,
-      flashAlphaBias: -0.06,
-      actorPulseBias: -0.002
-    },
-    ambientSky: {
-      configuredFamilies: ['technical-streak', 'grayscale-stars', 'signal-blink', 'signal-band', 'satellite-drift'],
-      backdropMotif: 'monolith-signal',
-      hazeColor: 0x1f232a,
-      hazeAccentColor: 0x58626f,
-      streakColor: 0xf1f3f6,
-      cometColor: 0xb2bcc8,
-      satelliteColor: 0xd8dde4,
-      ufoColor: 0xadb7c4,
-      driftMoteColor: 0x7c8794,
-      staticStarDensityScale: 0.52,
-      twinkleDensityScale: 0.44,
-      hazeAlphaScale: 0.5,
-      driftMoteDensityScale: 0.22,
-      shootingIntervalScale: 1.34,
-      cometIntervalScale: 1.42,
-      satelliteIntervalScale: 1.24,
-      ufoIntervalScale: 1.8,
-      heroCooldownScale: 1.04,
-      signatureCooldownScale: 1.18,
-      motifAlphaScale: 0.48,
-      veilWidthScale: 1.34,
-      veilHeightScale: 0.42,
-      veilRotationRange: 4,
-      allowSatellite: true,
-      allowUfo: false
-    },
-    title: {
-      fontFamily: '"Bahnschrift", "Segoe UI", sans-serif',
-      signatureFontFamily: '"Consolas", "Courier New", monospace',
-      supportFontFamily: '"Consolas", "Courier New", monospace',
-      titleColor: '#f4f6f8',
-      titleStroke: '#121316',
-      titleShadow: '#0d0f12',
-      signatureColor: '#c2c8cf',
-      supportColor: '#e1e5ea',
-      installColor: '#f4f6f8',
-      pendingColor: '#b7bcc4',
-      plateShadowColor: 0x000000,
-      plateOuterColor: 0x08090c,
-      plateInnerColor: 0x15181d,
-      plateLineColor: 0xe7eaee,
-      buttonFillColor: 0x121419,
-      buttonStrokeColor: 0xc9ced6
-    }
-  }
-};
-
-const AMBIENT_SKY_DEPTHS: AmbientSkyDepths = Object.freeze({
-  base: -14,
-  haze: -13,
-  stars: -12,
-  twinkles: -11,
-  motes: -10.5,
-  events: -10
-});
-const AMBIENT_SKY_MAX_DELTA_MS = 80;
-const AMBIENT_SKY_TEXTURES = Object.freeze({
-  twinkle: 'mazer-ambient-twinkle',
-  streak: 'mazer-ambient-streak',
-  comet: 'mazer-ambient-comet',
-  satellite: 'mazer-ambient-satellite',
-  ufo: 'mazer-ambient-ufo'
-});
-
-interface AmbientSkyRect {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
-
-interface AmbientSkyTwinkleState {
-  sprite: Phaser.GameObjects.Image;
-  anchorX: number;
-  anchorY: number;
-  baseAlpha: number;
-  amplitude: number;
-  pulseMs: number;
-  driftX: number;
-  driftY: number;
-  phase: number;
-}
-
-interface AmbientSkyDriftMoteState {
-  sprite: Phaser.GameObjects.Image;
-  anchorX: number;
-  anchorY: number;
-  rangeX: number;
-  rangeY: number;
-  speedX: number;
-  speedY: number;
-  phase: number;
-  baseAlpha: number;
-  amplitude: number;
-}
-
-interface AmbientSkyVeilState {
-  graphics: Phaser.GameObjects.Graphics;
-  anchorX: number;
-  anchorY: number;
-  rangeX: number;
-  rangeY: number;
-  pulseMs: number;
-  phase: number;
-  baseAlpha: number;
-  amplitude: number;
-  scaleAmplitudeX: number;
-  scaleAmplitudeY: number;
-  rotationRange: number;
-  rotationPhase: number;
-}
-
-interface AmbientSkyMovingEvent {
-  family: AmbientSkyMovingFamily;
-  body: Phaser.GameObjects.Image;
-  glow?: Phaser.GameObjects.Image;
-  startedAt: number;
-  durationMs: number;
-  fromX: number;
-  fromY: number;
-  toX: number;
-  toY: number;
-  maxAlpha: number;
-  blinkMs?: number;
-  wobblePx?: number;
-  wobbleSpeed?: number;
-  phase: number;
-  width: number;
-  height: number;
-}
-
-interface AmbientSkyLaneSegment {
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-}
-
-const expandAmbientRect = (rect: AmbientSkyRect, amount: number): AmbientSkyRect => ({
-  left: rect.left - amount,
-  top: rect.top - amount,
-  right: rect.right + amount,
-  bottom: rect.bottom + amount
-});
-
-const rectsIntersect = (left: AmbientSkyRect, right: AmbientSkyRect): boolean => (
-  left.left < right.right
-  && left.right > right.left
-  && left.top < right.bottom
-  && left.bottom > right.top
-);
-
-export const resolveAmbientSkyProfileTuning = (
-  profile?: PresentationDeploymentProfile,
-  variant: AmbientPresentationVariant = DEFAULT_PRESENTATION_VARIANT,
-  reducedMotion = false
-): AmbientSkyProfileTuning => {
-  const safeVariant = sanitizePresentationVariant(variant);
-  let tuning: AmbientSkyProfileTuning = {
-    densityScale: 0.88,
-    motionScale: 0.72,
-    eventIntervalScale: 1.22,
-    twinkleCount: legacyTuning.menu.ambientSky.twinkleCount,
-    driftMoteCount: legacyTuning.menu.ambientSky.driftMoteCount,
-    movingEventCap: 1,
-    signatureEventCap: 1,
-    clearZoneScale: 1
-  };
-
-  switch (profile) {
-    case 'tv':
-      tuning = {
-        ...tuning,
-        densityScale: 1.04,
-        motionScale: 0.8,
-        eventIntervalScale: 1,
-        twinkleCount: 18,
-        driftMoteCount: 6,
-        movingEventCap: 1,
-        signatureEventCap: 1,
-        clearZoneScale: 1.04
-      };
-      break;
-    case 'obs':
-      tuning = {
-        ...tuning,
-        densityScale: 0.56,
-        motionScale: 0.54,
-        eventIntervalScale: 1.48,
-        twinkleCount: 8,
-        driftMoteCount: 2,
-        movingEventCap: 0,
-        signatureEventCap: 0,
-        clearZoneScale: 1.34
-      };
-      break;
-    case 'mobile':
-      tuning = {
-        ...tuning,
-        densityScale: 0.7,
-        motionScale: 0.64,
-        eventIntervalScale: 1.32,
-        twinkleCount: 10,
-        driftMoteCount: 3,
-        movingEventCap: 0,
-        signatureEventCap: 0,
-        clearZoneScale: 1.24
-      };
-      break;
-    case 'recovery':
-      tuning = {
-        ...tuning,
-        densityScale: 0.62,
-        motionScale: 0.56,
-        eventIntervalScale: 1.38,
-        twinkleCount: 9,
-        driftMoteCount: 2,
-        movingEventCap: 0,
-        signatureEventCap: 0,
-        clearZoneScale: 1.18
-      };
-      break;
-    default:
-      break;
-  }
-
-  switch (safeVariant) {
-    case 'title':
-      tuning = {
-        ...tuning,
-        densityScale: tuning.densityScale * 1.04,
-        eventIntervalScale: tuning.eventIntervalScale * 0.96
-      };
-      break;
-    case 'loading':
-      tuning = {
-        ...tuning,
-        densityScale: tuning.densityScale * 0.84,
-        motionScale: tuning.motionScale * 0.84,
-        eventIntervalScale: tuning.eventIntervalScale * 1.14
-      };
-      break;
-    case 'ambient':
-    default:
-      break;
-  }
-
-  if (reducedMotion) {
-    tuning = {
-      ...tuning,
-      densityScale: tuning.densityScale * 0.8,
-      motionScale: tuning.motionScale * 0.28,
-      eventIntervalScale: tuning.eventIntervalScale * 1.6,
-      twinkleCount: Math.max(4, Math.round(tuning.twinkleCount * 0.56)),
-      driftMoteCount: 0,
-      movingEventCap: 0,
-      signatureEventCap: 0,
-      clearZoneScale: tuning.clearZoneScale * 1.1
-    };
-  }
-
-  return tuning;
-};
-
-const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
-const sanitizePositive = (value: unknown, fallback: number, minimum = 1): number => (
-  isFiniteNumber(value) && value >= minimum ? value : fallback
-);
-const sanitizeOffset = (value: unknown): number => (isFiniteNumber(value) ? value : 0);
-const sanitizeInset = (value: unknown): number => Math.max(0, sanitizeOffset(value));
-const DEFAULT_VIEWPORT_SAFE_INSETS: ViewportSafeInsets = Object.freeze({
-  top: 0,
-  right: 0,
-  bottom: 0,
-  left: 0
-});
-const resolveSafeInsetMetric = (source: Pick<CSSStyleDeclaration, 'getPropertyValue'>, name: string): number => {
-  const parsed = Number.parseFloat(source.getPropertyValue(name).trim());
-  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
-};
-const sanitizeViewportSafeInsets = (
-  safeInsets?: Partial<ViewportSafeInsets> | null
-): ViewportSafeInsets => ({
-  top: sanitizeInset(safeInsets?.top),
-  right: sanitizeInset(safeInsets?.right),
-  bottom: sanitizeInset(safeInsets?.bottom),
-  left: sanitizeInset(safeInsets?.left)
-});
-
-const resolveBoardEdgeBufferPx = (
-  sceneLayout: SceneLayoutProfile,
-  profile?: PresentationDeploymentProfile
-): number => (
-  profile === 'mobile' && (sceneLayout.isTiny || sceneLayout.isNarrow)
-    ? MOBILE_BOARD_EDGE_BUFFER_PX
-    : TARGET_BOARD_EDGE_BUFFER_PX
-);
-
-const resolveTitleBandMetrics = (
-  sceneLayout: SceneLayoutProfile,
-  profile?: PresentationDeploymentProfile,
-  design?: PresentationDesignProfile
-): TitleBandMetrics => {
-  const compact = sceneLayout.isTiny || sceneLayout.isNarrow;
-  const recovery = isRecoveryDesignProfile(design);
-  return {
-    bandInset: Math.max(4, (compact ? COMPACT_TITLE_BAND_INSET_PX : DEFAULT_TITLE_BAND_INSET_PX) - (recovery ? 1 : 0)),
-    bandHeight: compact
-      ? (COMPACT_TITLE_BAND_HEIGHT_PX + (sceneLayout.isPortrait ? 0 : 2) - (recovery ? 6 : 0))
-      : (DEFAULT_TITLE_BAND_HEIGHT_PX + (sceneLayout.isPortrait ? 2 : 0) - (recovery ? 8 : 0)),
-    minHeight: compact ? (recovery ? 30 : 34) : (recovery ? 38 : 44),
-    boardGap: Math.max(4, resolveBoardEdgeBufferPx(sceneLayout, profile) + (compact ? 1 : 4) - (recovery ? 2 : 0))
-  };
-};
-
-const resolveInstallEdgeInsetPx = (sceneLayout: SceneLayoutProfile): number => (
-  sceneLayout.isTiny || sceneLayout.isNarrow
-    ? COMPACT_INSTALL_EDGE_INSET_PX
-    : DEFAULT_INSTALL_EDGE_INSET_PX
-);
-
-const resolveInstallChromeTitleReservePx = (
-  sceneLayout: SceneLayoutProfile,
-  chipWidth: number
-): number => {
-  const compact = sceneLayout.isTiny || sceneLayout.isNarrow;
-  const gapPx = compact ? 10 : 14;
-  return Math.max(0, Math.round(chipWidth + gapPx));
-};
-
-const resolveTitleBandReservedRightPx = (
-  viewportWidth: number,
-  viewportHeight: number,
-  sceneLayout: SceneLayoutProfile,
-  installReservePx: number,
-  profile?: PresentationDeploymentProfile,
-  design?: PresentationDesignProfile
-): number => {
-  const installReserve = Math.max(0, Math.round(installReservePx));
-
-  if (
-    resolveIntentFeedPresentationMode(viewportWidth, viewportHeight, sceneLayout, profile, design) !== 'commentary-rail'
-  ) {
-    return installReserve;
-  }
-
-  const railReserve = resolveIntentFeedCommentaryRailWidth(viewportWidth, sceneLayout)
-    + legacyTuning.menu.intentFeed.commentaryRailGapPx;
-
-  return Math.max(installReserve, railReserve);
-};
-
-const createSceneBounds = (
-  left: number,
-  top: number,
-  right: number,
-  bottom: number
-): BoardBounds => ({
-  left,
-  top,
-  right,
-  bottom,
-  width: right - left,
-  height: bottom - top,
-  centerX: left + ((right - left) / 2),
-  centerY: top + ((bottom - top) / 2)
-});
-
-export const resolveViewportSafeInsets = (
-  source?: Pick<CSSStyleDeclaration, 'getPropertyValue'> | null
-): ViewportSafeInsets => {
-  if (source) {
-    return {
-      top: resolveSafeInsetMetric(source, '--mazer-safe-area-top'),
-      right: resolveSafeInsetMetric(source, '--mazer-safe-area-right'),
-      bottom: resolveSafeInsetMetric(source, '--mazer-safe-area-bottom'),
-      left: resolveSafeInsetMetric(source, '--mazer-safe-area-left')
-    };
-  }
-
-  if (typeof window === 'undefined' || typeof document === 'undefined') {
-    return DEFAULT_VIEWPORT_SAFE_INSETS;
-  }
-
-  return resolveViewportSafeInsets(window.getComputedStyle(document.documentElement));
-};
-
-export const resolvePresentationBackdropFrame = (
-  viewportWidth: number,
-  viewportHeight: number,
-  centerX: number,
-  centerY: number
-): PresentationBackdropFrame => {
-  const safeWidth = sanitizePositive(viewportWidth, DEFAULT_VIEWPORT_WIDTH, 1);
-  const safeHeight = sanitizePositive(viewportHeight, DEFAULT_VIEWPORT_HEIGHT, 1);
-  const safeCenterX = Phaser.Math.Clamp(isFiniteNumber(centerX) ? centerX : safeWidth / 2, 0, safeWidth);
-  const safeCenterY = Phaser.Math.Clamp(isFiniteNumber(centerY) ? centerY : safeHeight / 2, 0, safeHeight);
-  const bleedX = Math.max(64, Math.round(safeWidth * 0.12));
-  const bleedY = Math.max(64, Math.round(safeHeight * 0.12));
-  const halfWidth = Math.max(safeCenterX, safeWidth - safeCenterX) + bleedX;
-  const halfHeight = Math.max(safeCenterY, safeHeight - safeCenterY) + bleedY;
-  const width = Math.max(safeWidth + (bleedX * 2), Math.round(halfWidth * 2));
-  const height = Math.max(safeHeight + (bleedY * 2), Math.round(halfHeight * 2));
-  const left = safeCenterX - (width / 2);
-  const top = safeCenterY - (height / 2);
-
-  return {
-    centerX: safeCenterX,
-    centerY: safeCenterY,
-    width,
-    height,
-    left,
-    top,
-    right: left + width,
-    bottom: top + height
-  };
-};
-
-const MENU_RESIZE_SETTLE_MS = 900;
-const MENU_RESIZE_BUCKET_PX = 4;
-const TRAIL_HEAD_ATTACHMENT_TOLERANCE_PX = 0.75;
-
-const resolveLiveTrailHeadIndex = (view: DemoWalkerViewFrame): number => (
-  view.currentIndex !== view.nextIndex && view.progress > 0 ? view.nextIndex : view.currentIndex
-);
-
-const isTrailHeadAttachedToActor = (render: TrailRenderDiagnostics): boolean => {
-  if (!render.hasActiveMotion || render.motionHeadCenter === undefined || render.headCenter === undefined) {
-    return true;
-  }
-
-  return Math.abs(render.headCenter.x - render.motionHeadCenter.x) <= TRAIL_HEAD_ATTACHMENT_TOLERANCE_PX
-    && Math.abs(render.headCenter.y - render.motionHeadCenter.y) <= TRAIL_HEAD_ATTACHMENT_TOLERANCE_PX;
-};
-
-const buildViewportRestartKey = (viewport: ViewportSize): string => {
-  const widthBucket = Math.round(sanitizePositive(viewport.width, DEFAULT_VIEWPORT_WIDTH, 0) / MENU_RESIZE_BUCKET_PX) * MENU_RESIZE_BUCKET_PX;
-  const heightBucket = Math.round(sanitizePositive(viewport.height, DEFAULT_VIEWPORT_HEIGHT, 0) / MENU_RESIZE_BUCKET_PX) * MENU_RESIZE_BUCKET_PX;
-  return `${widthBucket}x${heightBucket}`;
-};
-
-export const resolveMenuResizeRecoveryDecision = (
-  currentViewport: ViewportSize,
-  nextViewport: ViewportSize,
-  sceneAgeMs: number,
-  lastRestartKey?: string
-): ResizeRecoveryDecision => {
-  if (!nextViewport.measured) {
-    return { shouldRestart: false };
-  }
-
-  if (sceneAgeMs < MENU_RESIZE_SETTLE_MS) {
-    return { shouldRestart: false };
-  }
-
-  const widthDelta = Math.abs(sanitizePositive(nextViewport.width, 0, 0) - sanitizePositive(currentViewport.width, 0, 0));
-  const heightDelta = Math.abs(sanitizePositive(nextViewport.height, 0, 0) - sanitizePositive(currentViewport.height, 0, 0));
-  if (widthDelta < MENU_RESIZE_BUCKET_PX && heightDelta < MENU_RESIZE_BUCKET_PX) {
-    return { shouldRestart: false };
-  }
-
-  const restartKey = buildViewportRestartKey(nextViewport);
-  if (restartKey === lastRestartKey) {
-    return { shouldRestart: false, restartKey };
-  }
-
-  return {
-    shouldRestart: true,
-    restartKey
-  };
-};
-
-const DEMO_PACING_PROFILES: readonly MenuDemoCycle['pacing'][] = [
-  { exploreStepMs: -10, goalHoldMs: 60, resetHoldMs: 36, spawnHoldMs: 34 },
-  { exploreStepMs: -2, goalHoldMs: 16, resetHoldMs: 12, spawnHoldMs: 12 },
-  { exploreStepMs: 8, goalHoldMs: 96, resetHoldMs: 44, spawnHoldMs: 24 }
-] as const;
-
-const DEMO_MOOD_PROFILES: Record<DemoMood, {
-  solutionPathAlpha: number;
-  trailWindowOffset: number;
-  trailWindowScale: number;
-  ambientDriftPx: number;
-  ambientDriftMs: number;
-  actorPulseBoost: number;
-  persistentFadeFloor: number;
-  trailPulseBoost: number;
-  metadataAlpha: number;
-  auraAlpha: number;
-  haloAlpha: number;
-  shadeAlpha: number;
-}> = {
-  solve: {
-    solutionPathAlpha: 1,
-    trailWindowOffset: 10,
-    trailWindowScale: 1.04,
-    ambientDriftPx: 0.9,
-    ambientDriftMs: 6200,
-    actorPulseBoost: 0.04,
-    persistentFadeFloor: 0.38,
-    trailPulseBoost: 0.018,
-    metadataAlpha: 0.54,
-    auraAlpha: 0.078,
-    haloAlpha: 0.028,
-    shadeAlpha: 0.02
-  },
-  scan: {
-    solutionPathAlpha: 0.16,
-    trailWindowOffset: -12,
-    trailWindowScale: 0.36,
-    ambientDriftPx: 1,
-    ambientDriftMs: 7000,
-    actorPulseBoost: 0.018,
-    persistentFadeFloor: 0.28,
-    trailPulseBoost: 0.01,
-    metadataAlpha: 0.44,
-    auraAlpha: 0.082,
-    haloAlpha: 0.028,
-    shadeAlpha: 0.028
-  },
-  blueprint: {
-    solutionPathAlpha: 0.42,
-    trailWindowOffset: -2,
-    trailWindowScale: 0.62,
-    ambientDriftPx: 0.8,
-    ambientDriftMs: 7200,
-    actorPulseBoost: 0.026,
-    persistentFadeFloor: 0.33,
-    trailPulseBoost: 0.014,
-    metadataAlpha: 0.62,
-    auraAlpha: 0.074,
-    haloAlpha: 0.024,
-    shadeAlpha: 0.02
-  }
-};
-
-const VARIANT_PROFILES: Record<AmbientPresentationVariant, VariantProfile> = {
-  title: {
-    boardScaleWide: 0.982,
-    boardScaleNarrow: 0.962,
-    topReserveRatio: 0.118,
-    topReserveMinPx: 104,
-    bottomPaddingPx: 34,
-    sidePaddingPx: 14,
-    titleScale: 0.94,
-    titleAlpha: 0.9,
-    signatureAlpha: 0.62,
-    passiveAlpha: 0.5,
-    plateAlpha: 0.1,
-    panelAlpha: 0.16,
-    titleYOffsetRatio: 0.18,
-    titleAnchor: 'center',
-    titleDriftX: 0,
-    titleDriftY: 0,
-    titleDriftMs: 4000,
-    titleLetterSpacingWide: 1,
-    titleLetterSpacingNarrow: 0,
-    solutionPathScale: 1.04,
-    metadataAlphaScale: 0.84,
-    flashAlphaScale: 0.92,
-    boardAuraBias: -0.006,
-    boardHaloBias: 0.004,
-    boardShadeBias: -0.004,
-    boardVeilBias: 0.01,
-    boardOffsetRangeX: 4,
-    boardOffsetRangeY: 2,
-    hudOffsetRangeX: 5,
-    hudOffsetRangeY: 2,
-    driftScale: 0.72,
-    actorPulseBias: 0.012
-  },
-  ambient: {
-    boardScaleWide: 0.994,
-    boardScaleNarrow: 0.978,
-    topReserveRatio: 0.09,
-    topReserveMinPx: 78,
-    bottomPaddingPx: 30,
-    sidePaddingPx: 12,
-    titleScale: 0.78,
-    titleAlpha: 0.5,
-    signatureAlpha: 0.42,
-    passiveAlpha: 0.38,
-    plateAlpha: 0.07,
-    panelAlpha: 0.14,
-    titleYOffsetRatio: 0.11,
-    titleAnchor: 'center',
-    titleDriftX: 0,
-    titleDriftY: 0,
-    titleDriftMs: 4600,
-    titleLetterSpacingWide: 2,
-    titleLetterSpacingNarrow: 1,
-    solutionPathScale: 0.78,
-    metadataAlphaScale: 0.62,
-    flashAlphaScale: 0,
-    boardAuraBias: 0.012,
-    boardHaloBias: 0.008,
-    boardShadeBias: -0.006,
-    boardVeilBias: -0.012,
-    boardOffsetRangeX: 6,
-    boardOffsetRangeY: 3,
-    hudOffsetRangeX: 6,
-    hudOffsetRangeY: 4,
-    driftScale: 0.78,
-    actorPulseBias: 0.004
-  },
-  loading: {
-    boardScaleWide: 0.986,
-    boardScaleNarrow: 0.968,
-    topReserveRatio: 0.102,
-    topReserveMinPx: 82,
-    bottomPaddingPx: 40,
-    sidePaddingPx: 14,
-    titleScale: 0.84,
-    titleAlpha: 0.66,
-    signatureAlpha: 0.54,
-    passiveAlpha: 0.46,
-    plateAlpha: 0.1,
-    panelAlpha: 0.16,
-    titleYOffsetRatio: 0.13,
-    titleAnchor: 'left',
-    titleDriftX: 0,
-    titleDriftY: 0,
-    titleDriftMs: 3200,
-    titleLetterSpacingWide: 2,
-    titleLetterSpacingNarrow: 1,
-    solutionPathScale: 0.92,
-    metadataAlphaScale: 1.16,
-    flashAlphaScale: 1.08,
-    boardAuraBias: 0.012,
-    boardHaloBias: 0.01,
-    boardShadeBias: 0.008,
-    boardVeilBias: 0.02,
-    boardOffsetRangeX: 5,
-    boardOffsetRangeY: 3,
-    hudOffsetRangeX: 6,
-    hudOffsetRangeY: 2,
-    driftScale: 0.68,
-    actorPulseBias: 0.01
-  }
-};
-
-const CHROME_PROFILES: Record<PresentationChrome, ChromeProfile> = {
-  full: {
-    boardScaleBias: -0.002,
-    topReserveBias: 4,
-    bottomPaddingBias: 6,
-    sidePaddingBias: 2,
-    titleScale: 0.98,
-    titleAlpha: 0.94,
-    signatureAlpha: 0.9,
-    passiveAlpha: 0.92,
-    plateAlpha: 0.84,
-    panelAlpha: 0.86
-  },
-  minimal: {
-    boardScaleBias: 0.004,
-    topReserveBias: -12,
-    bottomPaddingBias: 0,
-    sidePaddingBias: 0,
-    titleScale: 0.88,
-    titleAlpha: 0.58,
-    signatureAlpha: 0.56,
-    passiveAlpha: 0.54,
-    plateAlpha: 0.5,
-    panelAlpha: 0.58
-  },
-  none: {
-    boardScaleBias: 0.022,
-    topReserveBias: -64,
-    bottomPaddingBias: -10,
-    sidePaddingBias: -2,
-    titleScale: 0,
-    titleAlpha: 0,
-    signatureAlpha: 0,
-    passiveAlpha: 0,
-    plateAlpha: 0,
-    panelAlpha: 0
-  }
-};
-
-const DEFAULT_DEPLOYMENT_PRESENTATION_PROFILE: DeploymentPresentationProfile = {
-  boardScaleBias: 0,
-  portraitBoardScaleBias: 0,
-  topReserveBias: 0,
-  portraitTopReserveBias: 0,
-  bottomPaddingBias: 0,
-  sidePaddingBias: 0,
-  maxBoardScale: 0.996,
-  titlePlateWidthScale: 1,
-  titlePlateHeightScale: 1,
-  titleLineSpacingScale: 1,
-  titleYOffsetBias: 0,
-  titleAlphaScale: 1,
-  signatureAlphaScale: 1,
-  passiveAlphaScale: 1,
-  plateAlphaScale: 1,
-  panelAlphaScale: 1,
-  offsetScale: 1,
-  driftScale: 1,
-  driftDurationScale: 1,
-  metadataAlphaScale: 1,
-  flashAlphaScale: 1,
-  boardAuraBiasScale: 1,
-  boardHaloBiasScale: 1,
-  boardShadeBiasScale: 1,
-  boardVeilBiasScale: 1,
-  boardAuraMotionScale: 1,
-  boardHaloMotionScale: 1
-};
-
-const DEPLOYMENT_PRESENTATION_PROFILES: Record<PresentationDeploymentProfile, DeploymentPresentationProfile> = {
-  tv: {
-    boardScaleBias: 0.014,
-    portraitBoardScaleBias: -0.006,
-    topReserveBias: -8,
-    portraitTopReserveBias: 6,
-    bottomPaddingBias: 0,
-    sidePaddingBias: -4,
-    maxBoardScale: 0.996,
-    titlePlateWidthScale: 0.92,
-    titlePlateHeightScale: 0.96,
-    titleLineSpacingScale: 1,
-    titleYOffsetBias: -4,
-    titleAlphaScale: 1.8,
-    signatureAlphaScale: 1.4,
-    passiveAlphaScale: 1.2,
-    plateAlphaScale: 1.6,
-    panelAlphaScale: 1.6,
-    offsetScale: 0.56,
-    driftScale: 0.72,
-    driftDurationScale: 1.34,
-    metadataAlphaScale: 0.72,
-    flashAlphaScale: 0.6,
-    boardAuraBiasScale: 1,
-    boardHaloBiasScale: 1,
-    boardShadeBiasScale: 1,
-    boardVeilBiasScale: 1,
-    boardAuraMotionScale: 1,
-    boardHaloMotionScale: 1
-  },
-  obs: {
-    boardScaleBias: 0.01,
-    portraitBoardScaleBias: -0.01,
-    topReserveBias: -8,
-    portraitTopReserveBias: 8,
-    bottomPaddingBias: 6,
-    sidePaddingBias: 10,
-    maxBoardScale: 0.968,
-    titlePlateWidthScale: 0.9,
-    titlePlateHeightScale: 0.94,
-    titleLineSpacingScale: 1,
-    titleYOffsetBias: -2,
-    titleAlphaScale: 1,
-    signatureAlphaScale: 1,
-    passiveAlphaScale: 1,
-    plateAlphaScale: 1,
-    panelAlphaScale: 1,
-    offsetScale: 0,
-    driftScale: 0,
-    driftDurationScale: 1,
-    metadataAlphaScale: 0.82,
-    flashAlphaScale: 0.72,
-    boardAuraBiasScale: 0,
-    boardHaloBiasScale: 0,
-    boardShadeBiasScale: 0.4,
-    boardVeilBiasScale: 0.6,
-    boardAuraMotionScale: 0.25,
-    boardHaloMotionScale: 0.25
-  },
-  mobile: {
-    boardScaleBias: -0.06,
-    portraitBoardScaleBias: -0.042,
-    topReserveBias: 6,
-    portraitTopReserveBias: 8,
-    bottomPaddingBias: 8,
-    sidePaddingBias: 10,
-    maxBoardScale: 0.996,
-    titlePlateWidthScale: 0.92,
-    titlePlateHeightScale: 0.86,
-    titleLineSpacingScale: 0.96,
-    titleYOffsetBias: -2,
-    titleAlphaScale: 1,
-    signatureAlphaScale: 1,
-    passiveAlphaScale: 1,
-    plateAlphaScale: 1,
-    panelAlphaScale: 1,
-    offsetScale: 0.76,
-    driftScale: 0.9,
-    driftDurationScale: 1.08,
-    metadataAlphaScale: 1.08,
-    flashAlphaScale: 1,
-    boardAuraBiasScale: 1,
-    boardHaloBiasScale: 1,
-    boardShadeBiasScale: 1,
-    boardVeilBiasScale: 1,
-    boardAuraMotionScale: 1,
-    boardHaloMotionScale: 1
-  },
-  recovery: {
-    boardScaleBias: 0.016,
-    portraitBoardScaleBias: 0,
-    topReserveBias: -14,
-    portraitTopReserveBias: -4,
-    bottomPaddingBias: -6,
-    sidePaddingBias: -2,
-    maxBoardScale: 0.992,
-    titlePlateWidthScale: 0.86,
-    titlePlateHeightScale: 0.92,
-    titleLineSpacingScale: 0.96,
-    titleYOffsetBias: -2,
-    titleAlphaScale: 1.04,
-    signatureAlphaScale: 0.94,
-    passiveAlphaScale: 0.92,
-    plateAlphaScale: 0.92,
-    panelAlphaScale: 0.8,
-    offsetScale: 0.42,
-    driftScale: 0.6,
-    driftDurationScale: 1.14,
-    metadataAlphaScale: 0.82,
-    flashAlphaScale: 0.78,
-    boardAuraBiasScale: 0.36,
-    boardHaloBiasScale: 0.32,
-    boardShadeBiasScale: 0.78,
-    boardVeilBiasScale: 0.72,
-    boardAuraMotionScale: 0.5,
-    boardHaloMotionScale: 0.46
-  }
-};
-
-const CURATED_MOOD_PATTERNS: readonly MoodPattern[] = [
-  ['solve', 'scan', 'solve', 'blueprint', 'solve', 'scan', 'solve', 'solve'],
-  ['solve', 'solve', 'scan', 'solve', 'blueprint', 'solve', 'scan', 'solve'],
-  ['solve', 'scan', 'solve', 'solve', 'blueprint', 'solve', 'solve', 'scan'],
-  ['solve', 'solve', 'scan', 'solve', 'solve', 'blueprint', 'scan', 'solve']
-] as const;
-
-const ANIMATION_TIME_WRAP_MS = 600_000;
-
-export interface MenuPresentationModel {
-  viewport: ViewportSize;
-  layout: SceneLayoutProfile;
-}
-
-export interface PresentationBackdropFrame {
-  centerX: number;
-  centerY: number;
-  width: number;
-  height: number;
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
-
-const resolveDeploymentPresentationProfile = (
-  profile: PresentationDeploymentProfile | null | undefined
-): DeploymentPresentationProfile => (
-  profile ? DEPLOYMENT_PRESENTATION_PROFILES[profile] : DEFAULT_DEPLOYMENT_PRESENTATION_PROFILE
-);
-
-const resolveRecoveredAmbientThemeProfile = (theme: PresentationThemeFamily): AmbientThemeProfile => {
-  const cached = RECOVERY_THEME_PROFILE_CACHE[theme];
-  if (cached) {
-    return cached;
-  }
-
-  const recovered = buildRecoveryThemeProfile(THEME_PROFILES[theme]);
-  RECOVERY_THEME_PROFILE_CACHE[theme] = recovered;
-  return recovered;
-};
-
-export const resolveAmbientThemeProfile = (
-  theme: PresentationThemeFamily,
-  design?: PresentationDesignProfile
-): AmbientThemeProfile => (
-  isRecoveryDesignProfile(design)
-    ? resolveRecoveredAmbientThemeProfile(theme)
-    : THEME_PROFILES[theme]
-);
-
-export interface TitleBandFrame {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-  width: number;
-  height: number;
-  centerX: number;
-  centerY: number;
-  reservedRight: number;
-}
-
-export interface TitleLockupLayout {
-  plateWidth: number;
-  plateHeight: number;
-  titleX: number;
-  titleY: number;
-  titleShadowY: number;
-  titleFontSize: number;
-  titleLetterSpacing: number;
-  subtitleTopOffsetY: number;
-  subtitleGap: number;
-  subtitleFontSize: number;
-  subtitleLetterSpacing: number;
-  estimatedSubtitleHeight: number;
-}
-
-export interface InstallChromeFrame {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-  width: number;
-  height: number;
-  centerX: number;
-  centerY: number;
-}
-
-const TARGET_BOARD_EDGE_BUFFER_PX = 8;
-const MOBILE_BOARD_EDGE_BUFFER_PX = 7;
-const DEFAULT_TITLE_BAND_INSET_PX = 10;
-const COMPACT_TITLE_BAND_INSET_PX = 6;
-const DEFAULT_TITLE_BAND_HEIGHT_PX = 56;
-const COMPACT_TITLE_BAND_HEIGHT_PX = 44;
-const DEFAULT_INSTALL_EDGE_INSET_PX = 18;
-const COMPACT_INSTALL_EDGE_INSET_PX = 10;
-
-interface TitleBandMetrics {
-  bandInset: number;
-  bandHeight: number;
-  minHeight: number;
-  boardGap: number;
-}
-
-export const MENU_SCENE_VISUAL_CAPTURE_KEY = '__MAZER_VISUAL_CAPTURE__' as const;
-export const MENU_SCENE_VISUAL_DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__' as const;
-export { MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY } from './menuRuntimeDiagnostics';
-
-type VisualCaptureInstallMode = InstallSurfaceState['mode'];
-
-export interface VisualSceneBounds {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-  width: number;
-  height: number;
-  centerX: number;
-  centerY: number;
-}
-
-export interface VisualScenePoint {
+interface StarParticle {
   x: number;
   y: number;
+  radius: number;
+  speed: number;
+  alpha: number;
 }
 
-export interface VisualSubtitleDiagnostics {
-  visible: boolean;
-  lineCount: number;
-  minimumGapBelowTitle?: number;
-  bounds?: VisualSceneBounds;
-  gapBelowTitle?: number;
-  gapBelowPlate?: number;
-}
-
-export interface MenuSceneVisualCaptureConfig {
-  enabled: boolean;
-  forceInstallMode?: VisualCaptureInstallMode;
-  manualInstallInstruction?: string;
-}
-
-export interface MenuSceneVisualDiagnostics {
-  revision: number;
-  updatedAt: number;
-  variant: AmbientPresentationVariant;
-  chrome: PresentationChrome;
-  profile?: PresentationDeploymentProfile;
-  design?: PresentationDesignProfile;
-  theme: PresentationThemeFamily;
-  viewport: {
-    width: number;
-    height: number;
-    safeInsets: ViewportSafeInsets;
-  };
-  board: {
-    bounds: BoardBounds;
-    safeBounds: BoardBounds;
-    tileSize: number;
-  };
-  title: {
-    expected: boolean;
-    visible: boolean;
-    frame?: TitleBandFrame;
-    bounds?: VisualSceneBounds;
-    plateBounds?: VisualSceneBounds;
-    textBounds?: VisualSceneBounds;
-    subtitle?: VisualSubtitleDiagnostics;
-  };
-  install: {
-    expected: boolean;
-    visible: boolean;
-    forced: boolean;
-    state: InstallSurfaceState['mode'];
-    frame?: InstallChromeFrame;
-    bounds?: VisualSceneBounds;
-  };
-  intentFeed: {
-    visible: boolean;
-    dock?: IntentFeedHudLayoutSnapshot['dock'];
-    compact: boolean;
-    statusVisible: boolean;
-    statusText?: string | null;
-    quickThoughtCount: number;
-    maxVisibleEvents: number;
-    onboardingVisible?: boolean;
-    onboardingLabel?: string | null;
-    riskVisible?: boolean;
-    nextRiskLabel?: string | null;
-    bounds?: VisualSceneBounds;
-  };
-  trail: {
-    start: number;
-    limit: number;
-    currentIndex: number;
-    nextIndex: number;
-    progress: number;
-    cue: DemoWalkerCue;
-    suppressesFuturePreview: boolean;
-    attachedToActor: boolean;
-    bridgeRendered: boolean;
-    render: TrailRenderDiagnostics;
-  };
-  attempt: {
-    mode: 'watch' | 'play';
-    sequence: MenuDemoSequence;
-    lifecyclePhase: DemoLifecyclePhase;
-    ritualPhase: DemoRitualPhase;
-    elapsedMs: number;
-    presentationElapsedMs: number;
-    visualArrivalLatchMs: number | null;
-  };
-  arrival: {
-    actorVisible: boolean;
-    goalVisible: boolean;
-    actorCenter?: VisualScenePoint;
-    goalCenter?: VisualScenePoint;
-    goalTileBounds?: VisualSceneBounds;
-    exitRegionBounds?: VisualSceneBounds;
-    actorInsideExitRegion: boolean;
-    settleProgress: number;
-    settleRemainingMs: number;
-    readyToClear: boolean;
-  };
-  paletteReadability: PaletteReadabilityReport;
-  bootTiming?: ReturnType<typeof buildBootTimingReport>;
-  ambient?: AmbientSkyDiagnostics;
-}
-
-declare global {
-  interface Window {
-    __MAZER_VISUAL_CAPTURE__?: Partial<MenuSceneVisualCaptureConfig>;
-    __MAZER_VISUAL_DIAGNOSTICS__?: MenuSceneVisualDiagnostics;
-  }
-}
-
-const resolveRuntimeWindow = (): Window | undefined => (
-  typeof window === 'undefined' ? undefined : window
-);
-
-const isVisualCaptureInstallMode = (value: unknown): value is VisualCaptureInstallMode => (
-  value === 'hidden' || value === 'available' || value === 'manual'
-);
-
-export const resolveMenuSceneVisualCaptureConfig = (
-  source: Pick<Window, typeof MENU_SCENE_VISUAL_CAPTURE_KEY> | undefined = resolveRuntimeWindow()
-): MenuSceneVisualCaptureConfig => {
-  const raw = source?.[MENU_SCENE_VISUAL_CAPTURE_KEY];
-  if (!raw || raw.enabled !== true) {
-    return { enabled: false };
-  }
-
-  return {
-    enabled: true,
-    ...(isVisualCaptureInstallMode(raw.forceInstallMode)
-      ? { forceInstallMode: raw.forceInstallMode }
-      : {}),
-    ...(typeof raw.manualInstallInstruction === 'string' && raw.manualInstallInstruction.trim().length > 0
-      ? { manualInstallInstruction: raw.manualInstallInstruction.trim() }
-      : {})
-  };
-};
-
-export const resolveMenuSceneInstallSurfaceState = (
-  state: InstallSurfaceState,
-  captureConfig: MenuSceneVisualCaptureConfig
-): InstallSurfaceState => {
-  if (!captureConfig.enabled || !captureConfig.forceInstallMode) {
-    return state;
-  }
-
-  if (captureConfig.forceInstallMode === 'available') {
-    return {
-      mode: 'available',
-      canPrompt: true,
-      installed: false,
-      standalone: false
-    };
-  }
-
-  if (captureConfig.forceInstallMode === 'manual') {
-    return {
-      mode: 'manual',
-      canPrompt: false,
-      installed: false,
-      standalone: false,
-      instruction: captureConfig.manualInstallInstruction ?? 'Add to Home Screen'
-    };
-  }
-
-  return {
-    mode: 'hidden',
-    canPrompt: false,
-    installed: false,
-    standalone: false
-  };
-};
-
-const toVisualSceneBounds = (
-  bounds?: { x: number; y: number; width: number; height: number } | null
-): VisualSceneBounds | undefined => {
-  if (!bounds || !isFiniteNumber(bounds.x) || !isFiniteNumber(bounds.y) || !isFiniteNumber(bounds.width) || !isFiniteNumber(bounds.height)) {
-    return undefined;
-  }
-
-  return {
-    left: bounds.x,
-    top: bounds.y,
-    right: bounds.x + bounds.width,
-    bottom: bounds.y + bounds.height,
-    width: bounds.width,
-    height: bounds.height,
-    centerX: bounds.x + (bounds.width / 2),
-    centerY: bounds.y + (bounds.height / 2)
-  };
-};
-
-const toVisualScenePoint = (
-  point?: { x: number; y: number } | null
-): VisualScenePoint | undefined => {
-  if (!point || !isFiniteNumber(point.x) || !isFiniteNumber(point.y)) {
-    return undefined;
-  }
-
-  return {
-    x: point.x,
-    y: point.y
-  };
-};
-
-const resolveRenderedTextLineCount = (text: Phaser.GameObjects.Text): number => {
-  const wrappedLines = text.getWrappedText(text.text);
-  if (Array.isArray(wrappedLines) && wrappedLines.length > 0) {
-    return wrappedLines.length;
-  }
-
-  return String(text.text ?? '')
-    .split(/\r?\n/)
-    .filter((line) => line.length > 0).length || 1;
-};
-
-const publishMenuSceneVisualDiagnostics = (diagnostics: MenuSceneVisualDiagnostics): void => {
-  const runtime = resolveRuntimeWindow();
-  if (!runtime) {
-    return;
-  }
-
-  runtime[MENU_SCENE_VISUAL_DIAGNOSTICS_KEY] = diagnostics;
-};
-
-const clearMenuSceneVisualDiagnostics = (): void => {
-  const runtime = resolveRuntimeWindow();
-  if (!runtime || !(MENU_SCENE_VISUAL_DIAGNOSTICS_KEY in runtime)) {
-    return;
-  }
-
-  delete runtime[MENU_SCENE_VISUAL_DIAGNOSTICS_KEY];
-};
-
-interface AmbientSkyLayerOptions {
+interface SceneLayout {
   width: number;
   height: number;
-  seed: number;
-  themeProfile: AmbientThemeProfile;
-  variant: AmbientPresentationVariant;
-  profile?: PresentationDeploymentProfile;
-  reducedMotion: boolean;
+  boardLeft: number;
+  boardTop: number;
+  boardSize: number;
+  tileSize: number;
+  buttonY: number;
+  buttonWidth: number;
+  buttonHeight: number;
 }
 
-class AmbientSkyLayer {
-  private readonly width: number;
-  private readonly height: number;
-  private readonly themeProfile: AmbientThemeProfile;
-  private readonly tuning: AmbientSkyProfileTuning;
-  private readonly reducedMotion: boolean;
-  private readonly base: Phaser.GameObjects.Graphics;
-  private readonly clouds: Phaser.GameObjects.Graphics;
-  private readonly farStars: Phaser.GameObjects.Graphics;
-  private readonly nearStars: Phaser.GameObjects.Graphics;
-  private readonly twinkles: AmbientSkyTwinkleState[] = [];
-  private readonly driftMotes: AmbientSkyDriftMoteState[] = [];
-  private readonly veils: AmbientSkyVeilState[] = [];
-  private readonly movingEvents: AmbientSkyMovingEvent[] = [];
-  private backdropCounts = {
-    clouds: 0,
-    farStars: 0,
-    nearStars: 0
-  };
-  private timelineMs = 0;
-  private rngState: number;
-  private nextShootingAt = 0;
-  private nextCometAt = 0;
-  private nextSatelliteAt = 0;
-  private nextUfoAt = 0;
-  private nextHeroWindowAt = 0;
-  private nextSignatureWindowAt = 0;
-  private boardRect?: AmbientSkyRect;
-  private titleRect?: AmbientSkyRect;
-  private installRect?: AmbientSkyRect;
-  private reservedRects: AmbientSkyRect[] = [];
-
-  public constructor(
-    private readonly scene: Phaser.Scene,
-    options: AmbientSkyLayerOptions
-  ) {
-    this.width = sanitizePositive(options.width, DEFAULT_VIEWPORT_WIDTH);
-    this.height = sanitizePositive(options.height, DEFAULT_VIEWPORT_HEIGHT);
-    this.themeProfile = options.themeProfile;
-    this.reducedMotion = options.reducedMotion;
-    this.tuning = resolveAmbientSkyProfileTuning(options.profile, options.variant, options.reducedMotion);
-    this.rngState = ((options.seed >>> 0)
-      ^ (this.width << 4)
-      ^ (this.height << 1)
-      ^ options.themeProfile.id.charCodeAt(0)
-      ^ options.variant.charCodeAt(0)
-      ^ (options.profile?.charCodeAt(0) ?? 0)
-    ) >>> 0 || 1;
-    this.ensureTextures();
-    this.base = this.scene.add.graphics().setDepth(AMBIENT_SKY_DEPTHS.base);
-    this.clouds = this.scene.add.graphics().setDepth(AMBIENT_SKY_DEPTHS.haze).setBlendMode(Phaser.BlendModes.SCREEN);
-    this.farStars = this.scene.add.graphics().setDepth(AMBIENT_SKY_DEPTHS.stars);
-    this.nearStars = this.scene.add.graphics().setDepth(AMBIENT_SKY_DEPTHS.stars);
-    this.drawBackdrop();
-    this.createVeils();
-    this.createTwinkles();
-    this.createDriftMotes();
-    this.resetSchedules();
-  }
-
-  public setReservedFrames(
-    boardBounds?: BoardBounds,
-    boardTileSize?: number,
-    titleFrame?: TitleBandFrame,
-    installFrame?: InstallChromeFrame
-  ): void {
-    const clearZoneTuning = legacyTuning.menu.ambientSky.clearZone;
-    const profilePad = (boardTileSize ?? 0) * clearZoneTuning.boardPadTiles * this.tuning.clearZoneScale;
-    const extraPad = this.tuning.clearZoneScale > 1.2
-      ? (clearZoneTuning.obsPadPx * 0.5)
-      : this.tuning.clearZoneScale > 1.08
-        ? clearZoneTuning.mobilePadPx
-        : 0;
-    this.boardRect = boardBounds
-      ? expandAmbientRect(
-        {
-          left: boardBounds.left,
-          top: boardBounds.top,
-          right: boardBounds.right,
-          bottom: boardBounds.bottom
-        },
-        profilePad + extraPad
-      )
-      : undefined;
-    this.titleRect = titleFrame
-      ? expandAmbientRect(
-        {
-          left: titleFrame.left,
-          top: titleFrame.top,
-          right: titleFrame.right,
-          bottom: titleFrame.bottom
-        },
-        clearZoneTuning.titlePadPx * this.tuning.clearZoneScale
-      )
-      : undefined;
-    this.installRect = installFrame
-      ? expandAmbientRect(
-        {
-          left: installFrame.left,
-          top: installFrame.top,
-          right: installFrame.right,
-          bottom: installFrame.bottom
-        },
-        clearZoneTuning.installPadPx * this.tuning.clearZoneScale
-      )
-      : undefined;
-    this.reservedRects = [this.boardRect, this.titleRect, this.installRect].filter((value): value is AmbientSkyRect => Boolean(value));
-  }
-
-  public update(deltaMs: number): void {
-    const frameMs = Math.max(0, Math.min(AMBIENT_SKY_MAX_DELTA_MS, deltaMs || 0));
-    this.timelineMs += frameMs;
-    this.updateVeils();
-    this.updateTwinkles();
-    this.updateDriftMotes();
-    this.updateMovingEvents();
-    this.maybeSpawnEvents();
-  }
-
-  public getDiagnostics(boardMinDepth: number, titleDepth?: number, installDepth?: number): AmbientSkyDiagnostics {
-    const movingCounts = {
-      shootingStars: this.countMovingEvents('shooting-star'),
-      comets: this.countMovingEvents('comet'),
-      satellites: this.countMovingEvents('satellite'),
-      ufos: this.countMovingEvents('ufo')
-    };
-    const reservedZoneBreaches = this.movingEvents.reduce((total, event) => (
-      total + (this.eventViolatesReservedZones(event) ? 1 : 0)
-    ), 0);
-    const signatureEvents = movingCounts.satellites + movingCounts.ufos;
-    const backgroundMax = Math.max(
-      AMBIENT_SKY_DEPTHS.base,
-      AMBIENT_SKY_DEPTHS.haze,
-      AMBIENT_SKY_DEPTHS.stars,
-      AMBIENT_SKY_DEPTHS.twinkles,
-      AMBIENT_SKY_DEPTHS.motes,
-      AMBIENT_SKY_DEPTHS.events
-    );
-
-    return {
-      reducedMotion: this.reducedMotion,
-      configuredFamilies: this.themeProfile.ambientSky.configuredFamilies,
-      activeCounts: {
-        clouds: this.backdropCounts.clouds,
-        farStars: this.backdropCounts.farStars,
-        nearStars: this.backdropCounts.nearStars,
-        twinkles: this.twinkles.length,
-        veils: this.veils.length,
-        driftMotes: this.driftMotes.length,
-        moving: this.movingEvents.length,
-        ...movingCounts
-      },
-      caps: {
-        twinkles: this.tuning.twinkleCount,
-        driftMotes: this.tuning.driftMoteCount,
-        moving: this.tuning.movingEventCap,
-        signatureEvents: this.tuning.signatureEventCap
-      },
-      reservedZoneBreaches,
-      uncluttered: this.twinkles.length <= this.tuning.twinkleCount
-        && this.driftMotes.length <= this.tuning.driftMoteCount
-        && this.movingEvents.length <= this.tuning.movingEventCap
-        && signatureEvents <= this.tuning.signatureEventCap,
-      behindBoard: backgroundMax < boardMinDepth,
-      depths: {
-        backgroundMax,
-        boardMin: boardMinDepth,
-        ...(titleDepth !== undefined ? { title: titleDepth } : {}),
-        ...(installDepth !== undefined ? { install: installDepth } : {})
-      }
-    };
-  }
-
-  public destroy(): void {
-    this.destroyMovingEvents();
-    for (const twinkle of this.twinkles) {
-      twinkle.sprite.destroy();
-    }
-    this.twinkles.length = 0;
-    for (const mote of this.driftMotes) {
-      mote.sprite.destroy();
-    }
-    this.driftMotes.length = 0;
-    for (const veil of this.veils) {
-      veil.graphics.destroy();
-    }
-    this.veils.length = 0;
-    this.nearStars.destroy();
-    this.farStars.destroy();
-    this.clouds.destroy();
-    this.base.destroy();
-  }
-
-  private ensureTextures(): void {
-    const { textures } = this.scene;
-    if (!textures.exists(AMBIENT_SKY_TEXTURES.twinkle)) {
-      const graphics = this.scene.add.graphics().setVisible(false);
-      graphics.fillStyle(0xffffff, 1);
-      graphics.fillRect(2, 0, 1, 5);
-      graphics.fillRect(0, 2, 5, 1);
-      graphics.fillRect(2, 2, 1, 1);
-      graphics.generateTexture(AMBIENT_SKY_TEXTURES.twinkle, 5, 5);
-      graphics.destroy();
-    }
-    if (!textures.exists(AMBIENT_SKY_TEXTURES.streak)) {
-      const graphics = this.scene.add.graphics().setVisible(false);
-      for (let index = 0; index < 14; index += 1) {
-        const alpha = (index + 1) / 14;
-        graphics.fillStyle(0xffffff, alpha);
-        graphics.fillRect(index * 4, index < 8 ? 2 : 1, 4, index < 8 ? 1 : 2);
-      }
-      graphics.generateTexture(AMBIENT_SKY_TEXTURES.streak, 56, 4);
-      graphics.destroy();
-    }
-    if (!textures.exists(AMBIENT_SKY_TEXTURES.comet)) {
-      const graphics = this.scene.add.graphics().setVisible(false);
-      for (let index = 0; index < 12; index += 1) {
-        graphics.fillStyle(0xffffff, Math.max(0.08, (index + 1) / 12));
-        graphics.fillRect(index * 4, 2, 4, 2);
-      }
-      graphics.fillStyle(0xffffff, 1);
-      graphics.fillRect(48, 1, 8, 4);
-      graphics.generateTexture(AMBIENT_SKY_TEXTURES.comet, 56, 6);
-      graphics.destroy();
-    }
-    if (!textures.exists(AMBIENT_SKY_TEXTURES.satellite)) {
-      const graphics = this.scene.add.graphics().setVisible(false);
-      graphics.fillStyle(0xffffff, 1);
-      graphics.fillRect(0, 1, 3, 2);
-      graphics.fillRect(4, 0, 4, 4);
-      graphics.fillRect(9, 1, 3, 2);
-      graphics.generateTexture(AMBIENT_SKY_TEXTURES.satellite, 12, 4);
-      graphics.destroy();
-    }
-    if (!textures.exists(AMBIENT_SKY_TEXTURES.ufo)) {
-      const graphics = this.scene.add.graphics().setVisible(false);
-      graphics.fillStyle(0xffffff, 1);
-      graphics.fillRect(2, 1, 10, 2);
-      graphics.fillRect(4, 0, 6, 1);
-      graphics.fillRect(1, 3, 12, 2);
-      graphics.fillRect(5, 5, 4, 1);
-      graphics.generateTexture(AMBIENT_SKY_TEXTURES.ufo, 14, 6);
-      graphics.destroy();
-    }
-  }
-
-  private drawBackdrop(): void {
-    const staticStarScale = this.themeProfile.ambientSky.staticStarDensityScale * this.tuning.densityScale;
-    const cloudCount = Math.max(3, Math.round(legacyTuning.menu.starfield.cloudCount * staticStarScale * 0.74));
-    const farStarCount = Math.max(96, Math.floor(legacyTuning.menu.starfield.starCount * 0.5 * staticStarScale));
-    const nearStarCount = Math.max(72, Math.ceil(legacyTuning.menu.starfield.starCount * 0.24 * staticStarScale));
-    this.backdropCounts = {
-      clouds: cloudCount,
-      farStars: farStarCount,
-      nearStars: nearStarCount
-    };
-
-    this.base.clear();
-    this.base.fillGradientStyle(
-      this.themeProfile.background.topLeft,
-      this.themeProfile.background.topRight,
-      this.themeProfile.background.bottomLeft,
-      this.themeProfile.background.bottomRight,
-      1
-    );
-    this.base.fillRect(0, 0, this.width, this.height);
-    this.base.fillStyle(this.themeProfile.palette.background.nebulaCore, 0.11);
-    this.base.fillCircle(this.width * 0.46, this.height * 0.42, Math.max(this.width, this.height) * 0.21);
-    this.base.fillStyle(this.themeProfile.palette.background.nebula, 0.08);
-    this.base.fillCircle(this.width * 0.58, this.height * 0.62, Math.max(this.width, this.height) * 0.29);
-    this.base.fillStyle(this.themeProfile.palette.background.deepSpace, 0.14);
-    this.base.fillRect(0, this.height * 0.78, this.width, this.height * 0.22);
-
-    this.clouds.clear();
-    for (let index = 0; index < cloudCount; index += 1) {
-      this.clouds.fillStyle(
-        this.themeProfile.palette.background.cloud,
-        this.range(legacyTuning.menu.starfield.cloudAlphaMin, legacyTuning.menu.starfield.cloudAlphaMax)
-          * this.themeProfile.background.cloudAlphaScale
-          * 0.72
-      );
-      this.clouds.fillCircle(
-        this.range(this.width * 0.12, this.width * 0.88),
-        this.range(this.height * 0.14, this.height * 0.86),
-        this.range(legacyTuning.menu.starfield.cloudRadiusMin * 0.8, legacyTuning.menu.starfield.cloudRadiusMax * 0.88)
-      );
-    }
-
-    this.farStars.clear();
-    for (let index = 0; index < farStarCount; index += 1) {
-      this.farStars.fillStyle(
-        this.themeProfile.palette.background.star,
-        this.range(
-          legacyTuning.menu.starfield.starAlphaMin * 0.5,
-          legacyTuning.menu.starfield.starAlphaMax * 0.42
-        ) * this.themeProfile.background.farStarAlphaScale
-      );
-      this.farStars.fillCircle(
-        this.range(0, this.width),
-        this.range(0, this.height),
-        this.range(legacyTuning.menu.starfield.starRadiusMin * 0.8, legacyTuning.menu.starfield.starRadiusMax * 0.68)
-      );
-    }
-
-    this.nearStars.clear();
-    for (let index = 0; index < nearStarCount; index += 1) {
-      this.nearStars.fillStyle(
-        this.themeProfile.palette.background.star,
-        this.range(
-          legacyTuning.menu.starfield.starAlphaMin * 0.56,
-          legacyTuning.menu.starfield.starAlphaMax * 0.54
-        ) * this.themeProfile.background.nearStarAlphaScale
-      );
-      this.nearStars.fillCircle(
-        this.range(0, this.width),
-        this.range(0, this.height),
-        this.range(legacyTuning.menu.starfield.starRadiusMin * 0.9, legacyTuning.menu.starfield.starRadiusMax * 0.86)
-      );
-    }
-
-    this.drawBackdropMotif(staticStarScale);
-
-    this.base.fillStyle(
-      this.themeProfile.palette.background.vignette,
-      legacyTuning.menu.starfield.vignetteAlpha * this.themeProfile.background.vignetteAlphaScale
-    );
-    this.base.fillRect(0, 0, this.width, this.height * legacyTuning.menu.starfield.vignetteBandRatio);
-    this.base.fillRect(
-      0,
-      this.height * (1 - legacyTuning.menu.starfield.vignetteBandRatio),
-      this.width,
-      this.height * legacyTuning.menu.starfield.vignetteBandRatio
-    );
-    this.base.fillStyle(this.themeProfile.palette.background.vignette, 0.08);
-    this.base.fillCircle(this.width * 0.5, this.height * 0.5, Math.max(this.width, this.height) * 0.58);
-  }
-
-  private drawBackdropMotif(staticStarScale: number): void {
-    const motifAlpha = this.themeProfile.ambientSky.motifAlphaScale * Math.max(0.72, this.tuning.densityScale);
-    const clusterCount = Math.max(8, Math.round(16 * staticStarScale));
-    const lineHeight = Math.max(1, Math.round(this.height * 0.0024));
-
-    switch (this.themeProfile.ambientSky.backdropMotif) {
-      case 'noir-band':
-        this.drawBackdropBand(this.clouds, this.width * 0.16, this.height * 0.42, this.width * 0.34, this.height * 0.18, this.themeProfile.ambientSky.hazeColor, 0.052 * motifAlpha);
-        this.drawBackdropBand(this.clouds, this.width * 0.84, this.height * 0.68, this.width * 0.28, this.height * 0.16, this.themeProfile.ambientSky.hazeAccentColor, 0.034 * motifAlpha);
-        this.drawBackdropBand(this.base, this.width * 0.5, this.height * 0.2, this.width * 0.82, Math.max(2, lineHeight * 4), this.themeProfile.ambientSky.streakColor, 0.012 * motifAlpha);
-        this.drawStarCluster(this.farStars, this.width * 0.14, this.height * 0.18, this.width * 0.12, this.height * 0.08, clusterCount, this.themeProfile.palette.background.star, 0.08, 0.22, 0.45, 1.1);
-        this.drawStarCluster(this.nearStars, this.width * 0.88, this.height * 0.24, this.width * 0.1, this.height * 0.08, Math.max(5, Math.round(clusterCount * 0.78)), this.themeProfile.palette.background.star, 0.1, 0.26, 0.5, 1.2);
-        break;
-      case 'ember-glow':
-        this.drawBackdropBand(this.clouds, this.width * 0.18, this.height * 0.74, this.width * 0.3, this.height * 0.28, this.themeProfile.ambientSky.hazeColor, 0.062 * motifAlpha);
-        this.drawBackdropBand(this.clouds, this.width * 0.82, this.height * 0.6, this.width * 0.26, this.height * 0.22, this.themeProfile.ambientSky.hazeAccentColor, 0.048 * motifAlpha);
-        this.drawBackdropBand(this.base, this.width * 0.5, this.height * 0.76, this.width * 0.76, this.height * 0.14, this.themeProfile.ambientSky.hazeAccentColor, 0.015 * motifAlpha);
-        this.drawStarCluster(this.nearStars, this.width * 0.24, this.height * 0.16, this.width * 0.1, this.height * 0.07, Math.max(5, Math.round(clusterCount * 0.72)), this.themeProfile.ambientSky.cometColor, 0.08, 0.22, 0.45, 1);
-        break;
-      case 'aurora-curtain':
-        this.drawBackdropBand(this.clouds, this.width * 0.14, this.height * 0.56, this.width * 0.3, this.height * 0.84, this.themeProfile.ambientSky.hazeColor, 0.066 * motifAlpha);
-        this.drawBackdropBand(this.clouds, this.width * 0.84, this.height * 0.54, this.width * 0.32, this.height * 0.78, this.themeProfile.ambientSky.hazeAccentColor, 0.056 * motifAlpha);
-        this.drawBackdropBand(this.clouds, this.width * 0.5, this.height * 0.34, this.width * 0.42, this.height * 0.18, this.themeProfile.ambientSky.cometColor, 0.032 * motifAlpha);
-        this.drawBackdropBand(this.base, this.width * 0.5, this.height * 0.4, this.width * 0.78, this.height * 0.24, this.themeProfile.ambientSky.hazeAccentColor, 0.014 * motifAlpha);
-        this.drawStarCluster(this.nearStars, this.width * 0.18, this.height * 0.18, this.width * 0.12, this.height * 0.09, clusterCount, this.themeProfile.palette.background.star, 0.1, 0.28, 0.48, 1.2);
-        this.drawStarCluster(this.nearStars, this.width * 0.84, this.height * 0.2, this.width * 0.1, this.height * 0.08, Math.max(5, Math.round(clusterCount * 0.84)), this.themeProfile.palette.background.star, 0.1, 0.3, 0.48, 1.26);
-        break;
-      case 'vellum-wash':
-        this.drawBackdropBand(this.clouds, this.width * 0.22, this.height * 0.4, this.width * 0.42, this.height * 0.18, this.themeProfile.ambientSky.hazeColor, 0.026 * motifAlpha);
-        this.drawBackdropBand(this.clouds, this.width * 0.8, this.height * 0.62, this.width * 0.36, this.height * 0.14, this.themeProfile.ambientSky.hazeAccentColor, 0.022 * motifAlpha);
-        this.drawBackdropBand(this.base, this.width * 0.5, this.height * 0.45, this.width * 0.74, this.height * 0.16, this.themeProfile.ambientSky.hazeAccentColor, 0.01 * motifAlpha);
-        this.drawStarCluster(this.farStars, this.width * 0.16, this.height * 0.16, this.width * 0.1, this.height * 0.08, Math.max(5, Math.round(clusterCount * 0.6)), this.themeProfile.palette.background.star, 0.06, 0.16, 0.4, 0.9);
-        break;
-      case 'monolith-signal':
-        this.drawBackdropBand(this.base, this.width * 0.52, this.height * 0.18, this.width * 0.7, this.height * 0.11, this.themeProfile.ambientSky.hazeColor, 0.018 * motifAlpha);
-        this.drawBackdropBand(this.base, this.width * 0.48, this.height * 0.78, this.width * 0.74, this.height * 0.12, this.themeProfile.ambientSky.hazeColor, 0.02 * motifAlpha);
-        this.drawBackdropBand(this.clouds, this.width * 0.18, this.height * 0.66, this.width * 0.22, this.height * 0.2, this.themeProfile.ambientSky.hazeAccentColor, 0.026 * motifAlpha);
-        this.drawBackdropBand(this.clouds, this.width * 0.82, this.height * 0.38, this.width * 0.2, this.height * 0.16, this.themeProfile.ambientSky.hazeColor, 0.022 * motifAlpha);
-        this.drawBackdropBand(this.base, this.width * 0.5, this.height * 0.5, this.width * 0.58, Math.max(2, lineHeight * 4), this.themeProfile.ambientSky.streakColor, 0.012 * motifAlpha);
-        this.drawStarCluster(this.farStars, this.width * 0.12, this.height * 0.2, this.width * 0.08, this.height * 0.07, Math.max(4, Math.round(clusterCount * 0.56)), this.themeProfile.palette.background.star, 0.08, 0.18, 0.42, 0.96);
-        break;
-      default:
-        break;
-    }
-  }
-
-  private drawBackdropBand(
-    graphics: Phaser.GameObjects.Graphics,
-    centerX: number,
-    centerY: number,
-    width: number,
-    height: number,
-    color: number,
-    alpha: number
-  ): void {
-    graphics.fillStyle(color, alpha);
-    graphics.fillEllipse(centerX, centerY, width, height);
-  }
-
-  private drawStarCluster(
-    graphics: Phaser.GameObjects.Graphics,
-    centerX: number,
-    centerY: number,
-    radiusX: number,
-    radiusY: number,
-    count: number,
-    color: number,
-    alphaMin: number,
-    alphaMax: number,
-    sizeMin: number,
-    sizeMax: number
-  ): void {
-    for (let index = 0; index < count; index += 1) {
-      const angle = this.range(0, Math.PI * 2);
-      const distance = Math.sqrt(this.rand());
-      graphics.fillStyle(color, this.range(alphaMin, alphaMax));
-      graphics.fillCircle(
-        centerX + (Math.cos(angle) * radiusX * distance),
-        centerY + (Math.sin(angle) * radiusY * distance),
-        this.range(sizeMin, sizeMax)
-      );
-    }
-  }
-
-  private createVeils(): void {
-    const motionAmplitudeScale = Math.max(this.reducedMotion ? 0.08 : 0.22, Math.min(1, this.tuning.motionScale));
-    const veilCount = Math.max(
-      1,
-      Math.round(legacyTuning.menu.ambientSky.hazeLayerCount * this.tuning.densityScale)
-    );
-    for (let index = 0; index < veilCount; index += 1) {
-      const graphics = this.scene.add.graphics().setDepth(AMBIENT_SKY_DEPTHS.haze).setBlendMode(Phaser.BlendModes.SCREEN);
-      const width = this.range(this.width * 0.18, this.width * 0.34) * this.themeProfile.ambientSky.veilWidthScale;
-      const height = this.range(this.height * 0.08, this.height * 0.16) * this.themeProfile.ambientSky.veilHeightScale;
-      const alpha = this.range(
-        legacyTuning.menu.ambientSky.hazeAlphaMin,
-        legacyTuning.menu.ambientSky.hazeAlphaMax
-      ) * this.themeProfile.ambientSky.hazeAlphaScale * this.themeProfile.ambientSky.motifAlphaScale;
-      this.drawVeilShape(graphics, width, height, alpha, index);
-      const anchor = this.resolveVeilAnchor(index);
-      graphics.setPosition(anchor.x, anchor.y);
-      graphics.setAlpha(0.78);
-      this.veils.push({
-        graphics,
-        anchorX: anchor.x,
-        anchorY: anchor.y,
-        rangeX: this.range(legacyTuning.menu.ambientSky.hazeDriftRangePx * 0.45, legacyTuning.menu.ambientSky.hazeDriftRangePx) * motionAmplitudeScale,
-        rangeY: this.range(legacyTuning.menu.ambientSky.hazeDriftRangePx * 0.18, legacyTuning.menu.ambientSky.hazeDriftRangePx * 0.58) * motionAmplitudeScale,
-        pulseMs: this.range(
-          legacyTuning.menu.ambientSky.hazeDriftDurationMinMs,
-          legacyTuning.menu.ambientSky.hazeDriftDurationMaxMs
-        ) / Math.max(0.25, this.tuning.motionScale),
-        phase: this.range(0, Math.PI * 2),
-        baseAlpha: graphics.alpha,
-        amplitude: 0.05 * motionAmplitudeScale,
-        scaleAmplitudeX: this.range(0.02, 0.07) * motionAmplitudeScale,
-        scaleAmplitudeY: this.range(0.02, 0.09) * motionAmplitudeScale,
-        rotationRange: (this.themeProfile.ambientSky.veilRotationRange * (Math.PI / 180)) * this.range(0.72, 1.08) * motionAmplitudeScale,
-        rotationPhase: this.range(0, Math.PI * 2)
-      });
-    }
-  }
-
-  private drawVeilShape(
-    graphics: Phaser.GameObjects.Graphics,
-    width: number,
-    height: number,
-    alpha: number,
-    index: number
-  ): void {
-    const accentAlpha = alpha * 0.68;
-
-    switch (this.themeProfile.ambientSky.backdropMotif) {
-      case 'aurora-curtain':
-        graphics.fillStyle(this.themeProfile.ambientSky.hazeColor, alpha);
-        graphics.fillEllipse(0, 0, width * 0.62, height);
-        graphics.fillStyle(this.themeProfile.ambientSky.hazeAccentColor, accentAlpha);
-        graphics.fillEllipse(width * 0.08, -height * 0.12, width * 0.28, height * 0.84);
-        graphics.fillStyle(this.themeProfile.ambientSky.cometColor, alpha * 0.32);
-        graphics.fillEllipse(-width * 0.12, height * 0.06, width * 0.22, height * 0.72);
-        break;
-      case 'ember-glow':
-        graphics.fillStyle(this.themeProfile.ambientSky.hazeColor, alpha);
-        graphics.fillEllipse(0, 0, width, height * 0.9);
-        graphics.fillStyle(this.themeProfile.ambientSky.hazeAccentColor, accentAlpha);
-        graphics.fillEllipse(width * 0.14, -height * 0.08, width * 0.56, height * 0.46);
-        graphics.fillStyle(this.themeProfile.ambientSky.driftMoteColor, alpha * 0.26);
-        graphics.fillEllipse(-width * 0.18, height * 0.04, width * 0.28, height * 0.22);
-        break;
-      case 'vellum-wash':
-        graphics.fillStyle(this.themeProfile.ambientSky.hazeColor, alpha * 0.92);
-        graphics.fillEllipse(0, 0, width, height * 0.78);
-        graphics.fillStyle(this.themeProfile.ambientSky.hazeAccentColor, alpha * 0.34);
-        graphics.fillEllipse(width * 0.1, -height * 0.04, width * 0.7, height * 0.42);
-        break;
-      case 'monolith-signal':
-        graphics.fillStyle(this.themeProfile.ambientSky.hazeColor, alpha * 0.9);
-        graphics.fillRect(-width * 0.5, -height * 0.12, width, height * 0.24);
-        graphics.fillStyle(this.themeProfile.ambientSky.hazeAccentColor, accentAlpha);
-        graphics.fillRect(-width * 0.34, height * (index % 2 === 0 ? -0.02 : 0.08), width * 0.68, height * 0.1);
-        break;
-      case 'noir-band':
-      default:
-        graphics.fillStyle(this.themeProfile.ambientSky.hazeColor, alpha);
-        graphics.fillEllipse(0, 0, width, height * 0.8);
-        graphics.fillStyle(this.themeProfile.ambientSky.hazeAccentColor, accentAlpha);
-        graphics.fillEllipse(width * 0.08, -Math.max(6, height * 0.08), width * 0.64, height * 0.5);
-        break;
-    }
-  }
-
-  private resolveVeilAnchor(index: number): { x: number; y: number } {
-    switch (this.themeProfile.ambientSky.backdropMotif) {
-      case 'aurora-curtain':
-        if (index % 3 === 0) {
-          return {
-            x: this.range(this.width * 0.12, this.width * 0.24),
-            y: this.range(this.height * 0.24, this.height * 0.78)
-          };
-        }
-        if (index % 3 === 1) {
-          return {
-            x: this.range(this.width * 0.76, this.width * 0.88),
-            y: this.range(this.height * 0.2, this.height * 0.76)
-          };
-        }
-        return {
-          x: this.range(this.width * 0.42, this.width * 0.58),
-          y: this.range(this.height * 0.16, this.height * 0.34)
-        };
-      case 'ember-glow':
-        return index % 2 === 0
-          ? {
-            x: this.range(this.width * 0.14, this.width * 0.34),
-            y: this.range(this.height * 0.6, this.height * 0.82)
-          }
-          : {
-            x: this.range(this.width * 0.68, this.width * 0.86),
-            y: this.range(this.height * 0.44, this.height * 0.76)
-          };
-      case 'vellum-wash':
-        return {
-          x: this.range(this.width * 0.18, this.width * 0.82),
-          y: this.range(this.height * 0.18, this.height * 0.82)
-        };
-      case 'monolith-signal':
-        return {
-          x: this.range(this.width * 0.22, this.width * 0.78),
-          y: index % 2 === 0
-            ? this.range(this.height * 0.2, this.height * 0.32)
-            : this.range(this.height * 0.68, this.height * 0.8)
-        };
-      case 'noir-band':
-      default:
-        return index % 2 === 0
-          ? {
-            x: this.range(this.width * 0.12, this.width * 0.32),
-            y: this.range(this.height * 0.24, this.height * 0.46)
-          }
-          : {
-            x: this.range(this.width * 0.68, this.width * 0.88),
-            y: this.range(this.height * 0.54, this.height * 0.78)
-          };
-    }
-  }
-
-  private createTwinkles(): void {
-    const motionAmplitudeScale = Math.max(this.reducedMotion ? 0.08 : 0.22, Math.min(1, this.tuning.motionScale));
-    const count = Math.max(
-      this.reducedMotion ? 4 : 6,
-      Math.round(this.tuning.twinkleCount * this.themeProfile.ambientSky.twinkleDensityScale)
-    );
-    for (let index = 0; index < count; index += 1) {
-      const anchor = this.sampleOpenSkyPoint(true);
-      const sprite = this.scene.add.image(anchor.x, anchor.y, AMBIENT_SKY_TEXTURES.twinkle)
-        .setDepth(AMBIENT_SKY_DEPTHS.twinkles)
-        .setTint(this.themeProfile.palette.background.star)
-        .setScale(this.range(0.8, 1.4))
-        .setAlpha(this.range(legacyTuning.menu.ambientSky.twinkleAlphaMin, legacyTuning.menu.ambientSky.twinkleAlphaMax));
-      this.twinkles.push({
-        sprite,
-        anchorX: anchor.x,
-        anchorY: anchor.y,
-        baseAlpha: sprite.alpha,
-        amplitude: this.range(0.06, 0.16) * motionAmplitudeScale,
-        pulseMs: this.range(
-          legacyTuning.menu.ambientSky.twinklePulseDurationMinMs,
-          legacyTuning.menu.ambientSky.twinklePulseDurationMaxMs
-        ) / Math.max(0.25, this.tuning.motionScale),
-        driftX: this.range(-legacyTuning.menu.ambientSky.twinkleDriftRangePx, legacyTuning.menu.ambientSky.twinkleDriftRangePx) * motionAmplitudeScale,
-        driftY: this.range(-legacyTuning.menu.ambientSky.twinkleDriftRangePx * 0.45, legacyTuning.menu.ambientSky.twinkleDriftRangePx * 0.45) * motionAmplitudeScale,
-        phase: this.range(0, Math.PI * 2)
-      });
-    }
-  }
-
-  private createDriftMotes(): void {
-    const motionAmplitudeScale = Math.max(this.reducedMotion ? 0.08 : 0.22, Math.min(1, this.tuning.motionScale));
-    const count = Math.max(
-      0,
-      Math.round(this.tuning.driftMoteCount * this.themeProfile.ambientSky.driftMoteDensityScale)
-    );
-    for (let index = 0; index < count; index += 1) {
-      const anchor = this.sampleOpenSkyPoint(false);
-      const sprite = this.scene.add.image(anchor.x, anchor.y, AMBIENT_SKY_TEXTURES.twinkle)
-        .setDepth(AMBIENT_SKY_DEPTHS.motes)
-        .setTint(this.themeProfile.ambientSky.driftMoteColor)
-        .setScale(this.range(0.6, 1.12))
-        .setAlpha(this.range(legacyTuning.menu.ambientSky.driftMoteAlphaMin, legacyTuning.menu.ambientSky.driftMoteAlphaMax));
-      this.driftMotes.push({
-        sprite,
-        anchorX: anchor.x,
-        anchorY: anchor.y,
-        rangeX: this.range(8, 26) * this.tuning.motionScale,
-        rangeY: this.range(10, 34) * this.tuning.motionScale,
-        speedX: this.range(
-          legacyTuning.menu.ambientSky.driftMoteSpeedPxPerSecMin,
-          legacyTuning.menu.ambientSky.driftMoteSpeedPxPerSecMax
-        ) / 1000,
-        speedY: this.range(
-          legacyTuning.menu.ambientSky.driftMoteSpeedPxPerSecMin * 0.68,
-          legacyTuning.menu.ambientSky.driftMoteSpeedPxPerSecMax * 0.82
-        ) / 1000,
-        phase: this.range(0, Math.PI * 2),
-        baseAlpha: sprite.alpha,
-        amplitude: this.range(0.02, 0.06) * motionAmplitudeScale
-      });
-    }
-  }
-
-  private updateVeils(): void {
-    for (const veil of this.veils) {
-      const wave = ((this.timelineMs + veil.phase) % veil.pulseMs) / veil.pulseMs;
-      const phase = wave * Math.PI * 2;
-      veil.graphics.setPosition(
-        veil.anchorX + (Math.sin(phase) * veil.rangeX),
-        veil.anchorY + (Math.cos(phase * 0.7) * veil.rangeY)
-      );
-      veil.graphics.setScale(
-        1 + (Math.sin((phase * 0.7) + veil.rotationPhase) * veil.scaleAmplitudeX),
-        1 + (Math.cos((phase * 0.54) + veil.rotationPhase) * veil.scaleAmplitudeY)
-      );
-      veil.graphics.setRotation(Math.sin((phase * 0.42) + veil.rotationPhase) * veil.rotationRange);
-      veil.graphics.setAlpha(veil.baseAlpha + (Math.sin(phase * 0.8) * veil.amplitude));
-    }
-  }
-
-  private updateTwinkles(): void {
-    for (const twinkle of this.twinkles) {
-      const wave = ((this.timelineMs + twinkle.phase) % twinkle.pulseMs) / twinkle.pulseMs;
-      const phase = wave * Math.PI * 2;
-      twinkle.sprite.setPosition(
-        twinkle.anchorX + (Math.sin(phase) * twinkle.driftX),
-        twinkle.anchorY + (Math.cos(phase * 0.8) * twinkle.driftY)
-      );
-      twinkle.sprite.setAlpha(
-        Phaser.Math.Clamp(
-          twinkle.baseAlpha + (Math.sin(phase) * twinkle.amplitude),
-          legacyTuning.menu.ambientSky.twinkleAlphaMin * 0.66,
-          legacyTuning.menu.ambientSky.twinkleAlphaMax * 1.1
-        )
-      );
-    }
-  }
-
-  private updateDriftMotes(): void {
-    for (const mote of this.driftMotes) {
-      const driftX = Math.sin((this.timelineMs * mote.speedX) + mote.phase) * mote.rangeX;
-      const driftY = Math.cos((this.timelineMs * mote.speedY) + mote.phase) * mote.rangeY;
-      mote.sprite.setPosition(mote.anchorX + driftX, mote.anchorY + driftY);
-      mote.sprite.setAlpha(Math.max(0.01, mote.baseAlpha + (Math.sin((this.timelineMs * mote.speedX * 0.8) + mote.phase) * mote.amplitude)));
-    }
-  }
-
-  private updateMovingEvents(): void {
-    for (let index = this.movingEvents.length - 1; index >= 0; index -= 1) {
-      const event = this.movingEvents[index];
-      const progress = Phaser.Math.Clamp((this.timelineMs - event.startedAt) / event.durationMs, 0, 1);
-      if (progress >= 1) {
-        event.glow?.destroy();
-        event.body.destroy();
-        this.movingEvents.splice(index, 1);
-        continue;
-      }
-
-      const eased = event.family === 'satellite' || event.family === 'ufo'
-        ? progress
-        : ease(progress);
-      const x = Phaser.Math.Linear(event.fromX, event.toX, eased);
-      const wobble = event.wobblePx
-        ? Math.sin((this.timelineMs * (event.wobbleSpeed ?? 0.003)) + event.phase) * event.wobblePx
-        : 0;
-      const y = Phaser.Math.Linear(event.fromY, event.toY, eased) + wobble;
-      const fadeIn = Math.min(1, progress / 0.12);
-      const fadeOut = Math.min(1, (1 - progress) / 0.18);
-      const envelope = Math.min(fadeIn, fadeOut);
-      const blink = event.blinkMs
-        ? 0.7 + (Math.max(0, Math.sin((this.timelineMs - event.startedAt) / event.blinkMs * Math.PI * 2)) * 0.3)
-        : 1;
-      const alpha = event.maxAlpha * envelope * blink;
-
-      event.body.setPosition(x, y).setAlpha(alpha);
-      event.glow?.setPosition(x, y).setAlpha(alpha * (event.family === 'comet' ? 0.7 : 0.46));
-    }
-  }
-
-  private maybeSpawnEvents(): void {
-    if (this.movingEvents.length >= this.tuning.movingEventCap) {
-      return;
-    }
-
-    if (this.timelineMs >= this.nextShootingAt) {
-      const spawned = this.spawnMovingEvent('shooting-star');
-      this.nextShootingAt = this.timelineMs + (this.resolveEventInterval('shooting-star') * (spawned ? 1 : 0.42));
-    }
-    if (
-      this.timelineMs >= this.nextCometAt
-      && this.timelineMs >= this.nextHeroWindowAt
-      && this.movingEvents.length < this.tuning.movingEventCap
-    ) {
-      const spawned = this.spawnMovingEvent('comet');
-      this.nextCometAt = this.timelineMs + (this.resolveEventInterval('comet') * (spawned ? 1 : 0.48));
-      if (spawned) {
-        this.nextHeroWindowAt = this.timelineMs + this.resolveTierCooldown('hero');
-      }
-    }
-    if (
-      this.themeProfile.ambientSky.allowSatellite
-      && this.tuning.signatureEventCap > 0
-      && this.timelineMs >= this.nextSatelliteAt
-      && this.timelineMs >= this.nextSignatureWindowAt
-      && this.countSignatureEvents() < this.tuning.signatureEventCap
-      && this.movingEvents.length < this.tuning.movingEventCap
-    ) {
-      const spawned = this.spawnMovingEvent('satellite');
-      this.nextSatelliteAt = this.timelineMs + (this.resolveEventInterval('satellite') * (spawned ? 1 : 0.56));
-      if (spawned) {
-        this.nextUfoAt = Math.max(this.nextUfoAt, this.timelineMs + (this.resolveTierCooldown('signature') * 0.82));
-        this.nextSignatureWindowAt = this.timelineMs + this.resolveTierCooldown('signature');
-      }
-    }
-    if (
-      this.themeProfile.ambientSky.allowUfo
-      && this.tuning.signatureEventCap > 0
-      && this.timelineMs >= this.nextUfoAt
-      && this.timelineMs >= this.nextSignatureWindowAt
-      && this.countSignatureEvents() < this.tuning.signatureEventCap
-      && this.movingEvents.length < this.tuning.movingEventCap
-    ) {
-      const spawned = this.spawnMovingEvent('ufo');
-      this.nextUfoAt = this.timelineMs + (this.resolveEventInterval('ufo') * (spawned ? 1 : 0.56));
-      if (spawned) {
-        this.nextSatelliteAt = Math.max(this.nextSatelliteAt, this.timelineMs + (this.resolveTierCooldown('signature') * 0.82));
-        this.nextSignatureWindowAt = this.timelineMs + this.resolveTierCooldown('signature');
-      }
-    }
-  }
-
-  private spawnMovingEvent(family: AmbientSkyMovingFamily): boolean {
-    const created = family === 'shooting-star'
-      ? this.createStreakEvent(false)
-      : family === 'comet'
-        ? this.createStreakEvent(true)
-        : family === 'satellite'
-          ? this.createSatelliteEvent(false)
-          : this.createSatelliteEvent(true);
-
-    if (created) {
-      this.movingEvents.push(created);
-      return true;
-    }
-
-    return false;
-  }
-
-  private createStreakEvent(comet: boolean): AmbientSkyMovingEvent | undefined {
-    const tuning = comet ? legacyTuning.menu.ambientSky.comet : legacyTuning.menu.ambientSky.shootingStar;
-    const width = this.range(tuning.lengthMinPx, tuning.lengthMaxPx);
-    const height = comet ? 6 : 4;
-    const durationMs = this.range(tuning.durationMinMs, tuning.durationMaxMs) / Math.max(0.25, this.tuning.motionScale);
-    const segment = this.pickLaneSegment(comet ? 'comet' : 'shooting-star', width, height);
-    if (!segment) {
-      return undefined;
-    }
-
-    const textureKey = comet ? AMBIENT_SKY_TEXTURES.comet : AMBIENT_SKY_TEXTURES.streak;
-    const tint = comet ? this.themeProfile.ambientSky.cometColor : this.themeProfile.ambientSky.streakColor;
-    const body = this.scene.add.image(segment.startX, segment.startY, textureKey)
-      .setDepth(AMBIENT_SKY_DEPTHS.events)
-      .setTint(tint)
-      .setBlendMode(Phaser.BlendModes.SCREEN)
-      .setDisplaySize(width, height);
-    const glow = this.scene.add.image(segment.startX, segment.startY, AMBIENT_SKY_TEXTURES.streak)
-      .setDepth(AMBIENT_SKY_DEPTHS.events - 0.1)
-      .setTint(comet ? this.themeProfile.ambientSky.streakColor : tint)
-      .setBlendMode(Phaser.BlendModes.SCREEN)
-      .setDisplaySize(width * (comet ? 0.92 : 0.82), height * (comet ? 2.2 : 1.6))
-      .setAlpha(0);
-    const rotation = Phaser.Math.Angle.Between(segment.startX, segment.startY, segment.endX, segment.endY);
-    body.setRotation(rotation);
-    glow.setRotation(rotation);
-
-    return {
-      family: comet ? 'comet' : 'shooting-star',
-      body,
-      glow,
-      startedAt: this.timelineMs,
-      durationMs,
-      fromX: segment.startX,
-      fromY: segment.startY,
-      toX: segment.endX,
-      toY: segment.endY,
-      maxAlpha: this.range(tuning.alphaMin, tuning.alphaMax),
-      wobblePx: comet ? 1.5 * this.tuning.motionScale : 0.8 * this.tuning.motionScale,
-      wobbleSpeed: comet ? 0.0042 : 0.0052,
-      phase: this.range(0, Math.PI * 2),
-      width,
-      height
-    };
-  }
-
-  private createSatelliteEvent(ufo: boolean): AmbientSkyMovingEvent | undefined {
-    const tuning = ufo ? legacyTuning.menu.ambientSky.ufo : legacyTuning.menu.ambientSky.satellite;
-    const width = ufo ? 18 : 14;
-    const height = ufo ? 7 : 5;
-    const durationMs = this.range(tuning.durationMinMs, tuning.durationMaxMs) / Math.max(0.25, this.tuning.motionScale);
-    const segment = this.pickLaneSegment(ufo ? 'ufo' : 'satellite', width, height);
-    if (!segment) {
-      return undefined;
-    }
-
-    const body = this.scene.add.image(
-      segment.startX,
-      segment.startY,
-      ufo ? AMBIENT_SKY_TEXTURES.ufo : AMBIENT_SKY_TEXTURES.satellite
-    )
-      .setDepth(AMBIENT_SKY_DEPTHS.events)
-      .setTint(ufo ? this.themeProfile.ambientSky.ufoColor : this.themeProfile.ambientSky.satelliteColor)
-      .setDisplaySize(width, height);
-    const glow = this.scene.add.image(segment.startX, segment.startY, AMBIENT_SKY_TEXTURES.twinkle)
-      .setDepth(AMBIENT_SKY_DEPTHS.events - 0.1)
-      .setTint(ufo ? this.themeProfile.ambientSky.ufoColor : this.themeProfile.ambientSky.satelliteColor)
-      .setBlendMode(Phaser.BlendModes.SCREEN)
-      .setScale(ufo ? 1.8 : 1.4)
-      .setAlpha(0);
-    const rotation = Phaser.Math.Angle.Between(segment.startX, segment.startY, segment.endX, segment.endY);
-    body.setRotation(rotation);
-    glow.setRotation(rotation);
-
-    return {
-      family: ufo ? 'ufo' : 'satellite',
-      body,
-      glow,
-      startedAt: this.timelineMs,
-      durationMs,
-      fromX: segment.startX,
-      fromY: segment.startY,
-      toX: segment.endX,
-      toY: segment.endY,
-      maxAlpha: this.range(tuning.alphaMin, tuning.alphaMax),
-      blinkMs: this.range(tuning.blinkDurationMinMs, tuning.blinkDurationMaxMs),
-      wobblePx: (ufo ? 1.4 : 0.8) * Math.max(this.reducedMotion ? 0.08 : 0.22, Math.min(1, this.tuning.motionScale)),
-      wobbleSpeed: ufo ? 0.0046 : 0.0034,
-      phase: this.range(0, Math.PI * 2),
-      width,
-      height
-    };
-  }
-
-  private pickLaneSegment(family: AmbientSkyMovingFamily, width: number, height: number): AmbientSkyLaneSegment | undefined {
-    const board = this.boardRect ?? {
-      left: this.width * 0.28,
-      top: this.height * 0.22,
-      right: this.width * 0.72,
-      bottom: this.height * 0.82
-    };
-    const topLimit = Math.max(44, Math.min(board.top - 18, this.height * 0.38));
-    const sideLeft = Math.max(96, board.left - 28);
-    const sideRight = Math.min(this.width - 96, board.right + 28);
-    const candidates: AmbientSkyLaneSegment[] = [];
-    const leftY = this.range(18, Math.max(26, topLimit));
-    const rightY = this.range(18, Math.max(26, topLimit));
-
-    if (family === 'shooting-star' || family === 'comet') {
-      candidates.push({
-        startX: -width,
-        startY: leftY,
-        endX: Math.max(sideLeft * 0.72, 96),
-        endY: Math.min(board.top - 12, leftY + this.range(18, 48))
-      });
-      candidates.push({
-        startX: this.width + width,
-        startY: rightY,
-        endX: Math.min(this.width - 96, sideRight + ((this.width - sideRight) * 0.28)),
-        endY: Math.min(board.top - 12, rightY + this.range(18, 48))
-      });
-      if (!this.titleRect && topLimit > 56) {
-        const crossY = this.range(18, Math.max(22, topLimit * 0.72));
-        candidates.push({
-          startX: -width,
-          startY: crossY,
-          endX: this.width + width,
-          endY: crossY + this.range(16, 40)
-        });
-      }
-    } else {
-      const leftLaneY = this.range(18, Math.max(26, topLimit));
-      const rightLaneY = this.range(18, Math.max(26, topLimit));
-      candidates.push({
-        startX: -width,
-        startY: leftLaneY,
-        endX: Math.max(sideLeft, this.width * 0.34),
-        endY: leftLaneY + this.range(-6, 6)
-      });
-      candidates.push({
-        startX: this.width + width,
-        startY: rightLaneY,
-        endX: Math.min(sideRight, this.width * 0.66),
-        endY: rightLaneY + this.range(-6, 6)
-      });
-      if (!this.titleRect && topLimit > 48) {
-        const crossY = this.range(18, Math.max(22, topLimit * 0.68));
-        candidates.push({
-          startX: -width,
-          startY: crossY,
-          endX: this.width + width,
-          endY: crossY + this.range(-4, 4)
-        });
-      }
-    }
-
-    const shuffled = [...candidates];
-    while (shuffled.length > 0) {
-      const segment = shuffled.splice(Math.floor(this.rand() * shuffled.length), 1)[0];
-      if (this.segmentClearsReservedZones(segment, width, height)) {
-        return segment;
-      }
-    }
-
-    return undefined;
-  }
-
-  private segmentClearsReservedZones(segment: AmbientSkyLaneSegment, width: number, height: number): boolean {
-    if (this.reservedRects.length === 0) {
-      return true;
-    }
-
-    const paddedWidth = Math.max(width, height) * 0.72;
-    const paddedHeight = Math.max(height, 8) * 2.2;
-    for (const progress of [0.15, 0.35, 0.55, 0.75, 0.92]) {
-      const x = Phaser.Math.Linear(segment.startX, segment.endX, progress);
-      const y = Phaser.Math.Linear(segment.startY, segment.endY, progress);
-      const bounds = {
-        left: x - (paddedWidth / 2),
-        top: y - (paddedHeight / 2),
-        right: x + (paddedWidth / 2),
-        bottom: y + (paddedHeight / 2)
-      };
-      if (this.reservedRects.some((reserved) => rectsIntersect(bounds, reserved))) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  private eventViolatesReservedZones(event: AmbientSkyMovingEvent): boolean {
-    if (this.reservedRects.length === 0) {
-      return false;
-    }
-
-    const bounds = toVisualSceneBounds(event.body.getBounds());
-    return bounds
-      ? this.reservedRects.some((reserved) => rectsIntersect(bounds, reserved))
-      : false;
-  }
-
-  private resetSchedules(): void {
-    this.nextShootingAt = this.resolveEventInterval('shooting-star') * 0.46;
-    this.nextCometAt = this.resolveEventInterval('comet') * 0.58;
-    this.nextSatelliteAt = this.resolveEventInterval('satellite') * 0.72;
-    this.nextUfoAt = this.resolveEventInterval('ufo') * 0.76;
-    this.nextHeroWindowAt = this.resolveTierCooldown('hero') * 0.52;
-    this.nextSignatureWindowAt = this.resolveTierCooldown('signature') * 0.62;
-  }
-
-  private resolveEventInterval(family: AmbientSkyMovingFamily): number {
-    const base = family === 'shooting-star'
-      ? legacyTuning.menu.ambientSky.shootingStar
-      : family === 'comet'
-        ? legacyTuning.menu.ambientSky.comet
-        : family === 'satellite'
-          ? legacyTuning.menu.ambientSky.satellite
-          : legacyTuning.menu.ambientSky.ufo;
-    const themeScale = family === 'shooting-star'
-      ? this.themeProfile.ambientSky.shootingIntervalScale
-      : family === 'comet'
-        ? this.themeProfile.ambientSky.cometIntervalScale
-        : family === 'satellite'
-          ? this.themeProfile.ambientSky.satelliteIntervalScale
-          : this.themeProfile.ambientSky.ufoIntervalScale;
-    return this.range(base.minIntervalMs, base.maxIntervalMs) * this.tuning.eventIntervalScale * themeScale;
-  }
-
-  private resolveTierCooldown(tier: AmbientSkyEventTier): number {
-    if (tier === 'occasional') {
-      return 0;
-    }
-
-    if (tier === 'hero') {
-      const base = (legacyTuning.menu.ambientSky.comet.minIntervalMs + legacyTuning.menu.ambientSky.comet.maxIntervalMs) / 2;
-      return base * this.tuning.eventIntervalScale * this.themeProfile.ambientSky.heroCooldownScale;
-    }
-
-    const satelliteBase = (legacyTuning.menu.ambientSky.satellite.minIntervalMs + legacyTuning.menu.ambientSky.satellite.maxIntervalMs) / 2;
-    const ufoBase = (legacyTuning.menu.ambientSky.ufo.minIntervalMs + legacyTuning.menu.ambientSky.ufo.maxIntervalMs) / 2;
-    return Math.max(satelliteBase, ufoBase) * this.tuning.eventIntervalScale * this.themeProfile.ambientSky.signatureCooldownScale;
-  }
-
-  private countMovingEvents(family: AmbientSkyMovingFamily): number {
-    return this.movingEvents.filter((event) => event.family === family).length;
-  }
-
-  private countSignatureEvents(): number {
-    return this.countMovingEvents('satellite') + this.countMovingEvents('ufo');
-  }
-
-  private destroyMovingEvents(): void {
-    for (const event of this.movingEvents) {
-      event.glow?.destroy();
-      event.body.destroy();
-    }
-    this.movingEvents.length = 0;
-  }
-
-  private sampleOpenSkyPoint(preferUpperBand: boolean): { x: number; y: number } {
-    const blocked = this.boardRect ?? {
-      left: this.width * 0.28,
-      top: this.height * 0.22,
-      right: this.width * 0.72,
-      bottom: this.height * 0.82
-    };
-
-    for (let attempt = 0; attempt < 16; attempt += 1) {
-      const x = this.range(this.width * 0.04, this.width * 0.96);
-      const y = this.range(
-        preferUpperBand ? this.height * 0.06 : this.height * 0.12,
-        preferUpperBand ? this.height * 0.72 : this.height * 0.86
-      );
-      if (x < blocked.left || x > blocked.right || y < blocked.top || y > blocked.bottom) {
-        return { x, y };
-      }
-    }
-
-    return {
-      x: this.range(this.width * 0.08, this.width * 0.92),
-      y: this.range(this.height * 0.08, this.height * 0.84)
-    };
-  }
-
-  private rand(): number {
-    this.rngState = ((Math.imul(this.rngState, 1664525) + 1013904223) >>> 0) || 1;
-    return this.rngState / 0xffffffff;
-  }
-
-  private range(min: number, max: number): number {
-    if (min === max) {
-      return min;
-    }
-
-    return min + ((max - min) * this.rand());
-  }
-}
-
-export function resolveMenuPresentationModel(
-  width: number,
-  height: number,
-  variant: AmbientPresentationVariant,
-  chrome: PresentationChrome = DEFAULT_PRESENTATION_CHROME,
-  titleVisible = true,
-  profile?: PresentationDeploymentProfile,
-  safeInsets?: Partial<ViewportSafeInsets> | null,
-  design?: PresentationDesignProfile
-): MenuPresentationModel {
-  const viewport = resolveViewportSize(width, height, DEFAULT_VIEWPORT_WIDTH, DEFAULT_VIEWPORT_HEIGHT);
-
-  return {
-    viewport,
-    layout: resolveSceneLayoutProfile(viewport.width, viewport.height, variant, chrome, titleVisible, profile, safeInsets, design)
-  };
-}
-
-export function resolveTitleBandFrame(
-  viewportWidth: number,
-  sceneLayout: SceneLayoutProfile,
-  boardLayout?: BoardLayout | null,
-  safeInsets?: Partial<ViewportSafeInsets> | null,
-  profile?: PresentationDeploymentProfile,
-  reservedRightPx = 0,
-  design?: PresentationDesignProfile
-): TitleBandFrame {
-  const viewportSafeInsets = sanitizeViewportSafeInsets(safeInsets);
-  const compact = sceneLayout.isTiny || sceneLayout.isNarrow;
-  const metrics = resolveTitleBandMetrics(sceneLayout, profile, design);
-  const bandInset = metrics.bandInset;
-  const safeRightInset = Math.max(viewportSafeInsets.right + bandInset, sceneLayout.sidePadding + bandInset);
-  const reservedRight = Math.max(0, Math.round(reservedRightPx));
-  const left = Math.max(viewportSafeInsets.left + bandInset, sceneLayout.sidePadding + bandInset);
-  const right = Math.max(
-    left + (compact ? 104 : 132),
-    viewportWidth - safeRightInset - reservedRight
-  );
-  const actualReservedRight = Math.max(0, viewportWidth - safeRightInset - right);
-  const top = Math.max(viewportSafeInsets.top + bandInset, bandInset);
-  const preferredBottom = top + metrics.bandHeight;
-  const boardGap = boardLayout
-    ? Math.max(
-      metrics.boardGap,
-      Math.round(boardLayout.tileSize * (compact ? 0.5 : 0.65))
-    )
-    : metrics.boardGap;
-  const maxBottom = boardLayout
-    ? Math.min(
-      preferredBottom,
-      boardLayout.safeBounds.top - boardGap,
-      boardLayout.boardY - boardGap
-    )
-    : preferredBottom;
-  const bottom = Math.max(top + metrics.minHeight, maxBottom);
-
-  return {
-    left,
-    top,
-    right,
-    bottom,
-    width: right - left,
-    height: bottom - top,
-    centerX: left + ((right - left) / 2),
-    centerY: top + ((bottom - top) / 2),
-    reservedRight: actualReservedRight
-  };
-}
-
-export function resolveTitleLockupLayout(
-  boardLayout: BoardLayout,
-  sceneLayout: SceneLayoutProfile,
-  titleBandFrame: TitleBandFrame,
-  variant: AmbientPresentationVariant,
-  chrome: PresentationChrome = DEFAULT_PRESENTATION_CHROME,
-  profile?: PresentationDeploymentProfile,
-  design?: PresentationDesignProfile
-): TitleLockupLayout {
-  const safeVariant = sanitizePresentationVariant(variant);
-  const safeChrome = CHROME_PROFILES[chrome] ? chrome : DEFAULT_PRESENTATION_CHROME;
-  const variantProfile = VARIANT_PROFILES[safeVariant];
-  const chromeProfile = CHROME_PROFILES[safeChrome];
-  const deploymentProfile = profile ? DEPLOYMENT_PRESENTATION_PROFILES[profile] : DEFAULT_DEPLOYMENT_PRESENTATION_PROFILE;
-  const recoveryScale = isRecoveryDesignProfile(design) ? 0.92 : 1;
-  const titlePlateMaxWidth = Math.max(112, titleBandFrame.width - 24);
-  const titlePlateMinWidth = Math.min(
-    profile === 'recovery'
-      ? (variantProfile.titleAnchor === 'left' ? 180 : 192)
-      : (variantProfile.titleAnchor === 'left' ? 196 : 212),
-    titlePlateMaxWidth
-  );
-  const plateWidth = Phaser.Math.Clamp(
-    Math.round(
-      boardLayout.boardSize
-        * (sceneLayout.isNarrow ? 0.46 : legacyTuning.menu.title.plateWidthRatio - 0.015)
-        * variantProfile.titleScale
-        * chromeProfile.titleScale
-        * deploymentProfile.titlePlateWidthScale
-        * recoveryScale
-    ),
-    titlePlateMinWidth,
-    Math.max(Math.min(sceneLayout.isPortrait ? 320 : 368, titlePlateMaxWidth), 112)
-  );
-  const basePlateHeight = Phaser.Math.Clamp(
-    Math.round(
-      boardLayout.boardSize
-        * legacyTuning.menu.title.plateHeightRatio
-        * Phaser.Math.Linear(0.86, 0.98, variantProfile.titleScale * Math.max(0.72, chromeProfile.titleScale))
-        * 0.88
-        * deploymentProfile.titlePlateHeightScale
-        * recoveryScale
-    ),
-    sceneLayout.isTiny ? 28 : 34,
-    Math.max(legacyTuning.menu.title.plateHeightMaxPx - 6, 48)
-  );
-  const plateLaneInset = sceneLayout.isTiny
-    ? 10
-    : safeChrome === 'minimal'
-      ? 16
-      : 12;
-  const plateHeight = Math.min(
-    basePlateHeight,
-    Math.max(sceneLayout.isTiny ? 26 : 30, titleBandFrame.height - plateLaneInset)
-  );
-  const titleFontSize = Phaser.Math.Clamp(
-    Math.round(
-        boardLayout.boardSize
-          * legacyTuning.menu.title.fontScaleToBoard
-          * variantProfile.titleScale
-          * chromeProfile.titleScale
-          * 0.9
-          * recoveryScale
-    ),
-    sceneLayout.isNarrow ? 20 : 26,
-    Math.max(sceneLayout.isNarrow ? 22 : 26, Math.round(plateHeight * 0.74))
-  );
-  const titleLetterSpacing = sceneLayout.isNarrow
-    ? variantProfile.titleLetterSpacingNarrow
-    : variantProfile.titleLetterSpacingWide;
-  const subtitleLineHeightScale = sceneLayout.isTiny ? 1.08 : 1.18;
-  const subtitleBaseFontSize = Math.max(
-    8,
-    Math.round((sceneLayout.isTiny ? 8 : sceneLayout.isNarrow ? 9 : 10) * deploymentProfile.titleLineSpacingScale * recoveryScale)
-  );
-  const subtitleLetterSpacing = sceneLayout.isNarrow ? 0.8 : 1.2;
-  const minSubtitleGap = Math.max(
-    sceneLayout.isTiny ? 5 : 6,
-    Math.round(titleBandFrame.height * (sceneLayout.isPortrait ? 0.09 : 0.11))
-  );
-  const desiredTitleTopInset = Math.round(
-    Math.max(
-      sceneLayout.isTiny ? 2 : 4,
-      titleBandFrame.height * Math.max(0.06, variantProfile.titleYOffsetRatio * 0.38)
-        + Math.max(0, deploymentProfile.titleYOffsetBias * 0.08)
-    )
-  );
-  const availableSubtitleLane = Math.max(minSubtitleGap + 8, titleBandFrame.height - desiredTitleTopInset - plateHeight);
-  const maxSubtitleHeight = Math.max(8, availableSubtitleLane - minSubtitleGap);
-  const subtitleFontSize = Math.max(
-    8,
-    Math.min(subtitleBaseFontSize, Math.floor(maxSubtitleHeight / subtitleLineHeightScale))
-  );
-  const estimatedSubtitleHeight = Math.max(8, Math.round(subtitleFontSize * subtitleLineHeightScale));
-  const subtitleGap = Math.max(
-    minSubtitleGap,
-    Math.min(availableSubtitleLane - estimatedSubtitleHeight, minSubtitleGap + Math.round(titleBandFrame.height * 0.02))
-  );
-  const titleTopInset = Math.max(0, Math.min(
-    desiredTitleTopInset,
-    titleBandFrame.height - plateHeight - subtitleGap - estimatedSubtitleHeight
-  ));
-  const unclampedTitleY = titleBandFrame.top + titleTopInset + (plateHeight / 2);
-  const titleBottom = unclampedTitleY + (plateHeight / 2);
-  const subtitleBottom = titleBottom + subtitleGap + estimatedSubtitleHeight;
-  const titleOverflow = Math.max(0, subtitleBottom - titleBandFrame.bottom);
-  const titleY = Math.max(
-    titleBandFrame.top + (plateHeight / 2),
-    unclampedTitleY - titleOverflow
-  );
-  const titleX = variantProfile.titleAnchor === 'left'
-    ? titleBandFrame.left + (plateWidth / 2)
-    : titleBandFrame.centerX;
-
-  return {
-    plateWidth,
-    plateHeight,
-    titleX,
-    titleY,
-    titleShadowY: titleY + 1,
-    titleFontSize,
-    titleLetterSpacing,
-    subtitleTopOffsetY: (plateHeight / 2) + subtitleGap,
-    subtitleGap,
-    subtitleFontSize,
-    subtitleLetterSpacing,
-    estimatedSubtitleHeight
-  };
-}
-
-export function resolveInstallChromeFrame(
-  viewportWidth: number,
-  viewportHeight: number,
-  sceneLayout: SceneLayoutProfile,
-  boardLayout: BoardLayout | null | undefined,
-  chipWidth: number,
-  chipHeight: number,
-  safeInsets?: Partial<ViewportSafeInsets> | null,
-  titleFrame?: TitleBandFrame | null
-): InstallChromeFrame {
-  void boardLayout;
-  const viewportSafeInsets = sanitizeViewportSafeInsets(safeInsets);
-  const compact = sceneLayout.isTiny || sceneLayout.isNarrow;
-  const safeWidth = sanitizePositive(viewportWidth, DEFAULT_VIEWPORT_WIDTH, 1);
-  const safeHeight = sanitizePositive(viewportHeight, DEFAULT_VIEWPORT_HEIGHT, 1);
-  const edgeInset = Math.max(
-    Math.max(viewportSafeInsets.left, viewportSafeInsets.right) + resolveInstallEdgeInsetPx(sceneLayout),
-    sceneLayout.sidePadding + (compact ? 8 : 10)
-  );
-  const laneRight = safeWidth - edgeInset;
-  const laneLeft = titleFrame
-    ? titleFrame.right
-    : Math.max(viewportSafeInsets.left + edgeInset, edgeInset);
-  const centerX = titleFrame
-    ? Phaser.Math.Clamp(
-      titleFrame.right + (titleFrame.reservedRight / 2),
-      laneLeft + (chipWidth / 2),
-      laneRight - (chipWidth / 2)
-    )
-    : Phaser.Math.Clamp(
-      laneRight - (chipWidth / 2),
-      laneLeft + (chipWidth / 2),
-      laneRight - (chipWidth / 2)
-    );
-  const fallbackTopInset = Math.max(viewportSafeInsets.top + resolveInstallEdgeInsetPx(sceneLayout), resolveInstallEdgeInsetPx(sceneLayout));
-  const centerY = titleFrame
-    ? Phaser.Math.Clamp(
-      titleFrame.centerY,
-      titleFrame.top + (chipHeight / 2),
-      titleFrame.bottom - (chipHeight / 2)
-    )
-    : Math.min(
-      safeHeight - (chipHeight / 2),
-      Math.max(chipHeight / 2, fallbackTopInset + (chipHeight / 2))
-    );
-  const left = Math.round(centerX - (chipWidth / 2));
-  const top = Math.round(centerY - (chipHeight / 2));
-
-  return {
-    left,
-    top,
-    right: left + chipWidth,
-    bottom: top + chipHeight,
-    width: chipWidth,
-    height: chipHeight,
-    centerX,
-    centerY
-  };
-}
-
-const isBottomDockedInstallFrame = (
-  installFrame: InstallChromeFrame | null | undefined,
-  viewportHeight: number,
-  titleFrame?: TitleBandFrame
-): boolean => {
-  if (!installFrame) {
-    return false;
-  }
-
-  if (titleFrame && installFrame.bottom <= titleFrame.bottom + 8) {
-    return false;
-  }
-
-  return installFrame.centerY >= viewportHeight * 0.62 || installFrame.top >= viewportHeight * 0.58;
+const BOARD_FRAME_PADDING = 18;
+const BOARD_SHADOW_OFFSET = 10;
+const MENU_BUTTON_ALPHA = 0.18;
+const MENU_BUTTON_STROKE_ALPHA = 0.24;
+const MENU_TEXT_COLOR = '#0b841d';
+const TITLE_FILL_COLOR = '#249628';
+const TITLE_SHADOW_COLOR = '#0c2e13';
+const MESSAGE_DURATION_MS = 1800;
+const DEMO_STEP_MS = 118;
+const DEMO_REGEN_HOLD_MS = 860;
+const TRAIL_FADE_TAIL = 16;
+
+const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+
+const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
+
+const formatClock = (elapsedMs: number): string => {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
-export function resolveBoardCompositionFrame(
-  viewportWidth: number,
-  viewportHeight: number,
-  sceneLayout: SceneLayoutProfile,
-  titleFrame?: TitleBandFrame,
-  installFrame?: InstallChromeFrame,
-  safeInsets?: Partial<ViewportSafeInsets> | null,
-  profile?: PresentationDeploymentProfile,
-  design?: PresentationDesignProfile
-): BoardBounds {
-  const viewportSafeInsets = sanitizeViewportSafeInsets(safeInsets);
-  const safeWidth = sanitizePositive(viewportWidth, DEFAULT_VIEWPORT_WIDTH, 1);
-  const safeHeight = sanitizePositive(viewportHeight, DEFAULT_VIEWPORT_HEIGHT, 1);
-  const boardBuffer = resolveBoardEdgeBufferPx(sceneLayout, profile);
-  const boardLaneGap = boardBuffer + (sceneLayout.isTiny || sceneLayout.isNarrow ? 2 : 4);
-  const left = Math.max(viewportSafeInsets.left + boardBuffer, boardBuffer);
-  let right = Math.max(
-    left + 24,
-    safeWidth - Math.max(viewportSafeInsets.right + boardBuffer, boardBuffer)
-  );
-  let top = titleFrame
-    ? titleFrame.bottom + boardLaneGap
-    : Math.max(viewportSafeInsets.top + boardBuffer, boardBuffer);
-  const bottomDockedInstall = isBottomDockedInstallFrame(installFrame, safeHeight, titleFrame);
-  let bottom = bottomDockedInstall && installFrame
-    ? installFrame.top - boardLaneGap
-    : safeHeight - Math.max(viewportSafeInsets.bottom + boardBuffer, boardBuffer);
-
-  const presentationMode = resolveIntentFeedPresentationMode(
-    safeWidth,
-    safeHeight,
-    sceneLayout,
-    profile,
-    design
-  );
-  if (presentationMode === 'commentary-rail') {
-    const commentaryRailWidth = resolveIntentFeedCommentaryRailWidth(safeWidth, sceneLayout);
-    const commentaryRailReserve = commentaryRailWidth + legacyTuning.menu.intentFeed.commentaryRailGapPx;
-    const reservedRight = right - commentaryRailReserve;
-    if (reservedRight >= left + 24) {
-      right = reservedRight;
-    }
-  } else {
-    const feedMetrics = resolveIntentFeedPanelMetrics({ width: safeWidth, height: safeHeight }, false, false, profile);
-    const feedBottom = bottomDockedInstall && installFrame
-      ? installFrame.top - legacyTuning.menu.intentFeed.installGapPx
-      : safeHeight - Math.max(
-        viewportSafeInsets.bottom + legacyTuning.menu.intentFeed.insetYPx,
-        legacyTuning.menu.intentFeed.insetYPx
-      );
-    const reservedBottom = feedBottom - feedMetrics.height - legacyTuning.menu.intentFeed.boardGapPx - Math.max(2, Math.round(boardBuffer * 0.5));
-    if (reservedBottom >= top + 24) {
-      bottom = Math.min(bottom, reservedBottom);
-    }
+const buildPathTrail = (
+  points: readonly LegacyPoint[],
+  limit: number | null
+): LegacyPoint[] => {
+  if (limit === null || points.length <= limit) {
+    return points.map(copyPoint);
   }
 
-  if (profile === 'obs' && !titleFrame) {
-    const symmetricMargin = Math.max(top, safeHeight - bottom);
-    top = symmetricMargin;
-    bottom = safeHeight - symmetricMargin;
-  }
-
-  if (bottom <= top + 24) {
-    const fallbackTop = Math.max(viewportSafeInsets.top + boardBuffer, boardBuffer);
-    const fallbackBottom = safeHeight - Math.max(viewportSafeInsets.bottom + boardBuffer, boardBuffer);
-    top = Math.min(top, fallbackBottom - 24);
-    bottom = Math.max(bottom, fallbackTop + 24);
-  }
-
-  return createSceneBounds(left, top, right, bottom);
-}
-
-export function resolveIntentFeedPresentationMode(
-  viewportWidth: number,
-  viewportHeight: number,
-  sceneLayout: SceneLayoutProfile,
-  profile?: PresentationDeploymentProfile,
-  design?: PresentationDesignProfile
-): IntentFeedPresentationMode {
-  const tuning = legacyTuning.menu.intentFeed;
-  const safeWidth = sanitizePositive(viewportWidth, DEFAULT_VIEWPORT_WIDTH, 1);
-  const safeHeight = sanitizePositive(viewportHeight, DEFAULT_VIEWPORT_HEIGHT, 1);
-  const aspectRatio = safeWidth / Math.max(1, safeHeight);
-  const wideEnough = safeWidth >= tuning.commentaryRailMinViewportWidthPx;
-  const tallEnough = safeHeight >= tuning.commentaryRailMinViewportHeightPx;
-  const landscapeEnough = aspectRatio >= tuning.commentaryRailMinAspectRatio;
-  const railEnabled = profile === 'recovery'
-    || isRecoveryDesignProfile(design)
-    || legacyTuning.menu.intentFeed.commentaryRailEnabled;
-
-  if (profile === 'obs') {
-    return 'bottom-panel';
-  }
-
-  if (
-    sceneLayout.isPortrait
-    || sceneLayout.isTiny
-    || sceneLayout.isNarrow
-    || sceneLayout.isShort
-    || !railEnabled
-  ) {
-    return 'bottom-panel';
-  }
-
-  return wideEnough && tallEnough && landscapeEnough
-    ? 'commentary-rail'
-    : 'bottom-panel';
-}
-
-function resolveIntentFeedCommentaryRailWidth(
-  viewportWidth: number,
-  sceneLayout: SceneLayoutProfile
-): number {
-  const tuning = legacyTuning.menu.intentFeed;
-  const compact = sceneLayout.isTiny || sceneLayout.isNarrow;
-  const insetX = tuning.insetXPx;
-  const maxWidth = compact ? tuning.compactWidthPx : tuning.widthPx;
-  const minWidth = compact ? tuning.compactMinWidthPx : tuning.minWidthPx;
-  const widthRatio = compact ? tuning.compactMaxWidthRatio : tuning.maxWidthRatio;
-  const availableWidth = Math.max(96, viewportWidth - (insetX * 2));
-  const desiredWidth = Math.round(viewportWidth * widthRatio);
-  const cappedWidth = Math.min(maxWidth, availableWidth);
-  const floorWidth = Math.min(minWidth, cappedWidth);
-
-  return Math.max(floorWidth, Math.min(cappedWidth, desiredWidth));
-}
+  return points.slice(Math.max(0, points.length - limit)).map(copyPoint);
+};
 
 export class MenuScene extends Phaser.Scene {
-  private titlePulseTween?: Phaser.Tweens.Tween;
-  private titleDriftTween?: Phaser.Tweens.Tween;
-  private ambientSky?: AmbientSkyLayer;
-  private presentationVariant: AmbientPresentationVariant = DEFAULT_PRESENTATION_VARIANT;
-  private launchConfig: PresentationLaunchConfig = { ...DEFAULT_PRESENTATION_LAUNCH_CONFIG };
-  private activeTheme: PresentationThemeFamily = PRESENTATION_THEME_FAMILIES[0];
+  private settings: LegacySettings = copyLegacySettings(LEGACY_DEFAULTS);
+  private mazeSeed = 0x5a17f00d;
+  private maze!: LegacyMazeSnapshot;
+  private player!: LegacyPoint;
+  private trail: LegacyPoint[] = [];
+  private mode: RuntimeMode = 'menu';
+  private overlay: OverlayKind = 'none';
+  private overlayReturn: OverlayKind = 'none';
+  private pendingMazeRebuild = false;
+  private demoCursor = 0;
+  private nextDemoMoveAtMs = 0;
+  private playStartedAtMs = 0;
+  private messageText = '';
+  private messageVisibleUntilMs = 0;
+  private titleText!: Phaser.GameObjects.Text;
+  private titleShadow!: Phaser.GameObjects.Text;
+  private footerText!: Phaser.GameObjects.Text;
+  private backdropGraphics!: Phaser.GameObjects.Graphics;
+  private boardStaticGraphics!: Phaser.GameObjects.Graphics;
+  private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
+  private overlayGraphics!: Phaser.GameObjects.Graphics;
+  private hudGraphics!: Phaser.GameObjects.Graphics;
+  private uiTexts: Phaser.GameObjects.Text[] = [];
+  private uiButtons: UiButton[] = [];
+  private stars: StarParticle[] = [];
+  private layout!: SceneLayout;
+  private boardStaticDirty = true;
+  private boardDynamicDirty = true;
+  private backdropDirty = true;
+  private uiDirty = true;
 
   public constructor() {
     super('MenuScene');
   }
 
-  public init(data: MenuSceneInitData = {}): void {
-    markBootTiming('menu-scene:init-start');
-    this.launchConfig = sanitizePresentationLaunchConfig(data);
-    this.presentationVariant = sanitizePresentationVariant(this.launchConfig.presentation);
-    markBootTiming('menu-scene:init-end');
+  public create(): void {
+    this.backdropGraphics = this.add.graphics();
+    this.boardStaticGraphics = this.add.graphics();
+    this.boardDynamicGraphics = this.add.graphics();
+    this.overlayGraphics = this.add.graphics();
+    this.hudGraphics = this.add.graphics();
+
+    this.titleShadow = this.add.text(0, 0, 'Mazer', {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '96px',
+      color: TITLE_SHADOW_COLOR
+    }).setOrigin(0.5).setAlpha(0.72);
+    this.titleText = this.add.text(0, 0, 'Mazer', {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '96px',
+      color: TITLE_FILL_COLOR
+    }).setOrigin(0.5).setAlpha(0.62);
+    this.footerText = this.add.text(0, 0, '', {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '18px',
+      color: '#d7d6de',
+      align: 'center'
+    }).setOrigin(0.5).setAlpha(0.92);
+
+    this.createStars();
+    this.rebuildMaze();
+    this.refreshLayout();
+    this.installInput();
+
+    this.scale.on('resize', () => {
+      this.refreshLayout();
+    });
   }
 
-  public create(): void {
-    markBootTiming('menu-scene:create-start');
-    const launchConfig = sanitizePresentationLaunchConfig(this.launchConfig);
-    const variant = sanitizePresentationVariant(launchConfig.presentation);
-    const chrome = resolveEffectivePresentationChrome(launchConfig);
-    const titleVisible = shouldShowPresentationTitle(launchConfig);
-    const contentProfileId: PresentationContentProfile = launchConfig.contentProfile ?? DEFAULT_PRESENTATION_CONTENT_PROFILE;
-    const deploymentProfileId = launchConfig.profile;
-    const deploymentProfile = resolveDeploymentPresentationProfile(deploymentProfileId);
-    const deterministicCapture = isDeterministicPresentationCapture(launchConfig);
-    let presentationMode: PresentationMode = launchConfig.mode;
-    const moodOverride = resolveForcedDemoMood(launchConfig.mood);
-    const viewportSafeInsets = resolveViewportSafeInsets();
-    const presentationModel = resolveMenuPresentationModel(
-      this.scale.width,
-      this.scale.height,
-      variant,
-      chrome,
-      titleVisible,
-      deploymentProfileId,
-      viewportSafeInsets,
-      launchConfig.design
-    );
-    const { width, height } = presentationModel.viewport;
-    const visualCaptureConfig = resolveMenuSceneVisualCaptureConfig();
-    const runtimeConfig = resolveMenuSceneRuntimeConfig(
-      typeof window === 'undefined' ? undefined : window.location?.search,
-      {
-        hardwareConcurrency: typeof navigator !== 'undefined' && Number.isFinite(navigator.hardwareConcurrency)
-          ? navigator.hardwareConcurrency
-          : null,
-        saveData: Boolean(
-          (
-            typeof navigator !== 'undefined'
-              ? (navigator as Navigator & { connection?: { saveData?: boolean } })
-              : undefined
-          )?.connection?.saveData
-        ),
-        lowPowerHardwareConcurrencyMax: legacyTuning.menu.runtime.lowPowerHardwareConcurrencyMax
+  public update(time: number, delta: number): void {
+    this.updateStars(delta);
+
+    if (this.mode === 'menu' && this.overlay === 'none') {
+      this.updateMenuDemo(time);
+    }
+
+    if (this.messageVisibleUntilMs > 0 && time >= this.messageVisibleUntilMs) {
+      this.messageVisibleUntilMs = 0;
+      this.messageText = '';
+      if (this.overlay === 'message') {
+        this.overlay = 'none';
+        this.overlayReturn = 'none';
+        this.uiDirty = true;
       }
-    );
-    const reducedMotion = prefersReducedMotion();
-    const variantProfile = VARIANT_PROFILES[variant];
-    const chromeProfile = CHROME_PROFILES[chrome];
-    const sceneLayout = presentationModel.layout;
-    const sceneStartedAt = this.time.now;
-    const sceneInstanceId = nextMenuSceneInstanceId();
-    let visualDiagnosticsRevision = 0;
-    let runtimeDiagnosticsRevision = 0;
-    let recoveryActivated = false;
-    let recoveryEpisode: MazeEpisode | undefined;
-    let patternEngine: PatternEngine | undefined;
-    let patternFrame: PatternFrame | undefined;
-    let pendingWatchFrame: PatternFrame | undefined;
-    let episodePresentationShell: EpisodePresentationShell | undefined;
-    let intentRuntimeSession: MenuIntentRuntimeSession | undefined;
-    let intentRuntimeBootstrap: Phaser.Time.TimerEvent | undefined;
-    let resizeRestart: Phaser.Time.TimerEvent | undefined;
-    let lastResizeRestartKey: string | undefined;
-    let handleVisibilityChange: (() => void) | undefined;
-    let handleResize: ((gameSize?: { width?: number; height?: number }) => void) | undefined;
-    let removeInstallSurfaceListener: (() => void) | undefined;
-    let updateDemo: ((time: number, delta: number) => void) | undefined;
-    let activeTitleBandFrame: TitleBandFrame | undefined;
-    let activeTitleLockupLayout: TitleLockupLayout | undefined;
-    let activeTitleShadowContainer: Phaser.GameObjects.Container | undefined;
-    let activeTitleContainer: Phaser.GameObjects.Container | undefined;
-    let activeTitlePlateContainer: Phaser.GameObjects.Container | undefined;
-    let activeTitleText: Phaser.GameObjects.Text | undefined;
-    let activeTitleSubtitle: Phaser.GameObjects.Text | undefined;
-    let installChrome: Phaser.GameObjects.Container | undefined;
-    let activeInstallFrame: InstallChromeFrame | undefined;
-    let activeInstallBounds: VisualSceneBounds | undefined;
-    let activeInstallState: InstallSurfaceState = resolveMenuSceneInstallSurfaceState(getInstallSurfaceState(), visualCaptureConfig);
-    let firstInteractiveFrameSeen = false;
-    let deferredVisualSetupComplete = false;
-    let deferredVisualSetupQueued = false;
-    let deferredVisualSetupActive = false;
-    let deferredVisualTaskQueue: Array<{ label: string; run: () => void }> = [];
-    let deferredSceneChromeReady = false;
-    let bootTimingReportLogged = false;
-    const isDocumentSceneHidden = (): boolean => (
-      typeof document !== 'undefined'
-      && (document.visibilityState === 'hidden' || document.hidden)
-    );
-    let sceneHidden = isDocumentSceneHidden();
-    let performanceMode: MenuScenePerformanceMode = sceneHidden
-      ? 'hidden'
-      : runtimeConfig.lowPowerActive
-        ? 'throttled'
-        : 'full';
-    let visibilityChangeCount = sceneHidden ? 1 : 0;
-    let visibilitySuspendCount = sceneHidden ? 1 : 0;
-    let activeTweenCount = 0;
-    let activeTimerCount = 0;
-    let activeListenerCount = 0;
-    let lastTrailSegmentCount = 0;
-    let lastRunnerPolicyTelemetry: DemoRunnerTelemetry = {
-      wrongBranchCount: 0,
-      backtrackCount: 0,
-      recoveryCount: 0
-    };
-    let lastIntentEntryCount = 0;
-    let lastIntentFeedDiagnostics: MenuSceneRuntimeDiagnostics['feed'] = {
-      step: null,
-      signature: '',
-      status: null,
-      visibleEntryCount: 0,
-      visibleEntries: [],
-      changeCount: 0,
-      lastChangedAt: null
-    };
-    let lastProjection: RunProjection | null = null;
-    let telemetryEventSequence = 0;
-    let telemetryEventLogVersion = 0;
-    let telemetryCurrentRunId: string | null = null;
-    let telemetryCurrentMazeId: string | null = null;
-    let telemetryCurrentAttemptNo = 0;
-    let telemetryEvents: TelemetryEvent[] = [];
-    let telemetrySettingsInitialized = false;
-    let lastProjectionState: RunProjectionState | null = null;
-    let lastThoughtEventSignature = '';
-    let lastMemoryEventSignature = '';
-    let lastHazardEventSignature = '';
-    let runEndedForCurrentAttempt = false;
-    let ambientSkyDeltaBudgetMs = 0;
-    let lastRuntimeDiagnosticsPublishedAt = sceneStartedAt;
-    let totalFrameCount = 0;
-    let totalFrameTimeMs = 0;
-    let worstFrameTimeMs = 0;
-    let totalSpikeCount = 0;
-    const recentFrameTimesMs: number[] = [];
-    const recentHeapSamples: Array<{ atMs: number; usedBytes: number }> = [];
-    let hiddenRecoveryThrottleUntilMs = 0;
-    let lastHeapPressureActive = false;
-    let renderDemo: () => void = () => undefined;
-    let playLoopState = createPlayLoopState(presentationMode);
-    let playInputDiagnostics = createPlayInputDiagnostics();
-    const pendingHumanActions: HumanInputAction[] = [];
-    const inputRepeatGate = new HumanInputRepeatGate({
-      moveRepeatMinIntervalMs: Math.max(56, Math.round(legacyTuning.demo.cadence.exploreStepMs * 0.62))
-    });
-    const touchInputSupported = resolveTouchInputCapability(typeof window !== 'undefined' ? window : undefined)
-      || Boolean((this.game as { device?: { input?: { touch?: boolean } } }).device?.input?.touch);
-    let touchControlsVisible = false;
-    let touchControlsChrome: TouchControlChrome | undefined;
-    let touchInputState = createTouchInputState();
-    let removeKeyboardInputListener: (() => void) | undefined;
-    let removeTouchInputListeners: (() => void) | undefined;
-
-    const resetPlayInputDiagnostics = (): void => {
-      playInputDiagnostics = createPlayInputDiagnostics();
-      inputRepeatGate.reset();
-    };
-
-    const syncPlayInputQueueDepth = (): void => {
-      playInputDiagnostics.queueDepth = pendingHumanActions.length;
-      playInputDiagnostics.maxQueueDepth = Math.max(playInputDiagnostics.maxQueueDepth, pendingHumanActions.length);
-    };
-
-    const recordAcceptedInput = (action: HumanInputAction): void => {
-      playInputDiagnostics.acceptedCount += 1;
-      playInputDiagnostics.lastAcceptedActionKind = action.kind;
-      playInputDiagnostics.lastAcceptedSource = action.source;
-      playInputDiagnostics.lastAcceptedAtMs = Number.isFinite(action.atMs) ? Math.max(0, Math.round(action.atMs ?? 0)) : this.time.now;
-    };
-
-    const recordDroppedInput = (
-      action: Pick<HumanInputAction, 'kind'> | null,
-      reason: HumanInputDropReason,
-      merged = false
-    ): void => {
-      if (merged) {
-        playInputDiagnostics.mergedCount += 1;
-      } else {
-        playInputDiagnostics.droppedCount += 1;
-      }
-      playInputDiagnostics.lastDroppedActionKind = action?.kind ?? null;
-      playInputDiagnostics.lastDroppedReason = reason;
-      playInputDiagnostics.lastDroppedAtMs = this.time.now;
-    };
-
-    const enqueueHumanAction = (action: HumanInputAction): boolean => {
-      if (!isMovementActionKind(action.kind)) {
-        if (action.kind === 'restart_attempt') {
-          pendingHumanActions.length = 0;
-        }
-
-        const firstMovementIndex = pendingHumanActions.findIndex((entry) => isMovementActionKind(entry.kind));
-        if (firstMovementIndex === -1) {
-          pendingHumanActions.push(action);
-        } else {
-          pendingHumanActions.splice(firstMovementIndex, 0, action);
-        }
-        syncPlayInputQueueDepth();
-        recordAcceptedInput(action);
-        return true;
-      }
-
-      const movementQueue = pendingHumanActions.filter((entry) => isMovementActionKind(entry.kind));
-      const lastQueuedMovement = movementQueue.at(-1) ?? null;
-      if (lastQueuedMovement?.kind === action.kind) {
-        recordDroppedInput(action, 'queue_merged', true);
-        return false;
-      }
-
-      if (movementQueue.length >= 2) {
-        recordDroppedInput(action, 'queue_full');
-        return false;
-      }
-
-      pendingHumanActions.push(action);
-      syncPlayInputQueueDepth();
-      recordAcceptedInput(action);
-      return true;
-    };
-
-    const toRuntimeFeedEntries = (
-      feedState: IntentFeedState | null
-    ): MenuSceneRuntimeDiagnostics['feed']['visibleEntries'] => (
-      feedState?.entries.map((entry) => ({
-        id: entry.id,
-        speaker: entry.speaker,
-        kind: entry.kind,
-        importance: entry.importance,
-        summary: entry.summary,
-        slot: entry.slot
-      })) ?? []
-    );
-    const toRuntimeFeedStatus = (
-      feedState: IntentFeedState | null
-    ): MenuSceneRuntimeDiagnostics['feed']['status'] => (
-      feedState?.status
-        ? {
-            speaker: feedState.status.speaker,
-            kind: feedState.status.kind,
-            importance: feedState.status.importance,
-            summary: feedState.status.summary
-          }
-        : null
-    );
-    const appendTelemetryEvent = <K extends TelemetryEventKind>(
-      kind: K,
-      payload: TelemetryEvent<K>['payload'],
-      overrides: Partial<Pick<TelemetryEvent, 'runId' | 'mazeId' | 'attemptNo' | 'elapsedMs' | 'createdAt'>> = {}
-    ): void => {
-      if (!telemetryCurrentRunId && !overrides.runId) {
-        return;
-      }
-
-      const event: TelemetryEvent = {
-        eventId: `${sceneInstanceId}-${String(++telemetryEventSequence).padStart(4, '0')}`,
-        kind,
-        runId: overrides.runId ?? telemetryCurrentRunId ?? `scene-${sceneInstanceId}`,
-        mazeId: overrides.mazeId ?? telemetryCurrentMazeId ?? undefined,
-        attemptNo: overrides.attemptNo ?? telemetryCurrentAttemptNo,
-        elapsedMs: overrides.elapsedMs ?? Math.max(0, Math.round(this.time.now - sceneStartedAt)),
-        createdAt: overrides.createdAt ?? new Date().toISOString(),
-        mode: presentationMode,
-        payload
-      };
-
-      telemetryEvents.push(event);
-      telemetryEventLogVersion += 1;
-      if (telemetryEvents.length > 256) {
-        telemetryEvents = telemetryEvents.slice(-256);
-      }
-    };
-    const ensureTelemetrySettings = (): void => {
-      if (telemetrySettingsInitialized) {
-        return;
-      }
-
-      telemetrySettingsInitialized = true;
-      appendTelemetryEvent('settings_changed', {
-        setting: 'reduced_motion',
-        nextValue: reducedMotion
-      }, {
-        runId: `scene-${sceneInstanceId}-settings`,
-        attemptNo: 0
-      });
-      appendTelemetryEvent('settings_changed', {
-        setting: 'launch_profile',
-        nextValue: deploymentProfileId ?? 'default'
-      }, {
-        runId: `scene-${sceneInstanceId}-settings`,
-        attemptNo: 0
-      });
-      appendTelemetryEvent('settings_changed', {
-        setting: 'mode',
-        nextValue: presentationMode
-      }, {
-        runId: `scene-${sceneInstanceId}-settings`,
-        attemptNo: 0
-      });
-    };
-    const beginTelemetryRun = (episode: MazeEpisode, phase: 'pre-roll' | 'build' | 'watch' | 'hold' | 'erase'): void => {
-      telemetryCurrentAttemptNo += 1;
-      telemetryCurrentMazeId = `maze-${episode.seed.toString(16)}`;
-      telemetryCurrentRunId = `scene-${sceneInstanceId}-attempt-${telemetryCurrentAttemptNo}`;
-      lastProjectionState = null;
-      lastThoughtEventSignature = '';
-      lastMemoryEventSignature = '';
-      lastHazardEventSignature = '';
-      runEndedForCurrentAttempt = false;
-      resetPlayInputDiagnostics();
-      syncPlayInputQueueDepth();
-      appendTelemetryEvent('run_started', {
-        phase,
-        mode: presentationMode
-      });
-    };
-    const finalizeTelemetryRun = (outcome: 'failed' | 'cleared' | 'aborted'): void => {
-      if (runEndedForCurrentAttempt || !telemetryCurrentRunId) {
-        return;
-      }
-
-      runEndedForCurrentAttempt = true;
-      appendTelemetryEvent('run_ended', {
-        outcome,
-        durationMs: Math.max(0, Math.round(this.time.now - sceneStartedAt))
-      });
-    };
-    ensureTelemetrySettings();
-    const runOptional = (label: string, render: () => void): void => {
-      try {
-        render();
-      } catch (error) {
-        console.error(`MenuScene optional ${label} skipped.`, error);
-      }
-    };
-    const countEmitterListeners = (emitter: unknown, eventName: string): number => {
-      const listenerCount = (emitter as { listenerCount?: (event: string) => number })?.listenerCount;
-      if (typeof listenerCount !== 'function') {
-        return 0;
-      }
-
-      try {
-        return Math.max(0, listenerCount.call(emitter, eventName));
-      } catch {
-        return 0;
-      }
-    };
-    const resolveActiveTweenCount = (): number => {
-      const tweens = (this.tweens as Phaser.Tweens.TweenManager & { getTweens?: () => unknown[] }).getTweens?.();
-      return Array.isArray(tweens) ? tweens.length : 0;
-    };
-    const resolveActiveTimerCount = (): number => {
-      const timers = (this.time as Phaser.Time.Clock & { getAllEvents?: () => unknown[] }).getAllEvents?.();
-      return Array.isArray(timers) ? timers.length : 0;
-    };
-    const resolveHeapSample = (): MenuSceneRuntimeDiagnostics['resources']['jsHeap'] | undefined => {
-      const memory = (typeof performance !== 'undefined'
-        ? (performance as Performance & {
-          memory?: {
-            usedJSHeapSize?: number;
-            totalJSHeapSize?: number;
-            jsHeapSizeLimit?: number;
-          };
-        }).memory
-        : undefined);
-      if (!memory || !Number.isFinite(memory.usedJSHeapSize)) {
-        return undefined;
-      }
-
-      return {
-        usedBytes: Math.max(0, Math.round(memory.usedJSHeapSize ?? 0)),
-        ...(Number.isFinite(memory.totalJSHeapSize) ? { totalBytes: Math.max(0, Math.round(memory.totalJSHeapSize ?? 0)) } : {}),
-        ...(Number.isFinite(memory.jsHeapSizeLimit) ? { limitBytes: Math.max(0, Math.round(memory.jsHeapSizeLimit ?? 0)) } : {})
-      };
-    };
-    const resolveHeapPressureActive = (
-      nowMs: number,
-      heapSample?: MenuSceneRuntimeDiagnostics['resources']['jsHeap']
-    ): boolean => {
-      if (heapSample) {
-        recentHeapSamples.push({
-          atMs: nowMs,
-          usedBytes: heapSample.usedBytes
-        });
-        if (recentHeapSamples.length > legacyTuning.menu.runtime.heapSampleWindow) {
-          recentHeapSamples.splice(0, recentHeapSamples.length - legacyTuning.menu.runtime.heapSampleWindow);
-        }
-      }
-
-      if (recentHeapSamples.length < 2) {
-        lastHeapPressureActive = false;
-        return lastHeapPressureActive;
-      }
-
-      const first = recentHeapSamples[0];
-      const last = recentHeapSamples.at(-1);
-      if (!first || !last) {
-        lastHeapPressureActive = false;
-        return lastHeapPressureActive;
-      }
-
-      const growthBytes = Math.max(0, last.usedBytes - first.usedBytes);
-      const threshold = lastHeapPressureActive
-        ? legacyTuning.menu.runtime.heapGrowthRecoverBytes
-        : legacyTuning.menu.runtime.heapGrowthThrottleBytes;
-      lastHeapPressureActive = growthBytes >= threshold;
-      return lastHeapPressureActive;
-    };
-    const updatePerformanceMode = (sceneHiddenState: boolean, nowMs = this.time.now): void => {
-      const recentFrames = summarizeMenuSceneFrameWindow(
-        recentFrameTimesMs,
-        legacyTuning.menu.runtime.spikeFrameMs
-      );
-      performanceMode = resolveMenuScenePerformanceMode(performanceMode, {
-        hidden: sceneHiddenState,
-        lowPowerActive: runtimeConfig.lowPowerActive,
-        recentAverageFrameMs: recentFrames.averageMs,
-        recentSpikeCount: recentFrames.spikeCount,
-        heapPressureActive: lastHeapPressureActive,
-        recoveryHoldActive: hiddenRecoveryThrottleUntilMs > nowMs,
-        tuning: legacyTuning.menu.runtime
-      });
-    };
-    const publishRuntimeDiagnostics = (sceneHidden: boolean, force = false): void => {
-      const nowMs = this.time.now;
-      if (!force && nowMs - lastRuntimeDiagnosticsPublishedAt < legacyTuning.menu.runtime.diagnosticsPublishIntervalMs) {
-        return;
-      }
-
-      const heapSample = resolveHeapSample();
-      const heapPressureActive = resolveHeapPressureActive(nowMs, heapSample);
-      const postHiddenRecoveryActive = hiddenRecoveryThrottleUntilMs > nowMs;
-      updatePerformanceMode(sceneHidden, nowMs);
-      lastRuntimeDiagnosticsPublishedAt = nowMs;
-
-      if (!runtimeConfig.enabled) {
-        return;
-      }
-
-      const recentFrames = summarizeMenuSceneFrameWindow(recentFrameTimesMs, legacyTuning.menu.runtime.spikeFrameMs);
-      const averageFrameMs = totalFrameCount > 0
-        ? Number((totalFrameTimeMs / totalFrameCount).toFixed(3))
-        : 0;
-      const sceneUpdateListeners = countEmitterListeners(this.events, Phaser.Scenes.Events.UPDATE);
-      const sceneShutdownListeners = countEmitterListeners(this.events, Phaser.Scenes.Events.SHUTDOWN);
-      const scaleResizeListeners = countEmitterListeners(this.scale, Phaser.Scale.Events.RESIZE);
-      const listenerCount = sceneUpdateListeners
-        + sceneShutdownListeners
-        + scaleResizeListeners
-        + (handleVisibilityChange ? 1 : 0)
-        + (removeInstallSurfaceListener ? 1 : 0);
-      const ambientDiagnostics = this.ambientSky?.getDiagnostics(
-        episodePresentationShell
-          ? Math.min(
-            0,
-            episodePresentationShell.boardAura.depth,
-            episodePresentationShell.boardHalo.depth,
-            episodePresentationShell.boardShade.depth
-          )
-          : 0,
-        activeTitleContainer?.depth,
-        installChrome?.depth
-      );
-
-      activeTweenCount = resolveActiveTweenCount();
-      activeTimerCount = resolveActiveTimerCount();
-      activeListenerCount = listenerCount;
-      const telemetrySummary = summarizeTelemetrySemantics(telemetryEvents);
-      publishMenuSceneRuntimeDiagnostics({
-        revision: ++runtimeDiagnosticsRevision,
-        sceneInstanceId,
-        updatedAt: nowMs,
-        runtimeMs: Math.max(0, nowMs - sceneStartedAt),
-        visibility: {
-          hidden: sceneHidden,
-          changeCount: visibilityChangeCount,
-          suspendCount: visibilitySuspendCount
-        },
-        performance: {
-          mode: performanceMode,
-          averageFrameMs,
-          recentAverageFrameMs: recentFrames.averageMs,
-          recentFrameCount: recentFrames.count,
-          worstFrameMs: Number(worstFrameTimeMs.toFixed(3)),
-          worstRecentFrameMs: recentFrames.worstMs,
-          spikeCount: totalSpikeCount,
-          recentSpikeCount: recentFrames.spikeCount,
-          estimatedFps: recentFrames.fps,
-          lowPowerDetected: runtimeConfig.lowPowerDetected,
-          lowPowerForced: runtimeConfig.lowPowerForced,
-          lowPowerActive: runtimeConfig.lowPowerActive,
-          heapPressureActive,
-          postHiddenRecoveryActive,
-          hardwareConcurrency: runtimeConfig.hardwareConcurrency,
-          saveData: runtimeConfig.saveData
-        },
-        feed: lastIntentFeedDiagnostics,
-        input: {
-          ...playInputDiagnostics,
-          queueDepth: pendingHumanActions.length,
-          maxQueueDepth: Math.max(playInputDiagnostics.maxQueueDepth, pendingHumanActions.length)
-        },
-        projection: lastProjection,
-        telemetry: {
-          eventLogVersion: telemetryEventLogVersion,
-          currentRunId: telemetryCurrentRunId,
-          currentMazeId: telemetryCurrentMazeId,
-          currentAttemptNo: telemetryCurrentAttemptNo > 0 ? telemetryCurrentAttemptNo : null,
-          events: telemetryEvents,
-          summary: telemetrySummary
-        },
-        resources: {
-          activeTweens: activeTweenCount,
-          activeTimers: activeTimerCount,
-          listenerCount: activeListenerCount,
-          listenerBreakdown: {
-            sceneUpdate: sceneUpdateListeners,
-            sceneShutdown: sceneShutdownListeners,
-            scaleResize: scaleResizeListeners,
-            visibilityAttached: Boolean(handleVisibilityChange),
-            installSurfaceAttached: Boolean(removeInstallSurfaceListener)
-          },
-          trailSegmentCount: lastTrailSegmentCount,
-          trailSegmentCap: legacyTuning.demo.behavior.trailMaxLength,
-          runnerPolicy: {
-            wrongBranchCount: lastRunnerPolicyTelemetry.wrongBranchCount,
-            backtrackCount: lastRunnerPolicyTelemetry.backtrackCount,
-            recoveryCount: lastRunnerPolicyTelemetry.recoveryCount
-          },
-          intentEntryCount: lastIntentEntryCount,
-          intentEntryCap: legacyTuning.menu.intentFeed.maxVisibleEntries,
-          deferredVisualTasksRemaining: deferredVisualTaskQueue.length,
-          deferredTasksPerFrameCap: legacyTuning.menu.runtime.deferredTasksPerFrame[performanceMode],
-          background: {
-            clouds: ambientDiagnostics?.activeCounts.clouds ?? 0,
-            farStars: ambientDiagnostics?.activeCounts.farStars ?? 0,
-            nearStars: ambientDiagnostics?.activeCounts.nearStars ?? 0,
-            twinkles: ambientDiagnostics?.activeCounts.twinkles ?? 0,
-            veils: ambientDiagnostics?.activeCounts.veils ?? 0,
-            driftMotes: ambientDiagnostics?.activeCounts.driftMotes ?? 0,
-            moving: ambientDiagnostics?.activeCounts.moving ?? 0,
-            movingCap: ambientDiagnostics?.caps.moving ?? 0,
-            signatureCap: ambientDiagnostics?.caps.signatureEvents ?? 0
-          },
-          ...(heapSample ? { jsHeap: heapSample } : {})
-        }
-      });
-    };
-    const removeRuntimeListeners = (options: { keepResize?: boolean } = {}): void => {
-      if (typeof document !== 'undefined' && handleVisibilityChange) {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      }
-      if (!options.keepResize && handleResize) {
-        this.scale.off(Phaser.Scale.Events.RESIZE, handleResize);
-      }
-      if (updateDemo) {
-        this.events.off(Phaser.Scenes.Events.UPDATE, updateDemo);
-      }
-      removeInstallSurfaceListener?.();
-      removeKeyboardInputListener?.();
-      removeTouchInputListeners?.();
-      handleVisibilityChange = undefined;
-      if (!options.keepResize) {
-        handleResize = undefined;
-      }
-      removeInstallSurfaceListener = undefined;
-      removeKeyboardInputListener = undefined;
-      removeTouchInputListeners = undefined;
-      updateDemo = undefined;
-    };
-    const destroyEpisodePresentationShell = (): void => {
-      if (!episodePresentationShell) {
-        return;
-      }
-
-      this.tweens.killTweensOf([
-        episodePresentationShell.boardAura,
-        episodePresentationShell.boardHalo,
-        episodePresentationShell.boardShade,
-        episodePresentationShell.boardVeil,
-        episodePresentationShell.ritualCard,
-        episodePresentationShell.ritualCardStroke,
-        episodePresentationShell.ritualTitle,
-        episodePresentationShell.ritualSubtitle
-      ]);
-      episodePresentationShell.demoStatusHud.destroy();
-      episodePresentationShell.intentFeedHud.destroy();
-      episodePresentationShell.boardRenderer.destroy();
-      episodePresentationShell.motifSecondary.destroy();
-      episodePresentationShell.motifPrimary.destroy();
-      episodePresentationShell.blueprintAccent.destroy();
-      episodePresentationShell.ritualSubtitle.destroy();
-      episodePresentationShell.ritualTitle.destroy();
-      episodePresentationShell.ritualCardStroke.destroy();
-      episodePresentationShell.ritualCard.destroy();
-      episodePresentationShell.boardVeil.destroy();
-      episodePresentationShell.boardShade.destroy();
-      episodePresentationShell.boardHalo.destroy();
-      episodePresentationShell.boardAura.destroy();
-      episodePresentationShell = undefined;
-      intentRuntimeBootstrap?.remove(false);
-      intentRuntimeBootstrap = undefined;
-      intentRuntimeSession = undefined;
-    };
-    const destroyPresentation = (destroyEngine: boolean): void => {
-      resizeRestart?.remove(false);
-      resizeRestart = undefined;
-      this.titlePulseTween?.remove();
-      this.titlePulseTween = undefined;
-      this.titleDriftTween?.remove();
-      this.titleDriftTween = undefined;
-      this.ambientSky?.destroy();
-      this.ambientSky = undefined;
-      destroyEpisodePresentationShell();
-      if (destroyEngine) {
-        patternEngine?.destroy();
-        patternEngine = undefined;
-      }
-      this.time.removeAllEvents();
-      this.tweens.killAll();
-      this.children.removeAll(true);
-      activeTitleBandFrame = undefined;
-      activeTitleLockupLayout = undefined;
-      activeTitleShadowContainer = undefined;
-      activeTitleContainer = undefined;
-      activeTitlePlateContainer = undefined;
-      activeTitleText = undefined;
-      activeTitleSubtitle = undefined;
-      installChrome = undefined;
-      activeInstallFrame = undefined;
-      activeInstallBounds = undefined;
-      deferredVisualSetupActive = false;
-      deferredVisualSetupQueued = false;
-      deferredVisualTaskQueue = [];
-      clearMenuSceneVisualDiagnostics();
-      clearMenuSceneRuntimeDiagnostics();
-    };
-    const renderVisibleRecovery = (): void => {
-      const viewport = resolveSceneViewport(this);
-      destroyPresentation(false);
-      this.renderRecoveryShell(viewport.width, viewport.height, recoveryEpisode);
-    };
-    const failOpen = (error: unknown): void => {
-      if (recoveryActivated) {
-        return;
-      }
-
-      recoveryActivated = true;
-      recoveryEpisode = patternFrame?.episode;
-      console.error('MenuScene failed open to recovery shell.', error);
-      removeRuntimeListeners({ keepResize: true });
-      renderVisibleRecovery();
-    };
-
-    try {
-      this.cameras.main.roundPixels = true;
-      this.cameras.main.fadeIn(reducedMotion ? 0 : variant === 'loading' ? 180 : 240, 0, 0, 0);
-      const themeLock = launchConfig.theme === 'auto' ? undefined : launchConfig.theme;
-      const familyLock = launchConfig.family && launchConfig.family !== 'auto' ? launchConfig.family : undefined;
-      const scheduleSeed = launchConfig.seed ?? legacyTuning.demo.seed;
-      let demoSeed = launchConfig.seed ?? legacyTuning.demo.seed;
-      let demoCycle = 0;
-      let pendingCyclePlan: MenuDemoCycle | undefined;
-      patternEngine = new PatternEngine(() => {
-        const cycleSeed = deterministicCapture ? (launchConfig.seed ?? demoSeed) : demoSeed;
-        const cycle = resolveMenuDemoCycle(scheduleSeed, deterministicCapture ? 0 : demoCycle, {
-          difficulty: launchConfig.difficulty,
-          size: launchConfig.size,
-          mood: moodOverride,
-          theme: themeLock,
-          family: familyLock
-        });
-        pendingCyclePlan = cycle;
-        const resolved = generateMazeForDifficulty({
-          scale: legacyTuning.board.scale,
-          seed: cycleSeed,
-          size: cycle.size,
-          family: cycle.family,
-          presentationPreset: cycle.presentationPreset,
-          checkPointModifier: cycle.entropy.checkPointModifier,
-          shortcutCountModifier: cycle.entropy.shortcutCountModifier
-        }, cycle.difficulty);
-
-        if (!deterministicCapture) {
-          demoSeed += legacyTuning.demo.behavior.regenerateSeedStep;
-          demoCycle += 1;
-        }
-
-        return resolved.episode;
-      }, resolvePatternEngineMode(variant));
-      patternFrame = patternEngine.next(0);
-      recoveryEpisode = patternFrame.episode;
-      let demoCyclePlan = pendingCyclePlan ?? resolveMenuDemoCycle(scheduleSeed, 0, {
-        difficulty: launchConfig.difficulty,
-        size: launchConfig.size,
-        mood: moodOverride,
-        theme: themeLock,
-        family: familyLock
-      });
-      pendingCyclePlan = undefined;
-      this.activeTheme = demoCyclePlan.theme;
-      const sceneThemeProfile = resolveAmbientThemeProfile(demoCyclePlan.theme, launchConfig.design);
-      this.add.rectangle(0, 0, width, height, sceneThemeProfile.palette.background.deepSpace, 1)
-        .setOrigin(0)
-        .setDepth(AMBIENT_SKY_DEPTHS.base - 1);
-        let installPromptPending = false;
-        const compactInstallChrome = sceneLayout.isTiny || sceneLayout.isNarrow;
-      const maybeLogBootTimingReport = (): void => {
-        if (bootTimingReportLogged || !firstInteractiveFrameSeen || !deferredVisualSetupComplete) {
-          return;
-        }
-
-        bootTimingReportLogged = true;
-        logBootTimingReport('Mazer 2D boot timing');
-      };
-      const hydrateEpisodePresentationDecorations = (
-        shell: EpisodePresentationShell | undefined,
-        themeProfile: AmbientThemeProfile
-      ): void => {
-        if (!shell) {
-          return;
-        }
-
-        runOptional('blueprint accent setup', () => {
-          drawBlueprintAccent(shell.blueprintAccent, shell.layout, themeProfile.palette.board.topHighlight);
-        });
-        runOptional('theme motif setup', () => {
-          drawThemeMotifs(themeProfile, shell.motifPrimary, shell.motifSecondary, shell.layout);
-        });
-      };
-      const completeDeferredVisualSetup = (): void => {
-        if (deferredVisualSetupComplete) {
-          return;
-        }
-
-        deferredVisualSetupComplete = true;
-        deferredVisualSetupActive = false;
-        deferredVisualTaskQueue = [];
-        markBootTiming('menu-scene:deferred-visual-setup');
-        maybeLogBootTimingReport();
-      };
-      const drainDeferredVisualSetup = (): void => {
-        if (recoveryActivated || deferredVisualSetupComplete || !deferredVisualSetupActive) {
-          return;
-        }
-
-        const taskBudget = legacyTuning.menu.runtime.deferredTasksPerFrame[performanceMode];
-        if (taskBudget <= 0) {
-          return;
-        }
-
-        let tasksRemaining = taskBudget;
-        while (tasksRemaining > 0 && deferredVisualTaskQueue.length > 0) {
-          const nextTask = deferredVisualTaskQueue.shift();
-          if (!nextTask) {
-            break;
-          }
-
-          runOptional(nextTask.label, nextTask.run);
-          tasksRemaining -= 1;
-        }
-
-        if (deferredVisualTaskQueue.length === 0) {
-          completeDeferredVisualSetup();
-        }
-      };
-      const runDeferredVisualSetup = (): void => {
-        if (recoveryActivated || deferredVisualSetupComplete) {
-          return;
-        }
-
-        if (!deferredVisualSetupActive) {
-          deferredVisualSetupActive = true;
-          deferredVisualTaskQueue = [
-            {
-              label: 'scene chrome',
-              run: () => {
-                renderSceneChrome();
-              }
-            },
-            {
-              label: 'ambient sky',
-              run: () => {
-                this.drawStarfield(width, height, sceneThemeProfile, scheduleSeed, variant, deploymentProfileId, reducedMotion);
-              }
-            },
-            {
-              label: 'presentation decorations',
-              run: () => {
-                if (episodePresentationShell) {
-                  hydrateEpisodePresentationDecorations(episodePresentationShell, sceneThemeProfile);
-                  syncAmbientSkyReservedFrames();
-                }
-              }
-            }
-          ];
-        }
-
-        try {
-          drainDeferredVisualSetup();
-        } catch (error) {
-          console.error('MenuScene deferred visual setup failed.', error);
-          completeDeferredVisualSetup();
-        }
-      };
-      const scheduleDeferredVisualSetup = (): void => {
-        if (recoveryActivated || deferredVisualSetupComplete || deferredVisualSetupQueued) {
-          return;
-        }
-
-        deferredVisualSetupQueued = true;
-        this.time.delayedCall(0, () => {
-          deferredVisualSetupQueued = false;
-          runDeferredVisualSetup();
-        });
-      };
-      const scheduleIntentRuntimeSession = (episode: MazeEpisode): void => {
-        intentRuntimeBootstrap?.remove(false);
-        intentRuntimeBootstrap = this.time.delayedCall(0, () => {
-          if (recoveryActivated || !episodePresentationShell || patternFrame?.episode !== episode) {
-            return;
-          }
-
-          intentRuntimeSession = createMenuIntentRuntimeSession(episode, contentProfileId);
-          renderDemo();
-        });
-      };
-      const publishVisualDiagnostics = (
-        view?: DemoWalkerViewFrame,
-        renderedTrail?: { start: number; limit: number }
-      ): void => {
-        if (!visualCaptureConfig.enabled || !episodePresentationShell) {
-          return;
-        }
-
-        const themeProfile = resolveAmbientThemeProfile(this.activeTheme, launchConfig.design);
-        const trailRender = episodePresentationShell.boardRenderer.getTrailRenderDiagnostics();
-        const bootTiming = buildBootTimingReport();
-        const activeEpisode = patternFrame?.episode;
-        const activePath = activeEpisode?.raster.pathIndices;
-        const presentedBoardBounds = resolveBoardPresentationBounds(
-          episodePresentationShell.layout,
-          demoPresentation.frameOffsetX,
-          demoPresentation.frameOffsetY
-        );
-        const renderedHeadIndex = renderedTrail && activePath && renderedTrail.limit > 0
-          ? activePath[renderedTrail.limit - 1] ?? null
-          : null;
-        const trailHeadAttached = isTrailHeadAttachedToActor(trailRender);
-        const expectedTrailHeadIndex = view
-          ? resolveLiveTrailHeadIndex(view)
-          : null;
-        const titleBounds = activeTitleContainer ? toVisualSceneBounds(activeTitleContainer.getBounds()) : undefined;
-        const titlePlateBounds = activeTitlePlateContainer ? toVisualSceneBounds(activeTitlePlateContainer.getBounds()) : undefined;
-        const titleTextBounds = activeTitleText ? toVisualSceneBounds(activeTitleText.getBounds()) : undefined;
-        const subtitleBounds = activeTitleSubtitle ? toVisualSceneBounds(activeTitleSubtitle.getBounds()) : undefined;
-        const subtitleGapBelowTitle = subtitleBounds && titleTextBounds
-          ? subtitleBounds.top - titleTextBounds.bottom
-          : undefined;
-        const subtitleGapBelowPlate = subtitleBounds && titlePlateBounds
-          ? subtitleBounds.top - titlePlateBounds.bottom
-          : undefined;
-        const intentFeedLayout = episodePresentationShell.intentFeedHud.getLayoutSnapshot();
-        const intentFeedBounds = intentFeedLayout.rect
-          ? toVisualSceneBounds({
-            x: intentFeedLayout.rect.left,
-            y: intentFeedLayout.rect.top,
-            width: intentFeedLayout.rect.width,
-            height: intentFeedLayout.rect.height
-          })
-          : undefined;
-        const overlayAlpha = demoPresentation.lifecyclePhase === 'erase-wipe'
-          ? Phaser.Math.Clamp(1 - ease(demoPresentation.eraseWipeProgress), 0, 1)
-          : 1;
-        const actorVisible = demoPresentation.showActor || (demoPresentation.lifecyclePhase === 'erase-wipe' && overlayAlpha > 0.02);
-        const goalVisible = demoPresentation.showGoalMarker;
-        const actorCenter = trailRender.headCenter
-          ? {
-              x: trailRender.headCenter.x + demoPresentation.frameOffsetX,
-              y: trailRender.headCenter.y + demoPresentation.frameOffsetY
-            }
-          : undefined;
-        const goalTileBounds = activeEpisode
-          ? toVisualSceneBounds({
-              x: episodePresentationShell.layout.boardX
-                + (xFromIndex(activeEpisode.raster.endIndex, activeEpisode.raster.width) * episodePresentationShell.layout.tileSize)
-                + demoPresentation.frameOffsetX,
-              y: episodePresentationShell.layout.boardY
-                + (yFromIndex(activeEpisode.raster.endIndex, activeEpisode.raster.width) * episodePresentationShell.layout.tileSize)
-                + demoPresentation.frameOffsetY,
-              width: episodePresentationShell.layout.tileSize,
-              height: episodePresentationShell.layout.tileSize
-            })
-          : undefined;
-        const exitInsetPx = Math.max(
-          0,
-          Math.min(
-            episodePresentationShell.layout.tileSize * 0.48,
-            episodePresentationShell.layout.tileSize * legacyTuning.demo.lifecycle.exitArrivalInsetRatio
-          )
-        );
-        const exitRegionBounds = goalTileBounds
-          ? toVisualSceneBounds({
-              x: goalTileBounds.left + exitInsetPx,
-              y: goalTileBounds.top + exitInsetPx,
-              width: Math.max(1, goalTileBounds.width - (exitInsetPx * 2)),
-              height: Math.max(1, goalTileBounds.height - (exitInsetPx * 2))
-            })
-          : undefined;
-        const actorInsideExitRegion = actorCenter && goalTileBounds
-          ? isPointInsideTileArrivalRegion(
-              actorCenter,
-              goalTileBounds.left,
-              goalTileBounds.top,
-              goalTileBounds.width,
-              legacyTuning.demo.lifecycle.exitArrivalInsetRatio
-            )
-          : false;
-        const visualArrivalLatchMs = activeEpisode
-          ? resolveDemoVisualArrivalLatchMs(activeEpisode, demoConfig)
-          : null;
-        const settleWindowMs = Math.max(0, Math.trunc(legacyTuning.demo.lifecycle.visualArrivalSettleMs));
-        const settleStartMs = visualArrivalLatchMs === null
-          ? null
-          : Math.max(0, visualArrivalLatchMs - settleWindowMs);
-        const settleProgress = visualArrivalLatchMs === null
-          ? 0
-          : settleWindowMs <= 0
-            ? (actorInsideExitRegion ? 1 : 0)
-            : clamp((lastPresentationElapsedMs - (settleStartMs ?? 0)) / Math.max(1, settleWindowMs), 0, 1);
-        const settleRemainingMs = visualArrivalLatchMs === null
-          ? 0
-          : Math.max(0, visualArrivalLatchMs - lastPresentationElapsedMs);
-        const subtitleDiagnostics = activeTitleSubtitle
-          ? {
-            visible: subtitleBounds !== undefined,
-            lineCount: resolveRenderedTextLineCount(activeTitleSubtitle),
-            ...(activeTitleLockupLayout ? { minimumGapBelowTitle: activeTitleLockupLayout.subtitleGap } : {}),
-            ...(subtitleBounds ? { bounds: subtitleBounds } : {}),
-            ...(subtitleGapBelowTitle !== undefined ? { gapBelowTitle: subtitleGapBelowTitle } : {}),
-            ...(subtitleGapBelowPlate !== undefined ? { gapBelowPlate: subtitleGapBelowPlate } : {})
-          }
-          : undefined;
-
-        publishMenuSceneVisualDiagnostics({
-          revision: ++visualDiagnosticsRevision,
-          updatedAt: this.time.now,
-          variant,
-          chrome,
-          ...(deploymentProfileId ? { profile: deploymentProfileId } : {}),
-          ...(launchConfig.design ? { design: launchConfig.design } : {}),
-          theme: this.activeTheme,
-          viewport: {
-            width,
-            height,
-            safeInsets: viewportSafeInsets
-          },
-          board: {
-            bounds: presentedBoardBounds,
-            safeBounds: episodePresentationShell.layout.safeBounds,
-            tileSize: episodePresentationShell.layout.tileSize
-          },
-          title: {
-            expected: titleVisible,
-            visible: titleVisible && titleBounds !== undefined,
-            ...(activeTitleBandFrame ? { frame: activeTitleBandFrame } : {}),
-            ...(titleBounds ? { bounds: titleBounds } : {}),
-            ...(titlePlateBounds ? { plateBounds: titlePlateBounds } : {}),
-            ...(titleTextBounds ? { textBounds: titleTextBounds } : {}),
-            ...(subtitleDiagnostics ? { subtitle: subtitleDiagnostics } : {})
-          },
-          install: {
-            expected: activeInstallState.mode !== 'hidden',
-            visible: activeInstallState.mode !== 'hidden' && activeInstallBounds !== undefined,
-            forced: visualCaptureConfig.forceInstallMode !== undefined,
-            state: activeInstallState.mode,
-            ...(activeInstallFrame ? { frame: activeInstallFrame } : {}),
-            ...(activeInstallBounds ? { bounds: activeInstallBounds } : {})
-          },
-          intentFeed: {
-            visible: intentFeedLayout.visible,
-            dock: intentFeedLayout.dock,
-            compact: intentFeedLayout.compact,
-            statusVisible: intentFeedLayout.statusVisible,
-            statusText: intentFeedLayout.statusText,
-            quickThoughtCount: intentFeedLayout.quickThoughtCount,
-            maxVisibleEvents: intentFeedLayout.maxVisibleEvents,
-            onboardingVisible: intentFeedLayout.onboardingVisible,
-            onboardingLabel: intentFeedLayout.onboardingLabel,
-            riskVisible: intentFeedLayout.riskVisible,
-            nextRiskLabel: intentFeedLayout.nextRiskLabel,
-            ...(intentFeedBounds ? { bounds: intentFeedBounds } : {})
-          },
-          trail: {
-            start: renderedTrail?.start ?? trailRender.trailStart,
-            limit: renderedTrail?.limit ?? trailRender.trailLimit,
-            currentIndex: view?.currentIndex ?? activeEpisode?.raster.startIndex ?? 0,
-            nextIndex: view?.nextIndex ?? activeEpisode?.raster.startIndex ?? 0,
-            progress: view?.progress ?? 0,
-            cue: view?.cue ?? 'spawn',
-            suppressesFuturePreview: expectedTrailHeadIndex === null || (
-              renderedHeadIndex === expectedTrailHeadIndex
-              && (
-                !view
-                || view.currentIndex === view.nextIndex
-                || view.progress <= 0
-                || trailHeadAttached
-              )
-            ),
-            attachedToActor: trailRender.attachedToActor && trailHeadAttached,
-            bridgeRendered: trailRender.bridgeRendered,
-            render: trailRender
-          },
-          attempt: {
-            mode: presentationMode,
-            sequence: demoPresentation.sequence,
-            lifecyclePhase: demoPresentation.lifecyclePhase,
-            ritualPhase: demoPresentation.ritualPhase,
-            elapsedMs: lastModeElapsedMs,
-            presentationElapsedMs: lastPresentationElapsedMs,
-            visualArrivalLatchMs
-          },
-          arrival: {
-            actorVisible,
-            goalVisible,
-            ...(actorCenter ? { actorCenter: toVisualScenePoint(actorCenter) } : {}),
-            ...(goalTileBounds ? { goalCenter: toVisualScenePoint({ x: goalTileBounds.centerX, y: goalTileBounds.centerY }) } : {}),
-            ...(goalTileBounds ? { goalTileBounds } : {}),
-            ...(exitRegionBounds ? { exitRegionBounds } : {}),
-            actorInsideExitRegion,
-            settleProgress,
-            settleRemainingMs,
-            readyToClear: visualArrivalLatchMs !== null && lastPresentationElapsedMs >= visualArrivalLatchMs
-          },
-          paletteReadability: getPaletteReadabilityReport(themeProfile.palette),
-          ...(bootTiming ? { bootTiming } : {}),
-          ...(this.ambientSky
-            ? {
-                ambient: this.ambientSky.getDiagnostics(
-                  Math.min(0, episodePresentationShell.boardAura.depth, episodePresentationShell.boardHalo.depth, episodePresentationShell.boardShade.depth),
-                  activeTitleContainer?.depth,
-                  installChrome?.depth
-                )
-              }
-            : {})
-        });
-      };
-      const resolveInstallChromeLabel = (state: InstallSurfaceState): string => (
-        state.mode === 'manual'
-          ? ((state.instruction ?? 'Add to Home Screen').replace(/^Use\s+/u, ''))
-          : installPromptPending
-            ? 'Installing...'
-            : (compactInstallChrome ? 'Install Mazer' : 'Install Mazer')
-      );
-      const createInstallChromeLabelStyle = (state: InstallSurfaceState) => ({
-        color: state.mode === 'available'
-          ? toColorString(installPromptPending ? MAZER_BRAND_COLORS.frameHighlight : MAZER_BRAND_COLORS.wordmark)
-          : toColorString(MAZER_BRAND_COLORS.support),
-        fontFamily: '"Consolas", "Courier New", monospace',
-        fontSize: `${compactInstallChrome ? 8 : 10}px`,
-        fontStyle: state.mode === 'available' ? 'bold' : 'normal',
-        wordWrap: state.mode === 'manual'
-          ? {
-            width: Math.max(160, Math.min(276, width * (compactInstallChrome ? 0.58 : 0.42))),
-            useAdvancedWrap: true
-          }
-          : undefined
-      });
-      const resolveChromeTextResolution = (): number => resolveHudTextResolution({ width, height });
-      const measureInstallChromeMetrics = (
-        themeProfile: AmbientThemeProfile,
-        state: InstallSurfaceState = activeInstallState
-      ): { compactInstall: boolean; labelText: string; chipWidth: number; chipHeight: number } | undefined => {
-        void themeProfile;
-        if (state.mode === 'hidden') {
-          return undefined;
-        }
-
-        const labelText = resolveInstallChromeLabel(state);
-        const label = applyTextResolution(this.add.text(-4096, -4096, labelText, createInstallChromeLabelStyle(state))
-          .setOrigin(0.5)
-          .setLetterSpacing(compactInstallChrome ? 0 : 2)
-          .setVisible(false)
-          .setAlpha(0), resolveChromeTextResolution());
-        const horizontalChrome = compactInstallChrome ? 58 : 74;
-        const chipWidth = Phaser.Math.Clamp(
-          Math.ceil(label.width + horizontalChrome),
-          state.mode === 'manual' ? 182 : (compactInstallChrome ? 148 : 178),
-          Math.max(
-            state.mode === 'manual' ? 182 : (compactInstallChrome ? 148 : 178),
-            Math.round(width * (state.mode === 'manual' ? (compactInstallChrome ? 0.7 : 0.5) : compactInstallChrome ? 0.46 : 0.3))
-          )
-        );
-        const chipHeight = Math.max(compactInstallChrome ? 26 : 30, Math.ceil(label.height + (compactInstallChrome ? 12 : 16)));
-        label.destroy();
-        return {
-          compactInstall: compactInstallChrome,
-          labelText,
-          chipWidth,
-          chipHeight
-        };
-      };
-      const createEpisodePresentationShell = (
-        episode: MazeEpisode,
-        themeId: PresentationThemeFamily
-      ): EpisodePresentationShell => {
-        const themeProfile = resolveAmbientThemeProfile(themeId, launchConfig.design);
-        const installMetrics = measureInstallChromeMetrics(sceneThemeProfile, activeInstallState);
-        const installTitleReserveRight = installMetrics
-          ? resolveInstallChromeTitleReservePx(sceneLayout, installMetrics.chipWidth)
-          : 0;
-        const titleReserveRight = resolveTitleBandReservedRightPx(
-          width,
-          height,
-          sceneLayout,
-          installTitleReserveRight,
-          deploymentProfileId,
-          launchConfig.design
-        );
-        const titleFrame = titleVisible
-          ? resolveTitleBandFrame(
-            width,
-            sceneLayout,
-            undefined,
-            viewportSafeInsets,
-            deploymentProfileId,
-            titleReserveRight,
-            launchConfig.design
-          )
-          : undefined;
-        const installFrame = installMetrics
-          ? resolveInstallChromeFrame(
-            width,
-            height,
-            sceneLayout,
-            undefined,
-            installMetrics.chipWidth,
-            installMetrics.chipHeight,
-            viewportSafeInsets,
-            titleFrame
-          )
-          : undefined;
-        const boardCompositionFrame = resolveBoardCompositionFrame(
-          width,
-          height,
-          sceneLayout,
-          titleFrame,
-          installFrame,
-          viewportSafeInsets,
-          deploymentProfileId,
-          launchConfig.design
-        );
-        const layout = createBoardLayout(this, episode, {
-          boardScale: sceneLayout.boardScale,
-          safeBounds: boardCompositionFrame
-        });
-        const boardCenterX = layout.boardX + (layout.boardWidth / 2);
-        const boardCenterY = layout.boardY + (layout.boardHeight / 2);
-        // Keep the backdrop field viewport-filling while the board itself stays inside the safe frame.
-        const backdropFrame = resolvePresentationBackdropFrame(width, height, boardCenterX, boardCenterY);
-        const boardShellWidth = Math.max(24, Math.round(layout.boardWidth + (layout.tileSize * 4)));
-        const boardShellHeight = Math.max(24, Math.round(layout.boardHeight + (layout.tileSize * 4)));
-        const boardAuraWidth = Math.max(24, Math.round(layout.boardWidth * 1.18));
-        const boardAuraHeight = Math.max(24, Math.round(layout.boardHeight * 1.14));
-        const boardHaloWidth = Math.max(20, Math.round(layout.boardWidth * 1.06));
-        const boardHaloHeight = Math.max(20, Math.round(layout.boardHeight * 1.06));
-        const signalPriority = legacyTuning.menu.signalPriority;
-        const boardRenderer = new BoardRenderer(this, episode, layout, {
-          theme: {
-            ...themeProfile.boardTheme,
-            trailFillAlphaScale: (themeProfile.boardTheme.trailFillAlphaScale ?? 1) * signalPriority.trailFillAlphaScale,
-            trailGlowAlphaScale: (themeProfile.boardTheme.trailGlowAlphaScale ?? 1) * signalPriority.trailGlowAlphaScale,
-            trailCoreAlphaScale: (themeProfile.boardTheme.trailCoreAlphaScale ?? 1) * signalPriority.trailCoreAlphaScale,
-            goalGlowAlphaScale: (themeProfile.boardTheme.goalGlowAlphaScale ?? 1) * signalPriority.goalGlowAlphaScale,
-            actorHaloAlphaScale: (themeProfile.boardTheme.actorHaloAlphaScale ?? 1) * signalPriority.actorHaloAlphaScale,
-            palette: themeProfile.palette
-          }
-        });
-        boardRenderer.drawBoardChrome();
-
-        const boardAura = this.add.ellipse(
-          backdropFrame.centerX,
-          backdropFrame.centerY,
-          boardAuraWidth,
-          boardAuraHeight,
-          themeProfile.shell.auraColor,
-          0.022
-        ).setOrigin(0.5).setDepth(-2.5).setBlendMode(Phaser.BlendModes.SCREEN);
-        const boardHalo = this.add.ellipse(
-          backdropFrame.centerX,
-          backdropFrame.centerY,
-          boardHaloWidth,
-          boardHaloHeight,
-          themeProfile.shell.haloColor,
-          0.008
-        ).setOrigin(0.5).setDepth(-1.8).setBlendMode(Phaser.BlendModes.SCREEN);
-        const boardShade = this.add.rectangle(
-          backdropFrame.centerX,
-          backdropFrame.centerY,
-          boardShellWidth,
-          boardShellHeight,
-          themeProfile.shell.shadeColor,
-          0.01
-        ).setOrigin(0.5).setDepth(-1.2);
-        const boardVeil = this.add.rectangle(
-          backdropFrame.centerX,
-          backdropFrame.centerY,
-          Math.max(18, layout.boardWidth + 2),
-          Math.max(18, layout.boardHeight + 2),
-          themeProfile.shell.veilColor,
-          0
-        ).setOrigin(0.5).setDepth(7.2);
-        const ritualTuning = legacyTuning.demo.ritual;
-        const ritualCardWidth = clamp(
-          Math.round(layout.boardWidth * ritualTuning.cardWidthRatio),
-          ritualTuning.cardMinWidthPx,
-          ritualTuning.cardMaxWidthPx
-        );
-        const ritualCardY = layout.boardY + Math.max(42, Math.round(layout.boardHeight * 0.22));
-        const ritualCard = this.add.rectangle(
-          boardCenterX,
-          ritualCardY,
-          ritualCardWidth,
-          ritualTuning.cardHeightPx,
-          themeProfile.palette.ui.overlayFill,
-          0
-        ).setOrigin(0.5).setDepth(10.72);
-        const ritualCardStroke = this.add.rectangle(
-          boardCenterX,
-          ritualCardY,
-          ritualCardWidth,
-          ritualTuning.cardHeightPx
-        ).setOrigin(0.5).setDepth(10.74).setStrokeStyle(1, themeProfile.palette.ui.overlayStroke, 0);
-        const ritualTitle = applyTextResolution(this.add.text(boardCenterX, ritualCardY - 13, '', {
-          color: `#${themeProfile.palette.ui.text.toString(16).padStart(6, '0')}`,
-          fontFamily: themeProfile.title.fontFamily,
-          fontSize: `${ritualTuning.cardTitleFontPx}px`,
-          fontStyle: 'bold'
-        }).setOrigin(0.5).setAlpha(0).setDepth(10.76), resolveHudTextResolution(resolveSceneViewport(this)));
-        const ritualSubtitle = applyTextResolution(this.add.text(boardCenterX, ritualCardY + 9, '', {
-          color: `#${themeProfile.palette.ui.textDim.toString(16).padStart(6, '0')}`,
-          fontFamily: themeProfile.title.fontFamily,
-          fontSize: `${ritualTuning.cardSubtitleFontPx}px`,
-          align: 'center',
-          wordWrap: { width: ritualCardWidth - 28, useAdvancedWrap: true }
-        }).setOrigin(0.5).setAlpha(0).setDepth(10.76), resolveHudTextResolution(resolveSceneViewport(this)));
-        const blueprintAccent = this.add.graphics().setDepth(7.1).setBlendMode(Phaser.BlendModes.SCREEN);
-        const motifPrimary = this.add.graphics().setDepth(5.8);
-        const motifSecondary = this.add.graphics().setDepth(6.15);
-
-        return {
-          layout,
-          boardCenterX,
-          boardCenterY,
-          boardRenderer,
-          demoStatusHud: createDemoStatusHud(this, layout, {
-            reducedMotion,
-            chrome,
-            profile: deploymentProfileId,
-            theme: {
-              ...themeProfile.hudTheme,
-              railAlphaScale: 0,
-              modeAlphaScale: 0,
-              metaAlphaScale: (themeProfile.hudTheme.metaAlphaScale ?? 1) * 0.44,
-              flashAlphaScale: 0,
-              palette: themeProfile.palette
-            }
-          }),
-          intentFeedHud: createIntentFeedHud(this, {
-            palette: themeProfile.palette,
-            profile: deploymentProfileId
-          }),
-          boardAura,
-          boardHalo,
-          boardShade,
-          boardVeil,
-          ritualCard,
-          ritualCardStroke,
-          ritualTitle,
-          ritualSubtitle,
-          blueprintAccent,
-          motifPrimary,
-          motifSecondary
-        };
-      };
-      episodePresentationShell = createEpisodePresentationShell(patternFrame.episode, demoCyclePlan.theme);
-      const layout = episodePresentationShell.layout;
-      const syncAmbientSkyReservedFrames = (): void => {
-        this.ambientSky?.setReservedFrames(
-          episodePresentationShell?.layout.boardBounds,
-          episodePresentationShell?.layout.tileSize,
-          activeTitleBandFrame,
-          activeInstallFrame
-        );
-      };
-      syncAmbientSkyReservedFrames();
-      const renderInstallChrome = (state: InstallSurfaceState = getInstallSurfaceState()): void => {
-        installChrome ??= this.add.container(0, 0).setDepth(11);
-        const resolvedState = resolveMenuSceneInstallSurfaceState(state, visualCaptureConfig);
-        installChrome.removeAll(true);
-        activeInstallState = resolvedState;
-        activeInstallBounds = undefined;
-        activeInstallFrame = undefined;
-
-        if (resolvedState.mode === 'hidden') {
-          installChrome.setVisible(false);
-          return;
-        }
-
-        const installMetrics = measureInstallChromeMetrics(sceneThemeProfile, resolvedState);
-        if (!installMetrics) {
-          installChrome.setVisible(false);
-          return;
-        }
-
-        const { compactInstall, labelText, chipWidth, chipHeight } = installMetrics;
-        const label = applyTextResolution(this.add.text(0, 0, labelText, createInstallChromeLabelStyle(resolvedState))
-          .setOrigin(0, 0.5)
-          .setLetterSpacing(compactInstall ? 1 : 2), resolveChromeTextResolution());
-        const installFrame = resolveInstallChromeFrame(
-          width,
-          height,
-          sceneLayout,
-          layout,
-          chipWidth,
-          chipHeight,
-          viewportSafeInsets,
-          activeTitleBandFrame
-        );
-        activeInstallFrame = installFrame;
-
-        installChrome.setVisible(true);
-        installChrome.setPosition(installFrame.centerX, installFrame.centerY);
-
-        const closeDiameter = compactInstall ? 16 : 20;
-        const markSize = compactInstall ? 16 : 20;
-        const closeInset = compactInstall ? 10 : 14;
-        const contentLeft = -(chipWidth / 2) + (compactInstall ? 12 : 14);
-        const markX = contentLeft + (markSize / 2);
-        const labelX = markX + (markSize / 2) + (compactInstall ? 8 : 10);
-        const closeX = (chipWidth / 2) - closeInset;
-        const labelMaxWidth = Math.max(72, closeX - labelX - (compactInstall ? 10 : 14));
-
-        const shadow = this.add.rectangle(0, 2, chipWidth + 2, chipHeight + 2, sceneThemeProfile.title.plateShadowColor, 0.03);
-        const chip = this.add.rectangle(
-          0,
-          0,
-          chipWidth,
-          chipHeight,
-          MAZER_BRAND_COLORS.shell,
-          resolvedState.mode === 'manual'
-            ? 0.82
-            : installPromptPending
-              ? 0.86
-              : 0.87
-        ).setStrokeStyle(
-          1,
-          MAZER_BRAND_COLORS.frame,
-          resolvedState.mode === 'manual'
-            ? 0.4
-            : installPromptPending
-              ? 0.62
-              : 0.52
-        );
-        const accent = this.add.rectangle(
-          0,
-          -(chipHeight / 2) + 4,
-          Math.max(18, chipWidth - 20),
-          2,
-          MAZER_BRAND_COLORS.route,
-          resolvedState.mode === 'manual' ? 0.16 : 0.24
-        );
-        const brandMark = createMazerBrandMark(this, markSize, 0.98)
-          .setPosition(markX, 0)
-          .setScale(compactInstall ? 0.88 : 0.96);
-        label.setPosition(labelX, 0).setFixedSize(labelMaxWidth, 0);
-        const closeButton = this.add.container(closeX, 0);
-        const closeHit = this.add.circle(0, 0, closeDiameter / 2, MAZER_BRAND_COLORS.shell, 0.01)
-          .setStrokeStyle(1, MAZER_BRAND_COLORS.muted, 0.24);
-        const closeGlyph = applyTextResolution(
-          this.add.text(0, -1, '×', {
-            color: toColorString(MAZER_BRAND_COLORS.support),
-            fontFamily: '"Bahnschrift SemiCondensed", "Trebuchet MS", "Segoe UI", sans-serif',
-            fontSize: `${compactInstall ? 12 : 14}px`,
-            fontStyle: 'bold'
-          }).setOrigin(0.5).setAlpha(0.84),
-          resolveChromeTextResolution()
-        );
-        closeButton.add([closeHit, closeGlyph]);
-
-        if (resolvedState.mode === 'available' && !installPromptPending) {
-          const setChipState = (hovered: boolean): void => {
-            chip.setFillStyle(
-              MAZER_BRAND_COLORS.shell,
-              hovered ? 0.94 : 0.89
-            );
-            chip.setStrokeStyle(1, MAZER_BRAND_COLORS.frame, hovered ? 0.64 : 0.46);
-            label.setAlpha(hovered ? 1 : 0.96);
-          };
-
-          chip.setInteractive({ useHandCursor: true });
-          chip.on('pointerover', () => {
-            setChipState(true);
-          });
-          chip.on('pointerout', () => {
-            setChipState(false);
-          });
-          chip.on('pointerup', () => {
-            if (installPromptPending) {
-              return;
-            }
-
-            installPromptPending = true;
-            renderInstallChrome();
-            void promptInstallSurface()
-              .catch((error) => {
-                console.error('MenuScene install prompt failed open.', error);
-              })
-              .finally(() => {
-                installPromptPending = false;
-                renderInstallChrome();
-              });
-          });
-          setChipState(false);
-        } else {
-          label.setAlpha(resolvedState.mode === 'manual' ? 0.94 : 0.82);
-        }
-
-        const applyCloseState = (hovered: boolean): void => {
-          closeHit.setStrokeStyle(1, MAZER_BRAND_COLORS.frameHighlight, hovered ? 0.44 : 0.24);
-          closeGlyph.setAlpha(hovered ? 1 : 0.84);
-        };
-        closeHit.setInteractive({ useHandCursor: true });
-        closeHit.on('pointerover', () => {
-          applyCloseState(true);
-        });
-        closeHit.on('pointerout', () => {
-          applyCloseState(false);
-        });
-        closeHit.on('pointerup', () => {
-          installPromptPending = false;
-          dismissInstallSurface();
-          renderInstallChrome();
-        });
-        applyCloseState(false);
-
-        installChrome.add([shadow, chip, accent, brandMark, label, closeButton]);
-        activeInstallBounds = toVisualSceneBounds(installChrome.getBounds());
-        syncAmbientSkyReservedFrames();
-      };
-      const renderTitleChrome = (): void => {
-        const hadActiveTitle = Boolean(activeTitleContainer || activeTitleShadowContainer);
-        const titleTweenTargets = [activeTitleShadowContainer, activeTitleContainer]
-          .filter((target): target is Phaser.GameObjects.Container => Boolean(target));
-        if (titleTweenTargets.length > 0) {
-          this.tweens.killTweensOf(titleTweenTargets);
-        }
-        activeTitleShadowContainer?.destroy(true);
-        activeTitleContainer?.destroy(true);
-        activeTitleBandFrame = undefined;
-        activeTitleLockupLayout = undefined;
-        activeTitleShadowContainer = undefined;
-        activeTitleContainer = undefined;
-        activeTitlePlateContainer = undefined;
-        activeTitleText = undefined;
-        activeTitleSubtitle = undefined;
-        if (!titleVisible) {
-          return;
-        }
-
-        const installMetrics = measureInstallChromeMetrics(sceneThemeProfile, activeInstallState);
-        const installTitleReserveRight = installMetrics
-          ? resolveInstallChromeTitleReservePx(sceneLayout, installMetrics.chipWidth)
-          : 0;
-        const titleReserveRight = resolveTitleBandReservedRightPx(
-          width,
-          height,
-          sceneLayout,
-          installTitleReserveRight,
-          deploymentProfileId,
-          launchConfig.design
-        );
-        const titleBandFrame = resolveTitleBandFrame(
-          width,
-          sceneLayout,
-          layout,
-          viewportSafeInsets,
-          deploymentProfileId,
-          titleReserveRight,
-          launchConfig.design
-        );
-        const titleLockup = resolveTitleLockupLayout(
-          layout,
-          sceneLayout,
-          titleBandFrame,
-          variant,
-          chrome,
-          deploymentProfileId,
-          launchConfig.design
-        );
-        let titleY = titleLockup.titleY;
-        let titleShadowY = titleLockup.titleShadowY;
-        activeTitleBandFrame = titleBandFrame;
-        activeTitleLockupLayout = titleLockup;
-        const titleShadowContainer = this.add.container(titleLockup.titleX, titleShadowY).setDepth(6.9);
-        const titleContainer = this.add.container(titleLockup.titleX, titleY).setDepth(9);
-        const titlePlateContainer = this.add.container(0, 0);
-        const titleAlpha = variantProfile.titleAlpha * chromeProfile.titleAlpha * deploymentProfile.titleAlphaScale;
-        const signatureAlpha = variantProfile.signatureAlpha * chromeProfile.signatureAlpha * deploymentProfile.signatureAlphaScale;
-        const plateAlpha = Math.min(0.14, variantProfile.plateAlpha * chromeProfile.plateAlpha * deploymentProfile.plateAlphaScale * 0.9);
-        const panelAlpha = Math.min(0.11, variantProfile.panelAlpha * chromeProfile.panelAlpha * deploymentProfile.panelAlphaScale * 0.64);
-        const titleShadowAlpha = Math.min(0.07, 0.05 * titleAlpha);
-        const titleFontFamily = '"Bahnschrift SemiCondensed", "Trebuchet MS", "Segoe UI", sans-serif';
-        const supportFontFamily = '"Consolas", "Courier New", monospace';
-        const titleStrokeWidth = 1;
-        const emblemSize = Math.round(titleLockup.plateHeight * 0.46);
-        const emblemOffsetX = -Math.round(titleLockup.plateWidth * 0.25);
-        const titleOffsetX = Math.round(titleLockup.plateWidth * 0.065);
-        titlePlateContainer.add([
-          this.add.rectangle(0, 0, titleLockup.plateWidth, titleLockup.plateHeight, MAZER_BRAND_COLORS.shell, plateAlpha)
-            .setStrokeStyle(1, MAZER_BRAND_COLORS.frame, 0.62 * titleAlpha),
-          this.add.rectangle(0, 0, titleLockup.plateWidth - 12, titleLockup.plateHeight - 10, sceneThemeProfile.title.plateInnerColor, panelAlpha)
-            .setStrokeStyle(1, MAZER_BRAND_COLORS.frameHighlight, 0.26 * titleAlpha),
-          this.add.rectangle(
-            0,
-            -(titleLockup.plateHeight / 2) + 5,
-            titleLockup.plateWidth - 20,
-            2,
-            MAZER_BRAND_COLORS.route,
-            0.22 * titleAlpha
-          )
-        ]);
-        titlePlateContainer.add(
-          createMazerBrandMark(this, emblemSize, 0.98)
-            .setPosition(emblemOffsetX, -Math.round(titleLockup.plateHeight * 0.02))
-        );
-        titleShadowContainer.add([
-          applyTextResolution(this.add.text(titleOffsetX + 1, 1, legacyTuning.menu.title.text, {
-            color: toColorString(MAZER_BRAND_COLORS.wordmarkShadow),
-            fontFamily: titleFontFamily,
-            fontSize: `${titleLockup.titleFontSize}px`,
-            fontStyle: 'bold'
-          }).setOrigin(0.5).setLetterSpacing(titleLockup.titleLetterSpacing).setAlpha(titleShadowAlpha), resolveChromeTextResolution())
-        ]);
-        const title = applyTextResolution(this.add.text(titleOffsetX, -Math.round(titleLockup.plateHeight * 0.08), legacyTuning.menu.title.text, {
-          color: toColorString(MAZER_BRAND_COLORS.wordmark),
-          fontFamily: titleFontFamily,
-          fontSize: `${titleLockup.titleFontSize}px`,
-          fontStyle: 'bold'
-        }).setOrigin(0.5).setLetterSpacing(titleLockup.titleLetterSpacing)
-          .setAlpha(Math.min(1, titleAlpha * 1.04))
-          .setStroke(toColorString(MAZER_BRAND_COLORS.wordmarkShadow), titleStrokeWidth), resolveChromeTextResolution());
-        const subtitle = applyTextResolution(this.add.text(0, titleLockup.subtitleTopOffsetY, TITLE_SIGNATURE_TEXT, {
-          color: toColorString(MAZER_BRAND_COLORS.support),
-          fontFamily: supportFontFamily,
-          fontSize: `${titleLockup.subtitleFontSize}px`
-        }).setOrigin(0.5, 0)
-          .setAlpha(Math.min(0.74, signatureAlpha))
-          .setLetterSpacing(titleLockup.subtitleLetterSpacing), resolveChromeTextResolution());
-
-        titlePlateContainer.add(title);
-        titleContainer.add([titlePlateContainer, subtitle]);
-
-        const titleBounds = titleContainer.getBounds();
-        const overflowTop = titleBandFrame.top - titleBounds.top;
-        const overflowBottom = titleBounds.bottom - titleBandFrame.bottom;
-        const titleShiftY = overflowBottom > 0
-          ? -Math.ceil(overflowBottom)
-          : overflowTop > 0
-            ? Math.ceil(overflowTop)
-            : 0;
-        if (titleShiftY !== 0) {
-          titleY += titleShiftY;
-          titleShadowY += titleShiftY;
-          titleContainer.y = titleY;
-          titleShadowContainer.y = titleShadowY;
-        }
-
-        activeTitleShadowContainer = titleShadowContainer;
-        activeTitleContainer = titleContainer;
-        activeTitlePlateContainer = titlePlateContainer;
-        activeTitleText = title;
-        activeTitleSubtitle = subtitle;
-        if (reducedMotion || chrome === 'minimal' || hadActiveTitle) {
-          titleContainer.setAlpha(1).setScale(1);
-          titleShadowContainer.setAlpha(1).setScale(1);
-          return;
-        }
-
-        titleContainer.setAlpha(0);
-        titleContainer.y -= 8;
-        titleContainer.setScale(0.992);
-        titleShadowContainer.setAlpha(0);
-        titleShadowContainer.y -= 4;
-        titleShadowContainer.setScale(1);
-        runOptional('title motion', () => {
-          this.tweens.add({
-            targets: titleContainer,
-            alpha: 1,
-            y: titleY,
-            scaleX: 1,
-            scaleY: 1,
-            duration: 760,
-            ease: 'Cubic.easeOut'
-          });
-          this.tweens.add({
-            targets: titleShadowContainer,
-            alpha: 1,
-            y: titleShadowY,
-            duration: 640,
-            ease: 'Cubic.easeOut'
-          });
-        });
-      };
-      const renderSceneChrome = (): void => {
-        if (deferredSceneChromeReady) {
-          return;
-        }
-
-        deferredSceneChromeReady = true;
-        renderTitleChrome();
-        renderInstallChrome();
-        removeInstallSurfaceListener = subscribeInstallSurface((state) => {
-          try {
-            renderTitleChrome();
-            renderInstallChrome(state);
-          } catch (error) {
-            console.error('MenuScene optional install surface skipped.', error);
-          }
-        });
-        syncAmbientSkyReservedFrames();
-      };
-
-      let lastCue: DemoWalkerCue = 'spawn';
-      let lastModeElapsedMs = 0;
-      let lastPresentationElapsedMs = 0;
-      let demoConfig = resolveDemoConfig(patternFrame.episode, demoCyclePlan, presentationMode, contentProfileId);
-      let demoPresentation = resolveMenuDemoPresentation(
-        patternFrame.episode,
-        demoCyclePlan,
-        0,
-        demoConfig,
-        variant,
-        deploymentProfileId,
-        launchConfig.design
-      );
-      const applyPresentationLayer = (presentation: MenuDemoPresentation): void => {
-        const shell = episodePresentationShell;
-        if (!shell) {
-          return;
-        }
-
-        const themeProfile = resolveAmbientThemeProfile(presentation.theme, launchConfig.design);
-        const offsetX = sanitizeOffset(presentation.frameOffsetX);
-        const offsetY = sanitizeOffset(presentation.frameOffsetY);
-        shell.boardRenderer.setPresentationOffset(offsetX, offsetY);
-        runOptional('board chrome', () => {
-          shell.boardAura.setPosition(shell.boardCenterX + offsetX, shell.boardCenterY + offsetY)
-            .setAlpha(presentation.boardAuraAlpha)
-            .setScale(presentation.boardAuraScale);
-          shell.boardHalo.setPosition(shell.boardCenterX + offsetX, shell.boardCenterY + offsetY)
-            .setAlpha(presentation.boardHaloAlpha)
-            .setScale(presentation.boardHaloScale);
-          shell.boardShade.setPosition(shell.boardCenterX + offsetX, shell.boardCenterY + offsetY)
-            .setAlpha(presentation.boardShadeAlpha * 0.22);
-          shell.boardVeil.setPosition(shell.boardCenterX + offsetX, shell.boardCenterY + offsetY)
-            .setAlpha(presentation.boardVeilAlpha * 0.18);
-          shell.motifPrimary.setPosition(shell.layout.boardX + offsetX, shell.layout.boardY + offsetY)
-            .setAlpha(presentation.motifPrimaryAlpha);
-          shell.motifSecondary.setPosition(shell.layout.boardX + offsetX, shell.layout.boardY + offsetY)
-            .setAlpha(presentation.motifSecondaryAlpha);
-          shell.blueprintAccent.setPosition(shell.layout.boardX + offsetX, shell.layout.boardY + offsetY)
-            .setAlpha(resolveBlueprintAccentAlpha(presentation, themeProfile));
-        });
-        runOptional('ritual overlay', () => {
-          // presentation.ritualPhase === 'fail' remains part of the lifecycle contract even with the card hidden.
-          const ritualY = shell.layout.boardY + offsetY + Math.max(42, Math.round(shell.layout.boardHeight * 0.22));
-          const ritualScale = reducedMotion ? 1 : 0.992;
-
-          shell.ritualCard
-            .setPosition(shell.boardCenterX + offsetX, ritualY)
-            .setScale(ritualScale)
-            .setAlpha(0);
-          shell.ritualCardStroke
-            .setPosition(shell.boardCenterX + offsetX, ritualY)
-            .setScale(ritualScale)
-            .setAlpha(0);
-          shell.ritualTitle
-            .setPosition(shell.boardCenterX + offsetX, ritualY - 13)
-            .setScale(ritualScale)
-            .setText('')
-            .setAlpha(0);
-          shell.ritualSubtitle
-            .setPosition(shell.boardCenterX + offsetX, ritualY + 9)
-            .setScale(ritualScale)
-            .setText('')
-            .setAlpha(0);
-        });
-      };
-      const renderBoardPresentation = (
-        shell: EpisodePresentationShell,
-        episode: MazeEpisode,
-        presentation: MenuDemoPresentation,
-        view: DemoWalkerViewFrame,
-        renderedTrail: { start: number; limit: number },
-        boardState: MenuRuntimeBoardState | null
-      ): void => {
-        const overlayAlpha = presentation.lifecyclePhase === 'erase-wipe'
-          ? Phaser.Math.Clamp(1 - ease(presentation.eraseWipeProgress), 0, 1)
-          : 1;
-        const showTrailOverlay = presentation.showTrail || (presentation.lifecyclePhase === 'erase-wipe' && overlayAlpha > 0.02);
-        const showActorOverlay = presentation.showActor || (presentation.lifecyclePhase === 'erase-wipe' && overlayAlpha > 0.02);
-
-        shell.boardRenderer.drawBase({
-          solutionPathAlpha: presentation.solutionPathAlpha,
-          lifecycle: presentation.lifecyclePhase === 'build-reveal' || presentation.lifecyclePhase === 'pre-roll' || presentation.lifecyclePhase === 'settle-in'
-            ? {
-              phase: 'build',
-              progress: presentation.buildRevealProgress,
-              reducedMotion
-            }
-            : presentation.lifecyclePhase === 'erase-wipe'
-              ? {
-                phase: 'erase',
-                progress: presentation.eraseWipeProgress,
-                reducedMotion
-              }
-              : undefined
-        });
-
-        if (presentation.showStartMarker) {
-          shell.boardRenderer.drawStart(view.cue);
-        } else {
-          shell.boardRenderer.clearStart();
-        }
-
-        if (presentation.showGoalMarker) {
-          shell.boardRenderer.drawGoal(view.cue);
-        } else {
-          shell.boardRenderer.clearGoal();
-        }
-
-        if (showTrailOverlay) {
-          shell.boardRenderer.drawTrail(episode.raster.pathIndices, {
-            cue: view.cue,
-            limit: renderedTrail.limit,
-            start: renderedTrail.start,
-            emphasis: presentationMode === 'play' ? 'player' : 'demo',
-            persistentTrail: presentation.persistentTrail,
-            persistentFadeFloor: presentation.persistentFadeFloor,
-            pulseBoost: presentation.trailPulseBoost,
-            alphaScale: overlayAlpha,
-            activeMotion: view.currentIndex === view.nextIndex
-              ? undefined
-              : {
-                fromIndex: view.currentIndex,
-                toIndex: view.nextIndex,
-                progress: view.progress
-              }
-          });
-        } else {
-          shell.boardRenderer.clearTrail();
-        }
-
-        const telegraphs = boardState?.telegraphs ?? [];
-        shell.boardRenderer.drawMechanicTelegraphs(telegraphs, {
-          compact: presentationMode === 'play'
-        });
-
-        if (!showActorOverlay) {
-          shell.boardRenderer.clearActor();
-          return;
-        }
-
-        if (view.currentIndex === view.nextIndex || view.progress <= 0 || presentation.lifecyclePhase === 'settle-in') {
-          shell.boardRenderer.drawActor(view.currentIndex, view.direction, view.cue, presentation.actorPulseBoost, overlayAlpha);
-          return;
-        }
-
-        shell.boardRenderer.drawActorMotion(
-          view.currentIndex,
-          view.nextIndex,
-          view.progress,
-          view.direction,
-          view.cue,
-          presentation.actorPulseBoost,
-          overlayAlpha
-        );
-      };
-      const applyEpisodePresentation = (): void => {
-        if (!patternFrame) {
-          return;
-        }
-
-        destroyEpisodePresentationShell();
-        this.activeTheme = demoCyclePlan.theme;
-        episodePresentationShell = createEpisodePresentationShell(patternFrame.episode, demoCyclePlan.theme);
-        intentRuntimeSession = undefined;
-        scheduleIntentRuntimeSession(patternFrame.episode);
-        if (deferredVisualSetupComplete) {
-          hydrateEpisodePresentationDecorations(
-            episodePresentationShell,
-            resolveAmbientThemeProfile(demoCyclePlan.theme, launchConfig.design)
-          );
-        }
-        syncAmbientSkyReservedFrames();
-        playLoopState = resetPlayLoopState(playLoopState, presentationMode);
-        demoConfig = resolveDemoConfig(patternFrame.episode, demoCyclePlan, presentationMode, contentProfileId);
-        demoPresentation = resolveMenuDemoPresentation(
-          patternFrame.episode,
-          demoCyclePlan,
-          0,
-          demoConfig,
-          variant,
-          deploymentProfileId,
-          launchConfig.design
-        );
-        lastCue = 'spawn';
-        recoveryEpisode = patternFrame.episode;
-        beginTelemetryRun(
-          patternFrame.episode,
-          demoPresentation.lifecyclePhase === 'pre-roll' ? 'pre-roll' : 'build'
-        );
-        applyPresentationLayer(demoPresentation);
-        renderBoardPresentation(
-          episodePresentationShell,
-          patternFrame.episode,
-          demoPresentation,
-          resolveDemoWalkerViewFrame(patternFrame.episode, 0, demoConfig, demoPresentation.trailWindow),
-          { start: 0, limit: 1 },
-          null
-        );
-        if (!reducedMotion) {
-          episodePresentationShell.boardRenderer.startAmbientMotion(
-            demoPresentation.ambientDriftPxX,
-            demoPresentation.ambientDriftPxY,
-            demoPresentation.ambientDriftMs
-          );
-        }
-      };
-      applyEpisodePresentation();
-
-      const accentCueBeat = (cue: DemoWalkerCue): void => {
-        const shell = episodePresentationShell;
-        if (reducedMotion || recoveryActivated || !shell) {
-          return;
-        }
-
-        const pulseBoard = (shadeFrom: number, haloFrom: number, auraFrom: number, duration: number, scaleFrom = 1.015): void => {
-          this.tweens.killTweensOf([shell.boardShade, shell.boardHalo, shell.boardAura]);
-          this.tweens.add({
-            targets: shell.boardShade,
-            alpha: { from: shadeFrom, to: shell.boardShade.alpha },
-            duration,
-            ease: 'Quad.easeOut'
-          });
-          this.tweens.add({
-            targets: shell.boardHalo,
-            alpha: { from: haloFrom, to: shell.boardHalo.alpha },
-            scaleX: { from: scaleFrom, to: shell.boardHalo.scaleX },
-            scaleY: { from: scaleFrom, to: shell.boardHalo.scaleY },
-            duration,
-            ease: 'Quad.easeOut'
-          });
-          this.tweens.add({
-            targets: shell.boardAura,
-            alpha: { from: auraFrom, to: shell.boardAura.alpha },
-            scaleX: { from: scaleFrom + 0.01, to: shell.boardAura.scaleX },
-            scaleY: { from: scaleFrom + 0.01, to: shell.boardAura.scaleY },
-            duration: duration + 60,
-            ease: 'Quad.easeOut'
-          });
-        };
-
-        if (cue === 'goal') {
-          pulseBoard(0.1, 0.08, 0.1, 280, 1.012);
-        }
-      };
-      const resolvePresentationElapsedMs = (episode: MazeEpisode, elapsedMs: number, presentation: MenuDemoPresentation): number => (
-        resolveDemoPresentationElapsedMs(episode, elapsedMs, demoConfig, presentation)
-      );
-      const appendControlTelemetry = (
-        control: 'keyboard' | 'touch' | 'restart' | 'pause' | 'toggle_thoughts',
-        actionKind?: HumanInputAction['kind']
-      ): void => {
-        appendTelemetryEvent('control_used', {
-          control,
-          ...(actionKind ? { actionKind } : {}),
-          source: presentationMode === 'play' ? 'play-shell' : 'watch-shell'
-        });
-      };
-      const restartPlayAttempt = (): void => {
-        if (!patternFrame) {
-          return;
-        }
-
-        finalizeTelemetryRun('aborted');
-        playLoopState = resetPlayLoopState(playLoopState, presentationMode);
-        resetPlayInputDiagnostics();
-        syncPlayInputQueueDepth();
-        lastProjectionState = null;
-        lastThoughtEventSignature = '';
-        lastMemoryEventSignature = '';
-        lastHazardEventSignature = '';
-        beginTelemetryRun(patternFrame.episode, 'build');
-      };
-      const applyRuntimeMode = (nextMode: PresentationMode): void => {
-        if (nextMode === presentationMode) {
-          return;
-        }
-
-        const previousMode = presentationMode;
-        finalizeTelemetryRun('aborted');
-        presentationMode = nextMode;
-        playLoopState = resetPlayLoopState(playLoopState, presentationMode);
-        pendingHumanActions.length = 0;
-        resetPlayInputDiagnostics();
-        syncPlayInputQueueDepth();
-        resetTouchInputState(touchInputState);
-        touchControlsVisible = false;
-        touchControlsChrome?.root.setVisible(false);
-        appendTelemetryEvent('settings_changed', {
-          setting: 'mode',
-          previousValue: previousMode,
-          nextValue: nextMode
-        }, {
-          runId: `scene-${sceneInstanceId}-settings`,
-          attemptNo: 0
-        });
-
-        if (!patternEngine) {
-          return;
-        }
-
-        pendingWatchFrame = undefined;
-        patternEngine.resumeFresh();
-        applyPatternFrame(patternEngine.next(0));
-      };
-      const createTouchButtonChrome = (
-        control: HumanInputAction['kind']
-      ): TouchControlButtonChrome => {
-        const container = this.add.container(0, 0);
-        const shadow = this.add.rectangle(0, 3, 48, 48, sceneThemeProfile.title.plateShadowColor, 0.1);
-        const body = this.add.rectangle(0, 0, 48, 48, sceneThemeProfile.title.buttonFillColor, 0.2)
-          .setStrokeStyle(1, sceneThemeProfile.title.buttonStrokeColor, 0.32);
-        const label = applyTextResolution(this.add.text(0, 0, TOUCH_CONTROL_TEXT[control], {
-          color: sceneThemeProfile.title.signatureColor,
-          fontFamily: sceneThemeProfile.title.fontFamily,
-          fontSize: `${Math.max(12, Math.round(legacyTuning.menu.intentFeed.statusFontPx * 0.94))}px`,
-          fontStyle: 'bold'
-        }).setOrigin(0.5), resolveChromeTextResolution());
-
-        container.add([shadow, body, label]);
-        return {
-          control,
-          container,
-          shadow,
-          body,
-          label
-        };
-      };
-      const ensureTouchControlsChrome = (): TouchControlChrome => {
-        if (touchControlsChrome) {
-          return touchControlsChrome;
-        }
-
-        const root = this.add.container(0, 0).setDepth(11.45).setVisible(false);
-        const buttons = Object.fromEntries(
-          ['move_up', 'move_down', 'move_left', 'move_right', 'pause', 'restart_attempt', 'toggle_thoughts']
-            .map((control) => [control, createTouchButtonChrome(control as HumanInputAction['kind'])])
-        ) as Record<HumanInputAction['kind'], TouchControlButtonChrome>;
-
-        root.add(Object.values(buttons).map((button) => button.container));
-        touchControlsChrome = {
-          root,
-          buttons
-        };
-        return touchControlsChrome;
-      };
-      const renderTouchControls = (): void => {
-        if (!touchInputSupported || presentationMode !== 'play') {
-          touchControlsVisible = false;
-          touchInputState = createTouchInputState();
-          touchControlsChrome?.root.setVisible(false);
-          return;
-        }
-
-        const chrome = ensureTouchControlsChrome();
-        const layout = resolveTouchControlLayout(
-          { width, height },
-          {
-            safeInsets: viewportSafeInsets,
-            compact: sceneLayout.isTiny || sceneLayout.isNarrow || sceneLayout.isPortrait
-          }
-        );
-
-        if (!touchControlsVisible) {
-          touchInputState = createTouchInputState();
-          touchControlsVisible = true;
-        }
-
-        chrome.root.setVisible(true);
-
-        const updateButton = (control: HumanInputAction['kind'], shortLabel: string): void => {
-          const button = chrome.buttons[control];
-          const rect = layout.controls[control];
-          const isActive = (touchInputState.activePointerCountByControl.get(control) ?? 0) > 0;
-          const bodyAlpha = isActive ? 0.34 : 0.22;
-          const strokeAlpha = isActive ? 0.72 : 0.24;
-
-          button.container.setPosition(rect.centerX, rect.centerY);
-          button.shadow
-            .setSize(rect.width + 6, rect.height + 6)
-            .setAlpha(isActive ? 0.24 : 0.16);
-          button.body
-            .setSize(rect.width, rect.height)
-            .setFillStyle(sceneThemeProfile.title.buttonFillColor, bodyAlpha)
-            .setStrokeStyle(1, sceneThemeProfile.title.buttonStrokeColor, strokeAlpha);
-          button.label
-            .setText(shortLabel)
-            .setFontSize(Math.max(12, Math.round(rect.height * 0.42)))
-            .setAlpha(isActive ? 1 : 0.92);
-        };
-
-        updateButton('move_up', TOUCH_CONTROL_TEXT.move_up);
-        updateButton('move_down', TOUCH_CONTROL_TEXT.move_down);
-        updateButton('move_left', TOUCH_CONTROL_TEXT.move_left);
-        updateButton('move_right', TOUCH_CONTROL_TEXT.move_right);
-        updateButton('pause', TOUCH_CONTROL_TEXT.pause);
-        updateButton('restart_attempt', TOUCH_CONTROL_TEXT.restart_attempt);
-        updateButton('toggle_thoughts', TOUCH_CONTROL_TEXT.toggle_thoughts);
-      };
-      const advancePlayLoop = (episode: MazeEpisode, deltaMs: number): void => {
-        const path = episode.raster.pathIndices;
-        const lastCursor = Math.max(0, path.length - 1);
-        const safeDeltaMs = Math.max(0, deltaMs);
-        const prioritizedControlIndex = pendingHumanActions.findIndex((action) => !isMovementActionKind(action.kind));
-        if (prioritizedControlIndex > 0) {
-          const [prioritizedControl] = pendingHumanActions.splice(prioritizedControlIndex, 1);
-          if (prioritizedControl) {
-            pendingHumanActions.unshift(prioritizedControl);
-          }
-        }
-        syncPlayInputQueueDepth();
-
-        while (pendingHumanActions.length > 0) {
-          const queuedAction = pendingHumanActions[0];
-          if (!queuedAction) {
-            pendingHumanActions.shift();
-            syncPlayInputQueueDepth();
-            continue;
-          }
-
-          if (queuedAction.kind === 'pause') {
-            pendingHumanActions.shift();
-            syncPlayInputQueueDepth();
-            playLoopState = {
-              ...playLoopState,
-              paused: !playLoopState.paused
-            };
-            playInputDiagnostics.lastConsumedAtMs = this.time.now;
-            appendControlTelemetry('pause', queuedAction.kind);
-            if (playLoopState.paused) {
-              return;
-            }
-            continue;
-          }
-
-          if (queuedAction.kind === 'restart_attempt') {
-            pendingHumanActions.shift();
-            syncPlayInputQueueDepth();
-            playInputDiagnostics.lastConsumedAtMs = this.time.now;
-            appendControlTelemetry('restart', queuedAction.kind);
-            restartPlayAttempt();
-            return;
-          }
-
-          if (queuedAction.kind === 'toggle_thoughts') {
-            pendingHumanActions.shift();
-            syncPlayInputQueueDepth();
-            playLoopState = {
-              ...playLoopState,
-              thoughtsVisible: !playLoopState.thoughtsVisible
-            };
-            playInputDiagnostics.lastConsumedAtMs = this.time.now;
-            appendControlTelemetry('toggle_thoughts', queuedAction.kind);
-            continue;
-          }
-
-          break;
-        }
-
-        if (playLoopState.paused) {
-          pendingHumanActions.length = 0;
-          syncPlayInputQueueDepth();
-          return;
-        }
-
-        if (playLoopState.buildElapsedMs < demoConfig.cadence.spawnHoldMs) {
-          playLoopState = {
-            ...playLoopState,
-            buildElapsedMs: Math.min(demoConfig.cadence.spawnHoldMs, playLoopState.buildElapsedMs + safeDeltaMs)
-          };
-          return;
-        }
-
-        if (playLoopState.motion) {
-          const moveDurationMs = Math.max(72, Math.round(demoConfig.cadence.exploreStepMs * PLAY_MOVE_ANIMATION_RATIO));
-          const nextProgress = Math.min(1, playLoopState.motion.progress + (safeDeltaMs / moveDurationMs));
-
-          if (nextProgress >= 1) {
-            playLoopState = {
-              ...playLoopState,
-              pathCursor: playLoopState.motion.toCursor,
-              motion: null,
-              clearElapsedMs: playLoopState.motion.toCursor >= lastCursor ? 1 : playLoopState.clearElapsedMs
-            };
-          } else {
-            playLoopState = {
-              ...playLoopState,
-              motion: {
-                ...playLoopState.motion,
-                progress: nextProgress
-              }
-            };
-          }
-          return;
-        }
-
-        if (playLoopState.pathCursor >= lastCursor) {
-          playLoopState = {
-            ...playLoopState,
-            clearElapsedMs: playLoopState.clearElapsedMs + safeDeltaMs
-          };
-          return;
-        }
-
-        while (pendingHumanActions.length > 0) {
-          const action = pendingHumanActions.shift();
-          syncPlayInputQueueDepth();
-          if (!action) {
-            continue;
-          }
-
-          const currentCursor = playLoopState.pathCursor;
-          const currentIndex = path[currentCursor] ?? episode.raster.startIndex;
-          const nextCursor = Math.min(lastCursor, currentCursor + 1);
-          const previousCursor = Math.max(0, currentCursor - 1);
-          const nextIndex = path[nextCursor] ?? currentIndex;
-          const previousIndex = path[previousCursor] ?? currentIndex;
-          const forwardDirection = currentCursor < lastCursor
-            ? resolveDirectionBetween(currentIndex, nextIndex, episode.raster.width)
-            : null;
-          const backwardDirection = currentCursor > 0
-            ? resolveDirectionBetween(currentIndex, previousIndex, episode.raster.width)
-            : null;
-          const requestedDirection = action.kind === 'move_up'
-            ? 0
-            : action.kind === 'move_down'
-              ? 1
-              : action.kind === 'move_left'
-                ? 2
-                : 3;
-
-          appendControlTelemetry(action.source === 'touch' ? 'touch' : 'keyboard', action.kind);
-          if (forwardDirection !== null && requestedDirection === forwardDirection) {
-            playLoopState = {
-              ...playLoopState,
-              motion: {
-                fromCursor: currentCursor,
-                toCursor: nextCursor,
-                progress: 0,
-                direction: forwardDirection
-              }
-            };
-            playInputDiagnostics.lastConsumedAtMs = this.time.now;
-            return;
-          }
-
-          if (backwardDirection !== null && requestedDirection === backwardDirection) {
-            playLoopState = {
-              ...playLoopState,
-              motion: {
-                fromCursor: currentCursor,
-                toCursor: previousCursor,
-                progress: 0,
-                direction: backwardDirection
-              }
-            };
-            playInputDiagnostics.lastConsumedAtMs = this.time.now;
-            return;
-          }
-        }
-      };
-      const resolvePlayElapsedMs = (episode: MazeEpisode): number => {
-        const pathSegments = Math.max(1, episode.raster.pathIndices.length - 1);
-        const traverseMs = Math.max(1, pathSegments * Math.max(1, demoConfig.cadence.exploreStepMs));
-        if (playLoopState.buildElapsedMs < demoConfig.cadence.spawnHoldMs) {
-          return playLoopState.buildElapsedMs;
-        }
-
-        if (playLoopState.clearElapsedMs > 0) {
-          return demoConfig.cadence.spawnHoldMs + traverseMs + playLoopState.clearElapsedMs;
-        }
-
-        const progressCursor = playLoopState.motion
-          ? playLoopState.motion.fromCursor + ((playLoopState.motion.toCursor - playLoopState.motion.fromCursor) * playLoopState.motion.progress)
-          : playLoopState.pathCursor;
-
-        return demoConfig.cadence.spawnHoldMs + ((Math.max(0, progressCursor) / pathSegments) * traverseMs);
-      };
-      const resolvePlayHudStatusLabel = (
-        feedState: IntentFeedState | null,
-        boardState: MenuRuntimeBoardState | null
-      ): string | null => {
-        void boardState;
-        const candidate = feedState?.status?.summary ?? null;
-        if (!candidate || candidate.trim().length === 0) {
-          return null;
-        }
-
-        return clampIntentFeedSummary(candidate, touchInputSupported ? 34 : 46);
-      };
-
-      renderDemo = (): void => {
-        const shell = episodePresentationShell;
-        if (!patternFrame || !shell) {
-          return;
-        }
-
-        const episode = patternFrame.episode;
-        const modeElapsedMs = presentationMode === 'play'
-          ? resolvePlayElapsedMs(episode)
-          : patternFrame.t * 1000;
-        demoPresentation = resolveMenuDemoPresentation(
-          episode,
-          demoCyclePlan,
-          modeElapsedMs,
-          demoConfig,
-          variant,
-          deploymentProfileId,
-          launchConfig.design
-        );
-        const presentationElapsedMs = presentationMode === 'play'
-          ? modeElapsedMs
-          : resolvePresentationElapsedMs(episode, patternFrame.t * 1000, demoPresentation);
-        lastModeElapsedMs = Math.max(0, Math.round(modeElapsedMs));
-        lastPresentationElapsedMs = Math.max(0, Math.round(presentationElapsedMs));
-        const view = presentationMode === 'play'
-          ? (
-              playLoopState.buildElapsedMs < demoConfig.cadence.spawnHoldMs
-                ? resolveDemoWalkerViewFrame(
-                    episode,
-                    Math.max(0, playLoopState.buildElapsedMs),
-                    demoConfig,
-                    demoPresentation.trailWindow
-                  )
-                : buildPlayViewFrame(episode, playLoopState, demoPresentation.trailWindow)
-            )
-          : resolveDemoWalkerViewFrame(
-              episode,
-              presentationElapsedMs,
-              demoConfig,
-              demoPresentation.trailWindow
-            );
-        const path = episode.raster.pathIndices;
-        const renderedTrail = presentationMode === 'play'
-          ? {
-              start: view.trailStart,
-              limit: view.trailLimit
-            }
-          : resolveDemoTrailRenderBounds(path, view, demoPresentation.trailWindow);
-        const intentStep = Math.max(0, view.canonicalCursor);
-        lastTrailSegmentCount = Math.max(0, renderedTrail.limit - renderedTrail.start);
-        lastRunnerPolicyTelemetry = view.telemetry;
-        intentRuntimeSession?.advanceToStep(intentStep);
-        const boardState = intentRuntimeSession?.getBoardState(intentStep) ?? null;
-        const resolvedPresentation = boardState
-          && demoPresentation.ritualPhase === 'fail'
-          ? {
-              ...demoPresentation,
-              ritualTitle: boardState.failReasonTitle,
-              ritualSubtitle: boardState.failReasonSubtitle
-            }
-          : demoPresentation;
-        demoPresentation = resolvedPresentation;
-
-        applyPresentationLayer(resolvedPresentation);
-        renderBoardPresentation(shell, episode, resolvedPresentation, view, renderedTrail, boardState);
-        const rawFeedState = resolvedPresentation.showIntentFeed
-          ? (intentRuntimeSession?.getDisplayFeedState(intentStep, this.time.now) ?? null)
-          : null;
-        const normalizedRawFeedState = rawFeedState && contentProfileId === 'core-only'
-          ? (() => {
-              const coreEntries = (rawFeedState.events ?? rawFeedState.entries ?? [])
-                .slice(0, legacyTuning.menu.intentFeed.maxVisibleEntries)
-                .map((entry, slot) => ({
-                  ...entry,
-                  slot,
-                  summary: clampIntentFeedSummary(entry.summary, touchInputSupported ? 30 : 42)
-                }));
-              return {
-                ...rawFeedState,
-                status: rawFeedState.status
-                  ? {
-                      ...rawFeedState.status,
-                      summary: clampIntentFeedSummary(rawFeedState.status.summary, touchInputSupported ? 36 : 54)
-                    }
-                  : rawFeedState.status,
-                entries: coreEntries,
-                events: coreEntries
-              };
-            })()
-          : rawFeedState;
-        const feedStateBase = presentationMode === 'play'
-          ? (
-              playLoopState.thoughtsVisible
-                ? (
-                    normalizedRawFeedState
-                      ? (() => {
-                        const playEntries = (
-                          normalizedRawFeedState.events?.slice(0, legacyTuning.menu.intentFeed.maxVisibleEntries)
-                          ?? normalizedRawFeedState.entries.slice(0, legacyTuning.menu.intentFeed.maxVisibleEntries)
-                        )
-                          .map((entry, slot) => ({
-                            ...entry,
-                            slot,
-                            summary: clampIntentFeedSummary(entry.summary, touchInputSupported ? 26 : 34)
-                          }));
-                        return {
-                          ...normalizedRawFeedState,
-                          status: normalizedRawFeedState.status
-                            ? {
-                                ...normalizedRawFeedState.status,
-                                summary: clampIntentFeedSummary(normalizedRawFeedState.status.summary, touchInputSupported ? 34 : 46)
-                              }
-                            : normalizedRawFeedState.status,
-                          entries: playEntries,
-                          events: playEntries
-                        };
-                      })()
-                      : null
-                  )
-                : (
-                    normalizedRawFeedState?.status
-                      ? {
-                          ...normalizedRawFeedState,
-                          status: {
-                            ...normalizedRawFeedState.status,
-                            summary: clampIntentFeedSummary(normalizedRawFeedState.status.summary, touchInputSupported ? 34 : 46)
-                          },
-                          entries: [],
-                          events: [],
-                          pings: []
-                        }
-              : null
-                  )
-            )
-          : normalizedRawFeedState;
-        const feedState = contentProfileId === 'core-only' && presentationMode !== 'play'
-          ? applyRunnerThoughtOverlay(feedStateBase, view.cue, episode.seed, view.canonicalCursor)
-          : feedStateBase;
-
-        runOptional('hud metadata', () => {
-          shell.demoStatusHud.setState(
-            episode,
-            resolvedPresentation.mood,
-            resolvedPresentation.sequence,
-            resolvedPresentation.variant,
-            resolvedPresentation.metadataAlpha * 0.36,
-            0,
-            `${presentationMode.toUpperCase()} | ${resolvedPresentation.phaseLabel}`,
-            resolvedPresentation.hudOffsetX,
-            resolvedPresentation.hudOffsetY
-          );
-        });
-        runOptional('intent feed', () => {
-          const trailDiagnostics = shell.boardRenderer.getTrailRenderDiagnostics();
-          const presentedBoardBounds = resolveBoardPresentationBounds(
-            shell.layout,
-            resolvedPresentation.frameOffsetX,
-            resolvedPresentation.frameOffsetY
-          );
-          const fallbackPlayerX = shell.layout.boardX
-            + (xFromIndex(view.currentIndex, episode.raster.width) * shell.layout.tileSize)
-            + (shell.layout.tileSize / 2);
-          const fallbackPlayerY = shell.layout.boardY
-            + (yFromIndex(view.currentIndex, episode.raster.width) * shell.layout.tileSize)
-            + (shell.layout.tileSize / 2);
-          const objectiveX = shell.layout.boardX
-            + (xFromIndex(episode.raster.endIndex, episode.raster.width) * shell.layout.tileSize)
-            + (shell.layout.tileSize / 2);
-          const objectiveY = shell.layout.boardY
-            + (yFromIndex(episode.raster.endIndex, episode.raster.width) * shell.layout.tileSize)
-            + (shell.layout.tileSize / 2);
-          const anchorSize = legacyTuning.menu.intentFeed.anchorSizePx;
-          lastIntentFeedDiagnostics = summarizeMenuSceneRuntimeFeed({
-            step: feedState?.step ?? null,
-            status: toRuntimeFeedStatus(feedState),
-            visibleEntries: toRuntimeFeedEntries(feedState),
-            previous: lastIntentFeedDiagnostics,
-            nowMs: this.time.now
-          });
-          lastIntentEntryCount = lastIntentFeedDiagnostics.visibleEntryCount;
-
-          shell.intentFeedHud.setState(feedState, {
-            player: {
-              x: (trailDiagnostics.headCenter?.x ?? fallbackPlayerX) + resolvedPresentation.frameOffsetX,
-              y: (trailDiagnostics.headCenter?.y ?? fallbackPlayerY) + resolvedPresentation.frameOffsetY,
-              width: anchorSize,
-              height: anchorSize
-            },
-            objective: {
-              x: objectiveX + resolvedPresentation.frameOffsetX,
-              y: objectiveY + resolvedPresentation.frameOffsetY,
-              width: anchorSize,
-              height: anchorSize
-            },
-            board: {
-              x: presentedBoardBounds.centerX,
-              y: presentedBoardBounds.centerY,
-              width: presentedBoardBounds.width,
-              height: presentedBoardBounds.height
-            },
-            title: activeTitleBandFrame
-              ? {
-                x: activeTitleBandFrame.centerX,
-                y: activeTitleBandFrame.centerY,
-                width: activeTitleBandFrame.width,
-                height: activeTitleBandFrame.height
-              }
-              : undefined,
-            install: activeInstallBounds
-              ? {
-                x: activeInstallBounds.centerX,
-                y: activeInstallBounds.centerY,
-                width: activeInstallBounds.width,
-                height: activeInstallBounds.height
-              }
-              : undefined,
-            avoid: [
-              ...(activeTitleBandFrame
-                ? [{
-                  x: activeTitleBandFrame.centerX,
-                  y: activeTitleBandFrame.centerY,
-                  width: activeTitleBandFrame.width,
-                  height: activeTitleBandFrame.height
-                }]
-                : []),
-              ...(activeInstallBounds
-                ? [{
-                  x: activeInstallBounds.centerX,
-                  y: activeInstallBounds.centerY,
-                  width: activeInstallBounds.width,
-                  height: activeInstallBounds.height
-                }]
-                : [])
-            ]
-          }, {
-            statusLabel: presentationMode === 'play'
-              ? resolvePlayHudStatusLabel(feedState, boardState)
-              : null
-          });
-          renderTouchControls();
-        });
-        const projectionState = resolveRunProjectionStateFromPresentation(resolvedPresentation);
-        const leadSummary = feedState?.entries[0]?.summary ?? feedState?.status?.summary ?? resolvedPresentation.phaseLabel;
-        const leadKind = feedState?.entries[0]?.kind ?? feedState?.status?.kind ?? null;
-        const failReason = resolvedPresentation.ritualPhase === 'fail' && boardState
-          ? `${boardState.failReasonTitle}: ${boardState.failReasonSubtitle}`
-          : resolvedPresentation.ritualPhase === 'fail' && resolvedPresentation.ritualTitle.length > 0
-            ? `${resolvedPresentation.ritualTitle}: ${resolvedPresentation.ritualSubtitle}`
-            : null;
-        lastProjection = createRunProjection({
-          runId: telemetryCurrentRunId ?? `scene-${sceneInstanceId}`,
-          mazeId: telemetryCurrentMazeId ?? `maze-${episode.seed.toString(16)}`,
-          attemptNo: telemetryCurrentAttemptNo,
-          elapsedMs: Math.max(0, Math.round(modeElapsedMs)),
-          mode: resolvePlayRunMode(presentationMode),
-          state: projectionState,
-          failReason,
-          compactThought: leadSummary,
-          riskLevel: resolveRunProjectionRiskLevel(projectionState, boardState),
-          progressPct: resolveRunProjectionProgressPct(resolvedPresentation, path.length, renderedTrail.limit),
-          miniMapHash: hashProjectionSignature(
-            episode.seed,
-            projectionState,
-            intentStep,
-            renderedTrail.limit,
-            boardState?.telegraphs.map((telegraph) => `${telegraph.kind}:${telegraph.id}:${telegraph.active ? '1' : '0'}`).join(',') ?? 'none'
-          ),
-          updatedAt: new Date().toISOString()
-        });
-        if (projectionState !== lastProjectionState) {
-          if (projectionState === 'failed' && failReason) {
-            appendTelemetryEvent('fail_reason', {
-              failReason,
-              stage: resolvedPresentation.lifecyclePhase
-            });
-          }
-          if (projectionState === 'failed') {
-            finalizeTelemetryRun('failed');
-          } else if (projectionState === 'cleared') {
-            finalizeTelemetryRun('cleared');
-          }
-          lastProjectionState = projectionState;
-        }
-
-        const thoughtSignature = `${lastIntentFeedDiagnostics.signature}|${projectionState}`;
-        if (feedState && lastIntentFeedDiagnostics.signature.length > 0 && thoughtSignature !== lastThoughtEventSignature) {
-          lastThoughtEventSignature = thoughtSignature;
-          appendTelemetryEvent('thought_shown', {
-            compactThought: leadSummary,
-            density: lastIntentFeedDiagnostics.visibleEntryCount > 1 ? 'richer' : 'sparse'
-          });
-        }
-
-        const recallEntry = feedState?.entries.find((entry) => (
-          /\brecall\b|\bmemory\b/i.test(String(entry.kind)) || /\brecall\b|\bmemory\b/i.test(entry.summary)
-        )) ?? null;
-        const recallSummary = recallEntry?.summary ?? (feedState?.status && /\brecall\b|\bmemory\b/i.test(feedState.status.summary)
-          ? feedState.status.summary
-          : null);
-        if (recallSummary && recallSummary !== lastMemoryEventSignature) {
-          lastMemoryEventSignature = recallSummary;
-          appendTelemetryEvent('memory_recalled', {
-            memoryKey: recallEntry?.id ?? leadKind ?? undefined,
-            recalledFrom: recallSummary
-          });
-        }
-
-        const hazardTelegraph = boardState?.telegraphs.find((telegraph) => (
-          telegraph.kind === 'hazard-tile'
-          || telegraph.kind === 'timed-gate'
-          || telegraph.kind === 'patrol-lane'
-          || telegraph.kind === 'pressure-door'
-        )) ?? null;
-        const hazardSignature = hazardTelegraph
-          ? `${hazardTelegraph.id}:${hazardTelegraph.active ? '1' : '0'}:${hazardTelegraph.readiness.toFixed(2)}`
-          : '';
-        if (hazardSignature.length > 0 && hazardSignature !== lastHazardEventSignature) {
-          lastHazardEventSignature = hazardSignature;
-          appendTelemetryEvent('hazard_entered', {
-            hazardId: hazardTelegraph?.id,
-            telegraphStrength: hazardTelegraph && (hazardTelegraph.active || hazardTelegraph.readiness >= 0.72)
-              ? 'stronger'
-              : 'baseline'
-          });
-        }
-        publishVisualDiagnostics(view, renderedTrail);
-        if (view.cue !== lastCue) {
-          runOptional('cue accent', () => {
-            accentCueBeat(view.cue);
-          });
-          lastCue = view.cue;
-        }
-      };
-      const applyPatternFrame = (nextFrame: PatternFrame): void => {
-        if (!patternFrame) {
-          patternFrame = nextFrame;
-          pendingWatchFrame = undefined;
-          recoveryEpisode = nextFrame.episode;
-          return;
-        }
-
-        const previousEpisode = patternFrame.episode;
-        try {
-          patternFrame = nextFrame;
-          pendingWatchFrame = undefined;
-          recoveryEpisode = nextFrame.episode;
-          demoCyclePlan = pendingCyclePlan ?? demoCyclePlan;
-          pendingCyclePlan = undefined;
-          applyEpisodePresentation();
-          renderDemo();
-        } catch (error) {
-          failOpen(error);
-        } finally {
-          disposeMazeEpisode(previousEpisode);
-        }
-      };
-      const setSceneHiddenState = (hidden: boolean): void => {
-        if (sceneHidden === hidden) {
-          return;
-        }
-
-        sceneHidden = hidden;
-        visibilityChangeCount += 1;
-        if (hidden) {
-          visibilitySuspendCount += 1;
-          hiddenRecoveryThrottleUntilMs = 0;
-          recentFrameTimesMs.length = 0;
-        }
-
-        const sceneTweens = this.tweens as Phaser.Tweens.TweenManager & {
-          pauseAll?: () => void;
-          resumeAll?: () => void;
-        };
-        const sceneClock = this.time as Phaser.Time.Clock & { paused?: boolean };
-
-        if (hidden) {
-          patternEngine?.suspend();
-          sceneClock.paused = true;
-          sceneTweens.pauseAll?.();
-          ambientSkyDeltaBudgetMs = 0;
-          updatePerformanceMode(true);
-          publishRuntimeDiagnostics(true, true);
-          return;
-        }
-
-        sceneClock.paused = false;
-        sceneTweens.resumeAll?.();
-        ambientSkyDeltaBudgetMs = 0;
-        recentFrameTimesMs.length = 0;
-        hiddenRecoveryThrottleUntilMs = this.time.now + legacyTuning.menu.runtime.postHiddenRecoveryMs;
-        updatePerformanceMode(false, this.time.now);
-        publishRuntimeDiagnostics(false, true);
-      };
-      handleVisibilityChange = (): void => {
-        if (typeof document === 'undefined' || recoveryActivated) {
-          return;
-        }
-
-        if (isDocumentSceneHidden()) {
-          setSceneHiddenState(true);
-          return;
-        }
-
-        if (!sceneHidden) {
-          return;
-        }
-
-        setSceneHiddenState(false);
-        try {
-          patternEngine?.resumeFresh();
-          if (patternEngine) {
-            applyPatternFrame(patternEngine.next(0));
-          }
-        } catch (error) {
-          failOpen(error);
-        }
-      };
-
-      const refreshAfterResize = (nextViewport: ViewportSize): void => {
-        const decision = resolveMenuResizeRecoveryDecision(
-          resolveViewportSize(this.scale.width, this.scale.height, width, height),
-          nextViewport,
-          Math.max(0, this.time.now - sceneStartedAt),
-          lastResizeRestartKey
-        );
-        if (!decision.shouldRestart) {
-          return;
-        }
-
-        lastResizeRestartKey = decision.restartKey ?? lastResizeRestartKey;
-        resizeRestart?.remove(false);
-        resizeRestart = this.time.delayedCall(160, () => {
-          if (recoveryActivated) {
-            renderVisibleRecovery();
-            return;
-          }
-
-          this.scene.restart(launchConfig);
-        });
-      };
-      handleResize = (gameSize): void => {
-        const fallbackViewport = resolveSceneViewport(this);
-        refreshAfterResize(resolveViewportSize(
-          gameSize?.width,
-          gameSize?.height,
-          fallbackViewport.width,
-          fallbackViewport.height
-        ));
-      };
-
-      renderDemo();
-      const keyboardManager = this.input.keyboard;
-      if (keyboardManager) {
-        const handleKeydown = (event: KeyboardEvent): void => {
-          if (isModeToggleKey(event)) {
-            event.preventDefault();
-            applyRuntimeMode(presentationMode === 'watch' ? 'play' : 'watch');
-            return;
-          }
-
-          const action = resolveHumanKeyboardAction(event, this.time.now);
-          if (!action) {
-            return;
-          }
-
-          const decision = inputRepeatGate.inspect(action, this.time.now);
-          if (!decision.accepted) {
-            recordDroppedInput(action, decision.reason ?? 'repeat_blocked', decision.reason === 'repeat_merged');
-            return;
-          }
-
-          if (presentationMode === 'watch') {
-            recordDroppedInput(action, 'watch_ignored');
-            return;
-          }
-
-          enqueueHumanAction(action);
-        };
-
-        keyboardManager.on('keydown', handleKeydown);
-        removeKeyboardInputListener = () => {
-          keyboardManager.off('keydown', handleKeydown);
-        };
-      }
-      if (touchInputSupported) {
-        const inputPlugin = this.input;
-        const handlePointerDown = (pointer: Phaser.Input.Pointer): void => {
-          if (presentationMode !== 'play') {
-            return;
-          }
-
-          const action = resolveHumanTouchAction({
-            x: pointer.x,
-            y: pointer.y,
-            pointerId: pointer.id,
-            timeStamp: this.time.now
-          }, resolveTouchControlLayout(
-            { width, height },
-            {
-              safeInsets: viewportSafeInsets,
-              compact: sceneLayout.isTiny || sceneLayout.isNarrow || sceneLayout.isPortrait
-            }
-          ), touchInputState, this.time.now);
-          if (!action) {
-            return;
-          }
-
-          enqueueHumanAction(action);
-          renderTouchControls();
-        };
-        const handlePointerRelease = (pointer: Phaser.Input.Pointer): void => {
-          releaseTouchPointer(touchInputState, pointer.id);
-          renderTouchControls();
-        };
-        const handleGameOut = (): void => {
-          resetTouchInputState(touchInputState);
-          renderTouchControls();
-        };
-
-        inputPlugin.on(Phaser.Input.Events.POINTER_DOWN, handlePointerDown);
-        inputPlugin.on(Phaser.Input.Events.POINTER_UP, handlePointerRelease);
-        inputPlugin.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, handlePointerRelease);
-        inputPlugin.on(Phaser.Input.Events.GAME_OUT, handleGameOut);
-        removeTouchInputListeners = () => {
-          inputPlugin.off(Phaser.Input.Events.POINTER_DOWN, handlePointerDown);
-          inputPlugin.off(Phaser.Input.Events.POINTER_UP, handlePointerRelease);
-          inputPlugin.off(Phaser.Input.Events.POINTER_UP_OUTSIDE, handlePointerRelease);
-          inputPlugin.off(Phaser.Input.Events.GAME_OUT, handleGameOut);
-        };
-      }
-      markBootTiming('menu-scene:create-core-ready');
-      if (typeof document !== 'undefined') {
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-      }
-      this.scale.on(Phaser.Scale.Events.RESIZE, handleResize);
-      if (sceneHidden) {
-        const sceneTweens = this.tweens as Phaser.Tweens.TweenManager & { pauseAll?: () => void };
-        const sceneClock = this.time as Phaser.Time.Clock & { paused?: boolean };
-        patternEngine?.suspend();
-        sceneClock.paused = true;
-        sceneTweens.pauseAll?.();
-        updatePerformanceMode(true, sceneStartedAt);
-      }
-      publishRuntimeDiagnostics(sceneHidden, true);
-      updateDemo = (_time: number, delta: number): void => {
-        if (sceneHidden) {
-          return;
-        }
-
-        const safeDelta = Math.max(0, Math.min(delta, 250));
-        totalFrameCount += 1;
-        totalFrameTimeMs += safeDelta;
-        worstFrameTimeMs = Math.max(worstFrameTimeMs, safeDelta);
-        if (safeDelta >= legacyTuning.menu.runtime.spikeFrameMs) {
-          totalSpikeCount += 1;
-        }
-        recentFrameTimesMs.push(safeDelta);
-        if (recentFrameTimesMs.length > legacyTuning.menu.runtime.recentFrameWindow) {
-          recentFrameTimesMs.splice(0, recentFrameTimesMs.length - legacyTuning.menu.runtime.recentFrameWindow);
-        }
-        updatePerformanceMode(false);
-
-        if (!firstInteractiveFrameSeen) {
-          firstInteractiveFrameSeen = true;
-          markBootTiming('menu-scene:first-interactive-frame');
-          scheduleDeferredVisualSetup();
-          maybeLogBootTimingReport();
-        }
-
-        if (deferredVisualSetupActive) {
-          drainDeferredVisualSetup();
-        }
-
-        ambientSkyDeltaBudgetMs += safeDelta;
-        if (ambientSkyDeltaBudgetMs >= legacyTuning.menu.runtime.ambientUpdateIntervalMs[performanceMode]) {
-          const delta = Math.min(ambientSkyDeltaBudgetMs, AMBIENT_SKY_MAX_DELTA_MS);
-          ambientSkyDeltaBudgetMs = 0;
-          this.ambientSky?.update(delta);
-        }
-        if (recoveryActivated || !patternEngine) {
-          publishRuntimeDiagnostics(false);
-          return;
-        }
-
-        try {
-          if (presentationMode === 'play') {
-            if (!patternFrame) {
-              const initialFrame = patternEngine.next(0);
-              patternFrame = initialFrame;
-              recoveryEpisode = initialFrame.episode;
-            }
-
-            advancePlayLoop(patternFrame.episode, safeDelta);
-            if (playLoopState.clearElapsedMs > (demoConfig.cadence.goalHoldMs + resolveDemoFadePhaseDurationsMs(demoConfig).totalMs)) {
-              patternEngine.resumeFresh();
-              applyPatternFrame(patternEngine.next(0));
-            } else {
-              renderDemo();
-            }
-            publishRuntimeDiagnostics(false);
-            return;
-          }
-
-          if (!patternFrame) {
-            const initialFrame = pendingWatchFrame ?? patternEngine.next(0);
-            patternFrame = initialFrame;
-            pendingWatchFrame = undefined;
-            recoveryEpisode = initialFrame.episode;
-            renderDemo();
-            publishRuntimeDiagnostics(false);
-            return;
-          }
-
-          const currentCycleDurationMs = resolveDemoCycleDurationMs(patternFrame.episode, demoConfig);
-          if (pendingWatchFrame) {
-            patternFrame = {
-              ...patternFrame,
-              t: patternFrame.t + (safeDelta / 1000)
-            };
-            if ((patternFrame.t * 1000) >= currentCycleDurationMs) {
-              applyPatternFrame(pendingWatchFrame);
-            } else {
-              renderDemo();
-            }
-            publishRuntimeDiagnostics(false);
-            return;
-          }
-
-          const nextFrame = patternEngine.next(safeDelta / 1000);
-          if (nextFrame.episode !== patternFrame.episode) {
-            if ((patternFrame.t * 1000) >= currentCycleDurationMs) {
-              applyPatternFrame(nextFrame);
-            } else {
-              pendingWatchFrame = nextFrame;
-              patternFrame = {
-                ...patternFrame,
-                t: patternFrame.t + (safeDelta / 1000)
-              };
-              renderDemo();
-            }
-            publishRuntimeDiagnostics(false);
-            return;
-          }
-
-          patternFrame = nextFrame;
-          renderDemo();
-          publishRuntimeDiagnostics(false);
-        } catch (error) {
-          failOpen(error);
-        }
-      };
-      this.events.on(Phaser.Scenes.Events.UPDATE, updateDemo);
-      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-        finalizeTelemetryRun('aborted');
-        removeRuntimeListeners();
-        destroyPresentation(true);
-      });
-      markBootTiming('menu-scene:create-end');
-    } catch (error) {
-      failOpen(error);
+    }
+
+    if (this.backdropDirty) {
+      this.drawBackdrop();
+    }
+    if (this.boardStaticDirty) {
+      this.drawStaticBoard();
+    }
+    if (this.boardDynamicDirty) {
+      this.drawDynamicBoard();
+      this.drawHud(time);
+    }
+    if (this.uiDirty) {
+      this.rebuildUi();
     }
   }
 
-  private drawStarfield(
-    width: number,
-    height: number,
-    themeProfile: AmbientThemeProfile,
-    seed: number = legacyTuning.demo.seed,
-    variant: AmbientPresentationVariant = this.presentationVariant,
-    profile = this.launchConfig.profile,
-    reducedMotion = prefersReducedMotion()
-  ): void {
-    const safeWidth = sanitizePositive(width, DEFAULT_VIEWPORT_WIDTH);
-    const safeHeight = sanitizePositive(height, DEFAULT_VIEWPORT_HEIGHT);
-    this.ambientSky?.destroy();
-    this.ambientSky = new AmbientSkyLayer(this, {
-      width: safeWidth,
-      height: safeHeight,
-      seed,
-      themeProfile,
-      variant,
-      profile,
-      reducedMotion
+  private installInput(): void {
+    this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
+      if (event.repeat) {
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        this.handleBackAction();
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'p' && this.mode === 'play') {
+        if (this.overlay === 'pause') {
+          this.closeOverlay();
+        } else if (this.overlay === 'none') {
+          this.openOverlay('pause');
+        }
+        return;
+      }
+
+      if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'none') {
+        this.startPlayMode();
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'o' && this.mode === 'menu' && this.overlay === 'none') {
+        this.openOverlay('options');
+        return;
+      }
+
+      if (this.mode !== 'play' || this.overlay !== 'none') {
+        return;
+      }
+
+      const lower = event.key.toLowerCase();
+      if (lower === 'w' || event.key === 'ArrowUp') {
+        this.tryMovePlayer(0, -1);
+      } else if (lower === 's' || event.key === 'ArrowDown') {
+        this.tryMovePlayer(0, 1);
+      } else if (lower === 'a' || event.key === 'ArrowLeft') {
+        this.tryMovePlayer(-1, 0);
+      } else if (lower === 'd' || event.key === 'ArrowRight') {
+        this.tryMovePlayer(1, 0);
+      }
     });
   }
 
-  private renderRecoveryShell(width: number, height: number, episode?: MazeEpisode): void {
-    const safeWidth = sanitizePositive(width, DEFAULT_VIEWPORT_WIDTH);
-    const safeHeight = sanitizePositive(height, DEFAULT_VIEWPORT_HEIGHT);
-    const themeProfile = resolveAmbientThemeProfile(this.activeTheme, this.launchConfig.design);
-    const viewportSafeInsets = resolveViewportSafeInsets();
-    const layoutModel = resolveMenuPresentationModel(
-      safeWidth,
-      safeHeight,
-      this.presentationVariant,
-      'full',
-      true,
-      this.launchConfig.profile,
-      viewportSafeInsets,
-      this.launchConfig.design
+  private refreshLayout(): void {
+    const width = this.scale.width;
+    const height = this.scale.height;
+    const isPortrait = height > width;
+    const baseBoardSize = Math.min(
+      width * (isPortrait ? 0.82 : 0.44),
+      height * (isPortrait ? 0.64 : 0.77)
     );
+    const boardScaleFactor = clamp(1 + (this.settings.camScale * 0.01), 0.55, 1.48);
+    const boardSize = Math.max(300, Math.round(baseBoardSize * boardScaleFactor));
+    const tileSize = Math.max(4, Math.floor((boardSize - (BOARD_FRAME_PADDING * 2)) / this.maze.size));
+    const snappedBoardSize = tileSize * this.maze.size;
+    const boardLeft = Math.round((width - snappedBoardSize) / 2);
+    const boardTop = Math.round(Math.max(54, (height - snappedBoardSize) * 0.11));
 
-    this.drawStarfield(safeWidth, safeHeight, themeProfile, legacyTuning.demo.seed, this.presentationVariant, this.launchConfig.profile, true);
-    this.add.text(safeWidth / 2, Math.max(56, safeHeight * 0.18), legacyTuning.menu.title.text, {
-      color: themeProfile.title.titleColor,
-      fontFamily: themeProfile.title.fontFamily,
-      fontSize: `${Math.max(32, Math.round(Math.min(safeWidth, safeHeight) * 0.08))}px`,
-      fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(20);
-    this.add.text(safeWidth / 2, Math.max(100, safeHeight * 0.26), '\u00b0 by fawxzzy', {
-      color: themeProfile.title.signatureColor,
-      fontFamily: themeProfile.title.signatureFontFamily,
-      fontSize: '14px'
-    }).setOrigin(0.5).setDepth(20);
-    this.add.text(safeWidth / 2, Math.max(132, safeHeight * 0.32), 'recovery demo', {
-      color: themeProfile.title.supportColor,
-      fontFamily: themeProfile.title.supportFontFamily,
-      fontSize: '12px'
-    }).setOrigin(0.5).setDepth(20);
+    this.layout = {
+      width,
+      height,
+      boardLeft,
+      boardTop,
+      boardSize: snappedBoardSize,
+      tileSize,
+      buttonY: Math.round(boardTop + snappedBoardSize + Math.min(56, Math.max(28, (height - (boardTop + snappedBoardSize)) * 0.55))),
+      buttonWidth: Math.round(Math.min(350, Math.max(180, width * 0.12))),
+      buttonHeight: 64
+    };
 
-    if (!episode) {
+    this.titleShadow
+      .setPosition(width / 2, boardTop + (tileSize * 6.2))
+      .setFontSize(Math.max(56, Math.round(snappedBoardSize * 0.17)));
+    this.titleText
+      .setPosition(width / 2, boardTop + (tileSize * 6))
+      .setFontSize(Math.max(56, Math.round(snappedBoardSize * 0.17)));
+    this.footerText.setPosition(width / 2, height - 22);
+
+    this.boardStaticDirty = true;
+    this.boardDynamicDirty = true;
+    this.backdropDirty = true;
+    this.uiDirty = true;
+  }
+
+  private rebuildMaze(): void {
+    this.maze = createLegacyMaze(this.settings.scale, this.mazeSeed);
+    this.player = copyPoint(this.maze.start);
+    this.demoCursor = Math.min(6, Math.max(0, this.maze.solutionPath.length - 1));
+    this.trail = buildPathTrail(this.maze.solutionPath.slice(0, this.demoCursor + 1), null);
+    this.nextDemoMoveAtMs = 0;
+    this.pendingMazeRebuild = false;
+    this.boardStaticDirty = true;
+    this.boardDynamicDirty = true;
+    this.uiDirty = true;
+  }
+
+  private regenerateMaze(): void {
+    this.mazeSeed = (this.mazeSeed + 1) >>> 0;
+    this.rebuildMaze();
+  }
+
+  private enterMenuMode(): void {
+    this.mode = 'menu';
+    this.overlay = 'none';
+    this.overlayReturn = 'none';
+    this.regenerateMaze();
+  }
+
+  private startPlayMode(): void {
+    this.mode = 'play';
+    this.overlay = 'none';
+    this.overlayReturn = 'none';
+    this.player = copyPoint(this.maze.start);
+    this.trail = [copyPoint(this.player)];
+    this.playStartedAtMs = this.time.now;
+    this.boardDynamicDirty = true;
+    this.uiDirty = true;
+  }
+
+  private updateMenuDemo(time: number): void {
+    if (time < this.nextDemoMoveAtMs) {
       return;
     }
 
-    try {
-      const layout = createBoardLayout(this, episode, {
-        boardScale: Math.min(0.72, layoutModel.layout.boardScale),
-        topReserve: Math.max(140, Math.round(safeHeight * 0.34)),
-        sidePadding: Math.max(12, layoutModel.layout.sidePadding + 8),
-        bottomPadding: Math.max(20, layoutModel.layout.bottomPadding)
-      });
-      const recoveryBoard = new BoardRenderer(this, episode, layout, {
-        theme: {
-          ...themeProfile.boardTheme,
-          palette: themeProfile.palette
+    const path = this.maze.solutionPath;
+    if (path.length === 0) {
+      this.regenerateMaze();
+      return;
+    }
+
+    if (this.demoCursor >= path.length - 1) {
+      this.nextDemoMoveAtMs = time + DEMO_REGEN_HOLD_MS;
+      this.regenerateMaze();
+      return;
+    }
+
+    this.demoCursor += 1;
+    const nextPoint = path[this.demoCursor];
+    if (!nextPoint) {
+      return;
+    }
+
+    this.player = copyPoint(nextPoint);
+    this.trail = buildPathTrail(
+      path.slice(0, this.demoCursor + 1),
+      this.settings.toggleTrailFade ? TRAIL_FADE_TAIL : null
+    );
+    this.nextDemoMoveAtMs = time + DEMO_STEP_MS;
+    this.boardDynamicDirty = true;
+  }
+
+  private tryMovePlayer(deltaX: number, deltaY: number): void {
+    const next = movePoint(this.player, deltaX, deltaY);
+    if (!isWalkableTile(this.maze, next)) {
+      return;
+    }
+
+    this.player = next;
+    this.trail.push(copyPoint(this.player));
+    if (this.settings.toggleTrailFade && this.trail.length > TRAIL_FADE_TAIL) {
+      this.trail = this.trail.slice(this.trail.length - TRAIL_FADE_TAIL);
+    }
+
+    if (next.x === this.maze.goal.x && next.y === this.maze.goal.y) {
+      this.enterMenuMode();
+      return;
+    }
+
+    this.boardDynamicDirty = true;
+  }
+
+  private createStars(): void {
+    const starCount = 170;
+    this.stars = Array.from({ length: starCount }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      radius: 0.8 + (Math.random() * 2.3),
+      speed: 0.014 + (Math.random() * 0.05),
+      alpha: 0.28 + (Math.random() * 0.6)
+    }));
+  }
+
+  private updateStars(delta: number): void {
+    const speedScale = this.settings.darkMode ? 0.24 : 0.42;
+    for (const star of this.stars) {
+      star.y += star.speed * (delta / 1000) * speedScale;
+      if (star.y > 1.05) {
+        star.y = -0.05;
+        star.x = Math.random();
+      }
+    }
+
+    this.backdropDirty = true;
+  }
+
+  private drawBackdrop(): void {
+    const { width, height } = this.layout;
+    this.backdropGraphics.clear();
+
+    const fieldColor = this.settings.darkMode ? 0x22172d : 0x2a1c3a;
+    const glowColor = this.settings.darkMode ? 0x3d2a52 : 0x4e356d;
+
+    this.backdropGraphics.fillStyle(fieldColor, 1);
+    this.backdropGraphics.fillRect(0, 0, width, height);
+    this.backdropGraphics.fillStyle(glowColor, 0.78);
+    this.backdropGraphics.fillCircle(width * 0.24, height * 0.22, Math.min(width, height) * 0.22);
+    this.backdropGraphics.fillCircle(width * 0.76, height * 0.24, Math.min(width, height) * 0.18);
+    this.backdropGraphics.fillCircle(width * 0.52, height * 0.76, Math.min(width, height) * 0.16);
+
+    for (const star of this.stars) {
+      this.backdropGraphics.fillStyle(0xffffff, star.alpha);
+      this.backdropGraphics.fillRect(
+        Math.round(star.x * width),
+        Math.round(star.y * height),
+        Math.max(1, Math.round(star.radius)),
+        Math.max(1, Math.round(star.radius))
+      );
+    }
+
+    this.backdropDirty = false;
+  }
+
+  private drawStaticBoard(): void {
+    const { boardLeft, boardTop, boardSize, tileSize } = this.layout;
+    const pathColor = linearColorToNumber(this.settings.pathColor);
+    const wallColor = linearColorToNumber(this.settings.wallColor);
+    const boardFill = this.settings.darkMode ? 0x221d25 : 0x4a454d;
+    const boardEdge = this.settings.darkMode ? 0x0f0b10 : 0x2f2830;
+    const pathGlow = this.settings.darkMode ? 0xb3acb8 : 0xd0cad2;
+
+    this.boardStaticGraphics.clear();
+    this.boardStaticGraphics.fillStyle(0x000000, 0.28);
+    this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardSize, boardSize);
+    this.boardStaticGraphics.fillStyle(boardEdge, 1);
+    this.boardStaticGraphics.fillRect(boardLeft - 6, boardTop - 8, boardSize + 12, boardSize + 12);
+    this.boardStaticGraphics.fillStyle(boardFill, 0.96);
+    this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
+
+    for (let y = 0; y < this.maze.size; y += 1) {
+      for (let x = 0; x < this.maze.size; x += 1) {
+        const tileX = boardLeft + (x * tileSize);
+        const tileY = boardTop + (y * tileSize);
+        const walkable = this.maze.grid[y]?.[x] === true;
+
+        this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor, 1);
+        this.boardStaticGraphics.fillRect(tileX, tileY, tileSize, tileSize);
+
+        if (walkable) {
+          this.boardStaticGraphics.fillStyle(pathColor, 1);
+          this.boardStaticGraphics.fillRect(
+            tileX + 1,
+            tileY + 1,
+            Math.max(1, tileSize - 2),
+            Math.max(1, tileSize - 2)
+          );
         }
-      });
-      recoveryBoard.drawBoardChrome();
-      recoveryBoard.drawBase();
-      recoveryBoard.drawStart('spawn');
-      recoveryBoard.drawGoal();
-    } catch (error) {
-      console.error('MenuScene recovery board render failed.', error);
+      }
     }
+
+    this.titleText.setVisible(this.mode === 'menu');
+    this.titleShadow.setVisible(this.mode === 'menu');
+    this.boardStaticDirty = false;
   }
-}
 
-export function resolveSceneLayoutProfile(
-  width: number,
-  height: number,
-  variant: AmbientPresentationVariant,
-  chrome: PresentationChrome = DEFAULT_PRESENTATION_CHROME,
-  titleVisible = true,
-  deploymentProfileId?: PresentationDeploymentProfile,
-  safeInsets?: Partial<ViewportSafeInsets> | null,
-  design?: PresentationDesignProfile
-): SceneLayoutProfile {
-  const safeVariant = sanitizePresentationVariant(variant);
-  const safeChrome = CHROME_PROFILES[chrome] ? chrome : DEFAULT_PRESENTATION_CHROME;
-  const chromeProfile = CHROME_PROFILES[safeChrome];
-  const profile = VARIANT_PROFILES[safeVariant];
-  const deploymentProfile = resolveDeploymentPresentationProfile(deploymentProfileId);
-  const recovery = isRecoveryDesignProfile(design);
-  const viewportSafeInsets = sanitizeViewportSafeInsets(safeInsets);
-  const safeWidth = sanitizePositive(width, DEFAULT_VIEWPORT_WIDTH);
-  const safeHeight = sanitizePositive(height, DEFAULT_VIEWPORT_HEIGHT);
-  const safeSideInset = Math.max(viewportSafeInsets.left, viewportSafeInsets.right);
-  const isNarrow = safeWidth <= legacyTuning.menu.layout.narrowBreakpoint;
-  const isPortrait = safeHeight > (safeWidth * 1.12);
-  const isShort = safeHeight < 720;
-  const isTiny = safeWidth < 420 || safeHeight < 260;
-  const boardScale = Phaser.Math.Clamp(
-    (isNarrow ? profile.boardScaleNarrow : profile.boardScaleWide)
-      + chromeProfile.boardScaleBias
-      + deploymentProfile.boardScaleBias
-      + (!titleVisible ? 0.004 : 0)
-      + (isPortrait ? 0.006 + deploymentProfile.portraitBoardScaleBias : 0)
-      + (recovery ? 0.01 : 0)
-      - (isTiny ? 0.026 : 0)
-      - (titleVisible && isNarrow && isPortrait ? 0.01 : 0)
-      - (isShort ? 0.012 : 0),
-    isTiny ? 0.82 : 0.92,
-    Math.min(safeChrome === 'none' ? 0.998 : 0.996, deploymentProfile.maxBoardScale)
-  );
-  let topReserve = Math.max(
-    Math.max(
-      12,
-        profile.topReserveMinPx
-          + chromeProfile.topReserveBias
-          + deploymentProfile.topReserveBias
-          - (recovery ? 10 : 0)
-          + (isPortrait ? 12 + deploymentProfile.portraitTopReserveBias : 0)
-          - (safeVariant === 'ambient' ? 6 : 0)
-          - (isTiny ? 28 : 0)
-        - (!titleVisible ? 12 : 0)
-    ),
-    Math.round(
-      safeHeight
-        * (profile.topReserveRatio + (isPortrait ? 0.024 : 0) - (isShort ? 0.016 : 0) - (isTiny ? 0.04 : 0))
-    ) + chromeProfile.topReserveBias + deploymentProfile.topReserveBias - (recovery ? 10 : 0)
-  ) + viewportSafeInsets.top;
-  let bottomPadding = Math.max(
-    6,
-    profile.bottomPaddingPx
-      + chromeProfile.bottomPaddingBias
-      + deploymentProfile.bottomPaddingBias
-      + (isPortrait ? 4 : 0)
-      + (titleVisible && (deploymentProfileId === 'mobile' || isPortrait) ? 6 : 0)
-      + (safeVariant === 'loading' ? 4 : 0)
-      - (recovery ? 4 : 0)
-      - (isTiny ? 12 : 0)
-  ) + viewportSafeInsets.bottom;
-  const minimumBoardSpan = Math.max(24, Math.round(Math.min(safeWidth, safeHeight) * 0.2));
-  const verticalOverflow = (topReserve + bottomPadding + minimumBoardSpan) - safeHeight;
-  if (verticalOverflow > 0) {
-    const minTopReserve = viewportSafeInsets.top + 12;
-    const minBottomPadding = viewportSafeInsets.bottom + 6;
-    const topReduction = Math.min(verticalOverflow, Math.max(0, topReserve - minTopReserve));
-    topReserve -= topReduction;
-    bottomPadding -= Math.min(verticalOverflow - topReduction, Math.max(0, bottomPadding - minBottomPadding));
-  }
-  const sidePadding = Math.max(
-    2,
-    profile.sidePaddingPx
-      + chromeProfile.sidePaddingBias
-      + deploymentProfile.sidePaddingBias
-      + (isPortrait ? 2 : 0)
-      + (isNarrow ? -2 : 0)
-      - (recovery ? 1 : 0)
-      - (isTiny ? 4 : 0)
-  ) + safeSideInset;
-  const obsSafeVerticalPadding = Math.max(
-    topReserve,
-    bottomPadding,
-    Math.round(safeHeight * 0.05)
-  );
-  const obsSafeSidePadding = Math.max(
-    sidePadding,
-    Math.round(safeWidth * 0.015),
-    12
-  );
+  private drawDynamicBoard(): void {
+    const { boardLeft, boardTop, tileSize } = this.layout;
+    this.boardDynamicGraphics.clear();
 
-  return {
-    isNarrow,
-    isPortrait,
-    isShort,
-    isTiny,
-    boardScale,
-    topReserve: deploymentProfileId === 'obs' ? obsSafeVerticalPadding : topReserve,
-    bottomPadding: deploymentProfileId === 'obs' ? obsSafeVerticalPadding : bottomPadding,
-    sidePadding: deploymentProfileId === 'obs' ? obsSafeSidePadding : sidePadding
-  };
-}
+    const trail = this.mode === 'menu'
+      ? this.trail
+      : buildPathTrail(this.trail, this.settings.toggleTrailFade ? TRAIL_FADE_TAIL : null);
+    const boardOffset = this.resolveBoardOffset();
 
-const roundClampedCadenceMs = (value: number, min: number, max: number): number => (
-  Math.round(clamp(value, min, max))
-);
-
-const resolveTargetTraverseMs = (episode: MazeEpisode, cycle: MenuDemoCycle, pathSegments: number): number => {
-  const difficultyBias = episode.difficulty === 'chill'
-    ? -140
-    : episode.difficulty === 'standard'
-      ? -40
-      : episode.difficulty === 'spicy'
-        ? 90
-        : 170;
-  const sizeBias = episode.size === 'small'
-    ? -120
-    : episode.size === 'medium'
-      ? 0
-      : episode.size === 'large'
-        ? 110
-        : 170;
-  const moodBias = cycle.mood === 'scan'
-    ? -60
-    : cycle.mood === 'blueprint'
-      ? 90
-      : 25;
-
-  return clamp(
-    1420 + Math.min(1200, pathSegments * 24) + difficultyBias + sizeBias + moodBias,
-    1400,
-    3200
-  );
-};
-
-const resolveTargetBuildMs = (episode: MazeEpisode, cycle: MenuDemoCycle): number => {
-  const traceSteps = Math.max(1, episode.generationTrace.steps.length);
-  const sizeBias = episode.size === 'small'
-    ? -70
-    : episode.size === 'medium'
-      ? 0
-      : episode.size === 'large'
-        ? 120
-        : 220;
-  const moodBias = cycle.mood === 'scan'
-    ? 60
-    : cycle.mood === 'blueprint'
-      ? 140
-      : 90;
-
-  return clamp(
-    760 + Math.min(1750, traceSteps * 3.6) + sizeBias + moodBias,
-    920,
-    2500
-  );
-};
-
-export const resolveDemoConfig = (
-  episode: MazeEpisode,
-  cycle: MenuDemoCycle,
-  mode: PresentationMode = 'watch',
-  contentProfile: PresentationContentProfile = 'full'
-): DemoWalkerConfig => {
-  const runnerPolicyEnabled = mode !== 'play' && contentProfile === 'core-only';
-  const runnerPolicySeedConfig: DemoWalkerConfig = {
-    ...legacyTuning.demo,
-    behavior: {
-      ...legacyTuning.demo.behavior,
-      enableRunnerMistakes: runnerPolicyEnabled
+    if (this.maze.start) {
+      this.fillTile(this.boardDynamicGraphics, this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize);
     }
-  };
-  const routeCueOverrides = resolveDemoWalkerCueOverrides(episode, runnerPolicySeedConfig);
-  const pathSegments = Math.max(1, routeCueOverrides.length || (episode.raster.pathIndices.length - 1));
-  const spectatorPlan = createDemoSpectatorPlan(episode, contentProfile);
-  const watchSlowdownFactor = mode === 'play' ? 1 : (1 / 0.75);
-  const buildSlowdownFactor = mode === 'play' ? 1.65 : 3;
-  const baseSpawnHoldMs = legacyTuning.demo.cadence.spawnHoldMs + cycle.pacing.spawnHoldMs + (cycle.mood === 'blueprint' ? 60 : 0);
-  const baseExploreStepMs = legacyTuning.demo.cadence.exploreStepMs + cycle.pacing.exploreStepMs + (cycle.mood === 'scan' ? 8 : 0);
-  const baseGoalHoldMs = legacyTuning.demo.cadence.goalHoldMs + cycle.pacing.goalHoldMs + (episode.difficulty === 'brutal' ? 100 : 0);
-  const baseResetHoldMs = legacyTuning.demo.cadence.resetHoldMs + cycle.pacing.resetHoldMs + (cycle.mood === 'solve' ? 18 : 0);
-  const targetExploreStepMs = (resolveTargetTraverseMs(episode, cycle, pathSegments) / pathSegments) * watchSlowdownFactor;
-  const targetBuildMs = resolveTargetBuildMs(episode, cycle) * buildSlowdownFactor;
-  const spawnHoldMs = roundClampedCadenceMs(
-    Math.max(
-      targetBuildMs,
-      baseSpawnHoldMs
-        + (pathSegments <= 10 ? 34 : pathSegments >= 28 ? 10 : 20)
-        + (episode.size === 'small' ? 18 : episode.size === 'huge' ? -10 : 0)
-    ),
-    mode === 'play' ? 420 : 920,
-    mode === 'play' ? 1600 : 2500
-  );
-  const exploreStepMs = roundClampedCadenceMs(
-    ((baseExploreStepMs * watchSlowdownFactor) * 0.44) + (targetExploreStepMs * 0.56),
-    mode === 'play' ? 82 : 96,
-    mode === 'play' ? 132 : 176
-  );
-  const goalHoldMs = roundClampedCadenceMs(
-    (baseGoalHoldMs * (mode === 'play' ? 0.42 : 0.72))
-      + Math.min(mode === 'play' ? 180 : 260, pathSegments * (mode === 'play' ? 6 : 7))
-      + (episode.size === 'small' ? -120 : episode.size === 'large' ? 30 : episode.size === 'huge' ? 50 : 0)
-      + (episode.difficulty === 'chill' ? -60 : episode.difficulty === 'brutal' ? 90 : 0),
-    mode === 'play' ? 980 : 2600,
-    mode === 'play' ? 1950 : 3600
-  );
-  const resetHoldMs = roundClampedCadenceMs(
-    ((baseResetHoldMs * (mode === 'play' ? 0.92 : 1.58)) * 1.5)
-      + (pathSegments <= 10 ? 40 : pathSegments >= 28 ? 180 : 110)
-      + (cycle.mood === 'blueprint' ? 36 : cycle.mood === 'scan' ? -20 : 0)
-      + (episode.size === 'small' ? -40 : episode.size === 'huge' ? 90 : 0),
-    mode === 'play' ? 720 : 1120,
-    mode === 'play' ? 1140 : 1980
-  );
-  const totalTraverseMs = exploreStepMs * pathSegments;
-  const segmentWeights = Array.from({ length: pathSegments }, () => 1);
-  const segmentCues: Array<DemoSegmentCue | DemoWalkerCue> = Array.from({ length: pathSegments }, () => 'explore');
-
-  const canonicalToRouteSegment = (canonicalSegmentIndex: number): number => {
-    if (canonicalSegmentIndex <= 0) {
-      return 0;
+    if (this.maze.goal) {
+      this.fillTile(this.boardDynamicGraphics, this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize);
     }
 
-    let canonicalProgress = 0;
-    for (let routeSegmentIndex = 0; routeSegmentIndex < routeCueOverrides.length; routeSegmentIndex += 1) {
-      const cueOverride = routeCueOverrides[routeSegmentIndex];
-      if (cueOverride === 'anticipate' || cueOverride === 'dead-end' || cueOverride === 'backtrack') {
+    for (let index = 0; index < trail.length; index += 1) {
+      const point = trail[index];
+      if (!point) {
         continue;
       }
 
-      canonicalProgress += 1;
-      if (canonicalProgress >= canonicalSegmentIndex) {
-        return routeSegmentIndex;
-      }
+      const alpha = this.mode === 'play'
+        ? clamp(0.25 + ((index / Math.max(1, trail.length - 1)) * 0.75), 0.25, 1)
+        : clamp(0.22 + ((index / Math.max(1, trail.length - 1)) * 0.82), 0.22, 1);
+      this.fillTile(this.boardDynamicGraphics, point, 0x14b8d9, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, alpha, 1);
     }
 
-    return Math.max(0, pathSegments - 1);
-  };
+    this.fillTile(this.boardDynamicGraphics, this.player, 0xf2f4f8, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, 0);
+    this.boardDynamicDirty = false;
+  }
 
-  spectatorPlan.riskWindows.forEach((window) => {
-    const routeSegmentIndex = canonicalToRouteSegment(window.segmentIndex);
-    if (routeSegmentIndex < 0 || routeSegmentIndex >= pathSegments) {
-      return;
+  private resolveBoardOffset(): Phaser.Math.Vector2 {
+    if (this.mode !== 'play' || !this.settings.toggleCameraFollow) {
+      return new Phaser.Math.Vector2(0, 0);
     }
 
-    segmentWeights[routeSegmentIndex] = Math.max(segmentWeights[routeSegmentIndex], window.weight);
-    segmentCues[routeSegmentIndex] = window.cue;
-    if (routeSegmentIndex > 0 && window.cue === 'anticipate') {
-      segmentWeights[routeSegmentIndex - 1] = Math.max(segmentWeights[routeSegmentIndex - 1], 1 + ((window.weight - 1) * 0.42));
-      if (segmentCues[routeSegmentIndex - 1] === 'explore') {
-        segmentCues[routeSegmentIndex - 1] = 'anticipate';
-      }
-    }
-  });
+    const xRatio = this.player.x / Math.max(1, this.maze.size - 1);
+    const yRatio = this.player.y / Math.max(1, this.maze.size - 1);
+    const offsetX = Math.round((0.5 - xRatio) * Math.min(42, this.layout.tileSize * 4));
+    const offsetY = Math.round((0.5 - yRatio) * Math.min(42, this.layout.tileSize * 4));
+    return new Phaser.Math.Vector2(offsetX, offsetY);
+  }
 
-  routeCueOverrides.forEach((cueOverride, segmentIndex) => {
-    if (!cueOverride || segmentIndex >= pathSegments) {
-      return;
-    }
+  private fillTile(
+    graphics: Phaser.GameObjects.Graphics,
+    point: LegacyPoint,
+    color: number,
+    originX: number,
+    originY: number,
+    tileSize: number,
+    alpha = 1,
+    inset = 0
+  ): void {
+    graphics.fillStyle(color, alpha);
+    graphics.fillRect(
+      originX + (point.x * tileSize) + inset,
+      originY + (point.y * tileSize) + inset,
+      Math.max(1, tileSize - (inset * 2)),
+      Math.max(1, tileSize - (inset * 2))
+    );
+  }
 
-    if (
-      cueOverride === 'anticipate'
-      || cueOverride === 'reacquire'
-      || cueOverride === 'dead-end'
-      || cueOverride === 'backtrack'
-    ) {
-      segmentCues[segmentIndex] = cueOverride;
-      segmentWeights[segmentIndex] = Math.max(
-        segmentWeights[segmentIndex],
-        cueOverride === 'backtrack'
-          ? 0.92
-          : cueOverride === 'reacquire'
-            ? 1.08
-            : cueOverride === 'dead-end'
-              ? 1.18
-              : 1.12
+  private drawHud(time: number): void {
+    this.hudGraphics.clear();
+    if (this.mode !== 'play') {
+      this.footerText.setText(
+        this.overlay === 'none'
+          ? 'Legacy reset lane: Start / Options / Exit restored first'
+          : ''
       );
+      return;
     }
-  });
 
-  const totalWeight = segmentWeights.reduce((total, value) => total + value, 0);
-  const segmentDurationsMs = segmentWeights.map((weight) => Math.max(1, Math.round((totalTraverseMs * weight) / totalWeight)));
-  const durationDelta = totalTraverseMs - segmentDurationsMs.reduce((total, value) => total + value, 0);
-  if (segmentDurationsMs.length > 0 && durationDelta !== 0) {
-    segmentDurationsMs[segmentDurationsMs.length - 1] = Math.max(1, segmentDurationsMs[segmentDurationsMs.length - 1] + durationDelta);
-  }
+    this.footerText.setText(this.overlay === 'none' ? 'WASD or arrows to move   P to pause' : '');
 
-  return {
-    ...legacyTuning.demo,
-    cadence: {
-      ...legacyTuning.demo.cadence,
-      spawnHoldMs,
-      exploreStepMs,
-      goalHoldMs,
-      resetHoldMs
-    },
-    behavior: {
-      ...legacyTuning.demo.behavior,
-      enableRunnerMistakes: runnerPolicyEnabled,
-      segmentDurationsMs,
-      segmentCues
-    }
-  };
-};
+    const elapsed = formatClock(time - this.playStartedAtMs);
+    const timerText = `Time ${elapsed}`;
+    const arrowOriginX = this.layout.width - 130;
+    const arrowOriginY = 58;
+    const boardOffset = this.resolveBoardOffset();
+    const goalScreenX = this.layout.boardLeft + boardOffset.x + (this.maze.goal.x * this.layout.tileSize);
+    const goalScreenY = this.layout.boardTop + boardOffset.y + (this.maze.goal.y * this.layout.tileSize);
+    const playerScreenX = this.layout.boardLeft + boardOffset.x + (this.player.x * this.layout.tileSize);
+    const playerScreenY = this.layout.boardTop + boardOffset.y + (this.player.y * this.layout.tileSize);
+    const angle = Phaser.Math.Angle.Between(playerScreenX, playerScreenY, goalScreenX, goalScreenY);
+    const length = 36;
 
-const demoVisualArrivalLatchCache = new WeakMap<MazeEpisode, Map<string, number>>();
+    this.hudGraphics.fillStyle(0x000000, 0.24);
+    this.hudGraphics.fillRoundedRect(20, 18, 170, 42, 8);
+    this.hudGraphics.lineStyle(1, 0xffffff, 0.18);
+    this.hudGraphics.strokeRoundedRect(20, 18, 170, 42, 8);
 
-const resolveDemoSegmentDurationsMs = (
-  episode: MazeEpisode,
-  config: DemoWalkerConfig
-): readonly number[] => {
-  const segmentCount = Math.max(1, episode.raster.pathIndices.length - 1);
-  const configured = config.behavior.segmentDurationsMs ?? [];
-  if (configured.length === segmentCount && configured.every((value) => Number.isFinite(value) && value > 0)) {
-    return configured.map((value) => Math.max(1, Math.round(value)));
-  }
-
-  return Array.from({ length: segmentCount }, () => Math.max(1, config.cadence.exploreStepMs));
-};
-
-export const hasDemoWalkerVisuallyReachedExit = (
-  episode: MazeEpisode,
-  elapsedMs: number,
-  config: DemoWalkerConfig
-): boolean => {
-  const view = resolveDemoWalkerViewFrame(episode, elapsedMs, config, 1);
-  const tileSize = 1;
-  const endTileX = xFromIndex(episode.raster.endIndex, episode.raster.width);
-  const endTileY = yFromIndex(episode.raster.endIndex, episode.raster.width);
-  const currentTileX = xFromIndex(view.currentIndex, episode.raster.width);
-  const currentTileY = yFromIndex(view.currentIndex, episode.raster.width);
-  const nextTileX = xFromIndex(view.nextIndex, episode.raster.width);
-  const nextTileY = yFromIndex(view.nextIndex, episode.raster.width);
-  const clampedProgress = Phaser.Math.Clamp(view.progress, 0, 1);
-  const easedProgress = clampedProgress * clampedProgress * (3 - (2 * clampedProgress));
-  const centerX = view.currentIndex === view.nextIndex
-    ? currentTileX + (tileSize / 2)
-    : Phaser.Math.Linear(currentTileX + (tileSize / 2), nextTileX + (tileSize / 2), easedProgress);
-  const centerY = view.currentIndex === view.nextIndex
-    ? currentTileY + (tileSize / 2)
-    : Phaser.Math.Linear(currentTileY + (tileSize / 2), nextTileY + (tileSize / 2), easedProgress);
-  const bodyCenter = resolveActorBodyCenterPoint(
-    centerX,
-    centerY,
-    tileSize,
-    view.direction,
-    view.cue,
-    elapsedMs
-  );
-
-  return isPointInsideTileArrivalRegion(
-    bodyCenter,
-    endTileX,
-    endTileY,
-    tileSize,
-    legacyTuning.demo.lifecycle.exitArrivalInsetRatio
-  );
-};
-
-export const resolveDemoVisualArrivalLatchMs = (
-  episode: MazeEpisode,
-  config: DemoWalkerConfig
-): number => {
-  const segmentDurations = resolveDemoSegmentDurationsMs(episode, config);
-  const cacheKey = [
-    config.cadence.spawnHoldMs,
-    config.cadence.exploreStepMs,
-    config.cadence.goalHoldMs,
-    config.cadence.resetHoldMs,
-    legacyTuning.demo.lifecycle.visualArrivalSettleMs,
-    legacyTuning.demo.lifecycle.exitArrivalInsetRatio,
-    segmentDurations.join(',')
-  ].join('|');
-  const cachedEntries = demoVisualArrivalLatchCache.get(episode);
-  const cachedLatch = cachedEntries?.get(cacheKey);
-  if (cachedLatch !== undefined) {
-    return cachedLatch;
-  }
-
-  const spawnHoldMs = Math.max(1, config.cadence.spawnHoldMs);
-  const traverseMs = Math.max(1, resolveDemoWalkerTraverseMs(config, segmentDurations.length));
-  const traverseEndMs = spawnHoldMs + traverseMs;
-  const settleMs = Math.max(0, Math.trunc(legacyTuning.demo.lifecycle.visualArrivalSettleMs));
-  let entryElapsedMs = traverseEndMs;
-
-  if (episode.raster.pathIndices.length > 1) {
-    const finalSegmentDurationMs = Math.max(1, segmentDurations.at(-1) ?? config.cadence.exploreStepMs);
-    const finalSegmentStartMs = Math.max(spawnHoldMs, traverseEndMs - finalSegmentDurationMs);
-    let low = finalSegmentStartMs;
-    let high = traverseEndMs;
-    while ((high - low) > 1) {
-      const mid = Math.floor((low + high) / 2);
-      if (hasDemoWalkerVisuallyReachedExit(episode, mid, config)) {
-        high = mid;
-      } else {
-        low = mid;
+    this.uiTexts.forEach((text) => {
+      if (text.getData('hud') === true) {
+        text.destroy();
       }
+    });
+    this.uiTexts = this.uiTexts.filter((text) => text.active);
+
+    const timer = this.add.text(32, 29, timerText, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '20px',
+      color: '#f2f2f4'
+    });
+    timer.setData('hud', true);
+    this.uiTexts.push(timer);
+
+    this.hudGraphics.lineStyle(3, 0xf4f6fa, 0.95);
+    this.hudGraphics.beginPath();
+    this.hudGraphics.moveTo(arrowOriginX, arrowOriginY);
+    this.hudGraphics.lineTo(
+      arrowOriginX + (Math.cos(angle) * length),
+      arrowOriginY + (Math.sin(angle) * length)
+    );
+    this.hudGraphics.strokePath();
+    this.hudGraphics.fillStyle(0xf4f6fa, 0.95);
+    this.hudGraphics.fillTriangle(
+      arrowOriginX + (Math.cos(angle) * length),
+      arrowOriginY + (Math.sin(angle) * length),
+      arrowOriginX + (Math.cos(angle + 2.4) * 12),
+      arrowOriginY + (Math.sin(angle + 2.4) * 12),
+      arrowOriginX + (Math.cos(angle - 2.4) * 12),
+      arrowOriginY + (Math.sin(angle - 2.4) * 12)
+    );
+  }
+
+  private rebuildUi(): void {
+    this.overlayGraphics.clear();
+    this.clearUi();
+
+    if (this.overlay === 'none') {
+      if (this.mode === 'menu') {
+        const [leftLabel, centerLabel, rightLabel] = MAIN_MENU_BUTTONS;
+        this.uiButtons.push(
+          this.createButton(
+            this.layout.width * 0.17,
+            this.layout.buttonY,
+            this.layout.buttonWidth,
+            this.layout.buttonHeight,
+            leftLabel,
+            () => this.showExitMessage()
+          ),
+          this.createButton(
+            this.layout.width * 0.5,
+            this.layout.buttonY,
+            this.layout.buttonWidth,
+            this.layout.buttonHeight,
+            centerLabel,
+            () => this.startPlayMode()
+          ),
+          this.createButton(
+            this.layout.width * 0.83,
+            this.layout.buttonY,
+            this.layout.buttonWidth,
+            this.layout.buttonHeight,
+            rightLabel,
+            () => this.openOverlay('options')
+          )
+        );
+      }
+
+      this.uiDirty = false;
+      return;
     }
 
-    entryElapsedMs = hasDemoWalkerVisuallyReachedExit(episode, high, config) ? high : traverseEndMs;
+    this.drawOverlayPanel();
+
+    switch (this.overlay) {
+      case 'options':
+        this.buildOptionsOverlay();
+        break;
+      case 'features':
+        this.buildFeaturesOverlay();
+        break;
+      case 'gameModes':
+        this.buildGameModesOverlay();
+        break;
+      case 'pause':
+        this.buildPauseOverlay();
+        break;
+      case 'message':
+        this.buildMessageOverlay();
+        break;
+    }
+
+    this.uiDirty = false;
   }
 
-  const latchMs = Math.max(traverseEndMs, entryElapsedMs + settleMs);
-  const nextCacheEntries = cachedEntries ?? new Map<string, number>();
-  nextCacheEntries.set(cacheKey, latchMs);
-  demoVisualArrivalLatchCache.set(episode, nextCacheEntries);
-  return latchMs;
-};
+  private drawOverlayPanel(): void {
+    const width = Math.min(720, this.layout.width - 80);
+    const height = Math.min(620, this.layout.height - 120);
+    const left = Math.round((this.layout.width - width) / 2);
+    const top = Math.round((this.layout.height - height) / 2);
 
-export const resolveDemoPresentationElapsedMs = (
-  episode: MazeEpisode,
-  elapsedMs: number,
-  config: DemoWalkerConfig,
-  presentation: MenuDemoPresentation
-): number => {
-  const spawnHoldMs = Math.max(1, config.cadence.spawnHoldMs);
-  const segmentCount = Math.max(1, (config.behavior.segmentDurationsMs?.length ?? 0) || (episode.raster.pathIndices.length - 1));
-  const traverseMs = Math.max(1, resolveDemoWalkerTraverseMs(config, segmentCount));
-  const visualArrivalLatchMs = resolveDemoVisualArrivalLatchMs(episode, config);
-  const ritualTuning = legacyTuning.demo.ritual;
-  const commitWindowStart = spawnHoldMs + Math.max(1, Math.floor(traverseMs * ritualTuning.decisionWindowStartRatio));
-  const commitWindowEnd = spawnHoldMs + Math.max(1, Math.floor(traverseMs * ritualTuning.decisionWindowEndRatio));
-
-  if (presentation.ritualPhase === 'decision' && elapsedMs >= commitWindowStart) {
-    const slowedElapsed = Math.min(elapsedMs, commitWindowEnd);
-    const commitOffset = slowedElapsed - commitWindowStart;
-    const reducedCommit = Math.floor(commitOffset * ritualTuning.decisionSlowdownFactor);
-    return commitWindowStart + reducedCommit;
+    this.overlayGraphics.fillStyle(0x06060b, 0.76);
+    this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);
+    this.overlayGraphics.fillStyle(0x18151f, 0.96);
+    this.overlayGraphics.fillRoundedRect(left, top, width, height, 12);
+    this.overlayGraphics.lineStyle(2, 0x5f5866, 0.92);
+    this.overlayGraphics.strokeRoundedRect(left, top, width, height, 12);
   }
 
-  if (
-    presentation.lifecyclePhase === 'clear-hold'
-    || presentation.lifecyclePhase === 'reflection-beat'
-    || presentation.lifecyclePhase === 'erase-wipe'
-  ) {
-    return visualArrivalLatchMs;
+  private buildOptionsOverlay(): void {
+    const top = Math.round((this.layout.height - Math.min(620, this.layout.height - 120)) / 2);
+    let rowY = top + 54;
+    this.createOverlayTitle('Options', rowY);
+    rowY += 52;
+
+    rowY = this.createStepperRow('Maze Scale', String(this.settings.scale), rowY, () => {
+      this.settings.scale = clampInteger(this.settings.scale - 1, 25, 150);
+      this.pendingMazeRebuild = true;
+      this.uiDirty = true;
+    }, () => {
+      this.settings.scale = clampInteger(this.settings.scale + 1, 25, 150);
+      this.pendingMazeRebuild = true;
+      this.uiDirty = true;
+    });
+
+    rowY = this.createStepperRow('Camera Scale', String(this.settings.camScale), rowY, () => {
+      this.settings.camScale = clampInteger(this.settings.camScale - 1, -50, 50);
+      this.refreshLayout();
+    }, () => {
+      this.settings.camScale = clampInteger(this.settings.camScale + 1, -50, 50);
+      this.refreshLayout();
+    });
+
+    rowY = this.createColorRow('Path RGB', this.settings.pathColor, rowY, (channel, delta) => {
+      this.settings.pathColor[channel] = clampUnit(this.settings.pathColor[channel] + delta);
+      this.pendingMazeRebuild = true;
+      this.boardStaticDirty = true;
+      this.uiDirty = true;
+    });
+
+    rowY = this.createColorRow('Wall RGB', this.settings.wallColor, rowY, (channel, delta) => {
+      this.settings.wallColor[channel] = clampUnit(this.settings.wallColor[channel] + delta);
+      this.pendingMazeRebuild = true;
+      this.boardStaticDirty = true;
+      this.uiDirty = true;
+    });
+
+    const buttonY = top + 500;
+    this.uiButtons.push(
+      this.createButton(this.layout.width * 0.33, buttonY, 170, 54, 'Features', () => this.openNestedOverlay('features', 'options')),
+      this.createButton(this.layout.width * 0.67, buttonY, 170, 54, 'Game Modes', () => this.openNestedOverlay('gameModes', 'options')),
+      this.createButton(this.layout.width * 0.5, buttonY + 76, 170, 54, 'Back', () => this.handleBackAction())
+    );
   }
 
-  return elapsedMs;
-};
+  private buildFeaturesOverlay(): void {
+    const top = Math.round((this.layout.height - Math.min(620, this.layout.height - 120)) / 2);
+    let rowY = top + 54;
+    this.createOverlayTitle('Features', rowY);
+    rowY += 72;
 
-export const resolveDemoCycleDurationMs = (
-  episode: MazeEpisode,
-  config: DemoWalkerConfig
-): number => (
-  resolveDemoVisualArrivalLatchMs(episode, config)
-  + Math.max(1, config.cadence.goalHoldMs)
-  + resolveDemoFadePhaseDurationsMs(config).totalMs
-);
+    rowY = this.createToggleRow('Camera Follow', this.settings.toggleCameraFollow, rowY, () => {
+      this.settings.toggleCameraFollow = !this.settings.toggleCameraFollow;
+      this.boardDynamicDirty = true;
+      this.uiDirty = true;
+    });
 
-export const resolveDemoTrailRenderBounds = (
-  path: ArrayLike<number>,
-  view: DemoWalkerViewFrame,
-  trailWindow = Math.max(1, view.trailLimit - view.trailStart)
-): { start: number; limit: number } => {
-  if (path.length <= 0) {
-    return { start: 0, limit: 0 };
+    rowY = this.createToggleRow('Trail Fade', this.settings.toggleTrailFade, rowY, () => {
+      this.settings.toggleTrailFade = !this.settings.toggleTrailFade;
+      this.boardDynamicDirty = true;
+      this.uiDirty = true;
+    });
+
+    this.uiButtons.push(
+      this.createButton(this.layout.width * 0.5, top + 500, 170, 54, 'Back', () => this.handleBackAction())
+    );
   }
 
-  const visibleWindow = Math.max(
-    1,
-    Math.min(
-      path.length,
-      Math.max(1, trailWindow)
-    )
-  );
-  const clampWindow = (limit: number): { start: number; limit: number } => {
-    const safeLimit = Math.max(0, Math.min(path.length, limit));
-    return {
-      start: Math.max(0, safeLimit - visibleWindow),
-      limit: safeLimit
+  private buildGameModesOverlay(): void {
+    const top = Math.round((this.layout.height - Math.min(620, this.layout.height - 120)) / 2);
+    let rowY = top + 54;
+    this.createOverlayTitle('Game Modes', rowY);
+    rowY += 72;
+
+    this.createToggleRow('Dark Mode', this.settings.darkMode, rowY, () => {
+      this.settings.darkMode = !this.settings.darkMode;
+      this.backdropDirty = true;
+      this.boardStaticDirty = true;
+      this.boardDynamicDirty = true;
+      this.uiDirty = true;
+    });
+
+    this.uiButtons.push(
+      this.createButton(this.layout.width * 0.5, top + 500, 170, 54, 'Back', () => this.handleBackAction())
+    );
+  }
+
+  private buildPauseOverlay(): void {
+    const top = Math.round((this.layout.height - Math.min(620, this.layout.height - 120)) / 2);
+    let rowY = top + 54;
+    this.createOverlayTitle('Paused', rowY);
+    rowY += 72;
+
+    this.createStepperRow('Camera Scale', String(this.settings.camScale), rowY, () => {
+      this.settings.camScale = clampInteger(this.settings.camScale - 1, -50, 50);
+      this.refreshLayout();
+    }, () => {
+      this.settings.camScale = clampInteger(this.settings.camScale + 1, -50, 50);
+      this.refreshLayout();
+    });
+
+    this.uiButtons.push(
+      this.createButton(this.layout.width * 0.3, top + 420, 150, 54, 'Back', () => this.closeOverlay()),
+      this.createButton(this.layout.width * 0.5, top + 420, 150, 54, 'Reset', () => {
+        this.player = copyPoint(this.maze.start);
+        this.trail = [copyPoint(this.player)];
+        this.closeOverlay();
+        this.boardDynamicDirty = true;
+      }),
+      this.createButton(this.layout.width * 0.7, top + 420, 180, 54, 'Main Menu', () => this.enterMenuMode()),
+      this.createButton(this.layout.width * 0.5, top + 500, 170, 54, 'Features', () => this.openNestedOverlay('features', 'pause'))
+    );
+  }
+
+  private buildMessageOverlay(): void {
+    const top = Math.round((this.layout.height - Math.min(620, this.layout.height - 120)) / 2);
+    this.createOverlayTitle('Exit', top + 76);
+    const body = this.add.text(this.layout.width / 2, top + 190, this.messageText, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '22px',
+      color: '#f2f2f4',
+      align: 'center',
+      wordWrap: { width: 420 }
+    }).setOrigin(0.5);
+    this.uiTexts.push(body);
+    this.uiButtons.push(
+      this.createButton(this.layout.width / 2, top + 420, 170, 54, 'Back', () => this.closeOverlay())
+    );
+  }
+
+  private createOverlayTitle(text: string, y: number): void {
+    const label = this.add.text(this.layout.width / 2, y, text, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '34px',
+      color: '#6bc96f'
+    }).setOrigin(0.5);
+    this.uiTexts.push(label);
+  }
+
+  private createStepperRow(
+    label: string,
+    value: string,
+    y: number,
+    onMinus: () => void,
+    onPlus: () => void
+  ): number {
+    const rowLabel = this.add.text(this.layout.width * 0.26, y, label, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '22px',
+      color: '#d9d8df'
+    }).setOrigin(0, 0.5);
+    const rowValue = this.add.text(this.layout.width * 0.5, y, value, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '22px',
+      color: '#6bc96f'
+    }).setOrigin(0.5);
+
+    this.uiTexts.push(rowLabel, rowValue);
+    this.uiButtons.push(
+      this.createButton(this.layout.width * 0.64, y, 52, 42, '-', onMinus),
+      this.createButton(this.layout.width * 0.75, y, 52, 42, '+', onPlus)
+    );
+
+    return y + 58;
+  }
+
+  private createColorRow(
+    label: string,
+    color: { r: number; g: number; b: number },
+    y: number,
+    onDelta: (channel: 'r' | 'g' | 'b', delta: number) => void
+  ): number {
+    const colorText = `${color.r.toFixed(2)}  ${color.g.toFixed(2)}  ${color.b.toFixed(2)}`;
+    const swatch = linearColorToHex(color);
+
+    const rowLabel = this.add.text(this.layout.width * 0.18, y, label, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '20px',
+      color: '#d9d8df'
+    }).setOrigin(0, 0.5);
+    const rowValue = this.add.text(this.layout.width * 0.46, y, colorText, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '18px',
+      color: '#f0f0f4'
+    }).setOrigin(0.5);
+    const swatchLabel = this.add.text(this.layout.width * 0.74, y, swatch, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '18px',
+      color: swatch
+    }).setOrigin(0.5);
+
+    this.uiTexts.push(rowLabel, rowValue, swatchLabel);
+
+    this.uiButtons.push(
+      this.createButton(this.layout.width * 0.58, y - 16, 44, 30, 'R-', () => onDelta('r', -0.05)),
+      this.createButton(this.layout.width * 0.64, y - 16, 44, 30, 'R+', () => onDelta('r', 0.05)),
+      this.createButton(this.layout.width * 0.58, y + 16, 44, 30, 'G-', () => onDelta('g', -0.05)),
+      this.createButton(this.layout.width * 0.64, y + 16, 44, 30, 'G+', () => onDelta('g', 0.05)),
+      this.createButton(this.layout.width * 0.70, y - 16, 44, 30, 'B-', () => onDelta('b', -0.05)),
+      this.createButton(this.layout.width * 0.76, y - 16, 44, 30, 'B+', () => onDelta('b', 0.05))
+    );
+
+    return y + 82;
+  }
+
+  private createToggleRow(label: string, value: boolean, y: number, onToggle: () => void): number {
+    const rowLabel = this.add.text(this.layout.width * 0.28, y, label, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '22px',
+      color: '#d9d8df'
+    }).setOrigin(0, 0.5);
+    const stateText = this.add.text(this.layout.width * 0.62, y, value ? 'Off' : 'On', {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '22px',
+      color: '#6bc96f'
+    }).setOrigin(0.5);
+    this.uiTexts.push(rowLabel, stateText);
+    this.uiButtons.push(
+      this.createButton(this.layout.width * 0.76, y, 120, 44, value ? 'Disable' : 'Enable', onToggle)
+    );
+
+    return y + 64;
+  }
+
+  private createButton(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    text: string,
+    onClick: () => void
+  ): UiButton {
+    const background = this.add.rectangle(x, y, width, height, 0xffffff, MENU_BUTTON_ALPHA);
+    background.setStrokeStyle(2, 0xb8b1c1, MENU_BUTTON_STROKE_ALPHA);
+    background.setInteractive({ useHandCursor: true });
+
+    const label = this.add.text(x, y, text, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: `${Math.max(18, Math.min(40, Math.round(height * 0.48)))}px`,
+      color: MENU_TEXT_COLOR
+    }).setOrigin(0.5);
+
+    const setActive = (active: boolean): void => {
+      background.setFillStyle(0xffffff, active ? 0.28 : MENU_BUTTON_ALPHA);
+      background.setStrokeStyle(2, 0xffffff, active ? 0.36 : MENU_BUTTON_STROKE_ALPHA);
+      label.setAlpha(active ? 1 : 0.92);
     };
-  };
-  const headIndex = resolveLiveTrailHeadIndex(view);
-  let headCursor = -1;
-  for (let index = 0; index < path.length; index += 1) {
-    if (path[index] === headIndex) {
-      headCursor = index;
-      break;
-    }
-  }
 
-  if (headCursor < 0) {
-    return clampWindow(Math.max(1, Math.min(path.length, view.trailLimit)));
-  }
+    background.on('pointerover', () => setActive(true));
+    background.on('pointerout', () => setActive(false));
+    background.on('pointerdown', onClick);
 
-  return clampWindow(headCursor + 1);
-};
-
-const resolveDemoTrailWindow = (episode: MazeEpisode, mood: DemoMood): number => {
-  const sizeOffset = episode.size === 'small' ? -2 : episode.size === 'medium' ? 0 : episode.size === 'large' ? 2 : 4;
-  const difficultyBase = episode.difficulty === 'chill'
-    ? 18
-    : episode.difficulty === 'standard'
-      ? 22
-      : episode.difficulty === 'spicy'
-        ? 26
-        : 30;
-  const moodProfile = DEMO_MOOD_PROFILES[mood];
-  return clamp(
-    Math.round((difficultyBase + sizeOffset + moodProfile.trailWindowOffset) * moodProfile.trailWindowScale),
-    4,
-    legacyTuning.demo.behavior.trailMaxLength
-  );
-};
-
-export const resolveMenuDemoSequence = (
-  episode: MazeEpisode,
-  elapsedMs: number,
-  config: DemoWalkerConfig
-): { sequence: MenuDemoSequence; progress: number } => {
-  const spawnHoldMs = Math.max(1, config.cadence.spawnHoldMs);
-  const segmentCount = Math.max(1, (config.behavior.segmentDurationsMs?.length ?? 0) || (episode.raster.pathIndices.length - 1));
-  const traverseMs = Math.max(1, resolveDemoWalkerTraverseMs(config, segmentCount));
-  const goalHoldMs = Math.max(1, config.cadence.goalHoldMs);
-  const fadeDurations = resolveDemoFadePhaseDurationsMs(config);
-  const visualArrivalLatchMs = resolveDemoVisualArrivalLatchMs(episode, config);
-  const arrivalWindowStartMs = spawnHoldMs + traverseMs;
-  const fadeWindowStartMs = visualArrivalLatchMs + goalHoldMs;
-
-  if (elapsedMs < spawnHoldMs) {
-    return { sequence: 'intro', progress: elapsedMs / spawnHoldMs };
-  }
-  if (elapsedMs < arrivalWindowStartMs) {
-    return { sequence: 'reveal', progress: (elapsedMs - spawnHoldMs) / traverseMs };
-  }
-  if (elapsedMs < fadeWindowStartMs) {
     return {
-      sequence: 'arrival',
-      progress: (elapsedMs - arrivalWindowStartMs) / Math.max(1, fadeWindowStartMs - arrivalWindowStartMs)
+      background,
+      label,
+      setActive,
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+      }
     };
   }
-  return {
-    sequence: 'fade',
-    progress: Math.min(1, (elapsedMs - fadeWindowStartMs) / Math.max(1, fadeDurations.totalMs))
-  };
-};
 
-export const resolveDemoFadePhaseDurationsMs = (
-  config: DemoWalkerConfig
-): {
-  clearHoldMs: number;
-  reflectionBeatMs: number;
-  eraseWipeMs: number;
-  totalMs: number;
-} => {
-  const lifecycleTuning = legacyTuning.demo.lifecycle;
-  const ritualTuning = legacyTuning.demo.ritual;
-  const baseFadeMs = Math.max(1, config.cadence.resetHoldMs);
-  const clearHoldRatio = clamp(lifecycleTuning.clearHoldRatio, 0.12, 0.58);
-  const eraseStartRatio = clamp(lifecycleTuning.eraseStartRatio, Math.max(clearHoldRatio + 0.08, 0.42), 0.92);
-  const reflectionRatio = clamp(
-    ritualTuning.failReflectionRatio,
-    Math.max(clearHoldRatio + 0.08, 0.24),
-    eraseStartRatio
-  );
-  const clearHoldMs = Math.max(
-    1,
-    Math.round(baseFadeMs * clearHoldRatio),
-    Math.max(1, Math.trunc(lifecycleTuning.minClearHoldMs))
-  );
-  const reflectionBeatMs = Math.max(
-    1,
-    Math.round(baseFadeMs * Math.max(0.08, reflectionRatio - clearHoldRatio)),
-    Math.max(1, Math.trunc(lifecycleTuning.minReflectionBeatMs))
-  );
-  const eraseWipeMs = Math.max(
-    1,
-    Math.round(baseFadeMs * Math.max(0.08, 1 - eraseStartRatio)),
-    Math.max(1, Math.trunc(lifecycleTuning.minEraseWipeMs))
-  );
-
-  return {
-    clearHoldMs,
-    reflectionBeatMs,
-    eraseWipeMs,
-    totalMs: clearHoldMs + reflectionBeatMs + eraseWipeMs
-  };
-};
-
-const resolveSuccessRitualCopy = (seed: number, mood: DemoMood): { title: string; subtitle: string } => ({
-  title: SUCCESS_RITUAL_TITLES[mix(seed, mood.charCodeAt(0), 0x41b39a27) % SUCCESS_RITUAL_TITLES.length],
-  subtitle: SUCCESS_RITUAL_SUBTITLES[mood][0]
-});
-
-const resolveRetryRitualCopy = (seed: number, mood: DemoMood): { title: string; subtitle: string } => ({
-  title: RETRY_RITUAL_TITLES[mix(seed, mood.charCodeAt(0), 0x2dd9a165) % RETRY_RITUAL_TITLES.length],
-  subtitle: RETRY_RITUAL_SUBTITLES[mood][0]
-});
-
-export const resolveMenuDemoPresentation = (
-  episode: MazeEpisode,
-  cycle: MenuDemoCycle,
-  elapsedMs: number,
-  config: DemoWalkerConfig,
-  variant: AmbientPresentationVariant = DEFAULT_PRESENTATION_VARIANT,
-  deploymentProfileId?: PresentationDeploymentProfile,
-  design?: PresentationDesignProfile
-): MenuDemoPresentation => {
-  const moodProfile = DEMO_MOOD_PROFILES[cycle.mood];
-  const safeVariant = sanitizePresentationVariant(variant);
-  const showSolutionPathPreview = safeVariant === 'loading';
-  const variantProfile = VARIANT_PROFILES[safeVariant];
-  const deploymentProfile = resolveDeploymentPresentationProfile(deploymentProfileId);
-  const themeProfile = resolveAmbientThemeProfile(cycle.theme, design);
-  const sequenceState = resolveMenuDemoSequence(episode, elapsedMs, config);
-  const progress = ease(sequenceState.progress);
-  const oscillationTimeMs = normalizeAnimationTime(elapsedMs);
-  const wave = 0.5 + (Math.sin((oscillationTimeMs + (episode.seed * 17)) * 0.0022) * 0.5);
-  const offsets = resolvePresentationOffsets(episode.seed, safeVariant);
-  const atmosphereSeed = mix(episode.seed ^ 0x2f8f1d3b, cycle.theme.charCodeAt(0), cycle.mood.charCodeAt(0));
-  const atmosphereBias = (((atmosphereSeed & 0xff) / 255) - 0.5) * 2;
-  const trailBias = ((((atmosphereSeed >>> 8) & 0xff) / 255) - 0.5) * 2;
-  let boardVeilAlpha = 0.03;
-  let boardAuraAlpha = moodProfile.auraAlpha;
-  let boardHaloAlpha = moodProfile.haloAlpha;
-  let boardShadeAlpha = moodProfile.shadeAlpha;
-  let boardAuraScale = 1;
-  let boardHaloScale = 1;
-  let metadataAlpha = moodProfile.metadataAlpha * variantProfile.metadataAlphaScale;
-  let flashAlpha = safeVariant === 'loading' ? 0.24 : 0;
-  let ritualPhase: DemoRitualPhase = 'none';
-  let ritualProgress = 0;
-  let ritualAlpha = 0;
-  let ritualTitle = '';
-  let ritualSubtitle = '';
-  const ritualTuning = legacyTuning.demo.ritual;
-  const lifecycleTuning = legacyTuning.demo.lifecycle;
-  const fadeDurations = resolveDemoFadePhaseDurationsMs(config);
-  const fadeReflectionRatio = clamp(
-    (fadeDurations.clearHoldMs + fadeDurations.reflectionBeatMs) / Math.max(1, fadeDurations.totalMs),
-    0.08,
-    0.92
-  );
-  const fadeWindowStartMs = resolveDemoVisualArrivalLatchMs(episode, config) + Math.max(1, config.cadence.goalHoldMs);
-  let lifecyclePhase: DemoLifecyclePhase = 'active-watch';
-  let buildRevealProgress = 1;
-  let eraseWipeProgress = 0;
-
-  switch (sequenceState.sequence) {
-    case 'intro':
-      boardVeilAlpha = lerp(cycle.mood === 'scan' ? 0.18 : 0.22, 0.04, progress);
-      boardAuraAlpha = moodProfile.auraAlpha + ((1 - progress) * 0.028);
-      boardHaloAlpha = moodProfile.haloAlpha + ((1 - progress) * 0.024);
-      boardShadeAlpha = moodProfile.shadeAlpha + ((1 - progress) * 0.018);
-      boardAuraScale = lerp(1.018, 1, progress);
-      boardHaloScale = lerp(1.012, 1, progress);
-      metadataAlpha = clamp((moodProfile.metadataAlpha * 0.82 * variantProfile.metadataAlphaScale) + (progress * 0.08), 0.18, 0.82);
-      flashAlpha = cycle.mood === 'blueprint' ? lerp(0.82, 0.24, progress) : flashAlpha;
-      break;
-    case 'reveal':
-      boardVeilAlpha = clamp((cycle.mood === 'scan' ? 0.036 : 0.022) + (wave * (cycle.mood === 'scan' ? 0.01 : 0.005)), 0, 0.24);
-      boardAuraAlpha = moodProfile.auraAlpha + (wave * (cycle.mood === 'scan' ? 0.024 : 0.014));
-      boardHaloAlpha = moodProfile.haloAlpha + (wave * (cycle.mood === 'scan' ? 0.016 : 0.009));
-      boardShadeAlpha = moodProfile.shadeAlpha + (wave * (cycle.mood === 'scan' ? 0.018 : 0.01));
-      boardAuraScale = 1 + (wave * 0.006);
-      boardHaloScale = 1 + (wave * 0.004);
-      metadataAlpha = clamp((moodProfile.metadataAlpha + (cycle.mood === 'blueprint' ? 0.08 : 0.04)) * variantProfile.metadataAlphaScale, 0.18, 0.82);
-      flashAlpha = cycle.mood === 'blueprint' ? Math.max(0, 0.46 - (progress * 0.46)) : flashAlpha;
-      break;
-    case 'arrival': {
-      const arrivalGlow = 1 - Math.abs((progress * 2) - 1);
-      boardVeilAlpha = 0.022;
-      boardAuraAlpha = moodProfile.auraAlpha + 0.012 + (arrivalGlow * 0.028);
-      boardHaloAlpha = moodProfile.haloAlpha + 0.008 + (arrivalGlow * 0.022);
-      boardShadeAlpha = moodProfile.shadeAlpha + (arrivalGlow * 0.014);
-      boardAuraScale = 1.004 + (arrivalGlow * 0.008);
-      boardHaloScale = 1.003 + (arrivalGlow * 0.006);
-      metadataAlpha = clamp((moodProfile.metadataAlpha + 0.12) * variantProfile.metadataAlphaScale, 0.18, 0.82);
-      flashAlpha = cycle.mood === 'blueprint' ? 0.14 * (1 - progress) : Math.max(flashAlpha, 0.28 + (arrivalGlow * 0.24));
-      break;
+  private clearUi(): void {
+    for (const button of this.uiButtons) {
+      button.destroy();
     }
-    case 'fade':
-      boardVeilAlpha = lerp(0.06, 0.22, progress);
-      boardAuraAlpha = lerp(moodProfile.auraAlpha + 0.012, 0.068, progress);
-      boardHaloAlpha = lerp(moodProfile.haloAlpha + 0.014, 0.018, progress);
-      boardShadeAlpha = lerp(moodProfile.shadeAlpha + 0.012, 0.012, progress);
-      boardAuraScale = lerp(1.008, 1.014, progress);
-      boardHaloScale = lerp(1.006, 1.012, progress);
-      metadataAlpha = clamp(lerp(moodProfile.metadataAlpha * 0.9, 0.28, progress) * variantProfile.metadataAlphaScale, 0.18, 0.82);
-      flashAlpha = safeVariant === 'loading' ? lerp(0.22, 0.12, progress) : 0;
-      break;
-  }
+    this.uiButtons = [];
 
-  if (sequenceState.sequence === 'intro') {
-    const buildRevealStart = clamp(lifecycleTuning.buildRevealStartRatio, 0, 0.72);
-    const settleInRatio = clamp(lifecycleTuning.settleInRatio, 0.08, 0.28);
-    const buildRevealEnd = clamp(
-      lifecycleTuning.buildRevealEndRatio,
-      Math.max(buildRevealStart + 0.08, 0.3),
-      1 - settleInRatio
-    );
-    buildRevealProgress = clamp(
-      (progress - buildRevealStart) / Math.max(0.01, buildRevealEnd - buildRevealStart),
-      0,
-      1
-    );
-    lifecyclePhase = progress < lifecycleTuning.buildPrerollRatio
-      ? 'pre-roll'
-      : buildRevealProgress < 1
-        ? 'build-reveal'
-        : 'settle-in';
-  } else if (sequenceState.sequence === 'fade') {
-    const fadeElapsedMs = clamp(elapsedMs - fadeWindowStartMs, 0, fadeDurations.totalMs);
-    const clearHoldEndMs = fadeDurations.clearHoldMs;
-    const reflectionEndMs = clearHoldEndMs + fadeDurations.reflectionBeatMs;
-    eraseWipeProgress = clamp(
-      (fadeElapsedMs - reflectionEndMs) / Math.max(1, fadeDurations.eraseWipeMs),
-      0,
-      1
-    );
-    lifecyclePhase = fadeElapsedMs < clearHoldEndMs
-      ? 'clear-hold'
-      : fadeElapsedMs < reflectionEndMs
-        ? 'reflection-beat'
-        : 'erase-wipe';
-  }
-
-  if (safeVariant === 'title') {
-    boardVeilAlpha += sequenceState.sequence === 'intro' ? 0.02 : 0.01;
-    boardAuraAlpha -= 0.008;
-    boardHaloAlpha += 0.002;
-    metadataAlpha -= 0.04;
-  } else if (safeVariant === 'ambient') {
-    boardVeilAlpha -= 0.012;
-    boardAuraAlpha += 0.004;
-    boardHaloAlpha += 0.004;
-    boardAuraScale += 0.002;
-    boardHaloScale += 0.002;
-    metadataAlpha -= 0.02;
-  } else {
-    boardVeilAlpha += 0.02;
-    boardAuraAlpha += 0.004;
-    boardHaloAlpha += 0.006;
-    boardShadeAlpha += 0.008;
-    metadataAlpha += 0.04;
-    flashAlpha = Math.max(
-      flashAlpha,
-      sequenceState.sequence === 'intro'
-        ? 0.28
-        : sequenceState.sequence === 'reveal'
-          ? 0.24
-      : 0.18
-    );
-  }
-  if (sequenceState.sequence === 'reveal'
-    && progress >= ritualTuning.decisionWindowStartRatio
-    && progress <= ritualTuning.decisionWindowEndRatio) {
-    ritualPhase = 'decision';
-    ritualProgress = clamp(
-      (progress - ritualTuning.decisionWindowStartRatio)
-        / Math.max(0.01, ritualTuning.decisionWindowEndRatio - ritualTuning.decisionWindowStartRatio),
-      0,
-      1
-    );
-  } else if (sequenceState.sequence === 'fade') {
-    if (progress < fadeReflectionRatio) {
-      const successCopy = resolveSuccessRitualCopy(episode.seed, cycle.mood);
-      ritualPhase = 'success';
-      ritualProgress = clamp(progress / fadeReflectionRatio, 0, 1);
-      ritualAlpha = lerp(0.18, ritualTuning.failCardAlpha, ritualProgress);
-      ritualTitle = successCopy.title;
-      ritualSubtitle = successCopy.subtitle;
-    } else {
-      const retryCopy = resolveRetryRitualCopy(episode.seed, cycle.mood);
-      ritualPhase = 'retry';
-      ritualProgress = clamp((progress - fadeReflectionRatio) / Math.max(0.01, 1 - fadeReflectionRatio), 0, 1);
-      ritualAlpha = lerp(ritualTuning.retryCardAlpha, 0.24, ritualProgress);
-      ritualTitle = retryCopy.title;
-      ritualSubtitle = retryCopy.subtitle;
+    for (const text of this.uiTexts) {
+      if (text.active) {
+        text.destroy();
+      }
     }
+    this.uiTexts = [];
   }
-  const persistentFadeFloor = clamp(
-    moodProfile.persistentFadeFloor
-      + (wave * 0.06)
-      + (atmosphereBias * 0.025)
-      + (sequenceState.sequence === 'arrival' ? 0.08 : sequenceState.sequence === 'fade' ? 0.04 : 0),
-    0.22,
-    0.72
-  );
-  const trailPulseBoost = clamp(
-    moodProfile.trailPulseBoost
-      + (themeProfile.presentation.actorPulseBias * 0.6)
-      + ((wave - 0.5) * 0.04)
-      + (trailBias * 0.012),
-    0,
-    0.08
-  );
-  const boardAuraScaleDelta = (boardAuraScale - 1) * deploymentProfile.boardAuraMotionScale;
-  const boardHaloScaleDelta = (boardHaloScale - 1) * deploymentProfile.boardHaloMotionScale;
-  const motifPrimarySequenceScale = sequenceState.sequence === 'arrival'
-    ? 1
-    : sequenceState.sequence === 'reveal'
-      ? 0.86
-      : sequenceState.sequence === 'intro'
-        ? 0.72
-        : 0.54;
-  const motifSecondarySequenceScale = sequenceState.sequence === 'reveal'
-    ? 1
-    : sequenceState.sequence === 'arrival'
-      ? 0.82
-      : sequenceState.sequence === 'intro'
-        ? 0.64
-        : 0.42;
 
-  return {
-    variant: safeVariant,
-    mood: cycle.mood,
-    theme: cycle.theme,
-    sequence: sequenceState.sequence,
-    lifecyclePhase,
-    buildRevealProgress,
-    eraseWipeProgress,
-    showStartMarker: buildRevealProgress >= 0.18 && eraseWipeProgress < 0.96,
-    showGoalMarker: buildRevealProgress >= 0.56 && eraseWipeProgress < 0.9,
-    showActor: lifecyclePhase === 'settle-in' || lifecyclePhase === 'active-watch' || lifecyclePhase === 'clear-hold' || lifecyclePhase === 'reflection-beat',
-    showTrail: lifecyclePhase === 'active-watch' || lifecyclePhase === 'clear-hold' || lifecyclePhase === 'reflection-beat',
-    showIntentFeed: lifecyclePhase !== 'pre-roll',
-    phaseLabel: lifecyclePhase === 'pre-roll'
-      ? 'setting the board'
-      : lifecyclePhase === 'build-reveal'
-        ? 'building maze'
-        : lifecyclePhase === 'settle-in'
-          ? 'settling the view'
-          : lifecyclePhase === 'clear-hold'
-            ? 'holding clear'
-            : lifecyclePhase === 'reflection-beat'
-              ? 'reading the route'
-              : lifecyclePhase === 'erase-wipe'
-                ? 'folding the maze'
-                : resolvePhaseLabel(sequenceState.sequence, episode.seed, cycle.mood, safeVariant),
-    solutionPathAlpha: showSolutionPathPreview
-      ? clamp(
-        moodProfile.solutionPathAlpha * variantProfile.solutionPathScale * themeProfile.presentation.solutionPathAlphaScale,
-        0.14,
-        1
-      )
-      : 0,
-    trailWindow: resolveDemoTrailWindow(episode, cycle.mood),
-    ambientDriftPxX: offsets.driftX
-      * moodProfile.ambientDriftPx
-      * variantProfile.driftScale
-      * deploymentProfile.driftScale
-      * themeProfile.presentation.driftScale
-      || 0,
-    ambientDriftPxY: offsets.driftY
-      * moodProfile.ambientDriftPx
-      * variantProfile.driftScale
-      * deploymentProfile.driftScale
-      * themeProfile.presentation.driftScale
-      || 0,
-    ambientDriftMs: clamp(Math.round(moodProfile.ambientDriftMs * deploymentProfile.driftDurationScale), 1200, 12000),
-    frameOffsetX: Math.round(offsets.frameOffsetX * deploymentProfile.offsetScale * themeProfile.presentation.offsetScale) || 0,
-    frameOffsetY: Math.round(offsets.frameOffsetY * deploymentProfile.offsetScale * themeProfile.presentation.offsetScale) || 0,
-    hudOffsetX: Math.round(offsets.hudOffsetX * deploymentProfile.offsetScale * themeProfile.presentation.offsetScale) || 0,
-    hudOffsetY: Math.round(offsets.hudOffsetY * deploymentProfile.offsetScale * themeProfile.presentation.offsetScale) || 0,
-    boardVeilAlpha: clamp(
-      boardVeilAlpha
-        + (variantProfile.boardVeilBias * deploymentProfile.boardVeilBiasScale)
-        + (atmosphereBias * 0.012)
-        + themeProfile.shell.veilAlphaBias,
-      0,
-      0.24
-    ),
-    boardAuraAlpha: clamp(
-      boardAuraAlpha
-        + (variantProfile.boardAuraBias * deploymentProfile.boardAuraBiasScale)
-        + (atmosphereBias * 0.012)
-        + themeProfile.shell.auraAlphaBias,
-      0.06,
-      0.18
-    ),
-    boardHaloAlpha: clamp(
-      boardHaloAlpha
-        + (variantProfile.boardHaloBias * deploymentProfile.boardHaloBiasScale)
-        + (trailBias * 0.01)
-        + themeProfile.shell.haloAlphaBias,
-      0.018,
-      0.11
-    ),
-    boardShadeAlpha: clamp(
-      boardShadeAlpha
-        + (variantProfile.boardShadeBias * deploymentProfile.boardShadeBiasScale)
-        + (trailBias * 0.01)
-        + themeProfile.shell.shadeAlphaBias,
-      0.012,
-      0.1
-    ),
-    boardAuraScale: clamp(
-      1
-        + boardAuraScaleDelta
-        + (wave * variantProfile.boardAuraBias * 0.1 * deploymentProfile.boardAuraBiasScale)
-        + (atmosphereBias * 0.006)
-        + themeProfile.shell.auraScaleBias,
-      1,
-      1.035
-    ),
-    boardHaloScale: clamp(
-      1
-        + boardHaloScaleDelta
-        + (wave * variantProfile.boardHaloBias * 0.1 * deploymentProfile.boardHaloBiasScale)
-        + (trailBias * 0.004)
-        + themeProfile.shell.haloScaleBias,
-      1,
-      1.02
-    ),
-    motifPrimaryAlpha: clamp(themeProfile.shell.motifPrimaryAlpha * motifPrimarySequenceScale, 0, 0.2),
-    motifSecondaryAlpha: clamp(themeProfile.shell.motifSecondaryAlpha * motifSecondarySequenceScale, 0, 0.16),
-    actorPulseBoost: clamp(moodProfile.actorPulseBoost + variantProfile.actorPulseBias + themeProfile.presentation.actorPulseBias, 0, 0.12),
-    persistentTrail: true,
-    persistentFadeFloor,
-    trailPulseBoost,
-    metadataAlpha: clamp(
-      (metadataAlpha + themeProfile.presentation.metadataAlphaBias + (atmosphereBias * 0.025))
-        * deploymentProfile.metadataAlphaScale,
-      0.18,
-      0.82
-    ),
-    flashAlpha: clamp(
-      (flashAlpha + themeProfile.presentation.flashAlphaBias)
-        * variantProfile.flashAlphaScale
-        * deploymentProfile.flashAlphaScale,
-      0,
-      0.84
-    ),
-    ritualPhase,
-    ritualProgress,
-    ritualAlpha: clamp(ritualAlpha, 0, 0.92),
-    ritualTitle,
-    ritualSubtitle
-  };
-};
+  private openNestedOverlay(kind: OverlayKind, returnTo: OverlayKind): void {
+    this.overlay = kind;
+    this.overlayReturn = returnTo;
+    this.uiDirty = true;
+  }
 
-export const resolveMenuDemoCycle = (seed: number, cycle: number, overrides: MenuDemoCycleOverrides = {}): MenuDemoCycle => {
-  const mood = overrides.mood ?? resolveCuratedMood(seed, cycle);
-  const familyCycle = overrides.family || overrides.mood || overrides.size || overrides.difficulty ? 0 : cycle;
-  const familySeed = seed >>> 0;
-  const family = overrides.family ?? resolveCuratedFamily(familySeed, familyCycle);
-  const theme = overrides.theme ?? resolveAmbientFamilyTheme(seed, cycle, family);
-  const presetCycle = familyCycle;
-  const entropy = resolveAmbientCycleEntropy(seed, cycle, mood, theme, family);
-  return {
-    difficulty: overrides.difficulty ?? pickCuratedCycleValue(ROTATING_DIFFICULTIES, seed ^ 0x517cc1b7, cycle + 1, 0x517cc1b7),
-    size: overrides.size ?? pickCuratedCycleValue(ROTATING_SIZES, seed, cycle, 0x2d2816fe),
-    mood,
-    theme,
-    family,
-    presentationPreset: resolveMenuDemoPreset(seed, presetCycle, mood, theme, family),
-    entropy,
-    pacing: DEMO_PACING_PROFILES[mix(seed, cycle, 0x6d2b79f5) % DEMO_PACING_PROFILES.length]
-  };
-};
+  private openOverlay(kind: OverlayKind): void {
+    this.overlay = kind;
+    this.overlayReturn = 'none';
+    this.uiDirty = true;
+  }
 
-export const resolveMenuDemoPreset = (
-  seed: number,
-  cycle: number,
-  mood: DemoMood,
-  theme?: PresentationThemeFamily,
-  family?: MazeFamily
-): MazePresentationPreset => {
-  const safeTheme = theme ?? PRESENTATION_THEME_FAMILIES[mix(seed, cycle, 0x34c2ab51) % PRESENTATION_THEME_FAMILIES.length];
-  const mixed = mix(seed, cycle, 0x31b7c3d1 ^ mood.charCodeAt(0) ^ safeTheme.charCodeAt(0));
-  const resolvePairingPolicy = (targetFamily: MazeFamily): AmbientFamilyThemePairingPolicy => (
-    AMBIENT_FAMILY_THEME_PAIRING_POLICY[targetFamily]
-  );
-  const isDefaultTheme = (targetFamily: MazeFamily): boolean => (
-    resolvePairingPolicy(targetFamily).defaults.includes(safeTheme)
-  );
-  const isAccentTheme = (targetFamily: MazeFamily): boolean => (
-    resolvePairingPolicy(targetFamily).accents.includes(safeTheme)
-  );
-  const isBlueprintAccentTheme = (targetFamily: MazeFamily): boolean => (
-    resolvePairingPolicy(targetFamily).blueprintAccent.includes(safeTheme)
-  );
-  if (family === 'framed') {
-    return isDefaultTheme(family)
-      ? mixed % 6 === 0 ? 'classic' : 'framed'
-      : mixed % 4 === 0 ? 'classic' : 'framed';
+  private closeOverlay(): void {
+    this.overlay = 'none';
+    this.overlayReturn = 'none';
+    if (this.pendingMazeRebuild) {
+      this.regenerateMaze();
+    }
+    this.uiDirty = true;
   }
-  if (family === 'braided') {
-    return isDefaultTheme(family) && mixed % 8 !== 0
-      ? 'braided'
-      : mixed % 5 === 0 ? 'classic' : 'braided';
-  }
-  if (family === 'sparse') {
-    return isDefaultTheme(family) || isAccentTheme(family)
-      ? 'classic'
-      : mixed % 5 === 0 ? 'braided' : 'classic';
-  }
-  if (family === 'dense') {
-    const blueprintAllowed = isBlueprintAccentTheme(family);
-    return blueprintAllowed && mixed % 7 === 0
-      ? 'blueprint-rare'
-      : mixed % 4 === 0 ? 'classic' : 'braided';
-  }
-  if (family === 'split-flow') {
-    const blueprintAllowed = mood === 'blueprint' && isBlueprintAccentTheme(family);
-    return blueprintAllowed && mixed % 9 === 0
-      ? 'blueprint-rare'
-      : isDefaultTheme(family) && mixed % 5 !== 0
-        ? 'classic'
-        : mixed % 3 === 0 ? 'braided' : 'classic';
-  }
-  switch (mood) {
-    case 'scan':
-      if (safeTheme === 'noir' || safeTheme === 'vellum') {
-        return mixed % 3 === 0 ? 'classic' : 'framed';
+
+  private handleBackAction(): void {
+    if (this.overlay === 'none') {
+      if (this.mode === 'play') {
+        this.openOverlay('pause');
       }
-      return mixed % 7 === 0 ? 'classic' : mixed % 3 === 0 ? 'framed' : 'braided';
-    case 'blueprint':
-      if (safeTheme === 'aurora') {
-        return mixed % 2 === 0 ? 'blueprint-rare' : 'braided';
-      }
-      return mixed % 5 <= 1 ? 'blueprint-rare' : mixed % 3 === 0 ? 'classic' : 'framed';
-    case 'solve':
-    default:
-      if (safeTheme === 'ember') {
-        return mixed % 3 === 0 ? 'framed' : 'braided';
-      }
-      return mixed % 8 === 0 ? 'blueprint-rare' : mixed % 5 === 0 ? 'framed' : mixed % 3 === 0 ? 'braided' : 'classic';
-  }
-};
+      return;
+    }
 
-const resolveAmbientCycleEntropy = (
-  seed: number,
-  cycle: number,
-  mood: DemoMood,
-  theme: PresentationThemeFamily,
-  family: MazeFamily
-): MenuDemoCycle['entropy'] => {
-  const moodSalt = mood.charCodeAt(0);
-  const themeSalt = theme.charCodeAt(0) ^ theme.charCodeAt(theme.length - 1) ^ family.charCodeAt(0);
-  const mixed = mix(seed ^ 0x6f23ad5b, cycle + moodSalt, 0x5a9dc15f ^ themeSalt);
-  const blend = (mixed & 0xff) / 255;
-  const drift = ((mixed >>> 8) & 0xff) / 255;
-  const familyCheckBias = family === 'sparse'
-    ? 0.04
-    : family === 'split-flow'
-      ? 0.06
-      : family === 'dense'
-        ? 0.05
-        : family === 'framed'
-          ? 0.02
-          : family === 'braided'
-            ? -0.01
-            : 0;
-  const familyShortcutBias = family === 'braided'
-    ? 0.08
-    : family === 'dense'
-      ? 0.06
-      : family === 'sparse'
-        ? -0.06
-        : family === 'framed'
-          ? -0.03
-          : family === 'split-flow'
-            ? -0.01
-            : 0;
-  return {
-    checkPointModifier: clamp(
-      legacyTuning.board.checkPointModifier + ((blend - 0.5) * 0.16) + (mood === 'blueprint' ? 0.05 : mood === 'scan' ? -0.03 : 0.02) + familyCheckBias,
-      0.16,
-      0.56
-    ),
-    shortcutCountModifier: clamp(
-      legacyTuning.board.shortcutCountModifier.menu + ((drift - 0.5) * 0.12) + (theme === 'monolith' ? 0.03 : theme === 'vellum' ? -0.01 : 0) + familyShortcutBias,
-      0.04,
-      0.3
-    )
-  };
-};
+    if (this.overlayReturn !== 'none') {
+      this.overlay = this.overlayReturn;
+      this.overlayReturn = 'none';
+      this.uiDirty = true;
+      return;
+    }
 
-const resolveCuratedMood = (seed: number, cycle: number): DemoMood => {
-  const block = Math.floor(cycle / CURATED_MOOD_PATTERNS[0].length);
-  const slot = cycle % CURATED_MOOD_PATTERNS[0].length;
-  const pattern = CURATED_MOOD_PATTERNS[mix(seed, block, 0x7f4a7c15) % CURATED_MOOD_PATTERNS.length];
-  return pattern[slot];
-};
-
-const resolveCuratedFamily = (seed: number, cycle: number): MazeFamily => {
-  return resolveCuratedFamilyRotation(seed, cycle);
-};
-
-const resolveForcedDemoMood = (mood: PresentationMood): DemoMood | undefined => (
-  mood === 'auto' ? undefined : mood
-);
-
-const pickCuratedCycleValue = <T>(items: readonly T[], seed: number, cycle: number, salt: number): T => {
-  const block = Math.floor(cycle / items.length);
-  const slot = cycle % items.length;
-  const order = [...items.keys()];
-  let state = mix(seed, block, salt) || 1;
-
-  for (let index = order.length - 1; index > 0; index -= 1) {
-    state = lcg(state);
-    const swapIndex = state % (index + 1);
-    [order[index], order[swapIndex]] = [order[swapIndex], order[index]];
+    this.closeOverlay();
   }
 
-  return items[order[slot]];
-};
-
-const resolvePresentationOffsets = (seed: number, variant: AmbientPresentationVariant): PresentationOffsets => {
-  const safeVariant = sanitizePresentationVariant(variant);
-  const profile = VARIANT_PROFILES[safeVariant];
-  const mixed = mix(seed, 0, safeVariant.charCodeAt(0));
-  const alt = mix(seed ^ 0x9e3779b9, 1, safeVariant.charCodeAt(safeVariant.length - 1));
-
-  return {
-    frameOffsetX: resolveSignedRange(mixed, profile.boardOffsetRangeX),
-    frameOffsetY: resolveSignedRange(alt, profile.boardOffsetRangeY),
-    hudOffsetX: resolveSignedRange(mixed >>> 3, profile.hudOffsetRangeX),
-    hudOffsetY: resolveSignedRange(alt >>> 3, profile.hudOffsetRangeY),
-    driftX: resolveFloatRange(mixed >>> 5, 0.35, 1),
-    driftY: resolveFloatRange(alt >>> 5, 0.35, 1)
-  };
-};
-
-const resolvePhaseLabel = (
-  sequence: MenuDemoSequence,
-  seed: number,
-  mood: DemoMood,
-  variant: AmbientPresentationVariant
-): string => {
-  const safeVariant = sanitizePresentationVariant(variant);
-  if (safeVariant !== 'loading') {
-    return PASSIVE_TAGLINES[safeVariant];
+  private showExitMessage(): void {
+    this.messageText = 'The original project used the engine quit command. Browser builds cannot close the tab directly, so Exit is preserved as UI but not as hard quit behavior.';
+    this.messageVisibleUntilMs = this.time.now + MESSAGE_DURATION_MS;
+    this.openOverlay('message');
   }
-
-  const labels = LOADING_PHASE_LABELS[sequence];
-  return labels[mix(seed, mood.charCodeAt(0), sequence.charCodeAt(0)) % labels.length];
-};
-
-const resolveBlueprintAccentAlpha = (
-  presentation: MenuDemoPresentation,
-  themeProfile: AmbientThemeProfile = resolveAmbientThemeProfile(presentation.theme)
-): number => {
-  if (presentation.mood !== 'blueprint') {
-    return 0;
-  }
-
-  const variantBase = presentation.variant === 'loading'
-    ? 0.42
-    : presentation.variant === 'ambient'
-      ? 0.36
-      : 0.3;
-  const sequenceScale = presentation.sequence === 'reveal'
-    ? 1
-    : presentation.sequence === 'arrival'
-      ? 0.82
-      : presentation.sequence === 'intro'
-      ? 0.54
-      : 0.36;
-  return clamp(variantBase * sequenceScale * themeProfile.shell.blueprintAccentAlphaScale, 0, 0.42);
-};
-
-const drawBlueprintAccent = (
-  graphics: Phaser.GameObjects.Graphics,
-  layout: ReturnType<typeof createBoardLayout>,
-  accentColor = palette.board.topHighlight
-): void => {
-  const safeTileSize = Math.max(2, Math.round(layout.tileSize));
-  const width = Math.max(16, Math.round(layout.boardWidth));
-  const height = Math.max(16, Math.round(layout.boardHeight));
-  const step = Math.max(safeTileSize * 4, Math.round(Math.min(width, height) * 0.18));
-  const inset = Math.max(2, Math.round(safeTileSize * 0.45));
-
-  graphics.clear();
-  graphics.lineStyle(1, accentColor, 0.12);
-  for (let x = step; x < width; x += step) {
-    graphics.lineBetween(x + 0.5, inset, x + 0.5, height - inset);
-  }
-  for (let y = step; y < height; y += step) {
-    graphics.lineBetween(inset, y + 0.5, width - inset, y + 0.5);
-  }
-  graphics.lineStyle(1, accentColor, 0.22);
-  graphics.strokeRect(inset + 0.5, inset + 0.5, width - (inset * 2) - 1, height - (inset * 2) - 1);
-};
-
-const drawThemeMotifs = (
-  themeProfile: AmbientThemeProfile,
-  primary: Phaser.GameObjects.Graphics,
-  secondary: Phaser.GameObjects.Graphics,
-  layout: ReturnType<typeof createBoardLayout>
-): void => {
-  const width = Math.max(24, Math.round(layout.boardWidth));
-  const height = Math.max(24, Math.round(layout.boardHeight));
-  const inset = Math.max(4, Math.round(layout.tileSize * 1.1));
-  const edge = Math.max(2, Math.round(layout.tileSize * 0.75));
-
-  primary.clear();
-  secondary.clear();
-
-  switch (themeProfile.id) {
-    case 'noir':
-      primary.fillStyle(themeProfile.palette.board.shadow, 0.06);
-      primary.fillRect(-edge, height - Math.max(6, edge * 2), width + (edge * 2), Math.max(6, edge * 2));
-      primary.lineStyle(1, themeProfile.palette.board.trailGlow, 0.1);
-      primary.strokeRect(inset + 0.5, inset + 0.5, width - (inset * 2) - 1, height - (inset * 2) - 1);
-      secondary.lineStyle(1, themeProfile.palette.board.innerStroke, 0.08);
-      secondary.strokeRect(inset * 1.6 + 0.5, inset * 1.2 + 0.5, width - Math.round(inset * 3.2) - 1, height - Math.round(inset * 2.4) - 1);
-      break;
-    case 'ember':
-      primary.lineStyle(Math.max(2, Math.round(layout.tileSize * 0.08)), themeProfile.palette.board.goal, 0.08);
-      primary.strokeRect(edge + 0.5, edge + 0.5, width - (edge * 2) - 1, height - (edge * 2) - 1);
-      secondary.fillStyle(themeProfile.palette.board.trailGlow, 0.04);
-      secondary.fillRect(edge, edge, width - (edge * 2), Math.max(4, edge));
-      secondary.fillRect(edge, height - Math.max(4, edge * 2), width - (edge * 2), Math.max(4, edge));
-      break;
-    case 'aurora':
-      primary.lineStyle(1, themeProfile.palette.board.trailGlow, 0.09);
-      primary.lineBetween(inset, height * 0.2, width - inset, height * 0.32);
-      primary.lineBetween(inset, height * 0.58, width - inset, height * 0.42);
-      primary.lineBetween(inset, height * 0.82, width - inset, height * 0.7);
-      secondary.fillStyle(themeProfile.palette.board.playerHalo, 0.04);
-      secondary.fillRect(edge, Math.round(height * 0.24), width - (edge * 2), Math.max(4, Math.round(height * 0.08)));
-      break;
-    case 'vellum':
-      primary.lineStyle(1, themeProfile.palette.board.topHighlight, 0.05);
-      primary.lineBetween(inset, height * 0.22, width - inset, height * 0.28);
-      primary.lineBetween(inset, height * 0.52, width - inset, height * 0.48);
-      primary.lineBetween(inset, height * 0.76, width - inset, height * 0.7);
-      secondary.fillStyle(themeProfile.palette.board.playerHalo, 0.03);
-      secondary.fillRect(edge, Math.round(height * 0.18), width - (edge * 2), Math.max(4, Math.round(height * 0.06)));
-      secondary.fillRect(edge, Math.round(height * 0.72), width - (edge * 2), Math.max(4, Math.round(height * 0.05)));
-      break;
-    case 'monolith':
-    default:
-      primary.fillStyle(themeProfile.palette.board.shadow, 0.08);
-      primary.fillRect(-edge, edge, width + (edge * 2), height + edge);
-      secondary.lineStyle(1, themeProfile.palette.board.outerStroke, 0.1);
-      secondary.strokeRect(inset + 0.5, inset + 0.5, width - (inset * 2) - 1, height - (inset * 2) - 1);
-      break;
-  }
-};
-
-const resolveSignedRange = (value: number, range: number): number => (
-  range <= 0 ? 0 : Math.round((((value & 0xff) / 255) * 2 - 1) * range)
-);
-
-const resolveFloatRange = (value: number, min: number, max: number): number => (
-  min + (((value & 0xff) / 255) * (max - min))
-);
-
-const mix = (seed: number, cycle: number, salt: number): number => (
-  Math.imul((seed >>> 0) ^ Math.imul((cycle + 1) >>> 0, 0x9e3779b1), (salt | 1) >>> 0) >>> 0
-);
-
-const lcg = (state: number): number => ((Math.imul(state, 1664525) + 1013904223) >>> 0);
-
-const ease = (value: number): number => {
-  const clamped = clamp(value, 0, 1);
-  return clamped * clamped * (3 - (2 * clamped));
-};
-
-const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
-
-const lerp = (from: number, to: number, t: number): number => from + ((to - from) * t);
-
-const toColorString = (value: number): string => `#${value.toString(16).padStart(6, '0')}`;
-
-const createMazerBrandMark = (
-  scene: Phaser.Scene,
-  size: number,
-  alpha = 1
-): Phaser.GameObjects.Graphics => {
-  const mark = scene.add.graphics();
-  const unit = size / 48;
-  const outerRadius = Math.max(5, 7 * unit);
-  const innerRadius = Math.max(4, 5 * unit);
-  const lineWidth = Math.max(2, 6 * unit);
-  const inset = 4 * unit;
-
-  mark.fillStyle(MAZER_BRAND_COLORS.shell, 0.22 * alpha);
-  mark.fillRoundedRect(-24 * unit, -24 * unit, 48 * unit, 48 * unit, outerRadius);
-  mark.lineStyle(Math.max(1, 3 * unit), MAZER_BRAND_COLORS.frame, 0.96 * alpha);
-  mark.strokeRoundedRect(-24 * unit, -24 * unit, 48 * unit, 48 * unit, outerRadius);
-  mark.lineStyle(Math.max(1, 2 * unit), MAZER_BRAND_COLORS.frameHighlight, 0.34 * alpha);
-  mark.strokeRoundedRect(-20 * unit, -20 * unit, 40 * unit, 40 * unit, innerRadius);
-  mark.lineStyle(lineWidth, MAZER_BRAND_COLORS.route, 0.98 * alpha);
-  mark.beginPath();
-  mark.moveTo(-16 * unit, 16 * unit);
-  mark.lineTo(-16 * unit, -14 * unit);
-  mark.lineTo(-6 * unit, -14 * unit);
-  mark.lineTo(-6 * unit, 4 * unit);
-  mark.lineTo(0, 4 * unit);
-  mark.lineTo(0, -6 * unit);
-  mark.lineTo(8 * unit, -6 * unit);
-  mark.lineTo(8 * unit, -14 * unit);
-  mark.lineTo(16 * unit, -14 * unit);
-  mark.lineTo(16 * unit, 16 * unit);
-  mark.strokePath();
-  mark.lineStyle(Math.max(1, lineWidth * 0.32), MAZER_BRAND_COLORS.frameHighlight, 0.34 * alpha);
-  mark.beginPath();
-  mark.moveTo(-16 * unit, 16 * unit);
-  mark.lineTo(-16 * unit, -14 * unit);
-  mark.lineTo(-6 * unit, -14 * unit);
-  mark.lineTo(-6 * unit, 4 * unit);
-  mark.lineTo(0, 4 * unit);
-  mark.lineTo(0, -6 * unit);
-  mark.lineTo(8 * unit, -6 * unit);
-  mark.lineTo(8 * unit, -14 * unit);
-  mark.lineTo(16 * unit, -14 * unit);
-  mark.lineTo(16 * unit, 16 * unit);
-  mark.strokePath();
-  mark.fillStyle(MAZER_BRAND_COLORS.route, alpha);
-  mark.fillCircle(-16 * unit, 16 * unit, 4.5 * unit);
-  mark.fillStyle(MAZER_BRAND_COLORS.goal, alpha);
-  mark.fillRoundedRect((16 * unit) - (5 * unit), (16 * unit) - (5 * unit), 10 * unit, 10 * unit, 2.8 * unit);
-  mark.lineStyle(Math.max(1, 1.4 * unit), MAZER_BRAND_COLORS.frameHighlight, 0.24 * alpha);
-  mark.strokeRoundedRect(-20 * unit + inset, -20 * unit + inset, 40 * unit - (inset * 2), 40 * unit - (inset * 2), Math.max(3, innerRadius - unit));
-
-  return mark;
-};
-
-const normalizeAnimationTime = (value: number, periodMs = ANIMATION_TIME_WRAP_MS): number => {
-  if (!Number.isFinite(value) || periodMs <= 0) {
-    return 0;
-  }
-
-  const wrapped = value % periodMs;
-  return wrapped < 0 ? wrapped + periodMs : wrapped;
-};
-
-const prefersReducedMotion = (): boolean => (
-  typeof window !== 'undefined'
-  && typeof window.matchMedia === 'function'
-  && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-);
+}

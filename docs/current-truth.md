@@ -1,57 +1,88 @@
 # Current Truth
 
-Use this note as the anti-drift override when older diffs, screenshots, or prose disagree.
+Use this note as the anti-drift override when older prose, screenshots, or implementation layers disagree.
 
-## Precedence
+## Active lane
 
-Current repo truth should be read in this order:
+The active lane is now:
 
-1. Latest repo-owned visual artifacts from the visual-proof receipt root in `tmp/captures/mazer-visual-proof/`
-2. The current visual assertions in `tests/scenes/demo-build.test.ts`
-3. Current runtime/tooling in `scripts/visual/mazer-run.mjs`, `scripts/visual/index-artifacts.mjs`, and `scripts/gates/future-lane-health.mjs`
-4. Older prose and research notes
+`legacy Unreal truth -> web app reset/port`
 
-If an older note conflicts with the screenshot gate or `demo-build.test.ts`, treat the older note as stale.
+This supersedes the prior productized 2D recovery shell as the main implementation direction.
 
-## Local baseline truth
+## Source-of-truth order
 
-- The screenshot gate is the primary visual source of truth now. Exact target URLs, diagnostics, and before/after artifacts are repo-owned.
-- The active shipping lane is the 2D Phaser runtime. Future-runtime and planet/3D proof work stay parked and non-authoritative for shipping claims.
-- The repo-owned proof path is green locally as of April 20, 2026. The canonical serial proof order passed again: `npm run visual:matrix -- --preset core --skip-build true`, then `npm run edge:live -- --skip-build true --headless true --run core-only-watch`, then `npm run edge:live -- --skip-build true --headless true --run core-only-play`, then `npm run verify`.
-- The closure lane uses that same serial local proof order now: `npm run visual:matrix -- --preset core --skip-build true`, then `npm run edge:live -- --skip-build true --headless true --run core-only-watch`, then `npm run edge:live -- --skip-build true --headless true --run core-only-play`, then `npm run verify`.
-- Recovery-design inspection is additive, not canonical shipping proof. Use `npm run visual:matrix:recovery`, `npm run edge:live:recovery:watch`, and `npm run edge:live:recovery:play` when design-recovery work needs route-aware evidence without replacing the shipping closure order.
-- Browser-heavy proof runs are non-canonical when they overlap. Parallel preview/browser proof is a false-failure source, not a release requirement.
-- The live 2D receipt root is `tmp/captures/mazer-visual-proof/`. The committed baseline pointer at `artifacts/visual/baseline.json` is promoted explicitly from that repo-owned root.
-- Trail attach and no-future-preview are the live contract now. The trail should promote into the moving head tile and stop previewing ahead of the actor.
-- The player must remain the dominant local visual signal in the shipping 2D runtime, including worst-case high-contrast or noisy board states.
-- Theme-specific palette tuning must never allow trail or goal to outrank the player's local signal.
-- Player readability is permanent. Trail/player support should oppose local tile luminance during watch, build, and erase phases.
-- Readable HUD thought text uses a bounded queue plus minimum dwell time. It should not replace entries at raw event speed.
-- The layout-proof path should be one command plus one preset config. Responsive captures should not depend on one-off ad hoc scripts.
-- Thought HUD status and quick-thought lanes are separate responsibilities now. Persistent route context should not share the same lane contract as short-lived observation updates.
-- Contrast that only works on some board presets is not sufficient for the live shipping surface.
-- Desktop, TV, and OBS now use the tight 5px board-fit composition frame between the title band and the bottom-center install CTA lane.
-- The bottom panel is the universal shell lane for now. Reopening a desktop side rail would regress maze/commentary cohesion and is not current truth.
-- Floating thought HUDs in the gameplay core are a failure mode. The live shell should favor the lower safe lane and keep the maze attention core clean.
-- Title/header cleanup landed. Current visual polish favors clearer lockup contrast, lower shadow mud, and tighter readout spacing.
-- Start/end diversity improved materially, but generator-side endpoint strategy spread is still not finished and remains too region-opposed heavy.
-- Build/rebuild is part of the spectator story, not a loading effect. The demo loop should read as `generator-step build -> watch run -> fail/clear hold -> reflection beat -> erase/wipe -> next build`.
-- The build reveal should consume a real bounded generator trace emitted behind `buildMaze`, with pacing scaled by maze size and reduced-motion-safe chunking instead of a fake presentation-only sweep.
-- Small mazes fit a fixed presentation frame; spare space becomes framing, not larger tiles.
-- Future glance or proof surfaces should consume compact `RunProjection` state with `full`, `compact`, or `private` privacy transforms instead of raw renderer/frame state.
-- Spectator tuning decisions should come from repo-owned experiment receipts. `runtime:observe` and `edge:live` now carry variant ids and telemetry summaries for that purpose.
+Read the repo in this order:
+
+1. Restored Unreal legacy truth from `legacy/old-project.zip`
+2. Legacy screenshots under `legacy/screenshots/`
+3. Legacy specs under `docs/legacy/`
+4. Reset-lane contract docs:
+   - `docs/research/MAZER_LEGACY_WEB_PORT_CONTRACT.md`
+   - `docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md`
+5. Current web runtime code
+
+If the current web app disagrees with restored legacy truth, legacy wins for this lane.
+
+## Current implementation truth
+
+- The current web runtime has been reset to a smaller legacy-first Phaser shell.
+- The old productized menu shell is no longer the active source of truth.
+- The current front-door contract is legacy-shaped:
+  - `Exit`
+  - `Start`
+  - `Options`
+- The current runtime preserves the one-overlay-at-a-time rule.
+- The current overlay family is:
+  - options
+  - features
+  - game modes
+  - pause
+  - message
+- The current menu shell is intentionally simpler and closer to the archived Unreal menu composition than the previous recovery shell.
+
+## What is already restored
+
+- legacy archive extraction command: `npm run legacy:extract`
+- restored Unreal truth workspace in ATLAS temp storage
+- legacy menu-shaped web front door
+- legacy-style menu demo board/trail presentation
+- legacy-style active play start path
+- legacy-style options/features/game-mode/pause overlay structure
+- repo-owned reset-lane tests in `tests/reset/`
+
+## What is not yet 1:1
+
+- maze generation lifecycle is still a reset-lane approximation, not the full old staged process graph
+- demo AI and backtracking are not yet a full legacy-exact port
+- in-game HUD is only partially restored
+- browser exit cannot literally execute the old engine quit behavior
+- visual/material parity still needs another pass against screenshots and restored assets
+
+## Current proof rule
+
+For the reset lane, the local proof spine is:
+
+1. `npm run legacy:extract`
+2. `npm run verify`
+
+Current `verify` means:
+
+- reset-lane tests
+- production build
+
+The older visual matrix / Edge live proof lane is now archival for comparison, not current closure truth for the reset lane.
 
 ## Release rule
 
-- Local repo health is green when the latest visual pass and repo verify pass are green.
-- Hosted-preview closure is a separate manual stop rule. Local green does not close the hosted lane by itself.
-- If the repo-owned proof path is green and the hosted preview still needs its manual or authenticated browser pass, describe the lane as healthy-but-held.
-- Production is only considered current when that latest local visual pass is committed and deployed.
-- A local-only visual win does not upgrade production truth by itself.
+- Do not claim production parity with the old game yet.
+- Do not claim 1:1 parity until the parity matrix gaps are actually closed.
+- Do not reopen the old recovery/product shell as if it were the authoritative direction.
 
 ## Still open
 
-- Production can still lag behind the local baseline.
-- Endpoint strategy diversity still needs another pass.
-- Runtime observe/soak visibility rollups are now repo-owned analysis truth. They inform local diagnostics and soak receipts, but they do not upgrade production truth by themselves.
-- `noir` and `monolith` may still want one last small separation/polish pass if the role split feels too close by eye.
+- exact main-menu behavior polish
+- exact play HUD parity
+- exact demo AI parity
+- exact generation/reset-flow parity
+- final screenshot-grade visual parity

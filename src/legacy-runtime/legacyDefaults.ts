@@ -1,0 +1,78 @@
+export interface LegacyLinearColor {
+  r: number;
+  g: number;
+  b: number;
+}
+
+export interface LegacySettings {
+  scale: number;
+  camScale: number;
+  pathColor: LegacyLinearColor;
+  wallColor: LegacyLinearColor;
+  darkMode: boolean;
+  toggleCameraFollow: boolean;
+  toggleTrailFade: boolean;
+}
+
+export const LEGACY_DEFAULTS: LegacySettings = {
+  scale: 50,
+  camScale: 0,
+  pathColor: {
+    r: 0.19099,
+    g: 0.192708,
+    b: 0.18769
+  },
+  wallColor: {
+    r: 0.067708,
+    g: 0.067708,
+    b: 0.067708
+  },
+  darkMode: false,
+  toggleCameraFollow: false,
+  toggleTrailFade: false
+};
+
+export const MAIN_MENU_BUTTONS = ['Exit', 'Start', 'Options'] as const;
+
+export const clampNumber = (value: number, min: number, max: number): number => (
+  Math.max(min, Math.min(max, value))
+);
+
+export const clampInteger = (value: number, min: number, max: number): number => (
+  Math.max(min, Math.min(max, Math.round(value)))
+);
+
+export const clampUnit = (value: number): number => clampNumber(value, 0, 1);
+
+const linearChannelToSrgbByte = (value: number): number => {
+  const normalized = clampUnit(value);
+  const srgb = normalized <= 0.0031308
+    ? normalized * 12.92
+    : (1.055 * Math.pow(normalized, 1 / 2.4)) - 0.055;
+
+  return clampInteger(Math.round(srgb * 255), 0, 255);
+};
+
+export const linearColorToHex = (color: LegacyLinearColor): string => {
+  const channels = [
+    linearChannelToSrgbByte(color.r),
+    linearChannelToSrgbByte(color.g),
+    linearChannelToSrgbByte(color.b)
+  ];
+
+  return `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+};
+
+export const linearColorToNumber = (color: LegacyLinearColor): number => (
+  Number.parseInt(linearColorToHex(color).slice(1), 16)
+);
+
+export const copyLegacySettings = (settings: LegacySettings): LegacySettings => ({
+  scale: settings.scale,
+  camScale: settings.camScale,
+  pathColor: { ...settings.pathColor },
+  wallColor: { ...settings.wallColor },
+  darkMode: settings.darkMode,
+  toggleCameraFollow: settings.toggleCameraFollow,
+  toggleTrailFade: settings.toggleTrailFade
+});

@@ -1,25 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: 'Courier New', Courier, monospace;
-  --mazer-safe-area-top: env(safe-area-inset-top, 0px);
-  --mazer-safe-area-right: env(safe-area-inset-right, 0px);
-  --mazer-safe-area-bottom: env(safe-area-inset-bottom, 0px);
-  --mazer-safe-area-left: env(safe-area-inset-left, 0px);
-  --mazer-viewport-width: 100vw;
-  --mazer-viewport-height: 100dvh;
-  --mazer-bg-a: #16223d;
-  --mazer-bg-b: #0d1528;
-  --mazer-bg-c: #060a12;
-  --mazer-bg-d: #020409;
-  --mazer-bg-focus: rgba(142, 208, 255, 0.1);
-  --mazer-stage-glow: rgba(126, 198, 255, 0.05);
-  --mazer-stage-shadow: rgba(0, 0, 0, 0.22);
-  --mazer-frame-stroke: rgba(132, 168, 214, 0.54);
-  --mazer-frame-focus: #b8e4ff;
-  --mazer-canvas-shadow: rgba(0, 0, 0, 0.62);
-  --mazer-canvas-glow: rgba(108, 180, 255, 0.14);
-  --mazer-shell-pad-x: clamp(6px, 1vw, 18px);
-  --mazer-shell-pad-y: clamp(6px, 1.1vh, 18px);
+  font-family: "Courier New", monospace;
 }
 
 * {
@@ -34,124 +15,30 @@ body,
   min-height: 100dvh;
 }
 
-html {
+html,
+body {
   margin: 0;
   overflow: hidden;
 }
 
 body {
-  margin: 0;
   background:
-    radial-gradient(circle at 50% 46%, var(--mazer-bg-focus) 0, rgba(122, 170, 255, 0) 30%),
-    radial-gradient(circle at 18% 16%, rgba(126, 196, 255, 0.08) 0, rgba(126, 196, 255, 0) 24%),
-    radial-gradient(circle at 82% 18%, rgba(196, 220, 255, 0.05) 0, rgba(196, 220, 255, 0) 20%),
-    radial-gradient(circle at 50% 62%, var(--mazer-bg-a) 0, var(--mazer-bg-b) 38%, var(--mazer-bg-c) 100%),
-    linear-gradient(180deg, var(--mazer-bg-d) 0, var(--mazer-bg-c) 100%)
-    fixed;
-  color: #f8f8ff;
-  overflow: hidden;
-  position: relative;
-}
-
-body::before,
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-}
-
-body::before {
-  background:
-    radial-gradient(circle at 50% 46%, rgba(148, 210, 255, 0.05) 0, rgba(148, 210, 255, 0) 44%),
-    radial-gradient(circle at 50% 76%, rgba(255, 255, 255, 0.03) 0, rgba(255, 255, 255, 0) 28%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.012) 0, rgba(255, 255, 255, 0) 24%, rgba(255, 255, 255, 0) 76%, rgba(255, 255, 255, 0.012) 100%);
-  opacity: 0.24;
-}
-
-body::after {
-  background:
-    radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.03) 0, rgba(255, 255, 255, 0) 34%),
-    radial-gradient(circle at 50% 44%, rgba(128, 188, 255, 0.045) 0, rgba(128, 188, 255, 0) 44%);
-  mask-image: radial-gradient(circle at center, black 16%, transparent 76%);
-  opacity: 0.025;
+    radial-gradient(circle at 24% 18%, rgba(104, 76, 138, 0.45) 0, rgba(104, 76, 138, 0) 26%),
+    radial-gradient(circle at 78% 18%, rgba(132, 96, 176, 0.38) 0, rgba(132, 96, 176, 0) 24%),
+    radial-gradient(circle at 52% 78%, rgba(98, 70, 132, 0.3) 0, rgba(98, 70, 132, 0) 22%),
+    linear-gradient(180deg, #261630 0, #2b1b39 40%, #24152f 100%);
+  color: #f3f4f8;
 }
 
 #app {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: var(--mazer-viewport-width);
-  height: var(--mazer-viewport-height);
-  min-height: var(--mazer-viewport-height);
-  overflow: hidden;
-  isolation: isolate;
-}
-
-#app::before {
-  content: '';
-  position: absolute;
-  inset: max(-12vh, -96px) max(-8vw, -80px);
-  background:
-    radial-gradient(circle at 50% 46%, rgba(142, 208, 255, 0.1) 0, rgba(120, 182, 255, 0) 52%),
-    radial-gradient(circle at 50% 62%, var(--mazer-stage-shadow) 0, rgba(0, 0, 0, 0) 72%),
-    radial-gradient(circle at 50% 92%, var(--mazer-stage-glow) 0, rgba(126, 198, 255, 0) 42%);
-  pointer-events: none;
-  filter: blur(14px);
-  opacity: 0.52;
+  inset: 0;
 }
 
 canvas {
   display: block;
-  position: absolute;
-  inset: 0;
-  z-index: 1;
   width: 100% !important;
   height: 100% !important;
-  max-width: none;
-  max-height: none;
-  margin: 0;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  -ms-interpolation-mode: nearest-neighbor;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  background: transparent;
-  touch-action: none;
-  transition: outline-color 200ms ease, outline-offset 200ms ease;
-}
-
-canvas:focus-visible {
-  outline: 1px solid rgba(184, 228, 255, 0.72);
-  outline-offset: -2px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #app::before {
-    filter: blur(12px);
-  }
-}
-
-@media (max-width: 640px) {
-  :root {
-    --mazer-shell-pad-x: 2px;
-    --mazer-shell-pad-y: 2px;
-  }
-
-  body::before,
-  body::after {
-    opacity: 0.4;
-  }
-
-  #app::before {
-    inset: max(-10vh, -80px) max(-6vw, -48px);
-    filter: blur(12px);
-  }
-}
-
-@media (max-height: 720px) {
-  :root {
-    --mazer-shell-pad-y: 2px;
-  }
 }

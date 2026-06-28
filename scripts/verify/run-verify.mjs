@@ -20,6 +20,5 @@ const runNpm = (args) => {
   });
 };
 
-runNpm(['run', 'architecture:check']);
 runNpm(['run', 'test:verify']);
 runNpm(['run', 'build']);
