@@ -80,6 +80,18 @@ describe('presentation palette', () => {
     }
   });
 
+  test('keeps recovery design palettes readable while reducing ambient clutter', () => {
+    for (const theme of ['noir', 'ember', 'aurora', 'vellum', 'monolith'] as const) {
+      const shipping = resolveAmbientThemeProfile(theme);
+      const recovery = resolveAmbientThemeProfile(theme, 'recovery');
+      const report = getPaletteReadabilityReport(recovery.palette);
+
+      expect(report.failures, `${theme}: recovery readability`).toEqual([]);
+      expect(recovery.background.cloudAlphaScale, `${theme}: cloud alpha`).toBeLessThan(shipping.background.cloudAlphaScale);
+      expect(recovery.ambientSky.staticStarDensityScale, `${theme}: star density`).toBeLessThan(shipping.ambientSky.staticStarDensityScale);
+    }
+  });
+
   test('keeps the light-board trail readable instead of washing into the floor', () => {
     const vellum = getPaletteReadabilityReport(resolveAmbientThemeProfile('vellum').palette);
     const vellumFloorVsTrail = vellum.checkpoints.find((checkpoint) => checkpoint.key === 'floor-vs-trail');

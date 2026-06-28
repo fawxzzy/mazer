@@ -32,4 +32,7 @@ npm run
 | --- | --- |
 | `npm run visual:capture` | Capture a repo-owned visual proof packet. |
 | `npm run visual:matrix` | Capture the shipping layout matrix. |
+| `npm run visual:matrix:recovery` | Capture the recovery-design layout matrix without changing the shipping default proof route. |
+| `npm run edge:live:recovery:watch` | Capture the recovery-design watch shell through the repo-owned Edge harness. |
+| `npm run edge:live:recovery:play` | Capture the recovery-design play shell through the repo-owned Edge harness. |
 | `npm run visual:gate` | Evaluate the latest visual proof gate outputs. |

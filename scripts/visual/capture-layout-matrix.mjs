@@ -419,6 +419,7 @@ const captureViewportWithRetries = async (options) => {
 export const captureLayoutMatrix = async ({
   baseUrl = DEFAULT_BASE_URL,
   route,
+  design,
   presetGroup = 'core',
   runId,
   timeoutMs = DEFAULT_CAPTURE_TIMEOUT_MS,
@@ -462,13 +463,18 @@ export const captureLayoutMatrix = async ({
     })();
   const resolvedBaseUrl = normalizeBaseUrl(preview?.baseUrl ?? baseUrl);
   const browser = await launchLayoutMatrixBrowser();
+  const resolvedDesign = typeof design === 'string' ? design.trim().toLowerCase() : null;
 
   try {
     const viewports = resolveLayoutMatrixViewports(presetGroup);
     const captures = [];
 
     for (const viewport of viewports) {
-      const resolvedRoute = normalizeRoute(resolveLayoutMatrixRoute(viewport, hasExplicitRoute ? route : undefined));
+      const resolvedRoute = normalizeRoute(resolveLayoutMatrixRoute(
+        viewport,
+        hasExplicitRoute ? route : undefined,
+        resolvedDesign ? { design: resolvedDesign } : undefined
+      ));
       captures.push(await captureViewportWithRetries({
         browser,
         baseUrl: resolvedBaseUrl,
@@ -488,7 +494,7 @@ export const captureLayoutMatrix = async ({
         path: resolve(runDir, capture.files.full)
       })),
       outputPath: contactSheetPath,
-      title: `Mazer Layout Matrix :: ${presetGroup}`
+      title: resolvedDesign ? `Mazer Layout Matrix :: ${presetGroup} :: ${resolvedDesign}` : `Mazer Layout Matrix :: ${presetGroup}`
     });
 
     const summary = {
@@ -500,6 +506,7 @@ export const captureLayoutMatrix = async ({
         baseUrl: resolvedBaseUrl
       },
       presetGroup,
+      design: resolvedDesign,
       artifactRoot: runDir,
       files: {
         markdown: relativeToRun(runDir, markdownPath),
@@ -555,6 +562,7 @@ const main = async () => {
   const result = await captureLayoutMatrix({
     baseUrl: externalUrl ?? args['base-url'] ?? DEFAULT_BASE_URL,
     route: typeof args.route === 'string' ? args.route : undefined,
+    design: typeof args.design === 'string' ? args.design : undefined,
     presetGroup: typeof args.preset === 'string' ? args.preset : 'core',
     runId: typeof args.run === 'string' ? args.run : undefined,
     timeoutMs: parseIntegerArg(args.timeout, DEFAULT_CAPTURE_TIMEOUT_MS),
