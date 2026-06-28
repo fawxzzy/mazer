@@ -16,6 +16,10 @@ import {
   type LegacyMazeSnapshot,
   type LegacyPoint
 } from '../legacy-runtime/legacyMaze';
+import {
+  resolveLegacyMenuLayout,
+  type LegacyMenuLayout
+} from '../legacy-runtime/legacyMenuLayout';
 
 type RuntimeMode = 'menu' | 'play';
 type OverlayKind = 'none' | 'options' | 'features' | 'gameModes' | 'pause' | 'message';
@@ -35,19 +39,6 @@ interface StarParticle {
   alpha: number;
 }
 
-interface SceneLayout {
-  width: number;
-  height: number;
-  boardLeft: number;
-  boardTop: number;
-  boardSize: number;
-  tileSize: number;
-  buttonY: number;
-  buttonWidth: number;
-  buttonHeight: number;
-}
-
-const BOARD_FRAME_PADDING = 18;
 const BOARD_SHADOW_OFFSET = 10;
 const MENU_BUTTON_ALPHA = 0.18;
 const MENU_BUTTON_STROKE_ALPHA = 0.24;
@@ -107,7 +98,7 @@ export class MenuScene extends Phaser.Scene {
   private uiTexts: Phaser.GameObjects.Text[] = [];
   private uiButtons: UiButton[] = [];
   private stars: StarParticle[] = [];
-  private layout!: SceneLayout;
+  private layout!: LegacyMenuLayout;
   private boardStaticDirty = true;
   private boardDynamicDirty = true;
   private backdropDirty = true;
@@ -233,37 +224,15 @@ export class MenuScene extends Phaser.Scene {
   private refreshLayout(): void {
     const width = this.scale.width;
     const height = this.scale.height;
-    const isPortrait = height > width;
-    const baseBoardSize = Math.min(
-      width * (isPortrait ? 0.82 : 0.44),
-      height * (isPortrait ? 0.64 : 0.77)
-    );
-    const boardScaleFactor = clamp(1 + (this.settings.camScale * 0.01), 0.55, 1.48);
-    const boardSize = Math.max(300, Math.round(baseBoardSize * boardScaleFactor));
-    const tileSize = Math.max(4, Math.floor((boardSize - (BOARD_FRAME_PADDING * 2)) / this.maze.size));
-    const snappedBoardSize = tileSize * this.maze.size;
-    const boardLeft = Math.round((width - snappedBoardSize) / 2);
-    const boardTop = Math.round(Math.max(54, (height - snappedBoardSize) * 0.11));
-
-    this.layout = {
-      width,
-      height,
-      boardLeft,
-      boardTop,
-      boardSize: snappedBoardSize,
-      tileSize,
-      buttonY: Math.round(boardTop + snappedBoardSize + Math.min(56, Math.max(28, (height - (boardTop + snappedBoardSize)) * 0.55))),
-      buttonWidth: Math.round(Math.min(350, Math.max(180, width * 0.12))),
-      buttonHeight: 64
-    };
+    this.layout = resolveLegacyMenuLayout(width, height, this.settings.scale + this.settings.camScale, this.maze.size);
 
     this.titleShadow
-      .setPosition(width / 2, boardTop + (tileSize * 6.2))
-      .setFontSize(Math.max(56, Math.round(snappedBoardSize * 0.17)));
+      .setPosition(this.layout.titleX, this.layout.titleY + Math.max(6, Math.round(this.layout.tileSize * 0.18)))
+      .setFontSize(Math.max(56, Math.round(this.layout.boardSize * 0.16)));
     this.titleText
-      .setPosition(width / 2, boardTop + (tileSize * 6))
-      .setFontSize(Math.max(56, Math.round(snappedBoardSize * 0.17)));
-    this.footerText.setPosition(width / 2, height - 22);
+      .setPosition(this.layout.titleX, this.layout.titleY)
+      .setFontSize(Math.max(56, Math.round(this.layout.boardSize * 0.16)));
+    this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
 
     this.boardStaticDirty = true;
     this.boardDynamicDirty = true;
@@ -386,15 +355,15 @@ export class MenuScene extends Phaser.Scene {
     const { width, height } = this.layout;
     this.backdropGraphics.clear();
 
-    const fieldColor = this.settings.darkMode ? 0x22172d : 0x2a1c3a;
-    const glowColor = this.settings.darkMode ? 0x3d2a52 : 0x4e356d;
+    const fieldColor = this.settings.darkMode ? 0x22172d : 0x2c1f3b;
+    const glowColor = this.settings.darkMode ? 0x3b2a4f : 0x563b74;
 
     this.backdropGraphics.fillStyle(fieldColor, 1);
     this.backdropGraphics.fillRect(0, 0, width, height);
-    this.backdropGraphics.fillStyle(glowColor, 0.78);
-    this.backdropGraphics.fillCircle(width * 0.24, height * 0.22, Math.min(width, height) * 0.22);
-    this.backdropGraphics.fillCircle(width * 0.76, height * 0.24, Math.min(width, height) * 0.18);
-    this.backdropGraphics.fillCircle(width * 0.52, height * 0.76, Math.min(width, height) * 0.16);
+    this.backdropGraphics.fillStyle(glowColor, 0.24);
+    this.backdropGraphics.fillCircle(width * 0.18, height * 0.24, Math.min(width, height) * 0.16);
+    this.backdropGraphics.fillCircle(width * 0.82, height * 0.18, Math.min(width, height) * 0.14);
+    this.backdropGraphics.fillCircle(width * 0.56, height * 0.82, Math.min(width, height) * 0.12);
 
     for (const star of this.stars) {
       this.backdropGraphics.fillStyle(0xffffff, star.alpha);
@@ -517,11 +486,7 @@ export class MenuScene extends Phaser.Scene {
   private drawHud(time: number): void {
     this.hudGraphics.clear();
     if (this.mode !== 'play') {
-      this.footerText.setText(
-        this.overlay === 'none'
-          ? 'Legacy reset lane: Start / Options / Exit restored first'
-          : ''
-      );
+      this.footerText.setText('');
       return;
     }
 
@@ -587,7 +552,7 @@ export class MenuScene extends Phaser.Scene {
         const [leftLabel, centerLabel, rightLabel] = MAIN_MENU_BUTTONS;
         this.uiButtons.push(
           this.createButton(
-            this.layout.width * 0.17,
+            this.layout.leftButtonX,
             this.layout.buttonY,
             this.layout.buttonWidth,
             this.layout.buttonHeight,
@@ -595,7 +560,7 @@ export class MenuScene extends Phaser.Scene {
             () => this.showExitMessage()
           ),
           this.createButton(
-            this.layout.width * 0.5,
+            this.layout.centerButtonX,
             this.layout.buttonY,
             this.layout.buttonWidth,
             this.layout.buttonHeight,
@@ -603,7 +568,7 @@ export class MenuScene extends Phaser.Scene {
             () => this.startPlayMode()
           ),
           this.createButton(
-            this.layout.width * 0.83,
+            this.layout.rightButtonX,
             this.layout.buttonY,
             this.layout.buttonWidth,
             this.layout.buttonHeight,
