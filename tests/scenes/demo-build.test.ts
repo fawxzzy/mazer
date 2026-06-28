@@ -204,9 +204,6 @@ describe('demo-only build', () => {
     expect(resolveBootPresentationConfig('?profile=recovery')).toEqual({
       presentation: 'title',
       chrome: 'full',
-    expect(resolveBootPresentationConfig('?design=recovery')).toEqual({
-      presentation: 'ambient',
-      chrome: 'minimal',
       mood: 'auto',
       title: 'show',
       theme: 'auto',
