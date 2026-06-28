@@ -994,6 +994,27 @@ export const resolveEdgeLiveArrivalProofState = (diagnostics) => {
   };
 };
 
+export const isEdgeLiveArrivalProofCandidate = (state) => {
+  const isArrivalWindow = state.lifecyclePhase === 'active-watch'
+    && (state.sequence === 'arrival' || state.sequence === 'fade' || state.sequence === 'reveal');
+  const isClearHoldFallback = state.lifecyclePhase === 'clear-hold' && state.readyToClear;
+
+  return state.actorVisible
+    && state.goalVisible
+    && (
+      (state.actorInsideExitRegion && isArrivalWindow)
+      || isClearHoldFallback
+    );
+};
+
+export const isEdgeLiveArrivalProofPass = (snapshot) => (
+  snapshot?.attempt?.lifecyclePhase === 'active-watch'
+    ? snapshot?.arrival?.actorInsideExitRegion === true
+    : snapshot?.attempt?.lifecyclePhase === 'clear-hold'
+      ? snapshot?.arrival?.readyToClear === true
+      : false
+);
+
 const readDiagnostics = async (page) => page.evaluate((keys) => ({
   visual: window[keys.visual] ?? null,
   runtime: window[keys.runtime] ?? null
@@ -1059,6 +1080,9 @@ export const isRetriableEdgeLiveCaptureError = (error) => {
   return (
     message.includes('Timed out waiting for edge live diagnostics')
     || message.includes('Timed out waiting for an active attempt lifecycle frame')
+    || message.includes('Timed out waiting for a hosted watch arrival frame before clear-hold')
+    || message.includes('Timed out waiting for clear-hold after hosted watch arrival')
+    || message.includes('Timed out waiting for erase-wipe after hosted watch clear-hold')
     || (error?.name === 'TimeoutError')
   );
 };
@@ -1218,16 +1242,7 @@ const captureEndWindowProof = async ({
   const arrivalDiagnostics = await waitForDiagnosticsMatch(
     page,
     timeoutMs,
-    (diagnostics) => {
-      const state = resolveEdgeLiveArrivalProofState(diagnostics?.visual);
-      const isArrivalWindow = state.lifecyclePhase === 'active-watch'
-        && (state.sequence === 'arrival' || state.sequence === 'fade' || state.sequence === 'reveal');
-      const isClearHoldFallback = state.lifecyclePhase === 'clear-hold' && state.readyToClear;
-      return state.actorVisible
-        && state.goalVisible
-        && state.actorInsideExitRegion
-        && (isArrivalWindow || isClearHoldFallback);
-    },
+    (diagnostics) => isEdgeLiveArrivalProofCandidate(resolveEdgeLiveArrivalProofState(diagnostics?.visual)),
     'Timed out waiting for a hosted watch arrival frame before clear-hold.'
   );
   await page.screenshot({
@@ -1280,11 +1295,7 @@ const captureEndWindowProof = async ({
 
   return {
     pass: Boolean(
-      arrivalSnapshot.arrival?.actorInsideExitRegion
-      && (
-        arrivalSnapshot.attempt?.lifecyclePhase === 'active-watch'
-        || arrivalSnapshot.attempt?.lifecyclePhase === 'clear-hold'
-      )
+      isEdgeLiveArrivalProofPass(arrivalSnapshot)
       && clearHoldSnapshot.attempt?.lifecyclePhase === 'clear-hold'
       && clearHoldSnapshot.arrival?.readyToClear === true
       && eraseSnapshot.attempt?.lifecyclePhase === 'erase-wipe'

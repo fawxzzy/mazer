@@ -96,6 +96,9 @@ describe('edge live check', () => {
 
   test('prefers explicit urls and derives board/hud verdicts from bounds', async () => {
     const {
+      isEdgeLiveArrivalProofCandidate,
+      isEdgeLiveArrivalProofPass,
+      isRetriableEdgeLiveCaptureError,
       resolveEdgeLiveAttemptKey,
       resolveEdgeLiveArrivalProofState,
       resolveEdgeLiveTargetUrl,
@@ -150,6 +153,9 @@ describe('edge live check', () => {
     expect(isEdgeLiveEndWindowRun('core-only-play')).toBe(false);
     expect(isEdgeLiveEndWindowRun('core-only-watch-recovery')).toBe(true);
     expect(isEdgeLiveEndWindowRun('core-only-play-recovery')).toBe(false);
+    expect(isRetriableEdgeLiveCaptureError(new Error('Timed out waiting for a hosted watch arrival frame before clear-hold.'))).toBe(true);
+    expect(isRetriableEdgeLiveCaptureError(new Error('Timed out waiting for clear-hold after hosted watch arrival.'))).toBe(true);
+    expect(isRetriableEdgeLiveCaptureError(new Error('Timed out waiting for erase-wipe after hosted watch clear-hold.'))).toBe(true);
     expect(resolveEdgeLiveAttemptKey({
       runtime: {
         projection: {
@@ -189,6 +195,32 @@ describe('edge live check', () => {
       readyToClear: false,
       settleRemainingMs: 120
     });
+    expect(isEdgeLiveArrivalProofCandidate({
+      actorVisible: true,
+      goalVisible: true,
+      actorInsideExitRegion: false,
+      lifecyclePhase: 'clear-hold',
+      sequence: 'fade',
+      readyToClear: true
+    })).toBe(true);
+    expect(isEdgeLiveArrivalProofPass({
+      attempt: {
+        lifecyclePhase: 'clear-hold'
+      },
+      arrival: {
+        readyToClear: true,
+        actorInsideExitRegion: false
+      }
+    })).toBe(true);
+    expect(isEdgeLiveArrivalProofPass({
+      attempt: {
+        lifecyclePhase: 'active-watch'
+      },
+      arrival: {
+        readyToClear: true,
+        actorInsideExitRegion: false
+      }
+    })).toBe(false);
   }, 15_000);
 
   test('resolves proof-surface workflows for the reduced projection routes', async () => {
