@@ -609,6 +609,12 @@ export class MenuScene extends Phaser.Scene {
     this.uiTexts = this.uiTexts.filter((text) => text.active);
   }
 
+  private clearPlayHudImmediately(): void {
+    this.hudGraphics.clear();
+    this.clearHudTexts();
+    this.footerText.setText('');
+  }
+
   private rebuildUi(): void {
     this.overlayGraphics.clear();
     this.clearUi();
@@ -722,13 +728,13 @@ export class MenuScene extends Phaser.Scene {
     this.createOverlayTitle('Features', rowY);
     rowY += 72;
 
-    rowY = this.createToggleRow('Camera Follow', this.settings.toggleCameraFollow, rowY, () => {
+    rowY = this.createToggleRow('Camera Follow', this.settings.toggleCameraFollow, rowY, panel, () => {
       this.settings.toggleCameraFollow = !this.settings.toggleCameraFollow;
       this.boardDynamicDirty = true;
       this.uiDirty = true;
     });
 
-    rowY = this.createToggleRow('Trail Fade', this.settings.toggleTrailFade, rowY, () => {
+    rowY = this.createToggleRow('Trail Fade', this.settings.toggleTrailFade, rowY, panel, () => {
       this.settings.toggleTrailFade = !this.settings.toggleTrailFade;
       this.boardDynamicDirty = true;
       this.uiDirty = true;
@@ -745,7 +751,7 @@ export class MenuScene extends Phaser.Scene {
     this.createOverlayTitle('Game Modes', rowY);
     rowY += 72;
 
-    this.createToggleRow('Dark Mode', this.settings.darkMode, rowY, () => {
+    this.createToggleRow('Dark Mode', this.settings.darkMode, rowY, panel, () => {
       this.settings.darkMode = !this.settings.darkMode;
       this.backdropDirty = true;
       this.boardStaticDirty = true;
@@ -965,23 +971,42 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private createToggleRow(label: string, value: boolean, y: number, onToggle: () => void): number {
-    const rowLabel = this.add.text(this.layout.width * 0.28, y, label, {
+  private createToggleRow(
+    label: string,
+    value: boolean,
+    y: number,
+    panel: OverlayPanelFrame,
+    onToggle: () => void
+  ): number {
+    const stacked = panel.width < 420;
+    const rowLabel = this.add.text(panel.left + 28, y, label, {
       fontFamily: '"Courier New", monospace',
-      fontSize: '22px',
+      fontSize: stacked ? '20px' : '22px',
       color: '#d9d8df'
     }).setOrigin(0, 0.5);
-    const stateText = this.add.text(this.layout.width * 0.62, y, value ? 'Off' : 'On', {
+    const stateText = this.add.text(
+      stacked ? panel.left + 64 : panel.left + Math.round(panel.width * 0.64),
+      stacked ? y + 32 : y,
+      value ? 'Off' : 'On',
+      {
       fontFamily: '"Courier New", monospace',
-      fontSize: '22px',
+      fontSize: stacked ? '18px' : '22px',
       color: '#6bc96f'
-    }).setOrigin(0.5);
+      }
+    ).setOrigin(0.5);
     this.uiTexts.push(rowLabel, stateText);
     this.uiButtons.push(
-      this.createButton(this.layout.width * 0.76, y, 120, 44, value ? 'Disable' : 'Enable', onToggle)
+      this.createButton(
+        stacked ? panel.left + panel.width - 92 : panel.left + Math.round(panel.width * 0.82),
+        stacked ? y + 32 : y,
+        stacked ? 136 : 120,
+        44,
+        value ? 'Disable' : 'Enable',
+        onToggle
+      )
     );
 
-    return y + 64;
+    return y + (stacked ? 84 : 64);
   }
 
   private createButton(
@@ -1039,6 +1064,9 @@ export class MenuScene extends Phaser.Scene {
 
   private openNestedOverlay(kind: OverlayKind, returnTo: OverlayKind): void {
     this.activeInputField = null;
+    if (this.mode === 'play') {
+      this.clearPlayHudImmediately();
+    }
     this.overlay = kind;
     this.overlayReturn = returnTo;
     this.boardDynamicDirty = true;
@@ -1050,6 +1078,9 @@ export class MenuScene extends Phaser.Scene {
       this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
     }
     this.activeInputField = null;
+    if (this.mode === 'play') {
+      this.clearPlayHudImmediately();
+    }
     this.overlay = kind;
     this.overlayReturn = 'none';
     this.boardDynamicDirty = true;
@@ -1066,6 +1097,9 @@ export class MenuScene extends Phaser.Scene {
       this.regenerateMaze();
     }
     this.activeInputField = null;
+    if (this.mode === 'play') {
+      this.clearPlayHudImmediately();
+    }
     this.boardDynamicDirty = true;
     this.uiDirty = true;
   }
