@@ -2,8 +2,6 @@ import Phaser from 'phaser';
 import {
   LEGACY_DEFAULTS,
   MAIN_MENU_BUTTONS,
-  clampInteger,
-  clampUnit,
   copyLegacySettings,
   linearColorToHex,
   linearColorToNumber,
@@ -20,6 +18,12 @@ import {
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
 } from '../legacy-runtime/legacyMenuLayout';
+import {
+  applyLegacyOptionField,
+  createLegacyOptionFieldDrafts,
+  type LegacyOptionFieldDrafts,
+  type LegacyOptionFieldId
+} from '../legacy-runtime/legacyOptionFields';
 
 type RuntimeMode = 'menu' | 'play';
 type OverlayKind = 'none' | 'options' | 'features' | 'gameModes' | 'pause' | 'message';
@@ -37,6 +41,14 @@ interface StarParticle {
   radius: number;
   speed: number;
   alpha: number;
+}
+
+interface OverlayPanelFrame {
+  centerX: number;
+  height: number;
+  left: number;
+  top: number;
+  width: number;
 }
 
 const BOARD_SHADOW_OFFSET = 10;
@@ -74,6 +86,8 @@ const buildPathTrail = (
 
 export class MenuScene extends Phaser.Scene {
   private settings: LegacySettings = copyLegacySettings(LEGACY_DEFAULTS);
+  private optionFieldDrafts: LegacyOptionFieldDrafts = createLegacyOptionFieldDrafts(LEGACY_DEFAULTS);
+  private activeInputField: LegacyOptionFieldId | null = null;
   private mazeSeed = 0x5a17f00d;
   private maze!: LegacyMazeSnapshot;
   private player!: LegacyPoint;
@@ -155,6 +169,7 @@ export class MenuScene extends Phaser.Scene {
       if (this.overlay === 'message') {
         this.overlay = 'none';
         this.overlayReturn = 'none';
+        this.boardDynamicDirty = true;
         this.uiDirty = true;
       }
     }
@@ -177,6 +192,10 @@ export class MenuScene extends Phaser.Scene {
   private installInput(): void {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (event.repeat) {
+        return;
+      }
+
+      if (this.overlay !== 'none' && this.handleOverlayFieldInput(event)) {
         return;
       }
 
@@ -221,6 +240,47 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
+  private handleOverlayFieldInput(event: KeyboardEvent): boolean {
+    if (this.activeInputField === null) {
+      return false;
+    }
+
+    if (event.key === 'Enter') {
+      this.commitOverlayField(this.activeInputField);
+      return true;
+    }
+
+    if (event.key === 'Escape') {
+      this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
+      this.activeInputField = null;
+      this.uiDirty = true;
+      return true;
+    }
+
+    if (event.key === 'Backspace') {
+      const nextValue = this.optionFieldDrafts[this.activeInputField].slice(0, -1);
+      this.optionFieldDrafts[this.activeInputField] = nextValue;
+      this.uiDirty = true;
+      return true;
+    }
+
+    if (!/^[0-9.-]$/.test(event.key)) {
+      return false;
+    }
+
+    const currentValue = this.optionFieldDrafts[this.activeInputField];
+    if (event.key === '-' && currentValue.includes('-')) {
+      return true;
+    }
+    if (event.key === '.' && currentValue.includes('.')) {
+      return true;
+    }
+
+    this.optionFieldDrafts[this.activeInputField] = `${currentValue}${event.key}`;
+    this.uiDirty = true;
+    return true;
+  }
+
   private refreshLayout(): void {
     const width = this.scale.width;
     const height = this.scale.height;
@@ -247,6 +307,9 @@ export class MenuScene extends Phaser.Scene {
     this.trail = buildPathTrail(this.maze.solutionPath.slice(0, this.demoCursor + 1), null);
     this.nextDemoMoveAtMs = 0;
     this.pendingMazeRebuild = false;
+    this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
+    this.activeInputField = null;
+    this.refreshLayout();
     this.boardStaticDirty = true;
     this.boardDynamicDirty = true;
     this.uiDirty = true;
@@ -485,12 +548,13 @@ export class MenuScene extends Phaser.Scene {
 
   private drawHud(time: number): void {
     this.hudGraphics.clear();
-    if (this.mode !== 'play') {
+    this.clearHudTexts();
+    if (this.mode !== 'play' || this.overlay !== 'none') {
       this.footerText.setText('');
       return;
     }
 
-    this.footerText.setText(this.overlay === 'none' ? 'WASD or arrows to move   P to pause' : '');
+    this.footerText.setText('WASD or arrows to move   P to pause');
 
     const elapsed = formatClock(time - this.playStartedAtMs);
     const timerText = `Time ${elapsed}`;
@@ -508,13 +572,6 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.fillRoundedRect(20, 18, 170, 42, 8);
     this.hudGraphics.lineStyle(1, 0xffffff, 0.18);
     this.hudGraphics.strokeRoundedRect(20, 18, 170, 42, 8);
-
-    this.uiTexts.forEach((text) => {
-      if (text.getData('hud') === true) {
-        text.destroy();
-      }
-    });
-    this.uiTexts = this.uiTexts.filter((text) => text.active);
 
     const timer = this.add.text(32, 29, timerText, {
       fontFamily: '"Courier New", monospace',
@@ -541,6 +598,15 @@ export class MenuScene extends Phaser.Scene {
       arrowOriginX + (Math.cos(angle - 2.4) * 12),
       arrowOriginY + (Math.sin(angle - 2.4) * 12)
     );
+  }
+
+  private clearHudTexts(): void {
+    this.uiTexts.forEach((text) => {
+      if (text.getData('hud') === true) {
+        text.destroy();
+      }
+    });
+    this.uiTexts = this.uiTexts.filter((text) => text.active);
   }
 
   private rebuildUi(): void {
@@ -606,68 +672,53 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawOverlayPanel(): void {
-    const width = Math.min(720, this.layout.width - 80);
-    const height = Math.min(620, this.layout.height - 120);
-    const left = Math.round((this.layout.width - width) / 2);
-    const top = Math.round((this.layout.height - height) / 2);
+    const panel = this.resolveOverlayPanelFrame();
 
     this.overlayGraphics.fillStyle(0x06060b, 0.76);
     this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);
     this.overlayGraphics.fillStyle(0x18151f, 0.96);
-    this.overlayGraphics.fillRoundedRect(left, top, width, height, 12);
+    this.overlayGraphics.fillRoundedRect(panel.left, panel.top, panel.width, panel.height, 12);
     this.overlayGraphics.lineStyle(2, 0x5f5866, 0.92);
-    this.overlayGraphics.strokeRoundedRect(left, top, width, height, 12);
+    this.overlayGraphics.strokeRoundedRect(panel.left, panel.top, panel.width, panel.height, 12);
+  }
+
+  private resolveOverlayPanelFrame(): OverlayPanelFrame {
+    const width = Math.min(720, this.layout.width - 40);
+    const height = Math.min(620, this.layout.height - 72);
+    const left = Math.round((this.layout.width - width) / 2);
+    const top = Math.round((this.layout.height - height) / 2);
+
+    return {
+      centerX: left + Math.round(width / 2),
+      height,
+      left,
+      top,
+      width
+    };
   }
 
   private buildOptionsOverlay(): void {
-    const top = Math.round((this.layout.height - Math.min(620, this.layout.height - 120)) / 2);
-    let rowY = top + 54;
-    this.createOverlayTitle('Options', rowY);
-    rowY += 52;
+    const panel = this.resolveOverlayPanelFrame();
+    let rowY = panel.top + 72;
+    this.createOverlayTitle('Options', panel.top + 54);
 
-    rowY = this.createStepperRow('Maze Scale', String(this.settings.scale), rowY, () => {
-      this.settings.scale = clampInteger(this.settings.scale - 1, 25, 150);
-      this.pendingMazeRebuild = true;
-      this.uiDirty = true;
-    }, () => {
-      this.settings.scale = clampInteger(this.settings.scale + 1, 25, 150);
-      this.pendingMazeRebuild = true;
-      this.uiDirty = true;
-    });
+    rowY = this.createInputRow('Maze Scale', 'scale', rowY, panel);
+    rowY = this.createInputRow('Camera Scale', 'camScale', rowY, panel);
+    rowY = this.createColorInputRow('Path RGB', ['pathR', 'pathG', 'pathB'], rowY, panel, this.settings.pathColor);
+    rowY = this.createColorInputRow('Wall RGB', ['wallR', 'wallG', 'wallB'], rowY, panel, this.settings.wallColor);
 
-    rowY = this.createStepperRow('Camera Scale', String(this.settings.camScale), rowY, () => {
-      this.settings.camScale = clampInteger(this.settings.camScale - 1, -50, 50);
-      this.refreshLayout();
-    }, () => {
-      this.settings.camScale = clampInteger(this.settings.camScale + 1, -50, 50);
-      this.refreshLayout();
-    });
-
-    rowY = this.createColorRow('Path RGB', this.settings.pathColor, rowY, (channel, delta) => {
-      this.settings.pathColor[channel] = clampUnit(this.settings.pathColor[channel] + delta);
-      this.pendingMazeRebuild = true;
-      this.boardStaticDirty = true;
-      this.uiDirty = true;
-    });
-
-    rowY = this.createColorRow('Wall RGB', this.settings.wallColor, rowY, (channel, delta) => {
-      this.settings.wallColor[channel] = clampUnit(this.settings.wallColor[channel] + delta);
-      this.pendingMazeRebuild = true;
-      this.boardStaticDirty = true;
-      this.uiDirty = true;
-    });
-
-    const buttonY = top + 500;
+    const buttonY = panel.top + panel.height - 140;
+    const utilityButtonWidth = panel.width < 420 ? 124 : 170;
     this.uiButtons.push(
-      this.createButton(this.layout.width * 0.33, buttonY, 170, 54, 'Features', () => this.openNestedOverlay('features', 'options')),
-      this.createButton(this.layout.width * 0.67, buttonY, 170, 54, 'Game Modes', () => this.openNestedOverlay('gameModes', 'options')),
-      this.createButton(this.layout.width * 0.5, buttonY + 76, 170, 54, 'Back', () => this.handleBackAction())
+      this.createButton(panel.centerX - Math.round(panel.width * 0.24), buttonY, utilityButtonWidth, 54, 'Features', () => this.openNestedOverlay('features', 'options')),
+      this.createButton(panel.centerX + Math.round(panel.width * 0.24), buttonY, utilityButtonWidth, 54, 'Game Modes', () => this.openNestedOverlay('gameModes', 'options')),
+      this.createButton(panel.centerX, buttonY + 76, Math.min(180, panel.width - 96), 54, 'Back', () => this.handleBackAction())
     );
   }
 
   private buildFeaturesOverlay(): void {
-    const top = Math.round((this.layout.height - Math.min(620, this.layout.height - 120)) / 2);
-    let rowY = top + 54;
+    const panel = this.resolveOverlayPanelFrame();
+    let rowY = panel.top + 54;
     this.createOverlayTitle('Features', rowY);
     rowY += 72;
 
@@ -684,13 +735,13 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.uiButtons.push(
-      this.createButton(this.layout.width * 0.5, top + 500, 170, 54, 'Back', () => this.handleBackAction())
+      this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Back', () => this.handleBackAction())
     );
   }
 
   private buildGameModesOverlay(): void {
-    const top = Math.round((this.layout.height - Math.min(620, this.layout.height - 120)) / 2);
-    let rowY = top + 54;
+    const panel = this.resolveOverlayPanelFrame();
+    let rowY = panel.top + 54;
     this.createOverlayTitle('Game Modes', rowY);
     rowY += 72;
 
@@ -703,51 +754,101 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.uiButtons.push(
-      this.createButton(this.layout.width * 0.5, top + 500, 170, 54, 'Back', () => this.handleBackAction())
+      this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Back', () => this.handleBackAction())
     );
   }
 
   private buildPauseOverlay(): void {
-    const top = Math.round((this.layout.height - Math.min(620, this.layout.height - 120)) / 2);
-    let rowY = top + 54;
+    const panel = this.resolveOverlayPanelFrame();
+    let rowY = panel.top + 54;
     this.createOverlayTitle('Paused', rowY);
     rowY += 72;
 
-    this.createStepperRow('Camera Scale', String(this.settings.camScale), rowY, () => {
-      this.settings.camScale = clampInteger(this.settings.camScale - 1, -50, 50);
-      this.refreshLayout();
-    }, () => {
-      this.settings.camScale = clampInteger(this.settings.camScale + 1, -50, 50);
-      this.refreshLayout();
-    });
+    this.createInputRow('Camera Scale', 'camScale', rowY, panel);
+
+    const stacked = panel.width < 420;
+    if (stacked) {
+      this.uiButtons.push(
+        this.createButton(panel.centerX - 78, panel.top + panel.height - 196, 132, 54, 'Back', () => this.closeOverlay()),
+        this.createButton(panel.centerX + 78, panel.top + panel.height - 196, 132, 54, 'Reset', () => {
+          this.player = copyPoint(this.maze.start);
+          this.trail = [copyPoint(this.player)];
+          this.closeOverlay();
+          this.boardDynamicDirty = true;
+        }),
+        this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Main Menu', () => this.enterMenuMode()),
+        this.createButton(panel.centerX, panel.top + panel.height - 56, Math.min(180, panel.width - 96), 46, 'Features', () => this.openNestedOverlay('features', 'pause'))
+      );
+      return;
+    }
 
     this.uiButtons.push(
-      this.createButton(this.layout.width * 0.3, top + 420, 150, 54, 'Back', () => this.closeOverlay()),
-      this.createButton(this.layout.width * 0.5, top + 420, 150, 54, 'Reset', () => {
+      this.createButton(panel.centerX - Math.round(panel.width * 0.28), panel.top + panel.height - 196, 132, 54, 'Back', () => this.closeOverlay()),
+      this.createButton(panel.centerX, panel.top + panel.height - 196, 132, 54, 'Reset', () => {
         this.player = copyPoint(this.maze.start);
         this.trail = [copyPoint(this.player)];
         this.closeOverlay();
         this.boardDynamicDirty = true;
       }),
-      this.createButton(this.layout.width * 0.7, top + 420, 180, 54, 'Main Menu', () => this.enterMenuMode()),
-      this.createButton(this.layout.width * 0.5, top + 500, 170, 54, 'Features', () => this.openNestedOverlay('features', 'pause'))
+      this.createButton(panel.centerX + Math.round(panel.width * 0.28), panel.top + panel.height - 196, 144, 54, 'Main Menu', () => this.enterMenuMode()),
+      this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Features', () => this.openNestedOverlay('features', 'pause'))
     );
   }
 
   private buildMessageOverlay(): void {
-    const top = Math.round((this.layout.height - Math.min(620, this.layout.height - 120)) / 2);
-    this.createOverlayTitle('Exit', top + 76);
-    const body = this.add.text(this.layout.width / 2, top + 190, this.messageText, {
+    const panel = this.resolveOverlayPanelFrame();
+    this.createOverlayTitle('Exit', panel.top + 76);
+    const body = this.add.text(panel.centerX, panel.top + 190, this.messageText, {
       fontFamily: '"Courier New", monospace',
       fontSize: '22px',
       color: '#f2f2f4',
       align: 'center',
-      wordWrap: { width: 420 }
+      wordWrap: { width: panel.width - 120 }
     }).setOrigin(0.5);
     this.uiTexts.push(body);
     this.uiButtons.push(
-      this.createButton(this.layout.width / 2, top + 420, 170, 54, 'Back', () => this.closeOverlay())
+      this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Back', () => this.closeOverlay())
     );
+  }
+
+  private selectOverlayField(fieldId: LegacyOptionFieldId): void {
+    if (this.activeInputField && this.activeInputField !== fieldId) {
+      this.commitOverlayField(this.activeInputField);
+    }
+
+    this.activeInputField = fieldId;
+    this.uiDirty = true;
+  }
+
+  private commitOverlayField(fieldId: LegacyOptionFieldId): void {
+    const result = applyLegacyOptionField(this.settings, this.optionFieldDrafts, fieldId);
+    const previousScale = this.settings.scale;
+
+    this.settings = result.settings;
+    this.optionFieldDrafts = result.drafts;
+
+    if (result.affectsMaze) {
+      this.pendingMazeRebuild = true;
+      this.boardStaticDirty = true;
+      this.boardDynamicDirty = true;
+    }
+    if (result.affectsCamera || this.settings.scale !== previousScale) {
+      this.refreshLayout();
+    }
+
+    this.uiDirty = true;
+  }
+
+  private commitAllOverlayFields(): void {
+    const fieldIds: LegacyOptionFieldId[] = this.overlay === 'pause'
+      ? ['camScale']
+      : ['scale', 'camScale', 'pathR', 'pathG', 'pathB', 'wallR', 'wallG', 'wallB'];
+
+    for (const fieldId of fieldIds) {
+      this.commitOverlayField(fieldId);
+    }
+
+    this.activeInputField = null;
   }
 
   private createOverlayTitle(text: string, y: number): void {
@@ -759,70 +860,109 @@ export class MenuScene extends Phaser.Scene {
     this.uiTexts.push(label);
   }
 
-  private createStepperRow(
+  private createInputRow(
     label: string,
-    value: string,
+    fieldId: LegacyOptionFieldId,
     y: number,
-    onMinus: () => void,
-    onPlus: () => void
+    panel: OverlayPanelFrame
   ): number {
-    const rowLabel = this.add.text(this.layout.width * 0.26, y, label, {
+    const stacked = panel.width < 420;
+    const labelX = panel.left + 28;
+    const rowLabel = this.add.text(labelX, y, label, {
       fontFamily: '"Courier New", monospace',
-      fontSize: '22px',
+      fontSize: stacked ? '20px' : '22px',
       color: '#d9d8df'
     }).setOrigin(0, 0.5);
-    const rowValue = this.add.text(this.layout.width * 0.5, y, value, {
-      fontFamily: '"Courier New", monospace',
-      fontSize: '22px',
-      color: '#6bc96f'
-    }).setOrigin(0.5);
 
-    this.uiTexts.push(rowLabel, rowValue);
-    this.uiButtons.push(
-      this.createButton(this.layout.width * 0.64, y, 52, 42, '-', onMinus),
-      this.createButton(this.layout.width * 0.75, y, 52, 42, '+', onPlus)
+    this.uiTexts.push(rowLabel);
+    this.createInputFieldBox(
+      stacked ? panel.centerX : panel.left + Math.round(panel.width * 0.72),
+      stacked ? y + 34 : y,
+      stacked ? panel.width - 56 : Math.min(188, Math.round(panel.width * 0.38)),
+      44,
+      fieldId,
+      this.optionFieldDrafts[fieldId]
     );
 
-    return y + 58;
+    return y + (stacked ? 82 : 58);
   }
 
-  private createColorRow(
+  private createColorInputRow(
     label: string,
-    color: { r: number; g: number; b: number },
+    fieldIds: [LegacyOptionFieldId, LegacyOptionFieldId, LegacyOptionFieldId],
     y: number,
-    onDelta: (channel: 'r' | 'g' | 'b', delta: number) => void
+    panel: OverlayPanelFrame,
+    color: { r: number; g: number; b: number }
   ): number {
-    const colorText = `${color.r.toFixed(2)}  ${color.g.toFixed(2)}  ${color.b.toFixed(2)}`;
+    const stacked = panel.width < 420;
     const swatch = linearColorToHex(color);
 
-    const rowLabel = this.add.text(this.layout.width * 0.18, y, label, {
+    const rowLabel = this.add.text(panel.left + 28, y, label, {
       fontFamily: '"Courier New", monospace',
       fontSize: '20px',
       color: '#d9d8df'
     }).setOrigin(0, 0.5);
-    const rowValue = this.add.text(this.layout.width * 0.46, y, colorText, {
+    const swatchLabel = this.add.text(panel.left + panel.width - 72, y, swatch, {
       fontFamily: '"Courier New", monospace',
-      fontSize: '18px',
-      color: '#f0f0f4'
-    }).setOrigin(0.5);
-    const swatchLabel = this.add.text(this.layout.width * 0.74, y, swatch, {
-      fontFamily: '"Courier New", monospace',
-      fontSize: '18px',
+      fontSize: stacked ? '16px' : '18px',
       color: swatch
     }).setOrigin(0.5);
 
-    this.uiTexts.push(rowLabel, rowValue, swatchLabel);
+    this.uiTexts.push(rowLabel, swatchLabel);
+    const startX = stacked ? panel.left + 58 : panel.left + Math.round(panel.width * 0.46);
+    const spacing = stacked ? Math.round((panel.width - 116) / 2) : 122;
+    const inputY = stacked ? y + 38 : y;
+    const channelLabelY = stacked ? y + 14 : y - 24;
 
-    this.uiButtons.push(
-      this.createButton(this.layout.width * 0.58, y - 16, 44, 30, 'R-', () => onDelta('r', -0.05)),
-      this.createButton(this.layout.width * 0.64, y - 16, 44, 30, 'R+', () => onDelta('r', 0.05)),
-      this.createButton(this.layout.width * 0.58, y + 16, 44, 30, 'G-', () => onDelta('g', -0.05)),
-      this.createButton(this.layout.width * 0.64, y + 16, 44, 30, 'G+', () => onDelta('g', 0.05)),
-      this.createButton(this.layout.width * 0.70, y - 16, 44, 30, 'B-', () => onDelta('b', -0.05)),
-      this.createButton(this.layout.width * 0.76, y - 16, 44, 30, 'B+', () => onDelta('b', 0.05))
-    );
+    for (const [index, fieldId] of fieldIds.entries()) {
+      const caption = this.add.text(startX + (spacing * index), channelLabelY, ['R', 'G', 'B'][index] ?? '', {
+        fontFamily: '"Courier New", monospace',
+        fontSize: '14px',
+        color: '#6bc96f'
+      }).setOrigin(0.5);
+      this.uiTexts.push(caption);
+      this.createInputFieldBox(
+        startX + (spacing * index),
+        inputY,
+        stacked ? 84 : 100,
+        42,
+        fieldId,
+        this.optionFieldDrafts[fieldId]
+      );
+    }
 
-    return y + 82;
+    return y + (stacked ? 92 : 82);
+  }
+
+  private createInputFieldBox(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    fieldId: LegacyOptionFieldId,
+    value: string
+  ): void {
+    const isActive = this.activeInputField === fieldId;
+    const background = this.add.rectangle(x, y, width, height, 0xffffff, isActive ? 0.18 : 0.08);
+    background.setStrokeStyle(2, isActive ? 0x6bc96f : 0xb8b1c1, isActive ? 0.95 : 0.32);
+    background.setInteractive({ useHandCursor: true });
+    background.on('pointerdown', () => this.selectOverlayField(fieldId));
+
+    const label = this.add.text(x, y, value, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: `${Math.max(14, Math.min(22, Math.round(height * 0.38)))}px`,
+      color: isActive ? '#7cf58f' : '#f0f0f4'
+    }).setOrigin(0.5);
+
+    this.uiButtons.push({
+      background,
+      label,
+      setActive: () => undefined,
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+      }
+    });
   }
 
   private createToggleRow(label: string, value: boolean, y: number, onToggle: () => void): number {
@@ -898,23 +1038,35 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private openNestedOverlay(kind: OverlayKind, returnTo: OverlayKind): void {
+    this.activeInputField = null;
     this.overlay = kind;
     this.overlayReturn = returnTo;
+    this.boardDynamicDirty = true;
     this.uiDirty = true;
   }
 
   private openOverlay(kind: OverlayKind): void {
+    if (kind === 'options' || kind === 'pause') {
+      this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
+    }
+    this.activeInputField = null;
     this.overlay = kind;
     this.overlayReturn = 'none';
+    this.boardDynamicDirty = true;
     this.uiDirty = true;
   }
 
   private closeOverlay(): void {
+    if (this.overlay === 'options' || this.overlay === 'pause') {
+      this.commitAllOverlayFields();
+    }
     this.overlay = 'none';
     this.overlayReturn = 'none';
     if (this.pendingMazeRebuild) {
       this.regenerateMaze();
     }
+    this.activeInputField = null;
+    this.boardDynamicDirty = true;
     this.uiDirty = true;
   }
 
@@ -929,6 +1081,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.overlayReturn !== 'none') {
       this.overlay = this.overlayReturn;
       this.overlayReturn = 'none';
+      this.boardDynamicDirty = true;
       this.uiDirty = true;
       return;
     }
