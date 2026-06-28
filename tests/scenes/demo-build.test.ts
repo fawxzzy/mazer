@@ -621,8 +621,20 @@ describe('demo-only build', () => {
     const episode = resolved.episode;
     const defaultModel = resolveMenuPresentationModel(1920, 1080, 'title', 'full', true);
     const recoveryModel = resolveMenuPresentationModel(1920, 1080, 'title', 'full', true, 'recovery');
+    const shippingTvModel = resolveMenuPresentationModel(1920, 1080, 'ambient', 'minimal', true, 'tv');
+    const designRecoveryModel = resolveMenuPresentationModel(1920, 1080, 'ambient', 'minimal', true, 'tv', undefined, 'recovery');
     const defaultTitleBand = resolveTitleBandFrame(defaultModel.viewport.width, defaultModel.layout);
     const recoveryTitleBand = resolveTitleBandFrame(recoveryModel.viewport.width, recoveryModel.layout, undefined, undefined, 'recovery', 490);
+    const shippingTvTitleBand = resolveTitleBandFrame(shippingTvModel.viewport.width, shippingTvModel.layout, undefined, undefined, 'tv');
+    const designRecoveryTitleBand = resolveTitleBandFrame(
+      designRecoveryModel.viewport.width,
+      designRecoveryModel.layout,
+      undefined,
+      undefined,
+      'tv',
+      490,
+      'recovery'
+    );
     const defaultBoardFrame = resolveBoardCompositionFrame(
       defaultModel.viewport.width,
       defaultModel.viewport.height,
@@ -636,6 +648,25 @@ describe('demo-only build', () => {
       recoveryTitleBand,
       undefined,
       undefined,
+      'recovery'
+    );
+    const shippingTvBoardFrame = resolveBoardCompositionFrame(
+      shippingTvModel.viewport.width,
+      shippingTvModel.viewport.height,
+      shippingTvModel.layout,
+      shippingTvTitleBand,
+      undefined,
+      undefined,
+      'tv'
+    );
+    const designRecoveryBoardFrame = resolveBoardCompositionFrame(
+      designRecoveryModel.viewport.width,
+      designRecoveryModel.viewport.height,
+      designRecoveryModel.layout,
+      designRecoveryTitleBand,
+      undefined,
+      undefined,
+      'tv',
       'recovery'
     );
     const defaultLayout = createBoardLayout(createViewportSceneStub(defaultModel.viewport.width, defaultModel.viewport.height), episode, {
@@ -658,11 +689,21 @@ describe('demo-only build', () => {
       recoveryModel.layout,
       'recovery'
     )).toBe('commentary-rail');
+    expect(resolveIntentFeedPresentationMode(
+      designRecoveryModel.viewport.width,
+      designRecoveryModel.viewport.height,
+      designRecoveryModel.layout,
+      'tv',
+      'recovery'
+    )).toBe('commentary-rail');
     expect(recoveryBoardFrame.height).toBeGreaterThan(defaultBoardFrame.height);
     expect(recoveryBoardFrame.width).toBeLessThan(defaultBoardFrame.width);
     expect(recoveryLayout.boardHeight).toBeGreaterThan(defaultLayout.boardHeight);
     expect(Math.abs(recoveryTitleBand.centerX - recoveryBoardFrame.centerX)).toBeLessThanOrEqual(2);
     expect(recoveryTitleBand.right).toBeLessThan(defaultTitleBand.right);
+    expect(designRecoveryBoardFrame.height).toBeGreaterThan(shippingTvBoardFrame.height);
+    expect(designRecoveryBoardFrame.width).toBeLessThan(shippingTvBoardFrame.width);
+    expect(designRecoveryTitleBand.right).toBeLessThan(shippingTvTitleBand.right);
 
     disposeMazeEpisode(episode);
   });

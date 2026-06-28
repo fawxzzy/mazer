@@ -2072,13 +2072,13 @@ const resolveTitleBandReservedRightPx = (
   viewportHeight: number,
   sceneLayout: SceneLayoutProfile,
   installReservePx: number,
-  profile?: PresentationDeploymentProfile
+  profile?: PresentationDeploymentProfile,
+  design?: PresentationDesignProfile
 ): number => {
   const installReserve = Math.max(0, Math.round(installReservePx));
 
   if (
-    profile !== 'recovery'
-    || resolveIntentFeedPresentationMode(viewportWidth, viewportHeight, sceneLayout, profile) !== 'commentary-rail'
+    resolveIntentFeedPresentationMode(viewportWidth, viewportHeight, sceneLayout, profile, design) !== 'commentary-rail'
   ) {
     return installReserve;
   }
@@ -4288,7 +4288,8 @@ export function resolveBoardCompositionFrame(
   titleFrame?: TitleBandFrame,
   installFrame?: InstallChromeFrame,
   safeInsets?: Partial<ViewportSafeInsets> | null,
-  profile?: PresentationDeploymentProfile
+  profile?: PresentationDeploymentProfile,
+  design?: PresentationDesignProfile
 ): BoardBounds {
   const viewportSafeInsets = sanitizeViewportSafeInsets(safeInsets);
   const safeWidth = sanitizePositive(viewportWidth, DEFAULT_VIEWPORT_WIDTH, 1);
@@ -4312,7 +4313,8 @@ export function resolveBoardCompositionFrame(
     safeWidth,
     safeHeight,
     sceneLayout,
-    profile
+    profile,
+    design
   );
   if (presentationMode === 'commentary-rail') {
     const commentaryRailWidth = resolveIntentFeedCommentaryRailWidth(safeWidth, sceneLayout);
@@ -4355,7 +4357,8 @@ export function resolveIntentFeedPresentationMode(
   viewportWidth: number,
   viewportHeight: number,
   sceneLayout: SceneLayoutProfile,
-  profile?: PresentationDeploymentProfile
+  profile?: PresentationDeploymentProfile,
+  design?: PresentationDesignProfile
 ): IntentFeedPresentationMode {
   const tuning = legacyTuning.menu.intentFeed;
   const safeWidth = sanitizePositive(viewportWidth, DEFAULT_VIEWPORT_WIDTH, 1);
@@ -4364,7 +4367,9 @@ export function resolveIntentFeedPresentationMode(
   const wideEnough = safeWidth >= tuning.commentaryRailMinViewportWidthPx;
   const tallEnough = safeHeight >= tuning.commentaryRailMinViewportHeightPx;
   const landscapeEnough = aspectRatio >= tuning.commentaryRailMinAspectRatio;
-  const railEnabled = profile === 'recovery' || legacyTuning.menu.intentFeed.commentaryRailEnabled;
+  const railEnabled = profile === 'recovery'
+    || isRecoveryDesignProfile(design)
+    || legacyTuning.menu.intentFeed.commentaryRailEnabled;
 
   if (profile === 'obs') {
     return 'bottom-panel';
@@ -5534,7 +5539,8 @@ export class MenuScene extends Phaser.Scene {
           height,
           sceneLayout,
           installTitleReserveRight,
-          deploymentProfileId
+          deploymentProfileId,
+          launchConfig.design
         );
         const titleFrame = titleVisible
           ? resolveTitleBandFrame(
@@ -5566,7 +5572,8 @@ export class MenuScene extends Phaser.Scene {
           titleFrame,
           installFrame,
           viewportSafeInsets,
-          deploymentProfileId
+          deploymentProfileId,
+          launchConfig.design
         );
         const layout = createBoardLayout(this, episode, {
           boardScale: sceneLayout.boardScale,
@@ -5895,7 +5902,8 @@ export class MenuScene extends Phaser.Scene {
           height,
           sceneLayout,
           installTitleReserveRight,
-          deploymentProfileId
+          deploymentProfileId,
+          launchConfig.design
         );
         const titleBandFrame = resolveTitleBandFrame(
           width,
