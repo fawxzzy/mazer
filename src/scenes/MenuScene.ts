@@ -200,12 +200,12 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: '"Courier New", monospace',
       fontSize: '96px',
       color: TITLE_SHADOW_COLOR
-    }).setOrigin(0.5).setAlpha(0.62);
+    }).setOrigin(0.5).setAlpha(0.76);
     this.titleText = this.add.text(0, 0, 'Mazer', {
       fontFamily: '"Courier New", monospace',
       fontSize: '96px',
       color: TITLE_FILL_COLOR
-    }).setOrigin(0.5).setAlpha(0.72);
+    }).setOrigin(0.5).setAlpha(0.88);
     this.footerText = this.add.text(0, 0, '', {
       fontFamily: '"Courier New", monospace',
       fontSize: '18px',
@@ -360,10 +360,10 @@ export class MenuScene extends Phaser.Scene {
     const isPortrait = height > width;
     this.layout = resolveLegacyMenuLayout(width, height, this.settings.scale + this.settings.camScale, this.maze.size);
     const titleFontSize = Math.max(
-      isPortrait ? 62 : 76,
-      Math.round(this.layout.boardSize * (isPortrait ? 0.18 : 0.2))
+      isPortrait ? 64 : 82,
+      Math.round(this.layout.boardSize * (isPortrait ? 0.19 : 0.215))
     );
-    const titleShadowOffset = Math.max(isPortrait ? 6 : 8, Math.round(this.layout.tileSize * (isPortrait ? 0.18 : 0.24)));
+    const titleShadowOffset = Math.max(isPortrait ? 7 : 10, Math.round(this.layout.tileSize * (isPortrait ? 0.22 : 0.3)));
 
     this.titleShadow
       .setPosition(this.layout.titleX, this.layout.titleY + titleShadowOffset)
@@ -1195,13 +1195,13 @@ export class MenuScene extends Phaser.Scene {
     const isMenuFrontDoor = this.mode === 'menu' && this.overlay === 'none';
     const isPrimaryFrontDoorButton = isMenuFrontDoor && text === 'Start';
     const baseAlpha = isMenuFrontDoor
-      ? (isPrimaryFrontDoorButton ? 0.16 : 0.12)
+      ? (isPrimaryFrontDoorButton ? 0.22 : 0.16)
       : MENU_BUTTON_ALPHA;
     const baseStroke = isMenuFrontDoor
-      ? (isPrimaryFrontDoorButton ? 0.34 : 0.28)
+      ? (isPrimaryFrontDoorButton ? 0.42 : 0.34)
       : MENU_BUTTON_STROKE_ALPHA;
     const strokeColor = isMenuFrontDoor
-      ? (isPrimaryFrontDoorButton ? 0xc2bacb : 0xb2a9bc)
+      ? (isPrimaryFrontDoorButton ? 0xd4cadf : 0xc6bbd2)
       : 0xb8b1c1;
     const background = this.add.rectangle(x, y, width, height, 0xffffff, baseAlpha);
     background.setStrokeStyle(2, strokeColor, baseStroke);
@@ -1228,14 +1228,14 @@ export class MenuScene extends Phaser.Scene {
       background.setFillStyle(
         0xffffff,
         active
-          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.22 : 0.16) : 0.28)
+          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.28 : 0.2) : 0.28)
           : baseAlpha
       );
       background.setStrokeStyle(
         2,
         0xffffff,
         active
-          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.38 : 0.3) : 0.36)
+          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.48 : 0.38) : 0.36)
           : baseStroke
       );
       label.setAlpha(

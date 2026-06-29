@@ -30,11 +30,11 @@ export const resolveLegacyMenuLayout = (
 ): LegacyMenuLayout => {
   const normalizedScale = clampInteger(scale, 25, 150);
   const isPortrait = height > width;
-  const baseBoardScale = isPortrait ? 0.94 : 0.45;
+  const baseBoardScale = isPortrait ? 0.94 : 0.48;
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const rawBoardSize = Math.min(
     width * baseBoardScale * scaleBias,
-    height * (isPortrait ? 0.54 : 0.78) * scaleBias
+    height * (isPortrait ? 0.54 : 0.8) * scaleBias
   );
   const boardSize = Math.round(clamp(rawBoardSize, 300, Math.min(width * (isPortrait ? 0.94 : 0.82), height * (isPortrait ? 0.84 : 0.82))));
   const tileSize = Math.max(4, Math.floor(boardSize / Math.max(1, mazeSize)));
@@ -49,8 +49,8 @@ export const resolveLegacyMenuLayout = (
       height - Math.round(buttonHeight * 0.8)
     ))
     : Math.round(clamp(
-      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.16),
-      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.5),
+      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.08),
+      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.44),
       height - Math.round(buttonHeight * 0.6)
     ));
   const centerButtonY = isPortrait
@@ -60,15 +60,15 @@ export const resolveLegacyMenuLayout = (
       buttonY - Math.round(buttonHeight * 0.28)
     ))
     : Math.round(clamp(
-      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.22),
-      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.36),
+      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.18),
+      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.3),
       buttonY - Math.round(buttonHeight * 0.3)
     ));
   const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.21 : 0.13), isPortrait ? 96 : 150, isPortrait ? 144 : 252));
   const centerButtonWidth = isPortrait
     ? Math.round(clamp(buttonWidth * 1.14, buttonWidth, 168))
     : Math.round(clamp(buttonWidth * 1.55, buttonWidth + 36, 312));
-  const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.145 : 0.17), 58, 320));
+  const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.145 : 0.16), 58, 320));
   const centerButtonX = Math.round(width * 0.5);
 
   return {
