@@ -79,7 +79,7 @@ export const resolveLegacyMenuLayout = (
     boardSize: snappedBoardSize,
     tileSize,
     titleX: Math.round(width / 2),
-    titleY: Math.round(boardTop + (snappedBoardSize * (isPortrait ? 0.14 : 0.128))),
+    titleY: Math.round(boardTop + (snappedBoardSize * (isPortrait ? 0.148 : 0.146))),
     footerY: height - 18,
     buttonY,
     centerButtonY,

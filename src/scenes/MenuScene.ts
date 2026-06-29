@@ -1249,10 +1249,10 @@ export class MenuScene extends Phaser.Scene {
     const isMenuFrontDoor = this.mode === 'menu' && this.overlay === 'none';
     const isPrimaryFrontDoorButton = isMenuFrontDoor && text === 'Start';
     const baseAlpha = isMenuFrontDoor
-      ? (isPrimaryFrontDoorButton ? 0.1 : 0.07)
+      ? (isPrimaryFrontDoorButton ? 0.12 : 0.09)
       : MENU_BUTTON_ALPHA;
     const baseStroke = isMenuFrontDoor
-      ? (isPrimaryFrontDoorButton ? 0.24 : 0.18)
+      ? (isPrimaryFrontDoorButton ? 0.28 : 0.22)
       : MENU_BUTTON_STROKE_ALPHA;
     const strokeColor = isMenuFrontDoor
       ? (isPrimaryFrontDoorButton ? 0xbdb5c9 : 0xa59db4)
@@ -1276,24 +1276,24 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: '"Courier New", monospace',
       fontSize: `${buttonFontSize}px`,
       color: buttonTextColor
-    }).setOrigin(0.5).setAlpha(isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.78 : 0.68) : 0.92);
+    }).setOrigin(0.5).setAlpha(isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.84 : 0.76) : 0.92);
 
     const setActive = (active: boolean): void => {
       background.setFillStyle(
         0xffffff,
         active
-          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.16 : 0.12) : 0.28)
+          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.2 : 0.16) : 0.28)
           : baseAlpha
       );
       background.setStrokeStyle(
         isMenuFrontDoor ? 1 : 2,
         0xffffff,
         active
-          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.3 : 0.22) : 0.36)
+          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.34 : 0.28) : 0.36)
           : baseStroke
       );
       label.setAlpha(
-        active ? 0.94 : (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.78 : 0.68) : 0.92)
+        active ? 0.98 : (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.84 : 0.76) : 0.92)
       );
     };
 
