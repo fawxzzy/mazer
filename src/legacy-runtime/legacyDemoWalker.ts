@@ -4,7 +4,7 @@ import { TILE_END, TILE_FLOOR, TILE_PATH, createGrid, indexFromCoordinates, xFro
 import { legacyTuning } from '../config/tuning';
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 
-export const LEGACY_MENU_SNAPSHOT_PREROLL_STEPS = 56;
+export const LEGACY_MENU_SNAPSHOT_PREROLL_STEPS = 68;
 
 const pointToIndex = (point: LegacyPoint, width: number): number => indexFromCoordinates(point.x, point.y, width);
 

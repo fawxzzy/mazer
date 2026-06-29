@@ -73,6 +73,57 @@ Rule:
 
 - if you cannot name the owner surface and proof surface for a change, the change is not ready to make
 
+## Reset-lane state map
+
+This is the active state contract for the current app front door.
+
+| State family | Values | Owner | Notes |
+| --- | --- | --- | --- |
+| runtime mode | `menu` / `play` | `src/scenes/MenuScene.ts` | decides whether the fixed menu snapshot or generated play maze is active |
+| active overlay | `none` / `options` / `features` / `gameModes` / `pause` / `message` | `src/scenes/MenuScene.ts` | exactly one overlay at a time |
+| settings | `LegacySettings` | `src/legacy-runtime/legacyDefaults.ts`, `src/legacy-runtime/legacyOptionFields.ts`, `src/scenes/MenuScene.ts` | menu and pause fields mutate this contract |
+| current maze snapshot | `LegacyMazeSnapshot` | `src/legacy-runtime/legacyMaze.ts` | menu mode uses `createLegacyMenuMaze()`, play mode uses `createLegacyMaze()` |
+| menu demo episode/config/state | `MazeEpisode`, `DemoWalkerConfig`, `DemoWalkerState` | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | menu-only attract route and preroll truth |
+| player/trail/goal live state | `player`, `trail`, `goal` | `src/scenes/MenuScene.ts` | trail presentation differs between menu and play, but ownership stays local to the scene |
+| visual diagnostics | `window.__MAZER_VISUAL_DIAGNOSTICS__` | `src/scenes/MenuScene.ts` | visual proof scripts treat this as route-aware readback, not gameplay truth |
+
+## End-to-end flow map
+
+Use this when you need to understand the app as a system instead of a file list.
+
+1. Boot:
+   `src/boot/main.ts` clears localhost service-worker/cache drift, then starts Phaser through `src/boot/phaserConfig.ts`.
+2. Scene handoff:
+   `src/scenes/BootScene.ts` hands off immediately to `src/scenes/MenuScene.ts`.
+3. Front door build:
+   `MenuScene` resolves layout, builds the fixed menu snapshot through `createLegacyMenuMaze()`, and publishes diagnostics.
+4. Menu attract motion:
+   `createLegacyDemoWalkerEpisode()` + `createLegacyMenuSnapshotDemoWalkerConfig()` + `advanceDemoWalker()` drive the menu-only trail/player motion.
+5. User entry:
+   `Start` calls `startPlayMode()`, which swaps the runtime over to `createLegacyMaze()` and hides the title lockup.
+6. Overlay mutation:
+   `Options`, `Features`, `Game Modes`, `Pause`, and `Message` all route through the single `overlay` state in `MenuScene`.
+7. Field commits:
+   `applyLegacyOptionField()` mutates `LegacySettings`; if a field affects maze/layout, `MenuScene` triggers rebuild or layout refresh.
+8. Active play:
+   movement, timer HUD, goal arrow, win/reset return, and pause routing all stay inside `MenuScene`.
+9. Proof readback:
+   visual scripts and live checks read `window.__MAZER_VISUAL_DIAGNOSTICS__`; reset-lane tests assert the stable contracts under `tests/reset/*`.
+
+## Input-to-owner routing
+
+This is the fastest way to answer "if I click or press this, what actually owns it?"
+
+| Trigger | First owner | Downstream owner chain |
+| --- | --- | --- |
+| `Enter` on menu / `Start` click | `MenuScene.startPlayMode()` | `createLegacyMaze()` -> play-mode player/trail/HUD |
+| `Options` click | `MenuScene.openOverlay('options')` | `legacyOptionFields.ts` -> settings/layout/maze rebuild |
+| `Features` click | `MenuScene.openNestedOverlay('features', ...)` | menu or pause overlay toggle state |
+| `Game Modes` click | `MenuScene.openNestedOverlay('gameModes', ...)` | dark-mode flag -> backdrop/static-board redraw |
+| `Escape` | `MenuScene.handleBackAction()` | close overlay, open pause, or return to menu depending on current state |
+| movement keys / arrows | `MenuScene.tryMovePlayer()` | `legacyMaze.ts` walkability gate -> trail/win reset |
+| menu screenshot parity tweak | `legacyMenuSnapshot.ts`, `legacyMenuLayout.ts`, `MenuScene.ts` | geometry -> composition -> presentation |
+
 ## Active reset-lane subsystems
 
 ### Front door + play shell

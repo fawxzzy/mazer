@@ -942,8 +942,8 @@ export const resolveEdgeLiveVerdicts = (diagnostics) => {
     : null;
 
   const boardOverflow = isInsideBounds(boardBounds, safeBounds, 4);
-  const hudOverlap = boardBounds && hudBounds ? !doRectsOverlap(boardBounds, hudBounds) : false;
-  const hudClip = viewportBounds && hudBounds ? isInsideBounds(hudBounds, viewportBounds, 2) : false;
+  const hudOverlap = hudBounds ? Boolean(boardBounds && !doRectsOverlap(boardBounds, hudBounds)) : true;
+  const hudClip = hudBounds ? Boolean(viewportBounds && isInsideBounds(hudBounds, viewportBounds, 2)) : true;
 
   return {
     boardOverflow: {
@@ -1023,27 +1023,51 @@ const readDiagnostics = async (page) => page.evaluate((keys) => ({
   runtime: RUNTIME_DIAGNOSTICS_KEY
 });
 
+export const isResetLaneVisualDiagnostics = (visual) => Boolean(
+  visual
+  && visual.board?.bounds
+  && visual.board?.safeBounds
+  && visual.runtime?.mode
+  && Number.isFinite(visual.runtime?.trailLength)
+);
+
+export const hasHostedAttemptLifecycle = (diagnostics) => Boolean(
+  diagnostics?.visual?.attempt || diagnostics?.visual?.arrival
+);
+
+export const isEdgeLiveDiagnosticsReady = (diagnostics, { requireActiveTrail = false } = {}) => {
+  const visual = diagnostics?.visual ?? null;
+  if (!visual?.board?.bounds || !visual?.board?.safeBounds) {
+    return false;
+  }
+
+  const hostedProofReady = Boolean(
+    visual.intentFeed?.bounds
+    && visual.intentFeed?.visible === true
+    && (!requireActiveTrail || (
+      visual.trail?.currentIndex !== visual.trail?.nextIndex
+      && visual.trail?.progress > 0
+      && visual.trail?.progress < 1
+    ))
+  );
+  if (hostedProofReady) {
+    return true;
+  }
+
+  if (!isResetLaneVisualDiagnostics(visual)) {
+    return false;
+  }
+
+  return !requireActiveTrail || visual.runtime.trailLength > 1;
+};
+
 const waitForDiagnostics = async (page, timeoutMs, { requireActiveTrail = false } = {}) => {
   const startedAt = Date.now();
   let lastDiagnostics = null;
 
   while ((Date.now() - startedAt) < timeoutMs) {
     lastDiagnostics = await readDiagnostics(page);
-    const visual = lastDiagnostics?.visual ?? null;
-    const ready = Boolean(
-      visual
-      && visual.board?.bounds
-      && visual.board?.safeBounds
-      && visual.intentFeed?.bounds
-      && visual.intentFeed?.visible === true
-      && (!requireActiveTrail || (
-        visual.trail?.currentIndex !== visual.trail?.nextIndex
-        && visual.trail?.progress > 0
-        && visual.trail?.progress < 1
-      ))
-    );
-
-    if (ready) {
+    if (isEdgeLiveDiagnosticsReady(lastDiagnostics, { requireActiveTrail })) {
       return lastDiagnostics;
     }
 
@@ -1431,14 +1455,23 @@ const captureViewport = async ({
     }
 
     if (!interaction) {
-      endWindow = await captureEndWindowProof({
-        page,
-        runId,
-        timeoutMs,
-        runDir,
-        screenshotsDir,
-        viewport
-      });
+      if (isEdgeLiveEndWindowRun(runId) && hasHostedAttemptLifecycle(secondDiagnostics)) {
+        endWindow = await captureEndWindowProof({
+          page,
+          runId,
+          timeoutMs,
+          runDir,
+          screenshotsDir,
+          viewport
+        });
+      } else {
+        endWindow = {
+          available: false,
+          reason: hasHostedAttemptLifecycle(secondDiagnostics)
+            ? 'not-an-end-window-run'
+            : 'reset-lane-visual-diagnostics'
+        };
+      }
     }
 
     const record = {

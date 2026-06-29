@@ -96,8 +96,11 @@ describe('edge live check', () => {
 
   test('prefers explicit urls and derives board/hud verdicts from bounds', async () => {
     const {
+      hasHostedAttemptLifecycle,
+      isEdgeLiveDiagnosticsReady,
       isEdgeLiveArrivalProofCandidate,
       isEdgeLiveArrivalProofPass,
+      isResetLaneVisualDiagnostics,
       isRetriableEdgeLiveCaptureError,
       resolveEdgeLiveAttemptKey,
       resolveEdgeLiveArrivalProofState,
@@ -147,6 +150,29 @@ describe('edge live check', () => {
     expect(overlapVerdicts.boardOverflow.pass).toBe(true);
     expect(overlapVerdicts.hudOverlap.pass).toBe(false);
     expect(overlapVerdicts.hudClip.pass).toBe(true);
+
+    const resetLaneDiagnostics = {
+      visual: {
+        board: {
+          bounds: { left: 220, top: 160, right: 820, bottom: 760 },
+          safeBounds: { left: 200, top: 140, right: 840, bottom: 780 }
+        },
+        runtime: {
+          mode: 'menu',
+          trailLength: 12
+        }
+      }
+    };
+
+    expect(isResetLaneVisualDiagnostics(resetLaneDiagnostics.visual)).toBe(true);
+    expect(isEdgeLiveDiagnosticsReady(resetLaneDiagnostics)).toBe(true);
+    expect(isEdgeLiveDiagnosticsReady(resetLaneDiagnostics, { requireActiveTrail: true })).toBe(true);
+    expect(hasHostedAttemptLifecycle(resetLaneDiagnostics)).toBe(false);
+    expect(resolveEdgeLiveVerdicts(resetLaneDiagnostics.visual)).toMatchObject({
+      boardOverflow: { pass: true },
+      hudOverlap: { pass: true },
+      hudClip: { pass: true }
+    });
 
     expect(isEdgeLiveEndWindowRun('core-only-watch')).toBe(true);
     expect(isEdgeLiveEndWindowRun('core-only-cycle')).toBe(true);

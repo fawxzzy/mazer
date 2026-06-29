@@ -137,6 +137,10 @@ const LEGACY_MENU_SLAB_FILL = 0x655f6a;
 const LEGACY_MENU_SLAB_EDGE = 0x27222c;
 const LEGACY_MENU_SLAB_HIGHLIGHT = 0xa8a1af;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0.28;
+const LEGACY_MENU_PATH_CORE = 0x2c2731;
+const LEGACY_MENU_PATH_EDGE = 0x5b5560;
+const LEGACY_MENU_WALL_FILL = 0x807a86;
+const LEGACY_MENU_WALL_GRID = 0x918b98;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
@@ -393,11 +397,11 @@ export class MenuScene extends Phaser.Scene {
     this.titleShadow
       .setPosition(this.layout.titleX, this.layout.titleY + titleShadowOffset)
       .setFontSize(titleFontSize)
-      .setAlpha(isPortrait ? 0.44 : 0.34);
+      .setAlpha(isPortrait ? 0.34 : 0.26);
     this.titleText
       .setPosition(this.layout.titleX, this.layout.titleY)
       .setFontSize(titleFontSize)
-      .setAlpha(isPortrait ? 0.66 : 0.62);
+      .setAlpha(isPortrait ? 0.56 : 0.5);
     this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
 
     this.boardStaticDirty = true;
@@ -602,15 +606,17 @@ export class MenuScene extends Phaser.Scene {
     const { boardLeft, boardTop, boardSize, tileSize } = this.layout;
     const isMenuMode = this.mode === 'menu';
     const pathColor = isMenuMode
-      ? (this.settings.darkMode ? 0x37323b : 0x57515b)
+      ? LEGACY_MENU_PATH_CORE
       : linearColorToNumber(this.settings.pathColor);
     const wallColor = isMenuMode
-      ? (this.settings.darkMode ? 0x08060b : 0x120d15)
+      ? LEGACY_MENU_WALL_FILL
       : linearColorToNumber(this.settings.wallColor);
-    const boardFill = this.settings.darkMode ? 0x16121a : 0x4a454f;
+    const boardFill = isMenuMode
+      ? 0x5b5560
+      : (this.settings.darkMode ? 0x16121a : 0x4a454f);
     const boardEdge = this.settings.darkMode ? 0x030205 : 0x322c35;
     const pathGlow = isMenuMode
-      ? (this.settings.darkMode ? 0xa39daa : 0xaaa4b0)
+      ? LEGACY_MENU_PATH_EDGE
       : (this.settings.darkMode ? 0xb3acb8 : 0xd0cad2);
 
     this.boardStaticGraphics.clear();
@@ -657,11 +663,19 @@ export class MenuScene extends Phaser.Scene {
         const tileY = boardTop + (y * tileSize);
         const walkable = this.maze.grid[y]?.[x] === true;
 
-        this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor, isMenuMode ? 0.82 : 1);
+        this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor, isMenuMode ? 0.94 : 1);
         this.boardStaticGraphics.fillRect(tileX, tileY, tileSize, tileSize);
 
         if (walkable) {
-          this.boardStaticGraphics.fillStyle(pathColor, isMenuMode ? 0.74 : 1);
+          this.boardStaticGraphics.fillStyle(pathColor, isMenuMode ? 0.98 : 1);
+          this.boardStaticGraphics.fillRect(
+            tileX + 1,
+            tileY + 1,
+            Math.max(1, tileSize - 2),
+            Math.max(1, tileSize - 2)
+          );
+        } else if (isMenuMode && tileSize > 6) {
+          this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.12);
           this.boardStaticGraphics.fillRect(
             tileX + 1,
             tileY + 1,
