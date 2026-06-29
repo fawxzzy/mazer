@@ -23,7 +23,7 @@ export const resolveLegacyMenuPathRenderFrame = (
   point: LegacyPoint,
   tileSize: number
 ): LegacyMenuPathRenderFrame => {
-  const edgeInset = Math.max(1, Math.floor(tileSize * 0.08));
+  const edgeInset = Math.max(1, Math.floor(tileSize * 0.12));
   const leftInset = isWalkableGridPoint(maze, { x: point.x - 1, y: point.y }) ? 0 : edgeInset;
   const rightInset = isWalkableGridPoint(maze, { x: point.x + 1, y: point.y }) ? 0 : edgeInset;
   const topInset = isWalkableGridPoint(maze, { x: point.x, y: point.y - 1 }) ? 0 : edgeInset;
