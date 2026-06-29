@@ -425,10 +425,10 @@ export class MenuScene extends Phaser.Scene {
     const { width, height } = this.layout;
     this.backdropGraphics.clear();
 
-    const fieldColor = this.settings.darkMode ? 0x16101c : 0x2c1f3b;
-    const glowColor = this.settings.darkMode ? 0x2a1d3a : 0x563b74;
-    const glowAlpha = this.settings.darkMode ? 0.09 : 0.14;
-    const starAlphaScale = this.settings.darkMode ? 0.74 : 1;
+    const fieldColor = this.settings.darkMode ? 0x120c17 : 0x2c1f3b;
+    const glowColor = this.settings.darkMode ? 0x241731 : 0x563b74;
+    const glowAlpha = this.settings.darkMode ? 0.07 : 0.14;
+    const starAlphaScale = this.settings.darkMode ? 0.52 : 1;
 
     this.backdropGraphics.fillStyle(fieldColor, 1);
     this.backdropGraphics.fillRect(0, 0, width, height);
@@ -446,6 +446,10 @@ export class MenuScene extends Phaser.Scene {
         Math.max(1, Math.round(star.radius))
       );
     }
+    if (this.settings.darkMode) {
+      this.backdropGraphics.fillStyle(0x000000, 0.18);
+      this.backdropGraphics.fillRect(0, 0, width, height);
+    }
 
     this.backdropDirty = false;
   }
@@ -459,10 +463,10 @@ export class MenuScene extends Phaser.Scene {
     const wallColor = isMenuMode
       ? (this.settings.darkMode ? 0x060509 : 0x0d0a10)
       : linearColorToNumber(this.settings.wallColor);
-    const boardFill = this.settings.darkMode ? 0x1f1a23 : 0x4a454d;
-    const boardEdge = this.settings.darkMode ? 0x09070b : 0x2f2830;
+    const boardFill = this.settings.darkMode ? 0x17131a : 0x4a454d;
+    const boardEdge = this.settings.darkMode ? 0x040306 : 0x2f2830;
     const pathGlow = isMenuMode
-      ? (this.settings.darkMode ? 0x7e7883 : 0x8f8a93)
+      ? (this.settings.darkMode ? 0x9891a0 : 0x8f8a93)
       : (this.settings.darkMode ? 0xb3acb8 : 0xd0cad2);
 
     this.boardStaticGraphics.clear();
@@ -472,6 +476,10 @@ export class MenuScene extends Phaser.Scene {
     this.boardStaticGraphics.fillRect(boardLeft - 6, boardTop - 8, boardSize + 12, boardSize + 12);
     this.boardStaticGraphics.fillStyle(boardFill, 0.96);
     this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
+    if (this.settings.darkMode) {
+      this.boardStaticGraphics.fillStyle(0x000000, 0.12);
+      this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
+    }
     if (isMenuMode) {
       this.boardStaticGraphics.lineStyle(1, 0x6f6972, LEGACY_BOARD_GRID_ALPHA);
       for (let step = 0; step <= this.maze.size; step += 1) {
