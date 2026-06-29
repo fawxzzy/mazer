@@ -179,10 +179,16 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - trail append and trim behavior
   - goal-step detection
 
+- `src/legacy-runtime/legacyMenuDemoLifecycle.ts`
+  - menu demo bootstrap and preroll
+  - menu demo trail/player projection
+  - per-frame demo advance projection
+
 Boundary:
 
 - if the question is "when should play stop accepting input after hitting goal?", start in `src/legacy-runtime/legacyPlayLifecycle.ts`
 - if the question is "what exactly changes after one movement key press?", start in `src/legacy-runtime/legacyPlayStep.ts`
+- if the question is "how does the front-door demo bootstrap or advance?", start in `src/legacy-runtime/legacyMenuDemoLifecycle.ts`
 - if the question is "what should happen after the reset hold finishes?", start in `src/scenes/MenuScene.ts`
 
 ### Menu scene render/update order
@@ -424,6 +430,7 @@ If you want to change one thing, start here:
   - `docs/legacy/art-direction.md`
   - `legacy/screenshots/menu-01.png` .. `menu-04.png`
 - menu demo timing or route progression:
+  - `src/legacy-runtime/legacyMenuDemoLifecycle.ts`
   - `src/legacy-runtime/legacyDemoWalker.ts`
   - `src/domain/ai/demoWalker.ts`
   - `src/scenes/MenuScene.ts`

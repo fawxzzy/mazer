@@ -119,6 +119,7 @@ describe('legacy reset lane', () => {
 
   test('keeps the active-play HUD minimal and legacy-shaped', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const demoLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuDemoLifecycle.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const timerText = `Time ${elapsed}`;');
     expect(menuSceneSource).toContain('Phaser.Math.Angle.Between');
@@ -126,10 +127,11 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.hudGraphics.fillRect(18, 18, 156, 34);');
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
     expect(menuSceneSource).toContain('this.schedulePlayResetReturn();');
-    expect(menuSceneSource).toContain('createLegacyDemoWalkerEpisode(this.maze)');
-    expect(menuSceneSource).toContain('createLegacyMenuDemoWalkerConfig(this.maze.seed)');
-    expect(menuSceneSource).toContain('createLegacyMenuSnapshotDemoWalkerConfig(this.maze.seed)');
-    expect(menuSceneSource).toContain('advanceDemoWalker(this.menuDemoEpisode, this.menuDemoState, this.menuDemoConfig)');
+    expect(menuSceneSource).toContain('createLegacyMenuDemoBootstrap(this.maze, this.settings.toggleTrailFade, TRAIL_FADE_TAIL)');
+    expect(menuSceneSource).toContain('advanceLegacyMenuDemoFrame(');
+    expect(demoLifecycleSource).toContain('createLegacyMenuSnapshotDemoWalkerConfig(maze.seed)');
+    expect(demoLifecycleSource).toContain('createLegacyMenuDemoWalkerConfig(maze.seed)');
+    expect(demoLifecycleSource).toContain('advanceDemoWalker(episode, state, config)');
   });
 
   test('cleans up localhost service workers before booting Phaser', () => {

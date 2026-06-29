@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
-import { advanceDemoWalker, createDemoWalkerState, type DemoWalkerConfig, type DemoWalkerState } from '../domain/ai';
+import type { DemoWalkerConfig, DemoWalkerState } from '../domain/ai';
 import type { MazeEpisode } from '../domain/maze';
-import { legacyTuning } from '../config/tuning';
 import {
   LEGACY_DEFAULTS,
   MAIN_MENU_BUTTONS,
@@ -25,6 +24,10 @@ import {
 } from '../legacy-runtime/legacyPlayLifecycle';
 import { advanceLegacyPlayStep } from '../legacy-runtime/legacyPlayStep';
 import {
+  advanceLegacyMenuDemoFrame,
+  createLegacyMenuDemoBootstrap
+} from '../legacy-runtime/legacyMenuDemoLifecycle';
+import {
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
 } from '../legacy-runtime/legacyMenuLayout';
@@ -39,9 +42,6 @@ import {
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
-  createLegacyMenuSnapshotDemoWalkerConfig,
-  resolveLegacyPointFromDemoIndex,
-  resolveLegacyTrailFromDemoSteps
 } from '../legacy-runtime/legacyDemoWalker';
 import { resolveLegacyMenuPathRenderFrame } from '../legacy-runtime/legacyMenuRender';
 
@@ -178,13 +178,11 @@ const buildPathTrail = (
   limit: number | null
 ): LegacyPoint[] => {
   if (limit === null || points.length <= limit) {
-    return points.map(copyPoint);
+    return points.map((point) => ({ x: point.x, y: point.y }));
   }
 
-  return points.slice(Math.max(0, points.length - limit)).map(copyPoint);
+  return points.slice(Math.max(0, points.length - limit)).map((point) => ({ x: point.x, y: point.y }));
 };
-
-const isFixedLegacyMenuSnapshot = (maze: Pick<LegacyMazeSnapshot, 'size'>): boolean => maze.size <= 25;
 
 export class MenuScene extends Phaser.Scene {
   private settings: LegacySettings = copyLegacySettings(LEGACY_DEFAULTS);
@@ -441,34 +439,16 @@ export class MenuScene extends Phaser.Scene {
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
     this.maze = this.buildMazeForCurrentMode();
     this.menuDemoEpisode = this.mode === 'menu' ? createLegacyDemoWalkerEpisode(this.maze) : null;
-    this.menuDemoConfig = isFixedLegacyMenuSnapshot(this.maze)
-      ? createLegacyMenuSnapshotDemoWalkerConfig(this.maze.seed)
-      : createLegacyMenuDemoWalkerConfig(this.maze.seed);
-    this.menuDemoState = this.mode === 'menu' && this.menuDemoEpisode
-      ? createDemoWalkerState(this.menuDemoEpisode, this.menuDemoConfig)
-      : null;
-    if (this.mode === 'menu' && this.menuDemoEpisode && this.menuDemoState) {
-      const basePrerollSteps = Math.max(0, this.menuDemoConfig.behavior.prerollSteps ?? legacyTuning.demo.behavior.prerollSteps ?? 0);
-      const prerollSteps = isFixedLegacyMenuSnapshot(this.maze)
-        ? Math.min(
-            basePrerollSteps,
-            Math.max(0, this.maze.solutionPath.length - 8)
-          )
-        : basePrerollSteps;
-      for (let step = 0; step < prerollSteps; step += 1) {
-        const advance = advanceDemoWalker(this.menuDemoEpisode, this.menuDemoState, this.menuDemoConfig);
-        this.menuDemoState = advance.state;
-        if (advance.shouldRegenerateMaze || this.menuDemoState.phase !== 'explore') {
-          break;
-        }
-      }
-
-      this.player = resolveLegacyPointFromDemoIndex(this.menuDemoState.currentIndex, this.menuDemoEpisode.raster.width);
-      this.trail = buildPathTrail(
-        resolveLegacyTrailFromDemoSteps(this.menuDemoState.trailSteps, this.menuDemoEpisode.raster.width),
-        this.settings.toggleTrailFade ? TRAIL_FADE_TAIL : null
-      );
+    if (this.mode === 'menu') {
+      const bootstrap = createLegacyMenuDemoBootstrap(this.maze, this.settings.toggleTrailFade, TRAIL_FADE_TAIL);
+      this.menuDemoEpisode = bootstrap.episode;
+      this.menuDemoConfig = bootstrap.config;
+      this.menuDemoState = bootstrap.state;
+      this.player = bootstrap.player;
+      this.trail = bootstrap.trail;
     } else {
+      this.menuDemoConfig = createLegacyMenuDemoWalkerConfig(this.maze.seed);
+      this.menuDemoState = null;
       this.player = copyPoint(this.maze.start);
       this.trail = [copyPoint(this.maze.start)];
     }
@@ -521,16 +501,19 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const advance = advanceDemoWalker(this.menuDemoEpisode, this.menuDemoState, this.menuDemoConfig);
-    this.menuDemoState = advance.state;
-    this.player = resolveLegacyPointFromDemoIndex(this.menuDemoState.currentIndex, this.menuDemoEpisode.raster.width);
-    this.trail = buildPathTrail(
-      resolveLegacyTrailFromDemoSteps(this.menuDemoState.trailSteps, this.menuDemoEpisode.raster.width),
-      this.settings.toggleTrailFade ? TRAIL_FADE_TAIL : null
+    const nextFrame = advanceLegacyMenuDemoFrame(
+      this.menuDemoEpisode,
+      this.menuDemoState,
+      this.menuDemoConfig,
+      this.settings.toggleTrailFade,
+      TRAIL_FADE_TAIL
     );
-    this.nextDemoMoveAtMs = time + advance.delayMs;
-    if (advance.shouldRegenerateMaze) {
-      this.regenerateMaze(advance.delayMs);
+    this.menuDemoState = nextFrame.state;
+    this.player = nextFrame.player;
+    this.trail = nextFrame.trail;
+    this.nextDemoMoveAtMs = time + nextFrame.delayMs;
+    if (nextFrame.shouldRegenerateMaze) {
+      this.regenerateMaze(nextFrame.delayMs);
       return;
     }
     this.boardDynamicDirty = true;
