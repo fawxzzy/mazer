@@ -19,7 +19,7 @@ describe('legacy menu layout', () => {
     const layout = resolveLegacyMenuLayout(430, 932, 50, 49);
 
     expect(layout.boardSize).toBeLessThan(layout.width);
-    expect(layout.buttonY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.8));
+    expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
     expect(layout.buttonY).toBeLessThan(layout.height);
     expect(layout.buttonWidth).toBeLessThanOrEqual(156);
     expect(layout.leftButtonX + (layout.buttonWidth / 2)).toBeLessThan(layout.centerButtonX - 8);

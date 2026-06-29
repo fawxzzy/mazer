@@ -40,12 +40,17 @@ export const resolveLegacyMenuLayout = (
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
   const boardTop = Math.round(clamp(height * (isPortrait ? 0.09 : 0.11), 44, isPortrait ? 92 : 132));
   const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.068 : 0.088), 50, 96));
-  const buttonOverlap = Math.round(isPortrait ? buttonHeight * 0.28 : buttonHeight * 0.16);
-  const buttonY = Math.round(clamp(
-    boardTop + snappedBoardSize - buttonOverlap,
-    boardTop + snappedBoardSize - Math.round(buttonHeight * 0.5),
-    height - Math.round(buttonHeight * 0.6)
-  ));
+  const buttonY = isPortrait
+    ? Math.round(clamp(
+      boardTop + snappedBoardSize + Math.round(buttonHeight * 0.95),
+      boardTop + snappedBoardSize + 32,
+      height - Math.round(buttonHeight * 0.8)
+    ))
+    : Math.round(clamp(
+      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.16),
+      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.5),
+      height - Math.round(buttonHeight * 0.6)
+    ));
   const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.23 : 0.13), isPortrait ? 108 : 150, isPortrait ? 156 : 252));
   const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.145 : 0.17), 58, 320));
   const centerButtonX = Math.round(width * 0.5);

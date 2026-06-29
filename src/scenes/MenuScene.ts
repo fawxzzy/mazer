@@ -59,6 +59,7 @@ const TITLE_FILL_COLOR = '#249628';
 const TITLE_SHADOW_COLOR = '#0c2e13';
 const LEGACY_BOARD_GRID_ALPHA = 0.3;
 const MESSAGE_DURATION_MS = 1800;
+const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const DEMO_STEP_MS = 118;
 const DEMO_REGEN_HOLD_MS = 860;
 const TRAIL_FADE_TAIL = 16;
@@ -134,12 +135,12 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: '"Courier New", monospace',
       fontSize: '96px',
       color: TITLE_SHADOW_COLOR
-    }).setOrigin(0.5).setAlpha(0.72);
+    }).setOrigin(0.5).setAlpha(0.78);
     this.titleText = this.add.text(0, 0, 'Mazer', {
       fontFamily: '"Courier New", monospace',
       fontSize: '96px',
       color: TITLE_FILL_COLOR
-    }).setOrigin(0.5).setAlpha(0.62);
+    }).setOrigin(0.5).setAlpha(0.72);
     this.footerText = this.add.text(0, 0, '', {
       fontFamily: '"Courier New", monospace',
       fontSize: '18px',
@@ -148,7 +149,7 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5).setAlpha(0.92);
 
     this.createStars();
-    this.rebuildMaze();
+    this.rebuildMaze(this.time.now + INITIAL_MENU_DEMO_HOLD_MS);
     this.refreshLayout();
     this.installInput();
 
@@ -301,12 +302,12 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
-  private rebuildMaze(): void {
+  private rebuildMaze(nextDemoMoveAtMs = 0): void {
     this.maze = createLegacyMaze(this.settings.scale, this.mazeSeed);
     this.player = copyPoint(this.maze.start);
-    this.demoCursor = Math.min(6, Math.max(0, this.maze.solutionPath.length - 1));
-    this.trail = buildPathTrail(this.maze.solutionPath.slice(0, this.demoCursor + 1), null);
-    this.nextDemoMoveAtMs = 0;
+    this.demoCursor = this.maze.solutionPath.length > 0 ? 0 : -1;
+    this.trail = buildPathTrail(this.maze.solutionPath.slice(0, Math.max(0, this.demoCursor + 1)), null);
+    this.nextDemoMoveAtMs = nextDemoMoveAtMs;
     this.pendingMazeRebuild = false;
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
     this.activeInputField = null;
@@ -316,9 +317,9 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
-  private regenerateMaze(): void {
+  private regenerateMaze(delayMs = 0): void {
     this.mazeSeed = (this.mazeSeed + 1) >>> 0;
-    this.rebuildMaze();
+    this.rebuildMaze(this.time.now + delayMs);
   }
 
   private enterMenuMode(): void {
@@ -352,7 +353,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (this.demoCursor >= path.length - 1) {
       this.nextDemoMoveAtMs = time + DEMO_REGEN_HOLD_MS;
-      this.regenerateMaze();
+      this.regenerateMaze(DEMO_REGEN_HOLD_MS);
       return;
     }
 
@@ -1034,9 +1035,9 @@ export class MenuScene extends Phaser.Scene {
     onClick: () => void
   ): UiButton {
     const isMenuFrontDoor = this.mode === 'menu' && this.overlay === 'none';
-    const baseAlpha = isMenuFrontDoor ? 0.08 : MENU_BUTTON_ALPHA;
-    const baseStroke = isMenuFrontDoor ? 0.2 : MENU_BUTTON_STROKE_ALPHA;
-    const strokeColor = isMenuFrontDoor ? 0x9a92a3 : 0xb8b1c1;
+    const baseAlpha = isMenuFrontDoor ? 0.12 : MENU_BUTTON_ALPHA;
+    const baseStroke = isMenuFrontDoor ? 0.28 : MENU_BUTTON_STROKE_ALPHA;
+    const strokeColor = isMenuFrontDoor ? 0xb2a9bc : 0xb8b1c1;
     const background = this.add.rectangle(x, y, width, height, 0xffffff, baseAlpha);
     background.setStrokeStyle(2, strokeColor, baseStroke);
     background.setInteractive({ useHandCursor: true });
@@ -1055,7 +1056,7 @@ export class MenuScene extends Phaser.Scene {
     const setActive = (active: boolean): void => {
       background.setFillStyle(0xffffff, active ? (isMenuFrontDoor ? 0.16 : 0.28) : baseAlpha);
       background.setStrokeStyle(2, 0xffffff, active ? (isMenuFrontDoor ? 0.3 : 0.36) : baseStroke);
-      label.setAlpha(active ? 1 : 0.92);
+      label.setAlpha(active ? 1 : (isMenuFrontDoor ? 0.98 : 0.92));
     };
 
     background.on('pointerover', () => setActive(true));
