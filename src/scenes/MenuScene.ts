@@ -146,7 +146,7 @@ export class MenuScene extends Phaser.Scene {
   private settings: LegacySettings = copyLegacySettings(LEGACY_DEFAULTS);
   private optionFieldDrafts: LegacyOptionFieldDrafts = createLegacyOptionFieldDrafts(LEGACY_DEFAULTS);
   private activeInputField: LegacyOptionFieldId | null = null;
-  private mazeSeed = 0x5a17f00d;
+  private mazeSeed = 3749;
   private maze!: LegacyMazeSnapshot;
   private player!: LegacyPoint;
   private trail: LegacyPoint[] = [];
