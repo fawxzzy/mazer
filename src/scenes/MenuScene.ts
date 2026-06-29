@@ -1001,8 +1001,9 @@ export class MenuScene extends Phaser.Scene {
       fontSize: stacked ? '20px' : '22px',
       color: '#d9d8df'
     }).setOrigin(0, 0.5);
+    const toggleX = stacked ? panel.left + panel.width - 52 : panel.left + Math.round(panel.width * 0.82);
     const stateText = this.add.text(
-      stacked ? panel.left + 64 : panel.left + Math.round(panel.width * 0.64),
+      stacked ? toggleX - 76 : toggleX - 78,
       stacked ? y + 32 : y,
       value ? 'Off' : 'On',
       {
@@ -1013,17 +1014,48 @@ export class MenuScene extends Phaser.Scene {
     ).setOrigin(0.5);
     this.uiTexts.push(rowLabel, stateText);
     this.uiButtons.push(
-      this.createButton(
-        stacked ? panel.left + panel.width - 92 : panel.left + Math.round(panel.width * 0.82),
-        stacked ? y + 32 : y,
-        stacked ? 136 : 120,
-        44,
-        value ? 'Disable' : 'Enable',
-        onToggle
-      )
+      this.createToggleCheckbox(toggleX, stacked ? y + 32 : y, stacked ? 30 : 32, value, onToggle)
     );
 
     return y + (stacked ? 84 : 64);
+  }
+
+  private createToggleCheckbox(
+    x: number,
+    y: number,
+    size: number,
+    checked: boolean,
+    onToggle: () => void
+  ): UiButton {
+    const background = this.add.rectangle(x, y, size, size, 0xffffff, 0.08);
+    background.setStrokeStyle(2, 0xb8b1c1, 0.58);
+    background.setInteractive({ useHandCursor: true });
+
+    const label = this.add.text(x, y, checked ? 'x' : '', {
+      fontFamily: '"Courier New", monospace',
+      fontSize: `${Math.max(16, Math.round(size * 0.7))}px`,
+      color: '#6bc96f'
+    }).setOrigin(0.5).setAlpha(checked ? 1 : 0.34);
+
+    const setActive = (active: boolean): void => {
+      background.setFillStyle(0xffffff, active ? 0.14 : 0.08);
+      background.setStrokeStyle(2, active ? 0xffffff : 0xb8b1c1, active ? 0.86 : 0.58);
+      label.setAlpha(checked ? (active ? 1 : 0.96) : (active ? 0.5 : 0.34));
+    };
+
+    background.on('pointerover', () => setActive(true));
+    background.on('pointerout', () => setActive(false));
+    background.on('pointerdown', onToggle);
+
+    return {
+      background,
+      label,
+      setActive,
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+      }
+    };
   }
 
   private createButton(
