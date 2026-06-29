@@ -4,7 +4,18 @@ import { TILE_END, TILE_FLOOR, TILE_PATH, createGrid, indexFromCoordinates, xFro
 import { legacyTuning } from '../config/tuning';
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 
-export const LEGACY_MENU_SNAPSHOT_PREROLL_STEPS = 68;
+export const LEGACY_MENU_SNAPSHOT_PREROLL_STEPS = 72;
+export const LEGACY_MENU_SNAPSHOT_CADENCE = {
+  spawnHoldMs: 220,
+  exploreStepMs: 104,
+  backtrackStepMs: 76,
+  decisionPauseMs: 228,
+  anticipationStepMs: 84,
+  branchCommitMs: 112,
+  branchResumeMs: 148,
+  goalHoldMs: 1180,
+  resetHoldMs: 340
+} as const;
 
 const pointToIndex = (point: LegacyPoint, width: number): number => indexFromCoordinates(point.x, point.y, width);
 
@@ -48,6 +59,10 @@ export const createLegacyMenuSnapshotDemoWalkerConfig = (seed: number): DemoWalk
 
   return {
     ...baseConfig,
+    cadence: {
+      ...baseConfig.cadence,
+      ...LEGACY_MENU_SNAPSHOT_CADENCE
+    },
     behavior: {
       ...baseConfig.behavior,
       enableRunnerMistakes: false,

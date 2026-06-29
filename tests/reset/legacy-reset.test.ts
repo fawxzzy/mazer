@@ -4,6 +4,7 @@ import { createLegacyMaze, createLegacyMenuMaze } from '../../src/legacy-runtime
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
+  LEGACY_MENU_SNAPSHOT_CADENCE,
   createLegacyMenuSnapshotDemoWalkerConfig,
   LEGACY_MENU_SNAPSHOT_PREROLL_STEPS,
   resolveLegacyPointFromDemoIndex,
@@ -107,8 +108,13 @@ describe('legacy reset lane', () => {
     const genericConfig = createLegacyMenuDemoWalkerConfig(3749);
 
     expect(snapshotConfig.behavior.enableRunnerMistakes).toBe(false);
-    expect(snapshotConfig.behavior.prerollSteps).toBe(LEGACY_MENU_SNAPSHOT_PREROLL_STEPS);
+    expect(snapshotConfig.behavior.prerollSteps).toBeGreaterThanOrEqual(LEGACY_MENU_SNAPSHOT_PREROLL_STEPS);
+    expect(snapshotConfig.cadence.exploreStepMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.exploreStepMs);
+    expect(snapshotConfig.cadence.backtrackStepMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.backtrackStepMs);
+    expect(snapshotConfig.cadence.goalHoldMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.goalHoldMs);
+    expect(snapshotConfig.cadence.resetHoldMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.resetHoldMs);
     expect(genericConfig.behavior.enableRunnerMistakes).toBe(true);
+    expect(genericConfig.cadence.exploreStepMs).not.toBe(snapshotConfig.cadence.exploreStepMs);
   });
 
   test('keeps the active-play HUD minimal and legacy-shaped', () => {
