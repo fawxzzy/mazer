@@ -21,10 +21,19 @@ export const createLegacyRuntimeMazeForMode = (
   mode: LegacyGenerationMode,
   scale: number,
   seed: number
-): LegacyMazeSnapshot => (
-  resolveLegacyMazeBuildKind(mode) === 'menu-snapshot'
+): LegacyMazeSnapshot => {
+  const buildKind = resolveLegacyMazeBuildKind(mode);
+  const maze = buildKind === 'menu-snapshot'
     ? createLegacyMenuMaze(seed)
-    : createLegacyMaze(scale, seed)
-);
+    : createLegacyMaze(scale, seed);
+
+  return {
+    ...maze,
+    generation: {
+      buildKind,
+      processStageIds: resolveLegacyGenerationProcessStageIds(scale)
+    }
+  };
+};
 
 export const stepLegacyGenerationSeed = (seed: number): number => (seed + 1) >>> 0;

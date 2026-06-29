@@ -142,5 +142,7 @@ describe('legacy reset lane', () => {
     expect(bootSource).toContain('navigator.serviceWorker.getRegistrations()');
     expect(bootSource).toContain("cacheKey.includes('mazer')");
     expect(bootSource).toContain('window.location.reload();');
+    expect(bootSource).toContain("markMazerBootStatus('boot-start');");
+    expect(bootSource).toContain("markMazerBootStatus('game-created');");
   });
 });

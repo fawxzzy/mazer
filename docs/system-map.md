@@ -25,7 +25,7 @@ The active app entry path is:
 
 Meaning:
 
-- `main.ts` owns localhost service-worker/cache cleanup
+- `main.ts` owns localhost service-worker/cache cleanup and boot-status milestones
 - `phaserConfig.ts` owns the scene list and Phaser boot config
 - `BootScene.ts` is only a handoff
 - `MenuScene.ts` is the real application surface for the reset lane
@@ -36,7 +36,7 @@ Use this before large edits so you know the whole app, not just the current scre
 
 | Area | Ownership |
 | --- | --- |
-| `src/boot/*` | browser boot, localhost cleanup, Phaser startup |
+| `src/boot/*` | browser boot, localhost cleanup, Phaser startup, live boot diagnostics |
 | `src/scenes/*` | runtime shell, front door, overlays, play loop, HUD, live presentation |
 | `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, option field parsing |
 | `src/domain/ai/*` | deterministic demo walker stepping and attract behavior |
@@ -57,6 +57,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | Surface | Current owner | Supporting truth/proof |
 | --- | --- | --- |
 | boot + localhost cleanup | `src/boot/main.ts` | `tests/reset/legacy-reset.test.ts` |
+| boot diagnostics readback | `src/boot/bootStatus.ts`, `src/boot/main.ts` | `tests/boot/boot-status.test.ts` |
 | Phaser scene wiring | `src/boot/phaserConfig.ts` | `npm run build` |
 | active front door and play shell | `src/scenes/MenuScene.ts` | in-app browser, `npm run verify` |
 | fixed menu maze shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `tests/reset/legacy-reset.test.ts`, screenshots |
@@ -124,6 +125,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - legacy process stage ids
   - menu-vs-play build routing
   - deterministic seed stepping for rebuild approximations
+  - generation metadata attached to runtime-created mazes
 - `src/scenes/MenuScene.ts`
   - `buildMazeForCurrentMode()` picks menu vs play builder
   - `rebuildMaze()` rehydrates maze, player, trail, demo state, and layout
@@ -451,6 +453,7 @@ If you want to change one thing, start here:
   - `src/legacy-runtime/legacyMaze.ts`
   - `src/scenes/MenuScene.ts`
   - `tests/reset/legacy-reset.test.ts`
+  - `tests/reset/legacy-generation-diagnostics.test.ts`
 - options/features/game modes/pause fields:
   - `src/legacy-runtime/legacyOptionFields.ts`
   - `src/scenes/MenuScene.ts`
@@ -458,6 +461,10 @@ If you want to change one thing, start here:
   - `src/scenes/MenuScene.ts`
 - localhost boot weirdness:
   - `src/boot/main.ts`
+- live boot diagnostics:
+  - `src/boot/bootStatus.ts`
+  - `src/boot/main.ts`
+  - `tests/boot/boot-status.test.ts`
 - scene wiring or startup:
   - `src/boot/phaserConfig.ts`
   - `src/scenes/BootScene.ts`

@@ -13,6 +13,10 @@ export interface LegacyMazeSnapshot {
   goal: LegacyPoint;
   solutionPath: LegacyPoint[];
   seed: number;
+  generation?: {
+    buildKind: 'menu-snapshot' | 'play-generated';
+    processStageIds: number[];
+  };
 }
 
 const LEGACY_MIN_SCALE = 25;

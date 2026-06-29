@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { DemoWalkerConfig, DemoWalkerState } from '../domain/ai';
 import type { MazeEpisode } from '../domain/maze';
+import { markMazerBootStatus } from '../boot/bootStatus';
 import {
   LEGACY_DEFAULTS,
   MAIN_MENU_BUTTONS,
@@ -98,6 +99,10 @@ interface MenuSceneVisualDiagnostics {
       prerollSteps: number;
       reachedGoal: boolean;
       runnerMistakesEnabled: boolean;
+    };
+    generation: {
+      buildKind: string | null;
+      processStageIds: number[];
     };
     mode: RuntimeMode;
     overlay: OverlayKind;
@@ -227,6 +232,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   public create(): void {
+    markMazerBootStatus('menu-scene-create');
     this.backdropGraphics = this.add.graphics();
     this.boardStaticGraphics = this.add.graphics();
     this.boardDynamicGraphics = this.add.graphics();
@@ -1494,6 +1500,10 @@ export class MenuScene extends Phaser.Scene {
         mode: this.mode,
         overlay: this.overlay,
         mazeSize: this.maze.size,
+        generation: {
+          buildKind: this.maze.generation?.buildKind ?? null,
+          processStageIds: [...(this.maze.generation?.processStageIds ?? [])]
+        },
         player: copyPoint(this.player),
         goal: copyPoint(this.maze.goal),
         trailLength: this.trail.length,
