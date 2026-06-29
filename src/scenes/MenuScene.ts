@@ -686,8 +686,7 @@ export class MenuScene extends Phaser.Scene {
       this.footerText.setText('');
       return;
     }
-
-    this.footerText.setText('WASD or arrows to move   P to pause');
+    this.footerText.setText('');
 
     const elapsed = formatClock(time - this.playStartedAtMs);
     const timerText = `Time ${elapsed}`;
