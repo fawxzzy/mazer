@@ -140,6 +140,16 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - reset return path
   - visual diagnostics published for visual proof
 
+- `src/legacy-runtime/legacyPlayLifecycle.ts`
+  - active-play goal-reset hold duration
+  - pending-reset gate for input and movement
+  - due-reset return timing contract
+
+Boundary:
+
+- if the question is "when should play stop accepting input after hitting goal?", start in `src/legacy-runtime/legacyPlayLifecycle.ts`
+- if the question is "what should happen after the reset hold finishes?", start in `src/scenes/MenuScene.ts`
+
 ### Menu scene render/update order
 
 Use this before touching presentation code inside `MenuScene.ts` so you know whether a miss belongs to state, layout, or drawing order.
@@ -382,6 +392,10 @@ If you want to change one thing, start here:
   - `src/legacy-runtime/legacyDemoWalker.ts`
   - `src/domain/ai/demoWalker.ts`
   - `src/scenes/MenuScene.ts`
+- play reset timing / return gate:
+  - `src/legacy-runtime/legacyPlayLifecycle.ts`
+  - `src/scenes/MenuScene.ts`
+  - `tests/reset/legacy-play-lifecycle.test.ts`
 - play movement or win/reset loop:
   - `src/scenes/MenuScene.ts`
   - `docs/legacy/gameplay-spec.md`

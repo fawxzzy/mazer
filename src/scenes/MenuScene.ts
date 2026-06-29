@@ -19,6 +19,11 @@ import {
   type LegacyPoint
 } from '../legacy-runtime/legacyMaze';
 import {
+  hasPendingLegacyPlayResetReturn,
+  scheduleLegacyPlayResetReturnAtMs,
+  shouldConsumeLegacyPlayResetReturn
+} from '../legacy-runtime/legacyPlayLifecycle';
+import {
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
 } from '../legacy-runtime/legacyMenuLayout';
@@ -136,7 +141,6 @@ const LEGACY_BOARD_GRID_ALPHA = 0.016;
 const MESSAGE_DURATION_MS = 1800;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
-const ACTIVE_PLAY_GOAL_RESET_HOLD_MS = 340;
 const LEGACY_MENU_SLAB_FILL = 0x5a5464;
 const LEGACY_MENU_SLAB_EDGE = 0x14101a;
 const LEGACY_MENU_SLAB_HIGHLIGHT = 0xbcb5c7;
@@ -270,7 +274,7 @@ export class MenuScene extends Phaser.Scene {
       this.updateMenuDemo(time);
     }
 
-    if (this.mode === 'play' && this.playResetReturnAtMs > 0 && time >= this.playResetReturnAtMs) {
+    if (shouldConsumeLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs, time)) {
       this.enterMenuMode();
       return;
     }
@@ -309,7 +313,7 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
-      if (this.mode === 'play' && this.playResetReturnAtMs > 0) {
+      if (hasPendingLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs)) {
         return;
       }
 
@@ -534,7 +538,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private tryMovePlayer(deltaX: number, deltaY: number): void {
-    if (this.playResetReturnAtMs > 0) {
+    if (hasPendingLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs)) {
       return;
     }
 
@@ -559,7 +563,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private schedulePlayResetReturn(): void {
-    this.playResetReturnAtMs = this.time.now + ACTIVE_PLAY_GOAL_RESET_HOLD_MS;
+    this.playResetReturnAtMs = scheduleLegacyPlayResetReturnAtMs(this.time.now);
   }
 
   private createStars(): void {
