@@ -149,12 +149,16 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(titleUnderlayBand, { x: 19, y: 9 });
   appendSegment(titleUnderlayBand, { x: 17, y: 9 });
   appendSegment(titleUnderlayBand, { x: 17, y: 11 });
+  appendSegment(titleUnderlayBand, { x: 13, y: 11 });
+  appendSegment(titleUnderlayBand, { x: 13, y: 8 });
+  appendSegment(titleUnderlayBand, { x: 15, y: 8 });
 
   const leftInteriorDrop: LegacyMenuSnapshotPoint[] = [{ x: 6, y: 10 }];
   appendSegment(leftInteriorDrop, { x: 6, y: 16 });
   appendSegment(leftInteriorDrop, { x: 9, y: 16 });
   appendSegment(leftInteriorDrop, { x: 9, y: 14 });
   appendSegment(leftInteriorDrop, { x: 11, y: 14 });
+  appendSegment(leftInteriorDrop, { x: 11, y: 12 });
 
   const midLeftShelf: LegacyMenuSnapshotPoint[] = [{ x: 4, y: 13 }];
   appendSegment(midLeftShelf, { x: 8, y: 13 });
@@ -197,6 +201,8 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(rightInnerPocket, { x: 21, y: 11 });
   appendSegment(rightInnerPocket, { x: 21, y: 15 });
   appendSegment(rightInnerPocket, { x: 19, y: 15 });
+  appendSegment(rightInnerPocket, { x: 19, y: 13 });
+  appendSegment(rightInnerPocket, { x: 18, y: 13 });
 
   return [
     { id: 'upper-ridge', points: upperRidge },
