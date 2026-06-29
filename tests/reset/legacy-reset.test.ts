@@ -125,6 +125,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).not.toContain('WASD or arrows to move   P to pause');
     expect(menuSceneSource).toContain('this.hudGraphics.fillRect(18, 18, 156, 34);');
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
+    expect(menuSceneSource).toContain('const ACTIVE_PLAY_GOAL_RESET_HOLD_MS = 340;');
+    expect(menuSceneSource).toContain('this.schedulePlayResetReturn();');
+    expect(menuSceneSource).toContain('private schedulePlayResetReturn(): void {');
     expect(menuSceneSource).toContain('createLegacyDemoWalkerEpisode(this.maze)');
     expect(menuSceneSource).toContain('createLegacyMenuDemoWalkerConfig(this.maze.seed)');
     expect(menuSceneSource).toContain('createLegacyMenuSnapshotDemoWalkerConfig(this.maze.seed)');

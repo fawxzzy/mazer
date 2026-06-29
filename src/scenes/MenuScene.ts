@@ -136,6 +136,7 @@ const LEGACY_BOARD_GRID_ALPHA = 0.016;
 const MESSAGE_DURATION_MS = 1800;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
+const ACTIVE_PLAY_GOAL_RESET_HOLD_MS = 340;
 const LEGACY_MENU_SLAB_FILL = 0x5a5464;
 const LEGACY_MENU_SLAB_EDGE = 0x14101a;
 const LEGACY_MENU_SLAB_HIGHLIGHT = 0xbcb5c7;
@@ -197,6 +198,7 @@ export class MenuScene extends Phaser.Scene {
   private menuDemoConfig!: DemoWalkerConfig;
   private nextDemoMoveAtMs = 0;
   private playStartedAtMs = 0;
+  private playResetReturnAtMs = 0;
   private messageText = '';
   private messageVisibleUntilMs = 0;
   private titleText!: Phaser.GameObjects.Text;
@@ -268,6 +270,11 @@ export class MenuScene extends Phaser.Scene {
       this.updateMenuDemo(time);
     }
 
+    if (this.mode === 'play' && this.playResetReturnAtMs > 0 && time >= this.playResetReturnAtMs) {
+      this.enterMenuMode();
+      return;
+    }
+
     if (this.messageVisibleUntilMs > 0 && time >= this.messageVisibleUntilMs) {
       this.messageVisibleUntilMs = 0;
       this.messageText = '';
@@ -299,6 +306,10 @@ export class MenuScene extends Phaser.Scene {
   private installInput(): void {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (event.repeat) {
+        return;
+      }
+
+      if (this.mode === 'play' && this.playResetReturnAtMs > 0) {
         return;
       }
 
@@ -475,6 +486,7 @@ export class MenuScene extends Phaser.Scene {
 
   private enterMenuMode(): void {
     this.mode = 'menu';
+    this.playResetReturnAtMs = 0;
     this.overlay = 'none';
     this.overlayReturn = 'none';
     this.titleText.setVisible(true);
@@ -484,6 +496,7 @@ export class MenuScene extends Phaser.Scene {
 
   private startPlayMode(): void {
     this.mode = 'play';
+    this.playResetReturnAtMs = 0;
     this.overlay = 'none';
     this.overlayReturn = 'none';
     this.titleText.setVisible(false);
@@ -521,6 +534,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private tryMovePlayer(deltaX: number, deltaY: number): void {
+    if (this.playResetReturnAtMs > 0) {
+      return;
+    }
+
     const next = movePoint(this.player, deltaX, deltaY);
     if (!isWalkableTile(this.maze, next)) {
       return;
@@ -533,11 +550,16 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (next.x === this.maze.goal.x && next.y === this.maze.goal.y) {
-      this.enterMenuMode();
+      this.schedulePlayResetReturn();
+      this.boardDynamicDirty = true;
       return;
     }
 
     this.boardDynamicDirty = true;
+  }
+
+  private schedulePlayResetReturn(): void {
+    this.playResetReturnAtMs = this.time.now + ACTIVE_PLAY_GOAL_RESET_HOLD_MS;
   }
 
   private createStars(): void {
