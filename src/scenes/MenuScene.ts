@@ -815,30 +815,30 @@ export class MenuScene extends Phaser.Scene {
 
     const elapsed = formatClock(time - this.playStartedAtMs);
     const timerText = `Time ${elapsed}`;
-    const arrowOriginX = this.layout.width - 130;
-    const arrowOriginY = 58;
+    const arrowOriginX = this.layout.width - 56;
+    const arrowOriginY = 36;
     const boardOffset = this.resolveBoardOffset();
     const goalScreenX = this.layout.boardLeft + boardOffset.x + (this.maze.goal.x * this.layout.tileSize);
     const goalScreenY = this.layout.boardTop + boardOffset.y + (this.maze.goal.y * this.layout.tileSize);
     const playerScreenX = this.layout.boardLeft + boardOffset.x + (this.player.x * this.layout.tileSize);
     const playerScreenY = this.layout.boardTop + boardOffset.y + (this.player.y * this.layout.tileSize);
     const angle = Phaser.Math.Angle.Between(playerScreenX, playerScreenY, goalScreenX, goalScreenY);
-    const length = 36;
+    const length = 26;
 
-    this.hudGraphics.fillStyle(0x000000, 0.38);
-    this.hudGraphics.fillRoundedRect(20, 18, 184, 44, 8);
-    this.hudGraphics.lineStyle(1, 0xffffff, 0.22);
-    this.hudGraphics.strokeRoundedRect(20, 18, 184, 44, 8);
+    this.hudGraphics.fillStyle(0x05050a, 0.34);
+    this.hudGraphics.fillRect(18, 18, 156, 34);
+    this.hudGraphics.lineStyle(1, 0xdedbe6, 0.26);
+    this.hudGraphics.strokeRect(18, 18, 156, 34);
 
-    const timer = this.add.text(32, 29, timerText, {
+    const timer = this.add.text(28, 24, timerText, {
       fontFamily: '"Courier New", monospace',
-      fontSize: '22px',
-      color: '#f2f2f4'
+      fontSize: '18px',
+      color: '#d7f0d6'
     });
     timer.setData('hud', true);
     this.uiTexts.push(timer);
 
-    this.hudGraphics.lineStyle(3, 0xf4f6fa, 0.95);
+    this.hudGraphics.lineStyle(2, 0xe4efe6, 0.92);
     this.hudGraphics.beginPath();
     this.hudGraphics.moveTo(arrowOriginX, arrowOriginY);
     this.hudGraphics.lineTo(
@@ -846,14 +846,14 @@ export class MenuScene extends Phaser.Scene {
       arrowOriginY + (Math.sin(angle) * length)
     );
     this.hudGraphics.strokePath();
-    this.hudGraphics.fillStyle(0xf4f6fa, 0.95);
+    this.hudGraphics.fillStyle(0xe4efe6, 0.92);
     this.hudGraphics.fillTriangle(
       arrowOriginX + (Math.cos(angle) * length),
       arrowOriginY + (Math.sin(angle) * length),
-      arrowOriginX + (Math.cos(angle + 2.4) * 12),
-      arrowOriginY + (Math.sin(angle + 2.4) * 12),
-      arrowOriginX + (Math.cos(angle - 2.4) * 12),
-      arrowOriginY + (Math.sin(angle - 2.4) * 12)
+      arrowOriginX + (Math.cos(angle + 2.42) * 9),
+      arrowOriginY + (Math.sin(angle + 2.42) * 9),
+      arrowOriginX + (Math.cos(angle - 2.42) * 9),
+      arrowOriginY + (Math.sin(angle - 2.42) * 9)
     );
   }
 

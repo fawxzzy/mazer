@@ -123,6 +123,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const timerText = `Time ${elapsed}`;');
     expect(menuSceneSource).toContain('Phaser.Math.Angle.Between');
     expect(menuSceneSource).not.toContain('WASD or arrows to move   P to pause');
+    expect(menuSceneSource).toContain('this.hudGraphics.fillRect(18, 18, 156, 34);');
+    expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
     expect(menuSceneSource).toContain('createLegacyDemoWalkerEpisode(this.maze)');
     expect(menuSceneSource).toContain('createLegacyMenuDemoWalkerConfig(this.maze.seed)');
     expect(menuSceneSource).toContain('createLegacyMenuSnapshotDemoWalkerConfig(this.maze.seed)');
