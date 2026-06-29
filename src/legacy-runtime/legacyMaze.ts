@@ -1,4 +1,5 @@
 import { clampInteger } from './legacyDefaults';
+import { resolveLegacyMenuSnapshotBlueprint } from './legacyMenuSnapshot';
 
 export interface LegacyPoint {
   x: number;
@@ -16,7 +17,6 @@ export interface LegacyMazeSnapshot {
 
 const LEGACY_MIN_SCALE = 25;
 const LEGACY_MAX_SCALE = 150;
-const LEGACY_MENU_SNAPSHOT_SIZE = 25;
 
 const createSeededRng = (seed: number): (() => number) => {
   let state = (seed >>> 0) || 1;
@@ -55,134 +55,10 @@ const createEmptyGrid = (size: number): boolean[][] => (
   Array.from({ length: size }, () => Array.from({ length: size }, () => false))
 );
 
-const appendSegment = (path: LegacyPoint[], to: LegacyPoint): void => {
-  const from = path[path.length - 1];
-  if (!from) {
-    path.push({ ...to });
-    return;
-  }
-
-  if (from.x !== to.x && from.y !== to.y) {
-    throw new Error(`Legacy path segment must stay orthogonal: ${from.x},${from.y} -> ${to.x},${to.y}`);
-  }
-
-  const stepX = from.x === to.x ? 0 : (from.x < to.x ? 1 : -1);
-  const stepY = from.y === to.y ? 0 : (from.y < to.y ? 1 : -1);
-  let cursorX = from.x;
-  let cursorY = from.y;
-
-  while (cursorX !== to.x || cursorY !== to.y) {
-    cursorX += stepX;
-    cursorY += stepY;
-    path.push({ x: cursorX, y: cursorY });
-  }
-};
-
 const carvePolyline = (grid: boolean[][], points: readonly LegacyPoint[]): void => {
   for (const point of points) {
     grid[point.y]![point.x] = true;
   }
-};
-
-const buildStaircase = (
-  start: LegacyPoint,
-  steps: number,
-  horizontalDirection: 1 | -1,
-  verticalDirection: 1 | -1
-): LegacyPoint[] => {
-  const points: LegacyPoint[] = [{ ...start }];
-  let cursor = { ...start };
-
-  for (let index = 0; index < steps; index += 1) {
-    cursor = { x: cursor.x + horizontalDirection, y: cursor.y };
-    points.push({ ...cursor });
-    cursor = { x: cursor.x, y: cursor.y + verticalDirection };
-    points.push({ ...cursor });
-  }
-
-  return points;
-};
-
-const buildLegacyMenuSolutionPath = (): LegacyPoint[] => {
-  const path: LegacyPoint[] = [{ x: 3, y: 4 }];
-
-  appendSegment(path, { x: 8, y: 4 });
-  appendSegment(path, { x: 8, y: 7 });
-  appendSegment(path, { x: 5, y: 7 });
-  appendSegment(path, { x: 5, y: 12 });
-  appendSegment(path, { x: 10, y: 12 });
-  appendSegment(path, { x: 10, y: 9 });
-  appendSegment(path, { x: 14, y: 9 });
-  appendSegment(path, { x: 14, y: 13 });
-  appendSegment(path, { x: 12, y: 13 });
-  appendSegment(path, { x: 12, y: 17 });
-  appendSegment(path, { x: 14, y: 17 });
-  appendSegment(path, { x: 14, y: 18 });
-  appendSegment(path, { x: 15, y: 18 });
-  appendSegment(path, { x: 15, y: 19 });
-  appendSegment(path, { x: 16, y: 19 });
-  appendSegment(path, { x: 16, y: 20 });
-  appendSegment(path, { x: 17, y: 20 });
-  appendSegment(path, { x: 17, y: 21 });
-  appendSegment(path, { x: 20, y: 21 });
-  appendSegment(path, { x: 20, y: 13 });
-  appendSegment(path, { x: 22, y: 13 });
-  appendSegment(path, { x: 22, y: 22 });
-
-  return path;
-};
-
-const buildLegacyMenuBranchPolylines = (): LegacyPoint[][] => {
-  const branches: LegacyPoint[][] = [];
-
-  const topSpine: LegacyPoint[] = [{ x: 3, y: 2 }];
-  appendSegment(topSpine, { x: 10, y: 2 });
-  appendSegment(topSpine, { x: 10, y: 5 });
-  appendSegment(topSpine, { x: 16, y: 5 });
-  appendSegment(topSpine, { x: 16, y: 2 });
-  appendSegment(topSpine, { x: 21, y: 2 });
-  appendSegment(topSpine, { x: 21, y: 8 });
-  appendSegment(topSpine, { x: 18, y: 8 });
-  branches.push(topSpine);
-
-  const leftFrame: LegacyPoint[] = [{ x: 2, y: 4 }];
-  appendSegment(leftFrame, { x: 2, y: 22 });
-  appendSegment(leftFrame, { x: 6, y: 22 });
-  appendSegment(leftFrame, { x: 6, y: 19 });
-  appendSegment(leftFrame, { x: 9, y: 19 });
-  branches.push(leftFrame);
-
-  const centerBand: LegacyPoint[] = [{ x: 8, y: 10 }];
-  appendSegment(centerBand, { x: 18, y: 10 });
-  appendSegment(centerBand, { x: 18, y: 16 });
-  appendSegment(centerBand, { x: 15, y: 16 });
-  appendSegment(centerBand, { x: 15, y: 12 });
-  branches.push(centerBand);
-
-  branches.push(buildStaircase({ x: 6, y: 5 }, 6, 1, 1));
-  branches.push(buildStaircase({ x: 8, y: 14 }, 6, 1, 1));
-
-  const lowerBand: LegacyPoint[] = [{ x: 7, y: 15 }];
-  appendSegment(lowerBand, { x: 7, y: 21 });
-  appendSegment(lowerBand, { x: 13, y: 21 });
-  appendSegment(lowerBand, { x: 13, y: 23 });
-  appendSegment(lowerBand, { x: 18, y: 23 });
-  branches.push(lowerBand);
-
-  const rightPocket: LegacyPoint[] = [{ x: 19, y: 13 }];
-  appendSegment(rightPocket, { x: 19, y: 6 });
-  appendSegment(rightPocket, { x: 23, y: 6 });
-  appendSegment(rightPocket, { x: 23, y: 18 });
-  appendSegment(rightPocket, { x: 21, y: 18 });
-  branches.push(rightPocket);
-
-  const rightSpine: LegacyPoint[] = [{ x: 21, y: 12 }];
-  appendSegment(rightSpine, { x: 23, y: 12 });
-  appendSegment(rightSpine, { x: 23, y: 20 });
-  appendSegment(rightSpine, { x: 20, y: 20 });
-  branches.push(rightSpine);
-
-  return branches;
 };
 
 const walkableNeighbors = (grid: boolean[][], point: LegacyPoint): LegacyPoint[] => {
@@ -349,13 +225,14 @@ export const createLegacyMaze = (scale: number, seed: number): LegacyMazeSnapsho
 };
 
 export const createLegacyMenuMaze = (seed: number): LegacyMazeSnapshot => {
-  const size = LEGACY_MENU_SNAPSHOT_SIZE;
+  const blueprint = resolveLegacyMenuSnapshotBlueprint();
+  const size = blueprint.size;
   const grid = createEmptyGrid(size);
-  const solutionPath = buildLegacyMenuSolutionPath();
+  const solutionPath = blueprint.solutionPath.map((point) => ({ ...point }));
 
   carvePolyline(grid, solutionPath);
-  for (const branch of buildLegacyMenuBranchPolylines()) {
-    carvePolyline(grid, branch);
+  for (const branch of blueprint.branches) {
+    carvePolyline(grid, branch.points);
   }
 
   const start = solutionPath[0]!;
