@@ -398,13 +398,13 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createStars(): void {
-    const starCount = 170;
+    const starCount = 260;
     this.stars = Array.from({ length: starCount }, () => ({
       x: Math.random(),
       y: Math.random(),
-      radius: 0.8 + (Math.random() * 2.3),
-      speed: 0.014 + (Math.random() * 0.05),
-      alpha: 0.28 + (Math.random() * 0.6)
+      radius: 0.7 + (Math.random() * 1.8),
+      speed: 0.01 + (Math.random() * 0.04),
+      alpha: 0.34 + (Math.random() * 0.52)
     }));
   }
 
@@ -425,29 +425,42 @@ export class MenuScene extends Phaser.Scene {
     const { width, height } = this.layout;
     this.backdropGraphics.clear();
 
-    const fieldColor = this.settings.darkMode ? 0x120c17 : 0x2c1f3b;
-    const glowColor = this.settings.darkMode ? 0x241731 : 0x563b74;
-    const glowAlpha = this.settings.darkMode ? 0.07 : 0.14;
-    const starAlphaScale = this.settings.darkMode ? 0.52 : 1;
+    const fieldColor = this.settings.darkMode ? 0x161022 : 0x2e1f45;
+    const hazeColor = this.settings.darkMode ? 0x231234 : 0x5a3c76;
+    const hazeAlpha = this.settings.darkMode ? 0.11 : 0.16;
+    const starAlphaScale = this.settings.darkMode ? 0.56 : 0.96;
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const maxDistance = Math.max(1, Math.hypot(centerX, centerY));
 
     this.backdropGraphics.fillStyle(fieldColor, 1);
     this.backdropGraphics.fillRect(0, 0, width, height);
-    this.backdropGraphics.fillStyle(glowColor, glowAlpha);
-    this.backdropGraphics.fillCircle(width * 0.22, height * 0.18, Math.min(width, height) * 0.1);
-    this.backdropGraphics.fillCircle(width * 0.84, height * 0.16, Math.min(width, height) * 0.08);
-    this.backdropGraphics.fillCircle(width * 0.72, height * 0.78, Math.min(width, height) * 0.06);
+    this.backdropGraphics.fillStyle(hazeColor, hazeAlpha);
+    this.backdropGraphics.fillCircle(centerX, centerY, Math.min(width, height) * 0.48);
+    this.backdropGraphics.fillStyle(hazeColor, hazeAlpha * 0.62);
+    this.backdropGraphics.fillCircle(centerX * 0.94, centerY * 0.9, Math.min(width, height) * 0.3);
 
     for (const star of this.stars) {
+      const pixelX = Math.round(star.x * width);
+      const pixelY = Math.round(star.y * height);
+      const deltaX = pixelX - centerX;
+      const deltaY = pixelY - centerY;
+      const distanceRatio = clamp(Math.hypot(deltaX, deltaY) / maxDistance, 0, 1);
+      const streakLength = Math.max(1, Math.round(distanceRatio * 4));
+      const coreSize = Math.max(1, Math.round(star.radius));
+      const stepX = deltaX === 0 ? 0 : (deltaX > 0 ? 1 : -1);
+      const stepY = deltaY === 0 ? 0 : (deltaY > 0 ? 1 : -1);
+
       this.backdropGraphics.fillStyle(0xffffff, star.alpha * starAlphaScale);
-      this.backdropGraphics.fillRect(
-        Math.round(star.x * width),
-        Math.round(star.y * height),
-        Math.max(1, Math.round(star.radius)),
-        Math.max(1, Math.round(star.radius))
-      );
+      this.backdropGraphics.fillRect(pixelX, pixelY, coreSize, coreSize);
+
+      for (let index = 1; index <= streakLength; index += 1) {
+        this.backdropGraphics.fillStyle(0xffffff, star.alpha * starAlphaScale * (0.45 - (index * 0.08)));
+        this.backdropGraphics.fillRect(pixelX + (stepX * index), pixelY + (stepY * index), 1, 1);
+      }
     }
     if (this.settings.darkMode) {
-      this.backdropGraphics.fillStyle(0x000000, 0.18);
+      this.backdropGraphics.fillStyle(0x000000, 0.16);
       this.backdropGraphics.fillRect(0, 0, width, height);
     }
 
