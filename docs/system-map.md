@@ -1,0 +1,184 @@
+# System Map
+
+This is the practical edit map for the current Mazer repo.
+
+Use it when you want to change behavior without losing track of the whole application.
+
+## Truth order
+
+When sources disagree, read in this order:
+
+1. `legacy/old-project.zip`
+2. `legacy/screenshots/menu-01.png` .. `menu-04.png`
+3. `docs/legacy/*`
+4. `docs/current-truth.md`
+5. current runtime code and tests
+
+## Runtime boot graph
+
+The active app entry path is:
+
+1. `src/boot/main.ts`
+2. `src/boot/phaserConfig.ts`
+3. `src/scenes/BootScene.ts`
+4. `src/scenes/MenuScene.ts`
+
+Meaning:
+
+- `main.ts` owns localhost service-worker/cache cleanup
+- `phaserConfig.ts` owns the scene list and Phaser boot config
+- `BootScene.ts` is only a handoff
+- `MenuScene.ts` is the real application surface for the reset lane
+
+## Active reset-lane subsystems
+
+### Front door + play shell
+
+- `src/scenes/MenuScene.ts`
+  - runtime mode switch: `menu` vs `play`
+  - overlay switch: `none | options | features | gameModes | pause | message`
+  - front-door button behavior
+  - active-play movement
+  - HUD timer and goal arrow
+  - menu demo stepping
+  - reset return path
+  - visual diagnostics published for visual proof
+
+### Legacy settings + menu shell helpers
+
+- `src/legacy-runtime/legacyDefaults.ts`
+  - canonical legacy defaults
+  - `Exit / Start / Options`
+- `src/legacy-runtime/legacyMenuLayout.ts`
+  - title, board, and button frame math
+- `src/legacy-runtime/legacyOptionFields.ts`
+  - text-field draft parsing and settings mutation
+
+### Menu-board ownership
+
+- `src/legacy-runtime/legacyMenuSnapshot.ts`
+  - fixed screenshot-shaped front-door board blueprint
+  - named branch groups for silhouette tweaking
+  - safest place to edit menu-only maze geometry
+
+- `src/legacy-runtime/legacyMaze.ts`
+  - generated maze builder for play mode
+  - adapter that converts the fixed menu snapshot blueprint into a `LegacyMazeSnapshot`
+
+Boundary:
+
+- If the change is menu screenshot parity only, start in `legacyMenuSnapshot.ts`
+- If the change is active-play maze truth, start in `legacyMaze.ts`
+
+### Menu demo / attract behavior
+
+- `src/legacy-runtime/legacyDemoWalker.ts`
+  - adapts legacy maze snapshots into demo-walker episodes/config
+- `src/domain/ai/demoWalker.ts`
+  - deterministic demo stepping, backtracking, goal hold, reset hold
+
+Boundary:
+
+- route shape lives in the legacy snapshot/generator
+- route behavior over time lives in the demo walker
+
+## Legacy document ownership
+
+- `docs/legacy/art-direction.md`
+  - screenshot-derived visual rules
+- `docs/legacy/ui-spec.md`
+  - overlay and button behavior truth
+- `docs/legacy/gameplay-spec.md`
+  - process-count generation and reset behavior truth
+- `docs/legacy/file-map.md`
+  - original Unreal owner map
+
+## Proof and validation surfaces
+
+### Closure spine
+
+- `npm run legacy:extract`
+- `npm run verify`
+
+What `verify` currently means:
+
+- reset tests
+- demo walker tests
+- production build
+
+### Visual comparison surfaces
+
+- `npm run visual:matrix -- --preset core --skip-build true`
+  - layout artifact pack under `tmp/captures/mazer-layout-matrix/*`
+- `npm run edge:live`
+  - live route/console proof
+- in-app browser on localhost
+  - fastest human truth check for the active surface
+
+### Repo-owned tests most relevant to this lane
+
+- `tests/reset/legacy-reset.test.ts`
+  - front door, menu snapshot, HUD/minimal play shell, localhost boot cleanup
+- `tests/reset/legacy-menu-layout.test.ts`
+  - board/button/title layout contract
+- `tests/reset/legacy-option-fields.test.ts`
+  - options input behavior
+- `tests/ai/demo-walker.test.ts`
+  - demo AI/reset-flow proof
+
+## Parked/support surfaces
+
+These are part of the repo map, but not the current shipping/reset truth:
+
+- `src/future-runtime/**`
+  - future Phaser and planet/3D experiments
+- `src/visual-proof/**`
+  - proof-only rendering/runtime lane
+- `src/mazer-core/**`
+  - bounded core/runtime research lane
+- `src/topology-proof/**`
+  - topology proof surfaces
+- `src/watch-pass-*`
+  - separate watch-pass explorations
+- `src/projections/**`
+  - native/export projection experiments
+
+Rule:
+
+- do not pull these lanes into reset-lane claims unless a packet explicitly reopens them
+
+## Practical edit map
+
+If you want to change one thing, start here:
+
+- menu board silhouette:
+  - `src/legacy-runtime/legacyMenuSnapshot.ts`
+- menu board frame, title, button placement:
+  - `src/legacy-runtime/legacyMenuLayout.ts`
+  - `src/scenes/MenuScene.ts`
+- menu demo timing or route progression:
+  - `src/legacy-runtime/legacyDemoWalker.ts`
+  - `src/domain/ai/demoWalker.ts`
+  - `src/scenes/MenuScene.ts`
+- play movement or win/reset loop:
+  - `src/scenes/MenuScene.ts`
+  - `docs/legacy/gameplay-spec.md`
+- options/features/game modes/pause fields:
+  - `src/legacy-runtime/legacyOptionFields.ts`
+  - `src/scenes/MenuScene.ts`
+- HUD timer / goal arrow:
+  - `src/scenes/MenuScene.ts`
+- localhost boot weirdness:
+  - `src/boot/main.ts`
+- scene wiring or startup:
+  - `src/boot/phaserConfig.ts`
+  - `src/scenes/BootScene.ts`
+
+## Invariants to preserve
+
+- gameplay truth comes from the restored Unreal project
+- visual truth comes from `legacy/screenshots/*`
+- menu mode and play mode stay split
+- one active overlay at a time
+- menu screenshot work must not silently rewrite play behavior
+- do not claim 1:1 until the parity gaps are actually closed

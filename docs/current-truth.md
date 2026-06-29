@@ -20,6 +20,7 @@ Read the repo in this order:
 4. Reset-lane contract docs:
    - `docs/research/MAZER_LEGACY_WEB_PORT_CONTRACT.md`
    - `docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md`
+   - `docs/system-map.md`
 5. Current web runtime code
 
 If the current web app disagrees with restored legacy truth, legacy wins for this lane.
