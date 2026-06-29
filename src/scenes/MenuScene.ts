@@ -99,12 +99,12 @@ const BOARD_SHADOW_OFFSET = 10;
 const MENU_BUTTON_ALPHA = 0.18;
 const MENU_BUTTON_STROKE_ALPHA = 0.24;
 const MENU_TEXT_COLOR = '#0b841d';
-const TITLE_FILL_COLOR = '#249628';
+const TITLE_FILL_COLOR = '#208b24';
 const TITLE_SHADOW_COLOR = '#0c2e13';
 const LEGACY_BOARD_GRID_ALPHA = 0.3;
 const MESSAGE_DURATION_MS = 1800;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
-const INITIAL_MENU_DEMO_PREROLL_PROGRESS = 0.62;
+const INITIAL_MENU_DEMO_PREROLL_PROGRESS = 0.74;
 const DEMO_STEP_MS = 118;
 const DEMO_REGEN_HOLD_MS = 860;
 const TRAIL_FADE_TAIL = 16;
@@ -192,12 +192,12 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: '"Courier New", monospace',
       fontSize: '96px',
       color: TITLE_SHADOW_COLOR
-    }).setOrigin(0.5).setAlpha(0.84);
+    }).setOrigin(0.5).setAlpha(0.62);
     this.titleText = this.add.text(0, 0, 'Mazer', {
       fontFamily: '"Courier New", monospace',
       fontSize: '96px',
       color: TITLE_FILL_COLOR
-    }).setOrigin(0.5).setAlpha(0.82);
+    }).setOrigin(0.5).setAlpha(0.72);
     this.footerText = this.add.text(0, 0, '', {
       fontFamily: '"Courier New", monospace',
       fontSize: '18px',
@@ -352,8 +352,8 @@ export class MenuScene extends Phaser.Scene {
     const isPortrait = height > width;
     this.layout = resolveLegacyMenuLayout(width, height, this.settings.scale + this.settings.camScale, this.maze.size);
     const titleFontSize = Math.max(
-      isPortrait ? 72 : 88,
-      Math.round(this.layout.boardSize * (isPortrait ? 0.22 : 0.245))
+      isPortrait ? 62 : 76,
+      Math.round(this.layout.boardSize * (isPortrait ? 0.18 : 0.2))
     );
     const titleShadowOffset = Math.max(isPortrait ? 6 : 8, Math.round(this.layout.tileSize * (isPortrait ? 0.18 : 0.24)));
 
@@ -1200,8 +1200,8 @@ export class MenuScene extends Phaser.Scene {
     const buttonFontSize = Math.max(
       isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 18 : 16) : 18,
       Math.min(
-        isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 38 : 34) : 40,
-        Math.min(Math.round(height * (isPrimaryFrontDoorButton ? 0.54 : 0.48)), textFitSize)
+        isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 34 : 30) : 40,
+        Math.min(Math.round(height * (isPrimaryFrontDoorButton ? 0.5 : 0.44)), textFitSize)
       )
     );
     const buttonTextColor = isMenuFrontDoor
