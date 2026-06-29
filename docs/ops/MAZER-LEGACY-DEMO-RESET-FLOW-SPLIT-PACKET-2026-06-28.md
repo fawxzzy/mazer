@@ -50,13 +50,13 @@ This is a real behavioral restoration, not only a docs rewrite.
 
 Commands run:
 
-- `npm run test -- tests/ai/demo-walker.test.ts`
+- `npx vitest run tests/ai/demo-walker.test.ts`
+- `npm run verify`
 
 Result:
 
 - focused AI/reset tests passed
-
-Follow-up full-lane verification was run after this packet before closeout.
+- repo `verify` passed
 
 ## Remaining truth
 

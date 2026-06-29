@@ -20,11 +20,11 @@ npm run
 | --- | --- |
 | `npm run architecture:check` | Validate the explicit scene and architecture wiring rules. |
 | `npm run lint` | Run the TypeScript no-emit check. |
-| `npm run test` | Run the repo-local automated test suite, excluding the dedicated maze soak lane. |
+| `npm run test` | Run the repo-local reset-lane and demo-walker proof tests, excluding the dedicated maze soak lane. |
 | `npm run test:soak` | Run the isolated maze soak test lane. |
 | `npm run test:playbook-adoption` | Validate the repo-local Playbook adoption export against the repo schema and owner contract ids. |
 | `npm run test:playbook-verification` | Validate the repo-local Playbook verification report against the ATLAS root schema and live command surface. |
-| `npm run verify` | Run the repo-local architecture check, automated tests, and production build path used for the Playbook convergence slice. |
+| `npm run verify` | Run the repo-local reset-lane proof tests plus the production build path used for the current legacy reset/port lane. |
 
 ## Visual proof
 

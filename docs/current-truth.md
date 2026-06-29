@@ -69,6 +69,7 @@ For the reset lane, the local proof spine is:
 Current `verify` means:
 
 - reset-lane tests
+- demo walker reset-flow proof tests
 - production build
 
 The older visual matrix / Edge live proof lane is now archival for comparison, not current closure truth for the reset lane.
