@@ -110,6 +110,29 @@ Use this when you need to understand the app as a system instead of a file list.
 9. Proof readback:
    visual scripts and live checks read `window.__MAZER_VISUAL_DIAGNOSTICS__`; reset-lane tests assert the stable contracts under `tests/reset/*`.
 
+### Generation / reset owner chain
+
+Use this before changing how mazes are built or how play/menu returns regenerate state.
+
+- `docs/legacy/gameplay-spec.md`
+  - legacy truth for staged `_ProcessCount` generation and process `8` reset behavior
+- `src/legacy-runtime/legacyMaze.ts`
+  - current one-shot maze builders:
+  - `createLegacyMenuMaze()` for the fixed front-door snapshot
+  - `createLegacyMaze()` for generated play mazes
+- `src/scenes/MenuScene.ts`
+  - `buildMazeForCurrentMode()` picks menu vs play builder
+  - `rebuildMaze()` rehydrates maze, player, trail, demo state, and layout
+  - `regenerateMaze()` increments seed and reruns the build path
+  - `startPlayMode()` swaps from menu shell into active-play generation
+  - `enterMenuMode()` returns active play back into menu flow after reset
+
+Boundary:
+
+- if the change is "what topology gets generated?", start in `src/legacy-runtime/legacyMaze.ts`
+- if the change is "when does the runtime rebuild or return to menu?", start in `src/scenes/MenuScene.ts`
+- if the change is "how do we port the old staged process `0/3/4/5/6/7/8` lifecycle exactly?", start from `docs/legacy/gameplay-spec.md` and open a dedicated port packet before rewriting runtime code
+
 ## Input-to-owner routing
 
 This is the fastest way to answer "if I click or press this, what actually owns it?"
@@ -410,6 +433,11 @@ If you want to change one thing, start here:
 - play movement or win/reset loop:
   - `src/scenes/MenuScene.ts`
   - `docs/legacy/gameplay-spec.md`
+- generation / reset lifecycle:
+  - `docs/legacy/gameplay-spec.md`
+  - `src/legacy-runtime/legacyMaze.ts`
+  - `src/scenes/MenuScene.ts`
+  - `tests/reset/legacy-reset.test.ts`
 - options/features/game modes/pause fields:
   - `src/legacy-runtime/legacyOptionFields.ts`
   - `src/scenes/MenuScene.ts`
