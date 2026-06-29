@@ -104,13 +104,13 @@ declare global {
 export const MENU_SCENE_VISUAL_CAPTURE_KEY = '__MAZER_VISUAL_CAPTURE__' as const;
 export const MENU_SCENE_VISUAL_DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__' as const;
 
-const BOARD_SHADOW_OFFSET = 10;
+const BOARD_SHADOW_OFFSET = 14;
 const MENU_BUTTON_ALPHA = 0.18;
 const MENU_BUTTON_STROKE_ALPHA = 0.24;
 const MENU_TEXT_COLOR = '#0b841d';
 const TITLE_FILL_COLOR = '#208b24';
 const TITLE_SHADOW_COLOR = '#0c2e13';
-const LEGACY_BOARD_GRID_ALPHA = 0.3;
+const LEGACY_BOARD_GRID_ALPHA = 0.22;
 const MESSAGE_DURATION_MS = 1800;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
@@ -562,23 +562,31 @@ export class MenuScene extends Phaser.Scene {
     const { boardLeft, boardTop, boardSize, tileSize } = this.layout;
     const isMenuMode = this.mode === 'menu';
     const pathColor = isMenuMode
-      ? (this.settings.darkMode ? 0x322f37 : 0x4b474e)
+      ? (this.settings.darkMode ? 0x302d35 : 0x49454c)
       : linearColorToNumber(this.settings.pathColor);
     const wallColor = isMenuMode
-      ? (this.settings.darkMode ? 0x060509 : 0x0d0a10)
+      ? (this.settings.darkMode ? 0x050408 : 0x09070b)
       : linearColorToNumber(this.settings.wallColor);
-    const boardFill = this.settings.darkMode ? 0x17131a : 0x4a454d;
-    const boardEdge = this.settings.darkMode ? 0x040306 : 0x2f2830;
+    const boardFill = this.settings.darkMode ? 0x151118 : 0x464149;
+    const boardEdge = this.settings.darkMode ? 0x030205 : 0x2a252d;
     const pathGlow = isMenuMode
-      ? (this.settings.darkMode ? 0x9891a0 : 0x8f8a93)
+      ? (this.settings.darkMode ? 0x9b96a1 : 0x97929c)
       : (this.settings.darkMode ? 0xb3acb8 : 0xd0cad2);
 
     this.boardStaticGraphics.clear();
-    this.boardStaticGraphics.fillStyle(0x000000, 0.28);
+    this.boardStaticGraphics.fillStyle(0x000000, isMenuMode ? 0.38 : 0.28);
     this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardSize, boardSize);
+    if (isMenuMode) {
+      this.boardStaticGraphics.fillStyle(0x000000, 0.52);
+      this.boardStaticGraphics.fillRect(boardLeft + boardSize, boardTop + 18, 18, Math.max(0, boardSize - 10));
+      this.boardStaticGraphics.fillRect(boardLeft + 18, boardTop + boardSize, Math.max(0, boardSize - 10), 16);
+      this.boardStaticGraphics.fillStyle(0xffffff, 0.04);
+      this.boardStaticGraphics.fillRect(boardLeft - 4, boardTop - 4, boardSize + 8, 2);
+      this.boardStaticGraphics.fillRect(boardLeft - 4, boardTop - 4, 2, boardSize + 8);
+    }
     this.boardStaticGraphics.fillStyle(boardEdge, 1);
     this.boardStaticGraphics.fillRect(boardLeft - 6, boardTop - 8, boardSize + 12, boardSize + 12);
-    this.boardStaticGraphics.fillStyle(boardFill, 0.96);
+    this.boardStaticGraphics.fillStyle(boardFill, isMenuMode ? 0.98 : 0.96);
     this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
     if (this.settings.darkMode) {
       this.boardStaticGraphics.fillStyle(0x000000, 0.12);
