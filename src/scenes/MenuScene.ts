@@ -51,6 +51,50 @@ interface OverlayPanelFrame {
   width: number;
 }
 
+interface VisualRect {
+  bottom: number;
+  centerX: number;
+  centerY: number;
+  height: number;
+  left: number;
+  right: number;
+  top: number;
+  width: number;
+}
+
+interface MenuSceneVisualDiagnostics {
+  board: {
+    bounds: VisualRect;
+    safeBounds: VisualRect;
+    tileSize: number;
+  };
+  revision: number;
+  updatedAt: number;
+  viewport: {
+    height: number;
+    safeInsets: {
+      bottom: number;
+      left: number;
+      right: number;
+      top: number;
+    };
+    width: number;
+  };
+}
+
+declare global {
+  interface Window {
+    __MAZER_VISUAL_CAPTURE__?: {
+      enabled?: boolean;
+      forceInstallMode?: string;
+    };
+    __MAZER_VISUAL_DIAGNOSTICS__?: MenuSceneVisualDiagnostics;
+  }
+}
+
+export const MENU_SCENE_VISUAL_CAPTURE_KEY = '__MAZER_VISUAL_CAPTURE__' as const;
+export const MENU_SCENE_VISUAL_DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__' as const;
+
 const BOARD_SHADOW_OFFSET = 10;
 const MENU_BUTTON_ALPHA = 0.18;
 const MENU_BUTTON_STROKE_ALPHA = 0.24;
@@ -65,6 +109,17 @@ const DEMO_REGEN_HOLD_MS = 860;
 const TRAIL_FADE_TAIL = 16;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+
+const createVisualRect = (left: number, top: number, width: number, height: number): VisualRect => ({
+  left,
+  top,
+  width,
+  height,
+  right: left + width,
+  bottom: top + height,
+  centerX: left + (width / 2),
+  centerY: top + (height / 2)
+});
 
 const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
 
@@ -119,6 +174,7 @@ export class MenuScene extends Phaser.Scene {
   private boardDynamicDirty = true;
   private backdropDirty = true;
   private uiDirty = true;
+  private visualDiagnosticsRevision = 0;
 
   public constructor() {
     super('MenuScene');
@@ -156,6 +212,10 @@ export class MenuScene extends Phaser.Scene {
     this.scale.on('resize', () => {
       this.refreshLayout();
     });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.clearVisualDiagnostics();
+    });
+    this.publishVisualDiagnostics(this.time.now);
   }
 
   public update(time: number, delta: number): void {
@@ -189,6 +249,8 @@ export class MenuScene extends Phaser.Scene {
     if (this.uiDirty) {
       this.rebuildUi();
     }
+
+    this.publishVisualDiagnostics(time);
   }
 
   private installInput(): void {
@@ -1253,5 +1315,48 @@ export class MenuScene extends Phaser.Scene {
     this.messageText = 'The original project used the engine quit command. Browser builds cannot close the tab directly, so Exit is preserved as UI but not as hard quit behavior.';
     this.messageVisibleUntilMs = this.time.now + MESSAGE_DURATION_MS;
     this.openOverlay('message');
+  }
+
+  private publishVisualDiagnostics(time: number): void {
+    if (typeof window === 'undefined' || !this.layout) {
+      return;
+    }
+
+    const safeBounds = createVisualRect(0, 0, this.layout.width, this.layout.height);
+    const boardBounds = createVisualRect(
+      this.layout.boardLeft,
+      this.layout.boardTop,
+      this.layout.boardSize,
+      this.layout.boardSize
+    );
+
+    this.visualDiagnosticsRevision += 1;
+    window[MENU_SCENE_VISUAL_DIAGNOSTICS_KEY] = {
+      revision: this.visualDiagnosticsRevision,
+      updatedAt: Math.max(0, Math.round(time)),
+      viewport: {
+        width: this.layout.width,
+        height: this.layout.height,
+        safeInsets: {
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0
+        }
+      },
+      board: {
+        bounds: boardBounds,
+        safeBounds,
+        tileSize: this.layout.tileSize
+      }
+    };
+  }
+
+  private clearVisualDiagnostics(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    delete window[MENU_SCENE_VISUAL_DIAGNOSTICS_KEY];
   }
 }

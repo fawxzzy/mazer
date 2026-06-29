@@ -127,8 +127,9 @@ export const resolveLayoutMatrixReadiness = ({
   viewport
 } = {}) => {
   const boardBoundsReady = hasFiniteRect(diagnostics?.board?.bounds);
-  const hudBoundsReady = hasFiniteRect(diagnostics?.intentFeed?.bounds);
-  const dockModeReady = typeof diagnostics?.intentFeed?.dock === 'string' && diagnostics.intentFeed.dock.length > 0;
+  const hasHudDiagnostics = diagnostics?.intentFeed != null;
+  const hudBoundsReady = !hasHudDiagnostics || hasFiniteRect(diagnostics?.intentFeed?.bounds);
+  const dockModeReady = !hasHudDiagnostics || (typeof diagnostics?.intentFeed?.dock === 'string' && diagnostics.intentFeed.dock.length > 0);
   const routeMetadataReady = typeof route === 'string'
     && route.length > 0
     && typeof url === 'string'
@@ -140,10 +141,10 @@ export const resolveLayoutMatrixReadiness = ({
   if (!boardBoundsReady) {
     missing.push('board-bounds');
   }
-  if (!hudBoundsReady) {
+  if (hasHudDiagnostics && !hudBoundsReady) {
     missing.push('hud-bounds');
   }
-  if (!dockModeReady) {
+  if (hasHudDiagnostics && !dockModeReady) {
     missing.push('hud-dock');
   }
   if (!routeMetadataReady) {
@@ -277,7 +278,7 @@ const buildMarkdownSummary = ({ runId, sourceMode, baseUrl, presetGroup, capture
 
   for (const capture of captures) {
     lines.push(
-      `| ${capture.viewport.id} | ${capture.route} | ${capture.viewport.width}x${capture.viewport.height} | ${formatBounds(capture.board.safeBounds)} | ${formatBounds(capture.board.bounds)} | ${formatBounds(capture.intentFeed.bounds)} | ${capture.files.full} | ${capture.files.gameplay} |`
+      `| ${capture.viewport.id} | ${capture.route} | ${capture.viewport.width}x${capture.viewport.height} | ${formatBounds(capture.board.safeBounds)} | ${formatBounds(capture.board.bounds)} | ${formatBounds(capture.intentFeed?.bounds ?? null)} | ${capture.files.full} | ${capture.files.gameplay} |`
     );
   }
 
@@ -522,7 +523,7 @@ export const captureLayoutMatrix = async ({
           bounds: capture.diagnostics.board.bounds,
           tileSize: capture.diagnostics.board.tileSize
         },
-        intentFeed: capture.diagnostics.intentFeed,
+        intentFeed: capture.diagnostics.intentFeed ?? null,
         title: capture.diagnostics.title,
         install: capture.diagnostics.install,
         consoleMessageCount: capture.consoleMessages.length
