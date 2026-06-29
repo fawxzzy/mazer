@@ -100,8 +100,10 @@ describe('edge live check', () => {
       isEdgeLiveDiagnosticsReady,
       isEdgeLiveArrivalProofCandidate,
       isEdgeLiveArrivalProofPass,
+      isRetriableEdgeLiveDiagnosticsReadError,
       isResetLaneVisualDiagnostics,
       isRetriableEdgeLiveCaptureError,
+      readDiagnostics,
       resolveEdgeLiveAttemptKey,
       resolveEdgeLiveArrivalProofState,
       resolveEdgeLiveTargetUrl,
@@ -179,6 +181,8 @@ describe('edge live check', () => {
     expect(isEdgeLiveEndWindowRun('core-only-play')).toBe(false);
     expect(isEdgeLiveEndWindowRun('core-only-watch-recovery')).toBe(true);
     expect(isEdgeLiveEndWindowRun('core-only-play-recovery')).toBe(false);
+    expect(isRetriableEdgeLiveDiagnosticsReadError(new Error('Execution context was destroyed, most likely because of a navigation'))).toBe(true);
+    expect(isRetriableEdgeLiveDiagnosticsReadError(new Error('deterministic hard failure'))).toBe(false);
     expect(isRetriableEdgeLiveCaptureError(new Error('Timed out waiting for a hosted watch arrival frame before clear-hold.'))).toBe(true);
     expect(isRetriableEdgeLiveCaptureError(new Error('Timed out waiting for clear-hold after hosted watch arrival.'))).toBe(true);
     expect(isRetriableEdgeLiveCaptureError(new Error('Timed out waiting for erase-wipe after hosted watch clear-hold.'))).toBe(true);
@@ -247,6 +251,25 @@ describe('edge live check', () => {
         actorInsideExitRegion: false
       }
     })).toBe(false);
+
+    let readAttempts = 0;
+    const fakePage = {
+      evaluate: async () => {
+        readAttempts += 1;
+        if (readAttempts === 1) {
+          throw new Error('Execution context was destroyed, most likely because of a navigation');
+        }
+
+        return {
+          visual: { board: { bounds: true, safeBounds: true }, runtime: { mode: 'menu', trailLength: 2 } },
+          runtime: { mode: 'menu' }
+        };
+      },
+      waitForTimeout: async () => {}
+    };
+    const diagnosticsAfterRetry = await readDiagnostics(fakePage, { retries: 2, retryDelayMs: 0 });
+    expect(readAttempts).toBe(2);
+    expect(diagnosticsAfterRetry.visual.runtime.mode).toBe('menu');
   }, 15_000);
 
   test('resolves proof-surface workflows for the reduced projection routes', async () => {

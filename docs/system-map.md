@@ -176,11 +176,14 @@ Use this before editing `legacyMenuSnapshot.ts` so you know which named branch i
 | `upper-ridge` | top-left to upper-mid ridge mass above the title trench |
 | `top-spine` | highest top run that keeps the upper plate from reading too open |
 | `upper-left-pocket` | small left interior inset that keeps the upper-left from flattening out |
+| `upper-left-lattice` | nested upper-left trench family that restores the carved corner density |
 | `left-frame` | tall left outer frame and lower-left anchor |
 | `center-band` | center horizontal trench with the mid-board rightward turn |
 | `center-pocket` | center-right pocket that feeds the diagonal/lower transition |
 | `title-trench` | dark top-center trench behind and around the wordmark |
+| `title-underlay-band` | upper-mid trench run below the wordmark that keeps the title plate from reading hollow |
 | `left-interior-drop` | mid-left vertical drop that keeps the left interior from reading hollow |
+| `mid-left-shelf` | left-middle shelf that thickens the interior mass before the diagonal drop |
 | `diagonal-upper` | upper diagonal staircase family crossing toward the center |
 | `diagonal-lower` | lower diagonal staircase family that leads toward the goal-side mass |
 | `lower-band` | long lower trench across the lower-left and lower-middle plate |

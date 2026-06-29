@@ -112,6 +112,13 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(upperLeftPocket, { x: 6, y: 7 });
   appendSegment(upperLeftPocket, { x: 8, y: 7 });
 
+  const upperLeftLattice: LegacyMenuSnapshotPoint[] = [{ x: 5, y: 4 }];
+  appendSegment(upperLeftLattice, { x: 7, y: 4 });
+  appendSegment(upperLeftLattice, { x: 7, y: 6 });
+  appendSegment(upperLeftLattice, { x: 5, y: 6 });
+  appendSegment(upperLeftLattice, { x: 5, y: 8 });
+  appendSegment(upperLeftLattice, { x: 8, y: 8 });
+
   const leftFrame: LegacyMenuSnapshotPoint[] = [{ x: 2, y: 4 }];
   appendSegment(leftFrame, { x: 2, y: 22 });
   appendSegment(leftFrame, { x: 6, y: 22 });
@@ -137,11 +144,22 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(titleTrench, { x: 15, y: 6 });
   appendSegment(titleTrench, { x: 15, y: 8 });
 
+  const titleUnderlayBand: LegacyMenuSnapshotPoint[] = [{ x: 11, y: 7 }];
+  appendSegment(titleUnderlayBand, { x: 19, y: 7 });
+  appendSegment(titleUnderlayBand, { x: 19, y: 9 });
+  appendSegment(titleUnderlayBand, { x: 17, y: 9 });
+  appendSegment(titleUnderlayBand, { x: 17, y: 11 });
+
   const leftInteriorDrop: LegacyMenuSnapshotPoint[] = [{ x: 6, y: 10 }];
   appendSegment(leftInteriorDrop, { x: 6, y: 16 });
   appendSegment(leftInteriorDrop, { x: 9, y: 16 });
   appendSegment(leftInteriorDrop, { x: 9, y: 14 });
   appendSegment(leftInteriorDrop, { x: 11, y: 14 });
+
+  const midLeftShelf: LegacyMenuSnapshotPoint[] = [{ x: 4, y: 13 }];
+  appendSegment(midLeftShelf, { x: 8, y: 13 });
+  appendSegment(midLeftShelf, { x: 8, y: 15 });
+  appendSegment(midLeftShelf, { x: 6, y: 15 });
 
   const lowerBand: LegacyMenuSnapshotPoint[] = [{ x: 7, y: 15 }];
   appendSegment(lowerBand, { x: 7, y: 21 });
@@ -184,11 +202,14 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
     { id: 'upper-ridge', points: upperRidge },
     { id: 'top-spine', points: topSpine },
     { id: 'upper-left-pocket', points: upperLeftPocket },
+    { id: 'upper-left-lattice', points: upperLeftLattice },
     { id: 'left-frame', points: leftFrame },
     { id: 'center-band', points: centerBand },
     { id: 'center-pocket', points: centerPocket },
     { id: 'title-trench', points: titleTrench },
+    { id: 'title-underlay-band', points: titleUnderlayBand },
     { id: 'left-interior-drop', points: leftInteriorDrop },
+    { id: 'mid-left-shelf', points: midLeftShelf },
     { id: 'diagonal-upper', points: buildStaircase({ x: 6, y: 5 }, 6, 1, 1) },
     { id: 'diagonal-lower', points: buildStaircase({ x: 8, y: 14 }, 6, 1, 1) },
     { id: 'lower-band', points: lowerBand },

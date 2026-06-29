@@ -1015,13 +1015,40 @@ export const isEdgeLiveArrivalProofPass = (snapshot) => (
       : false
 );
 
-const readDiagnostics = async (page) => page.evaluate((keys) => ({
-  visual: window[keys.visual] ?? null,
-  runtime: window[keys.runtime] ?? null
-}), {
-  visual: VISUAL_DIAGNOSTICS_KEY,
-  runtime: RUNTIME_DIAGNOSTICS_KEY
-});
+export const isRetriableEdgeLiveDiagnosticsReadError = (error) => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /Execution context was destroyed|Cannot find context with specified id|Target page, context or browser has been closed/i.test(
+    error.message
+  );
+};
+
+export const readDiagnostics = async (page, { retries = 3, retryDelayMs = 120 } = {}) => {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      return await page.evaluate((keys) => ({
+        visual: window[keys.visual] ?? null,
+        runtime: window[keys.runtime] ?? null
+      }), {
+        visual: VISUAL_DIAGNOSTICS_KEY,
+        runtime: RUNTIME_DIAGNOSTICS_KEY
+      });
+    } catch (error) {
+      lastError = error;
+      if (!isRetriableEdgeLiveDiagnosticsReadError(error) || attempt >= retries) {
+        throw error;
+      }
+
+      await page.waitForTimeout(retryDelayMs);
+    }
+  }
+
+  throw lastError ?? new Error('Unable to read edge-live diagnostics.');
+};
 
 export const isResetLaneVisualDiagnostics = (visual) => Boolean(
   visual
