@@ -13,8 +13,6 @@ import {
 import {
   createLegacyMenuMaze,
   createLegacyMaze,
-  isWalkableTile,
-  movePoint,
   type LegacyMazeSnapshot,
   type LegacyPoint
 } from '../legacy-runtime/legacyMaze';
@@ -23,6 +21,7 @@ import {
   scheduleLegacyPlayResetReturnAtMs,
   shouldConsumeLegacyPlayResetReturn
 } from '../legacy-runtime/legacyPlayLifecycle';
+import { advanceLegacyPlayStep } from '../legacy-runtime/legacyPlayStep';
 import {
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
@@ -542,18 +541,23 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const next = movePoint(this.player, deltaX, deltaY);
-    if (!isWalkableTile(this.maze, next)) {
+    const nextStep = advanceLegacyPlayStep({
+      maze: this.maze,
+      player: this.player,
+      trail: this.trail,
+      deltaX,
+      deltaY,
+      toggleTrailFade: this.settings.toggleTrailFade,
+      trailFadeTail: TRAIL_FADE_TAIL
+    });
+    if (!nextStep.moved) {
       return;
     }
 
-    this.player = next;
-    this.trail.push(copyPoint(this.player));
-    if (this.settings.toggleTrailFade && this.trail.length > TRAIL_FADE_TAIL) {
-      this.trail = this.trail.slice(this.trail.length - TRAIL_FADE_TAIL);
-    }
+    this.player = nextStep.player;
+    this.trail = nextStep.trail;
 
-    if (next.x === this.maze.goal.x && next.y === this.maze.goal.y) {
+    if (nextStep.reachedGoal) {
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
       return;

@@ -145,9 +145,16 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - pending-reset gate for input and movement
   - due-reset return timing contract
 
+- `src/legacy-runtime/legacyPlayStep.ts`
+  - one-tile cardinal movement
+  - wall-collision gate
+  - trail append and trim behavior
+  - goal-step detection
+
 Boundary:
 
 - if the question is "when should play stop accepting input after hitting goal?", start in `src/legacy-runtime/legacyPlayLifecycle.ts`
+- if the question is "what exactly changes after one movement key press?", start in `src/legacy-runtime/legacyPlayStep.ts`
 - if the question is "what should happen after the reset hold finishes?", start in `src/scenes/MenuScene.ts`
 
 ### Menu scene render/update order
@@ -396,6 +403,10 @@ If you want to change one thing, start here:
   - `src/legacy-runtime/legacyPlayLifecycle.ts`
   - `src/scenes/MenuScene.ts`
   - `tests/reset/legacy-play-lifecycle.test.ts`
+- play movement / trail mutation:
+  - `src/legacy-runtime/legacyPlayStep.ts`
+  - `src/scenes/MenuScene.ts`
+  - `tests/reset/legacy-play-step.test.ts`
 - play movement or win/reset loop:
   - `src/scenes/MenuScene.ts`
   - `docs/legacy/gameplay-spec.md`
