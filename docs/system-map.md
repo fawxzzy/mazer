@@ -140,6 +140,39 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - reset return path
   - visual diagnostics published for visual proof
 
+### Menu scene render/update order
+
+Use this before touching presentation code inside `MenuScene.ts` so you know whether a miss belongs to state, layout, or drawing order.
+
+1. `create()`
+   - allocates graphics/text layers
+   - rebuilds the active maze
+   - resolves layout
+   - installs keyboard input
+2. `update()`
+   - advances starfield
+   - advances menu demo when `mode=menu` and `overlay=none`
+   - expires message overlay state
+   - redraws backdrop if `backdropDirty`
+   - redraws static board shell if `boardStaticDirty`
+   - redraws dynamic board + HUD if `boardDynamicDirty`
+   - rebuilds UI controls if `uiDirty`
+   - republishes `window.__MAZER_VISUAL_DIAGNOSTICS__`
+3. static menu composition owners
+   - `refreshLayout()` -> board/title/button coordinates
+   - `drawStaticBoard()` -> slab shell, board frame, tile grid, grayscale maze body
+   - `createButton()` -> menu button outline, alpha, typography treatment
+4. live motion owners
+   - `updateMenuDemo()` -> attract stepping cadence
+   - `drawDynamicBoard()` -> trail, player, goal, camera-follow offset
+   - `drawHud()` -> active-play timer + goal arrow only
+
+Boundary:
+
+- if the board is in the wrong place, start in `legacyMenuLayout.ts`
+- if the board is in the right place but looks wrong, start in `MenuScene.ts`
+- if the trail or attract route is wrong, start in `legacyDemoWalker.ts` / `demoWalker.ts`
+
 ### Legacy settings + menu shell helpers
 
 - `src/legacy-runtime/legacyDefaults.ts`
@@ -343,6 +376,20 @@ This keeps visual passes bounded:
 - geometry in the snapshot
 - composition in the layout contract
 - presentation in the scene
+
+## Legacy menu parity hotspots
+
+When the page still feels wrong but the board route is already close, use this quick owner map instead of guessing:
+
+| Visible miss | First owner |
+| --- | --- |
+| title too low / too high | `src/legacy-runtime/legacyMenuLayout.ts` |
+| board too small / too large | `src/legacy-runtime/legacyMenuLayout.ts` |
+| board shell too flat / too clean | `src/scenes/MenuScene.ts` -> `drawStaticBoard()` |
+| button boxes too loud / too weak | `src/scenes/MenuScene.ts` -> `createButton()` |
+| maze silhouette still reads empty | `src/legacy-runtime/legacyMenuSnapshot.ts` |
+| trail route or pacing feels wrong | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts` |
+| live page loads but differs from capture | rerun `npm run visual:matrix` and compare with localhost before editing again |
 
 ## Invariants to preserve
 
