@@ -30,6 +30,29 @@ Meaning:
 - `BootScene.ts` is only a handoff
 - `MenuScene.ts` is the real application surface for the reset lane
 
+## Whole-application owner map
+
+Use this as the top-level "where does this actually live?" map before editing:
+
+| Surface | Current owner | Supporting truth/proof |
+| --- | --- | --- |
+| boot + localhost cleanup | `src/boot/main.ts` | `tests/reset/legacy-reset.test.ts` |
+| Phaser scene wiring | `src/boot/phaserConfig.ts` | `npm run build` |
+| active front door and play shell | `src/scenes/MenuScene.ts` | in-app browser, `npm run verify` |
+| fixed menu maze shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `tests/reset/legacy-reset.test.ts`, screenshots |
+| generated play maze | `src/legacy-runtime/legacyMaze.ts` | `tests/reset/legacy-reset.test.ts` |
+| menu title/board/button layout math | `src/legacy-runtime/legacyMenuLayout.ts` | `tests/reset/legacy-menu-layout.test.ts` |
+| menu demo behavior | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts` | demo-walker tests, live menu preview |
+| options field parsing | `src/legacy-runtime/legacyOptionFields.ts` | `tests/reset/legacy-option-fields.test.ts` |
+| legacy defaults/colors/button labels | `src/legacy-runtime/legacyDefaults.ts` | `tests/reset/legacy-reset.test.ts` |
+| archived visual truth | `legacy/screenshots/menu-01.png` .. `menu-04.png` | direct visual comparison |
+| archived behavior truth | `legacy/old-project.zip`, `docs/legacy/*` | `npm run legacy:extract` |
+| parity contract / open gaps | `docs/current-truth.md`, `docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md` | latest packet + repo proof |
+
+Rule:
+
+- if you cannot name the owner surface and proof surface for a change, the change is not ready to make
+
 ## Active reset-lane subsystems
 
 ### Front door + play shell
@@ -199,6 +222,24 @@ If you want to change one thing, start here:
 - scene wiring or startup:
   - `src/boot/phaserConfig.ts`
   - `src/scenes/BootScene.ts`
+
+## Fast visual parity workflow
+
+For menu-screen 1:1 work, use this sequence every time:
+
+1. `legacy/screenshots/menu-01.png` .. `menu-04.png`
+2. `src/legacy-runtime/legacyMenuSnapshot.ts` for maze-shape mass
+3. `src/legacy-runtime/legacyMenuLayout.ts` for board/title/button placement
+4. `src/scenes/MenuScene.ts` for slab colors, tile rendering, title opacity, and button treatment
+5. `tests/reset/legacy-reset.test.ts`
+6. `tests/reset/legacy-menu-layout.test.ts`
+7. live localhost in the in-app browser
+
+This keeps visual passes bounded:
+
+- geometry in the snapshot
+- composition in the layout contract
+- presentation in the scene
 
 ## Invariants to preserve
 

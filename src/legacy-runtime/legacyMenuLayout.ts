@@ -30,7 +30,7 @@ export const resolveLegacyMenuLayout = (
 ): LegacyMenuLayout => {
   const normalizedScale = clampInteger(scale, 25, 150);
   const isPortrait = height > width;
-  const baseBoardScale = isPortrait ? 0.93 : 0.485;
+  const baseBoardScale = isPortrait ? 0.93 : 0.5;
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const rawBoardSize = Math.min(
     width * baseBoardScale * scaleBias,
@@ -40,8 +40,8 @@ export const resolveLegacyMenuLayout = (
   const tileSize = Math.max(4, Math.floor(boardSize / Math.max(1, mazeSize)));
   const snappedBoardSize = tileSize * mazeSize;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
-  const boardTop = Math.round(clamp(height * (isPortrait ? 0.11 : 0.11), 44, isPortrait ? 116 : 132));
-  const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.058 : 0.088), isPortrait ? 46 : 50, isPortrait ? 78 : 96));
+  const boardTop = Math.round(clamp(height * (isPortrait ? 0.11 : 0.088), 44, isPortrait ? 116 : 120));
+  const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.058 : 0.09), isPortrait ? 46 : 56, isPortrait ? 78 : 98));
   const buttonY = isPortrait
     ? Math.round(clamp(
       boardTop + snappedBoardSize + Math.round(buttonHeight * 0.95),
@@ -64,10 +64,10 @@ export const resolveLegacyMenuLayout = (
       boardTop + snappedBoardSize - Math.round(buttonHeight * 0.24),
       buttonY - Math.round(buttonHeight * 0.3)
     ));
-  const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.21 : 0.13), isPortrait ? 96 : 150, isPortrait ? 144 : 252));
+  const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.21 : 0.145), isPortrait ? 96 : 164, isPortrait ? 144 : 270));
   const centerButtonWidth = isPortrait
     ? Math.round(clamp(buttonWidth * 1.08, buttonWidth, 160))
-    : Math.round(clamp(buttonWidth * 1.35, buttonWidth + 28, 276));
+    : Math.round(clamp(buttonWidth * 1.42, buttonWidth + 34, 304));
   const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.16 : 0.14), 68, 288));
   const centerButtonX = Math.round(width * 0.5);
 
@@ -79,7 +79,7 @@ export const resolveLegacyMenuLayout = (
     boardSize: snappedBoardSize,
     tileSize,
     titleX: Math.round(width / 2),
-    titleY: Math.round(boardTop + (snappedBoardSize * 0.19)),
+    titleY: Math.round(boardTop + (snappedBoardSize * 0.16)),
     footerY: height - 18,
     buttonY,
     centerButtonY,

@@ -31,11 +31,12 @@ So the runtime was reset and replaced with a smaller legacy-first shell:
 Read these first:
 
 1. [docs/current-truth.md](docs/current-truth.md)
-2. [docs/research/MAZER_LEGACY_WEB_PORT_CONTRACT.md](docs/research/MAZER_LEGACY_WEB_PORT_CONTRACT.md)
-3. [docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md](docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md)
-4. [docs/legacy/gameplay-spec.md](docs/legacy/gameplay-spec.md)
-5. [docs/legacy/ui-spec.md](docs/legacy/ui-spec.md)
-6. [docs/legacy/art-direction.md](docs/legacy/art-direction.md)
+2. [docs/system-map.md](docs/system-map.md)
+3. [docs/research/MAZER_LEGACY_WEB_PORT_CONTRACT.md](docs/research/MAZER_LEGACY_WEB_PORT_CONTRACT.md)
+4. [docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md](docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md)
+5. [docs/legacy/gameplay-spec.md](docs/legacy/gameplay-spec.md)
+6. [docs/legacy/ui-spec.md](docs/legacy/ui-spec.md)
+7. [docs/legacy/art-direction.md](docs/legacy/art-direction.md)
 
 ## Local development
 
