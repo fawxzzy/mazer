@@ -16,7 +16,7 @@ Only the following paths were inspected from the Unreal archive:
 ### Maze lifecycle + generation
 - `Source/Mazer/MazerGameModeBase.cpp/.h`
   - level boot sequence
-  - staged generation pipeline (`CreateGrid` → `MapPath` → `CreatePath` → `CreateShortCuts` → `Draw`)
+  - staged generation pipeline (`CreateGrid` -> `MapPath` -> `CreatePath` -> `CreateShortCuts` -> `Draw`)
   - start/end tile selection and reset flow
 
 - `Source/Mazer/Private/MazerGameState.cpp`
@@ -51,6 +51,6 @@ Only the following paths were inspected from the Unreal archive:
 - `Source/Mazer/Private/UI/FeaturesWidget.cpp/.h`
   - camera-follow and trail-fade toggles
 - `Source/Mazer/Private/UI/GameModesWidget.cpp/.h`
-  - dark mode toggle
+  - dark mode toggle and directional-light intensity switching (`2.0` light, `0.3` dark)
 - `Source/Mazer/Private/UI/GameHud.cpp/.h`
   - in-game HUD bindings (timer + arrow)

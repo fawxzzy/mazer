@@ -2,6 +2,13 @@
 
 Constraint: exactly one active overlay should be visible at a time (menu/options/pause/win-like terminal states).
 
+Recovered source owners:
+- `Source/Mazer/Private/UI/MainMenuWidget.cpp`
+- `Source/Mazer/Private/UI/PauseMenuWidget.cpp`
+- `Source/Mazer/Private/UI/GamePauseMenu.cpp`
+- `Source/Mazer/Private/UI/FeaturesWidget.cpp`
+- `Source/Mazer/Private/UI/GameModesWidget.cpp`
+
 ## Main menu
 Primary controls:
 - **Start**
@@ -22,8 +29,8 @@ Editable fields:
 - Wall RGB channels (`0..1` each)
 
 Buttons:
-- **Features** → opens `FeaturesWidget`
-- **Game Modes** → opens `GameModesWidget`
+- **Features** -> opens `FeaturesWidget`
+- **Game Modes** -> opens `GameModesWidget`
 - **Back**
   - closes options
   - unpauses
@@ -35,6 +42,9 @@ Toggles:
 - Trail fade behavior (`_ToggleTrailFade`)
 
 Each toggle also updates accompanying On/Off label text.
+Legacy polarity is inverted in the label copy:
+- checked `true` shows `Off`
+- unchecked `false` shows `On`
 
 ## Game modes submenu (`GameModesWidget`)
 Toggles:
@@ -54,5 +64,5 @@ Pause key binding is `P`.
 
 ## Win flow
 - No dedicated win overlay in extracted C++.
-- Win is represented by end-tile overlap → reset/retravel behavior.
+- Win is represented by end-tile overlap -> reset/retravel behavior.
 - During active play this exits to template scene with `_Playing=false` (effectively returning to menu pipeline).
