@@ -131,11 +131,27 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(centerPocket, { x: 17, y: 18 });
   appendSegment(centerPocket, { x: 18, y: 18 });
 
+  const titleTrench: LegacyMenuSnapshotPoint[] = [{ x: 11, y: 4 }];
+  appendSegment(titleTrench, { x: 18, y: 4 });
+  appendSegment(titleTrench, { x: 18, y: 6 });
+  appendSegment(titleTrench, { x: 15, y: 6 });
+  appendSegment(titleTrench, { x: 15, y: 8 });
+
+  const leftInteriorDrop: LegacyMenuSnapshotPoint[] = [{ x: 6, y: 10 }];
+  appendSegment(leftInteriorDrop, { x: 6, y: 16 });
+  appendSegment(leftInteriorDrop, { x: 9, y: 16 });
+  appendSegment(leftInteriorDrop, { x: 9, y: 14 });
+  appendSegment(leftInteriorDrop, { x: 11, y: 14 });
+
   const lowerBand: LegacyMenuSnapshotPoint[] = [{ x: 7, y: 15 }];
   appendSegment(lowerBand, { x: 7, y: 21 });
   appendSegment(lowerBand, { x: 13, y: 21 });
   appendSegment(lowerBand, { x: 13, y: 23 });
   appendSegment(lowerBand, { x: 18, y: 23 });
+
+  const lowerFloorTrench: LegacyMenuSnapshotPoint[] = [{ x: 10, y: 22 }];
+  appendSegment(lowerFloorTrench, { x: 19, y: 22 });
+  appendSegment(lowerFloorTrench, { x: 19, y: 20 });
 
   const lowerCenterLoop: LegacyMenuSnapshotPoint[] = [{ x: 9, y: 17 }];
   appendSegment(lowerCenterLoop, { x: 9, y: 20 });
@@ -159,6 +175,11 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(rightLowerNotch, { x: 22, y: 19 });
   appendSegment(rightLowerNotch, { x: 21, y: 19 });
 
+  const rightInnerPocket: LegacyMenuSnapshotPoint[] = [{ x: 18, y: 11 }];
+  appendSegment(rightInnerPocket, { x: 21, y: 11 });
+  appendSegment(rightInnerPocket, { x: 21, y: 15 });
+  appendSegment(rightInnerPocket, { x: 19, y: 15 });
+
   return [
     { id: 'upper-ridge', points: upperRidge },
     { id: 'top-spine', points: topSpine },
@@ -166,13 +187,17 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
     { id: 'left-frame', points: leftFrame },
     { id: 'center-band', points: centerBand },
     { id: 'center-pocket', points: centerPocket },
+    { id: 'title-trench', points: titleTrench },
+    { id: 'left-interior-drop', points: leftInteriorDrop },
     { id: 'diagonal-upper', points: buildStaircase({ x: 6, y: 5 }, 6, 1, 1) },
     { id: 'diagonal-lower', points: buildStaircase({ x: 8, y: 14 }, 6, 1, 1) },
     { id: 'lower-band', points: lowerBand },
+    { id: 'lower-floor-trench', points: lowerFloorTrench },
     { id: 'lower-center-loop', points: lowerCenterLoop },
     { id: 'right-pocket', points: rightPocket },
     { id: 'right-spine', points: rightSpine },
-    { id: 'right-lower-notch', points: rightLowerNotch }
+    { id: 'right-lower-notch', points: rightLowerNotch },
+    { id: 'right-inner-pocket', points: rightInnerPocket }
   ];
 };
 

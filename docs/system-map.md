@@ -167,6 +167,35 @@ Boundary:
 - If the change is menu screenshot parity only, start in `legacyMenuSnapshot.ts`
 - If the change is active-play maze truth, start in `legacyMaze.ts`
 
+### Fixed menu snapshot branch map
+
+Use this before editing `legacyMenuSnapshot.ts` so you know which named branch is changing which part of the board.
+
+| Branch id | Current role |
+| --- | --- |
+| `upper-ridge` | top-left to upper-mid ridge mass above the title trench |
+| `top-spine` | highest top run that keeps the upper plate from reading too open |
+| `upper-left-pocket` | small left interior inset that keeps the upper-left from flattening out |
+| `left-frame` | tall left outer frame and lower-left anchor |
+| `center-band` | center horizontal trench with the mid-board rightward turn |
+| `center-pocket` | center-right pocket that feeds the diagonal/lower transition |
+| `title-trench` | dark top-center trench behind and around the wordmark |
+| `left-interior-drop` | mid-left vertical drop that keeps the left interior from reading hollow |
+| `diagonal-upper` | upper diagonal staircase family crossing toward the center |
+| `diagonal-lower` | lower diagonal staircase family that leads toward the goal-side mass |
+| `lower-band` | long lower trench across the lower-left and lower-middle plate |
+| `lower-floor-trench` | bottom floor trench that thickens the late lower-right approach |
+| `lower-center-loop` | lower-center loop/pocket just above the bottom trench |
+| `right-pocket` | tall right-side outer pocket that shapes the goal-side silhouette |
+| `right-spine` | right-side inner spine and lower-right return |
+| `right-lower-notch` | small lower-right notch that keeps the outer goal lane stepped |
+| `right-inner-pocket` | inner-right pocket that thickens the mid-right trench family |
+
+Rule:
+
+- add or move snapshot density by editing the named branch that matches the visible miss
+- only change the `solutionPath` when the actual attract-route truth is wrong, not just the screenshot mass
+
 ### Menu-board render chain
 
 - `src/legacy-runtime/legacyMenuSnapshot.ts`
