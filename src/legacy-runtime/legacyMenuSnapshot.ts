@@ -104,7 +104,9 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(topSpine, { x: 16, y: 2 });
   appendSegment(topSpine, { x: 21, y: 2 });
   appendSegment(topSpine, { x: 21, y: 8 });
-  appendSegment(topSpine, { x: 18, y: 8 });
+  appendSegment(topSpine, { x: 16, y: 8 });
+  appendSegment(topSpine, { x: 16, y: 6 });
+  appendSegment(topSpine, { x: 18, y: 6 });
 
   const upperLeftPocket: LegacyMenuSnapshotPoint[] = [{ x: 4, y: 5 }];
   appendSegment(upperLeftPocket, { x: 4, y: 9 });
@@ -118,6 +120,9 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(upperLeftLattice, { x: 5, y: 6 });
   appendSegment(upperLeftLattice, { x: 5, y: 8 });
   appendSegment(upperLeftLattice, { x: 8, y: 8 });
+  appendSegment(upperLeftLattice, { x: 8, y: 10 });
+  appendSegment(upperLeftLattice, { x: 10, y: 10 });
+  appendSegment(upperLeftLattice, { x: 10, y: 8 });
 
   const leftFrame: LegacyMenuSnapshotPoint[] = [{ x: 2, y: 4 }];
   appendSegment(leftFrame, { x: 2, y: 22 });
@@ -143,15 +148,16 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(titleTrench, { x: 18, y: 6 });
   appendSegment(titleTrench, { x: 15, y: 6 });
   appendSegment(titleTrench, { x: 15, y: 8 });
+  appendSegment(titleTrench, { x: 12, y: 8 });
 
-  const titleUnderlayBand: LegacyMenuSnapshotPoint[] = [{ x: 11, y: 7 }];
+  const titleUnderlayBand: LegacyMenuSnapshotPoint[] = [{ x: 9, y: 7 }];
   appendSegment(titleUnderlayBand, { x: 19, y: 7 });
   appendSegment(titleUnderlayBand, { x: 19, y: 9 });
   appendSegment(titleUnderlayBand, { x: 17, y: 9 });
   appendSegment(titleUnderlayBand, { x: 17, y: 11 });
   appendSegment(titleUnderlayBand, { x: 13, y: 11 });
   appendSegment(titleUnderlayBand, { x: 13, y: 8 });
-  appendSegment(titleUnderlayBand, { x: 15, y: 8 });
+  appendSegment(titleUnderlayBand, { x: 16, y: 8 });
 
   const leftInteriorDrop: LegacyMenuSnapshotPoint[] = [{ x: 6, y: 10 }];
   appendSegment(leftInteriorDrop, { x: 6, y: 16 });
@@ -216,7 +222,7 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
     { id: 'title-underlay-band', points: titleUnderlayBand },
     { id: 'left-interior-drop', points: leftInteriorDrop },
     { id: 'mid-left-shelf', points: midLeftShelf },
-    { id: 'diagonal-upper', points: buildStaircase({ x: 6, y: 5 }, 7, 1, 1) },
+    { id: 'diagonal-upper', points: buildStaircase({ x: 5, y: 4 }, 8, 1, 1) },
     { id: 'diagonal-lower', points: buildStaircase({ x: 8, y: 14 }, 7, 1, 1) },
     { id: 'lower-band', points: lowerBand },
     { id: 'lower-floor-trench', points: lowerFloorTrench },
