@@ -84,6 +84,25 @@ const carvePolyline = (grid: boolean[][], points: readonly LegacyPoint[]): void 
   }
 };
 
+const buildStaircase = (
+  start: LegacyPoint,
+  steps: number,
+  horizontalDirection: 1 | -1,
+  verticalDirection: 1 | -1
+): LegacyPoint[] => {
+  const points: LegacyPoint[] = [{ ...start }];
+  let cursor = { ...start };
+
+  for (let index = 0; index < steps; index += 1) {
+    cursor = { x: cursor.x + horizontalDirection, y: cursor.y };
+    points.push({ ...cursor });
+    cursor = { x: cursor.x, y: cursor.y + verticalDirection };
+    points.push({ ...cursor });
+  }
+
+  return points;
+};
+
 const buildLegacyMenuSolutionPath = (): LegacyPoint[] => {
   const path: LegacyPoint[] = [{ x: 3, y: 4 }];
 
@@ -140,6 +159,9 @@ const buildLegacyMenuBranchPolylines = (): LegacyPoint[][] => {
   appendSegment(centerBand, { x: 15, y: 12 });
   branches.push(centerBand);
 
+  branches.push(buildStaircase({ x: 6, y: 5 }, 6, 1, 1));
+  branches.push(buildStaircase({ x: 8, y: 14 }, 6, 1, 1));
+
   const lowerBand: LegacyPoint[] = [{ x: 7, y: 15 }];
   appendSegment(lowerBand, { x: 7, y: 21 });
   appendSegment(lowerBand, { x: 13, y: 21 });
@@ -153,6 +175,12 @@ const buildLegacyMenuBranchPolylines = (): LegacyPoint[][] => {
   appendSegment(rightPocket, { x: 23, y: 18 });
   appendSegment(rightPocket, { x: 21, y: 18 });
   branches.push(rightPocket);
+
+  const rightSpine: LegacyPoint[] = [{ x: 21, y: 12 }];
+  appendSegment(rightSpine, { x: 23, y: 12 });
+  appendSegment(rightSpine, { x: 23, y: 20 });
+  appendSegment(rightSpine, { x: 20, y: 20 });
+  branches.push(rightSpine);
 
   return branches;
 };
