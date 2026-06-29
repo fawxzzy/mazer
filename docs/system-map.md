@@ -120,6 +120,10 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - current one-shot maze builders:
   - `createLegacyMenuMaze()` for the fixed front-door snapshot
   - `createLegacyMaze()` for generated play mazes
+- `src/legacy-runtime/legacyGenerationLifecycle.ts`
+  - legacy process stage ids
+  - menu-vs-play build routing
+  - deterministic seed stepping for rebuild approximations
 - `src/scenes/MenuScene.ts`
   - `buildMazeForCurrentMode()` picks menu vs play builder
   - `rebuildMaze()` rehydrates maze, player, trail, demo state, and layout
@@ -130,6 +134,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
 Boundary:
 
 - if the change is "what topology gets generated?", start in `src/legacy-runtime/legacyMaze.ts`
+- if the change is "which builder, seed step, or process-stage contract applies?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts`
 - if the change is "when does the runtime rebuild or return to menu?", start in `src/scenes/MenuScene.ts`
 - if the change is "how do we port the old staged process `0/3/4/5/6/7/8` lifecycle exactly?", start from `docs/legacy/gameplay-spec.md` and open a dedicated port packet before rewriting runtime code
 
@@ -435,6 +440,7 @@ If you want to change one thing, start here:
   - `docs/legacy/gameplay-spec.md`
 - generation / reset lifecycle:
   - `docs/legacy/gameplay-spec.md`
+  - `src/legacy-runtime/legacyGenerationLifecycle.ts`
   - `src/legacy-runtime/legacyMaze.ts`
   - `src/scenes/MenuScene.ts`
   - `tests/reset/legacy-reset.test.ts`

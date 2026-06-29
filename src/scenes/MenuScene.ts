@@ -11,11 +11,13 @@ import {
   type LegacySettings
 } from '../legacy-runtime/legacyDefaults';
 import {
-  createLegacyMenuMaze,
-  createLegacyMaze,
   type LegacyMazeSnapshot,
   type LegacyPoint
 } from '../legacy-runtime/legacyMaze';
+import {
+  createLegacyRuntimeMazeForMode,
+  stepLegacyGenerationSeed
+} from '../legacy-runtime/legacyGenerationLifecycle';
 import {
   hasPendingLegacyPlayResetReturn,
   scheduleLegacyPlayResetReturnAtMs,
@@ -433,9 +435,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private buildMazeForCurrentMode(): LegacyMazeSnapshot {
-    return this.mode === 'menu'
-      ? createLegacyMenuMaze(this.mazeSeed)
-      : createLegacyMaze(this.settings.scale, this.mazeSeed);
+    return createLegacyRuntimeMazeForMode(this.mode, this.settings.scale, this.mazeSeed);
   }
 
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
@@ -483,7 +483,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private regenerateMaze(delayMs = 0): void {
-    this.mazeSeed = (this.mazeSeed + 1) >>> 0;
+    this.mazeSeed = stepLegacyGenerationSeed(this.mazeSeed);
     this.rebuildMaze(this.time.now + delayMs);
   }
 
