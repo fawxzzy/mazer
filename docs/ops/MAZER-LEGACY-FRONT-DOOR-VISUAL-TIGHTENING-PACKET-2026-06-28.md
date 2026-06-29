@@ -45,13 +45,13 @@ Results:
 
 Visual artifact:
 
-- `C:/ATLAS/tmp/captures/mazer-layout-matrix/2026-06-29T03-18-01-088Z`
+- `tmp/captures/mazer-layout-matrix/2026-06-29T03-18-01-088Z`
 
 Live browser proof:
 
 - reloaded local in-app browser surface
 - no browser `warn` / `error` logs
-- screenshot: `C:/ATLAS/tmp/mazer-live-frontdoor-tighten-check.png`
+- screenshot: `tmp/mazer-live-frontdoor-tighten-check.png`
 
 ## Truthful result
 

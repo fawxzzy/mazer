@@ -47,14 +47,14 @@ Result:
 
 Visual artifact:
 
-- `C:/ATLAS/tmp/captures/mazer-layout-matrix/2026-06-29T02-58-35-333Z`
+- `tmp/captures/mazer-layout-matrix/2026-06-29T02-58-35-333Z`
 
 ## Live browser proof
 
 Reloaded the local in-app browser surface and captured:
 
-- `C:/ATLAS/tmp/mazer-live-menu-demo-check.png`
-- `C:/ATLAS/tmp/mazer-live-menu-demo-check-late.png`
+- `tmp/mazer-live-menu-demo-check.png`
+- `tmp/mazer-live-menu-demo-check-late.png`
 
 Observed truth:
 
