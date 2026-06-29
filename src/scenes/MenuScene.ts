@@ -136,10 +136,10 @@ const LEGACY_BOARD_GRID_ALPHA = 0.016;
 const MESSAGE_DURATION_MS = 1800;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
-const LEGACY_MENU_SLAB_FILL = 0x4f4958;
-const LEGACY_MENU_SLAB_EDGE = 0x18131d;
-const LEGACY_MENU_SLAB_HIGHLIGHT = 0xa29aaa;
-const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0.34;
+const LEGACY_MENU_SLAB_FILL = 0x5a5464;
+const LEGACY_MENU_SLAB_EDGE = 0x14101a;
+const LEGACY_MENU_SLAB_HIGHLIGHT = 0xbcb5c7;
+const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0.38;
 const LEGACY_MENU_PATH_CORE = 0x9994a2;
 const LEGACY_MENU_PATH_EDGE = 0x57515f;
 const LEGACY_MENU_WALL_FILL = 0x2f2937;
@@ -630,9 +630,9 @@ export class MenuScene extends Phaser.Scene {
       ? LEGACY_MENU_WALL_FILL
       : linearColorToNumber(this.settings.wallColor);
     const boardFill = isMenuMode
-      ? 0x2a2531
+      ? 0x2f2a37
       : (this.settings.darkMode ? 0x16121a : 0x4a454f);
-    const boardEdge = isMenuMode ? 0x120d15 : (this.settings.darkMode ? 0x030205 : 0x322c35);
+    const boardEdge = isMenuMode ? 0x0f0b13 : (this.settings.darkMode ? 0x030205 : 0x322c35);
     const pathGlow = isMenuMode
       ? LEGACY_MENU_PATH_EDGE
       : (this.settings.darkMode ? 0xb3acb8 : 0xd0cad2);
@@ -641,24 +641,31 @@ export class MenuScene extends Phaser.Scene {
     this.boardStaticGraphics.fillStyle(0x000000, isMenuMode ? LEGACY_MENU_PANEL_SHADOW_ALPHA : 0.28);
     this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardSize, boardSize);
     if (isMenuMode) {
-      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_FILL, 0.42);
-      this.boardStaticGraphics.fillRect(boardLeft - 14, boardTop - 14, boardSize + 28, boardSize + 24);
-      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_EDGE, 0.88);
-      this.boardStaticGraphics.fillRect(boardLeft - 10, boardTop - 8, 6, boardSize + 12);
-      this.boardStaticGraphics.fillRect(boardLeft + boardSize + 4, boardTop - 2, 10, boardSize + 14);
-      this.boardStaticGraphics.fillRect(boardLeft - 2, boardTop + boardSize + 4, boardSize + 16, 6);
-      this.boardStaticGraphics.fillRect(boardLeft - 2, boardTop - 10, boardSize + 10, 4);
-      this.boardStaticGraphics.fillStyle(0x000000, 0.28);
-      this.boardStaticGraphics.fillRect(boardLeft + boardSize + 14, boardTop + 14, 6, Math.max(0, boardSize - 10));
-      this.boardStaticGraphics.fillRect(boardLeft + 18, boardTop + boardSize + 10, Math.max(0, boardSize - 4), 4);
-      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_HIGHLIGHT, 0.08);
-      this.boardStaticGraphics.fillRect(boardLeft - 11, boardTop - 11, boardSize + 16, 1);
-      this.boardStaticGraphics.fillRect(boardLeft - 11, boardTop - 11, 1, boardSize + 16);
+      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_FILL, 0.5);
+      this.boardStaticGraphics.fillRect(boardLeft - 15, boardTop - 15, boardSize + 30, boardSize + 25);
+      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_EDGE, 0.92);
+      this.boardStaticGraphics.fillRect(boardLeft - 11, boardTop - 9, 7, boardSize + 13);
+      this.boardStaticGraphics.fillRect(boardLeft + boardSize + 4, boardTop - 3, 11, boardSize + 16);
+      this.boardStaticGraphics.fillRect(boardLeft - 3, boardTop + boardSize + 4, boardSize + 18, 7);
+      this.boardStaticGraphics.fillRect(boardLeft - 3, boardTop - 11, boardSize + 12, 4);
+      this.boardStaticGraphics.fillStyle(0x000000, 0.34);
+      this.boardStaticGraphics.fillRect(boardLeft + boardSize + 15, boardTop + 14, 7, Math.max(0, boardSize - 8));
+      this.boardStaticGraphics.fillRect(boardLeft + 20, boardTop + boardSize + 11, Math.max(0, boardSize - 2), 5);
+      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_HIGHLIGHT, 0.12);
+      this.boardStaticGraphics.fillRect(boardLeft - 12, boardTop - 12, boardSize + 18, 1);
+      this.boardStaticGraphics.fillRect(boardLeft - 12, boardTop - 12, 1, boardSize + 18);
+      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_HIGHLIGHT, 0.07);
+      this.boardStaticGraphics.fillRect(boardLeft - 7, boardTop - 6, boardSize + 10, 1);
     }
     this.boardStaticGraphics.fillStyle(boardEdge, 1);
     this.boardStaticGraphics.fillRect(boardLeft - 3, boardTop - 3, boardSize + 6, boardSize + 6);
     this.boardStaticGraphics.fillStyle(boardFill, isMenuMode ? 0.98 : 0.96);
     this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
+    if (isMenuMode) {
+      this.boardStaticGraphics.fillStyle(0xffffff, 0.035);
+      this.boardStaticGraphics.fillRect(boardLeft + 1, boardTop + 1, boardSize - 2, 2);
+      this.boardStaticGraphics.fillRect(boardLeft + 1, boardTop + 1, 2, boardSize - 2);
+    }
     if (this.settings.darkMode) {
       this.boardStaticGraphics.fillStyle(0x000000, 0.12);
       this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
