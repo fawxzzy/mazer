@@ -326,6 +326,8 @@ export class MenuScene extends Phaser.Scene {
     this.mode = 'menu';
     this.overlay = 'none';
     this.overlayReturn = 'none';
+    this.titleText.setVisible(true);
+    this.titleShadow.setVisible(true);
     this.regenerateMaze();
   }
 
@@ -333,9 +335,12 @@ export class MenuScene extends Phaser.Scene {
     this.mode = 'play';
     this.overlay = 'none';
     this.overlayReturn = 'none';
+    this.titleText.setVisible(false);
+    this.titleShadow.setVisible(false);
     this.player = copyPoint(this.maze.start);
     this.trail = [copyPoint(this.player)];
     this.playStartedAtMs = this.time.now;
+    this.boardStaticDirty = true;
     this.boardDynamicDirty = true;
     this.uiDirty = true;
   }
@@ -585,14 +590,14 @@ export class MenuScene extends Phaser.Scene {
     const angle = Phaser.Math.Angle.Between(playerScreenX, playerScreenY, goalScreenX, goalScreenY);
     const length = 36;
 
-    this.hudGraphics.fillStyle(0x000000, 0.24);
-    this.hudGraphics.fillRoundedRect(20, 18, 170, 42, 8);
-    this.hudGraphics.lineStyle(1, 0xffffff, 0.18);
-    this.hudGraphics.strokeRoundedRect(20, 18, 170, 42, 8);
+    this.hudGraphics.fillStyle(0x000000, 0.38);
+    this.hudGraphics.fillRoundedRect(20, 18, 184, 44, 8);
+    this.hudGraphics.lineStyle(1, 0xffffff, 0.22);
+    this.hudGraphics.strokeRoundedRect(20, 18, 184, 44, 8);
 
     const timer = this.add.text(32, 29, timerText, {
       fontFamily: '"Courier New", monospace',
-      fontSize: '20px',
+      fontSize: '22px',
       color: '#f2f2f4'
     });
     timer.setData('hud', true);
@@ -1113,11 +1118,11 @@ export class MenuScene extends Phaser.Scene {
     this.uiButtons = [];
 
     for (const text of this.uiTexts) {
-      if (text.active) {
+      if (text.active && text.getData('hud') !== true) {
         text.destroy();
       }
     }
-    this.uiTexts = [];
+    this.uiTexts = this.uiTexts.filter((text) => text.active);
   }
 
   private openNestedOverlay(kind: OverlayKind, returnTo: OverlayKind): void {
