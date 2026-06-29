@@ -55,9 +55,9 @@ export const resolveLegacyMenuLayout = (
     ));
   const centerButtonY = isPortrait
     ? Math.round(clamp(
-      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.08),
-      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.18),
-      buttonY - Math.round(buttonHeight * 0.52)
+      boardTop + snappedBoardSize + Math.round(buttonHeight * 0.08),
+      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.04),
+      buttonY - Math.round(buttonHeight * 0.28)
     ))
     : Math.round(clamp(
       boardTop + snappedBoardSize - Math.round(buttonHeight * 0.22),

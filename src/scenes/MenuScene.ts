@@ -135,12 +135,12 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: '"Courier New", monospace',
       fontSize: '96px',
       color: TITLE_SHADOW_COLOR
-    }).setOrigin(0.5).setAlpha(0.78);
+    }).setOrigin(0.5).setAlpha(0.84);
     this.titleText = this.add.text(0, 0, 'Mazer', {
       fontFamily: '"Courier New", monospace',
       fontSize: '96px',
       color: TITLE_FILL_COLOR
-    }).setOrigin(0.5).setAlpha(0.72);
+    }).setOrigin(0.5).setAlpha(0.82);
     this.footerText = this.add.text(0, 0, '', {
       fontFamily: '"Courier New", monospace',
       fontSize: '18px',
@@ -286,14 +286,20 @@ export class MenuScene extends Phaser.Scene {
   private refreshLayout(): void {
     const width = this.scale.width;
     const height = this.scale.height;
+    const isPortrait = height > width;
     this.layout = resolveLegacyMenuLayout(width, height, this.settings.scale + this.settings.camScale, this.maze.size);
+    const titleFontSize = Math.max(
+      isPortrait ? 72 : 88,
+      Math.round(this.layout.boardSize * (isPortrait ? 0.22 : 0.245))
+    );
+    const titleShadowOffset = Math.max(isPortrait ? 6 : 8, Math.round(this.layout.tileSize * (isPortrait ? 0.18 : 0.24)));
 
     this.titleShadow
-      .setPosition(this.layout.titleX, this.layout.titleY + Math.max(6, Math.round(this.layout.tileSize * 0.18)))
-      .setFontSize(Math.max(72, Math.round(this.layout.boardSize * 0.22)));
+      .setPosition(this.layout.titleX, this.layout.titleY + titleShadowOffset)
+      .setFontSize(titleFontSize);
     this.titleText
       .setPosition(this.layout.titleX, this.layout.titleY)
-      .setFontSize(Math.max(72, Math.round(this.layout.boardSize * 0.22)));
+      .setFontSize(titleFontSize);
     this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
 
     this.boardStaticDirty = true;
@@ -1103,28 +1109,54 @@ export class MenuScene extends Phaser.Scene {
     onClick: () => void
   ): UiButton {
     const isMenuFrontDoor = this.mode === 'menu' && this.overlay === 'none';
-    const baseAlpha = isMenuFrontDoor ? 0.12 : MENU_BUTTON_ALPHA;
-    const baseStroke = isMenuFrontDoor ? 0.28 : MENU_BUTTON_STROKE_ALPHA;
-    const strokeColor = isMenuFrontDoor ? 0xb2a9bc : 0xb8b1c1;
+    const isPrimaryFrontDoorButton = isMenuFrontDoor && text === 'Start';
+    const baseAlpha = isMenuFrontDoor
+      ? (isPrimaryFrontDoorButton ? 0.16 : 0.12)
+      : MENU_BUTTON_ALPHA;
+    const baseStroke = isMenuFrontDoor
+      ? (isPrimaryFrontDoorButton ? 0.34 : 0.28)
+      : MENU_BUTTON_STROKE_ALPHA;
+    const strokeColor = isMenuFrontDoor
+      ? (isPrimaryFrontDoorButton ? 0xc2bacb : 0xb2a9bc)
+      : 0xb8b1c1;
     const background = this.add.rectangle(x, y, width, height, 0xffffff, baseAlpha);
     background.setStrokeStyle(2, strokeColor, baseStroke);
     background.setInteractive({ useHandCursor: true });
     const textFitSize = Math.floor((width * (isMenuFrontDoor ? 1.3 : 1.45)) / Math.max(4, text.length));
     const buttonFontSize = Math.max(
-      isMenuFrontDoor ? 16 : 18,
-      Math.min(isMenuFrontDoor ? 34 : 40, Math.min(Math.round(height * 0.48), textFitSize))
+      isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 18 : 16) : 18,
+      Math.min(
+        isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 38 : 34) : 40,
+        Math.min(Math.round(height * (isPrimaryFrontDoorButton ? 0.54 : 0.48)), textFitSize)
+      )
     );
+    const buttonTextColor = isMenuFrontDoor
+      ? (isPrimaryFrontDoorButton ? '#1c9d2d' : '#178b23')
+      : MENU_TEXT_COLOR;
 
     const label = this.add.text(x, y, text, {
       fontFamily: '"Courier New", monospace',
       fontSize: `${buttonFontSize}px`,
-      color: MENU_TEXT_COLOR
-    }).setOrigin(0.5);
+      color: buttonTextColor
+    }).setOrigin(0.5).setAlpha(isMenuFrontDoor ? 1 : 0.92);
 
     const setActive = (active: boolean): void => {
-      background.setFillStyle(0xffffff, active ? (isMenuFrontDoor ? 0.16 : 0.28) : baseAlpha);
-      background.setStrokeStyle(2, 0xffffff, active ? (isMenuFrontDoor ? 0.3 : 0.36) : baseStroke);
-      label.setAlpha(active ? 1 : (isMenuFrontDoor ? 0.98 : 0.92));
+      background.setFillStyle(
+        0xffffff,
+        active
+          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.22 : 0.16) : 0.28)
+          : baseAlpha
+      );
+      background.setStrokeStyle(
+        2,
+        0xffffff,
+        active
+          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.38 : 0.3) : 0.36)
+          : baseStroke
+      );
+      label.setAlpha(
+        active ? 1 : (isMenuFrontDoor ? 1 : 0.92)
+      );
     };
 
     background.on('pointerover', () => setActive(true));
