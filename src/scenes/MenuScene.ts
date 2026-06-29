@@ -104,6 +104,7 @@ const TITLE_SHADOW_COLOR = '#0c2e13';
 const LEGACY_BOARD_GRID_ALPHA = 0.3;
 const MESSAGE_DURATION_MS = 1800;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
+const INITIAL_MENU_DEMO_PREROLL_STEPS = 22;
 const DEMO_STEP_MS = 118;
 const DEMO_REGEN_HOLD_MS = 860;
 const TRAIL_FADE_TAIL = 16;
@@ -372,8 +373,16 @@ export class MenuScene extends Phaser.Scene {
 
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
     this.maze = createLegacyMaze(this.settings.scale, this.mazeSeed);
-    this.player = copyPoint(this.maze.start);
-    this.demoCursor = this.maze.solutionPath.length > 0 ? 0 : -1;
+    const menuPrerollSteps = this.mode === 'menu'
+      ? Math.min(
+        Math.max(0, this.maze.solutionPath.length - 1),
+        INITIAL_MENU_DEMO_PREROLL_STEPS
+      )
+      : 0;
+    this.demoCursor = this.maze.solutionPath.length > 0 ? menuPrerollSteps : -1;
+    this.player = this.demoCursor >= 0 && this.maze.solutionPath[this.demoCursor]
+      ? copyPoint(this.maze.solutionPath[this.demoCursor] as LegacyPoint)
+      : copyPoint(this.maze.start);
     this.trail = buildPathTrail(this.maze.solutionPath.slice(0, Math.max(0, this.demoCursor + 1)), null);
     this.nextDemoMoveAtMs = nextDemoMoveAtMs;
     this.pendingMazeRebuild = false;
