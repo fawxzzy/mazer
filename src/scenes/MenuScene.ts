@@ -31,6 +31,7 @@ import {
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
+  createLegacyMenuSnapshotDemoWalkerConfig,
   resolveLegacyPointFromDemoIndex,
   resolveLegacyTrailFromDemoSteps
 } from '../legacy-runtime/legacyDemoWalker';
@@ -77,6 +78,23 @@ interface MenuSceneVisualDiagnostics {
     bounds: VisualRect;
     safeBounds: VisualRect;
     tileSize: number;
+  };
+  runtime: {
+    goal: LegacyPoint;
+    mazeSize: number;
+    menuDemo: {
+      cue: DemoWalkerState['cue'] | null;
+      pathCursor: number | null;
+      phase: DemoWalkerState['phase'] | null;
+      prerollSteps: number;
+      reachedGoal: boolean;
+      runnerMistakesEnabled: boolean;
+    };
+    mode: RuntimeMode;
+    overlay: OverlayKind;
+    player: LegacyPoint;
+    trailLength: number;
+    trailTail: LegacyPoint[];
   };
   revision: number;
   updatedAt: number;
@@ -148,6 +166,8 @@ const buildPathTrail = (
 
   return points.slice(Math.max(0, points.length - limit)).map(copyPoint);
 };
+
+const isFixedLegacyMenuSnapshot = (maze: Pick<LegacyMazeSnapshot, 'size'>): boolean => maze.size <= 25;
 
 export class MenuScene extends Phaser.Scene {
   private settings: LegacySettings = copyLegacySettings(LEGACY_DEFAULTS);
@@ -389,14 +409,19 @@ export class MenuScene extends Phaser.Scene {
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
     this.maze = this.buildMazeForCurrentMode();
     this.menuDemoEpisode = this.mode === 'menu' ? createLegacyDemoWalkerEpisode(this.maze) : null;
-    this.menuDemoConfig = createLegacyMenuDemoWalkerConfig(this.maze.seed);
+    this.menuDemoConfig = isFixedLegacyMenuSnapshot(this.maze)
+      ? createLegacyMenuSnapshotDemoWalkerConfig(this.maze.seed)
+      : createLegacyMenuDemoWalkerConfig(this.maze.seed);
     this.menuDemoState = this.mode === 'menu' && this.menuDemoEpisode
       ? createDemoWalkerState(this.menuDemoEpisode, this.menuDemoConfig)
       : null;
     if (this.mode === 'menu' && this.menuDemoEpisode && this.menuDemoState) {
       const basePrerollSteps = Math.max(0, this.menuDemoConfig.behavior.prerollSteps ?? legacyTuning.demo.behavior.prerollSteps ?? 0);
-      const prerollSteps = this.maze.size <= 25
-        ? Math.max(basePrerollSteps, 36)
+      const prerollSteps = isFixedLegacyMenuSnapshot(this.maze)
+        ? Math.min(
+            basePrerollSteps,
+            Math.max(0, this.maze.solutionPath.length - 8)
+          )
         : basePrerollSteps;
       for (let step = 0; step < prerollSteps; step += 1) {
         const advance = advanceDemoWalker(this.menuDemoEpisode, this.menuDemoState, this.menuDemoConfig);
@@ -1381,6 +1406,23 @@ export class MenuScene extends Phaser.Scene {
           right: 0,
           bottom: 0,
           left: 0
+        }
+      },
+      runtime: {
+        mode: this.mode,
+        overlay: this.overlay,
+        mazeSize: this.maze.size,
+        player: copyPoint(this.player),
+        goal: copyPoint(this.maze.goal),
+        trailLength: this.trail.length,
+        trailTail: this.trail.slice(Math.max(0, this.trail.length - 8)).map(copyPoint),
+        menuDemo: {
+          phase: this.menuDemoState?.phase ?? null,
+          cue: this.menuDemoState?.cue ?? null,
+          pathCursor: this.menuDemoState?.pathCursor ?? null,
+          reachedGoal: this.menuDemoState?.reachedGoal ?? false,
+          prerollSteps: Math.max(0, this.menuDemoConfig?.behavior.prerollSteps ?? 0),
+          runnerMistakesEnabled: this.menuDemoConfig?.behavior.enableRunnerMistakes === true
         }
       },
       board: {
