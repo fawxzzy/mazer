@@ -192,6 +192,24 @@ Boundary:
 - if the board silhouette is wrong, edit `legacyMenuSnapshot.ts`
 - if the silhouette is right but the maze reads too chunky or too modern, edit `src/legacy-runtime/legacyMenuRender.ts` and the menu-only board draw path in `MenuScene.ts`
 
+### Modular parity lock sequence
+
+Use this to avoid broad “fix the whole menu” passes. Lock one module at a time, prove it, then move on.
+
+| Module | Owner chain | Proof surface |
+| --- | --- | --- |
+| title lockup | `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-title.test.ts`, screenshot comparison |
+| button chrome | `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/scenes/MenuScene.ts#createButton()` | `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-button-chrome.test.ts`, screenshot comparison |
+| board silhouette | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, screenshot comparison |
+| board material / tile read | `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts#drawStaticBoard()` | `tests/scenes/menu-render-frame.test.ts`, screenshot comparison |
+| backdrop field | `src/scenes/MenuScene.ts#drawBackdrop()` | screenshot comparison |
+| demo route / pacing | `src/legacy-runtime/legacyDemoWalker.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, live preview |
+
+Rule:
+
+- do not modify more than one module family in a single parity packet unless one owner chain is unusable without the other
+- if a miss can be described as one row in this table, keep the packet at that row
+
 ### Legacy settings + menu shell helpers
 
 - `src/legacy-runtime/legacyDefaults.ts`

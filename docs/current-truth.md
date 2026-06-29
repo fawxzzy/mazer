@@ -77,6 +77,18 @@ Current `verify` means:
 
 The older visual matrix / Edge live proof lane is now archival for comparison, not current closure truth for the reset lane.
 
+## Current parity execution rule
+
+- Do not run broad menu-wide polish passes by default.
+- Lock menu parity one module at a time:
+  - title lockup
+  - button chrome
+  - board silhouette
+  - board material / tile read
+  - backdrop field
+  - demo route / pacing
+- For the active module, name one owner chain, one proof surface, and one visible legacy miss before editing.
+
 ## Release rule
 
 - Do not claim production parity with the old game yet.

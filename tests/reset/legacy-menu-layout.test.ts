@@ -19,8 +19,8 @@ describe('legacy menu layout', () => {
     expect(layout.rightButtonX).toBeGreaterThan(layout.boardLeft + layout.boardSize);
     expect(layout.buttonWidth).toBeLessThanOrEqual(208);
     expect(layout.centerButtonWidth).toBeLessThanOrEqual(228);
-    expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.09));
-    expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.15));
+    expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.08));
+    expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.12));
   });
 
   test('keeps the portrait board dominant with separated buttons near the board edge', () => {
@@ -36,7 +36,7 @@ describe('legacy menu layout', () => {
     expect(layout.buttonHeight).toBeLessThanOrEqual(60);
     expect(layout.leftButtonX + (layout.buttonWidth / 2)).toBeLessThan(layout.centerButtonX - 8);
     expect(layout.rightButtonX - (layout.buttonWidth / 2)).toBeGreaterThan(layout.centerButtonX + 8);
-    expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.1));
-    expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.16));
+    expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.09));
+    expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.13));
   });
 });
