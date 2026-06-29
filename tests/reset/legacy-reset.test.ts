@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import { LEGACY_DEFAULTS, MAIN_MENU_BUTTONS, linearColorToHex } from '../../src/legacy-runtime/legacyDefaults';
 import { createLegacyMaze } from '../../src/legacy-runtime/legacyMaze';
+import {
+  createLegacyDemoWalkerEpisode,
+  createLegacyMenuDemoWalkerConfig,
+  resolveLegacyPointFromDemoIndex,
+  resolveLegacyTrailFromDemoSteps
+} from '../../src/legacy-runtime/legacyDemoWalker';
+import { collectDemoWalkerTelemetry, createDemoWalkerState } from '../../src/domain/ai';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -30,12 +37,32 @@ describe('legacy reset lane', () => {
     expect(lastStep).toEqual(maze.goal);
   });
 
+  test('adapts legacy maze snapshots into the recovered menu demo walker lane', () => {
+    const maze = createLegacyMaze(50, 3749);
+    const episode = createLegacyDemoWalkerEpisode(maze);
+    const config = createLegacyMenuDemoWalkerConfig(maze.seed);
+    const state = createDemoWalkerState(episode, config);
+    const telemetry = collectDemoWalkerTelemetry(episode, config);
+
+    expect(episode.raster.startIndex).toBe((maze.start.y * maze.size) + maze.start.x);
+    expect(episode.raster.endIndex).toBe((maze.goal.y * maze.size) + maze.goal.x);
+    expect(Array.from(episode.raster.pathIndices).at(0)).toBe(episode.raster.startIndex);
+    expect(Array.from(episode.raster.pathIndices).at(-1)).toBe(episode.raster.endIndex);
+    expect(config.behavior.enableRunnerMistakes).toBe(true);
+    expect(telemetry.backtrackCount).toBeGreaterThan(0);
+    expect(resolveLegacyPointFromDemoIndex(state.currentIndex, episode.raster.width)).toEqual(maze.start);
+    expect(resolveLegacyTrailFromDemoSteps(state.trailSteps, episode.raster.width)).toEqual([maze.start]);
+  });
+
   test('keeps the active-play HUD minimal and legacy-shaped', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const timerText = `Time ${elapsed}`;');
     expect(menuSceneSource).toContain('Phaser.Math.Angle.Between');
     expect(menuSceneSource).not.toContain('WASD or arrows to move   P to pause');
+    expect(menuSceneSource).toContain('createLegacyDemoWalkerEpisode(this.maze)');
+    expect(menuSceneSource).toContain('createLegacyMenuDemoWalkerConfig(this.maze.seed)');
+    expect(menuSceneSource).toContain('advanceDemoWalker(this.menuDemoEpisode, this.menuDemoState, this.menuDemoConfig)');
   });
 
   test('cleans up localhost service workers before booting Phaser', () => {
