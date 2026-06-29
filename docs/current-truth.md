@@ -49,6 +49,7 @@ If the current web app disagrees with restored legacy truth, legacy wins for thi
 - legacy menu-shaped web front door
 - fixed legacy-shaped menu snapshot separated from the play-maze generator
 - filled the fixed menu snapshot with staircase and right-spine silhouette branches for closer screenshot parity
+- title lockup is now tuned to sit deeper over the board instead of reading like a small shell label
 - legacy-style menu demo board/trail presentation
 - legacy-style active play start path
 - legacy-style options/features/game-mode/pause overlay structure

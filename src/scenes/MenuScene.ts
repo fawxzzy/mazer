@@ -231,11 +231,13 @@ export class MenuScene extends Phaser.Scene {
     this.titleShadow = this.add.text(0, 0, 'Mazer', {
       fontFamily: '"Courier New", monospace',
       fontSize: '96px',
+      fontStyle: 'bold',
       color: TITLE_SHADOW_COLOR
     }).setOrigin(0.5).setAlpha(0.76);
     this.titleText = this.add.text(0, 0, 'Mazer', {
       fontFamily: '"Courier New", monospace',
       fontSize: '96px',
+      fontStyle: 'bold',
       color: TITLE_FILL_COLOR
     }).setOrigin(0.5).setAlpha(0.88);
     this.footerText = this.add.text(0, 0, '', {
