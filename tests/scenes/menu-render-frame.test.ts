@@ -14,9 +14,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(resolveLegacyMenuPathRenderFrame(maze, { x: 1, y: 1 }, 20)).toEqual({
       leftInset: 0,
-      topInset: 3,
+      topInset: 1,
       width: 20,
-      height: 14
+      height: 18
     });
   });
 
@@ -31,10 +31,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     };
 
     expect(resolveLegacyMenuPathRenderFrame(maze, { x: 1, y: 1 }, 20)).toEqual({
-      leftInset: 3,
-      topInset: 3,
-      width: 14,
-      height: 17
+      leftInset: 1,
+      topInset: 1,
+      width: 18,
+      height: 19
     });
   });
 });

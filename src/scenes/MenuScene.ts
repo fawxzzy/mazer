@@ -132,7 +132,7 @@ const MENU_BUTTON_STROKE_ALPHA = 0.24;
 const MENU_TEXT_COLOR = '#0b841d';
 const TITLE_FILL_COLOR = '#1d8726';
 const TITLE_SHADOW_COLOR = '#103516';
-const LEGACY_BOARD_GRID_ALPHA = 0.024;
+const LEGACY_BOARD_GRID_ALPHA = 0.016;
 const MESSAGE_DURATION_MS = 1800;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
@@ -701,7 +701,7 @@ export class MenuScene extends Phaser.Scene {
               Math.max(1, tileSize - 2)
             );
           } else if (isMenuMode && tileSize > 6) {
-            this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.08);
+            this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.05);
             this.boardStaticGraphics.fillRect(
               tileX + 1,
               tileY + 1,
