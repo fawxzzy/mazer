@@ -173,6 +173,25 @@ Boundary:
 - if the board is in the right place but looks wrong, start in `MenuScene.ts`
 - if the trail or attract route is wrong, start in `legacyDemoWalker.ts` / `demoWalker.ts`
 
+### Menu board visual render roles
+
+Use this before changing how the front door looks without changing the actual maze snapshot truth.
+
+| Concern | Owner |
+| --- | --- |
+| menu board geometry and button/title placement | `src/legacy-runtime/legacyMenuLayout.ts` |
+| fixed legacy snapshot shape | `src/legacy-runtime/legacyMenuSnapshot.ts` |
+| menu trench width / connection continuity | `src/legacy-runtime/legacyMenuRender.ts` + `src/scenes/MenuScene.ts` |
+| slab/frame colors and backdrop haze | `src/scenes/MenuScene.ts` constants near `LEGACY_MENU_*` + `drawBackdrop()` |
+| title opacity / shadow / wordmark presence | `src/scenes/MenuScene.ts` -> `refreshLayout()` + scene title text setup |
+| front-door button box strength / label presence | `src/scenes/MenuScene.ts` -> `createButton()` |
+| menu attract trail/player colors | `src/scenes/MenuScene.ts` dynamic board draw path |
+
+Boundary:
+
+- if the board silhouette is wrong, edit `legacyMenuSnapshot.ts`
+- if the silhouette is right but the maze reads too chunky or too modern, edit `src/legacy-runtime/legacyMenuRender.ts` and the menu-only board draw path in `MenuScene.ts`
+
 ### Legacy settings + menu shell helpers
 
 - `src/legacy-runtime/legacyDefaults.ts`
