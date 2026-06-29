@@ -79,6 +79,10 @@ describe('legacy reset lane', () => {
     expect(menuMaze.grid[6]?.[17]).toBe(true);
     expect(menuMaze.grid[7]?.[9]).toBe(true);
     expect(menuMaze.grid[11]?.[13]).toBe(true);
+    expect(menuMaze.grid[6]?.[24]).toBe(true);
+    expect(menuMaze.grid[12]?.[24]).toBe(true);
+    expect(menuMaze.grid[16]?.[23]).toBe(true);
+    expect(menuMaze.grid[11]?.[22]).toBe(true);
   });
 
   test('adapts legacy maze snapshots into the recovered menu demo walker lane', () => {
