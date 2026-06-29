@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { LEGACY_DEFAULTS, MAIN_MENU_BUTTONS, linearColorToHex } from '../../src/legacy-runtime/legacyDefaults';
-import { createLegacyMaze } from '../../src/legacy-runtime/legacyMaze';
+import { createLegacyMaze, createLegacyMenuMaze } from '../../src/legacy-runtime/legacyMaze';
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
@@ -35,6 +35,18 @@ describe('legacy reset lane', () => {
 
     expect(firstStep).toEqual(maze.start);
     expect(lastStep).toEqual(maze.goal);
+  });
+
+  test('uses a fixed legacy-shaped menu maze snapshot for the front door', () => {
+    const menuMaze = createLegacyMenuMaze(3749);
+
+    expect(menuMaze.size).toBe(25);
+    expect(menuMaze.start).toEqual({ x: 3, y: 4 });
+    expect(menuMaze.goal).toEqual({ x: 22, y: 22 });
+    expect(menuMaze.solutionPath[0]).toEqual(menuMaze.start);
+    expect(menuMaze.solutionPath.at(-1)).toEqual(menuMaze.goal);
+    expect(menuMaze.grid[13]?.[22]).toBe(true);
+    expect(menuMaze.grid[21]?.[20]).toBe(true);
   });
 
   test('adapts legacy maze snapshots into the recovered menu demo walker lane', () => {

@@ -46,6 +46,7 @@ If the current web app disagrees with restored legacy truth, legacy wins for thi
 - legacy archive extraction command: `npm run legacy:extract`
 - restored Unreal truth workspace in ATLAS temp storage
 - legacy menu-shaped web front door
+- fixed legacy-shaped menu snapshot separated from the play-maze generator
 - legacy-style menu demo board/trail presentation
 - legacy-style active play start path
 - legacy-style options/features/game-mode/pause overlay structure
@@ -83,6 +84,7 @@ The older visual matrix / Edge live proof lane is now archival for comparison, n
 ## Still open
 
 - exact main-menu behavior polish
+- exact menu snapshot silhouette and attract-route parity
 - exact play HUD parity
 - exact demo AI parity
 - exact generation/reset-flow parity

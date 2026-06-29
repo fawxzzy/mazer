@@ -11,6 +11,7 @@ import {
   type LegacySettings
 } from '../legacy-runtime/legacyDefaults';
 import {
+  createLegacyMenuMaze,
   createLegacyMaze,
   isWalkableTile,
   movePoint,
@@ -379,15 +380,24 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
+  private buildMazeForCurrentMode(): LegacyMazeSnapshot {
+    return this.mode === 'menu'
+      ? createLegacyMenuMaze(this.mazeSeed)
+      : createLegacyMaze(this.settings.scale, this.mazeSeed);
+  }
+
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
-    this.maze = createLegacyMaze(this.settings.scale, this.mazeSeed);
+    this.maze = this.buildMazeForCurrentMode();
     this.menuDemoEpisode = this.mode === 'menu' ? createLegacyDemoWalkerEpisode(this.maze) : null;
     this.menuDemoConfig = createLegacyMenuDemoWalkerConfig(this.maze.seed);
     this.menuDemoState = this.mode === 'menu' && this.menuDemoEpisode
       ? createDemoWalkerState(this.menuDemoEpisode, this.menuDemoConfig)
       : null;
     if (this.mode === 'menu' && this.menuDemoEpisode && this.menuDemoState) {
-      const prerollSteps = Math.max(0, this.menuDemoConfig.behavior.prerollSteps ?? legacyTuning.demo.behavior.prerollSteps ?? 0);
+      const basePrerollSteps = Math.max(0, this.menuDemoConfig.behavior.prerollSteps ?? legacyTuning.demo.behavior.prerollSteps ?? 0);
+      const prerollSteps = this.maze.size <= 25
+        ? Math.max(basePrerollSteps, 36)
+        : basePrerollSteps;
       for (let step = 0; step < prerollSteps; step += 1) {
         const advance = advanceDemoWalker(this.menuDemoEpisode, this.menuDemoState, this.menuDemoConfig);
         this.menuDemoState = advance.state;
@@ -426,7 +436,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayReturn = 'none';
     this.titleText.setVisible(true);
     this.titleShadow.setVisible(true);
-    this.regenerateMaze();
+    this.rebuildMaze(this.time.now + INITIAL_MENU_DEMO_HOLD_MS);
   }
 
   private startPlayMode(): void {
@@ -435,8 +445,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayReturn = 'none';
     this.titleText.setVisible(false);
     this.titleShadow.setVisible(false);
-    this.player = copyPoint(this.maze.start);
-    this.trail = [copyPoint(this.player)];
+    this.rebuildMaze();
     this.playStartedAtMs = this.time.now;
     this.boardStaticDirty = true;
     this.boardDynamicDirty = true;
