@@ -541,13 +541,13 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createStars(): void {
-    const starCount = 260;
+    const starCount = 320;
     this.stars = Array.from({ length: starCount }, () => ({
       x: Math.random(),
       y: Math.random(),
-      radius: 0.7 + (Math.random() * 1.8),
+      radius: 0.7 + (Math.random() * 2.2),
       speed: 0.01 + (Math.random() * 0.04),
-      alpha: 0.34 + (Math.random() * 0.52)
+      alpha: 0.28 + (Math.random() * 0.6)
     }));
   }
 
@@ -568,10 +568,10 @@ export class MenuScene extends Phaser.Scene {
     const { width, height } = this.layout;
     this.backdropGraphics.clear();
 
-    const fieldColor = this.settings.darkMode ? 0x130d1d : 0x2c1e43;
-    const hazeColor = this.settings.darkMode ? 0x211130 : 0x4f346a;
-    const hazeAlpha = this.settings.darkMode ? 0.03 : 0.045;
-    const starAlphaScale = this.settings.darkMode ? 0.56 : 0.96;
+    const fieldColor = this.settings.darkMode ? 0x10091a : 0x26163d;
+    const hazeColor = this.settings.darkMode ? 0x2d153c : 0x5c3c77;
+    const hazeAlpha = this.settings.darkMode ? 0.05 : 0.07;
+    const starAlphaScale = this.settings.darkMode ? 0.64 : 1.08;
     const centerX = width / 2;
     const centerY = height / 2;
     const maxDistance = Math.max(1, Math.hypot(centerX, centerY));
@@ -579,9 +579,13 @@ export class MenuScene extends Phaser.Scene {
     this.backdropGraphics.fillStyle(fieldColor, 1);
     this.backdropGraphics.fillRect(0, 0, width, height);
     this.backdropGraphics.fillStyle(hazeColor, hazeAlpha);
-    this.backdropGraphics.fillCircle(centerX, centerY, Math.min(width, height) * 0.24);
+    this.backdropGraphics.fillCircle(centerX, centerY, Math.min(width, height) * 0.26);
     this.backdropGraphics.fillStyle(hazeColor, hazeAlpha * 0.3);
-    this.backdropGraphics.fillCircle(centerX * 0.96, centerY * 0.9, Math.min(width, height) * 0.14);
+    this.backdropGraphics.fillCircle(centerX * 0.9, centerY * 0.84, Math.min(width, height) * 0.17);
+    this.backdropGraphics.fillStyle(hazeColor, hazeAlpha * 0.24);
+    this.backdropGraphics.fillCircle(width * 0.16, height * 0.2, Math.min(width, height) * 0.16);
+    this.backdropGraphics.fillCircle(width * 0.84, height * 0.2, Math.min(width, height) * 0.18);
+    this.backdropGraphics.fillCircle(width * 0.82, height * 0.76, Math.min(width, height) * 0.16);
 
     for (const star of this.stars) {
       const pixelX = Math.round(star.x * width);
@@ -589,21 +593,27 @@ export class MenuScene extends Phaser.Scene {
       const deltaX = pixelX - centerX;
       const deltaY = pixelY - centerY;
       const distanceRatio = clamp(Math.hypot(deltaX, deltaY) / maxDistance, 0, 1);
-      const streakLength = Math.max(1, Math.round(distanceRatio * 4));
+      const streakLength = Math.max(1, Math.round((distanceRatio * 3) + (star.radius * 0.85)));
       const coreSize = Math.max(1, Math.round(star.radius));
       const stepX = deltaX === 0 ? 0 : (deltaX > 0 ? 1 : -1);
       const stepY = deltaY === 0 ? 0 : (deltaY > 0 ? 1 : -1);
+      const haloAlpha = star.alpha * starAlphaScale * (coreSize > 1 ? 0.16 : 0.07);
+
+      if (coreSize > 1) {
+        this.backdropGraphics.fillStyle(0xffffff, haloAlpha);
+        this.backdropGraphics.fillRect(pixelX - 1, pixelY - 1, coreSize + 2, coreSize + 2);
+      }
 
       this.backdropGraphics.fillStyle(0xffffff, star.alpha * starAlphaScale);
       this.backdropGraphics.fillRect(pixelX, pixelY, coreSize, coreSize);
 
       for (let index = 1; index <= streakLength; index += 1) {
-        this.backdropGraphics.fillStyle(0xffffff, star.alpha * starAlphaScale * (0.45 - (index * 0.08)));
+        this.backdropGraphics.fillStyle(0xffffff, star.alpha * starAlphaScale * (0.48 - (index * 0.07)));
         this.backdropGraphics.fillRect(pixelX + (stepX * index), pixelY + (stepY * index), 1, 1);
       }
     }
     if (this.settings.darkMode) {
-      this.backdropGraphics.fillStyle(0x000000, 0.16);
+      this.backdropGraphics.fillStyle(0x000000, 0.12);
       this.backdropGraphics.fillRect(0, 0, width, height);
     }
 
