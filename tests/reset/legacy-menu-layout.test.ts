@@ -30,13 +30,15 @@ describe('legacy menu layout', () => {
     expect(layout.centerButtonY).toBeLessThan(layout.buttonY);
     expect(layout.centerButtonWidth).toBeGreaterThanOrEqual(layout.buttonWidth);
     expect(layout.centerButtonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
+    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(12);
     expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
+    expect(layout.buttonY - layout.centerButtonY).toBeGreaterThanOrEqual(18);
     expect(layout.buttonY).toBeLessThan(layout.height);
     expect(layout.buttonWidth).toBeLessThanOrEqual(132);
     expect(layout.buttonHeight).toBeLessThanOrEqual(60);
     expect(layout.leftButtonX + (layout.buttonWidth / 2)).toBeLessThan(layout.centerButtonX - 8);
     expect(layout.rightButtonX - (layout.buttonWidth / 2)).toBeGreaterThan(layout.centerButtonX + 8);
-    expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.09));
-    expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.13));
+    expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.08));
+    expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.11));
   });
 });

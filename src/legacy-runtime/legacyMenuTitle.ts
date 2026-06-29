@@ -12,8 +12,8 @@ export const resolveLegacyMenuTitlePresentation = (
   isPortrait: boolean
 ): LegacyMenuTitlePresentation => {
   const fontSize = Math.max(
-    isPortrait ? 46 : 60,
-    Math.round(boardSize * (isPortrait ? 0.122 : 0.134))
+    isPortrait ? 42 : 60,
+    Math.round(boardSize * (isPortrait ? 0.108 : 0.134))
   );
   const shadowOffsetX = Math.max(isPortrait ? 2 : 3, Math.round(tileSize * 0.06));
   const shadowOffsetY = Math.max(isPortrait ? 4 : 5, Math.round(tileSize * (isPortrait ? 0.12 : 0.14)));

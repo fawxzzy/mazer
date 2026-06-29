@@ -16,8 +16,8 @@ describe('legacy menu title presentation', () => {
   test('keeps the portrait wordmark readable without inflating to recovery-shell scale', () => {
     const presentation = resolveLegacyMenuTitlePresentation(387, 7, true);
 
-    expect(presentation.fontSize).toBeGreaterThanOrEqual(46);
-    expect(presentation.fontSize).toBeLessThanOrEqual(52);
+    expect(presentation.fontSize).toBeGreaterThanOrEqual(42);
+    expect(presentation.fontSize).toBeLessThanOrEqual(46);
     expect(presentation.shadowOffsetX).toBeGreaterThanOrEqual(2);
     expect(presentation.shadowOffsetY).toBeGreaterThanOrEqual(4);
     expect(presentation.titleAlpha).toBeLessThan(0.5);
