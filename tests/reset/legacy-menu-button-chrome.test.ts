@@ -20,9 +20,10 @@ describe('legacy menu button chrome', () => {
     expect(primary.baseStroke).toBeGreaterThan(secondary.baseStroke);
     expect(primary.fontSize).toBeGreaterThanOrEqual(secondary.fontSize);
     expect(primary.labelAlpha).toBeGreaterThan(secondary.labelAlpha);
+    expect(primary.strokeWidth).toBeGreaterThanOrEqual(secondary.strokeWidth);
   });
 
-  test('keeps side-button chrome readable without turning into dense shell UI', () => {
+  test('keeps side-button chrome visible enough to survive the narrow live browser pane', () => {
     const secondary = resolveLegacyMenuButtonChrome({
       width: 144,
       height: 54,
@@ -30,10 +31,10 @@ describe('legacy menu button chrome', () => {
       isPrimary: false
     });
 
-    expect(secondary.fontSize).toBeGreaterThanOrEqual(18);
-    expect(secondary.fontSize).toBeLessThanOrEqual(30);
-    expect(secondary.baseAlpha).toBeLessThan(0.05);
-    expect(secondary.hoverAlpha).toBeLessThan(0.1);
-    expect(secondary.strokeWidth).toBe(1);
+    expect(secondary.fontSize).toBeGreaterThanOrEqual(20);
+    expect(secondary.fontSize).toBeLessThanOrEqual(32);
+    expect(secondary.baseAlpha).toBeGreaterThan(0.06);
+    expect(secondary.hoverAlpha).toBeGreaterThan(0.1);
+    expect(secondary.strokeWidth).toBe(2);
   });
 });
