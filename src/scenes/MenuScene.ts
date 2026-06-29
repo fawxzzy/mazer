@@ -133,6 +133,10 @@ const LEGACY_BOARD_GRID_ALPHA = 0.22;
 const MESSAGE_DURATION_MS = 1800;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
+const LEGACY_MENU_SLAB_FILL = 0x59535d;
+const LEGACY_MENU_SLAB_EDGE = 0x211d25;
+const LEGACY_MENU_SLAB_HIGHLIGHT = 0x8a8490;
+const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0.54;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
@@ -381,17 +385,19 @@ export class MenuScene extends Phaser.Scene {
     const isPortrait = height > width;
     this.layout = resolveLegacyMenuLayout(width, height, this.settings.scale + this.settings.camScale, this.maze.size);
     const titleFontSize = Math.max(
-      isPortrait ? 64 : 82,
-      Math.round(this.layout.boardSize * (isPortrait ? 0.19 : 0.215))
+      isPortrait ? 60 : 76,
+      Math.round(this.layout.boardSize * (isPortrait ? 0.17 : 0.185))
     );
-    const titleShadowOffset = Math.max(isPortrait ? 7 : 10, Math.round(this.layout.tileSize * (isPortrait ? 0.22 : 0.3)));
+    const titleShadowOffset = Math.max(isPortrait ? 8 : 11, Math.round(this.layout.tileSize * (isPortrait ? 0.24 : 0.34)));
 
     this.titleShadow
       .setPosition(this.layout.titleX, this.layout.titleY + titleShadowOffset)
-      .setFontSize(titleFontSize);
+      .setFontSize(titleFontSize)
+      .setAlpha(isPortrait ? 0.64 : 0.6);
     this.titleText
       .setPosition(this.layout.titleX, this.layout.titleY)
-      .setFontSize(titleFontSize);
+      .setFontSize(titleFontSize)
+      .setAlpha(isPortrait ? 0.72 : 0.68);
     this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
 
     this.boardStaticDirty = true;
@@ -601,22 +607,28 @@ export class MenuScene extends Phaser.Scene {
     const wallColor = isMenuMode
       ? (this.settings.darkMode ? 0x050408 : 0x09070b)
       : linearColorToNumber(this.settings.wallColor);
-    const boardFill = this.settings.darkMode ? 0x151118 : 0x464149;
-    const boardEdge = this.settings.darkMode ? 0x030205 : 0x2a252d;
+    const boardFill = this.settings.darkMode ? 0x151118 : 0x454149;
+    const boardEdge = this.settings.darkMode ? 0x030205 : 0x322c35;
     const pathGlow = isMenuMode
       ? (this.settings.darkMode ? 0x9b96a1 : 0x97929c)
       : (this.settings.darkMode ? 0xb3acb8 : 0xd0cad2);
 
     this.boardStaticGraphics.clear();
-    this.boardStaticGraphics.fillStyle(0x000000, isMenuMode ? 0.38 : 0.28);
+    this.boardStaticGraphics.fillStyle(0x000000, isMenuMode ? LEGACY_MENU_PANEL_SHADOW_ALPHA : 0.28);
     this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardSize, boardSize);
     if (isMenuMode) {
-      this.boardStaticGraphics.fillStyle(0x000000, 0.52);
-      this.boardStaticGraphics.fillRect(boardLeft + boardSize, boardTop + 18, 18, Math.max(0, boardSize - 10));
-      this.boardStaticGraphics.fillRect(boardLeft + 18, boardTop + boardSize, Math.max(0, boardSize - 10), 16);
-      this.boardStaticGraphics.fillStyle(0xffffff, 0.04);
-      this.boardStaticGraphics.fillRect(boardLeft - 4, boardTop - 4, boardSize + 8, 2);
-      this.boardStaticGraphics.fillRect(boardLeft - 4, boardTop - 4, 2, boardSize + 8);
+      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_FILL, 0.72);
+      this.boardStaticGraphics.fillRect(boardLeft - 22, boardTop - 18, boardSize + 34, boardSize + 26);
+      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_EDGE, 0.84);
+      this.boardStaticGraphics.fillRect(boardLeft - 12, boardTop - 10, 8, boardSize + 18);
+      this.boardStaticGraphics.fillRect(boardLeft + boardSize + 2, boardTop - 2, 10, boardSize + 16);
+      this.boardStaticGraphics.fillRect(boardLeft - 4, boardTop + boardSize + 2, boardSize + 16, 8);
+      this.boardStaticGraphics.fillStyle(0x000000, 0.5);
+      this.boardStaticGraphics.fillRect(boardLeft + boardSize + 12, boardTop + 20, 10, Math.max(0, boardSize - 12));
+      this.boardStaticGraphics.fillRect(boardLeft + 22, boardTop + boardSize + 10, Math.max(0, boardSize - 6), 8);
+      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_HIGHLIGHT, 0.12);
+      this.boardStaticGraphics.fillRect(boardLeft - 20, boardTop - 16, boardSize + 24, 2);
+      this.boardStaticGraphics.fillRect(boardLeft - 20, boardTop - 16, 2, boardSize + 18);
     }
     this.boardStaticGraphics.fillStyle(boardEdge, 1);
     this.boardStaticGraphics.fillRect(boardLeft - 6, boardTop - 8, boardSize + 12, boardSize + 12);
@@ -1237,13 +1249,13 @@ export class MenuScene extends Phaser.Scene {
     const isMenuFrontDoor = this.mode === 'menu' && this.overlay === 'none';
     const isPrimaryFrontDoorButton = isMenuFrontDoor && text === 'Start';
     const baseAlpha = isMenuFrontDoor
-      ? (isPrimaryFrontDoorButton ? 0.22 : 0.16)
+      ? (isPrimaryFrontDoorButton ? 0.18 : 0.12)
       : MENU_BUTTON_ALPHA;
     const baseStroke = isMenuFrontDoor
-      ? (isPrimaryFrontDoorButton ? 0.42 : 0.34)
+      ? (isPrimaryFrontDoorButton ? 0.34 : 0.26)
       : MENU_BUTTON_STROKE_ALPHA;
     const strokeColor = isMenuFrontDoor
-      ? (isPrimaryFrontDoorButton ? 0xd4cadf : 0xc6bbd2)
+      ? (isPrimaryFrontDoorButton ? 0xc8bfd2 : 0xb8afc4)
       : 0xb8b1c1;
     const background = this.add.rectangle(x, y, width, height, 0xffffff, baseAlpha);
     background.setStrokeStyle(2, strokeColor, baseStroke);
@@ -1264,24 +1276,24 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: '"Courier New", monospace',
       fontSize: `${buttonFontSize}px`,
       color: buttonTextColor
-    }).setOrigin(0.5).setAlpha(isMenuFrontDoor ? 1 : 0.92);
+    }).setOrigin(0.5).setAlpha(isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.8 : 0.72) : 0.92);
 
     const setActive = (active: boolean): void => {
       background.setFillStyle(
         0xffffff,
         active
-          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.28 : 0.2) : 0.28)
+          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.24 : 0.17) : 0.28)
           : baseAlpha
       );
       background.setStrokeStyle(
         2,
         0xffffff,
         active
-          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.48 : 0.38) : 0.36)
+          ? (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.42 : 0.32) : 0.36)
           : baseStroke
       );
       label.setAlpha(
-        active ? 1 : (isMenuFrontDoor ? 1 : 0.92)
+        active ? 1 : (isMenuFrontDoor ? (isPrimaryFrontDoorButton ? 0.8 : 0.72) : 0.92)
       );
     };
 

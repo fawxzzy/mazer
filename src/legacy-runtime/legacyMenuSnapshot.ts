@@ -88,6 +88,15 @@ const buildSolutionPath = (): LegacyMenuSnapshotPoint[] => {
 };
 
 const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
+  const upperRidge: LegacyMenuSnapshotPoint[] = [{ x: 4, y: 3 }];
+  appendSegment(upperRidge, { x: 9, y: 3 });
+  appendSegment(upperRidge, { x: 9, y: 5 });
+  appendSegment(upperRidge, { x: 13, y: 5 });
+  appendSegment(upperRidge, { x: 13, y: 3 });
+  appendSegment(upperRidge, { x: 19, y: 3 });
+  appendSegment(upperRidge, { x: 19, y: 7 });
+  appendSegment(upperRidge, { x: 17, y: 7 });
+
   const topSpine: LegacyMenuSnapshotPoint[] = [{ x: 3, y: 2 }];
   appendSegment(topSpine, { x: 10, y: 2 });
   appendSegment(topSpine, { x: 10, y: 5 });
@@ -96,6 +105,12 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(topSpine, { x: 21, y: 2 });
   appendSegment(topSpine, { x: 21, y: 8 });
   appendSegment(topSpine, { x: 18, y: 8 });
+
+  const upperLeftPocket: LegacyMenuSnapshotPoint[] = [{ x: 4, y: 5 }];
+  appendSegment(upperLeftPocket, { x: 4, y: 9 });
+  appendSegment(upperLeftPocket, { x: 6, y: 9 });
+  appendSegment(upperLeftPocket, { x: 6, y: 7 });
+  appendSegment(upperLeftPocket, { x: 8, y: 7 });
 
   const leftFrame: LegacyMenuSnapshotPoint[] = [{ x: 2, y: 4 }];
   appendSegment(leftFrame, { x: 2, y: 22 });
@@ -109,11 +124,24 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(centerBand, { x: 15, y: 16 });
   appendSegment(centerBand, { x: 15, y: 12 });
 
+  const centerPocket: LegacyMenuSnapshotPoint[] = [{ x: 10, y: 12 }];
+  appendSegment(centerPocket, { x: 13, y: 12 });
+  appendSegment(centerPocket, { x: 13, y: 14 });
+  appendSegment(centerPocket, { x: 17, y: 14 });
+  appendSegment(centerPocket, { x: 17, y: 18 });
+  appendSegment(centerPocket, { x: 18, y: 18 });
+
   const lowerBand: LegacyMenuSnapshotPoint[] = [{ x: 7, y: 15 }];
   appendSegment(lowerBand, { x: 7, y: 21 });
   appendSegment(lowerBand, { x: 13, y: 21 });
   appendSegment(lowerBand, { x: 13, y: 23 });
   appendSegment(lowerBand, { x: 18, y: 23 });
+
+  const lowerCenterLoop: LegacyMenuSnapshotPoint[] = [{ x: 9, y: 17 }];
+  appendSegment(lowerCenterLoop, { x: 9, y: 20 });
+  appendSegment(lowerCenterLoop, { x: 12, y: 20 });
+  appendSegment(lowerCenterLoop, { x: 12, y: 18 });
+  appendSegment(lowerCenterLoop, { x: 14, y: 18 });
 
   const rightPocket: LegacyMenuSnapshotPoint[] = [{ x: 19, y: 13 }];
   appendSegment(rightPocket, { x: 19, y: 6 });
@@ -126,15 +154,25 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(rightSpine, { x: 23, y: 20 });
   appendSegment(rightSpine, { x: 20, y: 20 });
 
+  const rightLowerNotch: LegacyMenuSnapshotPoint[] = [{ x: 20, y: 16 }];
+  appendSegment(rightLowerNotch, { x: 22, y: 16 });
+  appendSegment(rightLowerNotch, { x: 22, y: 19 });
+  appendSegment(rightLowerNotch, { x: 21, y: 19 });
+
   return [
+    { id: 'upper-ridge', points: upperRidge },
     { id: 'top-spine', points: topSpine },
+    { id: 'upper-left-pocket', points: upperLeftPocket },
     { id: 'left-frame', points: leftFrame },
     { id: 'center-band', points: centerBand },
+    { id: 'center-pocket', points: centerPocket },
     { id: 'diagonal-upper', points: buildStaircase({ x: 6, y: 5 }, 6, 1, 1) },
     { id: 'diagonal-lower', points: buildStaircase({ x: 8, y: 14 }, 6, 1, 1) },
     { id: 'lower-band', points: lowerBand },
+    { id: 'lower-center-loop', points: lowerCenterLoop },
     { id: 'right-pocket', points: rightPocket },
-    { id: 'right-spine', points: rightSpine }
+    { id: 'right-spine', points: rightSpine },
+    { id: 'right-lower-notch', points: rightLowerNotch }
   ];
 };
 

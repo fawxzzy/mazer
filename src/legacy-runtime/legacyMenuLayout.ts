@@ -30,7 +30,7 @@ export const resolveLegacyMenuLayout = (
 ): LegacyMenuLayout => {
   const normalizedScale = clampInteger(scale, 25, 150);
   const isPortrait = height > width;
-  const baseBoardScale = isPortrait ? 0.94 : 0.48;
+  const baseBoardScale = isPortrait ? 0.93 : 0.485;
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const rawBoardSize = Math.min(
     width * baseBoardScale * scaleBias,
@@ -55,20 +55,20 @@ export const resolveLegacyMenuLayout = (
     ));
   const centerButtonY = isPortrait
     ? Math.round(clamp(
-      boardTop + snappedBoardSize + Math.round(buttonHeight * 0.08),
-      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.04),
+      boardTop + snappedBoardSize + Math.round(buttonHeight * 0.04),
+      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.06),
       buttonY - Math.round(buttonHeight * 0.28)
     ))
     : Math.round(clamp(
-      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.18),
-      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.3),
+      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.14),
+      boardTop + snappedBoardSize - Math.round(buttonHeight * 0.24),
       buttonY - Math.round(buttonHeight * 0.3)
     ));
   const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.21 : 0.13), isPortrait ? 96 : 150, isPortrait ? 144 : 252));
   const centerButtonWidth = isPortrait
-    ? Math.round(clamp(buttonWidth * 1.14, buttonWidth, 168))
-    : Math.round(clamp(buttonWidth * 1.55, buttonWidth + 36, 312));
-  const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.145 : 0.16), 58, 320));
+    ? Math.round(clamp(buttonWidth * 1.08, buttonWidth, 160))
+    : Math.round(clamp(buttonWidth * 1.35, buttonWidth + 28, 276));
+  const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.16 : 0.14), 68, 288));
   const centerButtonX = Math.round(width * 0.5);
 
   return {
@@ -79,7 +79,7 @@ export const resolveLegacyMenuLayout = (
     boardSize: snappedBoardSize,
     tileSize,
     titleX: Math.round(width / 2),
-    titleY: Math.round(boardTop + (snappedBoardSize * 0.16)),
+    titleY: Math.round(boardTop + (snappedBoardSize * 0.19)),
     footerY: height - 18,
     buttonY,
     centerButtonY,

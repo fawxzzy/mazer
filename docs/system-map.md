@@ -38,6 +38,8 @@ Meaning:
   - runtime mode switch: `menu` vs `play`
   - overlay switch: `none | options | features | gameModes | pause | message`
   - front-door button behavior
+  - title lockup opacity, scale, and vertical placement
+  - board slab/frame presentation and menu-only chrome
   - active-play movement
   - HUD timer and goal arrow
   - menu demo stepping
@@ -51,6 +53,7 @@ Meaning:
   - `Exit / Start / Options`
 - `src/legacy-runtime/legacyMenuLayout.ts`
   - title, board, and button frame math
+  - spacing contract between board edge and `Exit / Start / Options`
 - `src/legacy-runtime/legacyOptionFields.ts`
   - text-field draft parsing and settings mutation
 
@@ -70,10 +73,22 @@ Boundary:
 - If the change is menu screenshot parity only, start in `legacyMenuSnapshot.ts`
 - If the change is active-play maze truth, start in `legacyMaze.ts`
 
+### Menu-board render chain
+
+- `src/legacy-runtime/legacyMenuSnapshot.ts`
+  - owns the fixed menu blueprint polylines and named silhouette branches
+- `src/legacy-runtime/legacyMaze.ts`
+  - converts that blueprint into the boolean walkable grid used by the runtime
+- `src/scenes/MenuScene.ts`
+  - renders the board shell, maze tiles, trail, player, goal, and title lockup onto the front door
+- `tests/reset/legacy-reset.test.ts`
+  - holds the direct tile assertions that keep screenshot-only branch additions from drifting silently
+
 ### Menu demo / attract behavior
 
 - `src/legacy-runtime/legacyDemoWalker.ts`
   - adapts legacy maze snapshots into demo-walker episodes/config
+  - fixed-snapshot menu-only demo policy and deterministic preroll
 - `src/domain/ai/demoWalker.ts`
   - deterministic demo stepping, backtracking, goal hold, reset hold
 
@@ -159,9 +174,14 @@ If you want to change one thing, start here:
 
 - menu board silhouette:
   - `src/legacy-runtime/legacyMenuSnapshot.ts`
+  - `tests/reset/legacy-reset.test.ts`
 - menu board frame, title, button placement:
   - `src/legacy-runtime/legacyMenuLayout.ts`
   - `src/scenes/MenuScene.ts`
+- menu-only slab/frame/title/button parity:
+  - `src/scenes/MenuScene.ts`
+  - `docs/legacy/art-direction.md`
+  - `legacy/screenshots/menu-01.png` .. `menu-04.png`
 - menu demo timing or route progression:
   - `src/legacy-runtime/legacyDemoWalker.ts`
   - `src/domain/ai/demoWalker.ts`
