@@ -66,6 +66,7 @@ describe('demo walker', () => {
     const resetAdvance = advanceDemoWalker(episode, state);
     expect(resetAdvance.state.phase).toBe('reset-hold');
     expect(resetAdvance.state.resetReason).toBe('goal');
+    expect(resetAdvance.state.cue).toBe('reset');
 
     const regenerateAdvance = advanceDemoWalker(episode, resetAdvance.state);
     expect(regenerateAdvance.shouldRegenerateMaze).toBe(true);
@@ -73,6 +74,62 @@ describe('demo walker', () => {
     expect(regenerateAdvance.state.currentIndex).toBe(episode.raster.startIndex);
     expect(regenerateAdvance.state.loops).toBe(1);
     expect(regenerateAdvance.state.cue).toBe('spawn');
+  });
+
+  test('can perform an AI-only reset on the same maze before a later goal regeneration', () => {
+    const episode = generateMaze({
+      scale: 50,
+      seed: 902,
+      size: 'large',
+      family: 'split-flow',
+      checkPointModifier: 0.35,
+      shortcutCountModifier: 0.18
+    });
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    let state = createDemoWalkerState(episode, config);
+    let aiResetAdvance: ReturnType<typeof advanceDemoWalker> | null = null;
+    const maxSteps = Math.max(256, episode.raster.pathIndices.length * 6);
+
+    for (let step = 0; step < maxSteps; step += 1) {
+      const advance = advanceDemoWalker(episode, state, config);
+      state = advance.state;
+      if (advance.state.resetReason === 'ai-path-exhausted') {
+        aiResetAdvance = advance;
+        break;
+      }
+    }
+
+    expect(aiResetAdvance).not.toBeNull();
+    expect(aiResetAdvance?.shouldRegenerateMaze).toBeUndefined();
+    expect(aiResetAdvance?.state.phase).toBe('reset-hold');
+    expect(aiResetAdvance?.state.cue).toBe('reset');
+
+    const resetReplay = advanceDemoWalker(episode, aiResetAdvance!.state, config);
+    expect(resetReplay.shouldRegenerateMaze).toBeUndefined();
+    expect(resetReplay.nextSeed).toBeUndefined();
+    expect(resetReplay.state.currentIndex).toBe(episode.raster.startIndex);
+    expect(resetReplay.state.loops).toBe(1);
+    expect(resetReplay.state.aiLogicSwitch).toBe(true);
+
+    state = resetReplay.state;
+    let reachedGoal = false;
+    for (let step = 0; step < maxSteps; step += 1) {
+      const advance = advanceDemoWalker(episode, state, config);
+      state = advance.state;
+      if (state.phase === 'goal-hold') {
+        reachedGoal = true;
+        break;
+      }
+    }
+
+    expect(reachedGoal).toBe(true);
   });
 
   test('caps trail buffers instead of retaining the full path', () => {

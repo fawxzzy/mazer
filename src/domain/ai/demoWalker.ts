@@ -60,7 +60,7 @@ export interface DemoWalkerViewFrame {
 }
 
 export type DemoWalkerPhase = 'explore' | 'goal-hold' | 'reset-hold';
-type DemoWalkerResetReason = 'goal' | null;
+type DemoWalkerResetReason = 'goal' | 'ai-path-exhausted' | null;
 export type DemoTrailMode = 'explore' | 'backtrack' | 'goal';
 export type DemoWalkerCue = 'spawn' | 'anticipate' | 'explore' | 'dead-end' | 'backtrack' | 'reacquire' | 'goal' | 'reset';
 
@@ -83,6 +83,7 @@ export interface DemoWalkerState {
   pathCursor: number;
   canonicalCursor: number;
   telemetry: DemoRunnerTelemetry;
+  aiLogicSwitch: boolean;
 }
 
 interface DemoRunnerPlan {
@@ -91,6 +92,7 @@ interface DemoRunnerPlan {
   segmentTrailModes: readonly DemoTrailMode[];
   cueOverrides: readonly (DemoSegmentCue | DemoWalkerCue | null)[];
   telemetry: DemoRunnerTelemetry;
+  aiResetPathCursor: number | null;
 }
 
 const defaultConfig: DemoWalkerConfig = {
@@ -219,7 +221,8 @@ export const createDemoWalkerState = (
     cue: 'spawn',
     pathCursor: 0,
     canonicalCursor: runnerPlan.canonicalCursors[0] ?? 0,
-    telemetry: runnerPlan.telemetry
+    telemetry: runnerPlan.telemetry,
+    aiLogicSwitch: false
   };
 };
 
@@ -238,7 +241,29 @@ export const advanceDemoWalker = (
         ...state,
         phase: 'reset-hold',
         resetReason: 'goal',
-        cue: 'goal',
+        cue: 'reset',
+        stepsTaken: state.stepsTaken + 1
+      },
+      delayMs: config.cadence.resetHoldMs
+    };
+  }
+
+  const shouldTriggerAiReset = (
+    state.phase === 'explore'
+    && state.reachedGoal === false
+    && state.aiLogicSwitch === false
+    && config.behavior.enableRunnerMistakes === true
+    && config.behavior.emulateLogicSwitchPotentialCheckBug === true
+    && runnerPlan.aiResetPathCursor !== null
+    && state.pathCursor >= runnerPlan.aiResetPathCursor
+  );
+  if (shouldTriggerAiReset) {
+    return {
+      state: {
+        ...state,
+        phase: 'reset-hold',
+        resetReason: 'ai-path-exhausted',
+        cue: 'reset',
         stepsTaken: state.stepsTaken + 1
       },
       delayMs: config.cadence.resetHoldMs
@@ -246,14 +271,21 @@ export const advanceDemoWalker = (
   }
 
   if (state.phase === 'reset-hold') {
+    const nextState = createDemoWalkerState(episode, config);
+    const shouldRegenerateMaze = state.resetReason === 'goal';
     return {
       state: {
-        ...createDemoWalkerState(episode, config),
-        loops: state.loops + 1
+        ...nextState,
+        loops: state.loops + 1,
+        aiLogicSwitch: state.resetReason === 'ai-path-exhausted'
+          ? !state.aiLogicSwitch
+          : false
       },
       delayMs: config.cadence.exploreStepMs,
-      shouldRegenerateMaze: true,
-      nextSeed: config.seed + ((state.loops + 1) * config.behavior.regenerateSeedStep)
+      shouldRegenerateMaze: shouldRegenerateMaze ? true : undefined,
+      nextSeed: shouldRegenerateMaze
+        ? config.seed + ((state.loops + 1) * config.behavior.regenerateSeedStep)
+        : undefined
     };
   }
 
@@ -284,7 +316,8 @@ export const advanceDemoWalker = (
       cue,
       pathCursor: nextCursor,
       canonicalCursor: runnerPlan.canonicalCursors[nextCursor] ?? state.canonicalCursor,
-      telemetry: runnerPlan.telemetry
+      telemetry: runnerPlan.telemetry,
+      aiLogicSwitch: state.aiLogicSwitch
     },
     delayMs: reachedGoal ? config.cadence.goalHoldMs : config.cadence.exploreStepMs
   };
@@ -442,7 +475,8 @@ const buildPreciseRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
       index >= segmentCount - 1 ? 'goal' : 'explore'
     )),
     cueOverrides: Array.from({ length: segmentCount }, () => null),
-    telemetry: EMPTY_TELEMETRY
+    telemetry: EMPTY_TELEMETRY,
+    aiResetPathCursor: null
   };
 };
 
@@ -506,6 +540,7 @@ const buildHumanizedRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     backtrackCount: 0,
     recoveryCount: 0
   };
+  let aiResetPathCursor: number | null = null;
 
   for (let canonicalCursor = 1; canonicalCursor < canonicalPath.length; canonicalCursor += 1) {
     const detour = selections.get(canonicalCursor - 1);
@@ -539,6 +574,9 @@ const buildHumanizedRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     canonicalCursors.push(canonicalCursor);
     segmentTrailModes.push(canonicalCursor >= canonicalPath.length - 1 ? 'goal' : 'explore');
     cueOverrides.push(detour ? 'reacquire' : null);
+    if (detour) {
+      aiResetPathCursor = routeIndices.length - 1;
+    }
   }
 
   return {
@@ -546,7 +584,8 @@ const buildHumanizedRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     canonicalCursors: Uint32Array.from(canonicalCursors),
     segmentTrailModes,
     cueOverrides,
-    telemetry
+    telemetry,
+    aiResetPathCursor
   };
 };
 
