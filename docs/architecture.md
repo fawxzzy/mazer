@@ -1,116 +1,85 @@
 # Architecture
 
-Initial foundation is organized into boot, scenes, domain, render, and ui layers.
+This document tracks the repo-level structure that is currently truthful for the active lane.
 
-## Maze domain (pure TypeScript)
+Current lane:
 
-The maze generation lane is implemented as an index-based, renderer-agnostic domain module under `src/domain`.
+- `legacy Unreal truth -> web app reset/port`
 
-- `src/domain/rng`
-  - Deterministic seeded RNG (`Mulberry32`) used by all generation steps for reproducible mazes.
-- `src/domain/maze/grid.ts`
-  - Grid construction and cardinal neighbor indexing in ordered slots `[top, bottom, left, right]`.
-  - Border handling is encoded via `neighborCount` and floor defaults.
-- `src/domain/maze/path.ts`
-  - Legacy-ported checkpoint-driven path carving with mixed neighbor strategy:
-    - closest-to-checkpoint candidate
-    - random candidate
-    - direction-preferred candidate
-  - Local adjacency validation prevents dense/invalid routing and preserves the Unreal backtracking rules.
-  - Checkpoint sampling now follows the recovered legacy banding (`scale * 3 .. scale^2 - 1`) instead of scanning the full board.
-  - Legacy backtracking behavior is preserved, including the "record new closest path entries, then retry from the newest viable one" quirk.
-- `src/domain/maze/shortcuts.ts`
-  - Shortcut pass opens qualifying wall bridges only when opposite path corridors exist, matching legacy corridor-bridge behavior.
-  - Wall candidates intentionally remain duplicated because the Unreal `WallArray` accumulated duplicates and that weighting affects shortcut picks.
-- `src/domain/maze/core.ts`
-  - Wilson remains the generation truth.
-  - A corridor-graph solve layer collapses straight corridors into weighted edges, keeps junctions/dead ends/start/goal as nodes, and runs a bidirectional solve before expanding back to the canonical tile path for rendering.
-- `src/domain/maze/generator.ts`
-  - Orchestrates deterministic build/raster steps and keeps only the current episode in memory.
-  - Presentation presets are lightweight post-processing, not alternate substrate generators:
-    - `classic`: baseline Wilson presentation
-    - `braided`: reduced dead ends via extra braid pass
-    - `framed`: subtle perimeter/composition bias for presentation modes
-    - `blueprint-rare`: rare architectural cross-corridor pass for blueprint mood
+Primary cross-check:
 
-### Legacy parity notes
+- [`docs/current-truth.md`](./current-truth.md)
+- [`docs/system-map.md`](./system-map.md)
 
-- Ported directly from recovered Unreal code:
-  - checkpoint count and shortcut budget formulas
-  - checkpoint validity rules
-  - mixed next-tile chooser ordering
-  - backtracking path selection behavior
-  - duplicate wall accumulation before shortcut carving
-  - reset loop semantics of "consume reset flag, rebuild, return ready state"
-- Approximated on purpose:
-  - legacy randomness mixed `std::mt19937`, `std::rand`, and `std::time(0)` reseeding; the rebuild uses one deterministic seeded stream so the same input seed always reproduces the same maze
-  - legacy menu/demo generation yielded partial work across ticks; the pure TS domain runs the same logic to completion in one call
+## Active runtime
 
-### Output contract
+The active shipped/runtime path is a small Phaser shell with one boot scene and one owner scene:
 
-`generateMaze` returns a `MazeBuildResult` designed for future renderer + demo AI consumers:
+- `src/boot/main.ts`
+  - clears localhost service-worker/cache drift before boot
+  - starts Phaser with the repo-owned config
+- `src/boot/phaserConfig.ts`
+  - wires only `BootScene` and `MenuScene`
+- `src/scenes/BootScene.ts`
+  - immediately routes to `MenuScene`
+- `src/scenes/MenuScene.ts`
+  - owns the front door, active play, HUD, overlays, reset flow, visual diagnostics, and menu demo
 
-- flat `tiles` array with index/x/y/neighbor metadata
-- explicit `startIndex` and `endIndex`
-- `pathIndices` and `wallIndices`
-- deterministic seed + budget counters (`checkpointCount`, `shortcutsCreated`)
-- presentation preset metadata for the current episode only
+There is no separate active `GameScene` or `OptionsScene` in the reset lane. Those concerns now live inside `MenuScene` as mode/overlay state.
 
-No Phaser scene code is used inside this lane.
+## Reset-lane ownership
 
-### Runtime patterns
+The reset lane is intentionally split into small owner modules:
 
-- Pattern: compress corridors before solving when the runtime representation is corridor-heavy.
-- Pattern: apply deployment profile defaults first, then explicit URL params as overrides.
-- Rule: deployment profiles may tune presentation defaults, but must never fork the maze substrate.
-- Failure mode: optional presentation polish must never be able to black-screen the board/title path.
-- Failure mode: presentation-specific polish must degrade to visible board/title output, never blank the screen.
+- `src/legacy-runtime/legacyDefaults.ts`
+  - legacy settings defaults and front-door button truth
+- `src/legacy-runtime/legacyMenuLayout.ts`
+  - board/title/button placement across desktop and portrait
+- `src/legacy-runtime/legacyOptionFields.ts`
+  - menu/pause editable field parsing and application
+- `src/legacy-runtime/legacyMenuSnapshot.ts`
+  - fixed screenshot-shaped menu board blueprint for the front door
+- `src/legacy-runtime/legacyMaze.ts`
+  - generated active-play maze builder plus menu-snapshot adaptation
+- `src/legacy-runtime/legacyDemoWalker.ts`
+  - adapter from legacy maze snapshots into the repo-owned demo walker lane
+- `src/domain/ai/demoWalker.ts`
+  - deterministic attract/demo traversal behavior
 
-### Deployment profiles
+## Runtime split that must stay stable
 
-- `profile=tv|obs|mobile|recovery` is a presentation-only resolver that sits on top of the existing URL param launch path.
-- Profiles may adjust ambient defaults, chrome bias, spacing, drift, and safe framing, but they do not create alternate maze generation, solver, or retention paths.
-- `profile=recovery` is the current design-recovery inspection surface for the shipping 2D shell. It gives the board more weight, narrows the title chrome, quiets background motion, and on wide screens can shift the spectator feed to a side rail so the board gets more vertical room without opening the parked planet/3D lane.
-- The menu scene remains single-source for board state, hidden-tab suspend/resume, and current-episode-only retention.
+The current repo truth depends on this boundary:
 
-## Scene map
+- menu mode uses the fixed legacy snapshot lane
+- play mode uses the generated solvable maze lane
+- overlays are single-owner and single-active
+- menu screenshot parity work must not silently mutate play behavior
 
-Current scene flow keeps menu-first startup with an attract-mode shell:
+## Verification
 
-- `BootScene`
-  - one-step startup scene that always routes into `MenuScene`.
-- `MenuScene`
-  - renders the starfield, translucent green `Mazer` title, the centered square live maze demo, and one subtle gear utility affordance in the top-right.
-  - owns the attract-mode loop by scheduling deterministic demo walker phases (`explore`, `backtrack`, `goal-hold`, `reset-hold`) from the pure AI lane.
-  - owns the overlay event bus and enforces one active overlay at a time through `OverlayManager`.
-- `GameScene`
-  - manual-play QA run entered from `OptionsScene` or hidden keyboard shortcuts on the menu.
-- `OptionsScene`
-  - compact secondary sheet opened from `MenuScene` via the gear affordance or `Esc`.
-  - exposes low-priority manual play for local QA and a single return action.
+The reset lane closes against:
 
-Overlay behavior is explicit and centralized: only `OptionsScene` can be active over the menu at once.
+- `npm run legacy:extract`
+- `npm run verify`
 
-## UI + render support modules
+Supporting proof surfaces still matter for diagnosis and visual comparison:
 
-- `src/render/palette.ts`
-  - retro color tokens for background, board, and UI composition.
-- `src/ui/menuButton.ts`
-  - reusable retro action button primitive.
-- `src/ui/overlaySheet.ts`
-  - shared dimmer + panel composition for overlay scenes.
-- `src/ui/overlayManager.ts`
-  - scene-level overlay guard (`open`, `close`, `closeActive`) that prevents multi-overlay stacking.
+- `npm run visual:matrix -- --preset core --skip-build true`
+- `npm run edge:live`
 
-## Local data contract
+## Parked and support lanes
 
-Persistent browser data is versioned and namespaced under `mazer:v1:*`.
+These folders exist in the repo but are not current reset-lane shipping truth:
 
-- `mazer:v1:meta`
-  - schema marker used for safe boot cleanup and future migrations.
-- `mazer:v1:bestTimes`
-  - bounded list of best local completion times, deduped by maze seed and sorted fastest-first.
-- `mazer:v1:settings`
-  - reserved for future durable player settings; transient runtime state is intentionally excluded.
+- `src/future-runtime/**`
+  - parked future/planet and future Phaser experiments
+- `src/mazer-core/**`
+  - bounded research/runtime-core lane
+- `src/visual-proof/**`
+  - proof-only environment and rendering lane
+- `src/topology-proof/**`
+  - topology/readability proof surfaces
+- `src/watch-pass-*`
+  - separate watch-pass/product experiments
 
-Boot cleanup removes only Mazer-owned legacy keys, malformed entries, and prior-version artifacts. Runtime-only state such as live trails, demo history, overlays, and debug noise stays in memory and is capped instead of persisted.
+They remain important support material, but they are not the source of truth for the current menu/play port lane.
