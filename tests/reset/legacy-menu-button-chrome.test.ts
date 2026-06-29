@@ -31,10 +31,10 @@ describe('legacy menu button chrome', () => {
       isPrimary: false
     });
 
-    expect(secondary.fontSize).toBeGreaterThanOrEqual(20);
-    expect(secondary.fontSize).toBeLessThanOrEqual(32);
-    expect(secondary.baseAlpha).toBeGreaterThan(0.06);
-    expect(secondary.hoverAlpha).toBeGreaterThan(0.1);
+    expect(secondary.fontSize).toBeGreaterThanOrEqual(22);
+    expect(secondary.fontSize).toBeLessThanOrEqual(36);
+    expect(secondary.baseAlpha).toBeGreaterThan(0.075);
+    expect(secondary.hoverAlpha).toBeGreaterThan(0.12);
     expect(secondary.strokeWidth).toBe(2);
   });
 });

@@ -22,23 +22,23 @@ export const resolveLegacyMenuButtonChrome = (
   input: ResolveLegacyMenuButtonChromeInput
 ): LegacyMenuButtonChrome => {
   const { height, isPrimary, textLength, width } = input;
-  const fitSize = Math.floor((width * 1.34) / Math.max(4, textLength));
+  const fitSize = Math.floor((width * 1.4) / Math.max(4, textLength));
   const fontSize = Math.max(
-    isPrimary ? 24 : 20,
+    isPrimary ? 26 : 22,
     Math.min(
-      isPrimary ? 42 : 32,
-      Math.min(Math.round(height * (isPrimary ? 0.62 : 0.54)), fitSize)
+      isPrimary ? 46 : 36,
+      Math.min(Math.round(height * (isPrimary ? 0.66 : 0.58)), fitSize)
     )
   );
 
   return {
-    baseAlpha: isPrimary ? 0.09 : 0.068,
-    baseStroke: isPrimary ? 0.82 : 0.68,
+    baseAlpha: isPrimary ? 0.105 : 0.08,
+    baseStroke: isPrimary ? 0.86 : 0.72,
     fontSize,
-    hoverAlpha: isPrimary ? 0.16 : 0.12,
+    hoverAlpha: isPrimary ? 0.18 : 0.135,
     hoverLabelAlpha: 1,
-    hoverStroke: isPrimary ? 0.96 : 0.82,
-    labelAlpha: isPrimary ? 0.99 : 0.95,
+    hoverStroke: isPrimary ? 0.98 : 0.86,
+    labelAlpha: isPrimary ? 1 : 0.965,
     strokeColor: isPrimary ? 0xc9c0d7 : 0xb4abc3,
     strokeWidth: 2,
     textColor: isPrimary ? '#1f9f2f' : '#188826'
