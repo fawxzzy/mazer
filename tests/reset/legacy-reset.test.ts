@@ -4,6 +4,8 @@ import { createLegacyMaze, createLegacyMenuMaze } from '../../src/legacy-runtime
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
+  createLegacyMenuSnapshotDemoWalkerConfig,
+  LEGACY_MENU_SNAPSHOT_PREROLL_STEPS,
   resolveLegacyPointFromDemoIndex,
   resolveLegacyTrailFromDemoSteps
 } from '../../src/legacy-runtime/legacyDemoWalker';
@@ -69,6 +71,15 @@ describe('legacy reset lane', () => {
     expect(resolveLegacyTrailFromDemoSteps(state.trailSteps, episode.raster.width)).toEqual([maze.start]);
   });
 
+  test('uses a deterministic deep-preroll config for the fixed legacy menu snapshot', () => {
+    const snapshotConfig = createLegacyMenuSnapshotDemoWalkerConfig(3749);
+    const genericConfig = createLegacyMenuDemoWalkerConfig(3749);
+
+    expect(snapshotConfig.behavior.enableRunnerMistakes).toBe(false);
+    expect(snapshotConfig.behavior.prerollSteps).toBe(LEGACY_MENU_SNAPSHOT_PREROLL_STEPS);
+    expect(genericConfig.behavior.enableRunnerMistakes).toBe(true);
+  });
+
   test('keeps the active-play HUD minimal and legacy-shaped', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
@@ -77,6 +88,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).not.toContain('WASD or arrows to move   P to pause');
     expect(menuSceneSource).toContain('createLegacyDemoWalkerEpisode(this.maze)');
     expect(menuSceneSource).toContain('createLegacyMenuDemoWalkerConfig(this.maze.seed)');
+    expect(menuSceneSource).toContain('createLegacyMenuSnapshotDemoWalkerConfig(this.maze.seed)');
     expect(menuSceneSource).toContain('advanceDemoWalker(this.menuDemoEpisode, this.menuDemoState, this.menuDemoConfig)');
   });
 

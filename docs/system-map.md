@@ -114,6 +114,12 @@ What `verify` currently means:
   - live route/console proof
 - in-app browser on localhost
   - fastest human truth check for the active surface
+- `window.__MAZER_VISUAL_DIAGNOSTICS__`
+  - board bounds plus live reset-lane runtime pointers:
+  - mode / overlay
+  - maze size, player, goal
+  - trail tail
+  - menu-demo phase / cue / path cursor / preroll / wrong-turn policy
 
 ### Repo-owned tests most relevant to this lane
 

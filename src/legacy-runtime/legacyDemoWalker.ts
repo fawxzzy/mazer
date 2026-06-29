@@ -4,6 +4,8 @@ import { TILE_END, TILE_FLOOR, TILE_PATH, createGrid, indexFromCoordinates, xFro
 import { legacyTuning } from '../config/tuning';
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 
+export const LEGACY_MENU_SNAPSHOT_PREROLL_STEPS = 56;
+
 const pointToIndex = (point: LegacyPoint, width: number): number => indexFromCoordinates(point.x, point.y, width);
 
 const inferLegacyMazeSize = (scale: number): MazeSize => {
@@ -40,6 +42,22 @@ export const createLegacyMenuDemoWalkerConfig = (seed: number): DemoWalkerConfig
     enableRunnerMistakes: true
   }
 });
+
+export const createLegacyMenuSnapshotDemoWalkerConfig = (seed: number): DemoWalkerConfig => {
+  const baseConfig = createLegacyMenuDemoWalkerConfig(seed);
+
+  return {
+    ...baseConfig,
+    behavior: {
+      ...baseConfig.behavior,
+      enableRunnerMistakes: false,
+      prerollSteps: Math.max(
+        baseConfig.behavior.prerollSteps ?? 0,
+        LEGACY_MENU_SNAPSHOT_PREROLL_STEPS
+      )
+    }
+  };
+};
 
 export const createLegacyDemoWalkerEpisode = (maze: LegacyMazeSnapshot): MazeEpisode => {
   const tiles = createGrid(maze.size, maze.size);
