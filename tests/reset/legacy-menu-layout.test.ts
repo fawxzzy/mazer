@@ -10,11 +10,14 @@ describe('legacy menu layout', () => {
     expect(Math.abs(boardCenter - (layout.width / 2))).toBeLessThanOrEqual(2);
     expect(layout.centerButtonY).toBeLessThan(layout.buttonY);
     expect(layout.centerButtonWidth).toBeGreaterThan(layout.buttonWidth);
-    expect(layout.buttonY).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize - Math.round(layout.buttonHeight * 0.25));
+    expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
+    expect(layout.buttonY - (layout.buttonHeight / 2)).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 2);
     expect(layout.buttonY).toBeLessThan(Math.round(layout.height * 0.9));
-    expect(layout.buttonHeight).toBeGreaterThanOrEqual(80);
+    expect(layout.buttonHeight).toBeGreaterThanOrEqual(48);
+    expect(layout.buttonHeight).toBeLessThanOrEqual(72);
     expect(layout.leftButtonX).toBeLessThan(layout.boardLeft);
     expect(layout.rightButtonX).toBeGreaterThan(layout.boardLeft + layout.boardSize);
+    expect(layout.buttonWidth).toBeLessThanOrEqual(224);
   });
 
   test('keeps the portrait board dominant with separated buttons near the board edge', () => {
@@ -23,10 +26,11 @@ describe('legacy menu layout', () => {
     expect(layout.boardSize).toBeLessThan(layout.width);
     expect(layout.centerButtonY).toBeLessThan(layout.buttonY);
     expect(layout.centerButtonWidth).toBeGreaterThanOrEqual(layout.buttonWidth);
-    expect(layout.centerButtonY).toBeGreaterThan(layout.boardTop + layout.boardSize - Math.round(layout.buttonHeight * 0.12));
+    expect(layout.centerButtonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
     expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
     expect(layout.buttonY).toBeLessThan(layout.height);
     expect(layout.buttonWidth).toBeLessThanOrEqual(144);
+    expect(layout.buttonHeight).toBeLessThanOrEqual(64);
     expect(layout.leftButtonX + (layout.buttonWidth / 2)).toBeLessThan(layout.centerButtonX - 8);
     expect(layout.rightButtonX - (layout.buttonWidth / 2)).toBeGreaterThan(layout.centerButtonX + 8);
   });

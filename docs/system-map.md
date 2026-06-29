@@ -30,6 +30,26 @@ Meaning:
 - `BootScene.ts` is only a handoff
 - `MenuScene.ts` is the real application surface for the reset lane
 
+## Full runtime directory map
+
+Use this before large edits so you know the whole app, not just the current screen:
+
+| Area | Ownership |
+| --- | --- |
+| `src/boot/*` | browser boot, localhost cleanup, Phaser startup |
+| `src/scenes/*` | runtime shell, front door, overlays, play loop, HUD, live presentation |
+| `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, option field parsing |
+| `src/domain/ai/*` | deterministic demo walker stepping and attract behavior |
+| `src/domain/maze/*` | generated maze/runtime domain logic used outside the fixed menu snapshot |
+| `tests/reset/*` | legacy reset-lane contracts and guardrails |
+| `tests/scenes/*` | scene composition, presentation, and live-shell proof guards |
+| `legacy/*` | restored source truth inputs and screenshot truth |
+| `docs/current-truth.md` + `docs/research/*` | lane contract, parity gaps, port sequencing |
+
+Rule:
+
+- if a tweak touches more than one row, map that dependency chain before editing
+
 ## Whole-application owner map
 
 Use this as the top-level "where does this actually live?" map before editing:
