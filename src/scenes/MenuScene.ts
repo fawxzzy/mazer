@@ -674,7 +674,7 @@ export class MenuScene extends Phaser.Scene {
           this.createButton(
             this.layout.centerButtonX,
             this.layout.centerButtonY,
-            this.layout.buttonWidth,
+            this.layout.centerButtonWidth,
             this.layout.buttonHeight,
             centerLabel,
             () => this.startPlayMode()

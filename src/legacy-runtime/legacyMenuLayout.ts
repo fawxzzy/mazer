@@ -12,6 +12,7 @@ export interface LegacyMenuLayout {
   footerY: number;
   buttonY: number;
   centerButtonY: number;
+  centerButtonWidth: number;
   leftButtonX: number;
   centerButtonX: number;
   rightButtonX: number;
@@ -64,6 +65,9 @@ export const resolveLegacyMenuLayout = (
       buttonY - Math.round(buttonHeight * 0.3)
     ));
   const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.23 : 0.13), isPortrait ? 108 : 150, isPortrait ? 156 : 252));
+  const centerButtonWidth = isPortrait
+    ? buttonWidth
+    : Math.round(clamp(buttonWidth * 1.55, buttonWidth + 36, 312));
   const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.145 : 0.17), 58, 320));
   const centerButtonX = Math.round(width * 0.5);
 
@@ -79,6 +83,7 @@ export const resolveLegacyMenuLayout = (
     footerY: height - 18,
     buttonY,
     centerButtonY,
+    centerButtonWidth,
     leftButtonX: sideButtonInset,
     centerButtonX,
     rightButtonX: width - sideButtonInset,
