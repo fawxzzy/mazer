@@ -673,7 +673,7 @@ export class MenuScene extends Phaser.Scene {
           ),
           this.createButton(
             this.layout.centerButtonX,
-            this.layout.buttonY,
+            this.layout.centerButtonY,
             this.layout.buttonWidth,
             this.layout.buttonHeight,
             centerLabel,
