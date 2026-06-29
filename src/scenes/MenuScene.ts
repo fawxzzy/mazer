@@ -425,18 +425,20 @@ export class MenuScene extends Phaser.Scene {
     const { width, height } = this.layout;
     this.backdropGraphics.clear();
 
-    const fieldColor = this.settings.darkMode ? 0x22172d : 0x2c1f3b;
-    const glowColor = this.settings.darkMode ? 0x3b2a4f : 0x563b74;
+    const fieldColor = this.settings.darkMode ? 0x16101c : 0x2c1f3b;
+    const glowColor = this.settings.darkMode ? 0x2a1d3a : 0x563b74;
+    const glowAlpha = this.settings.darkMode ? 0.09 : 0.14;
+    const starAlphaScale = this.settings.darkMode ? 0.74 : 1;
 
     this.backdropGraphics.fillStyle(fieldColor, 1);
     this.backdropGraphics.fillRect(0, 0, width, height);
-    this.backdropGraphics.fillStyle(glowColor, 0.14);
+    this.backdropGraphics.fillStyle(glowColor, glowAlpha);
     this.backdropGraphics.fillCircle(width * 0.22, height * 0.18, Math.min(width, height) * 0.1);
     this.backdropGraphics.fillCircle(width * 0.84, height * 0.16, Math.min(width, height) * 0.08);
     this.backdropGraphics.fillCircle(width * 0.72, height * 0.78, Math.min(width, height) * 0.06);
 
     for (const star of this.stars) {
-      this.backdropGraphics.fillStyle(0xffffff, star.alpha);
+      this.backdropGraphics.fillStyle(0xffffff, star.alpha * starAlphaScale);
       this.backdropGraphics.fillRect(
         Math.round(star.x * width),
         Math.round(star.y * height),
@@ -451,12 +453,16 @@ export class MenuScene extends Phaser.Scene {
   private drawStaticBoard(): void {
     const { boardLeft, boardTop, boardSize, tileSize } = this.layout;
     const isMenuMode = this.mode === 'menu';
-    const pathColor = isMenuMode ? 0x4b474e : linearColorToNumber(this.settings.pathColor);
-    const wallColor = isMenuMode ? 0x0d0a10 : linearColorToNumber(this.settings.wallColor);
-    const boardFill = this.settings.darkMode ? 0x221d25 : 0x4a454d;
-    const boardEdge = this.settings.darkMode ? 0x0f0b10 : 0x2f2830;
+    const pathColor = isMenuMode
+      ? (this.settings.darkMode ? 0x322f37 : 0x4b474e)
+      : linearColorToNumber(this.settings.pathColor);
+    const wallColor = isMenuMode
+      ? (this.settings.darkMode ? 0x060509 : 0x0d0a10)
+      : linearColorToNumber(this.settings.wallColor);
+    const boardFill = this.settings.darkMode ? 0x1f1a23 : 0x4a454d;
+    const boardEdge = this.settings.darkMode ? 0x09070b : 0x2f2830;
     const pathGlow = isMenuMode
-      ? 0x8f8a93
+      ? (this.settings.darkMode ? 0x7e7883 : 0x8f8a93)
       : (this.settings.darkMode ? 0xb3acb8 : 0xd0cad2);
 
     this.boardStaticGraphics.clear();
@@ -530,7 +536,11 @@ export class MenuScene extends Phaser.Scene {
       const alpha = this.mode === 'play'
         ? clamp(0.25 + ((index / Math.max(1, trail.length - 1)) * 0.75), 0.25, 1)
         : clamp(0.22 + ((index / Math.max(1, trail.length - 1)) * 0.82), 0.22, 1);
-      this.fillTile(this.boardDynamicGraphics, point, 0x14b8d9, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, alpha, 1);
+      const trailColor = this.settings.darkMode ? 0x10c8f2 : 0x14b8d9;
+      const trailAlpha = this.settings.darkMode && this.mode === 'menu'
+        ? clamp(alpha + 0.08, 0, 1)
+        : alpha;
+      this.fillTile(this.boardDynamicGraphics, point, trailColor, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, trailAlpha, 1);
     }
 
     this.fillTile(this.boardDynamicGraphics, this.player, 0xf2f4f8, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, 0);
