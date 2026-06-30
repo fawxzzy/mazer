@@ -12,17 +12,17 @@ export const resolveLegacyMenuTitlePresentation = (
   isPortrait: boolean
 ): LegacyMenuTitlePresentation => {
   const fontSize = Math.max(
-    isPortrait ? 78 : 152,
-    Math.round(boardSize * (isPortrait ? 0.205 : 0.244))
+    isPortrait ? 78 : 142,
+    Math.round(boardSize * (isPortrait ? 0.205 : 0.226))
   );
   const shadowOffsetX = Math.max(isPortrait ? 4 : 5, Math.round(tileSize * 0.12));
-  const shadowOffsetY = Math.max(isPortrait ? 6 : 8, Math.round(tileSize * (isPortrait ? 0.2 : 0.24)));
+  const shadowOffsetY = Math.max(isPortrait ? 6 : 7, Math.round(tileSize * (isPortrait ? 0.2 : 0.2)));
 
   return {
     fontSize,
     shadowOffsetX,
     shadowOffsetY,
-    shadowAlpha: isPortrait ? 0.5 : 0.48,
-    titleAlpha: isPortrait ? 0.84 : 0.82
+    shadowAlpha: isPortrait ? 0.5 : 0.44,
+    titleAlpha: isPortrait ? 0.84 : 0.8
   };
 };

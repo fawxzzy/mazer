@@ -23,8 +23,8 @@ describe('legacy menu layout', () => {
     expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(8);
     expect(layout.buttonWidth).toBeLessThanOrEqual(228);
     expect(layout.centerButtonWidth).toBeLessThanOrEqual(252);
-    expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.22));
-    expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.24));
+    expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.205));
+    expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.225));
   });
 
   test('keeps the portrait board dominant with separated buttons near the board edge', () => {
