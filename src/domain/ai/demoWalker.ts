@@ -134,22 +134,36 @@ const runnerPlanCache = new WeakMap<MazeEpisode, {
 
 const resolveSegmentDurations = (
   pathSegmentCount: number,
-  config: DemoWalkerConfig
+  config: DemoWalkerConfig,
+  runnerPlan?: DemoRunnerPlan
 ): number[] => {
   const configured = config.behavior.segmentDurationsMs ?? [];
   if (configured.length === pathSegmentCount && configured.every((value) => Number.isFinite(value) && value > 0)) {
     return configured.map((value) => Math.max(1, Math.round(value)));
   }
 
-  return Array.from({ length: pathSegmentCount }, () => Math.max(1, config.cadence.exploreStepMs));
+  return Array.from({ length: pathSegmentCount }, (_value, segmentIndex) => (
+    resolveSegmentDelayMs(segmentIndex, pathSegmentCount, config, runnerPlan)
+  ));
 };
 
 const resolveSegmentCue = (
   segmentIndex: number,
   lastPathIndex: number,
   progress: number,
-  config: DemoWalkerConfig
+  config: DemoWalkerConfig,
+  runnerPlan?: DemoRunnerPlan
 ): DemoWalkerCue => {
+  const planCue = runnerPlan?.cueOverrides[segmentIndex];
+  if (
+    planCue === 'anticipate'
+    || planCue === 'reacquire'
+    || planCue === 'dead-end'
+    || planCue === 'backtrack'
+  ) {
+    return planCue;
+  }
+
   const configuredCue = config.behavior.segmentCues?.[segmentIndex];
   if (
     configuredCue === 'anticipate'
@@ -160,7 +174,46 @@ const resolveSegmentCue = (
     return configuredCue;
   }
 
+  if (runnerPlan?.segmentTrailModes[segmentIndex] === 'backtrack') {
+    return 'backtrack';
+  }
+
   return segmentIndex >= lastPathIndex - 2 && progress >= 0.42 ? 'anticipate' : 'explore';
+};
+
+const resolveSegmentDelayMs = (
+  segmentIndex: number,
+  pathSegmentCount: number,
+  config: DemoWalkerConfig,
+  runnerPlan?: DemoRunnerPlan
+): number => {
+  const cue = resolveSegmentCue(segmentIndex, pathSegmentCount, 1, config, runnerPlan);
+  const trailMode = runnerPlan?.segmentTrailModes[segmentIndex] ?? 'explore';
+  const currentCanonicalCursor = runnerPlan?.canonicalCursors[segmentIndex] ?? segmentIndex;
+  const nextCanonicalCursor = runnerPlan?.canonicalCursors[segmentIndex + 1] ?? (segmentIndex + 1);
+  const isBranchCommit = (
+    cue === 'anticipate'
+    && trailMode === 'explore'
+    && currentCanonicalCursor === nextCanonicalCursor
+  );
+
+  if (cue === 'dead-end') {
+    return Math.max(1, config.cadence.decisionPauseMs);
+  }
+  if (cue === 'reacquire') {
+    return Math.max(1, config.cadence.branchResumeMs);
+  }
+  if (cue === 'backtrack' || trailMode === 'backtrack') {
+    return Math.max(1, config.cadence.backtrackStepMs);
+  }
+  if (isBranchCommit) {
+    return Math.max(1, config.cadence.branchCommitMs);
+  }
+  if (cue === 'anticipate') {
+    return Math.max(1, config.cadence.anticipationStepMs);
+  }
+
+  return Math.max(1, config.cadence.exploreStepMs);
 };
 
 const resolveDemoRunnerPlan = (
@@ -298,7 +351,8 @@ export const advanceDemoWalker = (
     : runnerPlan.segmentTrailModes[segmentIndex] ?? 'explore';
   const cue = reachedGoal
     ? 'goal'
-    : resolveSegmentCue(segmentIndex, lastCursor, 1, config);
+    : resolveSegmentCue(segmentIndex, lastCursor, 1, config, runnerPlan);
+  const segmentDelayMs = resolveSegmentDelayMs(segmentIndex, lastCursor, config, runnerPlan);
 
   return {
     state: {
@@ -319,7 +373,7 @@ export const advanceDemoWalker = (
       telemetry: runnerPlan.telemetry,
       aiLogicSwitch: state.aiLogicSwitch
     },
-    delayMs: reachedGoal ? config.cadence.goalHoldMs : config.cadence.exploreStepMs
+    delayMs: reachedGoal ? config.cadence.goalHoldMs : segmentDelayMs
   };
 };
 
@@ -345,7 +399,7 @@ export const resolveDemoWalkerViewFrame = (
   const resetHoldMs = Math.max(0, config.cadence.resetHoldMs);
   const visibleWindow = Math.max(1, trailWindow);
   const lastPathIndex = Math.max(0, path.length - 1);
-  const segmentDurations = resolveSegmentDurations(lastPathIndex, config);
+  const segmentDurations = resolveSegmentDurations(lastPathIndex, config, runnerPlan);
 
   if (path.length <= 1) {
     return {
@@ -408,7 +462,7 @@ export const resolveDemoWalkerViewFrame = (
       previousIndex: segment === 0 ? startIndex : (path[segment - 1] ?? currentIndex),
       direction: resolveDirectionBetween(currentIndex, nextIndex, episode.raster.width),
       progress,
-      cue: resolveSegmentCue(segment, lastPathIndex, progress, config),
+      cue: resolveSegmentCue(segment, lastPathIndex, progress, config, runnerPlan),
       trailStart: 0,
       trailLimit,
       canonicalCursor: runnerPlan.canonicalCursors[visibleCursor] ?? 0,

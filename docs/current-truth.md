@@ -49,7 +49,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `70%`
+- `71%`
 
 Why it is not higher yet:
 
@@ -67,6 +67,7 @@ Why it is not higher yet:
 - filled the fixed menu snapshot with staircase and right-spine silhouette branches for closer screenshot parity
 - title lockup is now tuned to sit deeper over the board instead of reading like a small shell label
 - legacy-style menu demo board/trail presentation
+- legacy menu demo now emits live recovery cues and cue-specific pacing instead of collapsing wrong-turn motion back to plain explore timing
 - legacy-style active play start path
 - legacy-style options/features/game-mode/pause overlay structure
 - repo-owned reset-lane tests in `tests/reset/`
@@ -118,6 +119,6 @@ The older visual matrix / Edge live proof lane is now archival for comparison, n
 - exact main-menu behavior polish
 - exact menu snapshot silhouette and attract-route parity
 - exact play HUD parity
-- exact demo AI parity
+- exact demo AI parity beyond the newly restored recovery cue/pacing lane
 - exact generation/reset-flow parity
 - final screenshot-grade visual parity

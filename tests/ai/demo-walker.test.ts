@@ -242,4 +242,106 @@ describe('demo walker', () => {
     expect(lateFrame.canonicalCursor).toBeLessThanOrEqual(episode.raster.pathIndices.length - 1);
     expect(firstFrame.canonicalCursor).toBeGreaterThanOrEqual(0);
   });
+
+  test('surfaces branch, dead-end, backtrack, and reacquire cues with cue-specific delays', () => {
+    const episode = generateMaze({
+      scale: 50,
+      seed: 902,
+      size: 'large',
+      family: 'split-flow',
+      checkPointModifier: 0.35,
+      shortcutCountModifier: 0.18
+    });
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    let state = createDemoWalkerState(episode, config);
+    let branchCommitAdvance: ReturnType<typeof advanceDemoWalker> | null = null;
+    let deadEndAdvance: ReturnType<typeof advanceDemoWalker> | null = null;
+    let backtrackAdvance: ReturnType<typeof advanceDemoWalker> | null = null;
+    let reacquireAdvance: ReturnType<typeof advanceDemoWalker> | null = null;
+    const maxSteps = Math.max(256, episode.raster.pathIndices.length * 8);
+
+    for (let step = 0; step < maxSteps; step += 1) {
+      const previousState = state;
+      const advance = advanceDemoWalker(episode, state, config);
+
+      if (
+        branchCommitAdvance === null
+        && advance.state.cue === 'anticipate'
+        && advance.state.canonicalCursor === previousState.canonicalCursor
+      ) {
+        branchCommitAdvance = advance;
+      }
+      if (deadEndAdvance === null && advance.state.cue === 'dead-end') {
+        deadEndAdvance = advance;
+      }
+      if (backtrackAdvance === null && advance.state.cue === 'backtrack') {
+        backtrackAdvance = advance;
+      }
+      if (reacquireAdvance === null && advance.state.cue === 'reacquire') {
+        reacquireAdvance = advance;
+      }
+
+      state = advance.state;
+      if (branchCommitAdvance && deadEndAdvance && backtrackAdvance && reacquireAdvance) {
+        break;
+      }
+    }
+
+    expect(branchCommitAdvance).not.toBeNull();
+    expect(branchCommitAdvance?.delayMs).toBe(config.cadence.branchCommitMs);
+    expect(deadEndAdvance).not.toBeNull();
+    expect(deadEndAdvance?.delayMs).toBe(config.cadence.decisionPauseMs);
+    expect(backtrackAdvance).not.toBeNull();
+    expect(backtrackAdvance?.delayMs).toBe(config.cadence.backtrackStepMs);
+    expect(reacquireAdvance).not.toBeNull();
+    expect(reacquireAdvance?.delayMs).toBe(config.cadence.branchResumeMs);
+  });
+
+  test('view frames expose recovery cues during deterministic wrong-turn playback', () => {
+    const episode = generateMaze({
+      scale: 50,
+      seed: 902,
+      size: 'large',
+      family: 'split-flow',
+      checkPointModifier: 0.35,
+      shortcutCountModifier: 0.18
+    });
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    let state = createDemoWalkerState(episode, config);
+    let elapsedMs = config.cadence.spawnHoldMs;
+    const seenCues = new Set<string>();
+    const maxSteps = Math.max(256, episode.raster.pathIndices.length * 8);
+
+    for (let step = 0; step < maxSteps; step += 1) {
+      const advance = advanceDemoWalker(episode, state, config);
+      const sampleElapsedMs = elapsedMs + Math.max(1, Math.floor(advance.delayMs / 2));
+      const frame = resolveDemoWalkerViewFrame(episode, sampleElapsedMs, config, 8);
+
+      seenCues.add(frame.cue);
+      elapsedMs += advance.delayMs;
+      state = advance.state;
+
+      if (seenCues.has('dead-end') && seenCues.has('backtrack') && seenCues.has('reacquire')) {
+        break;
+      }
+    }
+
+    expect(seenCues.has('dead-end')).toBe(true);
+    expect(seenCues.has('backtrack')).toBe(true);
+    expect(seenCues.has('reacquire')).toBe(true);
+  });
 });

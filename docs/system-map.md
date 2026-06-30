@@ -342,6 +342,7 @@ Rule:
   - fixed-snapshot menu-only demo policy and deterministic preroll
 - `src/domain/ai/demoWalker.ts`
   - deterministic demo stepping, backtracking, goal hold, reset hold
+  - cue overrides and cue-specific pacing for branch commit, dead-end, backtrack, and reacquire beats
 
 Boundary:
 

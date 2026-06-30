@@ -2,7 +2,7 @@
 
 Date: 2026-06-29
 Status: active
-Current marker: `70%`
+Current marker: `71%`
 
 ## Intent
 
@@ -65,14 +65,14 @@ The current marker is the sum of the awarded points below.
 | Overlay family and field responsibilities | `14` | `10` | partial | `src/legacy-runtime/legacyOptionFields.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, localhost | options/features/game-modes/pause fields still need field-by-field exactness and routing verification |
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | exact movement edge cases and return/reset timing still need tighter legacy proof |
 | Generation lifecycle exactness | `16` | `6` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts` | current build path is still an approximation, not the full staged legacy process pipeline |
-| Demo route, backtracking, and pacing | `12` | `7` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, localhost | exact backtrack policy, cadence, and reset semantics are not yet fully legacy-exact |
+| Demo route, backtracking, and pacing | `12` | `8` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, localhost | recovery cues and cue-specific pacing now drive the live route, but full legacy reset semantics and final backtrack exactness still remain open |
 | In-game HUD and goal-arrow parity | `8` | `6` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, direct play-route screenshot, localhost | HUD compactness is now closer to the legacy minimal contract, but final exactness and stronger repo-owned play proof still remain open |
 
 Current total:
 
-- `70 / 100`
+- `71 / 100`
 
-## Why the marker is held at 70%
+## Why the marker is held at 71%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -84,7 +84,7 @@ The repo is materially past the "rough prototype" stage:
 But `100%` would still be dishonest today because the biggest remaining gaps are not cosmetic:
 
 - generation/reset lifecycle is still approximate
-- demo route semantics are still partial
+- demo route semantics are still partial even after recovery cues/pacing were restored
 - HUD parity is incomplete
 - screenshot-grade menu material/composition is not fully closed
 - some overlay and front-door responsibilities still need exactness passes
@@ -112,10 +112,9 @@ Do not ratchet for:
 Keep the remaining work bounded in this order unless proof shows a different blocker:
 
 1. menu board material / tile read
-2. demo route / pacing exactness
-3. active-play HUD exactness
-4. generation/reset staged lifecycle exactness
-5. overlay field-by-field responsibility cleanup
+2. active-play HUD exactness
+3. generation/reset staged lifecycle exactness
+4. overlay field-by-field responsibility cleanup
 
 Each future packet should name:
 
