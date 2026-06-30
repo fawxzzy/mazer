@@ -95,6 +95,7 @@ But `100%` would still be dishonest today because the biggest remaining gaps are
 Current proof note:
 
 - live runtime diagnostics are now actually bridged through `MenuScene` and covered by repo-owned tests
+- the visible runtime panel now also shows the active menu-demo cue and whether the front-door snapshot is using the mistake-enabled legacy lane
 - the localhost right-pane browser remains useful for visual truth on the single `4173` preview server
 - direct browser-automation readback of `window.__MAZER_*` globals is still browser-owned and flaky, but runtime diagnostics now have a DOM-backed fallback surface and visible panel so that seam no longer blocks localhost proof
 

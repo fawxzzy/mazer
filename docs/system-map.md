@@ -93,7 +93,7 @@ This is the active state contract for the current app front door.
 | menu demo episode/config/state | `MazeEpisode`, `DemoWalkerConfig`, `DemoWalkerState` | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | menu-only attract route and preroll truth |
 | player/trail/goal live state | `player`, `trail`, `goal` | `src/scenes/MenuScene.ts` | trail presentation differs between menu and play, but ownership stays local to the scene |
 | visual diagnostics | `window.__MAZER_VISUAL_DIAGNOSTICS__` | `src/scenes/MenuScene.ts` | visual proof scripts treat this as route-aware readback, not gameplay truth |
-| runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics`, `#mazer-runtime-diagnostics` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; browser automation still may not see the `window` globals directly, but the DOM attribute and visible panel are repo-owned fallback surfaces |
+| runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics`, `#mazer-runtime-diagnostics` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; browser automation still may not see the `window` globals directly, but the DOM attribute and visible panel are repo-owned fallback surfaces and now expose active menu-demo cue plus mistake-enabled lane state |
 
 ## End-to-end flow map
 
