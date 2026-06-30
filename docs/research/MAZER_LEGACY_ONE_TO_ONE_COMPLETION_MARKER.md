@@ -90,6 +90,12 @@ But `100%` would still be dishonest today because the biggest remaining gaps are
 - HUD parity is closer, but not final
 - screenshot-grade menu material/composition is not fully closed
 
+Current proof note:
+
+- live runtime diagnostics are now actually bridged through `MenuScene` and covered by repo-owned tests
+- the localhost right-pane browser remains useful for visual truth on the single `4173` preview server
+- direct browser-automation readback of `window.__MAZER_*` globals is still a current observability seam and should not be mistaken for missing repo wiring
+
 ## Ratchet rule
 
 The marker may move only when a bounded legacy-owned segment changes state with proof.

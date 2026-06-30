@@ -223,6 +223,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('entryStageId: this.pendingGenerationRequest?.gate.entryStageId ?? null');
     expect(menuSceneSource).toContain('processStageIds: [...(this.pendingGenerationRequest?.processStageIds ?? [])]');
     expect(menuSceneSource).toContain('executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({');
+    expect(menuSceneSource).toContain('resolveMenuSceneRuntimeConfig(runtimeSearch, {');
+    expect(menuSceneSource).toContain('publishMenuSceneRuntimeDiagnostics({');
+    expect(menuSceneSource).toContain('clearMenuSceneRuntimeDiagnostics();');
   });
 
   test('defers overlay rebuild travel until closing the options surface', () => {

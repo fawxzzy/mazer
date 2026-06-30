@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { DemoWalkerConfig, DemoWalkerState } from '../domain/ai';
 import type { MazeEpisode } from '../domain/maze';
 import { markMazerBootStatus } from '../boot/bootStatus';
+import { legacyTuning } from '../config/tuning';
 import {
   LEGACY_DEFAULTS,
   MAIN_MENU_BUTTONS,
@@ -68,6 +69,18 @@ import {
   createLegacyMenuDemoWalkerConfig,
 } from '../legacy-runtime/legacyDemoWalker';
 import { resolveLegacyMenuPathRenderFrame } from '../legacy-runtime/legacyMenuRender';
+import {
+  clearMenuSceneRuntimeDiagnostics,
+  nextMenuSceneInstanceId,
+  publishMenuSceneRuntimeDiagnostics,
+  resolveMenuScenePerformanceMode,
+  resolveMenuSceneRuntimeConfig,
+  summarizeMenuSceneFrameWindow,
+  summarizeMenuSceneRuntimeFeed,
+  type MenuScenePerformanceMode,
+  type MenuSceneRuntimeConfig
+} from './menuRuntimeDiagnostics';
+import { summarizeTelemetrySemantics } from '../telemetry';
 
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
@@ -345,6 +358,25 @@ export class MenuScene extends Phaser.Scene {
   private backdropDirty = true;
   private uiDirty = true;
   private visualDiagnosticsRevision = 0;
+  private runtimeDiagnosticsConfig: MenuSceneRuntimeConfig = {
+    enabled: false,
+    lowPowerDetected: false,
+    lowPowerForced: false,
+    lowPowerActive: false,
+    hardwareConcurrency: null,
+    saveData: false
+  };
+  private runtimeDiagnosticsRevision = 0;
+  private runtimeDiagnosticsSceneInstanceId = 0;
+  private runtimeDiagnosticsPerformanceMode: MenuScenePerformanceMode = 'full';
+  private runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+  private runtimeFrameWindowMs: number[] = [];
+  private runtimeFrameCount = 0;
+  private runtimeFrameTotalMs = 0;
+  private runtimeWorstFrameMs = 0;
+  private runtimeVisibilityChangeCount = 0;
+  private runtimeVisibilitySuspendCount = 0;
+  private runtimeFeedDiagnostics = summarizeMenuSceneRuntimeFeed({ nowMs: 0 });
 
   public constructor() {
     super('MenuScene');
@@ -352,6 +384,7 @@ export class MenuScene extends Phaser.Scene {
 
   public create(): void {
     markMazerBootStatus('menu-scene-create');
+    this.initializeRuntimeDiagnostics();
     this.backdropGraphics = this.add.graphics();
     this.boardStaticGraphics = this.add.graphics();
     this.boardDynamicGraphics = this.add.graphics();
@@ -399,11 +432,14 @@ export class MenuScene extends Phaser.Scene {
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.clearVisualDiagnostics();
+      clearMenuSceneRuntimeDiagnostics();
     });
     this.publishVisualDiagnostics(this.time.now);
+    this.publishRuntimeDiagnostics(this.time.now, 0, true);
   }
 
   public update(time: number, delta: number): void {
+    this.recordRuntimeFrame(delta);
     this.updateStars(delta);
 
     const pendingReset = this.pendingResetRequest;
@@ -459,6 +495,177 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.publishVisualDiagnostics(time);
+    this.publishRuntimeDiagnostics(time, delta);
+  }
+
+  private initializeRuntimeDiagnostics(): void {
+    const runtimeSearch = typeof window === 'undefined' ? '' : window.location.search;
+    const runtimeNavigator = typeof navigator === 'undefined' ? null : navigator;
+    const networkInformation = runtimeNavigator && 'connection' in runtimeNavigator
+      ? (runtimeNavigator as Navigator & { connection?: { saveData?: boolean } }).connection
+      : undefined;
+
+    this.runtimeDiagnosticsConfig = resolveMenuSceneRuntimeConfig(runtimeSearch, {
+      hardwareConcurrency: runtimeNavigator?.hardwareConcurrency ?? null,
+      saveData: networkInformation?.saveData === true,
+      lowPowerHardwareConcurrencyMax: legacyTuning.menu.runtime.lowPowerHardwareConcurrencyMax
+    });
+
+    if (!this.runtimeDiagnosticsConfig.enabled) {
+      return;
+    }
+
+    this.runtimeDiagnosticsSceneInstanceId = nextMenuSceneInstanceId();
+  }
+
+  private recordRuntimeFrame(delta: number): void {
+    if (!this.runtimeDiagnosticsConfig.enabled) {
+      return;
+    }
+
+    const safeDelta = Number.isFinite(delta) ? Math.max(0, delta) : 0;
+    this.runtimeFrameWindowMs.push(safeDelta);
+    if (this.runtimeFrameWindowMs.length > legacyTuning.menu.runtime.recentFrameWindow) {
+      this.runtimeFrameWindowMs.shift();
+    }
+    this.runtimeFrameCount += 1;
+    this.runtimeFrameTotalMs += safeDelta;
+    this.runtimeWorstFrameMs = Math.max(this.runtimeWorstFrameMs, safeDelta);
+  }
+
+  private publishRuntimeDiagnostics(time: number, delta: number, force = false): void {
+    if (!this.runtimeDiagnosticsConfig.enabled) {
+      return;
+    }
+
+    if (
+      !force
+      && time - this.runtimeDiagnosticsLastPublishedAtMs < legacyTuning.menu.runtime.diagnosticsPublishIntervalMs
+    ) {
+      return;
+    }
+
+    const frameSummary = summarizeMenuSceneFrameWindow(
+      this.runtimeFrameWindowMs,
+      legacyTuning.menu.runtime.spikeFrameMs
+    );
+    const hidden = typeof document !== 'undefined' ? document.hidden === true : false;
+    if (hidden && delta > 0) {
+      this.runtimeVisibilitySuspendCount += 1;
+    }
+    this.runtimeDiagnosticsPerformanceMode = resolveMenuScenePerformanceMode(
+      this.runtimeDiagnosticsPerformanceMode,
+      {
+        hidden,
+        lowPowerActive: this.runtimeDiagnosticsConfig.lowPowerActive,
+        recentAverageFrameMs: frameSummary.averageMs,
+        recentSpikeCount: frameSummary.spikeCount,
+        tuning: legacyTuning.menu.runtime
+      }
+    );
+    this.runtimeFeedDiagnostics = summarizeMenuSceneRuntimeFeed({
+      step: this.menuDemoState?.stepsTaken ?? null,
+      status: null,
+      visibleEntries: [],
+      previous: this.runtimeFeedDiagnostics,
+      nowMs: time
+    });
+    this.runtimeDiagnosticsRevision += 1;
+    this.runtimeDiagnosticsLastPublishedAtMs = time;
+
+    const averageFrameMs = this.runtimeFrameCount > 0
+      ? Number((this.runtimeFrameTotalMs / this.runtimeFrameCount).toFixed(3))
+      : 0;
+    const starCount = this.stars.length;
+    const telemetrySummary = summarizeTelemetrySemantics([]);
+
+    publishMenuSceneRuntimeDiagnostics({
+      revision: this.runtimeDiagnosticsRevision,
+      sceneInstanceId: this.runtimeDiagnosticsSceneInstanceId,
+      updatedAt: Math.max(0, Math.round(time)),
+      runtimeMs: Math.max(0, Math.round(time)),
+      visibility: {
+        hidden,
+        changeCount: this.runtimeVisibilityChangeCount,
+        suspendCount: this.runtimeVisibilitySuspendCount
+      },
+      performance: {
+        mode: this.runtimeDiagnosticsPerformanceMode,
+        averageFrameMs,
+        recentAverageFrameMs: frameSummary.averageMs,
+        recentFrameCount: frameSummary.count,
+        worstFrameMs: Number(this.runtimeWorstFrameMs.toFixed(3)),
+        worstRecentFrameMs: frameSummary.worstMs,
+        spikeCount: this.runtimeFrameWindowMs.filter((sample) => sample >= legacyTuning.menu.runtime.spikeFrameMs).length,
+        recentSpikeCount: frameSummary.spikeCount,
+        estimatedFps: frameSummary.fps,
+        lowPowerDetected: this.runtimeDiagnosticsConfig.lowPowerDetected,
+        lowPowerForced: this.runtimeDiagnosticsConfig.lowPowerForced,
+        lowPowerActive: this.runtimeDiagnosticsConfig.lowPowerActive,
+        heapPressureActive: false,
+        postHiddenRecoveryActive: false,
+        hardwareConcurrency: this.runtimeDiagnosticsConfig.hardwareConcurrency,
+        saveData: this.runtimeDiagnosticsConfig.saveData
+      },
+      feed: this.runtimeFeedDiagnostics,
+      input: {
+        acceptedCount: 0,
+        droppedCount: 0,
+        mergedCount: 0,
+        lastAcceptedActionKind: null,
+        lastAcceptedSource: null,
+        lastAcceptedAtMs: null,
+        lastConsumedAtMs: null,
+        lastDroppedActionKind: null,
+        lastDroppedReason: null,
+        lastDroppedAtMs: null,
+        queueDepth: 0,
+        maxQueueDepth: 0
+      },
+      projection: null,
+      telemetry: {
+        eventLogVersion: 0,
+        currentRunId: null,
+        currentMazeId: null,
+        currentAttemptNo: null,
+        events: [],
+        summary: telemetrySummary
+      },
+      resources: {
+        activeTweens: 0,
+        activeTimers: 0,
+        listenerCount: 1,
+        listenerBreakdown: {
+          sceneUpdate: 1,
+          sceneShutdown: 1,
+          scaleResize: 1,
+          visibilityAttached: false,
+          installSurfaceAttached: false
+        },
+        trailSegmentCount: this.trail.length,
+        trailSegmentCap: TRAIL_FADE_TAIL,
+        runnerPolicy: {
+          wrongBranchCount: 0,
+          backtrackCount: 0,
+          recoveryCount: 0
+        },
+        intentEntryCount: 0,
+        intentEntryCap: 0,
+        deferredVisualTasksRemaining: 0,
+        deferredTasksPerFrameCap: legacyTuning.menu.runtime.deferredTasksPerFrame[this.runtimeDiagnosticsPerformanceMode],
+        background: {
+          clouds: 0,
+          farStars: starCount,
+          nearStars: 0,
+          twinkles: 0,
+          veils: 0,
+          driftMotes: 0,
+          moving: starCount,
+          movingCap: starCount,
+          signatureCap: starCount
+        }
+      }
+    });
   }
 
   private installInput(): void {

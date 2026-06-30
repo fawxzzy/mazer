@@ -1,10 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import {
   MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY,
+  clearMenuSceneRuntimeDiagnostics,
+  publishMenuSceneRuntimeDiagnostics,
   resolveMenuScenePerformanceMode,
   resolveMenuSceneRuntimeConfig,
   summarizeMenuSceneRuntimeFeed,
-  summarizeMenuSceneFrameWindow
+  summarizeMenuSceneFrameWindow,
+  type MenuSceneRuntimeDiagnostics
 } from '../../src/scenes/menuRuntimeDiagnostics';
 import { legacyTuning } from '../../src/config/tuning';
 
@@ -184,5 +187,125 @@ describe('menu runtime diagnostics', () => {
     expect(changed.signature).not.toBe(first.signature);
     expect(changed.changeCount).toBe(2);
     expect(changed.lastChangedAt).toBe(360);
+  });
+
+  test('publishes and clears runtime diagnostics on the window surface', () => {
+    const runtimeWindow = {} as Window;
+    const previousWindow = globalThis.window;
+
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: runtimeWindow
+    });
+
+    const diagnostics: MenuSceneRuntimeDiagnostics = {
+      revision: 1,
+      sceneInstanceId: 7,
+      updatedAt: 1200,
+      runtimeMs: 1200,
+      visibility: {
+        hidden: false,
+        changeCount: 0,
+        suspendCount: 0
+      },
+      performance: {
+        mode: 'full',
+        averageFrameMs: 16.667,
+        recentAverageFrameMs: 16.667,
+        recentFrameCount: 60,
+        worstFrameMs: 18,
+        worstRecentFrameMs: 18,
+        spikeCount: 0,
+        recentSpikeCount: 0,
+        estimatedFps: 60,
+        lowPowerDetected: false,
+        lowPowerForced: false,
+        lowPowerActive: false,
+        heapPressureActive: false,
+        postHiddenRecoveryActive: false,
+        hardwareConcurrency: 8,
+        saveData: false
+      },
+      feed: summarizeMenuSceneRuntimeFeed({
+        step: 0,
+        status: null,
+        visibleEntries: [],
+        nowMs: 1200
+      }),
+      input: {
+        acceptedCount: 0,
+        droppedCount: 0,
+        mergedCount: 0,
+        lastAcceptedActionKind: null,
+        lastAcceptedSource: null,
+        lastAcceptedAtMs: null,
+        lastConsumedAtMs: null,
+        lastDroppedActionKind: null,
+        lastDroppedReason: null,
+        lastDroppedAtMs: null,
+        queueDepth: 0,
+        maxQueueDepth: 0
+      },
+      projection: null,
+      telemetry: {
+        eventLogVersion: 0,
+        currentRunId: null,
+        currentMazeId: null,
+        currentAttemptNo: null,
+        events: [],
+        summary: {
+          countsByKind: {},
+          latestByKind: {},
+          latestAtMs: null
+        }
+      },
+      resources: {
+        activeTweens: 0,
+        activeTimers: 0,
+        listenerCount: 3,
+        listenerBreakdown: {
+          sceneUpdate: 1,
+          sceneShutdown: 1,
+          scaleResize: 1,
+          visibilityAttached: false,
+          installSurfaceAttached: false
+        },
+        trailSegmentCount: 0,
+        trailSegmentCap: 16,
+        runnerPolicy: {
+          wrongBranchCount: 0,
+          backtrackCount: 0,
+          recoveryCount: 0
+        },
+        intentEntryCount: 0,
+        intentEntryCap: 0,
+        deferredVisualTasksRemaining: 0,
+        deferredTasksPerFrameCap: legacyTuning.menu.runtime.deferredTasksPerFrame.full,
+        background: {
+          clouds: 0,
+          farStars: 0,
+          nearStars: 0,
+          twinkles: 0,
+          veils: 0,
+          driftMotes: 0,
+          moving: 0,
+          movingCap: 0,
+          signatureCap: 0
+        }
+      }
+    };
+
+    try {
+      publishMenuSceneRuntimeDiagnostics(diagnostics);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]).toEqual(diagnostics);
+
+      clearMenuSceneRuntimeDiagnostics();
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]).toBeUndefined();
+    } finally {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: previousWindow
+      });
+    }
   });
 });
