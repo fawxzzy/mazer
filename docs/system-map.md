@@ -425,6 +425,7 @@ Boundary:
 - use the in-app browser as the default live proof surface for the current branch
 - after code changes, reload the existing `4173` tab before judging the UI
 - only branch into extra localhost ports or alternate proof surfaces when a packet explicitly requires it
+- when legacy desktop screenshot parity is the actual question, widen that same tab temporarily instead of spawning more browser windows, then reset the viewport after proof
 
 What `verify` currently means:
 
@@ -453,6 +454,8 @@ What `verify` currently means:
   - serialized DOM fallback for repo tooling and browser automation readback
 - `#mazer-runtime-diagnostics`
   - visible proof-only panel for the in-app browser when `runtimeDiagnostics=1`
+  - desktop proof now prefers the upper-left gutter so the panel does not sit on top of `Exit`
+  - narrow proof falls back to a compact lower placement so the same single maintained browser still stays readable
 
 ### Repo-owned tests most relevant to this lane
 

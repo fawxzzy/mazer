@@ -89,6 +89,7 @@ Why it is not higher yet:
 - `runtimeDiagnostics=1` now flows through the live `MenuScene` update loop and publishes a repo-owned runtime diagnostics surface instead of stopping at helper-only parsing/tests
 - runtime diagnostics now also publish a proof-only DOM attribute and visible side-browser diagnostics surface so localhost inspection does not depend on the hidden `window.__MAZER_*` globals alone
 - the visible runtime diagnostics panel now also exposes active menu-demo cue, mistake-enabled lane state, and path cursor so front-door demo proof no longer depends on the hidden browser globals
+- the visible runtime diagnostics panel now prefers the upper-left desktop gutter and a compact bottom fallback on narrow viewports, which keeps the single maintained `4173` browser more usable for menu-parity inspection without removing the proof surface
 - legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
 - in-game pause commands now route through an explicit legacy pause lifecycle contract for `Back`, `Reset`, and `Main Menu`
 - features and game-modes toggles now route through an explicit legacy overlay-toggle contract, with inverted `On/Off` copy kept only where the legacy widget actually owned it
@@ -131,6 +132,7 @@ Localhost operation rule:
 - keep one maintained preview server on `http://127.0.0.1:4173/`
 - prefer the in-app browser as the live human proof surface for the current branch
 - reload that single tab after code changes instead of scattering proof across multiple localhost ports unless a packet explicitly needs another surface
+- when judging legacy desktop screenshot parity from the side browser, use a temporary wider viewport on that same tab, then reset it instead of opening extra browser instances
 
 ## Current parity execution rule
 
