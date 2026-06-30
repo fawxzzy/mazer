@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   consumeLegacyGenerationRequest,
+  consumeLegacyGenerationRequestState,
   createLegacyGenerationRequest,
   createLegacyRuntimeMazeForMode,
   LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID,
@@ -81,5 +82,35 @@ describe('legacy generation lifecycle', () => {
     expect(playMaze.generation?.buildKind).toBe('play-generated');
     expect(playMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
     expect(playMaze.seed).toBe(902);
+  });
+
+  test('makes legacy stage-7 finalize responsibilities explicit for play and menu requests', () => {
+    const playRequest = createLegacyGenerationRequest({
+      currentSeed: 902,
+      dueAtMs: 0,
+      mode: 'play',
+      reason: 'play-start',
+      scale: 50
+    });
+    const menuRequest = createLegacyGenerationRequest({
+      currentSeed: 3749,
+      dueAtMs: 0,
+      mode: 'menu',
+      reason: 'menu-return',
+      scale: 50
+    });
+
+    const playState = consumeLegacyGenerationRequestState(playRequest, 50);
+    const menuState = consumeLegacyGenerationRequestState(menuRequest, 50);
+
+    expect(playState.startsPlayTimer).toBe(true);
+    expect(playState.titleVisible).toBe(false);
+    expect(playState.initialPlayer).toEqual(playState.maze.start);
+    expect(playState.initialTrail).toEqual([playState.maze.start]);
+
+    expect(menuState.startsPlayTimer).toBe(false);
+    expect(menuState.titleVisible).toBe(true);
+    expect(menuState.initialPlayer).toEqual(menuState.maze.start);
+    expect(menuState.initialTrail).toEqual([menuState.maze.start]);
   });
 });

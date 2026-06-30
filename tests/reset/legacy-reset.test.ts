@@ -176,9 +176,12 @@ describe('legacy reset lane', () => {
     expect(generationLifecycleSource).toContain('createLegacyGenerationRequest');
     expect(generationLifecycleSource).toContain('shouldConsumeLegacyGenerationRequest');
     expect(generationLifecycleSource).toContain('consumeLegacyGenerationRequest');
+    expect(generationLifecycleSource).toContain('consumeLegacyGenerationRequestState');
     expect(menuSceneSource).toContain("this.pendingGenerationRequest: LegacyGenerationRequest | null = null;".replace('this.', 'private '));
     expect(menuSceneSource).toContain('const nextRequest = this.pendingGenerationRequest;');
     expect(menuSceneSource).toContain('if (nextRequest !== null && shouldConsumeLegacyGenerationRequest(nextRequest, time))');
+    expect(menuSceneSource).toContain('const generationState = consumeLegacyGenerationRequestState(request, this.settings.scale);');
+    expect(menuSceneSource).toContain('if (generationState.startsPlayTimer) {');
     expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-goal-reset', delayMs, { stepSeed: true });");
     expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });");
     expect(menuSceneSource).toContain("this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });");

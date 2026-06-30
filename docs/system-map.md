@@ -127,6 +127,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - menu-vs-play build routing
   - deterministic seed stepping for rebuild approximations
   - queued generation/reset request reasons and tick-consumption contract
+  - explicit stage-7 finalize state for spawn, title visibility, and play timer start
   - generation metadata attached to runtime-created mazes
 - `src/scenes/MenuScene.ts`
   - `applyGenerationRequest()` rehydrates maze, player, trail, demo state, HUD, and layout from a named request

@@ -2,7 +2,7 @@
 
 Date: 2026-06-29
 Status: active
-Current marker: `73%`
+Current marker: `74%`
 
 ## Intent
 
@@ -64,15 +64,15 @@ The current marker is the sum of the awarded points below.
 | Menu screenshot composition and board presentation | `14` | `10` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/scenes/menu-render-frame.test.ts` | final screenshot-grade composition is still open, but board material/tile read is materially closer after the heavier trench pass |
 | Overlay family and field responsibilities | `14` | `10` | partial | `src/legacy-runtime/legacyOptionFields.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, localhost | options/features/game-modes/pause fields still need field-by-field exactness and routing verification |
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | exact movement edge cases and return/reset timing still need tighter legacy proof |
-| Generation lifecycle exactness | `16` | `7` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts` | reset/generation now flow through explicit queued runtime requests, but the full staged legacy process pipeline is still not ported |
+| Generation lifecycle exactness | `16` | `8` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts` | reset/generation now flow through explicit queued runtime requests and explicit stage-7 finalize state, but the full staged legacy process pipeline is still not ported |
 | Demo route, backtracking, and pacing | `12` | `8` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, localhost | recovery cues and cue-specific pacing now drive the live route, but full legacy reset semantics and final backtrack exactness still remain open |
 | In-game HUD and goal-arrow parity | `8` | `7` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot | the timer/arrow overlay is tighter and the full overlay footprint is now carried by repo-owned proof, but final screenshot-grade exactness is still open |
 
 Current total:
 
-- `73 / 100`
+- `74 / 100`
 
-## Why the marker is held at 73%
+## Why the marker is held at 74%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -85,6 +85,7 @@ But `100%` would still be dishonest today because the biggest remaining gaps are
 
 - generation/reset lifecycle is still approximate
 - generation/reset lifecycle is more explicit than before, but still not a full staged process port
+- stage `7` finalization is now explicit, but process `8` reset semantics and the full staged pipeline are still open
 - demo route semantics are still partial even after recovery cues/pacing were restored
 - HUD parity is closer, but not final
 - screenshot-grade menu material/composition is not fully closed

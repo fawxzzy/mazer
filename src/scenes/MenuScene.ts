@@ -16,7 +16,7 @@ import {
 } from '../legacy-runtime/legacyMaze';
 import { resolveInitialRuntimeMode } from '../legacy-runtime/legacyLaunchMode';
 import {
-  consumeLegacyGenerationRequest,
+  consumeLegacyGenerationRequestState,
   createLegacyGenerationRequest,
   shouldConsumeLegacyGenerationRequest,
   type LegacyGenerationRequest,
@@ -494,9 +494,12 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private applyGenerationRequest(request: LegacyGenerationRequest, nextDemoMoveAtMs = 0): void {
+    const generationState = consumeLegacyGenerationRequestState(request, this.settings.scale);
     this.mode = request.mode;
     this.mazeSeed = request.seed;
-    this.maze = consumeLegacyGenerationRequest(request, this.settings.scale);
+    this.maze = generationState.maze;
+    this.titleText.setVisible(generationState.titleVisible);
+    this.titleShadow.setVisible(generationState.titleVisible);
     this.menuDemoEpisode = this.mode === 'menu' ? createLegacyDemoWalkerEpisode(this.maze) : null;
     if (this.mode === 'menu') {
       const bootstrap = createLegacyMenuDemoBootstrap(this.maze, this.settings.toggleTrailFade, TRAIL_FADE_TAIL);
@@ -508,8 +511,11 @@ export class MenuScene extends Phaser.Scene {
     } else {
       this.menuDemoConfig = createLegacyMenuDemoWalkerConfig(this.maze.seed);
       this.menuDemoState = null;
-      this.player = copyPoint(this.maze.start);
-      this.trail = [copyPoint(this.maze.start)];
+      this.player = generationState.initialPlayer;
+      this.trail = generationState.initialTrail;
+      if (generationState.startsPlayTimer) {
+        this.playStartedAtMs = this.time.now;
+      }
     }
     this.nextDemoMoveAtMs = nextDemoMoveAtMs;
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
@@ -561,8 +567,6 @@ export class MenuScene extends Phaser.Scene {
     this.playResetReturnAtMs = 0;
     this.overlay = 'none';
     this.overlayReturn = 'none';
-    this.titleText.setVisible(true);
-    this.titleShadow.setVisible(true);
     this.applyGenerationRequest(
       createLegacyGenerationRequest({
         currentSeed: this.mazeSeed,
@@ -580,10 +584,7 @@ export class MenuScene extends Phaser.Scene {
     this.playResetReturnAtMs = 0;
     this.overlay = 'none';
     this.overlayReturn = 'none';
-    this.titleText.setVisible(false);
-    this.titleShadow.setVisible(false);
     this.rebuildMaze();
-    this.playStartedAtMs = this.time.now;
     this.boardStaticDirty = true;
     this.boardDynamicDirty = true;
     this.uiDirty = true;

@@ -1,4 +1,9 @@
-import { createLegacyMaze, createLegacyMenuMaze, type LegacyMazeSnapshot } from './legacyMaze';
+import {
+  createLegacyMaze,
+  createLegacyMenuMaze,
+  type LegacyMazeSnapshot,
+  type LegacyPoint
+} from './legacyMaze';
 
 export type LegacyGenerationMode = 'menu' | 'play';
 export type LegacyMazeBuildKind = 'menu-snapshot' | 'play-generated';
@@ -18,6 +23,14 @@ export interface LegacyGenerationRequest {
   processStageIds: LegacyGenerationProcessStageId[];
   reason: LegacyGenerationRequestReason;
   seed: number;
+}
+
+export interface LegacyGenerationConsumption {
+  initialPlayer: LegacyPoint;
+  initialTrail: LegacyPoint[];
+  maze: LegacyMazeSnapshot;
+  startsPlayTimer: boolean;
+  titleVisible: boolean;
 }
 
 export const LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS: readonly LegacyGenerationProcessStageId[] = [0, 3, 4, 6, 7, 8];
@@ -90,3 +103,19 @@ export const consumeLegacyGenerationRequest = (
   request: LegacyGenerationRequest,
   scale: number
 ): LegacyMazeSnapshot => createLegacyRuntimeMazeForMode(request.mode, scale, request.seed);
+
+export const consumeLegacyGenerationRequestState = (
+  request: LegacyGenerationRequest,
+  scale: number
+): LegacyGenerationConsumption => {
+  const maze = consumeLegacyGenerationRequest(request, scale);
+  const initialPlayer = { ...maze.start };
+
+  return {
+    maze,
+    initialPlayer,
+    initialTrail: [{ ...maze.start }],
+    startsPlayTimer: request.mode === 'play',
+    titleVisible: request.mode === 'menu'
+  };
+};
