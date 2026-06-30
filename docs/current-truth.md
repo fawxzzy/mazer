@@ -64,6 +64,7 @@ Why it is not higher yet:
 - legacy menu-shaped web front door
 - fixed legacy-shaped menu snapshot separated from the play-maze generator
 - filled the fixed menu snapshot with staircase and right-spine silhouette branches for closer screenshot parity
+- upper-left menu snapshot branches now carry a denser frame/pocket/lattice read, which moves the upper-left corner a little closer to the restored legacy screenshots without claiming final screenshot-grade closure
 - title lockup is now tuned to sit deeper over the board instead of reading like a small shell label
 - legacy-style menu demo board/trail presentation
 - legacy menu demo now emits live recovery cues and cue-specific pacing instead of collapsing wrong-turn motion back to plain explore timing
