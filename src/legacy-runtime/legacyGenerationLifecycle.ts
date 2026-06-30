@@ -46,6 +46,7 @@ export interface LegacyGenerationBudgetContract {
 }
 
 export interface LegacyGenerationRequest {
+  budget: LegacyGenerationBudgetContract;
   buildKind: LegacyMazeBuildKind;
   dueAtMs: number;
   executionPlan: LegacyGenerationStageContract[];
@@ -279,6 +280,7 @@ export const createLegacyGenerationRequest = ({
     reason,
     seed,
     dueAtMs: Math.max(0, Math.round(dueAtMs)),
+    budget: resolveLegacyGenerationBudgetContract(mode, scale),
     buildKind: resolveLegacyMazeBuildKind(mode),
     executionPlan: resolveLegacyGenerationExecutionPlan(mode, scale),
     processStageIds: resolveLegacyGenerationProcessStageIds(scale)

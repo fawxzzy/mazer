@@ -73,6 +73,7 @@ Why it is not higher yet:
 - legacy process-8 reset branches now route through explicit reset requests for active-play return vs menu-demo regeneration
 - legacy stage `0/3/4/5/6` execution cadence is now explicit for menu-sliced versus play-continuous generation
 - legacy generation metadata now carries explicit checkpoint/shortcut budget contracts into runtime diagnostics for menu versus play lanes
+- queued generation requests now publish their own build, stage, and budget contract alongside the live maze contract in scene diagnostics
 - legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
 - in-game pause commands now route through an explicit legacy pause lifecycle contract for `Back`, `Reset`, and `Main Menu`
 - features and game-modes toggles now route through an explicit legacy overlay-toggle contract, with inverted `On/Off` copy kept only where the legacy widget actually owned it

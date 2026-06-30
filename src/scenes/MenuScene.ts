@@ -148,8 +148,25 @@ interface MenuSceneVisualDiagnostics {
         name: string;
       }>;
       pendingRequest: {
+        budget: {
+          checkpointCount: number | null;
+          checkpointModifier: number | null;
+          scale: number | null;
+          shortcutCount: number | null;
+          shortcutCountModifier: number | null;
+          shortcutStageEnabled: boolean | null;
+        };
+        buildKind: string | null;
         dueAtMs: number | null;
+        executionPlan: Array<{
+          batchSize: number | null;
+          batchUnit: string | null;
+          executionKind: string | null;
+          id: number;
+          name: string;
+        }>;
         mode: RuntimeMode | null;
+        processStageIds: number[];
         reason: string | null;
         seed: number | null;
       };
@@ -1790,10 +1807,27 @@ export class MenuScene extends Phaser.Scene {
             batchUnit: stage.batchUnit
           })),
           pendingRequest: {
+            budget: {
+              checkpointCount: this.pendingGenerationRequest?.budget.checkpointCount ?? null,
+              checkpointModifier: this.pendingGenerationRequest?.budget.checkpointModifier ?? null,
+              scale: this.pendingGenerationRequest?.budget.scale ?? null,
+              shortcutCount: this.pendingGenerationRequest?.budget.shortcutCount ?? null,
+              shortcutCountModifier: this.pendingGenerationRequest?.budget.shortcutCountModifier ?? null,
+              shortcutStageEnabled: this.pendingGenerationRequest?.budget.shortcutStageEnabled ?? null
+            },
+            buildKind: this.pendingGenerationRequest?.buildKind ?? null,
             reason: this.pendingGenerationRequest?.reason ?? null,
             dueAtMs: this.pendingGenerationRequest?.dueAtMs ?? null,
             seed: this.pendingGenerationRequest?.seed ?? null,
-            mode: this.pendingGenerationRequest?.mode ?? null
+            mode: this.pendingGenerationRequest?.mode ?? null,
+            executionPlan: (this.pendingGenerationRequest?.executionPlan ?? []).map((stage) => ({
+              id: stage.id,
+              name: stage.name,
+              executionKind: stage.executionKind,
+              batchSize: stage.batchSize,
+              batchUnit: stage.batchUnit
+            })),
+            processStageIds: [...(this.pendingGenerationRequest?.processStageIds ?? [])]
           },
           processStageIds: [...(this.maze.generation?.processStageIds ?? [])]
         },

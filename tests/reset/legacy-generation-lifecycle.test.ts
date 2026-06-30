@@ -104,6 +104,14 @@ describe('legacy generation lifecycle', () => {
     });
 
     expect(menuBootRequest.seed).toBe(3749);
+    expect(menuBootRequest.budget).toEqual({
+      scale: 50,
+      checkpointModifier: 0.35,
+      checkpointCount: 67,
+      shortcutCountModifier: 0.13,
+      shortcutCount: 6,
+      shortcutStageEnabled: true
+    });
     expect(menuBootRequest.buildKind).toBe('menu-snapshot');
     expect(menuBootRequest.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
     expect(menuBootRequest.executionPlan[0]).toEqual({
@@ -114,6 +122,7 @@ describe('legacy generation lifecycle', () => {
       batchUnit: 'rows'
     });
     expect(goalResetRequest.seed).toBe(3750);
+    expect(goalResetRequest.budget.shortcutCountModifier).toBe(0.13);
     expect(goalResetRequest.reason).toBe('menu-demo-goal-reset');
     expect(shouldConsumeLegacyGenerationRequest(goalResetRequest, 1539)).toBe(false);
     expect(shouldConsumeLegacyGenerationRequest(goalResetRequest, 1540)).toBe(true);

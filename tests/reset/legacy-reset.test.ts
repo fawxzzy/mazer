@@ -213,6 +213,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('budget: {');
     expect(menuSceneSource).toContain('checkpointCount: this.maze.generation?.budget.checkpointCount ?? null');
     expect(menuSceneSource).toContain('shortcutCountModifier: this.maze.generation?.budget.shortcutCountModifier ?? null');
+    expect(menuSceneSource).toContain('buildKind: this.pendingGenerationRequest?.buildKind ?? null');
+    expect(menuSceneSource).toContain('checkpointCount: this.pendingGenerationRequest?.budget.checkpointCount ?? null');
+    expect(menuSceneSource).toContain('processStageIds: [...(this.pendingGenerationRequest?.processStageIds ?? [])]');
     expect(menuSceneSource).toContain('executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({');
   });
 

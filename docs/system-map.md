@@ -135,6 +135,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - explicit stage `0/3/4/5/6` execution cadence contract for menu-sliced versus play-continuous generation
   - explicit stage-7 finalize state for spawn, title visibility, and play timer start
   - generation metadata attached to runtime-created mazes
+  - queued generation requests now carry build, stage, and budget metadata before tick consumption
 - `src/legacy-runtime/legacyPlayLifecycle.ts`
   - explicit process-8 reset request contract for:
   - active-play return-to-menu hold
@@ -143,7 +144,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - `applyGenerationRequest()` rehydrates maze, player, trail, demo state, HUD, and layout from a named request
   - `queueGenerationRequest()` stages delayed menu/play rebuilds instead of collapsing every branch into immediate rebuild calls
   - `pendingResetRequest` now carries the explicit process-8 branch until the scene update consumes it
-  - runtime diagnostics now publish generation budget metadata alongside stage cadence and pending request state
+  - runtime diagnostics now publish generation budget metadata alongside stage cadence and full pending request contract state
   - `startPlayMode()` swaps from menu shell into active-play generation
   - `enterMenuMode()` returns active play back into menu flow after reset
   - `drawHud()` owns the compact timer chip, goal arrow, and published HUD proof bounds
