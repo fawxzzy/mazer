@@ -49,7 +49,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `82%`
+- `83%`
 
 Why it is not higher yet:
 
@@ -75,6 +75,7 @@ Why it is not higher yet:
 - legacy generation metadata now carries explicit checkpoint/shortcut budget contracts into runtime diagnostics for menu versus play lanes
 - queued generation requests now publish their own build, stage, and budget contract alongside the live maze contract in scene diagnostics
 - generation requests now carry the explicit delay-gated process-0 entry contract, and reset requests now carry the explicit initialized process-8 entry contract
+- legacy level-building scheduler truth is now explicit in the runtime contract: process `0` requires the armed start-time + delay-start flag, the exact legacy delay duration remains honestly unrecovered, and initialized process `8` reset entry is marked as the branch that bypasses that delay gate
 - `runtimeDiagnostics=1` now flows through the live `MenuScene` update loop and publishes a repo-owned runtime diagnostics surface instead of stopping at helper-only parsing/tests
 - runtime diagnostics now also publish a proof-only DOM attribute and visible side-browser diagnostics surface so localhost inspection does not depend on the hidden `window.__MAZER_*` globals alone
 - legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
@@ -92,6 +93,7 @@ Why it is not higher yet:
 - maze generation lifecycle is still a reset-lane approximation, not the full old staged process graph
 - generation/reset branches, stage cadence, budget formulas, and process-entry gates are now explicit runtime contracts, but the full staged process `0/3/4/5/6/7/8` port is still not complete
 - stage `7` responsibilities, process `8` reset branches, process-0 delay entry, and stage `0/3/4/5/6` execution cadence are now explicit, but the remaining staged generator implementation is still not fully ported
+- level-building scheduler ownership is clearer now, but the runtime still does not execute the full staged Unreal process graph
 - demo AI and backtracking are not yet a full legacy-exact port
 - in-game HUD is only partially restored
 - browser exit cannot literally execute the old engine quit behavior

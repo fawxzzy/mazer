@@ -21,6 +21,11 @@ describe('legacy generation diagnostics contract', () => {
       armsDelayStartOnQueue: true,
       consumesWhileUninitialized: true,
       consumesWhileInitialized: false,
+      requiresLevelBuildingStartTime: true,
+      requiresLevelBuildingDelayStartedFlag: true,
+      levelBuildingDelayDurationMs: null,
+      levelBuildingDelayDurationSource: 'legacy-variable-unrecovered',
+      initializedResetBypassesDelayGate: true,
       resetsLevelBuildingTimerAfterConsume: true
     });
     expect(menuMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
@@ -48,6 +53,11 @@ describe('legacy generation diagnostics contract', () => {
       armsDelayStartOnQueue: true,
       consumesWhileUninitialized: true,
       consumesWhileInitialized: false,
+      requiresLevelBuildingStartTime: true,
+      requiresLevelBuildingDelayStartedFlag: true,
+      levelBuildingDelayDurationMs: null,
+      levelBuildingDelayDurationSource: 'legacy-variable-unrecovered',
+      initializedResetBypassesDelayGate: true,
       resetsLevelBuildingTimerAfterConsume: true
     });
     expect(playMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);

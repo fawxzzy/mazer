@@ -35,6 +35,11 @@ export interface LegacyMazeSnapshot {
       consumesWhileInitialized: boolean;
       consumesWhileUninitialized: boolean;
       entryStageId: number;
+      initializedResetBypassesDelayGate: boolean;
+      levelBuildingDelayDurationMs: number | null;
+      levelBuildingDelayDurationSource: 'legacy-variable-unrecovered';
+      requiresLevelBuildingDelayStartedFlag: boolean;
+      requiresLevelBuildingStartTime: boolean;
       resetsLevelBuildingTimerAfterConsume: boolean;
       waitsForLevelBuildingDelay: boolean;
     };

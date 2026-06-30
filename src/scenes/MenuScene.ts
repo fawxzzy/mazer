@@ -165,6 +165,11 @@ interface MenuSceneVisualDiagnostics {
         consumesWhileInitialized: boolean | null;
         consumesWhileUninitialized: boolean | null;
         entryStageId: number | null;
+        initializedResetBypassesDelayGate: boolean | null;
+        levelBuildingDelayDurationMs: number | null;
+        levelBuildingDelayDurationSource: string | null;
+        requiresLevelBuildingDelayStartedFlag: boolean | null;
+        requiresLevelBuildingStartTime: boolean | null;
         resetsLevelBuildingTimerAfterConsume: boolean | null;
         waitsForLevelBuildingDelay: boolean | null;
       };
@@ -179,6 +184,7 @@ interface MenuSceneVisualDiagnostics {
         };
         buildKind: string | null;
         dueAtMs: number | null;
+        queuedAtMs: number | null;
         executionPlan: Array<{
           batchSize: number | null;
           batchUnit: string | null;
@@ -191,6 +197,11 @@ interface MenuSceneVisualDiagnostics {
           consumesWhileInitialized: boolean | null;
           consumesWhileUninitialized: boolean | null;
           entryStageId: number | null;
+          initializedResetBypassesDelayGate: boolean | null;
+          levelBuildingDelayDurationMs: number | null;
+          levelBuildingDelayDurationSource: string | null;
+          requiresLevelBuildingDelayStartedFlag: boolean | null;
+          requiresLevelBuildingStartTime: boolean | null;
           resetsLevelBuildingTimerAfterConsume: boolean | null;
           waitsForLevelBuildingDelay: boolean | null;
         };
@@ -203,6 +214,7 @@ interface MenuSceneVisualDiagnostics {
     };
     reset: {
       entry: {
+        bypassesLevelBuildingDelay: boolean | null;
         clearsResetFlagOnConsume: boolean | null;
         consumesWhileInitialized: boolean | null;
         entryStageId: number | null;
@@ -422,6 +434,7 @@ export class MenuScene extends Phaser.Scene {
           currentSeed: this.mazeSeed,
           dueAtMs: this.time.now,
           mode: 'menu',
+          queuedAtMs: this.time.now,
           reason: 'boot-menu',
           scale: this.settings.scale
         }),
@@ -858,13 +871,14 @@ export class MenuScene extends Phaser.Scene {
 
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
     this.applyGenerationRequest(
-      createLegacyGenerationRequest({
-        currentSeed: this.mazeSeed,
-        dueAtMs: this.time.now,
-        mode: this.mode,
-        reason: this.mode === 'play' ? 'play-start' : 'boot-menu',
-        scale: this.settings.scale
-      }),
+        createLegacyGenerationRequest({
+          currentSeed: this.mazeSeed,
+          dueAtMs: this.time.now,
+          mode: this.mode,
+          queuedAtMs: this.time.now,
+          reason: this.mode === 'play' ? 'play-start' : 'boot-menu',
+          scale: this.settings.scale
+        }),
       nextDemoMoveAtMs
     );
   }
@@ -882,6 +896,7 @@ export class MenuScene extends Phaser.Scene {
       currentSeed: this.mazeSeed,
       dueAtMs: this.time.now + Math.max(0, delayMs),
       mode,
+      queuedAtMs: this.time.now,
       reason,
       scale: this.settings.scale,
       stepSeed: options.stepSeed === true
@@ -900,6 +915,7 @@ export class MenuScene extends Phaser.Scene {
         currentSeed: this.mazeSeed,
         dueAtMs: this.time.now,
         mode: 'menu',
+        queuedAtMs: this.time.now,
         reason: 'menu-return',
         scale: this.settings.scale
       }),
@@ -1006,6 +1022,7 @@ export class MenuScene extends Phaser.Scene {
         currentSeed: this.mazeSeed,
         dueAtMs: time,
         mode: 'menu',
+        queuedAtMs: time,
         reason: 'menu-demo-goal-reset',
         scale: this.settings.scale,
         stepSeed: true
@@ -2067,6 +2084,11 @@ export class MenuScene extends Phaser.Scene {
             consumesWhileInitialized: this.maze.generation?.gate.consumesWhileInitialized ?? null,
             consumesWhileUninitialized: this.maze.generation?.gate.consumesWhileUninitialized ?? null,
             entryStageId: this.maze.generation?.gate.entryStageId ?? null,
+            initializedResetBypassesDelayGate: this.maze.generation?.gate.initializedResetBypassesDelayGate ?? null,
+            levelBuildingDelayDurationMs: this.maze.generation?.gate.levelBuildingDelayDurationMs ?? null,
+            levelBuildingDelayDurationSource: this.maze.generation?.gate.levelBuildingDelayDurationSource ?? null,
+            requiresLevelBuildingDelayStartedFlag: this.maze.generation?.gate.requiresLevelBuildingDelayStartedFlag ?? null,
+            requiresLevelBuildingStartTime: this.maze.generation?.gate.requiresLevelBuildingStartTime ?? null,
             resetsLevelBuildingTimerAfterConsume: this.maze.generation?.gate.resetsLevelBuildingTimerAfterConsume ?? null,
             waitsForLevelBuildingDelay: this.maze.generation?.gate.waitsForLevelBuildingDelay ?? null
           },
@@ -2082,6 +2104,7 @@ export class MenuScene extends Phaser.Scene {
             buildKind: this.pendingGenerationRequest?.buildKind ?? null,
             reason: this.pendingGenerationRequest?.reason ?? null,
             dueAtMs: this.pendingGenerationRequest?.dueAtMs ?? null,
+            queuedAtMs: this.pendingGenerationRequest?.queuedAtMs ?? null,
             seed: this.pendingGenerationRequest?.seed ?? null,
             mode: this.pendingGenerationRequest?.mode ?? null,
             executionPlan: (this.pendingGenerationRequest?.executionPlan ?? []).map((stage) => ({
@@ -2096,6 +2119,11 @@ export class MenuScene extends Phaser.Scene {
               consumesWhileInitialized: this.pendingGenerationRequest?.gate.consumesWhileInitialized ?? null,
               consumesWhileUninitialized: this.pendingGenerationRequest?.gate.consumesWhileUninitialized ?? null,
               entryStageId: this.pendingGenerationRequest?.gate.entryStageId ?? null,
+              initializedResetBypassesDelayGate: this.pendingGenerationRequest?.gate.initializedResetBypassesDelayGate ?? null,
+              levelBuildingDelayDurationMs: this.pendingGenerationRequest?.gate.levelBuildingDelayDurationMs ?? null,
+              levelBuildingDelayDurationSource: this.pendingGenerationRequest?.gate.levelBuildingDelayDurationSource ?? null,
+              requiresLevelBuildingDelayStartedFlag: this.pendingGenerationRequest?.gate.requiresLevelBuildingDelayStartedFlag ?? null,
+              requiresLevelBuildingStartTime: this.pendingGenerationRequest?.gate.requiresLevelBuildingStartTime ?? null,
               resetsLevelBuildingTimerAfterConsume: this.pendingGenerationRequest?.gate.resetsLevelBuildingTimerAfterConsume ?? null,
               waitsForLevelBuildingDelay: this.pendingGenerationRequest?.gate.waitsForLevelBuildingDelay ?? null
             },
@@ -2105,6 +2133,7 @@ export class MenuScene extends Phaser.Scene {
         },
         reset: {
           entry: {
+            bypassesLevelBuildingDelay: this.pendingResetRequest?.entry.bypassesLevelBuildingDelay ?? null,
             clearsResetFlagOnConsume: this.pendingResetRequest?.entry.clearsResetFlagOnConsume ?? null,
             consumesWhileInitialized: this.pendingResetRequest?.entry.consumesWhileInitialized ?? null,
             entryStageId: this.pendingResetRequest?.entry.entryStageId ?? null,

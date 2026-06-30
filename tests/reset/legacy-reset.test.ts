@@ -161,6 +161,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("mode: 'menu',");
     expect(menuSceneSource).toContain("if (request.action === 'return-menu') {");
     expect(menuSceneSource).toContain('pendingAction: this.pendingResetRequest?.action ?? null,');
+    expect(menuSceneSource).toContain('bypassesLevelBuildingDelay: this.pendingResetRequest?.entry.bypassesLevelBuildingDelay ?? null,');
   });
 
   test('keeps the menu backdrop in the denser screenshot-directed field lane', () => {
@@ -205,6 +206,10 @@ describe('legacy reset lane', () => {
     expect(generationLifecycleSource).toContain('entryStageId: LEGACY_GENERATION_ENTRY_STAGE_ID');
     expect(generationLifecycleSource).toContain('waitsForLevelBuildingDelay: true');
     expect(generationLifecycleSource).toContain('consumesWhileUninitialized: true');
+    expect(generationLifecycleSource).toContain('requiresLevelBuildingStartTime: true');
+    expect(generationLifecycleSource).toContain('requiresLevelBuildingDelayStartedFlag: true');
+    expect(generationLifecycleSource).toContain("levelBuildingDelayDurationSource: LEGACY_LEVEL_BUILDING_DELAY_DURATION_SOURCE");
+    expect(generationLifecycleSource).toContain('initializedResetBypassesDelayGate: true');
     expect(menuSceneSource).toContain("this.pendingGenerationRequest: LegacyGenerationRequest | null = null;".replace('this.', 'private '));
     expect(menuSceneSource).toContain('const nextRequest = this.pendingGenerationRequest;');
     expect(menuSceneSource).toContain('if (nextRequest !== null && shouldConsumeLegacyGenerationRequest(nextRequest, time))');
@@ -221,6 +226,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('buildKind: this.pendingGenerationRequest?.buildKind ?? null');
     expect(menuSceneSource).toContain('checkpointCount: this.pendingGenerationRequest?.budget.checkpointCount ?? null');
     expect(menuSceneSource).toContain('entryStageId: this.pendingGenerationRequest?.gate.entryStageId ?? null');
+    expect(menuSceneSource).toContain('queuedAtMs: this.pendingGenerationRequest?.queuedAtMs ?? null');
+    expect(menuSceneSource).toContain('levelBuildingDelayDurationSource: this.pendingGenerationRequest?.gate.levelBuildingDelayDurationSource ?? null');
+    expect(menuSceneSource).toContain('requiresLevelBuildingStartTime: this.pendingGenerationRequest?.gate.requiresLevelBuildingStartTime ?? null');
     expect(menuSceneSource).toContain('processStageIds: [...(this.pendingGenerationRequest?.processStageIds ?? [])]');
     expect(menuSceneSource).toContain('executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({');
     expect(menuSceneSource).toContain('resolveMenuSceneRuntimeConfig(runtimeSearch, {');
@@ -261,6 +269,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private applyLegacyPauseCommand(command: LegacyPauseCommand): void {');
     expect(playLifecycleSource).toContain('resolveLegacyResetEntryContract');
     expect(playLifecycleSource).toContain('entryStageId: LEGACY_RESET_ENTRY_STAGE_ID');
+    expect(playLifecycleSource).toContain('bypassesLevelBuildingDelay: true');
     expect(playLifecycleSource).toContain('rearmsDelayStart: mode === \'menu\'');
     expect(legacyGamePauseSource).toContain('MazerGameInstance->_ResetPlayerPosition = true;');
     expect(legacyGamePauseSource).toContain('Back_Clicked();');

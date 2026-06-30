@@ -11,6 +11,7 @@ export type LegacyGenerationMode = 'menu' | 'play';
 export type LegacyMazeBuildKind = 'menu-snapshot' | 'play-generated';
 export type LegacyGenerationProcessStageId = 0 | 3 | 4 | 5 | 6 | 7 | 8;
 export type LegacyGenerationStageName = 'CreateGrid' | 'MapPath' | 'CreatePath' | 'CreateShortCuts' | 'Draw' | 'Finalize' | 'Reset';
+export type LegacyGenerationDelayDurationSource = 'legacy-variable-unrecovered';
 export type LegacyGenerationStageExecutionKind =
   | 'full-stage'
   | 'row-slice'
@@ -51,6 +52,11 @@ export interface LegacyGenerationTickGateContract {
   consumesWhileInitialized: boolean;
   consumesWhileUninitialized: boolean;
   entryStageId: LegacyGenerationEntryStageId;
+  initializedResetBypassesDelayGate: boolean;
+  levelBuildingDelayDurationMs: number | null;
+  levelBuildingDelayDurationSource: LegacyGenerationDelayDurationSource;
+  requiresLevelBuildingDelayStartedFlag: boolean;
+  requiresLevelBuildingStartTime: boolean;
   resetsLevelBuildingTimerAfterConsume: boolean;
   waitsForLevelBuildingDelay: boolean;
 }
@@ -63,6 +69,7 @@ export interface LegacyGenerationRequest {
   gate: LegacyGenerationTickGateContract;
   mode: LegacyGenerationMode;
   processStageIds: LegacyGenerationProcessStageId[];
+  queuedAtMs: number;
   reason: LegacyGenerationRequestReason;
   seed: number;
 }
@@ -78,6 +85,8 @@ export interface LegacyGenerationConsumption {
 export const LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS: readonly LegacyGenerationProcessStageId[] = [0, 3, 4, 6, 7, 8];
 export const LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID: LegacyGenerationProcessStageId = 5;
 export const LEGACY_GENERATION_ENTRY_STAGE_ID: LegacyGenerationEntryStageId = 0;
+export const LEGACY_LEVEL_BUILDING_DELAY_DURATION_MS: number | null = null;
+export const LEGACY_LEVEL_BUILDING_DELAY_DURATION_SOURCE: LegacyGenerationDelayDurationSource = 'legacy-variable-unrecovered';
 
 const LEGACY_MIN_SCALE = 25;
 const LEGACY_MAX_SCALE = 150;
@@ -116,6 +125,11 @@ export const resolveLegacyGenerationTickGateContract = (): LegacyGenerationTickG
   armsDelayStartOnQueue: true,
   consumesWhileUninitialized: true,
   consumesWhileInitialized: false,
+  requiresLevelBuildingStartTime: true,
+  requiresLevelBuildingDelayStartedFlag: true,
+  levelBuildingDelayDurationMs: LEGACY_LEVEL_BUILDING_DELAY_DURATION_MS,
+  levelBuildingDelayDurationSource: LEGACY_LEVEL_BUILDING_DELAY_DURATION_SOURCE,
+  initializedResetBypassesDelayGate: true,
   resetsLevelBuildingTimerAfterConsume: true
 });
 
@@ -285,6 +299,7 @@ export const createLegacyGenerationRequest = ({
   currentSeed,
   dueAtMs,
   mode,
+  queuedAtMs = dueAtMs,
   reason,
   scale,
   stepSeed = false
@@ -292,6 +307,7 @@ export const createLegacyGenerationRequest = ({
   currentSeed: number;
   dueAtMs: number;
   mode: LegacyGenerationMode;
+  queuedAtMs?: number;
   reason: LegacyGenerationRequestReason;
   scale: number;
   stepSeed?: boolean;
@@ -303,6 +319,7 @@ export const createLegacyGenerationRequest = ({
     reason,
     seed,
     dueAtMs: Math.max(0, Math.round(dueAtMs)),
+    queuedAtMs: Math.max(0, Math.round(queuedAtMs)),
     budget: resolveLegacyGenerationBudgetContract(mode, scale),
     buildKind: resolveLegacyMazeBuildKind(mode),
     executionPlan: resolveLegacyGenerationExecutionPlan(mode, scale),

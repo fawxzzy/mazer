@@ -53,6 +53,11 @@ describe('legacy generation lifecycle', () => {
       armsDelayStartOnQueue: true,
       consumesWhileUninitialized: true,
       consumesWhileInitialized: false,
+      requiresLevelBuildingStartTime: true,
+      requiresLevelBuildingDelayStartedFlag: true,
+      levelBuildingDelayDurationMs: null,
+      levelBuildingDelayDurationSource: 'legacy-variable-unrecovered',
+      initializedResetBypassesDelayGate: true,
       resetsLevelBuildingTimerAfterConsume: true
     });
   });
@@ -116,6 +121,7 @@ describe('legacy generation lifecycle', () => {
     });
 
     expect(menuBootRequest.seed).toBe(3749);
+    expect(menuBootRequest.queuedAtMs).toBe(1200);
     expect(menuBootRequest.budget).toEqual({
       scale: 50,
       checkpointModifier: 0.35,
@@ -130,6 +136,11 @@ describe('legacy generation lifecycle', () => {
       armsDelayStartOnQueue: true,
       consumesWhileUninitialized: true,
       consumesWhileInitialized: false,
+      requiresLevelBuildingStartTime: true,
+      requiresLevelBuildingDelayStartedFlag: true,
+      levelBuildingDelayDurationMs: null,
+      levelBuildingDelayDurationSource: 'legacy-variable-unrecovered',
+      initializedResetBypassesDelayGate: true,
       resetsLevelBuildingTimerAfterConsume: true
     });
     expect(menuBootRequest.buildKind).toBe('menu-snapshot');
@@ -142,6 +153,7 @@ describe('legacy generation lifecycle', () => {
       batchUnit: 'rows'
     });
     expect(goalResetRequest.seed).toBe(3750);
+    expect(goalResetRequest.queuedAtMs).toBe(1540);
     expect(goalResetRequest.budget.shortcutCountModifier).toBe(0.13);
     expect(goalResetRequest.reason).toBe('menu-demo-goal-reset');
     expect(shouldConsumeLegacyGenerationRequest(goalResetRequest, 1539)).toBe(false);

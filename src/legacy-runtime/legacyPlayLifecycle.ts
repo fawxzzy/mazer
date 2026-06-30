@@ -4,6 +4,7 @@ export type LegacyResetAction = 'regenerate-maze' | 'return-menu';
 export type LegacyResetReason = 'goal';
 
 export interface LegacyResetEntryContract {
+  bypassesLevelBuildingDelay: boolean;
   clearsResetFlagOnConsume: boolean;
   consumesWhileInitialized: boolean;
   entryStageId: LegacyResetEntryStageId;
@@ -28,6 +29,7 @@ export const resolveLegacyResetAction = (mode: LegacyPlayMode): LegacyResetActio
 
 export const resolveLegacyResetEntryContract = (mode: LegacyPlayMode): LegacyResetEntryContract => ({
   entryStageId: LEGACY_RESET_ENTRY_STAGE_ID,
+  bypassesLevelBuildingDelay: true,
   clearsResetFlagOnConsume: true,
   consumesWhileInitialized: true,
   rearmsDelayStart: mode === 'menu',
