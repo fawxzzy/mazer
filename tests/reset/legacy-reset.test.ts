@@ -128,7 +128,11 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const timerText = `Time ${elapsed}`;');
     expect(menuSceneSource).toContain('Phaser.Math.Angle.Between');
     expect(menuSceneSource).not.toContain('WASD or arrows to move   P to pause');
-    expect(menuSceneSource).toContain('this.hudGraphics.fillRect(18, 18, 156, 34);');
+    expect(menuSceneSource).toContain('const arrowOriginX = this.layout.width - 42;');
+    expect(menuSceneSource).toContain('const arrowOriginY = 26;');
+    expect(menuSceneSource).toContain('const length = 22;');
+    expect(menuSceneSource).toContain('this.hudGraphics.fillRect(16, 16, 132, 26);');
+    expect(menuSceneSource).toContain("fontSize: '16px',");
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
     expect(menuSceneSource).toContain('this.schedulePlayResetReturn();');
     expect(menuSceneSource).toContain('createLegacyMenuDemoBootstrap(this.maze, this.settings.toggleTrailFade, TRAIL_FADE_TAIL)');

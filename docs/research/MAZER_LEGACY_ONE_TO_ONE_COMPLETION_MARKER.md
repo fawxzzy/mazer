@@ -2,7 +2,7 @@
 
 Date: 2026-06-29
 Status: active
-Current marker: `69%`
+Current marker: `70%`
 
 ## Intent
 
@@ -66,13 +66,13 @@ The current marker is the sum of the awarded points below.
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | exact movement edge cases and return/reset timing still need tighter legacy proof |
 | Generation lifecycle exactness | `16` | `6` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts` | current build path is still an approximation, not the full staged legacy process pipeline |
 | Demo route, backtracking, and pacing | `12` | `7` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, localhost | exact backtrack policy, cadence, and reset semantics are not yet fully legacy-exact |
-| In-game HUD and goal-arrow parity | `8` | `5` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, localhost | HUD is only partially restored and still needs exact legacy compactness/behavior polish |
+| In-game HUD and goal-arrow parity | `8` | `6` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, direct play-route screenshot, localhost | HUD compactness is now closer to the legacy minimal contract, but final exactness and stronger repo-owned play proof still remain open |
 
 Current total:
 
-- `69 / 100`
+- `70 / 100`
 
-## Why the marker is held at 69%
+## Why the marker is held at 70%
 
 The repo is materially past the "rough prototype" stage:
 

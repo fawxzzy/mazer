@@ -14,6 +14,7 @@ import {
   type LegacyMazeSnapshot,
   type LegacyPoint
 } from '../legacy-runtime/legacyMaze';
+import { resolveInitialRuntimeMode } from '../legacy-runtime/legacyLaunchMode';
 import {
   createLegacyRuntimeMazeForMode,
   stepLegacyGenerationSeed
@@ -259,8 +260,11 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5).setAlpha(0.92);
 
     this.createStars();
-    this.rebuildMaze(this.time.now + INITIAL_MENU_DEMO_HOLD_MS);
-    this.refreshLayout();
+    if (resolveInitialRuntimeMode(typeof window === 'undefined' ? '' : window.location.search) === 'play') {
+      this.startPlayMode();
+    } else {
+      this.rebuildMaze(this.time.now + INITIAL_MENU_DEMO_HOLD_MS);
+    }
     this.installInput();
 
     this.scale.on('resize', () => {
@@ -838,24 +842,24 @@ export class MenuScene extends Phaser.Scene {
 
     const elapsed = formatClock(time - this.playStartedAtMs);
     const timerText = `Time ${elapsed}`;
-    const arrowOriginX = this.layout.width - 56;
-    const arrowOriginY = 36;
+    const arrowOriginX = this.layout.width - 42;
+    const arrowOriginY = 26;
     const boardOffset = this.resolveBoardOffset();
     const goalScreenX = this.layout.boardLeft + boardOffset.x + (this.maze.goal.x * this.layout.tileSize);
     const goalScreenY = this.layout.boardTop + boardOffset.y + (this.maze.goal.y * this.layout.tileSize);
     const playerScreenX = this.layout.boardLeft + boardOffset.x + (this.player.x * this.layout.tileSize);
     const playerScreenY = this.layout.boardTop + boardOffset.y + (this.player.y * this.layout.tileSize);
     const angle = Phaser.Math.Angle.Between(playerScreenX, playerScreenY, goalScreenX, goalScreenY);
-    const length = 26;
+    const length = 22;
 
     this.hudGraphics.fillStyle(0x05050a, 0.34);
-    this.hudGraphics.fillRect(18, 18, 156, 34);
-    this.hudGraphics.lineStyle(1, 0xdedbe6, 0.26);
-    this.hudGraphics.strokeRect(18, 18, 156, 34);
+    this.hudGraphics.fillRect(16, 16, 132, 26);
+    this.hudGraphics.lineStyle(1, 0xdedbe6, 0.22);
+    this.hudGraphics.strokeRect(16, 16, 132, 26);
 
-    const timer = this.add.text(28, 24, timerText, {
+    const timer = this.add.text(26, 19, timerText, {
       fontFamily: '"Courier New", monospace',
-      fontSize: '18px',
+      fontSize: '16px',
       color: '#d7f0d6'
     });
     timer.setData('hud', true);
@@ -873,10 +877,10 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.fillTriangle(
       arrowOriginX + (Math.cos(angle) * length),
       arrowOriginY + (Math.sin(angle) * length),
-      arrowOriginX + (Math.cos(angle + 2.42) * 9),
-      arrowOriginY + (Math.sin(angle + 2.42) * 9),
-      arrowOriginX + (Math.cos(angle - 2.42) * 9),
-      arrowOriginY + (Math.sin(angle - 2.42) * 9)
+      arrowOriginX + (Math.cos(angle + 2.42) * 7),
+      arrowOriginY + (Math.sin(angle + 2.42) * 7),
+      arrowOriginX + (Math.cos(angle - 2.42) * 7),
+      arrowOriginY + (Math.sin(angle - 2.42) * 7)
     );
   }
 
