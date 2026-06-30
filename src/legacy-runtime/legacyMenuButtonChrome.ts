@@ -32,15 +32,15 @@ export const resolveLegacyMenuButtonChrome = (
   );
 
   return {
-    baseAlpha: isPrimary ? 0.092 : 0.062,
-    baseStroke: isPrimary ? 0.78 : 0.58,
+    baseAlpha: isPrimary ? 0.1 : 0.074,
+    baseStroke: isPrimary ? 0.84 : 0.68,
     fontSize,
-    hoverAlpha: isPrimary ? 0.15 : 0.112,
+    hoverAlpha: isPrimary ? 0.162 : 0.126,
     hoverLabelAlpha: 1,
-    hoverStroke: isPrimary ? 0.9 : 0.76,
-    labelAlpha: isPrimary ? 0.96 : 0.9,
-    strokeColor: isPrimary ? 0xc9c0d7 : 0xb4abc3,
+    hoverStroke: isPrimary ? 0.92 : 0.8,
+    labelAlpha: isPrimary ? 0.98 : 0.94,
+    strokeColor: isPrimary ? 0xd3cae0 : 0xc2b8d1,
     strokeWidth: 2,
-    textColor: isPrimary ? '#1f9f2f' : '#188826'
+    textColor: isPrimary ? '#22a533' : '#1d9230'
   };
 };

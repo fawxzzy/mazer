@@ -33,9 +33,11 @@ describe('legacy menu button chrome', () => {
 
     expect(secondary.fontSize).toBeGreaterThanOrEqual(20);
     expect(secondary.fontSize).toBeLessThanOrEqual(32);
-    expect(secondary.baseAlpha).toBeGreaterThan(0.06);
-    expect(secondary.baseAlpha).toBeLessThan(0.07);
-    expect(secondary.hoverAlpha).toBeGreaterThan(0.11);
+    expect(secondary.baseAlpha).toBeGreaterThan(0.07);
+    expect(secondary.baseAlpha).toBeLessThan(0.08);
+    expect(secondary.baseStroke).toBeGreaterThan(0.66);
+    expect(secondary.hoverAlpha).toBeGreaterThan(0.12);
+    expect(secondary.labelAlpha).toBeGreaterThanOrEqual(0.94);
     expect(secondary.strokeWidth).toBe(2);
   });
 });
