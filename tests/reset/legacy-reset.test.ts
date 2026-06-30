@@ -212,7 +212,10 @@ describe('legacy reset lane', () => {
 
   test('defers overlay rebuild travel until closing the options surface', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
-    const legacyPauseMenuSource = readFileSync(resolve('C:/ATLAS/tmp/mazer-legacy-unreal-restore/Source/Mazer/Private/UI/PauseMenuWidget.cpp'), 'utf8');
+    const legacyPauseMenuSource = readFileSync(
+      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'PauseMenuWidget.cpp'),
+      'utf8'
+    );
 
     expect(menuSceneSource).toContain('private pendingOverlayMazeRebuild = false;');
     expect(menuSceneSource).toContain('this.pendingOverlayMazeRebuild = true;');
