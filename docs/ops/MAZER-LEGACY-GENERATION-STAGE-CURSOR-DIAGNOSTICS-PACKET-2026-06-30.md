@@ -27,7 +27,9 @@ Queued generation requests now carry an explicit stage-cursor projection for leg
 
 Consumed runtime mazes now carry an explicit stage-cursor projection for stage-7 finalization.
 
-Runtime visual diagnostics now publish both the live maze stage cursor and the pending generation request stage cursor so localhost proof can inspect the staged lifecycle posture without depending on prose.
+Runtime visual diagnostics now publish both the live maze stage cursor and the pending generation request stage cursor so automated localhost proof can inspect the staged lifecycle posture without depending on prose.
+
+The DOM-backed runtime diagnostics attribute and visible side-browser panel now also publish the live generation stage cursor so the maintained `4173` browser can show the cursor without depending on hidden `window.__MAZER_*` globals.
 
 ## Boundary
 
@@ -51,8 +53,9 @@ Reason:
 Focused validation:
 
 ```bash
-npm run test -- tests/reset/legacy-generation-lifecycle.test.ts tests/reset/legacy-generation-diagnostics.test.ts tests/reset/legacy-reset.test.ts
+npm run test -- tests/scenes/menu-runtime-diagnostics.test.ts tests/reset/legacy-generation-lifecycle.test.ts tests/reset/legacy-generation-diagnostics.test.ts tests/reset/legacy-reset.test.ts
 npm run lint
+npm run build
 npm run verify
 ```
 
@@ -61,7 +64,11 @@ Result:
 - passed
 - reset lane and demo walker suite passed as part of the configured test target
 - TypeScript no-emit lint passed
+- build passed
 - repo verify passed, including the serialized reset/demo test lane and production build
+- live browser on `http://127.0.0.1:4173/?runtimeDiagnostics=1` loaded with one canvas and no warn/error console logs
+- DOM-backed runtime diagnostics exposed `consumed-finalized:7` with `player-finalized`
+- visible panel showed `gen stage consumed-finalized:7 signal player-finalized complete yes`
 
 ## Next honest slice
 
