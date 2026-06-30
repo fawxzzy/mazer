@@ -64,23 +64,23 @@ describe('legacy generation lifecycle', () => {
 
   test('makes the legacy 0/3/4/5/6 execution cadence explicit for menu and play generation', () => {
     expect(resolveLegacyGenerationExecutionPlan('play', 50)).toEqual([
-      { id: 0, name: 'CreateGrid', executionKind: 'full-stage', batchSize: null, batchUnit: null },
-      { id: 3, name: 'MapPath', executionKind: 'full-stage', batchSize: null, batchUnit: null },
-      { id: 4, name: 'CreatePath', executionKind: 'full-stage', batchSize: null, batchUnit: null },
-      { id: 5, name: 'CreateShortCuts', executionKind: 'full-stage', batchSize: null, batchUnit: null },
-      { id: 6, name: 'Draw', executionKind: 'full-stage', batchSize: null, batchUnit: null },
-      { id: 7, name: 'Finalize', executionKind: 'finalize-state', batchSize: null, batchUnit: null },
-      { id: 8, name: 'Reset', executionKind: 'reset-branch', batchSize: null, batchUnit: null }
+      { id: 0, name: 'CreateGrid', completionSignal: 'grid-spawn-complete', advancesToStageId: 3, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
+      { id: 3, name: 'MapPath', completionSignal: 'checkpoint-budget-exhausted', advancesToStageId: 4, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
+      { id: 4, name: 'CreatePath', completionSignal: 'path-array-exhausted', advancesToStageId: 5, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
+      { id: 5, name: 'CreateShortCuts', completionSignal: 'shortcut-budget-exhausted', advancesToStageId: 6, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: 6 },
+      { id: 6, name: 'Draw', completionSignal: 'draw-iteration-complete', advancesToStageId: 7, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
+      { id: 7, name: 'Finalize', completionSignal: 'player-finalized', advancesToStageId: null, executionKind: 'finalize-state', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
+      { id: 8, name: 'Reset', completionSignal: 'play-reset-template-return', advancesToStageId: null, executionKind: 'reset-branch', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null }
     ]);
 
     expect(resolveLegacyGenerationExecutionPlan('menu', 50)).toEqual([
-      { id: 0, name: 'CreateGrid', executionKind: 'row-slice', batchSize: 1, batchUnit: 'rows' },
-      { id: 3, name: 'MapPath', executionKind: 'checkpoint-pass', batchSize: 1, batchUnit: 'checkpoint-passes' },
-      { id: 4, name: 'CreatePath', executionKind: 'path-batch', batchSize: 4, batchUnit: 'path-tiles' },
-      { id: 5, name: 'CreateShortCuts', executionKind: 'shortcut-attempt', batchSize: 1, batchUnit: 'shortcut-attempts' },
-      { id: 6, name: 'Draw', executionKind: 'row-slice', batchSize: 1, batchUnit: 'rows' },
-      { id: 7, name: 'Finalize', executionKind: 'finalize-state', batchSize: null, batchUnit: null },
-      { id: 8, name: 'Reset', executionKind: 'reset-branch', batchSize: null, batchUnit: null }
+      { id: 0, name: 'CreateGrid', completionSignal: 'grid-spawn-complete', advancesToStageId: 3, executionKind: 'row-slice', batchSize: 1, batchUnit: 'rows', skipToStageIdWhenDisabled: null },
+      { id: 3, name: 'MapPath', completionSignal: 'checkpoint-budget-exhausted', advancesToStageId: 4, executionKind: 'checkpoint-pass', batchSize: 1, batchUnit: 'checkpoint-passes', skipToStageIdWhenDisabled: null },
+      { id: 4, name: 'CreatePath', completionSignal: 'path-array-exhausted', advancesToStageId: 5, executionKind: 'path-batch', batchSize: 4, batchUnit: 'path-tiles', skipToStageIdWhenDisabled: null },
+      { id: 5, name: 'CreateShortCuts', completionSignal: 'shortcut-budget-exhausted', advancesToStageId: 6, executionKind: 'shortcut-attempt', batchSize: 1, batchUnit: 'shortcut-attempts', skipToStageIdWhenDisabled: 6 },
+      { id: 6, name: 'Draw', completionSignal: 'draw-iteration-complete', advancesToStageId: 7, executionKind: 'row-slice', batchSize: 1, batchUnit: 'rows', skipToStageIdWhenDisabled: null },
+      { id: 7, name: 'Finalize', completionSignal: 'player-finalized', advancesToStageId: null, executionKind: 'finalize-state', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
+      { id: 8, name: 'Reset', completionSignal: 'menu-reset-delay-rearmed', advancesToStageId: 0, executionKind: 'reset-branch', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null }
     ]);
   });
 
@@ -148,9 +148,12 @@ describe('legacy generation lifecycle', () => {
     expect(menuBootRequest.executionPlan[0]).toEqual({
       id: 0,
       name: 'CreateGrid',
+      completionSignal: 'grid-spawn-complete',
+      advancesToStageId: 3,
       executionKind: 'row-slice',
       batchSize: 1,
-      batchUnit: 'rows'
+      batchUnit: 'rows',
+      skipToStageIdWhenDisabled: null
     });
     expect(goalResetRequest.seed).toBe(3750);
     expect(goalResetRequest.queuedAtMs).toBe(1540);
@@ -176,9 +179,12 @@ describe('legacy generation lifecycle', () => {
     expect(playMaze.generation?.executionPlan[0]).toEqual({
       id: 0,
       name: 'CreateGrid',
+      completionSignal: 'grid-spawn-complete',
+      advancesToStageId: 3,
       executionKind: 'full-stage',
       batchSize: null,
-      batchUnit: null
+      batchUnit: null,
+      skipToStageIdWhenDisabled: null
     });
     expect(playMaze.seed).toBe(902);
   });

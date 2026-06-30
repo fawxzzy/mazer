@@ -137,6 +137,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - explicit level-building scheduler contract for start-time + delay-start flag ownership, with honest `durationMs = null` until the old `_LevelBuildingLogicDelayDuration` value is recovered
   - queued generation/reset request reasons and tick-consumption contract
   - explicit stage `0/3/4/5/6` execution cadence contract for menu-sliced versus play-continuous generation
+  - explicit stage completion signals, next-stage transitions, and stage-5 skip-to-6 progression contract
   - explicit stage-7 finalize state for spawn, title visibility, and play timer start
   - generation metadata attached to runtime-created mazes
   - queued generation requests now carry build, stage, budget, arm-time, and delay-gate metadata before tick consumption
@@ -161,6 +162,7 @@ Boundary:
 - if the change is "what checkpoint/shortcut budget does the current runtime claim?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `window.__MAZER_VISUAL_DIAGNOSTICS__`
 - if the change is "what legacy gate causes process 0 or process 8 to enter?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `src/legacy-runtime/legacyPlayLifecycle.ts`
 - if the change is "what exactly owns the level-building delay gate or reset bypass semantics?", start in `docs/legacy/gameplay-spec.md`, `src/legacy-runtime/legacyGenerationLifecycle.ts`, and `src/legacy-runtime/legacyPlayLifecycle.ts`
+- if the change is "which stage advances where or which stage can skip ahead?", start in `docs/legacy/gameplay-spec.md` and `src/legacy-runtime/legacyGenerationLifecycle.ts`
 - if the change is "when does the runtime rebuild or return to menu?", start in `src/scenes/MenuScene.ts`
 - if the change is "how do we port the old staged process `0/3/4/5/6/7/8` lifecycle exactly?", start from `docs/legacy/gameplay-spec.md` and open a dedicated port packet before rewriting runtime code
 

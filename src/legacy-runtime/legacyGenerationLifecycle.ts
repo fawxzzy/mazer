@@ -12,6 +12,15 @@ export type LegacyMazeBuildKind = 'menu-snapshot' | 'play-generated';
 export type LegacyGenerationProcessStageId = 0 | 3 | 4 | 5 | 6 | 7 | 8;
 export type LegacyGenerationStageName = 'CreateGrid' | 'MapPath' | 'CreatePath' | 'CreateShortCuts' | 'Draw' | 'Finalize' | 'Reset';
 export type LegacyGenerationDelayDurationSource = 'legacy-variable-unrecovered';
+export type LegacyGenerationCompletionSignal =
+  | 'grid-spawn-complete'
+  | 'checkpoint-budget-exhausted'
+  | 'path-array-exhausted'
+  | 'shortcut-budget-exhausted'
+  | 'draw-iteration-complete'
+  | 'player-finalized'
+  | 'menu-reset-delay-rearmed'
+  | 'play-reset-template-return';
 export type LegacyGenerationStageExecutionKind =
   | 'full-stage'
   | 'row-slice'
@@ -31,11 +40,14 @@ export type LegacyGenerationRequestReason =
   | 'overlay-rebuild';
 
 export interface LegacyGenerationStageContract {
+  advancesToStageId: LegacyGenerationProcessStageId | null;
   batchSize: number | null;
   batchUnit: LegacyGenerationStageBatchUnit;
+  completionSignal: LegacyGenerationCompletionSignal;
   executionKind: LegacyGenerationStageExecutionKind;
   id: LegacyGenerationProcessStageId;
   name: LegacyGenerationStageName;
+  skipToStageIdWhenDisabled: LegacyGenerationProcessStageId | null;
 }
 
 export interface LegacyGenerationBudgetContract {
@@ -174,27 +186,44 @@ const createLegacyStageContract = (
     switch (stageId) {
       case 7:
         return {
+          advancesToStageId: null,
           id: stageId,
           name: resolveLegacyGenerationStageName(stageId),
+          completionSignal: 'player-finalized',
           executionKind: 'finalize-state',
           batchSize: null,
-          batchUnit: null
+          batchUnit: null,
+          skipToStageIdWhenDisabled: null
         };
       case 8:
         return {
+          advancesToStageId: null,
           id: stageId,
           name: resolveLegacyGenerationStageName(stageId),
+          completionSignal: 'play-reset-template-return',
           executionKind: 'reset-branch',
           batchSize: null,
-          batchUnit: null
+          batchUnit: null,
+          skipToStageIdWhenDisabled: null
         };
       default:
         return {
+          advancesToStageId: stageId === 0 ? 3 : stageId === 3 ? 4 : stageId === 4 ? 5 : stageId === 5 ? 6 : 7,
           id: stageId,
           name: resolveLegacyGenerationStageName(stageId),
+          completionSignal: stageId === 0
+            ? 'grid-spawn-complete'
+            : stageId === 3
+              ? 'checkpoint-budget-exhausted'
+              : stageId === 4
+                ? 'path-array-exhausted'
+                : stageId === 5
+                  ? 'shortcut-budget-exhausted'
+                  : 'draw-iteration-complete',
           executionKind: 'full-stage',
           batchSize: null,
-          batchUnit: null
+          batchUnit: null,
+          skipToStageIdWhenDisabled: stageId === 5 ? 6 : null
         };
     }
   }
@@ -202,59 +231,80 @@ const createLegacyStageContract = (
   switch (stageId) {
     case 0:
       return {
+        advancesToStageId: 3,
         id: stageId,
         name: resolveLegacyGenerationStageName(stageId),
+        completionSignal: 'grid-spawn-complete',
         executionKind: 'row-slice',
         batchSize: 1,
-        batchUnit: 'rows'
+        batchUnit: 'rows',
+        skipToStageIdWhenDisabled: null
       };
     case 3:
       return {
+        advancesToStageId: 4,
         id: stageId,
         name: resolveLegacyGenerationStageName(stageId),
+        completionSignal: 'checkpoint-budget-exhausted',
         executionKind: 'checkpoint-pass',
         batchSize: 1,
-        batchUnit: 'checkpoint-passes'
+        batchUnit: 'checkpoint-passes',
+        skipToStageIdWhenDisabled: null
       };
     case 4:
       return {
+        advancesToStageId: 5,
         id: stageId,
         name: resolveLegacyGenerationStageName(stageId),
+        completionSignal: 'path-array-exhausted',
         executionKind: 'path-batch',
         batchSize: 4,
-        batchUnit: 'path-tiles'
+        batchUnit: 'path-tiles',
+        skipToStageIdWhenDisabled: null
       };
     case 5:
       return {
+        advancesToStageId: 6,
         id: stageId,
         name: resolveLegacyGenerationStageName(stageId),
+        completionSignal: 'shortcut-budget-exhausted',
         executionKind: 'shortcut-attempt',
         batchSize: 1,
-        batchUnit: 'shortcut-attempts'
+        batchUnit: 'shortcut-attempts',
+        skipToStageIdWhenDisabled: 6
       };
     case 6:
       return {
+        advancesToStageId: 7,
         id: stageId,
         name: resolveLegacyGenerationStageName(stageId),
+        completionSignal: 'draw-iteration-complete',
         executionKind: 'row-slice',
         batchSize: 1,
-        batchUnit: 'rows'
+        batchUnit: 'rows',
+        skipToStageIdWhenDisabled: null
       };
     case 7:
       return {
+        advancesToStageId: null,
         id: stageId,
         name: resolveLegacyGenerationStageName(stageId),
+        completionSignal: 'player-finalized',
         executionKind: 'finalize-state',
         batchSize: null,
-        batchUnit: null
+        batchUnit: null,
+        skipToStageIdWhenDisabled: null
       };
     case 8:
       return {
+        advancesToStageId: LEGACY_GENERATION_ENTRY_STAGE_ID,
         id: stageId,
         name: resolveLegacyGenerationStageName(stageId),
+        completionSignal: 'menu-reset-delay-rearmed',
         executionKind: 'reset-branch',
         batchSize: null,
-        batchUnit: null
+        batchUnit: null,
+        skipToStageIdWhenDisabled: null
       };
     default:
       return stageId satisfies never;

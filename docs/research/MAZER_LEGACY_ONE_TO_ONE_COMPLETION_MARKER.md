@@ -64,7 +64,7 @@ The current marker is the sum of the awarded points below.
 | Menu screenshot composition and board presentation | `14` | `10` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/scenes/menu-render-frame.test.ts` | final screenshot-grade composition is still open, but board material/tile read is materially closer after the heavier trench pass |
 | Overlay family and field responsibilities | `14` | `14` | aligned | `src/legacy-runtime/legacyOptionFields.ts` -> `src/legacy-runtime/legacyOverlayFieldCommit.ts` -> `src/legacy-runtime/legacyOverlayToggleFields.ts` -> `src/legacy-runtime/legacyOverlayRouting.ts` -> `src/legacy-runtime/legacyPauseLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-overlay-routing.test.ts`, `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost | keep the overlay proof spine green while larger runtime gaps close elsewhere |
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | exact movement edge cases and return/reset timing still need tighter legacy proof |
-| Generation lifecycle exactness | `16` | `13` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost runtime diagnostics | reset/generation now flow through explicit queued runtime requests, explicit delay-gated process-0 entry, explicit stage-7 finalize state, explicit initialized process-8 reset entry, explicit menu-vs-play stage cadence, explicit checkpoint/shortcut budget metadata, and an explicit level-building scheduler contract that names the armed start-time / delay-start flags plus the honest unrecovered legacy duration seam, but the full staged legacy process pipeline is still not ported |
+| Generation lifecycle exactness | `16` | `13` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost runtime diagnostics | reset/generation now flow through explicit queued runtime requests, explicit delay-gated process-0 entry, explicit stage-7 finalize state, explicit initialized process-8 reset entry, explicit menu-vs-play stage cadence, explicit checkpoint/shortcut budget metadata, an explicit level-building scheduler contract that names the armed start-time / delay-start flags plus the honest unrecovered legacy duration seam, and an explicit stage transition graph, but the full staged legacy process pipeline is still not ported |
 | Demo route, backtracking, and pacing | `12` | `8` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, localhost | recovery cues and cue-specific pacing now drive the live route, but full legacy reset semantics and final backtrack exactness still remain open |
 | In-game HUD and goal-arrow parity | `8` | `7` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot | the timer/arrow overlay is tighter and the full overlay footprint is now carried by repo-owned proof, but final screenshot-grade exactness is still open |
 
@@ -85,7 +85,7 @@ But `100%` would still be dishonest today because the biggest remaining gaps are
 
 - generation/reset lifecycle is still approximate
 - generation/reset lifecycle is more explicit than before, but still not a full staged process port
-- stage `7` finalization, process `8` reset entry, process `0` delay-gated entry, the armed level-building scheduler contract, stage `0/3/4/5/6` cadence, and checkpoint/shortcut budget formulas are now explicit, but the remaining staged pipeline is still open
+- stage `7` finalization, process `8` reset entry, process `0` delay-gated entry, the armed level-building scheduler contract, the stage transition graph, stage `0/3/4/5/6` cadence, and checkpoint/shortcut budget formulas are now explicit, but the remaining staged pipeline is still open
 - demo route semantics are still partial even after recovery cues/pacing were restored
 - HUD parity is closer, but not final
 - screenshot-grade menu material/composition is not fully closed
@@ -113,6 +113,11 @@ Do not ratchet for:
 - broader mapping with no behavior change
 - unproven visual claims
 - internal cleanup that does not improve legacy parity
+
+Current note:
+
+- explicit lifecycle mapping can still be worth landing for restart safety and owner clarity
+- but lifecycle mapping alone does not justify a percent move unless it also closes a behavior gap or restores missing legacy-owned semantics
 
 ## Preferred modular lock order from here
 

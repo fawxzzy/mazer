@@ -24,11 +24,22 @@ export interface LegacyMazeSnapshot {
     };
     buildKind: 'menu-snapshot' | 'play-generated';
     executionPlan: Array<{
+      advancesToStageId: number | null;
       batchSize: number | null;
       batchUnit: 'checkpoint-passes' | 'path-tiles' | 'rows' | 'shortcut-attempts' | null;
+      completionSignal:
+        | 'grid-spawn-complete'
+        | 'checkpoint-budget-exhausted'
+        | 'path-array-exhausted'
+        | 'shortcut-budget-exhausted'
+        | 'draw-iteration-complete'
+        | 'player-finalized'
+        | 'menu-reset-delay-rearmed'
+        | 'play-reset-template-return';
       executionKind: 'checkpoint-pass' | 'finalize-state' | 'full-stage' | 'path-batch' | 'reset-branch' | 'row-slice' | 'shortcut-attempt';
       id: number;
       name: 'CreateGrid' | 'CreatePath' | 'CreateShortCuts' | 'Draw' | 'Finalize' | 'MapPath' | 'Reset';
+      skipToStageIdWhenDisabled: number | null;
     }>;
     gate: {
       armsDelayStartOnQueue: boolean;

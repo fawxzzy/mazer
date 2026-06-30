@@ -154,11 +154,14 @@ interface MenuSceneVisualDiagnostics {
       };
       buildKind: string | null;
       executionPlan: Array<{
+        advancesToStageId: number | null;
         batchSize: number | null;
         batchUnit: string | null;
+        completionSignal: string | null;
         executionKind: string | null;
         id: number;
         name: string;
+        skipToStageIdWhenDisabled: number | null;
       }>;
       gate: {
         armsDelayStartOnQueue: boolean | null;
@@ -186,11 +189,14 @@ interface MenuSceneVisualDiagnostics {
         dueAtMs: number | null;
         queuedAtMs: number | null;
         executionPlan: Array<{
+          advancesToStageId: number | null;
           batchSize: number | null;
           batchUnit: string | null;
+          completionSignal: string | null;
           executionKind: string | null;
           id: number;
           name: string;
+          skipToStageIdWhenDisabled: number | null;
         }>;
         gate: {
           armsDelayStartOnQueue: boolean | null;
@@ -2073,11 +2079,14 @@ export class MenuScene extends Phaser.Scene {
           },
           buildKind: this.maze.generation?.buildKind ?? null,
           executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({
+            advancesToStageId: stage.advancesToStageId,
             id: stage.id,
             name: stage.name,
+            completionSignal: stage.completionSignal,
             executionKind: stage.executionKind,
             batchSize: stage.batchSize,
-            batchUnit: stage.batchUnit
+            batchUnit: stage.batchUnit,
+            skipToStageIdWhenDisabled: stage.skipToStageIdWhenDisabled
           })),
           gate: {
             armsDelayStartOnQueue: this.maze.generation?.gate.armsDelayStartOnQueue ?? null,
@@ -2108,11 +2117,14 @@ export class MenuScene extends Phaser.Scene {
             seed: this.pendingGenerationRequest?.seed ?? null,
             mode: this.pendingGenerationRequest?.mode ?? null,
             executionPlan: (this.pendingGenerationRequest?.executionPlan ?? []).map((stage) => ({
+              advancesToStageId: stage.advancesToStageId,
               id: stage.id,
               name: stage.name,
+              completionSignal: stage.completionSignal,
               executionKind: stage.executionKind,
               batchSize: stage.batchSize,
-              batchUnit: stage.batchUnit
+              batchUnit: stage.batchUnit,
+              skipToStageIdWhenDisabled: stage.skipToStageIdWhenDisabled
             })),
             gate: {
               armsDelayStartOnQueue: this.pendingGenerationRequest?.gate.armsDelayStartOnQueue ?? null,
