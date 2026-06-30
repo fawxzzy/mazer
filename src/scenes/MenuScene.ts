@@ -30,6 +30,10 @@ import {
   shouldConsumeLegacyPlayResetReturn,
   type LegacyResetRequest,
 } from '../legacy-runtime/legacyPlayLifecycle';
+import {
+  resolveLegacyPauseCommand,
+  type LegacyPauseCommand
+} from '../legacy-runtime/legacyPauseLifecycle';
 import { advanceLegacyPlayStep } from '../legacy-runtime/legacyPlayStep';
 import {
   advanceLegacyMenuDemoFrame,
@@ -1238,28 +1242,18 @@ export class MenuScene extends Phaser.Scene {
     const stacked = panel.width < 420;
     if (stacked) {
       this.uiButtons.push(
-        this.createButton(panel.centerX - 78, panel.top + panel.height - 196, 132, 54, 'Back', () => this.closeOverlay()),
-        this.createButton(panel.centerX + 78, panel.top + panel.height - 196, 132, 54, 'Reset', () => {
-          this.player = copyPoint(this.maze.start);
-          this.trail = [copyPoint(this.player)];
-          this.closeOverlay();
-          this.boardDynamicDirty = true;
-        }),
-        this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Main Menu', () => this.enterMenuMode()),
+        this.createButton(panel.centerX - 78, panel.top + panel.height - 196, 132, 54, 'Back', () => this.applyLegacyPauseCommand('resume')),
+        this.createButton(panel.centerX + 78, panel.top + panel.height - 196, 132, 54, 'Reset', () => this.applyLegacyPauseCommand('reset-player')),
+        this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Main Menu', () => this.applyLegacyPauseCommand('return-menu')),
         this.createButton(panel.centerX, panel.top + panel.height - 56, Math.min(180, panel.width - 96), 46, 'Features', () => this.openNestedOverlay('features', 'pause'))
       );
       return;
     }
 
     this.uiButtons.push(
-      this.createButton(panel.centerX - Math.round(panel.width * 0.28), panel.top + panel.height - 196, 132, 54, 'Back', () => this.closeOverlay()),
-      this.createButton(panel.centerX, panel.top + panel.height - 196, 132, 54, 'Reset', () => {
-        this.player = copyPoint(this.maze.start);
-        this.trail = [copyPoint(this.player)];
-        this.closeOverlay();
-        this.boardDynamicDirty = true;
-      }),
-      this.createButton(panel.centerX + Math.round(panel.width * 0.28), panel.top + panel.height - 196, 144, 54, 'Main Menu', () => this.enterMenuMode()),
+      this.createButton(panel.centerX - Math.round(panel.width * 0.28), panel.top + panel.height - 196, 132, 54, 'Back', () => this.applyLegacyPauseCommand('resume')),
+      this.createButton(panel.centerX, panel.top + panel.height - 196, 132, 54, 'Reset', () => this.applyLegacyPauseCommand('reset-player')),
+      this.createButton(panel.centerX + Math.round(panel.width * 0.28), panel.top + panel.height - 196, 144, 54, 'Main Menu', () => this.applyLegacyPauseCommand('return-menu')),
       this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Features', () => this.openNestedOverlay('features', 'pause'))
     );
   }
@@ -1635,6 +1629,25 @@ export class MenuScene extends Phaser.Scene {
     }
     this.boardDynamicDirty = true;
     this.uiDirty = true;
+  }
+
+  private applyLegacyPauseCommand(command: LegacyPauseCommand): void {
+    const result = resolveLegacyPauseCommand(command, this.maze.start);
+
+    if (result.nextPlayer !== null) {
+      this.player = result.nextPlayer;
+      this.trail = result.nextTrail ?? [copyPoint(result.nextPlayer)];
+      this.boardDynamicDirty = true;
+    }
+
+    if (result.enterMenu) {
+      this.enterMenuMode();
+      return;
+    }
+
+    if (result.closesOverlay) {
+      this.closeOverlay();
+    }
   }
 
   private handleBackAction(): void {

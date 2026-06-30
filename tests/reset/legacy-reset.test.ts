@@ -225,4 +225,23 @@ describe('legacy reset lane', () => {
     expect(legacyPauseMenuSource).toContain('if (ScaleNumChanged || MaterialChanged)');
     expect(legacyPauseMenuSource).toContain('GetWorld()->ServerTravel("Game/Level/Template");');
   });
+
+  test('routes pause commands through an explicit legacy pause lifecycle contract', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const pauseLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPauseLifecycle.ts'), 'utf8');
+    const legacyGamePauseSource = readFileSync(
+      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'GamePauseMenu.cpp'),
+      'utf8'
+    );
+
+    expect(pauseLifecycleSource).toContain("type LegacyPauseCommand = 'reset-player' | 'return-menu' | 'resume';");
+    expect(pauseLifecycleSource).toContain('resolveLegacyPauseCommand');
+    expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('resume')");
+    expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('reset-player')");
+    expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('return-menu')");
+    expect(menuSceneSource).toContain('private applyLegacyPauseCommand(command: LegacyPauseCommand): void {');
+    expect(legacyGamePauseSource).toContain('MazerGameInstance->_ResetPlayerPosition = true;');
+    expect(legacyGamePauseSource).toContain('Back_Clicked();');
+    expect(legacyGamePauseSource).toContain('MazerGameInstance->_Playing = false;');
+  });
 });
