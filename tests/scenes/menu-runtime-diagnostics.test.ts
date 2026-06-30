@@ -7,6 +7,7 @@ import {
   formatMenuSceneRuntimeDiagnosticsSurfaceText,
   parseMenuSceneRuntimeDiagnosticsAttribute,
   publishMenuSceneRuntimeDiagnostics,
+  resolveMenuSceneRuntimeDiagnosticsSurfaceCssText,
   resolveMenuScenePerformanceMode,
   resolveMenuSceneRuntimeConfig,
   summarizeMenuSceneRuntimeFeed,
@@ -193,8 +194,30 @@ describe('menu runtime diagnostics', () => {
     expect(changed.lastChangedAt).toBe(360);
   });
 
+  test('anchors the proof panel in the upper-left gutter for desktop proof and keeps compact fallback placement on narrow viewports', () => {
+    const desktopCss = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(1280, 720);
+    const mobileCss = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(405, 958);
+
+    expect(desktopCss).toContain('left:12px');
+    expect(desktopCss).toContain('top:12px');
+    expect(desktopCss).toContain('right:auto');
+    expect(desktopCss).toContain('bottom:auto');
+    expect(desktopCss).toContain('max-width:307px');
+    expect(desktopCss).toContain('white-space:pre-wrap');
+
+    expect(mobileCss).toContain('left:12px');
+    expect(mobileCss).toContain('bottom:12px');
+    expect(mobileCss).toContain('right:12px');
+    expect(mobileCss).toContain('top:auto');
+    expect(mobileCss).toContain('max-width:calc(100vw - 24px)');
+    expect(mobileCss).toContain('font:11px/1.35 "Courier New", monospace');
+  });
+
   test('publishes and clears runtime diagnostics on the window and DOM proof surfaces', () => {
-    const runtimeWindow = {} as Window;
+    const runtimeWindow = {
+      innerWidth: 1280,
+      innerHeight: 720
+    } as Window;
     const previousWindow = globalThis.window;
     const previousDocument = globalThis.document;
     const documentAttributes = new Map<string, string>();
@@ -366,6 +389,8 @@ describe('menu runtime diagnostics', () => {
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toBe(
         formatMenuSceneRuntimeDiagnosticsSurfaceText(diagnostics)
       );
+      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.style.cssText).toContain('top:12px');
+      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.style.cssText).toContain('bottom:auto');
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
         'demo explore cue backtrack mistakes on cursor 12'
       );

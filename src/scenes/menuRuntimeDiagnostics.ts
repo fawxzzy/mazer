@@ -182,6 +182,52 @@ const formatRuntimeMetric = (value: number, digits = 1): string => (
   Number.isFinite(value) ? Number(value).toFixed(digits) : 'n/a'
 );
 
+const resolveRuntimeViewportSize = (): { width: number; height: number } => {
+  const runtime = resolveRuntimeWindow();
+  const runtimeDocument = resolveRuntimeDocument();
+  const documentWidth = Number(runtimeDocument?.documentElement?.clientWidth ?? 0);
+  const documentHeight = Number(runtimeDocument?.documentElement?.clientHeight ?? 0);
+  const windowWidth = Number(runtime?.innerWidth ?? 0);
+  const windowHeight = Number(runtime?.innerHeight ?? 0);
+
+  return {
+    width: Math.max(0, Math.trunc(Number.isFinite(windowWidth) && windowWidth > 0 ? windowWidth : documentWidth)),
+    height: Math.max(0, Math.trunc(Number.isFinite(windowHeight) && windowHeight > 0 ? windowHeight : documentHeight))
+  };
+};
+
+export const resolveMenuSceneRuntimeDiagnosticsSurfaceCssText = (
+  viewportWidth?: number | null,
+  viewportHeight?: number | null
+): string => {
+  const width = Number.isFinite(viewportWidth) ? Math.max(0, Math.trunc(viewportWidth ?? 0)) : 0;
+  const height = Number.isFinite(viewportHeight) ? Math.max(0, Math.trunc(viewportHeight ?? 0)) : 0;
+  const useDesktopPlacement = width >= 960 && height >= 540;
+  const desktopMaxWidth = Math.min(320, Math.max(220, Math.round(width * 0.24)));
+  const compactFontSize = width > 0 && width < 460 ? 11 : 12;
+
+  return [
+    'position:fixed',
+    useDesktopPlacement ? 'left:12px' : 'left:12px',
+    useDesktopPlacement ? 'top:12px' : 'bottom:12px',
+    useDesktopPlacement ? 'right:auto' : 'right:12px',
+    useDesktopPlacement ? 'bottom:auto' : 'top:auto',
+    'z-index:99999',
+    'margin:0',
+    'padding:8px 10px',
+    'max-width:' + (useDesktopPlacement ? `${desktopMaxWidth}px` : 'calc(100vw - 24px)'),
+    'overflow-wrap:anywhere',
+    'border:1px solid rgba(222, 219, 230, 0.28)',
+    'background:rgba(5, 5, 10, 0.72)',
+    'color:#d7f0d6',
+    `font:${compactFontSize}px/1.35 "Courier New", monospace`,
+    'white-space:pre-wrap',
+    'pointer-events:none',
+    'border-radius:4px',
+    'box-shadow:0 4px 16px rgba(0, 0, 0, 0.28)'
+  ].join(';');
+};
+
 const normalizeFeedSummary = (value: string): string => value.trim().replace(/\s+/g, ' ');
 
 const buildFeedSignature = (
@@ -424,12 +470,15 @@ export const parseMenuSceneRuntimeDiagnosticsAttribute = (
 const ensureMenuSceneRuntimeDiagnosticsSurface = (
   runtimeDocument: Document
 ): HTMLElement | null => {
+  const viewport = resolveRuntimeViewportSize();
+  const cssText = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(viewport.width, viewport.height);
   const existing = runtimeDocument.getElementById(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID);
   if (
     existing
     && typeof (existing as Partial<HTMLElement>).textContent !== 'undefined'
     && typeof (existing as Partial<HTMLElement>).style !== 'undefined'
   ) {
+    (existing as HTMLElement).style.cssText = cssText;
     return existing as HTMLElement;
   }
 
@@ -439,22 +488,7 @@ const ensureMenuSceneRuntimeDiagnosticsSurface = (
 
   const surface = runtimeDocument.createElement('pre');
   surface.id = MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID;
-  surface.style.cssText = [
-    'position:fixed',
-    'left:12px',
-    'bottom:12px',
-    'z-index:99999',
-    'margin:0',
-    'padding:8px 10px',
-    'border:1px solid rgba(222, 219, 230, 0.28)',
-    'background:rgba(5, 5, 10, 0.72)',
-    'color:#d7f0d6',
-    'font:12px/1.35 "Courier New", monospace',
-    'white-space:pre',
-    'pointer-events:none',
-    'border-radius:4px',
-    'box-shadow:0 4px 16px rgba(0, 0, 0, 0.28)'
-  ].join(';');
+  surface.style.cssText = cssText;
   runtimeDocument.body.appendChild(surface);
   return surface;
 };
