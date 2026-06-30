@@ -23,6 +23,7 @@ import {
   type LegacyRuntimeMode
 } from '../legacy-runtime/legacyOverlayRouting';
 import {
+  createLegacyMenuResetGenerationRequest,
   consumeLegacyGenerationRequestState,
   createLegacyGenerationRequest,
   shouldConsumeLegacyGenerationRequest,
@@ -1048,18 +1049,11 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    this.applyGenerationRequest(
-      createLegacyGenerationRequest({
-        currentSeed: this.mazeSeed,
-        dueAtMs: time,
-        mode: 'menu',
-        queuedAtMs: time,
-        reason: 'menu-demo-goal-reset',
-        scale: this.settings.scale,
-        stepSeed: true
-      }),
-      time
-    );
+    this.pendingGenerationRequest = createLegacyMenuResetGenerationRequest({
+      currentSeed: this.mazeSeed,
+      nowMs: time,
+      scale: this.settings.scale
+    });
   }
 
   private createStars(): void {

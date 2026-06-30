@@ -2,7 +2,7 @@
 
 Date: 2026-06-29
 Status: active
-Current marker: `89%`
+Current marker: `90%`
 
 ## Intent
 
@@ -64,15 +64,15 @@ The current marker is the sum of the awarded points below.
 | Menu screenshot composition and board presentation | `14` | `13` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-title.test.ts`, `tests/reset/legacy-menu-button-chrome.test.ts`, `tests/reset/legacy-menu-backdrop.test.ts`, `tests/scenes/menu-render-frame.test.ts`, localhost | final screenshot-grade composition is still open, but desktop board dominance, title lockup, button support chrome, explicit backdrop ownership, a darker less-even board-material pass, a slightly wider/quieter trench read, a denser upper-left frame/pocket/lattice silhouette, and added lower-left shelf density are now closer to the restored screenshots without yet closing the last material/composition gap |
 | Overlay family and field responsibilities | `14` | `14` | aligned | `src/legacy-runtime/legacyOptionFields.ts` -> `src/legacy-runtime/legacyOverlayFieldCommit.ts` -> `src/legacy-runtime/legacyOverlayToggleFields.ts` -> `src/legacy-runtime/legacyOverlayRouting.ts` -> `src/legacy-runtime/legacyPauseLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-overlay-routing.test.ts`, `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost | keep the overlay proof spine green while larger runtime gaps close elsewhere |
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | exact movement edge cases and return/reset timing still need tighter legacy proof |
-| Generation lifecycle exactness | `16` | `13` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost runtime diagnostics | reset/generation now flow through explicit queued runtime requests, explicit delay-gated process-0 entry, explicit stage-7 finalize state, explicit initialized process-8 reset entry, explicit menu-vs-play stage cadence, explicit checkpoint/shortcut budget metadata, an explicit level-building scheduler contract that names the armed start-time / delay-start flags plus the honest unrecovered legacy duration seam, an explicit stage transition graph, and an explicit stage-cursor diagnostics projection for queued process-0 entry versus consumed stage-7 finalization, but the full staged legacy process pipeline is still not ported |
+| Generation lifecycle exactness | `16` | `14` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost runtime diagnostics | reset/generation now flow through explicit queued runtime requests, explicit delay-gated process-0 entry, explicit stage-7 finalize state, explicit initialized process-8 reset entry, an explicit menu-demo process-8-to-process-0 handoff instead of inline regeneration, explicit menu-vs-play stage cadence, explicit checkpoint/shortcut budget metadata, an explicit level-building scheduler contract that names the armed start-time / delay-start flags plus the honest unrecovered legacy duration seam, an explicit stage transition graph, and an explicit stage-cursor diagnostics projection for queued process-0 entry versus consumed stage-7 finalization, but the full staged legacy process pipeline is still not ported |
 | Demo route, backtracking, and pacing | `12` | `10` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, localhost | recovery cues and cue-specific pacing now drive the live route, the fixed front-door snapshot no longer suppresses the legacy mistake/backtrack lane, and the snapshot bootstrap now settles into a visible `explore` pose instead of landing in `goal-hold` or `reset-hold`, but full legacy reset semantics and final backtrack exactness still remain open |
 | In-game HUD and goal-arrow parity | `8` | `7` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot | the timer/arrow overlay is tighter and the full overlay footprint is now carried by repo-owned proof, but final screenshot-grade exactness is still open |
 
 Current total:
 
-- `89 / 100`
+- `90 / 100`
 
-## Why the marker is held at 89%
+## Why the marker is held at 90%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -90,7 +90,7 @@ But `100%` would still be dishonest today because the biggest remaining gaps are
 - desktop board tile read is slightly closer after widening the menu trench core and reducing wall-grid noise, but screenshot-grade board material and composition exactness are still open
 - the upper-left frame/pocket/lattice corner is slightly closer after extending those fixed snapshot branches, but the menu board is still short of final screenshot-grade silhouette closure
 - the lower-left interior is slightly closer after adding fixed snapshot shelf density, but the menu board is still short of final screenshot-grade silhouette closure
-- stage `7` finalization, process `8` reset entry, process `0` delay-gated entry, the armed level-building scheduler contract, the stage transition graph, stage `0/3/4/5/6` cadence, stage-cursor diagnostics, and checkpoint/shortcut budget formulas are now explicit, but the remaining staged pipeline is still open
+- stage `7` finalization, process `8` reset entry, menu process-8-to-process-0 reset handoff, process `0` delay-gated entry, the armed level-building scheduler contract, the stage transition graph, stage `0/3/4/5/6` cadence, stage-cursor diagnostics, and checkpoint/shortcut budget formulas are now explicit, but the remaining staged pipeline is still open
 - demo route semantics are closer now that the fixed front-door snapshot also uses the legacy mistake/backtrack lane and no longer boots into a weak `reset-hold` / `goal-hold` first impression, but full reset/backtrack exactness is still partial
 - HUD parity is closer, but not final
 - screenshot-grade menu material/composition is not fully closed
@@ -125,6 +125,7 @@ Current note:
 - explicit lifecycle mapping can still be worth landing for restart safety and owner clarity
 - but lifecycle mapping alone does not justify a percent move unless it also closes a behavior gap or restores missing legacy-owned semantics
 - the stage-cursor packet improves runtime proof and owner clarity, but the marker stays held because the runtime still consumes generation through the current one-shot builder
+- the menu reset-handoff packet earns one point because it changes runtime behavior: process-8 menu reset no longer regenerates inline and instead enqueues the next process-0 generation request
 
 ## Preferred modular lock order from here
 

@@ -3,6 +3,7 @@ import {
   consumeLegacyGenerationRequest,
   consumeLegacyGenerationRequestState,
   createLegacyGenerationRequest,
+  createLegacyMenuResetGenerationRequest,
   createLegacyRuntimeMazeForMode,
   LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID,
   LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS,
@@ -235,6 +236,28 @@ describe('legacy generation lifecycle', () => {
       skipToStageIdWhenDisabled: null
     });
     expect(playMaze.seed).toBe(902);
+  });
+
+  test('converts menu process-8 reset into the next queued process-0 generation request', () => {
+    const resetGenerationRequest = createLegacyMenuResetGenerationRequest({
+      currentSeed: 3749,
+      nowMs: 1820,
+      scale: 50
+    });
+
+    expect(resetGenerationRequest.reason).toBe('menu-demo-goal-reset');
+    expect(resetGenerationRequest.mode).toBe('menu');
+    expect(resetGenerationRequest.seed).toBe(3750);
+    expect(resetGenerationRequest.queuedAtMs).toBe(1820);
+    expect(resetGenerationRequest.dueAtMs).toBe(1820);
+    expect(resetGenerationRequest.stageCursor).toEqual({
+      phase: 'queued-entry',
+      currentStageId: 0,
+      completionSignal: 'grid-spawn-complete',
+      previousStageIds: [],
+      remainingStageIds: [3, 4, 5, 6, 7, 8],
+      processComplete: false
+    });
   });
 
   test('makes legacy stage-7 finalize responsibilities explicit for play and menu requests', () => {

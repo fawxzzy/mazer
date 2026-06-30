@@ -219,6 +219,7 @@ describe('legacy reset lane', () => {
 
     expect(generationLifecycleSource).toContain("type LegacyGenerationRequestReason =");
     expect(generationLifecycleSource).toContain('createLegacyGenerationRequest');
+    expect(generationLifecycleSource).toContain('createLegacyMenuResetGenerationRequest');
     expect(generationLifecycleSource).toContain('shouldConsumeLegacyGenerationRequest');
     expect(generationLifecycleSource).toContain('consumeLegacyGenerationRequest');
     expect(generationLifecycleSource).toContain('consumeLegacyGenerationRequestState');
@@ -250,7 +251,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('if (generationState.startsPlayTimer) {');
     expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });");
     expect(menuSceneSource).toContain("this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });");
-    expect(menuSceneSource).toContain("reason: 'menu-demo-goal-reset',");
+    expect(menuSceneSource).toContain('this.pendingGenerationRequest = createLegacyMenuResetGenerationRequest({');
+    expect(menuSceneSource).toContain('nowMs: time,');
     expect(menuSceneSource).toContain('pendingRequest: {');
     expect(menuSceneSource).toContain('budget: {');
     expect(menuSceneSource).toContain('checkpointCount: this.maze.generation?.budget.checkpointCount ?? null');

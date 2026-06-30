@@ -421,6 +421,24 @@ export const createLegacyGenerationRequest = ({
   };
 };
 
+export const createLegacyMenuResetGenerationRequest = ({
+  currentSeed,
+  nowMs,
+  scale
+}: {
+  currentSeed: number;
+  nowMs: number;
+  scale: number;
+}): LegacyGenerationRequest => createLegacyGenerationRequest({
+  currentSeed,
+  dueAtMs: nowMs,
+  mode: 'menu',
+  queuedAtMs: nowMs,
+  reason: 'menu-demo-goal-reset',
+  scale,
+  stepSeed: true
+});
+
 export const shouldConsumeLegacyGenerationRequest = (
   request: LegacyGenerationRequest | null,
   nowMs: number
