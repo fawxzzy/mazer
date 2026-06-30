@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import {
+  MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE,
   MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY,
+  MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID,
   clearMenuSceneRuntimeDiagnostics,
+  formatMenuSceneRuntimeDiagnosticsSurfaceText,
+  parseMenuSceneRuntimeDiagnosticsAttribute,
   publishMenuSceneRuntimeDiagnostics,
   resolveMenuScenePerformanceMode,
   resolveMenuSceneRuntimeConfig,
@@ -189,13 +193,63 @@ describe('menu runtime diagnostics', () => {
     expect(changed.lastChangedAt).toBe(360);
   });
 
-  test('publishes and clears runtime diagnostics on the window surface', () => {
+  test('publishes and clears runtime diagnostics on the window and DOM proof surfaces', () => {
     const runtimeWindow = {} as Window;
     const previousWindow = globalThis.window;
+    const previousDocument = globalThis.document;
+    const documentAttributes = new Map<string, string>();
+    const documentElements = new Map<string, {
+      id: string;
+      textContent: string;
+      style: { cssText: string };
+      remove: () => void;
+    }>();
+    const runtimeDocument = {
+      documentElement: {
+        setAttribute: (name: string, value: string) => {
+          documentAttributes.set(name, value);
+        },
+        getAttribute: (name: string) => documentAttributes.get(name) ?? null,
+        removeAttribute: (name: string) => {
+          documentAttributes.delete(name);
+        }
+      },
+      body: {
+        appendChild: (element: {
+          id: string;
+          textContent: string;
+          style: { cssText: string };
+          remove: () => void;
+        }) => {
+          if (element.id) {
+            documentElements.set(element.id, element);
+          }
+          return element;
+        }
+      },
+      getElementById: (id: string) => documentElements.get(id) ?? null,
+      createElement: () => {
+        const element = {
+          id: '',
+          textContent: '',
+          style: { cssText: '' },
+          remove: () => {
+            if (element.id) {
+              documentElements.delete(element.id);
+            }
+          }
+        };
+        return element;
+      }
+    } as unknown as Document;
 
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: runtimeWindow
+    });
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: runtimeDocument
     });
 
     const diagnostics: MenuSceneRuntimeDiagnostics = {
@@ -298,13 +352,25 @@ describe('menu runtime diagnostics', () => {
     try {
       publishMenuSceneRuntimeDiagnostics(diagnostics);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]).toEqual(diagnostics);
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )).toEqual(diagnostics);
+      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toBe(
+        formatMenuSceneRuntimeDiagnosticsSurfaceText(diagnostics)
+      );
 
       clearMenuSceneRuntimeDiagnostics();
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]).toBeUndefined();
+      expect(documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)).toBeUndefined();
+      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)).toBeUndefined();
     } finally {
       Object.defineProperty(globalThis, 'window', {
         configurable: true,
         value: previousWindow
+      });
+      Object.defineProperty(globalThis, 'document', {
+        configurable: true,
+        value: previousDocument
       });
     }
   });

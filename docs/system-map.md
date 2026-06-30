@@ -61,7 +61,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | boot diagnostics readback | `src/boot/bootStatus.ts`, `src/boot/main.ts` | `tests/boot/boot-status.test.ts` |
 | Phaser scene wiring | `src/boot/phaserConfig.ts` | `npm run build` |
 | active front door and play shell | `src/scenes/MenuScene.ts` | in-app browser, `npm run verify` |
-| live runtime diagnostics bridge | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost |
+| live runtime diagnostics bridge | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, localhost |
 | fixed menu maze shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `tests/reset/legacy-reset.test.ts`, screenshots |
 | generated play maze | `src/legacy-runtime/legacyMaze.ts` | `tests/reset/legacy-reset.test.ts` |
 | menu title/board/button layout math | `src/legacy-runtime/legacyMenuLayout.ts` | `tests/reset/legacy-menu-layout.test.ts` |
@@ -93,7 +93,7 @@ This is the active state contract for the current app front door.
 | menu demo episode/config/state | `MazeEpisode`, `DemoWalkerConfig`, `DemoWalkerState` | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | menu-only attract route and preroll truth |
 | player/trail/goal live state | `player`, `trail`, `goal` | `src/scenes/MenuScene.ts` | trail presentation differs between menu and play, but ownership stays local to the scene |
 | visual diagnostics | `window.__MAZER_VISUAL_DIAGNOSTICS__` | `src/scenes/MenuScene.ts` | visual proof scripts treat this as route-aware readback, not gameplay truth |
-| runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; direct browser-automation readback is still a current observability seam |
+| runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics`, `#mazer-runtime-diagnostics` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; browser automation still may not see the `window` globals directly, but the DOM attribute and visible panel are repo-owned fallback surfaces |
 
 ## End-to-end flow map
 
@@ -438,7 +438,11 @@ What `verify` currently means:
   - menu-demo phase / cue / path cursor / preroll / wrong-turn policy
 - `window.__MAZER_RUNTIME_DIAGNOSTICS__`
   - runtime-diagnostics readback for frame-window, low-power, and publish-cadence truth when enabled
-  - current caveat: browser automation did not surface the `window.__MAZER_*` globals during this packet even while the localhost canvas rendered, so use screenshot truth plus repo-owned tests when that readback goes missing
+  - current caveat: browser automation still may not surface the `window.__MAZER_*` globals directly even while the localhost canvas renders
+- `data-mazer-runtime-diagnostics`
+  - serialized DOM fallback for repo tooling and browser automation readback
+- `#mazer-runtime-diagnostics`
+  - visible proof-only panel for the in-app browser when `runtimeDiagnostics=1`
 
 ### Repo-owned tests most relevant to this lane
 

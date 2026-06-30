@@ -19,6 +19,7 @@ import { buildVisibilityRollup } from './runtime-visibility-rollup.mjs';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
 const RUNTIME_DIAGNOSTICS_KEY = '__MAZER_RUNTIME_DIAGNOSTICS__';
+const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';
 const DEFAULT_ARTIFACT_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-runtime-soak');
 const DEFAULT_CAPTURE_TIMEOUT_MS = 30_000;
 const DEFAULT_DURATION_SECONDS = 60;
@@ -65,15 +66,35 @@ const getCommitSha = () => {
 };
 
 const waitForRuntimeDiagnostics = async (page, timeoutMs) => {
-  await page.waitForFunction((diagnosticsKey) => {
-    const diagnostics = window[diagnosticsKey];
+  await page.waitForFunction(({ diagnosticsKey, diagnosticsAttribute }) => {
+    const diagnostics = window[diagnosticsKey] ?? (() => {
+      const serialized = document.documentElement.getAttribute(diagnosticsAttribute);
+      if (typeof serialized !== 'string' || serialized.length === 0) {
+        return null;
+      }
+
+      try {
+        const parsed = JSON.parse(serialized);
+        return (
+          parsed
+          && parsed.sceneInstanceId
+          && parsed.performance
+          && parsed.resources
+        ) ? parsed : null;
+      } catch {
+        return null;
+      }
+    })();
     return Boolean(
       diagnostics
       && diagnostics.sceneInstanceId
       && diagnostics.performance
       && diagnostics.resources
     );
-  }, RUNTIME_DIAGNOSTICS_KEY, { timeout: timeoutMs });
+  }, {
+    diagnosticsKey: RUNTIME_DIAGNOSTICS_KEY,
+    diagnosticsAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE
+  }, { timeout: timeoutMs });
 };
 
 const setSimulatedVisibility = async (page, hidden) => {
@@ -328,7 +349,29 @@ const captureRuntimeSoak = async ({
       hiddenReleased = true;
     }
 
-    const diagnostics = await page.evaluate((diagnosticsKey) => window[diagnosticsKey], RUNTIME_DIAGNOSTICS_KEY);
+    const diagnostics = await page.evaluate(({ diagnosticsKey, diagnosticsAttribute }) => (
+      window[diagnosticsKey] ?? (() => {
+        const serialized = document.documentElement.getAttribute(diagnosticsAttribute);
+        if (typeof serialized !== 'string' || serialized.length === 0) {
+          return null;
+        }
+
+        try {
+          const parsed = JSON.parse(serialized);
+          return (
+            parsed
+            && parsed.sceneInstanceId
+            && parsed.performance
+            && parsed.resources
+          ) ? parsed : null;
+        } catch {
+          return null;
+        }
+      })()
+    ), {
+      diagnosticsKey: RUNTIME_DIAGNOSTICS_KEY,
+      diagnosticsAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE
+    });
     if (diagnostics) {
       samples.push({
         capturedAt: new Date().toISOString(),

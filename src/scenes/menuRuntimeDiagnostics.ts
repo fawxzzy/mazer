@@ -3,6 +3,8 @@ import type { TelemetryEvent, TelemetrySemanticSummary } from '../telemetry';
 import type { HumanInputTimingSnapshot } from '../input-human';
 
 export const MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY = '__MAZER_RUNTIME_DIAGNOSTICS__' as const;
+export const MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics' as const;
+export const MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID = 'mazer-runtime-diagnostics' as const;
 
 export type MenuScenePerformanceMode = 'full' | 'throttled' | 'hidden';
 
@@ -162,6 +164,14 @@ let fallbackSceneInstanceId = 0;
 
 const resolveRuntimeWindow = (): Window | undefined => (
   typeof window === 'undefined' ? undefined : window
+);
+
+const resolveRuntimeDocument = (): Document | undefined => (
+  typeof document === 'undefined' ? undefined : document
+);
+
+const formatRuntimeMetric = (value: number, digits = 1): string => (
+  Number.isFinite(value) ? Number(value).toFixed(digits) : 'n/a'
 );
 
 const normalizeFeedSummary = (value: string): string => value.trim().replace(/\s+/g, ' ');
@@ -370,20 +380,114 @@ export const nextMenuSceneInstanceId = (): number => {
   return runtime.__MAZER_MENU_SCENE_INSTANCE__;
 };
 
-export const publishMenuSceneRuntimeDiagnostics = (
+export const formatMenuSceneRuntimeDiagnosticsSurfaceText = (
+  diagnostics: MenuSceneRuntimeDiagnostics
+): string => [
+  `diag s${diagnostics.sceneInstanceId} r${diagnostics.revision} perf:${diagnostics.performance.mode}`,
+  `fps ${Math.round(diagnostics.performance.estimatedFps)} avg ${formatRuntimeMetric(diagnostics.performance.recentAverageFrameMs)}ms worst ${formatRuntimeMetric(diagnostics.performance.worstRecentFrameMs)}ms spikes ${diagnostics.performance.recentSpikeCount}`,
+  `trail ${diagnostics.resources.trailSegmentCount}/${diagnostics.resources.trailSegmentCap} listeners ${diagnostics.resources.listenerCount} vis ${diagnostics.visibility.changeCount}/${diagnostics.visibility.suspendCount} low ${diagnostics.performance.lowPowerActive ? 'on' : 'off'}`
+].join('\n');
+
+export const parseMenuSceneRuntimeDiagnosticsAttribute = (
+  value: string | null | undefined
+): MenuSceneRuntimeDiagnostics | null => {
+  if (typeof value !== 'string' || value.length === 0) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<MenuSceneRuntimeDiagnostics> | null;
+    if (
+      parsed
+      && parsed.sceneInstanceId
+      && parsed.performance
+      && parsed.resources
+    ) {
+      return parsed as MenuSceneRuntimeDiagnostics;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
+const ensureMenuSceneRuntimeDiagnosticsSurface = (
+  runtimeDocument: Document
+): HTMLElement | null => {
+  const existing = runtimeDocument.getElementById(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID);
+  if (
+    existing
+    && typeof (existing as Partial<HTMLElement>).textContent !== 'undefined'
+    && typeof (existing as Partial<HTMLElement>).style !== 'undefined'
+  ) {
+    return existing as HTMLElement;
+  }
+
+  if (!runtimeDocument.body) {
+    return null;
+  }
+
+  const surface = runtimeDocument.createElement('pre');
+  surface.id = MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID;
+  surface.style.cssText = [
+    'position:fixed',
+    'left:12px',
+    'bottom:12px',
+    'z-index:99999',
+    'margin:0',
+    'padding:8px 10px',
+    'border:1px solid rgba(222, 219, 230, 0.28)',
+    'background:rgba(5, 5, 10, 0.72)',
+    'color:#d7f0d6',
+    'font:12px/1.35 "Courier New", monospace',
+    'white-space:pre',
+    'pointer-events:none',
+    'border-radius:4px',
+    'box-shadow:0 4px 16px rgba(0, 0, 0, 0.28)'
+  ].join(';');
+  runtimeDocument.body.appendChild(surface);
+  return surface;
+};
+
+const publishMenuSceneRuntimeDiagnosticsInstallSurface = (
   diagnostics?: MenuSceneRuntimeDiagnostics
 ): void => {
-  const runtime = resolveRuntimeWindow();
-  if (!runtime) {
+  const runtimeDocument = resolveRuntimeDocument();
+  if (!runtimeDocument) {
     return;
   }
 
   if (!diagnostics) {
-    delete runtime[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY];
+    runtimeDocument.documentElement.removeAttribute(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE);
+    runtimeDocument.getElementById(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.remove();
     return;
   }
 
-  runtime[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY] = diagnostics;
+  runtimeDocument.documentElement.setAttribute(
+    MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE,
+    JSON.stringify(diagnostics)
+  );
+  const surface = ensureMenuSceneRuntimeDiagnosticsSurface(runtimeDocument);
+  if (!surface) {
+    return;
+  }
+
+  surface.textContent = formatMenuSceneRuntimeDiagnosticsSurfaceText(diagnostics);
+};
+
+export const publishMenuSceneRuntimeDiagnostics = (
+  diagnostics?: MenuSceneRuntimeDiagnostics
+): void => {
+  const runtime = resolveRuntimeWindow();
+  if (runtime) {
+    if (!diagnostics) {
+      delete runtime[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY];
+    } else {
+      runtime[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY] = diagnostics;
+    }
+  }
+  publishMenuSceneRuntimeDiagnosticsInstallSurface(diagnostics);
 };
 
 export const clearMenuSceneRuntimeDiagnostics = (): void => {

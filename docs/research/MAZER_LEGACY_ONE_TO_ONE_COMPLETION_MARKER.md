@@ -94,7 +94,7 @@ Current proof note:
 
 - live runtime diagnostics are now actually bridged through `MenuScene` and covered by repo-owned tests
 - the localhost right-pane browser remains useful for visual truth on the single `4173` preview server
-- direct browser-automation readback of `window.__MAZER_*` globals is still a current observability seam and should not be mistaken for missing repo wiring
+- direct browser-automation readback of `window.__MAZER_*` globals is still browser-owned and flaky, but runtime diagnostics now have a DOM-backed fallback surface and visible panel so that seam no longer blocks localhost proof
 
 ## Ratchet rule
 

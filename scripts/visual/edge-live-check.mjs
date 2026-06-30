@@ -29,6 +29,7 @@ const EDGE_LIVE_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-edge-live')
 const VISUAL_CAPTURE_KEY = '__MAZER_VISUAL_CAPTURE__';
 const VISUAL_DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__';
 const RUNTIME_DIAGNOSTICS_KEY = '__MAZER_RUNTIME_DIAGNOSTICS__';
+const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';
 const PROOF_SURFACE_SIGNAL_KEY = '__MAZER_PROOF_SURFACES__';
 const DEFAULT_PRESET_GROUP = 'core';
 const DEFAULT_HEADLESS = true;
@@ -531,13 +532,31 @@ const runEdgeLiveInteraction = async ({
 
   const waitForMovementReady = async () => {
     await page.waitForFunction(
-      ({ runtimeKey, requiredMode }) => {
-        const runtime = window[runtimeKey] ?? null;
+      ({ runtimeKey, runtimeAttribute, requiredMode }) => {
+        const runtime = window[runtimeKey] ?? (() => {
+          const serialized = document.documentElement.getAttribute(runtimeAttribute);
+          if (typeof serialized !== 'string' || serialized.length === 0) {
+            return null;
+          }
+
+          try {
+            const parsed = JSON.parse(serialized);
+            return (
+              parsed
+              && parsed.sceneInstanceId
+              && parsed.performance
+              && parsed.resources
+            ) ? parsed : null;
+          } catch {
+            return null;
+          }
+        })();
         const projection = runtime?.projection ?? null;
         return projection?.mode === requiredMode && projection?.state === 'watching';
       },
       {
         runtimeKey: RUNTIME_DIAGNOSTICS_KEY,
+        runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
         requiredMode: interaction.requiredMode ?? 'play'
       },
       { timeout: Math.max(5_000, Math.round(timeoutMs * 0.8)) }
@@ -1030,12 +1049,35 @@ export const readDiagnostics = async (page, { retries = 3, retryDelayMs = 120 } 
 
   for (let attempt = 1; attempt <= retries; attempt += 1) {
     try {
-      return await page.evaluate((keys) => ({
-        visual: window[keys.visual] ?? null,
-        runtime: window[keys.runtime] ?? null
-      }), {
+      return await page.evaluate((keys) => {
+        const runtimeFromWindow = window[keys.runtime] ?? null;
+        const runtimeFromAttribute = (() => {
+          const serialized = document.documentElement.getAttribute(keys.runtimeAttribute);
+          if (typeof serialized !== 'string' || serialized.length === 0) {
+            return null;
+          }
+
+          try {
+            const parsed = JSON.parse(serialized);
+            return (
+              parsed
+              && parsed.sceneInstanceId
+              && parsed.performance
+              && parsed.resources
+            ) ? parsed : null;
+          } catch {
+            return null;
+          }
+        })();
+
+        return {
+          visual: window[keys.visual] ?? null,
+          runtime: runtimeFromWindow ?? runtimeFromAttribute
+        };
+      }, {
         visual: VISUAL_DIAGNOSTICS_KEY,
-        runtime: RUNTIME_DIAGNOSTICS_KEY
+        runtime: RUNTIME_DIAGNOSTICS_KEY,
+        runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE
       });
     } catch (error) {
       lastError = error;

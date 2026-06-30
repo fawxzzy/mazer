@@ -121,6 +121,70 @@ describe('edge live check', () => {
       url: 'https://preview.example.test/mazer'
     })).toBe('https://preview.example.test/mazer?runtimeDiagnostics=1');
 
+    const runtimeDiagnosticsFromAttribute = {
+      sceneInstanceId: 9,
+      performance: {
+        mode: 'full',
+        estimatedFps: 60
+      },
+      resources: {
+        listenerCount: 4
+      }
+    };
+    const originalWindow = globalThis.window;
+    const originalDocument = globalThis.document;
+    const diagnosticsFromDom = await readDiagnostics({
+      evaluate: async (pageFunction: (arg: {
+        visual: string;
+        runtime: string;
+        runtimeAttribute: string;
+      }) => unknown, arg: {
+        visual: string;
+        runtime: string;
+        runtimeAttribute: string;
+      }) => {
+        Object.defineProperty(globalThis, 'window', {
+          configurable: true,
+          value: {}
+        });
+        Object.defineProperty(globalThis, 'document', {
+          configurable: true,
+          value: {
+            documentElement: {
+              getAttribute: (name: string) => (
+                name === arg.runtimeAttribute
+                  ? JSON.stringify(runtimeDiagnosticsFromAttribute)
+                  : null
+              )
+            }
+          }
+        });
+
+        try {
+          return pageFunction(arg);
+        } finally {
+          Object.defineProperty(globalThis, 'window', {
+            configurable: true,
+            value: originalWindow
+          });
+          Object.defineProperty(globalThis, 'document', {
+            configurable: true,
+            value: originalDocument
+          });
+        }
+      },
+      waitForTimeout: async () => {}
+    });
+    expect(diagnosticsFromDom.runtime).toMatchObject({
+      sceneInstanceId: 9,
+      performance: {
+        mode: 'full'
+      },
+      resources: {
+        listenerCount: 4
+      }
+    });
+
     const verdicts = resolveEdgeLiveVerdicts({
       viewport: { width: 1440, height: 900 },
       board: {

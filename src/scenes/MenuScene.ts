@@ -376,6 +376,9 @@ export class MenuScene extends Phaser.Scene {
   private runtimeWorstFrameMs = 0;
   private runtimeVisibilityChangeCount = 0;
   private runtimeVisibilitySuspendCount = 0;
+  private runtimeVisibilityAttached = false;
+  private runtimeInstallSurfaceAttached = false;
+  private runtimeVisibilityChangeHandler: (() => void) | null = null;
   private runtimeFeedDiagnostics = summarizeMenuSceneRuntimeFeed({ nowMs: 0 });
 
   public constructor() {
@@ -431,11 +434,12 @@ export class MenuScene extends Phaser.Scene {
       this.refreshLayout();
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.detachRuntimeDiagnostics();
       this.clearVisualDiagnostics();
       clearMenuSceneRuntimeDiagnostics();
     });
     this.publishVisualDiagnostics(this.time.now);
-    this.publishRuntimeDiagnostics(this.time.now, 0, true);
+    this.publishRuntimeDiagnostics(this.time.now, true);
   }
 
   public update(time: number, delta: number): void {
@@ -495,7 +499,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.publishVisualDiagnostics(time);
-    this.publishRuntimeDiagnostics(time, delta);
+    this.publishRuntimeDiagnostics(time);
   }
 
   private initializeRuntimeDiagnostics(): void {
@@ -516,6 +520,17 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.runtimeDiagnosticsSceneInstanceId = nextMenuSceneInstanceId();
+    this.runtimeInstallSurfaceAttached = typeof document !== 'undefined';
+    if (typeof document !== 'undefined') {
+      this.runtimeVisibilityChangeHandler = () => {
+        this.runtimeVisibilityChangeCount += 1;
+        if (document.hidden) {
+          this.runtimeVisibilitySuspendCount += 1;
+        }
+      };
+      document.addEventListener('visibilitychange', this.runtimeVisibilityChangeHandler);
+      this.runtimeVisibilityAttached = true;
+    }
   }
 
   private recordRuntimeFrame(delta: number): void {
@@ -533,7 +548,7 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeWorstFrameMs = Math.max(this.runtimeWorstFrameMs, safeDelta);
   }
 
-  private publishRuntimeDiagnostics(time: number, delta: number, force = false): void {
+  private publishRuntimeDiagnostics(time: number, force = false): void {
     if (!this.runtimeDiagnosticsConfig.enabled) {
       return;
     }
@@ -550,9 +565,6 @@ export class MenuScene extends Phaser.Scene {
       legacyTuning.menu.runtime.spikeFrameMs
     );
     const hidden = typeof document !== 'undefined' ? document.hidden === true : false;
-    if (hidden && delta > 0) {
-      this.runtimeVisibilitySuspendCount += 1;
-    }
     this.runtimeDiagnosticsPerformanceMode = resolveMenuScenePerformanceMode(
       this.runtimeDiagnosticsPerformanceMode,
       {
@@ -634,13 +646,13 @@ export class MenuScene extends Phaser.Scene {
       resources: {
         activeTweens: 0,
         activeTimers: 0,
-        listenerCount: 1,
+        listenerCount: 3 + (this.runtimeVisibilityAttached ? 1 : 0),
         listenerBreakdown: {
           sceneUpdate: 1,
           sceneShutdown: 1,
           scaleResize: 1,
-          visibilityAttached: false,
-          installSurfaceAttached: false
+          visibilityAttached: this.runtimeVisibilityAttached,
+          installSurfaceAttached: this.runtimeInstallSurfaceAttached
         },
         trailSegmentCount: this.trail.length,
         trailSegmentCap: TRAIL_FADE_TAIL,
@@ -666,6 +678,20 @@ export class MenuScene extends Phaser.Scene {
         }
       }
     });
+  }
+
+  private detachRuntimeDiagnostics(): void {
+    if (
+      !this.runtimeVisibilityAttached
+      || this.runtimeVisibilityChangeHandler === null
+      || typeof document === 'undefined'
+    ) {
+      return;
+    }
+
+    document.removeEventListener('visibilitychange', this.runtimeVisibilityChangeHandler);
+    this.runtimeVisibilityAttached = false;
+    this.runtimeVisibilityChangeHandler = null;
   }
 
   private installInput(): void {
