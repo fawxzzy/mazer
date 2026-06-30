@@ -6,6 +6,7 @@ import {
   createLegacyRuntimeMazeForMode,
   LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID,
   LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS,
+  resolveLegacyGenerationExecutionPlan,
   resolveLegacyGenerationProcessStageIds,
   resolveLegacyMazeBuildKind,
   shouldConsumeLegacyGenerationRequest,
@@ -21,6 +22,28 @@ describe('legacy generation lifecycle', () => {
     expect(resolveLegacyGenerationProcessStageIds(35)).toEqual([0, 3, 4, 6, 7, 8]);
     expect(resolveLegacyGenerationProcessStageIds(36)).toEqual([0, 3, 4, 5, 6, 7, 8]);
     expect(resolveLegacyGenerationProcessStageIds(50)).toContain(LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID);
+  });
+
+  test('makes the legacy 0/3/4/5/6 execution cadence explicit for menu and play generation', () => {
+    expect(resolveLegacyGenerationExecutionPlan('play', 50)).toEqual([
+      { id: 0, name: 'CreateGrid', executionKind: 'full-stage', batchSize: null, batchUnit: null },
+      { id: 3, name: 'MapPath', executionKind: 'full-stage', batchSize: null, batchUnit: null },
+      { id: 4, name: 'CreatePath', executionKind: 'full-stage', batchSize: null, batchUnit: null },
+      { id: 5, name: 'CreateShortCuts', executionKind: 'full-stage', batchSize: null, batchUnit: null },
+      { id: 6, name: 'Draw', executionKind: 'full-stage', batchSize: null, batchUnit: null },
+      { id: 7, name: 'Finalize', executionKind: 'finalize-state', batchSize: null, batchUnit: null },
+      { id: 8, name: 'Reset', executionKind: 'reset-branch', batchSize: null, batchUnit: null }
+    ]);
+
+    expect(resolveLegacyGenerationExecutionPlan('menu', 50)).toEqual([
+      { id: 0, name: 'CreateGrid', executionKind: 'row-slice', batchSize: 1, batchUnit: 'rows' },
+      { id: 3, name: 'MapPath', executionKind: 'checkpoint-pass', batchSize: 1, batchUnit: 'checkpoint-passes' },
+      { id: 4, name: 'CreatePath', executionKind: 'path-batch', batchSize: 4, batchUnit: 'path-tiles' },
+      { id: 5, name: 'CreateShortCuts', executionKind: 'shortcut-attempt', batchSize: 1, batchUnit: 'shortcut-attempts' },
+      { id: 6, name: 'Draw', executionKind: 'row-slice', batchSize: 1, batchUnit: 'rows' },
+      { id: 7, name: 'Finalize', executionKind: 'finalize-state', batchSize: null, batchUnit: null },
+      { id: 8, name: 'Reset', executionKind: 'reset-branch', batchSize: null, batchUnit: null }
+    ]);
   });
 
   test('routes menu and play mode to the correct maze builders', () => {
@@ -62,6 +85,13 @@ describe('legacy generation lifecycle', () => {
     expect(menuBootRequest.seed).toBe(3749);
     expect(menuBootRequest.buildKind).toBe('menu-snapshot');
     expect(menuBootRequest.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
+    expect(menuBootRequest.executionPlan[0]).toEqual({
+      id: 0,
+      name: 'CreateGrid',
+      executionKind: 'row-slice',
+      batchSize: 1,
+      batchUnit: 'rows'
+    });
     expect(goalResetRequest.seed).toBe(3750);
     expect(goalResetRequest.reason).toBe('menu-demo-goal-reset');
     expect(shouldConsumeLegacyGenerationRequest(goalResetRequest, 1539)).toBe(false);
@@ -81,6 +111,13 @@ describe('legacy generation lifecycle', () => {
 
     expect(playMaze.generation?.buildKind).toBe('play-generated');
     expect(playMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
+    expect(playMaze.generation?.executionPlan[0]).toEqual({
+      id: 0,
+      name: 'CreateGrid',
+      executionKind: 'full-stage',
+      batchSize: null,
+      batchUnit: null
+    });
     expect(playMaze.seed).toBe(902);
   });
 

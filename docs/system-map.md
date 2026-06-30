@@ -127,6 +127,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - menu-vs-play build routing
   - deterministic seed stepping for rebuild approximations
   - queued generation/reset request reasons and tick-consumption contract
+  - explicit stage `0/3/4/5/6` execution cadence contract for menu-sliced versus play-continuous generation
   - explicit stage-7 finalize state for spawn, title visibility, and play timer start
   - generation metadata attached to runtime-created mazes
 - `src/legacy-runtime/legacyPlayLifecycle.ts`

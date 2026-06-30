@@ -193,6 +193,11 @@ describe('legacy reset lane', () => {
     expect(generationLifecycleSource).toContain('shouldConsumeLegacyGenerationRequest');
     expect(generationLifecycleSource).toContain('consumeLegacyGenerationRequest');
     expect(generationLifecycleSource).toContain('consumeLegacyGenerationRequestState');
+    expect(generationLifecycleSource).toContain('resolveLegacyGenerationExecutionPlan');
+    expect(generationLifecycleSource).toContain("executionKind: 'row-slice'");
+    expect(generationLifecycleSource).toContain("executionKind: 'checkpoint-pass'");
+    expect(generationLifecycleSource).toContain("executionKind: 'path-batch'");
+    expect(generationLifecycleSource).toContain("executionKind: 'shortcut-attempt'");
     expect(menuSceneSource).toContain("this.pendingGenerationRequest: LegacyGenerationRequest | null = null;".replace('this.', 'private '));
     expect(menuSceneSource).toContain('const nextRequest = this.pendingGenerationRequest;');
     expect(menuSceneSource).toContain('if (nextRequest !== null && shouldConsumeLegacyGenerationRequest(nextRequest, time))');
@@ -202,5 +207,6 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });");
     expect(menuSceneSource).toContain("reason: 'menu-demo-goal-reset',");
     expect(menuSceneSource).toContain('pendingRequest: {');
+    expect(menuSceneSource).toContain('executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({');
   });
 });

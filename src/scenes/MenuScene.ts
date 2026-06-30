@@ -116,6 +116,13 @@ interface MenuSceneVisualDiagnostics {
     };
     generation: {
       buildKind: string | null;
+      executionPlan: Array<{
+        batchSize: number | null;
+        batchUnit: string | null;
+        executionKind: string | null;
+        id: number;
+        name: string;
+      }>;
       pendingRequest: {
         dueAtMs: number | null;
         mode: RuntimeMode | null;
@@ -1676,6 +1683,13 @@ export class MenuScene extends Phaser.Scene {
         mazeSize: this.maze.size,
         generation: {
           buildKind: this.maze.generation?.buildKind ?? null,
+          executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({
+            id: stage.id,
+            name: stage.name,
+            executionKind: stage.executionKind,
+            batchSize: stage.batchSize,
+            batchUnit: stage.batchUnit
+          })),
           pendingRequest: {
             reason: this.pendingGenerationRequest?.reason ?? null,
             dueAtMs: this.pendingGenerationRequest?.dueAtMs ?? null,

@@ -15,6 +15,13 @@ export interface LegacyMazeSnapshot {
   seed: number;
   generation?: {
     buildKind: 'menu-snapshot' | 'play-generated';
+    executionPlan: Array<{
+      batchSize: number | null;
+      batchUnit: 'checkpoint-passes' | 'path-tiles' | 'rows' | 'shortcut-attempts' | null;
+      executionKind: 'checkpoint-pass' | 'finalize-state' | 'full-stage' | 'path-batch' | 'reset-branch' | 'row-slice' | 'shortcut-attempt';
+      id: number;
+      name: 'CreateGrid' | 'CreatePath' | 'CreateShortCuts' | 'Draw' | 'Finalize' | 'MapPath' | 'Reset';
+    }>;
     processStageIds: number[];
   };
 }

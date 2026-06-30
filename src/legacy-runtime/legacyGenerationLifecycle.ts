@@ -8,6 +8,16 @@ import {
 export type LegacyGenerationMode = 'menu' | 'play';
 export type LegacyMazeBuildKind = 'menu-snapshot' | 'play-generated';
 export type LegacyGenerationProcessStageId = 0 | 3 | 4 | 5 | 6 | 7 | 8;
+export type LegacyGenerationStageName = 'CreateGrid' | 'MapPath' | 'CreatePath' | 'CreateShortCuts' | 'Draw' | 'Finalize' | 'Reset';
+export type LegacyGenerationStageExecutionKind =
+  | 'full-stage'
+  | 'row-slice'
+  | 'checkpoint-pass'
+  | 'path-batch'
+  | 'shortcut-attempt'
+  | 'finalize-state'
+  | 'reset-branch';
+export type LegacyGenerationStageBatchUnit = 'rows' | 'checkpoint-passes' | 'path-tiles' | 'shortcut-attempts' | null;
 export type LegacyGenerationRequestReason =
   | 'boot-menu'
   | 'play-start'
@@ -16,9 +26,18 @@ export type LegacyGenerationRequestReason =
   | 'menu-demo-missing-episode'
   | 'overlay-rebuild';
 
+export interface LegacyGenerationStageContract {
+  batchSize: number | null;
+  batchUnit: LegacyGenerationStageBatchUnit;
+  executionKind: LegacyGenerationStageExecutionKind;
+  id: LegacyGenerationProcessStageId;
+  name: LegacyGenerationStageName;
+}
+
 export interface LegacyGenerationRequest {
   buildKind: LegacyMazeBuildKind;
   dueAtMs: number;
+  executionPlan: LegacyGenerationStageContract[];
   mode: LegacyGenerationMode;
   processStageIds: LegacyGenerationProcessStageId[];
   reason: LegacyGenerationRequestReason;
@@ -46,12 +65,138 @@ export const resolveLegacyMazeBuildKind = (mode: LegacyGenerationMode): LegacyMa
   mode === 'menu' ? 'menu-snapshot' : 'play-generated'
 );
 
+const resolveLegacyGenerationStageName = (
+  stageId: LegacyGenerationProcessStageId
+): LegacyGenerationStageName => {
+  switch (stageId) {
+    case 0:
+      return 'CreateGrid';
+    case 3:
+      return 'MapPath';
+    case 4:
+      return 'CreatePath';
+    case 5:
+      return 'CreateShortCuts';
+    case 6:
+      return 'Draw';
+    case 7:
+      return 'Finalize';
+    case 8:
+      return 'Reset';
+    default:
+      return stageId satisfies never;
+  }
+};
+
+const createLegacyStageContract = (
+  mode: LegacyGenerationMode,
+  stageId: LegacyGenerationProcessStageId
+): LegacyGenerationStageContract => {
+  if (mode === 'play') {
+    switch (stageId) {
+      case 7:
+        return {
+          id: stageId,
+          name: resolveLegacyGenerationStageName(stageId),
+          executionKind: 'finalize-state',
+          batchSize: null,
+          batchUnit: null
+        };
+      case 8:
+        return {
+          id: stageId,
+          name: resolveLegacyGenerationStageName(stageId),
+          executionKind: 'reset-branch',
+          batchSize: null,
+          batchUnit: null
+        };
+      default:
+        return {
+          id: stageId,
+          name: resolveLegacyGenerationStageName(stageId),
+          executionKind: 'full-stage',
+          batchSize: null,
+          batchUnit: null
+        };
+    }
+  }
+
+  switch (stageId) {
+    case 0:
+      return {
+        id: stageId,
+        name: resolveLegacyGenerationStageName(stageId),
+        executionKind: 'row-slice',
+        batchSize: 1,
+        batchUnit: 'rows'
+      };
+    case 3:
+      return {
+        id: stageId,
+        name: resolveLegacyGenerationStageName(stageId),
+        executionKind: 'checkpoint-pass',
+        batchSize: 1,
+        batchUnit: 'checkpoint-passes'
+      };
+    case 4:
+      return {
+        id: stageId,
+        name: resolveLegacyGenerationStageName(stageId),
+        executionKind: 'path-batch',
+        batchSize: 4,
+        batchUnit: 'path-tiles'
+      };
+    case 5:
+      return {
+        id: stageId,
+        name: resolveLegacyGenerationStageName(stageId),
+        executionKind: 'shortcut-attempt',
+        batchSize: 1,
+        batchUnit: 'shortcut-attempts'
+      };
+    case 6:
+      return {
+        id: stageId,
+        name: resolveLegacyGenerationStageName(stageId),
+        executionKind: 'row-slice',
+        batchSize: 1,
+        batchUnit: 'rows'
+      };
+    case 7:
+      return {
+        id: stageId,
+        name: resolveLegacyGenerationStageName(stageId),
+        executionKind: 'finalize-state',
+        batchSize: null,
+        batchUnit: null
+      };
+    case 8:
+      return {
+        id: stageId,
+        name: resolveLegacyGenerationStageName(stageId),
+        executionKind: 'reset-branch',
+        batchSize: null,
+        batchUnit: null
+      };
+    default:
+      return stageId satisfies never;
+  }
+};
+
+export const resolveLegacyGenerationExecutionPlan = (
+  mode: LegacyGenerationMode,
+  scale: number
+): LegacyGenerationStageContract[] => (
+  resolveLegacyGenerationProcessStageIds(scale).map((stageId) => createLegacyStageContract(mode, stageId))
+);
+
 export const createLegacyRuntimeMazeForMode = (
   mode: LegacyGenerationMode,
   scale: number,
   seed: number
 ): LegacyMazeSnapshot => {
   const buildKind = resolveLegacyMazeBuildKind(mode);
+  const executionPlan = resolveLegacyGenerationExecutionPlan(mode, scale);
   const maze = buildKind === 'menu-snapshot'
     ? createLegacyMenuMaze(seed)
     : createLegacyMaze(scale, seed);
@@ -60,6 +205,7 @@ export const createLegacyRuntimeMazeForMode = (
     ...maze,
     generation: {
       buildKind,
+      executionPlan,
       processStageIds: resolveLegacyGenerationProcessStageIds(scale)
     }
   };
@@ -90,6 +236,7 @@ export const createLegacyGenerationRequest = ({
     seed,
     dueAtMs: Math.max(0, Math.round(dueAtMs)),
     buildKind: resolveLegacyMazeBuildKind(mode),
+    executionPlan: resolveLegacyGenerationExecutionPlan(mode, scale),
     processStageIds: resolveLegacyGenerationProcessStageIds(scale)
   };
 };
