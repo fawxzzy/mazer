@@ -48,7 +48,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `84%`
+- `85%`
 
 Why it is not higher yet:
 
@@ -77,6 +77,7 @@ Why it is not higher yet:
 - legacy level-building scheduler truth is now explicit in the runtime contract: process `0` requires the armed start-time + delay-start flag, the exact legacy delay duration remains honestly unrecovered, and initialized process `8` reset entry is marked as the branch that bypasses that delay gate
 - legacy stage progression truth is now explicit in the runtime contract: stages now publish their own completion signals, next-stage transitions, and the stage-5 skip-to-6 rule when shortcuts are disabled
 - legacy front-door `Exit` now routes through an explicit browser-safe quit equivalence contract instead of a temporary explanation overlay, and the dead `message` overlay family has been removed from the active reset lane
+- desktop menu layout now gives the front-door board more dominant space in wide viewports, which moves the current web shell closer to the legacy board-first screenshot composition without reopening other menu modules
 - `runtimeDiagnostics=1` now flows through the live `MenuScene` update loop and publishes a repo-owned runtime diagnostics surface instead of stopping at helper-only parsing/tests
 - runtime diagnostics now also publish a proof-only DOM attribute and visible side-browser diagnostics surface so localhost inspection does not depend on the hidden `window.__MAZER_*` globals alone
 - legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
@@ -144,6 +145,7 @@ Localhost operation rule:
 ## Still open
 
 - exact menu snapshot silhouette and attract-route parity
+- final desktop layout/button/title spacing still needs screenshot-grade tightening even after the board-dominance correction
 - exact play HUD parity beyond the tighter compact overlay and full proof bounds
 - exact demo AI parity beyond the newly restored recovery cue/pacing lane
 - exact generation/reset-flow parity beyond the queued request contract

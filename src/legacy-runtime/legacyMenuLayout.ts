@@ -30,13 +30,13 @@ export const resolveLegacyMenuLayout = (
 ): LegacyMenuLayout => {
   const normalizedScale = clampInteger(scale, 25, 150);
   const isPortrait = height > width;
-  const baseBoardScale = isPortrait ? 0.92 : 0.485;
+  const baseBoardScale = isPortrait ? 0.92 : 0.52;
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const rawBoardSize = Math.min(
     width * baseBoardScale * scaleBias,
-    height * (isPortrait ? 0.54 : 0.74) * scaleBias
+    height * (isPortrait ? 0.54 : 0.775) * scaleBias
   );
-  const boardSize = Math.round(clamp(rawBoardSize, 300, Math.min(width * (isPortrait ? 0.92 : 0.78), height * (isPortrait ? 0.82 : 0.76))));
+  const boardSize = Math.round(clamp(rawBoardSize, 300, Math.min(width * (isPortrait ? 0.92 : 0.78), height * (isPortrait ? 0.82 : 0.79))));
   const tileSize = Math.max(4, Math.floor(boardSize / Math.max(1, mazeSize)));
   const snappedBoardSize = tileSize * mazeSize;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
