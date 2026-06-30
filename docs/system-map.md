@@ -185,7 +185,7 @@ This is the fastest way to answer "if I click or press this, what actually owns 
 | `Game Modes` click | `MenuScene.openNestedOverlay('gameModes', ...)` | `legacyOverlayToggleFields.ts` -> dark-mode flag -> backdrop/static-board redraw |
 | `Escape` | `MenuScene.handleBackAction()` | close overlay, open pause, or return to menu depending on current state |
 | `Back` / `Reset` / `Main Menu` inside pause | `MenuScene.applyLegacyPauseCommand()` | `legacyPauseLifecycle.ts` -> overlay close, player reset, or menu return |
-| movement keys / arrows | `MenuScene.tryMovePlayer()` | `legacyMaze.ts` walkability gate -> trail/win reset |
+| movement keys / arrows | `MenuScene.handleLegacyPlayMovementKeyDown()` | `legacyPlayStep.ts` input buffer -> `MenuScene.tryMovePlayer()` -> `legacyMaze.ts` walkability gate -> trail/win reset |
 | menu screenshot parity tweak | `legacyMenuSnapshot.ts`, `legacyMenuLayout.ts`, `MenuScene.ts` | geometry -> composition -> presentation |
 
 ## Active reset-lane subsystems
@@ -211,6 +211,8 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - due-reset return timing contract for active play and menu demo goal branches
 
 - `src/legacy-runtime/legacyPlayStep.ts`
+  - restored simultaneous-key input buffer contract
+  - held direction flag vector resolution
   - one-tile cardinal movement
   - wall-collision gate
   - trail append and trim behavior
@@ -243,7 +245,7 @@ This is the fastest way to answer "if I click or press this, what actually owns 
 Boundary:
 
 - if the question is "when should play stop accepting input after hitting goal?", start in `src/legacy-runtime/legacyPlayLifecycle.ts`
-- if the question is "what exactly changes after one movement key press?", start in `src/legacy-runtime/legacyPlayStep.ts`
+- if the question is "what exactly changes after one movement key press or held key repeat?", start in `src/legacy-runtime/legacyPlayStep.ts` and `MenuScene.handleLegacyPlayMovementKeyDown()`
 - if the question is "how does the front-door demo bootstrap or advance?", start in `src/legacy-runtime/legacyMenuDemoLifecycle.ts`
 - if the question is "what exactly should options/pause field commits mean?", start in `src/legacy-runtime/legacyOverlayFieldCommit.ts`
 - if the question is "what exactly should features or game-modes toggles mutate and label?", start in `src/legacy-runtime/legacyOverlayToggleFields.ts`
