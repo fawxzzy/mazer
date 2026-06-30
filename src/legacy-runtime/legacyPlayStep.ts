@@ -28,6 +28,7 @@ export interface LegacyPlayStepResult {
 }
 
 const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
+const normalizeDelta = (delta: number): number => Math.sign(delta);
 
 export const createLegacyPlayMoveFlags = (): LegacyPlayMoveFlags => ({
   down: false,
@@ -43,6 +44,33 @@ export const resolveLegacyPlayMoveVector = (
   deltaY: (flags.down ? 1 : 0) - (flags.up ? 1 : 0)
 });
 
+export const resolveLegacyPlayCollisionDelta = (
+  maze: LegacyMazeSnapshot,
+  player: LegacyPoint,
+  deltaX: number,
+  deltaY: number
+): { deltaX: number; deltaY: number } => {
+  const normalizedDeltaX = normalizeDelta(deltaX);
+  const normalizedDeltaY = normalizeDelta(deltaY);
+  const gatedDeltaX = normalizedDeltaX !== 0 && isWalkableTile(maze, movePoint(player, normalizedDeltaX, 0))
+    ? normalizedDeltaX
+    : 0;
+  const gatedDeltaY = normalizedDeltaY !== 0 && isWalkableTile(maze, movePoint(player, 0, normalizedDeltaY))
+    ? normalizedDeltaY
+    : 0;
+
+  if (gatedDeltaX === 0 && gatedDeltaY === 0) {
+    return { deltaX: 0, deltaY: 0 };
+  }
+
+  const finalTarget = movePoint(player, gatedDeltaX, gatedDeltaY);
+  if (!isWalkableTile(maze, finalTarget)) {
+    return { deltaX: 0, deltaY: 0 };
+  }
+
+  return { deltaX: gatedDeltaX, deltaY: gatedDeltaY };
+};
+
 export const advanceLegacyPlayStep = ({
   deltaX,
   deltaY,
@@ -52,8 +80,8 @@ export const advanceLegacyPlayStep = ({
   trail,
   trailFadeTail = LEGACY_PLAY_TRAIL_FADE_TAIL
 }: LegacyPlayStepInput): LegacyPlayStepResult => {
-  const next = movePoint(player, deltaX, deltaY);
-  if (!isWalkableTile(maze, next)) {
+  const gatedDelta = resolveLegacyPlayCollisionDelta(maze, player, deltaX, deltaY);
+  if (gatedDelta.deltaX === 0 && gatedDelta.deltaY === 0) {
     return {
       moved: false,
       player: copyPoint(player),
@@ -62,6 +90,7 @@ export const advanceLegacyPlayStep = ({
     };
   }
 
+  const next = movePoint(player, gatedDelta.deltaX, gatedDelta.deltaY);
   const nextPlayer = copyPoint(next);
   const nextTrail = [...trail.map(copyPoint), copyPoint(nextPlayer)];
   const boundedTrail = toggleTrailFade && nextTrail.length > trailFadeTail

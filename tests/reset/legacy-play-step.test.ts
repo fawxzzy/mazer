@@ -4,6 +4,7 @@ import {
   createLegacyPlayMoveFlags,
   LEGACY_PLAY_TRAIL_FADE_TAIL,
   LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
+  resolveLegacyPlayCollisionDelta,
   resolveLegacyPlayMoveVector
 } from '../../src/legacy-runtime/legacyPlayStep';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
@@ -67,6 +68,7 @@ describe('legacy play step', () => {
 
   test('allows a simultaneous diagonal step when the resolved target is walkable', () => {
     const maze = createTestMaze();
+    maze.grid[2][1] = true;
     maze.grid[2][2] = true;
     const result = advanceLegacyPlayStep({
       maze,
@@ -80,6 +82,47 @@ describe('legacy play step', () => {
     expect(result.moved).toBe(true);
     expect(result.player).toEqual({ x: 2, y: 2 });
     expect(result.trail).toEqual([{ x: 1, y: 1 }, { x: 2, y: 2 }]);
+  });
+
+  test('slides along the open axis when simultaneous input includes one blocked axis', () => {
+    const maze = createTestMaze();
+
+    expect(resolveLegacyPlayCollisionDelta(maze, { x: 1, y: 1 }, 1, 1)).toEqual({ deltaX: 1, deltaY: 0 });
+
+    const result = advanceLegacyPlayStep({
+      maze,
+      player: { x: 1, y: 1 },
+      trail: [{ x: 1, y: 1 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false
+    });
+
+    expect(result.moved).toBe(true);
+    expect(result.player).toEqual({ x: 2, y: 1 });
+    expect(result.trail).toEqual([{ x: 1, y: 1 }, { x: 2, y: 1 }]);
+  });
+
+  test('blocks a simultaneous corner move when the final diagonal target is a wall', () => {
+    const maze = createTestMaze();
+    maze.grid[2][1] = true;
+    maze.grid[1][2] = true;
+    maze.grid[2][2] = false;
+
+    expect(resolveLegacyPlayCollisionDelta(maze, { x: 1, y: 1 }, 1, 1)).toEqual({ deltaX: 0, deltaY: 0 });
+
+    const result = advanceLegacyPlayStep({
+      maze,
+      player: { x: 1, y: 1 },
+      trail: [{ x: 1, y: 1 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false
+    });
+
+    expect(result.moved).toBe(false);
+    expect(result.player).toEqual({ x: 1, y: 1 });
+    expect(result.trail).toEqual([{ x: 1, y: 1 }]);
   });
 
   test('blocks wall collisions without moving the player or trail', () => {
