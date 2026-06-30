@@ -13,7 +13,12 @@ describe('legacy menu demo lifecycle', () => {
 
     expect(isFixedLegacyMenuSnapshot(menuMaze)).toBe(true);
     expect(bootstrap.config.behavior.enableRunnerMistakes).toBe(true);
+    expect(bootstrap.state.phase).toBe('explore');
+    expect(bootstrap.state.cue).not.toBe('spawn');
+    expect(bootstrap.state.cue).not.toBe('reset');
+    expect(bootstrap.state.cue).not.toBe('goal');
     expect(bootstrap.state.currentIndex).not.toBe(bootstrap.episode.raster.startIndex);
+    expect(bootstrap.state.pathCursor).toBeGreaterThanOrEqual(8);
     expect(bootstrap.trail.length).toBeGreaterThan(0);
     expect(bootstrap.trail.length).toBeLessThanOrEqual(16);
   });

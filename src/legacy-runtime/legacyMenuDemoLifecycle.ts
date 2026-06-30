@@ -41,26 +41,65 @@ export interface LegacyMenuDemoAdvance {
   trail: LegacyPoint[];
 }
 
+const LEGACY_MENU_SNAPSHOT_BOOTSTRAP_MIN_VISIBLE_CURSOR = 8;
+
+const isStableSnapshotBootstrapState = (
+  episode: MazeEpisode,
+  state: DemoWalkerState,
+  minVisibleCursor: number
+): boolean => (
+  state.phase === 'explore'
+  && state.cue !== 'spawn'
+  && state.currentIndex !== episode.raster.startIndex
+  && state.pathCursor >= minVisibleCursor
+);
+
 export const createLegacyMenuDemoBootstrap = (
   maze: LegacyMazeSnapshot,
   toggleTrailFade: boolean,
   trailFadeTail: number
 ): LegacyMenuDemoBootstrap => {
   const episode = createLegacyDemoWalkerEpisode(maze);
-  const config = isFixedLegacyMenuSnapshot(maze)
+  const isFixedSnapshot = isFixedLegacyMenuSnapshot(maze);
+  const config = isFixedSnapshot
     ? createLegacyMenuSnapshotDemoWalkerConfig(maze.seed)
     : createLegacyMenuDemoWalkerConfig(maze.seed);
   let state = createDemoWalkerState(episode, config);
   const basePrerollSteps = Math.max(0, config.behavior.prerollSteps ?? legacyTuning.demo.behavior.prerollSteps ?? 0);
-  const prerollSteps = isFixedLegacyMenuSnapshot(maze)
+  const prerollSteps = isFixedSnapshot
     ? Math.min(basePrerollSteps, Math.max(0, maze.solutionPath.length - 8))
     : basePrerollSteps;
 
-  for (let step = 0; step < prerollSteps; step += 1) {
-    const advance = advanceDemoWalker(episode, state, config);
-    state = advance.state;
-    if (advance.shouldRegenerateMaze || state.phase !== 'explore') {
-      break;
+  if (isFixedSnapshot) {
+    const minVisibleCursor = Math.min(
+      Math.max(1, LEGACY_MENU_SNAPSHOT_BOOTSTRAP_MIN_VISIBLE_CURSOR),
+      Math.max(1, maze.solutionPath.length - 4)
+    );
+    const maxBootstrapSteps = Math.max(
+      prerollSteps + Math.max(16, maze.solutionPath.length * 4),
+      minVisibleCursor + 16
+    );
+    let stepsTaken = 0;
+
+    while (stepsTaken < maxBootstrapSteps) {
+      if (
+        stepsTaken >= prerollSteps
+        && isStableSnapshotBootstrapState(episode, state, minVisibleCursor)
+      ) {
+        break;
+      }
+
+      const advance = advanceDemoWalker(episode, state, config);
+      state = advance.state;
+      stepsTaken += 1;
+    }
+  } else {
+    for (let step = 0; step < prerollSteps; step += 1) {
+      const advance = advanceDemoWalker(episode, state, config);
+      state = advance.state;
+      if (advance.shouldRegenerateMaze || state.phase !== 'explore') {
+        break;
+      }
     }
   }
 

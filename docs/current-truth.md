@@ -48,7 +48,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `88%`
+- `89%`
 
 Why it is not higher yet:
 
@@ -69,6 +69,7 @@ Why it is not higher yet:
 - legacy-style menu demo board/trail presentation
 - legacy menu demo now emits live recovery cues and cue-specific pacing instead of collapsing wrong-turn motion back to plain explore timing
 - fixed front-door menu snapshot now also runs the mistake-enabled legacy recovery lane instead of a solver-only attract path, so the canonical menu demo can surface dead-end, backtrack, reacquire, and AI-only reset behavior
+- fixed front-door menu snapshot bootstrap now settles into a visible `explore` pose instead of stopping in `goal-hold` or `reset-hold`, which keeps the first live menu impression closer to the restored legacy screenshots
 - legacy generation/reset now routes through explicit queued request contracts instead of collapsing every branch into immediate rebuild calls
 - legacy generation consumption now carries explicit stage-7 finalize responsibilities for play/menu spawn, title, and timer start
 - legacy process-8 reset branches now route through explicit reset requests for active-play return vs menu-demo regeneration

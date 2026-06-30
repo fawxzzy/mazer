@@ -65,7 +65,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | fixed menu maze shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `tests/reset/legacy-reset.test.ts`, screenshots |
 | generated play maze | `src/legacy-runtime/legacyMaze.ts` | `tests/reset/legacy-reset.test.ts` |
 | menu title/board/button layout math | `src/legacy-runtime/legacyMenuLayout.ts` | `tests/reset/legacy-menu-layout.test.ts` |
-| menu demo behavior | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, live menu preview |
+| menu demo behavior | `src/legacy-runtime/legacyMenuDemoLifecycle.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, live menu preview |
 | options field parsing | `src/legacy-runtime/legacyOptionFields.ts` | `tests/reset/legacy-option-fields.test.ts` |
 | options + pause field commit roles | `src/legacy-runtime/legacyOverlayFieldCommit.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | features + game-modes toggle routing | `src/legacy-runtime/legacyOverlayToggleFields.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-reset.test.ts` |
@@ -106,7 +106,7 @@ Use this when you need to understand the app as a system instead of a file list.
 3. Front door build:
    `MenuScene` resolves layout, builds the fixed menu snapshot through `createLegacyMenuMaze()`, and publishes diagnostics.
 4. Menu attract motion:
-   `createLegacyDemoWalkerEpisode()` + `createLegacyMenuSnapshotDemoWalkerConfig()` + `advanceDemoWalker()` drive the menu-only trail/player motion.
+   `createLegacyDemoWalkerEpisode()` + `createLegacyMenuSnapshotDemoWalkerConfig()` + `createLegacyMenuDemoBootstrap()` + `advanceDemoWalker()` drive the menu-only trail/player motion.
 5. User entry:
    `Start` calls `startPlayMode()`, which swaps the runtime over to `createLegacyMaze()` and hides the title lockup.
 6. Overlay mutation:
