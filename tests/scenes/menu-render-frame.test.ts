@@ -49,7 +49,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x18131d;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GRID = 0x0f0b12;');
     expect(menuSceneSource).toContain('? 0x1f1a24');
-    expect(menuSceneSource).toContain('const innerInset = Math.max(1, Math.floor(tileSize * 0.22));');
-    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.012);');
+    expect(menuSceneSource).toContain('const innerInset = Math.max(1, Math.floor(tileSize * 0.11));');
+    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.006);');
   });
 });

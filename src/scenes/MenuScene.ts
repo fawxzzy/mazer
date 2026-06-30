@@ -1159,7 +1159,7 @@ export class MenuScene extends Phaser.Scene {
 
         if (walkable && isMenuMode) {
           const frame = resolveLegacyMenuPathRenderFrame(this.maze, { x, y }, tileSize);
-          const innerInset = Math.max(1, Math.floor(tileSize * 0.22));
+          const innerInset = Math.max(1, Math.floor(tileSize * 0.11));
 
           this.boardStaticGraphics.fillStyle(pathGlow, 0.9);
           this.boardStaticGraphics.fillRect(
@@ -1188,7 +1188,7 @@ export class MenuScene extends Phaser.Scene {
               Math.max(1, tileSize - 2)
             );
           } else if (isMenuMode && tileSize > 6) {
-            this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.012);
+            this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.006);
             this.boardStaticGraphics.fillRect(
               tileX + 1,
               tileY + 1,
