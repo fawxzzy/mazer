@@ -191,8 +191,11 @@ const resolveLegacyGenerationStageName = (
 
 const createLegacyStageContract = (
   mode: LegacyGenerationMode,
-  stageId: LegacyGenerationProcessStageId
+  stageId: LegacyGenerationProcessStageId,
+  shortcutStageEnabled: boolean
 ): LegacyGenerationStageContract => {
+  const pathStageAdvanceTarget: LegacyGenerationProcessStageId = shortcutStageEnabled ? 5 : 6;
+
   if (mode === 'play') {
     switch (stageId) {
       case 7:
@@ -219,7 +222,7 @@ const createLegacyStageContract = (
         };
       default:
         return {
-          advancesToStageId: stageId === 0 ? 3 : stageId === 3 ? 4 : stageId === 4 ? 5 : stageId === 5 ? 6 : 7,
+          advancesToStageId: stageId === 0 ? 3 : stageId === 3 ? 4 : stageId === 4 ? pathStageAdvanceTarget : stageId === 5 ? 6 : 7,
           id: stageId,
           name: resolveLegacyGenerationStageName(stageId),
           completionSignal: stageId === 0
@@ -264,7 +267,7 @@ const createLegacyStageContract = (
       };
     case 4:
       return {
-        advancesToStageId: 5,
+        advancesToStageId: pathStageAdvanceTarget,
         id: stageId,
         name: resolveLegacyGenerationStageName(stageId),
         completionSignal: 'path-array-exhausted',
@@ -325,9 +328,12 @@ const createLegacyStageContract = (
 export const resolveLegacyGenerationExecutionPlan = (
   mode: LegacyGenerationMode,
   scale: number
-): LegacyGenerationStageContract[] => (
-  resolveLegacyGenerationProcessStageIds(scale).map((stageId) => createLegacyStageContract(mode, stageId))
-);
+): LegacyGenerationStageContract[] => {
+  const budget = resolveLegacyGenerationBudgetContract(mode, scale);
+
+  return resolveLegacyGenerationProcessStageIds(scale)
+    .map((stageId) => createLegacyStageContract(mode, stageId, budget.shortcutStageEnabled));
+};
 
 export const resolveLegacyGenerationStageCursor = (
   executionPlan: readonly LegacyGenerationStageContract[],

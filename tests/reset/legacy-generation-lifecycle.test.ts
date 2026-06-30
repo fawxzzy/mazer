@@ -86,6 +86,26 @@ describe('legacy generation lifecycle', () => {
     ]);
   });
 
+  test('skips shortcut stage transitions when scale disables process 5', () => {
+    const menuSmallPlan = resolveLegacyGenerationExecutionPlan('menu', 35);
+    const playSmallPlan = resolveLegacyGenerationExecutionPlan('play', 35);
+
+    expect(menuSmallPlan.map((stage) => stage.id)).toEqual([0, 3, 4, 6, 7, 8]);
+    expect(playSmallPlan.map((stage) => stage.id)).toEqual([0, 3, 4, 6, 7, 8]);
+    expect(menuSmallPlan.find((stage) => stage.id === 4)).toMatchObject({
+      advancesToStageId: 6,
+      completionSignal: 'path-array-exhausted',
+      executionKind: 'path-batch'
+    });
+    expect(playSmallPlan.find((stage) => stage.id === 4)).toMatchObject({
+      advancesToStageId: 6,
+      completionSignal: 'path-array-exhausted',
+      executionKind: 'full-stage'
+    });
+    expect(menuSmallPlan.some((stage) => stage.id === 5)).toBe(false);
+    expect(playSmallPlan.some((stage) => stage.id === 5)).toBe(false);
+  });
+
   test('projects queued and consumed stage cursors from the legacy execution plan', () => {
     const menuPlan = resolveLegacyGenerationExecutionPlan('menu', 50);
 

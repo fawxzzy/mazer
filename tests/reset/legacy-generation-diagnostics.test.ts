@@ -87,4 +87,24 @@ describe('legacy generation diagnostics contract', () => {
       { id: 8, name: 'Reset', completionSignal: 'play-reset-template-return', advancesToStageId: null, executionKind: 'reset-branch', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null }
     ]);
   });
+
+  test('publishes shortcut-disabled stage transitions without impossible process-5 edges', () => {
+    const menuSmallMaze = createLegacyRuntimeMazeForMode('menu', 35, 3749);
+    const playSmallMaze = createLegacyRuntimeMazeForMode('play', 35, 3749);
+
+    expect(menuSmallMaze.generation?.budget.shortcutStageEnabled).toBe(false);
+    expect(playSmallMaze.generation?.budget.shortcutStageEnabled).toBe(false);
+    expect(menuSmallMaze.generation?.processStageIds).toEqual([0, 3, 4, 6, 7, 8]);
+    expect(playSmallMaze.generation?.processStageIds).toEqual([0, 3, 4, 6, 7, 8]);
+    expect(menuSmallMaze.generation?.executionPlan.find((stage) => stage.id === 4)).toMatchObject({
+      advancesToStageId: 6,
+      completionSignal: 'path-array-exhausted'
+    });
+    expect(playSmallMaze.generation?.executionPlan.find((stage) => stage.id === 4)).toMatchObject({
+      advancesToStageId: 6,
+      completionSignal: 'path-array-exhausted'
+    });
+    expect(menuSmallMaze.generation?.executionPlan.some((stage) => stage.id === 5)).toBe(false);
+    expect(playSmallMaze.generation?.executionPlan.some((stage) => stage.id === 5)).toBe(false);
+  });
 });
