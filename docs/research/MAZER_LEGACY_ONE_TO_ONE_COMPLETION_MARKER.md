@@ -2,7 +2,7 @@
 
 Date: 2026-06-29
 Status: active
-Current marker: `68%`
+Current marker: `69%`
 
 ## Intent
 
@@ -61,7 +61,7 @@ The current marker is the sum of the awarded points below.
 | --- | --- | --- | --- | --- | --- | --- |
 | Legacy truth restore, extraction, and proof spine | `10` | `10` | locked | `legacy/old-project.zip` -> `docs/current-truth.md` -> `docs/system-map.md` | `npm run legacy:extract`, `npm run verify` | keep current truth and proof docs in sync when runtime truth changes |
 | Front-door menu shell semantics | `12` | `11` | close | `src/legacy-runtime/legacyDefaults.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/reset/legacy-menu-layout.test.ts`, localhost | final `Exit` equivalence and exact front-door behavior polish still need one bounded pass |
-| Menu screenshot composition and board presentation | `14` | `9` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/scenes/menu-render-frame.test.ts` | board material/tile read and final screenshot-grade composition are still open |
+| Menu screenshot composition and board presentation | `14` | `10` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/scenes/menu-render-frame.test.ts` | final screenshot-grade composition is still open, but board material/tile read is materially closer after the heavier trench pass |
 | Overlay family and field responsibilities | `14` | `10` | partial | `src/legacy-runtime/legacyOptionFields.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, localhost | options/features/game-modes/pause fields still need field-by-field exactness and routing verification |
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | exact movement edge cases and return/reset timing still need tighter legacy proof |
 | Generation lifecycle exactness | `16` | `6` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts` | current build path is still an approximation, not the full staged legacy process pipeline |
@@ -70,9 +70,9 @@ The current marker is the sum of the awarded points below.
 
 Current total:
 
-- `68 / 100`
+- `69 / 100`
 
-## Why the marker is held at 68%
+## Why the marker is held at 69%
 
 The repo is materially past the "rough prototype" stage:
 

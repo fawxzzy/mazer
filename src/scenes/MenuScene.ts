@@ -143,7 +143,7 @@ const MENU_BUTTON_STROKE_ALPHA = 0.24;
 const MENU_TEXT_COLOR = '#0b841d';
 const TITLE_FILL_COLOR = '#1d8726';
 const TITLE_SHADOW_COLOR = '#103516';
-const LEGACY_BOARD_GRID_ALPHA = 0.016;
+const LEGACY_BOARD_GRID_ALPHA = 0.008;
 const MESSAGE_DURATION_MS = 1800;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
@@ -151,10 +151,10 @@ const LEGACY_MENU_SLAB_FILL = 0x5a5464;
 const LEGACY_MENU_SLAB_EDGE = 0x14101a;
 const LEGACY_MENU_SLAB_HIGHLIGHT = 0xbcb5c7;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0.38;
-const LEGACY_MENU_PATH_CORE = 0x9994a2;
-const LEGACY_MENU_PATH_EDGE = 0x57515f;
-const LEGACY_MENU_WALL_FILL = 0x2f2937;
-const LEGACY_MENU_WALL_GRID = 0x433d4a;
+const LEGACY_MENU_PATH_CORE = 0x8c8793;
+const LEGACY_MENU_PATH_EDGE = 0x433d48;
+const LEGACY_MENU_WALL_FILL = 0x1a1520;
+const LEGACY_MENU_WALL_GRID = 0x110d15;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
@@ -653,7 +653,7 @@ export class MenuScene extends Phaser.Scene {
       ? LEGACY_MENU_WALL_FILL
       : linearColorToNumber(this.settings.wallColor);
     const boardFill = isMenuMode
-      ? 0x2f2a37
+      ? 0x221d29
       : (this.settings.darkMode ? 0x16121a : 0x4a454f);
     const boardEdge = isMenuMode ? 0x0f0b13 : (this.settings.darkMode ? 0x030205 : 0x322c35);
     const pathGlow = isMenuMode
@@ -714,7 +714,7 @@ export class MenuScene extends Phaser.Scene {
 
         if (walkable && isMenuMode) {
           const frame = resolveLegacyMenuPathRenderFrame(this.maze, { x, y }, tileSize);
-          const innerInset = Math.max(1, Math.floor(tileSize * 0.14));
+          const innerInset = Math.max(1, Math.floor(tileSize * 0.2));
 
           this.boardStaticGraphics.fillStyle(pathGlow, 0.94);
           this.boardStaticGraphics.fillRect(
@@ -743,7 +743,7 @@ export class MenuScene extends Phaser.Scene {
               Math.max(1, tileSize - 2)
             );
           } else if (isMenuMode && tileSize > 6) {
-            this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.05);
+            this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.018);
             this.boardStaticGraphics.fillRect(
               tileX + 1,
               tileY + 1,
