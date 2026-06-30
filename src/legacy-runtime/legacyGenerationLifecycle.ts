@@ -4,6 +4,8 @@ import {
   type LegacyMazeSnapshot,
   type LegacyPoint
 } from './legacyMaze';
+import { clampInteger } from './legacyDefaults';
+import { legacyTuning } from '../config/tuning';
 
 export type LegacyGenerationMode = 'menu' | 'play';
 export type LegacyMazeBuildKind = 'menu-snapshot' | 'play-generated';
@@ -34,6 +36,15 @@ export interface LegacyGenerationStageContract {
   name: LegacyGenerationStageName;
 }
 
+export interface LegacyGenerationBudgetContract {
+  checkpointCount: number;
+  checkpointModifier: number;
+  scale: number;
+  shortcutCount: number;
+  shortcutCountModifier: number;
+  shortcutStageEnabled: boolean;
+}
+
 export interface LegacyGenerationRequest {
   buildKind: LegacyMazeBuildKind;
   dueAtMs: number;
@@ -55,8 +66,39 @@ export interface LegacyGenerationConsumption {
 export const LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS: readonly LegacyGenerationProcessStageId[] = [0, 3, 4, 6, 7, 8];
 export const LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID: LegacyGenerationProcessStageId = 5;
 
+const LEGACY_MIN_SCALE = 25;
+const LEGACY_MAX_SCALE = 150;
+
+const resolveLegacyGenerationScale = (scale: number): number => (
+  clampInteger(scale, LEGACY_MIN_SCALE, LEGACY_MAX_SCALE)
+);
+
+const resolveLegacyShortcutCountModifier = (mode: LegacyGenerationMode): number => (
+  mode === 'menu'
+    ? legacyTuning.board.shortcutCountModifier.menu
+    : legacyTuning.board.shortcutCountModifier.game
+);
+
+export const resolveLegacyGenerationBudgetContract = (
+  mode: LegacyGenerationMode,
+  scale: number
+): LegacyGenerationBudgetContract => {
+  const normalizedScale = resolveLegacyGenerationScale(scale);
+  const checkpointModifier = legacyTuning.board.checkPointModifier;
+  const shortcutCountModifier = resolveLegacyShortcutCountModifier(mode);
+
+  return {
+    scale: normalizedScale,
+    checkpointModifier,
+    checkpointCount: Math.trunc(normalizedScale + (normalizedScale * checkpointModifier)),
+    shortcutCountModifier,
+    shortcutCount: Math.trunc(normalizedScale * shortcutCountModifier),
+    shortcutStageEnabled: normalizedScale > 35
+  };
+};
+
 export const resolveLegacyGenerationProcessStageIds = (scale: number): LegacyGenerationProcessStageId[] => (
-  scale > 35
+  resolveLegacyGenerationScale(scale) > 35
     ? [...LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS.slice(0, 3), LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID, ...LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS.slice(3)]
     : [...LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS]
 );
@@ -197,6 +239,7 @@ export const createLegacyRuntimeMazeForMode = (
 ): LegacyMazeSnapshot => {
   const buildKind = resolveLegacyMazeBuildKind(mode);
   const executionPlan = resolveLegacyGenerationExecutionPlan(mode, scale);
+  const budget = resolveLegacyGenerationBudgetContract(mode, scale);
   const maze = buildKind === 'menu-snapshot'
     ? createLegacyMenuMaze(seed)
     : createLegacyMaze(scale, seed);
@@ -204,6 +247,7 @@ export const createLegacyRuntimeMazeForMode = (
   return {
     ...maze,
     generation: {
+      budget,
       buildKind,
       executionPlan,
       processStageIds: resolveLegacyGenerationProcessStageIds(scale)

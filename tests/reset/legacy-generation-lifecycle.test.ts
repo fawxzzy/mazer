@@ -7,6 +7,7 @@ import {
   LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID,
   LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS,
   resolveLegacyGenerationExecutionPlan,
+  resolveLegacyGenerationBudgetContract,
   resolveLegacyGenerationProcessStageIds,
   resolveLegacyMazeBuildKind,
   shouldConsumeLegacyGenerationRequest,
@@ -22,6 +23,26 @@ describe('legacy generation lifecycle', () => {
     expect(resolveLegacyGenerationProcessStageIds(35)).toEqual([0, 3, 4, 6, 7, 8]);
     expect(resolveLegacyGenerationProcessStageIds(36)).toEqual([0, 3, 4, 5, 6, 7, 8]);
     expect(resolveLegacyGenerationProcessStageIds(50)).toContain(LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID);
+  });
+
+  test('makes the legacy checkpoint and shortcut budget formulas explicit for menu and play lanes', () => {
+    expect(resolveLegacyGenerationBudgetContract('menu', 24)).toEqual({
+      scale: 25,
+      checkpointModifier: 0.35,
+      checkpointCount: 33,
+      shortcutCountModifier: 0.13,
+      shortcutCount: 3,
+      shortcutStageEnabled: false
+    });
+
+    expect(resolveLegacyGenerationBudgetContract('play', 50)).toEqual({
+      scale: 50,
+      checkpointModifier: 0.35,
+      checkpointCount: 67,
+      shortcutCountModifier: 0.18,
+      shortcutCount: 9,
+      shortcutStageEnabled: true
+    });
   });
 
   test('makes the legacy 0/3/4/5/6 execution cadence explicit for menu and play generation', () => {

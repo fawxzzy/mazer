@@ -131,6 +131,14 @@ interface MenuSceneVisualDiagnostics {
       runnerMistakesEnabled: boolean;
     };
     generation: {
+      budget: {
+        checkpointCount: number | null;
+        checkpointModifier: number | null;
+        scale: number | null;
+        shortcutCount: number | null;
+        shortcutCountModifier: number | null;
+        shortcutStageEnabled: boolean | null;
+      };
       buildKind: string | null;
       executionPlan: Array<{
         batchSize: number | null;
@@ -1765,6 +1773,14 @@ export class MenuScene extends Phaser.Scene {
         overlay: this.overlay,
         mazeSize: this.maze.size,
         generation: {
+          budget: {
+            checkpointCount: this.maze.generation?.budget.checkpointCount ?? null,
+            checkpointModifier: this.maze.generation?.budget.checkpointModifier ?? null,
+            scale: this.maze.generation?.budget.scale ?? null,
+            shortcutCount: this.maze.generation?.budget.shortcutCount ?? null,
+            shortcutCountModifier: this.maze.generation?.budget.shortcutCountModifier ?? null,
+            shortcutStageEnabled: this.maze.generation?.budget.shortcutStageEnabled ?? null
+          },
           buildKind: this.maze.generation?.buildKind ?? null,
           executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({
             id: stage.id,

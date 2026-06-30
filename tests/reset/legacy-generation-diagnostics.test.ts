@@ -6,6 +6,14 @@ describe('legacy generation diagnostics contract', () => {
     const menuMaze = createLegacyRuntimeMazeForMode('menu', 50, 3749);
     const playMaze = createLegacyRuntimeMazeForMode('play', 50, 3749);
 
+    expect(menuMaze.generation?.budget).toEqual({
+      scale: 50,
+      checkpointModifier: 0.35,
+      checkpointCount: 67,
+      shortcutCountModifier: 0.13,
+      shortcutCount: 6,
+      shortcutStageEnabled: true
+    });
     expect(menuMaze.generation?.buildKind).toBe('menu-snapshot');
     expect(menuMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
     expect(menuMaze.generation?.executionPlan).toEqual([
@@ -17,6 +25,14 @@ describe('legacy generation diagnostics contract', () => {
       { id: 7, name: 'Finalize', executionKind: 'finalize-state', batchSize: null, batchUnit: null },
       { id: 8, name: 'Reset', executionKind: 'reset-branch', batchSize: null, batchUnit: null }
     ]);
+    expect(playMaze.generation?.budget).toEqual({
+      scale: 50,
+      checkpointModifier: 0.35,
+      checkpointCount: 67,
+      shortcutCountModifier: 0.18,
+      shortcutCount: 9,
+      shortcutStageEnabled: true
+    });
     expect(playMaze.generation?.buildKind).toBe('play-generated');
     expect(playMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
     expect(playMaze.generation?.executionPlan).toEqual([

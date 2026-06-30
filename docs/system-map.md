@@ -130,6 +130,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - legacy process stage ids
   - menu-vs-play build routing
   - deterministic seed stepping for rebuild approximations
+  - explicit checkpoint and shortcut budget formulas for the active runtime scale/mode
   - queued generation/reset request reasons and tick-consumption contract
   - explicit stage `0/3/4/5/6` execution cadence contract for menu-sliced versus play-continuous generation
   - explicit stage-7 finalize state for spawn, title visibility, and play timer start
@@ -142,6 +143,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - `applyGenerationRequest()` rehydrates maze, player, trail, demo state, HUD, and layout from a named request
   - `queueGenerationRequest()` stages delayed menu/play rebuilds instead of collapsing every branch into immediate rebuild calls
   - `pendingResetRequest` now carries the explicit process-8 branch until the scene update consumes it
+  - runtime diagnostics now publish generation budget metadata alongside stage cadence and pending request state
   - `startPlayMode()` swaps from menu shell into active-play generation
   - `enterMenuMode()` returns active play back into menu flow after reset
   - `drawHud()` owns the compact timer chip, goal arrow, and published HUD proof bounds
@@ -150,6 +152,7 @@ Boundary:
 
 - if the change is "what topology gets generated?", start in `src/legacy-runtime/legacyMaze.ts`
 - if the change is "which builder, seed step, or process-stage contract applies?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts`
+- if the change is "what checkpoint/shortcut budget does the current runtime claim?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `window.__MAZER_VISUAL_DIAGNOSTICS__`
 - if the change is "when does the runtime rebuild or return to menu?", start in `src/scenes/MenuScene.ts`
 - if the change is "how do we port the old staged process `0/3/4/5/6/7/8` lifecycle exactly?", start from `docs/legacy/gameplay-spec.md` and open a dedicated port packet before rewriting runtime code
 

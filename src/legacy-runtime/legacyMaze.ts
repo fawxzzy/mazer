@@ -14,6 +14,14 @@ export interface LegacyMazeSnapshot {
   solutionPath: LegacyPoint[];
   seed: number;
   generation?: {
+    budget: {
+      checkpointCount: number;
+      checkpointModifier: number;
+      scale: number;
+      shortcutCount: number;
+      shortcutCountModifier: number;
+      shortcutStageEnabled: boolean;
+    };
     buildKind: 'menu-snapshot' | 'play-generated';
     executionPlan: Array<{
       batchSize: number | null;

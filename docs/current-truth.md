@@ -49,7 +49,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `80%`
+- `81%`
 
 Why it is not higher yet:
 
@@ -72,6 +72,7 @@ Why it is not higher yet:
 - legacy generation consumption now carries explicit stage-7 finalize responsibilities for play/menu spawn, title, and timer start
 - legacy process-8 reset branches now route through explicit reset requests for active-play return vs menu-demo regeneration
 - legacy stage `0/3/4/5/6` execution cadence is now explicit for menu-sliced versus play-continuous generation
+- legacy generation metadata now carries explicit checkpoint/shortcut budget contracts into runtime diagnostics for menu versus play lanes
 - legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
 - in-game pause commands now route through an explicit legacy pause lifecycle contract for `Back`, `Reset`, and `Main Menu`
 - features and game-modes toggles now route through an explicit legacy overlay-toggle contract, with inverted `On/Off` copy kept only where the legacy widget actually owned it
@@ -85,7 +86,7 @@ Why it is not higher yet:
 ## What is not yet 1:1
 
 - maze generation lifecycle is still a reset-lane approximation, not the full old staged process graph
-- generation/reset branches and stage cadence are now explicit runtime contracts, but the full staged process `0/3/4/5/6/7/8` port is still not complete
+- generation/reset branches, stage cadence, and budget formulas are now explicit runtime contracts, but the full staged process `0/3/4/5/6/7/8` port is still not complete
 - stage `7` responsibilities, process `8` reset branches, and stage `0/3/4/5/6` execution cadence are now explicit, but the remaining staged generator implementation is still not fully ported
 - demo AI and backtracking are not yet a full legacy-exact port
 - in-game HUD is only partially restored
