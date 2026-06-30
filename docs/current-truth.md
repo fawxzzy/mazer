@@ -48,11 +48,11 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `92%`
+- `93%`
 
 Why it is not higher yet:
 
-- generation/reset lifecycle is still approximate
+- active-play movement/reset semantics are closer, but remaining movement collision and reset timing exactness still need proof
 - demo AI exactness is still partial
 - HUD parity is still partial
 - final screenshot-grade menu material/composition is still open
@@ -84,6 +84,7 @@ Why it is not higher yet:
 - legacy stage progression truth is now explicit in the runtime contract: stages now publish their own completion signals, next-stage transitions, and the stage-5 skip-to-6 rule when shortcuts are disabled
 - stage `4` now advances directly to stage `6` when scale disables shortcut process `5`, so small-maze runtime plans no longer publish an impossible `4 -> 5` transition
 - menu static-board drawing now follows the stage-6 row-slice contract during generation application, so the front-door board reveal advances by legacy draw-stage rows instead of appearing only as one completed static pass
+- active-play movement now follows the restored Unreal simultaneous-key input buffer: first movement keydown arms a 50ms resolve delay, held direction flags can combine into one composite step, opposing directions cancel, repeat movement resolves the current held vector immediately, and the buffer clears on pause/menu/reset boundaries
 - legacy front-door `Exit` now routes through an explicit browser-safe quit equivalence contract instead of a temporary explanation overlay, and the dead `message` overlay family has been removed from the active reset lane
 - desktop menu layout now gives the front-door board more dominant space in wide viewports, which moves the current web shell closer to the legacy board-first screenshot composition without reopening other menu modules
 - desktop title lockup now sits higher and reads less heavily over the board in wide viewports, which moves the wordmark treatment closer to the restored legacy screenshots without reopening button or backdrop ownership
@@ -114,6 +115,7 @@ Why it is not higher yet:
 - stage-cursor diagnostics now expose queued process-0 entry and consumed stage-7 finalization, and visual diagnostics now expose the menu draw-stage row cursor
 - the browser builder still resolves maze topology before stage-6 row reveal, so exact topology internals remain a future gameplay/topology concern rather than an unstated lifecycle claim
 - demo AI and backtracking are not yet a full legacy-exact port
+- active-play collision and reset-loop edge cases are closer after the simultaneous-key buffer port, but not fully closed
 - in-game HUD is only partially restored
 - browser exit cannot literally execute the old engine quit behavior, but the bounded browser-safe quit equivalence is now explicit and proof-backed
 - visual/material parity still needs another pass against screenshots and restored assets
@@ -164,6 +166,7 @@ Localhost operation rule:
 
 - exact menu snapshot silhouette and attract-route parity
 - final desktop backdrop/material exactness still needs screenshot-grade tightening even after the board-dominance, title-lockup, button-support, explicit backdrop-owner, darker board-material, and lower-left snapshot shelf corrections
+- exact active-play collision/reset edge cases beyond the simultaneous-key buffer port
 - exact play HUD parity beyond the tighter compact overlay and full proof bounds
 - exact demo AI parity beyond the newly restored front-door recovery lane and cue/pacing surface
 - exact generation/reset-flow parity beyond the queued request contract

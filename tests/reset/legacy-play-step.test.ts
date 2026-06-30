@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { advanceLegacyPlayStep, LEGACY_PLAY_TRAIL_FADE_TAIL } from '../../src/legacy-runtime/legacyPlayStep';
+import {
+  advanceLegacyPlayStep,
+  createLegacyPlayMoveFlags,
+  LEGACY_PLAY_TRAIL_FADE_TAIL,
+  LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
+  resolveLegacyPlayMoveVector
+} from '../../src/legacy-runtime/legacyPlayStep';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 
 const createTestMaze = (): LegacyMazeSnapshot => ({
@@ -38,6 +44,42 @@ describe('legacy play step', () => {
     expect(result.player).toEqual({ x: 2, y: 1 });
     expect(result.reachedGoal).toBe(false);
     expect(result.trail).toEqual([{ x: 1, y: 1 }, { x: 2, y: 1 }]);
+  });
+
+  test('resolves held direction flags after the legacy simultaneous-key delay', () => {
+    const flags = createLegacyPlayMoveFlags();
+    flags.right = true;
+    flags.down = true;
+
+    expect(LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS).toBe(50);
+    expect(resolveLegacyPlayMoveVector(flags)).toEqual({ deltaX: 1, deltaY: 1 });
+  });
+
+  test('opposing held directions cancel before movement resolves', () => {
+    const flags = createLegacyPlayMoveFlags();
+    flags.left = true;
+    flags.right = true;
+    flags.up = true;
+    flags.down = true;
+
+    expect(resolveLegacyPlayMoveVector(flags)).toEqual({ deltaX: 0, deltaY: 0 });
+  });
+
+  test('allows a simultaneous diagonal step when the resolved target is walkable', () => {
+    const maze = createTestMaze();
+    maze.grid[2][2] = true;
+    const result = advanceLegacyPlayStep({
+      maze,
+      player: { x: 1, y: 1 },
+      trail: [{ x: 1, y: 1 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false
+    });
+
+    expect(result.moved).toBe(true);
+    expect(result.player).toEqual({ x: 2, y: 2 });
+    expect(result.trail).toEqual([{ x: 1, y: 1 }, { x: 2, y: 2 }]);
   });
 
   test('blocks wall collisions without moving the player or trail', () => {

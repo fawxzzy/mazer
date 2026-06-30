@@ -167,6 +167,13 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
     expect(menuSceneSource).toContain('this.schedulePlayResetReturn();');
+    expect(menuSceneSource).toContain('private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();');
+    expect(menuSceneSource).toContain('private playMoveTimer: Phaser.Time.TimerEvent | null = null;');
+    expect(menuSceneSource).toContain('LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS');
+    expect(menuSceneSource).toContain('this.handleLegacyPlayMovementKeyDown(event)');
+    expect(menuSceneSource).toContain("this.input.keyboard?.on('keyup'");
+    expect(menuSceneSource).toContain('resolveLegacyPlayMoveVector(this.playMoveFlags)');
+    expect(menuSceneSource).toContain('this.resetLegacyPlayInputBuffer();');
     expect(menuSceneSource).toContain('createLegacyMenuDemoBootstrap(this.maze, this.settings.toggleTrailFade, TRAIL_FADE_TAIL)');
     expect(menuSceneSource).toContain('advanceLegacyMenuDemoFrame(');
     expect(demoLifecycleSource).toContain('createLegacyMenuSnapshotDemoWalkerConfig(maze.seed)');

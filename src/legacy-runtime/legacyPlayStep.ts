@@ -1,6 +1,14 @@
 import { isWalkableTile, movePoint, type LegacyMazeSnapshot, type LegacyPoint } from './legacyMaze';
 
 export const LEGACY_PLAY_TRAIL_FADE_TAIL = 16;
+export const LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS = 50;
+
+export interface LegacyPlayMoveFlags {
+  down: boolean;
+  left: boolean;
+  right: boolean;
+  up: boolean;
+}
 
 export interface LegacyPlayStepInput {
   deltaX: number;
@@ -20,6 +28,20 @@ export interface LegacyPlayStepResult {
 }
 
 const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
+
+export const createLegacyPlayMoveFlags = (): LegacyPlayMoveFlags => ({
+  down: false,
+  left: false,
+  right: false,
+  up: false
+});
+
+export const resolveLegacyPlayMoveVector = (
+  flags: LegacyPlayMoveFlags
+): { deltaX: number; deltaY: number } => ({
+  deltaX: (flags.right ? 1 : 0) - (flags.left ? 1 : 0),
+  deltaY: (flags.down ? 1 : 0) - (flags.up ? 1 : 0)
+});
 
 export const advanceLegacyPlayStep = ({
   deltaX,

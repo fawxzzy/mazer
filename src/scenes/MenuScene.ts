@@ -42,7 +42,13 @@ import {
   resolveLegacyPauseCommand,
   type LegacyPauseCommand
 } from '../legacy-runtime/legacyPauseLifecycle';
-import { advanceLegacyPlayStep } from '../legacy-runtime/legacyPlayStep';
+import {
+  advanceLegacyPlayStep,
+  createLegacyPlayMoveFlags,
+  LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
+  resolveLegacyPlayMoveVector,
+  type LegacyPlayMoveFlags
+} from '../legacy-runtime/legacyPlayStep';
 import {
   advanceLegacyMenuDemoFrame,
   createLegacyMenuDemoBootstrap
@@ -380,6 +386,8 @@ export class MenuScene extends Phaser.Scene {
   private pendingResetRequest: LegacyResetRequest | null = null;
   private pendingOverlayMazeRebuild = false;
   private playResetReturnAtMs = 0;
+  private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();
+  private playMoveTimer: Phaser.Time.TimerEvent | null = null;
   private titleText!: Phaser.GameObjects.Text;
   private titleShadow!: Phaser.GameObjects.Text;
   private footerText!: Phaser.GameObjects.Text;
@@ -757,14 +765,19 @@ export class MenuScene extends Phaser.Scene {
 
   private installInput(): void {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      if (event.repeat) {
-        return;
-      }
-
       if (
         hasPendingLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs)
         || hasPendingLegacyResetRequest(this.pendingResetRequest)
       ) {
+        this.resetLegacyPlayInputBuffer();
+        return;
+      }
+
+      if (this.handleLegacyPlayMovementKeyDown(event)) {
+        return;
+      }
+
+      if (event.repeat) {
         return;
       }
 
@@ -799,18 +812,82 @@ export class MenuScene extends Phaser.Scene {
       if (this.mode !== 'play' || this.overlay !== 'none') {
         return;
       }
-
-      const lower = event.key.toLowerCase();
-      if (lower === 'w' || event.key === 'ArrowUp') {
-        this.tryMovePlayer(0, -1);
-      } else if (lower === 's' || event.key === 'ArrowDown') {
-        this.tryMovePlayer(0, 1);
-      } else if (lower === 'a' || event.key === 'ArrowLeft') {
-        this.tryMovePlayer(-1, 0);
-      } else if (lower === 'd' || event.key === 'ArrowRight') {
-        this.tryMovePlayer(1, 0);
-      }
     });
+
+    this.input.keyboard?.on('keyup', (event: KeyboardEvent) => {
+      this.handleLegacyPlayMovementKeyUp(event);
+    });
+  }
+
+  private resolveLegacyPlayMovementDirection(event: KeyboardEvent): keyof LegacyPlayMoveFlags | null {
+    const lower = event.key.toLowerCase();
+    if (lower === 'w' || event.key === 'ArrowUp') {
+      return 'up';
+    }
+    if (lower === 's' || event.key === 'ArrowDown') {
+      return 'down';
+    }
+    if (lower === 'a' || event.key === 'ArrowLeft') {
+      return 'left';
+    }
+    if (lower === 'd' || event.key === 'ArrowRight') {
+      return 'right';
+    }
+    return null;
+  }
+
+  private handleLegacyPlayMovementKeyDown(event: KeyboardEvent): boolean {
+    if (this.mode !== 'play' || this.overlay !== 'none') {
+      return false;
+    }
+
+    const direction = this.resolveLegacyPlayMovementDirection(event);
+    if (direction === null) {
+      return false;
+    }
+
+    this.playMoveFlags[direction] = true;
+    if (event.repeat) {
+      this.resolveLegacyPlayInputBuffer();
+    } else {
+      this.scheduleLegacyPlayInputBuffer();
+    }
+    return true;
+  }
+
+  private handleLegacyPlayMovementKeyUp(event: KeyboardEvent): boolean {
+    const direction = this.resolveLegacyPlayMovementDirection(event);
+    if (direction === null) {
+      return false;
+    }
+
+    this.playMoveFlags[direction] = false;
+    return true;
+  }
+
+  private scheduleLegacyPlayInputBuffer(): void {
+    this.playMoveTimer?.remove(false);
+    this.playMoveTimer = this.time.delayedCall(LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS, () => {
+      this.playMoveTimer = null;
+      this.resolveLegacyPlayInputBuffer();
+    });
+  }
+
+  private resetLegacyPlayInputBuffer(): void {
+    this.playMoveTimer?.remove(false);
+    this.playMoveTimer = null;
+    this.playMoveFlags = createLegacyPlayMoveFlags();
+  }
+
+  private resolveLegacyPlayInputBuffer(): void {
+    this.playMoveTimer?.remove(false);
+    this.playMoveTimer = null;
+    const { deltaX, deltaY } = resolveLegacyPlayMoveVector(this.playMoveFlags);
+    if (deltaX === 0 && deltaY === 0) {
+      return;
+    }
+
+    this.tryMovePlayer(deltaX, deltaY);
   }
 
   private handleOverlayFieldInput(event: KeyboardEvent): boolean {
@@ -988,6 +1065,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private enterMenuMode(): void {
+    this.resetLegacyPlayInputBuffer();
     this.mode = 'menu';
     this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
@@ -1008,6 +1086,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startPlayMode(): void {
+    this.resetLegacyPlayInputBuffer();
     this.mode = 'play';
     this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
@@ -1087,6 +1166,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private schedulePlayResetReturn(): void {
+    this.resetLegacyPlayInputBuffer();
     this.pendingResetRequest = createLegacyResetRequest({
       mode: 'play',
       nowMs: this.time.now,
@@ -1972,6 +2052,7 @@ export class MenuScene extends Phaser.Scene {
     }
     this.activeInputField = null;
     if (this.mode === 'play') {
+      this.resetLegacyPlayInputBuffer();
       this.clearPlayHudImmediately();
     }
     this.overlay = kind;
@@ -1988,6 +2069,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayReturn = 'none';
     this.activeInputField = null;
     if (this.mode === 'play') {
+      this.resetLegacyPlayInputBuffer();
       this.clearPlayHudImmediately();
     }
     this.boardDynamicDirty = true;
