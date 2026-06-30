@@ -80,6 +80,7 @@ Why it is not higher yet:
 - desktop menu layout now gives the front-door board more dominant space in wide viewports, which moves the current web shell closer to the legacy board-first screenshot composition without reopening other menu modules
 - desktop title lockup now sits higher and reads less heavily over the board in wide viewports, which moves the wordmark treatment closer to the restored legacy screenshots without reopening button or backdrop ownership
 - desktop front-door support chrome now uses narrower button boxes, more inward side-button placement, and lighter button treatment in wide viewports, which moves the lower menu composition closer to the restored legacy screenshots without reopening board or backdrop ownership
+- legacy menu backdrop field now routes through an explicit backdrop owner contract in `src/legacy-runtime/legacyMenuBackdrop.ts`, with a denser cloudy/star treatment that moves the desktop space field closer to the restored screenshots without claiming final screenshot-grade closure
 - `runtimeDiagnostics=1` now flows through the live `MenuScene` update loop and publishes a repo-owned runtime diagnostics surface instead of stopping at helper-only parsing/tests
 - runtime diagnostics now also publish a proof-only DOM attribute and visible side-browser diagnostics surface so localhost inspection does not depend on the hidden `window.__MAZER_*` globals alone
 - legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
@@ -147,7 +148,7 @@ Localhost operation rule:
 ## Still open
 
 - exact menu snapshot silhouette and attract-route parity
-- final desktop backdrop/material exactness still needs screenshot-grade tightening even after the board-dominance, title-lockup, and button-support corrections
+- final desktop backdrop/material exactness still needs screenshot-grade tightening even after the board-dominance, title-lockup, button-support, and explicit backdrop-owner corrections
 - exact play HUD parity beyond the tighter compact overlay and full proof bounds
 - exact demo AI parity beyond the newly restored recovery cue/pacing lane
 - exact generation/reset-flow parity beyond the queued request contract

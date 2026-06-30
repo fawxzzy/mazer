@@ -286,7 +286,7 @@ Use this before changing how the front door looks without changing the actual ma
 | menu board geometry and button/title placement | `src/legacy-runtime/legacyMenuLayout.ts` |
 | fixed legacy snapshot shape | `src/legacy-runtime/legacyMenuSnapshot.ts` |
 | menu trench width / connection continuity | `src/legacy-runtime/legacyMenuRender.ts` + `src/scenes/MenuScene.ts` |
-| slab/frame colors and backdrop haze | `src/scenes/MenuScene.ts` constants near `LEGACY_MENU_*` + `drawBackdrop()` |
+| slab/frame colors and backdrop haze | `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/scenes/MenuScene.ts#drawBackdrop()` plus `LEGACY_MENU_*` board constants |
 | title opacity / shadow / wordmark presence | `src/scenes/MenuScene.ts` -> `refreshLayout()` + scene title text setup |
 | front-door button box strength / label presence | `src/scenes/MenuScene.ts` -> `createButton()` |
 | menu attract trail/player colors | `src/scenes/MenuScene.ts` dynamic board draw path |
@@ -306,7 +306,7 @@ Use this to avoid broad “fix the whole menu” passes. Lock one module at a ti
 | button chrome | `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/scenes/MenuScene.ts#createButton()` | `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-button-chrome.test.ts`, screenshot comparison |
 | board silhouette | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, screenshot comparison |
 | board material / tile read | `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts#drawStaticBoard()` | `tests/scenes/menu-render-frame.test.ts`, screenshot comparison |
-| backdrop field | `src/scenes/MenuScene.ts#drawBackdrop()` | screenshot comparison |
+| backdrop field | `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/scenes/MenuScene.ts#drawBackdrop()` | `tests/reset/legacy-menu-backdrop.test.ts`, screenshot comparison |
 | demo route / pacing | `src/legacy-runtime/legacyDemoWalker.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, live preview |
 
 Rule:

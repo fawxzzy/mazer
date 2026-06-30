@@ -52,6 +52,16 @@ import {
 } from '../legacy-runtime/legacyMenuLayout';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { resolveLegacyMenuTitlePresentation } from '../legacy-runtime/legacyMenuTitle';
+import {
+  LEGACY_MENU_STAR_COUNT,
+  advanceLegacyMenuBackdropStars,
+  createLegacyMenuBackdropStars,
+  resolveLegacyMenuBackdropOrbs,
+  resolveLegacyMenuBackdropPalette,
+  resolveLegacyMenuBackdropStreakLength,
+  resolveLegacyMenuBackdropTailStep,
+  type LegacyMenuBackdropStar
+} from '../legacy-runtime/legacyMenuBackdrop';
 import { performLegacyBrowserSafeExit } from '../legacy-runtime/legacyExit';
 import {
   createLegacyOptionFieldDrafts,
@@ -91,14 +101,6 @@ interface UiButton {
   label: Phaser.GameObjects.Text;
   setActive(active: boolean): void;
   destroy(): void;
-}
-
-interface StarParticle {
-  x: number;
-  y: number;
-  radius: number;
-  speed: number;
-  alpha: number;
 }
 
 interface OverlayPanelFrame {
@@ -364,7 +366,7 @@ export class MenuScene extends Phaser.Scene {
   private hudGraphics!: Phaser.GameObjects.Graphics;
   private uiTexts: Phaser.GameObjects.Text[] = [];
   private uiButtons: UiButton[] = [];
-  private stars: StarParticle[] = [];
+  private stars: LegacyMenuBackdropStar[] = [];
   private layout!: LegacyMenuLayout;
   private hudBounds: VisualRect | null = null;
   private hudTimerBounds: VisualRect | null = null;
@@ -1025,67 +1027,35 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createStars(): void {
-    const starCount = 440;
-    this.stars = Array.from({ length: starCount }, () => ({
-      x: Math.random(),
-      y: Math.random(),
-      radius: 0.8 + (Math.random() * 2.8),
-      speed: 0.008 + (Math.random() * 0.045),
-      alpha: 0.22 + (Math.random() * 0.72)
-    }));
+    this.stars = createLegacyMenuBackdropStars().slice(0, LEGACY_MENU_STAR_COUNT);
   }
 
   private updateStars(delta: number): void {
-    const speedScale = this.settings.darkMode ? 0.24 : 0.42;
-    for (const star of this.stars) {
-      star.y += star.speed * (delta / 1000) * speedScale;
-      if (star.y > 1.05) {
-        star.y = -0.05;
-        star.x = Math.random();
-      }
-    }
-
+    advanceLegacyMenuBackdropStars(this.stars, delta, this.settings.darkMode);
     this.backdropDirty = true;
   }
 
   private drawBackdrop(): void {
     const { width, height } = this.layout;
     this.backdropGraphics.clear();
+    const palette = resolveLegacyMenuBackdropPalette(this.settings.darkMode);
+    const hazeOrbs = resolveLegacyMenuBackdropOrbs(width, height, this.settings.darkMode);
 
-    const fieldColor = this.settings.darkMode ? 0x12091b : 0x2a1742;
-    const hazeColor = this.settings.darkMode ? 0x39184c : 0x6e458e;
-    const hazeAlpha = this.settings.darkMode ? 0.06 : 0.1;
-    const starAlphaScale = this.settings.darkMode ? 0.72 : 1.18;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const maxDistance = Math.max(1, Math.hypot(centerX, centerY));
-
-    this.backdropGraphics.fillStyle(fieldColor, 1);
+    this.backdropGraphics.fillStyle(palette.fieldColor, 1);
     this.backdropGraphics.fillRect(0, 0, width, height);
-    this.backdropGraphics.fillStyle(hazeColor, hazeAlpha);
-    this.backdropGraphics.fillCircle(centerX, centerY, Math.min(width, height) * 0.29);
-    this.backdropGraphics.fillStyle(hazeColor, hazeAlpha * 0.3);
-    this.backdropGraphics.fillCircle(centerX * 0.92, centerY * 0.86, Math.min(width, height) * 0.19);
-    this.backdropGraphics.fillStyle(hazeColor, hazeAlpha * 0.34);
-    this.backdropGraphics.fillCircle(width * 0.17, height * 0.21, Math.min(width, height) * 0.18);
-    this.backdropGraphics.fillCircle(width * 0.84, height * 0.2, Math.min(width, height) * 0.2);
-    this.backdropGraphics.fillCircle(width * 0.82, height * 0.76, Math.min(width, height) * 0.18);
-    this.backdropGraphics.fillStyle(0xffffff, this.settings.darkMode ? 0.016 : 0.024);
-    this.backdropGraphics.fillCircle(width * 0.14, height * 0.12, Math.min(width, height) * 0.08);
-    this.backdropGraphics.fillCircle(width * 0.88, height * 0.12, Math.min(width, height) * 0.07);
-    this.backdropGraphics.fillCircle(width * 0.89, height * 0.84, Math.min(width, height) * 0.06);
+    for (const orb of hazeOrbs) {
+      this.backdropGraphics.fillStyle(orb.color, orb.alpha);
+      this.backdropGraphics.fillCircle(orb.x, orb.y, orb.radius);
+    }
 
+    const starAlphaScale = palette.starAlphaScale;
     for (const star of this.stars) {
       const pixelX = Math.round(star.x * width);
       const pixelY = Math.round(star.y * height);
-      const deltaX = pixelX - centerX;
-      const deltaY = pixelY - centerY;
-      const distanceRatio = clamp(Math.hypot(deltaX, deltaY) / maxDistance, 0, 1);
-      const streakLength = Math.max(1, Math.round((distanceRatio * 4) + (star.radius * 0.9)));
+      const streakLength = resolveLegacyMenuBackdropStreakLength(star);
       const coreSize = Math.max(1, Math.round(star.radius));
-      const stepX = deltaX === 0 ? 0 : (deltaX > 0 ? 1 : -1);
-      const stepY = deltaY === 0 ? 0 : (deltaY > 0 ? 1 : -1);
-      const haloAlpha = star.alpha * starAlphaScale * (coreSize > 1 ? 0.18 : 0.08);
+      const { x: stepX, y: stepY } = resolveLegacyMenuBackdropTailStep(star);
+      const haloAlpha = star.alpha * starAlphaScale * (coreSize > 1 ? 0.16 : 0.07);
 
       if (coreSize > 1) {
         this.backdropGraphics.fillStyle(0xffffff, haloAlpha);
@@ -1100,8 +1070,8 @@ export class MenuScene extends Phaser.Scene {
         this.backdropGraphics.fillRect(pixelX + (stepX * index), pixelY + (stepY * index), 1, 1);
       }
     }
-    if (this.settings.darkMode) {
-      this.backdropGraphics.fillStyle(0x000000, 0.1);
+    if (palette.overlayAlpha > 0) {
+      this.backdropGraphics.fillStyle(0x000000, palette.overlayAlpha);
       this.backdropGraphics.fillRect(0, 0, width, height);
     }
 

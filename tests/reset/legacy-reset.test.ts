@@ -185,10 +185,11 @@ describe('legacy reset lane', () => {
   test('keeps the menu backdrop in the denser screenshot-directed field lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const starCount = 440;');
-    expect(menuSceneSource).toContain('const hazeAlpha = this.settings.darkMode ? 0.06 : 0.1;');
-    expect(menuSceneSource).toContain('this.backdropGraphics.fillCircle(width * 0.17, height * 0.21');
-    expect(menuSceneSource).toContain('this.backdropGraphics.fillCircle(width * 0.89, height * 0.84');
+    expect(menuSceneSource).toContain('LEGACY_MENU_STAR_COUNT');
+    expect(menuSceneSource).toContain('createLegacyMenuBackdropStars');
+    expect(menuSceneSource).toContain('advanceLegacyMenuBackdropStars');
+    expect(menuSceneSource).toContain('resolveLegacyMenuBackdropPalette');
+    expect(menuSceneSource).toContain('resolveLegacyMenuBackdropOrbs');
   });
 
   test('cleans up localhost service workers before booting Phaser', () => {
