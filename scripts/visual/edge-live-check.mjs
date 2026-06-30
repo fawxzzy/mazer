@@ -930,7 +930,7 @@ export const resolveEdgeLiveTargetUrl = (viewport, options = {}) => resolveViewp
 export const resolveEdgeLiveVerdicts = (diagnostics) => {
   const boardBounds = diagnostics?.board?.bounds ?? null;
   const safeBounds = diagnostics?.board?.safeBounds ?? null;
-  const hudBounds = diagnostics?.intentFeed?.bounds ?? null;
+  const hudBounds = diagnostics?.hud?.bounds ?? diagnostics?.intentFeed?.bounds ?? null;
   const viewport = diagnostics?.viewport ?? null;
   const viewportBounds = viewport
     ? {
@@ -1154,9 +1154,12 @@ const createSnapshot = (stage, diagnostics, screenshotPath) => {
       tileSize: visual?.board?.tileSize ?? null
     },
     hud: {
-      bounds: visual?.intentFeed?.bounds ?? null,
-      visible: visual?.intentFeed?.visible ?? null,
+      bounds: visual?.hud?.bounds ?? visual?.intentFeed?.bounds ?? null,
+      visible: visual?.hud?.visible ?? visual?.intentFeed?.visible ?? null,
       dock: visual?.intentFeed?.dock ?? null,
+      kind: visual?.hud?.kind ?? null,
+      timerBounds: visual?.hud?.timerBounds ?? null,
+      arrowBounds: visual?.hud?.arrowBounds ?? null,
       compact: visual?.intentFeed?.compact ?? null,
       statusVisible: visual?.intentFeed?.statusVisible ?? null,
       statusText: visual?.intentFeed?.statusText ?? null,

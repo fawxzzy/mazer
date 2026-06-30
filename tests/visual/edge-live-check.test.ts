@@ -127,6 +127,9 @@ describe('edge live check', () => {
         bounds: { left: 220, top: 160, right: 820, bottom: 760 },
         safeBounds: { left: 200, top: 140, right: 840, bottom: 780 }
       },
+      hud: {
+        bounds: { left: 18, top: 18, right: 150, bottom: 44 }
+      },
       intentFeed: {
         bounds: { left: 860, top: 160, right: 1240, bottom: 620 },
         visible: true
@@ -142,6 +145,9 @@ describe('edge live check', () => {
       board: {
         bounds: { left: 220, top: 160, right: 820, bottom: 760 },
         safeBounds: { left: 200, top: 140, right: 840, bottom: 780 }
+      },
+      hud: {
+        bounds: { left: 760, top: 240, right: 980, bottom: 700 }
       },
       intentFeed: {
         bounds: { left: 760, top: 240, right: 980, bottom: 700 },

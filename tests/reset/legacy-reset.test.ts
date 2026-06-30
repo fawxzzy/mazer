@@ -131,7 +131,11 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const arrowOriginX = this.layout.width - 42;');
     expect(menuSceneSource).toContain('const arrowOriginY = 26;');
     expect(menuSceneSource).toContain('const length = 22;');
-    expect(menuSceneSource).toContain('this.hudGraphics.fillRect(16, 16, 132, 26);');
+    expect(menuSceneSource).toContain('const timerLeft = 16;');
+    expect(menuSceneSource).toContain('const timerTop = 16;');
+    expect(menuSceneSource).toContain('const timerWidth = 132;');
+    expect(menuSceneSource).toContain('const timerHeight = 26;');
+    expect(menuSceneSource).toContain('this.hudGraphics.fillRect(timerLeft, timerTop, timerWidth, timerHeight);');
     expect(menuSceneSource).toContain("fontSize: '16px',");
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
     expect(menuSceneSource).toContain('this.schedulePlayResetReturn();');
