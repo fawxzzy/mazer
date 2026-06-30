@@ -97,9 +97,13 @@ describe('legacy reset lane', () => {
     expect(menuMaze.grid[15]?.[23]).toBe(true);
     expect(menuMaze.grid[8]?.[10]).toBe(true);
     expect(menuMaze.grid[10]?.[8]).toBe(true);
+    expect(menuMaze.grid[5]?.[8]).toBe(true);
+    expect(menuMaze.grid[6]?.[9]).toBe(true);
+    expect(menuMaze.grid[6]?.[10]).toBe(true);
     expect(menuMaze.grid[6]?.[17]).toBe(true);
     expect(menuMaze.grid[7]?.[9]).toBe(true);
     expect(menuMaze.grid[11]?.[13]).toBe(true);
+    expect(menuMaze.grid[3]?.[2]).toBe(true);
     expect(menuMaze.grid[6]?.[24]).toBe(true);
     expect(menuMaze.grid[12]?.[24]).toBe(true);
     expect(menuMaze.grid[18]?.[20]).toBe(true);

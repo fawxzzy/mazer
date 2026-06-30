@@ -113,6 +113,7 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(upperLeftPocket, { x: 6, y: 9 });
   appendSegment(upperLeftPocket, { x: 6, y: 7 });
   appendSegment(upperLeftPocket, { x: 8, y: 7 });
+  appendSegment(upperLeftPocket, { x: 8, y: 5 });
 
   const upperLeftLattice: LegacyMenuSnapshotPoint[] = [{ x: 5, y: 4 }];
   appendSegment(upperLeftLattice, { x: 7, y: 4 });
@@ -123,8 +124,10 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
   appendSegment(upperLeftLattice, { x: 8, y: 10 });
   appendSegment(upperLeftLattice, { x: 10, y: 10 });
   appendSegment(upperLeftLattice, { x: 10, y: 8 });
+  appendSegment(upperLeftLattice, { x: 10, y: 6 });
+  appendSegment(upperLeftLattice, { x: 9, y: 6 });
 
-  const leftFrame: LegacyMenuSnapshotPoint[] = [{ x: 2, y: 4 }];
+  const leftFrame: LegacyMenuSnapshotPoint[] = [{ x: 2, y: 3 }];
   appendSegment(leftFrame, { x: 2, y: 22 });
   appendSegment(leftFrame, { x: 6, y: 22 });
   appendSegment(leftFrame, { x: 6, y: 19 });
