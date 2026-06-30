@@ -360,6 +360,7 @@ Use this before editing `legacyMenuSnapshot.ts` so you know which named branch i
 | `title-underlay-band` | upper-mid trench run below the wordmark that keeps the title plate from reading hollow |
 | `left-interior-drop` | mid-left vertical drop that keeps the left interior from reading hollow |
 | `mid-left-shelf` | left-middle shelf that thickens the interior mass before the diagonal drop |
+| `lower-left-shelves` | lower-left nested shelf family that reduces the oversized empty block below the mid-left shelf |
 | `diagonal-upper` | upper diagonal staircase family crossing toward the center |
 | `diagonal-lower` | lower diagonal staircase family that leads toward the goal-side mass |
 | `lower-band` | long lower trench across the lower-left and lower-middle plate |
