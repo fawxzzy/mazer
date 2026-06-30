@@ -96,6 +96,7 @@ import { summarizeTelemetrySemantics } from '../telemetry';
 
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
+type RuntimeGenerationStage = NonNullable<LegacyMazeSnapshot['generation']>['executionPlan'][number];
 
 interface UiButton {
   background: Phaser.GameObjects.Rectangle;
@@ -187,6 +188,12 @@ interface MenuSceneVisualDiagnostics {
         previousStageIds: number[];
         processComplete: boolean | null;
         remainingStageIds: number[];
+      };
+      drawStage: {
+        batchSize: number | null;
+        batchUnit: string | null;
+        rowsVisible: number | null;
+        staged: boolean;
       };
       pendingRequest: {
         budget: {
@@ -392,6 +399,7 @@ export class MenuScene extends Phaser.Scene {
   private boardDynamicDirty = true;
   private backdropDirty = true;
   private uiDirty = true;
+  private menuStaticDrawRowsVisible: number | null = null;
   private visualDiagnosticsRevision = 0;
   private runtimeDiagnosticsConfig: MenuSceneRuntimeConfig = {
     enabled: false,
@@ -508,6 +516,8 @@ export class MenuScene extends Phaser.Scene {
       this.enterMenuMode();
       return;
     }
+
+    this.advanceLegacyMenuStaticDrawStage();
 
     if (this.backdropDirty) {
       this.drawBackdrop();
@@ -632,6 +642,12 @@ export class MenuScene extends Phaser.Scene {
           : null
       },
       generation: {
+        drawStage: {
+          batchSize: this.resolveLegacyMenuStaticDrawStage()?.batchSize ?? null,
+          batchUnit: this.resolveLegacyMenuStaticDrawStage()?.batchUnit ?? null,
+          rowsVisible: this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics(),
+          staged: this.mode === 'menu' && this.resolveLegacyMenuStaticDrawStage()?.executionKind === 'row-slice'
+        },
         stageCursor: {
           completionSignal: this.maze.generation?.stageCursor.completionSignal ?? null,
           currentStageId: this.maze.generation?.stageCursor.currentStageId ?? null,
@@ -899,6 +915,7 @@ export class MenuScene extends Phaser.Scene {
     this.boardStaticDirty = true;
     this.boardDynamicDirty = true;
     this.uiDirty = true;
+    this.armLegacyMenuStaticDrawStage();
   }
 
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
@@ -933,6 +950,41 @@ export class MenuScene extends Phaser.Scene {
       scale: this.settings.scale,
       stepSeed: options.stepSeed === true
     });
+  }
+
+  private resolveLegacyMenuStaticDrawStage(): RuntimeGenerationStage | null {
+    return this.maze.generation?.executionPlan.find((stage) => stage.id === 6) ?? null;
+  }
+
+  private resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics(): number | null {
+    const drawStage = this.resolveLegacyMenuStaticDrawStage();
+    if (this.mode !== 'menu' || drawStage?.executionKind !== 'row-slice') {
+      return null;
+    }
+
+    return this.menuStaticDrawRowsVisible ?? this.maze.size;
+  }
+
+  private armLegacyMenuStaticDrawStage(): void {
+    const drawStage = this.resolveLegacyMenuStaticDrawStage();
+    this.menuStaticDrawRowsVisible = this.mode === 'menu' && drawStage?.executionKind === 'row-slice'
+      ? 0
+      : null;
+  }
+
+  private advanceLegacyMenuStaticDrawStage(): void {
+    if (this.menuStaticDrawRowsVisible === null) {
+      return;
+    }
+
+    const drawStage = this.resolveLegacyMenuStaticDrawStage();
+    const batchSize = Math.max(1, drawStage?.batchSize ?? 1);
+    this.menuStaticDrawRowsVisible = Math.min(this.maze.size, this.menuStaticDrawRowsVisible + batchSize);
+    this.boardStaticDirty = true;
+    this.boardDynamicDirty = true;
+    if (this.menuStaticDrawRowsVisible >= this.maze.size) {
+      this.menuStaticDrawRowsVisible = null;
+    }
   }
 
   private enterMenuMode(): void {
@@ -1171,7 +1223,11 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    for (let y = 0; y < this.maze.size; y += 1) {
+    const staticDrawRowLimit = isMenuMode && this.menuStaticDrawRowsVisible !== null
+      ? this.menuStaticDrawRowsVisible
+      : this.maze.size;
+
+    for (let y = 0; y < staticDrawRowLimit; y += 1) {
       for (let x = 0; x < this.maze.size; x += 1) {
         const tileX = boardLeft + (x * tileSize);
         const tileY = boardTop + (y * tileSize);
@@ -2074,6 +2130,12 @@ export class MenuScene extends Phaser.Scene {
             previousStageIds: [...(this.maze.generation?.stageCursor.previousStageIds ?? [])],
             processComplete: this.maze.generation?.stageCursor.processComplete ?? null,
             remainingStageIds: [...(this.maze.generation?.stageCursor.remainingStageIds ?? [])]
+          },
+          drawStage: {
+            batchSize: this.resolveLegacyMenuStaticDrawStage()?.batchSize ?? null,
+            batchUnit: this.resolveLegacyMenuStaticDrawStage()?.batchUnit ?? null,
+            rowsVisible: this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics(),
+            staged: this.mode === 'menu' && this.resolveLegacyMenuStaticDrawStage()?.executionKind === 'row-slice'
           },
           pendingRequest: {
             budget: {

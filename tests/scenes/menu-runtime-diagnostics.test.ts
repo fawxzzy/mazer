@@ -289,6 +289,12 @@ describe('menu runtime diagnostics', () => {
         runnerMistakesEnabled: true
       },
       generation: {
+        drawStage: {
+          batchSize: 1,
+          batchUnit: 'rows',
+          rowsVisible: 25,
+          staged: true
+        },
         stageCursor: {
           phase: 'consumed-finalized',
           currentStageId: 7,
@@ -406,6 +412,9 @@ describe('menu runtime diagnostics', () => {
       );
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
         'gen stage consumed-finalized:7 signal player-finalized complete yes'
+      );
+      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
+        'draw rows 25 batch 1 rows staged yes'
       );
 
       clearMenuSceneRuntimeDiagnostics();

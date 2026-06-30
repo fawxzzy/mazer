@@ -48,7 +48,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `91%`
+- `92%`
 
 Why it is not higher yet:
 
@@ -83,6 +83,7 @@ Why it is not higher yet:
 - legacy level-building scheduler truth is now explicit in the runtime contract: process `0` requires the armed start-time + delay-start flag, the exact legacy delay duration remains honestly unrecovered, and initialized process `8` reset entry is marked as the branch that bypasses that delay gate
 - legacy stage progression truth is now explicit in the runtime contract: stages now publish their own completion signals, next-stage transitions, and the stage-5 skip-to-6 rule when shortcuts are disabled
 - stage `4` now advances directly to stage `6` when scale disables shortcut process `5`, so small-maze runtime plans no longer publish an impossible `4 -> 5` transition
+- menu static-board drawing now follows the stage-6 row-slice contract during generation application, so the front-door board reveal advances by legacy draw-stage rows instead of appearing only as one completed static pass
 - legacy front-door `Exit` now routes through an explicit browser-safe quit equivalence contract instead of a temporary explanation overlay, and the dead `message` overlay family has been removed from the active reset lane
 - desktop menu layout now gives the front-door board more dominant space in wide viewports, which moves the current web shell closer to the legacy board-first screenshot composition without reopening other menu modules
 - desktop title lockup now sits higher and reads less heavily over the board in wide viewports, which moves the wordmark treatment closer to the restored legacy screenshots without reopening button or backdrop ownership
@@ -107,11 +108,11 @@ Why it is not higher yet:
 
 ## What is not yet 1:1
 
-- maze generation lifecycle is still a reset-lane approximation, not the full old staged process graph
-- generation/reset branches, stage cadence, budget formulas, process-entry gates, the menu-demo process-8-to-process-0 handoff, and shortcut-disabled stage `4 -> 6` progression are now explicit runtime contracts, but the full staged process `0/3/4/5/6/7/8` port is still not complete
-- stage `7` responsibilities, process `8` reset branches, process-0 delay entry, the menu reset handoff, shortcut-disabled stage progression, and stage `0/3/4/5/6` execution cadence are now explicit, but the remaining staged generator implementation is still not fully ported
-- stage-cursor diagnostics now expose queued process-0 entry and consumed stage-7 finalization, but the runtime still consumes each request through the current one-shot maze builder rather than an incremental staged port
-- level-building scheduler ownership is clearer now, but the runtime still does not execute the full staged Unreal process graph
+- maze generation topology is still produced by the browser builder instead of a literal line-for-line Unreal generator port
+- generation/reset branches, stage cadence, budget formulas, process-entry gates, the menu-demo process-8-to-process-0 handoff, shortcut-disabled stage `4 -> 6` progression, and menu stage-6 row-sliced drawing are now explicit runtime contracts
+- stage `7` responsibilities, process `8` reset branches, process-0 delay entry, the menu reset handoff, shortcut-disabled stage progression, and stage `0/3/4/5/6` execution cadence are now explicit lifecycle truth
+- stage-cursor diagnostics now expose queued process-0 entry and consumed stage-7 finalization, and visual diagnostics now expose the menu draw-stage row cursor
+- the browser builder still resolves maze topology before stage-6 row reveal, so exact topology internals remain a future gameplay/topology concern rather than an unstated lifecycle claim
 - demo AI and backtracking are not yet a full legacy-exact port
 - in-game HUD is only partially restored
 - browser exit cannot literally execute the old engine quit behavior, but the bounded browser-safe quit equivalence is now explicit and proof-backed

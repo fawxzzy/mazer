@@ -82,6 +82,12 @@ export interface MenuSceneRuntimeDiagnostics {
     runnerMistakesEnabled: boolean | null;
   };
   generation?: {
+    drawStage?: {
+      batchSize: number | null;
+      batchUnit: string | null;
+      rowsVisible: number | null;
+      staged: boolean;
+    };
     stageCursor: {
       completionSignal: string | null;
       currentStageId: number | null;
@@ -451,7 +457,8 @@ export const formatMenuSceneRuntimeDiagnosticsSurfaceText = (
   `fps ${Math.round(diagnostics.performance.estimatedFps)} avg ${formatRuntimeMetric(diagnostics.performance.recentAverageFrameMs)}ms worst ${formatRuntimeMetric(diagnostics.performance.worstRecentFrameMs)}ms spikes ${diagnostics.performance.recentSpikeCount}`,
   `trail ${diagnostics.resources.trailSegmentCount}/${diagnostics.resources.trailSegmentCap} listeners ${diagnostics.resources.listenerCount} vis ${diagnostics.visibility.changeCount}/${diagnostics.visibility.suspendCount} low ${diagnostics.performance.lowPowerActive ? 'on' : 'off'}`,
   `demo ${diagnostics.menuDemo?.phase ?? 'none'} cue ${diagnostics.menuDemo?.cue ?? 'none'} mistakes ${diagnostics.menuDemo?.runnerMistakesEnabled === true ? 'on' : diagnostics.menuDemo?.runnerMistakesEnabled === false ? 'off' : 'n/a'} cursor ${diagnostics.menuDemo?.pathCursor ?? 'n/a'}`,
-  `gen stage ${diagnostics.generation?.stageCursor.phase ?? 'none'}:${diagnostics.generation?.stageCursor.currentStageId ?? 'n/a'} signal ${diagnostics.generation?.stageCursor.completionSignal ?? 'n/a'} complete ${diagnostics.generation?.stageCursor.processComplete === true ? 'yes' : diagnostics.generation?.stageCursor.processComplete === false ? 'no' : 'n/a'}`
+  `gen stage ${diagnostics.generation?.stageCursor.phase ?? 'none'}:${diagnostics.generation?.stageCursor.currentStageId ?? 'n/a'} signal ${diagnostics.generation?.stageCursor.completionSignal ?? 'n/a'} complete ${diagnostics.generation?.stageCursor.processComplete === true ? 'yes' : diagnostics.generation?.stageCursor.processComplete === false ? 'no' : 'n/a'}`,
+  `draw rows ${diagnostics.generation?.drawStage?.rowsVisible ?? 'n/a'} batch ${diagnostics.generation?.drawStage?.batchSize ?? 'n/a'} ${diagnostics.generation?.drawStage?.batchUnit ?? 'n/a'} staged ${diagnostics.generation?.drawStage?.staged === true ? 'yes' : diagnostics.generation?.drawStage?.staged === false ? 'no' : 'n/a'}`
 ].join('\n');
 
 export const parseMenuSceneRuntimeDiagnosticsAttribute = (

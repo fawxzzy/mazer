@@ -249,6 +249,11 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('if (nextRequest !== null && shouldConsumeLegacyGenerationRequest(nextRequest, time))');
     expect(menuSceneSource).toContain('const generationState = consumeLegacyGenerationRequestState(request, this.settings.scale);');
     expect(menuSceneSource).toContain('if (generationState.startsPlayTimer) {');
+    expect(menuSceneSource).toContain('private menuStaticDrawRowsVisible: number | null = null;');
+    expect(menuSceneSource).toContain('this.armLegacyMenuStaticDrawStage();');
+    expect(menuSceneSource).toContain('private advanceLegacyMenuStaticDrawStage(): void {');
+    expect(menuSceneSource).toContain('this.menuStaticDrawRowsVisible = Math.min(this.maze.size, this.menuStaticDrawRowsVisible + batchSize);');
+    expect(menuSceneSource).toContain('const staticDrawRowLimit = isMenuMode && this.menuStaticDrawRowsVisible !== null');
     expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });");
     expect(menuSceneSource).toContain("this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });");
     expect(menuSceneSource).toContain('this.pendingGenerationRequest = createLegacyMenuResetGenerationRequest({');
@@ -270,6 +275,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('stageCursor: {');
     expect(menuSceneSource).toContain('currentStageId: this.maze.generation?.stageCursor.currentStageId ?? null');
     expect(menuSceneSource).toContain('currentStageId: this.pendingGenerationRequest?.stageCursor.currentStageId ?? null');
+    expect(menuSceneSource).toContain('drawStage: {');
+    expect(menuSceneSource).toContain('rowsVisible: this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics()');
     expect(menuSceneSource).toContain('executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({');
     expect(menuSceneSource).toContain('resolveMenuSceneRuntimeConfig(runtimeSearch, {');
     expect(menuSceneSource).toContain('publishMenuSceneRuntimeDiagnostics({');
