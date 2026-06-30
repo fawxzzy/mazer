@@ -24,21 +24,21 @@ export const resolveLegacyMenuButtonChrome = (
   const { height, isPrimary, textLength, width } = input;
   const fitSize = Math.floor((width * 1.4) / Math.max(4, textLength));
   const fontSize = Math.max(
-    isPrimary ? 26 : 22,
+    isPrimary ? 24 : 20,
     Math.min(
-      isPrimary ? 46 : 36,
-      Math.min(Math.round(height * (isPrimary ? 0.66 : 0.58)), fitSize)
+      isPrimary ? 40 : 32,
+      Math.min(Math.round(height * (isPrimary ? 0.58 : 0.52)), fitSize)
     )
   );
 
   return {
-    baseAlpha: isPrimary ? 0.105 : 0.08,
-    baseStroke: isPrimary ? 0.86 : 0.72,
+    baseAlpha: isPrimary ? 0.092 : 0.062,
+    baseStroke: isPrimary ? 0.78 : 0.58,
     fontSize,
-    hoverAlpha: isPrimary ? 0.18 : 0.135,
+    hoverAlpha: isPrimary ? 0.15 : 0.112,
     hoverLabelAlpha: 1,
-    hoverStroke: isPrimary ? 0.98 : 0.86,
-    labelAlpha: isPrimary ? 1 : 0.965,
+    hoverStroke: isPrimary ? 0.9 : 0.76,
+    labelAlpha: isPrimary ? 0.96 : 0.9,
     strokeColor: isPrimary ? 0xc9c0d7 : 0xb4abc3,
     strokeWidth: 2,
     textColor: isPrimary ? '#1f9f2f' : '#188826'
