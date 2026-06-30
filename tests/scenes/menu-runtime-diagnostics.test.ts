@@ -257,6 +257,14 @@ describe('menu runtime diagnostics', () => {
       sceneInstanceId: 7,
       updatedAt: 1200,
       runtimeMs: 1200,
+      menuDemo: {
+        phase: 'explore',
+        cue: 'backtrack',
+        pathCursor: 12,
+        reachedGoal: false,
+        prerollSteps: 72,
+        runnerMistakesEnabled: true
+      },
       visibility: {
         hidden: false,
         changeCount: 0,
@@ -357,6 +365,9 @@ describe('menu runtime diagnostics', () => {
       )).toEqual(diagnostics);
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toBe(
         formatMenuSceneRuntimeDiagnosticsSurfaceText(diagnostics)
+      );
+      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
+        'demo explore cue backtrack mistakes on cursor 12'
       );
 
       clearMenuSceneRuntimeDiagnostics();

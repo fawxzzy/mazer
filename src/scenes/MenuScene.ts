@@ -604,6 +604,16 @@ export class MenuScene extends Phaser.Scene {
       sceneInstanceId: this.runtimeDiagnosticsSceneInstanceId,
       updatedAt: Math.max(0, Math.round(time)),
       runtimeMs: Math.max(0, Math.round(time)),
+      menuDemo: {
+        phase: this.menuDemoState?.phase ?? null,
+        cue: this.menuDemoState?.cue ?? null,
+        pathCursor: this.menuDemoState?.pathCursor ?? null,
+        reachedGoal: this.menuDemoState?.reachedGoal ?? false,
+        prerollSteps: Math.max(0, this.menuDemoConfig?.behavior.prerollSteps ?? 0),
+        runnerMistakesEnabled: this.menuDemoConfig
+          ? this.menuDemoConfig.behavior.enableRunnerMistakes === true
+          : null
+      },
       visibility: {
         hidden,
         changeCount: this.runtimeVisibilityChangeCount,

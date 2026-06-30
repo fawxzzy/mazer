@@ -73,6 +73,14 @@ export interface MenuSceneRuntimeDiagnostics {
   sceneInstanceId: number;
   updatedAt: number;
   runtimeMs: number;
+  menuDemo?: {
+    phase: string | null;
+    cue: string | null;
+    pathCursor: number | null;
+    reachedGoal: boolean;
+    prerollSteps: number;
+    runnerMistakesEnabled: boolean | null;
+  };
   visibility: {
     hidden: boolean;
     changeCount: number;
@@ -385,7 +393,8 @@ export const formatMenuSceneRuntimeDiagnosticsSurfaceText = (
 ): string => [
   `diag s${diagnostics.sceneInstanceId} r${diagnostics.revision} perf:${diagnostics.performance.mode}`,
   `fps ${Math.round(diagnostics.performance.estimatedFps)} avg ${formatRuntimeMetric(diagnostics.performance.recentAverageFrameMs)}ms worst ${formatRuntimeMetric(diagnostics.performance.worstRecentFrameMs)}ms spikes ${diagnostics.performance.recentSpikeCount}`,
-  `trail ${diagnostics.resources.trailSegmentCount}/${diagnostics.resources.trailSegmentCap} listeners ${diagnostics.resources.listenerCount} vis ${diagnostics.visibility.changeCount}/${diagnostics.visibility.suspendCount} low ${diagnostics.performance.lowPowerActive ? 'on' : 'off'}`
+  `trail ${diagnostics.resources.trailSegmentCount}/${diagnostics.resources.trailSegmentCap} listeners ${diagnostics.resources.listenerCount} vis ${diagnostics.visibility.changeCount}/${diagnostics.visibility.suspendCount} low ${diagnostics.performance.lowPowerActive ? 'on' : 'off'}`,
+  `demo ${diagnostics.menuDemo?.phase ?? 'none'} cue ${diagnostics.menuDemo?.cue ?? 'none'} mistakes ${diagnostics.menuDemo?.runnerMistakesEnabled === true ? 'on' : diagnostics.menuDemo?.runnerMistakesEnabled === false ? 'off' : 'n/a'} cursor ${diagnostics.menuDemo?.pathCursor ?? 'n/a'}`
 ].join('\n');
 
 export const parseMenuSceneRuntimeDiagnosticsAttribute = (
