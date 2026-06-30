@@ -77,6 +77,7 @@ Why it is not higher yet:
 - legacy stage `0/3/4/5/6` execution cadence is now explicit for menu-sliced versus play-continuous generation
 - legacy generation metadata now carries explicit checkpoint/shortcut budget contracts into runtime diagnostics for menu versus play lanes
 - queued generation requests now publish their own build, stage, and budget contract alongside the live maze contract in scene diagnostics
+- queued generation requests and consumed runtime mazes now carry an explicit stage-cursor projection, so diagnostics can distinguish queued process-0 entry from consumed stage-7 finalization without claiming the full staged Unreal generator is ported
 - generation requests now carry the explicit delay-gated process-0 entry contract, and reset requests now carry the explicit initialized process-8 entry contract
 - legacy level-building scheduler truth is now explicit in the runtime contract: process `0` requires the armed start-time + delay-start flag, the exact legacy delay duration remains honestly unrecovered, and initialized process `8` reset entry is marked as the branch that bypasses that delay gate
 - legacy stage progression truth is now explicit in the runtime contract: stages now publish their own completion signals, next-stage transitions, and the stage-5 skip-to-6 rule when shortcuts are disabled
@@ -106,6 +107,7 @@ Why it is not higher yet:
 - maze generation lifecycle is still a reset-lane approximation, not the full old staged process graph
 - generation/reset branches, stage cadence, budget formulas, and process-entry gates are now explicit runtime contracts, but the full staged process `0/3/4/5/6/7/8` port is still not complete
 - stage `7` responsibilities, process `8` reset branches, process-0 delay entry, and stage `0/3/4/5/6` execution cadence are now explicit, but the remaining staged generator implementation is still not fully ported
+- stage-cursor diagnostics now expose queued process-0 entry and consumed stage-7 finalization, but the runtime still consumes each request through the current one-shot maze builder rather than an incremental staged port
 - level-building scheduler ownership is clearer now, but the runtime still does not execute the full staged Unreal process graph
 - demo AI and backtracking are not yet a full legacy-exact port
 - in-game HUD is only partially restored

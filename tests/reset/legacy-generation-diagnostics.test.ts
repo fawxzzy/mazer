@@ -29,6 +29,14 @@ describe('legacy generation diagnostics contract', () => {
       resetsLevelBuildingTimerAfterConsume: true
     });
     expect(menuMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
+    expect(menuMaze.generation?.stageCursor).toEqual({
+      phase: 'consumed-finalized',
+      currentStageId: 7,
+      completionSignal: 'player-finalized',
+      previousStageIds: [0, 3, 4, 5, 6],
+      remainingStageIds: [8],
+      processComplete: true
+    });
     expect(menuMaze.generation?.executionPlan).toEqual([
       { id: 0, name: 'CreateGrid', completionSignal: 'grid-spawn-complete', advancesToStageId: 3, executionKind: 'row-slice', batchSize: 1, batchUnit: 'rows', skipToStageIdWhenDisabled: null },
       { id: 3, name: 'MapPath', completionSignal: 'checkpoint-budget-exhausted', advancesToStageId: 4, executionKind: 'checkpoint-pass', batchSize: 1, batchUnit: 'checkpoint-passes', skipToStageIdWhenDisabled: null },
@@ -61,6 +69,14 @@ describe('legacy generation diagnostics contract', () => {
       resetsLevelBuildingTimerAfterConsume: true
     });
     expect(playMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
+    expect(playMaze.generation?.stageCursor).toEqual({
+      phase: 'consumed-finalized',
+      currentStageId: 7,
+      completionSignal: 'player-finalized',
+      previousStageIds: [0, 3, 4, 5, 6],
+      remainingStageIds: [8],
+      processComplete: true
+    });
     expect(playMaze.generation?.executionPlan).toEqual([
       { id: 0, name: 'CreateGrid', completionSignal: 'grid-spawn-complete', advancesToStageId: 3, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
       { id: 3, name: 'MapPath', completionSignal: 'checkpoint-budget-exhausted', advancesToStageId: 4, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },

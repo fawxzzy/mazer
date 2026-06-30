@@ -31,6 +31,7 @@ export type LegacyGenerationStageExecutionKind =
   | 'reset-branch';
 export type LegacyGenerationStageBatchUnit = 'rows' | 'checkpoint-passes' | 'path-tiles' | 'shortcut-attempts' | null;
 export type LegacyGenerationEntryStageId = 0;
+export type LegacyGenerationStageCursorPhase = 'queued-entry' | 'consumed-finalized' | 'reset-branch';
 export type LegacyGenerationRequestReason =
   | 'boot-menu'
   | 'play-start'
@@ -48,6 +49,15 @@ export interface LegacyGenerationStageContract {
   id: LegacyGenerationProcessStageId;
   name: LegacyGenerationStageName;
   skipToStageIdWhenDisabled: LegacyGenerationProcessStageId | null;
+}
+
+export interface LegacyGenerationStageCursor {
+  completionSignal: LegacyGenerationCompletionSignal;
+  currentStageId: LegacyGenerationProcessStageId;
+  phase: LegacyGenerationStageCursorPhase;
+  previousStageIds: LegacyGenerationProcessStageId[];
+  processComplete: boolean;
+  remainingStageIds: LegacyGenerationProcessStageId[];
 }
 
 export interface LegacyGenerationBudgetContract {
@@ -84,6 +94,7 @@ export interface LegacyGenerationRequest {
   queuedAtMs: number;
   reason: LegacyGenerationRequestReason;
   seed: number;
+  stageCursor: LegacyGenerationStageCursor;
 }
 
 export interface LegacyGenerationConsumption {
@@ -318,6 +329,35 @@ export const resolveLegacyGenerationExecutionPlan = (
   resolveLegacyGenerationProcessStageIds(scale).map((stageId) => createLegacyStageContract(mode, stageId))
 );
 
+export const resolveLegacyGenerationStageCursor = (
+  executionPlan: readonly LegacyGenerationStageContract[],
+  phase: LegacyGenerationStageCursorPhase
+): LegacyGenerationStageCursor => {
+  const fallbackStage = executionPlan[0];
+  const stage = executionPlan.find((candidate) => (
+    phase === 'queued-entry'
+      ? candidate.id === LEGACY_GENERATION_ENTRY_STAGE_ID
+      : phase === 'consumed-finalized'
+        ? candidate.id === 7
+        : candidate.id === 8
+  )) ?? fallbackStage;
+
+  if (!stage) {
+    throw new Error('Legacy generation stage cursor requires a non-empty execution plan.');
+  }
+
+  const stageIndex = executionPlan.findIndex((candidate) => candidate.id === stage.id);
+
+  return {
+    phase,
+    currentStageId: stage.id,
+    completionSignal: stage.completionSignal,
+    previousStageIds: executionPlan.slice(0, Math.max(0, stageIndex)).map((candidate) => candidate.id),
+    remainingStageIds: executionPlan.slice(stageIndex + 1).map((candidate) => candidate.id),
+    processComplete: phase === 'consumed-finalized'
+  };
+};
+
 export const createLegacyRuntimeMazeForMode = (
   mode: LegacyGenerationMode,
   scale: number,
@@ -338,7 +378,8 @@ export const createLegacyRuntimeMazeForMode = (
       buildKind,
       executionPlan,
       gate,
-      processStageIds: resolveLegacyGenerationProcessStageIds(scale)
+      processStageIds: resolveLegacyGenerationProcessStageIds(scale),
+      stageCursor: resolveLegacyGenerationStageCursor(executionPlan, 'consumed-finalized')
     }
   };
 };
@@ -363,6 +404,7 @@ export const createLegacyGenerationRequest = ({
   stepSeed?: boolean;
 }): LegacyGenerationRequest => {
   const seed = stepSeed ? stepLegacyGenerationSeed(currentSeed) : currentSeed;
+  const executionPlan = resolveLegacyGenerationExecutionPlan(mode, scale);
 
   return {
     mode,
@@ -372,9 +414,10 @@ export const createLegacyGenerationRequest = ({
     queuedAtMs: Math.max(0, Math.round(queuedAtMs)),
     budget: resolveLegacyGenerationBudgetContract(mode, scale),
     buildKind: resolveLegacyMazeBuildKind(mode),
-    executionPlan: resolveLegacyGenerationExecutionPlan(mode, scale),
+    executionPlan,
     gate: resolveLegacyGenerationTickGateContract(),
-    processStageIds: resolveLegacyGenerationProcessStageIds(scale)
+    processStageIds: resolveLegacyGenerationProcessStageIds(scale),
+    stageCursor: resolveLegacyGenerationStageCursor(executionPlan, 'queued-entry')
   };
 };
 

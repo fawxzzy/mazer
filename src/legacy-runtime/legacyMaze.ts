@@ -55,6 +55,22 @@ export interface LegacyMazeSnapshot {
       waitsForLevelBuildingDelay: boolean;
     };
     processStageIds: number[];
+    stageCursor: {
+      completionSignal:
+        | 'grid-spawn-complete'
+        | 'checkpoint-budget-exhausted'
+        | 'path-array-exhausted'
+        | 'shortcut-budget-exhausted'
+        | 'draw-iteration-complete'
+        | 'player-finalized'
+        | 'menu-reset-delay-rearmed'
+        | 'play-reset-template-return';
+      currentStageId: number;
+      phase: 'queued-entry' | 'consumed-finalized' | 'reset-branch';
+      previousStageIds: number[];
+      processComplete: boolean;
+      remainingStageIds: number[];
+    };
   };
 }
 

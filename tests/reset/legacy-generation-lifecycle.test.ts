@@ -8,6 +8,7 @@ import {
   LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS,
   resolveLegacyGenerationExecutionPlan,
   resolveLegacyGenerationBudgetContract,
+  resolveLegacyGenerationStageCursor,
   resolveLegacyGenerationTickGateContract,
   resolveLegacyGenerationProcessStageIds,
   resolveLegacyMazeBuildKind,
@@ -84,6 +85,37 @@ describe('legacy generation lifecycle', () => {
     ]);
   });
 
+  test('projects queued and consumed stage cursors from the legacy execution plan', () => {
+    const menuPlan = resolveLegacyGenerationExecutionPlan('menu', 50);
+
+    expect(resolveLegacyGenerationStageCursor(menuPlan, 'queued-entry')).toEqual({
+      phase: 'queued-entry',
+      currentStageId: 0,
+      completionSignal: 'grid-spawn-complete',
+      previousStageIds: [],
+      remainingStageIds: [3, 4, 5, 6, 7, 8],
+      processComplete: false
+    });
+
+    expect(resolveLegacyGenerationStageCursor(menuPlan, 'consumed-finalized')).toEqual({
+      phase: 'consumed-finalized',
+      currentStageId: 7,
+      completionSignal: 'player-finalized',
+      previousStageIds: [0, 3, 4, 5, 6],
+      remainingStageIds: [8],
+      processComplete: true
+    });
+
+    expect(resolveLegacyGenerationStageCursor(menuPlan, 'reset-branch')).toEqual({
+      phase: 'reset-branch',
+      currentStageId: 8,
+      completionSignal: 'menu-reset-delay-rearmed',
+      previousStageIds: [0, 3, 4, 5, 6, 7],
+      remainingStageIds: [],
+      processComplete: false
+    });
+  });
+
   test('routes menu and play mode to the correct maze builders', () => {
     expect(resolveLegacyMazeBuildKind('menu')).toBe('menu-snapshot');
     expect(resolveLegacyMazeBuildKind('play')).toBe('play-generated');
@@ -145,6 +177,14 @@ describe('legacy generation lifecycle', () => {
     });
     expect(menuBootRequest.buildKind).toBe('menu-snapshot');
     expect(menuBootRequest.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
+    expect(menuBootRequest.stageCursor).toEqual({
+      phase: 'queued-entry',
+      currentStageId: 0,
+      completionSignal: 'grid-spawn-complete',
+      previousStageIds: [],
+      remainingStageIds: [3, 4, 5, 6, 7, 8],
+      processComplete: false
+    });
     expect(menuBootRequest.executionPlan[0]).toEqual({
       id: 0,
       name: 'CreateGrid',
@@ -176,6 +216,14 @@ describe('legacy generation lifecycle', () => {
 
     expect(playMaze.generation?.buildKind).toBe('play-generated');
     expect(playMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
+    expect(playMaze.generation?.stageCursor).toEqual({
+      phase: 'consumed-finalized',
+      currentStageId: 7,
+      completionSignal: 'player-finalized',
+      previousStageIds: [0, 3, 4, 5, 6],
+      remainingStageIds: [8],
+      processComplete: true
+    });
     expect(playMaze.generation?.executionPlan[0]).toEqual({
       id: 0,
       name: 'CreateGrid',

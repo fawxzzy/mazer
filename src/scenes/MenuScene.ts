@@ -179,6 +179,14 @@ interface MenuSceneVisualDiagnostics {
         resetsLevelBuildingTimerAfterConsume: boolean | null;
         waitsForLevelBuildingDelay: boolean | null;
       };
+      stageCursor: {
+        completionSignal: string | null;
+        currentStageId: number | null;
+        phase: string | null;
+        previousStageIds: number[];
+        processComplete: boolean | null;
+        remainingStageIds: number[];
+      };
       pendingRequest: {
         budget: {
           checkpointCount: number | null;
@@ -218,6 +226,14 @@ interface MenuSceneVisualDiagnostics {
         processStageIds: number[];
         reason: string | null;
         seed: number | null;
+        stageCursor: {
+          completionSignal: string | null;
+          currentStageId: number | null;
+          phase: string | null;
+          previousStageIds: number[];
+          processComplete: boolean | null;
+          remainingStageIds: number[];
+        };
       };
       processStageIds: number[];
     };
@@ -2047,6 +2063,14 @@ export class MenuScene extends Phaser.Scene {
             resetsLevelBuildingTimerAfterConsume: this.maze.generation?.gate.resetsLevelBuildingTimerAfterConsume ?? null,
             waitsForLevelBuildingDelay: this.maze.generation?.gate.waitsForLevelBuildingDelay ?? null
           },
+          stageCursor: {
+            completionSignal: this.maze.generation?.stageCursor.completionSignal ?? null,
+            currentStageId: this.maze.generation?.stageCursor.currentStageId ?? null,
+            phase: this.maze.generation?.stageCursor.phase ?? null,
+            previousStageIds: [...(this.maze.generation?.stageCursor.previousStageIds ?? [])],
+            processComplete: this.maze.generation?.stageCursor.processComplete ?? null,
+            remainingStageIds: [...(this.maze.generation?.stageCursor.remainingStageIds ?? [])]
+          },
           pendingRequest: {
             budget: {
               checkpointCount: this.pendingGenerationRequest?.budget.checkpointCount ?? null,
@@ -2085,7 +2109,15 @@ export class MenuScene extends Phaser.Scene {
               resetsLevelBuildingTimerAfterConsume: this.pendingGenerationRequest?.gate.resetsLevelBuildingTimerAfterConsume ?? null,
               waitsForLevelBuildingDelay: this.pendingGenerationRequest?.gate.waitsForLevelBuildingDelay ?? null
             },
-            processStageIds: [...(this.pendingGenerationRequest?.processStageIds ?? [])]
+            processStageIds: [...(this.pendingGenerationRequest?.processStageIds ?? [])],
+            stageCursor: {
+              completionSignal: this.pendingGenerationRequest?.stageCursor.completionSignal ?? null,
+              currentStageId: this.pendingGenerationRequest?.stageCursor.currentStageId ?? null,
+              phase: this.pendingGenerationRequest?.stageCursor.phase ?? null,
+              previousStageIds: [...(this.pendingGenerationRequest?.stageCursor.previousStageIds ?? [])],
+              processComplete: this.pendingGenerationRequest?.stageCursor.processComplete ?? null,
+              remainingStageIds: [...(this.pendingGenerationRequest?.stageCursor.remainingStageIds ?? [])]
+            }
           },
           processStageIds: [...(this.maze.generation?.processStageIds ?? [])]
         },

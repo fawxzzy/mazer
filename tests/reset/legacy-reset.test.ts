@@ -224,6 +224,7 @@ describe('legacy reset lane', () => {
     expect(generationLifecycleSource).toContain('consumeLegacyGenerationRequestState');
     expect(generationLifecycleSource).toContain('resolveLegacyGenerationExecutionPlan');
     expect(generationLifecycleSource).toContain('resolveLegacyGenerationBudgetContract');
+    expect(generationLifecycleSource).toContain('resolveLegacyGenerationStageCursor');
     expect(generationLifecycleSource).toContain('resolveLegacyGenerationTickGateContract');
     expect(generationLifecycleSource).toContain("completionSignal: 'grid-spawn-complete'");
     expect(generationLifecycleSource).toContain("completionSignal: 'checkpoint-budget-exhausted'");
@@ -264,6 +265,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('completionSignal: stage.completionSignal,');
     expect(menuSceneSource).toContain('advancesToStageId: stage.advancesToStageId,');
     expect(menuSceneSource).toContain('processStageIds: [...(this.pendingGenerationRequest?.processStageIds ?? [])]');
+    expect(menuSceneSource).toContain('stageCursor: {');
+    expect(menuSceneSource).toContain('currentStageId: this.maze.generation?.stageCursor.currentStageId ?? null');
+    expect(menuSceneSource).toContain('currentStageId: this.pendingGenerationRequest?.stageCursor.currentStageId ?? null');
     expect(menuSceneSource).toContain('executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({');
     expect(menuSceneSource).toContain('resolveMenuSceneRuntimeConfig(runtimeSearch, {');
     expect(menuSceneSource).toContain('publishMenuSceneRuntimeDiagnostics({');
