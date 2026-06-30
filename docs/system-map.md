@@ -214,7 +214,8 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - restored simultaneous-key input buffer contract
   - held direction flag vector resolution
   - one-tile cardinal movement
-  - wall-collision gate
+  - axis-gated wall-collision resolution
+  - simultaneous blocked-axis slide and diagonal corner-block behavior
   - trail append and trim behavior
   - goal-step detection
 

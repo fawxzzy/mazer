@@ -1,8 +1,8 @@
 # Mazer Legacy 1:1 Completion Marker
 
-Date: 2026-06-29
+Date: 2026-06-30
 Status: active
-Current marker: `93%`
+Current marker: `94%`
 
 ## Intent
 
@@ -63,16 +63,16 @@ The current marker is the sum of the awarded points below.
 | Front-door menu shell semantics | `12` | `12` | aligned | `src/legacy-runtime/legacyDefaults.ts` -> `src/legacy-runtime/legacyExit.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-exit.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/reset/legacy-menu-layout.test.ts`, localhost | keep the browser-safe quit equivalence and front-door proof surfaces green while larger parity gaps close elsewhere |
 | Menu screenshot composition and board presentation | `14` | `13` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-title.test.ts`, `tests/reset/legacy-menu-button-chrome.test.ts`, `tests/reset/legacy-menu-backdrop.test.ts`, `tests/scenes/menu-render-frame.test.ts`, localhost | final screenshot-grade composition is still open, but desktop board dominance, title lockup, button support chrome, explicit backdrop ownership, a darker less-even board-material pass, a slightly wider/quieter trench read, a denser upper-left frame/pocket/lattice silhouette, and added lower-left shelf density are now closer to the restored screenshots without yet closing the last material/composition gap |
 | Overlay family and field responsibilities | `14` | `14` | aligned | `src/legacy-runtime/legacyOptionFields.ts` -> `src/legacy-runtime/legacyOverlayFieldCommit.ts` -> `src/legacy-runtime/legacyOverlayToggleFields.ts` -> `src/legacy-runtime/legacyOverlayRouting.ts` -> `src/legacy-runtime/legacyPauseLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-overlay-routing.test.ts`, `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost | keep the overlay proof spine green while larger runtime gaps close elsewhere |
-| Active play movement and win/reset loop | `14` | `11` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | simultaneous-key movement buffering is now ported from the restored Unreal player source, but collision edge cases and return/reset timing still need tighter legacy proof |
+| Active play movement and win/reset loop | `14` | `12` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | simultaneous-key movement buffering and axis-gated collision are now ported from the restored Unreal player source, but return/reset timing still needs tighter legacy proof |
 | Generation lifecycle exactness | `16` | `16` | aligned | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost runtime diagnostics | lifecycle ownership is now explicit and behavior-backed: reset/generation flow through queued runtime requests, delay-gated process-0 entry, stage-7 finalize state, initialized process-8 reset entry, menu-demo process-8-to-process-0 handoff, menu-vs-play stage cadence, checkpoint/shortcut budget metadata, level-building scheduler contract, stage transition graph, shortcut-disabled stage `4 -> 6` progression, stage-cursor diagnostics, and menu stage-6 row-sliced static-board drawing; exact topology-builder internals can still improve later, but the lifecycle carrier no longer has a known unowned stage seam |
 | Demo route, backtracking, and pacing | `12` | `10` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, localhost | recovery cues and cue-specific pacing now drive the live route, the fixed front-door snapshot no longer suppresses the legacy mistake/backtrack lane, and the snapshot bootstrap now settles into a visible `explore` pose instead of landing in `goal-hold` or `reset-hold`, but full legacy reset semantics and final backtrack exactness still remain open |
 | In-game HUD and goal-arrow parity | `8` | `7` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot | the timer/arrow overlay is tighter and the full overlay footprint is now carried by repo-owned proof, but final screenshot-grade exactness is still open |
 
 Current total:
 
-- `93 / 100`
+- `94 / 100`
 
-## Why the marker is held at 93%
+## Why the marker is held at 94%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -91,6 +91,7 @@ But `100%` would still be dishonest today because the biggest remaining gaps are
 - the lower-left interior is slightly closer after adding fixed snapshot shelf density, but the menu board is still short of final screenshot-grade silhouette closure
 - stage `7` finalization, process `8` reset entry, menu process-8-to-process-0 reset handoff, process `0` delay-gated entry, the armed level-building scheduler contract, the stage transition graph, shortcut-disabled stage `4 -> 6` progression, stage `0/3/4/5/6` cadence, stage-cursor diagnostics, checkpoint/shortcut budget formulas, and menu stage-6 row-sliced drawing are now explicit and proof-backed
 - active play now carries the restored Unreal simultaneous-key buffer contract: first movement keydown waits 50ms, held cardinal flags resolve as one vector, opposing axes cancel, key repeat resolves the current held vector, and reset/pause/menu boundaries clear stale movement
+- active-play collision now carries the restored Unreal axis-gated movement shape: horizontal and vertical side gates resolve independently, blocked simultaneous axes can slide along an open axis, and true diagonal corner collisions block instead of cutting through walls
 - demo route semantics are closer now that the fixed front-door snapshot also uses the legacy mistake/backtrack lane and no longer boots into a weak `reset-hold` / `goal-hold` first impression, but full reset/backtrack exactness is still partial
 - HUD parity is closer, but not final
 - screenshot-grade menu material/composition is not fully closed
@@ -129,12 +130,13 @@ Current note:
 - the shortcut-disabled transition packet earns one point because it removes a real impossible runtime-plan edge: small-maze stage `4` now advances to stage `6` when process `5` is omitted
 - the menu draw-stage packet earns one point because stage `6` now changes runtime behavior: menu static-board drawing advances by row batches from the lifecycle plan instead of rendering only as one completed static pass
 - the active-play simultaneous-key packet earns one point because movement input now changes runtime behavior to match the old player source's delayed first press, held-direction vector resolution, repeat movement, and stale-key cleanup boundaries
+- the active-play axis-gated collision packet earns one point because simultaneous movement now matches the old player source's independent `CheckMoveR/L/U/D` gates instead of checking only the final combined target
 
 ## Preferred modular lock order from here
 
 Keep the remaining work bounded in this order unless proof shows a different blocker:
 
-1. active play collision and reset-return edge cases
+1. active play reset-return edge cases
 2. demo route backtracking and reset exactness
 3. final screenshot-grade board/material review
 4. final screenshot-grade play HUD polish

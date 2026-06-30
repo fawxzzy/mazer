@@ -60,11 +60,11 @@ But the public shell, overlay model, HUD, and visual composition still differ ma
 
 ## Immediate next slice
 
-`legacy active-play collision and reset-return edge-case packet`
+`legacy active-play reset-return edge-case packet`
 
 Target:
 
-- tighten one exact active-play collision or reset-return edge case against restored legacy behavior
+- tighten one exact active-play reset-return edge case against restored legacy behavior
 - preserve the now-aligned generation lifecycle proof while changing only the active-play owner chain
 - keep the current web app as canonical
 - use `docs/legacy/gameplay-spec.md` and restored Unreal source as truth while tightening play-state runtime behavior
