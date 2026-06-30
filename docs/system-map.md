@@ -284,6 +284,7 @@ Rule:
   - spacing contract between board edge and `Exit / Start / Options`
 - `src/legacy-runtime/legacyOptionFields.ts`
   - text-field draft parsing and settings mutation
+  - maze-affecting option edits now defer runtime rebuild until overlay close, matching the legacy menu/pause contract more closely
 
 ### Menu-board ownership
 

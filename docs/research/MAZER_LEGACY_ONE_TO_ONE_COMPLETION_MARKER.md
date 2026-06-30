@@ -2,7 +2,7 @@
 
 Date: 2026-06-29
 Status: active
-Current marker: `76%`
+Current marker: `77%`
 
 ## Intent
 
@@ -62,7 +62,7 @@ The current marker is the sum of the awarded points below.
 | Legacy truth restore, extraction, and proof spine | `10` | `10` | locked | `legacy/old-project.zip` -> `docs/current-truth.md` -> `docs/system-map.md` | `npm run legacy:extract`, `npm run verify` | keep current truth and proof docs in sync when runtime truth changes |
 | Front-door menu shell semantics | `12` | `11` | close | `src/legacy-runtime/legacyDefaults.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/reset/legacy-menu-layout.test.ts`, localhost | final `Exit` equivalence and exact front-door behavior polish still need one bounded pass |
 | Menu screenshot composition and board presentation | `14` | `10` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/scenes/menu-render-frame.test.ts` | final screenshot-grade composition is still open, but board material/tile read is materially closer after the heavier trench pass |
-| Overlay family and field responsibilities | `14` | `10` | partial | `src/legacy-runtime/legacyOptionFields.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, localhost | options/features/game-modes/pause fields still need field-by-field exactness and routing verification |
+| Overlay family and field responsibilities | `14` | `11` | partial | `src/legacy-runtime/legacyOptionFields.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost | options/pause rebuild timing now defers to overlay close like legacy truth, but features/game-modes/pause fields still need broader field-by-field exactness and routing verification |
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | exact movement edge cases and return/reset timing still need tighter legacy proof |
 | Generation lifecycle exactness | `16` | `10` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | reset/generation now flow through explicit queued runtime requests, explicit stage-7 finalize state, explicit process-8 reset branches, and explicit menu-vs-play stage cadence, but the full staged legacy process pipeline is still not ported |
 | Demo route, backtracking, and pacing | `12` | `8` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, localhost | recovery cues and cue-specific pacing now drive the live route, but full legacy reset semantics and final backtrack exactness still remain open |
@@ -70,9 +70,9 @@ The current marker is the sum of the awarded points below.
 
 Current total:
 
-- `76 / 100`
+- `77 / 100`
 
-## Why the marker is held at 76%
+## Why the marker is held at 77%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -89,7 +89,7 @@ But `100%` would still be dishonest today because the biggest remaining gaps are
 - demo route semantics are still partial even after recovery cues/pacing were restored
 - HUD parity is closer, but not final
 - screenshot-grade menu material/composition is not fully closed
-- some overlay and front-door responsibilities still need exactness passes
+- some overlay and front-door responsibilities still need exactness passes beyond the deferred options/pause rebuild contract
 
 ## Ratchet rule
 

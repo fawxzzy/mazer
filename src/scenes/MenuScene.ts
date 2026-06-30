@@ -257,6 +257,7 @@ export class MenuScene extends Phaser.Scene {
   private nextDemoMoveAtMs = 0;
   private playStartedAtMs = 0;
   private pendingResetRequest: LegacyResetRequest | null = null;
+  private pendingOverlayMazeRebuild = false;
   private playResetReturnAtMs = 0;
   private messageText = '';
   private messageVisibleUntilMs = 0;
@@ -592,6 +593,7 @@ export class MenuScene extends Phaser.Scene {
 
   private enterMenuMode(): void {
     this.mode = 'menu';
+    this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
     this.playResetReturnAtMs = 0;
     this.overlay = 'none';
@@ -610,6 +612,7 @@ export class MenuScene extends Phaser.Scene {
 
   private startPlayMode(): void {
     this.mode = 'play';
+    this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
     this.playResetReturnAtMs = 0;
     this.overlay = 'none';
@@ -1288,17 +1291,14 @@ export class MenuScene extends Phaser.Scene {
 
   private commitOverlayField(fieldId: LegacyOptionFieldId): void {
     const result = applyLegacyOptionField(this.settings, this.optionFieldDrafts, fieldId);
-    const previousScale = this.settings.scale;
 
     this.settings = result.settings;
     this.optionFieldDrafts = result.drafts;
 
     if (result.affectsMaze) {
-      this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });
-      this.boardStaticDirty = true;
-      this.boardDynamicDirty = true;
+      this.pendingOverlayMazeRebuild = true;
     }
-    if (result.affectsCamera || this.settings.scale !== previousScale) {
+    if (result.affectsCamera) {
       this.refreshLayout();
     }
 
@@ -1306,12 +1306,23 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private commitAllOverlayFields(): void {
+    const previousScale = this.settings.scale;
     const fieldIds: LegacyOptionFieldId[] = this.overlay === 'pause'
       ? ['camScale']
       : ['scale', 'camScale', 'pathR', 'pathG', 'pathB', 'wallR', 'wallG', 'wallB'];
 
     for (const fieldId of fieldIds) {
       this.commitOverlayField(fieldId);
+    }
+
+    if (this.pendingOverlayMazeRebuild) {
+      this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });
+      this.pendingOverlayMazeRebuild = false;
+      this.boardStaticDirty = true;
+      this.boardDynamicDirty = true;
+    }
+    if (this.settings.scale !== previousScale) {
+      this.refreshLayout();
     }
 
     this.activeInputField = null;
@@ -1600,6 +1611,7 @@ export class MenuScene extends Phaser.Scene {
   private openOverlay(kind: OverlayKind): void {
     if (kind === 'options' || kind === 'pause') {
       this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
+      this.pendingOverlayMazeRebuild = false;
     }
     this.activeInputField = null;
     if (this.mode === 'play') {

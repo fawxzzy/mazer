@@ -49,7 +49,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `76%`
+- `77%`
 
 Why it is not higher yet:
 
@@ -72,6 +72,7 @@ Why it is not higher yet:
 - legacy generation consumption now carries explicit stage-7 finalize responsibilities for play/menu spawn, title, and timer start
 - legacy process-8 reset branches now route through explicit reset requests for active-play return vs menu-demo regeneration
 - legacy stage `0/3/4/5/6` execution cadence is now explicit for menu-sliced versus play-continuous generation
+- legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
 - legacy-style active play start path
 - active-play HUD now uses a tighter timer/goal-arrow overlay and repo-owned proof can bound the full overlay footprint
 - legacy-style options/features/game-mode/pause overlay structure
@@ -85,6 +86,7 @@ Why it is not higher yet:
 - demo AI and backtracking are not yet a full legacy-exact port
 - in-game HUD is only partially restored
 - browser exit cannot literally execute the old engine quit behavior
+- options/features/game-modes/pause still need more field-by-field and routing exactness beyond the deferred rebuild contract
 - visual/material parity still needs another pass against screenshots and restored assets
 
 ## Current proof rule
