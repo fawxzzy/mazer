@@ -39,7 +39,7 @@ Use this before large edits so you know the whole app, not just the current scre
 | --- | --- |
 | `src/boot/*` | browser boot, localhost cleanup, Phaser startup, live boot diagnostics |
 | `src/scenes/*` | runtime shell, front door, overlays, play loop, HUD, live presentation |
-| `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, option field parsing, pause command contracts |
+| `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, option field parsing, overlay toggle contracts, pause command contracts |
 | `src/domain/ai/*` | deterministic demo walker stepping and attract behavior |
 | `src/domain/maze/*` | generated maze/runtime domain logic used outside the fixed menu snapshot |
 | `tests/reset/*` | legacy reset-lane contracts and guardrails |
@@ -66,6 +66,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | menu title/board/button layout math | `src/legacy-runtime/legacyMenuLayout.ts` | `tests/reset/legacy-menu-layout.test.ts` |
 | menu demo behavior | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts` | demo-walker tests, live menu preview |
 | options field parsing | `src/legacy-runtime/legacyOptionFields.ts` | `tests/reset/legacy-option-fields.test.ts` |
+| features + game-modes toggle routing | `src/legacy-runtime/legacyOverlayToggleFields.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | pause command routing | `src/legacy-runtime/legacyPauseLifecycle.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | legacy defaults/colors/button labels | `src/legacy-runtime/legacyDefaults.ts` | `tests/reset/legacy-reset.test.ts` |
 | archived visual truth | `legacy/screenshots/menu-01.png` .. `menu-04.png` | direct visual comparison |
@@ -158,8 +159,8 @@ This is the fastest way to answer "if I click or press this, what actually owns 
 | --- | --- | --- |
 | `Enter` on menu / `Start` click | `MenuScene.startPlayMode()` | `createLegacyMaze()` -> play-mode player/trail/HUD |
 | `Options` click | `MenuScene.openOverlay('options')` | `legacyOptionFields.ts` -> settings/layout/maze rebuild |
-| `Features` click | `MenuScene.openNestedOverlay('features', ...)` | menu or pause overlay toggle state |
-| `Game Modes` click | `MenuScene.openNestedOverlay('gameModes', ...)` | dark-mode flag -> backdrop/static-board redraw |
+| `Features` click | `MenuScene.openNestedOverlay('features', ...)` | `legacyOverlayToggleFields.ts` -> menu or pause overlay toggle state |
+| `Game Modes` click | `MenuScene.openNestedOverlay('gameModes', ...)` | `legacyOverlayToggleFields.ts` -> dark-mode flag -> backdrop/static-board redraw |
 | `Escape` | `MenuScene.handleBackAction()` | close overlay, open pause, or return to menu depending on current state |
 | `Back` / `Reset` / `Main Menu` inside pause | `MenuScene.applyLegacyPauseCommand()` | `legacyPauseLifecycle.ts` -> overlay close, player reset, or menu return |
 | movement keys / arrows | `MenuScene.tryMovePlayer()` | `legacyMaze.ts` walkability gate -> trail/win reset |
@@ -198,6 +199,11 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - menu demo trail/player projection
   - per-frame demo advance projection
 
+- `src/legacy-runtime/legacyOverlayToggleFields.ts`
+  - explicit features and game-modes toggle ownership
+  - inverted `On/Off` copy only for legacy features toggles
+  - dark-mode field effects and legacy light-intensity role
+
 - `src/legacy-runtime/legacyPauseLifecycle.ts`
   - explicit `resume` / `reset-player` / `return-menu` pause command contract
   - legacy-shaped distinction between overlay close, player reset, and menu return
@@ -207,6 +213,7 @@ Boundary:
 - if the question is "when should play stop accepting input after hitting goal?", start in `src/legacy-runtime/legacyPlayLifecycle.ts`
 - if the question is "what exactly changes after one movement key press?", start in `src/legacy-runtime/legacyPlayStep.ts`
 - if the question is "how does the front-door demo bootstrap or advance?", start in `src/legacy-runtime/legacyMenuDemoLifecycle.ts`
+- if the question is "what exactly should features or game-modes toggles mutate and label?", start in `src/legacy-runtime/legacyOverlayToggleFields.ts`
 - if the question is "what exactly should Back, Reset, or Main Menu do from pause?", start in `src/legacy-runtime/legacyPauseLifecycle.ts`
 - if the question is "what should happen after the reset hold finishes?", start in `src/scenes/MenuScene.ts`
 

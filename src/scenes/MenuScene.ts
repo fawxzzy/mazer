@@ -52,6 +52,12 @@ import {
   type LegacyOptionFieldId
 } from '../legacy-runtime/legacyOptionFields';
 import {
+  applyLegacyOverlayToggleField,
+  resolveLegacyOverlayToggleStateText,
+  type LegacyOverlayToggleFieldId,
+  type LegacyOverlayToggleStateText
+} from '../legacy-runtime/legacyOverlayToggleFields';
+import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
 } from '../legacy-runtime/legacyDemoWalker';
@@ -1195,17 +1201,27 @@ export class MenuScene extends Phaser.Scene {
     this.createOverlayTitle('Features', rowY);
     rowY += 72;
 
-    rowY = this.createToggleRow('Camera Follow', this.settings.toggleCameraFollow, rowY, panel, () => {
-      this.settings.toggleCameraFollow = !this.settings.toggleCameraFollow;
-      this.boardDynamicDirty = true;
-      this.uiDirty = true;
-    });
+    rowY = this.createToggleRow(
+      'Camera Follow',
+      this.settings.toggleCameraFollow,
+      rowY,
+      panel,
+      {
+        stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow)
+      },
+      () => this.applyLegacyOverlayToggleField('toggleCameraFollow')
+    );
 
-    rowY = this.createToggleRow('Trail Fade', this.settings.toggleTrailFade, rowY, panel, () => {
-      this.settings.toggleTrailFade = !this.settings.toggleTrailFade;
-      this.boardDynamicDirty = true;
-      this.uiDirty = true;
-    });
+    rowY = this.createToggleRow(
+      'Trail Fade',
+      this.settings.toggleTrailFade,
+      rowY,
+      panel,
+      {
+        stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade)
+      },
+      () => this.applyLegacyOverlayToggleField('toggleTrailFade')
+    );
 
     this.uiButtons.push(
       this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Back', () => this.handleBackAction())
@@ -1218,13 +1234,16 @@ export class MenuScene extends Phaser.Scene {
     this.createOverlayTitle('Game Modes', rowY);
     rowY += 72;
 
-    this.createToggleRow('Dark Mode', this.settings.darkMode, rowY, panel, () => {
-      this.settings.darkMode = !this.settings.darkMode;
-      this.backdropDirty = true;
-      this.boardStaticDirty = true;
-      this.boardDynamicDirty = true;
-      this.uiDirty = true;
-    });
+    this.createToggleRow(
+      'Dark Mode',
+      this.settings.darkMode,
+      rowY,
+      panel,
+      {
+        stateText: null
+      },
+      () => this.applyLegacyOverlayToggleField('darkMode')
+    );
 
     this.uiButtons.push(
       this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Back', () => this.handleBackAction())
@@ -1441,6 +1460,9 @@ export class MenuScene extends Phaser.Scene {
     value: boolean,
     y: number,
     panel: OverlayPanelFrame,
+    options: {
+      stateText: LegacyOverlayToggleStateText | null;
+    },
     onToggle: () => void
   ): number {
     const stacked = panel.width < 420;
@@ -1450,17 +1472,20 @@ export class MenuScene extends Phaser.Scene {
       color: '#d9d8df'
     }).setOrigin(0, 0.5);
     const toggleX = stacked ? panel.left + panel.width - 52 : panel.left + Math.round(panel.width * 0.82);
-    const stateText = this.add.text(
-      stacked ? toggleX - 76 : toggleX - 78,
-      stacked ? y + 32 : y,
-      value ? 'Off' : 'On',
-      {
-      fontFamily: '"Courier New", monospace',
-      fontSize: stacked ? '18px' : '22px',
-      color: '#6bc96f'
-      }
-    ).setOrigin(0.5);
-    this.uiTexts.push(rowLabel, stateText);
+    this.uiTexts.push(rowLabel);
+    if (options.stateText !== null) {
+      const stateText = this.add.text(
+        stacked ? toggleX - 76 : toggleX - 78,
+        stacked ? y + 32 : y,
+        options.stateText,
+        {
+          fontFamily: '"Courier New", monospace',
+          fontSize: stacked ? '18px' : '22px',
+          color: '#6bc96f'
+        }
+      ).setOrigin(0.5);
+      this.uiTexts.push(stateText);
+    }
     this.uiButtons.push(
       this.createToggleCheckbox(toggleX, stacked ? y + 32 : y, stacked ? 30 : 32, value, onToggle)
     );
@@ -1648,6 +1673,23 @@ export class MenuScene extends Phaser.Scene {
     if (result.closesOverlay) {
       this.closeOverlay();
     }
+  }
+
+  private applyLegacyOverlayToggleField(fieldId: LegacyOverlayToggleFieldId): void {
+    const result = applyLegacyOverlayToggleField(this.settings, fieldId);
+    this.settings = result.settings;
+
+    if (result.affectsBackdrop) {
+      this.backdropDirty = true;
+    }
+    if (result.affectsBoardStatic) {
+      this.boardStaticDirty = true;
+    }
+    if (result.affectsBoardDynamic) {
+      this.boardDynamicDirty = true;
+    }
+
+    this.uiDirty = true;
   }
 
   private handleBackAction(): void {

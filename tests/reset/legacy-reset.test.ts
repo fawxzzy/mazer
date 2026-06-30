@@ -244,4 +244,35 @@ describe('legacy reset lane', () => {
     expect(legacyGamePauseSource).toContain('Back_Clicked();');
     expect(legacyGamePauseSource).toContain('MazerGameInstance->_Playing = false;');
   });
+
+  test('routes features and game-modes toggle responsibilities through an explicit legacy overlay toggle contract', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const toggleFieldSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayToggleFields.ts'), 'utf8');
+    const legacyFeaturesSource = readFileSync(
+      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'FeaturesWidget.cpp'),
+      'utf8'
+    );
+    const legacyGameModesSource = readFileSync(
+      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'GameModesWidget.cpp'),
+      'utf8'
+    );
+
+    expect(toggleFieldSource).toContain("type LegacyOverlayToggleFieldId = 'toggleCameraFollow' | 'toggleTrailFade' | 'darkMode';");
+    expect(toggleFieldSource).toContain('resolveLegacyOverlayToggleStateText');
+    expect(toggleFieldSource).toContain('legacyDirectionalLightIntensity');
+    expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow)");
+    expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade)");
+    expect(menuSceneSource).toContain('stateText: null');
+    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleCameraFollow')");
+    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailFade')");
+    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('darkMode')");
+    expect(menuSceneSource).toContain('private applyLegacyOverlayToggleField(fieldId: LegacyOverlayToggleFieldId): void {');
+    expect(legacyFeaturesSource).toContain('ToggleCameraFollowText');
+    expect(legacyFeaturesSource).toContain('ToggleTrailFadeText');
+    expect(legacyFeaturesSource).toContain('SetToggleCameraFollowText("Off")');
+    expect(legacyFeaturesSource).toContain('SetToggleTrailFadeText("Off")');
+    expect(legacyGameModesSource).not.toContain('DarkModeText');
+    expect(legacyGameModesSource).toContain('SetIntensity(2.f);');
+    expect(legacyGameModesSource).toContain('SetIntensity(0.3f);');
+  });
 });
