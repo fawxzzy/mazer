@@ -76,6 +76,7 @@ Why it is not higher yet:
 - in-game pause commands now route through an explicit legacy pause lifecycle contract for `Back`, `Reset`, and `Main Menu`
 - features and game-modes toggles now route through an explicit legacy overlay-toggle contract, with inverted `On/Off` copy kept only where the legacy widget actually owned it
 - menu-time overlay fields now route through an explicit legacy field-commit contract, separating deferred reload-on-back fields from the immediate camera-flag path
+- nested overlay routing from `Options` / `Pause` back through `Features` and `Game Modes` now routes through an explicit legacy overlay-routing contract
 - legacy-style active play start path
 - active-play HUD now uses a tighter timer/goal-arrow overlay and repo-owned proof can bound the full overlay footprint
 - legacy-style options/features/game-mode/pause overlay structure
@@ -89,7 +90,6 @@ Why it is not higher yet:
 - demo AI and backtracking are not yet a full legacy-exact port
 - in-game HUD is only partially restored
 - browser exit cannot literally execute the old engine quit behavior
-- nested overlay verification from menu/pause parents is still not fully closed
 - visual/material parity still needs another pass against screenshots and restored assets
 
 ## Current proof rule

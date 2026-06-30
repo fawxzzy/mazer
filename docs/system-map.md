@@ -39,7 +39,7 @@ Use this before large edits so you know the whole app, not just the current scre
 | --- | --- |
 | `src/boot/*` | browser boot, localhost cleanup, Phaser startup, live boot diagnostics |
 | `src/scenes/*` | runtime shell, front door, overlays, play loop, HUD, live presentation |
-| `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, option field parsing, overlay field-commit contracts, overlay toggle contracts, pause command contracts |
+| `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, option field parsing, overlay field-commit contracts, overlay toggle contracts, overlay routing contracts, pause command contracts |
 | `src/domain/ai/*` | deterministic demo walker stepping and attract behavior |
 | `src/domain/maze/*` | generated maze/runtime domain logic used outside the fixed menu snapshot |
 | `tests/reset/*` | legacy reset-lane contracts and guardrails |
@@ -68,6 +68,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | options field parsing | `src/legacy-runtime/legacyOptionFields.ts` | `tests/reset/legacy-option-fields.test.ts` |
 | options + pause field commit roles | `src/legacy-runtime/legacyOverlayFieldCommit.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | features + game-modes toggle routing | `src/legacy-runtime/legacyOverlayToggleFields.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-reset.test.ts` |
+| nested overlay return routing | `src/legacy-runtime/legacyOverlayRouting.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-routing.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | pause command routing | `src/legacy-runtime/legacyPauseLifecycle.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | legacy defaults/colors/button labels | `src/legacy-runtime/legacyDefaults.ts` | `tests/reset/legacy-reset.test.ts` |
 | archived visual truth | `legacy/screenshots/menu-01.png` .. `menu-04.png` | direct visual comparison |
@@ -210,6 +211,11 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - inverted `On/Off` copy only for legacy features toggles
   - dark-mode field effects and legacy light-intensity role
 
+- `src/legacy-runtime/legacyOverlayRouting.ts`
+  - explicit nested overlay open/return routing
+  - parent return semantics for `Features` and `Game Modes`
+  - `Escape` / `Back` behavior split for play, top-level overlays, and nested overlays
+
 - `src/legacy-runtime/legacyPauseLifecycle.ts`
   - explicit `resume` / `reset-player` / `return-menu` pause command contract
   - legacy-shaped distinction between overlay close, player reset, and menu return
@@ -221,6 +227,7 @@ Boundary:
 - if the question is "how does the front-door demo bootstrap or advance?", start in `src/legacy-runtime/legacyMenuDemoLifecycle.ts`
 - if the question is "what exactly should options/pause field commits mean?", start in `src/legacy-runtime/legacyOverlayFieldCommit.ts`
 - if the question is "what exactly should features or game-modes toggles mutate and label?", start in `src/legacy-runtime/legacyOverlayToggleFields.ts`
+- if the question is "how should nested overlays return to `options` or `pause`?", start in `src/legacy-runtime/legacyOverlayRouting.ts`
 - if the question is "what exactly should Back, Reset, or Main Menu do from pause?", start in `src/legacy-runtime/legacyPauseLifecycle.ts`
 - if the question is "what should happen after the reset hold finishes?", start in `src/scenes/MenuScene.ts`
 

@@ -296,4 +296,26 @@ describe('legacy reset lane', () => {
     expect(legacyPauseMenuSource).toContain('MazerGameInstance->_WallMaterialChanged = MaterialChanged = true;');
     expect(legacyPauseMenuSource).toContain('MazerGameInstance->_CamScaleFlag = true;');
   });
+
+  test('routes nested overlay back navigation through an explicit legacy overlay routing contract', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const overlayRoutingSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayRouting.ts'), 'utf8');
+    const legacyFeaturesSource = readFileSync(
+      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'FeaturesWidget.cpp'),
+      'utf8'
+    );
+    const legacyGameModesSource = readFileSync(
+      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'GameModesWidget.cpp'),
+      'utf8'
+    );
+
+    expect(overlayRoutingSource).toContain('resolveLegacyNestedOverlayOpen');
+    expect(overlayRoutingSource).toContain('resolveLegacyOverlayBackAction');
+    expect(menuSceneSource).toContain('const nextOverlayState = resolveLegacyNestedOverlayOpen(');
+    expect(menuSceneSource).toContain('const action = resolveLegacyOverlayBackAction({');
+    expect(menuSceneSource).toContain("case 'return-parent':");
+    expect(menuSceneSource).toContain("case 'close-overlay':");
+    expect(legacyFeaturesSource).toContain('RemoveFromParent();');
+    expect(legacyGameModesSource).toContain('RemoveFromParent();');
+  });
 });

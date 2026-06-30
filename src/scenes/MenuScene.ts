@@ -16,6 +16,12 @@ import {
 } from '../legacy-runtime/legacyMaze';
 import { resolveInitialRuntimeMode } from '../legacy-runtime/legacyLaunchMode';
 import {
+  resolveLegacyNestedOverlayOpen,
+  resolveLegacyOverlayBackAction,
+  type LegacyOverlayKind,
+  type LegacyRuntimeMode
+} from '../legacy-runtime/legacyOverlayRouting';
+import {
   consumeLegacyGenerationRequestState,
   createLegacyGenerationRequest,
   shouldConsumeLegacyGenerationRequest,
@@ -63,8 +69,8 @@ import {
 } from '../legacy-runtime/legacyDemoWalker';
 import { resolveLegacyMenuPathRenderFrame } from '../legacy-runtime/legacyMenuRender';
 
-type RuntimeMode = 'menu' | 'play';
-type OverlayKind = 'none' | 'options' | 'features' | 'gameModes' | 'pause' | 'message';
+type RuntimeMode = LegacyRuntimeMode;
+type OverlayKind = LegacyOverlayKind;
 
 interface UiButton {
   background: Phaser.GameObjects.Rectangle;
@@ -1617,12 +1623,16 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private openNestedOverlay(kind: OverlayKind, returnTo: OverlayKind): void {
+    const nextOverlayState = resolveLegacyNestedOverlayOpen(
+      kind as Extract<OverlayKind, 'features' | 'gameModes'>,
+      returnTo as Extract<OverlayKind, 'options' | 'pause'>
+    );
     this.activeInputField = null;
     if (this.mode === 'play') {
       this.clearPlayHudImmediately();
     }
-    this.overlay = kind;
-    this.overlayReturn = returnTo;
+    this.overlay = nextOverlayState.overlay;
+    this.overlayReturn = nextOverlayState.overlayReturn;
     this.boardDynamicDirty = true;
     this.uiDirty = true;
   }
@@ -1693,22 +1703,28 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleBackAction(): void {
-    if (this.overlay === 'none') {
-      if (this.mode === 'play') {
-        this.openOverlay('pause');
-      }
-      return;
-    }
+    const action = resolveLegacyOverlayBackAction({
+      mode: this.mode,
+      overlay: this.overlay,
+      overlayReturn: this.overlayReturn
+    });
 
-    if (this.overlayReturn !== 'none') {
-      this.overlay = this.overlayReturn;
-      this.overlayReturn = 'none';
-      this.boardDynamicDirty = true;
-      this.uiDirty = true;
-      return;
+    switch (action.kind) {
+      case 'noop':
+        return;
+      case 'open-overlay':
+        this.openOverlay(action.overlay);
+        return;
+      case 'return-parent':
+        this.overlay = action.overlay;
+        this.overlayReturn = action.overlayReturn;
+        this.boardDynamicDirty = true;
+        this.uiDirty = true;
+        return;
+      case 'close-overlay':
+        this.closeOverlay();
+        return;
     }
-
-    this.closeOverlay();
   }
 
   private showExitMessage(): void {
