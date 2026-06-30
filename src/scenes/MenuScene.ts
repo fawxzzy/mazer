@@ -147,6 +147,14 @@ interface MenuSceneVisualDiagnostics {
         id: number;
         name: string;
       }>;
+      gate: {
+        armsDelayStartOnQueue: boolean | null;
+        consumesWhileInitialized: boolean | null;
+        consumesWhileUninitialized: boolean | null;
+        entryStageId: number | null;
+        resetsLevelBuildingTimerAfterConsume: boolean | null;
+        waitsForLevelBuildingDelay: boolean | null;
+      };
       pendingRequest: {
         budget: {
           checkpointCount: number | null;
@@ -165,6 +173,14 @@ interface MenuSceneVisualDiagnostics {
           id: number;
           name: string;
         }>;
+        gate: {
+          armsDelayStartOnQueue: boolean | null;
+          consumesWhileInitialized: boolean | null;
+          consumesWhileUninitialized: boolean | null;
+          entryStageId: number | null;
+          resetsLevelBuildingTimerAfterConsume: boolean | null;
+          waitsForLevelBuildingDelay: boolean | null;
+        };
         mode: RuntimeMode | null;
         processStageIds: number[];
         reason: string | null;
@@ -173,6 +189,13 @@ interface MenuSceneVisualDiagnostics {
       processStageIds: number[];
     };
     reset: {
+      entry: {
+        clearsResetFlagOnConsume: boolean | null;
+        consumesWhileInitialized: boolean | null;
+        entryStageId: number | null;
+        rearmsDelayStart: boolean | null;
+        returnsToTemplateLevel: boolean | null;
+      };
       pendingAction: string | null;
       dueAtMs: number | null;
       reason: string | null;
@@ -1806,6 +1829,14 @@ export class MenuScene extends Phaser.Scene {
             batchSize: stage.batchSize,
             batchUnit: stage.batchUnit
           })),
+          gate: {
+            armsDelayStartOnQueue: this.maze.generation?.gate.armsDelayStartOnQueue ?? null,
+            consumesWhileInitialized: this.maze.generation?.gate.consumesWhileInitialized ?? null,
+            consumesWhileUninitialized: this.maze.generation?.gate.consumesWhileUninitialized ?? null,
+            entryStageId: this.maze.generation?.gate.entryStageId ?? null,
+            resetsLevelBuildingTimerAfterConsume: this.maze.generation?.gate.resetsLevelBuildingTimerAfterConsume ?? null,
+            waitsForLevelBuildingDelay: this.maze.generation?.gate.waitsForLevelBuildingDelay ?? null
+          },
           pendingRequest: {
             budget: {
               checkpointCount: this.pendingGenerationRequest?.budget.checkpointCount ?? null,
@@ -1827,11 +1858,26 @@ export class MenuScene extends Phaser.Scene {
               batchSize: stage.batchSize,
               batchUnit: stage.batchUnit
             })),
+            gate: {
+              armsDelayStartOnQueue: this.pendingGenerationRequest?.gate.armsDelayStartOnQueue ?? null,
+              consumesWhileInitialized: this.pendingGenerationRequest?.gate.consumesWhileInitialized ?? null,
+              consumesWhileUninitialized: this.pendingGenerationRequest?.gate.consumesWhileUninitialized ?? null,
+              entryStageId: this.pendingGenerationRequest?.gate.entryStageId ?? null,
+              resetsLevelBuildingTimerAfterConsume: this.pendingGenerationRequest?.gate.resetsLevelBuildingTimerAfterConsume ?? null,
+              waitsForLevelBuildingDelay: this.pendingGenerationRequest?.gate.waitsForLevelBuildingDelay ?? null
+            },
             processStageIds: [...(this.pendingGenerationRequest?.processStageIds ?? [])]
           },
           processStageIds: [...(this.maze.generation?.processStageIds ?? [])]
         },
         reset: {
+          entry: {
+            clearsResetFlagOnConsume: this.pendingResetRequest?.entry.clearsResetFlagOnConsume ?? null,
+            consumesWhileInitialized: this.pendingResetRequest?.entry.consumesWhileInitialized ?? null,
+            entryStageId: this.pendingResetRequest?.entry.entryStageId ?? null,
+            rearmsDelayStart: this.pendingResetRequest?.entry.rearmsDelayStart ?? null,
+            returnsToTemplateLevel: this.pendingResetRequest?.entry.returnsToTemplateLevel ?? null
+          },
           pendingAction: this.pendingResetRequest?.action ?? null,
           dueAtMs: this.pendingResetRequest?.dueAtMs ?? null,
           reason: this.pendingResetRequest?.reason ?? null

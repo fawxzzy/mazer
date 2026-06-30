@@ -20,6 +20,7 @@ export type LegacyGenerationStageExecutionKind =
   | 'finalize-state'
   | 'reset-branch';
 export type LegacyGenerationStageBatchUnit = 'rows' | 'checkpoint-passes' | 'path-tiles' | 'shortcut-attempts' | null;
+export type LegacyGenerationEntryStageId = 0;
 export type LegacyGenerationRequestReason =
   | 'boot-menu'
   | 'play-start'
@@ -45,11 +46,21 @@ export interface LegacyGenerationBudgetContract {
   shortcutStageEnabled: boolean;
 }
 
+export interface LegacyGenerationTickGateContract {
+  armsDelayStartOnQueue: boolean;
+  consumesWhileInitialized: boolean;
+  consumesWhileUninitialized: boolean;
+  entryStageId: LegacyGenerationEntryStageId;
+  resetsLevelBuildingTimerAfterConsume: boolean;
+  waitsForLevelBuildingDelay: boolean;
+}
+
 export interface LegacyGenerationRequest {
   budget: LegacyGenerationBudgetContract;
   buildKind: LegacyMazeBuildKind;
   dueAtMs: number;
   executionPlan: LegacyGenerationStageContract[];
+  gate: LegacyGenerationTickGateContract;
   mode: LegacyGenerationMode;
   processStageIds: LegacyGenerationProcessStageId[];
   reason: LegacyGenerationRequestReason;
@@ -66,6 +77,7 @@ export interface LegacyGenerationConsumption {
 
 export const LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS: readonly LegacyGenerationProcessStageId[] = [0, 3, 4, 6, 7, 8];
 export const LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID: LegacyGenerationProcessStageId = 5;
+export const LEGACY_GENERATION_ENTRY_STAGE_ID: LegacyGenerationEntryStageId = 0;
 
 const LEGACY_MIN_SCALE = 25;
 const LEGACY_MAX_SCALE = 150;
@@ -97,6 +109,15 @@ export const resolveLegacyGenerationBudgetContract = (
     shortcutStageEnabled: normalizedScale > 35
   };
 };
+
+export const resolveLegacyGenerationTickGateContract = (): LegacyGenerationTickGateContract => ({
+  entryStageId: LEGACY_GENERATION_ENTRY_STAGE_ID,
+  waitsForLevelBuildingDelay: true,
+  armsDelayStartOnQueue: true,
+  consumesWhileUninitialized: true,
+  consumesWhileInitialized: false,
+  resetsLevelBuildingTimerAfterConsume: true
+});
 
 export const resolveLegacyGenerationProcessStageIds = (scale: number): LegacyGenerationProcessStageId[] => (
   resolveLegacyGenerationScale(scale) > 35
@@ -241,6 +262,7 @@ export const createLegacyRuntimeMazeForMode = (
   const buildKind = resolveLegacyMazeBuildKind(mode);
   const executionPlan = resolveLegacyGenerationExecutionPlan(mode, scale);
   const budget = resolveLegacyGenerationBudgetContract(mode, scale);
+  const gate = resolveLegacyGenerationTickGateContract();
   const maze = buildKind === 'menu-snapshot'
     ? createLegacyMenuMaze(seed)
     : createLegacyMaze(scale, seed);
@@ -251,6 +273,7 @@ export const createLegacyRuntimeMazeForMode = (
       budget,
       buildKind,
       executionPlan,
+      gate,
       processStageIds: resolveLegacyGenerationProcessStageIds(scale)
     }
   };
@@ -283,6 +306,7 @@ export const createLegacyGenerationRequest = ({
     budget: resolveLegacyGenerationBudgetContract(mode, scale),
     buildKind: resolveLegacyMazeBuildKind(mode),
     executionPlan: resolveLegacyGenerationExecutionPlan(mode, scale),
+    gate: resolveLegacyGenerationTickGateContract(),
     processStageIds: resolveLegacyGenerationProcessStageIds(scale)
   };
 };

@@ -195,12 +195,16 @@ describe('legacy reset lane', () => {
     expect(generationLifecycleSource).toContain('consumeLegacyGenerationRequestState');
     expect(generationLifecycleSource).toContain('resolveLegacyGenerationExecutionPlan');
     expect(generationLifecycleSource).toContain('resolveLegacyGenerationBudgetContract');
+    expect(generationLifecycleSource).toContain('resolveLegacyGenerationTickGateContract');
     expect(generationLifecycleSource).toContain("executionKind: 'row-slice'");
     expect(generationLifecycleSource).toContain("executionKind: 'checkpoint-pass'");
     expect(generationLifecycleSource).toContain("executionKind: 'path-batch'");
     expect(generationLifecycleSource).toContain("executionKind: 'shortcut-attempt'");
     expect(generationLifecycleSource).toContain('checkpointCount: Math.trunc(normalizedScale + (normalizedScale * checkpointModifier))');
     expect(generationLifecycleSource).toContain('shortcutCount: Math.trunc(normalizedScale * shortcutCountModifier)');
+    expect(generationLifecycleSource).toContain('entryStageId: LEGACY_GENERATION_ENTRY_STAGE_ID');
+    expect(generationLifecycleSource).toContain('waitsForLevelBuildingDelay: true');
+    expect(generationLifecycleSource).toContain('consumesWhileUninitialized: true');
     expect(menuSceneSource).toContain("this.pendingGenerationRequest: LegacyGenerationRequest | null = null;".replace('this.', 'private '));
     expect(menuSceneSource).toContain('const nextRequest = this.pendingGenerationRequest;');
     expect(menuSceneSource).toContain('if (nextRequest !== null && shouldConsumeLegacyGenerationRequest(nextRequest, time))');
@@ -213,8 +217,10 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('budget: {');
     expect(menuSceneSource).toContain('checkpointCount: this.maze.generation?.budget.checkpointCount ?? null');
     expect(menuSceneSource).toContain('shortcutCountModifier: this.maze.generation?.budget.shortcutCountModifier ?? null');
+    expect(menuSceneSource).toContain('entryStageId: this.maze.generation?.gate.entryStageId ?? null');
     expect(menuSceneSource).toContain('buildKind: this.pendingGenerationRequest?.buildKind ?? null');
     expect(menuSceneSource).toContain('checkpointCount: this.pendingGenerationRequest?.budget.checkpointCount ?? null');
+    expect(menuSceneSource).toContain('entryStageId: this.pendingGenerationRequest?.gate.entryStageId ?? null');
     expect(menuSceneSource).toContain('processStageIds: [...(this.pendingGenerationRequest?.processStageIds ?? [])]');
     expect(menuSceneSource).toContain('executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({');
   });
@@ -238,6 +244,7 @@ describe('legacy reset lane', () => {
   test('routes pause commands through an explicit legacy pause lifecycle contract', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const pauseLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPauseLifecycle.ts'), 'utf8');
+    const playLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayLifecycle.ts'), 'utf8');
     const legacyGamePauseSource = readFileSync(
       resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'GamePauseMenu.cpp'),
       'utf8'
@@ -249,6 +256,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('reset-player')");
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('return-menu')");
     expect(menuSceneSource).toContain('private applyLegacyPauseCommand(command: LegacyPauseCommand): void {');
+    expect(playLifecycleSource).toContain('resolveLegacyResetEntryContract');
+    expect(playLifecycleSource).toContain('entryStageId: LEGACY_RESET_ENTRY_STAGE_ID');
+    expect(playLifecycleSource).toContain('rearmsDelayStart: mode === \'menu\'');
     expect(legacyGamePauseSource).toContain('MazerGameInstance->_ResetPlayerPosition = true;');
     expect(legacyGamePauseSource).toContain('Back_Clicked();');
     expect(legacyGamePauseSource).toContain('MazerGameInstance->_Playing = false;');

@@ -30,6 +30,14 @@ export interface LegacyMazeSnapshot {
       id: number;
       name: 'CreateGrid' | 'CreatePath' | 'CreateShortCuts' | 'Draw' | 'Finalize' | 'MapPath' | 'Reset';
     }>;
+    gate: {
+      armsDelayStartOnQueue: boolean;
+      consumesWhileInitialized: boolean;
+      consumesWhileUninitialized: boolean;
+      entryStageId: number;
+      resetsLevelBuildingTimerAfterConsume: boolean;
+      waitsForLevelBuildingDelay: boolean;
+    };
     processStageIds: number[];
   };
 }

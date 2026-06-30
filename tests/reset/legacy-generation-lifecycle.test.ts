@@ -8,6 +8,7 @@ import {
   LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS,
   resolveLegacyGenerationExecutionPlan,
   resolveLegacyGenerationBudgetContract,
+  resolveLegacyGenerationTickGateContract,
   resolveLegacyGenerationProcessStageIds,
   resolveLegacyMazeBuildKind,
   shouldConsumeLegacyGenerationRequest,
@@ -42,6 +43,17 @@ describe('legacy generation lifecycle', () => {
       shortcutCountModifier: 0.18,
       shortcutCount: 9,
       shortcutStageEnabled: true
+    });
+  });
+
+  test('makes the legacy delay-gated process-0 entry contract explicit for queued generation', () => {
+    expect(resolveLegacyGenerationTickGateContract()).toEqual({
+      entryStageId: 0,
+      waitsForLevelBuildingDelay: true,
+      armsDelayStartOnQueue: true,
+      consumesWhileUninitialized: true,
+      consumesWhileInitialized: false,
+      resetsLevelBuildingTimerAfterConsume: true
     });
   });
 
@@ -111,6 +123,14 @@ describe('legacy generation lifecycle', () => {
       shortcutCountModifier: 0.13,
       shortcutCount: 6,
       shortcutStageEnabled: true
+    });
+    expect(menuBootRequest.gate).toEqual({
+      entryStageId: 0,
+      waitsForLevelBuildingDelay: true,
+      armsDelayStartOnQueue: true,
+      consumesWhileUninitialized: true,
+      consumesWhileInitialized: false,
+      resetsLevelBuildingTimerAfterConsume: true
     });
     expect(menuBootRequest.buildKind).toBe('menu-snapshot');
     expect(menuBootRequest.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);

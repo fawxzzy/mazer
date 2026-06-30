@@ -131,6 +131,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - menu-vs-play build routing
   - deterministic seed stepping for rebuild approximations
   - explicit checkpoint and shortcut budget formulas for the active runtime scale/mode
+  - explicit delay-gated process-0 entry contract for queued generation
   - queued generation/reset request reasons and tick-consumption contract
   - explicit stage `0/3/4/5/6` execution cadence contract for menu-sliced versus play-continuous generation
   - explicit stage-7 finalize state for spawn, title visibility, and play timer start
@@ -140,11 +141,12 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - explicit process-8 reset request contract for:
   - active-play return-to-menu hold
   - menu-demo regenerate-in-place branch
+  - explicit initialized process-8 entry contract for reset consumption
 - `src/scenes/MenuScene.ts`
   - `applyGenerationRequest()` rehydrates maze, player, trail, demo state, HUD, and layout from a named request
   - `queueGenerationRequest()` stages delayed menu/play rebuilds instead of collapsing every branch into immediate rebuild calls
   - `pendingResetRequest` now carries the explicit process-8 branch until the scene update consumes it
-  - runtime diagnostics now publish generation budget metadata alongside stage cadence and full pending request contract state
+  - runtime diagnostics now publish generation budget metadata, process-entry gates, and full pending request contract state
   - `startPlayMode()` swaps from menu shell into active-play generation
   - `enterMenuMode()` returns active play back into menu flow after reset
   - `drawHud()` owns the compact timer chip, goal arrow, and published HUD proof bounds
@@ -154,6 +156,7 @@ Boundary:
 - if the change is "what topology gets generated?", start in `src/legacy-runtime/legacyMaze.ts`
 - if the change is "which builder, seed step, or process-stage contract applies?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts`
 - if the change is "what checkpoint/shortcut budget does the current runtime claim?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `window.__MAZER_VISUAL_DIAGNOSTICS__`
+- if the change is "what legacy gate causes process 0 or process 8 to enter?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `src/legacy-runtime/legacyPlayLifecycle.ts`
 - if the change is "when does the runtime rebuild or return to menu?", start in `src/scenes/MenuScene.ts`
 - if the change is "how do we port the old staged process `0/3/4/5/6/7/8` lifecycle exactly?", start from `docs/legacy/gameplay-spec.md` and open a dedicated port packet before rewriting runtime code
 

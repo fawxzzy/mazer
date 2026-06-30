@@ -15,6 +15,14 @@ describe('legacy generation diagnostics contract', () => {
       shortcutStageEnabled: true
     });
     expect(menuMaze.generation?.buildKind).toBe('menu-snapshot');
+    expect(menuMaze.generation?.gate).toEqual({
+      entryStageId: 0,
+      waitsForLevelBuildingDelay: true,
+      armsDelayStartOnQueue: true,
+      consumesWhileUninitialized: true,
+      consumesWhileInitialized: false,
+      resetsLevelBuildingTimerAfterConsume: true
+    });
     expect(menuMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
     expect(menuMaze.generation?.executionPlan).toEqual([
       { id: 0, name: 'CreateGrid', executionKind: 'row-slice', batchSize: 1, batchUnit: 'rows' },
@@ -34,6 +42,14 @@ describe('legacy generation diagnostics contract', () => {
       shortcutStageEnabled: true
     });
     expect(playMaze.generation?.buildKind).toBe('play-generated');
+    expect(playMaze.generation?.gate).toEqual({
+      entryStageId: 0,
+      waitsForLevelBuildingDelay: true,
+      armsDelayStartOnQueue: true,
+      consumesWhileUninitialized: true,
+      consumesWhileInitialized: false,
+      resetsLevelBuildingTimerAfterConsume: true
+    });
     expect(playMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
     expect(playMaze.generation?.executionPlan).toEqual([
       { id: 0, name: 'CreateGrid', executionKind: 'full-stage', batchSize: null, batchUnit: null },
