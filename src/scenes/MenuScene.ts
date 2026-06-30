@@ -630,6 +630,16 @@ export class MenuScene extends Phaser.Scene {
           ? this.menuDemoConfig.behavior.enableRunnerMistakes === true
           : null
       },
+      generation: {
+        stageCursor: {
+          completionSignal: this.maze.generation?.stageCursor.completionSignal ?? null,
+          currentStageId: this.maze.generation?.stageCursor.currentStageId ?? null,
+          phase: this.maze.generation?.stageCursor.phase ?? null,
+          previousStageIds: [...(this.maze.generation?.stageCursor.previousStageIds ?? [])],
+          processComplete: this.maze.generation?.stageCursor.processComplete ?? null,
+          remainingStageIds: [...(this.maze.generation?.stageCursor.remainingStageIds ?? [])]
+        }
+      },
       visibility: {
         hidden,
         changeCount: this.runtimeVisibilityChangeCount,

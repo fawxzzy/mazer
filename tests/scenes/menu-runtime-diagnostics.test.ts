@@ -288,6 +288,16 @@ describe('menu runtime diagnostics', () => {
         prerollSteps: 72,
         runnerMistakesEnabled: true
       },
+      generation: {
+        stageCursor: {
+          phase: 'consumed-finalized',
+          currentStageId: 7,
+          completionSignal: 'player-finalized',
+          previousStageIds: [0, 3, 4, 5, 6],
+          remainingStageIds: [8],
+          processComplete: true
+        }
+      },
       visibility: {
         hidden: false,
         changeCount: 0,
@@ -393,6 +403,9 @@ describe('menu runtime diagnostics', () => {
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.style.cssText).toContain('bottom:auto');
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
         'demo explore cue backtrack mistakes on cursor 12'
+      );
+      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
+        'gen stage consumed-finalized:7 signal player-finalized complete yes'
       );
 
       clearMenuSceneRuntimeDiagnostics();

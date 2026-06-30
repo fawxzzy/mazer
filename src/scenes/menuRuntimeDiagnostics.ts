@@ -81,6 +81,16 @@ export interface MenuSceneRuntimeDiagnostics {
     prerollSteps: number;
     runnerMistakesEnabled: boolean | null;
   };
+  generation?: {
+    stageCursor: {
+      completionSignal: string | null;
+      currentStageId: number | null;
+      phase: string | null;
+      previousStageIds: number[];
+      processComplete: boolean | null;
+      remainingStageIds: number[];
+    };
+  };
   visibility: {
     hidden: boolean;
     changeCount: number;
@@ -440,7 +450,8 @@ export const formatMenuSceneRuntimeDiagnosticsSurfaceText = (
   `diag s${diagnostics.sceneInstanceId} r${diagnostics.revision} perf:${diagnostics.performance.mode}`,
   `fps ${Math.round(diagnostics.performance.estimatedFps)} avg ${formatRuntimeMetric(diagnostics.performance.recentAverageFrameMs)}ms worst ${formatRuntimeMetric(diagnostics.performance.worstRecentFrameMs)}ms spikes ${diagnostics.performance.recentSpikeCount}`,
   `trail ${diagnostics.resources.trailSegmentCount}/${diagnostics.resources.trailSegmentCap} listeners ${diagnostics.resources.listenerCount} vis ${diagnostics.visibility.changeCount}/${diagnostics.visibility.suspendCount} low ${diagnostics.performance.lowPowerActive ? 'on' : 'off'}`,
-  `demo ${diagnostics.menuDemo?.phase ?? 'none'} cue ${diagnostics.menuDemo?.cue ?? 'none'} mistakes ${diagnostics.menuDemo?.runnerMistakesEnabled === true ? 'on' : diagnostics.menuDemo?.runnerMistakesEnabled === false ? 'off' : 'n/a'} cursor ${diagnostics.menuDemo?.pathCursor ?? 'n/a'}`
+  `demo ${diagnostics.menuDemo?.phase ?? 'none'} cue ${diagnostics.menuDemo?.cue ?? 'none'} mistakes ${diagnostics.menuDemo?.runnerMistakesEnabled === true ? 'on' : diagnostics.menuDemo?.runnerMistakesEnabled === false ? 'off' : 'n/a'} cursor ${diagnostics.menuDemo?.pathCursor ?? 'n/a'}`,
+  `gen stage ${diagnostics.generation?.stageCursor.phase ?? 'none'}:${diagnostics.generation?.stageCursor.currentStageId ?? 'n/a'} signal ${diagnostics.generation?.stageCursor.completionSignal ?? 'n/a'} complete ${diagnostics.generation?.stageCursor.processComplete === true ? 'yes' : diagnostics.generation?.stageCursor.processComplete === false ? 'no' : 'n/a'}`
 ].join('\n');
 
 export const parseMenuSceneRuntimeDiagnosticsAttribute = (
