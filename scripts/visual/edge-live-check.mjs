@@ -1635,8 +1635,8 @@ const buildMarkdownSummary = ({ runId, sourceMode, baseUrl, explicitUrl, presetG
     '- First load, second load, and an active-motion attempt frame are captured when available.',
     '- Core watch and cycle runs also capture arrival, clear-hold, and erase end-window proof frames.',
     '- Board overflow compares the published board bounds against the safe frame.',
-    '- HUD overlap checks the intent feed rectangle against the maze board bounds.',
-    '- HUD clip checks the intent feed rectangle against the viewport bounds.'
+    '- HUD overlap checks the published HUD proof footprint against the maze board bounds.',
+    '- HUD clip checks the published HUD proof footprint against the viewport bounds.'
   );
 
   return `${lines.join('\n')}\n`;

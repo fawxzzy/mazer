@@ -2,7 +2,7 @@
 
 Date: 2026-06-29
 Status: active
-Current marker: `72%`
+Current marker: `73%`
 
 ## Intent
 
@@ -66,13 +66,13 @@ The current marker is the sum of the awarded points below.
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | exact movement edge cases and return/reset timing still need tighter legacy proof |
 | Generation lifecycle exactness | `16` | `7` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts` | reset/generation now flow through explicit queued runtime requests, but the full staged legacy process pipeline is still not ported |
 | Demo route, backtracking, and pacing | `12` | `8` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, localhost | recovery cues and cue-specific pacing now drive the live route, but full legacy reset semantics and final backtrack exactness still remain open |
-| In-game HUD and goal-arrow parity | `8` | `6` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, direct play-route screenshot, localhost | HUD compactness is now closer to the legacy minimal contract, but final exactness and stronger repo-owned play proof still remain open |
+| In-game HUD and goal-arrow parity | `8` | `7` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot | the timer/arrow overlay is tighter and the full overlay footprint is now carried by repo-owned proof, but final screenshot-grade exactness is still open |
 
 Current total:
 
-- `72 / 100`
+- `73 / 100`
 
-## Why the marker is held at 72%
+## Why the marker is held at 73%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -86,7 +86,7 @@ But `100%` would still be dishonest today because the biggest remaining gaps are
 - generation/reset lifecycle is still approximate
 - generation/reset lifecycle is more explicit than before, but still not a full staged process port
 - demo route semantics are still partial even after recovery cues/pacing were restored
-- HUD parity is incomplete
+- HUD parity is closer, but not final
 - screenshot-grade menu material/composition is not fully closed
 - some overlay and front-door responsibilities still need exactness passes
 
@@ -112,10 +112,10 @@ Do not ratchet for:
 
 Keep the remaining work bounded in this order unless proof shows a different blocker:
 
-1. active-play HUD exactness
-2. generation/reset staged lifecycle exactness
-3. overlay field-by-field responsibility cleanup
-4. final screenshot-grade board/material review
+1. generation/reset staged lifecycle exactness
+2. overlay field-by-field responsibility cleanup
+3. final screenshot-grade board/material review
+4. final screenshot-grade play HUD polish
 
 Each future packet should name:
 

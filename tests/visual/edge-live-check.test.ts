@@ -159,6 +159,20 @@ describe('edge live check', () => {
     expect(overlapVerdicts.hudOverlap.pass).toBe(false);
     expect(overlapVerdicts.hudClip.pass).toBe(true);
 
+    const resetLaneHudVerdicts = resolveEdgeLiveVerdicts({
+      viewport: { width: 1280, height: 720 },
+      board: {
+        bounds: { left: 392, top: 52, right: 888, bottom: 548 },
+        safeBounds: { left: 0, top: 0, right: 1280, bottom: 720 }
+      },
+      hud: {
+        bounds: { left: 14, top: 14, right: 1260, bottom: 40 }
+      }
+    });
+
+    expect(resetLaneHudVerdicts.hudOverlap.pass).toBe(true);
+    expect(resetLaneHudVerdicts.hudClip.pass).toBe(true);
+
     const resetLaneDiagnostics = {
       visual: {
         board: {

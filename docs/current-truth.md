@@ -49,7 +49,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `72%`
+- `73%`
 
 Why it is not higher yet:
 
@@ -70,6 +70,7 @@ Why it is not higher yet:
 - legacy menu demo now emits live recovery cues and cue-specific pacing instead of collapsing wrong-turn motion back to plain explore timing
 - legacy generation/reset now routes through explicit queued request contracts instead of collapsing every branch into immediate rebuild calls
 - legacy-style active play start path
+- active-play HUD now uses a tighter timer/goal-arrow overlay and repo-owned proof can bound the full overlay footprint
 - legacy-style options/features/game-mode/pause overlay structure
 - repo-owned reset-lane tests in `tests/reset/`
 
@@ -120,7 +121,7 @@ The older visual matrix / Edge live proof lane is now archival for comparison, n
 
 - exact main-menu behavior polish
 - exact menu snapshot silhouette and attract-route parity
-- exact play HUD parity
+- exact play HUD parity beyond the tighter compact overlay and full proof bounds
 - exact demo AI parity beyond the newly restored recovery cue/pacing lane
 - exact generation/reset-flow parity beyond the queued request contract
 - final screenshot-grade visual parity

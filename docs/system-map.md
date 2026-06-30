@@ -129,11 +129,12 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - queued generation/reset request reasons and tick-consumption contract
   - generation metadata attached to runtime-created mazes
 - `src/scenes/MenuScene.ts`
-  - `buildMazeForCurrentMode()` picks menu vs play builder
-  - `rebuildMaze()` rehydrates maze, player, trail, demo state, and layout
-  - `regenerateMaze()` increments seed and reruns the build path
+  - `applyGenerationRequest()` rehydrates maze, player, trail, demo state, HUD, and layout from a named request
+  - `queueGenerationRequest()` stages delayed menu/play rebuilds instead of collapsing every branch into immediate rebuild calls
+  - `regenerateMaze()` now schedules the menu-demo goal-reset request path
   - `startPlayMode()` swaps from menu shell into active-play generation
   - `enterMenuMode()` returns active play back into menu flow after reset
+  - `drawHud()` owns the compact timer chip, goal arrow, and published HUD proof bounds
 
 Boundary:
 

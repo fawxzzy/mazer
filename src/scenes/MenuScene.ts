@@ -189,6 +189,20 @@ const cloneVisualRect = (rect: VisualRect | null): VisualRect | null => (
   rect ? { ...rect } : null
 );
 
+const mergeVisualRects = (...rects: Array<VisualRect | null>): VisualRect | null => {
+  const presentRects = rects.filter((rect): rect is VisualRect => rect !== null);
+  if (presentRects.length === 0) {
+    return null;
+  }
+
+  const left = Math.min(...presentRects.map((rect) => rect.left));
+  const top = Math.min(...presentRects.map((rect) => rect.top));
+  const right = Math.max(...presentRects.map((rect) => rect.right));
+  const bottom = Math.max(...presentRects.map((rect) => rect.bottom));
+
+  return createVisualRect(left, top, right - left, bottom - top);
+};
+
 const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
 
 const formatClock = (elapsedMs: number): string => {
@@ -919,34 +933,34 @@ export class MenuScene extends Phaser.Scene {
 
     const elapsed = formatClock(time - this.playStartedAtMs);
     const timerText = `Time ${elapsed}`;
-    const arrowOriginX = this.layout.width - 42;
-    const arrowOriginY = 26;
+    const arrowOriginX = this.layout.width - 30;
+    const arrowOriginY = 22;
     const boardOffset = this.resolveBoardOffset();
     const goalScreenX = this.layout.boardLeft + boardOffset.x + (this.maze.goal.x * this.layout.tileSize);
     const goalScreenY = this.layout.boardTop + boardOffset.y + (this.maze.goal.y * this.layout.tileSize);
     const playerScreenX = this.layout.boardLeft + boardOffset.x + (this.player.x * this.layout.tileSize);
     const playerScreenY = this.layout.boardTop + boardOffset.y + (this.player.y * this.layout.tileSize);
     const angle = Phaser.Math.Angle.Between(playerScreenX, playerScreenY, goalScreenX, goalScreenY);
-    const length = 22;
-    const timerLeft = 16;
-    const timerTop = 16;
-    const timerWidth = 132;
-    const timerHeight = 26;
+    const length = 18;
+    const timerLeft = 14;
+    const timerTop = 14;
+    const timerWidth = 118;
+    const timerHeight = 22;
     const arrowTipX = arrowOriginX + (Math.cos(angle) * length);
     const arrowTipY = arrowOriginY + (Math.sin(angle) * length);
-    const arrowLeftX = arrowOriginX + (Math.cos(angle + 2.42) * 7);
-    const arrowLeftY = arrowOriginY + (Math.sin(angle + 2.42) * 7);
-    const arrowRightX = arrowOriginX + (Math.cos(angle - 2.42) * 7);
-    const arrowRightY = arrowOriginY + (Math.sin(angle - 2.42) * 7);
+    const arrowLeftX = arrowOriginX + (Math.cos(angle + 2.42) * 6);
+    const arrowLeftY = arrowOriginY + (Math.sin(angle + 2.42) * 6);
+    const arrowRightX = arrowOriginX + (Math.cos(angle - 2.42) * 6);
+    const arrowRightY = arrowOriginY + (Math.sin(angle - 2.42) * 6);
 
     this.hudGraphics.fillStyle(0x05050a, 0.34);
     this.hudGraphics.fillRect(timerLeft, timerTop, timerWidth, timerHeight);
     this.hudGraphics.lineStyle(1, 0xdedbe6, 0.22);
     this.hudGraphics.strokeRect(timerLeft, timerTop, timerWidth, timerHeight);
 
-    const timer = this.add.text(26, 19, timerText, {
+    const timer = this.add.text(22, 16, timerText, {
       fontFamily: '"Courier New", monospace',
-      fontSize: '16px',
+      fontSize: '14px',
       color: '#d7f0d6'
     });
     timer.setData('hud', true);
@@ -977,7 +991,7 @@ export class MenuScene extends Phaser.Scene {
       Math.ceil(Math.max(arrowOriginX, arrowTipX, arrowLeftX, arrowRightX) - Math.min(arrowOriginX, arrowTipX, arrowLeftX, arrowRightX)) + 4,
       Math.ceil(Math.max(arrowOriginY, arrowTipY, arrowLeftY, arrowRightY) - Math.min(arrowOriginY, arrowTipY, arrowLeftY, arrowRightY)) + 4
     );
-    this.hudBounds = cloneVisualRect(this.hudTimerBounds);
+    this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);
   }
 
   private clearHudTexts(): void {
