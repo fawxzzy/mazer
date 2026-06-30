@@ -147,6 +147,22 @@ describe('legacy reset lane', () => {
     expect(demoLifecycleSource).toContain('advanceDemoWalker(episode, state, config)');
   });
 
+  test('routes legacy process-8 reset branches through explicit reset requests', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const playLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayLifecycle.ts'), 'utf8');
+
+    expect(playLifecycleSource).toContain('type LegacyResetAction =');
+    expect(playLifecycleSource).toContain('createLegacyResetRequest');
+    expect(playLifecycleSource).toContain('shouldConsumeLegacyResetRequest');
+    expect(menuSceneSource).toContain('private pendingResetRequest: LegacyResetRequest | null = null;');
+    expect(menuSceneSource).toContain('if (pendingReset !== null && shouldConsumeLegacyResetRequest(pendingReset, time)) {');
+    expect(menuSceneSource).toContain("this.pendingResetRequest = createLegacyResetRequest({");
+    expect(menuSceneSource).toContain("mode: 'play',");
+    expect(menuSceneSource).toContain("mode: 'menu',");
+    expect(menuSceneSource).toContain("if (request.action === 'return-menu') {");
+    expect(menuSceneSource).toContain('pendingAction: this.pendingResetRequest?.action ?? null,');
+  });
+
   test('keeps the menu backdrop in the denser screenshot-directed field lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
@@ -182,9 +198,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('if (nextRequest !== null && shouldConsumeLegacyGenerationRequest(nextRequest, time))');
     expect(menuSceneSource).toContain('const generationState = consumeLegacyGenerationRequestState(request, this.settings.scale);');
     expect(menuSceneSource).toContain('if (generationState.startsPlayTimer) {');
-    expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-goal-reset', delayMs, { stepSeed: true });");
     expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });");
     expect(menuSceneSource).toContain("this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });");
+    expect(menuSceneSource).toContain("reason: 'menu-demo-goal-reset',");
     expect(menuSceneSource).toContain('pendingRequest: {');
   });
 });

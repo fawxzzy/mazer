@@ -49,7 +49,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `74%`
+- `75%`
 
 Why it is not higher yet:
 
@@ -70,6 +70,7 @@ Why it is not higher yet:
 - legacy menu demo now emits live recovery cues and cue-specific pacing instead of collapsing wrong-turn motion back to plain explore timing
 - legacy generation/reset now routes through explicit queued request contracts instead of collapsing every branch into immediate rebuild calls
 - legacy generation consumption now carries explicit stage-7 finalize responsibilities for play/menu spawn, title, and timer start
+- legacy process-8 reset branches now route through explicit reset requests for active-play return vs menu-demo regeneration
 - legacy-style active play start path
 - active-play HUD now uses a tighter timer/goal-arrow overlay and repo-owned proof can bound the full overlay footprint
 - legacy-style options/features/game-mode/pause overlay structure
@@ -79,7 +80,7 @@ Why it is not higher yet:
 
 - maze generation lifecycle is still a reset-lane approximation, not the full old staged process graph
 - generation/reset branches are now explicit runtime requests, but the full staged process `0/3/4/5/6/7/8` port is still not complete
-- stage `7` responsibilities are now explicit, but the remaining staged generation and process `8` reset flow are still not fully ported
+- stage `7` responsibilities are now explicit, and process `8` reset branches are explicit too, but the remaining staged generation pipeline is still not fully ported
 - demo AI and backtracking are not yet a full legacy-exact port
 - in-game HUD is only partially restored
 - browser exit cannot literally execute the old engine quit behavior

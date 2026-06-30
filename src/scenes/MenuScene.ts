@@ -22,9 +22,13 @@ import {
   type LegacyGenerationRequest,
 } from '../legacy-runtime/legacyGenerationLifecycle';
 import {
+  createLegacyResetRequest,
+  hasPendingLegacyResetRequest,
   hasPendingLegacyPlayResetReturn,
   scheduleLegacyPlayResetReturnAtMs,
-  shouldConsumeLegacyPlayResetReturn
+  shouldConsumeLegacyResetRequest,
+  shouldConsumeLegacyPlayResetReturn,
+  type LegacyResetRequest,
 } from '../legacy-runtime/legacyPlayLifecycle';
 import { advanceLegacyPlayStep } from '../legacy-runtime/legacyPlayStep';
 import {
@@ -119,6 +123,11 @@ interface MenuSceneVisualDiagnostics {
         seed: number | null;
       };
       processStageIds: number[];
+    };
+    reset: {
+      pendingAction: string | null;
+      dueAtMs: number | null;
+      reason: string | null;
     };
     mode: RuntimeMode;
     overlay: OverlayKind;
@@ -240,6 +249,7 @@ export class MenuScene extends Phaser.Scene {
   private menuDemoConfig!: DemoWalkerConfig;
   private nextDemoMoveAtMs = 0;
   private playStartedAtMs = 0;
+  private pendingResetRequest: LegacyResetRequest | null = null;
   private playResetReturnAtMs = 0;
   private messageText = '';
   private messageVisibleUntilMs = 0;
@@ -324,13 +334,25 @@ export class MenuScene extends Phaser.Scene {
   public update(time: number, delta: number): void {
     this.updateStars(delta);
 
+    const pendingReset = this.pendingResetRequest;
+    if (pendingReset !== null && shouldConsumeLegacyResetRequest(pendingReset, time)) {
+      this.pendingResetRequest = null;
+      this.consumeResetRequest(pendingReset, time);
+      return;
+    }
+
     const nextRequest = this.pendingGenerationRequest;
     if (nextRequest !== null && shouldConsumeLegacyGenerationRequest(nextRequest, time)) {
       this.pendingGenerationRequest = null;
       this.applyGenerationRequest(nextRequest, time);
     }
 
-    if (this.mode === 'menu' && this.overlay === 'none' && this.pendingGenerationRequest === null) {
+    if (
+      this.mode === 'menu'
+      && this.overlay === 'none'
+      && this.pendingGenerationRequest === null
+      && this.pendingResetRequest === null
+    ) {
       this.updateMenuDemo(time);
     }
 
@@ -373,7 +395,10 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
-      if (hasPendingLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs)) {
+      if (
+        hasPendingLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs)
+        || hasPendingLegacyResetRequest(this.pendingResetRequest)
+      ) {
         return;
       }
 
@@ -558,12 +583,9 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private regenerateMaze(delayMs = 0): void {
-    this.queueGenerationRequest('menu-demo-goal-reset', delayMs, { stepSeed: true });
-  }
-
   private enterMenuMode(): void {
     this.mode = 'menu';
+    this.pendingResetRequest = null;
     this.playResetReturnAtMs = 0;
     this.overlay = 'none';
     this.overlayReturn = 'none';
@@ -581,6 +603,7 @@ export class MenuScene extends Phaser.Scene {
 
   private startPlayMode(): void {
     this.mode = 'play';
+    this.pendingResetRequest = null;
     this.playResetReturnAtMs = 0;
     this.overlay = 'none';
     this.overlayReturn = 'none';
@@ -612,14 +635,22 @@ export class MenuScene extends Phaser.Scene {
     this.trail = nextFrame.trail;
     this.nextDemoMoveAtMs = time + nextFrame.delayMs;
     if (nextFrame.shouldRegenerateMaze) {
-      this.regenerateMaze(nextFrame.delayMs);
+      this.pendingResetRequest = createLegacyResetRequest({
+        delayMs: nextFrame.delayMs,
+        mode: 'menu',
+        nowMs: time,
+        reason: 'goal'
+      });
       return;
     }
     this.boardDynamicDirty = true;
   }
 
   private tryMovePlayer(deltaX: number, deltaY: number): void {
-    if (hasPendingLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs)) {
+    if (
+      hasPendingLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs)
+      || hasPendingLegacyResetRequest(this.pendingResetRequest)
+    ) {
       return;
     }
 
@@ -649,7 +680,31 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private schedulePlayResetReturn(): void {
+    this.pendingResetRequest = createLegacyResetRequest({
+      mode: 'play',
+      nowMs: this.time.now,
+      reason: 'goal'
+    });
     this.playResetReturnAtMs = scheduleLegacyPlayResetReturnAtMs(this.time.now);
+  }
+
+  private consumeResetRequest(request: LegacyResetRequest, time: number): void {
+    if (request.action === 'return-menu') {
+      this.enterMenuMode();
+      return;
+    }
+
+    this.applyGenerationRequest(
+      createLegacyGenerationRequest({
+        currentSeed: this.mazeSeed,
+        dueAtMs: time,
+        mode: 'menu',
+        reason: 'menu-demo-goal-reset',
+        scale: this.settings.scale,
+        stepSeed: true
+      }),
+      time
+    );
   }
 
   private createStars(): void {
@@ -1628,6 +1683,11 @@ export class MenuScene extends Phaser.Scene {
             mode: this.pendingGenerationRequest?.mode ?? null
           },
           processStageIds: [...(this.maze.generation?.processStageIds ?? [])]
+        },
+        reset: {
+          pendingAction: this.pendingResetRequest?.action ?? null,
+          dueAtMs: this.pendingResetRequest?.dueAtMs ?? null,
+          reason: this.pendingResetRequest?.reason ?? null
         },
         player: copyPoint(this.player),
         goal: copyPoint(this.maze.goal),

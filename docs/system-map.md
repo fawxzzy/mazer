@@ -129,10 +129,14 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - queued generation/reset request reasons and tick-consumption contract
   - explicit stage-7 finalize state for spawn, title visibility, and play timer start
   - generation metadata attached to runtime-created mazes
+- `src/legacy-runtime/legacyPlayLifecycle.ts`
+  - explicit process-8 reset request contract for:
+  - active-play return-to-menu hold
+  - menu-demo regenerate-in-place branch
 - `src/scenes/MenuScene.ts`
   - `applyGenerationRequest()` rehydrates maze, player, trail, demo state, HUD, and layout from a named request
   - `queueGenerationRequest()` stages delayed menu/play rebuilds instead of collapsing every branch into immediate rebuild calls
-  - `regenerateMaze()` now schedules the menu-demo goal-reset request path
+  - `pendingResetRequest` now carries the explicit process-8 branch until the scene update consumes it
   - `startPlayMode()` swaps from menu shell into active-play generation
   - `enterMenuMode()` returns active play back into menu flow after reset
   - `drawHud()` owns the compact timer chip, goal arrow, and published HUD proof bounds
@@ -176,8 +180,9 @@ This is the fastest way to answer "if I click or press this, what actually owns 
 
 - `src/legacy-runtime/legacyPlayLifecycle.ts`
   - active-play goal-reset hold duration
+  - explicit reset-request action/due-time contract
   - pending-reset gate for input and movement
-  - due-reset return timing contract
+  - due-reset return timing contract for active play and menu demo goal branches
 
 - `src/legacy-runtime/legacyPlayStep.ts`
   - one-tile cardinal movement
