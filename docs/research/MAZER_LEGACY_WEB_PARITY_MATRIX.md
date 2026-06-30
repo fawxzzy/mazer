@@ -24,7 +24,7 @@ Restored legacy truth:
 | Menu demo AI walker | `Source/Mazer/Private/Player/MazerPlayer.cpp` | `src/legacy-runtime/legacyMenuDemoLifecycle.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | `partial` | Demo motion now carries live recovery cues and cue-specific pacing, but legacy backtracking/reset semantics are still not fully exact | Re-port the remaining legacy demo walker backtrack and reset semantics exactly |
 | Active play movement | `Source/Mazer/Private/Player/MazerPlayer.cpp` | `src/legacy-runtime/legacyPlayStep.ts`, `src/scenes/MenuScene.ts` | `partial` | Web play mode now exists as a first-class legacy-shaped lane, but edge-case movement/collision behavior still needs exact tightening | Tighten movement, collision gating, and play-state transitions against restored legacy behavior |
 | Win/reset loop | `Source/Mazer/MazerGameModeBase.cpp`, `Source/Mazer/Private/MazerGameState.cpp` | `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | `partial` | Reset timing and return flow are now explicit request branches for play vs menu demo, but the remaining staged behavior split is still not fully ported | Restore the remaining exact legacy reset semantics around the staged generator |
-| Main menu front door | `Source/Mazer/Private/UI/MainMenuWidget.cpp` | `src/legacy-runtime/legacyDefaults.ts`, `src/legacy-runtime/legacyMenuLayout.ts`, `src/scenes/MenuScene.ts` | `partial` | `Start`, `Options`, and `Exit` are restored as the front door, but exact behavior/presentation parity is still being tightened | Finish exact front-door behavior and browser-safe `Exit` equivalence |
+| Main menu front door | `Source/Mazer/Private/UI/MainMenuWidget.cpp` | `src/legacy-runtime/legacyDefaults.ts`, `src/legacy-runtime/legacyExit.ts`, `src/legacy-runtime/legacyMenuLayout.ts`, `src/scenes/MenuScene.ts` | `aligned` | `Start`, `Options`, and `Exit` are restored as first-class controls, and `Exit` now uses an explicit browser-safe quit equivalence instead of a message detour | Preserve the front-door contract while larger runtime and visual gaps close elsewhere |
 | Options overlay | `Source/Mazer/Private/UI/PauseMenuWidget.cpp` | `src/legacy-runtime/legacyOptionFields.ts`, `src/legacy-runtime/legacyOverlayFieldCommit.ts`, `src/legacy-runtime/legacyOverlayRouting.ts`, `src/scenes/MenuScene.ts` | `aligned` | The options surface now carries explicit field-commit classes and nested-overlay return routing | Preserve the current contract while larger runtime gaps close elsewhere |
 | Features overlay | `Source/Mazer/Private/UI/FeaturesWidget.cpp` | `src/legacy-runtime/legacyOverlayToggleFields.ts`, `src/legacy-runtime/legacyOverlayRouting.ts`, `src/scenes/MenuScene.ts` | `aligned` | Features toggle ownership and nested return routing are now explicit repo truth | Preserve the current contract while larger runtime gaps close elsewhere |
 | Game modes overlay | `Source/Mazer/Private/UI/GameModesWidget.cpp` | `src/legacy-runtime/legacyOverlayToggleFields.ts`, `src/legacy-runtime/legacyOverlayRouting.ts`, `src/scenes/MenuScene.ts` | `aligned` | Game modes now carries explicit dark-mode semantics and nested return routing without a made-up state label | Preserve the current contract while larger runtime gaps close elsewhere |
@@ -60,11 +60,11 @@ But the public shell, overlay model, HUD, and visual composition still differ ma
 
 ## Immediate next slice
 
-`legacy main-menu parity packet`
+`legacy screenshot-grade menu composition packet`
 
 Target:
 
-- restore `Start`, `Options`, `Exit` as first-class web front-door controls
-- restore the one-overlay-at-a-time legacy menu structure
+- keep `Start`, `Options`, and `Exit` locked as front-door truth
+- tighten screenshot-facing board/material/title/backdrop parity
 - keep the current web app as canonical
 - use the restored Unreal project and screenshots as truth while rebuilding the web shell

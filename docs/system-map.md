@@ -87,7 +87,7 @@ This is the active state contract for the current app front door.
 | State family | Values | Owner | Notes |
 | --- | --- | --- | --- |
 | runtime mode | `menu` / `play` | `src/scenes/MenuScene.ts` | decides whether the fixed menu snapshot or generated play maze is active |
-| active overlay | `none` / `options` / `features` / `gameModes` / `pause` / `message` | `src/scenes/MenuScene.ts` | exactly one overlay at a time |
+| active overlay | `none` / `options` / `features` / `gameModes` / `pause` | `src/scenes/MenuScene.ts` | exactly one overlay at a time |
 | settings | `LegacySettings` | `src/legacy-runtime/legacyDefaults.ts`, `src/legacy-runtime/legacyOptionFields.ts`, `src/scenes/MenuScene.ts` | menu and pause fields mutate this contract |
 | current maze snapshot | `LegacyMazeSnapshot` | `src/legacy-runtime/legacyMaze.ts` | menu mode uses `createLegacyMenuMaze()`, play mode uses `createLegacyMaze()` |
 | menu demo episode/config/state | `MazeEpisode`, `DemoWalkerConfig`, `DemoWalkerState` | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | menu-only attract route and preroll truth |
@@ -110,7 +110,7 @@ Use this when you need to understand the app as a system instead of a file list.
 5. User entry:
    `Start` calls `startPlayMode()`, which swaps the runtime over to `createLegacyMaze()` and hides the title lockup.
 6. Overlay mutation:
-   `Options`, `Features`, `Game Modes`, `Pause`, and `Message` all route through the single `overlay` state in `MenuScene`.
+   `Options`, `Features`, `Game Modes`, and `Pause` all route through the single `overlay` state in `MenuScene`.
 7. Field commits:
    `applyLegacyOptionField()` normalizes draft values, `legacyOverlayFieldCommit.ts` classifies them into deferred reload-on-back vs immediate camera-flag roles, and `MenuScene` applies the resulting rebuild/layout effects.
 8. Active play:
@@ -187,7 +187,7 @@ This is the fastest way to answer "if I click or press this, what actually owns 
 
 - `src/scenes/MenuScene.ts`
   - runtime mode switch: `menu` vs `play`
-  - overlay switch: `none | options | features | gameModes | pause | message`
+  - overlay switch: `none | options | features | gameModes | pause`
   - front-door button behavior
   - title lockup opacity, scale, and vertical placement
   - board slab/frame presentation and menu-only chrome
@@ -256,7 +256,6 @@ Use this before touching presentation code inside `MenuScene.ts` so you know whe
 2. `update()`
    - advances starfield
    - advances menu demo when `mode=menu` and `overlay=none`
-   - expires message overlay state
    - redraws backdrop if `backdropDirty`
    - redraws static board shell if `boardStaticDirty`
    - redraws dynamic board + HUD if `boardDynamicDirty`
@@ -419,6 +418,13 @@ Boundary:
 - `npm run legacy:extract`
 - `npm run verify`
 - `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md`
+
+### Localhost proof operation
+
+- keep one maintained preview server on `http://127.0.0.1:4173/`
+- use the in-app browser as the default live proof surface for the current branch
+- after code changes, reload the existing `4173` tab before judging the UI
+- only branch into extra localhost ports or alternate proof surfaces when a packet explicitly requires it
 
 What `verify` currently means:
 

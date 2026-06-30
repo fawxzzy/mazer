@@ -2,7 +2,7 @@
 
 Date: 2026-06-29
 Status: active
-Current marker: `83%`
+Current marker: `84%`
 
 ## Intent
 
@@ -60,7 +60,7 @@ The current marker is the sum of the awarded points below.
 | Segment | Weight | Current points | Current truth | Owner chain | Proof surface | Exact remaining gap |
 | --- | --- | --- | --- | --- | --- | --- |
 | Legacy truth restore, extraction, and proof spine | `10` | `10` | locked | `legacy/old-project.zip` -> `docs/current-truth.md` -> `docs/system-map.md` | `npm run legacy:extract`, `npm run verify` | keep current truth and proof docs in sync when runtime truth changes |
-| Front-door menu shell semantics | `12` | `11` | close | `src/legacy-runtime/legacyDefaults.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/reset/legacy-menu-layout.test.ts`, localhost | final `Exit` equivalence and exact front-door behavior polish still need one bounded pass |
+| Front-door menu shell semantics | `12` | `12` | aligned | `src/legacy-runtime/legacyDefaults.ts` -> `src/legacy-runtime/legacyExit.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-exit.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/reset/legacy-menu-layout.test.ts`, localhost | keep the browser-safe quit equivalence and front-door proof surfaces green while larger parity gaps close elsewhere |
 | Menu screenshot composition and board presentation | `14` | `10` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/scenes/menu-render-frame.test.ts` | final screenshot-grade composition is still open, but board material/tile read is materially closer after the heavier trench pass |
 | Overlay family and field responsibilities | `14` | `14` | aligned | `src/legacy-runtime/legacyOptionFields.ts` -> `src/legacy-runtime/legacyOverlayFieldCommit.ts` -> `src/legacy-runtime/legacyOverlayToggleFields.ts` -> `src/legacy-runtime/legacyOverlayRouting.ts` -> `src/legacy-runtime/legacyPauseLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-overlay-routing.test.ts`, `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost | keep the overlay proof spine green while larger runtime gaps close elsewhere |
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | exact movement edge cases and return/reset timing still need tighter legacy proof |
@@ -70,9 +70,9 @@ The current marker is the sum of the awarded points below.
 
 Current total:
 
-- `83 / 100`
+- `84 / 100`
 
-## Why the marker is held at 83%
+## Why the marker is held at 84%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -85,6 +85,7 @@ But `100%` would still be dishonest today because the biggest remaining gaps are
 
 - generation/reset lifecycle is still approximate
 - generation/reset lifecycle is more explicit than before, but still not a full staged process port
+- front-door `Exit` semantics are now closed through an explicit browser-safe quit equivalence, so the remaining gaps are no longer front-door contract gaps
 - stage `7` finalization, process `8` reset entry, process `0` delay-gated entry, the armed level-building scheduler contract, the stage transition graph, stage `0/3/4/5/6` cadence, and checkpoint/shortcut budget formulas are now explicit, but the remaining staged pipeline is still open
 - demo route semantics are still partial even after recovery cues/pacing were restored
 - HUD parity is closer, but not final

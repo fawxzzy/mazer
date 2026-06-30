@@ -19,6 +19,24 @@ describe('legacy reset lane', () => {
     expect(MAIN_MENU_BUTTONS).toEqual(['Exit', 'Start', 'Options']);
   });
 
+  test('routes the front-door Exit button through a browser-safe quit equivalence', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const legacyExitSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyExit.ts'), 'utf8');
+    const legacyOverlayRoutingSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayRouting.ts'), 'utf8');
+    const legacyMainMenuSource = readFileSync(
+      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'MainMenuWidget.cpp'),
+      'utf8'
+    );
+
+    expect(menuSceneSource).toContain("() => this.performLegacyExit()");
+    expect(menuSceneSource).toContain('private performLegacyExit(): void {');
+    expect(menuSceneSource).not.toContain("case 'message':");
+    expect(legacyExitSource).toContain("kind: 'replace-about-blank'");
+    expect(legacyExitSource).toContain("runtime?.location?.replace?.(action.targetUrl ?? 'about:blank');");
+    expect(legacyOverlayRoutingSource).not.toContain("'message'");
+    expect(legacyMainMenuSource).toContain('PlayerController->ConsoleCommand("quit");');
+  });
+
   test('preserves legacy default settings', () => {
     expect(LEGACY_DEFAULTS.scale).toBe(50);
     expect(LEGACY_DEFAULTS.camScale).toBe(0);

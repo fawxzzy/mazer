@@ -40,7 +40,6 @@ If the current web app disagrees with restored legacy truth, legacy wins for thi
   - features
   - game modes
   - pause
-  - message
 - The current menu shell is intentionally simpler and closer to the archived Unreal menu composition than the previous recovery shell.
 
 ## Current 1:1 completion marker
@@ -49,7 +48,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `83%`
+- `84%`
 
 Why it is not higher yet:
 
@@ -77,6 +76,7 @@ Why it is not higher yet:
 - generation requests now carry the explicit delay-gated process-0 entry contract, and reset requests now carry the explicit initialized process-8 entry contract
 - legacy level-building scheduler truth is now explicit in the runtime contract: process `0` requires the armed start-time + delay-start flag, the exact legacy delay duration remains honestly unrecovered, and initialized process `8` reset entry is marked as the branch that bypasses that delay gate
 - legacy stage progression truth is now explicit in the runtime contract: stages now publish their own completion signals, next-stage transitions, and the stage-5 skip-to-6 rule when shortcuts are disabled
+- legacy front-door `Exit` now routes through an explicit browser-safe quit equivalence contract instead of a temporary explanation overlay, and the dead `message` overlay family has been removed from the active reset lane
 - `runtimeDiagnostics=1` now flows through the live `MenuScene` update loop and publishes a repo-owned runtime diagnostics surface instead of stopping at helper-only parsing/tests
 - runtime diagnostics now also publish a proof-only DOM attribute and visible side-browser diagnostics surface so localhost inspection does not depend on the hidden `window.__MAZER_*` globals alone
 - legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
@@ -97,7 +97,7 @@ Why it is not higher yet:
 - level-building scheduler ownership is clearer now, but the runtime still does not execute the full staged Unreal process graph
 - demo AI and backtracking are not yet a full legacy-exact port
 - in-game HUD is only partially restored
-- browser exit cannot literally execute the old engine quit behavior
+- browser exit cannot literally execute the old engine quit behavior, but the bounded browser-safe quit equivalence is now explicit and proof-backed
 - visual/material parity still needs another pass against screenshots and restored assets
 - browser automation localhost still does not expose the published `window.__MAZER_*` globals directly, but runtime diagnostics now have a DOM-backed fallback read surface and visible panel on the single `4173` preview server
 
@@ -115,6 +115,12 @@ Current `verify` means:
 - production build
 
 The older visual matrix / Edge live proof lane is now archival for comparison, not current closure truth for the reset lane.
+
+Localhost operation rule:
+
+- keep one maintained preview server on `http://127.0.0.1:4173/`
+- prefer the in-app browser as the live human proof surface for the current branch
+- reload that single tab after code changes instead of scattering proof across multiple localhost ports unless a packet explicitly needs another surface
 
 ## Current parity execution rule
 
@@ -137,7 +143,6 @@ The older visual matrix / Edge live proof lane is now archival for comparison, n
 
 ## Still open
 
-- exact main-menu behavior polish
 - exact menu snapshot silhouette and attract-route parity
 - exact play HUD parity beyond the tighter compact overlay and full proof bounds
 - exact demo AI parity beyond the newly restored recovery cue/pacing lane

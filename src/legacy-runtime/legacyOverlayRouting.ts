@@ -1,5 +1,5 @@
 export type LegacyRuntimeMode = 'menu' | 'play';
-export type LegacyOverlayKind = 'none' | 'options' | 'features' | 'gameModes' | 'pause' | 'message';
+export type LegacyOverlayKind = 'none' | 'options' | 'features' | 'gameModes' | 'pause';
 
 export interface LegacyOverlayRoutingState {
   mode: LegacyRuntimeMode;

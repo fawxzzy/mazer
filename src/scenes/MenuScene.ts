@@ -52,6 +52,7 @@ import {
 } from '../legacy-runtime/legacyMenuLayout';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { resolveLegacyMenuTitlePresentation } from '../legacy-runtime/legacyMenuTitle';
+import { performLegacyBrowserSafeExit } from '../legacy-runtime/legacyExit';
 import {
   createLegacyOptionFieldDrafts,
   type LegacyOptionFieldDrafts,
@@ -271,7 +272,6 @@ const MENU_TEXT_COLOR = '#0b841d';
 const TITLE_FILL_COLOR = '#1d8726';
 const TITLE_SHADOW_COLOR = '#103516';
 const LEGACY_BOARD_GRID_ALPHA = 0.008;
-const MESSAGE_DURATION_MS = 1800;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
 const LEGACY_MENU_SLAB_FILL = 0x5a5464;
@@ -354,8 +354,6 @@ export class MenuScene extends Phaser.Scene {
   private pendingResetRequest: LegacyResetRequest | null = null;
   private pendingOverlayMazeRebuild = false;
   private playResetReturnAtMs = 0;
-  private messageText = '';
-  private messageVisibleUntilMs = 0;
   private titleText!: Phaser.GameObjects.Text;
   private titleShadow!: Phaser.GameObjects.Text;
   private footerText!: Phaser.GameObjects.Text;
@@ -490,17 +488,6 @@ export class MenuScene extends Phaser.Scene {
     if (shouldConsumeLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs, time)) {
       this.enterMenuMode();
       return;
-    }
-
-    if (this.messageVisibleUntilMs > 0 && time >= this.messageVisibleUntilMs) {
-      this.messageVisibleUntilMs = 0;
-      this.messageText = '';
-      if (this.overlay === 'message') {
-        this.overlay = 'none';
-        this.overlayReturn = 'none';
-        this.boardDynamicDirty = true;
-        this.uiDirty = true;
-      }
     }
 
     if (this.backdropDirty) {
@@ -1412,7 +1399,7 @@ export class MenuScene extends Phaser.Scene {
             this.layout.buttonWidth,
             this.layout.buttonHeight,
             leftLabel,
-            () => this.showExitMessage()
+            () => this.performLegacyExit()
           ),
           this.createButton(
             this.layout.centerButtonX,
@@ -1451,9 +1438,6 @@ export class MenuScene extends Phaser.Scene {
         break;
       case 'pause':
         this.buildPauseOverlay();
-        break;
-      case 'message':
-        this.buildMessageOverlay();
         break;
     }
 
@@ -1584,22 +1568,6 @@ export class MenuScene extends Phaser.Scene {
       this.createButton(panel.centerX, panel.top + panel.height - 196, 132, 54, 'Reset', () => this.applyLegacyPauseCommand('reset-player')),
       this.createButton(panel.centerX + Math.round(panel.width * 0.28), panel.top + panel.height - 196, 144, 54, 'Main Menu', () => this.applyLegacyPauseCommand('return-menu')),
       this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Features', () => this.openNestedOverlay('features', 'pause'))
-    );
-  }
-
-  private buildMessageOverlay(): void {
-    const panel = this.resolveOverlayPanelFrame();
-    this.createOverlayTitle('Exit', panel.top + 76);
-    const body = this.add.text(panel.centerX, panel.top + 190, this.messageText, {
-      fontFamily: '"Courier New", monospace',
-      fontSize: '22px',
-      color: '#f2f2f4',
-      align: 'center',
-      wordWrap: { width: panel.width - 120 }
-    }).setOrigin(0.5);
-    this.uiTexts.push(body);
-    this.uiButtons.push(
-      this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Back', () => this.closeOverlay())
     );
   }
 
@@ -2031,10 +1999,8 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private showExitMessage(): void {
-    this.messageText = 'The original project used the engine quit command. Browser builds cannot close the tab directly, so Exit is preserved as UI but not as hard quit behavior.';
-    this.messageVisibleUntilMs = this.time.now + MESSAGE_DURATION_MS;
-    this.openOverlay('message');
+  private performLegacyExit(): void {
+    performLegacyBrowserSafeExit(typeof window === 'undefined' ? undefined : window);
   }
 
   private publishVisualDiagnostics(time: number): void {
