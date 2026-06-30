@@ -20,6 +20,7 @@ Read the repo in this order:
 4. Reset-lane contract docs:
    - `docs/research/MAZER_LEGACY_WEB_PORT_CONTRACT.md`
    - `docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md`
+   - `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md`
    - `docs/system-map.md`
 5. Current web runtime code
 
@@ -41,6 +42,21 @@ If the current web app disagrees with restored legacy truth, legacy wins for thi
   - pause
   - message
 - The current menu shell is intentionally simpler and closer to the archived Unreal menu composition than the previous recovery shell.
+
+## Current 1:1 completion marker
+
+Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wide completion meter.
+
+Current held marker:
+
+- `68%`
+
+Why it is not higher yet:
+
+- generation/reset lifecycle is still approximate
+- demo AI exactness is still partial
+- HUD parity is still partial
+- final screenshot-grade menu material/composition is still open
 
 ## What is already restored
 
@@ -81,6 +97,7 @@ The older visual matrix / Edge live proof lane is now archival for comparison, n
 ## Current parity execution rule
 
 - Do not run broad menu-wide polish passes by default.
+- Do not ratchet the 1:1 marker without a bounded segment proof packet.
 - Lock menu parity one module at a time:
   - title lockup
   - button chrome

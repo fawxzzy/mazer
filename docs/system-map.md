@@ -12,7 +12,8 @@ When sources disagree, read in this order:
 2. `legacy/screenshots/menu-01.png` .. `menu-04.png`
 3. `docs/legacy/*`
 4. `docs/current-truth.md`
-5. current runtime code and tests
+5. `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md`
+6. current runtime code and tests
 
 ## Runtime boot graph
 
@@ -68,7 +69,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | legacy defaults/colors/button labels | `src/legacy-runtime/legacyDefaults.ts` | `tests/reset/legacy-reset.test.ts` |
 | archived visual truth | `legacy/screenshots/menu-01.png` .. `menu-04.png` | direct visual comparison |
 | archived behavior truth | `legacy/old-project.zip`, `docs/legacy/*` | `npm run legacy:extract` |
-| parity contract / open gaps | `docs/current-truth.md`, `docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md` | latest packet + repo proof |
+| parity contract / open gaps | `docs/current-truth.md`, `docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md`, `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` | latest packet + repo proof |
 
 Rule:
 
@@ -262,6 +263,7 @@ Rule:
 
 - do not modify more than one module family in a single parity packet unless one owner chain is unusable without the other
 - if a miss can be described as one row in this table, keep the packet at that row
+- move the repo-wide 1:1 percent only when one of these module families or a larger weighted segment in the completion marker has proof-backed state change
 
 ### Legacy settings + menu shell helpers
 
@@ -363,6 +365,7 @@ Boundary:
 
 - `npm run legacy:extract`
 - `npm run verify`
+- `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md`
 
 What `verify` currently means:
 
@@ -505,6 +508,7 @@ When the page still feels wrong but the board route is already close, use this q
 
 - gameplay truth comes from the restored Unreal project
 - visual truth comes from `legacy/screenshots/*`
+- the repo-wide 1:1 percent lives in `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md`
 - menu mode and play mode stay split
 - one active overlay at a time
 - menu screenshot work must not silently rewrite play behavior
