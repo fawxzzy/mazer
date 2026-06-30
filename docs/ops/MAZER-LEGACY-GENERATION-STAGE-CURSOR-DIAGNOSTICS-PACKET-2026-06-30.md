@@ -66,7 +66,7 @@ Result:
 - TypeScript no-emit lint passed
 - build passed
 - repo verify passed, including the serialized reset/demo test lane and production build
-- live browser on `http://127.0.0.1:4173/?runtimeDiagnostics=1` loaded with one canvas and no warn/error console logs
+- live browser on `http://127.0.0.1:4173/?runtimeDiagnostics=1` loaded with one canvas; Chromium emitted WebGL/driver warnings during the proof, but no app-level page errors blocked diagnostics
 - DOM-backed runtime diagnostics exposed `consumed-finalized:7` with `player-finalized`
 - visible panel showed `gen stage consumed-finalized:7 signal player-finalized complete yes`
 
