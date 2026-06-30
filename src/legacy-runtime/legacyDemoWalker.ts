@@ -65,7 +65,6 @@ export const createLegacyMenuSnapshotDemoWalkerConfig = (seed: number): DemoWalk
     },
     behavior: {
       ...baseConfig.behavior,
-      enableRunnerMistakes: false,
       prerollSteps: Math.max(
         baseConfig.behavior.prerollSteps ?? 0,
         LEGACY_MENU_SNAPSHOT_PREROLL_STEPS

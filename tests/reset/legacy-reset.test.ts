@@ -129,7 +129,7 @@ describe('legacy reset lane', () => {
     const snapshotConfig = createLegacyMenuSnapshotDemoWalkerConfig(3749);
     const genericConfig = createLegacyMenuDemoWalkerConfig(3749);
 
-    expect(snapshotConfig.behavior.enableRunnerMistakes).toBe(false);
+    expect(snapshotConfig.behavior.enableRunnerMistakes).toBe(true);
     expect(snapshotConfig.behavior.prerollSteps).toBeGreaterThanOrEqual(LEGACY_MENU_SNAPSHOT_PREROLL_STEPS);
     expect(snapshotConfig.cadence.exploreStepMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.exploreStepMs);
     expect(snapshotConfig.cadence.backtrackStepMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.backtrackStepMs);

@@ -12,7 +12,7 @@ describe('legacy menu demo lifecycle', () => {
     const bootstrap = createLegacyMenuDemoBootstrap(menuMaze, true, 16);
 
     expect(isFixedLegacyMenuSnapshot(menuMaze)).toBe(true);
-    expect(bootstrap.config.behavior.enableRunnerMistakes).toBe(false);
+    expect(bootstrap.config.behavior.enableRunnerMistakes).toBe(true);
     expect(bootstrap.state.currentIndex).not.toBe(bootstrap.episode.raster.startIndex);
     expect(bootstrap.trail.length).toBeGreaterThan(0);
     expect(bootstrap.trail.length).toBeLessThanOrEqual(16);
@@ -43,5 +43,31 @@ describe('legacy menu demo lifecycle', () => {
     expect(nextFrame.state.currentIndex).not.toBe(bootstrap.state.currentIndex);
     expect(nextFrame.trail.length).toBeGreaterThan(0);
     expect(nextFrame.trail.length).toBeLessThanOrEqual(16);
+  });
+
+  test('lets the fixed front-door snapshot surface legacy recovery cues instead of a solver-only attract path', () => {
+    const menuMaze = createLegacyMenuMaze(3749);
+    const bootstrap = createLegacyMenuDemoBootstrap(menuMaze, false, 16);
+    let state = bootstrap.state;
+    const seenCues = new Set<string>([state.cue]);
+
+    for (let step = 0; step < 512; step += 1) {
+      const nextFrame = advanceLegacyMenuDemoFrame(
+        bootstrap.episode,
+        state,
+        bootstrap.config,
+        false,
+        16
+      );
+      state = nextFrame.state;
+      seenCues.add(state.cue);
+      if (seenCues.has('dead-end') && seenCues.has('backtrack') && seenCues.has('reacquire')) {
+        break;
+      }
+    }
+
+    expect(seenCues.has('dead-end')).toBe(true);
+    expect(seenCues.has('backtrack')).toBe(true);
+    expect(seenCues.has('reacquire')).toBe(true);
   });
 });

@@ -48,7 +48,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `87%`
+- `88%`
 
 Why it is not higher yet:
 
@@ -67,6 +67,7 @@ Why it is not higher yet:
 - title lockup is now tuned to sit deeper over the board instead of reading like a small shell label
 - legacy-style menu demo board/trail presentation
 - legacy menu demo now emits live recovery cues and cue-specific pacing instead of collapsing wrong-turn motion back to plain explore timing
+- fixed front-door menu snapshot now also runs the mistake-enabled legacy recovery lane instead of a solver-only attract path, so the canonical menu demo can surface dead-end, backtrack, reacquire, and AI-only reset behavior
 - legacy generation/reset now routes through explicit queued request contracts instead of collapsing every branch into immediate rebuild calls
 - legacy generation consumption now carries explicit stage-7 finalize responsibilities for play/menu spawn, title, and timer start
 - legacy process-8 reset branches now route through explicit reset requests for active-play return vs menu-demo regeneration
@@ -151,6 +152,6 @@ Localhost operation rule:
 - exact menu snapshot silhouette and attract-route parity
 - final desktop backdrop/material exactness still needs screenshot-grade tightening even after the board-dominance, title-lockup, button-support, explicit backdrop-owner, and darker board-material corrections
 - exact play HUD parity beyond the tighter compact overlay and full proof bounds
-- exact demo AI parity beyond the newly restored recovery cue/pacing lane
+- exact demo AI parity beyond the newly restored front-door recovery lane and cue/pacing surface
 - exact generation/reset-flow parity beyond the queued request contract
 - final screenshot-grade visual parity
