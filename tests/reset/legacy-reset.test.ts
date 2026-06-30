@@ -138,6 +138,15 @@ describe('legacy reset lane', () => {
     expect(demoLifecycleSource).toContain('advanceDemoWalker(episode, state, config)');
   });
 
+  test('keeps the menu backdrop in the denser screenshot-directed field lane', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('const starCount = 440;');
+    expect(menuSceneSource).toContain('const hazeAlpha = this.settings.darkMode ? 0.06 : 0.1;');
+    expect(menuSceneSource).toContain('this.backdropGraphics.fillCircle(width * 0.17, height * 0.21');
+    expect(menuSceneSource).toContain('this.backdropGraphics.fillCircle(width * 0.89, height * 0.84');
+  });
+
   test('cleans up localhost service workers before booting Phaser', () => {
     const bootSource = readFileSync(resolve(process.cwd(), 'src/boot/main.ts'), 'utf8');
 
