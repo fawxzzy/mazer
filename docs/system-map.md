@@ -126,6 +126,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - legacy process stage ids
   - menu-vs-play build routing
   - deterministic seed stepping for rebuild approximations
+  - queued generation/reset request reasons and tick-consumption contract
   - generation metadata attached to runtime-created mazes
 - `src/scenes/MenuScene.ts`
   - `buildMazeForCurrentMode()` picks menu vs play builder

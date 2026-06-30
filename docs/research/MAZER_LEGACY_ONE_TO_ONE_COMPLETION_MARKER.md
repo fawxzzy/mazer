@@ -2,7 +2,7 @@
 
 Date: 2026-06-29
 Status: active
-Current marker: `71%`
+Current marker: `72%`
 
 ## Intent
 
@@ -64,15 +64,15 @@ The current marker is the sum of the awarded points below.
 | Menu screenshot composition and board presentation | `14` | `10` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/scenes/menu-render-frame.test.ts` | final screenshot-grade composition is still open, but board material/tile read is materially closer after the heavier trench pass |
 | Overlay family and field responsibilities | `14` | `10` | partial | `src/legacy-runtime/legacyOptionFields.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, localhost | options/features/game-modes/pause fields still need field-by-field exactness and routing verification |
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | exact movement edge cases and return/reset timing still need tighter legacy proof |
-| Generation lifecycle exactness | `16` | `6` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts` | current build path is still an approximation, not the full staged legacy process pipeline |
+| Generation lifecycle exactness | `16` | `7` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts` | reset/generation now flow through explicit queued runtime requests, but the full staged legacy process pipeline is still not ported |
 | Demo route, backtracking, and pacing | `12` | `8` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, localhost | recovery cues and cue-specific pacing now drive the live route, but full legacy reset semantics and final backtrack exactness still remain open |
 | In-game HUD and goal-arrow parity | `8` | `6` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, direct play-route screenshot, localhost | HUD compactness is now closer to the legacy minimal contract, but final exactness and stronger repo-owned play proof still remain open |
 
 Current total:
 
-- `71 / 100`
+- `72 / 100`
 
-## Why the marker is held at 71%
+## Why the marker is held at 72%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -84,6 +84,7 @@ The repo is materially past the "rough prototype" stage:
 But `100%` would still be dishonest today because the biggest remaining gaps are not cosmetic:
 
 - generation/reset lifecycle is still approximate
+- generation/reset lifecycle is more explicit than before, but still not a full staged process port
 - demo route semantics are still partial even after recovery cues/pacing were restored
 - HUD parity is incomplete
 - screenshot-grade menu material/composition is not fully closed
@@ -111,10 +112,10 @@ Do not ratchet for:
 
 Keep the remaining work bounded in this order unless proof shows a different blocker:
 
-1. menu board material / tile read
-2. active-play HUD exactness
-3. generation/reset staged lifecycle exactness
-4. overlay field-by-field responsibility cleanup
+1. active-play HUD exactness
+2. generation/reset staged lifecycle exactness
+3. overlay field-by-field responsibility cleanup
+4. final screenshot-grade board/material review
 
 Each future packet should name:
 

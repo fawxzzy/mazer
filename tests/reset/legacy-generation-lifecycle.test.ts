@@ -1,10 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import {
+  consumeLegacyGenerationRequest,
+  createLegacyGenerationRequest,
   createLegacyRuntimeMazeForMode,
   LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID,
   LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS,
   resolveLegacyGenerationProcessStageIds,
   resolveLegacyMazeBuildKind,
+  shouldConsumeLegacyGenerationRequest,
   stepLegacyGenerationSeed
 } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 
@@ -36,5 +39,47 @@ describe('legacy generation lifecycle', () => {
     expect(stepLegacyGenerationSeed(0)).toBe(1);
     expect(stepLegacyGenerationSeed(3749)).toBe(3750);
     expect(stepLegacyGenerationSeed(0xffffffff)).toBe(0);
+  });
+
+  test('creates explicit queued generation requests instead of collapsing every branch into immediate rebuilds', () => {
+    const menuBootRequest = createLegacyGenerationRequest({
+      currentSeed: 3749,
+      dueAtMs: 1200,
+      mode: 'menu',
+      reason: 'boot-menu',
+      scale: 50
+    });
+    const goalResetRequest = createLegacyGenerationRequest({
+      currentSeed: 3749,
+      dueAtMs: 1540,
+      mode: 'menu',
+      reason: 'menu-demo-goal-reset',
+      scale: 50,
+      stepSeed: true
+    });
+
+    expect(menuBootRequest.seed).toBe(3749);
+    expect(menuBootRequest.buildKind).toBe('menu-snapshot');
+    expect(menuBootRequest.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
+    expect(goalResetRequest.seed).toBe(3750);
+    expect(goalResetRequest.reason).toBe('menu-demo-goal-reset');
+    expect(shouldConsumeLegacyGenerationRequest(goalResetRequest, 1539)).toBe(false);
+    expect(shouldConsumeLegacyGenerationRequest(goalResetRequest, 1540)).toBe(true);
+  });
+
+  test('consumes queued generation requests through the legacy builder routing', () => {
+    const playRequest = createLegacyGenerationRequest({
+      currentSeed: 902,
+      dueAtMs: 0,
+      mode: 'play',
+      reason: 'play-start',
+      scale: 50
+    });
+
+    const playMaze = consumeLegacyGenerationRequest(playRequest, 50);
+
+    expect(playMaze.generation?.buildKind).toBe('play-generated');
+    expect(playMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
+    expect(playMaze.seed).toBe(902);
   });
 });

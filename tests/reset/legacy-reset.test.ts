@@ -166,4 +166,21 @@ describe('legacy reset lane', () => {
     expect(bootSource).toContain("markMazerBootStatus('boot-start');");
     expect(bootSource).toContain("markMazerBootStatus('game-created');");
   });
+
+  test('routes generation and reset through explicit queued request contracts', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const generationLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyGenerationLifecycle.ts'), 'utf8');
+
+    expect(generationLifecycleSource).toContain("type LegacyGenerationRequestReason =");
+    expect(generationLifecycleSource).toContain('createLegacyGenerationRequest');
+    expect(generationLifecycleSource).toContain('shouldConsumeLegacyGenerationRequest');
+    expect(generationLifecycleSource).toContain('consumeLegacyGenerationRequest');
+    expect(menuSceneSource).toContain("this.pendingGenerationRequest: LegacyGenerationRequest | null = null;".replace('this.', 'private '));
+    expect(menuSceneSource).toContain('const nextRequest = this.pendingGenerationRequest;');
+    expect(menuSceneSource).toContain('if (nextRequest !== null && shouldConsumeLegacyGenerationRequest(nextRequest, time))');
+    expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-goal-reset', delayMs, { stepSeed: true });");
+    expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });");
+    expect(menuSceneSource).toContain("this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });");
+    expect(menuSceneSource).toContain('pendingRequest: {');
+  });
 });

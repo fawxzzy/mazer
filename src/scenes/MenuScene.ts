@@ -16,8 +16,10 @@ import {
 } from '../legacy-runtime/legacyMaze';
 import { resolveInitialRuntimeMode } from '../legacy-runtime/legacyLaunchMode';
 import {
-  createLegacyRuntimeMazeForMode,
-  stepLegacyGenerationSeed
+  consumeLegacyGenerationRequest,
+  createLegacyGenerationRequest,
+  shouldConsumeLegacyGenerationRequest,
+  type LegacyGenerationRequest,
 } from '../legacy-runtime/legacyGenerationLifecycle';
 import {
   hasPendingLegacyPlayResetReturn,
@@ -110,6 +112,12 @@ interface MenuSceneVisualDiagnostics {
     };
     generation: {
       buildKind: string | null;
+      pendingRequest: {
+        dueAtMs: number | null;
+        mode: RuntimeMode | null;
+        reason: string | null;
+        seed: number | null;
+      };
       processStageIds: number[];
     };
     mode: RuntimeMode;
@@ -212,7 +220,7 @@ export class MenuScene extends Phaser.Scene {
   private mode: RuntimeMode = 'menu';
   private overlay: OverlayKind = 'none';
   private overlayReturn: OverlayKind = 'none';
-  private pendingMazeRebuild = false;
+  private pendingGenerationRequest: LegacyGenerationRequest | null = null;
   private menuDemoEpisode: MazeEpisode | null = null;
   private menuDemoState: DemoWalkerState | null = null;
   private menuDemoConfig!: DemoWalkerConfig;
@@ -277,7 +285,16 @@ export class MenuScene extends Phaser.Scene {
     if (resolveInitialRuntimeMode(typeof window === 'undefined' ? '' : window.location.search) === 'play') {
       this.startPlayMode();
     } else {
-      this.rebuildMaze(this.time.now + INITIAL_MENU_DEMO_HOLD_MS);
+      this.applyGenerationRequest(
+        createLegacyGenerationRequest({
+          currentSeed: this.mazeSeed,
+          dueAtMs: this.time.now,
+          mode: 'menu',
+          reason: 'boot-menu',
+          scale: this.settings.scale
+        }),
+        this.time.now + INITIAL_MENU_DEMO_HOLD_MS
+      );
     }
     this.installInput();
 
@@ -293,7 +310,13 @@ export class MenuScene extends Phaser.Scene {
   public update(time: number, delta: number): void {
     this.updateStars(delta);
 
-    if (this.mode === 'menu' && this.overlay === 'none') {
+    const nextRequest = this.pendingGenerationRequest;
+    if (nextRequest !== null && shouldConsumeLegacyGenerationRequest(nextRequest, time)) {
+      this.pendingGenerationRequest = null;
+      this.applyGenerationRequest(nextRequest, time);
+    }
+
+    if (this.mode === 'menu' && this.overlay === 'none' && this.pendingGenerationRequest === null) {
       this.updateMenuDemo(time);
     }
 
@@ -456,12 +479,10 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
-  private buildMazeForCurrentMode(): LegacyMazeSnapshot {
-    return createLegacyRuntimeMazeForMode(this.mode, this.settings.scale, this.mazeSeed);
-  }
-
-  private rebuildMaze(nextDemoMoveAtMs = 0): void {
-    this.maze = this.buildMazeForCurrentMode();
+  private applyGenerationRequest(request: LegacyGenerationRequest, nextDemoMoveAtMs = 0): void {
+    this.mode = request.mode;
+    this.mazeSeed = request.seed;
+    this.maze = consumeLegacyGenerationRequest(request, this.settings.scale);
     this.menuDemoEpisode = this.mode === 'menu' ? createLegacyDemoWalkerEpisode(this.maze) : null;
     if (this.mode === 'menu') {
       const bootstrap = createLegacyMenuDemoBootstrap(this.maze, this.settings.toggleTrailFade, TRAIL_FADE_TAIL);
@@ -477,7 +498,6 @@ export class MenuScene extends Phaser.Scene {
       this.trail = [copyPoint(this.maze.start)];
     }
     this.nextDemoMoveAtMs = nextDemoMoveAtMs;
-    this.pendingMazeRebuild = false;
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
     this.activeInputField = null;
     this.refreshLayout();
@@ -486,9 +506,40 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
+  private rebuildMaze(nextDemoMoveAtMs = 0): void {
+    this.applyGenerationRequest(
+      createLegacyGenerationRequest({
+        currentSeed: this.mazeSeed,
+        dueAtMs: this.time.now,
+        mode: this.mode,
+        reason: this.mode === 'play' ? 'play-start' : 'boot-menu',
+        scale: this.settings.scale
+      }),
+      nextDemoMoveAtMs
+    );
+  }
+
+  private queueGenerationRequest(
+    reason: LegacyGenerationRequest['reason'],
+    delayMs = 0,
+    options: {
+      mode?: RuntimeMode;
+      stepSeed?: boolean;
+    } = {}
+  ): void {
+    const mode = options.mode ?? this.mode;
+    this.pendingGenerationRequest = createLegacyGenerationRequest({
+      currentSeed: this.mazeSeed,
+      dueAtMs: this.time.now + Math.max(0, delayMs),
+      mode,
+      reason,
+      scale: this.settings.scale,
+      stepSeed: options.stepSeed === true
+    });
+  }
+
   private regenerateMaze(delayMs = 0): void {
-    this.mazeSeed = stepLegacyGenerationSeed(this.mazeSeed);
-    this.rebuildMaze(this.time.now + delayMs);
+    this.queueGenerationRequest('menu-demo-goal-reset', delayMs, { stepSeed: true });
   }
 
   private enterMenuMode(): void {
@@ -498,7 +549,16 @@ export class MenuScene extends Phaser.Scene {
     this.overlayReturn = 'none';
     this.titleText.setVisible(true);
     this.titleShadow.setVisible(true);
-    this.rebuildMaze(this.time.now + INITIAL_MENU_DEMO_HOLD_MS);
+    this.applyGenerationRequest(
+      createLegacyGenerationRequest({
+        currentSeed: this.mazeSeed,
+        dueAtMs: this.time.now,
+        mode: 'menu',
+        reason: 'menu-return',
+        scale: this.settings.scale
+      }),
+      this.time.now + INITIAL_MENU_DEMO_HOLD_MS
+    );
   }
 
   private startPlayMode(): void {
@@ -521,7 +581,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (!this.menuDemoEpisode || !this.menuDemoState) {
-      this.regenerateMaze();
+      this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });
       return;
     }
 
@@ -1157,7 +1217,7 @@ export class MenuScene extends Phaser.Scene {
     this.optionFieldDrafts = result.drafts;
 
     if (result.affectsMaze) {
-      this.pendingMazeRebuild = true;
+      this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });
       this.boardStaticDirty = true;
       this.boardDynamicDirty = true;
     }
@@ -1480,9 +1540,6 @@ export class MenuScene extends Phaser.Scene {
     }
     this.overlay = 'none';
     this.overlayReturn = 'none';
-    if (this.pendingMazeRebuild) {
-      this.regenerateMaze();
-    }
     this.activeInputField = null;
     if (this.mode === 'play') {
       this.clearPlayHudImmediately();
@@ -1549,6 +1606,12 @@ export class MenuScene extends Phaser.Scene {
         mazeSize: this.maze.size,
         generation: {
           buildKind: this.maze.generation?.buildKind ?? null,
+          pendingRequest: {
+            reason: this.pendingGenerationRequest?.reason ?? null,
+            dueAtMs: this.pendingGenerationRequest?.dueAtMs ?? null,
+            seed: this.pendingGenerationRequest?.seed ?? null,
+            mode: this.pendingGenerationRequest?.mode ?? null
+          },
           processStageIds: [...(this.maze.generation?.processStageIds ?? [])]
         },
         player: copyPoint(this.player),
