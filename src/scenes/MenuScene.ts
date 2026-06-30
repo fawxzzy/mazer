@@ -46,11 +46,11 @@ import {
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { resolveLegacyMenuTitlePresentation } from '../legacy-runtime/legacyMenuTitle';
 import {
-  applyLegacyOptionField,
   createLegacyOptionFieldDrafts,
   type LegacyOptionFieldDrafts,
   type LegacyOptionFieldId
 } from '../legacy-runtime/legacyOptionFields';
+import { applyLegacyOverlayFieldCommit } from '../legacy-runtime/legacyOverlayFieldCommit';
 import {
   applyLegacyOverlayToggleField,
   resolveLegacyOverlayToggleStateText,
@@ -1303,15 +1303,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private commitOverlayField(fieldId: LegacyOptionFieldId): void {
-    const result = applyLegacyOptionField(this.settings, this.optionFieldDrafts, fieldId);
+    const result = applyLegacyOverlayFieldCommit(this.settings, this.optionFieldDrafts, fieldId);
 
     this.settings = result.settings;
     this.optionFieldDrafts = result.drafts;
 
-    if (result.affectsMaze) {
+    if (result.triggersReloadOnBack) {
       this.pendingOverlayMazeRebuild = true;
     }
-    if (result.affectsCamera) {
+    if (result.refreshLayout) {
       this.refreshLayout();
     }
 

@@ -275,4 +275,25 @@ describe('legacy reset lane', () => {
     expect(legacyGameModesSource).toContain('SetIntensity(2.f);');
     expect(legacyGameModesSource).toContain('SetIntensity(0.3f);');
   });
+
+  test('routes menu-time overlay field commits through an explicit legacy flag contract', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const overlayFieldCommitSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayFieldCommit.ts'), 'utf8');
+    const legacyPauseMenuSource = readFileSync(
+      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'PauseMenuWidget.cpp'),
+      'utf8'
+    );
+
+    expect(overlayFieldCommitSource).toContain("type LegacyOverlayFieldCommitKind = 'camera-flag' | 'material-change' | 'scale-change';");
+    expect(overlayFieldCommitSource).toContain('applyLegacyOverlayFieldCommit');
+    expect(overlayFieldCommitSource).toContain('triggersReloadOnBack');
+    expect(overlayFieldCommitSource).toContain('triggersCameraFlag');
+    expect(menuSceneSource).toContain("const result = applyLegacyOverlayFieldCommit(this.settings, this.optionFieldDrafts, fieldId);");
+    expect(menuSceneSource).toContain('if (result.triggersReloadOnBack) {');
+    expect(menuSceneSource).toContain('if (result.refreshLayout) {');
+    expect(legacyPauseMenuSource).toContain('ScaleNumChanged = true;');
+    expect(legacyPauseMenuSource).toContain('MazerGameInstance->_PathMaterialChanged = MaterialChanged = true;');
+    expect(legacyPauseMenuSource).toContain('MazerGameInstance->_WallMaterialChanged = MaterialChanged = true;');
+    expect(legacyPauseMenuSource).toContain('MazerGameInstance->_CamScaleFlag = true;');
+  });
 });

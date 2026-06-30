@@ -39,7 +39,7 @@ Use this before large edits so you know the whole app, not just the current scre
 | --- | --- |
 | `src/boot/*` | browser boot, localhost cleanup, Phaser startup, live boot diagnostics |
 | `src/scenes/*` | runtime shell, front door, overlays, play loop, HUD, live presentation |
-| `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, option field parsing, overlay toggle contracts, pause command contracts |
+| `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, option field parsing, overlay field-commit contracts, overlay toggle contracts, pause command contracts |
 | `src/domain/ai/*` | deterministic demo walker stepping and attract behavior |
 | `src/domain/maze/*` | generated maze/runtime domain logic used outside the fixed menu snapshot |
 | `tests/reset/*` | legacy reset-lane contracts and guardrails |
@@ -66,6 +66,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | menu title/board/button layout math | `src/legacy-runtime/legacyMenuLayout.ts` | `tests/reset/legacy-menu-layout.test.ts` |
 | menu demo behavior | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts` | demo-walker tests, live menu preview |
 | options field parsing | `src/legacy-runtime/legacyOptionFields.ts` | `tests/reset/legacy-option-fields.test.ts` |
+| options + pause field commit roles | `src/legacy-runtime/legacyOverlayFieldCommit.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | features + game-modes toggle routing | `src/legacy-runtime/legacyOverlayToggleFields.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | pause command routing | `src/legacy-runtime/legacyPauseLifecycle.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | legacy defaults/colors/button labels | `src/legacy-runtime/legacyDefaults.ts` | `tests/reset/legacy-reset.test.ts` |
@@ -108,7 +109,7 @@ Use this when you need to understand the app as a system instead of a file list.
 6. Overlay mutation:
    `Options`, `Features`, `Game Modes`, `Pause`, and `Message` all route through the single `overlay` state in `MenuScene`.
 7. Field commits:
-   `applyLegacyOptionField()` mutates `LegacySettings`; if a field affects maze/layout, `MenuScene` triggers rebuild or layout refresh.
+   `applyLegacyOptionField()` normalizes draft values, `legacyOverlayFieldCommit.ts` classifies them into deferred reload-on-back vs immediate camera-flag roles, and `MenuScene` applies the resulting rebuild/layout effects.
 8. Active play:
    movement, timer HUD, goal arrow, win/reset return, and pause routing all stay inside `MenuScene`.
 9. Proof readback:
@@ -199,6 +200,11 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - menu demo trail/player projection
   - per-frame demo advance projection
 
+- `src/legacy-runtime/legacyOverlayFieldCommit.ts`
+  - explicit `scale-change` / `material-change` / `camera-flag` commit classes
+  - deferred reload-on-back for scale/material fields
+  - immediate camera-flag semantics for `camScale`
+
 - `src/legacy-runtime/legacyOverlayToggleFields.ts`
   - explicit features and game-modes toggle ownership
   - inverted `On/Off` copy only for legacy features toggles
@@ -213,6 +219,7 @@ Boundary:
 - if the question is "when should play stop accepting input after hitting goal?", start in `src/legacy-runtime/legacyPlayLifecycle.ts`
 - if the question is "what exactly changes after one movement key press?", start in `src/legacy-runtime/legacyPlayStep.ts`
 - if the question is "how does the front-door demo bootstrap or advance?", start in `src/legacy-runtime/legacyMenuDemoLifecycle.ts`
+- if the question is "what exactly should options/pause field commits mean?", start in `src/legacy-runtime/legacyOverlayFieldCommit.ts`
 - if the question is "what exactly should features or game-modes toggles mutate and label?", start in `src/legacy-runtime/legacyOverlayToggleFields.ts`
 - if the question is "what exactly should Back, Reset, or Main Menu do from pause?", start in `src/legacy-runtime/legacyPauseLifecycle.ts`
 - if the question is "what should happen after the reset hold finishes?", start in `src/scenes/MenuScene.ts`
