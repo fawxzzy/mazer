@@ -22,7 +22,7 @@ Restored legacy truth:
 | --- | --- | --- | --- | --- | --- |
 | Maze generation lifecycle | `Source/Mazer/MazerGameModeBase.cpp`, `Source/Mazer/Private/MazerGameState.cpp` | `src/legacy-runtime/legacyGenerationLifecycle.ts`, `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/legacy-runtime/legacyMaze.ts`, `src/scenes/MenuScene.ts` | `aligned` | Current web build path queues named reset/generation requests and carries explicit process-0 delay entry, process-8 reset entry, a real menu-demo process-8-to-process-0 handoff instead of inline regeneration, valid shortcut-disabled stage `4 -> 6` progression, stage-`0/3/4/5/6/7/8` cadence/branch contracts, checkpoint/shortcut budget metadata, stage-cursor diagnostics, and menu stage-6 row-sliced static-board drawing; exact topology internals remain browser-native but the lifecycle carrier is no longer the highest open seam | Keep lifecycle proof green while active play, demo backtracking, and final visual gaps close |
 | Menu demo AI walker | `Source/Mazer/Private/Player/MazerPlayer.cpp` | `src/legacy-runtime/legacyMenuDemoLifecycle.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | `partial` | Demo motion now carries live recovery cues and cue-specific pacing, the fixed front-door snapshot no longer suppresses the legacy mistake/backtrack lane, and the fixed-snapshot bootstrap no longer lands in `goal-hold` or `reset-hold` on first render, but legacy backtracking/reset semantics are still not fully exact | Re-port the remaining legacy demo walker backtrack and reset semantics exactly |
-| Active play movement | `Source/Mazer/Private/Player/MazerPlayer.cpp` | `src/legacy-runtime/legacyPlayStep.ts`, `src/scenes/MenuScene.ts` | `partial` | Web play mode now exists as a first-class legacy-shaped lane, but edge-case movement/collision behavior still needs exact tightening | Tighten movement, collision gating, and play-state transitions against restored legacy behavior |
+| Active play movement | `Source/Mazer/Private/Player/MazerPlayer.cpp` | `src/legacy-runtime/legacyPlayStep.ts`, `src/scenes/MenuScene.ts` | `partial` | Web play mode now carries the restored Unreal simultaneous-key buffer: first movement keydown waits 50ms, held cardinal flags resolve as one vector, opposing axes cancel, repeat movement resolves the held vector, and stale movement clears across pause/menu/reset boundaries; collision edge cases still need exact tightening | Tighten collision gating and remaining play-state transitions against restored legacy behavior |
 | Win/reset loop | `Source/Mazer/MazerGameModeBase.cpp`, `Source/Mazer/Private/MazerGameState.cpp` | `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | `partial` | Reset timing and return flow are now explicit request branches for play vs menu demo, but the remaining staged behavior split is still not fully ported | Restore the remaining exact legacy reset semantics around the staged generator |
 | Main menu front door | `Source/Mazer/Private/UI/MainMenuWidget.cpp` | `src/legacy-runtime/legacyDefaults.ts`, `src/legacy-runtime/legacyExit.ts`, `src/legacy-runtime/legacyMenuLayout.ts`, `src/scenes/MenuScene.ts` | `aligned` | `Start`, `Options`, and `Exit` are restored as first-class controls, and `Exit` now uses an explicit browser-safe quit equivalence instead of a message detour | Preserve the front-door contract while larger runtime and visual gaps close elsewhere |
 | Options overlay | `Source/Mazer/Private/UI/PauseMenuWidget.cpp` | `src/legacy-runtime/legacyOptionFields.ts`, `src/legacy-runtime/legacyOverlayFieldCommit.ts`, `src/legacy-runtime/legacyOverlayRouting.ts`, `src/scenes/MenuScene.ts` | `aligned` | The options surface now carries explicit field-commit classes and nested-overlay return routing | Preserve the current contract while larger runtime gaps close elsewhere |
@@ -60,11 +60,11 @@ But the public shell, overlay model, HUD, and visual composition still differ ma
 
 ## Immediate next slice
 
-`legacy active-play reset and movement edge-case packet`
+`legacy active-play collision and reset-return edge-case packet`
 
 Target:
 
-- tighten one exact active-play movement or reset edge case against restored legacy behavior
+- tighten one exact active-play collision or reset-return edge case against restored legacy behavior
 - preserve the now-aligned generation lifecycle proof while changing only the active-play owner chain
 - keep the current web app as canonical
 - use `docs/legacy/gameplay-spec.md` and restored Unreal source as truth while tightening play-state runtime behavior
