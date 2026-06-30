@@ -273,17 +273,17 @@ const MENU_BUTTON_STROKE_ALPHA = 0.24;
 const MENU_TEXT_COLOR = '#0b841d';
 const TITLE_FILL_COLOR = '#1d8726';
 const TITLE_SHADOW_COLOR = '#103516';
-const LEGACY_BOARD_GRID_ALPHA = 0.008;
+const LEGACY_BOARD_GRID_ALPHA = 0.005;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
 const LEGACY_MENU_SLAB_FILL = 0x5a5464;
 const LEGACY_MENU_SLAB_EDGE = 0x14101a;
 const LEGACY_MENU_SLAB_HIGHLIGHT = 0xbcb5c7;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0.38;
-const LEGACY_MENU_PATH_CORE = 0x8c8793;
-const LEGACY_MENU_PATH_EDGE = 0x433d48;
-const LEGACY_MENU_WALL_FILL = 0x1a1520;
-const LEGACY_MENU_WALL_GRID = 0x110d15;
+const LEGACY_MENU_PATH_CORE = 0x85808d;
+const LEGACY_MENU_PATH_EDGE = 0x38323c;
+const LEGACY_MENU_WALL_FILL = 0x18131d;
+const LEGACY_MENU_WALL_GRID = 0x0f0b12;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
@@ -1088,7 +1088,7 @@ export class MenuScene extends Phaser.Scene {
       ? LEGACY_MENU_WALL_FILL
       : linearColorToNumber(this.settings.wallColor);
     const boardFill = isMenuMode
-      ? 0x221d29
+      ? 0x1f1a24
       : (this.settings.darkMode ? 0x16121a : 0x4a454f);
     const boardEdge = isMenuMode ? 0x0f0b13 : (this.settings.darkMode ? 0x030205 : 0x322c35);
     const pathGlow = isMenuMode
@@ -1120,7 +1120,7 @@ export class MenuScene extends Phaser.Scene {
     this.boardStaticGraphics.fillStyle(boardFill, isMenuMode ? 0.98 : 0.96);
     this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
     if (isMenuMode) {
-      this.boardStaticGraphics.fillStyle(0xffffff, 0.035);
+      this.boardStaticGraphics.fillStyle(0xffffff, 0.026);
       this.boardStaticGraphics.fillRect(boardLeft + 1, boardTop + 1, boardSize - 2, 2);
       this.boardStaticGraphics.fillRect(boardLeft + 1, boardTop + 1, 2, boardSize - 2);
     }
@@ -1129,7 +1129,7 @@ export class MenuScene extends Phaser.Scene {
       this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
     }
     if (isMenuMode) {
-      this.boardStaticGraphics.lineStyle(1, 0x7c7585, LEGACY_BOARD_GRID_ALPHA);
+      this.boardStaticGraphics.lineStyle(1, 0x6c6673, LEGACY_BOARD_GRID_ALPHA);
       for (let step = 0; step <= this.maze.size; step += 1) {
         const offset = step * tileSize;
         this.boardStaticGraphics.beginPath();
@@ -1149,16 +1149,16 @@ export class MenuScene extends Phaser.Scene {
 
         if (walkable && isMenuMode) {
           const frame = resolveLegacyMenuPathRenderFrame(this.maze, { x, y }, tileSize);
-          const innerInset = Math.max(1, Math.floor(tileSize * 0.2));
+          const innerInset = Math.max(1, Math.floor(tileSize * 0.22));
 
-          this.boardStaticGraphics.fillStyle(pathGlow, 0.94);
+          this.boardStaticGraphics.fillStyle(pathGlow, 0.9);
           this.boardStaticGraphics.fillRect(
             tileX + frame.leftInset,
             tileY + frame.topInset,
             frame.width,
             frame.height
           );
-          this.boardStaticGraphics.fillStyle(pathColor, 0.98);
+          this.boardStaticGraphics.fillStyle(pathColor, 0.92);
           this.boardStaticGraphics.fillRect(
             tileX + frame.leftInset + innerInset,
             tileY + frame.topInset + innerInset,
@@ -1178,7 +1178,7 @@ export class MenuScene extends Phaser.Scene {
               Math.max(1, tileSize - 2)
             );
           } else if (isMenuMode && tileSize > 6) {
-            this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.018);
+            this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.012);
             this.boardStaticGraphics.fillRect(
               tileX + 1,
               tileY + 1,

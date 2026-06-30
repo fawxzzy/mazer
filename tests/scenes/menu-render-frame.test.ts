@@ -43,13 +43,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps the menu board in the heavier legacy trench-material lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0.008;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0x8c8793;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x433d48;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x1a1520;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GRID = 0x110d15;');
-    expect(menuSceneSource).toContain('? 0x221d29');
-    expect(menuSceneSource).toContain('const innerInset = Math.max(1, Math.floor(tileSize * 0.2));');
-    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.018);');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0.005;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0x85808d;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x38323c;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x18131d;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GRID = 0x0f0b12;');
+    expect(menuSceneSource).toContain('? 0x1f1a24');
+    expect(menuSceneSource).toContain('const innerInset = Math.max(1, Math.floor(tileSize * 0.22));');
+    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.012);');
   });
 });
