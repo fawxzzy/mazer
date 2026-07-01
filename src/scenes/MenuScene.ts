@@ -643,6 +643,9 @@ export class MenuScene extends Phaser.Scene {
       backtrackCount: 0,
       recoveryCount: 0
     };
+    const trailSegmentCap = this.settings.toggleTrailFade
+      ? TRAIL_FADE_TAIL
+      : Math.max(this.trail.length, this.menuDemoConfig?.behavior.trailMaxLength ?? this.trail.length);
 
     publishMenuSceneRuntimeDiagnostics({
       revision: this.runtimeDiagnosticsRevision,
@@ -738,7 +741,7 @@ export class MenuScene extends Phaser.Scene {
           installSurfaceAttached: this.runtimeInstallSurfaceAttached
         },
         trailSegmentCount: this.trail.length,
-        trailSegmentCap: TRAIL_FADE_TAIL,
+        trailSegmentCap,
         runnerPolicy: {
           wrongBranchCount: runnerTelemetry.wrongBranchCount,
           backtrackCount: runnerTelemetry.backtrackCount,

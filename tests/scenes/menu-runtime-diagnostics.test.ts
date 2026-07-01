@@ -408,8 +408,8 @@ describe('menu runtime diagnostics', () => {
           visibilityAttached: false,
           installSurfaceAttached: false
         },
-        trailSegmentCount: 0,
-        trailSegmentCap: 16,
+        trailSegmentCount: 46,
+        trailSegmentCap: 46,
         runnerPolicy: {
           wrongBranchCount: 2,
           backtrackCount: 5,
@@ -446,6 +446,9 @@ describe('menu runtime diagnostics', () => {
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.style.cssText).toContain('bottom:auto');
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
         'demo explore cue backtrack mistakes on cursor 12'
+      );
+      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
+        'trail 46/46'
       );
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
         'ai wrong 2 back 5 recover 2'
