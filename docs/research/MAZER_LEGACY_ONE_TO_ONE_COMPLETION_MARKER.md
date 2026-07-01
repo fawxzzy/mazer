@@ -2,7 +2,7 @@
 
 Date: 2026-07-01
 Status: active
-Current marker: `83%`
+Current marker: `84%`
 
 ## Intent
 
@@ -66,13 +66,13 @@ The current marker is the sum of the awarded points below.
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | simultaneous-key movement buffering, axis-gated collision, and single-request active-play reset return are ported, but full active-play feel, HUD integration, and edge-case equivalence are not yet complete |
 | Generation lifecycle exactness | `16` | `14` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/domain/maze/core.ts` -> `src/domain/maze/generator.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/maze/maze-domain.test.ts`, localhost runtime diagnostics | process/stage ownership is mapped, diagnostics show stage-6 row reveal, browser shortcut topology creates family-aware route-affecting bypasses with separated canonical-route reconnection proof, rasterized domain play mazes apply the restored legacy `CreateShortCuts` opposite-corridor wall-bridge rule, and active reset-lane generated play mazes now use a source-shaped checkpoint path-builder in `createLegacyMaze()` instead of the earlier DFS perfect-maze owner; that active builder mirrors the `CreateGrid` / `MapPath` / `CreatePath` / `CreateShortCuts` responsibility split, feeds a duplicate-preserving `_WallArray` into shortcut creation, and reports checkpoint/path/wall-array stats; exact Unreal RNG, process-yield timing, and byte-for-byte `MapPath`/`Backtrack` selection remain open |
 | Demo route, backtracking, and pacing | `12` | `8` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, localhost | recovery cues, AI-only reset replay, goal-reset timing, and `AiTilePathCheck` admission are covered, but the live walker is still not a line-for-line Unreal path-stack/backtracking port |
-| In-game HUD and goal-arrow parity | `8` | `5` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot | the timer/arrow overlay is tighter and bounded, but final legacy HUD timer/goal-arrow semantics and visual exactness are still open |
+| In-game HUD and goal-arrow parity | `8` | `6` | partial | `src/legacy-runtime/legacyPlayHud.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-hud.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot, `window.__MAZER_VISUAL_DIAGNOSTICS__` | the timer/arrow overlay now has repo-owned timer formatting, arrow-angle geometry, bounds, scene wiring, and desktop/mobile diagnostics proof, but final legacy HUD material/placement exactness and exact old widget styling are still open |
 
 Current total:
 
-- `83 / 100`
+- `84 / 100`
 
-## Why the marker was corrected from 97% to 70%, then ratcheted to 83%
+## Why the marker was corrected from 97% to 70%, then ratcheted to 84%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -107,7 +107,7 @@ The biggest remaining gaps are not cosmetic:
 - active-play collision now carries the restored Unreal axis-gated movement shape: horizontal and vertical side gates resolve independently, blocked simultaneous axes can slide along an open axis, and true diagonal corner collisions block instead of cutting through walls
 - active-play goal reset now carries one process-8 reset request as the sole return-to-menu authority, which removes the duplicate scene-local reset-return timer and better matches the restored Unreal `_ResetGame` consumption branch
 - demo reset and route semantics are closer now that the fixed front-door snapshot also uses the legacy mistake/backtrack lane, no longer boots into a weak `reset-hold` / `goal-hold` first impression, replays AI-only reset without regeneration, queues the menu goal-reset process-8 request immediately after reset-hold, and rejects one-tile spur wrong-turn candidates through the restored `AiTilePathCheck` gate
-- HUD parity is closer, but not final
+- HUD parity is closer because timer formatting, goal-arrow angle, and proof bounds now live in `src/legacy-runtime/legacyPlayHud.ts` and publish through visual diagnostics, but final old-widget styling and exact placement are not complete
 - screenshot-grade menu material/composition is not fully closed
 
 Do not reuse `97%` for the literal 1:1 clone marker unless the remaining screenshot, HUD, topology, and demo-stack gaps have been closed with proof.
@@ -188,13 +188,14 @@ Current note:
 - the menu material contrast packet earns one point because it changes visible board-material rendering toward the restored screenshot's harder charcoal/light-gray maze read: wall/slab mass is darker, path cores are slightly less washed out, and path edges carry stronger dark contrast. Completed desktop and mobile browser captures prove the material change after the staged row reveal has finished. It does not earn more because exact maze silhouette, title overlap, button placement, and legacy trail/sprite treatment remain open
 - the menu dynamic trail weight packet earns one point because it changes visible menu-demo route rendering toward the restored screenshot's heavier cyan traversal path while preserving a corridor-style inset instead of returning to full-square cells. Completed desktop and mobile browser captures prove the route/marker footprint change. It does not earn more because exact player sprite treatment, final maze silhouette, title overlap, and button placement remain open
 - the menu button plate proportion packet earns one point because it changes the desktop front-door button layout math toward the restored screenshot's larger support-plate proportions while leaving portrait sizing bounded. Desktop and mobile browser captures prove the Start/Exit/Options fit after the change. It does not earn more because exact final button placement, title overlap, and whole-menu screenshot composition remain open
+- the legacy play HUD contract packet earns one point because active-play timer formatting, goal-arrow angle math, timer/arrow bounds, and diagnostics now live in a repo-owned helper and are wired through `MenuScene.drawHud()`. Focused tests plus desktop/mobile play-route browser captures prove `timerText` and `arrowAngleRadians` are available on `window.__MAZER_VISUAL_DIAGNOSTICS__`. It does not earn more because final legacy HUD material, exact old-widget placement, diagnostics-free visual styling, and end-to-end play-feel exactness remain open
 
 ## Preferred modular lock order from here
 
 Keep the remaining work bounded in this order unless proof shows a different blocker:
 
 1. final screenshot-grade board/material review
-2. final screenshot-grade play HUD polish
+2. final screenshot-grade play HUD visual polish
 3. active-play/HUD edge-case exactness review
 
 Each future packet should name:

@@ -47,6 +47,10 @@ import {
   type LegacyPlayMoveFlags
 } from '../legacy-runtime/legacyPlayStep';
 import {
+  resolveLegacyPlayHudFrame,
+  type LegacyPlayHudFrame
+} from '../legacy-runtime/legacyPlayHud';
+import {
   advanceLegacyMenuDemoFrame,
   createLegacyMenuDemoGoalResetRequest,
   createLegacyMenuDemoBootstrap
@@ -144,6 +148,8 @@ interface MenuSceneVisualDiagnostics {
     bounds: VisualRect | null;
     timerBounds: VisualRect | null;
     arrowBounds: VisualRect | null;
+    timerText: string | null;
+    arrowAngleRadians: number | null;
   };
   runtime: {
     goal: LegacyPoint;
@@ -364,13 +370,6 @@ const mergeVisualRects = (...rects: Array<VisualRect | null>): VisualRect | null
 
 const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
 
-const formatClock = (elapsedMs: number): string => {
-  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-};
-
 const buildPathTrail = (
   points: readonly LegacyPoint[],
   limit: number | null
@@ -418,6 +417,7 @@ export class MenuScene extends Phaser.Scene {
   private hudBounds: VisualRect | null = null;
   private hudTimerBounds: VisualRect | null = null;
   private hudArrowBounds: VisualRect | null = null;
+  private hudFrame: LegacyPlayHudFrame | null = null;
   private boardStaticDirty = true;
   private boardDynamicDirty = true;
   private backdropDirty = true;
@@ -1558,40 +1558,41 @@ export class MenuScene extends Phaser.Scene {
     this.hudBounds = null;
     this.hudTimerBounds = null;
     this.hudArrowBounds = null;
+    this.hudFrame = null;
     if (this.mode !== 'play' || this.overlay !== 'none') {
       this.footerText.setText('');
       return;
     }
     this.footerText.setText('');
 
-    const elapsed = formatClock(time - this.playStartedAtMs);
-    const timerText = `Time ${elapsed}`;
-    const arrowOriginX = this.layout.width - 30;
-    const arrowOriginY = 22;
     const boardOffset = this.resolveBoardOffset();
     const goalScreenX = this.layout.boardLeft + boardOffset.x + (this.maze.goal.x * this.layout.tileSize);
     const goalScreenY = this.layout.boardTop + boardOffset.y + (this.maze.goal.y * this.layout.tileSize);
     const playerScreenX = this.layout.boardLeft + boardOffset.x + (this.player.x * this.layout.tileSize);
     const playerScreenY = this.layout.boardTop + boardOffset.y + (this.player.y * this.layout.tileSize);
-    const angle = Phaser.Math.Angle.Between(playerScreenX, playerScreenY, goalScreenX, goalScreenY);
-    const length = 18;
-    const timerLeft = 14;
-    const timerTop = 14;
-    const timerWidth = 118;
-    const timerHeight = 22;
-    const arrowTipX = arrowOriginX + (Math.cos(angle) * length);
-    const arrowTipY = arrowOriginY + (Math.sin(angle) * length);
-    const arrowLeftX = arrowOriginX + (Math.cos(angle + 2.42) * 6);
-    const arrowLeftY = arrowOriginY + (Math.sin(angle + 2.42) * 6);
-    const arrowRightX = arrowOriginX + (Math.cos(angle - 2.42) * 6);
-    const arrowRightY = arrowOriginY + (Math.sin(angle - 2.42) * 6);
+    const hudFrame = resolveLegacyPlayHudFrame({
+      elapsedMs: time - this.playStartedAtMs,
+      goalScreen: { x: goalScreenX, y: goalScreenY },
+      layoutWidth: this.layout.width,
+      playerScreen: { x: playerScreenX, y: playerScreenY }
+    });
 
     this.hudGraphics.fillStyle(0x05050a, 0.34);
-    this.hudGraphics.fillRect(timerLeft, timerTop, timerWidth, timerHeight);
+    this.hudGraphics.fillRect(
+      hudFrame.timerBounds.left,
+      hudFrame.timerBounds.top,
+      hudFrame.timerBounds.width,
+      hudFrame.timerBounds.height
+    );
     this.hudGraphics.lineStyle(1, 0xdedbe6, 0.22);
-    this.hudGraphics.strokeRect(timerLeft, timerTop, timerWidth, timerHeight);
+    this.hudGraphics.strokeRect(
+      hudFrame.timerBounds.left,
+      hudFrame.timerBounds.top,
+      hudFrame.timerBounds.width,
+      hudFrame.timerBounds.height
+    );
 
-    const timer = this.add.text(22, 16, timerText, {
+    const timer = this.add.text(22, 16, hudFrame.timerText, {
       fontFamily: '"Courier New", monospace',
       fontSize: '14px',
       color: '#d7f0d6'
@@ -1601,30 +1602,36 @@ export class MenuScene extends Phaser.Scene {
 
     this.hudGraphics.lineStyle(2, 0xe4efe6, 0.92);
     this.hudGraphics.beginPath();
-    this.hudGraphics.moveTo(arrowOriginX, arrowOriginY);
+    this.hudGraphics.moveTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y);
     this.hudGraphics.lineTo(
-      arrowTipX,
-      arrowTipY
+      hudFrame.arrowTip.x,
+      hudFrame.arrowTip.y
     );
     this.hudGraphics.strokePath();
     this.hudGraphics.fillStyle(0xe4efe6, 0.92);
     this.hudGraphics.fillTriangle(
-      arrowTipX,
-      arrowTipY,
-      arrowLeftX,
-      arrowLeftY,
-      arrowRightX,
-      arrowRightY
+      hudFrame.arrowTip.x,
+      hudFrame.arrowTip.y,
+      hudFrame.arrowLeft.x,
+      hudFrame.arrowLeft.y,
+      hudFrame.arrowRight.x,
+      hudFrame.arrowRight.y
     );
 
-    this.hudTimerBounds = createVisualRect(timerLeft, timerTop, timerWidth, timerHeight);
+    this.hudTimerBounds = createVisualRect(
+      hudFrame.timerBounds.left,
+      hudFrame.timerBounds.top,
+      hudFrame.timerBounds.width,
+      hudFrame.timerBounds.height
+    );
     this.hudArrowBounds = createVisualRect(
-      Math.floor(Math.min(arrowOriginX, arrowTipX, arrowLeftX, arrowRightX)) - 2,
-      Math.floor(Math.min(arrowOriginY, arrowTipY, arrowLeftY, arrowRightY)) - 2,
-      Math.ceil(Math.max(arrowOriginX, arrowTipX, arrowLeftX, arrowRightX) - Math.min(arrowOriginX, arrowTipX, arrowLeftX, arrowRightX)) + 4,
-      Math.ceil(Math.max(arrowOriginY, arrowTipY, arrowLeftY, arrowRightY) - Math.min(arrowOriginY, arrowTipY, arrowLeftY, arrowRightY)) + 4
+      hudFrame.arrowBounds.left,
+      hudFrame.arrowBounds.top,
+      hudFrame.arrowBounds.width,
+      hudFrame.arrowBounds.height
     );
     this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);
+    this.hudFrame = hudFrame;
   }
 
   private clearHudTexts(): void {
@@ -1641,6 +1648,7 @@ export class MenuScene extends Phaser.Scene {
     this.hudBounds = null;
     this.hudTimerBounds = null;
     this.hudArrowBounds = null;
+    this.hudFrame = null;
     this.clearHudTexts();
     this.footerText.setText('');
   }
@@ -2444,7 +2452,9 @@ export class MenuScene extends Phaser.Scene {
         visible: this.mode === 'play' && this.overlay === 'none',
         bounds: cloneVisualRect(this.hudBounds),
         timerBounds: cloneVisualRect(this.hudTimerBounds),
-        arrowBounds: cloneVisualRect(this.hudArrowBounds)
+        arrowBounds: cloneVisualRect(this.hudArrowBounds),
+        timerText: this.hudFrame?.timerText ?? null,
+        arrowAngleRadians: this.hudFrame?.arrowAngleRadians ?? null
       }
     };
   }

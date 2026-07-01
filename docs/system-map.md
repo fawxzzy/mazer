@@ -39,7 +39,7 @@ Use this before large edits so you know the whole app, not just the current scre
 | --- | --- |
 | `src/boot/*` | browser boot, localhost cleanup, Phaser startup, live boot diagnostics |
 | `src/scenes/*` | runtime shell, front door, overlays, play loop, HUD, live presentation |
-| `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, option field parsing, overlay field-commit contracts, overlay toggle contracts, overlay routing contracts, pause command contracts |
+| `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, play HUD geometry, option field parsing, overlay field-commit contracts, overlay toggle contracts, overlay routing contracts, pause command contracts |
 | `src/domain/ai/*` | deterministic demo walker stepping and attract behavior |
 | `src/domain/maze/*` | generated maze/runtime domain logic used outside the fixed menu snapshot |
 | `tests/reset/*` | legacy reset-lane contracts and guardrails |
@@ -62,6 +62,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | Phaser scene wiring | `src/boot/phaserConfig.ts` | `npm run build` |
 | active front door and play shell | `src/scenes/MenuScene.ts` | in-app browser, `npm run verify` |
 | live runtime diagnostics bridge | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, localhost |
+| active-play HUD timer and goal arrow | `src/legacy-runtime/legacyPlayHud.ts`, `src/scenes/MenuScene.ts#drawHud()` | `tests/reset/legacy-play-hud.test.ts`, `tests/reset/legacy-reset.test.ts`, desktop/mobile play-route screenshots, `window.__MAZER_VISUAL_DIAGNOSTICS__` |
 | fixed menu maze shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `tests/reset/legacy-reset.test.ts`, screenshots |
 | generated play maze | `src/legacy-runtime/legacyMaze.ts` | `tests/reset/legacy-reset.test.ts` |
 | menu title/board/button layout math | `src/legacy-runtime/legacyMenuLayout.ts` | `tests/reset/legacy-menu-layout.test.ts` |
@@ -114,7 +115,7 @@ Use this when you need to understand the app as a system instead of a file list.
 7. Field commits:
    `applyLegacyOptionField()` normalizes draft values, `legacyOverlayFieldCommit.ts` classifies them into deferred reload-on-back vs immediate camera-flag roles, and `MenuScene` applies the resulting rebuild/layout effects.
 8. Active play:
-   movement, timer HUD, goal arrow, win/reset return, and pause routing all stay inside `MenuScene`.
+   movement, win/reset return, and pause routing stay inside `MenuScene`; timer HUD formatting and goal-arrow geometry route through `legacyPlayHud.ts` before `MenuScene.drawHud()` renders them.
 9. Proof readback:
    visual scripts and live checks read `window.__MAZER_VISUAL_DIAGNOSTICS__`; reset-lane tests assert the stable contracts under `tests/reset/*`.
 
@@ -174,7 +175,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - runtime diagnostics now publish generation budget metadata, process-entry gates, queue arm time, and full pending request contract state
   - `startPlayMode()` swaps from menu shell into active-play generation
   - `enterMenuMode()` returns active play back into menu flow after reset
-  - `drawHud()` owns the compact timer chip, goal arrow, and published HUD proof bounds
+  - `drawHud()` renders the compact timer chip and goal arrow from `resolveLegacyPlayHudFrame()` and publishes HUD proof bounds
 
 Boundary:
 
@@ -189,6 +190,7 @@ Boundary:
 - if the change is "why does the menu board reveal by rows after generation?", start in `MenuScene.armLegacyMenuStaticDrawStage()`, `MenuScene.advanceLegacyMenuStaticDrawStage(time)`, `resolveMenuSceneGenerationDrawStageProgress()`, and the stage-6 execution plan
 - if the change is "what is the menu AI currently doing?", start in `src/domain/ai/demoWalker.ts`, then check `menuDemoState.telemetry` in `MenuScene.publishRuntimeDiagnostics()`
 - if the change is "when does the runtime rebuild or return to menu?", start in `src/scenes/MenuScene.ts`
+- if the change is "what should the active-play timer text, goal-arrow angle, or HUD proof bounds be?", start in `src/legacy-runtime/legacyPlayHud.ts`, then inspect `MenuScene.drawHud()`
 - if the change is "how do we port the old staged process `0/3/4/5/6/7/8` lifecycle exactly?", start from `docs/legacy/gameplay-spec.md` and open a dedicated port packet before rewriting runtime code
 
 ## Input-to-owner routing
@@ -217,7 +219,7 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - title lockup opacity, scale, and vertical placement
   - board slab/frame presentation and menu-only chrome
   - active-play movement
-  - HUD timer and goal arrow
+  - HUD timer and goal arrow rendering from `src/legacy-runtime/legacyPlayHud.ts`
   - menu demo stepping
   - reset return path
   - visual diagnostics published for visual proof
@@ -300,7 +302,7 @@ Use this before touching presentation code inside `MenuScene.ts` so you know whe
 4. live motion owners
    - `updateMenuDemo()` -> attract stepping cadence
    - `drawDynamicBoard()` -> trail, player, goal, camera-follow offset
-   - `drawHud()` -> active-play timer + goal arrow only
+   - `drawHud()` -> active-play timer + goal arrow only, using `legacyPlayHud.ts` for timer/arrow geometry
 
 Boundary:
 
@@ -487,6 +489,7 @@ What `verify` currently means:
   - board bounds plus live reset-lane runtime pointers:
   - mode / overlay
   - maze size, player, goal
+  - HUD timer text, arrow angle, and timer/arrow/bounds rectangles
   - trail tail
   - menu-demo phase / cue / path cursor / preroll / wrong-turn policy
 - `window.__MAZER_RUNTIME_DIAGNOSTICS__`
@@ -503,6 +506,8 @@ What `verify` currently means:
 
 - `tests/reset/legacy-reset.test.ts`
   - front door, menu snapshot, HUD/minimal play shell, localhost boot cleanup
+- `tests/reset/legacy-play-hud.test.ts`
+  - active-play timer formatting, goal-arrow angle math, and HUD bounds proof
 - `tests/reset/legacy-menu-layout.test.ts`
   - board/button/title layout contract
 - `tests/reset/legacy-option-fields.test.ts`
@@ -572,7 +577,9 @@ If you want to change one thing, start here:
   - `src/legacy-runtime/legacyOptionFields.ts`
   - `src/scenes/MenuScene.ts`
 - HUD timer / goal arrow:
+  - `src/legacy-runtime/legacyPlayHud.ts`
   - `src/scenes/MenuScene.ts`
+  - `tests/reset/legacy-play-hud.test.ts`
 - localhost boot weirdness:
   - `src/boot/main.ts`
 - live boot diagnostics:

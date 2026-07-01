@@ -222,19 +222,21 @@ describe('legacy reset lane', () => {
 
   test('keeps the active-play HUD minimal and legacy-shaped', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const legacyPlayHudSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayHud.ts'), 'utf8');
     const demoLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuDemoLifecycle.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const timerText = `Time ${elapsed}`;');
-    expect(menuSceneSource).toContain('Phaser.Math.Angle.Between');
+    expect(menuSceneSource).toContain('resolveLegacyPlayHudFrame({');
+    expect(menuSceneSource).toContain('hudFrame.timerText');
+    expect(menuSceneSource).toContain('timerText: this.hudFrame?.timerText ?? null');
+    expect(menuSceneSource).toContain('arrowAngleRadians: this.hudFrame?.arrowAngleRadians ?? null');
+    expect(legacyPlayHudSource).toContain('const timerText = `Time ${formatLegacyHudClock(input.elapsedMs)}`;');
+    expect(legacyPlayHudSource).toContain('Math.atan2(goalScreen.y - playerScreen.y, goalScreen.x - playerScreen.x)');
     expect(menuSceneSource).not.toContain('WASD or arrows to move   P to pause');
-    expect(menuSceneSource).toContain('const arrowOriginX = this.layout.width - 30;');
-    expect(menuSceneSource).toContain('const arrowOriginY = 22;');
-    expect(menuSceneSource).toContain('const length = 18;');
-    expect(menuSceneSource).toContain('const timerLeft = 14;');
-    expect(menuSceneSource).toContain('const timerTop = 14;');
-    expect(menuSceneSource).toContain('const timerWidth = 118;');
-    expect(menuSceneSource).toContain('const timerHeight = 22;');
-    expect(menuSceneSource).toContain('this.hudGraphics.fillRect(timerLeft, timerTop, timerWidth, timerHeight);');
+    expect(legacyPlayHudSource).toContain('x: input.layoutWidth - 30');
+    expect(legacyPlayHudSource).toContain('y: 22');
+    expect(legacyPlayHudSource).toContain('const length = 18;');
+    expect(legacyPlayHudSource).toContain('const timerBounds = createLegacyHudRect(14, 14, 118, 22);');
+    expect(menuSceneSource).toContain('this.hudGraphics.fillRect(');
     expect(menuSceneSource).toContain("fontSize: '14px',");
     expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
