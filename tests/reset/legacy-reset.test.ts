@@ -264,9 +264,13 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const generationState = consumeLegacyGenerationRequestState(request, this.settings.scale);');
     expect(menuSceneSource).toContain('if (generationState.startsPlayTimer) {');
     expect(menuSceneSource).toContain('private menuStaticDrawRowsVisible: number | null = null;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 42;');
+    expect(menuSceneSource).toContain('private menuStaticDrawNextRowAtMs = 0;');
     expect(menuSceneSource).toContain('this.armLegacyMenuStaticDrawStage();');
-    expect(menuSceneSource).toContain('private advanceLegacyMenuStaticDrawStage(): void {');
+    expect(menuSceneSource).toContain('private advanceLegacyMenuStaticDrawStage(time: number): void {');
+    expect(menuSceneSource).toContain('if (time < this.menuStaticDrawNextRowAtMs)');
     expect(menuSceneSource).toContain('this.menuStaticDrawRowsVisible = Math.min(this.maze.size, this.menuStaticDrawRowsVisible + batchSize);');
+    expect(menuSceneSource).toContain('this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;');
     expect(menuSceneSource).toContain('const staticDrawRowLimit = isMenuMode && this.menuStaticDrawRowsVisible !== null');
     expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });");
     expect(menuSceneSource).toContain("this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });");

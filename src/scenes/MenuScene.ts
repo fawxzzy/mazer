@@ -323,6 +323,7 @@ const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
 const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.24;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.34;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.52;
+const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 42;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
@@ -416,6 +417,7 @@ export class MenuScene extends Phaser.Scene {
   private backdropDirty = true;
   private uiDirty = true;
   private menuStaticDrawRowsVisible: number | null = null;
+  private menuStaticDrawNextRowAtMs = 0;
   private visualDiagnosticsRevision = 0;
   private runtimeDiagnosticsConfig: MenuSceneRuntimeConfig = {
     enabled: false,
@@ -528,7 +530,7 @@ export class MenuScene extends Phaser.Scene {
       this.updateMenuDemo(time);
     }
 
-    this.advanceLegacyMenuStaticDrawStage();
+    this.advanceLegacyMenuStaticDrawStage(time);
 
     if (this.backdropDirty) {
       this.drawBackdrop();
@@ -1063,23 +1065,33 @@ export class MenuScene extends Phaser.Scene {
 
   private armLegacyMenuStaticDrawStage(): void {
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
-    this.menuStaticDrawRowsVisible = this.mode === 'menu' && drawStage?.executionKind === 'row-slice'
-      ? 0
-      : null;
+    if (this.mode === 'menu' && drawStage?.executionKind === 'row-slice') {
+      this.menuStaticDrawRowsVisible = 0;
+      this.menuStaticDrawNextRowAtMs = this.time.now;
+      return;
+    }
+
+    this.menuStaticDrawRowsVisible = null;
+    this.menuStaticDrawNextRowAtMs = 0;
   }
 
-  private advanceLegacyMenuStaticDrawStage(): void {
+  private advanceLegacyMenuStaticDrawStage(time: number): void {
     if (this.menuStaticDrawRowsVisible === null) {
+      return;
+    }
+    if (time < this.menuStaticDrawNextRowAtMs) {
       return;
     }
 
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     const batchSize = Math.max(1, drawStage?.batchSize ?? 1);
     this.menuStaticDrawRowsVisible = Math.min(this.maze.size, this.menuStaticDrawRowsVisible + batchSize);
+    this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;
     this.boardStaticDirty = true;
     this.boardDynamicDirty = true;
     if (this.menuStaticDrawRowsVisible >= this.maze.size) {
       this.menuStaticDrawRowsVisible = null;
+      this.menuStaticDrawNextRowAtMs = 0;
     }
   }
 
