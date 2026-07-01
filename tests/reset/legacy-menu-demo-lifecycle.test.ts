@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { createLegacyMenuMaze, createLegacyMaze } from '../../src/legacy-runtime/legacyMaze';
 import {
   advanceLegacyMenuDemoFrame,
+  createLegacyMenuDemoGoalResetRequest,
   createLegacyMenuDemoBootstrap,
   isFixedLegacyMenuSnapshot
 } from '../../src/legacy-runtime/legacyMenuDemoLifecycle';
@@ -74,5 +75,55 @@ describe('legacy menu demo lifecycle', () => {
     expect(seenCues.has('dead-end')).toBe(true);
     expect(seenCues.has('backtrack')).toBe(true);
     expect(seenCues.has('reacquire')).toBe(true);
+  });
+
+  test('replays the same menu maze after an AI-only reset without requesting regeneration', () => {
+    const menuMaze = createLegacyMenuMaze(3749);
+    const bootstrap = createLegacyMenuDemoBootstrap(menuMaze, false, 16);
+    let state = bootstrap.state;
+    let aiResetFrame: ReturnType<typeof advanceLegacyMenuDemoFrame> | null = null;
+
+    for (let step = 0; step < 512; step += 1) {
+      const nextFrame = advanceLegacyMenuDemoFrame(
+        bootstrap.episode,
+        state,
+        bootstrap.config,
+        false,
+        16
+      );
+      state = nextFrame.state;
+      if (state.resetReason === 'ai-path-exhausted') {
+        aiResetFrame = nextFrame;
+        break;
+      }
+    }
+
+    expect(aiResetFrame).not.toBeNull();
+    expect(aiResetFrame?.shouldRegenerateMaze).toBe(false);
+
+    const replayFrame = advanceLegacyMenuDemoFrame(
+      bootstrap.episode,
+      aiResetFrame!.state,
+      bootstrap.config,
+      false,
+      16
+    );
+
+    expect(replayFrame.shouldRegenerateMaze).toBe(false);
+    expect(replayFrame.state.currentIndex).toBe(bootstrap.episode.raster.startIndex);
+    expect(replayFrame.state.loops).toBe(aiResetFrame!.state.loops + 1);
+    expect(replayFrame.state.aiLogicSwitch).toBe(true);
+  });
+
+  test('creates an immediate process-8 menu reset request after goal reset-hold has elapsed', () => {
+    const request = createLegacyMenuDemoGoalResetRequest(4200);
+
+    expect(request.mode).toBe('menu');
+    expect(request.reason).toBe('goal');
+    expect(request.action).toBe('regenerate-maze');
+    expect(request.dueAtMs).toBe(4200);
+    expect(request.entry.entryStageId).toBe(8);
+    expect(request.entry.rearmsDelayStart).toBe(true);
+    expect(request.entry.returnsToTemplateLevel).toBe(false);
   });
 });

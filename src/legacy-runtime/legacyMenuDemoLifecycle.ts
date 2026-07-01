@@ -2,6 +2,10 @@ import { advanceDemoWalker, createDemoWalkerState, type DemoWalkerConfig, type D
 import type { MazeEpisode } from '../domain/maze';
 import { legacyTuning } from '../config/tuning';
 import {
+  createLegacyResetRequest,
+  type LegacyResetRequest
+} from './legacyPlayLifecycle';
+import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
   createLegacyMenuSnapshotDemoWalkerConfig,
@@ -135,3 +139,12 @@ export const advanceLegacyMenuDemoFrame = (
     )
   };
 };
+
+export const createLegacyMenuDemoGoalResetRequest = (
+  nowMs: number
+): LegacyResetRequest => createLegacyResetRequest({
+  delayMs: 0,
+  mode: 'menu',
+  nowMs,
+  reason: 'goal'
+});

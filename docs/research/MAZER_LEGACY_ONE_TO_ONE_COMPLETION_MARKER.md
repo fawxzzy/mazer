@@ -2,7 +2,7 @@
 
 Date: 2026-06-30
 Status: active
-Current marker: `95%`
+Current marker: `96%`
 
 ## Intent
 
@@ -65,14 +65,14 @@ The current marker is the sum of the awarded points below.
 | Overlay family and field responsibilities | `14` | `14` | aligned | `src/legacy-runtime/legacyOptionFields.ts` -> `src/legacy-runtime/legacyOverlayFieldCommit.ts` -> `src/legacy-runtime/legacyOverlayToggleFields.ts` -> `src/legacy-runtime/legacyOverlayRouting.ts` -> `src/legacy-runtime/legacyPauseLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-overlay-routing.test.ts`, `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost | keep the overlay proof spine green while larger runtime gaps close elsewhere |
 | Active play movement and win/reset loop | `14` | `13` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | simultaneous-key movement buffering, axis-gated collision, and single-request active-play reset return are now ported from the restored Unreal player/source flow; keep this proof green while remaining HUD/demo/visual gaps close |
 | Generation lifecycle exactness | `16` | `16` | aligned | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost runtime diagnostics | lifecycle ownership is now explicit and behavior-backed: reset/generation flow through queued runtime requests, delay-gated process-0 entry, stage-7 finalize state, initialized process-8 reset entry, menu-demo process-8-to-process-0 handoff, menu-vs-play stage cadence, checkpoint/shortcut budget metadata, level-building scheduler contract, stage transition graph, shortcut-disabled stage `4 -> 6` progression, stage-cursor diagnostics, and menu stage-6 row-sliced static-board drawing; exact topology-builder internals can still improve later, but the lifecycle carrier no longer has a known unowned stage seam |
-| Demo route, backtracking, and pacing | `12` | `10` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, localhost | recovery cues and cue-specific pacing now drive the live route, the fixed front-door snapshot no longer suppresses the legacy mistake/backtrack lane, and the snapshot bootstrap now settles into a visible `explore` pose instead of landing in `goal-hold` or `reset-hold`, but full legacy reset semantics and final backtrack exactness still remain open |
+| Demo route, backtracking, and pacing | `12` | `11` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, localhost | recovery cues and cue-specific pacing now drive the live route, the fixed front-door snapshot no longer suppresses the legacy mistake/backtrack lane, the snapshot bootstrap now settles into a visible `explore` pose instead of landing in `goal-hold` or `reset-hold`, AI-only reset replay stays on the same menu maze, and goal-reset handoff is immediate after reset-hold; final route/backtrack exactness still remains open |
 | In-game HUD and goal-arrow parity | `8` | `7` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot | the timer/arrow overlay is tighter and the full overlay footprint is now carried by repo-owned proof, but final screenshot-grade exactness is still open |
 
 Current total:
 
-- `95 / 100`
+- `96 / 100`
 
-## Why the marker is held at 95%
+## Why the marker is held at 96%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -93,7 +93,7 @@ But `100%` would still be dishonest today because the biggest remaining gaps are
 - active play now carries the restored Unreal simultaneous-key buffer contract: first movement keydown waits 50ms, held cardinal flags resolve as one vector, opposing axes cancel, key repeat resolves the current held vector, and reset/pause/menu boundaries clear stale movement
 - active-play collision now carries the restored Unreal axis-gated movement shape: horizontal and vertical side gates resolve independently, blocked simultaneous axes can slide along an open axis, and true diagonal corner collisions block instead of cutting through walls
 - active-play goal reset now carries one process-8 reset request as the sole return-to-menu authority, which removes the duplicate scene-local reset-return timer and better matches the restored Unreal `_ResetGame` consumption branch
-- demo route semantics are closer now that the fixed front-door snapshot also uses the legacy mistake/backtrack lane and no longer boots into a weak `reset-hold` / `goal-hold` first impression, but full reset/backtrack exactness is still partial
+- demo reset semantics are closer now that the fixed front-door snapshot also uses the legacy mistake/backtrack lane, no longer boots into a weak `reset-hold` / `goal-hold` first impression, replays AI-only reset without regeneration, and queues the menu goal-reset process-8 request immediately after reset-hold; final route/backtrack exactness is still partial
 - HUD parity is closer, but not final
 - screenshot-grade menu material/composition is not fully closed
 
@@ -133,12 +133,13 @@ Current note:
 - the active-play simultaneous-key packet earns one point because movement input now changes runtime behavior to match the old player source's delayed first press, held-direction vector resolution, repeat movement, and stale-key cleanup boundaries
 - the active-play axis-gated collision packet earns one point because simultaneous movement now matches the old player source's independent `CheckMoveR/L/U/D` gates instead of checking only the final combined target
 - the active-play reset-return packet earns one point because goal reset timing now flows through the explicit process-8 `LegacyResetRequest` only, matching the old `_ResetGame` -> process `8` branch more closely and removing the shadow `playResetReturnAtMs` path
+- the menu-demo reset exactness packet earns one point because it changes runtime behavior: goal reset now queues the process-8 menu reset request immediately after reset-hold instead of waiting one extra explore-step delay, and AI-only reset replay is explicitly covered without regenerating the menu maze
 
 ## Preferred modular lock order from here
 
 Keep the remaining work bounded in this order unless proof shows a different blocker:
 
-1. demo route backtracking and reset exactness
+1. demo route backtracking exactness
 2. final screenshot-grade board/material review
 3. final screenshot-grade play HUD polish
 

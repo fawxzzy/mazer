@@ -224,6 +224,8 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - menu demo bootstrap and preroll
   - menu demo trail/player projection
   - per-frame demo advance projection
+  - immediate menu goal-reset process-8 request after reset-hold
+  - AI-only reset replay contract without menu-maze regeneration
 
 - `src/legacy-runtime/legacyOverlayFieldCommit.ts`
   - explicit `scale-change` / `material-change` / `camera-flag` commit classes
@@ -248,7 +250,7 @@ Boundary:
 
 - if the question is "when should play stop accepting input after hitting goal?", start in `src/legacy-runtime/legacyPlayLifecycle.ts`
 - if the question is "what exactly changes after one movement key press or held key repeat?", start in `src/legacy-runtime/legacyPlayStep.ts` and `MenuScene.handleLegacyPlayMovementKeyDown()`
-- if the question is "how does the front-door demo bootstrap or advance?", start in `src/legacy-runtime/legacyMenuDemoLifecycle.ts`
+- if the question is "how does the front-door demo bootstrap, advance, replay AI-only reset, or hand off after goal reset-hold?", start in `src/legacy-runtime/legacyMenuDemoLifecycle.ts`
 - if the question is "what exactly should options/pause field commits mean?", start in `src/legacy-runtime/legacyOverlayFieldCommit.ts`
 - if the question is "what exactly should features or game-modes toggles mutate and label?", start in `src/legacy-runtime/legacyOverlayToggleFields.ts`
 - if the question is "how should nested overlays return to `options` or `pause`?", start in `src/legacy-runtime/legacyOverlayRouting.ts`

@@ -48,6 +48,7 @@ import {
 } from '../legacy-runtime/legacyPlayStep';
 import {
   advanceLegacyMenuDemoFrame,
+  createLegacyMenuDemoGoalResetRequest,
   createLegacyMenuDemoBootstrap
 } from '../legacy-runtime/legacyMenuDemoLifecycle';
 import {
@@ -1107,12 +1108,7 @@ export class MenuScene extends Phaser.Scene {
     this.trail = nextFrame.trail;
     this.nextDemoMoveAtMs = time + nextFrame.delayMs;
     if (nextFrame.shouldRegenerateMaze) {
-      this.pendingResetRequest = createLegacyResetRequest({
-        delayMs: nextFrame.delayMs,
-        mode: 'menu',
-        nowMs: time,
-        reason: 'goal'
-      });
+      this.pendingResetRequest = createLegacyMenuDemoGoalResetRequest(time);
       return;
     }
     this.boardDynamicDirty = true;

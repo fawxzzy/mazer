@@ -21,9 +21,9 @@ Restored legacy truth:
 | Legacy system | Legacy owner | Current web owner | Status | Exact gap | Next port target |
 | --- | --- | --- | --- | --- | --- |
 | Maze generation lifecycle | `Source/Mazer/MazerGameModeBase.cpp`, `Source/Mazer/Private/MazerGameState.cpp` | `src/legacy-runtime/legacyGenerationLifecycle.ts`, `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/legacy-runtime/legacyMaze.ts`, `src/scenes/MenuScene.ts` | `aligned` | Current web build path queues named reset/generation requests and carries explicit process-0 delay entry, process-8 reset entry, a real menu-demo process-8-to-process-0 handoff instead of inline regeneration, valid shortcut-disabled stage `4 -> 6` progression, stage-`0/3/4/5/6/7/8` cadence/branch contracts, checkpoint/shortcut budget metadata, stage-cursor diagnostics, and menu stage-6 row-sliced static-board drawing; exact topology internals remain browser-native but the lifecycle carrier is no longer the highest open seam | Keep lifecycle proof green while active play, demo backtracking, and final visual gaps close |
-| Menu demo AI walker | `Source/Mazer/Private/Player/MazerPlayer.cpp` | `src/legacy-runtime/legacyMenuDemoLifecycle.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | `partial` | Demo motion now carries live recovery cues and cue-specific pacing, the fixed front-door snapshot no longer suppresses the legacy mistake/backtrack lane, and the fixed-snapshot bootstrap no longer lands in `goal-hold` or `reset-hold` on first render, but legacy backtracking/reset semantics are still not fully exact | Re-port the remaining legacy demo walker backtrack and reset semantics exactly |
+| Menu demo AI walker | `Source/Mazer/Private/Player/MazerPlayer.cpp` | `src/legacy-runtime/legacyMenuDemoLifecycle.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | `partial` | Demo motion now carries live recovery cues and cue-specific pacing, the fixed front-door snapshot no longer suppresses the legacy mistake/backtrack lane, the fixed-snapshot bootstrap no longer lands in `goal-hold` or `reset-hold` on first render, AI-only reset replays the same menu maze without regeneration, and goal reset queues the process-8 request immediately after reset-hold; legacy route/backtrack semantics are still not fully exact | Re-port the remaining legacy demo walker route/backtrack semantics exactly |
 | Active play movement | `Source/Mazer/Private/Player/MazerPlayer.cpp` | `src/legacy-runtime/legacyPlayStep.ts`, `src/scenes/MenuScene.ts` | `partial` | Web play mode now carries the restored Unreal simultaneous-key buffer and axis-gated collision shape: first movement keydown waits 50ms, held cardinal flags resolve as one vector, opposing axes cancel, repeat movement resolves the held vector, stale movement clears across pause/menu/reset boundaries, blocked simultaneous axes can slide along the open axis, and diagonal corner collisions block instead of cutting through walls | Keep active-play movement proof green while remaining demo/HUD/visual gaps close |
-| Win/reset loop | `Source/Mazer/MazerGameModeBase.cpp`, `Source/Mazer/Private/MazerGameState.cpp` | `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | `partial` | Active-play goal reset now flows through the explicit process-8 reset request as the single return-to-menu authority; menu-demo reset/backtrack exactness remains the larger open reset-adjacent seam | Restore the remaining exact legacy demo reset/backtrack semantics |
+| Win/reset loop | `Source/Mazer/MazerGameModeBase.cpp`, `Source/Mazer/Private/MazerGameState.cpp` | `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | `partial` | Active-play goal reset now flows through the explicit process-8 reset request as the single return-to-menu authority; menu-demo goal reset now consumes immediately after reset-hold and AI-only reset replays without regeneration; remaining reset-adjacent work is mostly demo route/backtrack exactness | Restore the remaining exact legacy demo route/backtrack semantics |
 | Main menu front door | `Source/Mazer/Private/UI/MainMenuWidget.cpp` | `src/legacy-runtime/legacyDefaults.ts`, `src/legacy-runtime/legacyExit.ts`, `src/legacy-runtime/legacyMenuLayout.ts`, `src/scenes/MenuScene.ts` | `aligned` | `Start`, `Options`, and `Exit` are restored as first-class controls, and `Exit` now uses an explicit browser-safe quit equivalence instead of a message detour | Preserve the front-door contract while larger runtime and visual gaps close elsewhere |
 | Options overlay | `Source/Mazer/Private/UI/PauseMenuWidget.cpp` | `src/legacy-runtime/legacyOptionFields.ts`, `src/legacy-runtime/legacyOverlayFieldCommit.ts`, `src/legacy-runtime/legacyOverlayRouting.ts`, `src/scenes/MenuScene.ts` | `aligned` | The options surface now carries explicit field-commit classes and nested-overlay return routing | Preserve the current contract while larger runtime gaps close elsewhere |
 | Features overlay | `Source/Mazer/Private/UI/FeaturesWidget.cpp` | `src/legacy-runtime/legacyOverlayToggleFields.ts`, `src/legacy-runtime/legacyOverlayRouting.ts`, `src/scenes/MenuScene.ts` | `aligned` | Features toggle ownership and nested return routing are now explicit repo truth | Preserve the current contract while larger runtime gaps close elsewhere |
@@ -54,17 +54,17 @@ But the public shell, overlay model, HUD, and visual composition still differ ma
 
 1. legacy front-door menu and overlay parity
 2. active-play HUD and reset-flow parity
-3. menu demo AI exactness pass
+3. menu demo AI route/backtrack exactness pass
 4. generation lifecycle exactness pass
 5. final visual/material/background tightening
 
 ## Immediate next slice
 
-`legacy menu-demo backtrack and reset exactness packet`
+`legacy menu-demo route/backtrack exactness packet`
 
 Target:
 
-- tighten one exact menu-demo backtrack or reset edge case against restored legacy behavior
+- tighten one exact menu-demo route/backtrack edge case against restored legacy behavior
 - preserve the now-aligned active-play and generation lifecycle proof while changing only the demo owner chain
 - keep the current web app as canonical
 - use `docs/legacy/gameplay-spec.md` and restored Unreal source as truth while tightening demo-state runtime behavior

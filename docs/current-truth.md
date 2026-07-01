@@ -48,12 +48,12 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `95%`
+- `96%`
 
 Why it is not higher yet:
 
-- active-play movement/collision/reset-return semantics are closer, but demo AI, HUD, and final visual parity still need proof
-- demo AI exactness is still partial
+- active-play movement/collision/reset-return semantics are closer, menu-demo reset semantics are closer, but demo route, HUD, and final visual parity still need proof
+- demo AI route exactness is still partial
 - HUD parity is still partial
 - final screenshot-grade menu material/composition is still open
 
@@ -71,6 +71,7 @@ Why it is not higher yet:
 - legacy menu demo now emits live recovery cues and cue-specific pacing instead of collapsing wrong-turn motion back to plain explore timing
 - fixed front-door menu snapshot now also runs the mistake-enabled legacy recovery lane instead of a solver-only attract path, so the canonical menu demo can surface dead-end, backtrack, reacquire, and AI-only reset behavior
 - fixed front-door menu snapshot bootstrap now settles into a visible `explore` pose instead of stopping in `goal-hold` or `reset-hold`, which keeps the first live menu impression closer to the restored legacy screenshots
+- menu-demo goal reset now queues an immediate process-8 reset request after reset-hold has elapsed instead of waiting one extra explore-step delay before the process-0 generation handoff, and AI-only reset replay is covered without regenerating the menu maze
 - legacy generation/reset now routes through explicit queued request contracts instead of collapsing every branch into immediate rebuild calls
 - legacy generation consumption now carries explicit stage-7 finalize responsibilities for play/menu spawn, title, and timer start
 - legacy process-8 reset branches now route through explicit reset requests for active-play return vs menu-demo regeneration
@@ -116,7 +117,7 @@ Why it is not higher yet:
 - stage `7` responsibilities, process `8` reset branches, process-0 delay entry, the menu reset handoff, shortcut-disabled stage progression, and stage `0/3/4/5/6` execution cadence are now explicit lifecycle truth
 - stage-cursor diagnostics now expose queued process-0 entry and consumed stage-7 finalization, and visual diagnostics now expose the menu draw-stage row cursor
 - the browser builder still resolves maze topology before stage-6 row reveal, so exact topology internals remain a future gameplay/topology concern rather than an unstated lifecycle claim
-- demo AI and backtracking are not yet a full legacy-exact port
+- demo AI route/backtracking is not yet a full legacy-exact port, but AI-only reset replay and goal reset handoff timing are now explicitly covered
 - active-play movement, collision, and reset-return ownership are closer after the simultaneous-key buffer, axis-gated collision, and single reset-request ports
 - in-game HUD is only partially restored
 - browser exit cannot literally execute the old engine quit behavior, but the bounded browser-safe quit equivalence is now explicit and proof-backed
@@ -168,8 +169,8 @@ Localhost operation rule:
 
 - exact menu snapshot silhouette and attract-route parity
 - final desktop backdrop/material exactness still needs screenshot-grade tightening even after the board-dominance, title-lockup, button-support, explicit backdrop-owner, darker board-material, and lower-left snapshot shelf corrections
-- exact demo AI reset/backtrack edge cases beyond the newly restored front-door recovery lane and cue/pacing surface
+- exact demo AI route/backtrack edge cases beyond the newly restored front-door recovery lane, cue/pacing surface, AI-only reset replay, and immediate goal-reset handoff
 - exact play HUD parity beyond the tighter compact overlay and full proof bounds
-- exact demo AI parity beyond the newly restored front-door recovery lane and cue/pacing surface
+- exact demo AI route parity beyond the newly restored front-door recovery lane, cue/pacing surface, AI-only reset replay, and immediate goal-reset handoff
 - exact generation/reset-flow parity beyond the queued request contract
 - final screenshot-grade visual parity
