@@ -128,10 +128,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const legacyMenuRenderSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuRender.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0.005;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0.003;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xaaa4b0;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x18131d;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.74;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_RELIEF_SHADOW = 0x07050b;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_RELIEF_SHADOW_ALPHA = 0.34;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO = 0.13;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x3f3a46;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GRID = 0x18131d;');
     expect(menuSceneSource).toContain('? 0x1f1a24');
@@ -139,10 +142,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.06;');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);');
+    expect(menuSceneSource).toContain('tileX + segment.leftInset + reliefOffset');
     expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(pathGlow, LEGACY_MENU_PATH_EDGE_ALPHA);');
     expect(menuSceneSource).toContain('tileX + frames.core.leftInset');
     expect(legacyMenuRenderSource).toContain('resolveLegacyMenuPathStrokeSegments');
-    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.006);');
+    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.004);');
   });
 
   test('keeps menu dynamic trail overlays in the legacy corridor frame instead of full square cells', () => {
