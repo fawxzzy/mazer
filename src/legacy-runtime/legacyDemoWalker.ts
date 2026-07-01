@@ -130,7 +130,7 @@ export const createLegacyDemoWalkerEpisode = (maze: LegacyMazeSnapshot): MazeEpi
       chokeCorridors: 0,
       loopDetours: 0
     },
-    shortcutsCreated: 0,
+    shortcutsCreated: maze.shortcutsCreated ?? 0,
     accepted: true,
     difficulty: inferLegacyMazeDifficulty(maze),
     difficultyScore: 0,

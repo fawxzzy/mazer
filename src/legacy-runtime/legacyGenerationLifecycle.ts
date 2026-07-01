@@ -375,7 +375,7 @@ export const createLegacyRuntimeMazeForMode = (
   const gate = resolveLegacyGenerationTickGateContract();
   const maze = buildKind === 'menu-snapshot'
     ? createLegacyMenuMaze(seed)
-    : createLegacyMaze(scale, seed);
+    : createLegacyMaze(scale, seed, budget.shortcutStageEnabled ? budget.shortcutCount : 0);
 
   return {
     ...maze,

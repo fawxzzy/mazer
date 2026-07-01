@@ -128,6 +128,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - current one-shot maze builders:
   - `createLegacyMenuMaze()` for the fixed front-door snapshot
   - `createLegacyMaze()` for generated play mazes
+  - active reset-lane shortcut bridges using the explicit legacy shortcut budget and the restored opposite-corridor wall-neighbor rule
 - `src/domain/maze/core.ts`
   - browser-native Wilson/topology builder beneath generated play mazes
   - family-aware shortcut braiding profiles for classic, braided, sparse, dense, framed, and split-flow

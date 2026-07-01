@@ -14,6 +14,32 @@ import { collectDemoWalkerTelemetry, createDemoWalkerState } from '../../src/dom
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+const countLegacyShortcutBridgeFloors = (maze: ReturnType<typeof createLegacyMaze>): number => {
+  let bridges = 0;
+
+  for (let y = 1; y < maze.size - 1; y += 1) {
+    for (let x = 1; x < maze.size - 1; x += 1) {
+      if (maze.grid[y]?.[x] !== true) {
+        continue;
+      }
+
+      const top = maze.grid[y - 1]?.[x];
+      const bottom = maze.grid[y + 1]?.[x];
+      const left = maze.grid[y]?.[x - 1];
+      const right = maze.grid[y]?.[x + 1];
+      const verticalWalls = top === false && bottom === false;
+      const horizontalWalls = left === false && right === false;
+      const horizontalPaths = left === true && right === true;
+      const verticalPaths = top === true && bottom === true;
+      if ((verticalWalls && horizontalPaths) || (horizontalWalls && verticalPaths)) {
+        bridges += 1;
+      }
+    }
+  }
+
+  return bridges;
+};
+
 describe('legacy reset lane', () => {
   test('restores the legacy front-door button set', () => {
     expect(MAIN_MENU_BUTTONS).toEqual(['Exit', 'Start', 'Options']);
@@ -56,6 +82,20 @@ describe('legacy reset lane', () => {
 
     expect(firstStep).toEqual(maze.start);
     expect(lastStep).toEqual(maze.goal);
+  });
+
+  test('applies legacy shortcut bridge openings to generated play mazes', () => {
+    const maze = createLegacyMaze(50, 0x5a17f00d, 9);
+
+    expect(maze.shortcutsCreated).toBeGreaterThan(0);
+    expect(maze.shortcutsCreated).toBeLessThanOrEqual(9);
+    expect(countLegacyShortcutBridgeFloors(maze)).toBeGreaterThan(0);
+  });
+
+  test('keeps shortcut-disabled generated mazes free of shortcut openings', () => {
+    const maze = createLegacyMaze(25, 0x5a17f00d, 9);
+
+    expect(maze.shortcutsCreated).toBe(0);
   });
 
   test('uses a fixed legacy-shaped menu maze snapshot for the front door', () => {
@@ -133,6 +173,7 @@ describe('legacy reset lane', () => {
     expect(Array.from(episode.raster.pathIndices).at(-1)).toBe(episode.raster.endIndex);
     expect(config.behavior.enableRunnerMistakes).toBe(true);
     expect(telemetry.backtrackCount).toBeGreaterThan(0);
+    expect(episode.shortcutsCreated).toBe(maze.shortcutsCreated);
     expect(resolveLegacyPointFromDemoIndex(state.currentIndex, episode.raster.width)).toEqual(maze.start);
     expect(resolveLegacyTrailFromDemoSteps(state.trailSteps, episode.raster.width)).toEqual([maze.start]);
   });

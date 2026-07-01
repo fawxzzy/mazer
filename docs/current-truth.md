@@ -48,7 +48,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `71%`
+- `72%`
 
 Why it is not higher yet:
 
@@ -56,7 +56,7 @@ Why it is not higher yet:
 - restored screenshots and the current localhost browser surface still show material visual drift in board geometry, maze density, title/button composition, and screenshot-grade menu presentation
 - active-play movement/collision/reset-return semantics are closer, menu-demo reset semantics are closer, and demo route candidate admission now follows the restored `AiTilePathCheck` gate, but HUD and final visual parity still need proof
 - demo AI route/backtrack candidate gating is now aligned for the known dead-end spur seam; line-for-line topology/path-stack internals remain future tightening work
-- maze generation process/stage ownership is mapped, browser shortcut topology now uses family-aware route-affecting bypasses with separated route-reconnection proof instead of random dead-end wall punches, and generated play-maze rasters now apply the restored `CreateShortCuts` opposite-corridor wall-bridge rule; the browser topology builder is still not a line-for-line Unreal `CreateGrid` / `MapPath` / `CreatePath` / `CreateShortCuts` port
+- maze generation process/stage ownership is mapped, browser shortcut topology now uses family-aware route-affecting bypasses with separated route-reconnection proof instead of random dead-end wall punches, generated domain play-maze rasters apply the restored `CreateShortCuts` opposite-corridor wall-bridge rule, and active reset-lane play mazes now apply the same rule through `createLegacyMaze()` using the explicit legacy shortcut budget; the browser topology builder is still not a line-for-line Unreal `CreateGrid` / `MapPath` / `CreatePath` / `CreateShortCuts` port
 - HUD parity is still partial
 - final screenshot-grade menu material/composition is still open
 
@@ -89,7 +89,7 @@ Why it is not higher yet:
 - legacy level-building scheduler truth is now explicit in the runtime contract: process `0` requires the armed start-time + delay-start flag, the exact legacy delay duration remains honestly unrecovered, and initialized process `8` reset entry is marked as the branch that bypasses that delay gate
 - legacy stage progression truth is now explicit in the runtime contract: stages now publish their own completion signals, next-stage transitions, and the stage-5 skip-to-6 rule when shortcuts are disabled
 - stage `4` now advances directly to stage `6` when scale disables shortcut process `5`, so small-maze runtime plans no longer publish an impossible `4 -> 5` transition
-- browser shortcut braiding now scores wall openings by useful loop distance, applies family-specific shortcut profiles, disables weak fallback shortcuts for sparse mazes, adds a bounded route-aware braided bypass pass after endpoint selection that requires separated route reconnection before opening the wall, and applies a raster-level legacy shortcut bridge pass that opens only wall tiles with opposite floor corridors on one axis and perpendicular wall blockers on the other axis, so braided mazes can expose more than one start-goal route without collapsing dense/sparse identity
+- browser shortcut braiding now scores wall openings by useful loop distance, applies family-specific shortcut profiles, disables weak fallback shortcuts for sparse mazes, adds a bounded route-aware braided bypass pass after endpoint selection that requires separated route reconnection before opening the wall, applies a raster-level legacy shortcut bridge pass, and now applies the same opposite-corridor wall-bridge rule inside active `createLegacyMaze()` play snapshots, so generated mazes can expose more than one start-goal route without collapsing dense/sparse identity
 - menu static-board drawing now follows the stage-6 row-slice contract during generation application, so the front-door board reveal advances by legacy draw-stage rows instead of appearing only as one completed static pass
 - menu stage-6 row-sliced drawing is now cadence-gated, so the front-door board reveal remains visible over time instead of advancing as fast as the browser frame loop can run
 - active-play movement now follows the restored Unreal simultaneous-key input buffer: first movement keydown arms a 50ms resolve delay, held direction flags can combine into one composite step, opposing directions cancel, repeat movement resolves the current held vector immediately, and the buffer clears on pause/menu/reset boundaries
@@ -128,7 +128,7 @@ Why it is not higher yet:
 ## What is not yet 1:1
 
 - maze generation topology is still produced by the browser builder instead of a literal line-for-line Unreal generator port
-- shortcut topology is stronger than the earlier browser-native random dead-end braider and now proves multiple route-bypass bands plus a raster-level legacy opposite-corridor bridge for the covered braided seed, but it remains a partial port rather than the full Unreal `CreateShortCuts` source lifecycle
+- shortcut topology is stronger than the earlier browser-native random dead-end braider and now proves multiple route-bypass bands plus legacy opposite-corridor bridges in both the domain raster path and active reset-lane play snapshot path, but it remains a partial port rather than the full Unreal `CreateShortCuts` source lifecycle
 - generation/reset branches, stage cadence, budget formulas, process-entry gates, the menu-demo process-8-to-process-0 handoff, shortcut-disabled stage `4 -> 6` progression, and menu stage-6 row-sliced drawing are now explicit runtime contracts
 - stage `7` responsibilities, process `8` reset branches, process-0 delay entry, the menu reset handoff, shortcut-disabled stage progression, and stage `0/3/4/5/6` execution cadence are now explicit lifecycle truth
 - stage-cursor diagnostics now expose queued process-0 entry and consumed stage-7 finalization, and visual/runtime diagnostics now expose the cadence-gated menu draw-stage row cursor, remaining rows, completion state, and percent progress

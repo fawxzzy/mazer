@@ -16,8 +16,10 @@ This pass rechecked the rebuilt maze/domain code against the read-only Unreal so
 - Checkpoint count remains `_Scale + (_Scale * _CheckPointModifier)`.
 - Shortcut budget remains `_Scale * _ShortcutCountModifier`.
 - Shortcut carving still only runs when `scale > 35`.
-- The rebuilt `wallIndices` now mirror the legacy `_WallArray` lifecycle:
-  only the selected wall-array entry is removed during shortcut carving, so duplicate references to the same tile can remain behind as stale wall entries.
+- Generated active-play snapshots now apply the restored `CreateShortCuts` bridge condition:
+  the selected tile must still be a wall, all four cardinal neighbors must exist, one axis must have opposite walkable path corridors, and the perpendicular axis must remain walled.
+- The active reset-lane pass uses the explicit legacy shortcut budget (`_Scale * _ShortcutCountModifier`) and skips shortcut creation when scale disables process `5`.
+- The exact old `_WallArray` stale-entry/duplicate lifecycle is still not literal in the rebuild; current shortcut selection is deterministic and removes selected candidates from a unique wall-candidate list.
 
 ### Reset / regenerate loop
 - Legacy reset still has two distinct branches:
