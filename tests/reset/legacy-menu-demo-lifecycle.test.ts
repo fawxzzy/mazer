@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { isTileFloor } from '../../src/domain/maze';
 import { createLegacyMenuMaze, createLegacyMaze } from '../../src/legacy-runtime/legacyMaze';
 import {
   advanceLegacyMenuDemoFrame,
@@ -32,7 +33,7 @@ describe('legacy menu demo lifecycle', () => {
     expect(bootstrap.config.behavior.enableRunnerMistakes).toBe(true);
     expect(bootstrap.state.phase).toBe('explore');
     expect(bootstrap.player).toEqual(bootstrap.trail.at(-1));
-    expect(Array.from(bootstrap.episode.raster.pathIndices)).toContain(bootstrap.state.currentIndex);
+    expect(isTileFloor(bootstrap.episode.raster.tiles, bootstrap.state.currentIndex)).toBe(true);
   });
 
   test('advances the menu demo frame through the shared trail/player projection', () => {

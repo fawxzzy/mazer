@@ -437,6 +437,7 @@ Rule:
   - fixed-snapshot menu-only demo policy and deterministic preroll
 - `src/domain/ai/demoWalker.ts`
   - deterministic demo stepping, backtracking, goal hold, reset hold
+  - source-shaped menu AI route planning from live neighbor scans, potential-tile targeting, path-stack rewind, first-recovery AI reset seam, and canonical replay after reset
   - cue overrides and cue-specific pacing for branch commit, dead-end, backtrack, and reacquire beats
   - legacy `AiTilePathCheck`-style wrong-turn candidate admission: a non-end branch candidate must expose at least one unvisited onward floor tile besides the current tile
 

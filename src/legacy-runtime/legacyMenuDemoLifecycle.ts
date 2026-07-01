@@ -96,6 +96,12 @@ export const createLegacyMenuDemoBootstrap = (
       }
 
       const advance = advanceDemoWalker(episode, state, config);
+      if (advance.state.cue === 'dead-end') {
+        break;
+      }
+      if (advance.state.resetReason === 'ai-path-exhausted') {
+        break;
+      }
       state = advance.state;
       stepsTaken += 1;
     }

@@ -535,57 +535,19 @@ const buildPreciseRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
 };
 
 const buildHumanizedRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
+  return buildLegacyAiRunnerPlan(episode);
+};
+
+const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
   const canonicalPath = Array.from(episode.raster.pathIndices);
-  const canonicalSet = new Set(canonicalPath);
-  const budget = resolveRunnerWrongTurnBudget(episode);
-  const minGap = episode.size === 'small' ? 4 : episode.size === 'medium' ? 5 : 6;
-  const selections = new Map<number, number[]>();
-  let lastSelectedCursor = Number.NEGATIVE_INFINITY;
-
-  for (let cursor = 1; cursor < canonicalPath.length - 2; cursor += 1) {
-    if (selections.size >= budget) {
-      break;
+  const canonicalCursorByIndex = new Map<number, number>();
+  canonicalPath.forEach((index, cursor) => {
+    if (!canonicalCursorByIndex.has(index)) {
+      canonicalCursorByIndex.set(index, cursor);
     }
-    if (cursor - lastSelectedCursor < minGap) {
-      continue;
-    }
+  });
 
-    const branchPath = resolveBranchExcursion(episode, canonicalPath, canonicalSet, cursor);
-    if (!branchPath) {
-      continue;
-    }
-
-    const chance = resolveRunnerWrongTurnChance(episode, cursor, canonicalPath.length);
-    const roll = randomFloat(mixSeed(episode.seed, cursor, 0x31c6f541));
-    if (roll <= chance) {
-      selections.set(cursor, branchPath);
-      lastSelectedCursor = cursor;
-    }
-  }
-
-  if (selections.size === 0 && budget > 0) {
-    let fallbackCursor = -1;
-    let fallbackPath: number[] | null = null;
-    let fallbackScore = Number.NEGATIVE_INFINITY;
-    for (let cursor = 1; cursor < canonicalPath.length - 2; cursor += 1) {
-      const branchPath = resolveBranchExcursion(episode, canonicalPath, canonicalSet, cursor);
-      if (!branchPath) {
-        continue;
-      }
-
-      const score = branchPath.length + (cursor / Math.max(1, canonicalPath.length));
-      if (score > fallbackScore) {
-        fallbackScore = score;
-        fallbackCursor = cursor;
-        fallbackPath = branchPath;
-      }
-    }
-    if (fallbackCursor >= 0 && fallbackPath) {
-      selections.set(fallbackCursor, fallbackPath);
-    }
-  }
-
-  const routeIndices: number[] = [canonicalPath[0] ?? episode.raster.startIndex];
+  const routeIndices: number[] = [episode.raster.startIndex];
   const canonicalCursors: number[] = [0];
   const segmentTrailModes: DemoTrailMode[] = [];
   const cueOverrides: Array<DemoSegmentCue | DemoWalkerCue | null> = [];
@@ -594,43 +556,122 @@ const buildHumanizedRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     backtrackCount: 0,
     recoveryCount: 0
   };
+  const visited = new Set<number>([episode.raster.startIndex]);
+  const potentialTiles: number[] = [];
+  const pathStack: number[] = [episode.raster.startIndex];
+  let currentIndex = episode.raster.startIndex;
+  let aiTargetTile: number | null = null;
+  let aiBacktracking = false;
+  let aiBackTrackUndoVisitedFlag = false;
   let aiResetPathCursor: number | null = null;
+  let pendingDeadEndCue = false;
+  const maxSteps = Math.max(64, episode.raster.tiles.length * 4);
 
-  for (let canonicalCursor = 1; canonicalCursor < canonicalPath.length; canonicalCursor += 1) {
-    const detour = selections.get(canonicalCursor - 1);
-    if (detour && detour.length > 0) {
-      telemetry.wrongBranchCount += 1;
-      for (let detourIndex = 0; detourIndex < detour.length; detourIndex += 1) {
-        routeIndices.push(detour[detourIndex]);
-        canonicalCursors.push(canonicalCursor - 1);
-        segmentTrailModes.push('explore');
-        cueOverrides.push(detourIndex === detour.length - 1 ? 'dead-end' : detourIndex === 0 ? 'anticipate' : null);
+  const appendStep = (
+    nextIndex: number,
+    mode: DemoTrailMode,
+    cue: DemoSegmentCue | DemoWalkerCue | null
+  ): boolean => {
+    if (routeIndices[routeIndices.length - 1] === nextIndex) {
+      return false;
+    }
+
+    routeIndices.push(nextIndex);
+    canonicalCursors.push(resolveNearestCanonicalCursor(nextIndex, canonicalPath, canonicalCursorByIndex, episode.raster.width));
+    segmentTrailModes.push(mode);
+    cueOverrides.push(cue);
+    return true;
+  };
+
+  for (let step = 0; step < maxSteps; step += 1) {
+    if (currentIndex === episode.raster.endIndex) {
+      break;
+    }
+
+    if (!aiBacktracking) {
+      const nextTile = resolveLegacyAiDirectMove(episode, currentIndex, visited, potentialTiles);
+      if (nextTile !== null) {
+        const nextIsCanonical = canonicalCursorByIndex.has(nextTile);
+        const currentIsCanonical = canonicalCursorByIndex.has(currentIndex);
+        visited.add(nextTile);
+        removeFirst(potentialTiles, nextTile);
+        pathStack.push(nextTile);
+        appendStep(nextTile, 'explore', nextIsCanonical && currentIsCanonical ? null : 'anticipate');
+        if (!nextIsCanonical || !currentIsCanonical) {
+          telemetry.wrongBranchCount += 1;
+        }
+        currentIndex = nextTile;
+        continue;
       }
 
-      const backtrackRoute = detour.slice(0, -1).reverse();
-      for (const step of backtrackRoute) {
-        routeIndices.push(step);
-        canonicalCursors.push(canonicalCursor - 1);
-        segmentTrailModes.push('backtrack');
-        cueOverrides.push('backtrack');
-        telemetry.backtrackCount += 1;
+      pendingDeadEndCue = true;
+      aiTargetTile = resolveLegacyAiPotentialTarget(episode, currentIndex, visited, potentialTiles, false);
+      aiBacktracking = true;
+      if (aiTargetTile === null) {
+        continue;
       }
+    }
 
-      routeIndices.push(canonicalPath[canonicalCursor - 1] ?? episode.raster.startIndex);
-      canonicalCursors.push(canonicalCursor - 1);
-      segmentTrailModes.push('backtrack');
-      cueOverrides.push('backtrack');
-      telemetry.backtrackCount += 1;
+    if (aiTargetTile === null) {
+      aiTargetTile = episode.raster.startIndex;
+    }
+
+    const nextBacktrackTile = pathStack[pathStack.length - 1];
+    if (nextBacktrackTile === undefined) {
+      aiResetPathCursor = Math.max(0, routeIndices.length - 1);
+      break;
+    }
+
+    const targetIsNeighbor = collectFloorNeighbors(nextBacktrackTile, episode.raster.width, episode.raster.height, episode.raster.tiles)
+      .includes(aiTargetTile);
+    if (targetIsNeighbor) {
+      aiBackTrackUndoVisitedFlag = false;
+      aiBacktracking = false;
+      visited.add(nextBacktrackTile);
+      pathStack.pop();
+      pathStack.push(nextBacktrackTile);
+      appendStep(nextBacktrackTile, 'backtrack', 'reacquire');
       telemetry.recoveryCount += 1;
+      if (aiResetPathCursor === null) {
+        aiResetPathCursor = Math.max(0, routeIndices.length - 1);
+      }
+      pendingDeadEndCue = false;
+      currentIndex = nextBacktrackTile;
+      continue;
     }
 
-    routeIndices.push(canonicalPath[canonicalCursor] ?? episode.raster.endIndex);
-    canonicalCursors.push(canonicalCursor);
-    segmentTrailModes.push(canonicalCursor >= canonicalPath.length - 1 ? 'goal' : 'explore');
-    cueOverrides.push(detour ? 'reacquire' : null);
-    if (detour) {
-      aiResetPathCursor = routeIndices.length - 1;
+    const shouldUndoVisited = collectFloorNeighbors(nextBacktrackTile, episode.raster.width, episode.raster.height, episode.raster.tiles)
+      .some((neighbor) => (
+        potentialTiles.includes(neighbor)
+        && passesLegacyAiTilePathCheck(
+          neighbor,
+          nextBacktrackTile,
+          visited,
+          episode.raster.width,
+          episode.raster.height,
+          episode.raster.tiles,
+          episode.raster.endIndex
+        )
+      ));
+    aiBackTrackUndoVisitedFlag = aiBackTrackUndoVisitedFlag || shouldUndoVisited;
+    visited.add(nextBacktrackTile);
+    if (aiBackTrackUndoVisitedFlag) {
+      visited.delete(nextBacktrackTile);
     }
+    pathStack.pop();
+    if (appendStep(nextBacktrackTile, 'backtrack', pendingDeadEndCue ? 'dead-end' : 'backtrack')) {
+      pendingDeadEndCue = false;
+    }
+    telemetry.backtrackCount += 1;
+    currentIndex = nextBacktrackTile;
+  }
+
+  const canonicalReplayStart = aiResetPathCursor === null
+    ? (canonicalCursorByIndex.get(routeIndices[routeIndices.length - 1] ?? episode.raster.startIndex) ?? 0)
+    : 0;
+  for (let cursor = Math.max(1, canonicalReplayStart + 1); cursor < canonicalPath.length; cursor += 1) {
+    const nextIndex = canonicalPath[cursor] ?? episode.raster.endIndex;
+    appendStep(nextIndex, cursor >= canonicalPath.length - 1 ? 'goal' : 'explore', cursor === canonicalReplayStart + 1 ? 'reacquire' : null);
   }
 
   return {
@@ -643,147 +684,80 @@ const buildHumanizedRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
   };
 };
 
-const resolveRunnerWrongTurnBudget = (episode: MazeEpisode): number => {
-  const difficultyBudget = episode.difficulty === 'chill'
-    ? 1
-    : episode.difficulty === 'standard'
-      ? 1
-      : episode.difficulty === 'spicy'
-        ? 2
-        : 2;
-  const sizeBonus = episode.size === 'huge' ? 1 : 0;
-  return Math.min(3, difficultyBudget + sizeBonus);
-};
-
-const resolveRunnerWrongTurnChance = (
+const resolveLegacyAiDirectMove = (
   episode: MazeEpisode,
-  canonicalCursor: number,
-  pathLength: number
-): number => {
-  const progress = canonicalCursor / Math.max(1, pathLength - 1);
-  const difficultyChance = episode.difficulty === 'chill'
-    ? 0.22
-    : episode.difficulty === 'standard'
-      ? 0.3
-      : episode.difficulty === 'spicy'
-        ? 0.38
-        : 0.42;
-  const exitDecoyBias = progress >= 0.62 && progress <= 0.86 ? 0.08 : 0;
-  return Math.max(0.12, Math.min(0.58, difficultyChance + exitDecoyBias));
-};
-
-const resolveBranchExcursion = (
-  episode: MazeEpisode,
-  canonicalPath: readonly number[],
-  canonicalSet: ReadonlySet<number>,
-  canonicalCursor: number
-): number[] | null => {
+  currentIndex: number,
+  visited: ReadonlySet<number>,
+  potentialTiles: number[]
+): number | null => {
   const width = episode.raster.width;
   const height = episode.raster.height;
   const tiles = episode.raster.tiles;
-  const junctionIndex = canonicalPath[canonicalCursor];
-  const previousIndex = canonicalPath[canonicalCursor - 1];
-  const nextIndex = canonicalPath[canonicalCursor + 1];
-  const maxDepth = episode.size === 'small' ? 2 : episode.size === 'medium' ? 3 : 4;
-  const visited = new Set(canonicalPath.slice(0, canonicalCursor + 1));
-  const branchNeighbors = collectFloorNeighbors(junctionIndex, width, height, tiles)
-    .filter((neighbor) => (
-      neighbor !== previousIndex
-      && neighbor !== nextIndex
-      && !canonicalSet.has(neighbor)
+  let nextTile: number | null = null;
+  let smallestDistance = Number.POSITIVE_INFINITY;
+
+  for (const neighbor of collectFloorNeighbors(currentIndex, width, height, tiles)) {
+    if (
+      !visited.has(neighbor)
       && passesLegacyAiTilePathCheck(
         neighbor,
-        junctionIndex,
+        currentIndex,
         visited,
         width,
         height,
         tiles,
         episode.raster.endIndex
       )
-    ));
-
-  let bestPath: number[] | null = null;
-  let bestScore = Number.NEGATIVE_INFINITY;
-  for (const neighbor of branchNeighbors) {
-    const candidate = findBestBranchPath(
-      episode,
-      junctionIndex,
-      neighbor,
-      canonicalSet,
-      maxDepth
-    );
-    if (!candidate) {
-      continue;
-    }
-
-    const score = candidate.length
-      + (countFloorNeighbors(candidate[candidate.length - 1], width, height, tiles) <= 1 ? 1.2 : 0)
-      + (manhattanDistance(candidate[candidate.length - 1], episode.raster.endIndex, width)
-        < manhattanDistance(junctionIndex, episode.raster.endIndex, width) ? 0.35 : 0)
-      + (randomFloat(mixSeed(episode.seed, canonicalCursor, neighbor)) * 0.12);
-    if (score > bestScore) {
-      bestScore = score;
-      bestPath = candidate;
+    ) {
+      potentialTiles.push(neighbor);
+      const distance = euclideanDistance(neighbor, episode.raster.endIndex, width);
+      if (distance < smallestDistance) {
+        smallestDistance = distance;
+        nextTile = neighbor;
+      }
     }
   }
 
-  return bestPath;
+  return nextTile;
 };
 
-const findBestBranchPath = (
+const resolveLegacyAiPotentialTarget = (
   episode: MazeEpisode,
-  junctionIndex: number,
-  startIndex: number,
-  canonicalSet: ReadonlySet<number>,
-  maxDepth: number
-): number[] | null => {
+  currentIndex: number,
+  visited: ReadonlySet<number>,
+  potentialTiles: number[],
+  aiLogicSwitch: boolean
+): number | null => {
+  let nextTile: number | null = null;
   const width = episode.raster.width;
   const height = episode.raster.height;
   const tiles = episode.raster.tiles;
-  const parents = new Map<number, number>([[startIndex, junctionIndex]]);
-  const depths = new Map<number, number>([[startIndex, 1]]);
-  const queue: number[] = [startIndex];
-  let bestTarget = startIndex;
-  let bestScore = Number.NEGATIVE_INFINITY;
 
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    const depth = depths.get(current) ?? 1;
-    const degree = countFloorNeighbors(current, width, height, tiles);
-    const score = depth + (degree <= 1 ? 1.2 : 0);
-    if (score > bestScore) {
-      bestScore = score;
-      bestTarget = current;
+  while (nextTile === null && potentialTiles.length > 0) {
+    if (aiLogicSwitch) {
+      // Preserve the restored source bug: the retarget branch checks NextTile
+      // while it is still null, which drains potential targets.
+      potentialTiles.splice(0, potentialTiles.length);
+      return null;
     }
 
-    if (depth >= maxDepth) {
-      continue;
-    }
-
-    for (const neighbor of collectFloorNeighbors(current, width, height, tiles)) {
-      if (neighbor === junctionIndex || parents.has(neighbor) || canonicalSet.has(neighbor)) {
-        continue;
-      }
-
-      parents.set(neighbor, current);
-      depths.set(neighbor, depth + 1);
-      queue.push(neighbor);
+    const candidate = potentialTiles[potentialTiles.length - 1] ?? null;
+    const candidateValid = candidate !== null && passesLegacyAiTilePathCheck(
+      candidate,
+      currentIndex,
+      visited,
+      width,
+      height,
+      tiles,
+      episode.raster.endIndex
+    );
+    removeFirst(potentialTiles, candidate);
+    if (candidateValid) {
+      nextTile = candidate;
     }
   }
 
-  const path: number[] = [];
-  let cursor = bestTarget;
-  while (cursor !== junctionIndex) {
-    path.push(cursor);
-    const parent = parents.get(cursor);
-    if (parent === undefined) {
-      break;
-    }
-    cursor = parent;
-  }
-
-  path.reverse();
-  return path.length > 0 ? path : null;
+  return nextTile;
 };
 
 const passesLegacyAiTilePathCheck = (
@@ -820,23 +794,47 @@ const collectFloorNeighbors = (
   return neighbors;
 };
 
-const countFloorNeighbors = (
+const resolveNearestCanonicalCursor = (
   index: number,
-  width: number,
-  height: number,
-  tiles: Uint8Array
-): number => collectFloorNeighbors(index, width, height, tiles).length;
+  canonicalPath: readonly number[],
+  canonicalCursorByIndex: ReadonlyMap<number, number>,
+  width: number
+): number => {
+  const exactCursor = canonicalCursorByIndex.get(index);
+  if (exactCursor !== undefined) {
+    return exactCursor;
+  }
+
+  let bestCursor = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let cursor = 0; cursor < canonicalPath.length; cursor += 1) {
+    const distance = manhattanDistance(index, canonicalPath[cursor] ?? index, width);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestCursor = cursor;
+    }
+  }
+
+  return bestCursor;
+};
+
+const euclideanDistance = (fromIndex: number, toIndex: number, width: number): number => {
+  const dx = (fromIndex % width) - (toIndex % width);
+  const dy = Math.floor(fromIndex / width) - Math.floor(toIndex / width);
+  return Math.sqrt((dx * dx) + (dy * dy));
+};
 
 const manhattanDistance = (fromIndex: number, toIndex: number, width: number): number => (
   Math.abs((fromIndex % width) - (toIndex % width))
   + Math.abs(Math.floor(fromIndex / width) - Math.floor(toIndex / width))
 );
 
-const mixSeed = (seed: number, a: number, b: number): number => (
-  Math.imul((seed >>> 0) ^ Math.imul((a + 1) >>> 0, 0x9e3779b1), ((b | 1) >>> 0)) >>> 0
-);
-
-const randomFloat = (state: number): number => ((state & 0xffff) / 0xffff);
+const removeFirst = <T>(values: T[], value: T | null): void => {
+  const index = values.indexOf(value as T);
+  if (index >= 0) {
+    values.splice(index, 1);
+  }
+};
 
 const appendTrail = (trail: number[], nextIndex: number, maxLength: number): number[] => {
   const nextTrail = trail.slice(Math.max(0, trail.length - maxLength + 1));
