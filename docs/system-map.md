@@ -320,7 +320,7 @@ Use this before changing how the front door looks without changing the actual ma
 | slab/frame colors and backdrop haze | `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/scenes/MenuScene.ts#drawBackdrop()` plus `LEGACY_MENU_*` board constants |
 | title opacity / shadow / wordmark presence | `src/legacy-runtime/legacyMenuTitle.ts` -> `src/scenes/MenuScene.ts#refreshLayout()` + scene title text setup |
 | front-door button box strength / label presence / dark pane fill | `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/scenes/MenuScene.ts#createButton()` |
-| menu attract trail/player colors and footprint | `src/scenes/MenuScene.ts` dynamic board draw path |
+| menu attract trail/player colors and corridor footprint | `src/scenes/MenuScene.ts#fillLegacyMenuDynamicPathTile()` + `src/scenes/MenuScene.ts#fillMenuDynamicMarkerTile()` |
 
 Boundary:
 
