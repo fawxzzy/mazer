@@ -143,10 +143,21 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);');
     expect(menuSceneSource).toContain('tileX + segment.leftInset + reliefOffset');
-    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(pathGlow, LEGACY_MENU_PATH_EDGE_ALPHA);');
+    expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('tileX + frames.core.leftInset');
     expect(legacyMenuRenderSource).toContain('resolveLegacyMenuPathStrokeSegments');
     expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.004);');
+  });
+
+  test('keeps active play maze rendering on connected corridors instead of square debug cells', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = 0x1a161f;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;');
+    expect(menuSceneSource).toContain('isMenuMode ? LEGACY_MENU_PATH_RELIEF_SHADOW : LEGACY_PLAY_PATH_RELIEF_SHADOW');
+    expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
+    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(pathColor, isMenuMode ? 0.92 : 0.96);');
+    expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor');
   });
 
   test('keeps menu dynamic trail overlays in the legacy corridor frame instead of full square cells', () => {

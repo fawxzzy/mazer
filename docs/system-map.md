@@ -60,11 +60,11 @@ Use this as the top-level "where does this actually live?" map before editing:
 | boot + localhost cleanup | `src/boot/main.ts` | `tests/reset/legacy-reset.test.ts` |
 | boot diagnostics readback | `src/boot/bootStatus.ts`, `src/boot/main.ts` | `tests/boot/boot-status.test.ts` |
 | Phaser scene wiring | `src/boot/phaserConfig.ts` | `npm run build` |
-| active front door and play shell | `src/scenes/MenuScene.ts` | in-app browser, `npm run verify` |
+| active front door and play shell | `src/scenes/MenuScene.ts` | in-app browser, `npm run verify`; play board rendering owns connected corridor material for generated mazes |
 | live runtime diagnostics bridge | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, localhost |
 | active-play HUD timer and goal arrow | `src/legacy-runtime/legacyPlayHud.ts`, `src/scenes/MenuScene.ts#drawHud()` | `tests/reset/legacy-play-hud.test.ts`, `tests/reset/legacy-reset.test.ts`, desktop/mobile play-route screenshots, `window.__MAZER_VISUAL_DIAGNOSTICS__` with bare `timerText`, `arrowAngleRadians`, and `arrowAngleDegrees` |
 | fixed menu maze shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `tests/reset/legacy-reset.test.ts`, screenshots |
-| generated play maze | `src/legacy-runtime/legacyMaze.ts` | `tests/reset/legacy-reset.test.ts` |
+| generated play maze | `src/legacy-runtime/legacyMaze.ts` | `tests/reset/legacy-reset.test.ts`; includes source-shaped checkpoint pathing, shortcut bridges, disconnected-floor pruning, and weak-goal rebasing for playable browser topology |
 | menu title/board/button layout math | `src/legacy-runtime/legacyMenuLayout.ts` | `tests/reset/legacy-menu-layout.test.ts` |
 | menu demo behavior | `src/legacy-runtime/legacyMenuDemoLifecycle.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, live menu preview |
 | options field parsing | `src/legacy-runtime/legacyOptionFields.ts` | `tests/reset/legacy-option-fields.test.ts` |
@@ -115,7 +115,7 @@ Use this when you need to understand the app as a system instead of a file list.
 7. Field commits:
    `applyLegacyOptionField()` normalizes draft values, `legacyOverlayFieldCommit.ts` classifies them into deferred reload-on-back vs immediate camera-flag roles, and `MenuScene` applies the resulting rebuild/layout effects.
 8. Active play:
-   movement, win/reset return, and pause routing stay inside `MenuScene`; source-exact timer HUD formatting and goal-arrow radians/degrees geometry route through `legacyPlayHud.ts` before `MenuScene.drawHud()` renders them.
+   movement, win/reset return, pause routing, and generated-board rendering stay inside `MenuScene`; source-exact timer HUD formatting and goal-arrow radians/degrees geometry route through `legacyPlayHud.ts` before `MenuScene.drawHud()` renders them.
 9. Proof readback:
    visual scripts and live checks read `window.__MAZER_VISUAL_DIAGNOSTICS__`; reset-lane tests assert the stable contracts under `tests/reset/*`.
 
@@ -134,6 +134,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - `MapPath` / `Backtrack` equivalent: checkpoint selection, mixed next-tile choice, local path-neighbor validation, longest-path end selection, and source-shaped resume from the next tile selected by backtracking
   - `CreatePath` equivalent: path-neighbor wall-array collection with duplicate/stale candidate preservation
   - `CreateShortCuts` equivalent: explicit legacy shortcut budget, restored opposite-corridor wall-neighbor rule, and random `_WallArray` removal loop
+  - playable-topology normalization: after shortcut creation, generated play mazes prune disconnected floor components and rebase trivially weak goals to the farthest reachable floor; this is a browser-port quality guard, while exact Unreal RNG/time seeding remains open
 - `src/domain/maze/core.ts`
   - browser-native Wilson/topology builder for domain/proof maze families outside the active reset-lane play snapshot owner
   - family-aware shortcut braiding profiles for classic, braided, sparse, dense, framed, and split-flow

@@ -26,6 +26,14 @@ export interface LegacyMazeSnapshot {
     topology: 'legacy-checkpoint-path-builder';
     wallArrayEntries: number;
   };
+  playableTopologyStats?: {
+    disconnectedComponentsPruned: number;
+    disconnectedFloorTilesPruned: number;
+    goalRebasedToFarthestReachableFloor: boolean;
+    originalGoalDistance: number | null;
+    reachableFloors: number;
+    resolvedGoalDistance: number;
+  };
   shortcutsCreated?: number;
   shortcutStats?: {
     requested: number;
@@ -200,6 +208,124 @@ const buildShortestPath = (grid: boolean[][], start: LegacyPoint, goal: LegacyPo
 
   path.reverse();
   return path;
+};
+
+const resolveReachableFloorDistances = (
+  grid: boolean[][],
+  start: LegacyPoint
+): Map<string, { distance: number; point: LegacyPoint }> => {
+  const reachable = new Map<string, { distance: number; point: LegacyPoint }>();
+  if (grid[start.y]?.[start.x] !== true) {
+    return reachable;
+  }
+
+  const queue: Array<{ distance: number; point: LegacyPoint }> = [{ distance: 0, point: start }];
+  reachable.set(keyForPoint(start), { distance: 0, point: clonePoint(start) });
+
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    if (!current) {
+      continue;
+    }
+
+    for (const direction of LEGACY_STEP_DIRECTIONS) {
+      const next = {
+        x: current.point.x + direction.x,
+        y: current.point.y + direction.y
+      };
+      const nextKey = keyForPoint(next);
+      if (grid[next.y]?.[next.x] !== true || reachable.has(nextKey)) {
+        continue;
+      }
+
+      const entry = { distance: current.distance + 1, point: next };
+      reachable.set(nextKey, entry);
+      queue.push(entry);
+    }
+  }
+
+  return reachable;
+};
+
+const normalizeLegacyPlayableTopology = (
+  grid: boolean[][],
+  start: LegacyPoint,
+  goal: LegacyPoint
+): {
+  goal: LegacyPoint;
+  stats: NonNullable<LegacyMazeSnapshot['playableTopologyStats']>;
+} => {
+  const reachable = resolveReachableFloorDistances(grid, start);
+  let disconnectedComponentsPruned = 0;
+  let disconnectedFloorTilesPruned = 0;
+
+  for (let y = 0; y < grid.length; y += 1) {
+    const row = grid[y];
+    if (!row) {
+      continue;
+    }
+
+    for (let x = 0; x < row.length; x += 1) {
+      if (row[x] !== true || reachable.has(`${x},${y}`)) {
+        continue;
+      }
+
+      disconnectedComponentsPruned += 1;
+      const queue: LegacyPoint[] = [{ x, y }];
+      row[x] = false;
+
+      for (let index = 0; index < queue.length; index += 1) {
+        const current = queue[index];
+        if (!current) {
+          continue;
+        }
+
+        disconnectedFloorTilesPruned += 1;
+        for (const direction of LEGACY_STEP_DIRECTIONS) {
+          const next = {
+            x: current.x + direction.x,
+            y: current.y + direction.y
+          };
+          if (grid[next.y]?.[next.x] !== true || reachable.has(keyForPoint(next))) {
+            continue;
+          }
+
+          grid[next.y]![next.x] = false;
+          queue.push(next);
+        }
+      }
+    }
+  }
+
+  let farthest = reachable.get(keyForPoint(start)) ?? { distance: 0, point: clonePoint(start) };
+  for (const entry of reachable.values()) {
+    if (entry.distance > farthest.distance) {
+      farthest = entry;
+    }
+  }
+
+  const originalGoalDistance = reachable.get(keyForPoint(goal))?.distance ?? null;
+  const minPlayableRouteDistance = Math.max(LEGACY_MIN_SCALE, Math.floor(grid.length * 1.5));
+  const shouldRebaseGoal = (
+    originalGoalDistance === null
+    || originalGoalDistance < Math.min(minPlayableRouteDistance, farthest.distance)
+  );
+  const resolvedGoal = shouldRebaseGoal ? farthest.point : goal;
+  const resolvedGoalDistance = shouldRebaseGoal
+    ? farthest.distance
+    : (originalGoalDistance ?? farthest.distance);
+
+  return {
+    goal: clonePoint(resolvedGoal),
+    stats: {
+      disconnectedComponentsPruned,
+      disconnectedFloorTilesPruned,
+      goalRebasedToFarthestReachableFloor: shouldRebaseGoal,
+      originalGoalDistance,
+      reachableFloors: reachable.size,
+      resolvedGoalDistance
+    }
+  };
 };
 
 const isLegacyShortcutBridgeCandidate = (
@@ -693,12 +819,13 @@ const createLegacyCheckpointPathMaze = (
 
 export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: number): LegacyMazeSnapshot => {
   const size = normalizeGridSize(scale);
-  const { grid, start, goal, wallArray, pathBuilderStats } = createLegacyCheckpointPathMaze(size, seed);
+  const { grid, start, goal: sourceGoal, wallArray, pathBuilderStats } = createLegacyCheckpointPathMaze(size, seed);
   const rng = createSeededRng(seed ^ 0x5a17c0de);
   const resolvedShortcutCount = size > 35
     ? (shortcutCount ?? Math.trunc(size * legacyTuning.board.shortcutCountModifier.game))
     : 0;
   const shortcutStats = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount, wallArray);
+  const { goal, stats: playableTopologyStats } = normalizeLegacyPlayableTopology(grid, start, sourceGoal);
   const solutionPath = buildShortestPath(grid, start, goal);
 
   return {
@@ -710,6 +837,7 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     solutionPath,
     seed,
     pathBuilderStats,
+    playableTopologyStats,
     shortcutsCreated: shortcutStats.created,
     shortcutStats
   };

@@ -332,6 +332,10 @@ const LEGACY_MENU_PATH_RELIEF_SHADOW_ALPHA = 0.34;
 const LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO = 0.13;
 const LEGACY_MENU_WALL_FILL = 0x302a36;
 const LEGACY_MENU_WALL_GRID = 0x18131d;
+const LEGACY_PLAY_PATH_EDGE = 0x1a161f;
+const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
+const LEGACY_PLAY_PATH_RELIEF_SHADOW = 0x08060c;
+const LEGACY_PLAY_PATH_RELIEF_SHADOW_ALPHA = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
 const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
@@ -1340,14 +1344,14 @@ export class MenuScene extends Phaser.Scene {
         const tileY = boardTop + (y * tileSize);
         const walkable = this.maze.grid[y]?.[x] === true;
 
-        if (walkable && isMenuMode) {
+        if (walkable) {
           const segments = resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);
           const frames = resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);
           const reliefOffset = Math.max(1, Math.floor(tileSize * LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO));
 
           this.boardStaticGraphics.fillStyle(
-            LEGACY_MENU_PATH_RELIEF_SHADOW,
-            LEGACY_MENU_PATH_RELIEF_SHADOW_ALPHA
+            isMenuMode ? LEGACY_MENU_PATH_RELIEF_SHADOW : LEGACY_PLAY_PATH_RELIEF_SHADOW,
+            isMenuMode ? LEGACY_MENU_PATH_RELIEF_SHADOW_ALPHA : LEGACY_PLAY_PATH_RELIEF_SHADOW_ALPHA
           );
           for (const segment of segments.edge) {
             this.boardStaticGraphics.fillRect(
@@ -1358,7 +1362,10 @@ export class MenuScene extends Phaser.Scene {
             );
           }
 
-          this.boardStaticGraphics.fillStyle(pathGlow, LEGACY_MENU_PATH_EDGE_ALPHA);
+          this.boardStaticGraphics.fillStyle(
+            isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE,
+            isMenuMode ? LEGACY_MENU_PATH_EDGE_ALPHA : LEGACY_PLAY_PATH_EDGE_ALPHA
+          );
           for (const segment of segments.edge) {
             this.boardStaticGraphics.fillRect(
               tileX + segment.leftInset,
@@ -1367,7 +1374,7 @@ export class MenuScene extends Phaser.Scene {
               segment.height
             );
           }
-          this.boardStaticGraphics.fillStyle(pathColor, 0.92);
+          this.boardStaticGraphics.fillStyle(pathColor, isMenuMode ? 0.92 : 0.96);
           this.boardStaticGraphics.fillRect(
             tileX + frames.core.leftInset,
             tileY + frames.core.topInset,
@@ -1375,18 +1382,10 @@ export class MenuScene extends Phaser.Scene {
             frames.core.height
           );
         } else {
-          this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor, isMenuMode ? 0.94 : 1);
+          this.boardStaticGraphics.fillStyle(wallColor, isMenuMode ? 0.94 : 1);
           this.boardStaticGraphics.fillRect(tileX, tileY, tileSize, tileSize);
 
-          if (walkable) {
-            this.boardStaticGraphics.fillStyle(pathColor, isMenuMode ? 0.98 : 1);
-            this.boardStaticGraphics.fillRect(
-              tileX + 1,
-              tileY + 1,
-              Math.max(1, tileSize - 2),
-              Math.max(1, tileSize - 2)
-            );
-          } else if (isMenuMode && tileSize > 6) {
+          if (isMenuMode && tileSize > 6) {
             this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.004);
             this.boardStaticGraphics.fillRect(
               tileX + 1,

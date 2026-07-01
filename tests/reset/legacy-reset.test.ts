@@ -40,6 +40,46 @@ const countLegacyShortcutBridgeFloors = (maze: ReturnType<typeof createLegacyMaz
   return bridges;
 };
 
+const countDetachedFloorTiles = (maze: ReturnType<typeof createLegacyMaze>): number => {
+  const queue = [maze.start];
+  const visited = new Set<string>([`${maze.start.x},${maze.start.y}`]);
+  const directions = [
+    { x: 0, y: -1 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 },
+    { x: 1, y: 0 }
+  ];
+
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    if (!current) {
+      continue;
+    }
+
+    for (const direction of directions) {
+      const next = { x: current.x + direction.x, y: current.y + direction.y };
+      const key = `${next.x},${next.y}`;
+      if (maze.grid[next.y]?.[next.x] !== true || visited.has(key)) {
+        continue;
+      }
+
+      visited.add(key);
+      queue.push(next);
+    }
+  }
+
+  let detached = 0;
+  for (let y = 0; y < maze.size; y += 1) {
+    for (let x = 0; x < maze.size; x += 1) {
+      if (maze.grid[y]?.[x] === true && !visited.has(`${x},${y}`)) {
+        detached += 1;
+      }
+    }
+  }
+
+  return detached;
+};
+
 const expectScaledMenuTile = (
   maze: ReturnType<typeof createLegacyMenuMaze>,
   sourceX: number,
@@ -98,6 +138,27 @@ describe('legacy reset lane', () => {
 
     expect(firstStep).toEqual(maze.start);
     expect(lastStep).toEqual(maze.goal);
+  });
+
+  test('normalizes generated play mazes into one playable floor component', () => {
+    for (const seed of [3749, 0x5a17f00d, 2, 777, 1001]) {
+      const maze = createLegacyMaze(50, seed);
+
+      expect(countDetachedFloorTiles(maze)).toBe(0);
+      expect(maze.solutionPath.length).toBeGreaterThanOrEqual(Math.floor(maze.size * 1.5));
+      expect(maze.playableTopologyStats?.reachableFloors).toBeGreaterThan(maze.solutionPath.length);
+      expect(maze.playableTopologyStats?.disconnectedFloorTilesPruned).toBeGreaterThan(0);
+      expect(maze.playableTopologyStats?.disconnectedComponentsPruned).toBeGreaterThan(0);
+    }
+  });
+
+  test('rebases weak generated goals without replacing already playable routes', () => {
+    const weakGoalMaze = createLegacyMaze(50, 777);
+    const playableGoalMaze = createLegacyMaze(50, 0x5a17f00d);
+
+    expect(weakGoalMaze.playableTopologyStats?.goalRebasedToFarthestReachableFloor).toBe(true);
+    expect(weakGoalMaze.playableTopologyStats?.originalGoalDistance).toBeLessThan(weakGoalMaze.playableTopologyStats?.resolvedGoalDistance ?? 0);
+    expect(playableGoalMaze.playableTopologyStats?.goalRebasedToFarthestReachableFloor).toBe(false);
   });
 
   test('applies legacy shortcut bridge openings to generated play mazes', () => {
