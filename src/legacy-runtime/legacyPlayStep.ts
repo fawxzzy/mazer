@@ -2,6 +2,8 @@ import { isWalkableTile, movePoint, type LegacyMazeSnapshot, type LegacyPoint } 
 
 export const LEGACY_PLAY_TRAIL_FADE_TAIL = 16;
 export const LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS = 50;
+export const LEGACY_POINTER_MOVE_MIN_DRAG_PX = 18;
+export const LEGACY_POINTER_DIAGONAL_RATIO = 0.55;
 
 export interface LegacyPlayMoveFlags {
   down: boolean;
@@ -27,8 +29,37 @@ export interface LegacyPlayStepResult {
   trail: LegacyPoint[];
 }
 
+export interface LegacyPointerMoveInput {
+  endX: number;
+  endY: number;
+  playerScreenX: number;
+  playerScreenY: number;
+  startX: number;
+  startY: number;
+  tileSize: number;
+}
+
 const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
 const normalizeDelta = (delta: number): number => Math.sign(delta);
+const resolveScreenDeltaMoveVector = (
+  deltaX: number,
+  deltaY: number
+): { deltaX: number; deltaY: number } => {
+  const absX = Math.abs(deltaX);
+  const absY = Math.abs(deltaY);
+  if (absX < 1 && absY < 1) {
+    return { deltaX: 0, deltaY: 0 };
+  }
+
+  const majorAxis = Math.max(absX, absY);
+  const minorAxis = Math.min(absX, absY);
+  const keepDiagonal = minorAxis >= majorAxis * LEGACY_POINTER_DIAGONAL_RATIO;
+
+  return {
+    deltaX: keepDiagonal || absX >= absY ? Math.sign(deltaX) : 0,
+    deltaY: keepDiagonal || absY > absX ? Math.sign(deltaY) : 0
+  };
+};
 
 export const createLegacyPlayMoveFlags = (): LegacyPlayMoveFlags => ({
   down: false,
@@ -43,6 +74,27 @@ export const resolveLegacyPlayMoveVector = (
   deltaX: (flags.right ? 1 : 0) - (flags.left ? 1 : 0),
   deltaY: (flags.down ? 1 : 0) - (flags.up ? 1 : 0)
 });
+
+export const resolveLegacyPointerMoveVector = ({
+  endX,
+  endY,
+  playerScreenX,
+  playerScreenY,
+  startX,
+  startY,
+  tileSize
+}: LegacyPointerMoveInput): { deltaX: number; deltaY: number } => {
+  const dragDeltaX = endX - startX;
+  const dragDeltaY = endY - startY;
+  const dragDistance = Math.hypot(dragDeltaX, dragDeltaY);
+  const minimumDragDistance = Math.max(LEGACY_POINTER_MOVE_MIN_DRAG_PX, tileSize * 0.35);
+
+  if (dragDistance >= minimumDragDistance) {
+    return resolveScreenDeltaMoveVector(dragDeltaX, dragDeltaY);
+  }
+
+  return resolveScreenDeltaMoveVector(endX - playerScreenX, endY - playerScreenY);
+};
 
 export const resolveLegacyPlayCollisionDelta = (
   maze: LegacyMazeSnapshot,

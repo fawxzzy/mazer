@@ -4,6 +4,7 @@ import {
   createLegacyPlayMoveFlags,
   LEGACY_PLAY_TRAIL_FADE_TAIL,
   LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
+  resolveLegacyPointerMoveVector,
   resolveLegacyPlayCollisionDelta,
   resolveLegacyPlayMoveVector
 } from '../../src/legacy-runtime/legacyPlayStep';
@@ -65,6 +66,54 @@ describe('legacy play step', () => {
     flags.down = true;
 
     expect(resolveLegacyPlayMoveVector(flags)).toEqual({ deltaX: 0, deltaY: 0 });
+  });
+
+  test('resolves mobile swipe direction into the same one-step vector contract', () => {
+    expect(resolveLegacyPointerMoveVector({
+      startX: 120,
+      startY: 120,
+      endX: 182,
+      endY: 124,
+      playerScreenX: 140,
+      playerScreenY: 140,
+      tileSize: 8
+    })).toEqual({ deltaX: 1, deltaY: 0 });
+  });
+
+  test('preserves diagonal mobile swipe intent when both axes are significant', () => {
+    expect(resolveLegacyPointerMoveVector({
+      startX: 100,
+      startY: 100,
+      endX: 156,
+      endY: 142,
+      playerScreenX: 140,
+      playerScreenY: 140,
+      tileSize: 8
+    })).toEqual({ deltaX: 1, deltaY: 1 });
+  });
+
+  test('resolves short mobile taps from the player screen center', () => {
+    expect(resolveLegacyPointerMoveVector({
+      startX: 158,
+      startY: 140,
+      endX: 160,
+      endY: 140,
+      playerScreenX: 140,
+      playerScreenY: 140,
+      tileSize: 8
+    })).toEqual({ deltaX: 1, deltaY: 0 });
+  });
+
+  test('ignores tiny mobile taps on the player center', () => {
+    expect(resolveLegacyPointerMoveVector({
+      startX: 140,
+      startY: 140,
+      endX: 140,
+      endY: 140,
+      playerScreenX: 140,
+      playerScreenY: 140,
+      tileSize: 8
+    })).toEqual({ deltaX: 0, deltaY: 0 });
   });
 
   test('allows a simultaneous diagonal step when the resolved target is walkable', () => {
