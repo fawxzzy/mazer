@@ -84,7 +84,7 @@ import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
 } from '../legacy-runtime/legacyDemoWalker';
-import { resolveLegacyMenuPathRenderFrame } from '../legacy-runtime/legacyMenuRender';
+import { resolveLegacyMenuPathRenderFrames } from '../legacy-runtime/legacyMenuRender';
 import {
   clearMenuSceneRuntimeDiagnostics,
   nextMenuSceneInstanceId,
@@ -1292,22 +1292,21 @@ export class MenuScene extends Phaser.Scene {
         const walkable = this.maze.grid[y]?.[x] === true;
 
         if (walkable && isMenuMode) {
-          const frame = resolveLegacyMenuPathRenderFrame(this.maze, { x, y }, tileSize);
-          const innerInset = Math.max(1, Math.floor(tileSize * 0.11));
+          const frames = resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);
 
           this.boardStaticGraphics.fillStyle(pathGlow, 0.9);
           this.boardStaticGraphics.fillRect(
-            tileX + frame.leftInset,
-            tileY + frame.topInset,
-            frame.width,
-            frame.height
+            tileX + frames.edge.leftInset,
+            tileY + frames.edge.topInset,
+            frames.edge.width,
+            frames.edge.height
           );
           this.boardStaticGraphics.fillStyle(pathColor, 0.92);
           this.boardStaticGraphics.fillRect(
-            tileX + frame.leftInset + innerInset,
-            tileY + frame.topInset + innerInset,
-            Math.max(1, frame.width - (innerInset * 2)),
-            Math.max(1, frame.height - (innerInset * 2))
+            tileX + frames.core.leftInset,
+            tileY + frames.core.topInset,
+            frames.core.width,
+            frames.core.height
           );
         } else {
           this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor, isMenuMode ? 0.94 : 1);

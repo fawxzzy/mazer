@@ -7,6 +7,11 @@ export interface LegacyMenuPathRenderFrame {
   height: number;
 }
 
+export interface LegacyMenuPathRenderFrames {
+  edge: LegacyMenuPathRenderFrame;
+  core: LegacyMenuPathRenderFrame;
+}
+
 const isWalkableGridPoint = (
   maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
   point: LegacyPoint
@@ -34,5 +39,36 @@ export const resolveLegacyMenuPathRenderFrame = (
     topInset,
     width: Math.max(2, tileSize - leftInset - rightInset),
     height: Math.max(2, tileSize - topInset - bottomInset)
+  };
+};
+
+export const resolveLegacyMenuPathRenderFrames = (
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  point: LegacyPoint,
+  tileSize: number
+): LegacyMenuPathRenderFrames => {
+  const edge = resolveLegacyMenuPathRenderFrame(maze, point, tileSize);
+  const coreInset = Math.max(1, Math.floor(tileSize * 0.08));
+  const connectedLeft = isWalkableGridPoint(maze, { x: point.x - 1, y: point.y });
+  const connectedRight = isWalkableGridPoint(maze, { x: point.x + 1, y: point.y });
+  const connectedTop = isWalkableGridPoint(maze, { x: point.x, y: point.y - 1 });
+  const connectedBottom = isWalkableGridPoint(maze, { x: point.x, y: point.y + 1 });
+  const leftInset = connectedLeft ? edge.leftInset : edge.leftInset + coreInset;
+  const topInset = connectedTop ? edge.topInset : edge.topInset + coreInset;
+  const rightInset = connectedRight
+    ? tileSize - edge.leftInset - edge.width
+    : (tileSize - edge.leftInset - edge.width) + coreInset;
+  const bottomInset = connectedBottom
+    ? tileSize - edge.topInset - edge.height
+    : (tileSize - edge.topInset - edge.height) + coreInset;
+
+  return {
+    edge,
+    core: {
+      leftInset,
+      topInset,
+      width: Math.max(1, tileSize - leftInset - rightInset),
+      height: Math.max(1, tileSize - topInset - bottomInset)
+    }
   };
 };
