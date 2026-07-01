@@ -58,7 +58,7 @@ build passed
 Side-browser proof:
 
 ```text
-C:\ATLAS\tmp\mazer-current-desktop-segment-dark-route-1920x1080.png
+ATLAS local-only tmp artifact: tmp/mazer-current-desktop-segment-dark-route-1920x1080.png
 ```
 
 Runtime diagnostics on the maintained `4173` browser tab:
