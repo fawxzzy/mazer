@@ -9,13 +9,15 @@ import {
   generateMaze,
   generateMazeForDifficulty,
   getNeighborIndex,
+  isTileFloor,
   PatternEngine,
   resetAndRegenerate,
   runBatch,
   solveAStar,
   solveCorridorGraph,
   type MazeCore,
-  type MazeConfig
+  type MazeConfig,
+  type MazeEpisode
 } from '../../src/domain/maze';
 import { assertMazeInvariants, measureEpisodeTopology, serializeMaze } from './maze-test-utils';
 
@@ -76,6 +78,35 @@ const countCanonicalBypassableBands = (maze: MazeCore): number => {
   }
 
   return bands.size;
+};
+
+const countLegacyRasterShortcutBridges = (episode: MazeEpisode): number => {
+  const { tiles, width, height, pathIndices } = episode.raster;
+  const canonical = new Set<number>(Array.from(pathIndices));
+  let bridges = 0;
+
+  for (let index = 0; index < tiles.length; index += 1) {
+    if (canonical.has(index) || !isTileFloor(tiles, index)) {
+      continue;
+    }
+    const top = getNeighborIndex(index, width, height, 0);
+    const bottom = getNeighborIndex(index, width, height, 1);
+    const left = getNeighborIndex(index, width, height, 2);
+    const right = getNeighborIndex(index, width, height, 3);
+    if (top === -1 || bottom === -1 || left === -1 || right === -1) {
+      continue;
+    }
+
+    const verticalWalls = !isTileFloor(tiles, top) && !isTileFloor(tiles, bottom);
+    const horizontalWalls = !isTileFloor(tiles, left) && !isTileFloor(tiles, right);
+    const horizontalFloors = isTileFloor(tiles, left) && isTileFloor(tiles, right);
+    const verticalFloors = isTileFloor(tiles, top) && isTileFloor(tiles, bottom);
+    if ((verticalWalls && horizontalFloors) || (horizontalWalls && verticalFloors)) {
+      bridges += 1;
+    }
+  }
+
+  return bridges;
 };
 
 const setCorePassage = (maze: MazeCore, from: number, to: number, open: boolean): void => {
@@ -344,6 +375,7 @@ describe('maze domain generation', () => {
     expect(maze.shortcutsCreated).toBeGreaterThan(0);
     expect(countCanonicalBypassableEdges(maze.core!)).toBeGreaterThan(1);
     expect(countCanonicalBypassableBands(maze.core!)).toBeGreaterThanOrEqual(2);
+    expect(countLegacyRasterShortcutBridges(maze)).toBeGreaterThan(0);
 
     disposeMazeEpisode(maze);
   });

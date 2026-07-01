@@ -2,7 +2,7 @@
 
 Date: 2026-07-01
 Status: active
-Current marker: `70%`
+Current marker: `71%`
 
 ## Intent
 
@@ -64,15 +64,15 @@ The current marker is the sum of the awarded points below.
 | Menu screenshot composition and board presentation | `14` | `6` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-title.test.ts`, `tests/reset/legacy-menu-button-chrome.test.ts`, `tests/reset/legacy-menu-backdrop.test.ts`, `tests/scenes/menu-render-frame.test.ts`, localhost | restored screenshots show denser, thinner Unreal corridor geometry and a different board/material read than the current web board; current work is closer than the old product shell but not near screenshot-grade closure |
 | Overlay family and field responsibilities | `14` | `12` | mostly aligned | `src/legacy-runtime/legacyOptionFields.ts` -> `src/legacy-runtime/legacyOverlayFieldCommit.ts` -> `src/legacy-runtime/legacyOverlayToggleFields.ts` -> `src/legacy-runtime/legacyOverlayRouting.ts` -> `src/legacy-runtime/legacyPauseLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-overlay-routing.test.ts`, `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost | overlay ownership and routing are strong, but widget-level screenshot and input exactness still need review against the restored UI source and screenshots |
 | Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | simultaneous-key movement buffering, axis-gated collision, and single-request active-play reset return are ported, but full active-play feel, HUD integration, and edge-case equivalence are not yet complete |
-| Generation lifecycle exactness | `16` | `9` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/domain/maze/core.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/maze/maze-domain.test.ts`, localhost runtime diagnostics | process/stage ownership is mapped, diagnostics show stage-6 row reveal, and browser shortcut topology now creates family-aware route-affecting bypasses with separated canonical-route reconnection proof instead of random dead-end wall punches, but the browser builder still resolves topology outside a line-for-line Unreal `CreateGrid`/`MapPath`/`CreatePath`/`CreateShortCuts` port |
+| Generation lifecycle exactness | `16` | `10` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/domain/maze/core.ts` -> `src/domain/maze/generator.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/maze/maze-domain.test.ts`, localhost runtime diagnostics | process/stage ownership is mapped, diagnostics show stage-6 row reveal, browser shortcut topology creates family-aware route-affecting bypasses with separated canonical-route reconnection proof, and rasterized play mazes now apply the restored legacy `CreateShortCuts` opposite-corridor wall-bridge rule as deterministic additive shortcut openings; the browser builder still does not run the full Unreal `CreateGrid`/`MapPath`/`CreatePath`/`CreateShortCuts` sequence line-for-line |
 | Demo route, backtracking, and pacing | `12` | `8` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, localhost | recovery cues, AI-only reset replay, goal-reset timing, and `AiTilePathCheck` admission are covered, but the live walker is still not a line-for-line Unreal path-stack/backtracking port |
 | In-game HUD and goal-arrow parity | `8` | `5` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot | the timer/arrow overlay is tighter and bounded, but final legacy HUD timer/goal-arrow semantics and visual exactness are still open |
 
 Current total:
 
-- `70 / 100`
+- `71 / 100`
 
-## Why the marker was corrected from 97% to 70%
+## Why the marker was corrected from 97% to 70%, then ratcheted to 71%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -93,7 +93,7 @@ The corrected `70%` marker means:
 The biggest remaining gaps are not cosmetic:
 
 - generation/reset lifecycle ownership is now aligned, but exact topology-builder internals are still browser-native rather than a line-for-line Unreal generator port
-- shortcut topology is no longer the earlier random dead-end braider: it now uses family-aware loop scoring, sparse fallback protection, and a bounded route-aware braided bypass pass that rejects candidates without separated canonical-route reconnection; this improves route alternatives but does not close the literal `CreateShortCuts` port gap
+- shortcut topology is no longer the earlier random dead-end braider: it now uses family-aware loop scoring, sparse fallback protection, a bounded route-aware braided bypass pass that rejects candidates without separated canonical-route reconnection, and a raster-level legacy opposite-corridor bridge pass that opens only wall tiles with one floor-floor axis and one wall-wall axis; this improves route alternatives and ports the core `CreateShortCuts` condition, but does not close the full line-for-line generator port gap
 - front-door `Exit` semantics are closed through an explicit browser-safe quit equivalence, but the visible front-door composition is still not screenshot-grade
 - desktop menu board dominance, title lockup, and button support chrome are closer to legacy screenshot truth, the backdrop field now has an explicit owner plus a closer cloudy/star treatment, and the board material now reads darker and less evenly tiled, but screenshot-grade backdrop/material and final composition exactness are still open
 - desktop board tile read is slightly closer after widening the menu trench core and reducing wall-grid noise, but screenshot-grade board material and composition exactness are still open
@@ -175,6 +175,7 @@ Current note:
 - the wide-route-core/soft-edge static-board material packet does not earn a point because it reduces the tiny-grid/checker read in dense route areas but still does not close screenshot-grade board material, dense corridor geometry, or full menu composition parity
 - the maze shortcut topology packet does not earn a point because it replaces the weak random browser braider with family-aware route-affecting bypass logic and tests, but it is still an improved browser-native equivalent rather than a line-for-line Unreal `CreateShortCuts` port
 - the maze shortcut route-span packet does not earn a point because it hardens the browser-native bypass pass with separated canonical-route reconnection and multi-band bypass proof, but it still does not recover the literal Unreal `CreateShortCuts` implementation
+- the maze raster bridge shortcut packet earns one point because it changes runtime maze topology by restoring the old `CreateShortCuts` wall-selection shape at the raster layer: the browser opens deterministic additive floor bridges only where the selected wall tile has opposite floor/path corridors on one axis and wall blockers on the other axis; it does not earn more because the web builder still does not execute the full Unreal wall-array, random-removal, process-yield, and staged path-builder internals line-for-line
 - the connected light-core menu-material packet does not earn a point because it moves the static board toward the restored light-corridor / dark-wall screenshot role, but exact corridor density, slab relief, title overlap, and full screenshot-grade composition remain open
 
 ## Preferred modular lock order from here

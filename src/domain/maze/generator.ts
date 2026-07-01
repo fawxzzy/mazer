@@ -18,6 +18,7 @@ import type {
   MazeEpisode,
   MazeFamily,
   MazeFamilyMode,
+  MazeGenerationPhase,
   MazeGenerationTrace,
   MazeGenerationState,
   MazeMetrics,
@@ -566,7 +567,7 @@ const rasterizeMaze = (options: RasterizeOptions): MazeEpisode => {
     startIndex,
     endIndex
   }, footprint);
-  const rasterGenerationTrace = rasterizeGenerationTrace(
+  let rasterGenerationTrace = rasterizeGenerationTrace(
     generationTrace,
     core.width,
     playableWidth,
@@ -580,12 +581,26 @@ const rasterizeMaze = (options: RasterizeOptions): MazeEpisode => {
   for (let pathCursor = 0; pathCursor < raster.pathIndices.length; pathCursor += 1) {
     raster.tiles[raster.pathIndices[pathCursor]] |= TILE_PATH;
   }
+  const legacyBridgeShortcutIndices = applyLegacyRasterShortcutBridges(
+    raster.tiles,
+    raster.width,
+    raster.height,
+    seed,
+    core.width,
+    core.braidRatio
+  );
+  rasterGenerationTrace = appendRasterGenerationTraceSteps(
+    rasterGenerationTrace,
+    legacyBridgeShortcutIndices,
+    'braid'
+  );
   raster.tiles[raster.endIndex] |= TILE_END;
 
   const metrics = measureTileMaze(raster.tiles, raster.width, raster.height, raster.pathIndices);
   const routeMotifs = measureTileMazeRouteMotifs(raster.tiles, raster.width, raster.height, raster.pathIndices);
   const rasterMinSolutionLength = Math.max(1, (minSolutionLength * 2) - 1);
-  const difficultyResult = classifyMazeDifficulty(metrics, raster.width, raster.height, shortcutsCreated, routeMotifs);
+  const totalShortcutsCreated = shortcutsCreated + legacyBridgeShortcutIndices.length;
+  const difficultyResult = classifyMazeDifficulty(metrics, raster.width, raster.height, totalShortcutsCreated, routeMotifs);
 
   return {
     seed,
@@ -597,7 +612,7 @@ const rasterizeMaze = (options: RasterizeOptions): MazeEpisode => {
     },
     metrics,
     routeMotifs,
-    shortcutsCreated,
+    shortcutsCreated: totalShortcutsCreated,
     accepted: acceptedCore && solution.found && passesRasterQualityGate(metrics, rasterMinSolutionLength),
     difficulty: difficultyResult.difficulty,
     difficultyScore: difficultyResult.score,
@@ -689,6 +704,96 @@ const rasterizeGenerationTrace = (
     uniqueTileCount: uniqueTiles.size,
     steps
   };
+};
+
+const appendRasterGenerationTraceSteps = (
+  trace: MazeGenerationTrace,
+  tileIndices: readonly number[],
+  phase: MazeGenerationPhase
+): MazeGenerationTrace => {
+  if (tileIndices.length === 0) {
+    return trace;
+  }
+
+  const uniqueTiles = new Set<number>();
+  trace.steps.forEach((step) => {
+    step.tileIndices.forEach((tileIndex) => uniqueTiles.add(tileIndex));
+  });
+  tileIndices.forEach((tileIndex) => uniqueTiles.add(tileIndex));
+
+  return {
+    ...trace,
+    uniqueTileCount: uniqueTiles.size,
+    steps: [
+      ...trace.steps,
+      ...tileIndices.map((tileIndex) => ({
+        phase,
+        tileIndices: [tileIndex]
+      }))
+    ]
+  };
+};
+
+const applyLegacyRasterShortcutBridges = (
+  tiles: Uint8Array,
+  width: number,
+  height: number,
+  seed: number,
+  coreWidth: number,
+  braidRatio: number
+): number[] => {
+  if (coreWidth <= 35 || braidRatio <= 0) {
+    return [];
+  }
+
+  const candidates: number[] = [];
+  for (let index = 0; index < tiles.length; index += 1) {
+    if (isTileFloor(tiles, index) || !isLegacyRasterShortcutCandidate(tiles, width, height, index)) {
+      continue;
+    }
+    candidates.push(index);
+  }
+
+  const budget = Math.min(
+    candidates.length,
+    Math.max(1, Math.trunc(coreWidth * braidRatio * 0.45))
+  );
+  const rng = createSeededRng((seed ^ 0x5c2a7b1d) >>> 0);
+  const opened: number[] = [];
+
+  while (opened.length < budget && candidates.length > 0) {
+    const pick = rng.nextInt(0, candidates.length - 1);
+    const [candidate] = candidates.splice(pick, 1);
+    if (!isLegacyRasterShortcutCandidate(tiles, width, height, candidate)) {
+      continue;
+    }
+
+    tiles[candidate] |= TILE_FLOOR;
+    opened.push(candidate);
+  }
+
+  return opened;
+};
+
+const isLegacyRasterShortcutCandidate = (
+  tiles: Uint8Array,
+  width: number,
+  height: number,
+  index: number
+): boolean => {
+  const top = getNeighborIndex(index, width, height, 0);
+  const bottom = getNeighborIndex(index, width, height, 1);
+  const left = getNeighborIndex(index, width, height, 2);
+  const right = getNeighborIndex(index, width, height, 3);
+  if (top === -1 || bottom === -1 || left === -1 || right === -1) {
+    return false;
+  }
+
+  const verticalWalls = !isTileFloor(tiles, top) && !isTileFloor(tiles, bottom);
+  const horizontalWalls = !isTileFloor(tiles, left) && !isTileFloor(tiles, right);
+  const horizontalFloors = isTileFloor(tiles, left) && isTileFloor(tiles, right);
+  const verticalFloors = isTileFloor(tiles, top) && isTileFloor(tiles, bottom);
+  return (verticalWalls && horizontalFloors) || (horizontalWalls && verticalFloors);
 };
 
 const resolveBoardFootprintOffset = (

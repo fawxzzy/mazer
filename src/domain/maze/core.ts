@@ -2934,7 +2934,9 @@ const applyRouteAwareBypassPass = (
       }
 
       const routeCenterBonus = 1 - Math.abs(progress - 0.52);
-      const offPathBonus = canonicalPath.has(to) ? 0 : 0.72;
+      const isLegacyPathBridge = canonicalPath.has(to);
+      const pathBridgeBonus = isLegacyPathBridge ? 1.08 : 0;
+      const offPathBonus = isLegacyPathBridge ? 0 : 0.48;
       const branchPenalty = Math.max(0, countOpenNeighbors(maze, from) - 2) * 0.45;
       candidates.push({
         from,
@@ -2943,6 +2945,7 @@ const applyRouteAwareBypassPass = (
         routeSpan,
         pathPosition,
         score: (routeCenterBonus * 2.2)
+          + pathBridgeBonus
           + offPathBonus
           + Math.min(routeSpan, minimumRouteSpan * 3) * 0.07
           + Math.min(loopDistance, searchDistanceLimit) * 0.08
