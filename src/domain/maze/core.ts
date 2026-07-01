@@ -185,6 +185,27 @@ interface AntiStraightnessPassOptions {
   readonly regionBias: 'balanced' | 'interior' | 'perimeter' | 'split';
 }
 
+interface BraidShortcutCandidate {
+  readonly from: number;
+  readonly to: number;
+  readonly loopDistance: number;
+  readonly score: number;
+}
+
+interface BraidShortcutProfile {
+  readonly minimumLoopDistance: number;
+  readonly targetLoopDistance: number;
+  readonly maximumLoopDistance: number;
+  readonly loopDistanceWeight: number;
+  readonly targetDistanceWeight: number;
+  readonly hubPenaltyScale: number;
+  readonly perimeterPenaltyScale: number;
+  readonly turnBonus: number;
+  readonly reserveTargetCells: boolean;
+  readonly useFallbackCandidates: boolean;
+  readonly openingTargetScale: number;
+}
+
 interface MazeFamilyTopologyProfile {
   readonly searchWindow: number;
   readonly placementStrategies: readonly MazePlacementStrategy[];
@@ -1345,6 +1366,7 @@ const scoreFamilyCandidate = (result: CoreBuildResult, attempt: number): number 
         + (shortcutScore * 1.15)
         + (branchScore * 0.12)
         + (motifScore * 0.22)
+        + (result.topology.loopDetours * 0.5)
         + (endpointAsymmetryScore * 0.78)
         + (endpointBranchScore * 0.62)
         + (endpointTurnScore * 0.68)
@@ -2562,6 +2584,13 @@ const generateWilsonMaze = (
   maze.start = placement.start;
   maze.goal = placement.goal;
   maze.placementStrategy = placement.strategy;
+  if (family === 'braided' && braidRatio > 0) {
+    const endpointSolution = solveCorridorGraph(maze, maze.start, maze.goal);
+    if (endpointSolution.found) {
+      traceRecorder.currentPhase = 'braid';
+      applyRouteAwareBypassPass(maze, endpointSolution.pathIndices, rng, traceRecorder);
+    }
+  }
   return {
     maze,
     generationTrace: finalizeCoreGenerationTrace(traceRecorder)
@@ -2569,24 +2598,309 @@ const generateWilsonMaze = (
 };
 
 const braidMaze = (maze: MazeCore, ratio: number, rng: () => number, recorder?: CoreGenerationTraceRecorder): void => {
-  const candidates: number[] = [];
+  let initialDeadEnds = 0;
   for (let index = 0; index < maze.cells.length; index += 1) {
     if (countOpenNeighbors(maze, index) === 1) {
-      candidates.push(index);
+      initialDeadEnds += 1;
     }
   }
 
-  shuffleInPlace(candidates, rng);
-  const target = Math.floor(candidates.length * clamp(ratio, 0, 1));
+  const profile = resolveBraidShortcutProfile(maze);
+  const target = Math.floor(initialDeadEnds * clamp(ratio, 0, 1) * profile.openingTargetScale);
+  const candidates = collectBraidShortcutCandidates(maze, profile, rng)
+    .sort((left, right) => right.score - left.score);
+  const usedCells = new Set<number>();
   let opened = 0;
 
-  for (let cursor = 0; cursor < candidates.length && opened < target; cursor += 1) {
-    const chosen = pickRandomClosedNeighbor(maze, candidates[cursor], rng);
-    if (chosen === -1) {
+  for (const candidate of candidates) {
+    if (opened >= target) {
+      return;
+    }
+    if (usedCells.has(candidate.from) || (profile.reserveTargetCells && usedCells.has(candidate.to))) {
+      continue;
+    }
+    if (isOpenBetween(maze, candidate.from, candidate.to)) {
+      continue;
+    }
+    if (countOpenNeighbors(maze, candidate.from) !== 1) {
       continue;
     }
 
-    carvePassage(maze, candidates[cursor], chosen, recorder);
+    carvePassage(maze, candidate.from, candidate.to, recorder);
+    usedCells.add(candidate.from);
+    if (profile.reserveTargetCells) {
+      usedCells.add(candidate.to);
+    }
+    opened += 1;
+  }
+};
+
+const resolveBraidShortcutProfile = (maze: MazeCore): BraidShortcutProfile => {
+  const boardScale = Math.sqrt(maze.cells.length);
+  const base = {
+    minimumLoopDistance: Math.max(4, Math.floor(boardScale * 0.28)),
+    targetLoopDistance: Math.max(8, Math.floor(boardScale * 0.38)),
+    maximumLoopDistance: Number.POSITIVE_INFINITY,
+    loopDistanceWeight: 0.42,
+    targetDistanceWeight: 0.34,
+    hubPenaltyScale: 0.85,
+    perimeterPenaltyScale: 0.35,
+    turnBonus: 0.4,
+    reserveTargetCells: true,
+    useFallbackCandidates: true,
+    openingTargetScale: 1
+  } satisfies BraidShortcutProfile;
+
+  switch (maze.family) {
+    case 'braided':
+      return {
+        minimumLoopDistance: Math.max(5, Math.floor(boardScale * 0.34)),
+        targetLoopDistance: Math.max(12, Math.floor(boardScale * 0.48)),
+        maximumLoopDistance: Number.POSITIVE_INFINITY,
+        loopDistanceWeight: 0.74,
+        targetDistanceWeight: 0.18,
+        hubPenaltyScale: 0.46,
+        perimeterPenaltyScale: 0.3,
+        turnBonus: 0.46,
+        reserveTargetCells: false,
+        useFallbackCandidates: true,
+        openingTargetScale: 1.18
+      };
+    case 'dense':
+      return {
+        minimumLoopDistance: 4,
+        targetLoopDistance: Math.max(7, Math.floor(boardScale * 0.18)),
+        maximumLoopDistance: Math.max(10, Math.floor(boardScale * 0.34)),
+        loopDistanceWeight: 0.08,
+        targetDistanceWeight: 1.15,
+        hubPenaltyScale: 0.38,
+        perimeterPenaltyScale: 0.22,
+        turnBonus: 0.5,
+        reserveTargetCells: true,
+        useFallbackCandidates: true,
+        openingTargetScale: 1
+      };
+    case 'sparse':
+      return {
+        minimumLoopDistance: Math.max(6, Math.floor(boardScale * 0.42)),
+        targetLoopDistance: Math.max(12, Math.floor(boardScale * 0.58)),
+        maximumLoopDistance: Math.max(16, Math.floor(boardScale * 0.82)),
+        loopDistanceWeight: 0.2,
+        targetDistanceWeight: 0.42,
+        hubPenaltyScale: 1,
+        perimeterPenaltyScale: 0.42,
+        turnBonus: 0.22,
+        reserveTargetCells: true,
+        useFallbackCandidates: false,
+        openingTargetScale: 0.72
+      };
+    case 'framed':
+      return {
+        ...base,
+        targetLoopDistance: Math.max(9, Math.floor(boardScale * 0.32)),
+        maximumLoopDistance: Math.max(13, Math.floor(boardScale * 0.5)),
+        perimeterPenaltyScale: 0.14
+      };
+    case 'split-flow':
+      return {
+        ...base,
+        minimumLoopDistance: Math.max(4, Math.floor(boardScale * 0.3)),
+        targetLoopDistance: Math.max(10, Math.floor(boardScale * 0.42)),
+        loopDistanceWeight: 0.46,
+        targetDistanceWeight: 0.3
+      };
+    case 'classic':
+    default:
+      return base;
+  }
+};
+
+const collectBraidShortcutCandidates = (
+  maze: MazeCore,
+  profile: BraidShortcutProfile,
+  rng: () => number
+): BraidShortcutCandidate[] => {
+  const candidates: BraidShortcutCandidate[] = [];
+  const fallbacks: BraidShortcutCandidate[] = [];
+  const searchDistanceLimit = Math.min(
+    maze.cells.length - 1,
+    Math.max(
+      Number.isFinite(profile.maximumLoopDistance) ? profile.maximumLoopDistance : profile.targetLoopDistance * 2,
+      profile.minimumLoopDistance + 4
+    )
+  );
+
+  for (let from = 0; from < maze.cells.length; from += 1) {
+    if (countOpenNeighbors(maze, from) !== 1) {
+      continue;
+    }
+
+    for (let direction = 0; direction < DIRS.length; direction += 1) {
+      const to = neighborIndexForDirection(maze, from, direction);
+      if (to === -1 || isOpenBetween(maze, from, to)) {
+        continue;
+      }
+
+      const loopDistance = measureOpenGraphDistance(maze, from, to, searchDistanceLimit);
+      if (loopDistance < 4) {
+        continue;
+      }
+
+      const candidate = scoreBraidShortcutCandidate(maze, from, to, loopDistance, profile, rng);
+      if (loopDistance >= profile.minimumLoopDistance && loopDistance <= profile.maximumLoopDistance) {
+        candidates.push(candidate);
+      } else {
+        fallbacks.push(candidate);
+      }
+    }
+  }
+
+  return candidates.length > 0 || !profile.useFallbackCandidates ? candidates : fallbacks;
+};
+
+const scoreBraidShortcutCandidate = (
+  maze: MazeCore,
+  from: number,
+  to: number,
+  loopDistance: number,
+  profile: BraidShortcutProfile,
+  rng: () => number
+): BraidShortcutCandidate => {
+  const toDegree = countOpenNeighbors(maze, to);
+  const fromX = xFromIndex(from, maze.width);
+  const fromY = yFromIndex(from, maze.width);
+  const toX = xFromIndex(to, maze.width);
+  const toY = yFromIndex(to, maze.width);
+  const perimeterPenalty = (
+    Number(isOnPerimeter(fromX, fromY, maze.width, maze.height))
+    + Number(isOnPerimeter(toX, toY, maze.width, maze.height))
+  ) * profile.perimeterPenaltyScale;
+  const hubPenalty = Math.max(0, toDegree - 2) * profile.hubPenaltyScale;
+  const targetDistancePenalty = Math.abs(loopDistance - profile.targetLoopDistance) * profile.targetDistanceWeight;
+  const turnBonus = hasTurnOpportunity(maze, from) || hasTurnOpportunity(maze, to) ? profile.turnBonus : 0;
+
+  return {
+    from,
+    to,
+    loopDistance,
+    score: (loopDistance * profile.loopDistanceWeight)
+      + turnBonus
+      - targetDistancePenalty
+      - perimeterPenalty
+      - hubPenalty
+      + (rng() * 0.01)
+  };
+};
+
+const measureOpenGraphDistance = (maze: MazeCore, start: number, target: number, maxDistance: number): number => {
+  const queue = new Int32Array(maze.cells.length);
+  const distances = new Int32Array(maze.cells.length);
+  distances.fill(-1);
+  let head = 0;
+  let tail = 0;
+  queue[tail] = start;
+  tail += 1;
+  distances[start] = 0;
+
+  while (head < tail) {
+    const current = queue[head];
+    head += 1;
+    const currentDistance = distances[current];
+    if (currentDistance >= maxDistance) {
+      continue;
+    }
+
+    for (const neighbor of getOpenNeighbors(maze, current)) {
+      if (distances[neighbor] !== -1) {
+        continue;
+      }
+
+      distances[neighbor] = currentDistance + 1;
+      if (neighbor === target) {
+        return distances[neighbor];
+      }
+      queue[tail] = neighbor;
+      tail += 1;
+    }
+  }
+
+  return -1;
+};
+
+const applyRouteAwareBypassPass = (
+  maze: MazeCore,
+  pathIndices: ArrayLike<number>,
+  rng: () => number,
+  recorder?: CoreGenerationTraceRecorder
+): void => {
+  const path = Array.from(pathIndices);
+  if (path.length < 10) {
+    return;
+  }
+
+  const canonicalPath = new Set(path);
+  const boardScale = Math.sqrt(maze.cells.length);
+  const searchDistanceLimit = Math.max(8, Math.floor(boardScale * 0.62));
+  const targetOpenings = Math.min(16, Math.max(3, Math.floor(path.length / 24)));
+  const minimumPathSeparation = Math.max(3, Math.floor(path.length / Math.max(4, targetOpenings * 3)));
+  const candidates: Array<BraidShortcutCandidate & { readonly pathPosition: number }> = [];
+
+  for (let pathPosition = 2; pathPosition < path.length - 2; pathPosition += 1) {
+    const from = path[pathPosition];
+    if (countOpenNeighbors(maze, from) >= 4) {
+      continue;
+    }
+
+    const progress = pathPosition / Math.max(1, path.length - 1);
+    if (progress < 0.1 || progress > 0.92) {
+      continue;
+    }
+
+    for (let direction = 0; direction < DIRS.length; direction += 1) {
+      const to = neighborIndexForDirection(maze, from, direction);
+      if (to === -1 || isOpenBetween(maze, from, to)) {
+        continue;
+      }
+
+      const loopDistance = measureOpenGraphDistance(maze, from, to, searchDistanceLimit);
+      if (loopDistance < 4) {
+        continue;
+      }
+
+      const routeCenterBonus = 1 - Math.abs(progress - 0.52);
+      const offPathBonus = canonicalPath.has(to) ? 0 : 0.72;
+      const branchPenalty = Math.max(0, countOpenNeighbors(maze, from) - 2) * 0.45;
+      candidates.push({
+        from,
+        to,
+        loopDistance,
+        pathPosition,
+        score: (routeCenterBonus * 2.2)
+          + offPathBonus
+          + Math.min(loopDistance, searchDistanceLimit) * 0.08
+          - branchPenalty
+          + (rng() * 0.01)
+      });
+    }
+  }
+
+  candidates.sort((left, right) => right.score - left.score);
+  const usedPathPositions: number[] = [];
+  let opened = 0;
+
+  for (const candidate of candidates) {
+    if (opened >= targetOpenings) {
+      return;
+    }
+    if (isOpenBetween(maze, candidate.from, candidate.to)) {
+      continue;
+    }
+    if (usedPathPositions.some((used) => Math.abs(used - candidate.pathPosition) < minimumPathSeparation)) {
+      continue;
+    }
+
+    carvePassage(maze, candidate.from, candidate.to, recorder);
+    usedPathPositions.push(candidate.pathPosition);
     opened += 1;
   }
 };
@@ -2894,48 +3208,6 @@ const hasTurnOpportunity = (maze: MazeCore, index: number): boolean => {
   return hasVertical && hasHorizontal;
 };
 
-const pickRandomClosedNeighbor = (maze: MazeCore, idx: number, rng: () => number): number => {
-  const x = xFromIndex(idx, maze.width);
-  const y = yFromIndex(idx, maze.width);
-  const cell = maze.cells[idx];
-  let optionCount = 0;
-
-  for (let direction = 0; direction < DIRS.length; direction += 1) {
-    const dir = DIRS[direction];
-    if ((cell & dir.bit) === 0) {
-      continue;
-    }
-    if (inBounds(x + dir.dx, y + dir.dy, maze.width, maze.height)) {
-      optionCount += 1;
-    }
-  }
-
-  if (optionCount === 0) {
-    return -1;
-  }
-
-  let pick = randomInt(optionCount, rng);
-  for (let direction = 0; direction < DIRS.length; direction += 1) {
-    const dir = DIRS[direction];
-    if ((cell & dir.bit) === 0) {
-      continue;
-    }
-
-    const nextX = x + dir.dx;
-    const nextY = y + dir.dy;
-    if (!inBounds(nextX, nextY, maze.width, maze.height)) {
-      continue;
-    }
-
-    if (pick === 0) {
-      return indexOf(maze.width, nextX, nextY);
-    }
-    pick -= 1;
-  }
-
-  return -1;
-};
-
 const createCoreGenerationTraceRecorder = (rootCellIndex: number): CoreGenerationTraceRecorder => ({
   currentPhase: 'seed',
   rootCellIndex,
@@ -3231,13 +3503,6 @@ const randomUnvisitedIndex = (inTree: Uint8Array, rng: () => number): number => 
 const inBounds = (x: number, y: number, width: number, height: number): boolean => (
   x >= 0 && y >= 0 && x < width && y < height
 );
-
-const shuffleInPlace = <T>(items: T[], rng: () => number): void => {
-  for (let index = items.length - 1; index > 0; index -= 1) {
-    const swapIndex = randomInt(index + 1, rng);
-    [items[index], items[swapIndex]] = [items[swapIndex], items[index]];
-  }
-};
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
