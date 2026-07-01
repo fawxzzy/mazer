@@ -363,11 +363,13 @@ Rule:
 - `src/legacy-runtime/legacyMenuSnapshot.ts`
   - fixed screenshot-shaped front-door board blueprint
   - named branch groups for silhouette tweaking
+  - projects the named 25-space branch blueprint into a 49-cell browser grid for screenshot-facing menu density
   - safest place to edit menu-only maze geometry
 
 - `src/legacy-runtime/legacyMaze.ts`
   - generated maze builder for play mode
   - adapter that converts the fixed menu snapshot blueprint into a `LegacyMazeSnapshot`
+  - tags snapshots with `source: 'menu-snapshot'` or `source: 'play-generated'` so demo policy does not infer identity from grid size
 
 Boundary:
 

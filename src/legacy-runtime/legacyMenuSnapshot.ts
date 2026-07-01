@@ -14,7 +14,31 @@ export interface LegacyMenuSnapshotBlueprint {
   branches: LegacyMenuSnapshotPolyline[];
 }
 
-export const LEGACY_MENU_SNAPSHOT_SIZE = 25;
+const LEGACY_MENU_BLUEPRINT_SOURCE_SIZE = 25;
+export const LEGACY_MENU_SNAPSHOT_SIZE = 49;
+const LEGACY_MENU_SNAPSHOT_COORDINATE_SCALE = Math.trunc(
+  (LEGACY_MENU_SNAPSHOT_SIZE - 1) / (LEGACY_MENU_BLUEPRINT_SOURCE_SIZE - 1)
+);
+
+const scaleSnapshotPoint = (point: LegacyMenuSnapshotPoint): LegacyMenuSnapshotPoint => ({
+  x: point.x * LEGACY_MENU_SNAPSHOT_COORDINATE_SCALE,
+  y: point.y * LEGACY_MENU_SNAPSHOT_COORDINATE_SCALE
+});
+
+const scaleSnapshotPath = (points: LegacyMenuSnapshotPoint[]): LegacyMenuSnapshotPoint[] => {
+  const scaledPath: LegacyMenuSnapshotPoint[] = [];
+
+  for (const point of points) {
+    appendSegment(scaledPath, scaleSnapshotPoint(point));
+  }
+
+  return scaledPath;
+};
+
+const scaleSnapshotPolyline = (polyline: LegacyMenuSnapshotPolyline): LegacyMenuSnapshotPolyline => ({
+  id: polyline.id,
+  points: scaleSnapshotPath(polyline.points)
+});
 
 const appendSegment = (path: LegacyMenuSnapshotPoint[], to: LegacyMenuSnapshotPoint): void => {
   const from = path[path.length - 1];
@@ -255,6 +279,6 @@ const buildBranchPolylines = (): LegacyMenuSnapshotPolyline[] => {
 
 export const resolveLegacyMenuSnapshotBlueprint = (): LegacyMenuSnapshotBlueprint => ({
   size: LEGACY_MENU_SNAPSHOT_SIZE,
-  solutionPath: buildSolutionPath(),
-  branches: buildBranchPolylines()
+  solutionPath: scaleSnapshotPath(buildSolutionPath()),
+  branches: buildBranchPolylines().map(scaleSnapshotPolyline)
 });

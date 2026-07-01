@@ -144,9 +144,11 @@ describe('legacy generation lifecycle', () => {
     const menuMaze = createLegacyRuntimeMazeForMode('menu', 50, 3749);
     const playMaze = createLegacyRuntimeMazeForMode('play', 50, 3749);
 
-    expect(menuMaze.size).toBe(25);
+    expect(menuMaze.size).toBe(49);
     expect(playMaze.size).toBeGreaterThan(25);
-    expect(menuMaze.goal).toEqual({ x: 22, y: 22 });
+    expect(menuMaze.goal).toEqual({ x: 44, y: 44 });
+    expect(menuMaze.source).toBe('menu-snapshot');
+    expect(playMaze.source).toBe('play-generated');
     expect(playMaze.start).not.toEqual(playMaze.goal);
   });
 

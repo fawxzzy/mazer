@@ -10,6 +10,7 @@ import {
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 
 const createTestMaze = (): LegacyMazeSnapshot => ({
+  source: 'play-generated',
   size: 5,
   grid: [
     [false, false, false, false, false],

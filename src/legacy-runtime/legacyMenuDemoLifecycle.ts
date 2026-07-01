@@ -27,7 +27,9 @@ const buildPathTrail = (
   return points.slice(Math.max(0, points.length - limit)).map(copyPoint);
 };
 
-export const isFixedLegacyMenuSnapshot = (maze: Pick<LegacyMazeSnapshot, 'size'>): boolean => maze.size <= 25;
+export const isFixedLegacyMenuSnapshot = (maze: Pick<LegacyMazeSnapshot, 'source'>): boolean => (
+  maze.source === 'menu-snapshot'
+);
 
 export interface LegacyMenuDemoBootstrap {
   config: DemoWalkerConfig;

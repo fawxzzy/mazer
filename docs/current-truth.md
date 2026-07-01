@@ -48,12 +48,12 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `75%`
+- `77%`
 
 Why it is not higher yet:
 
 - the previous `97%` posture was a contract/proof-surface overstatement for a literal old-Mazer 1:1 clone marker
-- restored screenshots and the current localhost browser surface still show material visual drift in board geometry, maze density, title/button composition, and screenshot-grade menu presentation
+- restored screenshots and the current localhost browser surface still show material visual drift in board silhouette, material relief, title/button composition, and screenshot-grade menu presentation even after the fixed menu snapshot moved from the earlier 25-cell approximation to a denser 49-cell projection
 - active-play movement/collision/reset-return semantics are closer, menu-demo reset semantics are closer, and demo route candidate admission now follows the restored `AiTilePathCheck` gate, but HUD and final visual parity still need proof
 - demo AI route/backtrack candidate gating is now aligned for the known dead-end spur seam; line-for-line topology/path-stack internals remain future tightening work
 - maze generation process/stage ownership is mapped, browser shortcut topology now uses family-aware route-affecting bypasses with separated route-reconnection proof instead of random dead-end wall punches, generated domain play-maze rasters apply the restored `CreateShortCuts` opposite-corridor wall-bridge rule, and active reset-lane play mazes now use a checkpoint path-builder in `createLegacyMaze()` that mirrors the legacy `CreateGrid` / `MapPath` / `CreatePath` responsibility split before feeding a duplicate-preserving `_WallArray` into the shortcut stage; exact Unreal RNG and line-for-line process-yield timing remain open
@@ -66,6 +66,7 @@ Why it is not higher yet:
 - restored Unreal truth workspace in ATLAS temp storage
 - legacy menu-shaped web front door
 - fixed legacy-shaped menu snapshot separated from the play-maze generator
+- fixed legacy-shaped menu snapshot now projects its named 25-space blueprint into a 49-cell browser grid, which better matches the old source default-scale density while preserving contiguous demo path truth
 - filled the fixed menu snapshot with staircase and right-spine silhouette branches for closer screenshot parity
 - upper-left menu snapshot branches now carry a denser frame/pocket/lattice read, which moves the upper-left corner a little closer to the restored legacy screenshots without claiming final screenshot-grade closure
 - upper-right menu snapshot branches now carry a small title-adjacent lattice run, which reduces one coarse upper-right board mass without claiming final screenshot-grade closure
@@ -109,6 +110,7 @@ Why it is not higher yet:
 - menu-mode static trench rendering now uses segment-based connected strokes and a gray-slab/dark-route role hierarchy, reducing the previous broad filled-cell material read without claiming final screenshot-grade board parity
 - menu-mode static route cores now use a wider dark channel and softer static edge pass, reducing the tiny-grid/checker read in dense route areas without claiming final screenshot-grade board parity
 - menu-mode static board material now uses the restored screenshot-facing role direction more closely: light-gray connected corridor cores over darker wall/slab fields, with dark edge strokes preserved for trench depth; this improves the board/material read but still does not close screenshot-grade parity
+- menu-mode fixed snapshot identity is now explicit on the runtime maze object (`source: 'menu-snapshot'` versus `source: 'play-generated'`), so fixed-snapshot demo policy no longer guesses from size and generated 49-cell play mazes stay on the generic demo path
 - `runtimeDiagnostics=1` now flows through the live `MenuScene` update loop and publishes a repo-owned runtime diagnostics surface instead of stopping at helper-only parsing/tests
 - runtime diagnostics now also publish a proof-only DOM attribute and visible side-browser diagnostics surface so localhost inspection does not depend on the hidden `window.__MAZER_*` globals alone
 - the visible runtime diagnostics panel now also exposes active menu-demo cue, mistake-enabled lane state, and path cursor so front-door demo proof no longer depends on the hidden browser globals

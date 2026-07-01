@@ -8,6 +8,7 @@ export interface LegacyPoint {
 }
 
 export interface LegacyMazeSnapshot {
+  source: 'menu-snapshot' | 'play-generated';
   size: number;
   grid: boolean[][];
   start: LegacyPoint;
@@ -700,6 +701,7 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
   const solutionPath = buildShortestPath(grid, start, goal);
 
   return {
+    source: 'play-generated',
     size,
     grid,
     start: clonePoint(start),
@@ -727,6 +729,7 @@ export const createLegacyMenuMaze = (seed: number): LegacyMazeSnapshot => {
   const goal = solutionPath.at(-1)!;
 
   return {
+    source: 'menu-snapshot',
     size,
     grid,
     start,

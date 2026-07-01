@@ -40,6 +40,14 @@ const countLegacyShortcutBridgeFloors = (maze: ReturnType<typeof createLegacyMaz
   return bridges;
 };
 
+const expectScaledMenuTile = (
+  maze: ReturnType<typeof createLegacyMenuMaze>,
+  sourceX: number,
+  sourceY: number
+): void => {
+  expect(maze.grid[sourceY * 2]?.[sourceX * 2]).toBe(true);
+};
+
 describe('legacy reset lane', () => {
   test('restores the legacy front-door button set', () => {
     expect(MAIN_MENU_BUTTONS).toEqual(['Exit', 'Start', 'Options']);
@@ -121,63 +129,63 @@ describe('legacy reset lane', () => {
   test('uses a fixed legacy-shaped menu maze snapshot for the front door', () => {
     const menuMaze = createLegacyMenuMaze(3749);
 
-    expect(menuMaze.size).toBe(25);
-    expect(menuMaze.start).toEqual({ x: 3, y: 4 });
-    expect(menuMaze.goal).toEqual({ x: 22, y: 22 });
+    expect(menuMaze.size).toBe(49);
+    expect(menuMaze.start).toEqual({ x: 6, y: 8 });
+    expect(menuMaze.goal).toEqual({ x: 44, y: 44 });
     expect(menuMaze.solutionPath[0]).toEqual(menuMaze.start);
     expect(menuMaze.solutionPath.at(-1)).toEqual(menuMaze.goal);
-    expect(menuMaze.grid[13]?.[22]).toBe(true);
-    expect(menuMaze.grid[21]?.[20]).toBe(true);
-    expect(menuMaze.grid[11]?.[12]).toBe(true);
-    expect(menuMaze.grid[19]?.[13]).toBe(true);
-    expect(menuMaze.grid[20]?.[23]).toBe(true);
-    expect(menuMaze.grid[3]?.[19]).toBe(true);
-    expect(menuMaze.grid[9]?.[4]).toBe(true);
-    expect(menuMaze.grid[14]?.[17]).toBe(true);
-    expect(menuMaze.grid[20]?.[12]).toBe(true);
-    expect(menuMaze.grid[19]?.[22]).toBe(true);
-    expect(menuMaze.grid[4]?.[18]).toBe(true);
-    expect(menuMaze.grid[16]?.[6]).toBe(true);
-    expect(menuMaze.grid[22]?.[18]).toBe(true);
-    expect(menuMaze.grid[11]?.[21]).toBe(true);
-    expect(menuMaze.grid[11]?.[23]).toBe(true);
-    expect(menuMaze.grid[4]?.[7]).toBe(true);
-    expect(menuMaze.grid[8]?.[5]).toBe(true);
-    expect(menuMaze.grid[7]?.[19]).toBe(true);
-    expect(menuMaze.grid[11]?.[17]).toBe(true);
-    expect(menuMaze.grid[11]?.[14]).toBe(true);
-    expect(menuMaze.grid[12]?.[11]).toBe(true);
-    expect(menuMaze.grid[13]?.[18]).toBe(true);
-    expect(menuMaze.grid[8]?.[13]).toBe(true);
-    expect(menuMaze.grid[8]?.[15]).toBe(true);
-    expect(menuMaze.grid[13]?.[4]).toBe(true);
-    expect(menuMaze.grid[15]?.[8]).toBe(true);
-    expect(menuMaze.grid[12]?.[13]).toBe(true);
-    expect(menuMaze.grid[21]?.[15]).toBe(true);
-    expect(menuMaze.grid[15]?.[23]).toBe(true);
-    expect(menuMaze.grid[8]?.[10]).toBe(true);
-    expect(menuMaze.grid[10]?.[8]).toBe(true);
-    expect(menuMaze.grid[5]?.[8]).toBe(true);
-    expect(menuMaze.grid[6]?.[9]).toBe(true);
-    expect(menuMaze.grid[6]?.[10]).toBe(true);
-    expect(menuMaze.grid[6]?.[17]).toBe(true);
-    expect(menuMaze.grid[7]?.[9]).toBe(true);
-    expect(menuMaze.grid[11]?.[13]).toBe(true);
-    expect(menuMaze.grid[3]?.[2]).toBe(true);
-    expect(menuMaze.grid[6]?.[24]).toBe(true);
-    expect(menuMaze.grid[12]?.[24]).toBe(true);
-    expect(menuMaze.grid[18]?.[20]).toBe(true);
-    expect(menuMaze.grid[20]?.[19]).toBe(true);
-    expect(menuMaze.grid[16]?.[23]).toBe(true);
-    expect(menuMaze.grid[11]?.[22]).toBe(true);
-    expect(menuMaze.grid[16]?.[3]).toBe(true);
-    expect(menuMaze.grid[18]?.[5]).toBe(true);
-    expect(menuMaze.grid[18]?.[8]).toBe(true);
-    expect(menuMaze.grid[20]?.[4]).toBe(true);
-    expect(menuMaze.grid[20]?.[8]).toBe(true);
-    expect(menuMaze.grid[4]?.[22]).toBe(true);
-    expect(menuMaze.grid[8]?.[23]).toBe(true);
-    expect(menuMaze.grid[10]?.[22]).toBe(true);
+    expectScaledMenuTile(menuMaze, 22, 13);
+    expectScaledMenuTile(menuMaze, 20, 21);
+    expectScaledMenuTile(menuMaze, 12, 11);
+    expectScaledMenuTile(menuMaze, 13, 19);
+    expectScaledMenuTile(menuMaze, 23, 20);
+    expectScaledMenuTile(menuMaze, 19, 3);
+    expectScaledMenuTile(menuMaze, 4, 9);
+    expectScaledMenuTile(menuMaze, 17, 14);
+    expectScaledMenuTile(menuMaze, 12, 20);
+    expectScaledMenuTile(menuMaze, 22, 19);
+    expectScaledMenuTile(menuMaze, 18, 4);
+    expectScaledMenuTile(menuMaze, 6, 16);
+    expectScaledMenuTile(menuMaze, 18, 22);
+    expectScaledMenuTile(menuMaze, 21, 11);
+    expectScaledMenuTile(menuMaze, 23, 11);
+    expectScaledMenuTile(menuMaze, 7, 4);
+    expectScaledMenuTile(menuMaze, 5, 8);
+    expectScaledMenuTile(menuMaze, 19, 7);
+    expectScaledMenuTile(menuMaze, 17, 11);
+    expectScaledMenuTile(menuMaze, 14, 11);
+    expectScaledMenuTile(menuMaze, 11, 12);
+    expectScaledMenuTile(menuMaze, 18, 13);
+    expectScaledMenuTile(menuMaze, 13, 8);
+    expectScaledMenuTile(menuMaze, 15, 8);
+    expectScaledMenuTile(menuMaze, 4, 13);
+    expectScaledMenuTile(menuMaze, 8, 15);
+    expectScaledMenuTile(menuMaze, 13, 12);
+    expectScaledMenuTile(menuMaze, 15, 21);
+    expectScaledMenuTile(menuMaze, 23, 15);
+    expectScaledMenuTile(menuMaze, 10, 8);
+    expectScaledMenuTile(menuMaze, 8, 10);
+    expectScaledMenuTile(menuMaze, 8, 5);
+    expectScaledMenuTile(menuMaze, 9, 6);
+    expectScaledMenuTile(menuMaze, 10, 6);
+    expectScaledMenuTile(menuMaze, 17, 6);
+    expectScaledMenuTile(menuMaze, 9, 7);
+    expectScaledMenuTile(menuMaze, 13, 11);
+    expectScaledMenuTile(menuMaze, 2, 3);
+    expectScaledMenuTile(menuMaze, 24, 6);
+    expectScaledMenuTile(menuMaze, 24, 12);
+    expectScaledMenuTile(menuMaze, 20, 18);
+    expectScaledMenuTile(menuMaze, 19, 20);
+    expectScaledMenuTile(menuMaze, 23, 16);
+    expectScaledMenuTile(menuMaze, 22, 11);
+    expectScaledMenuTile(menuMaze, 3, 16);
+    expectScaledMenuTile(menuMaze, 5, 18);
+    expectScaledMenuTile(menuMaze, 8, 18);
+    expectScaledMenuTile(menuMaze, 4, 20);
+    expectScaledMenuTile(menuMaze, 8, 20);
+    expectScaledMenuTile(menuMaze, 22, 4);
+    expectScaledMenuTile(menuMaze, 23, 8);
+    expectScaledMenuTile(menuMaze, 22, 10);
   });
 
   test('adapts legacy maze snapshots into the recovered menu demo walker lane', () => {
