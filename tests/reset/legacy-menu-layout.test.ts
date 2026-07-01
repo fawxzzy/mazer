@@ -8,7 +8,7 @@ describe('legacy menu layout', () => {
     const boardCenter = layout.boardLeft + (layout.boardSize / 2);
 
     expect(Math.abs(boardCenter - (layout.width / 2))).toBeLessThanOrEqual(2);
-    expect(layout.centerButtonY).toBeLessThan(layout.buttonY);
+    expect(layout.centerButtonY).toBe(layout.buttonY);
     expect(layout.centerButtonWidth).toBeGreaterThan(layout.buttonWidth);
     expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
     expect(layout.buttonY - (layout.buttonHeight / 2)).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 2);
@@ -19,8 +19,8 @@ describe('legacy menu layout', () => {
     expect(layout.boardSize).toBeLessThanOrEqual(882);
     expect(layout.leftButtonX).toBeLessThan(layout.boardLeft);
     expect(layout.rightButtonX).toBeGreaterThan(layout.boardLeft + layout.boardSize);
-    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(2);
-    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(8);
+    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(24);
+    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(42);
     expect(layout.buttonWidth).toBeGreaterThanOrEqual(220);
     expect(layout.buttonWidth).toBeLessThanOrEqual(238);
     expect(layout.centerButtonWidth).toBeLessThanOrEqual(262);
@@ -34,13 +34,13 @@ describe('legacy menu layout', () => {
     const layout = resolveLegacyMenuLayout(430, 932, 50, 49);
 
     expect(layout.boardSize).toBeLessThan(layout.width);
-    expect(layout.centerButtonY).toBeLessThan(layout.buttonY);
+    expect(layout.centerButtonY).toBe(layout.buttonY);
     expect(layout.centerButtonWidth).toBeGreaterThanOrEqual(layout.buttonWidth);
     expect(layout.centerButtonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
-    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(8);
-    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(14);
+    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(26);
+    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(54);
     expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
-    expect(layout.buttonY - layout.centerButtonY).toBeGreaterThanOrEqual(18);
+    expect(layout.buttonY - layout.centerButtonY).toBe(0);
     expect(layout.buttonY).toBeLessThan(layout.height);
     expect(layout.buttonWidth).toBeLessThanOrEqual(144);
     expect(layout.buttonHeight).toBeLessThanOrEqual(62);
