@@ -63,9 +63,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       },
       core: {
         leftInset: 0,
-        topInset: 7,
+        topInset: 5,
         width: 20,
-        height: 6
+        height: 10
       }
     });
   });
@@ -116,11 +116,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       { leftInset: 4, topInset: 4, width: 12, height: 16 }
     ]);
     expect(segments.core).toEqual([
-      { leftInset: 7, topInset: 7, width: 6, height: 6 },
-      { leftInset: 0, topInset: 7, width: 13, height: 6 },
-      { leftInset: 7, topInset: 7, width: 13, height: 6 },
-      { leftInset: 7, topInset: 0, width: 6, height: 13 },
-      { leftInset: 7, topInset: 7, width: 6, height: 13 }
+      { leftInset: 5, topInset: 5, width: 10, height: 10 },
+      { leftInset: 0, topInset: 5, width: 15, height: 10 },
+      { leftInset: 5, topInset: 5, width: 15, height: 10 },
+      { leftInset: 5, topInset: 0, width: 10, height: 15 },
+      { leftInset: 5, topInset: 5, width: 10, height: 15 }
     ]);
   });
 
@@ -131,12 +131,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0.005;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0x141019;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x807b86;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.28;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x6f6a76;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GRID = 0x18131d;');
     expect(menuSceneSource).toContain('? 0x1f1a24');
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.2;');
-    expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.16;');
+    expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.06;');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);');
+    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(pathGlow, LEGACY_MENU_PATH_EDGE_ALPHA);');
     expect(legacyMenuRenderSource).toContain('resolveLegacyMenuPathStrokeSegments');
     expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.006);');
   });

@@ -18,7 +18,7 @@ export interface LegacyMenuPathRenderSegments {
 }
 
 const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.2;
-const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.16;
+const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.06;
 
 const isWalkableGridPoint = (
   maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,

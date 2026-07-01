@@ -316,6 +316,7 @@ const LEGACY_MENU_SLAB_HIGHLIGHT = 0xbcb5c7;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0.38;
 const LEGACY_MENU_PATH_CORE = 0x141019;
 const LEGACY_MENU_PATH_EDGE = 0x807b86;
+const LEGACY_MENU_PATH_EDGE_ALPHA = 0.28;
 const LEGACY_MENU_WALL_FILL = 0x6f6a76;
 const LEGACY_MENU_WALL_GRID = 0x18131d;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
@@ -1323,7 +1324,7 @@ export class MenuScene extends Phaser.Scene {
         if (walkable && isMenuMode) {
           const segments = resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);
 
-          this.boardStaticGraphics.fillStyle(pathGlow, 0.9);
+          this.boardStaticGraphics.fillStyle(pathGlow, LEGACY_MENU_PATH_EDGE_ALPHA);
           for (const segment of segments.edge) {
             this.boardStaticGraphics.fillRect(
               tileX + segment.leftInset,
