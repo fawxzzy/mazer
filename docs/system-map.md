@@ -366,6 +366,7 @@ Use this before editing `legacyMenuSnapshot.ts` so you know which named branch i
 | `top-spine` | highest top run that keeps the upper plate from reading too open |
 | `upper-left-pocket` | small left interior inset that keeps the upper-left from flattening out and now climbs back toward the title plate |
 | `upper-left-lattice` | nested upper-left trench family that restores the carved corner density beside the wordmark |
+| `upper-right-lattice` | nested upper-right/title-adjacent trench family that reduces the coarse right-side title plate |
 | `left-frame` | tall left outer frame and lower-left anchor, now extending slightly higher to strengthen the upper-left edge |
 | `center-band` | center horizontal trench with the mid-board rightward turn |
 | `center-pocket` | center-right pocket that feeds the diagonal/lower transition |
