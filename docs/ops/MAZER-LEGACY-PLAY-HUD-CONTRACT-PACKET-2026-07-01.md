@@ -35,13 +35,13 @@ npm run lint
 npm run build
 ```
 
-Browser proof paths:
+Local-only browser proof paths, relative to the ATLAS root scratch area:
 
 ```text
-C:\ATLAS\tmp\captures\mazer-play-hud-contract-2026-07-01\play-hud-contract-desktop-1366x900.png
-C:\ATLAS\tmp\captures\mazer-play-hud-contract-2026-07-01\play-hud-contract-desktop-diagnostics.json
-C:\ATLAS\tmp\captures\mazer-play-hud-contract-2026-07-01\play-hud-contract-mobile-390x844.png
-C:\ATLAS\tmp\captures\mazer-play-hud-contract-2026-07-01\play-hud-contract-mobile-diagnostics.json
+tmp/captures/mazer-play-hud-contract-2026-07-01/play-hud-contract-desktop-1366x900.png
+tmp/captures/mazer-play-hud-contract-2026-07-01/play-hud-contract-desktop-diagnostics.json
+tmp/captures/mazer-play-hud-contract-2026-07-01/play-hud-contract-mobile-390x844.png
+tmp/captures/mazer-play-hud-contract-2026-07-01/play-hud-contract-mobile-diagnostics.json
 ```
 
 The corrected diagnostics readback showed:
