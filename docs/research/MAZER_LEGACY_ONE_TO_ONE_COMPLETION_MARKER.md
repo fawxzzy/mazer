@@ -173,6 +173,7 @@ Current note:
 - the segment-based static-board material packet does not earn a point because it reduces broad filled-cell drift and restores the gray slab / dark route hierarchy, but visual proof still shows tiny-grid/checker drift and incomplete screenshot-grade board parity
 - the wide-route-core/soft-edge static-board material packet does not earn a point because it reduces the tiny-grid/checker read in dense route areas but still does not close screenshot-grade board material, dense corridor geometry, or full menu composition parity
 - the maze shortcut topology packet does not earn a point because it replaces the weak random browser braider with family-aware route-affecting bypass logic and tests, but it is still an improved browser-native equivalent rather than a line-for-line Unreal `CreateShortCuts` port
+- the connected light-core menu-material packet does not earn a point because it moves the static board toward the restored light-corridor / dark-wall screenshot role, but exact corridor density, slab relief, title overlap, and full screenshot-grade composition remain open
 
 ## Preferred modular lock order from here
 

@@ -107,6 +107,7 @@ Why it is not higher yet:
 - menu-mode dynamic trail/start/goal/player overlays now use corridor-framed or inset rendering instead of full square cells, reducing the most obvious modern block-path read without claiming final screenshot-grade board parity
 - menu-mode static trench rendering now uses segment-based connected strokes and a gray-slab/dark-route role hierarchy, reducing the previous broad filled-cell material read without claiming final screenshot-grade board parity
 - menu-mode static route cores now use a wider dark channel and softer static edge pass, reducing the tiny-grid/checker read in dense route areas without claiming final screenshot-grade board parity
+- menu-mode static board material now uses the restored screenshot-facing role direction more closely: light-gray connected corridor cores over darker wall/slab fields, with dark edge strokes preserved for trench depth; this improves the board/material read but still does not close screenshot-grade parity
 - `runtimeDiagnostics=1` now flows through the live `MenuScene` update loop and publishes a repo-owned runtime diagnostics surface instead of stopping at helper-only parsing/tests
 - runtime diagnostics now also publish a proof-only DOM attribute and visible side-browser diagnostics surface so localhost inspection does not depend on the hidden `window.__MAZER_*` globals alone
 - the visible runtime diagnostics panel now also exposes active menu-demo cue, mistake-enabled lane state, and path cursor so front-door demo proof no longer depends on the hidden browser globals
@@ -190,6 +191,7 @@ Localhost operation rule:
 - the narrower trench-inset pass reduces the chunky menu-cell read, but full screenshot-grade corridor density and silhouette exactness are still open
 - the menu dynamic-overlay corridor-frame pass reduces full-square cyan/player marker drift, but it does not close final legacy trail/sprite/material exactness
 - the segment-based static-board material pass and follow-up wide-route-core/soft-edge pass reduce broad filled-cell drift, restore the gray slab / dark route hierarchy, and make dense route areas read less checker-like, but the current web board still is not screenshot-grade 1:1
+- the connected light-core material pass moves the menu board closer to the restored screenshot role split, but the current web board still differs in exact corridor density, slab relief, and title-over-board composition
 - the upper-right title-adjacent lattice is closer, but the full menu snapshot silhouette is still not screenshot-grade 1:1
 - exact demo AI route/backtrack internals beyond the newly restored front-door recovery lane, cue/pacing surface, AI-only reset replay, immediate goal-reset handoff, and `AiTilePathCheck` candidate gate
 - exact play HUD parity beyond the tighter compact overlay and full proof bounds
