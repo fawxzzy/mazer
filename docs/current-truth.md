@@ -158,6 +158,7 @@ Localhost operation rule:
 - Do not run broad menu-wide polish passes by default.
 - Do not ratchet the 1:1 marker without a bounded segment proof packet.
 - Do not restore the old `97%` marker by counting mapped owner contracts as visual/gameplay closure.
+- On every legacy 1:1 pass, re-evaluate the marker before closeout and state whether the weighted table changed or held flat.
 - Lock menu parity one module at a time:
   - title lockup
   - button chrome

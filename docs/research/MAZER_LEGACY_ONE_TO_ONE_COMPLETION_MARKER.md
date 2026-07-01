@@ -129,6 +129,20 @@ A ratchet is valid when:
 - the proof surface for that segment passed after the change
 - `docs/current-truth.md`, `docs/system-map.md`, and the parity matrix stay synchronized
 
+## Every-pass reevaluation rule
+
+Every legacy 1:1 pass must re-evaluate this marker before closeout, even when no percentage change is justified.
+
+Closeout must answer:
+
+- Which weighted segment was touched?
+- Did the segment's current points change?
+- If not, why did the evidence fail to justify a ratchet?
+- Do `docs/current-truth.md`, this marker, and `docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md` still agree?
+- Did `npm run verify` pass after the change?
+
+The guard test `tests/reset/legacy-marker.test.ts` enforces the basic marker arithmetic and document-synchronization check. It does not decide whether a ratchet is deserved; the pass owner still must compare the actual legacy evidence.
+
 Do not ratchet for:
 
 - nicer wording
