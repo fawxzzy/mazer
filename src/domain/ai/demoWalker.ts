@@ -685,11 +685,21 @@ const resolveBranchExcursion = (
   const previousIndex = canonicalPath[canonicalCursor - 1];
   const nextIndex = canonicalPath[canonicalCursor + 1];
   const maxDepth = episode.size === 'small' ? 2 : episode.size === 'medium' ? 3 : 4;
+  const visited = new Set(canonicalPath.slice(0, canonicalCursor + 1));
   const branchNeighbors = collectFloorNeighbors(junctionIndex, width, height, tiles)
     .filter((neighbor) => (
       neighbor !== previousIndex
       && neighbor !== nextIndex
       && !canonicalSet.has(neighbor)
+      && passesLegacyAiTilePathCheck(
+        neighbor,
+        junctionIndex,
+        visited,
+        width,
+        height,
+        tiles,
+        episode.raster.endIndex
+      )
     ));
 
   let bestPath: number[] | null = null;
@@ -774,6 +784,24 @@ const findBestBranchPath = (
 
   path.reverse();
   return path.length > 0 ? path : null;
+};
+
+const passesLegacyAiTilePathCheck = (
+  tileIndex: number,
+  currentIndex: number,
+  visited: ReadonlySet<number>,
+  width: number,
+  height: number,
+  tiles: Uint8Array,
+  endIndex: number
+): boolean => {
+  if (tileIndex === endIndex) {
+    return true;
+  }
+
+  return collectFloorNeighbors(tileIndex, width, height, tiles).some((neighbor) => (
+    neighbor !== currentIndex && !visited.has(neighbor)
+  ));
 };
 
 const collectFloorNeighbors = (

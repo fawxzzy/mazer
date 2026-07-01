@@ -6,7 +6,57 @@ import {
   resolveDemoWalkerViewFrame
 } from '../../src/domain/ai';
 import { legacyTuning } from '../../src/config/tuning';
-import { generateMaze } from '../../src/domain/maze';
+import { generateMaze, TILE_END, TILE_FLOOR, TILE_PATH, type MazeEpisode } from '../../src/domain/maze';
+
+const createSingleSpurEpisode = (): MazeEpisode => {
+  const tiles = new Uint8Array(35);
+  const canonicalPath = [15, 16, 17, 18, 19];
+  for (const index of canonicalPath) {
+    tiles[index] |= TILE_FLOOR | TILE_PATH;
+  }
+  tiles[10] |= TILE_FLOOR;
+  tiles[19] |= TILE_END;
+
+  return {
+    accepted: true,
+    difficulty: 'standard',
+    difficultyScore: 0,
+    family: 'classic',
+    generationTrace: {
+      rootTileIndex: 15,
+      uniqueTileCount: 6,
+      steps: [{ phase: 'seed', tileIndices: [15] }]
+    },
+    metrics: {
+      solutionLength: canonicalPath.length,
+      deadEnds: 2,
+      junctions: 1,
+      branchDensity: 1 / 6,
+      straightness: 1,
+      coverage: canonicalPath.length / 6
+    },
+    placementStrategy: 'farthest-pair',
+    presentationPreset: 'classic',
+    raster: {
+      width: 7,
+      height: 5,
+      tiles,
+      startIndex: 15,
+      endIndex: 19,
+      pathIndices: Uint32Array.from(canonicalPath)
+    },
+    routeMotifs: {
+      falseShortcutBranches: 0,
+      nearGoalBranches: 0,
+      hubJunctions: 1,
+      chokeCorridors: 0,
+      loopDetours: 0
+    },
+    seed: 7,
+    shortcutsCreated: 0,
+    size: 'small'
+  };
+};
 
 describe('demo walker', () => {
   test('steps forward along the validated A* solution path', () => {
@@ -241,6 +291,27 @@ describe('demo walker', () => {
     expect(lateFrame.telemetry.recoveryCount).toBeGreaterThan(0);
     expect(lateFrame.canonicalCursor).toBeLessThanOrEqual(episode.raster.pathIndices.length - 1);
     expect(firstFrame.canonicalCursor).toBeGreaterThanOrEqual(0);
+  });
+
+  test('does not commit a wrong turn into a spur that legacy AiTilePathCheck would reject', () => {
+    const episode = createSingleSpurEpisode();
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    let state = createDemoWalkerState(episode, config);
+    const maxSteps = Math.max(16, episode.raster.pathIndices.length * 6);
+    for (let step = 0; step < maxSteps; step += 1) {
+      state = advanceDemoWalker(episode, state, config).state;
+    }
+
+    expect(state.telemetry.wrongBranchCount).toBe(0);
+    expect(state.telemetry.backtrackCount).toBe(0);
+    expect(state.trailSteps.some((trailStep) => trailStep.index === 10)).toBe(false);
   });
 
   test('surfaces branch, dead-end, backtrack, and reacquire cues with cue-specific delays', () => {

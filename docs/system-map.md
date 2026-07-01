@@ -408,11 +408,13 @@ Rule:
 - `src/domain/ai/demoWalker.ts`
   - deterministic demo stepping, backtracking, goal hold, reset hold
   - cue overrides and cue-specific pacing for branch commit, dead-end, backtrack, and reacquire beats
+  - legacy `AiTilePathCheck`-style wrong-turn candidate admission: a non-end branch candidate must expose at least one unvisited onward floor tile besides the current tile
 
 Boundary:
 
 - route shape lives in the legacy snapshot/generator
 - route behavior over time lives in the demo walker
+- if a future demo-route miss is about selecting, rejecting, or backtracking branch candidates, start in `src/domain/ai/demoWalker.ts` and prove it with `tests/ai/demo-walker.test.ts`
 
 ## Legacy document ownership
 
