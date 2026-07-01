@@ -102,10 +102,13 @@ export const createLegacyMenuDemoBootstrap = (
   } else {
     for (let step = 0; step < prerollSteps; step += 1) {
       const advance = advanceDemoWalker(episode, state, config);
-      state = advance.state;
       if (advance.shouldRegenerateMaze || state.phase !== 'explore') {
         break;
       }
+      if (advance.state.phase !== 'explore') {
+        break;
+      }
+      state = advance.state;
     }
   }
 

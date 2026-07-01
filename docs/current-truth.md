@@ -48,7 +48,7 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `85%`
+- `86%`
 
 Why it is not higher yet:
 
@@ -56,7 +56,7 @@ Why it is not higher yet:
 - restored screenshots and the current localhost browser surface still show material visual drift in board silhouette, final relief, title/button composition, and screenshot-grade menu presentation even after the fixed menu snapshot moved from the earlier 25-cell approximation to a denser 49-cell projection, the menu corridors gained a darker offset relief pass, the wordmark opacity moved closer to the old translucent title treatment, the front-door buttons gained a darker legacy-facing pane-fill chrome plus larger desktop support-plate proportions, the board material gained darker wall/slab mass with harder path-edge contrast, and the cyan menu-demo route gained a thicker corridor-style footprint
 - active-play movement/collision/reset-return semantics are closer, menu-demo reset semantics are closer, demo route candidate admission now follows the restored `AiTilePathCheck` gate, and the HUD timer/goal-arrow contract is now extracted/tested/published through visual diagnostics with source-exact bare timer text and degree readback, but final HUD visual styling and final visual parity still need proof
 - demo AI route/backtrack candidate gating is now aligned for the known dead-end spur seam; line-for-line topology/path-stack internals remain future tightening work
-- maze generation process/stage ownership is mapped, browser shortcut topology now uses family-aware route-affecting bypasses with separated route-reconnection proof instead of random dead-end wall punches, generated domain play-maze rasters apply the restored `CreateShortCuts` opposite-corridor wall-bridge rule, and active reset-lane play mazes now use a checkpoint path-builder in `createLegacyMaze()` that mirrors the legacy `CreateGrid` / `MapPath` / `CreatePath` responsibility split before feeding a duplicate-preserving `_WallArray` into the shortcut stage; exact Unreal RNG and line-for-line process-yield timing remain open
+- maze generation process/stage ownership is mapped, browser shortcut topology now uses family-aware route-affecting bypasses with separated route-reconnection proof instead of random dead-end wall punches, generated domain play-maze rasters apply the restored `CreateShortCuts` opposite-corridor wall-bridge rule, and active reset-lane play mazes now use a checkpoint path-builder in `createLegacyMaze()` that mirrors the legacy `CreateGrid` / `MapPath` / `CreatePath` responsibility split before feeding a duplicate-preserving `_WallArray` into the shortcut stage; `Backtrack()` now resumes from the selected next tile like the restored source instead of the already-carved path candidate; exact Unreal RNG/time seeding and line-for-line process-yield timing remain open
 - HUD parity is still partial, but active-play timer formatting now uses the restored bare `M:SS` text plus `% 10` minute wrap, goal-arrow angle math publishes radians/degrees, and proof bounds now have a repo-owned helper and diagnostics readback
 - final screenshot-grade menu material/composition is still open
 
@@ -136,12 +136,12 @@ Why it is not higher yet:
 
 ## What is not yet 1:1
 
-- active reset-lane play topology now uses a source-shaped checkpoint path builder instead of the previous DFS perfect-maze owner, but exact Unreal RNG, process-yield timing, and byte-for-byte `MapPath`/`Backtrack` behavior are still not claimed
+- active reset-lane play topology now uses a source-shaped checkpoint path builder instead of the previous DFS perfect-maze owner, and `Backtrack()` now returns the selected next tile like the restored source; exact Unreal RNG/time seeding and process-yield timing are still not claimed
 - shortcut topology is stronger than the earlier browser-native random dead-end braider and now proves multiple route-bypass bands plus legacy opposite-corridor bridges in both the domain raster path and active reset-lane play snapshot path; the active reset-lane shortcut pass now consumes a duplicate-preserving `_WallArray` collected during the checkpoint path-builder's `CreatePath` equivalent and reports requested/attempted/created shortcut stats, but exact legacy randomness remains a partial port
 - generation/reset branches, stage cadence, budget formulas, process-entry gates, the menu-demo process-8-to-process-0 handoff, shortcut-disabled stage `4 -> 6` progression, and menu stage-6 row-sliced drawing are now explicit runtime contracts
 - stage `7` responsibilities, process `8` reset branches, process-0 delay entry, the menu reset handoff, shortcut-disabled stage progression, and stage `0/3/4/5/6` execution cadence are now explicit lifecycle truth
 - stage-cursor diagnostics now expose queued process-0 entry and consumed stage-7 finalization, and visual/runtime diagnostics now expose the cadence-gated menu draw-stage row cursor, remaining rows, completion state, and percent progress
-- the browser builder still resolves play topology as a one-shot browser-safe stage before stage-6 row reveal, so exact per-tick process-yield timing remains future gameplay/topology work rather than an unstated lifecycle claim; the visible row reveal is paced, and active play topology is now closer to the Unreal checkpoint path-builder than the prior DFS owner
+- the browser builder still resolves play topology as a one-shot browser-safe stage before stage-6 row reveal, so exact per-tick process-yield timing remains future gameplay/topology work rather than an unstated lifecycle claim; the visible row reveal is paced, and active play topology is now closer to the Unreal checkpoint path-builder and Backtrack return semantics than the prior DFS owner
 - demo AI route/backtracking is not a line-for-line Unreal stack port, but live recovery cues, AI-only reset replay, goal reset handoff timing, `AiTilePathCheck` candidate admission, and live wrong-branch/backtrack/recovery diagnostics are now explicitly covered
 - active-play movement, collision, and reset-return ownership are closer after the simultaneous-key buffer, axis-gated collision, and single reset-request ports
 - in-game HUD is only partially restored visually, but source-exact timer formatting, goal-arrow radians/degrees, and proof bounds are now explicit repo-owned contracts

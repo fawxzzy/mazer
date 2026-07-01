@@ -112,6 +112,21 @@ describe('legacy reset lane', () => {
     expect(countLegacyShortcutBridgeFloors(maze)).toBeGreaterThan(0);
   });
 
+  test('resumes from the next tile selected during legacy backtracking', () => {
+    const legacyMazeSource = readFileSync(
+      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'MazerGameModeBase.cpp'),
+      'utf8'
+    );
+    const webMazeSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMaze.ts'), 'utf8');
+
+    expect(legacyMazeSource).toContain('PotentialTile = FindNextTile(PotentialPathArray[randTile], MazerGameInstance->_Checkpoint.GridTileInfo.GridTile);');
+    expect(legacyMazeSource).toContain('PotentialTile = FindNextTile(PotentialPathArray[i], MazerGameInstance->_Checkpoint.GridTileInfo.GridTile);');
+    expect(webMazeSource).toContain('return findLegacyNextTile(size, pathMask, candidate, checkpoint, start, true, rng);');
+    expect(webMazeSource).toContain('const next = findLegacyNextTile(size, pathMask, candidate, checkpoint, start, true, rng);');
+    expect(webMazeSource).toContain('return next;');
+    expect(webMazeSource).toContain('pathLengths.get(keyForPoint(current)) ?? 0');
+  });
+
   test('keeps shortcut-disabled generated mazes free of shortcut openings', () => {
     const maze = createLegacyMaze(25, 0x5a17f00d, 9);
 

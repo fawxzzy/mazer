@@ -30,8 +30,9 @@ describe('legacy menu demo lifecycle', () => {
 
     expect(isFixedLegacyMenuSnapshot(playMaze)).toBe(false);
     expect(bootstrap.config.behavior.enableRunnerMistakes).toBe(true);
+    expect(bootstrap.state.phase).toBe('explore');
     expect(bootstrap.player).toEqual(bootstrap.trail.at(-1));
-    expect(bootstrap.state.currentIndex).toBeGreaterThanOrEqual(bootstrap.episode.raster.startIndex);
+    expect(Array.from(bootstrap.episode.raster.pathIndices)).toContain(bootstrap.state.currentIndex);
   });
 
   test('advances the menu demo frame through the shared trail/player projection', () => {

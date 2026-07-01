@@ -559,7 +559,7 @@ const backtrackLegacyPath = (
       return null;
     }
 
-    return findLegacyNextTile(size, pathMask, candidate, checkpoint, start, true, rng) ? candidate : null;
+    return findLegacyNextTile(size, pathMask, candidate, checkpoint, start, true, rng);
   }
 
   for (let index = potentialPathArray.length - 1; index >= 0; index -= 1) {
@@ -568,8 +568,9 @@ const backtrackLegacyPath = (
       continue;
     }
 
-    if (findLegacyNextTile(size, pathMask, candidate, checkpoint, start, true, rng)) {
-      return candidate;
+    const next = findLegacyNextTile(size, pathMask, candidate, checkpoint, start, true, rng);
+    if (next) {
+      return next;
     }
   }
 
@@ -641,7 +642,7 @@ const createLegacyCheckpointPathMaze = (
       }
 
       current = backtracked;
-      pathLengthCount = pathLengths.get(keyForPoint(current)) ?? pathLengthCount;
+      pathLengthCount = pathLengths.get(keyForPoint(current)) ?? 0;
     }
   }
 

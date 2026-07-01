@@ -131,7 +131,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - `createLegacyMaze()` for generated play mazes
   - active reset-lane play topology through a source-shaped checkpoint path-builder instead of the previous DFS perfect-maze owner
   - `CreateGrid` equivalent: square floor grid with non-floor borders
-  - `MapPath` equivalent: checkpoint selection, mixed next-tile choice, local path-neighbor validation, longest-path end selection, and backtrack attempts
+  - `MapPath` / `Backtrack` equivalent: checkpoint selection, mixed next-tile choice, local path-neighbor validation, longest-path end selection, and source-shaped resume from the next tile selected by backtracking
   - `CreatePath` equivalent: path-neighbor wall-array collection with duplicate/stale candidate preservation
   - `CreateShortCuts` equivalent: explicit legacy shortcut budget, restored opposite-corridor wall-neighbor rule, and random `_WallArray` removal loop
 - `src/domain/maze/core.ts`
@@ -180,7 +180,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
 Boundary:
 
 - if the change is "what active play topology gets generated?", start in `src/legacy-runtime/legacyMaze.ts`; inspect `src/domain/maze/core.ts` only for non-reset-lane domain/proof families
-- if the change is "how shortcut branches or alternate start-goal routes are carved?", start in `src/legacy-runtime/legacyMaze.ts` for active reset-lane `_WallArray` shortcut selection, then inspect `src/domain/maze/core.ts` at `braidMaze()`, `resolveBraidShortcutProfile()`, `measureRouteReconnectionSpan()`, and `applyRouteAwareBypassPass()`, then inspect `src/domain/maze/generator.ts` at the raster legacy bridge pass
+- if the change is "how shortcut branches or alternate start-goal routes are carved?", start in `src/legacy-runtime/legacyMaze.ts` for active reset-lane checkpoint/backtrack and `_WallArray` shortcut selection, then inspect `src/domain/maze/core.ts` at `braidMaze()`, `resolveBraidShortcutProfile()`, `measureRouteReconnectionSpan()`, and `applyRouteAwareBypassPass()`, then inspect `src/domain/maze/generator.ts` at the raster legacy bridge pass
 - if the change is "which builder, seed step, or process-stage contract applies?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts`
 - if the change is "what checkpoint/shortcut budget does the current runtime claim?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `window.__MAZER_VISUAL_DIAGNOSTICS__`
 - if the change is "what legacy gate causes process 0 or process 8 to enter?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `src/legacy-runtime/legacyPlayLifecycle.ts`
