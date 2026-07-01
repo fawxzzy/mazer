@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { DemoWalkerConfig, DemoWalkerState } from '../domain/ai';
+import type { DemoRunnerTelemetry, DemoWalkerConfig, DemoWalkerState } from '../domain/ai';
 import type { MazeEpisode } from '../domain/maze';
 import { markMazerBootStatus } from '../boot/bootStatus';
 import { legacyTuning } from '../config/tuning';
@@ -89,6 +89,7 @@ import {
   clearMenuSceneRuntimeDiagnostics,
   nextMenuSceneInstanceId,
   publishMenuSceneRuntimeDiagnostics,
+  resolveMenuSceneGenerationDrawStageProgress,
   resolveMenuScenePerformanceMode,
   resolveMenuSceneRuntimeConfig,
   summarizeMenuSceneFrameWindow,
@@ -151,6 +152,7 @@ interface MenuSceneVisualDiagnostics {
       prerollSteps: number;
       reachedGoal: boolean;
       runnerMistakesEnabled: boolean;
+      telemetry: DemoRunnerTelemetry | null;
     };
     generation: {
       budget: {
@@ -196,6 +198,10 @@ interface MenuSceneVisualDiagnostics {
       drawStage: {
         batchSize: number | null;
         batchUnit: string | null;
+        complete: boolean | null;
+        progressPercent: number | null;
+        rowCount: number | null;
+        rowsRemaining: number | null;
         rowsVisible: number | null;
         staged: boolean;
       };
@@ -625,6 +631,18 @@ export class MenuScene extends Phaser.Scene {
       : 0;
     const starCount = this.stars.length;
     const telemetrySummary = summarizeTelemetrySemantics([]);
+    const drawStage = this.resolveLegacyMenuStaticDrawStage();
+    const drawStageStaged = this.mode === 'menu' && drawStage?.executionKind === 'row-slice';
+    const drawRowsVisible = this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics();
+    const drawStageProgress = resolveMenuSceneGenerationDrawStageProgress({
+      rowsVisible: drawRowsVisible,
+      rowCount: drawStageStaged ? this.maze.size : null
+    });
+    const runnerTelemetry = this.menuDemoState?.telemetry ?? {
+      wrongBranchCount: 0,
+      backtrackCount: 0,
+      recoveryCount: 0
+    };
 
     publishMenuSceneRuntimeDiagnostics({
       revision: this.runtimeDiagnosticsRevision,
@@ -643,10 +661,14 @@ export class MenuScene extends Phaser.Scene {
       },
       generation: {
         drawStage: {
-          batchSize: this.resolveLegacyMenuStaticDrawStage()?.batchSize ?? null,
-          batchUnit: this.resolveLegacyMenuStaticDrawStage()?.batchUnit ?? null,
-          rowsVisible: this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics(),
-          staged: this.mode === 'menu' && this.resolveLegacyMenuStaticDrawStage()?.executionKind === 'row-slice'
+          batchSize: drawStage?.batchSize ?? null,
+          batchUnit: drawStage?.batchUnit ?? null,
+          complete: drawStageProgress.complete,
+          progressPercent: drawStageProgress.progressPercent,
+          rowCount: drawStageProgress.rowCount,
+          rowsRemaining: drawStageProgress.rowsRemaining,
+          rowsVisible: drawRowsVisible,
+          staged: drawStageStaged
         },
         stageCursor: {
           completionSignal: this.maze.generation?.stageCursor.completionSignal ?? null,
@@ -718,9 +740,9 @@ export class MenuScene extends Phaser.Scene {
         trailSegmentCount: this.trail.length,
         trailSegmentCap: TRAIL_FADE_TAIL,
         runnerPolicy: {
-          wrongBranchCount: 0,
-          backtrackCount: 0,
-          recoveryCount: 0
+          wrongBranchCount: runnerTelemetry.wrongBranchCount,
+          backtrackCount: runnerTelemetry.backtrackCount,
+          recoveryCount: runnerTelemetry.recoveryCount
         },
         intentEntryCount: 0,
         intentEntryCap: 0,
@@ -2130,6 +2152,13 @@ export class MenuScene extends Phaser.Scene {
       this.layout.boardSize,
       this.layout.boardSize
     );
+    const drawStage = this.resolveLegacyMenuStaticDrawStage();
+    const drawStageStaged = this.mode === 'menu' && drawStage?.executionKind === 'row-slice';
+    const drawRowsVisible = this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics();
+    const drawStageProgress = resolveMenuSceneGenerationDrawStageProgress({
+      rowsVisible: drawRowsVisible,
+      rowCount: drawStageStaged ? this.maze.size : null
+    });
 
     this.visualDiagnosticsRevision += 1;
     window[MENU_SCENE_VISUAL_DIAGNOSTICS_KEY] = {
@@ -2191,10 +2220,14 @@ export class MenuScene extends Phaser.Scene {
             remainingStageIds: [...(this.maze.generation?.stageCursor.remainingStageIds ?? [])]
           },
           drawStage: {
-            batchSize: this.resolveLegacyMenuStaticDrawStage()?.batchSize ?? null,
-            batchUnit: this.resolveLegacyMenuStaticDrawStage()?.batchUnit ?? null,
-            rowsVisible: this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics(),
-            staged: this.mode === 'menu' && this.resolveLegacyMenuStaticDrawStage()?.executionKind === 'row-slice'
+            batchSize: drawStage?.batchSize ?? null,
+            batchUnit: drawStage?.batchUnit ?? null,
+            complete: drawStageProgress.complete,
+            progressPercent: drawStageProgress.progressPercent,
+            rowCount: drawStageProgress.rowCount,
+            rowsRemaining: drawStageProgress.rowsRemaining,
+            rowsVisible: drawRowsVisible,
+            staged: drawStageStaged
           },
           pendingRequest: {
             budget: {
@@ -2269,7 +2302,8 @@ export class MenuScene extends Phaser.Scene {
           pathCursor: this.menuDemoState?.pathCursor ?? null,
           reachedGoal: this.menuDemoState?.reachedGoal ?? false,
           prerollSteps: Math.max(0, this.menuDemoConfig?.behavior.prerollSteps ?? 0),
-          runnerMistakesEnabled: this.menuDemoConfig?.behavior.enableRunnerMistakes === true
+          runnerMistakesEnabled: this.menuDemoConfig?.behavior.enableRunnerMistakes === true,
+          telemetry: this.menuDemoState?.telemetry ?? null
         }
       },
       board: {

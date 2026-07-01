@@ -7,6 +7,7 @@ import {
   formatMenuSceneRuntimeDiagnosticsSurfaceText,
   parseMenuSceneRuntimeDiagnosticsAttribute,
   publishMenuSceneRuntimeDiagnostics,
+  resolveMenuSceneGenerationDrawStageProgress,
   resolveMenuSceneRuntimeDiagnosticsSurfaceCssText,
   resolveMenuScenePerformanceMode,
   resolveMenuSceneRuntimeConfig,
@@ -117,6 +118,38 @@ describe('menu runtime diagnostics', () => {
     expect(summary.worstMs).toBe(58);
     expect(summary.spikeCount).toBe(1);
     expect(summary.fps).toBeCloseTo(36.7, 1);
+  });
+
+  test('summarizes staged generation draw progress for fluid row-reveal proof', () => {
+    expect(resolveMenuSceneGenerationDrawStageProgress({
+      rowsVisible: 7,
+      rowCount: 25
+    })).toEqual({
+      complete: false,
+      progressPercent: 28,
+      rowCount: 25,
+      rowsRemaining: 18
+    });
+
+    expect(resolveMenuSceneGenerationDrawStageProgress({
+      rowsVisible: 35,
+      rowCount: 25
+    })).toEqual({
+      complete: true,
+      progressPercent: 100,
+      rowCount: 25,
+      rowsRemaining: 0
+    });
+
+    expect(resolveMenuSceneGenerationDrawStageProgress({
+      rowsVisible: null,
+      rowCount: null
+    })).toEqual({
+      complete: null,
+      progressPercent: null,
+      rowCount: null,
+      rowsRemaining: null
+    });
   });
 
   test('tracks structured feed snapshots without inventing extra state changes', () => {
@@ -292,6 +325,10 @@ describe('menu runtime diagnostics', () => {
         drawStage: {
           batchSize: 1,
           batchUnit: 'rows',
+          complete: true,
+          progressPercent: 100,
+          rowCount: 25,
+          rowsRemaining: 0,
           rowsVisible: 25,
           staged: true
         },
@@ -374,9 +411,9 @@ describe('menu runtime diagnostics', () => {
         trailSegmentCount: 0,
         trailSegmentCap: 16,
         runnerPolicy: {
-          wrongBranchCount: 0,
-          backtrackCount: 0,
-          recoveryCount: 0
+          wrongBranchCount: 2,
+          backtrackCount: 5,
+          recoveryCount: 2
         },
         intentEntryCount: 0,
         intentEntryCap: 0,
@@ -411,10 +448,13 @@ describe('menu runtime diagnostics', () => {
         'demo explore cue backtrack mistakes on cursor 12'
       );
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
+        'ai wrong 2 back 5 recover 2'
+      );
+      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
         'gen stage consumed-finalized:7 signal player-finalized complete yes'
       );
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
-        'draw rows 25 batch 1 rows staged yes'
+        'draw rows 25/25 remaining 0 progress 100% batch 1 rows staged yes'
       );
 
       clearMenuSceneRuntimeDiagnostics();

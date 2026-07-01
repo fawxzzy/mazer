@@ -290,7 +290,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('currentStageId: this.maze.generation?.stageCursor.currentStageId ?? null');
     expect(menuSceneSource).toContain('currentStageId: this.pendingGenerationRequest?.stageCursor.currentStageId ?? null');
     expect(menuSceneSource).toContain('drawStage: {');
-    expect(menuSceneSource).toContain('rowsVisible: this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics()');
+    expect(menuSceneSource).toContain('const drawRowsVisible = this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics();');
+    expect(menuSceneSource).toContain('rowsVisible: drawRowsVisible');
+    expect(menuSceneSource).toContain('resolveMenuSceneGenerationDrawStageProgress({');
     expect(menuSceneSource).toContain('executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({');
     expect(menuSceneSource).toContain('resolveMenuSceneRuntimeConfig(runtimeSearch, {');
     expect(menuSceneSource).toContain('publishMenuSceneRuntimeDiagnostics({');

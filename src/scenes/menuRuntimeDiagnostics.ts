@@ -68,6 +68,13 @@ export interface MenuSceneRuntimeFeedDiagnostics {
   lastChangedAt: number | null;
 }
 
+export interface MenuSceneGenerationDrawStageProgress {
+  complete: boolean | null;
+  progressPercent: number | null;
+  rowCount: number | null;
+  rowsRemaining: number | null;
+}
+
 export interface MenuSceneRuntimeDiagnostics {
   revision: number;
   sceneInstanceId: number;
@@ -85,6 +92,10 @@ export interface MenuSceneRuntimeDiagnostics {
     drawStage?: {
       batchSize: number | null;
       batchUnit: string | null;
+      complete: boolean | null;
+      progressPercent: number | null;
+      rowCount: number | null;
+      rowsRemaining: number | null;
       rowsVisible: number | null;
       staged: boolean;
     };
@@ -439,6 +450,33 @@ export const summarizeMenuSceneRuntimeFeed = (options: {
   };
 };
 
+export const resolveMenuSceneGenerationDrawStageProgress = (options: {
+  rowCount?: number | null;
+  rowsVisible?: number | null;
+}): MenuSceneGenerationDrawStageProgress => {
+  const rowCount = Number.isFinite(options.rowCount)
+    ? Math.max(0, Math.trunc(options.rowCount ?? 0))
+    : null;
+  if (rowCount === null || rowCount <= 0 || !Number.isFinite(options.rowsVisible)) {
+    return {
+      complete: null,
+      progressPercent: null,
+      rowCount,
+      rowsRemaining: null
+    };
+  }
+
+  const rowsVisible = Math.min(rowCount, Math.max(0, Math.trunc(options.rowsVisible ?? 0)));
+  const rowsRemaining = Math.max(0, rowCount - rowsVisible);
+
+  return {
+    complete: rowsRemaining === 0,
+    progressPercent: Number(((rowsVisible / rowCount) * 100).toFixed(1)),
+    rowCount,
+    rowsRemaining
+  };
+};
+
 export const nextMenuSceneInstanceId = (): number => {
   const runtime = resolveRuntimeWindow();
   if (!runtime) {
@@ -457,8 +495,9 @@ export const formatMenuSceneRuntimeDiagnosticsSurfaceText = (
   `fps ${Math.round(diagnostics.performance.estimatedFps)} avg ${formatRuntimeMetric(diagnostics.performance.recentAverageFrameMs)}ms worst ${formatRuntimeMetric(diagnostics.performance.worstRecentFrameMs)}ms spikes ${diagnostics.performance.recentSpikeCount}`,
   `trail ${diagnostics.resources.trailSegmentCount}/${diagnostics.resources.trailSegmentCap} listeners ${diagnostics.resources.listenerCount} vis ${diagnostics.visibility.changeCount}/${diagnostics.visibility.suspendCount} low ${diagnostics.performance.lowPowerActive ? 'on' : 'off'}`,
   `demo ${diagnostics.menuDemo?.phase ?? 'none'} cue ${diagnostics.menuDemo?.cue ?? 'none'} mistakes ${diagnostics.menuDemo?.runnerMistakesEnabled === true ? 'on' : diagnostics.menuDemo?.runnerMistakesEnabled === false ? 'off' : 'n/a'} cursor ${diagnostics.menuDemo?.pathCursor ?? 'n/a'}`,
+  `ai wrong ${diagnostics.resources.runnerPolicy.wrongBranchCount} back ${diagnostics.resources.runnerPolicy.backtrackCount} recover ${diagnostics.resources.runnerPolicy.recoveryCount}`,
   `gen stage ${diagnostics.generation?.stageCursor.phase ?? 'none'}:${diagnostics.generation?.stageCursor.currentStageId ?? 'n/a'} signal ${diagnostics.generation?.stageCursor.completionSignal ?? 'n/a'} complete ${diagnostics.generation?.stageCursor.processComplete === true ? 'yes' : diagnostics.generation?.stageCursor.processComplete === false ? 'no' : 'n/a'}`,
-  `draw rows ${diagnostics.generation?.drawStage?.rowsVisible ?? 'n/a'} batch ${diagnostics.generation?.drawStage?.batchSize ?? 'n/a'} ${diagnostics.generation?.drawStage?.batchUnit ?? 'n/a'} staged ${diagnostics.generation?.drawStage?.staged === true ? 'yes' : diagnostics.generation?.drawStage?.staged === false ? 'no' : 'n/a'}`
+  `draw rows ${diagnostics.generation?.drawStage?.rowsVisible ?? 'n/a'}/${diagnostics.generation?.drawStage?.rowCount ?? 'n/a'} remaining ${diagnostics.generation?.drawStage?.rowsRemaining ?? 'n/a'} progress ${diagnostics.generation?.drawStage?.progressPercent ?? 'n/a'}% batch ${diagnostics.generation?.drawStage?.batchSize ?? 'n/a'} ${diagnostics.generation?.drawStage?.batchUnit ?? 'n/a'} staged ${diagnostics.generation?.drawStage?.staged === true ? 'yes' : diagnostics.generation?.drawStage?.staged === false ? 'no' : 'n/a'}`
 ].join('\n');
 
 export const parseMenuSceneRuntimeDiagnosticsAttribute = (
