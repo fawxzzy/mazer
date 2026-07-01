@@ -18,6 +18,8 @@ describe('legacy menu button chrome', () => {
 
     expect(primary.baseAlpha).toBeGreaterThan(secondary.baseAlpha);
     expect(primary.baseStroke).toBeGreaterThan(secondary.baseStroke);
+    expect(primary.fillColor).toBe(0x0d0715);
+    expect(primary.hoverFillColor).toBe(0x151021);
     expect(primary.fontSize).toBeGreaterThanOrEqual(secondary.fontSize);
     expect(primary.labelAlpha).toBeGreaterThan(secondary.labelAlpha);
     expect(primary.strokeWidth).toBeGreaterThanOrEqual(secondary.strokeWidth);
@@ -33,11 +35,12 @@ describe('legacy menu button chrome', () => {
 
     expect(secondary.fontSize).toBeGreaterThanOrEqual(20);
     expect(secondary.fontSize).toBeLessThanOrEqual(32);
-    expect(secondary.baseAlpha).toBeGreaterThan(0.07);
-    expect(secondary.baseAlpha).toBeLessThan(0.08);
-    expect(secondary.baseStroke).toBeGreaterThan(0.66);
+    expect(secondary.baseAlpha).toBeGreaterThanOrEqual(0.3);
+    expect(secondary.baseAlpha).toBeLessThanOrEqual(0.31);
+    expect(secondary.baseStroke).toBeGreaterThanOrEqual(0.52);
+    expect(secondary.fillColor).toBe(0x0d0715);
     expect(secondary.hoverAlpha).toBeGreaterThan(0.12);
-    expect(secondary.labelAlpha).toBeGreaterThanOrEqual(0.94);
+    expect(secondary.labelAlpha).toBeGreaterThanOrEqual(0.98);
     expect(secondary.strokeWidth).toBe(2);
   });
 });

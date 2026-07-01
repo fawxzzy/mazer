@@ -161,4 +161,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const connectedLeft = trailKeys.has(`${point.x - 1},${point.y}`);');
     expect(menuSceneSource).toContain('this.fillMenuDynamicMarkerTile(this.player, 0xf2f4f8');
   });
+
+  test('keeps front-door buttons in the legacy dark-pane chrome path', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('const fillColor = frontDoorChrome?.fillColor ?? 0xffffff;');
+    expect(menuSceneSource).toContain('this.add.rectangle(x, y, width, height, fillColor, baseAlpha);');
+    expect(menuSceneSource).toContain('? (frontDoorChrome?.hoverFillColor ?? 0xffffff)');
+  });
 });

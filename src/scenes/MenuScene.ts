@@ -2089,8 +2089,9 @@ export class MenuScene extends Phaser.Scene {
       : null;
     const baseAlpha = frontDoorChrome?.baseAlpha ?? MENU_BUTTON_ALPHA;
     const baseStroke = frontDoorChrome?.baseStroke ?? MENU_BUTTON_STROKE_ALPHA;
+    const fillColor = frontDoorChrome?.fillColor ?? 0xffffff;
     const strokeColor = frontDoorChrome?.strokeColor ?? 0xb8b1c1;
-    const background = this.add.rectangle(x, y, width, height, 0xffffff, baseAlpha);
+    const background = this.add.rectangle(x, y, width, height, fillColor, baseAlpha);
     background.setStrokeStyle(frontDoorChrome?.strokeWidth ?? 2, strokeColor, baseStroke);
     background.setInteractive({ useHandCursor: true });
     const textFitSize = Math.floor((width * 1.45) / Math.max(4, text.length));
@@ -2108,7 +2109,9 @@ export class MenuScene extends Phaser.Scene {
 
     const setActive = (active: boolean): void => {
       background.setFillStyle(
-        0xffffff,
+        active
+          ? (frontDoorChrome?.hoverFillColor ?? 0xffffff)
+          : fillColor,
         active
           ? (frontDoorChrome?.hoverAlpha ?? 0.28)
           : baseAlpha
