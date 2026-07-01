@@ -32,10 +32,7 @@ import {
 import {
   createLegacyResetRequest,
   hasPendingLegacyResetRequest,
-  hasPendingLegacyPlayResetReturn,
-  scheduleLegacyPlayResetReturnAtMs,
   shouldConsumeLegacyResetRequest,
-  shouldConsumeLegacyPlayResetReturn,
   type LegacyResetRequest,
 } from '../legacy-runtime/legacyPlayLifecycle';
 import {
@@ -385,7 +382,6 @@ export class MenuScene extends Phaser.Scene {
   private playStartedAtMs = 0;
   private pendingResetRequest: LegacyResetRequest | null = null;
   private pendingOverlayMazeRebuild = false;
-  private playResetReturnAtMs = 0;
   private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();
   private playMoveTimer: Phaser.Time.TimerEvent | null = null;
   private titleText!: Phaser.GameObjects.Text;
@@ -518,11 +514,6 @@ export class MenuScene extends Phaser.Scene {
       && this.pendingResetRequest === null
     ) {
       this.updateMenuDemo(time);
-    }
-
-    if (shouldConsumeLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs, time)) {
-      this.enterMenuMode();
-      return;
     }
 
     this.advanceLegacyMenuStaticDrawStage();
@@ -765,10 +756,7 @@ export class MenuScene extends Phaser.Scene {
 
   private installInput(): void {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      if (
-        hasPendingLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs)
-        || hasPendingLegacyResetRequest(this.pendingResetRequest)
-      ) {
+      if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
         this.resetLegacyPlayInputBuffer();
         return;
       }
@@ -1069,7 +1057,6 @@ export class MenuScene extends Phaser.Scene {
     this.mode = 'menu';
     this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
-    this.playResetReturnAtMs = 0;
     this.overlay = 'none';
     this.overlayReturn = 'none';
     this.applyGenerationRequest(
@@ -1090,7 +1077,6 @@ export class MenuScene extends Phaser.Scene {
     this.mode = 'play';
     this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
-    this.playResetReturnAtMs = 0;
     this.overlay = 'none';
     this.overlayReturn = 'none';
     this.rebuildMaze();
@@ -1133,10 +1119,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private tryMovePlayer(deltaX: number, deltaY: number): void {
-    if (
-      hasPendingLegacyPlayResetReturn(this.mode, this.playResetReturnAtMs)
-      || hasPendingLegacyResetRequest(this.pendingResetRequest)
-    ) {
+    if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
       return;
     }
 
@@ -1172,7 +1155,6 @@ export class MenuScene extends Phaser.Scene {
       nowMs: this.time.now,
       reason: 'goal'
     });
-    this.playResetReturnAtMs = scheduleLegacyPlayResetReturnAtMs(this.time.now);
   }
 
   private consumeResetRequest(request: LegacyResetRequest, time: number): void {

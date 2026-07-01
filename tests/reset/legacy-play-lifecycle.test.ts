@@ -2,13 +2,10 @@ import { describe, expect, test } from 'vitest';
 import {
   ACTIVE_PLAY_GOAL_RESET_HOLD_MS,
   createLegacyResetRequest,
-  hasPendingLegacyPlayResetReturn,
   hasPendingLegacyResetRequest,
   resolveLegacyResetEntryContract,
   resolveLegacyResetAction,
-  scheduleLegacyPlayResetReturnAtMs,
-  shouldConsumeLegacyResetRequest,
-  shouldConsumeLegacyPlayResetReturn
+  shouldConsumeLegacyResetRequest
 } from '../../src/legacy-runtime/legacyPlayLifecycle';
 
 describe('legacy play lifecycle', () => {
@@ -16,21 +13,17 @@ describe('legacy play lifecycle', () => {
     expect(ACTIVE_PLAY_GOAL_RESET_HOLD_MS).toBe(340);
   });
 
-  test('tracks whether a play reset return is pending', () => {
-    expect(hasPendingLegacyPlayResetReturn('play', 100)).toBe(true);
-    expect(hasPendingLegacyPlayResetReturn('play', 0)).toBe(false);
-    expect(hasPendingLegacyPlayResetReturn('menu', 100)).toBe(false);
-  });
+  test('uses the reset request itself as the active-play return timer', () => {
+    const playReset = createLegacyResetRequest({
+      mode: 'play',
+      nowMs: 1200,
+      reason: 'goal'
+    });
 
-  test('consumes the play reset return only after the hold elapses', () => {
-    expect(shouldConsumeLegacyPlayResetReturn('play', 1500, 1499)).toBe(false);
-    expect(shouldConsumeLegacyPlayResetReturn('play', 1500, 1500)).toBe(true);
-    expect(shouldConsumeLegacyPlayResetReturn('menu', 1500, 1800)).toBe(false);
-  });
-
-  test('schedules the reset return from the current scene time', () => {
-    expect(scheduleLegacyPlayResetReturnAtMs(1200)).toBe(1540);
-    expect(scheduleLegacyPlayResetReturnAtMs(1200, 0)).toBe(1200);
+    expect(hasPendingLegacyResetRequest(playReset)).toBe(true);
+    expect(playReset.dueAtMs).toBe(1540);
+    expect(shouldConsumeLegacyResetRequest(playReset, 1539)).toBe(false);
+    expect(shouldConsumeLegacyResetRequest(playReset, 1540)).toBe(true);
   });
 
   test('makes the initialized process-8 reset entry contract explicit for play and menu branches', () => {

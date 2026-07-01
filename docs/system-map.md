@@ -209,6 +209,7 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - explicit reset-request action/due-time contract
   - pending-reset gate for input and movement
   - due-reset return timing contract for active play and menu demo goal branches
+  - single active-play process-8 reset-return authority through `LegacyResetRequest`
 
 - `src/legacy-runtime/legacyPlayStep.ts`
   - restored simultaneous-key input buffer contract

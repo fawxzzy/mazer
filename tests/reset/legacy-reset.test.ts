@@ -188,7 +188,11 @@ describe('legacy reset lane', () => {
     expect(playLifecycleSource).toContain('type LegacyResetAction =');
     expect(playLifecycleSource).toContain('createLegacyResetRequest');
     expect(playLifecycleSource).toContain('shouldConsumeLegacyResetRequest');
+    expect(playLifecycleSource).not.toContain('shouldConsumeLegacyPlayResetReturn');
+    expect(playLifecycleSource).not.toContain('hasPendingLegacyPlayResetReturn');
+    expect(playLifecycleSource).not.toContain('scheduleLegacyPlayResetReturnAtMs');
     expect(menuSceneSource).toContain('private pendingResetRequest: LegacyResetRequest | null = null;');
+    expect(menuSceneSource).not.toContain('playResetReturnAtMs');
     expect(menuSceneSource).toContain('if (pendingReset !== null && shouldConsumeLegacyResetRequest(pendingReset, time)) {');
     expect(menuSceneSource).toContain("this.pendingResetRequest = createLegacyResetRequest({");
     expect(menuSceneSource).toContain("mode: 'play',");
