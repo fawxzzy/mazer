@@ -1,8 +1,8 @@
 # Mazer Legacy 1:1 Completion Marker
 
-Date: 2026-06-30
+Date: 2026-07-01
 Status: active
-Current marker: `97%`
+Current marker: `70%`
 
 ## Intent
 
@@ -60,19 +60,19 @@ The current marker is the sum of the awarded points below.
 | Segment | Weight | Current points | Current truth | Owner chain | Proof surface | Exact remaining gap |
 | --- | --- | --- | --- | --- | --- | --- |
 | Legacy truth restore, extraction, and proof spine | `10` | `10` | locked | `legacy/old-project.zip` -> `docs/current-truth.md` -> `docs/system-map.md` | `npm run legacy:extract`, `npm run verify` | keep current truth and proof docs in sync when runtime truth changes |
-| Front-door menu shell semantics | `12` | `12` | aligned | `src/legacy-runtime/legacyDefaults.ts` -> `src/legacy-runtime/legacyExit.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-exit.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/reset/legacy-menu-layout.test.ts`, localhost | keep the browser-safe quit equivalence and front-door proof surfaces green while larger parity gaps close elsewhere |
-| Menu screenshot composition and board presentation | `14` | `13` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-title.test.ts`, `tests/reset/legacy-menu-button-chrome.test.ts`, `tests/reset/legacy-menu-backdrop.test.ts`, `tests/scenes/menu-render-frame.test.ts`, localhost | final screenshot-grade composition is still open, but desktop board dominance, title lockup, button support chrome, explicit backdrop ownership, a darker less-even board-material pass, a slightly wider/quieter trench read, connected trench-core rendering, denser upper-left and upper-right lattice silhouettes, and added lower-left shelf density are now closer to the restored screenshots without yet closing the last material/composition gap |
-| Overlay family and field responsibilities | `14` | `14` | aligned | `src/legacy-runtime/legacyOptionFields.ts` -> `src/legacy-runtime/legacyOverlayFieldCommit.ts` -> `src/legacy-runtime/legacyOverlayToggleFields.ts` -> `src/legacy-runtime/legacyOverlayRouting.ts` -> `src/legacy-runtime/legacyPauseLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-overlay-routing.test.ts`, `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost | keep the overlay proof spine green while larger runtime gaps close elsewhere |
-| Active play movement and win/reset loop | `14` | `13` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | simultaneous-key movement buffering, axis-gated collision, and single-request active-play reset return are now ported from the restored Unreal player/source flow; keep this proof green while remaining HUD/demo/visual gaps close |
-| Generation lifecycle exactness | `16` | `16` | aligned | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost runtime diagnostics | lifecycle ownership is now explicit and behavior-backed: reset/generation flow through queued runtime requests, delay-gated process-0 entry, stage-7 finalize state, initialized process-8 reset entry, menu-demo process-8-to-process-0 handoff, menu-vs-play stage cadence, checkpoint/shortcut budget metadata, level-building scheduler contract, stage transition graph, shortcut-disabled stage `4 -> 6` progression, stage-cursor diagnostics, and menu stage-6 row-sliced static-board drawing; exact topology-builder internals can still improve later, but the lifecycle carrier no longer has a known unowned stage seam |
-| Demo route, backtracking, and pacing | `12` | `12` | aligned | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, localhost | recovery cues and cue-specific pacing now drive the live route, the fixed front-door snapshot no longer suppresses the legacy mistake/backtrack lane, the snapshot bootstrap now settles into a visible `explore` pose instead of landing in `goal-hold` or `reset-hold`, AI-only reset replay stays on the same menu maze, goal-reset handoff is immediate after reset-hold, and wrong-turn selection now applies the restored `AiTilePathCheck` candidate gate before committing to a branch |
-| In-game HUD and goal-arrow parity | `8` | `7` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot | the timer/arrow overlay is tighter and the full overlay footprint is now carried by repo-owned proof, but final screenshot-grade exactness is still open |
+| Front-door menu shell semantics | `12` | `10` | mostly aligned | `src/legacy-runtime/legacyDefaults.ts` -> `src/legacy-runtime/legacyExit.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-exit.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/reset/legacy-menu-layout.test.ts`, localhost | `Exit`, `Start`, and `Options` are restored, but exact widget sizing/placement and desktop-vs-side-browser composition are still visual parity work, not closed 1:1 truth |
+| Menu screenshot composition and board presentation | `14` | `6` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-title.test.ts`, `tests/reset/legacy-menu-button-chrome.test.ts`, `tests/reset/legacy-menu-backdrop.test.ts`, `tests/scenes/menu-render-frame.test.ts`, localhost | restored screenshots show denser, thinner Unreal corridor geometry and a different board/material read than the current web board; current work is closer than the old product shell but not near screenshot-grade closure |
+| Overlay family and field responsibilities | `14` | `12` | mostly aligned | `src/legacy-runtime/legacyOptionFields.ts` -> `src/legacy-runtime/legacyOverlayFieldCommit.ts` -> `src/legacy-runtime/legacyOverlayToggleFields.ts` -> `src/legacy-runtime/legacyOverlayRouting.ts` -> `src/legacy-runtime/legacyPauseLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-overlay-routing.test.ts`, `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost | overlay ownership and routing are strong, but widget-level screenshot and input exactness still need review against the restored UI source and screenshots |
+| Active play movement and win/reset loop | `14` | `10` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` | simultaneous-key movement buffering, axis-gated collision, and single-request active-play reset return are ported, but full active-play feel, HUD integration, and edge-case equivalence are not yet complete |
+| Generation lifecycle exactness | `16` | `9` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost runtime diagnostics | process/stage ownership is mapped and diagnostics show stage-6 row reveal, but the browser builder still resolves topology outside a line-for-line Unreal `CreateGrid`/`MapPath`/`CreatePath`/`CreateShortCuts` port |
+| Demo route, backtracking, and pacing | `12` | `8` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, localhost | recovery cues, AI-only reset replay, goal-reset timing, and `AiTilePathCheck` admission are covered, but the live walker is still not a line-for-line Unreal path-stack/backtracking port |
+| In-game HUD and goal-arrow parity | `8` | `5` | partial | `src/scenes/MenuScene.ts` | `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot | the timer/arrow overlay is tighter and bounded, but final legacy HUD timer/goal-arrow semantics and visual exactness are still open |
 
 Current total:
 
-- `97 / 100`
+- `70 / 100`
 
-## Why the marker is held at 97%
+## Why the marker was corrected from 97% to 70%
 
 The repo is materially past the "rough prototype" stage:
 
@@ -81,10 +81,19 @@ The repo is materially past the "rough prototype" stage:
 - menu/parity work is now modular instead of broad
 - active play, overlays, demo motion, diagnostics, and tests all exist as first-class repo surfaces
 
-But `100%` would still be dishonest today because the biggest remaining gaps are not cosmetic:
+However, the previous `97%` value overstated the user-facing 1:1 status. It gave near-full credit for mapped contracts and proof surfaces even when the current runtime still visibly differs from restored legacy truth.
+
+The corrected `70%` marker means:
+
+- the project has a strong restoration/proof foundation
+- several legacy behavior contracts are implemented and tested
+- the current web app is useful and inspectable on localhost
+- the current web app is not yet visually or algorithmically close enough to call it almost done
+
+The biggest remaining gaps are not cosmetic:
 
 - generation/reset lifecycle ownership is now aligned, but exact topology-builder internals are still browser-native rather than a line-for-line Unreal generator port
-- front-door `Exit` semantics are now closed through an explicit browser-safe quit equivalence, so the remaining gaps are no longer front-door contract gaps
+- front-door `Exit` semantics are closed through an explicit browser-safe quit equivalence, but the visible front-door composition is still not screenshot-grade
 - desktop menu board dominance, title lockup, and button support chrome are closer to legacy screenshot truth, the backdrop field now has an explicit owner plus a closer cloudy/star treatment, and the board material now reads darker and less evenly tiled, but screenshot-grade backdrop/material and final composition exactness are still open
 - desktop board tile read is slightly closer after widening the menu trench core and reducing wall-grid noise, but screenshot-grade board material and composition exactness are still open
 - connected trench-core rendering reduces the separated-cell/checkerboard read in the current fixed web snapshot, but the screenshot-grade dense corridor geometry remains open
@@ -98,6 +107,8 @@ But `100%` would still be dishonest today because the biggest remaining gaps are
 - demo reset and route semantics are closer now that the fixed front-door snapshot also uses the legacy mistake/backtrack lane, no longer boots into a weak `reset-hold` / `goal-hold` first impression, replays AI-only reset without regeneration, queues the menu goal-reset process-8 request immediately after reset-hold, and rejects one-tile spur wrong-turn candidates through the restored `AiTilePathCheck` gate
 - HUD parity is closer, but not final
 - screenshot-grade menu material/composition is not fully closed
+
+Do not reuse `97%` for the literal 1:1 clone marker unless the remaining screenshot, HUD, topology, and demo-stack gaps have been closed with proof.
 
 Current proof note:
 

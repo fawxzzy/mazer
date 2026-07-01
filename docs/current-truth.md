@@ -48,12 +48,15 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `97%`
+- `70%`
 
 Why it is not higher yet:
 
+- the previous `97%` posture was a contract/proof-surface overstatement for a literal old-Mazer 1:1 clone marker
+- restored screenshots and the current localhost browser surface still show material visual drift in board geometry, maze density, title/button composition, and screenshot-grade menu presentation
 - active-play movement/collision/reset-return semantics are closer, menu-demo reset semantics are closer, and demo route candidate admission now follows the restored `AiTilePathCheck` gate, but HUD and final visual parity still need proof
 - demo AI route/backtrack candidate gating is now aligned for the known dead-end spur seam; line-for-line topology/path-stack internals remain future tightening work
+- maze generation process/stage ownership is mapped, but the browser topology builder is still not a line-for-line Unreal `CreateGrid` / `MapPath` / `CreatePath` / `CreateShortCuts` port
 - HUD parity is still partial
 - final screenshot-grade menu material/composition is still open
 
@@ -154,6 +157,7 @@ Localhost operation rule:
 
 - Do not run broad menu-wide polish passes by default.
 - Do not ratchet the 1:1 marker without a bounded segment proof packet.
+- Do not restore the old `97%` marker by counting mapped owner contracts as visual/gameplay closure.
 - Lock menu parity one module at a time:
   - title lockup
   - button chrome

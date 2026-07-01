@@ -39,6 +39,8 @@ Restored legacy truth:
 
 The current web app is **not** a 1:1 legacy port.
 
+The repo-wide 1:1 marker is currently held at `70%` after the 2026-07-01 reality check. Older ops receipts that mention `97%` are historical packet state, not current marker truth.
+
 It already contains useful ported pieces:
 
 - core maze/runtime work
