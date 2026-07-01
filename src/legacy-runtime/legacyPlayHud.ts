@@ -22,6 +22,7 @@ export interface LegacyPlayHudFrameInput {
 }
 
 export interface LegacyPlayHudFrame {
+  arrowAngleDegrees: number;
   arrowAngleRadians: number;
   arrowBounds: LegacyHudRect;
   arrowLeft: LegacyHudPoint;
@@ -55,7 +56,7 @@ const mergeLegacyHudRects = (...rects: readonly LegacyHudRect[]): LegacyHudRect 
 
 export const formatLegacyHudClock = (elapsedMs: number): string => {
   const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
+  const minutes = Math.floor(totalSeconds / 60) % 10;
   const seconds = totalSeconds % 60;
 
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -67,14 +68,15 @@ export const resolveLegacyHudArrowAngle = (
 ): number => Math.atan2(goalScreen.y - playerScreen.y, goalScreen.x - playerScreen.x);
 
 export const resolveLegacyPlayHudFrame = (input: LegacyPlayHudFrameInput): LegacyPlayHudFrame => {
-  const timerText = `Time ${formatLegacyHudClock(input.elapsedMs)}`;
+  const timerText = formatLegacyHudClock(input.elapsedMs);
   const arrowOrigin = {
     x: input.layoutWidth - 30,
     y: 22
   };
   const arrowAngleRadians = resolveLegacyHudArrowAngle(input.playerScreen, input.goalScreen);
+  const arrowAngleDegrees = (arrowAngleRadians * 180) / Math.PI;
   const length = 18;
-  const timerBounds = createLegacyHudRect(14, 14, 118, 22);
+  const timerBounds = createLegacyHudRect(14, 14, 64, 22);
   const arrowTip = {
     x: arrowOrigin.x + (Math.cos(arrowAngleRadians) * length),
     y: arrowOrigin.y + (Math.sin(arrowAngleRadians) * length)
@@ -99,6 +101,7 @@ export const resolveLegacyPlayHudFrame = (input: LegacyPlayHudFrameInput): Legac
   );
 
   return {
+    arrowAngleDegrees,
     arrowAngleRadians,
     arrowBounds,
     arrowLeft,

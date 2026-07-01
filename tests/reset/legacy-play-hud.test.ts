@@ -11,6 +11,7 @@ describe('legacy play HUD', () => {
     expect(formatLegacyHudClock(999)).toBe('0:00');
     expect(formatLegacyHudClock(1_000)).toBe('0:01');
     expect(formatLegacyHudClock(61_200)).toBe('1:01');
+    expect(formatLegacyHudClock(600_000)).toBe('0:00');
   });
 
   test('points the goal arrow from player screen position toward the end tile', () => {
@@ -27,15 +28,16 @@ describe('legacy play HUD', () => {
       goalScreen: { x: 160, y: 100 }
     });
 
-    expect(frame.timerText).toBe('Time 1:02');
+    expect(frame.timerText).toBe('1:02');
     expect(frame.timerBounds).toMatchObject({
       left: 14,
       top: 14,
-      width: 118,
+      width: 64,
       height: 22
     });
     expect(frame.arrowOrigin).toEqual({ x: 1250, y: 22 });
     expect(frame.arrowAngleRadians).toBeCloseTo(0);
+    expect(frame.arrowAngleDegrees).toBeCloseTo(0);
     expect(frame.arrowBounds.left).toBeLessThanOrEqual(frame.arrowOrigin.x);
     expect(frame.arrowBounds.right).toBeGreaterThan(frame.arrowTip.x);
     expect(frame.bounds.left).toBe(frame.timerBounds.left);

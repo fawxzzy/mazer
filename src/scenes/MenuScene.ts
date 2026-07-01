@@ -148,6 +148,7 @@ interface MenuSceneVisualDiagnostics {
     bounds: VisualRect | null;
     timerBounds: VisualRect | null;
     arrowBounds: VisualRect | null;
+    arrowAngleDegrees: number | null;
     timerText: string | null;
     arrowAngleRadians: number | null;
   };
@@ -2453,6 +2454,7 @@ export class MenuScene extends Phaser.Scene {
         bounds: cloneVisualRect(this.hudBounds),
         timerBounds: cloneVisualRect(this.hudTimerBounds),
         arrowBounds: cloneVisualRect(this.hudArrowBounds),
+        arrowAngleDegrees: this.hudFrame?.arrowAngleDegrees ?? null,
         timerText: this.hudFrame?.timerText ?? null,
         arrowAngleRadians: this.hudFrame?.arrowAngleRadians ?? null
       }
