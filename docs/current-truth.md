@@ -65,6 +65,7 @@ Why it is not higher yet:
 - fixed legacy-shaped menu snapshot separated from the play-maze generator
 - filled the fixed menu snapshot with staircase and right-spine silhouette branches for closer screenshot parity
 - upper-left menu snapshot branches now carry a denser frame/pocket/lattice read, which moves the upper-left corner a little closer to the restored legacy screenshots without claiming final screenshot-grade closure
+- upper-right menu snapshot branches now carry a small title-adjacent lattice run, which reduces one coarse upper-right board mass without claiming final screenshot-grade closure
 - lower-left menu snapshot shelves now reduce the oversized empty lower-left block in the fixed front-door board, moving the board silhouette a little closer to the restored legacy screenshots without claiming final screenshot-grade closure
 - title lockup is now tuned to sit deeper over the board instead of reading like a small shell label
 - legacy-style menu demo board/trail presentation
@@ -172,6 +173,7 @@ Localhost operation rule:
 - exact menu snapshot silhouette and attract-route parity
 - final desktop backdrop/material exactness still needs screenshot-grade tightening even after the board-dominance, title-lockup, button-support, explicit backdrop-owner, darker board-material, and lower-left snapshot shelf corrections
 - connected trench-core rendering reduces the separated-cell read in the current fixed menu snapshot, but the restored screenshots still have denser, thinner corridor geometry than the web snapshot
+- the upper-right title-adjacent lattice is closer, but the full menu snapshot silhouette is still not screenshot-grade 1:1
 - exact demo AI route/backtrack internals beyond the newly restored front-door recovery lane, cue/pacing surface, AI-only reset replay, immediate goal-reset handoff, and `AiTilePathCheck` candidate gate
 - exact play HUD parity beyond the tighter compact overlay and full proof bounds
 - exact demo AI route parity beyond the newly restored front-door recovery lane, cue/pacing surface, AI-only reset replay, immediate goal-reset handoff, and `AiTilePathCheck` candidate gate
