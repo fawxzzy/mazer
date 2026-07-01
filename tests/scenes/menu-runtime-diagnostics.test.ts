@@ -2,13 +2,10 @@ import { describe, expect, test } from 'vitest';
 import {
   MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE,
   MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY,
-  MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID,
   clearMenuSceneRuntimeDiagnostics,
-  formatMenuSceneRuntimeDiagnosticsSurfaceText,
   parseMenuSceneRuntimeDiagnosticsAttribute,
   publishMenuSceneRuntimeDiagnostics,
   resolveMenuSceneGenerationDrawStageProgress,
-  resolveMenuSceneRuntimeDiagnosticsSurfaceCssText,
   resolveMenuScenePerformanceMode,
   resolveMenuSceneRuntimeConfig,
   summarizeMenuSceneRuntimeFeed,
@@ -227,33 +224,7 @@ describe('menu runtime diagnostics', () => {
     expect(changed.lastChangedAt).toBe(360);
   });
 
-  test('anchors the proof panel in the upper-left gutter for desktop proof and keeps compact fallback placement on narrow viewports', () => {
-    const desktopCss = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(1280, 720);
-    const desktopPlayCss = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(1280, 720, 'play');
-    const mobileCss = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(405, 958);
-
-    expect(desktopCss).toContain('left:12px');
-    expect(desktopCss).toContain('top:12px');
-    expect(desktopCss).toContain('right:auto');
-    expect(desktopCss).toContain('bottom:auto');
-    expect(desktopCss).toContain('max-width:307px');
-    expect(desktopCss).toContain('white-space:pre-wrap');
-
-    expect(desktopPlayCss).toContain('left:12px');
-    expect(desktopPlayCss).toContain('bottom:12px');
-    expect(desktopPlayCss).toContain('right:auto');
-    expect(desktopPlayCss).toContain('top:auto');
-    expect(desktopPlayCss).toContain('max-width:307px');
-
-    expect(mobileCss).toContain('left:12px');
-    expect(mobileCss).toContain('bottom:12px');
-    expect(mobileCss).toContain('right:12px');
-    expect(mobileCss).toContain('top:auto');
-    expect(mobileCss).toContain('max-width:calc(100vw - 24px)');
-    expect(mobileCss).toContain('font:11px/1.35 "Courier New", monospace');
-  });
-
-  test('publishes and clears runtime diagnostics on the window and DOM proof surfaces', () => {
+  test('publishes and clears runtime diagnostics on machine-readable proof surfaces only', () => {
     const runtimeWindow = {
       innerWidth: 1280,
       innerHeight: 720
@@ -261,12 +232,7 @@ describe('menu runtime diagnostics', () => {
     const previousWindow = globalThis.window;
     const previousDocument = globalThis.document;
     const documentAttributes = new Map<string, string>();
-    const documentElements = new Map<string, {
-      id: string;
-      textContent: string;
-      style: { cssText: string };
-      remove: () => void;
-    }>();
+    const createdElements: string[] = [];
     const runtimeDocument = {
       documentElement: {
         setAttribute: (name: string, value: string) => {
@@ -278,31 +244,13 @@ describe('menu runtime diagnostics', () => {
         }
       },
       body: {
-        appendChild: (element: {
-          id: string;
-          textContent: string;
-          style: { cssText: string };
-          remove: () => void;
-        }) => {
-          if (element.id) {
-            documentElements.set(element.id, element);
-          }
-          return element;
+        appendChild: () => {
+          throw new Error('runtime diagnostics must not create visible DOM children');
         }
       },
-      getElementById: (id: string) => documentElements.get(id) ?? null,
-      createElement: () => {
-        const element = {
-          id: '',
-          textContent: '',
-          style: { cssText: '' },
-          remove: () => {
-            if (element.id) {
-              documentElements.delete(element.id);
-            }
-          }
-        };
-        return element;
+      createElement: (tagName: string) => {
+        createdElements.push(tagName);
+        return {};
       }
     } as unknown as Document;
 
@@ -450,26 +398,7 @@ describe('menu runtime diagnostics', () => {
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )).toEqual(diagnostics);
-      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toBe(
-        formatMenuSceneRuntimeDiagnosticsSurfaceText(diagnostics)
-      );
-      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.style.cssText).toContain('top:12px');
-      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.style.cssText).toContain('bottom:auto');
-      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
-        'demo explore cue backtrack mistakes on cursor 12'
-      );
-      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
-        'trail 46/46'
-      );
-      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
-        'ai wrong 2 back 5 recover 2'
-      );
-      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
-        'gen stage consumed-finalized:7 signal player-finalized complete yes'
-      );
-      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
-        'draw rows 25/25 remaining 0 progress 100% batch 1 rows staged yes'
-      );
+      expect(createdElements).toEqual([]);
 
       publishMenuSceneRuntimeDiagnostics({
         ...diagnostics,
@@ -479,13 +408,15 @@ describe('menu runtime diagnostics', () => {
           overlay: 'none'
         }
       });
-      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.style.cssText).toContain('bottom:12px');
-      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.style.cssText).toContain('top:auto');
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.surface.mode).toBe('play');
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.surface.mode).toBe('play');
+      expect(createdElements).toEqual([]);
 
       clearMenuSceneRuntimeDiagnostics();
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]).toBeUndefined();
       expect(documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)).toBeUndefined();
-      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)).toBeUndefined();
     } finally {
       Object.defineProperty(globalThis, 'window', {
         configurable: true,

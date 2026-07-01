@@ -4,7 +4,6 @@ import type { HumanInputTimingSnapshot } from '../input-human';
 
 export const MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY = '__MAZER_RUNTIME_DIAGNOSTICS__' as const;
 export const MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics' as const;
-export const MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID = 'mazer-runtime-diagnostics' as const;
 
 export type MenuScenePerformanceMode = 'full' | 'throttled' | 'hidden';
 
@@ -208,59 +207,6 @@ const resolveRuntimeWindow = (): Window | undefined => (
 const resolveRuntimeDocument = (): Document | undefined => (
   typeof document === 'undefined' ? undefined : document
 );
-
-const formatRuntimeMetric = (value: number, digits = 1): string => (
-  Number.isFinite(value) ? Number(value).toFixed(digits) : 'n/a'
-);
-
-const resolveRuntimeViewportSize = (): { width: number; height: number } => {
-  const runtime = resolveRuntimeWindow();
-  const runtimeDocument = resolveRuntimeDocument();
-  const documentWidth = Number(runtimeDocument?.documentElement?.clientWidth ?? 0);
-  const documentHeight = Number(runtimeDocument?.documentElement?.clientHeight ?? 0);
-  const windowWidth = Number(runtime?.innerWidth ?? 0);
-  const windowHeight = Number(runtime?.innerHeight ?? 0);
-
-  return {
-    width: Math.max(0, Math.trunc(Number.isFinite(windowWidth) && windowWidth > 0 ? windowWidth : documentWidth)),
-    height: Math.max(0, Math.trunc(Number.isFinite(windowHeight) && windowHeight > 0 ? windowHeight : documentHeight))
-  };
-};
-
-export const resolveMenuSceneRuntimeDiagnosticsSurfaceCssText = (
-  viewportWidth?: number | null,
-  viewportHeight?: number | null,
-  surfaceMode?: 'menu' | 'play' | string | null
-): string => {
-  const width = Number.isFinite(viewportWidth) ? Math.max(0, Math.trunc(viewportWidth ?? 0)) : 0;
-  const height = Number.isFinite(viewportHeight) ? Math.max(0, Math.trunc(viewportHeight ?? 0)) : 0;
-  const useDesktopPlacement = width >= 960 && height >= 540;
-  const usePlayPlacement = surfaceMode === 'play';
-  const dockAtBottom = !useDesktopPlacement || usePlayPlacement;
-  const desktopMaxWidth = Math.min(320, Math.max(220, Math.round(width * 0.24)));
-  const compactFontSize = width > 0 && width < 460 ? 11 : 12;
-
-  return [
-    'position:fixed',
-    'left:12px',
-    dockAtBottom ? 'bottom:12px' : 'top:12px',
-    useDesktopPlacement ? 'right:auto' : 'right:12px',
-    dockAtBottom ? 'top:auto' : 'bottom:auto',
-    'z-index:99999',
-    'margin:0',
-    'padding:8px 10px',
-    'max-width:' + (useDesktopPlacement ? `${desktopMaxWidth}px` : 'calc(100vw - 24px)'),
-    'overflow-wrap:anywhere',
-    'border:1px solid rgba(222, 219, 230, 0.28)',
-    'background:rgba(5, 5, 10, 0.72)',
-    'color:#d7f0d6',
-    `font:${compactFontSize}px/1.35 "Courier New", monospace`,
-    'white-space:pre-wrap',
-    'pointer-events:none',
-    'border-radius:4px',
-    'box-shadow:0 4px 16px rgba(0, 0, 0, 0.28)'
-  ].join(';');
-};
 
 const normalizeFeedSummary = (value: string): string => value.trim().replace(/\s+/g, ' ');
 
@@ -495,18 +441,6 @@ export const nextMenuSceneInstanceId = (): number => {
   return runtime.__MAZER_MENU_SCENE_INSTANCE__;
 };
 
-export const formatMenuSceneRuntimeDiagnosticsSurfaceText = (
-  diagnostics: MenuSceneRuntimeDiagnostics
-): string => [
-  `diag s${diagnostics.sceneInstanceId} r${diagnostics.revision} perf:${diagnostics.performance.mode}`,
-  `fps ${Math.round(diagnostics.performance.estimatedFps)} avg ${formatRuntimeMetric(diagnostics.performance.recentAverageFrameMs)}ms worst ${formatRuntimeMetric(diagnostics.performance.worstRecentFrameMs)}ms spikes ${diagnostics.performance.recentSpikeCount}`,
-  `trail ${diagnostics.resources.trailSegmentCount}/${diagnostics.resources.trailSegmentCap} listeners ${diagnostics.resources.listenerCount} vis ${diagnostics.visibility.changeCount}/${diagnostics.visibility.suspendCount} low ${diagnostics.performance.lowPowerActive ? 'on' : 'off'}`,
-  `demo ${diagnostics.menuDemo?.phase ?? 'none'} cue ${diagnostics.menuDemo?.cue ?? 'none'} mistakes ${diagnostics.menuDemo?.runnerMistakesEnabled === true ? 'on' : diagnostics.menuDemo?.runnerMistakesEnabled === false ? 'off' : 'n/a'} cursor ${diagnostics.menuDemo?.pathCursor ?? 'n/a'}`,
-  `ai wrong ${diagnostics.resources.runnerPolicy.wrongBranchCount} back ${diagnostics.resources.runnerPolicy.backtrackCount} recover ${diagnostics.resources.runnerPolicy.recoveryCount}`,
-  `gen stage ${diagnostics.generation?.stageCursor.phase ?? 'none'}:${diagnostics.generation?.stageCursor.currentStageId ?? 'n/a'} signal ${diagnostics.generation?.stageCursor.completionSignal ?? 'n/a'} complete ${diagnostics.generation?.stageCursor.processComplete === true ? 'yes' : diagnostics.generation?.stageCursor.processComplete === false ? 'no' : 'n/a'}`,
-  `draw rows ${diagnostics.generation?.drawStage?.rowsVisible ?? 'n/a'}/${diagnostics.generation?.drawStage?.rowCount ?? 'n/a'} remaining ${diagnostics.generation?.drawStage?.rowsRemaining ?? 'n/a'} progress ${diagnostics.generation?.drawStage?.progressPercent ?? 'n/a'}% batch ${diagnostics.generation?.drawStage?.batchSize ?? 'n/a'} ${diagnostics.generation?.drawStage?.batchUnit ?? 'n/a'} staged ${diagnostics.generation?.drawStage?.staged === true ? 'yes' : diagnostics.generation?.drawStage?.staged === false ? 'no' : 'n/a'}`
-].join('\n');
-
 export const parseMenuSceneRuntimeDiagnosticsAttribute = (
   value: string | null | undefined
 ): MenuSceneRuntimeDiagnostics | null => {
@@ -531,37 +465,6 @@ export const parseMenuSceneRuntimeDiagnosticsAttribute = (
   return null;
 };
 
-const ensureMenuSceneRuntimeDiagnosticsSurface = (
-  runtimeDocument: Document,
-  diagnostics?: MenuSceneRuntimeDiagnostics
-): HTMLElement | null => {
-  const viewport = resolveRuntimeViewportSize();
-  const cssText = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(
-    viewport.width,
-    viewport.height,
-    diagnostics?.surface.mode
-  );
-  const existing = runtimeDocument.getElementById(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID);
-  if (
-    existing
-    && typeof (existing as Partial<HTMLElement>).textContent !== 'undefined'
-    && typeof (existing as Partial<HTMLElement>).style !== 'undefined'
-  ) {
-    (existing as HTMLElement).style.cssText = cssText;
-    return existing as HTMLElement;
-  }
-
-  if (!runtimeDocument.body) {
-    return null;
-  }
-
-  const surface = runtimeDocument.createElement('pre');
-  surface.id = MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID;
-  surface.style.cssText = cssText;
-  runtimeDocument.body.appendChild(surface);
-  return surface;
-};
-
 const publishMenuSceneRuntimeDiagnosticsInstallSurface = (
   diagnostics?: MenuSceneRuntimeDiagnostics
 ): void => {
@@ -572,7 +475,6 @@ const publishMenuSceneRuntimeDiagnosticsInstallSurface = (
 
   if (!diagnostics) {
     runtimeDocument.documentElement.removeAttribute(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE);
-    runtimeDocument.getElementById(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.remove();
     return;
   }
 
@@ -580,12 +482,6 @@ const publishMenuSceneRuntimeDiagnosticsInstallSurface = (
     MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE,
     JSON.stringify(diagnostics)
   );
-  const surface = ensureMenuSceneRuntimeDiagnosticsSurface(runtimeDocument, diagnostics);
-  if (!surface) {
-    return;
-  }
-
-  surface.textContent = formatMenuSceneRuntimeDiagnosticsSurfaceText(diagnostics);
 };
 
 export const publishMenuSceneRuntimeDiagnostics = (
