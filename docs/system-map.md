@@ -131,7 +131,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
 - `src/domain/maze/core.ts`
   - browser-native Wilson/topology builder beneath generated play mazes
   - family-aware shortcut braiding profiles for classic, braided, sparse, dense, framed, and split-flow
-  - bounded route-aware braided bypass pass after endpoint selection, recorded as braid-phase generation trace steps
+  - bounded route-aware braided bypass pass after endpoint selection, requiring separated canonical-route reconnection and recording accepted openings as braid-phase generation trace steps
   - still not a line-for-line Unreal `CreateGrid` / `MapPath` / `CreatePath` / `CreateShortCuts` port
 - `src/legacy-runtime/legacyGenerationLifecycle.ts`
   - legacy process stage ids
@@ -169,7 +169,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
 Boundary:
 
 - if the change is "what topology gets generated?", start in `src/legacy-runtime/legacyMaze.ts`, then inspect `src/domain/maze/core.ts`
-- if the change is "how shortcut branches or alternate start-goal routes are carved?", start in `src/domain/maze/core.ts` at `braidMaze()`, `resolveBraidShortcutProfile()`, and `applyRouteAwareBypassPass()`
+- if the change is "how shortcut branches or alternate start-goal routes are carved?", start in `src/domain/maze/core.ts` at `braidMaze()`, `resolveBraidShortcutProfile()`, `measureRouteReconnectionSpan()`, and `applyRouteAwareBypassPass()`
 - if the change is "which builder, seed step, or process-stage contract applies?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts`
 - if the change is "what checkpoint/shortcut budget does the current runtime claim?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `window.__MAZER_VISUAL_DIAGNOSTICS__`
 - if the change is "what legacy gate causes process 0 or process 8 to enter?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `src/legacy-runtime/legacyPlayLifecycle.ts`

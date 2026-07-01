@@ -59,6 +59,25 @@ const countCanonicalBypassableEdges = (maze: MazeCore): number => {
   return bypassableEdges;
 };
 
+const countCanonicalBypassableBands = (maze: MazeCore): number => {
+  const solution = solveAStar(maze, maze.start, maze.goal);
+  const path = Array.from(solution.pathIndices);
+  const bands = new Set<number>();
+
+  for (let index = 1; index < path.length; index += 1) {
+    const from = path[index - 1];
+    const to = path[index];
+    setCorePassage(maze, from, to, false);
+    const reroute = solveAStar(maze, maze.start, maze.goal);
+    if (reroute.found) {
+      bands.add(Math.min(4, Math.floor((index / Math.max(1, path.length - 1)) * 5)));
+    }
+    setCorePassage(maze, from, to, true);
+  }
+
+  return bands.size;
+};
+
 const setCorePassage = (maze: MazeCore, from: number, to: number, open: boolean): void => {
   const fromX = from % maze.width;
   const fromY = Math.floor(from / maze.width);
@@ -323,7 +342,8 @@ describe('maze domain generation', () => {
     assertMazeInvariants(maze);
     expect(maze.core).toBeDefined();
     expect(maze.shortcutsCreated).toBeGreaterThan(0);
-    expect(countCanonicalBypassableEdges(maze.core!)).toBeGreaterThan(0);
+    expect(countCanonicalBypassableEdges(maze.core!)).toBeGreaterThan(1);
+    expect(countCanonicalBypassableBands(maze.core!)).toBeGreaterThanOrEqual(2);
 
     disposeMazeEpisode(maze);
   });

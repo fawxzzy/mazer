@@ -189,6 +189,7 @@ interface BraidShortcutCandidate {
   readonly from: number;
   readonly to: number;
   readonly loopDistance: number;
+  readonly routeSpan?: number;
   readonly score: number;
 }
 
@@ -2827,6 +2828,54 @@ const measureOpenGraphDistance = (maze: MazeCore, start: number, target: number,
   return -1;
 };
 
+const measureRouteReconnectionSpan = (
+  maze: MazeCore,
+  start: number,
+  routePositions: ReadonlyMap<number, number>,
+  sourcePathPosition: number,
+  maxDistance: number,
+  minimumSpan: number
+): number => {
+  const queue = new Int32Array(maze.cells.length);
+  const distances = new Int32Array(maze.cells.length);
+  distances.fill(-1);
+  let head = 0;
+  let tail = 0;
+  let bestSpan = -1;
+
+  queue[tail] = start;
+  tail += 1;
+  distances[start] = 0;
+
+  while (head < tail) {
+    const current = queue[head];
+    head += 1;
+    const currentDistance = distances[current];
+    const routePosition = routePositions.get(current);
+    if (routePosition !== undefined) {
+      const span = Math.abs(routePosition - sourcePathPosition);
+      if (span >= minimumSpan) {
+        bestSpan = Math.max(bestSpan, span);
+      }
+    }
+    if (currentDistance >= maxDistance) {
+      continue;
+    }
+
+    for (const neighbor of getOpenNeighbors(maze, current)) {
+      if (distances[neighbor] !== -1) {
+        continue;
+      }
+
+      distances[neighbor] = currentDistance + 1;
+      queue[tail] = neighbor;
+      tail += 1;
+    }
+  }
+
+  return bestSpan;
+};
+
 const applyRouteAwareBypassPass = (
   maze: MazeCore,
   pathIndices: ArrayLike<number>,
@@ -2839,10 +2888,15 @@ const applyRouteAwareBypassPass = (
   }
 
   const canonicalPath = new Set(path);
+  const routePositions = new Map<number, number>();
+  path.forEach((cellIndex, pathPosition) => {
+    routePositions.set(cellIndex, pathPosition);
+  });
   const boardScale = Math.sqrt(maze.cells.length);
   const searchDistanceLimit = Math.max(8, Math.floor(boardScale * 0.62));
   const targetOpenings = Math.min(16, Math.max(3, Math.floor(path.length / 24)));
   const minimumPathSeparation = Math.max(3, Math.floor(path.length / Math.max(4, targetOpenings * 3)));
+  const minimumRouteSpan = Math.max(minimumPathSeparation + 2, Math.floor(path.length / Math.max(5, targetOpenings * 2)));
   const candidates: Array<BraidShortcutCandidate & { readonly pathPosition: number }> = [];
 
   for (let pathPosition = 2; pathPosition < path.length - 2; pathPosition += 1) {
@@ -2867,6 +2921,18 @@ const applyRouteAwareBypassPass = (
         continue;
       }
 
+      const routeSpan = measureRouteReconnectionSpan(
+        maze,
+        to,
+        routePositions,
+        pathPosition,
+        Math.max(searchDistanceLimit, loopDistance),
+        minimumRouteSpan
+      );
+      if (routeSpan < minimumRouteSpan) {
+        continue;
+      }
+
       const routeCenterBonus = 1 - Math.abs(progress - 0.52);
       const offPathBonus = canonicalPath.has(to) ? 0 : 0.72;
       const branchPenalty = Math.max(0, countOpenNeighbors(maze, from) - 2) * 0.45;
@@ -2874,9 +2940,11 @@ const applyRouteAwareBypassPass = (
         from,
         to,
         loopDistance,
+        routeSpan,
         pathPosition,
         score: (routeCenterBonus * 2.2)
           + offPathBonus
+          + Math.min(routeSpan, minimumRouteSpan * 3) * 0.07
           + Math.min(loopDistance, searchDistanceLimit) * 0.08
           - branchPenalty
           + (rng() * 0.01)
