@@ -12,6 +12,9 @@ export interface LegacyMenuPathRenderFrames {
   core: LegacyMenuPathRenderFrame;
 }
 
+const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.2;
+const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.16;
+
 const isWalkableGridPoint = (
   maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
   point: LegacyPoint
@@ -28,7 +31,7 @@ export const resolveLegacyMenuPathRenderFrame = (
   point: LegacyPoint,
   tileSize: number
 ): LegacyMenuPathRenderFrame => {
-  const edgeInset = Math.max(1, Math.floor(tileSize * 0.12));
+  const edgeInset = Math.max(1, Math.floor(tileSize * LEGACY_MENU_TRENCH_EDGE_INSET_RATIO));
   const leftInset = isWalkableGridPoint(maze, { x: point.x - 1, y: point.y }) ? 0 : edgeInset;
   const rightInset = isWalkableGridPoint(maze, { x: point.x + 1, y: point.y }) ? 0 : edgeInset;
   const topInset = isWalkableGridPoint(maze, { x: point.x, y: point.y - 1 }) ? 0 : edgeInset;
@@ -48,7 +51,7 @@ export const resolveLegacyMenuPathRenderFrames = (
   tileSize: number
 ): LegacyMenuPathRenderFrames => {
   const edge = resolveLegacyMenuPathRenderFrame(maze, point, tileSize);
-  const coreInset = Math.max(1, Math.floor(tileSize * 0.08));
+  const coreInset = Math.max(1, Math.floor(tileSize * LEGACY_MENU_TRENCH_CORE_INSET_RATIO));
   const connectedLeft = isWalkableGridPoint(maze, { x: point.x - 1, y: point.y });
   const connectedRight = isWalkableGridPoint(maze, { x: point.x + 1, y: point.y });
   const connectedTop = isWalkableGridPoint(maze, { x: point.x, y: point.y - 1 });
