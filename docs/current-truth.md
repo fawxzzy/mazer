@@ -48,12 +48,12 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `80%`
+- `81%`
 
 Why it is not higher yet:
 
 - the previous `97%` posture was a contract/proof-surface overstatement for a literal old-Mazer 1:1 clone marker
-- restored screenshots and the current localhost browser surface still show material visual drift in board silhouette, final relief, title/button composition, and screenshot-grade menu presentation even after the fixed menu snapshot moved from the earlier 25-cell approximation to a denser 49-cell projection, the menu corridors gained a darker offset relief pass, the wordmark opacity moved closer to the old translucent title treatment, and the front-door buttons gained a darker legacy-facing pane-fill chrome
+- restored screenshots and the current localhost browser surface still show material visual drift in board silhouette, final relief, title/button composition, and screenshot-grade menu presentation even after the fixed menu snapshot moved from the earlier 25-cell approximation to a denser 49-cell projection, the menu corridors gained a darker offset relief pass, the wordmark opacity moved closer to the old translucent title treatment, the front-door buttons gained a darker legacy-facing pane-fill chrome, and the board material gained darker wall/slab mass with harder path-edge contrast
 - active-play movement/collision/reset-return semantics are closer, menu-demo reset semantics are closer, and demo route candidate admission now follows the restored `AiTilePathCheck` gate, but HUD and final visual parity still need proof
 - demo AI route/backtrack candidate gating is now aligned for the known dead-end spur seam; line-for-line topology/path-stack internals remain future tightening work
 - maze generation process/stage ownership is mapped, browser shortcut topology now uses family-aware route-affecting bypasses with separated route-reconnection proof instead of random dead-end wall punches, generated domain play-maze rasters apply the restored `CreateShortCuts` opposite-corridor wall-bridge rule, and active reset-lane play mazes now use a checkpoint path-builder in `createLegacyMaze()` that mirrors the legacy `CreateGrid` / `MapPath` / `CreatePath` responsibility split before feeding a duplicate-preserving `_WallArray` into the shortcut stage; exact Unreal RNG and line-for-line process-yield timing remain open
@@ -113,6 +113,7 @@ Why it is not higher yet:
 - menu-mode static route cores now use a wider dark channel and softer static edge pass, reducing the tiny-grid/checker read in dense route areas without claiming final screenshot-grade board parity
 - menu-mode static board material now uses the restored screenshot-facing role direction more closely: light-gray connected corridor cores over darker wall/slab fields, with dark edge strokes preserved for trench depth; this improves the board/material read but still does not close screenshot-grade parity
 - menu-mode static corridor rendering now adds a dark offset relief shadow behind connected path segments and quiets residual wall-grid noise, reducing the flat modern line-art read in desktop/mobile browser proof without claiming final screenshot-grade material parity
+- menu-mode board material now uses darker wall/slab mass and stronger path-edge contrast, moving the board closer to the restored screenshots' hard charcoal/light-gray maze read without claiming exact silhouette, title overlap, or trail/sprite parity
 - menu-mode fixed snapshot identity is now explicit on the runtime maze object (`source: 'menu-snapshot'` versus `source: 'play-generated'`), so fixed-snapshot demo policy no longer guesses from size and generated 49-cell play mazes stay on the generic demo path
 - `runtimeDiagnostics=1` now flows through the live `MenuScene` update loop and publishes a repo-owned runtime diagnostics surface instead of stopping at helper-only parsing/tests
 - runtime diagnostics now also publish a proof-only DOM attribute and visible side-browser diagnostics surface so localhost inspection does not depend on the hidden `window.__MAZER_*` globals alone
@@ -143,7 +144,7 @@ Why it is not higher yet:
 - in-game HUD is only partially restored
 - browser exit cannot literally execute the old engine quit behavior, but the bounded browser-safe quit equivalence is now explicit and proof-backed
 - visual/material parity still needs another pass against screenshots and restored assets
-- menu static/dynamic material, title opacity, and front-door button pane fills are closer after the corridor-frame, thinner-overlay, path-relief, title-glass, and button dark-pane passes, but the restored screenshots still show different cyan/player sprite treatment, richer slab material, exact button placement, and tighter screenshot-grade composition than the current web runtime
+- menu static/dynamic material, title opacity, and front-door button pane fills are closer after the corridor-frame, thinner-overlay, path-relief, title-glass, button dark-pane, and material-contrast passes, but the restored screenshots still show different cyan/player sprite treatment, exact maze silhouette, exact button placement, final title overlap, and tighter screenshot-grade composition than the current web runtime
 - browser automation localhost still does not expose the published `window.__MAZER_*` globals directly, but runtime diagnostics now have a DOM-backed fallback read surface and visible panel on the single `4173` preview server
 
 ## Current proof rule

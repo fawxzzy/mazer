@@ -317,13 +317,13 @@ const LEGACY_MENU_SLAB_FILL = 0x4f4a55;
 const LEGACY_MENU_SLAB_EDGE = 0x14101a;
 const LEGACY_MENU_SLAB_HIGHLIGHT = 0xbcb5c7;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0.38;
-const LEGACY_MENU_PATH_CORE = 0xaaa4b0;
-const LEGACY_MENU_PATH_EDGE = 0x18131d;
-const LEGACY_MENU_PATH_EDGE_ALPHA = 0.74;
+const LEGACY_MENU_PATH_CORE = 0x9f99a6;
+const LEGACY_MENU_PATH_EDGE = 0x100c15;
+const LEGACY_MENU_PATH_EDGE_ALPHA = 0.82;
 const LEGACY_MENU_PATH_RELIEF_SHADOW = 0x07050b;
 const LEGACY_MENU_PATH_RELIEF_SHADOW_ALPHA = 0.34;
 const LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO = 0.13;
-const LEGACY_MENU_WALL_FILL = 0x3f3a46;
+const LEGACY_MENU_WALL_FILL = 0x302a36;
 const LEGACY_MENU_WALL_GRID = 0x18131d;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
 const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.3;
@@ -1276,7 +1276,7 @@ export class MenuScene extends Phaser.Scene {
       ? LEGACY_MENU_WALL_FILL
       : linearColorToNumber(this.settings.wallColor);
     const boardFill = isMenuMode
-      ? 0x1f1a24
+      ? 0x18131d
       : (this.settings.darkMode ? 0x16121a : 0x4a454f);
     const boardEdge = isMenuMode ? 0x0f0b13 : (this.settings.darkMode ? 0x030205 : 0x322c35);
     const pathGlow = isMenuMode
