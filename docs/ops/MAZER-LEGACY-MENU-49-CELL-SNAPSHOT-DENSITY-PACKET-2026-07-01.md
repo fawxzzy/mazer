@@ -70,8 +70,8 @@ edge live play passed
 Browser proof:
 
 ```text
-C:\ATLAS\tmp\captures\mazer-menu-49-density-2026-07-01\menu-after-desktop-1366x900-built.png
-C:\ATLAS\tmp\captures\mazer-menu-49-density-2026-07-01\menu-after-mobile-390x844-built.png
+tmp/captures/mazer-menu-49-density-2026-07-01/menu-after-desktop-1366x900-built.png
+tmp/captures/mazer-menu-49-density-2026-07-01/menu-after-mobile-390x844-built.png
 ```
 
 Visible desktop diagnostics:
