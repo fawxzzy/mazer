@@ -41,7 +41,7 @@ export const resolveLegacyMenuLayout = (
   const snappedBoardSize = tileSize * mazeSize;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
   const boardTop = Math.round(clamp(height * (isPortrait ? 0.104 : 0.074), 40, isPortrait ? 102 : 88));
-  const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.058), isPortrait ? 42 : 50, isPortrait ? 62 : 70));
+  const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
   const buttonY = isPortrait
     ? Math.round(clamp(
       boardTop + snappedBoardSize + Math.round(buttonHeight * 0.86),
@@ -64,10 +64,10 @@ export const resolveLegacyMenuLayout = (
       boardTop + snappedBoardSize + 2,
       buttonY - Math.round(buttonHeight * 0.38)
     ));
-  const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.21 : 0.102), isPortrait ? 96 : 150, isPortrait ? 144 : 208));
+  const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.21 : 0.118), isPortrait ? 96 : 164, isPortrait ? 144 : 238));
   const centerButtonWidth = isPortrait
     ? Math.round(clamp(buttonWidth * 1.12, buttonWidth + 8, 170))
-    : Math.round(clamp(buttonWidth * 1.1, buttonWidth + 16, 226));
+    : Math.round(clamp(buttonWidth * 1.14, buttonWidth + 20, 262));
   const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.16 : 0.156), 66, 324));
   const centerButtonX = Math.round(width * 0.5);
 
