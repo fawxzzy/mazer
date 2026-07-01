@@ -48,16 +48,16 @@ Use `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as the repo-wid
 
 Current held marker:
 
-- `86%`
+- `87%`
 
 Why it is not higher yet:
 
 - the previous `97%` posture was a contract/proof-surface overstatement for a literal old-Mazer 1:1 clone marker
 - restored screenshots and the current localhost browser surface still show material visual drift in board silhouette, final relief, title/button composition, and screenshot-grade menu presentation even after the fixed menu snapshot moved from the earlier 25-cell approximation to a denser 49-cell projection, the menu corridors gained a darker offset relief pass, the wordmark opacity moved closer to the old translucent title treatment, the front-door buttons gained a darker legacy-facing pane-fill chrome plus larger desktop support-plate proportions, the board material gained darker wall/slab mass with harder path-edge contrast, and the cyan menu-demo route gained a thicker corridor-style footprint
-- active-play movement/collision/reset-return semantics are closer, menu-demo reset semantics are closer, demo route candidate admission now follows the restored `AiTilePathCheck` gate, and the HUD timer/goal-arrow contract is now extracted/tested/published through visual diagnostics with source-exact bare timer text and degree readback, but final HUD visual styling and final visual parity still need proof
+- active-play movement/collision/reset-return semantics are closer, menu-demo reset semantics are closer, demo route candidate admission now follows the restored `AiTilePathCheck` gate, and the HUD timer/goal-arrow contract is now extracted/tested/published through visual diagnostics with source-exact bare timer text and degree readback; active-play HUD visual chrome now avoids the prior heavy bordered browser chip and the diagnostics proof panel no longer covers the timer on play routes, but broader active-play feel and final menu visual parity still need proof
 - demo AI route/backtrack candidate gating is now aligned for the known dead-end spur seam; line-for-line topology/path-stack internals remain future tightening work
 - maze generation process/stage ownership is mapped, browser shortcut topology now uses family-aware route-affecting bypasses with separated route-reconnection proof instead of random dead-end wall punches, generated domain play-maze rasters apply the restored `CreateShortCuts` opposite-corridor wall-bridge rule, and active reset-lane play mazes now use a checkpoint path-builder in `createLegacyMaze()` that mirrors the legacy `CreateGrid` / `MapPath` / `CreatePath` responsibility split before feeding a duplicate-preserving `_WallArray` into the shortcut stage; `Backtrack()` now resumes from the selected next tile like the restored source instead of the already-carved path candidate; generated play mazes also run a browser-safe playable-topology normalization that removes disconnected floor components and rebases trivially weak goals to the farthest reachable floor so the restored shortcut/path-builder work cannot leave unreachable visual noise or a degenerate play route; exact Unreal RNG/time seeding and line-for-line process-yield timing remain open
-- HUD parity is still partial, but active-play timer formatting now uses the restored bare `M:SS` text plus `% 10` minute wrap, goal-arrow angle math publishes radians/degrees, and proof bounds now have a repo-owned helper and diagnostics readback
+- HUD parity is now closed for the currently restored browser-equivalent source seam: active-play timer formatting uses the restored bare `M:SS` text plus `% 10` minute wrap, goal-arrow angle math publishes radians/degrees, proof bounds have a repo-owned helper and diagnostics readback, HUD chrome now stays in a minimal Timer/EndArrow widget lane, and runtime diagnostics dock away from the play timer; if a stronger Unreal widget blueprint/material source is recovered later, that evidence can reopen a narrower visual-style packet
 - active-play maze rendering no longer uses the prior square-cell debug-style path fill; play mode now uses connected corridor segments with a darker edge/core hierarchy, which reduces the white-grid regression while keeping topology, movement, and shortcuts unchanged
 - final screenshot-grade menu material/composition is still open
 
@@ -133,7 +133,7 @@ Why it is not higher yet:
 - menu-time overlay fields now route through an explicit legacy field-commit contract, separating deferred reload-on-back fields from the immediate camera-flag path
 - nested overlay routing from `Options` / `Pause` back through `Features` and `Game Modes` now routes through an explicit legacy overlay-routing contract
 - legacy-style active play start path
-- active-play HUD now uses a tighter timer/goal-arrow overlay, repo-owned timer/arrow geometry, and diagnostics proof that bounds the full overlay footprint
+- active-play HUD now uses a tighter timer/goal-arrow overlay, repo-owned timer/arrow geometry, a minimal source-shaped Timer/EndArrow visual treatment, and diagnostics proof that bounds the full overlay footprint without covering the timer in the maintained play browser
 - legacy-style options/features/game-mode/pause overlay structure
 - repo-owned reset-lane tests in `tests/reset/`
 
@@ -147,7 +147,7 @@ Why it is not higher yet:
 - the browser builder still resolves play topology as a one-shot browser-safe stage before stage-6 row reveal, so exact per-tick process-yield timing remains future gameplay/topology work rather than an unstated lifecycle claim; the visible row reveal is paced, and active play topology is now closer to the Unreal checkpoint path-builder and Backtrack return semantics than the prior DFS owner
 - demo AI route/backtracking is not a line-for-line Unreal stack port, but live recovery cues, AI-only reset replay, goal reset handoff timing, `AiTilePathCheck` candidate admission, and live wrong-branch/backtrack/recovery diagnostics are now explicitly covered
 - active-play movement, collision, and reset-return ownership are closer after the simultaneous-key buffer, axis-gated collision, and single reset-request ports
-- in-game HUD is only partially restored visually, but source-exact timer formatting, goal-arrow radians/degrees, and proof bounds are now explicit repo-owned contracts
+- in-game HUD is restored for the currently available source-backed browser seam: source-exact timer formatting, goal-arrow radians/degrees, proof bounds, minimal widget chrome, and diagnostics-safe docking are explicit repo-owned contracts
 - active-play board material is closer after replacing square debug-cell path fills with connected corridors, but final old-game play-board styling is not yet screenshot-grade
 - browser exit cannot literally execute the old engine quit behavior, but the bounded browser-safe quit equivalence is now explicit and proof-backed
 - visual/material parity still needs another pass against screenshots and restored assets
@@ -208,7 +208,7 @@ Localhost operation rule:
 - the connected light-core material pass moves the menu board closer to the restored screenshot role split, but the current web board still differs in exact corridor density, slab relief, and title-over-board composition
 - the upper-right title-adjacent lattice is closer, but the full menu snapshot silhouette is still not screenshot-grade 1:1
 - exact demo AI route/backtrack internals beyond the newly restored front-door recovery lane, cue/pacing surface, AI-only reset replay, immediate goal-reset handoff, and `AiTilePathCheck` candidate gate
-- exact play HUD parity beyond the extracted source-exact timer/goal-arrow contract, tighter compact overlay, and full proof bounds
+- exact active-play feel beyond the extracted source-exact timer/goal-arrow contract, tighter compact overlay, minimal HUD widget chrome, diagnostics-safe proof dock, and full proof bounds
 - exact demo AI route parity beyond the newly restored front-door recovery lane, cue/pacing surface, AI-only reset replay, immediate goal-reset handoff, and `AiTilePathCheck` candidate gate
 - exact generation/reset-flow parity beyond the queued request contract
 - final screenshot-grade visual parity

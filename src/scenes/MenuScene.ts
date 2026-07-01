@@ -336,6 +336,12 @@ const LEGACY_PLAY_PATH_EDGE = 0x1a161f;
 const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
 const LEGACY_PLAY_PATH_RELIEF_SHADOW = 0x08060c;
 const LEGACY_PLAY_PATH_RELIEF_SHADOW_ALPHA = 0.22;
+const LEGACY_PLAY_HUD_TIMER_PANE = 0x05050a;
+const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.18;
+const LEGACY_PLAY_HUD_TIMER_TEXT = '#d7f0d6';
+const LEGACY_PLAY_HUD_TIMER_SHADOW = '#081208';
+const LEGACY_PLAY_HUD_ARROW = 0xe4efe6;
+const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
 const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
@@ -670,6 +676,10 @@ export class MenuScene extends Phaser.Scene {
       sceneInstanceId: this.runtimeDiagnosticsSceneInstanceId,
       updatedAt: Math.max(0, Math.round(time)),
       runtimeMs: Math.max(0, Math.round(time)),
+      surface: {
+        mode: this.mode,
+        overlay: this.overlay
+      },
       menuDemo: {
         phase: this.menuDemoState?.phase ?? null,
         cue: this.menuDemoState?.cue ?? null,
@@ -1577,30 +1587,50 @@ export class MenuScene extends Phaser.Scene {
       playerScreen: { x: playerScreenX, y: playerScreenY }
     });
 
-    this.hudGraphics.fillStyle(0x05050a, 0.34);
+    this.hudGraphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, LEGACY_PLAY_HUD_TIMER_PANE_ALPHA);
     this.hudGraphics.fillRect(
       hudFrame.timerBounds.left,
       hudFrame.timerBounds.top,
       hudFrame.timerBounds.width,
       hudFrame.timerBounds.height
     );
-    this.hudGraphics.lineStyle(1, 0xdedbe6, 0.22);
-    this.hudGraphics.strokeRect(
-      hudFrame.timerBounds.left,
-      hudFrame.timerBounds.top,
-      hudFrame.timerBounds.width,
-      hudFrame.timerBounds.height
-    );
+
+    const timerShadow = this.add.text(23, 17, hudFrame.timerText, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '14px',
+      color: LEGACY_PLAY_HUD_TIMER_SHADOW
+    });
+    timerShadow.setData('hud', true);
+    timerShadow.setAlpha(0.64);
+    this.uiTexts.push(timerShadow);
 
     const timer = this.add.text(22, 16, hudFrame.timerText, {
       fontFamily: '"Courier New", monospace',
       fontSize: '14px',
-      color: '#d7f0d6'
+      color: LEGACY_PLAY_HUD_TIMER_TEXT
     });
     timer.setData('hud', true);
     this.uiTexts.push(timer);
 
-    this.hudGraphics.lineStyle(2, 0xe4efe6, 0.92);
+    this.hudGraphics.lineStyle(3, LEGACY_PLAY_HUD_ARROW_SHADOW, 0.36);
+    this.hudGraphics.beginPath();
+    this.hudGraphics.moveTo(hudFrame.arrowOrigin.x + 1, hudFrame.arrowOrigin.y + 1);
+    this.hudGraphics.lineTo(
+      hudFrame.arrowTip.x + 1,
+      hudFrame.arrowTip.y + 1
+    );
+    this.hudGraphics.strokePath();
+    this.hudGraphics.fillStyle(LEGACY_PLAY_HUD_ARROW_SHADOW, 0.36);
+    this.hudGraphics.fillTriangle(
+      hudFrame.arrowTip.x + 1,
+      hudFrame.arrowTip.y + 1,
+      hudFrame.arrowLeft.x + 1,
+      hudFrame.arrowLeft.y + 1,
+      hudFrame.arrowRight.x + 1,
+      hudFrame.arrowRight.y + 1
+    );
+
+    this.hudGraphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW, 0.9);
     this.hudGraphics.beginPath();
     this.hudGraphics.moveTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y);
     this.hudGraphics.lineTo(
@@ -1608,7 +1638,7 @@ export class MenuScene extends Phaser.Scene {
       hudFrame.arrowTip.y
     );
     this.hudGraphics.strokePath();
-    this.hudGraphics.fillStyle(0xe4efe6, 0.92);
+    this.hudGraphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.9);
     this.hudGraphics.fillTriangle(
       hudFrame.arrowTip.x,
       hudFrame.arrowTip.y,

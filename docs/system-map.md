@@ -61,8 +61,8 @@ Use this as the top-level "where does this actually live?" map before editing:
 | boot diagnostics readback | `src/boot/bootStatus.ts`, `src/boot/main.ts` | `tests/boot/boot-status.test.ts` |
 | Phaser scene wiring | `src/boot/phaserConfig.ts` | `npm run build` |
 | active front door and play shell | `src/scenes/MenuScene.ts` | in-app browser, `npm run verify`; play board rendering owns connected corridor material for generated mazes |
-| live runtime diagnostics bridge | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, localhost |
-| active-play HUD timer and goal arrow | `src/legacy-runtime/legacyPlayHud.ts`, `src/scenes/MenuScene.ts#drawHud()` | `tests/reset/legacy-play-hud.test.ts`, `tests/reset/legacy-reset.test.ts`, desktop/mobile play-route screenshots, `window.__MAZER_VISUAL_DIAGNOSTICS__` with bare `timerText`, `arrowAngleRadians`, and `arrowAngleDegrees` |
+| live runtime diagnostics bridge | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, localhost; play-mode diagnostics dock away from the HUD timer |
+| active-play HUD timer and goal arrow | `src/legacy-runtime/legacyPlayHud.ts`, `src/scenes/MenuScene.ts#drawHud()` | `tests/reset/legacy-play-hud.test.ts`, `tests/reset/legacy-reset.test.ts`, desktop/mobile play-route screenshots, `window.__MAZER_VISUAL_DIAGNOSTICS__` with bare `timerText`, `arrowAngleRadians`, and `arrowAngleDegrees`; source-shaped minimal Timer/EndArrow chrome |
 | fixed menu maze shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `tests/reset/legacy-reset.test.ts`, screenshots |
 | generated play maze | `src/legacy-runtime/legacyMaze.ts` | `tests/reset/legacy-reset.test.ts`; includes source-shaped checkpoint pathing, shortcut bridges, disconnected-floor pruning, and weak-goal rebasing for playable browser topology |
 | menu title/board/button layout math | `src/legacy-runtime/legacyMenuLayout.ts` | `tests/reset/legacy-menu-layout.test.ts` |
@@ -115,7 +115,7 @@ Use this when you need to understand the app as a system instead of a file list.
 7. Field commits:
    `applyLegacyOptionField()` normalizes draft values, `legacyOverlayFieldCommit.ts` classifies them into deferred reload-on-back vs immediate camera-flag roles, and `MenuScene` applies the resulting rebuild/layout effects.
 8. Active play:
-   movement, win/reset return, pause routing, and generated-board rendering stay inside `MenuScene`; source-exact timer HUD formatting and goal-arrow radians/degrees geometry route through `legacyPlayHud.ts` before `MenuScene.drawHud()` renders them.
+   movement, win/reset return, pause routing, and generated-board rendering stay inside `MenuScene`; source-exact timer HUD formatting and goal-arrow radians/degrees geometry route through `legacyPlayHud.ts` before `MenuScene.drawHud()` renders them through a minimal Timer/EndArrow visual lane.
 9. Proof readback:
    visual scripts and live checks read `window.__MAZER_VISUAL_DIAGNOSTICS__`; reset-lane tests assert the stable contracts under `tests/reset/*`.
 
@@ -176,7 +176,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - runtime diagnostics now publish generation budget metadata, process-entry gates, queue arm time, and full pending request contract state
   - `startPlayMode()` swaps from menu shell into active-play generation
   - `enterMenuMode()` returns active play back into menu flow after reset
-  - `drawHud()` renders the compact bare timer chip and goal arrow from `resolveLegacyPlayHudFrame()` and publishes HUD proof bounds plus radians/degrees readback
+  - `drawHud()` renders the compact bare timer and goal arrow from `resolveLegacyPlayHudFrame()` with minimal source-shaped widget chrome and publishes HUD proof bounds plus radians/degrees readback
 
 Boundary:
 
@@ -490,7 +490,7 @@ What `verify` currently means:
   - board bounds plus live reset-lane runtime pointers:
   - mode / overlay
   - maze size, player, goal
-  - HUD bare timer text, arrow radians/degrees, and timer/arrow/bounds rectangles
+  - HUD bare timer text, arrow radians/degrees, timer/arrow/bounds rectangles, and the minimal source-shaped active HUD visual lane
   - trail tail
   - menu-demo phase / cue / path cursor / preroll / wrong-turn policy
 - `window.__MAZER_RUNTIME_DIAGNOSTICS__`
@@ -508,7 +508,7 @@ What `verify` currently means:
 - `tests/reset/legacy-reset.test.ts`
   - front door, menu snapshot, HUD/minimal play shell, localhost boot cleanup
 - `tests/reset/legacy-play-hud.test.ts`
-  - active-play bare timer formatting, `% 10` minute wrap, goal-arrow radians/degrees math, and HUD bounds proof
+  - active-play bare timer formatting, `% 10` minute wrap, goal-arrow radians/degrees math, minimal widget chrome, and HUD bounds proof
 - `tests/reset/legacy-menu-layout.test.ts`
   - board/button/title layout contract
 - `tests/reset/legacy-option-fields.test.ts`

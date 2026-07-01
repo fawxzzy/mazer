@@ -80,6 +80,10 @@ export interface MenuSceneRuntimeDiagnostics {
   sceneInstanceId: number;
   updatedAt: number;
   runtimeMs: number;
+  surface: {
+    mode: 'menu' | 'play';
+    overlay: string;
+  };
   menuDemo?: {
     phase: string | null;
     cue: string | null;
@@ -225,20 +229,23 @@ const resolveRuntimeViewportSize = (): { width: number; height: number } => {
 
 export const resolveMenuSceneRuntimeDiagnosticsSurfaceCssText = (
   viewportWidth?: number | null,
-  viewportHeight?: number | null
+  viewportHeight?: number | null,
+  surfaceMode?: 'menu' | 'play' | string | null
 ): string => {
   const width = Number.isFinite(viewportWidth) ? Math.max(0, Math.trunc(viewportWidth ?? 0)) : 0;
   const height = Number.isFinite(viewportHeight) ? Math.max(0, Math.trunc(viewportHeight ?? 0)) : 0;
   const useDesktopPlacement = width >= 960 && height >= 540;
+  const usePlayPlacement = surfaceMode === 'play';
+  const dockAtBottom = !useDesktopPlacement || usePlayPlacement;
   const desktopMaxWidth = Math.min(320, Math.max(220, Math.round(width * 0.24)));
   const compactFontSize = width > 0 && width < 460 ? 11 : 12;
 
   return [
     'position:fixed',
-    useDesktopPlacement ? 'left:12px' : 'left:12px',
-    useDesktopPlacement ? 'top:12px' : 'bottom:12px',
+    'left:12px',
+    dockAtBottom ? 'bottom:12px' : 'top:12px',
     useDesktopPlacement ? 'right:auto' : 'right:12px',
-    useDesktopPlacement ? 'bottom:auto' : 'top:auto',
+    dockAtBottom ? 'top:auto' : 'bottom:auto',
     'z-index:99999',
     'margin:0',
     'padding:8px 10px',
@@ -525,10 +532,15 @@ export const parseMenuSceneRuntimeDiagnosticsAttribute = (
 };
 
 const ensureMenuSceneRuntimeDiagnosticsSurface = (
-  runtimeDocument: Document
+  runtimeDocument: Document,
+  diagnostics?: MenuSceneRuntimeDiagnostics
 ): HTMLElement | null => {
   const viewport = resolveRuntimeViewportSize();
-  const cssText = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(viewport.width, viewport.height);
+  const cssText = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(
+    viewport.width,
+    viewport.height,
+    diagnostics?.surface.mode
+  );
   const existing = runtimeDocument.getElementById(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID);
   if (
     existing
@@ -568,7 +580,7 @@ const publishMenuSceneRuntimeDiagnosticsInstallSurface = (
     MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE,
     JSON.stringify(diagnostics)
   );
-  const surface = ensureMenuSceneRuntimeDiagnosticsSurface(runtimeDocument);
+  const surface = ensureMenuSceneRuntimeDiagnosticsSurface(runtimeDocument, diagnostics);
   if (!surface) {
     return;
   }

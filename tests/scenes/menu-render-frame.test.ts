@@ -160,6 +160,20 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor');
   });
 
+  test('keeps active play HUD in a source-shaped timer and arrow widget lane', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.18;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_TEXT =');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_SHADOW =');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW = 0xe4efe6;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;');
+    expect(menuSceneSource).toContain('const timerShadow = this.add.text(23, 17, hudFrame.timerText');
+    expect(menuSceneSource).toContain('timerShadow.setAlpha(0.64);');
+    expect(menuSceneSource).toContain('this.hudGraphics.fillTriangle(');
+    expect(menuSceneSource).not.toContain('this.hudGraphics.strokeRect(');
+  });
+
   test('keeps menu dynamic trail overlays in the legacy corridor frame instead of full square cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 

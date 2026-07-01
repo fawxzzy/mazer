@@ -229,6 +229,7 @@ describe('menu runtime diagnostics', () => {
 
   test('anchors the proof panel in the upper-left gutter for desktop proof and keeps compact fallback placement on narrow viewports', () => {
     const desktopCss = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(1280, 720);
+    const desktopPlayCss = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(1280, 720, 'play');
     const mobileCss = resolveMenuSceneRuntimeDiagnosticsSurfaceCssText(405, 958);
 
     expect(desktopCss).toContain('left:12px');
@@ -237,6 +238,12 @@ describe('menu runtime diagnostics', () => {
     expect(desktopCss).toContain('bottom:auto');
     expect(desktopCss).toContain('max-width:307px');
     expect(desktopCss).toContain('white-space:pre-wrap');
+
+    expect(desktopPlayCss).toContain('left:12px');
+    expect(desktopPlayCss).toContain('bottom:12px');
+    expect(desktopPlayCss).toContain('right:auto');
+    expect(desktopPlayCss).toContain('top:auto');
+    expect(desktopPlayCss).toContain('max-width:307px');
 
     expect(mobileCss).toContain('left:12px');
     expect(mobileCss).toContain('bottom:12px');
@@ -313,6 +320,10 @@ describe('menu runtime diagnostics', () => {
       sceneInstanceId: 7,
       updatedAt: 1200,
       runtimeMs: 1200,
+      surface: {
+        mode: 'menu',
+        overlay: 'none'
+      },
       menuDemo: {
         phase: 'explore',
         cue: 'backtrack',
@@ -459,6 +470,17 @@ describe('menu runtime diagnostics', () => {
       expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.textContent).toContain(
         'draw rows 25/25 remaining 0 progress 100% batch 1 rows staged yes'
       );
+
+      publishMenuSceneRuntimeDiagnostics({
+        ...diagnostics,
+        revision: 2,
+        surface: {
+          mode: 'play',
+          overlay: 'none'
+        }
+      });
+      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.style.cssText).toContain('bottom:12px');
+      expect(documentElements.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_SURFACE_ID)?.style.cssText).toContain('top:auto');
 
       clearMenuSceneRuntimeDiagnostics();
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]).toBeUndefined();
