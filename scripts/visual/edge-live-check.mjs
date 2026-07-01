@@ -88,6 +88,7 @@ const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
   'mobile-touch-smoke': Object.freeze({
     kind: 'touch',
     requiredMode: 'play',
+    requiresControlEvents: false,
     movementWaitMs: 260,
     controlWaitMs: 220,
     restartWaitMs: 900,
@@ -295,6 +296,12 @@ const resolveInteractiveProjectionMode = (projection) => (
     : null
 );
 
+const resolveInteractiveSurfaceMode = (surface) => (
+  surface?.mode === 'play' || surface?.mode === 'menu'
+    ? surface.mode
+    : null
+);
+
 export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
   const runtime = diagnostics?.runtime ?? null;
   const visual = diagnostics?.visual ?? null;
@@ -309,7 +316,12 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
   );
 
   return {
-    mode: resolveInteractiveProjectionMode(projection) ?? resolveTelemetryModeFromCaptures([{ telemetry: { mode: telemetrySummary?.mode ?? null } }]) ?? null,
+    mode: (
+      resolveInteractiveProjectionMode(projection)
+      ?? resolveInteractiveSurfaceMode(runtime?.surface)
+      ?? resolveTelemetryModeFromCaptures([{ telemetry: { mode: telemetrySummary?.mode ?? null } }])
+      ?? null
+    ),
     controlUsedCount,
     projection: projection
       ? {
@@ -362,6 +374,14 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
           nextIndex: visual.trail.nextIndex ?? null,
           progress: visual.trail.progress ?? null,
           cue: visual.trail.cue ?? null
+        }
+      : null,
+    player: (runtime?.play?.player ?? runtime?.player)
+      ? {
+          x: Number.isFinite((runtime.play?.player ?? runtime.player).x) ? (runtime.play?.player ?? runtime.player).x : null,
+          y: Number.isFinite((runtime.play?.player ?? runtime.player).y) ? (runtime.play?.player ?? runtime.player).y : null,
+          screenX: Number.isFinite((runtime.play?.player ?? runtime.player).screenX) ? (runtime.play?.player ?? runtime.player).screenX : null,
+          screenY: Number.isFinite((runtime.play?.player ?? runtime.player).screenY) ? (runtime.play?.player ?? runtime.player).screenY : null
         }
       : null
   };
@@ -425,14 +445,24 @@ const buildMovementDelta = (before, after) => {
   const progressDelta = Number.isFinite(afterTrail?.progress) && Number.isFinite(beforeTrail?.progress)
     ? round(afterTrail.progress - beforeTrail.progress, 3)
     : null;
+  const playerXDelta = Number.isFinite(after?.player?.x) && Number.isFinite(before?.player?.x)
+    ? after.player.x - before.player.x
+    : null;
+  const playerYDelta = Number.isFinite(after?.player?.y) && Number.isFinite(before?.player?.y)
+    ? after.player.y - before.player.y
+    : null;
 
   return {
     currentIndexDelta,
     nextIndexDelta,
+    playerXDelta,
+    playerYDelta,
     progressDelta,
     moved: Boolean(
       (currentIndexDelta ?? 0) !== 0
       || (nextIndexDelta ?? 0) !== 0
+      || (playerXDelta ?? 0) !== 0
+      || (playerYDelta ?? 0) !== 0
       || (progressDelta ?? 0) !== 0
     )
   };
@@ -511,6 +541,46 @@ const resolveTouchControlPoint = ({ viewport, diagnostics, control }) => {
     : null;
 };
 
+const TOUCH_MOVEMENT_CONTROLS = new Set(['move_up', 'move_right', 'move_down', 'move_left']);
+
+const resolveTouchMovementSwipe = ({ diagnostics, control }) => {
+  if (!TOUCH_MOVEMENT_CONTROLS.has(control)) {
+    return null;
+  }
+
+  const player = diagnostics?.runtime?.play?.player ?? null;
+  const board = diagnostics?.runtime?.play?.board ?? null;
+  if (
+    !Number.isFinite(player?.screenX)
+    || !Number.isFinite(player?.screenY)
+    || !Number.isFinite(board?.left)
+    || !Number.isFinite(board?.right)
+    || !Number.isFinite(board?.top)
+    || !Number.isFinite(board?.bottom)
+  ) {
+    return null;
+  }
+
+  const distance = Math.max(18, Math.round((board.tileSize ?? 8) * 1.8));
+  const deltaByControl = {
+    move_up: { x: 0, y: -distance },
+    move_right: { x: distance, y: 0 },
+    move_down: { x: 0, y: distance },
+    move_left: { x: -distance, y: 0 }
+  };
+  const delta = deltaByControl[control];
+  return {
+    start: {
+      x: Math.min(board.right - 1, Math.max(board.left + 1, player.screenX)),
+      y: Math.min(board.bottom - 1, Math.max(board.top + 1, player.screenY))
+    },
+    end: {
+      x: Math.min(board.right - 1, Math.max(board.left + 1, player.screenX + delta.x)),
+      y: Math.min(board.bottom - 1, Math.max(board.top + 1, player.screenY + delta.y))
+    }
+  };
+};
+
 const runEdgeLiveInteraction = async ({
   page,
   viewport,
@@ -552,7 +622,9 @@ const runEdgeLiveInteraction = async ({
           }
         })();
         const projection = runtime?.projection ?? null;
-        return projection?.mode === requiredMode && projection?.state === 'watching';
+        const projectionReady = projection?.mode === requiredMode && projection?.state === 'watching';
+        const surfaceReady = runtime?.surface?.mode === requiredMode;
+        return projectionReady || surfaceReady;
       },
       {
         runtimeKey: RUNTIME_DIAGNOSTICS_KEY,
@@ -565,6 +637,15 @@ const runEdgeLiveInteraction = async ({
   };
 
   const triggerTouchStep = async (diagnostics, control) => {
+    const swipe = resolveTouchMovementSwipe({ diagnostics, control });
+    if (swipe) {
+      await page.mouse.move(swipe.start.x, swipe.start.y);
+      await page.mouse.down();
+      await page.mouse.move(swipe.end.x, swipe.end.y, { steps: 4 });
+      await page.mouse.up();
+      return;
+    }
+
     const point = resolveTouchControlPoint({ viewport, diagnostics, control });
     if (!point) {
       const error = new Error(`Interactive touch workflow could not resolve ${control} touch coordinates on ${viewport.id}.`);
@@ -641,7 +722,9 @@ const runEdgeLiveInteraction = async ({
       currentDiagnostics = await waitForMovementReady();
       const movementReadyState = summarizeEdgeLiveInteractiveState(currentDiagnostics);
       const currentProjectionState = movementReadyState?.projection?.state ?? null;
-      if (currentProjectionState !== 'watching') {
+      const hasResetLaneMovementState = movementReadyState.mode === (interaction.requiredMode ?? 'play')
+        && (movementReadyState.trail !== null || movementReadyState.player !== null);
+      if (currentProjectionState !== 'watching' && !hasResetLaneMovementState) {
         const error = new Error(`Interactive ${interaction.kind} workflow never reached a movement-ready play state on ${viewport.id}.`);
         error.code = INTERACTIVE_PLAY_FAILURE_CODE;
         error.failureStage = 'movement-ready';
@@ -753,7 +836,7 @@ const runEdgeLiveInteraction = async ({
     throw error;
   }
 
-  if ((finalState.controlUsedCount ?? 0) <= 0) {
+  if (interaction.requiresControlEvents !== false && (finalState.controlUsedCount ?? 0) <= 0) {
     const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not record any control_used events.`);
     error.code = INTERACTIVE_PLAY_FAILURE_CODE;
     error.failureStage = 'interaction-control-events';

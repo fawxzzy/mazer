@@ -518,6 +518,61 @@ describe('edge live check', () => {
         nextIndex: 10
       }
     });
+
+    expect(summarizeEdgeLiveInteractiveState({
+      runtime: {
+        surface: {
+          mode: 'play',
+          overlay: 'none'
+        },
+        telemetry: {
+          summary: {
+            eventCounts: {}
+          }
+        },
+        player: {
+          x: 2,
+          y: 3
+        }
+      }
+    })).toMatchObject({
+      mode: 'play',
+      projection: null,
+      player: {
+        x: 2,
+        y: 3
+      }
+    });
+
+    expect(summarizeEdgeLiveInteractiveState({
+      runtime: {
+        surface: {
+          mode: 'play',
+          overlay: 'none'
+        },
+        play: {
+          player: {
+            x: 4,
+            y: 5,
+            screenX: 144,
+            screenY: 176
+          }
+        },
+        telemetry: {
+          summary: {
+            eventCounts: {}
+          }
+        }
+      }
+    })).toMatchObject({
+      mode: 'play',
+      player: {
+        x: 4,
+        y: 5,
+        screenX: 144,
+        screenY: 176
+      }
+    });
   }, 15_000);
 
   test('aggregates business receipts from captured telemetry events', async () => {

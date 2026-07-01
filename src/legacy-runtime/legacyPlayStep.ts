@@ -30,6 +30,12 @@ export interface LegacyPlayStepResult {
 }
 
 export interface LegacyPointerMoveInput {
+  boardBounds?: {
+    bottom: number;
+    left: number;
+    right: number;
+    top: number;
+  };
   endX: number;
   endY: number;
   playerScreenX: number;
@@ -76,6 +82,7 @@ export const resolveLegacyPlayMoveVector = (
 });
 
 export const resolveLegacyPointerMoveVector = ({
+  boardBounds,
   endX,
   endY,
   playerScreenX,
@@ -84,6 +91,10 @@ export const resolveLegacyPointerMoveVector = ({
   startY,
   tileSize
 }: LegacyPointerMoveInput): { deltaX: number; deltaY: number } => {
+  if (boardBounds && !isPointInsideLegacyBoardBounds(startX, startY, boardBounds)) {
+    return { deltaX: 0, deltaY: 0 };
+  }
+
   const dragDeltaX = endX - startX;
   const dragDeltaY = endY - startY;
   const dragDistance = Math.hypot(dragDeltaX, dragDeltaY);
@@ -95,6 +106,12 @@ export const resolveLegacyPointerMoveVector = ({
 
   return resolveScreenDeltaMoveVector(endX - playerScreenX, endY - playerScreenY);
 };
+
+export const isPointInsideLegacyBoardBounds = (
+  x: number,
+  y: number,
+  bounds: { bottom: number; left: number; right: number; top: number }
+): boolean => x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
 
 export const resolveLegacyPlayCollisionDelta = (
   maze: LegacyMazeSnapshot,

@@ -83,6 +83,22 @@ export interface MenuSceneRuntimeDiagnostics {
     mode: 'menu' | 'play';
     overlay: string;
   };
+  play?: {
+    board: {
+      bottom: number;
+      left: number;
+      right: number;
+      top: number;
+      size: number;
+      tileSize: number;
+    };
+    player: {
+      x: number;
+      y: number;
+      screenX: number;
+      screenY: number;
+    };
+  };
   menuDemo?: {
     phase: string | null;
     cue: string | null;

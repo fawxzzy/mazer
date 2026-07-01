@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   advanceLegacyPlayStep,
   createLegacyPlayMoveFlags,
+  isPointInsideLegacyBoardBounds,
   LEGACY_PLAY_TRAIL_FADE_TAIL,
   LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
   resolveLegacyPointerMoveVector,
@@ -100,6 +101,46 @@ describe('legacy play step', () => {
       endY: 140,
       playerScreenX: 140,
       playerScreenY: 140,
+      tileSize: 8
+    })).toEqual({ deltaX: 1, deltaY: 0 });
+  });
+
+  test('ignores mobile pointer starts outside the active board bounds', () => {
+    const boardBounds = {
+      left: 20,
+      top: 80,
+      right: 360,
+      bottom: 420
+    };
+
+    expect(isPointInsideLegacyBoardBounds(160, 140, boardBounds)).toBe(true);
+    expect(isPointInsideLegacyBoardBounds(160, 50, boardBounds)).toBe(false);
+    expect(resolveLegacyPointerMoveVector({
+      boardBounds,
+      startX: 160,
+      startY: 50,
+      endX: 240,
+      endY: 50,
+      playerScreenX: 160,
+      playerScreenY: 160,
+      tileSize: 8
+    })).toEqual({ deltaX: 0, deltaY: 0 });
+  });
+
+  test('keeps inside-board mobile swipes valid when the release leaves the board', () => {
+    expect(resolveLegacyPointerMoveVector({
+      boardBounds: {
+        left: 20,
+        top: 80,
+        right: 360,
+        bottom: 420
+      },
+      startX: 160,
+      startY: 160,
+      endX: 410,
+      endY: 160,
+      playerScreenX: 160,
+      playerScreenY: 160,
       tileSize: 8
     })).toEqual({ deltaX: 1, deltaY: 0 });
   });

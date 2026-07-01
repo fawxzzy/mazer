@@ -43,6 +43,7 @@ import {
   advanceLegacyPlayStep,
   createLegacyPlayMoveFlags,
   LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
+  isPointInsideLegacyBoardBounds,
   resolveLegacyPointerMoveVector,
   resolveLegacyPlayMoveVector,
   type LegacyPlayMoveFlags
@@ -672,6 +673,8 @@ export class MenuScene extends Phaser.Scene {
     const trailSegmentCap = this.settings.toggleTrailFade
       ? TRAIL_FADE_TAIL
       : Math.max(this.trail.length, this.menuDemoConfig?.behavior.trailMaxLength ?? this.trail.length);
+    const boardOffset = this.resolveBoardOffset();
+    const boardBounds = this.resolveLegacyPlayBoardBounds();
 
     publishMenuSceneRuntimeDiagnostics({
       revision: this.runtimeDiagnosticsRevision,
@@ -681,6 +684,19 @@ export class MenuScene extends Phaser.Scene {
       surface: {
         mode: this.mode,
         overlay: this.overlay
+      },
+      play: {
+        board: {
+          ...boardBounds,
+          size: this.layout.boardSize,
+          tileSize: this.layout.tileSize
+        },
+        player: {
+          x: this.player.x,
+          y: this.player.y,
+          screenX: this.layout.boardLeft + boardOffset.x + ((this.player.x + 0.5) * this.layout.tileSize),
+          screenY: this.layout.boardTop + boardOffset.y + ((this.player.y + 0.5) * this.layout.tileSize)
+        }
       },
       menuDemo: {
         phase: this.menuDemoState?.phase ?? null,
@@ -921,6 +937,10 @@ export class MenuScene extends Phaser.Scene {
       this.playPointerStart = null;
       return false;
     }
+    if (!this.isLegacyPlayPointerInsideBoard(pointer.x, pointer.y)) {
+      this.playPointerStart = null;
+      return false;
+    }
 
     this.playPointerStart = { x: pointer.x, y: pointer.y };
     return true;
@@ -955,7 +975,9 @@ export class MenuScene extends Phaser.Scene {
     end: { x: number; y: number }
   ): { deltaX: number; deltaY: number } {
     const boardOffset = this.resolveBoardOffset();
+    const boardBounds = this.resolveLegacyPlayBoardBounds();
     return resolveLegacyPointerMoveVector({
+      boardBounds,
       startX: start.x,
       startY: start.y,
       endX: end.x,
@@ -964,6 +986,20 @@ export class MenuScene extends Phaser.Scene {
       playerScreenY: this.layout.boardTop + boardOffset.y + ((this.player.y + 0.5) * this.layout.tileSize),
       tileSize: this.layout.tileSize
     });
+  }
+
+  private resolveLegacyPlayBoardBounds(): { bottom: number; left: number; right: number; top: number } {
+    const boardOffset = this.resolveBoardOffset();
+    return {
+      bottom: this.layout.boardTop + boardOffset.y + this.layout.boardSize,
+      left: this.layout.boardLeft + boardOffset.x,
+      right: this.layout.boardLeft + boardOffset.x + this.layout.boardSize,
+      top: this.layout.boardTop + boardOffset.y
+    };
+  }
+
+  private isLegacyPlayPointerInsideBoard(x: number, y: number): boolean {
+    return isPointInsideLegacyBoardBounds(x, y, this.resolveLegacyPlayBoardBounds());
   }
 
   private scheduleLegacyPlayInputBuffer(): void {

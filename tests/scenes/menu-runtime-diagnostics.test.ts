@@ -272,6 +272,22 @@ describe('menu runtime diagnostics', () => {
         mode: 'menu',
         overlay: 'none'
       },
+      play: {
+        board: {
+          bottom: 420,
+          left: 20,
+          right: 360,
+          top: 80,
+          size: 340,
+          tileSize: 10
+        },
+        player: {
+          x: 1,
+          y: 2,
+          screenX: 35,
+          screenY: 105
+        }
+      },
       menuDemo: {
         phase: 'explore',
         cue: 'backtrack',
@@ -398,6 +414,7 @@ describe('menu runtime diagnostics', () => {
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )).toEqual(diagnostics);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.play?.player.screenX).toBe(35);
       expect(createdElements).toEqual([]);
 
       publishMenuSceneRuntimeDiagnostics({
