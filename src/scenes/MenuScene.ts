@@ -84,7 +84,7 @@ import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
 } from '../legacy-runtime/legacyDemoWalker';
-import { resolveLegacyMenuPathRenderFrames } from '../legacy-runtime/legacyMenuRender';
+import { resolveLegacyMenuPathRenderSegments } from '../legacy-runtime/legacyMenuRender';
 import {
   clearMenuSceneRuntimeDiagnostics,
   nextMenuSceneInstanceId,
@@ -314,10 +314,10 @@ const LEGACY_MENU_SLAB_FILL = 0x5a5464;
 const LEGACY_MENU_SLAB_EDGE = 0x14101a;
 const LEGACY_MENU_SLAB_HIGHLIGHT = 0xbcb5c7;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0.38;
-const LEGACY_MENU_PATH_CORE = 0x85808d;
-const LEGACY_MENU_PATH_EDGE = 0x38323c;
-const LEGACY_MENU_WALL_FILL = 0x18131d;
-const LEGACY_MENU_WALL_GRID = 0x0f0b12;
+const LEGACY_MENU_PATH_CORE = 0x141019;
+const LEGACY_MENU_PATH_EDGE = 0x807b86;
+const LEGACY_MENU_WALL_FILL = 0x6f6a76;
+const LEGACY_MENU_WALL_GRID = 0x18131d;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
 const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.24;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.34;
@@ -1321,22 +1321,26 @@ export class MenuScene extends Phaser.Scene {
         const walkable = this.maze.grid[y]?.[x] === true;
 
         if (walkable && isMenuMode) {
-          const frames = resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);
+          const segments = resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);
 
           this.boardStaticGraphics.fillStyle(pathGlow, 0.9);
-          this.boardStaticGraphics.fillRect(
-            tileX + frames.edge.leftInset,
-            tileY + frames.edge.topInset,
-            frames.edge.width,
-            frames.edge.height
-          );
+          for (const segment of segments.edge) {
+            this.boardStaticGraphics.fillRect(
+              tileX + segment.leftInset,
+              tileY + segment.topInset,
+              segment.width,
+              segment.height
+            );
+          }
           this.boardStaticGraphics.fillStyle(pathColor, 0.92);
-          this.boardStaticGraphics.fillRect(
-            tileX + frames.core.leftInset,
-            tileY + frames.core.topInset,
-            frames.core.width,
-            frames.core.height
-          );
+          for (const segment of segments.core) {
+            this.boardStaticGraphics.fillRect(
+              tileX + segment.leftInset,
+              tileY + segment.topInset,
+              segment.width,
+              segment.height
+            );
+          }
         } else {
           this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor, isMenuMode ? 0.94 : 1);
           this.boardStaticGraphics.fillRect(tileX, tileY, tileSize, tileSize);

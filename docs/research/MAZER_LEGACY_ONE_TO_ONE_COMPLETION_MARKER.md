@@ -168,6 +168,7 @@ Current note:
 - the AI/draw-progress diagnostics packet does not earn a point because it improves evidence and future edit safety but does not change gameplay behavior or close a screenshot-grade parity gap
 - the narrow trench-inset packet does not earn a point because it reduces chunky path-cell rendering in one board/material module but does not close screenshot-grade corridor geometry or full menu composition parity
 - the menu dynamic-overlay corridor-frame packet does not earn a point because it reduces the full-square cyan/player marker read in one board/material module but does not close exact legacy trail/sprite treatment or full screenshot-grade board parity
+- the segment-based static-board material packet does not earn a point because it reduces broad filled-cell drift and restores the gray slab / dark route hierarchy, but visual proof still shows tiny-grid/checker drift and incomplete screenshot-grade board parity
 
 ## Preferred modular lock order from here
 

@@ -12,6 +12,11 @@ export interface LegacyMenuPathRenderFrames {
   core: LegacyMenuPathRenderFrame;
 }
 
+export interface LegacyMenuPathRenderSegments {
+  edge: LegacyMenuPathRenderFrame[];
+  core: LegacyMenuPathRenderFrame[];
+}
+
 const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.2;
 const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.16;
 
@@ -73,5 +78,74 @@ export const resolveLegacyMenuPathRenderFrames = (
       width: Math.max(1, tileSize - leftInset - rightInset),
       height: Math.max(1, tileSize - topInset - bottomInset)
     }
+  };
+};
+
+const resolveLegacyMenuPathStrokeSegments = (
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  point: LegacyPoint,
+  tileSize: number,
+  strokeWidth: number
+): LegacyMenuPathRenderFrame[] => {
+  const inset = Math.max(0, Math.floor((tileSize - strokeWidth) / 2));
+  const centerSpan = Math.max(1, tileSize - (inset * 2));
+  const segments: LegacyMenuPathRenderFrame[] = [
+    {
+      leftInset: inset,
+      topInset: inset,
+      width: centerSpan,
+      height: centerSpan
+    }
+  ];
+
+  if (isWalkableGridPoint(maze, { x: point.x - 1, y: point.y })) {
+    segments.push({
+      leftInset: 0,
+      topInset: inset,
+      width: inset + centerSpan,
+      height: centerSpan
+    });
+  }
+  if (isWalkableGridPoint(maze, { x: point.x + 1, y: point.y })) {
+    segments.push({
+      leftInset: inset,
+      topInset: inset,
+      width: tileSize - inset,
+      height: centerSpan
+    });
+  }
+  if (isWalkableGridPoint(maze, { x: point.x, y: point.y - 1 })) {
+    segments.push({
+      leftInset: inset,
+      topInset: 0,
+      width: centerSpan,
+      height: inset + centerSpan
+    });
+  }
+  if (isWalkableGridPoint(maze, { x: point.x, y: point.y + 1 })) {
+    segments.push({
+      leftInset: inset,
+      topInset: inset,
+      width: centerSpan,
+      height: tileSize - inset
+    });
+  }
+
+  return segments;
+};
+
+export const resolveLegacyMenuPathRenderSegments = (
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  point: LegacyPoint,
+  tileSize: number
+): LegacyMenuPathRenderSegments => {
+  const edgeInset = Math.max(1, Math.floor(tileSize * LEGACY_MENU_TRENCH_EDGE_INSET_RATIO));
+  const coreInset = Math.max(1, Math.floor(tileSize * LEGACY_MENU_TRENCH_CORE_INSET_RATIO));
+  const edgeWidth = Math.max(2, tileSize - (edgeInset * 2));
+  const coreWidth = Math.max(1, tileSize - ((edgeInset + coreInset) * 2));
+
+  return {
+    edge: resolveLegacyMenuPathStrokeSegments(maze, point, tileSize, edgeWidth),
+    core: resolveLegacyMenuPathStrokeSegments(maze, point, tileSize, coreWidth)
   };
 };
