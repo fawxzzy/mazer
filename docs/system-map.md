@@ -128,9 +128,13 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - current one-shot maze builders:
   - `createLegacyMenuMaze()` for the fixed front-door snapshot
   - `createLegacyMaze()` for generated play mazes
-  - active reset-lane shortcut bridges using the explicit legacy shortcut budget, the restored opposite-corridor wall-neighbor rule, and a duplicate-preserving `_WallArray`-style random-removal loop
+  - active reset-lane play topology through a source-shaped checkpoint path-builder instead of the previous DFS perfect-maze owner
+  - `CreateGrid` equivalent: square floor grid with non-floor borders
+  - `MapPath` equivalent: checkpoint selection, mixed next-tile choice, local path-neighbor validation, longest-path end selection, and backtrack attempts
+  - `CreatePath` equivalent: path-neighbor wall-array collection with duplicate/stale candidate preservation
+  - `CreateShortCuts` equivalent: explicit legacy shortcut budget, restored opposite-corridor wall-neighbor rule, and random `_WallArray` removal loop
 - `src/domain/maze/core.ts`
-  - browser-native Wilson/topology builder beneath generated play mazes
+  - browser-native Wilson/topology builder for domain/proof maze families outside the active reset-lane play snapshot owner
   - family-aware shortcut braiding profiles for classic, braided, sparse, dense, framed, and split-flow
   - bounded route-aware braided bypass pass after endpoint selection, requiring separated canonical-route reconnection and recording accepted openings as braid-phase generation trace steps
   - route-aware bypass scoring balances legacy path-bridge candidates against off-path alternatives before rasterization
@@ -138,7 +142,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - rasterizes core topology into the playable tile board
   - applies the additive legacy `CreateShortCuts` opposite-corridor bridge rule using `TILE_FLOOR` walkability semantics instead of the browser-only canonical `TILE_PATH` flag
   - appends accepted raster bridge openings as braid-phase generation trace steps and includes them in shortcut/difficulty accounting
-  - still not a line-for-line Unreal `CreateGrid` / `MapPath` / `CreatePath` / `CreateShortCuts` port
+  - still not the active reset-lane `createLegacyMaze()` owner
 - `src/legacy-runtime/legacyGenerationLifecycle.ts`
   - legacy process stage ids
   - menu-vs-play build routing
@@ -174,7 +178,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
 
 Boundary:
 
-- if the change is "what topology gets generated?", start in `src/legacy-runtime/legacyMaze.ts`, then inspect `src/domain/maze/core.ts`
+- if the change is "what active play topology gets generated?", start in `src/legacy-runtime/legacyMaze.ts`; inspect `src/domain/maze/core.ts` only for non-reset-lane domain/proof families
 - if the change is "how shortcut branches or alternate start-goal routes are carved?", start in `src/legacy-runtime/legacyMaze.ts` for active reset-lane `_WallArray` shortcut selection, then inspect `src/domain/maze/core.ts` at `braidMaze()`, `resolveBraidShortcutProfile()`, `measureRouteReconnectionSpan()`, and `applyRouteAwareBypassPass()`, then inspect `src/domain/maze/generator.ts` at the raster legacy bridge pass
 - if the change is "which builder, seed step, or process-stage contract applies?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts`
 - if the change is "what checkpoint/shortcut budget does the current runtime claim?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `window.__MAZER_VISUAL_DIAGNOSTICS__`

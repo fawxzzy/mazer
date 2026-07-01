@@ -16,6 +16,10 @@ This pass rechecked the rebuilt maze/domain code against the read-only Unreal so
 - Checkpoint count remains `_Scale + (_Scale * _CheckPointModifier)`.
 - Shortcut budget remains `_Scale * _ShortcutCountModifier`.
 - Shortcut carving still only runs when `scale > 35`.
+- Generated active-play snapshots now use a source-shaped checkpoint path-builder instead of the earlier DFS perfect-maze owner:
+  - `CreateGrid` equivalent: floor grid plus non-floor border
+  - `MapPath` equivalent: checkpoint selection, mixed next-tile choice, local path-neighbor validation, backtracking, and longest-path end selection
+  - `CreatePath` equivalent: path-neighbor wall-array collection
 - Generated active-play snapshots now apply the restored `CreateShortCuts` bridge condition:
   the selected tile must still be a wall, all four cardinal neighbors must exist, one axis must have opposite walkable path corridors, and the perpendicular axis must remain walled.
 - The active reset-lane pass uses the explicit legacy shortcut budget (`_Scale * _ShortcutCountModifier`) and skips shortcut creation when scale disables process `5`.
@@ -55,6 +59,8 @@ This pass rechecked the rebuilt maze/domain code against the read-only Unreal so
 ## Approximated behavior that remains
 - Maze randomness is still deterministic/seeded in the rebuild.
   Legacy C++ mixed `std::random_device`, `std::rand`, and `std::srand(time(0))`, so exact roll-for-roll output is not reproducible from source alone.
+- The active checkpoint path-builder is source-shaped but not byte-for-byte identical to the old `MapPath()` / `Backtrack()` loop.
+  It preserves the owner responsibilities and major selection gates while keeping browser builds deterministic and one-shot.
 - Demo timer values remain approximated.
   `_PlayerAiDelayDuration` was blueprint-driven in the Unreal project; the rebuild now keeps a more staged but still deterministic calibration for readability:
   `exploreStepMs: 104`, `backtrackStepMs: 76`, `decisionPauseMs: 228`, `anticipationStepMs: 84`, `branchCommitMs: 112`, `branchResumeMs: 148`, `goalHoldMs: 1180`, `resetHoldMs: 340`.

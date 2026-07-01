@@ -40,6 +40,10 @@ Generation is tick-scheduled by `AMazerGameState::Tick` after `_LevelBuildingLog
   - use local path-adjacency validation to avoid over-dense routing
   - if blocked, backtrack to prior path tiles and retry
 - Longest discovered path length updates `_EndTile`.
+- Current web status:
+  - active play now uses a checkpoint path-builder in `src/legacy-runtime/legacyMaze.ts` rather than the earlier DFS perfect-maze topology
+  - the browser builder keeps deterministic seeded randomness and does not claim exact `std::rand` / `std::srand(time(0))` roll parity
+  - exact per-tick process yields are represented by lifecycle contracts and diagnostics, not by pausing the one-shot browser build internally
 
 ## Shortcuts
 - Shortcut budget scales with maze size:

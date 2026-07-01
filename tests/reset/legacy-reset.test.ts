@@ -76,6 +76,14 @@ describe('legacy reset lane', () => {
     expect(maze.size).toBeGreaterThanOrEqual(25);
     expect(maze.solutionPath.length).toBeGreaterThan(2);
     expect(maze.start).not.toEqual(maze.goal);
+    expect(maze.pathBuilderStats).toMatchObject({
+      topology: 'legacy-checkpoint-path-builder',
+      requestedCheckpoints: Math.trunc(maze.size + (maze.size * 0.35)),
+      exhaustedCheckpoints: true
+    });
+    expect(maze.pathBuilderStats?.acceptedCheckpoints).toBeGreaterThan(0);
+    expect(maze.pathBuilderStats?.pathTiles).toBeGreaterThan(maze.solutionPath.length);
+    expect(maze.pathBuilderStats?.wallArrayEntries).toBeGreaterThan(0);
 
     const firstStep = maze.solutionPath[0];
     const lastStep = maze.solutionPath.at(-1);
