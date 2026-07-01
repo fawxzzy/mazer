@@ -44,6 +44,8 @@ Generation is tick-scheduled by `AMazerGameState::Tick` after `_LevelBuildingLog
 ## Shortcuts
 - Shortcut budget scales with maze size:
   - `_ShortcutCount = _Scale * _ShortcutCountModifier`
+- Shortcut attempts pick one random entry from `_WallArray`, then remove that entry from the array whether the selected wall opens or is rejected.
+- `_WallArray` is populated from neighbors of path tiles during `CreatePath()` and can contain duplicate or stale entries.
 - Candidate shortcut tile must currently be wall and have full 4-neighbor context.
 - A wall becomes a path only when it bridges two opposite existing path corridors:
   - vertical wall pair + horizontal path pair, or

@@ -128,7 +128,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - current one-shot maze builders:
   - `createLegacyMenuMaze()` for the fixed front-door snapshot
   - `createLegacyMaze()` for generated play mazes
-  - active reset-lane shortcut bridges using the explicit legacy shortcut budget and the restored opposite-corridor wall-neighbor rule
+  - active reset-lane shortcut bridges using the explicit legacy shortcut budget, the restored opposite-corridor wall-neighbor rule, and a duplicate-preserving `_WallArray`-style random-removal loop
 - `src/domain/maze/core.ts`
   - browser-native Wilson/topology builder beneath generated play mazes
   - family-aware shortcut braiding profiles for classic, braided, sparse, dense, framed, and split-flow
@@ -175,7 +175,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
 Boundary:
 
 - if the change is "what topology gets generated?", start in `src/legacy-runtime/legacyMaze.ts`, then inspect `src/domain/maze/core.ts`
-- if the change is "how shortcut branches or alternate start-goal routes are carved?", start in `src/domain/maze/core.ts` at `braidMaze()`, `resolveBraidShortcutProfile()`, `measureRouteReconnectionSpan()`, and `applyRouteAwareBypassPass()`, then inspect `src/domain/maze/generator.ts` at the raster legacy bridge pass
+- if the change is "how shortcut branches or alternate start-goal routes are carved?", start in `src/legacy-runtime/legacyMaze.ts` for active reset-lane `_WallArray` shortcut selection, then inspect `src/domain/maze/core.ts` at `braidMaze()`, `resolveBraidShortcutProfile()`, `measureRouteReconnectionSpan()`, and `applyRouteAwareBypassPass()`, then inspect `src/domain/maze/generator.ts` at the raster legacy bridge pass
 - if the change is "which builder, seed step, or process-stage contract applies?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts`
 - if the change is "what checkpoint/shortcut budget does the current runtime claim?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `window.__MAZER_VISUAL_DIAGNOSTICS__`
 - if the change is "what legacy gate causes process 0 or process 8 to enter?", start in `src/legacy-runtime/legacyGenerationLifecycle.ts` and `src/legacy-runtime/legacyPlayLifecycle.ts`

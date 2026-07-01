@@ -89,6 +89,10 @@ describe('legacy reset lane', () => {
 
     expect(maze.shortcutsCreated).toBeGreaterThan(0);
     expect(maze.shortcutsCreated).toBeLessThanOrEqual(9);
+    expect(maze.shortcutStats?.requested).toBe(9);
+    expect(maze.shortcutStats?.created).toBe(maze.shortcutsCreated);
+    expect(maze.shortcutStats?.attempts).toBeGreaterThanOrEqual(maze.shortcutsCreated ?? 0);
+    expect(maze.shortcutStats?.wallArrayEntries).toBeGreaterThan(maze.shortcutStats?.uniqueWallCandidates ?? 0);
     expect(countLegacyShortcutBridgeFloors(maze)).toBeGreaterThan(0);
   });
 
@@ -96,6 +100,14 @@ describe('legacy reset lane', () => {
     const maze = createLegacyMaze(25, 0x5a17f00d, 9);
 
     expect(maze.shortcutsCreated).toBe(0);
+    expect(maze.shortcutStats).toEqual({
+      requested: 0,
+      attempts: 0,
+      wallArrayEntries: 0,
+      uniqueWallCandidates: 0,
+      created: 0,
+      exhaustedWallArray: false
+    });
   });
 
   test('uses a fixed legacy-shaped menu maze snapshot for the front door', () => {

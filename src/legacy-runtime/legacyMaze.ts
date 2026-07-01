@@ -15,6 +15,14 @@ export interface LegacyMazeSnapshot {
   solutionPath: LegacyPoint[];
   seed: number;
   shortcutsCreated?: number;
+  shortcutStats?: {
+    requested: number;
+    attempts: number;
+    wallArrayEntries: number;
+    uniqueWallCandidates: number;
+    created: number;
+    exhaustedWallArray: boolean;
+  };
   generation?: {
     budget: {
       checkpointCount: number;
@@ -256,40 +264,63 @@ const isLegacyShortcutBridgeCandidate = (
   return (verticalWalls && horizontalPaths) || (horizontalWalls && verticalPaths);
 };
 
-const collectLegacyShortcutWallCandidates = (grid: boolean[][]): LegacyPoint[] => {
-  const candidates: LegacyPoint[] = [];
-  for (let y = 1; y < grid.length - 1; y += 1) {
+const collectLegacyShortcutWallArray = (grid: boolean[][]): LegacyPoint[] => {
+  const wallArray: LegacyPoint[] = [];
+  const directions: LegacyPoint[] = [
+    { x: 0, y: -1 },
+    { x: 0, y: 1 },
+    { x: -1, y: 0 },
+    { x: 1, y: 0 }
+  ];
+
+  for (let y = 0; y < grid.length; y += 1) {
     const row = grid[y];
     if (!row) {
       continue;
     }
 
-    for (let x = 1; x < row.length - 1; x += 1) {
-      const candidate = { x, y };
-      if (isLegacyShortcutBridgeCandidate(grid, candidate)) {
-        candidates.push(candidate);
+    for (let x = 0; x < row.length; x += 1) {
+      if (grid[y]?.[x] !== true) {
+        continue;
+      }
+
+      for (const direction of directions) {
+        const neighbor = { x: x + direction.x, y: y + direction.y };
+        if (grid[neighbor.y]?.[neighbor.x] === false) {
+          wallArray.push(neighbor);
+        }
       }
     }
   }
 
-  return candidates;
+  return wallArray;
 };
 
 const applyLegacyShortcutBridges = (
   grid: boolean[][],
   rng: () => number,
   shortcutCount: number
-): number => {
+): NonNullable<LegacyMazeSnapshot['shortcutStats']> => {
   if (shortcutCount <= 0) {
-    return 0;
+    return {
+      requested: 0,
+      attempts: 0,
+      wallArrayEntries: 0,
+      uniqueWallCandidates: 0,
+      created: 0,
+      exhaustedWallArray: false
+    };
   }
 
-  const wallCandidates = collectLegacyShortcutWallCandidates(grid);
+  const wallArray = collectLegacyShortcutWallArray(grid);
+  const uniqueWallCandidates = new Set(wallArray.map((point) => keyForPoint(point))).size;
   let created = 0;
+  let attempts = 0;
 
-  while (created < shortcutCount && wallCandidates.length > 0) {
-    const candidateIndex = Math.floor(rng() * wallCandidates.length);
-    const [candidate] = wallCandidates.splice(candidateIndex, 1);
+  while (created < shortcutCount && wallArray.length > 0) {
+    attempts += 1;
+    const candidateIndex = Math.floor(rng() * wallArray.length);
+    const [candidate] = wallArray.splice(candidateIndex, 1);
     if (!candidate || !isLegacyShortcutBridgeCandidate(grid, candidate)) {
       continue;
     }
@@ -298,7 +329,14 @@ const applyLegacyShortcutBridges = (
     created += 1;
   }
 
-  return created;
+  return {
+    requested: shortcutCount,
+    attempts,
+    wallArrayEntries: attempts + wallArray.length,
+    uniqueWallCandidates,
+    created,
+    exhaustedWallArray: wallArray.length === 0 && created < shortcutCount
+  };
 };
 
 export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: number): LegacyMazeSnapshot => {
@@ -351,7 +389,7 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
   const resolvedShortcutCount = size > 35
     ? (shortcutCount ?? Math.trunc(size * legacyTuning.board.shortcutCountModifier.game))
     : 0;
-  const shortcutsCreated = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount);
+  const shortcutStats = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount);
   const solutionPath = buildShortestPath(grid, start, goal);
 
   return {
@@ -361,7 +399,8 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     goal: clonePoint(goal),
     solutionPath,
     seed,
-    shortcutsCreated
+    shortcutsCreated: shortcutStats.created,
+    shortcutStats
   };
 };
 
@@ -386,7 +425,15 @@ export const createLegacyMenuMaze = (seed: number): LegacyMazeSnapshot => {
     goal,
     solutionPath,
     seed,
-    shortcutsCreated: 0
+    shortcutsCreated: 0,
+    shortcutStats: {
+      requested: 0,
+      attempts: 0,
+      wallArrayEntries: 0,
+      uniqueWallCandidates: 0,
+      created: 0,
+      exhaustedWallArray: false
+    }
   };
 };
 

@@ -19,7 +19,8 @@ This pass rechecked the rebuilt maze/domain code against the read-only Unreal so
 - Generated active-play snapshots now apply the restored `CreateShortCuts` bridge condition:
   the selected tile must still be a wall, all four cardinal neighbors must exist, one axis must have opposite walkable path corridors, and the perpendicular axis must remain walled.
 - The active reset-lane pass uses the explicit legacy shortcut budget (`_Scale * _ShortcutCountModifier`) and skips shortcut creation when scale disables process `5`.
-- The exact old `_WallArray` stale-entry/duplicate lifecycle is still not literal in the rebuild; current shortcut selection is deterministic and removes selected candidates from a unique wall-candidate list.
+- The active reset-lane shortcut pass now builds a duplicate-preserving `_WallArray`-style list from path-neighbor walls, removes one randomly selected entry per attempt, revalidates stale entries before opening them, and reports requested/attempted/created shortcut stats.
+- Exact legacy roll-for-roll randomness is still not literal because the Unreal source mixes `std::random_device`, `std::rand`, and repeated `std::srand(time(0))`; the rebuild keeps deterministic seeded selection for browser testability.
 
 ### Reset / regenerate loop
 - Legacy reset still has two distinct branches:
