@@ -48,8 +48,8 @@ built successfully
 
 Localhost proof:
 
-- desktop capture: `C:/ATLAS/tmp/mazer-menu-material-connected-core-desktop-2026-07-01.png`
-- mobile capture: `C:/ATLAS/tmp/mazer-menu-material-connected-core-mobile-2026-07-01.png`
+- desktop capture: `tmp/mazer-menu-material-connected-core-desktop-2026-07-01.png` (local-only ATLAS scratch)
+- mobile capture: `tmp/mazer-menu-material-connected-core-mobile-2026-07-01.png` (local-only ATLAS scratch)
 - browser console errors: none
 
 ## Marker Re-Evaluation
