@@ -110,4 +110,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);');
     expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.006);');
   });
+
+  test('keeps menu dynamic trail overlays in the legacy corridor frame instead of full square cells', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.24;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.34;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.52;');
+    expect(menuSceneSource).toContain("const menuTrailKeys = this.mode === 'menu'");
+    expect(menuSceneSource).toContain('this.fillLegacyMenuDynamicPathTile(');
+    expect(menuSceneSource).toContain('const connectedLeft = trailKeys.has(`${point.x - 1},${point.y}`);');
+    expect(menuSceneSource).toContain('this.fillMenuDynamicMarkerTile(this.player, 0xf2f4f8');
+  });
 });
