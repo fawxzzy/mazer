@@ -22,7 +22,7 @@ export const resolveLegacyMenuTitlePresentation = (
     fontSize,
     shadowOffsetX,
     shadowOffsetY,
-    shadowAlpha: isPortrait ? 0.5 : 0.44,
-    titleAlpha: isPortrait ? 0.84 : 0.8
+    shadowAlpha: isPortrait ? 0.38 : 0.34,
+    titleAlpha: isPortrait ? 0.76 : 0.7
   };
 };

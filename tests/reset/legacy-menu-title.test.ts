@@ -9,7 +9,10 @@ describe('legacy menu title presentation', () => {
     expect(presentation.fontSize).toBeLessThanOrEqual(190);
     expect(presentation.shadowOffsetX).toBeGreaterThanOrEqual(5);
     expect(presentation.shadowOffsetY).toBeGreaterThanOrEqual(7);
-    expect(presentation.titleAlpha).toBeGreaterThanOrEqual(0.8);
+    expect(presentation.titleAlpha).toBeGreaterThanOrEqual(0.68);
+    expect(presentation.titleAlpha).toBeLessThanOrEqual(0.72);
+    expect(presentation.shadowAlpha).toBeGreaterThanOrEqual(0.32);
+    expect(presentation.shadowAlpha).toBeLessThanOrEqual(0.36);
     expect(presentation.shadowAlpha).toBeLessThan(presentation.titleAlpha);
   });
 
@@ -20,7 +23,10 @@ describe('legacy menu title presentation', () => {
     expect(presentation.fontSize).toBeLessThanOrEqual(81);
     expect(presentation.shadowOffsetX).toBeGreaterThanOrEqual(4);
     expect(presentation.shadowOffsetY).toBeGreaterThanOrEqual(6);
-    expect(presentation.titleAlpha).toBeGreaterThan(0.82);
+    expect(presentation.titleAlpha).toBeGreaterThanOrEqual(0.74);
+    expect(presentation.titleAlpha).toBeLessThanOrEqual(0.78);
+    expect(presentation.shadowAlpha).toBeGreaterThanOrEqual(0.36);
+    expect(presentation.shadowAlpha).toBeLessThanOrEqual(0.4);
     expect(presentation.shadowAlpha).toBeLessThan(presentation.titleAlpha);
   });
 });
