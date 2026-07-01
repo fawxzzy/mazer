@@ -103,6 +103,7 @@ Why it is not higher yet:
 - the visible runtime diagnostics panel now also exposes active menu-demo cue, mistake-enabled lane state, and path cursor so front-door demo proof no longer depends on the hidden browser globals
 - the visible runtime diagnostics panel now also exposes the generation stage cursor, so the side-browser can show consumed stage-7 finalization without relying on hidden globals
 - the visible runtime diagnostics panel now prefers the upper-left desktop gutter and a compact bottom fallback on narrow viewports, which keeps the single maintained `4173` browser more usable for menu-parity inspection without removing the proof surface
+- runtime and visual diagnostics now expose live menu-demo AI wrong-branch/backtrack/recovery counters plus stage-6 row-reveal progress, so menu AI review and generation-fluidity review no longer depend on placeholder counters or hidden row state
 - legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
 - in-game pause commands now route through an explicit legacy pause lifecycle contract for `Back`, `Reset`, and `Main Menu`
 - features and game-modes toggles now route through an explicit legacy overlay-toggle contract, with inverted `On/Off` copy kept only where the legacy widget actually owned it
@@ -118,9 +119,9 @@ Why it is not higher yet:
 - maze generation topology is still produced by the browser builder instead of a literal line-for-line Unreal generator port
 - generation/reset branches, stage cadence, budget formulas, process-entry gates, the menu-demo process-8-to-process-0 handoff, shortcut-disabled stage `4 -> 6` progression, and menu stage-6 row-sliced drawing are now explicit runtime contracts
 - stage `7` responsibilities, process `8` reset branches, process-0 delay entry, the menu reset handoff, shortcut-disabled stage progression, and stage `0/3/4/5/6` execution cadence are now explicit lifecycle truth
-- stage-cursor diagnostics now expose queued process-0 entry and consumed stage-7 finalization, and visual diagnostics now expose the menu draw-stage row cursor
+- stage-cursor diagnostics now expose queued process-0 entry and consumed stage-7 finalization, and visual/runtime diagnostics now expose the menu draw-stage row cursor, remaining rows, completion state, and percent progress
 - the browser builder still resolves maze topology before stage-6 row reveal, so exact topology internals remain a future gameplay/topology concern rather than an unstated lifecycle claim
-- demo AI route/backtracking is not a line-for-line Unreal stack port, but live recovery cues, AI-only reset replay, goal reset handoff timing, and `AiTilePathCheck` candidate admission are now explicitly covered
+- demo AI route/backtracking is not a line-for-line Unreal stack port, but live recovery cues, AI-only reset replay, goal reset handoff timing, `AiTilePathCheck` candidate admission, and live wrong-branch/backtrack/recovery diagnostics are now explicitly covered
 - active-play movement, collision, and reset-return ownership are closer after the simultaneous-key buffer, axis-gated collision, and single reset-request ports
 - in-game HUD is only partially restored
 - browser exit cannot literally execute the old engine quit behavior, but the bounded browser-safe quit equivalence is now explicit and proof-backed

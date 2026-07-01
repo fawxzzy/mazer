@@ -103,6 +103,7 @@ Current proof note:
 
 - live runtime diagnostics are now actually bridged through `MenuScene` and covered by repo-owned tests
 - the visible runtime panel now also shows the active menu-demo cue and whether the front-door snapshot is using the mistake-enabled legacy lane
+- the visible runtime panel and visual diagnostics now also show live menu-demo AI wrong-branch/backtrack/recovery counters plus stage-6 row-reveal progress, making AI/generation-fluidity review evidence-backed without changing gameplay behavior
 - the localhost right-pane browser remains useful for visual truth on the single `4173` preview server
 - direct browser-automation readback of `window.__MAZER_*` globals is still browser-owned and flaky, but runtime diagnostics now have a DOM-backed fallback surface and visible panel so that seam no longer blocks localhost proof
 
@@ -139,6 +140,7 @@ Current note:
 - the menu-demo `AiTilePathCheck` packet earns one point because it changes runtime behavior: wrong-turn selection no longer commits into a one-tile spur that the restored Unreal AI would reject for lacking an unvisited onward path
 - the connected trench-core packet does not earn a point because it improves material continuity inside the current web snapshot but does not close the final screenshot-grade menu composition gap
 - the upper-right lattice packet does not earn a point because it improves one fixed snapshot silhouette area but does not close the final screenshot-grade menu composition gap
+- the AI/draw-progress diagnostics packet does not earn a point because it improves evidence and future edit safety but does not change gameplay behavior or close a screenshot-grade parity gap
 
 ## Preferred modular lock order from here
 
