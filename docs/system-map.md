@@ -93,7 +93,7 @@ This is the active state contract for the current app front door.
 | menu demo episode/config/state | `MazeEpisode`, `DemoWalkerConfig`, `DemoWalkerState` | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | menu-only attract route and preroll truth |
 | player/trail/goal live state | `player`, `trail`, `goal` | `src/scenes/MenuScene.ts` | trail presentation differs between menu and play, but ownership stays local to the scene |
 | visual diagnostics | `window.__MAZER_VISUAL_DIAGNOSTICS__` | `src/scenes/MenuScene.ts` | visual proof scripts treat this as route-aware readback, not gameplay truth |
-| runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics`, `#mazer-runtime-diagnostics` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; browser automation still may not see the `window` globals directly, but the DOM attribute and visible panel are repo-owned fallback surfaces and now expose active menu-demo cue, mistake-enabled lane state, and generation stage cursor |
+| runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics`, `#mazer-runtime-diagnostics` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; browser automation still may not see the `window` globals directly, but the DOM attribute and visible panel are repo-owned fallback surfaces and now expose active menu-demo cue, mistake-enabled lane state, AI wrong-branch/backtrack/recovery counters, generation stage cursor, and stage-6 draw progress |
 
 ## End-to-end flow map
 
@@ -153,6 +153,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - `applyGenerationRequest()` rehydrates maze, player, trail, demo state, HUD, and layout from a named request
   - `queueGenerationRequest()` stages delayed menu/play rebuilds instead of collapsing every branch into immediate rebuild calls
   - `armLegacyMenuStaticDrawStage()` and `advanceLegacyMenuStaticDrawStage()` apply the menu stage-6 row-slice draw contract to static-board rendering
+  - runtime diagnostics bridge live stage-6 draw progress through `resolveMenuSceneGenerationDrawStageProgress()`
   - `pendingResetRequest` now carries the explicit process-8 branch until the scene update consumes it
   - `consumeResetRequest()` now converts menu-demo process-8 reset into a pending process-0 generation request instead of regenerating inline
   - runtime diagnostics now publish generation budget metadata, process-entry gates, queue arm time, and full pending request contract state
@@ -169,7 +170,8 @@ Boundary:
 - if the change is "what exactly owns the level-building delay gate or reset bypass semantics?", start in `docs/legacy/gameplay-spec.md`, `src/legacy-runtime/legacyGenerationLifecycle.ts`, and `src/legacy-runtime/legacyPlayLifecycle.ts`
 - if the change is "which stage advances where, which stage can skip ahead, or which stage cursor diagnostics should publish?", start in `docs/legacy/gameplay-spec.md` and `src/legacy-runtime/legacyGenerationLifecycle.ts`
 - if the change is "why does small-maze generation skip process `5`?", start in `resolveLegacyGenerationBudgetContract()` and `resolveLegacyGenerationExecutionPlan()`
-- if the change is "why does the menu board reveal by rows after generation?", start in `MenuScene.armLegacyMenuStaticDrawStage()` and the stage-6 execution plan
+- if the change is "why does the menu board reveal by rows after generation?", start in `MenuScene.armLegacyMenuStaticDrawStage()`, `resolveMenuSceneGenerationDrawStageProgress()`, and the stage-6 execution plan
+- if the change is "what is the menu AI currently doing?", start in `src/domain/ai/demoWalker.ts`, then check `menuDemoState.telemetry` in `MenuScene.publishRuntimeDiagnostics()`
 - if the change is "when does the runtime rebuild or return to menu?", start in `src/scenes/MenuScene.ts`
 - if the change is "how do we port the old staged process `0/3/4/5/6/7/8` lifecycle exactly?", start from `docs/legacy/gameplay-spec.md` and open a dedicated port packet before rewriting runtime code
 
