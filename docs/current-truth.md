@@ -105,6 +105,7 @@ Why it is not higher yet:
 - menu-mode trench core rendering now bridges across connected walkable neighbors, so the current fixed web snapshot reads less checkerboarded while still not claiming dense screenshot-grade geometry parity
 - menu-mode trench rendering now uses a stronger closed-edge inset and narrower light-core channel, reducing the chunky filled-cell read without claiming final screenshot-grade corridor geometry parity
 - menu-mode dynamic trail/start/goal/player overlays now use corridor-framed or inset rendering instead of full square cells, reducing the most obvious modern block-path read without claiming final screenshot-grade board parity
+- menu-mode dynamic trail/start/goal/player overlays now also use thinner corridor/highlight ratios, reducing the chunky cyan route and marker footprint in both desktop and mobile browser captures without claiming exact legacy trail/sprite parity
 - menu-mode static trench rendering now uses segment-based connected strokes and a gray-slab/dark-route role hierarchy, reducing the previous broad filled-cell material read without claiming final screenshot-grade board parity
 - menu-mode static route cores now use a wider dark channel and softer static edge pass, reducing the tiny-grid/checker read in dense route areas without claiming final screenshot-grade board parity
 - menu-mode static board material now uses the restored screenshot-facing role direction more closely: light-gray connected corridor cores over darker wall/slab fields, with dark edge strokes preserved for trench depth; this improves the board/material read but still does not close screenshot-grade parity
@@ -137,7 +138,7 @@ Why it is not higher yet:
 - in-game HUD is only partially restored
 - browser exit cannot literally execute the old engine quit behavior, but the bounded browser-safe quit equivalence is now explicit and proof-backed
 - visual/material parity still needs another pass against screenshots and restored assets
-- menu dynamic overlay material is closer after the corridor-frame pass, but the restored screenshots still show denser board geometry, different cyan/player sprite treatment, and richer slab material than the current web runtime
+- menu dynamic overlay material is closer after the corridor-frame and thinner-overlay passes, but the restored screenshots still show denser board geometry, different cyan/player sprite treatment, and richer slab material than the current web runtime
 - browser automation localhost still does not expose the published `window.__MAZER_*` globals directly, but runtime diagnostics now have a DOM-backed fallback read surface and visible panel on the single `4173` preview server
 
 ## Current proof rule
@@ -189,7 +190,7 @@ Localhost operation rule:
 - final desktop backdrop/material exactness still needs screenshot-grade tightening even after the board-dominance, title-lockup, button-support, explicit backdrop-owner, darker board-material, and lower-left snapshot shelf corrections
 - connected trench-core rendering reduces the separated-cell read in the current fixed menu snapshot, but the restored screenshots still have denser, thinner corridor geometry than the web snapshot
 - the narrower trench-inset pass reduces the chunky menu-cell read, but full screenshot-grade corridor density and silhouette exactness are still open
-- the menu dynamic-overlay corridor-frame pass reduces full-square cyan/player marker drift, but it does not close final legacy trail/sprite/material exactness
+- the menu dynamic-overlay corridor-frame and thinner-overlay passes reduce full-square cyan/player marker drift, but they do not close final legacy trail/sprite/material exactness
 - the segment-based static-board material pass and follow-up wide-route-core/soft-edge pass reduce broad filled-cell drift, restore the gray slab / dark route hierarchy, and make dense route areas read less checker-like, but the current web board still is not screenshot-grade 1:1
 - the connected light-core material pass moves the menu board closer to the restored screenshot role split, but the current web board still differs in exact corridor density, slab relief, and title-over-board composition
 - the upper-right title-adjacent lattice is closer, but the full menu snapshot silhouette is still not screenshot-grade 1:1
