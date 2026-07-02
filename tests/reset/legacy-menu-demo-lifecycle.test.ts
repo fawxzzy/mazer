@@ -53,6 +53,41 @@ describe('legacy menu demo lifecycle', () => {
     expect(nextFrame.trail.length).toBeLessThanOrEqual(16);
   });
 
+  test('bounds the fixed menu bootstrap trail when trail fade is enabled', () => {
+    const menuMaze = createLegacyMenuMaze(3749);
+    const fadedBootstrap = createLegacyMenuDemoBootstrap(menuMaze, true, 3);
+    const persistentBootstrap = createLegacyMenuDemoBootstrap(menuMaze, false, 3);
+
+    expect(fadedBootstrap.trail).toHaveLength(3);
+    expect(fadedBootstrap.trail.at(-1)).toEqual(fadedBootstrap.player);
+    expect(persistentBootstrap.trail.length).toBeGreaterThan(3);
+    expect(persistentBootstrap.trail.at(-1)).toEqual(persistentBootstrap.player);
+  });
+
+  test('bounds the menu demo advance trail when trail fade is enabled', () => {
+    const menuMaze = createLegacyMenuMaze(3749);
+    const bootstrap = createLegacyMenuDemoBootstrap(menuMaze, false, 3);
+    const fadedFrame = advanceLegacyMenuDemoFrame(
+      bootstrap.episode,
+      bootstrap.state,
+      bootstrap.config,
+      true,
+      3
+    );
+    const persistentFrame = advanceLegacyMenuDemoFrame(
+      bootstrap.episode,
+      bootstrap.state,
+      bootstrap.config,
+      false,
+      3
+    );
+
+    expect(fadedFrame.trail).toHaveLength(3);
+    expect(fadedFrame.trail.at(-1)).toEqual(fadedFrame.player);
+    expect(persistentFrame.trail.length).toBeGreaterThan(3);
+    expect(persistentFrame.trail.at(-1)).toEqual(persistentFrame.player);
+  });
+
   test('lets the fixed front-door snapshot surface legacy recovery cues instead of a solver-only attract path', () => {
     const menuMaze = createLegacyMenuMaze(3749);
     const bootstrap = createLegacyMenuDemoBootstrap(menuMaze, false, 16);

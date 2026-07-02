@@ -41,6 +41,7 @@ flowchart TD
 | Menu AI cues and cadence | `src/domain/ai/demoWalker.ts` | `cueOverrides`, `segmentTrailModes`, `resolveSegmentCue()`, `resolveSegmentDelayMs()` | `tests/ai/demo-walker.test.ts`, runtime diagnostics |
 | Menu AI route diagnostics | `src/domain/ai/demoWalker.ts` | `collectDemoWalkerRouteDiagnostics()`, `menuDemo.route` runtime diagnostics | `tests/ai/demo-walker.test.ts`, `tests/scenes/menu-runtime-diagnostics.test.ts`, maintained browser DOM diagnostics |
 | AI reset and regeneration | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | `createLegacyMenuDemoGoalResetRequest()`, process-8 to process-0 handoff | `tests/reset/legacy-menu-demo-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` |
+| Menu trail fade / material-revert equivalent | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | `createLegacyMenuDemoBootstrap()`, `advanceLegacyMenuDemoFrame()`, `toggleTrailFade`, `trailFadeTail` | `tests/reset/legacy-menu-demo-lifecycle.test.ts` |
 | Browser readback | `src/scenes/menuRuntimeDiagnostics.ts` | `data-mazer-runtime-diagnostics`, stage cursor, draw-stage progress, runner telemetry | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/visual/edge-live-check.test.ts` |
 
 ## Current AI Shape
@@ -72,6 +73,7 @@ Menu generation is intentionally not the same owner as active play generation:
 - Menu mode uses the fixed legacy menu snapshot.
 - Play mode uses generated active runtime mazes.
 - Menu stage `6` draw is row-sliced and cadence-gated so the board can reveal over time.
+- Menu demo trail fade is represented as a bounded visible trail tail, which is the browser-safe equivalent for the old delayed material-revert lane.
 - Play topology is currently resolved as a browser-safe build before visible draw.
 - Exact old engine per-tick process-yield timing is still open.
 
@@ -86,7 +88,7 @@ Menu generation is intentionally not the same owner as active play generation:
 ## Known Open Gaps
 
 - Exact numeric Blueprint `_PlayerAiDelayDuration` remains unrecovered, but extracted C++ proves the single-timer cadence shape now used by the rebuild.
-- Exact visited-tile color-revert/material timer behavior remains unrecovered.
+- Exact visited-tile color-revert/material timer behavior remains unrecovered, but menu bootstrap and advance now prove the current browser-equivalent trail-tail behavior for `toggleTrailFade`.
 - The positive `_AiBackTrackUndoVisitedFlag` / `visitedUndoCount` proof route is now covered by a deterministic fixture; remaining visited-color work is about material/timer behavior, not branch observability.
 - Exact engine process-yield timing for generation remains approximated by browser-safe contracts.
 - Final screenshot-grade menu material and sprite treatment remain visual work, not AI pathing work.
