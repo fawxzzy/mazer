@@ -190,7 +190,7 @@ Boundary:
 - if the change is "which stage advances where, which stage can skip ahead, or which stage cursor diagnostics should publish?", start in `docs/legacy/gameplay-spec.md` and `src/legacy-runtime/legacyGenerationLifecycle.ts`
 - if the change is "why does small-maze generation skip process `5`?", start in `resolveLegacyGenerationBudgetContract()` and `resolveLegacyGenerationExecutionPlan()`
 - if the change is "why does the menu board reveal by rows after generation?", start in `MenuScene.armLegacyMenuStaticDrawStage()`, `MenuScene.advanceLegacyMenuStaticDrawStage(time)`, `resolveMenuSceneGenerationDrawStageProgress()`, and the stage-6 execution plan
-- if the change is "what is the menu AI currently doing?", start in `src/domain/ai/demoWalker.ts`, then check `menuDemoState.telemetry` in `MenuScene.publishRuntimeDiagnostics()`
+- if the change is "what is the menu AI currently doing?", start in `docs/research/MAZER_MENU_GENERATION_AI_LOOP_MAP.md`, then inspect `src/domain/ai/demoWalker.ts` and `menuDemoState.telemetry` in `MenuScene.publishRuntimeDiagnostics()`
 - if the change is "when does the runtime rebuild or return to menu?", start in `src/scenes/MenuScene.ts`
 - if the change is "what should the active-play timer text, minute wrap, goal-arrow angle, or HUD proof bounds be?", start in `src/legacy-runtime/legacyPlayHud.ts`, then inspect `MenuScene.drawHud()`
 - if the change is "how do we port the old staged process `0/3/4/5/6/7/8` lifecycle exactly?", start from `docs/legacy/gameplay-spec.md` and open a dedicated port packet before rewriting runtime code
