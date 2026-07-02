@@ -9,14 +9,23 @@ export interface LegacyMenuTitlePresentation {
 export const resolveLegacyMenuTitlePresentation = (
   boardSize: number,
   tileSize: number,
-  isPortrait: boolean
+  isPortrait: boolean,
+  viewportWidth = boardSize
 ): LegacyMenuTitlePresentation => {
-  const fontSize = Math.max(
+  const baseFontSize = Math.max(
     isPortrait ? 78 : 142,
     Math.round(boardSize * (isPortrait ? 0.205 : 0.226))
   );
-  const shadowOffsetX = Math.max(isPortrait ? 4 : 5, Math.round(tileSize * 0.12));
-  const shadowOffsetY = Math.max(isPortrait ? 6 : 7, Math.round(tileSize * (isPortrait ? 0.2 : 0.2)));
+  const isUltraNarrow = isPortrait && viewportWidth < 360;
+  const fontSize = isUltraNarrow
+    ? Math.round(Math.min(baseFontSize, Math.max(42, viewportWidth * 0.3)))
+    : baseFontSize;
+  const shadowOffsetX = isUltraNarrow
+    ? Math.max(2, Math.round(fontSize * 0.07))
+    : Math.max(isPortrait ? 4 : 5, Math.round(tileSize * 0.12));
+  const shadowOffsetY = isUltraNarrow
+    ? Math.max(3, Math.round(fontSize * 0.09))
+    : Math.max(isPortrait ? 6 : 7, Math.round(tileSize * 0.2));
 
   return {
     fontSize,

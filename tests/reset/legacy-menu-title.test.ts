@@ -29,4 +29,15 @@ describe('legacy menu title presentation', () => {
     expect(presentation.shadowAlpha).toBeLessThanOrEqual(0.4);
     expect(presentation.shadowAlpha).toBeLessThan(presentation.titleAlpha);
   });
+
+  test('caps the wordmark in ultra-narrow side panels without changing normal portrait scale', () => {
+    const presentation = resolveLegacyMenuTitlePresentation(147, 3, true, 172);
+
+    expect(presentation.fontSize).toBeGreaterThanOrEqual(42);
+    expect(presentation.fontSize).toBeLessThanOrEqual(52);
+    expect(presentation.fontSize * 3.25).toBeLessThanOrEqual(172);
+    expect(presentation.shadowOffsetX).toBeLessThanOrEqual(4);
+    expect(presentation.shadowOffsetY).toBeLessThanOrEqual(5);
+    expect(presentation.titleAlpha).toBeGreaterThan(presentation.shadowAlpha);
+  });
 });

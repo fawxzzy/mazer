@@ -1149,7 +1149,8 @@ export class MenuScene extends Phaser.Scene {
     const titlePresentation = resolveLegacyMenuTitlePresentation(
       this.layout.boardSize,
       this.layout.tileSize,
-      isPortrait
+      isPortrait,
+      width
     );
 
     this.titleShadow
