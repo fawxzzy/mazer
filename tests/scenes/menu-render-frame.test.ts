@@ -140,38 +140,36 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(segments.core[0]).toEqual({ leftInset: 0, topInset: 0, width: 6, height: 6 });
   });
 
-  test('keeps the menu board in the heavier legacy trench-material lane', () => {
+  test('keeps the menu board in the clean 2d maze-material lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const legacyMenuRenderSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuRender.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0.01;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xaaa4af;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x15101a;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.88;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_RELIEF_SHADOW = 0x07050b;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_RELIEF_SHADOW_ALPHA = 0.34;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO = 0.13;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x3d3842;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GRID = 0x5d5863;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xb8b2bd;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x2b2530;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.7;');
+    expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_SHADOW');
+    expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x24202a;');
     expect(menuSceneSource).toContain('? 0x18131d');
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.14;');
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.04;');
     expect(legacyMenuRenderSource).toContain('const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);');
-    expect(menuSceneSource).toContain('tileX + segment.leftInset + reliefOffset');
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('tileX + frames.core.leftInset');
     expect(legacyMenuRenderSource).toContain('resolveLegacyMenuPathStrokeSegments');
-    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.018);');
+    expect(menuSceneSource).toContain('Keep wall cells flat: the generated topology should read cleanly without fake bevel/depth.');
   });
 
   test('keeps active play maze rendering on connected corridors instead of square debug cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = 0x1a161f;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;');
-    expect(menuSceneSource).toContain('isMenuMode ? LEGACY_MENU_PATH_RELIEF_SHADOW : LEGACY_PLAY_PATH_RELIEF_SHADOW');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = 0x2a2630;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.42;');
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(pathColor, isMenuMode ? 0.92 : 0.96);');
     expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor');
