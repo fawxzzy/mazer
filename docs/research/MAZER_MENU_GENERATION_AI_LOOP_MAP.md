@@ -38,7 +38,7 @@ flowchart TD
 | Menu row reveal | `src/scenes/MenuScene.ts` | `armLegacyMenuStaticDrawStage()`, `advanceLegacyMenuStaticDrawStage(time)`, `resolveMenuSceneGenerationDrawStageProgress()` | `tests/reset/legacy-reset.test.ts`, localhost diagnostics |
 | Menu AI bootstrap | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | `createLegacyDemoWalkerEpisode()`, fixed-snapshot preroll, visible stable bootstrap | `tests/reset/legacy-menu-demo-lifecycle.test.ts` |
 | Menu AI route plan | `src/domain/ai/demoWalker.ts` | `resolveDemoRunnerPlan()`, `buildPreciseRunnerPlan()`, `buildLegacyAiRunnerPlan()` | `tests/ai/demo-walker.test.ts` |
-| Menu AI cues | `src/domain/ai/demoWalker.ts` | `cueOverrides`, `segmentTrailModes`, `resolveSegmentCue()`, `resolveSegmentDelayMs()` | `tests/ai/demo-walker.test.ts`, runtime diagnostics |
+| Menu AI cues and cadence | `src/domain/ai/demoWalker.ts` | `cueOverrides`, `segmentTrailModes`, `resolveSegmentCue()`, `resolveSegmentDelayMs()` | `tests/ai/demo-walker.test.ts`, runtime diagnostics |
 | Menu AI route diagnostics | `src/domain/ai/demoWalker.ts` | `collectDemoWalkerRouteDiagnostics()`, `menuDemo.route` runtime diagnostics | `tests/ai/demo-walker.test.ts`, `tests/scenes/menu-runtime-diagnostics.test.ts`, maintained browser DOM diagnostics |
 | AI reset and regeneration | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | `createLegacyMenuDemoGoalResetRequest()`, process-8 to process-0 handoff | `tests/reset/legacy-menu-demo-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | Browser readback | `src/scenes/menuRuntimeDiagnostics.ts` | `data-mazer-runtime-diagnostics`, stage cursor, draw-stage progress, runner telemetry | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/visual/edge-live-check.test.ts` |
@@ -62,6 +62,7 @@ The humanized lane owns:
 - `findFloorPath()`: reconnects wrong-branch recovery to canonical replay through adjacent floor movement.
 - `collectDemoWalkerRouteDiagnostics()`: publishes the current route shape without changing route selection.
 - first-mistake route construction stops after emitted `dead-end`, `backtrack`, and `reacquire` cues are represented, then returns to canonical replay instead of continuing exploratory route construction.
+- cue-specific labels remain presentation/readback state, but movement, backtrack, dead-end, branch, and reacquire beats now resolve through one `exploreStepMs` timer because extracted C++ reschedules `AiPlayerLogic()` with one `_PlayerAiDelayDuration`.
 
 ## Current Generation Shape
 
@@ -83,7 +84,7 @@ Menu generation is intentionally not the same owner as active play generation:
 
 ## Known Open Gaps
 
-- Exact Unreal blueprint AI cadence remains unrecovered.
+- Exact numeric Blueprint `_PlayerAiDelayDuration` remains unrecovered, but extracted C++ proves the single-timer cadence shape now used by the rebuild.
 - Exact visited-tile color-revert/material timer behavior remains unrecovered.
 - Exact engine process-yield timing for generation remains approximated by browser-safe contracts.
 - Final screenshot-grade menu material and sprite treatment remain visual work, not AI pathing work.

@@ -198,32 +198,11 @@ const resolveSegmentDelayMs = (
   config: DemoWalkerConfig,
   runnerPlan?: DemoRunnerPlan
 ): number => {
-  const cue = resolveSegmentCue(segmentIndex, pathSegmentCount, 1, config, runnerPlan);
-  const trailMode = runnerPlan?.segmentTrailModes[segmentIndex] ?? 'explore';
-  const currentCanonicalCursor = runnerPlan?.canonicalCursors[segmentIndex] ?? segmentIndex;
-  const nextCanonicalCursor = runnerPlan?.canonicalCursors[segmentIndex + 1] ?? (segmentIndex + 1);
-  const isBranchCommit = (
-    cue === 'anticipate'
-    && trailMode === 'explore'
-    && currentCanonicalCursor === nextCanonicalCursor
-  );
-
-  if (cue === 'dead-end') {
-    return Math.max(1, config.cadence.decisionPauseMs);
-  }
-  if (cue === 'reacquire') {
-    return Math.max(1, config.cadence.branchResumeMs);
-  }
-  if (cue === 'backtrack' || trailMode === 'backtrack') {
-    return Math.max(1, config.cadence.backtrackStepMs);
-  }
-  if (isBranchCommit) {
-    return Math.max(1, config.cadence.branchCommitMs);
-  }
-  if (cue === 'anticipate') {
-    return Math.max(1, config.cadence.anticipationStepMs);
-  }
-
+  void segmentIndex;
+  void pathSegmentCount;
+  void runnerPlan;
+  // Legacy AMazerPlayer reschedules AiPlayerLogic with one _PlayerAiDelayDuration
+  // after every AI tick. Cue labels drive presentation, not separate timers.
   return Math.max(1, config.cadence.exploreStepMs);
 };
 

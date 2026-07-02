@@ -323,7 +323,7 @@ describe('demo walker', () => {
     expect(state.trailSteps.some((trailStep) => trailStep.index === 10)).toBe(false);
   });
 
-  test('surfaces branch, dead-end, backtrack, and reacquire cues with cue-specific delays', () => {
+  test('surfaces branch, dead-end, backtrack, and reacquire cues on the single legacy AI timer', () => {
     const episode = generateMaze({
       scale: 50,
       seed: 902,
@@ -375,13 +375,13 @@ describe('demo walker', () => {
     }
 
     expect(branchCommitAdvance).not.toBeNull();
-    expect(branchCommitAdvance?.delayMs).toBe(config.cadence.branchCommitMs);
     expect(deadEndAdvance).not.toBeNull();
-    expect(deadEndAdvance?.delayMs).toBe(config.cadence.decisionPauseMs);
     expect(backtrackAdvance).not.toBeNull();
-    expect(backtrackAdvance?.delayMs).toBe(config.cadence.backtrackStepMs);
     expect(reacquireAdvance).not.toBeNull();
-    expect(reacquireAdvance?.delayMs).toBe(config.cadence.branchResumeMs);
+    expect(branchCommitAdvance?.delayMs).toBe(config.cadence.exploreStepMs);
+    expect(deadEndAdvance?.delayMs).toBe(config.cadence.exploreStepMs);
+    expect(backtrackAdvance?.delayMs).toBe(config.cadence.exploreStepMs);
+    expect(reacquireAdvance?.delayMs).toBe(config.cadence.exploreStepMs);
   });
 
   test('summarizes humanized menu AI route shape for diagnostics', () => {

@@ -8,11 +8,11 @@ export const LEGACY_MENU_SNAPSHOT_PREROLL_STEPS = 72;
 export const LEGACY_MENU_SNAPSHOT_CADENCE = {
   spawnHoldMs: 220,
   exploreStepMs: 104,
-  backtrackStepMs: 76,
-  decisionPauseMs: 228,
-  anticipationStepMs: 84,
-  branchCommitMs: 112,
-  branchResumeMs: 148,
+  backtrackStepMs: 104,
+  decisionPauseMs: 104,
+  anticipationStepMs: 104,
+  branchCommitMs: 104,
+  branchResumeMs: 104,
   goalHoldMs: 1180,
   resetHoldMs: 340
 } as const;

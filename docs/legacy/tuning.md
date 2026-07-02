@@ -62,8 +62,9 @@ This pass rechecked the rebuilt maze/domain code against the read-only Unreal so
 - The active checkpoint path-builder is source-shaped but not byte-for-byte identical to the old `MapPath()` / `Backtrack()` loop.
   It preserves the owner responsibilities and major selection gates while keeping browser builds deterministic and one-shot.
 - Demo timer values remain approximated.
-  `_PlayerAiDelayDuration` was blueprint-driven in the Unreal project; the rebuild now keeps a more staged but still deterministic calibration for readability:
-  `exploreStepMs: 104`, `backtrackStepMs: 76`, `decisionPauseMs: 228`, `anticipationStepMs: 84`, `branchCommitMs: 112`, `branchResumeMs: 148`, `goalHoldMs: 1180`, `resetHoldMs: 340`.
+  `_PlayerAiDelayDuration` was blueprint-driven in the Unreal project; the extracted C++ proves the AI loop is a single timer rescheduled after every `AiPlayerLogic()` call, so the rebuild now uses one AI movement cadence while keeping cue labels for presentation/readback:
+  `exploreStepMs: 104`, `backtrackStepMs: 104`, `decisionPauseMs: 104`, `anticipationStepMs: 104`, `branchCommitMs: 104`, `branchResumeMs: 104`, `goalHoldMs: 1180`, `resetHoldMs: 340`.
+  The numeric Blueprint default is still unrecovered from the available source/assets.
 - Demo maze regeneration uses deterministic seed stepping (`seed + 1` per completed goal maze) as a rebuild approximation for legacy's non-deterministic fresh generation.
 - The menu trail rendering is still a rebuild interpretation of the legacy tile color-revert system rather than a literal material-timer port.
 - The rebuild now carries explicit presentation cues (`spawn`, `anticipate`, `explore`, `dead-end`, `backtrack`, `reacquire`, `goal`, `reset`) alongside the recovered AI logic so the menu scene can stage turn commits, dead ends, backtracking, and branch reacquisition more clearly without changing the underlying path choice.
