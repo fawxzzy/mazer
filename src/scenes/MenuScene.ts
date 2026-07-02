@@ -2591,9 +2591,10 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const safeBounds = createVisualRect(0, 0, this.layout.width, this.layout.height);
+    const boardOffset = this.resolveBoardOffset();
     const boardBounds = createVisualRect(
-      this.layout.boardLeft,
-      this.layout.boardTop,
+      this.layout.boardLeft + boardOffset.x,
+      this.layout.boardTop + boardOffset.y,
       this.layout.boardSize,
       this.layout.boardSize
     );

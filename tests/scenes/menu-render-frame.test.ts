@@ -231,6 +231,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const boardOffset = this.resolveBoardOffset();');
     expect(menuSceneSource).toContain('const boardLeft = layoutBoardLeft + boardOffset.x;');
     expect(menuSceneSource).toContain('const boardTop = layoutBoardTop + boardOffset.y;');
+    expect(menuSceneSource).toContain('this.layout.boardLeft + boardOffset.x');
+    expect(menuSceneSource).toContain('this.layout.boardTop + boardOffset.y');
     expect(menuSceneSource).toContain('if (this.settings.toggleCameraFollow) {');
     expect(menuSceneSource).toContain('this.boardStaticDirty = true;');
     expect(toggleFieldSource).toContain('affectsBoardStatic: true');
