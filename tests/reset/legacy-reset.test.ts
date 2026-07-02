@@ -178,6 +178,9 @@ describe('legacy reset lane', () => {
     });
     expect(maze.routeQualityStats?.bypassableSolutionEdges).toBeGreaterThan(0);
     expect(maze.routeQualityStats?.bypassableRouteBands).toBeGreaterThan(0);
+    expect(maze.routeQualityStats?.meaningfulBypassableSolutionEdges).toBeGreaterThan(1);
+    expect(maze.routeQualityStats?.meaningfulBypassableRouteBands).toBeGreaterThan(1);
+    expect(maze.routeQualityStats?.minimumMeaningfulDetour).toBeGreaterThanOrEqual(2);
   });
 
   test('resumes from the next tile selected during legacy backtracking', () => {

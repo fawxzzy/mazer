@@ -37,6 +37,9 @@ export interface LegacyMazeSnapshot {
   routeQualityStats?: {
     bypassableRouteBands: number;
     bypassableSolutionEdges: number;
+    meaningfulBypassableRouteBands: number;
+    meaningfulBypassableSolutionEdges: number;
+    minimumMeaningfulDetour: number;
     routeQuality: 'single-route' | 'multi-route';
     sampledSolutionEdges: number;
   };
@@ -216,14 +219,14 @@ const buildShortestPath = (grid: boolean[][], start: LegacyPoint, goal: LegacyPo
   return path;
 };
 
-const hasAlternativeRouteWithoutEdge = (
+const measureAlternativeRouteDistanceWithoutEdge = (
   grid: boolean[][],
   start: LegacyPoint,
   goal: LegacyPoint,
   blockedFrom: LegacyPoint,
   blockedTo: LegacyPoint
-): boolean => {
-  const queue: LegacyPoint[] = [start];
+): number | null => {
+  const queue: Array<{ point: LegacyPoint; distance: number }> = [{ point: start, distance: 0 }];
   const visited = new Set<string>([keyForPoint(start)]);
 
   for (let index = 0; index < queue.length; index += 1) {
@@ -232,22 +235,22 @@ const hasAlternativeRouteWithoutEdge = (
       continue;
     }
 
-    if (isSamePoint(current, goal)) {
-      return true;
+    if (isSamePoint(current.point, goal)) {
+      return current.distance;
     }
 
     for (const direction of LEGACY_STEP_DIRECTIONS) {
       const next = {
-        x: current.x + direction.x,
-        y: current.y + direction.y
+        x: current.point.x + direction.x,
+        y: current.point.y + direction.y
       };
       if (grid[next.y]?.[next.x] !== true) {
         continue;
       }
 
       const crossesBlockedEdge = (
-        (isSamePoint(current, blockedFrom) && isSamePoint(next, blockedTo))
-        || (isSamePoint(current, blockedTo) && isSamePoint(next, blockedFrom))
+        (isSamePoint(current.point, blockedFrom) && isSamePoint(next, blockedTo))
+        || (isSamePoint(current.point, blockedTo) && isSamePoint(next, blockedFrom))
       );
       if (crossesBlockedEdge) {
         continue;
@@ -259,11 +262,11 @@ const hasAlternativeRouteWithoutEdge = (
       }
 
       visited.add(nextKey);
-      queue.push(next);
+      queue.push({ point: next, distance: current.distance + 1 });
     }
   }
 
-  return false;
+  return null;
 };
 
 const measureLegacyRouteQuality = (
@@ -274,7 +277,10 @@ const measureLegacyRouteQuality = (
 ): NonNullable<LegacyMazeSnapshot['routeQualityStats']> => {
   const sampledSolutionEdges = Math.max(0, solutionPath.length - 1);
   const bypassableBands = new Set<number>();
+  const meaningfulBypassableBands = new Set<number>();
   let bypassableSolutionEdges = 0;
+  let meaningfulBypassableSolutionEdges = 0;
+  const minimumMeaningfulDetour = Math.max(2, Math.ceil(sampledSolutionEdges * 0.03));
 
   for (let index = 1; index < solutionPath.length; index += 1) {
     const from = solutionPath[index - 1];
@@ -283,18 +289,35 @@ const measureLegacyRouteQuality = (
       continue;
     }
 
-    if (!hasAlternativeRouteWithoutEdge(grid, start, goal, from, to)) {
+    const alternativeDistance = measureAlternativeRouteDistanceWithoutEdge(grid, start, goal, from, to);
+    if (alternativeDistance === null) {
       continue;
     }
 
     bypassableSolutionEdges += 1;
-    bypassableBands.add(Math.min(4, Math.floor((index / Math.max(1, sampledSolutionEdges)) * 5)));
+    const routeBand = Math.min(4, Math.floor((index / Math.max(1, sampledSolutionEdges)) * 5));
+    bypassableBands.add(routeBand);
+
+    if (alternativeDistance - sampledSolutionEdges < minimumMeaningfulDetour) {
+      continue;
+    }
+
+    meaningfulBypassableSolutionEdges += 1;
+    meaningfulBypassableBands.add(routeBand);
   }
+
+  const minimumMeaningfulEdges = Math.max(2, Math.ceil(sampledSolutionEdges * 0.02));
 
   return {
     bypassableRouteBands: bypassableBands.size,
     bypassableSolutionEdges,
-    routeQuality: bypassableSolutionEdges > 0 ? 'multi-route' : 'single-route',
+    meaningfulBypassableRouteBands: meaningfulBypassableBands.size,
+    meaningfulBypassableSolutionEdges,
+    minimumMeaningfulDetour,
+    routeQuality: (
+      meaningfulBypassableSolutionEdges >= minimumMeaningfulEdges
+      && meaningfulBypassableBands.size >= 2
+    ) ? 'multi-route' : 'single-route',
     sampledSolutionEdges
   };
 };
