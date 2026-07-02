@@ -149,6 +149,7 @@ describe('legacy reset lane', () => {
       expect(maze.playableTopologyStats?.reachableFloors).toBeGreaterThan(maze.solutionPath.length);
       expect(maze.playableTopologyStats?.disconnectedFloorTilesPruned).toBeGreaterThan(0);
       expect(maze.playableTopologyStats?.disconnectedComponentsPruned).toBeGreaterThan(0);
+      expect(maze.routeQualityStats?.sampledSolutionEdges).toBe(maze.solutionPath.length - 1);
     }
   });
 
@@ -171,6 +172,12 @@ describe('legacy reset lane', () => {
     expect(maze.shortcutStats?.attempts).toBeGreaterThanOrEqual(maze.shortcutsCreated ?? 0);
     expect(maze.shortcutStats?.wallArrayEntries).toBeGreaterThan(maze.shortcutStats?.uniqueWallCandidates ?? 0);
     expect(countLegacyShortcutBridgeFloors(maze)).toBeGreaterThan(0);
+    expect(maze.routeQualityStats).toMatchObject({
+      routeQuality: 'multi-route',
+      sampledSolutionEdges: maze.solutionPath.length - 1
+    });
+    expect(maze.routeQualityStats?.bypassableSolutionEdges).toBeGreaterThan(0);
+    expect(maze.routeQualityStats?.bypassableRouteBands).toBeGreaterThan(0);
   });
 
   test('resumes from the next tile selected during legacy backtracking', () => {

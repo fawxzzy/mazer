@@ -34,6 +34,12 @@ export interface LegacyMazeSnapshot {
     reachableFloors: number;
     resolvedGoalDistance: number;
   };
+  routeQualityStats?: {
+    bypassableRouteBands: number;
+    bypassableSolutionEdges: number;
+    routeQuality: 'single-route' | 'multi-route';
+    sampledSolutionEdges: number;
+  };
   shortcutsCreated?: number;
   shortcutStats?: {
     requested: number;
@@ -208,6 +214,89 @@ const buildShortestPath = (grid: boolean[][], start: LegacyPoint, goal: LegacyPo
 
   path.reverse();
   return path;
+};
+
+const hasAlternativeRouteWithoutEdge = (
+  grid: boolean[][],
+  start: LegacyPoint,
+  goal: LegacyPoint,
+  blockedFrom: LegacyPoint,
+  blockedTo: LegacyPoint
+): boolean => {
+  const queue: LegacyPoint[] = [start];
+  const visited = new Set<string>([keyForPoint(start)]);
+
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    if (!current) {
+      continue;
+    }
+
+    if (isSamePoint(current, goal)) {
+      return true;
+    }
+
+    for (const direction of LEGACY_STEP_DIRECTIONS) {
+      const next = {
+        x: current.x + direction.x,
+        y: current.y + direction.y
+      };
+      if (grid[next.y]?.[next.x] !== true) {
+        continue;
+      }
+
+      const crossesBlockedEdge = (
+        (isSamePoint(current, blockedFrom) && isSamePoint(next, blockedTo))
+        || (isSamePoint(current, blockedTo) && isSamePoint(next, blockedFrom))
+      );
+      if (crossesBlockedEdge) {
+        continue;
+      }
+
+      const nextKey = keyForPoint(next);
+      if (visited.has(nextKey)) {
+        continue;
+      }
+
+      visited.add(nextKey);
+      queue.push(next);
+    }
+  }
+
+  return false;
+};
+
+const measureLegacyRouteQuality = (
+  grid: boolean[][],
+  start: LegacyPoint,
+  goal: LegacyPoint,
+  solutionPath: readonly LegacyPoint[]
+): NonNullable<LegacyMazeSnapshot['routeQualityStats']> => {
+  const sampledSolutionEdges = Math.max(0, solutionPath.length - 1);
+  const bypassableBands = new Set<number>();
+  let bypassableSolutionEdges = 0;
+
+  for (let index = 1; index < solutionPath.length; index += 1) {
+    const from = solutionPath[index - 1];
+    const to = solutionPath[index];
+    if (!from || !to) {
+      continue;
+    }
+
+    if (!hasAlternativeRouteWithoutEdge(grid, start, goal, from, to)) {
+      continue;
+    }
+
+    bypassableSolutionEdges += 1;
+    bypassableBands.add(Math.min(4, Math.floor((index / Math.max(1, sampledSolutionEdges)) * 5)));
+  }
+
+  return {
+    bypassableRouteBands: bypassableBands.size,
+    bypassableSolutionEdges,
+    routeQuality: bypassableSolutionEdges > 0 ? 'multi-route' : 'single-route',
+    sampledSolutionEdges
+  };
 };
 
 const resolveReachableFloorDistances = (
@@ -827,6 +916,7 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
   const shortcutStats = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount, wallArray);
   const { goal, stats: playableTopologyStats } = normalizeLegacyPlayableTopology(grid, start, sourceGoal);
   const solutionPath = buildShortestPath(grid, start, goal);
+  const routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath);
 
   return {
     source: 'play-generated',
@@ -838,6 +928,7 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     seed,
     pathBuilderStats,
     playableTopologyStats,
+    routeQualityStats,
     shortcutsCreated: shortcutStats.created,
     shortcutStats
   };
