@@ -173,6 +173,7 @@ export interface MenuSceneRuntimeDiagnostics {
       sceneShutdown: number;
       scaleResize: number;
       visibilityAttached: boolean;
+      legacyPlayFocusGuardAttached: boolean;
       installSurfaceAttached: boolean;
     };
     trailSegmentCount: number;

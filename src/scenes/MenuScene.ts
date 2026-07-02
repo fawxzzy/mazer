@@ -460,6 +460,9 @@ export class MenuScene extends Phaser.Scene {
   private runtimeVisibilityAttached = false;
   private runtimeInstallSurfaceAttached = false;
   private runtimeVisibilityChangeHandler: (() => void) | null = null;
+  private legacyPlayFocusGuardAttached = false;
+  private legacyPlayWindowBlurHandler: (() => void) | null = null;
+  private legacyPlayVisibilityChangeHandler: (() => void) | null = null;
   private runtimeFeedDiagnostics = summarizeMenuSceneRuntimeFeed({ nowMs: 0 });
 
   public constructor() {
@@ -511,12 +514,14 @@ export class MenuScene extends Phaser.Scene {
       );
     }
     this.installInput();
+    this.installLegacyPlayFocusGuards();
 
     this.scale.on('resize', () => {
       this.refreshLayout();
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.detachRuntimeDiagnostics();
+      this.detachLegacyPlayFocusGuards();
       this.clearVisualDiagnostics();
       clearMenuSceneRuntimeDiagnostics();
     });
@@ -778,12 +783,13 @@ export class MenuScene extends Phaser.Scene {
       resources: {
         activeTweens: 0,
         activeTimers: 0,
-        listenerCount: 3 + (this.runtimeVisibilityAttached ? 1 : 0),
+        listenerCount: 3 + (this.runtimeVisibilityAttached ? 1 : 0) + (this.legacyPlayFocusGuardAttached ? 2 : 0),
         listenerBreakdown: {
           sceneUpdate: 1,
           sceneShutdown: 1,
           scaleResize: 1,
           visibilityAttached: this.runtimeVisibilityAttached,
+          legacyPlayFocusGuardAttached: this.legacyPlayFocusGuardAttached,
           installSurfaceAttached: this.runtimeInstallSurfaceAttached
         },
         trailSegmentCount: this.trail.length,
@@ -824,6 +830,45 @@ export class MenuScene extends Phaser.Scene {
     document.removeEventListener('visibilitychange', this.runtimeVisibilityChangeHandler);
     this.runtimeVisibilityAttached = false;
     this.runtimeVisibilityChangeHandler = null;
+  }
+
+  private installLegacyPlayFocusGuards(): void {
+    if (this.legacyPlayFocusGuardAttached) {
+      return;
+    }
+
+    this.legacyPlayWindowBlurHandler = () => {
+      this.handleLegacyPlayInputFocusLoss();
+    };
+    this.legacyPlayVisibilityChangeHandler = () => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        this.handleLegacyPlayInputFocusLoss();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('blur', this.legacyPlayWindowBlurHandler);
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.legacyPlayVisibilityChangeHandler);
+    }
+    this.legacyPlayFocusGuardAttached = true;
+  }
+
+  private detachLegacyPlayFocusGuards(): void {
+    if (!this.legacyPlayFocusGuardAttached) {
+      return;
+    }
+
+    if (typeof window !== 'undefined' && this.legacyPlayWindowBlurHandler !== null) {
+      window.removeEventListener('blur', this.legacyPlayWindowBlurHandler);
+    }
+    if (typeof document !== 'undefined' && this.legacyPlayVisibilityChangeHandler !== null) {
+      document.removeEventListener('visibilitychange', this.legacyPlayVisibilityChangeHandler);
+    }
+    this.legacyPlayWindowBlurHandler = null;
+    this.legacyPlayVisibilityChangeHandler = null;
+    this.legacyPlayFocusGuardAttached = false;
   }
 
   private installInput(): void {
@@ -1017,6 +1062,10 @@ export class MenuScene extends Phaser.Scene {
     this.playMoveTimer = null;
     this.playMoveFlags = createLegacyPlayMoveFlags();
     this.playPointerStart = null;
+  }
+
+  private handleLegacyPlayInputFocusLoss(): void {
+    this.resetLegacyPlayInputBuffer();
   }
 
   private resolveLegacyPlayInputBuffer(): void {

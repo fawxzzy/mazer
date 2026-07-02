@@ -381,6 +381,7 @@ describe('menu runtime diagnostics', () => {
           sceneShutdown: 1,
           scaleResize: 1,
           visibilityAttached: false,
+          legacyPlayFocusGuardAttached: false,
           installSurfaceAttached: false
         },
         trailSegmentCount: 46,

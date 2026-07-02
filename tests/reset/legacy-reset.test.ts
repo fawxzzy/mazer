@@ -328,6 +328,12 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('event.preventDefault();');
     expect(menuSceneSource).toContain('resolveLegacyPlayMoveVector(this.playMoveFlags)');
     expect(menuSceneSource).toContain('this.resetLegacyPlayInputBuffer();');
+    expect(menuSceneSource).toContain('this.installLegacyPlayFocusGuards();');
+    expect(menuSceneSource).toContain('this.detachLegacyPlayFocusGuards();');
+    expect(menuSceneSource).toContain("window.addEventListener('blur', this.legacyPlayWindowBlurHandler);");
+    expect(menuSceneSource).toContain("window.removeEventListener('blur', this.legacyPlayWindowBlurHandler);");
+    expect(menuSceneSource).toContain("document.addEventListener('visibilitychange', this.legacyPlayVisibilityChangeHandler);");
+    expect(menuSceneSource).toContain('private handleLegacyPlayInputFocusLoss(): void {');
     expect(menuSceneSource).toContain('createLegacyMenuDemoBootstrap(this.maze, this.settings.toggleTrailFade, TRAIL_FADE_TAIL)');
     expect(menuSceneSource).toContain('advanceLegacyMenuDemoFrame(');
     expect(demoLifecycleSource).toContain('createLegacyMenuSnapshotDemoWalkerConfig(maze.seed)');

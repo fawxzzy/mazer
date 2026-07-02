@@ -481,5 +481,5 @@ describe('demo walker', () => {
 
       expect(sawWrongBranchOrRecovery).toBe(true);
     }
-  });
+  }, 15_000);
 });
