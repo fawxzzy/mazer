@@ -314,6 +314,44 @@ describe('menu runtime diagnostics', () => {
         }
       },
       generation: {
+        maze: {
+          buildKind: 'menu-generated',
+          source: 'menu-generated',
+          size: 49,
+          seed: 3749,
+          solutionPathLength: 120,
+          shortcutStats: {
+            requested: 9,
+            attempts: 9,
+            created: 6,
+            wallArrayEntries: 80,
+            uniqueWallCandidates: 32,
+            exhaustedWallArray: false
+          },
+          pathBuilderStats: {
+            acceptedCheckpoints: 4,
+            backtracks: 2,
+            longestPathLength: 120,
+            pathTiles: 260,
+            requestedCheckpoints: 5,
+            wallArrayEntries: 80
+          },
+          playableTopologyStats: {
+            disconnectedComponentsPruned: 0,
+            disconnectedFloorTilesPruned: 0,
+            goalRebasedToFarthestReachableFloor: false,
+            reachableFloors: 260,
+            resolvedGoalDistance: 119
+          },
+          routeQualityStats: {
+            bypassableRouteBands: 3,
+            bypassableSolutionEdges: 17,
+            meaningfulBypassableRouteBands: 2,
+            meaningfulBypassableSolutionEdges: 8,
+            routeQuality: 'multi-route',
+            sampledSolutionEdges: 48
+          }
+        },
         drawStage: {
           batchSize: 1,
           batchUnit: 'rows',
@@ -434,6 +472,9 @@ describe('menu runtime diagnostics', () => {
       )).toEqual(diagnostics);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.play?.player.screenX).toBe(35);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.menuDemo?.route?.cueCounts.reacquire).toBe(2);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.source).toBe('menu-generated');
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.routeQualityStats?.routeQuality)
+        .toBe('multi-route');
       expect(createdElements).toEqual([]);
 
       publishMenuSceneRuntimeDiagnostics({
@@ -448,6 +489,9 @@ describe('menu runtime diagnostics', () => {
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )?.surface.mode).toBe('play');
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.generation?.maze?.buildKind).toBe('menu-generated');
       expect(createdElements).toEqual([]);
 
       clearMenuSceneRuntimeDiagnostics();

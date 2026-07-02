@@ -735,6 +735,44 @@ export class MenuScene extends Phaser.Scene {
         } : undefined
       },
       generation: {
+        maze: {
+          buildKind: this.maze.generation?.buildKind ?? null,
+          source: this.maze.source,
+          size: this.maze.size,
+          seed: this.maze.seed,
+          solutionPathLength: this.maze.solutionPath.length,
+          shortcutStats: this.maze.shortcutStats ? {
+            requested: this.maze.shortcutStats.requested,
+            attempts: this.maze.shortcutStats.attempts,
+            created: this.maze.shortcutStats.created,
+            wallArrayEntries: this.maze.shortcutStats.wallArrayEntries,
+            uniqueWallCandidates: this.maze.shortcutStats.uniqueWallCandidates,
+            exhaustedWallArray: this.maze.shortcutStats.exhaustedWallArray
+          } : undefined,
+          pathBuilderStats: this.maze.pathBuilderStats ? {
+            acceptedCheckpoints: this.maze.pathBuilderStats.acceptedCheckpoints,
+            backtracks: this.maze.pathBuilderStats.backtracks,
+            longestPathLength: this.maze.pathBuilderStats.longestPathLength,
+            pathTiles: this.maze.pathBuilderStats.pathTiles,
+            requestedCheckpoints: this.maze.pathBuilderStats.requestedCheckpoints,
+            wallArrayEntries: this.maze.pathBuilderStats.wallArrayEntries
+          } : undefined,
+          playableTopologyStats: this.maze.playableTopologyStats ? {
+            disconnectedComponentsPruned: this.maze.playableTopologyStats.disconnectedComponentsPruned,
+            disconnectedFloorTilesPruned: this.maze.playableTopologyStats.disconnectedFloorTilesPruned,
+            goalRebasedToFarthestReachableFloor: this.maze.playableTopologyStats.goalRebasedToFarthestReachableFloor,
+            reachableFloors: this.maze.playableTopologyStats.reachableFloors,
+            resolvedGoalDistance: this.maze.playableTopologyStats.resolvedGoalDistance
+          } : undefined,
+          routeQualityStats: this.maze.routeQualityStats ? {
+            bypassableRouteBands: this.maze.routeQualityStats.bypassableRouteBands,
+            bypassableSolutionEdges: this.maze.routeQualityStats.bypassableSolutionEdges,
+            meaningfulBypassableRouteBands: this.maze.routeQualityStats.meaningfulBypassableRouteBands,
+            meaningfulBypassableSolutionEdges: this.maze.routeQualityStats.meaningfulBypassableSolutionEdges,
+            routeQuality: this.maze.routeQualityStats.routeQuality,
+            sampledSolutionEdges: this.maze.routeQualityStats.sampledSolutionEdges
+          } : undefined
+        },
         drawStage: {
           batchSize: drawStage?.batchSize ?? null,
           batchUnit: drawStage?.batchUnit ?? null,

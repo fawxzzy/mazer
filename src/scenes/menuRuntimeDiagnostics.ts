@@ -117,6 +117,44 @@ export interface MenuSceneRuntimeDiagnostics {
     };
   };
   generation?: {
+    maze?: {
+      buildKind: 'menu-snapshot' | 'menu-generated' | 'play-generated' | null;
+      source: 'menu-snapshot' | 'menu-generated' | 'play-generated';
+      size: number;
+      seed: number;
+      solutionPathLength: number;
+      shortcutStats?: {
+        requested: number;
+        attempts: number;
+        created: number;
+        wallArrayEntries: number;
+        uniqueWallCandidates: number;
+        exhaustedWallArray: boolean;
+      };
+      pathBuilderStats?: {
+        acceptedCheckpoints: number;
+        backtracks: number;
+        longestPathLength: number;
+        pathTiles: number;
+        requestedCheckpoints: number;
+        wallArrayEntries: number;
+      };
+      playableTopologyStats?: {
+        disconnectedComponentsPruned: number;
+        disconnectedFloorTilesPruned: number;
+        goalRebasedToFarthestReachableFloor: boolean;
+        reachableFloors: number;
+        resolvedGoalDistance: number;
+      };
+      routeQualityStats?: {
+        bypassableRouteBands: number;
+        bypassableSolutionEdges: number;
+        meaningfulBypassableRouteBands: number;
+        meaningfulBypassableSolutionEdges: number;
+        routeQuality: 'single-route' | 'multi-route';
+        sampledSolutionEdges: number;
+      };
+    };
     drawStage?: {
       batchSize: number | null;
       batchUnit: string | null;
