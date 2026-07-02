@@ -1,6 +1,6 @@
 import {
+  createLegacyGeneratedMenuMaze,
   createLegacyMaze,
-  createLegacyMenuMaze,
   type LegacyMazeSnapshot,
   type LegacyPoint
 } from './legacyMaze';
@@ -8,7 +8,7 @@ import { clampInteger } from './legacyDefaults';
 import { legacyTuning } from '../config/tuning';
 
 export type LegacyGenerationMode = 'menu' | 'play';
-export type LegacyMazeBuildKind = 'menu-snapshot' | 'play-generated';
+export type LegacyMazeBuildKind = 'menu-generated' | 'play-generated';
 export type LegacyGenerationProcessStageId = 0 | 3 | 4 | 5 | 6 | 7 | 8;
 export type LegacyGenerationStageName = 'CreateGrid' | 'MapPath' | 'CreatePath' | 'CreateShortCuts' | 'Draw' | 'Finalize' | 'Reset';
 export type LegacyGenerationDelayDurationSource = 'legacy-variable-unrecovered';
@@ -163,7 +163,7 @@ export const resolveLegacyGenerationProcessStageIds = (scale: number): LegacyGen
 );
 
 export const resolveLegacyMazeBuildKind = (mode: LegacyGenerationMode): LegacyMazeBuildKind => (
-  mode === 'menu' ? 'menu-snapshot' : 'play-generated'
+  mode === 'menu' ? 'menu-generated' : 'play-generated'
 );
 
 const resolveLegacyGenerationStageName = (
@@ -373,9 +373,10 @@ export const createLegacyRuntimeMazeForMode = (
   const executionPlan = resolveLegacyGenerationExecutionPlan(mode, scale);
   const budget = resolveLegacyGenerationBudgetContract(mode, scale);
   const gate = resolveLegacyGenerationTickGateContract();
-  const maze = buildKind === 'menu-snapshot'
-    ? createLegacyMenuMaze(seed)
-    : createLegacyMaze(scale, seed, budget.shortcutStageEnabled ? budget.shortcutCount : 0);
+  const resolvedShortcutCount = budget.shortcutStageEnabled ? budget.shortcutCount : 0;
+  const maze = buildKind === 'menu-generated'
+    ? createLegacyGeneratedMenuMaze(scale, seed, resolvedShortcutCount)
+    : createLegacyMaze(scale, seed, resolvedShortcutCount);
 
   return {
     ...maze,

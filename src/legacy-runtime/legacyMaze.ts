@@ -8,7 +8,7 @@ export interface LegacyPoint {
 }
 
 export interface LegacyMazeSnapshot {
-  source: 'menu-snapshot' | 'play-generated';
+  source: 'menu-snapshot' | 'menu-generated' | 'play-generated';
   size: number;
   grid: boolean[][];
   start: LegacyPoint;
@@ -61,7 +61,7 @@ export interface LegacyMazeSnapshot {
       shortcutCountModifier: number;
       shortcutStageEnabled: boolean;
     };
-    buildKind: 'menu-snapshot' | 'play-generated';
+    buildKind: 'menu-snapshot' | 'menu-generated' | 'play-generated';
     executionPlan: Array<{
       advancesToStageId: number | null;
       batchSize: number | null;
@@ -956,6 +956,19 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     shortcutStats
   };
 };
+
+export const createLegacyGeneratedMenuMaze = (
+  scale: number,
+  seed: number,
+  shortcutCount?: number
+): LegacyMazeSnapshot => ({
+  ...createLegacyMaze(
+    scale,
+    seed,
+    shortcutCount ?? Math.trunc(normalizeGridSize(scale) * legacyTuning.board.shortcutCountModifier.menu)
+  ),
+  source: 'menu-generated'
+});
 
 export const createLegacyMenuMaze = (seed: number): LegacyMazeSnapshot => {
   const blueprint = resolveLegacyMenuSnapshotBlueprint();

@@ -14,7 +14,8 @@ describe('legacy generation diagnostics contract', () => {
       shortcutCount: 6,
       shortcutStageEnabled: true
     });
-    expect(menuMaze.generation?.buildKind).toBe('menu-snapshot');
+    expect(menuMaze.source).toBe('menu-generated');
+    expect(menuMaze.generation?.buildKind).toBe('menu-generated');
     expect(menuMaze.generation?.gate).toEqual({
       entryStageId: 0,
       waitsForLevelBuildingDelay: true,
@@ -29,6 +30,8 @@ describe('legacy generation diagnostics contract', () => {
       resetsLevelBuildingTimerAfterConsume: true
     });
     expect(menuMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
+    expect(menuMaze.pathBuilderStats?.topology).toBe('legacy-checkpoint-path-builder');
+    expect(menuMaze.shortcutStats?.requested).toBe(6);
     expect(menuMaze.generation?.stageCursor).toEqual({
       phase: 'consumed-finalized',
       currentStageId: 7,

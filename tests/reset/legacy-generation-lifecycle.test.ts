@@ -137,8 +137,8 @@ describe('legacy generation lifecycle', () => {
     });
   });
 
-  test('routes menu and play mode to the correct maze builders', () => {
-    expect(resolveLegacyMazeBuildKind('menu')).toBe('menu-snapshot');
+  test('routes menu and play mode to procedural maze builders', () => {
+    expect(resolveLegacyMazeBuildKind('menu')).toBe('menu-generated');
     expect(resolveLegacyMazeBuildKind('play')).toBe('play-generated');
 
     const menuMaze = createLegacyRuntimeMazeForMode('menu', 50, 3749);
@@ -146,10 +146,14 @@ describe('legacy generation lifecycle', () => {
 
     expect(menuMaze.size).toBe(49);
     expect(playMaze.size).toBeGreaterThan(25);
-    expect(menuMaze.goal).toEqual({ x: 44, y: 44 });
-    expect(menuMaze.source).toBe('menu-snapshot');
+    expect(menuMaze.source).toBe('menu-generated');
     expect(playMaze.source).toBe('play-generated');
+    expect(menuMaze.start).not.toEqual(menuMaze.goal);
     expect(playMaze.start).not.toEqual(playMaze.goal);
+    expect(menuMaze.pathBuilderStats?.topology).toBe('legacy-checkpoint-path-builder');
+    expect(playMaze.pathBuilderStats?.topology).toBe('legacy-checkpoint-path-builder');
+    expect(menuMaze.shortcutStats?.requested).toBe(6);
+    expect(playMaze.shortcutStats?.requested).toBe(9);
   });
 
   test('steps regeneration seeds deterministically', () => {
@@ -198,7 +202,7 @@ describe('legacy generation lifecycle', () => {
       initializedResetBypassesDelayGate: true,
       resetsLevelBuildingTimerAfterConsume: true
     });
-    expect(menuBootRequest.buildKind).toBe('menu-snapshot');
+    expect(menuBootRequest.buildKind).toBe('menu-generated');
     expect(menuBootRequest.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
     expect(menuBootRequest.stageCursor).toEqual({
       phase: 'queued-entry',

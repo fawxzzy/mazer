@@ -41,7 +41,7 @@ Use this before large edits so you know the whole app, not just the current scre
 | `src/scenes/*` | runtime shell, front door, overlays, play loop, HUD, live presentation |
 | `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, play HUD geometry, option field parsing, overlay field-commit contracts, overlay toggle contracts, overlay routing contracts, pause command contracts |
 | `src/domain/ai/*` | deterministic demo walker stepping and attract behavior |
-| `src/domain/maze/*` | generated maze/runtime domain logic used outside the fixed menu snapshot |
+| `src/domain/maze/*` | generated maze/runtime domain logic used by live menu and play generation |
 | `tests/reset/*` | legacy reset-lane contracts and guardrails |
 | `tests/scenes/*` | scene composition, presentation, and live-shell proof guards |
 | `legacy/*` | restored source truth inputs and screenshot truth |
@@ -88,10 +88,10 @@ This is the active state contract for the current app front door.
 
 | State family | Values | Owner | Notes |
 | --- | --- | --- | --- |
-| runtime mode | `menu` / `play` | `src/scenes/MenuScene.ts` | decides whether the fixed menu snapshot or generated play maze is active |
+| runtime mode | `menu` / `play` | `src/scenes/MenuScene.ts` | decides whether menu-generated or play-generated runtime behavior is active |
 | active overlay | `none` / `options` / `features` / `gameModes` / `pause` | `src/scenes/MenuScene.ts` | exactly one overlay at a time |
 | settings | `LegacySettings` | `src/legacy-runtime/legacyDefaults.ts`, `src/legacy-runtime/legacyOptionFields.ts`, `src/scenes/MenuScene.ts` | menu and pause fields mutate this contract |
-| current maze snapshot | `LegacyMazeSnapshot` | `src/legacy-runtime/legacyMaze.ts` | menu mode uses `createLegacyMenuMaze()`, play mode uses `createLegacyMaze()` |
+| current maze snapshot | `LegacyMazeSnapshot` | `src/legacy-runtime/legacyMaze.ts` | menu mode uses `createLegacyGeneratedMenuMaze()`, play mode uses `createLegacyMaze()`, and `createLegacyMenuMaze()` remains a fixed screenshot fixture |
 | menu demo episode/config/state | `MazeEpisode`, `DemoWalkerConfig`, `DemoWalkerState` | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | menu-only attract route and preroll truth |
 | player/trail/goal live state | `player`, `trail`, `goal` | `src/scenes/MenuScene.ts` | trail presentation differs between menu and play, but ownership stays local to the scene |
 | visual diagnostics | `window.__MAZER_VISUAL_DIAGNOSTICS__` | `src/scenes/MenuScene.ts` | visual proof scripts treat this as route-aware readback, not gameplay truth |
@@ -106,7 +106,7 @@ Use this when you need to understand the app as a system instead of a file list.
 2. Scene handoff:
    `src/scenes/BootScene.ts` hands off immediately to `src/scenes/MenuScene.ts`.
 3. Front door build:
-   `MenuScene` resolves layout, builds the fixed menu snapshot through `createLegacyMenuMaze()`, and publishes diagnostics.
+   `MenuScene` resolves layout, builds the live procedural menu maze through `createLegacyGeneratedMenuMaze()`, and publishes diagnostics.
 4. Menu attract motion:
    `createLegacyDemoWalkerEpisode()` + `createLegacyMenuSnapshotDemoWalkerConfig()` + `createLegacyMenuDemoBootstrap()` + `advanceDemoWalker()` drive the menu-only trail/player motion.
 5. User entry:
@@ -128,8 +128,9 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - legacy truth for staged `_ProcessCount` generation and process `8` reset behavior
 - `src/legacy-runtime/legacyMaze.ts`
   - current one-shot maze builders:
-  - `createLegacyMenuMaze()` for the fixed front-door snapshot
+  - `createLegacyGeneratedMenuMaze()` for live procedural menu mazes
   - `createLegacyMaze()` for generated play mazes
+  - `createLegacyMenuMaze()` for the fixed front-door screenshot fixture
   - active reset-lane play topology through a source-shaped checkpoint path-builder instead of the previous DFS perfect-maze owner
   - `CreateGrid` equivalent: square floor grid with non-floor borders
   - `MapPath` / `Backtrack` equivalent: checkpoint selection, mixed next-tile choice, local path-neighbor validation, longest-path end selection, and source-shaped resume from the next tile selected by backtracking
@@ -374,7 +375,7 @@ Rule:
 - `src/legacy-runtime/legacyMaze.ts`
   - generated maze builder for play mode
   - adapter that converts the fixed menu snapshot blueprint into a `LegacyMazeSnapshot`
-  - tags snapshots with `source: 'menu-snapshot'` or `source: 'play-generated'` so demo policy does not infer identity from grid size
+  - tags snapshots with `source: 'menu-generated'`, `source: 'play-generated'`, or `source: 'menu-snapshot'` so demo policy does not infer identity from grid size
 
 Boundary:
 
