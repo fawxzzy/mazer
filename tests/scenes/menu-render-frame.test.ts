@@ -196,10 +196,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_HALO = 0x83efff;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_CORE = 0xf8fbff;');
     expect(menuSceneSource).toContain('const dynamicTrailKeys = new Set(trail.map((point) => `${point.x},${point.y}`));');
     expect(menuSceneSource).toContain('this.fillLegacyMenuDynamicPathTile(');
     expect(menuSceneSource).toContain('const connectedLeft = trailKeys.has(`${point.x - 1},${point.y}`);');
-    expect(menuSceneSource).toContain('this.fillMenuDynamicMarkerTile(this.player, 0xf2f4f8');
+    expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player');
+    expect(menuSceneSource).toContain('const centerX = originX + ((point.x + 0.5) * tileSize);');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillCircle(centerX, centerY, coreRadius);');
   });
 
   test('keeps active play dynamic overlays in the corridor frame instead of square cells', () => {
@@ -210,7 +214,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.24;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.48;');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
-    expect(menuSceneSource).toContain('this.fillPlayDynamicMarkerTile(this.player, 0xf2f4f8');
+    expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player');
+    expect(menuSceneSource).toContain('const playerScreenX = this.layout.boardLeft + boardOffset.x + ((this.player.x + 0.5) * this.layout.tileSize);');
+    expect(menuSceneSource).toContain('const goalScreenX = this.layout.boardLeft + boardOffset.x + ((this.maze.goal.x + 0.5) * this.layout.tileSize);');
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, point, trailColor, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, trailAlpha, 1);');
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, this.player, 0xf2f4f8, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, 0);');
   });

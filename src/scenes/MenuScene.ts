@@ -350,6 +350,11 @@ const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x06131c;
 const LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO = 0.28;
 const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.24;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.48;
+const LEGACY_PLAYER_MARKER_SHADOW = 0x05070f;
+const LEGACY_PLAYER_MARKER_HALO = 0x83efff;
+const LEGACY_PLAYER_MARKER_CORE = 0xf8fbff;
+const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.3;
+const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.44;
 const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 42;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
@@ -1650,9 +1655,9 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (this.mode === 'menu') {
-      this.fillMenuDynamicMarkerTile(this.player, 0xf2f4f8, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.92);
+      this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94);
     } else {
-      this.fillPlayDynamicMarkerTile(this.player, 0xf2f4f8, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.98);
+      this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1);
     }
     this.boardDynamicDirty = false;
   }
@@ -1814,6 +1819,28 @@ export class MenuScene extends Phaser.Scene {
     this.fillTile(this.boardDynamicGraphics, point, color, originX, originY, tileSize, alpha, inset);
   }
 
+  private fillLegacyPlayerMarkerTile(
+    point: LegacyPoint,
+    originX: number,
+    originY: number,
+    tileSize: number,
+    alpha: number
+  ): void {
+    const centerX = originX + ((point.x + 0.5) * tileSize);
+    const centerY = originY + ((point.y + 0.5) * tileSize);
+    const haloRadius = Math.max(4, Math.floor(tileSize * LEGACY_PLAYER_MARKER_HALO_RATIO));
+    const coreRadius = Math.max(2, Math.floor(tileSize * LEGACY_PLAYER_MARKER_RADIUS_RATIO));
+
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.5, alpha * 0.5));
+    this.boardDynamicGraphics.fillCircle(centerX + 1, centerY + 1, haloRadius + 1);
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_HALO, Math.min(0.76, alpha * 0.76));
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, haloRadius);
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.78, alpha * 0.78));
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, coreRadius + 1);
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_CORE, alpha);
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, coreRadius);
+  }
+
   private drawHud(time: number): void {
     this.hudGraphics.clear();
     this.clearHudTexts();
@@ -1828,10 +1855,10 @@ export class MenuScene extends Phaser.Scene {
     this.footerText.setText('');
 
     const boardOffset = this.resolveBoardOffset();
-    const goalScreenX = this.layout.boardLeft + boardOffset.x + (this.maze.goal.x * this.layout.tileSize);
-    const goalScreenY = this.layout.boardTop + boardOffset.y + (this.maze.goal.y * this.layout.tileSize);
-    const playerScreenX = this.layout.boardLeft + boardOffset.x + (this.player.x * this.layout.tileSize);
-    const playerScreenY = this.layout.boardTop + boardOffset.y + (this.player.y * this.layout.tileSize);
+    const goalScreenX = this.layout.boardLeft + boardOffset.x + ((this.maze.goal.x + 0.5) * this.layout.tileSize);
+    const goalScreenY = this.layout.boardTop + boardOffset.y + ((this.maze.goal.y + 0.5) * this.layout.tileSize);
+    const playerScreenX = this.layout.boardLeft + boardOffset.x + ((this.player.x + 0.5) * this.layout.tileSize);
+    const playerScreenY = this.layout.boardTop + boardOffset.y + ((this.player.y + 0.5) * this.layout.tileSize);
     const hudFrame = resolveLegacyPlayHudFrame({
       elapsedMs: time - this.playStartedAtMs,
       goalScreen: { x: goalScreenX, y: goalScreenY },

@@ -429,7 +429,8 @@ Rule:
   - owns menu-only trench edge/core frame math, including connection-aware light-core continuity and segment-based connected strokes for the static front-door board
 - `src/scenes/MenuScene.ts`
   - owns static board material role colors and currently renders flat connected dark-edge/light-core corridor segments without the older offset relief shadow
-  - owns menu dynamic trail/start/goal/player overlay footprint ratios through `LEGACY_MENU_DYNAMIC_*` constants
+  - owns menu dynamic trail/start/goal overlay footprint ratios through `LEGACY_MENU_DYNAMIC_*` constants
+  - owns the centered high-contrast player marker glyph through `LEGACY_PLAYER_MARKER_*` constants
 - `tests/reset/legacy-reset.test.ts`
   - holds the direct tile assertions that keep screenshot-only branch additions from drifting silently
 
