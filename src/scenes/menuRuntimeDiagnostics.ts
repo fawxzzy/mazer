@@ -92,6 +92,21 @@ export interface MenuSceneRuntimeDiagnostics {
       size: number;
       tileSize: number;
     };
+    inputBuffer: {
+      held: {
+        down: boolean;
+        left: boolean;
+        right: boolean;
+        up: boolean;
+      };
+      pendingTimerActive: boolean;
+      pointerStartActive: boolean;
+      resolvedVector: {
+        deltaX: number;
+        deltaY: number;
+      };
+      simultaneousDelayMs: number;
+    };
     player: {
       x: number;
       y: number;
