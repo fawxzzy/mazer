@@ -325,6 +325,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS');
     expect(menuSceneSource).toContain('this.handleLegacyPlayMovementKeyDown(event)');
     expect(menuSceneSource).toContain("this.input.keyboard?.on('keyup'");
+    expect(menuSceneSource).toContain('event.preventDefault();');
     expect(menuSceneSource).toContain('resolveLegacyPlayMoveVector(this.playMoveFlags)');
     expect(menuSceneSource).toContain('this.resetLegacyPlayInputBuffer();');
     expect(menuSceneSource).toContain('createLegacyMenuDemoBootstrap(this.maze, this.settings.toggleTrailFade, TRAIL_FADE_TAIL)');

@@ -913,6 +913,7 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
+    event.preventDefault();
     this.playMoveFlags[direction] = true;
     if (event.repeat) {
       this.resolveLegacyPlayInputBuffer();
@@ -928,6 +929,7 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
+    event.preventDefault();
     this.playMoveFlags[direction] = false;
     return true;
   }
