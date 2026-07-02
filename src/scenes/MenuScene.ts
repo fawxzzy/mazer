@@ -706,6 +706,18 @@ export class MenuScene extends Phaser.Scene {
           size: this.layout.boardSize,
           tileSize: this.layout.tileSize
         },
+        inputBuffer: {
+          held: {
+            down: this.playMoveFlags.down,
+            left: this.playMoveFlags.left,
+            right: this.playMoveFlags.right,
+            up: this.playMoveFlags.up
+          },
+          pendingTimerActive: this.playMoveTimer !== null,
+          pointerStartActive: this.playPointerStart !== null,
+          resolvedVector: resolveLegacyPlayMoveVector(this.playMoveFlags),
+          simultaneousDelayMs: LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS
+        },
         player: {
           x: this.player.x,
           y: this.player.y,

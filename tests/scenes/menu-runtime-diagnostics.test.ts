@@ -281,6 +281,21 @@ describe('menu runtime diagnostics', () => {
           size: 340,
           tileSize: 10
         },
+        inputBuffer: {
+          held: {
+            down: true,
+            left: false,
+            right: true,
+            up: false
+          },
+          pendingTimerActive: true,
+          pointerStartActive: false,
+          resolvedVector: {
+            deltaX: 1,
+            deltaY: 1
+          },
+          simultaneousDelayMs: 50
+        },
         player: {
           x: 1,
           y: 2,
@@ -471,6 +486,11 @@ describe('menu runtime diagnostics', () => {
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )).toEqual(diagnostics);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.play?.player.screenX).toBe(35);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.play?.inputBuffer.resolvedVector)
+        .toEqual({ deltaX: 1, deltaY: 1 });
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.play?.inputBuffer.simultaneousDelayMs).toBe(50);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.menuDemo?.route?.cueCounts.reacquire).toBe(2);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.source).toBe('menu-generated');
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.routeQualityStats?.routeQuality)
