@@ -88,7 +88,7 @@ Menu generation is intentionally not the same owner as active play generation:
 ## Known Open Gaps
 
 - Exact numeric Blueprint `_PlayerAiDelayDuration` remains unrecovered, but extracted C++ proves the single-timer cadence shape now used by the rebuild.
-- Exact visited-tile color-revert/material timer behavior remains unrecovered, but menu bootstrap and advance now prove the current browser-equivalent trail-tail behavior for `toggleTrailFade`.
+- Exact visited-tile color-revert/material timer behavior remains unrecovered. A bounded scan of `GI_MazerGameInstance.uasset` found `_TileColorRevertDelay` and `FloatProperty` names, but not a trustworthy serialized default value; menu bootstrap and advance prove only the current browser-equivalent trail-tail behavior for `toggleTrailFade`.
 - The positive `_AiBackTrackUndoVisitedFlag` / `visitedUndoCount` proof route is now covered by a deterministic fixture; remaining visited-color work is about material/timer behavior, not branch observability.
 - Exact engine process-yield timing for generation remains approximated by browser-safe contracts.
 - Final screenshot-grade menu material and sprite treatment remain visual work, not AI pathing work.

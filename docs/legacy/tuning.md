@@ -7,6 +7,7 @@ This pass rechecked the rebuilt maze/domain code against the read-only Unreal so
 - Legacy reset scheduler: `Mazer/Source/Mazer/Private/MazerGameState.cpp`
 - Legacy menu/demo AI: `Mazer/Source/Mazer/Private/Player/MazerPlayer.cpp`
 - Legacy shared defaults: `Mazer/Source/Mazer/Public/MazerGameInstance.h`
+- Legacy Blueprint defaults recovery attempt: `Mazer/Content/Game/GI_MazerGameInstance.uasset`
 - Rebuild tuning source: `src/config/tuning.ts`
 
 ## Exact-from-legacy behavior now reflected
@@ -68,7 +69,7 @@ This pass rechecked the rebuilt maze/domain code against the read-only Unreal so
 - Demo maze regeneration uses deterministic seed stepping (`seed + 1` per completed goal maze) as a rebuild approximation for legacy's non-deterministic fresh generation.
 - The menu trail rendering is still a rebuild interpretation of the legacy tile color-revert system rather than a literal material-timer port.
   `createLegacyMenuDemoBootstrap()` and `advanceLegacyMenuDemoFrame()` now have focused tests proving `toggleTrailFade` bounds the visible trail to the supplied tail while persistent trail mode keeps the full projected path.
-  The exact `_TileColorRevertDelay` numeric value and material timing remain unrecovered from the current source/assets.
+  A follow-up scan of `Content/Game/GI_MazerGameInstance.uasset` found the `_TileColorRevertDelay` and `FloatProperty` names, but not a trustworthy serialized Blueprint default value; the exact numeric value and material timing remain unrecovered from the current source/assets.
 - The rebuild now carries explicit presentation cues (`spawn`, `anticipate`, `explore`, `dead-end`, `backtrack`, `reacquire`, `goal`, `reset`) alongside the recovered AI logic so the menu scene can stage turn commits, dead ends, backtracking, and branch reacquisition more clearly without changing the underlying path choice.
 - Demo walker route diagnostics now expose `visitedUndoCount` for the legacy `_AiBackTrackUndoVisitedFlag` seam.
   The representative split-flow proof route covers wrong-turn recovery without exercising that rarer branch; `createVisitedUndoEpisode()` now supplies a focused deterministic fixture where the branch increments `visitedUndoCount`.
