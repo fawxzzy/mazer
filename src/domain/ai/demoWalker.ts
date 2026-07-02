@@ -623,13 +623,19 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     return true;
   };
 
+  const addPotentialTile = (tileIndex: number): void => {
+    if (!potentialTiles.includes(tileIndex)) {
+      potentialTiles.push(tileIndex);
+    }
+  };
+
   for (let step = 0; step < maxSteps; step += 1) {
     if (currentIndex === episode.raster.endIndex) {
       break;
     }
 
     if (!aiBacktracking) {
-      const nextTile = resolveLegacyAiDirectMove(episode, currentIndex, visited, potentialTiles);
+      const nextTile = resolveLegacyAiDirectMove(episode, currentIndex, visited, addPotentialTile);
       if (nextTile !== null) {
         const nextIsCanonical = canonicalCursorByIndex.has(nextTile);
         const currentIsCanonical = canonicalCursorByIndex.has(currentIndex);
@@ -677,6 +683,14 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
       }
       pendingDeadEndCue = false;
       currentIndex = nextBacktrackTile;
+      if (
+        aiResetPathCursor !== null
+        && cueOverrides.includes('dead-end')
+        && cueOverrides.includes('backtrack')
+        && cueOverrides.includes('reacquire')
+      ) {
+        break;
+      }
       continue;
     }
 
@@ -743,7 +757,7 @@ const resolveLegacyAiDirectMove = (
   episode: MazeEpisode,
   currentIndex: number,
   visited: ReadonlySet<number>,
-  potentialTiles: number[]
+  addPotentialTile: (tileIndex: number) => void
 ): number | null => {
   const width = episode.raster.width;
   const height = episode.raster.height;
@@ -764,7 +778,7 @@ const resolveLegacyAiDirectMove = (
         episode.raster.endIndex
       )
     ) {
-      potentialTiles.push(neighbor);
+      addPotentialTile(neighbor);
       const distance = euclideanDistance(neighbor, episode.raster.endIndex, width);
       if (distance < smallestDistance) {
         smallestDistance = distance;

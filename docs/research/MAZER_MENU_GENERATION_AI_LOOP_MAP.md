@@ -2,13 +2,13 @@
 
 Date: 2026-07-02
 Status: active owner map
-Current 1:1 marker: `92%` unchanged
+Current 1:1 marker: `93%`
 
 ## Purpose
 
 This map is the first stop before changing the menu maze reveal, menu-demo AI pathing, route cues, or generation diagnostics. It keeps future passes modular so a visual tweak does not accidentally rewrite topology, AI route ownership, or reset flow.
 
-This is a mapping packet only. It does not ratchet the 1:1 marker.
+This started as a mapping packet. The follow-up route-quality bound ratcheted the 1:1 marker because it changed runtime AI route construction and added a regression guard.
 
 ## Runtime Loop
 
@@ -54,12 +54,14 @@ The humanized lane owns:
 
 - `visited`: restored "already seen" path gate.
 - `potentialTiles`: restored queue of valid neighboring floor candidates.
+- potential target admission is idempotent so duplicate shortcut candidates cannot inflate the menu loop.
 - `pathStack`: restored backtrack spine.
 - `passesLegacyAiTilePathCheck()`: rejects one-tile dead spurs that cannot continue toward the end.
 - `resolveLegacyAiDirectMove()`: scans unvisited floor neighbors and picks the nearest valid candidate to the end.
 - `resolveLegacyAiPotentialTarget()`: selects a target from the potential list when direct movement fails.
 - `findFloorPath()`: reconnects wrong-branch recovery to canonical replay through adjacent floor movement.
 - `collectDemoWalkerRouteDiagnostics()`: publishes the current route shape without changing route selection.
+- first-mistake route construction stops after emitted `dead-end`, `backtrack`, and `reacquire` cues are represented, then returns to canonical replay instead of continuing exploratory route construction.
 
 ## Current Generation Shape
 
@@ -89,5 +91,5 @@ Menu generation is intentionally not the same owner as active play generation:
 ## Current Best Next Runtime Slices
 
 1. Validate whether the current menu row reveal cadence should stay fixed at one row per gate or be tuned against recovered video/screenshot evidence.
-2. Compare `buildLegacyAiRunnerPlan()` telemetry against longer menu soak captures and only then adjust wrong-branch frequency.
+2. Compare `buildLegacyAiRunnerPlan()` telemetry against longer menu soak captures and only then adjust wrong-branch frequency or route-quality thresholds.
 3. Keep play shortcut/topology changes isolated in `legacyMaze.ts`; do not mix them into menu fixed-snapshot work.

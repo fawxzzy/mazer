@@ -404,9 +404,11 @@ describe('demo walker', () => {
     const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
 
     expect(diagnostics.routeLength).toBeGreaterThan(episode.raster.pathIndices.length);
+    expect(diagnostics.routeLength).toBeLessThanOrEqual(episode.raster.pathIndices.length * 4);
     expect(diagnostics.segmentCount).toBe(diagnostics.routeLength - 1);
     expect(diagnostics.canonicalPathLength).toBe(episode.raster.pathIndices.length);
     expect(diagnostics.traverseMs).toBeGreaterThan(0);
+    expect(diagnostics.traverseMs).toBeLessThan(60_000);
     expect(diagnostics.aiResetPathCursor).not.toBeNull();
     expect(diagnostics.telemetry.wrongBranchCount).toBeGreaterThan(0);
     expect(diagnostics.telemetry.backtrackCount).toBeGreaterThan(0);
