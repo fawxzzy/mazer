@@ -324,21 +324,21 @@ const MENU_BUTTON_STROKE_ALPHA = 0.24;
 const MENU_TEXT_COLOR = '#0b841d';
 const TITLE_FILL_COLOR = '#1d8726';
 const TITLE_SHADOW_COLOR = '#103516';
-const LEGACY_BOARD_GRID_ALPHA = 0.003;
+const LEGACY_BOARD_GRID_ALPHA = 0.01;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
-const LEGACY_MENU_SLAB_FILL = 0x4f4a55;
+const LEGACY_MENU_SLAB_FILL = 0x5c5662;
 const LEGACY_MENU_SLAB_EDGE = 0x14101a;
 const LEGACY_MENU_SLAB_HIGHLIGHT = 0xbcb5c7;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0.38;
-const LEGACY_MENU_PATH_CORE = 0x9f99a6;
-const LEGACY_MENU_PATH_EDGE = 0x100c15;
-const LEGACY_MENU_PATH_EDGE_ALPHA = 0.82;
+const LEGACY_MENU_PATH_CORE = 0xaaa4af;
+const LEGACY_MENU_PATH_EDGE = 0x15101a;
+const LEGACY_MENU_PATH_EDGE_ALPHA = 0.88;
 const LEGACY_MENU_PATH_RELIEF_SHADOW = 0x07050b;
 const LEGACY_MENU_PATH_RELIEF_SHADOW_ALPHA = 0.34;
 const LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO = 0.13;
-const LEGACY_MENU_WALL_FILL = 0x302a36;
-const LEGACY_MENU_WALL_GRID = 0x18131d;
+const LEGACY_MENU_WALL_FILL = 0x3d3842;
+const LEGACY_MENU_WALL_GRID = 0x5d5863;
 const LEGACY_PLAY_PATH_EDGE = 0x1a161f;
 const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
 const LEGACY_PLAY_PATH_RELIEF_SHADOW = 0x08060c;
@@ -1466,7 +1466,7 @@ export class MenuScene extends Phaser.Scene {
     this.boardStaticGraphics.fillStyle(0x000000, isMenuMode ? LEGACY_MENU_PANEL_SHADOW_ALPHA : 0.28);
     this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardSize, boardSize);
     if (isMenuMode) {
-      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_FILL, 0.5);
+      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_FILL, 0.56);
       this.boardStaticGraphics.fillRect(boardLeft - 15, boardTop - 15, boardSize + 30, boardSize + 25);
       this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_EDGE, 0.92);
       this.boardStaticGraphics.fillRect(boardLeft - 11, boardTop - 9, 7, boardSize + 13);
@@ -1560,7 +1560,7 @@ export class MenuScene extends Phaser.Scene {
           this.boardStaticGraphics.fillRect(tileX, tileY, tileSize, tileSize);
 
           if (isMenuMode && tileSize > 6) {
-            this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.004);
+            this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.018);
             this.boardStaticGraphics.fillRect(
               tileX + 1,
               tileY + 1,

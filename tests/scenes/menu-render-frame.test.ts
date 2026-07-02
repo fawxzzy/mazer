@@ -20,9 +20,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(resolveLegacyMenuPathRenderFrame(maze, { x: 1, y: 1 }, 20)).toEqual({
       leftInset: 0,
-      topInset: 4,
+      topInset: 2,
       width: 20,
-      height: 12
+      height: 16
     });
   });
 
@@ -37,10 +37,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     };
 
     expect(resolveLegacyMenuPathRenderFrame(maze, { x: 1, y: 1 }, 20)).toEqual({
-      leftInset: 4,
-      topInset: 4,
-      width: 12,
-      height: 16
+      leftInset: 2,
+      topInset: 2,
+      width: 16,
+      height: 18
     });
   });
 
@@ -57,15 +57,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(resolveLegacyMenuPathRenderFrames(maze, { x: 1, y: 1 }, 20)).toEqual({
       edge: {
         leftInset: 0,
-        topInset: 4,
+        topInset: 2,
         width: 20,
-        height: 12
+        height: 16
       },
       core: {
         leftInset: 0,
-        topInset: 5,
+        topInset: 3,
         width: 20,
-        height: 10
+        height: 14
       }
     });
   });
@@ -109,44 +109,61 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const segments = resolveLegacyMenuPathRenderSegments(maze, { x: 1, y: 1 }, 20);
 
     expect(segments.edge).toEqual([
-      { leftInset: 4, topInset: 4, width: 12, height: 12 },
-      { leftInset: 0, topInset: 4, width: 16, height: 12 },
-      { leftInset: 4, topInset: 4, width: 16, height: 12 },
-      { leftInset: 4, topInset: 0, width: 12, height: 16 },
-      { leftInset: 4, topInset: 4, width: 12, height: 16 }
+      { leftInset: 2, topInset: 2, width: 16, height: 16 },
+      { leftInset: 0, topInset: 2, width: 18, height: 16 },
+      { leftInset: 2, topInset: 2, width: 18, height: 16 },
+      { leftInset: 2, topInset: 0, width: 16, height: 18 },
+      { leftInset: 2, topInset: 2, width: 16, height: 18 }
     ]);
     expect(segments.core).toEqual([
-      { leftInset: 5, topInset: 5, width: 10, height: 10 },
-      { leftInset: 0, topInset: 5, width: 15, height: 10 },
-      { leftInset: 5, topInset: 5, width: 15, height: 10 },
-      { leftInset: 5, topInset: 0, width: 10, height: 15 },
-      { leftInset: 5, topInset: 5, width: 10, height: 15 }
+      { leftInset: 3, topInset: 3, width: 14, height: 14 },
+      { leftInset: 0, topInset: 3, width: 17, height: 14 },
+      { leftInset: 3, topInset: 3, width: 17, height: 14 },
+      { leftInset: 3, topInset: 0, width: 14, height: 17 },
+      { leftInset: 3, topInset: 3, width: 14, height: 17 }
     ]);
+  });
+
+  test('keeps tiny live-browser tiles dense instead of hairline thin', () => {
+    const maze = {
+      size: 3,
+      grid: [
+        [false, true, false],
+        [true, true, true],
+        [false, true, false]
+      ]
+    };
+
+    const segments = resolveLegacyMenuPathRenderSegments(maze, { x: 1, y: 1 }, 6);
+
+    expect(segments.edge[0]).toEqual({ leftInset: 0, topInset: 0, width: 6, height: 6 });
+    expect(segments.core[0]).toEqual({ leftInset: 0, topInset: 0, width: 6, height: 6 });
   });
 
   test('keeps the menu board in the heavier legacy trench-material lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const legacyMenuRenderSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuRender.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0.003;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0x9f99a6;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x100c15;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.82;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0.01;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xaaa4af;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x15101a;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.88;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_RELIEF_SHADOW = 0x07050b;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_RELIEF_SHADOW_ALPHA = 0.34;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO = 0.13;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x302a36;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GRID = 0x18131d;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x3d3842;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GRID = 0x5d5863;');
     expect(menuSceneSource).toContain('? 0x18131d');
-    expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.2;');
-    expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.06;');
+    expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.14;');
+    expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.04;');
+    expect(legacyMenuRenderSource).toContain('const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);');
     expect(menuSceneSource).toContain('tileX + segment.leftInset + reliefOffset');
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('tileX + frames.core.leftInset');
     expect(legacyMenuRenderSource).toContain('resolveLegacyMenuPathStrokeSegments');
-    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.004);');
+    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.018);');
   });
 
   test('keeps active play maze rendering on connected corridors instead of square debug cells', () => {

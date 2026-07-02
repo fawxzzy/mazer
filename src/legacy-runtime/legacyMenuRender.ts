@@ -17,8 +17,16 @@ export interface LegacyMenuPathRenderSegments {
   core: LegacyMenuPathRenderFrame[];
 }
 
-const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.2;
-const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.06;
+const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.14;
+const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.04;
+
+const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {
+  if (tileSize <= 8) {
+    return 0;
+  }
+
+  return Math.max(1, Math.floor(tileSize * ratio));
+};
 
 const isWalkableGridPoint = (
   maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
@@ -36,7 +44,7 @@ export const resolveLegacyMenuPathRenderFrame = (
   point: LegacyPoint,
   tileSize: number
 ): LegacyMenuPathRenderFrame => {
-  const edgeInset = Math.max(1, Math.floor(tileSize * LEGACY_MENU_TRENCH_EDGE_INSET_RATIO));
+  const edgeInset = resolveLegacyMenuTrenchInset(tileSize, LEGACY_MENU_TRENCH_EDGE_INSET_RATIO);
   const leftInset = isWalkableGridPoint(maze, { x: point.x - 1, y: point.y }) ? 0 : edgeInset;
   const rightInset = isWalkableGridPoint(maze, { x: point.x + 1, y: point.y }) ? 0 : edgeInset;
   const topInset = isWalkableGridPoint(maze, { x: point.x, y: point.y - 1 }) ? 0 : edgeInset;
@@ -56,7 +64,7 @@ export const resolveLegacyMenuPathRenderFrames = (
   tileSize: number
 ): LegacyMenuPathRenderFrames => {
   const edge = resolveLegacyMenuPathRenderFrame(maze, point, tileSize);
-  const coreInset = Math.max(1, Math.floor(tileSize * LEGACY_MENU_TRENCH_CORE_INSET_RATIO));
+  const coreInset = resolveLegacyMenuTrenchInset(tileSize, LEGACY_MENU_TRENCH_CORE_INSET_RATIO);
   const connectedLeft = isWalkableGridPoint(maze, { x: point.x - 1, y: point.y });
   const connectedRight = isWalkableGridPoint(maze, { x: point.x + 1, y: point.y });
   const connectedTop = isWalkableGridPoint(maze, { x: point.x, y: point.y - 1 });
@@ -139,8 +147,8 @@ export const resolveLegacyMenuPathRenderSegments = (
   point: LegacyPoint,
   tileSize: number
 ): LegacyMenuPathRenderSegments => {
-  const edgeInset = Math.max(1, Math.floor(tileSize * LEGACY_MENU_TRENCH_EDGE_INSET_RATIO));
-  const coreInset = Math.max(1, Math.floor(tileSize * LEGACY_MENU_TRENCH_CORE_INSET_RATIO));
+  const edgeInset = resolveLegacyMenuTrenchInset(tileSize, LEGACY_MENU_TRENCH_EDGE_INSET_RATIO);
+  const coreInset = resolveLegacyMenuTrenchInset(tileSize, LEGACY_MENU_TRENCH_CORE_INSET_RATIO);
   const edgeWidth = Math.max(2, tileSize - (edgeInset * 2));
   const coreWidth = Math.max(1, tileSize - ((edgeInset + coreInset) * 2));
 
