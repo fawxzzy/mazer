@@ -413,6 +413,8 @@ describe('demo walker', () => {
     expect(diagnostics.telemetry.wrongBranchCount).toBeGreaterThan(0);
     expect(diagnostics.telemetry.backtrackCount).toBeGreaterThan(0);
     expect(diagnostics.telemetry.recoveryCount).toBeGreaterThan(0);
+    // The representative proof route covers recovery, but not the rarer legacy visited-undo branch.
+    expect(diagnostics.telemetry.visitedUndoCount).toBe(0);
     expect(diagnostics.cueCounts['dead-end']).toBeGreaterThan(0);
     expect(diagnostics.cueCounts.backtrack).toBeGreaterThan(0);
     expect(diagnostics.cueCounts.reacquire).toBeGreaterThan(0);

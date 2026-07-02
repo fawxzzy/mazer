@@ -43,6 +43,7 @@ export interface DemoRunnerTelemetry {
   wrongBranchCount: number;
   backtrackCount: number;
   recoveryCount: number;
+  visitedUndoCount: number;
 }
 
 export interface DemoRunnerRouteDiagnostics {
@@ -135,7 +136,8 @@ const defaultConfig: DemoWalkerConfig = {
 const EMPTY_TELEMETRY: DemoRunnerTelemetry = {
   wrongBranchCount: 0,
   backtrackCount: 0,
-  recoveryCount: 0
+  recoveryCount: 0,
+  visitedUndoCount: 0
 };
 
 const runnerPlanCache = new WeakMap<MazeEpisode, {
@@ -573,7 +575,8 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
   const telemetry: DemoRunnerTelemetry = {
     wrongBranchCount: 0,
     backtrackCount: 0,
-    recoveryCount: 0
+    recoveryCount: 0,
+    visitedUndoCount: 0
   };
   const visited = new Set<number>([episode.raster.startIndex]);
   const potentialTiles: number[] = [];
@@ -690,6 +693,7 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     visited.add(nextBacktrackTile);
     if (aiBackTrackUndoVisitedFlag) {
       visited.delete(nextBacktrackTile);
+      telemetry.visitedUndoCount += 1;
     }
     pathStack.pop();
     if (appendStep(nextBacktrackTile, 'backtrack', pendingDeadEndCue ? 'dead-end' : 'backtrack')) {
