@@ -9,6 +9,9 @@ describe('legacy menu layout', () => {
 
     expect(Math.abs(boardCenter - (layout.width / 2))).toBeLessThanOrEqual(2);
     expect(layout.centerButtonY).toBe(layout.buttonY);
+    expect(layout.leftButtonY).toBe(layout.buttonY);
+    expect(layout.rightButtonY).toBe(layout.buttonY);
+    expect(layout.buttonLayout).toBe('row');
     expect(layout.centerButtonWidth).toBeGreaterThan(layout.buttonWidth);
     expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
     expect(layout.buttonY - (layout.buttonHeight / 2)).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 2);
@@ -35,6 +38,9 @@ describe('legacy menu layout', () => {
 
     expect(layout.boardSize).toBeLessThan(layout.width);
     expect(layout.centerButtonY).toBe(layout.buttonY);
+    expect(layout.leftButtonY).toBe(layout.buttonY);
+    expect(layout.rightButtonY).toBe(layout.buttonY);
+    expect(layout.buttonLayout).toBe('row');
     expect(layout.centerButtonWidth).toBeGreaterThanOrEqual(layout.buttonWidth);
     expect(layout.centerButtonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
     expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(26);
@@ -48,5 +54,21 @@ describe('legacy menu layout', () => {
     expect(layout.rightButtonX - (layout.buttonWidth / 2)).toBeGreaterThan(layout.centerButtonX + 8);
     expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.2));
     expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.22));
+  });
+
+  test('stacks front-door buttons and fits the board in ultra-narrow side panels', () => {
+    const layout = resolveLegacyMenuLayout(172, 407, 50, 49);
+
+    expect(layout.buttonLayout).toBe('stack');
+    expect(layout.boardLeft).toBeGreaterThanOrEqual(0);
+    expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width);
+    expect(layout.tileSize).toBeGreaterThanOrEqual(3);
+    expect(layout.leftButtonX).toBe(layout.centerButtonX);
+    expect(layout.rightButtonX).toBe(layout.centerButtonX);
+    expect(layout.leftButtonY + layout.buttonHeight).toBeLessThan(layout.centerButtonY);
+    expect(layout.centerButtonY + layout.buttonHeight).toBeLessThan(layout.rightButtonY);
+    expect(layout.rightButtonY + (layout.buttonHeight / 2)).toBeLessThan(layout.footerY);
+    expect(layout.buttonWidth).toBeLessThanOrEqual(layout.width - 36);
+    expect(layout.centerButtonWidth).toBeLessThanOrEqual(layout.width - 20);
   });
 });

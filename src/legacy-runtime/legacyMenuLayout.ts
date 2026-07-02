@@ -10,8 +10,11 @@ export interface LegacyMenuLayout {
   titleX: number;
   titleY: number;
   footerY: number;
+  buttonLayout: 'row' | 'stack';
   buttonY: number;
   centerButtonY: number;
+  leftButtonY: number;
+  rightButtonY: number;
   centerButtonWidth: number;
   leftButtonX: number;
   centerButtonX: number;
@@ -30,19 +33,25 @@ export const resolveLegacyMenuLayout = (
 ): LegacyMenuLayout => {
   const normalizedScale = clampInteger(scale, 25, 150);
   const isPortrait = height > width;
+  const isUltraNarrow = isPortrait && width < 360;
   const baseBoardScale = isPortrait ? 0.92 : 0.52;
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
+  const maxBoardSize = Math.min(
+    width * (isPortrait ? 0.92 : 0.78),
+    height * (isPortrait ? 0.82 : 0.79)
+  );
+  const minBoardSize = Math.min(300, Math.max(120, maxBoardSize));
   const rawBoardSize = Math.min(
     width * baseBoardScale * scaleBias,
     height * (isPortrait ? 0.54 : 0.775) * scaleBias
   );
-  const boardSize = Math.round(clamp(rawBoardSize, 300, Math.min(width * (isPortrait ? 0.92 : 0.78), height * (isPortrait ? 0.82 : 0.79))));
-  const tileSize = Math.max(4, Math.floor(boardSize / Math.max(1, mazeSize)));
+  const boardSize = Math.round(clamp(rawBoardSize, minBoardSize, maxBoardSize));
+  const tileSize = Math.max(isUltraNarrow ? 3 : 4, Math.floor(boardSize / Math.max(1, mazeSize)));
   const snappedBoardSize = tileSize * mazeSize;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
-  const boardTop = Math.round(clamp(height * (isPortrait ? 0.104 : 0.074), 40, isPortrait ? 102 : 88));
+  const boardTop = Math.round(clamp(height * (isPortrait ? 0.104 : 0.074), isUltraNarrow ? 32 : 40, isPortrait ? 102 : 88));
   const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
-  const buttonY = isPortrait
+  const rowButtonY = isPortrait
     ? Math.round(clamp(
       boardTop + snappedBoardSize + Math.round(buttonHeight * 0.86),
       boardTop + snappedBoardSize + 26,
@@ -53,13 +62,22 @@ export const resolveLegacyMenuLayout = (
       boardTop + snappedBoardSize + 24,
       height - Math.round(buttonHeight * 0.54)
     ));
-  const centerButtonY = buttonY;
-  const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.21 : 0.118), isPortrait ? 96 : 164, isPortrait ? 144 : 238));
+  const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.21 : 0.118), isUltraNarrow ? 96 : (isPortrait ? 96 : 164), isPortrait ? Math.min(144, width - 36) : 238));
   const centerButtonWidth = isPortrait
     ? Math.round(clamp(buttonWidth * 1.12, buttonWidth + 8, 170))
     : Math.round(clamp(buttonWidth * 1.14, buttonWidth + 20, 262));
-  const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.16 : 0.156), 66, 324));
+  const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.16 : 0.156), isUltraNarrow ? Math.round(width / 2) : 66, 324));
   const centerButtonX = Math.round(width * 0.5);
+  const stackGap = Math.round(clamp(height * 0.02, 7, 12));
+  const stackHeight = (buttonHeight * 3) + (stackGap * 2);
+  const stackTop = Math.round(clamp(
+    boardTop + snappedBoardSize + 18,
+    boardTop + snappedBoardSize + 12,
+    height - stackHeight - 18
+  ));
+  const leftButtonY = isUltraNarrow ? stackTop + Math.round(buttonHeight / 2) : rowButtonY;
+  const centerButtonY = isUltraNarrow ? leftButtonY + buttonHeight + stackGap : rowButtonY;
+  const rightButtonY = isUltraNarrow ? centerButtonY + buttonHeight + stackGap : rowButtonY;
 
   return {
     width,
@@ -71,8 +89,11 @@ export const resolveLegacyMenuLayout = (
     titleX: Math.round(width / 2),
     titleY: Math.round(boardTop + (snappedBoardSize * (isPortrait ? 0.216 : 0.221))),
     footerY: height - 18,
-    buttonY,
+    buttonLayout: isUltraNarrow ? 'stack' : 'row',
+    buttonY: rowButtonY,
     centerButtonY,
+    leftButtonY,
+    rightButtonY,
     centerButtonWidth,
     leftButtonX: sideButtonInset,
     centerButtonX,

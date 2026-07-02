@@ -1940,7 +1940,7 @@ export class MenuScene extends Phaser.Scene {
         this.uiButtons.push(
           this.createButton(
             this.layout.leftButtonX,
-            this.layout.buttonY,
+            this.layout.leftButtonY,
             this.layout.buttonWidth,
             this.layout.buttonHeight,
             leftLabel,
@@ -1956,7 +1956,7 @@ export class MenuScene extends Phaser.Scene {
           ),
           this.createButton(
             this.layout.rightButtonX,
-            this.layout.buttonY,
+            this.layout.rightButtonY,
             this.layout.buttonWidth,
             this.layout.buttonHeight,
             rightLabel,
