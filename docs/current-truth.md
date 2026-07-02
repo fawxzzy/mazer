@@ -129,6 +129,7 @@ Why it is not higher yet:
 - runtime diagnostics expose active menu-demo cue, mistake-enabled lane state, path cursor, and generation stage cursor through the DOM attribute/window proof surfaces so front-door demo and stage-7 finalization proof no longer depends on visible debug text
 - the removed visible runtime diagnostics panel was never legacy UI; keeping diagnostics data-only preserves proof while preventing proof tooling from polluting the maintained `4173` browser
 - runtime and visual diagnostics now expose live menu-demo AI wrong-branch/backtrack/recovery counters plus stage-6 row-reveal progress, so menu AI review and generation-fluidity review no longer depend on placeholder counters or hidden row state
+- runtime diagnostics now also expose `menuDemo.route` with route length, segment count, canonical path length, traverse duration, cue counts, trail-mode counts, and AI reset cursor; this improves menu AI tuning evidence but does not itself ratchet the legacy 1:1 marker
 - legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
 - in-game pause commands now route through an explicit legacy pause lifecycle contract for `Back`, `Reset`, and `Main Menu`
 - features and game-modes toggles now route through an explicit legacy overlay-toggle contract, with inverted `On/Off` copy kept only where the legacy widget actually owned it

@@ -1,5 +1,10 @@
 import Phaser from 'phaser';
-import type { DemoRunnerTelemetry, DemoWalkerConfig, DemoWalkerState } from '../domain/ai';
+import {
+  collectDemoWalkerRouteDiagnostics,
+  type DemoRunnerTelemetry,
+  type DemoWalkerConfig,
+  type DemoWalkerState
+} from '../domain/ai';
 import type { MazeEpisode } from '../domain/maze';
 import { markMazerBootStatus } from '../boot/bootStatus';
 import { legacyTuning } from '../config/tuning';
@@ -670,7 +675,10 @@ export class MenuScene extends Phaser.Scene {
       rowsVisible: drawRowsVisible,
       rowCount: drawStageStaged ? this.maze.size : null
     });
-    const runnerTelemetry = this.menuDemoState?.telemetry ?? {
+    const routeDiagnostics = this.menuDemoEpisode && this.menuDemoConfig
+      ? collectDemoWalkerRouteDiagnostics(this.menuDemoEpisode, this.menuDemoConfig)
+      : null;
+    const runnerTelemetry = routeDiagnostics?.telemetry ?? this.menuDemoState?.telemetry ?? {
       wrongBranchCount: 0,
       backtrackCount: 0,
       recoveryCount: 0
@@ -711,7 +719,16 @@ export class MenuScene extends Phaser.Scene {
         prerollSteps: Math.max(0, this.menuDemoConfig?.behavior.prerollSteps ?? 0),
         runnerMistakesEnabled: this.menuDemoConfig
           ? this.menuDemoConfig.behavior.enableRunnerMistakes === true
-          : null
+          : null,
+        route: routeDiagnostics ? {
+          aiResetPathCursor: routeDiagnostics.aiResetPathCursor,
+          canonicalPathLength: routeDiagnostics.canonicalPathLength,
+          cueCounts: routeDiagnostics.cueCounts,
+          routeLength: routeDiagnostics.routeLength,
+          segmentCount: routeDiagnostics.segmentCount,
+          trailModeCounts: routeDiagnostics.trailModeCounts,
+          traverseMs: routeDiagnostics.traverseMs
+        } : undefined
       },
       generation: {
         drawStage: {

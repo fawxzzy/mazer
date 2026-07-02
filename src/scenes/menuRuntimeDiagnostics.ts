@@ -106,6 +106,15 @@ export interface MenuSceneRuntimeDiagnostics {
     reachedGoal: boolean;
     prerollSteps: number;
     runnerMistakesEnabled: boolean | null;
+    route?: {
+      aiResetPathCursor: number | null;
+      canonicalPathLength: number;
+      cueCounts: Partial<Record<string, number>>;
+      routeLength: number;
+      segmentCount: number;
+      trailModeCounts: Partial<Record<string, number>>;
+      traverseMs: number;
+    };
   };
   generation?: {
     drawStage?: {

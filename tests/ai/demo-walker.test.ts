@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   advanceDemoWalker,
+  collectDemoWalkerRouteDiagnostics,
   createDemoWalkerState,
   resolveDemoWalkerViewFrame
 } from '../../src/domain/ai';
@@ -381,6 +382,39 @@ describe('demo walker', () => {
     expect(backtrackAdvance?.delayMs).toBe(config.cadence.backtrackStepMs);
     expect(reacquireAdvance).not.toBeNull();
     expect(reacquireAdvance?.delayMs).toBe(config.cadence.branchResumeMs);
+  });
+
+  test('summarizes humanized menu AI route shape for diagnostics', () => {
+    const episode = generateMaze({
+      scale: 50,
+      seed: 902,
+      size: 'large',
+      family: 'split-flow',
+      checkPointModifier: 0.35,
+      shortcutCountModifier: 0.18
+    });
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
+
+    expect(diagnostics.routeLength).toBeGreaterThan(episode.raster.pathIndices.length);
+    expect(diagnostics.segmentCount).toBe(diagnostics.routeLength - 1);
+    expect(diagnostics.canonicalPathLength).toBe(episode.raster.pathIndices.length);
+    expect(diagnostics.traverseMs).toBeGreaterThan(0);
+    expect(diagnostics.aiResetPathCursor).not.toBeNull();
+    expect(diagnostics.telemetry.wrongBranchCount).toBeGreaterThan(0);
+    expect(diagnostics.telemetry.backtrackCount).toBeGreaterThan(0);
+    expect(diagnostics.telemetry.recoveryCount).toBeGreaterThan(0);
+    expect(diagnostics.cueCounts['dead-end']).toBeGreaterThan(0);
+    expect(diagnostics.cueCounts.backtrack).toBeGreaterThan(0);
+    expect(diagnostics.cueCounts.reacquire).toBeGreaterThan(0);
+    expect(diagnostics.trailModeCounts.backtrack).toBeGreaterThan(0);
   });
 
   test('view frames expose recovery cues during deterministic wrong-turn playback', () => {

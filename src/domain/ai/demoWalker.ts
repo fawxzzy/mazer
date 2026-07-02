@@ -45,6 +45,17 @@ export interface DemoRunnerTelemetry {
   recoveryCount: number;
 }
 
+export interface DemoRunnerRouteDiagnostics {
+  aiResetPathCursor: number | null;
+  canonicalPathLength: number;
+  cueCounts: Partial<Record<DemoWalkerCue, number>>;
+  routeLength: number;
+  segmentCount: number;
+  telemetry: DemoRunnerTelemetry;
+  trailModeCounts: Partial<Record<DemoTrailMode, number>>;
+  traverseMs: number;
+}
+
 export interface DemoWalkerViewFrame {
   currentIndex: number;
   nextIndex: number;
@@ -253,6 +264,35 @@ export const collectDemoWalkerTelemetry = (
   episode: MazeEpisode,
   config: DemoWalkerConfig = defaultConfig
 ): DemoRunnerTelemetry => resolveDemoRunnerPlan(episode, config).telemetry;
+
+export const collectDemoWalkerRouteDiagnostics = (
+  episode: MazeEpisode,
+  config: DemoWalkerConfig = defaultConfig
+): DemoRunnerRouteDiagnostics => {
+  const runnerPlan = resolveDemoRunnerPlan(episode, config);
+  const segmentCount = Math.max(0, runnerPlan.routeIndices.length - 1);
+  const cueCounts: Partial<Record<DemoWalkerCue, number>> = {};
+  const trailModeCounts: Partial<Record<DemoTrailMode, number>> = {};
+
+  for (let segmentIndex = 0; segmentIndex < segmentCount; segmentIndex += 1) {
+    const cue = resolveSegmentCue(segmentIndex, segmentCount, 1, config, runnerPlan);
+    cueCounts[cue] = (cueCounts[cue] ?? 0) + 1;
+
+    const trailMode = runnerPlan.segmentTrailModes[segmentIndex] ?? 'explore';
+    trailModeCounts[trailMode] = (trailModeCounts[trailMode] ?? 0) + 1;
+  }
+
+  return {
+    aiResetPathCursor: runnerPlan.aiResetPathCursor,
+    canonicalPathLength: episode.raster.pathIndices.length,
+    cueCounts,
+    routeLength: runnerPlan.routeIndices.length,
+    segmentCount,
+    telemetry: runnerPlan.telemetry,
+    trailModeCounts,
+    traverseMs: resolveDemoWalkerTraverseMs(config, segmentCount)
+  };
+};
 
 export const createDemoWalkerState = (
   episode: MazeEpisode,

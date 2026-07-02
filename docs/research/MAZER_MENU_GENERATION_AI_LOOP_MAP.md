@@ -39,6 +39,7 @@ flowchart TD
 | Menu AI bootstrap | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | `createLegacyDemoWalkerEpisode()`, fixed-snapshot preroll, visible stable bootstrap | `tests/reset/legacy-menu-demo-lifecycle.test.ts` |
 | Menu AI route plan | `src/domain/ai/demoWalker.ts` | `resolveDemoRunnerPlan()`, `buildPreciseRunnerPlan()`, `buildLegacyAiRunnerPlan()` | `tests/ai/demo-walker.test.ts` |
 | Menu AI cues | `src/domain/ai/demoWalker.ts` | `cueOverrides`, `segmentTrailModes`, `resolveSegmentCue()`, `resolveSegmentDelayMs()` | `tests/ai/demo-walker.test.ts`, runtime diagnostics |
+| Menu AI route diagnostics | `src/domain/ai/demoWalker.ts` | `collectDemoWalkerRouteDiagnostics()`, `menuDemo.route` runtime diagnostics | `tests/ai/demo-walker.test.ts`, `tests/scenes/menu-runtime-diagnostics.test.ts`, maintained browser DOM diagnostics |
 | AI reset and regeneration | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | `createLegacyMenuDemoGoalResetRequest()`, process-8 to process-0 handoff | `tests/reset/legacy-menu-demo-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | Browser readback | `src/scenes/menuRuntimeDiagnostics.ts` | `data-mazer-runtime-diagnostics`, stage cursor, draw-stage progress, runner telemetry | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/visual/edge-live-check.test.ts` |
 
@@ -58,6 +59,7 @@ The humanized lane owns:
 - `resolveLegacyAiDirectMove()`: scans unvisited floor neighbors and picks the nearest valid candidate to the end.
 - `resolveLegacyAiPotentialTarget()`: selects a target from the potential list when direct movement fails.
 - `findFloorPath()`: reconnects wrong-branch recovery to canonical replay through adjacent floor movement.
+- `collectDemoWalkerRouteDiagnostics()`: publishes the current route shape without changing route selection.
 
 ## Current Generation Shape
 

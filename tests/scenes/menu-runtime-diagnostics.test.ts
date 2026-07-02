@@ -294,7 +294,24 @@ describe('menu runtime diagnostics', () => {
         pathCursor: 12,
         reachedGoal: false,
         prerollSteps: 72,
-        runnerMistakesEnabled: true
+        runnerMistakesEnabled: true,
+        route: {
+          aiResetPathCursor: 42,
+          canonicalPathLength: 120,
+          cueCounts: {
+            backtrack: 5,
+            'dead-end': 1,
+            reacquire: 2
+          },
+          routeLength: 144,
+          segmentCount: 143,
+          trailModeCounts: {
+            backtrack: 7,
+            explore: 135,
+            goal: 1
+          },
+          traverseMs: 14872
+        }
       },
       generation: {
         drawStage: {
@@ -416,6 +433,7 @@ describe('menu runtime diagnostics', () => {
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )).toEqual(diagnostics);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.play?.player.screenX).toBe(35);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.menuDemo?.route?.cueCounts.reacquire).toBe(2);
       expect(createdElements).toEqual([]);
 
       publishMenuSceneRuntimeDiagnostics({
