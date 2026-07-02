@@ -1,0 +1,243 @@
+# Mazer Legacy 1:1 Completion Marker
+
+Date: 2026-07-02
+Status: active
+Current marker: `93%`
+
+## Intent
+
+Use this document as the single percent marker for reaching a truthful `100%` legacy-to-web Mazer port.
+
+The goal is not "keep polishing until it feels close."
+The goal is:
+
+- preserve legacy behavior and responsibilities exactly where the browser can support them
+- allow structural cleanup, tests, diagnostics, and modularization when they do not change legacy truth
+- ratchet progress only when a bounded parity gap is actually closed
+
+## What counts as 100%
+
+For this repo, `100%` means all of the following are true at once:
+
+- the web app reproduces the legacy gameplay loop closely enough that remaining differences are browser/engine container differences, not product-direction drift
+- menu flow, overlay responsibilities, play flow, demo flow, and reset flow all match the old project semantically
+- screenshot-facing composition, palette roles, and menu-time presentation are close enough that remaining drift is minor rendering variance, not design mismatch
+- the proof spine, tests, and owner map are strong enough that future edits do not silently break parity
+
+`100%` does not require pretending the browser is Unreal.
+It does require eliminating the major behavior, UI, and visual gaps that still separate the current app from the restored legacy truth.
+
+## Allowed improvements while preserving 1:1
+
+These changes are valid and can count toward completion if behavior stays legacy-faithful:
+
+- extracting scene-local logic into named legacy modules
+- adding diagnostics, tests, and proof surfaces
+- fixing bugs that move the runtime closer to legacy behavior
+- cleaning layout/render code so long as the visible output moves toward legacy truth
+- replacing brittle wiring with clearer owner chains when the resulting behavior stays the same
+
+These do not count toward 1:1 completion:
+
+- new product features that did not exist in legacy truth
+- visual redesign that is merely "nicer" but less legacy-faithful
+- duplicate app/repo/infrastructure surfaces
+- claiming parity because the app is cleaner internally while visible behavior still differs
+
+## Non-literal equivalence rules
+
+Some legacy behaviors cannot be literal in the browser. They still count as complete only when the equivalent contract is explicit:
+
+- `Exit`: browser-safe leave/close semantics may stand in for engine quit behavior
+- render pipeline: Phaser/browser rendering may differ slightly from Unreal materials if the visual role and composition still match
+- random source behavior: deterministic staging and reset semantics matter more than bit-for-bit RNG identity
+
+## Weighted completion model
+
+Use these segment weights for the single repo-wide marker.
+The current marker is the sum of the awarded points below.
+
+| Segment | Weight | Current points | Current truth | Owner chain | Proof surface | Exact remaining gap |
+| --- | --- | --- | --- | --- | --- | --- |
+| Legacy truth restore, extraction, and proof spine | `10` | `10` | locked | `legacy/old-project.zip` -> `docs/current-truth.md` -> `docs/system-map.md` | `npm run legacy:extract`, `npm run verify` | keep current truth and proof docs in sync when runtime truth changes |
+| Front-door menu shell semantics | `12` | `11` | mostly aligned | `src/legacy-runtime/legacyDefaults.ts` -> `src/legacy-runtime/legacyExit.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-exit.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-title.test.ts`, localhost | `Exit`, `Start`, and `Options` are restored, desktop front-door button plates now use a larger legacy-facing width/height envelope while portrait sizing remains bounded, the center `Start` button now shares the same baseline as the side buttons on normal portrait/desktop widths, and ultra-narrow side-panel portrait widths now fit the board, cap source-aware title scale to the panel width, and stack front-door buttons instead of overlapping them; exact final widget placement and desktop-vs-side-browser composition are still visual parity work, not closed 1:1 truth |
+| Menu screenshot composition and board presentation | `14` | `13` | partial | `src/legacy-runtime/legacyMenuSnapshot.ts` -> `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuTitle.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/legacy-runtime/legacyMenuRender.ts` -> `src/scenes/MenuScene.ts` | screenshot comparison, `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-title.test.ts`, `tests/reset/legacy-menu-button-chrome.test.ts`, `tests/reset/legacy-menu-backdrop.test.ts`, `tests/scenes/menu-render-frame.test.ts`, localhost | fixed menu snapshot still preserves the named legacy blueprint as a 49-cell screenshot fixture, but live menu runtime now uses `menu-generated` procedural mazes; menu corridors carry a shadow-relief pass with quieter wall-grid noise, the wordmark now uses a more translucent legacy-glass opacity profile, ultra-narrow side-panel title scale is now bounded to the maintained browser width, dense live procedural boards now use a tighter side-panel title cap than fixed snapshot fixtures, the front-door buttons now render through a darker pane-fill chrome instead of translucent white blocks, the front-door button row now uses one shared baseline, the board material now uses darker wall/slab mass with harder path-edge contrast, a dense-slab material pass makes tiny live-browser tiles less hairline-thin, and the cyan demo route now uses a thicker corridor-style edge/core footprint, so desktop/mobile proof has denser, less flat, less modern, and more charcoal/light-gray/cyan screenshot-facing menu presentation than the earlier coarse/clean board; exact live procedural-menu silhouette, final material relief, full title composition, full button composition, and exact legacy player sprite treatment are still open |
+| Overlay family and field responsibilities | `14` | `12` | mostly aligned | `src/legacy-runtime/legacyOptionFields.ts` -> `src/legacy-runtime/legacyOverlayFieldCommit.ts` -> `src/legacy-runtime/legacyOverlayToggleFields.ts` -> `src/legacy-runtime/legacyOverlayRouting.ts` -> `src/legacy-runtime/legacyPauseLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-overlay-routing.test.ts`, `tests/reset/legacy-pause-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, localhost | overlay ownership and routing are strong, but widget-level screenshot and input exactness still need review against the restored UI source and screenshots |
+| Active play movement and win/reset loop | `14` | `13` | partial | `src/legacy-runtime/legacyPlayStep.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/scenes/menu-runtime-diagnostics.test.ts`, localhost mobile play proof | simultaneous-key movement buffering, mobile pointer/touch vector mapping, board-bounded mobile pointer admission, browser focus-loss input cleanup, camera-follow static/dynamic layer alignment, axis-gated collision, single-request active-play goal reset return, pause-reset trail preservation, connected static play corridors, and active dynamic corridor overlays are ported through one shared legacy play-step/reset/render contract, but final active-play feel and exact old-game play-board material are not yet complete |
+| Generation lifecycle exactness | `16` | `15` | partial | `docs/legacy/gameplay-spec.md` -> `src/legacy-runtime/legacyGenerationLifecycle.ts` -> `src/legacy-runtime/legacyPlayLifecycle.ts` -> `src/legacy-runtime/legacyMaze.ts` -> `src/domain/maze/core.ts` -> `src/domain/maze/generator.ts` -> `src/scenes/MenuScene.ts` | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts`, `tests/reset/legacy-play-lifecycle.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/maze/maze-domain.test.ts`, localhost runtime diagnostics | process/stage ownership is mapped, diagnostics show stage-6 row reveal, browser shortcut topology creates family-aware route-affecting bypasses with separated canonical-route reconnection proof, rasterized domain play mazes apply the restored legacy `CreateShortCuts` opposite-corridor wall-bridge rule, and both live menu mazes plus active reset-lane generated play mazes now use the source-shaped checkpoint path-builder family instead of leaving the main menu on a fixed snapshot; `createLegacyGeneratedMenuMaze()` mirrors the `CreateGrid` / `MapPath` / `CreatePath` / `CreateShortCuts` responsibility split with menu-specific shortcut tuning and row-sliced drawing, while `createLegacyMaze()` preserves play-specific shortcut tuning and full-stage play consumption. The shared active builder feeds a duplicate-preserving `_WallArray` into shortcut creation, resumes from the next tile selected by `Backtrack()` instead of the already-carved path candidate, reports checkpoint/path/wall-array stats, normalizes generated topology by pruning disconnected floor components and rebasing trivially weak goals to the farthest reachable floor, and publishes route-quality stats that distinguish any bypassable solution edge from meaningful detour-bearing bypass coverage across route bands; exact Unreal RNG/time seeding and process-yield timing remain open |
+| Demo route, backtracking, and pacing | `12` | `11` | partial | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` -> `src/domain/ai/demoWalker.ts` -> `src/scenes/MenuScene.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, localhost | recovery cues, AI-only reset replay, goal-reset timing, `AiTilePathCheck` admission, source-shaped neighbor-scan / potential-tile / path-stack backtracking route planning, connected floor-path reacquire after wrong-branch recovery, bounded first-mistake replay planning, single-timer AI movement cadence shape, positive visited-undo proof, browser-equivalent menu trail-fade-tail behavior, and a bounded `GI_MazerGameInstance.uasset` scan are covered; exact Unreal material color-revert timing and numeric Blueprint AI delay default remain open |
+| In-game HUD and goal-arrow parity | `8` | `8` | aligned | `src/legacy-runtime/legacyPlayHud.ts` -> `src/scenes/MenuScene.ts` -> `src/scenes/menuRuntimeDiagnostics.ts` | `tests/reset/legacy-play-hud.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/visual/edge-live-check.test.ts`, `npm run edge:live -- --skip-build true --headless true --run core-only-play`, direct play-route screenshot, `window.__MAZER_VISUAL_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics` | the timer/arrow overlay now has repo-owned source-exact bare `M:SS` timer text, legacy `% 10` minute wrap, arrow-angle radians/degrees geometry, tighter timer bounds, scene wiring, desktop/mobile diagnostics proof, minimal source-shaped Timer/EndArrow visual chrome, and data-only runtime diagnostics that do not draw a visible proof/debug panel into play; reopen only if stronger Unreal widget blueprint/material evidence is recovered |
+
+Current total:
+
+- `93 / 100`
+
+## Why the marker was corrected from 97% to 70%, then ratcheted to 93%
+
+The repo is materially past the "rough prototype" stage:
+
+- legacy truth is restored and extracted
+- the reset lane has a stable front door
+- menu/parity work is now modular instead of broad
+- active play, overlays, demo motion, diagnostics, and tests all exist as first-class repo surfaces
+
+However, the previous `97%` value overstated the user-facing 1:1 status. It gave near-full credit for mapped contracts and proof surfaces even when the current runtime still visibly differs from restored legacy truth.
+
+The corrected `70%` marker means:
+
+- the project has a strong restoration/proof foundation
+- several legacy behavior contracts are implemented and tested
+- the current web app is useful and inspectable on localhost
+- the current web app is not yet visually or algorithmically close enough to call it almost done
+
+The biggest remaining gaps are not cosmetic:
+
+- generation/reset lifecycle ownership is now aligned, and active play topology no longer starts from the earlier DFS perfect-maze owner; it now uses a source-shaped checkpoint path-builder, source-shaped `Backtrack()` next-tile resume semantics, wall-array handoff, a generated-play quality normalization that removes unreachable floor components and avoids trivially weak goals in `createLegacyMaze()`, and stricter route-quality stats that only classify `multi-route` when shortcut-enabled play snapshots retain meaningful detour-bearing bypass coverage across multiple route bands, but exact Unreal RNG/time seeding and process-yield timing remain open
+- shortcut topology is no longer the earlier random dead-end braider: it now uses family-aware loop scoring, sparse fallback protection, a bounded route-aware braided bypass pass that rejects candidates without separated canonical-route reconnection, a raster-level legacy opposite-corridor bridge pass, and an active reset-lane `createLegacyMaze()` shortcut bridge pass using the explicit legacy budget plus a duplicate-preserving `_WallArray` collected by the checkpoint path-builder's `CreatePath` equivalent; this improves route alternatives and ports the core `CreateShortCuts` condition plus selection lifecycle shape onto the active runtime owner, but does not close exact legacy randomness
+- front-door `Exit` semantics are closed through an explicit browser-safe quit equivalence, but the visible front-door composition is still not screenshot-grade
+- desktop menu board dominance, title lockup, and button support chrome are closer to legacy screenshot truth, the front-door buttons now use a darker pane-fill chrome instead of translucent white block fills plus a larger desktop plate envelope, the center `Start` button now shares the same baseline as `Exit` and `Options`, the backdrop field now has an explicit owner plus a closer cloudy/star treatment, and the board material now reads darker, higher contrast, and less evenly tiled; the fixed menu snapshot now also renders as a 49-cell projection instead of the earlier coarse 25-cell board, but screenshot-grade backdrop/material and final composition exactness are still open
+- desktop board tile read is slightly closer after widening the menu trench core and reducing wall-grid noise, but screenshot-grade board material and composition exactness are still open
+- the title lockup now reads more like the legacy translucent green glass wordmark after reducing title/shadow opacity, but exact wordmark material and overlap remain open
+- connected trench-core rendering reduces the separated-cell/checkerboard read in the current fixed web snapshot, the 49-cell projection closes the most obvious coarse-grid density miss, the path-relief shadow pass reduces the flat modern line-art read, and the thicker cyan demo route reduces the hairline-trail mismatch, but exact screenshot-grade corridor geometry, final material relief, and exact player sprite treatment remain open
+- the upper-left frame/pocket/lattice corner is slightly closer after extending those fixed snapshot branches, but the menu board is still short of final screenshot-grade silhouette closure
+- the upper-right title-adjacent lattice is slightly closer after adding one fixed snapshot branch family, but the menu board is still short of final screenshot-grade silhouette closure
+- the lower-left interior is slightly closer after adding fixed snapshot shelf density, but the menu board is still short of final screenshot-grade silhouette closure
+- stage `7` finalization, process `8` reset entry, menu process-8-to-process-0 reset handoff, process `0` delay-gated entry, the armed level-building scheduler contract, the stage transition graph, shortcut-disabled stage `4 -> 6` progression, stage `0/3/4/5/6` cadence, stage-cursor diagnostics, checkpoint/shortcut budget formulas, and menu stage-6 row-sliced drawing are now explicit and proof-backed
+- active play now carries the restored Unreal simultaneous-key buffer contract: first movement keydown waits 50ms, held cardinal flags resolve as one vector, opposing axes cancel, key repeat resolves the current held vector, and reset/pause/menu boundaries clear stale movement
+- active play now consumes accepted movement key events at the scene input boundary, so browser default arrow-key behavior cannot compete with the game loop during play
+- active play now clears held movement flags, the pending 50ms movement timer, and pointer starts when the browser window blurs or the document becomes hidden, preventing stale browser focus state from replaying movement after focus returns
+- active play now carries a browser/mobile pointer adapter that maps swipes and short taps into the same one-step vector contract before collision resolution, so mobile play is no longer keyboard-only and does not fork gameplay rules
+- active play now gates mobile pointer starts to the active board bounds, including camera-follow board offsets, so taps on the HUD or surrounding shell no longer become movement while inside-board swipes still resolve through the same one-step contract
+- active-play camera-follow now applies the same offset to the static maze, dynamic overlays, HUD geometry, and pointer-bound checks so camera-follow cannot split the player/trail layer away from the maze layer
+- active-play collision now carries the restored Unreal axis-gated movement shape: horizontal and vertical side gates resolve independently, blocked simultaneous axes can slide along an open axis, and true diagonal corner collisions block instead of cutting through walls
+- active-play goal reset now carries one process-8 reset request as the sole return-to-menu authority, which removes the duplicate scene-local reset-return timer and better matches the restored Unreal `_ResetGame` consumption branch
+- active-play pause reset now preserves existing trail history while returning the player to the start tile, matching the restored `_ResetPlayerPosition` branch more closely than the previous browser trail wipe to `[start]`
+- active-play board rendering is less debug-grid-like now that generated play mazes draw walkable paths as connected corridor segments with darker edge/core hierarchy and active dynamic trail/start/goal/player overlays use corridor/inset rendering instead of per-tile bright square fills, but final old-game play-board visual parity remains open
+- demo reset and route semantics are closer now that the fixed front-door snapshot also uses the legacy mistake/backtrack lane, no longer boots into a weak `reset-hold` / `goal-hold` first impression, replays AI-only reset without regeneration, queues the menu goal-reset process-8 request immediately after reset-hold, rejects one-tile spur wrong-turn candidates through the restored `AiTilePathCheck` gate, derives humanized routing from a source-shaped neighbor scan / potential-tile / path-stack backtracking planner instead of injecting detours into the canonical solution path, reconnects wrong-branch recovery to canonical replay through adjacent floor movement instead of a non-adjacent route splice, bounds first-mistake replay planning so the menu AI does not keep exploring after the reset/reacquire seam has enough visible cue evidence, now uses one AI movement timer for all cue beats like the extracted C++ `_PlayerAiDelayDuration` loop, publishes `visitedUndoCount` diagnostics for the legacy `_AiBackTrackUndoVisitedFlag` seam, now has a deterministic positive proof fixture for that branch, and now has direct proof that `toggleTrailFade` bounds the menu demo visible trail tail while persistent trail mode keeps the full projected path
+- HUD parity is aligned for the currently restored source-backed browser seam because timer formatting now matches the restored source's bare `M:SS` text and `% 10` minute wrap, goal-arrow angle radians/degrees and proof bounds live in `src/legacy-runtime/legacyPlayHud.ts`, visual chrome now stays in a minimal Timer/EndArrow widget lane rather than a heavy browser debug chip, and runtime diagnostics are data-only instead of drawing a visible panel in the maintained browser
+- screenshot-grade menu material/composition is not fully closed
+
+Do not reuse `97%` for the literal 1:1 clone marker unless the remaining screenshot, topology, active-play feel, and demo-stack gaps have been closed with proof.
+
+Current proof note:
+
+- live runtime diagnostics are now actually bridged through `MenuScene` and covered by repo-owned tests
+- runtime diagnostics now also publish the active menu-demo cue and whether the front-door snapshot is using the mistake-enabled legacy lane through machine-readable proof surfaces
+- runtime diagnostics and visual diagnostics now also show live menu-demo AI wrong-branch/backtrack/recovery counters plus stage-6 row-reveal progress through machine-readable proof surfaces, making AI/generation-fluidity review evidence-backed without changing gameplay behavior
+- the localhost right-pane browser remains useful for visual truth on the single `4173` preview server
+- direct browser-automation readback of `window.__MAZER_*` globals is still browser-owned and flaky, but runtime diagnostics now have a DOM-backed fallback surface so that seam no longer blocks localhost proof without drawing a visible proof/debug panel
+
+## Ratchet rule
+
+The marker may move only when a bounded legacy-owned segment changes state with proof.
+
+A ratchet is valid when:
+
+- one named segment above has a specific gap reduced or closed
+- the owner chain for that segment was the actual edit path
+- the proof surface for that segment passed after the change
+- `docs/current-truth.md`, `docs/system-map.md`, and the parity matrix stay synchronized
+
+## Every-pass reevaluation rule
+
+Every legacy 1:1 pass must re-evaluate this marker before closeout, even when no percentage change is justified.
+
+Closeout must answer:
+
+- Which weighted segment was touched?
+- Did the segment's current points change?
+- If not, why did the evidence fail to justify a ratchet?
+- Do `docs/current-truth.md`, this marker, and `docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md` still agree?
+- Did `npm run verify` pass after the change?
+
+The guard test `tests/reset/legacy-marker.test.ts` enforces the basic marker arithmetic and document-synchronization check. It does not decide whether a ratchet is deserved; the pass owner still must compare the actual legacy evidence.
+
+Do not ratchet for:
+
+- nicer wording
+- broader mapping with no behavior change
+- unproven visual claims
+- internal cleanup that does not improve legacy parity
+
+Current note:
+
+- explicit lifecycle mapping can still be worth landing for restart safety and owner clarity
+- but lifecycle mapping alone does not justify a percent move unless it also closes a behavior gap or restores missing legacy-owned semantics
+- the stage-cursor packet improved runtime proof and owner clarity but did not ratchet by itself because it was diagnostics-only
+- the menu reset-handoff packet earns one point because it changes runtime behavior: process-8 menu reset no longer regenerates inline and instead enqueues the next process-0 generation request
+- the shortcut-disabled transition packet earns one point because it removes a real impossible runtime-plan edge: small-maze stage `4` now advances to stage `6` when process `5` is omitted
+- the menu draw-stage packet earns one point because stage `6` now changes runtime behavior: menu static-board drawing advances by row batches from the lifecycle plan instead of rendering only as one completed static pass
+- the active-play simultaneous-key packet earns one point because movement input now changes runtime behavior to match the old player source's delayed first press, held-direction vector resolution, repeat movement, and stale-key cleanup boundaries
+- the active-play axis-gated collision packet earns one point because simultaneous movement now matches the old player source's independent `CheckMoveR/L/U/D` gates instead of checking only the final combined target
+- the active-play reset-return packet earns one point because goal reset timing now flows through the explicit process-8 `LegacyResetRequest` only, matching the old `_ResetGame` -> process `8` branch more closely and removing the shadow `playResetReturnAtMs` path
+- the menu-demo reset exactness packet earns one point because it changes runtime behavior: goal reset now queues the process-8 menu reset request immediately after reset-hold instead of waiting one extra explore-step delay, and AI-only reset replay is explicitly covered without regenerating the menu maze
+- the menu-demo `AiTilePathCheck` packet earns one point because it changes runtime behavior: wrong-turn selection no longer commits into a one-tile spur that the restored Unreal AI would reject for lacking an unvisited onward path
+- the menu draw-stage cadence packet does not earn a point because it improves the visible row-reveal timing and proves intermediate `0/25 -> 13/25 -> 25/25` diagnostics on localhost, but the exact Unreal generator timing and line-for-line topology internals remain unrecovered
+- the connected trench-core packet does not earn a point because it improves material continuity inside the current web snapshot but does not close the final screenshot-grade menu composition gap
+- the upper-right lattice packet does not earn a point because it improves one fixed snapshot silhouette area but does not close the final screenshot-grade menu composition gap
+- the AI/draw-progress diagnostics packet does not earn a point because it improves evidence and future edit safety but does not change gameplay behavior or close a screenshot-grade parity gap
+- the narrow trench-inset packet does not earn a point because it reduces chunky path-cell rendering in one board/material module but does not close screenshot-grade corridor geometry or full menu composition parity
+- the menu dynamic-overlay corridor-frame packet does not earn a point because it reduces the full-square cyan/player marker read in one board/material module but does not close exact legacy trail/sprite treatment or full screenshot-grade board parity
+- the menu dynamic-overlay thinner-highlight packet does not earn a point because it reduces the chunky cyan route and marker footprint in desktop/mobile captures, but it does not close exact legacy trail/sprite treatment or full screenshot-grade board parity
+- the segment-based static-board material packet does not earn a point because it reduces broad filled-cell drift and restores the gray slab / dark route hierarchy, but visual proof still shows tiny-grid/checker drift and incomplete screenshot-grade board parity
+- the wide-route-core/soft-edge static-board material packet does not earn a point because it reduces the tiny-grid/checker read in dense route areas but still does not close screenshot-grade board material, dense corridor geometry, or full menu composition parity
+- the maze shortcut topology packet does not earn a point because it replaces the weak random browser braider with family-aware route-affecting bypass logic and tests, but it is still an improved browser-native equivalent rather than a line-for-line Unreal `CreateShortCuts` port
+- the maze shortcut route-span packet does not earn a point because it hardens the browser-native bypass pass with separated canonical-route reconnection and multi-band bypass proof, but it still does not recover the literal Unreal `CreateShortCuts` implementation
+- the maze raster bridge shortcut packet earns one point because it changes runtime maze topology by restoring the old `CreateShortCuts` wall-selection shape at the raster layer: the browser opens deterministic additive floor bridges only where the selected wall tile has opposite floor/path corridors on one axis and wall blockers on the other axis; it does not earn more because the web builder still does not execute the full Unreal wall-array, random-removal, process-yield, and staged path-builder internals line-for-line
+- the active runtime shortcut bridge packet earned one point because it moved the restored opposite-corridor shortcut rule into `src/legacy-runtime/legacyMaze.ts`, which is the active reset-lane maze owner used by `MenuScene`, and wired the explicit legacy shortcut budget into play-mode generation; it did not earn more at that time because the full Unreal staged wall-array lifecycle and checkpoint path builder were still open
+- the active runtime wall-array shortcut packet earned one point because active reset-lane shortcut selection built a `_WallArray`-style duplicate-preserving candidate list from path-neighbor walls, randomly removed one entry per attempt, revalidated stale candidates before opening, and reported requested/attempted/created shortcut stats; it did not earn more at that time because the full Unreal checkpoint path builder was still open
+- the active runtime checkpoint path-builder packet earns two points because active reset-lane play topology no longer starts from a DFS perfect-maze algorithm; `createLegacyMaze()` now runs a source-shaped `CreateGrid` / `MapPath` / `CreatePath` sequence, records checkpoint/path/wall-array stats, and feeds the resulting duplicate-preserving wall array into shortcut creation. It does not earn the final two generation points because exact Unreal RNG, per-tick process-yield timing, and byte-for-byte `MapPath()` / `Backtrack()` behavior remain browser-safe approximations
+- the active runtime Backtrack next-tile packet earns one point because it closes a restored-source mismatch in the active reset-lane maze builder: Unreal `Backtrack()` returns `FindNextTile(PotentialPathArray[...], Checkpoint)` and resumes from that next tile, while the previous web builder resumed from the already-carved path candidate. The web builder now returns the selected next tile and resets unknown returned tile path length like the source-shaped struct flow. It does not earn the final generation point because exact Unreal RNG/time seeding and process-yield timing remain open
+- the generated play-maze topology quality packet does not earn a point because it is a browser-port quality guard inside the already-awarded generation segment: it removes disconnected floor components and rebases trivially weak generated goals so the play maze does not regress into unreachable visual noise or a degenerate route, but it is not a line-for-line Unreal RNG/process-yield recovery and does not close the final generation exactness gap
+- the active runtime route-quality stats packet does not earn a point because it adds direct proof that shortcut-enabled generated play snapshots retain alternate start-goal route capacity, but it does not change runtime generation behavior or recover exact Unreal RNG/time seeding/process-yield timing; the marker remains `93%`.
+- the meaningful route-quality classification packet does not earn a point because it tightens proof/classification safety by requiring detour-bearing bypass coverage across more than one route band before `createLegacyMaze()` calls a shortcut-enabled play snapshot `multi-route`; it guards against shallow-loop overclaiming, but it does not change maze generation topology or recover exact Unreal RNG/time seeding/process-yield timing; the marker remains `93%`.
+- the connected light-core menu-material packet does not earn a point because it moves the static board toward the restored light-corridor / dark-wall screenshot role, but exact corridor density, slab relief, title overlap, and full screenshot-grade composition remain open
+- the 49-cell fixed menu snapshot packet earns two points because it changes the actual menu-board runtime topology from the coarse 25-cell approximation to a 49-cell projection of the named legacy snapshot blueprint, preserves contiguous solution/demo path truth, keeps the fixed snapshot source-tagged apart from generated play mazes, and proves the change in desktop and mobile browser captures. It does not earn more because the exact old screenshot silhouette, material relief, wordmark overlap, button composition, and legacy trail/sprite treatment still differ visibly
+- the menu path-relief material packet earns one point because it changes visible menu-board runtime rendering: connected path segments now draw a dark offset relief shadow before the light corridor pass, and the remaining wall-grid overlay is quieter. Desktop and mobile browser captures prove a less flat board/material read. It does not earn more because exact old screenshot silhouette, final slab relief, wordmark overlap, button composition, and legacy trail/sprite treatment still differ visibly
+- the menu title glass packet earns one point because it changes visible wordmark runtime rendering toward the restored screenshot's translucent green title treatment while preserving existing layout. Desktop and mobile browser captures prove the opacity change. It does not earn more because exact wordmark material, title-over-board overlap, button composition, and final screenshot-grade menu composition remain open
+- the menu button dark-pane packet earns one point because it changes visible front-door button rendering toward the restored screenshot's dark support-pane treatment while preserving the existing menu-only button layout and overlay behavior. Desktop and mobile browser captures prove the fill/hover chrome change. It does not earn more because exact button placement, title-over-board overlap, and final screenshot-grade menu composition remain open
+- the menu material contrast packet earns one point because it changes visible board-material rendering toward the restored screenshot's harder charcoal/light-gray maze read: wall/slab mass is darker, path cores are slightly less washed out, and path edges carry stronger dark contrast. Completed desktop and mobile browser captures prove the material change after the staged row reveal has finished. It does not earn more because exact maze silhouette, title overlap, button placement, and legacy trail/sprite treatment remain open
+- the menu dynamic trail weight packet earns one point because it changes visible menu-demo route rendering toward the restored screenshot's heavier cyan traversal path while preserving a corridor-style inset instead of returning to full-square cells. Completed desktop and mobile browser captures prove the route/marker footprint change. It does not earn more because exact player sprite treatment, final maze silhouette, title overlap, and button placement remain open
+- the menu button plate proportion packet earns one point because it changes the desktop front-door button layout math toward the restored screenshot's larger support-plate proportions while leaving portrait sizing bounded. Desktop and mobile browser captures prove the Start/Exit/Options fit after the change. It does not earn more because exact final button placement, title overlap, and whole-menu screenshot composition remain open
+- the ultra-narrow side-panel menu layout packet does not earn a point because it fixes a clear browser-side layout defect by fitting the board into a 172px-wide side panel and stacking `Exit` / `Start` / `Options`, but it does not close exact legacy widget placement, title overlap, or screenshot-grade menu composition; the marker remains `93%`.
+- the ultra-narrow side-panel title-scale packet does not earn a point because it fixes a clear maintained-browser defect by preventing the normal portrait wordmark minimum from spilling across a 172px-wide side panel, but it does not close exact title overlap, full menu composition, or screenshot-grade legacy parity; the marker remains `93%`.
+- the procedural live-menu generation packet does not earn a point yet because it correctly routes the main menu through the same checkpoint/path/shortcut procedural builder family as Start-game mazes, but exact Unreal RNG/time seeding and process-yield timing remain open, and live procedural-menu screenshot composition still needs browser proof before the visual row can be safely ratcheted; the marker remains `93%`.
+- the procedural menu title-composition packet does not earn a point because it fixes a maintained-browser visual regression from dense `menu-generated` boards by using a tighter ultra-narrow wordmark cap only for procedural menu surfaces, while fixed snapshot title treatment remains unchanged; browser proof is cleaner, but exact live procedural-menu silhouette, final material relief, and whole-menu screenshot composition remain open, so the marker remains `93%`.
+- the legacy play HUD contract packet earns one point because active-play timer formatting, goal-arrow angle math, timer/arrow bounds, and diagnostics now live in a repo-owned helper and are wired through `MenuScene.drawHud()`. Focused tests plus desktop/mobile play-route browser captures prove `timerText` and `arrowAngleRadians` are available on `window.__MAZER_VISUAL_DIAGNOSTICS__`. It does not earn more because final legacy HUD material, exact old-widget placement, diagnostics-free visual styling, and end-to-end play-feel exactness remain open
+- the legacy play HUD source-exactness packet earns one point because it closes a restored-source mismatch: the active-play timer now renders bare `M:SS` text instead of a browser-added `Time` label, wraps minutes with the legacy `% 10` rule, exposes the old widget's degree angle value alongside radians, and narrows the timer proof bounds. Focused tests plus desktop/mobile play-route captures prove the active HUD contract. It does not earn more because final legacy HUD material, exact old-widget placement, diagnostics-free visual styling, and end-to-end play-feel exactness remain open
+- the legacy play HUD visual/source-widget packet earns one point because it closes the remaining source-backed browser HUD seam: the active-play HUD no longer depends on a heavy bordered browser chip, the timer uses a minimal text/shadow treatment, the end-arrow uses the compact source-owned image lane with a subtle shadow, and runtime diagnostics now publish machine-readable play/menu surface mode without drawing a visible proof panel. It does not earn more because it is the final point in the HUD segment, not a claim that broader active-play feel, final board material, or menu screenshot parity is complete
+- the diagnostics-panel removal packet does not earn a point because it removes a non-legacy proof artifact from the visible game without closing a new weighted legacy behavior segment; the marker remains `87%`
+- the active-play connected-corridor render packet does not earn a point because it reduces a visible generated-play regression by replacing square debug-cell path fills with connected corridor rendering, but it does not close the final active-play feel/HUD edge-case segment or final screenshot-grade visual parity
+- the active-play dynamic corridor overlay packet does not earn a point because it reduces a visible generated-play regression by moving active trail/start/goal/player overlays out of the generic square `fillTile()` lane, but it does not close final play-board material parity, exact legacy player sprite treatment, or final active-play feel; the marker remains `93%`.
+- the active-play camera-follow layer-alignment packet does not earn a point because it closes a real static/dynamic/HUD/pointer offset mismatch under camera-follow, but it does not close exact camera behavior, final active-play feel, or generated play-board material parity; the marker remains `93%`.
+- the front-door button-baseline packet does not earn a point because it fixes a clear browser/mobile placement defect by aligning `Start` with `Exit` and `Options`, but it does not close the remaining screenshot-grade menu composition segment; the marker remains `87%`
+- the active-play mobile pointer-input packet earns one point because it changes runtime behavior in the active-play owner chain: mobile swipes and short taps now resolve through `src/legacy-runtime/legacyPlayStep.ts` and feed the same axis-gated movement/collision path as keyboard input. It does not earn more because exact active-play feel, remaining edge cases, and final play-board material parity remain open
+- the menu AI source-shaped path-stack planner packet earns one point because it changes runtime demo behavior in `src/domain/ai/demoWalker.ts`: the humanized menu route now scans live neighbors, admits `AiTilePathCheck` candidates, queues potential tiles, chooses the nearest unvisited candidate to the end, backtracks through the path stack when direct movement fails, surfaces the direct-fail beat as `dead-end`, and marks the first recovery seam as the AI-only reset point before replaying the same maze. It does not earn more because exact Unreal material color-revert timing, blueprint `_PlayerAiDelayDuration`, and every visited-flag side effect are still approximated.
+- the active-play mobile board-bounds packet earns one point because it closes a real mobile gameplay edge case in the active-play owner chain: pointer starts outside the active board no longer produce movement, while inside-board swipes may still release outside the board and resolve through the same legacy one-step vector and axis-gated collision contract. It does not earn more because final active-play feel and exact generated play-board material parity remain open.
+- the active-play keyboard default-consumption packet does not earn a point because it is a browser reliability/feel guard inside the already-awarded active-play input segment: accepted movement keydown/keyup events are now consumed so page/browser defaults cannot compete with play movement, but this does not close final active-play feel, exact old-game input cadence, or generated play-board material parity.
+- the active-play pause reset trail-preservation packet does not earn a point because it closes a source-backed pause reset mismatch by preserving the current trail while returning the player to start, but it does not close final active-play feel, exact play-board material, or broader reset/play cadence exactness; the marker remains `93%`.
+- the menu AI connected-reacquire packet earns one point because it closes a real route-quality bug in `src/domain/ai/demoWalker.ts`: after wrong-branch recovery, the humanized menu route now inserts an adjacent floor-path reacquire segment before replaying the canonical path, instead of visually jumping from a distant wrong-branch tile back to the early canonical route. It does not earn more because exact Unreal material color-revert timing, blueprint AI cadence, and full visited-flag side effects remain open.
+- the active-play focus-loss cleanup packet earns one point because it closes a real browser-runtime input edge case in the active-play owner chain: held movement flags, the pending simultaneous-key timer, and pointer starts now reset on window blur or document hidden, so stale focus state cannot trigger delayed movement when the player returns. It does not earn more because final active-play feel and exact generated play-board material parity remain open.
+- the menu AI route diagnostics packet does not earn a point because it adds route-shape observability for safer future tuning but does not change route selection, cadence, material side effects, or recovered source behavior; the marker remains `92%`.
+- the menu AI route-quality bound packet earns one point because it changes runtime behavior in `src/domain/ai/demoWalker.ts`: potential target admission is idempotent, and the first-mistake planner stops exploratory route construction after emitted dead-end/backtrack/reacquire evidence is present, then returns to canonical replay. The representative split-flow route is now guarded to stay below 4x the canonical solution and under 60 seconds while preserving wrong-branch recovery cues. It does not earn more because exact Unreal material color-revert timing, blueprint AI cadence, and full visited-flag side effects remain open.
+- the menu AI single-timer cadence packet does not earn a point because it aligns runtime cadence shape with the extracted C++ timer loop but does not recover the numeric Blueprint `_PlayerAiDelayDuration`, exact material color-revert timing, or full visited-flag side effects; the marker remains `93%`.
+- the menu AI visited-undo diagnostics packet does not earn a point because it makes the legacy `_AiBackTrackUndoVisitedFlag` seam observable through `visitedUndoCount`, but the current representative route still does not positively exercise that side effect and exact Unreal visited-color/material timer behavior remains open; the marker remains `93%`.
+- the menu AI visited-undo positive-proof packet does not earn a point because it closes a proof gap for the existing `_AiBackTrackUndoVisitedFlag`-equivalent branch rather than changing runtime behavior or recovering exact Unreal material/timer behavior; the marker remains `93%`.
+- the menu trail-fade-tail proof packet does not earn a point because it proves the current browser-equivalent trail-tail behavior in `legacyMenuDemoLifecycle` but does not recover the exact Unreal `_TileColorRevertDelay` numeric timing or material transition; the marker remains `93%`.
+- the tile color revert delay source-bound packet does not earn a point because it records a source and `GI_MazerGameInstance.uasset` recovery attempt, but no trustworthy serialized Blueprint default value was recovered and no runtime behavior changed; the marker remains `93%`.
+- the menu dense-slab material packet does not earn a point because it improves one visual module and proves the static board is less black/hairline-thin in the maintained browser, but it does not close final screenshot-grade silhouette, title overlap, button composition, or legacy player/trail treatment; the marker remains `93%`.
+
+## Preferred modular lock order from here
+
+Keep the remaining work bounded in this order unless proof shows a different blocker:
+
+1. active-play feel, mobile input, and edge-case exactness review
+2. final demo-stack/backtracking exactness review
+3. final screenshot-grade board/material review
+
+Each future packet should name:
+
+- one segment row from this marker
+- one owner chain
+- one proof surface
+- one exact legacy miss being closed

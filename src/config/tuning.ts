@@ -479,11 +479,11 @@ export const legacyTuning = {
       // Legacy AI was timer-driven (`_PlayerAiDelayDuration`); exact value was BP-driven.
       spawnHoldMs: 360,
       exploreStepMs: 138,
-      backtrackStepMs: 95,
-      decisionPauseMs: 285,
-      anticipationStepMs: 105,
-      branchCommitMs: 140,
-      branchResumeMs: 185,
+      backtrackStepMs: 138,
+      decisionPauseMs: 138,
+      anticipationStepMs: 138,
+      branchCommitMs: 138,
+      branchResumeMs: 138,
       // Ambient shell should linger at the solved end-state long enough to read the full route.
       goalHoldMs: 3900,
       resetHoldMs: 620,

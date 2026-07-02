@@ -1,10 +1,16 @@
 import { describe, expect, test } from 'vitest';
 import {
+  MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE,
   MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY,
+  clearMenuSceneRuntimeDiagnostics,
+  parseMenuSceneRuntimeDiagnosticsAttribute,
+  publishMenuSceneRuntimeDiagnostics,
+  resolveMenuSceneGenerationDrawStageProgress,
   resolveMenuScenePerformanceMode,
   resolveMenuSceneRuntimeConfig,
   summarizeMenuSceneRuntimeFeed,
-  summarizeMenuSceneFrameWindow
+  summarizeMenuSceneFrameWindow,
+  type MenuSceneRuntimeDiagnostics
 } from '../../src/scenes/menuRuntimeDiagnostics';
 import { legacyTuning } from '../../src/config/tuning';
 
@@ -111,6 +117,38 @@ describe('menu runtime diagnostics', () => {
     expect(summary.fps).toBeCloseTo(36.7, 1);
   });
 
+  test('summarizes staged generation draw progress for fluid row-reveal proof', () => {
+    expect(resolveMenuSceneGenerationDrawStageProgress({
+      rowsVisible: 7,
+      rowCount: 25
+    })).toEqual({
+      complete: false,
+      progressPercent: 28,
+      rowCount: 25,
+      rowsRemaining: 18
+    });
+
+    expect(resolveMenuSceneGenerationDrawStageProgress({
+      rowsVisible: 35,
+      rowCount: 25
+    })).toEqual({
+      complete: true,
+      progressPercent: 100,
+      rowCount: 25,
+      rowsRemaining: 0
+    });
+
+    expect(resolveMenuSceneGenerationDrawStageProgress({
+      rowsVisible: null,
+      rowCount: null
+    })).toEqual({
+      complete: null,
+      progressPercent: null,
+      rowCount: null,
+      rowsRemaining: null
+    });
+  });
+
   test('tracks structured feed snapshots without inventing extra state changes', () => {
     const first = summarizeMenuSceneRuntimeFeed({
       step: 4,
@@ -184,5 +222,246 @@ describe('menu runtime diagnostics', () => {
     expect(changed.signature).not.toBe(first.signature);
     expect(changed.changeCount).toBe(2);
     expect(changed.lastChangedAt).toBe(360);
+  });
+
+  test('publishes and clears runtime diagnostics on machine-readable proof surfaces only', () => {
+    const runtimeWindow = {
+      innerWidth: 1280,
+      innerHeight: 720
+    } as Window;
+    const previousWindow = globalThis.window;
+    const previousDocument = globalThis.document;
+    const documentAttributes = new Map<string, string>();
+    const createdElements: string[] = [];
+    const runtimeDocument = {
+      documentElement: {
+        setAttribute: (name: string, value: string) => {
+          documentAttributes.set(name, value);
+        },
+        getAttribute: (name: string) => documentAttributes.get(name) ?? null,
+        removeAttribute: (name: string) => {
+          documentAttributes.delete(name);
+        }
+      },
+      body: {
+        appendChild: () => {
+          throw new Error('runtime diagnostics must not create visible DOM children');
+        }
+      },
+      createElement: (tagName: string) => {
+        createdElements.push(tagName);
+        return {};
+      }
+    } as unknown as Document;
+
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: runtimeWindow
+    });
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: runtimeDocument
+    });
+
+    const diagnostics: MenuSceneRuntimeDiagnostics = {
+      revision: 1,
+      sceneInstanceId: 7,
+      updatedAt: 1200,
+      runtimeMs: 1200,
+      surface: {
+        mode: 'menu',
+        overlay: 'none'
+      },
+      play: {
+        board: {
+          bottom: 420,
+          left: 20,
+          right: 360,
+          top: 80,
+          size: 340,
+          tileSize: 10
+        },
+        player: {
+          x: 1,
+          y: 2,
+          screenX: 35,
+          screenY: 105
+        }
+      },
+      menuDemo: {
+        phase: 'explore',
+        cue: 'backtrack',
+        pathCursor: 12,
+        reachedGoal: false,
+        prerollSteps: 72,
+        runnerMistakesEnabled: true,
+        route: {
+          aiResetPathCursor: 42,
+          canonicalPathLength: 120,
+          cueCounts: {
+            backtrack: 5,
+            'dead-end': 1,
+            reacquire: 2
+          },
+          routeLength: 144,
+          segmentCount: 143,
+          trailModeCounts: {
+            backtrack: 7,
+            explore: 135,
+            goal: 1
+          },
+          traverseMs: 14872
+        }
+      },
+      generation: {
+        drawStage: {
+          batchSize: 1,
+          batchUnit: 'rows',
+          complete: true,
+          progressPercent: 100,
+          rowCount: 25,
+          rowsRemaining: 0,
+          rowsVisible: 25,
+          staged: true
+        },
+        stageCursor: {
+          phase: 'consumed-finalized',
+          currentStageId: 7,
+          completionSignal: 'player-finalized',
+          previousStageIds: [0, 3, 4, 5, 6],
+          remainingStageIds: [8],
+          processComplete: true
+        }
+      },
+      visibility: {
+        hidden: false,
+        changeCount: 0,
+        suspendCount: 0
+      },
+      performance: {
+        mode: 'full',
+        averageFrameMs: 16.667,
+        recentAverageFrameMs: 16.667,
+        recentFrameCount: 60,
+        worstFrameMs: 18,
+        worstRecentFrameMs: 18,
+        spikeCount: 0,
+        recentSpikeCount: 0,
+        estimatedFps: 60,
+        lowPowerDetected: false,
+        lowPowerForced: false,
+        lowPowerActive: false,
+        heapPressureActive: false,
+        postHiddenRecoveryActive: false,
+        hardwareConcurrency: 8,
+        saveData: false
+      },
+      feed: summarizeMenuSceneRuntimeFeed({
+        step: 0,
+        status: null,
+        visibleEntries: [],
+        nowMs: 1200
+      }),
+      input: {
+        acceptedCount: 0,
+        droppedCount: 0,
+        mergedCount: 0,
+        lastAcceptedActionKind: null,
+        lastAcceptedSource: null,
+        lastAcceptedAtMs: null,
+        lastConsumedAtMs: null,
+        lastDroppedActionKind: null,
+        lastDroppedReason: null,
+        lastDroppedAtMs: null,
+        queueDepth: 0,
+        maxQueueDepth: 0
+      },
+      projection: null,
+      telemetry: {
+        eventLogVersion: 0,
+        currentRunId: null,
+        currentMazeId: null,
+        currentAttemptNo: null,
+        events: [],
+        summary: {
+          countsByKind: {},
+          latestByKind: {},
+          latestAtMs: null
+        }
+      },
+      resources: {
+        activeTweens: 0,
+        activeTimers: 0,
+        listenerCount: 3,
+        listenerBreakdown: {
+          sceneUpdate: 1,
+          sceneShutdown: 1,
+          scaleResize: 1,
+          visibilityAttached: false,
+          legacyPlayFocusGuardAttached: false,
+          installSurfaceAttached: false
+        },
+        trailSegmentCount: 46,
+        trailSegmentCap: 46,
+        runnerPolicy: {
+          wrongBranchCount: 2,
+          backtrackCount: 5,
+          recoveryCount: 2
+        },
+        intentEntryCount: 0,
+        intentEntryCap: 0,
+        deferredVisualTasksRemaining: 0,
+        deferredTasksPerFrameCap: legacyTuning.menu.runtime.deferredTasksPerFrame.full,
+        background: {
+          clouds: 0,
+          farStars: 0,
+          nearStars: 0,
+          twinkles: 0,
+          veils: 0,
+          driftMotes: 0,
+          moving: 0,
+          movingCap: 0,
+          signatureCap: 0
+        }
+      }
+    };
+
+    try {
+      publishMenuSceneRuntimeDiagnostics(diagnostics);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]).toEqual(diagnostics);
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )).toEqual(diagnostics);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.play?.player.screenX).toBe(35);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.menuDemo?.route?.cueCounts.reacquire).toBe(2);
+      expect(createdElements).toEqual([]);
+
+      publishMenuSceneRuntimeDiagnostics({
+        ...diagnostics,
+        revision: 2,
+        surface: {
+          mode: 'play',
+          overlay: 'none'
+        }
+      });
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.surface.mode).toBe('play');
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.surface.mode).toBe('play');
+      expect(createdElements).toEqual([]);
+
+      clearMenuSceneRuntimeDiagnostics();
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]).toBeUndefined();
+      expect(documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)).toBeUndefined();
+    } finally {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: previousWindow
+      });
+      Object.defineProperty(globalThis, 'document', {
+        configurable: true,
+        value: previousDocument
+      });
+    }
   });
 });

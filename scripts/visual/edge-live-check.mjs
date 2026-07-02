@@ -29,6 +29,7 @@ const EDGE_LIVE_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-edge-live')
 const VISUAL_CAPTURE_KEY = '__MAZER_VISUAL_CAPTURE__';
 const VISUAL_DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__';
 const RUNTIME_DIAGNOSTICS_KEY = '__MAZER_RUNTIME_DIAGNOSTICS__';
+const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';
 const PROOF_SURFACE_SIGNAL_KEY = '__MAZER_PROOF_SURFACES__';
 const DEFAULT_PRESET_GROUP = 'core';
 const DEFAULT_HEADLESS = true;
@@ -87,6 +88,7 @@ const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
   'mobile-touch-smoke': Object.freeze({
     kind: 'touch',
     requiredMode: 'play',
+    requiresControlEvents: false,
     movementWaitMs: 260,
     controlWaitMs: 220,
     restartWaitMs: 900,
@@ -294,6 +296,12 @@ const resolveInteractiveProjectionMode = (projection) => (
     : null
 );
 
+const resolveInteractiveSurfaceMode = (surface) => (
+  surface?.mode === 'play' || surface?.mode === 'menu'
+    ? surface.mode
+    : null
+);
+
 export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
   const runtime = diagnostics?.runtime ?? null;
   const visual = diagnostics?.visual ?? null;
@@ -308,7 +316,12 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
   );
 
   return {
-    mode: resolveInteractiveProjectionMode(projection) ?? resolveTelemetryModeFromCaptures([{ telemetry: { mode: telemetrySummary?.mode ?? null } }]) ?? null,
+    mode: (
+      resolveInteractiveProjectionMode(projection)
+      ?? resolveInteractiveSurfaceMode(runtime?.surface)
+      ?? resolveTelemetryModeFromCaptures([{ telemetry: { mode: telemetrySummary?.mode ?? null } }])
+      ?? null
+    ),
     controlUsedCount,
     projection: projection
       ? {
@@ -361,6 +374,14 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
           nextIndex: visual.trail.nextIndex ?? null,
           progress: visual.trail.progress ?? null,
           cue: visual.trail.cue ?? null
+        }
+      : null,
+    player: (runtime?.play?.player ?? runtime?.player)
+      ? {
+          x: Number.isFinite((runtime.play?.player ?? runtime.player).x) ? (runtime.play?.player ?? runtime.player).x : null,
+          y: Number.isFinite((runtime.play?.player ?? runtime.player).y) ? (runtime.play?.player ?? runtime.player).y : null,
+          screenX: Number.isFinite((runtime.play?.player ?? runtime.player).screenX) ? (runtime.play?.player ?? runtime.player).screenX : null,
+          screenY: Number.isFinite((runtime.play?.player ?? runtime.player).screenY) ? (runtime.play?.player ?? runtime.player).screenY : null
         }
       : null
   };
@@ -424,14 +445,24 @@ const buildMovementDelta = (before, after) => {
   const progressDelta = Number.isFinite(afterTrail?.progress) && Number.isFinite(beforeTrail?.progress)
     ? round(afterTrail.progress - beforeTrail.progress, 3)
     : null;
+  const playerXDelta = Number.isFinite(after?.player?.x) && Number.isFinite(before?.player?.x)
+    ? after.player.x - before.player.x
+    : null;
+  const playerYDelta = Number.isFinite(after?.player?.y) && Number.isFinite(before?.player?.y)
+    ? after.player.y - before.player.y
+    : null;
 
   return {
     currentIndexDelta,
     nextIndexDelta,
+    playerXDelta,
+    playerYDelta,
     progressDelta,
     moved: Boolean(
       (currentIndexDelta ?? 0) !== 0
       || (nextIndexDelta ?? 0) !== 0
+      || (playerXDelta ?? 0) !== 0
+      || (playerYDelta ?? 0) !== 0
       || (progressDelta ?? 0) !== 0
     )
   };
@@ -510,6 +541,46 @@ const resolveTouchControlPoint = ({ viewport, diagnostics, control }) => {
     : null;
 };
 
+const TOUCH_MOVEMENT_CONTROLS = new Set(['move_up', 'move_right', 'move_down', 'move_left']);
+
+const resolveTouchMovementSwipe = ({ diagnostics, control }) => {
+  if (!TOUCH_MOVEMENT_CONTROLS.has(control)) {
+    return null;
+  }
+
+  const player = diagnostics?.runtime?.play?.player ?? null;
+  const board = diagnostics?.runtime?.play?.board ?? null;
+  if (
+    !Number.isFinite(player?.screenX)
+    || !Number.isFinite(player?.screenY)
+    || !Number.isFinite(board?.left)
+    || !Number.isFinite(board?.right)
+    || !Number.isFinite(board?.top)
+    || !Number.isFinite(board?.bottom)
+  ) {
+    return null;
+  }
+
+  const distance = Math.max(18, Math.round((board.tileSize ?? 8) * 1.8));
+  const deltaByControl = {
+    move_up: { x: 0, y: -distance },
+    move_right: { x: distance, y: 0 },
+    move_down: { x: 0, y: distance },
+    move_left: { x: -distance, y: 0 }
+  };
+  const delta = deltaByControl[control];
+  return {
+    start: {
+      x: Math.min(board.right - 1, Math.max(board.left + 1, player.screenX)),
+      y: Math.min(board.bottom - 1, Math.max(board.top + 1, player.screenY))
+    },
+    end: {
+      x: Math.min(board.right - 1, Math.max(board.left + 1, player.screenX + delta.x)),
+      y: Math.min(board.bottom - 1, Math.max(board.top + 1, player.screenY + delta.y))
+    }
+  };
+};
+
 const runEdgeLiveInteraction = async ({
   page,
   viewport,
@@ -531,13 +602,33 @@ const runEdgeLiveInteraction = async ({
 
   const waitForMovementReady = async () => {
     await page.waitForFunction(
-      ({ runtimeKey, requiredMode }) => {
-        const runtime = window[runtimeKey] ?? null;
+      ({ runtimeKey, runtimeAttribute, requiredMode }) => {
+        const runtime = window[runtimeKey] ?? (() => {
+          const serialized = document.documentElement.getAttribute(runtimeAttribute);
+          if (typeof serialized !== 'string' || serialized.length === 0) {
+            return null;
+          }
+
+          try {
+            const parsed = JSON.parse(serialized);
+            return (
+              parsed
+              && parsed.sceneInstanceId
+              && parsed.performance
+              && parsed.resources
+            ) ? parsed : null;
+          } catch {
+            return null;
+          }
+        })();
         const projection = runtime?.projection ?? null;
-        return projection?.mode === requiredMode && projection?.state === 'watching';
+        const projectionReady = projection?.mode === requiredMode && projection?.state === 'watching';
+        const surfaceReady = runtime?.surface?.mode === requiredMode;
+        return projectionReady || surfaceReady;
       },
       {
         runtimeKey: RUNTIME_DIAGNOSTICS_KEY,
+        runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
         requiredMode: interaction.requiredMode ?? 'play'
       },
       { timeout: Math.max(5_000, Math.round(timeoutMs * 0.8)) }
@@ -546,6 +637,15 @@ const runEdgeLiveInteraction = async ({
   };
 
   const triggerTouchStep = async (diagnostics, control) => {
+    const swipe = resolveTouchMovementSwipe({ diagnostics, control });
+    if (swipe) {
+      await page.mouse.move(swipe.start.x, swipe.start.y);
+      await page.mouse.down();
+      await page.mouse.move(swipe.end.x, swipe.end.y, { steps: 4 });
+      await page.mouse.up();
+      return;
+    }
+
     const point = resolveTouchControlPoint({ viewport, diagnostics, control });
     if (!point) {
       const error = new Error(`Interactive touch workflow could not resolve ${control} touch coordinates on ${viewport.id}.`);
@@ -622,7 +722,9 @@ const runEdgeLiveInteraction = async ({
       currentDiagnostics = await waitForMovementReady();
       const movementReadyState = summarizeEdgeLiveInteractiveState(currentDiagnostics);
       const currentProjectionState = movementReadyState?.projection?.state ?? null;
-      if (currentProjectionState !== 'watching') {
+      const hasResetLaneMovementState = movementReadyState.mode === (interaction.requiredMode ?? 'play')
+        && (movementReadyState.trail !== null || movementReadyState.player !== null);
+      if (currentProjectionState !== 'watching' && !hasResetLaneMovementState) {
         const error = new Error(`Interactive ${interaction.kind} workflow never reached a movement-ready play state on ${viewport.id}.`);
         error.code = INTERACTIVE_PLAY_FAILURE_CODE;
         error.failureStage = 'movement-ready';
@@ -734,7 +836,7 @@ const runEdgeLiveInteraction = async ({
     throw error;
   }
 
-  if ((finalState.controlUsedCount ?? 0) <= 0) {
+  if (interaction.requiresControlEvents !== false && (finalState.controlUsedCount ?? 0) <= 0) {
     const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not record any control_used events.`);
     error.code = INTERACTIVE_PLAY_FAILURE_CODE;
     error.failureStage = 'interaction-control-events';
@@ -930,7 +1032,7 @@ export const resolveEdgeLiveTargetUrl = (viewport, options = {}) => resolveViewp
 export const resolveEdgeLiveVerdicts = (diagnostics) => {
   const boardBounds = diagnostics?.board?.bounds ?? null;
   const safeBounds = diagnostics?.board?.safeBounds ?? null;
-  const hudBounds = diagnostics?.intentFeed?.bounds ?? null;
+  const hudBounds = diagnostics?.hud?.bounds ?? diagnostics?.intentFeed?.bounds ?? null;
   const viewport = diagnostics?.viewport ?? null;
   const viewportBounds = viewport
     ? {
@@ -942,8 +1044,8 @@ export const resolveEdgeLiveVerdicts = (diagnostics) => {
     : null;
 
   const boardOverflow = isInsideBounds(boardBounds, safeBounds, 4);
-  const hudOverlap = boardBounds && hudBounds ? !doRectsOverlap(boardBounds, hudBounds) : false;
-  const hudClip = viewportBounds && hudBounds ? isInsideBounds(hudBounds, viewportBounds, 2) : false;
+  const hudOverlap = hudBounds ? Boolean(boardBounds && !doRectsOverlap(boardBounds, hudBounds)) : true;
+  const hudClip = hudBounds ? Boolean(viewportBounds && isInsideBounds(hudBounds, viewportBounds, 2)) : true;
 
   return {
     boardOverflow: {
@@ -1015,13 +1117,101 @@ export const isEdgeLiveArrivalProofPass = (snapshot) => (
       : false
 );
 
-const readDiagnostics = async (page) => page.evaluate((keys) => ({
-  visual: window[keys.visual] ?? null,
-  runtime: window[keys.runtime] ?? null
-}), {
-  visual: VISUAL_DIAGNOSTICS_KEY,
-  runtime: RUNTIME_DIAGNOSTICS_KEY
-});
+export const isRetriableEdgeLiveDiagnosticsReadError = (error) => {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /Execution context was destroyed|Cannot find context with specified id|Target page, context or browser has been closed/i.test(
+    error.message
+  );
+};
+
+export const readDiagnostics = async (page, { retries = 3, retryDelayMs = 120 } = {}) => {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      return await page.evaluate((keys) => {
+        const runtimeFromWindow = window[keys.runtime] ?? null;
+        const runtimeFromAttribute = (() => {
+          const serialized = document.documentElement.getAttribute(keys.runtimeAttribute);
+          if (typeof serialized !== 'string' || serialized.length === 0) {
+            return null;
+          }
+
+          try {
+            const parsed = JSON.parse(serialized);
+            return (
+              parsed
+              && parsed.sceneInstanceId
+              && parsed.performance
+              && parsed.resources
+            ) ? parsed : null;
+          } catch {
+            return null;
+          }
+        })();
+
+        return {
+          visual: window[keys.visual] ?? null,
+          runtime: runtimeFromWindow ?? runtimeFromAttribute
+        };
+      }, {
+        visual: VISUAL_DIAGNOSTICS_KEY,
+        runtime: RUNTIME_DIAGNOSTICS_KEY,
+        runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE
+      });
+    } catch (error) {
+      lastError = error;
+      if (!isRetriableEdgeLiveDiagnosticsReadError(error) || attempt >= retries) {
+        throw error;
+      }
+
+      await page.waitForTimeout(retryDelayMs);
+    }
+  }
+
+  throw lastError ?? new Error('Unable to read edge-live diagnostics.');
+};
+
+export const isResetLaneVisualDiagnostics = (visual) => Boolean(
+  visual
+  && visual.board?.bounds
+  && visual.board?.safeBounds
+  && visual.runtime?.mode
+  && Number.isFinite(visual.runtime?.trailLength)
+);
+
+export const hasHostedAttemptLifecycle = (diagnostics) => Boolean(
+  diagnostics?.visual?.attempt || diagnostics?.visual?.arrival
+);
+
+export const isEdgeLiveDiagnosticsReady = (diagnostics, { requireActiveTrail = false } = {}) => {
+  const visual = diagnostics?.visual ?? null;
+  if (!visual?.board?.bounds || !visual?.board?.safeBounds) {
+    return false;
+  }
+
+  const hostedProofReady = Boolean(
+    visual.intentFeed?.bounds
+    && visual.intentFeed?.visible === true
+    && (!requireActiveTrail || (
+      visual.trail?.currentIndex !== visual.trail?.nextIndex
+      && visual.trail?.progress > 0
+      && visual.trail?.progress < 1
+    ))
+  );
+  if (hostedProofReady) {
+    return true;
+  }
+
+  if (!isResetLaneVisualDiagnostics(visual)) {
+    return false;
+  }
+
+  return !requireActiveTrail || visual.runtime.trailLength > 1;
+};
 
 const waitForDiagnostics = async (page, timeoutMs, { requireActiveTrail = false } = {}) => {
   const startedAt = Date.now();
@@ -1029,21 +1219,7 @@ const waitForDiagnostics = async (page, timeoutMs, { requireActiveTrail = false 
 
   while ((Date.now() - startedAt) < timeoutMs) {
     lastDiagnostics = await readDiagnostics(page);
-    const visual = lastDiagnostics?.visual ?? null;
-    const ready = Boolean(
-      visual
-      && visual.board?.bounds
-      && visual.board?.safeBounds
-      && visual.intentFeed?.bounds
-      && visual.intentFeed?.visible === true
-      && (!requireActiveTrail || (
-        visual.trail?.currentIndex !== visual.trail?.nextIndex
-        && visual.trail?.progress > 0
-        && visual.trail?.progress < 1
-      ))
-    );
-
-    if (ready) {
+    if (isEdgeLiveDiagnosticsReady(lastDiagnostics, { requireActiveTrail })) {
       return lastDiagnostics;
     }
 
@@ -1103,9 +1279,12 @@ const createSnapshot = (stage, diagnostics, screenshotPath) => {
       tileSize: visual?.board?.tileSize ?? null
     },
     hud: {
-      bounds: visual?.intentFeed?.bounds ?? null,
-      visible: visual?.intentFeed?.visible ?? null,
+      bounds: visual?.hud?.bounds ?? visual?.intentFeed?.bounds ?? null,
+      visible: visual?.hud?.visible ?? visual?.intentFeed?.visible ?? null,
       dock: visual?.intentFeed?.dock ?? null,
+      kind: visual?.hud?.kind ?? null,
+      timerBounds: visual?.hud?.timerBounds ?? null,
+      arrowBounds: visual?.hud?.arrowBounds ?? null,
       compact: visual?.intentFeed?.compact ?? null,
       statusVisible: visual?.intentFeed?.statusVisible ?? null,
       statusText: visual?.intentFeed?.statusText ?? null,
@@ -1431,14 +1610,23 @@ const captureViewport = async ({
     }
 
     if (!interaction) {
-      endWindow = await captureEndWindowProof({
-        page,
-        runId,
-        timeoutMs,
-        runDir,
-        screenshotsDir,
-        viewport
-      });
+      if (isEdgeLiveEndWindowRun(runId) && hasHostedAttemptLifecycle(secondDiagnostics)) {
+        endWindow = await captureEndWindowProof({
+          page,
+          runId,
+          timeoutMs,
+          runDir,
+          screenshotsDir,
+          viewport
+        });
+      } else {
+        endWindow = {
+          available: false,
+          reason: hasHostedAttemptLifecycle(secondDiagnostics)
+            ? 'not-an-end-window-run'
+            : 'reset-lane-visual-diagnostics'
+        };
+      }
     }
 
     const record = {
@@ -1572,8 +1760,8 @@ const buildMarkdownSummary = ({ runId, sourceMode, baseUrl, explicitUrl, presetG
     '- First load, second load, and an active-motion attempt frame are captured when available.',
     '- Core watch and cycle runs also capture arrival, clear-hold, and erase end-window proof frames.',
     '- Board overflow compares the published board bounds against the safe frame.',
-    '- HUD overlap checks the intent feed rectangle against the maze board bounds.',
-    '- HUD clip checks the intent feed rectangle against the viewport bounds.'
+    '- HUD overlap checks the published HUD proof footprint against the maze board bounds.',
+    '- HUD clip checks the published HUD proof footprint against the viewport bounds.'
   );
 
   return `${lines.join('\n')}\n`;

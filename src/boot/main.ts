@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import '../styles/base.css';
+import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { phaserConfig } from './phaserConfig';
 
 const LOCALHOST_SW_RESET_KEY = 'mazer:localhost-sw-reset:v1';
@@ -45,11 +46,14 @@ const resetLocalhostServiceWorkers = async (): Promise<boolean> => {
 };
 
 const boot = async (): Promise<void> => {
+  markMazerBootStatus('boot-start');
+
   if (isLocalhostRuntime()) {
     const changed = await resetLocalhostServiceWorkers();
     const reloadAlreadyRequested = window.sessionStorage.getItem(LOCALHOST_SW_RESET_KEY) === '1';
 
     if (changed && !reloadAlreadyRequested) {
+      markMazerBootStatus('reload-requested');
       window.sessionStorage.setItem(LOCALHOST_SW_RESET_KEY, '1');
       window.location.reload();
       return;
@@ -58,7 +62,14 @@ const boot = async (): Promise<void> => {
     window.sessionStorage.removeItem(LOCALHOST_SW_RESET_KEY);
   }
 
-  void new Phaser.Game(phaserConfig);
+  markMazerBootStatus('game-creating');
+  const game = new Phaser.Game(phaserConfig);
+  attachMazerGameToWindow(game);
+  markMazerBootStatus('game-created');
 };
 
-void boot();
+void boot().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  markMazerBootStatus('error', message);
+  throw error;
+});

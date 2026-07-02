@@ -3,6 +3,7 @@ import type { TelemetryEvent, TelemetrySemanticSummary } from '../telemetry';
 import type { HumanInputTimingSnapshot } from '../input-human';
 
 export const MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY = '__MAZER_RUNTIME_DIAGNOSTICS__' as const;
+export const MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics' as const;
 
 export type MenuScenePerformanceMode = 'full' | 'throttled' | 'hidden';
 
@@ -66,11 +67,75 @@ export interface MenuSceneRuntimeFeedDiagnostics {
   lastChangedAt: number | null;
 }
 
+export interface MenuSceneGenerationDrawStageProgress {
+  complete: boolean | null;
+  progressPercent: number | null;
+  rowCount: number | null;
+  rowsRemaining: number | null;
+}
+
 export interface MenuSceneRuntimeDiagnostics {
   revision: number;
   sceneInstanceId: number;
   updatedAt: number;
   runtimeMs: number;
+  surface: {
+    mode: 'menu' | 'play';
+    overlay: string;
+  };
+  play?: {
+    board: {
+      bottom: number;
+      left: number;
+      right: number;
+      top: number;
+      size: number;
+      tileSize: number;
+    };
+    player: {
+      x: number;
+      y: number;
+      screenX: number;
+      screenY: number;
+    };
+  };
+  menuDemo?: {
+    phase: string | null;
+    cue: string | null;
+    pathCursor: number | null;
+    reachedGoal: boolean;
+    prerollSteps: number;
+    runnerMistakesEnabled: boolean | null;
+    route?: {
+      aiResetPathCursor: number | null;
+      canonicalPathLength: number;
+      cueCounts: Partial<Record<string, number>>;
+      routeLength: number;
+      segmentCount: number;
+      trailModeCounts: Partial<Record<string, number>>;
+      traverseMs: number;
+    };
+  };
+  generation?: {
+    drawStage?: {
+      batchSize: number | null;
+      batchUnit: string | null;
+      complete: boolean | null;
+      progressPercent: number | null;
+      rowCount: number | null;
+      rowsRemaining: number | null;
+      rowsVisible: number | null;
+      staged: boolean;
+    };
+    stageCursor: {
+      completionSignal: string | null;
+      currentStageId: number | null;
+      phase: string | null;
+      previousStageIds: number[];
+      processComplete: boolean | null;
+      remainingStageIds: number[];
+    };
+  };
   visibility: {
     hidden: boolean;
     changeCount: number;
@@ -117,6 +182,7 @@ export interface MenuSceneRuntimeDiagnostics {
       sceneShutdown: number;
       scaleResize: number;
       visibilityAttached: boolean;
+      legacyPlayFocusGuardAttached: boolean;
       installSurfaceAttached: boolean;
     };
     trailSegmentCount: number;
@@ -162,6 +228,10 @@ let fallbackSceneInstanceId = 0;
 
 const resolveRuntimeWindow = (): Window | undefined => (
   typeof window === 'undefined' ? undefined : window
+);
+
+const resolveRuntimeDocument = (): Document | undefined => (
+  typeof document === 'undefined' ? undefined : document
 );
 
 const normalizeFeedSummary = (value: string): string => value.trim().replace(/\s+/g, ' ');
@@ -359,6 +429,33 @@ export const summarizeMenuSceneRuntimeFeed = (options: {
   };
 };
 
+export const resolveMenuSceneGenerationDrawStageProgress = (options: {
+  rowCount?: number | null;
+  rowsVisible?: number | null;
+}): MenuSceneGenerationDrawStageProgress => {
+  const rowCount = Number.isFinite(options.rowCount)
+    ? Math.max(0, Math.trunc(options.rowCount ?? 0))
+    : null;
+  if (rowCount === null || rowCount <= 0 || !Number.isFinite(options.rowsVisible)) {
+    return {
+      complete: null,
+      progressPercent: null,
+      rowCount,
+      rowsRemaining: null
+    };
+  }
+
+  const rowsVisible = Math.min(rowCount, Math.max(0, Math.trunc(options.rowsVisible ?? 0)));
+  const rowsRemaining = Math.max(0, rowCount - rowsVisible);
+
+  return {
+    complete: rowsRemaining === 0,
+    progressPercent: Number(((rowsVisible / rowCount) * 100).toFixed(1)),
+    rowCount,
+    rowsRemaining
+  };
+};
+
 export const nextMenuSceneInstanceId = (): number => {
   const runtime = resolveRuntimeWindow();
   if (!runtime) {
@@ -370,20 +467,61 @@ export const nextMenuSceneInstanceId = (): number => {
   return runtime.__MAZER_MENU_SCENE_INSTANCE__;
 };
 
-export const publishMenuSceneRuntimeDiagnostics = (
+export const parseMenuSceneRuntimeDiagnosticsAttribute = (
+  value: string | null | undefined
+): MenuSceneRuntimeDiagnostics | null => {
+  if (typeof value !== 'string' || value.length === 0) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<MenuSceneRuntimeDiagnostics> | null;
+    if (
+      parsed
+      && parsed.sceneInstanceId
+      && parsed.performance
+      && parsed.resources
+    ) {
+      return parsed as MenuSceneRuntimeDiagnostics;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
+const publishMenuSceneRuntimeDiagnosticsInstallSurface = (
   diagnostics?: MenuSceneRuntimeDiagnostics
 ): void => {
-  const runtime = resolveRuntimeWindow();
-  if (!runtime) {
+  const runtimeDocument = resolveRuntimeDocument();
+  if (!runtimeDocument) {
     return;
   }
 
   if (!diagnostics) {
-    delete runtime[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY];
+    runtimeDocument.documentElement.removeAttribute(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE);
     return;
   }
 
-  runtime[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY] = diagnostics;
+  runtimeDocument.documentElement.setAttribute(
+    MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE,
+    JSON.stringify(diagnostics)
+  );
+};
+
+export const publishMenuSceneRuntimeDiagnostics = (
+  diagnostics?: MenuSceneRuntimeDiagnostics
+): void => {
+  const runtime = resolveRuntimeWindow();
+  if (runtime) {
+    if (!diagnostics) {
+      delete runtime[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY];
+    } else {
+      runtime[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY] = diagnostics;
+    }
+  }
+  publishMenuSceneRuntimeDiagnosticsInstallSurface(diagnostics);
 };
 
 export const clearMenuSceneRuntimeDiagnostics = (): void => {

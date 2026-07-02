@@ -96,9 +96,14 @@ describe('edge live check', () => {
 
   test('prefers explicit urls and derives board/hud verdicts from bounds', async () => {
     const {
+      hasHostedAttemptLifecycle,
+      isEdgeLiveDiagnosticsReady,
       isEdgeLiveArrivalProofCandidate,
       isEdgeLiveArrivalProofPass,
+      isRetriableEdgeLiveDiagnosticsReadError,
+      isResetLaneVisualDiagnostics,
       isRetriableEdgeLiveCaptureError,
+      readDiagnostics,
       resolveEdgeLiveAttemptKey,
       resolveEdgeLiveArrivalProofState,
       resolveEdgeLiveTargetUrl,
@@ -116,11 +121,78 @@ describe('edge live check', () => {
       url: 'https://preview.example.test/mazer'
     })).toBe('https://preview.example.test/mazer?runtimeDiagnostics=1');
 
+    const runtimeDiagnosticsFromAttribute = {
+      sceneInstanceId: 9,
+      performance: {
+        mode: 'full',
+        estimatedFps: 60
+      },
+      resources: {
+        listenerCount: 4
+      }
+    };
+    const originalWindow = globalThis.window;
+    const originalDocument = globalThis.document;
+    const diagnosticsFromDom = await readDiagnostics({
+      evaluate: async (pageFunction: (arg: {
+        visual: string;
+        runtime: string;
+        runtimeAttribute: string;
+      }) => unknown, arg: {
+        visual: string;
+        runtime: string;
+        runtimeAttribute: string;
+      }) => {
+        Object.defineProperty(globalThis, 'window', {
+          configurable: true,
+          value: {}
+        });
+        Object.defineProperty(globalThis, 'document', {
+          configurable: true,
+          value: {
+            documentElement: {
+              getAttribute: (name: string) => (
+                name === arg.runtimeAttribute
+                  ? JSON.stringify(runtimeDiagnosticsFromAttribute)
+                  : null
+              )
+            }
+          }
+        });
+
+        try {
+          return pageFunction(arg);
+        } finally {
+          Object.defineProperty(globalThis, 'window', {
+            configurable: true,
+            value: originalWindow
+          });
+          Object.defineProperty(globalThis, 'document', {
+            configurable: true,
+            value: originalDocument
+          });
+        }
+      },
+      waitForTimeout: async () => {}
+    });
+    expect(diagnosticsFromDom.runtime).toMatchObject({
+      sceneInstanceId: 9,
+      performance: {
+        mode: 'full'
+      },
+      resources: {
+        listenerCount: 4
+      }
+    });
+
     const verdicts = resolveEdgeLiveVerdicts({
       viewport: { width: 1440, height: 900 },
       board: {
         bounds: { left: 220, top: 160, right: 820, bottom: 760 },
         safeBounds: { left: 200, top: 140, right: 840, bottom: 780 }
+      },
+      hud: {
+        bounds: { left: 18, top: 18, right: 150, bottom: 44 }
       },
       intentFeed: {
         bounds: { left: 860, top: 160, right: 1240, bottom: 620 },
@@ -138,6 +210,9 @@ describe('edge live check', () => {
         bounds: { left: 220, top: 160, right: 820, bottom: 760 },
         safeBounds: { left: 200, top: 140, right: 840, bottom: 780 }
       },
+      hud: {
+        bounds: { left: 760, top: 240, right: 980, bottom: 700 }
+      },
       intentFeed: {
         bounds: { left: 760, top: 240, right: 980, bottom: 700 },
         visible: true
@@ -148,11 +223,50 @@ describe('edge live check', () => {
     expect(overlapVerdicts.hudOverlap.pass).toBe(false);
     expect(overlapVerdicts.hudClip.pass).toBe(true);
 
+    const resetLaneHudVerdicts = resolveEdgeLiveVerdicts({
+      viewport: { width: 1280, height: 720 },
+      board: {
+        bounds: { left: 392, top: 52, right: 888, bottom: 548 },
+        safeBounds: { left: 0, top: 0, right: 1280, bottom: 720 }
+      },
+      hud: {
+        bounds: { left: 14, top: 14, right: 1260, bottom: 40 }
+      }
+    });
+
+    expect(resetLaneHudVerdicts.hudOverlap.pass).toBe(true);
+    expect(resetLaneHudVerdicts.hudClip.pass).toBe(true);
+
+    const resetLaneDiagnostics = {
+      visual: {
+        board: {
+          bounds: { left: 220, top: 160, right: 820, bottom: 760 },
+          safeBounds: { left: 200, top: 140, right: 840, bottom: 780 }
+        },
+        runtime: {
+          mode: 'menu',
+          trailLength: 12
+        }
+      }
+    };
+
+    expect(isResetLaneVisualDiagnostics(resetLaneDiagnostics.visual)).toBe(true);
+    expect(isEdgeLiveDiagnosticsReady(resetLaneDiagnostics)).toBe(true);
+    expect(isEdgeLiveDiagnosticsReady(resetLaneDiagnostics, { requireActiveTrail: true })).toBe(true);
+    expect(hasHostedAttemptLifecycle(resetLaneDiagnostics)).toBe(false);
+    expect(resolveEdgeLiveVerdicts(resetLaneDiagnostics.visual)).toMatchObject({
+      boardOverflow: { pass: true },
+      hudOverlap: { pass: true },
+      hudClip: { pass: true }
+    });
+
     expect(isEdgeLiveEndWindowRun('core-only-watch')).toBe(true);
     expect(isEdgeLiveEndWindowRun('core-only-cycle')).toBe(true);
     expect(isEdgeLiveEndWindowRun('core-only-play')).toBe(false);
     expect(isEdgeLiveEndWindowRun('core-only-watch-recovery')).toBe(true);
     expect(isEdgeLiveEndWindowRun('core-only-play-recovery')).toBe(false);
+    expect(isRetriableEdgeLiveDiagnosticsReadError(new Error('Execution context was destroyed, most likely because of a navigation'))).toBe(true);
+    expect(isRetriableEdgeLiveDiagnosticsReadError(new Error('deterministic hard failure'))).toBe(false);
     expect(isRetriableEdgeLiveCaptureError(new Error('Timed out waiting for a hosted watch arrival frame before clear-hold.'))).toBe(true);
     expect(isRetriableEdgeLiveCaptureError(new Error('Timed out waiting for clear-hold after hosted watch arrival.'))).toBe(true);
     expect(isRetriableEdgeLiveCaptureError(new Error('Timed out waiting for erase-wipe after hosted watch clear-hold.'))).toBe(true);
@@ -221,6 +335,25 @@ describe('edge live check', () => {
         actorInsideExitRegion: false
       }
     })).toBe(false);
+
+    let readAttempts = 0;
+    const fakePage = {
+      evaluate: async () => {
+        readAttempts += 1;
+        if (readAttempts === 1) {
+          throw new Error('Execution context was destroyed, most likely because of a navigation');
+        }
+
+        return {
+          visual: { board: { bounds: true, safeBounds: true }, runtime: { mode: 'menu', trailLength: 2 } },
+          runtime: { mode: 'menu' }
+        };
+      },
+      waitForTimeout: async () => {}
+    };
+    const diagnosticsAfterRetry = await readDiagnostics(fakePage, { retries: 2, retryDelayMs: 0 });
+    expect(readAttempts).toBe(2);
+    expect(diagnosticsAfterRetry.visual.runtime.mode).toBe('menu');
   }, 15_000);
 
   test('resolves proof-surface workflows for the reduced projection routes', async () => {
@@ -383,6 +516,61 @@ describe('edge live check', () => {
       },
       trail: {
         nextIndex: 10
+      }
+    });
+
+    expect(summarizeEdgeLiveInteractiveState({
+      runtime: {
+        surface: {
+          mode: 'play',
+          overlay: 'none'
+        },
+        telemetry: {
+          summary: {
+            eventCounts: {}
+          }
+        },
+        player: {
+          x: 2,
+          y: 3
+        }
+      }
+    })).toMatchObject({
+      mode: 'play',
+      projection: null,
+      player: {
+        x: 2,
+        y: 3
+      }
+    });
+
+    expect(summarizeEdgeLiveInteractiveState({
+      runtime: {
+        surface: {
+          mode: 'play',
+          overlay: 'none'
+        },
+        play: {
+          player: {
+            x: 4,
+            y: 5,
+            screenX: 144,
+            screenY: 176
+          }
+        },
+        telemetry: {
+          summary: {
+            eventCounts: {}
+          }
+        }
+      }
+    })).toMatchObject({
+      mode: 'play',
+      player: {
+        x: 4,
+        y: 5,
+        screenX: 144,
+        screenY: 176
       }
     });
   }, 15_000);

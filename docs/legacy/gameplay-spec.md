@@ -40,10 +40,16 @@ Generation is tick-scheduled by `AMazerGameState::Tick` after `_LevelBuildingLog
   - use local path-adjacency validation to avoid over-dense routing
   - if blocked, backtrack to prior path tiles and retry
 - Longest discovered path length updates `_EndTile`.
+- Current web status:
+  - active play now uses a checkpoint path-builder in `src/legacy-runtime/legacyMaze.ts` rather than the earlier DFS perfect-maze topology
+  - the browser builder keeps deterministic seeded randomness and does not claim exact `std::rand` / `std::srand(time(0))` roll parity
+  - exact per-tick process yields are represented by lifecycle contracts and diagnostics, not by pausing the one-shot browser build internally
 
 ## Shortcuts
 - Shortcut budget scales with maze size:
   - `_ShortcutCount = _Scale * _ShortcutCountModifier`
+- Shortcut attempts pick one random entry from `_WallArray`, then remove that entry from the array whether the selected wall opens or is rejected.
+- `_WallArray` is populated from neighbors of path tiles during `CreatePath()` and can contain duplicate or stale entries.
 - Candidate shortcut tile must currently be wall and have full 4-neighbor context.
 - A wall becomes a path only when it bridges two opposite existing path corridors:
   - vertical wall pair + horizontal path pair, or

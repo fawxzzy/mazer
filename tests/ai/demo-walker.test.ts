@@ -2,11 +2,128 @@ import { describe, expect, test } from 'vitest';
 
 import {
   advanceDemoWalker,
+  collectDemoWalkerRouteDiagnostics,
   createDemoWalkerState,
   resolveDemoWalkerViewFrame
 } from '../../src/domain/ai';
 import { legacyTuning } from '../../src/config/tuning';
-import { generateMaze } from '../../src/domain/maze';
+import {
+  generateMaze,
+  isTileFloor,
+  resolveDirectionBetween,
+  TILE_END,
+  TILE_FLOOR,
+  TILE_PATH,
+  type MazeEpisode
+} from '../../src/domain/maze';
+
+const createSingleSpurEpisode = (): MazeEpisode => {
+  const tiles = new Uint8Array(35);
+  const canonicalPath = [15, 16, 17, 18, 19];
+  for (const index of canonicalPath) {
+    tiles[index] |= TILE_FLOOR | TILE_PATH;
+  }
+  tiles[10] |= TILE_FLOOR;
+  tiles[19] |= TILE_END;
+
+  return {
+    accepted: true,
+    difficulty: 'standard',
+    difficultyScore: 0,
+    family: 'classic',
+    generationTrace: {
+      rootTileIndex: 15,
+      uniqueTileCount: 6,
+      steps: [{ phase: 'seed', tileIndices: [15] }]
+    },
+    metrics: {
+      solutionLength: canonicalPath.length,
+      deadEnds: 2,
+      junctions: 1,
+      branchDensity: 1 / 6,
+      straightness: 1,
+      coverage: canonicalPath.length / 6
+    },
+    placementStrategy: 'farthest-pair',
+    presentationPreset: 'classic',
+    raster: {
+      width: 7,
+      height: 5,
+      tiles,
+      startIndex: 15,
+      endIndex: 19,
+      pathIndices: Uint32Array.from(canonicalPath)
+    },
+    routeMotifs: {
+      falseShortcutBranches: 0,
+      nearGoalBranches: 0,
+      hubJunctions: 1,
+      chokeCorridors: 0,
+      loopDetours: 0
+    },
+    seed: 7,
+    shortcutsCreated: 0,
+    size: 'small'
+  };
+};
+
+const createVisitedUndoEpisode = (): MazeEpisode => {
+  const width = 7;
+  const height = 7;
+  const tiles = new Uint8Array(width * height);
+  const floorIndices = [
+    0, 2, 8, 10, 13, 15, 16, 17, 19, 20,
+    22, 23, 25, 26, 29, 30, 31, 32, 45, 47
+  ];
+  const canonicalPath = [22, 29, 30, 31, 32, 25, 26];
+  for (const index of floorIndices) {
+    tiles[index] |= TILE_FLOOR;
+  }
+  for (const index of canonicalPath) {
+    tiles[index] |= TILE_PATH;
+  }
+  tiles[26] |= TILE_END;
+
+  return {
+    accepted: true,
+    difficulty: 'standard',
+    difficultyScore: 0,
+    family: 'classic',
+    generationTrace: {
+      rootTileIndex: 22,
+      uniqueTileCount: floorIndices.length,
+      steps: [{ phase: 'seed', tileIndices: [22] }]
+    },
+    metrics: {
+      solutionLength: canonicalPath.length,
+      deadEnds: 4,
+      junctions: 4,
+      branchDensity: 4 / floorIndices.length,
+      straightness: 0.5,
+      coverage: canonicalPath.length / floorIndices.length
+    },
+    placementStrategy: 'farthest-pair',
+    presentationPreset: 'classic',
+    raster: {
+      width,
+      height,
+      tiles,
+      startIndex: 22,
+      endIndex: 26,
+      pathIndices: Uint32Array.from(canonicalPath)
+    },
+    routeMotifs: {
+      falseShortcutBranches: 2,
+      nearGoalBranches: 1,
+      hubJunctions: 2,
+      chokeCorridors: 1,
+      loopDetours: 1
+    },
+    seed: 17_474,
+    shortcutsCreated: 0,
+    size: 'small'
+  };
+};
 
 describe('demo walker', () => {
   test('steps forward along the validated A* solution path', () => {
@@ -242,4 +359,244 @@ describe('demo walker', () => {
     expect(lateFrame.canonicalCursor).toBeLessThanOrEqual(episode.raster.pathIndices.length - 1);
     expect(firstFrame.canonicalCursor).toBeGreaterThanOrEqual(0);
   });
+
+  test('does not commit a wrong turn into a spur that legacy AiTilePathCheck would reject', () => {
+    const episode = createSingleSpurEpisode();
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    let state = createDemoWalkerState(episode, config);
+    const maxSteps = Math.max(16, episode.raster.pathIndices.length * 6);
+    for (let step = 0; step < maxSteps; step += 1) {
+      state = advanceDemoWalker(episode, state, config).state;
+    }
+
+    expect(state.telemetry.wrongBranchCount).toBe(0);
+    expect(state.telemetry.backtrackCount).toBe(0);
+    expect(state.trailSteps.some((trailStep) => trailStep.index === 10)).toBe(false);
+  });
+
+  test('surfaces branch, dead-end, backtrack, and reacquire cues on the single legacy AI timer', () => {
+    const episode = generateMaze({
+      scale: 50,
+      seed: 902,
+      size: 'large',
+      family: 'split-flow',
+      checkPointModifier: 0.35,
+      shortcutCountModifier: 0.18
+    });
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    let state = createDemoWalkerState(episode, config);
+    let branchCommitAdvance: ReturnType<typeof advanceDemoWalker> | null = null;
+    let deadEndAdvance: ReturnType<typeof advanceDemoWalker> | null = null;
+    let backtrackAdvance: ReturnType<typeof advanceDemoWalker> | null = null;
+    let reacquireAdvance: ReturnType<typeof advanceDemoWalker> | null = null;
+    const maxSteps = Math.max(256, episode.raster.pathIndices.length * 8);
+
+    for (let step = 0; step < maxSteps; step += 1) {
+      const previousState = state;
+      const advance = advanceDemoWalker(episode, state, config);
+
+      if (
+        branchCommitAdvance === null
+        && advance.state.cue === 'anticipate'
+        && advance.state.canonicalCursor === previousState.canonicalCursor
+      ) {
+        branchCommitAdvance = advance;
+      }
+      if (deadEndAdvance === null && advance.state.cue === 'dead-end') {
+        deadEndAdvance = advance;
+      }
+      if (backtrackAdvance === null && advance.state.cue === 'backtrack') {
+        backtrackAdvance = advance;
+      }
+      if (reacquireAdvance === null && advance.state.cue === 'reacquire') {
+        reacquireAdvance = advance;
+      }
+
+      state = advance.state;
+      if (branchCommitAdvance && deadEndAdvance && backtrackAdvance && reacquireAdvance) {
+        break;
+      }
+    }
+
+    expect(branchCommitAdvance).not.toBeNull();
+    expect(deadEndAdvance).not.toBeNull();
+    expect(backtrackAdvance).not.toBeNull();
+    expect(reacquireAdvance).not.toBeNull();
+    expect(branchCommitAdvance?.delayMs).toBe(config.cadence.exploreStepMs);
+    expect(deadEndAdvance?.delayMs).toBe(config.cadence.exploreStepMs);
+    expect(backtrackAdvance?.delayMs).toBe(config.cadence.exploreStepMs);
+    expect(reacquireAdvance?.delayMs).toBe(config.cadence.exploreStepMs);
+  });
+
+  test('summarizes humanized menu AI route shape for diagnostics', () => {
+    const episode = generateMaze({
+      scale: 50,
+      seed: 902,
+      size: 'large',
+      family: 'split-flow',
+      checkPointModifier: 0.35,
+      shortcutCountModifier: 0.18
+    });
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
+
+    expect(diagnostics.routeLength).toBeGreaterThan(episode.raster.pathIndices.length);
+    expect(diagnostics.routeLength).toBeLessThanOrEqual(episode.raster.pathIndices.length * 4);
+    expect(diagnostics.segmentCount).toBe(diagnostics.routeLength - 1);
+    expect(diagnostics.canonicalPathLength).toBe(episode.raster.pathIndices.length);
+    expect(diagnostics.traverseMs).toBeGreaterThan(0);
+    expect(diagnostics.traverseMs).toBeLessThan(60_000);
+    expect(diagnostics.aiResetPathCursor).not.toBeNull();
+    expect(diagnostics.telemetry.wrongBranchCount).toBeGreaterThan(0);
+    expect(diagnostics.telemetry.backtrackCount).toBeGreaterThan(0);
+    expect(diagnostics.telemetry.recoveryCount).toBeGreaterThan(0);
+    // The representative proof route covers recovery, but not the rarer legacy visited-undo branch.
+    expect(diagnostics.telemetry.visitedUndoCount).toBe(0);
+    expect(diagnostics.cueCounts['dead-end']).toBeGreaterThan(0);
+    expect(diagnostics.cueCounts.backtrack).toBeGreaterThan(0);
+    expect(diagnostics.cueCounts.reacquire).toBeGreaterThan(0);
+    expect(diagnostics.trailModeCounts.backtrack).toBeGreaterThan(0);
+  });
+
+  test('exercises the legacy visited-undo side effect while backtracking toward a potential target', () => {
+    const episode = createVisitedUndoEpisode();
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
+
+    expect(diagnostics.telemetry.wrongBranchCount).toBeGreaterThan(0);
+    expect(diagnostics.telemetry.backtrackCount).toBeGreaterThan(0);
+    expect(diagnostics.telemetry.recoveryCount).toBeGreaterThan(0);
+    expect(diagnostics.telemetry.visitedUndoCount).toBe(1);
+    expect(diagnostics.routeLength).toBeGreaterThan(episode.raster.pathIndices.length);
+    expect(diagnostics.routeLength).toBeLessThanOrEqual(episode.raster.pathIndices.length * 4);
+    expect(diagnostics.aiResetPathCursor).not.toBeNull();
+  });
+
+  test('view frames expose recovery cues during deterministic wrong-turn playback', () => {
+    const episode = generateMaze({
+      scale: 50,
+      seed: 902,
+      size: 'large',
+      family: 'split-flow',
+      checkPointModifier: 0.35,
+      shortcutCountModifier: 0.18
+    });
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    let state = createDemoWalkerState(episode, config);
+    let elapsedMs = config.cadence.spawnHoldMs;
+    const seenCues = new Set<string>();
+    const maxSteps = Math.max(256, episode.raster.pathIndices.length * 8);
+
+    for (let step = 0; step < maxSteps; step += 1) {
+      const advance = advanceDemoWalker(episode, state, config);
+      const sampleElapsedMs = elapsedMs + Math.max(1, Math.floor(advance.delayMs / 2));
+      const frame = resolveDemoWalkerViewFrame(episode, sampleElapsedMs, config, 8);
+
+      seenCues.add(frame.cue);
+      elapsedMs += advance.delayMs;
+      state = advance.state;
+
+      if (seenCues.has('dead-end') && seenCues.has('backtrack') && seenCues.has('reacquire')) {
+        break;
+      }
+    }
+
+    expect(seenCues.has('dead-end')).toBe(true);
+    expect(seenCues.has('backtrack')).toBe(true);
+    expect(seenCues.has('reacquire')).toBe(true);
+  });
+
+  test('humanized menu AI route never emits invalid jumps while exploring wrong branches', () => {
+    const cases = [
+      { scale: 50, seed: 902, size: 'large', family: 'split-flow', shortcutCountModifier: 0.18 },
+      { scale: 50, seed: 3749, size: 'medium', family: 'classic', shortcutCountModifier: 0.13 },
+      { scale: 75, seed: 8_811, size: 'huge', family: 'braided', shortcutCountModifier: 0.24 }
+    ] as const;
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    for (const testCase of cases) {
+      const episode = generateMaze({
+        scale: testCase.scale,
+        seed: testCase.seed,
+        size: testCase.size,
+        family: testCase.family,
+        checkPointModifier: 0.35,
+        shortcutCountModifier: testCase.shortcutCountModifier
+      });
+      let state = createDemoWalkerState(episode, config);
+      let sawWrongBranchOrRecovery = false;
+      const maxSteps = Math.max(256, episode.raster.pathIndices.length * 8);
+
+      for (let step = 0; step < maxSteps; step += 1) {
+        const previousIndex = state.currentIndex;
+        const previousPhase = state.phase;
+        const advance = advanceDemoWalker(episode, state, config);
+        state = advance.state;
+
+        expect(isTileFloor(episode.raster.tiles, state.currentIndex)).toBe(true);
+        if (previousPhase === 'explore' && state.phase === 'explore') {
+          const direction = resolveDirectionBetween(previousIndex, state.currentIndex, episode.raster.width);
+          if (direction === null) {
+            throw new Error(
+              `Non-adjacent demo AI move for seed=${testCase.seed} step=${step}`
+              + ` from=${previousIndex} to=${state.currentIndex}`
+              + ` cue=${state.cue} cursor=${state.pathCursor} canonical=${state.canonicalCursor}`
+            );
+          }
+        }
+
+        sawWrongBranchOrRecovery = sawWrongBranchOrRecovery
+          || state.telemetry.wrongBranchCount > 0
+          || state.telemetry.backtrackCount > 0
+          || state.telemetry.recoveryCount > 0;
+
+        if (advance.shouldRegenerateMaze || state.phase === 'goal-hold') {
+          break;
+        }
+      }
+
+      expect(sawWrongBranchOrRecovery).toBe(true);
+    }
+  }, 15_000);
 });

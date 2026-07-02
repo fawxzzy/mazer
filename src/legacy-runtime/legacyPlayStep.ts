@@ -1,0 +1,175 @@
+import { isWalkableTile, movePoint, type LegacyMazeSnapshot, type LegacyPoint } from './legacyMaze';
+
+export const LEGACY_PLAY_TRAIL_FADE_TAIL = 16;
+export const LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS = 50;
+export const LEGACY_POINTER_MOVE_MIN_DRAG_PX = 18;
+export const LEGACY_POINTER_DIAGONAL_RATIO = 0.55;
+
+export interface LegacyPlayMoveFlags {
+  down: boolean;
+  left: boolean;
+  right: boolean;
+  up: boolean;
+}
+
+export interface LegacyPlayStepInput {
+  deltaX: number;
+  deltaY: number;
+  maze: LegacyMazeSnapshot;
+  player: LegacyPoint;
+  toggleTrailFade: boolean;
+  trail: LegacyPoint[];
+  trailFadeTail?: number;
+}
+
+export interface LegacyPlayStepResult {
+  moved: boolean;
+  player: LegacyPoint;
+  reachedGoal: boolean;
+  trail: LegacyPoint[];
+}
+
+export interface LegacyPointerMoveInput {
+  boardBounds?: {
+    bottom: number;
+    left: number;
+    right: number;
+    top: number;
+  };
+  endX: number;
+  endY: number;
+  playerScreenX: number;
+  playerScreenY: number;
+  startX: number;
+  startY: number;
+  tileSize: number;
+}
+
+const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
+const normalizeDelta = (delta: number): number => Math.sign(delta);
+const resolveScreenDeltaMoveVector = (
+  deltaX: number,
+  deltaY: number
+): { deltaX: number; deltaY: number } => {
+  const absX = Math.abs(deltaX);
+  const absY = Math.abs(deltaY);
+  if (absX < 1 && absY < 1) {
+    return { deltaX: 0, deltaY: 0 };
+  }
+
+  const majorAxis = Math.max(absX, absY);
+  const minorAxis = Math.min(absX, absY);
+  const keepDiagonal = minorAxis >= majorAxis * LEGACY_POINTER_DIAGONAL_RATIO;
+
+  return {
+    deltaX: keepDiagonal || absX >= absY ? Math.sign(deltaX) : 0,
+    deltaY: keepDiagonal || absY > absX ? Math.sign(deltaY) : 0
+  };
+};
+
+export const createLegacyPlayMoveFlags = (): LegacyPlayMoveFlags => ({
+  down: false,
+  left: false,
+  right: false,
+  up: false
+});
+
+export const resolveLegacyPlayMoveVector = (
+  flags: LegacyPlayMoveFlags
+): { deltaX: number; deltaY: number } => ({
+  deltaX: (flags.right ? 1 : 0) - (flags.left ? 1 : 0),
+  deltaY: (flags.down ? 1 : 0) - (flags.up ? 1 : 0)
+});
+
+export const resolveLegacyPointerMoveVector = ({
+  boardBounds,
+  endX,
+  endY,
+  playerScreenX,
+  playerScreenY,
+  startX,
+  startY,
+  tileSize
+}: LegacyPointerMoveInput): { deltaX: number; deltaY: number } => {
+  if (boardBounds && !isPointInsideLegacyBoardBounds(startX, startY, boardBounds)) {
+    return { deltaX: 0, deltaY: 0 };
+  }
+
+  const dragDeltaX = endX - startX;
+  const dragDeltaY = endY - startY;
+  const dragDistance = Math.hypot(dragDeltaX, dragDeltaY);
+  const minimumDragDistance = Math.max(LEGACY_POINTER_MOVE_MIN_DRAG_PX, tileSize * 0.35);
+
+  if (dragDistance >= minimumDragDistance) {
+    return resolveScreenDeltaMoveVector(dragDeltaX, dragDeltaY);
+  }
+
+  return resolveScreenDeltaMoveVector(endX - playerScreenX, endY - playerScreenY);
+};
+
+export const isPointInsideLegacyBoardBounds = (
+  x: number,
+  y: number,
+  bounds: { bottom: number; left: number; right: number; top: number }
+): boolean => x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom;
+
+export const resolveLegacyPlayCollisionDelta = (
+  maze: LegacyMazeSnapshot,
+  player: LegacyPoint,
+  deltaX: number,
+  deltaY: number
+): { deltaX: number; deltaY: number } => {
+  const normalizedDeltaX = normalizeDelta(deltaX);
+  const normalizedDeltaY = normalizeDelta(deltaY);
+  const gatedDeltaX = normalizedDeltaX !== 0 && isWalkableTile(maze, movePoint(player, normalizedDeltaX, 0))
+    ? normalizedDeltaX
+    : 0;
+  const gatedDeltaY = normalizedDeltaY !== 0 && isWalkableTile(maze, movePoint(player, 0, normalizedDeltaY))
+    ? normalizedDeltaY
+    : 0;
+
+  if (gatedDeltaX === 0 && gatedDeltaY === 0) {
+    return { deltaX: 0, deltaY: 0 };
+  }
+
+  const finalTarget = movePoint(player, gatedDeltaX, gatedDeltaY);
+  if (!isWalkableTile(maze, finalTarget)) {
+    return { deltaX: 0, deltaY: 0 };
+  }
+
+  return { deltaX: gatedDeltaX, deltaY: gatedDeltaY };
+};
+
+export const advanceLegacyPlayStep = ({
+  deltaX,
+  deltaY,
+  maze,
+  player,
+  toggleTrailFade,
+  trail,
+  trailFadeTail = LEGACY_PLAY_TRAIL_FADE_TAIL
+}: LegacyPlayStepInput): LegacyPlayStepResult => {
+  const gatedDelta = resolveLegacyPlayCollisionDelta(maze, player, deltaX, deltaY);
+  if (gatedDelta.deltaX === 0 && gatedDelta.deltaY === 0) {
+    return {
+      moved: false,
+      player: copyPoint(player),
+      reachedGoal: false,
+      trail: trail.map(copyPoint)
+    };
+  }
+
+  const next = movePoint(player, gatedDelta.deltaX, gatedDelta.deltaY);
+  const nextPlayer = copyPoint(next);
+  const nextTrail = [...trail.map(copyPoint), copyPoint(nextPlayer)];
+  const boundedTrail = toggleTrailFade && nextTrail.length > trailFadeTail
+    ? nextTrail.slice(nextTrail.length - trailFadeTail)
+    : nextTrail;
+
+  return {
+    moved: true,
+    player: nextPlayer,
+    reachedGoal: nextPlayer.x === maze.goal.x && nextPlayer.y === maze.goal.y,
+    trail: boundedTrail
+  };
+};

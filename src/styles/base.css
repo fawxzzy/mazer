@@ -19,6 +19,9 @@ html,
 body {
   margin: 0;
   overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
 }
 
 body {
@@ -41,4 +44,6 @@ canvas {
   height: 100% !important;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  touch-action: none;
+  user-select: none;
 }

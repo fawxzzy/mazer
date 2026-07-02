@@ -28,6 +28,7 @@ import {
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
 const RUNTIME_DIAGNOSTICS_KEY = '__MAZER_RUNTIME_DIAGNOSTICS__';
+const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';
 const PROOF_SURFACE_SIGNAL_KEY = '__MAZER_PROOF_SURFACES__';
 const DEFAULT_ARTIFACT_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-runtime-observe');
 const DEFAULT_CAPTURE_TIMEOUT_MS = 30_000;
@@ -216,8 +217,25 @@ const createProofSurfaceObserveDiagnostics = (proofSurface) => {
   };
 };
 
-const readObserveDiagnostics = async (page) => page.evaluate(({ runtimeKey, proofKey }) => {
-  const runtimeDiagnostics = window[runtimeKey];
+const readObserveDiagnostics = async (page) => page.evaluate(({ runtimeKey, runtimeAttribute, proofKey }) => {
+  const runtimeDiagnostics = window[runtimeKey] ?? (() => {
+    const serialized = document.documentElement.getAttribute(runtimeAttribute);
+    if (typeof serialized !== 'string' || serialized.length === 0) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(serialized);
+      return (
+        parsed
+        && parsed.sceneInstanceId
+        && parsed.performance
+        && parsed.resources
+      ) ? parsed : null;
+    } catch {
+      return null;
+    }
+  })();
   if (
     runtimeDiagnostics
     && runtimeDiagnostics.sceneInstanceId
@@ -300,12 +318,30 @@ const readObserveDiagnostics = async (page) => page.evaluate(({ runtimeKey, proo
   return null;
 }, {
   runtimeKey: RUNTIME_DIAGNOSTICS_KEY,
+  runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
   proofKey: PROOF_SURFACE_SIGNAL_KEY
 });
 
 const waitForRuntimeDiagnostics = async (page, timeoutMs) => {
-  await page.waitForFunction(({ runtimeKey, proofKey }) => {
-    const runtimeDiagnostics = window[runtimeKey];
+  await page.waitForFunction(({ runtimeKey, runtimeAttribute, proofKey }) => {
+    const runtimeDiagnostics = window[runtimeKey] ?? (() => {
+      const serialized = document.documentElement.getAttribute(runtimeAttribute);
+      if (typeof serialized !== 'string' || serialized.length === 0) {
+        return null;
+      }
+
+      try {
+        const parsed = JSON.parse(serialized);
+        return (
+          parsed
+          && parsed.sceneInstanceId
+          && parsed.performance
+          && parsed.resources
+        ) ? parsed : null;
+      } catch {
+        return null;
+      }
+    })();
     if (
       runtimeDiagnostics
       && runtimeDiagnostics.sceneInstanceId
@@ -319,6 +355,7 @@ const waitForRuntimeDiagnostics = async (page, timeoutMs) => {
     return Boolean(proofSurface?.ready);
   }, {
     runtimeKey: RUNTIME_DIAGNOSTICS_KEY,
+    runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
     proofKey: PROOF_SURFACE_SIGNAL_KEY
   }, { timeout: timeoutMs });
 };

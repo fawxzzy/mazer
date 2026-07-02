@@ -4,7 +4,18 @@ import { TILE_END, TILE_FLOOR, TILE_PATH, createGrid, indexFromCoordinates, xFro
 import { legacyTuning } from '../config/tuning';
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 
-export const LEGACY_MENU_SNAPSHOT_PREROLL_STEPS = 56;
+export const LEGACY_MENU_SNAPSHOT_PREROLL_STEPS = 72;
+export const LEGACY_MENU_SNAPSHOT_CADENCE = {
+  spawnHoldMs: 220,
+  exploreStepMs: 104,
+  backtrackStepMs: 104,
+  decisionPauseMs: 104,
+  anticipationStepMs: 104,
+  branchCommitMs: 104,
+  branchResumeMs: 104,
+  goalHoldMs: 1180,
+  resetHoldMs: 340
+} as const;
 
 const pointToIndex = (point: LegacyPoint, width: number): number => indexFromCoordinates(point.x, point.y, width);
 
@@ -48,9 +59,12 @@ export const createLegacyMenuSnapshotDemoWalkerConfig = (seed: number): DemoWalk
 
   return {
     ...baseConfig,
+    cadence: {
+      ...baseConfig.cadence,
+      ...LEGACY_MENU_SNAPSHOT_CADENCE
+    },
     behavior: {
       ...baseConfig.behavior,
-      enableRunnerMistakes: false,
       prerollSteps: Math.max(
         baseConfig.behavior.prerollSteps ?? 0,
         LEGACY_MENU_SNAPSHOT_PREROLL_STEPS
@@ -116,7 +130,7 @@ export const createLegacyDemoWalkerEpisode = (maze: LegacyMazeSnapshot): MazeEpi
       chokeCorridors: 0,
       loopDetours: 0
     },
-    shortcutsCreated: 0,
+    shortcutsCreated: maze.shortcutsCreated ?? 0,
     accepted: true,
     difficulty: inferLegacyMazeDifficulty(maze),
     difficultyScore: 0,

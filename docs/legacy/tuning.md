@@ -7,6 +7,7 @@ This pass rechecked the rebuilt maze/domain code against the read-only Unreal so
 - Legacy reset scheduler: `Mazer/Source/Mazer/Private/MazerGameState.cpp`
 - Legacy menu/demo AI: `Mazer/Source/Mazer/Private/Player/MazerPlayer.cpp`
 - Legacy shared defaults: `Mazer/Source/Mazer/Public/MazerGameInstance.h`
+- Legacy Blueprint defaults recovery attempt: `Mazer/Content/Game/GI_MazerGameInstance.uasset`
 - Rebuild tuning source: `src/config/tuning.ts`
 
 ## Exact-from-legacy behavior now reflected
@@ -16,8 +17,15 @@ This pass rechecked the rebuilt maze/domain code against the read-only Unreal so
 - Checkpoint count remains `_Scale + (_Scale * _CheckPointModifier)`.
 - Shortcut budget remains `_Scale * _ShortcutCountModifier`.
 - Shortcut carving still only runs when `scale > 35`.
-- The rebuilt `wallIndices` now mirror the legacy `_WallArray` lifecycle:
-  only the selected wall-array entry is removed during shortcut carving, so duplicate references to the same tile can remain behind as stale wall entries.
+- Generated active-play snapshots now use a source-shaped checkpoint path-builder instead of the earlier DFS perfect-maze owner:
+  - `CreateGrid` equivalent: floor grid plus non-floor border
+  - `MapPath` equivalent: checkpoint selection, mixed next-tile choice, local path-neighbor validation, backtracking, and longest-path end selection
+  - `CreatePath` equivalent: path-neighbor wall-array collection
+- Generated active-play snapshots now apply the restored `CreateShortCuts` bridge condition:
+  the selected tile must still be a wall, all four cardinal neighbors must exist, one axis must have opposite walkable path corridors, and the perpendicular axis must remain walled.
+- The active reset-lane pass uses the explicit legacy shortcut budget (`_Scale * _ShortcutCountModifier`) and skips shortcut creation when scale disables process `5`.
+- The active reset-lane shortcut pass now builds a duplicate-preserving `_WallArray`-style list from path-neighbor walls, removes one randomly selected entry per attempt, revalidates stale entries before opening them, and reports requested/attempted/created shortcut stats.
+- Exact legacy roll-for-roll randomness is still not literal because the Unreal source mixes `std::random_device`, `std::rand`, and repeated `std::srand(time(0))`; the rebuild keeps deterministic seeded selection for browser testability.
 
 ### Reset / regenerate loop
 - Legacy reset still has two distinct branches:
@@ -52,12 +60,19 @@ This pass rechecked the rebuilt maze/domain code against the read-only Unreal so
 ## Approximated behavior that remains
 - Maze randomness is still deterministic/seeded in the rebuild.
   Legacy C++ mixed `std::random_device`, `std::rand`, and `std::srand(time(0))`, so exact roll-for-roll output is not reproducible from source alone.
+- The active checkpoint path-builder is source-shaped but not byte-for-byte identical to the old `MapPath()` / `Backtrack()` loop.
+  It preserves the owner responsibilities and major selection gates while keeping browser builds deterministic and one-shot.
 - Demo timer values remain approximated.
-  `_PlayerAiDelayDuration` was blueprint-driven in the Unreal project; the rebuild now keeps a more staged but still deterministic calibration for readability:
-  `exploreStepMs: 104`, `backtrackStepMs: 76`, `decisionPauseMs: 228`, `anticipationStepMs: 84`, `branchCommitMs: 112`, `branchResumeMs: 148`, `goalHoldMs: 1180`, `resetHoldMs: 340`.
+  `_PlayerAiDelayDuration` was blueprint-driven in the Unreal project; the extracted C++ proves the AI loop is a single timer rescheduled after every `AiPlayerLogic()` call, so the rebuild now uses one AI movement cadence while keeping cue labels for presentation/readback:
+  `exploreStepMs: 104`, `backtrackStepMs: 104`, `decisionPauseMs: 104`, `anticipationStepMs: 104`, `branchCommitMs: 104`, `branchResumeMs: 104`, `goalHoldMs: 1180`, `resetHoldMs: 340`.
+  The numeric Blueprint default is still unrecovered from the available source/assets.
 - Demo maze regeneration uses deterministic seed stepping (`seed + 1` per completed goal maze) as a rebuild approximation for legacy's non-deterministic fresh generation.
 - The menu trail rendering is still a rebuild interpretation of the legacy tile color-revert system rather than a literal material-timer port.
+  `createLegacyMenuDemoBootstrap()` and `advanceLegacyMenuDemoFrame()` now have focused tests proving `toggleTrailFade` bounds the visible trail to the supplied tail while persistent trail mode keeps the full projected path.
+  A follow-up scan of `Content/Game/GI_MazerGameInstance.uasset` found the `_TileColorRevertDelay` and `FloatProperty` names, but not a trustworthy serialized Blueprint default value; the exact numeric value and material timing remain unrecovered from the current source/assets.
 - The rebuild now carries explicit presentation cues (`spawn`, `anticipate`, `explore`, `dead-end`, `backtrack`, `reacquire`, `goal`, `reset`) alongside the recovered AI logic so the menu scene can stage turn commits, dead ends, backtracking, and branch reacquisition more clearly without changing the underlying path choice.
+- Demo walker route diagnostics now expose `visitedUndoCount` for the legacy `_AiBackTrackUndoVisitedFlag` seam.
+  The representative split-flow proof route covers wrong-turn recovery without exercising that rarer branch; `createVisitedUndoEpisode()` now supplies a focused deterministic fixture where the branch increments `visitedUndoCount`.
 - The attract-mode menu now prerolls a small deterministic number of demo steps before first paint so the board reads as active immediately instead of opening on a blank maze.
 - The responsive shell is intentionally a rebuild adaptation, not a literal Unreal widget layout port.
   Exact legacy placement depended on a fixed desktop presentation with a visible Start button.

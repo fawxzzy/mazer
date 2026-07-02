@@ -9,14 +9,22 @@ import {
   generateMaze,
   generateMazeForDifficulty,
   getNeighborIndex,
+  isTileFloor,
   PatternEngine,
   resetAndRegenerate,
   runBatch,
   solveAStar,
   solveCorridorGraph,
-  type MazeConfig
+  type MazeCore,
+  type MazeConfig,
+  type MazeEpisode
 } from '../../src/domain/maze';
 import { assertMazeInvariants, measureEpisodeTopology, serializeMaze } from './maze-test-utils';
+
+const N = 1 << 0;
+const E = 1 << 1;
+const S = 1 << 2;
+const W = 1 << 3;
 
 const EXPLICIT_FAMILY_REPLAY_TIMEOUT_MS = 30_000;
 const FAMILY_ARCHETYPE_TIMEOUT_MS = 60_000;
@@ -33,6 +41,104 @@ const defaultConfig: MazeConfig = {
 const resolveBuildWidth = (size: MazeConfig['size']): number => (
   size === 'small' ? 25 : size === 'medium' ? 37 : size === 'large' ? 51 : 75
 );
+
+const countCanonicalBypassableEdges = (maze: MazeCore): number => {
+  const solution = solveAStar(maze, maze.start, maze.goal);
+  const path = Array.from(solution.pathIndices);
+  let bypassableEdges = 0;
+
+  for (let index = 1; index < path.length; index += 1) {
+    const from = path[index - 1];
+    const to = path[index];
+    setCorePassage(maze, from, to, false);
+    const reroute = solveAStar(maze, maze.start, maze.goal);
+    if (reroute.found) {
+      bypassableEdges += 1;
+    }
+    setCorePassage(maze, from, to, true);
+  }
+
+  return bypassableEdges;
+};
+
+const countCanonicalBypassableBands = (maze: MazeCore): number => {
+  const solution = solveAStar(maze, maze.start, maze.goal);
+  const path = Array.from(solution.pathIndices);
+  const bands = new Set<number>();
+
+  for (let index = 1; index < path.length; index += 1) {
+    const from = path[index - 1];
+    const to = path[index];
+    setCorePassage(maze, from, to, false);
+    const reroute = solveAStar(maze, maze.start, maze.goal);
+    if (reroute.found) {
+      bands.add(Math.min(4, Math.floor((index / Math.max(1, path.length - 1)) * 5)));
+    }
+    setCorePassage(maze, from, to, true);
+  }
+
+  return bands.size;
+};
+
+const countLegacyRasterShortcutBridges = (episode: MazeEpisode): number => {
+  const { tiles, width, height, pathIndices } = episode.raster;
+  const canonical = new Set<number>(Array.from(pathIndices));
+  let bridges = 0;
+
+  for (let index = 0; index < tiles.length; index += 1) {
+    if (canonical.has(index) || !isTileFloor(tiles, index)) {
+      continue;
+    }
+    const top = getNeighborIndex(index, width, height, 0);
+    const bottom = getNeighborIndex(index, width, height, 1);
+    const left = getNeighborIndex(index, width, height, 2);
+    const right = getNeighborIndex(index, width, height, 3);
+    if (top === -1 || bottom === -1 || left === -1 || right === -1) {
+      continue;
+    }
+
+    const verticalWalls = !isTileFloor(tiles, top) && !isTileFloor(tiles, bottom);
+    const horizontalWalls = !isTileFloor(tiles, left) && !isTileFloor(tiles, right);
+    const horizontalFloors = isTileFloor(tiles, left) && isTileFloor(tiles, right);
+    const verticalFloors = isTileFloor(tiles, top) && isTileFloor(tiles, bottom);
+    if ((verticalWalls && horizontalFloors) || (horizontalWalls && verticalFloors)) {
+      bridges += 1;
+    }
+  }
+
+  return bridges;
+};
+
+const setCorePassage = (maze: MazeCore, from: number, to: number, open: boolean): void => {
+  const fromX = from % maze.width;
+  const fromY = Math.floor(from / maze.width);
+  const toX = to % maze.width;
+  const toY = Math.floor(to / maze.width);
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const direction = dx === 0 && dy === -1
+    ? { bit: N, opposite: S }
+    : dx === 1 && dy === 0
+      ? { bit: E, opposite: W }
+      : dx === 0 && dy === 1
+        ? { bit: S, opposite: N }
+        : dx === -1 && dy === 0
+          ? { bit: W, opposite: E }
+          : null;
+
+  if (!direction) {
+    throw new Error(`Core cells ${from} and ${to} are not adjacent`);
+  }
+
+  if (open) {
+    maze.cells[from] &= ~direction.bit;
+    maze.cells[to] &= ~direction.opposite;
+    return;
+  }
+
+  maze.cells[from] |= direction.bit;
+  maze.cells[to] |= direction.opposite;
+};
 
 describe('maze domain generation', () => {
   test('is deterministic from seed', () => {
@@ -252,6 +358,28 @@ describe('maze domain generation', () => {
     expect(maze.metrics.deadEnds).toBeGreaterThan(0);
   });
 
+  test('shortcut braiding creates route-affecting bypasses instead of tiny random openings', () => {
+    const maze = buildMaze({
+      width: 51,
+      height: 51,
+      seed: 8_811,
+      family: 'braided',
+      presentationPreset: 'braided',
+      braidRatio: 0.22,
+      includeCore: true,
+      minSolutionLength: 24
+    });
+
+    assertMazeInvariants(maze);
+    expect(maze.core).toBeDefined();
+    expect(maze.shortcutsCreated).toBeGreaterThan(0);
+    expect(countCanonicalBypassableEdges(maze.core!)).toBeGreaterThan(1);
+    expect(countCanonicalBypassableBands(maze.core!)).toBeGreaterThanOrEqual(2);
+    expect(countLegacyRasterShortcutBridges(maze)).toBeGreaterThan(0);
+
+    disposeMazeEpisode(maze);
+  });
+
   test('family archetypes produce materially different topology signatures', { timeout: FAMILY_ARCHETYPE_TIMEOUT_MS }, () => {
     const sampleFamilies = ['classic', 'braided', 'sparse', 'dense', 'framed', 'split-flow'] as const;
     const seeds = [7_000, 7_037, 7_074, 7_111] as const;
@@ -271,6 +399,7 @@ describe('maze domain generation', () => {
         junctions: average(familyEpisodes.map((episode) => episode.metrics.junctions)),
         branchDensity: average(familyEpisodes.map((episode) => episode.metrics.branchDensity)),
         straightness: average(familyEpisodes.map((episode) => episode.metrics.straightness)),
+        shortcutsCreated: average(familyEpisodes.map((episode) => episode.shortcutsCreated)),
         corridorMean: average(topology.map((item) => item.corridorMean)),
         corridorP90: average(topology.map((item) => item.corridorP90)),
         falseShortcutBranches: average(familyEpisodes.map((episode) => episode.routeMotifs.falseShortcutBranches)),
@@ -292,6 +421,7 @@ describe('maze domain generation', () => {
       junctions: number;
       branchDensity: number;
       straightness: number;
+      shortcutsCreated: number;
       corridorMean: number;
       corridorP90: number;
       falseShortcutBranches: number;
@@ -317,7 +447,7 @@ describe('maze domain generation', () => {
     expect(byFamily.dense.corridorMean).toBeLessThan(byFamily.classic.corridorMean);
     expect(byFamily.dense.branchDensity).toBeGreaterThan(byFamily.classic.branchDensity);
     expect(byFamily.classic.falseShortcutBranches).toBeGreaterThanOrEqual(1);
-    expect(byFamily.braided.loopDetours).toBeGreaterThan(byFamily.classic.loopDetours);
+    expect(byFamily.braided.shortcutsCreated).toBeGreaterThan(byFamily.classic.shortcutsCreated);
     expect(byFamily.sparse.goalCorridorLead).toBeGreaterThan(byFamily.dense.goalCorridorLead);
     expect(byFamily.dense.goalBranchReach).toBeGreaterThan(byFamily.classic.goalBranchReach);
     expect(byFamily.dense.goalTurnPotential).toBeGreaterThan(byFamily.dense.startTurnPotential);
