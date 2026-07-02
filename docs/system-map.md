@@ -62,7 +62,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | Phaser scene wiring | `src/boot/phaserConfig.ts` | `npm run build` |
 | active front door and play shell | `src/scenes/MenuScene.ts` | in-app browser, `npm run verify`; play board rendering owns connected corridor material for generated mazes |
 | active-play keyboard, focus-loss, and mobile pointer movement | `src/legacy-runtime/legacyPlayStep.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/scenes/menu-runtime-diagnostics.test.ts`, localhost mobile/play proof; accepted movement keys are consumed at the scene boundary, browser focus loss clears held movement flags and pending movement timers, and pointer/touch swipes plus short taps resolve into the same one-step vector and axis-gated collision path as keyboard input, with pointer starts bounded to the active board rectangle |
-| live runtime diagnostics bridge | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, localhost; diagnostics are data-only and do not draw a visible proof/debug panel over the game |
+| live runtime diagnostics bridge | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, localhost; diagnostics are data-only and do not draw a visible proof/debug panel over the game, and `generation.maze` exposes source/build family plus compact maze quality stats for maintained-browser proof |
 | active-play HUD timer and goal arrow | `src/legacy-runtime/legacyPlayHud.ts`, `src/scenes/MenuScene.ts#drawHud()` | `tests/reset/legacy-play-hud.test.ts`, `tests/reset/legacy-reset.test.ts`, desktop/mobile play-route screenshots, `window.__MAZER_VISUAL_DIAGNOSTICS__` with bare `timerText`, `arrowAngleRadians`, and `arrowAngleDegrees`; source-shaped minimal Timer/EndArrow chrome |
 | fixed menu maze shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `tests/reset/legacy-reset.test.ts`, screenshots |
 | generated play maze | `src/legacy-runtime/legacyMaze.ts` | `tests/reset/legacy-reset.test.ts`; includes source-shaped checkpoint pathing, shortcut bridges, disconnected-floor pruning, and weak-goal rebasing for playable browser topology |
@@ -95,7 +95,7 @@ This is the active state contract for the current app front door.
 | menu demo episode/config/state | `MazeEpisode`, `DemoWalkerConfig`, `DemoWalkerState` | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | menu-only attract route and preroll truth |
 | player/trail/goal live state | `player`, `trail`, `goal` | `src/scenes/MenuScene.ts` | trail presentation differs between menu and play, but ownership stays local to the scene |
 | visual diagnostics | `window.__MAZER_VISUAL_DIAGNOSTICS__` | `src/scenes/MenuScene.ts` | visual proof scripts treat this as route-aware readback, not gameplay truth |
-| runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; browser automation still may not see the `window` globals directly, but the DOM attribute is the repo-owned fallback surface and now exposes active menu-demo cue, route shape, mistake-enabled lane state, AI wrong-branch/backtrack/recovery counters, generation stage cursor, and stage-6 draw progress without drawing visible debug text |
+| runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; browser automation still may not see the `window` globals directly, but the DOM attribute is the repo-owned fallback surface and now exposes active menu-demo cue, route shape, mistake-enabled lane state, AI wrong-branch/backtrack/recovery counters, generation stage cursor, stage-6 draw progress, and compact maze source/build/quality readback without drawing visible debug text |
 
 ## End-to-end flow map
 
@@ -172,6 +172,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - `applyGenerationRequest()` rehydrates maze, player, trail, demo state, HUD, and layout from a named request
   - `queueGenerationRequest()` stages delayed menu/play rebuilds instead of collapsing every branch into immediate rebuild calls
   - `armLegacyMenuStaticDrawStage()` and `advanceLegacyMenuStaticDrawStage()` apply the menu stage-6 row-slice draw contract to static-board rendering, including the menu-only row cadence gate
+  - runtime diagnostics bridge live maze provenance through `generation.maze`, including menu/play source, build kind, solution path length, shortcut stats, checkpoint path-builder stats, playable-topology stats, and route-quality classification
   - runtime diagnostics bridge live stage-6 draw progress through `resolveMenuSceneGenerationDrawStageProgress()`
   - `pendingResetRequest` now carries the explicit process-8 branch until the scene update consumes it
   - `consumeResetRequest()` now converts menu-demo process-8 reset into a pending process-0 generation request instead of regenerating inline
@@ -502,6 +503,7 @@ What `verify` currently means:
   - current caveat: browser automation still may not surface the `window.__MAZER_*` globals directly even while the localhost canvas renders
 - `data-mazer-runtime-diagnostics`
   - serialized DOM fallback for repo tooling and browser automation readback
+  - contains `generation.maze.source` / `generation.maze.buildKind` so the maintained browser can prove `menu-generated` versus `play-generated` without depending on hidden window globals
 - visible diagnostics DOM node
   - removed from the current runtime; `runtimeDiagnostics=1` is data-only and must not append visible proof text to the game surface
 

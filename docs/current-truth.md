@@ -133,6 +133,7 @@ Why it is not higher yet:
 - the removed visible runtime diagnostics panel was never legacy UI; keeping diagnostics data-only preserves proof while preventing proof tooling from polluting the maintained `4173` browser
 - runtime and visual diagnostics now expose live menu-demo AI wrong-branch/backtrack/recovery counters plus stage-6 row-reveal progress, so menu AI review and generation-fluidity review no longer depend on placeholder counters or hidden row state
 - runtime diagnostics now also expose `menuDemo.route` with route length, segment count, canonical path length, traverse duration, cue counts, trail-mode counts, and AI reset cursor; the representative split-flow menu AI route is guarded below 4x the canonical solution and under 60 seconds so shortcut-heavy recovery cannot silently regress into a runaway attract loop
+- runtime diagnostics now expose compact maze provenance and quality readback under `generation.maze`, including `source`, `buildKind`, size, seed, solution path length, shortcut stats, checkpoint/path-builder stats, playable-topology normalization stats, and route-quality classification; maintained `4173` browser proof confirms the menu surface reports `menu-generated` and the play route reports `play-generated` without relying on hidden window globals
 - legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
 - in-game pause commands now route through an explicit legacy pause lifecycle contract for `Back`, `Reset`, and `Main Menu`
 - features and game-modes toggles now route through an explicit legacy overlay-toggle contract, with inverted `On/Off` copy kept only where the legacy widget actually owned it
@@ -158,7 +159,7 @@ Why it is not higher yet:
 - browser exit cannot literally execute the old engine quit behavior, but the bounded browser-safe quit equivalence is now explicit and proof-backed
 - visual/material parity still needs another pass against screenshots and restored assets
 - menu static/dynamic material, title opacity, front-door button pane fills/proportions/baseline, and cyan route weight are closer after the corridor-frame, thinner-overlay, path-relief, title-glass, button dark-pane, material-contrast, dynamic-trail weight, button-plate proportion, button-baseline, and dense-slab material passes, but the restored screenshots still show different exact player sprite treatment, exact maze silhouette, exact button placement, final title overlap, and tighter screenshot-grade composition than the current web runtime
-- browser automation localhost still does not expose the published `window.__MAZER_*` globals directly, but runtime diagnostics now have a DOM-backed fallback read surface on the single `4173` preview server without a visible debug panel
+- browser automation localhost still does not expose the published `window.__MAZER_*` globals directly, but runtime diagnostics now have a DOM-backed fallback read surface on the single `4173` preview server without a visible debug panel, including the active maze source/build family needed to prove procedural menu versus play generation
 
 ## Current proof rule
 
