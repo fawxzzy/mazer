@@ -321,13 +321,13 @@ Use this before changing how the front door looks without changing the actual ma
 
 | Concern | Owner |
 | --- | --- |
-| menu board geometry and button/title placement | `src/legacy-runtime/legacyMenuLayout.ts` |
+| menu board geometry, ultra-narrow fractional board fit, and button/title placement | `src/legacy-runtime/legacyMenuLayout.ts` |
 | fixed legacy snapshot shape | `src/legacy-runtime/legacyMenuSnapshot.ts` |
 | menu trench width / connection-aware core continuity / segment-based static strokes / connected light-core material / static edge alpha / flat 2D material contrast / core-vs-grid read | `src/legacy-runtime/legacyMenuRender.ts` + `src/scenes/MenuScene.ts` |
-| slab/frame colors and backdrop haze | `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/scenes/MenuScene.ts#drawBackdrop()` plus `LEGACY_MENU_*` board constants |
+| flat slab/frame colors, no-grid/no-bevel clean-2D lane, and backdrop haze | `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/scenes/MenuScene.ts#drawBackdrop()` plus `LEGACY_MENU_*` board constants |
 | title opacity / shadow / wordmark presence | `src/legacy-runtime/legacyMenuTitle.ts` -> `src/scenes/MenuScene.ts#refreshLayout()` + scene title text setup; `MenuScene` passes `procedural` only when the live maze source is `menu-generated` |
 | front-door button box strength / plate proportions / label presence / dark pane fill | `src/legacy-runtime/legacyMenuLayout.ts` -> `src/legacy-runtime/legacyMenuButtonChrome.ts` -> `src/scenes/MenuScene.ts#createButton()` |
-| menu attract trail/player colors and corridor footprint | `src/scenes/MenuScene.ts#fillLegacyMenuDynamicPathTile()` + `src/scenes/MenuScene.ts#fillMenuDynamicMarkerTile()` |
+| menu attract trail/player colors, centered player marker, and corridor footprint | `src/scenes/MenuScene.ts#fillLegacyMenuDynamicPathTile()` + `src/scenes/MenuScene.ts#fillMenuDynamicMarkerTile()` + `src/scenes/MenuScene.ts#fillLegacyPlayerMarkerTile()` |
 
 Boundary:
 
