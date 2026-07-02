@@ -498,6 +498,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('reset-player')");
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('return-menu')");
     expect(menuSceneSource).toContain('private applyLegacyPauseCommand(command: LegacyPauseCommand): void {');
+    expect(menuSceneSource).toContain('const result = resolveLegacyPauseCommand(command, this.maze.start, this.trail);');
     expect(playLifecycleSource).toContain('resolveLegacyResetEntryContract');
     expect(playLifecycleSource).toContain('entryStageId: LEGACY_RESET_ENTRY_STAGE_ID');
     expect(playLifecycleSource).toContain('bypassesLevelBuildingDelay: true');

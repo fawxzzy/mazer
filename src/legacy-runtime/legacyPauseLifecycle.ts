@@ -13,7 +13,8 @@ const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y
 
 export const resolveLegacyPauseCommand = (
   command: LegacyPauseCommand,
-  start: LegacyPoint
+  start: LegacyPoint,
+  currentTrail: readonly LegacyPoint[] = []
 ): LegacyPauseCommandResult => {
   switch (command) {
     case 'resume':
@@ -25,11 +26,16 @@ export const resolveLegacyPauseCommand = (
       };
     case 'reset-player': {
       const nextPlayer = copyPoint(start);
+      const preservedTrail = currentTrail.map(copyPoint);
+      const trailAlreadyEndsAtStart = preservedTrail.at(-1)?.x === nextPlayer.x
+        && preservedTrail.at(-1)?.y === nextPlayer.y;
       return {
         closesOverlay: true,
         enterMenu: false,
         nextPlayer,
-        nextTrail: [copyPoint(nextPlayer)]
+        nextTrail: trailAlreadyEndsAtStart
+          ? preservedTrail
+          : [...preservedTrail, copyPoint(nextPlayer)]
       };
     }
     case 'return-menu':

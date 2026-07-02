@@ -2406,7 +2406,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private applyLegacyPauseCommand(command: LegacyPauseCommand): void {
-    const result = resolveLegacyPauseCommand(command, this.maze.start);
+    const result = resolveLegacyPauseCommand(command, this.maze.start, this.trail);
 
     if (result.nextPlayer !== null) {
       this.player = result.nextPlayer;
