@@ -61,6 +61,7 @@ The humanized lane owns:
 - `resolveLegacyAiPotentialTarget()`: selects a target from the potential list when direct movement fails.
 - `findFloorPath()`: reconnects wrong-branch recovery to canonical replay through adjacent floor movement.
 - `collectDemoWalkerRouteDiagnostics()`: publishes the current route shape without changing route selection, including `visitedUndoCount` for the legacy `_AiBackTrackUndoVisitedFlag` side-effect seam.
+- `createVisitedUndoEpisode()`: test-only fixture proving a deterministic route where `_AiBackTrackUndoVisitedFlag`-equivalent behavior increments `visitedUndoCount`.
 - first-mistake route construction stops after emitted `dead-end`, `backtrack`, and `reacquire` cues are represented, then returns to canonical replay instead of continuing exploratory route construction.
 - cue-specific labels remain presentation/readback state, but movement, backtrack, dead-end, branch, and reacquire beats now resolve through one `exploreStepMs` timer because extracted C++ reschedules `AiPlayerLogic()` with one `_PlayerAiDelayDuration`.
 
@@ -86,7 +87,7 @@ Menu generation is intentionally not the same owner as active play generation:
 
 - Exact numeric Blueprint `_PlayerAiDelayDuration` remains unrecovered, but extracted C++ proves the single-timer cadence shape now used by the rebuild.
 - Exact visited-tile color-revert/material timer behavior remains unrecovered.
-- A deterministic positive proof route for `_AiBackTrackUndoVisitedFlag` / `visitedUndoCount` is still open; the current representative split-flow proof covers wrong-branch, dead-end, backtrack, and reacquire without exercising that rarer branch.
+- The positive `_AiBackTrackUndoVisitedFlag` / `visitedUndoCount` proof route is now covered by a deterministic fixture; remaining visited-color work is about material/timer behavior, not branch observability.
 - Exact engine process-yield timing for generation remains approximated by browser-safe contracts.
 - Final screenshot-grade menu material and sprite treatment remain visual work, not AI pathing work.
 

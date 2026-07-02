@@ -67,6 +67,64 @@ const createSingleSpurEpisode = (): MazeEpisode => {
   };
 };
 
+const createVisitedUndoEpisode = (): MazeEpisode => {
+  const width = 7;
+  const height = 7;
+  const tiles = new Uint8Array(width * height);
+  const floorIndices = [
+    0, 2, 8, 10, 13, 15, 16, 17, 19, 20,
+    22, 23, 25, 26, 29, 30, 31, 32, 45, 47
+  ];
+  const canonicalPath = [22, 29, 30, 31, 32, 25, 26];
+  for (const index of floorIndices) {
+    tiles[index] |= TILE_FLOOR;
+  }
+  for (const index of canonicalPath) {
+    tiles[index] |= TILE_PATH;
+  }
+  tiles[26] |= TILE_END;
+
+  return {
+    accepted: true,
+    difficulty: 'standard',
+    difficultyScore: 0,
+    family: 'classic',
+    generationTrace: {
+      rootTileIndex: 22,
+      uniqueTileCount: floorIndices.length,
+      steps: [{ phase: 'seed', tileIndices: [22] }]
+    },
+    metrics: {
+      solutionLength: canonicalPath.length,
+      deadEnds: 4,
+      junctions: 4,
+      branchDensity: 4 / floorIndices.length,
+      straightness: 0.5,
+      coverage: canonicalPath.length / floorIndices.length
+    },
+    placementStrategy: 'farthest-pair',
+    presentationPreset: 'classic',
+    raster: {
+      width,
+      height,
+      tiles,
+      startIndex: 22,
+      endIndex: 26,
+      pathIndices: Uint32Array.from(canonicalPath)
+    },
+    routeMotifs: {
+      falseShortcutBranches: 2,
+      nearGoalBranches: 1,
+      hubJunctions: 2,
+      chokeCorridors: 1,
+      loopDetours: 1
+    },
+    seed: 17_474,
+    shortcutsCreated: 0,
+    size: 'small'
+  };
+};
+
 describe('demo walker', () => {
   test('steps forward along the validated A* solution path', () => {
     const episode = generateMaze({
@@ -419,6 +477,27 @@ describe('demo walker', () => {
     expect(diagnostics.cueCounts.backtrack).toBeGreaterThan(0);
     expect(diagnostics.cueCounts.reacquire).toBeGreaterThan(0);
     expect(diagnostics.trailModeCounts.backtrack).toBeGreaterThan(0);
+  });
+
+  test('exercises the legacy visited-undo side effect while backtracking toward a potential target', () => {
+    const episode = createVisitedUndoEpisode();
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
+
+    expect(diagnostics.telemetry.wrongBranchCount).toBeGreaterThan(0);
+    expect(diagnostics.telemetry.backtrackCount).toBeGreaterThan(0);
+    expect(diagnostics.telemetry.recoveryCount).toBeGreaterThan(0);
+    expect(diagnostics.telemetry.visitedUndoCount).toBe(1);
+    expect(diagnostics.routeLength).toBeGreaterThan(episode.raster.pathIndices.length);
+    expect(diagnostics.routeLength).toBeLessThanOrEqual(episode.raster.pathIndices.length * 4);
+    expect(diagnostics.aiResetPathCursor).not.toBeNull();
   });
 
   test('view frames expose recovery cues during deterministic wrong-turn playback', () => {

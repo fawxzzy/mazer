@@ -69,7 +69,7 @@ This pass rechecked the rebuilt maze/domain code against the read-only Unreal so
 - The menu trail rendering is still a rebuild interpretation of the legacy tile color-revert system rather than a literal material-timer port.
 - The rebuild now carries explicit presentation cues (`spawn`, `anticipate`, `explore`, `dead-end`, `backtrack`, `reacquire`, `goal`, `reset`) alongside the recovered AI logic so the menu scene can stage turn commits, dead ends, backtracking, and branch reacquisition more clearly without changing the underlying path choice.
 - Demo walker route diagnostics now expose `visitedUndoCount` for the legacy `_AiBackTrackUndoVisitedFlag` seam.
-  The current representative split-flow proof route covers wrong-turn recovery but does not positively exercise that rarer visited-undo side effect yet.
+  The representative split-flow proof route covers wrong-turn recovery without exercising that rarer branch; `createVisitedUndoEpisode()` now supplies a focused deterministic fixture where the branch increments `visitedUndoCount`.
 - The attract-mode menu now prerolls a small deterministic number of demo steps before first paint so the board reads as active immediately instead of opening on a blank maze.
 - The responsive shell is intentionally a rebuild adaptation, not a literal Unreal widget layout port.
   Exact legacy placement depended on a fixed desktop presentation with a visible Start button.
