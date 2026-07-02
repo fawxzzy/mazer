@@ -34,10 +34,10 @@ export const resolveLegacyMenuLayout = (
   const normalizedScale = clampInteger(scale, 25, 150);
   const isPortrait = height > width;
   const isUltraNarrow = isPortrait && width < 360;
-  const baseBoardScale = isPortrait ? 0.92 : 0.52;
+  const baseBoardScale = isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.52);
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const maxBoardSize = Math.min(
-    width * (isPortrait ? 0.92 : 0.78),
+    width * (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)),
     height * (isPortrait ? 0.82 : 0.79)
   );
   const minBoardSize = Math.min(300, Math.max(120, maxBoardSize));
@@ -46,8 +46,11 @@ export const resolveLegacyMenuLayout = (
     height * (isPortrait ? 0.54 : 0.775) * scaleBias
   );
   const boardSize = Math.round(clamp(rawBoardSize, minBoardSize, maxBoardSize));
-  const tileSize = Math.max(isUltraNarrow ? 3 : 4, Math.floor(boardSize / Math.max(1, mazeSize)));
-  const snappedBoardSize = tileSize * mazeSize;
+  const rawTileSize = boardSize / Math.max(1, mazeSize);
+  const tileSize = isUltraNarrow
+    ? Math.max(3, Number(rawTileSize.toFixed(3)))
+    : Math.max(4, Math.floor(rawTileSize));
+  const snappedBoardSize = Math.round(tileSize * mazeSize * 1000) / 1000;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
   const boardTop = Math.round(clamp(height * (isPortrait ? 0.104 : 0.074), isUltraNarrow ? 32 : 40, isPortrait ? 102 : 88));
   const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));

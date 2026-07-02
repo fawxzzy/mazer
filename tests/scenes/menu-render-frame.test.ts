@@ -144,7 +144,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const legacyMenuRenderSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuRender.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0.01;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xb8b2bd;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x2b2530;');
@@ -152,6 +152,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x24202a;');
+    expect(menuSceneSource).toContain('if (isMenuMode && LEGACY_BOARD_GRID_ALPHA > 0) {');
+    expect(menuSceneSource).toContain('Keep the board top-down: no pseudo bevel/highlight pass over the maze.');
     expect(menuSceneSource).toContain('? 0x18131d');
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.14;');
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.04;');
