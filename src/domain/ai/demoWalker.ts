@@ -669,6 +669,21 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
   const canonicalReplayStart = aiResetPathCursor === null
     ? (canonicalCursorByIndex.get(routeIndices[routeIndices.length - 1] ?? episode.raster.startIndex) ?? 0)
     : 0;
+  const replayAnchorIndex = canonicalPath[canonicalReplayStart] ?? episode.raster.startIndex;
+  const currentRouteTail = routeIndices[routeIndices.length - 1] ?? episode.raster.startIndex;
+  if (currentRouteTail !== replayAnchorIndex) {
+    const reacquirePath = findFloorPath(
+      currentRouteTail,
+      replayAnchorIndex,
+      episode.raster.width,
+      episode.raster.height,
+      episode.raster.tiles
+    );
+    for (let cursor = 1; cursor < reacquirePath.length; cursor += 1) {
+      appendStep(reacquirePath[cursor]!, 'backtrack', cursor === 1 ? 'reacquire' : 'backtrack');
+    }
+  }
+
   for (let cursor = Math.max(1, canonicalReplayStart + 1); cursor < canonicalPath.length; cursor += 1) {
     const nextIndex = canonicalPath[cursor] ?? episode.raster.endIndex;
     appendStep(nextIndex, cursor >= canonicalPath.length - 1 ? 'goal' : 'explore', cursor === canonicalReplayStart + 1 ? 'reacquire' : null);
@@ -792,6 +807,53 @@ const collectFloorNeighbors = (
     }
   }
   return neighbors;
+};
+
+const findFloorPath = (
+  startIndex: number,
+  targetIndex: number,
+  width: number,
+  height: number,
+  tiles: Uint8Array
+): number[] => {
+  if (startIndex === targetIndex) {
+    return [startIndex];
+  }
+
+  const cameFrom = new Int32Array(tiles.length);
+  cameFrom.fill(-1);
+  const queue = new Uint32Array(tiles.length);
+  let read = 0;
+  let write = 0;
+  queue[write] = startIndex;
+  write += 1;
+  cameFrom[startIndex] = startIndex;
+
+  while (read < write) {
+    const current = queue[read]!;
+    read += 1;
+
+    for (const neighbor of collectFloorNeighbors(current, width, height, tiles)) {
+      if (cameFrom[neighbor] !== -1) {
+        continue;
+      }
+      cameFrom[neighbor] = current;
+      if (neighbor === targetIndex) {
+        const path: number[] = [targetIndex];
+        let cursor = targetIndex;
+        while (cursor !== startIndex) {
+          cursor = cameFrom[cursor]!;
+          path.push(cursor);
+        }
+        path.reverse();
+        return path;
+      }
+      queue[write] = neighbor;
+      write += 1;
+    }
+  }
+
+  return [startIndex];
 };
 
 const resolveNearestCanonicalCursor = (

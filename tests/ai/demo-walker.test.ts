@@ -6,7 +6,15 @@ import {
   resolveDemoWalkerViewFrame
 } from '../../src/domain/ai';
 import { legacyTuning } from '../../src/config/tuning';
-import { generateMaze, TILE_END, TILE_FLOOR, TILE_PATH, type MazeEpisode } from '../../src/domain/maze';
+import {
+  generateMaze,
+  isTileFloor,
+  resolveDirectionBetween,
+  TILE_END,
+  TILE_FLOOR,
+  TILE_PATH,
+  type MazeEpisode
+} from '../../src/domain/maze';
 
 const createSingleSpurEpisode = (): MazeEpisode => {
   const tiles = new Uint8Array(35);
@@ -414,5 +422,64 @@ describe('demo walker', () => {
     expect(seenCues.has('dead-end')).toBe(true);
     expect(seenCues.has('backtrack')).toBe(true);
     expect(seenCues.has('reacquire')).toBe(true);
+  });
+
+  test('humanized menu AI route never emits invalid jumps while exploring wrong branches', () => {
+    const cases = [
+      { scale: 50, seed: 902, size: 'large', family: 'split-flow', shortcutCountModifier: 0.18 },
+      { scale: 50, seed: 3749, size: 'medium', family: 'classic', shortcutCountModifier: 0.13 },
+      { scale: 75, seed: 8_811, size: 'huge', family: 'braided', shortcutCountModifier: 0.24 }
+    ] as const;
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+
+    for (const testCase of cases) {
+      const episode = generateMaze({
+        scale: testCase.scale,
+        seed: testCase.seed,
+        size: testCase.size,
+        family: testCase.family,
+        checkPointModifier: 0.35,
+        shortcutCountModifier: testCase.shortcutCountModifier
+      });
+      let state = createDemoWalkerState(episode, config);
+      let sawWrongBranchOrRecovery = false;
+      const maxSteps = Math.max(256, episode.raster.pathIndices.length * 8);
+
+      for (let step = 0; step < maxSteps; step += 1) {
+        const previousIndex = state.currentIndex;
+        const previousPhase = state.phase;
+        const advance = advanceDemoWalker(episode, state, config);
+        state = advance.state;
+
+        expect(isTileFloor(episode.raster.tiles, state.currentIndex)).toBe(true);
+        if (previousPhase === 'explore' && state.phase === 'explore') {
+          const direction = resolveDirectionBetween(previousIndex, state.currentIndex, episode.raster.width);
+          if (direction === null) {
+            throw new Error(
+              `Non-adjacent demo AI move for seed=${testCase.seed} step=${step}`
+              + ` from=${previousIndex} to=${state.currentIndex}`
+              + ` cue=${state.cue} cursor=${state.pathCursor} canonical=${state.canonicalCursor}`
+            );
+          }
+        }
+
+        sawWrongBranchOrRecovery = sawWrongBranchOrRecovery
+          || state.telemetry.wrongBranchCount > 0
+          || state.telemetry.backtrackCount > 0
+          || state.telemetry.recoveryCount > 0;
+
+        if (advance.shouldRegenerateMaze || state.phase === 'goal-hold') {
+          break;
+        }
+      }
+
+      expect(sawWrongBranchOrRecovery).toBe(true);
+    }
   });
 });

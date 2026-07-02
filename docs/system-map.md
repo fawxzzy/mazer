@@ -67,7 +67,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | fixed menu maze shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `tests/reset/legacy-reset.test.ts`, screenshots |
 | generated play maze | `src/legacy-runtime/legacyMaze.ts` | `tests/reset/legacy-reset.test.ts`; includes source-shaped checkpoint pathing, shortcut bridges, disconnected-floor pruning, and weak-goal rebasing for playable browser topology |
 | menu title/board/button layout math | `src/legacy-runtime/legacyMenuLayout.ts` | `tests/reset/legacy-menu-layout.test.ts` |
-| menu demo behavior | `src/legacy-runtime/legacyMenuDemoLifecycle.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, live menu preview |
+| menu demo behavior | `src/legacy-runtime/legacyMenuDemoLifecycle.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, live menu preview; humanized wrong-branch recovery must reconnect through adjacent floor movement, not a non-adjacent canonical splice |
 | options field parsing | `src/legacy-runtime/legacyOptionFields.ts` | `tests/reset/legacy-option-fields.test.ts` |
 | options + pause field commit roles | `src/legacy-runtime/legacyOverlayFieldCommit.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | features + game-modes toggle routing | `src/legacy-runtime/legacyOverlayToggleFields.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-reset.test.ts` |
@@ -438,7 +438,7 @@ Rule:
   - fixed-snapshot menu-only demo policy and deterministic preroll
 - `src/domain/ai/demoWalker.ts`
   - deterministic demo stepping, backtracking, goal hold, reset hold
-  - source-shaped menu AI route planning from live neighbor scans, potential-tile targeting, path-stack rewind, first-recovery AI reset seam, and canonical replay after reset
+  - source-shaped menu AI route planning from live neighbor scans, potential-tile targeting, path-stack rewind, first-recovery AI reset seam, connected floor-path reacquire, and canonical replay after reset
   - cue overrides and cue-specific pacing for branch commit, dead-end, backtrack, and reacquire beats
   - legacy `AiTilePathCheck`-style wrong-turn candidate admission: a non-end branch candidate must expose at least one unvisited onward floor tile besides the current tile
 
@@ -446,7 +446,7 @@ Boundary:
 
 - route shape lives in the legacy snapshot/generator
 - route behavior over time lives in the demo walker
-- if a future demo-route miss is about selecting, rejecting, or backtracking branch candidates, start in `src/domain/ai/demoWalker.ts` and prove it with `tests/ai/demo-walker.test.ts`
+- if a future demo-route miss is about selecting, rejecting, backtracking branch candidates, or reconnecting recovery to canonical replay, start in `src/domain/ai/demoWalker.ts` and prove it with `tests/ai/demo-walker.test.ts`
 
 ## Legacy document ownership
 
