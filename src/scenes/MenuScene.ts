@@ -318,7 +318,7 @@ declare global {
 export const MENU_SCENE_VISUAL_CAPTURE_KEY = '__MAZER_VISUAL_CAPTURE__' as const;
 export const MENU_SCENE_VISUAL_DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__' as const;
 
-const BOARD_SHADOW_OFFSET = 10;
+const BOARD_SHADOW_OFFSET = 0;
 const MENU_BUTTON_ALPHA = 0.1;
 const MENU_BUTTON_STROKE_ALPHA = 0.24;
 const MENU_TEXT_COLOR = '#0b841d';
@@ -327,22 +327,15 @@ const TITLE_SHADOW_COLOR = '#103516';
 const LEGACY_BOARD_GRID_ALPHA = 0.01;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
-const LEGACY_MENU_SLAB_FILL = 0x5c5662;
-const LEGACY_MENU_SLAB_EDGE = 0x14101a;
-const LEGACY_MENU_SLAB_HIGHLIGHT = 0xbcb5c7;
-const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0.38;
-const LEGACY_MENU_PATH_CORE = 0xaaa4af;
-const LEGACY_MENU_PATH_EDGE = 0x15101a;
-const LEGACY_MENU_PATH_EDGE_ALPHA = 0.88;
-const LEGACY_MENU_PATH_RELIEF_SHADOW = 0x07050b;
-const LEGACY_MENU_PATH_RELIEF_SHADOW_ALPHA = 0.34;
-const LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO = 0.13;
-const LEGACY_MENU_WALL_FILL = 0x3d3842;
-const LEGACY_MENU_WALL_GRID = 0x5d5863;
-const LEGACY_PLAY_PATH_EDGE = 0x1a161f;
-const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
-const LEGACY_PLAY_PATH_RELIEF_SHADOW = 0x08060c;
-const LEGACY_PLAY_PATH_RELIEF_SHADOW_ALPHA = 0.22;
+const LEGACY_MENU_SLAB_FILL = 0x302b35;
+const LEGACY_MENU_SLAB_EDGE = 0x15111a;
+const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;
+const LEGACY_MENU_PATH_CORE = 0xb8b2bd;
+const LEGACY_MENU_PATH_EDGE = 0x2b2530;
+const LEGACY_MENU_PATH_EDGE_ALPHA = 0.7;
+const LEGACY_MENU_WALL_FILL = 0x24202a;
+const LEGACY_PLAY_PATH_EDGE = 0x2a2630;
+const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.42;
 const LEGACY_PLAY_HUD_TIMER_PANE = 0x05050a;
 const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.18;
 const LEGACY_PLAY_HUD_TIMER_TEXT = '#d7f0d6';
@@ -1513,24 +1506,19 @@ export class MenuScene extends Phaser.Scene {
       : (this.settings.darkMode ? 0xb3acb8 : 0xd0cad2);
 
     this.boardStaticGraphics.clear();
-    this.boardStaticGraphics.fillStyle(0x000000, isMenuMode ? LEGACY_MENU_PANEL_SHADOW_ALPHA : 0.28);
-    this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardSize, boardSize);
+    const boardShadowAlpha = isMenuMode ? LEGACY_MENU_PANEL_SHADOW_ALPHA : 0;
+    if (boardShadowAlpha > 0) {
+      this.boardStaticGraphics.fillStyle(0x000000, boardShadowAlpha);
+      this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardSize, boardSize);
+    }
     if (isMenuMode) {
-      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_FILL, 0.56);
-      this.boardStaticGraphics.fillRect(boardLeft - 15, boardTop - 15, boardSize + 30, boardSize + 25);
-      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_EDGE, 0.92);
-      this.boardStaticGraphics.fillRect(boardLeft - 11, boardTop - 9, 7, boardSize + 13);
-      this.boardStaticGraphics.fillRect(boardLeft + boardSize + 4, boardTop - 3, 11, boardSize + 16);
-      this.boardStaticGraphics.fillRect(boardLeft - 3, boardTop + boardSize + 4, boardSize + 18, 7);
-      this.boardStaticGraphics.fillRect(boardLeft - 3, boardTop - 11, boardSize + 12, 4);
-      this.boardStaticGraphics.fillStyle(0x000000, 0.34);
-      this.boardStaticGraphics.fillRect(boardLeft + boardSize + 15, boardTop + 14, 7, Math.max(0, boardSize - 8));
-      this.boardStaticGraphics.fillRect(boardLeft + 20, boardTop + boardSize + 11, Math.max(0, boardSize - 2), 5);
-      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_HIGHLIGHT, 0.12);
-      this.boardStaticGraphics.fillRect(boardLeft - 12, boardTop - 12, boardSize + 18, 1);
-      this.boardStaticGraphics.fillRect(boardLeft - 12, boardTop - 12, 1, boardSize + 18);
-      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_HIGHLIGHT, 0.07);
-      this.boardStaticGraphics.fillRect(boardLeft - 7, boardTop - 6, boardSize + 10, 1);
+      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_FILL, 0.88);
+      this.boardStaticGraphics.fillRect(boardLeft - 7, boardTop - 7, boardSize + 14, boardSize + 14);
+      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_EDGE, 0.9);
+      this.boardStaticGraphics.fillRect(boardLeft - 7, boardTop - 7, boardSize + 14, 2);
+      this.boardStaticGraphics.fillRect(boardLeft - 7, boardTop + boardSize + 5, boardSize + 14, 2);
+      this.boardStaticGraphics.fillRect(boardLeft - 7, boardTop - 7, 2, boardSize + 14);
+      this.boardStaticGraphics.fillRect(boardLeft + boardSize + 5, boardTop - 7, 2, boardSize + 14);
     }
     this.boardStaticGraphics.fillStyle(boardEdge, 1);
     this.boardStaticGraphics.fillRect(boardLeft - 3, boardTop - 3, boardSize + 6, boardSize + 6);
@@ -1571,21 +1559,6 @@ export class MenuScene extends Phaser.Scene {
         if (walkable) {
           const segments = resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);
           const frames = resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);
-          const reliefOffset = Math.max(1, Math.floor(tileSize * LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO));
-
-          this.boardStaticGraphics.fillStyle(
-            isMenuMode ? LEGACY_MENU_PATH_RELIEF_SHADOW : LEGACY_PLAY_PATH_RELIEF_SHADOW,
-            isMenuMode ? LEGACY_MENU_PATH_RELIEF_SHADOW_ALPHA : LEGACY_PLAY_PATH_RELIEF_SHADOW_ALPHA
-          );
-          for (const segment of segments.edge) {
-            this.boardStaticGraphics.fillRect(
-              tileX + segment.leftInset + reliefOffset,
-              tileY + segment.topInset + reliefOffset,
-              segment.width,
-              segment.height
-            );
-          }
-
           this.boardStaticGraphics.fillStyle(
             isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE,
             isMenuMode ? LEGACY_MENU_PATH_EDGE_ALPHA : LEGACY_PLAY_PATH_EDGE_ALPHA
@@ -1609,15 +1582,7 @@ export class MenuScene extends Phaser.Scene {
           this.boardStaticGraphics.fillStyle(wallColor, isMenuMode ? 0.94 : 1);
           this.boardStaticGraphics.fillRect(tileX, tileY, tileSize, tileSize);
 
-          if (isMenuMode && tileSize > 6) {
-            this.boardStaticGraphics.fillStyle(LEGACY_MENU_WALL_GRID, 0.018);
-            this.boardStaticGraphics.fillRect(
-              tileX + 1,
-              tileY + 1,
-              Math.max(1, tileSize - 2),
-              Math.max(1, tileSize - 2)
-            );
-          }
+          // Keep wall cells flat: the generated topology should read cleanly without fake bevel/depth.
         }
       }
     }
