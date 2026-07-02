@@ -1,7 +1,7 @@
 # Mazer Legacy Procedural Menu Title Composition Packet
 
 Date: 2026-07-02
-Repo: `C:\ATLAS\repos\mazer`
+Repo: `mazer`
 Branch: `codex/mazer-pass2-menu-parity`
 
 ## Scope
@@ -28,4 +28,3 @@ Tighten only the live procedural menu title composition after the main menu move
 The 1:1 marker remains `93%`.
 
 Reason: this fixes a maintained-browser composition regression from dense procedural menu boards, but exact live procedural-menu silhouette, final material relief, and screenshot-grade whole-menu composition remain open.
-
