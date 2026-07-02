@@ -217,6 +217,19 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, this.player, 0xf2f4f8, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, 0);');
   });
 
+  test('keeps camera-follow static and dynamic board layers on the same offset', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const toggleFieldSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayToggleFields.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardSize, tileSize } = this.layout;');
+    expect(menuSceneSource).toContain('const boardOffset = this.resolveBoardOffset();');
+    expect(menuSceneSource).toContain('const boardLeft = layoutBoardLeft + boardOffset.x;');
+    expect(menuSceneSource).toContain('const boardTop = layoutBoardTop + boardOffset.y;');
+    expect(menuSceneSource).toContain('if (this.settings.toggleCameraFollow) {');
+    expect(menuSceneSource).toContain('this.boardStaticDirty = true;');
+    expect(toggleFieldSource).toContain('affectsBoardStatic: true');
+  });
+
   test('keeps front-door buttons in the legacy dark-pane chrome path', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 

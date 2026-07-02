@@ -42,7 +42,7 @@ export const applyLegacyOverlayToggleField = (
       return {
         settings: nextSettings,
         affectsBackdrop: false,
-        affectsBoardStatic: false,
+        affectsBoardStatic: true,
         affectsBoardDynamic: true,
         legacyDirectionalLightIntensity: null,
         stateText: resolveLegacyOverlayToggleStateText(fieldId, nextSettings.toggleCameraFollow)

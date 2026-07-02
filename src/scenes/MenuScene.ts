@@ -1365,6 +1365,9 @@ export class MenuScene extends Phaser.Scene {
 
     this.player = nextStep.player;
     this.trail = nextStep.trail;
+    if (this.settings.toggleCameraFollow) {
+      this.boardStaticDirty = true;
+    }
 
     if (nextStep.reachedGoal) {
       this.schedulePlayResetReturn();
@@ -1450,7 +1453,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawStaticBoard(): void {
-    const { boardLeft, boardTop, boardSize, tileSize } = this.layout;
+    const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardSize, tileSize } = this.layout;
+    const boardOffset = this.resolveBoardOffset();
+    const boardLeft = layoutBoardLeft + boardOffset.x;
+    const boardTop = layoutBoardTop + boardOffset.y;
     const isMenuMode = this.mode === 'menu';
     const pathColor = isMenuMode
       ? LEGACY_MENU_PATH_CORE

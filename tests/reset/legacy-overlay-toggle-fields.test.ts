@@ -15,7 +15,7 @@ describe('legacy overlay toggle fields', () => {
     expect(resolveLegacyOverlayToggleStateText('darkMode', true)).toBeNull();
   });
 
-  test('toggles feature fields without forcing backdrop or static-board work', () => {
+  test('toggles feature fields through their exact board refresh lanes', () => {
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
 
     const cameraFollow = applyLegacyOverlayToggleField(settings, 'toggleCameraFollow');
@@ -24,7 +24,7 @@ describe('legacy overlay toggle fields', () => {
     expect(cameraFollow.settings.toggleCameraFollow).toBe(true);
     expect(cameraFollow.stateText).toBe('Off');
     expect(cameraFollow.affectsBackdrop).toBe(false);
-    expect(cameraFollow.affectsBoardStatic).toBe(false);
+    expect(cameraFollow.affectsBoardStatic).toBe(true);
     expect(cameraFollow.affectsBoardDynamic).toBe(true);
     expect(cameraFollow.legacyDirectionalLightIntensity).toBeNull();
 
