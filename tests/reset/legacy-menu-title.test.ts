@@ -40,4 +40,16 @@ describe('legacy menu title presentation', () => {
     expect(presentation.shadowOffsetY).toBeLessThanOrEqual(5);
     expect(presentation.titleAlpha).toBeGreaterThan(presentation.shadowAlpha);
   });
+
+  test('uses a tighter ultra-narrow wordmark for dense generated menu boards', () => {
+    const snapshotPresentation = resolveLegacyMenuTitlePresentation(147, 3, true, 172, 'snapshot');
+    const proceduralPresentation = resolveLegacyMenuTitlePresentation(147, 3, true, 172, 'procedural');
+
+    expect(proceduralPresentation.fontSize).toBeLessThan(snapshotPresentation.fontSize);
+    expect(proceduralPresentation.fontSize).toBeGreaterThanOrEqual(34);
+    expect(proceduralPresentation.fontSize).toBeLessThanOrEqual(36);
+    expect(proceduralPresentation.fontSize * 3.25).toBeLessThanOrEqual(118);
+    expect(proceduralPresentation.titleAlpha).toBeLessThan(snapshotPresentation.titleAlpha);
+    expect(proceduralPresentation.titleAlpha).toBeGreaterThan(proceduralPresentation.shadowAlpha);
+  });
 });

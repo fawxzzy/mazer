@@ -6,19 +6,26 @@ export interface LegacyMenuTitlePresentation {
   titleAlpha: number;
 }
 
+export type LegacyMenuTitleSurface = 'snapshot' | 'procedural';
+
 export const resolveLegacyMenuTitlePresentation = (
   boardSize: number,
   tileSize: number,
   isPortrait: boolean,
-  viewportWidth = boardSize
+  viewportWidth = boardSize,
+  surface: LegacyMenuTitleSurface = 'snapshot'
 ): LegacyMenuTitlePresentation => {
   const baseFontSize = Math.max(
     isPortrait ? 78 : 142,
     Math.round(boardSize * (isPortrait ? 0.205 : 0.226))
   );
   const isUltraNarrow = isPortrait && viewportWidth < 360;
+  const isProceduralUltraNarrow = isUltraNarrow && surface === 'procedural';
   const fontSize = isUltraNarrow
-    ? Math.round(Math.min(baseFontSize, Math.max(42, viewportWidth * 0.3)))
+    ? Math.round(Math.min(
+      baseFontSize,
+      Math.max(isProceduralUltraNarrow ? 34 : 42, viewportWidth * (isProceduralUltraNarrow ? 0.2 : 0.3))
+    ))
     : baseFontSize;
   const shadowOffsetX = isUltraNarrow
     ? Math.max(2, Math.round(fontSize * 0.07))
@@ -32,6 +39,6 @@ export const resolveLegacyMenuTitlePresentation = (
     shadowOffsetX,
     shadowOffsetY,
     shadowAlpha: isPortrait ? 0.38 : 0.34,
-    titleAlpha: isPortrait ? 0.76 : 0.7
+    titleAlpha: isProceduralUltraNarrow ? 0.64 : (isPortrait ? 0.76 : 0.7)
   };
 };

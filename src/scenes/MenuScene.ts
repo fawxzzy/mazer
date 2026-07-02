@@ -1150,7 +1150,8 @@ export class MenuScene extends Phaser.Scene {
       this.layout.boardSize,
       this.layout.tileSize,
       isPortrait,
-      width
+      width,
+      this.maze.source === 'menu-generated' ? 'procedural' : 'snapshot'
     );
 
     this.titleShadow
