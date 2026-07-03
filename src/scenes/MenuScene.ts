@@ -317,6 +317,7 @@ declare global {
 
 export const MENU_SCENE_VISUAL_CAPTURE_KEY = '__MAZER_VISUAL_CAPTURE__' as const;
 export const MENU_SCENE_VISUAL_DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__' as const;
+export const MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics' as const;
 
 const BOARD_SHADOW_OFFSET = 0;
 const MENU_BUTTON_ALPHA = 0.1;
@@ -2607,7 +2608,7 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.visualDiagnosticsRevision += 1;
-    window[MENU_SCENE_VISUAL_DIAGNOSTICS_KEY] = {
+    const diagnostics: MenuSceneVisualDiagnostics = {
       revision: this.visualDiagnosticsRevision,
       updatedAt: Math.max(0, Math.round(time)),
       viewport: {
@@ -2768,6 +2769,11 @@ export class MenuScene extends Phaser.Scene {
         arrowAngleRadians: this.hudFrame?.arrowAngleRadians ?? null
       }
     };
+    window[MENU_SCENE_VISUAL_DIAGNOSTICS_KEY] = diagnostics;
+    window.document?.documentElement?.setAttribute(
+      MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE,
+      JSON.stringify(diagnostics)
+    );
   }
 
   private clearVisualDiagnostics(): void {
@@ -2776,5 +2782,6 @@ export class MenuScene extends Phaser.Scene {
     }
 
     delete window[MENU_SCENE_VISUAL_DIAGNOSTICS_KEY];
+    window.document?.documentElement?.removeAttribute(MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE);
   }
 }

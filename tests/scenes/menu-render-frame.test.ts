@@ -238,6 +238,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(toggleFieldSource).toContain('affectsBoardStatic: true');
   });
 
+  test('publishes visual diagnostics to a maintained-browser DOM fallback', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain("export const MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics' as const;");
+    expect(menuSceneSource).toContain('const diagnostics: MenuSceneVisualDiagnostics = {');
+    expect(menuSceneSource).toContain('window[MENU_SCENE_VISUAL_DIAGNOSTICS_KEY] = diagnostics;');
+    expect(menuSceneSource).toContain('MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE,');
+    expect(menuSceneSource).toContain('JSON.stringify(diagnostics)');
+    expect(menuSceneSource).toContain('removeAttribute(MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE)');
+  });
+
   test('keeps front-door buttons in the legacy dark-pane chrome path', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 

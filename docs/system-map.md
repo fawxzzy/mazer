@@ -63,7 +63,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | active front door and play shell | `src/scenes/MenuScene.ts` | in-app browser, `npm run verify`; play board rendering owns connected corridor material for generated mazes |
 | active-play keyboard, focus-loss, and mobile pointer movement | `src/legacy-runtime/legacyPlayStep.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/scenes/menu-runtime-diagnostics.test.ts`, localhost mobile/play proof; accepted movement keys are consumed at the scene boundary, browser focus loss clears held movement flags and pending movement timers, pointer/touch swipes plus short taps resolve into the same one-step vector and axis-gated collision path as keyboard input with pointer starts bounded to the active board rectangle, and runtime diagnostics publish the live input-buffer state for maintained-browser feel review |
 | live runtime diagnostics bridge | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, localhost; diagnostics are data-only and do not draw a visible proof/debug panel over the game, and `generation.maze` exposes source/build family plus compact maze quality stats for maintained-browser proof |
-| active-play HUD timer and goal arrow | `src/legacy-runtime/legacyPlayHud.ts`, `src/scenes/MenuScene.ts#drawHud()` | `tests/reset/legacy-play-hud.test.ts`, `tests/reset/legacy-reset.test.ts`, desktop/mobile play-route screenshots, `window.__MAZER_VISUAL_DIAGNOSTICS__` with bare `timerText`, `arrowAngleRadians`, and `arrowAngleDegrees`; source-shaped minimal Timer/EndArrow chrome |
+| active-play HUD timer and goal arrow | `src/legacy-runtime/legacyPlayHud.ts`, `src/scenes/MenuScene.ts#drawHud()` | `tests/reset/legacy-play-hud.test.ts`, `tests/reset/legacy-reset.test.ts`, desktop/mobile play-route screenshots, `window.__MAZER_VISUAL_DIAGNOSTICS__` / `data-mazer-visual-diagnostics` with bare `timerText`, `arrowAngleRadians`, and `arrowAngleDegrees`; source-shaped minimal Timer/EndArrow chrome |
 | fixed menu maze shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `tests/reset/legacy-reset.test.ts`, screenshots |
 | generated play maze | `src/legacy-runtime/legacyMaze.ts` | `tests/reset/legacy-reset.test.ts`; includes source-shaped checkpoint pathing, shortcut bridges, disconnected-floor pruning, and weak-goal rebasing for playable browser topology |
 | menu title/board/button layout math | `src/legacy-runtime/legacyMenuLayout.ts`, `src/legacy-runtime/legacyMenuTitle.ts` | `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-title.test.ts`; `menu-generated` uses a tighter ultra-narrow title cap than fixed screenshot snapshots so dense procedural boards stay legible in the maintained side browser |
@@ -94,7 +94,7 @@ This is the active state contract for the current app front door.
 | current maze snapshot | `LegacyMazeSnapshot` | `src/legacy-runtime/legacyMaze.ts` | menu mode uses `createLegacyGeneratedMenuMaze()`, play mode uses `createLegacyMaze()`, and `createLegacyMenuMaze()` remains a fixed screenshot fixture |
 | menu demo episode/config/state | `MazeEpisode`, `DemoWalkerConfig`, `DemoWalkerState` | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | menu-only attract route and preroll truth |
 | player/trail/goal live state | `player`, `trail`, `goal` | `src/scenes/MenuScene.ts` | trail presentation differs between menu and play, but ownership stays local to the scene |
-| visual diagnostics | `window.__MAZER_VISUAL_DIAGNOSTICS__` | `src/scenes/MenuScene.ts` | visual proof scripts treat this as route-aware readback, not gameplay truth; active-play board bounds use the same camera-follow offset as the rendered static/dynamic board layers |
+| visual diagnostics | `window.__MAZER_VISUAL_DIAGNOSTICS__`, `data-mazer-visual-diagnostics` | `src/scenes/MenuScene.ts` | visual proof scripts treat this as route-aware readback, not gameplay truth; active-play board bounds use the same camera-follow offset as the rendered static/dynamic board layers, and the DOM attribute is the maintained-browser fallback when automation cannot read hidden window globals |
 | runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; browser automation still may not see the `window` globals directly, but the DOM attribute is the repo-owned fallback surface and now exposes active menu-demo cue, route shape, mistake-enabled lane state, AI wrong-branch/backtrack/recovery counters, generation stage cursor, stage-6 draw progress, and compact maze source/build/quality readback without drawing visible debug text |
 
 ## End-to-end flow map
@@ -118,7 +118,7 @@ Use this when you need to understand the app as a system instead of a file list.
 8. Active play:
    movement, win/reset return, pause routing, and generated-board rendering stay inside `MenuScene`; source-exact timer HUD formatting and goal-arrow radians/degrees geometry route through `legacyPlayHud.ts` before `MenuScene.drawHud()` renders them through a minimal Timer/EndArrow visual lane.
 9. Proof readback:
-   visual scripts and live checks read `window.__MAZER_VISUAL_DIAGNOSTICS__`; reset-lane tests assert the stable contracts under `tests/reset/*`.
+   visual scripts and live checks read `window.__MAZER_VISUAL_DIAGNOSTICS__` or the mirrored `data-mazer-visual-diagnostics` DOM fallback; reset-lane tests assert the stable contracts under `tests/reset/*`.
 
 ### Generation / reset owner chain
 
@@ -493,6 +493,7 @@ What `verify` currently means:
 - in-app browser on localhost
   - fastest human truth check for the active surface
 - `window.__MAZER_VISUAL_DIAGNOSTICS__`
+- `data-mazer-visual-diagnostics`
   - board bounds plus live reset-lane runtime pointers:
   - active-play board bounds include the camera-follow offset used by rendered board layers
   - mode / overlay
