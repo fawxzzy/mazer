@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import {
   advanceLegacyPlayStep,
+  createLegacyPlayPointerStart,
   createLegacyPlayMoveFlags,
   isPointInsideLegacyBoardBounds,
+  isSameLegacyPlayPointer,
   LEGACY_PLAY_TRAIL_FADE_TAIL,
   LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
   resolveLegacyPointerMoveVector,
@@ -143,6 +145,77 @@ describe('legacy play step', () => {
       playerScreenY: 160,
       tileSize: 8
     })).toEqual({ deltaX: 1, deltaY: 0 });
+  });
+
+  test('binds mobile play swipes to one active pointer identity', () => {
+    const firstTouch = createLegacyPlayPointerStart({
+      id: 1,
+      identifier: 12,
+      pointerId: 101,
+      x: 120,
+      y: 140
+    });
+
+    expect(firstTouch).toEqual({
+      id: 1,
+      identifier: 12,
+      pointerId: 101,
+      x: 120,
+      y: 140
+    });
+    expect(isSameLegacyPlayPointer(firstTouch, {
+      id: 2,
+      identifier: 13,
+      pointerId: 102,
+      x: 128,
+      y: 140
+    })).toBe(false);
+    expect(isSameLegacyPlayPointer(firstTouch, {
+      id: 99,
+      identifier: 13,
+      pointerId: 101,
+      x: 220,
+      y: 140
+    })).toBe(true);
+  });
+
+  test('falls back to touch identifier then Phaser pointer id for active pointer matching', () => {
+    const touchStart = createLegacyPlayPointerStart({
+      id: 1,
+      identifier: 14,
+      pointerId: null,
+      x: 120,
+      y: 140
+    });
+    const mouseStart = createLegacyPlayPointerStart({
+      id: 0,
+      identifier: null,
+      pointerId: null,
+      x: 120,
+      y: 140
+    });
+
+    expect(isSameLegacyPlayPointer(touchStart, {
+      id: 2,
+      identifier: 14,
+      pointerId: null,
+      x: 180,
+      y: 140
+    })).toBe(true);
+    expect(isSameLegacyPlayPointer(touchStart, {
+      id: 2,
+      identifier: 15,
+      pointerId: null,
+      x: 180,
+      y: 140
+    })).toBe(false);
+    expect(isSameLegacyPlayPointer(mouseStart, {
+      id: 0,
+      identifier: null,
+      pointerId: null,
+      x: 180,
+      y: 140
+    })).toBe(true);
   });
 
   test('ignores tiny mobile taps on the player center', () => {
