@@ -23,6 +23,7 @@ const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
 const VISUAL_CAPTURE_KEY = '__MAZER_VISUAL_CAPTURE__';
 const VISUAL_DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__';
+const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
 const LAYOUT_MATRIX_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-layout-matrix');
 const DEFAULT_ROUTE = '/';
 const CAPTURE_RETRIES = 3;
@@ -186,7 +187,27 @@ const waitForLayoutDiagnostics = async (page, timeoutMs, context) => {
   let lastReadiness = resolveLayoutMatrixReadiness(context);
 
   while ((Date.now() - startedAt) < timeoutMs) {
-    lastDiagnostics = await page.evaluate((diagnosticsKey) => window[diagnosticsKey] ?? null, VISUAL_DIAGNOSTICS_KEY);
+    lastDiagnostics = await page.evaluate(({ diagnosticsKey, diagnosticsAttribute }) => {
+      const fromWindow = window[diagnosticsKey] ?? null;
+      if (fromWindow) {
+        return fromWindow;
+      }
+
+      const serialized = document.documentElement.getAttribute(diagnosticsAttribute);
+      if (typeof serialized !== 'string' || serialized.length === 0) {
+        return null;
+      }
+
+      try {
+        const parsed = JSON.parse(serialized);
+        return parsed?.board?.bounds && parsed?.runtime?.mode ? parsed : null;
+      } catch {
+        return null;
+      }
+    }, {
+      diagnosticsKey: VISUAL_DIAGNOSTICS_KEY,
+      diagnosticsAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
+    });
     lastReadiness = resolveLayoutMatrixReadiness({
       ...context,
       diagnostics: lastDiagnostics

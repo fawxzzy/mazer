@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 const loadEdgeLiveHelpers = async () => {
   // @ts-expect-error The helper module is plain .mjs without TS declarations.
@@ -6,6 +8,18 @@ const loadEdgeLiveHelpers = async () => {
 };
 
 describe('edge live check', () => {
+  test('keeps visual proof scripts on the DOM diagnostics fallback', () => {
+    const edgeLiveSource = readFileSync(resolve(process.cwd(), 'scripts/visual/edge-live-check.mjs'), 'utf8');
+    const captureSource = readFileSync(resolve(process.cwd(), 'scripts/visual/capture.mjs'), 'utf8');
+    const layoutMatrixSource = readFileSync(resolve(process.cwd(), 'scripts/visual/capture-layout-matrix.mjs'), 'utf8');
+
+    for (const source of [edgeLiveSource, captureSource, layoutMatrixSource]) {
+      expect(source).toContain('data-mazer-visual-diagnostics');
+      expect(source).toContain('document.documentElement.getAttribute');
+      expect(source).toContain('JSON.parse(serialized)');
+    }
+  });
+
   test('builds edge-live experiment metadata from toggles', async () => {
     const { buildEdgeLiveExperiment } = await loadEdgeLiveHelpers();
 
@@ -131,15 +145,28 @@ describe('edge live check', () => {
         listenerCount: 4
       }
     };
+    const visualDiagnosticsFromAttribute = {
+      revision: 7,
+      board: {
+        bounds: { left: 12, top: 20, right: 212, bottom: 220 },
+        safeBounds: { left: 0, top: 0, right: 240, bottom: 260 }
+      },
+      runtime: {
+        mode: 'play',
+        trailLength: 5
+      }
+    };
     const originalWindow = globalThis.window;
     const originalDocument = globalThis.document;
     const diagnosticsFromDom = await readDiagnostics({
       evaluate: async (pageFunction: (arg: {
         visual: string;
+        visualAttribute: string;
         runtime: string;
         runtimeAttribute: string;
       }) => unknown, arg: {
         visual: string;
+        visualAttribute: string;
         runtime: string;
         runtimeAttribute: string;
       }) => {
@@ -154,7 +181,9 @@ describe('edge live check', () => {
               getAttribute: (name: string) => (
                 name === arg.runtimeAttribute
                   ? JSON.stringify(runtimeDiagnosticsFromAttribute)
-                  : null
+                  : name === arg.visualAttribute
+                    ? JSON.stringify(visualDiagnosticsFromAttribute)
+                    : null
               )
             }
           }
@@ -174,6 +203,15 @@ describe('edge live check', () => {
         }
       },
       waitForTimeout: async () => {}
+    });
+    expect(diagnosticsFromDom.visual).toMatchObject({
+      revision: 7,
+      board: {
+        bounds: { left: 12, top: 20, right: 212, bottom: 220 }
+      },
+      runtime: {
+        mode: 'play'
+      }
     });
     expect(diagnosticsFromDom.runtime).toMatchObject({
       sceneInstanceId: 9,
