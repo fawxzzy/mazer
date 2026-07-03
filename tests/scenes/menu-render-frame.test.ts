@@ -1,8 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import {
+  resolveLegacyDynamicMarkerInset,
+  resolveLegacyDynamicTrailStrokeWidth,
   resolveLegacyMenuPathRenderFrame,
   resolveLegacyMenuPathRenderFrames,
-  resolveLegacyMenuPathRenderSegments
+  resolveLegacyMenuPathRenderSegments,
+  resolveLegacyPlayerMarkerRenderMetrics
 } from '../../src/legacy-runtime/legacyMenuRender';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -205,7 +208,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const connectedLeft = trailKeys.has(`${point.x - 1},${point.y}`);');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player');
     expect(menuSceneSource).toContain('const centerX = originX + ((point.x + 0.5) * tileSize);');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillCircle(centerX, centerY, coreRadius);');
+    expect(menuSceneSource).toContain('resolveLegacyPlayerMarkerRenderMetrics(');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.coreRadius);');
   });
 
   test('keeps active play dynamic overlays in the corridor frame instead of square cells', () => {
@@ -221,6 +225,28 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const goalScreenX = this.layout.boardLeft + boardOffset.x + ((this.maze.goal.x + 0.5) * this.layout.tileSize);');
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, point, trailColor, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, trailAlpha, 1);');
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, this.player, 0xf2f4f8, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, 0);');
+  });
+
+  test('clamps dynamic overlays for ultra-narrow mobile tiles without oversized player blobs', () => {
+    expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.62, 3)).toBe(2);
+    expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.34, 2)).toBe(1);
+    expect(resolveLegacyDynamicMarkerInset(3.265, 0.22)).toBe(1);
+    expect(resolveLegacyPlayerMarkerRenderMetrics(3.265, 0.34, 0.54)).toEqual({
+      coreRadius: 1,
+      haloRadius: 2,
+      strokeWidth: 1
+    });
+  });
+
+  test('keeps larger desktop tiles visibly weighted after responsive overlay sizing', () => {
+    expect(resolveLegacyDynamicTrailStrokeWidth(18, 0.62, 3)).toBe(11);
+    expect(resolveLegacyDynamicTrailStrokeWidth(18, 0.34, 2)).toBe(6);
+    expect(resolveLegacyDynamicMarkerInset(18, 0.22)).toBe(3);
+    expect(resolveLegacyPlayerMarkerRenderMetrics(18, 0.34, 0.54)).toEqual({
+      coreRadius: 6,
+      haloRadius: 10,
+      strokeWidth: 2
+    });
   });
 
   test('keeps mobile active-play swipes bound to one pointer identity', () => {

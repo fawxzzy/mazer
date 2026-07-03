@@ -98,8 +98,11 @@ import {
   createLegacyMenuDemoWalkerConfig,
 } from '../legacy-runtime/legacyDemoWalker';
 import {
+  resolveLegacyDynamicMarkerInset,
+  resolveLegacyDynamicTrailStrokeWidth,
   resolveLegacyMenuPathRenderFrames,
-  resolveLegacyMenuPathRenderSegments
+  resolveLegacyMenuPathRenderSegments,
+  resolveLegacyPlayerMarkerRenderMetrics
 } from '../legacy-runtime/legacyMenuRender';
 import {
   clearMenuSceneRuntimeDiagnostics,
@@ -1823,12 +1826,12 @@ export class MenuScene extends Phaser.Scene {
     };
 
     drawTrailStroke(
-      Math.max(3, Math.floor(tileSize * edgeRatio)),
+      resolveLegacyDynamicTrailStrokeWidth(tileSize, edgeRatio, 3),
       edgeColor,
       Math.min(0.32, alpha * edgeAlphaScale)
     );
     drawTrailStroke(
-      Math.max(2, Math.floor(tileSize * coreRatio)),
+      resolveLegacyDynamicTrailStrokeWidth(tileSize, coreRatio, 2),
       color,
       Math.min(coreAlphaMax, alpha)
     );
@@ -1842,7 +1845,7 @@ export class MenuScene extends Phaser.Scene {
     tileSize: number,
     alpha: number
   ): void {
-    const inset = Math.max(2, Math.floor(tileSize * LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO));
+    const inset = resolveLegacyDynamicMarkerInset(tileSize, LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO);
     this.fillTile(this.boardDynamicGraphics, point, color, originX, originY, tileSize, alpha, inset);
   }
 
@@ -1854,7 +1857,7 @@ export class MenuScene extends Phaser.Scene {
     tileSize: number,
     alpha: number
   ): void {
-    const inset = Math.max(2, Math.floor(tileSize * LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO));
+    const inset = resolveLegacyDynamicMarkerInset(tileSize, LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO);
     this.fillTile(this.boardDynamicGraphics, point, color, originX, originY, tileSize, alpha, inset);
   }
 
@@ -1867,15 +1870,18 @@ export class MenuScene extends Phaser.Scene {
   ): void {
     const centerX = originX + ((point.x + 0.5) * tileSize);
     const centerY = originY + ((point.y + 0.5) * tileSize);
-    const haloRadius = Math.max(4, Math.floor(tileSize * LEGACY_PLAYER_MARKER_HALO_RATIO));
-    const coreRadius = Math.max(2, Math.floor(tileSize * LEGACY_PLAYER_MARKER_RADIUS_RATIO));
+    const playerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
+      tileSize,
+      LEGACY_PLAYER_MARKER_RADIUS_RATIO,
+      LEGACY_PLAYER_MARKER_HALO_RATIO
+    );
 
     this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_HALO, Math.min(0.72, alpha * 0.72));
-    this.boardDynamicGraphics.fillCircle(centerX, centerY, haloRadius);
-    this.boardDynamicGraphics.lineStyle(Math.max(1, Math.floor(tileSize * 0.12)), LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.72, alpha * 0.72));
-    this.boardDynamicGraphics.strokeCircle(centerX, centerY, coreRadius + 1);
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.haloRadius);
+    this.boardDynamicGraphics.lineStyle(playerMetrics.strokeWidth, LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.72, alpha * 0.72));
+    this.boardDynamicGraphics.strokeCircle(centerX, centerY, playerMetrics.coreRadius + 1);
     this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_CORE, alpha);
-    this.boardDynamicGraphics.fillCircle(centerX, centerY, coreRadius);
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.coreRadius);
   }
 
   private drawHud(time: number): void {
