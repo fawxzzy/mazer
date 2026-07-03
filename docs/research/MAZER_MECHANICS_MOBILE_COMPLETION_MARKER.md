@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 Status: active
-Current marker: `81%`
+Current marker: `82%`
 
 ## Intent
 
@@ -40,13 +40,13 @@ These can still be useful references, but they are not the active target.
 | Core gameplay loop and reset semantics | `20` | `19` | strong with generated-play traversal proof | `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | final touch-first/live play-feel proof across keyboard and pointer input after visual/layout tuning |
 | Maze generation and topology quality | `25` | `20` | strong with weak-route guard | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | continue tuning shortcut/alternate-route quality across wider seed families without disconnected floors, shallow loops, or degenerate goals |
 | Menu AI/demo loop | `15` | `13` | source-shaped with generated-menu seed proof | `src/domain/ai/demoWalker.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | continue proving clean recovery/replay behavior across wider generated menu seed families |
-| Mobile input and active-play usability | `15` | `12` | functional | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | confirm touch-first play stays reliable after board sizing/readability changes |
+| Mobile input and active-play usability | `15` | `13` | live touch movement proof | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | prove touch controls for pause/resume/restart/toggle and continue mobile board/player readability checks after layout tuning |
 | Top-down visual readability | `15` | `9` | improving with responsive overlay sizing | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyMenuRender.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | continue tuning board, floors, walls, player, trail, start, and goal crispness across narrow mobile and desktop |
 | Documentation, diagnostics, and proof safety | `10` | `8` | useful | `docs/current-truth.md`, `docs/system-map.md`, `tests/**`, runtime/visual diagnostics | keep the active target and proof spine synchronized as the old 1:1 lane becomes archival |
 
 Current total:
 
-- `81 / 100`
+- `82 / 100`
 
 ## Marker rule
 
