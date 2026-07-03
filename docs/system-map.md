@@ -9,11 +9,12 @@ Use it when you want to change behavior without losing track of the whole applic
 When sources disagree, read in this order:
 
 1. `legacy/old-project.zip`
-2. `legacy/screenshots/menu-01.png` .. `menu-04.png`
-3. `docs/legacy/*`
-4. `docs/current-truth.md`
-5. `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md`
-6. current runtime code and tests
+2. `docs/legacy/*`
+3. `docs/current-truth.md`
+4. `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md`
+5. `legacy/screenshots/menu-01.png` .. `menu-04.png` as archival visual reference unless screenshot parity is explicitly reopened
+6. `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` as retired visual parity history
+7. current runtime code and tests
 
 ## Runtime boot graph
 
@@ -76,7 +77,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | legacy defaults/colors/button labels | `src/legacy-runtime/legacyDefaults.ts` | `tests/reset/legacy-reset.test.ts` |
 | archived visual truth | `legacy/screenshots/menu-01.png` .. `menu-04.png` | direct visual comparison |
 | archived behavior truth | `legacy/old-project.zip`, `docs/legacy/*` | `npm run legacy:extract` |
-| parity contract / open gaps | `docs/current-truth.md`, `docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md`, `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` | latest packet + repo proof |
+| active completion contract / open gaps | `docs/current-truth.md`, `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md`, `docs/research/MAZER_LEGACY_WEB_PARITY_MATRIX.md`, `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md` | latest packet + repo proof; legacy visual 1:1 is archival unless explicitly reopened |
 
 Rule:
 
@@ -638,9 +639,9 @@ When the page still feels wrong but the board route is already close, use this q
 ## Invariants to preserve
 
 - gameplay truth comes from the restored Unreal project
-- visual truth comes from `legacy/screenshots/*`
-- the repo-wide 1:1 percent lives in `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md`
+- active visual direction is mobile-clean, top-down readability; `legacy/screenshots/*` are archival visual reference unless screenshot-grade parity is explicitly reopened
+- the active repo-wide percent lives in `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md`; the old visual 1:1 percent is retired in `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md`
 - menu mode and play mode stay split
 - one active overlay at a time
 - menu screenshot work must not silently rewrite play behavior
-- do not claim 1:1 until the parity gaps are actually closed
+- do not claim 100% until the active mechanics/mobile gaps are actually closed

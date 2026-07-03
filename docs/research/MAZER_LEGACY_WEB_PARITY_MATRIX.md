@@ -1,7 +1,9 @@
 # Mazer Legacy Web Parity Matrix
 
 Date: 2026-06-28
-Status: initial matrix after legacy restore
+Status: archival unless screenshot-grade legacy parity is explicitly reopened
+
+2026-07-03 update: the active target is now mechanics-first and mobile-clean. Use `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md` for current progress. This matrix remains historical context for the retired visual 1:1 lane.
 
 Restored legacy truth:
 
