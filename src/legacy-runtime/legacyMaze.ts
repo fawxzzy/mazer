@@ -51,6 +51,8 @@ export interface LegacyMazeSnapshot {
     uniqueWallCandidates: number;
     created: number;
     exhaustedWallArray: boolean;
+    qualityReinforcementAttempts?: number;
+    qualityReinforcementCreated?: number;
   };
   generation?: {
     budget: {
@@ -443,9 +445,14 @@ const normalizeLegacyPlayableTopology = (
 const isLegacyShortcutBridgeCandidate = (
   grid: boolean[][],
   point: LegacyPoint
-): boolean => {
+): boolean => resolveLegacyShortcutBridgeEndpoints(grid, point) !== null;
+
+const resolveLegacyShortcutBridgeEndpoints = (
+  grid: boolean[][],
+  point: LegacyPoint
+): [LegacyPoint, LegacyPoint] | null => {
   if (grid[point.y]?.[point.x] === true) {
-    return false;
+    return null;
   }
 
   const top = grid[point.y - 1]?.[point.x];
@@ -458,14 +465,28 @@ const isLegacyShortcutBridgeCandidate = (
     || left === undefined
     || right === undefined
   ) {
-    return false;
+    return null;
   }
 
   const verticalWalls = top === false && bottom === false;
   const horizontalWalls = left === false && right === false;
   const horizontalPaths = left === true && right === true;
   const verticalPaths = top === true && bottom === true;
-  return (verticalWalls && horizontalPaths) || (horizontalWalls && verticalPaths);
+  if (verticalWalls && horizontalPaths) {
+    return [
+      { x: point.x - 1, y: point.y },
+      { x: point.x + 1, y: point.y }
+    ];
+  }
+
+  if (horizontalWalls && verticalPaths) {
+    return [
+      { x: point.x, y: point.y - 1 },
+      { x: point.x, y: point.y + 1 }
+    ];
+  }
+
+  return null;
 };
 
 const collectLegacyShortcutWallArray = (grid: boolean[][]): LegacyPoint[] => {
@@ -541,6 +562,61 @@ const applyLegacyShortcutBridges = (
     uniqueWallCandidates,
     created,
     exhaustedWallArray: wallArray.length === 0 && created < shortcutCount
+  };
+};
+
+const reinforceLegacyRouteQuality = (
+  grid: boolean[][],
+  rng: () => number,
+  start: LegacyPoint,
+  goal: LegacyPoint,
+  solutionPath: LegacyPoint[],
+  routeQualityStats: NonNullable<LegacyMazeSnapshot['routeQualityStats']>,
+  maxExtraShortcuts: number
+): {
+  routeQualityStats: NonNullable<LegacyMazeSnapshot['routeQualityStats']>;
+  solutionPath: LegacyPoint[];
+  attempts: number;
+  created: number;
+} => {
+  if (routeQualityStats.routeQuality === 'multi-route' || maxExtraShortcuts <= 0) {
+    return {
+      routeQualityStats,
+      solutionPath,
+      attempts: 0,
+      created: 0
+    };
+  }
+
+  const wallArray = collectLegacyShortcutWallArray(grid);
+  let attempts = 0;
+  let created = 0;
+  let nextSolutionPath = solutionPath;
+  let nextRouteQualityStats = routeQualityStats;
+
+  while (
+    created < maxExtraShortcuts
+    && wallArray.length > 0
+    && nextRouteQualityStats.routeQuality !== 'multi-route'
+  ) {
+    attempts += 1;
+    const candidateIndex = Math.floor(rng() * wallArray.length);
+    const [candidate] = wallArray.splice(candidateIndex, 1);
+    if (!candidate || !isLegacyShortcutBridgeCandidate(grid, candidate)) {
+      continue;
+    }
+
+    grid[candidate.y]![candidate.x] = true;
+    created += 1;
+    nextSolutionPath = buildShortestPath(grid, start, goal);
+    nextRouteQualityStats = measureLegacyRouteQuality(grid, start, goal, nextSolutionPath);
+  }
+
+  return {
+    routeQualityStats: nextRouteQualityStats,
+    solutionPath: nextSolutionPath,
+    attempts,
+    created
   };
 };
 
@@ -938,8 +1014,25 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     : 0;
   const shortcutStats = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount, wallArray);
   const { goal, stats: playableTopologyStats } = normalizeLegacyPlayableTopology(grid, start, sourceGoal);
-  const solutionPath = buildShortestPath(grid, start, goal);
-  const routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath);
+  let solutionPath = buildShortestPath(grid, start, goal);
+  let routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath);
+
+  const reinforcementStats = reinforceLegacyRouteQuality(
+    grid,
+    rng,
+    start,
+    goal,
+    solutionPath,
+    routeQualityStats,
+    resolvedShortcutCount > 0 ? Math.max(2, Math.floor(resolvedShortcutCount * 0.45)) : 0
+  );
+  if (reinforcementStats.created > 0) {
+    solutionPath = reinforcementStats.solutionPath;
+    routeQualityStats = reinforcementStats.routeQualityStats;
+    shortcutStats.created += reinforcementStats.created;
+    shortcutStats.qualityReinforcementAttempts = reinforcementStats.attempts;
+    shortcutStats.qualityReinforcementCreated = reinforcementStats.created;
+  }
 
   return {
     source: 'play-generated',

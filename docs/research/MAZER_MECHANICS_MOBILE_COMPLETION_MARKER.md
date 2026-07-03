@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 Status: active
-Current marker: `76%`
+Current marker: `78%`
 
 ## Intent
 
@@ -38,15 +38,15 @@ These can still be useful references, but they are not the active target.
 | Segment | Weight | Current points | Current truth | Main owners | Remaining gap |
 | --- | --- | --- | --- | --- | --- |
 | Core gameplay loop and reset semantics | `20` | `18` | strong | `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | final play-feel proof across touch and keyboard, especially after visual/layout tuning |
-| Maze generation and topology quality | `25` | `19` | strong but tunable | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | tune shortcut/alternate-route quality without disconnected floors, shallow loops, or degenerate goals |
+| Maze generation and topology quality | `25` | `20` | strong with weak-route guard | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | continue tuning shortcut/alternate-route quality across wider seed families without disconnected floors, shallow loops, or degenerate goals |
 | Menu AI/demo loop | `15` | `12` | source-shaped | `src/domain/ai/demoWalker.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | continue proving clean recovery/replay behavior on generated menu mazes |
 | Mobile input and active-play usability | `15` | `12` | functional | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | confirm touch-first play stays reliable after board sizing/readability changes |
 | Top-down visual readability | `15` | `8` | improving | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyMenuRender.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | make board, floors, walls, player, trail, start, and goal crisp on narrow mobile and desktop |
-| Documentation, diagnostics, and proof safety | `10` | `7` | useful | `docs/current-truth.md`, `docs/system-map.md`, `tests/**`, runtime/visual diagnostics | keep the active target and proof spine synchronized as the old 1:1 lane becomes archival |
+| Documentation, diagnostics, and proof safety | `10` | `8` | useful | `docs/current-truth.md`, `docs/system-map.md`, `tests/**`, runtime/visual diagnostics | keep the active target and proof spine synchronized as the old 1:1 lane becomes archival |
 
 Current total:
 
-- `76 / 100`
+- `78 / 100`
 
 ## Marker rule
 
