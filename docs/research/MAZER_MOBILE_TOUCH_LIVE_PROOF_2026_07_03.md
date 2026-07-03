@@ -1,7 +1,7 @@
 # Mazer Mobile Touch Live Proof
 
 Date: 2026-07-03
-Status: accepted mobile-touch movement plus partial control proof
+Status: accepted mobile-touch movement and control proof
 
 ## Scope
 
@@ -29,11 +29,11 @@ npm run edge:live -- --skip-build true --headless true --run mobile-touch-smoke
 - HUD overlap: `pass`
 - HUD clip: `pass`
 - Touch movement deltas: `3`
-- Touch control state: pause opens, restart changes state, and toggle/restart coordinates no longer overlap D-pad hit slop
+- Touch control state: pause opens, pause resumes from the same target, toggle-thoughts changes state, restart returns player state, and action controls no longer overlap D-pad hit slop
 - State changed: `yes`
 
-## Remaining Gap
+## Result
 
-The proof confirms touch movement through the maintained mobile play route and now covers a partial touch-control lane: pause opens from the shared mobile touch layout, restart changes state, the action column is separated from D-pad hit slop, and runtime diagnostics now expose overlay/resource state for maintained proof.
+The proof confirms touch movement and the maintained mobile touch-control route: pause, resume, toggle-thoughts, restart, and post-restart movement all change state in the `mobile-touch-smoke` timeline. Runtime diagnostics expose overlay/resource state for maintained proof, and the touch action column is separated from D-pad hit slop.
 
-The proof does not fully close mobile controls. The same pause touch target does not yet provide a maintained-smoke resume transition while the pause overlay is open, and `control_used` telemetry remains out of this reset-lane proof. The active marker can credit partial mobile control routing, but final touch-control usability remains open.
+This closes the mobile input/control proof lane for the current mechanics/mobile marker. Visible mobile control affordances remain a visual-readability task, and `control_used` telemetry remains out of this reset-lane proof.

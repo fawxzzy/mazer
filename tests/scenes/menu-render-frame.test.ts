@@ -268,8 +268,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolveTouchControlLayout');
     expect(menuSceneSource).toContain('private handleLegacyPlayTouchControl');
     expect(menuSceneSource).toContain('installLegacyPlayTouchControlFallback');
-    expect(menuSceneSource).toContain("target.addEventListener('touchstart'");
-    expect(menuSceneSource).toContain("target.addEventListener('touchend'");
+    expect(menuSceneSource).toContain("event.pointerType === 'touch'");
     expect(menuSceneSource).toContain('event.stopImmediatePropagation()');
     expect(menuSceneSource).toContain("case 'pause':");
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('reset-player');");

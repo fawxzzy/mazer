@@ -492,8 +492,6 @@ export class MenuScene extends Phaser.Scene {
   private legacyPlayWindowBlurHandler: (() => void) | null = null;
   private legacyPlayVisibilityChangeHandler: (() => void) | null = null;
   private legacyPlayTouchControlPointerDownHandler: ((event: PointerEvent) => void) | null = null;
-  private legacyPlayTouchControlTouchStartHandler: ((event: TouchEvent) => void) | null = null;
-  private legacyPlayTouchControlTouchEndHandler: ((event: TouchEvent) => void) | null = null;
   private runtimeFeedDiagnostics = summarizeMenuSceneRuntimeFeed({ nowMs: 0 });
 
   public constructor() {
@@ -1034,40 +1032,17 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private installLegacyPlayTouchControlFallback(): void {
-    if (
-      this.legacyPlayTouchControlPointerDownHandler !== null
-      || this.legacyPlayTouchControlTouchStartHandler !== null
-      || this.legacyPlayTouchControlTouchEndHandler !== null
-    ) {
+    if (this.legacyPlayTouchControlPointerDownHandler !== null) {
       return;
     }
 
     this.legacyPlayTouchControlPointerDownHandler = (event: PointerEvent) => {
+      // Phaser owns touch pointers; this fallback only catches non-touch pointer paths before DOM overlays.
+      if (event.pointerType === 'touch') {
+        return;
+      }
+
       if (!this.handleLegacyPlayTouchControlClientPoint(event.clientX, event.clientY)) {
-        return;
-      }
-
-      this.playPointerStart = null;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-    this.legacyPlayTouchControlTouchStartHandler = (event: TouchEvent) => {
-      if (this.overlay !== 'pause') {
-        return;
-      }
-
-      const touch = event.changedTouches.item(0);
-      if (!touch || !this.handleLegacyPlayTouchControlClientPoint(touch.clientX, touch.clientY)) {
-        return;
-      }
-
-      this.playPointerStart = null;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    };
-    this.legacyPlayTouchControlTouchEndHandler = (event: TouchEvent) => {
-      const touch = event.changedTouches.item(0);
-      if (!touch || !this.handleLegacyPlayTouchControlClientPoint(touch.clientX, touch.clientY)) {
         return;
       }
 
@@ -1083,22 +1058,10 @@ export class MenuScene extends Phaser.Scene {
         passive: false
       });
     }
-    target.addEventListener('touchstart', this.legacyPlayTouchControlTouchStartHandler as EventListener, {
-      capture: true,
-      passive: false
-    });
-    target.addEventListener('touchend', this.legacyPlayTouchControlTouchEndHandler as EventListener, {
-      capture: true,
-      passive: false
-    });
   }
 
   private detachLegacyPlayTouchControlFallback(): void {
-    if (
-      this.legacyPlayTouchControlPointerDownHandler === null
-      && this.legacyPlayTouchControlTouchStartHandler === null
-      && this.legacyPlayTouchControlTouchEndHandler === null
-    ) {
+    if (this.legacyPlayTouchControlPointerDownHandler === null) {
       return;
     }
 
@@ -1108,19 +1071,7 @@ export class MenuScene extends Phaser.Scene {
         capture: true
       });
     }
-    if (this.legacyPlayTouchControlTouchStartHandler !== null) {
-      target.removeEventListener('touchstart', this.legacyPlayTouchControlTouchStartHandler as EventListener, {
-        capture: true
-      });
-    }
-    if (this.legacyPlayTouchControlTouchEndHandler !== null) {
-      target.removeEventListener('touchend', this.legacyPlayTouchControlTouchEndHandler as EventListener, {
-        capture: true
-      });
-    }
     this.legacyPlayTouchControlPointerDownHandler = null;
-    this.legacyPlayTouchControlTouchStartHandler = null;
-    this.legacyPlayTouchControlTouchEndHandler = null;
   }
 
   private handleLegacyPlayTouchControlClientPoint(clientX: number, clientY: number): boolean {
