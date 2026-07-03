@@ -48,6 +48,26 @@ describe('input-human touch bridge', () => {
     )).toBe('move_right');
   });
 
+  test('keeps ultra-narrow portrait controls inside the viewport without oversized hit plates', () => {
+    const layout = resolveTouchControlLayout({
+      width: 172,
+      height: 407
+    });
+
+    expect(layout.frame.left).toBeGreaterThanOrEqual(0);
+    expect(layout.frame.right).toBeLessThanOrEqual(172);
+    expect(layout.frame.bottom).toBeLessThanOrEqual(407);
+    expect(layout.controls.move_up.width).toBeLessThan(52);
+    expect(layout.controls.move_left.left).toBeGreaterThanOrEqual(0);
+    expect(layout.controls.pause.right).toBeLessThanOrEqual(172);
+    expect(layout.controls.toggle_thoughts.bottom).toBeLessThanOrEqual(407);
+    expect(resolveTouchControlKindAtPoint(
+      layout,
+      layout.controls.move_left.centerX,
+      layout.controls.move_left.centerY
+    )).toBe('move_left');
+  });
+
   test('maps touch points into the shared human action schema and releases held pointers', () => {
     const layout = resolveTouchControlLayout({
       width: 390,

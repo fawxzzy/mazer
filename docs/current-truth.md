@@ -57,7 +57,7 @@ Use `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md` as the active re
 
 Current active marker:
 
-- `89%`
+- `90%`
 
 The old legacy visual 1:1 marker is retired at `93%` and is now archival. Do not ratchet it for future packets unless the operator explicitly reopens screenshot-grade legacy parity as the active target.
 
@@ -113,7 +113,7 @@ Why the active marker is not higher yet:
 - active-play movement now follows the restored Unreal simultaneous-key input buffer: first movement keydown arms a 50ms resolve delay, held direction flags can combine into one composite step, opposing directions cancel, repeat movement resolves the current held vector immediately, the buffer clears on pause/menu/reset and browser focus-loss boundaries, and runtime diagnostics publish the live held flags, resolved vector, pending timer, pointer-start state, and source delay for browser-side feel review
 - active-play pointer/touch input now maps mobile swipes and short taps into the same one-step vector contract used by keyboard movement before passing through the legacy axis-gated collision resolver; pointer starts outside the active board bounds are ignored so HUD/shell taps no longer trigger movement, in-flight swipes are bound to one pointer identity so second touches cannot overwrite the active start, `pointerupoutside` still completes inside-board swipes, game-out clears stale pointer starts, and `mobile-touch-smoke` now proves three maintained-browser touch movement deltas on the active play route
 - active-play camera-follow now applies the same board offset to the static maze, dynamic overlays, HUD geometry, pointer-bound checks, and visual diagnostics board bounds; movement marks the static board dirty when camera-follow is active so player/trail layers and proof rectangles do not drift away from the maze
-- active-play layout now uses a play-specific board-framing surface instead of reusing the front-door menu composition: the maintained `172x407` side-browser play board remains width-fit at `169x169` but is centered vertically (`top=119`, `bottom=288`) while menu mode keeps its stacked `Exit` / `Start` / `Options` layout (`250/300/350`), and visual diagnostics now publish the resolved layout/button surface for proof
+- active-play layout now uses a play-specific board-framing surface instead of reusing the front-door menu composition: the maintained `172x407` side-browser play board remains width-fit at `169x169`, but is intentionally top-biased (`top=57`, `bottom=226.001`) so compact touch controls can start at `241` with a clear board/control gap; menu mode keeps its stacked `Exit` / `Start` / `Options` layout (`250/300/350`), and visual diagnostics now publish the resolved layout/button surface for proof
 - active-play collision now follows the restored Unreal axis-gated movement shape more closely: simultaneous movement checks the horizontal and vertical side gates independently, slides along the open axis when one held axis is blocked, and blocks a true diagonal corner move when the final diagonal tile is a wall
 - active-play goal reset now uses the explicit process-8 `LegacyResetRequest` as the single return-to-menu authority, matching the restored Unreal `_ResetGame` -> process `8` branch more closely and removing the redundant scene-local `playResetReturnAtMs` shadow timer
 - active-play pause reset now preserves existing trail history while moving the player back to the start tile, matching the restored source's `_ResetPlayerPosition` branch more closely than the prior browser trail wipe
@@ -221,4 +221,4 @@ Localhost operation rule:
 - exact demo AI route/backtrack internals beyond the restored front-door recovery lane, cue/pacing surface, AI-only reset replay, immediate goal-reset handoff, `AiTilePathCheck` candidate gate, and connected reacquire path
 - exact active-play feel beyond the keyboard/pointer/focus-loss movement adapters, live keyboard/touch interaction proof, one-active-pointer mobile guard, pause-reset trail preservation, camera-follow layer alignment, active dynamic corridor overlays, extracted source-exact timer/goal-arrow contract, tighter compact overlay, minimal HUD widget chrome, data-only diagnostics proof, and full proof bounds
 - exact generation/reset-flow parity beyond the queued request contract
-- final mobile-clean board sizing plus wider player/trail readability proof beyond the now-visible compact touch-control affordances and ultra-narrow play-route pass
+- final mobile-clean board sizing plus wider player/trail readability proof beyond the now-separated compact touch-control lane and ultra-narrow play-route pass

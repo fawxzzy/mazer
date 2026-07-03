@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 Status: active
-Current marker: `89%`
+Current marker: `90%`
 
 ## Intent
 
@@ -41,12 +41,12 @@ These can still be useful references, but they are not the active target.
 | Maze generation and topology quality | `25` | `21` | stronger with default play/menu seed-family multi-route proof | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | continue tuning shortcut/alternate-route quality across wider seed families without disconnected floors, shallow loops, or degenerate goals |
 | Menu AI/demo loop | `15` | `14` | source-shaped with wider generated-menu seed-family playback proof | `src/domain/ai/demoWalker.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | continue proving clean recovery/replay behavior across longer soak captures and exact timing evidence |
 | Mobile input and active-play usability | `15` | `15` | live touch movement and touch-control proof | `src/scenes/MenuScene.ts`, `src/input-human/touch.ts`, `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | continue board/player readability checks in the visual-readability lane |
-| Top-down visual readability | `15` | `11` | improved with ultra-narrow player/trail/start/goal readability proof | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyMenuRender.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | continue tuning board, floors, walls, player, trail, start, and goal crispness across wider mobile and desktop surfaces |
+| Top-down visual readability | `15` | `12` | improved with ultra-narrow play-board/touch-control separation plus player/trail/start/goal readability proof | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyMenuRender.ts`, `src/legacy-runtime/legacyMenuLayout.ts`, `src/input-human/touch.ts` | continue tuning board, floors, walls, player, trail, start, and goal crispness across wider mobile and desktop surfaces |
 | Documentation, diagnostics, and proof safety | `10` | `8` | useful | `docs/current-truth.md`, `docs/system-map.md`, `tests/**`, runtime/visual diagnostics | keep the active target and proof spine synchronized as the old 1:1 lane becomes archival |
 
 Current total:
 
-- `89 / 100`
+- `90 / 100`
 
 ## Latest ratchet
 
@@ -55,6 +55,7 @@ Current total:
 - `2026-07-03`: `86% -> 87%` after widening route-quality reinforcement for generated mazes and adding seed-family guards proving default play and generated-menu mazes stay connected with meaningful alternate routes. Proof: focused reset/AI/render packet passed `20` files / `140` tests, including `16` default play seeds and `16` default menu seeds with no detached floors and `multi-route` route quality.
 - `2026-07-03`: `87% -> 88%` after widening generated-menu AI playback proof from a small representative set to the full `16`-seed default menu family plus the existing larger scale case. Proof: `npx vitest run tests/ai/demo-walker.test.ts --reporter=dot` passed `15` tests, including route diagnostics bounds and adjacent playback for `17` generated-menu cases.
 - `2026-07-03`: `88% -> 89%` after closing the active-play keyboard/touch mechanics proof gap: desktop keyboard proof now launches directly into the supported `mode=play` route, focuses the game canvas, models the 50ms simultaneous-key input buffer with held movement keys, reads fresh visual-runtime player state, and keyboard controls now cover pause, restart, and trail/thought toggle through the same play command path as touch. Proof: `npm run lint`, `npx vitest run tests/visual/edge-live-check.test.ts --reporter=dot`, `npm run edge:live -- --skip-build true --headless true --run play-mode-interactive`, and `npm run edge:live -- --skip-build true --headless true --run mobile-touch-smoke`.
+- `2026-07-03`: `89% -> 90%` after fixing ultra-narrow active-play readability so compact touch controls no longer overlap the maze board. Tight portrait touch controls now scale down below `360px` width, stay inside the viewport, and `172x407` / `320x568` play layouts reserve a clear lane between board and controls while normal `390x844` play remains centered. Proof: focused touch/layout Vitest tests, `npm run build`, and direct Playwright diagnostics showing `172x407` board bottom `226.001`, touch frame top `241`, gap `15`; `320x568` board bottom `361.992`, touch frame top `396`, gap `34`; and `390x844` board bottom `594`, touch frame top `615`, gap `21`.
 
 ## Marker rule
 

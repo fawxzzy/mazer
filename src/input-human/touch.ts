@@ -164,12 +164,23 @@ export const resolveTouchControlLayout = (
     left: normalizeInset(options.safeInsets?.left)
   };
   const minDim = Math.max(1, Math.min(viewport.width, viewport.height));
-  const buttonSize = clamp(Math.round(minDim * (compact ? 0.138 : 0.112)), compact ? 52 : 58, compact ? 82 : 94);
-  const gap = Math.max(10, Math.round(buttonSize * 0.18));
-  const compactGutter = compact ? Math.max(24, Math.round(buttonSize * 0.44)) : 0;
+  const tightPortrait = compact && viewport.height > viewport.width && viewport.width < 360;
+  const buttonSize = clamp(
+    Math.round(minDim * (compact ? 0.138 : 0.112)),
+    tightPortrait ? 42 : (compact ? 52 : 58),
+    tightPortrait ? 58 : (compact ? 82 : 94)
+  );
+  const gap = tightPortrait
+    ? Math.max(7, Math.round(buttonSize * 0.16))
+    : Math.max(10, Math.round(buttonSize * 0.18));
+  const compactGutter = compact && !tightPortrait ? Math.max(24, Math.round(buttonSize * 0.44)) : 0;
   const usableWidth = Math.max(1, viewport.width - safeInsets.left - safeInsets.right - compactGutter);
-  const frameWidth = Math.max(buttonSize * 4 + gap * 5, Math.min(usableWidth, buttonSize * 8));
-  const frameHeight = Math.max(buttonSize * 3 + gap * 4, buttonSize * 4);
+  const frameWidth = tightPortrait
+    ? Math.max(1, viewport.width - safeInsets.left - safeInsets.right)
+    : Math.max(buttonSize * 4 + gap * 5, Math.min(usableWidth, buttonSize * 8));
+  const frameHeight = tightPortrait
+    ? (buttonSize * 3) + (gap * 4)
+    : Math.max(buttonSize * 3 + gap * 4, buttonSize * 4);
   const frameLeft = clamp(Math.round(safeInsets.left + Math.max(12, buttonSize * 0.35)), 0, Math.max(0, viewport.width - frameWidth));
   const frameTop = clamp(Math.round(viewport.height - safeInsets.bottom - frameHeight - Math.max(12, buttonSize * 0.25)), 0, Math.max(0, viewport.height - frameHeight));
 
