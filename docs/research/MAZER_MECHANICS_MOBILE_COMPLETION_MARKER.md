@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 Status: active
-Current marker: `85%`
+Current marker: `86%`
 
 ## Intent
 
@@ -41,16 +41,17 @@ These can still be useful references, but they are not the active target.
 | Maze generation and topology quality | `25` | `20` | strong with weak-route guard | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | continue tuning shortcut/alternate-route quality across wider seed families without disconnected floors, shallow loops, or degenerate goals |
 | Menu AI/demo loop | `15` | `13` | source-shaped with generated-menu seed proof | `src/domain/ai/demoWalker.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | continue proving clean recovery/replay behavior across wider generated menu seed families |
 | Mobile input and active-play usability | `15` | `15` | live touch movement and touch-control proof | `src/scenes/MenuScene.ts`, `src/input-human/touch.ts`, `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | continue board/player readability checks in the visual-readability lane |
-| Top-down visual readability | `15` | `10` | improving with visible compact touch controls and mobile proof | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyMenuRender.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | continue tuning board, floors, walls, player, trail, start, and goal crispness across narrow mobile and desktop |
+| Top-down visual readability | `15` | `11` | improved with ultra-narrow player/trail/start/goal readability proof | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyMenuRender.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | continue tuning board, floors, walls, player, trail, start, and goal crispness across wider mobile and desktop surfaces |
 | Documentation, diagnostics, and proof safety | `10` | `8` | useful | `docs/current-truth.md`, `docs/system-map.md`, `tests/**`, runtime/visual diagnostics | keep the active target and proof spine synchronized as the old 1:1 lane becomes archival |
 
 Current total:
 
-- `85 / 100`
+- `86 / 100`
 
 ## Latest ratchet
 
 - `2026-07-03`: `84% -> 85%` after adding flat, visible, diagnostics-backed mobile touch controls that share the same resolver as the active touch hit targets. Proof: `npm run lint`, focused Vitest reset/input/render/edge tests, `npm run build`, `npm run edge:live -- --skip-build true --headless true --run mobile-touch-smoke`, and a direct 390x844 Playwright diagnostics/screenshot probe showing board bottom `594`, touch frame `19,615 366x216`, visible compact controls, and legacy HUD bounds still isolated at `14,4 354x32`.
+- `2026-07-03`: `85% -> 86%` after replacing ultra-narrow mobile overlay shrink rules with readability-first marker/trail sizing and stronger active-play player contrast. Proof: focused Vitest reset/AI/render packet passed `20` files / `138` tests, `npm run build`, `git diff --check`, and in-app-browser play-route proof at effective `166x359` CSS viewport with board bounds inside safe bounds, `tileSize=3.327`, no console errors, and visible centered player/trail/touch controls.
 
 ## Marker rule
 

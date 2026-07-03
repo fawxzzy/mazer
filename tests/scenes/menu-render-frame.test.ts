@@ -215,7 +215,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps active play dynamic overlays in the corridor frame instead of square cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x0a2b3c;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x063448;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO = 0.22;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.34;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.62;');
@@ -227,13 +227,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, this.player, 0xf2f4f8, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, 0);');
   });
 
-  test('clamps dynamic overlays for ultra-narrow mobile tiles without oversized player blobs', () => {
-    expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.62, 3)).toBe(2);
-    expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.34, 2)).toBe(1);
-    expect(resolveLegacyDynamicMarkerInset(3.265, 0.22)).toBe(1);
+  test('keeps dynamic overlays readable for ultra-narrow mobile tiles', () => {
+    expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.62, 3)).toBe(3);
+    expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.34, 2)).toBe(2);
+    expect(resolveLegacyDynamicMarkerInset(3.265, 0.22)).toBe(0);
     expect(resolveLegacyPlayerMarkerRenderMetrics(3.265, 0.34, 0.54)).toEqual({
-      coreRadius: 1,
-      haloRadius: 2,
+      coreRadius: 2,
+      haloRadius: 3,
       strokeWidth: 1
     });
   });

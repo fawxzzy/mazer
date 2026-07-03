@@ -386,7 +386,7 @@ const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
 const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;
-const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x0a2b3c;
+const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x063448;
 const LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.34;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.62;
@@ -1809,9 +1809,11 @@ export class MenuScene extends Phaser.Scene {
       }
 
       const alpha = this.mode === 'play'
-        ? clamp(0.25 + ((index / Math.max(1, trail.length - 1)) * 0.75), 0.25, 1)
+        ? clamp(0.34 + ((index / Math.max(1, trail.length - 1)) * 0.66), 0.34, 1)
         : clamp(0.22 + ((index / Math.max(1, trail.length - 1)) * 0.82), 0.22, 1);
-      const trailColor = this.settings.darkMode ? 0x10c8f2 : 0x14b8d9;
+      const trailColor = this.mode === 'play'
+        ? (this.settings.darkMode ? 0x42e6ff : 0x23d5ff)
+        : (this.settings.darkMode ? 0x10c8f2 : 0x14b8d9);
       const trailAlpha = this.settings.darkMode && this.mode === 'menu'
         ? clamp(alpha + 0.08, 0, 1)
         : alpha;
@@ -1922,8 +1924,8 @@ export class MenuScene extends Phaser.Scene {
       LEGACY_PLAY_DYNAMIC_TRAIL_EDGE,
       LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO,
       LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO,
-      0.34,
-      0.86
+      0.48,
+      0.94
     );
   }
 
@@ -2018,7 +2020,13 @@ export class MenuScene extends Phaser.Scene {
       LEGACY_PLAYER_MARKER_HALO_RATIO
     );
 
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_HALO, Math.min(0.72, alpha * 0.72));
+    const shadowRadius = playerMetrics.haloRadius + playerMetrics.strokeWidth + 1;
+
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.58, alpha * 0.58));
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, shadowRadius);
+    this.boardDynamicGraphics.lineStyle(playerMetrics.strokeWidth, LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.82, alpha * 0.82));
+    this.boardDynamicGraphics.strokeCircle(centerX, centerY, playerMetrics.haloRadius + playerMetrics.strokeWidth);
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_HALO, Math.min(0.78, alpha * 0.78));
     this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.haloRadius);
     this.boardDynamicGraphics.lineStyle(playerMetrics.strokeWidth, LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.72, alpha * 0.72));
     this.boardDynamicGraphics.strokeCircle(centerX, centerY, playerMetrics.coreRadius + 1);

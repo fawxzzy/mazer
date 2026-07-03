@@ -39,7 +39,7 @@ export const resolveLegacyDynamicMarkerInset = (
   ratio: number
 ): number => {
   const maxInset = Math.max(0, Math.floor((tileSize - 1) / 2));
-  const minimumInset = tileSize <= 4 ? 1 : 2;
+  const minimumInset = tileSize <= 4 ? 0 : 2;
   return Math.min(maxInset, Math.max(minimumInset, Math.floor(tileSize * ratio)));
 };
 
@@ -49,8 +49,7 @@ export const resolveLegacyDynamicTrailStrokeWidth = (
   minimumWidth: number
 ): number => {
   const maxWidth = Math.max(1, Math.floor(tileSize));
-  const responsiveMinimum = tileSize <= 4 ? 1 : minimumWidth;
-  return Math.min(maxWidth, Math.max(responsiveMinimum, Math.round(tileSize * ratio)));
+  return Math.min(maxWidth, Math.max(minimumWidth, Math.round(tileSize * ratio)));
 };
 
 export const resolveLegacyPlayerMarkerRenderMetrics = (
@@ -58,15 +57,15 @@ export const resolveLegacyPlayerMarkerRenderMetrics = (
   coreRatio: number,
   haloRatio: number
 ): LegacyPlayerMarkerRenderMetrics => {
-  const maxHaloRadius = Math.max(1, Math.ceil(tileSize * 0.56));
-  const maxCoreRadius = Math.max(1, Math.floor(tileSize * 0.42));
+  const maxHaloRadius = Math.max(1, Math.ceil(tileSize * 0.72));
+  const maxCoreRadius = Math.max(1, Math.ceil(tileSize * 0.5));
   const haloRadius = Math.min(
     maxHaloRadius,
-    Math.max(tileSize <= 4 ? 2 : 3, Math.round(tileSize * haloRatio))
+    Math.max(tileSize <= 4 ? 3 : 3, Math.round(tileSize * haloRatio))
   );
   const coreRadius = Math.min(
     maxCoreRadius,
-    Math.max(1, Math.round(tileSize * coreRatio))
+    Math.max(tileSize <= 4 ? 2 : 1, Math.round(tileSize * coreRatio))
   );
 
   return {
