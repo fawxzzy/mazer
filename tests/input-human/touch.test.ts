@@ -32,6 +32,7 @@ describe('input-human touch bridge', () => {
     expect(layout.controls.move_up.width).toBeGreaterThanOrEqual(52);
     expect(layout.controls.move_up.centerY).toBeLessThan(layout.controls.move_down.centerY);
     expect(layout.controls.move_left.centerX).toBeLessThan(layout.controls.move_right.centerX);
+    expect(layout.controls.pause.left).toBeGreaterThan(layout.controls.move_right.right + 80);
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.pause.centerX, layout.controls.pause.centerY)).toBe('pause');
     expect(resolveTouchControlKindAtPoint(
       layout,
