@@ -183,6 +183,25 @@ describe('legacy reset lane', () => {
     expect(maze.routeQualityStats?.minimumMeaningfulDetour).toBeGreaterThanOrEqual(2);
   });
 
+  test('reinforces weak shortcut outcomes without disconnecting generated play mazes', () => {
+    let reinforcedMaze: ReturnType<typeof createLegacyMaze> | null = null;
+
+    for (let seed = 1; seed <= 128; seed += 1) {
+      const maze = createLegacyMaze(50, seed, 3);
+      if ((maze.shortcutStats?.qualityReinforcementCreated ?? 0) > 0) {
+        reinforcedMaze = maze;
+        break;
+      }
+    }
+
+    expect(reinforcedMaze).not.toBeNull();
+    expect(reinforcedMaze?.routeQualityStats?.routeQuality).toBe('multi-route');
+    expect(reinforcedMaze?.routeQualityStats?.meaningfulBypassableSolutionEdges).toBeGreaterThan(1);
+    expect(reinforcedMaze?.routeQualityStats?.meaningfulBypassableRouteBands).toBeGreaterThan(1);
+    expect(reinforcedMaze?.shortcutStats?.qualityReinforcementCreated).toBeGreaterThan(0);
+    expect(countDetachedFloorTiles(reinforcedMaze!)).toBe(0);
+  });
+
   test('resumes from the next tile selected during legacy backtracking', () => {
     const legacyMazeSource = readFileSync(
       resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'MazerGameModeBase.cpp'),
