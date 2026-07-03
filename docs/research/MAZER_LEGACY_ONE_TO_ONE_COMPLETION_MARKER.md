@@ -1,8 +1,14 @@
 # Mazer Legacy 1:1 Completion Marker
 
 Date: 2026-07-02
-Status: active
-Current marker: `93%`
+Status: retired / archival
+Retired marker: `93%`
+
+## 2026-07-03 status update
+
+The operator retired screenshot-grade visual 1:1 as the active target.
+
+This marker remains the historical meter for the old literal legacy-to-web parity lane. Do not ratchet it during mechanics-first or mobile-clean work. The active completion marker is now `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md`.
 
 ## Intent
 

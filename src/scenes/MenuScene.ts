@@ -13,7 +13,6 @@ import {
   MAIN_MENU_BUTTONS,
   copyLegacySettings,
   linearColorToHex,
-  linearColorToNumber,
   type LegacySettings
 } from '../legacy-runtime/legacyDefaults';
 import {
@@ -346,14 +345,14 @@ const TITLE_SHADOW_COLOR = '#103516';
 const LEGACY_BOARD_GRID_ALPHA = 0;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
-const LEGACY_MENU_SLAB_FILL = 0x25212c;
+const LEGACY_MENU_SLAB_FILL = 0x101824;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;
-const LEGACY_MENU_PATH_CORE = 0xb8b2bd;
-const LEGACY_MENU_PATH_EDGE = 0x2b2530;
-const LEGACY_MENU_PATH_EDGE_ALPHA = 0.7;
-const LEGACY_MENU_WALL_FILL = 0x24202a;
-const LEGACY_PLAY_PATH_EDGE = 0x2a2630;
-const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.42;
+const LEGACY_MENU_PATH_CORE = 0xd8e3dc;
+const LEGACY_MENU_PATH_EDGE = 0x253448;
+const LEGACY_MENU_PATH_EDGE_ALPHA = 0.86;
+const LEGACY_MENU_WALL_FILL = 0x121c29;
+const LEGACY_PLAY_PATH_EDGE = 0x203244;
+const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.64;
 const LEGACY_PLAY_HUD_TIMER_PANE = 0x05050a;
 const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.18;
 const LEGACY_PLAY_HUD_TIMER_TEXT = '#d7f0d6';
@@ -364,15 +363,15 @@ const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
 const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;
-const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x06131c;
-const LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO = 0.28;
-const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.24;
-const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.48;
-const LEGACY_PLAYER_MARKER_SHADOW = 0x05070f;
-const LEGACY_PLAYER_MARKER_HALO = 0x83efff;
+const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x0a2b3c;
+const LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO = 0.22;
+const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.34;
+const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.62;
+const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
+const LEGACY_PLAYER_MARKER_HALO = 0xffd45a;
 const LEGACY_PLAYER_MARKER_CORE = 0xf8fbff;
-const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.3;
-const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.44;
+const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
+const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
 const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 42;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
@@ -1547,17 +1546,17 @@ export class MenuScene extends Phaser.Scene {
     const isMenuMode = this.mode === 'menu';
     const pathColor = isMenuMode
       ? LEGACY_MENU_PATH_CORE
-      : linearColorToNumber(this.settings.pathColor);
+      : 0xd9e7df;
     const wallColor = isMenuMode
       ? LEGACY_MENU_WALL_FILL
-      : linearColorToNumber(this.settings.wallColor);
+      : 0x101927;
     const boardFill = isMenuMode
-      ? 0x18131d
-      : (this.settings.darkMode ? 0x16121a : 0x4a454f);
-    const boardEdge = isMenuMode ? 0x0f0b13 : (this.settings.darkMode ? 0x030205 : 0x322c35);
+      ? 0x0d1520
+      : 0x0e1724;
+    const boardEdge = isMenuMode ? 0x050a10 : 0x050912;
     const pathGlow = isMenuMode
       ? LEGACY_MENU_PATH_EDGE
-      : (this.settings.darkMode ? 0xb3acb8 : 0xd0cad2);
+      : LEGACY_PLAY_PATH_EDGE;
 
     this.boardStaticGraphics.clear();
     const boardShadowAlpha = isMenuMode ? LEGACY_MENU_PANEL_SHADOW_ALPHA : 0;
