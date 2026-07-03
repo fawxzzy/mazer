@@ -80,6 +80,17 @@ const countDetachedFloorTiles = (maze: ReturnType<typeof createLegacyMaze>): num
   return detached;
 };
 
+const DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS = [
+  ...Array.from({ length: 64 }, (_, index) => index + 1),
+  89,
+  144,
+  233,
+  3749,
+  777,
+  1001,
+  0x5a17f00d
+];
+
 const expectScaledMenuTile = (
   maze: ReturnType<typeof createLegacyMenuMaze>,
   sourceX: number,
@@ -184,34 +195,62 @@ describe('legacy reset lane', () => {
   });
 
   test('keeps default generated play mazes connected with meaningful alternate routes across seed families', () => {
-    const seeds = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 3749, 777, 1001, 0x5a17f00d];
+    const failures: unknown[] = [];
 
-    for (const seed of seeds) {
+    for (const seed of DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS) {
       const maze = createLegacyMaze(50, seed);
 
       expect(maze.source).toBe('play-generated');
       expect(countDetachedFloorTiles(maze)).toBe(0);
-      expect(maze.solutionPath.length).toBeGreaterThanOrEqual(Math.floor(maze.size * 1.5));
-      expect(maze.routeQualityStats?.routeQuality).toBe('multi-route');
-      expect(maze.routeQualityStats?.meaningfulBypassableSolutionEdges).toBeGreaterThan(1);
-      expect(maze.routeQualityStats?.meaningfulBypassableRouteBands).toBeGreaterThan(1);
+      const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
+      if (
+        maze.solutionPath.length < minimumSolutionPathLength
+        || maze.routeQualityStats?.routeQuality !== 'multi-route'
+        || maze.routeQualityStats.meaningfulBypassableSolutionEdges <= 1
+        || maze.routeQualityStats.meaningfulBypassableRouteBands <= 1
+      ) {
+        failures.push({
+          seed,
+          minimumSolutionPathLength,
+          playableTopologyStats: maze.playableTopologyStats,
+          routeQualityStats: maze.routeQualityStats,
+          shortcutStats: maze.shortcutStats,
+          solutionPathLength: maze.solutionPath.length
+        });
+      }
     }
-  });
+
+    expect(failures).toEqual([]);
+  }, 20_000);
 
   test('keeps default generated menu mazes connected with meaningful alternate routes across seed families', () => {
-    const seeds = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 3749, 777, 1001, 0x5a17f00d];
+    const failures: unknown[] = [];
 
-    for (const seed of seeds) {
+    for (const seed of DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS) {
       const maze = createLegacyGeneratedMenuMaze(50, seed);
 
       expect(maze.source).toBe('menu-generated');
       expect(countDetachedFloorTiles(maze)).toBe(0);
-      expect(maze.solutionPath.length).toBeGreaterThanOrEqual(Math.floor(maze.size * 1.5));
-      expect(maze.routeQualityStats?.routeQuality).toBe('multi-route');
-      expect(maze.routeQualityStats?.meaningfulBypassableSolutionEdges).toBeGreaterThan(1);
-      expect(maze.routeQualityStats?.meaningfulBypassableRouteBands).toBeGreaterThan(1);
+      const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
+      if (
+        maze.solutionPath.length < minimumSolutionPathLength
+        || maze.routeQualityStats?.routeQuality !== 'multi-route'
+        || maze.routeQualityStats.meaningfulBypassableSolutionEdges <= 1
+        || maze.routeQualityStats.meaningfulBypassableRouteBands <= 1
+      ) {
+        failures.push({
+          seed,
+          minimumSolutionPathLength,
+          playableTopologyStats: maze.playableTopologyStats,
+          routeQualityStats: maze.routeQualityStats,
+          shortcutStats: maze.shortcutStats,
+          solutionPathLength: maze.solutionPath.length
+        });
+      }
     }
-  });
+
+    expect(failures).toEqual([]);
+  }, 20_000);
 
   test('reinforces weak shortcut outcomes without disconnecting generated play mazes', () => {
     let reinforcedMaze: ReturnType<typeof createLegacyMaze> | null = null;
