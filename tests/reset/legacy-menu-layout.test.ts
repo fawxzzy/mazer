@@ -73,4 +73,29 @@ describe('legacy menu layout', () => {
     expect(layout.buttonWidth).toBeLessThanOrEqual(layout.width - 36);
     expect(layout.centerButtonWidth).toBeLessThanOrEqual(layout.width - 20);
   });
+
+  test('centers the active-play board in ultra-narrow side panels without changing menu button math', () => {
+    const menuLayout = resolveLegacyMenuLayout(172, 407, 50, 49, 'menu');
+    const playLayout = resolveLegacyMenuLayout(172, 407, 50, 49, 'play');
+
+    expect(playLayout.buttonLayout).toBe('stack');
+    expect(playLayout.boardLeft).toBe(menuLayout.boardLeft);
+    expect(playLayout.boardSize).toBe(menuLayout.boardSize);
+    expect(playLayout.tileSize).toBe(menuLayout.tileSize);
+    expect(playLayout.boardTop).toBeGreaterThan(menuLayout.boardTop);
+    expect(playLayout.boardTop).toBeGreaterThanOrEqual(100);
+    expect(playLayout.boardTop + playLayout.boardSize).toBeLessThanOrEqual(playLayout.height - 36);
+    expect(menuLayout.leftButtonY + menuLayout.buttonHeight).toBeLessThan(menuLayout.centerButtonY);
+    expect(menuLayout.centerButtonY + menuLayout.buttonHeight).toBeLessThan(menuLayout.rightButtonY);
+  });
+
+  test('gives desktop active play a larger board than the front-door composition', () => {
+    const menuLayout = resolveLegacyMenuLayout(1920, 1080, 50, 49, 'menu');
+    const playLayout = resolveLegacyMenuLayout(1920, 1080, 50, 49, 'play');
+
+    expect(playLayout.boardSize).toBeGreaterThan(menuLayout.boardSize);
+    expect(Math.abs((playLayout.boardLeft + (playLayout.boardSize / 2)) - (playLayout.width / 2))).toBeLessThanOrEqual(2);
+    expect(playLayout.boardTop).toBeGreaterThanOrEqual(56);
+    expect(playLayout.boardTop + playLayout.boardSize).toBeLessThanOrEqual(playLayout.height - 12);
+  });
 });

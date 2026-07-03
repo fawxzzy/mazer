@@ -149,6 +149,21 @@ interface MenuSceneVisualDiagnostics {
     safeBounds: VisualRect;
     tileSize: number;
   };
+  layout: {
+    buttonHeight: number;
+    buttonLayout: LegacyMenuLayout['buttonLayout'];
+    buttonWidth: number;
+    centerButtonWidth: number;
+    centerButtonX: number;
+    centerButtonY: number;
+    leftButtonX: number;
+    leftButtonY: number;
+    rightButtonX: number;
+    rightButtonY: number;
+    surface: 'menu' | 'play';
+    titleX: number;
+    titleY: number;
+  };
   hud: {
     kind: 'legacy-play-hud' | null;
     visible: boolean;
@@ -1193,7 +1208,14 @@ export class MenuScene extends Phaser.Scene {
     const width = this.scale.width;
     const height = this.scale.height;
     const isPortrait = height > width;
-    this.layout = resolveLegacyMenuLayout(width, height, this.settings.scale + this.settings.camScale, this.maze.size);
+    const layoutSurface = this.mode === 'play' ? 'play' : 'menu';
+    this.layout = resolveLegacyMenuLayout(
+      width,
+      height,
+      this.settings.scale + this.settings.camScale,
+      this.maze.size,
+      layoutSurface
+    );
     const titlePresentation = resolveLegacyMenuTitlePresentation(
       this.layout.boardSize,
       this.layout.tileSize,
@@ -2757,6 +2779,21 @@ export class MenuScene extends Phaser.Scene {
         bounds: boardBounds,
         safeBounds,
         tileSize: this.layout.tileSize
+      },
+      layout: {
+        buttonHeight: this.layout.buttonHeight,
+        buttonLayout: this.layout.buttonLayout,
+        buttonWidth: this.layout.buttonWidth,
+        centerButtonWidth: this.layout.centerButtonWidth,
+        centerButtonX: this.layout.centerButtonX,
+        centerButtonY: this.layout.centerButtonY,
+        leftButtonX: this.layout.leftButtonX,
+        leftButtonY: this.layout.leftButtonY,
+        rightButtonX: this.layout.rightButtonX,
+        rightButtonY: this.layout.rightButtonY,
+        surface: this.mode === 'play' ? 'play' : 'menu',
+        titleX: this.layout.titleX,
+        titleY: this.layout.titleY
       },
       hud: {
         kind: this.mode === 'play' && this.overlay === 'none' ? 'legacy-play-hud' : null,

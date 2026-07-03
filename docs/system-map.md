@@ -321,7 +321,7 @@ Use this before changing how the front door looks without changing the actual ma
 
 | Concern | Owner |
 | --- | --- |
-| menu board geometry, ultra-narrow fractional board fit, and button/title placement | `src/legacy-runtime/legacyMenuLayout.ts` |
+| menu board geometry, ultra-narrow fractional board fit, front-door button/title placement, and active-play centered board framing | `src/legacy-runtime/legacyMenuLayout.ts` |
 | fixed legacy snapshot shape | `src/legacy-runtime/legacyMenuSnapshot.ts` |
 | menu trench width / connection-aware core continuity / segment-based static strokes / connected light-core material / static edge alpha / flat 2D material contrast / core-vs-grid read | `src/legacy-runtime/legacyMenuRender.ts` + `src/scenes/MenuScene.ts` |
 | flat slab/frame colors, no-grid/no-bevel clean-2D lane, and backdrop haze | `src/legacy-runtime/legacyMenuBackdrop.ts` -> `src/scenes/MenuScene.ts#drawBackdrop()` plus `LEGACY_MENU_*` board constants |
@@ -494,9 +494,10 @@ What `verify` currently means:
   - fastest human truth check for the active surface
 - `window.__MAZER_VISUAL_DIAGNOSTICS__`
 - `data-mazer-visual-diagnostics`
-  - board bounds plus live reset-lane runtime pointers:
-  - active-play board bounds include the camera-follow offset used by rendered board layers
-  - mode / overlay
+- board bounds plus live reset-lane runtime pointers:
+- active-play board bounds include the camera-follow offset used by rendered board layers
+- resolved layout surface (`menu` or `play`), button stack/row geometry, title coordinates, and active-play board framing
+- mode / overlay
   - maze size, player, goal
   - HUD bare timer text, arrow radians/degrees, timer/arrow/bounds rectangles, and the minimal source-shaped active HUD visual lane
   - trail tail
@@ -554,6 +555,10 @@ If you want to change one thing, start here:
 - menu board frame, title, button placement:
   - `src/legacy-runtime/legacyMenuLayout.ts`
   - `src/scenes/MenuScene.ts`
+- active-play board framing or side-browser centering:
+  - `src/legacy-runtime/legacyMenuLayout.ts`
+  - `src/scenes/MenuScene.ts`
+  - `tests/reset/legacy-menu-layout.test.ts`
 - menu-only slab/frame/title/button parity:
   - `src/scenes/MenuScene.ts`
   - `docs/legacy/art-direction.md`

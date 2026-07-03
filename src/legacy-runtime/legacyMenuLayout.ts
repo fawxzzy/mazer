@@ -23,27 +23,31 @@ export interface LegacyMenuLayout {
   buttonHeight: number;
 }
 
+export type LegacyMenuLayoutSurface = 'menu' | 'play';
+
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
 export const resolveLegacyMenuLayout = (
   width: number,
   height: number,
   scale: number,
-  mazeSize: number
+  mazeSize: number,
+  surface: LegacyMenuLayoutSurface = 'menu'
 ): LegacyMenuLayout => {
   const normalizedScale = clampInteger(scale, 25, 150);
   const isPortrait = height > width;
   const isUltraNarrow = isPortrait && width < 360;
-  const baseBoardScale = isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.52);
+  const isPlaySurface = surface === 'play';
+  const baseBoardScale = isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : (isPlaySurface ? 0.62 : 0.52));
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const maxBoardSize = Math.min(
     width * (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)),
-    height * (isPortrait ? 0.82 : 0.79)
+    height * (isPlaySurface ? (isPortrait ? 0.74 : 0.86) : (isPortrait ? 0.82 : 0.79))
   );
   const minBoardSize = Math.min(300, Math.max(120, maxBoardSize));
   const rawBoardSize = Math.min(
     width * baseBoardScale * scaleBias,
-    height * (isPortrait ? 0.54 : 0.775) * scaleBias
+    height * (isPlaySurface ? (isPortrait ? 0.64 : 0.84) : (isPortrait ? 0.54 : 0.775)) * scaleBias
   );
   const boardSize = Math.round(clamp(rawBoardSize, minBoardSize, maxBoardSize));
   const rawTileSize = boardSize / Math.max(1, mazeSize);
@@ -52,7 +56,9 @@ export const resolveLegacyMenuLayout = (
     : Math.max(4, Math.floor(rawTileSize));
   const snappedBoardSize = Math.round(tileSize * mazeSize * 1000) / 1000;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
-  const boardTop = Math.round(clamp(height * (isPortrait ? 0.104 : 0.074), isUltraNarrow ? 32 : 40, isPortrait ? 102 : 88));
+  const menuBoardTop = clamp(height * (isPortrait ? 0.104 : 0.074), isUltraNarrow ? 32 : 40, isPortrait ? 102 : 88);
+  const playBoardTop = clamp((height - snappedBoardSize) / 2, isUltraNarrow ? 48 : 56, height - snappedBoardSize - 12);
+  const boardTop = Math.round(isPlaySurface ? playBoardTop : menuBoardTop);
   const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
   const rowButtonY = isPortrait
     ? Math.round(clamp(
