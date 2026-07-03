@@ -11,7 +11,7 @@ import {
   resolveLegacyPlayCollisionDelta,
   resolveLegacyPlayMoveVector
 } from '../../src/legacy-runtime/legacyPlayStep';
-import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
+import { createLegacyMaze, type LegacyMazeSnapshot, type LegacyPoint } from '../../src/legacy-runtime/legacyMaze';
 
 const createTestMaze = (): LegacyMazeSnapshot => ({
   source: 'play-generated',
@@ -33,6 +33,11 @@ const createTestMaze = (): LegacyMazeSnapshot => ({
     { x: 3, y: 3 }
   ],
   seed: 77
+});
+
+const resolveStepDelta = (from: LegacyPoint, to: LegacyPoint): { deltaX: number; deltaY: number } => ({
+  deltaX: to.x - from.x,
+  deltaY: to.y - from.y
 });
 
 describe('legacy play step', () => {
@@ -344,5 +349,51 @@ describe('legacy play step', () => {
     expect(result.moved).toBe(true);
     expect(result.trail).toHaveLength(LEGACY_PLAY_TRAIL_FADE_TAIL);
     expect(result.trail.at(-1)).toEqual({ x: 3, y: 1 });
+  });
+
+  test('walks generated play mazes from start to goal through the active play-step contract', () => {
+    const cases = [
+      { seed: 3749, shortcutCount: 9 },
+      { seed: 777, shortcutCount: 3 },
+      { seed: 0x5a17f00d, shortcutCount: 9 },
+      { seed: 8_811, shortcutCount: 5 }
+    ] as const;
+
+    for (const testCase of cases) {
+      const maze = createLegacyMaze(50, testCase.seed, testCase.shortcutCount);
+      let player = maze.start;
+      let trail = [maze.start];
+      let reachedGoal = false;
+
+      expect(maze.source).toBe('play-generated');
+      expect(maze.solutionPath[0]).toEqual(maze.start);
+      expect(maze.solutionPath.at(-1)).toEqual(maze.goal);
+
+      for (let index = 1; index < maze.solutionPath.length; index += 1) {
+        const next = maze.solutionPath[index]!;
+        const delta = resolveStepDelta(player, next);
+        expect(Math.abs(delta.deltaX) + Math.abs(delta.deltaY)).toBe(1);
+
+        const result = advanceLegacyPlayStep({
+          maze,
+          player,
+          trail,
+          deltaX: delta.deltaX,
+          deltaY: delta.deltaY,
+          toggleTrailFade: false
+        });
+
+        expect(result.moved).toBe(true);
+        expect(result.player).toEqual(next);
+        player = result.player;
+        trail = result.trail;
+        reachedGoal = result.reachedGoal;
+      }
+
+      expect(player).toEqual(maze.goal);
+      expect(reachedGoal).toBe(true);
+      expect(trail).toHaveLength(maze.solutionPath.length);
+      expect(trail.at(-1)).toEqual(maze.goal);
+    }
   });
 });
