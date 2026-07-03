@@ -266,7 +266,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('resolveTouchControlKindAtPoint');
     expect(menuSceneSource).toContain('resolveTouchControlLayout');
+    expect(menuSceneSource).toContain('private resolveLegacyPlayTouchControlLayout()');
     expect(menuSceneSource).toContain('private handleLegacyPlayTouchControl');
+    expect(menuSceneSource).toContain('private drawLegacyPlayTouchControls()');
+    expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls();');
+    expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
+    expect(menuSceneSource).toContain('touchControls');
+    expect(menuSceneSource).toContain('LEGACY_PLAY_TOUCH_FRAME_FILL');
     expect(menuSceneSource).toContain('installLegacyPlayTouchControlFallback');
     expect(menuSceneSource).toContain("event.pointerType === 'touch'");
     expect(menuSceneSource).toContain('event.stopImmediatePropagation()');

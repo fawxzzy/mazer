@@ -180,6 +180,20 @@ interface MenuSceneVisualDiagnostics {
     timerText: string | null;
     arrowAngleRadians: number | null;
   };
+  touchControls: {
+    visible: boolean;
+    compact: boolean | null;
+    frame: VisualRect | null;
+    controls: {
+      move_up: VisualRect | null;
+      move_right: VisualRect | null;
+      move_down: VisualRect | null;
+      move_left: VisualRect | null;
+      pause: VisualRect | null;
+      restart_attempt: VisualRect | null;
+      toggle_thoughts: VisualRect | null;
+    };
+  };
   runtime: {
     goal: LegacyPoint;
     mazeSize: number;
@@ -363,6 +377,11 @@ const LEGACY_PLAY_HUD_TIMER_TEXT = '#d7f0d6';
 const LEGACY_PLAY_HUD_TIMER_SHADOW = '#081208';
 const LEGACY_PLAY_HUD_ARROW = 0xe4efe6;
 const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;
+const LEGACY_PLAY_TOUCH_FRAME_FILL = 0x06121c;
+const LEGACY_PLAY_TOUCH_BUTTON_FILL = 0x0c2633;
+const LEGACY_PLAY_TOUCH_BUTTON_STROKE = 0xb7f2ff;
+const LEGACY_PLAY_TOUCH_ICON = 0xecfff5;
+const LEGACY_PLAY_TOUCH_ACCENT = 0x72e0bf;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
 const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
@@ -459,6 +478,7 @@ export class MenuScene extends Phaser.Scene {
   private hudBounds: VisualRect | null = null;
   private hudTimerBounds: VisualRect | null = null;
   private hudArrowBounds: VisualRect | null = null;
+  private hudTouchControlBounds: VisualRect | null = null;
   private hudFrame: LegacyPlayHudFrame | null = null;
   private boardStaticDirty = true;
   private boardDynamicDirty = true;
@@ -1160,12 +1180,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const control = resolveTouchControlKindAtPoint(
-      resolveTouchControlLayout({
-        width: this.layout.width,
-        height: this.layout.height
-      }, {
-        compact: this.layout.width < 720 || this.layout.height < 720
-      }),
+      this.resolveLegacyPlayTouchControlLayout(),
       x,
       y
     );
@@ -1201,6 +1216,21 @@ export class MenuScene extends Phaser.Scene {
       default:
         return control satisfies never;
     }
+  }
+
+  private resolveLegacyPlayTouchControlLayout(): ReturnType<typeof resolveTouchControlLayout> {
+    return resolveTouchControlLayout({
+      width: this.layout.width,
+      height: this.layout.height
+    }, {
+      compact: this.layout.width < 720 || this.layout.height < 720
+    });
+  }
+
+  private shouldRenderLegacyPlayTouchControls(
+    touchControlLayout = this.resolveLegacyPlayTouchControlLayout()
+  ): boolean {
+    return this.mode === 'play' && this.overlay === 'none' && touchControlLayout.compact;
   }
 
   private handleLegacyPlayPointerUp(pointer: Phaser.Input.Pointer): boolean {
@@ -2002,6 +2032,7 @@ export class MenuScene extends Phaser.Scene {
     this.hudBounds = null;
     this.hudTimerBounds = null;
     this.hudArrowBounds = null;
+    this.hudTouchControlBounds = null;
     this.hudFrame = null;
     if (this.mode !== 'play' || this.overlay !== 'none') {
       this.footerText.setText('');
@@ -2094,8 +2125,128 @@ export class MenuScene extends Phaser.Scene {
       hudFrame.arrowBounds.width,
       hudFrame.arrowBounds.height
     );
+    this.hudTouchControlBounds = this.drawLegacyPlayTouchControls();
     this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);
     this.hudFrame = hudFrame;
+  }
+
+  private drawLegacyPlayTouchControls(): VisualRect | null {
+    const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
+    if (!this.shouldRenderLegacyPlayTouchControls(touchControlLayout)) {
+      return null;
+    }
+
+    const { controls, frame } = touchControlLayout;
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_FRAME_FILL, 0.28);
+    this.hudGraphics.fillRoundedRect(frame.left, frame.top, frame.width, frame.height, 18);
+    this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.18);
+    this.hudGraphics.strokeRoundedRect(frame.left, frame.top, frame.width, frame.height, 18);
+
+    this.drawLegacyPlayTouchButton(controls.move_up, false);
+    this.drawLegacyPlayTouchButton(controls.move_right, false);
+    this.drawLegacyPlayTouchButton(controls.move_down, false);
+    this.drawLegacyPlayTouchButton(controls.move_left, false);
+    this.drawLegacyPlayTouchButton(controls.pause, true);
+    this.drawLegacyPlayTouchButton(controls.restart_attempt, true);
+    this.drawLegacyPlayTouchButton(controls.toggle_thoughts, true);
+
+    this.drawLegacyPlayTouchArrow(controls.move_up, 'up');
+    this.drawLegacyPlayTouchArrow(controls.move_right, 'right');
+    this.drawLegacyPlayTouchArrow(controls.move_down, 'down');
+    this.drawLegacyPlayTouchArrow(controls.move_left, 'left');
+    this.drawLegacyPlayTouchPauseIcon(controls.pause);
+    this.drawLegacyPlayTouchRestartIcon(controls.restart_attempt);
+    this.drawLegacyPlayTouchTrailIcon(controls.toggle_thoughts);
+
+    return createVisualRect(frame.left, frame.top, frame.width, frame.height);
+  }
+
+  private drawLegacyPlayTouchButton(
+    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['move_up'],
+    accented: boolean
+  ): void {
+    this.hudGraphics.fillStyle(accented ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_FILL, accented ? 0.22 : 0.34);
+    this.hudGraphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, 14);
+    this.hudGraphics.lineStyle(2, accented ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, accented ? 0.5 : 0.42);
+    this.hudGraphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, 14);
+  }
+
+  private drawLegacyPlayTouchArrow(
+    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['move_up'],
+    direction: 'up' | 'right' | 'down' | 'left'
+  ): void {
+    const size = Math.round(Math.min(rect.width, rect.height) * 0.28);
+    const cx = rect.centerX;
+    const cy = rect.centerY;
+
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.86);
+    switch (direction) {
+      case 'up':
+        this.hudGraphics.fillTriangle(cx, cy - size, cx - size, cy + size, cx + size, cy + size);
+        break;
+      case 'right':
+        this.hudGraphics.fillTriangle(cx + size, cy, cx - size, cy - size, cx - size, cy + size);
+        break;
+      case 'down':
+        this.hudGraphics.fillTriangle(cx, cy + size, cx - size, cy - size, cx + size, cy - size);
+        break;
+      case 'left':
+        this.hudGraphics.fillTriangle(cx - size, cy, cx + size, cy - size, cx + size, cy + size);
+        break;
+      default:
+        direction satisfies never;
+    }
+  }
+
+  private drawLegacyPlayTouchPauseIcon(
+    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause']
+  ): void {
+    const barWidth = Math.max(5, Math.round(rect.width * 0.1));
+    const barHeight = Math.round(rect.height * 0.42);
+    const gap = Math.round(rect.width * 0.16);
+    const top = rect.centerY - Math.round(barHeight / 2);
+
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.86);
+    this.hudGraphics.fillRoundedRect(rect.centerX - gap - barWidth, top, barWidth, barHeight, 2);
+    this.hudGraphics.fillRoundedRect(rect.centerX + gap, top, barWidth, barHeight, 2);
+  }
+
+  private drawLegacyPlayTouchRestartIcon(
+    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['restart_attempt']
+  ): void {
+    const radius = Math.round(Math.min(rect.width, rect.height) * 0.23);
+    const tipSize = Math.max(7, Math.round(radius * 0.42));
+    const tipX = rect.centerX + Math.round(radius * 0.8);
+    const tipY = rect.centerY - Math.round(radius * 0.76);
+
+    this.hudGraphics.lineStyle(Math.max(3, Math.round(rect.width * 0.05)), LEGACY_PLAY_TOUCH_ICON, 0.82);
+    this.hudGraphics.beginPath();
+    this.hudGraphics.arc(rect.centerX, rect.centerY, radius, Phaser.Math.DegToRad(36), Phaser.Math.DegToRad(324), false);
+    this.hudGraphics.strokePath();
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.82);
+    this.hudGraphics.fillTriangle(tipX, tipY, tipX + tipSize, tipY - 1, tipX + 2, tipY + tipSize);
+  }
+
+  private drawLegacyPlayTouchTrailIcon(
+    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['toggle_thoughts']
+  ): void {
+    const radius = Math.max(3, Math.round(rect.width * 0.07));
+    const left = rect.centerX - Math.round(rect.width * 0.22);
+    const mid = rect.centerX;
+    const right = rect.centerX + Math.round(rect.width * 0.22);
+    const top = rect.centerY - Math.round(rect.height * 0.16);
+    const bottom = rect.centerY + Math.round(rect.height * 0.16);
+
+    this.hudGraphics.lineStyle(Math.max(3, Math.round(rect.width * 0.05)), LEGACY_PLAY_TOUCH_ICON, 0.78);
+    this.hudGraphics.beginPath();
+    this.hudGraphics.moveTo(left, bottom);
+    this.hudGraphics.lineTo(mid, top);
+    this.hudGraphics.lineTo(right, bottom);
+    this.hudGraphics.strokePath();
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.84);
+    this.hudGraphics.fillCircle(left, bottom, radius);
+    this.hudGraphics.fillCircle(mid, top, radius);
+    this.hudGraphics.fillCircle(right, bottom, radius);
   }
 
   private clearHudTexts(): void {
@@ -2112,6 +2263,7 @@ export class MenuScene extends Phaser.Scene {
     this.hudBounds = null;
     this.hudTimerBounds = null;
     this.hudArrowBounds = null;
+    this.hudTouchControlBounds = null;
     this.hudFrame = null;
     this.clearHudTexts();
     this.footerText.setText('');
@@ -2740,6 +2892,55 @@ export class MenuScene extends Phaser.Scene {
     performLegacyBrowserSafeExit(typeof window === 'undefined' ? undefined : window);
   }
 
+  private resolveLegacyPlayTouchControlDiagnostics(): MenuSceneVisualDiagnostics['touchControls'] {
+    const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
+    const visible = this.shouldRenderLegacyPlayTouchControls(touchControlLayout);
+    const emptyControls = {
+      move_up: null,
+      move_right: null,
+      move_down: null,
+      move_left: null,
+      pause: null,
+      restart_attempt: null,
+      toggle_thoughts: null
+    };
+
+    if (!visible) {
+      return {
+        visible,
+        compact: touchControlLayout.compact,
+        frame: null,
+        controls: emptyControls
+      };
+    }
+
+    const { controls, frame } = touchControlLayout;
+    return {
+      visible,
+      compact: touchControlLayout.compact,
+      frame: cloneVisualRect(this.hudTouchControlBounds) ?? createVisualRect(frame.left, frame.top, frame.width, frame.height),
+      controls: {
+        move_up: createVisualRect(controls.move_up.left, controls.move_up.top, controls.move_up.width, controls.move_up.height),
+        move_right: createVisualRect(controls.move_right.left, controls.move_right.top, controls.move_right.width, controls.move_right.height),
+        move_down: createVisualRect(controls.move_down.left, controls.move_down.top, controls.move_down.width, controls.move_down.height),
+        move_left: createVisualRect(controls.move_left.left, controls.move_left.top, controls.move_left.width, controls.move_left.height),
+        pause: createVisualRect(controls.pause.left, controls.pause.top, controls.pause.width, controls.pause.height),
+        restart_attempt: createVisualRect(
+          controls.restart_attempt.left,
+          controls.restart_attempt.top,
+          controls.restart_attempt.width,
+          controls.restart_attempt.height
+        ),
+        toggle_thoughts: createVisualRect(
+          controls.toggle_thoughts.left,
+          controls.toggle_thoughts.top,
+          controls.toggle_thoughts.width,
+          controls.toggle_thoughts.height
+        )
+      }
+    };
+  }
+
   private publishVisualDiagnostics(time: number): void {
     if (typeof window === 'undefined' || !this.layout) {
       return;
@@ -2760,6 +2961,7 @@ export class MenuScene extends Phaser.Scene {
       rowsVisible: drawRowsVisible,
       rowCount: drawStageStaged ? this.maze.size : null
     });
+    const touchControls = this.resolveLegacyPlayTouchControlDiagnostics();
 
     this.visualDiagnosticsRevision += 1;
     const diagnostics: MenuSceneVisualDiagnostics = {
@@ -2936,7 +3138,8 @@ export class MenuScene extends Phaser.Scene {
         arrowAngleDegrees: this.hudFrame?.arrowAngleDegrees ?? null,
         timerText: this.hudFrame?.timerText ?? null,
         arrowAngleRadians: this.hudFrame?.arrowAngleRadians ?? null
-      }
+      },
+      touchControls
     };
     window[MENU_SCENE_VISUAL_DIAGNOSTICS_KEY] = diagnostics;
     window.document?.documentElement?.setAttribute(

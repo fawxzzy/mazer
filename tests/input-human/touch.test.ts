@@ -29,6 +29,8 @@ describe('input-human touch bridge', () => {
     });
 
     expect(layout.frame.width).toBeGreaterThan(0);
+    expect(layout.frame.left).toBeGreaterThan(0);
+    expect(layout.frame.right).toBeLessThan(390);
     expect(layout.controls.move_up.width).toBeGreaterThanOrEqual(52);
     expect(layout.controls.move_up.centerY).toBeLessThan(layout.controls.move_down.centerY);
     expect(layout.controls.move_left.centerX).toBeLessThan(layout.controls.move_right.centerX);
