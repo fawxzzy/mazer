@@ -511,6 +511,8 @@ export class MenuScene extends Phaser.Scene {
   private legacyPlayFocusGuardAttached = false;
   private legacyPlayWindowBlurHandler: (() => void) | null = null;
   private legacyPlayVisibilityChangeHandler: (() => void) | null = null;
+  private legacyPlayDocumentKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
+  private legacyPlayDocumentKeyUpHandler: ((event: KeyboardEvent) => void) | null = null;
   private legacyPlayTouchControlPointerDownHandler: ((event: PointerEvent) => void) | null = null;
   private runtimeFeedDiagnostics = summarizeMenuSceneRuntimeFeed({ nowMs: 0 });
 
@@ -571,6 +573,7 @@ export class MenuScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.detachRuntimeDiagnostics();
       this.detachLegacyPlayFocusGuards();
+      this.detachLegacyPlayKeyboardFallback();
       this.detachLegacyPlayTouchControlFallback();
       this.clearVisualDiagnostics();
       clearMenuSceneRuntimeDiagnostics();
@@ -895,13 +898,21 @@ export class MenuScene extends Phaser.Scene {
       resources: {
         activeTweens: 0,
         activeTimers: 0,
-        listenerCount: 3 + (this.runtimeVisibilityAttached ? 1 : 0) + (this.legacyPlayFocusGuardAttached ? 2 : 0),
+        listenerCount: 3
+          + (this.runtimeVisibilityAttached ? 1 : 0)
+          + (this.legacyPlayFocusGuardAttached ? 2 : 0)
+          + (this.legacyPlayDocumentKeyDownHandler !== null ? 1 : 0)
+          + (this.legacyPlayDocumentKeyUpHandler !== null ? 1 : 0),
         listenerBreakdown: {
           sceneUpdate: 1,
           sceneShutdown: 1,
           scaleResize: 1,
           visibilityAttached: this.runtimeVisibilityAttached,
           legacyPlayFocusGuardAttached: this.legacyPlayFocusGuardAttached,
+          legacyPlayKeyboardFallbackAttached: (
+            this.legacyPlayDocumentKeyDownHandler !== null
+            && this.legacyPlayDocumentKeyUpHandler !== null
+          ),
           installSurfaceAttached: this.runtimeInstallSurfaceAttached
         },
         trailSegmentCount: this.trail.length,
@@ -928,6 +939,12 @@ export class MenuScene extends Phaser.Scene {
         }
       }
     });
+  }
+
+  private publishInteractionDiagnostics(): void {
+    const now = this.time.now;
+    this.publishVisualDiagnostics(now);
+    this.publishRuntimeDiagnostics(now, true);
   }
 
   private detachRuntimeDiagnostics(): void {
@@ -985,50 +1002,7 @@ export class MenuScene extends Phaser.Scene {
 
   private installInput(): void {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
-        this.resetLegacyPlayInputBuffer();
-        return;
-      }
-
-      if (this.handleLegacyPlayMovementKeyDown(event)) {
-        return;
-      }
-
-      if (event.repeat) {
-        return;
-      }
-
-      if (this.overlay !== 'none' && this.handleOverlayFieldInput(event)) {
-        return;
-      }
-
-      if (event.key === 'Escape') {
-        this.handleBackAction();
-        return;
-      }
-
-      if (event.key.toLowerCase() === 'p' && this.mode === 'play') {
-        if (this.overlay === 'pause') {
-          this.closeOverlay();
-        } else if (this.overlay === 'none') {
-          this.openOverlay('pause');
-        }
-        return;
-      }
-
-      if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'none') {
-        this.startPlayMode();
-        return;
-      }
-
-      if (event.key.toLowerCase() === 'o' && this.mode === 'menu' && this.overlay === 'none') {
-        this.openOverlay('options');
-        return;
-      }
-
-      if (this.mode !== 'play' || this.overlay !== 'none') {
-        return;
-      }
+      this.handleLegacyKeyboardDown(event);
     });
 
     this.input.keyboard?.on('keyup', (event: KeyboardEvent) => {
@@ -1048,7 +1022,112 @@ export class MenuScene extends Phaser.Scene {
       this.playPointerStart = null;
     });
 
+    this.installLegacyPlayKeyboardFallback();
     this.installLegacyPlayTouchControlFallback();
+  }
+
+  private installLegacyPlayKeyboardFallback(): void {
+    if (
+      this.legacyPlayDocumentKeyDownHandler !== null
+      || this.legacyPlayDocumentKeyUpHandler !== null
+      || typeof document === 'undefined'
+    ) {
+      return;
+    }
+
+    this.legacyPlayDocumentKeyDownHandler = (event: KeyboardEvent) => {
+      if (!event.defaultPrevented) {
+        this.handleLegacyKeyboardDown(event);
+      }
+    };
+    this.legacyPlayDocumentKeyUpHandler = (event: KeyboardEvent) => {
+      if (!event.defaultPrevented) {
+        this.handleLegacyPlayMovementKeyUp(event);
+      }
+    };
+
+    document.addEventListener('keydown', this.legacyPlayDocumentKeyDownHandler);
+    document.addEventListener('keyup', this.legacyPlayDocumentKeyUpHandler);
+  }
+
+  private detachLegacyPlayKeyboardFallback(): void {
+    if (typeof document === 'undefined') {
+      this.legacyPlayDocumentKeyDownHandler = null;
+      this.legacyPlayDocumentKeyUpHandler = null;
+      return;
+    }
+
+    if (this.legacyPlayDocumentKeyDownHandler !== null) {
+      document.removeEventListener('keydown', this.legacyPlayDocumentKeyDownHandler);
+    }
+    if (this.legacyPlayDocumentKeyUpHandler !== null) {
+      document.removeEventListener('keyup', this.legacyPlayDocumentKeyUpHandler);
+    }
+    this.legacyPlayDocumentKeyDownHandler = null;
+    this.legacyPlayDocumentKeyUpHandler = null;
+  }
+
+  private handleLegacyKeyboardDown(event: KeyboardEvent): boolean {
+    if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
+      this.resetLegacyPlayInputBuffer();
+      return true;
+    }
+
+    if (this.handleLegacyPlayMovementKeyDown(event)) {
+      return true;
+    }
+
+    if (event.repeat) {
+      return false;
+    }
+
+    if (this.overlay !== 'none' && this.handleOverlayFieldInput(event)) {
+      event.preventDefault();
+      return true;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.handleBackAction();
+      return true;
+    }
+
+    const lowerKey = event.key.toLowerCase();
+    if (lowerKey === 'p' && this.mode === 'play') {
+      event.preventDefault();
+      if (this.overlay === 'pause') {
+        this.closeOverlay();
+      } else if (this.overlay === 'none') {
+        this.openOverlay('pause');
+      }
+      return true;
+    }
+
+    if (lowerKey === 'r' && this.mode === 'play' && (this.overlay === 'none' || this.overlay === 'pause')) {
+      event.preventDefault();
+      this.applyLegacyPauseCommand('reset-player');
+      return true;
+    }
+
+    if (lowerKey === 't' && this.mode === 'play' && (this.overlay === 'none' || this.overlay === 'pause')) {
+      event.preventDefault();
+      this.applyLegacyOverlayToggleField('toggleTrailFade');
+      return true;
+    }
+
+    if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'none') {
+      event.preventDefault();
+      this.startPlayMode();
+      return true;
+    }
+
+    if (lowerKey === 'o' && this.mode === 'menu' && this.overlay === 'none') {
+      event.preventDefault();
+      this.openOverlay('options');
+      return true;
+    }
+
+    return false;
   }
 
   private installLegacyPlayTouchControlFallback(): void {
@@ -1603,10 +1682,12 @@ export class MenuScene extends Phaser.Scene {
     if (nextStep.reachedGoal) {
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
+      this.publishInteractionDiagnostics();
       return;
     }
 
     this.boardDynamicDirty = true;
+    this.publishInteractionDiagnostics();
   }
 
   private schedulePlayResetReturn(): void {
@@ -2818,6 +2899,9 @@ export class MenuScene extends Phaser.Scene {
     this.overlayReturn = 'none';
     this.boardDynamicDirty = true;
     this.uiDirty = true;
+    if (this.mode === 'play') {
+      this.publishInteractionDiagnostics();
+    }
   }
 
   private closeOverlay(): void {
@@ -2833,6 +2917,9 @@ export class MenuScene extends Phaser.Scene {
     }
     this.boardDynamicDirty = true;
     this.uiDirty = true;
+    if (this.mode === 'play') {
+      this.publishInteractionDiagnostics();
+    }
   }
 
   private applyLegacyPauseCommand(command: LegacyPauseCommand): void {
@@ -2842,6 +2929,7 @@ export class MenuScene extends Phaser.Scene {
       this.player = result.nextPlayer;
       this.trail = result.nextTrail ?? [copyPoint(result.nextPlayer)];
       this.boardDynamicDirty = true;
+      this.publishInteractionDiagnostics();
     }
 
     if (result.enterMenu) {
@@ -2869,6 +2957,9 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.uiDirty = true;
+    if (this.mode === 'play') {
+      this.publishInteractionDiagnostics();
+    }
   }
 
   private handleBackAction(): void {

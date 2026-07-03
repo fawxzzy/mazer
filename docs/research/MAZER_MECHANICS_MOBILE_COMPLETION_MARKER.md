@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 Status: active
-Current marker: `88%`
+Current marker: `89%`
 
 ## Intent
 
@@ -37,7 +37,7 @@ These can still be useful references, but they are not the active target.
 
 | Segment | Weight | Current points | Current truth | Main owners | Remaining gap |
 | --- | --- | --- | --- | --- | --- |
-| Core gameplay loop and reset semantics | `20` | `19` | strong with generated-play traversal proof | `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | final touch-first/live play-feel proof across keyboard and pointer input after visual/layout tuning |
+| Core gameplay loop and reset semantics | `20` | `20` | closed for current scope with generated-play traversal plus live keyboard/touch play proof | `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | continue future feel tuning only if new input regressions are found |
 | Maze generation and topology quality | `25` | `21` | stronger with default play/menu seed-family multi-route proof | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | continue tuning shortcut/alternate-route quality across wider seed families without disconnected floors, shallow loops, or degenerate goals |
 | Menu AI/demo loop | `15` | `14` | source-shaped with wider generated-menu seed-family playback proof | `src/domain/ai/demoWalker.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | continue proving clean recovery/replay behavior across longer soak captures and exact timing evidence |
 | Mobile input and active-play usability | `15` | `15` | live touch movement and touch-control proof | `src/scenes/MenuScene.ts`, `src/input-human/touch.ts`, `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | continue board/player readability checks in the visual-readability lane |
@@ -46,7 +46,7 @@ These can still be useful references, but they are not the active target.
 
 Current total:
 
-- `88 / 100`
+- `89 / 100`
 
 ## Latest ratchet
 
@@ -54,6 +54,7 @@ Current total:
 - `2026-07-03`: `85% -> 86%` after replacing ultra-narrow mobile overlay shrink rules with readability-first marker/trail sizing and stronger active-play player contrast. Proof: focused Vitest reset/AI/render packet passed `20` files / `138` tests, `npm run build`, `git diff --check`, and in-app-browser play-route proof at effective `166x359` CSS viewport with board bounds inside safe bounds, `tileSize=3.327`, no console errors, and visible centered player/trail/touch controls.
 - `2026-07-03`: `86% -> 87%` after widening route-quality reinforcement for generated mazes and adding seed-family guards proving default play and generated-menu mazes stay connected with meaningful alternate routes. Proof: focused reset/AI/render packet passed `20` files / `140` tests, including `16` default play seeds and `16` default menu seeds with no detached floors and `multi-route` route quality.
 - `2026-07-03`: `87% -> 88%` after widening generated-menu AI playback proof from a small representative set to the full `16`-seed default menu family plus the existing larger scale case. Proof: `npx vitest run tests/ai/demo-walker.test.ts --reporter=dot` passed `15` tests, including route diagnostics bounds and adjacent playback for `17` generated-menu cases.
+- `2026-07-03`: `88% -> 89%` after closing the active-play keyboard/touch mechanics proof gap: desktop keyboard proof now launches directly into the supported `mode=play` route, focuses the game canvas, models the 50ms simultaneous-key input buffer with held movement keys, reads fresh visual-runtime player state, and keyboard controls now cover pause, restart, and trail/thought toggle through the same play command path as touch. Proof: `npm run lint`, `npx vitest run tests/visual/edge-live-check.test.ts --reporter=dot`, `npm run edge:live -- --skip-build true --headless true --run play-mode-interactive`, and `npm run edge:live -- --skip-build true --headless true --run mobile-touch-smoke`.
 
 ## Marker rule
 

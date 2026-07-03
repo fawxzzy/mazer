@@ -51,7 +51,7 @@ const EDGE_LIVE_SPECIAL_ROUTES = Object.freeze({
   'watch-play-shell': '/?content=core-only&mode=play&theme=aurora',
   'play-mode-smoke': '/?content=core-only&mode=play&theme=ember',
   'play-hud-trim': '/?content=core-only&mode=play&theme=aurora',
-  'play-mode-interactive': '/?content=core-only&theme=aurora',
+  'play-mode-interactive': '/?content=core-only&mode=play&theme=aurora',
   'mobile-touch-smoke': '/?content=core-only&mode=play&theme=aurora',
   'core-only-watch': '/?content=core-only&theme=aurora',
   'core-only-play': '/?content=core-only&mode=play&theme=aurora',
@@ -72,7 +72,7 @@ const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
   'play-mode-interactive': Object.freeze({
     kind: 'keyboard',
     requiredMode: 'play',
-    ensureModeKey: 'm',
+    requiresControlEvents: false,
     movementWaitMs: 220,
     controlWaitMs: 180,
     restartWaitMs: 900,
@@ -306,6 +306,16 @@ const resolveInteractiveSurfaceMode = (surface) => (
 export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
   const runtime = diagnostics?.runtime ?? null;
   const visual = diagnostics?.visual ?? null;
+  const visualRuntime = visual?.runtime ?? null;
+  const surface = runtime?.surface ?? (
+    visualRuntime
+      ? {
+          mode: visualRuntime.mode ?? null,
+          overlay: visualRuntime.overlay ?? null
+        }
+      : null
+  );
+  const player = visualRuntime?.player ?? runtime?.play?.player ?? runtime?.player ?? null;
   const telemetrySummary = runtime?.telemetry?.summary ?? null;
   const telemetryEvents = Array.isArray(runtime?.telemetry?.events) ? runtime.telemetry.events : [];
   const projection = runtime?.projection ?? null;
@@ -319,11 +329,11 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
   return {
     mode: (
       resolveInteractiveProjectionMode(projection)
-      ?? resolveInteractiveSurfaceMode(runtime?.surface)
+      ?? resolveInteractiveSurfaceMode(surface)
       ?? resolveTelemetryModeFromCaptures([{ telemetry: { mode: telemetrySummary?.mode ?? null } }])
       ?? null
     ),
-    overlay: runtime?.surface?.overlay ?? null,
+    overlay: surface?.overlay ?? null,
     controlUsedCount,
     projection: projection
       ? {
@@ -375,7 +385,12 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
           trailSegmentCap: runtime.resources.trailSegmentCap ?? null,
           trailSegmentCount: runtime.resources.trailSegmentCount ?? null
         }
-      : null,
+      : visualRuntime
+        ? {
+            trailSegmentCap: null,
+            trailSegmentCount: visualRuntime.trailLength ?? null
+          }
+        : null,
     trail: visual?.trail
       ? {
           currentIndex: visual.trail.currentIndex ?? null,
@@ -384,12 +399,12 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
           cue: visual.trail.cue ?? null
         }
       : null,
-    player: (runtime?.play?.player ?? runtime?.player)
+    player: player
       ? {
-          x: Number.isFinite((runtime.play?.player ?? runtime.player).x) ? (runtime.play?.player ?? runtime.player).x : null,
-          y: Number.isFinite((runtime.play?.player ?? runtime.player).y) ? (runtime.play?.player ?? runtime.player).y : null,
-          screenX: Number.isFinite((runtime.play?.player ?? runtime.player).screenX) ? (runtime.play?.player ?? runtime.player).screenX : null,
-          screenY: Number.isFinite((runtime.play?.player ?? runtime.player).screenY) ? (runtime.play?.player ?? runtime.player).screenY : null
+          x: Number.isFinite(player.x) ? player.x : null,
+          y: Number.isFinite(player.y) ? player.y : null,
+          screenX: Number.isFinite(player.screenX) ? player.screenX : null,
+          screenY: Number.isFinite(player.screenY) ? player.screenY : null
         }
       : null
   };
@@ -604,8 +619,19 @@ const runEdgeLiveInteraction = async ({
     }
   };
 
-  const triggerKeyboardStep = async (key) => {
-    await page.keyboard.press(key);
+  const triggerKeyboardStep = async (key, options = {}) => {
+    const holdMs = Math.max(0, Math.round(options.holdMs ?? 0));
+    if (holdMs <= 0) {
+      await page.keyboard.press(key);
+      return;
+    }
+
+    await page.keyboard.down(key);
+    try {
+      await page.waitForTimeout(holdMs);
+    } finally {
+      await page.keyboard.up(key);
+    }
   };
 
   const waitForMovementReady = async () => {
@@ -665,6 +691,17 @@ const runEdgeLiveInteraction = async ({
 
     await page.touchscreen.tap(point.x, point.y);
   };
+
+  if (interaction.kind === 'keyboard') {
+    await page.evaluate(() => {
+      window.focus();
+    });
+    await page.locator('canvas').first().click({
+      position: { x: 4, y: 4 },
+      timeout: 2_000
+    }).catch(() => {});
+    await page.waitForTimeout(interaction.keyboardSettleWaitMs ?? 750);
+  }
 
   let currentDiagnostics = await readDiagnostics(page);
   const baselineState = summarizeEdgeLiveInteractiveState(currentDiagnostics);
@@ -752,7 +789,7 @@ const runEdgeLiveInteraction = async ({
         if (interaction.kind === 'touch') {
           await triggerTouchStep(beforeCandidateDiagnostics, candidate);
         } else {
-          await triggerKeyboardStep(candidate);
+          await triggerKeyboardStep(candidate, { holdMs: interaction.keyboardMovementHoldMs ?? 160 });
         }
         currentDiagnostics = await waitAfterInput(step.waitMs ?? interaction.movementWaitMs ?? 220);
         after = summarizeEdgeLiveInteractiveState(currentDiagnostics);
