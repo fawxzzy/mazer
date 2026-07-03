@@ -173,7 +173,11 @@ export const resolveTouchControlLayout = (
 
   const dpadCenterX = frameLeft + buttonSize + gap + Math.round(buttonSize * 0.5);
   const dpadCenterY = frameTop + buttonSize + gap + Math.round(buttonSize * 0.5);
-  const buttonStackLeft = frameLeft + buttonSize * 2 + gap * 3 + Math.round(buttonSize * 0.45);
+  const buttonStackLeft = clamp(
+    frameLeft + frameWidth - buttonSize - gap,
+    frameLeft,
+    Math.max(frameLeft, viewport.width - safeInsets.right - buttonSize)
+  );
   const buttonColumnTop = frameTop + Math.round(buttonSize * 0.05);
 
   const controls: Record<HumanInputActionKind, TouchRect> = {

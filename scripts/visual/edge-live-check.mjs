@@ -91,7 +91,7 @@ const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
     requiredMode: 'play',
     requiresControlEvents: false,
     movementWaitMs: 260,
-    controlWaitMs: 220,
+    controlWaitMs: 850,
     restartWaitMs: 900,
     steps: [
       { id: 'move-1', kind: 'movement', candidates: ['move_up', 'move_right', 'move_down', 'move_left'] },
@@ -323,6 +323,7 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
       ?? resolveTelemetryModeFromCaptures([{ telemetry: { mode: telemetrySummary?.mode ?? null } }])
       ?? null
     ),
+    overlay: runtime?.surface?.overlay ?? null,
     controlUsedCount,
     projection: projection
       ? {
@@ -369,6 +370,12 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
     controlActionBreakdown: playMetrics?.controlUsedByAction ?? null,
     watchToPlaySwitchCount: playMetrics?.watchToPlaySwitchCount ?? 0,
     failToRetryContinuation: telemetrySummary?.failToRetryContinuation ?? null,
+    resources: runtime?.resources
+      ? {
+          trailSegmentCap: runtime.resources.trailSegmentCap ?? null,
+          trailSegmentCount: runtime.resources.trailSegmentCount ?? null
+        }
+      : null,
     trail: visual?.trail
       ? {
           currentIndex: visual.trail.currentIndex ?? null,

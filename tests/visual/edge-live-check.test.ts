@@ -502,6 +502,14 @@ describe('edge live check', () => {
             }
           }
         },
+        surface: {
+          mode: 'play',
+          overlay: 'pause'
+        },
+        resources: {
+          trailSegmentCap: 16,
+          trailSegmentCount: 7
+        },
         projection: {
           mode: 'play',
           state: 'watching',
@@ -538,9 +546,14 @@ describe('edge live check', () => {
       }
     })).toMatchObject({
       mode: 'play',
+      overlay: 'pause',
       controlUsedCount: 3,
       input: {
         mergedCount: 2
+      },
+      resources: {
+        trailSegmentCap: 16,
+        trailSegmentCount: 7
       },
       hud: {
         statusText: 'Gate timing ahead'
@@ -575,6 +588,7 @@ describe('edge live check', () => {
       }
     })).toMatchObject({
       mode: 'play',
+      overlay: 'none',
       projection: null,
       player: {
         x: 2,

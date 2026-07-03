@@ -261,6 +261,21 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (!isSameLegacyPlayPointer(this.playPointerStart, pointer)) {');
   });
 
+  test('routes shared mobile touch controls into play pause, reset, and trail toggles', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('resolveTouchControlKindAtPoint');
+    expect(menuSceneSource).toContain('resolveTouchControlLayout');
+    expect(menuSceneSource).toContain('private handleLegacyPlayTouchControl');
+    expect(menuSceneSource).toContain('installLegacyPlayTouchControlFallback');
+    expect(menuSceneSource).toContain("target.addEventListener('touchstart'");
+    expect(menuSceneSource).toContain("target.addEventListener('touchend'");
+    expect(menuSceneSource).toContain('event.stopImmediatePropagation()');
+    expect(menuSceneSource).toContain("case 'pause':");
+    expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('reset-player');");
+    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailFade');");
+  });
+
   test('keeps camera-follow static and dynamic board layers on the same offset', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const toggleFieldSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayToggleFields.ts'), 'utf8');

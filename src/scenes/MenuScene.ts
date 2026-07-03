@@ -117,6 +117,7 @@ import {
   type MenuSceneRuntimeConfig
 } from './menuRuntimeDiagnostics';
 import { summarizeTelemetrySemantics } from '../telemetry';
+import { resolveTouchControlKindAtPoint, resolveTouchControlLayout } from '../input-human/touch';
 
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
@@ -490,6 +491,9 @@ export class MenuScene extends Phaser.Scene {
   private legacyPlayFocusGuardAttached = false;
   private legacyPlayWindowBlurHandler: (() => void) | null = null;
   private legacyPlayVisibilityChangeHandler: (() => void) | null = null;
+  private legacyPlayTouchControlPointerDownHandler: ((event: PointerEvent) => void) | null = null;
+  private legacyPlayTouchControlTouchStartHandler: ((event: TouchEvent) => void) | null = null;
+  private legacyPlayTouchControlTouchEndHandler: ((event: TouchEvent) => void) | null = null;
   private runtimeFeedDiagnostics = summarizeMenuSceneRuntimeFeed({ nowMs: 0 });
 
   public constructor() {
@@ -549,6 +553,7 @@ export class MenuScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.detachRuntimeDiagnostics();
       this.detachLegacyPlayFocusGuards();
+      this.detachLegacyPlayTouchControlFallback();
       this.clearVisualDiagnostics();
       clearMenuSceneRuntimeDiagnostics();
     });
@@ -1024,6 +1029,108 @@ export class MenuScene extends Phaser.Scene {
     this.input.on('gameout', () => {
       this.playPointerStart = null;
     });
+
+    this.installLegacyPlayTouchControlFallback();
+  }
+
+  private installLegacyPlayTouchControlFallback(): void {
+    if (
+      this.legacyPlayTouchControlPointerDownHandler !== null
+      || this.legacyPlayTouchControlTouchStartHandler !== null
+      || this.legacyPlayTouchControlTouchEndHandler !== null
+    ) {
+      return;
+    }
+
+    this.legacyPlayTouchControlPointerDownHandler = (event: PointerEvent) => {
+      if (!this.handleLegacyPlayTouchControlClientPoint(event.clientX, event.clientY)) {
+        return;
+      }
+
+      this.playPointerStart = null;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    this.legacyPlayTouchControlTouchStartHandler = (event: TouchEvent) => {
+      if (this.overlay !== 'pause') {
+        return;
+      }
+
+      const touch = event.changedTouches.item(0);
+      if (!touch || !this.handleLegacyPlayTouchControlClientPoint(touch.clientX, touch.clientY)) {
+        return;
+      }
+
+      this.playPointerStart = null;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    this.legacyPlayTouchControlTouchEndHandler = (event: TouchEvent) => {
+      const touch = event.changedTouches.item(0);
+      if (!touch || !this.handleLegacyPlayTouchControlClientPoint(touch.clientX, touch.clientY)) {
+        return;
+      }
+
+      this.playPointerStart = null;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+
+    const target = typeof document !== 'undefined' ? document : this.game.canvas;
+    if (typeof PointerEvent !== 'undefined') {
+      target.addEventListener('pointerdown', this.legacyPlayTouchControlPointerDownHandler as EventListener, {
+        capture: true,
+        passive: false
+      });
+    }
+    target.addEventListener('touchstart', this.legacyPlayTouchControlTouchStartHandler as EventListener, {
+      capture: true,
+      passive: false
+    });
+    target.addEventListener('touchend', this.legacyPlayTouchControlTouchEndHandler as EventListener, {
+      capture: true,
+      passive: false
+    });
+  }
+
+  private detachLegacyPlayTouchControlFallback(): void {
+    if (
+      this.legacyPlayTouchControlPointerDownHandler === null
+      && this.legacyPlayTouchControlTouchStartHandler === null
+      && this.legacyPlayTouchControlTouchEndHandler === null
+    ) {
+      return;
+    }
+
+    const target = typeof document !== 'undefined' ? document : this.game.canvas;
+    if (this.legacyPlayTouchControlPointerDownHandler !== null && typeof PointerEvent !== 'undefined') {
+      target.removeEventListener('pointerdown', this.legacyPlayTouchControlPointerDownHandler as EventListener, {
+        capture: true
+      });
+    }
+    if (this.legacyPlayTouchControlTouchStartHandler !== null) {
+      target.removeEventListener('touchstart', this.legacyPlayTouchControlTouchStartHandler as EventListener, {
+        capture: true
+      });
+    }
+    if (this.legacyPlayTouchControlTouchEndHandler !== null) {
+      target.removeEventListener('touchend', this.legacyPlayTouchControlTouchEndHandler as EventListener, {
+        capture: true
+      });
+    }
+    this.legacyPlayTouchControlPointerDownHandler = null;
+    this.legacyPlayTouchControlTouchStartHandler = null;
+    this.legacyPlayTouchControlTouchEndHandler = null;
+  }
+
+  private handleLegacyPlayTouchControlClientPoint(clientX: number, clientY: number): boolean {
+    const rect = this.game.canvas.getBoundingClientRect();
+    const width = Math.max(1, rect.width);
+    const height = Math.max(1, rect.height);
+    return this.handleLegacyPlayTouchControl(
+      ((clientX - rect.left) / width) * this.layout.width,
+      ((clientY - rect.top) / height) * this.layout.height
+    );
   }
 
   private resolveLegacyPlayMovementDirection(event: KeyboardEvent): keyof LegacyPlayMoveFlags | null {
@@ -1075,6 +1182,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyPlayPointerDown(pointer: Phaser.Input.Pointer): boolean {
+    if (this.handleLegacyPlayTouchControl(pointer.x, pointer.y)) {
+      this.playPointerStart = null;
+      return true;
+    }
+
     if (this.mode !== 'play' || this.overlay !== 'none' || hasPendingLegacyResetRequest(this.pendingResetRequest)) {
       this.playPointerStart = null;
       return false;
@@ -1089,6 +1201,55 @@ export class MenuScene extends Phaser.Scene {
 
     this.playPointerStart = createLegacyPlayPointerStart(pointer);
     return true;
+  }
+
+  private handleLegacyPlayTouchControl(x: number, y: number): boolean {
+    if (this.mode !== 'play' || hasPendingLegacyResetRequest(this.pendingResetRequest)) {
+      return false;
+    }
+
+    const control = resolveTouchControlKindAtPoint(
+      resolveTouchControlLayout({
+        width: this.layout.width,
+        height: this.layout.height
+      }, {
+        compact: this.layout.width < 720 || this.layout.height < 720
+      }),
+      x,
+      y
+    );
+
+    switch (control) {
+      case 'pause':
+        if (this.overlay === 'pause') {
+          this.closeOverlay();
+        } else if (this.overlay === 'none') {
+          this.openOverlay('pause');
+        } else {
+          return false;
+        }
+        return true;
+      case 'restart_attempt':
+        if (this.overlay === 'none' || this.overlay === 'pause') {
+          this.applyLegacyPauseCommand('reset-player');
+          return true;
+        }
+        return false;
+      case 'toggle_thoughts':
+        if (this.overlay === 'none' || this.overlay === 'pause') {
+          this.applyLegacyOverlayToggleField('toggleTrailFade');
+          return true;
+        }
+        return false;
+      case 'move_up':
+      case 'move_right':
+      case 'move_down':
+      case 'move_left':
+      case null:
+        return false;
+      default:
+        return control satisfies never;
+    }
   }
 
   private handleLegacyPlayPointerUp(pointer: Phaser.Input.Pointer): boolean {
