@@ -28,6 +28,7 @@ const isDirectRun = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
 const EDGE_LIVE_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-edge-live');
 const VISUAL_CAPTURE_KEY = '__MAZER_VISUAL_CAPTURE__';
 const VISUAL_DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__';
+const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
 const RUNTIME_DIAGNOSTICS_KEY = '__MAZER_RUNTIME_DIAGNOSTICS__';
 const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';
 const PROOF_SURFACE_SIGNAL_KEY = '__MAZER_PROOF_SURFACES__';
@@ -1133,32 +1134,37 @@ export const readDiagnostics = async (page, { retries = 3, retryDelayMs = 120 } 
   for (let attempt = 1; attempt <= retries; attempt += 1) {
     try {
       return await page.evaluate((keys) => {
-        const runtimeFromWindow = window[keys.runtime] ?? null;
-        const runtimeFromAttribute = (() => {
-          const serialized = document.documentElement.getAttribute(keys.runtimeAttribute);
+        const readJsonAttribute = (attributeName, accept) => {
+          const serialized = document.documentElement.getAttribute(attributeName);
           if (typeof serialized !== 'string' || serialized.length === 0) {
             return null;
           }
 
           try {
             const parsed = JSON.parse(serialized);
-            return (
-              parsed
-              && parsed.sceneInstanceId
-              && parsed.performance
-              && parsed.resources
-            ) ? parsed : null;
+            return accept(parsed) ? parsed : null;
           } catch {
             return null;
           }
-        })();
+        };
+
+        const visualFromAttribute = readJsonAttribute(
+          keys.visualAttribute,
+          (parsed) => Boolean(parsed?.board?.bounds && parsed?.runtime?.mode)
+        );
+        const runtimeFromWindow = window[keys.runtime] ?? null;
+        const runtimeFromAttribute = readJsonAttribute(
+          keys.runtimeAttribute,
+          (parsed) => Boolean(parsed?.sceneInstanceId && parsed?.performance && parsed?.resources)
+        );
 
         return {
-          visual: window[keys.visual] ?? null,
+          visual: window[keys.visual] ?? visualFromAttribute,
           runtime: runtimeFromWindow ?? runtimeFromAttribute
         };
       }, {
         visual: VISUAL_DIAGNOSTICS_KEY,
+        visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE,
         runtime: RUNTIME_DIAGNOSTICS_KEY,
         runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE
       });

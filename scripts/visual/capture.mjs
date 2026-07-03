@@ -20,6 +20,7 @@ import {
 
 const CAPTURE_KEY = '__MAZER_VISUAL_CAPTURE__';
 const DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__';
+const DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
 const CENTER_TOLERANCE_PX = 6;
 const FRAME_TOLERANCE_PX = 4;
 const TARGET_CAPTURE_RETRIES = 3;
@@ -373,7 +374,27 @@ const waitForDiagnostics = async (page, timeoutMs) => {
   let lastDiagnostics = null;
 
   while ((Date.now() - startedAt) < timeoutMs) {
-    lastDiagnostics = await page.evaluate((diagnosticsKey) => window[diagnosticsKey] ?? null, DIAGNOSTICS_KEY);
+    lastDiagnostics = await page.evaluate(({ diagnosticsKey, diagnosticsAttribute }) => {
+      const fromWindow = window[diagnosticsKey] ?? null;
+      if (fromWindow) {
+        return fromWindow;
+      }
+
+      const serialized = document.documentElement.getAttribute(diagnosticsAttribute);
+      if (typeof serialized !== 'string' || serialized.length === 0) {
+        return null;
+      }
+
+      try {
+        const parsed = JSON.parse(serialized);
+        return parsed?.board?.bounds && parsed?.runtime?.mode ? parsed : null;
+      } catch {
+        return null;
+      }
+    }, {
+      diagnosticsKey: DIAGNOSTICS_KEY,
+      diagnosticsAttribute: DIAGNOSTICS_ATTRIBUTE
+    });
     if (isDiagnosticsReady(lastDiagnostics)) {
       return lastDiagnostics;
     }
