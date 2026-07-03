@@ -7,6 +7,11 @@ import {
   resolveDemoWalkerViewFrame
 } from '../../src/domain/ai';
 import { legacyTuning } from '../../src/config/tuning';
+import { createLegacyGeneratedMenuMaze } from '../../src/legacy-runtime/legacyMaze';
+import {
+  createLegacyDemoWalkerEpisode,
+  createLegacyMenuDemoWalkerConfig
+} from '../../src/legacy-runtime/legacyDemoWalker';
 import {
   generateMaze,
   isTileFloor,
@@ -599,4 +604,52 @@ describe('demo walker', () => {
       expect(sawWrongBranchOrRecovery).toBe(true);
     }
   }, 15_000);
+
+  test('generated legacy menu mazes keep AI routes adjacent and bounded', () => {
+    const cases = [
+      { scale: 50, seed: 3749 },
+      { scale: 50, seed: 777 },
+      { scale: 50, seed: 0x5a17f00d },
+      { scale: 75, seed: 8_811 }
+    ] as const;
+
+    for (const testCase of cases) {
+      const maze = createLegacyGeneratedMenuMaze(testCase.scale, testCase.seed);
+      const episode = createLegacyDemoWalkerEpisode(maze);
+      const config = createLegacyMenuDemoWalkerConfig(testCase.seed);
+      const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
+      let state = createDemoWalkerState(episode, config);
+      const maxSteps = Math.max(256, episode.raster.pathIndices.length * 8);
+
+      expect(maze.source).toBe('menu-generated');
+      expect(diagnostics.routeLength).toBeGreaterThanOrEqual(episode.raster.pathIndices.length);
+      expect(diagnostics.routeLength).toBeLessThanOrEqual(episode.raster.pathIndices.length * 4);
+      expect(diagnostics.traverseMs).toBeLessThan(60_000);
+
+      for (let step = 0; step < maxSteps; step += 1) {
+        const previousIndex = state.currentIndex;
+        const previousPhase = state.phase;
+        const advance = advanceDemoWalker(episode, state, config);
+        state = advance.state;
+
+        expect(isTileFloor(episode.raster.tiles, state.currentIndex)).toBe(true);
+        if (previousPhase === 'explore' && state.phase === 'explore') {
+          const direction = resolveDirectionBetween(previousIndex, state.currentIndex, episode.raster.width);
+          if (direction === null) {
+            throw new Error(
+              `Non-adjacent generated-menu AI move for seed=${testCase.seed} step=${step}`
+              + ` from=${previousIndex} to=${state.currentIndex}`
+              + ` cue=${state.cue} cursor=${state.pathCursor} canonical=${state.canonicalCursor}`
+            );
+          }
+        }
+
+        if (advance.shouldRegenerateMaze || state.phase === 'goal-hold') {
+          break;
+        }
+      }
+
+      expect(state.phase === 'goal-hold' || state.phase === 'reset-hold').toBe(true);
+    }
+  }, 20_000);
 });
