@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { LEGACY_DEFAULTS, MAIN_MENU_BUTTONS, linearColorToHex } from '../../src/legacy-runtime/legacyDefaults';
-import { createLegacyMaze, createLegacyMenuMaze } from '../../src/legacy-runtime/legacyMaze';
+import { createLegacyGeneratedMenuMaze, createLegacyMaze, createLegacyMenuMaze } from '../../src/legacy-runtime/legacyMaze';
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
@@ -181,6 +181,36 @@ describe('legacy reset lane', () => {
     expect(maze.routeQualityStats?.meaningfulBypassableSolutionEdges).toBeGreaterThan(1);
     expect(maze.routeQualityStats?.meaningfulBypassableRouteBands).toBeGreaterThan(1);
     expect(maze.routeQualityStats?.minimumMeaningfulDetour).toBeGreaterThanOrEqual(2);
+  });
+
+  test('keeps default generated play mazes connected with meaningful alternate routes across seed families', () => {
+    const seeds = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 3749, 777, 1001, 0x5a17f00d];
+
+    for (const seed of seeds) {
+      const maze = createLegacyMaze(50, seed);
+
+      expect(maze.source).toBe('play-generated');
+      expect(countDetachedFloorTiles(maze)).toBe(0);
+      expect(maze.solutionPath.length).toBeGreaterThanOrEqual(Math.floor(maze.size * 1.5));
+      expect(maze.routeQualityStats?.routeQuality).toBe('multi-route');
+      expect(maze.routeQualityStats?.meaningfulBypassableSolutionEdges).toBeGreaterThan(1);
+      expect(maze.routeQualityStats?.meaningfulBypassableRouteBands).toBeGreaterThan(1);
+    }
+  });
+
+  test('keeps default generated menu mazes connected with meaningful alternate routes across seed families', () => {
+    const seeds = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 3749, 777, 1001, 0x5a17f00d];
+
+    for (const seed of seeds) {
+      const maze = createLegacyGeneratedMenuMaze(50, seed);
+
+      expect(maze.source).toBe('menu-generated');
+      expect(countDetachedFloorTiles(maze)).toBe(0);
+      expect(maze.solutionPath.length).toBeGreaterThanOrEqual(Math.floor(maze.size * 1.5));
+      expect(maze.routeQualityStats?.routeQuality).toBe('multi-route');
+      expect(maze.routeQualityStats?.meaningfulBypassableSolutionEdges).toBeGreaterThan(1);
+      expect(maze.routeQualityStats?.meaningfulBypassableRouteBands).toBeGreaterThan(1);
+    }
   });
 
   test('reinforces weak shortcut outcomes without disconnecting generated play mazes', () => {

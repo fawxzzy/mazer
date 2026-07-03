@@ -14,7 +14,7 @@ This started as a mapping packet. The follow-up route-quality bound ratcheted th
 
 ```mermaid
 flowchart TD
-  A["MenuScene.create()"] --> B["createLegacyMenuMaze(seed)"]
+  A["MenuScene.create()"] --> B["createLegacyGeneratedMenuMaze(scale, seed)"]
   B --> C["createLegacyDemoWalkerEpisode(maze)"]
   C --> D["createLegacyMenuDemoBootstrap(...)"]
   D --> E["createDemoWalkerState(episode, config)"]
@@ -33,7 +33,8 @@ flowchart TD
 
 | Concern | First owner | Downstream surfaces | Proof |
 | --- | --- | --- | --- |
-| Menu fixed maze shape | `src/legacy-runtime/legacyMaze.ts` | `createLegacyMenuMaze()`, `legacyMenuSnapshot.ts`, `legacyMenuRender.ts` | `tests/reset/legacy-reset.test.ts`, `tests/scenes/menu-render-frame.test.ts` |
+| Menu generated maze shape | `src/legacy-runtime/legacyMaze.ts` | `createLegacyGeneratedMenuMaze()`, `createLegacyMaze()`, `legacyMenuRender.ts` | `tests/reset/legacy-reset.test.ts`, `tests/scenes/menu-render-frame.test.ts` |
+| Fixed screenshot fixture shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `createLegacyMenuMaze()`, screenshot comparison fixtures | `tests/reset/legacy-reset.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts` |
 | Menu generation stage contract | `src/legacy-runtime/legacyGenerationLifecycle.ts` | process `0/3/4/5/6/7/8`, stage cursor, budget, draw-stage shape | `tests/reset/legacy-generation-lifecycle.test.ts`, `tests/reset/legacy-generation-diagnostics.test.ts` |
 | Menu row reveal | `src/scenes/MenuScene.ts` | `armLegacyMenuStaticDrawStage()`, `advanceLegacyMenuStaticDrawStage(time)`, `resolveMenuSceneGenerationDrawStageProgress()` | `tests/reset/legacy-reset.test.ts`, localhost diagnostics |
 | Menu AI bootstrap | `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | `createLegacyDemoWalkerEpisode()`, fixed-snapshot preroll, visible stable bootstrap | `tests/reset/legacy-menu-demo-lifecycle.test.ts` |
@@ -68,18 +69,20 @@ The humanized lane owns:
 
 ## Current Generation Shape
 
-Menu generation is intentionally not the same owner as active play generation:
+Menu generation shares the active play topology owner but uses a menu-specific budget/tuning wrapper:
 
-- Menu mode uses the fixed legacy menu snapshot.
-- Play mode uses generated active runtime mazes.
+- Menu mode uses `createLegacyGeneratedMenuMaze()`, which wraps the same checkpoint path-builder and shortcut reinforcement family as active play while preserving `source: 'menu-generated'`.
+- Play mode uses `createLegacyMaze()` and preserves `source: 'play-generated'`.
+- The fixed legacy menu snapshot remains available through `createLegacyMenuMaze()` only for screenshot comparison fixtures and fixed-snapshot demo tests.
 - Menu stage `6` draw is row-sliced and cadence-gated so the board can reveal over time.
 - Menu demo trail fade is represented as a bounded visible trail tail, which is the browser-safe equivalent for the old delayed material-revert lane.
 - Play topology is currently resolved as a browser-safe build before visible draw.
+- Default play and generated-menu seed-family guards now prove connected meaningful multi-route topology across representative seeds, including the prior weak generated-menu seed `3749`.
 - Exact old engine per-tick process-yield timing is still open.
 
 ## Safe Edit Rules
 
-- If changing the visible menu maze shape, start in `legacyMenuSnapshot.ts` or `legacyMenuRender.ts`, not `demoWalker.ts`.
+- If changing the live generated menu maze shape, start in `legacyMaze.ts`; if changing only the fixed screenshot fixture, start in `legacyMenuSnapshot.ts`.
 - If changing route behavior, start in `demoWalker.ts`, not `MenuScene.drawBoard()`.
 - If changing row reveal timing, start in `MenuScene.advanceLegacyMenuStaticDrawStage(time)` and generation diagnostics.
 - If changing menu reset/rebuild, start in `legacyMenuDemoLifecycle.ts` and `legacyGenerationLifecycle.ts`.

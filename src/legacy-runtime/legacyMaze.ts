@@ -1024,7 +1024,7 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     goal,
     solutionPath,
     routeQualityStats,
-    resolvedShortcutCount > 0 ? Math.max(2, Math.floor(resolvedShortcutCount * 0.45)) : 0
+    resolvedShortcutCount > 0 ? Math.max(2, resolvedShortcutCount) : 0
   );
   if (reinforcementStats.created > 0) {
     solutionPath = reinforcementStats.solutionPath;
