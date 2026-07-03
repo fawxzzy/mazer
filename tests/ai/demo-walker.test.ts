@@ -607,8 +607,21 @@ describe('demo walker', () => {
 
   test('generated legacy menu mazes keep AI routes adjacent and bounded', () => {
     const cases = [
+      { scale: 50, seed: 1 },
+      { scale: 50, seed: 2 },
+      { scale: 50, seed: 3 },
+      { scale: 50, seed: 5 },
+      { scale: 50, seed: 8 },
+      { scale: 50, seed: 13 },
+      { scale: 50, seed: 21 },
+      { scale: 50, seed: 34 },
+      { scale: 50, seed: 55 },
+      { scale: 50, seed: 89 },
+      { scale: 50, seed: 144 },
+      { scale: 50, seed: 233 },
       { scale: 50, seed: 3749 },
       { scale: 50, seed: 777 },
+      { scale: 50, seed: 1001 },
       { scale: 50, seed: 0x5a17f00d },
       { scale: 75, seed: 8_811 }
     ] as const;
@@ -651,5 +664,5 @@ describe('demo walker', () => {
 
       expect(state.phase === 'goal-hold' || state.phase === 'reset-hold').toBe(true);
     }
-  }, 20_000);
+  }, 30_000);
 });
