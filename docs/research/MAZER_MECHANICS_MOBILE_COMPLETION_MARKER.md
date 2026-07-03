@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 Status: active
-Current marker: `80%`
+Current marker: `81%`
 
 ## Intent
 
@@ -37,7 +37,7 @@ These can still be useful references, but they are not the active target.
 
 | Segment | Weight | Current points | Current truth | Main owners | Remaining gap |
 | --- | --- | --- | --- | --- | --- |
-| Core gameplay loop and reset semantics | `20` | `18` | strong | `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | final play-feel proof across touch and keyboard, especially after visual/layout tuning |
+| Core gameplay loop and reset semantics | `20` | `19` | strong with generated-play traversal proof | `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | final touch-first/live play-feel proof across keyboard and pointer input after visual/layout tuning |
 | Maze generation and topology quality | `25` | `20` | strong with weak-route guard | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | continue tuning shortcut/alternate-route quality across wider seed families without disconnected floors, shallow loops, or degenerate goals |
 | Menu AI/demo loop | `15` | `13` | source-shaped with generated-menu seed proof | `src/domain/ai/demoWalker.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | continue proving clean recovery/replay behavior across wider generated menu seed families |
 | Mobile input and active-play usability | `15` | `12` | functional | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | confirm touch-first play stays reliable after board sizing/readability changes |
@@ -46,7 +46,7 @@ These can still be useful references, but they are not the active target.
 
 Current total:
 
-- `80 / 100`
+- `81 / 100`
 
 ## Marker rule
 
