@@ -346,6 +346,7 @@ describe('legacy reset lane', () => {
     expect(legacyPlayHudSource).toContain('const timerBounds = createLegacyHudRect(14, 14, 64, 22);');
     expect(menuSceneSource).toContain('this.hudGraphics.fillRect(');
     expect(menuSceneSource).toContain("fontSize: '14px',");
+    expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls();');
     expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
     expect(menuSceneSource).toContain('this.schedulePlayResetReturn();');
