@@ -45,8 +45,27 @@ export interface LegacyPointerMoveInput {
   tileSize: number;
 }
 
+export interface LegacyPlayPointerLike {
+  id?: number;
+  identifier?: number | null;
+  pointerId?: number | null;
+  x: number;
+  y: number;
+}
+
+export interface LegacyPlayPointerStart {
+  id: number;
+  identifier: number | null;
+  pointerId: number | null;
+  x: number;
+  y: number;
+}
+
 const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
 const normalizeDelta = (delta: number): number => Math.sign(delta);
+const normalizePointerIdentity = (value: number | null | undefined): number | null => (
+  typeof value === 'number' && Number.isFinite(value) ? value : null
+);
 const resolveScreenDeltaMoveVector = (
   deltaX: number,
   deltaY: number
@@ -105,6 +124,31 @@ export const resolveLegacyPointerMoveVector = ({
   }
 
   return resolveScreenDeltaMoveVector(endX - playerScreenX, endY - playerScreenY);
+};
+
+export const createLegacyPlayPointerStart = (pointer: LegacyPlayPointerLike): LegacyPlayPointerStart => ({
+  id: normalizePointerIdentity(pointer.id) ?? 0,
+  identifier: normalizePointerIdentity(pointer.identifier),
+  pointerId: normalizePointerIdentity(pointer.pointerId),
+  x: pointer.x,
+  y: pointer.y
+});
+
+export const isSameLegacyPlayPointer = (
+  start: LegacyPlayPointerStart,
+  pointer: LegacyPlayPointerLike
+): boolean => {
+  const pointerId = normalizePointerIdentity(pointer.pointerId);
+  if (start.pointerId !== null && pointerId !== null) {
+    return start.pointerId === pointerId;
+  }
+
+  const identifier = normalizePointerIdentity(pointer.identifier);
+  if (start.identifier !== null && identifier !== null) {
+    return start.identifier === identifier;
+  }
+
+  return start.id === (normalizePointerIdentity(pointer.id) ?? 0);
 };
 
 export const isPointInsideLegacyBoardBounds = (

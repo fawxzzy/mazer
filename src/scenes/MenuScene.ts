@@ -46,12 +46,15 @@ import {
 } from '../legacy-runtime/legacyPauseLifecycle';
 import {
   advanceLegacyPlayStep,
+  createLegacyPlayPointerStart,
   createLegacyPlayMoveFlags,
   LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
   isPointInsideLegacyBoardBounds,
   resolveLegacyPointerMoveVector,
   resolveLegacyPlayMoveVector,
-  type LegacyPlayMoveFlags
+  isSameLegacyPlayPointer,
+  type LegacyPlayMoveFlags,
+  type LegacyPlayPointerStart
 } from '../legacy-runtime/legacyPlayStep';
 import {
   resolveLegacyPlayHudFrame,
@@ -437,7 +440,7 @@ export class MenuScene extends Phaser.Scene {
   private pendingOverlayMazeRebuild = false;
   private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();
   private playMoveTimer: Phaser.Time.TimerEvent | null = null;
-  private playPointerStart: { x: number; y: number } | null = null;
+  private playPointerStart: LegacyPlayPointerStart | null = null;
   private titleText!: Phaser.GameObjects.Text;
   private titleShadow!: Phaser.GameObjects.Text;
   private footerText!: Phaser.GameObjects.Text;
@@ -1013,6 +1016,12 @@ export class MenuScene extends Phaser.Scene {
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       this.handleLegacyPlayPointerUp(pointer);
     });
+    this.input.on('pointerupoutside', (pointer: Phaser.Input.Pointer) => {
+      this.handleLegacyPlayPointerUp(pointer);
+    });
+    this.input.on('gameout', () => {
+      this.playPointerStart = null;
+    });
   }
 
   private resolveLegacyPlayMovementDirection(event: KeyboardEvent): keyof LegacyPlayMoveFlags | null {
@@ -1068,17 +1077,23 @@ export class MenuScene extends Phaser.Scene {
       this.playPointerStart = null;
       return false;
     }
+    if (this.playPointerStart !== null && !isSameLegacyPlayPointer(this.playPointerStart, pointer)) {
+      return false;
+    }
     if (!this.isLegacyPlayPointerInsideBoard(pointer.x, pointer.y)) {
       this.playPointerStart = null;
       return false;
     }
 
-    this.playPointerStart = { x: pointer.x, y: pointer.y };
+    this.playPointerStart = createLegacyPlayPointerStart(pointer);
     return true;
   }
 
   private handleLegacyPlayPointerUp(pointer: Phaser.Input.Pointer): boolean {
     if (this.playPointerStart === null) {
+      return false;
+    }
+    if (!isSameLegacyPlayPointer(this.playPointerStart, pointer)) {
       return false;
     }
 
