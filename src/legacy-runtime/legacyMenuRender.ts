@@ -17,6 +17,12 @@ export interface LegacyMenuPathRenderSegments {
   core: LegacyMenuPathRenderFrame[];
 }
 
+export interface LegacyPlayerMarkerRenderMetrics {
+  coreRadius: number;
+  haloRadius: number;
+  strokeWidth: number;
+}
+
 const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.14;
 const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.04;
 
@@ -26,6 +32,48 @@ const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number =
   }
 
   return Math.max(1, Math.floor(tileSize * ratio));
+};
+
+export const resolveLegacyDynamicMarkerInset = (
+  tileSize: number,
+  ratio: number
+): number => {
+  const maxInset = Math.max(0, Math.floor((tileSize - 1) / 2));
+  const minimumInset = tileSize <= 4 ? 1 : 2;
+  return Math.min(maxInset, Math.max(minimumInset, Math.floor(tileSize * ratio)));
+};
+
+export const resolveLegacyDynamicTrailStrokeWidth = (
+  tileSize: number,
+  ratio: number,
+  minimumWidth: number
+): number => {
+  const maxWidth = Math.max(1, Math.floor(tileSize));
+  const responsiveMinimum = tileSize <= 4 ? 1 : minimumWidth;
+  return Math.min(maxWidth, Math.max(responsiveMinimum, Math.round(tileSize * ratio)));
+};
+
+export const resolveLegacyPlayerMarkerRenderMetrics = (
+  tileSize: number,
+  coreRatio: number,
+  haloRatio: number
+): LegacyPlayerMarkerRenderMetrics => {
+  const maxHaloRadius = Math.max(1, Math.ceil(tileSize * 0.56));
+  const maxCoreRadius = Math.max(1, Math.floor(tileSize * 0.42));
+  const haloRadius = Math.min(
+    maxHaloRadius,
+    Math.max(tileSize <= 4 ? 2 : 3, Math.round(tileSize * haloRatio))
+  );
+  const coreRadius = Math.min(
+    maxCoreRadius,
+    Math.max(1, Math.round(tileSize * coreRatio))
+  );
+
+  return {
+    coreRadius,
+    haloRadius,
+    strokeWidth: Math.max(1, Math.floor(tileSize * 0.12))
+  };
 };
 
 const isWalkableGridPoint = (
