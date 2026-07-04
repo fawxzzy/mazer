@@ -129,7 +129,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     ]);
   });
 
-  test('keeps tiny live-browser tiles dense instead of hairline thin', () => {
+  test('keeps phone-sized tiles separated instead of merging adjacent cells into blocks', () => {
     const maze = {
       size: 3,
       grid: [
@@ -141,8 +141,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     const segments = resolveLegacyMenuPathRenderSegments(maze, { x: 1, y: 1 }, 6);
 
-    expect(segments.edge[0]).toEqual({ leftInset: 0, topInset: 0, width: 6, height: 6 });
-    expect(segments.core[0]).toEqual({ leftInset: 0, topInset: 0, width: 6, height: 6 });
+    expect(segments.edge[0]).toEqual({ leftInset: 1, topInset: 1, width: 4, height: 4 });
+    expect(segments.core[0]).toEqual({ leftInset: 2, topInset: 2, width: 2, height: 2 });
   });
 
   test('keeps the menu board in the clean 2d maze-material lane', () => {
@@ -219,8 +219,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x063448;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.34;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.62;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.24;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.42;');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');");
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95, 'goal');");
@@ -229,6 +229,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineTo(centerX + markerMetrics.outerRadius, centerY);');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, true);');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.2;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.34;');
     expect(menuSceneSource).toContain('resolveLegacyPlayerLocatorRenderMetrics(');
     expect(menuSceneSource).toContain('drawLocatorTick(centerX - locatorMetrics.outerRadius, centerY, centerX - locatorMetrics.innerRadius, centerY);');
     expect(menuSceneSource).toContain('const playerScreenX = this.layout.boardLeft + boardOffset.x + ((this.player.x + 0.5) * this.layout.tileSize);');
@@ -243,12 +245,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(resolveLegacyDynamicMarkerInset(3.265, 0.22)).toBe(0);
     expect(resolveLegacyPlayerMarkerRenderMetrics(3.265, 0.34, 0.54)).toEqual({
       coreRadius: 2,
-      haloRadius: 3,
+      haloRadius: 2,
       strokeWidth: 1
     });
-    expect(resolveLegacyPlayerLocatorRenderMetrics(3.265, 3, 1)).toEqual({
-      innerRadius: 4,
-      outerRadius: 5,
+    expect(resolveLegacyPlayerMarkerRenderMetrics(7, 0.2, 0.34)).toEqual({
+      coreRadius: 1,
+      haloRadius: 2,
+      strokeWidth: 1
+    });
+    expect(resolveLegacyPlayerLocatorRenderMetrics(3.265, 2, 1)).toEqual({
+      innerRadius: 3,
+      outerRadius: 4,
       strokeWidth: 1
     });
     expect(resolveLegacyEndpointMarkerRenderMetrics(3.265)).toEqual({
@@ -269,7 +276,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     });
     expect(resolveLegacyPlayerLocatorRenderMetrics(18, 10, 2)).toEqual({
       innerRadius: 11,
-      outerRadius: 14,
+      outerRadius: 13,
       strokeWidth: 2
     });
     expect(resolveLegacyEndpointMarkerRenderMetrics(18)).toEqual({
