@@ -1,0 +1,6 @@
+# Runtime artifacts produced by Playbook local runs.
+*
+
+# Keep curated repo-local Playbook boundary files tracked.
+!.gitignore
+!README.md

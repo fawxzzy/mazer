@@ -62,18 +62,18 @@
     "verification_path": {
       "status": "passed",
       "commands": [
-        "npm run test:playbook-verification",
-        "npm run test:playbook-adoption",
-        "npm run verify"
+        "npm run verify:local"
       ],
       "evidence_refs": [
         "tests/playbook-verification-report.test.mjs",
         "docs/ops/MAZER-PLAYBOOK-VERIFICATION.md",
         "docs/COMMANDS.md",
-        "package.json"
+        "package.json",
+        "playbook.config.json",
+        ".playbook/local-verification-receipt.json"
       ],
       "notes": [
-        "The canonical repo-local green path is the verification report test, the adoption export test, and the existing repo verify bridge.",
+        "The canonical repo-local Playbook green path is verify:local, which runs the verification report test, the adoption export test, and the existing repo verify bridge.",
         "The verification report test keeps the report schema, scope declaration, and command references honest."
       ]
     }
@@ -86,7 +86,9 @@
     "tests/playbook-verification-report.test.mjs",
     "docs/ops/MAZER-PLAYBOOK-ADOPTION.md",
     "docs/ops/MAZER-PLAYBOOK-VERIFICATION.md",
+    "docs/PLAYBOOK_NOTES.md",
     "docs/COMMANDS.md",
-    "package.json"
+    "package.json",
+    "playbook.config.json"
   ]
 }

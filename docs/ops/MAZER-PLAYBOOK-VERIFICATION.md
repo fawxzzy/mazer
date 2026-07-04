@@ -26,16 +26,14 @@ Explicitly outside this report:
 Run the repo-owned validation path in this order:
 
 ```bash
-npm run test:playbook-verification
-npm run test:playbook-adoption
-npm run verify
+npm run verify:local
 ```
 
 Interpretation:
 
-- `npm run test:playbook-verification` proves the repo-owned verification report still matches the ATLAS root schema and declared command path.
-- `npm run test:playbook-adoption` proves the repo-owned adoption export still aligns to the Playbook owner contract.
-- `npm run verify` is the canonical repo-local verification bridge for the targeted Mazer convergence slice.
+- `npm run verify:local` is the Playbook activation gate for this repo.
+- It runs `npm run test:playbook-verification`, `npm run test:playbook-adoption`, and `npm run verify` in sequence.
+- Playbook local verification mode can use this as the repo-defined gate and emit `.playbook/local-verification-receipt.json` without inventing a Mazer-specific status dialect.
 
 ## Evidence
 
@@ -45,3 +43,5 @@ Interpretation:
 - `tests/playbook-verification-report.test.mjs`
 - `docs/COMMANDS.md`
 - `package.json`
+- `playbook.config.json`
+- `.playbook/local-verification-receipt.json` when produced by `playbook verify --local`

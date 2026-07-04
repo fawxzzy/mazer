@@ -150,11 +150,7 @@ test("mazer verification report references the live repo command surface", () =>
   const verificationDoc = fs.readFileSync(verificationDocPath, "utf8");
   const commands = report.criteria.verification_path.commands;
 
-  assert.deepEqual(commands, [
-    "npm run test:playbook-verification",
-    "npm run test:playbook-adoption",
-    "npm run verify"
-  ]);
+  assert.deepEqual(commands, ["npm run verify:local"]);
 
   for (const command of commands) {
     const scriptName = command.replace("npm run ", "");
