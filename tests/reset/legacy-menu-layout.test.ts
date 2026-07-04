@@ -139,6 +139,8 @@ describe('legacy menu layout', () => {
     });
 
     expect(touchLayout.frames).toHaveLength(2);
+    expect(touchLayout.frames?.[0].right).toBeLessThanOrEqual(playLayout.boardLeft - 18);
+    expect(touchLayout.frames?.[1].left).toBeGreaterThanOrEqual(playLayout.boardLeft + playLayout.boardSize + 18);
     expect(touchLayout.controls.move_right.right).toBeLessThanOrEqual(playLayout.boardLeft - 8);
     expect(touchLayout.controls.pause.left).toBeGreaterThanOrEqual(playLayout.boardLeft + playLayout.boardSize + 8);
     expect(touchLayout.controls.restart_attempt.left).toBe(touchLayout.controls.pause.left);

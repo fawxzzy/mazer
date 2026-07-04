@@ -333,6 +333,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(toggleFieldSource).toContain('affectsBoardStatic: true');
   });
 
+  test('uses rendered play board bounds for compact touch-control avoidance', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('const boardBounds = this.resolveLegacyPlayBoardBounds();');
+    expect(menuSceneSource).toContain('left: boardBounds.left');
+    expect(menuSceneSource).toContain('top: boardBounds.top');
+    expect(menuSceneSource).toContain('width: boardBounds.right - boardBounds.left');
+    expect(menuSceneSource).toContain('height: boardBounds.bottom - boardBounds.top');
+    expect(menuSceneSource).not.toContain('avoidRect: {\n        left: this.layout.boardLeft');
+  });
+
   test('publishes visual diagnostics to a maintained-browser DOM fallback', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 

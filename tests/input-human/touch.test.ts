@@ -89,6 +89,8 @@ describe('input-human touch bridge', () => {
     });
 
     expect(layout.frames).toHaveLength(2);
+    expect(layout.frames?.[0].right).toBeLessThanOrEqual(board.left - 18);
+    expect(layout.frames?.[1].left).toBeGreaterThanOrEqual(board.left + board.width + 18);
     expect(layout.controls.move_right.right).toBeLessThanOrEqual(board.left - 8);
     expect(layout.controls.pause.left).toBeGreaterThanOrEqual(board.left + board.width + 8);
     expect(layout.controls.restart_attempt.left).toBe(layout.controls.pause.left);
