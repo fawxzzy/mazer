@@ -10,6 +10,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 4173 --strictPort",
     "preview:health": "vite preview --strictPort",
     "verify": "node ./scripts/verify/run-verify.mjs",
+    "verify:local": "node ./scripts/verify/run-playbook-local-verify.mjs",
     "health": "node ./scripts/gates/future-lane-health.mjs",
     "legacy:extract": "node ./scripts/legacy/extract-legacy-truth.mjs",
     "gate:future-lane": "node ./scripts/gates/future-lane-health.mjs",

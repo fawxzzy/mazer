@@ -3,6 +3,8 @@
 This folder is the repo-local coordination surface for narrow playbook notes and lane-specific guidance.
 
 - `PLAYBOOK.md` remains the canonical rebuild-principles note for this repo.
+- `playbook.config.json` activates the repo-local Playbook install surface.
+- `npm run verify:local` is the local verification gate Playbook should use for this repo.
 - `.playbook/` does not own product truth, runtime contracts, or gameplay behavior.
 - Current repo truth stays with the active source tree, `docs/current-truth.md`, repo-owned visual evidence, and live tests.
 - The active product lane is the 2D Phaser shipping runtime.

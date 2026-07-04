@@ -25,6 +25,7 @@ npm run
 | `npm run test:playbook-adoption` | Validate the repo-local Playbook adoption export against the repo schema and owner contract ids. |
 | `npm run test:playbook-verification` | Validate the repo-local Playbook verification report against the ATLAS root schema and live command surface. |
 | `npm run verify` | Run the repo-local reset-lane proof tests plus the production build path used for the current legacy reset/port lane. |
+| `npm run verify:local` | Run the repo-local Playbook activation gate: verification report, adoption evidence, and the canonical Mazer verify bridge. |
 
 ## Visual proof
 
