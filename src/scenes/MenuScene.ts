@@ -1308,7 +1308,13 @@ export class MenuScene extends Phaser.Scene {
       width: this.layout.width,
       height: this.layout.height
     }, {
-      compact: this.layout.width < 720 || this.layout.height < 720
+      compact: this.layout.width < 720 || this.layout.height < 720,
+      avoidRect: {
+        left: this.layout.boardLeft,
+        top: this.layout.boardTop,
+        width: this.layout.boardSize,
+        height: this.layout.boardSize
+      }
     });
   }
 
@@ -2280,10 +2286,12 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const { controls, frame } = touchControlLayout;
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_FRAME_FILL, 0.28);
-    this.hudGraphics.fillRoundedRect(frame.left, frame.top, frame.width, frame.height, 18);
-    this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.18);
-    this.hudGraphics.strokeRoundedRect(frame.left, frame.top, frame.width, frame.height, 18);
+    for (const touchFrame of touchControlLayout.frames ?? [frame]) {
+      this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_FRAME_FILL, 0.28);
+      this.hudGraphics.fillRoundedRect(touchFrame.left, touchFrame.top, touchFrame.width, touchFrame.height, 18);
+      this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.18);
+      this.hudGraphics.strokeRoundedRect(touchFrame.left, touchFrame.top, touchFrame.width, touchFrame.height, 18);
+    }
 
     this.drawLegacyPlayTouchButton(controls.move_up, false);
     this.drawLegacyPlayTouchButton(controls.move_right, false);

@@ -122,4 +122,26 @@ describe('legacy menu layout', () => {
     expect(playLayout.boardTop).toBeGreaterThanOrEqual(56);
     expect(playLayout.boardTop + playLayout.boardSize).toBeLessThanOrEqual(playLayout.height - 12);
   });
+
+  test('keeps compact landscape active-play controls out of the board gutters', () => {
+    const playLayout = resolveLegacyMenuLayout(1280, 690, 50, 49, 'play');
+    const touchLayout = resolveTouchControlLayout({
+      width: playLayout.width,
+      height: playLayout.height
+    }, {
+      compact: true,
+      avoidRect: {
+        left: playLayout.boardLeft,
+        top: playLayout.boardTop,
+        width: playLayout.boardSize,
+        height: playLayout.boardSize
+      }
+    });
+
+    expect(touchLayout.frames).toHaveLength(2);
+    expect(touchLayout.controls.move_right.right).toBeLessThanOrEqual(playLayout.boardLeft - 8);
+    expect(touchLayout.controls.pause.left).toBeGreaterThanOrEqual(playLayout.boardLeft + playLayout.boardSize + 8);
+    expect(touchLayout.controls.restart_attempt.left).toBe(touchLayout.controls.pause.left);
+    expect(touchLayout.controls.toggle_thoughts.left).toBe(touchLayout.controls.pause.left);
+  });
 });

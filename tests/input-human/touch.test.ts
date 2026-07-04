@@ -73,6 +73,30 @@ describe('input-human touch bridge', () => {
     )).toBe('move_left');
   });
 
+  test('splits compact landscape controls into board-safe side gutters when board bounds are known', () => {
+    const board = {
+      left: 330,
+      top: 58,
+      width: 604,
+      height: 604
+    };
+    const layout = resolveTouchControlLayout({
+      width: 1280,
+      height: 690
+    }, {
+      compact: true,
+      avoidRect: board
+    });
+
+    expect(layout.frames).toHaveLength(2);
+    expect(layout.controls.move_right.right).toBeLessThanOrEqual(board.left - 8);
+    expect(layout.controls.pause.left).toBeGreaterThanOrEqual(board.left + board.width + 8);
+    expect(layout.controls.restart_attempt.left).toBe(layout.controls.pause.left);
+    expect(layout.controls.toggle_thoughts.left).toBe(layout.controls.pause.left);
+    expect(resolveTouchControlKindAtPoint(layout, layout.controls.pause.centerX, layout.controls.pause.centerY)).toBe('pause');
+    expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_left.centerX, layout.controls.move_left.centerY)).toBe('move_left');
+  });
+
   test('maps touch points into the shared human action schema and releases held pointers', () => {
     const layout = resolveTouchControlLayout({
       width: 390,
