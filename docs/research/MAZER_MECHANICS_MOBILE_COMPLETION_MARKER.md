@@ -2,7 +2,7 @@
 
 Date: 2026-07-04
 Status: active
-Current marker: `99%`
+Current marker: `100%`
 
 ## Intent
 
@@ -38,7 +38,7 @@ These can still be useful references, but they are not the active target.
 | Segment | Weight | Current points | Current truth | Main owners | Remaining gap |
 | --- | --- | --- | --- | --- | --- |
 | Core gameplay loop and reset semantics | `20` | `20` | closed for current scope with generated-play traversal plus live keyboard/touch play proof | `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | continue future feel tuning only if new input regressions are found |
-| Maze generation and topology quality | `25` | `24` | stronger with scored shortcut reinforcement, shortcut-enabled menu budget floor, shortcut-scale-band proof, and bounded large-scale topology smoke | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | continue future stress tuning outside the normal proof spine for extreme scales or newly discovered weak seed families |
+| Maze generation and topology quality | `25` | `25` | closed for current scope with scored shortcut reinforcement, shortcut-enabled menu budget floor, shortcut-scale-band proof, bounded large-scale smoke, and one bounded extreme-scale proof-spine smoke | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | continue future stress tuning only if newly discovered weak seed families appear |
 | Menu AI/demo loop | `15` | `15` | closed for current scope with generated-menu scale-band recovery, AI-only replay, and later goal-regeneration proof | `src/domain/ai/demoWalker.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | exact Unreal numeric delay/material timing can still tighten future parity if stronger source evidence is recovered |
 | Mobile input and active-play usability | `15` | `15` | live touch movement and touch-control proof | `src/scenes/MenuScene.ts`, `src/input-human/touch.ts`, `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | continue board/player readability checks in the visual-readability lane |
 | Top-down visual readability | `15` | `15` | closed for current scope with ultra-narrow play-board/touch-control separation, a cleaner mobile control deck, play-only player locator glyph, and distinct active-play start/goal endpoint markers | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyMenuRender.ts`, `src/legacy-runtime/legacyMenuLayout.ts`, `src/input-human/touch.ts` | future visual work should be regression-driven rather than broad polish |
@@ -46,7 +46,7 @@ These can still be useful references, but they are not the active target.
 
 Current total:
 
-- `99 / 100`
+- `100 / 100`
 
 ## Latest ratchet
 
@@ -65,6 +65,7 @@ Current total:
 - `2026-07-04`: `96% -> 97%` after widening the generated-maze topology proof beyond the existing shortcut-enabled bands with a bounded large-scale smoke at scale `99` for both play and generated-menu builders. The audit keeps the normal proof spine practical while proving no detached floors, non-degenerate route length, and meaningful multi-route quality at the larger board size. Proof: `npx vitest run tests/reset/legacy-topology-scale-audit.test.ts --reporter=dot`.
 - `2026-07-04`: `97% -> 98%` after making the active proof spine explicit and test-guarded. `current-truth.md` now states that `npm run verify` runs `npm run test:verify` plus `npm run build`, and that `test:verify` covers reset, demo walker, menu render-frame, and marker/topology contracts under `--maxWorkers 1`; `legacy-marker.test.ts` guards those doc/script/package contracts against drift. Proof: `npx vitest run tests/reset/legacy-marker.test.ts --reporter=dot`.
 - `2026-07-04`: `98% -> 99%` after closing the current proof-map drift in `docs/system-map.md`. The system map now points at the active mechanics/mobile marker and current-truth instead of the retired visual marker, documents the exact `verify` / `test:verify` spine, and records the generated-menu AI recovery/replay/regeneration proof obligation; `legacy-marker.test.ts` now guards system-map proof-spine entries too. Proof: `npx vitest run tests/reset/legacy-marker.test.ts --reporter=dot`.
+- `2026-07-04`: `99% -> 100%` after closing the remaining current-scope topology proof gap with a bounded scale-`149`, seed-`55` smoke for both play and generated-menu builders. The normal proof spine now includes connected, non-degenerate, meaningful multi-route evidence at scale bands `37`, `50`, `75`, large scale `99`, and the bounded extreme `149` case without adding a broad slow stress sweep. Proof: `npx vitest run tests/reset/legacy-topology-scale-audit.test.ts --reporter=dot`.
 
 ## Marker rule
 

@@ -124,4 +124,41 @@ describe('legacy topology scale audit', () => {
 
     expect(failures).toEqual([]);
   }, 45_000);
+
+  test('keeps one bounded extreme generated topology smoke in the proof spine', () => {
+    const failures: unknown[] = [];
+
+    for (const [kind, buildMaze] of [
+      ['play', createLegacyMaze],
+      ['menu', createLegacyGeneratedMenuMaze]
+    ] as const) {
+      const maze = buildMaze(149, 55);
+      const routeQualityStats = maze.routeQualityStats;
+      const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
+      const detachedFloorTiles = countDetachedFloorTiles(maze);
+
+      if (
+        detachedFloorTiles !== 0
+        || maze.solutionPath.length < minimumSolutionPathLength
+        || routeQualityStats?.routeQuality !== 'multi-route'
+        || routeQualityStats.meaningfulBypassableSolutionEdges <= 1
+        || routeQualityStats.meaningfulBypassableRouteBands <= 1
+      ) {
+        failures.push({
+          detachedFloorTiles,
+          kind,
+          minimumSolutionPathLength,
+          playableTopologyStats: maze.playableTopologyStats,
+          routeQualityStats,
+          scale: 149,
+          seed: 55,
+          shortcutStats: maze.shortcutStats,
+          size: maze.size,
+          solutionPathLength: maze.solutionPath.length
+        });
+      }
+    }
+
+    expect(failures).toEqual([]);
+  }, 60_000);
 });

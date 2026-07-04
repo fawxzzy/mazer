@@ -139,6 +139,7 @@ Use this before changing how mazes are built or how play/menu returns regenerate
   - `CreatePath` equivalent: path-neighbor wall-array collection with duplicate/stale candidate preservation
   - `CreateShortCuts` equivalent: explicit legacy shortcut budget, restored opposite-corridor wall-neighbor rule, random `_WallArray` removal loop, and capped weak-route reinforcement when measured route quality remains `single-route`
   - playable-topology normalization: after shortcut creation, generated play mazes prune disconnected floor components and rebase trivially weak goals to the farthest reachable floor; weak-route reinforcement only runs after this normalization so it cannot revive detached floor regions. These are browser-port quality guards, while exact Unreal RNG/time seeding remains open
+  - active topology proof includes shortcut-enabled scale bands `37`, `50`, `75`, bounded large scale `99`, and one bounded extreme scale-`149` smoke for both play and generated-menu builders
 - `src/domain/maze/core.ts`
   - browser-native Wilson/topology builder for domain/proof maze families outside the active reset-lane play snapshot owner
   - family-aware shortcut braiding profiles for classic, braided, sparse, dense, framed, and split-flow
@@ -653,4 +654,4 @@ When the page still feels wrong but the board route is already close, use this q
 - menu mode and play mode stay split
 - one active overlay at a time
 - menu screenshot work must not silently rewrite play behavior
-- do not claim 100% until the active mechanics/mobile gaps are actually closed
+- active mechanics/mobile `100%` means current-scope mechanics, topology, menu AI, mobile input, top-down readability, and proof-map gaps are closed by the marker spine; it does not claim screenshot-grade visual parity or exact Unreal RNG/tick-yield parity
