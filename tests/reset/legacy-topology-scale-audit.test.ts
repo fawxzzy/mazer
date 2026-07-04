@@ -84,4 +84,44 @@ describe('legacy topology scale audit', () => {
 
     expect(failures).toEqual([]);
   }, 30_000);
+
+  test('keeps large generated topology meaningful without requiring extreme-scale verify cost', () => {
+    const seeds = [1, 55, 233];
+    const failures: unknown[] = [];
+
+    for (const seed of seeds) {
+      for (const [kind, buildMaze] of [
+        ['play', createLegacyMaze],
+        ['menu', createLegacyGeneratedMenuMaze]
+      ] as const) {
+        const maze = buildMaze(99, seed);
+        const routeQualityStats = maze.routeQualityStats;
+        const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
+        const detachedFloorTiles = countDetachedFloorTiles(maze);
+
+        if (
+          detachedFloorTiles !== 0
+          || maze.solutionPath.length < minimumSolutionPathLength
+          || routeQualityStats?.routeQuality !== 'multi-route'
+          || routeQualityStats.meaningfulBypassableSolutionEdges <= 1
+          || routeQualityStats.meaningfulBypassableRouteBands <= 1
+        ) {
+          failures.push({
+            detachedFloorTiles,
+            kind,
+            minimumSolutionPathLength,
+            playableTopologyStats: maze.playableTopologyStats,
+            routeQualityStats,
+            scale: 99,
+            seed,
+            shortcutStats: maze.shortcutStats,
+            size: maze.size,
+            solutionPathLength: maze.solutionPath.length
+          });
+        }
+      }
+    }
+
+    expect(failures).toEqual([]);
+  }, 45_000);
 });

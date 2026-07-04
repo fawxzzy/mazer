@@ -2,7 +2,7 @@
 
 Date: 2026-07-04
 Status: active
-Current marker: `96%`
+Current marker: `97%`
 
 ## Intent
 
@@ -38,7 +38,7 @@ These can still be useful references, but they are not the active target.
 | Segment | Weight | Current points | Current truth | Main owners | Remaining gap |
 | --- | --- | --- | --- | --- | --- |
 | Core gameplay loop and reset semantics | `20` | `20` | closed for current scope with generated-play traversal plus live keyboard/touch play proof | `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyPlayLifecycle.ts`, `src/scenes/MenuScene.ts` | continue future feel tuning only if new input regressions are found |
-| Maze generation and topology quality | `25` | `23` | stronger with scored shortcut reinforcement, shortcut-enabled menu budget floor, and wider default play/menu scale-band multi-route proof | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | continue tuning shortcut/alternate-route quality across broader scale/seed families without disconnected floors, shallow loops, or degenerate goals |
+| Maze generation and topology quality | `25` | `24` | stronger with scored shortcut reinforcement, shortcut-enabled menu budget floor, shortcut-scale-band proof, and bounded large-scale topology smoke | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | continue future stress tuning outside the normal proof spine for extreme scales or newly discovered weak seed families |
 | Menu AI/demo loop | `15` | `15` | closed for current scope with generated-menu scale-band recovery, AI-only replay, and later goal-regeneration proof | `src/domain/ai/demoWalker.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | exact Unreal numeric delay/material timing can still tighten future parity if stronger source evidence is recovered |
 | Mobile input and active-play usability | `15` | `15` | live touch movement and touch-control proof | `src/scenes/MenuScene.ts`, `src/input-human/touch.ts`, `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | continue board/player readability checks in the visual-readability lane |
 | Top-down visual readability | `15` | `15` | closed for current scope with ultra-narrow play-board/touch-control separation, a cleaner mobile control deck, play-only player locator glyph, and distinct active-play start/goal endpoint markers | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyMenuRender.ts`, `src/legacy-runtime/legacyMenuLayout.ts`, `src/input-human/touch.ts` | future visual work should be regression-driven rather than broad polish |
@@ -46,7 +46,7 @@ These can still be useful references, but they are not the active target.
 
 Current total:
 
-- `96 / 100`
+- `97 / 100`
 
 ## Latest ratchet
 
@@ -62,6 +62,7 @@ Current total:
 - `2026-07-04`: `93% -> 94%` after closing the current visual-readability lane with distinct active-play endpoint glyphs: start now renders as a small target ring/core and goal renders as a red diamond/core marker, while menu endpoints keep their existing treatment. Proof: `npx vitest run tests/scenes/menu-render-frame.test.ts --reporter=dot`, `npm run lint`, `npm run build`, `npm run edge:live -- --skip-build true --headless true --run mobile-touch-smoke`, and the maintained phone portrait artifact at `C:\ATLAS\tmp\captures\mazer-edge-live\mobile-touch-smoke\screenshots\phone-portrait-attempt-lifecycle.png`.
 - `2026-07-04`: `94% -> 95%` after the shortcut-enabled scale-band topology audit exposed and closed an under-braided generated-menu edge case at scale `37`, seed `55`. Generated-menu mazes now apply a small shortcut-stage budget floor once process `5` is active, preserving shortcut-disabled behavior and existing scale-50 diagnostics while proving play/menu mazes across scales `37`, `50`, and `75` stay connected, non-degenerate, and meaningfully multi-route. Proof: `npx vitest run tests/reset/legacy-topology-scale-audit.test.ts --reporter=dot`, `npx vitest run tests/reset/legacy-reset.test.ts --reporter=dot`, and `npx vitest run tests/reset/legacy-topology-scale-audit.test.ts tests/reset/legacy-generation-lifecycle.test.ts tests/reset/legacy-generation-diagnostics.test.ts --reporter=dot`.
 - `2026-07-04`: `95% -> 96%` after closing the current menu AI/demo loop proof gap for mechanics/mobile scope. Generated-menu AI now has scale-band regression proof that it can enter a wrong-branch recovery, perform an AI-only reset without requesting regeneration, replay the same maze from the start, reach goal reset, and then request the later goal regeneration without non-adjacent moves or runaway route timing. Proof: `npx vitest run tests/ai/demo-walker.test.ts --reporter=dot`.
+- `2026-07-04`: `96% -> 97%` after widening the generated-maze topology proof beyond the existing shortcut-enabled bands with a bounded large-scale smoke at scale `99` for both play and generated-menu builders. The audit keeps the normal proof spine practical while proving no detached floors, non-degenerate route length, and meaningful multi-route quality at the larger board size. Proof: `npx vitest run tests/reset/legacy-topology-scale-audit.test.ts --reporter=dot`.
 
 ## Marker rule
 
