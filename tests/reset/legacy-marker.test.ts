@@ -54,6 +54,7 @@ describe('Mazer completion markers', () => {
 
   test('keeps the active proof spine explicit and aligned with repo verify scripts', () => {
     const currentTruth = readRepoFile('docs/current-truth.md');
+    const systemMap = readRepoFile('docs/system-map.md');
     const packageJson = readRepoFile('package.json');
     const verifyScript = readRepoFile('scripts/verify/run-verify.mjs');
 
@@ -70,6 +71,14 @@ describe('Mazer completion markers', () => {
     expect(currentTruth).toContain('- `tests/scenes/menu-render-frame.test.ts`');
     expect(currentTruth).toContain('- `--maxWorkers 1`');
     expect(currentTruth).toContain('npm run lint');
+    expect(systemMap).toContain('docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md');
+    expect(systemMap).toContain('docs/current-truth.md');
+    expect(systemMap).toContain('- `npm run test:verify`');
+    expect(systemMap).toContain('- `npm run build`');
+    expect(systemMap).toContain('- `tests/reset`');
+    expect(systemMap).toContain('- `tests/ai/demo-walker.test.ts`');
+    expect(systemMap).toContain('- `tests/scenes/menu-render-frame.test.ts`');
+    expect(systemMap).toContain('- `--maxWorkers 1`');
   });
 
   test('keeps the legacy visual one-to-one marker retired unless screenshot parity is reopened', () => {

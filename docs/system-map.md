@@ -444,7 +444,7 @@ Rule:
 - `src/domain/ai/demoWalker.ts`
   - deterministic demo stepping, backtracking, goal hold, reset hold
   - source-shaped menu AI route planning from live neighbor scans, idempotent potential-tile targeting, path-stack rewind, first-recovery AI reset seam, connected floor-path reacquire, bounded first-mistake route construction, and canonical replay after reset
-  - generated `menu-generated` maze proof must preserve adjacent floor-to-floor AI steps and bounded route/traverse diagnostics across representative seed families
+  - generated `menu-generated` maze proof must preserve adjacent floor-to-floor AI steps, bounded route/traverse diagnostics across representative seed families, and the recovery -> AI-only reset -> same-maze replay -> goal regeneration loop across representative scale bands
   - cue overrides for branch commit, dead-end, backtrack, and reacquire beats, with one movement cadence matching the extracted `_PlayerAiDelayDuration` timer shape
   - legacy `AiTilePathCheck`-style wrong-turn candidate admission: a non-end branch candidate must expose at least one unvisited onward floor tile besides the current tile
 
@@ -471,7 +471,8 @@ Boundary:
 
 - `npm run legacy:extract`
 - `npm run verify`
-- `docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md`
+- `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md`
+- `docs/current-truth.md`
 
 ### Localhost proof operation
 
@@ -483,9 +484,15 @@ Boundary:
 
 What `verify` currently means:
 
-- reset tests
-- demo walker tests
-- production build
+- `npm run test:verify`
+- `npm run build`
+
+What `test:verify` currently means:
+
+- `tests/reset`
+- `tests/ai/demo-walker.test.ts`
+- `tests/scenes/menu-render-frame.test.ts`
+- `--maxWorkers 1`
 
 ### Visual comparison surfaces
 

@@ -57,7 +57,7 @@ Use `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md` as the active re
 
 Current active marker:
 
-- `98%`
+- `99%`
 
 The old legacy visual 1:1 marker is retired at `93%` and is now archival. Do not ratchet it for future packets unless the operator explicitly reopens screenshot-grade legacy parity as the active target.
 
