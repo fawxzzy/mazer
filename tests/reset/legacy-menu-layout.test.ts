@@ -98,6 +98,21 @@ describe('legacy menu layout', () => {
     expect(menuLayout.centerButtonY + menuLayout.buttonHeight).toBeLessThan(menuLayout.rightButtonY);
   });
 
+  test('keeps the compact phone control deck below the active-play board', () => {
+    const playLayout = resolveLegacyMenuLayout(360, 740, 50, 49, 'play');
+    const touchLayout = resolveTouchControlLayout({
+      width: playLayout.width,
+      height: playLayout.height
+    }, {
+      compact: true
+    });
+
+    expect(playLayout.boardTop + playLayout.boardSize + 24).toBeLessThanOrEqual(touchLayout.frame.top);
+    expect(touchLayout.controls.pause.width).toBeGreaterThan(touchLayout.controls.move_up.width);
+    expect(touchLayout.controls.restart_attempt.bottom).toBeLessThanOrEqual(touchLayout.frame.bottom);
+    expect(touchLayout.controls.toggle_thoughts.bottom).toBeLessThanOrEqual(touchLayout.frame.bottom);
+  });
+
   test('gives desktop active play a larger board than the front-door composition', () => {
     const menuLayout = resolveLegacyMenuLayout(1920, 1080, 50, 49, 'menu');
     const playLayout = resolveLegacyMenuLayout(1920, 1080, 50, 49, 'play');

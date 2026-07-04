@@ -57,7 +57,7 @@ Use `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md` as the active re
 
 Current active marker:
 
-- `91%`
+- `92%`
 
 The old legacy visual 1:1 marker is retired at `93%` and is now archival. Do not ratchet it for future packets unless the operator explicitly reopens screenshot-grade legacy parity as the active target.
 
@@ -112,6 +112,7 @@ Why the active marker is not higher yet:
 - menu stage-6 row-sliced drawing is now cadence-gated, so the front-door board reveal remains visible over time instead of advancing as fast as the browser frame loop can run
 - active-play movement now follows the restored Unreal simultaneous-key input buffer: first movement keydown arms a 50ms resolve delay, held direction flags can combine into one composite step, opposing directions cancel, repeat movement resolves the current held vector immediately, the buffer clears on pause/menu/reset and browser focus-loss boundaries, and runtime diagnostics publish the live held flags, resolved vector, pending timer, pointer-start state, and source delay for browser-side feel review
 - active-play pointer/touch input now maps mobile swipes and short taps into the same one-step vector contract used by keyboard movement before passing through the legacy axis-gated collision resolver; pointer starts outside the active board bounds are ignored so HUD/shell taps no longer trigger movement, in-flight swipes are bound to one pointer identity so second touches cannot overwrite the active start, `pointerupoutside` still completes inside-board swipes, game-out clears stale pointer starts, and `mobile-touch-smoke` now proves three maintained-browser touch movement deltas on the active play route
+- active-play phone controls now use a full-width bottom deck instead of the prior cramped right-side stack: movement remains a D-pad, pause is the primary right-side action, restart/trail are smaller secondary actions, and the maintained geometry proof keeps the deck below the board on `390x844`, `360x740`, `320x568`, and `172x407`
 - active-play camera-follow now applies the same board offset to the static maze, dynamic overlays, HUD geometry, pointer-bound checks, and visual diagnostics board bounds; movement marks the static board dirty when camera-follow is active so player/trail layers and proof rectangles do not drift away from the maze
 - active-play layout now uses a play-specific board-framing surface instead of reusing the front-door menu composition: the maintained `172x407` side-browser play board remains width-fit at `169x169`, but is intentionally top-biased (`top=57`, `bottom=226.001`) so compact touch controls can start at `241` with a clear board/control gap; menu mode keeps its stacked `Exit` / `Start` / `Options` layout (`250/300/350`), and visual diagnostics now publish the resolved layout/button surface for proof
 - active-play collision now follows the restored Unreal axis-gated movement shape more closely: simultaneous movement checks the horizontal and vertical side gates independently, slides along the open axis when one held axis is blocked, and blocks a true diagonal corner move when the final diagonal tile is a wall

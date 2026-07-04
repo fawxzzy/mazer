@@ -1,8 +1,8 @@
 # Mazer Mechanics And Mobile Completion Marker
 
-Date: 2026-07-03
+Date: 2026-07-04
 Status: active
-Current marker: `91%`
+Current marker: `92%`
 
 ## Intent
 
@@ -41,12 +41,12 @@ These can still be useful references, but they are not the active target.
 | Maze generation and topology quality | `25` | `22` | stronger with scored shortcut reinforcement plus wider default play/menu seed-family multi-route proof | `src/legacy-runtime/legacyMaze.ts`, `src/domain/maze/*` | continue tuning shortcut/alternate-route quality across wider scale/seed families without disconnected floors, shallow loops, or degenerate goals |
 | Menu AI/demo loop | `15` | `14` | source-shaped with wider generated-menu seed-family playback proof | `src/domain/ai/demoWalker.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | continue proving clean recovery/replay behavior across longer soak captures and exact timing evidence |
 | Mobile input and active-play usability | `15` | `15` | live touch movement and touch-control proof | `src/scenes/MenuScene.ts`, `src/input-human/touch.ts`, `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | continue board/player readability checks in the visual-readability lane |
-| Top-down visual readability | `15` | `12` | improved with ultra-narrow play-board/touch-control separation plus player/trail/start/goal readability proof | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyMenuRender.ts`, `src/legacy-runtime/legacyMenuLayout.ts`, `src/input-human/touch.ts` | continue tuning board, floors, walls, player, trail, start, and goal crispness across wider mobile and desktop surfaces |
+| Top-down visual readability | `15` | `13` | improved with ultra-narrow play-board/touch-control separation, a cleaner mobile control deck, and player/trail/start/goal readability proof | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyMenuRender.ts`, `src/legacy-runtime/legacyMenuLayout.ts`, `src/input-human/touch.ts` | continue tuning board, floors, walls, player, trail, start, and goal crispness across wider mobile and desktop surfaces |
 | Documentation, diagnostics, and proof safety | `10` | `8` | useful | `docs/current-truth.md`, `docs/system-map.md`, `tests/**`, runtime/visual diagnostics | keep the active target and proof spine synchronized as the old 1:1 lane becomes archival |
 
 Current total:
 
-- `91 / 100`
+- `92 / 100`
 
 ## Latest ratchet
 
@@ -57,6 +57,7 @@ Current total:
 - `2026-07-03`: `88% -> 89%` after closing the active-play keyboard/touch mechanics proof gap: desktop keyboard proof now launches directly into the supported `mode=play` route, focuses the game canvas, models the 50ms simultaneous-key input buffer with held movement keys, reads fresh visual-runtime player state, and keyboard controls now cover pause, restart, and trail/thought toggle through the same play command path as touch. Proof: `npm run lint`, `npx vitest run tests/visual/edge-live-check.test.ts --reporter=dot`, `npm run edge:live -- --skip-build true --headless true --run play-mode-interactive`, and `npm run edge:live -- --skip-build true --headless true --run mobile-touch-smoke`.
 - `2026-07-03`: `89% -> 90%` after fixing ultra-narrow active-play readability so compact touch controls no longer overlap the maze board. Tight portrait touch controls now scale down below `360px` width, stay inside the viewport, and `172x407` / `320x568` play layouts reserve a clear lane between board and controls while normal `390x844` play remains centered. Proof: focused touch/layout Vitest tests, `npm run build`, and direct Playwright diagnostics showing `172x407` board bottom `226.001`, touch frame top `241`, gap `15`; `320x568` board bottom `361.992`, touch frame top `396`, gap `34`; and `390x844` board bottom `594`, touch frame top `615`, gap `21`.
 - `2026-07-03`: `90% -> 91%` after widening the generated-maze topology audit exposed weak seeds and the generator fix closed them. Shortcut reinforcement now scores candidate bridge openings by route-quality improvement instead of blindly accepting random valid bridges, and final post-shortcut route state can rebase a shortened goal to the farthest reachable floor. Proof: `npx vitest run tests/reset/legacy-reset.test.ts --reporter=dot` passed with default play and generated-menu audits covering seeds `1..64` plus `89`, `144`, `233`, `3749`, `777`, `1001`, and `0x5a17f00d`.
+- `2026-07-04`: `91% -> 92%` after replacing the crowded phone play controls with a full-width bottom control deck: movement stays on a D-pad, pause becomes the primary right-side action, and restart/trail remain smaller secondary actions. Proof: focused touch/layout Vitest tests, `npm run lint`, `npm run build`, `npx vitest run tests/scenes/menu-render-frame.test.ts tests/visual/edge-live-check.test.ts --reporter=dot`, `npm run edge:live -- --skip-build true --headless true --run mobile-touch-smoke`, and direct geometry probes showing clear board/control gaps at `390x844` (`45px`), `360x740` (`34px`), `320x568` (`22px`), and `172x407` (`49px`).
 
 ## Marker rule
 
