@@ -102,6 +102,7 @@ import {
   resolveLegacyDynamicTrailStrokeWidth,
   resolveLegacyMenuPathRenderFrames,
   resolveLegacyMenuPathRenderSegments,
+  resolveLegacyPlayerLocatorRenderMetrics,
   resolveLegacyPlayerMarkerRenderMetrics
 } from '../legacy-runtime/legacyMenuRender';
 import {
@@ -1922,9 +1923,9 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (this.mode === 'menu') {
-      this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94);
+      this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94, false);
     } else {
-      this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1);
+      this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, true);
     }
     this.boardDynamicDirty = false;
   }
@@ -2091,7 +2092,8 @@ export class MenuScene extends Phaser.Scene {
     originX: number,
     originY: number,
     tileSize: number,
-    alpha: number
+    alpha: number,
+    showLocatorTicks: boolean
   ): void {
     const centerX = originX + ((point.x + 0.5) * tileSize);
     const centerY = originY + ((point.y + 0.5) * tileSize);
@@ -2113,6 +2115,28 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicGraphics.strokeCircle(centerX, centerY, playerMetrics.coreRadius + 1);
     this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_CORE, alpha);
     this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.coreRadius);
+
+    if (!showLocatorTicks) {
+      return;
+    }
+
+    const locatorMetrics = resolveLegacyPlayerLocatorRenderMetrics(
+      tileSize,
+      playerMetrics.haloRadius,
+      playerMetrics.strokeWidth
+    );
+    const drawLocatorTick = (startX: number, startY: number, endX: number, endY: number): void => {
+      this.boardDynamicGraphics.beginPath();
+      this.boardDynamicGraphics.moveTo(startX, startY);
+      this.boardDynamicGraphics.lineTo(endX, endY);
+      this.boardDynamicGraphics.strokePath();
+    };
+
+    this.boardDynamicGraphics.lineStyle(locatorMetrics.strokeWidth, LEGACY_PLAYER_MARKER_CORE, Math.min(0.92, alpha * 0.92));
+    drawLocatorTick(centerX - locatorMetrics.outerRadius, centerY, centerX - locatorMetrics.innerRadius, centerY);
+    drawLocatorTick(centerX + locatorMetrics.innerRadius, centerY, centerX + locatorMetrics.outerRadius, centerY);
+    drawLocatorTick(centerX, centerY - locatorMetrics.outerRadius, centerX, centerY - locatorMetrics.innerRadius);
+    drawLocatorTick(centerX, centerY + locatorMetrics.innerRadius, centerX, centerY + locatorMetrics.outerRadius);
   }
 
   private drawHud(time: number): void {

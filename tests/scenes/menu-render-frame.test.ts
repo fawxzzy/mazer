@@ -5,6 +5,7 @@ import {
   resolveLegacyMenuPathRenderFrame,
   resolveLegacyMenuPathRenderFrames,
   resolveLegacyMenuPathRenderSegments,
+  resolveLegacyPlayerLocatorRenderMetrics,
   resolveLegacyPlayerMarkerRenderMetrics
 } from '../../src/legacy-runtime/legacyMenuRender';
 import { readFileSync } from 'node:fs';
@@ -210,6 +211,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const centerX = originX + ((point.x + 0.5) * tileSize);');
     expect(menuSceneSource).toContain('resolveLegacyPlayerMarkerRenderMetrics(');
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.coreRadius);');
+    expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94, false);');
   });
 
   test('keeps active play dynamic overlays in the corridor frame instead of square cells', () => {
@@ -221,6 +223,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.62;');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player');
+    expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, true);');
+    expect(menuSceneSource).toContain('resolveLegacyPlayerLocatorRenderMetrics(');
+    expect(menuSceneSource).toContain('drawLocatorTick(centerX - locatorMetrics.outerRadius, centerY, centerX - locatorMetrics.innerRadius, centerY);');
     expect(menuSceneSource).toContain('const playerScreenX = this.layout.boardLeft + boardOffset.x + ((this.player.x + 0.5) * this.layout.tileSize);');
     expect(menuSceneSource).toContain('const goalScreenX = this.layout.boardLeft + boardOffset.x + ((this.maze.goal.x + 0.5) * this.layout.tileSize);');
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, point, trailColor, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, trailAlpha, 1);');
@@ -236,6 +241,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       haloRadius: 3,
       strokeWidth: 1
     });
+    expect(resolveLegacyPlayerLocatorRenderMetrics(3.265, 3, 1)).toEqual({
+      innerRadius: 4,
+      outerRadius: 5,
+      strokeWidth: 1
+    });
   });
 
   test('keeps larger desktop tiles visibly weighted after responsive overlay sizing', () => {
@@ -245,6 +255,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(resolveLegacyPlayerMarkerRenderMetrics(18, 0.34, 0.54)).toEqual({
       coreRadius: 6,
       haloRadius: 10,
+      strokeWidth: 2
+    });
+    expect(resolveLegacyPlayerLocatorRenderMetrics(18, 10, 2)).toEqual({
+      innerRadius: 11,
+      outerRadius: 14,
       strokeWidth: 2
     });
   });

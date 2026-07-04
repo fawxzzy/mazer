@@ -57,7 +57,7 @@ Use `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md` as the active re
 
 Current active marker:
 
-- `92%`
+- `93%`
 
 The old legacy visual 1:1 marker is retired at `93%` and is now archival. Do not ratchet it for future packets unless the operator explicitly reopens screenshot-grade legacy parity as the active target.
 
@@ -120,6 +120,7 @@ Why the active marker is not higher yet:
 - active-play pause reset now preserves existing trail history while moving the player back to the start tile, matching the restored source's `_ResetPlayerPosition` branch more closely than the prior browser trail wipe
 - active-play HUD timer and goal-arrow geometry now route through `src/legacy-runtime/legacyPlayHud.ts`, and visual diagnostics publish source-exact bare `timerText`, `arrowAngleRadians`, and `arrowAngleDegrees` for desktop/mobile play-route proof
 - active-play board rendering now shares the connected-corridor path segment treatment instead of drawing each walkable tile as a bright inset square, active-play dynamic overlays now use connected trail strokes plus inset start/goal markers instead of full square blocks, and the player marker is drawn from tile center with a high-contrast halo/core treatment. Overlay stroke/inset/player metrics now clamp responsively for tiny mobile tiles, reducing debug-grid, off-center, and oversized-marker visual drift in generated play mazes without changing maze topology
+- active-play player readability now has a play-only locator glyph layered over the existing halo/core marker: tiny mobile tiles get a small ring/tick target so the player can be found over dense generated corridors and trail overlays, while menu-demo marker styling remains unchanged
 - legacy front-door `Exit` now routes through an explicit browser-safe quit equivalence contract instead of a temporary explanation overlay, ultra-narrow side-panel menu widths now use a vertical front-door button stack, viewport-fitted board, viewport-capped title scale, and a source-aware tighter title scale for dense `menu-generated` boards instead of the desktop/mobile row and normal portrait wordmark minimum, and the dead `message` overlay family has been removed from the active reset lane
 - desktop menu layout now gives the front-door board more dominant space in wide viewports, which moves the current web shell closer to the legacy board-first screenshot composition without reopening other menu modules
 - desktop title lockup now sits higher and reads less heavily over the board in wide viewports, which moves the wordmark treatment closer to the restored legacy screenshots without reopening button or backdrop ownership
