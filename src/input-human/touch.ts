@@ -239,32 +239,41 @@ export const resolveTouchControlLayout = (
     const leftGutter = Math.max(0, avoidLeft - safeInsets.left);
     const rightGutter = Math.max(0, viewport.width - safeInsets.right - avoidRight);
     const verticalSpace = Math.max(1, viewport.height - safeInsets.top - safeInsets.bottom);
+    const framePad = 8;
+    const boardGap = Math.max(18, Math.round(minDim * 0.028));
     const rawButtonSize = Math.round(minDim * 0.112);
     const maxButtonSize = Math.floor(Math.min(
-      (leftGutter - 24) / 3.3,
-      rightGutter - 24,
-      (verticalSpace - 24) / 3.3,
+      (leftGutter - boardGap - (framePad * 2)) / 3.3,
+      rightGutter - boardGap - (framePad * 2),
+      (verticalSpace - (framePad * 2)) / 3.3,
       rawButtonSize
     ));
-    const buttonSize = clamp(maxButtonSize, 42, 68);
+    const buttonSize = clamp(maxButtonSize, 36, 68);
     const gap = Math.max(8, Math.round(buttonSize * 0.18));
     const dpadSpan = (buttonSize * 3) + (gap * 2);
     const clusterHeight = dpadSpan;
+    const dpadFrameWidth = dpadSpan + (framePad * 2);
+    const actionFrameWidth = buttonSize + (framePad * 2);
+    const frameHeight = clusterHeight + (framePad * 2);
+    const leftSlotWidth = leftGutter - boardGap;
+    const rightSlotWidth = rightGutter - boardGap;
 
     if (
-      leftGutter >= dpadSpan + 16
-      && rightGutter >= buttonSize + 16
-      && verticalSpace >= clusterHeight + 16
+      leftSlotWidth >= dpadFrameWidth
+      && rightSlotWidth >= actionFrameWidth
+      && verticalSpace >= frameHeight
     ) {
       const clusterTop = clamp(
         Math.round(avoidTop + (((avoidBottom - avoidTop) - clusterHeight) / 2)),
-        safeInsets.top + 8,
-        viewport.height - safeInsets.bottom - clusterHeight - 8
+        safeInsets.top + framePad,
+        viewport.height - safeInsets.bottom - clusterHeight - framePad
       );
-      const dpadLeft = Math.round(safeInsets.left + ((leftGutter - dpadSpan) / 2));
-      const actionLeft = Math.round(avoidRight + ((rightGutter - buttonSize) / 2));
-      const dpadFrame = createRect(dpadLeft - 8, clusterTop - 8, dpadSpan + 16, clusterHeight + 16);
-      const actionFrame = createRect(actionLeft - 8, clusterTop - 8, buttonSize + 16, clusterHeight + 16);
+      const dpadFrameLeft = Math.round(safeInsets.left + ((leftSlotWidth - dpadFrameWidth) / 2));
+      const actionFrameLeft = Math.round(avoidRight + boardGap + ((rightSlotWidth - actionFrameWidth) / 2));
+      const dpadLeft = dpadFrameLeft + framePad;
+      const actionLeft = actionFrameLeft + framePad;
+      const dpadFrame = createRect(dpadFrameLeft, clusterTop - framePad, dpadFrameWidth, frameHeight);
+      const actionFrame = createRect(actionFrameLeft, clusterTop - framePad, actionFrameWidth, frameHeight);
       const frame = createRect(
         dpadFrame.left,
         Math.min(dpadFrame.top, actionFrame.top),

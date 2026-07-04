@@ -1304,16 +1304,18 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyPlayTouchControlLayout(): ReturnType<typeof resolveTouchControlLayout> {
+    const boardBounds = this.resolveLegacyPlayBoardBounds();
+
     return resolveTouchControlLayout({
       width: this.layout.width,
       height: this.layout.height
     }, {
       compact: this.layout.width < 720 || this.layout.height < 720,
       avoidRect: {
-        left: this.layout.boardLeft,
-        top: this.layout.boardTop,
-        width: this.layout.boardSize,
-        height: this.layout.boardSize
+        left: boardBounds.left,
+        top: boardBounds.top,
+        width: boardBounds.right - boardBounds.left,
+        height: boardBounds.bottom - boardBounds.top
       }
     });
   }
