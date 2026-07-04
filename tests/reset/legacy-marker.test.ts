@@ -52,6 +52,26 @@ describe('Mazer completion markers', () => {
     expect(agentRules).toContain('use `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md` as the active percent marker');
   });
 
+  test('keeps the active proof spine explicit and aligned with repo verify scripts', () => {
+    const currentTruth = readRepoFile('docs/current-truth.md');
+    const packageJson = readRepoFile('package.json');
+    const verifyScript = readRepoFile('scripts/verify/run-verify.mjs');
+
+    expect(packageJson).toContain('"verify": "node ./scripts/verify/run-verify.mjs"');
+    expect(packageJson).toContain('"test:verify": "vitest run tests/reset tests/ai/demo-walker.test.ts tests/scenes/menu-render-frame.test.ts --maxWorkers 1"');
+    expect(verifyScript).toContain("runNpm(['run', 'test:verify'])");
+    expect(verifyScript).toContain("runNpm(['run', 'build'])");
+    expect(currentTruth).toContain('Current `verify` means:');
+    expect(currentTruth).toContain('- `npm run test:verify`');
+    expect(currentTruth).toContain('- `npm run build`');
+    expect(currentTruth).toContain('Current `test:verify` means:');
+    expect(currentTruth).toContain('- `tests/reset`');
+    expect(currentTruth).toContain('- `tests/ai/demo-walker.test.ts`');
+    expect(currentTruth).toContain('- `tests/scenes/menu-render-frame.test.ts`');
+    expect(currentTruth).toContain('- `--maxWorkers 1`');
+    expect(currentTruth).toContain('npm run lint');
+  });
+
   test('keeps the legacy visual one-to-one marker retired unless screenshot parity is reopened', () => {
     const retiredMarkerDoc = readRepoFile('docs/research/MAZER_LEGACY_ONE_TO_ONE_COMPLETION_MARKER.md');
     const currentTruth = readRepoFile('docs/current-truth.md');

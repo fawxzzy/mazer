@@ -2,7 +2,7 @@
 
 Date: 2026-07-04
 Status: active
-Current marker: `97%`
+Current marker: `98%`
 
 ## Intent
 
@@ -42,11 +42,11 @@ These can still be useful references, but they are not the active target.
 | Menu AI/demo loop | `15` | `15` | closed for current scope with generated-menu scale-band recovery, AI-only replay, and later goal-regeneration proof | `src/domain/ai/demoWalker.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/legacy-runtime/legacyMenuDemoLifecycle.ts` | exact Unreal numeric delay/material timing can still tighten future parity if stronger source evidence is recovered |
 | Mobile input and active-play usability | `15` | `15` | live touch movement and touch-control proof | `src/scenes/MenuScene.ts`, `src/input-human/touch.ts`, `src/legacy-runtime/legacyPlayStep.ts`, `src/legacy-runtime/legacyMenuLayout.ts` | continue board/player readability checks in the visual-readability lane |
 | Top-down visual readability | `15` | `15` | closed for current scope with ultra-narrow play-board/touch-control separation, a cleaner mobile control deck, play-only player locator glyph, and distinct active-play start/goal endpoint markers | `src/scenes/MenuScene.ts`, `src/legacy-runtime/legacyMenuRender.ts`, `src/legacy-runtime/legacyMenuLayout.ts`, `src/input-human/touch.ts` | future visual work should be regression-driven rather than broad polish |
-| Documentation, diagnostics, and proof safety | `10` | `8` | useful | `docs/current-truth.md`, `docs/system-map.md`, `tests/**`, runtime/visual diagnostics | keep the active target and proof spine synchronized as the old 1:1 lane becomes archival |
+| Documentation, diagnostics, and proof safety | `10` | `9` | stronger with checked active proof-spine documentation for `verify` and `test:verify` | `docs/current-truth.md`, `docs/system-map.md`, `tests/**`, runtime/visual diagnostics | finish by keeping runtime diagnostics and proof-map receipts aligned with the final active completion claim |
 
 Current total:
 
-- `97 / 100`
+- `98 / 100`
 
 ## Latest ratchet
 
@@ -63,6 +63,7 @@ Current total:
 - `2026-07-04`: `94% -> 95%` after the shortcut-enabled scale-band topology audit exposed and closed an under-braided generated-menu edge case at scale `37`, seed `55`. Generated-menu mazes now apply a small shortcut-stage budget floor once process `5` is active, preserving shortcut-disabled behavior and existing scale-50 diagnostics while proving play/menu mazes across scales `37`, `50`, and `75` stay connected, non-degenerate, and meaningfully multi-route. Proof: `npx vitest run tests/reset/legacy-topology-scale-audit.test.ts --reporter=dot`, `npx vitest run tests/reset/legacy-reset.test.ts --reporter=dot`, and `npx vitest run tests/reset/legacy-topology-scale-audit.test.ts tests/reset/legacy-generation-lifecycle.test.ts tests/reset/legacy-generation-diagnostics.test.ts --reporter=dot`.
 - `2026-07-04`: `95% -> 96%` after closing the current menu AI/demo loop proof gap for mechanics/mobile scope. Generated-menu AI now has scale-band regression proof that it can enter a wrong-branch recovery, perform an AI-only reset without requesting regeneration, replay the same maze from the start, reach goal reset, and then request the later goal regeneration without non-adjacent moves or runaway route timing. Proof: `npx vitest run tests/ai/demo-walker.test.ts --reporter=dot`.
 - `2026-07-04`: `96% -> 97%` after widening the generated-maze topology proof beyond the existing shortcut-enabled bands with a bounded large-scale smoke at scale `99` for both play and generated-menu builders. The audit keeps the normal proof spine practical while proving no detached floors, non-degenerate route length, and meaningful multi-route quality at the larger board size. Proof: `npx vitest run tests/reset/legacy-topology-scale-audit.test.ts --reporter=dot`.
+- `2026-07-04`: `97% -> 98%` after making the active proof spine explicit and test-guarded. `current-truth.md` now states that `npm run verify` runs `npm run test:verify` plus `npm run build`, and that `test:verify` covers reset, demo walker, menu render-frame, and marker/topology contracts under `--maxWorkers 1`; `legacy-marker.test.ts` guards those doc/script/package contracts against drift. Proof: `npx vitest run tests/reset/legacy-marker.test.ts --reporter=dot`.
 
 ## Marker rule
 

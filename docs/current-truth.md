@@ -57,7 +57,7 @@ Use `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md` as the active re
 
 Current active marker:
 
-- `97%`
+- `98%`
 
 The old legacy visual 1:1 marker is retired at `93%` and is now archival. Do not ratchet it for future packets unless the operator explicitly reopens screenshot-grade legacy parity as the active target.
 
@@ -187,9 +187,17 @@ For the reset lane, the local proof spine is:
 
 Current `verify` means:
 
-- reset-lane tests
-- demo walker reset-flow proof tests
-- production build
+- `npm run test:verify`
+- `npm run build`
+
+Current `test:verify` means:
+
+- `tests/reset`
+- `tests/ai/demo-walker.test.ts`
+- `tests/scenes/menu-render-frame.test.ts`
+- `--maxWorkers 1`
+
+That proof spine currently guards marker arithmetic/current-truth sync, reset and generation lifecycle, topology scale audits, menu AI recovery/replay, active play movement/HUD/reset contracts, and render-frame layout/readability contracts. `npm run lint` remains a separate TypeScript gate for code-edit packets and should still be run before commit when implementation files change.
 
 The older visual matrix / Edge live proof lane is now archival for comparison, not current closure truth for the reset lane.
 
