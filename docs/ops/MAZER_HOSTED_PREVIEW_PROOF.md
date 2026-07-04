@@ -35,18 +35,22 @@ The hosted step is not closed by local green receipts alone. It closes only afte
 
 2026-07-04 status after mechanics/mobile cleanup reached `main`:
 
-- Local repo proof is healthy on `main` at `8d78194a`.
-- Local hosted-deploy preflight initially stopped because the latest GitHub squash commit author on `main` is not the owner identity required by the Mazer Vercel lane.
-- A disposable deploy-proof branch, `codex/mazer-hosted-preview-proof`, was created with an owner-authored empty commit over the same tree to avoid rewriting merged `main` history.
-- On that branch, the author preflight passed, but the Vercel link preflight stopped because repo-local `.vercel/project.json` is missing.
-- The deterministic pinned Vercel link command timed out without writing `.vercel/project.json`, so no deploy command was run.
-- Read-only Vercel project inspection confirmed the canonical project exists as `fawxzzy-mazer`, but its latest deployment still points at an older commit than the current mechanics/mobile `main`.
+- Local repo proof is healthy on `main` at `f96829fa`.
+- `main` still cannot be used directly for the deploy-identity gate because the latest GitHub squash commit author is not the owner identity required by the Mazer Vercel lane.
+- A disposable deploy-proof branch, `codex/mazer-hosted-preview-proof`, was used with an owner-authored commit over the same runtime tree to avoid rewriting merged `main` history.
+- Workspace-local Vercel linking is now established at `.vercel/project.json` for team `team_CMJn7MvzFZZBnhNnjVUZF2RD` and project `prj_t3zothbtj9DExrh3FjMsH98hwwSZ` (`fawxzzy/fawxzzy-mazer`).
+- `_stack` Mazer deploy preflight passed on the deploy-proof branch after linking.
+- The direct non-interactive deploy command `vercel.cmd --cwd <mazer repo> deploy --yes` succeeded.
+- Vercel reports deployment `dpl_4jfbnZby1pHpUDZNRMc6jBMCFtrb` as `READY`.
+- Preview URL: `https://fawxzzy-mazer-2fi0qbdkf-fawxzzy.vercel.app`.
+- Deployment metadata points at `codex/mazer-hosted-preview-proof` commit `ccfbcf9a17e815a9149f929d5216aebef15b6a75`.
+- Browser navigation to the preview route redirects to Vercel login, so the deployed-browser pass is still held by Vercel Authentication rather than by a build, deploy, or runtime failure.
 
-Current hosted state: `healthy-but-held`.
+Current hosted state: `deployed-but-manual-auth-held`.
 
-Blocker: local Vercel CLI project linking is not established in this workspace.
+Blocker: the deployed preview is protected by Vercel Authentication and requires an authenticated browser session before app-level hosted proof can be completed.
 
-Unblocker: complete the pinned `_stack` Mazer link/preflight path, then rerun `pnpm run mazer:deploy:preview` and perform the deployed-browser pass.
+Unblocker: sign in to Vercel in the intended browser context or temporarily provide an authorized share/access flow that reaches app HTML, then rerun the hosted browser pass against the deployed preview.
 
 ## Stop Rule
 
