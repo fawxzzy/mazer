@@ -665,4 +665,74 @@ describe('demo walker', () => {
       expect(state.phase === 'goal-hold' || state.phase === 'reset-hold').toBe(true);
     }
   }, 30_000);
+
+  test('generated menu AI can recover, replay, and later request goal regeneration across scale bands', () => {
+    const cases = [
+      { scale: 37, seed: 55 },
+      { scale: 37, seed: 89 },
+      { scale: 50, seed: 3749 },
+      { scale: 50, seed: 0x5a17f00d },
+      { scale: 75, seed: 8_811 },
+      { scale: 75, seed: 233 }
+    ] as const;
+
+    for (const testCase of cases) {
+      const maze = createLegacyGeneratedMenuMaze(testCase.scale, testCase.seed);
+      const episode = createLegacyDemoWalkerEpisode(maze);
+      const config = createLegacyMenuDemoWalkerConfig(testCase.seed);
+      const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
+      let state = createDemoWalkerState(episode, config);
+      let sawAiReset = false;
+      let sawAiReplay = false;
+      let sawGoalReset = false;
+      let sawGoalRegenerationRequest = false;
+      const maxSteps = Math.max(512, episode.raster.pathIndices.length * 12);
+
+      expect(diagnostics.routeLength).toBeLessThanOrEqual(episode.raster.pathIndices.length * 4);
+      expect(diagnostics.traverseMs).toBeLessThan(60_000);
+      expect(diagnostics.aiResetPathCursor).not.toBeNull();
+
+      for (let step = 0; step < maxSteps; step += 1) {
+        const previousIndex = state.currentIndex;
+        const previousPhase = state.phase;
+        const previousResetReason = state.resetReason;
+        const advance = advanceDemoWalker(episode, state, config);
+        state = advance.state;
+
+        expect(isTileFloor(episode.raster.tiles, state.currentIndex)).toBe(true);
+        if (previousPhase === 'explore' && state.phase === 'explore') {
+          const direction = resolveDirectionBetween(previousIndex, state.currentIndex, episode.raster.width);
+          if (direction === null) {
+            throw new Error(
+              `Non-adjacent generated-menu replay move for scale=${testCase.scale} seed=${testCase.seed} step=${step}`
+              + ` from=${previousIndex} to=${state.currentIndex}`
+              + ` cue=${state.cue} cursor=${state.pathCursor} canonical=${state.canonicalCursor}`
+            );
+          }
+        }
+
+        if (state.resetReason === 'ai-path-exhausted') {
+          sawAiReset = true;
+        }
+        if (previousResetReason === 'ai-path-exhausted' && state.aiLogicSwitch) {
+          sawAiReplay = true;
+          expect(advance.shouldRegenerateMaze).toBeUndefined();
+          expect(state.currentIndex).toBe(episode.raster.startIndex);
+        }
+        if (state.resetReason === 'goal') {
+          sawGoalReset = true;
+        }
+        if (advance.shouldRegenerateMaze) {
+          sawGoalRegenerationRequest = true;
+          expect(advance.nextSeed).toBeGreaterThan(testCase.seed);
+          break;
+        }
+      }
+
+      expect(sawAiReset).toBe(true);
+      expect(sawAiReplay).toBe(true);
+      expect(sawGoalReset).toBe(true);
+      expect(sawGoalRegenerationRequest).toBe(true);
+    }
+  }, 30_000);
 });
