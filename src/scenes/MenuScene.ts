@@ -100,6 +100,7 @@ import {
 import {
   resolveLegacyDynamicMarkerInset,
   resolveLegacyDynamicTrailStrokeWidth,
+  resolveLegacyEndpointMarkerRenderMetrics,
   resolveLegacyMenuPathRenderFrames,
   resolveLegacyMenuPathRenderSegments,
   resolveLegacyPlayerLocatorRenderMetrics,
@@ -388,7 +389,6 @@ const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x063448;
-const LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.34;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.62;
 const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
@@ -396,6 +396,9 @@ const LEGACY_PLAYER_MARKER_HALO = 0xffd45a;
 const LEGACY_PLAYER_MARKER_CORE = 0xf8fbff;
 const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
+const LEGACY_PLAY_START_MARKER_CORE = 0xfff1a6;
+const LEGACY_PLAY_GOAL_MARKER_CORE = 0xffedf0;
+const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xff6378;
 const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 42;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
@@ -1876,12 +1879,12 @@ export class MenuScene extends Phaser.Scene {
     if (this.mode === 'menu' && this.maze.start) {
       this.fillMenuDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9);
     } else if (this.maze.start) {
-      this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9);
+      this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');
     }
     if (this.mode === 'menu' && this.maze.goal) {
       this.fillMenuDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95);
     } else if (this.maze.goal) {
-      this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95);
+      this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95, 'goal');
     }
 
     for (let index = 0; index < trail.length; index += 1) {
@@ -2081,10 +2084,35 @@ export class MenuScene extends Phaser.Scene {
     originX: number,
     originY: number,
     tileSize: number,
-    alpha: number
+    alpha: number,
+    kind: 'start' | 'goal'
   ): void {
-    const inset = resolveLegacyDynamicMarkerInset(tileSize, LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO);
-    this.fillTile(this.boardDynamicGraphics, point, color, originX, originY, tileSize, alpha, inset);
+    const centerX = originX + ((point.x + 0.5) * tileSize);
+    const centerY = originY + ((point.y + 0.5) * tileSize);
+    const markerMetrics = resolveLegacyEndpointMarkerRenderMetrics(tileSize);
+    const shadowRadius = markerMetrics.outerRadius + markerMetrics.strokeWidth + 1;
+
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.48, alpha * 0.48));
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, shadowRadius);
+    this.boardDynamicGraphics.lineStyle(markerMetrics.strokeWidth, kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_EDGE : color, Math.min(0.96, alpha));
+    this.boardDynamicGraphics.strokeCircle(centerX, centerY, markerMetrics.outerRadius);
+
+    if (kind === 'goal') {
+      this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_EDGE, Math.min(0.86, alpha * 0.86));
+      this.boardDynamicGraphics.beginPath();
+      this.boardDynamicGraphics.moveTo(centerX, centerY - markerMetrics.outerRadius);
+      this.boardDynamicGraphics.lineTo(centerX + markerMetrics.outerRadius, centerY);
+      this.boardDynamicGraphics.lineTo(centerX, centerY + markerMetrics.outerRadius);
+      this.boardDynamicGraphics.lineTo(centerX - markerMetrics.outerRadius, centerY);
+      this.boardDynamicGraphics.closePath();
+      this.boardDynamicGraphics.fillPath();
+      this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha);
+      this.boardDynamicGraphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
+      return;
+    }
+
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_START_MARKER_CORE, alpha);
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
   }
 
   private fillLegacyPlayerMarkerTile(

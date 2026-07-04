@@ -29,6 +29,12 @@ export interface LegacyPlayerLocatorRenderMetrics {
   strokeWidth: number;
 }
 
+export interface LegacyEndpointMarkerRenderMetrics {
+  coreRadius: number;
+  outerRadius: number;
+  strokeWidth: number;
+}
+
 const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.14;
 const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.04;
 
@@ -95,6 +101,20 @@ export const resolveLegacyPlayerLocatorRenderMetrics = (
     innerRadius: Math.max(haloRadius + 1, outerRadius - tickLength),
     outerRadius,
     strokeWidth: Math.max(1, strokeWidth)
+  };
+};
+
+export const resolveLegacyEndpointMarkerRenderMetrics = (
+  tileSize: number
+): LegacyEndpointMarkerRenderMetrics => {
+  const strokeWidth = Math.max(1, Math.round(tileSize * 0.1));
+  const outerRadius = Math.max(tileSize <= 4 ? 4 : 3, Math.round(tileSize * 0.58));
+  const coreRadius = Math.max(tileSize <= 4 ? 2 : 2, Math.round(tileSize * 0.28));
+
+  return {
+    coreRadius,
+    outerRadius,
+    strokeWidth
   };
 };
 

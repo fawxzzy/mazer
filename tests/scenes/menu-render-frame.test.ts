@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   resolveLegacyDynamicMarkerInset,
   resolveLegacyDynamicTrailStrokeWidth,
+  resolveLegacyEndpointMarkerRenderMetrics,
   resolveLegacyMenuPathRenderFrame,
   resolveLegacyMenuPathRenderFrames,
   resolveLegacyMenuPathRenderSegments,
@@ -218,10 +219,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x063448;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO = 0.22;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.34;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.62;');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
+    expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');");
+    expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95, 'goal');");
+    expect(menuSceneSource).toContain('resolveLegacyEndpointMarkerRenderMetrics(tileSize);');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, markerMetrics.outerRadius);');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineTo(centerX + markerMetrics.outerRadius, centerY);');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, true);');
     expect(menuSceneSource).toContain('resolveLegacyPlayerLocatorRenderMetrics(');
@@ -246,6 +251,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       outerRadius: 5,
       strokeWidth: 1
     });
+    expect(resolveLegacyEndpointMarkerRenderMetrics(3.265)).toEqual({
+      coreRadius: 2,
+      outerRadius: 4,
+      strokeWidth: 1
+    });
   });
 
   test('keeps larger desktop tiles visibly weighted after responsive overlay sizing', () => {
@@ -260,6 +270,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(resolveLegacyPlayerLocatorRenderMetrics(18, 10, 2)).toEqual({
       innerRadius: 11,
       outerRadius: 14,
+      strokeWidth: 2
+    });
+    expect(resolveLegacyEndpointMarkerRenderMetrics(18)).toEqual({
+      coreRadius: 5,
+      outerRadius: 10,
       strokeWidth: 2
     });
   });
