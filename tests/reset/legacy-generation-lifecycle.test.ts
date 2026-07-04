@@ -37,6 +37,14 @@ describe('legacy generation lifecycle', () => {
       shortcutCount: 3,
       shortcutStageEnabled: false
     });
+    expect(resolveLegacyGenerationBudgetContract('menu', 37)).toEqual({
+      scale: 37,
+      checkpointModifier: 0.35,
+      checkpointCount: 49,
+      shortcutCountModifier: 0.13,
+      shortcutCount: 6,
+      shortcutStageEnabled: true
+    });
 
     expect(resolveLegacyGenerationBudgetContract('play', 50)).toEqual({
       scale: 50,

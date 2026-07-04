@@ -113,6 +113,7 @@ export const LEGACY_LEVEL_BUILDING_DELAY_DURATION_SOURCE: LegacyGenerationDelayD
 
 const LEGACY_MIN_SCALE = 25;
 const LEGACY_MAX_SCALE = 150;
+const LEGACY_MENU_MIN_SHORTCUT_COUNT = 6;
 
 const resolveLegacyGenerationScale = (scale: number): number => (
   clampInteger(scale, LEGACY_MIN_SCALE, LEGACY_MAX_SCALE)
@@ -123,6 +124,19 @@ const resolveLegacyShortcutCountModifier = (mode: LegacyGenerationMode): number 
     ? legacyTuning.board.shortcutCountModifier.menu
     : legacyTuning.board.shortcutCountModifier.game
 );
+
+const resolveLegacyShortcutCount = (
+  mode: LegacyGenerationMode,
+  normalizedScale: number,
+  shortcutCountModifier: number
+): number => {
+  const formulaCount = Math.trunc(normalizedScale * shortcutCountModifier);
+  if (mode !== 'menu' || normalizedScale <= 35) {
+    return formulaCount;
+  }
+
+  return Math.max(LEGACY_MENU_MIN_SHORTCUT_COUNT, formulaCount);
+};
 
 export const resolveLegacyGenerationBudgetContract = (
   mode: LegacyGenerationMode,
@@ -137,7 +151,7 @@ export const resolveLegacyGenerationBudgetContract = (
     checkpointModifier,
     checkpointCount: Math.trunc(normalizedScale + (normalizedScale * checkpointModifier)),
     shortcutCountModifier,
-    shortcutCount: Math.trunc(normalizedScale * shortcutCountModifier),
+    shortcutCount: resolveLegacyShortcutCount(mode, normalizedScale, shortcutCountModifier),
     shortcutStageEnabled: normalizedScale > 35
   };
 };

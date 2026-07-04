@@ -117,6 +117,7 @@ export interface LegacyMazeSnapshot {
 
 const LEGACY_MIN_SCALE = 25;
 const LEGACY_MAX_SCALE = 150;
+const LEGACY_MENU_MIN_SHORTCUT_COUNT = 6;
 
 const createSeededRng = (seed: number): (() => number) => {
   let state = (seed >>> 0) || 1;
@@ -131,6 +132,18 @@ const normalizeGridSize = (scale: number): number => {
   const clamped = clampInteger(scale, LEGACY_MIN_SCALE, LEGACY_MAX_SCALE);
   const normalized = clamped % 2 === 0 ? clamped - 1 : clamped;
   return Math.max(LEGACY_MIN_SCALE, normalized);
+};
+
+const resolveLegacyGeneratedMenuShortcutCount = (scale: number): number => {
+  const size = normalizeGridSize(scale);
+  if (size <= 35) {
+    return Math.trunc(size * legacyTuning.board.shortcutCountModifier.menu);
+  }
+
+  return Math.max(
+    LEGACY_MENU_MIN_SHORTCUT_COUNT,
+    Math.trunc(size * legacyTuning.board.shortcutCountModifier.menu)
+  );
 };
 
 const keyForPoint = (point: LegacyPoint): string => `${point.x},${point.y}`;
@@ -1164,7 +1177,7 @@ export const createLegacyGeneratedMenuMaze = (
   ...createLegacyMaze(
     scale,
     seed,
-    shortcutCount ?? Math.trunc(normalizeGridSize(scale) * legacyTuning.board.shortcutCountModifier.menu)
+    shortcutCount ?? resolveLegacyGeneratedMenuShortcutCount(scale)
   ),
   source: 'menu-generated'
 });

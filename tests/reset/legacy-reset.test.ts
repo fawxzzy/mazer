@@ -506,7 +506,8 @@ describe('legacy reset lane', () => {
     expect(generationLifecycleSource).toContain("executionKind: 'path-batch'");
     expect(generationLifecycleSource).toContain("executionKind: 'shortcut-attempt'");
     expect(generationLifecycleSource).toContain('checkpointCount: Math.trunc(normalizedScale + (normalizedScale * checkpointModifier))');
-    expect(generationLifecycleSource).toContain('shortcutCount: Math.trunc(normalizedScale * shortcutCountModifier)');
+    expect(generationLifecycleSource).toContain('const formulaCount = Math.trunc(normalizedScale * shortcutCountModifier)');
+    expect(generationLifecycleSource).toContain('shortcutCount: resolveLegacyShortcutCount(mode, normalizedScale, shortcutCountModifier)');
     expect(generationLifecycleSource).toContain('entryStageId: LEGACY_GENERATION_ENTRY_STAGE_ID');
     expect(generationLifecycleSource).toContain('waitsForLevelBuildingDelay: true');
     expect(generationLifecycleSource).toContain('consumesWhileUninitialized: true');
