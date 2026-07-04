@@ -31,6 +31,23 @@ Run the hosted deploy path from [`_stack`](../../../_stack/README.md):
 
 The hosted step is not closed by local green receipts alone. It closes only after the deployed preview has a successful browser pass in the required manual or authenticated context.
 
+## Latest Status
+
+2026-07-04 status after mechanics/mobile cleanup reached `main`:
+
+- Local repo proof is healthy on `main` at `8d78194a`.
+- Local hosted-deploy preflight initially stopped because the latest GitHub squash commit author on `main` is not the owner identity required by the Mazer Vercel lane.
+- A disposable deploy-proof branch, `codex/mazer-hosted-preview-proof`, was created with an owner-authored empty commit over the same tree to avoid rewriting merged `main` history.
+- On that branch, the author preflight passed, but the Vercel link preflight stopped because repo-local `.vercel/project.json` is missing.
+- The deterministic pinned Vercel link command timed out without writing `.vercel/project.json`, so no deploy command was run.
+- Read-only Vercel project inspection confirmed the canonical project exists as `fawxzzy-mazer`, but its latest deployment still points at an older commit than the current mechanics/mobile `main`.
+
+Current hosted state: `healthy-but-held`.
+
+Blocker: local Vercel CLI project linking is not established in this workspace.
+
+Unblocker: complete the pinned `_stack` Mazer link/preflight path, then rerun `pnpm run mazer:deploy:preview` and perform the deployed-browser pass.
+
 ## Stop Rule
 
 - Local proof green means the repo-owned runtime and proof surfaces are healthy.
