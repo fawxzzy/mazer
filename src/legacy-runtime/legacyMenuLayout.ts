@@ -57,7 +57,13 @@ export const resolveLegacyMenuLayout = (
   const snappedBoardSize = Math.round(tileSize * mazeSize * 1000) / 1000;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
   const menuBoardTop = clamp(height * (isPortrait ? 0.104 : 0.074), isUltraNarrow ? 32 : 40, isPortrait ? 102 : 88);
-  const playBoardTop = clamp((height - snappedBoardSize) / 2, isUltraNarrow ? 48 : 56, height - snappedBoardSize - 12);
+  const playBoardTop = isUltraNarrow
+    ? clamp(
+      height * 0.14,
+      48,
+      Math.max(48, height - snappedBoardSize - Math.round(height * 0.38))
+    )
+    : clamp((height - snappedBoardSize) / 2, 56, height - snappedBoardSize - 12);
   const boardTop = Math.round(isPlaySurface ? playBoardTop : menuBoardTop);
   const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
   const rowButtonY = isPortrait

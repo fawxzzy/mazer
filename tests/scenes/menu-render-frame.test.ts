@@ -2,9 +2,11 @@ import { describe, expect, test } from 'vitest';
 import {
   resolveLegacyDynamicMarkerInset,
   resolveLegacyDynamicTrailStrokeWidth,
+  resolveLegacyEndpointMarkerRenderMetrics,
   resolveLegacyMenuPathRenderFrame,
   resolveLegacyMenuPathRenderFrames,
   resolveLegacyMenuPathRenderSegments,
+  resolveLegacyPlayerLocatorRenderMetrics,
   resolveLegacyPlayerMarkerRenderMetrics
 } from '../../src/legacy-runtime/legacyMenuRender';
 import { readFileSync } from 'node:fs';
@@ -210,30 +212,48 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const centerX = originX + ((point.x + 0.5) * tileSize);');
     expect(menuSceneSource).toContain('resolveLegacyPlayerMarkerRenderMetrics(');
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.coreRadius);');
+    expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94, false);');
   });
 
   test('keeps active play dynamic overlays in the corridor frame instead of square cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x0a2b3c;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO = 0.22;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x063448;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.34;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.62;');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
+    expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');");
+    expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95, 'goal');");
+    expect(menuSceneSource).toContain('resolveLegacyEndpointMarkerRenderMetrics(tileSize);');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, markerMetrics.outerRadius);');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineTo(centerX + markerMetrics.outerRadius, centerY);');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player');
+    expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, true);');
+    expect(menuSceneSource).toContain('resolveLegacyPlayerLocatorRenderMetrics(');
+    expect(menuSceneSource).toContain('drawLocatorTick(centerX - locatorMetrics.outerRadius, centerY, centerX - locatorMetrics.innerRadius, centerY);');
     expect(menuSceneSource).toContain('const playerScreenX = this.layout.boardLeft + boardOffset.x + ((this.player.x + 0.5) * this.layout.tileSize);');
     expect(menuSceneSource).toContain('const goalScreenX = this.layout.boardLeft + boardOffset.x + ((this.maze.goal.x + 0.5) * this.layout.tileSize);');
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, point, trailColor, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, trailAlpha, 1);');
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, this.player, 0xf2f4f8, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, 0);');
   });
 
-  test('clamps dynamic overlays for ultra-narrow mobile tiles without oversized player blobs', () => {
-    expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.62, 3)).toBe(2);
-    expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.34, 2)).toBe(1);
-    expect(resolveLegacyDynamicMarkerInset(3.265, 0.22)).toBe(1);
+  test('keeps dynamic overlays readable for ultra-narrow mobile tiles', () => {
+    expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.62, 3)).toBe(3);
+    expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.34, 2)).toBe(2);
+    expect(resolveLegacyDynamicMarkerInset(3.265, 0.22)).toBe(0);
     expect(resolveLegacyPlayerMarkerRenderMetrics(3.265, 0.34, 0.54)).toEqual({
-      coreRadius: 1,
-      haloRadius: 2,
+      coreRadius: 2,
+      haloRadius: 3,
+      strokeWidth: 1
+    });
+    expect(resolveLegacyPlayerLocatorRenderMetrics(3.265, 3, 1)).toEqual({
+      innerRadius: 4,
+      outerRadius: 5,
+      strokeWidth: 1
+    });
+    expect(resolveLegacyEndpointMarkerRenderMetrics(3.265)).toEqual({
+      coreRadius: 2,
+      outerRadius: 4,
       strokeWidth: 1
     });
   });
@@ -245,6 +265,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(resolveLegacyPlayerMarkerRenderMetrics(18, 0.34, 0.54)).toEqual({
       coreRadius: 6,
       haloRadius: 10,
+      strokeWidth: 2
+    });
+    expect(resolveLegacyPlayerLocatorRenderMetrics(18, 10, 2)).toEqual({
+      innerRadius: 11,
+      outerRadius: 14,
+      strokeWidth: 2
+    });
+    expect(resolveLegacyEndpointMarkerRenderMetrics(18)).toEqual({
+      coreRadius: 5,
+      outerRadius: 10,
       strokeWidth: 2
     });
   });

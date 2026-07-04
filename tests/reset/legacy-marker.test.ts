@@ -49,7 +49,40 @@ describe('Mazer completion markers', () => {
     expect(markerDoc).toContain('This is the active completion marker for the current Mazer direction.');
     expect(markerDoc).toContain('Do not ratchet the retired legacy visual 1:1 marker from this lane.');
     expect(currentTruth).toContain('legacy visual 1:1 marker is retired');
+    expect(currentTruth).toContain('bounded extreme scale-`149` smoke');
+    expect(markerDoc).toContain('`99% -> 100%`');
+    expect(markerDoc).toContain('scale-`149`');
     expect(agentRules).toContain('use `docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md` as the active percent marker');
+  });
+
+  test('keeps the active proof spine explicit and aligned with repo verify scripts', () => {
+    const currentTruth = readRepoFile('docs/current-truth.md');
+    const systemMap = readRepoFile('docs/system-map.md');
+    const packageJson = readRepoFile('package.json');
+    const verifyScript = readRepoFile('scripts/verify/run-verify.mjs');
+
+    expect(packageJson).toContain('"verify": "node ./scripts/verify/run-verify.mjs"');
+    expect(packageJson).toContain('"test:verify": "vitest run tests/reset tests/ai/demo-walker.test.ts tests/scenes/menu-render-frame.test.ts --maxWorkers 1"');
+    expect(verifyScript).toContain("runNpm(['run', 'test:verify'])");
+    expect(verifyScript).toContain("runNpm(['run', 'build'])");
+    expect(currentTruth).toContain('Current `verify` means:');
+    expect(currentTruth).toContain('- `npm run test:verify`');
+    expect(currentTruth).toContain('- `npm run build`');
+    expect(currentTruth).toContain('Current `test:verify` means:');
+    expect(currentTruth).toContain('- `tests/reset`');
+    expect(currentTruth).toContain('- `tests/ai/demo-walker.test.ts`');
+    expect(currentTruth).toContain('- `tests/scenes/menu-render-frame.test.ts`');
+    expect(currentTruth).toContain('- `--maxWorkers 1`');
+    expect(currentTruth).toContain('npm run lint');
+    expect(systemMap).toContain('docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md');
+    expect(systemMap).toContain('docs/current-truth.md');
+    expect(systemMap).toContain('- `npm run test:verify`');
+    expect(systemMap).toContain('- `npm run build`');
+    expect(systemMap).toContain('- `tests/reset`');
+    expect(systemMap).toContain('- `tests/ai/demo-walker.test.ts`');
+    expect(systemMap).toContain('- `tests/scenes/menu-render-frame.test.ts`');
+    expect(systemMap).toContain('- `--maxWorkers 1`');
+    expect(systemMap).toContain('scale-`149` smoke');
   });
 
   test('keeps the legacy visual one-to-one marker retired unless screenshot parity is reopened', () => {

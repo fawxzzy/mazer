@@ -100,8 +100,10 @@ import {
 import {
   resolveLegacyDynamicMarkerInset,
   resolveLegacyDynamicTrailStrokeWidth,
+  resolveLegacyEndpointMarkerRenderMetrics,
   resolveLegacyMenuPathRenderFrames,
   resolveLegacyMenuPathRenderSegments,
+  resolveLegacyPlayerLocatorRenderMetrics,
   resolveLegacyPlayerMarkerRenderMetrics
 } from '../legacy-runtime/legacyMenuRender';
 import {
@@ -386,8 +388,7 @@ const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
 const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;
-const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x0a2b3c;
-const LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO = 0.22;
+const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x063448;
 const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.34;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.62;
 const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
@@ -395,6 +396,9 @@ const LEGACY_PLAYER_MARKER_HALO = 0xffd45a;
 const LEGACY_PLAYER_MARKER_CORE = 0xf8fbff;
 const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
+const LEGACY_PLAY_START_MARKER_CORE = 0xfff1a6;
+const LEGACY_PLAY_GOAL_MARKER_CORE = 0xffedf0;
+const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xff6378;
 const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 42;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
@@ -511,6 +515,8 @@ export class MenuScene extends Phaser.Scene {
   private legacyPlayFocusGuardAttached = false;
   private legacyPlayWindowBlurHandler: (() => void) | null = null;
   private legacyPlayVisibilityChangeHandler: (() => void) | null = null;
+  private legacyPlayDocumentKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
+  private legacyPlayDocumentKeyUpHandler: ((event: KeyboardEvent) => void) | null = null;
   private legacyPlayTouchControlPointerDownHandler: ((event: PointerEvent) => void) | null = null;
   private runtimeFeedDiagnostics = summarizeMenuSceneRuntimeFeed({ nowMs: 0 });
 
@@ -571,6 +577,7 @@ export class MenuScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.detachRuntimeDiagnostics();
       this.detachLegacyPlayFocusGuards();
+      this.detachLegacyPlayKeyboardFallback();
       this.detachLegacyPlayTouchControlFallback();
       this.clearVisualDiagnostics();
       clearMenuSceneRuntimeDiagnostics();
@@ -895,13 +902,21 @@ export class MenuScene extends Phaser.Scene {
       resources: {
         activeTweens: 0,
         activeTimers: 0,
-        listenerCount: 3 + (this.runtimeVisibilityAttached ? 1 : 0) + (this.legacyPlayFocusGuardAttached ? 2 : 0),
+        listenerCount: 3
+          + (this.runtimeVisibilityAttached ? 1 : 0)
+          + (this.legacyPlayFocusGuardAttached ? 2 : 0)
+          + (this.legacyPlayDocumentKeyDownHandler !== null ? 1 : 0)
+          + (this.legacyPlayDocumentKeyUpHandler !== null ? 1 : 0),
         listenerBreakdown: {
           sceneUpdate: 1,
           sceneShutdown: 1,
           scaleResize: 1,
           visibilityAttached: this.runtimeVisibilityAttached,
           legacyPlayFocusGuardAttached: this.legacyPlayFocusGuardAttached,
+          legacyPlayKeyboardFallbackAttached: (
+            this.legacyPlayDocumentKeyDownHandler !== null
+            && this.legacyPlayDocumentKeyUpHandler !== null
+          ),
           installSurfaceAttached: this.runtimeInstallSurfaceAttached
         },
         trailSegmentCount: this.trail.length,
@@ -928,6 +943,12 @@ export class MenuScene extends Phaser.Scene {
         }
       }
     });
+  }
+
+  private publishInteractionDiagnostics(): void {
+    const now = this.time.now;
+    this.publishVisualDiagnostics(now);
+    this.publishRuntimeDiagnostics(now, true);
   }
 
   private detachRuntimeDiagnostics(): void {
@@ -985,50 +1006,7 @@ export class MenuScene extends Phaser.Scene {
 
   private installInput(): void {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
-        this.resetLegacyPlayInputBuffer();
-        return;
-      }
-
-      if (this.handleLegacyPlayMovementKeyDown(event)) {
-        return;
-      }
-
-      if (event.repeat) {
-        return;
-      }
-
-      if (this.overlay !== 'none' && this.handleOverlayFieldInput(event)) {
-        return;
-      }
-
-      if (event.key === 'Escape') {
-        this.handleBackAction();
-        return;
-      }
-
-      if (event.key.toLowerCase() === 'p' && this.mode === 'play') {
-        if (this.overlay === 'pause') {
-          this.closeOverlay();
-        } else if (this.overlay === 'none') {
-          this.openOverlay('pause');
-        }
-        return;
-      }
-
-      if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'none') {
-        this.startPlayMode();
-        return;
-      }
-
-      if (event.key.toLowerCase() === 'o' && this.mode === 'menu' && this.overlay === 'none') {
-        this.openOverlay('options');
-        return;
-      }
-
-      if (this.mode !== 'play' || this.overlay !== 'none') {
-        return;
-      }
+      this.handleLegacyKeyboardDown(event);
     });
 
     this.input.keyboard?.on('keyup', (event: KeyboardEvent) => {
@@ -1048,7 +1026,112 @@ export class MenuScene extends Phaser.Scene {
       this.playPointerStart = null;
     });
 
+    this.installLegacyPlayKeyboardFallback();
     this.installLegacyPlayTouchControlFallback();
+  }
+
+  private installLegacyPlayKeyboardFallback(): void {
+    if (
+      this.legacyPlayDocumentKeyDownHandler !== null
+      || this.legacyPlayDocumentKeyUpHandler !== null
+      || typeof document === 'undefined'
+    ) {
+      return;
+    }
+
+    this.legacyPlayDocumentKeyDownHandler = (event: KeyboardEvent) => {
+      if (!event.defaultPrevented) {
+        this.handleLegacyKeyboardDown(event);
+      }
+    };
+    this.legacyPlayDocumentKeyUpHandler = (event: KeyboardEvent) => {
+      if (!event.defaultPrevented) {
+        this.handleLegacyPlayMovementKeyUp(event);
+      }
+    };
+
+    document.addEventListener('keydown', this.legacyPlayDocumentKeyDownHandler);
+    document.addEventListener('keyup', this.legacyPlayDocumentKeyUpHandler);
+  }
+
+  private detachLegacyPlayKeyboardFallback(): void {
+    if (typeof document === 'undefined') {
+      this.legacyPlayDocumentKeyDownHandler = null;
+      this.legacyPlayDocumentKeyUpHandler = null;
+      return;
+    }
+
+    if (this.legacyPlayDocumentKeyDownHandler !== null) {
+      document.removeEventListener('keydown', this.legacyPlayDocumentKeyDownHandler);
+    }
+    if (this.legacyPlayDocumentKeyUpHandler !== null) {
+      document.removeEventListener('keyup', this.legacyPlayDocumentKeyUpHandler);
+    }
+    this.legacyPlayDocumentKeyDownHandler = null;
+    this.legacyPlayDocumentKeyUpHandler = null;
+  }
+
+  private handleLegacyKeyboardDown(event: KeyboardEvent): boolean {
+    if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
+      this.resetLegacyPlayInputBuffer();
+      return true;
+    }
+
+    if (this.handleLegacyPlayMovementKeyDown(event)) {
+      return true;
+    }
+
+    if (event.repeat) {
+      return false;
+    }
+
+    if (this.overlay !== 'none' && this.handleOverlayFieldInput(event)) {
+      event.preventDefault();
+      return true;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.handleBackAction();
+      return true;
+    }
+
+    const lowerKey = event.key.toLowerCase();
+    if (lowerKey === 'p' && this.mode === 'play') {
+      event.preventDefault();
+      if (this.overlay === 'pause') {
+        this.closeOverlay();
+      } else if (this.overlay === 'none') {
+        this.openOverlay('pause');
+      }
+      return true;
+    }
+
+    if (lowerKey === 'r' && this.mode === 'play' && (this.overlay === 'none' || this.overlay === 'pause')) {
+      event.preventDefault();
+      this.applyLegacyPauseCommand('reset-player');
+      return true;
+    }
+
+    if (lowerKey === 't' && this.mode === 'play' && (this.overlay === 'none' || this.overlay === 'pause')) {
+      event.preventDefault();
+      this.applyLegacyOverlayToggleField('toggleTrailFade');
+      return true;
+    }
+
+    if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'none') {
+      event.preventDefault();
+      this.startPlayMode();
+      return true;
+    }
+
+    if (lowerKey === 'o' && this.mode === 'menu' && this.overlay === 'none') {
+      event.preventDefault();
+      this.openOverlay('options');
+      return true;
+    }
+
+    return false;
   }
 
   private installLegacyPlayTouchControlFallback(): void {
@@ -1603,10 +1686,12 @@ export class MenuScene extends Phaser.Scene {
     if (nextStep.reachedGoal) {
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
+      this.publishInteractionDiagnostics();
       return;
     }
 
     this.boardDynamicDirty = true;
+    this.publishInteractionDiagnostics();
   }
 
   private schedulePlayResetReturn(): void {
@@ -1794,12 +1879,12 @@ export class MenuScene extends Phaser.Scene {
     if (this.mode === 'menu' && this.maze.start) {
       this.fillMenuDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9);
     } else if (this.maze.start) {
-      this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9);
+      this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');
     }
     if (this.mode === 'menu' && this.maze.goal) {
       this.fillMenuDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95);
     } else if (this.maze.goal) {
-      this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95);
+      this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95, 'goal');
     }
 
     for (let index = 0; index < trail.length; index += 1) {
@@ -1809,9 +1894,11 @@ export class MenuScene extends Phaser.Scene {
       }
 
       const alpha = this.mode === 'play'
-        ? clamp(0.25 + ((index / Math.max(1, trail.length - 1)) * 0.75), 0.25, 1)
+        ? clamp(0.34 + ((index / Math.max(1, trail.length - 1)) * 0.66), 0.34, 1)
         : clamp(0.22 + ((index / Math.max(1, trail.length - 1)) * 0.82), 0.22, 1);
-      const trailColor = this.settings.darkMode ? 0x10c8f2 : 0x14b8d9;
+      const trailColor = this.mode === 'play'
+        ? (this.settings.darkMode ? 0x42e6ff : 0x23d5ff)
+        : (this.settings.darkMode ? 0x10c8f2 : 0x14b8d9);
       const trailAlpha = this.settings.darkMode && this.mode === 'menu'
         ? clamp(alpha + 0.08, 0, 1)
         : alpha;
@@ -1839,9 +1926,9 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (this.mode === 'menu') {
-      this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94);
+      this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94, false);
     } else {
-      this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1);
+      this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, true);
     }
     this.boardDynamicDirty = false;
   }
@@ -1922,8 +2009,8 @@ export class MenuScene extends Phaser.Scene {
       LEGACY_PLAY_DYNAMIC_TRAIL_EDGE,
       LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO,
       LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO,
-      0.34,
-      0.86
+      0.48,
+      0.94
     );
   }
 
@@ -1997,10 +2084,35 @@ export class MenuScene extends Phaser.Scene {
     originX: number,
     originY: number,
     tileSize: number,
-    alpha: number
+    alpha: number,
+    kind: 'start' | 'goal'
   ): void {
-    const inset = resolveLegacyDynamicMarkerInset(tileSize, LEGACY_PLAY_DYNAMIC_MARKER_INSET_RATIO);
-    this.fillTile(this.boardDynamicGraphics, point, color, originX, originY, tileSize, alpha, inset);
+    const centerX = originX + ((point.x + 0.5) * tileSize);
+    const centerY = originY + ((point.y + 0.5) * tileSize);
+    const markerMetrics = resolveLegacyEndpointMarkerRenderMetrics(tileSize);
+    const shadowRadius = markerMetrics.outerRadius + markerMetrics.strokeWidth + 1;
+
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.48, alpha * 0.48));
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, shadowRadius);
+    this.boardDynamicGraphics.lineStyle(markerMetrics.strokeWidth, kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_EDGE : color, Math.min(0.96, alpha));
+    this.boardDynamicGraphics.strokeCircle(centerX, centerY, markerMetrics.outerRadius);
+
+    if (kind === 'goal') {
+      this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_EDGE, Math.min(0.86, alpha * 0.86));
+      this.boardDynamicGraphics.beginPath();
+      this.boardDynamicGraphics.moveTo(centerX, centerY - markerMetrics.outerRadius);
+      this.boardDynamicGraphics.lineTo(centerX + markerMetrics.outerRadius, centerY);
+      this.boardDynamicGraphics.lineTo(centerX, centerY + markerMetrics.outerRadius);
+      this.boardDynamicGraphics.lineTo(centerX - markerMetrics.outerRadius, centerY);
+      this.boardDynamicGraphics.closePath();
+      this.boardDynamicGraphics.fillPath();
+      this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha);
+      this.boardDynamicGraphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
+      return;
+    }
+
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_START_MARKER_CORE, alpha);
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
   }
 
   private fillLegacyPlayerMarkerTile(
@@ -2008,7 +2120,8 @@ export class MenuScene extends Phaser.Scene {
     originX: number,
     originY: number,
     tileSize: number,
-    alpha: number
+    alpha: number,
+    showLocatorTicks: boolean
   ): void {
     const centerX = originX + ((point.x + 0.5) * tileSize);
     const centerY = originY + ((point.y + 0.5) * tileSize);
@@ -2018,12 +2131,40 @@ export class MenuScene extends Phaser.Scene {
       LEGACY_PLAYER_MARKER_HALO_RATIO
     );
 
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_HALO, Math.min(0.72, alpha * 0.72));
+    const shadowRadius = playerMetrics.haloRadius + playerMetrics.strokeWidth + 1;
+
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.58, alpha * 0.58));
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, shadowRadius);
+    this.boardDynamicGraphics.lineStyle(playerMetrics.strokeWidth, LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.82, alpha * 0.82));
+    this.boardDynamicGraphics.strokeCircle(centerX, centerY, playerMetrics.haloRadius + playerMetrics.strokeWidth);
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_HALO, Math.min(0.78, alpha * 0.78));
     this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.haloRadius);
     this.boardDynamicGraphics.lineStyle(playerMetrics.strokeWidth, LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.72, alpha * 0.72));
     this.boardDynamicGraphics.strokeCircle(centerX, centerY, playerMetrics.coreRadius + 1);
     this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_CORE, alpha);
     this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.coreRadius);
+
+    if (!showLocatorTicks) {
+      return;
+    }
+
+    const locatorMetrics = resolveLegacyPlayerLocatorRenderMetrics(
+      tileSize,
+      playerMetrics.haloRadius,
+      playerMetrics.strokeWidth
+    );
+    const drawLocatorTick = (startX: number, startY: number, endX: number, endY: number): void => {
+      this.boardDynamicGraphics.beginPath();
+      this.boardDynamicGraphics.moveTo(startX, startY);
+      this.boardDynamicGraphics.lineTo(endX, endY);
+      this.boardDynamicGraphics.strokePath();
+    };
+
+    this.boardDynamicGraphics.lineStyle(locatorMetrics.strokeWidth, LEGACY_PLAYER_MARKER_CORE, Math.min(0.92, alpha * 0.92));
+    drawLocatorTick(centerX - locatorMetrics.outerRadius, centerY, centerX - locatorMetrics.innerRadius, centerY);
+    drawLocatorTick(centerX + locatorMetrics.innerRadius, centerY, centerX + locatorMetrics.outerRadius, centerY);
+    drawLocatorTick(centerX, centerY - locatorMetrics.outerRadius, centerX, centerY - locatorMetrics.innerRadius);
+    drawLocatorTick(centerX, centerY + locatorMetrics.innerRadius, centerX, centerY + locatorMetrics.outerRadius);
   }
 
   private drawHud(time: number): void {
@@ -2810,6 +2951,9 @@ export class MenuScene extends Phaser.Scene {
     this.overlayReturn = 'none';
     this.boardDynamicDirty = true;
     this.uiDirty = true;
+    if (this.mode === 'play') {
+      this.publishInteractionDiagnostics();
+    }
   }
 
   private closeOverlay(): void {
@@ -2825,6 +2969,9 @@ export class MenuScene extends Phaser.Scene {
     }
     this.boardDynamicDirty = true;
     this.uiDirty = true;
+    if (this.mode === 'play') {
+      this.publishInteractionDiagnostics();
+    }
   }
 
   private applyLegacyPauseCommand(command: LegacyPauseCommand): void {
@@ -2834,6 +2981,7 @@ export class MenuScene extends Phaser.Scene {
       this.player = result.nextPlayer;
       this.trail = result.nextTrail ?? [copyPoint(result.nextPlayer)];
       this.boardDynamicDirty = true;
+      this.publishInteractionDiagnostics();
     }
 
     if (result.enterMenu) {
@@ -2861,6 +3009,9 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.uiDirty = true;
+    if (this.mode === 'play') {
+      this.publishInteractionDiagnostics();
+    }
   }
 
   private handleBackAction(): void {

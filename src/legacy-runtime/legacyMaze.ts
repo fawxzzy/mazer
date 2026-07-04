@@ -117,6 +117,7 @@ export interface LegacyMazeSnapshot {
 
 const LEGACY_MIN_SCALE = 25;
 const LEGACY_MAX_SCALE = 150;
+const LEGACY_MENU_MIN_SHORTCUT_COUNT = 6;
 
 const createSeededRng = (seed: number): (() => number) => {
   let state = (seed >>> 0) || 1;
@@ -131,6 +132,18 @@ const normalizeGridSize = (scale: number): number => {
   const clamped = clampInteger(scale, LEGACY_MIN_SCALE, LEGACY_MAX_SCALE);
   const normalized = clamped % 2 === 0 ? clamped - 1 : clamped;
   return Math.max(LEGACY_MIN_SCALE, normalized);
+};
+
+const resolveLegacyGeneratedMenuShortcutCount = (scale: number): number => {
+  const size = normalizeGridSize(scale);
+  if (size <= 35) {
+    return Math.trunc(size * legacyTuning.board.shortcutCountModifier.menu);
+  }
+
+  return Math.max(
+    LEGACY_MENU_MIN_SHORTCUT_COUNT,
+    Math.trunc(size * legacyTuning.board.shortcutCountModifier.menu)
+  );
 };
 
 const keyForPoint = (point: LegacyPoint): string => `${point.x},${point.y}`;
@@ -593,23 +606,65 @@ const reinforceLegacyRouteQuality = (
   let created = 0;
   let nextSolutionPath = solutionPath;
   let nextRouteQualityStats = routeQualityStats;
+  const scoreRouteQualityStats = (stats: NonNullable<LegacyMazeSnapshot['routeQualityStats']>): number => (
+    (stats.routeQuality === 'multi-route' ? 1_000_000 : 0)
+    + (stats.meaningfulBypassableRouteBands * 10_000)
+    + (stats.meaningfulBypassableSolutionEdges * 100)
+    + (stats.bypassableRouteBands * 10)
+    + stats.bypassableSolutionEdges
+  );
 
   while (
     created < maxExtraShortcuts
     && wallArray.length > 0
     && nextRouteQualityStats.routeQuality !== 'multi-route'
   ) {
-    attempts += 1;
-    const candidateIndex = Math.floor(rng() * wallArray.length);
-    const [candidate] = wallArray.splice(candidateIndex, 1);
-    if (!candidate || !isLegacyShortcutBridgeCandidate(grid, candidate)) {
+    // Random valid bridges can cluster in one route band; sample and score before committing.
+    const currentScore = scoreRouteQualityStats(nextRouteQualityStats);
+    const sampleCount = Math.min(wallArray.length, 18);
+    let bestCandidate: LegacyPoint | null = null;
+    let bestCandidateIndex = -1;
+    let bestSolutionPath = nextSolutionPath;
+    let bestRouteQualityStats = nextRouteQualityStats;
+    let bestScore = Number.NEGATIVE_INFINITY;
+
+    for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
+      attempts += 1;
+      const candidateIndex = Math.floor(rng() * wallArray.length);
+      const candidate = wallArray[candidateIndex];
+      if (!candidate || !isLegacyShortcutBridgeCandidate(grid, candidate)) {
+        continue;
+      }
+
+      grid[candidate.y]![candidate.x] = true;
+      const candidateSolutionPath = buildShortestPath(grid, start, goal);
+      const candidateRouteQualityStats = measureLegacyRouteQuality(grid, start, goal, candidateSolutionPath);
+      grid[candidate.y]![candidate.x] = false;
+
+      const candidateScore = scoreRouteQualityStats(candidateRouteQualityStats);
+      if (candidateScore > bestScore) {
+        bestCandidate = candidate;
+        bestCandidateIndex = candidateIndex;
+        bestSolutionPath = candidateSolutionPath;
+        bestRouteQualityStats = candidateRouteQualityStats;
+        bestScore = candidateScore;
+      }
+    }
+
+    if (!bestCandidate || bestCandidateIndex < 0) {
+      wallArray.splice(Math.floor(rng() * wallArray.length), 1);
       continue;
     }
 
-    grid[candidate.y]![candidate.x] = true;
+    wallArray.splice(bestCandidateIndex, 1);
+    if (bestScore < currentScore && created > 0) {
+      continue;
+    }
+
+    grid[bestCandidate.y]![bestCandidate.x] = true;
     created += 1;
-    nextSolutionPath = buildShortestPath(grid, start, goal);
-    nextRouteQualityStats = measureLegacyRouteQuality(grid, start, goal, nextSolutionPath);
+    nextSolutionPath = bestSolutionPath;
+    nextRouteQualityStats = bestRouteQualityStats;
   }
 
   return {
@@ -617,6 +672,58 @@ const reinforceLegacyRouteQuality = (
     solutionPath: nextSolutionPath,
     attempts,
     created
+  };
+};
+
+const resolveFarthestReachableFloor = (
+  grid: boolean[][],
+  start: LegacyPoint
+): { distance: number; point: LegacyPoint } => {
+  let farthest = { distance: 0, point: clonePoint(start) };
+
+  for (const entry of resolveReachableFloorDistances(grid, start).values()) {
+    if (entry.distance > farthest.distance) {
+      farthest = entry;
+    }
+  }
+
+  return {
+    distance: farthest.distance,
+    point: clonePoint(farthest.point)
+  };
+};
+
+const resolveLegacyFinalRouteState = (
+  grid: boolean[][],
+  start: LegacyPoint,
+  goal: LegacyPoint,
+  minimumSolutionPathLength: number,
+  playableTopologyStats: NonNullable<LegacyMazeSnapshot['playableTopologyStats']>
+): {
+  goal: LegacyPoint;
+  routeQualityStats: NonNullable<LegacyMazeSnapshot['routeQualityStats']>;
+  solutionPath: LegacyPoint[];
+} => {
+  let resolvedGoal = clonePoint(goal);
+  let solutionPath = buildShortestPath(grid, start, resolvedGoal);
+
+  if (solutionPath.length < minimumSolutionPathLength) {
+    const farthest = resolveFarthestReachableFloor(grid, start);
+    if (farthest.distance + 1 > solutionPath.length) {
+      resolvedGoal = farthest.point;
+      solutionPath = buildShortestPath(grid, start, resolvedGoal);
+      playableTopologyStats.goalRebasedToFarthestReachableFloor = true;
+      playableTopologyStats.resolvedGoalDistance = Math.max(
+        playableTopologyStats.resolvedGoalDistance,
+        Math.max(0, solutionPath.length - 1)
+      );
+    }
+  }
+
+  return {
+    goal: resolvedGoal,
+    routeQualityStats: measureLegacyRouteQuality(grid, start, resolvedGoal, solutionPath),
+    solutionPath
   };
 };
 
@@ -1013,9 +1120,13 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     ? (shortcutCount ?? Math.trunc(size * legacyTuning.board.shortcutCountModifier.game))
     : 0;
   const shortcutStats = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount, wallArray);
-  const { goal, stats: playableTopologyStats } = normalizeLegacyPlayableTopology(grid, start, sourceGoal);
-  let solutionPath = buildShortestPath(grid, start, goal);
-  let routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath);
+  const { goal: normalizedGoal, stats: playableTopologyStats } = normalizeLegacyPlayableTopology(grid, start, sourceGoal);
+  const minimumSolutionPathLength = Math.max(LEGACY_MIN_SCALE, Math.floor(size * 1.5));
+  let {
+    goal,
+    routeQualityStats,
+    solutionPath
+  } = resolveLegacyFinalRouteState(grid, start, normalizedGoal, minimumSolutionPathLength, playableTopologyStats);
 
   const reinforcementStats = reinforceLegacyRouteQuality(
     grid,
@@ -1024,7 +1135,7 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     goal,
     solutionPath,
     routeQualityStats,
-    resolvedShortcutCount > 0 ? Math.max(2, Math.floor(resolvedShortcutCount * 0.45)) : 0
+    resolvedShortcutCount > 0 ? Math.max(8, resolvedShortcutCount * 3) : 0
   );
   if (reinforcementStats.created > 0) {
     solutionPath = reinforcementStats.solutionPath;
@@ -1032,6 +1143,14 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     shortcutStats.created += reinforcementStats.created;
     shortcutStats.qualityReinforcementAttempts = reinforcementStats.attempts;
     shortcutStats.qualityReinforcementCreated = reinforcementStats.created;
+  }
+
+  if (solutionPath.length < minimumSolutionPathLength) {
+    ({
+      goal,
+      routeQualityStats,
+      solutionPath
+    } = resolveLegacyFinalRouteState(grid, start, goal, minimumSolutionPathLength, playableTopologyStats));
   }
 
   return {
@@ -1058,7 +1177,7 @@ export const createLegacyGeneratedMenuMaze = (
   ...createLegacyMaze(
     scale,
     seed,
-    shortcutCount ?? Math.trunc(normalizeGridSize(scale) * legacyTuning.board.shortcutCountModifier.menu)
+    shortcutCount ?? resolveLegacyGeneratedMenuShortcutCount(scale)
   ),
   source: 'menu-generated'
 });

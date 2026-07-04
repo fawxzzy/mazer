@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { resolveTouchControlLayout } from '../../src/input-human';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 
 describe('legacy menu layout', () => {
@@ -74,19 +75,42 @@ describe('legacy menu layout', () => {
     expect(layout.centerButtonWidth).toBeLessThanOrEqual(layout.width - 20);
   });
 
-  test('centers the active-play board in ultra-narrow side panels without changing menu button math', () => {
+  test('keeps active-play controls clear of the board in ultra-narrow side panels without changing menu button math', () => {
     const menuLayout = resolveLegacyMenuLayout(172, 407, 50, 49, 'menu');
     const playLayout = resolveLegacyMenuLayout(172, 407, 50, 49, 'play');
+    const touchLayout = resolveTouchControlLayout({
+      width: playLayout.width,
+      height: playLayout.height
+    }, {
+      compact: true
+    });
 
     expect(playLayout.buttonLayout).toBe('stack');
     expect(playLayout.boardLeft).toBe(menuLayout.boardLeft);
     expect(playLayout.boardSize).toBe(menuLayout.boardSize);
     expect(playLayout.tileSize).toBe(menuLayout.tileSize);
-    expect(playLayout.boardTop).toBeGreaterThan(menuLayout.boardTop);
-    expect(playLayout.boardTop).toBeGreaterThanOrEqual(100);
-    expect(playLayout.boardTop + playLayout.boardSize).toBeLessThanOrEqual(playLayout.height - 36);
+    expect(playLayout.boardTop).toBeGreaterThanOrEqual(menuLayout.boardTop);
+    expect(playLayout.boardTop).toBeGreaterThanOrEqual(48);
+    expect(playLayout.boardTop + playLayout.boardSize + 12).toBeLessThanOrEqual(touchLayout.frame.top);
+    expect(touchLayout.frame.right).toBeLessThanOrEqual(playLayout.width);
+    expect(touchLayout.frame.bottom).toBeLessThanOrEqual(playLayout.height);
     expect(menuLayout.leftButtonY + menuLayout.buttonHeight).toBeLessThan(menuLayout.centerButtonY);
     expect(menuLayout.centerButtonY + menuLayout.buttonHeight).toBeLessThan(menuLayout.rightButtonY);
+  });
+
+  test('keeps the compact phone control deck below the active-play board', () => {
+    const playLayout = resolveLegacyMenuLayout(360, 740, 50, 49, 'play');
+    const touchLayout = resolveTouchControlLayout({
+      width: playLayout.width,
+      height: playLayout.height
+    }, {
+      compact: true
+    });
+
+    expect(playLayout.boardTop + playLayout.boardSize + 24).toBeLessThanOrEqual(touchLayout.frame.top);
+    expect(touchLayout.controls.pause.width).toBeGreaterThan(touchLayout.controls.move_up.width);
+    expect(touchLayout.controls.restart_attempt.bottom).toBeLessThanOrEqual(touchLayout.frame.bottom);
+    expect(touchLayout.controls.toggle_thoughts.bottom).toBeLessThanOrEqual(touchLayout.frame.bottom);
   });
 
   test('gives desktop active play a larger board than the front-door composition', () => {

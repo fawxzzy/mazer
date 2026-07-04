@@ -29,12 +29,16 @@ describe('input-human touch bridge', () => {
     });
 
     expect(layout.frame.width).toBeGreaterThan(0);
-    expect(layout.frame.left).toBeGreaterThan(0);
-    expect(layout.frame.right).toBeLessThan(390);
-    expect(layout.controls.move_up.width).toBeGreaterThanOrEqual(52);
+    expect(layout.frame.left).toBe(0);
+    expect(layout.frame.right).toBe(390);
+    expect(layout.controls.move_up.width).toBeGreaterThanOrEqual(44);
     expect(layout.controls.move_up.centerY).toBeLessThan(layout.controls.move_down.centerY);
     expect(layout.controls.move_left.centerX).toBeLessThan(layout.controls.move_right.centerX);
     expect(layout.controls.pause.left).toBeGreaterThan(layout.controls.move_right.right + 80);
+    expect(layout.controls.pause.width).toBeGreaterThan(layout.controls.move_up.width);
+    expect(layout.controls.restart_attempt.width).toBeLessThan(layout.controls.pause.height);
+    expect(layout.controls.restart_attempt.centerY).toBeGreaterThan(layout.controls.pause.centerY);
+    expect(layout.controls.toggle_thoughts.centerY).toBe(layout.controls.restart_attempt.centerY);
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.pause.centerX, layout.controls.pause.centerY)).toBe('pause');
     expect(resolveTouchControlKindAtPoint(
       layout,
@@ -46,6 +50,27 @@ describe('input-human touch bridge', () => {
       layout.controls.move_right.centerX - 6,
       layout.controls.move_up.centerY + 12
     )).toBe('move_right');
+  });
+
+  test('keeps ultra-narrow portrait controls inside the viewport without oversized hit plates', () => {
+    const layout = resolveTouchControlLayout({
+      width: 172,
+      height: 407
+    });
+
+    expect(layout.frame.left).toBeGreaterThanOrEqual(0);
+    expect(layout.frame.right).toBeLessThanOrEqual(172);
+    expect(layout.frame.bottom).toBeLessThanOrEqual(407);
+    expect(layout.controls.move_up.width).toBeLessThan(52);
+    expect(layout.controls.move_left.left).toBeGreaterThanOrEqual(0);
+    expect(layout.controls.pause.right).toBeLessThanOrEqual(172);
+    expect(layout.controls.toggle_thoughts.bottom).toBeLessThanOrEqual(407);
+    expect(layout.controls.pause.centerX).toBeGreaterThan(layout.controls.move_right.centerX);
+    expect(resolveTouchControlKindAtPoint(
+      layout,
+      layout.controls.move_left.centerX,
+      layout.controls.move_left.centerY
+    )).toBe('move_left');
   });
 
   test('maps touch points into the shared human action schema and releases held pointers', () => {

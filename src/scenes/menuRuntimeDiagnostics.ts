@@ -236,6 +236,7 @@ export interface MenuSceneRuntimeDiagnostics {
       scaleResize: number;
       visibilityAttached: boolean;
       legacyPlayFocusGuardAttached: boolean;
+      legacyPlayKeyboardFallbackAttached: boolean;
       installSurfaceAttached: boolean;
     };
     trailSegmentCount: number;
