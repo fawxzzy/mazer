@@ -45,6 +45,7 @@ export interface TouchRect {
 export interface TouchControlLayout {
   compact: boolean;
   frame: TouchRect;
+  frames?: TouchRect[];
   controls: Record<HumanInputActionKind, TouchRect>;
 }
 
@@ -57,6 +58,12 @@ export interface TouchInputState {
 export interface TouchControlLayoutOptions {
   safeInsets?: TouchSafeInsetsLike;
   compact?: boolean;
+  avoidRect?: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
 }
 
 const TOUCH_DPAD_HIT_SLOP_RATIO = 0.32;
@@ -220,6 +227,66 @@ export const resolveTouchControlLayout = (
         )
       }
     };
+  }
+
+  const avoidRect = options.avoidRect;
+  const splitLandscape = compact && viewport.width > viewport.height && avoidRect !== undefined;
+  if (splitLandscape) {
+    const avoidLeft = clamp(Math.round(avoidRect.left), safeInsets.left, viewport.width - safeInsets.right);
+    const avoidRight = clamp(Math.round(avoidRect.left + avoidRect.width), safeInsets.left, viewport.width - safeInsets.right);
+    const avoidTop = clamp(Math.round(avoidRect.top), safeInsets.top, viewport.height - safeInsets.bottom);
+    const avoidBottom = clamp(Math.round(avoidRect.top + avoidRect.height), safeInsets.top, viewport.height - safeInsets.bottom);
+    const leftGutter = Math.max(0, avoidLeft - safeInsets.left);
+    const rightGutter = Math.max(0, viewport.width - safeInsets.right - avoidRight);
+    const verticalSpace = Math.max(1, viewport.height - safeInsets.top - safeInsets.bottom);
+    const rawButtonSize = Math.round(minDim * 0.112);
+    const maxButtonSize = Math.floor(Math.min(
+      (leftGutter - 24) / 3.3,
+      rightGutter - 24,
+      (verticalSpace - 24) / 3.3,
+      rawButtonSize
+    ));
+    const buttonSize = clamp(maxButtonSize, 42, 68);
+    const gap = Math.max(8, Math.round(buttonSize * 0.18));
+    const dpadSpan = (buttonSize * 3) + (gap * 2);
+    const clusterHeight = dpadSpan;
+
+    if (
+      leftGutter >= dpadSpan + 16
+      && rightGutter >= buttonSize + 16
+      && verticalSpace >= clusterHeight + 16
+    ) {
+      const clusterTop = clamp(
+        Math.round(avoidTop + (((avoidBottom - avoidTop) - clusterHeight) / 2)),
+        safeInsets.top + 8,
+        viewport.height - safeInsets.bottom - clusterHeight - 8
+      );
+      const dpadLeft = Math.round(safeInsets.left + ((leftGutter - dpadSpan) / 2));
+      const actionLeft = Math.round(avoidRight + ((rightGutter - buttonSize) / 2));
+      const dpadFrame = createRect(dpadLeft - 8, clusterTop - 8, dpadSpan + 16, clusterHeight + 16);
+      const actionFrame = createRect(actionLeft - 8, clusterTop - 8, buttonSize + 16, clusterHeight + 16);
+      const frame = createRect(
+        dpadFrame.left,
+        Math.min(dpadFrame.top, actionFrame.top),
+        actionFrame.right - dpadFrame.left,
+        Math.max(dpadFrame.bottom, actionFrame.bottom) - Math.min(dpadFrame.top, actionFrame.top)
+      );
+
+      return {
+        compact,
+        frame,
+        frames: [dpadFrame, actionFrame],
+        controls: {
+          move_up: createRect(dpadLeft + buttonSize + gap, clusterTop, buttonSize, buttonSize),
+          move_down: createRect(dpadLeft + buttonSize + gap, clusterTop + ((buttonSize + gap) * 2), buttonSize, buttonSize),
+          move_left: createRect(dpadLeft, clusterTop + buttonSize + gap, buttonSize, buttonSize),
+          move_right: createRect(dpadLeft + ((buttonSize + gap) * 2), clusterTop + buttonSize + gap, buttonSize, buttonSize),
+          pause: createRect(actionLeft, clusterTop, buttonSize, buttonSize),
+          restart_attempt: createRect(actionLeft, clusterTop + buttonSize + gap, buttonSize, buttonSize),
+          toggle_thoughts: createRect(actionLeft, clusterTop + ((buttonSize + gap) * 2), buttonSize, buttonSize)
+        }
+      };
+    }
   }
 
   const tightPortrait = compact && viewport.height > viewport.width && viewport.width < 360;

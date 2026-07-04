@@ -39,7 +39,7 @@ const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.14;
 const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.04;
 
 const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {
-  if (tileSize <= 8) {
+  if (tileSize <= 4) {
     return 0;
   }
 
@@ -69,11 +69,11 @@ export const resolveLegacyPlayerMarkerRenderMetrics = (
   coreRatio: number,
   haloRatio: number
 ): LegacyPlayerMarkerRenderMetrics => {
-  const maxHaloRadius = Math.max(1, Math.ceil(tileSize * 0.72));
-  const maxCoreRadius = Math.max(1, Math.ceil(tileSize * 0.5));
+  const maxHaloRadius = Math.max(1, Math.ceil(tileSize * 0.56));
+  const maxCoreRadius = Math.max(1, Math.ceil(tileSize * 0.34));
   const haloRadius = Math.min(
     maxHaloRadius,
-    Math.max(tileSize <= 4 ? 3 : 3, Math.round(tileSize * haloRatio))
+    Math.max(tileSize <= 4 ? 2 : 2, Math.round(tileSize * haloRatio))
   );
   const coreRadius = Math.min(
     maxCoreRadius,
@@ -93,9 +93,9 @@ export const resolveLegacyPlayerLocatorRenderMetrics = (
   strokeWidth: number
 ): LegacyPlayerLocatorRenderMetrics => {
   const minimumOuterRadius = haloRadius + strokeWidth + 1;
-  const responsiveOuterRadius = Math.round(tileSize * (tileSize <= 4 ? 1.55 : 0.8));
+  const responsiveOuterRadius = Math.round(tileSize * (tileSize <= 4 ? 1.25 : 0.56));
   const outerRadius = Math.max(minimumOuterRadius, responsiveOuterRadius);
-  const tickLength = Math.max(2, Math.round(tileSize * 0.34));
+  const tickLength = Math.max(1, Math.round(tileSize * 0.22));
 
   return {
     innerRadius: Math.max(haloRadius + 1, outerRadius - tickLength),

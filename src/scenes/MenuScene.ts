@@ -389,13 +389,15 @@ const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x063448;
-const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.34;
-const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.62;
+const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.24;
+const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.42;
 const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
 const LEGACY_PLAYER_MARKER_HALO = 0xffd45a;
 const LEGACY_PLAYER_MARKER_CORE = 0xf8fbff;
 const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
+const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.2;
+const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.34;
 const LEGACY_PLAY_START_MARKER_CORE = 0xfff1a6;
 const LEGACY_PLAY_GOAL_MARKER_CORE = 0xffedf0;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xff6378;
@@ -1306,7 +1308,13 @@ export class MenuScene extends Phaser.Scene {
       width: this.layout.width,
       height: this.layout.height
     }, {
-      compact: this.layout.width < 720 || this.layout.height < 720
+      compact: this.layout.width < 720 || this.layout.height < 720,
+      avoidRect: {
+        left: this.layout.boardLeft,
+        top: this.layout.boardTop,
+        width: this.layout.boardSize,
+        height: this.layout.boardSize
+      }
     });
   }
 
@@ -2009,8 +2017,8 @@ export class MenuScene extends Phaser.Scene {
       LEGACY_PLAY_DYNAMIC_TRAIL_EDGE,
       LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO,
       LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO,
-      0.48,
-      0.94
+      0.34,
+      0.86
     );
   }
 
@@ -2127,8 +2135,8 @@ export class MenuScene extends Phaser.Scene {
     const centerY = originY + ((point.y + 0.5) * tileSize);
     const playerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
       tileSize,
-      LEGACY_PLAYER_MARKER_RADIUS_RATIO,
-      LEGACY_PLAYER_MARKER_HALO_RATIO
+      showLocatorTicks ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : LEGACY_PLAYER_MARKER_RADIUS_RATIO,
+      showLocatorTicks ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : LEGACY_PLAYER_MARKER_HALO_RATIO
     );
 
     const shadowRadius = playerMetrics.haloRadius + playerMetrics.strokeWidth + 1;
@@ -2278,10 +2286,12 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const { controls, frame } = touchControlLayout;
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_FRAME_FILL, 0.28);
-    this.hudGraphics.fillRoundedRect(frame.left, frame.top, frame.width, frame.height, 18);
-    this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.18);
-    this.hudGraphics.strokeRoundedRect(frame.left, frame.top, frame.width, frame.height, 18);
+    for (const touchFrame of touchControlLayout.frames ?? [frame]) {
+      this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_FRAME_FILL, 0.28);
+      this.hudGraphics.fillRoundedRect(touchFrame.left, touchFrame.top, touchFrame.width, touchFrame.height, 18);
+      this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.18);
+      this.hudGraphics.strokeRoundedRect(touchFrame.left, touchFrame.top, touchFrame.width, touchFrame.height, 18);
+    }
 
     this.drawLegacyPlayTouchButton(controls.move_up, false);
     this.drawLegacyPlayTouchButton(controls.move_right, false);
