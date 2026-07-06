@@ -44,10 +44,10 @@ import {
   type LegacyPauseCommand
 } from '../legacy-runtime/legacyPauseLifecycle';
 import {
-  advanceLegacyPlayDiagonalSequence,
   advanceLegacyPlayStep,
   createLegacyPlayMoveFlags,
   LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
+  resolveLegacyPlayDiagonalSequenceSteps,
   resolveLegacyPointerMoveVector,
   resolveLegacyPlayMoveVector,
   isSameLegacyPlayPointer,
@@ -118,6 +118,7 @@ import {
   type MenuSceneRuntimeConfig
 } from './menuRuntimeDiagnostics';
 import { summarizeTelemetrySemantics } from '../telemetry';
+import type { HumanInputActionKind } from '../input-human';
 import { resolveTouchControlKindAtPoint, resolveTouchControlLayout } from '../input-human/touch';
 
 type RuntimeMode = LegacyRuntimeMode;
@@ -407,6 +408,9 @@ const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x107d74;
 const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.72;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.96;
+const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 520;
+const LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS = 112;
+const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
 const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
 const LEGACY_PLAYER_MARKER_HALO = 0x00b84a;
 const LEGACY_PLAYER_MARKER_CORE = 0x36ff7d;
@@ -484,6 +488,11 @@ export class MenuScene extends Phaser.Scene {
   private pendingOverlayMazeRebuild = false;
   private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();
   private playMoveTimer: Phaser.Time.TimerEvent | null = null;
+  private playDiagonalMoveQueue: Array<{ deltaX: number; deltaY: number }> = [];
+  private playDiagonalMoveTimer: Phaser.Time.TimerEvent | null = null;
+  private playHeldTouchControl: HumanInputActionKind | null = null;
+  private playHeldTouchPointerId: number | null = null;
+  private playHeldTouchRepeatTimer: Phaser.Time.TimerEvent | null = null;
   private playPointerStart: LegacyPlayPointerStart | null = null;
   private titleText!: Phaser.GameObjects.Text;
   private titleShadow!: Phaser.GameObjects.Text;
@@ -788,6 +797,12 @@ export class MenuScene extends Phaser.Scene {
           },
           pendingTimerActive: this.playMoveTimer !== null,
           pointerStartActive: this.playPointerStart !== null,
+          touchSprint: {
+            heldControl: this.playHeldTouchControl,
+            pendingStepCount: this.playDiagonalMoveQueue.length,
+            repeatTimerActive: this.playHeldTouchRepeatTimer !== null,
+            stepTimerActive: this.playDiagonalMoveTimer !== null
+          },
           resolvedVector: resolveLegacyPlayMoveVector(this.playMoveFlags),
           simultaneousDelayMs: LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS
         },
@@ -1273,7 +1288,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyPlayPointerDown(pointer: Phaser.Input.Pointer): boolean {
-    if (this.handleLegacyPlayTouchControl(pointer.x, pointer.y)) {
+    if (this.handleLegacyPlayTouchControl(pointer.x, pointer.y, pointer.id)) {
       this.playPointerStart = null;
       return true;
     }
@@ -1282,7 +1297,7 @@ export class MenuScene extends Phaser.Scene {
     return false;
   }
 
-  private handleLegacyPlayTouchControl(x: number, y: number): boolean {
+  private handleLegacyPlayTouchControl(x: number, y: number, pointerId: number | null = null): boolean {
     if (this.mode !== 'play' || hasPendingLegacyResetRequest(this.pendingResetRequest)) {
       return false;
     }
@@ -1314,60 +1329,182 @@ export class MenuScene extends Phaser.Scene {
       case 'move_up_left':
         if (this.overlay === 'none') {
           this.resetLegacyPlayInputBuffer();
-          this.tryMovePlayerDiagonalSequence(-1, -1);
+          this.beginLegacyPlayHeldTouchMove(control, pointerId);
           return true;
         }
         return false;
       case 'move_up_right':
         if (this.overlay === 'none') {
           this.resetLegacyPlayInputBuffer();
-          this.tryMovePlayerDiagonalSequence(1, -1);
+          this.beginLegacyPlayHeldTouchMove(control, pointerId);
           return true;
         }
         return false;
       case 'move_down_right':
         if (this.overlay === 'none') {
           this.resetLegacyPlayInputBuffer();
-          this.tryMovePlayerDiagonalSequence(1, 1);
+          this.beginLegacyPlayHeldTouchMove(control, pointerId);
           return true;
         }
         return false;
       case 'move_down_left':
         if (this.overlay === 'none') {
           this.resetLegacyPlayInputBuffer();
-          this.tryMovePlayerDiagonalSequence(-1, 1);
+          this.beginLegacyPlayHeldTouchMove(control, pointerId);
           return true;
         }
         return false;
       case 'move_up':
         if (this.overlay === 'none') {
           this.resetLegacyPlayInputBuffer();
-          this.tryMovePlayer(0, -1);
+          this.beginLegacyPlayHeldTouchMove(control, pointerId);
           return true;
         }
         return false;
       case 'move_right':
         if (this.overlay === 'none') {
           this.resetLegacyPlayInputBuffer();
-          this.tryMovePlayer(1, 0);
+          this.beginLegacyPlayHeldTouchMove(control, pointerId);
           return true;
         }
         return false;
       case 'move_down':
         if (this.overlay === 'none') {
           this.resetLegacyPlayInputBuffer();
-          this.tryMovePlayer(0, 1);
+          this.beginLegacyPlayHeldTouchMove(control, pointerId);
           return true;
         }
         return false;
       case 'move_left':
         if (this.overlay === 'none') {
           this.resetLegacyPlayInputBuffer();
-          this.tryMovePlayer(-1, 0);
+          this.beginLegacyPlayHeldTouchMove(control, pointerId);
           return true;
         }
         return false;
       case null:
+        return false;
+      default:
+        return control satisfies never;
+    }
+  }
+
+  private beginLegacyPlayHeldTouchMove(control: HumanInputActionKind, pointerId: number | null): boolean {
+    this.clearLegacyPlayHeldTouchRepeat();
+    this.playHeldTouchControl = control;
+    this.playHeldTouchPointerId = Number.isFinite(pointerId ?? NaN) ? Math.round(pointerId ?? 0) : null;
+    const moved = this.performLegacyPlayTouchMove(control);
+    if (moved) {
+      this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS);
+    }
+    return moved;
+  }
+
+  private releaseLegacyPlayHeldTouchMove(): boolean {
+    if (this.playHeldTouchControl === null) {
+      return false;
+    }
+
+    this.clearLegacyPlayHeldTouchRepeat();
+    this.playHeldTouchControl = null;
+    this.playHeldTouchPointerId = null;
+    this.publishInteractionDiagnostics();
+    return true;
+  }
+
+  private clearLegacyPlayHeldTouchRepeat(): void {
+    this.playHeldTouchRepeatTimer?.remove(false);
+    this.playHeldTouchRepeatTimer = null;
+  }
+
+  private scheduleLegacyPlayHeldTouchRepeat(delayMs: number): void {
+    this.clearLegacyPlayHeldTouchRepeat();
+    this.playHeldTouchRepeatTimer = this.time.delayedCall(Math.max(0, Math.round(delayMs)), () => {
+      this.playHeldTouchRepeatTimer = null;
+      this.repeatLegacyPlayHeldTouchMove();
+    });
+  }
+
+  private repeatLegacyPlayHeldTouchMove(): void {
+    if (
+      this.playHeldTouchControl === null
+      || this.mode !== 'play'
+      || this.overlay !== 'none'
+      || hasPendingLegacyResetRequest(this.pendingResetRequest)
+      || !this.isLegacyPlayHeldTouchPointerStillDown()
+    ) {
+      this.playHeldTouchControl = null;
+      this.playHeldTouchPointerId = null;
+      this.clearLegacyPlayHeldTouchRepeat();
+      this.publishInteractionDiagnostics();
+      return;
+    }
+
+    if (this.playDiagonalMoveTimer !== null || this.playDiagonalMoveQueue.length > 0) {
+      this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS);
+      return;
+    }
+
+    const moved = this.performLegacyPlayTouchMove(this.playHeldTouchControl);
+    if (!moved) {
+      this.playHeldTouchControl = null;
+      this.playHeldTouchPointerId = null;
+      this.clearLegacyPlayHeldTouchRepeat();
+      this.publishInteractionDiagnostics();
+      return;
+    }
+
+    this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS);
+  }
+
+  private isLegacyPlayHeldTouchPointerStillDown(): boolean {
+    const pointerId = this.playHeldTouchPointerId;
+    const managerPointers = (this.input.manager as Phaser.Input.InputManager & {
+      pointers?: Phaser.Input.Pointer[];
+    }).pointers ?? [];
+    const candidates = [
+      this.input.activePointer,
+      ...managerPointers
+    ].filter((pointer): pointer is Phaser.Input.Pointer => pointer !== undefined && pointer !== null);
+
+    if (pointerId === null) {
+      return candidates.some((pointer) => pointer.isDown);
+    }
+
+    return candidates.some((pointer) => {
+      const pointerIdentity = pointer as Phaser.Input.Pointer & {
+        identifier?: number | null;
+        pointerId?: number | null;
+      };
+      return pointer.isDown && (
+        pointer.id === pointerId
+        || pointerIdentity.identifier === pointerId
+        || pointerIdentity.pointerId === pointerId
+      );
+    });
+  }
+
+  private performLegacyPlayTouchMove(control: HumanInputActionKind): boolean {
+    switch (control) {
+      case 'move_up':
+        return this.tryMovePlayer(0, -1);
+      case 'move_up_right':
+        return this.startLegacyPlayDiagonalSprint(1, -1);
+      case 'move_right':
+        return this.tryMovePlayer(1, 0);
+      case 'move_down_right':
+        return this.startLegacyPlayDiagonalSprint(1, 1);
+      case 'move_down':
+        return this.tryMovePlayer(0, 1);
+      case 'move_down_left':
+        return this.startLegacyPlayDiagonalSprint(-1, 1);
+      case 'move_left':
+        return this.tryMovePlayer(-1, 0);
+      case 'move_up_left':
+        return this.startLegacyPlayDiagonalSprint(-1, -1);
+      case 'pause':
+      case 'restart_attempt':
+      case 'toggle_thoughts':
         return false;
       default:
         return control satisfies never;
@@ -1398,6 +1535,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyPlayPointerUp(pointer: Phaser.Input.Pointer): boolean {
+    if (this.releaseLegacyPlayHeldTouchMove()) {
+      return true;
+    }
+
     if (this.playPointerStart === null) {
       return false;
     }
@@ -1463,6 +1604,12 @@ export class MenuScene extends Phaser.Scene {
   private resetLegacyPlayInputBuffer(): void {
     this.playMoveTimer?.remove(false);
     this.playMoveTimer = null;
+    this.playDiagonalMoveTimer?.remove(false);
+    this.playDiagonalMoveTimer = null;
+    this.playDiagonalMoveQueue = [];
+    this.clearLegacyPlayHeldTouchRepeat();
+    this.playHeldTouchControl = null;
+    this.playHeldTouchPointerId = null;
     this.playMoveFlags = createLegacyPlayMoveFlags();
     this.playPointerStart = null;
   }
@@ -1772,37 +1919,62 @@ export class MenuScene extends Phaser.Scene {
     return true;
   }
 
-  private tryMovePlayerDiagonalSequence(deltaX: number, deltaY: number): boolean {
+  private startLegacyPlayDiagonalSprint(deltaX: number, deltaY: number): boolean {
     if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
       return false;
     }
 
-    const nextStep = advanceLegacyPlayDiagonalSequence({
+    const plan = resolveLegacyPlayDiagonalSequenceSteps({
       maze: this.maze,
       player: this.player,
       trail: this.trail,
       deltaX,
       deltaY,
       toggleTrailFade: this.settings.toggleTrailFade,
-      trailFadeTail: TRAIL_FADE_TAIL
+      trailFadeTail: TRAIL_FADE_TAIL,
+      maxSteps: 1
     });
-    if (!nextStep.moved) {
+    if (!plan.moved || plan.steps.length === 0) {
       return false;
     }
 
-    this.player = nextStep.player;
-    this.trail = nextStep.trail;
-    if (this.settings.toggleCameraFollow) {
-      this.boardStaticDirty = true;
+    this.playDiagonalMoveTimer?.remove(false);
+    this.playDiagonalMoveTimer = null;
+    this.playDiagonalMoveQueue = [...plan.steps];
+    return this.consumeLegacyPlayDiagonalSprintStep();
+  }
+
+  private consumeLegacyPlayDiagonalSprintStep(): boolean {
+    this.playDiagonalMoveTimer?.remove(false);
+    this.playDiagonalMoveTimer = null;
+
+    if (
+      this.mode !== 'play'
+      || this.overlay !== 'none'
+      || hasPendingLegacyResetRequest(this.pendingResetRequest)
+    ) {
+      this.playDiagonalMoveQueue = [];
+      return false;
     }
 
-    if (nextStep.reachedGoal) {
-      this.schedulePlayResetReturn();
+    const nextDelta = this.playDiagonalMoveQueue.shift() ?? null;
+    if (nextDelta === null) {
+      return false;
     }
 
-    this.boardDynamicDirty = true;
-    this.publishInteractionDiagnostics();
-    return true;
+    const moved = this.tryMovePlayer(nextDelta.deltaX, nextDelta.deltaY);
+    if (!moved || hasPendingLegacyResetRequest(this.pendingResetRequest)) {
+      this.playDiagonalMoveQueue = [];
+      return moved;
+    }
+
+    if (this.playDiagonalMoveQueue.length > 0) {
+      this.playDiagonalMoveTimer = this.time.delayedCall(LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS, () => {
+        this.consumeLegacyPlayDiagonalSprintStep();
+      });
+    }
+
+    return moved;
   }
 
   private schedulePlayResetReturn(): void {

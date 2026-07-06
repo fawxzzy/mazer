@@ -33,6 +33,12 @@ export interface LegacyPlayDiagonalSequenceInput extends LegacyPlayStepInput {
   maxSteps?: number;
 }
 
+export interface LegacyPlayDiagonalSequencePlan {
+  moved: boolean;
+  reachedGoal: boolean;
+  steps: Array<{ deltaX: number; deltaY: number }>;
+}
+
 export interface LegacyPointerMoveInput {
   boardBounds?: {
     bottom: number;
@@ -222,7 +228,7 @@ export const advanceLegacyPlayStep = ({
   };
 };
 
-export const advanceLegacyPlayDiagonalSequence = ({
+export const resolveLegacyPlayDiagonalSequenceSteps = ({
   deltaX,
   deltaY,
   maxSteps,
@@ -231,11 +237,11 @@ export const advanceLegacyPlayDiagonalSequence = ({
   toggleTrailFade,
   trail,
   trailFadeTail = LEGACY_PLAY_TRAIL_FADE_TAIL
-}: LegacyPlayDiagonalSequenceInput): LegacyPlayStepResult => {
+}: LegacyPlayDiagonalSequenceInput): LegacyPlayDiagonalSequencePlan => {
   const normalizedX = normalizeDelta(deltaX);
   const normalizedY = normalizeDelta(deltaY);
   if (normalizedX === 0 || normalizedY === 0) {
-    return advanceLegacyPlayStep({
+    const singleStep = advanceLegacyPlayStep({
       deltaX: normalizedX,
       deltaY: normalizedY,
       maze,
@@ -244,24 +250,37 @@ export const advanceLegacyPlayDiagonalSequence = ({
       trail,
       trailFadeTail
     });
+    return {
+      moved: singleStep.moved,
+      reachedGoal: singleStep.reachedGoal,
+      steps: singleStep.moved ? [{ deltaX: normalizedX, deltaY: normalizedY }] : []
+    };
   }
 
   const horizontal = { deltaX: normalizedX, deltaY: 0 };
   const vertical = { deltaX: 0, deltaY: normalizedY };
-  const stepLimit = Math.max(2, Math.round(maxSteps ?? maze.size * 2));
+  const stepLimit = Math.max(1, Math.round(maxSteps ?? maze.size * 2));
   let currentPlayer = copyPoint(player);
   let currentTrail = trail.map(copyPoint);
   let reachedGoal = false;
-  let movedAny = false;
+  const steps: Array<{ deltaX: number; deltaY: number }> = [];
   let preferHorizontalFirst = true;
 
   const resolveOrder = (
-    order: Array<{ deltaX: number; deltaY: number }>
-  ): { movedCount: number; player: LegacyPoint; reachedGoal: boolean; trail: LegacyPoint[] } => {
+    order: Array<{ deltaX: number; deltaY: number }>,
+    remainingSteps: number
+  ): {
+    movedCount: number;
+    player: LegacyPoint;
+    reachedGoal: boolean;
+    steps: Array<{ deltaX: number; deltaY: number }>;
+    trail: LegacyPoint[];
+  } => {
     let orderPlayer = copyPoint(currentPlayer);
     let orderTrail = currentTrail.map(copyPoint);
     let orderReachedGoal = false;
     let movedCount = 0;
+    const orderSteps: Array<{ deltaX: number; deltaY: number }> = [];
 
     for (const delta of order) {
       const next = advanceLegacyPlayStep({
@@ -278,10 +297,11 @@ export const advanceLegacyPlayDiagonalSequence = ({
       }
 
       movedCount += 1;
+      orderSteps.push({ deltaX: delta.deltaX, deltaY: delta.deltaY });
       orderPlayer = next.player;
       orderTrail = next.trail;
       orderReachedGoal = next.reachedGoal;
-      if (orderReachedGoal) {
+      if (orderReachedGoal || movedCount >= remainingSteps) {
         break;
       }
     }
@@ -290,21 +310,23 @@ export const advanceLegacyPlayDiagonalSequence = ({
       movedCount,
       player: orderPlayer,
       reachedGoal: orderReachedGoal,
+      steps: orderSteps,
       trail: orderTrail
     };
   };
 
-  for (let step = 0; step < stepLimit && !reachedGoal; step += 1) {
+  while (steps.length < stepLimit && !reachedGoal) {
+    const remainingSteps = stepLimit - steps.length;
     const firstOrder = preferHorizontalFirst ? [horizontal, vertical] : [vertical, horizontal];
     const secondOrder = preferHorizontalFirst ? [vertical, horizontal] : [horizontal, vertical];
-    const firstResult = resolveOrder(firstOrder);
-    const secondResult = resolveOrder(secondOrder);
+    const firstResult = resolveOrder(firstOrder, remainingSteps);
+    const secondResult = resolveOrder(secondOrder, remainingSteps);
     const chosen = secondResult.movedCount > firstResult.movedCount ? secondResult : firstResult;
     if (chosen.movedCount === 0) {
       break;
     }
 
-    movedAny = true;
+    steps.push(...chosen.steps);
     currentPlayer = chosen.player;
     currentTrail = chosen.trail;
     reachedGoal = chosen.reachedGoal;
@@ -312,7 +334,60 @@ export const advanceLegacyPlayDiagonalSequence = ({
   }
 
   return {
-    moved: movedAny,
+    moved: steps.length > 0,
+    reachedGoal,
+    steps
+  };
+};
+
+export const advanceLegacyPlayDiagonalSequence = ({
+  deltaX,
+  deltaY,
+  maxSteps,
+  maze,
+  player,
+  toggleTrailFade,
+  trail,
+  trailFadeTail = LEGACY_PLAY_TRAIL_FADE_TAIL
+}: LegacyPlayDiagonalSequenceInput): LegacyPlayStepResult => {
+  const plan = resolveLegacyPlayDiagonalSequenceSteps({
+    deltaX,
+    deltaY,
+    maxSteps,
+    maze,
+    player,
+    toggleTrailFade,
+    trail,
+    trailFadeTail
+  });
+  let currentPlayer = copyPoint(player);
+  let currentTrail = trail.map(copyPoint);
+  let reachedGoal = false;
+
+  for (const step of plan.steps) {
+    const next = advanceLegacyPlayStep({
+      deltaX: step.deltaX,
+      deltaY: step.deltaY,
+      maze,
+      player: currentPlayer,
+      toggleTrailFade,
+      trail: currentTrail,
+      trailFadeTail
+    });
+    if (!next.moved) {
+      break;
+    }
+
+    currentPlayer = next.player;
+    currentTrail = next.trail;
+    reachedGoal = next.reachedGoal;
+    if (reachedGoal) {
+      break;
+    }
+  }
+
+  return {
+    moved: plan.moved,
     player: currentPlayer,
     reachedGoal,
     trail: currentTrail

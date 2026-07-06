@@ -9,6 +9,7 @@ import {
   LEGACY_PLAY_TRAIL_FADE_TAIL,
   LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
   resolveLegacyPointerMoveVector,
+  resolveLegacyPlayDiagonalSequenceSteps,
   resolveLegacyPlayCollisionDelta,
   resolveLegacyPlayMoveVector
 } from '../../src/legacy-runtime/legacyPlayStep';
@@ -307,6 +308,35 @@ describe('legacy play step', () => {
     ]);
   });
 
+  test('plans a single touch diagonal command as visible cardinal substeps', () => {
+    const maze: LegacyMazeSnapshot = {
+      ...createTestMaze(),
+      grid: [
+        [false, false, false, false, false],
+        [false, true, false, false, false],
+        [false, true, true, false, false],
+        [false, false, true, false, false],
+        [false, false, false, false, false]
+      ],
+      goal: { x: 2, y: 3 }
+    };
+
+    expect(resolveLegacyPlayDiagonalSequenceSteps({
+      maze,
+      player: { x: 1, y: 1 },
+      trail: [{ x: 1, y: 1 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false,
+      maxSteps: 1
+    })).toMatchObject({
+      moved: true,
+      steps: [
+        { deltaX: 0, deltaY: 1 }
+      ]
+    });
+  });
+
   test('walks a touch diagonal sequence through the alternate cardinal order when that opens first', () => {
     const maze: LegacyMazeSnapshot = {
       ...createTestMaze(),
@@ -379,7 +409,7 @@ describe('legacy play step', () => {
       deltaX: 1,
       deltaY: 1,
       toggleTrailFade: false,
-      maxSteps: 1
+      maxSteps: 2
     });
 
     expect(alternate.moved).toBe(true);

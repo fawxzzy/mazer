@@ -290,6 +290,12 @@ describe('menu runtime diagnostics', () => {
           },
           pendingTimerActive: true,
           pointerStartActive: false,
+          touchSprint: {
+            heldControl: null,
+            pendingStepCount: 0,
+            repeatTimerActive: false,
+            stepTimerActive: false
+          },
           resolvedVector: {
             deltaX: 1,
             deltaY: 1

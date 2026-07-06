@@ -101,6 +101,12 @@ export interface MenuSceneRuntimeDiagnostics {
       };
       pendingTimerActive: boolean;
       pointerStartActive: boolean;
+      touchSprint: {
+        heldControl: string | null;
+        pendingStepCount: number;
+        repeatTimerActive: boolean;
+        stepTimerActive: boolean;
+      };
       resolvedVector: {
         deltaX: number;
         deltaY: number;
