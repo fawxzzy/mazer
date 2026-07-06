@@ -203,8 +203,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_HALO = 0xffd45a;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_CORE = 0xf8fbff;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_HALO = 0x22c55e;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_CORE = 0xdcffe7;');
     expect(menuSceneSource).toContain('const dynamicTrailKeys = new Set(trail.map((point) => `${point.x},${point.y}`));');
     expect(menuSceneSource).toContain('this.fillLegacyMenuDynamicPathTile(');
     expect(menuSceneSource).toContain('const connectedLeft = trailKeys.has(`${point.x - 1},${point.y}`);');
@@ -224,6 +224,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');");
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95, 'goal');");
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_CORE = 0xff263f;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xd81b2a;');
     expect(menuSceneSource).toContain('resolveLegacyEndpointMarkerRenderMetrics(tileSize);');
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, markerMetrics.outerRadius);');
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineTo(centerX + markerMetrics.outerRadius, centerY);');
