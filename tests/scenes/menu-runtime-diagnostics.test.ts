@@ -302,6 +302,12 @@ describe('menu runtime diagnostics', () => {
           screenX: 35,
           screenY: 105
         },
+        goal: {
+          x: 47,
+          y: 46,
+          screenX: 1735,
+          screenY: 1715
+        },
         markerStyle: {
           goalCoreColor: 0xff263f,
           goalEdgeColor: 0xd81b2a,

@@ -789,6 +789,12 @@ export class MenuScene extends Phaser.Scene {
           screenX: this.layout.boardLeft + boardOffset.x + ((this.player.x + 0.5) * this.layout.tileSize),
           screenY: this.layout.boardTop + boardOffset.y + ((this.player.y + 0.5) * this.layout.tileSize)
         },
+        goal: {
+          x: this.maze.goal.x,
+          y: this.maze.goal.y,
+          screenX: this.layout.boardLeft + boardOffset.x + ((this.maze.goal.x + 0.5) * this.layout.tileSize),
+          screenY: this.layout.boardTop + boardOffset.y + ((this.maze.goal.y + 0.5) * this.layout.tileSize)
+        },
         markerStyle: {
           goalCoreColor: LEGACY_PLAY_GOAL_MARKER_CORE,
           goalEdgeColor: LEGACY_PLAY_GOAL_MARKER_EDGE,
@@ -2164,16 +2170,20 @@ export class MenuScene extends Phaser.Scene {
 
     const shadowRadius = Math.min(tileSize * 0.5, playerMetrics.haloRadius + playerMetrics.strokeWidth);
 
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.58, alpha * 0.58));
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.36, alpha * 0.36));
     this.boardDynamicGraphics.fillCircle(centerX, centerY, shadowRadius);
-    this.boardDynamicGraphics.lineStyle(playerMetrics.strokeWidth, LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.82, alpha * 0.82));
+    this.boardDynamicGraphics.lineStyle(playerMetrics.strokeWidth, LEGACY_PLAYER_MARKER_HALO, Math.min(0.95, alpha * 0.95));
     this.boardDynamicGraphics.strokeCircle(centerX, centerY, playerMetrics.haloRadius + playerMetrics.strokeWidth);
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_HALO, Math.min(0.78, alpha * 0.78));
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_HALO, Math.min(0.92, alpha * 0.92));
     this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.haloRadius);
-    this.boardDynamicGraphics.lineStyle(playerMetrics.strokeWidth, LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.72, alpha * 0.72));
-    this.boardDynamicGraphics.strokeCircle(centerX, centerY, playerMetrics.coreRadius + 1);
     this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_CORE, alpha);
-    this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.coreRadius);
+    this.boardDynamicGraphics.beginPath();
+    this.boardDynamicGraphics.moveTo(centerX, centerY - playerMetrics.coreRadius);
+    this.boardDynamicGraphics.lineTo(centerX + playerMetrics.coreRadius, centerY);
+    this.boardDynamicGraphics.lineTo(centerX, centerY + playerMetrics.coreRadius);
+    this.boardDynamicGraphics.lineTo(centerX - playerMetrics.coreRadius, centerY);
+    this.boardDynamicGraphics.closePath();
+    this.boardDynamicGraphics.fillPath();
 
     if (!showLocatorTicks) {
       return;

@@ -1,6 +1,7 @@
 import { copyFile, unlink, writeFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inflateSync } from 'node:zlib';
 import { chromium } from 'playwright';
 import {
   DEFAULT_BASE_URL,
@@ -323,12 +324,30 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
         }
       : null
   );
-  const player = visualRuntime?.player ?? runtime?.play?.player ?? runtime?.player ?? null;
+  const player = runtime?.play?.player ?? visualRuntime?.player ?? runtime?.player ?? null;
   const telemetrySummary = runtime?.telemetry?.summary ?? null;
   const telemetryEvents = Array.isArray(runtime?.telemetry?.events) ? runtime.telemetry.events : [];
   const projection = runtime?.projection ?? null;
   const feed = runtime?.feed ?? null;
   const playMetrics = telemetrySummary?.playMetrics ?? null;
+  const goal = runtime?.play?.goal ?? visualRuntime?.goal ?? runtime?.goal ?? null;
+  const playBoard = runtime?.play?.board ?? null;
+  const resolveScreenCoordinate = (point, axis) => {
+    const screenKey = axis === 'x' ? 'screenX' : 'screenY';
+    if (Number.isFinite(point?.[screenKey])) {
+      return point[screenKey];
+    }
+
+    const boardOrigin = axis === 'x'
+      ? playBoard?.left ?? visual?.board?.bounds?.left ?? null
+      : playBoard?.top ?? visual?.board?.bounds?.top ?? null;
+    const tileSize = playBoard?.tileSize ?? visual?.board?.tileSize ?? null;
+    if (!Number.isFinite(point?.[axis]) || !Number.isFinite(boardOrigin) || !Number.isFinite(tileSize)) {
+      return null;
+    }
+
+    return boardOrigin + ((point[axis] + 0.5) * tileSize);
+  };
   const controlUsedCount = Math.max(
     telemetrySummary?.eventCounts?.control_used ?? 0,
     telemetryEvents.filter((event) => event?.kind === 'control_used').length
@@ -361,9 +380,11 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
           visibleEntryCount: feed.visibleEntryCount ?? null
         }
       : null,
-    playBoard: runtime?.play?.board
+    playBoard: playBoard
       ? {
-          tileSize: runtime.play.board.tileSize ?? null
+          left: playBoard.left ?? null,
+          top: playBoard.top ?? null,
+          tileSize: playBoard.tileSize ?? null
         }
       : null,
     input: runtime?.input
@@ -426,8 +447,16 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
       ? {
           x: Number.isFinite(player.x) ? player.x : null,
           y: Number.isFinite(player.y) ? player.y : null,
-          screenX: Number.isFinite(player.screenX) ? player.screenX : null,
-          screenY: Number.isFinite(player.screenY) ? player.screenY : null
+          screenX: resolveScreenCoordinate(player, 'x'),
+          screenY: resolveScreenCoordinate(player, 'y')
+        }
+      : null,
+    goal: goal
+      ? {
+          x: Number.isFinite(goal.x) ? goal.x : null,
+          y: Number.isFinite(goal.y) ? goal.y : null,
+          screenX: resolveScreenCoordinate(goal, 'x'),
+          screenY: resolveScreenCoordinate(goal, 'y')
         }
       : null
   };
@@ -525,6 +554,164 @@ export const resolvePlayMarkerStyleVerdict = (state) => {
           tileSize: Number.isFinite(tileSize) ? tileSize : null
         }
       : null
+  };
+};
+
+const parsePngRgba = (pngBytes) => {
+  const bytes = Buffer.from(pngBytes);
+  const signature = '89504e470d0a1a0a';
+  if (bytes.subarray(0, 8).toString('hex') !== signature) {
+    throw new Error('Marker pixel proof expected a PNG screenshot.');
+  }
+
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  const idatChunks = [];
+  let offset = 8;
+  while (offset < bytes.length) {
+    const length = bytes.readUInt32BE(offset);
+    const type = bytes.subarray(offset + 4, offset + 8).toString('ascii');
+    const data = bytes.subarray(offset + 8, offset + 8 + length);
+    offset += 12 + length;
+
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8];
+      colorType = data[9];
+    } else if (type === 'IDAT') {
+      idatChunks.push(data);
+    } else if (type === 'IEND') {
+      break;
+    }
+  }
+
+  if (bitDepth !== 8 || (colorType !== 6 && colorType !== 2)) {
+    throw new Error(`Marker pixel proof only supports 8-bit RGB/RGBA PNG screenshots; received bitDepth=${bitDepth}, colorType=${colorType}.`);
+  }
+
+  const sourceChannels = colorType === 6 ? 4 : 3;
+  const stride = width * sourceChannels;
+  const inflated = inflateSync(Buffer.concat(idatChunks));
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  let sourceOffset = 0;
+  let previous = new Uint8Array(stride);
+
+  for (let row = 0; row < height; row += 1) {
+    const filter = inflated[sourceOffset];
+    sourceOffset += 1;
+    const current = Uint8Array.from(inflated.subarray(sourceOffset, sourceOffset + stride));
+    sourceOffset += stride;
+
+    for (let index = 0; index < stride; index += 1) {
+      const left = index >= sourceChannels ? current[index - sourceChannels] : 0;
+      const up = previous[index] ?? 0;
+      const upLeft = index >= sourceChannels ? previous[index - sourceChannels] ?? 0 : 0;
+      if (filter === 1) {
+        current[index] = (current[index] + left) & 0xff;
+      } else if (filter === 2) {
+        current[index] = (current[index] + up) & 0xff;
+      } else if (filter === 3) {
+        current[index] = (current[index] + Math.floor((left + up) / 2)) & 0xff;
+      } else if (filter === 4) {
+        const p = left + up - upLeft;
+        const pa = Math.abs(p - left);
+        const pb = Math.abs(p - up);
+        const pc = Math.abs(p - upLeft);
+        const paeth = pa <= pb && pa <= pc ? left : pb <= pc ? up : upLeft;
+        current[index] = (current[index] + paeth) & 0xff;
+      } else if (filter !== 0) {
+        throw new Error(`Marker pixel proof received unsupported PNG filter ${filter}.`);
+      }
+    }
+
+    for (let x = 0; x < width; x += 1) {
+      const sourceIndex = x * sourceChannels;
+      const targetIndex = ((row * width) + x) * 4;
+      rgba[targetIndex] = current[sourceIndex];
+      rgba[targetIndex + 1] = current[sourceIndex + 1];
+      rgba[targetIndex + 2] = current[sourceIndex + 2];
+      rgba[targetIndex + 3] = sourceChannels === 4 ? current[sourceIndex + 3] : 255;
+    }
+
+    previous = current;
+  }
+
+  return {
+    width,
+    height,
+    rgba
+  };
+};
+
+export const sampleScreenshotMarkerPixels = async (page, state) => {
+  const screenshot = await page.screenshot({
+    fullPage: false,
+    animations: 'disabled'
+  });
+  const image = parsePngRgba(screenshot);
+  const player = state?.player ?? null;
+  const goal = state?.goal ?? null;
+  const sampleRadius = Math.max(1, Math.ceil((state?.markerStyle?.playerHaloRadius ?? 2) + 1));
+  const samplePoint = (point, classifier) => {
+    if (!Number.isFinite(point?.screenX) || !Number.isFinite(point?.screenY)) {
+      return {
+        pass: false,
+        reason: 'missing-point',
+        matchCount: 0,
+        sampledCount: 0
+      };
+    }
+
+    const centerX = Math.round(point.screenX);
+    const centerY = Math.round(point.screenY);
+    let matchCount = 0;
+    let sampledCount = 0;
+    const colorCounts = new Map();
+    for (let y = centerY - sampleRadius; y <= centerY + sampleRadius; y += 1) {
+      for (let x = centerX - sampleRadius; x <= centerX + sampleRadius; x += 1) {
+        if (x < 0 || y < 0 || x >= image.width || y >= image.height) {
+          continue;
+        }
+        const pixelIndex = ((y * image.width) + x) * 4;
+        const red = image.rgba[pixelIndex];
+        const green = image.rgba[pixelIndex + 1];
+        const blue = image.rgba[pixelIndex + 2];
+        const alpha = image.rgba[pixelIndex + 3];
+        if (alpha > 0) {
+          sampledCount += 1;
+          const colorKey = `${red},${green},${blue},${alpha}`;
+          colorCounts.set(colorKey, (colorCounts.get(colorKey) ?? 0) + 1);
+          if (classifier(red, green, blue, alpha)) {
+            matchCount += 1;
+          }
+        }
+      }
+    }
+
+    return {
+      pass: matchCount >= 3,
+      centerX,
+      centerY,
+      matchCount,
+      sampledCount,
+      topColors: [...colorCounts.entries()]
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 6)
+        .map(([rgba, count]) => ({ rgba, count }))
+    };
+  };
+
+  const playerSample = samplePoint(player, (red, green, blue) => green >= 170 && red <= 120 && blue >= 70);
+  const goalSample = samplePoint(goal, (red, green, blue) => red >= 180 && green <= 120 && blue <= 140);
+
+  return {
+    pass: playerSample.pass && goalSample.pass,
+    reason: playerSample.pass && goalSample.pass ? null : 'marker-pixel-mismatch',
+    player: playerSample,
+    goal: goalSample
   };
 };
 
@@ -997,6 +1184,23 @@ const runEdgeLiveInteraction = async ({
     throw error;
   }
 
+  const markerPixelVerdict = await sampleScreenshotMarkerPixels(page, finalState);
+  if (!markerPixelVerdict.pass) {
+    const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not render visible green player/red goal pixels: ${JSON.stringify(markerPixelVerdict)}`);
+    error.code = INTERACTIVE_PLAY_FAILURE_CODE;
+    error.failureStage = 'marker-pixels';
+    error.interaction = {
+      runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
+      baseline: baselineState,
+      timeline,
+      final: finalState,
+      restartTrailReset,
+      markerStyleVerdict,
+      markerPixelVerdict
+    };
+    throw error;
+  }
+
   return {
     runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
     inputKind: interaction.kind,
@@ -1014,6 +1218,7 @@ const runEdgeLiveInteraction = async ({
     input: finalState.input,
     restartTrailReset,
     markerStyleVerdict,
+    markerPixelVerdict,
     changed: hasInteractiveStateDelta(baselineState, finalState),
     mode: finalState.mode
   };
@@ -1901,6 +2106,7 @@ const buildMarkdownSummary = ({ runId, sourceMode, baseUrl, explicitUrl, presetG
       `- HUD state: ${interaction.hud ? `${interaction.hud.statusText ?? 'status-hidden'} | ${interaction.hud.nextRiskLabel ?? 'risk-hidden'}` : 'n/a'}`,
       `- Restart trail reset: ${interaction.restartTrailReset?.pass ? 'pass' : 'fail'} (${interaction.restartTrailReset?.beforeTrailSegmentCount ?? 'n/a'} -> ${interaction.restartTrailReset?.afterTrailSegmentCount ?? 'n/a'})`,
       `- Marker style: ${interaction.markerStyleVerdict?.pass ? 'pass' : 'fail'} (player ${interaction.markerStyleVerdict?.observed?.playerCoreColor ?? 'n/a'}, goal ${interaction.markerStyleVerdict?.observed?.goalCoreColor ?? 'n/a'}, haloRadius ${interaction.markerStyleVerdict?.observed?.playerHaloRadius ?? 'n/a'}, tile ${interaction.markerStyleVerdict?.observed?.tileSize ?? 'n/a'})`,
+      `- Marker pixels: ${interaction.markerPixelVerdict?.pass ? 'pass' : 'fail'} (player matches ${interaction.markerPixelVerdict?.player?.matchCount ?? 'n/a'}, goal matches ${interaction.markerPixelVerdict?.goal?.matchCount ?? 'n/a'})`,
       `- State changed: ${interaction.changed ? 'yes' : 'no'}`,
       '- Input timeline:'
     );

@@ -113,6 +113,12 @@ export interface MenuSceneRuntimeDiagnostics {
       screenX: number;
       screenY: number;
     };
+    goal: {
+      x: number;
+      y: number;
+      screenX: number;
+      screenY: number;
+    };
     markerStyle: {
       goalCoreColor: number;
       goalEdgeColor: number;

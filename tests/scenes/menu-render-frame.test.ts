@@ -211,7 +211,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player');
     expect(menuSceneSource).toContain('const centerX = originX + ((point.x + 0.5) * tileSize);');
     expect(menuSceneSource).toContain('resolveLegacyPlayerMarkerRenderMetrics(');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.coreRadius);');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineTo(centerX + playerMetrics.coreRadius, centerY);');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillPath();');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94, false);');
   });
 

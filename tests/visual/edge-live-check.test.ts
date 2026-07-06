@@ -435,6 +435,7 @@ describe('edge live check', () => {
       resolvePlayMarkerStyleVerdict,
       resolvePlayModeMovementKeyFromTrail,
       resolveRestartTrailResetVerdict,
+      sampleScreenshotMarkerPixels,
       summarizeEdgeLiveInteractiveState
     } = await loadEdgeLiveHelpers();
 
@@ -537,6 +538,12 @@ describe('edge live check', () => {
             playerCoreRadius: 2.38,
             playerHaloColor: 0x00b84a,
             playerHaloRadius: 3.22
+          },
+          goal: {
+            x: 44,
+            y: 1,
+            screenX: 332,
+            screenY: 258
           }
         }
       },
@@ -587,6 +594,12 @@ describe('edge live check', () => {
         playerCoreColor: 0x36ff7d,
         playerHaloColor: 0x00b84a
       },
+      goal: {
+        x: 44,
+        y: 1,
+        screenX: 332,
+        screenY: 258
+      },
       hud: {
         statusText: 'Gate timing ahead'
       },
@@ -601,6 +614,7 @@ describe('edge live check', () => {
         nextIndex: 10
       }
     });
+    expect(typeof sampleScreenshotMarkerPixels).toBe('function');
 
     expect(resolvePlayMarkerStyleVerdict(summarizeEdgeLiveInteractiveState({
       runtime: {
