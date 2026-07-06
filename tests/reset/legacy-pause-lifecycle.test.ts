@@ -27,7 +27,7 @@ describe('legacy pause lifecycle', () => {
     });
   });
 
-  test('preserves active trail history when pause reset returns the player to start', () => {
+  test('clears active trail history when pause reset returns the player to start', () => {
     const start = { x: 3, y: 4 };
     const currentTrail = [
       { x: 3, y: 4 },
@@ -39,12 +39,7 @@ describe('legacy pause lifecycle', () => {
       closesOverlay: true,
       enterMenu: false,
       nextPlayer: { x: 3, y: 4 },
-      nextTrail: [
-        { x: 3, y: 4 },
-        { x: 4, y: 4 },
-        { x: 5, y: 4 },
-        { x: 3, y: 4 }
-      ]
+      nextTrail: [{ x: 3, y: 4 }]
     });
 
     expect(resolveLegacyPauseCommand('reset-player', start, [{ x: 3, y: 4 }]).nextTrail).toEqual([

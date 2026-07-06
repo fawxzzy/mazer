@@ -35,8 +35,8 @@ export interface LegacyEndpointMarkerRenderMetrics {
   strokeWidth: number;
 }
 
-const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.14;
-const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.04;
+const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.18;
+const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.08;
 
 const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {
   if (tileSize <= 4) {
@@ -69,21 +69,21 @@ export const resolveLegacyPlayerMarkerRenderMetrics = (
   coreRatio: number,
   haloRatio: number
 ): LegacyPlayerMarkerRenderMetrics => {
-  const maxHaloRadius = Math.max(1, Math.ceil(tileSize * 0.56));
-  const maxCoreRadius = Math.max(1, Math.ceil(tileSize * 0.34));
+  const maxHaloRadius = Math.max(1, tileSize * 0.46);
+  const maxCoreRadius = Math.max(1, tileSize * 0.38);
   const haloRadius = Math.min(
     maxHaloRadius,
-    Math.max(tileSize <= 4 ? 2 : 2, Math.round(tileSize * haloRatio))
+    Math.max(1, tileSize * haloRatio)
   );
   const coreRadius = Math.min(
     maxCoreRadius,
-    Math.max(tileSize <= 4 ? 2 : 1, Math.round(tileSize * coreRatio))
+    Math.max(1, tileSize * coreRatio)
   );
 
   return {
     coreRadius,
     haloRadius,
-    strokeWidth: Math.max(1, Math.floor(tileSize * 0.12))
+    strokeWidth: Math.max(1, Math.min(2, Math.floor(tileSize * 0.12)))
   };
 };
 
@@ -92,13 +92,13 @@ export const resolveLegacyPlayerLocatorRenderMetrics = (
   haloRadius: number,
   strokeWidth: number
 ): LegacyPlayerLocatorRenderMetrics => {
-  const minimumOuterRadius = haloRadius + strokeWidth + 1;
-  const responsiveOuterRadius = Math.round(tileSize * (tileSize <= 4 ? 1.25 : 0.56));
-  const outerRadius = Math.max(minimumOuterRadius, responsiveOuterRadius);
-  const tickLength = Math.max(1, Math.round(tileSize * 0.22));
+  const maxOuterRadius = Math.max(1, tileSize * 0.48);
+  const responsiveOuterRadius = Math.max(haloRadius + (strokeWidth * 0.5), tileSize * 0.46);
+  const outerRadius = Math.min(maxOuterRadius, responsiveOuterRadius);
+  const tickLength = Math.min(Math.max(1, tileSize * 0.16), outerRadius * 0.52);
 
   return {
-    innerRadius: Math.max(haloRadius + 1, outerRadius - tickLength),
+    innerRadius: Math.max(0.5, outerRadius - tickLength),
     outerRadius,
     strokeWidth: Math.max(1, strokeWidth)
   };
@@ -108,8 +108,8 @@ export const resolveLegacyEndpointMarkerRenderMetrics = (
   tileSize: number
 ): LegacyEndpointMarkerRenderMetrics => {
   const strokeWidth = Math.max(1, Math.round(tileSize * 0.1));
-  const outerRadius = Math.max(tileSize <= 4 ? 4 : 3, Math.round(tileSize * 0.58));
-  const coreRadius = Math.max(tileSize <= 4 ? 2 : 2, Math.round(tileSize * 0.28));
+  const outerRadius = Math.max(1, tileSize * 0.48);
+  const coreRadius = Math.max(1, Math.min(tileSize * 0.28, outerRadius * 0.58));
 
   return {
     coreRadius,

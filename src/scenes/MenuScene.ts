@@ -367,12 +367,12 @@ const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
 const LEGACY_MENU_SLAB_FILL = 0x101824;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;
-const LEGACY_MENU_PATH_CORE = 0xd8e3dc;
-const LEGACY_MENU_PATH_EDGE = 0x253448;
-const LEGACY_MENU_PATH_EDGE_ALPHA = 0.86;
-const LEGACY_MENU_WALL_FILL = 0x121c29;
-const LEGACY_PLAY_PATH_EDGE = 0x203244;
-const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.64;
+const LEGACY_MENU_PATH_CORE = 0xe6f2eb;
+const LEGACY_MENU_PATH_EDGE = 0x304158;
+const LEGACY_MENU_PATH_EDGE_ALPHA = 0.9;
+const LEGACY_MENU_WALL_FILL = 0x0d1724;
+const LEGACY_PLAY_PATH_EDGE = 0x2b4258;
+const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.72;
 const LEGACY_PLAY_HUD_TIMER_PANE = 0x05050a;
 const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.18;
 const LEGACY_PLAY_HUD_TIMER_TEXT = '#d7f0d6';
@@ -392,12 +392,12 @@ const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x063448;
 const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.24;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.42;
 const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
-const LEGACY_PLAYER_MARKER_HALO = 0x22c55e;
-const LEGACY_PLAYER_MARKER_CORE = 0xdcffe7;
+const LEGACY_PLAYER_MARKER_HALO = 0x00b84a;
+const LEGACY_PLAYER_MARKER_CORE = 0x36ff7d;
 const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
-const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.2;
-const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.34;
+const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
+const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.46;
 const LEGACY_PLAY_START_MARKER_CORE = 0xfff1a6;
 const LEGACY_PLAY_GOAL_MARKER_CORE = 0xff263f;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xd81b2a;
@@ -2100,7 +2100,7 @@ export class MenuScene extends Phaser.Scene {
     const centerX = originX + ((point.x + 0.5) * tileSize);
     const centerY = originY + ((point.y + 0.5) * tileSize);
     const markerMetrics = resolveLegacyEndpointMarkerRenderMetrics(tileSize);
-    const shadowRadius = markerMetrics.outerRadius + markerMetrics.strokeWidth + 1;
+    const shadowRadius = Math.min(tileSize * 0.52, markerMetrics.outerRadius + markerMetrics.strokeWidth);
 
     this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.48, alpha * 0.48));
     this.boardDynamicGraphics.fillCircle(centerX, centerY, shadowRadius);
@@ -2141,7 +2141,7 @@ export class MenuScene extends Phaser.Scene {
       showLocatorTicks ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : LEGACY_PLAYER_MARKER_HALO_RATIO
     );
 
-    const shadowRadius = playerMetrics.haloRadius + playerMetrics.strokeWidth + 1;
+    const shadowRadius = Math.min(tileSize * 0.5, playerMetrics.haloRadius + playerMetrics.strokeWidth);
 
     this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.58, alpha * 0.58));
     this.boardDynamicGraphics.fillCircle(centerX, centerY, shadowRadius);

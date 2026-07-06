@@ -25,9 +25,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(resolveLegacyMenuPathRenderFrame(maze, { x: 1, y: 1 }, 20)).toEqual({
       leftInset: 0,
-      topInset: 2,
+      topInset: 3,
       width: 20,
-      height: 16
+      height: 14
     });
   });
 
@@ -42,10 +42,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     };
 
     expect(resolveLegacyMenuPathRenderFrame(maze, { x: 1, y: 1 }, 20)).toEqual({
-      leftInset: 2,
-      topInset: 2,
-      width: 16,
-      height: 18
+      leftInset: 3,
+      topInset: 3,
+      width: 14,
+      height: 17
     });
   });
 
@@ -62,15 +62,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(resolveLegacyMenuPathRenderFrames(maze, { x: 1, y: 1 }, 20)).toEqual({
       edge: {
         leftInset: 0,
-        topInset: 2,
-        width: 20,
-        height: 16
-      },
-      core: {
-        leftInset: 0,
         topInset: 3,
         width: 20,
         height: 14
+      },
+      core: {
+        leftInset: 0,
+        topInset: 4,
+        width: 20,
+        height: 12
       }
     });
   });
@@ -114,18 +114,18 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const segments = resolveLegacyMenuPathRenderSegments(maze, { x: 1, y: 1 }, 20);
 
     expect(segments.edge).toEqual([
-      { leftInset: 2, topInset: 2, width: 16, height: 16 },
-      { leftInset: 0, topInset: 2, width: 18, height: 16 },
-      { leftInset: 2, topInset: 2, width: 18, height: 16 },
-      { leftInset: 2, topInset: 0, width: 16, height: 18 },
-      { leftInset: 2, topInset: 2, width: 16, height: 18 }
-    ]);
-    expect(segments.core).toEqual([
       { leftInset: 3, topInset: 3, width: 14, height: 14 },
       { leftInset: 0, topInset: 3, width: 17, height: 14 },
       { leftInset: 3, topInset: 3, width: 17, height: 14 },
       { leftInset: 3, topInset: 0, width: 14, height: 17 },
       { leftInset: 3, topInset: 3, width: 14, height: 17 }
+    ]);
+    expect(segments.core).toEqual([
+      { leftInset: 4, topInset: 4, width: 12, height: 12 },
+      { leftInset: 0, topInset: 4, width: 16, height: 12 },
+      { leftInset: 4, topInset: 4, width: 16, height: 12 },
+      { leftInset: 4, topInset: 0, width: 12, height: 16 },
+      { leftInset: 4, topInset: 4, width: 12, height: 16 }
     ]);
   });
 
@@ -151,17 +151,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xd8e3dc;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x253448;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.86;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xe6f2eb;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x304158;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.9;');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x121c29;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x0d1724;');
     expect(menuSceneSource).toContain('if (isMenuMode && LEGACY_BOARD_GRID_ALPHA > 0) {');
     expect(menuSceneSource).toContain('Keep the board top-down: no pseudo bevel/highlight pass over the maze.');
     expect(menuSceneSource).toContain('? 0x0d1520');
-    expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.14;');
-    expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.04;');
+    expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.18;');
+    expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.08;');
     expect(legacyMenuRenderSource).toContain('const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);');
@@ -174,8 +174,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps active play maze rendering on connected corridors instead of square debug cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = 0x203244;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.64;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = 0x2b4258;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.72;');
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(pathColor, isMenuMode ? 0.92 : 0.96);');
@@ -203,8 +203,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_HALO = 0x22c55e;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_CORE = 0xdcffe7;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_HALO = 0x00b84a;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_CORE = 0x36ff7d;');
     expect(menuSceneSource).toContain('const dynamicTrailKeys = new Set(trail.map((point) => `${point.x},${point.y}`));');
     expect(menuSceneSource).toContain('this.fillLegacyMenuDynamicPathTile(');
     expect(menuSceneSource).toContain('const connectedLeft = trailKeys.has(`${point.x - 1},${point.y}`);');
@@ -231,8 +231,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineTo(centerX + markerMetrics.outerRadius, centerY);');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, true);');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.2;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.34;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.34;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.46;');
     expect(menuSceneSource).toContain('resolveLegacyPlayerLocatorRenderMetrics(');
     expect(menuSceneSource).toContain('drawLocatorTick(centerX - locatorMetrics.outerRadius, centerY, centerX - locatorMetrics.innerRadius, centerY);');
     expect(menuSceneSource).toContain('const playerScreenX = this.layout.boardLeft + boardOffset.x + ((this.player.x + 0.5) * this.layout.tileSize);');
@@ -245,47 +245,40 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.62, 3)).toBe(3);
     expect(resolveLegacyDynamicTrailStrokeWidth(3.265, 0.34, 2)).toBe(2);
     expect(resolveLegacyDynamicMarkerInset(3.265, 0.22)).toBe(0);
-    expect(resolveLegacyPlayerMarkerRenderMetrics(3.265, 0.34, 0.54)).toEqual({
-      coreRadius: 2,
-      haloRadius: 2,
-      strokeWidth: 1
-    });
-    expect(resolveLegacyPlayerMarkerRenderMetrics(7, 0.2, 0.34)).toEqual({
-      coreRadius: 1,
-      haloRadius: 2,
-      strokeWidth: 1
-    });
-    expect(resolveLegacyPlayerLocatorRenderMetrics(3.265, 2, 1)).toEqual({
-      innerRadius: 3,
-      outerRadius: 4,
-      strokeWidth: 1
-    });
-    expect(resolveLegacyEndpointMarkerRenderMetrics(3.265)).toEqual({
-      coreRadius: 2,
-      outerRadius: 4,
-      strokeWidth: 1
-    });
+    const tinyPlayer = resolveLegacyPlayerMarkerRenderMetrics(3.265, 0.34, 0.54);
+    expect(tinyPlayer.coreRadius).toBeCloseTo(1.11, 3);
+    expect(tinyPlayer.haloRadius).toBeCloseTo(1.502, 3);
+    expect(tinyPlayer.strokeWidth).toBe(1);
+    const phonePlayer = resolveLegacyPlayerMarkerRenderMetrics(7, 0.34, 0.46);
+    expect(phonePlayer.coreRadius).toBeCloseTo(2.38, 3);
+    expect(phonePlayer.haloRadius).toBeCloseTo(3.22, 3);
+    expect(phonePlayer.strokeWidth).toBe(1);
+    const tinyLocator = resolveLegacyPlayerLocatorRenderMetrics(3.265, tinyPlayer.haloRadius, tinyPlayer.strokeWidth);
+    expect(tinyLocator.innerRadius).toBeCloseTo(0.752, 3);
+    expect(tinyLocator.outerRadius).toBeCloseTo(1.567, 3);
+    expect(tinyLocator.strokeWidth).toBe(1);
+    const tinyEndpoint = resolveLegacyEndpointMarkerRenderMetrics(3.265);
+    expect(tinyEndpoint.coreRadius).toBeCloseTo(1, 3);
+    expect(tinyEndpoint.outerRadius).toBeCloseTo(1.567, 3);
+    expect(tinyEndpoint.strokeWidth).toBe(1);
   });
 
   test('keeps larger desktop tiles visibly weighted after responsive overlay sizing', () => {
     expect(resolveLegacyDynamicTrailStrokeWidth(18, 0.62, 3)).toBe(11);
     expect(resolveLegacyDynamicTrailStrokeWidth(18, 0.34, 2)).toBe(6);
     expect(resolveLegacyDynamicMarkerInset(18, 0.22)).toBe(3);
-    expect(resolveLegacyPlayerMarkerRenderMetrics(18, 0.34, 0.54)).toEqual({
-      coreRadius: 6,
-      haloRadius: 10,
-      strokeWidth: 2
-    });
-    expect(resolveLegacyPlayerLocatorRenderMetrics(18, 10, 2)).toEqual({
-      innerRadius: 11,
-      outerRadius: 13,
-      strokeWidth: 2
-    });
-    expect(resolveLegacyEndpointMarkerRenderMetrics(18)).toEqual({
-      coreRadius: 5,
-      outerRadius: 10,
-      strokeWidth: 2
-    });
+    const desktopPlayer = resolveLegacyPlayerMarkerRenderMetrics(18, 0.34, 0.54);
+    expect(desktopPlayer.coreRadius).toBeCloseTo(6.12, 3);
+    expect(desktopPlayer.haloRadius).toBeCloseTo(8.28, 3);
+    expect(desktopPlayer.strokeWidth).toBe(2);
+    const desktopLocator = resolveLegacyPlayerLocatorRenderMetrics(18, desktopPlayer.haloRadius, desktopPlayer.strokeWidth);
+    expect(desktopLocator.innerRadius).toBeCloseTo(5.76, 3);
+    expect(desktopLocator.outerRadius).toBeCloseTo(8.64, 3);
+    expect(desktopLocator.strokeWidth).toBe(2);
+    const desktopEndpoint = resolveLegacyEndpointMarkerRenderMetrics(18);
+    expect(desktopEndpoint.coreRadius).toBeCloseTo(5.011, 3);
+    expect(desktopEndpoint.outerRadius).toBeCloseTo(8.64, 3);
+    expect(desktopEndpoint.strokeWidth).toBe(2);
   });
 
   test('keeps mobile active-play swipes bound to one pointer identity', () => {
