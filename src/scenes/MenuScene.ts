@@ -157,6 +157,14 @@ interface MenuSceneVisualDiagnostics {
     safeBounds: VisualRect;
     tileSize: number;
   };
+  markerStyle: {
+    goalCoreColor: number;
+    goalEdgeColor: number;
+    playerCoreColor: number;
+    playerCoreRadius: number;
+    playerHaloColor: number;
+    playerHaloRadius: number;
+  };
   layout: {
     buttonHeight: number;
     buttonLayout: LegacyMenuLayout['buttonLayout'];
@@ -742,6 +750,11 @@ export class MenuScene extends Phaser.Scene {
       : Math.max(this.trail.length, this.menuDemoConfig?.behavior.trailMaxLength ?? this.trail.length);
     const boardOffset = this.resolveBoardOffset();
     const boardBounds = this.resolveLegacyPlayBoardBounds();
+    const playerMarkerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
+      this.layout.tileSize,
+      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : LEGACY_PLAYER_MARKER_RADIUS_RATIO,
+      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : LEGACY_PLAYER_MARKER_HALO_RATIO
+    );
 
     publishMenuSceneRuntimeDiagnostics({
       revision: this.runtimeDiagnosticsRevision,
@@ -775,6 +788,14 @@ export class MenuScene extends Phaser.Scene {
           y: this.player.y,
           screenX: this.layout.boardLeft + boardOffset.x + ((this.player.x + 0.5) * this.layout.tileSize),
           screenY: this.layout.boardTop + boardOffset.y + ((this.player.y + 0.5) * this.layout.tileSize)
+        },
+        markerStyle: {
+          goalCoreColor: LEGACY_PLAY_GOAL_MARKER_CORE,
+          goalEdgeColor: LEGACY_PLAY_GOAL_MARKER_EDGE,
+          playerCoreColor: LEGACY_PLAYER_MARKER_CORE,
+          playerCoreRadius: playerMarkerMetrics.coreRadius,
+          playerHaloColor: LEGACY_PLAYER_MARKER_HALO,
+          playerHaloRadius: playerMarkerMetrics.haloRadius
         }
       },
       menuDemo: {
@@ -3125,6 +3146,11 @@ export class MenuScene extends Phaser.Scene {
       rowCount: drawStageStaged ? this.maze.size : null
     });
     const touchControls = this.resolveLegacyPlayTouchControlDiagnostics();
+    const playerMarkerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
+      this.layout.tileSize,
+      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : LEGACY_PLAYER_MARKER_RADIUS_RATIO,
+      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : LEGACY_PLAYER_MARKER_HALO_RATIO
+    );
 
     this.visualDiagnosticsRevision += 1;
     const diagnostics: MenuSceneVisualDiagnostics = {
@@ -3276,6 +3302,14 @@ export class MenuScene extends Phaser.Scene {
         bounds: boardBounds,
         safeBounds,
         tileSize: this.layout.tileSize
+      },
+      markerStyle: {
+        goalCoreColor: LEGACY_PLAY_GOAL_MARKER_CORE,
+        goalEdgeColor: LEGACY_PLAY_GOAL_MARKER_EDGE,
+        playerCoreColor: LEGACY_PLAYER_MARKER_CORE,
+        playerCoreRadius: playerMarkerMetrics.coreRadius,
+        playerHaloColor: LEGACY_PLAYER_MARKER_HALO,
+        playerHaloRadius: playerMarkerMetrics.haloRadius
       },
       layout: {
         buttonHeight: this.layout.buttonHeight,

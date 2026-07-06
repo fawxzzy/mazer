@@ -226,6 +226,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95, 'goal');");
     expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_CORE = 0xff263f;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xd81b2a;');
+    expect(menuSceneSource).toContain('markerStyle: {');
+    expect(menuSceneSource).toContain('playerCoreColor: LEGACY_PLAYER_MARKER_CORE');
+    expect(menuSceneSource).toContain('playerHaloColor: LEGACY_PLAYER_MARKER_HALO');
+    expect(menuSceneSource).toContain('playerCoreRadius: playerMarkerMetrics.coreRadius');
+    expect(menuSceneSource).toContain('playerHaloRadius: playerMarkerMetrics.haloRadius');
     expect(menuSceneSource).toContain('resolveLegacyEndpointMarkerRenderMetrics(tileSize);');
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, markerMetrics.outerRadius);');
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineTo(centerX + markerMetrics.outerRadius, centerY);');

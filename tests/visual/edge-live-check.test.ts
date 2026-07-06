@@ -432,7 +432,9 @@ describe('edge live check', () => {
   test('summarizes interactive state and resolves movement keys from trail deltas', async () => {
     const {
       prioritizeMovementCandidates,
+      resolvePlayMarkerStyleVerdict,
       resolvePlayModeMovementKeyFromTrail,
+      resolveRestartTrailResetVerdict,
       summarizeEdgeLiveInteractiveState
     } = await loadEdgeLiveHelpers();
 
@@ -523,9 +525,30 @@ describe('edge live check', () => {
           step: 4,
           changeCount: 2,
           visibleEntryCount: 2
+        },
+        play: {
+          board: {
+            tileSize: 7
+          },
+          markerStyle: {
+            goalCoreColor: 0xff263f,
+            goalEdgeColor: 0xd81b2a,
+            playerCoreColor: 0x36ff7d,
+            playerCoreRadius: 2.38,
+            playerHaloColor: 0x00b84a,
+            playerHaloRadius: 3.22
+          }
         }
       },
       visual: {
+        markerStyle: {
+          goalCoreColor: 0xff263f,
+          goalEdgeColor: 0xd81b2a,
+          playerCoreColor: 0x36ff7d,
+          playerCoreRadius: 2.38,
+          playerHaloColor: 0x00b84a,
+          playerHaloRadius: 3.22
+        },
         intentFeed: {
           visible: true,
           compact: true,
@@ -555,6 +578,15 @@ describe('edge live check', () => {
         trailSegmentCap: 16,
         trailSegmentCount: 7
       },
+      playBoard: {
+        tileSize: 7
+      },
+      markerStyle: {
+        goalCoreColor: 0xff263f,
+        goalEdgeColor: 0xd81b2a,
+        playerCoreColor: 0x36ff7d,
+        playerHaloColor: 0x00b84a
+      },
       hud: {
         statusText: 'Gate timing ahead'
       },
@@ -568,6 +600,68 @@ describe('edge live check', () => {
       trail: {
         nextIndex: 10
       }
+    });
+
+    expect(resolvePlayMarkerStyleVerdict(summarizeEdgeLiveInteractiveState({
+      runtime: {
+        surface: {
+          mode: 'play',
+          overlay: 'none'
+        },
+        play: {
+          board: {
+            tileSize: 7
+          },
+          markerStyle: {
+            goalCoreColor: 0xff263f,
+            goalEdgeColor: 0xd81b2a,
+            playerCoreColor: 0x36ff7d,
+            playerCoreRadius: 2.38,
+            playerHaloColor: 0x00b84a,
+            playerHaloRadius: 3.22
+          }
+        },
+        telemetry: {
+          summary: {
+            eventCounts: {}
+          }
+        }
+      }
+    }))).toMatchObject({
+      pass: true,
+      colorMatches: true,
+      radiusFitsTile: true
+    });
+
+    expect(resolvePlayMarkerStyleVerdict(summarizeEdgeLiveInteractiveState({
+      runtime: {
+        surface: {
+          mode: 'play',
+          overlay: 'none'
+        },
+        play: {
+          board: {
+            tileSize: 7
+          },
+          markerStyle: {
+            goalCoreColor: 0xffffff,
+            goalEdgeColor: 0xd81b2a,
+            playerCoreColor: 0x000000,
+            playerCoreRadius: 4.5,
+            playerHaloColor: 0xffffff,
+            playerHaloRadius: 4.1
+          }
+        },
+        telemetry: {
+          summary: {
+            eventCounts: {}
+          }
+        }
+      }
+    }))).toMatchObject({
+      pass: false,
+      colorMatches: false,
+      radiusFitsTile: false
     });
 
     expect(summarizeEdgeLiveInteractiveState({
@@ -624,6 +718,46 @@ describe('edge live check', () => {
         screenX: 144,
         screenY: 176
       }
+    });
+
+    expect(resolveRestartTrailResetVerdict([
+      {
+        id: 'restart',
+        before: {
+          resources: {
+            trailSegmentCount: 7
+          }
+        },
+        after: {
+          resources: {
+            trailSegmentCount: 1
+          }
+        }
+      }
+    ])).toEqual({
+      pass: true,
+      beforeTrailSegmentCount: 7,
+      afterTrailSegmentCount: 1
+    });
+
+    expect(resolveRestartTrailResetVerdict([
+      {
+        id: 'restart',
+        before: {
+          resources: {
+            trailSegmentCount: 7
+          }
+        },
+        after: {
+          resources: {
+            trailSegmentCount: 4
+          }
+        }
+      }
+    ])).toEqual({
+      pass: false,
+      beforeTrailSegmentCount: 7,
+      afterTrailSegmentCount: 4
     });
   }, 15_000);
 

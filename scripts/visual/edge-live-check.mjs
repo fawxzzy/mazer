@@ -303,10 +303,18 @@ const resolveInteractiveSurfaceMode = (surface) => (
     : null
 );
 
+const EXPECTED_PLAY_MARKER_STYLE = Object.freeze({
+  goalCoreColor: 0xff263f,
+  goalEdgeColor: 0xd81b2a,
+  playerCoreColor: 0x36ff7d,
+  playerHaloColor: 0x00b84a
+});
+
 export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
   const runtime = diagnostics?.runtime ?? null;
   const visual = diagnostics?.visual ?? null;
   const visualRuntime = visual?.runtime ?? null;
+  const markerStyle = visual?.markerStyle ?? runtime?.play?.markerStyle ?? null;
   const surface = runtime?.surface ?? (
     visualRuntime
       ? {
@@ -353,6 +361,11 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
           visibleEntryCount: feed.visibleEntryCount ?? null
         }
       : null,
+    playBoard: runtime?.play?.board
+      ? {
+          tileSize: runtime.play.board.tileSize ?? null
+        }
+      : null,
     input: runtime?.input
       ? {
           acceptedCount: runtime.input.acceptedCount ?? 0,
@@ -391,6 +404,16 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
             trailSegmentCount: visualRuntime.trailLength ?? null
           }
         : null,
+    markerStyle: markerStyle
+      ? {
+          goalCoreColor: markerStyle.goalCoreColor ?? null,
+          goalEdgeColor: markerStyle.goalEdgeColor ?? null,
+          playerCoreColor: markerStyle.playerCoreColor ?? null,
+          playerCoreRadius: markerStyle.playerCoreRadius ?? null,
+          playerHaloColor: markerStyle.playerHaloColor ?? null,
+          playerHaloRadius: markerStyle.playerHaloRadius ?? null
+        }
+      : null,
     trail: visual?.trail
       ? {
           currentIndex: visual.trail.currentIndex ?? null,
@@ -455,6 +478,55 @@ export const resolvePlayModeMovementKeyFromTrail = (trail, rasterWidth = null) =
 const buildInteractiveStateSignature = (state) => JSON.stringify(state ?? null);
 
 const hasInteractiveStateDelta = (before, after) => buildInteractiveStateSignature(before) !== buildInteractiveStateSignature(after);
+
+export const resolveRestartTrailResetVerdict = (timeline) => {
+  const restartStep = Array.isArray(timeline)
+    ? timeline.find((step) => step?.id === 'restart')
+    : null;
+  const beforeCount = restartStep?.before?.resources?.trailSegmentCount ?? null;
+  const afterCount = restartStep?.after?.resources?.trailSegmentCount ?? null;
+  const pass = Number.isFinite(afterCount) && afterCount <= 1;
+
+  return {
+    pass,
+    beforeTrailSegmentCount: Number.isFinite(beforeCount) ? beforeCount : null,
+    afterTrailSegmentCount: Number.isFinite(afterCount) ? afterCount : null
+  };
+};
+
+export const resolvePlayMarkerStyleVerdict = (state) => {
+  const style = state?.markerStyle ?? null;
+  const tileSize = state?.playBoard?.tileSize ?? null;
+  const colorMatches = Boolean(style)
+    && style.goalCoreColor === EXPECTED_PLAY_MARKER_STYLE.goalCoreColor
+    && style.goalEdgeColor === EXPECTED_PLAY_MARKER_STYLE.goalEdgeColor
+    && style.playerCoreColor === EXPECTED_PLAY_MARKER_STYLE.playerCoreColor
+    && style.playerHaloColor === EXPECTED_PLAY_MARKER_STYLE.playerHaloColor;
+  const radiusFitsTile = Boolean(style)
+    && Number.isFinite(style.playerHaloRadius)
+    && style.playerHaloRadius > 0
+    && (
+      !Number.isFinite(tileSize)
+      || (style.playerHaloRadius * 2) <= (tileSize + 0.01)
+    );
+
+  return {
+    pass: colorMatches && radiusFitsTile,
+    colorMatches,
+    radiusFitsTile,
+    expected: EXPECTED_PLAY_MARKER_STYLE,
+    observed: style
+      ? {
+          goalCoreColor: style.goalCoreColor ?? null,
+          goalEdgeColor: style.goalEdgeColor ?? null,
+          playerCoreColor: style.playerCoreColor ?? null,
+          playerHaloColor: style.playerHaloColor ?? null,
+          playerHaloRadius: style.playerHaloRadius ?? null,
+          tileSize: Number.isFinite(tileSize) ? tileSize : null
+        }
+      : null
+  };
+};
 
 const buildMovementDelta = (before, after) => {
   const beforeTrail = before?.trail ?? null;
@@ -894,6 +966,37 @@ const runEdgeLiveInteraction = async ({
     throw error;
   }
 
+  const restartTrailReset = resolveRestartTrailResetVerdict(timeline);
+  if (timeline.some((step) => step.id === 'restart') && !restartTrailReset.pass) {
+    const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not clear trail on restart/reset.`);
+    error.code = INTERACTIVE_PLAY_FAILURE_CODE;
+    error.failureStage = 'restart-trail-reset';
+    error.interaction = {
+      runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
+      baseline: baselineState,
+      timeline,
+      final: finalState,
+      restartTrailReset
+    };
+    throw error;
+  }
+
+  const markerStyleVerdict = resolvePlayMarkerStyleVerdict(finalState);
+  if (!markerStyleVerdict.pass) {
+    const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not publish the expected green player/red goal marker style.`);
+    error.code = INTERACTIVE_PLAY_FAILURE_CODE;
+    error.failureStage = 'marker-style';
+    error.interaction = {
+      runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
+      baseline: baselineState,
+      timeline,
+      final: finalState,
+      restartTrailReset,
+      markerStyleVerdict
+    };
+    throw error;
+  }
+
   return {
     runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
     inputKind: interaction.kind,
@@ -909,6 +1012,8 @@ const runEdgeLiveInteraction = async ({
     failToRetryContinuation: finalState.failToRetryContinuation,
     hud: finalState.hud,
     input: finalState.input,
+    restartTrailReset,
+    markerStyleVerdict,
     changed: hasInteractiveStateDelta(baselineState, finalState),
     mode: finalState.mode
   };
@@ -1794,6 +1899,8 @@ const buildMarkdownSummary = ({ runId, sourceMode, baseUrl, explicitUrl, presetG
       `- Watch -> play switches: ${interaction.watchToPlaySwitchCount ?? 0}`,
       `- Input timing: ${interaction.input ? `accepted ${interaction.input.acceptedCount}, dropped ${interaction.input.droppedCount}, merged ${interaction.input.mergedCount}` : 'n/a'}`,
       `- HUD state: ${interaction.hud ? `${interaction.hud.statusText ?? 'status-hidden'} | ${interaction.hud.nextRiskLabel ?? 'risk-hidden'}` : 'n/a'}`,
+      `- Restart trail reset: ${interaction.restartTrailReset?.pass ? 'pass' : 'fail'} (${interaction.restartTrailReset?.beforeTrailSegmentCount ?? 'n/a'} -> ${interaction.restartTrailReset?.afterTrailSegmentCount ?? 'n/a'})`,
+      `- Marker style: ${interaction.markerStyleVerdict?.pass ? 'pass' : 'fail'} (player ${interaction.markerStyleVerdict?.observed?.playerCoreColor ?? 'n/a'}, goal ${interaction.markerStyleVerdict?.observed?.goalCoreColor ?? 'n/a'}, haloRadius ${interaction.markerStyleVerdict?.observed?.playerHaloRadius ?? 'n/a'}, tile ${interaction.markerStyleVerdict?.observed?.tileSize ?? 'n/a'})`,
       `- State changed: ${interaction.changed ? 'yes' : 'no'}`,
       '- Input timeline:'
     );

@@ -301,6 +301,14 @@ describe('menu runtime diagnostics', () => {
           y: 2,
           screenX: 35,
           screenY: 105
+        },
+        markerStyle: {
+          goalCoreColor: 0xff263f,
+          goalEdgeColor: 0xd81b2a,
+          playerCoreColor: 0x36ff7d,
+          playerCoreRadius: 2.38,
+          playerHaloColor: 0x00b84a,
+          playerHaloRadius: 3.22
         }
       },
       menuDemo: {

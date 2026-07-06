@@ -113,6 +113,14 @@ export interface MenuSceneRuntimeDiagnostics {
       screenX: number;
       screenY: number;
     };
+    markerStyle: {
+      goalCoreColor: number;
+      goalEdgeColor: number;
+      playerCoreColor: number;
+      playerCoreRadius: number;
+      playerHaloColor: number;
+      playerHaloRadius: number;
+    };
   };
   menuDemo?: {
     phase: string | null;
