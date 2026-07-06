@@ -29,6 +29,10 @@ export interface LegacyPlayStepResult {
   trail: LegacyPoint[];
 }
 
+export interface LegacyPlayDiagonalSequenceInput extends LegacyPlayStepInput {
+  maxSteps?: number;
+}
+
 export interface LegacyPointerMoveInput {
   boardBounds?: {
     bottom: number;
@@ -215,5 +219,102 @@ export const advanceLegacyPlayStep = ({
     player: nextPlayer,
     reachedGoal: nextPlayer.x === maze.goal.x && nextPlayer.y === maze.goal.y,
     trail: boundedTrail
+  };
+};
+
+export const advanceLegacyPlayDiagonalSequence = ({
+  deltaX,
+  deltaY,
+  maxSteps,
+  maze,
+  player,
+  toggleTrailFade,
+  trail,
+  trailFadeTail = LEGACY_PLAY_TRAIL_FADE_TAIL
+}: LegacyPlayDiagonalSequenceInput): LegacyPlayStepResult => {
+  const normalizedX = normalizeDelta(deltaX);
+  const normalizedY = normalizeDelta(deltaY);
+  if (normalizedX === 0 || normalizedY === 0) {
+    return advanceLegacyPlayStep({
+      deltaX: normalizedX,
+      deltaY: normalizedY,
+      maze,
+      player,
+      toggleTrailFade,
+      trail,
+      trailFadeTail
+    });
+  }
+
+  const horizontal = { deltaX: normalizedX, deltaY: 0 };
+  const vertical = { deltaX: 0, deltaY: normalizedY };
+  const stepLimit = Math.max(2, Math.round(maxSteps ?? maze.size * 2));
+  let currentPlayer = copyPoint(player);
+  let currentTrail = trail.map(copyPoint);
+  let reachedGoal = false;
+  let movedAny = false;
+  let preferHorizontalFirst = true;
+
+  const resolveOrder = (
+    order: Array<{ deltaX: number; deltaY: number }>
+  ): { movedCount: number; player: LegacyPoint; reachedGoal: boolean; trail: LegacyPoint[] } => {
+    let orderPlayer = copyPoint(currentPlayer);
+    let orderTrail = currentTrail.map(copyPoint);
+    let orderReachedGoal = false;
+    let movedCount = 0;
+
+    for (const delta of order) {
+      const next = advanceLegacyPlayStep({
+        deltaX: delta.deltaX,
+        deltaY: delta.deltaY,
+        maze,
+        player: orderPlayer,
+        toggleTrailFade,
+        trail: orderTrail,
+        trailFadeTail
+      });
+      if (!next.moved) {
+        continue;
+      }
+
+      movedCount += 1;
+      orderPlayer = next.player;
+      orderTrail = next.trail;
+      orderReachedGoal = next.reachedGoal;
+      if (orderReachedGoal) {
+        break;
+      }
+    }
+
+    return {
+      movedCount,
+      player: orderPlayer,
+      reachedGoal: orderReachedGoal,
+      trail: orderTrail
+    };
+  };
+
+  for (let step = 0; step < stepLimit && !reachedGoal; step += 1) {
+    const firstOrder = preferHorizontalFirst ? [horizontal, vertical] : [vertical, horizontal];
+    const secondOrder = preferHorizontalFirst ? [vertical, horizontal] : [horizontal, vertical];
+    const firstResult = resolveOrder(firstOrder);
+    const secondResult = resolveOrder(secondOrder);
+    const chosen = secondResult.movedCount > firstResult.movedCount ? secondResult : firstResult;
+    if (chosen.movedCount === 0) {
+      break;
+    }
+
+    movedAny = true;
+    currentPlayer = chosen.player;
+    currentTrail = chosen.trail;
+    reachedGoal = chosen.reachedGoal;
+    preferHorizontalFirst = !preferHorizontalFirst;
+  }
+
+  return {
+    moved: movedAny,
+    player: currentPlayer,
+    reachedGoal,
+    trail: currentTrail
   };
 };

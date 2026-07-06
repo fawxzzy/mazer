@@ -41,9 +41,13 @@ export const applyHumanInputAction = (
 
   switch (action.kind) {
     case 'move_up':
+    case 'move_up_right':
     case 'move_down':
+    case 'move_down_right':
     case 'move_left':
+    case 'move_down_left':
     case 'move_right':
+    case 'move_up_left':
       return {
         ...nextState,
         movementCount: state.movementCount + 1

@@ -1,8 +1,12 @@
 export const HUMAN_INPUT_ACTION_KINDS = [
   'move_up',
+  'move_up_right',
   'move_down',
+  'move_down_right',
   'move_left',
+  'move_down_left',
   'move_right',
+  'move_up_left',
   'pause',
   'restart_attempt',
   'toggle_thoughts'
@@ -10,9 +14,13 @@ export const HUMAN_INPUT_ACTION_KINDS = [
 
 export const HUMAN_MOVEMENT_ACTION_KINDS = [
   'move_up',
+  'move_up_right',
   'move_down',
+  'move_down_right',
   'move_left',
-  'move_right'
+  'move_down_left',
+  'move_right',
+  'move_up_left'
 ] as const;
 
 export type HumanInputActionKind = (typeof HUMAN_INPUT_ACTION_KINDS)[number];

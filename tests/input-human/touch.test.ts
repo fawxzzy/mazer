@@ -33,6 +33,10 @@ describe('input-human touch bridge', () => {
     expect(layout.frame.left).toBeGreaterThan(80);
     expect(layout.frame.right).toBeLessThan(310);
     expect(layout.controls.move_up.width).toBeGreaterThanOrEqual(44);
+    expect(layout.controls.move_up_left.centerX).toBeLessThan(layout.controls.move_up.centerX);
+    expect(layout.controls.move_up_right.centerX).toBeGreaterThan(layout.controls.move_up.centerX);
+    expect(layout.controls.move_down_left.centerY).toBeGreaterThan(layout.controls.move_left.centerY);
+    expect(layout.controls.move_down_right.centerY).toBeGreaterThan(layout.controls.move_right.centerY);
     expect(layout.controls.move_up.centerY).toBeLessThan(layout.controls.move_down.centerY);
     expect(layout.controls.move_left.centerX).toBeLessThan(layout.controls.move_right.centerX);
     expect(layout.controls.pause.top).toBeLessThan(layout.controls.move_up.top);
@@ -51,6 +55,8 @@ describe('input-human touch bridge', () => {
       layout.controls.move_left.right + 1,
       layout.controls.move_left.centerY
     )).toBeNull();
+    expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_up_left.centerX, layout.controls.move_up_left.centerY)).toBe('move_up_left');
+    expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_down_right.centerX, layout.controls.move_down_right.centerY)).toBe('move_down_right');
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_right.centerX, layout.controls.move_right.centerY)).toBe('move_right');
   });
 
@@ -65,6 +71,8 @@ describe('input-human touch bridge', () => {
     expect(layout.frame.bottom).toBeLessThanOrEqual(407);
     expect(layout.controls.move_up.width).toBeLessThan(52);
     expect(layout.controls.move_left.left).toBeGreaterThanOrEqual(0);
+    expect(layout.controls.move_up_left.left).toBeGreaterThanOrEqual(0);
+    expect(layout.controls.move_down_right.right).toBeLessThanOrEqual(172);
     expect(layout.controls.pause.right).toBeLessThanOrEqual(172);
     expect(layout.controls.toggle_thoughts.width).toBe(0);
     expect(layout.controls.pause.top).toBeLessThan(layout.controls.move_up.top);
@@ -94,6 +102,8 @@ describe('input-human touch bridge', () => {
     expect(layout.frames?.[0].right).toBeLessThanOrEqual(board.left - 18);
     expect(layout.frames?.[1].left).toBeGreaterThanOrEqual(board.left + board.width + 18);
     expect(layout.controls.move_right.right).toBeLessThanOrEqual(board.left - 8);
+    expect(layout.controls.move_up_right.right).toBeLessThanOrEqual(board.left - 8);
+    expect(layout.controls.move_down_left.left).toBeGreaterThanOrEqual(0);
     expect(layout.controls.pause.left).toBeGreaterThanOrEqual(board.left + board.width + 8);
     expect(layout.controls.restart_attempt.left).toBe(layout.controls.pause.left);
     expect(layout.controls.toggle_thoughts.width).toBe(0);
@@ -107,7 +117,7 @@ describe('input-human touch bridge', () => {
       height: 844
     });
     const state = createTouchInputState();
-    const movePoint = layout.controls.move_right;
+    const movePoint = layout.controls.move_down_left;
 
     const move = resolveHumanTouchAction({
       x: movePoint.centerX,
@@ -117,11 +127,11 @@ describe('input-human touch bridge', () => {
     }, layout, state, 128);
 
     expect(move).toEqual({
-      kind: 'move_right',
+      kind: 'move_down_left',
       source: 'touch',
       atMs: 128,
       repeat: false,
-      key: 'touch:move_right'
+      key: 'touch:move_down_left'
     });
     expect(resolveHumanTouchAction({
       x: movePoint.centerX,

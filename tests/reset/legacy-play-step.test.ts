@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  advanceLegacyPlayDiagonalSequence,
   advanceLegacyPlayStep,
   createLegacyPlayPointerStart,
   createLegacyPlayMoveFlags,
@@ -270,6 +271,124 @@ describe('legacy play step', () => {
     expect(result.moved).toBe(true);
     expect(result.player).toEqual({ x: 2, y: 1 });
     expect(result.trail).toEqual([{ x: 1, y: 1 }, { x: 2, y: 1 }]);
+  });
+
+  test('walks a touch diagonal sequence through the first open cardinal order', () => {
+    const maze: LegacyMazeSnapshot = {
+      ...createTestMaze(),
+      grid: [
+        [false, false, false, false, false],
+        [false, true, false, false, false],
+        [false, true, true, false, false],
+        [false, false, true, false, false],
+        [false, false, false, false, false]
+      ],
+      goal: { x: 2, y: 3 }
+    };
+
+    const result = advanceLegacyPlayDiagonalSequence({
+      maze,
+      player: { x: 1, y: 1 },
+      trail: [{ x: 1, y: 1 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false,
+      maxSteps: 4
+    });
+
+    expect(result.moved).toBe(true);
+    expect(result.player).toEqual({ x: 2, y: 3 });
+    expect(result.reachedGoal).toBe(true);
+    expect(result.trail).toEqual([
+      { x: 1, y: 1 },
+      { x: 1, y: 2 },
+      { x: 2, y: 2 },
+      { x: 2, y: 3 }
+    ]);
+  });
+
+  test('walks a touch diagonal sequence through the alternate cardinal order when that opens first', () => {
+    const maze: LegacyMazeSnapshot = {
+      ...createTestMaze(),
+      grid: [
+        [false, false, false, false, false],
+        [false, true, true, false, false],
+        [false, false, true, true, false],
+        [false, false, false, true, false],
+        [false, false, false, false, false]
+      ],
+      goal: { x: 3, y: 3 }
+    };
+
+    const result = advanceLegacyPlayDiagonalSequence({
+      maze,
+      player: { x: 1, y: 1 },
+      trail: [{ x: 1, y: 1 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false,
+      maxSteps: 4
+    });
+
+    expect(result.moved).toBe(true);
+    expect(result.player).toEqual({ x: 3, y: 3 });
+    expect(result.reachedGoal).toBe(true);
+    expect(result.trail).toEqual([
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 2, y: 2 },
+      { x: 3, y: 2 },
+      { x: 3, y: 3 }
+    ]);
+  });
+
+  test('prefers the diagonal cardinal order that can make the longer valid segment', () => {
+    const maze: LegacyMazeSnapshot = {
+      ...createTestMaze(),
+      grid: [
+        [false, false, false, false, false],
+        [false, true, true, false, false],
+        [false, true, false, false, false],
+        [false, true, true, false, false],
+        [false, false, false, false, false]
+      ],
+      goal: { x: 2, y: 3 }
+    };
+
+    const result = advanceLegacyPlayDiagonalSequence({
+      maze,
+      player: { x: 1, y: 1 },
+      trail: [{ x: 1, y: 1 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false,
+      maxSteps: 1
+    });
+
+    expect(result.moved).toBe(true);
+    expect(result.player).toEqual({ x: 2, y: 1 });
+    expect(result.trail).toEqual([
+      { x: 1, y: 1 },
+      { x: 2, y: 1 }
+    ]);
+
+    const alternate = advanceLegacyPlayDiagonalSequence({
+      maze,
+      player: { x: 1, y: 2 },
+      trail: [{ x: 1, y: 2 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false,
+      maxSteps: 1
+    });
+
+    expect(alternate.moved).toBe(true);
+    expect(alternate.player).toEqual({ x: 2, y: 3 });
+    expect(alternate.trail).toEqual([
+      { x: 1, y: 2 },
+      { x: 1, y: 3 },
+      { x: 2, y: 3 }
+    ]);
   });
 
   test('blocks a simultaneous corner move when the final diagonal target is a wall', () => {

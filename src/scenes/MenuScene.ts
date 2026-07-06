@@ -44,6 +44,7 @@ import {
   type LegacyPauseCommand
 } from '../legacy-runtime/legacyPauseLifecycle';
 import {
+  advanceLegacyPlayDiagonalSequence,
   advanceLegacyPlayStep,
   createLegacyPlayMoveFlags,
   LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
@@ -194,9 +195,13 @@ interface MenuSceneVisualDiagnostics {
     frame: VisualRect | null;
     controls: {
       move_up: VisualRect | null;
+      move_up_right: VisualRect | null;
       move_right: VisualRect | null;
+      move_down_right: VisualRect | null;
       move_down: VisualRect | null;
+      move_down_left: VisualRect | null;
       move_left: VisualRect | null;
+      move_up_left: VisualRect | null;
       pause: VisualRect | null;
       restart_attempt: VisualRect | null;
       toggle_thoughts: VisualRect | null;
@@ -1306,6 +1311,34 @@ export class MenuScene extends Phaser.Scene {
         return false;
       case 'toggle_thoughts':
         return false;
+      case 'move_up_left':
+        if (this.overlay === 'none') {
+          this.resetLegacyPlayInputBuffer();
+          this.tryMovePlayerDiagonalSequence(-1, -1);
+          return true;
+        }
+        return false;
+      case 'move_up_right':
+        if (this.overlay === 'none') {
+          this.resetLegacyPlayInputBuffer();
+          this.tryMovePlayerDiagonalSequence(1, -1);
+          return true;
+        }
+        return false;
+      case 'move_down_right':
+        if (this.overlay === 'none') {
+          this.resetLegacyPlayInputBuffer();
+          this.tryMovePlayerDiagonalSequence(1, 1);
+          return true;
+        }
+        return false;
+      case 'move_down_left':
+        if (this.overlay === 'none') {
+          this.resetLegacyPlayInputBuffer();
+          this.tryMovePlayerDiagonalSequence(-1, 1);
+          return true;
+        }
+        return false;
       case 'move_up':
         if (this.overlay === 'none') {
           this.resetLegacyPlayInputBuffer();
@@ -1703,9 +1736,9 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicDirty = true;
   }
 
-  private tryMovePlayer(deltaX: number, deltaY: number): void {
+  private tryMovePlayer(deltaX: number, deltaY: number): boolean {
     if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
-      return;
+      return false;
     }
 
     const nextStep = advanceLegacyPlayStep({
@@ -1718,7 +1751,7 @@ export class MenuScene extends Phaser.Scene {
       trailFadeTail: TRAIL_FADE_TAIL
     });
     if (!nextStep.moved) {
-      return;
+      return false;
     }
 
     this.player = nextStep.player;
@@ -1731,11 +1764,45 @@ export class MenuScene extends Phaser.Scene {
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
       this.publishInteractionDiagnostics();
-      return;
+      return true;
     }
 
     this.boardDynamicDirty = true;
     this.publishInteractionDiagnostics();
+    return true;
+  }
+
+  private tryMovePlayerDiagonalSequence(deltaX: number, deltaY: number): boolean {
+    if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
+      return false;
+    }
+
+    const nextStep = advanceLegacyPlayDiagonalSequence({
+      maze: this.maze,
+      player: this.player,
+      trail: this.trail,
+      deltaX,
+      deltaY,
+      toggleTrailFade: this.settings.toggleTrailFade,
+      trailFadeTail: TRAIL_FADE_TAIL
+    });
+    if (!nextStep.moved) {
+      return false;
+    }
+
+    this.player = nextStep.player;
+    this.trail = nextStep.trail;
+    if (this.settings.toggleCameraFollow) {
+      this.boardStaticDirty = true;
+    }
+
+    if (nextStep.reachedGoal) {
+      this.schedulePlayResetReturn();
+    }
+
+    this.boardDynamicDirty = true;
+    this.publishInteractionDiagnostics();
+    return true;
   }
 
   private schedulePlayResetReturn(): void {
@@ -2390,16 +2457,24 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.drawLegacyPlayTouchButton(controls.move_up, false);
+    this.drawLegacyPlayTouchButton(controls.move_up_right, false);
     this.drawLegacyPlayTouchButton(controls.move_right, false);
+    this.drawLegacyPlayTouchButton(controls.move_down_right, false);
     this.drawLegacyPlayTouchButton(controls.move_down, false);
+    this.drawLegacyPlayTouchButton(controls.move_down_left, false);
     this.drawLegacyPlayTouchButton(controls.move_left, false);
+    this.drawLegacyPlayTouchButton(controls.move_up_left, false);
     this.drawLegacyPlayTouchButton(controls.pause, true);
     this.drawLegacyPlayTouchButton(controls.restart_attempt, true);
 
     this.drawLegacyPlayTouchArrow(controls.move_up, 'up');
+    this.drawLegacyPlayTouchArrow(controls.move_up_right, 'up-right');
     this.drawLegacyPlayTouchArrow(controls.move_right, 'right');
+    this.drawLegacyPlayTouchArrow(controls.move_down_right, 'down-right');
     this.drawLegacyPlayTouchArrow(controls.move_down, 'down');
+    this.drawLegacyPlayTouchArrow(controls.move_down_left, 'down-left');
     this.drawLegacyPlayTouchArrow(controls.move_left, 'left');
+    this.drawLegacyPlayTouchArrow(controls.move_up_left, 'up-left');
     this.drawLegacyPlayTouchPauseIcon(controls.pause);
     this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');
     this.drawLegacyPlayTouchRestartIcon(controls.restart_attempt);
@@ -2425,10 +2500,11 @@ export class MenuScene extends Phaser.Scene {
 
   private drawLegacyPlayTouchArrow(
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['move_up'],
-    direction: 'up' | 'right' | 'down' | 'left'
+    direction: 'up' | 'up-right' | 'right' | 'down-right' | 'down' | 'down-left' | 'left' | 'up-left'
   ): void {
-    const size = Math.round(Math.min(rect.width, rect.height) * 0.24);
-    const stem = Math.max(8, Math.round(size * 1.05));
+    const diagonal = direction.includes('-');
+    const size = Math.round(Math.min(rect.width, rect.height) * (diagonal ? 0.2 : 0.24));
+    const stem = Math.max(8, Math.round(size * (diagonal ? 0.86 : 1.05)));
     const cx = rect.centerX;
     const cy = rect.centerY;
 
@@ -2451,6 +2527,22 @@ export class MenuScene extends Phaser.Scene {
         this.hudGraphics.moveTo(cx + size, cy);
         this.hudGraphics.lineTo(cx - Math.round(size * 0.28), cy + size);
         break;
+      case 'up-right':
+        this.hudGraphics.moveTo(cx - stem, cy + stem);
+        this.hudGraphics.lineTo(cx + size, cy - size);
+        this.hudGraphics.moveTo(cx + size, cy - size);
+        this.hudGraphics.lineTo(cx - Math.round(size * 0.16), cy - size);
+        this.hudGraphics.moveTo(cx + size, cy - size);
+        this.hudGraphics.lineTo(cx + size, cy + Math.round(size * 0.16));
+        break;
+      case 'down-right':
+        this.hudGraphics.moveTo(cx - stem, cy - stem);
+        this.hudGraphics.lineTo(cx + size, cy + size);
+        this.hudGraphics.moveTo(cx + size, cy + size);
+        this.hudGraphics.lineTo(cx - Math.round(size * 0.16), cy + size);
+        this.hudGraphics.moveTo(cx + size, cy + size);
+        this.hudGraphics.lineTo(cx + size, cy - Math.round(size * 0.16));
+        break;
       case 'down':
         this.hudGraphics.moveTo(cx, cy - stem);
         this.hudGraphics.lineTo(cx, cy + size);
@@ -2459,6 +2551,14 @@ export class MenuScene extends Phaser.Scene {
         this.hudGraphics.moveTo(cx, cy + size);
         this.hudGraphics.lineTo(cx + size, cy - Math.round(size * 0.28));
         break;
+      case 'down-left':
+        this.hudGraphics.moveTo(cx + stem, cy - stem);
+        this.hudGraphics.lineTo(cx - size, cy + size);
+        this.hudGraphics.moveTo(cx - size, cy + size);
+        this.hudGraphics.lineTo(cx + Math.round(size * 0.16), cy + size);
+        this.hudGraphics.moveTo(cx - size, cy + size);
+        this.hudGraphics.lineTo(cx - size, cy - Math.round(size * 0.16));
+        break;
       case 'left':
         this.hudGraphics.moveTo(cx + stem, cy);
         this.hudGraphics.lineTo(cx - size, cy);
@@ -2466,6 +2566,14 @@ export class MenuScene extends Phaser.Scene {
         this.hudGraphics.lineTo(cx + Math.round(size * 0.28), cy - size);
         this.hudGraphics.moveTo(cx - size, cy);
         this.hudGraphics.lineTo(cx + Math.round(size * 0.28), cy + size);
+        break;
+      case 'up-left':
+        this.hudGraphics.moveTo(cx + stem, cy + stem);
+        this.hudGraphics.lineTo(cx - size, cy - size);
+        this.hudGraphics.moveTo(cx - size, cy - size);
+        this.hudGraphics.lineTo(cx + Math.round(size * 0.16), cy - size);
+        this.hudGraphics.moveTo(cx - size, cy - size);
+        this.hudGraphics.lineTo(cx - size, cy + Math.round(size * 0.16));
         break;
       default:
         direction satisfies never;
@@ -3174,9 +3282,13 @@ export class MenuScene extends Phaser.Scene {
     const visible = this.shouldRenderLegacyPlayTouchControls(touchControlLayout);
     const emptyControls = {
       move_up: null,
+      move_up_right: null,
       move_right: null,
+      move_down_right: null,
       move_down: null,
+      move_down_left: null,
       move_left: null,
+      move_up_left: null,
       pause: null,
       restart_attempt: null,
       toggle_thoughts: null
@@ -3198,9 +3310,13 @@ export class MenuScene extends Phaser.Scene {
       frame: cloneVisualRect(this.hudTouchControlBounds) ?? createVisualRect(frame.left, frame.top, frame.width, frame.height),
       controls: {
         move_up: createVisualRect(controls.move_up.left, controls.move_up.top, controls.move_up.width, controls.move_up.height),
+        move_up_right: createVisualRect(controls.move_up_right.left, controls.move_up_right.top, controls.move_up_right.width, controls.move_up_right.height),
         move_right: createVisualRect(controls.move_right.left, controls.move_right.top, controls.move_right.width, controls.move_right.height),
+        move_down_right: createVisualRect(controls.move_down_right.left, controls.move_down_right.top, controls.move_down_right.width, controls.move_down_right.height),
         move_down: createVisualRect(controls.move_down.left, controls.move_down.top, controls.move_down.width, controls.move_down.height),
+        move_down_left: createVisualRect(controls.move_down_left.left, controls.move_down_left.top, controls.move_down_left.width, controls.move_down_left.height),
         move_left: createVisualRect(controls.move_left.left, controls.move_left.top, controls.move_left.width, controls.move_left.height),
+        move_up_left: createVisualRect(controls.move_up_left.left, controls.move_up_left.top, controls.move_up_left.width, controls.move_up_left.height),
         pause: createVisualRect(controls.pause.left, controls.pause.top, controls.pause.width, controls.pause.height),
         restart_attempt: createVisualRect(
           controls.restart_attempt.left,
