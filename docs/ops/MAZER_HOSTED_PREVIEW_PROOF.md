@@ -33,6 +33,22 @@ The hosted step is not closed by local green receipts alone. It closes only afte
 
 ## Latest Status
 
+2026-07-05 local / 2026-07-06 UTC hosted browser recheck:
+
+- The in-app browser refresh of the original protected Vercel login URL still stayed on `https://vercel.com/login?...`; the external browser login did not transfer into the Codex in-app browser profile.
+- Vercel connector access generated an authorized share URL for the deployed preview route:
+  `https://fawxzzy-mazer-2fi0qbdkf-fawxzzy.vercel.app/?content=core-only&mode=play&theme=aurora&runtimeDiagnostics=1&v=hosted-preview-proof&_vercel_share=LUNrDGWTwKmc4zw2N236Ato085Dc8lQg`
+- The authorized share URL reached the app route and normalized to:
+  `https://fawxzzy-mazer-2fi0qbdkf-fawxzzy.vercel.app/?content=core-only&mode=play&theme=aurora&runtimeDiagnostics=1&v=hosted-preview-proof`.
+- Browser title was `Mazer`; document state was `complete`.
+- Render proof showed one full-viewport Phaser canvas at mobile dimensions `405x958`, with active-play maze, timer, player marker, and touch controls visible.
+- Current-page app log proof showed Phaser `v3.90.0 (WebGL | Web Audio)` startup from the Mazer asset bundle.
+- Captured errors were Vercel login FedCM errors from the earlier protected-login page, not from the Mazer app URL.
+
+Current hosted state: `hosted-preview-app-loaded-via-authorized-share`.
+
+Remaining hosted limitation: the protected preview still does not become reachable by simply refreshing the Vercel login URL inside Codex. Browser proof currently requires either the Vercel connector share/access flow or a Vercel-authenticated in-app browser session.
+
 2026-07-04 status after mechanics/mobile cleanup reached `main`:
 
 - Local repo proof is healthy on `main` at `f96829fa`.
@@ -44,13 +60,7 @@ The hosted step is not closed by local green receipts alone. It closes only afte
 - Vercel reports deployment `dpl_4jfbnZby1pHpUDZNRMc6jBMCFtrb` as `READY`.
 - Preview URL: `https://fawxzzy-mazer-2fi0qbdkf-fawxzzy.vercel.app`.
 - Deployment metadata points at `codex/mazer-hosted-preview-proof` commit `ccfbcf9a17e815a9149f929d5216aebef15b6a75`.
-- Browser navigation to the preview route redirects to Vercel login, so the deployed-browser pass is still held by Vercel Authentication rather than by a build, deploy, or runtime failure.
-
-Current hosted state: `deployed-but-manual-auth-held`.
-
-Blocker: the deployed preview is protected by Vercel Authentication and requires an authenticated browser session before app-level hosted proof can be completed.
-
-Unblocker: sign in to Vercel in the intended browser context or temporarily provide an authorized share/access flow that reaches app HTML, then rerun the hosted browser pass against the deployed preview.
+- Direct browser navigation to the preview route redirected to Vercel login until an authorized share/access flow was used.
 
 ## Stop Rule
 
