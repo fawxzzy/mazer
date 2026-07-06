@@ -311,6 +311,16 @@ const EXPECTED_PLAY_MARKER_STYLE = Object.freeze({
   playerHaloColor: 0x00b84a
 });
 
+const isFiniteRect = (rect) => (
+  rect
+  && Number.isFinite(rect.left)
+  && Number.isFinite(rect.top)
+  && Number.isFinite(rect.right)
+  && Number.isFinite(rect.bottom)
+  && Number.isFinite(rect.width)
+  && Number.isFinite(rect.height)
+);
+
 export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
   const runtime = diagnostics?.runtime ?? null;
   const visual = diagnostics?.visual ?? null;
@@ -1184,6 +1194,25 @@ const runEdgeLiveInteraction = async ({
     throw error;
   }
 
+  const touchChromeVerdict = interaction.kind === 'touch'
+    ? resolvePlayTouchChromeVerdict(finalDiagnostics)
+    : { pass: true, topActionBar: true, bottomDpad: true, compass: true, observed: null };
+  if (!touchChromeVerdict.pass) {
+    const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not publish the expected top action bar, bottom D-pad, and compass layout.`);
+    error.code = INTERACTIVE_PLAY_FAILURE_CODE;
+    error.failureStage = 'touch-chrome';
+    error.interaction = {
+      runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
+      baseline: baselineState,
+      timeline,
+      final: finalState,
+      restartTrailReset,
+      markerStyleVerdict,
+      touchChromeVerdict
+    };
+    throw error;
+  }
+
   const markerPixelVerdict = await sampleScreenshotMarkerPixels(page, finalState);
   if (!markerPixelVerdict.pass) {
     const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not render visible green player/red goal pixels: ${JSON.stringify(markerPixelVerdict)}`);
@@ -1196,6 +1225,7 @@ const runEdgeLiveInteraction = async ({
       final: finalState,
       restartTrailReset,
       markerStyleVerdict,
+      touchChromeVerdict,
       markerPixelVerdict
     };
     throw error;
@@ -1218,6 +1248,7 @@ const runEdgeLiveInteraction = async ({
     input: finalState.input,
     restartTrailReset,
     markerStyleVerdict,
+    touchChromeVerdict,
     markerPixelVerdict,
     changed: hasInteractiveStateDelta(baselineState, finalState),
     mode: finalState.mode
@@ -1274,6 +1305,65 @@ const doRectsOverlap = (left, right) => (
   && left.top < right.bottom
   && left.bottom > right.top
 );
+
+export const resolvePlayTouchChromeVerdict = (diagnostics) => {
+  const visual = diagnostics?.visual ?? diagnostics ?? null;
+  const controls = visual?.touchControls?.controls ?? null;
+  const boardBounds = visual?.board?.bounds ?? null;
+  const hud = visual?.hud ?? null;
+  const viewport = visual?.viewport ?? null;
+  const pause = controls?.pause ?? null;
+  const restart = controls?.restart_attempt ?? null;
+  const trail = controls?.toggle_thoughts ?? null;
+  const up = controls?.move_up ?? null;
+  const down = controls?.move_down ?? null;
+  const left = controls?.move_left ?? null;
+  const right = controls?.move_right ?? null;
+  const actionControls = [pause, restart, trail];
+  const dpadControls = [up, down, left, right];
+  const hasActionControls = actionControls.every(isFiniteRect);
+  const hasDpadControls = dpadControls.every(isFiniteRect);
+  const rowTolerance = 3;
+  const topActionBar = hasActionControls
+    && actionControls.every((rect) => Math.abs(rect.top - pause.top) <= rowTolerance)
+    && actionControls.every((rect) => Math.abs(rect.bottom - pause.bottom) <= rowTolerance)
+    && pause.right < restart.left
+    && restart.right < trail.left
+    && (!isFiniteRect(boardBounds) || Math.max(pause.bottom, restart.bottom, trail.bottom) < boardBounds.top);
+  const bottomDpad = hasDpadControls
+    && up.centerY < left.centerY
+    && up.centerY < right.centerY
+    && down.centerY > left.centerY
+    && down.centerY > right.centerY
+    && left.centerX < up.centerX
+    && right.centerX > up.centerX
+    && (!isFiniteRect(boardBounds) || Math.min(up.top, left.top, right.top, down.top) > boardBounds.bottom);
+  const compass = isFiniteRect(hud?.arrowBounds)
+    && isFiniteRect(hud?.timerBounds)
+    && hud.arrowBounds.width >= 40
+    && hud.arrowBounds.height >= 40
+    && hud.arrowBounds.left > hud.timerBounds.right
+    && (!viewport || hud.arrowBounds.right >= viewport.width - 16);
+
+  return {
+    pass: Boolean(topActionBar && bottomDpad && compass),
+    topActionBar,
+    bottomDpad,
+    compass,
+    observed: {
+      pause,
+      restart,
+      trail,
+      up,
+      down,
+      left,
+      right,
+      boardBounds,
+      arrowBounds: hud?.arrowBounds ?? null,
+      timerBounds: hud?.timerBounds ?? null
+    }
+  };
+};
 
 const resolveExperimentSelection = (args = {}) => {
   const readToggle = (camelKey, kebabKey) => (
@@ -2106,6 +2196,7 @@ const buildMarkdownSummary = ({ runId, sourceMode, baseUrl, explicitUrl, presetG
       `- HUD state: ${interaction.hud ? `${interaction.hud.statusText ?? 'status-hidden'} | ${interaction.hud.nextRiskLabel ?? 'risk-hidden'}` : 'n/a'}`,
       `- Restart trail reset: ${interaction.restartTrailReset?.pass ? 'pass' : 'fail'} (${interaction.restartTrailReset?.beforeTrailSegmentCount ?? 'n/a'} -> ${interaction.restartTrailReset?.afterTrailSegmentCount ?? 'n/a'})`,
       `- Marker style: ${interaction.markerStyleVerdict?.pass ? 'pass' : 'fail'} (player ${interaction.markerStyleVerdict?.observed?.playerCoreColor ?? 'n/a'}, goal ${interaction.markerStyleVerdict?.observed?.goalCoreColor ?? 'n/a'}, haloRadius ${interaction.markerStyleVerdict?.observed?.playerHaloRadius ?? 'n/a'}, tile ${interaction.markerStyleVerdict?.observed?.tileSize ?? 'n/a'})`,
+      `- Touch chrome: ${interaction.touchChromeVerdict?.pass ? 'pass' : 'fail'} (top actions ${interaction.touchChromeVerdict?.topActionBar ? 'pass' : 'fail'}, bottom D-pad ${interaction.touchChromeVerdict?.bottomDpad ? 'pass' : 'fail'}, compass ${interaction.touchChromeVerdict?.compass ? 'pass' : 'fail'})`,
       `- Marker pixels: ${interaction.markerPixelVerdict?.pass ? 'pass' : 'fail'} (player matches ${interaction.markerPixelVerdict?.player?.matchCount ?? 'n/a'}, goal matches ${interaction.markerPixelVerdict?.goal?.matchCount ?? 'n/a'})`,
       `- State changed: ${interaction.changed ? 'yes' : 'no'}`,
       '- Input timeline:'

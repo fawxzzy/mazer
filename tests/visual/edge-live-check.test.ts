@@ -775,6 +775,71 @@ describe('edge live check', () => {
     });
   }, 15_000);
 
+  test('proves the mobile touch chrome uses top actions, bottom D-pad, and right compass', async () => {
+    const { resolvePlayTouchChromeVerdict } = await loadEdgeLiveHelpers();
+
+    const passingVerdict = resolvePlayTouchChromeVerdict({
+      visual: {
+        viewport: { width: 390, height: 844 },
+        board: {
+          bounds: { left: 24, top: 251, right: 367, bottom: 594, width: 343, height: 343 }
+        },
+        hud: {
+          timerBounds: { left: 14, top: 14, right: 78, bottom: 36, width: 64, height: 22 },
+          arrowBounds: { left: 334, top: 8, right: 378, bottom: 52, width: 44, height: 44 }
+        },
+        touchControls: {
+          controls: {
+            pause: { left: 45, top: 72, right: 126, bottom: 114, width: 81, height: 42, centerX: 85.5, centerY: 93 },
+            restart_attempt: { left: 154, top: 72, right: 235, bottom: 114, width: 81, height: 42, centerX: 194.5, centerY: 93 },
+            toggle_thoughts: { left: 263, top: 72, right: 344, bottom: 114, width: 81, height: 42, centerX: 303.5, centerY: 93 },
+            move_up: { left: 163, top: 636, right: 227, bottom: 700, width: 64, height: 64, centerX: 195, centerY: 668 },
+            move_left: { left: 96, top: 703, right: 160, bottom: 767, width: 64, height: 64, centerX: 128, centerY: 735 },
+            move_right: { left: 230, top: 703, right: 294, bottom: 767, width: 64, height: 64, centerX: 262, centerY: 735 },
+            move_down: { left: 163, top: 770, right: 227, bottom: 834, width: 64, height: 64, centerX: 195, centerY: 802 }
+          }
+        }
+      }
+    });
+
+    expect(passingVerdict).toMatchObject({
+      pass: true,
+      topActionBar: true,
+      bottomDpad: true,
+      compass: true
+    });
+
+    const failingVerdict = resolvePlayTouchChromeVerdict({
+      visual: {
+        viewport: { width: 390, height: 844 },
+        board: {
+          bounds: { left: 24, top: 251, right: 367, bottom: 594, width: 343, height: 343 }
+        },
+        hud: {
+          timerBounds: { left: 14, top: 14, right: 78, bottom: 36, width: 64, height: 22 },
+          arrowBounds: { left: 250, top: 20, right: 286, bottom: 56, width: 36, height: 36 }
+        },
+        touchControls: {
+          controls: {
+            pause: { left: 14, top: 686, right: 102, bottom: 730, width: 88, height: 44, centerX: 58, centerY: 708 },
+            restart_attempt: { left: 151, top: 686, right: 239, bottom: 730, width: 88, height: 44, centerX: 195, centerY: 708 },
+            toggle_thoughts: { left: 288, top: 686, right: 376, bottom: 730, width: 88, height: 44, centerX: 332, centerY: 708 },
+            move_up: { left: 151, top: 742, right: 239, bottom: 786, width: 88, height: 44, centerX: 195, centerY: 764 },
+            move_left: { left: 14, top: 742, right: 102, bottom: 786, width: 88, height: 44, centerX: 58, centerY: 764 },
+            move_right: { left: 288, top: 742, right: 376, bottom: 786, width: 88, height: 44, centerX: 332, centerY: 764 },
+            move_down: { left: 151, top: 798, right: 239, bottom: 842, width: 88, height: 44, centerX: 195, centerY: 820 }
+          }
+        }
+      }
+    });
+
+    expect(failingVerdict).toMatchObject({
+      pass: false,
+      topActionBar: false,
+      compass: false
+    });
+  }, 15_000);
+
   test('aggregates business receipts from captured telemetry events', async () => {
     const { buildEdgeLiveReceiptFromCaptures } = await loadEdgeLiveHelpers();
 
