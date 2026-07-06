@@ -45,6 +45,16 @@ const resetLocalhostServiceWorkers = async (): Promise<boolean> => {
   return changed;
 };
 
+const registerProductionServiceWorker = (): void => {
+  if (isLocalhostRuntime() || !('serviceWorker' in navigator)) {
+    return;
+  }
+
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/sw.js');
+  }, { once: true });
+};
+
 const boot = async (): Promise<void> => {
   markMazerBootStatus('boot-start');
 
@@ -65,6 +75,7 @@ const boot = async (): Promise<void> => {
   markMazerBootStatus('game-creating');
   const game = new Phaser.Game(phaserConfig);
   attachMazerGameToWindow(game);
+  registerProductionServiceWorker();
   markMazerBootStatus('game-created');
 };
 

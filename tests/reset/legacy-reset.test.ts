@@ -477,14 +477,20 @@ describe('legacy reset lane', () => {
 
   test('cleans up localhost service workers before booting Phaser', () => {
     const bootSource = readFileSync(resolve(process.cwd(), 'src/boot/main.ts'), 'utf8');
+    const viteConfigSource = readFileSync(resolve(process.cwd(), 'vite.config.ts'), 'utf8');
 
     expect(bootSource).toContain("const LOCALHOST_SW_RESET_KEY = 'mazer:localhost-sw-reset:v1';");
     expect(bootSource).toContain("['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)");
     expect(bootSource).toContain('navigator.serviceWorker.getRegistrations()');
     expect(bootSource).toContain("cacheKey.includes('mazer')");
     expect(bootSource).toContain('window.location.reload();');
+    expect(bootSource).toContain('const registerProductionServiceWorker = (): void => {');
+    expect(bootSource).toContain("if (isLocalhostRuntime() || !('serviceWorker' in navigator)) {");
+    expect(bootSource).toContain("navigator.serviceWorker.register('/sw.js')");
     expect(bootSource).toContain("markMazerBootStatus('boot-start');");
     expect(bootSource).toContain("markMazerBootStatus('game-created');");
+    expect(viteConfigSource).toContain('injectRegister: false');
+    expect(viteConfigSource).not.toContain("injectRegister: 'auto'");
   });
 
   test('routes generation and reset through explicit queued request contracts', () => {

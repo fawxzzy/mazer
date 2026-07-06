@@ -33,7 +33,7 @@ export default defineConfig({
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      injectRegister: false,
       manifestFilename: 'manifest.webmanifest',
       includeAssets: [
         'icons/icon-192.png',
