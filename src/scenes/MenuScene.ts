@@ -120,6 +120,7 @@ import {
 import { summarizeTelemetrySemantics } from '../telemetry';
 import {
   isMovementActionKind,
+  resolveHumanMovementPriorityCandidates,
   type HumanMovementActionKind
 } from '../input-human';
 import { resolveTouchControlKindAtPoint, resolveTouchControlLayout } from '../input-human/touch';
@@ -1534,8 +1535,13 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private performLegacyPlayHeldTouchMove(): boolean {
-    for (const move of this.playHeldTouchMoves.slice(0, LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT)) {
-      if (this.performLegacyPlayTouchMove(move.control)) {
+    const candidates = resolveHumanMovementPriorityCandidates(
+      this.playHeldTouchMoves.map((move) => move.control),
+      LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT
+    );
+
+    for (const control of candidates) {
+      if (this.performLegacyPlayTouchMove(control)) {
         return true;
       }
     }

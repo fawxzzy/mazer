@@ -6,6 +6,7 @@ import {
   createKeyboardSimulationPolicy,
   createScriptedSimulationPolicy,
   resolveHumanMovementActionFromPriorityStack,
+  resolveHumanMovementPriorityCandidates,
   resolveHumanInputActionKindFromKeyboard
 } from '../../src/input-human';
 import type { HumanInputAction } from '../../src/input-human';
@@ -102,5 +103,18 @@ describe('input-human bridge', () => {
     expect(resolveHumanMovementActionFromPriorityStack(['move_up', 'move_down'])).toBe('move_up');
     expect(resolveHumanMovementActionFromPriorityStack(['move_up_right', 'move_down'])).toBe('move_up_right');
     expect(resolveHumanMovementActionFromPriorityStack(['move_right', 'move_down', 'move_left'])).toBe('move_down_right');
+  });
+
+  test('keeps held movement fallback candidates in press order with a two-control cap', () => {
+    expect(resolveHumanMovementPriorityCandidates(['move_down', 'move_right'])).toEqual(['move_down', 'move_right']);
+    expect(resolveHumanMovementPriorityCandidates(['move_right', 'move_down'])).toEqual(['move_right', 'move_down']);
+    expect(resolveHumanMovementPriorityCandidates(['move_down', 'move_down', 'move_right'])).toEqual([
+      'move_down',
+      'move_right'
+    ]);
+    expect(resolveHumanMovementPriorityCandidates(['move_down', 'move_right', 'move_left'])).toEqual([
+      'move_down',
+      'move_right'
+    ]);
   });
 });

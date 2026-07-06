@@ -159,3 +159,24 @@ export const resolveHumanMovementActionFromPriorityStack = (
 
   return resolveHumanMovementActionFromVector(deltaX, deltaY);
 };
+
+export const resolveHumanMovementPriorityCandidates = (
+  controls: readonly HumanMovementActionKind[],
+  limit = 2
+): HumanMovementActionKind[] => {
+  const candidateLimit = Math.max(1, Math.round(limit));
+  const candidates: HumanMovementActionKind[] = [];
+
+  for (const control of controls) {
+    if (candidates.includes(control)) {
+      continue;
+    }
+
+    candidates.push(control);
+    if (candidates.length >= candidateLimit) {
+      break;
+    }
+  }
+
+  return candidates;
+};
