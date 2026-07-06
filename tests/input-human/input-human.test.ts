@@ -5,6 +5,7 @@ import {
   createHumanRunState,
   createKeyboardSimulationPolicy,
   createScriptedSimulationPolicy,
+  resolveHumanMovementActionFromPriorityStack,
   resolveHumanInputActionKindFromKeyboard
 } from '../../src/input-human';
 import type { HumanInputAction } from '../../src/input-human';
@@ -92,5 +93,14 @@ describe('input-human bridge', () => {
     expect(first.action?.kind).toBe('pause');
     expect(second.action?.kind).toBe('pause');
     expect(third.action?.kind).toBe('move_up');
+  });
+
+  test('combines up to two held movement controls by first-pressed axis priority', () => {
+    expect(resolveHumanMovementActionFromPriorityStack(['move_right', 'move_down'])).toBe('move_down_right');
+    expect(resolveHumanMovementActionFromPriorityStack(['move_down', 'move_right'])).toBe('move_down_right');
+    expect(resolveHumanMovementActionFromPriorityStack(['move_left', 'move_right'])).toBe('move_left');
+    expect(resolveHumanMovementActionFromPriorityStack(['move_up', 'move_down'])).toBe('move_up');
+    expect(resolveHumanMovementActionFromPriorityStack(['move_up_right', 'move_down'])).toBe('move_up_right');
+    expect(resolveHumanMovementActionFromPriorityStack(['move_right', 'move_down', 'move_left'])).toBe('move_down_right');
   });
 });

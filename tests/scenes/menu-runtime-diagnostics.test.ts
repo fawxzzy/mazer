@@ -291,6 +291,7 @@ describe('menu runtime diagnostics', () => {
           pendingTimerActive: true,
           pointerStartActive: false,
           touchSprint: {
+            activeControls: [],
             heldControl: null,
             pendingStepCount: 0,
             repeatTimerActive: false,

@@ -15,6 +15,9 @@ export const phaserConfig: Phaser.Types.Core.GameConfig = {
   audio: {
     noAudio: true
   },
+  input: {
+    activePointers: 2
+  },
   scene: [BootScene, MenuScene],
   scale: {
     mode: Phaser.Scale.RESIZE,

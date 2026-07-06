@@ -75,3 +75,87 @@ export const isMovementActionKind = (
   typeof value === 'string'
   && (HUMAN_MOVEMENT_ACTION_KINDS as readonly string[]).includes(value)
 );
+
+export interface HumanMovementVector {
+  deltaX: number;
+  deltaY: number;
+}
+
+export const resolveHumanMovementActionVector = (
+  control: HumanMovementActionKind
+): HumanMovementVector => {
+  switch (control) {
+    case 'move_up':
+      return { deltaX: 0, deltaY: -1 };
+    case 'move_up_right':
+      return { deltaX: 1, deltaY: -1 };
+    case 'move_right':
+      return { deltaX: 1, deltaY: 0 };
+    case 'move_down_right':
+      return { deltaX: 1, deltaY: 1 };
+    case 'move_down':
+      return { deltaX: 0, deltaY: 1 };
+    case 'move_down_left':
+      return { deltaX: -1, deltaY: 1 };
+    case 'move_left':
+      return { deltaX: -1, deltaY: 0 };
+    case 'move_up_left':
+      return { deltaX: -1, deltaY: -1 };
+    default:
+      return control satisfies never;
+  }
+};
+
+export const resolveHumanMovementActionFromVector = (
+  deltaX: number,
+  deltaY: number
+): HumanMovementActionKind | null => {
+  if (deltaX === 0 && deltaY < 0) {
+    return 'move_up';
+  }
+  if (deltaX > 0 && deltaY < 0) {
+    return 'move_up_right';
+  }
+  if (deltaX > 0 && deltaY === 0) {
+    return 'move_right';
+  }
+  if (deltaX > 0 && deltaY > 0) {
+    return 'move_down_right';
+  }
+  if (deltaX === 0 && deltaY > 0) {
+    return 'move_down';
+  }
+  if (deltaX < 0 && deltaY > 0) {
+    return 'move_down_left';
+  }
+  if (deltaX < 0 && deltaY === 0) {
+    return 'move_left';
+  }
+  if (deltaX < 0 && deltaY < 0) {
+    return 'move_up_left';
+  }
+  return null;
+};
+
+export const resolveHumanMovementActionFromPriorityStack = (
+  controls: readonly HumanMovementActionKind[],
+  limit = 2
+): HumanMovementActionKind | null => {
+  let deltaX = 0;
+  let deltaY = 0;
+
+  for (const control of controls.slice(0, Math.max(1, Math.round(limit)))) {
+    const vector = resolveHumanMovementActionVector(control);
+    if (deltaX === 0 && vector.deltaX !== 0) {
+      deltaX = vector.deltaX;
+    }
+    if (deltaY === 0 && vector.deltaY !== 0) {
+      deltaY = vector.deltaY;
+    }
+    if (deltaX !== 0 && deltaY !== 0) {
+      break;
+    }
+  }
+
+  return resolveHumanMovementActionFromVector(deltaX, deltaY);
+};
