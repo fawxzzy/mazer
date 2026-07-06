@@ -45,10 +45,8 @@ import {
 } from '../legacy-runtime/legacyPauseLifecycle';
 import {
   advanceLegacyPlayStep,
-  createLegacyPlayPointerStart,
   createLegacyPlayMoveFlags,
   LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
-  isPointInsideLegacyBoardBounds,
   resolveLegacyPointerMoveVector,
   resolveLegacyPlayMoveVector,
   isSameLegacyPlayPointer,
@@ -401,9 +399,9 @@ const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
 const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;
-const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x005466;
-const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.2;
-const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.36;
+const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x107d74;
+const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.72;
+const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.96;
 const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
 const LEGACY_PLAYER_MARKER_HALO = 0x00b84a;
 const LEGACY_PLAYER_MARKER_CORE = 0x36ff7d;
@@ -1275,20 +1273,8 @@ export class MenuScene extends Phaser.Scene {
       return true;
     }
 
-    if (this.mode !== 'play' || this.overlay !== 'none' || hasPendingLegacyResetRequest(this.pendingResetRequest)) {
-      this.playPointerStart = null;
-      return false;
-    }
-    if (this.playPointerStart !== null && !isSameLegacyPlayPointer(this.playPointerStart, pointer)) {
-      return false;
-    }
-    if (!this.isLegacyPlayPointerInsideBoard(pointer.x, pointer.y)) {
-      this.playPointerStart = null;
-      return false;
-    }
-
-    this.playPointerStart = createLegacyPlayPointerStart(pointer);
-    return true;
+    this.playPointerStart = null;
+    return false;
   }
 
   private handleLegacyPlayTouchControl(x: number, y: number): boolean {
@@ -1319,15 +1305,35 @@ export class MenuScene extends Phaser.Scene {
         }
         return false;
       case 'toggle_thoughts':
-        if (this.overlay === 'none' || this.overlay === 'pause') {
-          this.applyLegacyOverlayToggleField('toggleTrailFade');
+        return false;
+      case 'move_up':
+        if (this.overlay === 'none') {
+          this.resetLegacyPlayInputBuffer();
+          this.tryMovePlayer(0, -1);
           return true;
         }
         return false;
-      case 'move_up':
       case 'move_right':
+        if (this.overlay === 'none') {
+          this.resetLegacyPlayInputBuffer();
+          this.tryMovePlayer(1, 0);
+          return true;
+        }
+        return false;
       case 'move_down':
+        if (this.overlay === 'none') {
+          this.resetLegacyPlayInputBuffer();
+          this.tryMovePlayer(0, 1);
+          return true;
+        }
+        return false;
       case 'move_left':
+        if (this.overlay === 'none') {
+          this.resetLegacyPlayInputBuffer();
+          this.tryMovePlayer(-1, 0);
+          return true;
+        }
+        return false;
       case null:
         return false;
       default:
@@ -1411,10 +1417,6 @@ export class MenuScene extends Phaser.Scene {
       right: this.layout.boardLeft + boardOffset.x + this.layout.boardSize,
       top: this.layout.boardTop + boardOffset.y
     };
-  }
-
-  private isLegacyPlayPointerInsideBoard(x: number, y: number): boolean {
-    return isPointInsideLegacyBoardBounds(x, y, this.resolveLegacyPlayBoardBounds());
   }
 
   private scheduleLegacyPlayInputBuffer(): void {
@@ -1939,7 +1941,7 @@ export class MenuScene extends Phaser.Scene {
         ? clamp(0.34 + ((index / Math.max(1, trail.length - 1)) * 0.66), 0.34, 1)
         : clamp(0.22 + ((index / Math.max(1, trail.length - 1)) * 0.82), 0.22, 1);
       const trailColor = this.mode === 'play'
-        ? (this.settings.darkMode ? 0x42e6ff : 0x23d5ff)
+        ? (this.settings.darkMode ? 0x9cffd2 : 0x66eebf)
         : (this.settings.darkMode ? 0x10c8f2 : 0x14b8d9);
       const trailAlpha = this.settings.darkMode && this.mode === 'menu'
         ? clamp(alpha + 0.08, 0, 1)
@@ -2051,8 +2053,8 @@ export class MenuScene extends Phaser.Scene {
       LEGACY_PLAY_DYNAMIC_TRAIL_EDGE,
       LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO,
       LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO,
-      0.34,
-      0.86
+      0.42,
+      0.78
     );
   }
 
@@ -2232,7 +2234,10 @@ export class MenuScene extends Phaser.Scene {
     const goalScreenY = this.layout.boardTop + boardOffset.y + ((this.maze.goal.y + 0.5) * this.layout.tileSize);
     const playerScreenX = this.layout.boardLeft + boardOffset.x + ((this.player.x + 0.5) * this.layout.tileSize);
     const playerScreenY = this.layout.boardTop + boardOffset.y + ((this.player.y + 0.5) * this.layout.tileSize);
+    const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
+    const touchCompassBounds = this.resolveLegacyPlayTouchCompassBounds(touchControlLayout);
     const hudFrame = resolveLegacyPlayHudFrame({
+      compassBounds: touchCompassBounds ?? undefined,
       elapsedMs: time - this.playStartedAtMs,
       goalScreen: { x: goalScreenX, y: goalScreenY },
       layoutWidth: this.layout.width,
@@ -2264,6 +2269,7 @@ export class MenuScene extends Phaser.Scene {
     timer.setData('hud', true);
     this.uiTexts.push(timer);
 
+    this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);
     this.drawLegacyPlayCompass(hudFrame);
 
     this.hudGraphics.lineStyle(3, LEGACY_PLAY_HUD_ARROW_SHADOW, 0.36);
@@ -2322,9 +2328,30 @@ export class MenuScene extends Phaser.Scene {
       hudFrame.arrowBounds.width,
       hudFrame.arrowBounds.height
     );
-    this.hudTouchControlBounds = this.drawLegacyPlayTouchControls();
-    this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);
+    this.hudBounds = touchCompassBounds
+      ? this.hudTimerBounds
+      : mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);
     this.hudFrame = hudFrame;
+  }
+
+  private resolveLegacyPlayTouchCompassBounds(
+    touchControlLayout = this.resolveLegacyPlayTouchControlLayout()
+  ): { height: number; left: number; top: number; width: number } | null {
+    if (!this.shouldRenderLegacyPlayTouchControls(touchControlLayout)) {
+      return null;
+    }
+
+    const { move_down, move_left, move_right, move_up } = touchControlLayout.controls;
+    const centerX = (move_left.centerX + move_right.centerX) / 2;
+    const centerY = (move_up.centerY + move_down.centerY) / 2;
+    const size = Math.max(32, Math.min(44, Math.min(move_up.width, move_down.width, move_left.width, move_right.width) - 8));
+
+    return {
+      height: size,
+      left: Math.round(centerX - (size / 2)),
+      top: Math.round(centerY - (size / 2)),
+      width: size
+    };
   }
 
   private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame): void {
@@ -2347,8 +2374,9 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.fillCircle(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y, 2);
   }
 
-  private drawLegacyPlayTouchControls(): VisualRect | null {
-    const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
+  private drawLegacyPlayTouchControls(
+    touchControlLayout = this.resolveLegacyPlayTouchControlLayout()
+  ): VisualRect | null {
     if (!this.shouldRenderLegacyPlayTouchControls(touchControlLayout)) {
       return null;
     }
@@ -2367,7 +2395,6 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPlayTouchButton(controls.move_left, false);
     this.drawLegacyPlayTouchButton(controls.pause, true);
     this.drawLegacyPlayTouchButton(controls.restart_attempt, true);
-    this.drawLegacyPlayTouchButton(controls.toggle_thoughts, true);
 
     this.drawLegacyPlayTouchArrow(controls.move_up, 'up');
     this.drawLegacyPlayTouchArrow(controls.move_right, 'right');
@@ -2377,8 +2404,6 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');
     this.drawLegacyPlayTouchRestartIcon(controls.restart_attempt);
     this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');
-    this.drawLegacyPlayTouchTrailIcon(controls.toggle_thoughts);
-    this.drawLegacyPlayTouchLabel(controls.toggle_thoughts, 'TRAIL');
 
     return createVisualRect(frame.left, frame.top, frame.width, frame.height);
   }
@@ -2476,28 +2501,6 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.strokePath();
     this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.82);
     this.hudGraphics.fillTriangle(tipX, tipY, tipX + tipSize, tipY - 1, tipX + 2, tipY + tipSize);
-  }
-
-  private drawLegacyPlayTouchTrailIcon(
-    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['toggle_thoughts']
-  ): void {
-    const radius = Math.max(2, Math.round(rect.width * 0.045));
-    const left = rect.centerX - Math.round(rect.width * 0.22);
-    const mid = rect.centerX;
-    const right = rect.centerX + Math.round(rect.width * 0.22);
-    const top = rect.top + Math.round(rect.height * 0.16);
-    const bottom = rect.top + Math.round(rect.height * 0.36);
-
-    this.hudGraphics.lineStyle(Math.max(3, Math.round(rect.width * 0.05)), LEGACY_PLAY_TOUCH_ICON, 0.78);
-    this.hudGraphics.beginPath();
-    this.hudGraphics.moveTo(left, bottom);
-    this.hudGraphics.lineTo(mid, top);
-    this.hudGraphics.lineTo(right, bottom);
-    this.hudGraphics.strokePath();
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.84);
-    this.hudGraphics.fillCircle(left, bottom, radius);
-    this.hudGraphics.fillCircle(mid, top, radius);
-    this.hudGraphics.fillCircle(right, bottom, radius);
   }
 
   private drawLegacyPlayTouchLabel(
@@ -3205,12 +3208,14 @@ export class MenuScene extends Phaser.Scene {
           controls.restart_attempt.width,
           controls.restart_attempt.height
         ),
-        toggle_thoughts: createVisualRect(
-          controls.toggle_thoughts.left,
-          controls.toggle_thoughts.top,
-          controls.toggle_thoughts.width,
-          controls.toggle_thoughts.height
-        )
+        toggle_thoughts: controls.toggle_thoughts.width > 0 && controls.toggle_thoughts.height > 0
+          ? createVisualRect(
+            controls.toggle_thoughts.left,
+            controls.toggle_thoughts.top,
+            controls.toggle_thoughts.width,
+            controls.toggle_thoughts.height
+          )
+          : null
       }
     };
   }

@@ -229,9 +229,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps active play dynamic overlays in the corridor frame instead of square cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x005466;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.2;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.36;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x107d74;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.72;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.96;');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');");
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95, 'goal');");
@@ -297,33 +297,34 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(desktopEndpoint.strokeWidth).toBe(2);
   });
 
-  test('keeps mobile active-play swipes bound to one pointer identity', () => {
+  test('disables board tap and swipe movement so mobile play moves only from explicit controls', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('type LegacyPlayPointerStart');
     expect(menuSceneSource).toContain('private playPointerStart: LegacyPlayPointerStart | null = null;');
     expect(menuSceneSource).toContain("this.input.on('pointerupoutside', (pointer: Phaser.Input.Pointer) => {");
     expect(menuSceneSource).toContain("this.input.on('gameout', () => {");
-    expect(menuSceneSource).toContain('this.playPointerStart = createLegacyPlayPointerStart(pointer);');
-    expect(menuSceneSource).toContain('this.playPointerStart !== null && !isSameLegacyPlayPointer(this.playPointerStart, pointer)');
+    expect(menuSceneSource).toContain('this.playPointerStart = null;');
+    expect(menuSceneSource).not.toContain('this.playPointerStart = createLegacyPlayPointerStart(pointer);');
     expect(menuSceneSource).toContain('if (!isSameLegacyPlayPointer(this.playPointerStart, pointer)) {');
   });
 
-  test('routes shared mobile touch controls into play pause, reset, and trail toggles', () => {
+  test('routes shared mobile touch controls into explicit movement, pause, and reset only', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('resolveTouchControlKindAtPoint');
     expect(menuSceneSource).toContain('resolveTouchControlLayout');
     expect(menuSceneSource).toContain('private resolveLegacyPlayTouchControlLayout()');
     expect(menuSceneSource).toContain('private handleLegacyPlayTouchControl');
-    expect(menuSceneSource).toContain('private drawLegacyPlayTouchControls()');
-    expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls();');
-    expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
+    expect(menuSceneSource).toContain('private drawLegacyPlayTouchControls(');
+    expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
+    expect(menuSceneSource).toContain('this.hudBounds = touchCompassBounds');
+    expect(menuSceneSource).toContain(': mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).toContain('touchControls');
     expect(menuSceneSource).toContain('LEGACY_PLAY_TOUCH_FRAME_FILL');
     expect(menuSceneSource).toContain("this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');");
     expect(menuSceneSource).toContain("this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');");
-    expect(menuSceneSource).toContain("this.drawLegacyPlayTouchLabel(controls.toggle_thoughts, 'TRAIL');");
+    expect(menuSceneSource).not.toContain("this.drawLegacyPlayTouchLabel(controls.toggle_thoughts, 'TRAIL');");
     expect(menuSceneSource).toContain("this.hudGraphics.moveTo(cx, cy + stem);");
     expect(menuSceneSource).toContain("this.hudGraphics.lineTo(cx, cy - size);");
     expect(menuSceneSource).toContain('installLegacyPlayTouchControlFallback');
@@ -331,7 +332,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('event.stopImmediatePropagation()');
     expect(menuSceneSource).toContain("case 'pause':");
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('reset-player');");
-    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailFade');");
+    expect(menuSceneSource).toContain("case 'move_up':");
+    expect(menuSceneSource).toContain('this.tryMovePlayer(0, -1);');
+    expect(menuSceneSource).toContain('this.tryMovePlayer(1, 0);');
+    expect(menuSceneSource).toContain('this.tryMovePlayer(0, 1);');
+    expect(menuSceneSource).toContain('this.tryMovePlayer(-1, 0);');
   });
 
   test('keeps camera-follow static and dynamic board layers on the same offset', () => {

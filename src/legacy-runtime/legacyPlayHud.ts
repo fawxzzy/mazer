@@ -15,6 +15,12 @@ export interface LegacyHudRect {
 }
 
 export interface LegacyPlayHudFrameInput {
+  compassBounds?: {
+    height: number;
+    left: number;
+    top: number;
+    width: number;
+  };
   elapsedMs: number;
   goalScreen: LegacyHudPoint;
   layoutWidth: number;
@@ -69,7 +75,9 @@ export const resolveLegacyHudArrowAngle = (
 
 export const resolveLegacyPlayHudFrame = (input: LegacyPlayHudFrameInput): LegacyPlayHudFrame => {
   const timerText = formatLegacyHudClock(input.elapsedMs);
-  const compassBounds = createLegacyHudRect(input.layoutWidth - 56, 8, 44, 44);
+  const compassBounds = input.compassBounds
+    ? createLegacyHudRect(input.compassBounds.left, input.compassBounds.top, input.compassBounds.width, input.compassBounds.height)
+    : createLegacyHudRect(input.layoutWidth - 56, 8, 44, 44);
   const arrowOrigin = {
     x: compassBounds.centerX,
     y: compassBounds.centerY

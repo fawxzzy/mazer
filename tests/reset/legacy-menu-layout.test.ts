@@ -109,8 +109,8 @@ describe('legacy menu layout', () => {
 
     expect(playLayout.boardTop + playLayout.boardSize + 24).toBeLessThanOrEqual(touchLayout.frame.top);
     expect(touchLayout.controls.pause.width).toBeGreaterThan(touchLayout.controls.move_up.width);
-    expect(touchLayout.controls.restart_attempt.bottom).toBeLessThanOrEqual(touchLayout.frame.bottom);
-    expect(touchLayout.controls.toggle_thoughts.bottom).toBeLessThanOrEqual(touchLayout.frame.bottom);
+    expect(touchLayout.controls.restart_attempt.top).toBe(touchLayout.controls.pause.top);
+    expect(touchLayout.controls.toggle_thoughts.width).toBe(0);
   });
 
   test('gives desktop active play a larger board than the front-door composition', () => {
@@ -144,6 +144,6 @@ describe('legacy menu layout', () => {
     expect(touchLayout.controls.move_right.right).toBeLessThanOrEqual(playLayout.boardLeft - 8);
     expect(touchLayout.controls.pause.left).toBeGreaterThanOrEqual(playLayout.boardLeft + playLayout.boardSize + 8);
     expect(touchLayout.controls.restart_attempt.left).toBe(touchLayout.controls.pause.left);
-    expect(touchLayout.controls.toggle_thoughts.left).toBe(touchLayout.controls.pause.left);
+    expect(touchLayout.controls.toggle_thoughts.width).toBe(0);
   });
 });

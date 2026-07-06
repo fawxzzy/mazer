@@ -99,7 +99,6 @@ const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
       { id: 'move-2', kind: 'movement', candidates: ['move_up', 'move_right', 'move_down', 'move_left'] },
       { id: 'pause', kind: 'control', control: 'pause' },
       { id: 'resume', kind: 'control', control: 'pause' },
-      { id: 'toggle-thoughts', kind: 'control', control: 'toggle_thoughts' },
       { id: 'restart', kind: 'control', control: 'restart_attempt' },
       { id: 'move-3', kind: 'movement', candidates: ['move_up', 'move_right', 'move_down', 'move_left'], waitMs: 360 }
     ]
@@ -833,46 +832,6 @@ const resolveTouchControlPoint = ({ viewport, diagnostics, control }) => {
     : null;
 };
 
-const TOUCH_MOVEMENT_CONTROLS = new Set(['move_up', 'move_right', 'move_down', 'move_left']);
-
-const resolveTouchMovementSwipe = ({ diagnostics, control }) => {
-  if (!TOUCH_MOVEMENT_CONTROLS.has(control)) {
-    return null;
-  }
-
-  const player = diagnostics?.runtime?.play?.player ?? null;
-  const board = diagnostics?.runtime?.play?.board ?? null;
-  if (
-    !Number.isFinite(player?.screenX)
-    || !Number.isFinite(player?.screenY)
-    || !Number.isFinite(board?.left)
-    || !Number.isFinite(board?.right)
-    || !Number.isFinite(board?.top)
-    || !Number.isFinite(board?.bottom)
-  ) {
-    return null;
-  }
-
-  const distance = Math.max(18, Math.round((board.tileSize ?? 8) * 1.8));
-  const deltaByControl = {
-    move_up: { x: 0, y: -distance },
-    move_right: { x: distance, y: 0 },
-    move_down: { x: 0, y: distance },
-    move_left: { x: -distance, y: 0 }
-  };
-  const delta = deltaByControl[control];
-  return {
-    start: {
-      x: Math.min(board.right - 1, Math.max(board.left + 1, player.screenX)),
-      y: Math.min(board.bottom - 1, Math.max(board.top + 1, player.screenY))
-    },
-    end: {
-      x: Math.min(board.right - 1, Math.max(board.left + 1, player.screenX + delta.x)),
-      y: Math.min(board.bottom - 1, Math.max(board.top + 1, player.screenY + delta.y))
-    }
-  };
-};
-
 const runEdgeLiveInteraction = async ({
   page,
   viewport,
@@ -940,15 +899,6 @@ const runEdgeLiveInteraction = async ({
   };
 
   const triggerTouchStep = async (diagnostics, control) => {
-    const swipe = resolveTouchMovementSwipe({ diagnostics, control });
-    if (swipe) {
-      await page.mouse.move(swipe.start.x, swipe.start.y);
-      await page.mouse.down();
-      await page.mouse.move(swipe.end.x, swipe.end.y, { steps: 4 });
-      await page.mouse.up();
-      return;
-    }
-
     const point = resolveTouchControlPoint({ viewport, diagnostics, control });
     if (!point) {
       const error = new Error(`Interactive touch workflow could not resolve ${control} touch coordinates on ${viewport.id}.`);
@@ -1311,7 +1261,6 @@ export const resolvePlayTouchChromeVerdict = (diagnostics) => {
   const controls = visual?.touchControls?.controls ?? null;
   const boardBounds = visual?.board?.bounds ?? null;
   const hud = visual?.hud ?? null;
-  const viewport = visual?.viewport ?? null;
   const pause = controls?.pause ?? null;
   const restart = controls?.restart_attempt ?? null;
   const trail = controls?.toggle_thoughts ?? null;
@@ -1319,17 +1268,19 @@ export const resolvePlayTouchChromeVerdict = (diagnostics) => {
   const down = controls?.move_down ?? null;
   const left = controls?.move_left ?? null;
   const right = controls?.move_right ?? null;
-  const actionControls = [pause, restart, trail];
+  const actionControls = [pause, restart];
   const dpadControls = [up, down, left, right];
   const hasActionControls = actionControls.every(isFiniteRect);
   const hasDpadControls = dpadControls.every(isFiniteRect);
   const rowTolerance = 3;
+  const dpadCenterX = hasDpadControls ? (left.centerX + right.centerX) / 2 : null;
+  const dpadCenterY = hasDpadControls ? (up.centerY + down.centerY) / 2 : null;
   const topActionBar = hasActionControls
     && actionControls.every((rect) => Math.abs(rect.top - pause.top) <= rowTolerance)
     && actionControls.every((rect) => Math.abs(rect.bottom - pause.bottom) <= rowTolerance)
     && pause.right < restart.left
-    && restart.right < trail.left
-    && (!isFiniteRect(boardBounds) || Math.max(pause.bottom, restart.bottom, trail.bottom) < boardBounds.top);
+    && !isFiniteRect(trail)
+    && (!isFiniteRect(boardBounds) || Math.max(pause.bottom, restart.bottom) < boardBounds.top);
   const bottomDpad = hasDpadControls
     && up.centerY < left.centerY
     && up.centerY < right.centerY
@@ -1340,10 +1291,13 @@ export const resolvePlayTouchChromeVerdict = (diagnostics) => {
     && (!isFiniteRect(boardBounds) || Math.min(up.top, left.top, right.top, down.top) > boardBounds.bottom);
   const compass = isFiniteRect(hud?.arrowBounds)
     && isFiniteRect(hud?.timerBounds)
-    && hud.arrowBounds.width >= 40
-    && hud.arrowBounds.height >= 40
+    && hud.arrowBounds.width >= 32
+    && hud.arrowBounds.height >= 32
     && hud.arrowBounds.left > hud.timerBounds.right
-    && (!viewport || hud.arrowBounds.right >= viewport.width - 16);
+    && dpadCenterX !== null
+    && dpadCenterY !== null
+    && Math.abs(hud.arrowBounds.centerX - dpadCenterX) <= 2
+    && Math.abs(hud.arrowBounds.centerY - dpadCenterY) <= 2;
 
   return {
     pass: Boolean(topActionBar && bottomDpad && compass),

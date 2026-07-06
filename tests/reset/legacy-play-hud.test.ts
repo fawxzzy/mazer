@@ -49,4 +49,23 @@ describe('legacy play HUD', () => {
     expect(frame.bounds.left).toBe(frame.timerBounds.left);
     expect(frame.bounds.right).toBe(frame.arrowBounds.right);
   });
+
+  test('can pin the compass to an explicit touch-control center', () => {
+    const frame = resolveLegacyPlayHudFrame({
+      compassBounds: { left: 179, top: 719, width: 32, height: 32 },
+      elapsedMs: 12_000,
+      layoutWidth: 390,
+      playerScreen: { x: 100, y: 100 },
+      goalScreen: { x: 100, y: 160 }
+    });
+
+    expect(frame.arrowBounds).toMatchObject({
+      left: 179,
+      top: 719,
+      width: 32,
+      height: 32
+    });
+    expect(frame.arrowOrigin).toEqual({ x: 195, y: 735 });
+    expect(frame.arrowAngleRadians).toBeCloseTo(Math.PI / 2);
+  });
 });

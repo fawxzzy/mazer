@@ -775,7 +775,7 @@ describe('edge live check', () => {
     });
   }, 15_000);
 
-  test('proves the mobile touch chrome uses top actions, bottom D-pad, and right compass', async () => {
+  test('proves the mobile touch chrome uses two top actions, bottom D-pad, and centered compass', async () => {
     const { resolvePlayTouchChromeVerdict } = await loadEdgeLiveHelpers();
 
     const passingVerdict = resolvePlayTouchChromeVerdict({
@@ -786,13 +786,13 @@ describe('edge live check', () => {
         },
         hud: {
           timerBounds: { left: 14, top: 14, right: 78, bottom: 36, width: 64, height: 22 },
-          arrowBounds: { left: 334, top: 8, right: 378, bottom: 52, width: 44, height: 44 }
+          arrowBounds: { left: 179, top: 719, right: 211, bottom: 751, width: 32, height: 32, centerX: 195, centerY: 735 }
         },
         touchControls: {
           controls: {
             pause: { left: 45, top: 72, right: 126, bottom: 114, width: 81, height: 42, centerX: 85.5, centerY: 93 },
             restart_attempt: { left: 154, top: 72, right: 235, bottom: 114, width: 81, height: 42, centerX: 194.5, centerY: 93 },
-            toggle_thoughts: { left: 263, top: 72, right: 344, bottom: 114, width: 81, height: 42, centerX: 303.5, centerY: 93 },
+            toggle_thoughts: null,
             move_up: { left: 163, top: 636, right: 227, bottom: 700, width: 64, height: 64, centerX: 195, centerY: 668 },
             move_left: { left: 96, top: 703, right: 160, bottom: 767, width: 64, height: 64, centerX: 128, centerY: 735 },
             move_right: { left: 230, top: 703, right: 294, bottom: 767, width: 64, height: 64, centerX: 262, centerY: 735 },
