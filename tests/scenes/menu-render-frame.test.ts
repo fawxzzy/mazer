@@ -196,10 +196,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.18;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_TEXT =');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_SHADOW =');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW = 0xe4efe6;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW = 0xff263f;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_TAIL = 0xecfff5;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;');
     expect(menuSceneSource).toContain('const timerShadow = this.add.text(23, 17, hudFrame.timerText');
     expect(menuSceneSource).toContain('timerShadow.setAlpha(0.64);');
+    expect(menuSceneSource).toContain('this.drawLegacyPlayCompass(hudFrame);');
     expect(menuSceneSource).toContain('this.hudGraphics.fillTriangle(');
     expect(menuSceneSource).not.toContain('this.hudGraphics.strokeRect(');
   });
@@ -319,6 +321,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).toContain('touchControls');
     expect(menuSceneSource).toContain('LEGACY_PLAY_TOUCH_FRAME_FILL');
+    expect(menuSceneSource).toContain("this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');");
+    expect(menuSceneSource).toContain("this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');");
+    expect(menuSceneSource).toContain("this.drawLegacyPlayTouchLabel(controls.toggle_thoughts, 'TRAIL');");
+    expect(menuSceneSource).toContain("this.hudGraphics.moveTo(cx, cy + stem);");
+    expect(menuSceneSource).toContain("this.hudGraphics.lineTo(cx, cy - size);");
     expect(menuSceneSource).toContain('installLegacyPlayTouchControlFallback');
     expect(menuSceneSource).toContain("event.pointerType === 'touch'");
     expect(menuSceneSource).toContain('event.stopImmediatePropagation()');

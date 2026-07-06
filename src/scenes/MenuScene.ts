@@ -389,7 +389,8 @@ const LEGACY_PLAY_HUD_TIMER_PANE = 0x05050a;
 const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.18;
 const LEGACY_PLAY_HUD_TIMER_TEXT = '#d7f0d6';
 const LEGACY_PLAY_HUD_TIMER_SHADOW = '#081208';
-const LEGACY_PLAY_HUD_ARROW = 0xe4efe6;
+const LEGACY_PLAY_HUD_ARROW = 0xff263f;
+const LEGACY_PLAY_HUD_ARROW_TAIL = 0xecfff5;
 const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;
 const LEGACY_PLAY_TOUCH_FRAME_FILL = 0x06121c;
 const LEGACY_PLAY_TOUCH_BUTTON_FILL = 0x0c2633;
@@ -2263,6 +2264,8 @@ export class MenuScene extends Phaser.Scene {
     timer.setData('hud', true);
     this.uiTexts.push(timer);
 
+    this.drawLegacyPlayCompass(hudFrame);
+
     this.hudGraphics.lineStyle(3, LEGACY_PLAY_HUD_ARROW_SHADOW, 0.36);
     this.hudGraphics.beginPath();
     this.hudGraphics.moveTo(hudFrame.arrowOrigin.x + 1, hudFrame.arrowOrigin.y + 1);
@@ -2281,6 +2284,14 @@ export class MenuScene extends Phaser.Scene {
       hudFrame.arrowRight.y + 1
     );
 
+    this.hudGraphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW_TAIL, 0.86);
+    this.hudGraphics.beginPath();
+    this.hudGraphics.moveTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y);
+    this.hudGraphics.lineTo(
+      hudFrame.arrowOrigin.x - (Math.cos(hudFrame.arrowAngleRadians) * 9),
+      hudFrame.arrowOrigin.y - (Math.sin(hudFrame.arrowAngleRadians) * 9)
+    );
+    this.hudGraphics.strokePath();
     this.hudGraphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW, 0.9);
     this.hudGraphics.beginPath();
     this.hudGraphics.moveTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y);
@@ -2316,6 +2327,26 @@ export class MenuScene extends Phaser.Scene {
     this.hudFrame = hudFrame;
   }
 
+  private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame): void {
+    const { arrowBounds } = hudFrame;
+    const radius = Math.max(8, Math.min(arrowBounds.width, arrowBounds.height) * 0.34);
+
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_FRAME_FILL, 0.36);
+    this.hudGraphics.fillRoundedRect(arrowBounds.left, arrowBounds.top, arrowBounds.width, arrowBounds.height, 10);
+    this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.42);
+    this.hudGraphics.strokeRoundedRect(arrowBounds.left, arrowBounds.top, arrowBounds.width, arrowBounds.height, 10);
+    this.hudGraphics.lineStyle(1, LEGACY_PLAY_HUD_ARROW, 0.28);
+    this.hudGraphics.strokeCircle(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y, radius);
+    this.hudGraphics.beginPath();
+    this.hudGraphics.moveTo(hudFrame.arrowOrigin.x - radius + 3, hudFrame.arrowOrigin.y);
+    this.hudGraphics.lineTo(hudFrame.arrowOrigin.x + radius - 3, hudFrame.arrowOrigin.y);
+    this.hudGraphics.moveTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y - radius + 3);
+    this.hudGraphics.lineTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y + radius - 3);
+    this.hudGraphics.strokePath();
+    this.hudGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, 0.92);
+    this.hudGraphics.fillCircle(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y, 2);
+  }
+
   private drawLegacyPlayTouchControls(): VisualRect | null {
     const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
     if (!this.shouldRenderLegacyPlayTouchControls(touchControlLayout)) {
@@ -2343,8 +2374,11 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPlayTouchArrow(controls.move_down, 'down');
     this.drawLegacyPlayTouchArrow(controls.move_left, 'left');
     this.drawLegacyPlayTouchPauseIcon(controls.pause);
+    this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');
     this.drawLegacyPlayTouchRestartIcon(controls.restart_attempt);
+    this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');
     this.drawLegacyPlayTouchTrailIcon(controls.toggle_thoughts);
+    this.drawLegacyPlayTouchLabel(controls.toggle_thoughts, 'TRAIL');
 
     return createVisualRect(frame.left, frame.top, frame.width, frame.height);
   }
@@ -2353,46 +2387,74 @@ export class MenuScene extends Phaser.Scene {
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['move_up'],
     accented: boolean
   ): void {
-    this.hudGraphics.fillStyle(accented ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_FILL, accented ? 0.22 : 0.34);
-    this.hudGraphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, 14);
+    const radius = accented ? 8 : 10;
+    this.hudGraphics.fillStyle(accented ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_FILL, accented ? 0.18 : 0.34);
+    this.hudGraphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
+    this.hudGraphics.fillStyle(0xffffff, accented ? 0.04 : 0.06);
+    this.hudGraphics.fillRoundedRect(rect.left + 2, rect.top + 2, Math.max(1, rect.width - 4), Math.max(1, rect.height * 0.34), Math.max(3, radius - 3));
     this.hudGraphics.lineStyle(2, accented ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, accented ? 0.5 : 0.42);
-    this.hudGraphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, 14);
+    this.hudGraphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
+    this.hudGraphics.lineStyle(1, 0x000000, 0.28);
+    this.hudGraphics.strokeRoundedRect(rect.left + 3, rect.top + 3, Math.max(1, rect.width - 6), Math.max(1, rect.height - 6), Math.max(2, radius - 5));
   }
 
   private drawLegacyPlayTouchArrow(
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['move_up'],
     direction: 'up' | 'right' | 'down' | 'left'
   ): void {
-    const size = Math.round(Math.min(rect.width, rect.height) * 0.28);
+    const size = Math.round(Math.min(rect.width, rect.height) * 0.24);
+    const stem = Math.max(8, Math.round(size * 1.05));
     const cx = rect.centerX;
     const cy = rect.centerY;
 
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.86);
+    this.hudGraphics.lineStyle(Math.max(3, Math.round(rect.width * 0.06)), LEGACY_PLAY_TOUCH_ICON, 0.9);
+    this.hudGraphics.beginPath();
     switch (direction) {
       case 'up':
-        this.hudGraphics.fillTriangle(cx, cy - size, cx - size, cy + size, cx + size, cy + size);
+        this.hudGraphics.moveTo(cx, cy + stem);
+        this.hudGraphics.lineTo(cx, cy - size);
+        this.hudGraphics.moveTo(cx, cy - size);
+        this.hudGraphics.lineTo(cx - size, cy + Math.round(size * 0.28));
+        this.hudGraphics.moveTo(cx, cy - size);
+        this.hudGraphics.lineTo(cx + size, cy + Math.round(size * 0.28));
         break;
       case 'right':
-        this.hudGraphics.fillTriangle(cx + size, cy, cx - size, cy - size, cx - size, cy + size);
+        this.hudGraphics.moveTo(cx - stem, cy);
+        this.hudGraphics.lineTo(cx + size, cy);
+        this.hudGraphics.moveTo(cx + size, cy);
+        this.hudGraphics.lineTo(cx - Math.round(size * 0.28), cy - size);
+        this.hudGraphics.moveTo(cx + size, cy);
+        this.hudGraphics.lineTo(cx - Math.round(size * 0.28), cy + size);
         break;
       case 'down':
-        this.hudGraphics.fillTriangle(cx, cy + size, cx - size, cy - size, cx + size, cy - size);
+        this.hudGraphics.moveTo(cx, cy - stem);
+        this.hudGraphics.lineTo(cx, cy + size);
+        this.hudGraphics.moveTo(cx, cy + size);
+        this.hudGraphics.lineTo(cx - size, cy - Math.round(size * 0.28));
+        this.hudGraphics.moveTo(cx, cy + size);
+        this.hudGraphics.lineTo(cx + size, cy - Math.round(size * 0.28));
         break;
       case 'left':
-        this.hudGraphics.fillTriangle(cx - size, cy, cx + size, cy - size, cx + size, cy + size);
+        this.hudGraphics.moveTo(cx + stem, cy);
+        this.hudGraphics.lineTo(cx - size, cy);
+        this.hudGraphics.moveTo(cx - size, cy);
+        this.hudGraphics.lineTo(cx + Math.round(size * 0.28), cy - size);
+        this.hudGraphics.moveTo(cx - size, cy);
+        this.hudGraphics.lineTo(cx + Math.round(size * 0.28), cy + size);
         break;
       default:
         direction satisfies never;
     }
+    this.hudGraphics.strokePath();
   }
 
   private drawLegacyPlayTouchPauseIcon(
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause']
   ): void {
-    const barWidth = Math.max(5, Math.round(rect.width * 0.1));
-    const barHeight = Math.round(rect.height * 0.42);
-    const gap = Math.round(rect.width * 0.16);
-    const top = rect.centerY - Math.round(barHeight / 2);
+    const barWidth = Math.max(4, Math.round(rect.width * 0.055));
+    const barHeight = Math.round(rect.height * 0.28);
+    const gap = Math.round(rect.width * 0.08);
+    const top = rect.top + Math.round(rect.height * 0.16);
 
     this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.86);
     this.hudGraphics.fillRoundedRect(rect.centerX - gap - barWidth, top, barWidth, barHeight, 2);
@@ -2402,14 +2464,15 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyPlayTouchRestartIcon(
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['restart_attempt']
   ): void {
-    const radius = Math.round(Math.min(rect.width, rect.height) * 0.23);
+    const radius = Math.round(Math.min(rect.width, rect.height) * 0.18);
     const tipSize = Math.max(7, Math.round(radius * 0.42));
+    const iconCenterY = rect.top + Math.round(rect.height * 0.3);
     const tipX = rect.centerX + Math.round(radius * 0.8);
-    const tipY = rect.centerY - Math.round(radius * 0.76);
+    const tipY = iconCenterY - Math.round(radius * 0.76);
 
     this.hudGraphics.lineStyle(Math.max(3, Math.round(rect.width * 0.05)), LEGACY_PLAY_TOUCH_ICON, 0.82);
     this.hudGraphics.beginPath();
-    this.hudGraphics.arc(rect.centerX, rect.centerY, radius, Phaser.Math.DegToRad(36), Phaser.Math.DegToRad(324), false);
+    this.hudGraphics.arc(rect.centerX, iconCenterY, radius, Phaser.Math.DegToRad(36), Phaser.Math.DegToRad(324), false);
     this.hudGraphics.strokePath();
     this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.82);
     this.hudGraphics.fillTriangle(tipX, tipY, tipX + tipSize, tipY - 1, tipX + 2, tipY + tipSize);
@@ -2418,12 +2481,12 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyPlayTouchTrailIcon(
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['toggle_thoughts']
   ): void {
-    const radius = Math.max(3, Math.round(rect.width * 0.07));
+    const radius = Math.max(2, Math.round(rect.width * 0.045));
     const left = rect.centerX - Math.round(rect.width * 0.22);
     const mid = rect.centerX;
     const right = rect.centerX + Math.round(rect.width * 0.22);
-    const top = rect.centerY - Math.round(rect.height * 0.16);
-    const bottom = rect.centerY + Math.round(rect.height * 0.16);
+    const top = rect.top + Math.round(rect.height * 0.16);
+    const bottom = rect.top + Math.round(rect.height * 0.36);
 
     this.hudGraphics.lineStyle(Math.max(3, Math.round(rect.width * 0.05)), LEGACY_PLAY_TOUCH_ICON, 0.78);
     this.hudGraphics.beginPath();
@@ -2435,6 +2498,19 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.fillCircle(left, bottom, radius);
     this.hudGraphics.fillCircle(mid, top, radius);
     this.hudGraphics.fillCircle(right, bottom, radius);
+  }
+
+  private drawLegacyPlayTouchLabel(
+    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
+    label: string
+  ): void {
+    const text = this.add.text(rect.centerX, rect.bottom - Math.max(8, Math.round(rect.height * 0.22)), label, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: `${Math.max(8, Math.min(12, Math.round(rect.height * 0.26)))}px`,
+      color: LEGACY_PLAY_HUD_TIMER_TEXT
+    }).setOrigin(0.5).setAlpha(0.88);
+    text.setData('hud', true);
+    this.uiTexts.push(text);
   }
 
   private clearHudTexts(): void {

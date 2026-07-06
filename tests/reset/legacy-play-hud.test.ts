@@ -35,9 +35,15 @@ describe('legacy play HUD', () => {
       width: 64,
       height: 22
     });
-    expect(frame.arrowOrigin).toEqual({ x: 1250, y: 22 });
+    expect(frame.arrowOrigin).toEqual({ x: 1246, y: 30 });
     expect(frame.arrowAngleRadians).toBeCloseTo(0);
     expect(frame.arrowAngleDegrees).toBeCloseTo(0);
+    expect(frame.arrowBounds).toMatchObject({
+      left: 1224,
+      top: 8,
+      width: 44,
+      height: 44
+    });
     expect(frame.arrowBounds.left).toBeLessThanOrEqual(frame.arrowOrigin.x);
     expect(frame.arrowBounds.right).toBeGreaterThan(frame.arrowTip.x);
     expect(frame.bounds.left).toBe(frame.timerBounds.left);

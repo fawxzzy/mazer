@@ -180,51 +180,64 @@ export const resolveTouchControlLayout = (
       ultraNarrow ? 44 : 58
     );
     const gap = Math.max(6, Math.round(buttonSize * 0.16));
-    const frameWidth = Math.max(1, viewport.width - safeInsets.left - safeInsets.right);
-    const pad = ultraNarrow ? 0 : Math.max(10, Math.round(buttonSize * 0.3));
+    const dpadPad = ultraNarrow ? 6 : Math.max(10, Math.round(buttonSize * 0.3));
     const dpadSpan = (buttonSize * 3) + (gap * 2);
-    const frameHeight = dpadSpan + (pad * 2);
-    const frameLeft = clamp(Math.round(safeInsets.left), 0, Math.max(0, viewport.width - frameWidth));
+    const dpadFrameWidth = Math.min(
+      Math.max(1, viewport.width - safeInsets.left - safeInsets.right),
+      dpadSpan + (dpadPad * 2)
+    );
+    const dpadFrameHeight = dpadSpan + (dpadPad * 2);
+    const frameLeft = clamp(
+      Math.round((viewport.width - dpadFrameWidth) / 2),
+      safeInsets.left,
+      Math.max(safeInsets.left, viewport.width - safeInsets.right - dpadFrameWidth)
+    );
     const frameTop = clamp(
-      Math.round(viewport.height - safeInsets.bottom - frameHeight - Math.max(12, buttonSize * 0.25)),
+      Math.round(viewport.height - safeInsets.bottom - dpadFrameHeight - Math.max(12, buttonSize * 0.25)),
       0,
-      Math.max(0, viewport.height - frameHeight)
+      Math.max(0, viewport.height - dpadFrameHeight)
     );
-    const dpadLeft = frameLeft + pad;
-    const dpadTop = frameTop + pad;
-    const actionLaneWidth = Math.max(
-      buttonSize,
-      frameWidth - (pad * 2) - dpadSpan - Math.max(14, gap * 2)
+    const dpadLeft = frameLeft + dpadPad;
+    const dpadTop = frameTop + dpadPad;
+    const topActionHeight = clamp(Math.round(buttonSize * 0.84), 34, ultraNarrow ? 38 : 42);
+    const topActionGap = ultraNarrow ? 4 : Math.max(6, Math.round(gap * 0.82));
+    const topActionFrameLeft = ultraNarrow ? safeInsets.left + 6 : safeInsets.left + 88;
+    const topActionFrameRight = ultraNarrow
+      ? viewport.width - safeInsets.right - 6
+      : viewport.width - safeInsets.right - 60;
+    const topActionFrameWidth = Math.max(
+      (topActionHeight * 3) + (topActionGap * 2),
+      topActionFrameRight - topActionFrameLeft
     );
-    const actionWidth = ultraNarrow ? buttonSize : Math.min(104, actionLaneWidth);
-    const actionLeft = frameLeft + frameWidth - pad - actionWidth;
-    const actionTop = dpadTop;
-    const secondarySize = Math.max(30, Math.round(buttonSize * 0.78));
-    const secondaryPairFits = actionWidth >= (secondarySize * 2) + gap;
-    const secondaryLeft = actionLeft + Math.round((actionWidth - secondarySize) / 2);
-    const secondaryGap = Math.max(5, Math.round(gap * 0.85));
+    const actionWidth = Math.max(
+      topActionHeight,
+      Math.floor((topActionFrameWidth - (topActionGap * 2)) / 3)
+    );
+    const actionTop = safeInsets.top + (ultraNarrow ? 44 : 8);
+    const actionFrame = createRect(
+      clamp(
+        topActionFrameLeft,
+        safeInsets.left,
+        Math.max(safeInsets.left, viewport.width - safeInsets.right - ((actionWidth * 3) + (topActionGap * 2)))
+      ),
+      actionTop,
+      (actionWidth * 3) + (topActionGap * 2),
+      topActionHeight
+    );
+    const dpadFrame = createRect(frameLeft, frameTop, dpadFrameWidth, dpadFrameHeight);
 
     return {
       compact,
-      frame: createRect(frameLeft, frameTop, frameWidth, frameHeight),
+      frame: dpadFrame,
+      frames: [actionFrame, dpadFrame],
       controls: {
         move_up: createRect(dpadLeft + buttonSize + gap, dpadTop, buttonSize, buttonSize),
         move_down: createRect(dpadLeft + buttonSize + gap, dpadTop + ((buttonSize + gap) * 2), buttonSize, buttonSize),
         move_left: createRect(dpadLeft, dpadTop + buttonSize + gap, buttonSize, buttonSize),
         move_right: createRect(dpadLeft + ((buttonSize + gap) * 2), dpadTop + buttonSize + gap, buttonSize, buttonSize),
-        pause: createRect(actionLeft, actionTop, actionWidth, buttonSize),
-        restart_attempt: createRect(
-          secondaryPairFits ? actionLeft : secondaryLeft,
-          actionTop + buttonSize + secondaryGap,
-          secondarySize,
-          secondarySize
-        ),
-        toggle_thoughts: createRect(
-          secondaryPairFits ? actionLeft + actionWidth - secondarySize : secondaryLeft,
-          actionTop + buttonSize + secondaryGap + (secondaryPairFits ? 0 : secondarySize + secondaryGap),
-          secondarySize,
-          secondarySize
-        )
+        pause: createRect(actionFrame.left, actionFrame.top, actionWidth, topActionHeight),
+        restart_attempt: createRect(actionFrame.left + actionWidth + topActionGap, actionFrame.top, actionWidth, topActionHeight),
+        toggle_thoughts: createRect(actionFrame.left + ((actionWidth + topActionGap) * 2), actionFrame.top, actionWidth, topActionHeight)
       }
     };
   }
