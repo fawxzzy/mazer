@@ -481,6 +481,8 @@ const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO = 0.96;
 const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 50;
 const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
+const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 48;
+const LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS = 16;
 const LEGACY_PLAY_COMPASS_SPIN_DURATION_MS = 1800;
 const LEGACY_PLAY_COMPASS_SPIN_TURNS = 3.25;
 const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
@@ -566,6 +568,7 @@ export class MenuScene extends Phaser.Scene {
   private playHeldTouchMoves: LegacyPlayHeldTouchMove[] = [];
   private playHeldTouchSequence = 0;
   private playHeldTouchRepeatTimer: Phaser.Time.TimerEvent | null = null;
+  private playHeldTouchRepeatDueAtMs: number | null = null;
   private playTouchStickPointerId: number | null = null;
   private playTouchStickPull: TouchStickPullVector | null = null;
   private playPointerStart: LegacyPlayPointerStart | null = null;
@@ -909,6 +912,7 @@ export class MenuScene extends Phaser.Scene {
             movementSpeedLabel: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
             repeatInitialDelayMs: movementSpeedProfile.initialDelayMs,
             repeatIntervalMs: movementSpeedProfile.repeatIntervalMs,
+            stickRetargetDelayMs: LEGACY_PLAY_STICK_RETARGET_STEP_MS,
             turnDelayMs: movementSpeedProfile.turnDelayMs,
             pendingStepCount: this.playDiagonalMoveQueue.length,
             repeatTimerActive: this.playHeldTouchRepeatTimer !== null,
@@ -1427,7 +1431,7 @@ export class MenuScene extends Phaser.Scene {
       Math.abs(previousPull.normalizedY - nextPull.normalizedY),
       Math.abs(previousPull.distanceRatio - nextPull.distanceRatio)
     );
-    return previousPull.movement !== nextPull.movement || pullDelta >= 0.015;
+    return previousPull.movement !== nextPull.movement || pullDelta >= 0.008;
   }
 
   private resolveLegacyPlayTouchClientPoint(clientX: number, clientY: number): { x: number; y: number } {
@@ -1605,7 +1609,10 @@ export class MenuScene extends Phaser.Scene {
     const pullChanged = this.hasLegacyPlayTouchStickPullChanged(pullVector);
     this.playTouchStickPull = pullVector;
     if (pullVector !== null && pullVector.movementCandidates.length > 0) {
-      this.setLegacyPlayHeldTouchMoveCandidates(pullVector.movementCandidates, pointerId, { keepWhenBlocked: true });
+      this.setLegacyPlayHeldTouchMoveCandidates(pullVector.movementCandidates, pointerId, {
+        keepWhenBlocked: true,
+        smoothRetarget: true
+      });
     } else {
       this.releaseLegacyPlayHeldTouchMove(pointerId);
     }
@@ -1632,7 +1639,7 @@ export class MenuScene extends Phaser.Scene {
   private setLegacyPlayHeldTouchMoveCandidates(
     controls: readonly HumanMovementActionKind[],
     pointerId: number | null,
-    options: { keepWhenBlocked?: boolean } = {}
+    options: { keepWhenBlocked?: boolean; smoothRetarget?: boolean } = {}
   ): boolean {
     const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
     const uniqueControls: HumanMovementActionKind[] = [];
@@ -1677,6 +1684,21 @@ export class MenuScene extends Phaser.Scene {
     this.playHeldTouchMoves = [...remainingMoves, ...nextMoves];
     this.sortLegacyPlayHeldTouchMoves();
     this.boardDynamicDirty = true;
+
+    if (options.smoothRetarget) {
+      const currentDueAtMs = this.playHeldTouchRepeatDueAtMs;
+      const rescheduleThresholdMs = LEGACY_PLAY_STICK_RETARGET_STEP_MS
+        + LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS;
+      if (
+        this.playHeldTouchRepeatTimer === null
+        || currentDueAtMs === null
+        || currentDueAtMs - this.time.now > rescheduleThresholdMs
+      ) {
+        this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_STICK_RETARGET_STEP_MS);
+      }
+      this.publishInteractionDiagnostics();
+      return true;
+    }
 
     this.clearLegacyPlayHeldTouchRepeat();
     const moved = this.performLegacyPlayHeldTouchMove();
@@ -1817,12 +1839,16 @@ export class MenuScene extends Phaser.Scene {
   private clearLegacyPlayHeldTouchRepeat(): void {
     this.playHeldTouchRepeatTimer?.remove(false);
     this.playHeldTouchRepeatTimer = null;
+    this.playHeldTouchRepeatDueAtMs = null;
   }
 
   private scheduleLegacyPlayHeldTouchRepeat(delayMs: number): void {
     this.clearLegacyPlayHeldTouchRepeat();
-    this.playHeldTouchRepeatTimer = this.time.delayedCall(Math.max(0, Math.round(delayMs)), () => {
+    const normalizedDelayMs = Math.max(0, Math.round(delayMs));
+    this.playHeldTouchRepeatDueAtMs = this.time.now + normalizedDelayMs;
+    this.playHeldTouchRepeatTimer = this.time.delayedCall(normalizedDelayMs, () => {
       this.playHeldTouchRepeatTimer = null;
+      this.playHeldTouchRepeatDueAtMs = null;
       this.repeatLegacyPlayHeldTouchMove();
     });
   }

@@ -297,6 +297,7 @@ describe('menu runtime diagnostics', () => {
             movementSpeedLabel: '58%',
             repeatInitialDelayMs: 204,
             repeatIntervalMs: 91,
+            stickRetargetDelayMs: 48,
             turnDelayMs: 238,
             pendingStepCount: 0,
             repeatTimerActive: false,

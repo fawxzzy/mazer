@@ -148,6 +148,11 @@ describe('input-human touch bridge', () => {
       movement: 'move_right',
       movementCandidates: ['move_right', 'move_down']
     });
+    expect(resolveStickMovementIntent(Math.PI / 12, { previousIntentSegment: 0 })).toEqual({
+      intentSegment: 1,
+      movement: 'move_right',
+      movementCandidates: ['move_right', 'move_down']
+    });
     expect(resolveStickMovementIntent(Math.PI / 2, { previousIntentSegment: 0 }).intentSegment).toBe(4);
     const partialPull = resolveStickPullVector(
       layout.stick!,
