@@ -3,7 +3,7 @@ import { BootScene } from '../scenes/BootScene';
 import { MenuScene } from '../scenes/MenuScene';
 
 export const phaserConfig: Phaser.Types.Core.GameConfig = {
-  type: Phaser.AUTO,
+  type: Phaser.CANVAS,
   parent: 'app',
   width: 1280,
   height: 720,
@@ -14,6 +14,10 @@ export const phaserConfig: Phaser.Types.Core.GameConfig = {
   roundPixels: true,
   audio: {
     noAudio: true
+  },
+  fps: {
+    target: 60,
+    min: 30
   },
   input: {
     activePointers: 2

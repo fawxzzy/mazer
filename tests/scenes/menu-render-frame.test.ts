@@ -13,6 +13,16 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 describe('resolveLegacyMenuPathRenderFrame', () => {
+  test('caps active Phaser rendering to mobile-friendly 60 FPS', () => {
+    const phaserConfigSource = readFileSync(resolve(process.cwd(), 'src/boot/phaserConfig.ts'), 'utf8');
+
+    expect(phaserConfigSource).toContain('type: Phaser.CANVAS');
+    expect(phaserConfigSource).toContain('fps: {');
+    expect(phaserConfigSource).toContain('target: 60');
+    expect(phaserConfigSource).toContain('min: 30');
+    expect(phaserConfigSource).not.toContain('forceSetTimeOut: true');
+  });
+
   test('bridges connected neighbors to tile edges for legacy trench continuity', () => {
     const maze = {
       size: 3,
