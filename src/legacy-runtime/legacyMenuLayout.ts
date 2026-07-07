@@ -93,6 +93,9 @@ export const resolveLegacyMenuLayout = (
   const leftButtonY = isUltraNarrow ? stackTop + Math.round(buttonHeight / 2) : rowButtonY;
   const centerButtonY = isUltraNarrow ? leftButtonY + buttonHeight + stackGap : rowButtonY;
   const rightButtonY = isUltraNarrow ? centerButtonY + buttonHeight + stackGap : rowButtonY;
+  const titleOverlapY = Math.round(boardTop + (snappedBoardSize * (isPortrait ? 0.216 : 0.221)));
+  const menuPortraitTitleClearance = Math.round(clamp(snappedBoardSize * 0.13, 42, 68));
+  const menuPortraitTitleY = Math.max(34, boardTop - menuPortraitTitleClearance);
 
   return {
     width,
@@ -102,7 +105,7 @@ export const resolveLegacyMenuLayout = (
     boardSize: snappedBoardSize,
     tileSize,
     titleX: Math.round(width / 2),
-    titleY: Math.round(boardTop + (snappedBoardSize * (isPortrait ? 0.216 : 0.221))),
+    titleY: Math.round(!isPlaySurface && isPortrait ? menuPortraitTitleY : titleOverlapY),
     footerY: height - 18,
     buttonLayout: isUltraNarrow ? 'stack' : 'row',
     buttonY: rowButtonY,

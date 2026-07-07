@@ -30,6 +30,17 @@ describe('legacy menu title presentation', () => {
     expect(presentation.shadowAlpha).toBeLessThan(presentation.titleAlpha);
   });
 
+  test('uses a header-sized portrait wordmark for generated menu boards so it does not bury the maze', () => {
+    const snapshotPresentation = resolveLegacyMenuTitlePresentation(387, 7, true, 430, 'snapshot');
+    const proceduralPresentation = resolveLegacyMenuTitlePresentation(387, 7, true, 430, 'procedural');
+
+    expect(proceduralPresentation.fontSize).toBeLessThan(snapshotPresentation.fontSize);
+    expect(proceduralPresentation.fontSize).toBeGreaterThanOrEqual(68);
+    expect(proceduralPresentation.fontSize).toBeLessThanOrEqual(70);
+    expect(proceduralPresentation.titleAlpha).toBeGreaterThan(snapshotPresentation.titleAlpha);
+    expect(proceduralPresentation.shadowAlpha).toBeLessThan(proceduralPresentation.titleAlpha);
+  });
+
   test('caps the wordmark in ultra-narrow side panels without changing normal portrait scale', () => {
     const presentation = resolveLegacyMenuTitlePresentation(147, 3, true, 172);
 

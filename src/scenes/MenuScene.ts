@@ -111,7 +111,6 @@ import {
   createLegacyMenuDemoWalkerConfig,
 } from '../legacy-runtime/legacyDemoWalker';
 import {
-  resolveLegacyDynamicMarkerInset,
   resolveLegacyDynamicTrailStrokeWidth,
   resolveLegacyEndpointMarkerRenderMetrics,
   resolveLegacyMenuPathRenderFrames,
@@ -430,10 +429,10 @@ const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
 const LEGACY_MENU_SLAB_FILL = 0x101824;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;
-const LEGACY_MENU_PATH_CORE = 0xe6f2eb;
-const LEGACY_MENU_PATH_EDGE = 0x304158;
+const LEGACY_MENU_PATH_CORE = 0xe7fff4;
+const LEGACY_MENU_PATH_EDGE = 0x0d3c4f;
 const LEGACY_MENU_PATH_EDGE_ALPHA = 0.9;
-const LEGACY_MENU_WALL_FILL = 0x0d1724;
+const LEGACY_MENU_WALL_FILL = 0x07111d;
 const LEGACY_MENU_WALL_GLASS_ALPHA = 0.58;
 const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.18;
 const LEGACY_PLAY_PATH_CORE = 0xe7fff4;
@@ -465,10 +464,9 @@ const LEGACY_CYBER_PANEL_FILL = 0x07131d;
 const LEGACY_CYBER_PANEL_STROKE = 0x72e0bf;
 const LEGACY_CYBER_PANEL_STROKE_ALT = 0xb7f2ff;
 const LEGACY_CYBER_PANEL_SHADOW = 0x02070d;
-const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
-const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
-const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
-const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;
+const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x107d74;
+const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.64;
+const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x107d74;
 const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.64;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;
@@ -2643,10 +2641,8 @@ export class MenuScene extends Phaser.Scene {
     const wallColor = isMenuMode
       ? LEGACY_MENU_WALL_FILL
       : LEGACY_PLAY_WALL_FILL;
-    const boardFill = isMenuMode
-      ? 0x0d1520
-      : LEGACY_PLAY_BOARD_FILL;
-    const boardEdge = isMenuMode ? 0x050a10 : LEGACY_PLAY_BOARD_EDGE;
+    const boardFill = LEGACY_PLAY_BOARD_FILL;
+    const boardEdge = LEGACY_PLAY_BOARD_EDGE;
     const pathGlow = isMenuMode
       ? LEGACY_MENU_PATH_EDGE
       : LEGACY_PLAY_PATH_EDGE;
@@ -2658,7 +2654,7 @@ export class MenuScene extends Phaser.Scene {
       this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardSize, boardSize);
     }
     if (isMenuMode) {
-      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_FILL, 0.58);
+      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_FILL, 0.16);
       this.boardStaticGraphics.fillRect(boardLeft - 2, boardTop - 2, boardSize + 4, boardSize + 4);
     }
     this.boardStaticGraphics.fillStyle(boardEdge, 1);
@@ -2829,14 +2825,10 @@ export class MenuScene extends Phaser.Scene {
     const dynamicTrailKeys = new Set(trail.map((point) => `${point.x},${point.y}`));
     const boardOffset = this.resolveBoardOffset();
 
-    if (this.mode === 'menu' && this.maze.start) {
-      this.fillMenuDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9);
-    } else if (this.maze.start) {
+    if (this.maze.start) {
       this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');
     }
-    if (this.mode === 'menu' && this.maze.goal) {
-      this.fillMenuDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95);
-    } else if (this.maze.goal) {
+    if (this.maze.goal) {
       this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95, 'goal');
     }
 
@@ -2849,9 +2841,7 @@ export class MenuScene extends Phaser.Scene {
       const alpha = this.mode === 'play'
         ? clamp(0.34 + ((index / Math.max(1, trail.length - 1)) * 0.66), 0.34, 1)
         : clamp(0.22 + ((index / Math.max(1, trail.length - 1)) * 0.82), 0.22, 1);
-      const trailColor = this.mode === 'play'
-        ? (this.settings.darkMode ? 0x9cffd2 : 0x66eebf)
-        : (this.settings.darkMode ? 0x10c8f2 : 0x14b8d9);
+      const trailColor = this.settings.darkMode ? 0x9cffd2 : 0x66eebf;
       const trailAlpha = this.settings.darkMode && this.mode === 'menu'
         ? clamp(alpha + 0.08, 0, 1)
         : alpha;
@@ -2907,25 +2897,6 @@ export class MenuScene extends Phaser.Scene {
     const offsetX = Math.round((0.5 - xRatio) * Math.min(42, this.layout.tileSize * 4));
     const offsetY = Math.round((0.5 - yRatio) * Math.min(42, this.layout.tileSize * 4));
     return new Phaser.Math.Vector2(offsetX, offsetY);
-  }
-
-  private fillTile(
-    graphics: Phaser.GameObjects.Graphics,
-    point: LegacyPoint,
-    color: number,
-    originX: number,
-    originY: number,
-    tileSize: number,
-    alpha = 1,
-    inset = 0
-  ): void {
-    graphics.fillStyle(color, alpha);
-    graphics.fillRect(
-      originX + (point.x * tileSize) + inset,
-      originY + (point.y * tileSize) + inset,
-      Math.max(1, tileSize - (inset * 2)),
-      Math.max(1, tileSize - (inset * 2))
-    );
   }
 
   private fillLegacyMenuDynamicPathTile(
@@ -3075,18 +3046,6 @@ export class MenuScene extends Phaser.Scene {
       color,
       Math.min(coreAlphaMax, alpha)
     );
-  }
-
-  private fillMenuDynamicMarkerTile(
-    point: LegacyPoint,
-    color: number,
-    originX: number,
-    originY: number,
-    tileSize: number,
-    alpha: number
-  ): void {
-    const inset = resolveLegacyDynamicMarkerInset(tileSize, LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO);
-    this.fillTile(this.boardDynamicGraphics, point, color, originX, originY, tileSize, alpha, inset);
   }
 
   private fillPlayDynamicMarkerTile(

@@ -53,8 +53,9 @@ describe('legacy menu layout', () => {
     expect(layout.buttonHeight).toBeLessThanOrEqual(62);
     expect(layout.leftButtonX + (layout.buttonWidth / 2)).toBeLessThan(layout.centerButtonX - 8);
     expect(layout.rightButtonX - (layout.buttonWidth / 2)).toBeGreaterThan(layout.centerButtonX + 8);
-    expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.2));
-    expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.22));
+    expect(layout.titleY).toBeLessThan(layout.boardTop);
+    expect(layout.boardTop - layout.titleY).toBeGreaterThanOrEqual(42);
+    expect(layout.titleY).toBeGreaterThanOrEqual(34);
   });
 
   test('stacks front-door buttons and fits the board in ultra-narrow side panels', () => {

@@ -161,12 +161,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xe6f2eb;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x304158;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xe7fff4;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x0d3c4f;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.9;');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x0d1724;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x07111d;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GLASS_ALPHA = 0.58;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.18;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = 0x72e0bf;');
@@ -174,7 +174,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;');
     expect(menuSceneSource).toContain('if (isMenuMode && LEGACY_BOARD_GRID_ALPHA > 0) {');
     expect(menuSceneSource).toContain('Keep the board top-down: no pseudo bevel/highlight pass over the maze.');
-    expect(menuSceneSource).toContain('? 0x0d1520');
+    expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.18;');
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.08;');
     expect(legacyMenuRenderSource).toContain('const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {');
@@ -218,8 +218,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(pathColor, isMenuMode ? 0.92 : 0.96);');
     expect(menuSceneSource).toContain(': LEGACY_PLAY_PATH_CORE;');
     expect(menuSceneSource).toContain(': LEGACY_PLAY_WALL_FILL;');
-    expect(menuSceneSource).toContain(': LEGACY_PLAY_BOARD_FILL;');
-    expect(menuSceneSource).toContain('const boardEdge = isMenuMode ? 0x050a10 : LEGACY_PLAY_BOARD_EDGE;');
+    expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
+    expect(menuSceneSource).toContain('const boardEdge = LEGACY_PLAY_BOARD_EDGE;');
     expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor');
   });
 
@@ -248,10 +248,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps menu dynamic trail overlays in the legacy corridor frame instead of full square cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x107d74;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.64;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;');
     expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_HALO = 0x00b84a;');
     expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_CORE = 0x36ff7d;');
     expect(menuSceneSource).toContain('const dynamicTrailKeys = new Set(trail.map((point) => `${point.x},${point.y}`));');
@@ -508,5 +507,21 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const strokeColor = LEGACY_PLAY_TOUCH_ACCENT;');
     expect(menuSceneSource).toContain('? 0x123a2d');
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
+  });
+
+  test('keeps menu maze visuals aligned with the cleaned play maze language', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xe7fff4;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x0d3c4f;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x07111d;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x107d74;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.64;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;');
+    expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
+    expect(menuSceneSource).toContain('const boardEdge = LEGACY_PLAY_BOARD_EDGE;');
+    expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.start');
+    expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.goal');
+    expect(menuSceneSource).toContain('const trailColor = this.settings.darkMode ? 0x9cffd2 : 0x66eebf;');
   });
 });
