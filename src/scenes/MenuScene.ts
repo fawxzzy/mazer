@@ -173,6 +173,7 @@ interface MenuSceneVisualDiagnostics {
     playerCoreRadius: number;
     playerHaloColor: number;
     playerHaloRadius: number;
+    trailPulseEnabled: boolean;
     trailPulseColor: number;
     trailPulseEdgeColor: number;
     trailPulsePeriodMs: number;
@@ -432,7 +433,7 @@ const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.72;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.96;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR = 0x36ff7d;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE = 0xecfff5;
-const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 1400;
+const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_CORE_RATIO = 0.82;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO = 1;
@@ -871,6 +872,7 @@ export class MenuScene extends Phaser.Scene {
           playerCoreRadius: playerMarkerMetrics.coreRadius,
           playerHaloColor: LEGACY_PLAYER_MARKER_HALO,
           playerHaloRadius: playerMarkerMetrics.haloRadius,
+          trailPulseEnabled: this.settings.toggleTrailPulse,
           trailPulseColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR,
           trailPulseEdgeColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE,
           trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
@@ -2494,7 +2496,7 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    if (this.mode === 'play') {
+    if (this.mode === 'play' && this.settings.toggleTrailPulse) {
       this.drawLegacyPlayDynamicTrailPulse(
         trail,
         boardLeft + boardOffset.x,
@@ -2937,7 +2939,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(): boolean {
-    return this.mode === 'play' && this.overlay === 'none' && this.trail.length > 1;
+    return this.settings.toggleTrailPulse && this.mode === 'play' && this.overlay === 'none' && this.trail.length > 1;
   }
 
   private resolveLegacyPlayCompassVisualFrame(
@@ -3474,6 +3476,14 @@ export class MenuScene extends Phaser.Scene {
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailFade'),
         onLabel: 'On',
         stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'
+      },
+      {
+        checked: this.settings.toggleTrailPulse,
+        label: 'Trail Pulse',
+        offLabel: 'Off',
+        onClick: () => this.applyLegacyOverlayToggleField('toggleTrailPulse'),
+        onLabel: 'On',
+        stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'
       },
       {
         checked: this.settings.darkMode,
@@ -4208,6 +4218,7 @@ export class MenuScene extends Phaser.Scene {
         playerCoreRadius: playerMarkerMetrics.coreRadius,
         playerHaloColor: LEGACY_PLAYER_MARKER_HALO,
         playerHaloRadius: playerMarkerMetrics.haloRadius,
+        trailPulseEnabled: this.settings.toggleTrailPulse,
         trailPulseColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR,
         trailPulseEdgeColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE,
         trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS

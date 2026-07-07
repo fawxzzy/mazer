@@ -127,6 +127,7 @@ describe('legacy reset lane', () => {
     expect(LEGACY_DEFAULTS.camScale).toBe(0);
     expect(linearColorToHex(LEGACY_DEFAULTS.pathColor)).toBe('#797978');
     expect(linearColorToHex(LEGACY_DEFAULTS.wallColor)).toBe('#4a4a4a');
+    expect(LEGACY_DEFAULTS.toggleTrailPulse).toBe(true);
   });
 
   test('builds a solvable legacy maze snapshot', () => {
@@ -621,22 +622,25 @@ describe('legacy reset lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const toggleFieldSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayToggleFields.ts'), 'utf8');
 
-    expect(toggleFieldSource).toContain("type LegacyOverlayToggleFieldId = 'toggleCameraFollow' | 'toggleTrailFade' | 'darkMode' | 'controlMode';");
+    expect(toggleFieldSource).toContain("type LegacyOverlayToggleFieldId = 'toggleCameraFollow' | 'toggleTrailFade' | 'toggleTrailPulse' | 'darkMode' | 'controlMode';");
     expect(toggleFieldSource).toContain('resolveLegacyOverlayToggleStateText');
     expect(toggleFieldSource).toContain('legacyDirectionalLightIntensity');
     expect(menuSceneSource).toContain('private createFeatureControlRows(');
     expect(menuSceneSource).toContain('private createToggleSwitchRow(');
     expect(menuSceneSource).toContain("label: 'Camera Follow'");
     expect(menuSceneSource).toContain("label: 'Trail Fade'");
+    expect(menuSceneSource).toContain("label: 'Trail Pulse'");
     expect(menuSceneSource).toContain("label: 'Dark Mode'");
     expect(menuSceneSource).toContain("label: 'Controls'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'");
+    expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'");
     expect(menuSceneSource).toContain("stateText: this.settings.darkMode ? 'On' : 'Off'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'");
     expect(menuSceneSource).toContain('controls.length * (rowHeight + rowGap)');
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleCameraFollow')");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailFade')");
+    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailPulse')");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('darkMode')");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('controlMode')");
     expect(menuSceneSource).toContain('private applyLegacyOverlayToggleField(fieldId: LegacyOverlayToggleFieldId): void {');

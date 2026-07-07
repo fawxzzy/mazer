@@ -236,11 +236,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.96;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR = 0x36ff7d;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE = 0xecfff5;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 1400;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
     expect(menuSceneSource).toContain('this.hasLegacyPlayTrailPulsePendingFrame()');
+    expect(menuSceneSource).toContain("if (this.mode === 'play' && this.settings.toggleTrailPulse) {");
     expect(menuSceneSource).toContain('this.drawLegacyPlayDynamicTrailPulse(');
+    expect(menuSceneSource).toContain("return this.settings.toggleTrailPulse && this.mode === 'play' && this.overlay === 'none' && this.trail.length > 1;");
     expect(menuSceneSource).toContain('const pulseDistanceFromPlayer = phase * maxPulseIndex;');
     expect(menuSceneSource).toContain('const pulseCenterIndex = (trail.length - 1) - pulseDistanceFromPlayer;');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');");
@@ -253,6 +255,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('trailPulseColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR');
     expect(menuSceneSource).toContain('trailPulseEdgeColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE');
     expect(menuSceneSource).toContain('trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
+    expect(menuSceneSource).toContain('trailPulseEnabled: this.settings.toggleTrailPulse');
     expect(menuSceneSource).toContain('playerCoreRadius: playerMarkerMetrics.coreRadius');
     expect(menuSceneSource).toContain('playerHaloRadius: playerMarkerMetrics.haloRadius');
     expect(menuSceneSource).toContain('resolveLegacyEndpointMarkerRenderMetrics(tileSize);');

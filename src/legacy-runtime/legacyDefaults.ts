@@ -14,6 +14,7 @@ export interface LegacySettings {
   darkMode: boolean;
   toggleCameraFollow: boolean;
   toggleTrailFade: boolean;
+  toggleTrailPulse: boolean;
   controlMode: LegacyControlMode;
 }
 
@@ -33,6 +34,7 @@ export const LEGACY_DEFAULTS: LegacySettings = {
   darkMode: false,
   toggleCameraFollow: false,
   toggleTrailFade: false,
+  toggleTrailPulse: true,
   controlMode: 'arrows'
 };
 
@@ -79,5 +81,6 @@ export const copyLegacySettings = (settings: LegacySettings): LegacySettings => 
   darkMode: settings.darkMode,
   toggleCameraFollow: settings.toggleCameraFollow,
   toggleTrailFade: settings.toggleTrailFade,
+  toggleTrailPulse: settings.toggleTrailPulse ?? true,
   controlMode: settings.controlMode
 });

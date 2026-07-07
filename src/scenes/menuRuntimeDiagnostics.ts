@@ -133,6 +133,7 @@ export interface MenuSceneRuntimeDiagnostics {
       playerCoreRadius: number;
       playerHaloColor: number;
       playerHaloRadius: number;
+      trailPulseEnabled?: boolean;
       trailPulseColor?: number;
       trailPulseEdgeColor?: number;
       trailPulsePeriodMs?: number;

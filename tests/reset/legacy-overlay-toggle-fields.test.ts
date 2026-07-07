@@ -11,6 +11,8 @@ describe('legacy overlay toggle fields', () => {
     expect(resolveLegacyOverlayToggleStateText('toggleCameraFollow', true)).toBe('On');
     expect(resolveLegacyOverlayToggleStateText('toggleTrailFade', false)).toBe('Off');
     expect(resolveLegacyOverlayToggleStateText('toggleTrailFade', true)).toBe('On');
+    expect(resolveLegacyOverlayToggleStateText('toggleTrailPulse', false)).toBe('Off');
+    expect(resolveLegacyOverlayToggleStateText('toggleTrailPulse', true)).toBe('On');
     expect(resolveLegacyOverlayToggleStateText('controlMode', false)).toBe('Arrows');
     expect(resolveLegacyOverlayToggleStateText('controlMode', true)).toBe('Stick');
     expect(resolveLegacyOverlayToggleStateText('darkMode', false)).toBeNull();
@@ -22,6 +24,7 @@ describe('legacy overlay toggle fields', () => {
 
     const cameraFollow = applyLegacyOverlayToggleField(settings, 'toggleCameraFollow');
     const trailFade = applyLegacyOverlayToggleField(settings, 'toggleTrailFade');
+    const trailPulse = applyLegacyOverlayToggleField(settings, 'toggleTrailPulse');
     const controlMode = applyLegacyOverlayToggleField(settings, 'controlMode');
 
     expect(cameraFollow.settings.toggleCameraFollow).toBe(true);
@@ -37,6 +40,13 @@ describe('legacy overlay toggle fields', () => {
     expect(trailFade.affectsBoardStatic).toBe(false);
     expect(trailFade.affectsBoardDynamic).toBe(true);
     expect(trailFade.legacyDirectionalLightIntensity).toBeNull();
+
+    expect(trailPulse.settings.toggleTrailPulse).toBe(false);
+    expect(trailPulse.stateText).toBe('Off');
+    expect(trailPulse.affectsBackdrop).toBe(false);
+    expect(trailPulse.affectsBoardStatic).toBe(false);
+    expect(trailPulse.affectsBoardDynamic).toBe(true);
+    expect(trailPulse.legacyDirectionalLightIntensity).toBeNull();
 
     expect(controlMode.settings.controlMode).toBe('stick');
     expect(controlMode.stateText).toBe('Stick');
