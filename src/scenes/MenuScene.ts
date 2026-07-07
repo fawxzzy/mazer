@@ -1434,7 +1434,6 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private repeatLegacyPlayHeldTouchMove(): void {
-    this.pruneReleasedLegacyPlayHeldTouchMoves();
     if (
       this.playHeldTouchMoves.length === 0
       || this.mode !== 'play'
@@ -1474,41 +1473,6 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyPlayHeldTouchControl(): HumanMovementActionKind | null {
     return this.playHeldTouchMoves[0]?.control ?? null;
-  }
-
-  private pruneReleasedLegacyPlayHeldTouchMoves(): void {
-    const nextMoves = this.playHeldTouchMoves.filter((move) => this.isLegacyPlayHeldTouchPointerStillDown(move));
-    if (nextMoves.length !== this.playHeldTouchMoves.length) {
-      this.playHeldTouchMoves = nextMoves;
-      this.publishInteractionDiagnostics();
-    }
-  }
-
-  private isLegacyPlayHeldTouchPointerStillDown(move: LegacyPlayHeldTouchMove): boolean {
-    const pointerId = move.pointerId;
-    const managerPointers = (this.input.manager as Phaser.Input.InputManager & {
-      pointers?: Phaser.Input.Pointer[];
-    }).pointers ?? [];
-    const candidates = [
-      this.input.activePointer,
-      ...managerPointers
-    ].filter((pointer): pointer is Phaser.Input.Pointer => pointer !== undefined && pointer !== null);
-
-    if (pointerId === null) {
-      return candidates.some((pointer) => pointer.isDown);
-    }
-
-    return candidates.some((pointer) => {
-      const pointerIdentity = pointer as Phaser.Input.Pointer & {
-        identifier?: number | null;
-        pointerId?: number | null;
-      };
-      return pointer.isDown && (
-        pointer.id === pointerId
-        || pointerIdentity.identifier === pointerId
-        || pointerIdentity.pointerId === pointerId
-      );
-    });
   }
 
   private performLegacyPlayTouchMove(control: HumanMovementActionKind): boolean {
