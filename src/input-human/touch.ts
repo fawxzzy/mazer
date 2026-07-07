@@ -254,29 +254,25 @@ export const resolveTouchControlLayout = (
       );
     const dpadLeft = Math.round(frameLeft + ((dpadFrameWidth - dpadSpan) / 2));
     const dpadTop = Math.round(frameTop + ((dpadFrameHeight - dpadSpan) / 2));
-    const topActionHeight = clamp(Math.round(buttonSize * 0.84), 34, ultraNarrow ? 38 : 42);
-    const topActionGap = ultraNarrow ? 4 : Math.max(6, Math.round(gap * 0.82));
-    const topActionFrameLeft = ultraNarrow ? safeInsets.left + 6 : safeInsets.left + 88;
-    const topActionFrameRight = ultraNarrow
-      ? viewport.width - safeInsets.right - 6
-      : viewport.width - safeInsets.right - 60;
-    const topActionFrameWidth = Math.max(
-      (topActionHeight * 2) + topActionGap,
-      topActionFrameRight - topActionFrameLeft
-    );
-    const actionWidth = Math.max(
-      topActionHeight,
-      Math.floor((topActionFrameWidth - topActionGap) / 2)
+    const topActionHeight = clamp(Math.round(buttonSize * 0.72), 30, ultraNarrow ? 34 : 38);
+    const topActionGap = ultraNarrow ? 4 : Math.max(7, Math.round(gap * 0.9));
+    const timerSlotWidth = clamp(Math.round(viewport.width * 0.29), ultraNarrow ? 78 : 96, ultraNarrow ? 94 : 116);
+    const actionWidth = clamp(
+      Math.floor((viewport.width - safeInsets.left - safeInsets.right - timerSlotWidth - (topActionGap * 2) - 16) / 2),
+      ultraNarrow ? 50 : 58,
+      ultraNarrow ? 70 : 82
     );
     const actionTop = safeInsets.top + (ultraNarrow ? 44 : 8);
+    const actionClusterWidth = (actionWidth * 2) + timerSlotWidth + (topActionGap * 2);
+    const actionClusterLeft = clamp(
+      Math.round((viewport.width - actionClusterWidth) / 2),
+      safeInsets.left + 4,
+      Math.max(safeInsets.left + 4, viewport.width - safeInsets.right - actionClusterWidth - 4)
+    );
     const actionFrame = createRect(
-      clamp(
-        topActionFrameLeft,
-        safeInsets.left,
-        Math.max(safeInsets.left, viewport.width - safeInsets.right - ((actionWidth * 2) + topActionGap))
-      ),
+      actionClusterLeft,
       actionTop,
-      (actionWidth * 2) + topActionGap,
+      actionClusterWidth,
       topActionHeight
     );
     const dpadFrame = createRect(frameLeft, frameTop, dpadFrameWidth, dpadFrameHeight);
@@ -317,7 +313,7 @@ export const resolveTouchControlLayout = (
         move_left: createRect(dpadLeft, dpadTop + buttonSize + gap, buttonSize, buttonSize),
         move_right: createRect(dpadLeft + ((buttonSize + gap) * 2), dpadTop + buttonSize + gap, buttonSize, buttonSize),
         pause: createRect(actionFrame.left, actionFrame.top, actionWidth, topActionHeight),
-        restart_attempt: createRect(actionFrame.left + actionWidth + topActionGap, actionFrame.top, actionWidth, topActionHeight),
+        restart_attempt: createRect(actionFrame.right - actionWidth, actionFrame.top, actionWidth, topActionHeight),
         toggle_thoughts: EMPTY_TOUCH_RECT
       }
     };

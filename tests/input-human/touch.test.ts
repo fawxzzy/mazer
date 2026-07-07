@@ -45,6 +45,12 @@ describe('input-human touch bridge', () => {
     expect(layout.controls.move_left.centerX).toBeLessThan(layout.controls.move_right.centerX);
     expect(layout.controls.pause.top).toBeLessThan(layout.controls.move_up.top);
     expect(layout.controls.restart_attempt.left).toBeGreaterThan(layout.controls.pause.right);
+    expect(Math.abs((layout.frames?.[0].centerX ?? 0) - 195)).toBeLessThanOrEqual(1);
+    expect(layout.frames?.[0].height).toBeLessThan(layout.controls.move_up.height);
+    expect(layout.controls.pause.width).toBeLessThan(90);
+    expect(layout.controls.restart_attempt.width).toBe(layout.controls.pause.width);
+    expect(layout.controls.pause.left).toBeLessThan(90);
+    expect(layout.controls.restart_attempt.right).toBeGreaterThan(300);
     expect(layout.controls.toggle_thoughts.width).toBe(0);
     expect(layout.controls.toggle_thoughts.height).toBe(0);
     expect(layout.controls.restart_attempt.centerY).toBe(layout.controls.pause.centerY);

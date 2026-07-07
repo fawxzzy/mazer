@@ -216,18 +216,22 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps active play HUD in a source-shaped timer and arrow widget lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.18;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.68;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_TEXT =');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_SHADOW =');
+    expect(menuSceneSource).toContain('const LEGACY_CYBER_PANEL_STROKE = 0x72e0bf;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW = 0xff263f;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_TAIL = 0xecfff5;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;');
-    expect(menuSceneSource).toContain('const timerShadow = this.add.text(23, 17, hudFrame.timerText');
-    expect(menuSceneSource).toContain('timerShadow.setAlpha(0.64);');
+    expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
+    expect(menuSceneSource).toContain("fontSize: '23px',");
+    expect(menuSceneSource).toContain('timerShadow.setAlpha(0.7);');
     expect(menuSceneSource).toContain('this.drawLegacyPlayCompass(hudFrame, {');
     expect(menuSceneSource).toContain("showPane: touchControlLayout.controlMode !== 'stick'");
     expect(menuSceneSource).toContain('if (options.showPane) {');
     expect(menuSceneSource).toContain('this.hudGraphics.fillTriangle(');
+    expect(menuSceneSource).toContain('this.drawLegacyPlayTouchButton(controls.pause, true, false);');
+    expect(menuSceneSource).toContain('this.drawLegacyPlayTouchButton(controls.restart_attempt, true, false);');
     expect(menuSceneSource).not.toContain('this.hudGraphics.strokeRect(');
   });
 
@@ -380,7 +384,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.hudBounds = touchCompassBounds');
     expect(menuSceneSource).toContain(': mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).toContain('touchControls');
-    expect(menuSceneSource).toContain('LEGACY_PLAY_TOUCH_FRAME_FILL');
+    expect(menuSceneSource).toContain('LEGACY_CYBER_PANEL_FILL');
+    expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
     expect(menuSceneSource).toContain("this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');");
     expect(menuSceneSource).toContain("this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');");
     expect(menuSceneSource).not.toContain("this.drawLegacyPlayTouchLabel(controls.toggle_thoughts, 'TRAIL');");
@@ -435,11 +440,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('removeAttribute(MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE)');
   });
 
-  test('keeps front-door buttons in the legacy dark-pane chrome path', () => {
+  test('keeps front-door buttons in the shared cyber chrome path', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const fillColor = frontDoorChrome?.fillColor ?? 0xffffff;');
+    expect(menuSceneSource).toContain('const fillColor = LEGACY_CYBER_PANEL_FILL;');
     expect(menuSceneSource).toContain('this.add.rectangle(x, y, width, height, fillColor, baseAlpha);');
-    expect(menuSceneSource).toContain('? (frontDoorChrome?.hoverFillColor ?? 0xffffff)');
+    expect(menuSceneSource).toContain('const strokeColor = LEGACY_PLAY_TOUCH_ACCENT;');
+    expect(menuSceneSource).toContain('? 0x123a2d');
+    expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
   });
 });

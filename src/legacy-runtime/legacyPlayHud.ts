@@ -118,7 +118,7 @@ export const resolveLegacyPlayHudFrame = (input: LegacyPlayHudFrameInput): Legac
   const arrowAngleRadians = resolveLegacyHudArrowAngle(input.playerScreen, input.goalScreen);
   const arrowAngleDegrees = (arrowAngleRadians * 180) / Math.PI;
   const length = 14;
-  const timerBounds = createLegacyHudRect(14, 14, 64, 22);
+  const timerBounds = createLegacyHudRect(Math.round((input.layoutWidth - 112) / 2), 10, 112, 38);
   const arrowTip = {
     x: arrowOrigin.x + (Math.cos(arrowAngleRadians) * length),
     y: arrowOrigin.y + (Math.sin(arrowAngleRadians) * length)

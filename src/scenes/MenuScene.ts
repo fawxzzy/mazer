@@ -407,9 +407,9 @@ export const MENU_SCENE_VISUAL_DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__' 
 export const MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics' as const;
 
 const BOARD_SHADOW_OFFSET = 0;
-const MENU_BUTTON_ALPHA = 0.1;
-const MENU_BUTTON_STROKE_ALPHA = 0.24;
-const MENU_TEXT_COLOR = '#0b841d';
+const MENU_BUTTON_ALPHA = 0.34;
+const MENU_BUTTON_STROKE_ALPHA = 0.58;
+const MENU_TEXT_COLOR = '#ecfff5';
 const TITLE_FILL_COLOR = '#1d8726';
 const TITLE_SHADOW_COLOR = '#103516';
 const LEGACY_BOARD_GRID_ALPHA = 0;
@@ -436,9 +436,9 @@ const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = 0xb7f2ff;
 const LEGACY_BOARD_SIGIL_BORDER_SHADOW = 0x02070d;
 const LEGACY_BOARD_SIGIL_BORDER_ALPHA = 0.82;
 const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;
-const LEGACY_PLAY_HUD_TIMER_PANE = 0x05050a;
-const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.18;
-const LEGACY_PLAY_HUD_TIMER_TEXT = '#d7f0d6';
+const LEGACY_PLAY_HUD_TIMER_PANE = 0x07131d;
+const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.68;
+const LEGACY_PLAY_HUD_TIMER_TEXT = '#ecfff5';
 const LEGACY_PLAY_HUD_TIMER_SHADOW = '#081208';
 const LEGACY_PLAY_HUD_ARROW = 0xff263f;
 const LEGACY_PLAY_HUD_ARROW_TAIL = 0xecfff5;
@@ -448,6 +448,10 @@ const LEGACY_PLAY_TOUCH_BUTTON_FILL = 0x0c2633;
 const LEGACY_PLAY_TOUCH_BUTTON_STROKE = 0xb7f2ff;
 const LEGACY_PLAY_TOUCH_ICON = 0xecfff5;
 const LEGACY_PLAY_TOUCH_ACCENT = 0x72e0bf;
+const LEGACY_CYBER_PANEL_FILL = 0x07131d;
+const LEGACY_CYBER_PANEL_STROKE = 0x72e0bf;
+const LEGACY_CYBER_PANEL_STROKE_ALT = 0xb7f2ff;
+const LEGACY_CYBER_PANEL_SHADOW = 0x02070d;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x0a6f82;
 const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
@@ -3013,6 +3017,57 @@ export class MenuScene extends Phaser.Scene {
     drawLocatorTick(centerX, centerY + locatorMetrics.innerRadius, centerX, centerY + locatorMetrics.outerRadius);
   }
 
+  private drawLegacyCyberPanel(
+    graphics: Phaser.GameObjects.Graphics,
+    rect: {
+      active?: boolean;
+      alpha?: number;
+      fill?: number;
+      height: number;
+      left: number;
+      radius?: number;
+      top: number;
+      width: number;
+    }
+  ): void {
+    const alpha = rect.alpha ?? 0.48;
+    const radius = rect.radius ?? 10;
+    const active = rect.active ?? false;
+    const corner = Math.max(7, Math.min(16, Math.round(Math.min(rect.width, rect.height) * 0.28)));
+    const inset = 4;
+
+    graphics.fillStyle(LEGACY_CYBER_PANEL_SHADOW, Math.min(0.42, alpha * 0.42));
+    graphics.fillRoundedRect(rect.left + 2, rect.top + 3, rect.width, rect.height, radius);
+    graphics.fillStyle(rect.fill ?? LEGACY_CYBER_PANEL_FILL, alpha);
+    graphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
+    graphics.lineStyle(active ? 2 : 1, LEGACY_CYBER_PANEL_STROKE, active ? 0.86 : 0.5);
+    graphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
+    graphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, active ? 0.34 : 0.2);
+    graphics.strokeRoundedRect(
+      rect.left + inset,
+      rect.top + inset,
+      Math.max(1, rect.width - (inset * 2)),
+      Math.max(1, rect.height - (inset * 2)),
+      Math.max(2, radius - 4)
+    );
+
+    graphics.lineStyle(active ? 2 : 1, active ? LEGACY_CYBER_PANEL_STROKE_ALT : LEGACY_CYBER_PANEL_STROKE, active ? 0.9 : 0.62);
+    graphics.beginPath();
+    graphics.moveTo(rect.left + inset, rect.top + corner);
+    graphics.lineTo(rect.left + inset, rect.top + inset);
+    graphics.lineTo(rect.left + corner, rect.top + inset);
+    graphics.moveTo(rect.left + rect.width - corner, rect.top + inset);
+    graphics.lineTo(rect.left + rect.width - inset, rect.top + inset);
+    graphics.lineTo(rect.left + rect.width - inset, rect.top + corner);
+    graphics.moveTo(rect.left + inset, rect.top + rect.height - corner);
+    graphics.lineTo(rect.left + inset, rect.top + rect.height - inset);
+    graphics.lineTo(rect.left + corner, rect.top + rect.height - inset);
+    graphics.moveTo(rect.left + rect.width - corner, rect.top + rect.height - inset);
+    graphics.lineTo(rect.left + rect.width - inset, rect.top + rect.height - inset);
+    graphics.lineTo(rect.left + rect.width - inset, rect.top + rect.height - corner);
+    graphics.strokePath();
+  }
+
   private drawHud(time: number): void {
     this.hudGraphics.clear();
     this.clearHudTexts();
@@ -3046,28 +3101,33 @@ export class MenuScene extends Phaser.Scene {
       playerScreen: { x: playerScreenX, y: playerScreenY }
     });
 
-    this.hudGraphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, LEGACY_PLAY_HUD_TIMER_PANE_ALPHA);
-    this.hudGraphics.fillRect(
-      hudFrame.timerBounds.left,
-      hudFrame.timerBounds.top,
-      hudFrame.timerBounds.width,
-      hudFrame.timerBounds.height
-    );
-
-    const timerShadow = this.add.text(23, 17, hudFrame.timerText, {
-      fontFamily: '"Courier New", monospace',
-      fontSize: '14px',
-      color: LEGACY_PLAY_HUD_TIMER_SHADOW
+    this.drawLegacyCyberPanel(this.hudGraphics, {
+      active: true,
+      alpha: LEGACY_PLAY_HUD_TIMER_PANE_ALPHA,
+      fill: LEGACY_PLAY_HUD_TIMER_PANE,
+      height: hudFrame.timerBounds.height,
+      left: hudFrame.timerBounds.left,
+      radius: 10,
+      top: hudFrame.timerBounds.top,
+      width: hudFrame.timerBounds.width
     });
+
+    const timerShadow = this.add.text(hudFrame.timerBounds.centerX + 1, hudFrame.timerBounds.centerY + 1, hudFrame.timerText, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: '23px',
+      fontStyle: 'bold',
+      color: LEGACY_PLAY_HUD_TIMER_SHADOW
+    }).setOrigin(0.5);
     timerShadow.setData('hud', true);
-    timerShadow.setAlpha(0.64);
+    timerShadow.setAlpha(0.7);
     this.uiTexts.push(timerShadow);
 
-    const timer = this.add.text(22, 16, hudFrame.timerText, {
+    const timer = this.add.text(hudFrame.timerBounds.centerX, hudFrame.timerBounds.centerY, hudFrame.timerText, {
       fontFamily: '"Courier New", monospace',
-      fontSize: '14px',
+      fontSize: '23px',
+      fontStyle: 'bold',
       color: LEGACY_PLAY_HUD_TIMER_TEXT
-    });
+    }).setOrigin(0.5);
     timer.setData('hud', true);
     this.uiTexts.push(timer);
 
@@ -3281,12 +3341,6 @@ export class MenuScene extends Phaser.Scene {
 
     const { controls, frame } = touchControlLayout;
     const activeControls = this.resolveLegacyPlayActiveTouchControlSet();
-    for (const touchFrame of touchControlLayout.frames ?? [frame]) {
-      this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_FRAME_FILL, 0.28);
-      this.hudGraphics.fillRoundedRect(touchFrame.left, touchFrame.top, touchFrame.width, touchFrame.height, 18);
-      this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.18);
-      this.hudGraphics.strokeRoundedRect(touchFrame.left, touchFrame.top, touchFrame.width, touchFrame.height, 18);
-    }
 
     if (touchControlLayout.controlMode === 'stick' && touchControlLayout.stick !== null) {
       this.drawLegacyPlayTouchStick(touchControlLayout.stick, this.resolveLegacyPlayHeldTouchControl(), this.playTouchStickPull);
@@ -3377,22 +3431,16 @@ export class MenuScene extends Phaser.Scene {
     accented: boolean,
     active = false
   ): void {
-    const radius = accented ? 8 : 10;
-    this.hudGraphics.fillStyle(
-      active ? LEGACY_PLAY_TOUCH_ACCENT : (accented ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_FILL),
-      active ? 0.28 : (accented ? 0.18 : 0.34)
-    );
-    this.hudGraphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
-    this.hudGraphics.fillStyle(0xffffff, active ? 0.1 : (accented ? 0.04 : 0.06));
-    this.hudGraphics.fillRoundedRect(rect.left + 2, rect.top + 2, Math.max(1, rect.width - 4), Math.max(1, rect.height * 0.34), Math.max(3, radius - 3));
-    this.hudGraphics.lineStyle(
-      active ? 3 : 2,
-      active ? LEGACY_PLAY_TOUCH_ACCENT : (accented ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE),
-      active ? 0.82 : (accented ? 0.5 : 0.42)
-    );
-    this.hudGraphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
-    this.hudGraphics.lineStyle(1, 0x000000, 0.28);
-    this.hudGraphics.strokeRoundedRect(rect.left + 3, rect.top + 3, Math.max(1, rect.width - 6), Math.max(1, rect.height - 6), Math.max(2, radius - 5));
+    this.drawLegacyCyberPanel(this.hudGraphics, {
+      active: active || accented,
+      alpha: active ? 0.7 : (accented ? 0.56 : 0.44),
+      fill: active ? 0x123a2d : LEGACY_PLAY_TOUCH_BUTTON_FILL,
+      height: rect.height,
+      left: rect.left,
+      radius: accented ? 8 : 10,
+      top: rect.top,
+      width: rect.width
+    });
   }
 
   private drawLegacyPlayTouchArrow(
@@ -3600,10 +3648,16 @@ export class MenuScene extends Phaser.Scene {
 
     this.overlayGraphics.fillStyle(0x06060b, 0.76);
     this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);
-    this.overlayGraphics.fillStyle(0x18151f, 0.96);
-    this.overlayGraphics.fillRoundedRect(panel.left, panel.top, panel.width, panel.height, 12);
-    this.overlayGraphics.lineStyle(2, 0x5f5866, 0.92);
-    this.overlayGraphics.strokeRoundedRect(panel.left, panel.top, panel.width, panel.height, 12);
+    this.drawLegacyCyberPanel(this.overlayGraphics, {
+      active: true,
+      alpha: 0.88,
+      fill: 0x08131d,
+      height: panel.height,
+      left: panel.left,
+      radius: 14,
+      top: panel.top,
+      width: panel.width
+    });
   }
 
   private resolveOverlayPanelFrame(): OverlayPanelFrame {
@@ -3731,7 +3785,7 @@ export class MenuScene extends Phaser.Scene {
     const label = this.add.text(left, y, 'Game Toggles', {
       fontFamily: '"Courier New", monospace',
       fontSize: stacked ? '18px' : '20px',
-      color: '#6bc96f'
+      color: '#72e0bf'
     }).setOrigin(0, 0.5);
     this.uiTexts.push(label);
 
@@ -3769,11 +3823,11 @@ export class MenuScene extends Phaser.Scene {
     y: number;
   }): UiButton {
     const left = input.x - (input.width / 2);
-    const rowFill = input.checked ? 0x10251e : 0x211c12;
-    const rowStroke = input.checked ? LEGACY_PLAY_TOUCH_ACCENT : 0xeab308;
-    const stateColor = input.checked ? '#72e0bf' : '#ffd46a';
-    const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, input.checked ? 0.58 : 0.5);
-    background.setStrokeStyle(1, rowStroke, input.checked ? 0.42 : 0.34);
+    const rowFill = input.checked ? 0x10251e : LEGACY_CYBER_PANEL_FILL;
+    const rowStroke = input.checked ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
+    const stateColor = input.checked ? '#72e0bf' : '#b7f2ff';
+    const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, input.checked ? 0.62 : 0.5);
+    background.setStrokeStyle(1, rowStroke, input.checked ? 0.56 : 0.38);
     background.setInteractive({ useHandCursor: true });
 
     const label = this.add.text(left + 16, input.y, input.label, {
@@ -3789,10 +3843,10 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(1, 0.5).setAlpha(0.92);
 
     const trackX = left + input.width - 48;
-    const track = this.add.ellipse(trackX, input.y, 42, 24, input.checked ? 0x123a2d : 0x2f2710, 0.9);
+    const track = this.add.ellipse(trackX, input.y, 42, 24, input.checked ? 0x123a2d : 0x07131d, 0.9);
     track.setStrokeStyle(2, rowStroke, input.checked ? 0.66 : 0.52);
     const knobX = trackX + (input.checked ? 9 : -9);
-    const knob = this.add.circle(knobX, input.y, 8, input.checked ? LEGACY_PLAY_TOUCH_ACCENT : 0xffd46a, 0.98);
+    const knob = this.add.circle(knobX, input.y, 8, input.checked ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.98);
     knob.setStrokeStyle(1, 0xecfff5, input.checked ? 0.7 : 0.46);
 
     const setActive = (active: boolean): void => {
@@ -3890,7 +3944,7 @@ export class MenuScene extends Phaser.Scene {
     const rowLabel = this.add.text(labelX, y, label, {
       fontFamily: '"Courier New", monospace',
       fontSize: stacked ? '20px' : '22px',
-      color: '#d9d8df'
+      color: '#ecfff5'
     }).setOrigin(0, 0.5);
 
     this.uiTexts.push(rowLabel);
@@ -3919,7 +3973,7 @@ export class MenuScene extends Phaser.Scene {
     const rowLabel = this.add.text(panel.left + 28, y, label, {
       fontFamily: '"Courier New", monospace',
       fontSize: '20px',
-      color: '#d9d8df'
+      color: '#ecfff5'
     }).setOrigin(0, 0.5);
     const swatchLabel = this.add.text(panel.left + panel.width - 72, y, swatch, {
       fontFamily: '"Courier New", monospace',
@@ -3937,7 +3991,7 @@ export class MenuScene extends Phaser.Scene {
       const caption = this.add.text(startX + (spacing * index), channelLabelY, ['R', 'G', 'B'][index] ?? '', {
         fontFamily: '"Courier New", monospace',
         fontSize: '14px',
-        color: '#6bc96f'
+        color: '#72e0bf'
       }).setOrigin(0.5);
       this.uiTexts.push(caption);
       this.createInputFieldBox(
@@ -3962,15 +4016,15 @@ export class MenuScene extends Phaser.Scene {
     value: string
   ): void {
     const isActive = this.activeInputField === fieldId;
-    const background = this.add.rectangle(x, y, width, height, 0xffffff, isActive ? 0.18 : 0.08);
-    background.setStrokeStyle(2, isActive ? 0x6bc96f : 0xb8b1c1, isActive ? 0.95 : 0.32);
+    const background = this.add.rectangle(x, y, width, height, LEGACY_CYBER_PANEL_FILL, isActive ? 0.76 : 0.5);
+    background.setStrokeStyle(2, isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, isActive ? 0.95 : 0.42);
     background.setInteractive({ useHandCursor: true });
     background.on('pointerdown', () => this.selectOverlayField(fieldId));
 
     const label = this.add.text(x, y, value, {
       fontFamily: '"Courier New", monospace',
       fontSize: `${Math.max(14, Math.min(22, Math.round(height * 0.38)))}px`,
-      color: isActive ? '#7cf58f' : '#f0f0f4'
+      color: isActive ? '#72e0bf' : '#ecfff5'
     }).setOrigin(0.5);
 
     this.uiButtons.push({
@@ -4002,10 +4056,10 @@ export class MenuScene extends Phaser.Scene {
         isPrimary: isPrimaryFrontDoorButton
       })
       : null;
-    const baseAlpha = frontDoorChrome?.baseAlpha ?? MENU_BUTTON_ALPHA;
-    const baseStroke = frontDoorChrome?.baseStroke ?? MENU_BUTTON_STROKE_ALPHA;
-    const fillColor = frontDoorChrome?.fillColor ?? 0xffffff;
-    const strokeColor = frontDoorChrome?.strokeColor ?? 0xb8b1c1;
+    const baseAlpha = isMenuFrontDoor ? Math.max(frontDoorChrome?.baseAlpha ?? MENU_BUTTON_ALPHA, 0.38) : 0.54;
+    const baseStroke = isMenuFrontDoor ? Math.max(frontDoorChrome?.baseStroke ?? MENU_BUTTON_STROKE_ALPHA, 0.52) : 0.56;
+    const fillColor = LEGACY_CYBER_PANEL_FILL;
+    const strokeColor = LEGACY_PLAY_TOUCH_ACCENT;
     const background = this.add.rectangle(x, y, width, height, fillColor, baseAlpha);
     background.setStrokeStyle(frontDoorChrome?.strokeWidth ?? 2, strokeColor, baseStroke);
     background.setInteractive({ useHandCursor: true });
@@ -4014,7 +4068,7 @@ export class MenuScene extends Phaser.Scene {
       18,
       Math.min(40, Math.min(Math.round(height * 0.46), textFitSize))
     );
-    const buttonTextColor = frontDoorChrome?.textColor ?? MENU_TEXT_COLOR;
+    const buttonTextColor = MENU_TEXT_COLOR;
 
     const label = this.add.text(x, y, text, {
       fontFamily: '"Courier New", monospace',
@@ -4025,17 +4079,17 @@ export class MenuScene extends Phaser.Scene {
     const setActive = (active: boolean): void => {
       background.setFillStyle(
         active
-          ? (frontDoorChrome?.hoverFillColor ?? 0xffffff)
+          ? 0x123a2d
           : fillColor,
         active
-          ? (frontDoorChrome?.hoverAlpha ?? 0.28)
+          ? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)
           : baseAlpha
       );
       background.setStrokeStyle(
         frontDoorChrome?.strokeWidth ?? 2,
-        0xffffff,
+        active ? LEGACY_PLAY_TOUCH_BUTTON_STROKE : strokeColor,
         active
-          ? (frontDoorChrome?.hoverStroke ?? 0.36)
+          ? Math.max(frontDoorChrome?.hoverStroke ?? 0.9, 0.9)
           : baseStroke
       );
       label.setAlpha(

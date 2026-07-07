@@ -31,10 +31,10 @@ describe('legacy play HUD', () => {
 
     expect(frame.timerText).toBe('1:02');
     expect(frame.timerBounds).toMatchObject({
-      left: 14,
-      top: 14,
-      width: 64,
-      height: 22
+      left: 584,
+      top: 10,
+      width: 112,
+      height: 38
     });
     expect(frame.arrowOrigin).toEqual({ x: 1246, y: 30 });
     expect(frame.arrowAngleRadians).toBeCloseTo(0);

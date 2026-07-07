@@ -419,9 +419,9 @@ describe('legacy reset lane', () => {
     expect(legacyPlayHudSource).toContain('x: compassBounds.centerX');
     expect(legacyPlayHudSource).toContain('y: compassBounds.centerY');
     expect(legacyPlayHudSource).toContain('const length = 14;');
-    expect(legacyPlayHudSource).toContain('const timerBounds = createLegacyHudRect(14, 14, 64, 22);');
-    expect(menuSceneSource).toContain('this.hudGraphics.fillRect(');
-    expect(menuSceneSource).toContain("fontSize: '14px',");
+    expect(legacyPlayHudSource).toContain('const timerBounds = createLegacyHudRect(Math.round((input.layoutWidth - 112) / 2), 10, 112, 38);');
+    expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
+    expect(menuSceneSource).toContain("fontSize: '23px',");
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
     expect(menuSceneSource).toContain('this.startLegacyPlayCompassSpin(this.time.now);');
     expect(menuSceneSource).toContain('private resolveLegacyPlayCompassVisualFrame(');

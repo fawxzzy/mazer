@@ -1275,12 +1275,16 @@ export const resolvePlayTouchChromeVerdict = (diagnostics) => {
   const rowTolerance = 3;
   const dpadCenterX = hasDpadControls ? (left.centerX + right.centerX) / 2 : null;
   const dpadCenterY = hasDpadControls ? (up.centerY + down.centerY) / 2 : null;
+  const viewportCenterX = Number.isFinite(visual?.viewport?.width) ? visual.viewport.width / 2 : null;
   const topActionBar = hasActionControls
+    && isFiniteRect(hud?.timerBounds)
     && actionControls.every((rect) => Math.abs(rect.top - pause.top) <= rowTolerance)
     && actionControls.every((rect) => Math.abs(rect.bottom - pause.bottom) <= rowTolerance)
-    && pause.right < restart.left
+    && pause.right < hud.timerBounds.left
+    && hud.timerBounds.right < restart.left
+    && (viewportCenterX === null || Math.abs(hud.timerBounds.centerX - viewportCenterX) <= 2)
     && !isFiniteRect(trail)
-    && (!isFiniteRect(boardBounds) || Math.max(pause.bottom, restart.bottom) < boardBounds.top);
+    && (!isFiniteRect(boardBounds) || Math.max(pause.bottom, restart.bottom, hud.timerBounds.bottom) < boardBounds.top);
   const bottomDpad = hasDpadControls
     && up.centerY < left.centerY
     && up.centerY < right.centerY
@@ -1290,10 +1294,8 @@ export const resolvePlayTouchChromeVerdict = (diagnostics) => {
     && right.centerX > up.centerX
     && (!isFiniteRect(boardBounds) || Math.min(up.top, left.top, right.top, down.top) > boardBounds.bottom);
   const compass = isFiniteRect(hud?.arrowBounds)
-    && isFiniteRect(hud?.timerBounds)
     && hud.arrowBounds.width >= 32
     && hud.arrowBounds.height >= 32
-    && hud.arrowBounds.left > hud.timerBounds.right
     && dpadCenterX !== null
     && dpadCenterY !== null
     && Math.abs(hud.arrowBounds.centerX - dpadCenterX) <= 2

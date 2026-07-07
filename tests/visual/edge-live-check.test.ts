@@ -785,13 +785,13 @@ describe('edge live check', () => {
           bounds: { left: 24, top: 251, right: 367, bottom: 594, width: 343, height: 343 }
         },
         hud: {
-          timerBounds: { left: 14, top: 14, right: 78, bottom: 36, width: 64, height: 22 },
+          timerBounds: { left: 139, top: 10, right: 251, bottom: 48, width: 112, height: 38, centerX: 195, centerY: 29 },
           arrowBounds: { left: 179, top: 719, right: 211, bottom: 751, width: 32, height: 32, centerX: 195, centerY: 735 }
         },
         touchControls: {
           controls: {
-            pause: { left: 45, top: 72, right: 126, bottom: 114, width: 81, height: 42, centerX: 85.5, centerY: 93 },
-            restart_attempt: { left: 154, top: 72, right: 235, bottom: 114, width: 81, height: 42, centerX: 194.5, centerY: 93 },
+            pause: { left: 36, top: 8, right: 118, bottom: 46, width: 82, height: 38, centerX: 77, centerY: 27 },
+            restart_attempt: { left: 272, top: 8, right: 354, bottom: 46, width: 82, height: 38, centerX: 313, centerY: 27 },
             toggle_thoughts: null,
             move_up: { left: 163, top: 636, right: 227, bottom: 700, width: 64, height: 64, centerX: 195, centerY: 668 },
             move_left: { left: 96, top: 703, right: 160, bottom: 767, width: 64, height: 64, centerX: 128, centerY: 735 },
@@ -816,7 +816,7 @@ describe('edge live check', () => {
           bounds: { left: 24, top: 251, right: 367, bottom: 594, width: 343, height: 343 }
         },
         hud: {
-          timerBounds: { left: 14, top: 14, right: 78, bottom: 36, width: 64, height: 22 },
+          timerBounds: { left: 14, top: 14, right: 78, bottom: 36, width: 64, height: 22, centerX: 46, centerY: 25 },
           arrowBounds: { left: 250, top: 20, right: 286, bottom: 56, width: 36, height: 36 }
         },
         touchControls: {
