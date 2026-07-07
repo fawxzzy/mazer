@@ -406,10 +406,14 @@ const LEGACY_MENU_PATH_CORE = 0xe6f2eb;
 const LEGACY_MENU_PATH_EDGE = 0x304158;
 const LEGACY_MENU_PATH_EDGE_ALPHA = 0.9;
 const LEGACY_MENU_WALL_FILL = 0x0d1724;
+const LEGACY_MENU_WALL_GLASS_ALPHA = 0.75;
+const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.28;
 const LEGACY_PLAY_PATH_CORE = 0xe7fff4;
 const LEGACY_PLAY_PATH_EDGE = 0x0d3c4f;
 const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.9;
 const LEGACY_PLAY_WALL_FILL = 0x07111d;
+const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.75;
+const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.28;
 const LEGACY_PLAY_BOARD_FILL = 0x08111d;
 const LEGACY_PLAY_BOARD_EDGE = 0x031022;
 const LEGACY_PLAY_HUD_TIMER_PANE = 0x05050a;
@@ -2377,7 +2381,7 @@ export class MenuScene extends Phaser.Scene {
     }
     this.boardStaticGraphics.fillStyle(boardEdge, 1);
     this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop - 1, boardSize + 2, boardSize + 2);
-    this.boardStaticGraphics.fillStyle(boardFill, isMenuMode ? 0.98 : 0.96);
+    this.boardStaticGraphics.fillStyle(boardFill, isMenuMode ? LEGACY_MENU_BOARD_GLASS_ALPHA : LEGACY_PLAY_BOARD_GLASS_ALPHA);
     this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
     // Keep the board top-down: no pseudo bevel/highlight pass over the maze.
     if (this.settings.darkMode) {
@@ -2430,10 +2434,10 @@ export class MenuScene extends Phaser.Scene {
             frames.core.height
           );
         } else {
-          this.boardStaticGraphics.fillStyle(wallColor, isMenuMode ? 0.94 : 1);
+          this.boardStaticGraphics.fillStyle(wallColor, isMenuMode ? LEGACY_MENU_WALL_GLASS_ALPHA : LEGACY_PLAY_WALL_GLASS_ALPHA);
           this.boardStaticGraphics.fillRect(tileX, tileY, tileSize, tileSize);
 
-          // Keep wall cells flat: the generated topology should read cleanly without fake bevel/depth.
+          // Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.
         }
       }
     }
