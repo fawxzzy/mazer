@@ -201,7 +201,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;');
     expect(menuSceneSource).toContain('const timerShadow = this.add.text(23, 17, hudFrame.timerText');
     expect(menuSceneSource).toContain('timerShadow.setAlpha(0.64);');
-    expect(menuSceneSource).toContain('this.drawLegacyPlayCompass(hudFrame);');
+    expect(menuSceneSource).toContain('this.drawLegacyPlayCompass(hudFrame, {');
+    expect(menuSceneSource).toContain("showPane: touchControlLayout.controlMode !== 'stick'");
+    expect(menuSceneSource).toContain('if (options.showPane) {');
     expect(menuSceneSource).toContain('this.hudGraphics.fillTriangle(');
     expect(menuSceneSource).not.toContain('this.hudGraphics.strokeRect(');
   });
@@ -348,6 +350,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const sameControlIndex = this.playHeldTouchMoves.findIndex((move) => move.control === control);');
     expect(menuSceneSource).toContain('if (this.playHeldTouchMoves.length >= LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT) {');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
+    expect(menuSceneSource).toContain("showPane: touchControlLayout.controlMode !== 'stick'");
     expect(menuSceneSource).toContain('this.hudBounds = touchCompassBounds');
     expect(menuSceneSource).toContain(': mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).toContain('touchControls');

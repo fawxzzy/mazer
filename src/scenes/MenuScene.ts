@@ -2857,7 +2857,9 @@ export class MenuScene extends Phaser.Scene {
     this.uiTexts.push(timer);
 
     this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);
-    this.drawLegacyPlayCompass(hudFrame);
+    this.drawLegacyPlayCompass(hudFrame, {
+      showPane: touchControlLayout.controlMode !== 'stick'
+    });
     const compassVisualFrame = this.resolveLegacyPlayCompassVisualFrame(hudFrame, time);
     const visualArrow = this.resolveLegacyPlayCompassArrowGeometry(hudFrame, compassVisualFrame.angleRadians);
 
@@ -3033,14 +3035,16 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame): void {
+  private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame, options: { showPane: boolean } = { showPane: true }): void {
     const { arrowBounds } = hudFrame;
     const radius = Math.max(8, Math.min(arrowBounds.width, arrowBounds.height) * 0.34);
 
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_FRAME_FILL, 0.36);
-    this.hudGraphics.fillRoundedRect(arrowBounds.left, arrowBounds.top, arrowBounds.width, arrowBounds.height, 10);
-    this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.42);
-    this.hudGraphics.strokeRoundedRect(arrowBounds.left, arrowBounds.top, arrowBounds.width, arrowBounds.height, 10);
+    if (options.showPane) {
+      this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_FRAME_FILL, 0.36);
+      this.hudGraphics.fillRoundedRect(arrowBounds.left, arrowBounds.top, arrowBounds.width, arrowBounds.height, 10);
+      this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.42);
+      this.hudGraphics.strokeRoundedRect(arrowBounds.left, arrowBounds.top, arrowBounds.width, arrowBounds.height, 10);
+    }
     this.hudGraphics.lineStyle(1, LEGACY_PLAY_HUD_ARROW, 0.28);
     this.hudGraphics.strokeCircle(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y, radius);
     this.hudGraphics.beginPath();

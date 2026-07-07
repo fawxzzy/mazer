@@ -425,7 +425,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private resolveLegacyPlayCompassVisualFrame(');
     expect(menuSceneSource).toContain('this.hudBounds = touchCompassBounds');
     expect(menuSceneSource).toContain(': mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
-    expect(menuSceneSource).toContain('private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame): void');
+    expect(menuSceneSource).toContain('private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame, options: { showPane: boolean } = { showPane: true }): void');
+    expect(menuSceneSource).toContain("showPane: touchControlLayout.controlMode !== 'stick'");
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
     expect(menuSceneSource).toContain('this.schedulePlayResetReturn();');
     expect(menuSceneSource).toContain('private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();');
