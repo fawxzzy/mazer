@@ -467,6 +467,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('removeAttribute(MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE)');
   });
 
+  test('publishes a compact walkable maze snapshot for live play QA', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const runtimeDiagnosticsSource = readFileSync(resolve(process.cwd(), 'src/scenes/menuRuntimeDiagnostics.ts'), 'utf8');
+
+    expect(runtimeDiagnosticsSource).toContain("encoding: 'walkable-rows-v1';");
+    expect(runtimeDiagnosticsSource).toContain('walkableRows: string[];');
+    expect(menuSceneSource).toContain("encoding: 'walkable-rows-v1'");
+    expect(menuSceneSource).toContain("walkableRows: this.maze.grid.map((row) => row.map((walkable) => (walkable ? '1' : '0')).join(''))");
+  });
+
   test('keeps animated backdrop and visual diagnostics off the per-frame hot path', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const tuningSource = readFileSync(resolve(process.cwd(), 'src/config/tuning.ts'), 'utf8');

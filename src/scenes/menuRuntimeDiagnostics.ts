@@ -135,6 +135,11 @@ export interface MenuSceneRuntimeDiagnostics {
       screenX: number;
       screenY: number;
     };
+    playtest: {
+      encoding: 'walkable-rows-v1';
+      mazeSize: number;
+      walkableRows: string[];
+    };
     markerStyle: {
       goalCoreColor: number;
       goalEdgeColor: number;

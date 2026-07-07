@@ -324,6 +324,15 @@ describe('menu runtime diagnostics', () => {
           screenX: 1735,
           screenY: 1715
         },
+        playtest: {
+          encoding: 'walkable-rows-v1',
+          mazeSize: 3,
+          walkableRows: [
+            '111',
+            '010',
+            '111'
+          ]
+        },
         markerStyle: {
           goalCoreColor: 0xff263f,
           goalEdgeColor: 0xd81b2a,

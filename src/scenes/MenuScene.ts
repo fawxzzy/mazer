@@ -940,6 +940,11 @@ export class MenuScene extends Phaser.Scene {
           screenX: this.layout.boardLeft + boardOffset.x + ((this.maze.goal.x + 0.5) * this.layout.tileSize),
           screenY: this.layout.boardTop + boardOffset.y + ((this.maze.goal.y + 0.5) * this.layout.tileSize)
         },
+        playtest: {
+          encoding: 'walkable-rows-v1',
+          mazeSize: this.maze.size,
+          walkableRows: this.maze.grid.map((row) => row.map((walkable) => (walkable ? '1' : '0')).join(''))
+        },
         markerStyle: {
           goalCoreColor: LEGACY_PLAY_GOAL_MARKER_CORE,
           goalEdgeColor: LEGACY_PLAY_GOAL_MARKER_EDGE,
