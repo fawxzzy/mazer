@@ -164,6 +164,7 @@ export interface MenuSceneRuntimeDiagnostics {
       source: 'menu-snapshot' | 'menu-generated' | 'play-generated';
       size: number;
       seed: number;
+      seedSource: 'query' | 'runtime-random';
       solutionPathLength: number;
       shortcutStats?: {
         requested: number;

@@ -26,6 +26,11 @@ import {
   type LegacyRuntimeMode
 } from '../legacy-runtime/legacyOverlayRouting';
 import {
+  DEFAULT_LEGACY_RUNTIME_SEED,
+  createLegacyRuntimeRandomSeed,
+  resolveInitialLegacyRuntimeSeed
+} from '../legacy-runtime/legacyRuntimeSeed';
+import {
   createLegacyMenuResetGenerationRequest,
   consumeLegacyGenerationRequestState,
   createLegacyGenerationRequest,
@@ -534,7 +539,8 @@ export class MenuScene extends Phaser.Scene {
   private settings: LegacySettings = copyLegacySettings(LEGACY_DEFAULTS);
   private optionFieldDrafts: LegacyOptionFieldDrafts = createLegacyOptionFieldDrafts(LEGACY_DEFAULTS);
   private activeInputField: LegacyOptionFieldId | null = null;
-  private mazeSeed = 3749;
+  private mazeSeed = DEFAULT_LEGACY_RUNTIME_SEED;
+  private explicitRuntimeMazeSeed = false;
   private maze!: LegacyMazeSnapshot;
   private player!: LegacyPoint;
   private trail: LegacyPoint[] = [];
@@ -630,6 +636,12 @@ export class MenuScene extends Phaser.Scene {
 
   public create(): void {
     markMazerBootStatus('menu-scene-create');
+    const runtimeSearch = typeof window === 'undefined' ? '' : window.location.search;
+    const initialSeed = resolveInitialLegacyRuntimeSeed(runtimeSearch, {
+      previousSeed: this.mazeSeed
+    });
+    this.mazeSeed = initialSeed.seed;
+    this.explicitRuntimeMazeSeed = initialSeed.explicit;
     this.loadPersistedLegacyGameToggleSettings();
     this.initializeRuntimeDiagnostics();
     this.backdropGraphics = this.add.graphics();
@@ -658,7 +670,7 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5).setAlpha(0.92);
 
     this.createStars();
-    if (resolveInitialRuntimeMode(typeof window === 'undefined' ? '' : window.location.search) === 'play') {
+    if (resolveInitialRuntimeMode(runtimeSearch) === 'play') {
       this.startPlayMode();
     } else {
       this.applyGenerationRequest(
@@ -947,6 +959,7 @@ export class MenuScene extends Phaser.Scene {
           source: this.maze.source,
           size: this.maze.size,
           seed: this.maze.seed,
+          seedSource: this.explicitRuntimeMazeSeed ? 'query' : 'runtime-random',
           solutionPathLength: this.maze.solutionPath.length,
           shortcutStats: this.maze.shortcutStats ? {
             requested: this.maze.shortcutStats.requested,
@@ -2186,6 +2199,17 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
+  private refreshRuntimeMazeSeedIfUnpinned(): void {
+    if (this.explicitRuntimeMazeSeed) {
+      return;
+    }
+
+    this.mazeSeed = createLegacyRuntimeRandomSeed({
+      nowMs: this.time.now,
+      previousSeed: this.mazeSeed
+    });
+  }
+
   private queueGenerationRequest(
     reason: LegacyGenerationRequest['reason'],
     delayMs = 0,
@@ -2258,6 +2282,7 @@ export class MenuScene extends Phaser.Scene {
     this.pendingResetRequest = null;
     this.overlay = 'none';
     this.overlayReturn = 'none';
+    this.refreshRuntimeMazeSeedIfUnpinned();
     this.applyGenerationRequest(
       createLegacyGenerationRequest({
         currentSeed: this.mazeSeed,
@@ -2278,6 +2303,7 @@ export class MenuScene extends Phaser.Scene {
     this.pendingResetRequest = null;
     this.overlay = 'none';
     this.overlayReturn = 'none';
+    this.refreshRuntimeMazeSeedIfUnpinned();
     this.rebuildMaze();
     this.boardStaticDirty = true;
     this.boardDynamicDirty = true;

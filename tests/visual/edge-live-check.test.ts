@@ -74,7 +74,7 @@ describe('edge live check', () => {
     expect(resolveEdgeLiveDefaultRoute('play-mode-smoke')).toBe('/?content=core-only&mode=play&theme=ember');
     expect(resolveEdgeLiveDefaultRoute('play-hud-trim')).toBe('/?content=core-only&mode=play&theme=aurora');
     expect(resolveEdgeLiveDefaultRoute('play-mode-interactive')).toBe('/?content=core-only&mode=play&theme=aurora');
-    expect(resolveEdgeLiveDefaultRoute('mobile-touch-smoke')).toBe('/?content=core-only&mode=play&theme=aurora');
+    expect(resolveEdgeLiveDefaultRoute('mobile-touch-smoke')).toBe('/?content=core-only&mode=play&theme=aurora&mazeSeed=3749');
     expect(resolveEdgeLiveDefaultRoute('core-only-watch')).toBe('/?content=core-only&theme=aurora');
     expect(resolveEdgeLiveDefaultRoute('core-only-play')).toBe('/?content=core-only&mode=play&theme=aurora');
     expect(resolveEdgeLiveDefaultRoute('core-only-cycle')).toBe('/?content=core-only&theme=aurora');

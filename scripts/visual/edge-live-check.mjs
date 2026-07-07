@@ -53,7 +53,7 @@ const EDGE_LIVE_SPECIAL_ROUTES = Object.freeze({
   'play-mode-smoke': '/?content=core-only&mode=play&theme=ember',
   'play-hud-trim': '/?content=core-only&mode=play&theme=aurora',
   'play-mode-interactive': '/?content=core-only&mode=play&theme=aurora',
-  'mobile-touch-smoke': '/?content=core-only&mode=play&theme=aurora',
+  'mobile-touch-smoke': '/?content=core-only&mode=play&theme=aurora&mazeSeed=3749',
   'core-only-watch': '/?content=core-only&theme=aurora',
   'core-only-play': '/?content=core-only&mode=play&theme=aurora',
   'core-only-cycle': '/?content=core-only&theme=aurora',
