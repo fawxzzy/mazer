@@ -174,6 +174,9 @@ interface MenuSceneVisualDiagnostics {
     playerCoreRadius: number;
     playerHaloColor: number;
     playerHaloRadius: number;
+    trailPulseColor: number;
+    trailPulseEdgeColor: number;
+    trailPulsePeriodMs: number;
   };
   layout: {
     buttonHeight: number;
@@ -422,6 +425,12 @@ const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x107d74;
 const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.72;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.96;
+const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR = 0x36ff7d;
+const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE = 0xecfff5;
+const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 1400;
+const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
+const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_CORE_RATIO = 0.82;
+const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO = 1;
 const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 280;
 const LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS = 140;
 const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
@@ -665,6 +674,9 @@ export class MenuScene extends Phaser.Scene {
     if (this.hasLegacyPlayCompassSpinPendingFrame()) {
       this.boardDynamicDirty = true;
     }
+    if (this.hasLegacyPlayTrailPulsePendingFrame()) {
+      this.boardDynamicDirty = true;
+    }
 
     if (this.backdropDirty) {
       this.drawBackdrop();
@@ -673,7 +685,7 @@ export class MenuScene extends Phaser.Scene {
       this.drawStaticBoard();
     }
     if (this.boardDynamicDirty) {
-      this.drawDynamicBoard();
+      this.drawDynamicBoard(time);
       this.drawHud(time);
     }
     if (this.uiDirty) {
@@ -850,7 +862,10 @@ export class MenuScene extends Phaser.Scene {
           playerCoreColor: LEGACY_PLAYER_MARKER_CORE,
           playerCoreRadius: playerMarkerMetrics.coreRadius,
           playerHaloColor: LEGACY_PLAYER_MARKER_HALO,
-          playerHaloRadius: playerMarkerMetrics.haloRadius
+          playerHaloRadius: playerMarkerMetrics.haloRadius,
+          trailPulseColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR,
+          trailPulseEdgeColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE,
+          trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
         }
       },
       menuDemo: {
@@ -2176,7 +2191,7 @@ export class MenuScene extends Phaser.Scene {
     this.boardStaticDirty = false;
   }
 
-  private drawDynamicBoard(): void {
+  private drawDynamicBoard(time: number): void {
     const { boardLeft, boardTop, tileSize } = this.layout;
     this.boardDynamicGraphics.clear();
 
@@ -2233,6 +2248,17 @@ export class MenuScene extends Phaser.Scene {
           dynamicTrailKeys
         );
       }
+    }
+
+    if (this.mode === 'play') {
+      this.drawLegacyPlayDynamicTrailPulse(
+        trail,
+        boardLeft + boardOffset.x,
+        boardTop + boardOffset.y,
+        tileSize,
+        time,
+        dynamicTrailKeys
+      );
     }
 
     if (this.mode === 'menu') {
@@ -2322,6 +2348,53 @@ export class MenuScene extends Phaser.Scene {
       0.42,
       0.78
     );
+  }
+
+  private drawLegacyPlayDynamicTrailPulse(
+    trail: readonly LegacyPoint[],
+    originX: number,
+    originY: number,
+    tileSize: number,
+    time: number,
+    trailKeys: Set<string>
+  ): void {
+    if (trail.length < 2) {
+      return;
+    }
+
+    const maxPulseIndex = Math.max(1, trail.length - 1);
+    const phase = (time % LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS) / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS;
+    const pulseDistanceFromPlayer = phase * maxPulseIndex;
+    const pulseCenterIndex = (trail.length - 1) - pulseDistanceFromPlayer;
+
+    for (let index = trail.length - 1; index >= 0; index -= 1) {
+      const point = trail[index];
+      if (!point) {
+        continue;
+      }
+
+      const distance = Math.abs(index - pulseCenterIndex);
+      if (distance > LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW) {
+        continue;
+      }
+
+      const falloff = 1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW);
+      const alpha = clamp(0.14 + (falloff * 0.62), 0.14, 0.76);
+      this.fillLegacyDynamicPathTile(
+        point,
+        LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR,
+        originX,
+        originY,
+        tileSize,
+        alpha,
+        trailKeys,
+        LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE,
+        LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO,
+        LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_CORE_RATIO,
+        0.36,
+        0.86
+      );
+    }
   }
 
   private fillLegacyDynamicPathTile(
@@ -2615,6 +2688,10 @@ export class MenuScene extends Phaser.Scene {
 
   private hasLegacyPlayCompassSpinPendingFrame(): boolean {
     return this.hudCompassSpinStartedAtMs !== null;
+  }
+
+  private hasLegacyPlayTrailPulsePendingFrame(): boolean {
+    return this.mode === 'play' && this.overlay === 'none' && this.trail.length > 1;
   }
 
   private resolveLegacyPlayCompassVisualFrame(
@@ -3805,7 +3882,10 @@ export class MenuScene extends Phaser.Scene {
         playerCoreColor: LEGACY_PLAYER_MARKER_CORE,
         playerCoreRadius: playerMarkerMetrics.coreRadius,
         playerHaloColor: LEGACY_PLAYER_MARKER_HALO,
-        playerHaloRadius: playerMarkerMetrics.haloRadius
+        playerHaloRadius: playerMarkerMetrics.haloRadius,
+        trailPulseColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR,
+        trailPulseEdgeColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE,
+        trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
       },
       layout: {
         buttonHeight: this.layout.buttonHeight,
