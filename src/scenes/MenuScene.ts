@@ -92,6 +92,10 @@ import {
   type LegacyOverlayToggleFieldId
 } from '../legacy-runtime/legacyOverlayToggleFields';
 import {
+  readLegacyGameToggleSettings,
+  writeLegacyGameToggleSettings
+} from '../legacy-runtime/legacyGameTogglePreferences';
+import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
 } from '../legacy-runtime/legacyDemoWalker';
@@ -602,6 +606,7 @@ export class MenuScene extends Phaser.Scene {
 
   public create(): void {
     markMazerBootStatus('menu-scene-create');
+    this.loadPersistedLegacyGameToggleSettings();
     this.initializeRuntimeDiagnostics();
     this.backdropGraphics = this.add.graphics();
     this.boardStaticGraphics = this.add.graphics();
@@ -4066,7 +4071,7 @@ export class MenuScene extends Phaser.Scene {
 
   private applyLegacyOverlayToggleField(fieldId: LegacyOverlayToggleFieldId): void {
     const result = applyLegacyOverlayToggleField(this.settings, fieldId);
-    this.settings = result.settings;
+    this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), result.settings);
     if (fieldId === 'controlMode') {
       this.resetLegacyPlayInputBuffer();
     }
@@ -4084,6 +4089,23 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
     if (this.mode === 'play') {
       this.publishInteractionDiagnostics();
+    }
+  }
+
+  private loadPersistedLegacyGameToggleSettings(): void {
+    this.settings = readLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), this.settings);
+    this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
+  }
+
+  private resolveLegacyGameToggleStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    try {
+      return window.localStorage;
+    } catch {
+      return undefined;
     }
   }
 
