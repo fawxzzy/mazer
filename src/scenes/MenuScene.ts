@@ -586,6 +586,9 @@ export class MenuScene extends Phaser.Scene {
   private menuStaticDrawRowsVisible: number | null = null;
   private menuStaticDrawNextRowAtMs = 0;
   private visualDiagnosticsRevision = 0;
+  private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+  private backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
+  private backdropAccumulatedDeltaMs = 0;
   private runtimeDiagnosticsConfig: MenuSceneRuntimeConfig = {
     enabled: false,
     lowPowerDetected: false,
@@ -680,13 +683,13 @@ export class MenuScene extends Phaser.Scene {
       this.clearVisualDiagnostics();
       clearMenuSceneRuntimeDiagnostics();
     });
-    this.publishVisualDiagnostics(this.time.now);
+    this.publishVisualDiagnostics(this.time.now, true);
     this.publishRuntimeDiagnostics(this.time.now, true);
   }
 
   public update(time: number, delta: number): void {
     this.recordRuntimeFrame(delta);
-    this.updateStars(delta);
+    this.updateStars(time, delta);
 
     const pendingReset = this.pendingResetRequest;
     if (pendingReset !== null && shouldConsumeLegacyResetRequest(pendingReset, time)) {
@@ -1084,7 +1087,7 @@ export class MenuScene extends Phaser.Scene {
 
   private publishInteractionDiagnostics(): void {
     const now = this.time.now;
-    this.publishVisualDiagnostics(now);
+    this.publishVisualDiagnostics(now, true);
     this.publishRuntimeDiagnostics(now, true);
   }
 
@@ -2371,12 +2374,23 @@ export class MenuScene extends Phaser.Scene {
     this.stars = createLegacyMenuBackdropStars().slice(0, LEGACY_MENU_STAR_COUNT);
   }
 
-  private updateStars(delta: number): void {
+  private updateStars(time: number, delta: number): void {
     if (!this.settings.toggleAnimatedBackdrop) {
+      this.backdropAccumulatedDeltaMs = 0;
+      this.backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
       return;
     }
 
-    advanceLegacyMenuBackdropStars(this.stars, delta, this.settings.darkMode);
+    this.backdropAccumulatedDeltaMs += Math.max(0, delta);
+    const updateIntervalMs = legacyTuning.menu.runtime.ambientUpdateIntervalMs[this.runtimeDiagnosticsPerformanceMode];
+    if (time < this.backdropNextUpdateAtMs) {
+      return;
+    }
+
+    const elapsedMs = this.backdropAccumulatedDeltaMs;
+    this.backdropAccumulatedDeltaMs = 0;
+    this.backdropNextUpdateAtMs = time + updateIntervalMs;
+    advanceLegacyMenuBackdropStars(this.stars, elapsedMs, this.settings.darkMode);
     this.backdropDirty = true;
   }
 
@@ -4336,11 +4350,19 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private publishVisualDiagnostics(time: number): void {
+  private publishVisualDiagnostics(time: number, force = false): void {
     if (typeof window === 'undefined' || !this.layout) {
       return;
     }
 
+    if (
+      !force
+      && time - this.visualDiagnosticsLastPublishedAtMs < legacyTuning.menu.runtime.diagnosticsPublishIntervalMs
+    ) {
+      return;
+    }
+
+    this.visualDiagnosticsLastPublishedAtMs = time;
     const safeBounds = createVisualRect(0, 0, this.layout.width, this.layout.height);
     const boardOffset = this.resolveBoardOffset();
     const boardBounds = createVisualRect(

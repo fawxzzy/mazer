@@ -362,8 +362,8 @@ export const legacyTuning = {
       spikeFrameMs: 50,
       lowPowerHardwareConcurrencyMax: 4,
       ambientUpdateIntervalMs: {
-        full: 16,
-        throttled: 84,
+        full: 66,
+        throttled: 220,
         hidden: 1000
       },
       deferredTasksPerFrame: {

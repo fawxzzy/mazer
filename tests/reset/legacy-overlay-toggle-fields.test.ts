@@ -51,8 +51,8 @@ describe('legacy overlay toggle fields', () => {
     expect(trailPulse.affectsBoardDynamic).toBe(true);
     expect(trailPulse.legacyDirectionalLightIntensity).toBeNull();
 
-    expect(animatedBackdrop.settings.toggleAnimatedBackdrop).toBe(false);
-    expect(animatedBackdrop.stateText).toBe('Off');
+    expect(animatedBackdrop.settings.toggleAnimatedBackdrop).toBe(true);
+    expect(animatedBackdrop.stateText).toBe('On');
     expect(animatedBackdrop.affectsBackdrop).toBe(true);
     expect(animatedBackdrop.affectsBoardStatic).toBe(false);
     expect(animatedBackdrop.affectsBoardDynamic).toBe(false);

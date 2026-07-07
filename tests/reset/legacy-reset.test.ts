@@ -128,7 +128,7 @@ describe('legacy reset lane', () => {
     expect(linearColorToHex(LEGACY_DEFAULTS.pathColor)).toBe('#797978');
     expect(linearColorToHex(LEGACY_DEFAULTS.wallColor)).toBe('#4a4a4a');
     expect(LEGACY_DEFAULTS.toggleTrailPulse).toBe(true);
-    expect(LEGACY_DEFAULTS.toggleAnimatedBackdrop).toBe(true);
+    expect(LEGACY_DEFAULTS.toggleAnimatedBackdrop).toBe(false);
   });
 
   test('builds a solvable legacy maze snapshot', () => {

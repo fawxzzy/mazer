@@ -29,7 +29,7 @@ interface LegacyMenuBackdropOrbTemplate {
   yRatio: number;
 }
 
-export const LEGACY_MENU_STAR_COUNT = 520;
+export const LEGACY_MENU_STAR_COUNT = 180;
 
 const LIGHT_BACKDROP_ORBS: LegacyMenuBackdropOrbTemplate[] = [
   { xRatio: 0.52, yRatio: 0.45, radiusRatio: 0.38, alpha: 0.082, color: 0x754996 },

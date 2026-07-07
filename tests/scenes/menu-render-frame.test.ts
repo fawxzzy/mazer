@@ -440,6 +440,25 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('removeAttribute(MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE)');
   });
 
+  test('keeps animated backdrop and visual diagnostics off the per-frame hot path', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const tuningSource = readFileSync(resolve(process.cwd(), 'src/config/tuning.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('this.updateStars(time, delta);');
+    expect(menuSceneSource).toContain('private updateStars(time: number, delta: number): void');
+    expect(menuSceneSource).toContain('private backdropAccumulatedDeltaMs = 0;');
+    expect(menuSceneSource).toContain('this.backdropAccumulatedDeltaMs += Math.max(0, delta);');
+    expect(menuSceneSource).toContain('legacyTuning.menu.runtime.ambientUpdateIntervalMs[this.runtimeDiagnosticsPerformanceMode]');
+    expect(menuSceneSource).toContain('if (time < this.backdropNextUpdateAtMs) {');
+    expect(menuSceneSource).toContain('advanceLegacyMenuBackdropStars(this.stars, elapsedMs, this.settings.darkMode);');
+    expect(menuSceneSource).toContain('private publishVisualDiagnostics(time: number, force = false): void');
+    expect(menuSceneSource).toContain('time - this.visualDiagnosticsLastPublishedAtMs < legacyTuning.menu.runtime.diagnosticsPublishIntervalMs');
+    expect(menuSceneSource).toContain('this.publishVisualDiagnostics(this.time.now, true);');
+    expect(menuSceneSource).toContain('this.publishVisualDiagnostics(now, true);');
+    expect(tuningSource).toContain('full: 66,');
+    expect(tuningSource).toContain('throttled: 220,');
+  });
+
   test('keeps front-door buttons in the shared cyber chrome path', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
