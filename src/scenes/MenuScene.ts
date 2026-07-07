@@ -416,6 +416,11 @@ const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.75;
 const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.28;
 const LEGACY_PLAY_BOARD_FILL = 0x08111d;
 const LEGACY_PLAY_BOARD_EDGE = 0x031022;
+const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = 0x72e0bf;
+const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = 0xb7f2ff;
+const LEGACY_BOARD_SIGIL_BORDER_SHADOW = 0x02070d;
+const LEGACY_BOARD_SIGIL_BORDER_ALPHA = 0.82;
+const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;
 const LEGACY_PLAY_HUD_TIMER_PANE = 0x05050a;
 const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.18;
 const LEGACY_PLAY_HUD_TIMER_TEXT = '#d7f0d6';
@@ -1046,6 +1051,7 @@ export class MenuScene extends Phaser.Scene {
           twinkles: 0,
           veils: 0,
           driftMotes: 0,
+          sigils: 4,
           moving: starCount,
           movingCap: starCount,
           signatureCap: starCount
@@ -2318,6 +2324,7 @@ export class MenuScene extends Phaser.Scene {
       this.backdropGraphics.fillStyle(orb.color, orb.alpha);
       this.backdropGraphics.fillCircle(orb.x, orb.y, orb.radius);
     }
+    this.drawLegacyBackdropSigils(width, height, this.time.now);
 
     const starAlphaScale = palette.starAlphaScale;
     for (const star of this.stars) {
@@ -2347,6 +2354,48 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.backdropDirty = false;
+  }
+
+  private drawLegacyBackdropSigils(width: number, height: number, time: number): void {
+    const pulse = this.settings.toggleAnimatedBackdrop
+      ? 0.7 + (Math.sin(time / 1800) * 0.3)
+      : 0.78;
+    const alpha = LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA * pulse;
+    const color = this.settings.darkMode ? LEGACY_BOARD_SIGIL_BORDER_PRIMARY : LEGACY_BOARD_SIGIL_BORDER_SECONDARY;
+    const glyphs = [
+      { x: 0.16, y: 0.2, scale: 0.34, flip: 1 },
+      { x: 0.86, y: 0.28, scale: 0.28, flip: -1 },
+      { x: 0.22, y: 0.82, scale: 0.24, flip: -1 },
+      { x: 0.78, y: 0.78, scale: 0.3, flip: 1 }
+    ];
+
+    this.backdropGraphics.lineStyle(1, color, alpha);
+    for (const glyph of glyphs) {
+      const cx = width * glyph.x;
+      const cy = height * glyph.y;
+      const unit = Math.max(16, Math.round(Math.min(width, height) * glyph.scale * 0.16));
+      const flip = glyph.flip;
+
+      this.strokeLegacyPolyline(this.backdropGraphics, [
+        { x: cx, y: cy - (unit * 1.8) },
+        { x: cx + (unit * flip), y: cy - (unit * 0.7) },
+        { x: cx, y: cy },
+        { x: cx + (unit * 1.1 * flip), y: cy + (unit * 1.2) },
+        { x: cx, y: cy + (unit * 2.1) }
+      ]);
+      this.strokeLegacyPolyline(this.backdropGraphics, [
+        { x: cx - (unit * 1.5 * flip), y: cy - (unit * 0.35) },
+        { x: cx, y: cy },
+        { x: cx - (unit * 1.5 * flip), y: cy + (unit * 0.35) }
+      ]);
+      this.strokeLegacyPolyline(this.backdropGraphics, [
+        { x: cx - (unit * 0.55), y: cy - (unit * 1.05) },
+        { x: cx, y: cy - (unit * 1.42) },
+        { x: cx + (unit * 0.55), y: cy - (unit * 1.05) },
+        { x: cx, y: cy - (unit * 0.72) },
+        { x: cx - (unit * 0.55), y: cy - (unit * 1.05) }
+      ]);
+    }
   }
 
   private drawStaticBoard(): void {
@@ -2442,9 +2491,99 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
+    this.drawLegacyBoardSigilBorder(boardLeft, boardTop, boardSize);
+
     this.titleText.setVisible(this.mode === 'menu');
     this.titleShadow.setVisible(this.mode === 'menu');
     this.boardStaticDirty = false;
+  }
+
+  private drawLegacyBoardSigilBorder(boardLeft: number, boardTop: number, boardSize: number): void {
+    const inset = 2;
+    const outerLeft = boardLeft - inset;
+    const outerTop = boardTop - inset;
+    const outerSize = boardSize + (inset * 2);
+    const right = outerLeft + outerSize;
+    const bottom = outerTop + outerSize;
+    const corner = Math.max(10, Math.round(boardSize * 0.045));
+    const mid = Math.max(7, Math.round(boardSize * 0.028));
+    const centerX = outerLeft + (outerSize / 2);
+    const centerY = outerTop + (outerSize / 2);
+
+    this.boardStaticGraphics.lineStyle(2, LEGACY_BOARD_SIGIL_BORDER_SHADOW, 0.62);
+    this.strokeLegacyPolyline(this.boardStaticGraphics, [
+      { x: outerLeft, y: outerTop },
+      { x: right, y: outerTop },
+      { x: right, y: bottom },
+      { x: outerLeft, y: bottom },
+      { x: outerLeft, y: outerTop }
+    ]);
+
+    this.boardStaticGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_BORDER_PRIMARY, LEGACY_BOARD_SIGIL_BORDER_ALPHA);
+    this.strokeLegacyPolyline(this.boardStaticGraphics, [
+      { x: outerLeft + corner, y: outerTop },
+      { x: centerX - mid, y: outerTop },
+      { x: centerX, y: outerTop + mid },
+      { x: centerX + mid, y: outerTop },
+      { x: right - corner, y: outerTop }
+    ]);
+    this.strokeLegacyPolyline(this.boardStaticGraphics, [
+      { x: right, y: outerTop + corner },
+      { x: right, y: centerY - mid },
+      { x: right - mid, y: centerY },
+      { x: right, y: centerY + mid },
+      { x: right, y: bottom - corner }
+    ]);
+    this.strokeLegacyPolyline(this.boardStaticGraphics, [
+      { x: right - corner, y: bottom },
+      { x: centerX + mid, y: bottom },
+      { x: centerX, y: bottom - mid },
+      { x: centerX - mid, y: bottom },
+      { x: outerLeft + corner, y: bottom }
+    ]);
+    this.strokeLegacyPolyline(this.boardStaticGraphics, [
+      { x: outerLeft, y: bottom - corner },
+      { x: outerLeft, y: centerY + mid },
+      { x: outerLeft + mid, y: centerY },
+      { x: outerLeft, y: centerY - mid },
+      { x: outerLeft, y: outerTop + corner }
+    ]);
+
+    this.boardStaticGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_BORDER_SECONDARY, 0.56);
+    const corners = [
+      { x: outerLeft, y: outerTop, sx: 1, sy: 1 },
+      { x: right, y: outerTop, sx: -1, sy: 1 },
+      { x: right, y: bottom, sx: -1, sy: -1 },
+      { x: outerLeft, y: bottom, sx: 1, sy: -1 }
+    ];
+    for (const cornerGlyph of corners) {
+      this.strokeLegacyPolyline(this.boardStaticGraphics, [
+        { x: cornerGlyph.x + (cornerGlyph.sx * 2), y: cornerGlyph.y + (cornerGlyph.sy * corner) },
+        { x: cornerGlyph.x + (cornerGlyph.sx * corner), y: cornerGlyph.y + (cornerGlyph.sy * corner) },
+        { x: cornerGlyph.x + (cornerGlyph.sx * corner), y: cornerGlyph.y + (cornerGlyph.sy * 2) }
+      ]);
+      this.strokeLegacyPolyline(this.boardStaticGraphics, [
+        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.48)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.88)) },
+        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.88)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.48)) }
+      ]);
+    }
+  }
+
+  private strokeLegacyPolyline(
+    graphics: Phaser.GameObjects.Graphics,
+    points: Array<{ x: number; y: number }>
+  ): void {
+    const [first, ...rest] = points;
+    if (!first) {
+      return;
+    }
+
+    graphics.beginPath();
+    graphics.moveTo(Math.round(first.x) + 0.5, Math.round(first.y) + 0.5);
+    for (const point of rest) {
+      graphics.lineTo(Math.round(point.x) + 0.5, Math.round(point.y) + 0.5);
+    }
+    graphics.strokePath();
   }
 
   private drawDynamicBoard(time: number): void {

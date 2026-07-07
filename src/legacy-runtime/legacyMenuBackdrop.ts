@@ -95,14 +95,14 @@ export function advanceLegacyMenuBackdropStars(
 export function resolveLegacyMenuBackdropPalette(darkMode: boolean): LegacyMenuBackdropPalette {
   if (darkMode) {
     return {
-      fieldColor: 0x150b1f,
+      fieldColor: 0x090d19,
       starAlphaScale: 0.74,
       overlayAlpha: 0.1
     };
   }
 
   return {
-    fieldColor: 0x29163f,
+    fieldColor: 0x10172c,
     starAlphaScale: 1.08,
     overlayAlpha: 0
   };

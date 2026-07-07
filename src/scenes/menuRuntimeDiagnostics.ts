@@ -284,6 +284,7 @@ export interface MenuSceneRuntimeDiagnostics {
       twinkles: number;
       veils: number;
       driftMotes: number;
+      sigils?: number;
       moving: number;
       movingCap: number;
       signatureCap: number;
