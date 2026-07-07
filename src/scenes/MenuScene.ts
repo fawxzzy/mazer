@@ -3389,7 +3389,8 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveOverlayPanelFrame(): OverlayPanelFrame {
     const width = Math.min(720, this.layout.width - 40);
-    const height = Math.min(620, this.layout.height - 72);
+    const compact = this.layout.width < 480;
+    const height = Math.min(compact ? 760 : 620, this.layout.height - 48);
     const left = Math.round((this.layout.width - width) / 2);
     const top = Math.round((this.layout.height - height) / 2);
 
@@ -3409,7 +3410,7 @@ export class MenuScene extends Phaser.Scene {
 
     rowY = this.createInputRow('Maze Scale', 'scale', rowY, panel);
     rowY = this.createInputRow('Camera Scale', 'camScale', rowY, panel);
-    rowY = this.createFeatureControlGrid(rowY, panel);
+    rowY = this.createFeatureControlRows(rowY, panel);
     rowY = this.createColorInputRow('Path RGB', ['pathR', 'pathG', 'pathB'], rowY, panel, this.settings.pathColor);
     rowY = this.createColorInputRow('Wall RGB', ['wallR', 'wallG', 'wallB'], rowY, panel, this.settings.wallColor);
 
@@ -3425,7 +3426,7 @@ export class MenuScene extends Phaser.Scene {
     rowY += 72;
 
     rowY = this.createInputRow('Camera Scale', 'camScale', rowY, panel);
-    this.createFeatureControlGrid(rowY, panel);
+    this.createFeatureControlRows(rowY, panel);
 
     const stacked = panel.width < 420;
     if (stacked) {
@@ -3444,31 +3445,51 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  private createFeatureControlGrid(y: number, panel: OverlayPanelFrame): number {
+  private createFeatureControlRows(y: number, panel: OverlayPanelFrame): number {
     const stacked = panel.width < 420;
-    const columns = stacked ? 2 : 4;
-    const gap = stacked ? 10 : 12;
     const left = panel.left + 28;
     const width = panel.width - 56;
-    const buttonWidth = Math.floor((width - (gap * (columns - 1))) / columns);
-    const buttonHeight = stacked ? 42 : 44;
-    const rowGap = stacked ? 10 : 12;
-    const controls: Array<{ label: string; onClick: () => void }> = [
+    const rowHeight = stacked ? 46 : 48;
+    const rowGap = stacked ? 8 : 10;
+    const controls: Array<{
+      checked: boolean;
+      label: string;
+      offLabel: string;
+      onClick: () => void;
+      onLabel: string;
+      stateText: string;
+    }> = [
       {
-        label: `Camera ${resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow)}`,
-        onClick: () => this.applyLegacyOverlayToggleField('toggleCameraFollow')
+        checked: this.settings.toggleCameraFollow,
+        label: 'Camera Follow',
+        offLabel: 'Off',
+        onClick: () => this.applyLegacyOverlayToggleField('toggleCameraFollow'),
+        onLabel: 'On',
+        stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'
       },
       {
-        label: `Trail ${resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade)}`,
-        onClick: () => this.applyLegacyOverlayToggleField('toggleTrailFade')
+        checked: this.settings.toggleTrailFade,
+        label: 'Trail Fade',
+        offLabel: 'Off',
+        onClick: () => this.applyLegacyOverlayToggleField('toggleTrailFade'),
+        onLabel: 'On',
+        stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'
       },
       {
-        label: `Dark ${this.settings.darkMode ? 'On' : 'Off'}`,
-        onClick: () => this.applyLegacyOverlayToggleField('darkMode')
+        checked: this.settings.darkMode,
+        label: 'Dark Mode',
+        offLabel: 'Off',
+        onClick: () => this.applyLegacyOverlayToggleField('darkMode'),
+        onLabel: 'On',
+        stateText: this.settings.darkMode ? 'On' : 'Off'
       },
       {
-        label: `Controls ${resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick')}`,
-        onClick: () => this.applyLegacyOverlayToggleField('controlMode')
+        checked: this.settings.controlMode === 'stick',
+        label: 'Controls',
+        offLabel: 'Arrows',
+        onClick: () => this.applyLegacyOverlayToggleField('controlMode'),
+        onLabel: 'Stick',
+        stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'
       }
     ];
 
@@ -3481,21 +3502,89 @@ export class MenuScene extends Phaser.Scene {
 
     const gridTop = y + (stacked ? 28 : 32);
     controls.forEach((control, index) => {
-      const column = index % columns;
-      const row = Math.floor(index / columns);
       this.uiButtons.push(
-        this.createButton(
-          left + (column * (buttonWidth + gap)) + Math.round(buttonWidth / 2),
-          gridTop + (row * (buttonHeight + rowGap)) + Math.round(buttonHeight / 2),
-          buttonWidth,
-          buttonHeight,
-          control.label,
-          control.onClick
-        )
+        this.createToggleSwitchRow({
+          checked: control.checked,
+          label: control.label,
+          offLabel: control.offLabel,
+          onClick: control.onClick,
+          onLabel: control.onLabel,
+          stateText: control.stateText,
+          x: left + Math.round(width / 2),
+          y: gridTop + (index * (rowHeight + rowGap)) + Math.round(rowHeight / 2),
+          width,
+          height: rowHeight
+        })
       );
     });
 
-    return gridTop + (Math.ceil(controls.length / columns) * (buttonHeight + rowGap)) + (stacked ? 10 : 4);
+    return gridTop + (controls.length * (rowHeight + rowGap)) + (stacked ? 10 : 6);
+  }
+
+  private createToggleSwitchRow(input: {
+    checked: boolean;
+    height: number;
+    label: string;
+    offLabel: string;
+    onClick: () => void;
+    onLabel: string;
+    stateText: string;
+    width: number;
+    x: number;
+    y: number;
+  }): UiButton {
+    const left = input.x - (input.width / 2);
+    const rowFill = input.checked ? 0x10251e : 0x211c12;
+    const rowStroke = input.checked ? LEGACY_PLAY_TOUCH_ACCENT : 0xeab308;
+    const stateColor = input.checked ? '#72e0bf' : '#ffd46a';
+    const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, input.checked ? 0.58 : 0.5);
+    background.setStrokeStyle(1, rowStroke, input.checked ? 0.42 : 0.34);
+    background.setInteractive({ useHandCursor: true });
+
+    const label = this.add.text(left + 16, input.y, input.label, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: `${Math.max(16, Math.min(20, Math.round(input.height * 0.4)))}px`,
+      color: '#ecfff5'
+    }).setOrigin(0, 0.5).setAlpha(0.94);
+
+    const stateLabel = this.add.text(left + input.width - 84, input.y, input.stateText, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: `${Math.max(11, Math.min(13, Math.round(input.height * 0.28)))}px`,
+      color: stateColor
+    }).setOrigin(1, 0.5).setAlpha(0.92);
+
+    const trackX = left + input.width - 48;
+    const track = this.add.ellipse(trackX, input.y, 42, 24, input.checked ? 0x123a2d : 0x2f2710, 0.9);
+    track.setStrokeStyle(2, rowStroke, input.checked ? 0.66 : 0.52);
+    const knobX = trackX + (input.checked ? 9 : -9);
+    const knob = this.add.circle(knobX, input.y, 8, input.checked ? LEGACY_PLAY_TOUCH_ACCENT : 0xffd46a, 0.98);
+    knob.setStrokeStyle(1, 0xecfff5, input.checked ? 0.7 : 0.46);
+
+    const setActive = (active: boolean): void => {
+      background.setFillStyle(rowFill, active ? 0.7 : (input.checked ? 0.58 : 0.5));
+      background.setStrokeStyle(1, rowStroke, active ? 0.72 : (input.checked ? 0.42 : 0.34));
+      track.setStrokeStyle(2, rowStroke, active ? 0.88 : (input.checked ? 0.66 : 0.52));
+      knob.setScale(active ? 1.08 : 1);
+      label.setAlpha(active ? 1 : 0.94);
+      stateLabel.setAlpha(active ? 1 : 0.92);
+    };
+
+    background.on('pointerover', () => setActive(true));
+    background.on('pointerout', () => setActive(false));
+    background.on('pointerdown', input.onClick);
+
+    return {
+      background,
+      label,
+      setActive,
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+        stateLabel.destroy();
+        track.destroy();
+        knob.destroy();
+      }
+    };
   }
 
   private selectOverlayField(fieldId: LegacyOptionFieldId): void {
