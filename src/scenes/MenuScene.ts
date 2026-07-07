@@ -128,7 +128,6 @@ import {
   type HumanMovementActionKind
 } from '../input-human';
 import {
-  resolveStickMovementKind,
   resolveStickPullVector,
   resolveTouchControlKindAtPoint,
   resolveTouchControlLayout,
@@ -228,6 +227,9 @@ interface MenuSceneVisualDiagnostics {
       outer: VisualRect;
       pull: {
         distanceRatio: number;
+        intentSegment: number;
+        movement: HumanMovementActionKind;
+        movementCandidates: HumanMovementActionKind[];
         normalizedX: number;
         normalizedY: number;
       } | null;
@@ -1512,8 +1514,8 @@ export class MenuScene extends Phaser.Scene {
       this.playTouchStickPull = touchControlLayout.stick === null
         ? null
         : resolveStickPullVector(touchControlLayout.stick, x, y, { allowBeyondOuter: true });
-      if (isMovementActionKind(control)) {
-        this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
+      if (this.playTouchStickPull !== null) {
+        this.setLegacyPlayHeldTouchMoveCandidates(this.playTouchStickPull.movementCandidates, pointerId, { keepWhenBlocked: true });
       } else {
         this.releaseLegacyPlayHeldTouchMove(pointerId);
         this.publishInteractionDiagnostics();
@@ -1573,20 +1575,13 @@ export class MenuScene extends Phaser.Scene {
       return true;
     }
 
-    const control = resolveStickMovementKind(touchControlLayout.stick, x, y, {
-      allowBeyondOuter: true
-    });
     const pullVector = resolveStickPullVector(touchControlLayout.stick, x, y, {
       allowBeyondOuter: true
     });
     const pullChanged = this.hasLegacyPlayTouchStickPullChanged(pullVector);
     this.playTouchStickPull = pullVector;
-    if (isMovementActionKind(control)) {
-      const matchingMove = this.playHeldTouchMoves.find((move) => move.pointerId === normalizedPointerId);
-      if (matchingMove?.control !== control) {
-        this.normalizeLegacyPlayStickHeldTouchMovePointer(pointerId);
-        this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
-      }
+    if (pullVector !== null && pullVector.movementCandidates.length > 0) {
+      this.setLegacyPlayHeldTouchMoveCandidates(pullVector.movementCandidates, pointerId, { keepWhenBlocked: true });
     } else {
       this.releaseLegacyPlayHeldTouchMove(pointerId);
     }
@@ -1610,26 +1605,68 @@ export class MenuScene extends Phaser.Scene {
     return Math.hypot(x - stick.outer.centerX, y - stick.outer.centerY) <= stick.outer.width / 2;
   }
 
-  private normalizeLegacyPlayStickHeldTouchMovePointer(pointerId: number | null): void {
-    if (this.playHeldTouchMoves.length === 0) {
-      return;
-    }
-
+  private setLegacyPlayHeldTouchMoveCandidates(
+    controls: readonly HumanMovementActionKind[],
+    pointerId: number | null,
+    options: { keepWhenBlocked?: boolean } = {}
+  ): boolean {
     const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
-    const matchingMove = this.playHeldTouchMoves.find((move) => move.pointerId === normalizedPointerId);
-    if (this.playHeldTouchMoves.length === 1 && matchingMove === this.playHeldTouchMoves[0]) {
-      return;
+    const uniqueControls: HumanMovementActionKind[] = [];
+    for (const control of controls) {
+      if (!uniqueControls.includes(control)) {
+        uniqueControls.push(control);
+      }
+      if (uniqueControls.length >= LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT) {
+        break;
+      }
     }
 
-    const fallbackMove = matchingMove ?? this.playHeldTouchMoves[0] ?? null;
-    this.playHeldTouchMoves = fallbackMove === null
-      ? []
-      : [{
-        ...fallbackMove,
-        pointerId: normalizedPointerId
-      }];
-    this.hudDirty = true;
+    if (uniqueControls.length === 0) {
+      return this.releaseLegacyPlayHeldTouchMove(normalizedPointerId);
+    }
+
+    const existingForPointer = this.playHeldTouchMoves
+      .filter((move) => move.pointerId === normalizedPointerId)
+      .map((move) => move.control);
+    const candidatesUnchanged = existingForPointer.length === uniqueControls.length
+      && existingForPointer.every((control, index) => control === uniqueControls[index]);
+    if (candidatesUnchanged) {
+      return true;
+    }
+
+    const hadActiveMove = this.playHeldTouchMoves.length > 0;
+    const remainingMoves = this.playHeldTouchMoves.filter((move) => move.pointerId !== normalizedPointerId);
+    const availableCandidateSlots = Math.max(0, LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT - remainingMoves.length);
+    const nextControls = uniqueControls.slice(0, availableCandidateSlots);
+    if (nextControls.length === 0) {
+      return false;
+    }
+
+    const nextMoves = nextControls.map((control): LegacyPlayHeldTouchMove => {
+      this.playHeldTouchSequence += 1;
+      return {
+        control,
+        pointerId: normalizedPointerId,
+        sequence: this.playHeldTouchSequence
+      };
+    });
+    this.playHeldTouchMoves = [...remainingMoves, ...nextMoves];
+    this.sortLegacyPlayHeldTouchMoves();
+    this.boardDynamicDirty = true;
+
+    this.clearLegacyPlayHeldTouchRepeat();
+    const moved = this.performLegacyPlayHeldTouchMove();
+    if (moved) {
+      this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS);
+    } else if (!options.keepWhenBlocked) {
+      this.releaseLegacyPlayHeldTouchMove(normalizedPointerId);
+      return false;
+    } else if (!hadActiveMove) {
+      this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS);
+    }
+
     this.publishInteractionDiagnostics();
+    return true;
   }
 
   private beginLegacyPlayHeldTouchMove(
@@ -4346,6 +4383,9 @@ export class MenuScene extends Phaser.Scene {
             ? null
             : {
               distanceRatio: this.playTouchStickPull.distanceRatio,
+              intentSegment: this.playTouchStickPull.intentSegment,
+              movement: this.playTouchStickPull.movement,
+              movementCandidates: [...this.playTouchStickPull.movementCandidates],
               normalizedX: this.playTouchStickPull.normalizedX,
               normalizedY: this.playTouchStickPull.normalizedY
             }

@@ -4,6 +4,7 @@ import {
   createTouchInputState,
   releaseTouchPointer,
   resolveHumanTouchAction,
+  resolveStickMovementIntent,
   resolveStickMovementKind,
   resolveStickPullVector,
   resolveTouchControlLayout,
@@ -127,6 +128,16 @@ describe('input-human touch bridge', () => {
       layout.stick!.outer.centerY - 48,
       { allowBeyondOuter: true }
     )).toBe('move_left');
+    expect(resolveStickMovementIntent(-Math.PI / 2)).toEqual({
+      intentSegment: 12,
+      movement: 'move_up',
+      movementCandidates: ['move_up']
+    });
+    expect(resolveStickMovementIntent(-Math.PI / 4)).toEqual({
+      intentSegment: 14,
+      movement: 'move_up_right',
+      movementCandidates: ['move_right', 'move_up']
+    });
     const partialPull = resolveStickPullVector(
       layout.stick!,
       layout.stick!.outer.centerX + (layout.stick!.outer.width * 0.18),
@@ -134,6 +145,8 @@ describe('input-human touch bridge', () => {
       { allowBeyondOuter: true }
     );
     expect(partialPull?.movement).toBe('move_up_right');
+    expect(partialPull?.intentSegment).toBe(14);
+    expect(partialPull?.movementCandidates).toEqual(['move_right', 'move_up']);
     expect(partialPull?.distanceRatio).toBeGreaterThan(0);
     expect(partialPull?.distanceRatio).toBeLessThan(1);
     expect(partialPull?.normalizedX).toBeGreaterThan(0);

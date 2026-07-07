@@ -65,6 +65,8 @@ export interface TouchStickPullVector {
   angleRadians: number;
   distanceRatio: number;
   movement: HumanMovementActionKind;
+  movementCandidates: HumanMovementActionKind[];
+  intentSegment: number;
   normalizedX: number;
   normalizedY: number;
 }
@@ -101,6 +103,8 @@ const normalizeInset = (value: unknown): number => (
 );
 
 const EMPTY_TOUCH_RECT = createRect(-10_000, -10_000, 0, 0);
+const STICK_INTENT_SEGMENT_COUNT = 16;
+const STICK_INTENT_SEGMENT_RADIANS = (Math.PI * 2) / STICK_INTENT_SEGMENT_COUNT;
 
 const isPointInRect = (rect: TouchRect, x: number, y: number): boolean => (
   rect.width > 0
@@ -111,42 +115,54 @@ const isPointInRect = (rect: TouchRect, x: number, y: number): boolean => (
   && y <= rect.bottom
 );
 
-const resolveStickMovementFromVector = (
-  dx: number,
-  dy: number,
-  angle: number
-): HumanMovementActionKind | null => {
-  const absX = Math.abs(dx);
-  const absY = Math.abs(dy);
-  const cardinalDominanceRatio = 1.3;
-  if (absY >= absX * cardinalDominanceRatio) {
-    return dy < 0 ? 'move_up' : 'move_down';
+const uniqueMovementCandidates = (
+  candidates: readonly HumanMovementActionKind[]
+): HumanMovementActionKind[] => {
+  const unique: HumanMovementActionKind[] = [];
+  for (const candidate of candidates) {
+    if (!unique.includes(candidate)) {
+      unique.push(candidate);
+    }
   }
-  if (absX >= absY * cardinalDominanceRatio) {
-    return dx < 0 ? 'move_left' : 'move_right';
-  }
+  return unique;
+};
 
-  const octant = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
-  switch (octant) {
-    case 0:
-      return 'move_right';
-    case 1:
-      return 'move_down_right';
-    case 2:
-      return 'move_down';
-    case 3:
-      return 'move_down_left';
-    case 4:
-      return 'move_left';
-    case 5:
-      return 'move_up_left';
-    case 6:
-      return 'move_up';
-    case 7:
-      return 'move_up_right';
-    default:
-      return null;
-  }
+export const resolveStickMovementIntent = (
+  angle: number
+): {
+  intentSegment: number;
+  movement: HumanMovementActionKind;
+  movementCandidates: HumanMovementActionKind[];
+} => {
+  const normalizedAngle = angle < 0 ? angle + (Math.PI * 2) : angle;
+  const intentSegment = Math.floor((normalizedAngle + (STICK_INTENT_SEGMENT_RADIANS / 2)) / STICK_INTENT_SEGMENT_RADIANS) % STICK_INTENT_SEGMENT_COUNT;
+  const intents: Array<{
+    movement: HumanMovementActionKind;
+    movementCandidates: HumanMovementActionKind[];
+  }> = [
+    { movement: 'move_right', movementCandidates: ['move_right'] },
+    { movement: 'move_right', movementCandidates: ['move_right', 'move_down'] },
+    { movement: 'move_down_right', movementCandidates: ['move_right', 'move_down'] },
+    { movement: 'move_down', movementCandidates: ['move_down', 'move_right'] },
+    { movement: 'move_down', movementCandidates: ['move_down'] },
+    { movement: 'move_down', movementCandidates: ['move_down', 'move_left'] },
+    { movement: 'move_down_left', movementCandidates: ['move_left', 'move_down'] },
+    { movement: 'move_left', movementCandidates: ['move_left', 'move_down'] },
+    { movement: 'move_left', movementCandidates: ['move_left'] },
+    { movement: 'move_left', movementCandidates: ['move_left', 'move_up'] },
+    { movement: 'move_up_left', movementCandidates: ['move_left', 'move_up'] },
+    { movement: 'move_up', movementCandidates: ['move_up', 'move_left'] },
+    { movement: 'move_up', movementCandidates: ['move_up'] },
+    { movement: 'move_up', movementCandidates: ['move_up', 'move_right'] },
+    { movement: 'move_up_right', movementCandidates: ['move_right', 'move_up'] },
+    { movement: 'move_right', movementCandidates: ['move_right', 'move_up'] }
+  ];
+  const intent = intents[intentSegment] ?? intents[0];
+  return {
+    intentSegment,
+    movement: intent.movement,
+    movementCandidates: uniqueMovementCandidates(intent.movementCandidates)
+  };
 };
 
 export const resolveStickMovementKind = (
@@ -175,10 +191,7 @@ export const resolveStickPullVector = (
   }
 
   const angle = Math.atan2(dy, dx);
-  const movement = resolveStickMovementFromVector(dx, dy, angle);
-  if (movement === null) {
-    return null;
-  }
+  const intent = resolveStickMovementIntent(angle);
 
   const outerRadius = stick.outer.width / 2;
   const usableRadius = Math.max(1, outerRadius - stick.deadzoneRadius);
@@ -190,7 +203,9 @@ export const resolveStickPullVector = (
   return {
     angleRadians: angle,
     distanceRatio,
-    movement,
+    intentSegment: intent.intentSegment,
+    movement: intent.movement,
+    movementCandidates: intent.movementCandidates,
     normalizedX: unitX * distanceRatio,
     normalizedY: unitY * distanceRatio
   };
