@@ -77,9 +77,9 @@ export const resolveLegacyMenuLayout = (
       boardTop + snappedBoardSize + 24,
       height - Math.round(buttonHeight * 0.54)
     ));
-  const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.21 : 0.118), isUltraNarrow ? 96 : (isPortrait ? 96 : 164), isPortrait ? Math.min(144, width - 36) : 238));
+  const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.29 : 0.118), isUltraNarrow ? 96 : (isPortrait ? 118 : 164), isPortrait ? Math.min(132, width - 36) : 238));
   const centerButtonWidth = isPortrait
-    ? Math.round(clamp(buttonWidth * 1.12, buttonWidth + 8, 170))
+    ? buttonWidth
     : Math.round(clamp(buttonWidth * 1.14, buttonWidth + 20, 262));
   const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.16 : 0.156), isUltraNarrow ? Math.round(width / 2) : 66, 324));
   const centerButtonX = Math.round(width * 0.5);

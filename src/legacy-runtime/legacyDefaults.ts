@@ -54,13 +54,20 @@ export const clampInteger = (value: number, min: number, max: number): number =>
 
 export const clampUnit = (value: number): number => clampNumber(value, 0, 1);
 
-const linearChannelToSrgbByte = (value: number): number => {
+export const linearChannelToSrgbByte = (value: number): number => {
   const normalized = clampUnit(value);
   const srgb = normalized <= 0.0031308
     ? normalized * 12.92
     : (1.055 * Math.pow(normalized, 1 / 2.4)) - 0.055;
 
   return clampInteger(Math.round(srgb * 255), 0, 255);
+};
+
+export const srgbByteToLinearChannel = (value: number): number => {
+  const normalized = clampInteger(value, 0, 255) / 255;
+  return normalized <= 0.04045
+    ? normalized / 12.92
+    : Math.pow((normalized + 0.055) / 1.055, 2.4);
 };
 
 export const linearColorToHex = (color: LegacyLinearColor): string => {

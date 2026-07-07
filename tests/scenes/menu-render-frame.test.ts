@@ -167,7 +167,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x07111d;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GLASS_ALPHA = 0.58;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GLASS_ALPHA = 0.28;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.18;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = 0x72e0bf;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = 0xb7f2ff;');
@@ -209,7 +209,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = 0x0d3c4f;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.9;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_FILL = 0x07111d;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.58;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.28;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.18;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_FILL = 0x08111d;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_EDGE = 0x031022;');
@@ -502,10 +502,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps front-door buttons in the shared cyber chrome path', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const fillColor = LEGACY_CYBER_PANEL_FILL;');
-    expect(menuSceneSource).toContain('this.add.rectangle(x, y, width, height, fillColor, baseAlpha);');
-    expect(menuSceneSource).toContain('const strokeColor = LEGACY_PLAY_TOUCH_ACCENT;');
-    expect(menuSceneSource).toContain('? 0x123a2d');
+    expect(menuSceneSource).toContain('const panel = this.add.graphics();');
+    expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(panel, {');
+    expect(menuSceneSource).toContain('fill: active ? 0x123a2d : LEGACY_CYBER_PANEL_FILL');
+    expect(menuSceneSource).toContain('const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);');
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
   });
 

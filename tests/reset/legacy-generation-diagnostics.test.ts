@@ -45,7 +45,7 @@ describe('legacy generation diagnostics contract', () => {
       { id: 3, name: 'MapPath', completionSignal: 'checkpoint-budget-exhausted', advancesToStageId: 4, executionKind: 'checkpoint-pass', batchSize: 1, batchUnit: 'checkpoint-passes', skipToStageIdWhenDisabled: null },
       { id: 4, name: 'CreatePath', completionSignal: 'path-array-exhausted', advancesToStageId: 5, executionKind: 'path-batch', batchSize: 4, batchUnit: 'path-tiles', skipToStageIdWhenDisabled: null },
       { id: 5, name: 'CreateShortCuts', completionSignal: 'shortcut-budget-exhausted', advancesToStageId: 6, executionKind: 'shortcut-attempt', batchSize: 1, batchUnit: 'shortcut-attempts', skipToStageIdWhenDisabled: 6 },
-      { id: 6, name: 'Draw', completionSignal: 'draw-iteration-complete', advancesToStageId: 7, executionKind: 'row-slice', batchSize: 1, batchUnit: 'rows', skipToStageIdWhenDisabled: null },
+      { id: 6, name: 'Draw', completionSignal: 'draw-iteration-complete', advancesToStageId: 7, executionKind: 'row-slice', batchSize: 12, batchUnit: 'rows', skipToStageIdWhenDisabled: null },
       { id: 7, name: 'Finalize', completionSignal: 'player-finalized', advancesToStageId: null, executionKind: 'finalize-state', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
       { id: 8, name: 'Reset', completionSignal: 'menu-reset-delay-rearmed', advancesToStageId: 0, executionKind: 'reset-branch', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null }
     ]);
