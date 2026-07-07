@@ -127,7 +127,13 @@ import {
   resolveHumanMovementPriorityCandidates,
   type HumanMovementActionKind
 } from '../input-human';
-import { resolveStickMovementKind, resolveTouchControlKindAtPoint, resolveTouchControlLayout } from '../input-human/touch';
+import {
+  resolveStickMovementKind,
+  resolveStickPullVector,
+  resolveTouchControlKindAtPoint,
+  resolveTouchControlLayout,
+  type TouchStickPullVector
+} from '../input-human/touch';
 
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
@@ -220,6 +226,11 @@ interface MenuSceneVisualDiagnostics {
     stick: {
       inner: VisualRect;
       outer: VisualRect;
+      pull: {
+        distanceRatio: number;
+        normalizedX: number;
+        normalizedY: number;
+      } | null;
     } | null;
     controls: {
       move_up: VisualRect | null;
@@ -540,6 +551,7 @@ export class MenuScene extends Phaser.Scene {
   private playHeldTouchRepeatTimer: Phaser.Time.TimerEvent | null = null;
   private playTouchStickPointerId: number | null = null;
   private playTouchStickLastControl: HumanMovementActionKind | null = null;
+  private playTouchStickPull: TouchStickPullVector | null = null;
   private playPointerStart: LegacyPlayPointerStart | null = null;
   private titleText!: Phaser.GameObjects.Text;
   private titleShadow!: Phaser.GameObjects.Text;
@@ -1466,6 +1478,11 @@ export class MenuScene extends Phaser.Scene {
 
       this.resetLegacyPlayDirectionalInputBuffer();
       this.playTouchStickPointerId = normalizedPointerId;
+      this.playHeldTouchMoves = [];
+      this.clearLegacyPlayHeldTouchRepeat();
+      this.playTouchStickPull = touchControlLayout.stick === null
+        ? null
+        : resolveStickPullVector(touchControlLayout.stick, x, y, { allowBeyondOuter: true });
       if (isMovementActionKind(control)) {
         this.playTouchStickLastControl = control;
         this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
@@ -1525,17 +1542,23 @@ export class MenuScene extends Phaser.Scene {
 
     const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
     if (touchControlLayout.controlMode !== 'stick' || touchControlLayout.stick === null) {
-      this.releaseLegacyPlayHeldTouchMove(pointerId);
+      this.releaseLegacyPlayTouchPointer(pointerId);
       return true;
     }
 
     const control = resolveStickMovementKind(touchControlLayout.stick, x, y, {
       allowBeyondOuter: true
     });
+    const pullVector = resolveStickPullVector(touchControlLayout.stick, x, y, {
+      allowBeyondOuter: true
+    });
+    this.playTouchStickPull = pullVector;
     if (isMovementActionKind(control)) {
       this.playTouchStickLastControl = control;
+      this.normalizeLegacyPlayStickHeldTouchMovePointer(pointerId);
       this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
     } else if (this.playTouchStickLastControl !== null) {
+      this.normalizeLegacyPlayStickHeldTouchMovePointer(pointerId);
       this.beginLegacyPlayHeldTouchMove(this.playTouchStickLastControl, pointerId, { keepWhenBlocked: true });
     } else {
       this.releaseLegacyPlayHeldTouchMove(pointerId);
@@ -1556,6 +1579,28 @@ export class MenuScene extends Phaser.Scene {
     }
 
     return Math.hypot(x - stick.outer.centerX, y - stick.outer.centerY) <= stick.outer.width / 2;
+  }
+
+  private normalizeLegacyPlayStickHeldTouchMovePointer(pointerId: number | null): void {
+    if (this.playHeldTouchMoves.length === 0) {
+      return;
+    }
+
+    const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
+    const matchingMove = this.playHeldTouchMoves.find((move) => move.pointerId === normalizedPointerId);
+    if (this.playHeldTouchMoves.length === 1 && matchingMove === this.playHeldTouchMoves[0]) {
+      return;
+    }
+
+    const fallbackMove = matchingMove ?? this.playHeldTouchMoves[0] ?? null;
+    this.playHeldTouchMoves = fallbackMove === null
+      ? []
+      : [{
+        ...fallbackMove,
+        pointerId: normalizedPointerId
+      }];
+    this.boardDynamicDirty = true;
+    this.publishInteractionDiagnostics();
   }
 
   private beginLegacyPlayHeldTouchMove(
@@ -1672,6 +1717,7 @@ export class MenuScene extends Phaser.Scene {
     if (releasedStick) {
       this.playTouchStickPointerId = null;
       this.playTouchStickLastControl = null;
+      this.playTouchStickPull = null;
       this.boardDynamicDirty = true;
       this.publishInteractionDiagnostics();
     }
@@ -1702,6 +1748,7 @@ export class MenuScene extends Phaser.Scene {
       this.playHeldTouchMoves = [];
       this.playTouchStickPointerId = null;
       this.playTouchStickLastControl = null;
+      this.playTouchStickPull = null;
       this.clearLegacyPlayHeldTouchRepeat();
       this.publishInteractionDiagnostics();
       return;
@@ -1722,6 +1769,7 @@ export class MenuScene extends Phaser.Scene {
       this.playHeldTouchMoves = [];
       this.playTouchStickPointerId = null;
       this.playTouchStickLastControl = null;
+      this.playTouchStickPull = null;
       this.clearLegacyPlayHeldTouchRepeat();
       this.publishInteractionDiagnostics();
       return;
@@ -1914,6 +1962,7 @@ export class MenuScene extends Phaser.Scene {
     this.playHeldTouchMoves = [];
     this.playTouchStickPointerId = null;
     this.playTouchStickLastControl = null;
+    this.playTouchStickPull = null;
     this.playMoveFlags = createLegacyPlayMoveFlags();
     this.playPointerStart = null;
   }
@@ -3240,7 +3289,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (touchControlLayout.controlMode === 'stick' && touchControlLayout.stick !== null) {
-      this.drawLegacyPlayTouchStick(touchControlLayout.stick, this.resolveLegacyPlayHeldTouchControl());
+      this.drawLegacyPlayTouchStick(touchControlLayout.stick, this.resolveLegacyPlayHeldTouchControl(), this.playTouchStickPull);
       this.drawLegacyPlayTouchButton(controls.pause, true, false);
       this.drawLegacyPlayTouchButton(controls.restart_attempt, true, false);
       this.drawLegacyPlayTouchPauseIcon(controls.pause);
@@ -3279,7 +3328,8 @@ export class MenuScene extends Phaser.Scene {
 
   private drawLegacyPlayTouchStick(
     stick: NonNullable<ReturnType<typeof resolveTouchControlLayout>['stick']>,
-    activeControl: HumanMovementActionKind | null
+    activeControl: HumanMovementActionKind | null,
+    pullVector: TouchStickPullVector | null
   ): void {
     const outerRadius = stick.outer.width / 2;
     const innerRadius = stick.inner.width / 2;
@@ -3289,10 +3339,13 @@ export class MenuScene extends Phaser.Scene {
     let knobX = centerX;
     let knobY = centerY;
 
-    if (activeControl !== null) {
+    const travel = Math.max(outerRadius * 0.26, outerRadius - innerRadius - knobRadius);
+    if (pullVector !== null) {
+      knobX += pullVector.normalizedX * travel;
+      knobY += pullVector.normalizedY * travel;
+    } else if (activeControl !== null) {
       const vector = resolveHumanMovementActionVector(activeControl);
       const length = Math.hypot(vector.deltaX, vector.deltaY) || 1;
-      const travel = Math.max(outerRadius * 0.26, outerRadius - innerRadius - knobRadius);
       knobX += (vector.deltaX / length) * travel;
       knobY += (vector.deltaY / length) * travel;
     }
@@ -4192,7 +4245,14 @@ export class MenuScene extends Phaser.Scene {
             touchControlLayout.stick.outer.top,
             touchControlLayout.stick.outer.width,
             touchControlLayout.stick.outer.height
-          )
+          ),
+          pull: this.playTouchStickPull === null
+            ? null
+            : {
+              distanceRatio: this.playTouchStickPull.distanceRatio,
+              normalizedX: this.playTouchStickPull.normalizedX,
+              normalizedY: this.playTouchStickPull.normalizedY
+            }
         },
       controls: {
         move_up: createVisualRect(controls.move_up.left, controls.move_up.top, controls.move_up.width, controls.move_up.height),

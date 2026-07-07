@@ -5,6 +5,7 @@ import {
   releaseTouchPointer,
   resolveHumanTouchAction,
   resolveStickMovementKind,
+  resolveStickPullVector,
   resolveTouchControlLayout,
   resolveTouchControlKindAtPoint,
   resolveTouchInputCapability
@@ -102,6 +103,27 @@ describe('input-human touch bridge', () => {
       layout.stick!.outer.centerY - 320,
       { allowBeyondOuter: true }
     )).toBe('move_up_left');
+    const partialPull = resolveStickPullVector(
+      layout.stick!,
+      layout.stick!.outer.centerX + (layout.stick!.outer.width * 0.18),
+      layout.stick!.outer.centerY - (layout.stick!.outer.height * 0.22),
+      { allowBeyondOuter: true }
+    );
+    expect(partialPull?.movement).toBe('move_up_right');
+    expect(partialPull?.distanceRatio).toBeGreaterThan(0);
+    expect(partialPull?.distanceRatio).toBeLessThan(1);
+    expect(partialPull?.normalizedX).toBeGreaterThan(0);
+    expect(partialPull?.normalizedY).toBeLessThan(0);
+    const farPull = resolveStickPullVector(
+      layout.stick!,
+      layout.stick!.outer.centerX + 900,
+      layout.stick!.outer.centerY,
+      { allowBeyondOuter: true }
+    );
+    expect(farPull?.movement).toBe('move_right');
+    expect(farPull?.distanceRatio).toBe(1);
+    expect(farPull?.normalizedX).toBe(1);
+    expect(farPull?.normalizedY).toBe(0);
   });
 
   test('centers phone controls within the bottom lane below the board when board bounds are known', () => {

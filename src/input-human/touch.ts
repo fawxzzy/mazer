@@ -61,6 +61,14 @@ export interface TouchInputState {
   lastTriggeredAtByControl: Map<HumanInputActionKind, number>;
 }
 
+export interface TouchStickPullVector {
+  angleRadians: number;
+  distanceRatio: number;
+  movement: HumanMovementActionKind;
+  normalizedX: number;
+  normalizedY: number;
+}
+
 export interface TouchControlLayoutOptions {
   safeInsets?: TouchSafeInsetsLike;
   compact?: boolean;
@@ -109,6 +117,15 @@ export const resolveStickMovementKind = (
   y: number,
   options: { allowBeyondOuter?: boolean } = {}
 ): HumanMovementActionKind | null => {
+  return resolveStickPullVector(stick, x, y, options)?.movement ?? null;
+};
+
+export const resolveStickPullVector = (
+  stick: NonNullable<TouchControlLayout['stick']>,
+  x: number,
+  y: number,
+  options: { allowBeyondOuter?: boolean } = {}
+): TouchStickPullVector | null => {
   const dx = x - stick.outer.centerX;
   const dy = y - stick.outer.centerY;
   const distance = Math.hypot(dx, dy);
@@ -121,26 +138,50 @@ export const resolveStickMovementKind = (
 
   const angle = Math.atan2(dy, dx);
   const octant = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
+  let movement: HumanMovementActionKind;
   switch (octant) {
     case 0:
-      return 'move_right';
+      movement = 'move_right';
+      break;
     case 1:
-      return 'move_down_right';
+      movement = 'move_down_right';
+      break;
     case 2:
-      return 'move_down';
+      movement = 'move_down';
+      break;
     case 3:
-      return 'move_down_left';
+      movement = 'move_down_left';
+      break;
     case 4:
-      return 'move_left';
+      movement = 'move_left';
+      break;
     case 5:
-      return 'move_up_left';
+      movement = 'move_up_left';
+      break;
     case 6:
-      return 'move_up';
+      movement = 'move_up';
+      break;
     case 7:
-      return 'move_up_right';
+      movement = 'move_up_right';
+      break;
     default:
       return null;
   }
+
+  const outerRadius = stick.outer.width / 2;
+  const usableRadius = Math.max(1, outerRadius - stick.deadzoneRadius);
+  const clampedDistance = Math.min(distance, outerRadius);
+  const distanceRatio = clamp((clampedDistance - stick.deadzoneRadius) / usableRadius, 0, 1);
+  const unitX = dx / distance;
+  const unitY = dy / distance;
+
+  return {
+    angleRadians: angle,
+    distanceRatio,
+    movement,
+    normalizedX: unitX * distanceRatio,
+    normalizedY: unitY * distanceRatio
+  };
 };
 
 export const resolveTouchInputCapability = (runtime: TouchRuntimeLike | undefined): boolean => {
