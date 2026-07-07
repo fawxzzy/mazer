@@ -4,6 +4,7 @@ import {
   createTouchInputState,
   releaseTouchPointer,
   resolveHumanTouchAction,
+  resolveStickMovementKind,
   resolveTouchControlLayout,
   resolveTouchControlKindAtPoint,
   resolveTouchInputCapability
@@ -84,6 +85,17 @@ describe('input-human touch bridge', () => {
       layout.stick!.outer.centerX + (layout.stick!.outer.width * 0.32),
       layout.stick!.outer.centerY + (layout.stick!.outer.height * 0.32)
     )).toBe('move_down_right');
+    expect(resolveTouchControlKindAtPoint(
+      layout,
+      layout.stick!.outer.right + 20,
+      layout.stick!.outer.centerY
+    )).toBeNull();
+    expect(resolveStickMovementKind(
+      layout.stick!,
+      layout.stick!.outer.right + 20,
+      layout.stick!.outer.centerY,
+      { allowBeyondOuter: true }
+    )).toBe('move_right');
   });
 
   test('keeps ultra-narrow portrait controls inside the viewport without oversized hit plates', () => {

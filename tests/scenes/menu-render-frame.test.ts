@@ -339,6 +339,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.releaseLegacyPlayTouchPointer(event.pointerId)');
     expect(menuSceneSource).toContain("controlMode: this.settings.controlMode");
     expect(menuSceneSource).toContain("touchControlLayout.controlMode === 'stick'");
+    expect(menuSceneSource).toContain('resolveStickMovementKind(touchControlLayout.stick, x, y,');
+    expect(menuSceneSource).toContain('allowBeyondOuter: true');
+    expect(menuSceneSource).toContain('keepWhenBlocked: true');
+    expect(menuSceneSource).toContain('if (this.playTouchStickPointerId !== null) {');
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchStick(');
     expect(menuSceneSource).toContain('const wasHeld = this.playMoveFlags[direction];');
     expect(menuSceneSource).toContain('const sameControlIndex = this.playHeldTouchMoves.findIndex((move) => move.control === control);');

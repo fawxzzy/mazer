@@ -103,15 +103,19 @@ const isPointInRect = (rect: TouchRect, x: number, y: number): boolean => (
   && y <= rect.bottom
 );
 
-const resolveStickMovementKind = (
+export const resolveStickMovementKind = (
   stick: NonNullable<TouchControlLayout['stick']>,
   x: number,
-  y: number
+  y: number,
+  options: { allowBeyondOuter?: boolean } = {}
 ): HumanMovementActionKind | null => {
   const dx = x - stick.outer.centerX;
   const dy = y - stick.outer.centerY;
   const distance = Math.hypot(dx, dy);
-  if (distance < stick.deadzoneRadius || distance > stick.outer.width / 2) {
+  if (distance < stick.deadzoneRadius) {
+    return null;
+  }
+  if (!options.allowBeyondOuter && distance > stick.outer.width / 2) {
     return null;
   }
 
