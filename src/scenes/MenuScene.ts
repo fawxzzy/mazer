@@ -101,6 +101,11 @@ import {
   writeLegacyGameToggleSettings
 } from '../legacy-runtime/legacyGameTogglePreferences';
 import {
+  formatLegacyMovementSpeedPercent,
+  normalizeLegacyMovementSpeed,
+  resolveLegacyMovementSpeedProfile
+} from '../legacy-runtime/legacyMovementSpeed';
+import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
 } from '../legacy-runtime/legacyDemoWalker';
@@ -473,8 +478,6 @@ const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_CORE_RATIO = 0.76;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO = 0.96;
 const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 50;
-const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 240;
-const LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS = 100;
 const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
 const LEGACY_PLAY_COMPASS_SPIN_DURATION_MS = 1800;
@@ -862,6 +865,7 @@ export class MenuScene extends Phaser.Scene {
       backtrackCount: 0,
       recoveryCount: 0
     };
+    const movementSpeedProfile = resolveLegacyMovementSpeedProfile(this.settings.movementSpeed);
     const trailSegmentCap = this.settings.toggleTrailFade
       ? TRAIL_FADE_TAIL
       : Math.max(this.trail.length, this.menuDemoConfig?.behavior.trailMaxLength ?? this.trail.length);
@@ -900,8 +904,11 @@ export class MenuScene extends Phaser.Scene {
           touchSprint: {
             activeControls: this.playHeldTouchMoves.map((move) => move.control),
             heldControl: this.resolveLegacyPlayHeldTouchControl(),
-            repeatInitialDelayMs: LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS,
-            repeatIntervalMs: LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS,
+            movementSpeed: normalizeLegacyMovementSpeed(this.settings.movementSpeed),
+            movementSpeedLabel: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
+            repeatInitialDelayMs: movementSpeedProfile.initialDelayMs,
+            repeatIntervalMs: movementSpeedProfile.repeatIntervalMs,
+            turnDelayMs: movementSpeedProfile.turnDelayMs,
             pendingStepCount: this.playDiagonalMoveQueue.length,
             repeatTimerActive: this.playHeldTouchRepeatTimer !== null,
             stepTimerActive: this.playDiagonalMoveTimer !== null
@@ -1673,12 +1680,12 @@ export class MenuScene extends Phaser.Scene {
     this.clearLegacyPlayHeldTouchRepeat();
     const moved = this.performLegacyPlayHeldTouchMove();
     if (moved) {
-      this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS);
+      this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay(hadActiveMove ? 'turn' : 'initial'));
     } else if (!options.keepWhenBlocked) {
       this.releaseLegacyPlayHeldTouchMove(normalizedPointerId);
       return false;
     } else if (!hadActiveMove) {
-      this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS);
+      this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
     }
 
     this.publishInteractionDiagnostics();
@@ -1733,7 +1740,7 @@ export class MenuScene extends Phaser.Scene {
       this.clearLegacyPlayHeldTouchRepeat();
       const moved = this.performLegacyPlayHeldTouchMove();
       if (moved) {
-        this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS);
+        this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('turn'));
       } else if (!options.keepWhenBlocked) {
         this.releaseLegacyPlayHeldTouchMove(normalizedPointerId);
         return false;
@@ -1744,7 +1751,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (hadActiveMove) {
       if (this.playHeldTouchRepeatTimer === null) {
-        this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS);
+        this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
       }
       this.publishInteractionDiagnostics();
       return true;
@@ -1762,7 +1769,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (moved) {
-      this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS);
+      this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('initial'));
       this.publishInteractionDiagnostics();
     }
     return moved;
@@ -1819,6 +1826,20 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
+  private resolveLegacyPlayHeldTouchDelay(kind: 'initial' | 'repeat' | 'turn'): number {
+    const profile = resolveLegacyMovementSpeedProfile(this.settings.movementSpeed);
+    switch (kind) {
+      case 'initial':
+        return profile.initialDelayMs;
+      case 'repeat':
+        return profile.repeatIntervalMs;
+      case 'turn':
+        return profile.turnDelayMs;
+      default:
+        return kind satisfies never;
+    }
+  }
+
   private repeatLegacyPlayHeldTouchMove(): void {
     if (
       this.playHeldTouchMoves.length === 0
@@ -1854,7 +1875,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS);
+    this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
     this.publishInteractionDiagnostics();
   }
 
@@ -3915,7 +3936,20 @@ export class MenuScene extends Phaser.Scene {
       );
     });
 
-    return gridTop + (controls.length * (rowHeight + rowGap)) + (stacked ? 10 : 6);
+    const sliderY = gridTop + (controls.length * (rowHeight + rowGap)) + Math.round(rowHeight / 2);
+    this.uiButtons.push(
+      this.createMovementSpeedSliderRow({
+        height: rowHeight,
+        label: 'Move Speed',
+        stateText: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
+        value: normalizeLegacyMovementSpeed(this.settings.movementSpeed),
+        x: left + Math.round(width / 2),
+        y: sliderY,
+        width
+      })
+    );
+
+    return sliderY + Math.round(rowHeight / 2) + (stacked ? 10 : 6);
   }
 
   private createToggleSwitchRow(input: {
@@ -3979,6 +4013,102 @@ export class MenuScene extends Phaser.Scene {
         label.destroy();
         stateLabel.destroy();
         track.destroy();
+        knob.destroy();
+      }
+    };
+  }
+
+  private createMovementSpeedSliderRow(input: {
+    height: number;
+    label: string;
+    stateText: string;
+    value: number;
+    width: number;
+    x: number;
+    y: number;
+  }): UiButton {
+    const left = input.x - (input.width / 2);
+    const rowFill = LEGACY_CYBER_PANEL_FILL;
+    const rowStroke = LEGACY_PLAY_TOUCH_BUTTON_STROKE;
+    const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, 0.5);
+    background.setStrokeStyle(1, rowStroke, 0.38);
+    background.setInteractive({ useHandCursor: true });
+
+    const label = this.add.text(left + 16, input.y, input.label, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: `${Math.max(16, Math.min(20, Math.round(input.height * 0.4)))}px`,
+      color: '#ecfff5'
+    }).setOrigin(0, 0.5).setAlpha(0.94);
+
+    const stateLabel = this.add.text(left + input.width - 16, input.y, input.stateText, {
+      fontFamily: '"Courier New", monospace',
+      fontSize: `${Math.max(11, Math.min(13, Math.round(input.height * 0.28)))}px`,
+      color: '#72e0bf'
+    }).setOrigin(1, 0.5).setAlpha(0.92);
+
+    const trackLeft = left + Math.max(132, Math.round(input.width * 0.42));
+    const trackRight = left + input.width - 72;
+    const trackWidth = Math.max(44, trackRight - trackLeft);
+    const normalizedValue = normalizeLegacyMovementSpeed(input.value);
+    const track = this.add.rectangle(
+      trackLeft + Math.round(trackWidth / 2),
+      input.y,
+      trackWidth,
+      6,
+      0x07131d,
+      0.86
+    );
+    track.setStrokeStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.46);
+    const fill = this.add.rectangle(
+      trackLeft + Math.round((trackWidth * normalizedValue) / 2),
+      input.y,
+      Math.max(4, Math.round(trackWidth * normalizedValue)),
+      6,
+      LEGACY_PLAY_TOUCH_ACCENT,
+      0.72
+    );
+    const knob = this.add.circle(
+      trackLeft + Math.round(trackWidth * normalizedValue),
+      input.y,
+      8,
+      LEGACY_PLAY_TOUCH_ACCENT,
+      0.98
+    );
+    knob.setStrokeStyle(1, 0xecfff5, 0.72);
+
+    const commitPointerSpeed = (pointerX: number): void => {
+      const nextSpeed = normalizeLegacyMovementSpeed((pointerX - trackLeft) / trackWidth);
+      this.applyLegacyMovementSpeed(nextSpeed);
+    };
+
+    const setActive = (active: boolean): void => {
+      background.setFillStyle(rowFill, active ? 0.7 : 0.5);
+      background.setStrokeStyle(1, LEGACY_PLAY_TOUCH_ACCENT, active ? 0.72 : 0.38);
+      track.setStrokeStyle(1, LEGACY_PLAY_TOUCH_ACCENT, active ? 0.75 : 0.46);
+      knob.setScale(active ? 1.08 : 1);
+      label.setAlpha(active ? 1 : 0.94);
+      stateLabel.setAlpha(active ? 1 : 0.92);
+    };
+
+    background.on('pointerover', () => setActive(true));
+    background.on('pointerout', () => setActive(false));
+    background.on('pointerdown', (pointer: Phaser.Input.Pointer) => commitPointerSpeed(pointer.x));
+    background.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (pointer.isDown) {
+        commitPointerSpeed(pointer.x);
+      }
+    });
+
+    return {
+      background,
+      label,
+      setActive,
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+        stateLabel.destroy();
+        track.destroy();
+        fill.destroy();
         knob.destroy();
       }
     };
@@ -4311,6 +4441,19 @@ export class MenuScene extends Phaser.Scene {
       this.boardDynamicDirty = true;
     }
 
+    this.uiDirty = true;
+    if (this.mode === 'play') {
+      this.publishInteractionDiagnostics();
+    }
+  }
+
+  private applyLegacyMovementSpeed(speed: number): void {
+    const nextSettings = copyLegacySettings(this.settings);
+    nextSettings.movementSpeed = normalizeLegacyMovementSpeed(speed);
+    this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), nextSettings);
+    if (this.playHeldTouchMoves.length > 0 && this.playHeldTouchRepeatTimer !== null) {
+      this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
+    }
     this.uiDirty = true;
     if (this.mode === 'play') {
       this.publishInteractionDiagnostics();

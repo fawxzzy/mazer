@@ -27,6 +27,7 @@ describe('legacy game toggle preferences', () => {
     settings.scale = 75;
     settings.controlMode = 'stick';
     settings.darkMode = true;
+    settings.movementSpeed = 0.82;
     settings.toggleAnimatedBackdrop = false;
     settings.toggleCameraFollow = true;
     settings.toggleTrailFade = true;
@@ -38,6 +39,7 @@ describe('legacy game toggle preferences', () => {
     expect(JSON.parse(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY) ?? '{}')).toEqual({
       controlMode: 'stick',
       darkMode: true,
+      movementSpeed: 0.82,
       toggleAnimatedBackdrop: false,
       toggleCameraFollow: true,
       toggleTrailFade: true,
@@ -52,6 +54,7 @@ describe('legacy game toggle preferences', () => {
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
       controlMode: 'stick',
       darkMode: true,
+      movementSpeed: 0.33,
       toggleAnimatedBackdrop: false,
       toggleCameraFollow: true,
       toggleTrailFade: true,
@@ -64,6 +67,7 @@ describe('legacy game toggle preferences', () => {
     expect(pickLegacyGameTogglePreferences(settings)).toEqual({
       controlMode: 'stick',
       darkMode: true,
+      movementSpeed: 0.33,
       toggleAnimatedBackdrop: false,
       toggleCameraFollow: true,
       toggleTrailFade: true,
@@ -76,6 +80,7 @@ describe('legacy game toggle preferences', () => {
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
       controlMode: 'teleport',
       darkMode: 'yes',
+      movementSpeed: '1.4',
       toggleAnimatedBackdrop: 'no',
       toggleCameraFollow: 1,
       toggleTrailFade: null,
@@ -86,6 +91,7 @@ describe('legacy game toggle preferences', () => {
 
     expect(settings.controlMode).toBe('arrows');
     expect(settings.darkMode).toBe(true);
+    expect(settings.movementSpeed).toBe(1);
     expect(settings.toggleAnimatedBackdrop).toBe(false);
     expect(settings.toggleCameraFollow).toBe(false);
     expect(settings.toggleTrailFade).toBe(false);

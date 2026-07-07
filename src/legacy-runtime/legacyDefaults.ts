@@ -9,6 +9,7 @@ export type LegacyControlMode = 'arrows' | 'stick';
 export interface LegacySettings {
   scale: number;
   camScale: number;
+  movementSpeed: number;
   pathColor: LegacyLinearColor;
   wallColor: LegacyLinearColor;
   darkMode: boolean;
@@ -22,6 +23,7 @@ export interface LegacySettings {
 export const LEGACY_DEFAULTS: LegacySettings = {
   scale: 50,
   camScale: 0,
+  movementSpeed: 0.58,
   pathColor: {
     r: 0.19099,
     g: 0.192708,
@@ -78,6 +80,7 @@ export const linearColorToNumber = (color: LegacyLinearColor): number => (
 export const copyLegacySettings = (settings: LegacySettings): LegacySettings => ({
   scale: settings.scale,
   camScale: settings.camScale,
+  movementSpeed: settings.movementSpeed ?? LEGACY_DEFAULTS.movementSpeed,
   pathColor: { ...settings.pathColor },
   wallColor: { ...settings.wallColor },
   darkMode: settings.darkMode,

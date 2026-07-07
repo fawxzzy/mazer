@@ -1,15 +1,22 @@
 import {
   LEGACY_DEFAULTS,
+  clampNumber,
   copyLegacySettings,
   type LegacyControlMode,
   type LegacySettings
 } from './legacyDefaults';
+import {
+  LEGACY_MOVEMENT_SPEED_MAX,
+  LEGACY_MOVEMENT_SPEED_MIN,
+  normalizeLegacyMovementSpeed
+} from './legacyMovementSpeed';
 
 export const LEGACY_GAME_TOGGLE_STORAGE_KEY = 'mazer.game-toggles.v1';
 
 export interface LegacyGameTogglePreferences {
   controlMode: LegacyControlMode;
   darkMode: boolean;
+  movementSpeed: number;
   toggleAnimatedBackdrop: boolean;
   toggleCameraFollow: boolean;
   toggleTrailFade: boolean;
@@ -43,6 +50,7 @@ export const pickLegacyGameTogglePreferences = (
 ): LegacyGameTogglePreferences => ({
   controlMode: settings.controlMode,
   darkMode: settings.darkMode,
+  movementSpeed: normalizeLegacyMovementSpeed(settings.movementSpeed),
   toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop,
   toggleCameraFollow: settings.toggleCameraFollow,
   toggleTrailFade: settings.toggleTrailFade,
@@ -55,6 +63,12 @@ export const normalizeLegacyGameTogglePreferences = (
 ): LegacyGameTogglePreferences => ({
   controlMode: isControlMode(value?.controlMode) ? value.controlMode : fallback.controlMode,
   darkMode: normalizeBoolean(value?.darkMode, fallback.darkMode),
+  movementSpeed: normalizeLegacyMovementSpeed(
+    typeof value?.movementSpeed === 'number'
+      ? value.movementSpeed
+      : Number(value?.movementSpeed),
+    clampNumber(fallback.movementSpeed, LEGACY_MOVEMENT_SPEED_MIN, LEGACY_MOVEMENT_SPEED_MAX)
+  ),
   toggleAnimatedBackdrop: normalizeBoolean(value?.toggleAnimatedBackdrop, fallback.toggleAnimatedBackdrop),
   toggleCameraFollow: normalizeBoolean(value?.toggleCameraFollow, fallback.toggleCameraFollow),
   toggleTrailFade: normalizeBoolean(value?.toggleTrailFade, fallback.toggleTrailFade),

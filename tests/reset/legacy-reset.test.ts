@@ -125,6 +125,7 @@ describe('legacy reset lane', () => {
   test('preserves legacy default settings', () => {
     expect(LEGACY_DEFAULTS.scale).toBe(50);
     expect(LEGACY_DEFAULTS.camScale).toBe(0);
+    expect(LEGACY_DEFAULTS.movementSpeed).toBe(0.58);
     expect(linearColorToHex(LEGACY_DEFAULTS.pathColor)).toBe('#797978');
     expect(linearColorToHex(LEGACY_DEFAULTS.wallColor)).toBe('#4a4a4a');
     expect(LEGACY_DEFAULTS.toggleTrailPulse).toBe(true);
@@ -637,6 +638,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("label: 'Animated BG'");
     expect(menuSceneSource).toContain("label: 'Dark Mode'");
     expect(menuSceneSource).toContain("label: 'Controls'");
+    expect(menuSceneSource).toContain("label: 'Move Speed'");
+    expect(menuSceneSource).toContain('private createMovementSpeedSliderRow(');
+    expect(menuSceneSource).toContain('private applyLegacyMovementSpeed(speed: number): void {');
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'");
@@ -650,6 +654,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleAnimatedBackdrop')");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('darkMode')");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('controlMode')");
+    expect(menuSceneSource).toContain('this.applyLegacyMovementSpeed(nextSpeed);');
     expect(menuSceneSource).toContain('private applyLegacyOverlayToggleField(fieldId: LegacyOverlayToggleFieldId): void {');
     expect(menuSceneSource).not.toContain("this.openNestedOverlay('features'");
     expect(menuSceneSource).not.toContain("this.openNestedOverlay('gameModes'");
