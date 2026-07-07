@@ -481,11 +481,11 @@ const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO = 0.96;
 const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 50;
 const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
-const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 56;
+const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 64;
 const LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS = 16;
-const LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS = 128;
-const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = 92;
-const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = 128;
+const LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS = 144;
+const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = 104;
+const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = 144;
 const LEGACY_PLAY_COMPASS_SPIN_DURATION_MS = 1800;
 const LEGACY_PLAY_COMPASS_SPIN_TURNS = 3.25;
 const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
@@ -856,6 +856,7 @@ export class MenuScene extends Phaser.Scene {
       ? Number((this.runtimeFrameTotalMs / this.runtimeFrameCount).toFixed(3))
       : 0;
     const starCount = this.stars.length;
+    const movingBackdropActorCount = this.settings.toggleAnimatedBackdrop ? starCount : 0;
     const telemetrySummary = summarizeTelemetrySemantics([]);
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     const drawStageStaged = this.mode === 'menu' && drawStage?.executionKind === 'row-slice';
@@ -1118,8 +1119,8 @@ export class MenuScene extends Phaser.Scene {
           veils: 0,
           driftMotes: 0,
           sigils: 4,
-          moving: starCount,
-          movingCap: starCount,
+          moving: movingBackdropActorCount,
+          movingCap: movingBackdropActorCount,
           signatureCap: starCount
         }
       }

@@ -28,19 +28,19 @@ describe('legacy movement speed profile', () => {
     const fast = resolveLegacyMovementSpeedProfile(1);
 
     expect(slow).toEqual({
-      initialDelayMs: 300,
-      repeatIntervalMs: 124,
-      turnDelayMs: 342
+      initialDelayMs: 316,
+      repeatIntervalMs: 132,
+      turnDelayMs: 362
     });
     expect(defaultSpeed).toEqual({
-      initialDelayMs: 204,
-      repeatIntervalMs: 91,
-      turnDelayMs: 238
+      initialDelayMs: 216,
+      repeatIntervalMs: 97,
+      turnDelayMs: 254
     });
     expect(fast).toEqual({
-      initialDelayMs: 150,
-      repeatIntervalMs: 72,
-      turnDelayMs: 180
+      initialDelayMs: 160,
+      repeatIntervalMs: 78,
+      turnDelayMs: 194
     });
     expect(slow.repeatIntervalMs).toBeGreaterThan(defaultSpeed.repeatIntervalMs);
     expect(defaultSpeed.repeatIntervalMs).toBeGreaterThan(fast.repeatIntervalMs);

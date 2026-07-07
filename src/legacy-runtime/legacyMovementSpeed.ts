@@ -42,9 +42,9 @@ export const resolveLegacyMovementSpeedProfile = (
 ): LegacyMovementSpeedProfile => {
   const normalizedSpeed = normalizeLegacyMovementSpeed(speed);
   const ease = Math.pow(normalizedSpeed, 0.82);
-  const initialDelayMs = Math.round(300 - (ease * 150));
-  const repeatIntervalMs = Math.round(124 - (ease * 52));
-  const turnDelayMs = Math.round(initialDelayMs + 42 - (ease * 12));
+  const initialDelayMs = Math.round(316 - (ease * 156));
+  const repeatIntervalMs = Math.round(132 - (ease * 54));
+  const turnDelayMs = Math.round(initialDelayMs + 46 - (ease * 12));
 
   return {
     initialDelayMs,

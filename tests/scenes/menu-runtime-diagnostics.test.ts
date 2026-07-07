@@ -295,13 +295,13 @@ describe('menu runtime diagnostics', () => {
             heldControl: null,
             movementSpeed: 0.58,
             movementSpeedLabel: '58%',
-            repeatInitialDelayMs: 204,
-            repeatIntervalMs: 91,
-            stickInitialDelayMaxMs: 128,
-            stickRepeatIntervalMaxMs: 92,
-            stickRetargetDelayMs: 56,
-            stickTurnDelayMaxMs: 128,
-            turnDelayMs: 238,
+            repeatInitialDelayMs: 216,
+            repeatIntervalMs: 97,
+            stickInitialDelayMaxMs: 144,
+            stickRepeatIntervalMaxMs: 104,
+            stickRetargetDelayMs: 64,
+            stickTurnDelayMaxMs: 144,
+            turnDelayMs: 254,
             pendingStepCount: 0,
             repeatTimerActive: false,
             stepTimerActive: false
@@ -523,13 +523,13 @@ describe('menu runtime diagnostics', () => {
       )?.play?.inputBuffer.simultaneousDelayMs).toBe(50);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )?.play?.inputBuffer.touchSprint.repeatInitialDelayMs).toBe(204);
+      )?.play?.inputBuffer.touchSprint.repeatInitialDelayMs).toBe(216);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )?.play?.inputBuffer.touchSprint.repeatIntervalMs).toBe(91);
+      )?.play?.inputBuffer.touchSprint.repeatIntervalMs).toBe(97);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )?.play?.inputBuffer.touchSprint.turnDelayMs).toBe(238);
+      )?.play?.inputBuffer.touchSprint.turnDelayMs).toBe(254);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.menuDemo?.route?.cueCounts.reacquire).toBe(2);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.source).toBe('menu-generated');
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.routeQualityStats?.routeQuality)
