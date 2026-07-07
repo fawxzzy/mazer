@@ -3,8 +3,8 @@ import {
   type LegacySettings
 } from './legacyDefaults';
 
-export type LegacyOverlayToggleFieldId = 'toggleCameraFollow' | 'toggleTrailFade' | 'darkMode';
-export type LegacyOverlayToggleStateText = 'On' | 'Off';
+export type LegacyOverlayToggleFieldId = 'toggleCameraFollow' | 'toggleTrailFade' | 'darkMode' | 'controlMode';
+export type LegacyOverlayToggleStateText = 'On' | 'Off' | 'Arrows' | 'Stick';
 
 export interface LegacyOverlayToggleFieldApplyResult {
   settings: LegacySettings;
@@ -22,9 +22,11 @@ export const resolveLegacyOverlayToggleStateText = (
   switch (fieldId) {
     case 'toggleCameraFollow':
     case 'toggleTrailFade':
-      return value ? 'Off' : 'On';
+      return value ? 'On' : 'Off';
     case 'darkMode':
       return null;
+    case 'controlMode':
+      return value ? 'Stick' : 'Arrows';
     default:
       return fieldId satisfies never;
   }
@@ -66,6 +68,16 @@ export const applyLegacyOverlayToggleField = (
         affectsBoardDynamic: true,
         legacyDirectionalLightIntensity: nextSettings.darkMode ? 0.3 : 2.0,
         stateText: null
+      };
+    case 'controlMode':
+      nextSettings.controlMode = nextSettings.controlMode === 'stick' ? 'arrows' : 'stick';
+      return {
+        settings: nextSettings,
+        affectsBackdrop: false,
+        affectsBoardStatic: false,
+        affectsBoardDynamic: true,
+        legacyDirectionalLightIntensity: null,
+        stateText: resolveLegacyOverlayToggleStateText(fieldId, nextSettings.controlMode === 'stick')
       };
     default:
       return fieldId satisfies never;

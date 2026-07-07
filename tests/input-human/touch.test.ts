@@ -28,8 +28,10 @@ describe('input-human touch bridge', () => {
       height: 844
     });
 
+    expect(layout.controlMode).toBe('arrows');
     expect(layout.frame.width).toBeGreaterThan(0);
     expect(layout.frames).toHaveLength(2);
+    expect(layout.stick).toBeNull();
     expect(layout.frame.left).toBeGreaterThan(80);
     expect(layout.frame.right).toBeLessThan(310);
     expect(layout.controls.move_up.width).toBeGreaterThanOrEqual(44);
@@ -58,6 +60,30 @@ describe('input-human touch bridge', () => {
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_up_left.centerX, layout.controls.move_up_left.centerY)).toBe('move_up_left');
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_down_right.centerX, layout.controls.move_down_right.centerY)).toBe('move_down_right');
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_right.centerX, layout.controls.move_right.centerY)).toBe('move_right');
+  });
+
+  test('supports a stick control mode with a compass deadzone and 360-degree movement ring', () => {
+    const layout = resolveTouchControlLayout({
+      width: 390,
+      height: 844
+    }, {
+      controlMode: 'stick'
+    });
+
+    expect(layout.controlMode).toBe('stick');
+    expect(layout.stick).not.toBeNull();
+    expect(Math.abs(layout.stick!.inner.centerX - layout.stick!.outer.centerX)).toBeLessThanOrEqual(1);
+    expect(Math.abs(layout.stick!.inner.centerY - layout.stick!.outer.centerY)).toBeLessThanOrEqual(1);
+    expect(resolveTouchControlKindAtPoint(layout, layout.stick!.inner.centerX, layout.stick!.inner.centerY)).toBeNull();
+    expect(resolveTouchControlKindAtPoint(layout, layout.stick!.outer.centerX, layout.stick!.outer.top + 4)).toBe('move_up');
+    expect(resolveTouchControlKindAtPoint(layout, layout.stick!.outer.right - 4, layout.stick!.outer.centerY)).toBe('move_right');
+    expect(resolveTouchControlKindAtPoint(layout, layout.stick!.outer.centerX, layout.stick!.outer.bottom - 4)).toBe('move_down');
+    expect(resolveTouchControlKindAtPoint(layout, layout.stick!.outer.left + 4, layout.stick!.outer.centerY)).toBe('move_left');
+    expect(resolveTouchControlKindAtPoint(
+      layout,
+      layout.stick!.outer.centerX + (layout.stick!.outer.width * 0.32),
+      layout.stick!.outer.centerY + (layout.stick!.outer.height * 0.32)
+    )).toBe('move_down_right');
   });
 
   test('keeps ultra-narrow portrait controls inside the viewport without oversized hit plates', () => {

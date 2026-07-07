@@ -1,5 +1,5 @@
 export type LegacyRuntimeMode = 'menu' | 'play';
-export type LegacyOverlayKind = 'none' | 'options' | 'features' | 'gameModes' | 'pause';
+export type LegacyOverlayKind = 'none' | 'options' | 'pause';
 
 export interface LegacyOverlayRoutingState {
   mode: LegacyRuntimeMode;
@@ -10,16 +10,7 @@ export interface LegacyOverlayRoutingState {
 export type LegacyOverlayBackAction =
   | { kind: 'noop' }
   | { kind: 'open-overlay'; overlay: 'pause' }
-  | { kind: 'return-parent'; overlay: LegacyOverlayKind; overlayReturn: 'none' }
   | { kind: 'close-overlay' };
-
-export const resolveLegacyNestedOverlayOpen = (
-  overlay: Extract<LegacyOverlayKind, 'features' | 'gameModes'>,
-  overlayReturn: Extract<LegacyOverlayKind, 'options' | 'pause'>
-): Pick<LegacyOverlayRoutingState, 'overlay' | 'overlayReturn'> => ({
-  overlay,
-  overlayReturn
-});
 
 export const resolveLegacyOverlayBackAction = (
   state: LegacyOverlayRoutingState
@@ -34,14 +25,6 @@ export const resolveLegacyOverlayBackAction = (
 
     return {
       kind: 'noop'
-    };
-  }
-
-  if (state.overlayReturn !== 'none') {
-    return {
-      kind: 'return-parent',
-      overlay: state.overlayReturn,
-      overlayReturn: 'none'
     };
   }
 

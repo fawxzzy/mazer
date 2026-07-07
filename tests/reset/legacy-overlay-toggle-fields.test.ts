@@ -6,11 +6,13 @@ import {
 } from '../../src/legacy-runtime/legacyOverlayToggleFields';
 
 describe('legacy overlay toggle fields', () => {
-  test('keeps legacy inverted On/Off copy for feature toggles only', () => {
-    expect(resolveLegacyOverlayToggleStateText('toggleCameraFollow', false)).toBe('On');
-    expect(resolveLegacyOverlayToggleStateText('toggleCameraFollow', true)).toBe('Off');
-    expect(resolveLegacyOverlayToggleStateText('toggleTrailFade', false)).toBe('On');
-    expect(resolveLegacyOverlayToggleStateText('toggleTrailFade', true)).toBe('Off');
+  test('reports toggle labels from the actual setting value', () => {
+    expect(resolveLegacyOverlayToggleStateText('toggleCameraFollow', false)).toBe('Off');
+    expect(resolveLegacyOverlayToggleStateText('toggleCameraFollow', true)).toBe('On');
+    expect(resolveLegacyOverlayToggleStateText('toggleTrailFade', false)).toBe('Off');
+    expect(resolveLegacyOverlayToggleStateText('toggleTrailFade', true)).toBe('On');
+    expect(resolveLegacyOverlayToggleStateText('controlMode', false)).toBe('Arrows');
+    expect(resolveLegacyOverlayToggleStateText('controlMode', true)).toBe('Stick');
     expect(resolveLegacyOverlayToggleStateText('darkMode', false)).toBeNull();
     expect(resolveLegacyOverlayToggleStateText('darkMode', true)).toBeNull();
   });
@@ -20,20 +22,28 @@ describe('legacy overlay toggle fields', () => {
 
     const cameraFollow = applyLegacyOverlayToggleField(settings, 'toggleCameraFollow');
     const trailFade = applyLegacyOverlayToggleField(settings, 'toggleTrailFade');
+    const controlMode = applyLegacyOverlayToggleField(settings, 'controlMode');
 
     expect(cameraFollow.settings.toggleCameraFollow).toBe(true);
-    expect(cameraFollow.stateText).toBe('Off');
+    expect(cameraFollow.stateText).toBe('On');
     expect(cameraFollow.affectsBackdrop).toBe(false);
     expect(cameraFollow.affectsBoardStatic).toBe(true);
     expect(cameraFollow.affectsBoardDynamic).toBe(true);
     expect(cameraFollow.legacyDirectionalLightIntensity).toBeNull();
 
     expect(trailFade.settings.toggleTrailFade).toBe(true);
-    expect(trailFade.stateText).toBe('Off');
+    expect(trailFade.stateText).toBe('On');
     expect(trailFade.affectsBackdrop).toBe(false);
     expect(trailFade.affectsBoardStatic).toBe(false);
     expect(trailFade.affectsBoardDynamic).toBe(true);
     expect(trailFade.legacyDirectionalLightIntensity).toBeNull();
+
+    expect(controlMode.settings.controlMode).toBe('stick');
+    expect(controlMode.stateText).toBe('Stick');
+    expect(controlMode.affectsBackdrop).toBe(false);
+    expect(controlMode.affectsBoardStatic).toBe(false);
+    expect(controlMode.affectsBoardDynamic).toBe(true);
+    expect(controlMode.legacyDirectionalLightIntensity).toBeNull();
   });
 
   test('toggles dark mode through the legacy light-intensity role without companion state text', () => {

@@ -1,6 +1,7 @@
 import {
   type HumanInputAction,
-  type HumanInputActionKind
+  type HumanInputActionKind,
+  type HumanMovementActionKind
 } from './actions.ts';
 
 export interface TouchViewportLike {
@@ -43,8 +44,14 @@ export interface TouchRect {
 
 export interface TouchControlLayout {
   compact: boolean;
+  controlMode: TouchControlMode;
   frame: TouchRect;
   frames?: TouchRect[];
+  stick: {
+    deadzoneRadius: number;
+    inner: TouchRect;
+    outer: TouchRect;
+  } | null;
   controls: Record<HumanInputActionKind, TouchRect>;
 }
 
@@ -57,6 +64,7 @@ export interface TouchInputState {
 export interface TouchControlLayoutOptions {
   safeInsets?: TouchSafeInsetsLike;
   compact?: boolean;
+  controlMode?: TouchControlMode;
   avoidRect?: {
     left: number;
     top: number;
@@ -64,6 +72,8 @@ export interface TouchControlLayoutOptions {
     height: number;
   };
 }
+
+export type TouchControlMode = 'arrows' | 'stick';
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
@@ -93,6 +103,42 @@ const isPointInRect = (rect: TouchRect, x: number, y: number): boolean => (
   && y <= rect.bottom
 );
 
+const resolveStickMovementKind = (
+  stick: NonNullable<TouchControlLayout['stick']>,
+  x: number,
+  y: number
+): HumanMovementActionKind | null => {
+  const dx = x - stick.outer.centerX;
+  const dy = y - stick.outer.centerY;
+  const distance = Math.hypot(dx, dy);
+  if (distance < stick.deadzoneRadius || distance > stick.outer.width / 2) {
+    return null;
+  }
+
+  const angle = Math.atan2(dy, dx);
+  const octant = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
+  switch (octant) {
+    case 0:
+      return 'move_right';
+    case 1:
+      return 'move_down_right';
+    case 2:
+      return 'move_down';
+    case 3:
+      return 'move_down_left';
+    case 4:
+      return 'move_left';
+    case 5:
+      return 'move_up_left';
+    case 6:
+      return 'move_up';
+    case 7:
+      return 'move_up_right';
+    default:
+      return null;
+  }
+};
+
 export const resolveTouchInputCapability = (runtime: TouchRuntimeLike | undefined): boolean => {
   if (!runtime) {
     return false;
@@ -114,6 +160,7 @@ export const resolveTouchControlLayout = (
   options: TouchControlLayoutOptions = {}
 ): TouchControlLayout => {
   const compact = options.compact ?? Math.min(viewport.width, viewport.height) < 720;
+  const controlMode = options.controlMode ?? 'arrows';
   const safeInsets = {
     top: normalizeInset(options.safeInsets?.top),
     right: normalizeInset(options.safeInsets?.right),
@@ -175,11 +222,33 @@ export const resolveTouchControlLayout = (
       topActionHeight
     );
     const dpadFrame = createRect(frameLeft, frameTop, dpadFrameWidth, dpadFrameHeight);
+    const stickOuterSize = Math.min(dpadFrame.width - (dpadPad * 2), dpadFrame.height - (dpadPad * 2));
+    const stickOuter = createRect(
+      Math.round(dpadFrame.centerX - (stickOuterSize / 2)),
+      Math.round(dpadFrame.centerY - (stickOuterSize / 2)),
+      stickOuterSize,
+      stickOuterSize
+    );
+    const stickInnerSize = clamp(Math.round(stickOuterSize * 0.34), 34, 54);
+    const stickInner = createRect(
+      Math.round(stickOuter.centerX - (stickInnerSize / 2)),
+      Math.round(stickOuter.centerY - (stickInnerSize / 2)),
+      stickInnerSize,
+      stickInnerSize
+    );
 
     return {
       compact,
+      controlMode,
       frame: dpadFrame,
       frames: [actionFrame, dpadFrame],
+      stick: controlMode === 'stick'
+        ? {
+          deadzoneRadius: Math.max(16, Math.round(stickOuterSize * 0.18)),
+          inner: stickInner,
+          outer: stickOuter
+        }
+        : null,
       controls: {
         move_up_left: createRect(dpadLeft, dpadTop, buttonSize, buttonSize),
         move_up: createRect(dpadLeft + buttonSize + gap, dpadTop, buttonSize, buttonSize),
@@ -250,8 +319,10 @@ export const resolveTouchControlLayout = (
 
       return {
         compact,
+        controlMode,
         frame,
         frames: [dpadFrame, actionFrame],
+        stick: null,
         controls: {
           move_up_left: createRect(dpadLeft, clusterTop, buttonSize, buttonSize),
           move_up: createRect(dpadLeft + buttonSize + gap, clusterTop, buttonSize, buttonSize),
@@ -314,7 +385,9 @@ export const resolveTouchControlLayout = (
 
   return {
     compact,
+    controlMode,
     frame: createRect(frameLeft, frameTop, frameWidth, frameHeight),
+    stick: null,
     controls
   };
 };
@@ -329,6 +402,10 @@ export const resolveTouchControlKindAtPoint = (
     if (isPointInRect(rect, x, y)) {
       return kind;
     }
+  }
+
+  if (layout.controlMode === 'stick' && layout.stick !== null) {
+    return resolveStickMovementKind(layout.stick, x, y);
   }
 
   for (const kind of [

@@ -4,6 +4,8 @@ export interface LegacyLinearColor {
   b: number;
 }
 
+export type LegacyControlMode = 'arrows' | 'stick';
+
 export interface LegacySettings {
   scale: number;
   camScale: number;
@@ -12,6 +14,7 @@ export interface LegacySettings {
   darkMode: boolean;
   toggleCameraFollow: boolean;
   toggleTrailFade: boolean;
+  controlMode: LegacyControlMode;
 }
 
 export const LEGACY_DEFAULTS: LegacySettings = {
@@ -29,7 +32,8 @@ export const LEGACY_DEFAULTS: LegacySettings = {
   },
   darkMode: false,
   toggleCameraFollow: false,
-  toggleTrailFade: false
+  toggleTrailFade: false,
+  controlMode: 'arrows'
 };
 
 export const MAIN_MENU_BUTTONS = ['Exit', 'Start', 'Options'] as const;
@@ -74,5 +78,6 @@ export const copyLegacySettings = (settings: LegacySettings): LegacySettings => 
   wallColor: { ...settings.wallColor },
   darkMode: settings.darkMode,
   toggleCameraFollow: settings.toggleCameraFollow,
-  toggleTrailFade: settings.toggleTrailFade
+  toggleTrailFade: settings.toggleTrailFade,
+  controlMode: settings.controlMode
 });

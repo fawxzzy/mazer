@@ -335,7 +335,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('target.addEventListener(\'pointerup\', this.legacyPlayTouchControlPointerUpHandler as EventListener');
     expect(menuSceneSource).toContain('target.addEventListener(\'pointercancel\', this.legacyPlayTouchControlPointerUpHandler as EventListener');
     expect(menuSceneSource).toContain('this.handleLegacyPlayTouchControlClientPoint(event.clientX, event.clientY, event.pointerId)');
-    expect(menuSceneSource).toContain('this.releaseLegacyPlayHeldTouchMove(event.pointerId)');
+    expect(menuSceneSource).toContain('this.handleLegacyPlayTouchControlClientMove(event.clientX, event.clientY, event.pointerId)');
+    expect(menuSceneSource).toContain('this.releaseLegacyPlayTouchPointer(event.pointerId)');
+    expect(menuSceneSource).toContain("controlMode: this.settings.controlMode");
+    expect(menuSceneSource).toContain("touchControlLayout.controlMode === 'stick'");
+    expect(menuSceneSource).toContain('private drawLegacyPlayTouchStick(');
     expect(menuSceneSource).toContain('const wasHeld = this.playMoveFlags[direction];');
     expect(menuSceneSource).toContain('const sameControlIndex = this.playHeldTouchMoves.findIndex((move) => move.control === control);');
     expect(menuSceneSource).toContain('if (this.playHeldTouchMoves.length >= LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT) {');

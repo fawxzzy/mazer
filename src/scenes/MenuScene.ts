@@ -21,7 +21,6 @@ import {
 } from '../legacy-runtime/legacyMaze';
 import { resolveInitialRuntimeMode } from '../legacy-runtime/legacyLaunchMode';
 import {
-  resolveLegacyNestedOverlayOpen,
   resolveLegacyOverlayBackAction,
   type LegacyOverlayKind,
   type LegacyRuntimeMode
@@ -90,8 +89,7 @@ import { applyLegacyOverlayFieldCommit } from '../legacy-runtime/legacyOverlayFi
 import {
   applyLegacyOverlayToggleField,
   resolveLegacyOverlayToggleStateText,
-  type LegacyOverlayToggleFieldId,
-  type LegacyOverlayToggleStateText
+  type LegacyOverlayToggleFieldId
 } from '../legacy-runtime/legacyOverlayToggleFields';
 import {
   createLegacyDemoWalkerEpisode,
@@ -121,6 +119,7 @@ import {
 import { summarizeTelemetrySemantics } from '../telemetry';
 import {
   isMovementActionKind,
+  resolveHumanMovementActionVector,
   resolveHumanMovementPriorityCandidates,
   type HumanMovementActionKind
 } from '../input-human';
@@ -210,8 +209,13 @@ interface MenuSceneVisualDiagnostics {
   touchControls: {
     visible: boolean;
     compact: boolean | null;
+    controlMode: ReturnType<typeof resolveTouchControlLayout>['controlMode'] | null;
     activeControls: HumanMovementActionKind[];
     frame: VisualRect | null;
+    stick: {
+      inner: VisualRect;
+      outer: VisualRect;
+    } | null;
     controls: {
       move_up: VisualRect | null;
       move_up_right: VisualRect | null;
@@ -520,6 +524,7 @@ export class MenuScene extends Phaser.Scene {
   private playHeldTouchMoves: LegacyPlayHeldTouchMove[] = [];
   private playHeldTouchSequence = 0;
   private playHeldTouchRepeatTimer: Phaser.Time.TimerEvent | null = null;
+  private playTouchStickPointerId: number | null = null;
   private playPointerStart: LegacyPlayPointerStart | null = null;
   private titleText!: Phaser.GameObjects.Text;
   private titleShadow!: Phaser.GameObjects.Text;
@@ -577,6 +582,7 @@ export class MenuScene extends Phaser.Scene {
   private legacyPlayDocumentKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
   private legacyPlayDocumentKeyUpHandler: ((event: KeyboardEvent) => void) | null = null;
   private legacyPlayTouchControlPointerDownHandler: ((event: PointerEvent) => void) | null = null;
+  private legacyPlayTouchControlPointerMoveHandler: ((event: PointerEvent) => void) | null = null;
   private legacyPlayTouchControlPointerUpHandler: ((event: PointerEvent) => void) | null = null;
   private runtimeFeedDiagnostics = summarizeMenuSceneRuntimeFeed({ nowMs: 0 });
 
@@ -1111,6 +1117,9 @@ export class MenuScene extends Phaser.Scene {
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       this.handleLegacyPlayPointerDown(pointer);
     });
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      this.handleLegacyPlayPointerMove(pointer);
+    });
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
       this.handleLegacyPlayPointerUp(pointer);
     });
@@ -1248,13 +1257,27 @@ export class MenuScene extends Phaser.Scene {
       event.preventDefault();
       event.stopImmediatePropagation();
     };
+    this.legacyPlayTouchControlPointerMoveHandler = (event: PointerEvent) => {
+      // Match the non-touch fallback down path; Phaser continues to own real touch move events.
+      if (event.pointerType === 'touch') {
+        return;
+      }
+
+      if (!this.handleLegacyPlayTouchControlClientMove(event.clientX, event.clientY, event.pointerId)) {
+        return;
+      }
+
+      this.playPointerStart = null;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
     this.legacyPlayTouchControlPointerUpHandler = (event: PointerEvent) => {
       // Match the non-touch fallback down path; Phaser continues to own real touch release events.
       if (event.pointerType === 'touch') {
         return;
       }
 
-      if (!this.releaseLegacyPlayHeldTouchMove(event.pointerId)) {
+      if (!this.releaseLegacyPlayTouchPointer(event.pointerId)) {
         return;
       }
 
@@ -1266,6 +1289,10 @@ export class MenuScene extends Phaser.Scene {
     const target = typeof document !== 'undefined' ? document : this.game.canvas;
     if (typeof PointerEvent !== 'undefined') {
       target.addEventListener('pointerdown', this.legacyPlayTouchControlPointerDownHandler as EventListener, {
+        capture: true,
+        passive: false
+      });
+      target.addEventListener('pointermove', this.legacyPlayTouchControlPointerMoveHandler as EventListener, {
         capture: true,
         passive: false
       });
@@ -1292,6 +1319,11 @@ export class MenuScene extends Phaser.Scene {
       });
     }
     if (this.legacyPlayTouchControlPointerUpHandler !== null && typeof PointerEvent !== 'undefined') {
+      if (this.legacyPlayTouchControlPointerMoveHandler !== null) {
+        target.removeEventListener('pointermove', this.legacyPlayTouchControlPointerMoveHandler as EventListener, {
+          capture: true
+        });
+      }
       target.removeEventListener('pointerup', this.legacyPlayTouchControlPointerUpHandler as EventListener, {
         capture: true
       });
@@ -1300,18 +1332,29 @@ export class MenuScene extends Phaser.Scene {
       });
     }
     this.legacyPlayTouchControlPointerDownHandler = null;
+    this.legacyPlayTouchControlPointerMoveHandler = null;
     this.legacyPlayTouchControlPointerUpHandler = null;
   }
 
   private handleLegacyPlayTouchControlClientPoint(clientX: number, clientY: number, pointerId: number | null = null): boolean {
+    const point = this.resolveLegacyPlayTouchClientPoint(clientX, clientY);
+    return this.handleLegacyPlayTouchControl(point.x, point.y, pointerId);
+  }
+
+  private handleLegacyPlayTouchControlClientMove(clientX: number, clientY: number, pointerId: number | null = null): boolean {
+    const point = this.resolveLegacyPlayTouchClientPoint(clientX, clientY);
+    return this.handleLegacyPlayTouchControlMove(point.x, point.y, pointerId);
+  }
+
+  private resolveLegacyPlayTouchClientPoint(clientX: number, clientY: number): { x: number; y: number } {
     const rect = this.game.canvas.getBoundingClientRect();
     const width = Math.max(1, rect.width);
     const height = Math.max(1, rect.height);
-    return this.handleLegacyPlayTouchControl(
-      ((clientX - rect.left) / width) * this.layout.width,
-      ((clientY - rect.top) / height) * this.layout.height,
-      pointerId
-    );
+
+    return {
+      x: ((clientX - rect.left) / width) * this.layout.width,
+      y: ((clientY - rect.top) / height) * this.layout.height
+    };
   }
 
   private resolveLegacyPlayMovementDirection(event: KeyboardEvent): keyof LegacyPlayMoveFlags | null {
@@ -1380,16 +1423,38 @@ export class MenuScene extends Phaser.Scene {
     return false;
   }
 
+  private handleLegacyPlayPointerMove(pointer: Phaser.Input.Pointer): boolean {
+    return this.handleLegacyPlayTouchControlMove(pointer.x, pointer.y, pointer.id);
+  }
+
   private handleLegacyPlayTouchControl(x: number, y: number, pointerId: number | null = null): boolean {
     if (this.mode !== 'play' || hasPendingLegacyResetRequest(this.pendingResetRequest)) {
       return false;
     }
 
+    const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
     const control = resolveTouchControlKindAtPoint(
-      this.resolveLegacyPlayTouchControlLayout(),
+      touchControlLayout,
       x,
       y
     );
+    const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
+    if (touchControlLayout.controlMode === 'stick' && this.isLegacyPlayTouchStickPoint(touchControlLayout, x, y)) {
+      if (this.overlay !== 'none') {
+        return false;
+      }
+
+      this.resetLegacyPlayDirectionalInputBuffer();
+      this.playTouchStickPointerId = normalizedPointerId;
+      if (isMovementActionKind(control)) {
+        this.beginLegacyPlayHeldTouchMove(control, pointerId);
+      } else {
+        this.releaseLegacyPlayHeldTouchMove(pointerId);
+        this.publishInteractionDiagnostics();
+      }
+      this.boardDynamicDirty = true;
+      return true;
+    }
 
     if (isMovementActionKind(control)) {
       if (this.overlay !== 'none') {
@@ -1424,6 +1489,46 @@ export class MenuScene extends Phaser.Scene {
       default:
         return control satisfies never;
     }
+  }
+
+  private handleLegacyPlayTouchControlMove(x: number, y: number, pointerId: number | null = null): boolean {
+    if (this.mode !== 'play' || this.overlay !== 'none' || hasPendingLegacyResetRequest(this.pendingResetRequest)) {
+      return false;
+    }
+
+    const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
+    if (this.playTouchStickPointerId !== normalizedPointerId) {
+      return false;
+    }
+
+    const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
+    if (touchControlLayout.controlMode !== 'stick' || !this.isLegacyPlayTouchStickPoint(touchControlLayout, x, y)) {
+      this.releaseLegacyPlayHeldTouchMove(pointerId);
+      return true;
+    }
+
+    const control = resolveTouchControlKindAtPoint(touchControlLayout, x, y);
+    if (isMovementActionKind(control)) {
+      this.beginLegacyPlayHeldTouchMove(control, pointerId);
+    } else {
+      this.releaseLegacyPlayHeldTouchMove(pointerId);
+    }
+    this.boardDynamicDirty = true;
+    this.publishInteractionDiagnostics();
+    return true;
+  }
+
+  private isLegacyPlayTouchStickPoint(
+    touchControlLayout: ReturnType<typeof resolveTouchControlLayout>,
+    x: number,
+    y: number
+  ): boolean {
+    const stick = touchControlLayout.stick;
+    if (stick === null) {
+      return false;
+    }
+
+    return Math.hypot(x - stick.outer.centerX, y - stick.outer.centerY) <= stick.outer.width / 2;
   }
 
   private beginLegacyPlayHeldTouchMove(control: HumanMovementActionKind, pointerId: number | null): boolean {
@@ -1510,6 +1615,19 @@ export class MenuScene extends Phaser.Scene {
     return true;
   }
 
+  private releaseLegacyPlayTouchPointer(pointerId: number | null = null): boolean {
+    const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
+    const releasedMove = this.releaseLegacyPlayHeldTouchMove(pointerId);
+    const releasedStick = this.playTouchStickPointerId === normalizedPointerId;
+    if (releasedStick) {
+      this.playTouchStickPointerId = null;
+      this.boardDynamicDirty = true;
+      this.publishInteractionDiagnostics();
+    }
+
+    return releasedMove || releasedStick;
+  }
+
   private clearLegacyPlayHeldTouchRepeat(): void {
     this.playHeldTouchRepeatTimer?.remove(false);
     this.playHeldTouchRepeatTimer = null;
@@ -1531,6 +1649,7 @@ export class MenuScene extends Phaser.Scene {
       || hasPendingLegacyResetRequest(this.pendingResetRequest)
     ) {
       this.playHeldTouchMoves = [];
+      this.playTouchStickPointerId = null;
       this.clearLegacyPlayHeldTouchRepeat();
       this.publishInteractionDiagnostics();
       return;
@@ -1544,6 +1663,7 @@ export class MenuScene extends Phaser.Scene {
     const moved = this.performLegacyPlayHeldTouchMove();
     if (!moved) {
       this.playHeldTouchMoves = [];
+      this.playTouchStickPointerId = null;
       this.clearLegacyPlayHeldTouchRepeat();
       this.publishInteractionDiagnostics();
       return;
@@ -1643,6 +1763,7 @@ export class MenuScene extends Phaser.Scene {
       height: this.layout.height
     }, {
       compact: this.layout.width < 720 || this.layout.height < 720,
+      controlMode: this.settings.controlMode,
       avoidRect: {
         left: boardBounds.left,
         top: boardBounds.top,
@@ -1659,7 +1780,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyPlayPointerUp(pointer: Phaser.Input.Pointer): boolean {
-    if (this.releaseLegacyPlayHeldTouchMove(pointer.id)) {
+    if (this.releaseLegacyPlayTouchPointer(pointer.id)) {
       return true;
     }
 
@@ -1733,6 +1854,7 @@ export class MenuScene extends Phaser.Scene {
     this.playDiagonalMoveQueue = [];
     this.clearLegacyPlayHeldTouchRepeat();
     this.playHeldTouchMoves = [];
+    this.playTouchStickPointerId = null;
     this.playMoveFlags = createLegacyPlayMoveFlags();
     this.playPointerStart = null;
   }
@@ -2859,6 +2981,15 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }
 
+    if (touchControlLayout.controlMode === 'stick' && touchControlLayout.stick !== null) {
+      return {
+        height: touchControlLayout.stick.inner.height,
+        left: touchControlLayout.stick.inner.left,
+        top: touchControlLayout.stick.inner.top,
+        width: touchControlLayout.stick.inner.width
+      };
+    }
+
     const { move_down, move_left, move_right, move_up } = touchControlLayout.controls;
     const centerX = (move_left.centerX + move_right.centerX) / 2;
     const centerY = (move_up.centerY + move_down.centerY) / 2;
@@ -2908,6 +3039,17 @@ export class MenuScene extends Phaser.Scene {
       this.hudGraphics.strokeRoundedRect(touchFrame.left, touchFrame.top, touchFrame.width, touchFrame.height, 18);
     }
 
+    if (touchControlLayout.controlMode === 'stick' && touchControlLayout.stick !== null) {
+      this.drawLegacyPlayTouchStick(touchControlLayout.stick, this.resolveLegacyPlayHeldTouchControl());
+      this.drawLegacyPlayTouchButton(controls.pause, true, false);
+      this.drawLegacyPlayTouchButton(controls.restart_attempt, true, false);
+      this.drawLegacyPlayTouchPauseIcon(controls.pause);
+      this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');
+      this.drawLegacyPlayTouchRestartIcon(controls.restart_attempt);
+      this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');
+      return createVisualRect(frame.left, frame.top, frame.width, frame.height);
+    }
+
     this.drawLegacyPlayTouchButton(controls.move_up, false, activeControls.has('move_up'));
     this.drawLegacyPlayTouchButton(controls.move_up_right, false, activeControls.has('move_up_right'));
     this.drawLegacyPlayTouchButton(controls.move_right, false, activeControls.has('move_right'));
@@ -2933,6 +3075,48 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');
 
     return createVisualRect(frame.left, frame.top, frame.width, frame.height);
+  }
+
+  private drawLegacyPlayTouchStick(
+    stick: NonNullable<ReturnType<typeof resolveTouchControlLayout>['stick']>,
+    activeControl: HumanMovementActionKind | null
+  ): void {
+    const outerRadius = stick.outer.width / 2;
+    const innerRadius = stick.inner.width / 2;
+    const centerX = stick.outer.centerX;
+    const centerY = stick.outer.centerY;
+    const knobRadius = Math.max(10, innerRadius * 0.42);
+    let knobX = centerX;
+    let knobY = centerY;
+
+    if (activeControl !== null) {
+      const vector = resolveHumanMovementActionVector(activeControl);
+      const length = Math.hypot(vector.deltaX, vector.deltaY) || 1;
+      const travel = Math.max(outerRadius * 0.26, outerRadius - innerRadius - knobRadius);
+      knobX += (vector.deltaX / length) * travel;
+      knobY += (vector.deltaY / length) * travel;
+    }
+
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_BUTTON_FILL, 0.3);
+    this.hudGraphics.fillCircle(centerX, centerY, outerRadius);
+    this.hudGraphics.lineStyle(3, activeControl === null ? LEGACY_PLAY_TOUCH_BUTTON_STROKE : LEGACY_PLAY_TOUCH_ACCENT, activeControl === null ? 0.42 : 0.76);
+    this.hudGraphics.strokeCircle(centerX, centerY, outerRadius);
+    this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ICON, 0.18);
+    for (let index = 0; index < 8; index += 1) {
+      const angle = (index / 8) * Math.PI * 2;
+      this.hudGraphics.beginPath();
+      this.hudGraphics.moveTo(centerX + (Math.cos(angle) * (innerRadius + 8)), centerY + (Math.sin(angle) * (innerRadius + 8)));
+      this.hudGraphics.lineTo(centerX + (Math.cos(angle) * (outerRadius - 8)), centerY + (Math.sin(angle) * (outerRadius - 8)));
+      this.hudGraphics.strokePath();
+    }
+    this.hudGraphics.fillStyle(0x05070a, 0.45);
+    this.hudGraphics.fillCircle(centerX, centerY, innerRadius);
+    this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.38);
+    this.hudGraphics.strokeCircle(centerX, centerY, innerRadius);
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, activeControl === null ? 0.28 : 0.5);
+    this.hudGraphics.fillCircle(knobX, knobY, knobRadius);
+    this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_ICON, activeControl === null ? 0.52 : 0.86);
+    this.hudGraphics.strokeCircle(knobX, knobY, knobRadius);
   }
 
   private drawLegacyPlayTouchButton(
@@ -3150,12 +3334,6 @@ export class MenuScene extends Phaser.Scene {
       case 'options':
         this.buildOptionsOverlay();
         break;
-      case 'features':
-        this.buildFeaturesOverlay();
-        break;
-      case 'gameModes':
-        this.buildGameModesOverlay();
-        break;
       case 'pause':
         this.buildPauseOverlay();
         break;
@@ -3197,70 +3375,12 @@ export class MenuScene extends Phaser.Scene {
 
     rowY = this.createInputRow('Maze Scale', 'scale', rowY, panel);
     rowY = this.createInputRow('Camera Scale', 'camScale', rowY, panel);
+    rowY = this.createFeatureControlGrid(rowY, panel);
     rowY = this.createColorInputRow('Path RGB', ['pathR', 'pathG', 'pathB'], rowY, panel, this.settings.pathColor);
     rowY = this.createColorInputRow('Wall RGB', ['wallR', 'wallG', 'wallB'], rowY, panel, this.settings.wallColor);
 
-    const buttonY = panel.top + panel.height - 140;
-    const utilityButtonWidth = panel.width < 420 ? 124 : 170;
     this.uiButtons.push(
-      this.createButton(panel.centerX - Math.round(panel.width * 0.24), buttonY, utilityButtonWidth, 54, 'Features', () => this.openNestedOverlay('features', 'options')),
-      this.createButton(panel.centerX + Math.round(panel.width * 0.24), buttonY, utilityButtonWidth, 54, 'Game Modes', () => this.openNestedOverlay('gameModes', 'options')),
-      this.createButton(panel.centerX, buttonY + 76, Math.min(180, panel.width - 96), 54, 'Back', () => this.handleBackAction())
-    );
-  }
-
-  private buildFeaturesOverlay(): void {
-    const panel = this.resolveOverlayPanelFrame();
-    let rowY = panel.top + 54;
-    this.createOverlayTitle('Features', rowY);
-    rowY += 72;
-
-    rowY = this.createToggleRow(
-      'Camera Follow',
-      this.settings.toggleCameraFollow,
-      rowY,
-      panel,
-      {
-        stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow)
-      },
-      () => this.applyLegacyOverlayToggleField('toggleCameraFollow')
-    );
-
-    rowY = this.createToggleRow(
-      'Trail Fade',
-      this.settings.toggleTrailFade,
-      rowY,
-      panel,
-      {
-        stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade)
-      },
-      () => this.applyLegacyOverlayToggleField('toggleTrailFade')
-    );
-
-    this.uiButtons.push(
-      this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Back', () => this.handleBackAction())
-    );
-  }
-
-  private buildGameModesOverlay(): void {
-    const panel = this.resolveOverlayPanelFrame();
-    let rowY = panel.top + 54;
-    this.createOverlayTitle('Game Modes', rowY);
-    rowY += 72;
-
-    this.createToggleRow(
-      'Dark Mode',
-      this.settings.darkMode,
-      rowY,
-      panel,
-      {
-        stateText: null
-      },
-      () => this.applyLegacyOverlayToggleField('darkMode')
-    );
-
-    this.uiButtons.push(
-      this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Back', () => this.handleBackAction())
+      this.createButton(panel.centerX, panel.top + panel.height - 58, Math.min(180, panel.width - 96), 54, 'Back', () => this.handleBackAction())
     );
   }
 
@@ -3270,15 +3390,15 @@ export class MenuScene extends Phaser.Scene {
     this.createOverlayTitle('Paused', rowY);
     rowY += 72;
 
-    this.createInputRow('Camera Scale', 'camScale', rowY, panel);
+    rowY = this.createInputRow('Camera Scale', 'camScale', rowY, panel);
+    this.createFeatureControlGrid(rowY, panel);
 
     const stacked = panel.width < 420;
     if (stacked) {
       this.uiButtons.push(
         this.createButton(panel.centerX - 78, panel.top + panel.height - 196, 132, 54, 'Back', () => this.applyLegacyPauseCommand('resume')),
         this.createButton(panel.centerX + 78, panel.top + panel.height - 196, 132, 54, 'Reset', () => this.applyLegacyPauseCommand('reset-player')),
-        this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Main Menu', () => this.applyLegacyPauseCommand('return-menu')),
-        this.createButton(panel.centerX, panel.top + panel.height - 56, Math.min(180, panel.width - 96), 46, 'Features', () => this.openNestedOverlay('features', 'pause'))
+        this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Main Menu', () => this.applyLegacyPauseCommand('return-menu'))
       );
       return;
     }
@@ -3286,9 +3406,62 @@ export class MenuScene extends Phaser.Scene {
     this.uiButtons.push(
       this.createButton(panel.centerX - Math.round(panel.width * 0.28), panel.top + panel.height - 196, 132, 54, 'Back', () => this.applyLegacyPauseCommand('resume')),
       this.createButton(panel.centerX, panel.top + panel.height - 196, 132, 54, 'Reset', () => this.applyLegacyPauseCommand('reset-player')),
-      this.createButton(panel.centerX + Math.round(panel.width * 0.28), panel.top + panel.height - 196, 144, 54, 'Main Menu', () => this.applyLegacyPauseCommand('return-menu')),
-      this.createButton(panel.centerX, panel.top + panel.height - 120, Math.min(180, panel.width - 96), 54, 'Features', () => this.openNestedOverlay('features', 'pause'))
+      this.createButton(panel.centerX + Math.round(panel.width * 0.28), panel.top + panel.height - 196, 144, 54, 'Main Menu', () => this.applyLegacyPauseCommand('return-menu'))
     );
+  }
+
+  private createFeatureControlGrid(y: number, panel: OverlayPanelFrame): number {
+    const stacked = panel.width < 420;
+    const columns = stacked ? 2 : 4;
+    const gap = stacked ? 10 : 12;
+    const left = panel.left + 28;
+    const width = panel.width - 56;
+    const buttonWidth = Math.floor((width - (gap * (columns - 1))) / columns);
+    const buttonHeight = stacked ? 42 : 44;
+    const rowGap = stacked ? 10 : 12;
+    const controls: Array<{ label: string; onClick: () => void }> = [
+      {
+        label: `Camera ${resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow)}`,
+        onClick: () => this.applyLegacyOverlayToggleField('toggleCameraFollow')
+      },
+      {
+        label: `Trail ${resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade)}`,
+        onClick: () => this.applyLegacyOverlayToggleField('toggleTrailFade')
+      },
+      {
+        label: `Dark ${this.settings.darkMode ? 'On' : 'Off'}`,
+        onClick: () => this.applyLegacyOverlayToggleField('darkMode')
+      },
+      {
+        label: `Controls ${resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick')}`,
+        onClick: () => this.applyLegacyOverlayToggleField('controlMode')
+      }
+    ];
+
+    const label = this.add.text(left, y, 'Game Toggles', {
+      fontFamily: '"Courier New", monospace',
+      fontSize: stacked ? '18px' : '20px',
+      color: '#6bc96f'
+    }).setOrigin(0, 0.5);
+    this.uiTexts.push(label);
+
+    const gridTop = y + (stacked ? 28 : 32);
+    controls.forEach((control, index) => {
+      const column = index % columns;
+      const row = Math.floor(index / columns);
+      this.uiButtons.push(
+        this.createButton(
+          left + (column * (buttonWidth + gap)) + Math.round(buttonWidth / 2),
+          gridTop + (row * (buttonHeight + rowGap)) + Math.round(buttonHeight / 2),
+          buttonWidth,
+          buttonHeight,
+          control.label,
+          control.onClick
+        )
+      );
+    });
+
+    return gridTop + (Math.ceil(controls.length / columns) * (buttonHeight + rowGap)) + (stacked ? 10 : 4);
   }
 
   private selectOverlayField(fieldId: LegacyOptionFieldId): void {
@@ -3453,82 +3626,6 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private createToggleRow(
-    label: string,
-    value: boolean,
-    y: number,
-    panel: OverlayPanelFrame,
-    options: {
-      stateText: LegacyOverlayToggleStateText | null;
-    },
-    onToggle: () => void
-  ): number {
-    const stacked = panel.width < 420;
-    const rowLabel = this.add.text(panel.left + 28, y, label, {
-      fontFamily: '"Courier New", monospace',
-      fontSize: stacked ? '20px' : '22px',
-      color: '#d9d8df'
-    }).setOrigin(0, 0.5);
-    const toggleX = stacked ? panel.left + panel.width - 52 : panel.left + Math.round(panel.width * 0.82);
-    this.uiTexts.push(rowLabel);
-    if (options.stateText !== null) {
-      const stateText = this.add.text(
-        stacked ? toggleX - 76 : toggleX - 78,
-        stacked ? y + 32 : y,
-        options.stateText,
-        {
-          fontFamily: '"Courier New", monospace',
-          fontSize: stacked ? '18px' : '22px',
-          color: '#6bc96f'
-        }
-      ).setOrigin(0.5);
-      this.uiTexts.push(stateText);
-    }
-    this.uiButtons.push(
-      this.createToggleCheckbox(toggleX, stacked ? y + 32 : y, stacked ? 30 : 32, value, onToggle)
-    );
-
-    return y + (stacked ? 84 : 64);
-  }
-
-  private createToggleCheckbox(
-    x: number,
-    y: number,
-    size: number,
-    checked: boolean,
-    onToggle: () => void
-  ): UiButton {
-    const background = this.add.rectangle(x, y, size, size, 0xffffff, 0.08);
-    background.setStrokeStyle(2, 0xb8b1c1, 0.58);
-    background.setInteractive({ useHandCursor: true });
-
-    const label = this.add.text(x, y, checked ? 'x' : '', {
-      fontFamily: '"Courier New", monospace',
-      fontSize: `${Math.max(16, Math.round(size * 0.7))}px`,
-      color: '#6bc96f'
-    }).setOrigin(0.5).setAlpha(checked ? 1 : 0.34);
-
-    const setActive = (active: boolean): void => {
-      background.setFillStyle(0xffffff, active ? 0.14 : 0.08);
-      background.setStrokeStyle(2, active ? 0xffffff : 0xb8b1c1, active ? 0.86 : 0.58);
-      label.setAlpha(checked ? (active ? 1 : 0.96) : (active ? 0.5 : 0.34));
-    };
-
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', onToggle);
-
-    return {
-      background,
-      label,
-      setActive,
-      destroy: () => {
-        background.destroy();
-        label.destroy();
-      }
-    };
-  }
-
   private createButton(
     x: number,
     y: number,
@@ -3617,21 +3714,6 @@ export class MenuScene extends Phaser.Scene {
     this.uiTexts = this.uiTexts.filter((text) => text.active);
   }
 
-  private openNestedOverlay(kind: OverlayKind, returnTo: OverlayKind): void {
-    const nextOverlayState = resolveLegacyNestedOverlayOpen(
-      kind as Extract<OverlayKind, 'features' | 'gameModes'>,
-      returnTo as Extract<OverlayKind, 'options' | 'pause'>
-    );
-    this.activeInputField = null;
-    if (this.mode === 'play') {
-      this.clearPlayHudImmediately();
-    }
-    this.overlay = nextOverlayState.overlay;
-    this.overlayReturn = nextOverlayState.overlayReturn;
-    this.boardDynamicDirty = true;
-    this.uiDirty = true;
-  }
-
   private openOverlay(kind: OverlayKind): void {
     if (kind === 'options' || kind === 'pause') {
       this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
@@ -3695,6 +3777,9 @@ export class MenuScene extends Phaser.Scene {
   private applyLegacyOverlayToggleField(fieldId: LegacyOverlayToggleFieldId): void {
     const result = applyLegacyOverlayToggleField(this.settings, fieldId);
     this.settings = result.settings;
+    if (fieldId === 'controlMode') {
+      this.resetLegacyPlayInputBuffer();
+    }
 
     if (result.affectsBackdrop) {
       this.backdropDirty = true;
@@ -3724,12 +3809,6 @@ export class MenuScene extends Phaser.Scene {
         return;
       case 'open-overlay':
         this.openOverlay(action.overlay);
-        return;
-      case 'return-parent':
-        this.overlay = action.overlay;
-        this.overlayReturn = action.overlayReturn;
-        this.boardDynamicDirty = true;
-        this.uiDirty = true;
         return;
       case 'close-overlay':
         this.closeOverlay();
@@ -3762,8 +3841,10 @@ export class MenuScene extends Phaser.Scene {
       return {
         visible,
         compact: touchControlLayout.compact,
+        controlMode: touchControlLayout.controlMode,
         activeControls: [],
         frame: null,
+        stick: null,
         controls: emptyControls
       };
     }
@@ -3772,8 +3853,25 @@ export class MenuScene extends Phaser.Scene {
     return {
       visible,
       compact: touchControlLayout.compact,
+      controlMode: touchControlLayout.controlMode,
       activeControls: this.resolveLegacyPlayActiveTouchControls(),
       frame: cloneVisualRect(this.hudTouchControlBounds) ?? createVisualRect(frame.left, frame.top, frame.width, frame.height),
+      stick: touchControlLayout.stick === null
+        ? null
+        : {
+          inner: createVisualRect(
+            touchControlLayout.stick.inner.left,
+            touchControlLayout.stick.inner.top,
+            touchControlLayout.stick.inner.width,
+            touchControlLayout.stick.inner.height
+          ),
+          outer: createVisualRect(
+            touchControlLayout.stick.outer.left,
+            touchControlLayout.stick.outer.top,
+            touchControlLayout.stick.outer.width,
+            touchControlLayout.stick.outer.height
+          )
+        },
       controls: {
         move_up: createVisualRect(controls.move_up.left, controls.move_up.top, controls.move_up.width, controls.move_up.height),
         move_up_right: createVisualRect(controls.move_up_right.left, controls.move_up_right.top, controls.move_up_right.width, controls.move_up_right.height),
