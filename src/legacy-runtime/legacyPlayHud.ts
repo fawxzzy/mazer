@@ -40,6 +40,20 @@ export interface LegacyPlayHudFrame {
   timerText: string;
 }
 
+export interface LegacyCompassSpinFrameInput {
+  durationMs: number;
+  elapsedMs: number;
+  targetAngleRadians: number;
+  turns: number;
+}
+
+export interface LegacyCompassSpinFrame {
+  active: boolean;
+  angleDegrees: number;
+  angleRadians: number;
+  progress: number;
+}
+
 const createLegacyHudRect = (left: number, top: number, width: number, height: number): LegacyHudRect => ({
   left,
   top,
@@ -72,6 +86,25 @@ export const resolveLegacyHudArrowAngle = (
   playerScreen: LegacyHudPoint,
   goalScreen: LegacyHudPoint
 ): number => Math.atan2(goalScreen.y - playerScreen.y, goalScreen.x - playerScreen.x);
+
+export const resolveLegacyCompassSpinFrame = ({
+  durationMs,
+  elapsedMs,
+  targetAngleRadians,
+  turns
+}: LegacyCompassSpinFrameInput): LegacyCompassSpinFrame => {
+  const safeDurationMs = Math.max(1, Math.round(durationMs));
+  const progress = Math.max(0, Math.min(1, elapsedMs / safeDurationMs));
+  const remaining = Math.pow(1 - progress, 3);
+  const angleRadians = targetAngleRadians + (remaining * turns * Math.PI * 2);
+
+  return {
+    active: progress < 1,
+    angleDegrees: (angleRadians * 180) / Math.PI,
+    angleRadians,
+    progress
+  };
+};
 
 export const resolveLegacyPlayHudFrame = (input: LegacyPlayHudFrameInput): LegacyPlayHudFrame => {
   const timerText = formatLegacyHudClock(input.elapsedMs);

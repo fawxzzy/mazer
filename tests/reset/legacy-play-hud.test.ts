@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   formatLegacyHudClock,
+  resolveLegacyCompassSpinFrame,
   resolveLegacyHudArrowAngle,
   resolveLegacyPlayHudFrame
 } from '../../src/legacy-runtime/legacyPlayHud';
@@ -67,5 +68,34 @@ describe('legacy play HUD', () => {
     });
     expect(frame.arrowOrigin).toEqual({ x: 195, y: 735 });
     expect(frame.arrowAngleRadians).toBeCloseTo(Math.PI / 2);
+  });
+
+  test('eases the compass spin onto the true goal angle', () => {
+    const start = resolveLegacyCompassSpinFrame({
+      durationMs: 1_800,
+      elapsedMs: 0,
+      targetAngleRadians: Math.PI / 2,
+      turns: 3.25
+    });
+    const middle = resolveLegacyCompassSpinFrame({
+      durationMs: 1_800,
+      elapsedMs: 900,
+      targetAngleRadians: Math.PI / 2,
+      turns: 3.25
+    });
+    const settled = resolveLegacyCompassSpinFrame({
+      durationMs: 1_800,
+      elapsedMs: 1_800,
+      targetAngleRadians: Math.PI / 2,
+      turns: 3.25
+    });
+
+    expect(start.active).toBe(true);
+    expect(start.progress).toBe(0);
+    expect(middle.active).toBe(true);
+    expect(middle.angleRadians).not.toBeCloseTo(Math.PI / 2);
+    expect(settled.active).toBe(false);
+    expect(settled.progress).toBe(1);
+    expect(settled.angleRadians).toBeCloseTo(Math.PI / 2);
   });
 });

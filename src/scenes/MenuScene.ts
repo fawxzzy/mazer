@@ -55,6 +55,7 @@ import {
   type LegacyPlayPointerStart
 } from '../legacy-runtime/legacyPlayStep';
 import {
+  resolveLegacyCompassSpinFrame,
   resolveLegacyPlayHudFrame,
   type LegacyPlayHudFrame
 } from '../legacy-runtime/legacyPlayHud';
@@ -198,6 +199,10 @@ interface MenuSceneVisualDiagnostics {
     arrowAngleDegrees: number | null;
     timerText: string | null;
     arrowAngleRadians: number | null;
+    compassSpinActive: boolean;
+    compassSpinProgress: number | null;
+    compassVisualAngleDegrees: number | null;
+    compassVisualAngleRadians: number | null;
   };
   touchControls: {
     visible: boolean;
@@ -421,6 +426,8 @@ const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 280;
 const LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS = 140;
 const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
+const LEGACY_PLAY_COMPASS_SPIN_DURATION_MS = 1800;
+const LEGACY_PLAY_COMPASS_SPIN_TURNS = 3.25;
 const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
 const LEGACY_PLAYER_MARKER_HALO = 0x00b84a;
 const LEGACY_PLAYER_MARKER_CORE = 0x36ff7d;
@@ -521,6 +528,11 @@ export class MenuScene extends Phaser.Scene {
   private hudArrowBounds: VisualRect | null = null;
   private hudTouchControlBounds: VisualRect | null = null;
   private hudFrame: LegacyPlayHudFrame | null = null;
+  private hudCompassSpinStartedAtMs: number | null = null;
+  private hudCompassSpinActive = false;
+  private hudCompassSpinProgress: number | null = null;
+  private hudCompassVisualAngleRadians: number | null = null;
+  private hudCompassVisualAngleDegrees: number | null = null;
   private boardStaticDirty = true;
   private boardDynamicDirty = true;
   private backdropDirty = true;
@@ -650,6 +662,9 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.advanceLegacyMenuStaticDrawStage(time);
+    if (this.hasLegacyPlayCompassSpinPendingFrame()) {
+      this.boardDynamicDirty = true;
+    }
 
     if (this.backdropDirty) {
       this.drawBackdrop();
@@ -1743,6 +1758,7 @@ export class MenuScene extends Phaser.Scene {
       if (generationState.startsPlayTimer) {
         this.playStartedAtMs = this.time.now;
       }
+      this.startLegacyPlayCompassSpin(this.time.now);
     }
     this.nextDemoMoveAtMs = nextDemoMoveAtMs;
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
@@ -2473,6 +2489,10 @@ export class MenuScene extends Phaser.Scene {
     this.hudArrowBounds = null;
     this.hudTouchControlBounds = null;
     this.hudFrame = null;
+    this.hudCompassSpinActive = false;
+    this.hudCompassSpinProgress = null;
+    this.hudCompassVisualAngleRadians = null;
+    this.hudCompassVisualAngleDegrees = null;
     if (this.mode !== 'play' || this.overlay !== 'none') {
       this.footerText.setText('');
       return;
@@ -2521,49 +2541,51 @@ export class MenuScene extends Phaser.Scene {
 
     this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);
     this.drawLegacyPlayCompass(hudFrame);
+    const compassVisualFrame = this.resolveLegacyPlayCompassVisualFrame(hudFrame, time);
+    const visualArrow = this.resolveLegacyPlayCompassArrowGeometry(hudFrame, compassVisualFrame.angleRadians);
 
     this.hudGraphics.lineStyle(3, LEGACY_PLAY_HUD_ARROW_SHADOW, 0.36);
     this.hudGraphics.beginPath();
     this.hudGraphics.moveTo(hudFrame.arrowOrigin.x + 1, hudFrame.arrowOrigin.y + 1);
     this.hudGraphics.lineTo(
-      hudFrame.arrowTip.x + 1,
-      hudFrame.arrowTip.y + 1
+      visualArrow.tip.x + 1,
+      visualArrow.tip.y + 1
     );
     this.hudGraphics.strokePath();
     this.hudGraphics.fillStyle(LEGACY_PLAY_HUD_ARROW_SHADOW, 0.36);
     this.hudGraphics.fillTriangle(
-      hudFrame.arrowTip.x + 1,
-      hudFrame.arrowTip.y + 1,
-      hudFrame.arrowLeft.x + 1,
-      hudFrame.arrowLeft.y + 1,
-      hudFrame.arrowRight.x + 1,
-      hudFrame.arrowRight.y + 1
+      visualArrow.tip.x + 1,
+      visualArrow.tip.y + 1,
+      visualArrow.left.x + 1,
+      visualArrow.left.y + 1,
+      visualArrow.right.x + 1,
+      visualArrow.right.y + 1
     );
 
     this.hudGraphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW_TAIL, 0.86);
     this.hudGraphics.beginPath();
     this.hudGraphics.moveTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y);
     this.hudGraphics.lineTo(
-      hudFrame.arrowOrigin.x - (Math.cos(hudFrame.arrowAngleRadians) * 9),
-      hudFrame.arrowOrigin.y - (Math.sin(hudFrame.arrowAngleRadians) * 9)
+      hudFrame.arrowOrigin.x - (Math.cos(compassVisualFrame.angleRadians) * 9),
+      hudFrame.arrowOrigin.y - (Math.sin(compassVisualFrame.angleRadians) * 9)
     );
     this.hudGraphics.strokePath();
     this.hudGraphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW, 0.9);
     this.hudGraphics.beginPath();
     this.hudGraphics.moveTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y);
     this.hudGraphics.lineTo(
-      hudFrame.arrowTip.x,
-      hudFrame.arrowTip.y
+      visualArrow.tip.x,
+      visualArrow.tip.y
     );
     this.hudGraphics.strokePath();
     this.hudGraphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.9);
     this.hudGraphics.fillTriangle(
-      hudFrame.arrowTip.x,
-      hudFrame.arrowTip.y,
-      hudFrame.arrowLeft.x,
-      hudFrame.arrowLeft.y,
-      hudFrame.arrowRight.x,
-      hudFrame.arrowRight.y
+      visualArrow.tip.x,
+      visualArrow.tip.y,
+      visualArrow.left.x,
+      visualArrow.left.y,
+      visualArrow.right.x,
+      visualArrow.right.y
     );
 
     this.hudTimerBounds = createVisualRect(
@@ -2582,6 +2604,83 @@ export class MenuScene extends Phaser.Scene {
       ? this.hudTimerBounds
       : mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);
     this.hudFrame = hudFrame;
+  }
+
+  private startLegacyPlayCompassSpin(time: number): void {
+    this.hudCompassSpinStartedAtMs = time;
+    this.hudCompassSpinActive = true;
+    this.hudCompassSpinProgress = 0;
+    this.boardDynamicDirty = true;
+  }
+
+  private hasLegacyPlayCompassSpinPendingFrame(): boolean {
+    return this.hudCompassSpinStartedAtMs !== null;
+  }
+
+  private resolveLegacyPlayCompassVisualFrame(
+    hudFrame: LegacyPlayHudFrame,
+    time: number
+  ): {
+    active: boolean;
+    angleDegrees: number;
+    angleRadians: number;
+    progress: number;
+  } {
+    if (this.hudCompassSpinStartedAtMs === null) {
+      this.hudCompassSpinActive = false;
+      this.hudCompassSpinProgress = null;
+      this.hudCompassVisualAngleRadians = hudFrame.arrowAngleRadians;
+      this.hudCompassVisualAngleDegrees = hudFrame.arrowAngleDegrees;
+      return {
+        active: false,
+        angleDegrees: hudFrame.arrowAngleDegrees,
+        angleRadians: hudFrame.arrowAngleRadians,
+        progress: 1
+      };
+    }
+
+    const frame = resolveLegacyCompassSpinFrame({
+      durationMs: LEGACY_PLAY_COMPASS_SPIN_DURATION_MS,
+      elapsedMs: time - this.hudCompassSpinStartedAtMs,
+      targetAngleRadians: hudFrame.arrowAngleRadians,
+      turns: LEGACY_PLAY_COMPASS_SPIN_TURNS
+    });
+    this.hudCompassSpinActive = frame.active;
+    this.hudCompassSpinProgress = frame.progress;
+    this.hudCompassVisualAngleRadians = frame.angleRadians;
+    this.hudCompassVisualAngleDegrees = frame.angleDegrees;
+
+    if (!frame.active) {
+      this.hudCompassSpinStartedAtMs = null;
+    }
+
+    return frame;
+  }
+
+  private resolveLegacyPlayCompassArrowGeometry(
+    hudFrame: LegacyPlayHudFrame,
+    angleRadians: number
+  ): {
+    left: { x: number; y: number };
+    right: { x: number; y: number };
+    tip: { x: number; y: number };
+  } {
+    const length = 14;
+
+    return {
+      left: {
+        x: hudFrame.arrowOrigin.x + (Math.cos(angleRadians + 2.42) * 6),
+        y: hudFrame.arrowOrigin.y + (Math.sin(angleRadians + 2.42) * 6)
+      },
+      right: {
+        x: hudFrame.arrowOrigin.x + (Math.cos(angleRadians - 2.42) * 6),
+        y: hudFrame.arrowOrigin.y + (Math.sin(angleRadians - 2.42) * 6)
+      },
+      tip: {
+        x: hudFrame.arrowOrigin.x + (Math.cos(angleRadians) * length),
+        y: hudFrame.arrowOrigin.y + (Math.sin(angleRadians) * length)
+      }
+    };
   }
 
   private resolveLegacyPlayTouchCompassBounds(
@@ -3398,6 +3497,9 @@ export class MenuScene extends Phaser.Scene {
       this.player = result.nextPlayer;
       this.trail = result.nextTrail ?? [copyPoint(result.nextPlayer)];
       this.boardDynamicDirty = true;
+      if (command === 'reset-player' && this.mode === 'play') {
+        this.startLegacyPlayCompassSpin(this.time.now);
+      }
       this.publishInteractionDiagnostics();
     }
 
@@ -3728,7 +3830,11 @@ export class MenuScene extends Phaser.Scene {
         arrowBounds: cloneVisualRect(this.hudArrowBounds),
         arrowAngleDegrees: this.hudFrame?.arrowAngleDegrees ?? null,
         timerText: this.hudFrame?.timerText ?? null,
-        arrowAngleRadians: this.hudFrame?.arrowAngleRadians ?? null
+        arrowAngleRadians: this.hudFrame?.arrowAngleRadians ?? null,
+        compassSpinActive: this.hudCompassSpinActive,
+        compassSpinProgress: this.hudCompassSpinProgress,
+        compassVisualAngleDegrees: this.hudCompassVisualAngleDegrees,
+        compassVisualAngleRadians: this.hudCompassVisualAngleRadians
       },
       touchControls
     };

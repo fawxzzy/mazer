@@ -404,8 +404,11 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('timerText: this.hudFrame?.timerText ?? null');
     expect(menuSceneSource).toContain('arrowAngleDegrees: this.hudFrame?.arrowAngleDegrees ?? null');
     expect(menuSceneSource).toContain('arrowAngleRadians: this.hudFrame?.arrowAngleRadians ?? null');
+    expect(menuSceneSource).toContain('compassSpinActive: this.hudCompassSpinActive');
+    expect(menuSceneSource).toContain('compassVisualAngleRadians: this.hudCompassVisualAngleRadians');
     expect(legacyPlayHudSource).toContain('const timerText = formatLegacyHudClock(input.elapsedMs);');
     expect(legacyPlayHudSource).toContain('Math.atan2(goalScreen.y - playerScreen.y, goalScreen.x - playerScreen.x)');
+    expect(legacyPlayHudSource).toContain('resolveLegacyCompassSpinFrame');
     expect(legacyPlayHudSource).toContain('const minutes = Math.floor(totalSeconds / 60) % 10;');
     expect(legacyPlayHudSource).toContain('const arrowAngleDegrees = (arrowAngleRadians * 180) / Math.PI;');
     expect(menuSceneSource).not.toContain('WASD or arrows to move   P to pause');
@@ -418,6 +421,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.hudGraphics.fillRect(');
     expect(menuSceneSource).toContain("fontSize: '14px',");
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
+    expect(menuSceneSource).toContain('this.startLegacyPlayCompassSpin(this.time.now);');
+    expect(menuSceneSource).toContain('private resolveLegacyPlayCompassVisualFrame(');
     expect(menuSceneSource).toContain('this.hudBounds = touchCompassBounds');
     expect(menuSceneSource).toContain(': mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).toContain('private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame): void');
