@@ -328,6 +328,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private resolveLegacyPlayTouchControlLayout()');
     expect(menuSceneSource).toContain('private handleLegacyPlayTouchControl');
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchControls(');
+    expect(menuSceneSource).toContain('private resolveLegacyPlayActiveTouchControls()');
+    expect(menuSceneSource).toContain('activeControls: this.resolveLegacyPlayActiveTouchControls()');
+    expect(menuSceneSource).toContain("this.drawLegacyPlayTouchButton(controls.move_up, false, activeControls.has('move_up'));");
+    expect(menuSceneSource).toContain('const wasHeld = this.playMoveFlags[direction];');
+    expect(menuSceneSource).toContain('const sameControlIndex = this.playHeldTouchMoves.findIndex((move) => move.control === control);');
+    expect(menuSceneSource).toContain('if (this.playHeldTouchMoves.length >= LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT) {');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
     expect(menuSceneSource).toContain('this.hudBounds = touchCompassBounds');
     expect(menuSceneSource).toContain(': mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
