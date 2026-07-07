@@ -465,8 +465,8 @@ const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_CORE_RATIO = 0.82;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO = 1;
-const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 280;
-const LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS = 140;
+const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 160;
+const LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS = 100;
 const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
 const LEGACY_PLAY_COMPASS_SPIN_DURATION_MS = 1800;
@@ -880,6 +880,8 @@ export class MenuScene extends Phaser.Scene {
           touchSprint: {
             activeControls: this.playHeldTouchMoves.map((move) => move.control),
             heldControl: this.resolveLegacyPlayHeldTouchControl(),
+            repeatInitialDelayMs: LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS,
+            repeatIntervalMs: LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS,
             pendingStepCount: this.playDiagonalMoveQueue.length,
             repeatTimerActive: this.playHeldTouchRepeatTimer !== null,
             stepTimerActive: this.playDiagonalMoveTimer !== null

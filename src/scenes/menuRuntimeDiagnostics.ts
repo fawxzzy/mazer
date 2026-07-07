@@ -104,6 +104,8 @@ export interface MenuSceneRuntimeDiagnostics {
       touchSprint: {
         activeControls: string[];
         heldControl: string | null;
+        repeatInitialDelayMs: number;
+        repeatIntervalMs: number;
         pendingStepCount: number;
         repeatTimerActive: boolean;
         stepTimerActive: boolean;

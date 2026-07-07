@@ -379,6 +379,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const wasHeld = this.playMoveFlags[direction];');
     expect(menuSceneSource).toContain('const sameControlIndex = this.playHeldTouchMoves.findIndex((move) => move.control === control);');
     expect(menuSceneSource).toContain('if (this.playHeldTouchMoves.length >= LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT) {');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 160;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS = 100;');
+    expect(menuSceneSource).toContain('repeatInitialDelayMs: LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS');
+    expect(menuSceneSource).toContain('repeatIntervalMs: LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
     expect(menuSceneSource).toContain("showPane: touchControlLayout.controlMode !== 'stick'");
     expect(menuSceneSource).toContain('this.hudBounds = touchCompassBounds');

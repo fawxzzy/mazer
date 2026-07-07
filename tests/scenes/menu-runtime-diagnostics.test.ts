@@ -293,6 +293,8 @@ describe('menu runtime diagnostics', () => {
           touchSprint: {
             activeControls: [],
             heldControl: null,
+            repeatInitialDelayMs: 160,
+            repeatIntervalMs: 100,
             pendingStepCount: 0,
             repeatTimerActive: false,
             stepTimerActive: false
@@ -512,6 +514,12 @@ describe('menu runtime diagnostics', () => {
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )?.play?.inputBuffer.simultaneousDelayMs).toBe(50);
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.play?.inputBuffer.touchSprint.repeatInitialDelayMs).toBe(160);
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.play?.inputBuffer.touchSprint.repeatIntervalMs).toBe(100);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.menuDemo?.route?.cueCounts.reacquire).toBe(2);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.source).toBe('menu-generated');
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.routeQualityStats?.routeQuality)
