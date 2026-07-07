@@ -108,7 +108,10 @@ export interface MenuSceneRuntimeDiagnostics {
         movementSpeedLabel: string;
         repeatInitialDelayMs: number;
         repeatIntervalMs: number;
+        stickInitialDelayMaxMs: number;
+        stickRepeatIntervalMaxMs: number;
         stickRetargetDelayMs: number;
+        stickTurnDelayMaxMs: number;
         turnDelayMs: number;
         pendingStepCount: number;
         repeatTimerActive: boolean;

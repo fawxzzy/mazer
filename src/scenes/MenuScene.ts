@@ -483,6 +483,9 @@ const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
 const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 48;
 const LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS = 16;
+const LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS = 112;
+const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = 82;
+const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = 112;
 const LEGACY_PLAY_COMPASS_SPIN_DURATION_MS = 1800;
 const LEGACY_PLAY_COMPASS_SPIN_TURNS = 3.25;
 const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
@@ -912,7 +915,10 @@ export class MenuScene extends Phaser.Scene {
             movementSpeedLabel: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
             repeatInitialDelayMs: movementSpeedProfile.initialDelayMs,
             repeatIntervalMs: movementSpeedProfile.repeatIntervalMs,
+            stickInitialDelayMaxMs: LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS,
+            stickRepeatIntervalMaxMs: LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS,
             stickRetargetDelayMs: LEGACY_PLAY_STICK_RETARGET_STEP_MS,
+            stickTurnDelayMaxMs: LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS,
             turnDelayMs: movementSpeedProfile.turnDelayMs,
             pendingStepCount: this.playDiagonalMoveQueue.length,
             repeatTimerActive: this.playHeldTouchRepeatTimer !== null,
@@ -1855,13 +1861,20 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyPlayHeldTouchDelay(kind: 'initial' | 'repeat' | 'turn'): number {
     const profile = resolveLegacyMovementSpeedProfile(this.settings.movementSpeed);
+    const stickActive = this.playTouchStickPointerId !== null;
     switch (kind) {
       case 'initial':
-        return profile.initialDelayMs;
+        return stickActive
+          ? Math.min(profile.initialDelayMs, LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS)
+          : profile.initialDelayMs;
       case 'repeat':
-        return profile.repeatIntervalMs;
+        return stickActive
+          ? Math.min(profile.repeatIntervalMs, LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS)
+          : profile.repeatIntervalMs;
       case 'turn':
-        return profile.turnDelayMs;
+        return stickActive
+          ? Math.min(profile.turnDelayMs, LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS)
+          : profile.turnDelayMs;
       default:
         return kind satisfies never;
     }
