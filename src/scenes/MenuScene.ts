@@ -103,6 +103,7 @@ import {
 import {
   formatLegacyMovementSpeedPercent,
   normalizeLegacyMovementSpeed,
+  quantizeLegacyMovementSpeed,
   resolveLegacyMovementSpeedProfile
 } from '../legacy-runtime/legacyMovementSpeed';
 import {
@@ -4049,7 +4050,7 @@ export class MenuScene extends Phaser.Scene {
     const trackLeft = left + Math.max(132, Math.round(input.width * 0.42));
     const trackRight = left + input.width - 72;
     const trackWidth = Math.max(44, trackRight - trackLeft);
-    const normalizedValue = normalizeLegacyMovementSpeed(input.value);
+    const normalizedValue = quantizeLegacyMovementSpeed(input.value);
     const track = this.add.rectangle(
       trackLeft + Math.round(trackWidth / 2),
       input.y,
@@ -4077,7 +4078,7 @@ export class MenuScene extends Phaser.Scene {
     knob.setStrokeStyle(1, 0xecfff5, 0.72);
 
     const commitPointerSpeed = (pointerX: number): void => {
-      const nextSpeed = normalizeLegacyMovementSpeed((pointerX - trackLeft) / trackWidth);
+      const nextSpeed = quantizeLegacyMovementSpeed((pointerX - trackLeft) / trackWidth);
       this.applyLegacyMovementSpeed(nextSpeed);
     };
 
@@ -4448,8 +4449,14 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private applyLegacyMovementSpeed(speed: number): void {
+    const currentSpeed = quantizeLegacyMovementSpeed(this.settings.movementSpeed);
+    const nextSpeed = quantizeLegacyMovementSpeed(speed);
+    if (currentSpeed === nextSpeed) {
+      return;
+    }
+
     const nextSettings = copyLegacySettings(this.settings);
-    nextSettings.movementSpeed = normalizeLegacyMovementSpeed(speed);
+    nextSettings.movementSpeed = nextSpeed;
     this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), nextSettings);
     if (this.playHeldTouchMoves.length > 0 && this.playHeldTouchRepeatTimer !== null) {
       this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));

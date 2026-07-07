@@ -295,9 +295,9 @@ describe('menu runtime diagnostics', () => {
             heldControl: null,
             movementSpeed: 0.58,
             movementSpeedLabel: '58%',
-            repeatInitialDelayMs: 226,
-            repeatIntervalMs: 100,
-            turnDelayMs: 265,
+            repeatInitialDelayMs: 204,
+            repeatIntervalMs: 91,
+            turnDelayMs: 238,
             pendingStepCount: 0,
             repeatTimerActive: false,
             stepTimerActive: false
@@ -519,13 +519,13 @@ describe('menu runtime diagnostics', () => {
       )?.play?.inputBuffer.simultaneousDelayMs).toBe(50);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )?.play?.inputBuffer.touchSprint.repeatInitialDelayMs).toBe(226);
+      )?.play?.inputBuffer.touchSprint.repeatInitialDelayMs).toBe(204);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )?.play?.inputBuffer.touchSprint.repeatIntervalMs).toBe(100);
+      )?.play?.inputBuffer.touchSprint.repeatIntervalMs).toBe(91);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )?.play?.inputBuffer.touchSprint.turnDelayMs).toBe(265);
+      )?.play?.inputBuffer.touchSprint.turnDelayMs).toBe(238);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.menuDemo?.route?.cueCounts.reacquire).toBe(2);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.source).toBe('menu-generated');
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.routeQualityStats?.routeQuality)
