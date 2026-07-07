@@ -539,6 +539,7 @@ export class MenuScene extends Phaser.Scene {
   private playHeldTouchSequence = 0;
   private playHeldTouchRepeatTimer: Phaser.Time.TimerEvent | null = null;
   private playTouchStickPointerId: number | null = null;
+  private playTouchStickLastControl: HumanMovementActionKind | null = null;
   private playPointerStart: LegacyPlayPointerStart | null = null;
   private titleText!: Phaser.GameObjects.Text;
   private titleShadow!: Phaser.GameObjects.Text;
@@ -1466,8 +1467,10 @@ export class MenuScene extends Phaser.Scene {
       this.resetLegacyPlayDirectionalInputBuffer();
       this.playTouchStickPointerId = normalizedPointerId;
       if (isMovementActionKind(control)) {
+        this.playTouchStickLastControl = control;
         this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
       } else {
+        this.playTouchStickLastControl = null;
         this.releaseLegacyPlayHeldTouchMove(pointerId);
         this.publishInteractionDiagnostics();
       }
@@ -1530,7 +1533,10 @@ export class MenuScene extends Phaser.Scene {
       allowBeyondOuter: true
     });
     if (isMovementActionKind(control)) {
-      this.beginLegacyPlayHeldTouchMove(control, pointerId);
+      this.playTouchStickLastControl = control;
+      this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
+    } else if (this.playTouchStickLastControl !== null) {
+      this.beginLegacyPlayHeldTouchMove(this.playTouchStickLastControl, pointerId, { keepWhenBlocked: true });
     } else {
       this.releaseLegacyPlayHeldTouchMove(pointerId);
     }
@@ -1665,6 +1671,7 @@ export class MenuScene extends Phaser.Scene {
     const releasedStick = this.playTouchStickPointerId === normalizedPointerId;
     if (releasedStick) {
       this.playTouchStickPointerId = null;
+      this.playTouchStickLastControl = null;
       this.boardDynamicDirty = true;
       this.publishInteractionDiagnostics();
     }
@@ -1694,6 +1701,7 @@ export class MenuScene extends Phaser.Scene {
     ) {
       this.playHeldTouchMoves = [];
       this.playTouchStickPointerId = null;
+      this.playTouchStickLastControl = null;
       this.clearLegacyPlayHeldTouchRepeat();
       this.publishInteractionDiagnostics();
       return;
@@ -1713,6 +1721,7 @@ export class MenuScene extends Phaser.Scene {
       }
       this.playHeldTouchMoves = [];
       this.playTouchStickPointerId = null;
+      this.playTouchStickLastControl = null;
       this.clearLegacyPlayHeldTouchRepeat();
       this.publishInteractionDiagnostics();
       return;
@@ -1904,6 +1913,7 @@ export class MenuScene extends Phaser.Scene {
     this.clearLegacyPlayHeldTouchRepeat();
     this.playHeldTouchMoves = [];
     this.playTouchStickPointerId = null;
+    this.playTouchStickLastControl = null;
     this.playMoveFlags = createLegacyPlayMoveFlags();
     this.playPointerStart = null;
   }

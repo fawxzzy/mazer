@@ -193,13 +193,26 @@ export const resolveTouchControlLayout = (
       safeInsets.left,
       Math.max(safeInsets.left, viewport.width - safeInsets.right - dpadFrameWidth)
     );
-    const frameTop = clamp(
-      Math.round(viewport.height - safeInsets.bottom - dpadFrameHeight - Math.max(12, buttonSize * 0.25)),
-      0,
-      Math.max(0, viewport.height - dpadFrameHeight)
-    );
-    const dpadLeft = frameLeft + dpadPad;
-    const dpadTop = frameTop + dpadPad;
+    const bottomLaneTop = options.avoidRect
+      ? clamp(
+        Math.round(options.avoidRect.top + options.avoidRect.height),
+        0,
+        Math.max(0, viewport.height - safeInsets.bottom)
+      )
+      : null;
+    const frameTop = bottomLaneTop !== null
+      ? clamp(
+        Math.round(bottomLaneTop + (((viewport.height - safeInsets.bottom) - bottomLaneTop - dpadFrameHeight) / 2)),
+        bottomLaneTop,
+        Math.max(bottomLaneTop, viewport.height - safeInsets.bottom - dpadFrameHeight)
+      )
+      : clamp(
+        Math.round(viewport.height - safeInsets.bottom - dpadFrameHeight - Math.max(12, buttonSize * 0.25)),
+        0,
+        Math.max(0, viewport.height - dpadFrameHeight)
+      );
+    const dpadLeft = Math.round(frameLeft + ((dpadFrameWidth - dpadSpan) / 2));
+    const dpadTop = Math.round(frameTop + ((dpadFrameHeight - dpadSpan) / 2));
     const topActionHeight = clamp(Math.round(buttonSize * 0.84), 34, ultraNarrow ? 38 : 42);
     const topActionGap = ultraNarrow ? 4 : Math.max(6, Math.round(gap * 0.82));
     const topActionFrameLeft = ultraNarrow ? safeInsets.left + 6 : safeInsets.left + 88;

@@ -96,6 +96,36 @@ describe('input-human touch bridge', () => {
       layout.stick!.outer.centerY,
       { allowBeyondOuter: true }
     )).toBe('move_right');
+    expect(resolveStickMovementKind(
+      layout.stick!,
+      layout.stick!.outer.centerX - 500,
+      layout.stick!.outer.centerY - 320,
+      { allowBeyondOuter: true }
+    )).toBe('move_up_left');
+  });
+
+  test('centers phone controls within the bottom lane below the board when board bounds are known', () => {
+    const board = {
+      left: 31,
+      top: 308,
+      width: 343,
+      height: 343
+    };
+    const layout = resolveTouchControlLayout({
+      width: 390,
+      height: 844
+    }, {
+      avoidRect: board,
+      controlMode: 'stick'
+    });
+    const bottomLaneTop = board.top + board.height;
+    const bottomLaneCenterY = bottomLaneTop + ((844 - bottomLaneTop) / 2);
+
+    expect(layout.frame.top).toBeGreaterThanOrEqual(bottomLaneTop);
+    expect(layout.frame.bottom).toBeLessThanOrEqual(844);
+    expect(Math.abs(layout.frame.centerY - bottomLaneCenterY)).toBeLessThanOrEqual(1);
+    expect(Math.abs(layout.stick!.outer.centerX - 195)).toBeLessThanOrEqual(1);
+    expect(Math.abs(layout.stick!.outer.centerY - layout.frame.centerY)).toBeLessThanOrEqual(1);
   });
 
   test('keeps ultra-narrow portrait controls inside the viewport without oversized hit plates', () => {
