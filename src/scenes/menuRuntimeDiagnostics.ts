@@ -254,6 +254,8 @@ export interface MenuSceneRuntimeDiagnostics {
   resources: {
     activeTweens: number;
     activeTimers: number;
+    animatedBackdropEnabled?: boolean;
+    backdropDirty?: boolean;
     listenerCount: number;
     listenerBreakdown: {
       sceneUpdate: number;

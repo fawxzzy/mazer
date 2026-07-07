@@ -13,6 +13,8 @@ describe('legacy overlay toggle fields', () => {
     expect(resolveLegacyOverlayToggleStateText('toggleTrailFade', true)).toBe('On');
     expect(resolveLegacyOverlayToggleStateText('toggleTrailPulse', false)).toBe('Off');
     expect(resolveLegacyOverlayToggleStateText('toggleTrailPulse', true)).toBe('On');
+    expect(resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', false)).toBe('Off');
+    expect(resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', true)).toBe('On');
     expect(resolveLegacyOverlayToggleStateText('controlMode', false)).toBe('Arrows');
     expect(resolveLegacyOverlayToggleStateText('controlMode', true)).toBe('Stick');
     expect(resolveLegacyOverlayToggleStateText('darkMode', false)).toBeNull();
@@ -25,6 +27,7 @@ describe('legacy overlay toggle fields', () => {
     const cameraFollow = applyLegacyOverlayToggleField(settings, 'toggleCameraFollow');
     const trailFade = applyLegacyOverlayToggleField(settings, 'toggleTrailFade');
     const trailPulse = applyLegacyOverlayToggleField(settings, 'toggleTrailPulse');
+    const animatedBackdrop = applyLegacyOverlayToggleField(settings, 'toggleAnimatedBackdrop');
     const controlMode = applyLegacyOverlayToggleField(settings, 'controlMode');
 
     expect(cameraFollow.settings.toggleCameraFollow).toBe(true);
@@ -47,6 +50,13 @@ describe('legacy overlay toggle fields', () => {
     expect(trailPulse.affectsBoardStatic).toBe(false);
     expect(trailPulse.affectsBoardDynamic).toBe(true);
     expect(trailPulse.legacyDirectionalLightIntensity).toBeNull();
+
+    expect(animatedBackdrop.settings.toggleAnimatedBackdrop).toBe(false);
+    expect(animatedBackdrop.stateText).toBe('Off');
+    expect(animatedBackdrop.affectsBackdrop).toBe(true);
+    expect(animatedBackdrop.affectsBoardStatic).toBe(false);
+    expect(animatedBackdrop.affectsBoardDynamic).toBe(false);
+    expect(animatedBackdrop.legacyDirectionalLightIntensity).toBeNull();
 
     expect(controlMode.settings.controlMode).toBe('stick');
     expect(controlMode.stateText).toBe('Stick');

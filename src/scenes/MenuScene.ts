@@ -1005,6 +1005,8 @@ export class MenuScene extends Phaser.Scene {
       resources: {
         activeTweens: 0,
         activeTimers: 0,
+        animatedBackdropEnabled: this.settings.toggleAnimatedBackdrop,
+        backdropDirty: this.backdropDirty,
         listenerCount: 3
           + (this.runtimeVisibilityAttached ? 1 : 0)
           + (this.legacyPlayFocusGuardAttached ? 2 : 0)
@@ -2292,6 +2294,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private updateStars(delta: number): void {
+    if (!this.settings.toggleAnimatedBackdrop) {
+      return;
+    }
+
     advanceLegacyMenuBackdropStars(this.stars, delta, this.settings.darkMode);
     this.backdropDirty = true;
   }
@@ -3392,7 +3398,7 @@ export class MenuScene extends Phaser.Scene {
   private resolveOverlayPanelFrame(): OverlayPanelFrame {
     const width = Math.min(720, this.layout.width - 40);
     const compact = this.layout.width < 480;
-    const height = Math.min(compact ? 760 : 620, this.layout.height - 48);
+    const height = Math.min(compact ? this.layout.height - 32 : 620, this.layout.height - 32);
     const left = Math.round((this.layout.width - width) / 2);
     const top = Math.round((this.layout.height - height) / 2);
 
@@ -3451,8 +3457,8 @@ export class MenuScene extends Phaser.Scene {
     const stacked = panel.width < 420;
     const left = panel.left + 28;
     const width = panel.width - 56;
-    const rowHeight = stacked ? 46 : 48;
-    const rowGap = stacked ? 8 : 10;
+    const rowHeight = stacked ? 42 : 48;
+    const rowGap = stacked ? 5 : 10;
     const controls: Array<{
       checked: boolean;
       label: string;
@@ -3484,6 +3490,14 @@ export class MenuScene extends Phaser.Scene {
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailPulse'),
         onLabel: 'On',
         stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'
+      },
+      {
+        checked: this.settings.toggleAnimatedBackdrop,
+        label: 'Animated BG',
+        offLabel: 'Stagnant',
+        onClick: () => this.applyLegacyOverlayToggleField('toggleAnimatedBackdrop'),
+        onLabel: 'Animated',
+        stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Off'
       },
       {
         checked: this.settings.darkMode,
