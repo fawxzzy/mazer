@@ -157,8 +157,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x0d1724;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GLASS_ALPHA = 0.75;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.28;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GLASS_ALPHA = 0.58;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.18;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = 0x72e0bf;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = 0xb7f2ff;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;');
@@ -199,8 +199,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = 0x0d3c4f;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.9;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_FILL = 0x07111d;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.75;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.28;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.58;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.18;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_FILL = 0x08111d;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_EDGE = 0x031022;');
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_PATH_RELIEF_SHADOW');
@@ -259,8 +259,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x107d74;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.72;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.96;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.64;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR = 0x36ff7d;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE = 0xecfff5;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;');
@@ -379,7 +379,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const wasHeld = this.playMoveFlags[direction];');
     expect(menuSceneSource).toContain('const sameControlIndex = this.playHeldTouchMoves.findIndex((move) => move.control === control);');
     expect(menuSceneSource).toContain('if (this.playHeldTouchMoves.length >= LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT) {');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 160;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 240;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS = 100;');
     expect(menuSceneSource).toContain('repeatInitialDelayMs: LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS');
     expect(menuSceneSource).toContain('repeatIntervalMs: LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS');
@@ -397,6 +397,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("this.hudGraphics.lineTo(cx, cy - size);");
     expect(menuSceneSource).toContain('installLegacyPlayTouchControlFallback');
     expect(menuSceneSource).toContain("event.pointerType === 'touch'");
+    expect(menuSceneSource).toContain('event.target === this.game.canvas');
     expect(menuSceneSource).toContain('event.stopImmediatePropagation()');
     expect(menuSceneSource).toContain("case 'pause':");
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('reset-player');");

@@ -293,7 +293,7 @@ describe('menu runtime diagnostics', () => {
           touchSprint: {
             activeControls: [],
             heldControl: null,
-            repeatInitialDelayMs: 160,
+            repeatInitialDelayMs: 240,
             repeatIntervalMs: 100,
             pendingStepCount: 0,
             repeatTimerActive: false,
@@ -516,7 +516,7 @@ describe('menu runtime diagnostics', () => {
       )?.play?.inputBuffer.simultaneousDelayMs).toBe(50);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )?.play?.inputBuffer.touchSprint.repeatInitialDelayMs).toBe(160);
+      )?.play?.inputBuffer.touchSprint.repeatInitialDelayMs).toBe(240);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )?.play?.inputBuffer.touchSprint.repeatIntervalMs).toBe(100);

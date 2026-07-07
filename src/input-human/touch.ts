@@ -111,6 +111,44 @@ const isPointInRect = (rect: TouchRect, x: number, y: number): boolean => (
   && y <= rect.bottom
 );
 
+const resolveStickMovementFromVector = (
+  dx: number,
+  dy: number,
+  angle: number
+): HumanMovementActionKind | null => {
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+  const cardinalDominanceRatio = 1.3;
+  if (absY >= absX * cardinalDominanceRatio) {
+    return dy < 0 ? 'move_up' : 'move_down';
+  }
+  if (absX >= absY * cardinalDominanceRatio) {
+    return dx < 0 ? 'move_left' : 'move_right';
+  }
+
+  const octant = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
+  switch (octant) {
+    case 0:
+      return 'move_right';
+    case 1:
+      return 'move_down_right';
+    case 2:
+      return 'move_down';
+    case 3:
+      return 'move_down_left';
+    case 4:
+      return 'move_left';
+    case 5:
+      return 'move_up_left';
+    case 6:
+      return 'move_up';
+    case 7:
+      return 'move_up_right';
+    default:
+      return null;
+  }
+};
+
 export const resolveStickMovementKind = (
   stick: NonNullable<TouchControlLayout['stick']>,
   x: number,
@@ -137,35 +175,9 @@ export const resolveStickPullVector = (
   }
 
   const angle = Math.atan2(dy, dx);
-  const octant = (Math.round(angle / (Math.PI / 4)) + 8) % 8;
-  let movement: HumanMovementActionKind;
-  switch (octant) {
-    case 0:
-      movement = 'move_right';
-      break;
-    case 1:
-      movement = 'move_down_right';
-      break;
-    case 2:
-      movement = 'move_down';
-      break;
-    case 3:
-      movement = 'move_down_left';
-      break;
-    case 4:
-      movement = 'move_left';
-      break;
-    case 5:
-      movement = 'move_up_left';
-      break;
-    case 6:
-      movement = 'move_up';
-      break;
-    case 7:
-      movement = 'move_up_right';
-      break;
-    default:
-      return null;
+  const movement = resolveStickMovementFromVector(dx, dy, angle);
+  if (movement === null) {
+    return null;
   }
 
   const outerRadius = stick.outer.width / 2;

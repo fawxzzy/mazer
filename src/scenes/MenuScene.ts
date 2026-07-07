@@ -421,14 +421,14 @@ const LEGACY_MENU_PATH_CORE = 0xe6f2eb;
 const LEGACY_MENU_PATH_EDGE = 0x304158;
 const LEGACY_MENU_PATH_EDGE_ALPHA = 0.9;
 const LEGACY_MENU_WALL_FILL = 0x0d1724;
-const LEGACY_MENU_WALL_GLASS_ALPHA = 0.75;
-const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.28;
+const LEGACY_MENU_WALL_GLASS_ALPHA = 0.58;
+const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.18;
 const LEGACY_PLAY_PATH_CORE = 0xe7fff4;
 const LEGACY_PLAY_PATH_EDGE = 0x0d3c4f;
 const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.9;
 const LEGACY_PLAY_WALL_FILL = 0x07111d;
-const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.75;
-const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.28;
+const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.58;
+const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.18;
 const LEGACY_PLAY_BOARD_FILL = 0x08111d;
 const LEGACY_PLAY_BOARD_EDGE = 0x031022;
 const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = 0x72e0bf;
@@ -457,15 +457,15 @@ const LEGACY_MENU_DYNAMIC_MARKER_INSET_RATIO = 0.22;
 const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.3;
 const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.54;
 const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x107d74;
-const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.72;
-const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.96;
+const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.64;
+const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR = 0x36ff7d;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE = 0xecfff5;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
-const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_CORE_RATIO = 0.82;
-const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO = 1;
-const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 160;
+const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_CORE_RATIO = 0.76;
+const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO = 0.96;
+const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 240;
 const LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS = 100;
 const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
@@ -554,7 +554,6 @@ export class MenuScene extends Phaser.Scene {
   private playHeldTouchSequence = 0;
   private playHeldTouchRepeatTimer: Phaser.Time.TimerEvent | null = null;
   private playTouchStickPointerId: number | null = null;
-  private playTouchStickLastControl: HumanMovementActionKind | null = null;
   private playTouchStickPull: TouchStickPullVector | null = null;
   private playPointerStart: LegacyPlayPointerStart | null = null;
   private titleText!: Phaser.GameObjects.Text;
@@ -1286,7 +1285,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.legacyPlayTouchControlPointerDownHandler = (event: PointerEvent) => {
       // Phaser owns touch pointers; this fallback only catches non-touch pointer paths before DOM overlays.
-      if (event.pointerType === 'touch') {
+      if (event.pointerType === 'touch' || event.target === this.game.canvas) {
         return;
       }
 
@@ -1300,7 +1299,7 @@ export class MenuScene extends Phaser.Scene {
     };
     this.legacyPlayTouchControlPointerMoveHandler = (event: PointerEvent) => {
       // Match the non-touch fallback down path; Phaser continues to own real touch move events.
-      if (event.pointerType === 'touch') {
+      if (event.pointerType === 'touch' || event.target === this.game.canvas) {
         return;
       }
 
@@ -1314,7 +1313,7 @@ export class MenuScene extends Phaser.Scene {
     };
     this.legacyPlayTouchControlPointerUpHandler = (event: PointerEvent) => {
       // Match the non-touch fallback down path; Phaser continues to own real touch release events.
-      if (event.pointerType === 'touch') {
+      if (event.pointerType === 'touch' || event.target === this.game.canvas) {
         return;
       }
 
@@ -1493,10 +1492,8 @@ export class MenuScene extends Phaser.Scene {
         ? null
         : resolveStickPullVector(touchControlLayout.stick, x, y, { allowBeyondOuter: true });
       if (isMovementActionKind(control)) {
-        this.playTouchStickLastControl = control;
         this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
       } else {
-        this.playTouchStickLastControl = null;
         this.releaseLegacyPlayHeldTouchMove(pointerId);
         this.publishInteractionDiagnostics();
       }
@@ -1563,12 +1560,8 @@ export class MenuScene extends Phaser.Scene {
     });
     this.playTouchStickPull = pullVector;
     if (isMovementActionKind(control)) {
-      this.playTouchStickLastControl = control;
       this.normalizeLegacyPlayStickHeldTouchMovePointer(pointerId);
       this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
-    } else if (this.playTouchStickLastControl !== null) {
-      this.normalizeLegacyPlayStickHeldTouchMovePointer(pointerId);
-      this.beginLegacyPlayHeldTouchMove(this.playTouchStickLastControl, pointerId, { keepWhenBlocked: true });
     } else {
       this.releaseLegacyPlayHeldTouchMove(pointerId);
     }
@@ -1725,7 +1718,6 @@ export class MenuScene extends Phaser.Scene {
     const releasedStick = this.playTouchStickPointerId === normalizedPointerId;
     if (releasedStick) {
       this.playTouchStickPointerId = null;
-      this.playTouchStickLastControl = null;
       this.playTouchStickPull = null;
       this.boardDynamicDirty = true;
       this.publishInteractionDiagnostics();
@@ -1756,7 +1748,6 @@ export class MenuScene extends Phaser.Scene {
     ) {
       this.playHeldTouchMoves = [];
       this.playTouchStickPointerId = null;
-      this.playTouchStickLastControl = null;
       this.playTouchStickPull = null;
       this.clearLegacyPlayHeldTouchRepeat();
       this.publishInteractionDiagnostics();
@@ -1777,7 +1768,6 @@ export class MenuScene extends Phaser.Scene {
       }
       this.playHeldTouchMoves = [];
       this.playTouchStickPointerId = null;
-      this.playTouchStickLastControl = null;
       this.playTouchStickPull = null;
       this.clearLegacyPlayHeldTouchRepeat();
       this.publishInteractionDiagnostics();
@@ -1970,7 +1960,6 @@ export class MenuScene extends Phaser.Scene {
     this.clearLegacyPlayHeldTouchRepeat();
     this.playHeldTouchMoves = [];
     this.playTouchStickPointerId = null;
-    this.playTouchStickLastControl = null;
     this.playTouchStickPull = null;
     this.playMoveFlags = createLegacyPlayMoveFlags();
     this.playPointerStart = null;
@@ -2870,8 +2859,8 @@ export class MenuScene extends Phaser.Scene {
         LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE,
         LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO,
         LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_CORE_RATIO,
-        0.36,
-        0.86
+        0.32,
+        0.8
       );
     }
   }

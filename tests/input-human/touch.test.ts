@@ -108,7 +108,25 @@ describe('input-human touch bridge', () => {
       layout.stick!.outer.centerX - 500,
       layout.stick!.outer.centerY - 320,
       { allowBeyondOuter: true }
+    )).toBe('move_left');
+    expect(resolveStickMovementKind(
+      layout.stick!,
+      layout.stick!.outer.centerX - 500,
+      layout.stick!.outer.centerY - 500,
+      { allowBeyondOuter: true }
     )).toBe('move_up_left');
+    expect(resolveStickMovementKind(
+      layout.stick!,
+      layout.stick!.outer.centerX - 48,
+      layout.stick!.outer.centerY - 80,
+      { allowBeyondOuter: true }
+    )).toBe('move_up');
+    expect(resolveStickMovementKind(
+      layout.stick!,
+      layout.stick!.outer.centerX - 80,
+      layout.stick!.outer.centerY - 48,
+      { allowBeyondOuter: true }
+    )).toBe('move_left');
     const partialPull = resolveStickPullVector(
       layout.stick!,
       layout.stick!.outer.centerX + (layout.stick!.outer.width * 0.18),
