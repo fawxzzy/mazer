@@ -138,6 +138,17 @@ describe('input-human touch bridge', () => {
       movement: 'move_up_right',
       movementCandidates: ['move_right', 'move_up']
     });
+    expect(resolveStickMovementIntent(Math.PI / 16, { previousIntentSegment: 0 })).toEqual({
+      intentSegment: 0,
+      movement: 'move_right',
+      movementCandidates: ['move_right']
+    });
+    expect(resolveStickMovementIntent(Math.PI / 8, { previousIntentSegment: 0 })).toEqual({
+      intentSegment: 1,
+      movement: 'move_right',
+      movementCandidates: ['move_right', 'move_down']
+    });
+    expect(resolveStickMovementIntent(Math.PI / 2, { previousIntentSegment: 0 }).intentSegment).toBe(4);
     const partialPull = resolveStickPullVector(
       layout.stick!,
       layout.stick!.outer.centerX + (layout.stick!.outer.width * 0.18),
@@ -151,6 +162,14 @@ describe('input-human touch bridge', () => {
     expect(partialPull?.distanceRatio).toBeLessThan(1);
     expect(partialPull?.normalizedX).toBeGreaterThan(0);
     expect(partialPull?.normalizedY).toBeLessThan(0);
+    const stickyBoundaryPull = resolveStickPullVector(
+      layout.stick!,
+      layout.stick!.outer.centerX + 90,
+      layout.stick!.outer.centerY + 18,
+      { allowBeyondOuter: true, previousIntentSegment: 0 }
+    );
+    expect(stickyBoundaryPull?.intentSegment).toBe(0);
+    expect(stickyBoundaryPull?.movementCandidates).toEqual(['move_right']);
     const farPull = resolveStickPullVector(
       layout.stick!,
       layout.stick!.outer.centerX + 900,

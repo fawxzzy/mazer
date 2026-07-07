@@ -379,6 +379,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('movementCandidates: [...this.playTouchStickPull.movementCandidates]');
     expect(menuSceneSource).toContain('intentSegment: this.playTouchStickPull.intentSegment');
     expect(menuSceneSource).toContain('allowBeyondOuter: true');
+    expect(menuSceneSource).toContain('previousIntentSegment: this.playTouchStickPull?.intentSegment ?? null');
     expect(menuSceneSource).toContain('keepWhenBlocked: true');
     expect(menuSceneSource).toContain('if (this.playTouchStickPointerId !== null) {');
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchStick(');

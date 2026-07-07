@@ -105,6 +105,13 @@ const normalizeInset = (value: unknown): number => (
 const EMPTY_TOUCH_RECT = createRect(-10_000, -10_000, 0, 0);
 const STICK_INTENT_SEGMENT_COUNT = 16;
 const STICK_INTENT_SEGMENT_RADIANS = (Math.PI * 2) / STICK_INTENT_SEGMENT_COUNT;
+const STICK_INTENT_SEGMENT_HYSTERESIS_RADIANS = STICK_INTENT_SEGMENT_RADIANS * 0.28;
+const FULL_CIRCLE_RADIANS = Math.PI * 2;
+
+export interface StickPullOptions {
+  allowBeyondOuter?: boolean;
+  previousIntentSegment?: number | null;
+}
 
 const isPointInRect = (rect: TouchRect, x: number, y: number): boolean => (
   rect.width > 0
@@ -127,15 +134,49 @@ const uniqueMovementCandidates = (
   return unique;
 };
 
+const normalizeAngleRadians = (angle: number): number => (
+  ((angle % FULL_CIRCLE_RADIANS) + FULL_CIRCLE_RADIANS) % FULL_CIRCLE_RADIANS
+);
+
+const resolveCircularSegmentDistance = (left: number, right: number): number => {
+  const direct = Math.abs(left - right);
+  return Math.min(direct, STICK_INTENT_SEGMENT_COUNT - direct);
+};
+
+const resolveAngleDistanceRadians = (left: number, right: number): number => {
+  const distance = Math.abs(normalizeAngleRadians(left) - normalizeAngleRadians(right));
+  return Math.min(distance, FULL_CIRCLE_RADIANS - distance);
+};
+
+const normalizeIntentSegment = (segment: number | null | undefined): number | null => {
+  if (!Number.isFinite(segment ?? NaN)) {
+    return null;
+  }
+
+  return ((Math.round(segment ?? 0) % STICK_INTENT_SEGMENT_COUNT) + STICK_INTENT_SEGMENT_COUNT) % STICK_INTENT_SEGMENT_COUNT;
+};
+
 export const resolveStickMovementIntent = (
-  angle: number
+  angle: number,
+  options: { previousIntentSegment?: number | null } = {}
 ): {
   intentSegment: number;
   movement: HumanMovementActionKind;
   movementCandidates: HumanMovementActionKind[];
 } => {
-  const normalizedAngle = angle < 0 ? angle + (Math.PI * 2) : angle;
-  const intentSegment = Math.floor((normalizedAngle + (STICK_INTENT_SEGMENT_RADIANS / 2)) / STICK_INTENT_SEGMENT_RADIANS) % STICK_INTENT_SEGMENT_COUNT;
+  const normalizedAngle = normalizeAngleRadians(angle);
+  const rawIntentSegment = Math.floor((normalizedAngle + (STICK_INTENT_SEGMENT_RADIANS / 2)) / STICK_INTENT_SEGMENT_RADIANS) % STICK_INTENT_SEGMENT_COUNT;
+  const previousIntentSegment = normalizeIntentSegment(options.previousIntentSegment);
+  let intentSegment = rawIntentSegment;
+  if (previousIntentSegment !== null && rawIntentSegment !== previousIntentSegment) {
+    const segmentDistance = resolveCircularSegmentDistance(previousIntentSegment, rawIntentSegment);
+    const rawSegmentCenter = rawIntentSegment * STICK_INTENT_SEGMENT_RADIANS;
+    const angleDistanceFromRawCenter = resolveAngleDistanceRadians(normalizedAngle, rawSegmentCenter);
+    const switchThreshold = (STICK_INTENT_SEGMENT_RADIANS / 2) - STICK_INTENT_SEGMENT_HYSTERESIS_RADIANS;
+    if (segmentDistance === 1 && angleDistanceFromRawCenter > switchThreshold) {
+      intentSegment = previousIntentSegment;
+    }
+  }
   const intents: Array<{
     movement: HumanMovementActionKind;
     movementCandidates: HumanMovementActionKind[];
@@ -169,7 +210,7 @@ export const resolveStickMovementKind = (
   stick: NonNullable<TouchControlLayout['stick']>,
   x: number,
   y: number,
-  options: { allowBeyondOuter?: boolean } = {}
+  options: StickPullOptions = {}
 ): HumanMovementActionKind | null => {
   return resolveStickPullVector(stick, x, y, options)?.movement ?? null;
 };
@@ -178,7 +219,7 @@ export const resolveStickPullVector = (
   stick: NonNullable<TouchControlLayout['stick']>,
   x: number,
   y: number,
-  options: { allowBeyondOuter?: boolean } = {}
+  options: StickPullOptions = {}
 ): TouchStickPullVector | null => {
   const dx = x - stick.outer.centerX;
   const dy = y - stick.outer.centerY;
@@ -191,7 +232,9 @@ export const resolveStickPullVector = (
   }
 
   const angle = Math.atan2(dy, dx);
-  const intent = resolveStickMovementIntent(angle);
+  const intent = resolveStickMovementIntent(angle, {
+    previousIntentSegment: options.previousIntentSegment
+  });
 
   const outerRadius = stick.outer.width / 2;
   const usableRadius = Math.max(1, outerRadius - stick.deadzoneRadius);

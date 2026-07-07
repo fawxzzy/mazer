@@ -1513,7 +1513,9 @@ export class MenuScene extends Phaser.Scene {
       this.clearLegacyPlayHeldTouchRepeat();
       this.playTouchStickPull = touchControlLayout.stick === null
         ? null
-        : resolveStickPullVector(touchControlLayout.stick, x, y, { allowBeyondOuter: true });
+        : resolveStickPullVector(touchControlLayout.stick, x, y, {
+          allowBeyondOuter: true
+        });
       if (this.playTouchStickPull !== null) {
         this.setLegacyPlayHeldTouchMoveCandidates(this.playTouchStickPull.movementCandidates, pointerId, { keepWhenBlocked: true });
       } else {
@@ -1576,7 +1578,8 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const pullVector = resolveStickPullVector(touchControlLayout.stick, x, y, {
-      allowBeyondOuter: true
+      allowBeyondOuter: true,
+      previousIntentSegment: this.playTouchStickPull?.intentSegment ?? null
     });
     const pullChanged = this.hasLegacyPlayTouchStickPullChanged(pullVector);
     this.playTouchStickPull = pullVector;
