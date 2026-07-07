@@ -465,6 +465,7 @@ const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_CORE_RATIO = 0.76;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO = 0.96;
+const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 50;
 const LEGACY_PLAY_TOUCH_REPEAT_INITIAL_DELAY_MS = 240;
 const LEGACY_PLAY_TOUCH_REPEAT_INTERVAL_MS = 100;
 const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
@@ -580,10 +581,12 @@ export class MenuScene extends Phaser.Scene {
   private hudCompassVisualAngleDegrees: number | null = null;
   private boardStaticDirty = true;
   private boardDynamicDirty = true;
+  private hudDirty = true;
   private backdropDirty = true;
   private uiDirty = true;
   private menuStaticDrawRowsVisible: number | null = null;
   private menuStaticDrawNextRowAtMs = 0;
+  private legacyPlayTrailPulseNextFrameAtMs = 0;
   private visualDiagnosticsRevision = 0;
   private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   private backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
@@ -714,9 +717,9 @@ export class MenuScene extends Phaser.Scene {
 
     this.advanceLegacyMenuStaticDrawStage(time);
     if (this.hasLegacyPlayCompassSpinPendingFrame()) {
-      this.boardDynamicDirty = true;
+      this.hudDirty = true;
     }
-    if (this.hasLegacyPlayTrailPulsePendingFrame()) {
+    if (this.hasLegacyPlayTrailPulsePendingFrame(time)) {
       this.boardDynamicDirty = true;
     }
 
@@ -726,9 +729,13 @@ export class MenuScene extends Phaser.Scene {
     if (this.boardStaticDirty) {
       this.drawStaticBoard();
     }
-    if (this.boardDynamicDirty) {
+    const shouldDrawDynamicBoard = this.boardDynamicDirty;
+    if (shouldDrawDynamicBoard) {
       this.drawDynamicBoard(time);
+    }
+    if (this.hudDirty || shouldDrawDynamicBoard) {
       this.drawHud(time);
+      this.hudDirty = false;
     }
     if (this.uiDirty) {
       this.rebuildUi();
@@ -1086,10 +1093,10 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private publishInteractionDiagnostics(): void {
+  private publishInteractionDiagnostics(force = true): void {
     const now = this.time.now;
-    this.publishVisualDiagnostics(now, true);
-    this.publishRuntimeDiagnostics(now, true);
+    this.publishVisualDiagnostics(now, force);
+    this.publishRuntimeDiagnostics(now, force);
   }
 
   private detachRuntimeDiagnostics(): void {
@@ -1386,6 +1393,20 @@ export class MenuScene extends Phaser.Scene {
     return this.handleLegacyPlayTouchControlMove(point.x, point.y, pointerId);
   }
 
+  private hasLegacyPlayTouchStickPullChanged(nextPull: TouchStickPullVector | null): boolean {
+    const previousPull = this.playTouchStickPull;
+    if (previousPull === null || nextPull === null) {
+      return previousPull !== nextPull;
+    }
+
+    const pullDelta = Math.max(
+      Math.abs(previousPull.normalizedX - nextPull.normalizedX),
+      Math.abs(previousPull.normalizedY - nextPull.normalizedY),
+      Math.abs(previousPull.distanceRatio - nextPull.distanceRatio)
+    );
+    return previousPull.movement !== nextPull.movement || pullDelta >= 0.015;
+  }
+
   private resolveLegacyPlayTouchClientPoint(clientX: number, clientY: number): { x: number; y: number } {
     const rect = this.game.canvas.getBoundingClientRect();
     const width = Math.max(1, rect.width);
@@ -1558,15 +1579,21 @@ export class MenuScene extends Phaser.Scene {
     const pullVector = resolveStickPullVector(touchControlLayout.stick, x, y, {
       allowBeyondOuter: true
     });
+    const pullChanged = this.hasLegacyPlayTouchStickPullChanged(pullVector);
     this.playTouchStickPull = pullVector;
     if (isMovementActionKind(control)) {
-      this.normalizeLegacyPlayStickHeldTouchMovePointer(pointerId);
-      this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
+      const matchingMove = this.playHeldTouchMoves.find((move) => move.pointerId === normalizedPointerId);
+      if (matchingMove?.control !== control) {
+        this.normalizeLegacyPlayStickHeldTouchMovePointer(pointerId);
+        this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
+      }
     } else {
       this.releaseLegacyPlayHeldTouchMove(pointerId);
     }
-    this.boardDynamicDirty = true;
-    this.publishInteractionDiagnostics();
+    if (pullChanged) {
+      this.hudDirty = true;
+      this.publishInteractionDiagnostics(false);
+    }
     return true;
   }
 
@@ -1601,7 +1628,7 @@ export class MenuScene extends Phaser.Scene {
         ...fallbackMove,
         pointerId: normalizedPointerId
       }];
-    this.boardDynamicDirty = true;
+    this.hudDirty = true;
     this.publishInteractionDiagnostics();
   }
 
@@ -1707,7 +1734,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.playHeldTouchMoves.length === 0) {
       this.clearLegacyPlayHeldTouchRepeat();
     }
-    this.boardDynamicDirty = true;
+    this.hudDirty = true;
     this.publishInteractionDiagnostics();
     return true;
   }
@@ -3209,15 +3236,25 @@ export class MenuScene extends Phaser.Scene {
     this.hudCompassSpinStartedAtMs = time;
     this.hudCompassSpinActive = true;
     this.hudCompassSpinProgress = 0;
-    this.boardDynamicDirty = true;
+    this.hudDirty = true;
   }
 
   private hasLegacyPlayCompassSpinPendingFrame(): boolean {
     return this.hudCompassSpinStartedAtMs !== null;
   }
 
-  private hasLegacyPlayTrailPulsePendingFrame(): boolean {
-    return this.settings.toggleTrailPulse && this.mode === 'play' && this.overlay === 'none' && this.trail.length > 1;
+  private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
+    const active = this.settings.toggleTrailPulse && this.mode === 'play' && this.overlay === 'none' && this.trail.length > 1;
+    if (!active) {
+      this.legacyPlayTrailPulseNextFrameAtMs = 0;
+      return false;
+    }
+    if (time < this.legacyPlayTrailPulseNextFrameAtMs) {
+      return false;
+    }
+
+    this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;
+    return true;
   }
 
   private resolveLegacyPlayCompassVisualFrame(

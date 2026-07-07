@@ -266,10 +266,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
-    expect(menuSceneSource).toContain('this.hasLegacyPlayTrailPulsePendingFrame()');
+    expect(menuSceneSource).toContain('this.hasLegacyPlayTrailPulsePendingFrame(time)');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 50;');
+    expect(menuSceneSource).toContain('private legacyPlayTrailPulseNextFrameAtMs = 0;');
     expect(menuSceneSource).toContain("if (this.mode === 'play' && this.settings.toggleTrailPulse) {");
     expect(menuSceneSource).toContain('this.drawLegacyPlayDynamicTrailPulse(');
-    expect(menuSceneSource).toContain("return this.settings.toggleTrailPulse && this.mode === 'play' && this.overlay === 'none' && this.trail.length > 1;");
+    expect(menuSceneSource).toContain("const active = this.settings.toggleTrailPulse && this.mode === 'play' && this.overlay === 'none' && this.trail.length > 1;");
+    expect(menuSceneSource).toContain('this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;');
     expect(menuSceneSource).toContain('const pulseDistanceFromPlayer = phase * maxPulseIndex;');
     expect(menuSceneSource).toContain('const pulseCenterIndex = (trail.length - 1) - pulseDistanceFromPlayer;');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');");
@@ -459,7 +462,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private publishVisualDiagnostics(time: number, force = false): void');
     expect(menuSceneSource).toContain('time - this.visualDiagnosticsLastPublishedAtMs < legacyTuning.menu.runtime.diagnosticsPublishIntervalMs');
     expect(menuSceneSource).toContain('this.publishVisualDiagnostics(this.time.now, true);');
-    expect(menuSceneSource).toContain('this.publishVisualDiagnostics(now, true);');
+    expect(menuSceneSource).toContain('private publishInteractionDiagnostics(force = true): void');
+    expect(menuSceneSource).toContain('this.publishVisualDiagnostics(now, force);');
+    expect(menuSceneSource).toContain('this.publishInteractionDiagnostics(false);');
+    expect(menuSceneSource).toContain('private hudDirty = true;');
+    expect(menuSceneSource).toContain('this.hudDirty = true;');
     expect(tuningSource).toContain('full: 66,');
     expect(tuningSource).toContain('throttled: 220,');
   });
