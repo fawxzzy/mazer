@@ -577,6 +577,7 @@ export class MenuScene extends Phaser.Scene {
   private legacyPlayDocumentKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
   private legacyPlayDocumentKeyUpHandler: ((event: KeyboardEvent) => void) | null = null;
   private legacyPlayTouchControlPointerDownHandler: ((event: PointerEvent) => void) | null = null;
+  private legacyPlayTouchControlPointerUpHandler: ((event: PointerEvent) => void) | null = null;
   private runtimeFeedDiagnostics = summarizeMenuSceneRuntimeFeed({ nowMs: 0 });
 
   public constructor() {
@@ -1239,7 +1240,21 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
-      if (!this.handleLegacyPlayTouchControlClientPoint(event.clientX, event.clientY)) {
+      if (!this.handleLegacyPlayTouchControlClientPoint(event.clientX, event.clientY, event.pointerId)) {
+        return;
+      }
+
+      this.playPointerStart = null;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    this.legacyPlayTouchControlPointerUpHandler = (event: PointerEvent) => {
+      // Match the non-touch fallback down path; Phaser continues to own real touch release events.
+      if (event.pointerType === 'touch') {
+        return;
+      }
+
+      if (!this.releaseLegacyPlayHeldTouchMove(event.pointerId)) {
         return;
       }
 
@@ -1251,6 +1266,14 @@ export class MenuScene extends Phaser.Scene {
     const target = typeof document !== 'undefined' ? document : this.game.canvas;
     if (typeof PointerEvent !== 'undefined') {
       target.addEventListener('pointerdown', this.legacyPlayTouchControlPointerDownHandler as EventListener, {
+        capture: true,
+        passive: false
+      });
+      target.addEventListener('pointerup', this.legacyPlayTouchControlPointerUpHandler as EventListener, {
+        capture: true,
+        passive: false
+      });
+      target.addEventListener('pointercancel', this.legacyPlayTouchControlPointerUpHandler as EventListener, {
         capture: true,
         passive: false
       });
@@ -1268,16 +1291,26 @@ export class MenuScene extends Phaser.Scene {
         capture: true
       });
     }
+    if (this.legacyPlayTouchControlPointerUpHandler !== null && typeof PointerEvent !== 'undefined') {
+      target.removeEventListener('pointerup', this.legacyPlayTouchControlPointerUpHandler as EventListener, {
+        capture: true
+      });
+      target.removeEventListener('pointercancel', this.legacyPlayTouchControlPointerUpHandler as EventListener, {
+        capture: true
+      });
+    }
     this.legacyPlayTouchControlPointerDownHandler = null;
+    this.legacyPlayTouchControlPointerUpHandler = null;
   }
 
-  private handleLegacyPlayTouchControlClientPoint(clientX: number, clientY: number): boolean {
+  private handleLegacyPlayTouchControlClientPoint(clientX: number, clientY: number, pointerId: number | null = null): boolean {
     const rect = this.game.canvas.getBoundingClientRect();
     const width = Math.max(1, rect.width);
     const height = Math.max(1, rect.height);
     return this.handleLegacyPlayTouchControl(
       ((clientX - rect.left) / width) * this.layout.width,
-      ((clientY - rect.top) / height) * this.layout.height
+      ((clientY - rect.top) / height) * this.layout.height,
+      pointerId
     );
   }
 
