@@ -8,9 +8,9 @@ export const phaserConfig: Phaser.Types.Core.GameConfig = {
   width: 1280,
   height: 720,
   backgroundColor: '#1d1330',
-  pixelArt: true,
-  antialias: false,
-  antialiasGL: false,
+  pixelArt: false,
+  antialias: true,
+  antialiasGL: true,
   roundPixels: true,
   audio: {
     noAudio: true

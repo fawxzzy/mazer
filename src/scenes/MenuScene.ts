@@ -72,6 +72,10 @@ import {
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
 } from '../legacy-runtime/legacyMenuLayout';
+import {
+  resolveLegacyPathVisualStyle,
+  type LegacyPathVisualStyle
+} from '../legacy-runtime/legacyPathVisualStyle';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import { resolveLegacyMenuTitlePresentation } from '../legacy-runtime/legacyMenuTitle';
 import {
@@ -179,10 +183,16 @@ interface VisualRect {
   width: number;
 }
 
+interface VisualTextLabel {
+  bounds: VisualRect;
+  text: string;
+}
+
 interface MenuSceneVisualDiagnostics {
   board: {
     bounds: VisualRect;
     safeBounds: VisualRect;
+    pathVisualStyle: LegacyPathVisualStyle;
     tileSize: number;
   };
   markerStyle: {
@@ -212,6 +222,7 @@ interface MenuSceneVisualDiagnostics {
     titleX: number;
     titleY: number;
   };
+  textLabels: VisualTextLabel[];
   hud: {
     kind: 'legacy-play-hud' | null;
     visible: boolean;
@@ -420,6 +431,8 @@ export const MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagno
 
 const BOARD_SHADOW_OFFSET = 0;
 const MENU_BUTTON_ALPHA = 0.34;
+const LEGACY_UI_FONT_FAMILY = '"Trebuchet MS", "Segoe UI", sans-serif';
+const LEGACY_UI_MONO_FONT_FAMILY = 'Consolas, "Lucida Console", monospace';
 const MENU_TEXT_COLOR = '#ecfff5';
 const TITLE_FILL_COLOR = '#1d8726';
 const TITLE_SHADOW_COLOR = '#103516';
@@ -430,18 +443,20 @@ const LEGACY_MENU_SLAB_FILL = 0x101824;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;
 const LEGACY_MENU_PATH_CORE = 0xe7fff4;
 const LEGACY_MENU_PATH_EDGE = 0x0d3c4f;
-const LEGACY_MENU_PATH_EDGE_ALPHA = 0.9;
+const LEGACY_MENU_PATH_EDGE_ALPHA = 0.58;
 const LEGACY_MENU_WALL_FILL = 0x07111d;
-const LEGACY_MENU_WALL_GLASS_ALPHA = 0.28;
-const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.18;
+const LEGACY_MENU_WALL_GLASS_ALPHA = 0.18;
+const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.1;
 const LEGACY_PLAY_PATH_CORE = 0xe7fff4;
 const LEGACY_PLAY_PATH_EDGE = 0x0d3c4f;
-const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.9;
+const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
 const LEGACY_PLAY_WALL_FILL = 0x07111d;
-const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.28;
-const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.18;
+const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;
+const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.1;
 const LEGACY_PLAY_BOARD_FILL = 0x08111d;
 const LEGACY_PLAY_BOARD_EDGE = 0x031022;
+const LEGACY_PATH_TILE_CUE_COLOR = 0x0d3c4f;
+const LEGACY_PATH_TILE_CUE_ALPHA = 0.42;
 const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = 0x72e0bf;
 const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = 0xb7f2ff;
 const LEGACY_BOARD_SIGIL_BORDER_SHADOW = 0x02070d;
@@ -512,6 +527,10 @@ const createVisualRect = (left: number, top: number, width: number, height: numb
 
 const cloneVisualRect = (rect: VisualRect | null): VisualRect | null => (
   rect ? { ...rect } : null
+);
+
+const visualRectFromBounds = (rect: { left: number; top: number; width: number; height: number }): VisualRect => (
+  createVisualRect(rect.left, rect.top, rect.width, rect.height)
 );
 
 const mergeVisualRects = (...rects: Array<VisualRect | null>): VisualRect | null => {
@@ -635,6 +654,7 @@ export class MenuScene extends Phaser.Scene {
   private legacyPlayTouchControlPointerDownHandler: ((event: PointerEvent) => void) | null = null;
   private legacyPlayTouchControlPointerMoveHandler: ((event: PointerEvent) => void) | null = null;
   private legacyPlayTouchControlPointerUpHandler: ((event: PointerEvent) => void) | null = null;
+  private pathVisualStyle: LegacyPathVisualStyle = 'corridor';
   private runtimeFeedDiagnostics = summarizeMenuSceneRuntimeFeed({ nowMs: 0 });
 
   public constructor() {
@@ -644,6 +664,7 @@ export class MenuScene extends Phaser.Scene {
   public create(): void {
     markMazerBootStatus('menu-scene-create');
     const runtimeSearch = typeof window === 'undefined' ? '' : window.location.search;
+    this.pathVisualStyle = resolveLegacyPathVisualStyle(runtimeSearch);
     const initialSeed = resolveInitialLegacyRuntimeSeed(runtimeSearch, {
       previousSeed: this.mazeSeed
     });
@@ -658,19 +679,19 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics = this.add.graphics();
 
     this.titleShadow = this.add.text(0, 0, 'Mazer', {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '96px',
       fontStyle: 'bold',
       color: TITLE_SHADOW_COLOR
     }).setOrigin(0.5).setAlpha(0.76);
     this.titleText = this.add.text(0, 0, 'Mazer', {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '96px',
       fontStyle: 'bold',
       color: TITLE_FILL_COLOR
     }).setOrigin(0.5).setAlpha(0.88);
     this.footerText = this.add.text(0, 0, '', {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '18px',
       color: '#d7d6de',
       align: 'center'
@@ -2710,6 +2731,20 @@ export class MenuScene extends Phaser.Scene {
             frames.core.width,
             frames.core.height
           );
+          if (this.pathVisualStyle === 'hybrid') {
+            const cueSize = Math.max(1, Math.floor(tileSize * 0.22));
+            const cueInset = Math.floor((tileSize - cueSize) / 2);
+            this.boardStaticGraphics.fillStyle(
+              LEGACY_PATH_TILE_CUE_COLOR,
+              isMenuMode ? LEGACY_PATH_TILE_CUE_ALPHA : LEGACY_PATH_TILE_CUE_ALPHA * 0.82
+            );
+            this.boardStaticGraphics.fillRect(
+              tileX + cueInset,
+              tileY + cueInset,
+              cueSize,
+              cueSize
+            );
+          }
         } else {
           this.boardStaticGraphics.fillStyle(wallColor, isMenuMode ? LEGACY_MENU_WALL_GLASS_ALPHA : LEGACY_PLAY_WALL_GLASS_ALPHA);
           this.boardStaticGraphics.fillRect(tileX, tileY, tileSize, tileSize);
@@ -2868,7 +2903,7 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    if (this.mode === 'play' && this.settings.toggleTrailPulse) {
+    if (this.settings.toggleTrailPulse) {
       this.drawLegacyPlayDynamicTrailPulse(
         trail,
         boardLeft + boardOffset.x,
@@ -3193,7 +3228,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private padLegacyUiText<T extends Phaser.GameObjects.Text>(text: T): T {
-    text.setPadding(8, 4, 8, 4);
+    text.setPadding(12, 6, 12, 6);
     return text;
   }
 
@@ -3242,7 +3277,7 @@ export class MenuScene extends Phaser.Scene {
     });
 
     const timerShadow = this.add.text(hudFrame.timerBounds.centerX + 1, hudFrame.timerBounds.centerY + 1, hudFrame.timerText, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
       fontSize: '23px',
       fontStyle: 'bold',
       color: LEGACY_PLAY_HUD_TIMER_SHADOW
@@ -3252,7 +3287,7 @@ export class MenuScene extends Phaser.Scene {
     this.uiTexts.push(timerShadow);
 
     const timer = this.add.text(hudFrame.timerBounds.centerX, hudFrame.timerBounds.centerY, hudFrame.timerText, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
       fontSize: '23px',
       fontStyle: 'bold',
       color: LEGACY_PLAY_HUD_TIMER_TEXT
@@ -3341,7 +3376,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
-    const active = this.settings.toggleTrailPulse && this.mode === 'play' && this.overlay === 'none' && this.trail.length > 1;
+    const active = this.settings.toggleTrailPulse && this.overlay === 'none' && this.trail.length > 1;
     if (!active) {
       this.legacyPlayTrailPulseNextFrameAtMs = 0;
       return false;
@@ -3701,7 +3736,7 @@ export class MenuScene extends Phaser.Scene {
     label: string
   ): void {
     const text = this.padLegacyUiText(this.add.text(rect.centerX, rect.bottom - Math.max(8, Math.round(rect.height * 0.22)), label, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${Math.max(8, Math.min(12, Math.round(rect.height * 0.26)))}px`,
       color: LEGACY_PLAY_HUD_TIMER_TEXT
     })).setOrigin(0.5).setAlpha(0.88);
@@ -3929,7 +3964,7 @@ export class MenuScene extends Phaser.Scene {
     ];
 
     const label = this.padLegacyUiText(this.add.text(left, y, 'Game Toggles', {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: stacked ? '18px' : '20px',
       color: '#72e0bf'
     })).setOrigin(0, 0.5);
@@ -3990,17 +4025,18 @@ export class MenuScene extends Phaser.Scene {
     background.setInteractive({ useHandCursor: true });
 
     const label = this.padLegacyUiText(this.add.text(left + 16, input.y, input.label, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${Math.max(16, Math.min(20, Math.round(input.height * 0.4)))}px`,
       color: '#ecfff5'
     })).setOrigin(0, 0.5).setAlpha(0.94);
 
     const displayStateText = input.checked ? input.onLabel : input.offLabel;
     const stateLabel = this.padLegacyUiText(this.add.text(left + input.width - 84, input.y, displayStateText || input.stateText, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${Math.max(11, Math.min(13, Math.round(input.height * 0.28)))}px`,
       color: stateColor
     })).setOrigin(1, 0.5).setAlpha(0.92);
+    this.uiTexts.push(label, stateLabel);
 
     const trackX = left + input.width - 48;
     const track = this.add.ellipse(trackX, input.y, 42, 24, input.checked ? 0x123a2d : 0x07131d, 0.9);
@@ -4053,16 +4089,17 @@ export class MenuScene extends Phaser.Scene {
     background.setInteractive({ useHandCursor: true });
 
     const label = this.padLegacyUiText(this.add.text(left + 16, input.y, input.label, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${Math.max(16, Math.min(20, Math.round(input.height * 0.4)))}px`,
       color: '#ecfff5'
     })).setOrigin(0, 0.5).setAlpha(0.94);
 
     const stateLabel = this.padLegacyUiText(this.add.text(left + input.width - 16, input.y, input.stateText, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${Math.max(11, Math.min(13, Math.round(input.height * 0.28)))}px`,
       color: '#72e0bf'
     })).setOrigin(1, 0.5).setAlpha(0.92);
+    this.uiTexts.push(label, stateLabel);
 
     const trackLeft = left + Math.max(132, Math.round(input.width * 0.42));
     const trackRight = left + input.width - 72;
@@ -4182,7 +4219,7 @@ export class MenuScene extends Phaser.Scene {
 
   private createOverlayTitle(text: string, y: number): void {
     const label = this.padLegacyUiText(this.add.text(this.layout.width / 2, y, text, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${this.layout.width < 480 ? 30 : 34}px`,
       color: '#6bc96f'
     })).setOrigin(0.5);
@@ -4198,7 +4235,7 @@ export class MenuScene extends Phaser.Scene {
     const stacked = panel.width < 420;
     const labelX = panel.left + 28;
     const rowLabel = this.padLegacyUiText(this.add.text(labelX, y, label, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: stacked ? '20px' : '22px',
       color: '#ecfff5'
     })).setOrigin(0, 0.5);
@@ -4227,12 +4264,12 @@ export class MenuScene extends Phaser.Scene {
     const swatch = linearColorToHex(color);
 
     const rowLabel = this.padLegacyUiText(this.add.text(panel.left + 28, y, label, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '20px',
       color: '#ecfff5'
     })).setOrigin(0, 0.5);
     const swatchLabel = this.padLegacyUiText(this.add.text(panel.left + panel.width - 72, y, swatch, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: stacked ? '16px' : '18px',
       color: swatch
     })).setOrigin(0.5);
@@ -4245,7 +4282,7 @@ export class MenuScene extends Phaser.Scene {
 
     for (const [index, fieldId] of fieldIds.entries()) {
       const caption = this.padLegacyUiText(this.add.text(startX + (spacing * index), channelLabelY, ['R', 'G', 'B'][index] ?? '', {
-        fontFamily: '"Courier New", monospace',
+        fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: '14px',
         color: '#72e0bf'
       })).setOrigin(0.5);
@@ -4278,7 +4315,7 @@ export class MenuScene extends Phaser.Scene {
     background.on('pointerdown', () => this.selectOverlayField(fieldId));
 
     const label = this.padLegacyUiText(this.add.text(x, y, value, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${Math.max(14, Math.min(20, Math.round(height * 0.36)))}px`,
       color: isActive ? '#72e0bf' : '#ecfff5'
     })).setOrigin(0.5);
@@ -4341,10 +4378,11 @@ export class MenuScene extends Phaser.Scene {
     const buttonTextColor = MENU_TEXT_COLOR;
 
     const label = this.padLegacyUiText(this.add.text(x, y, text, {
-      fontFamily: '"Courier New", monospace',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${buttonFontSize}px`,
       color: buttonTextColor
     })).setOrigin(0.5).setAlpha(frontDoorChrome?.labelAlpha ?? 0.92);
+    this.uiTexts.push(label);
 
     const setActive = (active: boolean): void => {
       background.setFillStyle(
@@ -4631,6 +4669,15 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
+  private resolveVisualTextLabels(): VisualTextLabel[] {
+    return this.uiTexts
+      .filter((text) => text.active && text.visible && text.alpha > 0)
+      .map((text) => ({
+        text: text.text,
+        bounds: visualRectFromBounds(text.getBounds())
+      }));
+  }
+
   private publishVisualDiagnostics(time: number, force = false): void {
     if (typeof window === 'undefined' || !this.layout) {
       return;
@@ -4815,6 +4862,7 @@ export class MenuScene extends Phaser.Scene {
       board: {
         bounds: boardBounds,
         safeBounds,
+        pathVisualStyle: this.pathVisualStyle,
         tileSize: this.layout.tileSize
       },
       markerStyle: {
@@ -4844,6 +4892,7 @@ export class MenuScene extends Phaser.Scene {
         titleX: this.layout.titleX,
         titleY: this.layout.titleY
       },
+      textLabels: this.resolveVisualTextLabels(),
       hud: {
         kind: this.mode === 'play' && this.overlay === 'none' ? 'legacy-play-hud' : null,
         visible: this.mode === 'play' && this.overlay === 'none',

@@ -1083,9 +1083,9 @@ describe('demo-only build', () => {
   test('scene wiring only includes boot and menu scenes', () => {
     expect(phaserConfig.scene).toEqual([BootScene, expect.any(Function)]);
     expect((phaserConfig.scene as Array<{ name?: string }>).map((scene) => scene.name)).toEqual(['BootScene', 'MenuScene']);
-    expect(phaserConfig.pixelArt).toBe(true);
-    expect(phaserConfig.antialias).toBe(false);
-    expect(phaserConfig.antialiasGL).toBe(false);
+    expect(phaserConfig.pixelArt).toBe(false);
+    expect(phaserConfig.antialias).toBe(true);
+    expect(phaserConfig.antialiasGL).toBe(true);
     expect(phaserConfig.roundPixels).toBe(true);
     expect(phaserConfig.scale?.autoRound).toBe(true);
   });

@@ -16,7 +16,7 @@ describe('legacy menu layout', () => {
     expect(layout.centerButtonWidth).toBeGreaterThan(layout.buttonWidth);
     expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
     expect(layout.buttonY - (layout.buttonHeight / 2)).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 2);
-    expect(layout.buttonY).toBeLessThan(Math.round(layout.height * 0.9));
+    expect(layout.buttonY).toBeLessThan(Math.round(layout.height * 0.92));
     expect(layout.buttonHeight).toBeGreaterThanOrEqual(58);
     expect(layout.buttonHeight).toBeLessThanOrEqual(78);
     expect(layout.boardSize).toBeGreaterThanOrEqual(833);

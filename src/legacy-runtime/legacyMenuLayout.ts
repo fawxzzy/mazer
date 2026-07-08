@@ -38,7 +38,7 @@ export const resolveLegacyMenuLayout = (
   const isPortrait = height > width;
   const isUltraNarrow = isPortrait && width < 360;
   const isPlaySurface = surface === 'play';
-  const baseBoardScale = isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : (isPlaySurface ? 0.62 : 0.52));
+  const baseBoardScale = isUltraNarrow ? 0.98 : (isPortrait ? (isPlaySurface ? 0.92 : 0.86) : (isPlaySurface ? 0.62 : 0.52));
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const maxBoardSize = Math.min(
     width * (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)),
@@ -56,7 +56,19 @@ export const resolveLegacyMenuLayout = (
     : Math.max(4, Math.floor(rawTileSize));
   const snappedBoardSize = Math.round(tileSize * mazeSize * 1000) / 1000;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
-  const menuBoardTop = clamp(height * (isPortrait ? 0.104 : 0.074), isUltraNarrow ? 32 : 40, isPortrait ? 102 : 88);
+  const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
+  const stackGap = Math.round(clamp(height * 0.02, 7, 12));
+  const titleClearance = Math.round(clamp(snappedBoardSize * (isPortrait ? 0.13 : 0.11), isPortrait ? 42 : 36, isPortrait ? 68 : 74));
+  const menuButtonGap = Math.round(clamp(buttonHeight * (isPortrait ? 0.86 : 0.54), isPortrait ? 30 : 24, isPortrait ? 52 : 44));
+  const menuStackHeight = titleClearance + snappedBoardSize + menuButtonGap + buttonHeight;
+  const centeredMenuBoardTop = Math.round((height - menuStackHeight) / 2 + titleClearance);
+  const menuBoardTop = isUltraNarrow
+    ? clamp(height * 0.104, 32, 72)
+    : clamp(
+      centeredMenuBoardTop,
+      isPortrait ? 128 : 48,
+      Math.max(isPortrait ? 128 : 48, height - snappedBoardSize - menuButtonGap - buttonHeight - 24)
+    );
   const playBoardTop = isUltraNarrow
     ? clamp(
       height * 0.14,
@@ -65,7 +77,6 @@ export const resolveLegacyMenuLayout = (
     )
     : clamp((height - snappedBoardSize) / 2, 56, height - snappedBoardSize - 12);
   const boardTop = Math.round(isPlaySurface ? playBoardTop : menuBoardTop);
-  const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
   const rowButtonY = isPortrait
     ? Math.round(clamp(
       boardTop + snappedBoardSize + Math.round(buttonHeight * 0.86),
@@ -83,7 +94,6 @@ export const resolveLegacyMenuLayout = (
     : Math.round(clamp(buttonWidth * 1.14, buttonWidth + 20, 262));
   const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.16 : 0.156), isUltraNarrow ? Math.round(width / 2) : 66, 324));
   const centerButtonX = Math.round(width * 0.5);
-  const stackGap = Math.round(clamp(height * 0.02, 7, 12));
   const stackHeight = (buttonHeight * 3) + (stackGap * 2);
   const stackTop = Math.round(clamp(
     boardTop + snappedBoardSize + 18,
@@ -94,7 +104,7 @@ export const resolveLegacyMenuLayout = (
   const centerButtonY = isUltraNarrow ? leftButtonY + buttonHeight + stackGap : rowButtonY;
   const rightButtonY = isUltraNarrow ? centerButtonY + buttonHeight + stackGap : rowButtonY;
   const titleOverlapY = Math.round(boardTop + (snappedBoardSize * (isPortrait ? 0.216 : 0.221)));
-  const menuPortraitTitleClearance = Math.round(clamp(snappedBoardSize * 0.13, 42, 68));
+  const menuPortraitTitleClearance = titleClearance;
   const menuPortraitTitleY = Math.max(34, boardTop - menuPortraitTitleClearance);
 
   return {
