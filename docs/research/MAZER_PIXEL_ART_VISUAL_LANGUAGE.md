@@ -46,6 +46,7 @@ Keep:
 - Thin, deliberate panel lines.
 - Subtle sigil-border jewel facets where the chrome has intentional folded corners.
 - Edge-weighted backdrop shards that read as thin glass/rune slashes instead of broad floating bands.
+- Animated title accents that use crisp sigil rails, path-piece sweeps, and small glyph sparks rather than blurry logo bloom.
 - Limited, role-specific glow only where it helps read state.
 
 Reduce:

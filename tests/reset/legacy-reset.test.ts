@@ -574,7 +574,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS;');
     expect(menuSceneSource).toContain('private boardPathGraphics!: Phaser.GameObjects.Graphics;');
     expect(menuSceneSource).toContain('private boardPathDirty = true;');
-    expect(menuSceneSource).toContain('private drawBoardPaths(): void');
+    expect(menuSceneSource).toContain('private drawBoardPaths(time: number): void');
     expect(menuSceneSource).toContain('const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();');
     expect(menuSceneSource).toContain('for (let index = 0; index < Math.min(tileLimit, this.menuStaticDrawTileOrder.length); index += 1)');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawRowLimit(): number | null');

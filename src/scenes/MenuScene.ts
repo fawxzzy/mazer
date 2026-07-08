@@ -271,6 +271,12 @@ interface MenuSceneVisualDiagnostics {
     titleY: number;
   };
   title: {
+    animation: {
+      active: boolean;
+      phase: number;
+      sweepColumn: number;
+      sweepPeriodMs: number;
+    };
     bounds: VisualRect;
     builtFromPathPieces: boolean;
     pieceCount: number;
@@ -511,6 +517,10 @@ const LEGACY_UI_MONO_FONT_FAMILY = 'Consolas, "Lucida Console", monospace';
 const MENU_TEXT_COLOR = '#ecfff5';
 const LEGACY_MENU_PATH_TITLE_SHADOW = 0x02070d;
 const LEGACY_MENU_PATH_TITLE_ACCENT = 0x36ff7d;
+const LEGACY_MENU_PATH_TITLE_PRISM = 0xb7f2ff;
+const LEGACY_MENU_PATH_TITLE_RUNE = 0xfff05a;
+const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2200;
+const LEGACY_MENU_PATH_TITLE_FRAME_MS = 90;
 const LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA = 0.44;
 const LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA = 0.92;
 const LEGACY_BOARD_GRID_ALPHA = 0;
@@ -722,6 +732,7 @@ export class MenuScene extends Phaser.Scene {
   private menuStaticBuildPrerollStartedAtMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
   private legacyBoardCornerShimmerNextFrameAtMs = 0;
+  private legacyMenuTitleAnimationNextFrameAtMs = 0;
   private visualDiagnosticsRevision = 0;
   private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   private backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
@@ -879,7 +890,9 @@ export class MenuScene extends Phaser.Scene {
       this.boardPathDirty = true;
     }
     if (this.boardPathDirty) {
-      this.drawBoardPaths();
+      this.drawBoardPaths(time);
+    } else if (this.hasLegacyMenuTitleAnimationPendingFrame(time)) {
+      this.drawLegacyMenuPathTitle(time);
     }
     const shouldDrawDynamicBoard = this.boardDynamicDirty;
     if (shouldDrawDynamicBoard) {
@@ -3354,7 +3367,7 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private drawBoardPaths(): void {
+  private drawBoardPaths(time: number): void {
     const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardSize } = this.layout;
     const boardOffset = this.resolveBoardOffset();
     const boardLeft = layoutBoardLeft + boardOffset.x;
@@ -3410,7 +3423,7 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    this.drawLegacyMenuPathTitle();
+    this.drawLegacyMenuPathTitle(time);
     this.boardPathDirty = false;
   }
 
@@ -3425,6 +3438,27 @@ export class MenuScene extends Phaser.Scene {
     }
 
     return this.menuStaticDrawLifecyclePhase === 'building' ? 0 : 1;
+  }
+
+  private hasLegacyMenuTitleAnimationPendingFrame(time: number): boolean {
+    if (this.mode !== 'menu' || this.overlay !== 'none') {
+      return false;
+    }
+    if (time < this.legacyMenuTitleAnimationNextFrameAtMs) {
+      return false;
+    }
+
+    this.legacyMenuTitleAnimationNextFrameAtMs = time + LEGACY_MENU_PATH_TITLE_FRAME_MS;
+    return true;
+  }
+
+  private resolveLegacyMenuPathTitleAnimationPhase(time: number): number {
+    return (time % LEGACY_MENU_PATH_TITLE_SWEEP_MS) / LEGACY_MENU_PATH_TITLE_SWEEP_MS;
+  }
+
+  private resolveLegacyMenuPathTitleSweepColumn(columns: number, rows: number, time: number): number {
+    const phase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
+    return Math.round((phase * (columns + (rows * 0.72) + 5)) - 3);
   }
 
   private resolveLegacyMenuPathTitleVisiblePieces(pieceCount: number): number {
@@ -3455,7 +3489,137 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  private drawLegacyMenuPathTitle(): void {
+  private drawLegacyMenuPathTitleSigilRails(
+    titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
+    time: number,
+    alphaScale: number
+  ): void {
+    const phase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
+    const pulse = 0.55 + (Math.sin((phase * Math.PI * 2) + 0.4) * 0.22);
+    const railAlpha = clamp((0.28 + pulse * 0.3) * alphaScale, 0.16, 0.58);
+    const railGap = Math.max(5, Math.round(titleLayout.cellSize * 0.8));
+    const notch = Math.max(3, Math.round(titleLayout.cellSize * 0.46));
+    const left = titleLayout.left - railGap;
+    const right = titleLayout.left + titleLayout.width + railGap;
+    const top = titleLayout.top - railGap;
+    const bottom = titleLayout.top + titleLayout.height + railGap;
+    const centerX = titleLayout.left + (titleLayout.width / 2);
+    const crest = Math.max(5, Math.round(titleLayout.cellSize * 0.68));
+
+    this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_EDGE, railAlpha);
+    this.strokeLegacyPolyline(this.titleGraphics, [
+      { x: left, y: top + notch },
+      { x: left + notch, y: top },
+      { x: centerX - crest, y: top },
+      { x: centerX, y: top - Math.round(crest * 0.55) },
+      { x: centerX + crest, y: top },
+      { x: right - notch, y: top },
+      { x: right, y: top + notch }
+    ]);
+    this.strokeLegacyPolyline(this.titleGraphics, [
+      { x: left, y: bottom - notch },
+      { x: left + notch, y: bottom },
+      { x: centerX - crest, y: bottom },
+      { x: centerX, y: bottom + Math.round(crest * 0.55) },
+      { x: centerX + crest, y: bottom },
+      { x: right - notch, y: bottom },
+      { x: right, y: bottom - notch }
+    ]);
+
+    const crownHalf = Math.max(4, Math.round(titleLayout.cellSize * 0.56));
+    const crownTop = top - Math.round(crest * 0.9);
+    const crownBottom = bottom + Math.round(crest * 0.9);
+    this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_ACCENT, railAlpha * 1.12);
+    this.strokeLegacyPolyline(this.titleGraphics, [
+      { x: centerX, y: crownTop - crownHalf },
+      { x: centerX + crownHalf, y: crownTop },
+      { x: centerX, y: crownTop + crownHalf },
+      { x: centerX - crownHalf, y: crownTop },
+      { x: centerX, y: crownTop - crownHalf }
+    ]);
+    this.strokeLegacyPolyline(this.titleGraphics, [
+      { x: centerX, y: crownBottom - crownHalf },
+      { x: centerX + crownHalf, y: crownBottom },
+      { x: centerX, y: crownBottom + crownHalf },
+      { x: centerX - crownHalf, y: crownBottom },
+      { x: centerX, y: crownBottom - crownHalf }
+    ]);
+
+    const tickWidth = Math.max(2, Math.round(titleLayout.cellSize * 0.5));
+    const sweepX = titleLayout.left + (
+      clamp(this.resolveLegacyMenuPathTitleSweepColumn(titleLayout.columns, titleLayout.rows, time), 0, titleLayout.columns)
+      * titleLayout.cellSize
+    );
+    this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, railAlpha * 1.35);
+    this.strokeLegacyPolyline(this.titleGraphics, [
+      { x: sweepX - tickWidth, y: top - 1 },
+      { x: sweepX + tickWidth, y: top - 1 }
+    ]);
+    this.strokeLegacyPolyline(this.titleGraphics, [
+      { x: sweepX - tickWidth, y: bottom + 1 },
+      { x: sweepX + tickWidth, y: bottom + 1 }
+    ]);
+    this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_ACCENT, railAlpha * 0.78);
+    this.strokeLegacyPolyline(this.titleGraphics, [
+      { x: sweepX, y: top + Math.round(titleLayout.cellSize * 0.5) },
+      { x: sweepX, y: bottom - Math.round(titleLayout.cellSize * 0.5) }
+    ]);
+  }
+
+  private drawLegacyMenuPathTitlePrismSweep(
+    visibleCells: LegacyMenuPathTitleCell[],
+    titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
+    time: number,
+    alphaScale: number
+  ): void {
+    const phase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
+    const sweepPosition = (phase * (titleLayout.columns + (titleLayout.rows * 0.72) + 5)) - 3;
+    const pulse = 0.72 + (Math.sin(phase * Math.PI * 2) * 0.18);
+    const inset = Math.max(titleLayout.coreInset, Math.floor(titleLayout.cellSize * 0.16));
+    const glintSize = Math.max(1, titleLayout.cellSize - (inset * 2));
+    const starInset = Math.max(titleLayout.coreInset + 1, Math.floor(titleLayout.cellSize * 0.32));
+
+    for (const cell of visibleCells) {
+      const diagonalPosition = cell.column + (cell.row * 0.72);
+      const distance = Math.abs(diagonalPosition - sweepPosition);
+      const localTwinkle = Math.sin((time / 480) + (cell.order * 0.61));
+      const isAnchorSpark = cell.order % 13 === 0 && localTwinkle > 0.54;
+
+      if (distance < 1.55) {
+        const alpha = clamp((1 - (distance / 1.55)) * 0.72 * pulse * alphaScale, 0, 0.78);
+        this.titleGraphics.fillStyle(LEGACY_MENU_PATH_TITLE_ACCENT, alpha);
+        this.titleGraphics.fillRect(
+          titleLayout.left + (cell.column * titleLayout.cellSize) + inset,
+          titleLayout.top + (cell.row * titleLayout.cellSize) + inset,
+          glintSize,
+          glintSize
+        );
+        this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, alpha * 0.88);
+        this.strokeLegacyPolyline(this.titleGraphics, [
+          {
+            x: titleLayout.left + (cell.column * titleLayout.cellSize) + inset,
+            y: titleLayout.top + (cell.row * titleLayout.cellSize) + inset
+          },
+          {
+            x: titleLayout.left + ((cell.column + 1) * titleLayout.cellSize) - inset,
+            y: titleLayout.top + ((cell.row + 1) * titleLayout.cellSize) - inset
+          }
+        ]);
+      }
+
+      if (isAnchorSpark) {
+        this.titleGraphics.fillStyle(LEGACY_MENU_PATH_TITLE_RUNE, 0.4 * alphaScale);
+        this.titleGraphics.fillRect(
+          titleLayout.left + (cell.column * titleLayout.cellSize) + starInset,
+          titleLayout.top + (cell.row * titleLayout.cellSize) + starInset,
+          Math.max(1, titleLayout.cellSize - (starInset * 2)),
+          Math.max(1, titleLayout.cellSize - (starInset * 2))
+        );
+      }
+    }
+  }
+
+  private drawLegacyMenuPathTitle(time: number): void {
     this.titleGraphics.clear();
     const visible = this.mode === 'menu' && this.overlay === 'none';
     this.titleGraphics.setVisible(visible);
@@ -3501,6 +3665,8 @@ export class MenuScene extends Phaser.Scene {
       );
     }
 
+    this.drawLegacyMenuPathTitleSigilRails(titleLayout, time, titlePresentation.titleAlpha);
+
     for (const cell of visibleCells) {
       this.drawLegacyMenuPathTitleCell(
         cell,
@@ -3516,6 +3682,8 @@ export class MenuScene extends Phaser.Scene {
         }
       );
     }
+
+    this.drawLegacyMenuPathTitlePrismSweep(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
 
     const cursorCell = visibleCells.at(-1);
     if (cursorCell && visiblePieceCount < titleLayout.cells.length) {
@@ -5680,8 +5848,15 @@ export class MenuScene extends Phaser.Scene {
     );
     const pieceCount = titleLayout.cells.length;
     const progress = this.resolveLegacyMenuPathTitleProgress();
+    const phase = this.resolveLegacyMenuPathTitleAnimationPhase(this.time.now);
 
     return {
+      animation: {
+        active: this.mode === 'menu' && this.overlay === 'none',
+        phase: Number(phase.toFixed(3)),
+        sweepColumn: this.resolveLegacyMenuPathTitleSweepColumn(titleLayout.columns, titleLayout.rows, this.time.now),
+        sweepPeriodMs: LEGACY_MENU_PATH_TITLE_SWEEP_MS
+      },
       bounds: createVisualRect(titleLayout.left, titleLayout.top, titleLayout.width, titleLayout.height),
       builtFromPathPieces: true,
       pieceCount,
