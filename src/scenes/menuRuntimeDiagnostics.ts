@@ -72,6 +72,9 @@ export interface MenuSceneGenerationDrawStageProgress {
   progressPercent: number | null;
   rowCount: number | null;
   rowsRemaining: number | null;
+  tileCount?: number | null;
+  tilesRemaining?: number | null;
+  tilesVisible?: number | null;
 }
 
 export interface MenuSceneRuntimeDiagnostics {
@@ -219,6 +222,9 @@ export interface MenuSceneRuntimeDiagnostics {
       rowsRemaining: number | null;
       rowsVisible: number | null;
       staged: boolean;
+      tileCount?: number | null;
+      tilesRemaining?: number | null;
+      tilesVisible?: number | null;
     };
     stageCursor: {
       completionSignal: string | null;
@@ -529,7 +535,28 @@ export const summarizeMenuSceneRuntimeFeed = (options: {
 export const resolveMenuSceneGenerationDrawStageProgress = (options: {
   rowCount?: number | null;
   rowsVisible?: number | null;
+  tileCount?: number | null;
+  tilesVisible?: number | null;
 }): MenuSceneGenerationDrawStageProgress => {
+  const tileCount = Number.isFinite(options.tileCount)
+    ? Math.max(0, Math.trunc(options.tileCount ?? 0))
+    : null;
+  if (tileCount !== null && tileCount > 0 && Number.isFinite(options.tilesVisible)) {
+    const tilesVisible = Math.min(tileCount, Math.max(0, Math.trunc(options.tilesVisible ?? 0)));
+    const tilesRemaining = Math.max(0, tileCount - tilesVisible);
+    return {
+      complete: tilesRemaining === 0,
+      progressPercent: Number(((tilesVisible / tileCount) * 100).toFixed(1)),
+      rowCount: Number.isFinite(options.rowCount)
+        ? Math.max(0, Math.trunc(options.rowCount ?? 0))
+        : null,
+      rowsRemaining: null,
+      tileCount,
+      tilesRemaining,
+      tilesVisible
+    };
+  }
+
   const rowCount = Number.isFinite(options.rowCount)
     ? Math.max(0, Math.trunc(options.rowCount ?? 0))
     : null;
@@ -538,7 +565,10 @@ export const resolveMenuSceneGenerationDrawStageProgress = (options: {
       complete: null,
       progressPercent: null,
       rowCount,
-      rowsRemaining: null
+      rowsRemaining: null,
+      tileCount,
+      tilesRemaining: null,
+      tilesVisible: null
     };
   }
 
@@ -549,7 +579,10 @@ export const resolveMenuSceneGenerationDrawStageProgress = (options: {
     complete: rowsRemaining === 0,
     progressPercent: Number(((rowsVisible / rowCount) * 100).toFixed(1)),
     rowCount,
-    rowsRemaining
+    rowsRemaining,
+    tileCount,
+    tilesRemaining: null,
+    tilesVisible: null
   };
 };
 

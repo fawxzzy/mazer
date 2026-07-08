@@ -331,6 +331,9 @@ interface MenuSceneVisualDiagnostics {
         rowsRemaining: number | null;
         rowsVisible: number | null;
         staged: boolean;
+        tileCount?: number | null;
+        tilesRemaining?: number | null;
+        tilesVisible?: number | null;
       };
       pendingRequest: {
         budget: {
@@ -511,9 +514,12 @@ const LEGACY_PLAY_START_MARKER_CORE = 0xfff1a6;
 const LEGACY_PLAY_GOAL_MARKER_CORE = 0xff263f;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xd81b2a;
 const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;
+const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;
+const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;
 const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+const legacyScenePointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
 
 const createVisualRect = (left: number, top: number, width: number, height: number): VisualRect => ({
   left,
@@ -621,6 +627,10 @@ export class MenuScene extends Phaser.Scene {
   private uiDirty = true;
   private menuStaticDrawRowsVisible: number | null = null;
   private menuStaticDrawNextRowAtMs = 0;
+  private menuStaticDrawTileOrder: LegacyPoint[] = [];
+  private menuStaticDrawVisibleTileKeys = new Set<string>();
+  private menuStaticDrawTilesVisible: number | null = null;
+  private menuStaticDrawNextTileAtMs = 0;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
   private visualDiagnosticsRevision = 0;
   private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
@@ -880,9 +890,15 @@ export class MenuScene extends Phaser.Scene {
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     const drawStageStaged = this.mode === 'menu' && drawStage?.executionKind === 'row-slice';
     const drawRowsVisible = this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics();
+    const drawTilesVisible = this.resolveLegacyMenuStaticDrawTilesVisibleForDiagnostics();
+    const drawTileCount = drawStageStaged && this.menuStaticDrawTileOrder.length > 0
+      ? this.menuStaticDrawTileOrder.length
+      : null;
     const drawStageProgress = resolveMenuSceneGenerationDrawStageProgress({
       rowsVisible: drawRowsVisible,
-      rowCount: drawStageStaged ? this.maze.size : null
+      rowCount: drawStageStaged ? this.maze.size : null,
+      tilesVisible: drawTilesVisible,
+      tileCount: drawTileCount
     });
     const routeDiagnostics = this.menuDemoEpisode && this.menuDemoConfig
       ? collectDemoWalkerRouteDiagnostics(this.menuDemoEpisode, this.menuDemoConfig)
@@ -1044,7 +1060,10 @@ export class MenuScene extends Phaser.Scene {
           rowCount: drawStageProgress.rowCount,
           rowsRemaining: drawStageProgress.rowsRemaining,
           rowsVisible: drawRowsVisible,
-          staged: drawStageStaged
+          staged: drawStageStaged,
+          tileCount: drawStageProgress.tileCount,
+          tilesRemaining: drawStageProgress.tilesRemaining,
+          tilesVisible: drawStageProgress.tilesVisible
         },
         stageCursor: {
           completionSignal: this.maze.generation?.stageCursor.completionSignal ?? null,
@@ -2332,15 +2351,90 @@ export class MenuScene extends Phaser.Scene {
     return this.menuStaticDrawRowsVisible ?? this.maze.size;
   }
 
+  private resolveLegacyMenuStaticDrawTilesVisibleForDiagnostics(): number | null {
+    if (this.mode !== 'menu' || this.menuStaticDrawTileOrder.length <= 0) {
+      return null;
+    }
+
+    return this.menuStaticDrawTilesVisible ?? this.menuStaticDrawTileOrder.length;
+  }
+
   private resolveLegacyMenuStaticDrawRowLimit(): number | null {
     return this.mode === 'menu' && this.menuStaticDrawRowsVisible !== null
       ? this.menuStaticDrawRowsVisible
       : null;
   }
 
+  private resolveLegacyMenuStaticDrawTileLimit(): number | null {
+    return this.mode === 'menu' && this.menuStaticDrawTilesVisible !== null
+      ? this.menuStaticDrawTilesVisible
+      : null;
+  }
+
   private isLegacyMenuPointVisibleInStaticDraw(point: LegacyPoint): boolean {
+    if (this.mode !== 'menu') {
+      return true;
+    }
+
+    const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
+    if (tileLimit !== null) {
+      return this.menuStaticDrawVisibleTileKeys.has(legacyScenePointKey(point));
+    }
+
     const rowLimit = this.resolveLegacyMenuStaticDrawRowLimit();
     return rowLimit === null || point.y < rowLimit;
+  }
+
+  private buildLegacyMenuStaticDrawTileOrder(): LegacyPoint[] {
+    const solutionOrder = new Map<string, number>();
+    this.maze.solutionPath.forEach((point, index) => {
+      solutionOrder.set(legacyScenePointKey(point), index);
+    });
+
+    const orderedTiles: Array<LegacyPoint & { branchDistance: number; score: number }> = [];
+    for (let y = 0; y < this.maze.size; y += 1) {
+      for (let x = 0; x < this.maze.size; x += 1) {
+        if (this.maze.grid[y]?.[x] !== true) {
+          continue;
+        }
+
+        const point = { x, y };
+        const solutionIndex = solutionOrder.get(legacyScenePointKey(point));
+        if (solutionIndex !== undefined) {
+          orderedTiles.push({ ...point, branchDistance: 0, score: solutionIndex * 8 });
+          continue;
+        }
+
+        let nearestSolutionIndex = this.maze.solutionPath.length;
+        let nearestDistance = Number.POSITIVE_INFINITY;
+        for (let index = 0; index < this.maze.solutionPath.length; index += 1) {
+          const solutionPoint = this.maze.solutionPath[index];
+          if (!solutionPoint) {
+            continue;
+          }
+          const distance = Math.abs(solutionPoint.x - x) + Math.abs(solutionPoint.y - y);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestSolutionIndex = index;
+          }
+        }
+
+        orderedTiles.push({
+          ...point,
+          branchDistance: nearestDistance,
+          score: (nearestSolutionIndex * 8) + Math.min(7, nearestDistance)
+        });
+      }
+    }
+
+    return orderedTiles
+      .sort((left, right) => (
+        (left.score - right.score)
+        || (left.branchDistance - right.branchDistance)
+        || (left.y - right.y)
+        || (left.x - right.x)
+      ))
+      .map(({ x, y }) => ({ x, y }));
   }
 
   private resolveLegacyMenuStaticDrawDemoGateAtMs(): number {
@@ -2349,9 +2443,24 @@ export class MenuScene extends Phaser.Scene {
       return this.time.now;
     }
 
-    const batchSize = Math.max(1, drawStage.batchSize ?? 1);
-    const rowTicks = Math.ceil(this.maze.size / batchSize);
-    return this.time.now + (rowTicks * LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS) + LEGACY_MENU_STATIC_DRAW_SETTLE_MS;
+    const batchSize = Math.max(1, this.resolveLegacyMenuStaticDrawTileBatchSize());
+    const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);
+    return this.time.now + (tileTicks * LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS) + LEGACY_MENU_STATIC_DRAW_SETTLE_MS;
+  }
+
+  private resolveLegacyMenuStaticDrawTileBatchSize(): number {
+    return Math.max(1, Math.ceil(this.menuStaticDrawTileOrder.length / LEGACY_MENU_STATIC_DRAW_TARGET_TICKS));
+  }
+
+  private refreshLegacyMenuStaticDrawVisibleTileKeys(): void {
+    this.menuStaticDrawVisibleTileKeys.clear();
+    const visibleCount = this.menuStaticDrawTilesVisible ?? this.menuStaticDrawTileOrder.length;
+    for (let index = 0; index < Math.min(visibleCount, this.menuStaticDrawTileOrder.length); index += 1) {
+      const point = this.menuStaticDrawTileOrder[index];
+      if (point) {
+        this.menuStaticDrawVisibleTileKeys.add(legacyScenePointKey(point));
+      }
+    }
   }
 
   private armLegacyMenuStaticDrawStage(): void {
@@ -2359,30 +2468,53 @@ export class MenuScene extends Phaser.Scene {
     if (this.mode === 'menu' && drawStage?.executionKind === 'row-slice') {
       this.menuStaticDrawRowsVisible = 0;
       this.menuStaticDrawNextRowAtMs = this.time.now;
+      this.menuStaticDrawTileOrder = this.buildLegacyMenuStaticDrawTileOrder();
+      this.menuStaticDrawTilesVisible = 0;
+      this.menuStaticDrawNextTileAtMs = this.time.now;
+      this.refreshLegacyMenuStaticDrawVisibleTileKeys();
       return;
     }
 
     this.menuStaticDrawRowsVisible = null;
     this.menuStaticDrawNextRowAtMs = 0;
+    this.menuStaticDrawTileOrder = [];
+    this.menuStaticDrawVisibleTileKeys.clear();
+    this.menuStaticDrawTilesVisible = null;
+    this.menuStaticDrawNextTileAtMs = 0;
   }
 
   private advanceLegacyMenuStaticDrawStage(time: number): void {
-    if (this.menuStaticDrawRowsVisible === null) {
-      return;
-    }
-    if (time < this.menuStaticDrawNextRowAtMs) {
+    if (this.menuStaticDrawRowsVisible === null && this.menuStaticDrawTilesVisible === null) {
       return;
     }
 
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     const batchSize = Math.max(1, drawStage?.batchSize ?? 1);
-    this.menuStaticDrawRowsVisible = Math.min(this.maze.size, this.menuStaticDrawRowsVisible + batchSize);
-    this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;
-    this.boardStaticDirty = true;
-    this.boardDynamicDirty = true;
-    if (this.menuStaticDrawRowsVisible >= this.maze.size) {
-      this.menuStaticDrawRowsVisible = null;
-      this.menuStaticDrawNextRowAtMs = 0;
+    if (this.menuStaticDrawRowsVisible !== null && time >= this.menuStaticDrawNextRowAtMs) {
+      this.menuStaticDrawRowsVisible = Math.min(this.maze.size, this.menuStaticDrawRowsVisible + batchSize);
+      this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;
+      this.boardStaticDirty = true;
+      this.boardDynamicDirty = true;
+      if (this.menuStaticDrawRowsVisible >= this.maze.size) {
+        this.menuStaticDrawRowsVisible = null;
+        this.menuStaticDrawNextRowAtMs = 0;
+      }
+    }
+
+    if (this.menuStaticDrawTilesVisible !== null && time >= this.menuStaticDrawNextTileAtMs) {
+      this.menuStaticDrawTilesVisible = Math.min(
+        this.menuStaticDrawTileOrder.length,
+        this.menuStaticDrawTilesVisible + this.resolveLegacyMenuStaticDrawTileBatchSize()
+      );
+      this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+      this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS;
+      this.boardStaticDirty = true;
+      this.boardDynamicDirty = true;
+      if (this.menuStaticDrawTilesVisible >= this.menuStaticDrawTileOrder.length) {
+        this.menuStaticDrawTilesVisible = null;
+        this.menuStaticDrawNextTileAtMs = 0;
+        this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+      }
     }
   }
 
@@ -2422,7 +2554,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private updateMenuDemo(time: number): void {
-    if (this.menuStaticDrawRowsVisible !== null) {
+    if (this.menuStaticDrawRowsVisible !== null || this.menuStaticDrawTilesVisible !== null) {
       return;
     }
     if (time < this.nextDemoMoveAtMs) {
@@ -2728,7 +2860,9 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    const staticDrawRowLimit = isMenuMode && this.menuStaticDrawRowsVisible !== null
+    const staticDrawRowLimit = isMenuMode
+      && this.menuStaticDrawRowsVisible !== null
+      && this.resolveLegacyMenuStaticDrawTileLimit() === null
       ? this.menuStaticDrawRowsVisible
       : this.maze.size;
 
@@ -2737,8 +2871,9 @@ export class MenuScene extends Phaser.Scene {
         const tileX = boardLeft + (x * tileSize);
         const tileY = boardTop + (y * tileSize);
         const walkable = this.maze.grid[y]?.[x] === true;
+        const visibleWalkable = walkable && (!isMenuMode || this.isLegacyMenuPointVisibleInStaticDraw({ x, y }));
 
-        if (walkable) {
+        if (visibleWalkable) {
           const segments = resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);
           const frames = resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);
           this.boardStaticGraphics.fillStyle(
@@ -4736,9 +4871,15 @@ export class MenuScene extends Phaser.Scene {
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     const drawStageStaged = this.mode === 'menu' && drawStage?.executionKind === 'row-slice';
     const drawRowsVisible = this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics();
+    const drawTilesVisible = this.resolveLegacyMenuStaticDrawTilesVisibleForDiagnostics();
+    const drawTileCount = drawStageStaged && this.menuStaticDrawTileOrder.length > 0
+      ? this.menuStaticDrawTileOrder.length
+      : null;
     const drawStageProgress = resolveMenuSceneGenerationDrawStageProgress({
       rowsVisible: drawRowsVisible,
-      rowCount: drawStageStaged ? this.maze.size : null
+      rowCount: drawStageStaged ? this.maze.size : null,
+      tilesVisible: drawTilesVisible,
+      tileCount: drawTileCount
     });
     const touchControls = this.resolveLegacyPlayTouchControlDiagnostics();
     const playerMarkerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
@@ -4814,7 +4955,10 @@ export class MenuScene extends Phaser.Scene {
             rowCount: drawStageProgress.rowCount,
             rowsRemaining: drawStageProgress.rowsRemaining,
             rowsVisible: drawRowsVisible,
-            staged: drawStageStaged
+            staged: drawStageStaged,
+            tileCount: drawStageProgress.tileCount,
+            tilesRemaining: drawStageProgress.tilesRemaining,
+            tilesVisible: drawStageProgress.tilesVisible
           },
           pendingRequest: {
             budget: {

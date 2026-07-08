@@ -125,7 +125,10 @@ describe('menu runtime diagnostics', () => {
       complete: false,
       progressPercent: 28,
       rowCount: 25,
-      rowsRemaining: 18
+      rowsRemaining: 18,
+      tileCount: null,
+      tilesRemaining: null,
+      tilesVisible: null
     });
 
     expect(resolveMenuSceneGenerationDrawStageProgress({
@@ -135,7 +138,25 @@ describe('menu runtime diagnostics', () => {
       complete: true,
       progressPercent: 100,
       rowCount: 25,
-      rowsRemaining: 0
+      rowsRemaining: 0,
+      tileCount: null,
+      tilesRemaining: null,
+      tilesVisible: null
+    });
+
+    expect(resolveMenuSceneGenerationDrawStageProgress({
+      rowsVisible: 25,
+      rowCount: 25,
+      tilesVisible: 21,
+      tileCount: 84
+    })).toEqual({
+      complete: false,
+      progressPercent: 25,
+      rowCount: 25,
+      rowsRemaining: null,
+      tileCount: 84,
+      tilesRemaining: 63,
+      tilesVisible: 21
     });
 
     expect(resolveMenuSceneGenerationDrawStageProgress({
@@ -145,7 +166,10 @@ describe('menu runtime diagnostics', () => {
       complete: null,
       progressPercent: null,
       rowCount: null,
-      rowsRemaining: null
+      rowsRemaining: null,
+      tileCount: null,
+      tilesRemaining: null,
+      tilesVisible: null
     });
   });
 
