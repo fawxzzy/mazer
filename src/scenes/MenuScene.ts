@@ -272,7 +272,10 @@ interface MenuSceneVisualDiagnostics {
   title: {
     animation: {
       active: boolean;
+      facetCellCount: number;
+      facetPulsePeriodMs: number;
       phase: number;
+      sigilOrbitCount: number;
       sweepColumn: number;
       sweepPeriodMs: number;
     };
@@ -518,8 +521,12 @@ const LEGACY_MENU_PATH_TITLE_SHADOW = 0x02070d;
 const LEGACY_MENU_PATH_TITLE_ACCENT = 0x36ff7d;
 const LEGACY_MENU_PATH_TITLE_PRISM = 0xb7f2ff;
 const LEGACY_MENU_PATH_TITLE_RUNE = 0xfff05a;
+const LEGACY_MENU_PATH_TITLE_GEM = 0x8fffe8;
+const LEGACY_MENU_PATH_TITLE_FACET_WARM = 0xffd36a;
 const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2200;
+const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 2860;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 90;
+const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;
 const LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA = 0.44;
 const LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA = 0.92;
 const LEGACY_BOARD_GRID_ALPHA = 0;
@@ -3638,6 +3645,151 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  private drawLegacyMenuPathTitleGemFacets(
+    visibleCells: LegacyMenuPathTitleCell[],
+    titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
+    time: number,
+    alphaScale: number
+  ): void {
+    const phase = (time % LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS) / LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS;
+    const rotationStep = Math.floor(phase * 8);
+    const inset = Math.max(titleLayout.coreInset, Math.floor(titleLayout.cellSize * 0.2));
+    const lineInset = Math.max(titleLayout.coreInset + 1, Math.floor(titleLayout.cellSize * 0.32));
+
+    for (const cell of visibleCells) {
+      const left = titleLayout.left + (cell.column * titleLayout.cellSize) + inset;
+      const top = titleLayout.top + (cell.row * titleLayout.cellSize) + inset;
+      const right = titleLayout.left + ((cell.column + 1) * titleLayout.cellSize) - inset;
+      const bottom = titleLayout.top + ((cell.row + 1) * titleLayout.cellSize) - inset;
+      const midX = (left + right) / 2;
+      const midY = (top + bottom) / 2;
+      const shimmer = 0.52 + (Math.sin((phase * Math.PI * 2) + (cell.order * 0.73)) * 0.32);
+      const alpha = clamp((0.065 + (shimmer * 0.14)) * alphaScale, 0.04, 0.27);
+      const facetColor = cell.order % 4 === 0
+        ? LEGACY_MENU_PATH_TITLE_FACET_WARM
+        : LEGACY_MENU_PATH_TITLE_GEM;
+
+      this.titleGraphics.fillStyle(facetColor, alpha);
+      switch ((cell.order + rotationStep) % 4) {
+        case 0:
+          this.titleGraphics.fillTriangle(left, top, right, top, midX, midY);
+          break;
+        case 1:
+          this.titleGraphics.fillTriangle(right, top, right, bottom, midX, midY);
+          break;
+        case 2:
+          this.titleGraphics.fillTriangle(right, bottom, left, bottom, midX, midY);
+          break;
+        default:
+          this.titleGraphics.fillTriangle(left, bottom, left, top, midX, midY);
+          break;
+      }
+
+      if (cell.order % 7 === 0) {
+        const glintAlpha = clamp(alpha * 1.52, 0, 0.38);
+        this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, glintAlpha);
+        this.strokeLegacyPolyline(this.titleGraphics, [
+          {
+            x: titleLayout.left + (cell.column * titleLayout.cellSize) + lineInset,
+            y: titleLayout.top + ((cell.row + 1) * titleLayout.cellSize) - lineInset
+          },
+          {
+            x: titleLayout.left + ((cell.column + 1) * titleLayout.cellSize) - lineInset,
+            y: titleLayout.top + (cell.row * titleLayout.cellSize) + lineInset
+          }
+        ]);
+      }
+    }
+  }
+
+  private drawLegacyMenuPathTitleDiamond(
+    centerX: number,
+    centerY: number,
+    radius: number,
+    fillColor: number,
+    fillAlpha: number,
+    edgeColor: number,
+    edgeAlpha: number
+  ): void {
+    const top = { x: centerX, y: centerY - radius };
+    const right = { x: centerX + radius, y: centerY };
+    const bottom = { x: centerX, y: centerY + radius };
+    const left = { x: centerX - radius, y: centerY };
+
+    this.titleGraphics.fillStyle(fillColor, fillAlpha);
+    this.titleGraphics.fillTriangle(top.x, top.y, right.x, right.y, bottom.x, bottom.y);
+    this.titleGraphics.fillTriangle(top.x, top.y, left.x, left.y, bottom.x, bottom.y);
+    this.titleGraphics.lineStyle(1, edgeColor, edgeAlpha);
+    this.strokeLegacyPolyline(this.titleGraphics, [top, right, bottom, left, top]);
+    this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, edgeAlpha * 0.42);
+    this.strokeLegacyPolyline(this.titleGraphics, [
+      { x: centerX - (radius * 0.52), y: centerY },
+      { x: centerX, y: centerY - (radius * 0.52) },
+      { x: centerX + (radius * 0.52), y: centerY }
+    ]);
+  }
+
+  private drawLegacyMenuPathTitleOrbitSigils(
+    titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
+    time: number,
+    alphaScale: number
+  ): void {
+    const phase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
+    const railGap = Math.max(7, Math.round(titleLayout.cellSize * 1.08));
+    const left = titleLayout.left - railGap;
+    const right = titleLayout.left + titleLayout.width + railGap;
+    const top = titleLayout.top - railGap;
+    const bottom = titleLayout.top + titleLayout.height + railGap;
+    const centerX = titleLayout.left + (titleLayout.width / 2);
+    const centerY = titleLayout.top + (titleLayout.height / 2);
+
+    for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
+      const orbit = ((phase * 0.62) + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
+      const perimeter = orbit * 4;
+      let x = left;
+      let y = top;
+
+      if (perimeter < 1) {
+        x = left + ((right - left) * perimeter);
+        y = top;
+      } else if (perimeter < 2) {
+        x = right;
+        y = top + ((bottom - top) * (perimeter - 1));
+      } else if (perimeter < 3) {
+        x = right - ((right - left) * (perimeter - 2));
+        y = bottom;
+      } else {
+        x = left;
+        y = bottom - ((bottom - top) * (perimeter - 3));
+      }
+
+      const wave = 0.62 + (Math.sin((phase * Math.PI * 2) + (index * 1.38)) * 0.28);
+      const radius = Math.max(4, Math.round(titleLayout.cellSize * (0.46 + (wave * 0.32))));
+      const alpha = clamp((0.14 + (wave * 0.24)) * alphaScale, 0.1, 0.42);
+      const fillColor = index % 3 === 0
+        ? LEGACY_MENU_PATH_TITLE_FACET_WARM
+        : LEGACY_MENU_PATH_TITLE_GEM;
+
+      this.drawLegacyMenuPathTitleDiamond(
+        x,
+        y,
+        radius,
+        fillColor,
+        alpha * 0.6,
+        LEGACY_MENU_PATH_TITLE_ACCENT,
+        alpha
+      );
+      this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, alpha * 0.32);
+      this.strokeLegacyPolyline(this.titleGraphics, [
+        { x, y },
+        {
+          x: x + ((centerX - x) * 0.12),
+          y: y + ((centerY - y) * 0.12)
+        }
+      ]);
+    }
+  }
+
   private drawLegacyMenuPathTitle(time: number): void {
     this.titleGraphics.clear();
     const visible = this.mode === 'menu' && this.overlay === 'none';
@@ -3702,7 +3854,9 @@ export class MenuScene extends Phaser.Scene {
       );
     }
 
+    this.drawLegacyMenuPathTitleGemFacets(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
     this.drawLegacyMenuPathTitlePrismSweep(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
+    this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);
 
     const cursorCell = visibleCells.at(-1);
     if (cursorCell && visiblePieceCount < titleLayout.cells.length) {
@@ -5860,7 +6014,10 @@ export class MenuScene extends Phaser.Scene {
     return {
       animation: {
         active: this.mode === 'menu' && this.overlay === 'none',
+        facetCellCount: this.resolveLegacyMenuPathTitleVisiblePieces(pieceCount),
+        facetPulsePeriodMs: LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS,
         phase: Number(phase.toFixed(3)),
+        sigilOrbitCount: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS,
         sweepColumn: this.resolveLegacyMenuPathTitleSweepColumn(titleLayout.columns, titleLayout.rows, this.time.now),
         sweepPeriodMs: LEGACY_MENU_PATH_TITLE_SWEEP_MS
       },
