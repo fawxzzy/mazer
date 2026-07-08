@@ -560,6 +560,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const staticDrawRowLimit = isMenuMode');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawRowLimit(): number | null');
     expect(menuSceneSource).toContain('private buildLegacyMenuStaticDrawTileOrder(): LegacyPoint[]');
+    expect(menuSceneSource).toContain('this.maze.generationBuildTrace?.pathTiles');
+    expect(menuSceneSource).toContain('this.maze.generationBuildTrace?.shortcutTiles');
+    expect(menuSceneSource).toContain('this.maze.generationBuildTrace?.reinforcementShortcutTiles');
     expect(menuSceneSource).toContain('private refreshLegacyMenuStaticDrawVisibleTileKeys(): void');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawDemoGateAtMs(): number');
     expect(menuSceneSource).toContain('const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);');

@@ -15,6 +15,15 @@ export interface LegacyMazeSnapshot {
   goal: LegacyPoint;
   solutionPath: LegacyPoint[];
   seed: number;
+  generationBuildTrace?: {
+    checkpointTiles: LegacyPoint[];
+    finalGoal: LegacyPoint;
+    pathTiles: LegacyPoint[];
+    reinforcementShortcutTiles: LegacyPoint[];
+    shortcutTiles: LegacyPoint[];
+    sourceGoal: LegacyPoint;
+    start: LegacyPoint;
+  };
   pathBuilderStats?: {
     acceptedCheckpoints: number;
     backtracks: number;
@@ -539,15 +548,21 @@ const applyLegacyShortcutBridges = (
   rng: () => number,
   shortcutCount: number,
   sourceWallArray?: LegacyPoint[]
-): NonNullable<LegacyMazeSnapshot['shortcutStats']> => {
+): {
+  createdTiles: LegacyPoint[];
+  stats: NonNullable<LegacyMazeSnapshot['shortcutStats']>;
+} => {
   if (shortcutCount <= 0) {
     return {
-      requested: 0,
-      attempts: 0,
-      wallArrayEntries: 0,
-      uniqueWallCandidates: 0,
-      created: 0,
-      exhaustedWallArray: false
+      createdTiles: [],
+      stats: {
+        requested: 0,
+        attempts: 0,
+        wallArrayEntries: 0,
+        uniqueWallCandidates: 0,
+        created: 0,
+        exhaustedWallArray: false
+      }
     };
   }
 
@@ -555,6 +570,7 @@ const applyLegacyShortcutBridges = (
   const uniqueWallCandidates = new Set(wallArray.map((point) => keyForPoint(point))).size;
   let created = 0;
   let attempts = 0;
+  const createdTiles: LegacyPoint[] = [];
 
   while (created < shortcutCount && wallArray.length > 0) {
     attempts += 1;
@@ -565,16 +581,20 @@ const applyLegacyShortcutBridges = (
     }
 
     grid[candidate.y]![candidate.x] = true;
+    createdTiles.push(clonePoint(candidate));
     created += 1;
   }
 
   return {
-    requested: shortcutCount,
-    attempts,
-    wallArrayEntries: attempts + wallArray.length,
-    uniqueWallCandidates,
-    created,
-    exhaustedWallArray: wallArray.length === 0 && created < shortcutCount
+    createdTiles,
+    stats: {
+      requested: shortcutCount,
+      attempts,
+      wallArrayEntries: attempts + wallArray.length,
+      uniqueWallCandidates,
+      created,
+      exhaustedWallArray: wallArray.length === 0 && created < shortcutCount
+    }
   };
 };
 
@@ -591,19 +611,22 @@ const reinforceLegacyRouteQuality = (
   solutionPath: LegacyPoint[];
   attempts: number;
   created: number;
+  createdTiles: LegacyPoint[];
 } => {
   if (routeQualityStats.routeQuality === 'multi-route' || maxExtraShortcuts <= 0) {
     return {
       routeQualityStats,
       solutionPath,
       attempts: 0,
-      created: 0
+      created: 0,
+      createdTiles: []
     };
   }
 
   const wallArray = collectLegacyShortcutWallArray(grid);
   let attempts = 0;
   let created = 0;
+  const createdTiles: LegacyPoint[] = [];
   let nextSolutionPath = solutionPath;
   let nextRouteQualityStats = routeQualityStats;
   const scoreRouteQualityStats = (stats: NonNullable<LegacyMazeSnapshot['routeQualityStats']>): number => (
@@ -662,6 +685,7 @@ const reinforceLegacyRouteQuality = (
     }
 
     grid[bestCandidate.y]![bestCandidate.x] = true;
+    createdTiles.push(clonePoint(bestCandidate));
     created += 1;
     nextSolutionPath = bestSolutionPath;
     nextRouteQualityStats = bestRouteQualityStats;
@@ -671,7 +695,8 @@ const reinforceLegacyRouteQuality = (
     routeQualityStats: nextRouteQualityStats,
     solutionPath: nextSolutionPath,
     attempts,
-    created
+    created,
+    createdTiles
   };
 };
 
@@ -730,6 +755,7 @@ const resolveLegacyFinalRouteState = (
 interface LegacyCheckpointPathBuilderResult {
   grid: boolean[][];
   goal: LegacyPoint;
+  generationBuildTrace: Pick<NonNullable<LegacyMazeSnapshot['generationBuildTrace']>, 'checkpointTiles' | 'pathTiles' | 'sourceGoal' | 'start'>;
   pathBuilderStats: NonNullable<LegacyMazeSnapshot['pathBuilderStats']>;
   start: LegacyPoint;
   wallArray: LegacyPoint[];
@@ -1017,6 +1043,7 @@ const createLegacyCheckpointPathMaze = (
   let backtracks = 0;
   let longestPathLength = 0;
   let goal = clonePoint(start);
+  const checkpointTiles: LegacyPoint[] = [];
   let pathLengthCount = 0;
   let safetyIterations = 0;
   const safetyIterationLimit = Math.max(size * size * 8, requestedCheckpoints * size * 4);
@@ -1030,6 +1057,7 @@ const createLegacyCheckpointPathMaze = (
     }
 
     acceptedCheckpoints += 1;
+    checkpointTiles.push(clonePoint(checkpoint));
 
     while (safetyIterations < safetyIterationLimit) {
       safetyIterations += 1;
@@ -1097,6 +1125,12 @@ const createLegacyCheckpointPathMaze = (
     grid,
     start,
     goal,
+    generationBuildTrace: {
+      checkpointTiles,
+      pathTiles: pathTiles.map(clonePoint),
+      sourceGoal: clonePoint(goal),
+      start: clonePoint(start)
+    },
     wallArray,
     pathBuilderStats: {
       topology: 'legacy-checkpoint-path-builder',
@@ -1114,12 +1148,20 @@ const createLegacyCheckpointPathMaze = (
 
 export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: number): LegacyMazeSnapshot => {
   const size = normalizeGridSize(scale);
-  const { grid, start, goal: sourceGoal, wallArray, pathBuilderStats } = createLegacyCheckpointPathMaze(size, seed);
+  const {
+    grid,
+    start,
+    goal: sourceGoal,
+    generationBuildTrace,
+    wallArray,
+    pathBuilderStats
+  } = createLegacyCheckpointPathMaze(size, seed);
   const rng = createSeededRng(seed ^ 0x5a17c0de);
   const resolvedShortcutCount = size > 35
     ? (shortcutCount ?? Math.trunc(size * legacyTuning.board.shortcutCountModifier.game))
     : 0;
-  const shortcutStats = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount, wallArray);
+  const shortcutResult = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount, wallArray);
+  const shortcutStats = shortcutResult.stats;
   const { goal: normalizedGoal, stats: playableTopologyStats } = normalizeLegacyPlayableTopology(grid, start, sourceGoal);
   const minimumSolutionPathLength = Math.max(LEGACY_MIN_SCALE, Math.floor(size * 1.5));
   let {
@@ -1161,6 +1203,12 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     goal: clonePoint(goal),
     solutionPath,
     seed,
+    generationBuildTrace: {
+      ...generationBuildTrace,
+      finalGoal: clonePoint(goal),
+      reinforcementShortcutTiles: reinforcementStats.createdTiles.map(clonePoint),
+      shortcutTiles: shortcutResult.createdTiles.map(clonePoint)
+    },
     pathBuilderStats,
     playableTopologyStats,
     routeQualityStats,

@@ -175,6 +175,12 @@ export interface MenuSceneRuntimeDiagnostics {
   };
   generation?: {
     maze?: {
+      buildTrace?: {
+        checkpointTileCount: number;
+        pathTileCount: number;
+        reinforcementShortcutTileCount: number;
+        shortcutTileCount: number;
+      };
       buildKind: 'menu-snapshot' | 'menu-generated' | 'play-generated' | null;
       source: 'menu-snapshot' | 'menu-generated' | 'play-generated';
       size: number;

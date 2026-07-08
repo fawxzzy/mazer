@@ -520,6 +520,7 @@ const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const legacyScenePointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
+const cloneLegacyScenePoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
 
 const createVisualRect = (left: number, top: number, width: number, height: number): VisualRect => ({
   left,
@@ -1014,6 +1015,12 @@ export class MenuScene extends Phaser.Scene {
       },
       generation: {
         maze: {
+          buildTrace: this.maze.generationBuildTrace ? {
+            checkpointTileCount: this.maze.generationBuildTrace.checkpointTiles.length,
+            pathTileCount: this.maze.generationBuildTrace.pathTiles.length,
+            reinforcementShortcutTileCount: this.maze.generationBuildTrace.reinforcementShortcutTiles.length,
+            shortcutTileCount: this.maze.generationBuildTrace.shortcutTiles.length
+          } : undefined,
           buildKind: this.maze.generation?.buildKind ?? null,
           source: this.maze.source,
           size: this.maze.size,
@@ -2386,55 +2393,52 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private buildLegacyMenuStaticDrawTileOrder(): LegacyPoint[] {
-    const solutionOrder = new Map<string, number>();
-    this.maze.solutionPath.forEach((point, index) => {
-      solutionOrder.set(legacyScenePointKey(point), index);
-    });
+    const orderedTiles: LegacyPoint[] = [];
+    const seen = new Set<string>();
+    const solutionKeys = new Set(this.maze.solutionPath.map(legacyScenePointKey));
+    const appendTile = (point: LegacyPoint | undefined): void => {
+      if (!point || this.maze.grid[point.y]?.[point.x] !== true) {
+        return;
+      }
+      const key = legacyScenePointKey(point);
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      orderedTiles.push(cloneLegacyScenePoint(point));
+    };
 
-    const orderedTiles: Array<LegacyPoint & { branchDistance: number; score: number }> = [];
+    appendTile(this.maze.generationBuildTrace?.start ?? this.maze.start);
+    appendTile(this.maze.generationBuildTrace?.finalGoal ?? this.maze.goal);
+
+    for (const point of this.maze.solutionPath) {
+      appendTile(point);
+    }
+
+    for (const point of this.maze.generationBuildTrace?.pathTiles ?? []) {
+      if (!solutionKeys.has(legacyScenePointKey(point))) {
+        appendTile(point);
+      }
+    }
+
+    for (const point of this.maze.generationBuildTrace?.shortcutTiles ?? []) {
+      appendTile(point);
+    }
+
+    for (const point of this.maze.generationBuildTrace?.reinforcementShortcutTiles ?? []) {
+      appendTile(point);
+    }
+
     for (let y = 0; y < this.maze.size; y += 1) {
       for (let x = 0; x < this.maze.size; x += 1) {
         if (this.maze.grid[y]?.[x] !== true) {
           continue;
         }
-
-        const point = { x, y };
-        const solutionIndex = solutionOrder.get(legacyScenePointKey(point));
-        if (solutionIndex !== undefined) {
-          orderedTiles.push({ ...point, branchDistance: 0, score: solutionIndex * 8 });
-          continue;
-        }
-
-        let nearestSolutionIndex = this.maze.solutionPath.length;
-        let nearestDistance = Number.POSITIVE_INFINITY;
-        for (let index = 0; index < this.maze.solutionPath.length; index += 1) {
-          const solutionPoint = this.maze.solutionPath[index];
-          if (!solutionPoint) {
-            continue;
-          }
-          const distance = Math.abs(solutionPoint.x - x) + Math.abs(solutionPoint.y - y);
-          if (distance < nearestDistance) {
-            nearestDistance = distance;
-            nearestSolutionIndex = index;
-          }
-        }
-
-        orderedTiles.push({
-          ...point,
-          branchDistance: nearestDistance,
-          score: (nearestSolutionIndex * 8) + Math.min(7, nearestDistance)
-        });
+        appendTile({ x, y });
       }
     }
 
-    return orderedTiles
-      .sort((left, right) => (
-        (left.score - right.score)
-        || (left.branchDistance - right.branchDistance)
-        || (left.y - right.y)
-        || (left.x - right.x)
-      ))
-      .map(({ x, y }) => ({ x, y }));
+    return orderedTiles;
   }
 
   private resolveLegacyMenuStaticDrawDemoGateAtMs(): number {

@@ -32,6 +32,11 @@ describe('legacy generation diagnostics contract', () => {
     expect(menuMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
     expect(menuMaze.pathBuilderStats?.topology).toBe('legacy-checkpoint-path-builder');
     expect(menuMaze.shortcutStats?.requested).toBe(6);
+    expect(menuMaze.generationBuildTrace?.start).toEqual(menuMaze.start);
+    expect(menuMaze.generationBuildTrace?.finalGoal).toEqual(menuMaze.goal);
+    expect(menuMaze.generationBuildTrace?.pathTiles.length).toBe(menuMaze.pathBuilderStats?.pathTiles);
+    expect(menuMaze.generationBuildTrace?.checkpointTiles.length).toBe(menuMaze.pathBuilderStats?.acceptedCheckpoints);
+    expect(menuMaze.generationBuildTrace?.shortcutTiles.length).toBeLessThanOrEqual(menuMaze.shortcutStats?.created ?? 0);
     expect(menuMaze.generation?.stageCursor).toEqual({
       phase: 'consumed-finalized',
       currentStageId: 7,
