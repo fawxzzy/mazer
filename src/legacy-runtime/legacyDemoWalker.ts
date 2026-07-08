@@ -48,6 +48,11 @@ const inferLegacyMazeDifficulty = (maze: LegacyMazeSnapshot): MazeDifficulty => 
 export const createLegacyMenuDemoWalkerConfig = (seed: number): DemoWalkerConfig => ({
   ...legacyTuning.demo,
   seed,
+  cadence: {
+    ...legacyTuning.demo.cadence,
+    goalHoldMs: 0,
+    resetHoldMs: 0
+  },
   behavior: {
     ...legacyTuning.demo.behavior,
     enableRunnerMistakes: true,

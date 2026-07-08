@@ -65,7 +65,8 @@ import {
 } from '../legacy-runtime/legacyPlayHud';
 import {
   advanceLegacyMenuDemoFrame,
-  createLegacyMenuDemoBootstrap
+  createLegacyMenuDemoBootstrap,
+  type LegacyMenuDemoAdvance
 } from '../legacy-runtime/legacyMenuDemoLifecycle';
 import {
   resolveLegacyMenuLayout,
@@ -543,7 +544,7 @@ const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;
 const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;
 const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;
 const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
-const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 360;
+const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;
 const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 500;
 const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;
 const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = 860;
@@ -2668,6 +2669,8 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticDrawTilesVisible = this.menuStaticDrawTileOrder.length;
     this.refreshLegacyMenuStaticDrawVisibleTileKeys();
     this.menuStaticDrawNextTileAtMs = this.resolveLegacyMenuStaticDeconstructTileStartAtMs(time);
+    this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+    this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     this.queueGenerationRequest(
       'menu-demo-goal-reset',
       this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
@@ -2678,6 +2681,14 @@ export class MenuScene extends Phaser.Scene {
     );
     this.boardPathDirty = true;
     this.boardDynamicDirty = true;
+  }
+
+  private shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame: LegacyMenuDemoAdvance): boolean {
+    return this.mode === 'menu'
+      && this.maze.source !== 'menu-snapshot'
+      && this.menuStaticDrawLifecyclePhase === 'settled'
+      && nextFrame.state.reachedGoal === true
+      && nextFrame.state.phase === 'goal-hold';
   }
 
   private advanceLegacyMenuStaticDrawStage(time: number): void {
@@ -2812,6 +2823,12 @@ export class MenuScene extends Phaser.Scene {
     this.player = nextFrame.player;
     this.trail = nextFrame.trail;
     this.nextDemoMoveAtMs = time + nextFrame.delayMs;
+    if (this.shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame)) {
+      this.nextDemoMoveAtMs = time;
+      this.armLegacyMenuStaticDeconstructStage(time);
+      this.boardDynamicDirty = true;
+      return;
+    }
     this.boardDynamicDirty = true;
   }
 

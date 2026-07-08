@@ -551,7 +551,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 360;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 500;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = 860;');
@@ -586,11 +586,15 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private resolveLegacyMenuDeconstructHandoffProgress(time: number): number');
     expect(menuSceneSource).toContain('private drawLegacyMenuDeconstructHandoffBurst(');
     expect(menuSceneSource).toContain('private armLegacyMenuStaticDeconstructStage(time: number): void');
+    expect(menuSceneSource).toContain('private shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame: LegacyMenuDemoAdvance): boolean');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase = 'deconstructing';");
+    expect(menuSceneSource).toContain('this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;');
+    expect(menuSceneSource).toContain('this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;');
     expect(menuSceneSource).toContain("this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS");
     expect(menuSceneSource).toContain('const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase !== 'settled'");
     expect(menuSceneSource).toContain('if (nextFrame.shouldRegenerateMaze) {');
+    expect(menuSceneSource).toContain('if (this.shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame)) {');
     expect(menuSceneSource).toContain('this.armLegacyMenuStaticDeconstructStage(time);');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase !== 'deconstructing'");
     expect(menuSceneSource).toContain('const resolvedTrailAlpha = trailAlpha * menuTrailAlphaMultiplier;');
