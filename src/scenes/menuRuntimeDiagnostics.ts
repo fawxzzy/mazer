@@ -86,6 +86,36 @@ export interface MenuSceneRuntimeDiagnostics {
     mode: 'menu' | 'play';
     overlay: string;
   };
+  gameToggles?: {
+    animatedBackdrop: {
+      enabled: boolean;
+      stateText: string;
+    };
+    cameraFollow: {
+      enabled: boolean;
+      stateText: string;
+    };
+    controlMode: {
+      mode: 'arrows' | 'stick';
+      stateText: string;
+    };
+    darkMode: {
+      enabled: boolean;
+      stateText: string;
+    };
+    movementSpeed: {
+      label: string;
+      value: number;
+    };
+    trailFade: {
+      enabled: boolean;
+      stateText: string;
+    };
+    trailPulse: {
+      enabled: boolean;
+      stateText: string;
+    };
+  };
   play?: {
     board: {
       bottom: number;

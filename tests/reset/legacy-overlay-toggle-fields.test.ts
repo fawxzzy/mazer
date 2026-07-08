@@ -13,12 +13,12 @@ describe('legacy overlay toggle fields', () => {
     expect(resolveLegacyOverlayToggleStateText('toggleTrailFade', true)).toBe('On');
     expect(resolveLegacyOverlayToggleStateText('toggleTrailPulse', false)).toBe('Off');
     expect(resolveLegacyOverlayToggleStateText('toggleTrailPulse', true)).toBe('On');
-    expect(resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', false)).toBe('Off');
-    expect(resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', true)).toBe('On');
+    expect(resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', false)).toBe('Stagnant');
+    expect(resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', true)).toBe('Animated');
     expect(resolveLegacyOverlayToggleStateText('controlMode', false)).toBe('Arrows');
     expect(resolveLegacyOverlayToggleStateText('controlMode', true)).toBe('Stick');
-    expect(resolveLegacyOverlayToggleStateText('darkMode', false)).toBeNull();
-    expect(resolveLegacyOverlayToggleStateText('darkMode', true)).toBeNull();
+    expect(resolveLegacyOverlayToggleStateText('darkMode', false)).toBe('Off');
+    expect(resolveLegacyOverlayToggleStateText('darkMode', true)).toBe('On');
   });
 
   test('toggles feature fields through their exact board refresh lanes', () => {
@@ -52,7 +52,7 @@ describe('legacy overlay toggle fields', () => {
     expect(trailPulse.legacyDirectionalLightIntensity).toBeNull();
 
     expect(animatedBackdrop.settings.toggleAnimatedBackdrop).toBe(true);
-    expect(animatedBackdrop.stateText).toBe('On');
+    expect(animatedBackdrop.stateText).toBe('Animated');
     expect(animatedBackdrop.affectsBackdrop).toBe(true);
     expect(animatedBackdrop.affectsBoardStatic).toBe(false);
     expect(animatedBackdrop.affectsBoardDynamic).toBe(false);
@@ -66,20 +66,20 @@ describe('legacy overlay toggle fields', () => {
     expect(controlMode.legacyDirectionalLightIntensity).toBeNull();
   });
 
-  test('toggles dark mode through the legacy light-intensity role without companion state text', () => {
+  test('toggles dark mode through the legacy light-intensity role with exact state text', () => {
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
     const darkModeOn = applyLegacyOverlayToggleField(settings, 'darkMode');
     const darkModeOff = applyLegacyOverlayToggleField(darkModeOn.settings, 'darkMode');
 
     expect(darkModeOn.settings.darkMode).toBe(true);
-    expect(darkModeOn.stateText).toBeNull();
+    expect(darkModeOn.stateText).toBe('On');
     expect(darkModeOn.affectsBackdrop).toBe(true);
     expect(darkModeOn.affectsBoardStatic).toBe(true);
     expect(darkModeOn.affectsBoardDynamic).toBe(true);
     expect(darkModeOn.legacyDirectionalLightIntensity).toBe(0.3);
 
     expect(darkModeOff.settings.darkMode).toBe(false);
-    expect(darkModeOff.stateText).toBeNull();
+    expect(darkModeOff.stateText).toBe('Off');
     expect(darkModeOff.legacyDirectionalLightIntensity).toBe(2.0);
   });
 });

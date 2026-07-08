@@ -10,7 +10,7 @@ export type LegacyOverlayToggleFieldId =
   | 'toggleAnimatedBackdrop'
   | 'darkMode'
   | 'controlMode';
-export type LegacyOverlayToggleStateText = 'On' | 'Off' | 'Arrows' | 'Stick';
+export type LegacyOverlayToggleStateText = 'On' | 'Off' | 'Arrows' | 'Stick' | 'Animated' | 'Stagnant';
 
 export interface LegacyOverlayToggleFieldApplyResult {
   settings: LegacySettings;
@@ -29,10 +29,10 @@ export const resolveLegacyOverlayToggleStateText = (
     case 'toggleCameraFollow':
     case 'toggleTrailFade':
     case 'toggleTrailPulse':
-    case 'toggleAnimatedBackdrop':
-      return value ? 'On' : 'Off';
     case 'darkMode':
-      return null;
+      return value ? 'On' : 'Off';
+    case 'toggleAnimatedBackdrop':
+      return value ? 'Animated' : 'Stagnant';
     case 'controlMode':
       return value ? 'Stick' : 'Arrows';
     default:
@@ -95,7 +95,7 @@ export const applyLegacyOverlayToggleField = (
         affectsBoardStatic: true,
         affectsBoardDynamic: true,
         legacyDirectionalLightIntensity: nextSettings.darkMode ? 0.3 : 2.0,
-        stateText: null
+        stateText: resolveLegacyOverlayToggleStateText(fieldId, nextSettings.darkMode)
       };
     case 'controlMode':
       nextSettings.controlMode = nextSettings.controlMode === 'stick' ? 'arrows' : 'stick';

@@ -296,6 +296,36 @@ describe('menu runtime diagnostics', () => {
         mode: 'menu',
         overlay: 'none'
       },
+      gameToggles: {
+        animatedBackdrop: {
+          enabled: false,
+          stateText: 'Stagnant'
+        },
+        cameraFollow: {
+          enabled: false,
+          stateText: 'Off'
+        },
+        controlMode: {
+          mode: 'arrows',
+          stateText: 'Arrows'
+        },
+        darkMode: {
+          enabled: false,
+          stateText: 'Off'
+        },
+        movementSpeed: {
+          label: '58%',
+          value: 0.58
+        },
+        trailFade: {
+          enabled: false,
+          stateText: 'Off'
+        },
+        trailPulse: {
+          enabled: true,
+          stateText: 'On'
+        }
+      },
       play: {
         board: {
           bottom: 420,
@@ -565,6 +595,12 @@ describe('menu runtime diagnostics', () => {
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )?.play?.inputBuffer.touchSprint.turnDelayMs).toBe(254);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.animatedBackdrop.stateText)
+        .toBe('Stagnant');
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.darkMode.stateText)
+        .toBe('Off');
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.trailPulse.enabled)
+        .toBe(true);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.menuDemo?.route?.cueCounts.reacquire).toBe(2);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.source).toBe('menu-generated');
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.routeQualityStats?.routeQuality)

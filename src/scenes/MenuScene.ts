@@ -956,6 +956,36 @@ export class MenuScene extends Phaser.Scene {
         mode: this.mode,
         overlay: this.overlay
       },
+      gameToggles: {
+        animatedBackdrop: {
+          enabled: this.settings.toggleAnimatedBackdrop,
+          stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'
+        },
+        cameraFollow: {
+          enabled: this.settings.toggleCameraFollow,
+          stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'
+        },
+        controlMode: {
+          mode: this.settings.controlMode,
+          stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'
+        },
+        darkMode: {
+          enabled: this.settings.darkMode,
+          stateText: resolveLegacyOverlayToggleStateText('darkMode', this.settings.darkMode) ?? 'Off'
+        },
+        movementSpeed: {
+          label: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
+          value: normalizeLegacyMovementSpeed(this.settings.movementSpeed)
+        },
+        trailFade: {
+          enabled: this.settings.toggleTrailFade,
+          stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'
+        },
+        trailPulse: {
+          enabled: this.settings.toggleTrailPulse,
+          stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'
+        }
+      },
       play: {
         board: {
           ...boardBounds,
@@ -4350,7 +4380,7 @@ export class MenuScene extends Phaser.Scene {
         offLabel: 'Stagnant',
         onClick: () => this.applyLegacyOverlayToggleField('toggleAnimatedBackdrop'),
         onLabel: 'Animated',
-        stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Off'
+        stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'
       },
       {
         checked: this.settings.darkMode,
@@ -4358,7 +4388,7 @@ export class MenuScene extends Phaser.Scene {
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('darkMode'),
         onLabel: 'On',
-        stateText: this.settings.darkMode ? 'On' : 'Off'
+        stateText: resolveLegacyOverlayToggleStateText('darkMode', this.settings.darkMode) ?? 'Off'
       },
       {
         checked: this.settings.controlMode === 'stick',
@@ -4437,7 +4467,7 @@ export class MenuScene extends Phaser.Scene {
       color: '#ecfff5'
     })).setOrigin(0, 0.5).setAlpha(0.94);
 
-    const displayStateText = input.checked ? input.onLabel : input.offLabel;
+    const displayStateText = input.stateText || (input.checked ? input.onLabel : input.offLabel);
     const stateLabel = this.padLegacyUiText(this.add.text(left + input.width - 84, input.y, displayStateText || input.stateText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${Math.max(11, Math.min(13, Math.round(input.height * 0.28)))}px`,
