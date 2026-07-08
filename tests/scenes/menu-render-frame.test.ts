@@ -319,6 +319,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 6200;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FRAME_MS = 66;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(time: number): void');
@@ -331,6 +332,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitlePrismSweep(');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleGemFacets(');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleOrbitSigils(');
+    expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleOrbitPhase(time: number): number');
+    expect(menuSceneSource).toContain('const orbitPhase = this.resolveLegacyMenuPathTitleOrbitPhase(time);');
+    expect(menuSceneSource).toContain('const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;');
+    expect(menuSceneSource).not.toContain('phase * 0.62');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleDiamond(');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleSigilRails(');
     expect(menuSceneSource).toContain('private hasLegacyMenuTitleAnimationPendingFrame(time: number): boolean');
@@ -348,6 +353,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('scannerProgress: Number(sweepState.progress.toFixed(3))');
     expect(menuSceneSource).toContain('scannerSyncedToLifecycle: sweepState.syncedToLifecycle');
     expect(menuSceneSource).toContain('sigilOrbitCount: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS');
+    expect(menuSceneSource).toContain('sigilOrbitPeriodMs: LEGACY_MENU_PATH_TITLE_ORBIT_MS');
+    expect(menuSceneSource).toContain('sigilOrbitPhase: Number(this.resolveLegacyMenuPathTitleOrbitPhase(this.time.now).toFixed(3))');
     expect(menuSceneSource).toContain('sweepPeriodMs: LEGACY_MENU_PATH_TITLE_SWEEP_MS');
     expect(menuSceneSource).toContain('animation: {');
     expect(menuSceneSource).toContain('if (this.boardPathDirty) {');

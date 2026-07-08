@@ -306,6 +306,8 @@ interface MenuSceneVisualDiagnostics {
       scannerProgress: number;
       scannerSyncedToLifecycle: boolean;
       sigilOrbitCount: number;
+      sigilOrbitPeriodMs: number;
+      sigilOrbitPhase: number;
       sweepColumn: number;
       sweepPeriodMs: number;
     };
@@ -580,6 +582,7 @@ const LEGACY_MENU_PATH_TITLE_FACET_WARM = 0xffd36a;
 const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;
 const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;
 const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
+const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 6200;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 66;
 const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;
 const LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA = 0.44;
@@ -3842,6 +3845,10 @@ export class MenuScene extends Phaser.Scene {
     return (time % LEGACY_MENU_PATH_TITLE_SWEEP_MS) / LEGACY_MENU_PATH_TITLE_SWEEP_MS;
   }
 
+  private resolveLegacyMenuPathTitleOrbitPhase(time: number): number {
+    return (time % LEGACY_MENU_PATH_TITLE_ORBIT_MS) / LEGACY_MENU_PATH_TITLE_ORBIT_MS;
+  }
+
   private resolveLegacyMenuPathTitleSweepTravel(columns: number, rows: number): number {
     return columns + (rows * 0.72) + (LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS * 2);
   }
@@ -4130,7 +4137,7 @@ export class MenuScene extends Phaser.Scene {
     time: number,
     alphaScale: number
   ): void {
-    const phase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
+    const orbitPhase = this.resolveLegacyMenuPathTitleOrbitPhase(time);
     const railGap = Math.max(7, Math.round(titleLayout.cellSize * 1.08));
     const left = titleLayout.left - railGap;
     const right = titleLayout.left + titleLayout.width + railGap;
@@ -4140,7 +4147,7 @@ export class MenuScene extends Phaser.Scene {
     const centerY = titleLayout.top + (titleLayout.height / 2);
 
     for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
-      const orbit = ((phase * 0.62) + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
+      const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
       const perimeter = orbit * 4;
       let x = left;
       let y = top;
@@ -4159,7 +4166,7 @@ export class MenuScene extends Phaser.Scene {
         y = bottom - ((bottom - top) * (perimeter - 3));
       }
 
-      const wave = 0.62 + (Math.sin((phase * Math.PI * 2) + (index * 1.38)) * 0.28);
+      const wave = 0.62 + (Math.sin((orbitPhase * Math.PI * 2) + (index * 1.38)) * 0.28);
       const radius = Math.max(4, Math.round(titleLayout.cellSize * (0.46 + (wave * 0.32))));
       const alpha = clamp((0.14 + (wave * 0.24)) * alphaScale, 0.1, 0.42);
       const fillColor = index % 3 === 0
@@ -6766,6 +6773,8 @@ export class MenuScene extends Phaser.Scene {
         scannerProgress: Number(sweepState.progress.toFixed(3)),
         scannerSyncedToLifecycle: sweepState.syncedToLifecycle,
         sigilOrbitCount: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS,
+        sigilOrbitPeriodMs: LEGACY_MENU_PATH_TITLE_ORBIT_MS,
+        sigilOrbitPhase: Number(this.resolveLegacyMenuPathTitleOrbitPhase(this.time.now).toFixed(3)),
         sweepColumn: Number(sweepColumn.toFixed(3)),
         sweepPeriodMs: LEGACY_MENU_PATH_TITLE_SWEEP_MS
       },
