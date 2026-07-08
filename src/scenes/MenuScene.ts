@@ -636,6 +636,7 @@ export class MenuScene extends Phaser.Scene {
   private footerText!: Phaser.GameObjects.Text;
   private backdropGraphics!: Phaser.GameObjects.Graphics;
   private boardStaticGraphics!: Phaser.GameObjects.Graphics;
+  private boardPathGraphics!: Phaser.GameObjects.Graphics;
   private boardDynamicGraphics!: Phaser.GameObjects.Graphics;
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private hudGraphics!: Phaser.GameObjects.Graphics;
@@ -654,6 +655,7 @@ export class MenuScene extends Phaser.Scene {
   private hudCompassVisualAngleRadians: number | null = null;
   private hudCompassVisualAngleDegrees: number | null = null;
   private boardStaticDirty = true;
+  private boardPathDirty = true;
   private boardDynamicDirty = true;
   private hudDirty = true;
   private backdropDirty = true;
@@ -720,6 +722,7 @@ export class MenuScene extends Phaser.Scene {
     this.initializeRuntimeDiagnostics();
     this.backdropGraphics = this.add.graphics();
     this.boardStaticGraphics = this.add.graphics();
+    this.boardPathGraphics = this.add.graphics();
     this.boardDynamicGraphics = this.add.graphics();
     this.overlayGraphics = this.add.graphics();
     this.hudGraphics = this.add.graphics();
@@ -825,6 +828,10 @@ export class MenuScene extends Phaser.Scene {
     }
     if (this.boardStaticDirty) {
       this.drawStaticBoard();
+      this.boardPathDirty = true;
+    }
+    if (this.boardPathDirty) {
+      this.drawBoardPaths();
     }
     const shouldDrawDynamicBoard = this.boardDynamicDirty;
     if (shouldDrawDynamicBoard) {
@@ -1228,6 +1235,9 @@ export class MenuScene extends Phaser.Scene {
         activeTimers: 0,
         animatedBackdropEnabled: this.settings.toggleAnimatedBackdrop,
         backdropDirty: this.backdropDirty,
+        boardDynamicDirty: this.boardDynamicDirty,
+        boardPathDirty: this.boardPathDirty,
+        boardStaticDirty: this.boardStaticDirty,
         listenerCount: 3
           + (this.runtimeVisibilityAttached ? 1 : 0)
           + (this.legacyPlayFocusGuardAttached ? 2 : 0)
@@ -2357,6 +2367,7 @@ export class MenuScene extends Phaser.Scene {
     this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
 
     this.boardStaticDirty = true;
+    this.boardPathDirty = true;
     this.boardDynamicDirty = true;
     this.backdropDirty = true;
     this.uiDirty = true;
@@ -2392,6 +2403,7 @@ export class MenuScene extends Phaser.Scene {
     this.activeInputField = null;
     this.refreshLayout();
     this.boardStaticDirty = true;
+    this.boardPathDirty = true;
     this.boardDynamicDirty = true;
     this.uiDirty = true;
     this.armLegacyMenuStaticDrawStage();
@@ -2664,7 +2676,7 @@ export class MenuScene extends Phaser.Scene {
         stepSeed: true
       }
     );
-    this.boardStaticDirty = true;
+    this.boardPathDirty = true;
     this.boardDynamicDirty = true;
   }
 
@@ -2682,7 +2694,7 @@ export class MenuScene extends Phaser.Scene {
     ) {
       this.menuStaticDrawRowsVisible = Math.min(this.maze.size, this.menuStaticDrawRowsVisible + batchSize);
       this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;
-      this.boardStaticDirty = true;
+      this.boardPathDirty = true;
       this.boardDynamicDirty = true;
       if (this.menuStaticDrawRowsVisible >= this.maze.size) {
         this.menuStaticDrawRowsVisible = null;
@@ -2698,7 +2710,7 @@ export class MenuScene extends Phaser.Scene {
         );
         this.refreshLegacyMenuStaticDrawVisibleTileKeys();
         this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS;
-        this.boardStaticDirty = true;
+        this.boardPathDirty = true;
         this.boardDynamicDirty = true;
         if (this.menuStaticDrawTilesVisible <= 0) {
           this.menuStaticDrawTilesVisible = 0;
@@ -2716,7 +2728,7 @@ export class MenuScene extends Phaser.Scene {
       );
       this.refreshLegacyMenuStaticDrawVisibleTileKeys();
       this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS;
-      this.boardStaticDirty = true;
+      this.boardPathDirty = true;
       this.boardDynamicDirty = true;
       if (this.menuStaticDrawTilesVisible >= this.menuStaticDrawTileOrder.length) {
         this.menuStaticDrawTilesVisible = null;
@@ -2759,6 +2771,7 @@ export class MenuScene extends Phaser.Scene {
     this.refreshRuntimeMazeSeedIfUnpinned();
     this.rebuildMaze();
     this.boardStaticDirty = true;
+    this.boardPathDirty = true;
     this.boardDynamicDirty = true;
     this.uiDirty = true;
   }
@@ -2824,6 +2837,7 @@ export class MenuScene extends Phaser.Scene {
     this.trail = nextStep.trail;
     if (this.settings.toggleCameraFollow) {
       this.boardStaticDirty = true;
+      this.boardPathDirty = true;
     }
 
     if (nextStep.reachedGoal) {
@@ -3062,17 +3076,11 @@ export class MenuScene extends Phaser.Scene {
     const mazeSize = mazeRenderFrame.boardSize;
     const tileSize = mazeRenderFrame.tileSize;
     const isMenuMode = this.mode === 'menu';
-    const pathColor = isMenuMode
-      ? LEGACY_MENU_PATH_CORE
-      : LEGACY_PLAY_PATH_CORE;
     const wallColor = isMenuMode
       ? LEGACY_MENU_WALL_FILL
       : LEGACY_PLAY_WALL_FILL;
     const boardFill = LEGACY_PLAY_BOARD_FILL;
     const boardEdge = LEGACY_PLAY_BOARD_EDGE;
-    const pathGlow = isMenuMode
-      ? LEGACY_MENU_PATH_EDGE
-      : LEGACY_PLAY_PATH_EDGE;
 
     this.boardStaticGraphics.clear();
     const boardShadowAlpha = isMenuMode ? LEGACY_MENU_PANEL_SHADOW_ALPHA : 0;
@@ -3105,61 +3113,14 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    const staticDrawRowLimit = isMenuMode
-      && this.menuStaticDrawRowsVisible !== null
-      && this.resolveLegacyMenuStaticDrawTileLimit() === null
-      ? this.menuStaticDrawRowsVisible
-      : this.maze.size;
-
-    for (let y = 0; y < staticDrawRowLimit; y += 1) {
+    for (let y = 0; y < this.maze.size; y += 1) {
       for (let x = 0; x < this.maze.size; x += 1) {
         const tileX = mazeLeft + (x * tileSize);
         const tileY = mazeTop + (y * tileSize);
-        const walkable = this.maze.grid[y]?.[x] === true;
-        const visibleWalkable = walkable && (!isMenuMode || this.isLegacyMenuPointVisibleInStaticDraw({ x, y }));
+        this.boardStaticGraphics.fillStyle(wallColor, isMenuMode ? LEGACY_MENU_WALL_GLASS_ALPHA : LEGACY_PLAY_WALL_GLASS_ALPHA);
+        this.boardStaticGraphics.fillRect(tileX, tileY, tileSize, tileSize);
 
-        if (visibleWalkable) {
-          const segments = resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);
-          const frames = resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);
-          this.boardStaticGraphics.fillStyle(
-            isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE,
-            isMenuMode ? LEGACY_MENU_PATH_EDGE_ALPHA : LEGACY_PLAY_PATH_EDGE_ALPHA
-          );
-          for (const segment of segments.edge) {
-            this.boardStaticGraphics.fillRect(
-              tileX + segment.leftInset,
-              tileY + segment.topInset,
-              segment.width,
-              segment.height
-            );
-          }
-          this.boardStaticGraphics.fillStyle(pathColor, isMenuMode ? 0.92 : 0.96);
-          this.boardStaticGraphics.fillRect(
-            tileX + frames.core.leftInset,
-            tileY + frames.core.topInset,
-            frames.core.width,
-            frames.core.height
-          );
-          if (this.pathVisualStyle === 'hybrid') {
-            const cueSize = Math.max(1, Math.floor(tileSize * 0.22));
-            const cueInset = Math.floor((tileSize - cueSize) / 2);
-            this.boardStaticGraphics.fillStyle(
-              LEGACY_PATH_TILE_CUE_COLOR,
-              isMenuMode ? LEGACY_PATH_TILE_CUE_ALPHA : LEGACY_PATH_TILE_CUE_ALPHA * 0.82
-            );
-            this.boardStaticGraphics.fillRect(
-              tileX + cueInset,
-              tileY + cueInset,
-              cueSize,
-              cueSize
-            );
-          }
-        } else {
-          this.boardStaticGraphics.fillStyle(wallColor, isMenuMode ? LEGACY_MENU_WALL_GLASS_ALPHA : LEGACY_PLAY_WALL_GLASS_ALPHA);
-          this.boardStaticGraphics.fillRect(tileX, tileY, tileSize, tileSize);
-
-          // Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.
-        }
+        // Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.
       }
     }
 
@@ -3169,6 +3130,90 @@ export class MenuScene extends Phaser.Scene {
     this.titleText.setVisible(showMenuTitle);
     this.titleShadow.setVisible(showMenuTitle);
     this.boardStaticDirty = false;
+  }
+
+  private drawBoardPaths(): void {
+    const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardSize } = this.layout;
+    const boardOffset = this.resolveBoardOffset();
+    const boardLeft = layoutBoardLeft + boardOffset.x;
+    const boardTop = layoutBoardTop + boardOffset.y;
+    const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardSize);
+    const mazeLeft = mazeRenderFrame.boardLeft;
+    const mazeTop = mazeRenderFrame.boardTop;
+    const tileSize = mazeRenderFrame.tileSize;
+    const isMenuMode = this.mode === 'menu';
+    const pathColor = isMenuMode
+      ? LEGACY_MENU_PATH_CORE
+      : LEGACY_PLAY_PATH_CORE;
+    const pathGlow = isMenuMode
+      ? LEGACY_MENU_PATH_EDGE
+      : LEGACY_PLAY_PATH_EDGE;
+
+    this.boardPathGraphics.clear();
+    const drawPathPoint = (point: LegacyPoint): void => {
+      if (this.maze.grid[point.y]?.[point.x] !== true) {
+        return;
+      }
+
+      const tileX = mazeLeft + (point.x * tileSize);
+      const tileY = mazeTop + (point.y * tileSize);
+      const segments = resolveLegacyMenuPathRenderSegments(this.maze, point, tileSize);
+      const frames = resolveLegacyMenuPathRenderFrames(this.maze, point, tileSize);
+      this.boardPathGraphics.fillStyle(
+        isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE,
+        isMenuMode ? LEGACY_MENU_PATH_EDGE_ALPHA : LEGACY_PLAY_PATH_EDGE_ALPHA
+      );
+      for (const segment of segments.edge) {
+        this.boardPathGraphics.fillRect(
+          tileX + segment.leftInset,
+          tileY + segment.topInset,
+          segment.width,
+          segment.height
+        );
+      }
+      this.boardPathGraphics.fillStyle(pathColor, isMenuMode ? 0.92 : 0.96);
+      this.boardPathGraphics.fillRect(
+        tileX + frames.core.leftInset,
+        tileY + frames.core.topInset,
+        frames.core.width,
+        frames.core.height
+      );
+      if (this.pathVisualStyle === 'hybrid') {
+        const cueSize = Math.max(1, Math.floor(tileSize * 0.22));
+        const cueInset = Math.floor((tileSize - cueSize) / 2);
+        this.boardPathGraphics.fillStyle(
+          LEGACY_PATH_TILE_CUE_COLOR,
+          isMenuMode ? LEGACY_PATH_TILE_CUE_ALPHA : LEGACY_PATH_TILE_CUE_ALPHA * 0.82
+        );
+        this.boardPathGraphics.fillRect(
+          tileX + cueInset,
+          tileY + cueInset,
+          cueSize,
+          cueSize
+        );
+      }
+    };
+
+    const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
+    if (isMenuMode && tileLimit !== null) {
+      for (let index = 0; index < Math.min(tileLimit, this.menuStaticDrawTileOrder.length); index += 1) {
+        const point = this.menuStaticDrawTileOrder[index];
+        if (point) {
+          drawPathPoint(point);
+        }
+      }
+    } else {
+      for (let y = 0; y < this.maze.size; y += 1) {
+        for (let x = 0; x < this.maze.size; x += 1) {
+          if (isMenuMode && !this.isLegacyMenuPointVisibleInStaticDraw({ x, y })) {
+            continue;
+          }
+          drawPathPoint({ x, y });
+        }
+      }
+    }
+
+    this.boardPathDirty = false;
   }
 
   private resolveLegacyMazeRenderFrame(
@@ -4757,6 +4802,7 @@ export class MenuScene extends Phaser.Scene {
       this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });
       this.pendingOverlayMazeRebuild = false;
       this.boardStaticDirty = true;
+      this.boardPathDirty = true;
       this.boardDynamicDirty = true;
     }
     if (this.settings.scale !== previousScale) {
@@ -5055,6 +5101,7 @@ export class MenuScene extends Phaser.Scene {
     }
     if (result.affectsBoardStatic) {
       this.boardStaticDirty = true;
+      this.boardPathDirty = true;
     }
     if (result.affectsBoardDynamic) {
       this.boardDynamicDirty = true;

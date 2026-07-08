@@ -188,8 +188,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.18;');
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.08;');
     expect(legacyMenuRenderSource).toContain('const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {');
-    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(this.maze, { x, y }, tileSize);');
-    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(this.maze, { x, y }, tileSize);');
+    expect(menuSceneSource).toContain('const drawPathPoint = (point: LegacyPoint): void => {');
+    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(this.maze, point, tileSize);');
+    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(this.maze, point, tileSize);');
+    expect(menuSceneSource).toContain('for (let index = 0; index < Math.min(tileLimit, this.menuStaticDrawTileOrder.length); index += 1)');
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('tileX + frames.core.leftInset');
     expect(menuSceneSource).toContain('const tileX = mazeLeft + (x * tileSize);');
@@ -246,7 +248,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_EDGE = 0x031022;');
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
-    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(pathColor, isMenuMode ? 0.92 : 0.96);');
+    expect(menuSceneSource).toContain('private boardPathGraphics!: Phaser.GameObjects.Graphics;');
+    expect(menuSceneSource).toContain('private boardPathDirty = true;');
+    expect(menuSceneSource).toContain('this.boardPathGraphics = this.add.graphics();');
+    expect(menuSceneSource).toContain('if (this.boardPathDirty) {');
+    expect(menuSceneSource).toContain('this.drawBoardPaths();');
+    expect(menuSceneSource).toContain('private drawBoardPaths(): void {');
+    expect(menuSceneSource).toContain('this.boardPathGraphics.fillStyle(pathColor, isMenuMode ? 0.92 : 0.96);');
     expect(menuSceneSource).toContain(': LEGACY_PLAY_PATH_CORE;');
     expect(menuSceneSource).toContain(': LEGACY_PLAY_WALL_FILL;');
     expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
@@ -535,8 +543,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.publishInteractionDiagnostics(false);');
     expect(menuSceneSource).toContain('private hudDirty = true;');
     expect(menuSceneSource).toContain('this.hudDirty = true;');
-    expect(tuningSource).toContain('full: 66,');
-    expect(tuningSource).toContain('throttled: 220,');
+    expect(tuningSource).toContain('diagnosticsPublishIntervalMs: 1500,');
+    expect(tuningSource).toContain('full: 100,');
+    expect(tuningSource).toContain('throttled: 300,');
   });
 
   test('keeps front-door buttons in the shared cyber chrome path', () => {

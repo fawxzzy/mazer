@@ -329,6 +329,9 @@ export interface MenuSceneRuntimeDiagnostics {
     activeTimers: number;
     animatedBackdropEnabled?: boolean;
     backdropDirty?: boolean;
+    boardDynamicDirty?: boolean;
+    boardPathDirty?: boolean;
+    boardStaticDirty?: boolean;
     listenerCount: number;
     listenerBreakdown: {
       sceneUpdate: number;

@@ -349,7 +349,7 @@ export const legacyTuning = {
       actorHaloAlphaScale: 1.26
     },
     runtime: {
-      diagnosticsPublishIntervalMs: 1000,
+      diagnosticsPublishIntervalMs: 1500,
       recentFrameWindow: 180,
       heapSampleWindow: 45,
       degradeAverageFrameMs: 19,
@@ -362,8 +362,8 @@ export const legacyTuning = {
       spikeFrameMs: 50,
       lowPowerHardwareConcurrencyMax: 4,
       ambientUpdateIntervalMs: {
-        full: 66,
-        throttled: 220,
+        full: 100,
+        throttled: 300,
         hidden: 1000
       },
       deferredTasksPerFrame: {
