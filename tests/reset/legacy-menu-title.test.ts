@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   LEGACY_MENU_PATH_TITLE_CELLS,
   LEGACY_MENU_PATH_TITLE_COLUMNS,
+  LEGACY_MENU_PATH_TITLE_GRID,
   resolveLegacyMenuPathTitleLayout,
   resolveLegacyMenuTitlePresentation
 } from '../../src/legacy-runtime/legacyMenuTitle';
@@ -75,6 +76,7 @@ describe('legacy menu title presentation', () => {
     expect(LEGACY_MENU_PATH_TITLE_COLUMNS).toBe(29);
     expect(LEGACY_MENU_PATH_TITLE_CELLS).toHaveLength(87);
     expect(layout.cells).toBe(LEGACY_MENU_PATH_TITLE_CELLS);
+    expect(layout.grid).toBe(LEGACY_MENU_PATH_TITLE_GRID);
     expect(layout.cellSize).toBe(8);
     expect(layout.coreInset).toBe(1);
     expect(layout.width).toBe(232);
@@ -83,5 +85,8 @@ describe('legacy menu title presentation', () => {
     expect(layout.top).toBe(44);
     expect(layout.cells[0]).toEqual({ column: 0, row: 0, order: 0 });
     expect(layout.cells.at(-1)).toEqual({ column: 28, row: 6, order: 86 });
+    expect(layout.grid[0]?.[0]).toBe(true);
+    expect(layout.grid[0]?.[1]).toBe(false);
+    expect(layout.grid[6]?.[28]).toBe(true);
   });
 });

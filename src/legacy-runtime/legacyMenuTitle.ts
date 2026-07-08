@@ -19,6 +19,7 @@ export interface LegacyMenuPathTitleLayout {
   cells: LegacyMenuPathTitleCell[];
   columns: number;
   coreInset: number;
+  grid: boolean[][];
   height: number;
   left: number;
   rows: number;
@@ -106,6 +107,22 @@ export const LEGACY_MENU_PATH_TITLE_CELLS = buildLegacyMenuPathTitleCells();
 export const LEGACY_MENU_PATH_TITLE_COLUMNS = (LEGACY_MENU_PATH_TITLE_PATTERNS.length * LEGACY_MENU_PATH_TITLE_LETTER_COLUMNS)
   + ((LEGACY_MENU_PATH_TITLE_PATTERNS.length - 1) * LEGACY_MENU_PATH_TITLE_LETTER_GAP_COLUMNS);
 
+const buildLegacyMenuPathTitleGrid = (): boolean[][] => {
+  const grid = Array.from({ length: LEGACY_MENU_PATH_TITLE_ROWS }, () => (
+    Array.from({ length: LEGACY_MENU_PATH_TITLE_COLUMNS }, () => false)
+  ));
+
+  for (const cell of LEGACY_MENU_PATH_TITLE_CELLS) {
+    if (grid[cell.row]) {
+      grid[cell.row][cell.column] = true;
+    }
+  }
+
+  return grid;
+};
+
+export const LEGACY_MENU_PATH_TITLE_GRID = buildLegacyMenuPathTitleGrid();
+
 export const resolveLegacyMenuTitlePresentation = (
   boardSize: number,
   tileSize: number,
@@ -158,6 +175,7 @@ export const resolveLegacyMenuPathTitleLayout = (
     cells: LEGACY_MENU_PATH_TITLE_CELLS,
     columns: LEGACY_MENU_PATH_TITLE_COLUMNS,
     coreInset: Math.max(1, Math.floor(cellSize * 0.18)),
+    grid: LEGACY_MENU_PATH_TITLE_GRID,
     height,
     left: Math.round(centerX - (width / 2)),
     rows: LEGACY_MENU_PATH_TITLE_ROWS,

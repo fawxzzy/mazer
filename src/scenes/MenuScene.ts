@@ -127,7 +127,6 @@ import {
   createLegacyMenuDemoWalkerConfig,
 } from '../legacy-runtime/legacyDemoWalker';
 import {
-  resolveLegacyDynamicTrailStrokeWidth,
   resolveLegacyEndpointMarkerRenderMetrics,
   resolveLegacyMenuPathRenderFrames,
   resolveLegacyMenuPathRenderSegments,
@@ -207,6 +206,16 @@ interface LegacyMazeRenderFrame {
   boardSize: number;
   tileSize: number;
   safeInset: number;
+}
+
+interface LegacyPathMaterialOptions {
+  coreAlpha: number;
+  coreColor: number;
+  cueAlpha?: number;
+  cueColor?: number;
+  drawCue?: boolean;
+  edgeAlpha: number;
+  edgeColor: number;
 }
 
 interface MenuSceneVisualDiagnostics {
@@ -476,12 +485,8 @@ const LEGACY_UI_FONT_FAMILY = '"Trebuchet MS", "Segoe UI", sans-serif';
 const LEGACY_UI_MONO_FONT_FAMILY = 'Consolas, "Lucida Console", monospace';
 const MENU_TEXT_COLOR = '#ecfff5';
 const LEGACY_MENU_PATH_TITLE_SHADOW = 0x02070d;
-const LEGACY_MENU_PATH_TITLE_EDGE = 0x0d3c4f;
-const LEGACY_MENU_PATH_TITLE_CORE = 0xe7fff4;
 const LEGACY_MENU_PATH_TITLE_ACCENT = 0x36ff7d;
 const LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA = 0.44;
-const LEGACY_MENU_PATH_TITLE_EDGE_ALPHA = 0.84;
-const LEGACY_MENU_PATH_TITLE_CORE_ALPHA = 0.96;
 const LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA = 0.92;
 const LEGACY_BOARD_GRID_ALPHA = 0;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
@@ -528,18 +533,10 @@ const LEGACY_CYBER_PANEL_FILL = 0x07131d;
 const LEGACY_CYBER_PANEL_STROKE = 0x72e0bf;
 const LEGACY_CYBER_PANEL_STROKE_ALT = 0xb7f2ff;
 const LEGACY_CYBER_PANEL_SHADOW = 0x02070d;
-const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x107d74;
-const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.64;
-const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;
-const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x107d74;
-const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.64;
-const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR = 0x36ff7d;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE = 0xecfff5;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
-const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_CORE_RATIO = 0.76;
-const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO = 0.96;
 const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 50;
 const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
@@ -3203,6 +3200,58 @@ export class MenuScene extends Phaser.Scene {
     this.boardStaticDirty = false;
   }
 
+  private drawLegacyPathMaterialTile(
+    graphics: Phaser.GameObjects.Graphics,
+    point: LegacyPoint,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+    originX: number,
+    originY: number,
+    tileSize: number,
+    options: LegacyPathMaterialOptions
+  ): void {
+    if (pathSource.grid[point.y]?.[point.x] !== true) {
+      return;
+    }
+
+    const tileX = originX + (point.x * tileSize);
+    const tileY = originY + (point.y * tileSize);
+    const segments = resolveLegacyMenuPathRenderSegments(pathSource, point, tileSize);
+    const frames = resolveLegacyMenuPathRenderFrames(pathSource, point, tileSize);
+
+    graphics.fillStyle(options.edgeColor, options.edgeAlpha);
+    for (const segment of segments.edge) {
+      graphics.fillRect(
+        tileX + segment.leftInset,
+        tileY + segment.topInset,
+        segment.width,
+        segment.height
+      );
+    }
+
+    graphics.fillStyle(options.coreColor, options.coreAlpha);
+    graphics.fillRect(
+      tileX + frames.core.leftInset,
+      tileY + frames.core.topInset,
+      frames.core.width,
+      frames.core.height
+    );
+
+    if (options.drawCue === true) {
+      const cueSize = Math.max(1, Math.floor(tileSize * 0.22));
+      const cueInset = Math.floor((tileSize - cueSize) / 2);
+      graphics.fillStyle(
+        options.cueColor ?? LEGACY_PATH_TILE_CUE_COLOR,
+        options.cueAlpha ?? LEGACY_PATH_TILE_CUE_ALPHA
+      );
+      graphics.fillRect(
+        tileX + cueInset,
+        tileY + cueInset,
+        cueSize,
+        cueSize
+      );
+    }
+  }
+
   private drawBoardPaths(): void {
     const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardSize } = this.layout;
     const boardOffset = this.resolveBoardOffset();
@@ -3222,47 +3271,22 @@ export class MenuScene extends Phaser.Scene {
 
     this.boardPathGraphics.clear();
     const drawPathPoint = (point: LegacyPoint): void => {
-      if (this.maze.grid[point.y]?.[point.x] !== true) {
-        return;
-      }
-
-      const tileX = mazeLeft + (point.x * tileSize);
-      const tileY = mazeTop + (point.y * tileSize);
-      const segments = resolveLegacyMenuPathRenderSegments(this.maze, point, tileSize);
-      const frames = resolveLegacyMenuPathRenderFrames(this.maze, point, tileSize);
-      this.boardPathGraphics.fillStyle(
-        isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE,
-        isMenuMode ? LEGACY_MENU_PATH_EDGE_ALPHA : LEGACY_PLAY_PATH_EDGE_ALPHA
+      this.drawLegacyPathMaterialTile(
+        this.boardPathGraphics,
+        point,
+        this.maze,
+        mazeLeft,
+        mazeTop,
+        tileSize,
+        {
+          coreAlpha: isMenuMode ? 0.92 : 0.96,
+          coreColor: pathColor,
+          cueAlpha: isMenuMode ? LEGACY_PATH_TILE_CUE_ALPHA : LEGACY_PATH_TILE_CUE_ALPHA * 0.82,
+          drawCue: this.pathVisualStyle === 'hybrid',
+          edgeAlpha: isMenuMode ? LEGACY_MENU_PATH_EDGE_ALPHA : LEGACY_PLAY_PATH_EDGE_ALPHA,
+          edgeColor: isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE
+        }
       );
-      for (const segment of segments.edge) {
-        this.boardPathGraphics.fillRect(
-          tileX + segment.leftInset,
-          tileY + segment.topInset,
-          segment.width,
-          segment.height
-        );
-      }
-      this.boardPathGraphics.fillStyle(pathColor, isMenuMode ? 0.92 : 0.96);
-      this.boardPathGraphics.fillRect(
-        tileX + frames.core.leftInset,
-        tileY + frames.core.topInset,
-        frames.core.width,
-        frames.core.height
-      );
-      if (this.pathVisualStyle === 'hybrid') {
-        const cueSize = Math.max(1, Math.floor(tileSize * 0.22));
-        const cueInset = Math.floor((tileSize - cueSize) / 2);
-        this.boardPathGraphics.fillStyle(
-          LEGACY_PATH_TILE_CUE_COLOR,
-          isMenuMode ? LEGACY_PATH_TILE_CUE_ALPHA : LEGACY_PATH_TILE_CUE_ALPHA * 0.82
-        );
-        this.boardPathGraphics.fillRect(
-          tileX + cueInset,
-          tileY + cueInset,
-          cueSize,
-          cueSize
-        );
-      }
     };
 
     const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
@@ -3312,17 +3336,20 @@ export class MenuScene extends Phaser.Scene {
 
   private drawLegacyMenuPathTitleCell(
     cell: LegacyMenuPathTitleCell,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
     left: number,
     top: number,
     cellSize: number,
-    inset: number
+    options: LegacyPathMaterialOptions
   ): void {
-    const size = Math.max(1, cellSize - (inset * 2));
-    this.titleGraphics.fillRect(
-      left + (cell.column * cellSize) + inset,
-      top + (cell.row * cellSize) + inset,
-      size,
-      size
+    this.drawLegacyPathMaterialTile(
+      this.titleGraphics,
+      { x: cell.column, y: cell.row },
+      pathSource,
+      left,
+      top,
+      cellSize,
+      options
     );
   }
 
@@ -3351,37 +3378,40 @@ export class MenuScene extends Phaser.Scene {
     if (visibleCells.length <= 0) {
       return;
     }
+    const titlePathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'> = {
+      grid: titleLayout.grid,
+      size: titleLayout.columns
+    };
 
-    this.titleGraphics.fillStyle(LEGACY_MENU_PATH_TITLE_SHADOW, LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA);
     for (const cell of visibleCells) {
       this.drawLegacyMenuPathTitleCell(
         cell,
+        titlePathSource,
         titleLayout.left + titlePresentation.shadowOffsetX,
         titleLayout.top + titlePresentation.shadowOffsetY,
         titleLayout.cellSize,
-        0
+        {
+          coreAlpha: LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA,
+          coreColor: LEGACY_MENU_PATH_TITLE_SHADOW,
+          edgeAlpha: LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA,
+          edgeColor: LEGACY_MENU_PATH_TITLE_SHADOW
+        }
       );
     }
 
-    this.titleGraphics.fillStyle(
-      LEGACY_MENU_PATH_TITLE_EDGE,
-      LEGACY_MENU_PATH_TITLE_EDGE_ALPHA * titlePresentation.titleAlpha
-    );
-    for (const cell of visibleCells) {
-      this.drawLegacyMenuPathTitleCell(cell, titleLayout.left, titleLayout.top, titleLayout.cellSize, 0);
-    }
-
-    this.titleGraphics.fillStyle(
-      LEGACY_MENU_PATH_TITLE_CORE,
-      LEGACY_MENU_PATH_TITLE_CORE_ALPHA * titlePresentation.titleAlpha
-    );
     for (const cell of visibleCells) {
       this.drawLegacyMenuPathTitleCell(
         cell,
+        titlePathSource,
         titleLayout.left,
         titleLayout.top,
         titleLayout.cellSize,
-        titleLayout.coreInset
+        {
+          coreAlpha: 0.92 * titlePresentation.titleAlpha,
+          coreColor: LEGACY_MENU_PATH_CORE,
+          edgeAlpha: LEGACY_MENU_PATH_EDGE_ALPHA * titlePresentation.titleAlpha,
+          edgeColor: LEGACY_MENU_PATH_EDGE
+        }
       );
     }
 
@@ -3389,12 +3419,11 @@ export class MenuScene extends Phaser.Scene {
     if (cursorCell && visiblePieceCount < titleLayout.cells.length) {
       const accentInset = Math.max(titleLayout.coreInset + 1, Math.floor(titleLayout.cellSize * 0.28));
       this.titleGraphics.fillStyle(LEGACY_MENU_PATH_TITLE_ACCENT, LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA);
-      this.drawLegacyMenuPathTitleCell(
-        cursorCell,
-        titleLayout.left,
-        titleLayout.top,
-        titleLayout.cellSize,
-        accentInset
+      this.titleGraphics.fillRect(
+        titleLayout.left + (cursorCell.column * titleLayout.cellSize) + accentInset,
+        titleLayout.top + (cursorCell.row * titleLayout.cellSize) + accentInset,
+        Math.max(1, titleLayout.cellSize - (accentInset * 2)),
+        Math.max(1, titleLayout.cellSize - (accentInset * 2))
       );
     }
   }
@@ -3601,7 +3630,7 @@ export class MenuScene extends Phaser.Scene {
     const menuTrailAlphaMultiplier = this.mode === 'menu'
       ? this.resolveLegacyMenuDeconstructTrailAlpha(time)
       : 1;
-    const dynamicTrailKeys = new Set(visibleTrail.map((point) => `${point.x},${point.y}`));
+    const dynamicTrailPathSource = this.resolveLegacyPointPathSource(visibleTrail);
     const boardOffset = this.resolveBoardOffset();
     const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(
       boardLeft + boardOffset.x,
@@ -3644,7 +3673,7 @@ export class MenuScene extends Phaser.Scene {
           mazeTop,
           mazeTileSize,
           resolvedTrailAlpha,
-          dynamicTrailKeys
+          dynamicTrailPathSource
         );
       } else {
         this.fillLegacyPlayDynamicPathTile(
@@ -3654,7 +3683,7 @@ export class MenuScene extends Phaser.Scene {
           mazeTop,
           mazeTileSize,
           resolvedTrailAlpha,
-          dynamicTrailKeys
+          dynamicTrailPathSource
         );
       }
     }
@@ -3667,7 +3696,7 @@ export class MenuScene extends Phaser.Scene {
           mazeTop,
           mazeTileSize,
           time,
-          dynamicTrailKeys
+          dynamicTrailPathSource
         );
       }
     }
@@ -3713,7 +3742,7 @@ export class MenuScene extends Phaser.Scene {
     originY: number,
     tileSize: number,
     alpha: number,
-    trailKeys: Set<string>
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>
   ): void {
     this.fillLegacyDynamicPathTile(
       point,
@@ -3722,12 +3751,10 @@ export class MenuScene extends Phaser.Scene {
       originY,
       tileSize,
       alpha,
-      trailKeys,
-      LEGACY_MENU_DYNAMIC_TRAIL_EDGE,
-      LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO,
-      LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO,
-      0.42,
-      0.94
+      pathSource,
+      LEGACY_MENU_PATH_EDGE,
+      LEGACY_MENU_PATH_EDGE_ALPHA,
+      0.92
     );
   }
 
@@ -3738,7 +3765,7 @@ export class MenuScene extends Phaser.Scene {
     originY: number,
     tileSize: number,
     alpha: number,
-    trailKeys: Set<string>
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>
   ): void {
     this.fillLegacyDynamicPathTile(
       point,
@@ -3747,12 +3774,10 @@ export class MenuScene extends Phaser.Scene {
       originY,
       tileSize,
       alpha,
-      trailKeys,
-      LEGACY_PLAY_DYNAMIC_TRAIL_EDGE,
-      LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO,
-      LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO,
-      0.42,
-      0.78
+      pathSource,
+      LEGACY_PLAY_PATH_EDGE,
+      LEGACY_PLAY_PATH_EDGE_ALPHA,
+      0.96
     );
   }
 
@@ -3762,7 +3787,7 @@ export class MenuScene extends Phaser.Scene {
     originY: number,
     tileSize: number,
     time: number,
-    trailKeys: Set<string>
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>
   ): void {
     if (trail.length < 2) {
       return;
@@ -3793,14 +3818,26 @@ export class MenuScene extends Phaser.Scene {
         originY,
         tileSize,
         alpha,
-        trailKeys,
+        pathSource,
         LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE,
-        LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE_RATIO,
-        LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_CORE_RATIO,
-        0.32,
-        0.8
+        LEGACY_PLAY_PATH_EDGE_ALPHA,
+        0.96
       );
     }
+  }
+
+  private resolveLegacyPointPathSource(points: readonly LegacyPoint[]): Pick<LegacyMazeSnapshot, 'grid' | 'size'> {
+    const size = this.maze.size;
+    const grid = Array.from({ length: size }, () => Array.from({ length: size }, () => false));
+
+    for (const point of points) {
+      if (point.x < 0 || point.y < 0 || point.x >= size || point.y >= size) {
+        continue;
+      }
+      grid[point.y][point.x] = true;
+    }
+
+    return { grid, size };
   }
 
   private fillLegacyDynamicPathTile(
@@ -3810,48 +3847,24 @@ export class MenuScene extends Phaser.Scene {
     originY: number,
     tileSize: number,
     alpha: number,
-    trailKeys: Set<string>,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
     edgeColor: number,
-    edgeRatio: number,
-    coreRatio: number,
-    edgeAlphaScale: number,
+    edgeAlpha: number,
     coreAlphaMax: number
   ): void {
-    const tileX = originX + (point.x * tileSize);
-    const tileY = originY + (point.y * tileSize);
-    const connectedLeft = trailKeys.has(`${point.x - 1},${point.y}`);
-    const connectedRight = trailKeys.has(`${point.x + 1},${point.y}`);
-    const connectedTop = trailKeys.has(`${point.x},${point.y - 1}`);
-    const connectedBottom = trailKeys.has(`${point.x},${point.y + 1}`);
-    const drawTrailStroke = (width: number, colorValue: number, colorAlpha: number): void => {
-      const inset = Math.max(0, Math.floor((tileSize - width) / 2));
-      const centerSpan = Math.max(1, tileSize - (inset * 2));
-      this.boardDynamicGraphics.fillStyle(colorValue, colorAlpha);
-      this.boardDynamicGraphics.fillRect(tileX + inset, tileY + inset, centerSpan, centerSpan);
-
-      if (connectedLeft) {
-        this.boardDynamicGraphics.fillRect(tileX, tileY + inset, inset + centerSpan, centerSpan);
+    this.drawLegacyPathMaterialTile(
+      this.boardDynamicGraphics,
+      point,
+      pathSource,
+      originX,
+      originY,
+      tileSize,
+      {
+        coreAlpha: Math.min(coreAlphaMax, coreAlphaMax * alpha),
+        coreColor: color,
+        edgeAlpha: Math.min(edgeAlpha, edgeAlpha * alpha),
+        edgeColor
       }
-      if (connectedRight) {
-        this.boardDynamicGraphics.fillRect(tileX + inset, tileY + inset, tileSize - inset, centerSpan);
-      }
-      if (connectedTop) {
-        this.boardDynamicGraphics.fillRect(tileX + inset, tileY, centerSpan, inset + centerSpan);
-      }
-      if (connectedBottom) {
-        this.boardDynamicGraphics.fillRect(tileX + inset, tileY + inset, centerSpan, tileSize - inset);
-      }
-    };
-
-    drawTrailStroke(
-      resolveLegacyDynamicTrailStrokeWidth(tileSize, edgeRatio, 3),
-      edgeColor,
-      Math.min(0.32, alpha * edgeAlphaScale)
-    );
-    drawTrailStroke(
-      resolveLegacyDynamicTrailStrokeWidth(tileSize, coreRatio, 2),
-      color,
-      Math.min(coreAlphaMax, alpha)
     );
   }
 

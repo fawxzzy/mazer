@@ -189,13 +189,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.08;');
     expect(legacyMenuRenderSource).toContain('const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {');
     expect(menuSceneSource).toContain('const drawPathPoint = (point: LegacyPoint): void => {');
-    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(this.maze, point, tileSize);');
-    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(this.maze, point, tileSize);');
+    expect(menuSceneSource).toContain('private drawLegacyPathMaterialTile(');
+    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(pathSource, point, tileSize);');
+    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(pathSource, point, tileSize);');
     expect(menuSceneSource).toContain('for (let index = 0; index < Math.min(tileLimit, this.menuStaticDrawTileOrder.length); index += 1)');
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('tileX + frames.core.leftInset');
-    expect(menuSceneSource).toContain('const tileX = mazeLeft + (x * tileSize);');
-    expect(menuSceneSource).toContain('const tileY = mazeTop + (y * tileSize);');
+    expect(menuSceneSource).toContain('const tileX = originX + (point.x * tileSize);');
+    expect(menuSceneSource).toContain('const tileY = originY + (point.y * tileSize);');
     expect(menuSceneSource).toContain('renderBounds: mazeRenderBounds');
     expect(menuSceneSource).toContain('renderSafeInset: mazeRenderFrame.safeInset');
     expect(menuSceneSource).toContain('isMenuMode ? LEGACY_MENU_BOARD_GLASS_ALPHA : LEGACY_PLAY_BOARD_GLASS_ALPHA');
@@ -244,7 +245,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.1;');
     expect(menuSceneSource).toContain("private pathVisualStyle: LegacyPathVisualStyle = 'corridor';");
     expect(menuSceneSource).toContain('this.pathVisualStyle = resolveLegacyPathVisualStyle(runtimeSearch);');
-    expect(menuSceneSource).toContain("if (this.pathVisualStyle === 'hybrid') {");
+    expect(menuSceneSource).toContain("drawCue: this.pathVisualStyle === 'hybrid'");
     expect(menuSceneSource).toContain('pathVisualStyle: this.pathVisualStyle');
     expect(menuSceneSource).toContain('textLabels: this.resolveVisualTextLabels()');
     expect(menuSceneSource).toContain('this.uiTexts.push(label, stateLabel);');
@@ -255,6 +256,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private boardPathGraphics!: Phaser.GameObjects.Graphics;');
     expect(menuSceneSource).toContain('private boardPathDirty = true;');
     expect(menuSceneSource).toContain('this.boardPathGraphics = this.add.graphics();');
+    expect(menuSceneSource).toContain('private drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('private titleGraphics!: Phaser.GameObjects.Graphics;');
     expect(menuSceneSource).toContain('this.titleGraphics = this.add.graphics();');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(): void');
@@ -265,7 +267,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (this.boardPathDirty) {');
     expect(menuSceneSource).toContain('this.drawBoardPaths();');
     expect(menuSceneSource).toContain('private drawBoardPaths(): void {');
-    expect(menuSceneSource).toContain('this.boardPathGraphics.fillStyle(pathColor, isMenuMode ? 0.92 : 0.96);');
+    expect(menuSceneSource).toContain('this.drawLegacyPathMaterialTile(');
+    expect(menuSceneSource).toContain('coreAlpha: isMenuMode ? 0.92 : 0.96,');
     expect(menuSceneSource).toContain(': LEGACY_PLAY_PATH_CORE;');
     expect(menuSceneSource).toContain(': LEGACY_PLAY_WALL_FILL;');
     expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
@@ -298,18 +301,20 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps menu dynamic trail overlays in the legacy corridor frame instead of full square cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x107d74;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.64;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;');
+    expect(menuSceneSource).not.toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE =');
+    expect(menuSceneSource).not.toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO =');
+    expect(menuSceneSource).not.toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO =');
     expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_HALO = 0x00b84a;');
     expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_CORE = 0x36ff7d;');
     expect(menuSceneSource).toContain('const visibleTrail = this.mode === \'menu\'');
     expect(menuSceneSource).toContain('trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))');
-    expect(menuSceneSource).toContain('const dynamicTrailKeys = new Set(visibleTrail.map((point) => `${point.x},${point.y}`));');
+    expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.resolveLegacyPointPathSource(visibleTrail);');
     expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(');
     expect(menuSceneSource).toContain('const mazeTileSize = mazeRenderFrame.tileSize;');
     expect(menuSceneSource).toContain('this.fillLegacyMenuDynamicPathTile(');
-    expect(menuSceneSource).toContain('const connectedLeft = trailKeys.has(`${point.x - 1},${point.y}`);');
+    expect(menuSceneSource).toContain('pathSource: Pick<LegacyMazeSnapshot, \'grid\' | \'size\'>,');
+    expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE,');
+    expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE_ALPHA,');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player, mazeLeft, mazeTop, mazeTileSize');
     expect(menuSceneSource).toContain('const centerX = originX + ((point.x + 0.5) * tileSize);');
     expect(menuSceneSource).toContain('resolveLegacyPlayerMarkerRenderMetrics(');
@@ -321,14 +326,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps active play dynamic overlays in the corridor frame instead of square cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE = 0x107d74;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO = 0.64;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;');
+    expect(menuSceneSource).not.toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE =');
+    expect(menuSceneSource).not.toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_CORE_RATIO =');
+    expect(menuSceneSource).not.toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_EDGE_RATIO =');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR = 0x36ff7d;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE = 0xecfff5;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
+    expect(menuSceneSource).toContain('LEGACY_PLAY_PATH_EDGE,');
+    expect(menuSceneSource).toContain('LEGACY_PLAY_PATH_EDGE_ALPHA,');
     expect(menuSceneSource).toContain('this.hasLegacyPlayTrailPulsePendingFrame(time)');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 50;');
     expect(menuSceneSource).toContain('private legacyPlayTrailPulseNextFrameAtMs = 0;');
@@ -338,6 +345,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;');
     expect(menuSceneSource).toContain('const pulseDistanceFromPlayer = phase * maxPulseIndex;');
     expect(menuSceneSource).toContain('const pulseCenterIndex = (trail.length - 1) - pulseDistanceFromPlayer;');
+    expect(menuSceneSource).toContain('private resolveLegacyPointPathSource(points: readonly LegacyPoint[]): Pick<LegacyMazeSnapshot, \'grid\' | \'size\'>');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, LEGACY_PLAY_START_MARKER_EDGE, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');");
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, mazeLeft, mazeTop, mazeTileSize, 0.95, 'goal');");
     expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_CORE = 0xfff05a;');
@@ -576,9 +584,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xe7fff4;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x0d3c4f;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x07111d;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE = 0x107d74;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO = 0.64;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;');
+    expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE,');
+    expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE_ALPHA,');
+    expect(menuSceneSource).toContain('this.drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
     expect(menuSceneSource).toContain('const boardEdge = LEGACY_PLAY_BOARD_EDGE;');
     expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);');

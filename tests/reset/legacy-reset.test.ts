@@ -599,6 +599,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.armLegacyMenuStaticDeconstructStage(time);');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase !== 'deconstructing'");
     expect(menuSceneSource).toContain('const resolvedTrailAlpha = trailAlpha * menuTrailAlphaMultiplier;');
+    expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.resolveLegacyPointPathSource(visibleTrail);');
+    expect(menuSceneSource).toContain('private drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('handoffDurationMs: LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS');
     expect(menuSceneSource).toContain('handoffProgress: this.resolveLegacyMenuDeconstructHandoffProgress(time)');
     expect(menuSceneSource).toContain('trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))');
