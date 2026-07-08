@@ -259,9 +259,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(backdropSource).toContain('resolveLegacyMenuBackdropGlassShards');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropDriftRunes');
     expect(menuSceneSource).toContain('0.7 + (Math.sin(time / 1800) * 0.3)');
-    expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(shard.color, shard.alpha * 0.46);');
-    expect(menuSceneSource).toContain('const spineStart = this.rotateBackdropPoint(shard, -halfLength * 0.66, 0);');
-    expect(menuSceneSource).toContain('const tipGlintStart = this.rotateBackdropPoint(shard, halfLength * 0.72, -halfThickness * 0.42);');
+    expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(shard.color, shard.alpha * 0.14);');
+    expect(menuSceneSource).toContain('const spineStart = this.rotateBackdropPoint(shard, -halfLength * 0.78, 0);');
+    expect(menuSceneSource).toContain('const crossFacetStart = this.rotateBackdropPoint(shard, halfLength * 0.08, -halfThickness * 0.78);');
+    expect(menuSceneSource).toContain('const tailFacetStart = this.rotateBackdropPoint(shard, -halfLength * 0.88, 0);');
+    expect(menuSceneSource).toContain('const tipGlintStart = this.rotateBackdropPoint(shard, halfLength * 0.72, -halfThickness * 0.5);');
     expect(menuSceneSource).toContain('sigils: 4');
   });
 
