@@ -186,6 +186,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('isMenuMode ? LEGACY_MENU_WALL_GLASS_ALPHA : LEGACY_PLAY_WALL_GLASS_ALPHA');
     expect(menuSceneSource).toContain('this.drawLegacyBoardSigilBorder(boardLeft, boardTop, boardSize);');
     expect(menuSceneSource).toContain('private drawLegacyBoardSigilBorder(boardLeft: number, boardTop: number, boardSize: number): void');
+    expect(menuSceneSource).toContain('private drawLegacyMenuDeconstructHandoffBurst(');
+    expect(menuSceneSource).toContain('this.drawLegacyMenuDeconstructHandoffBurst(');
+    expect(menuSceneSource).toContain('LEGACY_MENU_DECONSTRUCT_BURST_COLOR');
     expect(menuSceneSource).toContain('private drawLegacyBackdropSigils(width: number, height: number, time: number): void');
     expect(legacyMenuRenderSource).toContain('resolveLegacyMenuPathStrokeSegments');
     expect(menuSceneSource).toContain('Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.');

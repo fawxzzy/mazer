@@ -223,6 +223,9 @@ export interface MenuSceneRuntimeDiagnostics {
       batchSize: number | null;
       batchUnit: string | null;
       complete: boolean | null;
+      handoffActive?: boolean;
+      handoffDurationMs?: number;
+      handoffProgress?: number;
       lifecyclePhase?: 'idle' | 'building' | 'settled' | 'deconstructing';
       nextSeedQueued?: boolean;
       progressPercent: number | null;
