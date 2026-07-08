@@ -522,6 +522,8 @@ const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;
 const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
 const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 360;
 const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 360;
+const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;
+const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = 860;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const legacyScenePointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
@@ -638,6 +640,7 @@ export class MenuScene extends Phaser.Scene {
   private menuStaticDrawVisibleTileKeys = new Set<string>();
   private menuStaticDrawTilesVisible: number | null = null;
   private menuStaticDrawNextTileAtMs = 0;
+  private menuStaticDeconstructStartedAtMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
   private visualDiagnosticsRevision = 0;
   private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
@@ -776,6 +779,12 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.advanceLegacyMenuStaticDrawStage(time);
+    if (
+      this.menuStaticDrawLifecyclePhase === 'deconstructing'
+      && this.resolveLegacyMenuDeconstructTrailAlpha(time) > 0
+    ) {
+      this.boardDynamicDirty = true;
+    }
     if (this.hasLegacyPlayCompassSpinPendingFrame()) {
       this.hudDirty = true;
     }
@@ -2463,7 +2472,33 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyMenuStaticDeconstructDurationMs(): number {
     const batchSize = Math.max(1, this.resolveLegacyMenuStaticDrawTileBatchSize());
     const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);
-    return LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS + (tileTicks * LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS);
+    return LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS
+      + LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS
+      + LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS
+      + (tileTicks * LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS);
+  }
+
+  private resolveLegacyMenuStaticDeconstructTileStartAtMs(time: number): number {
+    return time
+      + LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS
+      + LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS
+      + LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS;
+  }
+
+  private resolveLegacyMenuDeconstructTrailAlpha(time: number): number {
+    if (this.menuStaticDrawLifecyclePhase !== 'deconstructing' || this.menuStaticDeconstructStartedAtMs === null) {
+      return 1;
+    }
+
+    const fadeElapsedMs = time
+      - this.menuStaticDeconstructStartedAtMs
+      - LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS
+      - LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS;
+    if (fadeElapsedMs <= 0) {
+      return 1;
+    }
+
+    return clamp(1 - (fadeElapsedMs / LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS), 0, 1);
   }
 
   private resolveLegacyMenuStaticDrawTileBatchSize(): number {
@@ -2485,6 +2520,7 @@ export class MenuScene extends Phaser.Scene {
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     if (this.mode === 'menu' && drawStage?.executionKind === 'row-slice') {
       this.menuStaticDrawLifecyclePhase = 'building';
+      this.menuStaticDeconstructStartedAtMs = null;
       this.menuStaticDrawRowsVisible = 0;
       this.menuStaticDrawNextRowAtMs = this.time.now;
       this.menuStaticDrawTileOrder = this.buildLegacyMenuStaticDrawTileOrder();
@@ -2501,6 +2537,7 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticDrawVisibleTileKeys.clear();
     this.menuStaticDrawTilesVisible = null;
     this.menuStaticDrawNextTileAtMs = 0;
+    this.menuStaticDeconstructStartedAtMs = null;
   }
 
   private armLegacyMenuStaticDeconstructStage(time: number): void {
@@ -2513,11 +2550,12 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.menuStaticDrawLifecyclePhase = 'deconstructing';
+    this.menuStaticDeconstructStartedAtMs = time;
     this.menuStaticDrawRowsVisible = null;
     this.menuStaticDrawNextRowAtMs = 0;
     this.menuStaticDrawTilesVisible = this.menuStaticDrawTileOrder.length;
     this.refreshLegacyMenuStaticDrawVisibleTileKeys();
-    this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS;
+    this.menuStaticDrawNextTileAtMs = this.resolveLegacyMenuStaticDeconstructTileStartAtMs(time);
     this.queueGenerationRequest(
       'menu-demo-goal-reset',
       this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
@@ -2584,6 +2622,7 @@ export class MenuScene extends Phaser.Scene {
         this.menuStaticDrawTilesVisible = null;
         this.menuStaticDrawNextTileAtMs = 0;
         this.menuStaticDrawLifecyclePhase = 'settled';
+        this.menuStaticDeconstructStartedAtMs = null;
         this.refreshLegacyMenuStaticDrawVisibleTileKeys();
       }
     }
@@ -2648,14 +2687,18 @@ export class MenuScene extends Phaser.Scene {
       this.settings.toggleTrailFade,
       TRAIL_FADE_TAIL
     );
+    if (nextFrame.shouldRegenerateMaze) {
+      this.menuDemoState = nextFrame.state;
+      this.nextDemoMoveAtMs = time + nextFrame.delayMs;
+      this.armLegacyMenuStaticDeconstructStage(time);
+      this.boardDynamicDirty = true;
+      return;
+    }
+
     this.menuDemoState = nextFrame.state;
     this.player = nextFrame.player;
     this.trail = nextFrame.trail;
     this.nextDemoMoveAtMs = time + nextFrame.delayMs;
-    if (nextFrame.shouldRegenerateMaze) {
-      this.armLegacyMenuStaticDeconstructStage(time);
-      return;
-    }
     this.boardDynamicDirty = true;
   }
 
@@ -3099,6 +3142,9 @@ export class MenuScene extends Phaser.Scene {
     const visibleTrail = this.mode === 'menu'
       ? trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))
       : trail;
+    const menuTrailAlphaMultiplier = this.mode === 'menu'
+      ? this.resolveLegacyMenuDeconstructTrailAlpha(time)
+      : 1;
     const dynamicTrailKeys = new Set(visibleTrail.map((point) => `${point.x},${point.y}`));
     const boardOffset = this.resolveBoardOffset();
 
@@ -3122,6 +3168,10 @@ export class MenuScene extends Phaser.Scene {
       const trailAlpha = this.settings.darkMode && this.mode === 'menu'
         ? clamp(alpha + 0.08, 0, 1)
         : alpha;
+      const resolvedTrailAlpha = trailAlpha * menuTrailAlphaMultiplier;
+      if (resolvedTrailAlpha <= 0) {
+        continue;
+      }
       if (this.mode === 'menu') {
         this.fillLegacyMenuDynamicPathTile(
           point,
@@ -3129,7 +3179,7 @@ export class MenuScene extends Phaser.Scene {
           boardLeft + boardOffset.x,
           boardTop + boardOffset.y,
           tileSize,
-          trailAlpha,
+          resolvedTrailAlpha,
           dynamicTrailKeys
         );
       } else {
@@ -3139,25 +3189,30 @@ export class MenuScene extends Phaser.Scene {
           boardLeft + boardOffset.x,
           boardTop + boardOffset.y,
           tileSize,
-          trailAlpha,
+          resolvedTrailAlpha,
           dynamicTrailKeys
         );
       }
     }
 
     if (this.settings.toggleTrailPulse) {
-      this.drawLegacyPlayDynamicTrailPulse(
-        visibleTrail,
-        boardLeft + boardOffset.x,
-        boardTop + boardOffset.y,
-        tileSize,
-        time,
-        dynamicTrailKeys
-      );
+      if (menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
+        this.drawLegacyPlayDynamicTrailPulse(
+          visibleTrail,
+          boardLeft + boardOffset.x,
+          boardTop + boardOffset.y,
+          tileSize,
+          time,
+          dynamicTrailKeys
+        );
+      }
     }
 
     if (this.mode === 'menu') {
-      if (this.isLegacyMenuPointVisibleInStaticDraw(this.player)) {
+      if (
+        this.menuStaticDrawLifecyclePhase !== 'deconstructing'
+        && this.isLegacyMenuPointVisibleInStaticDraw(this.player)
+      ) {
         this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94, false);
       }
     } else {
