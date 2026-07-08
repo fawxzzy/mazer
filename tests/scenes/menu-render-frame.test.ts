@@ -187,8 +187,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT = 0xffffff;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA = 0.34;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO = 0.066;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1280;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 64;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1600;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 50;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;');
@@ -268,6 +268,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(backdropSource).toContain('resolveLegacyMenuBackdropDriftRunes');
     expect(menuSceneSource).toContain('0.7 + (Math.sin(time / 1800) * 0.3)');
     expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(shard.color, shard.alpha * 0.038);');
+    expect(backdropSource).toContain('const roundBackdropNumber = (value: number): number => Math.round(value * 1000) / 1000;');
+    expect(backdropSource).toContain('const localPhase = phase * (0.16 + (index * 0.022)) + (index * 1.73);');
+    expect(backdropSource).toContain('const driftX = Math.sin(localPhase) * 0.026;');
+    expect(backdropSource).toContain('const driftY = Math.cos(localPhase * 0.74) * 0.017;');
+    expect(backdropSource).toContain('const tailMagnitude = 0.68 + Math.min(0.28, distanceFromCenter * 0.42);');
+    expect(menuSceneSource).toContain('Math.round(pixelX + (stepX * index))');
     expect(menuSceneSource).toContain('const upperRailStart = this.rotateBackdropPoint(shard, -halfLength * 0.86, -halfThickness * 0.58);');
     expect(menuSceneSource).toContain('const upperRailBreakEnd = this.rotateBackdropPoint(shard, halfLength * 0.1, -halfThickness * 0.58);');
     expect(menuSceneSource).toContain('const leadingCutStart = this.rotateBackdropPoint(shard, halfLength * 0.54, -halfThickness - taper);');
@@ -304,9 +310,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_PRISM = 0xb7f2ff;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM = 0x8fffe8;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FACET_WARM = 0xffd36a;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2200;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 2860;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FRAME_MS = 90;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FRAME_MS = 66;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(time: number): void');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitlePrismSweep(');
@@ -316,6 +322,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleSigilRails(');
     expect(menuSceneSource).toContain('private hasLegacyMenuTitleAnimationPendingFrame(time: number): boolean');
     expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleProgress(): number');
+    expect(menuSceneSource).toContain('const smoothstep = (value: number): number => {');
+    expect(menuSceneSource).toContain('const alpha = clamp(smoothstep(1 - (distance / 2.2)) * 0.72 * pulse * alphaScale, 0, 0.78);');
+    expect(menuSceneSource).toContain('const shimmer = smoothstep(0.5 + (Math.sin((localPhase * Math.PI * 2) + (cell.order * 0.37)) * 0.5));');
+    expect(menuSceneSource).not.toContain('const rotationStep = Math.floor(phase * 8);');
     expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitle(time);');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathTitleLayout(');
     expect(menuSceneSource).toContain('title: this.resolveLegacyMenuPathTitleDiagnostics()');
@@ -394,6 +404,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE = 0xecfff5;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;');
+    expect(menuSceneSource).toContain('const falloff = smoothstep(1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW));');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
     expect(menuSceneSource).toContain('LEGACY_PLAY_PATH_EDGE,');
     expect(menuSceneSource).toContain('LEGACY_PLAY_PATH_EDGE_ALPHA,');
@@ -627,8 +638,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private hudDirty = true;');
     expect(menuSceneSource).toContain('this.hudDirty = true;');
     expect(tuningSource).toContain('diagnosticsPublishIntervalMs: 1500,');
-    expect(tuningSource).toContain('full: 100,');
-    expect(tuningSource).toContain('throttled: 300,');
+    expect(tuningSource).toContain('full: 83,');
+    expect(tuningSource).toContain('throttled: 250,');
   });
 
   test('keeps front-door buttons in the shared cyber chrome path', () => {

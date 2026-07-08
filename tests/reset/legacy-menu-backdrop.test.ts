@@ -93,7 +93,7 @@ describe('legacyMenuBackdrop', () => {
     expect(darkRunes[0].alpha).toBeLessThan(staticRunes[0].alpha);
   });
 
-  test('keeps star streaks short and biased inward against radial movement', () => {
+  test('keeps star streaks short with smooth inward radial tails', () => {
     const star = {
       x: 0.8,
       y: 0.8,
@@ -104,8 +104,11 @@ describe('legacyMenuBackdrop', () => {
     };
 
     expect(resolveLegacyMenuBackdropStreakLength(star)).toBe(5);
-    expect(resolveLegacyMenuBackdropTailStep(star)).toEqual({ x: -1, y: -1 });
-    expect(resolveLegacyMenuBackdropTailStep({ ...star, x: 0.2, y: 0.3 })).toEqual({ x: 1, y: 1 });
-    expect(resolveLegacyMenuBackdropTailStep({ ...star, x: 0.5, y: 0.08 })).toEqual({ x: 0, y: 1 });
+    expect(resolveLegacyMenuBackdropTailStep(star).x).toBeCloseTo(-0.607, 3);
+    expect(resolveLegacyMenuBackdropTailStep(star).y).toBeCloseTo(-0.607, 3);
+    expect(resolveLegacyMenuBackdropTailStep({ ...star, x: 0.2, y: 0.3 }).x).toBeCloseTo(0.692, 3);
+    expect(resolveLegacyMenuBackdropTailStep({ ...star, x: 0.2, y: 0.3 }).y).toBeCloseTo(0.461, 3);
+    expect(resolveLegacyMenuBackdropTailStep({ ...star, x: 0.5, y: 0.08 }).x).toBeCloseTo(0, 3);
+    expect(resolveLegacyMenuBackdropTailStep({ ...star, x: 0.5, y: 0.08 }).y).toBeCloseTo(0.856, 3);
   });
 });

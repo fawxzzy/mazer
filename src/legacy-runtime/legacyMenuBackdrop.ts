@@ -52,6 +52,8 @@ interface LegacyMenuBackdropShardTemplate {
   yRatio: number;
 }
 
+const roundBackdropNumber = (value: number): number => Math.round(value * 1000) / 1000;
+
 export const LEGACY_MENU_STAR_COUNT = 180;
 export const LEGACY_MENU_BACKDROP_SHARD_COUNT = 8;
 export const LEGACY_MENU_GLASS_SHARD_COUNT = 5;
@@ -227,16 +229,16 @@ export function resolveLegacyMenuBackdropGlassShards(
   const alphaScale = darkMode ? 0.7 : 1;
 
   return GLASS_SHARD_TEMPLATES.map((template, index) => {
-    const localPhase = phase * (0.22 + (index * 0.034)) + (index * 1.73);
-    const driftX = Math.sin(localPhase) * 0.042;
-    const driftY = Math.cos(localPhase * 0.82) * 0.028;
+    const localPhase = phase * (0.16 + (index * 0.022)) + (index * 1.73);
+    const driftX = Math.sin(localPhase) * 0.026;
+    const driftY = Math.cos(localPhase * 0.74) * 0.017;
 
     return {
       x: width * (template.xRatio + driftX),
       y: height * (template.yRatio + driftY),
       length: minDimension * template.lengthRatio,
       thickness: Math.max(3, minDimension * template.thicknessRatio),
-      angle: template.angle + (animated ? Math.sin(localPhase * 0.56) * 0.08 : 0),
+      angle: template.angle + (animated ? Math.sin(localPhase * 0.48) * 0.052 : 0),
       alpha: template.alpha * alphaScale,
       color: template.color
     };
@@ -281,16 +283,11 @@ export function resolveLegacyMenuBackdropStreakLength(star: LegacyMenuBackdropSt
 
 export function resolveLegacyMenuBackdropTailStep(star: LegacyMenuBackdropStar): { x: number; y: number } {
   const warpVector = resolveLegacyMenuBackdropWarpVector(star);
-  const quantizeTailAxis = (value: number): number => {
-    if (Math.abs(value) < 0.38) {
-      return 0;
-    }
-
-    return value > 0 ? -1 : 1;
-  };
+  const distanceFromCenter = resolveLegacyMenuBackdropWarpDistance(star);
+  const tailMagnitude = 0.68 + Math.min(0.28, distanceFromCenter * 0.42);
 
   return {
-    x: quantizeTailAxis(warpVector.x),
-    y: quantizeTailAxis(warpVector.y)
+    x: roundBackdropNumber(-warpVector.x * tailMagnitude),
+    y: roundBackdropNumber(-warpVector.y * tailMagnitude)
   };
 }

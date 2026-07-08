@@ -552,9 +552,9 @@ const LEGACY_MENU_PATH_TITLE_PRISM = 0xb7f2ff;
 const LEGACY_MENU_PATH_TITLE_RUNE = 0xfff05a;
 const LEGACY_MENU_PATH_TITLE_GEM = 0x8fffe8;
 const LEGACY_MENU_PATH_TITLE_FACET_WARM = 0xffd36a;
-const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2200;
-const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 2860;
-const LEGACY_MENU_PATH_TITLE_FRAME_MS = 90;
+const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;
+const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
+const LEGACY_MENU_PATH_TITLE_FRAME_MS = 66;
 const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;
 const LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA = 0.44;
 const LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA = 0.92;
@@ -591,8 +591,8 @@ const LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM = 0xffd66b;
 const LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT = 0xffffff;
 const LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA = 0.34;
 const LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO = 0.066;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1280;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 64;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1600;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 50;
 const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;
@@ -654,6 +654,10 @@ const LEGACY_MENU_DECONSTRUCT_BURST_COLOR = 0xb7f2ff;
 const LEGACY_MENU_DECONSTRUCT_BURST_ALT = 0x72e0bf;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+const smoothstep = (value: number): number => {
+  const x = clamp(value, 0, 1);
+  return x * x * (3 - (2 * x));
+};
 const legacyScenePointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
 const cloneLegacyScenePoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
 
@@ -3322,7 +3326,12 @@ export class MenuScene extends Phaser.Scene {
 
       for (let index = 1; index <= streakLength; index += 1) {
         this.backdropGraphics.fillStyle(0xffffff, star.alpha * starAlphaScale * (0.54 - (index * 0.07)));
-        this.backdropGraphics.fillRect(pixelX + (stepX * index), pixelY + (stepY * index), 1, 1);
+        this.backdropGraphics.fillRect(
+          Math.round(pixelX + (stepX * index)),
+          Math.round(pixelY + (stepY * index)),
+          1,
+          1
+        );
       }
     }
     if (palette.overlayAlpha > 0) {
@@ -3689,7 +3698,7 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyMenuPathTitleSweepColumn(columns: number, rows: number, time: number): number {
     const phase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
-    return Math.round((phase * (columns + (rows * 0.72) + 5)) - 3);
+    return (phase * (columns + (rows * 0.72) + 5)) - 3;
   }
 
   private resolveLegacyMenuPathTitleVisiblePieces(pieceCount: number): number {
@@ -3805,7 +3814,7 @@ export class MenuScene extends Phaser.Scene {
   ): void {
     const phase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
     const sweepPosition = (phase * (titleLayout.columns + (titleLayout.rows * 0.72) + 5)) - 3;
-    const pulse = 0.72 + (Math.sin(phase * Math.PI * 2) * 0.18);
+    const pulse = 0.76 + (Math.sin(phase * Math.PI * 2) * 0.14);
     const inset = Math.max(titleLayout.coreInset, Math.floor(titleLayout.cellSize * 0.16));
     const glintSize = Math.max(1, titleLayout.cellSize - (inset * 2));
     const starInset = Math.max(titleLayout.coreInset + 1, Math.floor(titleLayout.cellSize * 0.32));
@@ -3816,8 +3825,8 @@ export class MenuScene extends Phaser.Scene {
       const localTwinkle = Math.sin((time / 480) + (cell.order * 0.61));
       const isAnchorSpark = cell.order % 13 === 0 && localTwinkle > 0.54;
 
-      if (distance < 1.55) {
-        const alpha = clamp((1 - (distance / 1.55)) * 0.72 * pulse * alphaScale, 0, 0.78);
+      if (distance < 2.2) {
+        const alpha = clamp(smoothstep(1 - (distance / 2.2)) * 0.72 * pulse * alphaScale, 0, 0.78);
         this.titleGraphics.fillStyle(LEGACY_MENU_PATH_TITLE_ACCENT, alpha);
         this.titleGraphics.fillRect(
           titleLayout.left + (cell.column * titleLayout.cellSize) + inset,
@@ -3857,25 +3866,25 @@ export class MenuScene extends Phaser.Scene {
     alphaScale: number
   ): void {
     const phase = (time % LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS) / LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS;
-    const rotationStep = Math.floor(phase * 8);
     const inset = Math.max(titleLayout.coreInset, Math.floor(titleLayout.cellSize * 0.2));
     const lineInset = Math.max(titleLayout.coreInset + 1, Math.floor(titleLayout.cellSize * 0.32));
 
     for (const cell of visibleCells) {
+      const localPhase = (phase + ((cell.order % 17) / 17)) % 1;
       const left = titleLayout.left + (cell.column * titleLayout.cellSize) + inset;
       const top = titleLayout.top + (cell.row * titleLayout.cellSize) + inset;
       const right = titleLayout.left + ((cell.column + 1) * titleLayout.cellSize) - inset;
       const bottom = titleLayout.top + ((cell.row + 1) * titleLayout.cellSize) - inset;
       const midX = (left + right) / 2;
       const midY = (top + bottom) / 2;
-      const shimmer = 0.52 + (Math.sin((phase * Math.PI * 2) + (cell.order * 0.73)) * 0.32);
+      const shimmer = smoothstep(0.5 + (Math.sin((localPhase * Math.PI * 2) + (cell.order * 0.37)) * 0.5));
       const alpha = clamp((0.065 + (shimmer * 0.14)) * alphaScale, 0.04, 0.27);
       const facetColor = cell.order % 4 === 0
         ? LEGACY_MENU_PATH_TITLE_FACET_WARM
         : LEGACY_MENU_PATH_TITLE_GEM;
 
       this.titleGraphics.fillStyle(facetColor, alpha);
-      switch ((cell.order + rotationStep) % 4) {
+      switch (cell.order % 4) {
         case 0:
           this.titleGraphics.fillTriangle(left, top, right, top, midX, midY);
           break;
@@ -3891,16 +3900,17 @@ export class MenuScene extends Phaser.Scene {
       }
 
       if (cell.order % 7 === 0) {
-        const glintAlpha = clamp(alpha * 1.52, 0, 0.38);
+        const glintAlpha = clamp(alpha * (1.12 + (smoothstep(localPhase) * 0.58)), 0, 0.38);
+        const glintLean = (smoothstep(localPhase) - 0.5) * titleLayout.cellSize * 0.16;
         this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, glintAlpha);
         this.strokeLegacyPolyline(this.titleGraphics, [
           {
             x: titleLayout.left + (cell.column * titleLayout.cellSize) + lineInset,
-            y: titleLayout.top + ((cell.row + 1) * titleLayout.cellSize) - lineInset
+            y: titleLayout.top + ((cell.row + 1) * titleLayout.cellSize) - lineInset + glintLean
           },
           {
             x: titleLayout.left + ((cell.column + 1) * titleLayout.cellSize) - lineInset,
-            y: titleLayout.top + (cell.row * titleLayout.cellSize) + lineInset
+            y: titleLayout.top + (cell.row * titleLayout.cellSize) + lineInset + glintLean
           }
         ]);
       }
@@ -4568,7 +4578,7 @@ export class MenuScene extends Phaser.Scene {
         continue;
       }
 
-      const falloff = 1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW);
+      const falloff = smoothstep(1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW));
       const alpha = clamp(0.14 + (falloff * 0.62), 0.14, 0.76);
       this.fillLegacyDynamicPathTile(
         point,
