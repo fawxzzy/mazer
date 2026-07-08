@@ -15,6 +15,7 @@ import {
   linearColorToHex,
   type LegacySettings
 } from '../legacy-runtime/legacyDefaults';
+import { resolveLegacyAdvancedOptionsVisible } from '../legacy-runtime/legacyAdvancedOptions';
 import {
   type LegacyMazeSnapshot,
   type LegacyPoint
@@ -5779,17 +5780,26 @@ export class MenuScene extends Phaser.Scene {
   private buildOptionsOverlay(): void {
     const panel = this.resolveOverlayPanelFrame('options');
     const compact = panel.width < 420;
+    const showAdvancedOptions = this.shouldShowLegacyAdvancedOptions();
     let rowY = panel.top + 92;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
     this.createOverlayTitle('Options', panel.top + 44);
 
-    rowY = this.createInputRow('Maze Scale', 'scale', rowY, panel);
-    rowY = this.createInputRow('Camera Scale', 'camScale', rowY, panel);
+    if (showAdvancedOptions) {
+      rowY = this.createInputRow('Maze Scale', 'scale', rowY, panel);
+      rowY = this.createInputRow('Camera Scale', 'camScale', rowY, panel);
+    }
+
     rowY = this.createFeatureControlRows(rowY, panel);
-    if (!compact) {
+
+    if (showAdvancedOptions && !compact) {
       rowY = this.createColorInputRow('Path RGB 0-255', ['pathR', 'pathG', 'pathB'], rowY, panel, this.settings.pathColor);
       rowY = this.createColorInputRow('Wall RGB 0-255', ['wallR', 'wallG', 'wallB'], rowY, panel, this.settings.wallColor);
     }
+  }
+
+  private shouldShowLegacyAdvancedOptions(): boolean {
+    return resolveLegacyAdvancedOptionsVisible(typeof window === 'undefined' ? '' : window.location.search);
   }
 
   private buildPauseOverlay(): void {
