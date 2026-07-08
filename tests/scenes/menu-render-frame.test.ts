@@ -229,6 +229,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_SHARD_COUNT');
     expect(backdropSource).toContain('LEGACY_MENU_GLASS_SHARD_COUNT');
     expect(backdropSource).toContain('LEGACY_MENU_DRIFT_RUNE_COUNT');
+    expect(backdropSource).toContain("LEGACY_MENU_BACKDROP_STAR_MOTION = 'radial-warp'");
+    expect(backdropSource).toContain('resolveLegacyMenuBackdropWarpVector');
+    expect(backdropSource).toContain('resetLegacyMenuBackdropStarNearWarpOrigin');
+    expect(menuSceneSource).toContain('starMotion: LEGACY_MENU_BACKDROP_STAR_MOTION');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropGlassShards');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropDriftRunes');
     expect(menuSceneSource).toContain('0.7 + (Math.sin(time / 1800) * 0.3)');

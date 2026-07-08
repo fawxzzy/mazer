@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   LEGACY_MENU_BACKDROP_SHARD_COUNT,
+  LEGACY_MENU_BACKDROP_STAR_MOTION,
   LEGACY_MENU_DRIFT_RUNE_COUNT,
   LEGACY_MENU_GLASS_SHARD_COUNT,
   LEGACY_MENU_STAR_COUNT,
@@ -11,7 +12,8 @@ import {
   resolveLegacyMenuBackdropPalette,
   resolveLegacyMenuBackdropShards,
   resolveLegacyMenuBackdropStreakLength,
-  resolveLegacyMenuBackdropTailStep
+  resolveLegacyMenuBackdropTailStep,
+  resolveLegacyMenuBackdropWarpDistance
 } from '../../src/legacy-runtime/legacyMenuBackdrop';
 
 describe('legacyMenuBackdrop', () => {
@@ -29,20 +31,22 @@ describe('legacyMenuBackdrop', () => {
     });
   });
 
-  test('advances stars downward with wrap-safe x drift for the menu backdrop', () => {
+  test('advances stars outward from center and recycles them near the warp origin', () => {
     const stars = [{
-      x: 1.02,
-      y: 1.05,
+      x: 1.09,
+      y: 0.5,
       radius: 1.4,
       speed: 0.03,
       alpha: 0.5,
-      drift: 0.03
+      drift: 0
     }];
 
     advanceLegacyMenuBackdropStars(stars, 1000, false, () => 0.25);
 
-    expect(stars[0].y).toBe(-0.06);
-    expect(stars[0].x).toBe(0.25);
+    expect(stars[0].x).toBeCloseTo(0.5, 5);
+    expect(stars[0].y).toBeCloseTo(0.553, 3);
+    expect(resolveLegacyMenuBackdropWarpDistance(stars[0])).toBeLessThan(0.06);
+    expect(LEGACY_MENU_BACKDROP_STAR_MOTION).toBe('radial-warp');
   });
 
   test('publishes a deep blue-violet palette and bounded angular shards', () => {
@@ -87,19 +91,19 @@ describe('legacyMenuBackdrop', () => {
     expect(darkRunes[0].alpha).toBeLessThan(staticRunes[0].alpha);
   });
 
-  test('keeps star streaks short and biased upward against movement', () => {
+  test('keeps star streaks short and biased inward against radial movement', () => {
     const star = {
-      x: 0.5,
-      y: 0.5,
+      x: 0.8,
+      y: 0.8,
       radius: 2,
       speed: 0.03,
       alpha: 0.6,
       drift: 0.02
     };
 
-    expect(resolveLegacyMenuBackdropStreakLength(star)).toBe(2);
+    expect(resolveLegacyMenuBackdropStreakLength(star)).toBe(5);
     expect(resolveLegacyMenuBackdropTailStep(star)).toEqual({ x: -1, y: -1 });
-    expect(resolveLegacyMenuBackdropTailStep({ ...star, drift: -0.02 })).toEqual({ x: 1, y: -1 });
-    expect(resolveLegacyMenuBackdropTailStep({ ...star, drift: 0 })).toEqual({ x: 0, y: -1 });
+    expect(resolveLegacyMenuBackdropTailStep({ ...star, x: 0.2, y: 0.3 })).toEqual({ x: 1, y: 1 });
+    expect(resolveLegacyMenuBackdropTailStep({ ...star, x: 0.5, y: 0.08 })).toEqual({ x: 0, y: 1 });
   });
 });

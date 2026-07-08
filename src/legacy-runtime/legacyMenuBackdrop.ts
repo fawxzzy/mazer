@@ -56,6 +56,14 @@ export const LEGACY_MENU_STAR_COUNT = 180;
 export const LEGACY_MENU_BACKDROP_SHARD_COUNT = 8;
 export const LEGACY_MENU_GLASS_SHARD_COUNT = 5;
 export const LEGACY_MENU_DRIFT_RUNE_COUNT = 14;
+export const LEGACY_MENU_BACKDROP_STAR_MOTION = 'radial-warp';
+
+const LEGACY_MENU_BACKDROP_WARP_CENTER_X = 0.5;
+const LEGACY_MENU_BACKDROP_WARP_CENTER_Y = 0.5;
+const LEGACY_MENU_BACKDROP_WARP_WRAP_RADIUS = 0.82;
+const LEGACY_MENU_BACKDROP_WARP_RESPAWN_MIN_RADIUS = 0.018;
+const LEGACY_MENU_BACKDROP_WARP_RESPAWN_RADIUS_RANGE = 0.14;
+const LEGACY_MENU_BACKDROP_WARP_EDGE_MARGIN = 0.08;
 
 const LIGHT_BACKDROP_SHARDS: LegacyMenuBackdropShardTemplate[] = [
   { xRatio: 0.52, yRatio: 0.44, lengthRatio: 0.62, thicknessRatio: 0.038, angle: -0.64, alpha: 0.055, color: 0x72e0bf },
@@ -106,24 +114,70 @@ export function advanceLegacyMenuBackdropStars(
   darkMode: boolean,
   random: () => number = Math.random
 ): void {
-  const speedScale = darkMode ? 0.22 : 0.38;
-  const driftScale = darkMode ? 0.12 : 0.18;
+  const elapsedSeconds = Math.min(0.25, Math.max(0, deltaMs / 1000));
+  const speedScale = darkMode ? 0.46 : 0.72;
+  const tangentScale = darkMode ? 0.026 : 0.04;
 
   for (const star of stars) {
-    star.y += star.speed * (deltaMs / 1000) * speedScale;
-    star.x += star.drift * (deltaMs / 1000) * driftScale;
+    const warpVector = resolveLegacyMenuBackdropWarpVector(star);
+    const distanceFromCenter = resolveLegacyMenuBackdropWarpDistance(star);
+    const accelerationScale = 0.82 + Math.min(1.55, distanceFromCenter * 2.35);
+    const outwardStep = star.speed * elapsedSeconds * speedScale * accelerationScale;
+    const tangentStep = star.drift * elapsedSeconds * tangentScale;
 
-    if (star.y > 1.06) {
-      star.y = -0.06;
-      star.x = random();
-    }
+    star.x += (warpVector.x * outwardStep) + (-warpVector.y * tangentStep);
+    star.y += (warpVector.y * outwardStep) + (warpVector.x * tangentStep);
 
-    if (star.x > 1.03) {
-      star.x = -0.03;
-    } else if (star.x < -0.03) {
-      star.x = 1.03;
+    if (shouldRecycleLegacyMenuBackdropStar(star)) {
+      resetLegacyMenuBackdropStarNearWarpOrigin(star, random);
     }
   }
+}
+
+export function resolveLegacyMenuBackdropWarpDistance(star: LegacyMenuBackdropStar): number {
+  return Math.hypot(
+    star.x - LEGACY_MENU_BACKDROP_WARP_CENTER_X,
+    star.y - LEGACY_MENU_BACKDROP_WARP_CENTER_Y
+  );
+}
+
+export function resolveLegacyMenuBackdropWarpVector(star: LegacyMenuBackdropStar): { x: number; y: number } {
+  const deltaX = star.x - LEGACY_MENU_BACKDROP_WARP_CENTER_X;
+  const deltaY = star.y - LEGACY_MENU_BACKDROP_WARP_CENTER_Y;
+  const distance = Math.hypot(deltaX, deltaY);
+
+  if (distance > 0.0001) {
+    return {
+      x: deltaX / distance,
+      y: deltaY / distance
+    };
+  }
+
+  const fallbackAngle = star.drift >= 0 ? -Math.PI / 4 : (-3 * Math.PI) / 4;
+  return {
+    x: Math.cos(fallbackAngle),
+    y: Math.sin(fallbackAngle)
+  };
+}
+
+function shouldRecycleLegacyMenuBackdropStar(star: LegacyMenuBackdropStar): boolean {
+  return star.x < -LEGACY_MENU_BACKDROP_WARP_EDGE_MARGIN
+    || star.x > 1 + LEGACY_MENU_BACKDROP_WARP_EDGE_MARGIN
+    || star.y < -LEGACY_MENU_BACKDROP_WARP_EDGE_MARGIN
+    || star.y > 1 + LEGACY_MENU_BACKDROP_WARP_EDGE_MARGIN
+    || resolveLegacyMenuBackdropWarpDistance(star) > LEGACY_MENU_BACKDROP_WARP_WRAP_RADIUS;
+}
+
+function resetLegacyMenuBackdropStarNearWarpOrigin(
+  star: LegacyMenuBackdropStar,
+  random: () => number
+): void {
+  const angle = random() * Math.PI * 2;
+  const radius = LEGACY_MENU_BACKDROP_WARP_RESPAWN_MIN_RADIUS
+    + (random() * LEGACY_MENU_BACKDROP_WARP_RESPAWN_RADIUS_RANGE);
+
+  star.x = LEGACY_MENU_BACKDROP_WARP_CENTER_X + (Math.cos(angle) * radius);
+  star.y = LEGACY_MENU_BACKDROP_WARP_CENTER_Y + (Math.sin(angle) * radius);
 }
 
 export function resolveLegacyMenuBackdropPalette(darkMode: boolean): LegacyMenuBackdropPalette {
@@ -219,17 +273,24 @@ export function resolveLegacyMenuBackdropDriftRunes(
 }
 
 export function resolveLegacyMenuBackdropStreakLength(star: LegacyMenuBackdropStar): number {
-  return Math.max(1, Math.round((star.speed * 34) + (star.radius * 0.52)));
+  const distanceFromCenter = resolveLegacyMenuBackdropWarpDistance(star);
+  return Math.min(6, Math.max(1, Math.round(
+    (star.speed * 38) + (distanceFromCenter * 6.2) + (star.radius * 0.52)
+  )));
 }
 
 export function resolveLegacyMenuBackdropTailStep(star: LegacyMenuBackdropStar): { x: number; y: number } {
-  if (star.drift > 0.002) {
-    return { x: -1, y: -1 };
-  }
+  const warpVector = resolveLegacyMenuBackdropWarpVector(star);
+  const quantizeTailAxis = (value: number): number => {
+    if (Math.abs(value) < 0.38) {
+      return 0;
+    }
 
-  if (star.drift < -0.002) {
-    return { x: 1, y: -1 };
-  }
+    return value > 0 ? -1 : 1;
+  };
 
-  return { x: 0, y: -1 };
+  return {
+    x: quantizeTailAxis(warpVector.x),
+    y: quantizeTailAxis(warpVector.y)
+  };
 }

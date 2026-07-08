@@ -359,6 +359,7 @@ export interface MenuSceneRuntimeDiagnostics {
     background: {
       clouds: number;
       farStars: number;
+      starMotion?: string;
       nearStars: number;
       twinkles: number;
       shards?: number;

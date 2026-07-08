@@ -86,6 +86,7 @@ import {
   LEGACY_MENU_BACKDROP_SHARD_COUNT,
   LEGACY_MENU_DRIFT_RUNE_COUNT,
   LEGACY_MENU_GLASS_SHARD_COUNT,
+  LEGACY_MENU_BACKDROP_STAR_MOTION,
   LEGACY_MENU_STAR_COUNT,
   advanceLegacyMenuBackdropStars,
   createLegacyMenuBackdropStars,
@@ -1293,6 +1294,7 @@ export class MenuScene extends Phaser.Scene {
         background: {
           clouds: 0,
           farStars: starCount,
+          starMotion: LEGACY_MENU_BACKDROP_STAR_MOTION,
           nearStars: 0,
           twinkles: 0,
           shards: LEGACY_MENU_BACKDROP_SHARD_COUNT,
