@@ -307,7 +307,10 @@ interface MenuSceneVisualDiagnostics {
     canvasPixelHeight: number;
     canvasPixelWidth: number;
     devicePixelRatio: number;
+    renderResolutionDeficit: number;
+    renderResolutionTargetRatio: number;
     renderResolutionRatio: number;
+    undersampledForDevicePixelRatio: boolean;
   };
   hud: {
     kind: 'legacy-play-hud' | null;
@@ -6573,7 +6576,10 @@ export class MenuScene extends Phaser.Scene {
     const canvasCssHeight = Math.max(1, Math.round(canvasBounds.height));
     const canvasPixelWidth = Math.max(1, this.game.canvas.width);
     const canvasPixelHeight = Math.max(1, this.game.canvas.height);
+    const devicePixelRatio = typeof window === 'undefined' ? 1 : Math.max(1, window.devicePixelRatio || 1);
     const renderResolutionRatio = Math.round((canvasPixelWidth / canvasCssWidth) * 100) / 100;
+    const renderResolutionTargetRatio = Math.round(Math.min(devicePixelRatio, 2) * 100) / 100;
+    const renderResolutionDeficit = Math.round(Math.max(0, renderResolutionTargetRatio - renderResolutionRatio) * 100) / 100;
 
     this.visualDiagnosticsRevision += 1;
     const diagnostics: MenuSceneVisualDiagnostics = {
@@ -6782,8 +6788,11 @@ export class MenuScene extends Phaser.Scene {
         canvasCssWidth,
         canvasPixelHeight,
         canvasPixelWidth,
-        devicePixelRatio: typeof window === 'undefined' ? 1 : Math.max(1, window.devicePixelRatio || 1),
-        renderResolutionRatio
+        devicePixelRatio,
+        renderResolutionDeficit,
+        renderResolutionTargetRatio,
+        renderResolutionRatio,
+        undersampledForDevicePixelRatio: renderResolutionDeficit > 0.05
       },
       hud: {
         kind: this.mode === 'play' && this.overlay === 'none' ? 'legacy-play-hud' : null,

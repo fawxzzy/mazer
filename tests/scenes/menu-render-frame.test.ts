@@ -605,7 +605,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('removeAttribute(MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE)');
     expect(menuSceneSource).toContain('renderSurface: {');
     expect(menuSceneSource).toContain('canvasPixelWidth');
+    expect(menuSceneSource).toContain('renderResolutionTargetRatio');
+    expect(menuSceneSource).toContain('renderResolutionDeficit');
     expect(menuSceneSource).toContain('renderResolutionRatio');
+    expect(menuSceneSource).toContain('undersampledForDevicePixelRatio');
+    expect(menuSceneSource).toContain('const renderResolutionTargetRatio = Math.round(Math.min(devicePixelRatio, 2) * 100) / 100;');
+    expect(menuSceneSource).toContain('undersampledForDevicePixelRatio: renderResolutionDeficit > 0.05');
   });
 
   test('publishes a compact walkable maze snapshot for live play QA', () => {

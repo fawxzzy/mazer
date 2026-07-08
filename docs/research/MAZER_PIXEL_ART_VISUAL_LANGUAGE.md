@@ -5,7 +5,8 @@
 - The maintained runtime keeps Phaser `pixelArt: false`, `antialias: true`, `antialiasGL: true`, `roundPixels: true`, and `scale.autoRound: true` so text, controls, and gothic-cyber chrome stay readable.
 - Mobile crispness now comes from maze-layer pixel discipline: wall fills, path material frames, and path cues are snapped to integer canvas-pixel boundaries instead of relying on whole-canvas pixelation.
 - Whole-canvas CSS `image-rendering: pixelated` / `crisp-edges` is intentionally avoided in the active runtime because it makes anti-aliased text/chrome look chunky when translated from desktop to mobile.
-- Runtime diagnostics publish the canvas CSS size, backing size, device pixel ratio, and render ratio so mobile proofs can distinguish browser zoom or backing-store issues from maze-layer blur.
+- Runtime diagnostics publish the canvas CSS size, backing size, device pixel ratio, render ratio, capped target ratio, render deficit, and `undersampledForDevicePixelRatio` flag so mobile proofs can distinguish browser zoom or backing-store issues from maze-layer blur.
+- Current investigation found the likely real-phone blur cause: Phaser `RESIZE` mode keeps the canvas backing store at CSS pixels even on DPR 2-3 devices. A `405px` wide phone viewport can therefore render into a `405px` backing canvas and then be upscaled by the browser to physical pixels. The next renderer lane should either migrate to a DPR-aware backing canvas with logical CSS-pixel layout and compatible pointer mapping, or choose a deliberate low-DPR performance cap per device class.
 - The visual contract now has a screenshot gate for exact target URLs, with diagnostics exposed from `resolveTitleBandFrame`, `resolveInstallChromeFrame`, and `resolveDemoTrailRenderBounds`.
 - Themes must stay identity-consistent across `noir`, `ember`, `aurora`, `vellum`, and `monolith`.
 - The install CTA is shell chrome, not gameplay UI. It lives in a bottom-center lane and must not compete with the title or the board.
@@ -82,11 +83,11 @@ Do not copy:
 - `ember` can tolerate a slightly richer shell, but the trail and player still need clean separation from warm substrate.
 
 ## Top 5 Visual Changes To Make Next
-1. Push semantic signals one more step apart in value before adding any more decorative treatment, especially `trail` vs `player` and `start` vs `goal`.
-2. Keep reducing foreground softness until the board shell feels hard and the atmosphere clearly sits behind it.
-3. Tighten the mobile title plate further if needed so the wordmark survives at a glance, not just at full-screen inspection.
-4. Add screenshot-side contrast reporting for the title band and install lane so theme regressions are obvious in artifacts, not only by eye.
-5. Consider a tiny theme-specific board-floor tint adjustment per profile if mobile readability still lags desktop for `vellum` or `aurora`.
+1. Add a DPR-aware render pass for real phones: target backing-store ratio `2` on DPR 2-3 devices while preserving logical CSS-pixel layout and touch hit testing.
+2. Push semantic signals one more step apart in value before adding any more decorative treatment, especially `trail` vs `player` and `start` vs `goal`.
+3. Keep reducing foreground softness until the board shell feels hard and the atmosphere clearly sits behind it.
+4. Tighten the mobile title plate further if needed so the wordmark survives at a glance, not just at full-screen inspection.
+5. Add screenshot-side contrast reporting for the title band and install lane so theme regressions are obvious in artifacts, not only by eye.
 
 ## References
 - [W3C Understanding SC 1.4.3: Contrast (Minimum)](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum)
