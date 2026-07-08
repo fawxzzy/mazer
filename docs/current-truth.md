@@ -157,6 +157,7 @@ Why the active marker is now complete for the current scope:
 - runtime diagnostics now also expose `menuDemo.route` with route length, segment count, canonical path length, traverse duration, cue counts, trail-mode counts, and AI reset cursor; the representative split-flow menu AI route is guarded below 4x the canonical solution and under 60 seconds so shortcut-heavy recovery cannot silently regress into a runaway attract loop
 - runtime diagnostics now expose compact maze provenance and quality readback under `generation.maze`, including `source`, `buildKind`, size, seed, solution path length, shortcut stats, checkpoint/path-builder stats, playable-topology normalization stats, and route-quality classification; maintained `4173` browser proof confirms the menu surface reports `menu-generated` and the play route reports `play-generated` without relying on hidden window globals
 - runtime diagnostics now expose compact local cycle telemetry under `cycleTelemetry`, including bounded recent completion receipts and a conservative `learning` summary signal; this is local-only observation for future tuning and does not automatically alter maze generation, controls, or visuals yet
+- `npm run cycle:report` now converts raw local cycle history, runtime diagnostics, or localStorage-style exports into `mazer.cycle-learning.report.v1` Atlas-safe reports; full raw player paths stay out of the report, and the bridge is for durable tuning context rather than remote analytics or automatic adaptation
 - legacy options/pause rebuilds now defer to overlay close instead of rebuilding immediately on field commit
 - in-game pause commands now route through an explicit legacy pause lifecycle contract for `Back`, `Reset`, and `Main Menu`
 - features and game-modes toggles now route through an explicit legacy overlay-toggle contract, with inverted `On/Off` copy kept only where the legacy widget actually owned it
@@ -201,6 +202,7 @@ Current `test:verify` means:
 - `tests/reset`
 - `tests/ai/demo-walker.test.ts`
 - `tests/scenes/menu-render-frame.test.ts`
+- `tests/analysis/maze-cycle-telemetry-report.test.mjs`
 - `--maxWorkers 1`
 
 That proof spine currently guards marker arithmetic/current-truth sync, reset and generation lifecycle, topology scale audits, menu AI recovery/replay, active play movement/HUD/reset contracts, and render-frame layout/readability contracts. `npm run lint` remains a separate TypeScript gate for code-edit packets and should still be run before commit when implementation files change.
