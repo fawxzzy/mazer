@@ -80,6 +80,24 @@ const countDetachedFloorTiles = (maze: ReturnType<typeof createLegacyMaze>): num
   return detached;
 };
 
+const isEndpointOnMazeBorder = (
+  maze: ReturnType<typeof createLegacyMaze>,
+  point: { x: number; y: number }
+): boolean => (
+  point.x === 0 || point.y === 0 || point.x === maze.size - 1 || point.y === maze.size - 1
+);
+
+const collectBorderEndpointRoles = (maze: ReturnType<typeof createLegacyMaze>): Array<'start' | 'goal'> => {
+  const roles: Array<'start' | 'goal'> = [];
+  if (isEndpointOnMazeBorder(maze, maze.start)) {
+    roles.push('start');
+  }
+  if (isEndpointOnMazeBorder(maze, maze.goal)) {
+    roles.push('goal');
+  }
+  return roles;
+};
+
 const DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS = [
   ...Array.from({ length: 64 }, (_, index) => index + 1),
   89,
@@ -150,8 +168,10 @@ describe('legacy reset lane', () => {
   test('normalizes generated play mazes into one playable floor component', () => {
     for (const seed of [3749, 0x5a17f00d, 2, 777, 1001]) {
       const maze = createLegacyMaze(50, seed);
+      const borderEndpointRoles = collectBorderEndpointRoles(maze);
 
       expect(countDetachedFloorTiles(maze)).toBe(0);
+      expect(borderEndpointRoles.length).toBeGreaterThanOrEqual(1);
       expect(maze.solutionPath.length).toBeGreaterThanOrEqual(Math.floor(maze.size * 1.5));
       expect(maze.playableTopologyStats?.reachableFloors).toBeGreaterThan(maze.solutionPath.length);
       expect(maze.playableTopologyStats?.disconnectedFloorTilesPruned).toBeGreaterThan(0);
@@ -192,15 +212,28 @@ describe('legacy reset lane', () => {
 
   test('keeps default generated play mazes connected with meaningful alternate routes across seed families', () => {
     const failures: unknown[] = [];
+    const borderEndpointRoles = new Set<'start' | 'goal'>();
 
     for (const seed of DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS) {
       const maze = createLegacyMaze(50, seed);
+      for (const role of collectBorderEndpointRoles(maze)) {
+        borderEndpointRoles.add(role);
+      }
 
       expect(maze.source).toBe('play-generated');
       expect(countDetachedFloorTiles(maze)).toBe(0);
       const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
       if (
-        maze.solutionPath.length < minimumSolutionPathLength
+        collectBorderEndpointRoles(maze).length < 1
+        || maze.solutionPath[0]?.x !== maze.start.x
+        || maze.solutionPath[0]?.y !== maze.start.y
+        || maze.solutionPath.at(-1)?.x !== maze.goal.x
+        || maze.solutionPath.at(-1)?.y !== maze.goal.y
+        || maze.grid[maze.start.y]?.[maze.start.x] !== true
+        || maze.grid[maze.goal.y]?.[maze.goal.x] !== true
+        || maze.playableTopologyStats?.resolvedGoalDistance !== maze.solutionPath.length - 1
+        || (maze.playableTopologyStats?.reachableFloors ?? 0) <= maze.solutionPath.length
+        || maze.solutionPath.length < minimumSolutionPathLength
         || maze.routeQualityStats?.routeQuality !== 'multi-route'
         || maze.routeQualityStats.meaningfulBypassableSolutionEdges <= 1
         || maze.routeQualityStats.meaningfulBypassableRouteBands <= 1
@@ -217,19 +250,34 @@ describe('legacy reset lane', () => {
     }
 
     expect(failures).toEqual([]);
+    expect(borderEndpointRoles.has('start')).toBe(true);
+    expect(borderEndpointRoles.has('goal')).toBe(true);
   }, 20_000);
 
   test('keeps default generated menu mazes connected with meaningful alternate routes across seed families', () => {
     const failures: unknown[] = [];
+    const borderEndpointRoles = new Set<'start' | 'goal'>();
 
     for (const seed of DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS) {
       const maze = createLegacyGeneratedMenuMaze(50, seed);
+      for (const role of collectBorderEndpointRoles(maze)) {
+        borderEndpointRoles.add(role);
+      }
 
       expect(maze.source).toBe('menu-generated');
       expect(countDetachedFloorTiles(maze)).toBe(0);
       const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
       if (
-        maze.solutionPath.length < minimumSolutionPathLength
+        collectBorderEndpointRoles(maze).length < 1
+        || maze.solutionPath[0]?.x !== maze.start.x
+        || maze.solutionPath[0]?.y !== maze.start.y
+        || maze.solutionPath.at(-1)?.x !== maze.goal.x
+        || maze.solutionPath.at(-1)?.y !== maze.goal.y
+        || maze.grid[maze.start.y]?.[maze.start.x] !== true
+        || maze.grid[maze.goal.y]?.[maze.goal.x] !== true
+        || maze.playableTopologyStats?.resolvedGoalDistance !== maze.solutionPath.length - 1
+        || (maze.playableTopologyStats?.reachableFloors ?? 0) <= maze.solutionPath.length
+        || maze.solutionPath.length < minimumSolutionPathLength
         || maze.routeQualityStats?.routeQuality !== 'multi-route'
         || maze.routeQualityStats.meaningfulBypassableSolutionEdges <= 1
         || maze.routeQualityStats.meaningfulBypassableRouteBands <= 1
@@ -246,6 +294,8 @@ describe('legacy reset lane', () => {
     }
 
     expect(failures).toEqual([]);
+    expect(borderEndpointRoles.has('start')).toBe(true);
+    expect(borderEndpointRoles.has('goal')).toBe(true);
   }, 20_000);
 
   test('reinforces weak shortcut outcomes without disconnecting generated play mazes', () => {
