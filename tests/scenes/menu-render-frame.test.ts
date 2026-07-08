@@ -698,9 +698,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('fillScrollPill(track.left - 3, track.top - 2, track.width + 6, track.height + 4');
     expect(menuSceneSource).toContain('centerY - (height / 2) >= viewport.top + 2');
     expect(menuSceneSource).toContain('centerY + (height / 2) <= viewport.bottom - 2');
-    expect(menuSceneSource).toContain("const tightWidth = input.width < 260;");
-    expect(menuSceneSource).toContain("tightWidth && input.label !== 'Controls'");
-    expect(menuSceneSource).toContain('setAlpha(tightWidth ? 0 : 0.92).setVisible(!tightWidth)');
+    expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
+    expect(menuSceneSource).toContain('const showStateLabel = input.width >= 320;');
+    expect(menuSceneSource).toContain('const stateLabelRight = trackLeft - trackGap;');
+    expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
+    expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 0.92 : 0)');
+    expect(menuSceneSource).toContain('setVisible(showStateLabel)');
+    expect(menuSceneSource).not.toContain("const tightWidth = input.width < 260;");
+    expect(menuSceneSource).not.toContain("tightWidth && input.label !== 'Controls'");
     expect(menuSceneSource).not.toMatch(/fillRoundedRect\([^;]*,\s*999\)/);
     expect(menuSceneSource).toContain('overlayUi: {');
     expect(menuSceneSource).not.toContain('createButton(panel.centerX - 78, firstActionY, 132, 54, \'Back\'');

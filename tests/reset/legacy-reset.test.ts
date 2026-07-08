@@ -779,6 +779,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings)");
+    expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
+    expect(menuSceneSource).toContain('const showStateLabel = input.width >= 320;');
+    expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
     expect(menuSceneSource).toContain('controls.length * (rowHeight + rowGap)');
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleCameraFollow')");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailFade')");

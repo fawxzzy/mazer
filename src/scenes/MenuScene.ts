@@ -4925,6 +4925,26 @@ export class MenuScene extends Phaser.Scene {
     return text;
   }
 
+  private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>(
+    text: T,
+    maxWidth: number,
+    maxFontSize: number,
+    minFontSize: number
+  ): T {
+    const safeMaxWidth = Math.max(1, Math.floor(maxWidth));
+    const safeMaxFontSize = Math.max(1, Math.floor(maxFontSize));
+    const safeMinFontSize = Math.max(1, Math.min(safeMaxFontSize, Math.floor(minFontSize)));
+    for (let fontSize = safeMaxFontSize; fontSize >= safeMinFontSize; fontSize -= 1) {
+      text.setFontSize(fontSize);
+      if (text.width <= safeMaxWidth) {
+        return text;
+      }
+    }
+
+    text.setFontSize(safeMinFontSize);
+    return text;
+  }
+
   private drawHud(time: number): void {
     this.hudGraphics.clear();
     this.clearHudTexts();
@@ -5846,33 +5866,49 @@ export class MenuScene extends Phaser.Scene {
     const rowFill = input.checked ? 0x10251e : LEGACY_CYBER_PANEL_FILL;
     const rowStroke = input.checked ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
     const stateColor = input.checked ? '#72e0bf' : '#b7f2ff';
-    const tightWidth = input.width < 260;
+    const rowPaddingX = Math.max(12, Math.min(18, Math.round(input.width * 0.055)));
+    const trackWidth = 42;
+    const trackHeight = 24;
+    const trackX = left + input.width - rowPaddingX - Math.round(trackWidth / 2);
+    const trackLeft = trackX - Math.round(trackWidth / 2);
+    const trackGap = 10;
+    const showStateLabel = input.width >= 320;
+    const stateLaneWidth = showStateLabel
+      ? Math.max(54, Math.min(92, Math.round(input.width * 0.24)))
+      : 0;
+    const stateLabelRight = trackLeft - trackGap;
+    const labelX = left + rowPaddingX;
+    const labelRight = showStateLabel
+      ? stateLabelRight - stateLaneWidth - trackGap
+      : stateLabelRight - trackGap;
+    const labelMaxWidth = Math.max(54, labelRight - labelX);
+    const labelFontSize = Math.max(15, Math.min(20, Math.round(input.height * 0.4)));
+    const stateFontSize = Math.max(11, Math.min(13, Math.round(input.height * 0.28)));
     const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, input.checked ? 0.62 : 0.5);
     background.setStrokeStyle(1, rowStroke, input.checked ? 0.56 : 0.38);
     background.setInteractive({ useHandCursor: true });
 
-    const label = this.padLegacyUiText(this.add.text(left + 16, input.y, input.label, {
+    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, input.y, input.label, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${tightWidth ? 15 : Math.max(16, Math.min(20, Math.round(input.height * 0.4)))}px`,
+      fontSize: `${labelFontSize}px`,
       color: '#ecfff5'
-    })).setOrigin(0, 0.5).setAlpha(0.94);
+    })), labelMaxWidth, labelFontSize, 11).setOrigin(0, 0.5).setAlpha(0.94);
 
-    const displayStateText = tightWidth && input.label !== 'Controls'
-      ? (input.checked ? 'On' : 'Off')
-      : input.stateText || (input.checked ? input.onLabel : input.offLabel);
-    const compactStateLane = input.width < 300;
-    const stateLabel = this.padLegacyUiText(this.add.text(left + input.width - (compactStateLane ? 56 : 84), input.y, displayStateText || input.stateText, {
+    const displayStateText = input.stateText || (input.checked ? input.onLabel : input.offLabel);
+    const stateLabel = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(stateLabelRight, input.y, displayStateText || input.stateText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${compactStateLane ? Math.max(10, Math.min(11, Math.round(input.height * 0.24))) : Math.max(11, Math.min(13, Math.round(input.height * 0.28)))}px`,
+      fontSize: `${stateFontSize}px`,
       color: stateColor
-    })).setOrigin(1, 0.5).setAlpha(tightWidth ? 0 : 0.92).setVisible(!tightWidth);
+    })), stateLaneWidth, stateFontSize, 9)
+      .setOrigin(1, 0.5)
+      .setAlpha(showStateLabel ? 0.92 : 0)
+      .setVisible(showStateLabel);
     this.uiTexts.push(label);
-    if (!tightWidth) {
+    if (showStateLabel) {
       this.uiTexts.push(stateLabel);
     }
 
-    const trackX = left + input.width - 48;
-    const track = this.add.ellipse(trackX, input.y, 42, 24, input.checked ? 0x123a2d : 0x07131d, 0.9);
+    const track = this.add.ellipse(trackX, input.y, trackWidth, trackHeight, input.checked ? 0x123a2d : 0x07131d, 0.9);
     track.setStrokeStyle(2, rowStroke, input.checked ? 0.66 : 0.52);
     const knobX = trackX + (input.checked ? 9 : -9);
     const knob = this.add.circle(knobX, input.y, 8, input.checked ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.98);
