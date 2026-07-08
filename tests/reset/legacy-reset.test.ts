@@ -545,8 +545,12 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private menuStaticDrawRowsVisible: number | null = null;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 360;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 360;');
+    expect(menuSceneSource).toContain("private menuStaticDrawLifecyclePhase: LegacyMenuStaticDrawLifecyclePhase = 'idle';");
     expect(menuSceneSource).toContain('private menuStaticDrawNextRowAtMs = 0;');
     expect(menuSceneSource).toContain('private menuStaticDrawTileOrder: LegacyPoint[] = [];');
     expect(menuSceneSource).toContain('private menuStaticDrawVisibleTileKeys = new Set<string>();');
@@ -565,8 +569,12 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.maze.generationBuildTrace?.reinforcementShortcutTiles');
     expect(menuSceneSource).toContain('private refreshLegacyMenuStaticDrawVisibleTileKeys(): void');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawDemoGateAtMs(): number');
+    expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDeconstructDurationMs(): number');
+    expect(menuSceneSource).toContain('private armLegacyMenuStaticDeconstructStage(time: number): void');
+    expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase = 'deconstructing';");
+    expect(menuSceneSource).toContain("this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS");
     expect(menuSceneSource).toContain('const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);');
-    expect(menuSceneSource).toContain('if (this.menuStaticDrawRowsVisible !== null || this.menuStaticDrawTilesVisible !== null) {');
+    expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase !== 'settled'");
     expect(menuSceneSource).toContain('trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))');
     expect(menuSceneSource).toContain('this.isLegacyMenuPointVisibleInStaticDraw(this.player)');
     expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });");

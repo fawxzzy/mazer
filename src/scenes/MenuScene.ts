@@ -65,7 +65,6 @@ import {
 } from '../legacy-runtime/legacyPlayHud';
 import {
   advanceLegacyMenuDemoFrame,
-  createLegacyMenuDemoGoalResetRequest,
   createLegacyMenuDemoBootstrap
 } from '../legacy-runtime/legacyMenuDemoLifecycle';
 import {
@@ -150,6 +149,7 @@ import {
 
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
+type LegacyMenuStaticDrawLifecyclePhase = 'idle' | 'building' | 'settled' | 'deconstructing';
 type RuntimeGenerationStage = NonNullable<LegacyMazeSnapshot['generation']>['executionPlan'][number];
 type LegacyPlayHeldTouchMove = {
   control: HumanMovementActionKind;
@@ -326,6 +326,8 @@ interface MenuSceneVisualDiagnostics {
         batchSize: number | null;
         batchUnit: string | null;
         complete: boolean | null;
+        lifecyclePhase: LegacyMenuStaticDrawLifecyclePhase;
+        nextSeedQueued: boolean;
         progressPercent: number | null;
         rowCount: number | null;
         rowsRemaining: number | null;
@@ -515,8 +517,11 @@ const LEGACY_PLAY_GOAL_MARKER_CORE = 0xff263f;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xd81b2a;
 const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;
 const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;
+const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;
 const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;
 const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
+const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 360;
+const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 360;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const legacyScenePointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
@@ -626,6 +631,7 @@ export class MenuScene extends Phaser.Scene {
   private hudDirty = true;
   private backdropDirty = true;
   private uiDirty = true;
+  private menuStaticDrawLifecyclePhase: LegacyMenuStaticDrawLifecyclePhase = 'idle';
   private menuStaticDrawRowsVisible: number | null = null;
   private menuStaticDrawNextRowAtMs = 0;
   private menuStaticDrawTileOrder: LegacyPoint[] = [];
@@ -1063,6 +1069,8 @@ export class MenuScene extends Phaser.Scene {
           batchSize: drawStage?.batchSize ?? null,
           batchUnit: drawStage?.batchUnit ?? null,
           complete: drawStageProgress.complete,
+          lifecyclePhase: this.menuStaticDrawLifecyclePhase,
+          nextSeedQueued: this.mode === 'menu' && this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset',
           progressPercent: drawStageProgress.progressPercent,
           rowCount: drawStageProgress.rowCount,
           rowsRemaining: drawStageProgress.rowsRemaining,
@@ -2452,6 +2460,12 @@ export class MenuScene extends Phaser.Scene {
     return this.time.now + (tileTicks * LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS) + LEGACY_MENU_STATIC_DRAW_SETTLE_MS;
   }
 
+  private resolveLegacyMenuStaticDeconstructDurationMs(): number {
+    const batchSize = Math.max(1, this.resolveLegacyMenuStaticDrawTileBatchSize());
+    const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);
+    return LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS + (tileTicks * LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS);
+  }
+
   private resolveLegacyMenuStaticDrawTileBatchSize(): number {
     return Math.max(1, Math.ceil(this.menuStaticDrawTileOrder.length / LEGACY_MENU_STATIC_DRAW_TARGET_TICKS));
   }
@@ -2470,6 +2484,7 @@ export class MenuScene extends Phaser.Scene {
   private armLegacyMenuStaticDrawStage(): void {
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     if (this.mode === 'menu' && drawStage?.executionKind === 'row-slice') {
+      this.menuStaticDrawLifecyclePhase = 'building';
       this.menuStaticDrawRowsVisible = 0;
       this.menuStaticDrawNextRowAtMs = this.time.now;
       this.menuStaticDrawTileOrder = this.buildLegacyMenuStaticDrawTileOrder();
@@ -2479,12 +2494,40 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    this.menuStaticDrawLifecyclePhase = 'idle';
     this.menuStaticDrawRowsVisible = null;
     this.menuStaticDrawNextRowAtMs = 0;
     this.menuStaticDrawTileOrder = [];
     this.menuStaticDrawVisibleTileKeys.clear();
     this.menuStaticDrawTilesVisible = null;
     this.menuStaticDrawNextTileAtMs = 0;
+  }
+
+  private armLegacyMenuStaticDeconstructStage(time: number): void {
+    if (this.mode !== 'menu' || this.menuStaticDrawLifecyclePhase === 'deconstructing') {
+      return;
+    }
+
+    if (this.menuStaticDrawTileOrder.length <= 0) {
+      this.menuStaticDrawTileOrder = this.buildLegacyMenuStaticDrawTileOrder();
+    }
+
+    this.menuStaticDrawLifecyclePhase = 'deconstructing';
+    this.menuStaticDrawRowsVisible = null;
+    this.menuStaticDrawNextRowAtMs = 0;
+    this.menuStaticDrawTilesVisible = this.menuStaticDrawTileOrder.length;
+    this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+    this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS;
+    this.queueGenerationRequest(
+      'menu-demo-goal-reset',
+      this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
+      {
+        mode: 'menu',
+        stepSeed: true
+      }
+    );
+    this.boardStaticDirty = true;
+    this.boardDynamicDirty = true;
   }
 
   private advanceLegacyMenuStaticDrawStage(time: number): void {
@@ -2494,7 +2537,11 @@ export class MenuScene extends Phaser.Scene {
 
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     const batchSize = Math.max(1, drawStage?.batchSize ?? 1);
-    if (this.menuStaticDrawRowsVisible !== null && time >= this.menuStaticDrawNextRowAtMs) {
+    if (
+      this.menuStaticDrawLifecyclePhase === 'building'
+      && this.menuStaticDrawRowsVisible !== null
+      && time >= this.menuStaticDrawNextRowAtMs
+    ) {
       this.menuStaticDrawRowsVisible = Math.min(this.maze.size, this.menuStaticDrawRowsVisible + batchSize);
       this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;
       this.boardStaticDirty = true;
@@ -2506,6 +2553,25 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (this.menuStaticDrawTilesVisible !== null && time >= this.menuStaticDrawNextTileAtMs) {
+      if (this.menuStaticDrawLifecyclePhase === 'deconstructing') {
+        this.menuStaticDrawTilesVisible = Math.max(
+          0,
+          this.menuStaticDrawTilesVisible - this.resolveLegacyMenuStaticDrawTileBatchSize()
+        );
+        this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+        this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS;
+        this.boardStaticDirty = true;
+        this.boardDynamicDirty = true;
+        if (this.menuStaticDrawTilesVisible <= 0) {
+          this.menuStaticDrawTilesVisible = 0;
+          this.menuStaticDrawNextTileAtMs = Number.POSITIVE_INFINITY;
+          this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+          this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+          this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+        }
+        return;
+      }
+
       this.menuStaticDrawTilesVisible = Math.min(
         this.menuStaticDrawTileOrder.length,
         this.menuStaticDrawTilesVisible + this.resolveLegacyMenuStaticDrawTileBatchSize()
@@ -2517,6 +2583,7 @@ export class MenuScene extends Phaser.Scene {
       if (this.menuStaticDrawTilesVisible >= this.menuStaticDrawTileOrder.length) {
         this.menuStaticDrawTilesVisible = null;
         this.menuStaticDrawNextTileAtMs = 0;
+        this.menuStaticDrawLifecyclePhase = 'settled';
         this.refreshLegacyMenuStaticDrawVisibleTileKeys();
       }
     }
@@ -2558,7 +2625,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private updateMenuDemo(time: number): void {
-    if (this.menuStaticDrawRowsVisible !== null || this.menuStaticDrawTilesVisible !== null) {
+    if (
+      this.menuStaticDrawLifecyclePhase !== 'settled'
+      || this.menuStaticDrawRowsVisible !== null
+      || this.menuStaticDrawTilesVisible !== null
+    ) {
       return;
     }
     if (time < this.nextDemoMoveAtMs) {
@@ -2582,7 +2653,7 @@ export class MenuScene extends Phaser.Scene {
     this.trail = nextFrame.trail;
     this.nextDemoMoveAtMs = time + nextFrame.delayMs;
     if (nextFrame.shouldRegenerateMaze) {
-      this.pendingResetRequest = createLegacyMenuDemoGoalResetRequest(time);
+      this.armLegacyMenuStaticDeconstructStage(time);
       return;
     }
     this.boardDynamicDirty = true;
@@ -4952,11 +5023,13 @@ export class MenuScene extends Phaser.Scene {
             remainingStageIds: [...(this.maze.generation?.stageCursor.remainingStageIds ?? [])]
           },
           drawStage: {
-            batchSize: drawStage?.batchSize ?? null,
-            batchUnit: drawStage?.batchUnit ?? null,
-            complete: drawStageProgress.complete,
-            progressPercent: drawStageProgress.progressPercent,
-            rowCount: drawStageProgress.rowCount,
+          batchSize: drawStage?.batchSize ?? null,
+          batchUnit: drawStage?.batchUnit ?? null,
+          complete: drawStageProgress.complete,
+          lifecyclePhase: this.menuStaticDrawLifecyclePhase,
+          nextSeedQueued: this.mode === 'menu' && this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset',
+          progressPercent: drawStageProgress.progressPercent,
+          rowCount: drawStageProgress.rowCount,
             rowsRemaining: drawStageProgress.rowsRemaining,
             rowsVisible: drawRowsVisible,
             staged: drawStageStaged,

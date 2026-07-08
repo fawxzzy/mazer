@@ -223,6 +223,8 @@ export interface MenuSceneRuntimeDiagnostics {
       batchSize: number | null;
       batchUnit: string | null;
       complete: boolean | null;
+      lifecyclePhase?: 'idle' | 'building' | 'settled' | 'deconstructing';
+      nextSeedQueued?: boolean;
       progressPercent: number | null;
       rowCount: number | null;
       rowsRemaining: number | null;
