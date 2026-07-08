@@ -39,7 +39,7 @@ export const LEGACY_DEFAULTS: LegacySettings = {
   toggleTrailFade: false,
   toggleTrailPulse: true,
   toggleAnimatedBackdrop: false,
-  controlMode: 'arrows'
+  controlMode: 'stick'
 };
 
 export const MAIN_MENU_BUTTONS = ['Start', 'Options'] as const;

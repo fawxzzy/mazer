@@ -21,6 +21,14 @@ class MemoryStorage {
 }
 
 describe('legacy game toggle preferences', () => {
+  test('defaults fresh app sessions to stick controls', () => {
+    const settings = readLegacyGameToggleSettings(undefined, LEGACY_DEFAULTS);
+
+    expect(LEGACY_DEFAULTS.controlMode).toBe('stick');
+    expect(settings.controlMode).toBe('stick');
+    expect(pickLegacyGameTogglePreferences(settings).controlMode).toBe('stick');
+  });
+
   test('writes only game-toggle choices into local browser storage', () => {
     const storage = new MemoryStorage();
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
@@ -75,6 +83,18 @@ describe('legacy game toggle preferences', () => {
     });
   });
 
+  test('preserves an explicit persisted arrows control choice', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
+      controlMode: 'arrows'
+    }));
+
+    const settings = readLegacyGameToggleSettings(storage, LEGACY_DEFAULTS);
+
+    expect(settings.controlMode).toBe('arrows');
+    expect(pickLegacyGameTogglePreferences(settings).controlMode).toBe('arrows');
+  });
+
   test('ignores corrupt or invalid stored values and keeps safe fallbacks', () => {
     const storage = new MemoryStorage();
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
@@ -89,7 +109,7 @@ describe('legacy game toggle preferences', () => {
 
     const settings = readLegacyGameToggleSettings(storage, LEGACY_DEFAULTS);
 
-    expect(settings.controlMode).toBe('arrows');
+    expect(settings.controlMode).toBe('stick');
     expect(settings.darkMode).toBe(true);
     expect(settings.movementSpeed).toBe(1);
     expect(settings.toggleAnimatedBackdrop).toBe(false);

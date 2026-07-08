@@ -24,6 +24,8 @@ describe('legacy overlay toggle fields', () => {
   test('toggles feature fields through their exact board refresh lanes', () => {
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
 
+    expect(settings.controlMode).toBe('stick');
+
     const cameraFollow = applyLegacyOverlayToggleField(settings, 'toggleCameraFollow');
     const trailFade = applyLegacyOverlayToggleField(settings, 'toggleTrailFade');
     const trailPulse = applyLegacyOverlayToggleField(settings, 'toggleTrailPulse');
@@ -58,8 +60,8 @@ describe('legacy overlay toggle fields', () => {
     expect(animatedBackdrop.affectsBoardDynamic).toBe(false);
     expect(animatedBackdrop.legacyDirectionalLightIntensity).toBeNull();
 
-    expect(controlMode.settings.controlMode).toBe('stick');
-    expect(controlMode.stateText).toBe('Stick');
+    expect(controlMode.settings.controlMode).toBe('arrows');
+    expect(controlMode.stateText).toBe('Arrows');
     expect(controlMode.affectsBackdrop).toBe(false);
     expect(controlMode.affectsBoardStatic).toBe(false);
     expect(controlMode.affectsBoardDynamic).toBe(true);
