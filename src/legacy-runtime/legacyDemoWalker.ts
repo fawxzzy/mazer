@@ -50,7 +50,8 @@ export const createLegacyMenuDemoWalkerConfig = (seed: number): DemoWalkerConfig
   seed,
   behavior: {
     ...legacyTuning.demo.behavior,
-    enableRunnerMistakes: true
+    enableRunnerMistakes: true,
+    emulateLogicSwitchPotentialCheckBug: false
   }
 });
 
@@ -65,6 +66,7 @@ export const createLegacyMenuSnapshotDemoWalkerConfig = (seed: number): DemoWalk
     },
     behavior: {
       ...baseConfig.behavior,
+      emulateLogicSwitchPotentialCheckBug: true,
       prerollSteps: Math.max(
         baseConfig.behavior.prerollSteps ?? 0,
         LEGACY_MENU_SNAPSHOT_PREROLL_STEPS

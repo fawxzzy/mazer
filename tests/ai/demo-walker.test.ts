@@ -662,11 +662,11 @@ describe('demo walker', () => {
         }
       }
 
-      expect(state.phase === 'goal-hold' || state.phase === 'reset-hold').toBe(true);
+      expect(state.phase).toBe('goal-hold');
     }
   }, 30_000);
 
-  test('generated menu AI can recover, replay, and later request goal regeneration across scale bands', () => {
+  test('generated menu AI recovers without replaying and later requests goal regeneration across scale bands', () => {
     const cases = [
       { scale: 37, seed: 55 },
       { scale: 37, seed: 89 },
@@ -682,8 +682,6 @@ describe('demo walker', () => {
       const config = createLegacyMenuDemoWalkerConfig(testCase.seed);
       const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
       let state = createDemoWalkerState(episode, config);
-      let sawAiReset = false;
-      let sawAiReplay = false;
       let sawGoalReset = false;
       let sawGoalRegenerationRequest = false;
       const maxSteps = Math.max(512, episode.raster.pathIndices.length * 12);
@@ -691,11 +689,11 @@ describe('demo walker', () => {
       expect(diagnostics.routeLength).toBeLessThanOrEqual(episode.raster.pathIndices.length * 4);
       expect(diagnostics.traverseMs).toBeLessThan(60_000);
       expect(diagnostics.aiResetPathCursor).not.toBeNull();
+      expect(config.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
 
       for (let step = 0; step < maxSteps; step += 1) {
         const previousIndex = state.currentIndex;
         const previousPhase = state.phase;
-        const previousResetReason = state.resetReason;
         const advance = advanceDemoWalker(episode, state, config);
         state = advance.state;
 
@@ -711,14 +709,7 @@ describe('demo walker', () => {
           }
         }
 
-        if (state.resetReason === 'ai-path-exhausted') {
-          sawAiReset = true;
-        }
-        if (previousResetReason === 'ai-path-exhausted' && state.aiLogicSwitch) {
-          sawAiReplay = true;
-          expect(advance.shouldRegenerateMaze).toBeUndefined();
-          expect(state.currentIndex).toBe(episode.raster.startIndex);
-        }
+        expect(state.resetReason).not.toBe('ai-path-exhausted');
         if (state.resetReason === 'goal') {
           sawGoalReset = true;
         }
@@ -729,8 +720,6 @@ describe('demo walker', () => {
         }
       }
 
-      expect(sawAiReset).toBe(true);
-      expect(sawAiReplay).toBe(true);
       expect(sawGoalReset).toBe(true);
       expect(sawGoalRegenerationRequest).toBe(true);
     }
