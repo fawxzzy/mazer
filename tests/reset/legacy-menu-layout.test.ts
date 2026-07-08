@@ -59,6 +59,28 @@ describe('legacy menu layout', () => {
     expect(layout.titleY).toBeGreaterThanOrEqual(34);
   });
 
+  test('keeps normal phone-width menu buttons horizontal instead of using the side-panel stack', () => {
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 360, height: 740 },
+      { width: 390, height: 844 }
+    ]) {
+      const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
+
+      expect(layout.buttonLayout).toBe('row');
+      expect(layout.leftButtonY).toBe(layout.rightButtonY);
+      expect(layout.leftButtonY).toBe(layout.buttonY);
+      expect(layout.leftButtonX).toBeLessThan(layout.centerButtonX);
+      expect(layout.rightButtonX).toBeGreaterThan(layout.centerButtonX);
+      expect(layout.leftButtonX - (layout.buttonWidth / 2)).toBeGreaterThanOrEqual(8);
+      expect(layout.rightButtonX + (layout.buttonWidth / 2)).toBeLessThanOrEqual(layout.width - 8);
+      expect(layout.boardLeft).toBeGreaterThanOrEqual(8);
+      expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width - 8);
+      expect(layout.titleY).toBeLessThan(layout.boardTop);
+      expect(layout.leftButtonY + (layout.buttonHeight / 2)).toBeLessThan(layout.footerY);
+    }
+  });
+
   test('stacks the two front-door buttons and fits the board in ultra-narrow side panels', () => {
     const layout = resolveLegacyMenuLayout(172, 407, 50, 49);
 

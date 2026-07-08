@@ -26,6 +26,8 @@ export interface LegacyMenuLayout {
 export type LegacyMenuLayoutSurface = 'menu' | 'play';
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+const LEGACY_MENU_SIDE_PANEL_WIDTH = 300;
+const LEGACY_PLAY_ULTRA_NARROW_WIDTH = 360;
 
 export const resolveLegacyMenuLayout = (
   width: number,
@@ -36,8 +38,11 @@ export const resolveLegacyMenuLayout = (
 ): LegacyMenuLayout => {
   const normalizedScale = clampInteger(scale, 25, 150);
   const isPortrait = height > width;
-  const isUltraNarrow = isPortrait && width < 360;
   const isPlaySurface = surface === 'play';
+  const isSidePanelPortrait = isPortrait && width < LEGACY_MENU_SIDE_PANEL_WIDTH;
+  const isPlayUltraNarrow = isPlaySurface && isPortrait && width < LEGACY_PLAY_ULTRA_NARROW_WIDTH;
+  const isUltraNarrow = isSidePanelPortrait || isPlayUltraNarrow;
+  const usesStackedButtons = isSidePanelPortrait;
   const baseBoardScale = isUltraNarrow ? 0.98 : (isPortrait ? (isPlaySurface ? 0.92 : 0.86) : (isPlaySurface ? 0.62 : 0.52));
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const maxBoardSize = Math.min(
@@ -101,8 +106,8 @@ export const resolveLegacyMenuLayout = (
     boardTop + snappedBoardSize + 12,
     height - stackHeight - 18
   ));
-  const leftButtonY = isUltraNarrow ? stackTop + Math.round(buttonHeight / 2) : rowButtonY;
-  const rightButtonY = isUltraNarrow ? leftButtonY + buttonHeight + stackGap : rowButtonY;
+  const leftButtonY = usesStackedButtons ? stackTop + Math.round(buttonHeight / 2) : rowButtonY;
+  const rightButtonY = usesStackedButtons ? leftButtonY + buttonHeight + stackGap : rowButtonY;
   const centerButtonY = rowButtonY;
   const titleOverlapY = Math.round(boardTop + (snappedBoardSize * (isPortrait ? 0.216 : 0.221)));
   const menuPortraitTitleClearance = titleClearance;
@@ -118,15 +123,15 @@ export const resolveLegacyMenuLayout = (
     titleX: Math.round(width / 2),
     titleY: Math.round(!isPlaySurface && isPortrait ? menuPortraitTitleY : titleOverlapY),
     footerY: height - 18,
-    buttonLayout: isUltraNarrow ? 'stack' : 'row',
+    buttonLayout: usesStackedButtons ? 'stack' : 'row',
     buttonY: rowButtonY,
     centerButtonY,
     leftButtonY,
     rightButtonY,
     centerButtonWidth,
-    leftButtonX: isUltraNarrow ? centerButtonX : centerButtonX - rowButtonOffset,
+    leftButtonX: usesStackedButtons ? centerButtonX : centerButtonX - rowButtonOffset,
     centerButtonX,
-    rightButtonX: isUltraNarrow ? centerButtonX : centerButtonX + rowButtonOffset,
+    rightButtonX: usesStackedButtons ? centerButtonX : centerButtonX + rowButtonOffset,
     buttonWidth,
     buttonHeight
   };
