@@ -433,10 +433,12 @@ interface MenuSceneVisualDiagnostics {
         buildPrerollDurationMs: number;
         buildPrerollProgress: number;
         complete: boolean | null;
+        handoffEndsAtMs: number | null;
         handoffActive: boolean;
         handoffDurationMs: number;
         handoffProgress: number;
         lifecyclePhase: LegacyMenuStaticDrawLifecyclePhase;
+        zeroHoldStartedAtMs: number | null;
         nextSeedQueued: boolean;
         progressPercent: number | null;
         rowCount: number | null;
@@ -650,7 +652,7 @@ const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;
 const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
 const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;
 const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;
-const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 500;
+const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 1000;
 const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;
 const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = 860;
 const LEGACY_MENU_DECONSTRUCT_BURST_COLOR = 0xb7f2ff;
@@ -796,6 +798,7 @@ export class MenuScene extends Phaser.Scene {
   private menuStaticDrawTilesVisible: number | null = null;
   private menuStaticDrawNextTileAtMs = 0;
   private menuStaticDeconstructStartedAtMs: number | null = null;
+  private menuStaticDeconstructZeroHoldStartedAtMs: number | null = null;
   private menuStaticBuildPrerollStartedAtMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
   private legacyBoardCornerShimmerNextFrameAtMs = 0;
@@ -913,7 +916,11 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const nextRequest = this.pendingGenerationRequest;
-    if (nextRequest !== null && shouldConsumeLegacyGenerationRequest(nextRequest, time)) {
+    if (
+      nextRequest !== null
+      && shouldConsumeLegacyGenerationRequest(nextRequest, time)
+      && !this.shouldDelayLegacyMenuDeconstructRebuild(nextRequest, time)
+    ) {
       this.pendingGenerationRequest = null;
       this.applyGenerationRequest(nextRequest, time);
     }
@@ -932,7 +939,7 @@ export class MenuScene extends Phaser.Scene {
       this.menuStaticDrawLifecyclePhase === 'deconstructing'
       && (
         this.resolveLegacyMenuDeconstructTrailAlpha(time) > 0
-        || this.resolveLegacyMenuDeconstructHandoffProgress(time) > 0
+        || this.isLegacyMenuDeconstructHandoffActive(time)
       )
     ) {
       this.boardDynamicDirty = true;
@@ -1302,10 +1309,16 @@ export class MenuScene extends Phaser.Scene {
           buildPrerollDurationMs: LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS,
           buildPrerollProgress: this.resolveLegacyMenuBuildPrerollProgress(time),
           complete: drawStageProgress.complete,
-          handoffActive: this.resolveLegacyMenuDeconstructHandoffProgress(time) > 0,
+          handoffActive: this.isLegacyMenuDeconstructHandoffActive(time),
+          handoffEndsAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null
+            ? null
+            : Math.round(this.resolveLegacyMenuDeconstructHandoffEndsAtMs()),
           handoffDurationMs: LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
           handoffProgress: this.resolveLegacyMenuDeconstructHandoffProgress(time),
           lifecyclePhase: this.menuStaticDrawLifecyclePhase,
+          zeroHoldStartedAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null
+            ? null
+            : Math.round(this.menuStaticDeconstructZeroHoldStartedAtMs),
           nextSeedQueued: this.mode === 'menu' && this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset',
           progressPercent: drawStageProgress.progressPercent,
           rowCount: drawStageProgress.rowCount,
@@ -2677,6 +2690,22 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  private shouldDelayLegacyMenuDeconstructRebuild(request: LegacyGenerationRequest, time: number): boolean {
+    if (
+      request.reason !== 'menu-demo-goal-reset'
+      || this.mode !== 'menu'
+      || this.menuStaticDrawLifecyclePhase !== 'deconstructing'
+    ) {
+      return false;
+    }
+
+    if (this.menuStaticDrawTilesVisible !== 0 || this.menuStaticDeconstructZeroHoldStartedAtMs === null) {
+      return true;
+    }
+
+    return time < this.resolveLegacyMenuDeconstructHandoffEndsAtMs();
+  }
+
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
     this.applyGenerationRequest(
         createLegacyGenerationRequest({
@@ -2865,17 +2894,53 @@ export class MenuScene extends Phaser.Scene {
     if (
       this.menuStaticDrawLifecyclePhase !== 'deconstructing'
       || this.menuStaticDrawTilesVisible !== 0
+      || this.menuStaticDeconstructZeroHoldStartedAtMs === null
       || this.pendingGenerationRequest?.reason !== 'menu-demo-goal-reset'
     ) {
       return 0;
     }
 
-    const remainingMs = Math.max(0, this.pendingGenerationRequest.dueAtMs - time);
+    const remainingMs = Math.max(0, this.resolveLegacyMenuDeconstructHandoffEndsAtMs() - time);
     return clamp(
       1 - (remainingMs / LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS),
       0,
       1
     );
+  }
+
+  private resolveLegacyMenuDeconstructHandoffEndsAtMs(): number {
+    const holdStartedAtMs = this.menuStaticDeconstructZeroHoldStartedAtMs ?? this.time.now;
+    const pendingDueAtMs = this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset'
+      ? this.pendingGenerationRequest.dueAtMs
+      : 0;
+
+    return Math.max(
+      pendingDueAtMs,
+      holdStartedAtMs + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS
+    );
+  }
+
+  private isLegacyMenuDeconstructHandoffActive(time: number): boolean {
+    return this.menuStaticDrawLifecyclePhase === 'deconstructing'
+      && this.menuStaticDrawTilesVisible === 0
+      && this.menuStaticDeconstructZeroHoldStartedAtMs !== null
+      && this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset'
+      && time < this.resolveLegacyMenuDeconstructHandoffEndsAtMs();
+  }
+
+  private deferLegacyMenuDeconstructRebuildUntil(dueAtMs: number): void {
+    if (this.pendingGenerationRequest?.reason !== 'menu-demo-goal-reset') {
+      return;
+    }
+
+    if (this.pendingGenerationRequest.dueAtMs >= dueAtMs) {
+      return;
+    }
+
+    this.pendingGenerationRequest = {
+      ...this.pendingGenerationRequest,
+      dueAtMs
+    };
   }
 
   private resolveLegacyMenuBuildPrerollProgress(time: number): number {
@@ -2920,6 +2985,7 @@ export class MenuScene extends Phaser.Scene {
       const buildPrerollStartedAtMs = this.time.now - 1;
       this.menuStaticDrawLifecyclePhase = 'building';
       this.menuStaticDeconstructStartedAtMs = null;
+      this.menuStaticDeconstructZeroHoldStartedAtMs = null;
       this.menuStaticBuildPrerollStartedAtMs = buildPrerollStartedAtMs;
       this.menuStaticDrawRowsVisible = 0;
       this.menuStaticDrawNextRowAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;
@@ -2938,6 +3004,7 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticDrawTilesVisible = null;
     this.menuStaticDrawNextTileAtMs = 0;
     this.menuStaticDeconstructStartedAtMs = null;
+    this.menuStaticDeconstructZeroHoldStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
   }
 
@@ -2952,6 +3019,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.menuStaticDrawLifecyclePhase = 'deconstructing';
     this.menuStaticDeconstructStartedAtMs = time;
+    this.menuStaticDeconstructZeroHoldStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
     this.menuStaticDrawRowsVisible = null;
     this.menuStaticDrawNextRowAtMs = 0;
@@ -3025,6 +3093,12 @@ export class MenuScene extends Phaser.Scene {
         if (this.menuStaticDrawTilesVisible <= 0) {
           this.menuStaticDrawTilesVisible = 0;
           this.menuStaticDrawNextTileAtMs = Number.POSITIVE_INFINITY;
+          if (this.menuStaticDeconstructZeroHoldStartedAtMs === null) {
+            this.menuStaticDeconstructZeroHoldStartedAtMs = time;
+          }
+          this.deferLegacyMenuDeconstructRebuildUntil(
+            this.menuStaticDeconstructZeroHoldStartedAtMs + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS
+          );
           this.refreshLegacyMenuStaticDrawVisibleTileKeys();
           this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
           this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
@@ -6688,10 +6762,16 @@ export class MenuScene extends Phaser.Scene {
             buildPrerollDurationMs: LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS,
             buildPrerollProgress: this.resolveLegacyMenuBuildPrerollProgress(time),
             complete: drawStageProgress.complete,
-            handoffActive: this.resolveLegacyMenuDeconstructHandoffProgress(time) > 0,
+            handoffActive: this.isLegacyMenuDeconstructHandoffActive(time),
+            handoffEndsAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null
+              ? null
+              : Math.round(this.resolveLegacyMenuDeconstructHandoffEndsAtMs()),
             handoffDurationMs: LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
             handoffProgress: this.resolveLegacyMenuDeconstructHandoffProgress(time),
             lifecyclePhase: this.menuStaticDrawLifecyclePhase,
+            zeroHoldStartedAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null
+              ? null
+              : Math.round(this.menuStaticDeconstructZeroHoldStartedAtMs),
             nextSeedQueued: this.mode === 'menu' && this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset',
             progressPercent: drawStageProgress.progressPercent,
             rowCount: drawStageProgress.rowCount,

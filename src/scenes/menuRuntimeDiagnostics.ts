@@ -269,6 +269,7 @@ export interface MenuSceneRuntimeDiagnostics {
       buildPrerollProgress?: number;
       complete: boolean | null;
       handoffActive?: boolean;
+      handoffEndsAtMs?: number | null;
       handoffDurationMs?: number;
       handoffProgress?: number;
       lifecyclePhase?: 'idle' | 'building' | 'settled' | 'deconstructing';
@@ -281,6 +282,7 @@ export interface MenuSceneRuntimeDiagnostics {
       tileCount?: number | null;
       tilesRemaining?: number | null;
       tilesVisible?: number | null;
+      zeroHoldStartedAtMs?: number | null;
     };
     stageCursor: {
       completionSignal: string | null;

@@ -237,6 +237,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyMenuDeconstructHandoffBurst(');
     expect(menuSceneSource).toContain('this.drawLegacyMenuDeconstructHandoffBurst(');
     expect(menuSceneSource).toContain('this.resolveLegacyMenuBuildPrerollProgress(time)');
+    expect(menuSceneSource).toContain('this.isLegacyMenuDeconstructHandoffActive(time)');
+    expect(menuSceneSource).toContain('handoffEndsAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null');
+    expect(menuSceneSource).toContain('zeroHoldStartedAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null');
     expect(menuSceneSource).toContain('LEGACY_MENU_DECONSTRUCT_BURST_COLOR');
     expect(menuSceneSource).toContain('private drawLegacyBackdropSigils(width: number, height: number, time: number): void');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropGlassShards(');

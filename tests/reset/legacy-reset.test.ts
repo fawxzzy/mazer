@@ -591,7 +591,7 @@ describe('legacy reset lane', () => {
     expect(generationLifecycleSource).toContain('initializedResetBypassesDelayGate: true');
     expect(menuSceneSource).toContain("this.pendingGenerationRequest: LegacyGenerationRequest | null = null;".replace('this.', 'private '));
     expect(menuSceneSource).toContain('const nextRequest = this.pendingGenerationRequest;');
-    expect(menuSceneSource).toContain('if (nextRequest !== null && shouldConsumeLegacyGenerationRequest(nextRequest, time))');
+    expect(menuSceneSource).toContain('&& shouldConsumeLegacyGenerationRequest(nextRequest, time)');
     expect(menuSceneSource).toContain('const generationState = consumeLegacyGenerationRequestState(request, this.settings.scale);');
     expect(menuSceneSource).toContain('if (generationState.startsPlayTimer) {');
     expect(menuSceneSource).toContain('private menuStaticDrawRowsVisible: number | null = null;');
@@ -602,13 +602,14 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 500;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 1000;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = 860;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_BURST_COLOR = 0xb7f2ff;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_BURST_ALT = 0x72e0bf;');
     expect(menuSceneSource).toContain("private menuStaticDrawLifecyclePhase: LegacyMenuStaticDrawLifecyclePhase = 'idle';");
     expect(menuSceneSource).toContain('private menuStaticDeconstructStartedAtMs: number | null = null;');
+    expect(menuSceneSource).toContain('private menuStaticDeconstructZeroHoldStartedAtMs: number | null = null;');
     expect(menuSceneSource).toContain('private menuStaticBuildPrerollStartedAtMs: number | null = null;');
     expect(menuSceneSource).toContain('private menuStaticDrawNextRowAtMs = 0;');
     expect(menuSceneSource).toContain('private menuStaticDrawTileOrder: LegacyPoint[] = [];');
@@ -635,6 +636,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDeconstructDurationMs(): number');
     expect(menuSceneSource).toContain('private resolveLegacyMenuDeconstructTrailAlpha(time: number): number');
     expect(menuSceneSource).toContain('private resolveLegacyMenuDeconstructHandoffProgress(time: number): number');
+    expect(menuSceneSource).toContain('private shouldDelayLegacyMenuDeconstructRebuild(request: LegacyGenerationRequest, time: number): boolean');
+    expect(menuSceneSource).toContain('private deferLegacyMenuDeconstructRebuildUntil(dueAtMs: number): void');
     expect(menuSceneSource).toContain('private resolveLegacyMenuBuildPrerollProgress(time: number): number');
     expect(menuSceneSource).toContain('private isLegacyMenuBuildPrerollActive(time: number): boolean');
     expect(menuSceneSource).toContain('private drawLegacyMenuDeconstructHandoffBurst(');
@@ -644,6 +647,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;');
     expect(menuSceneSource).toContain('this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;');
     expect(menuSceneSource).toContain("this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS");
+    expect(menuSceneSource).toContain('&& !this.shouldDelayLegacyMenuDeconstructRebuild(nextRequest, time)');
+    expect(menuSceneSource).toContain('this.menuStaticDeconstructZeroHoldStartedAtMs + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS');
     expect(menuSceneSource).toContain('const buildPrerollStartedAtMs = this.time.now - 1;');
     expect(menuSceneSource).toContain('this.menuStaticDrawNextRowAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;');
     expect(menuSceneSource).toContain('this.menuStaticDrawNextTileAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;');
@@ -658,6 +663,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.resolveLegacyPointPathSource(visibleTrail);');
     expect(menuSceneSource).toContain('private drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('handoffDurationMs: LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS');
+    expect(menuSceneSource).toContain('handoffEndsAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null');
+    expect(menuSceneSource).toContain('zeroHoldStartedAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null');
     expect(menuSceneSource).toContain('handoffProgress: this.resolveLegacyMenuDeconstructHandoffProgress(time)');
     expect(menuSceneSource).toContain('buildPrerollDurationMs: LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS');
     expect(menuSceneSource).toContain('buildPrerollProgress: this.resolveLegacyMenuBuildPrerollProgress(time)');
