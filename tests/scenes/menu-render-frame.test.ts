@@ -326,6 +326,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("type LegacyMenuPathTitleSweepMode = 'build' | 'deconstruct' | 'idle';");
     expect(menuSceneSource).toContain('interface LegacyMenuPathTitleSweepState');
     expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleSweepState(');
+    expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleVisibleSweepEdge(');
+    expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleVisibleSweepState(');
+    expect(menuSceneSource).toContain('const rightmostVisibleColumn = visibleCells.reduce(');
+    expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitleSigilRails(visibleCells, titleLayout, time, titlePresentation.titleAlpha);');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase === 'building'");
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase === 'deconstructing'");
     expect(menuSceneSource).toContain("const syncedToLifecycle = mode !== 'idle';");
@@ -347,11 +351,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitle(time);');
     expect(menuSceneSource).toContain('resolveLegacyMenuPathTitleLayout(');
     expect(menuSceneSource).toContain('title: this.resolveLegacyMenuPathTitleDiagnostics()');
-    expect(menuSceneSource).toContain('facetCellCount: this.resolveLegacyMenuPathTitleVisiblePieces(pieceCount)');
+    expect(menuSceneSource).toContain('const visiblePieces = this.resolveLegacyMenuPathTitleVisiblePieces(pieceCount)');
+    expect(menuSceneSource).toContain('facetCellCount: visiblePieces');
     expect(menuSceneSource).toContain('facetPulsePeriodMs: LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS');
     expect(menuSceneSource).toContain('scannerMode: sweepState.mode');
     expect(menuSceneSource).toContain('scannerProgress: Number(sweepState.progress.toFixed(3))');
     expect(menuSceneSource).toContain('scannerSyncedToLifecycle: sweepState.syncedToLifecycle');
+    expect(menuSceneSource).toContain('scannerAttachedToVisibleEdge: sweepState.syncedToLifecycle && visibleSweepEdge !== null');
+    expect(menuSceneSource).toContain('scannerVisibleEdgeColumn: visibleSweepEdge === null');
     expect(menuSceneSource).toContain('sigilOrbitCount: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS');
     expect(menuSceneSource).toContain('sigilOrbitPeriodMs: LEGACY_MENU_PATH_TITLE_ORBIT_MS');
     expect(menuSceneSource).toContain('sigilOrbitPhase: Number(this.resolveLegacyMenuPathTitleOrbitPhase(this.time.now).toFixed(3))');

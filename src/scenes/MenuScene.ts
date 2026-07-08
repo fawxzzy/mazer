@@ -301,10 +301,12 @@ interface MenuSceneVisualDiagnostics {
       facetCellCount: number;
       facetPulsePeriodMs: number;
       phase: number;
+      scannerAttachedToVisibleEdge: boolean;
       scannerDirection: LegacyMenuPathTitleSweepState['direction'];
       scannerMode: LegacyMenuPathTitleSweepMode;
       scannerProgress: number;
       scannerSyncedToLifecycle: boolean;
+      scannerVisibleEdgeColumn: number | null;
       sigilOrbitCount: number;
       sigilOrbitPeriodMs: number;
       sigilOrbitPhase: number;
@@ -3881,8 +3883,68 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private resolveLegacyMenuPathTitleSweepColumn(columns: number, rows: number, time: number): number {
-    return this.resolveLegacyMenuPathTitleSweepState(columns, rows, time).column;
+  private resolveLegacyMenuPathTitleVisibleSweepEdge(
+    visibleCells: LegacyMenuPathTitleCell[],
+    columns: number,
+    rows: number
+  ): Pick<LegacyMenuPathTitleSweepState, 'column' | 'diagonalPosition'> | null {
+    if (visibleCells.length <= 0) {
+      return null;
+    }
+
+    const rightmostVisibleColumn = visibleCells.reduce(
+      (rightmostColumn, cell) => Math.max(rightmostColumn, cell.column + 1),
+      0
+    );
+    const rightmostVisibleDiagonalPosition = visibleCells.reduce(
+      (rightmostDiagonalPosition, cell) => Math.max(
+        rightmostDiagonalPosition,
+        cell.column + 1 + (cell.row * 0.72)
+      ),
+      0
+    );
+    const leadColumns = 0.18;
+
+    return {
+      column: clamp(rightmostVisibleColumn + leadColumns, 0, columns),
+      diagonalPosition: clamp(
+        rightmostVisibleDiagonalPosition + leadColumns,
+        0,
+        this.resolveLegacyMenuPathTitleSweepTravel(columns, rows)
+      )
+    };
+  }
+
+  private resolveLegacyMenuPathTitleVisibleSweepState(
+    visibleCells: LegacyMenuPathTitleCell[],
+    titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
+    time: number
+  ): LegacyMenuPathTitleSweepState {
+    const sweepState = this.resolveLegacyMenuPathTitleSweepState(titleLayout.columns, titleLayout.rows, time);
+    if (!sweepState.syncedToLifecycle) {
+      return sweepState;
+    }
+
+    const visibleSweepEdge = this.resolveLegacyMenuPathTitleVisibleSweepEdge(
+      visibleCells,
+      titleLayout.columns,
+      titleLayout.rows
+    );
+    if (!visibleSweepEdge) {
+      return sweepState;
+    }
+
+    const scannerProgress = titleLayout.columns > 0
+      ? clamp(visibleSweepEdge.column / titleLayout.columns, 0, 1)
+      : sweepState.progress;
+
+    return {
+      ...sweepState,
+      column: visibleSweepEdge.column,
+      diagonalPosition: visibleSweepEdge.diagonalPosition,
+      phase: scannerProgress,
+      progress: scannerProgress
+    };
   }
 
   private resolveLegacyMenuPathTitleVisiblePieces(pieceCount: number): number {
@@ -3914,11 +3976,12 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawLegacyMenuPathTitleSigilRails(
+    visibleCells: LegacyMenuPathTitleCell[],
     titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
     time: number,
     alphaScale: number
   ): void {
-    const sweepState = this.resolveLegacyMenuPathTitleSweepState(titleLayout.columns, titleLayout.rows, time);
+    const sweepState = this.resolveLegacyMenuPathTitleVisibleSweepState(visibleCells, titleLayout, time);
     const pulsePhase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
     const pulseBoost = sweepState.syncedToLifecycle ? 1.12 : 1;
     const pulse = (0.55 + (Math.sin((pulsePhase * Math.PI * 2) + 0.4) * 0.22)) * pulseBoost;
@@ -3998,7 +4061,7 @@ export class MenuScene extends Phaser.Scene {
     time: number,
     alphaScale: number
   ): void {
-    const sweepState = this.resolveLegacyMenuPathTitleSweepState(titleLayout.columns, titleLayout.rows, time);
+    const sweepState = this.resolveLegacyMenuPathTitleVisibleSweepState(visibleCells, titleLayout, time);
     const pulsePhase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
     const sweepPosition = sweepState.diagonalPosition;
     const pulse = (0.76 + (Math.sin(pulsePhase * Math.PI * 2) * 0.14))
@@ -4239,7 +4302,7 @@ export class MenuScene extends Phaser.Scene {
       );
     }
 
-    this.drawLegacyMenuPathTitleSigilRails(titleLayout, time, titlePresentation.titleAlpha);
+    this.drawLegacyMenuPathTitleSigilRails(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
 
     for (const cell of visibleCells) {
       this.drawLegacyMenuPathTitleCell(
@@ -6758,24 +6821,34 @@ export class MenuScene extends Phaser.Scene {
       titlePresentation.fontSize
     );
     const pieceCount = titleLayout.cells.length;
+    const visiblePieces = this.resolveLegacyMenuPathTitleVisiblePieces(pieceCount);
+    const visibleCells = titleLayout.cells.slice(0, visiblePieces);
     const progress = this.resolveLegacyMenuPathTitleProgress();
-    const sweepState = this.resolveLegacyMenuPathTitleSweepState(titleLayout.columns, titleLayout.rows, this.time.now);
-    const sweepColumn = this.resolveLegacyMenuPathTitleSweepColumn(titleLayout.columns, titleLayout.rows, this.time.now);
+    const sweepState = this.resolveLegacyMenuPathTitleVisibleSweepState(visibleCells, titleLayout, this.time.now);
+    const visibleSweepEdge = this.resolveLegacyMenuPathTitleVisibleSweepEdge(
+      visibleCells,
+      titleLayout.columns,
+      titleLayout.rows
+    );
 
     return {
       animation: {
         active: this.mode === 'menu' && this.overlay === 'none',
-        facetCellCount: this.resolveLegacyMenuPathTitleVisiblePieces(pieceCount),
+        facetCellCount: visiblePieces,
         facetPulsePeriodMs: LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS,
         phase: Number(sweepState.phase.toFixed(3)),
+        scannerAttachedToVisibleEdge: sweepState.syncedToLifecycle && visibleSweepEdge !== null,
         scannerDirection: sweepState.direction,
         scannerMode: sweepState.mode,
         scannerProgress: Number(sweepState.progress.toFixed(3)),
         scannerSyncedToLifecycle: sweepState.syncedToLifecycle,
+        scannerVisibleEdgeColumn: visibleSweepEdge === null
+          ? null
+          : Number(visibleSweepEdge.column.toFixed(3)),
         sigilOrbitCount: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS,
         sigilOrbitPeriodMs: LEGACY_MENU_PATH_TITLE_ORBIT_MS,
         sigilOrbitPhase: Number(this.resolveLegacyMenuPathTitleOrbitPhase(this.time.now).toFixed(3)),
-        sweepColumn: Number(sweepColumn.toFixed(3)),
+        sweepColumn: Number(sweepState.column.toFixed(3)),
         sweepPeriodMs: LEGACY_MENU_PATH_TITLE_SWEEP_MS
       },
       bounds: createVisualRect(titleLayout.left, titleLayout.top, titleLayout.width, titleLayout.height),
@@ -6783,7 +6856,7 @@ export class MenuScene extends Phaser.Scene {
       pieceCount,
       progressPercent: Math.round(progress * 100),
       visible: this.mode === 'menu' && this.overlay === 'none' && this.titleGraphics.visible,
-      visiblePieces: this.resolveLegacyMenuPathTitleVisiblePieces(pieceCount)
+      visiblePieces
     };
   }
 
