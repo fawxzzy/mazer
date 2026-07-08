@@ -234,6 +234,12 @@ interface MenuSceneVisualDiagnostics {
     safeBounds: VisualRect;
     pathVisualStyle: LegacyPathVisualStyle;
     tileSize: number;
+    cornerFacet: {
+      alpha: number;
+      animated: boolean;
+      shimmerPeriodMs: number;
+      visible: boolean;
+    };
   };
   markerStyle: {
     goalCoreColor: number;
@@ -533,6 +539,12 @@ const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = 0xb7f2ff;
 const LEGACY_BOARD_SIGIL_BORDER_SHADOW = 0x02070d;
 const LEGACY_BOARD_SIGIL_BORDER_ALPHA = 0.82;
 const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_BASE = 0x10293a;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW = 0xb7f2ff;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS = 0x72e0bf;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA = 0.2;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1800;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 110;
 const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;
@@ -709,6 +721,7 @@ export class MenuScene extends Phaser.Scene {
   private menuStaticDeconstructStartedAtMs: number | null = null;
   private menuStaticBuildPrerollStartedAtMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
+  private legacyBoardCornerShimmerNextFrameAtMs = 0;
   private visualDiagnosticsRevision = 0;
   private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   private backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
@@ -852,6 +865,9 @@ export class MenuScene extends Phaser.Scene {
       this.hudDirty = true;
     }
     if (this.hasLegacyPlayTrailPulsePendingFrame(time)) {
+      this.boardDynamicDirty = true;
+    }
+    if (this.hasLegacyBoardCornerShimmerPendingFrame(time)) {
       this.boardDynamicDirty = true;
     }
 
@@ -3622,6 +3638,72 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  private resolveLegacyBoardCornerFacetAlpha(time: number): number {
+    const phase = (time % LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS) / LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS;
+    return LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA + (Math.sin(phase * Math.PI * 2) * 0.045);
+  }
+
+  private hasLegacyBoardCornerShimmerPendingFrame(time: number): boolean {
+    if (time < this.legacyBoardCornerShimmerNextFrameAtMs) {
+      return false;
+    }
+
+    this.legacyBoardCornerShimmerNextFrameAtMs = time + LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS;
+    return true;
+  }
+
+  private drawLegacyBoardCornerFacetShimmer(boardLeft: number, boardTop: number, boardSize: number, time: number): void {
+    const inset = 2;
+    const outerLeft = boardLeft - inset;
+    const outerTop = boardTop - inset;
+    const outerSize = boardSize + (inset * 2);
+    const right = outerLeft + outerSize;
+    const bottom = outerTop + outerSize;
+    const corner = Math.max(10, Math.round(boardSize * 0.045));
+    const baseAlpha = clamp(this.resolveLegacyBoardCornerFacetAlpha(time), 0.12, 0.3);
+    const phase = (time % LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS) / LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS;
+    const corners = [
+      { x: outerLeft, y: outerTop, sx: 1, sy: 1 },
+      { x: right, y: outerTop, sx: -1, sy: 1 },
+      { x: right, y: bottom, sx: -1, sy: -1 },
+      { x: outerLeft, y: bottom, sx: 1, sy: -1 }
+    ];
+
+    for (let index = 0; index < corners.length; index += 1) {
+      const cornerGlyph = corners[index];
+      if (!cornerGlyph) {
+        continue;
+      }
+
+      const localPhase = (phase + (index * 0.19)) % 1;
+      const wave = 0.5 + (Math.sin(localPhase * Math.PI * 2) * 0.5);
+      const originX = Math.round(cornerGlyph.x + (cornerGlyph.sx * 2));
+      const originY = Math.round(cornerGlyph.y + (cornerGlyph.sy * 2));
+      const edgeX = Math.round(cornerGlyph.x + (cornerGlyph.sx * (corner * 0.9)));
+      const edgeY = Math.round(cornerGlyph.y + (cornerGlyph.sy * (corner * 0.9)));
+      const innerX = Math.round(cornerGlyph.x + (cornerGlyph.sx * (corner * 0.58)));
+      const innerY = Math.round(cornerGlyph.y + (cornerGlyph.sy * (corner * 0.58)));
+      const glintStep = 0.22 + (wave * 0.52);
+      const glintX = cornerGlyph.x + (cornerGlyph.sx * (corner * glintStep));
+      const glintY = cornerGlyph.y + (cornerGlyph.sy * (corner * glintStep));
+
+      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_BASE, baseAlpha);
+      this.boardDynamicGraphics.fillTriangle(originX, originY, edgeX, originY, originX, edgeY);
+      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS, baseAlpha * (0.2 + (wave * 0.18)));
+      this.boardDynamicGraphics.fillTriangle(originX, originY, innerX, originY, originX, innerY);
+      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW, baseAlpha * (0.52 + (wave * 0.42)));
+      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
+        { x: glintX, y: cornerGlyph.y + (cornerGlyph.sy * 3) },
+        { x: cornerGlyph.x + (cornerGlyph.sx * 3), y: glintY }
+      ]);
+      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS, baseAlpha * 0.42);
+      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
+        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.34)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.76)) },
+        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.76)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.34)) }
+      ]);
+    }
+  }
+
   private strokeLegacyPolyline(
     graphics: Phaser.GameObjects.Graphics,
     points: Array<{ x: number; y: number }>
@@ -3720,14 +3802,18 @@ export class MenuScene extends Phaser.Scene {
       : 1;
     const dynamicTrailPathSource = this.resolveLegacyPointPathSource(visibleTrail);
     const boardOffset = this.resolveBoardOffset();
+    const resolvedBoardLeft = boardLeft + boardOffset.x;
+    const resolvedBoardTop = boardTop + boardOffset.y;
     const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(
-      boardLeft + boardOffset.x,
-      boardTop + boardOffset.y,
+      resolvedBoardLeft,
+      resolvedBoardTop,
       boardSize
     );
     const mazeLeft = mazeRenderFrame.boardLeft;
     const mazeTop = mazeRenderFrame.boardTop;
     const mazeTileSize = mazeRenderFrame.tileSize;
+
+    this.drawLegacyBoardCornerFacetShimmer(resolvedBoardLeft, resolvedBoardTop, boardSize, time);
 
     if (this.maze.start && (this.mode !== 'menu' || this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start))) {
       this.fillPlayDynamicMarkerTile(this.maze.start, LEGACY_PLAY_START_MARKER_EDGE, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');
@@ -5809,7 +5895,13 @@ export class MenuScene extends Phaser.Scene {
         renderSafeInset: mazeRenderFrame.safeInset,
         safeBounds,
         pathVisualStyle: this.pathVisualStyle,
-        tileSize: mazeRenderFrame.tileSize
+        tileSize: mazeRenderFrame.tileSize,
+        cornerFacet: {
+          alpha: Number(this.resolveLegacyBoardCornerFacetAlpha(time).toFixed(3)),
+          animated: true,
+          shimmerPeriodMs: LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS,
+          visible: true
+        }
       },
       markerStyle: {
         goalCoreColor: LEGACY_PLAY_GOAL_MARKER_CORE,

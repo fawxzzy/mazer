@@ -44,12 +44,14 @@ Keep:
 - Integer-friendly sizing and placement.
 - Integer-snapped maze wall/path tile boundaries with rounded Phaser pixels.
 - Thin, deliberate panel lines.
+- Subtle sigil-border jewel facets where the chrome has intentional folded corners.
 - Limited, role-specific glow only where it helps read state.
 
 Reduce:
 - Foreground blur.
 - Large soft halos around title and CTA chrome.
 - Overlapping atmospheric overlays in front of the board.
+- Any border glow large enough to compete with path, player, start, or goal markers.
 
 Premium pixel-art presentation pattern:
 - Use softness only in the far background layer.
