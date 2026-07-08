@@ -487,7 +487,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('animatedBackdropEnabled: this.settings.toggleAnimatedBackdrop');
     expect(menuSceneSource).toContain('backdropDirty: this.backdropDirty');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropPalette');
-    expect(menuSceneSource).toContain('resolveLegacyMenuBackdropOrbs');
+    expect(menuSceneSource).toContain('resolveLegacyMenuBackdropShards');
+    expect(menuSceneSource).not.toContain('this.backdropGraphics.fillCircle');
   });
 
   test('cleans up localhost service workers before booting Phaser', () => {

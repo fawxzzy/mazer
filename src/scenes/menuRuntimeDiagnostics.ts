@@ -358,8 +358,9 @@ export interface MenuSceneRuntimeDiagnostics {
       farStars: number;
       nearStars: number;
       twinkles: number;
-      veils: number;
-      driftMotes: number;
+      shards?: number;
+      glassShards: number;
+      driftRunes: number;
       sigils?: number;
       moving: number;
       movingCap: number;

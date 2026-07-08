@@ -1,14 +1,15 @@
 import { describe, expect, test } from 'vitest';
 import {
-  LEGACY_MENU_DRIFT_MOTE_COUNT,
-  LEGACY_MENU_GLASS_VEIL_COUNT,
+  LEGACY_MENU_BACKDROP_SHARD_COUNT,
+  LEGACY_MENU_DRIFT_RUNE_COUNT,
+  LEGACY_MENU_GLASS_SHARD_COUNT,
   LEGACY_MENU_STAR_COUNT,
   advanceLegacyMenuBackdropStars,
   createLegacyMenuBackdropStars,
-  resolveLegacyMenuBackdropDriftMotes,
-  resolveLegacyMenuBackdropGlassVeils,
-  resolveLegacyMenuBackdropOrbs,
+  resolveLegacyMenuBackdropDriftRunes,
+  resolveLegacyMenuBackdropGlassShards,
   resolveLegacyMenuBackdropPalette,
+  resolveLegacyMenuBackdropShards,
   resolveLegacyMenuBackdropStreakLength,
   resolveLegacyMenuBackdropTailStep
 } from '../../src/legacy-runtime/legacyMenuBackdrop';
@@ -44,7 +45,7 @@ describe('legacyMenuBackdrop', () => {
     expect(stars[0].x).toBe(0.25);
   });
 
-  test('publishes a deep blue-violet palette and bounded haze orbs', () => {
+  test('publishes a deep blue-violet palette and bounded angular shards', () => {
     expect(resolveLegacyMenuBackdropPalette(false)).toEqual({
       fieldColor: 0x10172c,
       starAlphaScale: 1.08,
@@ -57,31 +58,33 @@ describe('legacyMenuBackdrop', () => {
       overlayAlpha: 0.1
     });
 
-    const orbs = resolveLegacyMenuBackdropOrbs(1280, 720, false);
-    expect(orbs).toHaveLength(8);
-    expect(orbs[0].x).toBeCloseTo(665.6, 1);
-    expect(orbs[0].radius).toBeCloseTo(273.6, 1);
-    expect(orbs[5].alpha).toBeLessThan(0.02);
+    const shards = resolveLegacyMenuBackdropShards(1280, 720, false);
+    expect(shards).toHaveLength(LEGACY_MENU_BACKDROP_SHARD_COUNT);
+    expect(shards[0].x).toBeCloseTo(665.6, 1);
+    expect(shards[0].length).toBeCloseTo(446.4, 1);
+    expect(shards[0].thickness).toBeCloseTo(27.36, 2);
+    expect(shards[5].alpha).toBeGreaterThan(0.02);
   });
 
-  test('resolves low-count glass veils and motes that animate only when requested', () => {
-    const staticVeils = resolveLegacyMenuBackdropGlassVeils(390, 844, false, 0, false);
-    const animatedVeils = resolveLegacyMenuBackdropGlassVeils(390, 844, false, 4000, true);
-    const staticMotes = resolveLegacyMenuBackdropDriftMotes(390, 844, false, 0, false);
-    const animatedMotes = resolveLegacyMenuBackdropDriftMotes(390, 844, false, 4000, true);
+  test('resolves low-count glass shards and runes that animate only when requested', () => {
+    const staticShards = resolveLegacyMenuBackdropGlassShards(390, 844, false, 0, false);
+    const animatedShards = resolveLegacyMenuBackdropGlassShards(390, 844, false, 4000, true);
+    const staticRunes = resolveLegacyMenuBackdropDriftRunes(390, 844, false, 0, false);
+    const animatedRunes = resolveLegacyMenuBackdropDriftRunes(390, 844, false, 4000, true);
 
-    expect(staticVeils).toHaveLength(LEGACY_MENU_GLASS_VEIL_COUNT);
-    expect(staticMotes).toHaveLength(LEGACY_MENU_DRIFT_MOTE_COUNT);
-    expect(staticVeils[0].radius).toBeCloseTo(70.2, 1);
-    expect(staticVeils[0].alpha).toBeCloseTo(0.155, 3);
-    expect(staticMotes[0].radius).toBeGreaterThanOrEqual(2.2);
-    expect(animatedVeils[0].x).not.toBe(staticVeils[0].x);
-    expect(animatedMotes[1].x).not.toBe(staticMotes[1].x);
+    expect(staticShards).toHaveLength(LEGACY_MENU_GLASS_SHARD_COUNT);
+    expect(staticRunes).toHaveLength(LEGACY_MENU_DRIFT_RUNE_COUNT);
+    expect(staticShards[0].length).toBeCloseTo(132.6, 1);
+    expect(staticShards[0].thickness).toBeCloseTo(11.7, 1);
+    expect(staticShards[0].alpha).toBeCloseTo(0.115, 3);
+    expect(staticRunes[0].size).toBeGreaterThanOrEqual(3);
+    expect(animatedShards[0].x).not.toBe(staticShards[0].x);
+    expect(animatedRunes[1].x).not.toBe(staticRunes[1].x);
 
-    const darkVeils = resolveLegacyMenuBackdropGlassVeils(390, 844, true, 0, false);
-    const darkMotes = resolveLegacyMenuBackdropDriftMotes(390, 844, true, 0, false);
-    expect(darkVeils[0].alpha).toBeLessThan(staticVeils[0].alpha);
-    expect(darkMotes[0].alpha).toBeLessThan(staticMotes[0].alpha);
+    const darkShards = resolveLegacyMenuBackdropGlassShards(390, 844, true, 0, false);
+    const darkRunes = resolveLegacyMenuBackdropDriftRunes(390, 844, true, 0, false);
+    expect(darkShards[0].alpha).toBeLessThan(staticShards[0].alpha);
+    expect(darkRunes[0].alpha).toBeLessThan(staticRunes[0].alpha);
   });
 
   test('keeps star streaks short and biased upward against movement', () => {

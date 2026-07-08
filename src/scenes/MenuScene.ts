@@ -83,17 +83,21 @@ import {
   type LegacyMenuPathTitleCell
 } from '../legacy-runtime/legacyMenuTitle';
 import {
+  LEGACY_MENU_BACKDROP_SHARD_COUNT,
+  LEGACY_MENU_DRIFT_RUNE_COUNT,
+  LEGACY_MENU_GLASS_SHARD_COUNT,
   LEGACY_MENU_STAR_COUNT,
-  LEGACY_MENU_DRIFT_MOTE_COUNT,
-  LEGACY_MENU_GLASS_VEIL_COUNT,
   advanceLegacyMenuBackdropStars,
   createLegacyMenuBackdropStars,
-  resolveLegacyMenuBackdropDriftMotes,
-  resolveLegacyMenuBackdropGlassVeils,
-  resolveLegacyMenuBackdropOrbs,
+  resolveLegacyMenuBackdropDriftRunes,
+  resolveLegacyMenuBackdropGlassShards,
   resolveLegacyMenuBackdropPalette,
+  resolveLegacyMenuBackdropShards,
   resolveLegacyMenuBackdropStreakLength,
   resolveLegacyMenuBackdropTailStep,
+  type LegacyMenuBackdropDriftRune,
+  type LegacyMenuBackdropGlassShard,
+  type LegacyMenuBackdropShard,
   type LegacyMenuBackdropStar
 } from '../legacy-runtime/legacyMenuBackdrop';
 import { performLegacyBrowserSafeExit } from '../legacy-runtime/legacyExit';
@@ -943,8 +947,13 @@ export class MenuScene extends Phaser.Scene {
       ? Number((this.runtimeFrameTotalMs / this.runtimeFrameCount).toFixed(3))
       : 0;
     const starCount = this.stars.length;
-    const backdropSignatureCount = starCount + LEGACY_MENU_GLASS_VEIL_COUNT + LEGACY_MENU_DRIFT_MOTE_COUNT;
-    const movingBackdropActorCount = this.settings.toggleAnimatedBackdrop ? backdropSignatureCount : 0;
+    const backdropSignatureCount = starCount
+      + LEGACY_MENU_BACKDROP_SHARD_COUNT
+      + LEGACY_MENU_GLASS_SHARD_COUNT
+      + LEGACY_MENU_DRIFT_RUNE_COUNT;
+    const movingBackdropActorCount = this.settings.toggleAnimatedBackdrop
+      ? starCount + LEGACY_MENU_GLASS_SHARD_COUNT + LEGACY_MENU_DRIFT_RUNE_COUNT
+      : 0;
     const telemetrySummary = summarizeTelemetrySemantics([]);
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     const drawStageStaged = this.mode === 'menu' && drawStage?.executionKind === 'row-slice';
@@ -1278,8 +1287,9 @@ export class MenuScene extends Phaser.Scene {
           farStars: starCount,
           nearStars: 0,
           twinkles: 0,
-          veils: LEGACY_MENU_GLASS_VEIL_COUNT,
-          driftMotes: LEGACY_MENU_DRIFT_MOTE_COUNT,
+          shards: LEGACY_MENU_BACKDROP_SHARD_COUNT,
+          glassShards: LEGACY_MENU_GLASS_SHARD_COUNT,
+          driftRunes: LEGACY_MENU_DRIFT_RUNE_COUNT,
           sigils: 4,
           moving: movingBackdropActorCount,
           movingCap: movingBackdropActorCount,
@@ -2962,16 +2972,16 @@ export class MenuScene extends Phaser.Scene {
     const { width, height } = this.layout;
     this.backdropGraphics.clear();
     const palette = resolveLegacyMenuBackdropPalette(this.settings.darkMode);
-    const hazeOrbs = resolveLegacyMenuBackdropOrbs(width, height, this.settings.darkMode);
+    const backdropShards = resolveLegacyMenuBackdropShards(width, height, this.settings.darkMode);
     const backdropAnimationTime = this.settings.toggleAnimatedBackdrop ? this.time.now : 0;
-    const glassVeils = resolveLegacyMenuBackdropGlassVeils(
+    const glassShards = resolveLegacyMenuBackdropGlassShards(
       width,
       height,
       this.settings.darkMode,
       backdropAnimationTime,
       this.settings.toggleAnimatedBackdrop
     );
-    const driftMotes = resolveLegacyMenuBackdropDriftMotes(
+    const driftRunes = resolveLegacyMenuBackdropDriftRunes(
       width,
       height,
       this.settings.darkMode,
@@ -2981,17 +2991,14 @@ export class MenuScene extends Phaser.Scene {
 
     this.backdropGraphics.fillStyle(palette.fieldColor, 1);
     this.backdropGraphics.fillRect(0, 0, width, height);
-    for (const orb of hazeOrbs) {
-      this.backdropGraphics.fillStyle(orb.color, orb.alpha);
-      this.backdropGraphics.fillCircle(orb.x, orb.y, orb.radius);
+    for (const shard of backdropShards) {
+      this.drawLegacyBackdropShard(shard, 0.36);
     }
-    for (const veil of glassVeils) {
-      this.backdropGraphics.fillStyle(veil.color, veil.alpha);
-      this.backdropGraphics.fillCircle(veil.x, veil.y, veil.radius);
+    for (const shard of glassShards) {
+      this.drawLegacyBackdropShard(shard, 0.74);
     }
-    for (const mote of driftMotes) {
-      this.backdropGraphics.fillStyle(mote.color, mote.alpha);
-      this.backdropGraphics.fillCircle(mote.x, mote.y, mote.radius);
+    for (const rune of driftRunes) {
+      this.drawLegacyBackdropRune(rune);
     }
     this.drawLegacyBackdropSigils(width, height, this.time.now);
 
@@ -3023,6 +3030,69 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.backdropDirty = false;
+  }
+
+  private drawLegacyBackdropShard(
+    shard: LegacyMenuBackdropShard | LegacyMenuBackdropGlassShard,
+    edgeAlphaScale: number
+  ): void {
+    const halfLength = shard.length / 2;
+    const halfThickness = shard.thickness / 2;
+    const taper = Math.min(halfLength * 0.28, shard.thickness * 1.8);
+    const points = [
+      this.rotateBackdropPoint(shard, -halfLength + taper, -halfThickness),
+      this.rotateBackdropPoint(shard, halfLength - taper, -halfThickness),
+      this.rotateBackdropPoint(shard, halfLength, 0),
+      this.rotateBackdropPoint(shard, halfLength - taper, halfThickness),
+      this.rotateBackdropPoint(shard, -halfLength + taper, halfThickness),
+      this.rotateBackdropPoint(shard, -halfLength, 0)
+    ];
+
+    this.backdropGraphics.fillStyle(shard.color, shard.alpha);
+    this.backdropGraphics.beginPath();
+    this.backdropGraphics.moveTo(points[0]?.x ?? shard.x, points[0]?.y ?? shard.y);
+    for (let index = 1; index < points.length; index += 1) {
+      const point = points[index];
+      if (point) {
+        this.backdropGraphics.lineTo(point.x, point.y);
+      }
+    }
+    this.backdropGraphics.closePath();
+    this.backdropGraphics.fillPath();
+
+    this.backdropGraphics.lineStyle(1, shard.color, shard.alpha * edgeAlphaScale);
+    this.strokeLegacyPolyline(this.backdropGraphics, points);
+  }
+
+  private drawLegacyBackdropRune(rune: LegacyMenuBackdropDriftRune): void {
+    const points = [
+      this.rotateBackdropPoint(rune, 0, -rune.size),
+      this.rotateBackdropPoint(rune, rune.size * 0.68, 0),
+      this.rotateBackdropPoint(rune, 0, rune.size),
+      this.rotateBackdropPoint(rune, -rune.size * 0.68, 0),
+      this.rotateBackdropPoint(rune, 0, -rune.size)
+    ];
+
+    this.backdropGraphics.lineStyle(1, rune.color, rune.alpha);
+    this.strokeLegacyPolyline(this.backdropGraphics, points);
+
+    const slashStart = this.rotateBackdropPoint(rune, -rune.size * 0.42, rune.size * 0.42);
+    const slashEnd = this.rotateBackdropPoint(rune, rune.size * 0.42, -rune.size * 0.42);
+    this.strokeLegacyPolyline(this.backdropGraphics, [slashStart, slashEnd]);
+  }
+
+  private rotateBackdropPoint(
+    source: { x: number; y: number; angle: number },
+    xOffset: number,
+    yOffset: number
+  ): { x: number; y: number } {
+    const cos = Math.cos(source.angle);
+    const sin = Math.sin(source.angle);
+
+    return {
+      x: source.x + (xOffset * cos) - (yOffset * sin),
+      y: source.y + (xOffset * sin) + (yOffset * cos)
+    };
   }
 
   private drawLegacyBackdropSigils(width: number, height: number, time: number): void {

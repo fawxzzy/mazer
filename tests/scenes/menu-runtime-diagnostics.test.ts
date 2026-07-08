@@ -565,8 +565,9 @@ describe('menu runtime diagnostics', () => {
           farStars: 0,
           nearStars: 0,
           twinkles: 0,
-          veils: 0,
-          driftMotes: 0,
+          shards: 0,
+          glassShards: 0,
+          driftRunes: 0,
           moving: 0,
           movingCap: 0,
           signatureCap: 0
