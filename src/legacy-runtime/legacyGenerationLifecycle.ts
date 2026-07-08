@@ -308,7 +308,7 @@ const createLegacyStageContract = (
         name: resolveLegacyGenerationStageName(stageId),
         completionSignal: 'draw-iteration-complete',
         executionKind: 'row-slice',
-        batchSize: 12,
+        batchSize: 1,
         batchUnit: 'rows',
         skipToStageIdWhenDisabled: null
       };

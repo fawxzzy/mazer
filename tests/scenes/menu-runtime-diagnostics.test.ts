@@ -407,7 +407,7 @@ describe('menu runtime diagnostics', () => {
           }
         },
         drawStage: {
-          batchSize: 12,
+          batchSize: 1,
           batchUnit: 'rows',
           complete: true,
           progressPercent: 100,

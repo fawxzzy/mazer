@@ -510,7 +510,8 @@ const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.46;
 const LEGACY_PLAY_START_MARKER_CORE = 0xfff1a6;
 const LEGACY_PLAY_GOAL_MARKER_CORE = 0xff263f;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xd81b2a;
-const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 42;
+const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;
+const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
@@ -2268,6 +2269,9 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicDirty = true;
     this.uiDirty = true;
     this.armLegacyMenuStaticDrawStage();
+    if (this.mode === 'menu') {
+      this.nextDemoMoveAtMs = Math.max(this.nextDemoMoveAtMs, this.resolveLegacyMenuStaticDrawDemoGateAtMs());
+    }
   }
 
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
@@ -2326,6 +2330,28 @@ export class MenuScene extends Phaser.Scene {
     }
 
     return this.menuStaticDrawRowsVisible ?? this.maze.size;
+  }
+
+  private resolveLegacyMenuStaticDrawRowLimit(): number | null {
+    return this.mode === 'menu' && this.menuStaticDrawRowsVisible !== null
+      ? this.menuStaticDrawRowsVisible
+      : null;
+  }
+
+  private isLegacyMenuPointVisibleInStaticDraw(point: LegacyPoint): boolean {
+    const rowLimit = this.resolveLegacyMenuStaticDrawRowLimit();
+    return rowLimit === null || point.y < rowLimit;
+  }
+
+  private resolveLegacyMenuStaticDrawDemoGateAtMs(): number {
+    const drawStage = this.resolveLegacyMenuStaticDrawStage();
+    if (this.mode !== 'menu' || drawStage?.executionKind !== 'row-slice') {
+      return this.time.now;
+    }
+
+    const batchSize = Math.max(1, drawStage.batchSize ?? 1);
+    const rowTicks = Math.ceil(this.maze.size / batchSize);
+    return this.time.now + (rowTicks * LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS) + LEGACY_MENU_STATIC_DRAW_SETTLE_MS;
   }
 
   private armLegacyMenuStaticDrawStage(): void {
@@ -2396,6 +2422,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private updateMenuDemo(time: number): void {
+    if (this.menuStaticDrawRowsVisible !== null) {
+      return;
+    }
     if (time < this.nextDemoMoveAtMs) {
       return;
     }
@@ -2857,25 +2886,28 @@ export class MenuScene extends Phaser.Scene {
     const trail = this.mode === 'menu'
       ? this.trail
       : buildPathTrail(this.trail, this.settings.toggleTrailFade ? TRAIL_FADE_TAIL : null);
-    const dynamicTrailKeys = new Set(trail.map((point) => `${point.x},${point.y}`));
+    const visibleTrail = this.mode === 'menu'
+      ? trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))
+      : trail;
+    const dynamicTrailKeys = new Set(visibleTrail.map((point) => `${point.x},${point.y}`));
     const boardOffset = this.resolveBoardOffset();
 
-    if (this.maze.start) {
+    if (this.maze.start && (this.mode !== 'menu' || this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start))) {
       this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');
     }
-    if (this.maze.goal) {
+    if (this.maze.goal && (this.mode !== 'menu' || this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal))) {
       this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95, 'goal');
     }
 
-    for (let index = 0; index < trail.length; index += 1) {
-      const point = trail[index];
+    for (let index = 0; index < visibleTrail.length; index += 1) {
+      const point = visibleTrail[index];
       if (!point) {
         continue;
       }
 
       const alpha = this.mode === 'play'
-        ? clamp(0.34 + ((index / Math.max(1, trail.length - 1)) * 0.66), 0.34, 1)
-        : clamp(0.22 + ((index / Math.max(1, trail.length - 1)) * 0.82), 0.22, 1);
+        ? clamp(0.34 + ((index / Math.max(1, visibleTrail.length - 1)) * 0.66), 0.34, 1)
+        : clamp(0.22 + ((index / Math.max(1, visibleTrail.length - 1)) * 0.82), 0.22, 1);
       const trailColor = this.settings.darkMode ? 0x9cffd2 : 0x66eebf;
       const trailAlpha = this.settings.darkMode && this.mode === 'menu'
         ? clamp(alpha + 0.08, 0, 1)
@@ -2905,7 +2937,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (this.settings.toggleTrailPulse) {
       this.drawLegacyPlayDynamicTrailPulse(
-        trail,
+        visibleTrail,
         boardLeft + boardOffset.x,
         boardTop + boardOffset.y,
         tileSize,
@@ -2915,7 +2947,9 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (this.mode === 'menu') {
-      this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94, false);
+      if (this.isLegacyMenuPointVisibleInStaticDraw(this.player)) {
+        this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94, false);
+      }
     } else {
       this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, true);
     }

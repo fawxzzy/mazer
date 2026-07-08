@@ -259,7 +259,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;');
     expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_HALO = 0x00b84a;');
     expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_CORE = 0x36ff7d;');
-    expect(menuSceneSource).toContain('const dynamicTrailKeys = new Set(trail.map((point) => `${point.x},${point.y}`));');
+    expect(menuSceneSource).toContain('const visibleTrail = this.mode === \'menu\'');
+    expect(menuSceneSource).toContain('trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))');
+    expect(menuSceneSource).toContain('const dynamicTrailKeys = new Set(visibleTrail.map((point) => `${point.x},${point.y}`));');
     expect(menuSceneSource).toContain('this.fillLegacyMenuDynamicPathTile(');
     expect(menuSceneSource).toContain('const connectedLeft = trailKeys.has(`${point.x - 1},${point.y}`);');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player');
@@ -267,7 +269,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolveLegacyPlayerMarkerRenderMetrics(');
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineTo(centerX + playerMetrics.coreRadius, centerY);');
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillPath();');
-    expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(this.player, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.94, false);');
+    expect(menuSceneSource).toContain('this.isLegacyMenuPointVisibleInStaticDraw(this.player)');
   });
 
   test('keeps active play dynamic overlays in the corridor frame instead of square cells', () => {
