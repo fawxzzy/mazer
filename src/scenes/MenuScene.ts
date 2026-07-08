@@ -117,6 +117,14 @@ import {
   writeLegacyGameToggleSettings
 } from '../legacy-runtime/legacyGameTogglePreferences';
 import {
+  MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT,
+  readMazeCycleTelemetryHistory,
+  recordMazeCycleTelemetryReceipt,
+  summarizeMazeCycleTelemetryDiagnostics,
+  type MazeCycleTelemetryHistory,
+  type MazeCycleTelemetrySurface
+} from '../legacy-runtime/mazeCycleTelemetry';
+import {
   clampLegacyOverlayScrollOffset,
   resolveLegacyOverlayScrollMetrics,
   type LegacyOverlayScrollMetrics,
@@ -713,6 +721,11 @@ export class MenuScene extends Phaser.Scene {
   private menuDemoConfig!: DemoWalkerConfig;
   private nextDemoMoveAtMs = 0;
   private playStartedAtMs = 0;
+  private playCyclePath: LegacyPoint[] = [];
+  private playCycleResetUsed = false;
+  private menuDemoCycleStartedAtMs = 0;
+  private menuDemoCycleRecorded = false;
+  private mazeCycleTelemetryHistory: MazeCycleTelemetryHistory = readMazeCycleTelemetryHistory(undefined);
   private pendingResetRequest: LegacyResetRequest | null = null;
   private pendingOverlayMazeRebuild = false;
   private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();
@@ -830,6 +843,7 @@ export class MenuScene extends Phaser.Scene {
     this.mazeSeed = initialSeed.seed;
     this.explicitRuntimeMazeSeed = initialSeed.explicit;
     this.loadPersistedLegacyGameToggleSettings();
+    this.loadPersistedMazeCycleTelemetryHistory();
     this.initializeRuntimeDiagnostics();
     this.backdropGraphics = this.add.graphics();
     this.boardStaticGraphics = this.add.graphics();
@@ -1003,6 +1017,12 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeWorstFrameMs = Math.max(this.runtimeWorstFrameMs, safeDelta);
   }
 
+  private resolveRuntimeAverageFrameMs(): number {
+    return this.runtimeFrameCount > 0
+      ? Number((this.runtimeFrameTotalMs / this.runtimeFrameCount).toFixed(3))
+      : 0;
+  }
+
   private publishRuntimeDiagnostics(time: number, force = false): void {
     if (!this.runtimeDiagnosticsConfig.enabled) {
       return;
@@ -1040,9 +1060,7 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeDiagnosticsRevision += 1;
     this.runtimeDiagnosticsLastPublishedAtMs = time;
 
-    const averageFrameMs = this.runtimeFrameCount > 0
-      ? Number((this.runtimeFrameTotalMs / this.runtimeFrameCount).toFixed(3))
-      : 0;
+    const averageFrameMs = this.resolveRuntimeAverageFrameMs();
     const starCount = this.stars.length;
     const backdropSignatureCount = starCount
       + LEGACY_MENU_BACKDROP_SHARD_COUNT
@@ -1346,6 +1364,7 @@ export class MenuScene extends Phaser.Scene {
         events: [],
         summary: telemetrySummary
       },
+      cycleTelemetry: summarizeMazeCycleTelemetryDiagnostics(this.mazeCycleTelemetryHistory),
       resources: {
         activeTweens: 0,
         activeTimers: 0,
@@ -2620,11 +2639,17 @@ export class MenuScene extends Phaser.Scene {
       this.menuDemoState = bootstrap.state;
       this.player = bootstrap.player;
       this.trail = bootstrap.trail;
+      this.menuDemoCycleStartedAtMs = this.time.now;
+      this.menuDemoCycleRecorded = false;
+      this.playCyclePath = [];
+      this.playCycleResetUsed = false;
     } else {
       this.menuDemoConfig = createLegacyMenuDemoWalkerConfig(this.maze.seed);
       this.menuDemoState = null;
       this.player = generationState.initialPlayer;
       this.trail = generationState.initialTrail;
+      this.playCyclePath = generationState.initialTrail.map(copyPoint);
+      this.playCycleResetUsed = false;
       if (generationState.startsPlayTimer) {
         this.playStartedAtMs = this.time.now;
       }
@@ -3081,6 +3106,7 @@ export class MenuScene extends Phaser.Scene {
     if (nextFrame.shouldRegenerateMaze) {
       this.menuDemoState = nextFrame.state;
       this.nextDemoMoveAtMs = time + nextFrame.delayMs;
+      this.recordMazeCycleCompletion('menu-demo');
       this.armLegacyMenuStaticDeconstructStage(time);
       this.boardDynamicDirty = true;
       return;
@@ -3092,6 +3118,7 @@ export class MenuScene extends Phaser.Scene {
     this.nextDemoMoveAtMs = time + nextFrame.delayMs;
     if (this.shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame)) {
       this.nextDemoMoveAtMs = time;
+      this.recordMazeCycleCompletion('menu-demo');
       this.armLegacyMenuStaticDeconstructStage(time);
       this.boardDynamicDirty = true;
       return;
@@ -3119,12 +3146,14 @@ export class MenuScene extends Phaser.Scene {
 
     this.player = nextStep.player;
     this.trail = nextStep.trail;
+    this.appendLegacyPlayCyclePoint(nextStep.player);
     if (this.settings.toggleCameraFollow) {
       this.boardStaticDirty = true;
       this.boardPathDirty = true;
     }
 
     if (nextStep.reachedGoal) {
+      this.recordMazeCycleCompletion('play');
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
       this.publishInteractionDiagnostics();
@@ -6176,6 +6205,8 @@ export class MenuScene extends Phaser.Scene {
       this.trail = result.nextTrail ?? [copyPoint(result.nextPlayer)];
       this.boardDynamicDirty = true;
       if (command === 'reset-player' && this.mode === 'play') {
+        this.playCycleResetUsed = true;
+        this.appendLegacyPlayCyclePoint(result.nextPlayer);
         this.startLegacyPlayCompassSpin(this.time.now);
       }
       this.publishInteractionDiagnostics();
@@ -6246,6 +6277,10 @@ export class MenuScene extends Phaser.Scene {
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
   }
 
+  private loadPersistedMazeCycleTelemetryHistory(): void {
+    this.mazeCycleTelemetryHistory = readMazeCycleTelemetryHistory(this.resolveMazeCycleTelemetryStorage());
+  }
+
   private resolveLegacyGameToggleStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
     if (typeof window === 'undefined') {
       return undefined;
@@ -6256,6 +6291,65 @@ export class MenuScene extends Phaser.Scene {
     } catch {
       return undefined;
     }
+  }
+
+  private resolveMazeCycleTelemetryStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    try {
+      return window.localStorage;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private appendLegacyPlayCyclePoint(point: LegacyPoint): void {
+    this.playCyclePath.push(copyPoint(point));
+    if (this.playCyclePath.length <= MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT) {
+      return;
+    }
+
+    const firstPoint = this.playCyclePath[0] ? copyPoint(this.playCyclePath[0]) : copyPoint(point);
+    const tail = this.playCyclePath.slice(Math.max(1, this.playCyclePath.length - (MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT - 1)));
+    this.playCyclePath = [firstPoint, ...tail.map(copyPoint)];
+  }
+
+  private recordMazeCycleCompletion(surface: MazeCycleTelemetrySurface): void {
+    if (surface === 'menu-demo' && this.menuDemoCycleRecorded) {
+      return;
+    }
+
+    const routeDiagnostics = surface === 'menu-demo' && this.menuDemoEpisode && this.menuDemoConfig
+      ? collectDemoWalkerRouteDiagnostics(this.menuDemoEpisode, this.menuDemoConfig)
+      : null;
+    const playerPath = surface === 'play'
+      ? this.playCyclePath
+      : this.trail;
+    const startedAtMs = surface === 'play'
+      ? this.playStartedAtMs
+      : this.menuDemoCycleStartedAtMs;
+
+    this.mazeCycleTelemetryHistory = recordMazeCycleTelemetryReceipt(
+      this.resolveMazeCycleTelemetryStorage(),
+      {
+        averageFrameMs: this.resolveRuntimeAverageFrameMs(),
+        completionTimeMs: Math.max(0, Math.round(this.time.now - startedAtMs)),
+        controlMode: this.settings.controlMode,
+        maze: this.maze,
+        playerPath,
+        resetUsed: surface === 'play' ? this.playCycleResetUsed : false,
+        surface,
+        backtracks: routeDiagnostics?.telemetry.backtrackCount,
+        wrongTurns: routeDiagnostics?.telemetry.wrongBranchCount
+      }
+    );
+
+    if (surface === 'menu-demo') {
+      this.menuDemoCycleRecorded = true;
+    }
+    this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
   private handleBackAction(): void {
