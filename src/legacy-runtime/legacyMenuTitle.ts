@@ -8,6 +8,104 @@ export interface LegacyMenuTitlePresentation {
 
 export type LegacyMenuTitleSurface = 'snapshot' | 'procedural';
 
+export interface LegacyMenuPathTitleCell {
+  column: number;
+  order: number;
+  row: number;
+}
+
+export interface LegacyMenuPathTitleLayout {
+  cellSize: number;
+  cells: LegacyMenuPathTitleCell[];
+  columns: number;
+  coreInset: number;
+  height: number;
+  left: number;
+  rows: number;
+  top: number;
+  width: number;
+}
+
+const LEGACY_MENU_PATH_TITLE_PATTERNS = [
+  [
+    '10001',
+    '11011',
+    '10101',
+    '10101',
+    '10001',
+    '10001',
+    '10001'
+  ],
+  [
+    '01110',
+    '10001',
+    '10001',
+    '11111',
+    '10001',
+    '10001',
+    '10001'
+  ],
+  [
+    '11111',
+    '00001',
+    '00010',
+    '00100',
+    '01000',
+    '10000',
+    '11111'
+  ],
+  [
+    '11111',
+    '10000',
+    '10000',
+    '11110',
+    '10000',
+    '10000',
+    '11111'
+  ],
+  [
+    '11110',
+    '10001',
+    '10001',
+    '11110',
+    '10100',
+    '10010',
+    '10001'
+  ]
+] as const;
+
+const LEGACY_MENU_PATH_TITLE_LETTER_COLUMNS = 5;
+const LEGACY_MENU_PATH_TITLE_LETTER_GAP_COLUMNS = 1;
+const LEGACY_MENU_PATH_TITLE_ROWS = 7;
+
+const buildLegacyMenuPathTitleCells = (): LegacyMenuPathTitleCell[] => {
+  const cells: LegacyMenuPathTitleCell[] = [];
+  let order = 0;
+
+  LEGACY_MENU_PATH_TITLE_PATTERNS.forEach((pattern, letterIndex) => {
+    const columnOffset = letterIndex * (LEGACY_MENU_PATH_TITLE_LETTER_COLUMNS + LEGACY_MENU_PATH_TITLE_LETTER_GAP_COLUMNS);
+    pattern.forEach((rowPattern, row) => {
+      [...rowPattern].forEach((value, column) => {
+        if (value !== '1') {
+          return;
+        }
+        cells.push({
+          column: columnOffset + column,
+          row,
+          order
+        });
+        order += 1;
+      });
+    });
+  });
+
+  return cells;
+};
+
+export const LEGACY_MENU_PATH_TITLE_CELLS = buildLegacyMenuPathTitleCells();
+export const LEGACY_MENU_PATH_TITLE_COLUMNS = (LEGACY_MENU_PATH_TITLE_PATTERNS.length * LEGACY_MENU_PATH_TITLE_LETTER_COLUMNS)
+  + ((LEGACY_MENU_PATH_TITLE_PATTERNS.length - 1) * LEGACY_MENU_PATH_TITLE_LETTER_GAP_COLUMNS);
+
 export const resolveLegacyMenuTitlePresentation = (
   boardSize: number,
   tileSize: number,
@@ -43,5 +141,27 @@ export const resolveLegacyMenuTitlePresentation = (
     shadowOffsetY,
     shadowAlpha: isPortrait ? 0.38 : 0.34,
     titleAlpha: isProceduralUltraNarrow ? 0.64 : (isProceduralPortrait ? 0.82 : (isPortrait ? 0.76 : 0.7))
+  };
+};
+
+export const resolveLegacyMenuPathTitleLayout = (
+  centerX: number,
+  centerY: number,
+  fontSize: number
+): LegacyMenuPathTitleLayout => {
+  const cellSize = Math.max(4, Math.round(fontSize / 9));
+  const width = LEGACY_MENU_PATH_TITLE_COLUMNS * cellSize;
+  const height = LEGACY_MENU_PATH_TITLE_ROWS * cellSize;
+
+  return {
+    cellSize,
+    cells: LEGACY_MENU_PATH_TITLE_CELLS,
+    columns: LEGACY_MENU_PATH_TITLE_COLUMNS,
+    coreInset: Math.max(1, Math.floor(cellSize * 0.18)),
+    height,
+    left: Math.round(centerX - (width / 2)),
+    rows: LEGACY_MENU_PATH_TITLE_ROWS,
+    top: Math.round(centerY - (height / 2)),
+    width
   };
 };

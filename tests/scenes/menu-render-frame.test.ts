@@ -251,6 +251,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private boardPathGraphics!: Phaser.GameObjects.Graphics;');
     expect(menuSceneSource).toContain('private boardPathDirty = true;');
     expect(menuSceneSource).toContain('this.boardPathGraphics = this.add.graphics();');
+    expect(menuSceneSource).toContain('private titleGraphics!: Phaser.GameObjects.Graphics;');
+    expect(menuSceneSource).toContain('this.titleGraphics = this.add.graphics();');
+    expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(): void');
+    expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleProgress(): number');
+    expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitle();');
+    expect(menuSceneSource).toContain('resolveLegacyMenuPathTitleLayout(');
+    expect(menuSceneSource).toContain('title: this.resolveLegacyMenuPathTitleDiagnostics()');
     expect(menuSceneSource).toContain('if (this.boardPathDirty) {');
     expect(menuSceneSource).toContain('this.drawBoardPaths();');
     expect(menuSceneSource).toContain('private drawBoardPaths(): void {');

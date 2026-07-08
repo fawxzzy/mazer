@@ -77,7 +77,11 @@ import {
   type LegacyPathVisualStyle
 } from '../legacy-runtime/legacyPathVisualStyle';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
-import { resolveLegacyMenuTitlePresentation } from '../legacy-runtime/legacyMenuTitle';
+import {
+  resolveLegacyMenuPathTitleLayout,
+  resolveLegacyMenuTitlePresentation,
+  type LegacyMenuPathTitleCell
+} from '../legacy-runtime/legacyMenuTitle';
 import {
   LEGACY_MENU_STAR_COUNT,
   LEGACY_MENU_DRIFT_MOTE_COUNT,
@@ -238,6 +242,14 @@ interface MenuSceneVisualDiagnostics {
     surface: 'menu' | 'play';
     titleX: number;
     titleY: number;
+  };
+  title: {
+    bounds: VisualRect;
+    builtFromPathPieces: boolean;
+    pieceCount: number;
+    progressPercent: number;
+    visible: boolean;
+    visiblePieces: number;
   };
   textLabels: VisualTextLabel[];
   hud: {
@@ -459,8 +471,14 @@ const MENU_BUTTON_ALPHA = 0.34;
 const LEGACY_UI_FONT_FAMILY = '"Trebuchet MS", "Segoe UI", sans-serif';
 const LEGACY_UI_MONO_FONT_FAMILY = 'Consolas, "Lucida Console", monospace';
 const MENU_TEXT_COLOR = '#ecfff5';
-const TITLE_FILL_COLOR = '#1d8726';
-const TITLE_SHADOW_COLOR = '#103516';
+const LEGACY_MENU_PATH_TITLE_SHADOW = 0x02070d;
+const LEGACY_MENU_PATH_TITLE_EDGE = 0x0d3c4f;
+const LEGACY_MENU_PATH_TITLE_CORE = 0xe7fff4;
+const LEGACY_MENU_PATH_TITLE_ACCENT = 0x36ff7d;
+const LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA = 0.44;
+const LEGACY_MENU_PATH_TITLE_EDGE_ALPHA = 0.84;
+const LEGACY_MENU_PATH_TITLE_CORE_ALPHA = 0.96;
+const LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA = 0.92;
 const LEGACY_BOARD_GRID_ALPHA = 0;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
@@ -632,8 +650,7 @@ export class MenuScene extends Phaser.Scene {
   private playTouchStickPointerId: number | null = null;
   private playTouchStickPull: TouchStickPullVector | null = null;
   private playPointerStart: LegacyPlayPointerStart | null = null;
-  private titleText!: Phaser.GameObjects.Text;
-  private titleShadow!: Phaser.GameObjects.Text;
+  private titleGraphics!: Phaser.GameObjects.Graphics;
   private footerText!: Phaser.GameObjects.Text;
   private backdropGraphics!: Phaser.GameObjects.Graphics;
   private boardStaticGraphics!: Phaser.GameObjects.Graphics;
@@ -725,21 +742,10 @@ export class MenuScene extends Phaser.Scene {
     this.boardStaticGraphics = this.add.graphics();
     this.boardPathGraphics = this.add.graphics();
     this.boardDynamicGraphics = this.add.graphics();
+    this.titleGraphics = this.add.graphics();
     this.overlayGraphics = this.add.graphics();
     this.hudGraphics = this.add.graphics();
 
-    this.titleShadow = this.add.text(0, 0, 'Mazer', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '96px',
-      fontStyle: 'bold',
-      color: TITLE_SHADOW_COLOR
-    }).setOrigin(0.5).setAlpha(0.76);
-    this.titleText = this.add.text(0, 0, 'Mazer', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '96px',
-      fontStyle: 'bold',
-      color: TITLE_FILL_COLOR
-    }).setOrigin(0.5).setAlpha(0.88);
     this.footerText = this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '18px',
@@ -2337,7 +2343,6 @@ export class MenuScene extends Phaser.Scene {
   private refreshLayout(): void {
     const width = this.scale.width;
     const height = this.scale.height;
-    const isPortrait = height > width;
     const layoutSurface = this.mode === 'play' ? 'play' : 'menu';
     this.layout = resolveLegacyMenuLayout(
       width,
@@ -2346,25 +2351,6 @@ export class MenuScene extends Phaser.Scene {
       this.maze.size,
       layoutSurface
     );
-    const titlePresentation = resolveLegacyMenuTitlePresentation(
-      this.layout.boardSize,
-      this.layout.tileSize,
-      isPortrait,
-      width,
-      this.maze.source === 'menu-generated' ? 'procedural' : 'snapshot'
-    );
-
-    this.titleShadow
-      .setPosition(
-        this.layout.titleX + titlePresentation.shadowOffsetX,
-        this.layout.titleY + titlePresentation.shadowOffsetY
-      )
-      .setFontSize(titlePresentation.fontSize)
-      .setAlpha(titlePresentation.shadowAlpha);
-    this.titleText
-      .setPosition(this.layout.titleX, this.layout.titleY)
-      .setFontSize(titlePresentation.fontSize)
-      .setAlpha(titlePresentation.titleAlpha);
     this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
 
     this.boardStaticDirty = true;
@@ -2379,8 +2365,7 @@ export class MenuScene extends Phaser.Scene {
     this.mode = request.mode;
     this.mazeSeed = request.seed;
     this.maze = generationState.maze;
-    this.titleText.setVisible(generationState.titleVisible);
-    this.titleShadow.setVisible(generationState.titleVisible);
+    this.titleGraphics.setVisible(generationState.titleVisible);
     this.menuDemoEpisode = this.mode === 'menu' ? createLegacyDemoWalkerEpisode(this.maze) : null;
     if (this.mode === 'menu') {
       const bootstrap = createLegacyMenuDemoBootstrap(this.maze, this.settings.toggleTrailFade, TRAIL_FADE_TAIL);
@@ -3144,8 +3129,7 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyBoardSigilBorder(boardLeft, boardTop, boardSize);
 
     const showMenuTitle = this.mode === 'menu' && this.overlay === 'none';
-    this.titleText.setVisible(showMenuTitle);
-    this.titleShadow.setVisible(showMenuTitle);
+    this.titleGraphics.setVisible(showMenuTitle);
     this.boardStaticDirty = false;
   }
 
@@ -3230,7 +3214,119 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
+    this.drawLegacyMenuPathTitle();
     this.boardPathDirty = false;
+  }
+
+  private resolveLegacyMenuPathTitleProgress(): number {
+    if (this.mode !== 'menu') {
+      return 0;
+    }
+
+    const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
+    if (tileLimit !== null && this.menuStaticDrawTileOrder.length > 0) {
+      return clamp(tileLimit / this.menuStaticDrawTileOrder.length, 0, 1);
+    }
+
+    return this.menuStaticDrawLifecyclePhase === 'building' ? 0 : 1;
+  }
+
+  private resolveLegacyMenuPathTitleVisiblePieces(pieceCount: number): number {
+    const progress = this.resolveLegacyMenuPathTitleProgress();
+    if (progress <= 0) {
+      return 0;
+    }
+
+    return clamp(Math.ceil(pieceCount * progress), 0, pieceCount);
+  }
+
+  private drawLegacyMenuPathTitleCell(
+    cell: LegacyMenuPathTitleCell,
+    left: number,
+    top: number,
+    cellSize: number,
+    inset: number
+  ): void {
+    const size = Math.max(1, cellSize - (inset * 2));
+    this.titleGraphics.fillRect(
+      left + (cell.column * cellSize) + inset,
+      top + (cell.row * cellSize) + inset,
+      size,
+      size
+    );
+  }
+
+  private drawLegacyMenuPathTitle(): void {
+    this.titleGraphics.clear();
+    const visible = this.mode === 'menu' && this.overlay === 'none';
+    this.titleGraphics.setVisible(visible);
+    if (!visible) {
+      return;
+    }
+
+    const titlePresentation = resolveLegacyMenuTitlePresentation(
+      this.layout.boardSize,
+      this.layout.tileSize,
+      this.layout.height > this.layout.width,
+      this.layout.width,
+      this.maze.source === 'menu-generated' ? 'procedural' : 'snapshot'
+    );
+    const titleLayout = resolveLegacyMenuPathTitleLayout(
+      this.layout.titleX,
+      this.layout.titleY,
+      titlePresentation.fontSize
+    );
+    const visiblePieceCount = this.resolveLegacyMenuPathTitleVisiblePieces(titleLayout.cells.length);
+    const visibleCells = titleLayout.cells.slice(0, visiblePieceCount);
+    if (visibleCells.length <= 0) {
+      return;
+    }
+
+    this.titleGraphics.fillStyle(LEGACY_MENU_PATH_TITLE_SHADOW, LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA);
+    for (const cell of visibleCells) {
+      this.drawLegacyMenuPathTitleCell(
+        cell,
+        titleLayout.left + titlePresentation.shadowOffsetX,
+        titleLayout.top + titlePresentation.shadowOffsetY,
+        titleLayout.cellSize,
+        0
+      );
+    }
+
+    this.titleGraphics.fillStyle(
+      LEGACY_MENU_PATH_TITLE_EDGE,
+      LEGACY_MENU_PATH_TITLE_EDGE_ALPHA * titlePresentation.titleAlpha
+    );
+    for (const cell of visibleCells) {
+      this.drawLegacyMenuPathTitleCell(cell, titleLayout.left, titleLayout.top, titleLayout.cellSize, 0);
+    }
+
+    this.titleGraphics.fillStyle(
+      LEGACY_MENU_PATH_TITLE_CORE,
+      LEGACY_MENU_PATH_TITLE_CORE_ALPHA * titlePresentation.titleAlpha
+    );
+    for (const cell of visibleCells) {
+      this.drawLegacyMenuPathTitleCell(
+        cell,
+        titleLayout.left,
+        titleLayout.top,
+        titleLayout.cellSize,
+        titleLayout.coreInset
+      );
+    }
+
+    const cursorCell = visibleCells.at(-1);
+    if (cursorCell && visiblePieceCount < titleLayout.cells.length) {
+      const accentInset = Math.max(titleLayout.coreInset + 1, Math.floor(titleLayout.cellSize * 0.28));
+      this.titleGraphics.fillStyle(LEGACY_MENU_PATH_TITLE_ACCENT, LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA);
+      this.drawLegacyMenuPathTitleCell(
+        cursorCell,
+        titleLayout.left,
+        titleLayout.top,
+        titleLayout.cellSize,
+        accentInset
+      );
+    }
   }
 
   private resolveLegacyMazeRenderFrame(
@@ -5049,8 +5145,7 @@ export class MenuScene extends Phaser.Scene {
     }
     this.overlay = kind;
     this.overlayReturn = 'none';
-    this.titleText.setVisible(false);
-    this.titleShadow.setVisible(false);
+    this.titleGraphics.setVisible(false);
     this.boardDynamicDirty = true;
     this.uiDirty = true;
     if (this.mode === 'play') {
@@ -5065,8 +5160,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlay = 'none';
     this.overlayReturn = 'none';
     const showMenuTitle = this.mode === 'menu';
-    this.titleText.setVisible(showMenuTitle);
-    this.titleShadow.setVisible(showMenuTitle);
+    this.titleGraphics.setVisible(showMenuTitle);
     this.activeInputField = null;
     if (this.mode === 'play') {
       this.resetLegacyPlayInputBuffer();
@@ -5289,6 +5383,32 @@ export class MenuScene extends Phaser.Scene {
         text: text.text,
         bounds: visualRectFromBounds(text.getBounds())
       }));
+  }
+
+  private resolveLegacyMenuPathTitleDiagnostics(): MenuSceneVisualDiagnostics['title'] {
+    const titlePresentation = resolveLegacyMenuTitlePresentation(
+      this.layout.boardSize,
+      this.layout.tileSize,
+      this.layout.height > this.layout.width,
+      this.layout.width,
+      this.maze.source === 'menu-generated' ? 'procedural' : 'snapshot'
+    );
+    const titleLayout = resolveLegacyMenuPathTitleLayout(
+      this.layout.titleX,
+      this.layout.titleY,
+      titlePresentation.fontSize
+    );
+    const pieceCount = titleLayout.cells.length;
+    const progress = this.resolveLegacyMenuPathTitleProgress();
+
+    return {
+      bounds: createVisualRect(titleLayout.left, titleLayout.top, titleLayout.width, titleLayout.height),
+      builtFromPathPieces: true,
+      pieceCount,
+      progressPercent: Math.round(progress * 100),
+      visible: this.mode === 'menu' && this.overlay === 'none' && this.titleGraphics.visible,
+      visiblePieces: this.resolveLegacyMenuPathTitleVisiblePieces(pieceCount)
+    };
   }
 
   private publishVisualDiagnostics(time: number, force = false): void {
@@ -5534,6 +5654,7 @@ export class MenuScene extends Phaser.Scene {
         titleX: this.layout.titleX,
         titleY: this.layout.titleY
       },
+      title: this.resolveLegacyMenuPathTitleDiagnostics(),
       textLabels: this.resolveVisualTextLabels(),
       hud: {
         kind: this.mode === 'play' && this.overlay === 'none' ? 'legacy-play-hud' : null,
