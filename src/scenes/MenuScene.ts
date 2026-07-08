@@ -101,7 +101,6 @@ import {
   type LegacyMenuBackdropShard,
   type LegacyMenuBackdropStar
 } from '../legacy-runtime/legacyMenuBackdrop';
-import { performLegacyBrowserSafeExit } from '../legacy-runtime/legacyExit';
 import {
   createLegacyOptionFieldDrafts,
   type LegacyOptionFieldDrafts,
@@ -4932,22 +4931,14 @@ export class MenuScene extends Phaser.Scene {
 
     if (this.overlay === 'none') {
       if (this.mode === 'menu') {
-        const [leftLabel, centerLabel, rightLabel] = MAIN_MENU_BUTTONS;
+        const [startLabel, optionsLabel] = MAIN_MENU_BUTTONS;
         this.uiButtons.push(
           this.createButton(
             this.layout.leftButtonX,
             this.layout.leftButtonY,
             this.layout.buttonWidth,
             this.layout.buttonHeight,
-            leftLabel,
-            () => this.performLegacyExit()
-          ),
-          this.createButton(
-            this.layout.centerButtonX,
-            this.layout.centerButtonY,
-            this.layout.centerButtonWidth,
-            this.layout.buttonHeight,
-            centerLabel,
+            startLabel,
             () => this.startPlayMode()
           ),
           this.createButton(
@@ -4955,7 +4946,7 @@ export class MenuScene extends Phaser.Scene {
             this.layout.rightButtonY,
             this.layout.buttonWidth,
             this.layout.buttonHeight,
-            rightLabel,
+            optionsLabel,
             () => this.openOverlay('options')
           )
         );
@@ -5735,10 +5726,6 @@ export class MenuScene extends Phaser.Scene {
         this.closeOverlay();
         return;
     }
-  }
-
-  private performLegacyExit(): void {
-    performLegacyBrowserSafeExit(typeof window === 'undefined' ? undefined : window);
   }
 
   private resolveLegacyPlayTouchControlDiagnostics(): MenuSceneVisualDiagnostics['touchControls'] {

@@ -100,26 +100,19 @@ const expectScaledMenuTile = (
 };
 
 describe('legacy reset lane', () => {
-  test('restores the legacy front-door button set', () => {
-    expect(MAIN_MENU_BUTTONS).toEqual(['Exit', 'Start', 'Options']);
+  test('keeps the active front-door button set focused on play and options', () => {
+    expect(MAIN_MENU_BUTTONS).toEqual(['Start', 'Options']);
   });
 
-  test('routes the front-door Exit button through a browser-safe quit equivalence', () => {
+  test('removes the front-door Exit button and browser quit equivalence path', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
-    const legacyExitSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyExit.ts'), 'utf8');
     const legacyOverlayRoutingSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayRouting.ts'), 'utf8');
-    const legacyMainMenuSource = readFileSync(
-      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'MainMenuWidget.cpp'),
-      'utf8'
-    );
 
-    expect(menuSceneSource).toContain("() => this.performLegacyExit()");
-    expect(menuSceneSource).toContain('private performLegacyExit(): void {');
+    expect(menuSceneSource).not.toContain("() => this.performLegacyExit()");
+    expect(menuSceneSource).not.toContain('private performLegacyExit(): void {');
+    expect(menuSceneSource).not.toContain('performLegacyBrowserSafeExit');
     expect(menuSceneSource).not.toContain("case 'message':");
-    expect(legacyExitSource).toContain("kind: 'replace-about-blank'");
-    expect(legacyExitSource).toContain("runtime?.location?.replace?.(action.targetUrl ?? 'about:blank');");
     expect(legacyOverlayRoutingSource).not.toContain("'message'");
-    expect(legacyMainMenuSource).toContain('PlayerController->ConsoleCommand("quit");');
   });
 
   test('preserves legacy default settings', () => {

@@ -19,7 +19,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("overlay: 'none'");
     expect(source).toContain("overlay: 'options'");
     expect(source).toContain("overlay: 'pause'");
-    expect(source).toContain("expectedLabels: ['Exit', 'Start', 'Options']");
+    expect(source).toContain("expectedLabels: ['Start', 'Options']");
     expect(source).toContain("expectedLabels: ['Paused', 'Game Toggles', 'Move Speed', 'Back', 'Reset', 'Main Menu']");
     expect(source).toContain("url.searchParams.set('mazeSeed', mazeSeed);");
     expect(source).toContain("url.searchParams.set('pathStyle', pathStyle);");
@@ -28,6 +28,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'play-goal-red'");
     expect(source).toContain("createCheck(\n      'play-stick-controls'");
     expect(source).toContain("createCheck(\n      'menu-text-labels'");
+    expect(source).not.toContain("expectedLabels: ['Exit', 'Start', 'Options']");
     expect(source).toContain("hasLabels(surfaces.options, ['Options', 'Maze Scale', 'Camera Scale', 'Game Toggles', 'Move Speed', 'Back'])");
     expect(source).toContain("hasLabels(surfaces.pause, ['Paused', 'Game Toggles', 'Move Speed', 'Back', 'Reset', 'Main Menu'])");
     expect(source).toContain('const reportPath = resolve(outputDir, \'report.md\');');

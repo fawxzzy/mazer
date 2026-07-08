@@ -206,8 +206,8 @@ const seedPreferences = async (page, preferences) => {
 
 const getMenuButtonPoints = (visual) => ({
   start: {
-    x: Math.round(visual?.layout?.centerButtonX ?? 0),
-    y: Math.round(visual?.layout?.centerButtonY ?? 0)
+    x: Math.round(visual?.layout?.leftButtonX ?? 0),
+    y: Math.round(visual?.layout?.leftButtonY ?? 0)
   },
   options: {
     x: Math.round(visual?.layout?.rightButtonX ?? 0),
@@ -304,7 +304,7 @@ const buildSurfaceChecks = ({
   const textChecks = [
     createCheck(
       'menu-text-labels',
-      hasLabels(surfaces.menu, ['Exit', 'Start', 'Options']),
+      hasLabels(surfaces.menu, ['Start', 'Options']),
       `labels=${labelDetail(surfaces.menu)}`
     ),
     createCheck(
@@ -445,7 +445,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const menu = await captureSurface({
       page,
       outputDir,
-      expectedLabels: ['Exit', 'Start', 'Options'],
+      expectedLabels: ['Start', 'Options'],
       id: '01-menu',
       mode: 'menu',
       overlay: 'none',

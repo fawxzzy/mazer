@@ -42,7 +42,7 @@ export const LEGACY_DEFAULTS: LegacySettings = {
   controlMode: 'arrows'
 };
 
-export const MAIN_MENU_BUTTONS = ['Exit', 'Start', 'Options'] as const;
+export const MAIN_MENU_BUTTONS = ['Start', 'Options'] as const;
 
 export const clampNumber = (value: number, min: number, max: number): number => (
   Math.max(min, Math.min(max, value))

@@ -360,10 +360,10 @@ Rule:
 
 - `src/legacy-runtime/legacyDefaults.ts`
   - canonical legacy defaults
-  - `Exit / Start / Options`
+  - active front-door buttons: `Start / Options`
 - `src/legacy-runtime/legacyMenuLayout.ts`
   - title, board, and button frame math
-  - spacing contract between board edge and `Exit / Start / Options`
+  - spacing contract between board edge and the centered `Start / Options` pair
 - `src/legacy-runtime/legacyOptionFields.ts`
   - text-field draft parsing and settings mutation
   - maze-affecting option edits now defer runtime rebuild until overlay close, matching the legacy menu/pause contract more closely

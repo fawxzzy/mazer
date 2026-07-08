@@ -92,17 +92,18 @@ export const resolveLegacyMenuLayout = (
   const centerButtonWidth = isPortrait
     ? buttonWidth
     : Math.round(clamp(buttonWidth * 1.14, buttonWidth + 20, 262));
-  const sideButtonInset = Math.round(clamp(width * (isPortrait ? 0.16 : 0.156), isUltraNarrow ? Math.round(width / 2) : 66, 324));
   const centerButtonX = Math.round(width * 0.5);
-  const stackHeight = (buttonHeight * 3) + (stackGap * 2);
+  const rowButtonGap = Math.round(clamp(width * (isPortrait ? 0.045 : 0.016), isPortrait ? 14 : 18, isPortrait ? 22 : 34));
+  const rowButtonOffset = Math.round((buttonWidth / 2) + (rowButtonGap / 2));
+  const stackHeight = (buttonHeight * 2) + stackGap;
   const stackTop = Math.round(clamp(
     boardTop + snappedBoardSize + 18,
     boardTop + snappedBoardSize + 12,
     height - stackHeight - 18
   ));
   const leftButtonY = isUltraNarrow ? stackTop + Math.round(buttonHeight / 2) : rowButtonY;
-  const centerButtonY = isUltraNarrow ? leftButtonY + buttonHeight + stackGap : rowButtonY;
-  const rightButtonY = isUltraNarrow ? centerButtonY + buttonHeight + stackGap : rowButtonY;
+  const rightButtonY = isUltraNarrow ? leftButtonY + buttonHeight + stackGap : rowButtonY;
+  const centerButtonY = rowButtonY;
   const titleOverlapY = Math.round(boardTop + (snappedBoardSize * (isPortrait ? 0.216 : 0.221)));
   const menuPortraitTitleClearance = titleClearance;
   const menuPortraitTitleY = Math.max(34, boardTop - menuPortraitTitleClearance);
@@ -123,9 +124,9 @@ export const resolveLegacyMenuLayout = (
     leftButtonY,
     rightButtonY,
     centerButtonWidth,
-    leftButtonX: sideButtonInset,
+    leftButtonX: isUltraNarrow ? centerButtonX : centerButtonX - rowButtonOffset,
     centerButtonX,
-    rightButtonX: width - sideButtonInset,
+    rightButtonX: isUltraNarrow ? centerButtonX : centerButtonX + rowButtonOffset,
     buttonWidth,
     buttonHeight
   };
