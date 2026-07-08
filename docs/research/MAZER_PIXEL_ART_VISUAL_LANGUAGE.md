@@ -1,8 +1,11 @@
 # Mazer Pixel-Art Visual Language
 
 ## Current Mazer Constraints
-- Mazer is ambient-only and non-playable right now. The board is the hero, not the chrome.
-- The runtime already commits to crisp rendering through Phaser `pixelArt: true`, `antialias: false`, `antialiasGL: false`, `roundPixels: true`, and `scale.autoRound: true`.
+- Mazer is a mobile-clean maze game with an animated front-door demo and an active play route. The board is the hero, not the chrome.
+- The maintained runtime keeps Phaser `pixelArt: false`, `antialias: true`, `antialiasGL: true`, `roundPixels: true`, and `scale.autoRound: true` so text, controls, and gothic-cyber chrome stay readable.
+- Mobile crispness now comes from maze-layer pixel discipline: wall fills, path material frames, and path cues are snapped to integer canvas-pixel boundaries instead of relying on whole-canvas pixelation.
+- Whole-canvas CSS `image-rendering: pixelated` / `crisp-edges` is intentionally avoided in the active runtime because it makes anti-aliased text/chrome look chunky when translated from desktop to mobile.
+- Runtime diagnostics publish the canvas CSS size, backing size, device pixel ratio, and render ratio so mobile proofs can distinguish browser zoom or backing-store issues from maze-layer blur.
 - The visual contract now has a screenshot gate for exact target URLs, with diagnostics exposed from `resolveTitleBandFrame`, `resolveInstallChromeFrame`, and `resolveDemoTrailRenderBounds`.
 - Themes must stay identity-consistent across `noir`, `ember`, `aurora`, `vellum`, and `monolith`.
 - The install CTA is shell chrome, not gameplay UI. It lives in a bottom-center lane and must not compete with the title or the board.
@@ -39,7 +42,7 @@ The premium move is not extra softness. It is controlled sharpness plus selectiv
 
 Keep:
 - Integer-friendly sizing and placement.
-- Hard nearest-neighbor rendering.
+- Integer-snapped maze wall/path tile boundaries with rounded Phaser pixels.
 - Thin, deliberate panel lines.
 - Limited, role-specific glow only where it helps read state.
 

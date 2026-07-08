@@ -15,8 +15,16 @@ import { resolve } from 'node:path';
 describe('resolveLegacyMenuPathRenderFrame', () => {
   test('caps active Phaser rendering to mobile-friendly 60 FPS', () => {
     const phaserConfigSource = readFileSync(resolve(process.cwd(), 'src/boot/phaserConfig.ts'), 'utf8');
+    const baseCssSource = readFileSync(resolve(process.cwd(), 'src/styles/base.css'), 'utf8');
 
     expect(phaserConfigSource).toContain('type: Phaser.CANVAS');
+    expect(phaserConfigSource).toContain('pixelArt: false');
+    expect(phaserConfigSource).toContain('antialias: true');
+    expect(phaserConfigSource).toContain('roundPixels: true');
+    expect(phaserConfigSource).toContain('autoRound: true');
+    expect(baseCssSource).toContain('image-rendering: auto;');
+    expect(baseCssSource).not.toContain('image-rendering: pixelated;');
+    expect(baseCssSource).not.toContain('image-rendering: crisp-edges;');
     expect(phaserConfigSource).toContain('fps: {');
     expect(phaserConfigSource).toContain('target: 60');
     expect(phaserConfigSource).toContain('min: 30');
@@ -190,13 +198,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(legacyMenuRenderSource).toContain('const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {');
     expect(menuSceneSource).toContain('const drawPathPoint = (point: LegacyPoint): void => {');
     expect(menuSceneSource).toContain('private drawLegacyPathMaterialTile(');
-    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(pathSource, point, tileSize);');
-    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(pathSource, point, tileSize);');
+    expect(menuSceneSource).toContain('private resolveLegacyPixelTileRect(');
+    expect(menuSceneSource).toContain('const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });');
+    expect(menuSceneSource).toContain('const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);');
+    expect(menuSceneSource).toContain('const materialTileSize = Math.max(1, Math.round(tileSize));');
+    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderSegments(pathSource, point, materialTileSize);');
+    expect(menuSceneSource).toContain('resolveLegacyMenuPathRenderFrames(pathSource, point, materialTileSize);');
+    expect(menuSceneSource).toContain('Math.round(originX + (point.x * tileSize))');
+    expect(menuSceneSource).toContain('Math.round(((frame.leftInset + frame.width) / materialTileSize) * tileRect.width)');
     expect(menuSceneSource).toContain('for (let index = 0; index < Math.min(tileLimit, this.menuStaticDrawTileOrder.length); index += 1)');
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
-    expect(menuSceneSource).toContain('tileX + frames.core.leftInset');
-    expect(menuSceneSource).toContain('const tileX = originX + (point.x * tileSize);');
-    expect(menuSceneSource).toContain('const tileY = originY + (point.y * tileSize);');
     expect(menuSceneSource).toContain('renderBounds: mazeRenderBounds');
     expect(menuSceneSource).toContain('renderSafeInset: mazeRenderFrame.safeInset');
     expect(menuSceneSource).toContain('isMenuMode ? LEGACY_MENU_BOARD_GLASS_ALPHA : LEGACY_PLAY_BOARD_GLASS_ALPHA');
@@ -536,6 +547,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE,');
     expect(menuSceneSource).toContain('JSON.stringify(diagnostics)');
     expect(menuSceneSource).toContain('removeAttribute(MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE)');
+    expect(menuSceneSource).toContain('renderSurface: {');
+    expect(menuSceneSource).toContain('canvasPixelWidth');
+    expect(menuSceneSource).toContain('renderResolutionRatio');
   });
 
   test('publishes a compact walkable maze snapshot for live play QA', () => {

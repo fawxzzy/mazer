@@ -209,6 +209,13 @@ interface LegacyMazeRenderFrame {
   safeInset: number;
 }
 
+interface LegacyPixelTileRect {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+}
+
 interface LegacyPathMaterialOptions {
   coreAlpha: number;
   coreColor: number;
@@ -266,6 +273,14 @@ interface MenuSceneVisualDiagnostics {
     visiblePieces: number;
   };
   textLabels: VisualTextLabel[];
+  renderSurface: {
+    canvasCssHeight: number;
+    canvasCssWidth: number;
+    canvasPixelHeight: number;
+    canvasPixelWidth: number;
+    devicePixelRatio: number;
+    renderResolutionRatio: number;
+  };
   hud: {
     kind: 'legacy-play-hud' | null;
     visible: boolean;
@@ -3233,10 +3248,9 @@ export class MenuScene extends Phaser.Scene {
 
     for (let y = 0; y < this.maze.size; y += 1) {
       for (let x = 0; x < this.maze.size; x += 1) {
-        const tileX = mazeLeft + (x * tileSize);
-        const tileY = mazeTop + (y * tileSize);
+        const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });
         this.boardStaticGraphics.fillStyle(wallColor, isMenuMode ? LEGACY_MENU_WALL_GLASS_ALPHA : LEGACY_PLAY_WALL_GLASS_ALPHA);
-        this.boardStaticGraphics.fillRect(tileX, tileY, tileSize, tileSize);
+        this.boardStaticGraphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
 
         // Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.
       }
@@ -3262,39 +3276,45 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const tileX = originX + (point.x * tileSize);
-    const tileY = originY + (point.y * tileSize);
-    const segments = resolveLegacyMenuPathRenderSegments(pathSource, point, tileSize);
-    const frames = resolveLegacyMenuPathRenderFrames(pathSource, point, tileSize);
+    const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
+    const materialTileSize = Math.max(1, Math.round(tileSize));
+    const segments = resolveLegacyMenuPathRenderSegments(pathSource, point, materialTileSize);
+    const frames = resolveLegacyMenuPathRenderFrames(pathSource, point, materialTileSize);
+    const fillMaterialFrame = (
+      frame: { height: number; leftInset: number; topInset: number; width: number }
+    ): void => {
+      const left = tileRect.left + Math.round((frame.leftInset / materialTileSize) * tileRect.width);
+      const top = tileRect.top + Math.round((frame.topInset / materialTileSize) * tileRect.height);
+      const right = tileRect.left + Math.round(((frame.leftInset + frame.width) / materialTileSize) * tileRect.width);
+      const bottom = tileRect.top + Math.round(((frame.topInset + frame.height) / materialTileSize) * tileRect.height);
+
+      graphics.fillRect(
+        left,
+        top,
+        Math.max(1, right - left),
+        Math.max(1, bottom - top)
+      );
+    };
 
     graphics.fillStyle(options.edgeColor, options.edgeAlpha);
     for (const segment of segments.edge) {
-      graphics.fillRect(
-        tileX + segment.leftInset,
-        tileY + segment.topInset,
-        segment.width,
-        segment.height
-      );
+      fillMaterialFrame(segment);
     }
 
     graphics.fillStyle(options.coreColor, options.coreAlpha);
-    graphics.fillRect(
-      tileX + frames.core.leftInset,
-      tileY + frames.core.topInset,
-      frames.core.width,
-      frames.core.height
-    );
+    fillMaterialFrame(frames.core);
 
     if (options.drawCue === true) {
-      const cueSize = Math.max(1, Math.floor(tileSize * 0.22));
-      const cueInset = Math.floor((tileSize - cueSize) / 2);
+      const cueSize = Math.max(1, Math.floor(Math.min(tileRect.width, tileRect.height) * 0.22));
+      const cueInsetX = Math.floor((tileRect.width - cueSize) / 2);
+      const cueInsetY = Math.floor((tileRect.height - cueSize) / 2);
       graphics.fillStyle(
         options.cueColor ?? LEGACY_PATH_TILE_CUE_COLOR,
         options.cueAlpha ?? LEGACY_PATH_TILE_CUE_ALPHA
       );
       graphics.fillRect(
-        tileX + cueInset,
-        tileY + cueInset,
+        tileRect.left + cueInsetX,
+        tileRect.top + cueInsetY,
         cueSize,
         cueSize
       );
@@ -3495,6 +3515,25 @@ export class MenuScene extends Phaser.Scene {
       boardSize: renderSize,
       tileSize: renderSize / Math.max(1, this.maze.size),
       safeInset
+    };
+  }
+
+  private resolveLegacyPixelTileRect(
+    originX: number,
+    originY: number,
+    tileSize: number,
+    point: LegacyPoint
+  ): LegacyPixelTileRect {
+    const left = Math.round(originX + (point.x * tileSize));
+    const top = Math.round(originY + (point.y * tileSize));
+    const right = Math.round(originX + ((point.x + 1) * tileSize));
+    const bottom = Math.round(originY + ((point.y + 1) * tileSize));
+
+    return {
+      left,
+      top,
+      width: Math.max(1, right - left),
+      height: Math.max(1, bottom - top)
     };
   }
 
@@ -5600,6 +5639,12 @@ export class MenuScene extends Phaser.Scene {
       this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : LEGACY_PLAYER_MARKER_RADIUS_RATIO,
       this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : LEGACY_PLAYER_MARKER_HALO_RATIO
     );
+    const canvasBounds = this.game.canvas.getBoundingClientRect();
+    const canvasCssWidth = Math.max(1, Math.round(canvasBounds.width));
+    const canvasCssHeight = Math.max(1, Math.round(canvasBounds.height));
+    const canvasPixelWidth = Math.max(1, this.game.canvas.width);
+    const canvasPixelHeight = Math.max(1, this.game.canvas.height);
+    const renderResolutionRatio = Math.round((canvasPixelWidth / canvasCssWidth) * 100) / 100;
 
     this.visualDiagnosticsRevision += 1;
     const diagnostics: MenuSceneVisualDiagnostics = {
@@ -5797,6 +5842,14 @@ export class MenuScene extends Phaser.Scene {
       },
       title: this.resolveLegacyMenuPathTitleDiagnostics(),
       textLabels: this.resolveVisualTextLabels(),
+      renderSurface: {
+        canvasCssHeight,
+        canvasCssWidth,
+        canvasPixelHeight,
+        canvasPixelWidth,
+        devicePixelRatio: typeof window === 'undefined' ? 1 : Math.max(1, window.devicePixelRatio || 1),
+        renderResolutionRatio
+      },
       hud: {
         kind: this.mode === 'play' && this.overlay === 'none' ? 'legacy-play-hud' : null,
         visible: this.mode === 'play' && this.overlay === 'none',
