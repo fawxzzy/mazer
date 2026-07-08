@@ -66,33 +66,33 @@ const LEGACY_MENU_BACKDROP_WARP_RESPAWN_RADIUS_RANGE = 0.14;
 const LEGACY_MENU_BACKDROP_WARP_EDGE_MARGIN = 0.08;
 
 const LIGHT_BACKDROP_SHARDS: LegacyMenuBackdropShardTemplate[] = [
-  { xRatio: 0.52, yRatio: 0.44, lengthRatio: 0.62, thicknessRatio: 0.038, angle: -0.64, alpha: 0.055, color: 0x72e0bf },
-  { xRatio: 0.2, yRatio: 0.23, lengthRatio: 0.38, thicknessRatio: 0.028, angle: 0.74, alpha: 0.034, color: 0xb7f2ff },
-  { xRatio: 0.84, yRatio: 0.22, lengthRatio: 0.42, thicknessRatio: 0.03, angle: -0.82, alpha: 0.038, color: 0x9cffd2 },
-  { xRatio: 0.82, yRatio: 0.78, lengthRatio: 0.34, thicknessRatio: 0.026, angle: 0.62, alpha: 0.03, color: 0xfff05a },
-  { xRatio: 0.14, yRatio: 0.82, lengthRatio: 0.3, thicknessRatio: 0.022, angle: -0.52, alpha: 0.024, color: 0x72e0bf },
-  { xRatio: 0.13, yRatio: 0.12, lengthRatio: 0.14, thicknessRatio: 0.018, angle: 0.78, alpha: 0.026, color: 0xd8cbff },
-  { xRatio: 0.9, yRatio: 0.12, lengthRatio: 0.15, thicknessRatio: 0.018, angle: -0.78, alpha: 0.028, color: 0xe7dcff },
-  { xRatio: 0.9, yRatio: 0.86, lengthRatio: 0.14, thicknessRatio: 0.016, angle: 0.58, alpha: 0.02, color: 0xd2c4ff }
+  { xRatio: 0.1, yRatio: 0.25, lengthRatio: 0.24, thicknessRatio: 0.012, angle: 0.74, alpha: 0.038, color: 0xb7f2ff },
+  { xRatio: 0.9, yRatio: 0.18, lengthRatio: 0.26, thicknessRatio: 0.012, angle: -0.82, alpha: 0.04, color: 0x9cffd2 },
+  { xRatio: 0.16, yRatio: 0.82, lengthRatio: 0.22, thicknessRatio: 0.01, angle: -0.52, alpha: 0.03, color: 0x72e0bf },
+  { xRatio: 0.84, yRatio: 0.8, lengthRatio: 0.24, thicknessRatio: 0.011, angle: 0.62, alpha: 0.032, color: 0xfff05a },
+  { xRatio: 0.31, yRatio: 0.13, lengthRatio: 0.13, thicknessRatio: 0.009, angle: 0.78, alpha: 0.024, color: 0xd8cbff },
+  { xRatio: 0.71, yRatio: 0.12, lengthRatio: 0.14, thicknessRatio: 0.009, angle: -0.78, alpha: 0.026, color: 0xe7dcff },
+  { xRatio: 0.08, yRatio: 0.56, lengthRatio: 0.16, thicknessRatio: 0.008, angle: -0.36, alpha: 0.022, color: 0x72e0bf },
+  { xRatio: 0.92, yRatio: 0.58, lengthRatio: 0.16, thicknessRatio: 0.008, angle: 0.36, alpha: 0.022, color: 0xd2c4ff }
 ];
 
 const DARK_BACKDROP_SHARDS: LegacyMenuBackdropShardTemplate[] = [
-  { xRatio: 0.52, yRatio: 0.44, lengthRatio: 0.58, thicknessRatio: 0.034, angle: -0.64, alpha: 0.04, color: 0x3b9f8a },
-  { xRatio: 0.2, yRatio: 0.2, lengthRatio: 0.36, thicknessRatio: 0.024, angle: 0.74, alpha: 0.024, color: 0x5a9bad },
-  { xRatio: 0.84, yRatio: 0.22, lengthRatio: 0.4, thicknessRatio: 0.026, angle: -0.82, alpha: 0.026, color: 0x5ac693 },
-  { xRatio: 0.82, yRatio: 0.8, lengthRatio: 0.32, thicknessRatio: 0.022, angle: 0.62, alpha: 0.022, color: 0x8f842e },
-  { xRatio: 0.15, yRatio: 0.82, lengthRatio: 0.28, thicknessRatio: 0.02, angle: -0.52, alpha: 0.018, color: 0x2d7a6c },
-  { xRatio: 0.12, yRatio: 0.12, lengthRatio: 0.13, thicknessRatio: 0.016, angle: 0.78, alpha: 0.018, color: 0xd7cdff },
-  { xRatio: 0.9, yRatio: 0.12, lengthRatio: 0.13, thicknessRatio: 0.016, angle: -0.78, alpha: 0.018, color: 0xe4dcff },
-  { xRatio: 0.89, yRatio: 0.85, lengthRatio: 0.12, thicknessRatio: 0.014, angle: 0.58, alpha: 0.014, color: 0xcfc3ff }
+  { xRatio: 0.1, yRatio: 0.25, lengthRatio: 0.22, thicknessRatio: 0.011, angle: 0.74, alpha: 0.026, color: 0x5a9bad },
+  { xRatio: 0.9, yRatio: 0.18, lengthRatio: 0.24, thicknessRatio: 0.011, angle: -0.82, alpha: 0.028, color: 0x5ac693 },
+  { xRatio: 0.16, yRatio: 0.82, lengthRatio: 0.2, thicknessRatio: 0.009, angle: -0.52, alpha: 0.022, color: 0x2d7a6c },
+  { xRatio: 0.84, yRatio: 0.8, lengthRatio: 0.22, thicknessRatio: 0.01, angle: 0.62, alpha: 0.024, color: 0x8f842e },
+  { xRatio: 0.31, yRatio: 0.13, lengthRatio: 0.12, thicknessRatio: 0.008, angle: 0.78, alpha: 0.018, color: 0xd7cdff },
+  { xRatio: 0.71, yRatio: 0.12, lengthRatio: 0.13, thicknessRatio: 0.008, angle: -0.78, alpha: 0.02, color: 0xe4dcff },
+  { xRatio: 0.08, yRatio: 0.56, lengthRatio: 0.15, thicknessRatio: 0.007, angle: -0.36, alpha: 0.016, color: 0x2d7a6c },
+  { xRatio: 0.92, yRatio: 0.58, lengthRatio: 0.15, thicknessRatio: 0.007, angle: 0.36, alpha: 0.016, color: 0xcfc3ff }
 ];
 
 const GLASS_SHARD_TEMPLATES: LegacyMenuBackdropShardTemplate[] = [
-  { xRatio: 0.28, yRatio: 0.36, lengthRatio: 0.34, thicknessRatio: 0.03, angle: -0.7, alpha: 0.115, color: 0x72e0bf },
-  { xRatio: 0.72, yRatio: 0.38, lengthRatio: 0.42, thicknessRatio: 0.034, angle: 0.64, alpha: 0.098, color: 0xb7f2ff },
-  { xRatio: 0.5, yRatio: 0.58, lengthRatio: 0.4, thicknessRatio: 0.032, angle: -0.34, alpha: 0.106, color: 0x9cffd2 },
-  { xRatio: 0.18, yRatio: 0.74, lengthRatio: 0.3, thicknessRatio: 0.026, angle: 0.82, alpha: 0.086, color: 0x9cffd2 },
-  { xRatio: 0.84, yRatio: 0.78, lengthRatio: 0.32, thicknessRatio: 0.028, angle: -0.74, alpha: 0.09, color: 0xfff05a }
+  { xRatio: 0.23, yRatio: 0.34, lengthRatio: 0.18, thicknessRatio: 0.012, angle: -0.7, alpha: 0.078, color: 0x72e0bf },
+  { xRatio: 0.77, yRatio: 0.36, lengthRatio: 0.22, thicknessRatio: 0.012, angle: 0.64, alpha: 0.072, color: 0xb7f2ff },
+  { xRatio: 0.18, yRatio: 0.62, lengthRatio: 0.17, thicknessRatio: 0.01, angle: -0.34, alpha: 0.064, color: 0x9cffd2 },
+  { xRatio: 0.82, yRatio: 0.66, lengthRatio: 0.18, thicknessRatio: 0.011, angle: 0.82, alpha: 0.066, color: 0x9cffd2 },
+  { xRatio: 0.52, yRatio: 0.86, lengthRatio: 0.2, thicknessRatio: 0.01, angle: -0.74, alpha: 0.06, color: 0xfff05a }
 ];
 
 export function createLegacyMenuBackdropStars(

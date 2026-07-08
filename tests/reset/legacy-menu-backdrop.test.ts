@@ -64,9 +64,11 @@ describe('legacyMenuBackdrop', () => {
 
     const shards = resolveLegacyMenuBackdropShards(1280, 720, false);
     expect(shards).toHaveLength(LEGACY_MENU_BACKDROP_SHARD_COUNT);
-    expect(shards[0].x).toBeCloseTo(665.6, 1);
-    expect(shards[0].length).toBeCloseTo(446.4, 1);
-    expect(shards[0].thickness).toBeCloseTo(27.36, 2);
+    expect(shards[0].x).toBeCloseTo(128, 1);
+    expect(shards[0].length).toBeCloseTo(172.8, 1);
+    expect(shards[0].thickness).toBeCloseTo(8.64, 2);
+    expect(shards[1].x).toBeCloseTo(1152, 1);
+    expect(shards[1].length).toBeCloseTo(187.2, 1);
     expect(shards[5].alpha).toBeGreaterThan(0.02);
   });
 
@@ -78,9 +80,9 @@ describe('legacyMenuBackdrop', () => {
 
     expect(staticShards).toHaveLength(LEGACY_MENU_GLASS_SHARD_COUNT);
     expect(staticRunes).toHaveLength(LEGACY_MENU_DRIFT_RUNE_COUNT);
-    expect(staticShards[0].length).toBeCloseTo(132.6, 1);
-    expect(staticShards[0].thickness).toBeCloseTo(11.7, 1);
-    expect(staticShards[0].alpha).toBeCloseTo(0.115, 3);
+    expect(staticShards[0].length).toBeCloseTo(70.2, 1);
+    expect(staticShards[0].thickness).toBeCloseTo(4.68, 1);
+    expect(staticShards[0].alpha).toBeCloseTo(0.078, 3);
     expect(staticRunes[0].size).toBeGreaterThanOrEqual(3);
     expect(animatedShards[0].x).not.toBe(staticShards[0].x);
     expect(animatedRunes[1].x).not.toBe(staticRunes[1].x);

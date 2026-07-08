@@ -45,6 +45,7 @@ Keep:
 - Integer-snapped maze wall/path tile boundaries with rounded Phaser pixels.
 - Thin, deliberate panel lines.
 - Subtle sigil-border jewel facets where the chrome has intentional folded corners.
+- Edge-weighted backdrop shards that read as thin glass/rune slashes instead of broad floating bands.
 - Limited, role-specific glow only where it helps read state.
 
 Reduce:
@@ -52,6 +53,7 @@ Reduce:
 - Large soft halos around title and CTA chrome.
 - Overlapping atmospheric overlays in front of the board.
 - Any border glow large enough to compete with path, player, start, or goal markers.
+- Broad center-screen backdrop blobs, circles, or lozenges that compete with the maze/title silhouette.
 
 Premium pixel-art presentation pattern:
 - Use softness only in the far background layer.
