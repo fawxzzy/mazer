@@ -124,6 +124,15 @@ export interface MenuSceneRuntimeDiagnostics {
       top: number;
       size: number;
       tileSize: number;
+      renderBounds?: {
+        bottom: number;
+        left: number;
+        right: number;
+        top: number;
+      };
+      renderSafeInset?: number;
+      renderSize?: number;
+      renderTileSize?: number;
     };
     inputBuffer: {
       held: {
