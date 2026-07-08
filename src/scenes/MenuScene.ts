@@ -3019,8 +3019,7 @@ export class MenuScene extends Phaser.Scene {
       this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_FILL, 0.16);
       this.boardStaticGraphics.fillRect(boardLeft - 2, boardTop - 2, boardSize + 4, boardSize + 4);
     }
-    this.boardStaticGraphics.fillStyle(boardEdge, 1);
-    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop - 1, boardSize + 2, boardSize + 2);
+    this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);
     this.boardStaticGraphics.fillStyle(boardFill, isMenuMode ? LEGACY_MENU_BOARD_GLASS_ALPHA : LEGACY_PLAY_BOARD_GLASS_ALPHA);
     this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
     // Keep the board top-down: no pseudo bevel/highlight pass over the maze.
@@ -3105,6 +3104,20 @@ export class MenuScene extends Phaser.Scene {
     this.titleText.setVisible(showMenuTitle);
     this.titleShadow.setVisible(showMenuTitle);
     this.boardStaticDirty = false;
+  }
+
+  private fillLegacyBoardEdgeFrame(
+    boardLeft: number,
+    boardTop: number,
+    boardSize: number,
+    color: number
+  ): void {
+    const frameSize = boardSize + 2;
+    this.boardStaticGraphics.fillStyle(color, 1);
+    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop - 1, frameSize, 1);
+    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop + boardSize, frameSize, 1);
+    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop, 1, boardSize);
+    this.boardStaticGraphics.fillRect(boardLeft + boardSize, boardTop, 1, boardSize);
   }
 
   private drawLegacyBoardSigilBorder(boardLeft: number, boardTop: number, boardSize: number): void {

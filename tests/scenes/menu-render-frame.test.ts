@@ -175,6 +175,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (isMenuMode && LEGACY_BOARD_GRID_ALPHA > 0) {');
     expect(menuSceneSource).toContain('Keep the board top-down: no pseudo bevel/highlight pass over the maze.');
     expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
+    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);');
+    expect(menuSceneSource).toContain('private fillLegacyBoardEdgeFrame(');
+    expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop - 1, boardSize + 2, boardSize + 2);');
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.18;');
     expect(legacyMenuRenderSource).toContain('const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.08;');
     expect(legacyMenuRenderSource).toContain('const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {');
@@ -536,6 +539,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO = 0.9;');
     expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
     expect(menuSceneSource).toContain('const boardEdge = LEGACY_PLAY_BOARD_EDGE;');
+    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);');
     expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.start');
     expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.goal');
     expect(menuSceneSource).toContain('const trailColor = this.settings.darkMode ? 0x9cffd2 : 0x66eebf;');
