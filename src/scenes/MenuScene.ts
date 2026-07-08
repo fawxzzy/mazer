@@ -579,9 +579,12 @@ const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;
 const LEGACY_BOARD_SIGIL_CORNER_FACET_BASE = 0x10293a;
 const LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW = 0xb7f2ff;
 const LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS = 0x72e0bf;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA = 0.2;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1800;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 110;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM = 0xffd66b;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT = 0xffffff;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA = 0.34;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO = 0.066;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1280;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 64;
 const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;
@@ -4171,7 +4174,9 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyBoardCornerFacetAlpha(time: number): number {
     const phase = (time % LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS) / LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS;
-    return LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA + (Math.sin(phase * Math.PI * 2) * 0.045);
+    const wave = 0.5 + (Math.sin(phase * Math.PI * 2) * 0.5);
+    const glint = Math.max(0, Math.sin((phase * Math.PI * 4) - 0.6));
+    return LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA + (wave * 0.085) + (glint * 0.04);
   }
 
   private hasLegacyBoardCornerShimmerPendingFrame(time: number): boolean {
@@ -4190,8 +4195,8 @@ export class MenuScene extends Phaser.Scene {
     const outerSize = boardSize + (inset * 2);
     const right = outerLeft + outerSize;
     const bottom = outerTop + outerSize;
-    const corner = Math.max(10, Math.round(boardSize * 0.045));
-    const baseAlpha = clamp(this.resolveLegacyBoardCornerFacetAlpha(time), 0.12, 0.3);
+    const corner = Math.max(16, Math.round(boardSize * LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO));
+    const baseAlpha = clamp(this.resolveLegacyBoardCornerFacetAlpha(time), 0.3, 0.58);
     const phase = (time % LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS) / LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS;
     const corners = [
       { x: outerLeft, y: outerTop, sx: 1, sy: 1 },
@@ -4217,17 +4222,31 @@ export class MenuScene extends Phaser.Scene {
       const glintStep = 0.22 + (wave * 0.52);
       const glintX = cornerGlyph.x + (cornerGlyph.sx * (corner * glintStep));
       const glintY = cornerGlyph.y + (cornerGlyph.sy * (corner * glintStep));
+      const prismStep = 0.3 + (wave * 0.2);
+      const prismX = Math.round(cornerGlyph.x + (cornerGlyph.sx * (corner * prismStep)));
+      const prismY = Math.round(cornerGlyph.y + (cornerGlyph.sy * (corner * prismStep)));
+      const prismAlpha = clamp(baseAlpha * (0.45 + (wave * 0.5)), 0.16, 0.5);
+      const glintAlpha = clamp(baseAlpha * (0.95 + (wave * 0.75)), 0.26, 0.74);
 
+      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW, baseAlpha * (0.18 + (wave * 0.18)));
+      this.boardDynamicGraphics.fillTriangle(originX, originY, edgeX, originY, originX, edgeY);
       this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_BASE, baseAlpha);
       this.boardDynamicGraphics.fillTriangle(originX, originY, edgeX, originY, originX, edgeY);
-      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS, baseAlpha * (0.2 + (wave * 0.18)));
+      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS, baseAlpha * (0.38 + (wave * 0.28)));
       this.boardDynamicGraphics.fillTriangle(originX, originY, innerX, originY, originX, innerY);
-      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW, baseAlpha * (0.52 + (wave * 0.42)));
+      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM, prismAlpha);
+      this.boardDynamicGraphics.fillTriangle(originX, originY, prismX, originY, originX, prismY);
+      this.boardDynamicGraphics.lineStyle(2, LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW, glintAlpha);
       this.strokeLegacyPolyline(this.boardDynamicGraphics, [
         { x: glintX, y: cornerGlyph.y + (cornerGlyph.sy * 3) },
         { x: cornerGlyph.x + (cornerGlyph.sx * 3), y: glintY }
       ]);
-      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS, baseAlpha * 0.42);
+      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT, glintAlpha * 0.46);
+      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
+        { x: originX, y: originY },
+        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.32)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.32)) }
+      ]);
+      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS, baseAlpha * 0.62);
       this.strokeLegacyPolyline(this.boardDynamicGraphics, [
         { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.34)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.76)) },
         { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.76)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.34)) }

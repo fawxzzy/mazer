@@ -183,8 +183,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_BASE = 0x10293a;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW = 0xb7f2ff;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS = 0x72e0bf;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1800;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 110;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM = 0xffd66b;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT = 0xffffff;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA = 0.34;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO = 0.066;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1280;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 64;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;');
@@ -222,7 +226,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyBoardCornerFacetShimmer(boardLeft: number, boardTop: number, boardSize: number, time: number): void');
     expect(menuSceneSource).toContain('private hasLegacyBoardCornerShimmerPendingFrame(time: number): boolean');
     expect(menuSceneSource).toContain('this.drawLegacyBoardCornerFacetShimmer(resolvedBoardLeft, resolvedBoardTop, boardSize, time);');
+    expect(menuSceneSource).toContain('const corner = Math.max(16, Math.round(boardSize * LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO));');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW, baseAlpha * (0.18 + (wave * 0.18)));');
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillTriangle(originX, originY, edgeX, originY, originX, edgeY);');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM, prismAlpha);');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT, glintAlpha * 0.46);');
     expect(menuSceneSource).toContain('cornerFacet: {');
     expect(menuSceneSource).toContain('animated: true');
     expect(menuSceneSource).toContain('shimmerPeriodMs: LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS');
