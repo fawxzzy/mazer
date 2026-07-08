@@ -299,18 +299,22 @@ describe('menu runtime diagnostics', () => {
       gameToggles: {
         animatedBackdrop: {
           enabled: false,
+          switchIsOn: false,
           stateText: 'Stagnant'
         },
         cameraFollow: {
           enabled: false,
+          switchIsOn: false,
           stateText: 'Off'
         },
         controlMode: {
           mode: 'arrows',
+          switchIsOn: false,
           stateText: 'Arrows'
         },
         darkMode: {
           enabled: false,
+          switchIsOn: false,
           stateText: 'Off'
         },
         movementSpeed: {
@@ -319,10 +323,12 @@ describe('menu runtime diagnostics', () => {
         },
         trailFade: {
           enabled: false,
+          switchIsOn: false,
           stateText: 'Off'
         },
         trailPulse: {
           enabled: true,
+          switchIsOn: true,
           stateText: 'On'
         }
       },
@@ -601,6 +607,8 @@ describe('menu runtime diagnostics', () => {
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.darkMode.stateText)
         .toBe('Off');
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.trailPulse.enabled)
+        .toBe(true);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.trailPulse.switchIsOn)
         .toBe(true);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.menuDemo?.route?.cueCounts.reacquire).toBe(2);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.source).toBe('menu-generated');

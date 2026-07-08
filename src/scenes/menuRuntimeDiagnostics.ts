@@ -90,18 +90,22 @@ export interface MenuSceneRuntimeDiagnostics {
   gameToggles?: {
     animatedBackdrop: {
       enabled: boolean;
+      switchIsOn: boolean;
       stateText: string;
     };
     cameraFollow: {
       enabled: boolean;
+      switchIsOn: boolean;
       stateText: string;
     };
     controlMode: {
       mode: 'arrows' | 'stick';
+      switchIsOn: boolean;
       stateText: string;
     };
     darkMode: {
       enabled: boolean;
+      switchIsOn: boolean;
       stateText: string;
     };
     movementSpeed: {
@@ -110,10 +114,12 @@ export interface MenuSceneRuntimeDiagnostics {
     };
     trailFade: {
       enabled: boolean;
+      switchIsOn: boolean;
       stateText: string;
     };
     trailPulse: {
       enabled: boolean;
+      switchIsOn: boolean;
       stateText: string;
     };
   };

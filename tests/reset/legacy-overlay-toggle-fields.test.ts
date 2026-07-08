@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { LEGACY_DEFAULTS, copyLegacySettings } from '../../src/legacy-runtime/legacyDefaults';
 import {
   applyLegacyOverlayToggleField,
+  resolveLegacyOverlayToggleSwitchIsOn,
   resolveLegacyOverlayToggleStateText
 } from '../../src/legacy-runtime/legacyOverlayToggleFields';
 
@@ -33,6 +34,7 @@ describe('legacy overlay toggle fields', () => {
     const controlMode = applyLegacyOverlayToggleField(settings, 'controlMode');
 
     expect(cameraFollow.settings.toggleCameraFollow).toBe(true);
+    expect(cameraFollow.switchIsOn).toBe(true);
     expect(cameraFollow.stateText).toBe('On');
     expect(cameraFollow.affectsBackdrop).toBe(false);
     expect(cameraFollow.affectsBoardStatic).toBe(true);
@@ -40,6 +42,7 @@ describe('legacy overlay toggle fields', () => {
     expect(cameraFollow.legacyDirectionalLightIntensity).toBeNull();
 
     expect(trailFade.settings.toggleTrailFade).toBe(true);
+    expect(trailFade.switchIsOn).toBe(true);
     expect(trailFade.stateText).toBe('On');
     expect(trailFade.affectsBackdrop).toBe(false);
     expect(trailFade.affectsBoardStatic).toBe(false);
@@ -47,6 +50,7 @@ describe('legacy overlay toggle fields', () => {
     expect(trailFade.legacyDirectionalLightIntensity).toBeNull();
 
     expect(trailPulse.settings.toggleTrailPulse).toBe(false);
+    expect(trailPulse.switchIsOn).toBe(false);
     expect(trailPulse.stateText).toBe('Off');
     expect(trailPulse.affectsBackdrop).toBe(false);
     expect(trailPulse.affectsBoardStatic).toBe(false);
@@ -54,6 +58,7 @@ describe('legacy overlay toggle fields', () => {
     expect(trailPulse.legacyDirectionalLightIntensity).toBeNull();
 
     expect(animatedBackdrop.settings.toggleAnimatedBackdrop).toBe(true);
+    expect(animatedBackdrop.switchIsOn).toBe(true);
     expect(animatedBackdrop.stateText).toBe('Animated');
     expect(animatedBackdrop.affectsBackdrop).toBe(true);
     expect(animatedBackdrop.affectsBoardStatic).toBe(false);
@@ -61,6 +66,7 @@ describe('legacy overlay toggle fields', () => {
     expect(animatedBackdrop.legacyDirectionalLightIntensity).toBeNull();
 
     expect(controlMode.settings.controlMode).toBe('arrows');
+    expect(controlMode.switchIsOn).toBe(false);
     expect(controlMode.stateText).toBe('Arrows');
     expect(controlMode.affectsBackdrop).toBe(false);
     expect(controlMode.affectsBoardStatic).toBe(false);
@@ -74,6 +80,7 @@ describe('legacy overlay toggle fields', () => {
     const darkModeOff = applyLegacyOverlayToggleField(darkModeOn.settings, 'darkMode');
 
     expect(darkModeOn.settings.darkMode).toBe(true);
+    expect(darkModeOn.switchIsOn).toBe(true);
     expect(darkModeOn.stateText).toBe('On');
     expect(darkModeOn.affectsBackdrop).toBe(true);
     expect(darkModeOn.affectsBoardStatic).toBe(true);
@@ -81,7 +88,46 @@ describe('legacy overlay toggle fields', () => {
     expect(darkModeOn.legacyDirectionalLightIntensity).toBe(0.3);
 
     expect(darkModeOff.settings.darkMode).toBe(false);
+    expect(darkModeOff.switchIsOn).toBe(false);
     expect(darkModeOff.stateText).toBe('Off');
     expect(darkModeOff.legacyDirectionalLightIntensity).toBe(2.0);
+  });
+
+  test('uses the same canonical boolean for every switch position both ways', () => {
+    const fields = [
+      'toggleCameraFollow',
+      'toggleTrailFade',
+      'toggleTrailPulse',
+      'toggleAnimatedBackdrop',
+      'darkMode',
+      'controlMode'
+    ] as const;
+    const settings = copyLegacySettings(LEGACY_DEFAULTS);
+
+    expect(resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', settings)).toBe(false);
+    expect(resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', settings)).toBe(false);
+    expect(resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', settings)).toBe(true);
+    expect(resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', settings)).toBe(false);
+    expect(resolveLegacyOverlayToggleSwitchIsOn('darkMode', settings)).toBe(false);
+    expect(resolveLegacyOverlayToggleSwitchIsOn('controlMode', settings)).toBe(true);
+
+    fields.forEach((fieldId) => {
+      const firstToggle = applyLegacyOverlayToggleField(settings, fieldId);
+      expect(firstToggle.switchIsOn).toBe(
+        resolveLegacyOverlayToggleSwitchIsOn(fieldId, firstToggle.settings)
+      );
+      expect(firstToggle.stateText).toBe(
+        resolveLegacyOverlayToggleStateText(fieldId, firstToggle.switchIsOn)
+      );
+
+      const secondToggle = applyLegacyOverlayToggleField(firstToggle.settings, fieldId);
+      expect(secondToggle.switchIsOn).toBe(
+        resolveLegacyOverlayToggleSwitchIsOn(fieldId, secondToggle.settings)
+      );
+      expect(secondToggle.stateText).toBe(
+        resolveLegacyOverlayToggleStateText(fieldId, secondToggle.switchIsOn)
+      );
+      expect(secondToggle.switchIsOn).toBe(resolveLegacyOverlayToggleSwitchIsOn(fieldId, settings));
+    });
   });
 });

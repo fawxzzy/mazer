@@ -18,6 +18,12 @@ export interface LegacyOverlayToggleFieldApplyResult {
   affectsBoardStatic: boolean;
   affectsBoardDynamic: boolean;
   legacyDirectionalLightIntensity: number | null;
+  switchIsOn: boolean;
+  stateText: LegacyOverlayToggleStateText | null;
+}
+
+export interface LegacyOverlayToggleDisplayState {
+  switchIsOn: boolean;
   stateText: LegacyOverlayToggleStateText | null;
 }
 
@@ -40,6 +46,40 @@ export const resolveLegacyOverlayToggleStateText = (
   }
 };
 
+export const resolveLegacyOverlayToggleSwitchIsOn = (
+  fieldId: LegacyOverlayToggleFieldId,
+  settings: LegacySettings
+): boolean => {
+  switch (fieldId) {
+    case 'toggleCameraFollow':
+      return settings.toggleCameraFollow;
+    case 'toggleTrailFade':
+      return settings.toggleTrailFade;
+    case 'toggleTrailPulse':
+      return settings.toggleTrailPulse;
+    case 'toggleAnimatedBackdrop':
+      return settings.toggleAnimatedBackdrop;
+    case 'darkMode':
+      return settings.darkMode;
+    case 'controlMode':
+      return settings.controlMode === 'stick';
+    default:
+      return fieldId satisfies never;
+  }
+};
+
+export const resolveLegacyOverlayToggleDisplayState = (
+  fieldId: LegacyOverlayToggleFieldId,
+  settings: LegacySettings
+): LegacyOverlayToggleDisplayState => {
+  const switchIsOn = resolveLegacyOverlayToggleSwitchIsOn(fieldId, settings);
+
+  return {
+    switchIsOn,
+    stateText: resolveLegacyOverlayToggleStateText(fieldId, switchIsOn)
+  };
+};
+
 export const applyLegacyOverlayToggleField = (
   settings: LegacySettings,
   fieldId: LegacyOverlayToggleFieldId
@@ -49,63 +89,75 @@ export const applyLegacyOverlayToggleField = (
   switch (fieldId) {
     case 'toggleCameraFollow':
       nextSettings.toggleCameraFollow = !nextSettings.toggleCameraFollow;
+      const cameraFollowDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
       return {
         settings: nextSettings,
         affectsBackdrop: false,
         affectsBoardStatic: true,
         affectsBoardDynamic: true,
         legacyDirectionalLightIntensity: null,
-        stateText: resolveLegacyOverlayToggleStateText(fieldId, nextSettings.toggleCameraFollow)
+        switchIsOn: cameraFollowDisplayState.switchIsOn,
+        stateText: cameraFollowDisplayState.stateText
       };
     case 'toggleTrailFade':
       nextSettings.toggleTrailFade = !nextSettings.toggleTrailFade;
+      const trailFadeDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
       return {
         settings: nextSettings,
         affectsBackdrop: false,
         affectsBoardStatic: false,
         affectsBoardDynamic: true,
         legacyDirectionalLightIntensity: null,
-        stateText: resolveLegacyOverlayToggleStateText(fieldId, nextSettings.toggleTrailFade)
+        switchIsOn: trailFadeDisplayState.switchIsOn,
+        stateText: trailFadeDisplayState.stateText
       };
     case 'toggleTrailPulse':
       nextSettings.toggleTrailPulse = !nextSettings.toggleTrailPulse;
+      const trailPulseDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
       return {
         settings: nextSettings,
         affectsBackdrop: false,
         affectsBoardStatic: false,
         affectsBoardDynamic: true,
         legacyDirectionalLightIntensity: null,
-        stateText: resolveLegacyOverlayToggleStateText(fieldId, nextSettings.toggleTrailPulse)
+        switchIsOn: trailPulseDisplayState.switchIsOn,
+        stateText: trailPulseDisplayState.stateText
       };
     case 'toggleAnimatedBackdrop':
       nextSettings.toggleAnimatedBackdrop = !nextSettings.toggleAnimatedBackdrop;
+      const animatedBackdropDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
       return {
         settings: nextSettings,
         affectsBackdrop: true,
         affectsBoardStatic: false,
         affectsBoardDynamic: false,
         legacyDirectionalLightIntensity: null,
-        stateText: resolveLegacyOverlayToggleStateText(fieldId, nextSettings.toggleAnimatedBackdrop)
+        switchIsOn: animatedBackdropDisplayState.switchIsOn,
+        stateText: animatedBackdropDisplayState.stateText
       };
     case 'darkMode':
       nextSettings.darkMode = !nextSettings.darkMode;
+      const darkModeDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
       return {
         settings: nextSettings,
         affectsBackdrop: true,
         affectsBoardStatic: true,
         affectsBoardDynamic: true,
         legacyDirectionalLightIntensity: nextSettings.darkMode ? 0.3 : 2.0,
-        stateText: resolveLegacyOverlayToggleStateText(fieldId, nextSettings.darkMode)
+        switchIsOn: darkModeDisplayState.switchIsOn,
+        stateText: darkModeDisplayState.stateText
       };
     case 'controlMode':
       nextSettings.controlMode = nextSettings.controlMode === 'stick' ? 'arrows' : 'stick';
+      const controlModeDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
       return {
         settings: nextSettings,
         affectsBackdrop: false,
         affectsBoardStatic: false,
         affectsBoardDynamic: true,
         legacyDirectionalLightIntensity: null,
-        stateText: resolveLegacyOverlayToggleStateText(fieldId, nextSettings.controlMode === 'stick')
+        switchIsOn: controlModeDisplayState.switchIsOn,
+        stateText: controlModeDisplayState.stateText
       };
     default:
       return fieldId satisfies never;

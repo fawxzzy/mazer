@@ -109,6 +109,7 @@ import {
 import { applyLegacyOverlayFieldCommit } from '../legacy-runtime/legacyOverlayFieldCommit';
 import {
   applyLegacyOverlayToggleField,
+  resolveLegacyOverlayToggleSwitchIsOn,
   resolveLegacyOverlayToggleStateText,
   type LegacyOverlayToggleFieldId
 } from '../legacy-runtime/legacyOverlayToggleFields';
@@ -1148,18 +1149,22 @@ export class MenuScene extends Phaser.Scene {
       gameToggles: {
         animatedBackdrop: {
           enabled: this.settings.toggleAnimatedBackdrop,
+          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
           stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'
         },
         cameraFollow: {
           enabled: this.settings.toggleCameraFollow,
+          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings),
           stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'
         },
         controlMode: {
           mode: this.settings.controlMode,
+          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings),
           stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'
         },
         darkMode: {
           enabled: this.settings.darkMode,
+          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings),
           stateText: resolveLegacyOverlayToggleStateText('darkMode', this.settings.darkMode) ?? 'Off'
         },
         movementSpeed: {
@@ -1168,10 +1173,12 @@ export class MenuScene extends Phaser.Scene {
         },
         trailFade: {
           enabled: this.settings.toggleTrailFade,
+          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
           stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'
         },
         trailPulse: {
           enabled: this.settings.toggleTrailPulse,
+          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
           stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'
         }
       },
@@ -5721,7 +5728,7 @@ export class MenuScene extends Phaser.Scene {
       stateText: string;
     }> = [
       {
-        checked: this.settings.toggleCameraFollow,
+        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings),
         label: 'Camera Follow',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleCameraFollow'),
@@ -5729,7 +5736,7 @@ export class MenuScene extends Phaser.Scene {
         stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'
       },
       {
-        checked: this.settings.toggleTrailFade,
+        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
         label: 'Trail Fade',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailFade'),
@@ -5737,7 +5744,7 @@ export class MenuScene extends Phaser.Scene {
         stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'
       },
       {
-        checked: this.settings.toggleTrailPulse,
+        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
         label: 'Trail Pulse',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailPulse'),
@@ -5745,7 +5752,7 @@ export class MenuScene extends Phaser.Scene {
         stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'
       },
       {
-        checked: this.settings.toggleAnimatedBackdrop,
+        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
         label: 'Animated BG',
         offLabel: 'Stagnant',
         onClick: () => this.applyLegacyOverlayToggleField('toggleAnimatedBackdrop'),
@@ -5753,7 +5760,7 @@ export class MenuScene extends Phaser.Scene {
         stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'
       },
       {
-        checked: this.settings.darkMode,
+        checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings),
         label: 'Dark Mode',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('darkMode'),
@@ -5761,7 +5768,7 @@ export class MenuScene extends Phaser.Scene {
         stateText: resolveLegacyOverlayToggleStateText('darkMode', this.settings.darkMode) ?? 'Off'
       },
       {
-        checked: this.settings.controlMode === 'stick',
+        checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings),
         label: 'Controls',
         offLabel: 'Arrows',
         onClick: () => this.applyLegacyOverlayToggleField('controlMode'),

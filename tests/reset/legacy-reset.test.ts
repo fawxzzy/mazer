@@ -754,6 +754,7 @@ describe('legacy reset lane', () => {
 
     expect(toggleFieldSource).toContain("| 'toggleAnimatedBackdrop'");
     expect(toggleFieldSource).toContain('resolveLegacyOverlayToggleStateText');
+    expect(toggleFieldSource).toContain('resolveLegacyOverlayToggleSwitchIsOn');
     expect(toggleFieldSource).toContain('legacyDirectionalLightIntensity');
     expect(menuSceneSource).toContain('private createFeatureControlRows(');
     expect(menuSceneSource).toContain('private createToggleSwitchRow(');
@@ -772,6 +773,12 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('darkMode', this.settings.darkMode) ?? 'Off'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'");
+    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings)");
+    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings)");
+    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
+    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings)");
+    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings)");
+    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings)");
     expect(menuSceneSource).toContain('controls.length * (rowHeight + rowGap)');
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleCameraFollow')");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailFade')");
