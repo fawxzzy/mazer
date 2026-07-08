@@ -367,6 +367,9 @@ interface MenuSceneVisualDiagnostics {
       drawStage: {
         batchSize: number | null;
         batchUnit: string | null;
+        buildPrerollActive: boolean;
+        buildPrerollDurationMs: number;
+        buildPrerollProgress: number;
         complete: boolean | null;
         handoffActive: boolean;
         handoffDurationMs: number;
@@ -563,6 +566,7 @@ const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;
 const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;
 const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;
 const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
+const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;
 const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;
 const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 500;
 const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;
@@ -687,6 +691,7 @@ export class MenuScene extends Phaser.Scene {
   private menuStaticDrawTilesVisible: number | null = null;
   private menuStaticDrawNextTileAtMs = 0;
   private menuStaticDeconstructStartedAtMs: number | null = null;
+  private menuStaticBuildPrerollStartedAtMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
   private visualDiagnosticsRevision = 0;
   private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
@@ -822,6 +827,9 @@ export class MenuScene extends Phaser.Scene {
         || this.resolveLegacyMenuDeconstructHandoffProgress(time) > 0
       )
     ) {
+      this.boardDynamicDirty = true;
+    }
+    if (this.isLegacyMenuBuildPrerollActive(time)) {
       this.boardDynamicDirty = true;
     }
     if (this.hasLegacyPlayCompassSpinPendingFrame()) {
@@ -1172,6 +1180,9 @@ export class MenuScene extends Phaser.Scene {
         drawStage: {
           batchSize: drawStage?.batchSize ?? null,
           batchUnit: drawStage?.batchUnit ?? null,
+          buildPrerollActive: this.isLegacyMenuBuildPrerollActive(time),
+          buildPrerollDurationMs: LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS,
+          buildPrerollProgress: this.resolveLegacyMenuBuildPrerollProgress(time),
           complete: drawStageProgress.complete,
           handoffActive: this.resolveLegacyMenuDeconstructHandoffProgress(time) > 0,
           handoffDurationMs: LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
@@ -2606,6 +2617,27 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
+  private resolveLegacyMenuBuildPrerollProgress(time: number): number {
+    if (
+      this.mode !== 'menu'
+      || this.menuStaticDrawLifecyclePhase !== 'building'
+      || this.menuStaticBuildPrerollStartedAtMs === null
+    ) {
+      return 0;
+    }
+
+    return clamp(
+      (time - this.menuStaticBuildPrerollStartedAtMs) / LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS,
+      0,
+      1
+    );
+  }
+
+  private isLegacyMenuBuildPrerollActive(time: number): boolean {
+    const progress = this.resolveLegacyMenuBuildPrerollProgress(time);
+    return progress > 0 && progress < 1;
+  }
+
   private resolveLegacyMenuStaticDrawTileBatchSize(): number {
     return Math.max(1, Math.ceil(this.menuStaticDrawTileOrder.length / LEGACY_MENU_STATIC_DRAW_TARGET_TICKS));
   }
@@ -2624,13 +2656,15 @@ export class MenuScene extends Phaser.Scene {
   private armLegacyMenuStaticDrawStage(): void {
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     if (this.mode === 'menu' && drawStage?.executionKind === 'row-slice') {
+      const buildPrerollStartedAtMs = this.time.now - 1;
       this.menuStaticDrawLifecyclePhase = 'building';
       this.menuStaticDeconstructStartedAtMs = null;
+      this.menuStaticBuildPrerollStartedAtMs = buildPrerollStartedAtMs;
       this.menuStaticDrawRowsVisible = 0;
-      this.menuStaticDrawNextRowAtMs = this.time.now;
+      this.menuStaticDrawNextRowAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;
       this.menuStaticDrawTileOrder = this.buildLegacyMenuStaticDrawTileOrder();
       this.menuStaticDrawTilesVisible = 0;
-      this.menuStaticDrawNextTileAtMs = this.time.now;
+      this.menuStaticDrawNextTileAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;
       this.refreshLegacyMenuStaticDrawVisibleTileKeys();
       return;
     }
@@ -2643,6 +2677,7 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticDrawTilesVisible = null;
     this.menuStaticDrawNextTileAtMs = 0;
     this.menuStaticDeconstructStartedAtMs = null;
+    this.menuStaticBuildPrerollStartedAtMs = null;
   }
 
   private armLegacyMenuStaticDeconstructStage(time: number): void {
@@ -2656,6 +2691,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.menuStaticDrawLifecyclePhase = 'deconstructing';
     this.menuStaticDeconstructStartedAtMs = time;
+    this.menuStaticBuildPrerollStartedAtMs = null;
     this.menuStaticDrawRowsVisible = null;
     this.menuStaticDrawNextRowAtMs = 0;
     this.menuStaticDrawTilesVisible = this.menuStaticDrawTileOrder.length;
@@ -2686,6 +2722,16 @@ export class MenuScene extends Phaser.Scene {
   private advanceLegacyMenuStaticDrawStage(time: number): void {
     if (this.menuStaticDrawRowsVisible === null && this.menuStaticDrawTilesVisible === null) {
       return;
+    }
+
+    if (
+      this.menuStaticDrawLifecyclePhase === 'building'
+      && this.menuStaticBuildPrerollStartedAtMs !== null
+      && time >= this.menuStaticBuildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS
+    ) {
+      this.menuStaticBuildPrerollStartedAtMs = null;
+      this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+      this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     }
 
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
@@ -2738,6 +2784,7 @@ export class MenuScene extends Phaser.Scene {
         this.menuStaticDrawNextTileAtMs = 0;
         this.menuStaticDrawLifecyclePhase = 'settled';
         this.menuStaticDeconstructStartedAtMs = null;
+        this.menuStaticBuildPrerollStartedAtMs = null;
         this.refreshLegacyMenuStaticDrawVisibleTileKeys();
       }
     }
@@ -3718,6 +3765,12 @@ export class MenuScene extends Phaser.Scene {
         boardTop,
         boardSize,
         this.resolveLegacyMenuDeconstructHandoffProgress(time)
+      );
+      this.drawLegacyMenuDeconstructHandoffBurst(
+        boardLeft,
+        boardTop,
+        boardSize,
+        this.resolveLegacyMenuBuildPrerollProgress(time)
       );
     }
     this.boardDynamicDirty = false;
@@ -5606,16 +5659,19 @@ export class MenuScene extends Phaser.Scene {
             remainingStageIds: [...(this.maze.generation?.stageCursor.remainingStageIds ?? [])]
           },
           drawStage: {
-          batchSize: drawStage?.batchSize ?? null,
-          batchUnit: drawStage?.batchUnit ?? null,
-          complete: drawStageProgress.complete,
-          handoffActive: this.resolveLegacyMenuDeconstructHandoffProgress(time) > 0,
-          handoffDurationMs: LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
-          handoffProgress: this.resolveLegacyMenuDeconstructHandoffProgress(time),
-          lifecyclePhase: this.menuStaticDrawLifecyclePhase,
-          nextSeedQueued: this.mode === 'menu' && this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset',
-          progressPercent: drawStageProgress.progressPercent,
-          rowCount: drawStageProgress.rowCount,
+            batchSize: drawStage?.batchSize ?? null,
+            batchUnit: drawStage?.batchUnit ?? null,
+            buildPrerollActive: this.isLegacyMenuBuildPrerollActive(time),
+            buildPrerollDurationMs: LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS,
+            buildPrerollProgress: this.resolveLegacyMenuBuildPrerollProgress(time),
+            complete: drawStageProgress.complete,
+            handoffActive: this.resolveLegacyMenuDeconstructHandoffProgress(time) > 0,
+            handoffDurationMs: LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
+            handoffProgress: this.resolveLegacyMenuDeconstructHandoffProgress(time),
+            lifecyclePhase: this.menuStaticDrawLifecyclePhase,
+            nextSeedQueued: this.mode === 'menu' && this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset',
+            progressPercent: drawStageProgress.progressPercent,
+            rowCount: drawStageProgress.rowCount,
             rowsRemaining: drawStageProgress.rowsRemaining,
             rowsVisible: drawRowsVisible,
             staged: drawStageStaged,

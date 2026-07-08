@@ -263,6 +263,9 @@ export interface MenuSceneRuntimeDiagnostics {
     drawStage?: {
       batchSize: number | null;
       batchUnit: string | null;
+      buildPrerollActive?: boolean;
+      buildPrerollDurationMs?: number;
+      buildPrerollProgress?: number;
       complete: boolean | null;
       handoffActive?: boolean;
       handoffDurationMs?: number;
