@@ -317,10 +317,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM = 0x8fffe8;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FACET_WARM = 0xffd36a;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FRAME_MS = 66;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(time: number): void');
+    expect(menuSceneSource).toContain("type LegacyMenuPathTitleSweepMode = 'build' | 'deconstruct' | 'idle';");
+    expect(menuSceneSource).toContain('interface LegacyMenuPathTitleSweepState');
+    expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleSweepState(');
+    expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase === 'building'");
+    expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase === 'deconstructing'");
+    expect(menuSceneSource).toContain("const syncedToLifecycle = mode !== 'idle';");
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitlePrismSweep(');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleGemFacets(');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleOrbitSigils(');
@@ -337,6 +344,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('title: this.resolveLegacyMenuPathTitleDiagnostics()');
     expect(menuSceneSource).toContain('facetCellCount: this.resolveLegacyMenuPathTitleVisiblePieces(pieceCount)');
     expect(menuSceneSource).toContain('facetPulsePeriodMs: LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS');
+    expect(menuSceneSource).toContain('scannerMode: sweepState.mode');
+    expect(menuSceneSource).toContain('scannerProgress: Number(sweepState.progress.toFixed(3))');
+    expect(menuSceneSource).toContain('scannerSyncedToLifecycle: sweepState.syncedToLifecycle');
     expect(menuSceneSource).toContain('sigilOrbitCount: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS');
     expect(menuSceneSource).toContain('sweepPeriodMs: LEGACY_MENU_PATH_TITLE_SWEEP_MS');
     expect(menuSceneSource).toContain('animation: {');

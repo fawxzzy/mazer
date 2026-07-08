@@ -177,12 +177,23 @@ import {
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
 type LegacyMenuStaticDrawLifecyclePhase = 'idle' | 'building' | 'settled' | 'deconstructing';
+type LegacyMenuPathTitleSweepMode = 'build' | 'deconstruct' | 'idle';
 type RuntimeGenerationStage = NonNullable<LegacyMazeSnapshot['generation']>['executionPlan'][number];
 type LegacyPlayHeldTouchMove = {
   control: HumanMovementActionKind;
   pointerId: number | null;
   sequence: number;
 };
+
+interface LegacyMenuPathTitleSweepState {
+  column: number;
+  diagonalPosition: number;
+  direction: 'forward' | 'reverse' | 'idle';
+  mode: LegacyMenuPathTitleSweepMode;
+  phase: number;
+  progress: number;
+  syncedToLifecycle: boolean;
+}
 
 interface UiButton {
   background: Phaser.GameObjects.Rectangle;
@@ -290,6 +301,10 @@ interface MenuSceneVisualDiagnostics {
       facetCellCount: number;
       facetPulsePeriodMs: number;
       phase: number;
+      scannerDirection: LegacyMenuPathTitleSweepState['direction'];
+      scannerMode: LegacyMenuPathTitleSweepMode;
+      scannerProgress: number;
+      scannerSyncedToLifecycle: boolean;
       sigilOrbitCount: number;
       sweepColumn: number;
       sweepPeriodMs: number;
@@ -563,6 +578,7 @@ const LEGACY_MENU_PATH_TITLE_RUNE = 0xfff05a;
 const LEGACY_MENU_PATH_TITLE_GEM = 0x8fffe8;
 const LEGACY_MENU_PATH_TITLE_FACET_WARM = 0xffd36a;
 const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;
+const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;
 const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 66;
 const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;
@@ -3826,9 +3842,40 @@ export class MenuScene extends Phaser.Scene {
     return (time % LEGACY_MENU_PATH_TITLE_SWEEP_MS) / LEGACY_MENU_PATH_TITLE_SWEEP_MS;
   }
 
+  private resolveLegacyMenuPathTitleSweepTravel(columns: number, rows: number): number {
+    return columns + (rows * 0.72) + (LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS * 2);
+  }
+
+  private resolveLegacyMenuPathTitleSweepState(
+    columns: number,
+    rows: number,
+    time: number
+  ): LegacyMenuPathTitleSweepState {
+    const idlePhase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
+    const lifecycleProgress = clamp(this.resolveLegacyMenuPathTitleProgress(), 0, 1);
+    const mode: LegacyMenuPathTitleSweepMode = this.menuStaticDrawLifecyclePhase === 'building'
+      ? 'build'
+      : this.menuStaticDrawLifecyclePhase === 'deconstructing'
+        ? 'deconstruct'
+        : 'idle';
+    const syncedToLifecycle = mode !== 'idle';
+    const progress = syncedToLifecycle ? lifecycleProgress : idlePhase;
+    const travel = this.resolveLegacyMenuPathTitleSweepTravel(columns, rows);
+    const overscan = LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS;
+
+    return {
+      column: (progress * (columns + (overscan * 2))) - overscan,
+      diagonalPosition: (progress * travel) - overscan,
+      direction: mode === 'build' ? 'forward' : mode === 'deconstruct' ? 'reverse' : 'idle',
+      mode,
+      phase: syncedToLifecycle ? progress : idlePhase,
+      progress,
+      syncedToLifecycle
+    };
+  }
+
   private resolveLegacyMenuPathTitleSweepColumn(columns: number, rows: number, time: number): number {
-    const phase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
-    return (phase * (columns + (rows * 0.72) + 5)) - 3;
+    return this.resolveLegacyMenuPathTitleSweepState(columns, rows, time).column;
   }
 
   private resolveLegacyMenuPathTitleVisiblePieces(pieceCount: number): number {
@@ -3864,8 +3911,10 @@ export class MenuScene extends Phaser.Scene {
     time: number,
     alphaScale: number
   ): void {
-    const phase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
-    const pulse = 0.55 + (Math.sin((phase * Math.PI * 2) + 0.4) * 0.22);
+    const sweepState = this.resolveLegacyMenuPathTitleSweepState(titleLayout.columns, titleLayout.rows, time);
+    const pulsePhase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
+    const pulseBoost = sweepState.syncedToLifecycle ? 1.12 : 1;
+    const pulse = (0.55 + (Math.sin((pulsePhase * Math.PI * 2) + 0.4) * 0.22)) * pulseBoost;
     const railAlpha = clamp((0.28 + pulse * 0.3) * alphaScale, 0.16, 0.58);
     const railGap = Math.max(5, Math.round(titleLayout.cellSize * 0.8));
     const notch = Math.max(3, Math.round(titleLayout.cellSize * 0.46));
@@ -3917,7 +3966,7 @@ export class MenuScene extends Phaser.Scene {
 
     const tickWidth = Math.max(2, Math.round(titleLayout.cellSize * 0.5));
     const sweepX = titleLayout.left + (
-      clamp(this.resolveLegacyMenuPathTitleSweepColumn(titleLayout.columns, titleLayout.rows, time), 0, titleLayout.columns)
+      clamp(sweepState.column, 0, titleLayout.columns)
       * titleLayout.cellSize
     );
     this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, railAlpha * 1.35);
@@ -3942,9 +3991,11 @@ export class MenuScene extends Phaser.Scene {
     time: number,
     alphaScale: number
   ): void {
-    const phase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
-    const sweepPosition = (phase * (titleLayout.columns + (titleLayout.rows * 0.72) + 5)) - 3;
-    const pulse = 0.76 + (Math.sin(phase * Math.PI * 2) * 0.14);
+    const sweepState = this.resolveLegacyMenuPathTitleSweepState(titleLayout.columns, titleLayout.rows, time);
+    const pulsePhase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
+    const sweepPosition = sweepState.diagonalPosition;
+    const pulse = (0.76 + (Math.sin(pulsePhase * Math.PI * 2) * 0.14))
+      * (sweepState.syncedToLifecycle ? 1.08 : 1);
     const inset = Math.max(titleLayout.coreInset, Math.floor(titleLayout.cellSize * 0.16));
     const glintSize = Math.max(1, titleLayout.cellSize - (inset * 2));
     const starInset = Math.max(titleLayout.coreInset + 1, Math.floor(titleLayout.cellSize * 0.32));
@@ -6701,16 +6752,21 @@ export class MenuScene extends Phaser.Scene {
     );
     const pieceCount = titleLayout.cells.length;
     const progress = this.resolveLegacyMenuPathTitleProgress();
-    const phase = this.resolveLegacyMenuPathTitleAnimationPhase(this.time.now);
+    const sweepState = this.resolveLegacyMenuPathTitleSweepState(titleLayout.columns, titleLayout.rows, this.time.now);
+    const sweepColumn = this.resolveLegacyMenuPathTitleSweepColumn(titleLayout.columns, titleLayout.rows, this.time.now);
 
     return {
       animation: {
         active: this.mode === 'menu' && this.overlay === 'none',
         facetCellCount: this.resolveLegacyMenuPathTitleVisiblePieces(pieceCount),
         facetPulsePeriodMs: LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS,
-        phase: Number(phase.toFixed(3)),
+        phase: Number(sweepState.phase.toFixed(3)),
+        scannerDirection: sweepState.direction,
+        scannerMode: sweepState.mode,
+        scannerProgress: Number(sweepState.progress.toFixed(3)),
+        scannerSyncedToLifecycle: sweepState.syncedToLifecycle,
         sigilOrbitCount: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS,
-        sweepColumn: this.resolveLegacyMenuPathTitleSweepColumn(titleLayout.columns, titleLayout.rows, this.time.now),
+        sweepColumn: Number(sweepColumn.toFixed(3)),
         sweepPeriodMs: LEGACY_MENU_PATH_TITLE_SWEEP_MS
       },
       bounds: createVisualRect(titleLayout.left, titleLayout.top, titleLayout.width, titleLayout.height),
