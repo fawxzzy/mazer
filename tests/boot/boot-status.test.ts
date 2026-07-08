@@ -39,6 +39,16 @@ describe('boot status', () => {
     expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.errorMessage).toBe('boot failed');
   });
 
+  test('allows production service-worker update failures to be reported without blocking boot', () => {
+    const runtime = {} as Window;
+    vi.stubGlobal('window', runtime);
+
+    markMazerBootStatus('service-worker-error', 'sw update failed');
+    expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.stage).toBe('service-worker-error');
+    expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.errorMessage).toBe('sw update failed');
+    expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.gameCreated).toBe(false);
+  });
+
   test('attaches the live Phaser game for browser diagnostics', () => {
     const runtime = {} as Window;
     const fakeGame = { destroy: () => undefined } as unknown as Phaser.Game;

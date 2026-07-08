@@ -539,13 +539,18 @@ describe('legacy reset lane', () => {
     const viteConfigSource = readFileSync(resolve(process.cwd(), 'vite.config.ts'), 'utf8');
 
     expect(bootSource).toContain("const LOCALHOST_SW_RESET_KEY = 'mazer:localhost-sw-reset:v1';");
+    expect(bootSource).toContain("const PRODUCTION_SW_UPDATE_RELOAD_KEY = 'mazer:production-sw-update-reload-at:v1';");
+    expect(bootSource).toContain('const PRODUCTION_SW_UPDATE_RELOAD_WINDOW_MS = 10_000;');
     expect(bootSource).toContain("['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)");
     expect(bootSource).toContain('navigator.serviceWorker.getRegistrations()');
     expect(bootSource).toContain("cacheKey.includes('mazer')");
     expect(bootSource).toContain('window.location.reload();');
+    expect(bootSource).toContain('const shouldReloadForProductionServiceWorkerUpdate = (nowMs: number): boolean => {');
     expect(bootSource).toContain('const registerProductionServiceWorker = (): void => {');
     expect(bootSource).toContain("if (isLocalhostRuntime() || !('serviceWorker' in navigator)) {");
+    expect(bootSource).toContain("navigator.serviceWorker.addEventListener('controllerchange'");
     expect(bootSource).toContain("navigator.serviceWorker.register('/sw.js')");
+    expect(bootSource).toContain('.then((registration) => registration.update())');
     expect(bootSource).toContain("markMazerBootStatus('boot-start');");
     expect(bootSource).toContain("markMazerBootStatus('game-created');");
     expect(viteConfigSource).toContain('injectRegister: false');

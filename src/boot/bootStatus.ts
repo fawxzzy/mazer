@@ -8,6 +8,7 @@ export type MazerBootStage =
   | 'reload-requested'
   | 'game-creating'
   | 'game-created'
+  | 'service-worker-error'
   | 'menu-scene-create'
   | 'error';
 
