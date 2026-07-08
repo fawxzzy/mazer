@@ -137,3 +137,9 @@ Current total:
 Ratchet this marker only when a bounded packet changes implemented state or proof-backed confidence in one of the weighted segments.
 
 Do not ratchet for wording changes alone. Do not ratchet the retired legacy visual 1:1 marker from this lane.
+
+## 2026-07-08 - Title deconstruct handoff parity receipt
+- Updated the menu deconstruct handoff so the title path pieces are an explicit participant in the same zero-tile hold as the board.
+- The rebuild guard now waits for both maze tiles and title pieces to reach zero before the 1000ms empty-board handoff can finish.
+- Diagnostics now expose title piece counts inside the draw-stage payload for mobile proof scripts.
+- Local 390x844 proof captured `tilesVisible: 0`, `titleVisiblePieces: 0`, `titleFullyDeconstructed: true`, `handoffActive: true`, and rebuild after the hold.

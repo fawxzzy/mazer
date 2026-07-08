@@ -445,6 +445,10 @@ interface MenuSceneVisualDiagnostics {
         rowsRemaining: number | null;
         rowsVisible: number | null;
         staged: boolean;
+        titleFullyDeconstructed: boolean;
+        titlePieceCount: number;
+        titlePiecesRemaining: number;
+        titleVisiblePieces: number;
         tileCount?: number | null;
         tilesRemaining?: number | null;
         tilesVisible?: number | null;
@@ -1098,6 +1102,15 @@ export class MenuScene extends Phaser.Scene {
       tilesVisible: drawTilesVisible,
       tileCount: drawTileCount
     });
+    const titlePieceCount = this.mode === 'menu'
+      ? this.resolveLegacyMenuPathTitlePieceCount()
+      : 0;
+    const titleVisiblePieces = this.mode === 'menu'
+      ? this.resolveLegacyMenuPathTitleVisiblePieceCount()
+      : 0;
+    const titlePiecesRemaining = this.menuStaticDrawLifecyclePhase === 'deconstructing'
+      ? titleVisiblePieces
+      : Math.max(0, titlePieceCount - titleVisiblePieces);
     const routeDiagnostics = this.menuDemoEpisode && this.menuDemoConfig
       ? collectDemoWalkerRouteDiagnostics(this.menuDemoEpisode, this.menuDemoConfig)
       : null;
@@ -1325,6 +1338,10 @@ export class MenuScene extends Phaser.Scene {
           rowsRemaining: drawStageProgress.rowsRemaining,
           rowsVisible: drawRowsVisible,
           staged: drawStageStaged,
+          titleFullyDeconstructed: titleVisiblePieces === 0,
+          titlePieceCount,
+          titlePiecesRemaining,
+          titleVisiblePieces,
           tileCount: drawStageProgress.tileCount,
           tilesRemaining: drawStageProgress.tilesRemaining,
           tilesVisible: drawStageProgress.tilesVisible
@@ -2699,7 +2716,7 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
-    if (this.menuStaticDrawTilesVisible !== 0 || this.menuStaticDeconstructZeroHoldStartedAtMs === null) {
+    if (!this.isLegacyMenuDeconstructVisualHandoffReady() || this.menuStaticDeconstructZeroHoldStartedAtMs === null) {
       return true;
     }
 
@@ -2893,7 +2910,7 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyMenuDeconstructHandoffProgress(time: number): number {
     if (
       this.menuStaticDrawLifecyclePhase !== 'deconstructing'
-      || this.menuStaticDrawTilesVisible !== 0
+      || !this.isLegacyMenuDeconstructVisualHandoffReady()
       || this.menuStaticDeconstructZeroHoldStartedAtMs === null
       || this.pendingGenerationRequest?.reason !== 'menu-demo-goal-reset'
     ) {
@@ -2922,10 +2939,15 @@ export class MenuScene extends Phaser.Scene {
 
   private isLegacyMenuDeconstructHandoffActive(time: number): boolean {
     return this.menuStaticDrawLifecyclePhase === 'deconstructing'
-      && this.menuStaticDrawTilesVisible === 0
+      && this.isLegacyMenuDeconstructVisualHandoffReady()
       && this.menuStaticDeconstructZeroHoldStartedAtMs !== null
       && this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset'
       && time < this.resolveLegacyMenuDeconstructHandoffEndsAtMs();
+  }
+
+  private isLegacyMenuDeconstructVisualHandoffReady(): boolean {
+    return this.menuStaticDrawTilesVisible === 0
+      && this.resolveLegacyMenuPathTitleVisiblePieceCount() === 0;
   }
 
   private deferLegacyMenuDeconstructRebuildUntil(dueAtMs: number): void {
@@ -2993,6 +3015,7 @@ export class MenuScene extends Phaser.Scene {
       this.menuStaticDrawTilesVisible = 0;
       this.menuStaticDrawNextTileAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;
       this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+      this.titleGraphics.clear();
       return;
     }
 
@@ -3093,6 +3116,7 @@ export class MenuScene extends Phaser.Scene {
         if (this.menuStaticDrawTilesVisible <= 0) {
           this.menuStaticDrawTilesVisible = 0;
           this.menuStaticDrawNextTileAtMs = Number.POSITIVE_INFINITY;
+          this.titleGraphics.clear();
           if (this.menuStaticDeconstructZeroHoldStartedAtMs === null) {
             this.menuStaticDeconstructZeroHoldStartedAtMs = time;
           }
@@ -3756,6 +3780,27 @@ export class MenuScene extends Phaser.Scene {
     }
 
     return this.menuStaticDrawLifecyclePhase === 'building' ? 0 : 1;
+  }
+
+  private resolveLegacyMenuPathTitlePieceCount(): number {
+    const titlePresentation = resolveLegacyMenuTitlePresentation(
+      this.layout.boardSize,
+      this.layout.tileSize,
+      this.layout.height > this.layout.width,
+      this.layout.width,
+      this.maze.source === 'menu-generated' ? 'procedural' : 'snapshot'
+    );
+    const titleLayout = resolveLegacyMenuPathTitleLayout(
+      this.layout.titleX,
+      this.layout.titleY,
+      titlePresentation.fontSize
+    );
+
+    return titleLayout.cells.length;
+  }
+
+  private resolveLegacyMenuPathTitleVisiblePieceCount(): number {
+    return this.resolveLegacyMenuPathTitleVisiblePieces(this.resolveLegacyMenuPathTitlePieceCount());
   }
 
   private hasLegacyMenuTitleAnimationPendingFrame(time: number): boolean {
@@ -6679,6 +6724,15 @@ export class MenuScene extends Phaser.Scene {
       tilesVisible: drawTilesVisible,
       tileCount: drawTileCount
     });
+    const titlePieceCount = this.mode === 'menu'
+      ? this.resolveLegacyMenuPathTitlePieceCount()
+      : 0;
+    const titleVisiblePieces = this.mode === 'menu'
+      ? this.resolveLegacyMenuPathTitleVisiblePieceCount()
+      : 0;
+    const titlePiecesRemaining = this.menuStaticDrawLifecyclePhase === 'deconstructing'
+      ? titleVisiblePieces
+      : Math.max(0, titlePieceCount - titleVisiblePieces);
     const touchControls = this.resolveLegacyPlayTouchControlDiagnostics();
     const overlayPanel = this.overlay === 'none' ? null : this.resolveOverlayPanelFrame(this.overlay);
     const playerMarkerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
@@ -6778,6 +6832,10 @@ export class MenuScene extends Phaser.Scene {
             rowsRemaining: drawStageProgress.rowsRemaining,
             rowsVisible: drawRowsVisible,
             staged: drawStageStaged,
+            titleFullyDeconstructed: titleVisiblePieces === 0,
+            titlePieceCount,
+            titlePiecesRemaining,
+            titleVisiblePieces,
             tileCount: drawStageProgress.tileCount,
             tilesRemaining: drawStageProgress.tilesRemaining,
             tilesVisible: drawStageProgress.tilesVisible

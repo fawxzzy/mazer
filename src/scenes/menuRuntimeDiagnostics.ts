@@ -279,6 +279,10 @@ export interface MenuSceneRuntimeDiagnostics {
       rowsRemaining: number | null;
       rowsVisible: number | null;
       staged: boolean;
+      titleFullyDeconstructed?: boolean;
+      titlePieceCount?: number;
+      titlePiecesRemaining?: number;
+      titleVisiblePieces?: number;
       tileCount?: number | null;
       tilesRemaining?: number | null;
       tilesVisible?: number | null;
