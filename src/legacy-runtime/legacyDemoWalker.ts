@@ -51,7 +51,8 @@ export const createLegacyMenuDemoWalkerConfig = (seed: number): DemoWalkerConfig
   behavior: {
     ...legacyTuning.demo.behavior,
     enableRunnerMistakes: true,
-    emulateLogicSwitchPotentialCheckBug: false
+    emulateLogicSwitchPotentialCheckBug: false,
+    prerollSteps: 0
   }
 });
 

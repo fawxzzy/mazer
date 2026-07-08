@@ -31,8 +31,12 @@ describe('legacy menu demo lifecycle', () => {
 
     expect(isFixedLegacyMenuSnapshot(playMaze)).toBe(false);
     expect(bootstrap.config.behavior.enableRunnerMistakes).toBe(true);
+    expect(bootstrap.config.behavior.prerollSteps).toBe(0);
     expect(bootstrap.state.phase).toBe('explore');
+    expect(bootstrap.state.pathCursor).toBe(0);
+    expect(bootstrap.player).toEqual(playMaze.start);
     expect(bootstrap.player).toEqual(bootstrap.trail.at(-1));
+    expect(bootstrap.trail).toEqual([playMaze.start]);
     expect(isTileFloor(bootstrap.episode.raster.tiles, bootstrap.state.currentIndex)).toBe(true);
   });
 

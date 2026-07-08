@@ -395,6 +395,7 @@ describe('legacy reset lane', () => {
     expect(snapshotConfig.cadence.resetHoldMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.resetHoldMs);
     expect(genericConfig.behavior.enableRunnerMistakes).toBe(true);
     expect(genericConfig.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
+    expect(genericConfig.behavior.prerollSteps).toBe(0);
     expect(snapshotConfig.behavior.emulateLogicSwitchPotentialCheckBug).toBe(true);
     expect(genericConfig.cadence.exploreStepMs).not.toBe(snapshotConfig.cadence.exploreStepMs);
   });
