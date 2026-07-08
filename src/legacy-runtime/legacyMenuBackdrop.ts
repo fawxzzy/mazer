@@ -21,6 +21,22 @@ export interface LegacyMenuBackdropOrb {
   y: number;
 }
 
+export interface LegacyMenuBackdropGlassVeil {
+  alpha: number;
+  color: number;
+  radius: number;
+  x: number;
+  y: number;
+}
+
+export interface LegacyMenuBackdropDriftMote {
+  alpha: number;
+  color: number;
+  radius: number;
+  x: number;
+  y: number;
+}
+
 interface LegacyMenuBackdropOrbTemplate {
   alpha: number;
   color: number;
@@ -30,6 +46,8 @@ interface LegacyMenuBackdropOrbTemplate {
 }
 
 export const LEGACY_MENU_STAR_COUNT = 180;
+export const LEGACY_MENU_GLASS_VEIL_COUNT = 5;
+export const LEGACY_MENU_DRIFT_MOTE_COUNT = 14;
 
 const LIGHT_BACKDROP_ORBS: LegacyMenuBackdropOrbTemplate[] = [
   { xRatio: 0.52, yRatio: 0.45, radiusRatio: 0.38, alpha: 0.082, color: 0x754996 },
@@ -51,6 +69,14 @@ const DARK_BACKDROP_ORBS: LegacyMenuBackdropOrbTemplate[] = [
   { xRatio: 0.12, yRatio: 0.12, radiusRatio: 0.055, alpha: 0.012, color: 0xd7cdff },
   { xRatio: 0.9, yRatio: 0.12, radiusRatio: 0.052, alpha: 0.012, color: 0xe4dcff },
   { xRatio: 0.89, yRatio: 0.85, radiusRatio: 0.05, alpha: 0.01, color: 0xcfc3ff }
+];
+
+const GLASS_VEIL_TEMPLATES: LegacyMenuBackdropOrbTemplate[] = [
+  { xRatio: 0.28, yRatio: 0.36, radiusRatio: 0.18, alpha: 0.155, color: 0x72e0bf },
+  { xRatio: 0.72, yRatio: 0.38, radiusRatio: 0.22, alpha: 0.13, color: 0xb7f2ff },
+  { xRatio: 0.5, yRatio: 0.58, radiusRatio: 0.2, alpha: 0.145, color: 0x754996 },
+  { xRatio: 0.18, yRatio: 0.74, radiusRatio: 0.16, alpha: 0.112, color: 0x9cffd2 },
+  { xRatio: 0.84, yRatio: 0.78, radiusRatio: 0.17, alpha: 0.122, color: 0xfff05a }
 ];
 
 export function createLegacyMenuBackdropStars(
@@ -123,6 +149,60 @@ export function resolveLegacyMenuBackdropOrbs(
     alpha: template.alpha,
     color: template.color
   }));
+}
+
+export function resolveLegacyMenuBackdropGlassVeils(
+  width: number,
+  height: number,
+  darkMode: boolean,
+  timeMs: number,
+  animated: boolean
+): LegacyMenuBackdropGlassVeil[] {
+  const minDimension = Math.min(width, height);
+  const phase = animated ? timeMs / 1000 : 0;
+  const alphaScale = darkMode ? 0.7 : 1;
+
+  return GLASS_VEIL_TEMPLATES.map((template, index) => {
+    const localPhase = phase * (0.22 + (index * 0.034)) + (index * 1.73);
+    const driftX = Math.sin(localPhase) * 0.078;
+    const driftY = Math.cos(localPhase * 0.82) * 0.052;
+
+    return {
+      x: width * (template.xRatio + driftX),
+      y: height * (template.yRatio + driftY),
+      radius: minDimension * template.radiusRatio,
+      alpha: template.alpha * alphaScale,
+      color: template.color
+    };
+  });
+}
+
+export function resolveLegacyMenuBackdropDriftMotes(
+  width: number,
+  height: number,
+  darkMode: boolean,
+  timeMs: number,
+  animated: boolean
+): LegacyMenuBackdropDriftMote[] {
+  const progress = animated ? timeMs / 14000 : 0;
+  const minDimension = Math.min(width, height);
+  const alphaScale = darkMode ? 0.68 : 1;
+  const colors = [0x72e0bf, 0xb7f2ff, 0x9cffd2, 0xd8cbff];
+
+  return Array.from({ length: LEGACY_MENU_DRIFT_MOTE_COUNT }, (_, index) => {
+    const laneSeed = (index * 0.61803398875) % 1;
+    const driftSeed = (index * 0.27316821) % 1;
+    const x = width * ((laneSeed + (progress * (0.32 + (driftSeed * 0.18)))) % 1);
+    const y = height * ((driftSeed + (progress * (0.12 + (laneSeed * 0.1))) + (Math.sin((progress * 8) + index) * 0.022)) % 1);
+
+    return {
+      x,
+      y,
+      radius: Math.max(2.2, minDimension * (0.0062 + (laneSeed * 0.0048))),
+      alpha: (0.18 + (driftSeed * 0.12)) * alphaScale,
+      color: colors[index % colors.length] ?? 0xb7f2ff
+    };
+  });
 }
 
 export function resolveLegacyMenuBackdropStreakLength(star: LegacyMenuBackdropStar): number {

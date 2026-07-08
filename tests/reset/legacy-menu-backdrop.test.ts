@@ -1,8 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import {
+  LEGACY_MENU_DRIFT_MOTE_COUNT,
+  LEGACY_MENU_GLASS_VEIL_COUNT,
   LEGACY_MENU_STAR_COUNT,
   advanceLegacyMenuBackdropStars,
   createLegacyMenuBackdropStars,
+  resolveLegacyMenuBackdropDriftMotes,
+  resolveLegacyMenuBackdropGlassVeils,
   resolveLegacyMenuBackdropOrbs,
   resolveLegacyMenuBackdropPalette,
   resolveLegacyMenuBackdropStreakLength,
@@ -58,6 +62,26 @@ describe('legacyMenuBackdrop', () => {
     expect(orbs[0].x).toBeCloseTo(665.6, 1);
     expect(orbs[0].radius).toBeCloseTo(273.6, 1);
     expect(orbs[5].alpha).toBeLessThan(0.02);
+  });
+
+  test('resolves low-count glass veils and motes that animate only when requested', () => {
+    const staticVeils = resolveLegacyMenuBackdropGlassVeils(390, 844, false, 0, false);
+    const animatedVeils = resolveLegacyMenuBackdropGlassVeils(390, 844, false, 4000, true);
+    const staticMotes = resolveLegacyMenuBackdropDriftMotes(390, 844, false, 0, false);
+    const animatedMotes = resolveLegacyMenuBackdropDriftMotes(390, 844, false, 4000, true);
+
+    expect(staticVeils).toHaveLength(LEGACY_MENU_GLASS_VEIL_COUNT);
+    expect(staticMotes).toHaveLength(LEGACY_MENU_DRIFT_MOTE_COUNT);
+    expect(staticVeils[0].radius).toBeCloseTo(70.2, 1);
+    expect(staticVeils[0].alpha).toBeCloseTo(0.155, 3);
+    expect(staticMotes[0].radius).toBeGreaterThanOrEqual(2.2);
+    expect(animatedVeils[0].x).not.toBe(staticVeils[0].x);
+    expect(animatedMotes[1].x).not.toBe(staticMotes[1].x);
+
+    const darkVeils = resolveLegacyMenuBackdropGlassVeils(390, 844, true, 0, false);
+    const darkMotes = resolveLegacyMenuBackdropDriftMotes(390, 844, true, 0, false);
+    expect(darkVeils[0].alpha).toBeLessThan(staticVeils[0].alpha);
+    expect(darkMotes[0].alpha).toBeLessThan(staticMotes[0].alpha);
   });
 
   test('keeps star streaks short and biased upward against movement', () => {

@@ -79,8 +79,12 @@ import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButto
 import { resolveLegacyMenuTitlePresentation } from '../legacy-runtime/legacyMenuTitle';
 import {
   LEGACY_MENU_STAR_COUNT,
+  LEGACY_MENU_DRIFT_MOTE_COUNT,
+  LEGACY_MENU_GLASS_VEIL_COUNT,
   advanceLegacyMenuBackdropStars,
   createLegacyMenuBackdropStars,
+  resolveLegacyMenuBackdropDriftMotes,
+  resolveLegacyMenuBackdropGlassVeils,
   resolveLegacyMenuBackdropOrbs,
   resolveLegacyMenuBackdropPalette,
   resolveLegacyMenuBackdropStreakLength,
@@ -912,7 +916,8 @@ export class MenuScene extends Phaser.Scene {
       ? Number((this.runtimeFrameTotalMs / this.runtimeFrameCount).toFixed(3))
       : 0;
     const starCount = this.stars.length;
-    const movingBackdropActorCount = this.settings.toggleAnimatedBackdrop ? starCount : 0;
+    const backdropSignatureCount = starCount + LEGACY_MENU_GLASS_VEIL_COUNT + LEGACY_MENU_DRIFT_MOTE_COUNT;
+    const movingBackdropActorCount = this.settings.toggleAnimatedBackdrop ? backdropSignatureCount : 0;
     const telemetrySummary = summarizeTelemetrySemantics([]);
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     const drawStageStaged = this.mode === 'menu' && drawStage?.executionKind === 'row-slice';
@@ -1229,12 +1234,12 @@ export class MenuScene extends Phaser.Scene {
           farStars: starCount,
           nearStars: 0,
           twinkles: 0,
-          veils: 0,
-          driftMotes: 0,
+          veils: LEGACY_MENU_GLASS_VEIL_COUNT,
+          driftMotes: LEGACY_MENU_DRIFT_MOTE_COUNT,
           sigils: 4,
           moving: movingBackdropActorCount,
           movingCap: movingBackdropActorCount,
-          signatureCap: starCount
+          signatureCap: backdropSignatureCount
         }
       }
     });
@@ -2910,12 +2915,35 @@ export class MenuScene extends Phaser.Scene {
     this.backdropGraphics.clear();
     const palette = resolveLegacyMenuBackdropPalette(this.settings.darkMode);
     const hazeOrbs = resolveLegacyMenuBackdropOrbs(width, height, this.settings.darkMode);
+    const backdropAnimationTime = this.settings.toggleAnimatedBackdrop ? this.time.now : 0;
+    const glassVeils = resolveLegacyMenuBackdropGlassVeils(
+      width,
+      height,
+      this.settings.darkMode,
+      backdropAnimationTime,
+      this.settings.toggleAnimatedBackdrop
+    );
+    const driftMotes = resolveLegacyMenuBackdropDriftMotes(
+      width,
+      height,
+      this.settings.darkMode,
+      backdropAnimationTime,
+      this.settings.toggleAnimatedBackdrop
+    );
 
     this.backdropGraphics.fillStyle(palette.fieldColor, 1);
     this.backdropGraphics.fillRect(0, 0, width, height);
     for (const orb of hazeOrbs) {
       this.backdropGraphics.fillStyle(orb.color, orb.alpha);
       this.backdropGraphics.fillCircle(orb.x, orb.y, orb.radius);
+    }
+    for (const veil of glassVeils) {
+      this.backdropGraphics.fillStyle(veil.color, veil.alpha);
+      this.backdropGraphics.fillCircle(veil.x, veil.y, veil.radius);
+    }
+    for (const mote of driftMotes) {
+      this.backdropGraphics.fillStyle(mote.color, mote.alpha);
+      this.backdropGraphics.fillCircle(mote.x, mote.y, mote.radius);
     }
     this.drawLegacyBackdropSigils(width, height, this.time.now);
 

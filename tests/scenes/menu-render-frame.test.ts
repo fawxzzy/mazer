@@ -193,6 +193,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacyMenuDeconstructHandoffBurst(');
     expect(menuSceneSource).toContain('LEGACY_MENU_DECONSTRUCT_BURST_COLOR');
     expect(menuSceneSource).toContain('private drawLegacyBackdropSigils(width: number, height: number, time: number): void');
+    expect(menuSceneSource).toContain('resolveLegacyMenuBackdropGlassVeils(');
+    expect(menuSceneSource).toContain('resolveLegacyMenuBackdropDriftMotes(');
+    expect(menuSceneSource).toContain('veils: LEGACY_MENU_GLASS_VEIL_COUNT');
+    expect(menuSceneSource).toContain('driftMotes: LEGACY_MENU_DRIFT_MOTE_COUNT');
     expect(legacyMenuRenderSource).toContain('resolveLegacyMenuPathStrokeSegments');
     expect(menuSceneSource).toContain('Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.');
   });
@@ -204,6 +208,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(backdropSource).toContain('fieldColor: 0x090d19');
     expect(backdropSource).toContain('fieldColor: 0x10172c');
     expect(menuSceneSource).toContain('this.drawLegacyBackdropSigils(width, height, this.time.now);');
+    expect(backdropSource).toContain('LEGACY_MENU_GLASS_VEIL_COUNT');
+    expect(backdropSource).toContain('LEGACY_MENU_DRIFT_MOTE_COUNT');
+    expect(backdropSource).toContain('resolveLegacyMenuBackdropGlassVeils');
+    expect(backdropSource).toContain('resolveLegacyMenuBackdropDriftMotes');
     expect(menuSceneSource).toContain('0.7 + (Math.sin(time / 1800) * 0.3)');
     expect(menuSceneSource).toContain('sigils: 4');
   });
