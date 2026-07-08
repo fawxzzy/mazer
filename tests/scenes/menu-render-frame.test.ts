@@ -642,6 +642,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.publishInteractionDiagnostics(false);');
     expect(menuSceneSource).toContain('private hudDirty = true;');
     expect(menuSceneSource).toContain('this.hudDirty = true;');
+    expect(menuSceneSource).toContain('const uiRebuilt = this.uiDirty;');
+    expect(menuSceneSource).toContain('this.publishVisualDiagnostics(time, uiRebuilt);');
     expect(tuningSource).toContain('diagnosticsPublishIntervalMs: 1500,');
     expect(tuningSource).toContain('full: 83,');
     expect(tuningSource).toContain('throttled: 250,');
@@ -670,6 +672,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.input.on(\'wheel\'');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerDown(pointer: Phaser.Input.Pointer): boolean');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerMove(pointer: Phaser.Input.Pointer): boolean');
+    expect(menuSceneSource).toContain('private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number');
+    expect(menuSceneSource).toContain('fillScrollPill(track.left - 3, track.top - 2, track.width + 6, track.height + 4');
+    expect(menuSceneSource).toContain('centerY - (height / 2) >= viewport.top + 2');
+    expect(menuSceneSource).toContain('centerY + (height / 2) <= viewport.bottom - 2');
+    expect(menuSceneSource).toContain("const tightWidth = input.width < 260;");
+    expect(menuSceneSource).toContain("tightWidth && input.label !== 'Controls'");
+    expect(menuSceneSource).toContain('setAlpha(tightWidth ? 0 : 0.92).setVisible(!tightWidth)');
+    expect(menuSceneSource).not.toMatch(/fillRoundedRect\([^;]*,\s*999\)/);
     expect(menuSceneSource).toContain('overlayUi: {');
     expect(menuSceneSource).not.toContain('createButton(panel.centerX - 78, firstActionY, 132, 54, \'Back\'');
     expect(menuSceneSource).not.toContain('createButton(panel.centerX, panel.top + panel.height - 58, Math.min(180, panel.width - 96), 54, \'Back\'');

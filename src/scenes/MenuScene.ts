@@ -970,11 +970,12 @@ export class MenuScene extends Phaser.Scene {
       this.drawHud(time);
       this.hudDirty = false;
     }
-    if (this.uiDirty) {
+    const uiRebuilt = this.uiDirty;
+    if (uiRebuilt) {
       this.rebuildUi();
     }
 
-    this.publishVisualDiagnostics(time);
+    this.publishVisualDiagnostics(time, uiRebuilt);
     this.publishRuntimeDiagnostics(time);
   }
 
@@ -4747,7 +4748,7 @@ export class MenuScene extends Phaser.Scene {
     }
   ): void {
     const alpha = rect.alpha ?? 0.48;
-    const radius = rect.radius ?? 10;
+    const radius = this.resolveLegacyRoundedRectRadius(rect.width, rect.height, rect.radius ?? 10);
     const active = rect.active ?? false;
     const corner = Math.max(7, Math.min(16, Math.round(Math.min(rect.width, rect.height) * 0.28)));
     const inset = 4;
@@ -4782,6 +4783,15 @@ export class MenuScene extends Phaser.Scene {
     graphics.lineTo(rect.left + rect.width - inset, rect.top + rect.height - inset);
     graphics.lineTo(rect.left + rect.width - inset, rect.top + rect.height - corner);
     graphics.strokePath();
+  }
+
+  private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number {
+    const safeWidth = Math.max(1, Math.abs(width));
+    const safeHeight = Math.max(1, Math.abs(height));
+    const maxRadius = Math.max(1, Math.floor(Math.min(safeWidth, safeHeight) / 2));
+    const requested = requestedRadius ?? maxRadius;
+
+    return Math.max(1, Math.min(maxRadius, Math.round(requested)));
   }
 
   private padLegacyUiText<T extends Phaser.GameObjects.Text>(text: T): T {
@@ -5464,14 +5474,39 @@ export class MenuScene extends Phaser.Scene {
       );
     }
 
-    graphics.fillStyle(LEGACY_CYBER_PANEL_SHADOW, 0.46);
-    graphics.fillRoundedRect(track.left - 3, track.top - 2, track.width + 6, track.height + 4, 999);
-    graphics.fillStyle(LEGACY_CYBER_PANEL_STROKE_ALT, 0.34);
-    graphics.fillRoundedRect(track.left - 1, track.top, track.width + 2, track.height, 999);
-    graphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.92);
-    graphics.fillRoundedRect(thumb.left - 2, thumb.top, thumb.width + 4, thumb.height, 999);
-    graphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.38);
-    graphics.fillRoundedRect(thumb.left, thumb.top + 2, Math.max(1, thumb.width), Math.max(1, thumb.height - 4), 999);
+    const fillScrollPill = (
+      left: number,
+      top: number,
+      width: number,
+      height: number,
+      color: number,
+      alpha: number
+    ): void => {
+      const safeWidth = Math.max(1, width);
+      const safeHeight = Math.max(1, height);
+      graphics.fillStyle(color, alpha);
+      graphics.fillRoundedRect(
+        left,
+        top,
+        safeWidth,
+        safeHeight,
+        this.resolveLegacyRoundedRectRadius(safeWidth, safeHeight)
+      );
+    };
+
+    // CanvasRenderer can overfill skinny pill shapes when the requested radius is much
+    // larger than the rect. Clamp it so the mobile scroll rail never paints over the UI.
+    fillScrollPill(track.left - 3, track.top - 2, track.width + 6, track.height + 4, LEGACY_CYBER_PANEL_SHADOW, 0.46);
+    fillScrollPill(track.left - 1, track.top, track.width + 2, track.height, LEGACY_CYBER_PANEL_STROKE_ALT, 0.34);
+    fillScrollPill(thumb.left - 2, thumb.top, thumb.width + 4, thumb.height, LEGACY_PLAY_TOUCH_ACCENT, 0.92);
+    fillScrollPill(
+      thumb.left,
+      thumb.top + 2,
+      Math.max(1, thumb.width),
+      Math.max(1, thumb.height - 4),
+      LEGACY_PLAY_TOUCH_ICON,
+      0.38
+    );
   }
 
   private buildOptionsOverlay(): void {
@@ -5554,8 +5589,8 @@ export class MenuScene extends Phaser.Scene {
     const toRenderY = (contentY: number): number => contentY - scrollOffset;
     const isVisible = (centerY: number, height: number): boolean => (
       viewport === null || (
-        centerY + (height / 2) >= viewport.top - 2
-        && centerY - (height / 2) <= viewport.bottom + 2
+        centerY - (height / 2) >= viewport.top + 2
+        && centerY + (height / 2) <= viewport.bottom - 2
       )
     );
     const controls: Array<{
@@ -5685,24 +5720,30 @@ export class MenuScene extends Phaser.Scene {
     const rowFill = input.checked ? 0x10251e : LEGACY_CYBER_PANEL_FILL;
     const rowStroke = input.checked ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
     const stateColor = input.checked ? '#72e0bf' : '#b7f2ff';
+    const tightWidth = input.width < 260;
     const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, input.checked ? 0.62 : 0.5);
     background.setStrokeStyle(1, rowStroke, input.checked ? 0.56 : 0.38);
     background.setInteractive({ useHandCursor: true });
 
     const label = this.padLegacyUiText(this.add.text(left + 16, input.y, input.label, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${Math.max(16, Math.min(20, Math.round(input.height * 0.4)))}px`,
+      fontSize: `${tightWidth ? 15 : Math.max(16, Math.min(20, Math.round(input.height * 0.4)))}px`,
       color: '#ecfff5'
     })).setOrigin(0, 0.5).setAlpha(0.94);
 
-    const displayStateText = input.stateText || (input.checked ? input.onLabel : input.offLabel);
+    const displayStateText = tightWidth && input.label !== 'Controls'
+      ? (input.checked ? 'On' : 'Off')
+      : input.stateText || (input.checked ? input.onLabel : input.offLabel);
     const compactStateLane = input.width < 300;
     const stateLabel = this.padLegacyUiText(this.add.text(left + input.width - (compactStateLane ? 56 : 84), input.y, displayStateText || input.stateText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${compactStateLane ? Math.max(10, Math.min(11, Math.round(input.height * 0.24))) : Math.max(11, Math.min(13, Math.round(input.height * 0.28)))}px`,
       color: stateColor
-    })).setOrigin(1, 0.5).setAlpha(0.92);
-    this.uiTexts.push(label, stateLabel);
+    })).setOrigin(1, 0.5).setAlpha(tightWidth ? 0 : 0.92).setVisible(!tightWidth);
+    this.uiTexts.push(label);
+    if (!tightWidth) {
+      this.uiTexts.push(stateLabel);
+    }
 
     const trackX = left + input.width - 48;
     const track = this.add.ellipse(trackX, input.y, 42, 24, input.checked ? 0x123a2d : 0x07131d, 0.9);
