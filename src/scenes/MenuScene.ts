@@ -3127,21 +3127,21 @@ export class MenuScene extends Phaser.Scene {
   ): void {
     const halfLength = shard.length / 2;
     const halfThickness = shard.thickness / 2;
-    const taper = Math.min(halfLength * 0.42, shard.thickness * 2.8);
-    const points = [
-      this.rotateBackdropPoint(shard, -halfLength + taper, -halfThickness),
-      this.rotateBackdropPoint(shard, halfLength - taper, -halfThickness),
-      this.rotateBackdropPoint(shard, halfLength, 0),
-      this.rotateBackdropPoint(shard, halfLength - taper, halfThickness),
-      this.rotateBackdropPoint(shard, -halfLength + taper, halfThickness),
-      this.rotateBackdropPoint(shard, -halfLength, 0)
+    const taper = Math.min(halfLength * 0.28, shard.thickness * 2.2);
+    const ghostPoints = [
+      this.rotateBackdropPoint(shard, -halfLength * 0.62, -halfThickness * 0.66),
+      this.rotateBackdropPoint(shard, halfLength * 0.52, -halfThickness * 0.66),
+      this.rotateBackdropPoint(shard, halfLength * 0.62, 0),
+      this.rotateBackdropPoint(shard, halfLength * 0.46, halfThickness * 0.66),
+      this.rotateBackdropPoint(shard, -halfLength * 0.58, halfThickness * 0.66),
+      this.rotateBackdropPoint(shard, -halfLength * 0.7, 0)
     ];
 
-    this.backdropGraphics.fillStyle(shard.color, shard.alpha * 0.14);
+    this.backdropGraphics.fillStyle(shard.color, shard.alpha * 0.038);
     this.backdropGraphics.beginPath();
-    this.backdropGraphics.moveTo(points[0]?.x ?? shard.x, points[0]?.y ?? shard.y);
-    for (let index = 1; index < points.length; index += 1) {
-      const point = points[index];
+    this.backdropGraphics.moveTo(ghostPoints[0]?.x ?? shard.x, ghostPoints[0]?.y ?? shard.y);
+    for (let index = 1; index < ghostPoints.length; index += 1) {
+      const point = ghostPoints[index];
       if (point) {
         this.backdropGraphics.lineTo(point.x, point.y);
       }
@@ -3149,49 +3149,55 @@ export class MenuScene extends Phaser.Scene {
     this.backdropGraphics.closePath();
     this.backdropGraphics.fillPath();
 
-    this.backdropGraphics.lineStyle(1, shard.color, shard.alpha * (edgeAlphaScale + 0.48));
-    this.strokeLegacyPolyline(this.backdropGraphics, points);
+    const upperRailStart = this.rotateBackdropPoint(shard, -halfLength * 0.86, -halfThickness * 0.58);
+    const upperRailBreakStart = this.rotateBackdropPoint(shard, -halfLength * 0.26, -halfThickness * 0.58);
+    const upperRailBreakEnd = this.rotateBackdropPoint(shard, halfLength * 0.1, -halfThickness * 0.58);
+    const upperRailEnd = this.rotateBackdropPoint(shard, halfLength * 0.82, -halfThickness * 0.58);
+    const lowerRailStart = this.rotateBackdropPoint(shard, -halfLength * 0.78, halfThickness * 0.58);
+    const lowerRailBreakStart = this.rotateBackdropPoint(shard, -halfLength * 0.12, halfThickness * 0.58);
+    const lowerRailBreakEnd = this.rotateBackdropPoint(shard, halfLength * 0.24, halfThickness * 0.58);
+    const lowerRailEnd = this.rotateBackdropPoint(shard, halfLength * 0.74, halfThickness * 0.58);
+    const centerBridgeStart = this.rotateBackdropPoint(shard, -halfLength * 0.2, 0);
+    const centerBridgeEnd = this.rotateBackdropPoint(shard, halfLength * 0.3, 0);
+    const leadingCutStart = this.rotateBackdropPoint(shard, halfLength * 0.54, -halfThickness - taper);
+    const leadingCutEnd = this.rotateBackdropPoint(shard, halfLength * 0.72, halfThickness + taper);
+    const trailingCutStart = this.rotateBackdropPoint(shard, -halfLength * 0.72, halfThickness + taper);
+    const trailingCutEnd = this.rotateBackdropPoint(shard, -halfLength * 0.5, -halfThickness - taper);
+    const notchStart = this.rotateBackdropPoint(shard, halfLength * 0.02, -halfThickness * 1.05);
+    const notchEnd = this.rotateBackdropPoint(shard, halfLength * 0.02, halfThickness * 1.05);
+    const tipGlintStart = this.rotateBackdropPoint(shard, halfLength * 0.78, -halfThickness * 0.92);
+    const tipGlintEnd = this.rotateBackdropPoint(shard, halfLength * 0.92, -halfThickness * 0.18);
 
-    const spineStart = this.rotateBackdropPoint(shard, -halfLength * 0.78, 0);
-    const spineEnd = this.rotateBackdropPoint(shard, halfLength * 0.82, 0);
-    const upperFacetStart = this.rotateBackdropPoint(shard, -halfLength * 0.3, -halfThickness * 0.9);
-    const upperFacetEnd = this.rotateBackdropPoint(shard, halfLength * 0.3, halfThickness * 0.38);
-    const lowerFacetStart = this.rotateBackdropPoint(shard, -halfLength * 0.54, halfThickness * 0.7);
-    const lowerFacetEnd = this.rotateBackdropPoint(shard, halfLength * 0.02, -halfThickness * 0.52);
-    const crossFacetStart = this.rotateBackdropPoint(shard, halfLength * 0.08, -halfThickness * 0.78);
-    const crossFacetEnd = this.rotateBackdropPoint(shard, halfLength * 0.42, halfThickness * 0.54);
-    const tailFacetStart = this.rotateBackdropPoint(shard, -halfLength * 0.88, 0);
-    const tailFacetEnd = this.rotateBackdropPoint(shard, -halfLength * 0.62, -halfThickness * 0.44);
-    const tipGlintStart = this.rotateBackdropPoint(shard, halfLength * 0.72, -halfThickness * 0.5);
-    const tipGlintEnd = this.rotateBackdropPoint(shard, halfLength * 0.94, 0);
-
-    this.backdropGraphics.lineStyle(1, shard.color, shard.alpha * (edgeAlphaScale + 0.62));
-    this.strokeLegacyPolyline(this.backdropGraphics, [spineStart, spineEnd]);
-    this.backdropGraphics.lineStyle(1, shard.color, shard.alpha * (edgeAlphaScale + 0.28));
-    this.strokeLegacyPolyline(this.backdropGraphics, [upperFacetStart, upperFacetEnd]);
-    this.strokeLegacyPolyline(this.backdropGraphics, [lowerFacetStart, lowerFacetEnd]);
-    this.backdropGraphics.lineStyle(1, shard.color, shard.alpha * (edgeAlphaScale + 0.14));
-    this.strokeLegacyPolyline(this.backdropGraphics, [crossFacetStart, crossFacetEnd]);
-    this.strokeLegacyPolyline(this.backdropGraphics, [tailFacetStart, tailFacetEnd]);
-    this.backdropGraphics.lineStyle(1, 0xffffff, shard.alpha * 0.22);
+    this.backdropGraphics.lineStyle(1, shard.color, shard.alpha * (edgeAlphaScale + 0.7));
+    this.strokeLegacyPolyline(this.backdropGraphics, [upperRailStart, upperRailBreakStart]);
+    this.strokeLegacyPolyline(this.backdropGraphics, [upperRailBreakEnd, upperRailEnd]);
+    this.strokeLegacyPolyline(this.backdropGraphics, [lowerRailStart, lowerRailBreakStart]);
+    this.strokeLegacyPolyline(this.backdropGraphics, [lowerRailBreakEnd, lowerRailEnd]);
+    this.backdropGraphics.lineStyle(1, shard.color, shard.alpha * (edgeAlphaScale + 0.32));
+    this.strokeLegacyPolyline(this.backdropGraphics, [centerBridgeStart, centerBridgeEnd]);
+    this.strokeLegacyPolyline(this.backdropGraphics, [leadingCutStart, leadingCutEnd]);
+    this.strokeLegacyPolyline(this.backdropGraphics, [trailingCutStart, trailingCutEnd]);
+    this.backdropGraphics.lineStyle(1, shard.color, shard.alpha * (edgeAlphaScale + 0.18));
+    this.strokeLegacyPolyline(this.backdropGraphics, [notchStart, notchEnd]);
+    this.backdropGraphics.lineStyle(1, 0xffffff, shard.alpha * 0.18);
     this.strokeLegacyPolyline(this.backdropGraphics, [tipGlintStart, tipGlintEnd]);
   }
 
   private drawLegacyBackdropRune(rune: LegacyMenuBackdropDriftRune): void {
-    const points = [
-      this.rotateBackdropPoint(rune, 0, -rune.size),
-      this.rotateBackdropPoint(rune, rune.size * 0.68, 0),
-      this.rotateBackdropPoint(rune, 0, rune.size),
-      this.rotateBackdropPoint(rune, -rune.size * 0.68, 0),
-      this.rotateBackdropPoint(rune, 0, -rune.size)
-    ];
+    const firstStrokeStart = this.rotateBackdropPoint(rune, -rune.size * 0.78, rune.size * 0.48);
+    const firstStrokeKnee = this.rotateBackdropPoint(rune, -rune.size * 0.08, -rune.size * 0.36);
+    const firstStrokeEnd = this.rotateBackdropPoint(rune, rune.size * 0.52, -rune.size * 0.12);
+    const secondStrokeStart = this.rotateBackdropPoint(rune, -rune.size * 0.3, rune.size * 0.74);
+    const secondStrokeEnd = this.rotateBackdropPoint(rune, rune.size * 0.72, rune.size * 0.18);
+    const tickStart = this.rotateBackdropPoint(rune, rune.size * 0.16, -rune.size * 0.72);
+    const tickEnd = this.rotateBackdropPoint(rune, rune.size * 0.54, -rune.size * 0.42);
 
-    this.backdropGraphics.lineStyle(1, rune.color, rune.alpha);
-    this.strokeLegacyPolyline(this.backdropGraphics, points);
-
-    const slashStart = this.rotateBackdropPoint(rune, -rune.size * 0.42, rune.size * 0.42);
-    const slashEnd = this.rotateBackdropPoint(rune, rune.size * 0.42, -rune.size * 0.42);
-    this.strokeLegacyPolyline(this.backdropGraphics, [slashStart, slashEnd]);
+    this.backdropGraphics.lineStyle(1, rune.color, rune.alpha * 0.86);
+    this.strokeLegacyPolyline(this.backdropGraphics, [firstStrokeStart, firstStrokeKnee, firstStrokeEnd]);
+    this.backdropGraphics.lineStyle(1, rune.color, rune.alpha * 0.58);
+    this.strokeLegacyPolyline(this.backdropGraphics, [secondStrokeStart, secondStrokeEnd]);
+    this.backdropGraphics.lineStyle(1, 0xffffff, rune.alpha * 0.18);
+    this.strokeLegacyPolyline(this.backdropGraphics, [tickStart, tickEnd]);
   }
 
   private rotateBackdropPoint(
@@ -3212,41 +3218,48 @@ export class MenuScene extends Phaser.Scene {
     const pulse = this.settings.toggleAnimatedBackdrop
       ? 0.7 + (Math.sin(time / 1800) * 0.3)
       : 0.78;
-    const alpha = LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA * pulse;
+    const alpha = LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA * pulse * 0.76;
     const color = this.settings.darkMode ? LEGACY_BOARD_SIGIL_BORDER_PRIMARY : LEGACY_BOARD_SIGIL_BORDER_SECONDARY;
     const glyphs = [
-      { x: 0.16, y: 0.2, scale: 0.34, flip: 1 },
-      { x: 0.86, y: 0.28, scale: 0.28, flip: -1 },
-      { x: 0.22, y: 0.82, scale: 0.24, flip: -1 },
-      { x: 0.78, y: 0.78, scale: 0.3, flip: 1 }
+      { x: 0.14, y: 0.19, scale: 0.23, flip: 1 },
+      { x: 0.87, y: 0.27, scale: 0.2, flip: -1 },
+      { x: 0.19, y: 0.82, scale: 0.18, flip: -1 },
+      { x: 0.79, y: 0.79, scale: 0.21, flip: 1 }
     ];
 
-    this.backdropGraphics.lineStyle(1, color, alpha);
     for (const glyph of glyphs) {
       const cx = width * glyph.x;
       const cy = height * glyph.y;
-      const unit = Math.max(16, Math.round(Math.min(width, height) * glyph.scale * 0.16));
+      const unit = Math.max(10, Math.round(Math.min(width, height) * glyph.scale * 0.13));
       const flip = glyph.flip;
+      const primaryRailStart = { x: cx - (unit * 1.82 * flip), y: cy - (unit * 0.34) };
+      const primaryRailKnee = { x: cx - (unit * 0.62 * flip), y: cy - (unit * 0.34) };
+      const primaryRailBridge = { x: cx - (unit * 0.12 * flip), y: cy - (unit * 0.78) };
+      const primaryRailEnd = { x: cx + (unit * 1.18 * flip), y: cy - (unit * 0.78) };
+      const lowerRailStart = { x: cx - (unit * 1.18 * flip), y: cy + (unit * 0.72) };
+      const lowerRailEnd = { x: cx + (unit * 0.86 * flip), y: cy + (unit * 0.34) };
+      const mastStart = { x: cx + (unit * 0.22 * flip), y: cy - (unit * 1.34) };
+      const mastEnd = { x: cx + (unit * 0.22 * flip), y: cy + (unit * 1.18) };
+      const glintStart = { x: cx + (unit * 0.7 * flip), y: cy - (unit * 1.08) };
+      const glintEnd = { x: cx + (unit * 1.1 * flip), y: cy - (unit * 0.88) };
 
+      this.backdropGraphics.lineStyle(1, color, alpha);
       this.strokeLegacyPolyline(this.backdropGraphics, [
-        { x: cx, y: cy - (unit * 1.8) },
-        { x: cx + (unit * flip), y: cy - (unit * 0.7) },
-        { x: cx, y: cy },
-        { x: cx + (unit * 1.1 * flip), y: cy + (unit * 1.2) },
-        { x: cx, y: cy + (unit * 2.1) }
+        primaryRailStart,
+        primaryRailKnee,
+        primaryRailBridge,
+        primaryRailEnd
       ]);
+      this.strokeLegacyPolyline(this.backdropGraphics, [lowerRailStart, lowerRailEnd]);
+      this.backdropGraphics.lineStyle(1, color, alpha * 0.56);
+      this.strokeLegacyPolyline(this.backdropGraphics, [mastStart, mastEnd]);
       this.strokeLegacyPolyline(this.backdropGraphics, [
-        { x: cx - (unit * 1.5 * flip), y: cy - (unit * 0.35) },
-        { x: cx, y: cy },
-        { x: cx - (unit * 1.5 * flip), y: cy + (unit * 0.35) }
+        { x: cx - (unit * 0.38 * flip), y: cy + (unit * 0.06) },
+        { x: cx + (unit * 0.28 * flip), y: cy - (unit * 0.22) },
+        { x: cx + (unit * 0.78 * flip), y: cy + (unit * 0.02) }
       ]);
-      this.strokeLegacyPolyline(this.backdropGraphics, [
-        { x: cx - (unit * 0.55), y: cy - (unit * 1.05) },
-        { x: cx, y: cy - (unit * 1.42) },
-        { x: cx + (unit * 0.55), y: cy - (unit * 1.05) },
-        { x: cx, y: cy - (unit * 0.72) },
-        { x: cx - (unit * 0.55), y: cy - (unit * 1.05) }
-      ]);
+      this.backdropGraphics.lineStyle(1, 0xffffff, alpha * 0.22);
+      this.strokeLegacyPolyline(this.backdropGraphics, [glintStart, glintEnd]);
     }
   }
 

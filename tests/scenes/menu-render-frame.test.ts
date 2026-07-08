@@ -259,11 +259,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(backdropSource).toContain('resolveLegacyMenuBackdropGlassShards');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropDriftRunes');
     expect(menuSceneSource).toContain('0.7 + (Math.sin(time / 1800) * 0.3)');
-    expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(shard.color, shard.alpha * 0.14);');
-    expect(menuSceneSource).toContain('const spineStart = this.rotateBackdropPoint(shard, -halfLength * 0.78, 0);');
-    expect(menuSceneSource).toContain('const crossFacetStart = this.rotateBackdropPoint(shard, halfLength * 0.08, -halfThickness * 0.78);');
-    expect(menuSceneSource).toContain('const tailFacetStart = this.rotateBackdropPoint(shard, -halfLength * 0.88, 0);');
-    expect(menuSceneSource).toContain('const tipGlintStart = this.rotateBackdropPoint(shard, halfLength * 0.72, -halfThickness * 0.5);');
+    expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(shard.color, shard.alpha * 0.038);');
+    expect(menuSceneSource).toContain('const upperRailStart = this.rotateBackdropPoint(shard, -halfLength * 0.86, -halfThickness * 0.58);');
+    expect(menuSceneSource).toContain('const upperRailBreakEnd = this.rotateBackdropPoint(shard, halfLength * 0.1, -halfThickness * 0.58);');
+    expect(menuSceneSource).toContain('const leadingCutStart = this.rotateBackdropPoint(shard, halfLength * 0.54, -halfThickness - taper);');
+    expect(menuSceneSource).toContain('const notchStart = this.rotateBackdropPoint(shard, halfLength * 0.02, -halfThickness * 1.05);');
+    expect(menuSceneSource).toContain('const tickStart = this.rotateBackdropPoint(rune, rune.size * 0.16, -rune.size * 0.72);');
     expect(menuSceneSource).toContain('sigils: 4');
   });
 
