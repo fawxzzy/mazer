@@ -9,7 +9,8 @@ import {
   readMazeCycleTelemetryHistory,
   recordMazeCycleTelemetryReceipt,
   summarizeMazeCyclePathDeviation,
-  summarizeMazeCycleTelemetryDiagnostics
+  summarizeMazeCycleTelemetryDiagnostics,
+  summarizeMazeCycleTelemetryLearning
 } from '../../src/legacy-runtime/mazeCycleTelemetry';
 import type { LegacyMazeSnapshot, LegacyPoint } from '../../src/legacy-runtime/legacyMaze';
 
@@ -147,12 +148,87 @@ describe('legacy maze cycle telemetry', () => {
       diagnosticReceiptLimit: MAZE_CYCLE_TELEMETRY_DIAGNOSTIC_RECEIPT_LIMIT,
       enabled: true,
       historyLimit: MAZE_CYCLE_TELEMETRY_HISTORY_LIMIT,
+      learning: {
+        averageBacktracks: 2,
+        averageCompletionTimeMs: 6000,
+        averageFrameMs: 12.5,
+        averageWrongTurns: 3,
+        confidence: 0.1,
+        menuDemoSampleCount: 1,
+        playSampleCount: 0,
+        preferredControlMode: 'arrows',
+        resetRate: 1,
+        routeQualityCounts: {
+          'multi-route': 1,
+          'single-route': 0,
+          unknown: 0
+        },
+        sampleCount: 1,
+        signal: 'hold'
+      },
       pathLimit: MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT,
       storageKey: MAZE_CYCLE_TELEMETRY_STORAGE_KEY,
       storedCount: 1
     });
     expect(diagnostics.latestReceipt?.playerPathPreview).toHaveLength(MAZE_CYCLE_TELEMETRY_PATH_PREVIEW_LIMIT);
     expect('playerPath' in (diagnostics.latestReceipt ?? {})).toBe(false);
+  });
+
+  test('summarizes recent local receipts into conservative learning signals', () => {
+    const challengeStorage = new MemoryStorage();
+    const maze = createTestMaze();
+
+    for (let index = 0; index < 3; index += 1) {
+      recordMazeCycleTelemetryReceipt(challengeStorage, {
+        averageFrameMs: 11 + index,
+        completedAt: `2026-07-08T16:00:0${index}.000Z`,
+        completionTimeMs: 5000 + (index * 1000),
+        controlMode: 'stick',
+        maze,
+        playerPath: maze.solutionPath,
+        resetUsed: false,
+        surface: 'play',
+        backtracks: index === 0 ? 1 : 0,
+        wrongTurns: index === 0 ? 1 : 0
+      });
+    }
+
+    expect(summarizeMazeCycleTelemetryLearning(readMazeCycleTelemetryHistory(challengeStorage))).toMatchObject({
+      averageBacktracks: 0.333,
+      averageCompletionTimeMs: 6000,
+      averageFrameMs: 12,
+      averageWrongTurns: 0.333,
+      confidence: 0.3,
+      playSampleCount: 3,
+      preferredControlMode: 'stick',
+      resetRate: 0,
+      signal: 'challenge'
+    });
+
+    const easeStorage = new MemoryStorage();
+    for (let index = 0; index < 3; index += 1) {
+      recordMazeCycleTelemetryReceipt(easeStorage, {
+        averageFrameMs: 22 + index,
+        completedAt: `2026-07-08T17:00:0${index}.000Z`,
+        completionTimeMs: 40_000 + (index * 1000),
+        controlMode: 'arrows',
+        maze,
+        playerPath: maze.solutionPath,
+        resetUsed: index !== 2,
+        surface: 'play',
+        backtracks: 7,
+        wrongTurns: 8
+      });
+    }
+
+    expect(summarizeMazeCycleTelemetryLearning(readMazeCycleTelemetryHistory(easeStorage))).toMatchObject({
+      averageBacktracks: 7,
+      averageWrongTurns: 8,
+      confidence: 0.3,
+      preferredControlMode: 'arrows',
+      resetRate: 0.667,
+      signal: 'ease'
+    });
   });
 
   test('continues with empty history when local storage is corrupt or blocked', () => {

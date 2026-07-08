@@ -7,14 +7,16 @@ export const MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT = 256;
 export const MAZE_CYCLE_TELEMETRY_DIAGNOSTIC_RECEIPT_LIMIT = 5;
 export const MAZE_CYCLE_TELEMETRY_PATH_PREVIEW_LIMIT = 8;
 
+export type MazeCycleRouteQuality = NonNullable<LegacyMazeSnapshot['routeQualityStats']>['routeQuality'];
 export type MazeCycleTelemetrySurface = 'menu-demo' | 'play';
+export type MazeCycleTelemetryLearningSignal = 'challenge' | 'ease' | 'hold';
 
 export interface MazeCycleTelemetryReceipt {
   id: string;
   surface: MazeCycleTelemetrySurface;
   mazeSeed: number;
   mazeSize: number;
-  routeQuality: NonNullable<LegacyMazeSnapshot['routeQualityStats']>['routeQuality'] | null;
+  routeQuality: MazeCycleRouteQuality | null;
   start: LegacyPoint;
   goal: LegacyPoint;
   playerPath: LegacyPoint[];
@@ -52,11 +54,27 @@ export type MazeCycleTelemetryDiagnosticReceipt = Omit<MazeCycleTelemetryReceipt
   playerPathPreview: LegacyPoint[];
 };
 
+export interface MazeCycleTelemetryLearningSummary {
+  averageBacktracks: number | null;
+  averageCompletionTimeMs: number | null;
+  averageFrameMs: number | null;
+  averageWrongTurns: number | null;
+  confidence: number;
+  menuDemoSampleCount: number;
+  playSampleCount: number;
+  preferredControlMode: LegacyControlMode | null;
+  resetRate: number | null;
+  routeQualityCounts: Record<'multi-route' | 'single-route' | 'unknown', number>;
+  sampleCount: number;
+  signal: MazeCycleTelemetryLearningSignal;
+}
+
 export interface MazeCycleTelemetryDiagnostics {
   diagnosticReceiptLimit: number;
   enabled: boolean;
   historyLimit: number;
   latestReceipt: MazeCycleTelemetryDiagnosticReceipt | null;
+  learning: MazeCycleTelemetryLearningSummary;
   pathLimit: number;
   recentReceipts: MazeCycleTelemetryDiagnosticReceipt[];
   storageKey: string;
@@ -89,6 +107,17 @@ const normalizeNonNegativeInteger = (value: unknown, fallback = 0): number => (
 
 const normalizeNonNegativeNumber = (value: unknown, fallback = 0): number => (
   typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value * 1000) / 1000) : fallback
+);
+
+const roundNumber = (value: number, precision = 3): number => {
+  const scale = 10 ** precision;
+  return Math.round(value * scale) / scale;
+};
+
+const averageOrNull = (values: readonly number[]): number | null => (
+  values.length > 0
+    ? roundNumber(values.reduce((total, value) => total + value, 0) / values.length)
+    : null
 );
 
 const isControlMode = (value: unknown): value is LegacyControlMode => (
@@ -326,6 +355,86 @@ const toDiagnosticReceipt = (
   };
 };
 
+const resolvePreferredControlMode = (
+  receipts: readonly MazeCycleTelemetryReceipt[]
+): LegacyControlMode | null => {
+  if (receipts.length === 0) {
+    return null;
+  }
+
+  const stickCount = receipts.filter((receipt) => receipt.controlMode === 'stick').length;
+  const arrowCount = receipts.length - stickCount;
+  return stickCount >= arrowCount ? 'stick' : 'arrows';
+};
+
+const resolveLearningSignal = (
+  receipts: readonly MazeCycleTelemetryReceipt[]
+): MazeCycleTelemetryLearningSignal => {
+  if (receipts.length < 3) {
+    return 'hold';
+  }
+
+  const averageWrongTurns = averageOrNull(receipts.map((receipt) => receipt.wrongTurns)) ?? 0;
+  const averageBacktracks = averageOrNull(receipts.map((receipt) => receipt.backtracks)) ?? 0;
+  const averageCompletionTimeMs = averageOrNull(receipts.map((receipt) => receipt.completionTimeMs)) ?? 0;
+  const resetRate = receipts.filter((receipt) => receipt.resetUsed).length / receipts.length;
+
+  if (resetRate >= 0.4 || averageWrongTurns >= 6 || averageBacktracks >= 6) {
+    return 'ease';
+  }
+
+  if (
+    resetRate <= 0.1
+    && averageWrongTurns <= 1
+    && averageBacktracks <= 1
+    && averageCompletionTimeMs > 0
+    && averageCompletionTimeMs <= 20_000
+  ) {
+    return 'challenge';
+  }
+
+  return 'hold';
+};
+
+export const summarizeMazeCycleTelemetryLearning = (
+  history: MazeCycleTelemetryHistory
+): MazeCycleTelemetryLearningSummary => {
+  const receipts = history.receipts;
+  const playReceipts = receipts.filter((receipt) => receipt.surface === 'play');
+  const menuDemoReceipts = receipts.filter((receipt) => receipt.surface === 'menu-demo');
+  const signalReceipts = playReceipts.length >= 3 ? playReceipts : receipts;
+  const routeQualityCounts: MazeCycleTelemetryLearningSummary['routeQualityCounts'] = {
+    'multi-route': 0,
+    'single-route': 0,
+    unknown: 0
+  };
+
+  receipts.forEach((receipt) => {
+    if (receipt.routeQuality === 'multi-route' || receipt.routeQuality === 'single-route') {
+      routeQualityCounts[receipt.routeQuality] += 1;
+    } else {
+      routeQualityCounts.unknown += 1;
+    }
+  });
+
+  return {
+    averageBacktracks: averageOrNull(receipts.map((receipt) => receipt.backtracks)),
+    averageCompletionTimeMs: averageOrNull(receipts.map((receipt) => receipt.completionTimeMs)),
+    averageFrameMs: averageOrNull(receipts.map((receipt) => receipt.averageFrameMs)),
+    averageWrongTurns: averageOrNull(receipts.map((receipt) => receipt.wrongTurns)),
+    confidence: roundNumber(Math.min(1, signalReceipts.length / 10)),
+    menuDemoSampleCount: menuDemoReceipts.length,
+    playSampleCount: playReceipts.length,
+    preferredControlMode: resolvePreferredControlMode(receipts),
+    resetRate: receipts.length > 0
+      ? roundNumber(receipts.filter((receipt) => receipt.resetUsed).length / receipts.length)
+      : null,
+    routeQualityCounts,
+    sampleCount: receipts.length,
+    signal: resolveLearningSignal(signalReceipts)
+  };
+};
+
 export const summarizeMazeCycleTelemetryDiagnostics = (
   history: MazeCycleTelemetryHistory
 ): MazeCycleTelemetryDiagnostics => ({
@@ -333,6 +442,7 @@ export const summarizeMazeCycleTelemetryDiagnostics = (
   enabled: true,
   historyLimit: MAZE_CYCLE_TELEMETRY_HISTORY_LIMIT,
   latestReceipt: history.receipts[0] ? toDiagnosticReceipt(history.receipts[0]) : null,
+  learning: summarizeMazeCycleTelemetryLearning(history),
   pathLimit: MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT,
   recentReceipts: history.receipts
     .slice(0, MAZE_CYCLE_TELEMETRY_DIAGNOSTIC_RECEIPT_LIMIT)
