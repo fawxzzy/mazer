@@ -45,6 +45,6 @@ export const resolveLegacyMenuButtonChrome = (
     labelAlpha: isPrimary ? 1 : 0.98,
     strokeColor: isPrimary ? 0xd3cae0 : 0xc2b8d1,
     strokeWidth: 2,
-    textColor: isPrimary ? '#18a52c' : '#129224'
+    textColor: isPrimary ? '#ffd84c' : '#ecfff5'
   };
 };

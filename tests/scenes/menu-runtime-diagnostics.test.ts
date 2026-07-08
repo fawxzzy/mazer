@@ -363,7 +363,9 @@ describe('menu runtime diagnostics', () => {
           playerCoreColor: 0x36ff7d,
           playerCoreRadius: 2.38,
           playerHaloColor: 0x00b84a,
-          playerHaloRadius: 3.22
+          playerHaloRadius: 3.22,
+          startCoreColor: 0xfff05a,
+          startEdgeColor: 0xffc629
         }
       },
       menuDemo: {

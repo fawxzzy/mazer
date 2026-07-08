@@ -23,6 +23,8 @@ describe('legacy menu button chrome', () => {
     expect(primary.fontSize).toBeGreaterThanOrEqual(secondary.fontSize);
     expect(primary.labelAlpha).toBeGreaterThan(secondary.labelAlpha);
     expect(primary.strokeWidth).toBeGreaterThanOrEqual(secondary.strokeWidth);
+    expect(primary.textColor).toBe('#ffd84c');
+    expect(secondary.textColor).toBe('#ecfff5');
   });
 
   test('keeps side-button chrome visible enough to survive the narrow live browser pane', () => {

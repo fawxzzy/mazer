@@ -202,6 +202,8 @@ interface MenuSceneVisualDiagnostics {
     playerCoreRadius: number;
     playerHaloColor: number;
     playerHaloRadius: number;
+    startCoreColor: number;
+    startEdgeColor: number;
     trailPulseEnabled: boolean;
     trailPulseColor: number;
     trailPulseEdgeColor: number;
@@ -515,7 +517,8 @@ const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
 const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.46;
-const LEGACY_PLAY_START_MARKER_CORE = 0xfff1a6;
+const LEGACY_PLAY_START_MARKER_CORE = 0xfff05a;
+const LEGACY_PLAY_START_MARKER_EDGE = 0xffc629;
 const LEGACY_PLAY_GOAL_MARKER_CORE = 0xff263f;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xd81b2a;
 const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;
@@ -1011,6 +1014,8 @@ export class MenuScene extends Phaser.Scene {
           playerCoreRadius: playerMarkerMetrics.coreRadius,
           playerHaloColor: LEGACY_PLAYER_MARKER_HALO,
           playerHaloRadius: playerMarkerMetrics.haloRadius,
+          startCoreColor: LEGACY_PLAY_START_MARKER_CORE,
+          startEdgeColor: LEGACY_PLAY_START_MARKER_EDGE,
           trailPulseEnabled: this.settings.toggleTrailPulse,
           trailPulseColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR,
           trailPulseEdgeColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE,
@@ -3243,7 +3248,7 @@ export class MenuScene extends Phaser.Scene {
     const boardOffset = this.resolveBoardOffset();
 
     if (this.maze.start && (this.mode !== 'menu' || this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start))) {
-      this.fillPlayDynamicMarkerTile(this.maze.start, 0xbca86f, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');
+      this.fillPlayDynamicMarkerTile(this.maze.start, LEGACY_PLAY_START_MARKER_EDGE, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.9, 'start');
     }
     if (this.maze.goal && (this.mode !== 'menu' || this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal))) {
       this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 0.95, 'goal');
@@ -4777,7 +4782,7 @@ export class MenuScene extends Phaser.Scene {
       18,
       Math.min(40, Math.min(Math.round(height * 0.46), textFitSize))
     );
-    const buttonTextColor = MENU_TEXT_COLOR;
+    const buttonTextColor = frontDoorChrome?.textColor ?? MENU_TEXT_COLOR;
 
     const label = this.padLegacyUiText(this.add.text(x, y, text, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
@@ -5288,6 +5293,8 @@ export class MenuScene extends Phaser.Scene {
         playerCoreRadius: playerMarkerMetrics.coreRadius,
         playerHaloColor: LEGACY_PLAYER_MARKER_HALO,
         playerHaloRadius: playerMarkerMetrics.haloRadius,
+        startCoreColor: LEGACY_PLAY_START_MARKER_CORE,
+        startEdgeColor: LEGACY_PLAY_START_MARKER_EDGE,
         trailPulseEnabled: this.settings.toggleTrailPulse,
         trailPulseColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_COLOR,
         trailPulseEdgeColor: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_EDGE,
