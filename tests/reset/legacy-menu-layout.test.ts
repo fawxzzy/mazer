@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import { resolveTouchControlLayout } from '../../src/input-human';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
+import {
+  resolveLegacyMenuPathTitleLayout,
+  resolveLegacyMenuPathTitleOrbitGeometry,
+  resolveLegacyMenuTitlePresentation
+} from '../../src/legacy-runtime/legacyMenuTitle';
 
 describe('legacy menu layout', () => {
   test('keeps the board centered with low outside buttons on desktop', () => {
@@ -58,6 +63,31 @@ describe('legacy menu layout', () => {
     expect(layout.titleY).toBeLessThan(layout.boardTop);
     expect(layout.boardTop - layout.titleY).toBeGreaterThanOrEqual(42);
     expect(layout.titleY).toBeGreaterThanOrEqual(34);
+  });
+
+  test('centers the portrait title diamond on the board top notch while clearing the border', () => {
+    const layout = resolveLegacyMenuLayout(405, 958, 50, 49, 'menu');
+    const presentation = resolveLegacyMenuTitlePresentation(
+      layout.boardSize,
+      layout.tileSize,
+      true,
+      layout.width,
+      'procedural'
+    );
+    const titleLayout = resolveLegacyMenuPathTitleLayout(layout.titleX, layout.titleY, presentation.fontSize);
+    const orbitGeometry = resolveLegacyMenuPathTitleOrbitGeometry(
+      titleLayout.left,
+      titleLayout.top,
+      titleLayout.width,
+      titleLayout.height,
+      titleLayout.cellSize
+    );
+    const orbitClearance = Math.max(9, Math.round(titleLayout.cellSize * 1.5));
+    const borderTop = layout.boardTop - 2;
+
+    expect(Math.abs(orbitGeometry.centerX - (layout.boardLeft + (layout.boardSize / 2)))).toBeLessThanOrEqual(0.5);
+    expect(orbitGeometry.crownBottom + orbitClearance).toBeLessThanOrEqual(borderTop + 1);
+    expect(orbitGeometry.crownBottom).toBeGreaterThanOrEqual(layout.boardTop - 32);
   });
 
   test('uses the cleaner 110-percent-style tile cadence on normal portrait phones', () => {

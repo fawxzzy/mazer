@@ -14,7 +14,7 @@ import {
 import {
   resolveLegacyMenuPathTitleOrbitGeometry,
   resolveLegacyMenuPathTitleOrbitPoint
-} from '../../src/scenes/MenuScene';
+} from '../../src/legacy-runtime/legacyMenuTitle';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 

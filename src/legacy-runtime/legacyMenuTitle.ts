@@ -27,6 +27,18 @@ export interface LegacyMenuPathTitleLayout {
   width: number;
 }
 
+export interface LegacyMenuPathTitleOrbitGeometry {
+  bottom: number;
+  centerX: number;
+  centerY: number;
+  crownBottom: number;
+  crownHalf: number;
+  crownTop: number;
+  left: number;
+  right: number;
+  top: number;
+}
+
 const LEGACY_MENU_PATH_TITLE_PATTERNS = [
   [
     '10001',
@@ -181,5 +193,69 @@ export const resolveLegacyMenuPathTitleLayout = (
     rows: LEGACY_MENU_PATH_TITLE_ROWS,
     top: Math.round(centerY - (height / 2)),
     width
+  };
+};
+
+export const resolveLegacyMenuPathTitleOrbitGeometry = (
+  titleLeft: number,
+  titleTop: number,
+  titleWidth: number,
+  titleHeight: number,
+  titleCellSize: number
+): LegacyMenuPathTitleOrbitGeometry => {
+  const railGap = Math.max(5, Math.round(titleCellSize * 0.8));
+  const orbitGap = Math.max(7, Math.round(titleCellSize * 1.08));
+  const railTop = titleTop - railGap;
+  const railBottom = titleTop + titleHeight + railGap;
+  const centerX = titleLeft + (titleWidth / 2);
+  const centerY = titleTop + (titleHeight / 2);
+  const crest = Math.max(5, Math.round(titleCellSize * 0.68));
+  const crownHalf = Math.max(4, Math.round(titleCellSize * 0.56));
+  const crownTop = railTop - Math.round(crest * 0.9);
+  const crownBottom = railBottom + Math.round(crest * 0.9);
+
+  return {
+    bottom: crownBottom,
+    centerX,
+    centerY,
+    crownBottom,
+    crownHalf,
+    crownTop,
+    left: titleLeft - orbitGap,
+    right: titleLeft + titleWidth + orbitGap,
+    top: crownTop
+  };
+};
+
+export const resolveLegacyMenuPathTitleOrbitPoint = (
+  geometry: LegacyMenuPathTitleOrbitGeometry,
+  orbit: number
+): { x: number; y: number } => {
+  const perimeter = (((orbit % 1) + 1) % 1) * 4;
+
+  if (perimeter < 1) {
+    return {
+      x: geometry.left + ((geometry.right - geometry.left) * perimeter),
+      y: geometry.top
+    };
+  }
+
+  if (perimeter < 2) {
+    return {
+      x: geometry.right,
+      y: geometry.top + ((geometry.bottom - geometry.top) * (perimeter - 1))
+    };
+  }
+
+  if (perimeter < 3) {
+    return {
+      x: geometry.right - ((geometry.right - geometry.left) * (perimeter - 2)),
+      y: geometry.bottom
+    };
+  }
+
+  return {
+    x: geometry.left,
+    y: geometry.bottom - ((geometry.bottom - geometry.top) * (perimeter - 3))
   };
 };

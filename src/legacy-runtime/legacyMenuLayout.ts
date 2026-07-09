@@ -1,4 +1,9 @@
 import { clampInteger } from './legacyDefaults';
+import {
+  resolveLegacyMenuPathTitleLayout,
+  resolveLegacyMenuPathTitleOrbitGeometry,
+  resolveLegacyMenuTitlePresentation
+} from './legacyMenuTitle';
 
 export interface LegacyMenuLayout {
   width: number;
@@ -30,6 +35,41 @@ const LEGACY_MENU_SIDE_PANEL_WIDTH = 300;
 const LEGACY_PLAY_ULTRA_NARROW_WIDTH = 360;
 const LEGACY_PHONE_CLEAN_ZOOM_WIDTH = 420;
 const LEGACY_PHONE_CLEAN_TILE_SIZE = 6;
+const LEGACY_BOARD_SIGIL_BORDER_INSET = 2;
+
+const resolveMenuPortraitTitleY = (
+  width: number,
+  boardTop: number,
+  boardSize: number,
+  tileSize: number,
+  fallbackTitleY: number,
+  isProceduralMenu: boolean
+): number => {
+  const titlePresentation = resolveLegacyMenuTitlePresentation(
+    boardSize,
+    tileSize,
+    true,
+    width,
+    isProceduralMenu ? 'procedural' : 'snapshot'
+  );
+  const titleLayout = resolveLegacyMenuPathTitleLayout(
+    Math.round(width / 2),
+    fallbackTitleY,
+    titlePresentation.fontSize
+  );
+  const orbitGeometry = resolveLegacyMenuPathTitleOrbitGeometry(
+    titleLayout.left,
+    titleLayout.top,
+    titleLayout.width,
+    titleLayout.height,
+    titleLayout.cellSize
+  );
+  const titleOrbitClearance = Math.max(9, Math.round(titleLayout.cellSize * 1.5));
+  const targetCrownBottomY = boardTop - LEGACY_BOARD_SIGIL_BORDER_INSET - titleOrbitClearance;
+  const alignedTitleY = fallbackTitleY - Math.max(0, Math.round(orbitGeometry.crownBottom - targetCrownBottomY));
+
+  return Math.max(28, alignedTitleY);
+};
 
 export const resolveLegacyMenuLayout = (
   width: number,
@@ -120,7 +160,15 @@ export const resolveLegacyMenuLayout = (
   const centerButtonY = rowButtonY;
   const titleOverlapY = Math.round(boardTop + (snappedBoardSize * (isPortrait ? 0.216 : 0.221)));
   const menuPortraitTitleClearance = titleClearance;
-  const menuPortraitTitleY = Math.max(34, boardTop - menuPortraitTitleClearance);
+  const menuPortraitTitleFallbackY = Math.max(34, boardTop - menuPortraitTitleClearance);
+  const menuPortraitTitleY = resolveMenuPortraitTitleY(
+    width,
+    boardTop,
+    snappedBoardSize,
+    tileSize,
+    menuPortraitTitleFallbackY,
+    true
+  );
 
   return {
     width,
