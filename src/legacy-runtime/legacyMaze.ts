@@ -183,21 +183,70 @@ const carvePolyline = (grid: boolean[][], points: readonly LegacyPoint[]): void 
   }
 };
 
+const resolveWrappedGridPoint = (grid: boolean[][], point: LegacyPoint): LegacyPoint | null => {
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+
+  if (point.x === -1 && point.y >= 0 && point.y < height) {
+    return { x: width - 1, y: point.y };
+  }
+  if (point.x === width && point.y >= 0 && point.y < height) {
+    return { x: 0, y: point.y };
+  }
+  if (point.y === -1 && point.x >= 0 && point.x < width) {
+    return { x: point.x, y: height - 1 };
+  }
+  if (point.y === height && point.x >= 0 && point.x < width) {
+    return { x: point.x, y: 0 };
+  }
+
+  return null;
+};
+
+const resolveLegacyGridStepTarget = (
+  grid: boolean[][],
+  point: LegacyPoint,
+  direction: LegacyPoint
+): LegacyPoint | null => {
+  const direct = {
+    x: point.x + direction.x,
+    y: point.y + direction.y
+  };
+  if (grid[direct.y]?.[direct.x] === true) {
+    return direct;
+  }
+
+  const wrapped = resolveWrappedGridPoint(grid, direct);
+  return wrapped && grid[wrapped.y]?.[wrapped.x] === true ? wrapped : null;
+};
+
+export const resolveLegacyWalkableGridNeighbors = (grid: boolean[][], point: LegacyPoint): LegacyPoint[] => {
+  const neighbors: LegacyPoint[] = [];
+
+  for (const direction of LEGACY_STEP_DIRECTIONS) {
+    const next = resolveLegacyGridStepTarget(grid, point, direction);
+    if (next) {
+      neighbors.push(next);
+    }
+  }
+
+  return neighbors;
+};
+
 const walkableNeighbors = (grid: boolean[][], point: LegacyPoint): LegacyPoint[] => {
   const neighbors: LegacyPoint[] = [];
-  const directions = [
-    { x: 0, y: -1 },
-    { x: 0, y: 1 },
-    { x: -1, y: 0 },
-    { x: 1, y: 0 }
-  ];
 
-  for (const direction of directions) {
-    const nextX = point.x + direction.x;
-    const nextY = point.y + direction.y;
+  for (const direction of LEGACY_STEP_DIRECTIONS) {
+    const next = {
+      x: point.x + direction.x,
+      y: point.y + direction.y
+    };
 
-    if (grid[nextY]?.[nextX] === true) {
-      neighbors.push({ x: nextX, y: nextY });
+    if (grid[next.y]?.[next.x] === true) {
+      neighbors.push(next);
     }
   }
 
@@ -1720,6 +1769,24 @@ export const createLegacyMenuMaze = (seed: number): LegacyMazeSnapshot => {
 export const isWalkableTile = (maze: LegacyMazeSnapshot, point: LegacyPoint): boolean => (
   maze.grid[point.y]?.[point.x] === true
 );
+
+export const resolveLegacyNavigationTarget = (
+  maze: LegacyMazeSnapshot,
+  point: LegacyPoint,
+  deltaX: number,
+  deltaY: number
+): LegacyPoint | null => {
+  const target = {
+    x: point.x + Math.sign(deltaX),
+    y: point.y + Math.sign(deltaY)
+  };
+  if (isWalkableTile(maze, target)) {
+    return target;
+  }
+
+  const wrapped = resolveWrappedGridPoint(maze.grid, target);
+  return wrapped && isWalkableTile(maze, wrapped) ? wrapped : null;
+};
 
 export const movePoint = (point: LegacyPoint, deltaX: number, deltaY: number): LegacyPoint => ({
   x: point.x + deltaX,

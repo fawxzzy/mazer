@@ -34,9 +34,14 @@ export const getNeighborIndex = (
 export const resolveDirectionBetween = (
   fromIndex: number,
   toIndex: number,
-  width: number
+  width: number,
+  height = width
 ): 0 | 1 | 2 | 3 | null => {
   const delta = toIndex - fromIndex;
+  const fromX = fromIndex % width;
+  const toX = toIndex % width;
+  const fromY = Math.floor(fromIndex / width);
+  const toY = Math.floor(toIndex / width);
 
   if (delta === -width) {
     return 0;
@@ -48,6 +53,18 @@ export const resolveDirectionBetween = (
     return 2;
   }
   if (delta === 1 && (fromIndex + 1) % width !== 0) {
+    return 3;
+  }
+  if (fromX === toX && fromY === 0 && toY === height - 1) {
+    return 0;
+  }
+  if (fromX === toX && fromY === height - 1 && toY === 0) {
+    return 1;
+  }
+  if (fromY === toY && fromX === 0 && toX === width - 1) {
+    return 2;
+  }
+  if (fromY === toY && fromX === width - 1 && toX === 0) {
     return 3;
   }
 

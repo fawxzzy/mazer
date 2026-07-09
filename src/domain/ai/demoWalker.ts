@@ -599,7 +599,13 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     }
 
     routeIndices.push(nextIndex);
-    canonicalCursors.push(resolveNearestCanonicalCursor(nextIndex, canonicalPath, canonicalCursorByIndex, episode.raster.width));
+    canonicalCursors.push(resolveNearestCanonicalCursor(
+      nextIndex,
+      canonicalPath,
+      canonicalCursorByIndex,
+      episode.raster.width,
+      episode.raster.height
+    ));
     segmentTrailModes.push(mode);
     cueOverrides.push(cue);
     return true;
@@ -762,7 +768,7 @@ const resolveLegacyAiDirectMove = (
       )
     ) {
       addPotentialTile(neighbor);
-      const distance = euclideanDistance(neighbor, episode.raster.endIndex, width);
+      const distance = euclideanDistance(neighbor, episode.raster.endIndex, width, height);
       if (distance < smallestDistance) {
         smallestDistance = distance;
         nextTile = neighbor;
@@ -838,12 +844,41 @@ const collectFloorNeighbors = (
 ): number[] => {
   const neighbors: number[] = [];
   for (let direction = 0; direction < 4; direction += 1) {
-    const nextIndex = getNeighborIndex(index, width, height, direction as 0 | 1 | 2 | 3);
+    const nextIndex = resolveWrappedFloorNeighborIndex(index, width, height, direction as 0 | 1 | 2 | 3);
     if (nextIndex !== -1 && isTileFloor(tiles, nextIndex)) {
       neighbors.push(nextIndex);
     }
   }
   return neighbors;
+};
+
+const resolveWrappedFloorNeighborIndex = (
+  index: number,
+  width: number,
+  height: number,
+  direction: 0 | 1 | 2 | 3
+): number => {
+  const direct = getNeighborIndex(index, width, height, direction);
+  if (direct !== -1) {
+    return direct;
+  }
+
+  const x = index % width;
+  const y = Math.floor(index / width);
+  if (direction === 0 && y === 0) {
+    return ((height - 1) * width) + x;
+  }
+  if (direction === 1 && y === height - 1) {
+    return x;
+  }
+  if (direction === 2 && x === 0) {
+    return (y * width) + (width - 1);
+  }
+  if (direction === 3 && x === width - 1) {
+    return y * width;
+  }
+
+  return -1;
 };
 
 const findFloorPath = (
@@ -897,7 +932,8 @@ const resolveNearestCanonicalCursor = (
   index: number,
   canonicalPath: readonly number[],
   canonicalCursorByIndex: ReadonlyMap<number, number>,
-  width: number
+  width: number,
+  height: number
 ): number => {
   const exactCursor = canonicalCursorByIndex.get(index);
   if (exactCursor !== undefined) {
@@ -907,7 +943,7 @@ const resolveNearestCanonicalCursor = (
   let bestCursor = 0;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (let cursor = 0; cursor < canonicalPath.length; cursor += 1) {
-    const distance = manhattanDistance(index, canonicalPath[cursor] ?? index, width);
+    const distance = manhattanDistance(index, canonicalPath[cursor] ?? index, width, height);
     if (distance < bestDistance) {
       bestDistance = distance;
       bestCursor = cursor;
@@ -917,16 +953,21 @@ const resolveNearestCanonicalCursor = (
   return bestCursor;
 };
 
-const euclideanDistance = (fromIndex: number, toIndex: number, width: number): number => {
-  const dx = (fromIndex % width) - (toIndex % width);
-  const dy = Math.floor(fromIndex / width) - Math.floor(toIndex / width);
+const euclideanDistance = (fromIndex: number, toIndex: number, width: number, height: number): number => {
+  const dx = wrappedAxisDistance(fromIndex % width, toIndex % width, width);
+  const dy = wrappedAxisDistance(Math.floor(fromIndex / width), Math.floor(toIndex / width), height);
   return Math.sqrt((dx * dx) + (dy * dy));
 };
 
-const manhattanDistance = (fromIndex: number, toIndex: number, width: number): number => (
-  Math.abs((fromIndex % width) - (toIndex % width))
-  + Math.abs(Math.floor(fromIndex / width) - Math.floor(toIndex / width))
+const manhattanDistance = (fromIndex: number, toIndex: number, width: number, height: number): number => (
+  wrappedAxisDistance(fromIndex % width, toIndex % width, width)
+  + wrappedAxisDistance(Math.floor(fromIndex / width), Math.floor(toIndex / width), height)
 );
+
+const wrappedAxisDistance = (from: number, to: number, span: number): number => {
+  const direct = Math.abs(from - to);
+  return Math.min(direct, Math.max(0, span - direct));
+};
 
 const removeFirst = <T>(values: T[], value: T | null): void => {
   const index = values.indexOf(value as T);

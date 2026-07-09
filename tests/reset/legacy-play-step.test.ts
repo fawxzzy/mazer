@@ -59,6 +59,50 @@ describe('legacy play step', () => {
     expect(result.trail).toEqual([{ x: 1, y: 1 }, { x: 2, y: 1 }]);
   });
 
+  test('treats paired off-border paths as one navigable step', () => {
+    const maze: LegacyMazeSnapshot = {
+      ...createTestMaze(),
+      grid: [
+        [false, false, true, false, false],
+        [false, false, false, false, false],
+        [true, false, false, false, true],
+        [false, false, false, false, false],
+        [false, false, true, false, false]
+      ],
+      start: { x: 0, y: 2 },
+      goal: { x: 4, y: 2 },
+      solutionPath: [
+        { x: 0, y: 2 },
+        { x: 4, y: 2 }
+      ]
+    };
+
+    const leftWrap = advanceLegacyPlayStep({
+      maze,
+      player: { x: 0, y: 2 },
+      trail: [{ x: 0, y: 2 }],
+      deltaX: -1,
+      deltaY: 0,
+      toggleTrailFade: false
+    });
+    const upWrap = advanceLegacyPlayStep({
+      maze,
+      player: { x: 2, y: 0 },
+      trail: [{ x: 2, y: 0 }],
+      deltaX: 0,
+      deltaY: -1,
+      toggleTrailFade: false
+    });
+
+    expect(resolveLegacyPlayCollisionDelta(maze, { x: 0, y: 2 }, -1, 0)).toEqual({ deltaX: -1, deltaY: 0 });
+    expect(leftWrap.moved).toBe(true);
+    expect(leftWrap.player).toEqual({ x: 4, y: 2 });
+    expect(leftWrap.reachedGoal).toBe(true);
+    expect(leftWrap.trail).toEqual([{ x: 0, y: 2 }, { x: 4, y: 2 }]);
+    expect(upWrap.moved).toBe(true);
+    expect(upWrap.player).toEqual({ x: 2, y: 4 });
+  });
+
   test('resolves held direction flags after the legacy simultaneous-key delay', () => {
     const flags = createLegacyPlayMoveFlags();
     flags.right = true;

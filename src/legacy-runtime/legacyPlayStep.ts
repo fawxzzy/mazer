@@ -1,4 +1,4 @@
-import { isWalkableTile, movePoint, type LegacyMazeSnapshot, type LegacyPoint } from './legacyMaze';
+import { isWalkableTile, movePoint, resolveLegacyNavigationTarget, type LegacyMazeSnapshot, type LegacyPoint } from './legacyMaze';
 
 export const LEGACY_PLAY_TRAIL_FADE_TAIL = 16;
 export const LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS = 50;
@@ -175,10 +175,10 @@ export const resolveLegacyPlayCollisionDelta = (
 ): { deltaX: number; deltaY: number } => {
   const normalizedDeltaX = normalizeDelta(deltaX);
   const normalizedDeltaY = normalizeDelta(deltaY);
-  const gatedDeltaX = normalizedDeltaX !== 0 && isWalkableTile(maze, movePoint(player, normalizedDeltaX, 0))
+  const gatedDeltaX = normalizedDeltaX !== 0 && resolveLegacyNavigationTarget(maze, player, normalizedDeltaX, 0)
     ? normalizedDeltaX
     : 0;
-  const gatedDeltaY = normalizedDeltaY !== 0 && isWalkableTile(maze, movePoint(player, 0, normalizedDeltaY))
+  const gatedDeltaY = normalizedDeltaY !== 0 && resolveLegacyNavigationTarget(maze, player, 0, normalizedDeltaY)
     ? normalizedDeltaY
     : 0;
 
@@ -186,7 +186,7 @@ export const resolveLegacyPlayCollisionDelta = (
     return { deltaX: 0, deltaY: 0 };
   }
 
-  const finalTarget = movePoint(player, gatedDeltaX, gatedDeltaY);
+  const finalTarget = resolveLegacyNavigationTarget(maze, player, gatedDeltaX, gatedDeltaY) ?? movePoint(player, gatedDeltaX, gatedDeltaY);
   if (!isWalkableTile(maze, finalTarget)) {
     return { deltaX: 0, deltaY: 0 };
   }
@@ -213,7 +213,8 @@ export const advanceLegacyPlayStep = ({
     };
   }
 
-  const next = movePoint(player, gatedDelta.deltaX, gatedDelta.deltaY);
+  const next = resolveLegacyNavigationTarget(maze, player, gatedDelta.deltaX, gatedDelta.deltaY)
+    ?? movePoint(player, gatedDelta.deltaX, gatedDelta.deltaY);
   const nextPlayer = copyPoint(next);
   const nextTrail = [...trail.map(copyPoint), copyPoint(nextPlayer)];
   const boundedTrail = toggleTrailFade && nextTrail.length > trailFadeTail

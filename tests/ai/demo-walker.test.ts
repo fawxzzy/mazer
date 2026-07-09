@@ -72,6 +72,59 @@ const createSingleSpurEpisode = (): MazeEpisode => {
   };
 };
 
+const createBorderWrapEpisode = (): MazeEpisode => {
+  const width = 5;
+  const height = 3;
+  const tiles = new Uint8Array(width * height);
+  const startIndex = 5;
+  const endIndex = 9;
+  const canonicalPath = [startIndex, endIndex];
+  for (const index of canonicalPath) {
+    tiles[index] |= TILE_FLOOR | TILE_PATH;
+  }
+  tiles[endIndex] |= TILE_END;
+
+  return {
+    accepted: true,
+    difficulty: 'standard',
+    difficultyScore: 0,
+    family: 'classic',
+    generationTrace: {
+      rootTileIndex: startIndex,
+      uniqueTileCount: canonicalPath.length,
+      steps: [{ phase: 'seed', tileIndices: [startIndex] }]
+    },
+    metrics: {
+      solutionLength: canonicalPath.length,
+      deadEnds: 0,
+      junctions: 0,
+      branchDensity: 0,
+      straightness: 1,
+      coverage: 1
+    },
+    placementStrategy: 'edge-biased',
+    presentationPreset: 'classic',
+    raster: {
+      width,
+      height,
+      tiles,
+      startIndex,
+      endIndex,
+      pathIndices: Uint32Array.from(canonicalPath)
+    },
+    routeMotifs: {
+      falseShortcutBranches: 0,
+      nearGoalBranches: 0,
+      hubJunctions: 0,
+      chokeCorridors: 0,
+      loopDetours: 0
+    },
+    seed: 91_009,
+    shortcutsCreated: 0,
+    size: 'small'
+  };
+};
+
 const createVisitedUndoEpisode = (): MazeEpisode => {
   const width = 7;
   const height = 7;
@@ -131,6 +184,24 @@ const createVisitedUndoEpisode = (): MazeEpisode => {
 };
 
 describe('demo walker', () => {
+  test('treats opposite-border exits as adjacent AI navigation choices', () => {
+    const episode = createBorderWrapEpisode();
+    const config = {
+      ...legacyTuning.demo,
+      behavior: {
+        ...legacyTuning.demo.behavior,
+        enableRunnerMistakes: true
+      }
+    };
+    const state = createDemoWalkerState(episode, config);
+    const advance = advanceDemoWalker(episode, state, config);
+
+    expect(advance.state.currentIndex).toBe(episode.raster.endIndex);
+    expect(advance.state.lastDirection).toBe(2);
+    expect(advance.state.reachedGoal).toBe(true);
+    expect(collectDemoWalkerRouteDiagnostics(episode, config).routeLength).toBe(2);
+  });
+
   test('steps forward along the validated A* solution path', () => {
     const episode = generateMaze({
       scale: 30,

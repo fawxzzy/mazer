@@ -12,6 +12,7 @@ import {
   isTileFloor,
   PatternEngine,
   resetAndRegenerate,
+  resolveDirectionBetween,
   runBatch,
   solveAStar,
   solveCorridorGraph,
@@ -37,6 +38,13 @@ const defaultConfig: MazeConfig = {
   checkPointModifier: 0.35,
   shortcutCountModifier: 0.18
 };
+
+test('resolves border-wrap moves as cardinal directions', () => {
+  expect(resolveDirectionBetween(10, 14, 5, 5)).toBe(2);
+  expect(resolveDirectionBetween(14, 10, 5, 5)).toBe(3);
+  expect(resolveDirectionBetween(2, 22, 5, 5)).toBe(0);
+  expect(resolveDirectionBetween(22, 2, 5, 5)).toBe(1);
+});
 
 const resolveBuildWidth = (size: MazeConfig['size']): number => (
   size === 'small' ? 25 : size === 'medium' ? 37 : size === 'large' ? 51 : 75
