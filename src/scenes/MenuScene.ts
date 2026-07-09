@@ -4948,9 +4948,10 @@ export class MenuScene extends Phaser.Scene {
     );
     const height = clampInteger(Math.round(fontSize * 1.95), 20, 28);
     const centerX = mazeRenderFrame.boardLeft + (mazeRenderFrame.boardSize / 2);
-    const centerY = mazeRenderFrame.boardTop + Math.max(
-      mazeRenderFrame.safeInset + (height / 2),
-      mazeRenderFrame.tileSize * 0.82
+    const badgeGap = clampInteger(Math.round(mazeRenderFrame.tileSize * 0.78), 4, 9);
+    const centerY = Math.max(
+      (height / 2) + 2,
+      mazeRenderFrame.boardTop - badgeGap - (height / 2)
     );
 
     this.drawLegacyCyberPanel(this.boardDynamicGraphics, {

@@ -572,6 +572,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO =');
     expect(menuSceneSource).toContain('const progressionPalette = this.resolveActiveLegacyProgressionPalette();');
     expect(menuSceneSource).toContain('this.drawLegacyProgressionBadge(mazeRenderFrame, progressionPalette);');
+    expect(menuSceneSource).toContain('const badgeGap = clampInteger(Math.round(mazeRenderFrame.tileSize * 0.78), 4, 9);');
+    expect(menuSceneSource).toContain('mazeRenderFrame.boardTop - badgeGap - (height / 2)');
     expect(menuSceneSource).toContain('const visibleTrail = this.mode === \'menu\'');
     expect(menuSceneSource).toContain('trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))');
     expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.resolveLegacyPointPathSource(visibleTrail);');
