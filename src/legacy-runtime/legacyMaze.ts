@@ -770,6 +770,22 @@ const isLegacyCornerBorderPoint = (size: number, point: LegacyPoint): boolean =>
   (point.x === 0 || point.x === size - 1) && (point.y === 0 || point.y === size - 1)
 );
 
+const resolveLegacyEndpointCoreInset = (size: number): number => (
+  clampInteger(Math.round(size * 0.22), 3, Math.max(3, Math.floor((size - 3) / 2)))
+);
+
+const isLegacyCoreInteriorPoint = (size: number, point: LegacyPoint): boolean => {
+  if (isLegacyBorderPoint(size, point)) {
+    return false;
+  }
+
+  const inset = resolveLegacyEndpointCoreInset(size);
+  return point.x >= inset
+    && point.y >= inset
+    && point.x <= size - 1 - inset
+    && point.y <= size - 1 - inset;
+};
+
 const hasResolvedLegacySolutionPath = (
   solutionPath: readonly LegacyPoint[],
   start: LegacyPoint,
@@ -912,6 +928,38 @@ const evaluateLegacyBorderEndpointCorridor = (
   return selectedEvaluation;
 };
 
+const resolveLegacyCoreEndpointFromSolutionPath = (
+  size: number,
+  solutionPath: LegacyPoint[],
+  role: LegacyBorderEndpointRole,
+  minimumSolutionPathLength: number
+): { endpoint: LegacyPoint; solutionPath: LegacyPoint[] } | null => {
+  if (role === 'goal') {
+    for (let index = solutionPath.length - 1; index >= minimumSolutionPathLength - 1; index -= 1) {
+      const endpoint = solutionPath[index];
+      if (endpoint && isLegacyCoreInteriorPoint(size, endpoint)) {
+        return {
+          endpoint: clonePoint(endpoint),
+          solutionPath: solutionPath.slice(0, index + 1).map(clonePoint)
+        };
+      }
+    }
+    return null;
+  }
+
+  for (let index = 0; index <= solutionPath.length - minimumSolutionPathLength; index += 1) {
+    const endpoint = solutionPath[index];
+    if (endpoint && isLegacyCoreInteriorPoint(size, endpoint)) {
+      return {
+        endpoint: clonePoint(endpoint),
+        solutionPath: solutionPath.slice(index).map(clonePoint)
+      };
+    }
+  }
+
+  return null;
+};
+
 const resolveLegacyBorderEndpointRouteState = (
   grid: boolean[][],
   start: LegacyPoint,
@@ -963,6 +1011,53 @@ const resolveLegacyBorderEndpointRouteState = (
     routeQualityStats: selected.evaluation.routeQualityStats,
     solutionPath: selected.evaluation.solutionPath,
     start: selected.role === 'start' ? selected.evaluation.endpoint : start
+  };
+};
+
+const resolveLegacyEndpointLayerRouteState = (
+  grid: boolean[][],
+  start: LegacyPoint,
+  goal: LegacyPoint,
+  routeQualityStats: NonNullable<LegacyMazeSnapshot['routeQualityStats']>,
+  solutionPath: LegacyPoint[],
+  seed: number,
+  minimumSolutionPathLength: number
+): {
+  goal: LegacyPoint;
+  routeQualityStats: NonNullable<LegacyMazeSnapshot['routeQualityStats']>;
+  solutionPath: LegacyPoint[];
+  start: LegacyPoint;
+} => {
+  const size = grid.length;
+  const startOnBorder = isLegacyBorderPoint(size, start);
+  const goalOnBorder = isLegacyBorderPoint(size, goal);
+  const roleToCore: LegacyBorderEndpointRole | null = startOnBorder && goalOnBorder
+    ? ((seed & 2) === 0 ? 'goal' : 'start')
+    : startOnBorder
+      ? 'goal'
+      : goalOnBorder
+        ? 'start'
+        : null;
+
+  if (!roleToCore) {
+    return { goal, routeQualityStats, solutionPath, start };
+  }
+
+  const coreEndpoint = roleToCore === 'start' ? start : goal;
+  if (isLegacyCoreInteriorPoint(size, coreEndpoint)) {
+    return { goal, routeQualityStats, solutionPath, start };
+  }
+
+  const coreEvaluation = resolveLegacyCoreEndpointFromSolutionPath(size, solutionPath, roleToCore, minimumSolutionPathLength);
+  if (!coreEvaluation) {
+    return { goal, routeQualityStats, solutionPath, start };
+  }
+
+  return {
+    goal: roleToCore === 'goal' ? coreEvaluation.endpoint : goal,
+    routeQualityStats,
+    solutionPath: coreEvaluation.solutionPath,
+    start: roleToCore === 'start' ? coreEvaluation.endpoint : start
   };
 };
 
@@ -1510,10 +1605,41 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     seed,
     minimumSolutionPathLength
   ));
+  const endpointLayerFallback = {
+    goal: clonePoint(goal),
+    routeQualityStats,
+    solutionPath: solutionPath.map(clonePoint),
+    start: clonePoint(start)
+  };
+  ({
+    goal,
+    routeQualityStats,
+    solutionPath,
+    start
+  } = resolveLegacyEndpointLayerRouteState(
+    grid,
+    start,
+    goal,
+    routeQualityStats,
+    solutionPath,
+    seed,
+    minimumSolutionPathLength
+  ));
+  const endpointLayerAdjusted = !isSamePoint(start, endpointLayerFallback.start)
+    || !isSamePoint(goal, endpointLayerFallback.goal);
   const borderWrapTiles = applyLegacyOppositeBorderConnections(grid);
-  if (borderWrapTiles.length > 0) {
+  if (borderWrapTiles.length > 0 || endpointLayerAdjusted) {
     solutionPath = buildShortestPath(grid, start, goal);
     routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath);
+    if (
+      endpointLayerAdjusted
+      && !hasStrongLegacyRouteQuality(routeQualityStats, solutionPath, minimumSolutionPathLength)
+    ) {
+      start = endpointLayerFallback.start;
+      goal = endpointLayerFallback.goal;
+      solutionPath = buildShortestPath(grid, start, goal);
+      routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath);
+    }
   }
   playableTopologyStats.reachableFloors = resolveReachableFloorDistances(grid, start).size;
   playableTopologyStats.resolvedGoalDistance = Math.max(0, solutionPath.length - 1);

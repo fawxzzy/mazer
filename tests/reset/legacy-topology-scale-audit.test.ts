@@ -149,6 +149,25 @@ const auditBorderFloorContinuity = (
   };
 };
 
+const auditEndpointLayering = (
+  maze: ReturnType<typeof createLegacyMaze>
+): {
+  borderEndpointCount: number;
+  interiorEndpointCount: number;
+  startOnBorder: boolean;
+  goalOnBorder: boolean;
+} => {
+  const startOnBorder = isBorderPoint(maze, maze.start);
+  const goalOnBorder = isBorderPoint(maze, maze.goal);
+
+  return {
+    borderEndpointCount: Number(startOnBorder) + Number(goalOnBorder),
+    interiorEndpointCount: Number(!startOnBorder) + Number(!goalOnBorder),
+    startOnBorder,
+    goalOnBorder
+  };
+};
+
 describe('legacy topology scale audit', () => {
   test('keeps play and generated-menu topology meaningful across shortcut-enabled scale bands', () => {
     const scales = [37, 50, 75];
@@ -166,9 +185,12 @@ describe('legacy topology scale audit', () => {
           const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
           const detachedFloorTiles = countDetachedFloorTiles(maze);
           const borderContinuity = auditBorderFloorContinuity(maze);
+          const endpointLayering = auditEndpointLayering(maze);
 
           if (
             detachedFloorTiles !== 0
+            || endpointLayering.borderEndpointCount !== 1
+            || endpointLayering.interiorEndpointCount !== 1
             || borderContinuity.borderFloorCount < 2
             || borderContinuity.floorRatio < 0.28
             || borderContinuity.floorRatio > 0.62
@@ -182,6 +204,7 @@ describe('legacy topology scale audit', () => {
             failures.push({
               borderContinuity,
               detachedFloorTiles,
+              endpointLayering,
               kind,
               minimumSolutionPathLength,
               playableTopologyStats: maze.playableTopologyStats,
@@ -214,9 +237,12 @@ describe('legacy topology scale audit', () => {
         const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
         const detachedFloorTiles = countDetachedFloorTiles(maze);
         const borderContinuity = auditBorderFloorContinuity(maze);
+        const endpointLayering = auditEndpointLayering(maze);
 
         if (
           detachedFloorTiles !== 0
+          || endpointLayering.borderEndpointCount !== 1
+          || endpointLayering.interiorEndpointCount !== 1
           || borderContinuity.borderFloorCount < 2
           || borderContinuity.floorRatio < 0.28
           || borderContinuity.floorRatio > 0.62
@@ -230,6 +256,7 @@ describe('legacy topology scale audit', () => {
           failures.push({
             borderContinuity,
             detachedFloorTiles,
+            endpointLayering,
             kind,
             minimumSolutionPathLength,
             playableTopologyStats: maze.playableTopologyStats,
@@ -259,9 +286,12 @@ describe('legacy topology scale audit', () => {
       const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
       const detachedFloorTiles = countDetachedFloorTiles(maze);
       const borderContinuity = auditBorderFloorContinuity(maze);
+      const endpointLayering = auditEndpointLayering(maze);
 
       if (
         detachedFloorTiles !== 0
+        || endpointLayering.borderEndpointCount !== 1
+        || endpointLayering.interiorEndpointCount !== 1
         || borderContinuity.borderFloorCount < 2
         || borderContinuity.floorRatio < 0.28
         || borderContinuity.floorRatio > 0.62
@@ -275,6 +305,7 @@ describe('legacy topology scale audit', () => {
         failures.push({
           borderContinuity,
           detachedFloorTiles,
+          endpointLayering,
           kind,
           minimumSolutionPathLength,
           playableTopologyStats: maze.playableTopologyStats,
