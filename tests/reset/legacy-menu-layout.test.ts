@@ -60,6 +60,20 @@ describe('legacy menu layout', () => {
     expect(layout.titleY).toBeGreaterThanOrEqual(34);
   });
 
+  test('uses the cleaner 110-percent-style tile cadence on normal portrait phones', () => {
+    const menuLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 'menu');
+    const playLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 'play');
+
+    expect(menuLayout.tileSize).toBe(6);
+    expect(playLayout.tileSize).toBe(6);
+    expect(menuLayout.boardSize).toBe(294);
+    expect(playLayout.boardSize).toBe(294);
+    expect(menuLayout.boardLeft).toBeGreaterThanOrEqual(48);
+    expect(playLayout.boardLeft).toBe(menuLayout.boardLeft);
+    expect(menuLayout.buttonLayout).toBe('row');
+    expect(playLayout.buttonLayout).toBe('row');
+  });
+
   test('keeps normal phone-width menu buttons horizontal instead of using the side-panel stack', () => {
     for (const viewport of [
       { width: 320, height: 568 },

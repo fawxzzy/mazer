@@ -28,6 +28,8 @@ export type LegacyMenuLayoutSurface = 'menu' | 'play';
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const LEGACY_MENU_SIDE_PANEL_WIDTH = 300;
 const LEGACY_PLAY_ULTRA_NARROW_WIDTH = 360;
+const LEGACY_PHONE_CLEAN_ZOOM_WIDTH = 420;
+const LEGACY_PHONE_CLEAN_TILE_SIZE = 6;
 
 export const resolveLegacyMenuLayout = (
   width: number,
@@ -56,8 +58,11 @@ export const resolveLegacyMenuLayout = (
   );
   const boardSize = Math.round(clamp(rawBoardSize, minBoardSize, maxBoardSize));
   const rawTileSize = boardSize / Math.max(1, mazeSize);
+  const shouldUseCleanPhoneCadence = isPortrait && !isUltraNarrow && width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH;
   const tileSize = isUltraNarrow
     ? Math.max(3, Number(rawTileSize.toFixed(3)))
+    : shouldUseCleanPhoneCadence
+      ? Math.max(4, Math.min(LEGACY_PHONE_CLEAN_TILE_SIZE, Math.floor(rawTileSize)))
     : Math.max(4, Math.floor(rawTileSize));
   const snappedBoardSize = Math.round(tileSize * mazeSize * 1000) / 1000;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
