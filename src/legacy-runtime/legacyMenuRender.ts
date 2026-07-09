@@ -169,11 +169,40 @@ const isNonCornerBorderPoint = (
   && !((point.x === 0 || point.x === maze.size - 1) && (point.y === 0 || point.y === maze.size - 1))
 );
 
+const resolveOppositeBorderPoint = (
+  maze: Pick<LegacyMazeSnapshot, 'size'>,
+  point: LegacyPoint
+): LegacyPoint | null => {
+  if (!isNonCornerBorderPoint(maze, point)) {
+    return null;
+  }
+
+  if (point.x === 0) {
+    return { x: maze.size - 1, y: point.y };
+  }
+  if (point.x === maze.size - 1) {
+    return { x: 0, y: point.y };
+  }
+  if (point.y === 0) {
+    return { x: point.x, y: maze.size - 1 };
+  }
+  if (point.y === maze.size - 1) {
+    return { x: point.x, y: 0 };
+  }
+
+  return null;
+};
+
 export const resolveLegacyMenuBorderDockDirections = (
   maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
   point: LegacyPoint
 ): LegacyMenuBorderDockDirection[] => {
   if (!isWalkableGridPoint(maze, point) || !isNonCornerBorderPoint(maze, point)) {
+    return [];
+  }
+
+  const opposite = resolveOppositeBorderPoint(maze, point);
+  if (!opposite || !isWalkableGridPoint(maze, opposite)) {
     return [];
   }
 

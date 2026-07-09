@@ -70,7 +70,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
   test('docks non-corner border paths into the board border instead of capping them', () => {
-    const maze = {
+    const oneSidedMaze = {
       size: 3,
       grid: [
         [false, false, false],
@@ -79,24 +79,36 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       ]
     };
 
+    expect(resolveLegacyMenuBorderDockDirections(oneSidedMaze, { x: 0, y: 1 })).toEqual([]);
+
+    const maze = {
+      size: 3,
+      grid: [
+        [false, false, false],
+        [true, true, true],
+        [false, false, false]
+      ]
+    };
+
     expect(resolveLegacyMenuBorderDockDirections(maze, { x: 0, y: 1 })).toEqual(['left']);
+    expect(resolveLegacyMenuBorderDockDirections(maze, { x: 2, y: 1 })).toEqual(['right']);
     expect(resolveLegacyMenuPathRenderFrame(maze, { x: 0, y: 1 }, 20)).toEqual({
       leftInset: 0,
       topInset: 3,
-      width: 17,
+      width: 20,
       height: 14
     });
     expect(resolveLegacyMenuPathRenderFrames(maze, { x: 0, y: 1 }, 20)).toEqual({
       edge: {
         leftInset: 0,
         topInset: 3,
-        width: 17,
+        width: 20,
         height: 14
       },
       core: {
         leftInset: 0,
         topInset: 4,
-        width: 16,
+        width: 20,
         height: 12
       }
     });

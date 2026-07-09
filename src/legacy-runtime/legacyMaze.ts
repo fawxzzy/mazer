@@ -966,6 +966,92 @@ const resolveLegacyBorderEndpointRouteState = (
   };
 };
 
+const resolveLegacyOppositeBorderPoint = (size: number, point: LegacyPoint): LegacyPoint | null => {
+  if (!isLegacyBorderPoint(size, point) || isLegacyCornerBorderPoint(size, point)) {
+    return null;
+  }
+
+  if (point.x === 0) {
+    return { x: size - 1, y: point.y };
+  }
+  if (point.x === size - 1) {
+    return { x: 0, y: point.y };
+  }
+  if (point.y === 0) {
+    return { x: point.x, y: size - 1 };
+  }
+  if (point.y === size - 1) {
+    return { x: point.x, y: 0 };
+  }
+
+  return null;
+};
+
+const resolveLegacyOppositeBorderConnectorStep = (size: number, point: LegacyPoint): LegacyPoint => {
+  if (point.x === 0) {
+    return { x: 1, y: 0 };
+  }
+  if (point.x === size - 1) {
+    return { x: -1, y: 0 };
+  }
+  if (point.y === 0) {
+    return { x: 0, y: 1 };
+  }
+
+  return { x: 0, y: -1 };
+};
+
+const applyLegacyOppositeBorderConnections = (grid: boolean[][]): LegacyPoint[] => {
+  const size = grid.length;
+  const createdTiles: LegacyPoint[] = [];
+  const seen = new Set<string>();
+  const sourceBorderPoints: LegacyPoint[] = [];
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const point = { x, y };
+      if (
+        grid[y]?.[x] === true
+        && isLegacyBorderPoint(size, point)
+        && !isLegacyCornerBorderPoint(size, point)
+      ) {
+        sourceBorderPoints.push(point);
+      }
+    }
+  }
+
+  for (const source of sourceBorderPoints) {
+    const opposite = resolveLegacyOppositeBorderPoint(size, source);
+    if (!opposite || grid[opposite.y]?.[opposite.x] === true) {
+      continue;
+    }
+
+    const step = resolveLegacyOppositeBorderConnectorStep(size, opposite);
+    let cursor = clonePoint(opposite);
+    while (
+      cursor.x >= 0
+      && cursor.y >= 0
+      && cursor.x < size
+      && cursor.y < size
+    ) {
+      if (grid[cursor.y]?.[cursor.x] === true) {
+        break;
+      }
+
+      grid[cursor.y]![cursor.x] = true;
+      const key = keyForPoint(cursor);
+      if (!seen.has(key)) {
+        seen.add(key);
+        createdTiles.push(clonePoint(cursor));
+      }
+
+      cursor = { x: cursor.x + step.x, y: cursor.y + step.y };
+    }
+  }
+
+  return createdTiles;
+};
+
 interface LegacyCheckpointPathBuilderResult {
   grid: boolean[][];
   goal: LegacyPoint;
@@ -1424,6 +1510,11 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     seed,
     minimumSolutionPathLength
   ));
+  const borderWrapTiles = applyLegacyOppositeBorderConnections(grid);
+  if (borderWrapTiles.length > 0) {
+    solutionPath = buildShortestPath(grid, start, goal);
+    routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath);
+  }
   playableTopologyStats.reachableFloors = resolveReachableFloorDistances(grid, start).size;
   playableTopologyStats.resolvedGoalDistance = Math.max(0, solutionPath.length - 1);
 
@@ -1438,7 +1529,10 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     generationBuildTrace: {
       ...generationBuildTrace,
       finalGoal: clonePoint(goal),
-      reinforcementShortcutTiles: reinforcementStats.createdTiles.map(clonePoint),
+      reinforcementShortcutTiles: [
+        ...reinforcementStats.createdTiles,
+        ...borderWrapTiles
+      ].map(clonePoint),
       start: clonePoint(start),
       shortcutTiles: shortcutResult.createdTiles.map(clonePoint)
     },

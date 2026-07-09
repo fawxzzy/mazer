@@ -98,6 +98,57 @@ const collectBorderEndpointRoles = (maze: ReturnType<typeof createLegacyMaze>): 
   return roles;
 };
 
+const isNonCornerBorderFloor = (
+  maze: ReturnType<typeof createLegacyMaze>,
+  point: { x: number; y: number }
+): boolean => (
+  maze.grid[point.y]?.[point.x] === true
+  && isEndpointOnMazeBorder(maze, point)
+  && !((point.x === 0 || point.x === maze.size - 1) && (point.y === 0 || point.y === maze.size - 1))
+);
+
+const resolveOppositeBorderPoint = (
+  maze: ReturnType<typeof createLegacyMaze>,
+  point: { x: number; y: number }
+): { x: number; y: number } | null => {
+  if (!isNonCornerBorderFloor(maze, point)) {
+    return null;
+  }
+
+  if (point.x === 0) {
+    return { x: maze.size - 1, y: point.y };
+  }
+  if (point.x === maze.size - 1) {
+    return { x: 0, y: point.y };
+  }
+  if (point.y === 0) {
+    return { x: point.x, y: maze.size - 1 };
+  }
+  return { x: point.x, y: 0 };
+};
+
+const collectUnpairedBorderFloorBleeds = (
+  maze: ReturnType<typeof createLegacyMaze>
+): Array<{ point: { x: number; y: number }; opposite: { x: number; y: number } | null }> => {
+  const failures: Array<{ point: { x: number; y: number }; opposite: { x: number; y: number } | null }> = [];
+
+  for (let y = 0; y < maze.size; y += 1) {
+    for (let x = 0; x < maze.size; x += 1) {
+      const point = { x, y };
+      if (!isNonCornerBorderFloor(maze, point)) {
+        continue;
+      }
+
+      const opposite = resolveOppositeBorderPoint(maze, point);
+      if (!opposite || maze.grid[opposite.y]?.[opposite.x] !== true) {
+        failures.push({ point, opposite });
+      }
+    }
+  }
+
+  return failures;
+};
+
 const DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS = [
   ...Array.from({ length: 64 }, (_, index) => index + 1),
   89,
@@ -171,6 +222,7 @@ describe('legacy reset lane', () => {
       const borderEndpointRoles = collectBorderEndpointRoles(maze);
 
       expect(countDetachedFloorTiles(maze)).toBe(0);
+      expect(collectUnpairedBorderFloorBleeds(maze)).toEqual([]);
       expect(borderEndpointRoles.length).toBeGreaterThanOrEqual(1);
       expect(maze.solutionPath.length).toBeGreaterThanOrEqual(Math.floor(maze.size * 1.5));
       expect(maze.playableTopologyStats?.reachableFloors).toBeGreaterThan(maze.solutionPath.length);
@@ -222,9 +274,11 @@ describe('legacy reset lane', () => {
 
       expect(maze.source).toBe('play-generated');
       expect(countDetachedFloorTiles(maze)).toBe(0);
+      const unpairedBorderBleeds = collectUnpairedBorderFloorBleeds(maze);
       const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
       if (
         collectBorderEndpointRoles(maze).length < 1
+        || unpairedBorderBleeds.length > 0
         || maze.solutionPath[0]?.x !== maze.start.x
         || maze.solutionPath[0]?.y !== maze.start.y
         || maze.solutionPath.at(-1)?.x !== maze.goal.x
@@ -244,6 +298,7 @@ describe('legacy reset lane', () => {
           playableTopologyStats: maze.playableTopologyStats,
           routeQualityStats: maze.routeQualityStats,
           shortcutStats: maze.shortcutStats,
+          unpairedBorderBleeds,
           solutionPathLength: maze.solutionPath.length
         });
       }
@@ -266,9 +321,11 @@ describe('legacy reset lane', () => {
 
       expect(maze.source).toBe('menu-generated');
       expect(countDetachedFloorTiles(maze)).toBe(0);
+      const unpairedBorderBleeds = collectUnpairedBorderFloorBleeds(maze);
       const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
       if (
         collectBorderEndpointRoles(maze).length < 1
+        || unpairedBorderBleeds.length > 0
         || maze.solutionPath[0]?.x !== maze.start.x
         || maze.solutionPath[0]?.y !== maze.start.y
         || maze.solutionPath.at(-1)?.x !== maze.goal.x
@@ -288,6 +345,7 @@ describe('legacy reset lane', () => {
           playableTopologyStats: maze.playableTopologyStats,
           routeQualityStats: maze.routeQualityStats,
           shortcutStats: maze.shortcutStats,
+          unpairedBorderBleeds,
           solutionPathLength: maze.solutionPath.length
         });
       }
@@ -297,6 +355,22 @@ describe('legacy reset lane', () => {
     expect(borderEndpointRoles.has('start')).toBe(true);
     expect(borderEndpointRoles.has('goal')).toBe(true);
   }, 20_000);
+
+  test('pairs generated edge-dock paths with exact opposite border continuations', () => {
+    const factories = [
+      { label: 'play', create: createLegacyMaze },
+      { label: 'menu', create: createLegacyGeneratedMenuMaze }
+    ] as const;
+
+    for (const factory of factories) {
+      for (const seed of [3749, 0x5a17f00d, 2, 777, 1001, 1, 3, 4, 5, 6]) {
+        const maze = factory.create(50, seed);
+
+        expect(collectUnpairedBorderFloorBleeds(maze), `${factory.label}:${seed}`).toEqual([]);
+        expect(countDetachedFloorTiles(maze), `${factory.label}:${seed}`).toBe(0);
+      }
+    }
+  });
 
   test('reinforces weak shortcut outcomes without disconnecting generated play mazes', () => {
     let reinforcedMaze: ReturnType<typeof createLegacyMaze> | null = null;
