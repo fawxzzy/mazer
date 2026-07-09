@@ -630,6 +630,83 @@ const LEGACY_MENU_PATH_TITLE_FRAME_MS = 66;
 const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;
 const LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA = 0.44;
 const LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA = 0.92;
+
+export interface LegacyMenuPathTitleOrbitGeometry {
+  bottom: number;
+  centerX: number;
+  centerY: number;
+  crownBottom: number;
+  crownHalf: number;
+  crownTop: number;
+  left: number;
+  right: number;
+  top: number;
+}
+
+export const resolveLegacyMenuPathTitleOrbitGeometry = (
+  titleLeft: number,
+  titleTop: number,
+  titleWidth: number,
+  titleHeight: number,
+  titleCellSize: number
+): LegacyMenuPathTitleOrbitGeometry => {
+  const railGap = Math.max(5, Math.round(titleCellSize * 0.8));
+  const orbitGap = Math.max(7, Math.round(titleCellSize * 1.08));
+  const railTop = titleTop - railGap;
+  const railBottom = titleTop + titleHeight + railGap;
+  const centerX = titleLeft + (titleWidth / 2);
+  const centerY = titleTop + (titleHeight / 2);
+  const crest = Math.max(5, Math.round(titleCellSize * 0.68));
+  const crownHalf = Math.max(4, Math.round(titleCellSize * 0.56));
+  const crownTop = railTop - Math.round(crest * 0.9);
+  const crownBottom = railBottom + Math.round(crest * 0.9);
+
+  return {
+    bottom: crownBottom,
+    centerX,
+    centerY,
+    crownBottom,
+    crownHalf,
+    crownTop,
+    left: titleLeft - orbitGap,
+    right: titleLeft + titleWidth + orbitGap,
+    top: crownTop
+  };
+};
+
+export const resolveLegacyMenuPathTitleOrbitPoint = (
+  geometry: LegacyMenuPathTitleOrbitGeometry,
+  orbit: number
+): { x: number; y: number } => {
+  const perimeter = (((orbit % 1) + 1) % 1) * 4;
+
+  if (perimeter < 1) {
+    return {
+      x: geometry.left + ((geometry.right - geometry.left) * perimeter),
+      y: geometry.top
+    };
+  }
+
+  if (perimeter < 2) {
+    return {
+      x: geometry.right,
+      y: geometry.top + ((geometry.bottom - geometry.top) * (perimeter - 1))
+    };
+  }
+
+  if (perimeter < 3) {
+    return {
+      x: geometry.right - ((geometry.right - geometry.left) * (perimeter - 2)),
+      y: geometry.bottom
+    };
+  }
+
+  return {
+    x: geometry.left,
+    y: geometry.bottom - ((geometry.bottom - geometry.top) * (perimeter - 3))
+  };
+};
+
 const LEGACY_BOARD_GRID_ALPHA = 0;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
@@ -4170,50 +4247,53 @@ export class MenuScene extends Phaser.Scene {
     const railAlpha = clamp((0.28 + pulse * 0.3) * alphaScale, 0.16, 0.58);
     const railGap = Math.max(5, Math.round(titleLayout.cellSize * 0.8));
     const notch = Math.max(3, Math.round(titleLayout.cellSize * 0.46));
+    const orbitGeometry = resolveLegacyMenuPathTitleOrbitGeometry(
+      titleLayout.left,
+      titleLayout.top,
+      titleLayout.width,
+      titleLayout.height,
+      titleLayout.cellSize
+    );
     const left = titleLayout.left - railGap;
     const right = titleLayout.left + titleLayout.width + railGap;
     const top = titleLayout.top - railGap;
     const bottom = titleLayout.top + titleLayout.height + railGap;
-    const centerX = titleLayout.left + (titleLayout.width / 2);
     const crest = Math.max(5, Math.round(titleLayout.cellSize * 0.68));
 
     this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_EDGE, railAlpha);
     this.strokeLegacyPolyline(this.titleGraphics, [
       { x: left, y: top + notch },
       { x: left + notch, y: top },
-      { x: centerX - crest, y: top },
-      { x: centerX, y: top - Math.round(crest * 0.55) },
-      { x: centerX + crest, y: top },
+      { x: orbitGeometry.centerX - crest, y: top },
+      { x: orbitGeometry.centerX, y: top - Math.round(crest * 0.55) },
+      { x: orbitGeometry.centerX + crest, y: top },
       { x: right - notch, y: top },
       { x: right, y: top + notch }
     ]);
     this.strokeLegacyPolyline(this.titleGraphics, [
       { x: left, y: bottom - notch },
       { x: left + notch, y: bottom },
-      { x: centerX - crest, y: bottom },
-      { x: centerX, y: bottom + Math.round(crest * 0.55) },
-      { x: centerX + crest, y: bottom },
+      { x: orbitGeometry.centerX - crest, y: bottom },
+      { x: orbitGeometry.centerX, y: bottom + Math.round(crest * 0.55) },
+      { x: orbitGeometry.centerX + crest, y: bottom },
       { x: right - notch, y: bottom },
       { x: right, y: bottom - notch }
     ]);
 
-    const crownHalf = Math.max(4, Math.round(titleLayout.cellSize * 0.56));
-    const crownTop = top - Math.round(crest * 0.9);
-    const crownBottom = bottom + Math.round(crest * 0.9);
     this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_ACCENT, railAlpha * 1.12);
     this.strokeLegacyPolyline(this.titleGraphics, [
-      { x: centerX, y: crownTop - crownHalf },
-      { x: centerX + crownHalf, y: crownTop },
-      { x: centerX, y: crownTop + crownHalf },
-      { x: centerX - crownHalf, y: crownTop },
-      { x: centerX, y: crownTop - crownHalf }
+      { x: orbitGeometry.centerX, y: orbitGeometry.crownTop - orbitGeometry.crownHalf },
+      { x: orbitGeometry.centerX + orbitGeometry.crownHalf, y: orbitGeometry.crownTop },
+      { x: orbitGeometry.centerX, y: orbitGeometry.crownTop + orbitGeometry.crownHalf },
+      { x: orbitGeometry.centerX - orbitGeometry.crownHalf, y: orbitGeometry.crownTop },
+      { x: orbitGeometry.centerX, y: orbitGeometry.crownTop - orbitGeometry.crownHalf }
     ]);
     this.strokeLegacyPolyline(this.titleGraphics, [
-      { x: centerX, y: crownBottom - crownHalf },
-      { x: centerX + crownHalf, y: crownBottom },
-      { x: centerX, y: crownBottom + crownHalf },
-      { x: centerX - crownHalf, y: crownBottom },
-      { x: centerX, y: crownBottom - crownHalf }
+      { x: orbitGeometry.centerX, y: orbitGeometry.crownBottom - orbitGeometry.crownHalf },
+      { x: orbitGeometry.centerX + orbitGeometry.crownHalf, y: orbitGeometry.crownBottom },
+      { x: orbitGeometry.centerX, y: orbitGeometry.crownBottom + orbitGeometry.crownHalf },
+      { x: orbitGeometry.centerX - orbitGeometry.crownHalf, y: orbitGeometry.crownBottom },
+      { x: orbitGeometry.centerX, y: orbitGeometry.crownBottom - orbitGeometry.crownHalf }
     ]);
 
     const tickWidth = Math.max(2, Math.round(titleLayout.cellSize * 0.5));
@@ -4383,33 +4463,17 @@ export class MenuScene extends Phaser.Scene {
     alphaScale: number
   ): void {
     const orbitPhase = this.resolveLegacyMenuPathTitleOrbitPhase(time);
-    const railGap = Math.max(7, Math.round(titleLayout.cellSize * 1.08));
-    const left = titleLayout.left - railGap;
-    const right = titleLayout.left + titleLayout.width + railGap;
-    const top = titleLayout.top - railGap;
-    const bottom = titleLayout.top + titleLayout.height + railGap;
-    const centerX = titleLayout.left + (titleLayout.width / 2);
-    const centerY = titleLayout.top + (titleLayout.height / 2);
+    const orbitGeometry = resolveLegacyMenuPathTitleOrbitGeometry(
+      titleLayout.left,
+      titleLayout.top,
+      titleLayout.width,
+      titleLayout.height,
+      titleLayout.cellSize
+    );
 
     for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
       const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
-      const perimeter = orbit * 4;
-      let x = left;
-      let y = top;
-
-      if (perimeter < 1) {
-        x = left + ((right - left) * perimeter);
-        y = top;
-      } else if (perimeter < 2) {
-        x = right;
-        y = top + ((bottom - top) * (perimeter - 1));
-      } else if (perimeter < 3) {
-        x = right - ((right - left) * (perimeter - 2));
-        y = bottom;
-      } else {
-        x = left;
-        y = bottom - ((bottom - top) * (perimeter - 3));
-      }
+      const { x, y } = resolveLegacyMenuPathTitleOrbitPoint(orbitGeometry, orbit);
 
       const wave = 0.62 + (Math.sin((orbitPhase * Math.PI * 2) + (index * 1.38)) * 0.28);
       const radius = Math.max(4, Math.round(titleLayout.cellSize * (0.46 + (wave * 0.32))));
@@ -4431,8 +4495,8 @@ export class MenuScene extends Phaser.Scene {
       this.strokeLegacyPolyline(this.titleGraphics, [
         { x, y },
         {
-          x: x + ((centerX - x) * 0.12),
-          y: y + ((centerY - y) * 0.12)
+          x: x + ((orbitGeometry.centerX - x) * 0.12),
+          y: y + ((orbitGeometry.centerY - y) * 0.12)
         }
       ]);
     }

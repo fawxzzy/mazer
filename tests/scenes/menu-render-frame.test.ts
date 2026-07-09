@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   resolveLegacyDynamicMarkerInset,
   resolveLegacyDynamicTrailStrokeWidth,
@@ -11,8 +11,22 @@ import {
   resolveLegacyPlayerLocatorRenderMetrics,
   resolveLegacyPlayerMarkerRenderMetrics
 } from '../../src/legacy-runtime/legacyMenuRender';
+import {
+  resolveLegacyMenuPathTitleOrbitGeometry,
+  resolveLegacyMenuPathTitleOrbitPoint
+} from '../../src/scenes/MenuScene';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+vi.mock('phaser', () => ({
+  default: {
+    Math: {
+      Clamp: (value: number, min: number, max: number) => Math.max(min, Math.min(max, value)),
+      Linear: (from: number, to: number, t: number) => from + ((to - from) * t)
+    },
+    Scene: class {}
+  }
+}));
 
 describe('resolveLegacyMenuPathRenderFrame', () => {
   test('caps active Phaser rendering to mobile-friendly 60 FPS', () => {
@@ -31,6 +45,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(phaserConfigSource).toContain('target: 60');
     expect(phaserConfigSource).toContain('min: 30');
     expect(phaserConfigSource).not.toContain('forceSetTimeOut: true');
+  });
+
+  test('aligns title orbit diamonds through the fixed top and bottom crown diamonds', () => {
+    const geometry = resolveLegacyMenuPathTitleOrbitGeometry(120, 40, 260, 70, 10);
+    const topCenter = resolveLegacyMenuPathTitleOrbitPoint(geometry, 0.125);
+    const bottomCenter = resolveLegacyMenuPathTitleOrbitPoint(geometry, 0.625);
+
+    expect(topCenter).toEqual({ x: geometry.centerX, y: geometry.crownTop });
+    expect(bottomCenter).toEqual({ x: geometry.centerX, y: geometry.crownBottom });
+    expect(geometry.top).toBe(geometry.crownTop);
+    expect(geometry.bottom).toBe(geometry.crownBottom);
   });
 
   test('bridges connected neighbors to tile edges for legacy trench continuity', () => {
