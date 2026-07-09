@@ -4948,11 +4948,17 @@ export class MenuScene extends Phaser.Scene {
     );
     const height = clampInteger(Math.round(fontSize * 1.95), 20, 28);
     const centerX = mazeRenderFrame.boardLeft + (mazeRenderFrame.boardSize / 2);
-    const badgeGap = clampInteger(Math.round(mazeRenderFrame.tileSize * 0.78), 4, 9);
-    const centerY = Math.max(
-      (height / 2) + 2,
-      mazeRenderFrame.boardTop - badgeGap - (height / 2)
-    );
+    const outerInset = Math.max(0, (this.layout.boardSize - mazeRenderFrame.boardSize) / 2);
+    const boardBottom = mazeRenderFrame.boardTop + mazeRenderFrame.boardSize + outerInset;
+    const buttonTop = this.layout.centerButtonY - (this.layout.buttonHeight / 2);
+    const availableGap = Math.max(0, buttonTop - boardBottom);
+    const badgeGap = clampInteger(Math.round(Math.min(mazeRenderFrame.tileSize * 0.95, availableGap * 0.22)), 5, 10);
+    const buttonGap = clampInteger(Math.round(Math.min(mazeRenderFrame.tileSize * 1.05, availableGap * 0.26)), 6, 12);
+    const minimumCenterY = boardBottom + badgeGap + (height / 2);
+    const maximumCenterY = buttonTop - buttonGap - (height / 2);
+    const centerY = maximumCenterY >= minimumCenterY
+      ? Math.round((minimumCenterY + maximumCenterY) / 2)
+      : minimumCenterY;
 
     this.drawLegacyCyberPanel(this.boardDynamicGraphics, {
       active: true,
