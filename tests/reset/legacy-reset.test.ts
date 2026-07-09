@@ -6,7 +6,6 @@ import {
   createLegacyMenuDemoWalkerConfig,
   LEGACY_MENU_SNAPSHOT_CADENCE,
   createLegacyMenuSnapshotDemoWalkerConfig,
-  LEGACY_MENU_SNAPSHOT_PREROLL_STEPS,
   resolveLegacyPointFromDemoIndex,
   resolveLegacyTrailFromDemoSteps
 } from '../../src/legacy-runtime/legacyDemoWalker';
@@ -500,20 +499,20 @@ describe('legacy reset lane', () => {
     expect(resolveLegacyTrailFromDemoSteps(state.trailSteps, episode.raster.width)).toEqual([maze.start]);
   });
 
-  test('uses a deterministic deep-preroll config for the fixed legacy menu snapshot', () => {
+  test('uses clean solver AI config for the fixed legacy menu snapshot', () => {
     const snapshotConfig = createLegacyMenuSnapshotDemoWalkerConfig(3749);
     const genericConfig = createLegacyMenuDemoWalkerConfig(3749);
 
-    expect(snapshotConfig.behavior.enableRunnerMistakes).toBe(true);
-    expect(snapshotConfig.behavior.prerollSteps).toBeGreaterThanOrEqual(LEGACY_MENU_SNAPSHOT_PREROLL_STEPS);
+    expect(snapshotConfig.behavior.enableRunnerMistakes).toBe(false);
+    expect(snapshotConfig.behavior.prerollSteps).toBe(0);
     expect(snapshotConfig.cadence.exploreStepMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.exploreStepMs);
     expect(snapshotConfig.cadence.backtrackStepMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.backtrackStepMs);
-    expect(snapshotConfig.cadence.goalHoldMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.goalHoldMs);
-    expect(snapshotConfig.cadence.resetHoldMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.resetHoldMs);
+    expect(snapshotConfig.cadence.goalHoldMs).toBe(0);
+    expect(snapshotConfig.cadence.resetHoldMs).toBe(0);
     expect(genericConfig.behavior.enableRunnerMistakes).toBe(false);
     expect(genericConfig.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
     expect(genericConfig.behavior.prerollSteps).toBe(0);
-    expect(snapshotConfig.behavior.emulateLogicSwitchPotentialCheckBug).toBe(true);
+    expect(snapshotConfig.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
     expect(genericConfig.cadence.exploreStepMs).not.toBe(snapshotConfig.cadence.exploreStepMs);
   });
 

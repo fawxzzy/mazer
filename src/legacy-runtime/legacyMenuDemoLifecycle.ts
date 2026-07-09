@@ -71,12 +71,13 @@ export const createLegacyMenuDemoBootstrap = (
     ? createLegacyMenuSnapshotDemoWalkerConfig(maze.seed)
     : createLegacyMenuDemoWalkerConfig(maze.seed);
   let state = createDemoWalkerState(episode, config);
+  const shouldBootstrapSnapshotRoute = isFixedSnapshot && config.behavior.enableRunnerMistakes === true;
   const basePrerollSteps = Math.max(0, config.behavior.prerollSteps ?? legacyTuning.demo.behavior.prerollSteps ?? 0);
-  const prerollSteps = isFixedSnapshot
+  const prerollSteps = shouldBootstrapSnapshotRoute
     ? Math.min(basePrerollSteps, Math.max(0, maze.solutionPath.length - 8))
     : basePrerollSteps;
 
-  if (isFixedSnapshot) {
+  if (shouldBootstrapSnapshotRoute) {
     const minVisibleCursor = Math.min(
       Math.max(1, LEGACY_MENU_SNAPSHOT_BOOTSTRAP_MIN_VISIBLE_CURSOR),
       Math.max(1, maze.solutionPath.length - 4)

@@ -14,15 +14,17 @@ describe('legacy menu demo lifecycle', () => {
     const bootstrap = createLegacyMenuDemoBootstrap(menuMaze, true, 16);
 
     expect(isFixedLegacyMenuSnapshot(menuMaze)).toBe(true);
-    expect(bootstrap.config.behavior.enableRunnerMistakes).toBe(true);
+    expect(bootstrap.config.behavior.enableRunnerMistakes).toBe(false);
+    expect(bootstrap.config.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
+    expect(bootstrap.config.behavior.prerollSteps).toBe(0);
     expect(bootstrap.state.phase).toBe('explore');
-    expect(bootstrap.state.cue).not.toBe('spawn');
+    expect(bootstrap.state.cue).toBe('spawn');
     expect(bootstrap.state.cue).not.toBe('reset');
     expect(bootstrap.state.cue).not.toBe('goal');
-    expect(bootstrap.state.currentIndex).not.toBe(bootstrap.episode.raster.startIndex);
-    expect(bootstrap.state.pathCursor).toBeGreaterThanOrEqual(8);
-    expect(bootstrap.trail.length).toBeGreaterThan(0);
-    expect(bootstrap.trail.length).toBeLessThanOrEqual(16);
+    expect(bootstrap.state.currentIndex).toBe(bootstrap.episode.raster.startIndex);
+    expect(bootstrap.state.pathCursor).toBe(0);
+    expect(bootstrap.player).toEqual(menuMaze.start);
+    expect(bootstrap.trail).toEqual([menuMaze.start]);
   });
 
   test('keeps generated mazes on the generic demo config path', () => {
@@ -64,9 +66,9 @@ describe('legacy menu demo lifecycle', () => {
     const fadedBootstrap = createLegacyMenuDemoBootstrap(menuMaze, true, 3);
     const persistentBootstrap = createLegacyMenuDemoBootstrap(menuMaze, false, 3);
 
-    expect(fadedBootstrap.trail).toHaveLength(3);
+    expect(fadedBootstrap.trail).toHaveLength(1);
     expect(fadedBootstrap.trail.at(-1)).toEqual(fadedBootstrap.player);
-    expect(persistentBootstrap.trail.length).toBeGreaterThan(3);
+    expect(persistentBootstrap.trail).toHaveLength(1);
     expect(persistentBootstrap.trail.at(-1)).toEqual(persistentBootstrap.player);
   });
 
@@ -88,13 +90,13 @@ describe('legacy menu demo lifecycle', () => {
       3
     );
 
-    expect(fadedFrame.trail).toHaveLength(3);
+    expect(fadedFrame.trail).toHaveLength(2);
     expect(fadedFrame.trail.at(-1)).toEqual(fadedFrame.player);
-    expect(persistentFrame.trail.length).toBeGreaterThan(3);
+    expect(persistentFrame.trail).toHaveLength(2);
     expect(persistentFrame.trail.at(-1)).toEqual(persistentFrame.player);
   });
 
-  test('lets the fixed front-door snapshot surface legacy recovery cues instead of a solver-only attract path', () => {
+  test('keeps the fixed front-door snapshot on the clean solver attract path', () => {
     const menuMaze = createLegacyMenuMaze(3749);
     const bootstrap = createLegacyMenuDemoBootstrap(menuMaze, false, 16);
     let state = bootstrap.state;
@@ -110,21 +112,22 @@ describe('legacy menu demo lifecycle', () => {
       );
       state = nextFrame.state;
       seenCues.add(state.cue);
-      if (seenCues.has('dead-end') && seenCues.has('backtrack') && seenCues.has('reacquire')) {
+      if (state.phase === 'goal-hold') {
         break;
       }
     }
 
-    expect(seenCues.has('dead-end')).toBe(true);
-    expect(seenCues.has('backtrack')).toBe(true);
-    expect(seenCues.has('reacquire')).toBe(true);
+    expect(state.phase).toBe('goal-hold');
+    expect(seenCues.has('dead-end')).toBe(false);
+    expect(seenCues.has('backtrack')).toBe(false);
+    expect(seenCues.has('reacquire')).toBe(false);
   });
 
-  test('replays the same menu maze after an AI-only reset without requesting regeneration', () => {
+  test('regenerates the fixed menu maze after a clean goal completion instead of AI-only reset replay', () => {
     const menuMaze = createLegacyMenuMaze(3749);
     const bootstrap = createLegacyMenuDemoBootstrap(menuMaze, false, 16);
     let state = bootstrap.state;
-    let aiResetFrame: ReturnType<typeof advanceLegacyMenuDemoFrame> | null = null;
+    let goalFrame: ReturnType<typeof advanceLegacyMenuDemoFrame> | null = null;
 
     for (let step = 0; step < 512; step += 1) {
       const nextFrame = advanceLegacyMenuDemoFrame(
@@ -135,27 +138,34 @@ describe('legacy menu demo lifecycle', () => {
         16
       );
       state = nextFrame.state;
-      if (state.resetReason === 'ai-path-exhausted') {
-        aiResetFrame = nextFrame;
+      if (state.phase === 'goal-hold') {
+        goalFrame = nextFrame;
         break;
       }
     }
 
-    expect(aiResetFrame).not.toBeNull();
-    expect(aiResetFrame?.shouldRegenerateMaze).toBe(false);
+    expect(goalFrame).not.toBeNull();
+    expect(goalFrame?.state.resetReason).not.toBe('ai-path-exhausted');
 
-    const replayFrame = advanceLegacyMenuDemoFrame(
+    const resetFrame = advanceLegacyMenuDemoFrame(
       bootstrap.episode,
-      aiResetFrame!.state,
+      goalFrame!.state,
+      bootstrap.config,
+      false,
+      16
+    );
+    const regenerateFrame = advanceLegacyMenuDemoFrame(
+      bootstrap.episode,
+      resetFrame.state,
       bootstrap.config,
       false,
       16
     );
 
-    expect(replayFrame.shouldRegenerateMaze).toBe(false);
-    expect(replayFrame.state.currentIndex).toBe(bootstrap.episode.raster.startIndex);
-    expect(replayFrame.state.loops).toBe(aiResetFrame!.state.loops + 1);
-    expect(replayFrame.state.aiLogicSwitch).toBe(true);
+    expect(resetFrame.state.resetReason).toBe('goal');
+    expect(regenerateFrame.shouldRegenerateMaze).toBe(true);
+    expect(regenerateFrame.state.currentIndex).toBe(bootstrap.episode.raster.startIndex);
+    expect(regenerateFrame.state.aiLogicSwitch).toBe(false);
   });
 
   test('creates an immediate process-8 menu reset request after goal reset-hold has elapsed', () => {

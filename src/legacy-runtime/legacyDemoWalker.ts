@@ -68,16 +68,15 @@ export const createLegacyMenuSnapshotDemoWalkerConfig = (seed: number): DemoWalk
     ...baseConfig,
     cadence: {
       ...baseConfig.cadence,
-      ...LEGACY_MENU_SNAPSHOT_CADENCE
+      ...LEGACY_MENU_SNAPSHOT_CADENCE,
+      goalHoldMs: 0,
+      resetHoldMs: 0
     },
     behavior: {
       ...baseConfig.behavior,
-      enableRunnerMistakes: true,
-      emulateLogicSwitchPotentialCheckBug: true,
-      prerollSteps: Math.max(
-        baseConfig.behavior.prerollSteps ?? 0,
-        LEGACY_MENU_SNAPSHOT_PREROLL_STEPS
-      )
+      enableRunnerMistakes: false,
+      emulateLogicSwitchPotentialCheckBug: false,
+      prerollSteps: 0
     }
   };
 };
