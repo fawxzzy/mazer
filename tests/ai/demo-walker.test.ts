@@ -635,8 +635,12 @@ describe('demo walker', () => {
       const maxSteps = Math.max(256, episode.raster.pathIndices.length * 8);
 
       expect(maze.source).toBe('menu-generated');
-      expect(diagnostics.routeLength).toBeGreaterThanOrEqual(episode.raster.pathIndices.length);
-      expect(diagnostics.routeLength).toBeLessThanOrEqual(episode.raster.pathIndices.length * 4);
+      expect(diagnostics.routeLength).toBe(episode.raster.pathIndices.length);
+      expect(diagnostics.canonicalPathLength).toBe(episode.raster.pathIndices.length);
+      expect(diagnostics.aiResetPathCursor).toBeNull();
+      expect(diagnostics.telemetry.wrongBranchCount).toBe(0);
+      expect(diagnostics.telemetry.backtrackCount).toBe(0);
+      expect(diagnostics.telemetry.recoveryCount).toBe(0);
       expect(diagnostics.traverseMs).toBeLessThan(60_000);
 
       for (let step = 0; step < maxSteps; step += 1) {
@@ -666,7 +670,7 @@ describe('demo walker', () => {
     }
   }, 30_000);
 
-  test('generated menu AI recovers without replaying and later requests goal regeneration across scale bands', () => {
+  test('generated menu AI follows a clean route and later requests goal regeneration across scale bands', () => {
     const cases = [
       { scale: 37, seed: 55 },
       { scale: 37, seed: 89 },
@@ -686,9 +690,14 @@ describe('demo walker', () => {
       let sawGoalRegenerationRequest = false;
       const maxSteps = Math.max(512, episode.raster.pathIndices.length * 12);
 
-      expect(diagnostics.routeLength).toBeLessThanOrEqual(episode.raster.pathIndices.length * 4);
+      expect(diagnostics.routeLength).toBe(episode.raster.pathIndices.length);
+      expect(diagnostics.canonicalPathLength).toBe(episode.raster.pathIndices.length);
       expect(diagnostics.traverseMs).toBeLessThan(60_000);
-      expect(diagnostics.aiResetPathCursor).not.toBeNull();
+      expect(diagnostics.aiResetPathCursor).toBeNull();
+      expect(diagnostics.telemetry.wrongBranchCount).toBe(0);
+      expect(diagnostics.telemetry.backtrackCount).toBe(0);
+      expect(diagnostics.telemetry.recoveryCount).toBe(0);
+      expect(config.behavior.enableRunnerMistakes).toBe(false);
       expect(config.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
 
       for (let step = 0; step < maxSteps; step += 1) {

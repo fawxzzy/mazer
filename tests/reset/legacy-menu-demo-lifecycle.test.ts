@@ -30,7 +30,7 @@ describe('legacy menu demo lifecycle', () => {
     const bootstrap = createLegacyMenuDemoBootstrap(playMaze, false, 16);
 
     expect(isFixedLegacyMenuSnapshot(playMaze)).toBe(false);
-    expect(bootstrap.config.behavior.enableRunnerMistakes).toBe(true);
+    expect(bootstrap.config.behavior.enableRunnerMistakes).toBe(false);
     expect(bootstrap.config.behavior.prerollSteps).toBe(0);
     expect(bootstrap.config.cadence.goalHoldMs).toBe(0);
     expect(bootstrap.config.cadence.resetHoldMs).toBe(0);

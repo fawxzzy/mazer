@@ -53,6 +53,7 @@
     "topology:export": "node ./scripts/topology/export-proof-manifests.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.75.0",
     "phaser": "^3.90.0"
   },
   "devDependencies": {

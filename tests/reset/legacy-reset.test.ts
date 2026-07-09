@@ -408,7 +408,7 @@ describe('legacy reset lane', () => {
     expectScaledMenuTile(menuMaze, 22, 10);
   });
 
-  test('adapts legacy maze snapshots into the recovered menu demo walker lane', () => {
+  test('adapts generated legacy maze snapshots into the clean menu demo walker lane', () => {
     const maze = createLegacyMaze(50, 3749);
     const episode = createLegacyDemoWalkerEpisode(maze);
     const config = createLegacyMenuDemoWalkerConfig(maze.seed);
@@ -419,8 +419,8 @@ describe('legacy reset lane', () => {
     expect(episode.raster.endIndex).toBe((maze.goal.y * maze.size) + maze.goal.x);
     expect(Array.from(episode.raster.pathIndices).at(0)).toBe(episode.raster.startIndex);
     expect(Array.from(episode.raster.pathIndices).at(-1)).toBe(episode.raster.endIndex);
-    expect(config.behavior.enableRunnerMistakes).toBe(true);
-    expect(telemetry.backtrackCount).toBeGreaterThan(0);
+    expect(config.behavior.enableRunnerMistakes).toBe(false);
+    expect(telemetry.backtrackCount).toBe(0);
     expect(episode.shortcutsCreated).toBe(maze.shortcutsCreated);
     expect(resolveLegacyPointFromDemoIndex(state.currentIndex, episode.raster.width)).toEqual(maze.start);
     expect(resolveLegacyTrailFromDemoSteps(state.trailSteps, episode.raster.width)).toEqual([maze.start]);
@@ -436,7 +436,7 @@ describe('legacy reset lane', () => {
     expect(snapshotConfig.cadence.backtrackStepMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.backtrackStepMs);
     expect(snapshotConfig.cadence.goalHoldMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.goalHoldMs);
     expect(snapshotConfig.cadence.resetHoldMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.resetHoldMs);
-    expect(genericConfig.behavior.enableRunnerMistakes).toBe(true);
+    expect(genericConfig.behavior.enableRunnerMistakes).toBe(false);
     expect(genericConfig.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
     expect(genericConfig.behavior.prerollSteps).toBe(0);
     expect(snapshotConfig.behavior.emulateLogicSwitchPotentialCheckBug).toBe(true);
@@ -592,7 +592,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("this.pendingGenerationRequest: LegacyGenerationRequest | null = null;".replace('this.', 'private '));
     expect(menuSceneSource).toContain('const nextRequest = this.pendingGenerationRequest;');
     expect(menuSceneSource).toContain('&& shouldConsumeLegacyGenerationRequest(nextRequest, time)');
-    expect(menuSceneSource).toContain('const generationState = consumeLegacyGenerationRequestState(request, this.settings.scale);');
+    expect(menuSceneSource).toContain('const generationState = consumeLegacyGenerationRequestState(request, request.budget.scale);');
+    expect(menuSceneSource).toContain("scale: this.resolveLegacyProgressionScaleForMode('menu')");
+    expect(menuSceneSource).toContain('scale: this.resolveLegacyProgressionScaleForMode(this.mode)');
     expect(menuSceneSource).toContain('if (generationState.startsPlayTimer) {');
     expect(menuSceneSource).toContain('private menuStaticDrawRowsVisible: number | null = null;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;');
@@ -820,7 +822,7 @@ describe('legacy reset lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const overlayRoutingSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayRouting.ts'), 'utf8');
 
-    expect(overlayRoutingSource).toContain("export type LegacyOverlayKind = 'none' | 'options' | 'pause';");
+    expect(overlayRoutingSource).toContain("export type LegacyOverlayKind = 'none' | 'options' | 'pause' | 'auth';");
     expect(overlayRoutingSource).toContain('resolveLegacyOverlayBackAction');
     expect(menuSceneSource).toContain('const action = resolveLegacyOverlayBackAction({');
     expect(menuSceneSource).toContain("case 'close-overlay':");

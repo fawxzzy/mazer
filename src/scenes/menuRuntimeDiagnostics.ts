@@ -1,6 +1,7 @@
 import type { RunProjection } from '../projections/runProjection.ts';
 import type { TelemetryEvent, TelemetrySemanticSummary } from '../telemetry';
 import type { MazeCycleTelemetryDiagnostics } from '../legacy-runtime/mazeCycleTelemetry';
+import type { LegacyProgressionDiagnostics } from '../legacy-runtime/legacyProgression';
 import type { HumanInputTimingSnapshot } from '../input-human';
 
 export const MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY = '__MAZER_RUNTIME_DIAGNOSTICS__' as const;
@@ -341,6 +342,7 @@ export interface MenuSceneRuntimeDiagnostics {
     summary: TelemetrySemanticSummary;
   };
   cycleTelemetry: MazeCycleTelemetryDiagnostics;
+  progression?: LegacyProgressionDiagnostics;
   resources: {
     activeTweens: number;
     activeTimers: number;

@@ -17,6 +17,34 @@ export interface LegacyMenuPathRenderSegments {
   core: LegacyMenuPathRenderFrame[];
 }
 
+export type LegacyMenuBorderDockDirection = 'bottom' | 'left' | 'right' | 'top';
+
+export interface LegacyMenuPixelRect {
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+}
+
+export interface LegacyMenuBorderDockRenderArea {
+  bottom: number;
+  left: number;
+  right: number;
+  top: number;
+}
+
+export interface LegacyMenuBorderDockRenderOptions {
+  boardLeft: number;
+  boardSize: number;
+  boardTop: number;
+  cornerGuardSize: number;
+  materialTileSize: number;
+  mazeLeft: number;
+  mazeSize: number;
+  mazeTop: number;
+  tileRect: LegacyMenuPixelRect;
+}
+
 export interface LegacyPlayerMarkerRenderMetrics {
   coreRadius: number;
   haloRadius: number;
@@ -39,7 +67,7 @@ const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.18;
 const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.08;
 
 const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {
-  if (tileSize <= 4) {
+  if (tileSize < 4) {
     return 0;
   }
 
@@ -129,16 +157,70 @@ const isWalkableGridPoint = (
   return maze.grid[point.y]?.[point.x] === true;
 };
 
+const isNonCornerBorderPoint = (
+  maze: Pick<LegacyMazeSnapshot, 'size'>,
+  point: LegacyPoint
+): boolean => (
+  point.x >= 0
+  && point.y >= 0
+  && point.x < maze.size
+  && point.y < maze.size
+  && (point.x === 0 || point.y === 0 || point.x === maze.size - 1 || point.y === maze.size - 1)
+  && !((point.x === 0 || point.x === maze.size - 1) && (point.y === 0 || point.y === maze.size - 1))
+);
+
+export const resolveLegacyMenuBorderDockDirections = (
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  point: LegacyPoint
+): LegacyMenuBorderDockDirection[] => {
+  if (!isWalkableGridPoint(maze, point) || !isNonCornerBorderPoint(maze, point)) {
+    return [];
+  }
+
+  const directions: LegacyMenuBorderDockDirection[] = [];
+  if (point.x === 0) {
+    directions.push('left');
+  }
+  if (point.x === maze.size - 1) {
+    directions.push('right');
+  }
+  if (point.y === 0) {
+    directions.push('top');
+  }
+  if (point.y === maze.size - 1) {
+    directions.push('bottom');
+  }
+
+  return directions;
+};
+
+const isLegacyMenuPathConnected = (
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  point: LegacyPoint,
+  direction: LegacyMenuBorderDockDirection
+): boolean => {
+  const neighbor = direction === 'left'
+    ? { x: point.x - 1, y: point.y }
+    : direction === 'right'
+      ? { x: point.x + 1, y: point.y }
+      : direction === 'top'
+        ? { x: point.x, y: point.y - 1 }
+        : { x: point.x, y: point.y + 1 };
+
+  return isWalkableGridPoint(maze, neighbor)
+    || resolveLegacyMenuBorderDockDirections(maze, point).includes(direction);
+};
+
 export const resolveLegacyMenuPathRenderFrame = (
   maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
   point: LegacyPoint,
   tileSize: number
 ): LegacyMenuPathRenderFrame => {
   const edgeInset = resolveLegacyMenuTrenchInset(tileSize, LEGACY_MENU_TRENCH_EDGE_INSET_RATIO);
-  const leftInset = isWalkableGridPoint(maze, { x: point.x - 1, y: point.y }) ? 0 : edgeInset;
-  const rightInset = isWalkableGridPoint(maze, { x: point.x + 1, y: point.y }) ? 0 : edgeInset;
-  const topInset = isWalkableGridPoint(maze, { x: point.x, y: point.y - 1 }) ? 0 : edgeInset;
-  const bottomInset = isWalkableGridPoint(maze, { x: point.x, y: point.y + 1 }) ? 0 : edgeInset;
+  const leftInset = isLegacyMenuPathConnected(maze, point, 'left') ? 0 : edgeInset;
+  const rightInset = isLegacyMenuPathConnected(maze, point, 'right') ? 0 : edgeInset;
+  const topInset = isLegacyMenuPathConnected(maze, point, 'top') ? 0 : edgeInset;
+  const bottomInset = isLegacyMenuPathConnected(maze, point, 'bottom') ? 0 : edgeInset;
 
   return {
     leftInset,
@@ -155,10 +237,10 @@ export const resolveLegacyMenuPathRenderFrames = (
 ): LegacyMenuPathRenderFrames => {
   const edge = resolveLegacyMenuPathRenderFrame(maze, point, tileSize);
   const coreInset = resolveLegacyMenuTrenchInset(tileSize, LEGACY_MENU_TRENCH_CORE_INSET_RATIO);
-  const connectedLeft = isWalkableGridPoint(maze, { x: point.x - 1, y: point.y });
-  const connectedRight = isWalkableGridPoint(maze, { x: point.x + 1, y: point.y });
-  const connectedTop = isWalkableGridPoint(maze, { x: point.x, y: point.y - 1 });
-  const connectedBottom = isWalkableGridPoint(maze, { x: point.x, y: point.y + 1 });
+  const connectedLeft = isLegacyMenuPathConnected(maze, point, 'left');
+  const connectedRight = isLegacyMenuPathConnected(maze, point, 'right');
+  const connectedTop = isLegacyMenuPathConnected(maze, point, 'top');
+  const connectedBottom = isLegacyMenuPathConnected(maze, point, 'bottom');
   const leftInset = connectedLeft ? edge.leftInset : edge.leftInset + coreInset;
   const topInset = connectedTop ? edge.topInset : edge.topInset + coreInset;
   const rightInset = connectedRight
@@ -179,6 +261,87 @@ export const resolveLegacyMenuPathRenderFrames = (
   };
 };
 
+export const resolveLegacyMenuBorderDockRenderAreas = (
+  direction: LegacyMenuBorderDockDirection,
+  frame: LegacyMenuPathRenderFrame,
+  options: LegacyMenuBorderDockRenderOptions
+): LegacyMenuBorderDockRenderArea[] => {
+  const boardRight = options.boardLeft + options.boardSize;
+  const boardBottom = options.boardTop + options.boardSize;
+  const mazeRight = options.mazeLeft + options.mazeSize;
+  const mazeBottom = options.mazeTop + options.mazeSize;
+  const materialTileSize = Math.max(1, options.materialTileSize);
+  const bandLeft = options.tileRect.left + Math.round((frame.leftInset / materialTileSize) * options.tileRect.width);
+  const bandTop = options.tileRect.top + Math.round((frame.topInset / materialTileSize) * options.tileRect.height);
+  const bandRight = options.tileRect.left + Math.round(((frame.leftInset + frame.width) / materialTileSize) * options.tileRect.width);
+  const bandBottom = options.tileRect.top + Math.round(((frame.topInset + frame.height) / materialTileSize) * options.tileRect.height);
+  const cornerGuardSize = Math.max(0, Math.round(options.cornerGuardSize));
+  const topGuard = options.boardTop + cornerGuardSize;
+  const bottomGuard = boardBottom - cornerGuardSize;
+  const leftGuard = options.boardLeft + cornerGuardSize;
+  const rightGuard = boardRight - cornerGuardSize;
+  const areas: LegacyMenuBorderDockRenderArea[] = [];
+
+  const pushArea = (area: LegacyMenuBorderDockRenderArea): void => {
+    if (Math.round(area.right - area.left) <= 0 || Math.round(area.bottom - area.top) <= 0) {
+      return;
+    }
+
+    areas.push(area);
+  };
+
+  if (direction === 'left') {
+    const left = options.boardLeft - 1;
+    const right = options.mazeLeft;
+    pushArea({ left, top: bandTop, right, bottom: bandBottom });
+    if (bandTop < topGuard) {
+      pushArea({ left, top: bandTop, right, bottom: topGuard });
+    }
+    if (bandBottom > bottomGuard) {
+      pushArea({ left, top: bottomGuard, right, bottom: bandBottom });
+    }
+    return areas;
+  }
+
+  if (direction === 'right') {
+    const left = mazeRight;
+    const right = boardRight + 1;
+    pushArea({ left, top: bandTop, right, bottom: bandBottom });
+    if (bandTop < topGuard) {
+      pushArea({ left, top: bandTop, right, bottom: topGuard });
+    }
+    if (bandBottom > bottomGuard) {
+      pushArea({ left, top: bottomGuard, right, bottom: bandBottom });
+    }
+    return areas;
+  }
+
+  if (direction === 'top') {
+    const top = options.boardTop - 1;
+    const bottom = options.mazeTop;
+    pushArea({ left: bandLeft, top, right: bandRight, bottom });
+    if (bandLeft < leftGuard) {
+      pushArea({ left: bandLeft, top, right: leftGuard, bottom });
+    }
+    if (bandRight > rightGuard) {
+      pushArea({ left: rightGuard, top, right: bandRight, bottom });
+    }
+    return areas;
+  }
+
+  const top = mazeBottom;
+  const bottom = boardBottom + 1;
+  pushArea({ left: bandLeft, top, right: bandRight, bottom });
+  if (bandLeft < leftGuard) {
+    pushArea({ left: bandLeft, top, right: leftGuard, bottom });
+  }
+  if (bandRight > rightGuard) {
+    pushArea({ left: rightGuard, top, right: bandRight, bottom });
+  }
+
+  return areas;
+};
+
 const resolveLegacyMenuPathStrokeSegments = (
   maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
   point: LegacyPoint,
@@ -196,7 +359,7 @@ const resolveLegacyMenuPathStrokeSegments = (
     }
   ];
 
-  if (isWalkableGridPoint(maze, { x: point.x - 1, y: point.y })) {
+  if (isLegacyMenuPathConnected(maze, point, 'left')) {
     segments.push({
       leftInset: 0,
       topInset: inset,
@@ -204,7 +367,7 @@ const resolveLegacyMenuPathStrokeSegments = (
       height: centerSpan
     });
   }
-  if (isWalkableGridPoint(maze, { x: point.x + 1, y: point.y })) {
+  if (isLegacyMenuPathConnected(maze, point, 'right')) {
     segments.push({
       leftInset: inset,
       topInset: inset,
@@ -212,7 +375,7 @@ const resolveLegacyMenuPathStrokeSegments = (
       height: centerSpan
     });
   }
-  if (isWalkableGridPoint(maze, { x: point.x, y: point.y - 1 })) {
+  if (isLegacyMenuPathConnected(maze, point, 'top')) {
     segments.push({
       leftInset: inset,
       topInset: 0,
@@ -220,7 +383,7 @@ const resolveLegacyMenuPathStrokeSegments = (
       height: inset + centerSpan
     });
   }
-  if (isWalkableGridPoint(maze, { x: point.x, y: point.y + 1 })) {
+  if (isLegacyMenuPathConnected(maze, point, 'bottom')) {
     segments.push({
       leftInset: inset,
       topInset: inset,
