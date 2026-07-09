@@ -41,6 +41,114 @@ const countDetachedFloorTiles = (maze: ReturnType<typeof createLegacyMaze>): num
   return detached;
 };
 
+const countWalkableFloorTiles = (maze: ReturnType<typeof createLegacyMaze>): number => (
+  maze.grid.reduce((total, row) => total + row.filter(Boolean).length, 0)
+);
+
+const isBorderPoint = (
+  maze: ReturnType<typeof createLegacyMaze>,
+  point: { x: number; y: number }
+): boolean => (
+  point.x === 0 || point.y === 0 || point.x === maze.size - 1 || point.y === maze.size - 1
+);
+
+const isCornerBorderPoint = (
+  maze: ReturnType<typeof createLegacyMaze>,
+  point: { x: number; y: number }
+): boolean => (
+  (point.x === 0 || point.x === maze.size - 1) && (point.y === 0 || point.y === maze.size - 1)
+);
+
+const isNonCornerBorderFloor = (
+  maze: ReturnType<typeof createLegacyMaze>,
+  point: { x: number; y: number }
+): boolean => (
+  maze.grid[point.y]?.[point.x] === true
+  && isBorderPoint(maze, point)
+  && !isCornerBorderPoint(maze, point)
+);
+
+const resolveOppositeBorderPoint = (
+  maze: ReturnType<typeof createLegacyMaze>,
+  point: { x: number; y: number }
+): { x: number; y: number } | null => {
+  if (!isNonCornerBorderFloor(maze, point)) {
+    return null;
+  }
+
+  if (point.x === 0) {
+    return { x: maze.size - 1, y: point.y };
+  }
+  if (point.x === maze.size - 1) {
+    return { x: 0, y: point.y };
+  }
+  if (point.y === 0) {
+    return { x: point.x, y: maze.size - 1 };
+  }
+  return { x: point.x, y: 0 };
+};
+
+const resolveInwardBorderNeighbor = (
+  maze: ReturnType<typeof createLegacyMaze>,
+  point: { x: number; y: number }
+): { x: number; y: number } | null => {
+  if (!isNonCornerBorderFloor(maze, point)) {
+    return null;
+  }
+
+  if (point.x === 0) {
+    return { x: 1, y: point.y };
+  }
+  if (point.x === maze.size - 1) {
+    return { x: maze.size - 2, y: point.y };
+  }
+  if (point.y === 0) {
+    return { x: point.x, y: 1 };
+  }
+  return { x: point.x, y: maze.size - 2 };
+};
+
+const auditBorderFloorContinuity = (
+  maze: ReturnType<typeof createLegacyMaze>
+): {
+  borderFloorCount: number;
+  floorRatio: number;
+  unpairedBorderBleeds: Array<{ opposite: { x: number; y: number } | null; point: { x: number; y: number } }>;
+  borderFloorsWithoutInwardConnection: Array<{ inward: { x: number; y: number } | null; point: { x: number; y: number } }>;
+} => {
+  const unpairedBorderBleeds: Array<{ opposite: { x: number; y: number } | null; point: { x: number; y: number } }> = [];
+  const borderFloorsWithoutInwardConnection: Array<{ inward: { x: number; y: number } | null; point: { x: number; y: number } }> = [];
+  let borderFloorCount = 0;
+  const walkableFloorTiles = countWalkableFloorTiles(maze);
+
+  for (let y = 0; y < maze.size; y += 1) {
+    for (let x = 0; x < maze.size; x += 1) {
+      const point = { x, y };
+      if (!isNonCornerBorderFloor(maze, point)) {
+        continue;
+      }
+
+      borderFloorCount += 1;
+      const opposite = resolveOppositeBorderPoint(maze, point);
+      if (!opposite || maze.grid[opposite.y]?.[opposite.x] !== true) {
+        unpairedBorderBleeds.push({ point, opposite });
+      }
+
+      const inward = resolveInwardBorderNeighbor(maze, point);
+      if (!inward || maze.grid[inward.y]?.[inward.x] !== true) {
+        borderFloorsWithoutInwardConnection.push({ point, inward });
+      }
+    }
+  }
+
+  return {
+    borderFloorCount,
+    floorRatio: walkableFloorTiles / Math.max(1, maze.size * maze.size),
+    unpairedBorderBleeds,
+    borderFloorsWithoutInwardConnection
+  };
+};
+
 describe('legacy topology scale audit', () => {
   test('keeps play and generated-menu topology meaningful across shortcut-enabled scale bands', () => {
     const scales = [37, 50, 75];
@@ -57,15 +165,22 @@ describe('legacy topology scale audit', () => {
           const routeQualityStats = maze.routeQualityStats;
           const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
           const detachedFloorTiles = countDetachedFloorTiles(maze);
+          const borderContinuity = auditBorderFloorContinuity(maze);
 
           if (
             detachedFloorTiles !== 0
+            || borderContinuity.borderFloorCount < 2
+            || borderContinuity.floorRatio < 0.28
+            || borderContinuity.floorRatio > 0.62
+            || borderContinuity.unpairedBorderBleeds.length > 0
+            || borderContinuity.borderFloorsWithoutInwardConnection.length > 0
             || maze.solutionPath.length < minimumSolutionPathLength
             || routeQualityStats?.routeQuality !== 'multi-route'
             || routeQualityStats.meaningfulBypassableSolutionEdges <= 1
             || routeQualityStats.meaningfulBypassableRouteBands <= 1
           ) {
             failures.push({
+              borderContinuity,
               detachedFloorTiles,
               kind,
               minimumSolutionPathLength,
@@ -98,15 +213,22 @@ describe('legacy topology scale audit', () => {
         const routeQualityStats = maze.routeQualityStats;
         const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
         const detachedFloorTiles = countDetachedFloorTiles(maze);
+        const borderContinuity = auditBorderFloorContinuity(maze);
 
         if (
           detachedFloorTiles !== 0
+          || borderContinuity.borderFloorCount < 2
+          || borderContinuity.floorRatio < 0.28
+          || borderContinuity.floorRatio > 0.62
+          || borderContinuity.unpairedBorderBleeds.length > 0
+          || borderContinuity.borderFloorsWithoutInwardConnection.length > 0
           || maze.solutionPath.length < minimumSolutionPathLength
           || routeQualityStats?.routeQuality !== 'multi-route'
           || routeQualityStats.meaningfulBypassableSolutionEdges <= 1
           || routeQualityStats.meaningfulBypassableRouteBands <= 1
         ) {
           failures.push({
+            borderContinuity,
             detachedFloorTiles,
             kind,
             minimumSolutionPathLength,
@@ -136,15 +258,22 @@ describe('legacy topology scale audit', () => {
       const routeQualityStats = maze.routeQualityStats;
       const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
       const detachedFloorTiles = countDetachedFloorTiles(maze);
+      const borderContinuity = auditBorderFloorContinuity(maze);
 
       if (
         detachedFloorTiles !== 0
+        || borderContinuity.borderFloorCount < 2
+        || borderContinuity.floorRatio < 0.28
+        || borderContinuity.floorRatio > 0.62
+        || borderContinuity.unpairedBorderBleeds.length > 0
+        || borderContinuity.borderFloorsWithoutInwardConnection.length > 0
         || maze.solutionPath.length < minimumSolutionPathLength
         || routeQualityStats?.routeQuality !== 'multi-route'
         || routeQualityStats.meaningfulBypassableSolutionEdges <= 1
         || routeQualityStats.meaningfulBypassableRouteBands <= 1
       ) {
         failures.push({
+          borderContinuity,
           detachedFloorTiles,
           kind,
           minimumSolutionPathLength,
