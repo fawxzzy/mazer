@@ -59,6 +59,12 @@ interface RecoveryDecisionSummary {
   totalCount: number;
 }
 
+interface RecoveryDecisionByScale extends RecoveryDecisionSummary {
+  averageRouteRatio: number;
+  p90RouteRatio: number;
+  scale: number;
+}
+
 interface CalibrationCase {
   adjacentMoveFailures: number;
   canonicalPathLength: number;
@@ -118,6 +124,7 @@ interface CalibrationSummary {
     p90: number;
   };
   recoveryDecision: RecoveryDecisionSummary;
+  recoveryDecisionByScale: RecoveryDecisionByScale[];
   scales: number[];
   seeds: number[];
   thoughtStateCounts: Partial<Record<DemoWalkerThoughtState, number>>;
@@ -292,6 +299,44 @@ const summarizeRecoveryDecisions = (
     totalCount: decisions.length
   };
 };
+
+const summarizeCalibrationRecoveryDecisions = (
+  cases: readonly CalibrationCase[]
+): RecoveryDecisionSummary => {
+  const totalCount = cases.reduce((total, entry) => total + entry.recoveryDecision.totalCount, 0);
+  return {
+    averageKnownRouteSteps: totalCount > 0
+      ? round(cases.reduce((total, entry) => (
+        total + (entry.recoveryDecision.averageKnownRouteSteps * entry.recoveryDecision.totalCount)
+      ), 0) / totalCount)
+      : 0,
+    frontierRecoveryCount: cases.reduce((total, entry) => (
+      total + entry.recoveryDecision.frontierRecoveryCount
+    ), 0),
+    maxKnownRouteSteps: Math.max(0, ...cases.map((entry) => entry.recoveryDecision.maxKnownRouteSteps)),
+    optionalRetargetCount: cases.reduce((total, entry) => (
+      total + entry.recoveryDecision.optionalRetargetCount
+    ), 0),
+    totalCount
+  };
+};
+
+const summarizeRecoveryDecisionsByScale = (
+  cases: readonly CalibrationCase[]
+): RecoveryDecisionByScale[] => [...new Set(cases.map((entry) => entry.scale))]
+  .sort((left, right) => left - right)
+  .map((scale) => {
+    const scaleCases = cases.filter((entry) => entry.scale === scale);
+    const routeRatios = scaleCases.map((entry) => entry.routeRatio).sort((left, right) => left - right);
+    return {
+      ...summarizeCalibrationRecoveryDecisions(scaleCases),
+      averageRouteRatio: routeRatios.length > 0
+        ? round(routeRatios.reduce((total, value) => total + value, 0) / routeRatios.length)
+        : 0,
+      p90RouteRatio: round(percentile(routeRatios, 0.9)),
+      scale
+    };
+  });
 
 const increment = <T extends string>(counts: Partial<Record<T, number>>, key: T | null | undefined): void => {
   if (!key) {
@@ -533,13 +578,7 @@ const buildSummary = (
   const scores = cases.map((entry) => entry.progression.after.score);
   const routeEfficiencyPressureScores = cases.map((entry) => entry.progression.routeEfficiencyPressureScore);
   const performanceScores = cases.map((entry) => entry.progression.performanceScore);
-  const recoveryDecisions = cases.flatMap((entry) => (
-    Array.from({ length: entry.recoveryDecision.frontierRecoveryCount }, () => ({ kind: 'frontier-recovery' as const }))
-      .concat(Array.from({ length: entry.recoveryDecision.optionalRetargetCount }, () => ({ kind: 'optional-retarget' as const })))
-  ));
-  const knownRecoveryRouteSteps = cases.flatMap((entry) => (
-    Array.from({ length: entry.recoveryDecision.totalCount }, () => entry.recoveryDecision.averageKnownRouteSteps)
-  ));
+  const recoveryDecision = summarizeCalibrationRecoveryDecisions(cases);
   const aiDecisionScores = cases
     .map((entry) => entry.progression.aiDecisionScore)
     .filter((score): score is MazeCycleAiDecisionScore => score !== null);
@@ -574,15 +613,8 @@ const buildSummary = (
       p50: round(percentile(routeRatios, 0.5)),
       p90: round(percentile(routeRatios, 0.9))
     },
-    recoveryDecision: {
-      averageKnownRouteSteps: knownRecoveryRouteSteps.length > 0
-        ? round(knownRecoveryRouteSteps.reduce((total, value) => total + value, 0) / knownRecoveryRouteSteps.length)
-        : 0,
-      frontierRecoveryCount: recoveryDecisions.filter((entry) => entry.kind === 'frontier-recovery').length,
-      maxKnownRouteSteps: Math.max(0, ...cases.map((entry) => entry.recoveryDecision.maxKnownRouteSteps)),
-      optionalRetargetCount: recoveryDecisions.filter((entry) => entry.kind === 'optional-retarget').length,
-      totalCount: recoveryDecisions.length
-    },
+    recoveryDecision,
+    recoveryDecisionByScale: summarizeRecoveryDecisionsByScale(cases),
     scales,
     seeds,
     thoughtStateCounts
