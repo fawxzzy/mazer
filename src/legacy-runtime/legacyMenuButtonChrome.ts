@@ -24,12 +24,16 @@ export const resolveLegacyMenuButtonChrome = (
   input: ResolveLegacyMenuButtonChromeInput
 ): LegacyMenuButtonChrome => {
   const { height, isPrimary, textLength, width } = input;
+  const compact = height <= 44 || width <= 132;
   const fitSize = Math.floor((width * 1.4) / Math.max(4, textLength));
+  const minimumFontSize = compact ? 16 : (isPrimary ? 24 : 20);
+  const maximumFontSize = compact ? 20 : (isPrimary ? 40 : 32);
+  const heightRatio = compact ? 0.46 : (isPrimary ? 0.58 : 0.52);
   const fontSize = Math.max(
-    isPrimary ? 24 : 20,
+    minimumFontSize,
     Math.min(
-      isPrimary ? 40 : 32,
-      Math.min(Math.round(height * (isPrimary ? 0.58 : 0.52)), fitSize)
+      maximumFontSize,
+      Math.min(Math.round(height * heightRatio), fitSize)
     )
   );
 

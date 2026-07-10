@@ -147,6 +147,14 @@ Do not ratchet for wording changes alone. Do not ratchet the retired legacy visu
 - Focused proof: `npm run lint`; `npx vitest run tests/ai/demo-walker.test.ts tests/reset/legacy-progression.test.ts tests/reset/legacy-game-toggle-preferences.test.ts tests/scenes/menu-render-frame.test.ts --maxWorkers 1` (`101` tests); and `npm run build`.
 - Open handoff: do not treat finite local AI route exhaustion as a valid end-of-maze outcome. The next AI slice must replace the reset/regeneration branch with persistent known-frontier expansion and prove no undiscovered goal target, teleport, or silent route reset occurs before genuine goal discovery.
 
+## 2026-07-10 - Authenticated mobile overlay and proof-harness maintenance receipt
+
+- Stayed at `100%`: this was a proof-backed mobile readability maintenance pass, not a new mechanics scope ratchet.
+- Compact front-door buttons now reserve real interior breathing room instead of enforcing the former `24px` primary-label minimum inside `42px` phone buttons. Main-menu `Start` and `Options` remain a single touch-friendly row at the `360x720` phone proof size.
+- Both Player Guide variants now keep their concise bullet copy inside the card. Options keeps the guide fixed above its independently scrollable toggles; Pause keeps its guide fixed above the independently scrollable toggle/Move Speed lane and its pinned reset/menu actions.
+- Pause toggle descriptions use shorter on/off language that remains readable on a narrow phone row. Options and Pause proof now includes top and bottom captures through real scroll-rail drag input, rather than assuming that an exposed rail makes lower controls reachable.
+- Proof: `npm run lint`; `npx vitest run tests/scenes/menu-render-frame.test.ts tests/reset/legacy-menu-layout.test.ts tests/reset/legacy-pause-lifecycle.test.ts tests/reset/legacy-menu-button-chrome.test.ts tests/reset/ui-surface-capture-script.test.mjs --maxWorkers 1` (`68` tests); `npm run build` producing `assets/main-B61oLgDr.js`; and `npm run visual:ui-surfaces -- --label mobile-bottom-scroll-drag-auth --auth-fixture authenticated --viewport 360x720 --device-scale-factor 2 --no-preview --skip-build --base-url http://127.0.0.1:4173`. The capture passed with route/mode/overlay contracts, native `2x` backing resolution, no console/page errors, no viewport escape or active-text overlap, contained progression badge text, and verified lower Options `Controls` plus Pause `Move Speed`, `Reset Progress`, `Reset`, and `Menu`. Artifacts: `tmp/captures/mazer-ui-surfaces/2026-07-10T19-55-41-618Z/`.
+
 ## 2026-07-08 - Title deconstruct handoff parity receipt
 - Updated the menu deconstruct handoff so the title path pieces are an explicit participant in the same zero-tile hold as the board.
 - The rebuild guard now waits for both maze tiles and title pieces to reach zero before the 1000ms empty-board handoff can finish.

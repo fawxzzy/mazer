@@ -82,19 +82,20 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       menuSceneSource.indexOf('private createFeatureControlRows(')
     );
 
-    expect(menuSceneSource).toContain('this.createLegacyOptionsInfoSection(rowY, panel);');
-    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(viewport.top + 4, panel, {');
+    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);');
+    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(\n      panel.top + (stacked ? 110 : 120)');
     expect(menuSceneSource).toContain("addText('PLAYER GUIDE'");
-    expect(buildOptionsSource.indexOf('rowY = this.createLegacyOptionsInfoSection(rowY, panel);')).toBeLessThan(
-      buildOptionsSource.indexOf('rowY = this.createFeatureControlRows(rowY, panel')
+    expect(buildOptionsSource.indexOf('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);')).toBeLessThan(
+      buildOptionsSource.indexOf('this.createFeatureControlRows(viewport.top, panel')
     );
-    expect(buildPauseSource.indexOf('const guideEndY = this.createLegacyOptionsInfoSection(viewport.top + 4, panel, {')).toBeLessThan(
-      buildPauseSource.indexOf('this.createFeatureControlRows(guideEndY, panel, {')
+    expect(buildPauseSource.indexOf('const guideEndY = this.createLegacyOptionsInfoSection(')).toBeLessThan(
+      buildPauseSource.indexOf('this.createFeatureControlRows(viewport.top, panel, {')
     );
     expect(guideSource).toContain("drawLegendRow(0, 'compass', 'Compass'");
     expect(guideSource).toContain("drawLegendRow(1, 'start', 'Start'");
     expect(guideSource).toContain("drawLegendRow(2, 'end', 'End'");
-    expect(guideSource).toContain("'Player: green beacon; the trail marks your route.'");
+    expect(guideSource).toContain("'Player: green beacon + trail.'");
+    expect(guideSource).toContain("'Score grades each run.'");
     expect(guideSource).not.toContain('activeTargetComplexity');
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
@@ -1254,12 +1255,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private resolveLegacyCurrentMazeLevel(): number');
     expect(menuSceneSource).toContain('private resolveLegacyProgressionBadgeText(_palette: LegacyProgressionPalette): string');
     expect(menuSceneSource).toContain('const text = this.resolveLegacyProgressionBadgeText(palette);');
-    expect(menuSceneSource).toContain("const skillLine = `AI Skill Lvl: ${aiTrack.rank}/${String(aiTrack.level).padStart(2, '0')}  Score: ${scoreLabel}`;");
-    expect(menuSceneSource).toContain("const runLine = `Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}  Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;");
+    expect(menuSceneSource).toContain("const skillLine = `AI Skill Lvl: ${aiTrack.rank}/${String(aiTrack.level).padStart(2, '0')}`;");
+    expect(menuSceneSource).toContain("const runLine = `Score: ${scoreLabel}  Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}  Maze: ${this.resolveLegacyCurrentMazeLevel()}`;");
     expect(menuSceneSource).toContain("return `${timerLabel}\\n${skillLine}\\n${runLine}`;");
     expect(menuSceneSource).toContain("const timerLine = this.formatLegacyElapsedLabel(this.resolveLegacyPlayElapsedMs());");
-    expect(menuSceneSource).toContain("const skillLine = `Skill Lvl: ${playerTrack.rank}/${String(playerTrack.level).padStart(2, '0')}  Score: ${scoreLabel}`;");
-    expect(menuSceneSource).toContain("const runLine = `Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}  Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;");
+    expect(menuSceneSource).toContain("const skillLine = `Skill Lvl: ${playerTrack.rank}/${String(playerTrack.level).padStart(2, '0')}`;");
+    expect(menuSceneSource).toContain("const runLine = `Score: ${scoreLabel}  Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}  Maze: ${this.resolveLegacyCurrentMazeLevel()}`;");
     expect(menuSceneSource).not.toContain('const complexityLabel =');
     expect(menuSceneSource).not.toContain('const signalLabel =');
     expect(menuSceneSource).not.toContain('Sig:');
@@ -1283,18 +1284,18 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const cardHeight = compact ? 264 : 274;');
-    expect(menuSceneSource).toContain('const guideHeight = (stacked ? 264 : 274) + (stacked ? 26 : 30);');
-    expect(menuSceneSource).toContain('const guideTitleFontSize = compact ? 19 : 21;');
-    expect(menuSceneSource).toContain('const guideRowFontSize = compact ? 14 : 15;');
-    expect(menuSceneSource).toContain('const guideRowMinFontSize = compact ? 12 : 13;');
+    expect(menuSceneSource).toContain('const cardHeight = compact ? 250 : 260;');
+    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);');
+    expect(menuSceneSource).toContain('const guideTitleFontSize = compact ? 18 : 21;');
+    expect(menuSceneSource).toContain('const guideRowFontSize = compact ? 13 : 15;');
+    expect(menuSceneSource).toContain('const guideRowMinFontSize = compact ? 11 : 13;');
     expect(menuSceneSource).toContain("addText('PLAYER GUIDE', panel.centerX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);");
     expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');");
-    expect(menuSceneSource).toContain("'Player: green beacon; the trail marks your route.'");
+    expect(menuSceneSource).toContain("'Player: green beacon + trail.'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
-    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Skill Lvl' : 'AI Skill Lvl'}: rank and current level.`");
-    expect(menuSceneSource).toContain("'Score: 0-100 run quality; Runs: completed mazes.'");
-    expect(menuSceneSource).toContain("'Maze Lvl: the current procedural challenge tier.'");
+    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Skill' : 'AI skill'}: rank + level.`");
+    expect(menuSceneSource).toContain("'Score grades each run.'");
+    expect(menuSceneSource).toContain("'Maze Lvl sets challenge.'");
   });
 
   test('exposes wrapped edge player snaps in runtime diagnostics', () => {
@@ -1455,8 +1456,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.overlayScrollThumbBounds = this.legacyOverlayScrollRectToVisualRect(metrics.thumb);');
     expect(menuSceneSource).toContain('const thumbAlpha = metrics.enabled ? 0.92 : 0.58;');
     expect(menuSceneSource).toContain('if (!showAdvancedOptions) {');
-    expect(menuSceneSource).toContain('const viewportTop = rowY - (compact ? 4 : 2);');
-    expect(menuSceneSource).toContain('const contentHeight = 18 + this.resolveFeatureControlRowsContentHeight(panel, {');
+    expect(menuSceneSource).toContain('const viewportTop = guideEndY + (compact ? 8 : 10);');
+    expect(menuSceneSource).toContain('const contentHeight = this.resolveFeatureControlRowsContentHeight(panel, {');
     expect(menuSceneSource).toContain('this.input.on(\'wheel\'');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerDown(pointer: Phaser.Input.Pointer): boolean');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerMove(pointer: Phaser.Input.Pointer): boolean');

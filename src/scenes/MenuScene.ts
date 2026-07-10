@@ -5887,8 +5887,8 @@ export class MenuScene extends Phaser.Scene {
       const playerTrack = this.progressionState.tracks.player;
       const timerLine = this.formatLegacyElapsedLabel(this.resolveLegacyPlayElapsedMs());
       const scoreLabel = playerTrack.paceScore > 0 ? String(playerTrack.paceScore) : '--';
-      const skillLine = `Skill Lvl: ${playerTrack.rank}/${String(playerTrack.level).padStart(2, '0')}  Score: ${scoreLabel}`;
-      const runLine = `Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}  Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;
+      const skillLine = `Skill Lvl: ${playerTrack.rank}/${String(playerTrack.level).padStart(2, '0')}`;
+      const runLine = `Score: ${scoreLabel}  Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}  Maze: ${this.resolveLegacyCurrentMazeLevel()}`;
 
       return `${timerLine}\n${skillLine}\n${runLine}`;
     }
@@ -5896,8 +5896,8 @@ export class MenuScene extends Phaser.Scene {
     const timerLabel = this.formatLegacyElapsedLabel(this.resolveLegacyMenuAiElapsedMs());
     const aiTrack = this.progressionState.tracks['ai-runner'];
     const scoreLabel = aiTrack.paceScore > 0 ? String(aiTrack.paceScore) : '--';
-    const skillLine = `AI Skill Lvl: ${aiTrack.rank}/${String(aiTrack.level).padStart(2, '0')}  Score: ${scoreLabel}`;
-    const runLine = `Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}  Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;
+    const skillLine = `AI Skill Lvl: ${aiTrack.rank}/${String(aiTrack.level).padStart(2, '0')}`;
+    const runLine = `Score: ${scoreLabel}  Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}  Maze: ${this.resolveLegacyCurrentMazeLevel()}`;
 
     return `${timerLabel}\n${skillLine}\n${runLine}`;
   }
@@ -7294,11 +7294,18 @@ export class MenuScene extends Phaser.Scene {
   private resolveOverlayPanelFrame(kind: OverlayKind = this.overlay): OverlayPanelFrame {
     const width = Math.min(720, this.layout.width - 40);
     const compact = this.layout.width < 480;
+    const mobilePortrait = compact && this.layout.height > this.layout.width;
+    const mobileTopInset = mobilePortrait
+      ? clampInteger(Math.round(this.layout.height * 0.055), 30, 44)
+      : 16;
     const maxCompactHeight = kind === 'pause' ? 820 : this.layout.height - 32;
     const maxDesktopHeight = kind === 'pause' ? 700 : 620;
-    let height = Math.min(compact ? maxCompactHeight : maxDesktopHeight, this.layout.height - 32);
+    let height = Math.min(
+      compact ? maxCompactHeight : maxDesktopHeight,
+      this.layout.height - mobileTopInset - 16
+    );
     const left = Math.round((this.layout.width - width) / 2);
-    let top = Math.round((this.layout.height - height) / 2);
+    let top = Math.max(mobileTopInset, Math.round((this.layout.height - height) / 2));
 
     if (kind === 'pause' && this.mode === 'play') {
       const timerFrame = resolveLegacyPlayHudFrame({
@@ -7337,12 +7344,12 @@ export class MenuScene extends Phaser.Scene {
     const stacked = panel.width < 420;
     const rowHeight = options.showDescriptions ? (stacked ? 66 : 70) : (stacked ? 46 : 48);
     const rowGap = stacked ? 8 : 10;
-    const headingGap = stacked ? 28 : 32;
     const toggleRowCount = 6;
 
-    return headingGap
+    return 4
       + (toggleRowCount * (rowHeight + rowGap))
-      + (options.includeMovementSpeed ? rowHeight + (stacked ? 10 : 6) : 0);
+      + (options.includeMovementSpeed ? rowHeight + (stacked ? 10 : 6) : 0)
+      + 4;
   }
 
   private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void {
@@ -7431,7 +7438,8 @@ export class MenuScene extends Phaser.Scene {
     if (!showAdvancedOptions) {
       const actionButtonHeight = compact ? 44 : 48;
       const actionY = panel.top + panel.height - (compact ? 48 : 56);
-      const viewportTop = rowY - (compact ? 4 : 2);
+      const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);
+      const viewportTop = guideEndY + (compact ? 8 : 10);
       const viewportBottom = actionY - (actionButtonHeight / 2) - (compact ? 14 : 16);
       const viewport = createVisualRect(
         panel.left + 24,
@@ -7439,22 +7447,16 @@ export class MenuScene extends Phaser.Scene {
         panel.width - 48,
         Math.max(140, viewportBottom - viewportTop)
       );
-      const guideHeight = (compact ? 264 : 274) + (compact ? 26 : 30);
-      const contentHeight = 18 + this.resolveFeatureControlRowsContentHeight(panel, {
+      const contentHeight = this.resolveFeatureControlRowsContentHeight(panel, {
         includeMovementSpeed: false
-      }) + guideHeight + 12;
+      });
       const scrollMetrics = resolveLegacyOverlayScrollMetrics({
         contentHeight,
         offset: this.overlayScrollOffset,
         viewport: this.visualRectToLegacyOverlayScrollRect(viewport)
       });
       this.applyLegacyOverlayScrollMetrics(scrollMetrics);
-      const guideEndY = this.createLegacyOptionsInfoSection(viewport.top + 4, panel, {
-        rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
-        scrollOffset: scrollMetrics.offset,
-        viewport
-      });
-      this.createFeatureControlRows(guideEndY, panel, {
+      this.createFeatureControlRows(viewport.top, panel, {
         includeMovementSpeed: false,
         rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
         scrollOffset: scrollMetrics.offset,
@@ -7484,47 +7486,27 @@ export class MenuScene extends Phaser.Scene {
 
   private createLegacyOptionsInfoSection(
     rowY: number,
-    panel: OverlayPanelFrame,
-    options: {
-      includeMovementSpeed?: boolean;
-      rightGutter?: number;
-      scrollOffset?: number;
-      showDescriptions?: boolean;
-      viewport?: VisualRect | null;
-    } = {}
+    panel: OverlayPanelFrame
   ): number {
     const compact = panel.width < 420;
-    const accountButtonHeight = compact ? 44 : 48;
-    const accountButtonY = panel.top + panel.height - (compact ? 48 : 56);
-    const flowMode = options.viewport ? 'scroll' : 'anchored';
-    const cardHeight = compact ? 264 : 274;
+    const cardHeight = compact ? 250 : 260;
     const cardWidth = Math.min(
-      panel.width - (compact ? 48 : 72) - (options.rightGutter ?? 0),
+      panel.width - (compact ? 48 : 72),
       compact ? 350 : 540
     );
     const cardLeft = panel.centerX - (cardWidth / 2);
-    const cardBottom = accountButtonY - (accountButtonHeight / 2) - (compact ? 12 : 14);
-    const preferredTop = cardBottom - cardHeight;
-    const contentTop = flowMode === 'scroll'
-      ? rowY + (compact ? 12 : 14)
-      : Math.max(panel.top + 86, Math.min(preferredTop, rowY));
-    const scrollOffset = options.scrollOffset ?? 0;
-    const cardTop = contentTop - scrollOffset;
-    const cardBottomRender = cardTop + cardHeight;
-    const viewport = options.viewport ?? null;
-    if (viewport && (cardBottomRender < viewport.top + 4 || cardTop > viewport.bottom - 4)) {
-      return contentTop + cardHeight + (compact ? 14 : 16);
-    }
+    const cardTop = Math.max(panel.top + (compact ? 82 : 88), rowY + (compact ? 8 : 10));
 
     const inset = compact ? 14 : 18;
-    const titleY = cardTop + (compact ? 19 : 21);
-    const legendTop = cardTop + (compact ? 52 : 58);
-    const rowHeight = compact ? 31 : 33;
-    const guideTitleFontSize = compact ? 19 : 21;
-    const guideRowFontSize = compact ? 14 : 15;
-    const guideRowMinFontSize = compact ? 12 : 13;
+    const titleY = cardTop + (compact ? 18 : 21);
+    const legendTop = cardTop + (compact ? 47 : 56);
+    const rowHeight = compact ? 27 : 31;
+    const guideTitleFontSize = compact ? 18 : 21;
+    const guideRowFontSize = compact ? 13 : 15;
+    const guideRowMinFontSize = compact ? 11 : 13;
     const detailLeft = cardLeft + inset;
     const detailWidth = cardWidth - (inset * 2);
+    const detailRight = detailLeft + detailWidth;
 
     this.drawLegacyCyberPanel(this.overlayGraphics, {
       active: true,
@@ -7576,16 +7558,16 @@ export class MenuScene extends Phaser.Scene {
       const rowTop = legendTop + (index * rowHeight);
       const glyphX = detailLeft + (compact ? 14 : 16);
       const glyphY = rowTop + (rowHeight / 2);
-      const labelX = detailLeft + (compact ? 34 : 40);
-      const labelWidth = Math.min(compact ? 104 : 120, detailWidth * (compact ? 0.32 : 0.36));
-      const copyX = labelX + (compact ? 104 : 116);
-      const copyWidth = Math.max(compact ? 96 : 104, detailLeft + detailWidth - copyX);
+      const labelX = detailLeft + (compact ? 28 : 34);
+      const labelWidth = Math.min(compact ? 76 : 118, Math.round(detailWidth * (compact ? 0.32 : 0.36)));
+      const copyX = labelX + labelWidth + (compact ? 4 : 8);
+      const copyWidth = Math.max(compact ? 82 : 104, detailRight - copyX);
       this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, compact ? 16 : 18);
-      addText(title, labelX, glyphY - (compact ? 4 : 5), labelWidth, color, guideRowFontSize, 0, 1, guideRowMinFontSize);
+      addText(title, labelX, glyphY, labelWidth, color, guideRowFontSize, 0, 1, guideRowMinFontSize);
       addText(
         copy,
         copyX,
-        glyphY - (compact ? 4 : 5),
+        glyphY,
         copyWidth,
         '#d9fff5',
         guideRowFontSize,
@@ -7598,18 +7580,25 @@ export class MenuScene extends Phaser.Scene {
     drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');
     drawLegendRow(1, 'start', 'Start', 'run begins', '#fff05a');
     drawLegendRow(2, 'end', 'End', 'clear here', '#ff5264');
-    const bulletTop = legendTop + (3 * rowHeight) + (compact ? 8 : 10);
-    const bullets = [
-      'Player: green beacon; the trail marks your route.',
-      `${this.mode === 'play' ? 'Skill Lvl' : 'AI Skill Lvl'}: rank and current level.`,
-      'Score: 0-100 run quality; Runs: completed mazes.',
-      'Maze Lvl: the current procedural challenge tier.'
-    ];
+    const bulletTop = legendTop + (3 * rowHeight) + (compact ? 18 : 12);
+    const bullets = compact
+      ? [
+        'Player: green beacon + trail.',
+        `${this.mode === 'play' ? 'Skill' : 'AI skill'}: rank + level.`,
+        'Score grades each run.',
+        'Maze Lvl sets challenge.'
+      ]
+      : [
+        'Player: green beacon; the trail marks your route.',
+        `${this.mode === 'play' ? 'Skill Lvl' : 'AI Skill Lvl'} combines rank and level.`,
+        'Score grades route quality; Runs count completed mazes.',
+        'Maze Lvl sets the current procedural challenge tier.'
+      ];
     bullets.forEach((copy, index) => {
       addText(`• ${copy}`, detailLeft, bulletTop + (index * rowHeight), detailWidth, '#d9fff5', guideRowFontSize, 0, 0.92, guideRowMinFontSize);
     });
 
-    return contentTop + cardHeight + (compact ? 14 : 16);
+    return cardTop + cardHeight + (compact ? 14 : 16);
   }
 
   private drawLegacyOptionsGuideGlyph(
@@ -7660,31 +7649,29 @@ export class MenuScene extends Phaser.Scene {
     }
     const actionButtonHeight = stacked ? 42 : 48;
     const actionY = panel.top + panel.height - (stacked ? 42 : 54);
-    const viewportTop = panel.top + (stacked ? 98 : 112) + (hasOverlayMessage ? 22 : 0);
-    const viewportBottom = actionY - (actionButtonHeight / 2) - (stacked ? 18 : 24);
+    const guideEndY = this.createLegacyOptionsInfoSection(
+      panel.top + (stacked ? 110 : 120) + (hasOverlayMessage ? 22 : 0),
+      panel
+    );
+    const viewportTop = guideEndY + (stacked ? 8 : 10);
+    const viewportBottom = actionY - (actionButtonHeight * 2) - 4;
     const viewport = createVisualRect(
       panel.left + 24,
       viewportTop,
       panel.width - 48,
       Math.max(120, viewportBottom - viewportTop)
     );
-    const guideHeight = (stacked ? 264 : 274) + (stacked ? 26 : 30);
-    const contentHeight = 18 + this.resolveFeatureControlRowsContentHeight(panel, {
+    const contentHeight = this.resolveFeatureControlRowsContentHeight(panel, {
       includeMovementSpeed: true,
       showDescriptions: true
-    }) + guideHeight + 12;
+    });
     const scrollMetrics = resolveLegacyOverlayScrollMetrics({
       contentHeight,
       offset: this.overlayScrollOffset,
       viewport: this.visualRectToLegacyOverlayScrollRect(viewport)
     });
     this.applyLegacyOverlayScrollMetrics(scrollMetrics);
-    const guideEndY = this.createLegacyOptionsInfoSection(viewport.top + 4, panel, {
-      rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
-      scrollOffset: scrollMetrics.offset,
-      viewport
-    });
-    this.createFeatureControlRows(guideEndY, panel, {
+    this.createFeatureControlRows(viewport.top, panel, {
       includeMovementSpeed: true,
       rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
       scrollOffset: scrollMetrics.offset,
@@ -8111,8 +8098,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings),
         description: this.settings.toggleCameraFollow
-          ? 'On: keeps the maze centered around you.'
-          : 'Off: keeps the full maze fixed in view.',
+          ? 'On: follows your position.'
+          : 'Off: keeps the full maze in view.',
         label: 'Camera Follow',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleCameraFollow'),
@@ -8122,8 +8109,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
         description: this.settings.toggleTrailFade
-          ? 'On: older trail tiles fade away.'
-          : 'Off: your full trail stays visible.',
+          ? 'On: old trail tiles fade.'
+          : 'Off: your full trail remains.',
         label: 'Trail Fade',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailFade'),
@@ -8133,8 +8120,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
         description: this.settings.toggleTrailPulse
-          ? 'On: trail gets a soft purple pulse.'
-          : 'Off: trail remains steady and crisp.',
+          ? 'On: purple pulse moves along the trail.'
+          : 'Off: no trail pulse.',
         label: 'Trail Pulse',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailPulse'),
@@ -8144,8 +8131,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
         description: this.settings.toggleAnimatedBackdrop
-          ? 'On: background stars and sigils drift.'
-          : 'Off: background stays still to reduce motion.',
+          ? 'On: stars and sigils move.'
+          : 'Off: background stays still.',
         label: 'Animated BG',
         offLabel: 'Stagnant',
         onClick: () => this.applyLegacyOverlayToggleField('toggleAnimatedBackdrop'),
@@ -8155,7 +8142,7 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings),
         description: this.settings.darkMode
-          ? 'On: higher-contrast dark game surface.'
+          ? 'On: darker, higher contrast.'
           : 'Off: brighter board treatment.',
         label: 'Dark Mode',
         offLabel: 'Off',
@@ -8166,8 +8153,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings),
         description: this.settings.controlMode === 'stick'
-          ? 'Stick: drag the on-screen compass to move.'
-          : 'Arrows: tap directional buttons to move.',
+          ? 'Stick: drag the compass to move.'
+          : 'Arrows: tap directional buttons.',
         label: 'Controls',
         offLabel: 'Arrows',
         onClick: () => this.applyLegacyOverlayToggleField('controlMode'),
@@ -8260,7 +8247,7 @@ export class MenuScene extends Phaser.Scene {
       ? Math.max(14, Math.min(18, Math.round(input.height * 0.27)))
       : Math.max(15, Math.min(20, Math.round(input.height * 0.4)));
     const stateFontSize = Math.max(11, Math.min(13, Math.round(input.height * 0.28)));
-    const titleY = input.y + (hasDescription ? -Math.round(input.height * 0.16) : 0);
+    const titleY = input.y + (hasDescription ? -Math.round(input.height * 0.24) : 0);
     const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, input.checked ? 0.62 : 0.5);
     background.setStrokeStyle(1, rowStroke, input.checked ? 0.56 : 0.38);
     background.setInteractive({ useHandCursor: true });
@@ -8286,7 +8273,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const description = hasDescription
-      ? this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, input.y + Math.round(input.height * 0.2), input.description!, {
+      ? this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, input.y + Math.round(input.height * 0.3), input.description!, {
         color: '#bfe9de',
         fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: `${Math.max(11, Math.min(13, Math.round(input.height * 0.18)))}px`
@@ -8886,7 +8873,7 @@ export class MenuScene extends Phaser.Scene {
   private createOverlayTitle(text: string, y: number): void {
     const label = this.padLegacyUiText(this.add.text(this.layout.width / 2, y, text, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${this.layout.width < 480 ? 30 : 34}px`,
+      fontSize: `${this.layout.width < 420 ? 24 : (this.layout.width < 480 ? 28 : 34)}px`,
       color: '#6bc96f'
     })).setOrigin(0.5);
     this.uiTexts.push(label);
@@ -9111,6 +9098,9 @@ export class MenuScene extends Phaser.Scene {
       fontSize: `${buttonFontSize}px`,
       color: buttonTextColor
     })).setOrigin(0.5).setAlpha(frontDoorChrome?.labelAlpha ?? 0.92);
+    if (isMenuFrontDoor) {
+      this.fitLegacyUiTextToWidth(label, Math.max(56, width - 24), buttonFontSize, 15);
+    }
     this.uiTexts.push(label);
 
     const setActive = (active: boolean): void => {

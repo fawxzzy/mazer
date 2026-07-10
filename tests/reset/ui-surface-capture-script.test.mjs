@@ -54,8 +54,10 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("id: '01-menu'");
     expect(source).toContain("id: '02-auth'");
     expect(source).toContain("id: '02-options'");
+    expect(source).toContain("id: '02-options-bottom'");
     expect(source).toContain("id: '03-play'");
     expect(source).toContain("id: '04-pause'");
+    expect(source).toContain("id: '04-pause-bottom'");
     expect(source).toContain("mode: 'menu'");
     expect(source).toContain("mode: 'play'");
     expect(source).toContain("overlay: 'none'");
@@ -100,6 +102,10 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'mobile-badge-text-fit'");
     expect(source).toContain('const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {');
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-affordance'");
+    expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-reachability'");
+    expect(source).toContain('const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
+    expect(source).toContain("expectedLabels: ['Controls']");
+    expect(source).toContain("expectedLabels: ['Move Speed', 'Reset Progress', 'Reset', 'Menu']");
     expect(source).toContain('optionsSurface.diagnostics.visual?.overlayUi');
     expect(source).toContain('pause.diagnostics.visual?.overlayUi');
     expect(source).toContain("nativeInputs: authSurface.nativeInputs");

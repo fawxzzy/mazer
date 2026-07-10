@@ -45,4 +45,24 @@ describe('legacy menu button chrome', () => {
     expect(secondary.labelAlpha).toBeGreaterThanOrEqual(0.98);
     expect(secondary.strokeWidth).toBe(2);
   });
+
+  test('reserves vertical breathing room for compact mobile menu buttons', () => {
+    const primary = resolveLegacyMenuButtonChrome({
+      width: 118,
+      height: 42,
+      textLength: 5,
+      isPrimary: true
+    });
+    const secondary = resolveLegacyMenuButtonChrome({
+      width: 118,
+      height: 42,
+      textLength: 7,
+      isPrimary: false
+    });
+
+    expect(primary.fontSize).toBeLessThan(24);
+    expect(secondary.fontSize).toBeLessThan(20);
+    expect(primary.fontSize).toBeGreaterThanOrEqual(16);
+    expect(secondary.fontSize).toBeGreaterThanOrEqual(16);
+  });
 });

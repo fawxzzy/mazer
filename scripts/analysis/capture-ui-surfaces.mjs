@@ -512,8 +512,8 @@ const hasTextLabels = (surface, expectedLabels) => {
 
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
   'Options',
-  'Move Speed',
-  'PLAYER GUIDE'
+  'PLAYER GUIDE',
+  'Camera Follow'
 ]);
 
 const resolveOptionsExpectedLabels = (authenticated) => [
@@ -554,6 +554,52 @@ const isFiniteBounds = (bounds) => (
   && Number.isFinite(bounds.width)
   && Number.isFinite(bounds.height)
 );
+
+const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
+  const before = await readDiagnostics(page);
+  const scroll = before.visual?.overlayUi?.scroll;
+  if (
+    scroll?.enabled !== true
+    || !Number.isFinite(scroll.maxOffset)
+    || scroll.maxOffset <= 0
+    || !isFiniteBounds(scroll.viewport)
+  ) {
+    return before;
+  }
+
+  const dragStartY = scroll.track.bottom - 2;
+  const dragEndY = scroll.track.top + 2;
+  const dragDistance = Math.max(1, dragStartY - dragEndY);
+  const dragCount = Math.max(1, Math.ceil(scroll.maxOffset / dragDistance));
+  for (let index = 0; index < dragCount; index += 1) {
+    await page.mouse.move(scroll.track.centerX, dragStartY);
+    await page.mouse.down();
+    await page.mouse.move(scroll.track.centerX, dragEndY, { steps: 8 });
+    await page.mouse.up();
+  }
+  await page.waitForFunction(
+    ({ visualAttribute }) => {
+      const raw = document.documentElement.getAttribute(visualAttribute);
+      if (!raw) {
+        return false;
+      }
+
+      try {
+        const visual = JSON.parse(raw);
+        const current = visual?.overlayUi?.scroll;
+        return current?.enabled === true
+          && Number.isFinite(current?.maxOffset)
+          && Number.isFinite(current?.offset)
+          && current.offset >= current.maxOffset - 1;
+      } catch {
+        return false;
+      }
+    },
+    { visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE },
+    { timeout: timeoutMs }
+  );
+  return readDiagnostics(page);
+};
 
 const collectTextBoundsIssues = (surfaceId, surface, viewport) => {
   if (surface?.skipped === true) {
@@ -730,6 +776,23 @@ const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {
     : [`${surfaceId}:thumb-outside-track`];
 };
 
+const collectOverlayScrollBottomIssues = (surfaceId, surface, expectedLabels) => {
+  if (surface?.skipped === true) {
+    return [];
+  }
+
+  const scroll = surface.overlayUi?.scroll;
+  if (scroll?.enabled !== true || !Number.isFinite(scroll.maxOffset) || !Number.isFinite(scroll.offset)) {
+    return [`${surfaceId}:missing-scroll-bottom-diagnostics`];
+  }
+  if (scroll.offset < scroll.maxOffset - 1) {
+    return [`${surfaceId}:offset=${scroll.offset.toFixed(1)}<max=${scroll.maxOffset.toFixed(1)}`];
+  }
+  return hasTextLabels(surface, expectedLabels)
+    ? []
+    : [`${surfaceId}:missing-bottom-labels=${expectedLabels.join(',')}`];
+};
+
 const buildSurfaceChecks = ({
   consoleMessages,
   pageErrors,
@@ -746,22 +809,28 @@ const buildSurfaceChecks = ({
     ...collectTextBoundsIssues('menu', surfaces.menu, viewport),
     ...collectTextBoundsIssues('auth', surfaces.auth, viewport),
     ...collectTextBoundsIssues('options', surfaces.options, viewport),
+    ...collectTextBoundsIssues('options-bottom', surfaces.optionsBottom, viewport),
     ...collectTextBoundsIssues('play', surfaces.play, viewport),
-    ...collectTextBoundsIssues('pause', surfaces.pause, viewport)
+    ...collectTextBoundsIssues('pause', surfaces.pause, viewport),
+    ...collectTextBoundsIssues('pause-bottom', surfaces.pauseBottom, viewport)
   ];
   const nativeInputBoundsIssues = [
     ...collectNativeInputBoundsIssues('menu', surfaces.menu, viewport),
     ...collectNativeInputBoundsIssues('auth', surfaces.auth, viewport),
     ...collectNativeInputBoundsIssues('options', surfaces.options, viewport),
+    ...collectNativeInputBoundsIssues('options-bottom', surfaces.optionsBottom, viewport),
     ...collectNativeInputBoundsIssues('play', surfaces.play, viewport),
-    ...collectNativeInputBoundsIssues('pause', surfaces.pause, viewport)
+    ...collectNativeInputBoundsIssues('pause', surfaces.pause, viewport),
+    ...collectNativeInputBoundsIssues('pause-bottom', surfaces.pauseBottom, viewport)
   ];
   const textOverlapIssues = [
     ...collectTextOverlapIssues('menu', surfaces.menu),
     ...collectTextOverlapIssues('auth', surfaces.auth),
     ...collectTextOverlapIssues('options', surfaces.options),
+    ...collectTextOverlapIssues('options-bottom', surfaces.optionsBottom),
     ...collectTextOverlapIssues('play', surfaces.play),
-    ...collectTextOverlapIssues('pause', surfaces.pause)
+    ...collectTextOverlapIssues('pause', surfaces.pause),
+    ...collectTextOverlapIssues('pause-bottom', surfaces.pauseBottom)
   ];
   const controlSpacingIssues = [
     ...collectMenuControlSpacingIssues(surfaces.menu)
@@ -769,6 +838,10 @@ const buildSurfaceChecks = ({
   const overlayScrollIssues = [
     ...collectOverlayScrollAffordanceIssues('options', surfaces.options),
     ...collectOverlayScrollAffordanceIssues('pause', surfaces.pause)
+  ];
+  const overlayScrollBottomIssues = [
+    ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, ['Controls']),
+    ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Move Speed', 'Reset Progress', 'Reset', 'Menu'])
   ];
   const menuTitle = surfaces.menu.title;
   const badgeFitIssues = [
@@ -913,6 +986,11 @@ const buildSurfaceChecks = ({
       'mobile-overlay-scroll-affordance',
       overlayScrollIssues.length === 0,
       overlayScrollIssues.length === 0 ? 'options and pause expose scroll viewport, rail, and thumb diagnostics' : overlayScrollIssues.join('; ')
+    ),
+    createCheck(
+      'mobile-overlay-scroll-reachability',
+      overlayScrollBottomIssues.length === 0,
+      overlayScrollBottomIssues.length === 0 ? 'options and pause bottom controls are reached through real scroll input' : overlayScrollBottomIssues.join('; ')
     )
   ];
   const runtimeChecks = [
@@ -970,9 +1048,15 @@ const buildMarkdownReport = (summary) => {
       ? `![Options](${summary.screenshots.options})`
       : '_Options capture skipped because the menu is auth-gated in the captured session._',
     '',
+    summary.screenshots.optionsBottom
+      ? `![Options bottom](${summary.screenshots.optionsBottom})`
+      : '_Options bottom capture skipped because the menu is auth-gated in the captured session._',
+    '',
     `![Play](${summary.screenshots.play})`,
     '',
     `![Pause](${summary.screenshots.pause})`,
+    '',
+    `![Pause bottom](${summary.screenshots.pauseBottom})`,
     ''
   ].join('\n');
 };
@@ -1096,6 +1180,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         reason: 'already-authenticated'
       };
 
+    let optionsBottomSurface = null;
     const optionsSurface = authGatedMenu
       ? {
         diagnostics: {
@@ -1126,6 +1211,19 @@ export const runUiSurfaceCapture = async (options = {}) => {
           overlay: 'options',
           route,
           skipWait: authFixture === 'authenticated',
+          timeoutMs,
+          viewport
+        });
+        await scrollOverlayToBottom(page, { timeoutMs });
+        optionsBottomSurface = await captureSurface({
+          page,
+          outputDir,
+          expectedLabels: ['Controls'],
+          id: '02-options-bottom',
+          mode: 'menu',
+          overlay: 'options',
+          route,
+          skipWait: true,
           timeoutMs,
           viewport
         });
@@ -1164,6 +1262,19 @@ export const runUiSurfaceCapture = async (options = {}) => {
       mode: 'play',
       overlay: 'pause',
       route: playRoute,
+      timeoutMs,
+      viewport
+    });
+    await scrollOverlayToBottom(page, { timeoutMs });
+    const pauseBottomSurface = await captureSurface({
+      page,
+      outputDir,
+      expectedLabels: ['Move Speed', 'Reset Progress', 'Reset', 'Menu'],
+      id: '04-pause-bottom',
+      mode: 'play',
+      overlay: 'pause',
+      route: playRoute,
+      skipWait: true,
       timeoutMs,
       viewport
     });
@@ -1217,6 +1328,20 @@ export const runUiSurfaceCapture = async (options = {}) => {
         textLabels: optionsSurface.diagnostics.visual?.textLabels,
         screenContract: optionsSurface.screenContract
       },
+      optionsBottom: authGatedMenu ? {
+        skipped: true,
+        reason: 'auth-gated-menu',
+        screenContract: null,
+        nativeInputs: [],
+        textLabels: []
+      } : {
+        mode: optionsBottomSurface.diagnostics.visual?.runtime?.mode ?? optionsBottomSurface.diagnostics.runtime?.surface?.mode,
+        overlay: optionsBottomSurface.diagnostics.visual?.runtime?.overlay ?? optionsBottomSurface.diagnostics.runtime?.surface?.overlay,
+        overlayUi: optionsBottomSurface.diagnostics.visual?.overlayUi,
+        nativeInputs: optionsBottomSurface.nativeInputs,
+        textLabels: optionsBottomSurface.diagnostics.visual?.textLabels,
+        screenContract: optionsBottomSurface.screenContract
+      },
       play: {
         mode: play.diagnostics.visual?.runtime?.mode ?? play.diagnostics.runtime?.surface?.mode,
         overlay: play.diagnostics.visual?.runtime?.overlay ?? play.diagnostics.runtime?.surface?.overlay,
@@ -1241,14 +1366,24 @@ export const runUiSurfaceCapture = async (options = {}) => {
         nativeInputs: pause.nativeInputs,
         textLabels: pause.diagnostics.visual?.textLabels,
         screenContract: pause.screenContract
+      },
+      pauseBottom: {
+        mode: pauseBottomSurface.diagnostics.visual?.runtime?.mode ?? pauseBottomSurface.diagnostics.runtime?.surface?.mode,
+        overlay: pauseBottomSurface.diagnostics.visual?.runtime?.overlay ?? pauseBottomSurface.diagnostics.runtime?.surface?.overlay,
+        overlayUi: pauseBottomSurface.diagnostics.visual?.overlayUi,
+        nativeInputs: pauseBottomSurface.nativeInputs,
+        textLabels: pauseBottomSurface.diagnostics.visual?.textLabels,
+        screenContract: pauseBottomSurface.screenContract
       }
     };
     const screenshots = {
       menu: menu.screenshotPath,
       auth: authSurface.screenshotPath,
       options: optionsSurface.screenshotPath,
+      optionsBottom: optionsBottomSurface?.screenshotPath ?? null,
       play: play.screenshotPath,
-      pause: pause.screenshotPath
+      pause: pause.screenshotPath,
+      pauseBottom: pauseBottomSurface.screenshotPath
     };
     const checks = buildSurfaceChecks({
       consoleMessages,
