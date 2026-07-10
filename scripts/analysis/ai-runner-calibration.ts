@@ -159,12 +159,16 @@ interface CalibrationSweepComparison {
   baselineRank: DemoWalkerAiSkillRank | null;
   goalTargetLeakPass: boolean;
   monotonicAverageScorePass: boolean;
+  monotonicAverageRouteRatioPass: boolean;
   monotonicRouteEfficiencyPass: boolean;
   notes: string[];
   rows: CalibrationSweepComparisonRow[];
 }
 
 interface CalibrationSweepComparisonRow {
+  averageRouteRatio: number | null;
+  routeRatioDeltaFromBaseline: number | null;
+  routeRatioDeltaFromPreviousRank: number | null;
   averageRouteEfficiencyPressureScore: number | null;
   routeEfficiencyPressureDeltaFromBaseline: number | null;
   routeEfficiencyPressureDeltaFromPreviousRank: number | null;
@@ -679,18 +683,22 @@ const buildRankSweepComparison = (
 ): CalibrationSweepComparison => {
   const baselineRank = ranks[0] ?? null;
   const baselineScore = baselineRank ? summaries[baselineRank]?.progression.averageScore ?? null : null;
+  const baselineRouteRatio = baselineRank ? summaries[baselineRank]?.routeRatio.average ?? null : null;
   const baselineRouteEfficiencyPressure = baselineRank
     ? summaries[baselineRank]?.progression.averageRouteEfficiencyPressureScore ?? null
     : null;
   let previousScore: number | null = null;
+  let previousRouteRatio: number | null = null;
   let previousRouteEfficiencyPressure: number | null = null;
   const rows: CalibrationSweepComparisonRow[] = ranks.map((rank) => {
     const summary = summaries[rank];
     const averageScore = summary?.progression.averageScore ?? null;
+    const averageRouteRatio = summary?.routeRatio.average ?? null;
     const averageAiDecisionScore = summary?.progression.averageAiDecisionScore ?? null;
     const averagePerformanceScore = summary?.progression.averagePerformanceScore ?? null;
     const averageRouteEfficiencyPressureScore = summary?.progression.averageRouteEfficiencyPressureScore ?? null;
     const row: CalibrationSweepComparisonRow = {
+      averageRouteRatio,
       averageRouteEfficiencyPressureScore,
       averageAiDecisionScore,
       averageScore,
@@ -701,6 +709,14 @@ const buildRankSweepComparison = (
       rank,
       reachedGoalCount: summary?.reachedGoalCount ?? 0,
       regenerationCount: summary?.regenerationCount ?? 0,
+      routeRatioDeltaFromBaseline:
+        baselineRouteRatio !== null && averageRouteRatio !== null
+          ? round(averageRouteRatio - baselineRouteRatio)
+          : null,
+      routeRatioDeltaFromPreviousRank:
+        previousRouteRatio !== null && averageRouteRatio !== null
+          ? round(averageRouteRatio - previousRouteRatio)
+          : null,
       routeEfficiencyPressureDeltaFromBaseline:
         baselineRouteEfficiencyPressure !== null && averageRouteEfficiencyPressureScore !== null
           ? round(averageRouteEfficiencyPressureScore - baselineRouteEfficiencyPressure)
@@ -713,12 +729,16 @@ const buildRankSweepComparison = (
       scoreDeltaFromPreviousRank: previousScore !== null && averageScore !== null ? round(averageScore - previousScore) : null
     };
     previousScore = averageScore;
+    previousRouteRatio = averageRouteRatio;
     previousRouteEfficiencyPressure = averageRouteEfficiencyPressureScore;
     return row;
   });
   const goalTargetLeakPass = rows.every((row) => row.goalTargetLeakCount === 0);
   const monotonicAverageScorePass = rows.every((row) => (
     row.scoreDeltaFromPreviousRank === null || row.scoreDeltaFromPreviousRank >= 0
+  ));
+  const monotonicAverageRouteRatioPass = rows.every((row) => (
+    row.routeRatioDeltaFromPreviousRank === null || row.routeRatioDeltaFromPreviousRank <= 0
   ));
   const monotonicRouteEfficiencyPass = rows.every((row) => (
     row.routeEfficiencyPressureDeltaFromPreviousRank === null
@@ -731,6 +751,9 @@ const buildRankSweepComparison = (
   if (!monotonicAverageScorePass) {
     notes.push('Higher AI ranks did not produce a monotonic average-score improvement in this sweep; tune perception budgets before treating rank as skill.');
   }
+  if (!monotonicAverageRouteRatioPass) {
+    notes.push('Higher AI ranks did not produce monotonic raw route-ratio improvement in this sweep; the progression score is not sufficient evidence of route skill on its own.');
+  }
   if (!monotonicRouteEfficiencyPass) {
     notes.push('Higher AI ranks did not produce monotonic route-efficiency pressure improvement in this sweep; tune controller behavior before treating rank as route skill.');
   }
@@ -739,6 +762,7 @@ const buildRankSweepComparison = (
     baselineRank,
     goalTargetLeakPass,
     monotonicAverageScorePass,
+    monotonicAverageRouteRatioPass,
     monotonicRouteEfficiencyPass,
     notes,
     rows
