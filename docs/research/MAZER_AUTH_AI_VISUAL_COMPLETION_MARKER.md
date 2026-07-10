@@ -65,6 +65,7 @@ Production proof:
 - A scale-`75` E-through-S sweep confirms that handoff is not ready: all 30 sampled runs reached goal with zero target leaks, but rank monotonicity fails. B/A reach route-efficiency pressure `61.371`, while C and S regress to `80.947`; higher rank must improve this stress band before the generator treats it as a promotion-ready scale.
 - Calibration now emits `monotonicAverageRouteRatioPass` alongside score and route-efficiency pressure. The scale-`75` sweep correctly fails all three rank gates: raw route ratio rises from E `4.179` to D `4.978` and C `5.616`, then rises again from A `4.131` to S `4.38`. This closes the false-positive path where a coarsely improving progression score could certify a slower controller.
 - `solvePreviewBudget` is currently resolved and reported for B/A/S but is not yet a controller action. It is an explicit implementation dependency, not evidence of extra planning ability. The next tuning pass must use the recovery ledger to design one bounded local preview behavior, then prove it reduces raw route ratio without leaking the goal, using a solver route, or reintroducing pre-goal regeneration.
+- The first bounded preview candidate was rejected and reverted: inspecting only the next unvisited corridor terminal worsened B from `4.335` to `5.197` and S from `4.38` to `4.645`, while A only improved from `4.131` to `4.116`. Future preview work must start from a recovery-decision discriminator, not a generic corridor-terminal bonus.
 
 ## Work Lanes
 
