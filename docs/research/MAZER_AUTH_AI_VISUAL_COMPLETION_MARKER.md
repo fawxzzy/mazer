@@ -23,6 +23,10 @@ Refreshed lane markers from this pass:
 
 Production proof:
 
+- Current Vercel production deployment `dpl_DBWoHVUPCED5fgDrbHfrpcTkPipU` reached `READY` and is aliased at `https://fawxzzy-mazer.vercel.app`.
+- Production alias returned HTTP 200 for `/?content=core-only&theme=aurora&runtimeDiagnostics=1&v=prod-shine-http-check-1783653601`.
+- Production mobile DPR-2 UI-surface proof passed with guest menu/auth, play, pause, green player/trail, green-white trail shine, purple pulse, no text bounds failures, no text overlap, badge fit, and scroll-rail diagnostics: `tmp/captures/mazer-ui-surfaces/2026-07-10T15-20-45-100Z/summary.json`.
+- Production authenticated Options DPR-2 proof passed through the diagnostics-only authenticated fixture, including Options labels, `player marker + trail`, `Log out`, play, pause, no text bounds failures, no text overlap, badge fit, and scroll-rail diagnostics: `tmp/captures/mazer-ui-surfaces/2026-07-10T15-22-29-065Z/summary.json`.
 - Current Vercel production deployment `dpl_EkcBtRpwXSpdd95dVoKFPBNtigRL` reached `READY` and is aliased at `https://fawxzzy-mazer.vercel.app`.
 - Production alias returned HTTP 200 for `/?content=core-only&theme=aurora&runtimeDiagnostics=1&v=prod-color-mobile-1783693900`.
 - Local mobile UI-surface proof passed on a 405x958 viewport with no text overflow, no text overlap, badge text fit, play player green, purple trail pulse retained, and pause scroll rail present: `tmp/captures/mazer-ui-surfaces/2026-07-10T14-30-53-829Z/summary.json`.
@@ -169,7 +173,7 @@ Production proof:
 ## Active Blockers
 
 - Visible browser form-entry is fixed with native input overlays. The wrong-project local build env issue has also been fixed. Negative visible login failure, successful visible login, reload persistence, and pause-menu logout are now proven through the app. A transparent native-button/form overlay was tested for the primary auth action but intentionally reverted because the in-app browser did not produce an observable submit transition; the shipped proof path uses native text inputs plus the existing canvas submit control with hidden `authAction` diagnostics.
-- High-DPI mobile blur was proven as renderer undersampling and now has a local Canvas backing-store fix with DPR-2 browser proof plus an options-click smoke. Remaining risk is broader mobile soak: play controls, pause scroll, auth native inputs, and longer animation cycles should be tested under DPR-2 before calling the graphics lane complete.
+- High-DPI mobile blur was proven as renderer undersampling and now has a local Canvas backing-store fix with DPR-2 browser proof, production guest/auth/play/pause proof, and production authenticated Options proof. Remaining risk is broader mobile soak: longer play-control sessions, auth native input entry under live credentials, and longer animation cycles should be tested under DPR-2 before calling the graphics lane complete.
 - Top-center notch handling is currently a render-reserve contract. It prevents visible path/border dock pieces from occupying the triangular divot, but it is not the final wrapped-topology/edge-bleed graph contract the maze generator, AI distance model, compass, and trail will eventually need to share.
 - The menu board cannot be safely enlarged on normal landscape by a single cap bump right now because integer tile snapping jumps desktop from a safe `735px` board to a `784px` board and collapses authenticated footer clearance. A future "bigger but safe" pass should use a fractional tile/layout contract instead of raising the cap blindly.
 - Atlas/playbook remote cycle learning now has a validator-gated consumer receipt, but the next pass should wire that consumer into an actual Atlas-side read/ratchet process instead of leaving it as a repo-local helper and test.

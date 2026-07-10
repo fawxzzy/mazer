@@ -122,6 +122,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("if (authFixture === 'authenticated') {");
     expect(source).toContain('skipWait = false');
     expect(source).toContain('skipWait ? await readDiagnostics(page)');
+    expect(source).toContain('return expected.every((label) => currentLabels.has(label));');
     expect(source).toContain('Surface ${id} missing labels after direct diagnostics read');
     expect(source).toContain('await openOptionsOverlayViaQa(page, timeoutMs);');
     expect(source).toContain("skipWait: authFixture === 'authenticated'");

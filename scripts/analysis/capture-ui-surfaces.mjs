@@ -382,15 +382,41 @@ const captureSurface = async ({
   timeoutMs,
   viewport
 }) => {
-  const diagnostics = skipWait ? await readDiagnostics(page) : await waitForSurface(page, {
-      expectedLabels,
-      mode,
-      overlay,
-      timeoutMs
-    });
+  let diagnostics = skipWait ? await readDiagnostics(page) : await waitForSurface(page, {
+    expectedLabels,
+    mode,
+    overlay,
+    timeoutMs
+  });
   if (skipWait && expectedLabels.length > 0) {
-    const labels = new Set((diagnostics.visual?.textLabels ?? []).map((entry) => entry.text));
-    const missingLabels = expectedLabels.filter((label) => !labels.has(label));
+    let labels = new Set((diagnostics.visual?.textLabels ?? []).map((entry) => entry.text));
+    let missingLabels = expectedLabels.filter((label) => !labels.has(label));
+    if (missingLabels.length > 0) {
+      await page.waitForFunction(
+        ({ expected, visualAttribute }) => {
+          const raw = document.documentElement.getAttribute(visualAttribute);
+          if (!raw) {
+            return false;
+          }
+
+          try {
+            const visual = JSON.parse(raw);
+            const currentLabels = new Set((visual?.textLabels ?? []).map((entry) => entry.text));
+            return expected.every((label) => currentLabels.has(label));
+          } catch {
+            return false;
+          }
+        },
+        {
+          expected: expectedLabels,
+          visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
+        },
+        { timeout: timeoutMs }
+      );
+      diagnostics = await readDiagnostics(page);
+      labels = new Set((diagnostics.visual?.textLabels ?? []).map((entry) => entry.text));
+      missingLabels = expectedLabels.filter((label) => !labels.has(label));
+    }
     if (missingLabels.length > 0) {
       throw new Error(`Surface ${id} missing labels after direct diagnostics read: ${missingLabels.join(', ')}`);
     }
