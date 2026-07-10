@@ -846,7 +846,7 @@ describe('legacy reset lane', () => {
       'utf8'
     );
 
-    expect(pauseLifecycleSource).toContain("type LegacyPauseCommand = 'reset-player' | 'return-menu' | 'resume';");
+    expect(pauseLifecycleSource).toContain("export type LegacyPauseCommand = 'reset-player' | 'return-menu' | 'resume' | 'reset-progression';");
     expect(pauseLifecycleSource).toContain('resolveLegacyPauseCommand');
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('resume')");
     expect(menuSceneSource).toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
@@ -940,7 +940,7 @@ describe('legacy reset lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const overlayRoutingSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayRouting.ts'), 'utf8');
 
-    expect(overlayRoutingSource).toContain("export type LegacyOverlayKind = 'none' | 'options' | 'pause' | 'auth';");
+    expect(overlayRoutingSource).toContain("export type LegacyOverlayKind = 'none' | 'options' | 'pause' | 'auth' | 'confirm-progression-reset';");
     expect(overlayRoutingSource).toContain('resolveLegacyOverlayBackAction');
     expect(menuSceneSource).toContain('const action = resolveLegacyOverlayBackAction({');
     expect(menuSceneSource).toContain("case 'close-overlay':");

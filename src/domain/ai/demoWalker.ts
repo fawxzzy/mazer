@@ -617,10 +617,9 @@ export const advanceDemoWalker = (
     && config.behavior.enableRunnerMistakes === true
     && runnerPlan.aiResetPathCursor !== null
     && state.pathCursor >= runnerPlan.aiResetPathCursor
-    && (
-      config.behavior.emulateLogicSwitchPotentialCheckBug === true
-      || config.behavior.runnerThinkingModel === 'human-local-memory'
-    )
+    // The legacy source runner retains its staged reset demonstration. The
+    // human-memory runner must recover through remembered frontiers instead.
+    && shouldUseLegacySourceHumanizedPlan(config)
   );
   if (shouldTriggerAiReset) {
     return {
@@ -637,11 +636,7 @@ export const advanceDemoWalker = (
 
   if (state.phase === 'reset-hold') {
     const nextState = createDemoWalkerState(episode, config);
-    const shouldRegenerateMaze = state.resetReason === 'goal'
-      || (
-        state.resetReason === 'ai-path-exhausted'
-        && config.behavior.runnerThinkingModel === 'human-local-memory'
-      );
+    const shouldRegenerateMaze = state.resetReason === 'goal';
     return {
       state: {
         ...nextState,
@@ -1196,8 +1191,7 @@ const buildHumanLocalMemoryRunnerPlan = (
         episode.raster.width,
         episode.raster.height,
         episode.raster.tiles,
-        visited,
-        deadEnds
+        visited
       );
       const routeStepCount = route.length - 1;
       if (routeStepCount <= 0 || routeStepCount > optionalRetargetMaxRouteLength) {
@@ -1717,8 +1711,7 @@ const backtrackToBestLocalMemorySplit = (input: {
     input.episode.raster.width,
     input.episode.raster.height,
     input.episode.raster.tiles,
-    input.visited,
-    input.deadEnds
+    input.visited
   );
 
   if (knownRoute.length > 1) {
@@ -1810,8 +1803,7 @@ const resolveBestLocalMemorySplitTarget = (input: {
       input.episode.raster.width,
       input.episode.raster.height,
       input.episode.raster.tiles,
-      input.visited,
-      input.deadEnds
+      input.visited
     );
     if (input.currentIndex !== split.index && route.length <= 1) {
       return;

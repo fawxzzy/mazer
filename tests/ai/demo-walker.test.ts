@@ -23,7 +23,9 @@ import {
 } from '../../src/domain/maze';
 
 const HUMAN_MEMORY_ROUTE_BOUND_MULTIPLIER = 14;
-const HUMAN_MEMORY_TRAVERSE_MS_BOUND = 150_000;
+// A low-rank runner now completes remembered-frontier recovery instead of
+// regenerating mid-run, so the guard must cover a full poor-search outcome.
+const HUMAN_MEMORY_TRAVERSE_MS_BOUND = 240_000;
 
 const expectAiMemoryDoesNotLeakGoalTarget = (
   episode: MazeEpisode,

@@ -16,7 +16,7 @@ Refreshed lane markers from this pass:
 
 | Lane | Marker |
 | --- | ---: |
-| AI/playbook progression contracts | 97% |
+| AI/playbook progression contracts | 98% |
 | Play-mode completion lifecycle | 76% |
 | Auth QA and production readiness | 94% |
 | Visual proof verification discipline | 99% |
@@ -39,6 +39,14 @@ Production proof:
 - Production play QA passed with goal reach, post-goal deconstruct, handoff, fresh build, compass spin, and ready state: `tmp/captures/mazer-live-play-qa/2026-07-10T08-04-44-747Z/post-prod-play-prod-wrap-aware.summary.json`.
 - The live play QA solver now models opposite-border wrapped steps like gameplay, guarded by `tests/reset/live-play-qa-script.test.mjs`, after production proof exposed the old flat-grid solver mismatch.
 - Local progression cap proof now runs from rebuilt bundle `main-WmkdgY7j.js`: browser diagnostics showed S-rank AI target complexity can challenge from `178` to `181` instead of clamping at `180`, and mobile UI-surface proof passed at `tmp/captures/mazer-ui-surfaces/2026-07-10T08-23-58-309Z/summary.json`.
+
+## Latest AI Recovery Receipt
+
+- Human-local-memory recovery no longer treats a remembered dead-end corridor as impassable. Dead ends remain excluded from new branch selection, but known-path recovery can traverse them to reach a recorded unexplored frontier.
+- `advanceDemoWalker()` now reserves `ai-path-exhausted` for the retired legacy-source demonstration model. The shipped generated menu runner cannot reset or regenerate pre-goal because a finite local route ended.
+- `tests/ai/demo-walker-known-frontier.test.ts` proves 30 generated menu mazes across scales `37`, `50`, and `75` reach the goal before any new-maze request, remain floor-valid and adjacent, emit no `ai-path-exhausted`, and regenerate only after the goal hold.
+- `npm run ai:calibrate -- --summary-only --scales=37,50,75 --ai-rank=E --ai-level=1` reached the goal in all `60` generated cases with `0` goal-target leaks and `0` pre-goal regenerations. The full supported `npm run test:verify` passed `36` files / `309` tests; `npm run lint` and `npm run build` also passed.
+- This removes the forced early ending without making E-rank perfect. Long low-rank searches remain visible and are penalized by route-efficiency/decision metrics; reducing that route overhead is the next tuning slice, not a reason to reintroduce a hidden shortcut or cutoff.
 
 ## Work Lanes
 
