@@ -103,9 +103,11 @@ const normalizeMazeComplexity = (value) => {
     checkpointScore: readNumber(value.checkpointScore),
     deadEndCount: readInteger(value.deadEndCount),
     deadEndPressureScore: readNumber(value.deadEndPressureScore),
+    edgeWrapChoiceScore: readNumber(value.edgeWrapChoiceScore),
     edgeWrapCount: readInteger(value.edgeWrapCount),
     edgeWrapReliefScore: readNumber(value.edgeWrapReliefScore),
     edgeWrapScore: readNumber(value.edgeWrapScore),
+    edgeWrapShortcutReliefScore: readNumber(value.edgeWrapShortcutReliefScore),
     fillQualityScore: readNumber(value.fillQualityScore),
     floorScore: readNumber(value.floorScore),
     routeScore: readNumber(value.routeScore),
@@ -144,6 +146,37 @@ const normalizeProgressionPacing = (value) => {
     recentChallengeCount: readInteger(value.recentChallengeCount),
     recentEaseCount: readInteger(value.recentEaseCount),
     signalWindow
+  };
+};
+
+const normalizeGenerationReview = (value) => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const delivery = ['under-target', 'on-target', 'over-target'].includes(value.delivery)
+    ? value.delivery
+    : 'unknown';
+
+  return {
+    adaptiveRetryCandidateCount: readInteger(value.adaptiveRetryCandidateCount),
+    adaptiveRetryScale: Number.isFinite(value.adaptiveRetryScale)
+      ? readInteger(value.adaptiveRetryScale)
+      : null,
+    adaptiveRetryUsed: value.adaptiveRetryUsed === true,
+    allCandidatesOverTarget: value.allCandidatesOverTarget === true,
+    allCandidatesUnderTarget: value.allCandidatesUnderTarget === true,
+    delivery,
+    difference: Number.isFinite(value.difference) ? Math.round(value.difference) : 0,
+    initialWindowUnderTarget: value.initialWindowUnderTarget === true,
+    measuredComplexity: readInteger(value.measuredComplexity),
+    pressureRetryCandidateCount: readInteger(value.pressureRetryCandidateCount),
+    pressureRetryUsed: value.pressureRetryUsed === true,
+    profileBand: typeof value.profileBand === 'string' ? value.profileBand : 'unknown',
+    searchedCandidateCount: readInteger(value.searchedCandidateCount),
+    selectedDistance: readInteger(value.selectedDistance),
+    targetComplexity: readInteger(value.targetComplexity),
+    tolerance: readInteger(value.tolerance)
   };
 };
 
@@ -527,7 +560,9 @@ const buildComplexityReview = (receipts) => {
     complexityReceiptCount: complexities.length,
     averageMeasuredComplexity: averageOrNull(complexities.map((complexity) => complexity.total)),
     averageEdgeWrapCount: averageOrNull(complexities.map((complexity) => complexity.edgeWrapCount)),
+    averageEdgeWrapChoiceScore: averageOrNull(complexities.map((complexity) => complexity.edgeWrapChoiceScore)),
     averageEdgeWrapReliefScore: averageOrNull(complexities.map((complexity) => complexity.edgeWrapReliefScore)),
+    averageEdgeWrapShortcutReliefScore: averageOrNull(complexities.map((complexity) => complexity.edgeWrapShortcutReliefScore)),
     averageSplitCount: averageOrNull(complexities.map((complexity) => complexity.splitCount)),
     averageWeightedDeadEndPressureScore: averageOrNull(complexities.map((complexity) => complexity.weightedDeadEndPressureScore)),
     averageWeightedSplitPressureScore: averageOrNull(complexities.map((complexity) => complexity.weightedSplitPressureScore)),
@@ -562,6 +597,22 @@ const buildProgressionReview = (diagnostics) => {
     pacing,
     canTuneLevelPacingFromCurrentData: Boolean(pacing && pacing.signalWindow.length >= 2),
     note: 'Progression review summarizes level/rank pacing state only. It excludes raw path history and does not auto-tune without a validated Atlas consumer.'
+  };
+};
+
+const buildGenerationReview = (diagnostics) => {
+  const progression = isRecord(diagnostics?.progression) ? diagnostics.progression : null;
+  const normalizedReview = normalizeGenerationReview(progression?.generationReview);
+
+  return {
+    hasGenerationDiagnostics: normalizedReview !== null,
+    review: normalizedReview,
+    canTuneGenerationFromCurrentData: Boolean(
+      normalizedReview
+        && normalizedReview.searchedCandidateCount >= 3
+        && normalizedReview.delivery !== 'unknown'
+    ),
+    note: 'Generation review summarizes target delivery and bounded retry usage. It excludes raw paths and should be calibrated against multiple cycle reports before changing generation pressure.'
   };
 };
 
@@ -609,6 +660,9 @@ export const validateMazeCycleTelemetryAtlasReport = (report) => {
   }
   if (!isRecord(report.progressionReview)) {
     issues.push('progression-review-missing');
+  }
+  if (!isRecord(report.generationReview)) {
+    issues.push('generation-review-missing');
   }
 
   const sampleCount = Number.isFinite(report.learning?.sampleCount) ? report.learning.sampleCount : 0;
@@ -720,6 +774,7 @@ export const createMazeCycleTelemetryAtlasReport = (payload, options = {}) => {
     complexityReview: buildComplexityReview(receipts),
     performancePressureReview: buildPerformancePressureReview(receipts),
     progressionReview: buildProgressionReview(diagnostics),
+    generationReview: buildGenerationReview(diagnostics),
     decision: {
       signal: learning.signal,
       confidence: learning.confidence,

@@ -30,9 +30,12 @@ export interface LegacyMenuLayout {
 
 export interface LegacyAuthenticatedMenuButtonStack {
   authenticatedButtonGap: number;
+  buttonLayout: 'row' | 'stack';
   authenticatedStackHeight: number;
   optionsButtonHeight: number;
+  optionsButtonX: number;
   optionsButtonY: number;
+  startButtonX: number;
   startButtonY: number;
 }
 
@@ -48,6 +51,8 @@ const LEGACY_PHONE_CLEAN_ZOOM_WIDTH = 420;
 const LEGACY_PHONE_CLEAN_TILE_SIZE = 8;
 const LEGACY_PHONE_CLEAN_SAFE_INSET = 7;
 const LEGACY_BOARD_SIGIL_BORDER_INSET = 2;
+const LEGACY_PLAY_TOP_HUD_MIN = 62;
+const LEGACY_PLAY_TOP_HUD_MAX = 84;
 
 const resolveMenuPortraitTitleY = (
   width: number,
@@ -84,9 +89,23 @@ const resolveMenuPortraitTitleY = (
 };
 
 export const resolveLegacyAuthenticatedMenuButtonStack = (
-  layout: Pick<LegacyMenuLayout, 'boardSize' | 'boardTop' | 'buttonHeight' | 'centerButtonY' | 'footerY'>
+  layout: Pick<LegacyMenuLayout, 'boardSize' | 'boardTop' | 'buttonHeight' | 'buttonLayout' | 'centerButtonX' | 'centerButtonY' | 'footerY' | 'height' | 'leftButtonX' | 'leftButtonY' | 'rightButtonX' | 'rightButtonY' | 'width'>
 ): LegacyAuthenticatedMenuButtonStack => {
   const safeButtonHeight = Math.max(1, Math.round(layout.buttonHeight));
+  const isMobilePortraitRow = layout.height > layout.width && layout.buttonLayout === 'row';
+  if (isMobilePortraitRow) {
+    return {
+      authenticatedButtonGap: Math.max(0, Math.round(layout.rightButtonX - layout.leftButtonX)),
+      buttonLayout: 'row',
+      authenticatedStackHeight: safeButtonHeight,
+      optionsButtonHeight: safeButtonHeight,
+      optionsButtonX: layout.rightButtonX,
+      optionsButtonY: layout.rightButtonY,
+      startButtonX: layout.leftButtonX,
+      startButtonY: layout.leftButtonY
+    };
+  }
+
   const optionsButtonHeight = Math.max(38, Math.round(safeButtonHeight * 0.78));
   const authenticatedButtonGap = clampInteger(
     Math.round(safeButtonHeight * LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_RATIO),
@@ -110,9 +129,12 @@ export const resolveLegacyAuthenticatedMenuButtonStack = (
 
   return {
     authenticatedButtonGap,
+    buttonLayout: 'stack',
     authenticatedStackHeight,
     optionsButtonHeight,
+    optionsButtonX: layout.centerButtonX,
     optionsButtonY,
+    startButtonX: layout.centerButtonX,
     startButtonY
   };
 };
@@ -172,13 +194,22 @@ export const resolveLegacyMenuLayout = (
       isPortrait ? 128 : 48,
       Math.max(isPortrait ? 128 : 48, height - snappedBoardSize - menuButtonGap - buttonHeight - 24)
     );
+  const playTopHudReserve = isPlaySurface && isPortrait
+    ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
+    : 56;
   const playBoardTop = isUltraNarrow
     ? clamp(
       height * 0.14,
-      48,
+      isPlaySurface ? Math.min(48, playTopHudReserve) : 48,
       Math.max(48, height - snappedBoardSize - Math.round(height * 0.38))
     )
-    : clamp((height - snappedBoardSize) / 2, 56, height - snappedBoardSize - 12);
+    : isPortrait
+      ? clamp(
+        playTopHudReserve,
+        playTopHudReserve,
+        Math.max(playTopHudReserve, height - snappedBoardSize - Math.round(height * 0.24))
+      )
+      : clamp((height - snappedBoardSize) / 2, 56, height - snappedBoardSize - 12);
   const boardTop = Math.round(isPlaySurface ? playBoardTop : menuBoardTop);
   const menuRowButtonY = boardTop + snappedBoardSize + menuButtonGap + Math.round(buttonHeight / 2);
   const playRowButtonY = isPortrait

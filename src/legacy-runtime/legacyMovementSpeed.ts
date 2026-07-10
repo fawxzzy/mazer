@@ -2,7 +2,7 @@ import { clampNumber } from './legacyDefaults';
 
 export const LEGACY_MOVEMENT_SPEED_MIN = 0;
 export const LEGACY_MOVEMENT_SPEED_MAX = 1;
-export const LEGACY_MOVEMENT_SPEED_DEFAULT = 0.58;
+export const LEGACY_MOVEMENT_SPEED_DEFAULT = 0.3;
 export const LEGACY_MOVEMENT_SPEED_STEP = 0.05;
 
 export interface LegacyMovementSpeedProfile {

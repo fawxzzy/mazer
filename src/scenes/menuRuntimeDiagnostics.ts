@@ -163,6 +163,20 @@ export interface MenuSceneRuntimeDiagnostics {
       renderSize?: number;
       renderTileSize?: number;
     };
+    lifecycle?: {
+      compassSpinExpected: boolean;
+      drawPhase: 'idle' | 'building' | 'settled' | 'deconstructing';
+      generationPending: boolean;
+      inputLocked: boolean;
+      nextSeedQueued: boolean;
+      overlayOpen: boolean;
+      phase: 'idle' | 'building' | 'ready' | 'playing' | 'goal-hold' | 'deconstructing' | 'handoff';
+      playerVisible: boolean;
+      resetPending: boolean;
+      timerRunning: boolean;
+      trailLength: number;
+      trailVisible: boolean;
+    };
     inputBuffer: {
       held: {
         down: boolean;
@@ -232,6 +246,9 @@ export interface MenuSceneRuntimeDiagnostics {
       trailPulseEnabled?: boolean;
       trailPulseColor?: number;
       trailPulseEdgeColor?: number;
+      trailShineColor?: number;
+      trailShineEnabled?: boolean;
+      trailShinePeriodMs?: number;
       iridescentMaterial?: {
         minPathColorDistance: number;
         playerAccentColor: number;
@@ -264,9 +281,12 @@ export interface MenuSceneRuntimeDiagnostics {
     prerollSteps: number;
     runnerMistakesEnabled: boolean | null;
     aiMemory?: {
+      choiceClass: string | null;
+      confidence: number;
       optionCount: number;
       optionPoints: Array<{ x: number; y: number }>;
       targetPoint: { x: number; y: number } | null;
+      thoughtState: string;
     };
     route?: {
       aiResetPathCursor: number | null;

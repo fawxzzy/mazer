@@ -149,9 +149,11 @@ describe('legacy remote progression', () => {
         checkpointScore: 0,
         deadEndCount: 4,
         deadEndPressureScore: 2.88,
+        edgeWrapChoiceScore: 1.3,
         edgeWrapCount: 2,
         edgeWrapReliefScore: 0,
         edgeWrapScore: 4.8,
+        edgeWrapShortcutReliefScore: 0,
         fillQualityScore: 8.5,
         floorScore: 7,
         routeScore: 18,
@@ -202,7 +204,7 @@ describe('legacy remote progression', () => {
         aiDecisionScore: expect.objectContaining({
           pressureScore: expect.any(Number),
           reliabilityScore: expect.any(Number),
-          signal: 'chaotic'
+          signal: 'searching'
         }),
         aiDecisionSummary: expect.objectContaining({ thinkingModel: 'human-local-memory' }),
         mazeComplexity: expect.objectContaining({

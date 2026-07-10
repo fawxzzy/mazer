@@ -83,6 +83,37 @@ const isWorktreeDirty = () => {
 
 const createPointKey = (point) => `${point.x},${point.y}`;
 
+const resolveWrappedGridPoint = (point, mazeSize) => {
+  if (point.x === -1 && point.y >= 0 && point.y < mazeSize) {
+    return { x: mazeSize - 1, y: point.y };
+  }
+  if (point.x === mazeSize && point.y >= 0 && point.y < mazeSize) {
+    return { x: 0, y: point.y };
+  }
+  if (point.y === -1 && point.x >= 0 && point.x < mazeSize) {
+    return { x: point.x, y: mazeSize - 1 };
+  }
+  if (point.y === mazeSize && point.x >= 0 && point.x < mazeSize) {
+    return { x: point.x, y: 0 };
+  }
+
+  return null;
+};
+
+const resolveWalkableRouteStep = ({ current, delta, mazeSize, walkableRows }) => {
+  const direct = {
+    x: current.x + delta.dx,
+    y: current.y + delta.dy
+  };
+  const directValue = walkableRows[direct.y]?.[direct.x];
+  if (directValue === '1') {
+    return direct;
+  }
+
+  const wrapped = resolveWrappedGridPoint(direct, mazeSize);
+  return wrapped && walkableRows[wrapped.y]?.[wrapped.x] === '1' ? wrapped : null;
+};
+
 export const normalizeLivePlayInputMethod = (value) => (
   value === 'stick' || value === 'arrows' || value === 'keyboard' || value === 'qa'
     ? value
@@ -113,17 +144,16 @@ export const solveWalkableRoute = ({
 
     for (const move of MOVEMENT_ORDER) {
       const delta = MOVE_DELTAS[move];
-      const next = {
-        x: current.x + delta.dx,
-        y: current.y + delta.dy
-      };
+      const next = resolveWalkableRouteStep({
+        current,
+        delta,
+        mazeSize,
+        walkableRows
+      });
+      if (!next) {
+        continue;
+      }
       const nextKey = createPointKey(next);
-      if (next.x < 0 || next.y < 0 || next.x >= mazeSize || next.y >= mazeSize) {
-        continue;
-      }
-      if (walkableRows[next.y]?.[next.x] !== '1') {
-        continue;
-      }
       if (parentByKey.has(nextKey)) {
         continue;
       }
@@ -254,8 +284,18 @@ export const readLivePlayDiagnostics = async (page) => page.evaluate(({ runtimeA
 export const resolveLivePlayLifecycleSnapshot = (diagnostics) => {
   const runtime = diagnostics?.runtime ?? null;
   const visual = diagnostics?.visual ?? null;
+  const runtimeLifecycle = runtime?.play?.lifecycle ?? null;
+  const visualLifecycle = visual?.runtime?.playLifecycle ?? null;
   const runtimeDraw = runtime?.generation?.drawStage ?? null;
   const visualDraw = visual?.runtime?.generation?.drawStage ?? null;
+  const currentDrawPhase = visualDraw?.lifecyclePhase ?? runtimeDraw?.lifecyclePhase ?? null;
+  const lifecycle = (
+    visualLifecycle?.drawPhase === currentDrawPhase
+      ? visualLifecycle
+      : runtimeLifecycle?.drawPhase === currentDrawPhase
+        ? runtimeLifecycle
+        : runtimeLifecycle ?? visualLifecycle ?? null
+  );
   const runtimeMaze = runtime?.generation?.maze ?? null;
   const visualGeneration = visual?.runtime?.generation ?? null;
   const runtimeSurface = runtime?.surface ?? null;
@@ -264,12 +304,17 @@ export const resolveLivePlayLifecycleSnapshot = (diagnostics) => {
   return {
     buildPrerollActive: Boolean(runtimeDraw?.buildPrerollActive ?? visualDraw?.buildPrerollActive ?? false),
     complete: runtimeDraw?.complete ?? visualDraw?.complete ?? null,
-    compassSpinActive: Boolean(visual?.hud?.compassSpinActive ?? false),
+    compassSpinActive: Boolean(visual?.hud?.compassSpinActive ?? lifecycle?.compassSpinExpected ?? false),
+    explicitLifecyclePhase: lifecycle?.phase ?? null,
+    runtimeDrawPhase: runtimeDraw?.lifecyclePhase ?? null,
+    runtimeExplicitLifecyclePhase: runtimeLifecycle?.phase ?? null,
+    runtimeLifecycleDrawPhase: runtimeLifecycle?.drawPhase ?? null,
     handoffActive: Boolean(runtimeDraw?.handoffActive ?? visualDraw?.handoffActive ?? false),
     handoffProgress: Number(runtimeDraw?.handoffProgress ?? visualDraw?.handoffProgress ?? 0),
-    lifecyclePhase: runtimeDraw?.lifecyclePhase ?? visualDraw?.lifecyclePhase ?? null,
+    inputLocked: lifecycle?.inputLocked ?? null,
+    lifecyclePhase: lifecycle?.drawPhase ?? currentDrawPhase,
     mode: runtimeSurface?.mode ?? visualRuntime?.mode ?? null,
-    nextSeedQueued: Boolean(runtimeDraw?.nextSeedQueued ?? visualDraw?.nextSeedQueued ?? false),
+    nextSeedQueued: Boolean(lifecycle?.nextSeedQueued ?? runtimeDraw?.nextSeedQueued ?? visualDraw?.nextSeedQueued ?? false),
     overlay: runtimeSurface?.overlay ?? visualRuntime?.overlay ?? null,
     player: runtime?.play?.player
       ? { x: runtime.play.player.x, y: runtime.play.player.y }
@@ -280,12 +325,62 @@ export const resolveLivePlayLifecycleSnapshot = (diagnostics) => {
     rowsVisible: runtimeDraw?.rowsVisible ?? visualDraw?.rowsVisible ?? null,
     seed: runtimeMaze?.seed ?? visualGeneration?.seed ?? null,
     source: runtimeMaze?.source ?? visualGeneration?.buildKind ?? null,
+    timerRunning: lifecycle?.timerRunning ?? null,
     tilesVisible: runtimeDraw?.tilesVisible ?? visualDraw?.tilesVisible ?? null
+    ,
+    visualDrawPhase: visualDraw?.lifecyclePhase ?? null,
+    visualExplicitLifecyclePhase: visualLifecycle?.phase ?? null,
+    visualLifecycleDrawPhase: visualLifecycle?.drawPhase ?? null
   };
+};
+
+const summarizeLifecycleTraceSamples = (samples) => {
+  const trace = [];
+  for (const sample of samples) {
+    const entry = {
+      elapsedMs: sample.elapsedMs,
+      explicit: sample.explicitLifecyclePhase,
+      draw: sample.lifecyclePhase,
+      handoff: sample.handoffActive,
+      inputLocked: sample.inputLocked,
+      nextSeedQueued: sample.nextSeedQueued,
+      runtime: sample.runtimeExplicitLifecyclePhase,
+      runtimeDraw: sample.runtimeDrawPhase,
+      runtimeLifecycleDraw: sample.runtimeLifecycleDrawPhase,
+      seed: sample.seed,
+      visual: sample.visualExplicitLifecyclePhase,
+      visualDraw: sample.visualDrawPhase,
+      visualLifecycleDraw: sample.visualLifecycleDrawPhase
+    };
+    const previous = trace[trace.length - 1] ?? null;
+    if (
+      previous !== null
+      && previous.explicit === entry.explicit
+      && previous.draw === entry.draw
+      && previous.handoff === entry.handoff
+      && previous.inputLocked === entry.inputLocked
+      && previous.nextSeedQueued === entry.nextSeedQueued
+      && previous.runtime === entry.runtime
+      && previous.runtimeDraw === entry.runtimeDraw
+      && previous.runtimeLifecycleDraw === entry.runtimeLifecycleDraw
+      && previous.seed === entry.seed
+      && previous.visual === entry.visual
+      && previous.visualDraw === entry.visualDraw
+      && previous.visualLifecycleDraw === entry.visualLifecycleDraw
+    ) {
+      continue;
+    }
+    trace.push(entry);
+    if (trace.length >= 48) {
+      break;
+    }
+  }
+  return trace;
 };
 
 export const summarizePostGoalLifecycleSamples = (samples, initialSeed) => {
   const phases = [...new Set(samples.map((sample) => sample.lifecyclePhase).filter(Boolean))];
+  const explicitPhases = [...new Set(samples.map((sample) => sample.explicitLifecyclePhase).filter(Boolean))];
   const settledFreshSample = samples.find((sample) => (
     sample.mode === 'play'
     && Number.isFinite(sample.seed)
@@ -294,6 +389,7 @@ export const summarizePostGoalLifecycleSamples = (samples, initialSeed) => {
     && sample.complete === true
   )) ?? null;
   const freshSeed = settledFreshSample?.seed ?? null;
+  const hasExplicitLifecycle = explicitPhases.length > 0;
   const sawBuilding = samples.some((sample) => (
     sample.lifecyclePhase === 'building'
     || sample.buildPrerollActive
@@ -304,15 +400,40 @@ export const summarizePostGoalLifecycleSamples = (samples, initialSeed) => {
   const sawFreshSeedQueued = samples.some((sample) => sample.nextSeedQueued === true);
   const sawHandoff = samples.some((sample) => sample.handoffActive === true || sample.handoffProgress > 0);
   const sawCompassSpin = samples.some((sample) => sample.compassSpinActive === true);
+  const sawExplicitBuilding = samples.some((sample) => sample.explicitLifecyclePhase === 'building');
+  const sawExplicitDeconstructing = samples.some((sample) => sample.explicitLifecyclePhase === 'deconstructing');
+  const sawExplicitGoalHold = samples.some((sample) => sample.explicitLifecyclePhase === 'goal-hold');
+  const sawExplicitHandoff = samples.some((sample) => sample.explicitLifecyclePhase === 'handoff');
+  const sawExplicitInputLock = samples.some((sample) => sample.inputLocked === true);
+  const sawExplicitReady = Boolean(settledFreshSample?.explicitLifecyclePhase === 'ready')
+    || samples.some((sample) => sample.seed === freshSeed && sample.explicitLifecyclePhase === 'ready');
+  const explicitLifecyclePass = !hasExplicitLifecycle || (
+    sawExplicitBuilding
+    && sawExplicitDeconstructing
+    && sawExplicitGoalHold
+    && sawExplicitHandoff
+    && sawExplicitInputLock
+    && sawExplicitReady
+  );
 
   return {
-    pass: Boolean(settledFreshSample && sawDeconstructing && sawBuilding && sawFreshSeedQueued && sawHandoff),
+    pass: Boolean(settledFreshSample && sawDeconstructing && sawBuilding && sawFreshSeedQueued && sawHandoff && explicitLifecyclePass),
+    explicitLifecyclePass,
+    explicitPhaseSequence: explicitPhases,
     freshSeed,
+    hasExplicitLifecycle,
+    lifecycleTrace: summarizeLifecycleTraceSamples(samples),
     phaseSequence: phases,
     sampleCount: samples.length,
     sawBuilding,
     sawCompassSpin,
     sawDeconstructing,
+    sawExplicitBuilding,
+    sawExplicitDeconstructing,
+    sawExplicitGoalHold,
+    sawExplicitHandoff,
+    sawExplicitInputLock,
+    sawExplicitReady,
     sawFreshSeedQueued,
     sawHandoff,
     settledFreshSeed: Boolean(settledFreshSample)
@@ -724,13 +845,23 @@ export const runLivePlayQa = async (options = {}) => {
       },
       postGoalLifecycle: lifecycleProof ? {
         elapsedMs: lifecycleProof.elapsedMs,
+        explicitLifecyclePass: lifecycleProof.explicitLifecyclePass,
+        explicitPhaseSequence: lifecycleProof.explicitPhaseSequence,
         freshSeed: lifecycleProof.freshSeed,
+        hasExplicitLifecycle: lifecycleProof.hasExplicitLifecycle,
+        lifecycleTrace: lifecycleProof.lifecycleTrace,
         pass: lifecycleProof.pass,
         phaseSequence: lifecycleProof.phaseSequence,
         sampleCount: lifecycleProof.sampleCount,
         sawBuilding: lifecycleProof.sawBuilding,
         sawCompassSpin: lifecycleProof.sawCompassSpin,
         sawDeconstructing: lifecycleProof.sawDeconstructing,
+        sawExplicitBuilding: lifecycleProof.sawExplicitBuilding,
+        sawExplicitDeconstructing: lifecycleProof.sawExplicitDeconstructing,
+        sawExplicitGoalHold: lifecycleProof.sawExplicitGoalHold,
+        sawExplicitHandoff: lifecycleProof.sawExplicitHandoff,
+        sawExplicitInputLock: lifecycleProof.sawExplicitInputLock,
+        sawExplicitReady: lifecycleProof.sawExplicitReady,
         sawFreshSeedQueued: lifecycleProof.sawFreshSeedQueued,
         sawHandoff: lifecycleProof.sawHandoff,
         settledFreshSeed: lifecycleProof.settledFreshSeed,

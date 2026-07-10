@@ -23,24 +23,56 @@ describe('live play QA script helpers', () => {
 
   test('solves a compact walkable-row route from player to goal', () => {
     const route = solveWalkableRoute({
-      player: { x: 0, y: 0 },
-      goal: { x: 2, y: 2 },
-      mazeSize: 3,
+      player: { x: 1, y: 1 },
+      goal: { x: 2, y: 3 },
+      mazeSize: 4,
       walkableRows: [
-        '110',
-        '010',
-        '011'
+        '0000',
+        '0110',
+        '0010',
+        '0010'
       ]
     });
 
     expect(route?.points).toEqual([
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
       { x: 1, y: 1 },
-      { x: 1, y: 2 },
-      { x: 2, y: 2 }
+      { x: 2, y: 1 },
+      { x: 2, y: 2 },
+      { x: 2, y: 3 }
     ]);
-    expect(route?.moves).toEqual(['move_right', 'move_down', 'move_down', 'move_right']);
+    expect(route?.moves).toEqual(['move_right', 'move_down', 'move_down']);
+  });
+
+  test('solves opposite-border wrapped steps like the live movement contract', () => {
+    const horizontal = solveWalkableRoute({
+      player: { x: 0, y: 2 },
+      goal: { x: 4, y: 2 },
+      mazeSize: 5,
+      walkableRows: [
+        '00000',
+        '00000',
+        '10001',
+        '00000',
+        '00100'
+      ]
+    });
+    const vertical = solveWalkableRoute({
+      player: { x: 2, y: 4 },
+      goal: { x: 2, y: 0 },
+      mazeSize: 5,
+      walkableRows: [
+        '00100',
+        '00000',
+        '10001',
+        '00000',
+        '00100'
+      ]
+    });
+
+    expect(horizontal?.points).toEqual([{ x: 0, y: 2 }, { x: 4, y: 2 }]);
+    expect(horizontal?.moves).toEqual(['move_left']);
+    expect(vertical?.points).toEqual([{ x: 2, y: 4 }, { x: 2, y: 0 }]);
+    expect(vertical?.moves).toEqual(['move_down']);
   });
 
   test('returns null when live diagnostics expose no playable route', () => {
@@ -129,7 +161,20 @@ describe('live play QA script helpers', () => {
       {
         complete: false,
         compassSpinActive: false,
+        explicitLifecyclePhase: 'goal-hold',
         handoffActive: false,
+        inputLocked: true,
+        lifecyclePhase: 'settled',
+        mode: 'play',
+        nextSeedQueued: true,
+        seed: 101
+      },
+      {
+        complete: false,
+        compassSpinActive: true,
+        explicitLifecyclePhase: 'deconstructing',
+        handoffActive: false,
+        inputLocked: true,
         lifecyclePhase: 'deconstructing',
         mode: 'play',
         nextSeedQueued: true,
@@ -138,8 +183,10 @@ describe('live play QA script helpers', () => {
       {
         complete: false,
         compassSpinActive: true,
+        explicitLifecyclePhase: 'handoff',
         handoffActive: true,
         handoffProgress: 0.5,
+        inputLocked: true,
         lifecyclePhase: 'deconstructing',
         mode: 'play',
         nextSeedQueued: true,
@@ -149,6 +196,8 @@ describe('live play QA script helpers', () => {
         buildPrerollActive: true,
         complete: false,
         compassSpinActive: true,
+        explicitLifecyclePhase: 'building',
+        inputLocked: true,
         lifecyclePhase: 'building',
         mode: 'play',
         nextSeedQueued: false,
@@ -158,6 +207,8 @@ describe('live play QA script helpers', () => {
       {
         complete: true,
         compassSpinActive: false,
+        explicitLifecyclePhase: 'ready',
+        inputLocked: false,
         lifecyclePhase: 'settled',
         mode: 'play',
         nextSeedQueued: false,
@@ -166,12 +217,21 @@ describe('live play QA script helpers', () => {
     ], 101);
 
     expect(summary).toMatchObject({
+      explicitLifecyclePass: true,
+      explicitPhaseSequence: ['goal-hold', 'deconstructing', 'handoff', 'building', 'ready'],
       freshSeed: 202,
+      hasExplicitLifecycle: true,
       pass: true,
       phaseSequence: ['settled', 'deconstructing', 'building'],
       sawBuilding: true,
       sawCompassSpin: true,
       sawDeconstructing: true,
+      sawExplicitBuilding: true,
+      sawExplicitDeconstructing: true,
+      sawExplicitGoalHold: true,
+      sawExplicitHandoff: true,
+      sawExplicitInputLock: true,
+      sawExplicitReady: true,
       sawFreshSeedQueued: true,
       sawHandoff: true,
       settledFreshSeed: true
@@ -201,6 +261,51 @@ describe('live play QA script helpers', () => {
     expect(summary.freshSeed).toBeNull();
   });
 
+  test('fails explicit lifecycle proof when new diagnostics skip goal hold', () => {
+    const summary = summarizePostGoalLifecycleSamples([
+      {
+        complete: false,
+        explicitLifecyclePhase: 'deconstructing',
+        inputLocked: true,
+        lifecyclePhase: 'deconstructing',
+        mode: 'play',
+        nextSeedQueued: true,
+        seed: 101
+      },
+      {
+        complete: false,
+        explicitLifecyclePhase: 'handoff',
+        handoffActive: true,
+        inputLocked: true,
+        lifecyclePhase: 'deconstructing',
+        mode: 'play',
+        nextSeedQueued: true,
+        seed: 101
+      },
+      {
+        complete: false,
+        explicitLifecyclePhase: 'building',
+        inputLocked: true,
+        lifecyclePhase: 'building',
+        mode: 'play',
+        rowsVisible: 4,
+        seed: 202
+      },
+      {
+        complete: true,
+        explicitLifecyclePhase: 'ready',
+        inputLocked: false,
+        lifecyclePhase: 'settled',
+        mode: 'play',
+        seed: 202
+      }
+    ], 101);
+
+    expect(summary.explicitLifecyclePass).toBe(false);
+    expect(summary.sawExplicitGoalHold).toBe(false);
+    expect(summary.pass).toBe(false);
+  });
+
   test('normalizes lifecycle diagnostics from runtime and visual payloads', () => {
     const snapshot = resolveLivePlayLifecycleSnapshot({
       runtime: {
@@ -220,6 +325,20 @@ describe('live play QA script helpers', () => {
           }
         },
         play: {
+          lifecycle: {
+            compassSpinExpected: true,
+            drawPhase: 'building',
+            generationPending: true,
+            inputLocked: true,
+            nextSeedQueued: true,
+            overlayOpen: false,
+            phase: 'building',
+            playerVisible: false,
+            resetPending: false,
+            timerRunning: false,
+            trailLength: 1,
+            trailVisible: false
+          },
           player: { x: 1, y: 2 }
         }
       },
@@ -231,8 +350,10 @@ describe('live play QA script helpers', () => {
     expect(snapshot).toMatchObject({
       buildPrerollActive: true,
       compassSpinActive: true,
+      explicitLifecyclePhase: 'building',
       handoffActive: true,
       handoffProgress: 0.25,
+      inputLocked: true,
       lifecyclePhase: 'building',
       mode: 'play',
       nextSeedQueued: true,
@@ -242,7 +363,53 @@ describe('live play QA script helpers', () => {
       rowsVisible: 8,
       seed: 303,
       source: 'play-generated',
+      timerRunning: false,
       tilesVisible: 33
     });
+  });
+
+  test('prefers visual lifecycle when runtime lifecycle is older than the current draw phase', () => {
+    const snapshot = resolveLivePlayLifecycleSnapshot({
+      runtime: {
+        surface: { mode: 'play', overlay: 'none' },
+        generation: {
+          maze: { seed: 101, source: 'play-generated' },
+          drawStage: {
+            complete: false,
+            lifecyclePhase: 'settled',
+            nextSeedQueued: true
+          }
+        },
+        play: {
+          lifecycle: {
+            drawPhase: 'settled',
+            phase: 'goal-hold',
+            inputLocked: true
+          },
+          player: { x: 4, y: 5 }
+        }
+      },
+      visual: {
+        runtime: {
+          generation: {
+            drawStage: {
+              complete: false,
+              handoffActive: false,
+              lifecyclePhase: 'deconstructing',
+              nextSeedQueued: true
+            }
+          },
+          playLifecycle: {
+            drawPhase: 'deconstructing',
+            phase: 'deconstructing',
+            inputLocked: true
+          }
+        }
+      }
+    });
+
+    expect(snapshot.explicitLifecyclePhase).toBe('deconstructing');
+    expect(snapshot.lifecyclePhase).toBe('deconstructing');
+    expect(snapshot.inputLocked).toBe(true);
   });
 });

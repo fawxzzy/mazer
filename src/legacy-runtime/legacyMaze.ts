@@ -7,6 +7,17 @@ export interface LegacyPoint {
   y: number;
 }
 
+export interface LegacyMazeGenerationProfile {
+  borderFeederTargetPerSide: number | null;
+  checkpointCountMultiplier: number;
+  requiredOppositeBorderConnections: {
+    horizontal: boolean;
+    vertical: boolean;
+  };
+  routeQualityReinforcementMultiplier: number;
+  shortcutCountMultiplier: number;
+}
+
 export interface LegacyMazeSnapshot {
   source: 'menu-snapshot' | 'menu-generated' | 'play-generated';
   size: number;
@@ -104,7 +115,30 @@ export interface LegacyMazeSnapshot {
       resetsLevelBuildingTimerAfterConsume: boolean;
       waitsForLevelBuildingDelay: boolean;
     };
+    profile?: LegacyMazeGenerationProfile;
     processStageIds: number[];
+    selection?: {
+      adaptiveRetryCandidateCount: number;
+      adaptiveRetryScale: number | null;
+      adaptiveRetryUsed: boolean;
+      allCandidatesOverTarget: boolean;
+      allCandidatesUnderTarget: boolean;
+      candidateCount: number;
+      candidateComplexityMax: number;
+      candidateComplexityMin: number;
+      delivery: 'under-target' | 'on-target' | 'over-target';
+      difference: number;
+      initialWindowOverTarget: boolean;
+      initialWindowUnderTarget: boolean;
+      measuredComplexity: number;
+      pressureRetryCandidateCount: number;
+      pressureRetryUsed: boolean;
+      searchedCandidateCount: number;
+      selectedDistance: number;
+      selectedSeed: number;
+      targetComplexity: number;
+      tolerance: number;
+    };
     stageCursor: {
       completionSignal:
         | 'grid-spawn-complete'
@@ -127,6 +161,31 @@ export interface LegacyMazeSnapshot {
 const LEGACY_MIN_SCALE = 25;
 const LEGACY_MAX_SCALE = 150;
 const LEGACY_MENU_MIN_SHORTCUT_COUNT = 6;
+const DEFAULT_LEGACY_MAZE_GENERATION_PROFILE: LegacyMazeGenerationProfile = {
+  borderFeederTargetPerSide: null,
+  checkpointCountMultiplier: 1,
+  requiredOppositeBorderConnections: {
+    horizontal: true,
+    vertical: true
+  },
+  routeQualityReinforcementMultiplier: 1,
+  shortcutCountMultiplier: 1
+};
+
+export const normalizeLegacyMazeGenerationProfile = (
+  profile?: Partial<LegacyMazeGenerationProfile> | null
+): LegacyMazeGenerationProfile => ({
+  borderFeederTargetPerSide: profile?.borderFeederTargetPerSide === null || profile?.borderFeederTargetPerSide === undefined
+    ? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.borderFeederTargetPerSide
+    : clampInteger(profile.borderFeederTargetPerSide, 0, 8),
+  checkpointCountMultiplier: Math.max(0.2, Math.min(1.6, profile?.checkpointCountMultiplier ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.checkpointCountMultiplier)),
+  requiredOppositeBorderConnections: {
+    horizontal: profile?.requiredOppositeBorderConnections?.horizontal ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.requiredOppositeBorderConnections.horizontal,
+    vertical: profile?.requiredOppositeBorderConnections?.vertical ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.requiredOppositeBorderConnections.vertical
+  },
+  routeQualityReinforcementMultiplier: Math.max(0, Math.min(2, profile?.routeQualityReinforcementMultiplier ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.routeQualityReinforcementMultiplier)),
+  shortcutCountMultiplier: Math.max(0, Math.min(2, profile?.shortcutCountMultiplier ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.shortcutCountMultiplier))
+});
 
 const createSeededRng = (seed: number): (() => number) => {
   let state = (seed >>> 0) || 1;
@@ -844,7 +903,10 @@ const resolveLegacyOppositeBorderConnectorStep = (size: number, point: LegacyPoi
   return { x: 0, y: -1 };
 };
 
-const applyLegacyOppositeBorderConnections = (grid: boolean[][]): LegacyPoint[] => {
+const applyLegacyOppositeBorderConnections = (
+  grid: boolean[][],
+  requiredConnections: LegacyMazeGenerationProfile['requiredOppositeBorderConnections']
+): LegacyPoint[] => {
   const size = grid.length;
   const createdTiles: LegacyPoint[] = [];
   const seen = new Set<string>();
@@ -864,6 +926,14 @@ const applyLegacyOppositeBorderConnections = (grid: boolean[][]): LegacyPoint[] 
   }
 
   for (const source of sourceBorderPoints) {
+    if (
+      (source.x === 0 || source.x === size - 1)
+        ? !requiredConnections.horizontal
+        : !requiredConnections.vertical
+    ) {
+      continue;
+    }
+
     const opposite = resolveLegacyOppositeBorderPoint(size, source);
     if (!opposite || grid[opposite.y]?.[opposite.x] === true) {
       continue;
@@ -1042,13 +1112,18 @@ const applyLegacyMandatoryOppositeBorderAxisConnection = (
 
 const applyLegacyMandatoryOppositeBorderConnections = (
   grid: boolean[][],
-  seed: number
+  seed: number,
+  requiredConnections: LegacyMazeGenerationProfile['requiredOppositeBorderConnections']
 ): LegacyPoint[] => {
   const createdTiles: LegacyPoint[] = [];
   const seen = new Set<string>();
 
-  applyLegacyMandatoryOppositeBorderAxisConnection(grid, 'horizontal', seed ^ 0x2c1b3c6d, createdTiles, seen);
-  applyLegacyMandatoryOppositeBorderAxisConnection(grid, 'vertical', seed ^ 0x7f4a7c15, createdTiles, seen);
+  if (requiredConnections.horizontal) {
+    applyLegacyMandatoryOppositeBorderAxisConnection(grid, 'horizontal', seed ^ 0x2c1b3c6d, createdTiles, seen);
+  }
+  if (requiredConnections.vertical) {
+    applyLegacyMandatoryOppositeBorderAxisConnection(grid, 'vertical', seed ^ 0x7f4a7c15, createdTiles, seen);
+  }
 
   return createdTiles;
 };
@@ -1173,10 +1248,17 @@ const countLegacyBorderFeedersOnSide = (
 
 const applyLegacyPerimeterFeederConnections = (
   grid: boolean[][],
-  seed: number
+  seed: number,
+  targetPerSideOverride?: number | null
 ): LegacyPoint[] => {
   const size = grid.length;
-  const targetPerSide = resolveLegacyBorderFeederTargetPerSide(size);
+  const targetPerSide = targetPerSideOverride === undefined || targetPerSideOverride === null
+    ? resolveLegacyBorderFeederTargetPerSide(size)
+    : clampInteger(targetPerSideOverride, 0, 8);
+  if (targetPerSide <= 0) {
+    return [];
+  }
+
   const createdTiles: LegacyPoint[] = [];
   const seen = new Set<string>();
   const sides: LegacyBorderFeederSide[] = ['left', 'right', 'top', 'bottom'];
@@ -1495,10 +1577,16 @@ const backtrackLegacyPath = (
 
 const createLegacyCheckpointPathMaze = (
   size: number,
-  seed: number
+  seed: number,
+  generationProfile?: Partial<LegacyMazeGenerationProfile> | null
 ): LegacyCheckpointPathBuilderResult => {
   const rng = createSeededRng(seed);
-  const requestedCheckpoints = Math.trunc(size + (size * legacyTuning.board.checkPointModifier));
+  const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
+  const requestedCheckpoints = clampInteger(
+    Math.trunc((size + (size * legacyTuning.board.checkPointModifier)) * profile.checkpointCountMultiplier),
+    4,
+    Math.trunc(size * 2)
+  );
   const pathMask = createEmptyGrid(size);
   const pathTiles: LegacyPoint[] = [];
   const pathLengths = new Map<string, number>();
@@ -1615,8 +1703,14 @@ const createLegacyCheckpointPathMaze = (
   };
 };
 
-export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: number): LegacyMazeSnapshot => {
+export const createLegacyMaze = (
+  scale: number,
+  seed: number,
+  shortcutCount?: number,
+  generationProfile?: Partial<LegacyMazeGenerationProfile> | null
+): LegacyMazeSnapshot => {
   const size = normalizeGridSize(scale);
+  const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
   const {
     grid,
     start: sourceStart,
@@ -1624,12 +1718,17 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     generationBuildTrace,
     wallArray,
     pathBuilderStats
-  } = createLegacyCheckpointPathMaze(size, seed);
+  } = createLegacyCheckpointPathMaze(size, seed, profile);
   let start = clonePoint(sourceStart);
   const rng = createSeededRng(seed ^ 0x5a17c0de);
-  const resolvedShortcutCount = size > 35
+  const baseShortcutCount = size > 35
     ? (shortcutCount ?? Math.trunc(size * legacyTuning.board.shortcutCountModifier.game))
     : 0;
+  const resolvedShortcutCount = clampInteger(
+    Math.trunc(baseShortcutCount * profile.shortcutCountMultiplier),
+    0,
+    Math.max(0, baseShortcutCount * 2)
+  );
   const shortcutResult = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount, wallArray);
   const shortcutStats = shortcutResult.stats;
   const { goal: normalizedGoal, stats: playableTopologyStats } = normalizeLegacyPlayableTopology(grid, start, sourceGoal);
@@ -1647,7 +1746,9 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     goal,
     solutionPath,
     routeQualityStats,
-    resolvedShortcutCount > 0 ? Math.max(8, resolvedShortcutCount * 3) : 0
+    resolvedShortcutCount > 0
+      ? Math.trunc(Math.max(8, resolvedShortcutCount * 3) * profile.routeQualityReinforcementMultiplier)
+      : 0
   );
   if (reinforcementStats.created > 0) {
     solutionPath = reinforcementStats.solutionPath;
@@ -1665,9 +1766,9 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
     } = resolveLegacyFinalRouteState(grid, start, goal, minimumSolutionPathLength, playableTopologyStats));
   }
 
-  const mandatoryBorderWrapTiles = applyLegacyMandatoryOppositeBorderConnections(grid, seed);
-  const perimeterFeederTiles = applyLegacyPerimeterFeederConnections(grid, seed);
-  const borderWrapTiles = applyLegacyOppositeBorderConnections(grid);
+  const mandatoryBorderWrapTiles = applyLegacyMandatoryOppositeBorderConnections(grid, seed, profile.requiredOppositeBorderConnections);
+  const perimeterFeederTiles = applyLegacyPerimeterFeederConnections(grid, seed, profile.borderFeederTargetPerSide);
+  const borderWrapTiles = applyLegacyOppositeBorderConnections(grid, profile.requiredOppositeBorderConnections);
   if (mandatoryBorderWrapTiles.length > 0 || perimeterFeederTiles.length > 0 || borderWrapTiles.length > 0) {
     solutionPath = buildShortestPath(grid, start, goal);
     routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath);
@@ -1706,12 +1807,14 @@ export const createLegacyMaze = (scale: number, seed: number, shortcutCount?: nu
 export const createLegacyGeneratedMenuMaze = (
   scale: number,
   seed: number,
-  shortcutCount?: number
+  shortcutCount?: number,
+  generationProfile?: Partial<LegacyMazeGenerationProfile> | null
 ): LegacyMazeSnapshot => ({
   ...createLegacyMaze(
     scale,
     seed,
-    shortcutCount ?? resolveLegacyGeneratedMenuShortcutCount(scale)
+    shortcutCount ?? resolveLegacyGeneratedMenuShortcutCount(scale),
+    generationProfile
   ),
   source: 'menu-generated'
 });

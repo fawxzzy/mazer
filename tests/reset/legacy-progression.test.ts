@@ -1,8 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
+import { createLegacyRuntimeMazeForMode, resolveLegacyGenerationBudgetContract } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 import {
   LEGACY_PROGRESSION_MENU_MIN_TILE_PX,
+  LEGACY_PROGRESSION_AI_CHALLENGE_SCORE_THRESHOLD,
+  LEGACY_PROGRESSION_AI_EASE_SCORE_THRESHOLD,
+  LEGACY_PROGRESSION_MAX_COMPLEXITY,
   LEGACY_PROGRESSION_MIN_COMPLEXITY,
   LEGACY_PROGRESSION_PHONE_MENU_TARGET_TILE_PX,
   LEGACY_PROGRESSION_PLAY_MIN_TILE_PX,
@@ -11,6 +15,8 @@ import {
   readLegacyProgressionState,
   resolveLegacyProgressionLevel,
   resolveLegacyProgressionExpectedCompletionMs,
+  resolveLegacyProgressionDifficultyProfile,
+  resolveLegacyMazeGenerationProfileForProgression,
   recordLegacyProgressionCycle,
   resolveLegacyMazeComplexity,
   resolveLegacyProgressionGenerationScale,
@@ -21,7 +27,10 @@ import {
   summarizeLegacyProgressionPacing,
   summarizeLegacyProgressionDiagnostics
 } from '../../src/legacy-runtime/legacyProgression';
-import { createMazeCycleTelemetryReceipt } from '../../src/legacy-runtime/mazeCycleTelemetry';
+import {
+  createMazeCycleTelemetryReceipt,
+  scoreMazeCycleAiDecisionSummary
+} from '../../src/legacy-runtime/mazeCycleTelemetry';
 
 class MemoryStorage {
   public values = new Map<string, string>();
@@ -234,6 +243,205 @@ describe('legacy progression', () => {
     state = recordLegacyProgressionCycle(new MemoryStorage(), state, slowReceipt, maze);
     expect(state.tracks['ai-runner'].lastSignal).toBe('ease');
     expect(state.tracks['ai-runner'].paceScore).toBeLessThanOrEqual(28);
+  });
+
+  test('lets human-like AI runs move skill level without requiring perfect pathing', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    const createSearchingAiReceipt = (completedAt: string) => createMazeCycleTelemetryReceipt({
+      aiDecisionSummary: {
+        backtrackCount: 4,
+        decisionCount: 40,
+        optionalRetargetCount: 1,
+        recoveryCount: 2,
+        thinkingModel: 'human-local-memory',
+        visitedUndoCount: 0,
+        wrongBranchCount: 3
+      },
+      averageFrameMs: 16,
+      completedAt,
+      completionTimeMs: 18_000,
+      controlMode: 'stick',
+      maze,
+      playerPath: maze.solutionPath,
+      resetUsed: false,
+      surface: 'menu-demo',
+      backtracks: 4,
+      wrongTurns: 3
+    });
+
+    let state = createEmptyLegacyProgressionState();
+    const startingAiTrack = state.tracks['ai-runner'];
+
+    state = recordLegacyProgressionCycle(storage, state, createSearchingAiReceipt('2026-07-08T12:00:00.000Z'), maze);
+    expect(state.tracks['ai-runner'].lastSignal).toBe('challenge');
+    expect(state.tracks['ai-runner'].paceScore).toBeGreaterThanOrEqual(LEGACY_PROGRESSION_AI_CHALLENGE_SCORE_THRESHOLD);
+    expect(state.tracks['ai-runner'].targetComplexity).toBeGreaterThan(startingAiTrack.targetComplexity);
+
+    state = recordLegacyProgressionCycle(storage, state, createSearchingAiReceipt('2026-07-08T12:01:00.000Z'), maze);
+    expect(state.tracks['ai-runner'].recentSignals.slice(0, 2)).toEqual(['challenge', 'challenge']);
+    expect(state.tracks['ai-runner'].level).toBeGreaterThan(startingAiTrack.level);
+  });
+
+  test('calibrates AI skill progression across repeated competent sample runs', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    let state = createEmptyLegacyProgressionState();
+
+    for (let run = 0; run < 6; run += 1) {
+      const receipt = createMazeCycleTelemetryReceipt({
+        aiDecisionSummary: {
+          backtrackCount: run % 2 === 0 ? 3 : 4,
+          decisionCount: 42,
+          optionalRetargetCount: run % 3 === 0 ? 1 : 0,
+          recoveryCount: 1,
+          thinkingModel: 'human-local-memory',
+          visitedUndoCount: 0,
+          wrongBranchCount: 2
+        },
+        averageFrameMs: 16,
+        completedAt: `2026-07-08T12:0${run}:00.000Z`,
+        completionTimeMs: 17_000 + (run * 350),
+        controlMode: 'stick',
+        maze,
+        playerPath: maze.solutionPath,
+        resetUsed: false,
+        surface: 'menu-demo',
+        backtracks: run % 2 === 0 ? 3 : 4,
+        wrongTurns: 2
+      });
+
+      state = recordLegacyProgressionCycle(storage, state, receipt, maze);
+    }
+
+    const aiTrack = state.tracks['ai-runner'];
+    const pacing = summarizeLegacyProgressionPacing(aiTrack, resolveLegacyMazeComplexity(maze).total);
+
+    expect(aiTrack.completedCycles).toBe(6);
+    expect(aiTrack.level).toBeGreaterThan(1);
+    expect(aiTrack.targetComplexity).toBeGreaterThan(LEGACY_PROGRESSION_MIN_COMPLEXITY + 8);
+    expect(aiTrack.rank).toBe('E');
+    expect(pacing.skillTrend).toBe('rising');
+    expect(pacing.levelProgressPercent).toBeGreaterThanOrEqual(0);
+    expect(pacing.levelProgressPercent).toBeLessThanOrEqual(100);
+    expect(pacing.complexityUntilNextLevel).toBeGreaterThanOrEqual(0);
+    expect(pacing.nextLevelTargetComplexity).toBeGreaterThanOrEqual(aiTrack.targetComplexity);
+  });
+
+  test('moves AI rank only after sustained competent progression', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    let state = createEmptyLegacyProgressionState();
+
+    for (let run = 0; run < 8; run += 1) {
+      state = recordLegacyProgressionCycle(storage, state, createMazeCycleTelemetryReceipt({
+        aiDecisionSummary: {
+          backtrackCount: 2,
+          decisionCount: 44,
+          optionalRetargetCount: run % 4 === 0 ? 1 : 0,
+          recoveryCount: 1,
+          thinkingModel: 'human-local-memory',
+          visitedUndoCount: 0,
+          wrongBranchCount: 2
+        },
+        averageFrameMs: 16,
+        completedAt: `2026-07-08T13:0${run}:00.000Z`,
+        completionTimeMs: 16_800 + (run * 220),
+        controlMode: 'stick',
+        maze,
+        playerPath: maze.solutionPath,
+        resetUsed: false,
+        surface: 'menu-demo',
+        backtracks: 2,
+        wrongTurns: 2
+      }), maze);
+    }
+
+    const aiTrack = state.tracks['ai-runner'];
+
+    expect(aiTrack.completedCycles).toBe(8);
+    expect(aiTrack.rank).toBe('D');
+    expect(aiTrack.targetComplexity).toBeGreaterThanOrEqual(28);
+    expect(aiTrack.recentSignals.every((signal) => signal === 'challenge')).toBe(true);
+  });
+
+  test('holds or eases AI progression when decision pressure is chaotic', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    const chaoticAiReceipt = createMazeCycleTelemetryReceipt({
+      aiDecisionSummary: {
+        backtrackCount: 12,
+        decisionCount: 24,
+        optionalRetargetCount: 5,
+        recoveryCount: 7,
+        thinkingModel: 'human-local-memory',
+        visitedUndoCount: 4,
+        wrongBranchCount: 10
+      },
+      averageFrameMs: 16,
+      completedAt: '2026-07-08T12:00:00.000Z',
+      completionTimeMs: 30_000,
+      controlMode: 'stick',
+      maze,
+      playerPath: [
+        ...maze.solutionPath,
+        ...maze.solutionPath
+      ],
+      resetUsed: false,
+      surface: 'menu-demo',
+      backtracks: 12,
+      wrongTurns: 10
+    });
+
+    const state = recordLegacyProgressionCycle(storage, createEmptyLegacyProgressionState(), chaoticAiReceipt, maze);
+
+    expect(state.tracks['ai-runner'].lastSignal).toBe('ease');
+    expect(state.tracks['ai-runner'].paceScore).toBeLessThanOrEqual(LEGACY_PROGRESSION_AI_EASE_SCORE_THRESHOLD);
+    expect(state.tracks['ai-runner'].targetComplexity).toBe(LEGACY_PROGRESSION_MIN_COMPLEXITY);
+  });
+
+  test('holds AI maze level when local-memory search exhausts without chaotic pressure', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    const searchingExhaustionReceipt = createMazeCycleTelemetryReceipt({
+      aiDecisionSummary: {
+        backtrackCount: 15,
+        decisionCount: 60,
+        optionalRetargetCount: 1,
+        recoveryCount: 7,
+        thinkingModel: 'human-local-memory',
+        visitedUndoCount: 0,
+        wrongBranchCount: 20
+      },
+      averageFrameMs: 16,
+      completedAt: '2026-07-08T12:02:00.000Z',
+      completionTimeMs: 30_000,
+      controlMode: 'stick',
+      maze,
+      playerPath: [
+        ...maze.solutionPath,
+        ...maze.solutionPath,
+        ...maze.solutionPath
+      ],
+      resetUsed: true,
+      surface: 'menu-demo',
+      backtracks: 15,
+      wrongTurns: 20
+    });
+
+    expect(scoreMazeCycleAiDecisionSummary(searchingExhaustionReceipt.aiDecisionSummary)?.signal).toBe('searching');
+    expect(searchingExhaustionReceipt.routeEfficiencyPressureScore).toBeGreaterThanOrEqual(88);
+
+    const state = recordLegacyProgressionCycle(
+      storage,
+      createEmptyLegacyProgressionState(),
+      searchingExhaustionReceipt,
+      maze
+    );
+
+    expect(state.tracks['ai-runner'].lastSignal).toBe('hold');
+    expect(state.tracks['ai-runner'].targetComplexity).toBe(LEGACY_PROGRESSION_MIN_COMPLEXITY);
+    expect(state.tracks['ai-runner'].struggleCycles).toBe(0);
   });
 
   test('uses shortest-path waste and render safety in the progression score', () => {
@@ -452,8 +660,53 @@ describe('legacy progression', () => {
     expect(breakdown.edgeWrapCount).toBe(1);
     expect(breakdown.edgeWrapScore).toBeGreaterThan(0);
     expect(breakdown.edgeWrapReliefScore).toBeGreaterThan(0);
+    expect(breakdown.edgeWrapShortcutReliefScore).toBe(breakdown.edgeWrapReliefScore);
+    expect(breakdown.edgeWrapChoiceScore).toBeGreaterThan(0);
     expect(breakdown.splitCount).toBeGreaterThan(0);
     expect(breakdown.weightedSplitPressureScore).toBeGreaterThan(0);
+  });
+
+  test('separates wrapped shortcut relief from wrapped choice complexity', () => {
+    const directShortcutMaze = createProgressionTestMaze({
+      size: 5,
+      grid: [
+        [false, false, false, false, false],
+        [false, false, false, false, false],
+        [true, true, true, true, true],
+        [false, false, false, false, false],
+        [false, false, false, false, false]
+      ],
+      start: { x: 0, y: 2 },
+      goal: { x: 4, y: 2 },
+      solutionPath: [
+        { x: 0, y: 2 },
+        { x: 4, y: 2 }
+      ]
+    });
+    const branchyWrappedMaze = createProgressionTestMaze({
+      size: 5,
+      grid: [
+        [false, false, true, false, false],
+        [false, false, true, false, false],
+        [true, true, true, true, true],
+        [false, true, true, true, false],
+        [false, false, true, false, false]
+      ],
+      start: { x: 0, y: 2 },
+      goal: { x: 4, y: 2 },
+      solutionPath: [
+        { x: 0, y: 2 },
+        { x: 4, y: 2 }
+      ]
+    });
+
+    const directBreakdown = resolveLegacyMazeComplexity(directShortcutMaze);
+    const branchyBreakdown = resolveLegacyMazeComplexity(branchyWrappedMaze);
+
+    expect(directBreakdown.edgeWrapShortcutReliefScore).toBeGreaterThan(0);
+    expect(branchyBreakdown.edgeWrapShortcutReliefScore).toBeGreaterThan(0);
+    expect(branchyBreakdown.edgeWrapChoiceScore).toBeGreaterThan(directBreakdown.edgeWrapChoiceScore);
+    expect(branchyBreakdown.total).toBeGreaterThan(directBreakdown.total);
   });
 
   test('summarizes bounded maze-level pacing without jumping target to measured complexity', () => {
@@ -465,16 +718,82 @@ describe('legacy progression', () => {
       activeLevel: 1,
       activeRank: 'E',
       activeTargetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY,
+      complexityUntilNextLevel: 4,
+      levelBaseTargetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY,
+      levelProgressPercent: 0,
       measuredMazeLevel: resolveLegacyProgressionLevel(92),
       nextChallengeTargetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 2,
       nextEaseTargetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY,
+      nextLevelTargetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4,
       recentChallengeCount: 0,
       recentEaseCount: 0,
+      skillTrend: 'steady',
       signalWindow: []
     });
   });
 
-  test('uses target complexity to tune future maze scale and visual progression color', () => {
+  test('allows S-rank AI progression to keep leveling past the old level-44 cap', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze({
+      size: 21,
+      solutionPath: Array.from({ length: 60 }, (_, index) => ({
+        x: Math.min(20, 1 + (index % 20)),
+        y: Math.min(20, 1 + Math.floor(index / 20))
+      }))
+    });
+    const baseState = createEmptyLegacyProgressionState();
+    let state = {
+      ...baseState,
+      tracks: {
+        ...baseState.tracks,
+        'ai-runner': {
+          ...baseState.tracks['ai-runner'],
+          cleanCycles: 33,
+          completedCycles: 742,
+          level: resolveLegacyProgressionLevel(180),
+          rank: 'S' as const,
+          recentSignals: ['challenge', 'challenge'],
+          targetComplexity: 180
+        }
+      }
+    };
+
+    const createCapBreakReceipt = (completedAt: string) => createMazeCycleTelemetryReceipt({
+      aiDecisionSummary: {
+        backtrackCount: 1,
+        decisionCount: 48,
+        optionalRetargetCount: 1,
+        recoveryCount: 1,
+        thinkingModel: 'human-local-memory',
+        visitedUndoCount: 0,
+        wrongBranchCount: 2
+      },
+      averageFrameMs: 16,
+      completedAt: '2026-07-10T08:20:00.000Z',
+      completionTimeMs: 16_500,
+      controlMode: 'stick',
+      maze,
+      playerPath: maze.solutionPath,
+      resetUsed: false,
+      surface: 'menu-demo',
+      backtracks: 1,
+      wrongTurns: 2
+    });
+
+    state = recordLegacyProgressionCycle(storage, state, createCapBreakReceipt('2026-07-10T08:20:00.000Z'), maze);
+    state = recordLegacyProgressionCycle(storage, state, createCapBreakReceipt('2026-07-10T08:21:00.000Z'), maze);
+
+    const aiTrack = state.tracks['ai-runner'];
+    const pacing = summarizeLegacyProgressionPacing(aiTrack, resolveLegacyMazeComplexity(maze).total);
+
+    expect(aiTrack.rank).toBe('S');
+    expect(aiTrack.targetComplexity).toBeGreaterThan(180);
+    expect(aiTrack.level).toBeGreaterThan(44);
+    expect(pacing.nextLevelTargetComplexity).toBeGreaterThan(180);
+    expect(pacing.complexityUntilNextLevel).toBeGreaterThanOrEqual(0);
+  });
+
+  test('uses target complexity to tune future maze scale while player and trail stay green', () => {
     const state = createEmptyLegacyProgressionState();
     const basePalette = resolveLegacyProgressionPalette(state.tracks.player, 'player');
     const advancedTrack = {
@@ -488,10 +807,86 @@ describe('legacy progression', () => {
 
     expect(basePalette.playerCoreColor).toBe(0x36ff7d);
     expect(basePalette.trailColor).toBe(0x36ff7d);
+    expect(basePalette.trailPulseColor).toBe(0xff61c7);
     expect(basePalette.trailPulseEdgeColor).not.toBe(0xecfff5);
-    expect(advancedPalette.playerCoreColor).toBe(0xff61c7);
+    expect(advancedPalette.playerCoreColor).toBe(0x36ff7d);
     expect(advancedPalette.trailColor).toBe(0x36ff7d);
+    expect(advancedPalette.trailPulseColor).toBe(0xff61c7);
     expect(resolveLegacyProgressionGenerationScale(50, advancedTrack)).toBeGreaterThan(50);
+  });
+
+  test('defines level-one mazes as small simple no-room routes', () => {
+    const state = createEmptyLegacyProgressionState();
+    const aiTrack = state.tracks['ai-runner'];
+    const profile = resolveLegacyProgressionDifficultyProfile(aiTrack);
+    const generationProfile = resolveLegacyMazeGenerationProfileForProgression(aiTrack);
+    const scale = resolveLegacyProgressionGenerationScale(50, aiTrack);
+    const budget = resolveLegacyGenerationBudgetContract('menu', scale, generationProfile);
+    const maze = createLegacyRuntimeMazeForMode('menu', scale, 3749, generationProfile);
+    const complexity = resolveLegacyMazeComplexity(maze);
+
+    expect(aiTrack.level).toBe(1);
+    expect(profile).toMatchObject({
+      band: 'tutorial',
+      branchPressure: 'minimal',
+      deadEndPressure: 'minimal',
+      expectedEdgeWraps: { horizontal: 0, vertical: 0 },
+      fillPressure: 'open',
+      roomsEnabled: false,
+      shortcutPressure: 'off'
+    });
+    expect(scale).toBeLessThanOrEqual(35);
+    expect(budget.shortcutStageEnabled).toBe(false);
+    expect(budget.shortcutCount).toBe(0);
+    expect(generationProfile.borderFeederTargetPerSide).toBe(0);
+    expect(generationProfile.requiredOppositeBorderConnections).toEqual({ horizontal: false, vertical: false });
+    expect(maze.shortcutStats?.requested).toBe(0);
+    expect(complexity.edgeWrapCount).toBe(0);
+  });
+
+  test('maps progression bands to increasing procedural pressure', () => {
+    const tutorial = resolveLegacyProgressionDifficultyProfile(8);
+    const starter = resolveLegacyProgressionDifficultyProfile(28);
+    const explorer = resolveLegacyProgressionDifficultyProfile(64);
+    const navigator = resolveLegacyProgressionDifficultyProfile(104);
+    const architect = resolveLegacyProgressionDifficultyProfile(152);
+    const mythic = resolveLegacyProgressionDifficultyProfile(180);
+
+    expect([
+      tutorial.band,
+      starter.band,
+      explorer.band,
+      navigator.band,
+      architect.band,
+      mythic.band
+    ]).toEqual(['tutorial', 'starter', 'explorer', 'navigator', 'architect', 'mythic']);
+    expect(tutorial.targetScale).toBeLessThan(starter.targetScale);
+    expect(starter.targetScale).toBeLessThan(explorer.targetScale);
+    expect(explorer.targetScale).toBeLessThan(navigator.targetScale);
+    expect(navigator.targetScale).toBeLessThan(architect.targetScale);
+    expect(architect.targetScale).toBeLessThan(mythic.targetScale);
+    expect(mythic.roomsEnabled).toBe(false);
+    expect(mythic.expectedEdgeWraps.horizontal).toBeGreaterThan(tutorial.expectedEdgeWraps.horizontal);
+    expect(mythic.expectedEdgeWraps.vertical).toBeGreaterThan(tutorial.expectedEdgeWraps.vertical);
+  });
+
+  test('turns higher difficulty bands into stronger generation pressure', () => {
+    const tutorialProfile = resolveLegacyMazeGenerationProfileForProgression(8);
+    const mythicProfile = resolveLegacyMazeGenerationProfileForProgression(180);
+    const tutorialBudget = resolveLegacyGenerationBudgetContract('menu', 29, tutorialProfile);
+    const mythicBudget = resolveLegacyGenerationBudgetContract('menu', 96, mythicProfile);
+    const mythicMaze = createLegacyRuntimeMazeForMode('menu', 96, 3749, mythicProfile);
+    const mythicComplexity = resolveLegacyMazeComplexity(mythicMaze);
+
+    expect(tutorialBudget.shortcutCount).toBe(0);
+    expect(mythicProfile.checkpointCountMultiplier).toBeGreaterThan(tutorialProfile.checkpointCountMultiplier);
+    expect(mythicProfile.shortcutCountMultiplier).toBeGreaterThan(tutorialProfile.shortcutCountMultiplier);
+    expect(mythicProfile.routeQualityReinforcementMultiplier).toBeGreaterThan(tutorialProfile.routeQualityReinforcementMultiplier);
+    expect(mythicProfile.borderFeederTargetPerSide).toBeGreaterThan(tutorialProfile.borderFeederTargetPerSide ?? 0);
+    expect(mythicBudget.checkpointCount).toBeGreaterThan(tutorialBudget.checkpointCount);
+    expect(mythicBudget.shortcutCount).toBeGreaterThan(0);
+    expect(mythicBudget.shortcutStageEnabled).toBe(true);
+    expect(mythicComplexity.edgeWrapCount).toBeGreaterThanOrEqual(2);
   });
 
   test('keeps player and trail progression colors distinct from the pale maze path', () => {
@@ -528,14 +923,14 @@ describe('legacy progression', () => {
     const maxedTrack = {
       ...state.tracks['ai-runner'],
       completedCycles: 5180,
-      level: 44,
+      level: 99,
       rank: 'S' as const,
-      targetComplexity: 180
+      targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
     };
     const palette = resolveLegacyProgressionPalette(maxedTrack, 'ai-runner');
 
-    expect(palette.label).toBe('AI Skill Lv 44 Rank S Runs 5180');
-    expect(palette.label).not.toContain('S180');
+    expect(palette.label).toBe('AI Skill Lv 99 Rank S Runs 5180');
+    expect(palette.label).not.toContain('S400');
     expect(palette.label).not.toContain('R:');
   });
 
@@ -543,7 +938,7 @@ describe('legacy progression', () => {
     const state = createEmptyLegacyProgressionState();
     const maxedTrack = {
       ...state.tracks['ai-runner'],
-      targetComplexity: 180
+      targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
     };
     const phoneViewport = { width: 365, height: 863 };
     const narrowViewport = { width: 332, height: 958 };
@@ -596,7 +991,7 @@ describe('legacy progression', () => {
     expect(normalPhoneLayout.boardLeft).toBeGreaterThanOrEqual(8);
     expect(normalPhoneLayout.boardLeft + normalPhoneLayout.boardSize).toBeLessThanOrEqual(normalPhoneViewport.width - 8);
 
-    for (const targetComplexity of [0, 20, 40, 60, 80, 100, 120, 140, 160, 180]) {
+    for (const targetComplexity of [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 220, 300, LEGACY_PROGRESSION_MAX_COMPLEXITY]) {
       const scale = resolveLegacyProgressionGenerationScale(50, {
         ...maxedTrack,
         targetComplexity
@@ -636,6 +1031,17 @@ describe('legacy progression', () => {
       }
     });
     expect(diagnostics.complexity.total).toBe(resolveLegacyMazeComplexity(maze).total);
+    expect(diagnostics.difficultyProfile.band).toBe('tutorial');
+    expect(diagnostics.generationReview).toMatchObject({
+      measuredComplexity: diagnostics.complexity.total,
+      profileBand: 'tutorial',
+      targetComplexity: state.tracks['ai-runner'].targetComplexity,
+      tolerance: 8
+    });
+    expect(['under-target', 'on-target', 'over-target']).toContain(diagnostics.generationReview.delivery);
+    expect(diagnostics.generationReview.difference).toBe(
+      diagnostics.complexity.total - state.tracks['ai-runner'].targetComplexity
+    );
     expect(diagnostics.palette.label.startsWith('AI Skill Lv ')).toBe(true);
     expect(diagnostics.pacing.activeLevel).toBe(1);
     expect(diagnostics.pacing.measuredMazeComplexity).toBe(diagnostics.complexity.total);

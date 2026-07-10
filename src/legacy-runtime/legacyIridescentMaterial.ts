@@ -95,71 +95,27 @@ export const resolveLegacyIridescentMidnightColor = (
 };
 
 export const resolveLegacyIridescentTrailColor = (
-  index: number,
-  total: number,
-  timeMs: number,
-  anchorColor = LEGACY_IRIDESCENT_GREEN_ANCHOR
-): number => {
-  const trailPosition = total <= 1 ? 0 : index / Math.max(1, total - 1);
-  const materialPhase = (timeMs / 7200) + (trailPosition * 0.62);
-  const prismColor = resolveLegacyIridescentMidnightColor(materialPhase);
-  const blendAmount = 0.34 + (0.16 * Math.sin((trailPosition * Math.PI * 2) + (timeMs / 1800)));
-  const safeFallback = mixLegacyIridescentColor(
-    anchorColor,
-    resolveLegacyIridescentMidnightColor(materialPhase + 0.42),
-    0.38
-  );
-  return resolveLegacyPathSafeIridescentColor(
-    mixLegacyIridescentColor(anchorColor, prismColor, blendAmount),
-    safeFallback
-  );
-};
+  _index: number,
+  _total: number,
+  _timeMs: number,
+  _anchorColor = LEGACY_IRIDESCENT_GREEN_ANCHOR
+): number => LEGACY_IRIDESCENT_GREEN_ANCHOR;
 
 export const resolveLegacyIridescentPulseColor = (
-  index: number,
-  total: number,
-  timeMs: number,
-  anchorColor = 0xff61c7
-): number => {
-  const trailPosition = total <= 1 ? 0 : index / Math.max(1, total - 1);
-  const prismColor = resolveLegacyIridescentMidnightColor((timeMs / 2600) + (trailPosition * 0.78) + 0.22);
-  const safeFallback = mixLegacyIridescentColor(
-    anchorColor,
-    resolveLegacyIridescentMidnightColor((timeMs / 2600) + (trailPosition * 0.78) + 0.58),
-    0.62
-  );
-  return resolveLegacyPathSafeIridescentColor(
-    mixLegacyIridescentColor(anchorColor, prismColor, 0.58),
-    safeFallback
-  );
-};
+  _index: number,
+  _total: number,
+  _timeMs: number,
+  _anchorColor = 0xff61c7
+): number => 0xff61c7;
 
 export const resolveLegacyIridescentPlayerHaloColor = (
-  timeMs: number,
-  anchorColor = 0x00b84a
-): number => (
-  resolveLegacyPathSafeIridescentColor(
-    mixLegacyIridescentColor(
-      anchorColor,
-      resolveLegacyIridescentMidnightColor((timeMs / 3600) + 0.14),
-      0.42
-    ),
-    anchorColor
-  )
-);
+  _timeMs: number,
+  _anchorColor = 0x00b84a
+): number => 0x00b84a;
 
 export const resolveLegacyIridescentPlayerCoreColor = (): number => LEGACY_IRIDESCENT_GREEN_ANCHOR;
 
 export const resolveLegacyIridescentPlayerAccentColor = (
-  timeMs: number,
-  anchorColor = LEGACY_IRIDESCENT_GREEN_ANCHOR
-): number => (
-  resolveLegacyPathSafeIridescentColor(
-    mixLegacyIridescentColor(
-      anchorColor,
-      resolveLegacyIridescentMidnightColor((timeMs / 4200) + 0.58),
-      0.3
-    ),
-    anchorColor
-  )
-);
+  _timeMs: number,
+  _anchorColor = LEGACY_IRIDESCENT_GREEN_ANCHOR
+): number => LEGACY_IRIDESCENT_GREEN_ANCHOR;

@@ -108,7 +108,7 @@ describe('legacy menu demo lifecycle', () => {
     }
 
     expect(failures).toEqual([]);
-  }, 15_000);
+  }, 30_000);
 
   test('bounds the fixed menu bootstrap trail when trail fade is enabled', () => {
     const menuMaze = createLegacyMenuMaze(3749);

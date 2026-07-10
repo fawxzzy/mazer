@@ -3,6 +3,7 @@ import {
   ACTIVE_PLAY_GOAL_RESET_HOLD_MS,
   createLegacyResetRequest,
   hasPendingLegacyResetRequest,
+  resolveLegacyPlayLifecycleSnapshot,
   resolveLegacyResetEntryContract,
   resolveLegacyResetAction,
   shouldConsumeLegacyResetRequest
@@ -73,5 +74,110 @@ describe('legacy play lifecycle', () => {
     expect(shouldConsumeLegacyResetRequest(playReset, 1540)).toBe(true);
     expect(shouldConsumeLegacyResetRequest(menuReset, 1819)).toBe(false);
     expect(shouldConsumeLegacyResetRequest(menuReset, 1820)).toBe(true);
+  });
+
+  test('projects explicit play lifecycle phases from draw, reset, and input state', () => {
+    expect(resolveLegacyPlayLifecycleSnapshot({
+      drawPhase: 'building',
+      generationPending: false,
+      handoffActive: false,
+      mode: 'play',
+      nextSeedQueued: false,
+      overlayOpen: false,
+      playerAlpha: 1,
+      resetPending: false,
+      stagedBuildVisible: true,
+      timerStarted: true,
+      trailAlpha: 1,
+      trailLength: 1
+    })).toMatchObject({
+      phase: 'building',
+      inputLocked: true,
+      timerRunning: false,
+      playerVisible: false,
+      compassSpinExpected: true
+    });
+
+    expect(resolveLegacyPlayLifecycleSnapshot({
+      drawPhase: 'settled',
+      generationPending: false,
+      handoffActive: false,
+      mode: 'play',
+      nextSeedQueued: false,
+      overlayOpen: false,
+      playerAlpha: 1,
+      resetPending: false,
+      stagedBuildVisible: false,
+      timerStarted: true,
+      trailAlpha: 1,
+      trailLength: 1
+    })).toMatchObject({
+      phase: 'ready',
+      inputLocked: false,
+      timerRunning: true,
+      playerVisible: true,
+      trailVisible: true
+    });
+
+    expect(resolveLegacyPlayLifecycleSnapshot({
+      drawPhase: 'settled',
+      generationPending: false,
+      handoffActive: false,
+      mode: 'play',
+      nextSeedQueued: false,
+      overlayOpen: false,
+      playerAlpha: 1,
+      resetPending: true,
+      stagedBuildVisible: false,
+      timerStarted: true,
+      trailAlpha: 1,
+      trailLength: 8
+    })).toMatchObject({
+      phase: 'goal-hold',
+      inputLocked: true,
+      timerRunning: false
+    });
+
+    expect(resolveLegacyPlayLifecycleSnapshot({
+      drawPhase: 'deconstructing',
+      generationPending: true,
+      handoffActive: true,
+      mode: 'play',
+      nextSeedQueued: true,
+      overlayOpen: false,
+      playerAlpha: 0,
+      resetPending: false,
+      stagedBuildVisible: false,
+      timerStarted: true,
+      trailAlpha: 0,
+      trailLength: 8
+    })).toMatchObject({
+      phase: 'handoff',
+      inputLocked: true,
+      nextSeedQueued: true,
+      playerVisible: false,
+      trailVisible: false,
+      compassSpinExpected: true
+    });
+
+    expect(resolveLegacyPlayLifecycleSnapshot({
+      drawPhase: 'deconstructing',
+      generationPending: true,
+      handoffActive: false,
+      mode: 'play',
+      nextSeedQueued: true,
+      overlayOpen: false,
+      playerAlpha: 0,
+      resetPending: false,
+      stagedBuildVisible: true,
+      timerStarted: true,
+      trailAlpha: 0,
+      trailLength: 8
+    })).toMatchObject({
+      phase: 'deconstructing',
+      inputLocked: true,
+      nextSeedQueued: true,
+      compassSpinExpected: true
+    });
   });
 });

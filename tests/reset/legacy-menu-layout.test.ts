@@ -143,11 +143,30 @@ describe('legacy menu layout', () => {
     }
   });
 
-  test('keeps authenticated start and options buttons padded as one centered stack', () => {
+  test('keeps authenticated start and options side-by-side on portrait phones', () => {
+    for (const viewport of [
+      { width: 405, height: 958 },
+      { width: 430, height: 932 }
+    ]) {
+      const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
+      const authenticated = resolveLegacyAuthenticatedMenuButtonStack(layout);
+
+      expect(authenticated.buttonLayout).toBe('row');
+      expect(authenticated.startButtonY).toBe(layout.buttonY);
+      expect(authenticated.optionsButtonY).toBe(layout.buttonY);
+      expect(authenticated.optionsButtonHeight).toBe(layout.buttonHeight);
+      expect(authenticated.startButtonX).toBe(layout.leftButtonX);
+      expect(authenticated.optionsButtonX).toBe(layout.rightButtonX);
+      expect(authenticated.startButtonX).toBeLessThan(layout.centerButtonX);
+      expect(authenticated.optionsButtonX).toBeGreaterThan(layout.centerButtonX);
+      expect(authenticated.startButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(96);
+      expect(authenticated.startButtonY + (layout.buttonHeight / 2)).toBeLessThan(layout.footerY);
+    }
+  });
+
+  test('keeps authenticated start and options buttons padded as one centered stack on desktop', () => {
     for (const viewport of [
       { width: 1280, height: 720 },
-      { width: 405, height: 958 },
-      { width: 430, height: 932 },
       { width: 1920, height: 1080 }
     ]) {
       const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
@@ -161,6 +180,9 @@ describe('legacy menu layout', () => {
         ? layout.centerButtonY
         : (layout.boardTop + layout.boardSize) + (availableHeight / 2);
 
+      expect(stack.buttonLayout).toBe('stack');
+      expect(stack.startButtonX).toBe(layout.centerButtonX);
+      expect(stack.optionsButtonX).toBe(layout.centerButtonX);
       expect(Math.round(optionsTop - startBottom)).toBeGreaterThanOrEqual(10);
       expect(Math.round(optionsTop - startBottom)).toBeLessThanOrEqual(14);
       expect(Math.abs(((stackTop + stackBottom) / 2) - expectedCenter)).toBeLessThanOrEqual(1);
@@ -224,6 +246,31 @@ describe('legacy menu layout', () => {
     expect(touchLayout.controls.pause.width).toBeGreaterThan(touchLayout.controls.move_up.width);
     expect(touchLayout.controls.restart_attempt.width).toBe(0);
     expect(touchLayout.controls.toggle_thoughts.width).toBe(0);
+  });
+
+  test('reserves a top mobile HUD lane for played-game badge and pause without overlapping the maze', () => {
+    const playLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 'play');
+    const touchLayout = resolveTouchControlLayout({
+      width: playLayout.width,
+      height: playLayout.height
+    }, {
+      compact: true,
+      controlMode: 'stick',
+      avoidRect: {
+        left: playLayout.boardLeft,
+        top: playLayout.boardTop,
+        width: playLayout.boardSize,
+        height: playLayout.boardSize
+      }
+    });
+
+    expect(playLayout.boardTop).toBeGreaterThanOrEqual(62);
+    expect(playLayout.boardTop).toBeLessThanOrEqual(90);
+    expect(touchLayout.controls.pause.top).toBeLessThan(16);
+    expect(touchLayout.controls.pause.right).toBeGreaterThanOrEqual(playLayout.width - 14);
+    expect(touchLayout.controls.pause.left).toBeGreaterThan(playLayout.width * 0.7);
+    expect(touchLayout.controls.pause.bottom + 12).toBeLessThanOrEqual(playLayout.boardTop);
+    expect(playLayout.boardTop + playLayout.boardSize + 24).toBeLessThanOrEqual(touchLayout.frame.top);
   });
 
   test('gives desktop active play a larger board than the front-door composition', () => {

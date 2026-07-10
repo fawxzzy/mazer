@@ -199,9 +199,11 @@ const normalizeMazeComplexityBreakdown = (value: unknown): LegacyMazeComplexityB
     checkpointScore: normalizeNonNegativeNumber(value.checkpointScore),
     deadEndCount: normalizeNonNegativeInteger(value.deadEndCount),
     deadEndPressureScore: normalizeNonNegativeNumber(value.deadEndPressureScore),
+    edgeWrapChoiceScore: normalizeNonNegativeNumber(value.edgeWrapChoiceScore),
     edgeWrapCount: normalizeNonNegativeInteger(value.edgeWrapCount),
     edgeWrapReliefScore: normalizeNonNegativeNumber(value.edgeWrapReliefScore),
     edgeWrapScore: normalizeNonNegativeNumber(value.edgeWrapScore),
+    edgeWrapShortcutReliefScore: normalizeNonNegativeNumber(value.edgeWrapShortcutReliefScore),
     fillQualityScore: normalizeNonNegativeNumber(value.fillQualityScore),
     floorScore: normalizeNonNegativeNumber(value.floorScore),
     routeScore: normalizeNonNegativeNumber(value.routeScore),
@@ -226,13 +228,13 @@ export const scoreMazeCycleAiDecisionSummary = (
 
   const decisionCount = Math.max(1, normalized.decisionCount);
   const routeNoiseScore = clampScore(((
-    normalized.wrongBranchCount * 3
+    normalized.wrongBranchCount
     + normalized.optionalRetargetCount * 1.5
     + normalized.visitedUndoCount * 4
   ) / decisionCount) * 100);
   const recoveryPressureScore = clampScore(((
-    normalized.backtrackCount * 1.2
-    + normalized.recoveryCount * 3
+    normalized.backtrackCount * 0.75
+    + normalized.recoveryCount * 2.25
   ) / decisionCount) * 100);
   const retargetPressureScore = clampScore((normalized.optionalRetargetCount / decisionCount) * 100);
   const pressureScore = clampScore((

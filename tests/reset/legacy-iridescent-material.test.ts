@@ -28,17 +28,17 @@ describe('legacy iridescent material', () => {
     }
   });
 
-  test('uses a green-readable anchor while shifting trail colors over time and path position', () => {
+  test('pins trail colors to the green readability anchor while rainbow material is deferred', () => {
     const headColor = resolveLegacyIridescentTrailColor(0, 12, 0, LEGACY_IRIDESCENT_GREEN_ANCHOR);
     const tailColor = resolveLegacyIridescentTrailColor(11, 12, 0, LEGACY_IRIDESCENT_GREEN_ANCHOR);
     const laterHeadColor = resolveLegacyIridescentTrailColor(0, 12, 3600, LEGACY_IRIDESCENT_GREEN_ANCHOR);
 
-    expect(headColor).not.toBe(tailColor);
-    expect(headColor).not.toBe(laterHeadColor);
-    expect(measureLegacyIridescentColorDistance(headColor, LEGACY_IRIDESCENT_GREEN_ANCHOR)).toBeLessThan(125);
+    expect(headColor).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
+    expect(tailColor).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
+    expect(laterHeadColor).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
   });
 
-  test('shifts player halo, player accent, and pulse colors without matching the path', () => {
+  test('pins player halo/accent green and keeps trail pulse purple until material QA resumes', () => {
     const earlyHalo = resolveLegacyIridescentPlayerHaloColor(0);
     const lateHalo = resolveLegacyIridescentPlayerHaloColor(1800);
     const earlyAccent = resolveLegacyIridescentPlayerAccentColor(0);
@@ -46,9 +46,12 @@ describe('legacy iridescent material', () => {
     const earlyPulse = resolveLegacyIridescentPulseColor(2, 10, 0);
     const latePulse = resolveLegacyIridescentPulseColor(2, 10, 900);
 
-    expect(earlyHalo).not.toBe(lateHalo);
-    expect(earlyAccent).not.toBe(lateAccent);
-    expect(earlyPulse).not.toBe(latePulse);
+    expect(earlyHalo).toBe(0x00b84a);
+    expect(lateHalo).toBe(0x00b84a);
+    expect(earlyAccent).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
+    expect(lateAccent).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
+    expect(earlyPulse).toBe(0xff61c7);
+    expect(latePulse).toBe(0xff61c7);
 
     for (const color of [lateHalo, lateAccent, latePulse]) {
       expect(measureLegacyIridescentColorDistance(color, LEGACY_IRIDESCENT_PATH_CORE_CONTRAST_COLOR))

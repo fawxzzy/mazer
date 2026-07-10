@@ -203,7 +203,7 @@ describe('legacy reset lane', () => {
   test('preserves legacy default settings', () => {
     expect(LEGACY_DEFAULTS.scale).toBe(50);
     expect(LEGACY_DEFAULTS.camScale).toBe(0);
-    expect(LEGACY_DEFAULTS.movementSpeed).toBe(0.58);
+    expect(LEGACY_DEFAULTS.movementSpeed).toBe(0.3);
     expect(linearColorToHex(LEGACY_DEFAULTS.pathColor)).toBe('#797978');
     expect(linearColorToHex(LEGACY_DEFAULTS.wallColor)).toBe('#4a4a4a');
     expect(LEGACY_DEFAULTS.toggleTrailPulse).toBe(true);
@@ -549,7 +549,6 @@ describe('legacy reset lane', () => {
     const demoLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuDemoLifecycle.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('resolveLegacyPlayHudFrame({');
-    expect(menuSceneSource).toContain('hudFrame.timerText');
     expect(menuSceneSource).toContain('timerText: this.hudFrame?.timerText ?? null');
     expect(menuSceneSource).toContain('arrowAngleDegrees: this.hudFrame?.arrowAngleDegrees ?? null');
     expect(menuSceneSource).toContain('arrowAngleRadians: this.hudFrame?.arrowAngleRadians ?? null');
@@ -568,7 +567,9 @@ describe('legacy reset lane', () => {
     expect(legacyPlayHudSource).toContain('const length = 14;');
     expect(legacyPlayHudSource).toContain('const timerBounds = createLegacyHudRect(Math.round((input.layoutWidth - 112) / 2), 10, 112, 38);');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
-    expect(menuSceneSource).toContain("fontSize: '23px',");
+    expect(menuSceneSource).toContain('timerText: this.hudFrame?.timerText ?? null');
+    expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
+    expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
     expect(menuSceneSource).toContain('this.startLegacyPlayCompassSpin(this.time.now);');
     expect(menuSceneSource).toContain('private resolveLegacyPlayCompassVisualFrame(');
@@ -679,9 +680,10 @@ describe('legacy reset lane', () => {
     expect(generationLifecycleSource).toContain("executionKind: 'checkpoint-pass'");
     expect(generationLifecycleSource).toContain("executionKind: 'path-batch'");
     expect(generationLifecycleSource).toContain("executionKind: 'shortcut-attempt'");
-    expect(generationLifecycleSource).toContain('checkpointCount: Math.trunc(normalizedScale + (normalizedScale * checkpointModifier))');
+    expect(generationLifecycleSource).toContain('const baseCheckpointCount = Math.trunc(normalizedScale + (normalizedScale * checkpointModifier))');
+    expect(generationLifecycleSource).toContain('Math.trunc(baseCheckpointCount * profile.checkpointCountMultiplier)');
     expect(generationLifecycleSource).toContain('const formulaCount = Math.trunc(normalizedScale * shortcutCountModifier)');
-    expect(generationLifecycleSource).toContain('shortcutCount: resolveLegacyShortcutCount(mode, normalizedScale, shortcutCountModifier)');
+    expect(generationLifecycleSource).toContain('const shortcutCount = clampInteger(');
     expect(generationLifecycleSource).toContain('entryStageId: LEGACY_GENERATION_ENTRY_STAGE_ID');
     expect(generationLifecycleSource).toContain('waitsForLevelBuildingDelay: true');
     expect(generationLifecycleSource).toContain('consumesWhileUninitialized: true');

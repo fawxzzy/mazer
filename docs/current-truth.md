@@ -208,6 +208,15 @@ Current `test:verify` means:
 
 That proof spine currently guards marker arithmetic/current-truth sync, reset and generation lifecycle, topology scale audits, menu AI recovery/replay, active play movement/HUD/reset contracts, and render-frame layout/readability contracts. `npm run lint` remains a separate TypeScript gate for code-edit packets and should still be run before commit when implementation files change.
 
+Current fast iteration rule:
+
+- `npm run verify:fast -- --list` previews the changed-file-to-proof-slice selection before spending time on checks.
+- `npm run verify:fast` runs TypeScript when implementation files changed and then runs only the selected Vitest files.
+- `npm run verify:fast:tests` runs the same selected Vitest slice with TypeScript skipped for same-cluster reruns after a TypeScript-backed pass already succeeded.
+- `npm run verify:fast:all` runs the full reset-lane test spine without the production build.
+- `npm run verify:fast -- --build` is the opt-in bridge when a bounded packet needs production bundle proof without switching back to the full reset-lane wrapper.
+- `npm run verify` remains the closure/release/marker-ratchet proof and still means `test:verify` plus `build`.
+
 The older visual matrix / Edge live proof lane is now archival for comparison, not current closure truth for the reset lane.
 
 Localhost operation rule:

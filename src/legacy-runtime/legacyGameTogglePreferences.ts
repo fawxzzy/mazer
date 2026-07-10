@@ -130,3 +130,37 @@ export const writeLegacyGameToggleSettings = (
 
   return normalizedSettings;
 };
+
+export const migrateLegacyGameToggleSettingsFromGlobalStorage = (
+  rootStorage: Pick<Storage, 'getItem' | 'setItem'> | undefined,
+  scopedStorage: Pick<Storage, 'getItem' | 'setItem'> | undefined,
+  fallback: LegacySettings = LEGACY_DEFAULTS
+): boolean => {
+  if (!rootStorage || !scopedStorage) {
+    return false;
+  }
+
+  try {
+    if (scopedStorage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY) !== null) {
+      return false;
+    }
+
+    const rawLegacyPreferences = rootStorage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY);
+    if (!rawLegacyPreferences) {
+      return false;
+    }
+
+    const normalizedPreferences = normalizeLegacyGameTogglePreferences(
+      JSON.parse(rawLegacyPreferences) as Partial<LegacyGameTogglePreferences>,
+      fallback
+    );
+
+    scopedStorage.setItem(
+      LEGACY_GAME_TOGGLE_STORAGE_KEY,
+      JSON.stringify(normalizedPreferences)
+    );
+    return true;
+  } catch {
+    return false;
+  }
+};

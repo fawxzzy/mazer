@@ -20,9 +20,11 @@ const createReceipt = (overrides = {}) => ({
     checkpointScore: 0,
     deadEndCount: 3,
     deadEndPressureScore: 2.16,
+    edgeWrapChoiceScore: 1.3,
     edgeWrapCount: 2,
     edgeWrapReliefScore: 0,
     edgeWrapScore: 4.8,
+    edgeWrapShortcutReliefScore: 0,
     fillQualityScore: 8.4,
     floorScore: 9,
     routeScore: 17,
@@ -129,7 +131,9 @@ describe('maze-cycle-telemetry-report', () => {
     expect(report.complexityReview).toMatchObject({
       averageDeadEndCount: 3,
       averageEdgeWrapCount: 2,
+      averageEdgeWrapChoiceScore: 1.3,
       averageEdgeWrapReliefScore: 0,
+      averageEdgeWrapShortcutReliefScore: 0,
       averageFillQualityScore: 8.4,
       averageMeasuredComplexity: 90,
       averageSplitCount: 8,
@@ -192,6 +196,24 @@ describe('maze-cycle-telemetry-report', () => {
       },
       progression: {
         activeTrackId: 'ai-runner',
+        generationReview: {
+          adaptiveRetryCandidateCount: 3,
+          adaptiveRetryScale: 57,
+          adaptiveRetryUsed: true,
+          allCandidatesOverTarget: false,
+          allCandidatesUnderTarget: true,
+          delivery: 'under-target',
+          difference: -22,
+          initialWindowUnderTarget: true,
+          measuredComplexity: 42,
+          pressureRetryCandidateCount: 3,
+          pressureRetryUsed: true,
+          profileBand: 'navigator',
+          searchedCandidateCount: 9,
+          selectedDistance: 22,
+          targetComplexity: 64,
+          tolerance: 8
+        },
         pacing: {
           activeLevel: 8,
           activeRank: 'D',
@@ -237,6 +259,23 @@ describe('maze-cycle-telemetry-report', () => {
         signalWindow: ['challenge', 'challenge', 'hold']
       }
     });
+    expect(report.generationReview).toMatchObject({
+      hasGenerationDiagnostics: true,
+      canTuneGenerationFromCurrentData: true,
+      review: {
+        adaptiveRetryCandidateCount: 3,
+        adaptiveRetryScale: 57,
+        adaptiveRetryUsed: true,
+        allCandidatesUnderTarget: true,
+        delivery: 'under-target',
+        initialWindowUnderTarget: true,
+        pressureRetryCandidateCount: 3,
+        pressureRetryUsed: true,
+        profileBand: 'navigator',
+        searchedCandidateCount: 9,
+        targetComplexity: 64
+      }
+    });
   });
 
   test('creates the same Atlas-safe report from Supabase cycle receipt rows', () => {
@@ -275,9 +314,11 @@ describe('maze-cycle-telemetry-report', () => {
               checkpointScore: 0,
               deadEndCount: 5,
               deadEndPressureScore: 3.6,
+              edgeWrapChoiceScore: 1.7,
               edgeWrapCount: 2,
               edgeWrapReliefScore: 1.2,
               edgeWrapScore: 4.8,
+              edgeWrapShortcutReliefScore: 1.2,
               fillQualityScore: 7.5,
               floorScore: 8,
               routeScore: 18,
@@ -329,14 +370,18 @@ describe('maze-cycle-telemetry-report', () => {
       signal: 'searching'
     });
     expect(report.latestReceipt.mazeComplexity).toMatchObject({
+      edgeWrapChoiceScore: 1.7,
       edgeWrapCount: 2,
+      edgeWrapShortcutReliefScore: 1.2,
       splitCount: 11,
       total: 87
     });
     expect(report.complexityReview).toMatchObject({
       averageDeadEndCount: 5,
       averageEdgeWrapCount: 2,
+      averageEdgeWrapChoiceScore: 1.7,
       averageEdgeWrapReliefScore: 1.2,
+      averageEdgeWrapShortcutReliefScore: 1.2,
       averageMeasuredComplexity: 87,
       averageWeightedDeadEndPressureScore: 0.9,
       averageWeightedSplitPressureScore: 1.6,

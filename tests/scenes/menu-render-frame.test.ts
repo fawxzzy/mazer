@@ -602,6 +602,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.backdropDirty = true;');
     expect(menuSceneSource).toContain('pathVisualStyle: this.pathVisualStyle');
     expect(menuSceneSource).toContain('textLabels: this.resolveVisualTextLabels()');
+    expect(menuSceneSource).toContain('buttons: this.uiButtons');
+    expect(menuSceneSource).toContain('text: button.text');
     expect(menuSceneSource).toContain('this.uiTexts.push(label, stateLabel);');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_FILL = 0x08111d;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_EDGE = 0x031022;');
@@ -684,19 +686,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor');
   });
 
-  test('keeps active play HUD in a source-shaped timer and arrow widget lane', () => {
+  test('keeps active play HUD focused on compass controls while the level badge owns the timer', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_PANE_ALPHA = 0.68;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_TEXT =');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_SHADOW =');
     expect(menuSceneSource).toContain('const LEGACY_CYBER_PANEL_STROKE = 0x72e0bf;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW = 0xff263f;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_TAIL = 0xecfff5;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
-    expect(menuSceneSource).toContain("fontSize: '23px',");
-    expect(menuSceneSource).toContain('timerShadow.setAlpha(0.7);');
+    expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
+    expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
     expect(menuSceneSource).toContain('this.drawLegacyPlayCompass(hudFrame, {');
     expect(menuSceneSource).toContain("showPane: touchControlLayout.controlMode !== 'stick'");
     expect(menuSceneSource).toContain('if (options.showPane) {');
@@ -788,7 +788,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('palette.trailPulseEdgeColor');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_PERIOD_MS = 1800;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_COLOR = 0xc8fff4;');
     expect(menuSceneSource).toContain('const falloff = smoothstep(1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW));');
+    expect(menuSceneSource).toContain('private drawLegacyDynamicTrailShine(');
+    expect(menuSceneSource).toContain('this.drawLegacyDynamicTrailShine(');
+    expect(menuSceneSource).toContain('const shineCenterIndex = (trail.length - 1) - (phase * maxShineIndex);');
+    expect(menuSceneSource).toContain('coreColor: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_COLOR');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
     expect(menuSceneSource).toContain('LEGACY_PLAY_PATH_EDGE,');
     expect(menuSceneSource).toContain('LEGACY_PLAY_PATH_EDGE_ALPHA,');
@@ -817,6 +823,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('startEdgeColor: LEGACY_PLAY_START_MARKER_EDGE');
     expect(menuSceneSource).toContain('trailPulseColor: progressionPalette.trailPulseColor');
     expect(menuSceneSource).toContain('trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor');
+    expect(menuSceneSource).toContain('trailShineColor: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_COLOR');
+    expect(menuSceneSource).toContain('trailShineEnabled: this.trail.length > 1');
+    expect(menuSceneSource).toContain('trailShinePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_PERIOD_MS');
     expect(menuSceneSource).toContain('iridescentMaterial: this.resolveLegacyIridescentMaterialDiagnostics(time, progressionPalette)');
     expect(menuSceneSource).toContain('private resolveLegacyIridescentMaterialDiagnostics(');
     expect(menuSceneSource).toContain('minPathColorDistance: LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE');
@@ -993,6 +1002,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("'Reset', resetAction");
     expect(menuSceneSource).toContain("case 'move_up':");
     expect(menuSceneSource).toContain('this.tryMovePlayer(0, -1);');
+    expect(menuSceneSource).toContain('private tryMovePlayerFromInput(deltaX: number, deltaY: number): boolean');
+    expect(menuSceneSource).toContain('return this.startLegacyPlayDiagonalSprint(deltaX, deltaY);');
+    expect(menuSceneSource).toContain('const accepted = this.tryMovePlayerFromInput(vector.deltaX, vector.deltaY);');
     expect(menuSceneSource).toContain('this.tryMovePlayer(1, 0);');
     expect(menuSceneSource).toContain('this.tryMovePlayer(0, 1);');
     expect(menuSceneSource).toContain('this.tryMovePlayer(-1, 0);');
@@ -1079,6 +1091,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('applies capped high-DPI text resolution to menu and overlay UI text', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const textCrispnessSource = readFileSync(resolve(process.cwd(), 'src/render/textCrispness.ts'), 'utf8');
 
     expect(menuSceneSource).toContain("import { applyTextResolution, resolveHudTextResolution } from '../render/textCrispness';");
     expect(menuSceneSource).toContain('private resolveLegacyUiTextResolution(): number');
@@ -1088,6 +1101,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.footerText = this.applyLegacyUiTextCrispness(this.add.text');
     expect(menuSceneSource).toContain('this.progressionBadgeText = this.applyLegacyUiTextCrispness(this.add.text');
     expect(menuSceneSource).toContain('this.applyLegacyUiTextCrispness(text);');
+    expect(textCrispnessSource).toContain('const devicePixelRatio = readDevicePixelRatio();');
+    expect(textCrispnessSource).not.toContain('navigator.webdriver');
+    expect(textCrispnessSource).not.toContain('HeadlessChrome');
   });
 
   test('publishes a compact walkable maze snapshot for live play QA', () => {
@@ -1141,6 +1157,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('authenticatedMenuButtonStack.optionsButtonY');
     expect(menuSceneSource).toContain('authenticatedMenuButtonStack.optionsButtonHeight');
     expect(menuSceneSource).toContain('const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);');
+    expect(menuSceneSource).toContain('bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height)');
+    expect(menuSceneSource).toContain('text,');
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
   });
 
@@ -1156,6 +1174,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authSource).toContain('persistSession: true');
     expect(authSource).toContain('detectSessionInUrl: true');
     expect(authSource).toContain('createLegacyAuthScopedStorage');
+    expect(menuSceneSource).toContain('LEGACY_GAME_TOGGLE_STORAGE_KEY');
+    expect(menuSceneSource).toContain('this.loadPersistedLegacyGameToggleSettings();');
+    expect(menuSceneSource).toContain('this.authSnapshot');
+    expect(menuSceneSource).toContain('private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null');
+    expect(menuSceneSource).toContain("runtimeDiagnostics !== '1' && runtimeDiagnostics !== 'true'");
+    expect(menuSceneSource).toContain("searchParams.get('authFixture')?.trim().toLowerCase() !== 'authenticated'");
+    expect(menuSceneSource).toContain("userId: 'runtime-diagnostics-auth-fixture'");
+    expect(menuSceneSource).toContain('const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();');
+    expect(menuSceneSource).toContain('if (runtimeAuthFixtureSnapshot) {');
     expect(menuSceneSource).toContain("this.openOverlay('auth')");
     expect(menuSceneSource).toContain('private buildAuthOverlay(): void');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSubmit(): Promise<void>');
@@ -1230,28 +1257,32 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private formatLegacyElapsedLabel(elapsedMs: number): string');
     expect(menuSceneSource).toContain('private formatLegacyProgressionRunCount(completedCycles: number): string');
     expect(menuSceneSource).toContain('private resolveLegacyMenuAiElapsedMs(): number');
+    expect(menuSceneSource).toContain('private resolveLegacyPlayElapsedMs(): number');
+    expect(menuSceneSource).toContain('private resolveLegacyCurrentMazeLevel(): number');
     expect(menuSceneSource).toContain('private resolveLegacyProgressionBadgeText(_palette: LegacyProgressionPalette): string');
     expect(menuSceneSource).toContain('const text = this.resolveLegacyProgressionBadgeText(palette);');
-    expect(menuSceneSource).toContain("const skillLine = `AI Skill  Level ${String(aiTrack.level).padStart(2, '0')}  Rank ${aiTrack.rank}`;");
-    expect(menuSceneSource).toContain("const runLine = `Run ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}  Score ${scoreLabel}  Time ${timerLabel}`;");
-    expect(menuSceneSource).toContain("return `${skillLine}\\n${runLine}`;");
-    expect(menuSceneSource).toContain("const skillLine = `Player Skill  Level ${String(playerTrack.level).padStart(2, '0')}  Rank ${playerTrack.rank}`;");
-    expect(menuSceneSource).toContain("const runLine = `Runs ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}`;");
+    expect(menuSceneSource).toContain("const skillLine = `AI Skill Lvl: ${aiTrack.rank}/${String(aiTrack.level).padStart(2, '0')}  Score: ${scoreLabel}`;");
+    expect(menuSceneSource).toContain("const runLine = `Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}  Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;");
+    expect(menuSceneSource).toContain("return `${timerLabel}\\n${skillLine}\\n${runLine}`;");
+    expect(menuSceneSource).toContain("const timerLine = this.formatLegacyElapsedLabel(this.resolveLegacyPlayElapsedMs());");
+    expect(menuSceneSource).toContain("const skillLine = `Skill Lvl: ${playerTrack.rank}/${String(playerTrack.level).padStart(2, '0')}  Score: ${scoreLabel}`;");
+    expect(menuSceneSource).toContain("const runLine = `Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}  Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;");
     expect(menuSceneSource).not.toContain('const complexityLabel =');
     expect(menuSceneSource).not.toContain('const signalLabel =');
     expect(menuSceneSource).not.toContain('Sig:');
     expect(menuSceneSource).not.toContain('return palette.label;');
   });
 
-  test('places the played-game level badge above the maze instead of below the board', () => {
+  test('places the played-game level badge in the top HUD lane without overlapping the maze', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain("const centerY = this.mode === 'play'");
     expect(menuSceneSource).toContain('? this.resolveLegacyPlayProgressionBadgeCenterY(mazeRenderFrame, height)');
     expect(menuSceneSource).toContain(': this.resolveLegacyMenuProgressionBadgeCenterY(mazeRenderFrame, height);');
     expect(menuSceneSource).toContain('private resolveLegacyPlayProgressionBadgeCenterY(');
-    expect(menuSceneSource).toContain('const mazeGap = clampInteger(Math.round(mazeRenderFrame.tileSize * 3), 20, 32);');
-    expect(menuSceneSource).toContain('const desiredTop = mazeRenderFrame.boardTop - mazeGap - height;');
+    expect(menuSceneSource).toContain('const mazeGap = clampInteger(Math.round(mazeRenderFrame.tileSize * 2.4), 16, 28);');
+    expect(menuSceneSource).toContain('const minimumTop = this.layout.height > this.layout.width ? 8 : 10;');
+    expect(menuSceneSource).toContain('const maximumTopBeforeMaze = mazeRenderFrame.boardTop - mazeGap - height;');
     expect(menuSceneSource).toContain('return Math.round(top + (height / 2));');
     expect(menuSceneSource).toContain('private resolveLegacyMenuProgressionBadgeCenterY(');
   });
@@ -1259,14 +1290,21 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const cardHeight = compact ? 238 : 246;');
-    expect(menuSceneSource).toContain('const guideHeight = (stacked ? 238 : 246) + (stacked ? 26 : 30);');
-    expect(menuSceneSource).toContain("addText('PLAYER GUIDE', cardLeft + inset, titleY, cardWidth - (inset * 2), '#9dffd5', compact ? 19 : 21, 0, 1);");
-    expect(menuSceneSource).toContain("drawLegendRow(3, 'player', 'Player', this.mode === 'play' ? 'your live marker and trail' : 'AI marker and trail', '#72e0bf');");
-    expect(menuSceneSource).toContain("this.mode === 'play' ? 'Level/Rank' : 'AI Level'");
-    expect(menuSceneSource).toContain("this.mode === 'play' ? 'your skill tier from clears' : 'AI skill tier from cycles'");
-    expect(menuSceneSource).toContain("this.mode === 'play' ? 'Runs' : 'Score/Time'");
-    expect(menuSceneSource).toContain("this.mode === 'play' ? 'completed player mazes' : '0-100 pace and run timer'");
+    expect(menuSceneSource).toContain('const cardHeight = compact ? 264 : 274;');
+    expect(menuSceneSource).toContain('const guideHeight = (stacked ? 264 : 274) + (stacked ? 26 : 30);');
+    expect(menuSceneSource).toContain('const guideTitleFontSize = compact ? 19 : 21;');
+    expect(menuSceneSource).toContain('const guideRowFontSize = compact ? 14 : 15;');
+    expect(menuSceneSource).toContain('const guideRowMinFontSize = compact ? 12 : 13;');
+    expect(menuSceneSource).toContain("addText('PLAYER GUIDE', cardLeft + inset, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0, 1, guideRowMinFontSize);");
+    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');");
+    expect(menuSceneSource).toContain("drawLegendRow(3, 'player', 'Player', 'player marker + trail', '#72e0bf');");
+    expect(menuSceneSource).not.toContain("'AI marker + trail'");
+    expect(menuSceneSource).toContain("this.mode === 'play' ? 'Skill Lvl' : 'AI Skill Lvl'");
+    expect(menuSceneSource).toContain("'rank / level'");
+    expect(menuSceneSource).toContain("'Clock + Score'");
+    expect(menuSceneSource).toContain("'time + 0-100 score'");
+    expect(menuSceneSource).toContain("'Runs + Maze Lvl'");
+    expect(menuSceneSource).toContain("'clears + current maze'");
   });
 
   test('exposes wrapped edge player snaps in runtime diagnostics', () => {
@@ -1280,6 +1318,34 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(diagnosticsSource).toContain("visualMotionSnapReason?: 'wrapped-step' | null;");
   });
 
+  test('publishes explicit play lifecycle diagnostics for runtime and visual proof', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const diagnosticsSource = readFileSync(resolve(process.cwd(), 'src/scenes/menuRuntimeDiagnostics.ts'), 'utf8');
+    const lifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayLifecycle.ts'), 'utf8');
+    const qaScriptSource = readFileSync(resolve(process.cwd(), 'scripts/analysis/live-play-qa.mjs'), 'utf8');
+
+    expect(lifecycleSource).toContain("export type LegacyPlayLifecyclePhase =");
+    expect(lifecycleSource).toContain("'goal-hold'");
+    expect(lifecycleSource).toContain("export const resolveLegacyPlayLifecycleSnapshot =");
+    expect(menuSceneSource).toContain('private resolveLegacyPlayLifecycleDiagnostics(time: number): LegacyPlayLifecycleSnapshot');
+    expect(menuSceneSource).toContain('private runtimeDiagnosticsPlayLifecycleSignature: string | null = null;');
+    expect(menuSceneSource).toContain('private visualDiagnosticsPlayLifecycleSignature: string | null = null;');
+    expect(menuSceneSource).toContain('private resolveLegacyPlayLifecycleDiagnosticsSignature(time: number): string');
+    expect(menuSceneSource).toContain('const lifecycleChanged = playLifecycleSignature !== this.runtimeDiagnosticsPlayLifecycleSignature;');
+    expect(menuSceneSource).toContain('const lifecycleChanged = playLifecycleSignature !== this.visualDiagnosticsPlayLifecycleSignature;');
+    expect(menuSceneSource).toContain('&& !lifecycleChanged');
+    expect(menuSceneSource).toContain('this.armLegacyMenuStaticDeconstructStage(time);');
+    expect(menuSceneSource).toContain('this.publishVisualDiagnostics(time, true);');
+    expect(menuSceneSource).toContain('this.publishRuntimeDiagnostics(time, true);');
+    expect(menuSceneSource).toContain('const playLifecycle = this.resolveLegacyPlayLifecycleDiagnostics(time);');
+    expect(menuSceneSource).toContain('lifecycle: playLifecycle');
+    expect(menuSceneSource).toContain('playLifecycle,');
+    expect(diagnosticsSource).toContain('lifecycle?: {');
+    expect(diagnosticsSource).toContain("phase: 'idle' | 'building' | 'ready' | 'playing' | 'goal-hold' | 'deconstructing' | 'handoff';");
+    expect(qaScriptSource).toContain('const runtimeLifecycle = runtime?.play?.lifecycle ?? null;');
+    expect(qaScriptSource).toContain('explicitLifecyclePhase: lifecycle?.phase ?? null');
+  });
+
   test('keeps live-play QA movement on a runtime-diagnostics-only bridge', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const qaScriptSource = readFileSync(resolve(process.cwd(), 'scripts/analysis/live-play-qa.mjs'), 'utf8');
@@ -1289,9 +1355,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (!this.runtimeDiagnosticsConfig.enabled || typeof window === \'undefined\')');
     expect(menuSceneSource).toContain('window.__MAZER_QA__ = {');
     expect(menuSceneSource).toContain('movePlayPlayer: (move: string): LegacyQaMoveResult => this.handleLegacyQaPlayMove(move)');
+    expect(menuSceneSource).toContain('openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay()');
+    expect(menuSceneSource).toContain('private handleLegacyQaOpenOptionsOverlay(): LegacyQaOverlayResult');
+    expect(menuSceneSource).toContain("this.openOverlay('options');");
+    expect(menuSceneSource).toContain('this.rebuildUi();');
+    expect(menuSceneSource).toContain('this.publishVisualDiagnostics(this.time.now, true);');
+    expect(menuSceneSource).toContain('this.publishRuntimeDiagnostics(this.time.now, true);');
     expect(menuSceneSource).toContain('private detachLegacyQaDiagnosticsSurface(): void');
     expect(menuSceneSource).toContain('delete window.__MAZER_QA__;');
-    expect(menuSceneSource).toContain('const accepted = this.tryMovePlayer(vector.deltaX, vector.deltaY);');
+    expect(menuSceneSource).toContain('const accepted = this.tryMovePlayerFromInput(vector.deltaX, vector.deltaY);');
     expect(qaScriptSource).toContain("const DEFAULT_INPUT_METHOD = 'qa';");
     expect(qaScriptSource).toContain('const api = window.__MAZER_QA__;');
     expect(qaScriptSource).toContain('api.movePlayPlayer(actionKind)');
@@ -1310,9 +1382,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("const seedOverride = mode === 'play'");
     expect(menuSceneSource).toContain('seedOverride');
     expect(menuSceneSource).toContain('seedOverride: this.createFreshLegacyPlayGenerationSeed()');
+    expect(menuSceneSource).toContain('private resolveLegacyTargetComplexityForMode(mode: RuntimeMode): number');
+    expect(menuSceneSource).toContain('targetComplexity: this.resolveLegacyTargetComplexityForMode(mode)');
+    expect(menuSceneSource).toContain("targetComplexity: this.resolveLegacyTargetComplexityForMode('play')");
+    expect(menuSceneSource).toContain("targetComplexity: this.resolveLegacyTargetComplexityForMode('menu')");
     expect(menuSceneSource).toContain("scale: this.resolveLegacyProgressionScaleForMode('play')");
     expect(menuSceneSource).toContain("seedSource: this.mode === 'play' || !this.explicitRuntimeMazeSeed ? 'runtime-random' : 'query'");
     expect(generationLifecycleSource).toContain('seedOverride?: number;');
+    expect(generationLifecycleSource).toContain('targetComplexity?: number;');
+    expect(generationLifecycleSource).toContain('selectLegacyRuntimeMazeForMode');
+    expect(generationLifecycleSource).toContain('selection: review');
     expect(generationLifecycleSource).toContain('normalizeLegacyRuntimeSeed(seedOverride, currentSeed)');
   });
 
@@ -1322,20 +1401,34 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const aiSource = readFileSync(resolve(process.cwd(), 'src/domain/ai/demoWalker.ts'), 'utf8');
 
     expect(aiSource).toContain('export interface DemoWalkerMemoryFrame');
+    expect(aiSource).toContain('thoughtState: DemoWalkerThoughtState;');
+    expect(aiSource).toContain('choiceClass: DemoWalkerChoiceClass | null;');
+    expect(aiSource).toContain('confidence: number;');
     expect(aiSource).toContain('aiMemory: DemoWalkerMemoryFrame;');
     expect(aiSource).toContain('memoryFrames: readonly DemoWalkerMemoryFrame[];');
     expect(aiSource).toContain('optionIndices: resolveMemoryOptionIndices()');
     expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_OPTION_CORE = 0x2de8ff;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_TARGET_CORE = 0xffd36a;');
+    expect(menuSceneSource).toContain('private resolveLegacyMenuAiThoughtStyle(');
+    expect(menuSceneSource).toContain('coreColor: LEGACY_MENU_AI_MEMORY_TARGET_CORE');
+    expect(menuSceneSource).toContain('edgeColor: LEGACY_MENU_AI_MEMORY_TARGET_EDGE');
     expect(menuSceneSource).toContain('private resolveLegacyMenuAiMemoryPoints()');
+    expect(menuSceneSource).toContain('const endIndex = this.menuDemoEpisode.raster.endIndex;');
+    expect(menuSceneSource).toContain('targetIndex === null || targetIndex === endIndex');
     expect(menuSceneSource).toContain('private drawLegacyMenuAiMemoryOverlay(');
     expect(menuSceneSource).toContain('this.drawLegacyMenuAiMemoryOverlay(');
     expect(menuSceneSource).toContain('aiMemory: {');
+    expect(menuSceneSource).toContain('choiceClass: menuAiMemory.choiceClass');
+    expect(menuSceneSource).toContain('confidence: menuAiMemory.confidence');
     expect(menuSceneSource).toContain('optionCount: menuAiMemory.optionPoints.length');
     expect(menuSceneSource).toContain('targetPoint: menuAiMemory.targetPoint ? copyPoint(menuAiMemory.targetPoint) : null');
+    expect(menuSceneSource).toContain('thoughtState: menuAiMemory.thoughtState');
     expect(diagnosticsSource).toContain('aiMemory?: {');
+    expect(diagnosticsSource).toContain('choiceClass: string | null;');
+    expect(diagnosticsSource).toContain('confidence: number;');
     expect(diagnosticsSource).toContain('optionPoints: Array<{ x: number; y: number }>;');
     expect(diagnosticsSource).toContain('targetPoint: { x: number; y: number } | null;');
+    expect(diagnosticsSource).toContain('thoughtState: string;');
   });
 
   test('keeps account form entry backed by native browser inputs for mobile and automation', () => {
@@ -1360,7 +1453,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');
-    expect(menuSceneSource).toContain('private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics): void');
+    expect(menuSceneSource).toContain('private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void');
     expect(menuSceneSource).toContain('private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand(\'resume\')));');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));');
@@ -1368,6 +1461,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const timerBottom = timerFrame.timerBounds.top + timerFrame.timerBounds.height;');
     expect(menuSceneSource).toContain('top = Math.max(timerBottom + (compact ? 10 : 14), 58);');
     expect(menuSceneSource).toContain('rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER');
+    expect(menuSceneSource).toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics, true);');
+    expect(menuSceneSource).toContain('this.overlayScrollThumbBounds = this.legacyOverlayScrollRectToVisualRect(metrics.thumb);');
+    expect(menuSceneSource).toContain('const thumbAlpha = metrics.enabled ? 0.92 : 0.58;');
+    expect(menuSceneSource).toContain('if (!showAdvancedOptions) {');
+    expect(menuSceneSource).toContain('const viewportTop = rowY - (compact ? 4 : 2);');
+    expect(menuSceneSource).toContain('const contentHeight = 18 + this.resolveFeatureControlRowsContentHeight(panel) + guideHeight + 12;');
     expect(menuSceneSource).toContain('this.input.on(\'wheel\'');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerDown(pointer: Phaser.Input.Pointer): boolean');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerMove(pointer: Phaser.Input.Pointer): boolean');

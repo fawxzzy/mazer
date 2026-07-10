@@ -339,8 +339,8 @@ describe('menu runtime diagnostics', () => {
           stateText: 'Off'
         },
         movementSpeed: {
-          label: '58%',
-          value: 0.58
+          label: '30%',
+          value: 0.3
         },
         trailFade: {
           enabled: false,
@@ -374,15 +374,15 @@ describe('menu runtime diagnostics', () => {
           touchSprint: {
             activeControls: [],
             heldControl: null,
-            movementSpeed: 0.58,
-            movementSpeedLabel: '58%',
-            repeatInitialDelayMs: 216,
-            repeatIntervalMs: 97,
+            movementSpeed: 0.3,
+            movementSpeedLabel: '30%',
+            repeatInitialDelayMs: 258,
+            repeatIntervalMs: 112,
             stickInitialDelayMaxMs: 144,
             stickRepeatIntervalMaxMs: 104,
             stickRetargetDelayMs: 64,
             stickTurnDelayMaxMs: 144,
-            turnDelayMs: 254,
+            turnDelayMs: 300,
             pendingStepCount: 0,
             repeatTimerActive: false,
             stepTimerActive: false
@@ -422,7 +422,10 @@ describe('menu runtime diagnostics', () => {
           playerHaloColor: 0x00b84a,
           playerHaloRadius: 3.22,
           startCoreColor: 0xfff05a,
-          startEdgeColor: 0xffc629
+          startEdgeColor: 0xffc629,
+          trailShineColor: 0xc8fff4,
+          trailShineEnabled: true,
+          trailShinePeriodMs: 1800
         }
       },
       menuDemo: {
@@ -617,13 +620,13 @@ describe('menu runtime diagnostics', () => {
       )?.play?.inputBuffer.simultaneousDelayMs).toBe(50);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )?.play?.inputBuffer.touchSprint.repeatInitialDelayMs).toBe(216);
+      )?.play?.inputBuffer.touchSprint.repeatInitialDelayMs).toBe(258);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )?.play?.inputBuffer.touchSprint.repeatIntervalMs).toBe(97);
+      )?.play?.inputBuffer.touchSprint.repeatIntervalMs).toBe(112);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )?.play?.inputBuffer.touchSprint.turnDelayMs).toBe(254);
+      )?.play?.inputBuffer.touchSprint.turnDelayMs).toBe(300);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.auth?.status)
         .toBe('authenticated');
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.auth?.rememberedIdentity?.sessionState)

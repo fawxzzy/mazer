@@ -326,9 +326,9 @@ export const resolveTouchControlLayout = (
     const dpadTop = Math.round(frameTop + ((dpadFrameHeight - dpadSpan) / 2));
     const topActionHeight = clamp(Math.round(buttonSize * 0.72), 30, ultraNarrow ? 34 : 38);
     const actionWidth = clamp(Math.round(viewport.width * 0.22), ultraNarrow ? 58 : 78, ultraNarrow ? 76 : 96);
-    const actionTop = safeInsets.top + (ultraNarrow ? 48 : 56);
+    const actionTop = safeInsets.top + (ultraNarrow ? 8 : 10);
     const actionLeft = clamp(
-      Math.round((viewport.width - actionWidth) / 2),
+      Math.round(viewport.width - safeInsets.right - actionWidth - 10),
       safeInsets.left + 4,
       Math.max(safeInsets.left + 4, viewport.width - safeInsets.right - actionWidth - 4)
     );

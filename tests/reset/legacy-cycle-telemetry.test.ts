@@ -168,9 +168,9 @@ describe('legacy maze cycle telemetry', () => {
       historyLimit: MAZE_CYCLE_TELEMETRY_HISTORY_LIMIT,
       latestReceipt: {
         aiDecisionScore: {
-          pressureScore: 40.305,
-          reliabilityScore: 59.695,
-          signal: 'searching'
+          pressureScore: 21.18,
+          reliabilityScore: 78.82,
+          signal: 'clean'
         },
         aiDecisionSummary: {
           backtrackCount: 2,
@@ -191,11 +191,11 @@ describe('legacy maze cycle telemetry', () => {
       },
       learning: {
         aiDecisionSignalCounts: {
-          clean: 0,
-          searching: 1,
+          clean: 1,
+          searching: 0,
           chaotic: 0
         },
-        averageAiDecisionPressureScore: 40.305,
+        averageAiDecisionPressureScore: 21.18,
         averageBacktracks: 2,
         averageCompletionTimeMs: 6000,
         averageFrameMs: 12.5,
