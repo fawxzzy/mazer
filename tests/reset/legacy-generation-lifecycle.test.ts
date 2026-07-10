@@ -4,6 +4,7 @@ import {
   consumeLegacyGenerationRequestState,
   createLegacyGenerationRequest,
   createLegacyMenuResetGenerationRequest,
+  createLegacyPlayResetGenerationRequest,
   createLegacyRuntimeMazeForMode,
   LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID,
   LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS,
@@ -78,7 +79,7 @@ describe('legacy generation lifecycle', () => {
       { id: 3, name: 'MapPath', completionSignal: 'checkpoint-budget-exhausted', advancesToStageId: 4, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
       { id: 4, name: 'CreatePath', completionSignal: 'path-array-exhausted', advancesToStageId: 5, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
       { id: 5, name: 'CreateShortCuts', completionSignal: 'shortcut-budget-exhausted', advancesToStageId: 6, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: 6 },
-      { id: 6, name: 'Draw', completionSignal: 'draw-iteration-complete', advancesToStageId: 7, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
+      { id: 6, name: 'Draw', completionSignal: 'draw-iteration-complete', advancesToStageId: 7, executionKind: 'row-slice', batchSize: 1, batchUnit: 'rows', skipToStageIdWhenDisabled: null },
       { id: 7, name: 'Finalize', completionSignal: 'player-finalized', advancesToStageId: null, executionKind: 'finalize-state', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
       { id: 8, name: 'Reset', completionSignal: 'play-reset-template-return', advancesToStageId: null, executionKind: 'reset-branch', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null }
     ]);
@@ -292,6 +293,24 @@ describe('legacy generation lifecycle', () => {
       remainingStageIds: [3, 4, 5, 6, 7, 8],
       processComplete: false
     });
+  });
+
+  test('allows play regeneration to use a fresh procedural seed override', () => {
+    const resetGenerationRequest = createLegacyPlayResetGenerationRequest({
+      currentSeed: 3749,
+      nowMs: 2220,
+      seedOverride: 982_451_653,
+      scale: 64
+    });
+
+    expect(resetGenerationRequest.reason).toBe('play-goal-reset');
+    expect(resetGenerationRequest.mode).toBe('play');
+    expect(resetGenerationRequest.seed).toBe(982_451_653);
+    expect(resetGenerationRequest.seed).not.toBe(3749);
+    expect(resetGenerationRequest.seed).not.toBe(3750);
+    expect(resetGenerationRequest.budget.scale).toBe(64);
+    expect(resetGenerationRequest.budget.shortcutCountModifier).toBe(0.18);
+    expect(resetGenerationRequest.buildKind).toBe('play-generated');
   });
 
   test('makes legacy stage-7 finalize responsibilities explicit for play and menu requests', () => {

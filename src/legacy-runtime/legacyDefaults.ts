@@ -34,11 +34,11 @@ export const LEGACY_DEFAULTS: LegacySettings = {
     g: 0.067708,
     b: 0.067708
   },
-  darkMode: false,
+  darkMode: true,
   toggleCameraFollow: false,
   toggleTrailFade: false,
   toggleTrailPulse: true,
-  toggleAnimatedBackdrop: false,
+  toggleAnimatedBackdrop: true,
   controlMode: 'stick'
 };
 
@@ -94,6 +94,6 @@ export const copyLegacySettings = (settings: LegacySettings): LegacySettings => 
   toggleCameraFollow: settings.toggleCameraFollow,
   toggleTrailFade: settings.toggleTrailFade,
   toggleTrailPulse: settings.toggleTrailPulse ?? true,
-  toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop ?? false,
+  toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop ?? LEGACY_DEFAULTS.toggleAnimatedBackdrop,
   controlMode: settings.controlMode
 });

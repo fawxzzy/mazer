@@ -18,12 +18,12 @@ describe('legacy menu button chrome', () => {
 
     expect(primary.baseAlpha).toBeGreaterThan(secondary.baseAlpha);
     expect(primary.baseStroke).toBeGreaterThan(secondary.baseStroke);
-    expect(primary.fillColor).toBe(0x0d0715);
-    expect(primary.hoverFillColor).toBe(0x151021);
+    expect(primary.fillColor).toBe(0x06170f);
+    expect(primary.hoverFillColor).toBe(0x0a2a1a);
     expect(primary.fontSize).toBeGreaterThanOrEqual(secondary.fontSize);
     expect(primary.labelAlpha).toBeGreaterThan(secondary.labelAlpha);
     expect(primary.strokeWidth).toBeGreaterThanOrEqual(secondary.strokeWidth);
-    expect(primary.textColor).toBe('#ffd84c');
+    expect(primary.textColor).toBe('#36ff7d');
     expect(secondary.textColor).toBe('#ecfff5');
   });
 

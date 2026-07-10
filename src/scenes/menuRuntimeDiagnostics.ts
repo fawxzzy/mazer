@@ -88,6 +88,27 @@ export interface MenuSceneRuntimeDiagnostics {
     mode: 'menu' | 'play';
     overlay: string;
   };
+  auth?: {
+    configured: boolean;
+    displayName: string | null;
+    email: string | null;
+    emailPresent: boolean;
+    formMode: 'login' | 'signup';
+    rememberedIdentity: {
+      displayName: string;
+      email: string;
+      sessionState: 'ready' | 'reauth-required';
+      updatedAt: string;
+    } | null;
+    status: 'guest' | 'authenticated' | 'unavailable';
+    userIdPresent: boolean;
+    latestMessage: {
+      copy: string;
+      id: string;
+      source: string;
+      tone: string;
+    } | null;
+  };
   gameToggles?: {
     animatedBackdrop: {
       enabled: boolean;
@@ -174,10 +195,16 @@ export interface MenuSceneRuntimeDiagnostics {
       simultaneousDelayMs: number;
     };
     player: {
+      renderScreenX?: number;
+      renderScreenY?: number;
       x: number;
       y: number;
       screenX: number;
       screenY: number;
+      visualMotionActive?: boolean;
+      visualMotionSnapReason?: 'wrapped-step' | null;
+      visualX?: number;
+      visualY?: number;
     };
     goal: {
       x: number;
@@ -195,6 +222,9 @@ export interface MenuSceneRuntimeDiagnostics {
       goalEdgeColor: number;
       playerCoreColor: number;
       playerCoreRadius: number;
+      playerBeaconAccentColor?: number;
+      playerBeaconColor?: number;
+      playerBeaconPeriodMs?: number;
       playerHaloColor: number;
       playerHaloRadius: number;
       startCoreColor?: number;
@@ -202,6 +232,22 @@ export interface MenuSceneRuntimeDiagnostics {
       trailPulseEnabled?: boolean;
       trailPulseColor?: number;
       trailPulseEdgeColor?: number;
+      iridescentMaterial?: {
+        minPathColorDistance: number;
+        playerAccentColor: number;
+        playerCoreColor: number;
+        playerHaloShiftColor: number;
+        pulseHeadColor: number;
+        pulseTailColor: number;
+        shiftPeriodMs: {
+          playerAccent: number;
+          playerHalo: number;
+          pulse: number;
+          trail: number;
+        };
+        trailHeadColor: number;
+        trailTailColor: number;
+      };
       trailPulsePeriodMs?: number;
     };
   };
@@ -209,9 +255,19 @@ export interface MenuSceneRuntimeDiagnostics {
     phase: string | null;
     cue: string | null;
     pathCursor: number | null;
+    gate: {
+      nextMoveAtMs: number;
+      released: boolean;
+      waitingForBuild: boolean;
+    };
     reachedGoal: boolean;
     prerollSteps: number;
     runnerMistakesEnabled: boolean | null;
+    aiMemory?: {
+      optionCount: number;
+      optionPoints: Array<{ x: number; y: number }>;
+      targetPoint: { x: number; y: number } | null;
+    };
     route?: {
       aiResetPathCursor: number | null;
       canonicalPathLength: number;
@@ -367,6 +423,7 @@ export interface MenuSceneRuntimeDiagnostics {
       wrongBranchCount: number;
       backtrackCount: number;
       recoveryCount: number;
+      optionalRetargetCount: number;
     };
     intentEntryCount: number;
     intentEntryCap: number;

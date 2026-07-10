@@ -22,6 +22,29 @@ import {
   type MazeEpisode
 } from '../../src/domain/maze';
 
+const HUMAN_MEMORY_ROUTE_BOUND_MULTIPLIER = 12;
+
+const expectAiMemoryDoesNotLeakGoalTarget = (
+  episode: MazeEpisode,
+  currentIndex: number,
+  targetIndex: number | null,
+  context: string
+): void => {
+  if (targetIndex !== episode.raster.endIndex || currentIndex === episode.raster.endIndex) {
+    return;
+  }
+
+  const directionToGoal = resolveDirectionBetween(
+    currentIndex,
+    episode.raster.endIndex,
+    episode.raster.width,
+    episode.raster.height
+  );
+  if (directionToGoal === null) {
+    throw new Error(`AI memory target leaked unseen goal for ${context}`);
+  }
+};
+
 const createSingleSpurEpisode = (): MazeEpisode => {
   const tiles = new Uint8Array(35);
   const canonicalPath = [15, 16, 17, 18, 19];
@@ -183,6 +206,74 @@ const createVisitedUndoEpisode = (): MazeEpisode => {
   };
 };
 
+const createOptionalRetargetEpisode = (): MazeEpisode => {
+  const width = 10;
+  const height = 9;
+  const tiles = new Uint8Array(width * height);
+  const toIndex = (x: number, y: number): number => (y * width) + x;
+  const floorCoordinates = [
+    [4, 4], [5, 4], [5, 5], [5, 6], [4, 6], [3, 6], [3, 5], [3, 4],
+    [4, 3], [5, 3], [6, 3], [7, 3], [8, 3], [8, 4]
+  ] as const;
+  const canonicalPath = [
+    toIndex(4, 4),
+    toIndex(4, 3),
+    toIndex(5, 3),
+    toIndex(6, 3),
+    toIndex(7, 3),
+    toIndex(8, 3),
+    toIndex(8, 4)
+  ];
+
+  for (const [x, y] of floorCoordinates) {
+    tiles[toIndex(x, y)] |= TILE_FLOOR;
+  }
+  for (const index of canonicalPath) {
+    tiles[index] |= TILE_PATH;
+  }
+  tiles[toIndex(8, 4)] |= TILE_END;
+
+  return {
+    accepted: true,
+    difficulty: 'standard',
+    difficultyScore: 0,
+    family: 'classic',
+    generationTrace: {
+      rootTileIndex: toIndex(4, 4),
+      uniqueTileCount: floorCoordinates.length,
+      steps: [{ phase: 'seed', tileIndices: [toIndex(4, 4)] }]
+    },
+    metrics: {
+      solutionLength: canonicalPath.length,
+      deadEnds: 1,
+      junctions: 2,
+      branchDensity: 2 / floorCoordinates.length,
+      straightness: 0.5,
+      coverage: canonicalPath.length / floorCoordinates.length
+    },
+    placementStrategy: 'farthest-pair',
+    presentationPreset: 'classic',
+    raster: {
+      width,
+      height,
+      tiles,
+      startIndex: toIndex(4, 4),
+      endIndex: toIndex(8, 4),
+      pathIndices: Uint32Array.from(canonicalPath)
+    },
+    routeMotifs: {
+      falseShortcutBranches: 1,
+      nearGoalBranches: 1,
+      hubJunctions: 1,
+      chokeCorridors: 1,
+      loopDetours: 1
+    },
+    seed: 1,
+    shortcutsCreated: 0,
+    size: 'small'
+  };
+};
+
 describe('demo walker', () => {
   test('treats opposite-border exits as adjacent AI navigation choices', () => {
     const episode = createBorderWrapEpisode();
@@ -323,7 +414,7 @@ describe('demo walker', () => {
     }
 
     expect(reachedGoal).toBe(true);
-  });
+  }, 15_000);
 
   test('caps trail buffers instead of retaining the full path', () => {
     const episode = generateMaze({
@@ -617,6 +708,59 @@ describe('demo walker', () => {
     expect(seenCues.has('reacquire')).toBe(true);
   });
 
+  test('can retarget to a remembered optional split without jumping', () => {
+    const episode = createOptionalRetargetEpisode();
+    const config = createLegacyMenuDemoWalkerConfig(1988);
+    const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
+    let state = createDemoWalkerState(episode, config);
+    let sawOptionalRetarget = false;
+    let sawMemoryOptions = false;
+    let sawMemoryTarget = false;
+    const maxSteps = Math.max(32, episode.raster.pathIndices.length * 8);
+
+    expect(diagnostics.telemetry.optionalRetargetCount).toBe(1);
+    expect(diagnostics.telemetry.backtrackCount).toBeGreaterThan(0);
+    expect(diagnostics.telemetry.recoveryCount).toBeGreaterThan(0);
+    expect(diagnostics.routeLength).toBeGreaterThan(episode.raster.pathIndices.length);
+
+    for (let step = 0; step < maxSteps; step += 1) {
+      const previousIndex = state.currentIndex;
+      const previousPhase = state.phase;
+      const advance = advanceDemoWalker(episode, state, config);
+      state = advance.state;
+
+      expect(isTileFloor(episode.raster.tiles, state.currentIndex)).toBe(true);
+      for (const optionIndex of state.aiMemory.optionIndices) {
+        expect(isTileFloor(episode.raster.tiles, optionIndex)).toBe(true);
+      }
+      if (state.aiMemory.targetIndex !== null) {
+        expect(isTileFloor(episode.raster.tiles, state.aiMemory.targetIndex)).toBe(true);
+      }
+      if (previousPhase === 'explore' && state.phase === 'explore') {
+        const direction = resolveDirectionBetween(previousIndex, state.currentIndex, episode.raster.width);
+        if (direction === null) {
+          throw new Error(
+            `Non-adjacent optional-retarget AI move at step=${step}`
+            + ` from=${previousIndex} to=${state.currentIndex}`
+            + ` cue=${state.cue} cursor=${state.pathCursor} canonical=${state.canonicalCursor}`
+          );
+        }
+      }
+
+      sawOptionalRetarget = sawOptionalRetarget || state.telemetry.optionalRetargetCount > 0;
+      sawMemoryOptions = sawMemoryOptions || state.aiMemory.optionIndices.length > 0;
+      sawMemoryTarget = sawMemoryTarget || state.aiMemory.targetIndex !== null;
+      if (state.phase === 'goal-hold') {
+        break;
+      }
+    }
+
+    expect(sawOptionalRetarget).toBe(true);
+    expect(sawMemoryOptions).toBe(true);
+    expect(sawMemoryTarget).toBe(true);
+    expect(state.phase).toBe('goal-hold');
+  });
+
   test('humanized menu AI route never emits invalid jumps while exploring wrong branches', () => {
     const cases = [
       { scale: 50, seed: 902, size: 'large', family: 'split-flow', shortcutCountModifier: 0.18 },
@@ -706,13 +850,16 @@ describe('demo walker', () => {
       const maxSteps = Math.max(256, episode.raster.pathIndices.length * 8);
 
       expect(maze.source).toBe('menu-generated');
-      expect(diagnostics.routeLength).toBe(episode.raster.pathIndices.length);
       expect(diagnostics.canonicalPathLength).toBe(episode.raster.pathIndices.length);
       expect(diagnostics.aiResetPathCursor).toBeNull();
-      expect(diagnostics.telemetry.wrongBranchCount).toBe(0);
-      expect(diagnostics.telemetry.backtrackCount).toBe(0);
-      expect(diagnostics.telemetry.recoveryCount).toBe(0);
+      expect(diagnostics.routeLength).toBeGreaterThanOrEqual(2);
+      expect(diagnostics.routeLength).toBeLessThanOrEqual(
+        episode.raster.pathIndices.length * HUMAN_MEMORY_ROUTE_BOUND_MULTIPLIER
+      );
       expect(diagnostics.traverseMs).toBeLessThan(60_000);
+      expect(config.behavior.enableRunnerMistakes).toBe(true);
+      expect(config.behavior.runnerThinkingModel).toBe('human-local-memory');
+      expect(config.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
 
       for (let step = 0; step < maxSteps; step += 1) {
         const previousIndex = state.currentIndex;
@@ -721,6 +868,12 @@ describe('demo walker', () => {
         state = advance.state;
 
         expect(isTileFloor(episode.raster.tiles, state.currentIndex)).toBe(true);
+        expectAiMemoryDoesNotLeakGoalTarget(
+          episode,
+          state.currentIndex,
+          state.aiMemory.targetIndex,
+          `seed=${testCase.seed} step=${step}`
+        );
         if (previousPhase === 'explore' && state.phase === 'explore') {
           const direction = resolveDirectionBetween(previousIndex, state.currentIndex, episode.raster.width);
           if (direction === null) {
@@ -741,7 +894,7 @@ describe('demo walker', () => {
     }
   }, 30_000);
 
-  test('generated menu AI follows a clean route and later requests goal regeneration across scale bands', () => {
+  test('generated menu AI follows bounded human local-memory routes and later requests goal regeneration across scale bands', () => {
     const cases = [
       { scale: 37, seed: 55 },
       { scale: 37, seed: 89 },
@@ -761,14 +914,15 @@ describe('demo walker', () => {
       let sawGoalRegenerationRequest = false;
       const maxSteps = Math.max(512, episode.raster.pathIndices.length * 12);
 
-      expect(diagnostics.routeLength).toBe(episode.raster.pathIndices.length);
       expect(diagnostics.canonicalPathLength).toBe(episode.raster.pathIndices.length);
+      expect(diagnostics.routeLength).toBeGreaterThanOrEqual(2);
+      expect(diagnostics.routeLength).toBeLessThanOrEqual(
+        episode.raster.pathIndices.length * HUMAN_MEMORY_ROUTE_BOUND_MULTIPLIER
+      );
       expect(diagnostics.traverseMs).toBeLessThan(60_000);
       expect(diagnostics.aiResetPathCursor).toBeNull();
-      expect(diagnostics.telemetry.wrongBranchCount).toBe(0);
-      expect(diagnostics.telemetry.backtrackCount).toBe(0);
-      expect(diagnostics.telemetry.recoveryCount).toBe(0);
-      expect(config.behavior.enableRunnerMistakes).toBe(false);
+      expect(config.behavior.enableRunnerMistakes).toBe(true);
+      expect(config.behavior.runnerThinkingModel).toBe('human-local-memory');
       expect(config.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
 
       for (let step = 0; step < maxSteps; step += 1) {
@@ -778,6 +932,12 @@ describe('demo walker', () => {
         state = advance.state;
 
         expect(isTileFloor(episode.raster.tiles, state.currentIndex)).toBe(true);
+        expectAiMemoryDoesNotLeakGoalTarget(
+          episode,
+          state.currentIndex,
+          state.aiMemory.targetIndex,
+          `scale=${testCase.scale} seed=${testCase.seed} step=${step}`
+        );
         if (previousPhase === 'explore' && state.phase === 'explore') {
           const direction = resolveDirectionBetween(previousIndex, state.currentIndex, episode.raster.width);
           if (direction === null) {

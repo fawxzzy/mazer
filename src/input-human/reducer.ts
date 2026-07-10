@@ -58,12 +58,7 @@ export const applyHumanInputAction = (
         paused: !state.paused
       };
     case 'restart_attempt':
-      return {
-        ...nextState,
-        paused: false,
-        attempt: state.attempt + 1,
-        movementCount: 0
-      };
+      return nextState;
     case 'toggle_thoughts':
       return {
         ...nextState,

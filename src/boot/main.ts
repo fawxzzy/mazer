@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import '../styles/base.css';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
+import { installMazerPortraitLock } from './orientationLock';
 import { phaserConfig } from './phaserConfig';
 
 const LOCALHOST_SW_RESET_KEY = 'mazer:localhost-sw-reset:v1';
@@ -82,6 +83,7 @@ const registerProductionServiceWorker = (): void => {
 
 const boot = async (): Promise<void> => {
   markMazerBootStatus('boot-start');
+  installMazerPortraitLock();
 
   if (isLocalhostRuntime()) {
     const changed = await resetLocalhostServiceWorkers();

@@ -50,13 +50,17 @@ export const createLegacyMenuDemoWalkerConfig = (seed: number): DemoWalkerConfig
   seed,
   cadence: {
     ...legacyTuning.demo.cadence,
+    exploreStepMs: 88,
+    backtrackStepMs: 88,
     goalHoldMs: 0,
     resetHoldMs: 0
   },
   behavior: {
     ...legacyTuning.demo.behavior,
-    enableRunnerMistakes: false,
+    trailMaxLength: 2048,
+    enableRunnerMistakes: true,
     emulateLogicSwitchPotentialCheckBug: false,
+    runnerThinkingModel: 'human-local-memory',
     prerollSteps: 0
   }
 });
@@ -74,8 +78,9 @@ export const createLegacyMenuSnapshotDemoWalkerConfig = (seed: number): DemoWalk
     },
     behavior: {
       ...baseConfig.behavior,
-      enableRunnerMistakes: false,
+      enableRunnerMistakes: true,
       emulateLogicSwitchPotentialCheckBug: false,
+      runnerThinkingModel: 'human-local-memory',
       prerollSteps: 0
     }
   };

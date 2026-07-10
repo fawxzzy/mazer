@@ -4,6 +4,7 @@ import {
   type LegacyMazeSnapshot,
   type LegacyPoint
 } from './legacyMaze';
+import { normalizeLegacyRuntimeSeed } from './legacyRuntimeSeed';
 import { clampInteger } from './legacyDefaults';
 import { legacyTuning } from '../config/tuning';
 
@@ -38,6 +39,7 @@ export type LegacyGenerationRequestReason =
   | 'menu-return'
   | 'menu-demo-goal-reset'
   | 'menu-demo-missing-episode'
+  | 'play-goal-reset'
   | 'overlay-rebuild';
 
 export interface LegacyGenerationStageContract {
@@ -234,6 +236,17 @@ const createLegacyStageContract = (
           batchUnit: null,
           skipToStageIdWhenDisabled: null
         };
+      case 6:
+        return {
+          advancesToStageId: 7,
+          id: stageId,
+          name: resolveLegacyGenerationStageName(stageId),
+          completionSignal: 'draw-iteration-complete',
+          executionKind: 'row-slice',
+          batchSize: 1,
+          batchUnit: 'rows',
+          skipToStageIdWhenDisabled: null
+        };
       default:
         return {
           advancesToStageId: stageId === 0 ? 3 : stageId === 3 ? 4 : stageId === 4 ? pathStageAdvanceTarget : stageId === 5 ? 6 : 7,
@@ -414,6 +427,7 @@ export const createLegacyGenerationRequest = ({
   queuedAtMs = dueAtMs,
   reason,
   scale,
+  seedOverride,
   stepSeed = false
 }: {
   currentSeed: number;
@@ -422,9 +436,14 @@ export const createLegacyGenerationRequest = ({
   queuedAtMs?: number;
   reason: LegacyGenerationRequestReason;
   scale: number;
+  seedOverride?: number;
   stepSeed?: boolean;
 }): LegacyGenerationRequest => {
-  const seed = stepSeed ? stepLegacyGenerationSeed(currentSeed) : currentSeed;
+  const seed = seedOverride !== undefined
+    ? normalizeLegacyRuntimeSeed(seedOverride, currentSeed)
+    : stepSeed
+      ? stepLegacyGenerationSeed(currentSeed)
+      : currentSeed;
   const executionPlan = resolveLegacyGenerationExecutionPlan(mode, scale);
 
   return {
@@ -457,6 +476,27 @@ export const createLegacyMenuResetGenerationRequest = ({
   queuedAtMs: nowMs,
   reason: 'menu-demo-goal-reset',
   scale,
+  stepSeed: true
+});
+
+export const createLegacyPlayResetGenerationRequest = ({
+  currentSeed,
+  nowMs,
+  seedOverride,
+  scale
+}: {
+  currentSeed: number;
+  nowMs: number;
+  seedOverride?: number;
+  scale: number;
+}): LegacyGenerationRequest => createLegacyGenerationRequest({
+  currentSeed,
+  dueAtMs: nowMs,
+  mode: 'play',
+  queuedAtMs: nowMs,
+  reason: 'play-goal-reset',
+  scale,
+  seedOverride,
   stepSeed: true
 });
 

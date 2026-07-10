@@ -37,6 +37,12 @@ describe('boot status', () => {
     markMazerBootStatus('error', 'boot failed');
     expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.stage).toBe('error');
     expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.errorMessage).toBe('boot failed');
+    expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.playerMessage).toMatchObject({
+      copy: 'The maze did not finish loading. Try refreshing once.',
+      source: 'boot',
+      technicalDetail: 'boot failed',
+      tone: 'error'
+    });
   });
 
   test('allows production service-worker update failures to be reported without blocking boot', () => {
@@ -47,6 +53,12 @@ describe('boot status', () => {
     expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.stage).toBe('service-worker-error');
     expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.errorMessage).toBe('sw update failed');
     expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.gameCreated).toBe(false);
+    expect(runtime[MAZER_BOOT_STATUS_WINDOW_KEY]?.playerMessage).toMatchObject({
+      copy: 'The offline cache could not update. The game can still run online.',
+      source: 'boot',
+      technicalDetail: 'sw update failed',
+      tone: 'warning'
+    });
   });
 
   test('attaches the live Phaser game for browser diagnostics', () => {

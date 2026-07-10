@@ -18,6 +18,19 @@ describe('edge live check', () => {
       expect(source).toContain('document.documentElement.getAttribute');
       expect(source).toContain('JSON.parse(serialized)');
     }
+
+    for (const source of [edgeLiveSource, captureSource, layoutMatrixSource]) {
+      expect(source).toContain('assertVisualScreenContract');
+      expect(source).toContain('buildVisualScreenContract');
+    }
+
+    for (const source of [captureSource, layoutMatrixSource]) {
+      expect(source).toContain('screenContract');
+      expect(source).toContain('actualUrl');
+    }
+
+    expect(edgeLiveSource).toContain('screenContracts');
+    expect(edgeLiveSource).toContain('buildEdgeLiveScreenContract');
   });
 
   test('builds edge-live experiment metadata from toggles', async () => {

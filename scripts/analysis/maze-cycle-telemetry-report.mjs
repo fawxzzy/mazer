@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const MAZER_CYCLE_TELEMETRY_STORAGE_KEY = 'mazer.cycle-telemetry.v1';
 export const MAZER_CYCLE_LEARNING_REPORT_SCHEMA = 'mazer.cycle-learning.report.v1';
+export const MAZER_CYCLE_LEARNING_CONSUMER_SCHEMA = 'mazer.cycle-learning.consumer.v1';
 const PATH_PREVIEW_LIMIT = 8;
 
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -23,6 +24,47 @@ const averageOrNull = (values) => {
     : null;
 };
 
+const clampScore = (value) => Math.max(0, Math.min(100, roundNumber(value)));
+
+const scoreAiDecisionSummary = (summary) => {
+  if (!isRecord(summary)) {
+    return null;
+  }
+
+  const decisionCount = Math.max(1, Number.isFinite(summary.decisionCount) ? Math.round(summary.decisionCount) : 0);
+  const wrongBranchCount = Number.isFinite(summary.wrongBranchCount) ? Math.max(0, Math.round(summary.wrongBranchCount)) : 0;
+  const backtrackCount = Number.isFinite(summary.backtrackCount) ? Math.max(0, Math.round(summary.backtrackCount)) : 0;
+  const recoveryCount = Number.isFinite(summary.recoveryCount) ? Math.max(0, Math.round(summary.recoveryCount)) : 0;
+  const optionalRetargetCount = Number.isFinite(summary.optionalRetargetCount)
+    ? Math.max(0, Math.round(summary.optionalRetargetCount))
+    : 0;
+  const visitedUndoCount = Number.isFinite(summary.visitedUndoCount) ? Math.max(0, Math.round(summary.visitedUndoCount)) : 0;
+  const routeNoiseScore = clampScore(((
+    wrongBranchCount * 3
+    + optionalRetargetCount * 1.5
+    + visitedUndoCount * 4
+  ) / decisionCount) * 100);
+  const recoveryPressureScore = clampScore(((
+    backtrackCount * 1.2
+    + recoveryCount * 3
+  ) / decisionCount) * 100);
+  const retargetPressureScore = clampScore((optionalRetargetCount / decisionCount) * 100);
+  const pressureScore = clampScore((
+    routeNoiseScore * 0.45
+    + recoveryPressureScore * 0.45
+    + retargetPressureScore * 0.1
+  ));
+
+  return {
+    pressureScore,
+    reliabilityScore: clampScore(100 - pressureScore),
+    recoveryPressureScore,
+    routeNoiseScore,
+    retargetPressureScore,
+    signal: pressureScore >= 60 ? 'chaotic' : pressureScore >= 25 ? 'searching' : 'clean'
+  };
+};
+
 const countBy = (items, resolveKey, allowedKeys) => {
   const counts = Object.fromEntries(allowedKeys.map((key) => [key, 0]));
   for (const item of items) {
@@ -37,42 +79,192 @@ const copyPoint = (point) => ({
   y: Number.isFinite(point?.y) ? Math.round(point.y) : 0
 });
 
+const readNumber = (value, fallback = 0) => (
+  Number.isFinite(value) ? Math.max(0, Math.round(value * 1000) / 1000) : fallback
+);
+
+const readInteger = (value, fallback = 0) => (
+  Number.isFinite(value) ? Math.max(0, Math.round(value)) : fallback
+);
+
+const readReceiptField = (receipt, camelKey, snakeKey) => {
+  if (!isRecord(receipt)) {
+    return undefined;
+  }
+  return receipt[camelKey] ?? (snakeKey ? receipt[snakeKey] : undefined);
+};
+
+const normalizeMazeComplexity = (value) => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    checkpointScore: readNumber(value.checkpointScore),
+    deadEndCount: readInteger(value.deadEndCount),
+    deadEndPressureScore: readNumber(value.deadEndPressureScore),
+    edgeWrapCount: readInteger(value.edgeWrapCount),
+    edgeWrapReliefScore: readNumber(value.edgeWrapReliefScore),
+    edgeWrapScore: readNumber(value.edgeWrapScore),
+    fillQualityScore: readNumber(value.fillQualityScore),
+    floorScore: readNumber(value.floorScore),
+    routeScore: readNumber(value.routeScore),
+    shortcutScore: readNumber(value.shortcutScore),
+    sizeScore: readNumber(value.sizeScore),
+    solutionScore: readNumber(value.solutionScore),
+    splitCount: readInteger(value.splitCount),
+    splitScore: readNumber(value.splitScore),
+    total: readInteger(value.total),
+    weightedDeadEndPressureScore: readNumber(value.weightedDeadEndPressureScore),
+    weightedSplitPressureScore: readNumber(value.weightedSplitPressureScore)
+  };
+};
+
+const normalizeProgressionPacing = (value) => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const rawSignalWindow = Array.isArray(value.signalWindow) ? value.signalWindow : [];
+  const signalWindow = rawSignalWindow
+    .filter((signal) => signal === 'challenge' || signal === 'ease' || signal === 'hold')
+    .slice(0, 6);
+
+  return {
+    activeLevel: readInteger(value.activeLevel),
+    activeRank: typeof value.activeRank === 'string' ? value.activeRank : 'unknown',
+    activeTargetComplexity: readInteger(value.activeTargetComplexity),
+    challengeStep: readInteger(value.challengeStep),
+    easeStep: Number.isFinite(value.easeStep) ? Math.round(value.easeStep) : 0,
+    measuredMazeComplexity: readInteger(value.measuredMazeComplexity),
+    measuredMazeLevel: readInteger(value.measuredMazeLevel),
+    measuredMazeRank: typeof value.measuredMazeRank === 'string' ? value.measuredMazeRank : 'unknown',
+    nextChallengeTargetComplexity: readInteger(value.nextChallengeTargetComplexity),
+    nextEaseTargetComplexity: readInteger(value.nextEaseTargetComplexity),
+    recentChallengeCount: readInteger(value.recentChallengeCount),
+    recentEaseCount: readInteger(value.recentEaseCount),
+    signalWindow
+  };
+};
+
 const normalizeReceipt = (receipt) => {
   if (!isRecord(receipt)) {
     return null;
   }
 
-  const rawPath = Array.isArray(receipt.playerPath) ? receipt.playerPath : [];
-  const rawPreview = Array.isArray(receipt.playerPathPreview) ? receipt.playerPathPreview : [];
+  const embeddedReceipt = isRecord(receipt.receipt) ? receipt.receipt : {};
+  const mergedReceipt = {
+    ...embeddedReceipt,
+    ...receipt,
+    aiDecisionSummary: receipt.aiDecisionSummary ?? embeddedReceipt.aiDecisionSummary,
+    mazeComplexity: receipt.mazeComplexity ?? embeddedReceipt.mazeComplexity,
+    playerPath: receipt.playerPath ?? embeddedReceipt.playerPath,
+    playerPathLength: receipt.playerPathLength ?? embeddedReceipt.playerPathLength,
+    playerPathPreview: receipt.playerPathPreview ?? embeddedReceipt.playerPathPreview,
+    playerPathTruncated: receipt.playerPathTruncated ?? embeddedReceipt.playerPathTruncated,
+    routeOverrunRatio: receipt.routeOverrunRatio ?? embeddedReceipt.routeOverrunRatio,
+    routeOverrunSteps: receipt.routeOverrunSteps ?? embeddedReceipt.routeOverrunSteps,
+    renderSafetyPenaltyScore: receipt.renderSafetyPenaltyScore ?? embeddedReceipt.renderSafetyPenaltyScore,
+    routeEfficiencyPressureScore: receipt.routeEfficiencyPressureScore ?? embeddedReceipt.routeEfficiencyPressureScore,
+    shortestViablePathLength: receipt.shortestViablePathLength ?? embeddedReceipt.shortestViablePathLength
+  };
+  const rawPath = Array.isArray(readReceiptField(mergedReceipt, 'playerPath', 'player_path'))
+    ? readReceiptField(mergedReceipt, 'playerPath', 'player_path')
+    : [];
+  const rawPreview = Array.isArray(readReceiptField(mergedReceipt, 'playerPathPreview', 'player_path_preview'))
+    ? readReceiptField(mergedReceipt, 'playerPathPreview', 'player_path_preview')
+    : [];
   const pathPreviewSource = rawPath.length > 0
     ? rawPath.slice(Math.max(0, rawPath.length - PATH_PREVIEW_LIMIT))
     : rawPreview.slice(Math.max(0, rawPreview.length - PATH_PREVIEW_LIMIT));
+  const aiDecisionSummary = readReceiptField(mergedReceipt, 'aiDecisionSummary', 'ai_decision_summary');
+  const normalizedAiDecisionSummary = isRecord(aiDecisionSummary)
+    ? {
+      backtrackCount: Number.isFinite(aiDecisionSummary.backtrackCount)
+        ? Math.max(0, Math.round(aiDecisionSummary.backtrackCount))
+        : 0,
+      decisionCount: Number.isFinite(aiDecisionSummary.decisionCount)
+        ? Math.max(0, Math.round(aiDecisionSummary.decisionCount))
+        : 0,
+      optionalRetargetCount: Number.isFinite(aiDecisionSummary.optionalRetargetCount)
+        ? Math.max(0, Math.round(aiDecisionSummary.optionalRetargetCount))
+        : 0,
+      recoveryCount: Number.isFinite(aiDecisionSummary.recoveryCount)
+        ? Math.max(0, Math.round(aiDecisionSummary.recoveryCount))
+        : 0,
+      thinkingModel: ['human-local-memory', 'legacy-source', 'unknown'].includes(aiDecisionSummary.thinkingModel)
+        ? aiDecisionSummary.thinkingModel
+        : 'unknown',
+      visitedUndoCount: Number.isFinite(aiDecisionSummary.visitedUndoCount)
+        ? Math.max(0, Math.round(aiDecisionSummary.visitedUndoCount))
+        : 0,
+      wrongBranchCount: Number.isFinite(aiDecisionSummary.wrongBranchCount)
+        ? Math.max(0, Math.round(aiDecisionSummary.wrongBranchCount))
+        : 0
+    }
+    : null;
+  const surface = readReceiptField(mergedReceipt, 'surface');
+  const routeQuality = readReceiptField(mergedReceipt, 'routeQuality', 'route_quality');
+  const controlMode = readReceiptField(mergedReceipt, 'controlMode', 'control_mode');
+  const playerPathLength = readReceiptField(mergedReceipt, 'playerPathLength', 'path_length');
+  const playerPathTruncated = readReceiptField(mergedReceipt, 'playerPathTruncated', 'player_path_truncated');
+  const shortestViablePathLength = readReceiptField(mergedReceipt, 'shortestViablePathLength');
+  const completedAt = readReceiptField(mergedReceipt, 'completedAt', 'completed_at');
+  const normalizedPlayerPathLength = Number.isFinite(playerPathLength)
+    ? Math.max(0, Math.round(playerPathLength))
+    : rawPath.length;
+  const normalizedShortestViablePathLength = Number.isFinite(shortestViablePathLength)
+    ? Math.max(1, Math.round(shortestViablePathLength))
+    : Math.max(1, normalizedPlayerPathLength);
+  const fallbackRouteOverrunSteps = Math.max(0, normalizedPlayerPathLength - normalizedShortestViablePathLength);
+  const routeOverrunSteps = readReceiptField(mergedReceipt, 'routeOverrunSteps');
+  const routeOverrunRatio = readReceiptField(mergedReceipt, 'routeOverrunRatio');
 
   return {
-    id: typeof receipt.id === 'string' ? receipt.id : null,
-    surface: receipt.surface === 'menu-demo' || receipt.surface === 'play' ? receipt.surface : 'unknown',
-    mazeSeed: Number.isFinite(receipt.mazeSeed) ? Math.round(receipt.mazeSeed) : null,
-    mazeSize: Number.isFinite(receipt.mazeSize) ? Math.round(receipt.mazeSize) : null,
-    routeQuality: receipt.routeQuality === 'multi-route' || receipt.routeQuality === 'single-route'
-      ? receipt.routeQuality
+    id: typeof mergedReceipt.id === 'string' ? mergedReceipt.id : null,
+    surface: surface === 'menu-demo' || surface === 'play' ? surface : 'unknown',
+    aiDecisionSummary: normalizedAiDecisionSummary,
+    aiDecisionScore: scoreAiDecisionSummary(normalizedAiDecisionSummary),
+    mazeSeed: Number.isFinite(readReceiptField(mergedReceipt, 'mazeSeed', 'maze_seed'))
+      ? Math.round(readReceiptField(mergedReceipt, 'mazeSeed', 'maze_seed'))
+      : null,
+    mazeSize: Number.isFinite(readReceiptField(mergedReceipt, 'mazeSize', 'maze_size'))
+      ? Math.round(readReceiptField(mergedReceipt, 'mazeSize', 'maze_size'))
+      : null,
+    mazeComplexity: normalizeMazeComplexity(readReceiptField(mergedReceipt, 'mazeComplexity')),
+    routeQuality: routeQuality === 'multi-route' || routeQuality === 'single-route'
+      ? routeQuality
       : 'unknown',
-    start: copyPoint(receipt.start),
-    goal: copyPoint(receipt.goal),
-    playerPathLength: Number.isFinite(receipt.playerPathLength)
-      ? Math.max(0, Math.round(receipt.playerPathLength))
-      : rawPath.length,
-    playerPathTruncated: receipt.playerPathTruncated === true,
-    wrongTurns: Number.isFinite(receipt.wrongTurns) ? Math.max(0, Math.round(receipt.wrongTurns)) : 0,
-    backtracks: Number.isFinite(receipt.backtracks) ? Math.max(0, Math.round(receipt.backtracks)) : 0,
-    completionTimeMs: Number.isFinite(receipt.completionTimeMs)
-      ? Math.max(0, Math.round(receipt.completionTimeMs))
+    start: copyPoint(readReceiptField(mergedReceipt, 'start', 'start_cell')),
+    goal: copyPoint(readReceiptField(mergedReceipt, 'goal', 'goal_cell')),
+    playerPathLength: normalizedPlayerPathLength,
+    playerPathTruncated: playerPathTruncated === true,
+    routeOverrunRatio: Number.isFinite(routeOverrunRatio)
+      ? roundNumber(Math.max(0, routeOverrunRatio))
+      : roundNumber(fallbackRouteOverrunSteps / normalizedShortestViablePathLength),
+    routeOverrunSteps: Number.isFinite(routeOverrunSteps)
+      ? Math.max(0, Math.round(routeOverrunSteps))
+      : fallbackRouteOverrunSteps,
+    renderSafetyPenaltyScore: readNumber(readReceiptField(mergedReceipt, 'renderSafetyPenaltyScore')),
+    routeEfficiencyPressureScore: readNumber(readReceiptField(mergedReceipt, 'routeEfficiencyPressureScore')),
+    shortestViablePathLength: normalizedShortestViablePathLength,
+    wrongTurns: Number.isFinite(readReceiptField(mergedReceipt, 'wrongTurns', 'wrong_turns'))
+      ? Math.max(0, Math.round(readReceiptField(mergedReceipt, 'wrongTurns', 'wrong_turns')))
       : 0,
-    resetUsed: receipt.resetUsed === true,
-    controlMode: receipt.controlMode === 'stick' || receipt.controlMode === 'arrows'
-      ? receipt.controlMode
+    backtracks: Number.isFinite(readReceiptField(mergedReceipt, 'backtracks'))
+      ? Math.max(0, Math.round(readReceiptField(mergedReceipt, 'backtracks')))
+      : 0,
+    completionTimeMs: Number.isFinite(readReceiptField(mergedReceipt, 'completionTimeMs', 'completion_time_ms'))
+      ? Math.max(0, Math.round(readReceiptField(mergedReceipt, 'completionTimeMs', 'completion_time_ms')))
+      : 0,
+    resetUsed: readReceiptField(mergedReceipt, 'resetUsed', 'reset_used') === true,
+    controlMode: controlMode === 'stick' || controlMode === 'arrows'
+      ? controlMode
       : 'unknown',
-    averageFrameMs: Number.isFinite(receipt.averageFrameMs) ? roundNumber(receipt.averageFrameMs) : null,
-    completedAt: typeof receipt.completedAt === 'string' ? receipt.completedAt : null,
+    averageFrameMs: Number.isFinite(readReceiptField(mergedReceipt, 'averageFrameMs', 'average_frame_ms'))
+      ? roundNumber(readReceiptField(mergedReceipt, 'averageFrameMs', 'average_frame_ms'))
+      : null,
+    completedAt: typeof completedAt === 'string' ? completedAt : null,
     playerPathPreview: pathPreviewSource.map(copyPoint)
   };
 };
@@ -87,6 +279,16 @@ const normalizeHistory = (historyLike) => {
   return rawReceipts.map(normalizeReceipt).filter(Boolean);
 };
 
+const looksLikeSupabaseReceiptRows = (receipts) => receipts.some((receipt) => (
+  isRecord(receipt)
+  && (
+    typeof receipt.user_id === 'string'
+    || Object.prototype.hasOwnProperty.call(receipt, 'maze_seed')
+    || Object.prototype.hasOwnProperty.call(receipt, 'start_cell')
+    || Object.prototype.hasOwnProperty.call(receipt, 'goal_cell')
+  )
+));
+
 const resolveSignal = (receipts) => {
   const playReceipts = receipts.filter((receipt) => receipt.surface === 'play');
   const signalReceipts = playReceipts.length >= 3 ? playReceipts : receipts;
@@ -97,9 +299,17 @@ const resolveSignal = (receipts) => {
   const averageWrongTurns = averageOrNull(signalReceipts.map((receipt) => receipt.wrongTurns)) ?? 0;
   const averageBacktracks = averageOrNull(signalReceipts.map((receipt) => receipt.backtracks)) ?? 0;
   const averageCompletionTimeMs = averageOrNull(signalReceipts.map((receipt) => receipt.completionTimeMs)) ?? 0;
+  const averageRenderSafetyPenaltyScore = averageOrNull(signalReceipts.map((receipt) => receipt.renderSafetyPenaltyScore)) ?? 0;
+  const averageRouteEfficiencyPressureScore = averageOrNull(signalReceipts.map((receipt) => receipt.routeEfficiencyPressureScore)) ?? 0;
   const resetRate = signalReceipts.filter((receipt) => receipt.resetUsed).length / signalReceipts.length;
 
-  if (resetRate >= 0.4 || averageWrongTurns >= 6 || averageBacktracks >= 6) {
+  if (
+    resetRate >= 0.4
+    || averageWrongTurns >= 6
+    || averageBacktracks >= 6
+    || averageRouteEfficiencyPressureScore >= 45
+    || averageRenderSafetyPenaltyScore >= 34
+  ) {
     return 'ease';
   }
 
@@ -132,6 +342,8 @@ const summarizeReceipts = (receipts) => {
     averageBacktracks: averageOrNull(receipts.map((receipt) => receipt.backtracks)),
     averageCompletionTimeMs: averageOrNull(receipts.map((receipt) => receipt.completionTimeMs)),
     averageFrameMs: averageOrNull(receipts.map((receipt) => receipt.averageFrameMs)),
+    averageRenderSafetyPenaltyScore: averageOrNull(receipts.map((receipt) => receipt.renderSafetyPenaltyScore)),
+    averageRouteEfficiencyPressureScore: averageOrNull(receipts.map((receipt) => receipt.routeEfficiencyPressureScore)),
     averageWrongTurns: averageOrNull(receipts.map((receipt) => receipt.wrongTurns)),
     confidence: roundNumber(Math.min(1, (playReceipts.length >= 3 ? playReceipts.length : receipts.length) / 10)),
     menuDemoSampleCount: menuDemoReceipts.length,
@@ -151,6 +363,14 @@ const unwrapPayload = (payload) => {
     return unwrapPayload(JSON.parse(payload));
   }
 
+  if (Array.isArray(payload)) {
+    return {
+      diagnostics: null,
+      inputKind: looksLikeSupabaseReceiptRows(payload) ? 'supabase-export' : 'history',
+      receipts: normalizeHistory(payload)
+    };
+  }
+
   if (!isRecord(payload)) {
     return {
       diagnostics: null,
@@ -160,7 +380,15 @@ const unwrapPayload = (payload) => {
   }
 
   if (isRecord(payload.cycleTelemetry)) {
-    return unwrapPayload(payload.cycleTelemetry);
+    const unwrapped = unwrapPayload(payload.cycleTelemetry);
+    return {
+      ...unwrapped,
+      diagnostics: {
+        ...payload.cycleTelemetry,
+        progression: payload.progression
+      },
+      inputKind: 'runtime-diagnostics'
+    };
   }
 
   if (isRecord(payload.localStorage) && typeof payload.localStorage[MAZER_CYCLE_TELEMETRY_STORAGE_KEY] === 'string') {
@@ -194,9 +422,12 @@ const unwrapPayload = (payload) => {
     };
   }
 
+  const exportedReceipts = Array.isArray(payload.receipts) ? payload.receipts : [];
+  const looksLikeSupabaseRows = looksLikeSupabaseReceiptRows(exportedReceipts);
+
   return {
     diagnostics: null,
-    inputKind: Array.isArray(payload.receipts) ? 'history' : 'unknown',
+    inputKind: looksLikeSupabaseRows ? 'supabase-export' : Array.isArray(payload.receipts) ? 'history' : 'unknown',
     receipts: normalizeHistory(payload)
   };
 };
@@ -256,6 +487,207 @@ const buildCohorts = (receipts) => ({
   bySurface: countBy(receipts, (receipt) => receipt.surface, ['menu-demo', 'play', 'unknown'])
 });
 
+const buildAiDecisionReview = (receipts, learning) => {
+  const summaries = receipts
+    .map((receipt) => receipt.aiDecisionSummary)
+    .filter(Boolean);
+  const scores = summaries
+    .map(scoreAiDecisionSummary)
+    .filter(Boolean);
+
+  return {
+    menuDemoReceipts: learning.menuDemoSampleCount,
+    playReceipts: learning.playSampleCount,
+    aiDecisionReceiptCount: summaries.length,
+    canTuneMenuAiFromCurrentData: learning.menuDemoSampleCount >= 3 && summaries.length >= 3,
+    canTuneHumanDifficultyFromCurrentData: learning.playSampleCount >= 3,
+    averageDecisionCount: averageOrNull(summaries.map((summary) => summary.decisionCount)),
+    averageWrongBranchCount: averageOrNull(summaries.map((summary) => summary.wrongBranchCount)),
+    averageBacktrackCount: averageOrNull(summaries.map((summary) => summary.backtrackCount)),
+    averageRecoveryCount: averageOrNull(summaries.map((summary) => summary.recoveryCount)),
+    averageOptionalRetargetCount: averageOrNull(summaries.map((summary) => summary.optionalRetargetCount)),
+    averagePressureScore: averageOrNull(scores.map((score) => score.pressureScore)),
+    averageReliabilityScore: averageOrNull(scores.map((score) => score.reliabilityScore)),
+    decisionSignalCounts: countBy(scores, (score) => score.signal, ['clean', 'searching', 'chaotic']),
+    thinkingModelCounts: countBy(summaries, (summary) => summary.thinkingModel, [
+      'human-local-memory',
+      'legacy-source',
+      'unknown'
+    ]),
+    note: 'Menu demo AI receipts are compact behavior summaries. They do not add enemies, traps, items, obstacles, or remote training.'
+  };
+};
+
+const buildComplexityReview = (receipts) => {
+  const complexities = receipts
+    .map((receipt) => receipt.mazeComplexity)
+    .filter(Boolean);
+
+  return {
+    complexityReceiptCount: complexities.length,
+    averageMeasuredComplexity: averageOrNull(complexities.map((complexity) => complexity.total)),
+    averageEdgeWrapCount: averageOrNull(complexities.map((complexity) => complexity.edgeWrapCount)),
+    averageEdgeWrapReliefScore: averageOrNull(complexities.map((complexity) => complexity.edgeWrapReliefScore)),
+    averageSplitCount: averageOrNull(complexities.map((complexity) => complexity.splitCount)),
+    averageWeightedDeadEndPressureScore: averageOrNull(complexities.map((complexity) => complexity.weightedDeadEndPressureScore)),
+    averageWeightedSplitPressureScore: averageOrNull(complexities.map((complexity) => complexity.weightedSplitPressureScore)),
+    averageDeadEndCount: averageOrNull(complexities.map((complexity) => complexity.deadEndCount)),
+    averageFillQualityScore: averageOrNull(complexities.map((complexity) => complexity.fillQualityScore)),
+    canTuneComplexityFromCurrentData: complexities.length >= 3,
+    note: 'Complexity receipts are measured from maze topology. They do not imply enemies, traps, rooms, obstacles, or diagonal graph support.'
+  };
+};
+
+const buildPerformancePressureReview = (receipts) => ({
+  receiptCount: receipts.length,
+  averageRouteEfficiencyPressureScore: averageOrNull(receipts.map((receipt) => receipt.routeEfficiencyPressureScore)),
+  averageRenderSafetyPenaltyScore: averageOrNull(receipts.map((receipt) => receipt.renderSafetyPenaltyScore)),
+  averageRouteOverrunRatio: averageOrNull(receipts.map((receipt) => receipt.routeOverrunRatio)),
+  averageRouteOverrunSteps: averageOrNull(receipts.map((receipt) => receipt.routeOverrunSteps)),
+  averageShortestViablePathLength: averageOrNull(receipts.map((receipt) => receipt.shortestViablePathLength)),
+  routeEfficiencyPressureReceiptCount: receipts.filter((receipt) => receipt.routeEfficiencyPressureScore > 0).length,
+  routeOverrunReceiptCount: receipts.filter((receipt) => receipt.routeOverrunSteps > 0).length,
+  renderSafetyPenaltyReceiptCount: receipts.filter((receipt) => receipt.renderSafetyPenaltyScore > 0).length,
+  canTunePerformancePressureFromCurrentData: receipts.length >= 3,
+  note: 'Shortest-path comparison, route-efficiency, and render-safety pressure are cycle-level signals. They influence tuning review without changing static maze topology.'
+});
+
+const buildProgressionReview = (diagnostics) => {
+  const progression = isRecord(diagnostics?.progression) ? diagnostics.progression : null;
+  const pacing = normalizeProgressionPacing(progression?.pacing);
+
+  return {
+    hasProgressionDiagnostics: progression !== null,
+    activeTrackId: typeof progression?.activeTrackId === 'string' ? progression.activeTrackId : null,
+    pacing,
+    canTuneLevelPacingFromCurrentData: Boolean(pacing && pacing.signalWindow.length >= 2),
+    note: 'Progression review summarizes level/rank pacing state only. It excludes raw path history and does not auto-tune without a validated Atlas consumer.'
+  };
+};
+
+export const validateMazeCycleTelemetryAtlasReport = (report) => {
+  const issues = [];
+
+  if (!isRecord(report)) {
+    return {
+      schema: MAZER_CYCLE_LEARNING_REPORT_SCHEMA,
+      valid: false,
+      issues: ['report-not-object'],
+      canConsumeForTuning: false
+    };
+  }
+
+  if (report.schema !== MAZER_CYCLE_LEARNING_REPORT_SCHEMA) {
+    issues.push('schema-mismatch');
+  }
+  if (!isRecord(report.source) || report.source.appId !== 'fawxzzy-mazer' || report.source.repoId !== 'mazer') {
+    issues.push('source-mismatch');
+  }
+  if (!isRecord(report.learning) || !['challenge', 'ease', 'hold'].includes(report.learning.signal)) {
+    issues.push('learning-signal-missing');
+  }
+  if (!isRecord(report.dataPolicy) || report.dataPolicy.atlasSafe !== true) {
+    issues.push('data-policy-not-atlas-safe');
+  }
+  if (isRecord(report.dataPolicy) && report.dataPolicy.rawPlayerPathExcludedFromReport !== true) {
+    issues.push('raw-path-policy-not-enforced');
+  }
+  if (isRecord(report.latestReceipt) && Array.isArray(report.latestReceipt.playerPath)) {
+    issues.push('latest-receipt-contains-raw-path');
+  }
+  if (Array.isArray(report.recentReceipts) && report.recentReceipts.some((receipt) => isRecord(receipt) && Array.isArray(receipt.playerPath))) {
+    issues.push('recent-receipts-contain-raw-path');
+  }
+  if (!isRecord(report.aiReview)) {
+    issues.push('ai-review-missing');
+  }
+  if (!isRecord(report.complexityReview)) {
+    issues.push('complexity-review-missing');
+  }
+  if (!isRecord(report.performancePressureReview)) {
+    issues.push('performance-pressure-review-missing');
+  }
+  if (!isRecord(report.progressionReview)) {
+    issues.push('progression-review-missing');
+  }
+
+  const sampleCount = Number.isFinite(report.learning?.sampleCount) ? report.learning.sampleCount : 0;
+  const hasTunableSample = sampleCount >= 3;
+
+  return {
+    schema: MAZER_CYCLE_LEARNING_REPORT_SCHEMA,
+    valid: issues.length === 0,
+    issues,
+    canConsumeForTuning: issues.length === 0 && hasTunableSample
+  };
+};
+
+const resolveConsumerFocus = (report) => {
+  const performance = isRecord(report.performancePressureReview) ? report.performancePressureReview : {};
+  const aiReview = isRecord(report.aiReview) ? report.aiReview : {};
+  const complexity = isRecord(report.complexityReview) ? report.complexityReview : {};
+  const averageRenderSafetyPenaltyScore = Number.isFinite(performance.averageRenderSafetyPenaltyScore)
+    ? performance.averageRenderSafetyPenaltyScore
+    : 0;
+  const averageRouteEfficiencyPressureScore = Number.isFinite(performance.averageRouteEfficiencyPressureScore)
+    ? performance.averageRouteEfficiencyPressureScore
+    : 0;
+  const averageAiPressureScore = Number.isFinite(aiReview.averagePressureScore)
+    ? aiReview.averagePressureScore
+    : 0;
+  const complexityReceiptCount = Number.isFinite(complexity.complexityReceiptCount)
+    ? complexity.complexityReceiptCount
+    : 0;
+
+  if ((report.learning?.sampleCount ?? 0) < 3) {
+    return 'collect-more-cycles';
+  }
+  if (averageRenderSafetyPenaltyScore >= 34) {
+    return 'render-safety';
+  }
+  if (averageRouteEfficiencyPressureScore >= 45) {
+    return 'route-efficiency';
+  }
+  if (averageAiPressureScore >= 60) {
+    return 'ai-chaos';
+  }
+  if (complexityReceiptCount >= 3 && report.learning?.signal === 'challenge') {
+    return 'increase-complexity';
+  }
+  if (report.learning?.signal === 'ease') {
+    return 'reduce-complexity';
+  }
+  return 'hold-and-observe';
+};
+
+export const createMazeCycleTelemetryAtlasConsumerReceipt = (
+  report,
+  options = {}
+) => {
+  const validation = validateMazeCycleTelemetryAtlasReport(report);
+  const focus = validation.canConsumeForTuning ? resolveConsumerFocus(report) : 'blocked-validation';
+
+  return {
+    schema: MAZER_CYCLE_LEARNING_CONSUMER_SCHEMA,
+    generatedAt: options.generatedAt ?? new Date().toISOString(),
+    sourceSchema: report?.schema ?? null,
+    validation,
+    decision: {
+      focus,
+      reportSignal: report?.learning?.signal ?? 'unknown',
+      reportConfidence: Number.isFinite(report?.learning?.confidence) ? report.learning.confidence : 0,
+      recommendedAction: validation.canConsumeForTuning ? report?.decision?.recommendedAction ?? 'hold-current-tuning' : 'fix-report-contract'
+    },
+    safeguards: {
+      noAutoTuningWithoutValidator: true,
+      rawPlayerPathRejected: validation.issues.includes('latest-receipt-contains-raw-path')
+        || validation.issues.includes('recent-receipts-contain-raw-path'),
+      diagonalGraphDeferred: true,
+      enemiesObstaclesDeferred: true
+    }
+  };
+};
+
 export const createMazeCycleTelemetryAtlasReport = (payload, options = {}) => {
   const { diagnostics, inputKind, receipts } = unwrapPayload(payload);
   const learning = diagnostics?.learning && isRecord(diagnostics.learning)
@@ -284,13 +716,10 @@ export const createMazeCycleTelemetryAtlasReport = (payload, options = {}) => {
     cohorts: buildCohorts(receipts),
     latestReceipt: recentReceipts[0] ?? null,
     recentReceipts,
-    aiReview: {
-      menuDemoReceipts: learning.menuDemoSampleCount,
-      playReceipts: learning.playSampleCount,
-      canTuneMenuAiFromCurrentData: learning.menuDemoSampleCount >= 3,
-      canTuneHumanDifficultyFromCurrentData: learning.playSampleCount >= 3,
-      note: 'Menu demo AI is deterministic restored route logic; this report summarizes its observed counters but does not train a model.'
-    },
+    aiReview: buildAiDecisionReview(receipts, learning),
+    complexityReview: buildComplexityReview(receipts),
+    performancePressureReview: buildPerformancePressureReview(receipts),
+    progressionReview: buildProgressionReview(diagnostics),
     decision: {
       signal: learning.signal,
       confidence: learning.confidence,
@@ -326,9 +755,11 @@ const readStdin = async () => {
 
 const parseArgs = (argv) => {
   const args = {
+    atlasConsumerRoot: null,
     input: null,
     output: null,
     atlasReceiptRoot: null,
+    consumerOutput: null,
     pretty: false
   };
 
@@ -339,6 +770,12 @@ const parseArgs = (argv) => {
       index += 1;
     } else if (arg === '--output') {
       args.output = argv[index + 1] ?? null;
+      index += 1;
+    } else if (arg === '--consumer-output') {
+      args.consumerOutput = argv[index + 1] ?? null;
+      index += 1;
+    } else if (arg === '--atlas-consumer-root') {
+      args.atlasConsumerRoot = argv[index + 1] ?? null;
       index += 1;
     } else if (arg === '--atlas-receipt-root') {
       args.atlasReceiptRoot = argv[index + 1] ?? null;
@@ -354,7 +791,7 @@ const parseArgs = (argv) => {
 };
 
 const helpText = `Usage:
-  node scripts/analysis/maze-cycle-telemetry-report.mjs --input <file|-> [--output <file>] [--atlas-receipt-root <dir>] [--pretty]
+  node scripts/analysis/maze-cycle-telemetry-report.mjs --input <file|-> [--output <file>] [--consumer-output <file>] [--atlas-receipt-root <dir>] [--atlas-consumer-root <dir>] [--pretty]
 
 Input may be:
   - raw mazer.cycle-telemetry.v1 history JSON
@@ -383,11 +820,16 @@ export const runMazeCycleTelemetryReportCli = async (argv = process.argv.slice(2
       : await readStdin();
   const payload = JSON.parse(inputText);
   const report = createMazeCycleTelemetryAtlasReport(payload);
+  const consumerReceipt = createMazeCycleTelemetryAtlasConsumerReceipt(report);
   const text = JSON.stringify(report, null, args.pretty ? 2 : 0) + '\n';
   const writes = {};
 
   if (args.output) {
     writes.output = await writeJsonFile(args.output, report, args.pretty);
+  }
+
+  if (args.consumerOutput) {
+    writes.consumerOutput = await writeJsonFile(args.consumerOutput, consumerReceipt, args.pretty);
   }
 
   if (args.atlasReceiptRoot) {
@@ -397,11 +839,18 @@ export const runMazeCycleTelemetryReportCli = async (argv = process.argv.slice(2
     writes.atlasLatest = await writeJsonFile(join(receiptRoot, 'latest.json'), report, args.pretty);
   }
 
-  if (!args.output && !args.atlasReceiptRoot) {
+  if (args.atlasConsumerRoot) {
+    const timestamp = consumerReceipt.generatedAt.replace(/[:.]/g, '-');
+    const consumerRoot = resolve(args.atlasConsumerRoot);
+    writes.atlasConsumerReceipt = await writeJsonFile(join(consumerRoot, `${timestamp}.json`), consumerReceipt, args.pretty);
+    writes.atlasConsumerLatest = await writeJsonFile(join(consumerRoot, 'latest.json'), consumerReceipt, args.pretty);
+  }
+
+  if (!args.output && !args.consumerOutput && !args.atlasReceiptRoot && !args.atlasConsumerRoot) {
     process.stdout.write(text);
   }
 
-  return { report, writes };
+  return { consumerReceipt, report, writes };
 };
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

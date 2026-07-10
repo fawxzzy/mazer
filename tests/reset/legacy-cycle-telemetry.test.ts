@@ -89,11 +89,20 @@ describe('legacy maze cycle telemetry', () => {
       averageFrameMs: 16.667,
       completionTimeMs: 12_345,
       controlMode: 'stick',
+      mazeComplexity: expect.objectContaining({
+        deadEndCount: expect.any(Number),
+        edgeWrapCount: expect.any(Number),
+        fillQualityScore: expect.any(Number),
+        splitCount: expect.any(Number),
+        total: expect.any(Number)
+      }),
       mazeSeed: 123,
       mazeSize: 6,
       playerPathLength: MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT + 40,
       playerPathTruncated: true,
+      renderSafetyPenaltyScore: 0,
       routeQuality: 'multi-route',
+      routeEfficiencyPressureScore: 100,
       surface: 'play'
     });
     expect(history.receipts[0]?.playerPath).toHaveLength(MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT);
@@ -130,6 +139,15 @@ describe('legacy maze cycle telemetry', () => {
     const storage = new MemoryStorage();
     const maze = createTestMaze();
     const history = recordMazeCycleTelemetryReceipt(storage, {
+      aiDecisionSummary: {
+        backtrackCount: 2,
+        decisionCount: 18,
+        optionalRetargetCount: 1,
+        recoveryCount: 1,
+        thinkingModel: 'human-local-memory',
+        visitedUndoCount: 0,
+        wrongBranchCount: 3
+      },
       averageFrameMs: 12.5,
       completedAt: '2026-07-08T13:00:00.000Z',
       completionTimeMs: 6000,
@@ -148,10 +166,41 @@ describe('legacy maze cycle telemetry', () => {
       diagnosticReceiptLimit: MAZE_CYCLE_TELEMETRY_DIAGNOSTIC_RECEIPT_LIMIT,
       enabled: true,
       historyLimit: MAZE_CYCLE_TELEMETRY_HISTORY_LIMIT,
+      latestReceipt: {
+        aiDecisionScore: {
+          pressureScore: 40.305,
+          reliabilityScore: 59.695,
+          signal: 'searching'
+        },
+        aiDecisionSummary: {
+          backtrackCount: 2,
+          decisionCount: 18,
+          optionalRetargetCount: 1,
+          recoveryCount: 1,
+          thinkingModel: 'human-local-memory',
+          visitedUndoCount: 0,
+          wrongBranchCount: 3
+        },
+        mazeComplexity: expect.objectContaining({
+          edgeWrapScore: expect.any(Number),
+          splitScore: expect.any(Number),
+          total: expect.any(Number)
+        }),
+        renderSafetyPenaltyScore: 0,
+        routeEfficiencyPressureScore: 100
+      },
       learning: {
+        aiDecisionSignalCounts: {
+          clean: 0,
+          searching: 1,
+          chaotic: 0
+        },
+        averageAiDecisionPressureScore: 40.305,
         averageBacktracks: 2,
         averageCompletionTimeMs: 6000,
         averageFrameMs: 12.5,
+        averageRenderSafetyPenaltyScore: 0,
+        averageRouteEfficiencyPressureScore: 100,
         averageWrongTurns: 3,
         confidence: 0.1,
         menuDemoSampleCount: 1,
@@ -197,6 +246,8 @@ describe('legacy maze cycle telemetry', () => {
       averageBacktracks: 0.333,
       averageCompletionTimeMs: 6000,
       averageFrameMs: 12,
+      averageRenderSafetyPenaltyScore: 0,
+      averageRouteEfficiencyPressureScore: 0,
       averageWrongTurns: 0.333,
       confidence: 0.3,
       playSampleCount: 3,
@@ -223,6 +274,8 @@ describe('legacy maze cycle telemetry', () => {
 
     expect(summarizeMazeCycleTelemetryLearning(readMazeCycleTelemetryHistory(easeStorage))).toMatchObject({
       averageBacktracks: 7,
+      averageRenderSafetyPenaltyScore: 27.778,
+      averageRouteEfficiencyPressureScore: 0,
       averageWrongTurns: 8,
       confidence: 0.3,
       preferredControlMode: 'arrows',
@@ -291,7 +344,60 @@ describe('legacy maze cycle telemetry', () => {
       surface: 'play'
     })).toMatchObject({
       backtracks: 1,
+      renderSafetyPenaltyScore: 0,
+      routeEfficiencyPressureScore: 28.571,
       wrongTurns: 1
+    });
+  });
+
+  test('uses route inefficiency and render safety as learning pressure', () => {
+    const inefficientStorage = new MemoryStorage();
+    const unsafeRenderStorage = new MemoryStorage();
+    const maze = createTestMaze();
+    const inefficientPath = [
+      ...maze.solutionPath,
+      { x: 4, y: 3 },
+      { x: 4, y: 4 },
+      { x: 4, y: 3 },
+      { x: 4, y: 4 },
+      { x: 4, y: 3 },
+      { x: 4, y: 4 }
+    ];
+
+    for (let index = 0; index < 3; index += 1) {
+      recordMazeCycleTelemetryReceipt(inefficientStorage, {
+        averageFrameMs: 16,
+        completedAt: `2026-07-08T18:00:0${index}.000Z`,
+        completionTimeMs: 8000,
+        controlMode: 'stick',
+        maze,
+        playerPath: inefficientPath,
+        resetUsed: false,
+        surface: 'play',
+        backtracks: 0,
+        wrongTurns: 0
+      });
+      recordMazeCycleTelemetryReceipt(unsafeRenderStorage, {
+        averageFrameMs: 31,
+        completedAt: `2026-07-08T19:00:0${index}.000Z`,
+        completionTimeMs: 8000,
+        controlMode: 'stick',
+        maze,
+        playerPath: maze.solutionPath,
+        resetUsed: false,
+        surface: 'play',
+        backtracks: 0,
+        wrongTurns: 0
+      });
+    }
+
+    expect(summarizeMazeCycleTelemetryLearning(readMazeCycleTelemetryHistory(inefficientStorage))).toMatchObject({
+      averageRouteEfficiencyPressureScore: 57.143,
+      signal: 'ease'
+    });
+    expect(summarizeMazeCycleTelemetryLearning(readMazeCycleTelemetryHistory(unsafeRenderStorage))).toMatchObject({
+      averageRenderSafetyPenaltyScore: 72.222,
+      signal: 'ease'
     });
   });
 });

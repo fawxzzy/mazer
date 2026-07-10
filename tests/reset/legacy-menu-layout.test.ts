@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { resolveTouchControlLayout } from '../../src/input-human';
-import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
+import {
+  resolveLegacyAuthenticatedMenuButtonStack,
+  resolveLegacyMenuLayout
+} from '../../src/legacy-runtime/legacyMenuLayout';
 import {
   resolveLegacyMenuPathTitleLayout,
   resolveLegacyMenuPathTitleOrbitGeometry,
@@ -19,20 +22,20 @@ describe('legacy menu layout', () => {
     expect(layout.centerButtonY).toBe(layout.buttonY);
     expect(layout.buttonLayout).toBe('row');
     expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
-    expect(layout.buttonY - (layout.buttonHeight / 2)).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 38);
+    expect(layout.buttonY - (layout.buttonHeight / 2)).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 54);
     expect(layout.buttonY + (layout.buttonHeight / 2)).toBeLessThan(layout.footerY);
     expect(layout.buttonHeight).toBeGreaterThanOrEqual(58);
     expect(layout.buttonHeight).toBeLessThanOrEqual(78);
-    expect(layout.boardSize).toBeGreaterThanOrEqual(833);
-    expect(layout.boardSize).toBeLessThanOrEqual(882);
+    expect(layout.boardSize).toBeGreaterThanOrEqual(720);
+    expect(layout.boardSize).toBeLessThanOrEqual(790);
     expect(layout.leftButtonX).toBeGreaterThan(layout.boardLeft);
     expect(layout.rightButtonX).toBeLessThan(layout.boardLeft + layout.boardSize);
     expect(layout.leftButtonX).toBeLessThan(layout.centerButtonX);
     expect(layout.rightButtonX).toBeGreaterThan(layout.centerButtonX);
     expect(layout.rightButtonX - layout.leftButtonX).toBeGreaterThanOrEqual(layout.buttonWidth + 18);
     expect(layout.rightButtonX - layout.leftButtonX).toBeLessThanOrEqual(layout.buttonWidth + 34);
-    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(74);
-    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(92);
+    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(116);
+    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(126);
     expect(layout.buttonWidth).toBeGreaterThanOrEqual(220);
     expect(layout.buttonWidth).toBeLessThanOrEqual(238);
     expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.205));
@@ -48,9 +51,9 @@ describe('legacy menu layout', () => {
     expect(layout.centerButtonY).toBe(layout.buttonY);
     expect(layout.buttonLayout).toBe('row');
     expect(layout.leftButtonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
-    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(62);
-    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(88);
-    expect(layout.leftButtonY - (layout.buttonHeight / 2)).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 40);
+    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(108);
+    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(114);
+    expect(layout.leftButtonY - (layout.buttonHeight / 2)).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 84);
     expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
     expect(layout.buttonY - layout.leftButtonY).toBe(0);
     expect(layout.buttonY).toBeLessThan(layout.height);
@@ -88,20 +91,33 @@ describe('legacy menu layout', () => {
     expect(Math.abs(orbitGeometry.centerX - (layout.boardLeft + (layout.boardSize / 2)))).toBeLessThanOrEqual(0.5);
     expect(orbitGeometry.crownBottom + orbitClearance).toBeLessThanOrEqual(borderTop + 1);
     expect(orbitGeometry.crownBottom).toBeGreaterThanOrEqual(layout.boardTop - 32);
+    expect(titleLayout.width).toBeGreaterThanOrEqual(300);
+    expect(titleLayout.width).toBeLessThanOrEqual(layout.width - 48);
   });
 
   test('uses the cleaner 110-percent-style tile cadence on normal portrait phones', () => {
     const menuLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 'menu');
     const playLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 'play');
 
-    expect(menuLayout.tileSize).toBe(6);
-    expect(playLayout.tileSize).toBe(6);
-    expect(menuLayout.boardSize).toBe(294);
-    expect(playLayout.boardSize).toBe(294);
-    expect(menuLayout.boardLeft).toBeGreaterThanOrEqual(48);
+    expect(menuLayout.tileSize).toBe(7);
+    expect(playLayout.tileSize).toBe(7);
+    expect(menuLayout.boardSize).toBe(357);
+    expect(playLayout.boardSize).toBe(357);
+    expect(menuLayout.boardLeft).toBeGreaterThanOrEqual(24);
     expect(playLayout.boardLeft).toBe(menuLayout.boardLeft);
     expect(menuLayout.buttonLayout).toBe('row');
     expect(playLayout.buttonLayout).toBe('row');
+  });
+
+  test('lets phone menu mazes reach the screen edge when progression scale permits fewer cells', () => {
+    const layout = resolveLegacyMenuLayout(405, 958, 50, 46, 'menu');
+
+    expect(layout.tileSize).toBe(8);
+    expect(layout.boardSize).toBe(382);
+    expect(layout.boardLeft).toBeGreaterThanOrEqual(8);
+    expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width - 8);
+    expect(layout.titleY).toBeLessThan(layout.boardTop);
+    expect(layout.buttonLayout).toBe('row');
   });
 
   test('keeps normal phone-width menu buttons horizontal instead of using the side-panel stack', () => {
@@ -115,6 +131,7 @@ describe('legacy menu layout', () => {
       expect(layout.buttonLayout).toBe('row');
       expect(layout.leftButtonY).toBe(layout.rightButtonY);
       expect(layout.leftButtonY).toBe(layout.buttonY);
+      expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(96);
       expect(layout.leftButtonX).toBeLessThan(layout.centerButtonX);
       expect(layout.rightButtonX).toBeGreaterThan(layout.centerButtonX);
       expect(layout.leftButtonX - (layout.buttonWidth / 2)).toBeGreaterThanOrEqual(8);
@@ -123,6 +140,35 @@ describe('legacy menu layout', () => {
       expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width - 8);
       expect(layout.titleY).toBeLessThan(layout.boardTop);
       expect(layout.leftButtonY + (layout.buttonHeight / 2)).toBeLessThan(layout.footerY);
+    }
+  });
+
+  test('keeps authenticated start and options buttons padded as one centered stack', () => {
+    for (const viewport of [
+      { width: 1280, height: 720 },
+      { width: 405, height: 958 },
+      { width: 430, height: 932 },
+      { width: 1920, height: 1080 }
+    ]) {
+      const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
+      const stack = resolveLegacyAuthenticatedMenuButtonStack(layout);
+      const startBottom = stack.startButtonY + (layout.buttonHeight / 2);
+      const optionsTop = stack.optionsButtonY - (stack.optionsButtonHeight / 2);
+      const stackTop = stack.startButtonY - (layout.buttonHeight / 2);
+      const stackBottom = stack.optionsButtonY + (stack.optionsButtonHeight / 2);
+      const availableHeight = layout.footerY - (layout.boardTop + layout.boardSize);
+      const expectedCenter = availableHeight >= stack.authenticatedStackHeight + 18
+        ? layout.centerButtonY
+        : (layout.boardTop + layout.boardSize) + (availableHeight / 2);
+
+      expect(Math.round(optionsTop - startBottom)).toBeGreaterThanOrEqual(10);
+      expect(Math.round(optionsTop - startBottom)).toBeLessThanOrEqual(14);
+      expect(Math.abs(((stackTop + stackBottom) / 2) - expectedCenter)).toBeLessThanOrEqual(1);
+      expect(stackTop).toBeGreaterThan(layout.boardTop + layout.boardSize);
+      if (viewport.width >= 1000) {
+        expect(stackTop - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(40);
+      }
+      expect(stackBottom).toBeLessThan(layout.footerY);
     }
   });
 
@@ -176,7 +222,7 @@ describe('legacy menu layout', () => {
 
     expect(playLayout.boardTop + playLayout.boardSize + 24).toBeLessThanOrEqual(touchLayout.frame.top);
     expect(touchLayout.controls.pause.width).toBeGreaterThan(touchLayout.controls.move_up.width);
-    expect(touchLayout.controls.restart_attempt.top).toBe(touchLayout.controls.pause.top);
+    expect(touchLayout.controls.restart_attempt.width).toBe(0);
     expect(touchLayout.controls.toggle_thoughts.width).toBe(0);
   });
 
@@ -210,7 +256,7 @@ describe('legacy menu layout', () => {
     expect(touchLayout.frames?.[1].left).toBeGreaterThanOrEqual(playLayout.boardLeft + playLayout.boardSize + 18);
     expect(touchLayout.controls.move_right.right).toBeLessThanOrEqual(playLayout.boardLeft - 8);
     expect(touchLayout.controls.pause.left).toBeGreaterThanOrEqual(playLayout.boardLeft + playLayout.boardSize + 8);
-    expect(touchLayout.controls.restart_attempt.left).toBe(touchLayout.controls.pause.left);
+    expect(touchLayout.controls.restart_attempt.width).toBe(0);
     expect(touchLayout.controls.toggle_thoughts.width).toBe(0);
   });
 });

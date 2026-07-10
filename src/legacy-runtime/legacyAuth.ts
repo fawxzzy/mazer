@@ -1,4 +1,5 @@
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
+import { LEGACY_AUTH_MESSAGE_COPY } from './legacyPlayerMessage';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
 export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
@@ -6,6 +7,7 @@ export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
 export type LegacyAuthStatus = 'guest' | 'authenticated' | 'unavailable';
 export type LegacyAuthFormMode = 'login' | 'signup';
 export type LegacyAuthFieldId = 'email' | 'password' | 'displayName';
+export type LegacyRememberedIdentitySessionState = 'ready' | 'reauth-required';
 
 export interface LegacyAuthConfig {
   anonKey: string;
@@ -38,12 +40,26 @@ export interface LegacyAuthActionResult {
   snapshot: LegacyAuthSessionSnapshot;
 }
 
+export interface LegacyRememberedIdentityState {
+  displayName: string;
+  email: string;
+  sessionState: LegacyRememberedIdentitySessionState;
+  updatedAt: string;
+}
+
+export interface LegacyRememberedIdentityInput {
+  displayName?: string | null;
+  email: string;
+  sessionState?: LegacyRememberedIdentitySessionState;
+  updatedAt?: string;
+}
+
 export type LegacyAuthStateListener = (
   snapshot: LegacyAuthSessionSnapshot,
   event: AuthChangeEvent
 ) => void;
 
-type LegacyAuthStorage = Pick<Storage, 'getItem' | 'setItem'>;
+type LegacyAuthStorage = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>;
 
 const createGuestSnapshot = (
   configured: boolean,
@@ -61,7 +77,13 @@ const createGuestSnapshot = (
 
 const readRuntimeEnv = (): Record<string, string | undefined> => {
   const meta = import.meta as unknown as { env?: Record<string, string | undefined> };
-  return meta.env ?? {};
+  const env = meta.env ?? {};
+
+  return {
+    ...env,
+    VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL
+  };
 };
 
 export const resolveLegacyAuthConfig = (
@@ -106,7 +128,7 @@ export const createLegacyAuthSessionSnapshot = (
 
   if (!configured) {
     return createGuestSnapshot(false, {
-      info: 'Account login needs Supabase env vars before it can be enabled.',
+      info: LEGACY_AUTH_MESSAGE_COPY.authUnavailable,
       ...overrides
     });
   }
@@ -127,6 +149,183 @@ export const createLegacyAuthSessionSnapshot = (
 };
 
 let legacyAuthClient: SupabaseClient | null = null;
+let legacyAuthPersistenceListenerInstalled = false;
+let legacyAuthLastSessionSignature: string | null = null;
+
+export const deriveLegacyRememberedIdentityDisplayName = (email: string): string => {
+  const localPart = normalizeLegacyAuthEmail(email).split('@')[0] ?? '';
+  const segments = localPart.split(/[._-]+/).filter(Boolean);
+  const primarySegment = segments[0] ?? localPart;
+  const normalized = primarySegment.trim().toLowerCase();
+  return normalized.length > 0
+    ? normalized.charAt(0).toUpperCase() + normalized.slice(1)
+    : 'Player';
+};
+
+export const buildLegacyRememberedIdentityState = (
+  input: LegacyRememberedIdentityInput
+): LegacyRememberedIdentityState => {
+  const email = normalizeLegacyAuthEmail(input.email);
+  return {
+    displayName: input.displayName?.trim() || deriveLegacyRememberedIdentityDisplayName(email),
+    email,
+    sessionState: input.sessionState ?? 'reauth-required',
+    updatedAt: input.updatedAt ?? new Date().toISOString()
+  };
+};
+
+const readLegacyRememberedIdentityStorage = (
+  storage: Pick<Storage, 'getItem'> | undefined
+): string | null => {
+  if (!storage) {
+    return null;
+  }
+
+  try {
+    return storage.getItem(LEGACY_AUTH_REMEMBERED_IDENTITY_KEY);
+  } catch {
+    return null;
+  }
+};
+
+export const readLegacyRememberedIdentityState = (
+  storage: Pick<Storage, 'getItem'> | undefined
+): LegacyRememberedIdentityState | null => {
+  const raw = readLegacyRememberedIdentityStorage(storage);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (typeof parsed === 'string') {
+      const email = normalizeLegacyAuthEmail(parsed);
+      return email ? buildLegacyRememberedIdentityState({ email }) : null;
+    }
+    if (parsed !== null && typeof parsed === 'object') {
+      const value = parsed as Partial<LegacyRememberedIdentityState>;
+      const email = typeof value.email === 'string' ? normalizeLegacyAuthEmail(value.email) : '';
+      if (!email) {
+        return null;
+      }
+      return buildLegacyRememberedIdentityState({
+        displayName: typeof value.displayName === 'string' ? value.displayName : null,
+        email,
+        sessionState: value.sessionState === 'ready' ? 'ready' : 'reauth-required',
+        updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : undefined
+      });
+    }
+  } catch {
+    const email = normalizeLegacyAuthEmail(raw);
+    return email ? buildLegacyRememberedIdentityState({ email }) : null;
+  }
+
+  return null;
+};
+
+export const writeLegacyRememberedIdentityState = (
+  storage: LegacyAuthStorage | undefined,
+  input: LegacyRememberedIdentityInput
+): LegacyRememberedIdentityState | null => {
+  if (!storage) {
+    return null;
+  }
+
+  const state = buildLegacyRememberedIdentityState(input);
+  if (!state.email) {
+    return null;
+  }
+
+  try {
+    storage.setItem(LEGACY_AUTH_REMEMBERED_IDENTITY_KEY, JSON.stringify(state));
+  } catch {
+    // Remembered identity is a convenience only; auth depends on Supabase session storage.
+  }
+
+  return state;
+};
+
+export const syncLegacyRememberedIdentityFromAuthenticatedSession = (
+  storage: LegacyAuthStorage | undefined,
+  snapshot: Pick<LegacyAuthSessionSnapshot, 'displayName' | 'email' | 'status'>
+): LegacyRememberedIdentityState | null => {
+  if (snapshot.status !== 'authenticated' || !snapshot.email) {
+    return null;
+  }
+
+  return writeLegacyRememberedIdentityState(storage, {
+    displayName: snapshot.displayName,
+    email: snapshot.email,
+    sessionState: 'ready'
+  });
+};
+
+export const markLegacyRememberedIdentityReauthRequired = (
+  storage: LegacyAuthStorage | undefined
+): LegacyRememberedIdentityState | null => {
+  const remembered = readLegacyRememberedIdentityState(storage);
+  if (!remembered) {
+    return null;
+  }
+
+  return writeLegacyRememberedIdentityState(storage, {
+    displayName: remembered.displayName,
+    email: remembered.email,
+    sessionState: 'reauth-required'
+  });
+};
+
+const resolveLegacyAuthSessionSignature = (session: Session | null): string | null => {
+  if (!session?.user?.id) {
+    return null;
+  }
+
+  return `${session.user.id}:${session.expires_at ?? 0}`;
+};
+
+const syncLegacyAuthPersistenceFromSession = (
+  session: Session | null,
+  event: AuthChangeEvent | 'BOOTSTRAP_SESSION'
+): LegacyAuthSessionSnapshot => {
+  const snapshot = createLegacyAuthSessionSnapshot(session);
+  const storage = typeof window === 'undefined' ? undefined : window.localStorage;
+  const signature = resolveLegacyAuthSessionSignature(session);
+
+  if (signature && signature !== legacyAuthLastSessionSignature) {
+    legacyAuthLastSessionSignature = signature;
+    syncLegacyRememberedIdentityFromAuthenticatedSession(storage, snapshot);
+  }
+
+  if (!signature && legacyAuthLastSessionSignature) {
+    legacyAuthLastSessionSignature = null;
+    markLegacyRememberedIdentityReauthRequired(storage);
+  }
+
+  if (event === 'SIGNED_OUT') {
+    legacyAuthLastSessionSignature = null;
+    markLegacyRememberedIdentityReauthRequired(storage);
+  }
+
+  return snapshot;
+};
+
+const installLegacyAuthPersistenceListener = (client: SupabaseClient): void => {
+  if (legacyAuthPersistenceListenerInstalled) {
+    return;
+  }
+
+  legacyAuthPersistenceListenerInstalled = true;
+  client.auth.onAuthStateChange((event, session) => {
+    syncLegacyAuthPersistenceFromSession(session, event);
+  });
+  void client.auth.getSession()
+    .then(({ data }) => {
+      syncLegacyAuthPersistenceFromSession(data.session, 'BOOTSTRAP_SESSION');
+    })
+    .catch(() => {
+      // Bootstrap session sync is best-effort; explicit auth reads still drive UI state.
+    });
+};
 
 export const getLegacyAuthClient = async (): Promise<SupabaseClient | null> => {
   const config = resolveLegacyAuthConfig();
@@ -144,6 +343,7 @@ export const getLegacyAuthClient = async (): Promise<SupabaseClient | null> => {
         storage: typeof window === 'undefined' ? undefined : window.localStorage
       }
     });
+    installLegacyAuthPersistenceListener(legacyAuthClient);
   }
 
   return legacyAuthClient;
@@ -156,9 +356,20 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
   }
 
   const { data, error } = await client.auth.getSession();
-  return createLegacyAuthSessionSnapshot(data.session, undefined, {
+  const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
     error: error?.message ?? null
   });
+  if (snapshot.status === 'authenticated') {
+    syncLegacyRememberedIdentityFromAuthenticatedSession(
+      typeof window === 'undefined' ? undefined : window.localStorage,
+      snapshot
+    );
+  } else {
+    markLegacyRememberedIdentityReauthRequired(
+      typeof window === 'undefined' ? undefined : window.localStorage
+    );
+  }
+  return snapshot;
 };
 
 export const signInLegacyAuth = async (
@@ -169,7 +380,7 @@ export const signInLegacyAuth = async (
   if (!client) {
     return {
       snapshot: createGuestSnapshot(false, {
-        error: 'Account login is not configured for this build.'
+        error: LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured
       })
     };
   }
@@ -179,11 +390,19 @@ export const signInLegacyAuth = async (
     password
   });
 
+  const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
+    error: error?.message ?? null,
+    info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedIn
+  });
+  if (snapshot.status === 'authenticated') {
+    syncLegacyRememberedIdentityFromAuthenticatedSession(
+      typeof window === 'undefined' ? undefined : window.localStorage,
+      snapshot
+    );
+  }
+
   return {
-    snapshot: createLegacyAuthSessionSnapshot(data.session, undefined, {
-      error: error?.message ?? null,
-      info: error ? null : 'Signed in.'
-    })
+    snapshot
   };
 };
 
@@ -196,7 +415,7 @@ export const signUpLegacyAuth = async (
   if (!client) {
     return {
       snapshot: createGuestSnapshot(false, {
-        error: 'Account signup is not configured for this build.'
+        error: LEGACY_AUTH_MESSAGE_COPY.signupNotConfigured
       })
     };
   }
@@ -213,14 +432,21 @@ export const signUpLegacyAuth = async (
   const info = error
     ? null
     : data.session
-      ? 'Account created.'
-      : 'Check your email to finish account setup.';
+      ? LEGACY_AUTH_MESSAGE_COPY.accountCreated
+      : LEGACY_AUTH_MESSAGE_COPY.verifyEmail;
+  const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
+    error: error?.message ?? null,
+    info
+  });
+  if (snapshot.status === 'authenticated') {
+    syncLegacyRememberedIdentityFromAuthenticatedSession(
+      typeof window === 'undefined' ? undefined : window.localStorage,
+      snapshot
+    );
+  }
 
   return {
-    snapshot: createLegacyAuthSessionSnapshot(data.session, undefined, {
-      error: error?.message ?? null,
-      info
-    })
+    snapshot
   };
 };
 
@@ -229,7 +455,7 @@ export const requestLegacyPasswordReset = async (email: string): Promise<LegacyA
   if (!client) {
     return {
       snapshot: createGuestSnapshot(false, {
-        error: 'Password reset is not configured for this build.'
+        error: LEGACY_AUTH_MESSAGE_COPY.passwordResetNotConfigured
       })
     };
   }
@@ -242,7 +468,7 @@ export const requestLegacyPasswordReset = async (email: string): Promise<LegacyA
   return {
     snapshot: createGuestSnapshot(true, {
       error: error?.message ?? null,
-      info: error ? null : 'Password reset email sent.'
+      info: error ? null : LEGACY_AUTH_MESSAGE_COPY.passwordResetSent
     })
   };
 };
@@ -255,11 +481,16 @@ export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
     };
   }
 
-  const { error } = await client.auth.signOut();
+  const { error } = await client.auth.signOut({ scope: 'local' });
+  if (!error) {
+    legacyAuthLastSessionSignature = null;
+    markLegacyRememberedIdentityReauthRequired(typeof window === 'undefined' ? undefined : window.localStorage);
+  }
+
   return {
     snapshot: createGuestSnapshot(true, {
       error: error?.message ?? null,
-      info: error ? null : 'Signed out. Guest progress is active.'
+      info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedOut
     })
   };
 };
@@ -272,7 +503,14 @@ export const subscribeLegacyAuthState = (
   }
 
   const { data } = client.auth.onAuthStateChange((event, session) => {
-    listener(createLegacyAuthSessionSnapshot(session), event);
+    const snapshot = createLegacyAuthSessionSnapshot(session);
+    if (snapshot.status === 'authenticated') {
+      syncLegacyRememberedIdentityFromAuthenticatedSession(
+        typeof window === 'undefined' ? undefined : window.localStorage,
+        snapshot
+      );
+    }
+    listener(snapshot, event);
   });
 
   return () => {
@@ -299,21 +537,21 @@ export const resolveLegacyAuthSubmitState = (
   if (!configured) {
     return {
       canSubmit: false,
-      reason: 'Login is not configured.'
+      reason: LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured
     };
   }
 
   if (!normalizeLegacyAuthEmail(form.email).includes('@')) {
     return {
       canSubmit: false,
-      reason: 'Enter an email.'
+      reason: LEGACY_AUTH_MESSAGE_COPY.enterEmail
     };
   }
 
   if (form.password.length < 6) {
     return {
       canSubmit: false,
-      reason: 'Password needs 6+ characters.'
+      reason: LEGACY_AUTH_MESSAGE_COPY.passwordMinimum
     };
   }
 
@@ -326,30 +564,14 @@ export const resolveLegacyAuthSubmitState = (
 export const readLegacyRememberedIdentity = (
   storage: Pick<Storage, 'getItem'> | undefined
 ): string => {
-  if (!storage) {
-    return '';
-  }
-
-  try {
-    return storage.getItem(LEGACY_AUTH_REMEMBERED_IDENTITY_KEY) ?? '';
-  } catch {
-    return '';
-  }
+  return readLegacyRememberedIdentityState(storage)?.email ?? '';
 };
 
 export const writeLegacyRememberedIdentity = (
   storage: LegacyAuthStorage | undefined,
   email: string
 ): void => {
-  if (!storage) {
-    return;
-  }
-
-  try {
-    storage.setItem(LEGACY_AUTH_REMEMBERED_IDENTITY_KEY, normalizeLegacyAuthEmail(email));
-  } catch {
-    // Remembered identity is a convenience only; login should not depend on it.
-  }
+  writeLegacyRememberedIdentityState(storage, { email });
 };
 
 export const resolveLegacyAuthAccountLabel = (

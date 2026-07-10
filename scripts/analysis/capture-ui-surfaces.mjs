@@ -15,6 +15,10 @@ import {
   resolveSessionId
 } from '../visual/common.mjs';
 import { launchPreviewServer, stopPreviewServer } from '../visual/preview-server.mjs';
+import {
+  assertVisualScreenContract,
+  buildVisualScreenContract
+} from '../visual/screen-contract.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
@@ -137,7 +141,7 @@ const waitForSurface = async (page, {
   return readDiagnostics(page);
 };
 
-const resolveRoute = ({ route = DEFAULT_ROUTE, label, mazeSeed, pathStyle }) => {
+const resolveRoute = ({ route = DEFAULT_ROUTE, label, mazeSeed }) => {
   const url = new URL(route, 'http://local.test');
   if (!url.searchParams.has('runtimeDiagnostics')) {
     url.searchParams.set('runtimeDiagnostics', '1');
@@ -145,11 +149,21 @@ const resolveRoute = ({ route = DEFAULT_ROUTE, label, mazeSeed, pathStyle }) => 
   if (typeof mazeSeed === 'string' && mazeSeed.length > 0) {
     url.searchParams.set('mazeSeed', mazeSeed);
   }
-  if (typeof pathStyle === 'string' && pathStyle.length > 0) {
-    url.searchParams.set('pathStyle', pathStyle);
-  }
   if (!url.searchParams.has('v')) {
     url.searchParams.set('v', `${label}-${Date.now()}`);
+  }
+
+  return `${url.pathname}${url.search}`;
+};
+
+const resolveRouteWithParams = (route, params) => {
+  const url = new URL(route, 'http://local.test');
+  for (const [key, value] of Object.entries(params)) {
+    if (value === null || value === undefined) {
+      url.searchParams.delete(key);
+      continue;
+    }
+    url.searchParams.set(key, String(value));
   }
 
   return `${url.pathname}${url.search}`;
@@ -179,19 +193,30 @@ const clickPoint = async (page, point, label) => {
   await page.mouse.click(point.x, point.y);
 };
 
-const captureSurface = async ({ page, outputDir, expectedLabels = [], id, mode, overlay, timeoutMs }) => {
+const captureSurface = async ({ page, outputDir, expectedLabels = [], id, mode, overlay, route, timeoutMs, viewport }) => {
   const diagnostics = await waitForSurface(page, {
     expectedLabels,
     mode,
     overlay,
     timeoutMs
   });
+  const screenContract = buildVisualScreenContract({
+    expectedRoute: route,
+    actualUrl: page.url(),
+    expectedMode: mode,
+    expectedOverlay: overlay,
+    viewport,
+    diagnostics: diagnostics.visual
+  });
+  assertVisualScreenContract(screenContract);
   const screenshotPath = resolve(outputDir, `${id}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: false });
   return {
     id,
     screenshotPath,
-    diagnostics
+    diagnostics,
+    actualUrl: page.url(),
+    screenContract
   };
 };
 
@@ -215,6 +240,20 @@ const getMenuButtonPoints = (visual) => ({
   }
 });
 
+const collectTextLabels = (surface) => (
+  surface?.textLabels ?? surface?.diagnostics?.visual?.textLabels ?? []
+).map((entry) => entry.text);
+
+const hasTextLabels = (surface, expectedLabels) => {
+  const labels = new Set(collectTextLabels(surface));
+  return expectedLabels.every((label) => labels.has(label));
+};
+
+const isAuthGatedMenuSurface = (surface) => (
+  hasTextLabels(surface, ['Login'])
+  && !hasTextLabels(surface, ['Start', 'Options'])
+);
+
 const getPauseButtonPoint = (visual) => {
   const pause = visual?.touchControls?.controls?.pause;
   return pause
@@ -228,30 +267,21 @@ const createCheck = (id, passed, detail) => ({
   detail
 });
 
-const resolveExpectedPathVisualStyle = (targetUrl) => {
-  try {
-    return new URL(targetUrl).searchParams.get('pathStyle') === 'hybrid'
-      ? 'hybrid'
-      : 'corridor';
-  } catch {
-    return 'corridor';
-  }
-};
+const isIgnorableConsoleMessage = (message) => (
+  message.type === 'warning'
+  && typeof message.text === 'string'
+  && message.text.includes('WebGL: CONTEXT_LOST_WEBGL')
+);
 
 const buildSurfaceChecks = ({
   consoleMessages,
   pageErrors,
-  surfaces,
-  targetUrl
+  surfaces
 }) => {
-  const expectedPathVisualStyle = resolveExpectedPathVisualStyle(targetUrl);
-  const hasLabels = (surface, expectedLabels) => {
-    const labels = new Set((surface.textLabels ?? []).map((entry) => entry.text));
-    return expectedLabels.every((label) => labels.has(label));
-  };
-  const labelDetail = (surface) => (surface.textLabels ?? [])
-    .map((entry) => entry.text)
+  const hasLabels = (surface, expectedLabels) => hasTextLabels(surface, expectedLabels);
+  const labelDetail = (surface) => collectTextLabels(surface)
     .join(', ');
+  const authGated = surfaces.menu.authGated === true;
   const surfaceChecks = [
     createCheck(
       'menu-surface',
@@ -260,8 +290,12 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'options-surface',
-      surfaces.options.mode === 'menu' && surfaces.options.overlay === 'options',
-      `options mode=${surfaces.options.mode ?? 'missing'} overlay=${surfaces.options.overlay ?? 'missing'}`
+      authGated
+        ? surfaces.options.skipped === true
+        : surfaces.options.mode === 'menu' && surfaces.options.overlay === 'options',
+      authGated
+        ? `skipped=${surfaces.options.skipped === true} reason=${surfaces.options.reason ?? 'missing'}`
+        : `options mode=${surfaces.options.mode ?? 'missing'} overlay=${surfaces.options.overlay ?? 'missing'}`
     ),
     createCheck(
       'play-surface',
@@ -274,10 +308,11 @@ const buildSurfaceChecks = ({
       `pause mode=${surfaces.pause.mode ?? 'missing'} overlay=${surfaces.pause.overlay ?? 'missing'}`
     )
   ];
-  const pathStyleChecks = ['menu', 'options', 'play', 'pause'].map((id) => createCheck(
+  const pathStyleSurfaceIds = authGated ? ['menu', 'play', 'pause'] : ['menu', 'options', 'play', 'pause'];
+  const pathStyleChecks = pathStyleSurfaceIds.map((id) => createCheck(
     `${id}-path-style`,
-    surfaces[id].board?.pathVisualStyle === expectedPathVisualStyle,
-    `${id} pathVisualStyle=${surfaces[id].board?.pathVisualStyle ?? 'missing'} expected=${expectedPathVisualStyle}`
+    surfaces[id].board?.pathVisualStyle === 'corridor',
+    `${id} pathVisualStyle=${surfaces[id].board?.pathVisualStyle ?? 'missing'} expected=corridor`
   ));
   const playChecks = [
     createCheck(
@@ -304,22 +339,26 @@ const buildSurfaceChecks = ({
   const textChecks = [
     createCheck(
       'menu-text-labels',
-      hasLabels(surfaces.menu, ['Start', 'Options']),
+      authGated ? hasLabels(surfaces.menu, ['Login']) : hasLabels(surfaces.menu, ['Start', 'Options']),
       `labels=${labelDetail(surfaces.menu)}`
     ),
     createCheck(
       'options-text-labels',
-      hasLabels(surfaces.options, ['Options', 'Maze Scale', 'Camera Scale', 'Game Toggles', 'Move Speed', 'Back']),
-      `labels=${labelDetail(surfaces.options)}`
+      authGated
+        ? surfaces.options.skipped === true
+        : hasLabels(surfaces.options, ['Options', 'Maze Scale', 'Camera Scale', 'Game Toggles', 'Move Speed', 'PLAYER GUIDE', 'Back', 'Account']),
+      authGated
+        ? `skipped=${surfaces.options.skipped === true} reason=${surfaces.options.reason ?? 'missing'}`
+        : `labels=${labelDetail(surfaces.options)}`
     ),
     createCheck(
       'play-text-labels',
-      hasLabels(surfaces.play, ['PAUSE', 'RESET']),
+      hasLabels(surfaces.play, ['PAUSE']) && !hasLabels(surfaces.play, ['RESET']),
       `labels=${labelDetail(surfaces.play)}`
     ),
     createCheck(
       'pause-text-labels',
-      hasLabels(surfaces.pause, ['Paused', 'Game Toggles', 'Move Speed', 'Back', 'Reset', 'Main Menu']),
+      hasLabels(surfaces.pause, ['Paused', 'Game Toggles', 'Move Speed', 'PLAYER GUIDE', 'Account', 'Resume']) && !hasLabels(surfaces.pause, ['Reset', 'Menu']),
       `labels=${labelDetail(surfaces.pause)}`
     )
   ];
@@ -369,7 +408,9 @@ const buildMarkdownReport = (summary) => {
     '',
     `![Menu](${summary.screenshots.menu})`,
     '',
-    `![Options](${summary.screenshots.options})`,
+    summary.screenshots.options
+      ? `![Options](${summary.screenshots.options})`
+      : '_Options capture skipped because the menu is auth-gated in the captured session._',
     '',
     `![Play](${summary.screenshots.play})`,
     '',
@@ -389,8 +430,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
   const route = options.route ?? resolveRoute({
     route: DEFAULT_ROUTE,
     label,
-    mazeSeed: options.mazeSeed,
-    pathStyle: options.pathStyle
+    mazeSeed: options.mazeSeed
   });
   const consoleMessages = [];
   const pageErrors = [];
@@ -420,11 +460,12 @@ export const runUiSurfaceCapture = async (options = {}) => {
     });
     const page = await context.newPage();
     page.on('console', (message) => {
-      if (['error', 'warning'].includes(message.type())) {
-        consoleMessages.push({
-          type: message.type(),
-          text: message.text()
-        });
+      const entry = {
+        type: message.type(),
+        text: message.text()
+      };
+      if (['error', 'warning'].includes(entry.type) && !isIgnorableConsoleMessage(entry)) {
+        consoleMessages.push(entry);
       }
     });
     page.on('pageerror', (error) => {
@@ -445,47 +486,75 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const menu = await captureSurface({
       page,
       outputDir,
-      expectedLabels: ['Start', 'Options'],
+      expectedLabels: [],
       id: '01-menu',
       mode: 'menu',
       overlay: 'none',
-      timeoutMs
+      route,
+      timeoutMs,
+      viewport
     });
-    const menuButtons = getMenuButtonPoints(menu.diagnostics.visual);
+    const authGatedMenu = isAuthGatedMenuSurface(menu.diagnostics.visual);
+    const menuButtons = authGatedMenu ? null : getMenuButtonPoints(menu.diagnostics.visual);
 
-    await clickPoint(page, menuButtons.options, 'Options');
-    const optionsSurface = await captureSurface({
-      page,
-      outputDir,
-      expectedLabels: ['Options', 'Maze Scale', 'Camera Scale', 'Game Toggles', 'Move Speed', 'Back'],
-      id: '02-options',
-      mode: 'menu',
-      overlay: 'options',
-      timeoutMs
-    });
+    const optionsSurface = authGatedMenu
+      ? {
+        diagnostics: {
+          runtime: null,
+          visual: null
+        },
+        screenContract: null,
+        screenshotPath: null,
+        skipped: true,
+        reason: 'auth-gated-menu'
+      }
+      : await (async () => {
+        await clickPoint(page, menuButtons.options, 'Options');
+        const captured = await captureSurface({
+          page,
+          outputDir,
+          expectedLabels: ['Options', 'Maze Scale', 'Camera Scale', 'Game Toggles', 'Move Speed', 'PLAYER GUIDE', 'Back', 'Account'],
+          id: '02-options',
+          mode: 'menu',
+          overlay: 'options',
+          route,
+          timeoutMs,
+          viewport
+        });
+        await page.keyboard.press('Escape');
+        await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs });
+        return captured;
+      })();
 
-    await page.keyboard.press('Escape');
-    await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs });
-    await clickPoint(page, menuButtons.start, 'Start');
+    const playRoute = authGatedMenu ? resolveRouteWithParams(route, { mode: 'play', overlay: null }) : route;
+    if (authGatedMenu) {
+      await page.goto(new URL(playRoute, resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: timeoutMs });
+    } else {
+      await clickPoint(page, menuButtons.start, 'Start');
+    }
     const play = await captureSurface({
       page,
       outputDir,
-      expectedLabels: ['PAUSE', 'RESET'],
+      expectedLabels: ['PAUSE'],
       id: '03-play',
       mode: 'play',
       overlay: 'none',
-      timeoutMs
+      route: playRoute,
+      timeoutMs,
+      viewport
     });
 
     await clickPoint(page, getPauseButtonPoint(play.diagnostics.visual), 'Pause');
     const pause = await captureSurface({
       page,
       outputDir,
-      expectedLabels: ['Paused', 'Game Toggles', 'Move Speed', 'Back', 'Reset', 'Main Menu'],
+      expectedLabels: ['Paused', 'Game Toggles', 'Move Speed', 'PLAYER GUIDE', 'Account', 'Resume'],
       id: '04-pause',
       mode: 'play',
       overlay: 'pause',
-      timeoutMs
+      route: playRoute,
+      timeoutMs,
+      viewport
     });
 
     const surfaces = {
@@ -494,13 +563,21 @@ export const runUiSurfaceCapture = async (options = {}) => {
         overlay: menu.diagnostics.runtime?.surface?.overlay,
         board: menu.diagnostics.visual?.board,
         layout: menu.diagnostics.visual?.layout,
-        textLabels: menu.diagnostics.visual?.textLabels
+        textLabels: menu.diagnostics.visual?.textLabels,
+        screenContract: menu.screenContract,
+        authGated: authGatedMenu
       },
-      options: {
+      options: authGatedMenu ? {
+        skipped: true,
+        reason: 'auth-gated-menu',
+        screenContract: null,
+        textLabels: []
+      } : {
         mode: optionsSurface.diagnostics.runtime?.surface?.mode,
         overlay: optionsSurface.diagnostics.runtime?.surface?.overlay,
         board: optionsSurface.diagnostics.visual?.board,
-        textLabels: optionsSurface.diagnostics.visual?.textLabels
+        textLabels: optionsSurface.diagnostics.visual?.textLabels,
+        screenContract: optionsSurface.screenContract
       },
       play: {
         mode: play.diagnostics.runtime?.surface?.mode,
@@ -508,13 +585,15 @@ export const runUiSurfaceCapture = async (options = {}) => {
         board: play.diagnostics.visual?.board,
         markerStyle: play.diagnostics.visual?.markerStyle,
         textLabels: play.diagnostics.visual?.textLabels,
-        touchControls: play.diagnostics.visual?.touchControls
+        touchControls: play.diagnostics.visual?.touchControls,
+        screenContract: play.screenContract
       },
       pause: {
         mode: pause.diagnostics.runtime?.surface?.mode,
         overlay: pause.diagnostics.runtime?.surface?.overlay,
         board: pause.diagnostics.visual?.board,
-        textLabels: pause.diagnostics.visual?.textLabels
+        textLabels: pause.diagnostics.visual?.textLabels,
+        screenContract: pause.screenContract
       }
     };
     const screenshots = {
@@ -575,7 +654,6 @@ if (isDirectRun) {
       : typeof args.mazeSeed === 'string'
         ? args.mazeSeed
         : undefined,
-    pathStyle: typeof args['path-style'] === 'string' ? args['path-style'] : undefined,
     previewTimeoutMs: parseIntegerArg(args['preview-timeout-ms'], DEFAULT_PREVIEW_TIMEOUT_MS),
     route: typeof args.route === 'string'
       ? resolveRoute({
@@ -585,8 +663,7 @@ if (isDirectRun) {
           ? args['maze-seed']
           : typeof args.mazeSeed === 'string'
             ? args.mazeSeed
-            : undefined,
-        pathStyle: typeof args['path-style'] === 'string' ? args['path-style'] : undefined
+            : undefined
       })
       : undefined,
     sessionId: args.session,

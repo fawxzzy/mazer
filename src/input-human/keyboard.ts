@@ -37,7 +37,6 @@ const KEYBOARD_CODE_TO_ACTION: Record<string, HumanInputActionKind> = {
   KeyD: 'move_right',
   KeyP: 'pause',
   Space: 'pause',
-  KeyR: 'restart_attempt',
   KeyT: 'toggle_thoughts'
 };
 
@@ -52,7 +51,6 @@ const KEYBOARD_KEY_TO_ACTION: Record<string, HumanInputActionKind> = {
   d: 'move_right',
   p: 'pause',
   ' ': 'pause',
-  r: 'restart_attempt',
   t: 'toggle_thoughts'
 };
 

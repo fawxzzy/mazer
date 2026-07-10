@@ -23,8 +23,8 @@ export interface LegacyResetRequest {
 export const ACTIVE_PLAY_GOAL_RESET_HOLD_MS = 340;
 export const LEGACY_RESET_ENTRY_STAGE_ID: LegacyResetEntryStageId = 8;
 
-export const resolveLegacyResetAction = (mode: LegacyPlayMode): LegacyResetAction => (
-  mode === 'play' ? 'return-menu' : 'regenerate-maze'
+export const resolveLegacyResetAction = (_mode: LegacyPlayMode): LegacyResetAction => (
+  'regenerate-maze'
 );
 
 export const resolveLegacyResetEntryContract = (mode: LegacyPlayMode): LegacyResetEntryContract => ({
@@ -33,7 +33,7 @@ export const resolveLegacyResetEntryContract = (mode: LegacyPlayMode): LegacyRes
   clearsResetFlagOnConsume: true,
   consumesWhileInitialized: true,
   rearmsDelayStart: mode === 'menu',
-  returnsToTemplateLevel: mode === 'play'
+  returnsToTemplateLevel: false
 });
 
 export const createLegacyResetRequest = ({

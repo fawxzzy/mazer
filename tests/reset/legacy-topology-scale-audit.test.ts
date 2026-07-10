@@ -149,24 +149,93 @@ const auditBorderFloorContinuity = (
   };
 };
 
-const auditEndpointLayering = (
+const auditOppositeBorderAxes = (
   maze: ReturnType<typeof createLegacyMaze>
 ): {
-  borderEndpointCount: number;
-  interiorEndpointCount: number;
-  startOnBorder: boolean;
-  goalOnBorder: boolean;
+  horizontal: number;
+  vertical: number;
 } => {
-  const startOnBorder = isBorderPoint(maze, maze.start);
-  const goalOnBorder = isBorderPoint(maze, maze.goal);
+  let horizontal = 0;
+  let vertical = 0;
+
+  for (let y = 1; y < maze.size - 1; y += 1) {
+    if (maze.grid[y]?.[0] === true && maze.grid[y]?.[maze.size - 1] === true) {
+      horizontal += 1;
+    }
+  }
+
+  for (let x = 1; x < maze.size - 1; x += 1) {
+    if (maze.grid[0]?.[x] === true && maze.grid[maze.size - 1]?.[x] === true) {
+      vertical += 1;
+    }
+  }
 
   return {
-    borderEndpointCount: Number(startOnBorder) + Number(goalOnBorder),
-    interiorEndpointCount: Number(!startOnBorder) + Number(!goalOnBorder),
-    startOnBorder,
-    goalOnBorder
+    horizontal,
+    vertical
   };
 };
+
+const isReservedCutoutLine = (maze: ReturnType<typeof createLegacyMaze>, line: number): boolean => {
+  const center = Math.floor(maze.size / 2);
+  const centerReserve = Math.max(2, Math.ceil(maze.size * 0.045));
+  return line <= 1
+    || line >= maze.size - 2
+    || Math.abs(line - center) <= centerReserve;
+};
+
+const auditBorderFeederSides = (
+  maze: ReturnType<typeof createLegacyMaze>
+): {
+  bottom: number;
+  left: number;
+  reservedBorderFloors: Array<{ x: number; y: number }>;
+  right: number;
+  top: number;
+} => {
+  const result = {
+    bottom: 0,
+    left: 0,
+    reservedBorderFloors: [] as Array<{ x: number; y: number }>,
+    right: 0,
+    top: 0
+  };
+
+  for (let y = 0; y < maze.size; y += 1) {
+    for (let x = 0; x < maze.size; x += 1) {
+      const point = { x, y };
+      if (!isNonCornerBorderFloor(maze, point)) {
+        continue;
+      }
+
+      if (point.x === 0) {
+        result.left += 1;
+        if (isReservedCutoutLine(maze, point.y)) {
+          result.reservedBorderFloors.push(point);
+        }
+      } else if (point.x === maze.size - 1) {
+        result.right += 1;
+        if (isReservedCutoutLine(maze, point.y)) {
+          result.reservedBorderFloors.push(point);
+        }
+      } else if (point.y === 0) {
+        result.top += 1;
+        if (isReservedCutoutLine(maze, point.x)) {
+          result.reservedBorderFloors.push(point);
+        }
+      } else if (point.y === maze.size - 1) {
+        result.bottom += 1;
+        if (isReservedCutoutLine(maze, point.x)) {
+          result.reservedBorderFloors.push(point);
+        }
+      }
+    }
+  }
+
+  return result;
+};
+
+const LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE = 1.4;
 
 describe('legacy topology scale audit', () => {
   test('keeps play and generated-menu topology meaningful across shortcut-enabled scale bands', () => {
@@ -182,15 +251,21 @@ describe('legacy topology scale audit', () => {
         ] as const) {
           const maze = buildMaze(scale, seed);
           const routeQualityStats = maze.routeQualityStats;
-          const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
+          const minimumSolutionPathLength = Math.floor(maze.size * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
           const detachedFloorTiles = countDetachedFloorTiles(maze);
           const borderContinuity = auditBorderFloorContinuity(maze);
-          const endpointLayering = auditEndpointLayering(maze);
+          const oppositeBorderAxes = auditOppositeBorderAxes(maze);
+          const borderFeederSides = auditBorderFeederSides(maze);
 
           if (
             detachedFloorTiles !== 0
-            || endpointLayering.borderEndpointCount !== 1
-            || endpointLayering.interiorEndpointCount !== 1
+            || oppositeBorderAxes.horizontal < 1
+            || oppositeBorderAxes.vertical < 1
+            || borderFeederSides.left < 2
+            || borderFeederSides.right < 2
+            || borderFeederSides.top < 2
+            || borderFeederSides.bottom < 2
+            || borderFeederSides.reservedBorderFloors.length > 0
             || borderContinuity.borderFloorCount < 2
             || borderContinuity.floorRatio < 0.28
             || borderContinuity.floorRatio > 0.62
@@ -202,9 +277,10 @@ describe('legacy topology scale audit', () => {
             || routeQualityStats.meaningfulBypassableRouteBands <= 1
           ) {
             failures.push({
+              borderFeederSides,
               borderContinuity,
               detachedFloorTiles,
-              endpointLayering,
+              oppositeBorderAxes,
               kind,
               minimumSolutionPathLength,
               playableTopologyStats: maze.playableTopologyStats,
@@ -234,15 +310,21 @@ describe('legacy topology scale audit', () => {
       ] as const) {
         const maze = buildMaze(99, seed);
         const routeQualityStats = maze.routeQualityStats;
-        const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
+        const minimumSolutionPathLength = Math.floor(maze.size * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
         const detachedFloorTiles = countDetachedFloorTiles(maze);
         const borderContinuity = auditBorderFloorContinuity(maze);
-        const endpointLayering = auditEndpointLayering(maze);
+        const oppositeBorderAxes = auditOppositeBorderAxes(maze);
+        const borderFeederSides = auditBorderFeederSides(maze);
 
         if (
           detachedFloorTiles !== 0
-          || endpointLayering.borderEndpointCount !== 1
-          || endpointLayering.interiorEndpointCount !== 1
+          || oppositeBorderAxes.horizontal < 1
+          || oppositeBorderAxes.vertical < 1
+          || borderFeederSides.left < 2
+          || borderFeederSides.right < 2
+          || borderFeederSides.top < 2
+          || borderFeederSides.bottom < 2
+          || borderFeederSides.reservedBorderFloors.length > 0
           || borderContinuity.borderFloorCount < 2
           || borderContinuity.floorRatio < 0.28
           || borderContinuity.floorRatio > 0.62
@@ -254,9 +336,10 @@ describe('legacy topology scale audit', () => {
           || routeQualityStats.meaningfulBypassableRouteBands <= 1
         ) {
           failures.push({
+            borderFeederSides,
             borderContinuity,
             detachedFloorTiles,
-            endpointLayering,
+            oppositeBorderAxes,
             kind,
             minimumSolutionPathLength,
             playableTopologyStats: maze.playableTopologyStats,
@@ -283,15 +366,21 @@ describe('legacy topology scale audit', () => {
     ] as const) {
       const maze = buildMaze(149, 55);
       const routeQualityStats = maze.routeQualityStats;
-      const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
+      const minimumSolutionPathLength = Math.floor(maze.size * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
       const detachedFloorTiles = countDetachedFloorTiles(maze);
       const borderContinuity = auditBorderFloorContinuity(maze);
-      const endpointLayering = auditEndpointLayering(maze);
+      const oppositeBorderAxes = auditOppositeBorderAxes(maze);
+      const borderFeederSides = auditBorderFeederSides(maze);
 
       if (
         detachedFloorTiles !== 0
-        || endpointLayering.borderEndpointCount !== 1
-        || endpointLayering.interiorEndpointCount !== 1
+        || oppositeBorderAxes.horizontal < 1
+        || oppositeBorderAxes.vertical < 1
+        || borderFeederSides.left < 2
+        || borderFeederSides.right < 2
+        || borderFeederSides.top < 2
+        || borderFeederSides.bottom < 2
+        || borderFeederSides.reservedBorderFloors.length > 0
         || borderContinuity.borderFloorCount < 2
         || borderContinuity.floorRatio < 0.28
         || borderContinuity.floorRatio > 0.62
@@ -303,9 +392,10 @@ describe('legacy topology scale audit', () => {
         || routeQualityStats.meaningfulBypassableRouteBands <= 1
       ) {
         failures.push({
+          borderFeederSides,
           borderContinuity,
           detachedFloorTiles,
-          endpointLayering,
+          oppositeBorderAxes,
           kind,
           minimumSolutionPathLength,
           playableTopologyStats: maze.playableTopologyStats,

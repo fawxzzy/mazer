@@ -13,17 +13,21 @@
 - Enable service worker only in production builds/deploys.
 
 ## Asset policy
-- Treat these as provided repository assets (do not generate, re-encode, or replace in implementation tasks):
-  - `/public/favicon.svg`
-  - `/public/apple-touch-icon.png`
+- Treat these as repository-owned brand assets generated from the current Mazer source icon:
+  - `/public/icons/mazer-app-icon.ico`
+  - `/public/icons/mazer-app-icon.png`
+  - `/public/icons/apple-touch-icon.png`
   - `/public/icons/icon-192.png`
   - `/public/icons/icon-512.png`
   - `/public/icons/icon-192-maskable.png`
   - `/public/icons/icon-512-maskable.png`
+- The current durable source/reference copy lives under the Atlas data layer:
+  - `data/atlas/brand/mazer/mazer-app-icon-2026-07-09-source.png`
+  - `data/atlas/ui-visual-proof/mazer/app-icon-2026-07-09/reference.png`
 
 ## Installability checks
 - Confirm `manifest.webmanifest` references all provided icon binaries.
-- Confirm `index.html` links include favicon, apple-touch icon, and manifest.
+- Confirm `index.html` links include ICO favicon, PNG favicon sizes, apple-touch icon, and manifest.
 - Confirm production build emits PWA registration plumbing.
 - Confirm localhost development does not register a service worker.
 

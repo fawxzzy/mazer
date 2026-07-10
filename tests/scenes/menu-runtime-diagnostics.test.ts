@@ -296,6 +296,27 @@ describe('menu runtime diagnostics', () => {
         mode: 'menu',
         overlay: 'none'
       },
+      auth: {
+        configured: true,
+        displayName: 'Mazer Owner',
+        email: 'fawxzzy@example.test',
+        emailPresent: true,
+        formMode: 'login',
+        rememberedIdentity: {
+          displayName: 'Mazer Owner',
+          email: 'fawxzzy@example.test',
+          sessionState: 'ready',
+          updatedAt: '2026-07-09T12:00:00.000Z'
+        },
+        status: 'authenticated',
+        userIdPresent: true,
+        latestMessage: {
+          copy: 'Signed in.',
+          id: 'auth:signed-in',
+          source: 'auth',
+          tone: 'success'
+        }
+      },
       gameToggles: {
         animatedBackdrop: {
           enabled: false,
@@ -560,7 +581,8 @@ describe('menu runtime diagnostics', () => {
         runnerPolicy: {
           wrongBranchCount: 2,
           backtrackCount: 5,
-          recoveryCount: 2
+          recoveryCount: 2,
+          optionalRetargetCount: 1
         },
         intentEntryCount: 0,
         intentEntryCap: 0,
@@ -602,6 +624,15 @@ describe('menu runtime diagnostics', () => {
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )?.play?.inputBuffer.touchSprint.turnDelayMs).toBe(254);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.auth?.status)
+        .toBe('authenticated');
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.auth?.rememberedIdentity?.sessionState)
+        .toBe('ready');
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.auth?.latestMessage?.copy)
+        .toBe('Signed in.');
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.auth?.userIdPresent).toBe(true);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.animatedBackdrop.stateText)
         .toBe('Stagnant');
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.darkMode.stateText)

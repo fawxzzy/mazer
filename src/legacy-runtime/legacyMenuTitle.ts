@@ -142,20 +142,20 @@ export const resolveLegacyMenuTitlePresentation = (
   viewportWidth = boardSize,
   surface: LegacyMenuTitleSurface = 'snapshot'
 ): LegacyMenuTitlePresentation => {
+  const isProceduralPortrait = isPortrait && surface === 'procedural';
   const baseFontSize = Math.max(
     isPortrait ? 78 : 142,
-    Math.round(boardSize * (isPortrait ? 0.205 : 0.226))
+    Math.round(boardSize * (isProceduralPortrait ? 0.265 : (isPortrait ? 0.205 : 0.226)))
   );
   const isUltraNarrow = isPortrait && viewportWidth < 360;
-  const isProceduralPortrait = isPortrait && surface === 'procedural';
   const isProceduralUltraNarrow = isUltraNarrow && surface === 'procedural';
   const fontSize = isUltraNarrow
     ? Math.round(Math.min(
       baseFontSize,
-      Math.max(isProceduralUltraNarrow ? 34 : 42, viewportWidth * (isProceduralUltraNarrow ? 0.2 : 0.3))
+      Math.max(isProceduralUltraNarrow ? 46 : 42, viewportWidth * (isProceduralUltraNarrow ? 0.24 : 0.3))
     ))
     : isProceduralPortrait
-      ? Math.round(Math.min(baseFontSize, Math.max(54, viewportWidth * 0.16)))
+      ? Math.round(Math.min(baseFontSize, Math.max(72, viewportWidth * 0.255)))
     : baseFontSize;
   const shadowOffsetX = isUltraNarrow
     ? Math.max(2, Math.round(fontSize * 0.07))

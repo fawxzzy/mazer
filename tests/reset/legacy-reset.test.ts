@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest';
 import { LEGACY_DEFAULTS, MAIN_MENU_BUTTONS, linearColorToHex } from '../../src/legacy-runtime/legacyDefaults';
-import { createLegacyGeneratedMenuMaze, createLegacyMaze, createLegacyMenuMaze } from '../../src/legacy-runtime/legacyMaze';
+import {
+  createLegacyGeneratedMenuMaze,
+  createLegacyMaze,
+  createLegacyMenuMaze,
+  isLegacyWrappedStepTransition
+} from '../../src/legacy-runtime/legacyMaze';
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
@@ -86,17 +91,6 @@ const isEndpointOnMazeBorder = (
   point.x === 0 || point.y === 0 || point.x === maze.size - 1 || point.y === maze.size - 1
 );
 
-const collectBorderEndpointRoles = (maze: ReturnType<typeof createLegacyMaze>): Array<'start' | 'goal'> => {
-  const roles: Array<'start' | 'goal'> = [];
-  if (isEndpointOnMazeBorder(maze, maze.start)) {
-    roles.push('start');
-  }
-  if (isEndpointOnMazeBorder(maze, maze.goal)) {
-    roles.push('goal');
-  }
-  return roles;
-};
-
 const isNonCornerBorderFloor = (
   maze: ReturnType<typeof createLegacyMaze>,
   point: { x: number; y: number }
@@ -148,6 +142,27 @@ const collectUnpairedBorderFloorBleeds = (
   return failures;
 };
 
+const collectOppositeBorderAxisConnections = (
+  maze: ReturnType<typeof createLegacyMaze>
+): { horizontal: number; vertical: number } => {
+  let horizontal = 0;
+  let vertical = 0;
+
+  for (let y = 1; y < maze.size - 1; y += 1) {
+    if (maze.grid[y]?.[0] === true && maze.grid[y]?.[maze.size - 1] === true) {
+      horizontal += 1;
+    }
+  }
+
+  for (let x = 1; x < maze.size - 1; x += 1) {
+    if (maze.grid[0]?.[x] === true && maze.grid[maze.size - 1]?.[x] === true) {
+      vertical += 1;
+    }
+  }
+
+  return { horizontal, vertical };
+};
+
 const DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS = [
   ...Array.from({ length: 64 }, (_, index) => index + 1),
   89,
@@ -158,6 +173,8 @@ const DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS = [
   1001,
   0x5a17f00d
 ];
+
+const LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE = 1.4;
 
 const expectScaledMenuTile = (
   maze: ReturnType<typeof createLegacyMenuMaze>,
@@ -190,7 +207,8 @@ describe('legacy reset lane', () => {
     expect(linearColorToHex(LEGACY_DEFAULTS.pathColor)).toBe('#797978');
     expect(linearColorToHex(LEGACY_DEFAULTS.wallColor)).toBe('#4a4a4a');
     expect(LEGACY_DEFAULTS.toggleTrailPulse).toBe(true);
-    expect(LEGACY_DEFAULTS.toggleAnimatedBackdrop).toBe(false);
+    expect(LEGACY_DEFAULTS.darkMode).toBe(true);
+    expect(LEGACY_DEFAULTS.toggleAnimatedBackdrop).toBe(true);
   });
 
   test('builds a solvable legacy maze snapshot', () => {
@@ -215,14 +233,22 @@ describe('legacy reset lane', () => {
     expect(lastStep).toEqual(maze.goal);
   });
 
+  test('classifies opposite-edge neighbor transitions as wrapped steps for visual snapping', () => {
+    expect(isLegacyWrappedStepTransition({ x: 0, y: 12 }, { x: 49, y: 12 })).toBe(true);
+    expect(isLegacyWrappedStepTransition({ x: 27, y: 49 }, { x: 27, y: 0 })).toBe(true);
+    expect(isLegacyWrappedStepTransition({ x: 12, y: 12 }, { x: 13, y: 12 })).toBe(false);
+    expect(isLegacyWrappedStepTransition({ x: 12, y: 12 }, { x: 12, y: 13 })).toBe(false);
+  });
+
   test('normalizes generated play mazes into one playable floor component', () => {
     for (const seed of [3749, 0x5a17f00d, 2, 777, 1001]) {
       const maze = createLegacyMaze(50, seed);
-      const borderEndpointRoles = collectBorderEndpointRoles(maze);
+      const borderAxisConnections = collectOppositeBorderAxisConnections(maze);
 
       expect(countDetachedFloorTiles(maze)).toBe(0);
       expect(collectUnpairedBorderFloorBleeds(maze)).toEqual([]);
-      expect(borderEndpointRoles.length).toBeGreaterThanOrEqual(1);
+      expect(borderAxisConnections.horizontal).toBeGreaterThanOrEqual(1);
+      expect(borderAxisConnections.vertical).toBeGreaterThanOrEqual(1);
       expect(maze.solutionPath.length).toBeGreaterThanOrEqual(Math.floor(maze.size * 1.5));
       expect(maze.playableTopologyStats?.reachableFloors).toBeGreaterThan(maze.solutionPath.length);
       expect(maze.playableTopologyStats?.disconnectedFloorTilesPruned).toBeGreaterThan(0);
@@ -263,20 +289,18 @@ describe('legacy reset lane', () => {
 
   test('keeps default generated play mazes connected with meaningful alternate routes across seed families', () => {
     const failures: unknown[] = [];
-    const borderEndpointRoles = new Set<'start' | 'goal'>();
 
     for (const seed of DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS) {
       const maze = createLegacyMaze(50, seed);
-      for (const role of collectBorderEndpointRoles(maze)) {
-        borderEndpointRoles.add(role);
-      }
 
       expect(maze.source).toBe('play-generated');
       expect(countDetachedFloorTiles(maze)).toBe(0);
       const unpairedBorderBleeds = collectUnpairedBorderFloorBleeds(maze);
-      const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
+      const borderAxisConnections = collectOppositeBorderAxisConnections(maze);
+      const minimumSolutionPathLength = Math.floor(maze.size * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
       if (
-        collectBorderEndpointRoles(maze).length < 1
+        borderAxisConnections.horizontal < 1
+        || borderAxisConnections.vertical < 1
         || unpairedBorderBleeds.length > 0
         || maze.solutionPath[0]?.x !== maze.start.x
         || maze.solutionPath[0]?.y !== maze.start.y
@@ -298,32 +322,29 @@ describe('legacy reset lane', () => {
           routeQualityStats: maze.routeQualityStats,
           shortcutStats: maze.shortcutStats,
           unpairedBorderBleeds,
+          borderAxisConnections,
           solutionPathLength: maze.solutionPath.length
         });
       }
     }
 
     expect(failures).toEqual([]);
-    expect(borderEndpointRoles.has('start')).toBe(true);
-    expect(borderEndpointRoles.has('goal')).toBe(true);
   }, 20_000);
 
   test('keeps default generated menu mazes connected with meaningful alternate routes across seed families', () => {
     const failures: unknown[] = [];
-    const borderEndpointRoles = new Set<'start' | 'goal'>();
 
     for (const seed of DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS) {
       const maze = createLegacyGeneratedMenuMaze(50, seed);
-      for (const role of collectBorderEndpointRoles(maze)) {
-        borderEndpointRoles.add(role);
-      }
 
       expect(maze.source).toBe('menu-generated');
       expect(countDetachedFloorTiles(maze)).toBe(0);
       const unpairedBorderBleeds = collectUnpairedBorderFloorBleeds(maze);
-      const minimumSolutionPathLength = Math.floor(maze.size * 1.5);
+      const borderAxisConnections = collectOppositeBorderAxisConnections(maze);
+      const minimumSolutionPathLength = Math.floor(maze.size * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
       if (
-        collectBorderEndpointRoles(maze).length < 1
+        borderAxisConnections.horizontal < 1
+        || borderAxisConnections.vertical < 1
         || unpairedBorderBleeds.length > 0
         || maze.solutionPath[0]?.x !== maze.start.x
         || maze.solutionPath[0]?.y !== maze.start.y
@@ -345,17 +366,16 @@ describe('legacy reset lane', () => {
           routeQualityStats: maze.routeQualityStats,
           shortcutStats: maze.shortcutStats,
           unpairedBorderBleeds,
+          borderAxisConnections,
           solutionPathLength: maze.solutionPath.length
         });
       }
     }
 
     expect(failures).toEqual([]);
-    expect(borderEndpointRoles.has('start')).toBe(true);
-    expect(borderEndpointRoles.has('goal')).toBe(true);
   }, 20_000);
 
-  test('pairs generated edge-dock paths with exact opposite border continuations', () => {
+  test('pairs generated edge-dock paths with exact opposite border continuations on both axes', () => {
     const factories = [
       { label: 'play', create: createLegacyMaze },
       { label: 'menu', create: createLegacyGeneratedMenuMaze }
@@ -364,8 +384,11 @@ describe('legacy reset lane', () => {
     for (const factory of factories) {
       for (const seed of [3749, 0x5a17f00d, 2, 777, 1001, 1, 3, 4, 5, 6]) {
         const maze = factory.create(50, seed);
+        const borderAxisConnections = collectOppositeBorderAxisConnections(maze);
 
         expect(collectUnpairedBorderFloorBleeds(maze), `${factory.label}:${seed}`).toEqual([]);
+        expect(borderAxisConnections.horizontal, `${factory.label}:${seed}`).toBeGreaterThanOrEqual(1);
+        expect(borderAxisConnections.vertical, `${factory.label}:${seed}`).toBeGreaterThanOrEqual(1);
         expect(countDetachedFloorTiles(maze), `${factory.label}:${seed}`).toBe(0);
       }
     }
@@ -492,24 +515,28 @@ describe('legacy reset lane', () => {
     expect(episode.raster.endIndex).toBe((maze.goal.y * maze.size) + maze.goal.x);
     expect(Array.from(episode.raster.pathIndices).at(0)).toBe(episode.raster.startIndex);
     expect(Array.from(episode.raster.pathIndices).at(-1)).toBe(episode.raster.endIndex);
-    expect(config.behavior.enableRunnerMistakes).toBe(false);
-    expect(telemetry.backtrackCount).toBe(0);
+    expect(config.behavior.enableRunnerMistakes).toBe(true);
+    expect(config.behavior.runnerThinkingModel).toBe('human-local-memory');
+    expect(config.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
+    expect(telemetry.backtrackCount).toBeGreaterThanOrEqual(0);
     expect(episode.shortcutsCreated).toBe(maze.shortcutsCreated);
     expect(resolveLegacyPointFromDemoIndex(state.currentIndex, episode.raster.width)).toEqual(maze.start);
     expect(resolveLegacyTrailFromDemoSteps(state.trailSteps, episode.raster.width)).toEqual([maze.start]);
   });
 
-  test('uses clean solver AI config for the fixed legacy menu snapshot', () => {
+  test('uses human local-memory AI config for the fixed legacy menu snapshot', () => {
     const snapshotConfig = createLegacyMenuSnapshotDemoWalkerConfig(3749);
     const genericConfig = createLegacyMenuDemoWalkerConfig(3749);
 
-    expect(snapshotConfig.behavior.enableRunnerMistakes).toBe(false);
+    expect(snapshotConfig.behavior.enableRunnerMistakes).toBe(true);
+    expect(snapshotConfig.behavior.runnerThinkingModel).toBe('human-local-memory');
     expect(snapshotConfig.behavior.prerollSteps).toBe(0);
     expect(snapshotConfig.cadence.exploreStepMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.exploreStepMs);
     expect(snapshotConfig.cadence.backtrackStepMs).toBe(LEGACY_MENU_SNAPSHOT_CADENCE.backtrackStepMs);
     expect(snapshotConfig.cadence.goalHoldMs).toBe(0);
     expect(snapshotConfig.cadence.resetHoldMs).toBe(0);
-    expect(genericConfig.behavior.enableRunnerMistakes).toBe(false);
+    expect(genericConfig.behavior.enableRunnerMistakes).toBe(true);
+    expect(genericConfig.behavior.runnerThinkingModel).toBe('human-local-memory');
     expect(genericConfig.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
     expect(genericConfig.behavior.prerollSteps).toBe(0);
     expect(snapshotConfig.behavior.emulateLogicSwitchPotentialCheckBug).toBe(false);
@@ -667,8 +694,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('&& shouldConsumeLegacyGenerationRequest(nextRequest, time)');
     expect(menuSceneSource).toContain('const generationState = consumeLegacyGenerationRequestState(request, request.budget.scale);');
     expect(menuSceneSource).toContain("scale: this.resolveLegacyProgressionScaleForMode('menu')");
-    expect(menuSceneSource).toContain('scale: this.resolveLegacyProgressionScaleForMode(this.mode)');
+    expect(menuSceneSource).toContain('scale: this.resolveLegacyProgressionScaleForMode(mode)');
     expect(menuSceneSource).toContain('if (generationState.startsPlayTimer) {');
+    expect(menuSceneSource).toContain('this.playStartedAtMs = Math.max(this.time.now, this.resolveLegacyMenuStaticDrawDemoGateAtMs());');
     expect(menuSceneSource).toContain('private menuStaticDrawRowsVisible: number | null = null;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;');
@@ -691,6 +719,10 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private menuStaticDrawVisibleTileKeys = new Set<string>();');
     expect(menuSceneSource).toContain('this.armLegacyMenuStaticDrawStage();');
     expect(menuSceneSource).toContain('this.nextDemoMoveAtMs = Math.max(this.nextDemoMoveAtMs, this.resolveLegacyMenuStaticDrawDemoGateAtMs());');
+    expect(menuSceneSource).toContain('private releaseLegacyMenuDemoGateOnStaticDrawSettled(time: number): void');
+    expect(menuSceneSource).toContain('this.nextDemoMoveAtMs = Math.min(this.nextDemoMoveAtMs, time);');
+    expect(menuSceneSource).toContain('this.menuDemoCycleStartedAtMs = time;');
+    expect(menuSceneSource).toContain('this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);');
     expect(menuSceneSource).toContain('private advanceLegacyMenuStaticDrawStage(time: number): void {');
     expect(menuSceneSource).toContain('this.menuStaticDrawTilesVisible = Math.min(');
     expect(menuSceneSource).toContain('this.menuStaticDrawRowsVisible = Math.min(this.maze.size, this.menuStaticDrawRowsVisible + batchSize);');
@@ -738,7 +770,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.armLegacyMenuStaticDeconstructStage(time);');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase !== 'deconstructing'");
     expect(menuSceneSource).toContain('const resolvedTrailAlpha = trailAlpha * menuTrailAlphaMultiplier;');
-    expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.resolveLegacyPointPathSource(visibleTrail);');
+    expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.maze;');
     expect(menuSceneSource).toContain('private drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('handoffDurationMs: LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS');
     expect(menuSceneSource).toContain('handoffEndsAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null');
@@ -753,7 +785,12 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.isLegacyMenuPointVisibleInStaticDraw(this.player)');
     expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });");
     expect(menuSceneSource).toContain("this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });");
-    expect(menuSceneSource).toContain('this.pendingGenerationRequest = createLegacyMenuResetGenerationRequest({');
+    expect(menuSceneSource).toContain('createLegacyPlayResetGenerationRequest({');
+    expect(menuSceneSource).toContain("scale: this.resolveLegacyProgressionScaleForMode('play')");
+    expect(menuSceneSource).toContain("if (request.mode === 'play') {");
+    expect(menuSceneSource).toContain('this.armLegacyMenuStaticDeconstructStage(time);');
+    expect(menuSceneSource).toContain("reason === 'menu-demo-goal-reset' || reason === 'play-goal-reset'");
+    expect(menuSceneSource).toContain('createLegacyMenuResetGenerationRequest({');
     expect(menuSceneSource).toContain('nowMs: time,');
     expect(menuSceneSource).toContain('pendingRequest: {');
     expect(menuSceneSource).toContain('budget: {');
@@ -810,10 +847,12 @@ describe('legacy reset lane', () => {
     expect(pauseLifecycleSource).toContain("type LegacyPauseCommand = 'reset-player' | 'return-menu' | 'resume';");
     expect(pauseLifecycleSource).toContain('resolveLegacyPauseCommand');
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('resume')");
-    expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('reset-player')");
-    expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('return-menu')");
+    expect(menuSceneSource).toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
+    expect(menuSceneSource).toContain("const mainMenuAction = (): void => this.applyLegacyPauseCommand('return-menu');");
     expect(menuSceneSource).toContain('private applyLegacyPauseCommand(command: LegacyPauseCommand): void {');
     expect(menuSceneSource).toContain('const result = resolveLegacyPauseCommand(command, this.maze.start, this.trail);');
+    expect(menuSceneSource).toContain('this.playCyclePath = [copyPoint(result.nextPlayer)];');
+    expect(menuSceneSource).toContain('this.playCycleResetUsed = true;');
     expect(playLifecycleSource).toContain('resolveLegacyResetEntryContract');
     expect(playLifecycleSource).toContain('entryStageId: LEGACY_RESET_ENTRY_STAGE_ID');
     expect(playLifecycleSource).toContain('bypassesLevelBuildingDelay: true');
@@ -883,6 +922,10 @@ describe('legacy reset lane', () => {
     expect(overlayFieldCommitSource).toContain('triggersReloadOnBack');
     expect(overlayFieldCommitSource).toContain('triggersCameraFlag');
     expect(menuSceneSource).toContain("const result = applyLegacyOverlayFieldCommit(this.settings, this.optionFieldDrafts, fieldId);");
+    expect(menuSceneSource).toContain('resolveLegacyOverlayFieldCommitMessage(');
+    expect(menuSceneSource).toContain('this.resolveLegacyOverlayFieldMessageLabel(fieldId)');
+    expect(menuSceneSource).toContain('this.resolveLegacyOverlayFieldMessageState(fieldId)');
+    expect(menuSceneSource).toContain("this.commitOverlayField(fieldId, { announce: false });");
     expect(menuSceneSource).toContain('if (result.triggersReloadOnBack) {');
     expect(menuSceneSource).toContain('if (result.refreshLayout) {');
     expect(legacyPauseMenuSource).toContain('ScaleNumChanged = true;');

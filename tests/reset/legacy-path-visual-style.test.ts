@@ -9,9 +9,9 @@ describe('legacy path visual style route flag', () => {
     expect(resolveLegacyPathVisualStyle('?pathStyle=debug')).toBe('corridor');
   });
 
-  test('enables the hybrid tile-cue research style by route flag only', () => {
-    expect(resolveLegacyPathVisualStyle('?pathStyle=hybrid')).toBe('hybrid');
-    expect(resolveLegacyPathVisualStyle(new URLSearchParams('pathStyle=HYBRID'))).toBe('hybrid');
+  test('keeps the shipping style corridor-only even when stale URLs request hybrid', () => {
+    expect(resolveLegacyPathVisualStyle('?pathStyle=hybrid')).toBe('corridor');
+    expect(resolveLegacyPathVisualStyle(new URLSearchParams('pathStyle=HYBRID'))).toBe('corridor');
     expect(resolveLegacyPathVisualStyle('?pathStyle=corridor')).toBe('corridor');
   });
 });

@@ -10,7 +10,7 @@ Executed state:
 
 - Marker A, Text And Chrome Readability: landed for the current mobile proof route. Phaser text now uses shared UI font/padding defaults and the Phaser renderer is configured for anti-aliased text instead of pixel-art texture generation.
 - Marker B, Menu Stack Centering: landed for portrait menu composition. The menu stack now computes board/title/button placement as one group instead of using a fixed top-biased board position.
-- Marker C, Maze Visual Language: partially landed as a route-flagged research preset. Default remains `corridor`; `?pathStyle=hybrid` overlays subtle tile-scale cues without changing the default.
+- Marker C, Maze Visual Language: locked to the connected `corridor` renderer. The former route-flagged hybrid/tile-cue preset is retired because it could make cached/debug sessions read as blockier square tiles.
 - Marker D, Glass Wall And Border System: landed for the current top-down surface with flatter translucent wall/board treatment and retained sigil border.
 - Marker F, Verification Harness: landed for the first reusable surface packet through `npm run visual:ui-surfaces`.
 - Marker E, Toggle Contract Audit: intentionally deferred beyond the already-fixed trail pulse/menu parity and existing persisted game-toggle checks; next work should audit any newly exposed path/wall/trail visual presets before adding options UI.
@@ -20,13 +20,12 @@ Proof:
 - `npm run test`: passed `27` files / `175` tests.
 - `npm run verify`: passed `27` files / `175` tests plus production build.
 - `npm run visual:ui-surfaces -- --skip-build --label ui-surfaces-corridor-asserted-seed3749 --maze-seed 3749`: passed with report at `C:\ATLAS\tmp\captures\mazer-ui-surfaces\2026-07-08T02-16-04-576Z\report.md`.
-- `npm run visual:ui-surfaces -- --skip-build --label ui-surfaces-hybrid-asserted-seed3749 --maze-seed 3749 --path-style hybrid`: passed with report at `C:\ATLAS\tmp\captures\mazer-ui-surfaces\2026-07-08T02-16-15-653Z\report.md`.
 - `npm run live:play-qa -- --skip-build --label ui-surfaces-final-live-qa --movement-speed 0.38 --move-cap 420`: passed, reached goal in `140` moves at `60 FPS`.
 
 Current visual decision:
 
 - Keep `corridor` as the default. It remains cleaner and less busy.
-- Keep `hybrid` behind the URL flag until direct mobile play review says the tile cues help more than they distract.
+- Do not expose a route flag that can switch the shipping maze away from connected corridors.
 
 ## Current Evidence
 
@@ -113,13 +112,13 @@ Candidate presets:
 
 - `corridor`: current connected path renderer. Cleanest, least tile-count explicit.
 - `tile-square`: every walkable tile drawn as a visible square. Most explicit, likely chunkier.
-- `hybrid`: connected corridor base plus subtle tile occupancy cues near player/trail or as low-alpha grid ticks.
+- retired hybrid/tile-cue research preset: useful for comparison, not supported in the shipping route.
 
 Recommended first implementation:
 
 - Add a renderer-level preset behind diagnostics or local setting first.
 - Compare screenshots for menu and play before exposing it in the options UI.
-- If `hybrid` wins, expose it as `Path Style` later.
+- If tile-count clarity becomes necessary, prototype it in a separate proof route without changing the shipping route.
 
 Exit conditions:
 
@@ -177,7 +176,7 @@ Current option fields:
 
 Settings missing from the toggle/options model:
 
-- Path visual style: corridor, tile-square, hybrid.
+- Path visual style: corridor only in shipping; tile-square or hybrid ideas stay proof-only.
 - Wall glass strength or wall visual preset.
 - Trail style: tile squares, connected ribbon, pulse-only emphasis.
 - Menu demo trail pulse behavior. Current pulse is play-only.
@@ -218,7 +217,7 @@ Required proof for next implementation pass:
 
 Implemented automation extension:
 
-- `npm run visual:ui-surfaces` captures menu/options/play/pause screenshots, checks runtime/visual diagnostics, asserts player/goal colors, asserts stick control visibility, validates path-style reflection, and writes a markdown report beside the screenshots.
+- `npm run visual:ui-surfaces` captures menu/options/play/pause screenshots, checks runtime/visual diagnostics, asserts player/goal colors, asserts stick control visibility, validates corridor-only path style, and writes a markdown report beside the screenshots.
 
 Recommended next automation extension:
 
@@ -240,4 +239,4 @@ No external blockers are known.
 
 ## Key Decision Needed Later
 
-Do not decide tile-square vs corridor permanently from code alone. The next pass should create proof screenshots for at least `corridor` and one `hybrid` option so the choice can be made visually without losing the current clean readability.
+The current shipping decision is corridor-only. Any renewed tile-square or hybrid comparison should happen in an isolated proof lane so the clean connected-maze route cannot regress.

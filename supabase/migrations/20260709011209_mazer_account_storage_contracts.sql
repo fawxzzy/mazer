@@ -76,62 +76,6 @@ comment on table public.mazer_cycle_receipts is
 comment on column public.mazer_cycle_receipts.receipt is
   'Optional compact receipt payload. Keep bounded; do not store long raw frame/event streams here.';
 
-create table if not exists public.mazer_license_accounts (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  stripe_customer_id text unique,
-  billing_email text,
-  livemode boolean not null default false,
-  created_at timestamp with time zone not null default now(),
-  updated_at timestamp with time zone not null default now()
-);
-
-comment on table public.mazer_license_accounts is
-  'Server-owned mapping between a Mazer auth user and Stripe customer state. Users can read their own row only.';
-
-create table if not exists public.mazer_license_entitlements (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  entitlement_key text not null check (entitlement_key ~ '^[a-z0-9][a-z0-9_-]{0,63}$'),
-  status text not null default 'active' check (status in ('active', 'trialing', 'past_due', 'canceled', 'revoked', 'expired')),
-  source_kind text not null check (source_kind in ('stripe_checkout', 'stripe_subscription', 'stripe_admin', 'migration')),
-  stripe_customer_id text,
-  stripe_checkout_session_id text unique,
-  stripe_subscription_id text,
-  stripe_price_id text,
-  current_period_start timestamp with time zone,
-  current_period_end timestamp with time zone,
-  granted_at timestamp with time zone not null default now(),
-  revoked_at timestamp with time zone,
-  metadata jsonb not null default '{}'::jsonb check (jsonb_typeof(metadata) = 'object'),
-  created_at timestamp with time zone not null default now(),
-  updated_at timestamp with time zone not null default now()
-);
-
-comment on table public.mazer_license_entitlements is
-  'Server-owned Mazer payment-wall/license entitlements derived from verified Stripe events or admin migration.';
-comment on column public.mazer_license_entitlements.metadata is
-  'Small server-written entitlement metadata. Never use client-written data to authorize paid access.';
-
-create table if not exists public.mazer_license_events (
-  id uuid primary key default gen_random_uuid(),
-  stripe_event_id text not null unique,
-  event_type text not null,
-  livemode boolean not null,
-  api_version text,
-  stripe_created_at timestamp with time zone,
-  user_id uuid references auth.users(id) on delete set null,
-  payload jsonb not null default '{}'::jsonb check (jsonb_typeof(payload) = 'object'),
-  processing_status text not null default 'pending' check (processing_status in ('pending', 'processed', 'failed', 'ignored')),
-  error text,
-  processed_at timestamp with time zone,
-  created_at timestamp with time zone not null default now()
-);
-
-comment on table public.mazer_license_events is
-  'Server-only Stripe webhook receipt ledger for idempotency, audit, and future license reconciliation.';
-comment on column public.mazer_license_events.payload is
-  'Verified Stripe event payload captured by server code. Do not expose this table to clients.';
-
 create index if not exists mazer_progression_states_player_level_idx
   on public.mazer_progression_states (player_level, player_rank);
 create index if not exists mazer_ai_progression_states_user_level_idx
@@ -140,60 +84,38 @@ create index if not exists mazer_cycle_receipts_user_completed_idx
   on public.mazer_cycle_receipts (user_id, completed_at desc);
 create index if not exists mazer_cycle_receipts_surface_completed_idx
   on public.mazer_cycle_receipts (surface, completed_at desc);
-create index if not exists mazer_license_accounts_customer_idx
-  on public.mazer_license_accounts (stripe_customer_id);
-create index if not exists mazer_license_entitlements_user_status_idx
-  on public.mazer_license_entitlements (user_id, status);
-create index if not exists mazer_license_entitlements_subscription_idx
-  on public.mazer_license_entitlements (stripe_subscription_id);
-create unique index if not exists mazer_license_entitlements_one_active_key_idx
-  on public.mazer_license_entitlements (user_id, entitlement_key)
-  where status in ('active', 'trialing');
-create index if not exists mazer_license_events_user_idx
-  on public.mazer_license_events (user_id)
-  where user_id is not null;
-create index if not exists mazer_license_events_status_idx
-  on public.mazer_license_events (processing_status, created_at desc);
 
-revoke all on table public.mazer_profiles from anon;
-revoke all on table public.mazer_ai_progression_states from anon;
-revoke all on table public.mazer_cycle_receipts from anon;
-revoke all on table public.mazer_license_accounts from anon;
-revoke all on table public.mazer_license_entitlements from anon;
-revoke all on table public.mazer_license_events from anon, authenticated;
+revoke all on table public.mazer_profiles from anon, authenticated, service_role;
+revoke all on table public.mazer_ai_progression_states from anon, authenticated, service_role;
+revoke all on table public.mazer_cycle_receipts from anon, authenticated, service_role;
 
 grant select, insert, update on public.mazer_profiles to authenticated;
 grant select, insert, update on public.mazer_ai_progression_states to authenticated;
 grant select, insert on public.mazer_cycle_receipts to authenticated;
-grant select on public.mazer_license_accounts to authenticated;
-grant select on public.mazer_license_entitlements to authenticated;
 
 grant select, insert, update, delete on public.mazer_profiles to service_role;
 grant select, insert, update, delete on public.mazer_ai_progression_states to service_role;
 grant select, insert, update, delete on public.mazer_cycle_receipts to service_role;
-grant select, insert, update, delete on public.mazer_license_accounts to service_role;
-grant select, insert, update, delete on public.mazer_license_entitlements to service_role;
-grant select, insert, update, delete on public.mazer_license_events to service_role;
 
 alter table public.mazer_profiles enable row level security;
 alter table public.mazer_ai_progression_states enable row level security;
 alter table public.mazer_cycle_receipts enable row level security;
-alter table public.mazer_license_accounts enable row level security;
-alter table public.mazer_license_entitlements enable row level security;
-alter table public.mazer_license_events enable row level security;
 
+drop policy if exists "Mazer users can read their own profile" on public.mazer_profiles;
 create policy "Mazer users can read their own profile"
 on public.mazer_profiles
 for select
 to authenticated
 using ((select auth.uid()) = user_id);
 
+drop policy if exists "Mazer users can create their own profile" on public.mazer_profiles;
 create policy "Mazer users can create their own profile"
 on public.mazer_profiles
 for insert
 to authenticated
 with check ((select auth.uid()) = user_id);
 
+drop policy if exists "Mazer users can update their own profile" on public.mazer_profiles;
 create policy "Mazer users can update their own profile"
 on public.mazer_profiles
 for update
@@ -201,18 +123,21 @@ to authenticated
 using ((select auth.uid()) = user_id)
 with check ((select auth.uid()) = user_id);
 
+drop policy if exists "Mazer users can read their own ai progression" on public.mazer_ai_progression_states;
 create policy "Mazer users can read their own ai progression"
 on public.mazer_ai_progression_states
 for select
 to authenticated
 using ((select auth.uid()) = user_id);
 
+drop policy if exists "Mazer users can create their own ai progression" on public.mazer_ai_progression_states;
 create policy "Mazer users can create their own ai progression"
 on public.mazer_ai_progression_states
 for insert
 to authenticated
 with check ((select auth.uid()) = user_id);
 
+drop policy if exists "Mazer users can update their own ai progression" on public.mazer_ai_progression_states;
 create policy "Mazer users can update their own ai progression"
 on public.mazer_ai_progression_states
 for update
@@ -220,26 +145,16 @@ to authenticated
 using ((select auth.uid()) = user_id)
 with check ((select auth.uid()) = user_id);
 
+drop policy if exists "Mazer users can read their own cycle receipts" on public.mazer_cycle_receipts;
 create policy "Mazer users can read their own cycle receipts"
 on public.mazer_cycle_receipts
 for select
 to authenticated
 using ((select auth.uid()) = user_id);
 
+drop policy if exists "Mazer users can create their own cycle receipts" on public.mazer_cycle_receipts;
 create policy "Mazer users can create their own cycle receipts"
 on public.mazer_cycle_receipts
 for insert
 to authenticated
 with check ((select auth.uid()) = user_id);
-
-create policy "Mazer users can read their own license account"
-on public.mazer_license_accounts
-for select
-to authenticated
-using ((select auth.uid()) = user_id);
-
-create policy "Mazer users can read their own license entitlements"
-on public.mazer_license_entitlements
-for select
-to authenticated
-using ((select auth.uid()) = user_id);

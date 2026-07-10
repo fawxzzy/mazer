@@ -26,14 +26,14 @@ describe('legacy play lifecycle', () => {
     expect(shouldConsumeLegacyResetRequest(playReset, 1540)).toBe(true);
   });
 
-  test('makes the initialized process-8 reset entry contract explicit for play and menu branches', () => {
+  test('makes the initialized process-8 reset entry contract explicit for perpetual play and menu branches', () => {
     expect(resolveLegacyResetEntryContract('play')).toEqual({
       entryStageId: 8,
       bypassesLevelBuildingDelay: true,
       clearsResetFlagOnConsume: true,
       consumesWhileInitialized: true,
       rearmsDelayStart: false,
-      returnsToTemplateLevel: true
+      returnsToTemplateLevel: false
     });
     expect(resolveLegacyResetEntryContract('menu')).toEqual({
       entryStageId: 8,
@@ -45,7 +45,7 @@ describe('legacy play lifecycle', () => {
     });
   });
 
-  test('makes the process-8 reset branch explicit for play and menu goals', () => {
+  test('makes the process-8 reset branch explicit for play-loop and menu goals', () => {
     const playReset = createLegacyResetRequest({
       mode: 'play',
       nowMs: 1200,
@@ -58,14 +58,14 @@ describe('legacy play lifecycle', () => {
       reason: 'goal'
     });
 
-    expect(resolveLegacyResetAction('play')).toBe('return-menu');
+    expect(resolveLegacyResetAction('play')).toBe('regenerate-maze');
     expect(resolveLegacyResetAction('menu')).toBe('regenerate-maze');
     expect(hasPendingLegacyResetRequest(playReset)).toBe(true);
     expect(playReset.entry.entryStageId).toBe(8);
     expect(playReset.entry.bypassesLevelBuildingDelay).toBe(true);
-    expect(playReset.entry.returnsToTemplateLevel).toBe(true);
+    expect(playReset.entry.returnsToTemplateLevel).toBe(false);
     expect(playReset.dueAtMs).toBe(1540);
-    expect(playReset.action).toBe('return-menu');
+    expect(playReset.action).toBe('regenerate-maze');
     expect(menuReset.entry.rearmsDelayStart).toBe(true);
     expect(menuReset.dueAtMs).toBe(1820);
     expect(menuReset.action).toBe('regenerate-maze');

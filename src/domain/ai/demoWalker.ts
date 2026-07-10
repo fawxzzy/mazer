@@ -26,6 +26,7 @@ export interface DemoWalkerConfig {
     emulateLogicSwitchPotentialCheckBug: boolean;
     regenerateSeedStep: number;
     enableRunnerMistakes?: boolean;
+    runnerThinkingModel?: 'legacy-source' | 'human-local-memory';
     prerollSteps?: number;
     segmentDurationsMs?: readonly number[];
     segmentCues?: readonly (DemoSegmentCue | DemoWalkerCue)[];
@@ -44,6 +45,7 @@ export interface DemoRunnerTelemetry {
   backtrackCount: number;
   recoveryCount: number;
   visitedUndoCount: number;
+  optionalRetargetCount: number;
 }
 
 export interface DemoRunnerRouteDiagnostics {
@@ -81,6 +83,11 @@ export interface DemoTrailStep {
   mode: DemoTrailMode;
 }
 
+export interface DemoWalkerMemoryFrame {
+  optionIndices: number[];
+  targetIndex: number | null;
+}
+
 export interface DemoWalkerState {
   currentIndex: number;
   trailIndices: number[];
@@ -96,6 +103,7 @@ export interface DemoWalkerState {
   canonicalCursor: number;
   telemetry: DemoRunnerTelemetry;
   aiLogicSwitch: boolean;
+  aiMemory: DemoWalkerMemoryFrame;
 }
 
 interface DemoRunnerPlan {
@@ -105,6 +113,13 @@ interface DemoRunnerPlan {
   cueOverrides: readonly (DemoSegmentCue | DemoWalkerCue | null)[];
   telemetry: DemoRunnerTelemetry;
   aiResetPathCursor: number | null;
+  memoryFrames: readonly DemoWalkerMemoryFrame[];
+}
+
+interface LocalMemorySplit {
+  choices: number[];
+  index: number;
+  tried: Set<number>;
 }
 
 const defaultConfig: DemoWalkerConfig = {
@@ -127,6 +142,7 @@ const defaultConfig: DemoWalkerConfig = {
     emulateLogicSwitchPotentialCheckBug: true,
     regenerateSeedStep: 1,
     enableRunnerMistakes: false,
+    runnerThinkingModel: 'legacy-source',
     prerollSteps: 0,
     segmentDurationsMs: [],
     segmentCues: []
@@ -137,13 +153,31 @@ const EMPTY_TELEMETRY: DemoRunnerTelemetry = {
   wrongBranchCount: 0,
   backtrackCount: 0,
   recoveryCount: 0,
-  visitedUndoCount: 0
+  visitedUndoCount: 0,
+  optionalRetargetCount: 0
 };
+
+const EMPTY_MEMORY_FRAME: DemoWalkerMemoryFrame = {
+  optionIndices: [],
+  targetIndex: null
+};
+
+const cloneMemoryFrame = (frame: DemoWalkerMemoryFrame): DemoWalkerMemoryFrame => ({
+  optionIndices: [...frame.optionIndices],
+  targetIndex: frame.targetIndex
+});
+
+const LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN = -3.5;
+const LOCAL_MEMORY_OPTIONAL_RETARGET_PATH_PENALTY = 0.2;
+const LOCAL_MEMORY_OPTIONAL_RETARGET_MAX_COUNT = 4;
+const LOCAL_MEMORY_RECOVERY_PATH_PENALTY = 0.55;
 
 const runnerPlanCache = new WeakMap<MazeEpisode, {
   precise?: DemoRunnerPlan;
-  humanized?: DemoRunnerPlan;
+  legacyHumanized?: DemoRunnerPlan;
+  localMemoryHumanized?: DemoRunnerPlan;
 }>();
+const goalDistanceFieldCache = new WeakMap<MazeEpisode, Float32Array>();
 
 const resolveSegmentDurations = (
   pathSegmentCount: number,
@@ -213,19 +247,28 @@ const resolveDemoRunnerPlan = (
   config: DemoWalkerConfig = defaultConfig
 ): DemoRunnerPlan => {
   const cacheEntry = runnerPlanCache.get(episode) ?? {};
-  const cacheKey = config.behavior.enableRunnerMistakes === true ? 'humanized' : 'precise';
+  const cacheKey = config.behavior.enableRunnerMistakes === true
+    ? shouldUseLegacySourceHumanizedPlan(config)
+      ? 'legacyHumanized'
+      : 'localMemoryHumanized'
+    : 'precise';
   const cached = cacheEntry[cacheKey];
   if (cached) {
     return cached;
   }
 
   const nextPlan = config.behavior.enableRunnerMistakes === true
-    ? buildHumanizedRunnerPlan(episode)
+    ? buildHumanizedRunnerPlan(episode, config)
     : buildPreciseRunnerPlan(episode);
   cacheEntry[cacheKey] = nextPlan;
   runnerPlanCache.set(episode, cacheEntry);
   return nextPlan;
 };
+
+const shouldUseLegacySourceHumanizedPlan = (config: DemoWalkerConfig): boolean => (
+  config.behavior.runnerThinkingModel === 'legacy-source'
+  || config.behavior.emulateLogicSwitchPotentialCheckBug === true
+);
 
 export const resolveDemoWalkerTraverseMs = (config: DemoWalkerConfig, segmentCount: number): number => (
   resolveSegmentDurations(segmentCount, config).reduce((total, value) => total + value, 0)
@@ -296,7 +339,8 @@ export const createDemoWalkerState = (
     pathCursor: 0,
     canonicalCursor: runnerPlan.canonicalCursors[0] ?? 0,
     telemetry: runnerPlan.telemetry,
-    aiLogicSwitch: false
+    aiLogicSwitch: false,
+    aiMemory: cloneMemoryFrame(runnerPlan.memoryFrames[0] ?? EMPTY_MEMORY_FRAME)
   };
 };
 
@@ -392,7 +436,8 @@ export const advanceDemoWalker = (
       pathCursor: nextCursor,
       canonicalCursor: runnerPlan.canonicalCursors[nextCursor] ?? state.canonicalCursor,
       telemetry: runnerPlan.telemetry,
-      aiLogicSwitch: state.aiLogicSwitch
+      aiLogicSwitch: state.aiLogicSwitch,
+      aiMemory: cloneMemoryFrame(runnerPlan.memoryFrames[nextCursor] ?? state.aiMemory)
     },
     delayMs: reachedGoal ? config.cadence.goalHoldMs : segmentDelayMs
   };
@@ -551,12 +596,18 @@ const buildPreciseRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     )),
     cueOverrides: Array.from({ length: segmentCount }, () => null),
     telemetry: EMPTY_TELEMETRY,
-    aiResetPathCursor: null
+    aiResetPathCursor: null,
+    memoryFrames: Array.from({ length: canonicalPath.length }, () => EMPTY_MEMORY_FRAME)
   };
 };
 
-const buildHumanizedRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
-  return buildLegacyAiRunnerPlan(episode);
+const buildHumanizedRunnerPlan = (
+  episode: MazeEpisode,
+  config: DemoWalkerConfig
+): DemoRunnerPlan => {
+  return shouldUseLegacySourceHumanizedPlan(config)
+    ? buildLegacyAiRunnerPlan(episode)
+    : buildHumanLocalMemoryRunnerPlan(episode, config);
 };
 
 const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
@@ -572,11 +623,13 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
   const canonicalCursors: number[] = [0];
   const segmentTrailModes: DemoTrailMode[] = [];
   const cueOverrides: Array<DemoSegmentCue | DemoWalkerCue | null> = [];
+  const memoryFrames: DemoWalkerMemoryFrame[] = [EMPTY_MEMORY_FRAME];
   const telemetry: DemoRunnerTelemetry = {
     wrongBranchCount: 0,
     backtrackCount: 0,
     recoveryCount: 0,
-    visitedUndoCount: 0
+    visitedUndoCount: 0,
+    optionalRetargetCount: 0
   };
   const visited = new Set<number>([episode.raster.startIndex]);
   const potentialTiles: number[] = [];
@@ -592,7 +645,8 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
   const appendStep = (
     nextIndex: number,
     mode: DemoTrailMode,
-    cue: DemoSegmentCue | DemoWalkerCue | null
+    cue: DemoSegmentCue | DemoWalkerCue | null,
+    memoryFrame: DemoWalkerMemoryFrame = EMPTY_MEMORY_FRAME
   ): boolean => {
     if (routeIndices[routeIndices.length - 1] === nextIndex) {
       return false;
@@ -608,6 +662,7 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     ));
     segmentTrailModes.push(mode);
     cueOverrides.push(cue);
+    memoryFrames.push(cloneMemoryFrame(memoryFrame));
     return true;
   };
 
@@ -738,8 +793,556 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     segmentTrailModes,
     cueOverrides,
     telemetry,
-    aiResetPathCursor
+    aiResetPathCursor,
+    memoryFrames
   };
+};
+
+const buildHumanLocalMemoryRunnerPlan = (
+  episode: MazeEpisode,
+  config: DemoWalkerConfig
+): DemoRunnerPlan => {
+  const canonicalPath = Array.from(episode.raster.pathIndices);
+  const canonicalCursorByIndex = new Map<number, number>();
+  canonicalPath.forEach((index, cursor) => {
+    if (!canonicalCursorByIndex.has(index)) {
+      canonicalCursorByIndex.set(index, cursor);
+    }
+  });
+
+  const routeIndices: number[] = [episode.raster.startIndex];
+  const canonicalCursors: number[] = [0];
+  const segmentTrailModes: DemoTrailMode[] = [];
+  const cueOverrides: Array<DemoSegmentCue | DemoWalkerCue | null> = [];
+  const memoryFrames: DemoWalkerMemoryFrame[] = [EMPTY_MEMORY_FRAME];
+  const telemetry: DemoRunnerTelemetry = {
+    wrongBranchCount: 0,
+    backtrackCount: 0,
+    recoveryCount: 0,
+    visitedUndoCount: 0,
+    optionalRetargetCount: 0
+  };
+  const visited = new Set<number>([episode.raster.startIndex]);
+  const deadEnds = new Set<number>();
+  const pathStack: number[] = [episode.raster.startIndex];
+  const splitRecords = new Map<number, LocalMemorySplit>();
+  const maxRouteLength = Math.max(canonicalPath.length + 16, episode.raster.tiles.length * 4);
+  const maxSteps = maxRouteLength;
+  const optionalRetargetCooldownSteps = Math.max(6, Math.floor(canonicalPath.length * 0.06));
+  const optionalRetargetMaxRouteLength = Math.max(4, Math.floor(canonicalPath.length * 0.22));
+  let currentIndex = episode.raster.startIndex;
+  let optionalRetargetCount = 0;
+  let lastOptionalRetargetRouteLength = Number.NEGATIVE_INFINITY;
+
+  const resolveMemoryOptionIndices = (): number[] => {
+    const optionIndices: number[] = [];
+    for (const split of splitRecords.values()) {
+      const bestChoice = resolveBestLocalMemorySplitChoice(split, {
+        deadEnds,
+        episode,
+        seed: config.seed,
+        visited
+      });
+      if (bestChoice !== null && !optionIndices.includes(bestChoice)) {
+        optionIndices.push(bestChoice);
+      }
+    }
+    return optionIndices.slice(0, 16);
+  };
+
+  const createMemoryFrame = (targetIndex: number | null = null): DemoWalkerMemoryFrame => ({
+    optionIndices: resolveMemoryOptionIndices(),
+    targetIndex
+  });
+
+  const appendStep = (
+    nextIndex: number,
+    mode: DemoTrailMode,
+    cue: DemoSegmentCue | DemoWalkerCue | null,
+    memoryFrame: DemoWalkerMemoryFrame = createMemoryFrame()
+  ): boolean => {
+    if (routeIndices[routeIndices.length - 1] === nextIndex) {
+      return false;
+    }
+
+    routeIndices.push(nextIndex);
+    canonicalCursors.push(resolveNearestCanonicalCursor(
+      nextIndex,
+      canonicalPath,
+      canonicalCursorByIndex,
+      episode.raster.width,
+      episode.raster.height
+    ));
+    segmentTrailModes.push(mode);
+    cueOverrides.push(cue);
+    memoryFrames.push(cloneMemoryFrame(memoryFrame));
+    return true;
+  };
+
+  const markWrongBranchIfNeeded = (fromIndex: number, nextIndex: number): void => {
+    if (!canonicalCursorByIndex.has(fromIndex) || !canonicalCursorByIndex.has(nextIndex)) {
+      telemetry.wrongBranchCount += 1;
+    }
+  };
+
+  const tryOptionalRetarget = (
+    fromIndex: number,
+    currentChoices: readonly number[]
+  ): number | null => {
+    const currentBestChoice = currentChoices[0];
+    if (
+      currentBestChoice === undefined
+      || optionalRetargetCount >= LOCAL_MEMORY_OPTIONAL_RETARGET_MAX_COUNT
+      || routeIndices.length - lastOptionalRetargetRouteLength < optionalRetargetCooldownSteps
+    ) {
+      return null;
+    }
+
+    const currentBestScore = scoreLocalMemoryChoice(fromIndex, currentBestChoice, episode, config.seed);
+    let bestCandidate: {
+      choice: number;
+      route: number[];
+      score: number;
+      split: LocalMemorySplit;
+    } | null = null;
+
+    for (const split of splitRecords.values()) {
+      if (split.index === fromIndex) {
+        continue;
+      }
+
+      const choice = resolveBestLocalMemorySplitChoice(split, {
+        deadEnds,
+        episode,
+        seed: config.seed,
+        visited
+      });
+      if (choice === null) {
+        continue;
+      }
+
+      const route = findKnownFloorPath(
+        fromIndex,
+        split.index,
+        episode.raster.width,
+        episode.raster.height,
+        episode.raster.tiles,
+        visited,
+        deadEnds
+      );
+      const routeStepCount = route.length - 1;
+      if (routeStepCount <= 0 || routeStepCount > optionalRetargetMaxRouteLength) {
+        continue;
+      }
+
+      const score = scoreLocalMemoryChoice(split.index, choice, episode, config.seed)
+        + (routeStepCount * LOCAL_MEMORY_OPTIONAL_RETARGET_PATH_PENALTY);
+      if (score + LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN >= currentBestScore) {
+        continue;
+      }
+      if (bestCandidate === null || score < bestCandidate.score) {
+        bestCandidate = {
+          choice,
+          route,
+          score,
+          split
+        };
+      }
+    }
+
+    if (bestCandidate === null) {
+      return null;
+    }
+
+    let retargetIndex = fromIndex;
+    for (let cursor = 1; cursor < bestCandidate.route.length; cursor += 1) {
+      const nextBacktrackIndex = bestCandidate.route[cursor];
+      if (nextBacktrackIndex === undefined) {
+        continue;
+      }
+      appendStep(nextBacktrackIndex, 'backtrack', 'backtrack', createMemoryFrame(bestCandidate.split.index));
+      telemetry.backtrackCount += 1;
+      retargetIndex = nextBacktrackIndex;
+    }
+
+    const targetStackIndex = pathStack.lastIndexOf(bestCandidate.split.index);
+    if (targetStackIndex >= 0) {
+      pathStack.splice(targetStackIndex + 1);
+    } else {
+      pathStack.push(bestCandidate.split.index);
+    }
+
+    bestCandidate.split.tried.add(bestCandidate.choice);
+    visited.add(bestCandidate.choice);
+    pathStack.push(bestCandidate.choice);
+    markWrongBranchIfNeeded(retargetIndex, bestCandidate.choice);
+    appendStep(bestCandidate.choice, 'explore', 'reacquire', createMemoryFrame(bestCandidate.choice));
+    telemetry.recoveryCount += 1;
+    telemetry.optionalRetargetCount += 1;
+    optionalRetargetCount += 1;
+    lastOptionalRetargetRouteLength = routeIndices.length;
+    return bestCandidate.choice;
+  };
+
+  for (let step = 0; step < maxSteps && routeIndices.length < maxRouteLength; step += 1) {
+    if (currentIndex === episode.raster.endIndex) {
+      break;
+    }
+
+    const choices = sortLocalMemoryChoices(
+      currentIndex,
+      collectLocalMemoryChoices(episode, currentIndex, visited, deadEnds),
+      episode,
+      config.seed
+    );
+
+    const retargeted = tryOptionalRetarget(currentIndex, choices);
+    if (retargeted !== null) {
+      currentIndex = retargeted;
+      continue;
+    }
+
+    if (choices.length > 0) {
+      const split = resolveLocalMemorySplit(splitRecords, currentIndex, choices);
+      const nextIndex = choices[0]!;
+      split.tried.add(nextIndex);
+      visited.add(nextIndex);
+      pathStack.push(nextIndex);
+      markWrongBranchIfNeeded(currentIndex, nextIndex);
+      appendStep(nextIndex, 'explore', canonicalCursorByIndex.has(nextIndex) ? null : 'anticipate', createMemoryFrame(nextIndex));
+      currentIndex = nextIndex;
+      continue;
+    }
+
+    deadEnds.add(currentIndex);
+    const recovered = backtrackToBestLocalMemorySplit({
+      appendStep,
+      canonicalCursorByIndex,
+      currentIndex,
+      deadEnds,
+      episode,
+      pathStack,
+      seed: config.seed,
+      splitRecords,
+      telemetry,
+      visited,
+      createMemoryFrame
+    });
+    if (recovered !== null) {
+      currentIndex = recovered;
+    } else {
+      break;
+    }
+  }
+
+  return {
+    routeIndices: Uint32Array.from(routeIndices),
+    canonicalCursors: Uint32Array.from(canonicalCursors),
+    segmentTrailModes,
+    cueOverrides,
+    telemetry,
+    aiResetPathCursor: null,
+    memoryFrames
+  };
+};
+
+const resolveLocalMemorySplit = (
+  splitRecords: Map<number, LocalMemorySplit>,
+  currentIndex: number,
+  choices: number[]
+): LocalMemorySplit => {
+  const existing = splitRecords.get(currentIndex);
+  if (existing) {
+    for (const choice of choices) {
+      if (!existing.choices.includes(choice)) {
+        existing.choices.push(choice);
+      }
+    }
+    return existing;
+  }
+
+  const split: LocalMemorySplit = {
+    choices: [...choices],
+    index: currentIndex,
+    tried: new Set<number>()
+  };
+  splitRecords.set(currentIndex, split);
+  return split;
+};
+
+const collectLocalMemoryChoices = (
+  episode: MazeEpisode,
+  currentIndex: number,
+  visited: ReadonlySet<number>,
+  deadEnds: ReadonlySet<number>
+): number[] => collectFloorNeighbors(
+  currentIndex,
+  episode.raster.width,
+  episode.raster.height,
+  episode.raster.tiles
+).filter((neighbor) => (
+  neighbor === episode.raster.endIndex
+  || (!visited.has(neighbor) && !deadEnds.has(neighbor))
+));
+
+const sortLocalMemoryChoices = (
+  fromIndex: number,
+  choices: readonly number[],
+  episode: MazeEpisode,
+  seed: number
+): number[] => [...choices].sort((left, right) => (
+  scoreLocalMemoryChoice(fromIndex, left, episode, seed)
+  - scoreLocalMemoryChoice(fromIndex, right, episode, seed)
+));
+
+const scoreLocalMemoryChoice = (
+  fromIndex: number,
+  choiceIndex: number,
+  episode: MazeEpisode,
+  seed: number
+): number => {
+  const goalDistance = resolveGoalPathDistance(episode, choiceIndex);
+  const currentDistance = resolveGoalPathDistance(episode, fromIndex);
+  const visualDistance = euclideanDistance(
+    choiceIndex,
+    episode.raster.endIndex,
+    episode.raster.width,
+    episode.raster.height
+  );
+  const progressBias = goalDistance <= currentDistance ? -0.34 : 1.08;
+  const deterministicNoise = Math.abs(Math.sin(((choiceIndex + 1) * 12.9898) + ((seed + 1) * 78.233))) * 1.15;
+  return goalDistance + (visualDistance * 0.16) + progressBias + deterministicNoise;
+};
+
+const resolveGoalPathDistance = (episode: MazeEpisode, index: number): number => {
+  const distances = resolveGoalDistanceField(episode);
+  const distance = distances[index];
+  return Number.isFinite(distance) ? distance : episode.raster.tiles.length;
+};
+
+const resolveGoalDistanceField = (episode: MazeEpisode): Float32Array => {
+  const cached = goalDistanceFieldCache.get(episode);
+  if (cached) {
+    return cached;
+  }
+
+  const { width, height, tiles, endIndex } = episode.raster;
+  const distances = new Float32Array(tiles.length);
+  distances.fill(Number.POSITIVE_INFINITY);
+  const queue = new Uint32Array(tiles.length);
+  let read = 0;
+  let write = 0;
+  distances[endIndex] = 0;
+  queue[write] = endIndex;
+  write += 1;
+
+  while (read < write) {
+    const current = queue[read]!;
+    read += 1;
+    const nextDistance = distances[current]! + 1;
+    for (const neighbor of collectFloorNeighbors(current, width, height, tiles)) {
+      if (nextDistance >= distances[neighbor]!) {
+        continue;
+      }
+      distances[neighbor] = nextDistance;
+      queue[write] = neighbor;
+      write += 1;
+    }
+  }
+
+  goalDistanceFieldCache.set(episode, distances);
+  return distances;
+};
+
+const backtrackToBestLocalMemorySplit = (input: {
+  appendStep: (
+    nextIndex: number,
+    mode: DemoTrailMode,
+    cue: DemoSegmentCue | DemoWalkerCue | null,
+    memoryFrame?: DemoWalkerMemoryFrame
+  ) => boolean;
+  canonicalCursorByIndex: ReadonlyMap<number, number>;
+  currentIndex: number;
+  deadEnds: Set<number>;
+  episode: MazeEpisode;
+  pathStack: number[];
+  seed: number;
+  splitRecords: Map<number, LocalMemorySplit>;
+  telemetry: DemoRunnerTelemetry;
+  visited: Set<number>;
+  createMemoryFrame?: (targetIndex?: number | null) => DemoWalkerMemoryFrame;
+}): number | null => {
+  let currentIndex = input.currentIndex;
+  const markDeadEndIfExhausted = (index: number): void => {
+    if (collectLocalMemoryChoices(input.episode, index, input.visited, input.deadEnds).length === 0) {
+      input.deadEnds.add(index);
+    }
+  };
+  const targetSplit = resolveBestLocalMemorySplitTarget(input);
+  if (targetSplit === null) {
+    return null;
+  }
+
+  markDeadEndIfExhausted(currentIndex);
+  const knownRoute = findKnownFloorPath(
+    currentIndex,
+    targetSplit.index,
+    input.episode.raster.width,
+    input.episode.raster.height,
+    input.episode.raster.tiles,
+    input.visited,
+    input.deadEnds
+  );
+
+  if (knownRoute.length > 1) {
+    for (let cursor = 1; cursor < knownRoute.length; cursor += 1) {
+      const nextBacktrackIndex = knownRoute[cursor];
+      if (nextBacktrackIndex === undefined) {
+        continue;
+      }
+      input.appendStep(
+        nextBacktrackIndex,
+        'backtrack',
+        cursor === 1 ? 'dead-end' : 'backtrack',
+        input.createMemoryFrame?.(targetSplit.index)
+      );
+      input.telemetry.backtrackCount += 1;
+      currentIndex = nextBacktrackIndex;
+    }
+    const targetStackIndex = input.pathStack.lastIndexOf(targetSplit.index);
+    if (targetStackIndex >= 0) {
+      while (input.pathStack.length > targetStackIndex + 1) {
+        const exhaustedIndex = input.pathStack.pop();
+        if (exhaustedIndex !== undefined && exhaustedIndex !== targetSplit.index) {
+          markDeadEndIfExhausted(exhaustedIndex);
+        }
+      }
+    }
+  } else {
+    let pendingDeadEndCue = true;
+    while (currentIndex !== targetSplit.index && input.pathStack.length > 1) {
+      const exhaustedIndex = input.pathStack.pop();
+      if (exhaustedIndex !== undefined) {
+        markDeadEndIfExhausted(exhaustedIndex);
+      }
+      const nextBacktrackIndex = input.pathStack.at(-1);
+      if (nextBacktrackIndex === undefined) {
+        return null;
+      }
+      input.appendStep(
+        nextBacktrackIndex,
+        'backtrack',
+        pendingDeadEndCue ? 'dead-end' : 'backtrack',
+        input.createMemoryFrame?.(targetSplit.index)
+      );
+      input.telemetry.backtrackCount += 1;
+      pendingDeadEndCue = false;
+      currentIndex = nextBacktrackIndex;
+    }
+  }
+
+  const nextChoice = resolveBestLocalMemorySplitChoice(targetSplit, input);
+  if (nextChoice === null) {
+    input.splitRecords.delete(targetSplit.index);
+    return currentIndex;
+  }
+
+  targetSplit.tried.add(nextChoice);
+  input.visited.add(nextChoice);
+  input.pathStack.push(nextChoice);
+  input.appendStep(nextChoice, 'explore', 'reacquire', input.createMemoryFrame?.(nextChoice));
+  input.telemetry.recoveryCount += 1;
+  if (!input.canonicalCursorByIndex.has(nextChoice) || !input.canonicalCursorByIndex.has(currentIndex)) {
+    input.telemetry.wrongBranchCount += 1;
+  }
+  return nextChoice;
+};
+
+const resolveBestLocalMemorySplitTarget = (input: {
+  currentIndex: number;
+  deadEnds: ReadonlySet<number>;
+  episode: MazeEpisode;
+  pathStack: readonly number[];
+  seed: number;
+  splitRecords: Map<number, LocalMemorySplit>;
+  visited: ReadonlySet<number>;
+}): LocalMemorySplit | null => {
+  let bestSplit: LocalMemorySplit | null = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  const registerCandidate = (split: LocalMemorySplit): void => {
+    const bestChoice = resolveBestLocalMemorySplitChoice(split, input);
+    if (bestChoice === null) {
+      return;
+    }
+    const route = findKnownFloorPath(
+      input.currentIndex,
+      split.index,
+      input.episode.raster.width,
+      input.episode.raster.height,
+      input.episode.raster.tiles,
+      input.visited,
+      input.deadEnds
+    );
+    if (input.currentIndex !== split.index && route.length <= 1) {
+      return;
+    }
+
+    const routeStepCount = Math.max(0, route.length - 1);
+    const score = scoreLocalMemoryChoice(split.index, bestChoice, input.episode, input.seed)
+      + (routeStepCount * LOCAL_MEMORY_RECOVERY_PATH_PENALTY);
+    if (score < bestScore) {
+      bestScore = score;
+      bestSplit = split;
+    }
+  };
+
+  for (const split of input.splitRecords.values()) {
+    registerCandidate(split);
+  }
+
+  for (const visitedIndex of input.visited) {
+    const frontierChoices = collectLocalMemoryChoices(
+      input.episode,
+      visitedIndex,
+      input.visited,
+      input.deadEnds
+    );
+    if (frontierChoices.length === 0) {
+      continue;
+    }
+
+    const split = resolveLocalMemorySplit(input.splitRecords, visitedIndex, frontierChoices);
+    registerCandidate(split);
+  }
+
+  return bestSplit;
+};
+
+const resolveBestLocalMemorySplitChoice = (
+  split: LocalMemorySplit,
+  input: {
+    deadEnds: ReadonlySet<number>;
+    episode: MazeEpisode;
+    seed: number;
+    visited: ReadonlySet<number>;
+  }
+): number | null => {
+  const validChoices = split.choices.filter((choice) => (
+    !split.tried.has(choice)
+    && !input.deadEnds.has(choice)
+    && (
+      choice === input.episode.raster.endIndex
+      || !input.visited.has(choice)
+    )
+    && collectFloorNeighbors(
+      split.index,
+      input.episode.raster.width,
+      input.episode.raster.height,
+      input.episode.raster.tiles
+    ).includes(choice)
+  ));
+  return sortLocalMemoryChoices(split.index, validChoices, input.episode, input.seed)[0] ?? null;
 };
 
 const resolveLegacyAiDirectMove = (
@@ -888,6 +1491,18 @@ const findFloorPath = (
   height: number,
   tiles: Uint8Array
 ): number[] => {
+  return findKnownFloorPath(startIndex, targetIndex, width, height, tiles);
+};
+
+const findKnownFloorPath = (
+  startIndex: number,
+  targetIndex: number,
+  width: number,
+  height: number,
+  tiles: Uint8Array,
+  allowedIndices?: ReadonlySet<number>,
+  blockedIndices: ReadonlySet<number> = new Set()
+): number[] => {
   if (startIndex === targetIndex) {
     return [startIndex];
   }
@@ -907,6 +1522,16 @@ const findFloorPath = (
 
     for (const neighbor of collectFloorNeighbors(current, width, height, tiles)) {
       if (cameFrom[neighbor] !== -1) {
+        continue;
+      }
+      if (
+        neighbor !== targetIndex
+        && neighbor !== startIndex
+        && (
+          (allowedIndices !== undefined && !allowedIndices.has(neighbor))
+          || blockedIndices.has(neighbor)
+        )
+      ) {
         continue;
       }
       cameFrom[neighbor] = current;

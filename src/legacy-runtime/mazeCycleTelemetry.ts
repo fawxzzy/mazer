@@ -1,5 +1,9 @@
 import type { LegacyControlMode } from './legacyDefaults';
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
+import {
+  resolveLegacyMazeComplexity,
+  type LegacyMazeComplexityBreakdown
+} from './legacyProgression';
 
 export const MAZE_CYCLE_TELEMETRY_STORAGE_KEY = 'mazer.cycle-telemetry.v1';
 export const MAZE_CYCLE_TELEMETRY_HISTORY_LIMIT = 50;
@@ -10,10 +14,33 @@ export const MAZE_CYCLE_TELEMETRY_PATH_PREVIEW_LIMIT = 8;
 export type MazeCycleRouteQuality = NonNullable<LegacyMazeSnapshot['routeQualityStats']>['routeQuality'];
 export type MazeCycleTelemetrySurface = 'menu-demo' | 'play';
 export type MazeCycleTelemetryLearningSignal = 'challenge' | 'ease' | 'hold';
+export type MazeCycleAiThinkingModel = 'human-local-memory' | 'legacy-source' | 'unknown';
+export type MazeCycleAiDecisionSignal = 'clean' | 'searching' | 'chaotic';
+
+export interface MazeCycleAiDecisionSummary {
+  backtrackCount: number;
+  decisionCount: number;
+  optionalRetargetCount: number;
+  recoveryCount: number;
+  thinkingModel: MazeCycleAiThinkingModel;
+  visitedUndoCount: number;
+  wrongBranchCount: number;
+}
+
+export interface MazeCycleAiDecisionScore {
+  pressureScore: number;
+  reliabilityScore: number;
+  recoveryPressureScore: number;
+  routeNoiseScore: number;
+  retargetPressureScore: number;
+  signal: MazeCycleAiDecisionSignal;
+}
 
 export interface MazeCycleTelemetryReceipt {
   id: string;
   surface: MazeCycleTelemetrySurface;
+  aiDecisionSummary: MazeCycleAiDecisionSummary | null;
+  mazeComplexity: LegacyMazeComplexityBreakdown | null;
   mazeSeed: number;
   mazeSize: number;
   routeQuality: MazeCycleRouteQuality | null;
@@ -22,6 +49,11 @@ export interface MazeCycleTelemetryReceipt {
   playerPath: LegacyPoint[];
   playerPathLength: number;
   playerPathTruncated: boolean;
+  routeOverrunRatio: number;
+  routeOverrunSteps: number;
+  renderSafetyPenaltyScore: number;
+  routeEfficiencyPressureScore: number;
+  shortestViablePathLength: number;
   wrongTurns: number;
   backtracks: number;
   completionTimeMs: number;
@@ -38,6 +70,7 @@ export interface MazeCycleTelemetryHistory {
 }
 
 export interface MazeCycleTelemetryRecordInput {
+  aiDecisionSummary?: MazeCycleAiDecisionSummary | null;
   averageFrameMs: number;
   completedAt?: string;
   completionTimeMs: number;
@@ -51,6 +84,7 @@ export interface MazeCycleTelemetryRecordInput {
 }
 
 export type MazeCycleTelemetryDiagnosticReceipt = Omit<MazeCycleTelemetryReceipt, 'playerPath'> & {
+  aiDecisionScore: MazeCycleAiDecisionScore | null;
   playerPathPreview: LegacyPoint[];
 };
 
@@ -58,6 +92,12 @@ export interface MazeCycleTelemetryLearningSummary {
   averageBacktracks: number | null;
   averageCompletionTimeMs: number | null;
   averageFrameMs: number | null;
+  averageAiDecisionPressureScore: number | null;
+  averageRenderSafetyPenaltyScore: number | null;
+  averageRouteOverrunRatio: number | null;
+  averageRouteOverrunSteps: number | null;
+  averageRouteEfficiencyPressureScore: number | null;
+  aiDecisionSignalCounts: Record<MazeCycleAiDecisionSignal, number>;
   averageWrongTurns: number | null;
   confidence: number;
   menuDemoSampleCount: number;
@@ -120,6 +160,8 @@ const averageOrNull = (values: readonly number[]): number | null => (
     : null
 );
 
+const clampScore = (value: number): number => Math.max(0, Math.min(100, roundNumber(value, 3)));
+
 const isControlMode = (value: unknown): value is LegacyControlMode => (
   value === 'arrows' || value === 'stick'
 );
@@ -127,6 +169,87 @@ const isControlMode = (value: unknown): value is LegacyControlMode => (
 const isSurface = (value: unknown): value is MazeCycleTelemetrySurface => (
   value === 'menu-demo' || value === 'play'
 );
+
+const isAiThinkingModel = (value: unknown): value is MazeCycleAiThinkingModel => (
+  value === 'human-local-memory' || value === 'legacy-source' || value === 'unknown'
+);
+
+const normalizeAiDecisionSummary = (value: unknown): MazeCycleAiDecisionSummary | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    backtrackCount: normalizeNonNegativeInteger(value.backtrackCount),
+    decisionCount: normalizeNonNegativeInteger(value.decisionCount),
+    optionalRetargetCount: normalizeNonNegativeInteger(value.optionalRetargetCount),
+    recoveryCount: normalizeNonNegativeInteger(value.recoveryCount),
+    thinkingModel: isAiThinkingModel(value.thinkingModel) ? value.thinkingModel : 'unknown',
+    visitedUndoCount: normalizeNonNegativeInteger(value.visitedUndoCount),
+    wrongBranchCount: normalizeNonNegativeInteger(value.wrongBranchCount)
+  };
+};
+
+const normalizeMazeComplexityBreakdown = (value: unknown): LegacyMazeComplexityBreakdown | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    checkpointScore: normalizeNonNegativeNumber(value.checkpointScore),
+    deadEndCount: normalizeNonNegativeInteger(value.deadEndCount),
+    deadEndPressureScore: normalizeNonNegativeNumber(value.deadEndPressureScore),
+    edgeWrapCount: normalizeNonNegativeInteger(value.edgeWrapCount),
+    edgeWrapReliefScore: normalizeNonNegativeNumber(value.edgeWrapReliefScore),
+    edgeWrapScore: normalizeNonNegativeNumber(value.edgeWrapScore),
+    fillQualityScore: normalizeNonNegativeNumber(value.fillQualityScore),
+    floorScore: normalizeNonNegativeNumber(value.floorScore),
+    routeScore: normalizeNonNegativeNumber(value.routeScore),
+    shortcutScore: normalizeNonNegativeNumber(value.shortcutScore),
+    sizeScore: normalizeNonNegativeNumber(value.sizeScore),
+    solutionScore: normalizeNonNegativeNumber(value.solutionScore),
+    splitCount: normalizeNonNegativeInteger(value.splitCount),
+    splitScore: normalizeNonNegativeNumber(value.splitScore),
+    total: normalizeNonNegativeInteger(value.total),
+    weightedDeadEndPressureScore: normalizeNonNegativeNumber(value.weightedDeadEndPressureScore),
+    weightedSplitPressureScore: normalizeNonNegativeNumber(value.weightedSplitPressureScore)
+  };
+};
+
+export const scoreMazeCycleAiDecisionSummary = (
+  summary: MazeCycleAiDecisionSummary | null
+): MazeCycleAiDecisionScore | null => {
+  const normalized = normalizeAiDecisionSummary(summary);
+  if (normalized === null) {
+    return null;
+  }
+
+  const decisionCount = Math.max(1, normalized.decisionCount);
+  const routeNoiseScore = clampScore(((
+    normalized.wrongBranchCount * 3
+    + normalized.optionalRetargetCount * 1.5
+    + normalized.visitedUndoCount * 4
+  ) / decisionCount) * 100);
+  const recoveryPressureScore = clampScore(((
+    normalized.backtrackCount * 1.2
+    + normalized.recoveryCount * 3
+  ) / decisionCount) * 100);
+  const retargetPressureScore = clampScore((normalized.optionalRetargetCount / decisionCount) * 100);
+  const pressureScore = clampScore((
+    routeNoiseScore * 0.45
+    + recoveryPressureScore * 0.45
+    + retargetPressureScore * 0.1
+  ));
+
+  return {
+    pressureScore,
+    reliabilityScore: clampScore(100 - pressureScore),
+    recoveryPressureScore,
+    routeNoiseScore,
+    retargetPressureScore,
+    signal: pressureScore >= 60 ? 'chaotic' : pressureScore >= 25 ? 'searching' : 'clean'
+  };
+};
 
 const pointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
 
@@ -157,6 +280,47 @@ const normalizePlayerPath = (
     playerPathLength: safePoints.length,
     playerPathTruncated: true
   };
+};
+
+export const scoreMazeCycleRouteEfficiencyPressure = (
+  playerPathLength: number,
+  solutionPathLength: number
+): number => {
+  const safeSolutionLength = Math.max(1, Math.round(solutionPathLength));
+  const safePathLength = Math.max(0, Math.round(playerPathLength));
+  if (safePathLength <= safeSolutionLength) {
+    return 0;
+  }
+
+  const routeWasteRatio = (safePathLength - safeSolutionLength) / safeSolutionLength;
+  return clampScore((routeWasteRatio / 1.5) * 100);
+};
+
+export const summarizeMazeCycleShortestPathComparison = (
+  playerPathLength: number,
+  solutionPathLength: number
+): {
+  routeOverrunRatio: number;
+  routeOverrunSteps: number;
+  shortestViablePathLength: number;
+} => {
+  const shortestViablePathLength = Math.max(1, Math.round(solutionPathLength));
+  const safePathLength = Math.max(0, Math.round(playerPathLength));
+  const routeOverrunSteps = Math.max(0, safePathLength - shortestViablePathLength);
+
+  return {
+    routeOverrunRatio: roundNumber(routeOverrunSteps / shortestViablePathLength),
+    routeOverrunSteps,
+    shortestViablePathLength
+  };
+};
+
+export const scoreMazeCycleRenderSafetyPenalty = (averageFrameMs: number): number => {
+  if (!Number.isFinite(averageFrameMs) || averageFrameMs <= 18) {
+    return 0;
+  }
+
+  return clampScore(((averageFrameMs - 18) / 18) * 100);
 };
 
 export const summarizeMazeCyclePathDeviation = (
@@ -219,6 +383,8 @@ const normalizeReceipt = (value: unknown): MazeCycleTelemetryReceipt | null => {
   return {
     id: value.id,
     surface,
+    aiDecisionSummary: normalizeAiDecisionSummary(value.aiDecisionSummary),
+    mazeComplexity: normalizeMazeComplexityBreakdown(value.mazeComplexity),
     mazeSeed: normalizeNonNegativeInteger(value.mazeSeed),
     mazeSize: normalizeNonNegativeInteger(value.mazeSize),
     routeQuality: value.routeQuality === 'multi-route' || value.routeQuality === 'single-route'
@@ -229,6 +395,11 @@ const normalizeReceipt = (value: unknown): MazeCycleTelemetryReceipt | null => {
     playerPath: normalizedPath.playerPath,
     playerPathLength: normalizeNonNegativeInteger(value.playerPathLength, normalizedPath.playerPathLength),
     playerPathTruncated: value.playerPathTruncated === true || normalizedPath.playerPathTruncated,
+    routeOverrunRatio: normalizeNonNegativeNumber(value.routeOverrunRatio),
+    routeOverrunSteps: normalizeNonNegativeInteger(value.routeOverrunSteps),
+    renderSafetyPenaltyScore: normalizeNonNegativeNumber(value.renderSafetyPenaltyScore),
+    routeEfficiencyPressureScore: normalizeNonNegativeNumber(value.routeEfficiencyPressureScore),
+    shortestViablePathLength: normalizeNonNegativeInteger(value.shortestViablePathLength, 1),
     wrongTurns: normalizeNonNegativeInteger(value.wrongTurns),
     backtracks: normalizeNonNegativeInteger(value.backtracks),
     completionTimeMs: normalizeNonNegativeInteger(value.completionTimeMs),
@@ -295,11 +466,18 @@ export const createMazeCycleTelemetryReceipt = (
 ): MazeCycleTelemetryReceipt => {
   const normalizedPath = normalizePlayerPath(input.playerPath, MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT);
   const derivedDeviation = summarizeMazeCyclePathDeviation(normalizedPath.playerPath, input.maze.solutionPath);
+  const shortestPathComparison = summarizeMazeCycleShortestPathComparison(
+    normalizedPath.playerPathLength,
+    input.maze.solutionPath.length
+  );
   const completedAt = input.completedAt ?? new Date().toISOString();
+  const averageFrameMs = normalizeNonNegativeNumber(input.averageFrameMs);
 
   return {
     id: `${input.surface}-${input.maze.seed}-${Date.parse(completedAt) || Date.now()}`,
     surface: input.surface,
+    aiDecisionSummary: normalizeAiDecisionSummary(input.aiDecisionSummary),
+    mazeComplexity: resolveLegacyMazeComplexity(input.maze),
     mazeSeed: input.maze.seed,
     mazeSize: input.maze.size,
     routeQuality: input.maze.routeQualityStats?.routeQuality ?? null,
@@ -308,12 +486,20 @@ export const createMazeCycleTelemetryReceipt = (
     playerPath: normalizedPath.playerPath,
     playerPathLength: normalizedPath.playerPathLength,
     playerPathTruncated: normalizedPath.playerPathTruncated,
+    routeOverrunRatio: shortestPathComparison.routeOverrunRatio,
+    routeOverrunSteps: shortestPathComparison.routeOverrunSteps,
+    renderSafetyPenaltyScore: scoreMazeCycleRenderSafetyPenalty(averageFrameMs),
+    routeEfficiencyPressureScore: scoreMazeCycleRouteEfficiencyPressure(
+      normalizedPath.playerPathLength,
+      input.maze.solutionPath.length
+    ),
+    shortestViablePathLength: shortestPathComparison.shortestViablePathLength,
     wrongTurns: normalizeNonNegativeInteger(input.wrongTurns, derivedDeviation.wrongTurns),
     backtracks: normalizeNonNegativeInteger(input.backtracks, derivedDeviation.backtracks),
     completionTimeMs: normalizeNonNegativeInteger(input.completionTimeMs),
     resetUsed: input.resetUsed,
     controlMode: input.controlMode,
-    averageFrameMs: normalizeNonNegativeNumber(input.averageFrameMs),
+    averageFrameMs,
     completedAt
   };
 };
@@ -337,6 +523,13 @@ const toDiagnosticReceipt = (
   return {
     id: receipt.id,
     surface: receipt.surface,
+    aiDecisionSummary: receipt.aiDecisionSummary
+      ? { ...receipt.aiDecisionSummary }
+      : null,
+    aiDecisionScore: scoreMazeCycleAiDecisionSummary(receipt.aiDecisionSummary),
+    mazeComplexity: receipt.mazeComplexity
+      ? { ...receipt.mazeComplexity }
+      : null,
     mazeSeed: receipt.mazeSeed,
     mazeSize: receipt.mazeSize,
     routeQuality: receipt.routeQuality,
@@ -344,6 +537,11 @@ const toDiagnosticReceipt = (
     goal: copyPoint(receipt.goal),
     playerPathLength: receipt.playerPathLength,
     playerPathTruncated: receipt.playerPathTruncated,
+    routeOverrunRatio: receipt.routeOverrunRatio,
+    routeOverrunSteps: receipt.routeOverrunSteps,
+    renderSafetyPenaltyScore: receipt.renderSafetyPenaltyScore,
+    routeEfficiencyPressureScore: receipt.routeEfficiencyPressureScore,
+    shortestViablePathLength: receipt.shortestViablePathLength,
     wrongTurns: receipt.wrongTurns,
     backtracks: receipt.backtracks,
     completionTimeMs: receipt.completionTimeMs,
@@ -377,9 +575,17 @@ const resolveLearningSignal = (
   const averageWrongTurns = averageOrNull(receipts.map((receipt) => receipt.wrongTurns)) ?? 0;
   const averageBacktracks = averageOrNull(receipts.map((receipt) => receipt.backtracks)) ?? 0;
   const averageCompletionTimeMs = averageOrNull(receipts.map((receipt) => receipt.completionTimeMs)) ?? 0;
+  const averageRenderSafetyPenaltyScore = averageOrNull(receipts.map((receipt) => receipt.renderSafetyPenaltyScore)) ?? 0;
+  const averageRouteEfficiencyPressureScore = averageOrNull(receipts.map((receipt) => receipt.routeEfficiencyPressureScore)) ?? 0;
   const resetRate = receipts.filter((receipt) => receipt.resetUsed).length / receipts.length;
 
-  if (resetRate >= 0.4 || averageWrongTurns >= 6 || averageBacktracks >= 6) {
+  if (
+    resetRate >= 0.4
+    || averageWrongTurns >= 6
+    || averageBacktracks >= 6
+    || averageRouteEfficiencyPressureScore >= 45
+    || averageRenderSafetyPenaltyScore >= 34
+  ) {
     return 'ease';
   }
 
@@ -402,6 +608,14 @@ export const summarizeMazeCycleTelemetryLearning = (
   const receipts = history.receipts;
   const playReceipts = receipts.filter((receipt) => receipt.surface === 'play');
   const menuDemoReceipts = receipts.filter((receipt) => receipt.surface === 'menu-demo');
+  const aiDecisionScores = receipts
+    .map((receipt) => scoreMazeCycleAiDecisionSummary(receipt.aiDecisionSummary))
+    .filter((score): score is MazeCycleAiDecisionScore => score !== null);
+  const aiDecisionSignalCounts: MazeCycleTelemetryLearningSummary['aiDecisionSignalCounts'] = {
+    clean: 0,
+    searching: 0,
+    chaotic: 0
+  };
   const signalReceipts = playReceipts.length >= 3 ? playReceipts : receipts;
   const routeQualityCounts: MazeCycleTelemetryLearningSummary['routeQualityCounts'] = {
     'multi-route': 0,
@@ -416,11 +630,20 @@ export const summarizeMazeCycleTelemetryLearning = (
       routeQualityCounts.unknown += 1;
     }
   });
+  aiDecisionScores.forEach((score) => {
+    aiDecisionSignalCounts[score.signal] += 1;
+  });
 
   return {
+    aiDecisionSignalCounts,
+    averageAiDecisionPressureScore: averageOrNull(aiDecisionScores.map((score) => score.pressureScore)),
     averageBacktracks: averageOrNull(receipts.map((receipt) => receipt.backtracks)),
     averageCompletionTimeMs: averageOrNull(receipts.map((receipt) => receipt.completionTimeMs)),
     averageFrameMs: averageOrNull(receipts.map((receipt) => receipt.averageFrameMs)),
+    averageRenderSafetyPenaltyScore: averageOrNull(receipts.map((receipt) => receipt.renderSafetyPenaltyScore)),
+    averageRouteOverrunRatio: averageOrNull(receipts.map((receipt) => receipt.routeOverrunRatio)),
+    averageRouteOverrunSteps: averageOrNull(receipts.map((receipt) => receipt.routeOverrunSteps)),
+    averageRouteEfficiencyPressureScore: averageOrNull(receipts.map((receipt) => receipt.routeEfficiencyPressureScore)),
     averageWrongTurns: averageOrNull(receipts.map((receipt) => receipt.wrongTurns)),
     confidence: roundNumber(Math.min(1, signalReceipts.length / 10)),
     menuDemoSampleCount: menuDemoReceipts.length,

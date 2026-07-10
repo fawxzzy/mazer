@@ -16,6 +16,10 @@ import {
 import { resolveLayoutMatrixRoute, resolveLayoutMatrixViewports } from './layout-matrix.config.mjs';
 import { launchPreviewServer, stopPreviewServer } from './preview-server.mjs';
 import {
+  assertVisualScreenContract,
+  buildVisualScreenContract
+} from './screen-contract.mjs';
+import {
   buildExperimentManifest,
   buildTelemetryReceipt,
   normalizeExperimentToggles,
@@ -1430,6 +1434,18 @@ export const resolveEdgeLiveTargetUrl = (viewport, options = {}) => resolveViewp
   explicitUrl: options.url
 });
 
+const buildEdgeLiveScreenContract = ({
+  expectedRoute,
+  actualUrl,
+  viewport,
+  diagnostics
+}) => buildVisualScreenContract({
+  expectedRoute: expectedRoute ?? actualUrl,
+  actualUrl,
+  viewport,
+  diagnostics: diagnostics?.visual ?? diagnostics
+});
+
 export const resolveEdgeLiveVerdicts = (diagnostics) => {
   const boardBounds = diagnostics?.board?.bounds ?? null;
   const safeBounds = diagnostics?.board?.safeBounds ?? null;
@@ -1953,6 +1969,7 @@ const captureViewport = async ({
   });
 
   const url = resolveViewportTargetUrl({ viewport, baseUrl, route, explicitUrl });
+  const expectedScreenRoute = explicitUrl ?? route ?? resolveLayoutMatrixRoute(viewport);
   const firstLoadPath = resolve(screenshotsDir, `${viewport.id}-first-load.png`);
   const secondLoadPath = resolve(screenshotsDir, `${viewport.id}-second-load.png`);
   const lifecyclePath = resolve(screenshotsDir, `${viewport.id}-attempt-lifecycle.png`);
@@ -1966,6 +1983,13 @@ const captureViewport = async ({
     }).catch(() => {});
     await page.waitForTimeout(250);
     const firstDiagnostics = await waitForDiagnostics(page, timeoutMs);
+    const firstLoadScreenContract = buildEdgeLiveScreenContract({
+      expectedRoute: expectedScreenRoute,
+      actualUrl: page.url(),
+      viewport,
+      diagnostics: firstDiagnostics
+    });
+    assertVisualScreenContract(firstLoadScreenContract);
     await page.screenshot({
       path: firstLoadPath,
       fullPage: false,
@@ -1978,6 +2002,13 @@ const captureViewport = async ({
     }).catch(() => {});
     await page.waitForTimeout(250);
     const secondDiagnostics = await waitForDiagnostics(page, timeoutMs);
+    const secondLoadScreenContract = buildEdgeLiveScreenContract({
+      expectedRoute: expectedScreenRoute,
+      actualUrl: page.url(),
+      viewport,
+      diagnostics: secondDiagnostics
+    });
+    assertVisualScreenContract(secondLoadScreenContract);
     await page.screenshot({
       path: secondLoadPath,
       fullPage: false,
@@ -1987,6 +2018,7 @@ const captureViewport = async ({
     let lifecycle = null;
     let interactionRecord = null;
     let endWindow = null;
+    let lifecycleScreenContract = null;
     try {
       let lifecycleDiagnostics = null;
       if (interaction) {
@@ -2000,6 +2032,13 @@ const captureViewport = async ({
       } else {
         lifecycleDiagnostics = await waitForDiagnostics(page, Math.max(2_000, Math.round(timeoutMs / 3)), { requireActiveTrail: true });
       }
+      lifecycleScreenContract = buildEdgeLiveScreenContract({
+        expectedRoute: expectedScreenRoute,
+        actualUrl: page.url(),
+        viewport,
+        diagnostics: lifecycleDiagnostics
+      });
+      assertVisualScreenContract(lifecycleScreenContract);
       await page.screenshot({
         path: lifecyclePath,
         fullPage: false,
@@ -2038,9 +2077,15 @@ const captureViewport = async ({
     const record = {
       viewport,
       url,
+      actualUrl: page.url(),
       route: explicitUrl ? null : route,
       experiment,
       consoleMessages,
+      screenContracts: {
+        firstLoad: firstLoadScreenContract,
+        secondLoad: secondLoadScreenContract,
+        lifecycle: lifecycle?.available === false ? null : lifecycleScreenContract
+      },
       firstLoad: createSnapshot('first-load', firstDiagnostics, relativeToRun(runDir, firstLoadPath)),
       secondLoad: createSnapshot('second-load', secondDiagnostics, relativeToRun(runDir, secondLoadPath)),
       lifecycle,
@@ -2848,8 +2893,10 @@ export const captureEdgeLive = async ({
         viewport: capture.viewport,
         route: capture.route,
         url: capture.url,
+        actualUrl: capture.actualUrl,
         experiment: capture.experiment,
         files: capture.files,
+        screenContracts: capture.screenContracts,
         board: capture.secondLoad.board,
         hud: capture.secondLoad.hud,
         verdicts: capture.secondLoad.verdicts,

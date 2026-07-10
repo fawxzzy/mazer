@@ -12,7 +12,7 @@ describe('input-human keyboard bridge', () => {
     expect(resolveHumanKeyboardActionKind({ code: 'KeyW' })).toBe('move_up');
     expect(resolveHumanKeyboardActionKind({ code: 'ArrowLeft' })).toBe('move_left');
     expect(resolveHumanKeyboardActionKind({ code: 'KeyP' })).toBe('pause');
-    expect(resolveHumanKeyboardActionKind({ code: 'KeyR' })).toBe('restart_attempt');
+    expect(resolveHumanKeyboardActionKind({ code: 'KeyR' })).toBeNull();
     expect(resolveHumanKeyboardActionKind({ code: 'KeyT' })).toBe('toggle_thoughts');
     expect(resolveHumanKeyboardActionKind({ code: 'KeyQ' })).toBeNull();
   });

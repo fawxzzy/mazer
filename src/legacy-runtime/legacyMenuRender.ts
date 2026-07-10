@@ -43,6 +43,12 @@ export interface LegacyMenuBorderDockRenderOptions {
   mazeSize: number;
   mazeTop: number;
   tileRect: LegacyMenuPixelRect;
+  topCenterNotch?: {
+    bottom: number;
+    left: number;
+    right: number;
+    top: number;
+  };
 }
 
 export interface LegacyPlayerMarkerRenderMetrics {
@@ -63,7 +69,7 @@ export interface LegacyEndpointMarkerRenderMetrics {
   strokeWidth: number;
 }
 
-const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.18;
+const LEGACY_MENU_TRENCH_EDGE_INSET_RATIO = 0.14;
 const LEGACY_MENU_TRENCH_CORE_INSET_RATIO = 0.08;
 
 const resolveLegacyMenuTrenchInset = (tileSize: number, ratio: number): number => {
@@ -95,10 +101,12 @@ export const resolveLegacyDynamicTrailStrokeWidth = (
 export const resolveLegacyPlayerMarkerRenderMetrics = (
   tileSize: number,
   coreRatio: number,
-  haloRatio: number
+  haloRatio: number,
+  maxCoreRatio = 0.38,
+  maxHaloRatio = 0.46
 ): LegacyPlayerMarkerRenderMetrics => {
-  const maxHaloRadius = Math.max(1, tileSize * 0.46);
-  const maxCoreRadius = Math.max(1, tileSize * 0.38);
+  const maxHaloRadius = Math.max(1, tileSize * maxHaloRatio);
+  const maxCoreRadius = Math.max(1, tileSize * maxCoreRatio);
   const haloRadius = Math.min(
     maxHaloRadius,
     Math.max(1, tileSize * haloRatio)
@@ -318,6 +326,16 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
 
     areas.push(area);
   };
+  const pushTopArea = (area: LegacyMenuBorderDockRenderArea): void => {
+    const notch = options.topCenterNotch;
+    if (!notch || area.bottom <= notch.top || area.top >= notch.bottom || area.right <= notch.left || area.left >= notch.right) {
+      pushArea(area);
+      return;
+    }
+
+    pushArea({ ...area, right: Math.min(area.right, notch.left) });
+    pushArea({ ...area, left: Math.max(area.left, notch.right) });
+  };
 
   if (direction === 'left') {
     const left = options.boardLeft - 1;
@@ -348,12 +366,12 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
   if (direction === 'top') {
     const top = options.boardTop - 1;
     const bottom = options.mazeTop;
-    pushArea({ left: bandLeft, top, right: bandRight, bottom });
+    pushTopArea({ left: bandLeft, top, right: bandRight, bottom });
     if (bandLeft < leftGuard) {
-      pushArea({ left: bandLeft, top, right: leftGuard, bottom });
+      pushTopArea({ left: bandLeft, top, right: leftGuard, bottom });
     }
     if (bandRight > rightGuard) {
-      pushArea({ left: rightGuard, top, right: bandRight, bottom });
+      pushTopArea({ left: rightGuard, top, right: bandRight, bottom });
     }
     return areas;
   }

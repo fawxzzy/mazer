@@ -57,9 +57,9 @@ describe('legacy overlay toggle fields', () => {
     expect(trailPulse.affectsBoardDynamic).toBe(true);
     expect(trailPulse.legacyDirectionalLightIntensity).toBeNull();
 
-    expect(animatedBackdrop.settings.toggleAnimatedBackdrop).toBe(true);
-    expect(animatedBackdrop.switchIsOn).toBe(true);
-    expect(animatedBackdrop.stateText).toBe('Animated');
+    expect(animatedBackdrop.settings.toggleAnimatedBackdrop).toBe(false);
+    expect(animatedBackdrop.switchIsOn).toBe(false);
+    expect(animatedBackdrop.stateText).toBe('Stagnant');
     expect(animatedBackdrop.affectsBackdrop).toBe(true);
     expect(animatedBackdrop.affectsBoardStatic).toBe(false);
     expect(animatedBackdrop.affectsBoardDynamic).toBe(false);
@@ -76,8 +76,8 @@ describe('legacy overlay toggle fields', () => {
 
   test('toggles dark mode through the legacy light-intensity role with exact state text', () => {
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
-    const darkModeOn = applyLegacyOverlayToggleField(settings, 'darkMode');
-    const darkModeOff = applyLegacyOverlayToggleField(darkModeOn.settings, 'darkMode');
+    const darkModeOff = applyLegacyOverlayToggleField(settings, 'darkMode');
+    const darkModeOn = applyLegacyOverlayToggleField(darkModeOff.settings, 'darkMode');
 
     expect(darkModeOn.settings.darkMode).toBe(true);
     expect(darkModeOn.switchIsOn).toBe(true);
@@ -107,8 +107,8 @@ describe('legacy overlay toggle fields', () => {
     expect(resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', settings)).toBe(false);
     expect(resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', settings)).toBe(false);
     expect(resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', settings)).toBe(true);
-    expect(resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', settings)).toBe(false);
-    expect(resolveLegacyOverlayToggleSwitchIsOn('darkMode', settings)).toBe(false);
+    expect(resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', settings)).toBe(true);
+    expect(resolveLegacyOverlayToggleSwitchIsOn('darkMode', settings)).toBe(true);
     expect(resolveLegacyOverlayToggleSwitchIsOn('controlMode', settings)).toBe(true);
 
     fields.forEach((fieldId) => {

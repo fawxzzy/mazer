@@ -1,5 +1,12 @@
 import Phaser from 'phaser';
 import {
+  applyMazerCanvasBackingResolution,
+  resolveMazerCanvasBackingResolution,
+  summarizeMazerRenderResolution,
+  type MazerRenderResolutionDiagnostics,
+  type MazerRenderResolutionStatus
+} from '../boot/canvasResolution';
+import {
   collectDemoWalkerRouteDiagnostics,
   type DemoRunnerTelemetry,
   type DemoWalkerConfig,
@@ -18,7 +25,9 @@ import {
 } from '../legacy-runtime/legacyDefaults';
 import { resolveLegacyAdvancedOptionsVisible } from '../legacy-runtime/legacyAdvancedOptions';
 import {
+  isLegacyWrappedStepTransition,
   type LegacyMazeSnapshot,
+  resolveLegacyNavigationTarget,
   type LegacyPoint
 } from '../legacy-runtime/legacyMaze';
 import { resolveInitialRuntimeMode } from '../legacy-runtime/legacyLaunchMode';
@@ -34,9 +43,11 @@ import {
 } from '../legacy-runtime/legacyRuntimeSeed';
 import {
   createLegacyMenuResetGenerationRequest,
+  createLegacyPlayResetGenerationRequest,
   consumeLegacyGenerationRequestState,
   createLegacyGenerationRequest,
   shouldConsumeLegacyGenerationRequest,
+  stepLegacyGenerationSeed,
   type LegacyGenerationRequest,
 } from '../legacy-runtime/legacyGenerationLifecycle';
 import {
@@ -68,9 +79,11 @@ import {
 import {
   advanceLegacyMenuDemoFrame,
   createLegacyMenuDemoBootstrap,
+  resolveLegacyMenuDemoTrail,
   type LegacyMenuDemoAdvance
 } from '../legacy-runtime/legacyMenuDemoLifecycle';
 import {
+  resolveLegacyAuthenticatedMenuButtonStack,
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
 } from '../legacy-runtime/legacyMenuLayout';
@@ -105,6 +118,14 @@ import {
   type LegacyMenuBackdropShard,
   type LegacyMenuBackdropStar
 } from '../legacy-runtime/legacyMenuBackdrop';
+import {
+  LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE,
+  resolveLegacyIridescentPlayerCoreColor,
+  resolveLegacyIridescentPlayerAccentColor,
+  resolveLegacyIridescentPlayerHaloColor,
+  resolveLegacyIridescentPulseColor,
+  resolveLegacyIridescentTrailColor
+} from '../legacy-runtime/legacyIridescentMaterial';
 import {
   createLegacyOptionFieldDrafts,
   type LegacyOptionFieldDrafts,
@@ -150,7 +171,9 @@ import {
   createLegacyGuestAuthSnapshot,
   readLegacyAuthSessionSnapshot,
   readLegacyRememberedIdentity,
+  readLegacyRememberedIdentityState,
   requestLegacyPasswordReset,
+  normalizeLegacyAuthEmail,
   resolveLegacyAuthAccountLabel,
   resolveLegacyAuthScopedStorageKey,
   resolveLegacyAuthSubmitState,
@@ -158,12 +181,33 @@ import {
   signOutLegacyAuth,
   signUpLegacyAuth,
   subscribeLegacyAuthState,
+  syncLegacyRememberedIdentityFromAuthenticatedSession,
   writeLegacyRememberedIdentity,
   type LegacyAuthFieldId,
   type LegacyAuthFormState,
-  type LegacyAuthSessionSnapshot
+  type LegacyAuthSessionSnapshot,
+  type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
-import { writeLegacyRemoteProgressionState } from '../legacy-runtime/legacyRemoteProgression';
+import {
+  LEGACY_AUTH_MESSAGE_COPY,
+  LEGACY_REMOTE_MESSAGE_COPY,
+  createLegacyPlayerMessage,
+  enqueueLegacyPlayerMessage,
+  expireLegacyPlayerMessageQueue,
+  resolveLegacyAuthFeedbackMessage,
+  resolveLegacyAuthValidationMessage,
+  resolveLegacyOverlayFieldCommitMessage,
+  resolveLegacyOverlayMovementSpeedMessage,
+  resolveLegacyOverlayToggleMessage,
+  resolveLegacyPlayerMessageColor,
+  type LegacyQueuedPlayerMessage,
+  type LegacyPlayerMessage
+} from '../legacy-runtime/legacyPlayerMessage';
+import {
+  writeLegacyRemoteCycleReceipt,
+  writeLegacyRemoteProgressionState,
+  type LegacyRemoteProgressionSyncResult
+} from '../legacy-runtime/legacyRemoteProgression';
 import {
   clampLegacyOverlayScrollOffset,
   resolveLegacyOverlayScrollMetrics,
@@ -179,6 +223,7 @@ import {
 import {
   createLegacyDemoWalkerEpisode,
   createLegacyMenuDemoWalkerConfig,
+  resolveLegacyPointFromDemoIndex,
 } from '../legacy-runtime/legacyDemoWalker';
 import {
   resolveLegacyEndpointMarkerRenderMetrics,
@@ -215,6 +260,7 @@ import {
   resolveTouchControlLayout,
   type TouchStickPullVector
 } from '../input-human/touch';
+import { applyTextResolution, resolveHudTextResolution } from '../render/textCrispness';
 
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
@@ -293,6 +339,25 @@ interface LegacyPathMaterialOptions {
   edgeColor: number;
 }
 
+type LegacyPlayerVisualMotionSnapReason = 'wrapped-step' | null;
+
+interface LegacyIridescentMaterialDiagnostics {
+  minPathColorDistance: number;
+  playerAccentColor: number;
+  playerCoreColor: number;
+  playerHaloShiftColor: number;
+  pulseHeadColor: number;
+  pulseTailColor: number;
+  shiftPeriodMs: {
+    playerAccent: number;
+    playerHalo: number;
+    pulse: number;
+    trail: number;
+  };
+  trailHeadColor: number;
+  trailTailColor: number;
+}
+
 interface MenuSceneVisualDiagnostics {
   board: {
     bounds: VisualRect;
@@ -307,6 +372,14 @@ interface MenuSceneVisualDiagnostics {
       shimmerPeriodMs: number;
       visible: boolean;
     };
+    pathMaterial: {
+      connectorSeamsEnabled: boolean;
+      seamCoreAlphaRatio: number;
+      seamEdgeAlphaRatio: number;
+      seamPadRatio: number;
+    };
+    renderResolution: MazerRenderResolutionDiagnostics;
+    topCenterNotch: VisualRect;
   };
   markerStyle: {
     goalCoreColor: number;
@@ -315,14 +388,36 @@ interface MenuSceneVisualDiagnostics {
     playerCoreRadius: number;
     playerHaloColor: number;
     playerHaloRadius: number;
+    playerBeaconAccentColor: number;
+    playerBeaconColor: number;
+    playerBeaconPeriodMs: number;
     startCoreColor: number;
     startEdgeColor: number;
     trailPulseEnabled: boolean;
     trailPulseColor: number;
     trailPulseEdgeColor: number;
+    iridescentMaterial: LegacyIridescentMaterialDiagnostics;
     trailPulsePeriodMs: number;
   };
   progression: LegacyProgressionDiagnostics;
+  progressionBadge: {
+    bounds: VisualRect | null;
+    text: string | null;
+    textBounds: VisualRect | null;
+    textFits: boolean;
+  };
+  menuCompass: {
+    bounds: VisualRect | null;
+    notchBounds: VisualRect;
+    visible: boolean;
+  };
+  remoteSync: {
+    lastError: string | null;
+    lastMessage: LegacyPlayerMessage | null;
+    lastSkippedReason: LegacyRemoteProgressionSyncResult['skippedReason'] | null;
+    lastSynced: boolean | null;
+  };
+  authAction: LegacyAuthActionDiagnostics | null;
   layout: {
     buttonHeight: number;
     buttonLayout: LegacyMenuLayout['buttonLayout'];
@@ -373,6 +468,7 @@ interface MenuSceneVisualDiagnostics {
     renderResolutionDeficit: number;
     renderResolutionTargetRatio: number;
     renderResolutionRatio: number;
+    status: MazerRenderResolutionStatus;
     undersampledForDevicePixelRatio: boolean;
   };
   hud: {
@@ -423,7 +519,10 @@ interface MenuSceneVisualDiagnostics {
   };
   overlayUi: {
     backChevron: VisualRect | null;
+    latestAuthMessage: LegacyPlayerMessage | null;
+    latestMessage: LegacyPlayerMessage | null;
     panel: VisualRect | null;
+    visibleMessages: LegacyPlayerMessage[];
     scroll: {
       bottomFadeAlpha: number;
       contentHeight: number;
@@ -441,11 +540,21 @@ interface MenuSceneVisualDiagnostics {
     mazeSize: number;
     menuDemo: {
       cue: DemoWalkerState['cue'] | null;
+      gate: {
+        nextMoveAtMs: number;
+        released: boolean;
+        waitingForBuild: boolean;
+      };
       pathCursor: number | null;
       phase: DemoWalkerState['phase'] | null;
       prerollSteps: number;
       reachedGoal: boolean;
       runnerMistakesEnabled: boolean;
+      aiMemory: {
+        optionCount: number;
+        optionPoints: LegacyPoint[];
+        targetPoint: LegacyPoint | null;
+      };
       telemetry: DemoRunnerTelemetry | null;
     };
     generation: {
@@ -458,6 +567,8 @@ interface MenuSceneVisualDiagnostics {
         shortcutStageEnabled: boolean | null;
       };
       buildKind: string | null;
+      seed: number | null;
+      seedSource: 'query' | 'runtime-random';
       executionPlan: Array<{
         advancesToStageId: number | null;
         batchSize: number | null;
@@ -599,8 +710,36 @@ interface MenuSceneVisualDiagnostics {
   };
 }
 
+interface LegacyAuthActionDiagnostics {
+  canSubmit: boolean | null;
+  emailPresent: boolean;
+  error: string | null;
+  info: string | null;
+  mode: LegacyAuthFormState['mode'];
+  passwordLength: number;
+  reason: string | null;
+  sequence: number;
+  stage: 'started' | 'blocked' | 'submitting' | 'result' | 'exception';
+  status: LegacyAuthStatus | null;
+}
+
+interface LegacyQaMoveResult {
+  accepted: boolean;
+  lifecycleLocked: boolean;
+  mode: RuntimeMode;
+  move: HumanMovementActionKind | null;
+  overlay: OverlayKind;
+  player: LegacyPoint;
+  reason: string | null;
+}
+
+interface LegacyQaDiagnosticsApi {
+  movePlayPlayer(move: string): LegacyQaMoveResult;
+}
+
 declare global {
   interface Window {
+    __MAZER_QA__?: LegacyQaDiagnosticsApi;
     __MAZER_VISUAL_CAPTURE__?: {
       enabled?: boolean;
       forceInstallMode?: string;
@@ -618,6 +757,7 @@ const MENU_BUTTON_ALPHA = 0.34;
 const LEGACY_UI_FONT_FAMILY = '"Trebuchet MS", "Segoe UI", sans-serif';
 const LEGACY_UI_MONO_FONT_FAMILY = 'Consolas, "Lucida Console", monospace';
 const MENU_TEXT_COLOR = '#ecfff5';
+const LEGACY_MENU_ACTION_GREEN = '#36ff7d';
 const LEGACY_MENU_PATH_TITLE_SHADOW = 0x02070d;
 const LEGACY_MENU_PATH_TITLE_ACCENT = 0x36ff7d;
 const LEGACY_MENU_PATH_TITLE_PRISM = 0xb7f2ff;
@@ -628,7 +768,7 @@ const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;
 const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;
 const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
 const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 6200;
-const LEGACY_MENU_PATH_TITLE_FRAME_MS = 66;
+const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;
 const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;
 const LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA = 0.44;
 const LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA = 0.92;
@@ -653,20 +793,23 @@ const LEGACY_PLAY_BOARD_FILL = 0x08111d;
 const LEGACY_PLAY_BOARD_EDGE = 0x031022;
 const LEGACY_PATH_TILE_CUE_COLOR = 0x0d3c4f;
 const LEGACY_PATH_TILE_CUE_ALPHA = 0.42;
+const LEGACY_PATH_CONNECTOR_SEAM_PAD_RATIO = 0.16;
+const LEGACY_PATH_CONNECTOR_SEAM_EDGE_ALPHA_RATIO = 0.72;
+const LEGACY_PATH_CONNECTOR_SEAM_CORE_ALPHA_RATIO = 0.94;
 const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = 0x72e0bf;
 const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = 0xb7f2ff;
 const LEGACY_BOARD_SIGIL_BORDER_SHADOW = 0x02070d;
 const LEGACY_BOARD_SIGIL_BORDER_ALPHA = 0.82;
 const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;
 const LEGACY_BOARD_SIGIL_CORNER_FACET_BASE = 0x10293a;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW = 0xb7f2ff;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS = 0x72e0bf;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM = 0xffd66b;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW = 0xc8fff4;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS = 0x9cff7d;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM = 0x72e0bf;
 const LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT = 0xffffff;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA = 0.34;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA = 0.48;
 const LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO = 0.066;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1600;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 50;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1280;
+const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 33;
 const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;
@@ -691,7 +834,7 @@ const LEGACY_OVERLAY_SCROLL_DRAG_START_PX = 3;
 const LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER = 20;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
-const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 50;
+const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;
 const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
 const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 64;
@@ -701,15 +844,26 @@ const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = 104;
 const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = 144;
 const LEGACY_PLAY_COMPASS_SPIN_DURATION_MS = 1800;
 const LEGACY_PLAY_COMPASS_SPIN_TURNS = 3.25;
+const LEGACY_PLAY_PLAYER_VISUAL_MOVE_MS = 116;
+const LEGACY_MENU_PLAYER_VISUAL_MOVE_MS = 150;
 const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
 const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
-const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
-const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.46;
+const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.46;
+const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.72;
+const LEGACY_PLAY_PLAYER_BEACON_COLOR = 0x36ff7d;
+const LEGACY_PLAY_PLAYER_BEACON_ACCENT = 0xb6ffd0;
+const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;
+const LEGACY_MENU_AI_BEACON_ALPHA_RATIO = 0.74;
+const LEGACY_MENU_AI_BEACON_RADIUS_RATIO = 0.16;
 const LEGACY_PLAY_START_MARKER_CORE = 0xfff05a;
 const LEGACY_PLAY_START_MARKER_EDGE = 0xffc629;
 const LEGACY_PLAY_GOAL_MARKER_CORE = 0xff263f;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xd81b2a;
+const LEGACY_MENU_AI_MEMORY_OPTION_CORE = 0x2de8ff;
+const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = 0x72e0bf;
+const LEGACY_MENU_AI_MEMORY_TARGET_CORE = 0xffd36a;
+const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = 0xff7a3d;
 const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;
 const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;
 const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;
@@ -784,6 +938,10 @@ export class MenuScene extends Phaser.Scene {
   private authSnapshot: LegacyAuthSessionSnapshot = createLegacyGuestAuthSnapshot();
   private authForm: LegacyAuthFormState = createEmptyLegacyAuthFormState('login');
   private activeAuthField: LegacyAuthFieldId | null = null;
+  private authNativeInput: HTMLInputElement | null = null;
+  private authNativeInputField: LegacyAuthFieldId | null = null;
+  private authNativeInputHandler: ((event: Event) => void) | null = null;
+  private authNativeKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
   private authSubmitting = false;
   private authUnsubscribe: (() => void) | null = null;
   private mazeSeed = DEFAULT_LEGACY_RUNTIME_SEED;
@@ -806,6 +964,15 @@ export class MenuScene extends Phaser.Scene {
   private menuDemoCycleRecorded = false;
   private mazeCycleTelemetryHistory: MazeCycleTelemetryHistory = readMazeCycleTelemetryHistory(undefined);
   private progressionState: LegacyProgressionState = readLegacyProgressionState(undefined);
+  private latestAuthMessage: LegacyPlayerMessage | null = null;
+  private latestRemoteSyncResult: LegacyRemoteProgressionSyncResult | null = null;
+  private latestOverlayMessage: LegacyPlayerMessage | null = null;
+  private latestAuthActionDiagnostics: LegacyAuthActionDiagnostics | null = null;
+  private authActionDiagnosticsSequence = 0;
+  private latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
+  private latestOverlayMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
+  private playerMessageQueue: LegacyQueuedPlayerMessage[] = [];
+  private playerMessageSequence = 0;
   private pendingResetRequest: LegacyResetRequest | null = null;
   private pendingOverlayMazeRebuild = false;
   private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();
@@ -822,6 +989,10 @@ export class MenuScene extends Phaser.Scene {
   private titleGraphics!: Phaser.GameObjects.Graphics;
   private footerText!: Phaser.GameObjects.Text;
   private progressionBadgeText!: Phaser.GameObjects.Text;
+  private progressionBadgeBounds: VisualRect | null = null;
+  private progressionBadgeTextBounds: VisualRect | null = null;
+  private progressionBadgeTextFits = false;
+  private menuCompassBounds: VisualRect | null = null;
   private backdropGraphics!: Phaser.GameObjects.Graphics;
   private boardStaticGraphics!: Phaser.GameObjects.Graphics;
   private boardPathGraphics!: Phaser.GameObjects.Graphics;
@@ -856,6 +1027,13 @@ export class MenuScene extends Phaser.Scene {
   private hudCompassSpinProgress: number | null = null;
   private hudCompassVisualAngleRadians: number | null = null;
   private hudCompassVisualAngleDegrees: number | null = null;
+  private playerVisualMotion: {
+    durationMs: number;
+    from: LegacyPoint;
+    startedAtMs: number;
+    to: LegacyPoint;
+  } | null = null;
+  private lastPlayerVisualMotionSnapReason: LegacyPlayerVisualMotionSnapReason = null;
   private boardStaticDirty = true;
   private boardPathDirty = true;
   private boardDynamicDirty = true;
@@ -938,19 +1116,19 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGraphics = this.add.graphics();
     this.hudGraphics = this.add.graphics();
 
-    this.footerText = this.add.text(0, 0, '', {
+    this.footerText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '18px',
       color: '#d7d6de',
       align: 'center'
-    }).setOrigin(0.5).setAlpha(0.92);
-    this.progressionBadgeText = this.add.text(0, 0, '', {
+    })).setOrigin(0.5).setAlpha(0.92);
+    this.progressionBadgeText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
       fontSize: '13px',
       fontStyle: 'bold',
       color: '#36ff7d',
       align: 'center'
-    }).setOrigin(0.5).setAlpha(0.96).setVisible(false);
+    })).setOrigin(0.5).setAlpha(0.96).setVisible(false);
 
     this.createStars();
     if (resolveInitialRuntimeMode(runtimeSearch) === 'play') {
@@ -970,6 +1148,7 @@ export class MenuScene extends Phaser.Scene {
     }
     this.installInput();
     this.installLegacyPlayFocusGuards();
+    this.installLegacyQaDiagnosticsSurface();
 
     this.scale.on('resize', () => {
       this.refreshLayout();
@@ -977,10 +1156,12 @@ export class MenuScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.authUnsubscribe?.();
       this.authUnsubscribe = null;
+      this.destroyLegacyAuthNativeInput();
       this.detachRuntimeDiagnostics();
       this.detachLegacyPlayFocusGuards();
       this.detachLegacyPlayKeyboardFallback();
       this.detachLegacyPlayTouchControlFallback();
+      this.detachLegacyQaDiagnosticsSurface();
       this.clearVisualDiagnostics();
       clearMenuSceneRuntimeDiagnostics();
     });
@@ -988,9 +1169,72 @@ export class MenuScene extends Phaser.Scene {
     this.publishRuntimeDiagnostics(this.time.now, true);
   }
 
+  private installLegacyQaDiagnosticsSurface(): void {
+    if (!this.runtimeDiagnosticsConfig.enabled || typeof window === 'undefined') {
+      return;
+    }
+
+    window.__MAZER_QA__ = {
+      movePlayPlayer: (move: string): LegacyQaMoveResult => this.handleLegacyQaPlayMove(move)
+    };
+  }
+
+  private detachLegacyQaDiagnosticsSurface(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    delete window.__MAZER_QA__;
+  }
+
+  private handleLegacyQaPlayMove(move: string): LegacyQaMoveResult {
+    const maybeMove = move as HumanMovementActionKind;
+    const normalizedMove = isMovementActionKind(maybeMove) ? maybeMove : null;
+    const base = {
+      lifecycleLocked: this.isLegacyPlayLifecycleInputLocked(),
+      mode: this.mode,
+      move: normalizedMove,
+      overlay: this.overlay,
+      player: copyPoint(this.player)
+    };
+
+    if (normalizedMove === null) {
+      return {
+        ...base,
+        accepted: false,
+        reason: 'invalid-move'
+      };
+    }
+    if (this.mode !== 'play') {
+      return {
+        ...base,
+        accepted: false,
+        reason: 'not-play-mode'
+      };
+    }
+    if (this.overlay !== 'none') {
+      return {
+        ...base,
+        accepted: false,
+        reason: 'overlay-open'
+      };
+    }
+
+    const vector = resolveHumanMovementActionVector(normalizedMove);
+    const accepted = this.tryMovePlayer(vector.deltaX, vector.deltaY);
+    return {
+      ...base,
+      accepted,
+      lifecycleLocked: this.isLegacyPlayLifecycleInputLocked(),
+      player: copyPoint(this.player),
+      reason: accepted ? null : 'blocked'
+    };
+  }
+
   public update(time: number, delta: number): void {
     this.recordRuntimeFrame(delta);
     this.updateStars(time, delta);
+    this.expireLegacyPlayerMessages(time);
 
     const pendingReset = this.pendingResetRequest;
     if (pendingReset !== null && shouldConsumeLegacyResetRequest(pendingReset, time)) {
@@ -1037,8 +1281,19 @@ export class MenuScene extends Phaser.Scene {
     if (this.hasLegacyPlayTrailPulsePendingFrame(time)) {
       this.boardDynamicDirty = true;
     }
+    if (this.hasLegacyPlayerVisualMotionPendingFrame(time)) {
+      this.boardDynamicDirty = true;
+      if (this.mode === 'play') {
+        this.hudDirty = true;
+      }
+    }
     if (this.hasLegacyBoardCornerShimmerPendingFrame(time)) {
       this.boardDynamicDirty = true;
+    }
+    if (this.isLegacyMenuHandoffAnimationActive(time)) {
+      this.boardDynamicDirty = true;
+      this.backdropDirty = true;
+      this.drawLegacyMenuPathTitle(time);
     }
 
     if (this.backdropDirty) {
@@ -1170,7 +1425,7 @@ export class MenuScene extends Phaser.Scene {
       : 0;
     const telemetrySummary = summarizeTelemetrySemantics([]);
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
-    const drawStageStaged = this.mode === 'menu' && drawStage?.executionKind === 'row-slice';
+    const drawStageStaged = drawStage?.executionKind === 'row-slice';
     const drawRowsVisible = this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics();
     const drawTilesVisible = this.resolveLegacyMenuStaticDrawTilesVisibleForDiagnostics();
     const drawTileCount = drawStageStaged && this.menuStaticDrawTileOrder.length > 0
@@ -1194,10 +1449,13 @@ export class MenuScene extends Phaser.Scene {
     const routeDiagnostics = this.menuDemoEpisode && this.menuDemoConfig
       ? collectDemoWalkerRouteDiagnostics(this.menuDemoEpisode, this.menuDemoConfig)
       : null;
+    const menuAiMemory = this.resolveLegacyMenuAiMemoryPoints();
     const runnerTelemetry = routeDiagnostics?.telemetry ?? this.menuDemoState?.telemetry ?? {
       wrongBranchCount: 0,
       backtrackCount: 0,
-      recoveryCount: 0
+      recoveryCount: 0,
+      visitedUndoCount: 0,
+      optionalRetargetCount: 0
     };
     const movementSpeedProfile = resolveLegacyMovementSpeedProfile(this.settings.movementSpeed);
     const trailSegmentCap = this.settings.toggleTrailFade
@@ -1211,10 +1469,14 @@ export class MenuScene extends Phaser.Scene {
       this.layout.boardSize
     );
     const progressionPalette = this.resolveActiveLegacyProgressionPalette();
+    const rememberedAuthIdentity = readLegacyRememberedIdentityState(this.resolveBrowserLocalStorage());
+    const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
     const playerMarkerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
       mazeRenderFrame.tileSize,
       this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : LEGACY_PLAYER_MARKER_RADIUS_RATIO,
-      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : LEGACY_PLAYER_MARKER_HALO_RATIO
+      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : LEGACY_PLAYER_MARKER_HALO_RATIO,
+      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : undefined,
+      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : undefined
     );
 
     publishMenuSceneRuntimeDiagnostics({
@@ -1225,6 +1487,24 @@ export class MenuScene extends Phaser.Scene {
       surface: {
         mode: this.mode,
         overlay: this.overlay
+      },
+      auth: {
+        configured: this.authSnapshot.configured,
+        displayName: this.authSnapshot.displayName,
+        email: this.authSnapshot.email,
+        emailPresent: this.authSnapshot.email !== null,
+        formMode: this.authForm.mode,
+        rememberedIdentity: rememberedAuthIdentity,
+        status: this.authSnapshot.status,
+        userIdPresent: this.authSnapshot.userId !== null,
+        latestMessage: this.latestAuthMessage
+          ? {
+              copy: this.latestAuthMessage.copy,
+              id: this.latestAuthMessage.id,
+              source: this.latestAuthMessage.source,
+              tone: this.latestAuthMessage.tone
+            }
+          : null
       },
       gameToggles: {
         animatedBackdrop: {
@@ -1306,6 +1586,12 @@ export class MenuScene extends Phaser.Scene {
           simultaneousDelayMs: LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS
         },
         player: {
+          renderScreenX: mazeRenderFrame.boardLeft + ((renderedPlayerPoint.x + 0.5) * mazeRenderFrame.tileSize),
+          renderScreenY: mazeRenderFrame.boardTop + ((renderedPlayerPoint.y + 0.5) * mazeRenderFrame.tileSize),
+          visualMotionActive: this.hasLegacyPlayerVisualMotionPendingFrame(time),
+          visualMotionSnapReason: this.lastPlayerVisualMotionSnapReason,
+          visualX: renderedPlayerPoint.x,
+          visualY: renderedPlayerPoint.y,
           x: this.player.x,
           y: this.player.y,
           screenX: mazeRenderFrame.boardLeft + ((this.player.x + 0.5) * mazeRenderFrame.tileSize),
@@ -1325,8 +1611,11 @@ export class MenuScene extends Phaser.Scene {
         markerStyle: {
           goalCoreColor: LEGACY_PLAY_GOAL_MARKER_CORE,
           goalEdgeColor: LEGACY_PLAY_GOAL_MARKER_EDGE,
-          playerCoreColor: progressionPalette.playerCoreColor,
+          playerCoreColor: resolveLegacyIridescentPlayerCoreColor(),
           playerCoreRadius: playerMarkerMetrics.coreRadius,
+          playerBeaconAccentColor: LEGACY_PLAY_PLAYER_BEACON_ACCENT,
+          playerBeaconColor: LEGACY_PLAY_PLAYER_BEACON_COLOR,
+          playerBeaconPeriodMs: LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS,
           playerHaloColor: progressionPalette.playerHaloColor,
           playerHaloRadius: playerMarkerMetrics.haloRadius,
           startCoreColor: LEGACY_PLAY_START_MARKER_CORE,
@@ -1334,6 +1623,7 @@ export class MenuScene extends Phaser.Scene {
           trailPulseEnabled: this.settings.toggleTrailPulse,
           trailPulseColor: progressionPalette.trailPulseColor,
           trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor,
+          iridescentMaterial: this.resolveLegacyIridescentMaterialDiagnostics(time, progressionPalette),
           trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
         }
       },
@@ -1341,11 +1631,23 @@ export class MenuScene extends Phaser.Scene {
         phase: this.menuDemoState?.phase ?? null,
         cue: this.menuDemoState?.cue ?? null,
         pathCursor: this.menuDemoState?.pathCursor ?? null,
+        gate: {
+          nextMoveAtMs: Math.round(this.nextDemoMoveAtMs),
+          released: this.menuStaticDrawLifecyclePhase === 'settled' && this.nextDemoMoveAtMs <= time,
+          waitingForBuild: this.menuStaticDrawLifecyclePhase !== 'settled'
+            || this.menuStaticDrawRowsVisible !== null
+            || this.menuStaticDrawTilesVisible !== null
+        },
         reachedGoal: this.menuDemoState?.reachedGoal ?? false,
         prerollSteps: Math.max(0, this.menuDemoConfig?.behavior.prerollSteps ?? 0),
         runnerMistakesEnabled: this.menuDemoConfig
           ? this.menuDemoConfig.behavior.enableRunnerMistakes === true
           : null,
+        aiMemory: {
+          optionCount: menuAiMemory.optionPoints.length,
+          optionPoints: menuAiMemory.optionPoints.map(copyPoint),
+          targetPoint: menuAiMemory.targetPoint ? copyPoint(menuAiMemory.targetPoint) : null
+        },
         route: routeDiagnostics ? {
           aiResetPathCursor: routeDiagnostics.aiResetPathCursor,
           canonicalPathLength: routeDiagnostics.canonicalPathLength,
@@ -1368,7 +1670,7 @@ export class MenuScene extends Phaser.Scene {
           source: this.maze.source,
           size: this.maze.size,
           seed: this.maze.seed,
-          seedSource: this.explicitRuntimeMazeSeed ? 'query' : 'runtime-random',
+          seedSource: this.mode === 'play' || !this.explicitRuntimeMazeSeed ? 'runtime-random' : 'query',
           solutionPathLength: this.maze.solutionPath.length,
           shortcutStats: this.maze.shortcutStats ? {
             requested: this.maze.shortcutStats.requested,
@@ -1419,7 +1721,7 @@ export class MenuScene extends Phaser.Scene {
           zeroHoldStartedAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null
             ? null
             : Math.round(this.menuStaticDeconstructZeroHoldStartedAtMs),
-          nextSeedQueued: this.mode === 'menu' && this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset',
+          nextSeedQueued: this.isLegacyDeconstructGenerationReason(this.pendingGenerationRequest?.reason ?? null),
           progressPercent: drawStageProgress.progressPercent,
           rowCount: drawStageProgress.rowCount,
           rowsRemaining: drawStageProgress.rowsRemaining,
@@ -1526,7 +1828,8 @@ export class MenuScene extends Phaser.Scene {
         runnerPolicy: {
           wrongBranchCount: runnerTelemetry.wrongBranchCount,
           backtrackCount: runnerTelemetry.backtrackCount,
-          recoveryCount: runnerTelemetry.recoveryCount
+          recoveryCount: runnerTelemetry.recoveryCount,
+          optionalRetargetCount: runnerTelemetry.optionalRetargetCount
         },
         intentEntryCount: 0,
         intentEntryCap: 0,
@@ -1736,12 +2039,6 @@ export class MenuScene extends Phaser.Scene {
       } else if (this.overlay === 'none') {
         this.openOverlay('pause');
       }
-      return true;
-    }
-
-    if (lowerKey === 'r' && this.mode === 'play' && (this.overlay === 'none' || this.overlay === 'pause')) {
-      event.preventDefault();
-      this.applyLegacyPauseCommand('reset-player');
       return true;
     }
 
@@ -2140,10 +2437,6 @@ export class MenuScene extends Phaser.Scene {
         }
         return true;
       case 'restart_attempt':
-        if (this.overlay === 'none' || this.overlay === 'pause') {
-          this.applyLegacyPauseCommand('reset-player');
-          return true;
-        }
         return false;
       case 'toggle_thoughts':
         return false;
@@ -2549,10 +2842,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private performLegacyPlayHeldTouchMove(): boolean {
-    const candidates = resolveHumanMovementPriorityCandidates(
-      this.playHeldTouchMoves.map((move) => move.control),
-      LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT
-    );
+    const candidates = this.resolveLegacyPlayStickIntentMoveCandidates()
+      ?? resolveHumanMovementPriorityCandidates(
+        this.playHeldTouchMoves.map((move) => move.control),
+        LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT
+      );
 
     for (const control of candidates) {
       if (this.performLegacyPlayTouchMove(control)) {
@@ -2561,6 +2855,53 @@ export class MenuScene extends Phaser.Scene {
     }
 
     return false;
+  }
+
+  private resolveLegacyPlayStickIntentMoveCandidates(): HumanMovementActionKind[] | null {
+    if (this.playTouchStickPointerId === null || this.playTouchStickPull === null) {
+      return null;
+    }
+
+    const pullVector = this.playTouchStickPull;
+    const axes: Array<{
+      control: HumanMovementActionKind;
+      deltaX: number;
+      deltaY: number;
+      magnitude: number;
+    }> = [];
+    const absoluteX = Math.abs(pullVector.normalizedX);
+    const absoluteY = Math.abs(pullVector.normalizedY);
+    if (absoluteX >= 0.08) {
+      axes.push({
+        control: pullVector.normalizedX > 0 ? 'move_right' : 'move_left',
+        deltaX: pullVector.normalizedX > 0 ? 1 : -1,
+        deltaY: 0,
+        magnitude: absoluteX
+      });
+    }
+    if (absoluteY >= 0.08) {
+      axes.push({
+        control: pullVector.normalizedY > 0 ? 'move_down' : 'move_up',
+        deltaX: 0,
+        deltaY: pullVector.normalizedY > 0 ? 1 : -1,
+        magnitude: absoluteY
+      });
+    }
+
+    const vectorOrderedControls = axes
+      .sort((left, right) => right.magnitude - left.magnitude)
+      .map((axis) => axis.control);
+    const legalOrderedControls = axes
+      .filter((axis) => resolveLegacyNavigationTarget(this.maze, this.player, axis.deltaX, axis.deltaY) !== null)
+      .sort((left, right) => right.magnitude - left.magnitude)
+      .map((axis) => axis.control);
+    const candidateSource = legalOrderedControls.length > 0
+      ? legalOrderedControls
+      : vectorOrderedControls.length > 0
+        ? vectorOrderedControls
+        : pullVector.movementCandidates;
+
+    return resolveHumanMovementPriorityCandidates(candidateSource, LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT);
   }
 
   private resolveLegacyPlayTouchControlLayout(): ReturnType<typeof resolveTouchControlLayout> {
@@ -2776,6 +3117,22 @@ export class MenuScene extends Phaser.Scene {
   private refreshLayout(): void {
     const width = this.scale.width;
     const height = this.scale.height;
+    const backingResolution = resolveMazerCanvasBackingResolution({
+      canvasCssHeight: height,
+      canvasCssWidth: width
+    });
+    const canvasRenderer = this.game.renderer as {
+      gameContext?: CanvasRenderingContext2D;
+      height?: number;
+      resize?: (width: number, height: number) => void;
+      width?: number;
+    };
+    applyMazerCanvasBackingResolution({
+      ...backingResolution,
+      canvas: this.game.canvas,
+      context: canvasRenderer.gameContext ?? this.game.canvas.getContext('2d'),
+      renderer: canvasRenderer
+    });
     const layoutSurface = this.mode === 'play' ? 'play' : 'menu';
     this.layout = resolveLegacyMenuLayout(
       width,
@@ -2806,6 +3163,7 @@ export class MenuScene extends Phaser.Scene {
       this.menuDemoConfig = bootstrap.config;
       this.menuDemoState = bootstrap.state;
       this.player = bootstrap.player;
+      this.syncLegacyPlayerVisualMotionTo(bootstrap.player);
       this.trail = bootstrap.trail;
       this.menuDemoCycleStartedAtMs = this.time.now;
       this.menuDemoCycleRecorded = false;
@@ -2815,12 +3173,10 @@ export class MenuScene extends Phaser.Scene {
       this.menuDemoConfig = createLegacyMenuDemoWalkerConfig(this.maze.seed);
       this.menuDemoState = null;
       this.player = generationState.initialPlayer;
+      this.syncLegacyPlayerVisualMotionTo(generationState.initialPlayer);
       this.trail = generationState.initialTrail;
       this.playCyclePath = generationState.initialTrail.map(copyPoint);
       this.playCycleResetUsed = false;
-      if (generationState.startsPlayTimer) {
-        this.playStartedAtMs = this.time.now;
-      }
       this.startLegacyPlayCompassSpin(this.time.now);
     }
     this.nextDemoMoveAtMs = nextDemoMoveAtMs;
@@ -2834,13 +3190,15 @@ export class MenuScene extends Phaser.Scene {
     this.armLegacyMenuStaticDrawStage();
     if (this.mode === 'menu') {
       this.nextDemoMoveAtMs = Math.max(this.nextDemoMoveAtMs, this.resolveLegacyMenuStaticDrawDemoGateAtMs());
+    } else if (generationState.startsPlayTimer) {
+      this.playStartedAtMs = Math.max(this.time.now, this.resolveLegacyMenuStaticDrawDemoGateAtMs());
     }
   }
 
   private shouldDelayLegacyMenuDeconstructRebuild(request: LegacyGenerationRequest, time: number): boolean {
     if (
-      request.reason !== 'menu-demo-goal-reset'
-      || this.mode !== 'menu'
+      !this.isLegacyDeconstructGenerationReason(request.reason)
+      || request.mode !== this.mode
       || this.menuStaticDrawLifecyclePhase !== 'deconstructing'
     ) {
       return false;
@@ -2854,14 +3212,19 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
+    const mode = this.mode;
+    const seedOverride = mode === 'play'
+      ? this.createFreshLegacyPlayGenerationSeed()
+      : undefined;
     this.applyGenerationRequest(
         createLegacyGenerationRequest({
           currentSeed: this.mazeSeed,
           dueAtMs: this.time.now,
-          mode: this.mode,
+          mode,
           queuedAtMs: this.time.now,
-          reason: this.mode === 'play' ? 'play-start' : 'boot-menu',
-          scale: this.resolveLegacyProgressionScaleForMode(this.mode)
+          reason: mode === 'play' ? 'play-start' : 'boot-menu',
+          scale: this.resolveLegacyProgressionScaleForMode(mode),
+          seedOverride
         }),
       nextDemoMoveAtMs
     );
@@ -2876,6 +3239,27 @@ export class MenuScene extends Phaser.Scene {
       nowMs: this.time.now,
       previousSeed: this.mazeSeed
     });
+  }
+
+  private createFreshLegacyPlayGenerationSeed(): number {
+    const playerTrack = this.progressionState.tracks.player;
+    const progressionSalt = (
+      (playerTrack.targetComplexity * 1009)
+      + (playerTrack.completedCycles * 9176)
+      + (playerTrack.level * 313)
+      + (playerTrack.paceScore * 37)
+    );
+    const seed = createLegacyRuntimeRandomSeed({
+      nowMs: Math.round(this.time.now + progressionSalt),
+      previousSeed: this.mazeSeed
+    });
+
+    return seed === this.mazeSeed || seed === playerTrack.lastMazeSeed
+      ? createLegacyRuntimeRandomSeed({
+        nowMs: Math.round(this.time.now + progressionSalt + 1),
+        previousSeed: stepLegacyGenerationSeed(this.mazeSeed)
+      })
+      : seed;
   }
 
   private queueGenerationRequest(
@@ -2904,7 +3288,7 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics(): number | null {
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
-    if (this.mode !== 'menu' || drawStage?.executionKind !== 'row-slice') {
+    if (drawStage?.executionKind !== 'row-slice') {
       return null;
     }
 
@@ -2912,7 +3296,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyMenuStaticDrawTilesVisibleForDiagnostics(): number | null {
-    if (this.mode !== 'menu' || this.menuStaticDrawTileOrder.length <= 0) {
+    if (this.menuStaticDrawTileOrder.length <= 0) {
       return null;
     }
 
@@ -2920,22 +3304,18 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyMenuStaticDrawRowLimit(): number | null {
-    return this.mode === 'menu' && this.menuStaticDrawRowsVisible !== null
+    return this.menuStaticDrawRowsVisible !== null
       ? this.menuStaticDrawRowsVisible
       : null;
   }
 
   private resolveLegacyMenuStaticDrawTileLimit(): number | null {
-    return this.mode === 'menu' && this.menuStaticDrawTilesVisible !== null
+    return this.menuStaticDrawTilesVisible !== null
       ? this.menuStaticDrawTilesVisible
       : null;
   }
 
   private isLegacyMenuPointVisibleInStaticDraw(point: LegacyPoint): boolean {
-    if (this.mode !== 'menu') {
-      return true;
-    }
-
     const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
     if (tileLimit !== null) {
       return this.menuStaticDrawVisibleTileKeys.has(legacyScenePointKey(point));
@@ -2996,13 +3376,23 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyMenuStaticDrawDemoGateAtMs(): number {
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
-    if (this.mode !== 'menu' || drawStage?.executionKind !== 'row-slice') {
+    if (drawStage?.executionKind !== 'row-slice') {
       return this.time.now;
     }
 
     const batchSize = Math.max(1, this.resolveLegacyMenuStaticDrawTileBatchSize());
     const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);
     return this.time.now + (tileTicks * LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS) + LEGACY_MENU_STATIC_DRAW_SETTLE_MS;
+  }
+
+  private releaseLegacyMenuDemoGateOnStaticDrawSettled(time: number): void {
+    if (this.mode !== 'menu' || !this.menuDemoState || this.menuDemoState.pathCursor > 0) {
+      return;
+    }
+
+    this.nextDemoMoveAtMs = Math.min(this.nextDemoMoveAtMs, time);
+    this.menuDemoCycleStartedAtMs = time;
+    this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
   private resolveLegacyMenuStaticDeconstructDurationMs(): number {
@@ -3037,12 +3427,27 @@ export class MenuScene extends Phaser.Scene {
     return clamp(1 - (fadeElapsedMs / LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS), 0, 1);
   }
 
+  private resolveLegacyMenuDeconstructPlayerAlpha(time: number): number {
+    if (this.menuStaticDrawLifecyclePhase !== 'deconstructing' || this.menuStaticDeconstructStartedAtMs === null) {
+      return 1;
+    }
+
+    const removeElapsedMs = time
+      - this.menuStaticDeconstructStartedAtMs
+      - LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS;
+    if (removeElapsedMs <= 0) {
+      return 1;
+    }
+
+    return clamp(1 - (removeElapsedMs / LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS), 0, 1);
+  }
+
   private resolveLegacyMenuDeconstructHandoffProgress(time: number): number {
     if (
       this.menuStaticDrawLifecyclePhase !== 'deconstructing'
       || !this.isLegacyMenuDeconstructVisualHandoffReady()
       || this.menuStaticDeconstructZeroHoldStartedAtMs === null
-      || this.pendingGenerationRequest?.reason !== 'menu-demo-goal-reset'
+      || !this.isLegacyDeconstructGenerationReason(this.pendingGenerationRequest?.reason ?? null)
     ) {
       return 0;
     }
@@ -3057,8 +3462,9 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyMenuDeconstructHandoffEndsAtMs(): number {
     const holdStartedAtMs = this.menuStaticDeconstructZeroHoldStartedAtMs ?? this.time.now;
-    const pendingDueAtMs = this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset'
-      ? this.pendingGenerationRequest.dueAtMs
+    const pendingRequest = this.pendingGenerationRequest;
+    const pendingDueAtMs = pendingRequest !== null && this.isLegacyDeconstructGenerationReason(pendingRequest.reason)
+      ? pendingRequest.dueAtMs
       : 0;
 
     return Math.max(
@@ -3071,7 +3477,7 @@ export class MenuScene extends Phaser.Scene {
     return this.menuStaticDrawLifecyclePhase === 'deconstructing'
       && this.isLegacyMenuDeconstructVisualHandoffReady()
       && this.menuStaticDeconstructZeroHoldStartedAtMs !== null
-      && this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset'
+      && this.isLegacyDeconstructGenerationReason(this.pendingGenerationRequest?.reason ?? null)
       && time < this.resolveLegacyMenuDeconstructHandoffEndsAtMs();
   }
 
@@ -3081,24 +3487,24 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private deferLegacyMenuDeconstructRebuildUntil(dueAtMs: number): void {
-    if (this.pendingGenerationRequest?.reason !== 'menu-demo-goal-reset') {
+    const pendingRequest = this.pendingGenerationRequest;
+    if (pendingRequest === null || !this.isLegacyDeconstructGenerationReason(pendingRequest.reason)) {
       return;
     }
 
-    if (this.pendingGenerationRequest.dueAtMs >= dueAtMs) {
+    if (pendingRequest.dueAtMs >= dueAtMs) {
       return;
     }
 
     this.pendingGenerationRequest = {
-      ...this.pendingGenerationRequest,
+      ...pendingRequest,
       dueAtMs
     };
   }
 
   private resolveLegacyMenuBuildPrerollProgress(time: number): number {
     if (
-      this.mode !== 'menu'
-      || this.menuStaticDrawLifecyclePhase !== 'building'
+      this.menuStaticDrawLifecyclePhase !== 'building'
       || this.menuStaticBuildPrerollStartedAtMs === null
     ) {
       return 0;
@@ -3114,6 +3520,10 @@ export class MenuScene extends Phaser.Scene {
   private isLegacyMenuBuildPrerollActive(time: number): boolean {
     const progress = this.resolveLegacyMenuBuildPrerollProgress(time);
     return progress > 0 && progress < 1;
+  }
+
+  private isLegacyMenuHandoffAnimationActive(time: number): boolean {
+    return this.isLegacyMenuBuildPrerollActive(time) || this.isLegacyMenuDeconstructHandoffActive(time);
   }
 
   private resolveLegacyMenuStaticDrawTileBatchSize(): number {
@@ -3133,7 +3543,7 @@ export class MenuScene extends Phaser.Scene {
 
   private armLegacyMenuStaticDrawStage(): void {
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
-    if (this.mode === 'menu' && drawStage?.executionKind === 'row-slice') {
+    if (drawStage?.executionKind === 'row-slice') {
       const buildPrerollStartedAtMs = this.time.now - 1;
       this.menuStaticDrawLifecyclePhase = 'building';
       this.menuStaticDeconstructStartedAtMs = null;
@@ -3162,7 +3572,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private armLegacyMenuStaticDeconstructStage(time: number): void {
-    if (this.mode !== 'menu' || this.menuStaticDrawLifecyclePhase === 'deconstructing') {
+    if (this.menuStaticDrawLifecyclePhase === 'deconstructing') {
       return;
     }
 
@@ -3181,16 +3591,31 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticDrawNextTileAtMs = this.resolveLegacyMenuStaticDeconstructTileStartAtMs(time);
     this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
-    this.queueGenerationRequest(
-      'menu-demo-goal-reset',
-      this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
-      {
-        mode: 'menu',
-        stepSeed: true
-      }
-    );
+    if (this.mode === 'play') {
+      this.pendingGenerationRequest = createLegacyPlayResetGenerationRequest({
+        currentSeed: this.mazeSeed,
+        nowMs: time + this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
+        seedOverride: this.createFreshLegacyPlayGenerationSeed(),
+        scale: this.resolveLegacyProgressionScaleForMode('play')
+      });
+    } else {
+      this.queueGenerationRequest(
+        'menu-demo-goal-reset',
+        this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
+        {
+          mode: 'menu',
+          stepSeed: true
+        }
+      );
+    }
     this.boardPathDirty = true;
     this.boardDynamicDirty = true;
+  }
+
+  private isLegacyDeconstructGenerationReason(
+    reason: LegacyGenerationRequest['reason'] | null
+  ): boolean {
+    return reason === 'menu-demo-goal-reset' || reason === 'play-goal-reset';
   }
 
   private shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame: LegacyMenuDemoAdvance): boolean {
@@ -3246,7 +3671,7 @@ export class MenuScene extends Phaser.Scene {
         if (this.menuStaticDrawTilesVisible <= 0) {
           this.menuStaticDrawTilesVisible = 0;
           this.menuStaticDrawNextTileAtMs = Number.POSITIVE_INFINITY;
-          this.titleGraphics.clear();
+          this.drawLegacyMenuPathTitle(time);
           if (this.menuStaticDeconstructZeroHoldStartedAtMs === null) {
             this.menuStaticDeconstructZeroHoldStartedAtMs = time;
           }
@@ -3275,6 +3700,7 @@ export class MenuScene extends Phaser.Scene {
         this.menuStaticDeconstructStartedAtMs = null;
         this.menuStaticBuildPrerollStartedAtMs = null;
         this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+        this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);
       }
     }
   }
@@ -3349,7 +3775,14 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.menuDemoState = nextFrame.state;
+    const previousPlayer = copyPoint(this.player);
     this.player = nextFrame.player;
+    this.armLegacyPlayerVisualMotion(
+      previousPlayer,
+      nextFrame.player,
+      time,
+      Math.min(LEGACY_MENU_PLAYER_VISUAL_MOVE_MS, Math.max(80, nextFrame.delayMs * 0.72))
+    );
     this.trail = nextFrame.trail;
     this.nextDemoMoveAtMs = time + nextFrame.delayMs;
     if (this.shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame)) {
@@ -3362,8 +3795,17 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicDirty = true;
   }
 
+  private isLegacyPlayLifecycleInputLocked(): boolean {
+    return hasPendingLegacyResetRequest(this.pendingResetRequest)
+      || this.pendingGenerationRequest !== null
+      || this.menuStaticDrawLifecyclePhase === 'building'
+      || this.menuStaticDrawLifecyclePhase === 'deconstructing'
+      || this.menuStaticDrawRowsVisible !== null
+      || this.menuStaticDrawTilesVisible !== null;
+  }
+
   private tryMovePlayer(deltaX: number, deltaY: number): boolean {
-    if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
+    if (this.isLegacyPlayLifecycleInputLocked()) {
       return false;
     }
 
@@ -3380,7 +3822,9 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
+    const previousPlayer = copyPoint(this.player);
     this.player = nextStep.player;
+    this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, LEGACY_PLAY_PLAYER_VISUAL_MOVE_MS);
     this.trail = nextStep.trail;
     this.appendLegacyPlayCyclePoint(nextStep.player);
     if (this.settings.toggleCameraFollow) {
@@ -3402,7 +3846,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startLegacyPlayDiagonalSprint(deltaX: number, deltaY: number): boolean {
-    if (hasPendingLegacyResetRequest(this.pendingResetRequest)) {
+    if (this.isLegacyPlayLifecycleInputLocked()) {
       return false;
     }
 
@@ -3433,7 +3877,7 @@ export class MenuScene extends Phaser.Scene {
     if (
       this.mode !== 'play'
       || this.overlay !== 'none'
-      || hasPendingLegacyResetRequest(this.pendingResetRequest)
+      || this.isLegacyPlayLifecycleInputLocked()
     ) {
       this.playDiagonalMoveQueue = [];
       return false;
@@ -3474,6 +3918,11 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    if (request.mode === 'play') {
+      this.armLegacyMenuStaticDeconstructStage(time);
+      return;
+    }
+
     this.pendingGenerationRequest = createLegacyMenuResetGenerationRequest({
       currentSeed: this.mazeSeed,
       nowMs: time,
@@ -3498,7 +3947,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const elapsedMs = this.backdropAccumulatedDeltaMs;
+    const elapsedMs = Math.min(this.backdropAccumulatedDeltaMs, updateIntervalMs * 2.25);
     this.backdropAccumulatedDeltaMs = 0;
     this.backdropNextUpdateAtMs = time + updateIntervalMs;
     advanceLegacyMenuBackdropStars(this.stars, elapsedMs, this.settings.darkMode);
@@ -3801,10 +4250,10 @@ export class MenuScene extends Phaser.Scene {
     const fillMaterialFrame = (
       frame: { height: number; leftInset: number; topInset: number; width: number }
     ): void => {
-      const left = tileRect.left + Math.round((frame.leftInset / materialTileSize) * tileRect.width);
-      const top = tileRect.top + Math.round((frame.topInset / materialTileSize) * tileRect.height);
-      const right = tileRect.left + Math.round(((frame.leftInset + frame.width) / materialTileSize) * tileRect.width);
-      const bottom = tileRect.top + Math.round(((frame.topInset + frame.height) / materialTileSize) * tileRect.height);
+      const left = tileRect.left + Math.floor((frame.leftInset / materialTileSize) * tileRect.width);
+      const top = tileRect.top + Math.floor((frame.topInset / materialTileSize) * tileRect.height);
+      const right = tileRect.left + Math.ceil(((frame.leftInset + frame.width) / materialTileSize) * tileRect.width);
+      const bottom = tileRect.top + Math.ceil(((frame.topInset + frame.height) / materialTileSize) * tileRect.height);
 
       graphics.fillRect(
         left,
@@ -3821,6 +4270,15 @@ export class MenuScene extends Phaser.Scene {
 
     graphics.fillStyle(options.coreColor, options.coreAlpha);
     fillMaterialFrame(frames.core);
+    this.fillLegacyPathConnectorSeams(
+      graphics,
+      point,
+      pathSource,
+      tileRect,
+      frames,
+      materialTileSize,
+      options
+    );
 
     if (options.drawCue === true) {
       const cueSize = Math.max(1, Math.floor(Math.min(tileRect.width, tileRect.height) * 0.22));
@@ -3836,6 +4294,87 @@ export class MenuScene extends Phaser.Scene {
         cueSize,
         cueSize
       );
+    }
+  }
+
+  private fillLegacyPathConnectorSeams(
+    graphics: Phaser.GameObjects.Graphics,
+    point: LegacyPoint,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+    tileRect: LegacyPixelTileRect,
+    frames: ReturnType<typeof resolveLegacyMenuPathRenderFrames>,
+    materialTileSize: number,
+    options: LegacyPathMaterialOptions
+  ): void {
+    const coreFrame = frames.core;
+    const coreLeft = tileRect.left + Math.floor((coreFrame.leftInset / materialTileSize) * tileRect.width);
+    const coreTop = tileRect.top + Math.floor((coreFrame.topInset / materialTileSize) * tileRect.height);
+    const coreRight = tileRect.left + Math.ceil(((coreFrame.leftInset + coreFrame.width) / materialTileSize) * tileRect.width);
+    const coreBottom = tileRect.top + Math.ceil(((coreFrame.topInset + coreFrame.height) / materialTileSize) * tileRect.height);
+    const coreWidth = Math.max(1, coreRight - coreLeft);
+    const coreHeight = Math.max(1, coreBottom - coreTop);
+    const tileRight = tileRect.left + tileRect.width;
+    const tileBottom = tileRect.top + tileRect.height;
+    const seamPad = Math.max(1, Math.round(Math.min(tileRect.width, tileRect.height) * LEGACY_PATH_CONNECTOR_SEAM_PAD_RATIO));
+    const seamEdgeAlpha = Math.min(options.edgeAlpha, options.edgeAlpha * LEGACY_PATH_CONNECTOR_SEAM_EDGE_ALPHA_RATIO);
+    const seamCoreAlpha = Math.min(options.coreAlpha, options.coreAlpha * LEGACY_PATH_CONNECTOR_SEAM_CORE_ALPHA_RATIO);
+    const hasConnectedNeighbor = (deltaX: number, deltaY: number): boolean =>
+      pathSource.grid[point.y + deltaY]?.[point.x + deltaX] === true;
+    const fillRect = (left: number, top: number, width: number, height: number): void => {
+      graphics.fillRect(left, top, Math.max(1, width), Math.max(1, height));
+    };
+    const seamRects: Array<{ height: number; left: number; top: number; width: number }> = [];
+
+    if (hasConnectedNeighbor(-1, 0)) {
+      seamRects.push({
+        left: tileRect.left,
+        top: coreTop,
+        width: (coreLeft - tileRect.left) + seamPad,
+        height: coreHeight
+      });
+    }
+    if (hasConnectedNeighbor(1, 0)) {
+      seamRects.push({
+        left: coreRight - seamPad,
+        top: coreTop,
+        width: (tileRight - coreRight) + seamPad,
+        height: coreHeight
+      });
+    }
+    if (hasConnectedNeighbor(0, -1)) {
+      seamRects.push({
+        left: coreLeft,
+        top: tileRect.top,
+        width: coreWidth,
+        height: (coreTop - tileRect.top) + seamPad
+      });
+    }
+    if (hasConnectedNeighbor(0, 1)) {
+      seamRects.push({
+        left: coreLeft,
+        top: coreBottom - seamPad,
+        width: coreWidth,
+        height: (tileBottom - coreBottom) + seamPad
+      });
+    }
+
+    if (seamRects.length <= 0) {
+      return;
+    }
+
+    graphics.fillStyle(options.edgeColor, seamEdgeAlpha);
+    for (const seam of seamRects) {
+      fillRect(
+        seam.left - seamPad,
+        seam.top - seamPad,
+        seam.width + (seamPad * 2),
+        seam.height + (seamPad * 2)
+      );
+    }
+
+    graphics.fillStyle(options.coreColor, seamCoreAlpha);
+    for (const seam of seamRects) {
+      fillRect(seam.left, seam.top, seam.width, seam.height);
     }
   }
 
@@ -3877,7 +4416,8 @@ export class MenuScene extends Phaser.Scene {
         mazeLeft,
         mazeTop,
         mazeSize,
-        tileRect
+        tileRect,
+        topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardSize)
       });
 
       for (const dockArea of dockAreas) {
@@ -3931,7 +4471,7 @@ export class MenuScene extends Phaser.Scene {
           coreAlpha: isMenuMode ? 0.92 : 0.96,
           coreColor: pathColor,
           cueAlpha: isMenuMode ? LEGACY_PATH_TILE_CUE_ALPHA : LEGACY_PATH_TILE_CUE_ALPHA * 0.82,
-          drawCue: this.pathVisualStyle === 'hybrid',
+          drawCue: false,
           edgeAlpha: isMenuMode ? LEGACY_MENU_PATH_EDGE_ALPHA : LEGACY_PLAY_PATH_EDGE_ALPHA,
           edgeColor: isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE
         }
@@ -3959,7 +4499,7 @@ export class MenuScene extends Phaser.Scene {
     };
 
     const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
-    if (isMenuMode && tileLimit !== null) {
+    if (tileLimit !== null) {
       for (let index = 0; index < Math.min(tileLimit, this.menuStaticDrawTileOrder.length); index += 1) {
         const point = this.menuStaticDrawTileOrder[index];
         if (point) {
@@ -3969,7 +4509,7 @@ export class MenuScene extends Phaser.Scene {
     } else {
       for (let y = 0; y < this.maze.size; y += 1) {
         for (let x = 0; x < this.maze.size; x += 1) {
-          if (isMenuMode && !this.isLegacyMenuPointVisibleInStaticDraw({ x, y })) {
+          if (!this.isLegacyMenuPointVisibleInStaticDraw({ x, y })) {
             continue;
           }
           drawPathPoint({ x, y });
@@ -4028,7 +4568,14 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyMenuPathTitleAnimationPhase(time: number): number {
-    return (time % LEGACY_MENU_PATH_TITLE_SWEEP_MS) / LEGACY_MENU_PATH_TITLE_SWEEP_MS;
+    const phase = (time % LEGACY_MENU_PATH_TITLE_SWEEP_MS) / LEGACY_MENU_PATH_TITLE_SWEEP_MS;
+    return phase <= 0.5 ? phase * 2 : (1 - phase) * 2;
+  }
+
+  private resolveLegacyMenuPathTitleAnimationDirection(time: number): 'forward' | 'reverse' {
+    return ((time % LEGACY_MENU_PATH_TITLE_SWEEP_MS) / LEGACY_MENU_PATH_TITLE_SWEEP_MS) <= 0.5
+      ? 'forward'
+      : 'reverse';
   }
 
   private resolveLegacyMenuPathTitleOrbitPhase(time: number): number {
@@ -4059,7 +4606,11 @@ export class MenuScene extends Phaser.Scene {
     return {
       column: (progress * (columns + (overscan * 2))) - overscan,
       diagonalPosition: (progress * travel) - overscan,
-      direction: mode === 'build' ? 'forward' : mode === 'deconstruct' ? 'reverse' : 'idle',
+      direction: mode === 'build'
+        ? 'forward'
+        : mode === 'deconstruct'
+          ? 'reverse'
+          : this.resolveLegacyMenuPathTitleAnimationDirection(time),
       mode,
       phase: syncedToLifecycle ? progress : idlePhase,
       progress,
@@ -4449,50 +5000,51 @@ export class MenuScene extends Phaser.Scene {
     );
     const visiblePieceCount = this.resolveLegacyMenuPathTitleVisiblePieces(titleLayout.cells.length);
     const visibleCells = titleLayout.cells.slice(0, visiblePieceCount);
-    if (visibleCells.length <= 0) {
-      return;
-    }
     const titlePathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'> = {
       grid: titleLayout.grid,
       size: titleLayout.columns
     };
 
-    for (const cell of visibleCells) {
-      this.drawLegacyMenuPathTitleCell(
-        cell,
-        titlePathSource,
-        titleLayout.left + titlePresentation.shadowOffsetX,
-        titleLayout.top + titlePresentation.shadowOffsetY,
-        titleLayout.cellSize,
-        {
-          coreAlpha: LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA,
-          coreColor: LEGACY_MENU_PATH_TITLE_SHADOW,
-          edgeAlpha: LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA,
-          edgeColor: LEGACY_MENU_PATH_TITLE_SHADOW
-        }
-      );
+    if (visibleCells.length > 0) {
+      for (const cell of visibleCells) {
+        this.drawLegacyMenuPathTitleCell(
+          cell,
+          titlePathSource,
+          titleLayout.left + titlePresentation.shadowOffsetX,
+          titleLayout.top + titlePresentation.shadowOffsetY,
+          titleLayout.cellSize,
+          {
+            coreAlpha: LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA,
+            coreColor: LEGACY_MENU_PATH_TITLE_SHADOW,
+            edgeAlpha: LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA,
+            edgeColor: LEGACY_MENU_PATH_TITLE_SHADOW
+          }
+        );
+      }
     }
 
     this.drawLegacyMenuPathTitleSigilRails(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
 
-    for (const cell of visibleCells) {
-      this.drawLegacyMenuPathTitleCell(
-        cell,
-        titlePathSource,
-        titleLayout.left,
-        titleLayout.top,
-        titleLayout.cellSize,
-        {
-          coreAlpha: 0.92 * titlePresentation.titleAlpha,
-          coreColor: LEGACY_MENU_PATH_CORE,
-          edgeAlpha: LEGACY_MENU_PATH_EDGE_ALPHA * titlePresentation.titleAlpha,
-          edgeColor: LEGACY_MENU_PATH_EDGE
-        }
-      );
-    }
+    if (visibleCells.length > 0) {
+      for (const cell of visibleCells) {
+        this.drawLegacyMenuPathTitleCell(
+          cell,
+          titlePathSource,
+          titleLayout.left,
+          titleLayout.top,
+          titleLayout.cellSize,
+          {
+            coreAlpha: 0.92 * titlePresentation.titleAlpha,
+            coreColor: LEGACY_MENU_PATH_CORE,
+            edgeAlpha: LEGACY_MENU_PATH_EDGE_ALPHA * titlePresentation.titleAlpha,
+            edgeColor: LEGACY_MENU_PATH_EDGE
+          }
+        );
+      }
 
-    this.drawLegacyMenuPathTitleGemFacets(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
-    this.drawLegacyMenuPathTitlePrismSweep(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
+      this.drawLegacyMenuPathTitleGemFacets(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
+      this.drawLegacyMenuPathTitlePrismSweep(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
+    }
     this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);
 
     const cursorCell = visibleCells.at(-1);
@@ -4527,6 +5079,29 @@ export class MenuScene extends Phaser.Scene {
       tileSize: renderSize / Math.max(1, this.maze.size),
       safeInset
     };
+  }
+
+  private resolveLegacyBoardTopCenterNotchBounds(
+    boardLeft: number,
+    boardTop: number,
+    boardSize: number
+  ): VisualRect {
+    const inset = 2;
+    const outerLeft = boardLeft - inset;
+    const outerTop = boardTop - inset;
+    const outerSize = boardSize + (inset * 2);
+    const mid = Math.max(7, Math.round(boardSize * 0.028));
+    const halfWidth = Math.max(mid + 5, Math.round(boardSize * 0.046));
+    const top = Math.round(outerTop - 1);
+    const bottom = Math.round(outerTop + mid + Math.max(Math.round(boardSize * 0.04), 13));
+    const centerX = outerLeft + (outerSize / 2);
+
+    return createVisualRect(
+      Math.round(centerX - halfWidth),
+      top,
+      Math.round(halfWidth * 2),
+      Math.max(1, bottom - top)
+    );
   }
 
   private resolveLegacyPixelTileRect(
@@ -4637,7 +5212,7 @@ export class MenuScene extends Phaser.Scene {
     const phase = (time % LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS) / LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS;
     const wave = 0.5 + (Math.sin(phase * Math.PI * 2) * 0.5);
     const glint = Math.max(0, Math.sin((phase * Math.PI * 4) - 0.6));
-    return LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA + (wave * 0.085) + (glint * 0.04);
+    return LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA + (wave * 0.14) + (glint * 0.08);
   }
 
   private hasLegacyBoardCornerShimmerPendingFrame(time: number): boolean {
@@ -4657,7 +5232,7 @@ export class MenuScene extends Phaser.Scene {
     const right = outerLeft + outerSize;
     const bottom = outerTop + outerSize;
     const corner = Math.max(16, Math.round(boardSize * LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO));
-    const baseAlpha = clamp(this.resolveLegacyBoardCornerFacetAlpha(time), 0.3, 0.58);
+    const baseAlpha = clamp(this.resolveLegacyBoardCornerFacetAlpha(time), 0.42, 0.82);
     const phase = (time % LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS) / LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS;
     const corners = [
       { x: outerLeft, y: outerTop, sx: 1, sy: 1 },
@@ -4686,8 +5261,8 @@ export class MenuScene extends Phaser.Scene {
       const prismStep = 0.3 + (wave * 0.2);
       const prismX = Math.round(cornerGlyph.x + (cornerGlyph.sx * (corner * prismStep)));
       const prismY = Math.round(cornerGlyph.y + (cornerGlyph.sy * (corner * prismStep)));
-      const prismAlpha = clamp(baseAlpha * (0.45 + (wave * 0.5)), 0.16, 0.5);
-      const glintAlpha = clamp(baseAlpha * (0.95 + (wave * 0.75)), 0.26, 0.74);
+      const prismAlpha = clamp(baseAlpha * (0.55 + (wave * 0.62)), 0.26, 0.74);
+      const glintAlpha = clamp(baseAlpha * (1.05 + (wave * 0.82)), 0.38, 0.96);
 
       this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW, baseAlpha * (0.18 + (wave * 0.18)));
       this.boardDynamicGraphics.fillTriangle(originX, originY, edgeX, originY, originX, edgeY);
@@ -4702,15 +5277,36 @@ export class MenuScene extends Phaser.Scene {
         { x: glintX, y: cornerGlyph.y + (cornerGlyph.sy * 3) },
         { x: cornerGlyph.x + (cornerGlyph.sx * 3), y: glintY }
       ]);
+      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM, glintAlpha * 0.72);
+      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
+        { x: glintX - (cornerGlyph.sx * 3), y: cornerGlyph.y + (cornerGlyph.sy * 6) },
+        { x: cornerGlyph.x + (cornerGlyph.sx * 6), y: glintY - (cornerGlyph.sy * 3) }
+      ]);
+      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT, glintAlpha * 0.38);
+      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
+        { x: glintX + (cornerGlyph.sx * 2), y: cornerGlyph.y + (cornerGlyph.sy * 5) },
+        { x: cornerGlyph.x + (cornerGlyph.sx * 5), y: glintY + (cornerGlyph.sy * 2) }
+      ]);
+      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT, glintAlpha * 0.5);
+      this.boardDynamicGraphics.fillCircle(
+        cornerGlyph.x + (cornerGlyph.sx * (corner * (0.24 + (wave * 0.38)))),
+        cornerGlyph.y + (cornerGlyph.sy * (corner * (0.24 + (wave * 0.38)))),
+        1.1 + (wave * 1.2)
+      );
       this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT, glintAlpha * 0.46);
       this.strokeLegacyPolyline(this.boardDynamicGraphics, [
         { x: originX, y: originY },
         { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.32)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.32)) }
       ]);
-      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS, baseAlpha * 0.62);
+      this.boardDynamicGraphics.lineStyle(2, LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS, baseAlpha * 0.78);
       this.strokeLegacyPolyline(this.boardDynamicGraphics, [
         { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.34)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.76)) },
         { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.76)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.34)) }
+      ]);
+      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT, glintAlpha * 0.62);
+      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
+        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.16)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.84)) },
+        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.84)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.16)) }
       ]);
     }
   }
@@ -4805,13 +5401,11 @@ export class MenuScene extends Phaser.Scene {
     const trail = this.mode === 'menu'
       ? this.trail
       : buildPathTrail(this.trail, this.settings.toggleTrailFade ? TRAIL_FADE_TAIL : null);
-    const visibleTrail = this.mode === 'menu'
-      ? trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))
-      : trail;
+    const visibleTrail = trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point));
     const menuTrailAlphaMultiplier = this.mode === 'menu'
       ? this.resolveLegacyMenuDeconstructTrailAlpha(time)
       : 1;
-    const dynamicTrailPathSource = this.resolveLegacyPointPathSource(visibleTrail);
+    const dynamicTrailPathSource = this.maze;
     const boardOffset = this.resolveBoardOffset();
     const resolvedBoardLeft = boardLeft + boardOffset.x;
     const resolvedBoardTop = boardTop + boardOffset.y;
@@ -4824,14 +5418,19 @@ export class MenuScene extends Phaser.Scene {
     const mazeTop = mazeRenderFrame.boardTop;
     const mazeTileSize = mazeRenderFrame.tileSize;
     const progressionPalette = this.resolveActiveLegacyProgressionPalette();
+    const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
 
+    this.menuCompassBounds = null;
     this.drawLegacyBoardCornerFacetShimmer(resolvedBoardLeft, resolvedBoardTop, boardSize, time);
     this.drawLegacyProgressionBadge(mazeRenderFrame, progressionPalette);
+    if (this.mode === 'menu' && this.overlay === 'none') {
+      this.drawLegacyMenuCompass(mazeRenderFrame, progressionPalette, time);
+    }
 
-    if (this.maze.start && (this.mode !== 'menu' || this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start))) {
+    if (this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
       this.fillPlayDynamicMarkerTile(this.maze.start, LEGACY_PLAY_START_MARKER_EDGE, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');
     }
-    if (this.maze.goal && (this.mode !== 'menu' || this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal))) {
+    if (this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
       this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, mazeLeft, mazeTop, mazeTileSize, 0.95, 'goal');
     }
 
@@ -4841,12 +5440,18 @@ export class MenuScene extends Phaser.Scene {
         continue;
       }
 
-      const alpha = this.mode === 'play'
-        ? clamp(0.34 + ((index / Math.max(1, visibleTrail.length - 1)) * 0.66), 0.34, 1)
-        : clamp(0.22 + ((index / Math.max(1, visibleTrail.length - 1)) * 0.82), 0.22, 1);
-      const trailColor = this.settings.darkMode
-        ? progressionPalette.trailPulseEdgeColor
-        : progressionPalette.trailColor;
+      const shouldFadeTrailByAge = this.mode === 'play' || this.settings.toggleTrailFade;
+      const alpha = shouldFadeTrailByAge
+        ? this.mode === 'play'
+          ? clamp(0.34 + ((index / Math.max(1, visibleTrail.length - 1)) * 0.66), 0.34, 1)
+          : clamp(0.22 + ((index / Math.max(1, visibleTrail.length - 1)) * 0.82), 0.22, 1)
+        : 0.94;
+      const trailColor = resolveLegacyIridescentTrailColor(
+        index,
+        visibleTrail.length,
+        time,
+        progressionPalette.trailColor
+      );
       const trailAlpha = this.settings.darkMode && this.mode === 'menu'
         ? clamp(alpha + 0.08, 0, 1)
         : alpha;
@@ -4864,6 +5469,22 @@ export class MenuScene extends Phaser.Scene {
           resolvedTrailAlpha,
           dynamicTrailPathSource
         );
+        this.drawLegacyDynamicTrailBorderDock(
+          point,
+          trailColor,
+          LEGACY_MENU_PATH_EDGE,
+          LEGACY_MENU_PATH_EDGE_ALPHA,
+          0.92,
+          resolvedTrailAlpha,
+          resolvedBoardLeft,
+          resolvedBoardTop,
+          boardSize,
+          mazeLeft,
+          mazeTop,
+          mazeRenderFrame.boardSize,
+          mazeTileSize,
+          dynamicTrailPathSource
+        );
       } else {
         this.fillLegacyPlayDynamicPathTile(
           point,
@@ -4874,35 +5495,73 @@ export class MenuScene extends Phaser.Scene {
           resolvedTrailAlpha,
           dynamicTrailPathSource
         );
+        this.drawLegacyDynamicTrailBorderDock(
+          point,
+          trailColor,
+          LEGACY_PLAY_PATH_EDGE,
+          LEGACY_PLAY_PATH_EDGE_ALPHA,
+          0.96,
+          resolvedTrailAlpha,
+          resolvedBoardLeft,
+          resolvedBoardTop,
+          boardSize,
+          mazeLeft,
+          mazeTop,
+          mazeRenderFrame.boardSize,
+          mazeTileSize,
+          dynamicTrailPathSource
+        );
       }
+    }
+
+    if (this.mode === 'menu' && menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
+      this.drawLegacyMenuAiMemoryOverlay(
+        mazeLeft,
+        mazeTop,
+        mazeTileSize,
+        menuTrailAlphaMultiplier,
+        dynamicTrailPathSource,
+        time
+      );
     }
 
     if (this.settings.toggleTrailPulse) {
       if (menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
         this.drawLegacyPlayDynamicTrailPulse(
           visibleTrail,
-          mazeLeft,
-          mazeTop,
-          mazeTileSize,
-          time,
-          dynamicTrailPathSource,
+        mazeLeft,
+        mazeTop,
+        resolvedBoardLeft,
+        resolvedBoardTop,
+        boardSize,
+        mazeRenderFrame.boardSize,
+        mazeTileSize,
+        time,
+        dynamicTrailPathSource,
           progressionPalette
         );
       }
     }
 
+    const playerAlpha = this.resolveLegacyMenuDeconstructPlayerAlpha(time);
     if (this.mode === 'menu') {
       if (
         this.menuStaticDrawLifecyclePhase !== 'deconstructing'
         && this.isLegacyMenuPointVisibleInStaticDraw(this.player)
       ) {
-        this.fillLegacyPlayerMarkerTile(this.player, mazeLeft, mazeTop, mazeTileSize, 0.94, false, progressionPalette);
+        this.fillLegacyPlayerMarkerTile(renderedPlayerPoint, mazeLeft, mazeTop, mazeTileSize, 0.94 * playerAlpha, false, progressionPalette, time);
       }
     } else {
-      this.fillLegacyPlayerMarkerTile(this.player, mazeLeft, mazeTop, mazeTileSize, 1, true, progressionPalette);
+      if (
+        playerAlpha > 0
+        && this.menuStaticDrawLifecyclePhase !== 'building'
+        && this.isLegacyMenuPointVisibleInStaticDraw(this.player)
+      ) {
+        this.fillLegacyPlayerMarkerTile(renderedPlayerPoint, mazeLeft, mazeTop, mazeTileSize, playerAlpha, true, progressionPalette, time);
+      }
     }
 
-    if (this.mode === 'menu') {
+    if (this.mode === 'menu' || this.mode === 'play') {
       this.drawLegacyMenuDeconstructHandoffBurst(
         boardLeft,
         boardTop,
@@ -4922,36 +5581,57 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyProgressionBadge(
     mazeRenderFrame: LegacyMazeRenderFrame,
     palette: LegacyProgressionPalette
-  ): void {
+  ): VisualRect | null {
     if (this.overlay !== 'none') {
+      this.progressionBadgeBounds = null;
+      this.progressionBadgeTextBounds = null;
+      this.progressionBadgeTextFits = false;
       this.progressionBadgeText.setVisible(false);
-      return;
+      return null;
     }
 
-    const text = palette.label;
-    const fontSize = clampInteger(Math.round(mazeRenderFrame.tileSize * 0.54), 10, 14);
-    const width = clampInteger(
-      Math.round(text.length * (fontSize * 0.64) + 28),
-      78,
-      Math.round(mazeRenderFrame.boardSize * 0.54)
+    const text = this.resolveLegacyProgressionBadgeText(palette);
+    const baseFontSize = this.mode === 'menu'
+      ? clampInteger(Math.round(mazeRenderFrame.tileSize * 0.64), 11, 14)
+      : clampInteger(Math.round(mazeRenderFrame.tileSize * 0.68), 11, 14);
+    const maxWidth = Math.max(
+      178,
+      Math.min(
+        this.layout.width - 18,
+        Math.round(mazeRenderFrame.boardSize + (mazeRenderFrame.safeInset * 2))
+      )
     );
-    const height = clampInteger(Math.round(fontSize * 1.95), 20, 28);
+    const horizontalPadding = this.mode === 'menu'
+      ? clampInteger(Math.round(mazeRenderFrame.tileSize * 2.85), 22, 30)
+      : clampInteger(Math.round(mazeRenderFrame.tileSize * 3.3), 24, 34);
+    const verticalPadding = clampInteger(Math.round(mazeRenderFrame.tileSize * 1.35), 9, 14);
+    this.progressionBadgeText
+      .setText(text)
+      .setFontSize(baseFontSize)
+      .setLineSpacing(2)
+      .setColor(LEGACY_MENU_ACTION_GREEN);
+    this.fitLegacyUiTextToWidth(
+      this.progressionBadgeText,
+      maxWidth - horizontalPadding,
+      baseFontSize,
+      10
+    );
+    const fittedTextWidth = Math.ceil(this.progressionBadgeText.width);
+    const fittedTextHeight = Math.ceil(this.progressionBadgeText.height);
+    const width = clampInteger(
+      fittedTextWidth + horizontalPadding,
+      178,
+      maxWidth
+    );
+    const height = clampInteger(fittedTextHeight + verticalPadding, 38, 58);
     const centerX = mazeRenderFrame.boardLeft + (mazeRenderFrame.boardSize / 2);
-    const outerInset = Math.max(0, (this.layout.boardSize - mazeRenderFrame.boardSize) / 2);
-    const boardBottom = mazeRenderFrame.boardTop + mazeRenderFrame.boardSize + outerInset;
-    const buttonTop = this.layout.centerButtonY - (this.layout.buttonHeight / 2);
-    const availableGap = Math.max(0, buttonTop - boardBottom);
-    const badgeGap = clampInteger(Math.round(Math.min(mazeRenderFrame.tileSize * 0.95, availableGap * 0.22)), 5, 10);
-    const buttonGap = clampInteger(Math.round(Math.min(mazeRenderFrame.tileSize * 1.05, availableGap * 0.26)), 6, 12);
-    const minimumCenterY = boardBottom + badgeGap + (height / 2);
-    const maximumCenterY = buttonTop - buttonGap - (height / 2);
-    const centerY = maximumCenterY >= minimumCenterY
-      ? Math.round((minimumCenterY + maximumCenterY) / 2)
-      : minimumCenterY;
+    const centerY = this.mode === 'play'
+      ? this.resolveLegacyPlayProgressionBadgeCenterY(mazeRenderFrame, height)
+      : this.resolveLegacyMenuProgressionBadgeCenterY(mazeRenderFrame, height);
 
     this.drawLegacyCyberPanel(this.boardDynamicGraphics, {
       active: true,
-      alpha: 0.32,
+      alpha: 0.42,
       fill: LEGACY_PLAY_HUD_TIMER_PANE,
       height,
       left: centerX - (width / 2),
@@ -4959,14 +5639,192 @@ export class MenuScene extends Phaser.Scene {
       top: centerY - (height / 2),
       width
     });
-    this.boardDynamicGraphics.lineStyle(1, palette.rankColor, 0.55);
+    this.boardDynamicGraphics.lineStyle(1, palette.rankColor, 0.72);
     this.boardDynamicGraphics.strokeRoundedRect(centerX - (width / 2), centerY - (height / 2), width, height, 7);
     this.progressionBadgeText
-      .setText(text)
-      .setFontSize(fontSize)
-      .setColor(palette.badgeColor)
       .setPosition(centerX, centerY)
       .setVisible(true);
+
+    const badgeBounds = createVisualRect(centerX - (width / 2), centerY - (height / 2), width, height);
+    const rawTextBounds = this.progressionBadgeText.getBounds();
+    const textBounds = createVisualRect(rawTextBounds.x, rawTextBounds.y, rawTextBounds.width, rawTextBounds.height);
+    this.progressionBadgeBounds = badgeBounds;
+    this.progressionBadgeTextBounds = textBounds;
+    this.progressionBadgeTextFits = textBounds.left >= badgeBounds.left + 4
+      && textBounds.right <= badgeBounds.right - 4
+      && textBounds.top >= badgeBounds.top + 2
+      && textBounds.bottom <= badgeBounds.bottom - 2;
+
+    return badgeBounds;
+  }
+
+  private resolveLegacyMenuProgressionBadgeCenterY(
+    mazeRenderFrame: LegacyMazeRenderFrame,
+    height: number
+  ): number {
+    const outerInset = Math.max(0, (this.layout.boardSize - mazeRenderFrame.boardSize) / 2);
+    const boardBottom = mazeRenderFrame.boardTop + mazeRenderFrame.boardSize + outerInset;
+    const authenticatedStack = this.authSnapshot.status === 'authenticated'
+      ? resolveLegacyAuthenticatedMenuButtonStack(this.layout)
+      : null;
+    const firstButtonCenterY = authenticatedStack?.startButtonY ?? this.layout.centerButtonY;
+    const buttonTop = firstButtonCenterY - (this.layout.buttonHeight / 2);
+    const availableGap = Math.max(0, buttonTop - boardBottom);
+    const badgeGap = clampInteger(Math.round(Math.min(mazeRenderFrame.tileSize * 0.95, availableGap * 0.22)), 5, 10);
+    const buttonGap = clampInteger(Math.round(Math.min(mazeRenderFrame.tileSize * 1.05, availableGap * 0.26)), 6, 12);
+    const minimumCenterY = boardBottom + badgeGap + (height / 2);
+    const maximumCenterY = buttonTop - buttonGap - (height / 2);
+
+    return maximumCenterY >= minimumCenterY
+      ? Math.round((minimumCenterY + maximumCenterY) / 2)
+      : minimumCenterY;
+  }
+
+  private resolveLegacyPlayProgressionBadgeCenterY(
+    mazeRenderFrame: LegacyMazeRenderFrame,
+    height: number
+  ): number {
+    const mazeGap = clampInteger(Math.round(mazeRenderFrame.tileSize * 3), 20, 32);
+    const minimumTop = 6;
+    const desiredTop = mazeRenderFrame.boardTop - mazeGap - height;
+    const top = Math.max(minimumTop, desiredTop);
+
+    return Math.round(top + (height / 2));
+  }
+
+  private formatLegacyElapsedLabel(elapsedMs: number): string {
+    const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  private formatLegacyProgressionRunCount(completedCycles: number): string {
+    const roundedCycles = Math.max(0, Math.round(completedCycles));
+
+    return `${Math.min(99_999, roundedCycles)}${roundedCycles > 99_999 ? '+' : ''}`;
+  }
+
+  private resolveLegacyMenuAiElapsedMs(): number {
+    if (this.mode !== 'menu') {
+      return 0;
+    }
+
+    const activeTrack = this.progressionState.tracks['ai-runner'];
+    if (
+      this.menuStaticDrawLifecyclePhase === 'settled'
+      && this.menuStaticDrawRowsVisible === null
+      && this.menuStaticDrawTilesVisible === null
+      && !this.menuDemoCycleRecorded
+    ) {
+      return Math.max(0, Math.round(this.time.now - this.menuDemoCycleStartedAtMs));
+    }
+
+    return activeTrack.lastCompletionTimeMs ?? 0;
+  }
+
+  private resolveLegacyProgressionBadgeText(_palette: LegacyProgressionPalette): string {
+    if (this.mode !== 'menu') {
+      const playerTrack = this.progressionState.tracks.player;
+      const skillLine = `Player Skill  Level ${String(playerTrack.level).padStart(2, '0')}  Rank ${playerTrack.rank}`;
+      const runLine = `Runs ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}`;
+
+      return `${skillLine}\n${runLine}`;
+    }
+
+    const timerLabel = this.formatLegacyElapsedLabel(this.resolveLegacyMenuAiElapsedMs());
+    const aiTrack = this.progressionState.tracks['ai-runner'];
+    const scoreLabel = aiTrack.paceScore > 0 ? String(aiTrack.paceScore) : '--';
+    const skillLine = `AI Skill  Level ${String(aiTrack.level).padStart(2, '0')}  Rank ${aiTrack.rank}`;
+    const runLine = `Run ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}  Score ${scoreLabel}  Time ${timerLabel}`;
+
+    return `${skillLine}\n${runLine}`;
+  }
+
+  private drawLegacyMenuCompass(
+    mazeRenderFrame: LegacyMazeRenderFrame,
+    palette: LegacyProgressionPalette,
+    time: number
+  ): void {
+    const boardLeft = mazeRenderFrame.boardLeft - mazeRenderFrame.safeInset;
+    const boardTop = mazeRenderFrame.boardTop - mazeRenderFrame.safeInset;
+    const boardSize = mazeRenderFrame.boardSize + (mazeRenderFrame.safeInset * 2);
+    const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardSize);
+    const size = clampInteger(
+      Math.round(Math.min(
+        notchBounds.width * 0.56,
+        notchBounds.height * 0.68,
+        mazeRenderFrame.tileSize * 2.15
+      )),
+      14,
+      22
+    );
+    const centerX = notchBounds.centerX;
+    const centerY = Math.round(notchBounds.top + (notchBounds.height * 0.43));
+    this.menuCompassBounds = createVisualRect(centerX - (size / 2), centerY - (size / 2), size, size);
+    const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
+    const playerScreen = {
+      x: mazeRenderFrame.boardLeft + ((renderedPlayerPoint.x + 0.5) * mazeRenderFrame.tileSize),
+      y: mazeRenderFrame.boardTop + ((renderedPlayerPoint.y + 0.5) * mazeRenderFrame.tileSize)
+    };
+    const goalScreen = {
+      x: mazeRenderFrame.boardLeft + ((this.maze.goal.x + 0.5) * mazeRenderFrame.tileSize),
+      y: mazeRenderFrame.boardTop + ((this.maze.goal.y + 0.5) * mazeRenderFrame.tileSize)
+    };
+    const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'
+      || this.menuStaticDrawLifecyclePhase === 'deconstructing';
+    const goalAngle = Math.atan2(goalScreen.y - playerScreen.y, goalScreen.x - playerScreen.x);
+    const angle = isLifecycleSpinActive
+      ? (time / 130) % (Math.PI * 2)
+      : goalAngle;
+    const pulse = 0.5 + (0.5 * Math.sin(time / 380));
+    const arrowLength = Math.max(8, size * 0.58);
+    const wing = Math.max(3, size * 0.26);
+    const tailLength = Math.max(4, size * 0.34);
+    const tip = {
+      x: centerX + (Math.cos(angle) * arrowLength),
+      y: centerY + (Math.sin(angle) * arrowLength)
+    };
+    const tail = {
+      x: centerX - (Math.cos(angle) * tailLength),
+      y: centerY - (Math.sin(angle) * tailLength)
+    };
+    const left = {
+      x: centerX + (Math.cos(angle + 2.36) * wing),
+      y: centerY + (Math.sin(angle + 2.36) * wing)
+    };
+    const right = {
+      x: centerX + (Math.cos(angle - 2.36) * wing),
+      y: centerY + (Math.sin(angle - 2.36) * wing)
+    };
+    const hubRadius = Math.max(2, size * 0.16);
+
+    this.boardDynamicGraphics.lineStyle(1, palette.rankColor, (isLifecycleSpinActive ? 0.5 : 0.34) + (pulse * 0.22));
+    this.boardDynamicGraphics.beginPath();
+    this.boardDynamicGraphics.moveTo(centerX - (size * 0.43), centerY - (size * 0.08));
+    this.boardDynamicGraphics.lineTo(centerX, centerY + (size * 0.38));
+    this.boardDynamicGraphics.lineTo(centerX + (size * 0.43), centerY - (size * 0.08));
+    this.boardDynamicGraphics.strokePath();
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.14 + (pulse * 0.12));
+    this.boardDynamicGraphics.fillTriangle(tip.x, tip.y, left.x, left.y, right.x, right.y);
+    this.boardDynamicGraphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW_SHADOW, 0.32);
+    this.boardDynamicGraphics.beginPath();
+    this.boardDynamicGraphics.moveTo(tail.x + 1, tail.y + 1);
+    this.boardDynamicGraphics.lineTo(centerX + 1, centerY + 1);
+    this.boardDynamicGraphics.lineTo(tip.x + 1, tip.y + 1);
+    this.boardDynamicGraphics.strokePath();
+    this.boardDynamicGraphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW, 0.86);
+    this.boardDynamicGraphics.beginPath();
+    this.boardDynamicGraphics.moveTo(tail.x, tail.y);
+    this.boardDynamicGraphics.lineTo(centerX, centerY);
+    this.boardDynamicGraphics.lineTo(tip.x, tip.y);
+    this.boardDynamicGraphics.strokePath();
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.78);
+    this.boardDynamicGraphics.fillTriangle(tip.x, tip.y, left.x, left.y, right.x, right.y);
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, 0.82);
+    this.boardDynamicGraphics.fillTriangle(centerX, centerY - hubRadius, centerX + hubRadius, centerY, centerX, centerY + hubRadius);
+    this.boardDynamicGraphics.fillTriangle(centerX, centerY - hubRadius, centerX - hubRadius, centerY, centerX, centerY + hubRadius);
   }
 
   private resolveBoardOffset(): Phaser.Math.Vector2 {
@@ -5004,6 +5862,97 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
+  private resolveLegacyMenuAiMemoryPoints(): {
+    optionPoints: LegacyPoint[];
+    targetPoint: LegacyPoint | null;
+  } {
+    if (this.mode !== 'menu' || this.menuDemoState === null || this.menuDemoEpisode === null) {
+      return {
+        optionPoints: [],
+        targetPoint: null
+      };
+    }
+
+    const width = this.menuDemoEpisode.raster.width;
+    const targetIndex = this.menuDemoState.aiMemory.targetIndex;
+    const targetPoint = targetIndex === null
+      ? null
+      : resolveLegacyPointFromDemoIndex(targetIndex, width);
+    const targetKey = targetPoint ? legacyScenePointKey(targetPoint) : null;
+    const seen = new Set<string>();
+    const optionPoints: LegacyPoint[] = [];
+
+    for (const optionIndex of this.menuDemoState.aiMemory.optionIndices) {
+      const optionPoint = resolveLegacyPointFromDemoIndex(optionIndex, width);
+      const key = legacyScenePointKey(optionPoint);
+      if (
+        key === targetKey
+        || seen.has(key)
+        || !this.isLegacyMenuPointVisibleInStaticDraw(optionPoint)
+      ) {
+        continue;
+      }
+      seen.add(key);
+      optionPoints.push(optionPoint);
+    }
+
+    return {
+      optionPoints,
+      targetPoint: targetPoint && this.isLegacyMenuPointVisibleInStaticDraw(targetPoint)
+        ? targetPoint
+        : null
+    };
+  }
+
+  private drawLegacyMenuAiMemoryOverlay(
+    originX: number,
+    originY: number,
+    tileSize: number,
+    alphaMultiplier: number,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+    time: number
+  ): void {
+    const { optionPoints, targetPoint } = this.resolveLegacyMenuAiMemoryPoints();
+    const optionAlpha = clamp(0.34 + (0.08 * Math.sin(time / 240)), 0.28, 0.44) * alphaMultiplier;
+    for (const point of optionPoints) {
+      this.fillLegacyDynamicPathTile(
+        point,
+        LEGACY_MENU_AI_MEMORY_OPTION_CORE,
+        originX,
+        originY,
+        tileSize,
+        optionAlpha,
+        pathSource,
+        LEGACY_MENU_AI_MEMORY_OPTION_EDGE,
+        0.72,
+        0.72
+      );
+    }
+
+    if (targetPoint === null) {
+      return;
+    }
+
+    const targetPulse = 0.5 + (0.5 * Math.sin(time / 150));
+    this.drawLegacyPathMaterialTile(
+      this.boardDynamicGraphics,
+      targetPoint,
+      pathSource,
+      originX,
+      originY,
+      tileSize,
+      {
+        coreAlpha: clamp(0.72 + (targetPulse * 0.2), 0.72, 0.92) * alphaMultiplier,
+        coreColor: LEGACY_MENU_AI_MEMORY_TARGET_CORE,
+        cueAlpha: clamp(0.62 + (targetPulse * 0.22), 0.62, 0.84) * alphaMultiplier,
+        cueColor: LEGACY_MENU_AI_MEMORY_TARGET_EDGE,
+        drawCue: true,
+        edgeAlpha: clamp(0.74 + (targetPulse * 0.18), 0.74, 0.92) * alphaMultiplier,
+        edgeColor: LEGACY_MENU_AI_MEMORY_TARGET_EDGE
+      }
+    );
+  }
+
   private fillLegacyPlayDynamicPathTile(
     point: LegacyPoint,
     color: number,
@@ -5031,6 +5980,10 @@ export class MenuScene extends Phaser.Scene {
     trail: readonly LegacyPoint[],
     originX: number,
     originY: number,
+    boardLeft: number,
+    boardTop: number,
+    boardSize: number,
+    mazeSize: number,
     tileSize: number,
     time: number,
     pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
@@ -5058,33 +6011,78 @@ export class MenuScene extends Phaser.Scene {
 
       const falloff = smoothstep(1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW));
       const alpha = clamp(0.14 + (falloff * 0.62), 0.14, 0.76);
+      const pulseColor = resolveLegacyIridescentPulseColor(index, trail.length, time, palette.trailPulseColor);
+      const pulseEdgeColor = resolveLegacyIridescentPulseColor(
+        index + 2,
+        trail.length + 3,
+        time + 340,
+        palette.trailPulseEdgeColor
+      );
       this.fillLegacyDynamicPathTile(
         point,
-        palette.trailPulseColor,
+        pulseColor,
         originX,
         originY,
         tileSize,
         alpha,
         pathSource,
-        palette.trailPulseEdgeColor,
+        pulseEdgeColor,
         LEGACY_PLAY_PATH_EDGE_ALPHA,
         0.96
+      );
+      this.drawLegacyDynamicTrailBorderDock(
+        point,
+        pulseColor,
+        pulseEdgeColor,
+        LEGACY_PLAY_PATH_EDGE_ALPHA,
+        0.96,
+        alpha,
+        boardLeft,
+        boardTop,
+        boardSize,
+        originX,
+        originY,
+        mazeSize,
+        tileSize,
+        pathSource
       );
     }
   }
 
-  private resolveLegacyPointPathSource(points: readonly LegacyPoint[]): Pick<LegacyMazeSnapshot, 'grid' | 'size'> {
-    const size = this.maze.size;
-    const grid = Array.from({ length: size }, () => Array.from({ length: size }, () => false));
-
-    for (const point of points) {
-      if (point.x < 0 || point.y < 0 || point.x >= size || point.y >= size) {
-        continue;
+  private drawLegacyDynamicTrailBorderDock(
+    point: LegacyPoint,
+    color: number,
+    edgeColor: number,
+    edgeAlpha: number,
+    coreAlphaMax: number,
+    alpha: number,
+    boardLeft: number,
+    boardTop: number,
+    boardSize: number,
+    mazeLeft: number,
+    mazeTop: number,
+    mazeSize: number,
+    tileSize: number,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>
+  ): void {
+    this.drawLegacyPathBorderDock(
+      this.boardDynamicGraphics,
+      point,
+      pathSource,
+      boardLeft,
+      boardTop,
+      boardSize,
+      mazeLeft,
+      mazeTop,
+      mazeSize,
+      tileSize,
+      {
+        coreAlpha: Math.min(coreAlphaMax, coreAlphaMax * alpha),
+        coreColor: color,
+        edgeAlpha: Math.min(edgeAlpha, edgeAlpha * alpha),
+        edgeColor
       }
-      grid[point.y][point.x] = true;
-    }
-
-    return { grid, size };
+    );
   }
 
   private fillLegacyDynamicPathTile(
@@ -5159,25 +6157,52 @@ export class MenuScene extends Phaser.Scene {
     tileSize: number,
     alpha: number,
     showLocatorTicks: boolean,
-    palette: LegacyProgressionPalette
+    _palette: LegacyProgressionPalette,
+    time: number
   ): void {
     const centerX = originX + ((point.x + 0.5) * tileSize);
     const centerY = originY + ((point.y + 0.5) * tileSize);
     const playerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
       tileSize,
       showLocatorTicks ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : LEGACY_PLAYER_MARKER_RADIUS_RATIO,
-      showLocatorTicks ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : LEGACY_PLAYER_MARKER_HALO_RATIO
+      showLocatorTicks ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : LEGACY_PLAYER_MARKER_HALO_RATIO,
+      showLocatorTicks ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : undefined,
+      showLocatorTicks ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : undefined
     );
 
     const shadowRadius = Math.min(tileSize * 0.5, playerMetrics.haloRadius + playerMetrics.strokeWidth);
 
     this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.36, alpha * 0.36));
     this.boardDynamicGraphics.fillCircle(centerX, centerY, shadowRadius);
-    this.boardDynamicGraphics.lineStyle(playerMetrics.strokeWidth, palette.playerHaloColor, Math.min(0.95, alpha * 0.95));
+    const playerCoreColor = resolveLegacyIridescentPlayerCoreColor();
+    const iridescentAccentColor = resolveLegacyIridescentPlayerAccentColor(time, playerCoreColor);
+    const beaconPhase = (Math.sin((time / LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS) * Math.PI * 2) + 1) / 2;
+    const beaconRadiusOffset = showLocatorTicks
+      ? tileSize * (0.18 + (beaconPhase * 0.1))
+      : tileSize * (LEGACY_MENU_AI_BEACON_RADIUS_RATIO + (beaconPhase * 0.08));
+    const beaconRadius = playerMetrics.haloRadius + playerMetrics.strokeWidth + beaconRadiusOffset;
+    const beaconAlpha = showLocatorTicks
+      ? Math.min(0.74, alpha * (0.34 + (beaconPhase * 0.28)))
+      : Math.min(0.5, alpha * LEGACY_MENU_AI_BEACON_ALPHA_RATIO * (0.34 + (beaconPhase * 0.22)));
+
+    this.boardDynamicGraphics.lineStyle(
+      Math.max(1, playerMetrics.strokeWidth * (showLocatorTicks ? 0.76 : 0.58)),
+      LEGACY_PLAY_PLAYER_BEACON_COLOR,
+      beaconAlpha
+    );
+    this.boardDynamicGraphics.strokeCircle(centerX, centerY, beaconRadius);
+    this.boardDynamicGraphics.lineStyle(
+      Math.max(1, playerMetrics.strokeWidth * (showLocatorTicks ? 0.42 : 0.32)),
+      LEGACY_PLAY_PLAYER_BEACON_ACCENT,
+      Math.min(showLocatorTicks ? 0.52 : 0.34, beaconAlpha * 0.7)
+    );
+    this.boardDynamicGraphics.strokeCircle(centerX, centerY, beaconRadius + Math.max(1, tileSize * 0.08));
+
+    this.boardDynamicGraphics.lineStyle(playerMetrics.strokeWidth, LEGACY_PLAY_PLAYER_BEACON_ACCENT, Math.min(0.95, alpha * 0.95));
     this.boardDynamicGraphics.strokeCircle(centerX, centerY, playerMetrics.haloRadius + playerMetrics.strokeWidth);
-    this.boardDynamicGraphics.fillStyle(palette.playerHaloColor, Math.min(0.92, alpha * 0.92));
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_PLAYER_BEACON_COLOR, Math.min(showLocatorTicks ? 0.88 : 0.78, alpha * (showLocatorTicks ? 0.88 : 0.78)));
     this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.haloRadius);
-    this.boardDynamicGraphics.fillStyle(palette.playerCoreColor, alpha);
+    this.boardDynamicGraphics.fillStyle(playerCoreColor, alpha);
     this.boardDynamicGraphics.beginPath();
     this.boardDynamicGraphics.moveTo(centerX, centerY - playerMetrics.coreRadius);
     this.boardDynamicGraphics.lineTo(centerX + playerMetrics.coreRadius, centerY);
@@ -5185,6 +6210,12 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicGraphics.lineTo(centerX - playerMetrics.coreRadius, centerY);
     this.boardDynamicGraphics.closePath();
     this.boardDynamicGraphics.fillPath();
+    this.boardDynamicGraphics.lineStyle(
+      Math.max(1, playerMetrics.strokeWidth * 0.58),
+      showLocatorTicks ? LEGACY_PLAY_PLAYER_BEACON_ACCENT : iridescentAccentColor,
+      Math.min(0.86, alpha * 0.86)
+    );
+    this.boardDynamicGraphics.strokePath();
 
     if (!showLocatorTicks) {
       return;
@@ -5202,11 +6233,106 @@ export class MenuScene extends Phaser.Scene {
       this.boardDynamicGraphics.strokePath();
     };
 
-    this.boardDynamicGraphics.lineStyle(locatorMetrics.strokeWidth, palette.playerCoreColor, Math.min(0.92, alpha * 0.92));
+    this.boardDynamicGraphics.lineStyle(locatorMetrics.strokeWidth, LEGACY_PLAY_PLAYER_BEACON_ACCENT, Math.min(0.96, alpha * 0.96));
     drawLocatorTick(centerX - locatorMetrics.outerRadius, centerY, centerX - locatorMetrics.innerRadius, centerY);
     drawLocatorTick(centerX + locatorMetrics.innerRadius, centerY, centerX + locatorMetrics.outerRadius, centerY);
     drawLocatorTick(centerX, centerY - locatorMetrics.outerRadius, centerX, centerY - locatorMetrics.innerRadius);
     drawLocatorTick(centerX, centerY + locatorMetrics.innerRadius, centerX, centerY + locatorMetrics.outerRadius);
+  }
+
+  private syncLegacyPlayerVisualMotionTo(
+    point: LegacyPoint,
+    snapReason: LegacyPlayerVisualMotionSnapReason = null
+  ): void {
+    this.playerVisualMotion = {
+      durationMs: 0,
+      from: copyPoint(point),
+      startedAtMs: this.time.now,
+      to: copyPoint(point)
+    };
+    this.lastPlayerVisualMotionSnapReason = snapReason;
+  }
+
+  private armLegacyPlayerVisualMotion(
+    from: LegacyPoint,
+    to: LegacyPoint,
+    time: number,
+    durationMs: number
+  ): void {
+    if (from.x === to.x && from.y === to.y) {
+      this.syncLegacyPlayerVisualMotionTo(to);
+      return;
+    }
+
+    if (this.isLegacyPlayerVisualWrapMove(from, to)) {
+      this.syncLegacyPlayerVisualMotionTo(to, 'wrapped-step');
+      return;
+    }
+
+    this.playerVisualMotion = {
+      durationMs: Math.max(1, Math.round(durationMs)),
+      from: copyPoint(from),
+      startedAtMs: time,
+      to: copyPoint(to)
+    };
+    this.lastPlayerVisualMotionSnapReason = null;
+  }
+
+  private isLegacyPlayerVisualWrapMove(from: LegacyPoint, to: LegacyPoint): boolean {
+    return isLegacyWrappedStepTransition(from, to);
+  }
+
+  private resolveLegacyIridescentMaterialDiagnostics(
+    time: number,
+    palette: LegacyProgressionPalette
+  ): LegacyIridescentMaterialDiagnostics {
+    const playerCoreColor = resolveLegacyIridescentPlayerCoreColor();
+    const trailLength = Math.max(1, this.trail.length);
+    const trailTailIndex = 0;
+    const trailHeadIndex = Math.max(0, this.trail.length - 1);
+
+    return {
+      minPathColorDistance: LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE,
+      playerAccentColor: resolveLegacyIridescentPlayerAccentColor(time, playerCoreColor),
+      playerCoreColor,
+      playerHaloShiftColor: resolveLegacyIridescentPlayerHaloColor(time, palette.playerHaloColor),
+      pulseHeadColor: resolveLegacyIridescentPulseColor(trailHeadIndex, trailLength, time, palette.trailPulseColor),
+      pulseTailColor: resolveLegacyIridescentPulseColor(trailTailIndex, trailLength, time, palette.trailPulseEdgeColor),
+      shiftPeriodMs: {
+        playerAccent: 4200,
+        playerHalo: 3600,
+        pulse: 2600,
+        trail: 7200
+      },
+      trailHeadColor: resolveLegacyIridescentTrailColor(trailHeadIndex, trailLength, time, palette.trailColor),
+      trailTailColor: resolveLegacyIridescentTrailColor(trailTailIndex, trailLength, time, palette.trailColor)
+    };
+  }
+
+  private hasLegacyPlayerVisualMotionPendingFrame(time: number): boolean {
+    if (this.playerVisualMotion === null) {
+      return false;
+    }
+
+    return time < this.playerVisualMotion.startedAtMs + this.playerVisualMotion.durationMs;
+  }
+
+  private resolveLegacyRenderedPlayerPoint(time: number): LegacyPoint {
+    const motion = this.playerVisualMotion;
+    if (motion === null || motion.durationMs <= 0) {
+      return copyPoint(this.player);
+    }
+
+    const progress = clamp((time - motion.startedAtMs) / motion.durationMs, 0, 1);
+    if (progress >= 1) {
+      return copyPoint(motion.to);
+    }
+
+    const eased = smoothstep(progress);
+    return {
+      x: motion.from.x + ((motion.to.x - motion.from.x) * eased),
+      y: motion.from.y + ((motion.to.y - motion.from.y) * eased)
+    };
   }
 
   private drawLegacyCyberPanel(
@@ -5269,7 +6395,18 @@ export class MenuScene extends Phaser.Scene {
     return Math.max(1, Math.min(maxRadius, Math.round(requested)));
   }
 
+  private resolveLegacyUiTextResolution(): number {
+    const width = this.layout?.width ?? this.scale.width;
+    const height = this.layout?.height ?? this.scale.height;
+    return resolveHudTextResolution({ width, height });
+  }
+
+  private applyLegacyUiTextCrispness<T extends Phaser.GameObjects.Text>(text: T): T {
+    return applyTextResolution(text, this.resolveLegacyUiTextResolution());
+  }
+
   private padLegacyUiText<T extends Phaser.GameObjects.Text>(text: T): T {
+    this.applyLegacyUiTextCrispness(text);
     text.setPadding(12, 6, 12, 6);
     return text;
   }
@@ -5320,8 +6457,9 @@ export class MenuScene extends Phaser.Scene {
     );
     const goalScreenX = mazeRenderFrame.boardLeft + ((this.maze.goal.x + 0.5) * mazeRenderFrame.tileSize);
     const goalScreenY = mazeRenderFrame.boardTop + ((this.maze.goal.y + 0.5) * mazeRenderFrame.tileSize);
-    const playerScreenX = mazeRenderFrame.boardLeft + ((this.player.x + 0.5) * mazeRenderFrame.tileSize);
-    const playerScreenY = mazeRenderFrame.boardTop + ((this.player.y + 0.5) * mazeRenderFrame.tileSize);
+    const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
+    const playerScreenX = mazeRenderFrame.boardLeft + ((renderedPlayerPoint.x + 0.5) * mazeRenderFrame.tileSize);
+    const playerScreenY = mazeRenderFrame.boardTop + ((renderedPlayerPoint.y + 0.5) * mazeRenderFrame.tileSize);
     const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
     const touchCompassBounds = this.resolveLegacyPlayTouchCompassBounds(touchControlLayout);
     const hudFrame = resolveLegacyPlayHudFrame({
@@ -5366,6 +6504,7 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPlayCompass(hudFrame, {
       showPane: touchControlLayout.controlMode !== 'stick'
     });
+    this.drawLegacyPlayPlayerMessageStack(hudFrame);
     const compassVisualFrame = this.resolveLegacyPlayCompassVisualFrame(hudFrame, time);
     const visualArrow = this.resolveLegacyPlayCompassArrowGeometry(hudFrame, compassVisualFrame.angleRadians);
 
@@ -5436,6 +6575,48 @@ export class MenuScene extends Phaser.Scene {
     this.hudCompassSpinActive = true;
     this.hudCompassSpinProgress = 0;
     this.hudDirty = true;
+  }
+
+  private drawLegacyPlayPlayerMessageStack(hudFrame: LegacyPlayHudFrame): void {
+    const messages = this.resolveVisibleLegacyPlayerMessages();
+    if (messages.length <= 0) {
+      return;
+    }
+
+    const compact = this.layout.width < 520;
+    const cardWidth = Math.min(this.layout.width - (compact ? 30 : 64), compact ? 342 : 430);
+    const cardHeight = compact ? 28 : 32;
+    const cardGap = cardHeight + 5;
+    const centerX = this.layout.width / 2;
+    const topY = hudFrame.timerBounds.top + hudFrame.timerBounds.height + (compact ? 12 : 16);
+
+    messages.forEach((message, index) => {
+      const cardTop = topY + (index * cardGap);
+      const cardLeft = centerX - (cardWidth / 2);
+      const toneColor = Phaser.Display.Color.HexStringToColor(resolveLegacyPlayerMessageColor(message)).color;
+
+      this.drawLegacyCyberPanel(this.hudGraphics, {
+        active: true,
+        alpha: message.tone === 'error' ? 0.9 : 0.78,
+        fill: message.tone === 'error' ? 0x211019 : LEGACY_CYBER_PANEL_FILL,
+        height: cardHeight,
+        left: cardLeft,
+        radius: 9,
+        top: cardTop,
+        width: cardWidth
+      });
+      this.hudGraphics.lineStyle(1, toneColor, message.tone === 'error' ? 0.82 : 0.58);
+      this.hudGraphics.strokeRoundedRect(cardLeft + 3, cardTop + 3, cardWidth - 6, cardHeight - 6, 7);
+
+      const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(centerX, cardTop + (cardHeight / 2), message.copy, {
+        align: 'center',
+        color: resolveLegacyPlayerMessageColor(message),
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: compact ? '12px' : '14px'
+      })), cardWidth - 24, compact ? 12 : 14, 10).setOrigin(0.5);
+      label.setData('hud', true);
+      this.uiTexts.push(label);
+    });
   }
 
   private hasLegacyPlayCompassSpinPendingFrame(): boolean {
@@ -5586,11 +6767,8 @@ export class MenuScene extends Phaser.Scene {
     if (touchControlLayout.controlMode === 'stick' && touchControlLayout.stick !== null) {
       this.drawLegacyPlayTouchStick(touchControlLayout.stick, this.resolveLegacyPlayHeldTouchControl(), this.playTouchStickPull);
       this.drawLegacyPlayTouchButton(controls.pause, true, false);
-      this.drawLegacyPlayTouchButton(controls.restart_attempt, true, false);
       this.drawLegacyPlayTouchPauseIcon(controls.pause);
       this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');
-      this.drawLegacyPlayTouchRestartIcon(controls.restart_attempt);
-      this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');
       return createVisualRect(frame.left, frame.top, frame.width, frame.height);
     }
 
@@ -5603,7 +6781,6 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPlayTouchButton(controls.move_left, false, activeControls.has('move_left'));
     this.drawLegacyPlayTouchButton(controls.move_up_left, false, activeControls.has('move_up_left'));
     this.drawLegacyPlayTouchButton(controls.pause, true, false);
-    this.drawLegacyPlayTouchButton(controls.restart_attempt, true, false);
 
     this.drawLegacyPlayTouchArrow(controls.move_up, 'up', activeControls.has('move_up'));
     this.drawLegacyPlayTouchArrow(controls.move_up_right, 'up-right', activeControls.has('move_up_right'));
@@ -5615,8 +6792,6 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPlayTouchArrow(controls.move_up_left, 'up-left', activeControls.has('move_up_left'));
     this.drawLegacyPlayTouchPauseIcon(controls.pause);
     this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');
-    this.drawLegacyPlayTouchRestartIcon(controls.restart_attempt);
-    this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');
 
     return createVisualRect(frame.left, frame.top, frame.width, frame.height);
   }
@@ -5781,23 +6956,6 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.fillRoundedRect(rect.centerX + gap, top, barWidth, barHeight, 2);
   }
 
-  private drawLegacyPlayTouchRestartIcon(
-    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['restart_attempt']
-  ): void {
-    const radius = Math.round(Math.min(rect.width, rect.height) * 0.18);
-    const tipSize = Math.max(7, Math.round(radius * 0.42));
-    const iconCenterY = rect.top + Math.round(rect.height * 0.3);
-    const tipX = rect.centerX + Math.round(radius * 0.8);
-    const tipY = iconCenterY - Math.round(radius * 0.76);
-
-    this.hudGraphics.lineStyle(Math.max(3, Math.round(rect.width * 0.05)), LEGACY_PLAY_TOUCH_ICON, 0.82);
-    this.hudGraphics.beginPath();
-    this.hudGraphics.arc(rect.centerX, iconCenterY, radius, Phaser.Math.DegToRad(36), Phaser.Math.DegToRad(324), false);
-    this.hudGraphics.strokePath();
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.82);
-    this.hudGraphics.fillTriangle(tipX, tipY, tipX + tipSize, tipY - 1, tipX + 2, tipY + tipSize);
-  }
-
   private drawLegacyPlayTouchLabel(
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
     label: string
@@ -5847,45 +7005,45 @@ export class MenuScene extends Phaser.Scene {
     if (this.overlay === 'none') {
       if (this.mode === 'menu') {
         const [startLabel, optionsLabel] = MAIN_MENU_BUTTONS;
-        const menuButtonWidth = Math.min(
-          this.layout.buttonWidth,
-          Math.max(86, Math.floor((this.layout.width - 42) / 3))
+        const isAuthenticated = this.authSnapshot.status === 'authenticated';
+        const primaryButtonWidth = Math.min(
+          this.layout.centerButtonWidth,
+          Math.max(118, Math.floor(this.layout.width * 0.34))
         );
-        const menuButtonGap = Math.max(8, Math.min(16, Math.round(this.layout.width * 0.028)));
-        const menuButtonY = this.layout.centerButtonY;
-        const accountLabel = this.authSnapshot.status === 'authenticated' ? 'Log out' : 'Login';
-        this.uiButtons.push(
-          this.createButton(
-            this.layout.centerButtonX - menuButtonWidth - menuButtonGap,
-            menuButtonY,
-            menuButtonWidth,
-            this.layout.buttonHeight,
-            startLabel,
-            () => this.startPlayMode()
-          ),
-          this.createButton(
-            this.layout.centerButtonX,
-            menuButtonY,
-            menuButtonWidth,
-            this.layout.buttonHeight,
-            optionsLabel,
-            () => this.openOverlay('options')
-          ),
-          this.createButton(
-            this.layout.centerButtonX + menuButtonWidth + menuButtonGap,
-            menuButtonY,
-            menuButtonWidth,
-            this.layout.buttonHeight,
-            accountLabel,
-            () => {
-              if (this.authSnapshot.status === 'authenticated') {
-                void this.handleLegacyAuthSignOut();
-              } else {
-                this.openOverlay('auth');
-              }
-            }
-          )
-        );
+
+        if (!isAuthenticated) {
+          this.uiButtons.push(
+            this.createButton(
+              this.layout.centerButtonX,
+              this.layout.centerButtonY,
+              primaryButtonWidth,
+              this.layout.buttonHeight,
+              'Login',
+              () => this.openOverlay('auth')
+            )
+          );
+        } else {
+          const optionsButtonWidth = Math.round(primaryButtonWidth * 0.84);
+          const authenticatedMenuButtonStack = resolveLegacyAuthenticatedMenuButtonStack(this.layout);
+          this.uiButtons.push(
+            this.createButton(
+              this.layout.centerButtonX,
+              authenticatedMenuButtonStack.startButtonY,
+              primaryButtonWidth,
+              this.layout.buttonHeight,
+              startLabel,
+              () => this.startPlayMode()
+            ),
+            this.createButton(
+              this.layout.centerButtonX,
+              authenticatedMenuButtonStack.optionsButtonY,
+              optionsButtonWidth,
+              authenticatedMenuButtonStack.optionsButtonHeight,
+              optionsLabel,
+              () => this.openOverlay('options')
+            )
+          );
+        }
       }
 
       this.uiDirty = false;
@@ -5931,9 +7089,21 @@ export class MenuScene extends Phaser.Scene {
     const compact = this.layout.width < 480;
     const maxCompactHeight = kind === 'pause' ? 820 : this.layout.height - 32;
     const maxDesktopHeight = kind === 'pause' ? 700 : 620;
-    const height = Math.min(compact ? maxCompactHeight : maxDesktopHeight, this.layout.height - 32);
+    let height = Math.min(compact ? maxCompactHeight : maxDesktopHeight, this.layout.height - 32);
     const left = Math.round((this.layout.width - width) / 2);
-    const top = Math.round((this.layout.height - height) / 2);
+    let top = Math.round((this.layout.height - height) / 2);
+
+    if (kind === 'pause' && this.mode === 'play') {
+      const timerFrame = resolveLegacyPlayHudFrame({
+        elapsedMs: 0,
+        goalScreen: { x: 0, y: 0 },
+        layoutWidth: this.layout.width,
+        playerScreen: { x: 0, y: 0 }
+      });
+      const timerBottom = timerFrame.timerBounds.top + timerFrame.timerBounds.height;
+      top = Math.max(timerBottom + (compact ? 10 : 14), 58);
+      height = Math.min(height, Math.max(180, this.layout.height - top - 16));
+    }
 
     return {
       centerX: left + Math.round(width / 2),
@@ -6033,9 +7203,16 @@ export class MenuScene extends Phaser.Scene {
     const panel = this.resolveOverlayPanelFrame('options');
     const compact = panel.width < 420;
     const showAdvancedOptions = this.shouldShowLegacyAdvancedOptions();
+    const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
     let rowY = panel.top + 92;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
     this.createOverlayTitle('Options', panel.top + 44);
+    if (visibleMessages.length > 0) {
+      this.createOverlayPlayerMessageStack(visibleMessages, panel.top + 76, panel);
+      rowY += visibleMessages.length * (compact ? 18 : 19);
+    }
+
+    rowY = this.createLegacyOptionsInfoSection(rowY, panel);
 
     if (showAdvancedOptions) {
       rowY = this.createInputRow('Maze Scale', 'scale', rowY, panel);
@@ -6048,6 +7225,199 @@ export class MenuScene extends Phaser.Scene {
       rowY = this.createColorInputRow('Path RGB 0-255', ['pathR', 'pathG', 'pathB'], rowY, panel, this.settings.pathColor);
       rowY = this.createColorInputRow('Wall RGB 0-255', ['wallR', 'wallG', 'wallB'], rowY, panel, this.settings.wallColor);
     }
+
+    this.createLegacyOptionsAccountActionRow(panel);
+  }
+
+  private createLegacyOptionsInfoSection(
+    rowY: number,
+    panel: OverlayPanelFrame,
+    options: {
+      rightGutter?: number;
+      scrollOffset?: number;
+      viewport?: VisualRect | null;
+    } = {}
+  ): number {
+    const compact = panel.width < 420;
+    const accountButtonHeight = compact ? 44 : 48;
+    const accountButtonY = panel.top + panel.height - (compact ? 48 : 56);
+    const flowMode = options.viewport ? 'scroll' : 'anchored';
+    const cardHeight = compact ? 238 : 246;
+    const cardWidth = Math.min(
+      panel.width - (compact ? 48 : 72) - (options.rightGutter ?? 0),
+      compact ? 350 : 540
+    );
+    const cardLeft = panel.centerX - (cardWidth / 2);
+    const cardBottom = accountButtonY - (accountButtonHeight / 2) - (compact ? 12 : 14);
+    const preferredTop = cardBottom - cardHeight;
+    const contentTop = flowMode === 'scroll'
+      ? rowY + (compact ? 12 : 14)
+      : Math.max(panel.top + 86, Math.min(preferredTop, rowY));
+    const scrollOffset = options.scrollOffset ?? 0;
+    const cardTop = contentTop - scrollOffset;
+    const cardBottomRender = cardTop + cardHeight;
+    const viewport = options.viewport ?? null;
+    if (viewport && (cardBottomRender < viewport.top + 4 || cardTop > viewport.bottom - 4)) {
+      return contentTop + cardHeight + (compact ? 14 : 16);
+    }
+
+    const inset = compact ? 14 : 18;
+    const titleY = cardTop + (compact ? 19 : 21);
+    const legendTop = cardTop + (compact ? 52 : 58);
+    const rowHeight = compact ? 29 : 30;
+    const detailLeft = cardLeft + inset;
+    const detailWidth = cardWidth - (inset * 2);
+
+    this.drawLegacyCyberPanel(this.overlayGraphics, {
+      active: true,
+      alpha: 0.66,
+      fill: LEGACY_PLAY_HUD_TIMER_PANE,
+      height: cardHeight,
+      left: cardLeft,
+      radius: 12,
+      top: cardTop,
+      width: cardWidth
+    });
+    this.overlayGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
+    this.overlayGraphics.strokeRoundedRect(cardLeft + 4, cardTop + 4, cardWidth - 8, cardHeight - 8, 9);
+    this.overlayGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.26);
+    this.overlayGraphics.lineBetween(cardLeft + inset, legendTop - 15, cardLeft + cardWidth - inset, legendTop - 15);
+
+    const addText = (
+      copy: string,
+      x: number,
+      y: number,
+      width: number,
+      color: string,
+      fontSize: number,
+      originX = 0,
+      alpha = 0.94
+    ): Phaser.GameObjects.Text => {
+      const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(x, y, copy, {
+        align: 'left',
+        color,
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: `${fontSize}px`
+      })), width, fontSize, 9)
+        .setOrigin(originX, 0.5)
+        .setAlpha(alpha);
+      this.uiTexts.push(label);
+      return label;
+    };
+
+    addText('PLAYER GUIDE', cardLeft + inset, titleY, cardWidth - (inset * 2), '#9dffd5', compact ? 19 : 21, 0, 1);
+
+    const drawLegendRow = (
+      index: number,
+      kind: 'compass' | 'start' | 'end' | 'player',
+      title: string,
+      copy: string,
+      color: string
+    ): void => {
+      const rowTop = legendTop + (index * rowHeight);
+      const glyphX = detailLeft + (compact ? 14 : 16);
+      const glyphY = rowTop + (rowHeight / 2);
+      const labelX = detailLeft + (compact ? 34 : 40);
+      this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, compact ? 16 : 18);
+      addText(title, labelX, glyphY - (compact ? 4 : 5), Math.min(112, detailWidth * 0.34), color, compact ? 13 : 14, 0, 1);
+      addText(
+        copy,
+        labelX + (compact ? 96 : 112),
+        glyphY - (compact ? 4 : 5),
+        detailWidth - (compact ? 134 : 158),
+        '#d9fff5',
+        compact ? 12 : 13,
+        0,
+        0.92
+      );
+    };
+
+    drawLegendRow(0, 'compass', 'Compass', 'points toward the end goal', '#b7f2ff');
+    drawLegendRow(1, 'start', 'Start', 'where each run begins', '#fff05a');
+    drawLegendRow(2, 'end', 'End', 'clear the maze here', '#ff5264');
+    drawLegendRow(3, 'player', 'Player', this.mode === 'play' ? 'your live marker and trail' : 'AI marker and trail', '#72e0bf');
+    drawLegendRow(
+      4,
+      'player',
+      this.mode === 'play' ? 'Level/Rank' : 'AI Level',
+      this.mode === 'play' ? 'your skill tier from clears' : 'AI skill tier from cycles',
+      '#9dffd5'
+    );
+    drawLegendRow(
+      5,
+      'player',
+      this.mode === 'play' ? 'Runs' : 'Score/Time',
+      this.mode === 'play' ? 'completed player mazes' : '0-100 pace and run timer',
+      '#9dffd5'
+    );
+
+    return contentTop + cardHeight + (compact ? 14 : 16);
+  }
+
+  private drawLegacyOptionsGuideGlyph(
+    kind: 'compass' | 'start' | 'end' | 'player',
+    centerX: number,
+    centerY: number,
+    size: number
+  ): void {
+    if (kind === 'compass') {
+      this.drawLegacyOptionsInfoCompassGlyph(centerX, centerY, size);
+      return;
+    }
+
+    const radius = size * 0.38;
+    const color = kind === 'start'
+      ? LEGACY_PLAY_START_MARKER_CORE
+      : kind === 'end'
+        ? LEGACY_PLAY_GOAL_MARKER_CORE
+        : LEGACY_PLAY_TOUCH_ACCENT;
+    const edge = kind === 'start'
+      ? LEGACY_PLAY_START_MARKER_EDGE
+      : kind === 'end'
+        ? LEGACY_PLAY_GOAL_MARKER_EDGE
+        : LEGACY_PLAY_TOUCH_ACCENT;
+    this.overlayGraphics.fillStyle(edge, 0.28);
+    this.overlayGraphics.fillCircle(centerX, centerY, radius * 1.45);
+    this.overlayGraphics.lineStyle(1, edge, 0.76);
+    this.overlayGraphics.strokeCircle(centerX, centerY, radius * 1.22);
+    this.overlayGraphics.fillStyle(color, 0.94);
+    this.overlayGraphics.fillCircle(centerX, centerY, radius);
+  }
+
+  private drawLegacyOptionsInfoCompassGlyph(centerX: number, centerY: number, size: number): void {
+    const radius = size / 2;
+    const tipY = centerY - (radius * 0.72);
+    const bottomY = centerY + (radius * 0.72);
+    const sideX = radius * 0.52;
+
+    this.overlayGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.52);
+    this.overlayGraphics.strokeCircle(centerX, centerY, radius);
+    this.overlayGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.2);
+    this.overlayGraphics.fillCircle(centerX, centerY, radius * 0.74);
+    this.overlayGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, 0.9);
+    this.overlayGraphics.fillTriangle(centerX, tipY, centerX + sideX, bottomY, centerX, centerY + (radius * 0.24));
+    this.overlayGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.82);
+    this.overlayGraphics.fillTriangle(centerX, tipY, centerX - sideX, bottomY, centerX, centerY + (radius * 0.24));
+    this.overlayGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.9);
+    this.overlayGraphics.fillCircle(centerX, centerY, Math.max(2, radius * 0.12));
+  }
+
+  private createLegacyOptionsAccountActionRow(panel: OverlayPanelFrame): void {
+    const compact = panel.width < 420;
+    const label = this.authSnapshot.status === 'authenticated' ? 'Log out' : 'Account';
+    const buttonWidth = Math.min(panel.width - 72, compact ? 190 : 220);
+    const buttonHeight = compact ? 44 : 48;
+    const buttonY = panel.top + panel.height - (compact ? 48 : 56);
+    const action = (): void => {
+      if (this.authSnapshot.status === 'authenticated') {
+        void this.handleLegacyAuthSignOut();
+        return;
+      }
+
+      this.openOverlay('auth');
+    };
+
+    this.uiButtons.push(this.createButton(panel.centerX, buttonY, buttonWidth, buttonHeight, label, action));
   }
 
   private shouldShowLegacyAdvancedOptions(): boolean {
@@ -6059,56 +7429,62 @@ export class MenuScene extends Phaser.Scene {
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand('resume')));
     this.createOverlayTitle('Paused', panel.top + 54);
     const stacked = panel.width < 420;
-    const actionY = panel.top + panel.height - (stacked ? 54 : 62);
-    const viewportTop = panel.top + (stacked ? 98 : 112);
-    const viewportBottom = actionY - (stacked ? 42 : 48);
+    const messageY = panel.top + (stacked ? 86 : 92);
+    const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
+    const hasOverlayMessage = visibleMessages.length > 0;
+    if (hasOverlayMessage) {
+      this.createOverlayPlayerMessageStack(visibleMessages, messageY, panel);
+    }
+    const actionButtonHeight = stacked ? 42 : 48;
+    const actionY = panel.top + panel.height - (stacked ? 42 : 54);
+    const viewportTop = panel.top + (stacked ? 98 : 112) + (hasOverlayMessage ? 22 : 0);
+    const viewportBottom = actionY - (actionButtonHeight / 2) - (stacked ? 18 : 24);
     const viewport = createVisualRect(
       panel.left + 24,
       viewportTop,
       panel.width - 48,
       Math.max(120, viewportBottom - viewportTop)
     );
-    const contentHeight = 18 + this.resolveFeatureControlRowsContentHeight(panel) + 12;
+    const guideHeight = (stacked ? 238 : 246) + (stacked ? 26 : 30);
+    const contentHeight = 18 + this.resolveFeatureControlRowsContentHeight(panel) + guideHeight + 12;
     const scrollMetrics = resolveLegacyOverlayScrollMetrics({
       contentHeight,
       offset: this.overlayScrollOffset,
       viewport: this.visualRectToLegacyOverlayScrollRect(viewport)
     });
     this.applyLegacyOverlayScrollMetrics(scrollMetrics);
-    this.createFeatureControlRows(viewport.top + 18, panel, {
+    const guideEndY = this.createLegacyOptionsInfoSection(viewport.top + 4, panel, {
+      rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
+      scrollOffset: scrollMetrics.offset,
+      viewport
+    });
+    this.createFeatureControlRows(guideEndY, panel, {
       rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
       scrollOffset: scrollMetrics.offset,
       viewport
     });
     this.drawLegacyOverlayScrollFacade(scrollMetrics);
 
-    const accountActionLabel = this.authSnapshot.status === 'authenticated' ? 'Log out' : 'Account';
-    const accountAction = (): void => {
-      if (this.authSnapshot.status === 'authenticated') {
-        void this.handleLegacyAuthSignOut();
-      } else {
-        this.openOverlay('auth');
-      }
-    };
+    const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');
+    const mainMenuAction = (): void => this.applyLegacyPauseCommand('return-menu');
 
     if (stacked) {
-      const compactActionWidth = Math.min(104, Math.floor((panel.width - 76) / 3));
-      const compactActionGap = 10;
+      const compactActionWidth = Math.min(128, Math.floor((panel.width - 64) / 2));
+      const compactActionGap = 14;
       const compactOffset = compactActionWidth + compactActionGap;
       this.uiButtons.push(
-        this.createButton(panel.centerX - compactOffset, actionY, compactActionWidth, 50, accountActionLabel, accountAction),
-        this.createButton(panel.centerX, actionY, compactActionWidth, 50, 'Reset', () => this.applyLegacyPauseCommand('reset-player')),
-        this.createButton(panel.centerX + compactOffset, actionY, compactActionWidth, 50, 'Menu', () => this.applyLegacyPauseCommand('return-menu'))
+        this.createButton(panel.centerX - (compactOffset / 2), actionY, compactActionWidth, actionButtonHeight, 'Reset', resetAction),
+        this.createButton(panel.centerX + (compactOffset / 2), actionY, compactActionWidth, actionButtonHeight, 'Menu', mainMenuAction)
       );
       return;
     }
 
-    const desktopActionWidth = 132;
-    const desktopActionGap = Math.round(panel.width * 0.17);
+    const desktopActionWidth = Math.min(140, Math.floor((panel.width - 72) / 2));
+    const desktopActionGap = 14;
+    const desktopOffset = (desktopActionWidth + desktopActionGap) / 2;
     this.uiButtons.push(
-      this.createButton(panel.centerX - desktopActionGap, actionY, desktopActionWidth, 54, accountActionLabel, accountAction),
-      this.createButton(panel.centerX, actionY, desktopActionWidth, 54, 'Reset', () => this.applyLegacyPauseCommand('reset-player')),
-      this.createButton(panel.centerX + desktopActionGap, actionY, 144, 54, 'Main Menu', () => this.applyLegacyPauseCommand('return-menu'))
+      this.createButton(panel.centerX - desktopOffset, actionY, desktopActionWidth, actionButtonHeight, 'Reset', resetAction),
+      this.createButton(panel.centerX + desktopOffset, actionY, desktopActionWidth, actionButtonHeight, 'Menu', mainMenuAction)
     );
   }
 
@@ -6117,47 +7493,40 @@ export class MenuScene extends Phaser.Scene {
     const stacked = panel.width < 420;
     const fieldWidth = Math.min(panel.width - 56, stacked ? 330 : 420);
     const fieldHeight = stacked ? 44 : 48;
-    const buttonHeight = stacked ? 46 : 50;
-    const buttonWidth = Math.min(stacked ? 132 : 154, Math.floor((panel.width - 72) / 2));
+    const buttonHeight = stacked ? 44 : 48;
+    const buttonWidth = Math.min(panel.width - 72, stacked ? 260 : 320);
     const centerX = panel.centerX;
-    let rowY = panel.top + (stacked ? 96 : 108);
+    const panelBottom = panel.top + panel.height;
+    let rowY = panel.top + (stacked ? 106 : 122);
 
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
     this.createOverlayTitle('Account', panel.top + (stacked ? 46 : 54));
 
     const accountLabel = resolveLegacyAuthAccountLabel(this.authSnapshot);
-    const statusCopy = this.authSnapshot.status === 'authenticated'
-      ? `Signed in as ${accountLabel}`
-      : this.authSnapshot.configured
-        ? 'Guest mode is active. Sign in to keep account progress separate.'
-        : 'Guest mode is active. Account login needs Supabase env vars.';
-    this.createAuthInfoText(statusCopy, rowY, panel, this.authSnapshot.status === 'authenticated' ? '#72e0bf' : '#ecfff5');
-    rowY += stacked ? 54 : 62;
+    this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
+    const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
+    if (visibleMessages.length > 0) {
+      this.createOverlayPlayerMessageStack(visibleMessages, panel.top + (stacked ? 80 : 88), panel);
+      rowY += visibleMessages.length * (stacked ? 18 : 20);
+    }
 
     if (this.authSnapshot.status === 'authenticated') {
+      this.createAuthInfoText(`Signed in as ${accountLabel}`, rowY, panel, '#72e0bf');
+      rowY += stacked ? 48 : 54;
       const detail = this.authSnapshot.email ?? this.authSnapshot.userId ?? '';
       if (detail.length > 0) {
         this.createAuthInfoText(detail, rowY, panel, '#b7f2ff', stacked ? 14 : 16);
         rowY += stacked ? 50 : 58;
       }
 
-      const buttonGap = Math.max(14, Math.round(panel.width * 0.04));
       this.uiButtons.push(
-        this.createButton(centerX - (buttonWidth / 2) - (buttonGap / 2), rowY, buttonWidth, buttonHeight, 'Log out', () => {
+        this.createButton(centerX, panelBottom - (stacked ? 116 : 126), buttonWidth, buttonHeight, 'Log out', () => {
           void this.handleLegacyAuthSignOut();
         }),
-        this.createButton(centerX + (buttonWidth / 2) + (buttonGap / 2), rowY, buttonWidth, buttonHeight, 'Close', () => this.closeOverlay())
+        this.createButton(centerX, panelBottom - (stacked ? 62 : 68), buttonWidth, buttonHeight, 'Close', () => this.closeOverlay())
       );
-      this.createAuthFeedbackText(rowY + 60, panel);
       return;
     }
-
-    const modeButtonGap = Math.max(12, Math.round(panel.width * 0.035));
-    this.uiButtons.push(
-      this.createButton(centerX - (buttonWidth / 2) - (modeButtonGap / 2), rowY, buttonWidth, buttonHeight, 'Login', () => this.setLegacyAuthFormMode('login')),
-      this.createButton(centerX + (buttonWidth / 2) + (modeButtonGap / 2), rowY, buttonWidth, buttonHeight, 'Create', () => this.setLegacyAuthFormMode('signup'))
-    );
-    rowY += stacked ? 62 : 68;
 
     this.createAuthFieldBox(centerX, rowY, fieldWidth, fieldHeight, 'email', this.authForm.email || 'email', this.authForm.email.length === 0);
     rowY += stacked ? 56 : 62;
@@ -6177,24 +7546,150 @@ export class MenuScene extends Phaser.Scene {
       rowY += stacked ? 56 : 62;
     }
 
-    const submitState = resolveLegacyAuthSubmitState(this.authForm, this.authSnapshot.configured);
     const primaryLabel = this.authSubmitting
       ? 'Working'
       : this.authForm.mode === 'signup'
         ? 'Create'
         : 'Login';
+    const secondaryModeLabel = this.authForm.mode === 'signup' ? 'Use Login' : 'Create Account';
+    const bottomButtonGap = stacked ? 54 : 58;
+    const bottomStartY = panelBottom - (stacked ? 184 : 196);
+
     this.uiButtons.push(
-      this.createButton(centerX - (buttonWidth / 2) - (modeButtonGap / 2), rowY, buttonWidth, buttonHeight, primaryLabel, () => {
+      this.createButton(centerX, bottomStartY, buttonWidth, buttonHeight, primaryLabel, () => {
         void this.handleLegacyAuthSubmit();
       }),
-      this.createButton(centerX + (buttonWidth / 2) + (modeButtonGap / 2), rowY, buttonWidth, buttonHeight, 'Reset', () => {
+      this.createButton(centerX, bottomStartY + bottomButtonGap, buttonWidth, buttonHeight, secondaryModeLabel, () => {
+        this.setLegacyAuthFormMode(this.authForm.mode === 'signup' ? 'login' : 'signup');
+      }),
+      this.createButton(centerX, bottomStartY + (bottomButtonGap * 2), buttonWidth, buttonHeight, 'Reset Password', () => {
         void this.handleLegacyAuthPasswordReset();
       })
     );
-    rowY += stacked ? 56 : 62;
+    this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
+  }
 
-    this.createAuthInfoText(submitState.reason ?? 'Use guest anytime; account sync is local-first right now.', rowY, panel, submitState.canSubmit ? '#72e0bf' : '#ffcf91', stacked ? 14 : 16);
-    this.createAuthFeedbackText(rowY + (stacked ? 42 : 48), panel);
+  private resolveLegacyCurrentAuthMessage(): LegacyPlayerMessage | null {
+    const feedbackMessage = resolveLegacyAuthFeedbackMessage(this.authSnapshot.error, this.authSnapshot.info);
+    if (feedbackMessage) {
+      return feedbackMessage;
+    }
+
+    if (this.authSnapshot.status === 'authenticated') {
+      return null;
+    }
+
+    const submitState = resolveLegacyAuthSubmitState(this.authForm, this.authSnapshot.configured);
+    const validationCopy = submitState.reason ?? (
+      this.authForm.mode === 'signup'
+        ? LEGACY_AUTH_MESSAGE_COPY.createReady
+        : LEGACY_AUTH_MESSAGE_COPY.loginReady
+    );
+
+    return resolveLegacyAuthValidationMessage(validationCopy, submitState.canSubmit);
+  }
+
+  private resolveVisibleLegacyPlayerMessages(): LegacyPlayerMessage[] {
+    return this.playerMessageQueue.map((entry) => entry.message);
+  }
+
+  private pushLegacyPlayerMessage(message: LegacyPlayerMessage | null): void {
+    if (!message) {
+      return;
+    }
+
+    this.playerMessageSequence += 1;
+    this.playerMessageQueue = enqueueLegacyPlayerMessage(
+      this.playerMessageQueue,
+      message,
+      this.time.now,
+      this.playerMessageSequence
+    );
+    this.markLegacyPlayerMessagesDirty();
+  }
+
+  private clearQueuedLegacyPlayerMessagesBySource(source: LegacyPlayerMessage['source']): void {
+    const nextQueue = this.playerMessageQueue.filter((entry) => entry.message.source !== source);
+    if (nextQueue.length !== this.playerMessageQueue.length) {
+      this.playerMessageQueue = nextQueue;
+      this.markLegacyPlayerMessagesDirty();
+    }
+  }
+
+  private markLegacyPlayerMessagesDirty(): void {
+    if (this.mode === 'play' && this.overlay === 'none') {
+      this.hudDirty = true;
+    } else {
+      this.uiDirty = true;
+    }
+    this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+  }
+
+  private setLatestOverlayMessage(message: LegacyPlayerMessage | null): void {
+    this.latestOverlayMessage = message;
+    this.latestOverlayMessageExpiresAtMs = message
+      ? this.time.now + message.durationMs
+      : Number.NEGATIVE_INFINITY;
+    this.pushLegacyPlayerMessage(message);
+  }
+
+  private armLegacyAuthFeedbackMessage(): void {
+    const message = resolveLegacyAuthFeedbackMessage(this.authSnapshot.error, this.authSnapshot.info);
+    this.latestAuthFeedbackMessageExpiresAtMs = message
+      ? this.time.now + message.durationMs
+      : Number.NEGATIVE_INFINITY;
+    this.pushLegacyPlayerMessage(message);
+  }
+
+  private clearLegacyAuthFeedbackMessage(): void {
+    this.authSnapshot = {
+      ...this.authSnapshot,
+      error: null,
+      info: null
+    };
+    this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
+    this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
+    this.clearQueuedLegacyPlayerMessagesBySource('auth');
+  }
+
+  private expireLegacyPlayerMessages(time: number): void {
+    let expired = false;
+    const nextQueue = expireLegacyPlayerMessageQueue(this.playerMessageQueue, time);
+    if (nextQueue.length !== this.playerMessageQueue.length) {
+      this.playerMessageQueue = nextQueue;
+      expired = true;
+    }
+
+    if (this.latestOverlayMessage && time >= this.latestOverlayMessageExpiresAtMs) {
+      this.setLatestOverlayMessage(null);
+      expired = true;
+    }
+
+    if (
+      (this.authSnapshot.error !== null || this.authSnapshot.info !== null)
+      && time >= this.latestAuthFeedbackMessageExpiresAtMs
+    ) {
+      this.clearLegacyAuthFeedbackMessage();
+      expired = true;
+    }
+
+    if (expired) {
+      this.markLegacyPlayerMessagesDirty();
+    }
+  }
+
+  private createOverlayPlayerMessageStack(
+    messages: readonly LegacyPlayerMessage[],
+    y: number,
+    panel: OverlayPanelFrame
+  ): void {
+    const stacked = panel.width < 420;
+    const cardGap = stacked ? 34 : 38;
+    const firstY = y - (((messages.length - 1) * cardGap) / 2);
+
+    messages.forEach((message, index) => {
+      this.createOverlayPlayerMessageCard(message, firstY + (index * cardGap), panel);
+    });
   }
 
   private createAuthInfoText(
@@ -6215,13 +7710,39 @@ export class MenuScene extends Phaser.Scene {
     this.uiTexts.push(label);
   }
 
-  private createAuthFeedbackText(y: number, panel: OverlayPanelFrame): void {
-    const message = this.authSnapshot.error ?? this.authSnapshot.info;
-    if (!message) {
-      return;
-    }
+  private createOverlayPlayerMessageCard(
+    message: LegacyPlayerMessage,
+    y: number,
+    panel: OverlayPanelFrame
+  ): void {
+    const stacked = panel.width < 420;
+    const cardWidth = Math.min(panel.width - (stacked ? 56 : 92), stacked ? 330 : 430);
+    const cardHeight = stacked ? 30 : 34;
+    const cardLeft = panel.centerX - (cardWidth / 2);
+    const cardTop = y - (cardHeight / 2);
+    const toneColor = Phaser.Display.Color.HexStringToColor(resolveLegacyPlayerMessageColor(message)).color;
 
-    this.createAuthInfoText(message, y, panel, this.authSnapshot.error ? '#ff7d7d' : '#72e0bf', panel.width < 420 ? 14 : 16);
+    this.drawLegacyCyberPanel(this.overlayGraphics, {
+      active: true,
+      alpha: message.tone === 'error' ? 0.94 : 0.86,
+      fill: message.tone === 'error' ? 0x211019 : LEGACY_CYBER_PANEL_FILL,
+      height: cardHeight,
+      left: cardLeft,
+      radius: 10,
+      top: cardTop,
+      width: cardWidth
+    });
+    this.overlayGraphics.lineStyle(1, toneColor, message.tone === 'error' ? 0.84 : 0.62);
+    this.overlayGraphics.strokeRoundedRect(cardLeft + 3, cardTop + 3, cardWidth - 6, cardHeight - 6, 8);
+
+    const maxWidth = cardWidth - 24;
+    const text = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(panel.centerX, y, message.copy, {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: stacked ? '13px' : '15px',
+      color: resolveLegacyPlayerMessageColor(message),
+      align: 'center'
+    })), maxWidth, stacked ? 13 : 15, 11).setOrigin(0.5);
+    this.uiTexts.push(text);
   }
 
   private createAuthFieldBox(
@@ -6237,19 +7758,46 @@ export class MenuScene extends Phaser.Scene {
     const background = this.add.rectangle(x, y, width, height, LEGACY_CYBER_PANEL_FILL, isActive ? 0.76 : 0.5);
     background.setStrokeStyle(2, isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, isActive ? 0.95 : 0.42);
     background.setInteractive({ useHandCursor: true });
-    background.on('pointerdown', () => this.selectLegacyAuthField(fieldId));
+    background.on('pointerdown', () => this.selectLegacyAuthField(fieldId, { height, width, x, y }));
+    if (isActive) {
+      this.positionLegacyAuthNativeInput(fieldId, { height, width, x, y });
+    }
 
     const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(x, y, value, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${Math.max(14, Math.min(20, Math.round(height * 0.38)))}px`,
       color: placeholder ? '#7894a0' : (isActive ? '#72e0bf' : '#ecfff5')
     })), width - 24, Math.max(14, Math.min(20, Math.round(height * 0.38))), 10).setOrigin(0.5);
+    const caret = isActive
+      ? this.add.rectangle(
+        placeholder ? x - (width / 2) + 22 : Math.min(x + (width / 2) - 18, label.x + (label.displayWidth / 2) + 6),
+        y,
+        Math.max(2, Math.round(width * 0.006)),
+        Math.max(18, Math.round(height * 0.5)),
+        LEGACY_PLAY_TOUCH_ACCENT,
+        0.98
+      ).setOrigin(0.5)
+      : null;
+    if (caret) {
+      this.tweens.add({
+        targets: caret,
+        alpha: 0.18,
+        duration: 420,
+        ease: 'Sine.easeInOut',
+        yoyo: true,
+        repeat: -1
+      });
+    }
 
     this.uiButtons.push({
       background,
       label,
       setActive: () => undefined,
       destroy: () => {
+        if (caret) {
+          this.tweens.killTweensOf(caret);
+          caret.destroy();
+        }
         background.destroy();
         label.destroy();
       }
@@ -6603,9 +8151,154 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
-  private selectLegacyAuthField(fieldId: LegacyAuthFieldId): void {
+  private selectLegacyAuthField(
+    fieldId: LegacyAuthFieldId,
+    bounds?: { height: number; width: number; x: number; y: number }
+  ): void {
     this.activeAuthField = fieldId;
+    if (bounds) {
+      this.positionLegacyAuthNativeInput(fieldId, bounds);
+    }
     this.uiDirty = true;
+  }
+
+  private createLegacyAuthNativeInput(fieldId: LegacyAuthFieldId): HTMLInputElement | null {
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
+      return null;
+    }
+
+    if (this.authNativeInput && this.authNativeInputField === fieldId) {
+      return this.authNativeInput;
+    }
+
+    this.destroyLegacyAuthNativeInput();
+    const input = document.createElement('input');
+    input.type = fieldId === 'password' ? 'password' : fieldId === 'email' ? 'email' : 'text';
+    input.autocomplete = fieldId === 'password' ? 'current-password' : fieldId === 'email' ? 'email' : 'name';
+    input.autocapitalize = fieldId === 'email' || fieldId === 'password' ? 'none' : 'words';
+    input.spellcheck = false;
+    input.setAttribute('aria-label', fieldId === 'displayName' ? 'display name' : fieldId);
+    input.setAttribute('data-mazer-auth-input', fieldId);
+    input.value = this.authForm[fieldId];
+    Object.assign(input.style, {
+      position: 'fixed',
+      zIndex: '2147483647',
+      opacity: '0.01',
+      background: 'transparent',
+      color: 'transparent',
+      caretColor: 'transparent',
+      border: '0',
+      outline: '0',
+      padding: '0',
+      margin: '0'
+    });
+
+    this.authNativeInputHandler = () => {
+      this.authForm = {
+        ...this.authForm,
+        [fieldId]: input.value
+      };
+      this.authSnapshot = {
+        ...this.authSnapshot,
+        error: null,
+        info: null
+      };
+      this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
+      this.clearQueuedLegacyPlayerMessagesBySource('auth');
+      this.uiDirty = true;
+    };
+    this.authNativeKeyDownHandler = (event: KeyboardEvent) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        void this.handleLegacyAuthSubmit();
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.activeAuthField = null;
+        this.destroyLegacyAuthNativeInput();
+        this.uiDirty = true;
+        return;
+      }
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        this.selectNextLegacyAuthField(event.shiftKey ? -1 : 1);
+      }
+    };
+    input.addEventListener('input', this.authNativeInputHandler);
+    input.addEventListener('keydown', this.authNativeKeyDownHandler);
+    document.body.appendChild(input);
+    this.authNativeInput = input;
+    this.authNativeInputField = fieldId;
+    return input;
+  }
+
+  private syncLegacyAuthNativeInputValue(): void {
+    if (!this.authNativeInput || this.authNativeInputField === null) {
+      return;
+    }
+
+    this.authForm = {
+      ...this.authForm,
+      [this.authNativeInputField]: this.authNativeInput.value
+    };
+  }
+
+  private recordLegacyAuthActionDiagnostics(
+    input: Pick<LegacyAuthActionDiagnostics, 'stage'> & Partial<Omit<LegacyAuthActionDiagnostics, 'sequence' | 'stage'>>
+  ): void {
+    this.authActionDiagnosticsSequence += 1;
+    this.latestAuthActionDiagnostics = {
+      canSubmit: input.canSubmit ?? null,
+      emailPresent: input.emailPresent ?? normalizeLegacyAuthEmail(this.authForm.email).includes('@'),
+      error: input.error ?? null,
+      info: input.info ?? null,
+      mode: input.mode ?? this.authForm.mode,
+      passwordLength: input.passwordLength ?? this.authForm.password.length,
+      reason: input.reason ?? null,
+      sequence: this.authActionDiagnosticsSequence,
+      stage: input.stage,
+      status: input.status ?? this.authSnapshot.status
+    };
+    this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+  }
+
+  private positionLegacyAuthNativeInput(
+    fieldId: LegacyAuthFieldId,
+    bounds: { height: number; width: number; x: number; y: number }
+  ): void {
+    const input = this.createLegacyAuthNativeInput(fieldId);
+    const canvas = this.game.canvas;
+    if (!input || !canvas) {
+      return;
+    }
+
+    input.type = fieldId === 'password' ? 'password' : fieldId === 'email' ? 'email' : 'text';
+    input.value = this.authForm[fieldId];
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / Math.max(1, this.scale.width);
+    const scaleY = rect.height / Math.max(1, this.scale.height);
+    input.style.left = `${rect.left + ((bounds.x - (bounds.width / 2)) * scaleX)}px`;
+    input.style.top = `${rect.top + ((bounds.y - (bounds.height / 2)) * scaleY)}px`;
+    input.style.width = `${bounds.width * scaleX}px`;
+    input.style.height = `${bounds.height * scaleY}px`;
+    window.setTimeout(() => input.focus({ preventScroll: true }), 0);
+  }
+
+  private destroyLegacyAuthNativeInput(): void {
+    if (this.authNativeInput) {
+      if (this.authNativeInputHandler) {
+        this.authNativeInput.removeEventListener('input', this.authNativeInputHandler);
+      }
+      if (this.authNativeKeyDownHandler) {
+        this.authNativeInput.removeEventListener('keydown', this.authNativeKeyDownHandler);
+      }
+      this.authNativeInput.remove();
+    }
+    this.authNativeInput = null;
+    this.authNativeInputField = null;
+    this.authNativeInputHandler = null;
+    this.authNativeKeyDownHandler = null;
   }
 
   private selectNextLegacyAuthField(direction: -1 | 1): void {
@@ -6632,11 +8325,16 @@ export class MenuScene extends Phaser.Scene {
       ...this.authForm,
       [fieldId]: nextValue
     };
+    if (this.authNativeInput && this.authNativeInputField === fieldId && this.authNativeInput.value !== nextValue) {
+      this.authNativeInput.value = nextValue;
+    }
     this.authSnapshot = {
       ...this.authSnapshot,
       error: null,
       info: null
     };
+    this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
+    this.clearQueuedLegacyPlayerMessagesBySource('auth');
     this.uiDirty = true;
   }
 
@@ -6646,11 +8344,14 @@ export class MenuScene extends Phaser.Scene {
       mode
     };
     this.activeAuthField = this.authForm.email.length > 0 ? 'password' : 'email';
+    this.destroyLegacyAuthNativeInput();
     this.authSnapshot = {
       ...this.authSnapshot,
       error: null,
       info: null
     };
+    this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
+    this.clearQueuedLegacyPlayerMessagesBySource('auth');
     this.uiDirty = true;
   }
 
@@ -6667,31 +8368,73 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    this.syncLegacyAuthNativeInputValue();
+    this.recordLegacyAuthActionDiagnostics({ stage: 'started' });
     const submitState = resolveLegacyAuthSubmitState(this.authForm, this.authSnapshot.configured);
     if (!submitState.canSubmit) {
+      this.recordLegacyAuthActionDiagnostics({
+        canSubmit: false,
+        reason: submitState.reason,
+        stage: 'blocked'
+      });
       this.authSnapshot = {
         ...this.authSnapshot,
         error: submitState.reason,
         info: null
       };
+      this.armLegacyAuthFeedbackMessage();
       this.uiDirty = true;
       return;
     }
 
     this.authSubmitting = true;
     this.uiDirty = true;
+    this.recordLegacyAuthActionDiagnostics({
+      canSubmit: true,
+      stage: 'submitting'
+    });
     writeLegacyRememberedIdentity(this.resolveBrowserLocalStorage(), this.authForm.email);
 
-    const result = this.authForm.mode === 'signup'
-      ? await signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.displayName)
-      : await signInLegacyAuth(this.authForm.email, this.authForm.password);
+    let result: Awaited<ReturnType<typeof signInLegacyAuth | typeof signUpLegacyAuth>>;
+    try {
+      result = this.authForm.mode === 'signup'
+        ? await signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.displayName)
+        : await signInLegacyAuth(this.authForm.email, this.authForm.password);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.authSubmitting = false;
+      this.authSnapshot = {
+        ...this.authSnapshot,
+        error: message,
+        info: null
+      };
+      this.recordLegacyAuthActionDiagnostics({
+        error: message,
+        stage: 'exception',
+        status: this.authSnapshot.status
+      });
+      this.armLegacyAuthFeedbackMessage();
+      this.uiDirty = true;
+      return;
+    }
 
     this.authSubmitting = false;
     this.authForm = {
       ...this.authForm,
       password: result.snapshot.status === 'authenticated' ? '' : this.authForm.password
     };
+    this.recordLegacyAuthActionDiagnostics({
+      error: result.snapshot.error,
+      info: result.snapshot.info,
+      stage: 'result',
+      status: result.snapshot.status
+    });
+    const shouldReturnToMainMenuAfterLogin = this.authForm.mode === 'login'
+      && result.snapshot.status === 'authenticated';
     this.applyLegacyAuthSnapshot(result.snapshot);
+    if (shouldReturnToMainMenuAfterLogin) {
+      this.closeLegacyAuthOverlayToMainMenu();
+    }
     this.uiDirty = true;
   }
 
@@ -6700,12 +8443,14 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    this.syncLegacyAuthNativeInputValue();
     if (!this.authSnapshot.configured) {
       this.authSnapshot = {
         ...this.authSnapshot,
-        error: 'Password reset is not configured for this build.',
+        error: LEGACY_AUTH_MESSAGE_COPY.passwordResetNotConfigured,
         info: null
       };
+      this.armLegacyAuthFeedbackMessage();
       this.uiDirty = true;
       return;
     }
@@ -6713,9 +8458,10 @@ export class MenuScene extends Phaser.Scene {
     if (!this.authForm.email.includes('@')) {
       this.authSnapshot = {
         ...this.authSnapshot,
-        error: 'Enter an email before reset.',
+        error: LEGACY_AUTH_MESSAGE_COPY.passwordResetEmailRequired,
         info: null
       };
+      this.armLegacyAuthFeedbackMessage();
       this.activeAuthField = 'email';
       this.uiDirty = true;
       return;
@@ -6734,6 +8480,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    this.syncLegacyAuthNativeInputValue();
     this.authSubmitting = true;
     this.uiDirty = true;
     const result = await signOutLegacyAuth();
@@ -6747,11 +8494,26 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
-  private commitOverlayField(fieldId: LegacyOptionFieldId): void {
+  private commitOverlayField(
+    fieldId: LegacyOptionFieldId,
+    options: { announce?: boolean } = {}
+  ): void {
     const result = applyLegacyOverlayFieldCommit(this.settings, this.optionFieldDrafts, fieldId);
 
     this.settings = result.settings;
     this.optionFieldDrafts = result.drafts;
+    if (options.announce !== false) {
+      const outcome = result.affectsCamera
+        ? 'camera'
+        : result.affectsMaze
+          ? result.commitKind === 'material-change' ? 'material' : 'maze'
+          : 'unchanged';
+      this.setLatestOverlayMessage(resolveLegacyOverlayFieldCommitMessage(
+        this.resolveLegacyOverlayFieldMessageLabel(fieldId),
+        this.resolveLegacyOverlayFieldMessageState(fieldId),
+        outcome
+      ));
+    }
 
     if (result.triggersReloadOnBack) {
       this.pendingOverlayMazeRebuild = true;
@@ -6770,7 +8532,7 @@ export class MenuScene extends Phaser.Scene {
       : ['scale', 'camScale', 'pathR', 'pathG', 'pathB', 'wallR', 'wallG', 'wallB'];
 
     for (const fieldId of fieldIds) {
-      this.commitOverlayField(fieldId);
+      this.commitOverlayField(fieldId, { announce: false });
     }
 
     if (this.pendingOverlayMazeRebuild) {
@@ -6785,6 +8547,33 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.activeInputField = null;
+  }
+
+  private resolveLegacyOverlayFieldMessageLabel(fieldId: LegacyOptionFieldId): string {
+    switch (fieldId) {
+      case 'scale':
+        return 'Maze Scale';
+      case 'camScale':
+        return 'Camera Scale';
+      case 'pathR':
+        return 'Path R';
+      case 'pathG':
+        return 'Path G';
+      case 'pathB':
+        return 'Path B';
+      case 'wallR':
+        return 'Wall R';
+      case 'wallG':
+        return 'Wall G';
+      case 'wallB':
+        return 'Wall B';
+      default:
+        return fieldId satisfies never;
+    }
+  }
+
+  private resolveLegacyOverlayFieldMessageState(fieldId: LegacyOptionFieldId): string {
+    return this.optionFieldDrafts[fieldId];
   }
 
   private createOverlayTitle(text: string, y: number): void {
@@ -7002,7 +8791,9 @@ export class MenuScene extends Phaser.Scene {
       18,
       Math.min(40, Math.min(Math.round(height * 0.46), textFitSize))
     );
-    const buttonTextColor = frontDoorChrome?.textColor ?? MENU_TEXT_COLOR;
+    const buttonTextColor = isPrimaryFrontDoorButton
+      ? LEGACY_MENU_ACTION_GREEN
+      : frontDoorChrome?.textColor ?? MENU_TEXT_COLOR;
 
     const label = this.padLegacyUiText(this.add.text(x, y, text, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
@@ -7095,6 +8886,9 @@ export class MenuScene extends Phaser.Scene {
     if (this.overlay === 'options' || this.overlay === 'pause') {
       this.commitAllOverlayFields();
     }
+    if (this.overlay === 'auth') {
+      this.destroyLegacyAuthNativeInput();
+    }
     const returnOverlay = this.overlay === 'auth' ? this.overlayReturn : 'none';
     this.resetLegacyOverlayScrollState();
     if (returnOverlay !== 'none') {
@@ -7124,18 +8918,35 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  private closeLegacyAuthOverlayToMainMenu(): void {
+    this.destroyLegacyAuthNativeInput();
+    this.resetLegacyOverlayScrollState();
+    if (this.mode !== 'menu') {
+      this.enterMenuMode();
+      return;
+    }
+
+    this.overlay = 'none';
+    this.overlayReturn = 'none';
+    this.activeInputField = null;
+    this.activeAuthField = null;
+    this.titleGraphics.setVisible(true);
+    this.boardDynamicDirty = true;
+    this.uiDirty = true;
+  }
+
   private applyLegacyPauseCommand(command: LegacyPauseCommand): void {
     const result = resolveLegacyPauseCommand(command, this.maze.start, this.trail);
 
     if (result.nextPlayer !== null) {
       this.player = result.nextPlayer;
+      this.syncLegacyPlayerVisualMotionTo(result.nextPlayer);
       this.trail = result.nextTrail ?? [copyPoint(result.nextPlayer)];
+      this.playCyclePath = [copyPoint(result.nextPlayer)];
+      this.playCycleResetUsed = true;
+      this.playStartedAtMs = this.time.now;
+      this.resetLegacyPlayInputBuffer();
       this.boardDynamicDirty = true;
-      if (command === 'reset-player' && this.mode === 'play') {
-        this.playCycleResetUsed = true;
-        this.appendLegacyPlayCyclePoint(result.nextPlayer);
-        this.startLegacyPlayCompassSpin(this.time.now);
-      }
       this.publishInteractionDiagnostics();
     }
 
@@ -7152,12 +8963,24 @@ export class MenuScene extends Phaser.Scene {
   private applyLegacyOverlayToggleField(fieldId: LegacyOverlayToggleFieldId): void {
     const result = applyLegacyOverlayToggleField(this.settings, fieldId);
     this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), result.settings);
+    this.setLatestOverlayMessage(resolveLegacyOverlayToggleMessage(
+      this.resolveLegacyOverlayToggleLabel(fieldId),
+      result.stateText ?? 'Updated'
+    ));
     if (fieldId === 'controlMode') {
       this.resetLegacyPlayInputBuffer();
       this.hudDirty = true;
     }
     if (fieldId === 'toggleTrailPulse') {
       this.legacyPlayTrailPulseNextFrameAtMs = 0;
+    }
+    if (fieldId === 'toggleTrailFade' && this.mode === 'menu' && this.menuDemoState !== null && this.menuDemoEpisode !== null) {
+      this.trail = resolveLegacyMenuDemoTrail(
+        this.menuDemoState,
+        this.menuDemoEpisode.raster.width,
+        this.settings.toggleTrailFade,
+        TRAIL_FADE_TAIL
+      );
     }
 
     if (result.affectsBackdrop) {
@@ -7190,12 +9013,34 @@ export class MenuScene extends Phaser.Scene {
     const nextSettings = copyLegacySettings(this.settings);
     nextSettings.movementSpeed = nextSpeed;
     this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), nextSettings);
+    this.setLatestOverlayMessage(resolveLegacyOverlayMovementSpeedMessage(
+      formatLegacyMovementSpeedPercent(nextSpeed)
+    ));
     if (this.playHeldTouchMoves.length > 0 && this.playHeldTouchRepeatTimer !== null) {
       this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
     }
     this.uiDirty = true;
     if (this.mode === 'play') {
       this.publishInteractionDiagnostics();
+    }
+  }
+
+  private resolveLegacyOverlayToggleLabel(fieldId: LegacyOverlayToggleFieldId): string {
+    switch (fieldId) {
+      case 'toggleCameraFollow':
+        return 'Camera Follow';
+      case 'toggleTrailFade':
+        return 'Trail Fade';
+      case 'toggleTrailPulse':
+        return 'Trail Pulse';
+      case 'toggleAnimatedBackdrop':
+        return 'Animated BG';
+      case 'darkMode':
+        return 'Dark Mode';
+      case 'controlMode':
+        return 'Controls';
+      default:
+        return fieldId satisfies never;
     }
   }
 
@@ -7224,12 +9069,21 @@ export class MenuScene extends Phaser.Scene {
     const previousProgressionState = this.progressionState;
 
     this.authSnapshot = snapshot;
+    this.armLegacyAuthFeedbackMessage();
     if (snapshot.email !== null) {
-      writeLegacyRememberedIdentity(this.resolveBrowserLocalStorage(), snapshot.email);
+      if (snapshot.status === 'authenticated') {
+        syncLegacyRememberedIdentityFromAuthenticatedSession(this.resolveBrowserLocalStorage(), snapshot);
+      } else {
+        writeLegacyRememberedIdentity(this.resolveBrowserLocalStorage(), snapshot.email);
+      }
       this.authForm = {
         ...this.authForm,
         email: snapshot.email
       };
+    }
+    if (snapshot.status === 'authenticated') {
+      this.activeAuthField = null;
+      this.destroyLegacyAuthNativeInput();
     }
 
     if (previousUserId !== snapshot.userId) {
@@ -7364,6 +9218,17 @@ export class MenuScene extends Phaser.Scene {
         playerPath,
         resetUsed: surface === 'play' ? this.playCycleResetUsed : false,
         surface,
+        aiDecisionSummary: routeDiagnostics
+          ? {
+            backtrackCount: routeDiagnostics.telemetry.backtrackCount,
+            decisionCount: routeDiagnostics.routeLength,
+            optionalRetargetCount: routeDiagnostics.telemetry.optionalRetargetCount,
+            recoveryCount: routeDiagnostics.telemetry.recoveryCount,
+            thinkingModel: this.menuDemoConfig.behavior.runnerThinkingModel ?? 'legacy-source',
+            visitedUndoCount: routeDiagnostics.telemetry.visitedUndoCount,
+            wrongBranchCount: routeDiagnostics.telemetry.wrongBranchCount
+          }
+          : null,
         backtracks: routeDiagnostics?.telemetry.backtrackCount,
         wrongTurns: routeDiagnostics?.telemetry.wrongBranchCount
       }
@@ -7376,6 +9241,13 @@ export class MenuScene extends Phaser.Scene {
         latestReceipt,
         this.maze
       );
+      void writeLegacyRemoteCycleReceipt(this.authSnapshot, latestReceipt)
+        .then((result) => {
+          this.publishLegacyRemoteSyncResult(result);
+        })
+        .catch((error: unknown) => {
+          this.publishLegacyRemoteSyncException('cycle-receipt', error);
+        });
       this.syncLegacyRemoteProgressionState();
       this.boardDynamicDirty = true;
       this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
@@ -7389,9 +9261,41 @@ export class MenuScene extends Phaser.Scene {
 
   private syncLegacyRemoteProgressionState(): void {
     void writeLegacyRemoteProgressionState(this.authSnapshot, this.progressionState)
-      .catch(() => {
-        // Remote progression is optional; local progression remains the source of play continuity.
+      .then((result) => {
+        this.publishLegacyRemoteSyncResult(result);
+      })
+      .catch((error: unknown) => {
+        this.publishLegacyRemoteSyncException('progression', error);
       });
+  }
+
+  private publishLegacyRemoteSyncResult(result: LegacyRemoteProgressionSyncResult): void {
+    this.latestRemoteSyncResult = result;
+    this.pushLegacyPlayerMessage(result.playerMessage);
+    this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+  }
+
+  private publishLegacyRemoteSyncException(
+    context: 'cycle-receipt' | 'progression',
+    error: unknown
+  ): void {
+    const technicalDetail = error instanceof Error
+      ? error.message
+      : String(error);
+    this.publishLegacyRemoteSyncResult({
+      error: technicalDetail,
+      playerMessage: createLegacyPlayerMessage({
+        copy: context === 'cycle-receipt'
+          ? LEGACY_REMOTE_MESSAGE_COPY.cycleReceiptFailed
+          : LEGACY_REMOTE_MESSAGE_COPY.progressionFailed,
+        id: `remote.${context}.exception`,
+        source: 'progression',
+        technicalDetail,
+        tone: 'warning'
+      }),
+      skippedReason: null,
+      synced: false
+    });
   }
 
   private handleBackAction(): void {
@@ -7598,7 +9502,7 @@ export class MenuScene extends Phaser.Scene {
       mazeRenderFrame.boardSize
     );
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
-    const drawStageStaged = this.mode === 'menu' && drawStage?.executionKind === 'row-slice';
+    const drawStageStaged = drawStage?.executionKind === 'row-slice';
     const drawRowsVisible = this.resolveLegacyMenuStaticDrawRowsVisibleForDiagnostics();
     const drawTilesVisible = this.resolveLegacyMenuStaticDrawTilesVisibleForDiagnostics();
     const drawTileCount = drawStageStaged && this.menuStaticDrawTileOrder.length > 0
@@ -7624,7 +9528,9 @@ export class MenuScene extends Phaser.Scene {
     const playerMarkerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
       mazeRenderFrame.tileSize,
       this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : LEGACY_PLAYER_MARKER_RADIUS_RATIO,
-      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : LEGACY_PLAYER_MARKER_HALO_RATIO
+      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : LEGACY_PLAYER_MARKER_HALO_RATIO,
+      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : undefined,
+      this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : undefined
     );
     const progressionDiagnostics = summarizeLegacyProgressionDiagnostics(
       this.progressionState,
@@ -7633,15 +9539,20 @@ export class MenuScene extends Phaser.Scene {
       this.resolveLegacyProgressionStorageKey()
     );
     const progressionPalette = progressionDiagnostics.palette;
+    const menuAiMemory = this.resolveLegacyMenuAiMemoryPoints();
     const canvasBounds = this.game.canvas.getBoundingClientRect();
     const canvasCssWidth = Math.max(1, Math.round(canvasBounds.width));
     const canvasCssHeight = Math.max(1, Math.round(canvasBounds.height));
     const canvasPixelWidth = Math.max(1, this.game.canvas.width);
     const canvasPixelHeight = Math.max(1, this.game.canvas.height);
-    const renderResolutionRatio = Math.round((canvasPixelWidth / canvasCssWidth) * 100) / 100;
     const devicePixelRatio = typeof window === 'undefined' ? 1 : Math.max(1, window.devicePixelRatio || 1);
-    const renderResolutionTargetRatio = Math.round(Math.min(devicePixelRatio, 2) * 100) / 100;
-    const renderResolutionDeficit = Math.round(Math.max(0, renderResolutionTargetRatio - renderResolutionRatio) * 100) / 100;
+    const renderResolutionDiagnostics = summarizeMazerRenderResolution({
+      canvasCssHeight,
+      canvasCssWidth,
+      canvasPixelHeight,
+      canvasPixelWidth,
+      devicePixelRatio
+    });
 
     this.visualDiagnosticsRevision += 1;
     const diagnostics: MenuSceneVisualDiagnostics = {
@@ -7671,6 +9582,8 @@ export class MenuScene extends Phaser.Scene {
             shortcutStageEnabled: this.maze.generation?.budget.shortcutStageEnabled ?? null
           },
           buildKind: this.maze.generation?.buildKind ?? null,
+          seed: this.maze.seed,
+          seedSource: this.mode === 'play' || !this.explicitRuntimeMazeSeed ? 'runtime-random' : 'query',
           executionPlan: (this.maze.generation?.executionPlan ?? []).map((stage) => ({
             advancesToStageId: stage.advancesToStageId,
             id: stage.id,
@@ -7719,7 +9632,7 @@ export class MenuScene extends Phaser.Scene {
             zeroHoldStartedAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null
               ? null
               : Math.round(this.menuStaticDeconstructZeroHoldStartedAtMs),
-            nextSeedQueued: this.mode === 'menu' && this.pendingGenerationRequest?.reason === 'menu-demo-goal-reset',
+            nextSeedQueued: this.isLegacyDeconstructGenerationReason(this.pendingGenerationRequest?.reason ?? null),
             progressPercent: drawStageProgress.progressPercent,
             rowCount: drawStageProgress.rowCount,
             rowsRemaining: drawStageProgress.rowsRemaining,
@@ -7804,9 +9717,21 @@ export class MenuScene extends Phaser.Scene {
           phase: this.menuDemoState?.phase ?? null,
           cue: this.menuDemoState?.cue ?? null,
           pathCursor: this.menuDemoState?.pathCursor ?? null,
+          gate: {
+            nextMoveAtMs: Math.round(this.nextDemoMoveAtMs),
+            released: this.menuStaticDrawLifecyclePhase === 'settled' && this.nextDemoMoveAtMs <= time,
+            waitingForBuild: this.menuStaticDrawLifecyclePhase !== 'settled'
+              || this.menuStaticDrawRowsVisible !== null
+              || this.menuStaticDrawTilesVisible !== null
+          },
           reachedGoal: this.menuDemoState?.reachedGoal ?? false,
           prerollSteps: Math.max(0, this.menuDemoConfig?.behavior.prerollSteps ?? 0),
           runnerMistakesEnabled: this.menuDemoConfig?.behavior.enableRunnerMistakes === true,
+          aiMemory: {
+            optionCount: menuAiMemory.optionPoints.length,
+            optionPoints: menuAiMemory.optionPoints.map(copyPoint),
+            targetPoint: menuAiMemory.targetPoint ? copyPoint(menuAiMemory.targetPoint) : null
+          },
           telemetry: this.menuDemoState?.telemetry ?? null
         }
       },
@@ -7822,13 +9747,28 @@ export class MenuScene extends Phaser.Scene {
           animated: true,
           shimmerPeriodMs: LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS,
           visible: true
-        }
+        },
+        pathMaterial: {
+          connectorSeamsEnabled: true,
+          seamCoreAlphaRatio: LEGACY_PATH_CONNECTOR_SEAM_CORE_ALPHA_RATIO,
+          seamEdgeAlphaRatio: LEGACY_PATH_CONNECTOR_SEAM_EDGE_ALPHA_RATIO,
+          seamPadRatio: LEGACY_PATH_CONNECTOR_SEAM_PAD_RATIO
+        },
+        renderResolution: renderResolutionDiagnostics,
+        topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(
+          this.layout.boardLeft + boardOffset.x,
+          this.layout.boardTop + boardOffset.y,
+          this.layout.boardSize
+        )
       },
       markerStyle: {
         goalCoreColor: LEGACY_PLAY_GOAL_MARKER_CORE,
         goalEdgeColor: LEGACY_PLAY_GOAL_MARKER_EDGE,
-        playerCoreColor: progressionPalette.playerCoreColor,
+        playerCoreColor: resolveLegacyIridescentPlayerCoreColor(),
         playerCoreRadius: playerMarkerMetrics.coreRadius,
+        playerBeaconAccentColor: LEGACY_PLAY_PLAYER_BEACON_ACCENT,
+        playerBeaconColor: LEGACY_PLAY_PLAYER_BEACON_COLOR,
+        playerBeaconPeriodMs: LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS,
         playerHaloColor: progressionPalette.playerHaloColor,
         playerHaloRadius: playerMarkerMetrics.haloRadius,
         startCoreColor: LEGACY_PLAY_START_MARKER_CORE,
@@ -7836,9 +9776,32 @@ export class MenuScene extends Phaser.Scene {
         trailPulseEnabled: this.settings.toggleTrailPulse,
         trailPulseColor: progressionPalette.trailPulseColor,
         trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor,
+        iridescentMaterial: this.resolveLegacyIridescentMaterialDiagnostics(time, progressionPalette),
         trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
       },
       progression: progressionDiagnostics,
+      progressionBadge: {
+        bounds: cloneVisualRect(this.progressionBadgeBounds),
+        text: this.progressionBadgeText.visible ? this.progressionBadgeText.text : null,
+        textBounds: cloneVisualRect(this.progressionBadgeTextBounds),
+        textFits: this.progressionBadgeTextFits
+      },
+      menuCompass: {
+        bounds: cloneVisualRect(this.menuCompassBounds),
+        notchBounds: this.resolveLegacyBoardTopCenterNotchBounds(
+          this.layout.boardLeft + boardOffset.x,
+          this.layout.boardTop + boardOffset.y,
+          this.layout.boardSize
+        ),
+        visible: this.mode === 'menu' && this.overlay === 'none' && this.menuCompassBounds !== null
+      },
+      remoteSync: {
+        lastError: this.latestRemoteSyncResult?.error ?? null,
+        lastMessage: this.latestRemoteSyncResult?.playerMessage ?? null,
+        lastSkippedReason: this.latestRemoteSyncResult?.skippedReason ?? null,
+        lastSynced: this.latestRemoteSyncResult?.synced ?? null
+      },
+      authAction: this.latestAuthActionDiagnostics,
       layout: {
         buttonHeight: this.layout.buttonHeight,
         buttonLayout: this.layout.buttonLayout,
@@ -7857,15 +9820,7 @@ export class MenuScene extends Phaser.Scene {
       title: this.resolveLegacyMenuPathTitleDiagnostics(),
       textLabels: this.resolveVisualTextLabels(),
       renderSurface: {
-        canvasCssHeight,
-        canvasCssWidth,
-        canvasPixelHeight,
-        canvasPixelWidth,
-        devicePixelRatio,
-        renderResolutionDeficit,
-        renderResolutionTargetRatio,
-        renderResolutionRatio,
-        undersampledForDevicePixelRatio: renderResolutionDeficit > 0.05
+        ...renderResolutionDiagnostics
       },
       hud: {
         kind: this.mode === 'play' && this.overlay === 'none' ? 'legacy-play-hud' : null,
@@ -7884,6 +9839,9 @@ export class MenuScene extends Phaser.Scene {
       touchControls,
       overlayUi: {
         backChevron: cloneVisualRect(this.overlayBackChevronBounds),
+        latestAuthMessage: this.latestAuthMessage,
+        latestMessage: this.latestOverlayMessage,
+        visibleMessages: this.resolveVisibleLegacyPlayerMessages(),
         panel: overlayPanel === null
           ? null
           : createVisualRect(overlayPanel.left, overlayPanel.top, overlayPanel.width, overlayPanel.height),

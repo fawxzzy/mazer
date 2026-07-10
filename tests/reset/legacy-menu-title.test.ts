@@ -36,13 +36,13 @@ describe('legacy menu title presentation', () => {
     expect(presentation.shadowAlpha).toBeLessThan(presentation.titleAlpha);
   });
 
-  test('uses a header-sized portrait wordmark for generated menu boards so it does not bury the maze', () => {
+  test('uses a wide portrait wordmark for generated menu boards while layout owns border clearance', () => {
     const snapshotPresentation = resolveLegacyMenuTitlePresentation(387, 7, true, 430, 'snapshot');
     const proceduralPresentation = resolveLegacyMenuTitlePresentation(387, 7, true, 430, 'procedural');
 
-    expect(proceduralPresentation.fontSize).toBeLessThan(snapshotPresentation.fontSize);
-    expect(proceduralPresentation.fontSize).toBeGreaterThanOrEqual(68);
-    expect(proceduralPresentation.fontSize).toBeLessThanOrEqual(70);
+    expect(proceduralPresentation.fontSize).toBeGreaterThan(snapshotPresentation.fontSize);
+    expect(proceduralPresentation.fontSize).toBeGreaterThanOrEqual(102);
+    expect(proceduralPresentation.fontSize).toBeLessThanOrEqual(104);
     expect(proceduralPresentation.titleAlpha).toBeGreaterThan(snapshotPresentation.titleAlpha);
     expect(proceduralPresentation.shadowAlpha).toBeLessThan(proceduralPresentation.titleAlpha);
   });
@@ -63,9 +63,9 @@ describe('legacy menu title presentation', () => {
     const proceduralPresentation = resolveLegacyMenuTitlePresentation(147, 3, true, 172, 'procedural');
 
     expect(proceduralPresentation.fontSize).toBeLessThan(snapshotPresentation.fontSize);
-    expect(proceduralPresentation.fontSize).toBeGreaterThanOrEqual(34);
-    expect(proceduralPresentation.fontSize).toBeLessThanOrEqual(36);
-    expect(proceduralPresentation.fontSize * 3.25).toBeLessThanOrEqual(118);
+    expect(proceduralPresentation.fontSize).toBeGreaterThanOrEqual(46);
+    expect(proceduralPresentation.fontSize).toBeLessThanOrEqual(48);
+    expect(proceduralPresentation.fontSize * 3.25).toBeLessThanOrEqual(172);
     expect(proceduralPresentation.titleAlpha).toBeLessThan(snapshotPresentation.titleAlpha);
     expect(proceduralPresentation.titleAlpha).toBeGreaterThan(proceduralPresentation.shadowAlpha);
   });

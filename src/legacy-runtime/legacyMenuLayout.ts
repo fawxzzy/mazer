@@ -28,13 +28,25 @@ export interface LegacyMenuLayout {
   buttonHeight: number;
 }
 
+export interface LegacyAuthenticatedMenuButtonStack {
+  authenticatedButtonGap: number;
+  authenticatedStackHeight: number;
+  optionsButtonHeight: number;
+  optionsButtonY: number;
+  startButtonY: number;
+}
+
 export type LegacyMenuLayoutSurface = 'menu' | 'play';
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+export const LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_RATIO = 0.22;
+export const LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MIN = 10;
+export const LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MAX = 14;
 const LEGACY_MENU_SIDE_PANEL_WIDTH = 300;
 const LEGACY_PLAY_ULTRA_NARROW_WIDTH = 360;
 const LEGACY_PHONE_CLEAN_ZOOM_WIDTH = 420;
-const LEGACY_PHONE_CLEAN_TILE_SIZE = 6;
+const LEGACY_PHONE_CLEAN_TILE_SIZE = 8;
+const LEGACY_PHONE_CLEAN_SAFE_INSET = 7;
 const LEGACY_BOARD_SIGIL_BORDER_INSET = 2;
 
 const resolveMenuPortraitTitleY = (
@@ -71,6 +83,40 @@ const resolveMenuPortraitTitleY = (
   return Math.max(28, alignedTitleY);
 };
 
+export const resolveLegacyAuthenticatedMenuButtonStack = (
+  layout: Pick<LegacyMenuLayout, 'boardSize' | 'boardTop' | 'buttonHeight' | 'centerButtonY' | 'footerY'>
+): LegacyAuthenticatedMenuButtonStack => {
+  const safeButtonHeight = Math.max(1, Math.round(layout.buttonHeight));
+  const optionsButtonHeight = Math.max(38, Math.round(safeButtonHeight * 0.78));
+  const authenticatedButtonGap = clampInteger(
+    Math.round(safeButtonHeight * LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_RATIO),
+    LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MIN,
+    LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MAX
+  );
+  const authenticatedStackHeight = safeButtonHeight + authenticatedButtonGap + optionsButtonHeight;
+  const stackHalfHeight = authenticatedStackHeight / 2;
+  const boardBottom = layout.boardTop + layout.boardSize;
+  const availableHeight = layout.footerY - boardBottom;
+  const minCenterY = boardBottom + stackHalfHeight + 8;
+  const maxCenterY = layout.footerY - stackHalfHeight - 2;
+  const stackCenterY = maxCenterY >= minCenterY
+    ? clamp(Math.round(layout.centerButtonY), minCenterY, maxCenterY)
+    : availableHeight >= authenticatedStackHeight + 2
+      ? boardBottom + (availableHeight / 2)
+      : Math.round(layout.centerButtonY);
+  const startButtonY = Math.round(stackCenterY - ((authenticatedStackHeight - safeButtonHeight) / 2));
+  const optionsButtonY = startButtonY
+    + Math.round((safeButtonHeight / 2) + authenticatedButtonGap + (optionsButtonHeight / 2));
+
+  return {
+    authenticatedButtonGap,
+    authenticatedStackHeight,
+    optionsButtonHeight,
+    optionsButtonY,
+    startButtonY
+  };
+};
+
 export const resolveLegacyMenuLayout = (
   width: number,
   height: number,
@@ -85,31 +131,38 @@ export const resolveLegacyMenuLayout = (
   const isPlayUltraNarrow = isPlaySurface && isPortrait && width < LEGACY_PLAY_ULTRA_NARROW_WIDTH;
   const isUltraNarrow = isSidePanelPortrait || isPlayUltraNarrow;
   const usesStackedButtons = isSidePanelPortrait;
+  const shouldUseCleanPhoneCadence = isPortrait && !isUltraNarrow && width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH;
+  const isShortLandscapeMenu = !isPlaySurface && !isPortrait && height < 820;
   const baseBoardScale = isUltraNarrow ? 0.98 : (isPortrait ? (isPlaySurface ? 0.92 : 0.86) : (isPlaySurface ? 0.62 : 0.52));
+  const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const maxBoardSize = Math.min(
-    width * (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)),
-    height * (isPlaySurface ? (isPortrait ? 0.74 : 0.86) : (isPortrait ? 0.82 : 0.79))
+    width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78))),
+    height * (isPlaySurface ? (isPortrait ? 0.74 : 0.86) : (isPortrait ? 0.82 : (isShortLandscapeMenu ? 0.6 : 0.72)))
   );
   const minBoardSize = Math.min(300, Math.max(120, maxBoardSize));
   const rawBoardSize = Math.min(
-    width * baseBoardScale * scaleBias,
-    height * (isPlaySurface ? (isPortrait ? 0.64 : 0.84) : (isPortrait ? 0.54 : 0.775)) * scaleBias
+    width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias,
+    height * (isPlaySurface ? (isPortrait ? 0.64 : 0.84) : (isPortrait ? 0.54 : (isShortLandscapeMenu ? 0.6 : 0.72))) * scaleBias
   );
   const boardSize = Math.round(clamp(rawBoardSize, minBoardSize, maxBoardSize));
   const rawTileSize = boardSize / Math.max(1, mazeSize);
-  const shouldUseCleanPhoneCadence = isPortrait && !isUltraNarrow && width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH;
+  const cleanPhoneMaxTileSize = Math.floor(
+    Math.max(1, width - 16 - (LEGACY_PHONE_CLEAN_SAFE_INSET * 2)) / Math.max(1, mazeSize)
+  );
   const tileSize = isUltraNarrow
     ? Math.max(3, Number(rawTileSize.toFixed(3)))
     : shouldUseCleanPhoneCadence
-      ? Math.max(4, Math.min(LEGACY_PHONE_CLEAN_TILE_SIZE, Math.floor(rawTileSize)))
+      ? Math.max(4, Math.min(LEGACY_PHONE_CLEAN_TILE_SIZE, cleanPhoneMaxTileSize, Math.floor(rawTileSize)))
     : Math.max(4, Math.floor(rawTileSize));
-  const snappedBoardSize = Math.round(tileSize * mazeSize * 1000) / 1000;
+  const snappedBoardSize = shouldUseCleanPhoneCadence
+    ? Math.round((tileSize * mazeSize) + (LEGACY_PHONE_CLEAN_SAFE_INSET * 2))
+    : Math.round(tileSize * mazeSize * 1000) / 1000;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
   const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
   const stackGap = Math.round(clamp(height * 0.02, 7, 12));
   const titleClearance = Math.round(clamp(snappedBoardSize * (isPortrait ? 0.13 : 0.11), isPortrait ? 42 : 36, isPortrait ? 68 : 74));
-  const menuButtonGap = Math.round(clamp(buttonHeight * (isPortrait ? 1.08 : 0.62), isPortrait ? 40 : 34, isPortrait ? 64 : 48));
+  const menuButtonGap = Math.round(clamp(buttonHeight * (isPortrait ? 1.82 : 1.2), isPortrait ? 76 : 70, isPortrait ? 96 : 90));
   const menuStackHeight = titleClearance + snappedBoardSize + menuButtonGap + buttonHeight;
   const centeredMenuBoardTop = Math.round((height - menuStackHeight) / 2 + titleClearance);
   const menuBoardTop = isUltraNarrow
@@ -169,6 +222,9 @@ export const resolveLegacyMenuLayout = (
     menuPortraitTitleFallbackY,
     true
   );
+  const titleX = !isPlaySurface && isPortrait
+    ? boardLeft + (snappedBoardSize / 2)
+    : Math.round(width / 2);
 
   return {
     width,
@@ -177,7 +233,7 @@ export const resolveLegacyMenuLayout = (
     boardTop,
     boardSize: snappedBoardSize,
     tileSize,
-    titleX: Math.round(width / 2),
+    titleX,
     titleY: Math.round(!isPlaySurface && isPortrait ? menuPortraitTitleY : titleOverlapY),
     footerY: height - 18,
     buttonLayout: usesStackedButtons ? 'stack' : 'row',

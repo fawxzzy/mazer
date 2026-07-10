@@ -45,17 +45,18 @@ describe('input-human touch bridge', () => {
     expect(layout.controls.move_up.centerY).toBeLessThan(layout.controls.move_down.centerY);
     expect(layout.controls.move_left.centerX).toBeLessThan(layout.controls.move_right.centerX);
     expect(layout.controls.pause.top).toBeLessThan(layout.controls.move_up.top);
-    expect(layout.controls.restart_attempt.left).toBeGreaterThan(layout.controls.pause.right);
+    expect(Math.abs(layout.controls.pause.centerX - 195)).toBeLessThanOrEqual(1);
+    expect(layout.controls.pause.top).toBeGreaterThan(48);
     expect(Math.abs((layout.frames?.[0].centerX ?? 0) - 195)).toBeLessThanOrEqual(1);
     expect(layout.frames?.[0].height).toBeLessThan(layout.controls.move_up.height);
     expect(layout.controls.pause.width).toBeLessThan(90);
-    expect(layout.controls.restart_attempt.width).toBe(layout.controls.pause.width);
-    expect(layout.controls.pause.left).toBeLessThan(90);
-    expect(layout.controls.restart_attempt.right).toBeGreaterThan(300);
+    expect(layout.controls.pause.left).toBeGreaterThan(140);
+    expect(layout.controls.restart_attempt.width).toBe(0);
+    expect(layout.controls.restart_attempt.height).toBe(0);
     expect(layout.controls.toggle_thoughts.width).toBe(0);
     expect(layout.controls.toggle_thoughts.height).toBe(0);
-    expect(layout.controls.restart_attempt.centerY).toBe(layout.controls.pause.centerY);
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.pause.centerX, layout.controls.pause.centerY)).toBe('pause');
+    expect(resolveTouchControlKindAtPoint(layout, layout.controls.restart_attempt.centerX, layout.controls.restart_attempt.centerY)).toBeNull();
     expect(resolveTouchControlKindAtPoint(
       layout,
       (layout.controls.move_left.centerX + layout.controls.move_right.centerX) / 2,
@@ -256,7 +257,7 @@ describe('input-human touch bridge', () => {
     expect(layout.controls.move_up_right.right).toBeLessThanOrEqual(board.left - 8);
     expect(layout.controls.move_down_left.left).toBeGreaterThanOrEqual(0);
     expect(layout.controls.pause.left).toBeGreaterThanOrEqual(board.left + board.width + 8);
-    expect(layout.controls.restart_attempt.left).toBe(layout.controls.pause.left);
+    expect(layout.controls.restart_attempt.width).toBe(0);
     expect(layout.controls.toggle_thoughts.width).toBe(0);
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.pause.centerX, layout.controls.pause.centerY)).toBe('pause');
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_left.centerX, layout.controls.move_left.centerY)).toBe('move_left');

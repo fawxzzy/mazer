@@ -9,6 +9,9 @@ Use screenshots as the primary machine input for Codex. Treat video as secondary
 - Do not capture from production accounts or production sessions.
 - Keep disposable artifacts under `tmp/`.
 - Commit only durable pointers, docs, and indexes.
+- A screenshot is not accepted as proof unless metadata proves the expected route, actual URL, runtime surface mode, overlay state, and viewport contract before capture.
+- If route, mode, overlay, or viewport do not match the requested surface, the capture must fail fast and write a failure receipt instead of being summarized as visual proof.
+- Evidence summaries must cite the metadata path and the `screenContract.pass` result, not just the image path.
 
 ## Packet Schema
 
@@ -35,6 +38,9 @@ Notes:
 - `diff-summary.json` should rank the largest regressions or deltas for review.
 - `baseline.json` should point at the approved baseline packet or run.
 - `metadata.json` should describe the scenario, viewport, seeded state, and artifact pointers.
+- `metadata.json` should include `actualUrl` and `screenContract` for each screenshot-backed capture.
+- `screenContract.expected` should include route, mode, overlay, and viewport.
+- `screenContract.actual` should include actual URL, diagnostics mode/overlay, and diagnostics viewport when available.
 
 ## Baseline Workflow
 

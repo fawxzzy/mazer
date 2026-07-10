@@ -13,6 +13,8 @@ comment on table public.mazer_progression_states is
 comment on column public.mazer_progression_states.state is
   'Normalized LegacyProgressionState payload, intentionally compact and client-owned by the signed-in user.';
 
+revoke all on table public.mazer_progression_states from anon, authenticated, service_role;
+
 grant select, insert, update on public.mazer_progression_states to authenticated;
 grant select, insert, update, delete on public.mazer_progression_states to service_role;
 

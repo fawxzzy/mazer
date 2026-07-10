@@ -28,6 +28,7 @@ Input may be one of:
 - raw `mazer.cycle-telemetry.v1` history JSON
 - runtime diagnostics JSON containing `cycleTelemetry`
 - localStorage-style JSON containing a `mazer.cycle-telemetry.v1` string
+- Supabase `mazer_cycle_receipts` row exports, either as an array or `{ "receipts": [...] }`
 
 Output schema:
 
@@ -49,6 +50,11 @@ Output schema:
 The report intentionally excludes raw full `playerPath` arrays. It keeps only
 bounded previews plus aggregates.
 
+AI menu-demo completions may include a compact `aiDecisionSummary` with the
+thinking model and bounded counters for decisions, wrong branches, backtracks,
+recoveries, and visited-undo events. This is the receipt surface formalized in
+`docs/research/MAZER_AI_PLAYBOOK_PROGRESS_CONTRACT.md`.
+
 ## Command
 
 ```bash
@@ -65,6 +71,33 @@ That writes both:
 
 - `runtime/receipts/mazer/cycle-telemetry/<timestamp>.json`
 - `runtime/receipts/mazer/cycle-telemetry/latest.json`
+
+## Remote Receipt Export
+
+Authenticated Supabase cycle rows can be exported and passed through the same
+reporter. The normalizer accepts snake_case database columns such as
+`maze_seed`, `maze_size`, `start_cell`, `goal_cell`, `path_length`,
+`completion_time_ms`, and `average_frame_ms`, plus the compact nested `receipt`
+payload.
+
+The Atlas report still excludes:
+
+- Supabase `user_id`
+- raw full `playerPath`
+- auth tokens
+- service-role or secret keys
+- unbounded browser storage
+
+Current proof:
+
+```bash
+npm run cycle:report -- --input ../../tmp/mazer-auth-qa/remote-cycle-receipt-export.json --atlas-receipt-root ../../runtime/receipts/mazer/cycle-telemetry --output ../../tmp/mazer-auth-qa/remote-cycle-atlas-report.json --pretty
+```
+
+This produced:
+
+- `<ATLAS_ROOT>/runtime/receipts/mazer/cycle-telemetry/latest.json`
+- `<ATLAS_ROOT>/tmp/mazer-auth-qa/remote-cycle-atlas-report.json`
 
 ## Interpretation Rules
 
@@ -84,3 +117,4 @@ Safe next lanes:
 1. Add a browser/dev export button if manual localStorage copy becomes annoying.
 2. Add an Atlas-side validator for `mazer.cycle-learning.report.v1`.
 3. Add adaptive tuning only after enough `play` receipts exist and the report signal is stable.
+4. Keep menu-demo AI tuning separate from human play difficulty until both tracks have enough receipts.
