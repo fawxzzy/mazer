@@ -108,7 +108,7 @@ describe('Mazer completion markers', () => {
     expect(markerDoc).toContain('menu explains AI Level, Score, Time, and run cycles');
     expect(markerDoc).toContain('played-game pause explains Player Level/Rank and Runs');
     expect(markerDoc).toContain('played-game badge no longer falls back to the compact `Lv` label');
-    expect(markerDoc).toContain('| DiscordOS Mazer feedback board | 85% |');
+    expect(markerDoc).toContain('| DiscordOS Mazer feedback board | 90% |');
     expect(markerDoc).toContain('| Visual proof verification discipline | 90% |');
     expect(markerDoc).toContain('| AI/playbook progression contracts | 70% |');
     expect(markerDoc).toContain('removes the remaining visual-goal inference fallback');
