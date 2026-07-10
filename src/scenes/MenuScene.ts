@@ -160,6 +160,7 @@ import {
 } from '../legacy-runtime/mazeCycleTelemetry';
 import {
   LEGACY_PROGRESSION_STORAGE_KEY,
+  createEmptyLegacyProgressionState,
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
   resolveLegacyMazeComplexity,
@@ -5585,10 +5586,10 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
-      this.fillPlayDynamicMarkerTile(this.maze.start, LEGACY_PLAY_START_MARKER_EDGE, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');
+      this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');
     }
     if (this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
-      this.fillPlayDynamicMarkerTile(this.maze.goal, 0xd81b2a, mazeLeft, mazeTop, mazeTileSize, 0.95, 'goal');
+      this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95, 'goal');
     }
 
     for (let index = 0; index < visibleTrail.length; index += 1) {
@@ -5963,6 +5964,28 @@ export class MenuScene extends Phaser.Scene {
     const angle = isLifecycleSpinActive
       ? (time / 130) % (Math.PI * 2)
       : goalAngle;
+    this.drawLegacyCompassGlyph(
+      this.boardDynamicGraphics,
+      centerX,
+      centerY,
+      size,
+      angle,
+      palette,
+      time,
+      isLifecycleSpinActive
+    );
+  }
+
+  private drawLegacyCompassGlyph(
+    graphics: Phaser.GameObjects.Graphics,
+    centerX: number,
+    centerY: number,
+    size: number,
+    angle: number,
+    palette: LegacyProgressionPalette,
+    time: number,
+    isLifecycleSpinActive: boolean
+  ): void {
     const pulse = 0.5 + (0.5 * Math.sin(time / 380));
     const arrowLength = Math.max(8, size * 0.58);
     const wing = Math.max(3, size * 0.26);
@@ -5985,31 +6008,31 @@ export class MenuScene extends Phaser.Scene {
     };
     const hubRadius = Math.max(2, size * 0.16);
 
-    this.boardDynamicGraphics.lineStyle(1, palette.rankColor, (isLifecycleSpinActive ? 0.5 : 0.34) + (pulse * 0.22));
-    this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(centerX - (size * 0.43), centerY - (size * 0.08));
-    this.boardDynamicGraphics.lineTo(centerX, centerY + (size * 0.38));
-    this.boardDynamicGraphics.lineTo(centerX + (size * 0.43), centerY - (size * 0.08));
-    this.boardDynamicGraphics.strokePath();
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.14 + (pulse * 0.12));
-    this.boardDynamicGraphics.fillTriangle(tip.x, tip.y, left.x, left.y, right.x, right.y);
-    this.boardDynamicGraphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW_SHADOW, 0.32);
-    this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(tail.x + 1, tail.y + 1);
-    this.boardDynamicGraphics.lineTo(centerX + 1, centerY + 1);
-    this.boardDynamicGraphics.lineTo(tip.x + 1, tip.y + 1);
-    this.boardDynamicGraphics.strokePath();
-    this.boardDynamicGraphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW, 0.86);
-    this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(tail.x, tail.y);
-    this.boardDynamicGraphics.lineTo(centerX, centerY);
-    this.boardDynamicGraphics.lineTo(tip.x, tip.y);
-    this.boardDynamicGraphics.strokePath();
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.78);
-    this.boardDynamicGraphics.fillTriangle(tip.x, tip.y, left.x, left.y, right.x, right.y);
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, 0.82);
-    this.boardDynamicGraphics.fillTriangle(centerX, centerY - hubRadius, centerX + hubRadius, centerY, centerX, centerY + hubRadius);
-    this.boardDynamicGraphics.fillTriangle(centerX, centerY - hubRadius, centerX - hubRadius, centerY, centerX, centerY + hubRadius);
+    graphics.lineStyle(1, palette.rankColor, (isLifecycleSpinActive ? 0.5 : 0.34) + (pulse * 0.22));
+    graphics.beginPath();
+    graphics.moveTo(centerX - (size * 0.43), centerY - (size * 0.08));
+    graphics.lineTo(centerX, centerY + (size * 0.38));
+    graphics.lineTo(centerX + (size * 0.43), centerY - (size * 0.08));
+    graphics.strokePath();
+    graphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.14 + (pulse * 0.12));
+    graphics.fillTriangle(tip.x, tip.y, left.x, left.y, right.x, right.y);
+    graphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW_SHADOW, 0.32);
+    graphics.beginPath();
+    graphics.moveTo(tail.x + 1, tail.y + 1);
+    graphics.lineTo(centerX + 1, centerY + 1);
+    graphics.lineTo(tip.x + 1, tip.y + 1);
+    graphics.strokePath();
+    graphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW, 0.86);
+    graphics.beginPath();
+    graphics.moveTo(tail.x, tail.y);
+    graphics.lineTo(centerX, centerY);
+    graphics.lineTo(tip.x, tip.y);
+    graphics.strokePath();
+    graphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.78);
+    graphics.fillTriangle(tip.x, tip.y, left.x, left.y, right.x, right.y);
+    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, 0.82);
+    graphics.fillTriangle(centerX, centerY - hubRadius, centerX + hubRadius, centerY, centerX, centerY + hubRadius);
+    graphics.fillTriangle(centerX, centerY - hubRadius, centerX - hubRadius, centerY, centerX, centerY + hubRadius);
   }
 
   private resolveBoardOffset(): Phaser.Math.Vector2 {
@@ -6403,7 +6426,6 @@ export class MenuScene extends Phaser.Scene {
 
   private fillPlayDynamicMarkerTile(
     point: LegacyPoint,
-    color: number,
     originX: number,
     originY: number,
     tileSize: number,
@@ -6412,30 +6434,48 @@ export class MenuScene extends Phaser.Scene {
   ): void {
     const centerX = originX + ((point.x + 0.5) * tileSize);
     const centerY = originY + ((point.y + 0.5) * tileSize);
+    this.drawLegacyEndpointMarker(
+      this.boardDynamicGraphics,
+      centerX,
+      centerY,
+      tileSize,
+      alpha,
+      kind
+    );
+  }
+
+  private drawLegacyEndpointMarker(
+    graphics: Phaser.GameObjects.Graphics,
+    centerX: number,
+    centerY: number,
+    tileSize: number,
+    alpha: number,
+    kind: 'start' | 'goal'
+  ): void {
     const markerMetrics = resolveLegacyEndpointMarkerRenderMetrics(tileSize);
     const shadowRadius = Math.min(tileSize * 0.52, markerMetrics.outerRadius + markerMetrics.strokeWidth);
 
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.48, alpha * 0.48));
-    this.boardDynamicGraphics.fillCircle(centerX, centerY, shadowRadius);
-    this.boardDynamicGraphics.lineStyle(markerMetrics.strokeWidth, kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_EDGE : color, Math.min(0.96, alpha));
-    this.boardDynamicGraphics.strokeCircle(centerX, centerY, markerMetrics.outerRadius);
+    graphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.48, alpha * 0.48));
+    graphics.fillCircle(centerX, centerY, shadowRadius);
+    graphics.lineStyle(markerMetrics.strokeWidth, kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_EDGE : LEGACY_PLAY_START_MARKER_EDGE, Math.min(0.96, alpha));
+    graphics.strokeCircle(centerX, centerY, markerMetrics.outerRadius);
 
     if (kind === 'goal') {
-      this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_EDGE, Math.min(0.86, alpha * 0.86));
-      this.boardDynamicGraphics.beginPath();
-      this.boardDynamicGraphics.moveTo(centerX, centerY - markerMetrics.outerRadius);
-      this.boardDynamicGraphics.lineTo(centerX + markerMetrics.outerRadius, centerY);
-      this.boardDynamicGraphics.lineTo(centerX, centerY + markerMetrics.outerRadius);
-      this.boardDynamicGraphics.lineTo(centerX - markerMetrics.outerRadius, centerY);
-      this.boardDynamicGraphics.closePath();
-      this.boardDynamicGraphics.fillPath();
-      this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha);
-      this.boardDynamicGraphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
+      graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_EDGE, Math.min(0.86, alpha * 0.86));
+      graphics.beginPath();
+      graphics.moveTo(centerX, centerY - markerMetrics.outerRadius);
+      graphics.lineTo(centerX + markerMetrics.outerRadius, centerY);
+      graphics.lineTo(centerX, centerY + markerMetrics.outerRadius);
+      graphics.lineTo(centerX - markerMetrics.outerRadius, centerY);
+      graphics.closePath();
+      graphics.fillPath();
+      graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha);
+      graphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
       return;
     }
 
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_START_MARKER_CORE, alpha);
-    this.boardDynamicGraphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
+    graphics.fillStyle(LEGACY_PLAY_START_MARKER_CORE, alpha);
+    graphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
   }
 
   private fillLegacyPlayerMarkerTile(
@@ -7322,6 +7362,9 @@ export class MenuScene extends Phaser.Scene {
       case 'auth':
         this.buildAuthOverlay();
         break;
+      case 'confirm-progression-reset':
+        this.buildProgressionResetConfirmationOverlay();
+        break;
     }
 
     this.uiDirty = false;
@@ -7383,14 +7426,19 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private resolveFeatureControlRowsContentHeight(panel: OverlayPanelFrame): number {
+  private resolveFeatureControlRowsContentHeight(
+    panel: OverlayPanelFrame,
+    options: { includeMovementSpeed?: boolean; showDescriptions?: boolean } = {}
+  ): number {
     const stacked = panel.width < 420;
-    const rowHeight = stacked ? 46 : 48;
+    const rowHeight = options.showDescriptions ? (stacked ? 66 : 70) : (stacked ? 46 : 48);
     const rowGap = stacked ? 8 : 10;
     const headingGap = stacked ? 28 : 32;
     const toggleRowCount = 6;
 
-    return headingGap + (toggleRowCount * (rowHeight + rowGap)) + rowHeight + (stacked ? 10 : 6);
+    return headingGap
+      + (toggleRowCount * (rowHeight + rowGap))
+      + (options.includeMovementSpeed ? rowHeight + (stacked ? 10 : 6) : 0);
   }
 
   private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void {
@@ -7488,7 +7536,9 @@ export class MenuScene extends Phaser.Scene {
         Math.max(140, viewportBottom - viewportTop)
       );
       const guideHeight = (compact ? 264 : 274) + (compact ? 26 : 30);
-      const contentHeight = 18 + this.resolveFeatureControlRowsContentHeight(panel) + guideHeight + 12;
+      const contentHeight = 18 + this.resolveFeatureControlRowsContentHeight(panel, {
+        includeMovementSpeed: false
+      }) + guideHeight + 12;
       const scrollMetrics = resolveLegacyOverlayScrollMetrics({
         contentHeight,
         offset: this.overlayScrollOffset,
@@ -7501,6 +7551,7 @@ export class MenuScene extends Phaser.Scene {
         viewport
       });
       this.createFeatureControlRows(guideEndY, panel, {
+        includeMovementSpeed: false,
         rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
         scrollOffset: scrollMetrics.offset,
         viewport
@@ -7517,7 +7568,7 @@ export class MenuScene extends Phaser.Scene {
       rowY = this.createInputRow('Camera Scale', 'camScale', rowY, panel);
     }
 
-    rowY = this.createFeatureControlRows(rowY, panel);
+    rowY = this.createFeatureControlRows(rowY, panel, { includeMovementSpeed: false });
 
     if (showAdvancedOptions && !compact) {
       rowY = this.createColorInputRow('Path RGB 0-255', ['pathR', 'pathG', 'pathB'], rowY, panel, this.settings.pathColor);
@@ -7531,8 +7582,10 @@ export class MenuScene extends Phaser.Scene {
     rowY: number,
     panel: OverlayPanelFrame,
     options: {
+      includeMovementSpeed?: boolean;
       rightGutter?: number;
       scrollOffset?: number;
+      showDescriptions?: boolean;
       viewport?: VisualRect | null;
     } = {}
   ): number {
@@ -7562,7 +7615,7 @@ export class MenuScene extends Phaser.Scene {
     const inset = compact ? 14 : 18;
     const titleY = cardTop + (compact ? 19 : 21);
     const legendTop = cardTop + (compact ? 52 : 58);
-    const rowHeight = compact ? 29 : 30;
+    const rowHeight = compact ? 31 : 33;
     const guideTitleFontSize = compact ? 19 : 21;
     const guideRowFontSize = compact ? 14 : 15;
     const guideRowMinFontSize = compact ? 12 : 13;
@@ -7607,11 +7660,11 @@ export class MenuScene extends Phaser.Scene {
       return label;
     };
 
-    addText('PLAYER GUIDE', cardLeft + inset, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0, 1, guideRowMinFontSize);
+    addText('PLAYER GUIDE', panel.centerX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);
 
     const drawLegendRow = (
       index: number,
-      kind: 'compass' | 'start' | 'end' | 'player',
+      kind: 'compass' | 'start' | 'end',
       title: string,
       copy: string,
       color: string
@@ -7641,78 +7694,31 @@ export class MenuScene extends Phaser.Scene {
     drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');
     drawLegendRow(1, 'start', 'Start', 'run begins', '#fff05a');
     drawLegendRow(2, 'end', 'End', 'clear here', '#ff5264');
-    drawLegendRow(3, 'player', 'Player', 'player marker + trail', '#72e0bf');
-    drawLegendRow(
-      4,
-      'player',
-      this.mode === 'play' ? 'Skill Lvl' : 'AI Skill Lvl',
-      'rank / level',
-      '#9dffd5'
-    );
-    drawLegendRow(
-      5,
-      'player',
-      'Clock + Score',
-      'time + 0-100 score',
-      '#9dffd5'
-    );
-    drawLegendRow(
-      6,
-      'player',
-      'Runs + Maze Lvl',
-      'clears + current maze',
-      '#9dffd5'
-    );
+    const bulletTop = legendTop + (3 * rowHeight) + (compact ? 8 : 10);
+    const bullets = [
+      'Player: green beacon; the trail marks your route.',
+      `${this.mode === 'play' ? 'Skill Lvl' : 'AI Skill Lvl'}: rank and current level.`,
+      'Score: 0-100 run quality; Runs: completed mazes.',
+      'Maze Lvl: the current procedural challenge tier.'
+    ];
+    bullets.forEach((copy, index) => {
+      addText(`• ${copy}`, detailLeft, bulletTop + (index * rowHeight), detailWidth, '#d9fff5', guideRowFontSize, 0, 0.92, guideRowMinFontSize);
+    });
 
     return contentTop + cardHeight + (compact ? 14 : 16);
   }
 
   private drawLegacyOptionsGuideGlyph(
-    kind: 'compass' | 'start' | 'end' | 'player',
+    kind: 'compass' | 'start' | 'end',
     centerX: number,
     centerY: number,
     size: number
   ): void {
     if (kind === 'compass') {
-      this.drawLegacyOptionsInfoCompassGlyph(centerX, centerY, size);
+      this.drawLegacyCompassGlyph(this.overlayGraphics, centerX, centerY, size, -Math.PI / 2, this.resolveActiveLegacyProgressionPalette(), this.time.now, false);
       return;
     }
-
-    const radius = size * 0.38;
-    const color = kind === 'start'
-      ? LEGACY_PLAY_START_MARKER_CORE
-      : kind === 'end'
-        ? LEGACY_PLAY_GOAL_MARKER_CORE
-        : LEGACY_PLAY_TOUCH_ACCENT;
-    const edge = kind === 'start'
-      ? LEGACY_PLAY_START_MARKER_EDGE
-      : kind === 'end'
-        ? LEGACY_PLAY_GOAL_MARKER_EDGE
-        : LEGACY_PLAY_TOUCH_ACCENT;
-    this.overlayGraphics.fillStyle(edge, 0.28);
-    this.overlayGraphics.fillCircle(centerX, centerY, radius * 1.45);
-    this.overlayGraphics.lineStyle(1, edge, 0.76);
-    this.overlayGraphics.strokeCircle(centerX, centerY, radius * 1.22);
-    this.overlayGraphics.fillStyle(color, 0.94);
-    this.overlayGraphics.fillCircle(centerX, centerY, radius);
-  }
-
-  private drawLegacyOptionsInfoCompassGlyph(centerX: number, centerY: number, size: number): void {
-    const radius = size / 2;
-    const tipY = centerY - (radius * 0.72);
-    const bottomY = centerY + (radius * 0.72);
-    const sideX = radius * 0.52;
-
-    this.overlayGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.52);
-    this.overlayGraphics.strokeCircle(centerX, centerY, radius);
-    this.overlayGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.2);
-    this.overlayGraphics.fillCircle(centerX, centerY, radius * 0.74);
-    this.overlayGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, 0.9);
-    this.overlayGraphics.fillTriangle(centerX, tipY, centerX + sideX, bottomY, centerX, centerY + (radius * 0.24));
-    this.overlayGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.82);
-    this.overlayGraphics.fillTriangle(centerX, tipY, centerX - sideX, bottomY, centerX, centerY + (radius * 0.24));
-    this.overlayGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.9);
-    this.overlayGraphics.fillCircle(centerX, centerY, Math.max(2, radius * 0.12));
+    this.drawLegacyEndpointMarker(this.overlayGraphics, centerX, centerY, size * 2, 0.94, kind === 'start' ? 'start' : 'goal');
   }
 
   private createLegacyOptionsAccountActionRow(panel: OverlayPanelFrame): void {
@@ -7759,7 +7765,10 @@ export class MenuScene extends Phaser.Scene {
       Math.max(120, viewportBottom - viewportTop)
     );
     const guideHeight = (stacked ? 264 : 274) + (stacked ? 26 : 30);
-    const contentHeight = 18 + this.resolveFeatureControlRowsContentHeight(panel) + guideHeight + 12;
+    const contentHeight = 18 + this.resolveFeatureControlRowsContentHeight(panel, {
+      includeMovementSpeed: true,
+      showDescriptions: true
+    }) + guideHeight + 12;
     const scrollMetrics = resolveLegacyOverlayScrollMetrics({
       contentHeight,
       offset: this.overlayScrollOffset,
@@ -7772,14 +7781,17 @@ export class MenuScene extends Phaser.Scene {
       viewport
     });
     this.createFeatureControlRows(guideEndY, panel, {
+      includeMovementSpeed: true,
       rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
       scrollOffset: scrollMetrics.offset,
+      showDescriptions: true,
       viewport
     });
     this.drawLegacyOverlayScrollFacade(scrollMetrics, true);
 
     const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');
     const mainMenuAction = (): void => this.applyLegacyPauseCommand('return-menu');
+    const progressionResetAction = (): void => this.openOverlay('confirm-progression-reset');
 
     if (stacked) {
       const compactActionWidth = Math.min(128, Math.floor((panel.width - 64) / 2));
@@ -7787,7 +7799,8 @@ export class MenuScene extends Phaser.Scene {
       const compactOffset = compactActionWidth + compactActionGap;
       this.uiButtons.push(
         this.createButton(panel.centerX - (compactOffset / 2), actionY, compactActionWidth, actionButtonHeight, 'Reset', resetAction),
-        this.createButton(panel.centerX + (compactOffset / 2), actionY, compactActionWidth, actionButtonHeight, 'Menu', mainMenuAction)
+        this.createButton(panel.centerX + (compactOffset / 2), actionY, compactActionWidth, actionButtonHeight, 'Menu', mainMenuAction),
+        this.createButton(panel.centerX, actionY - actionButtonHeight - 10, Math.min(232, panel.width - 72), actionButtonHeight, 'Reset Progress', progressionResetAction)
       );
       return;
     }
@@ -7797,7 +7810,44 @@ export class MenuScene extends Phaser.Scene {
     const desktopOffset = (desktopActionWidth + desktopActionGap) / 2;
     this.uiButtons.push(
       this.createButton(panel.centerX - desktopOffset, actionY, desktopActionWidth, actionButtonHeight, 'Reset', resetAction),
-      this.createButton(panel.centerX + desktopOffset, actionY, desktopActionWidth, actionButtonHeight, 'Menu', mainMenuAction)
+      this.createButton(panel.centerX + desktopOffset, actionY, desktopActionWidth, actionButtonHeight, 'Menu', mainMenuAction),
+      this.createButton(panel.centerX, actionY - actionButtonHeight - 14, Math.min(252, panel.width - 88), actionButtonHeight, 'Reset Progress', progressionResetAction)
+    );
+  }
+
+  private buildProgressionResetConfirmationOverlay(): void {
+    const panel = this.resolveOverlayPanelFrame('confirm-progression-reset');
+    const compact = panel.width < 420;
+    const buttonHeight = compact ? 44 : 48;
+    const buttonWidth = Math.min(panel.width - 72, compact ? 240 : 280);
+    const bodyWidth = Math.min(panel.width - 72, compact ? 300 : 440);
+    const bodyY = panel.top + (compact ? 138 : 156);
+    const actionY = panel.top + panel.height - (compact ? 72 : 84);
+
+    this.createOverlayTitle('Reset Progress?', panel.top + (compact ? 52 : 58));
+    const body = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(panel.centerX, bodyY, 'This resets your Player Skill, score, runs, and maze level to the starting baseline. Your menu AI progression stays unchanged.', {
+      align: 'center',
+      color: '#d9fff5',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${compact ? 16 : 18}px`,
+      wordWrap: { width: bodyWidth }
+    })), bodyWidth, compact ? 16 : 18, 13).setOrigin(0.5, 0.5);
+    this.uiTexts.push(body);
+
+    const cancel = (): void => this.openOverlay('pause');
+    const confirm = (): void => this.resetLegacyPlayerProgression();
+    if (compact) {
+      const width = Math.floor((buttonWidth - 12) / 2);
+      this.uiButtons.push(
+        this.createButton(panel.centerX - (width / 2) - 6, actionY, width, buttonHeight, 'Cancel', cancel),
+        this.createButton(panel.centerX + (width / 2) + 6, actionY, width, buttonHeight, 'Confirm', confirm)
+      );
+      return;
+    }
+
+    this.uiButtons.push(
+      this.createButton(panel.centerX, actionY - 28, buttonWidth, buttonHeight, 'Confirm Reset', confirm),
+      this.createButton(panel.centerX, actionY + 30, buttonWidth, buttonHeight, 'Cancel', cancel)
     );
   }
 
@@ -8123,15 +8173,18 @@ export class MenuScene extends Phaser.Scene {
     y: number,
     panel: OverlayPanelFrame,
     options: {
+      includeMovementSpeed?: boolean;
       rightGutter?: number;
       scrollOffset?: number;
+      showDescriptions?: boolean;
       viewport?: VisualRect | null;
     } = {}
   ): number {
     const stacked = panel.width < 420;
     const left = panel.left + 28;
     const width = panel.width - 56 - (options.rightGutter ?? 0);
-    const rowHeight = stacked ? 46 : 48;
+    const showDescriptions = options.showDescriptions === true;
+    const rowHeight = showDescriptions ? (stacked ? 66 : 70) : (stacked ? 46 : 48);
     const rowGap = stacked ? 8 : 10;
     const scrollOffset = options.scrollOffset ?? 0;
     const viewport = options.viewport ?? null;
@@ -8144,6 +8197,7 @@ export class MenuScene extends Phaser.Scene {
     );
     const controls: Array<{
       checked: boolean;
+      description: string;
       label: string;
       offLabel: string;
       onClick: () => void;
@@ -8152,6 +8206,9 @@ export class MenuScene extends Phaser.Scene {
     }> = [
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings),
+        description: this.settings.toggleCameraFollow
+          ? 'On: keeps the maze centered around you.'
+          : 'Off: keeps the full maze fixed in view.',
         label: 'Camera Follow',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleCameraFollow'),
@@ -8160,6 +8217,9 @@ export class MenuScene extends Phaser.Scene {
       },
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
+        description: this.settings.toggleTrailFade
+          ? 'On: older trail tiles fade away.'
+          : 'Off: your full trail stays visible.',
         label: 'Trail Fade',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailFade'),
@@ -8168,6 +8228,9 @@ export class MenuScene extends Phaser.Scene {
       },
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
+        description: this.settings.toggleTrailPulse
+          ? 'On: trail gets a soft purple pulse.'
+          : 'Off: trail remains steady and crisp.',
         label: 'Trail Pulse',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailPulse'),
@@ -8176,6 +8239,9 @@ export class MenuScene extends Phaser.Scene {
       },
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
+        description: this.settings.toggleAnimatedBackdrop
+          ? 'On: background stars and sigils drift.'
+          : 'Off: background stays still to reduce motion.',
         label: 'Animated BG',
         offLabel: 'Stagnant',
         onClick: () => this.applyLegacyOverlayToggleField('toggleAnimatedBackdrop'),
@@ -8184,6 +8250,9 @@ export class MenuScene extends Phaser.Scene {
       },
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings),
+        description: this.settings.darkMode
+          ? 'On: higher-contrast dark game surface.'
+          : 'Off: brighter board treatment.',
         label: 'Dark Mode',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('darkMode'),
@@ -8192,6 +8261,9 @@ export class MenuScene extends Phaser.Scene {
       },
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings),
+        description: this.settings.controlMode === 'stick'
+          ? 'Stick: drag the on-screen compass to move.'
+          : 'Arrows: tap directional buttons to move.',
         label: 'Controls',
         offLabel: 'Arrows',
         onClick: () => this.applyLegacyOverlayToggleField('controlMode'),
@@ -8211,6 +8283,7 @@ export class MenuScene extends Phaser.Scene {
       this.uiButtons.push(
         this.createToggleSwitchRow({
           checked: control.checked,
+          description: showDescriptions ? control.description : undefined,
           label: control.label,
           offLabel: control.offLabel,
           onClick: control.onClick,
@@ -8226,7 +8299,7 @@ export class MenuScene extends Phaser.Scene {
 
     const sliderY = gridTop + (controls.length * (rowHeight + rowGap)) + Math.round(rowHeight / 2);
     const sliderRenderY = toRenderY(sliderY);
-    if (isVisible(sliderRenderY, rowHeight)) {
+    if (options.includeMovementSpeed === true && isVisible(sliderRenderY, rowHeight)) {
       this.uiButtons.push(
         this.createMovementSpeedSliderRow({
           height: rowHeight,
@@ -8240,11 +8313,14 @@ export class MenuScene extends Phaser.Scene {
       );
     }
 
-    return sliderY + Math.round(rowHeight / 2) + (stacked ? 10 : 6);
+    return options.includeMovementSpeed === true
+      ? sliderY + Math.round(rowHeight / 2) + (stacked ? 10 : 6)
+      : gridTop + (controls.length * (rowHeight + rowGap));
   }
 
   private createToggleSwitchRow(input: {
     checked: boolean;
+    description?: string;
     height: number;
     label: string;
     offLabel: string;
@@ -8275,20 +8351,24 @@ export class MenuScene extends Phaser.Scene {
       ? stateLabelRight - stateLaneWidth - trackGap
       : stateLabelRight - trackGap;
     const labelMaxWidth = Math.max(54, labelRight - labelX);
-    const labelFontSize = Math.max(15, Math.min(20, Math.round(input.height * 0.4)));
+    const hasDescription = Boolean(input.description);
+    const labelFontSize = hasDescription
+      ? Math.max(14, Math.min(18, Math.round(input.height * 0.27)))
+      : Math.max(15, Math.min(20, Math.round(input.height * 0.4)));
     const stateFontSize = Math.max(11, Math.min(13, Math.round(input.height * 0.28)));
+    const titleY = input.y + (hasDescription ? -Math.round(input.height * 0.16) : 0);
     const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, input.checked ? 0.62 : 0.5);
     background.setStrokeStyle(1, rowStroke, input.checked ? 0.56 : 0.38);
     background.setInteractive({ useHandCursor: true });
 
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, input.y, input.label, {
+    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, titleY, input.label, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${labelFontSize}px`,
       color: '#ecfff5'
     })), labelMaxWidth, labelFontSize, 11).setOrigin(0, 0.5).setAlpha(0.94);
 
     const displayStateText = input.stateText || (input.checked ? input.onLabel : input.offLabel);
-    const stateLabel = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(stateLabelRight, input.y, displayStateText || input.stateText, {
+    const stateLabel = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(stateLabelRight, titleY, displayStateText || input.stateText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${stateFontSize}px`,
       color: stateColor
@@ -8301,10 +8381,23 @@ export class MenuScene extends Phaser.Scene {
       this.uiTexts.push(stateLabel);
     }
 
-    const track = this.add.ellipse(trackX, input.y, trackWidth, trackHeight, input.checked ? 0x123a2d : 0x07131d, 0.9);
+    const description = hasDescription
+      ? this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, input.y + Math.round(input.height * 0.2), input.description!, {
+        color: '#bfe9de',
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: `${Math.max(11, Math.min(13, Math.round(input.height * 0.18)))}px`
+      })), input.width - (rowPaddingX * 2), Math.max(11, Math.min(13, Math.round(input.height * 0.18))), 10)
+        .setOrigin(0, 0.5)
+        .setAlpha(0.84)
+      : null;
+    if (description) {
+      this.uiTexts.push(description);
+    }
+
+    const track = this.add.ellipse(trackX, titleY, trackWidth, trackHeight, input.checked ? 0x123a2d : 0x07131d, 0.9);
     track.setStrokeStyle(2, rowStroke, input.checked ? 0.66 : 0.52);
     const knobX = trackX + (input.checked ? 9 : -9);
-    const knob = this.add.circle(knobX, input.y, 8, input.checked ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.98);
+    const knob = this.add.circle(knobX, titleY, 8, input.checked ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.98);
     knob.setStrokeStyle(1, 0xecfff5, input.checked ? 0.7 : 0.46);
     let pressStart: { x: number; y: number } | null = null;
 
@@ -8346,6 +8439,7 @@ export class MenuScene extends Phaser.Scene {
         background.destroy();
         label.destroy();
         stateLabel.destroy();
+        description?.destroy();
         track.destroy();
         knob.destroy();
       }
@@ -9251,6 +9345,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private applyLegacyPauseCommand(command: LegacyPauseCommand): void {
+    if (command === 'reset-progression') {
+      this.openOverlay('confirm-progression-reset');
+      return;
+    }
     const result = resolveLegacyPauseCommand(command, this.maze.start, this.trail);
 
     if (result.nextPlayer !== null) {
@@ -9273,6 +9371,29 @@ export class MenuScene extends Phaser.Scene {
     if (result.closesOverlay) {
       this.closeOverlay();
     }
+  }
+
+  private resetLegacyPlayerProgression(): void {
+    const baseline = createEmptyLegacyProgressionState();
+    this.progressionState = writeLegacyProgressionState(this.resolveLegacyProgressionStorage(), {
+      ...baseline,
+      updatedAt: new Date().toISOString(),
+      tracks: {
+        player: baseline.tracks.player,
+        'ai-runner': this.progressionState.tracks['ai-runner']
+      }
+    });
+    this.setLatestOverlayMessage(createLegacyPlayerMessage({
+      copy: 'Player progression reset. AI progression was kept.',
+      id: 'progression.player.reset',
+      source: 'progression',
+      tone: 'success'
+    }));
+    this.syncLegacyRemoteProgressionState();
+    this.openOverlay('pause');
+    this.boardDynamicDirty = true;
+    this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+    this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
   private applyLegacyOverlayToggleField(fieldId: LegacyOverlayToggleFieldId): void {

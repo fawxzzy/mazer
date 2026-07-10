@@ -1,5 +1,5 @@
 export type LegacyRuntimeMode = 'menu' | 'play';
-export type LegacyOverlayKind = 'none' | 'options' | 'pause' | 'auth';
+export type LegacyOverlayKind = 'none' | 'options' | 'pause' | 'auth' | 'confirm-progression-reset';
 
 export interface LegacyOverlayRoutingState {
   mode: LegacyRuntimeMode;
@@ -25,6 +25,13 @@ export const resolveLegacyOverlayBackAction = (
 
     return {
       kind: 'noop'
+    };
+  }
+
+  if (state.overlay === 'confirm-progression-reset') {
+    return {
+      kind: 'open-overlay',
+      overlay: 'pause'
     };
   }
 

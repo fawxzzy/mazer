@@ -1,6 +1,6 @@
 import type { LegacyPoint } from './legacyMaze';
 
-export type LegacyPauseCommand = 'reset-player' | 'return-menu' | 'resume';
+export type LegacyPauseCommand = 'reset-player' | 'return-menu' | 'resume' | 'reset-progression';
 
 export interface LegacyPauseCommandResult {
   closesOverlay: boolean;
@@ -37,6 +37,13 @@ export const resolveLegacyPauseCommand = (
       return {
         closesOverlay: false,
         enterMenu: true,
+        nextPlayer: null,
+        nextTrail: null
+      };
+    case 'reset-progression':
+      return {
+        closesOverlay: false,
+        enterMenu: false,
         nextPlayer: null,
         nextTrail: null
       };

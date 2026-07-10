@@ -138,6 +138,15 @@ Ratchet this marker only when a bounded packet changes implemented state or proo
 
 Do not ratchet for wording changes alone. Do not ratchet the retired legacy visual 1:1 marker from this lane.
 
+## 2026-07-10 - Pause guide and progression-reset maintenance receipt
+
+- Stayed at `100%`: the active mechanics/mobile lane is already closed, so this focused maintenance pass did not ratchet it.
+- Main-menu Options no longer exposes Move Speed; played-game Pause retains Move Speed and now gives every Game Toggle an on/off meaning line.
+- Both guide surfaces now center `PLAYER GUIDE`, reuse the literal compass/start/end board renderers, and use concise player/status bullets instead of a duplicate player icon.
+- Played-game Pause now has a confirmation-gated `Reset Progress` action that clears only the player progression track, preserves the AI track, and uses the existing scoped local/remote progression persistence path.
+- Focused proof: `npm run lint`; `npx vitest run tests/ai/demo-walker.test.ts tests/reset/legacy-progression.test.ts tests/reset/legacy-game-toggle-preferences.test.ts tests/scenes/menu-render-frame.test.ts --maxWorkers 1` (`101` tests); and `npm run build`.
+- Open handoff: do not treat finite local AI route exhaustion as a valid end-of-maze outcome. The next AI slice must replace the reset/regeneration branch with persistent known-frontier expansion and prove no undiscovered goal target, teleport, or silent route reset occurs before genuine goal discovery.
+
 ## 2026-07-08 - Title deconstruct handoff parity receipt
 - Updated the menu deconstruct handoff so the title path pieces are an explicit participant in the same zero-tile hold as the board.
 - The rebuild guard now waits for both maze tiles and title pieces to reach zero before the 1000ms empty-board handoff can finish.
