@@ -48,6 +48,13 @@ Production proof:
 - `npm run ai:calibrate -- --summary-only --scales=37,50,75 --ai-rank=E --ai-level=1` reached the goal in all `60` generated cases with `0` goal-target leaks and `0` pre-goal regenerations. The full supported `npm run test:verify` passed `36` files / `309` tests; `npm run lint` and `npm run build` also passed.
 - This removes the forced early ending without making E-rank perfect. Long low-rank searches remain visible and are penalized by route-efficiency/decision metrics; reducing that route overhead is the next tuning slice, not a reason to reintroduce a hidden shortcut or cutoff.
 
+## Latest AI Rank-Ladder Receipt
+
+- D through S no longer inherit one D-grade local controller. Each rank now widens only its local lookahead, reduces confidence noise and split uncertainty, and lowers wrap mental cost; no rank receives full-floor routing or controller access to A*.
+- The maintained fast rank sweep at level `1` across scale `37` / seeds `1,2,3,5,8` stays monotonic with zero goal-target leaks: average score rises from E `65.2` to S `80.8`, while route-efficiency pressure falls from E `61.98` to S `25.937`.
+- `tests/ai/demo-walker-rank-ladder.test.ts` is now part of `npm run test:verify`; it guards the no-exhaustion cursor and ensures S has greater local perception with no longer average route than E. The bias proof now compares speedrunner against cautious-mapper rather than making the invalid claim that speedrunner always beats shortcut-gambler on every local topology.
+- Full proof after this change: `npm run test:verify` passed `38` files / `311` tests, then `npm run lint` and `npm run build` passed.
+
 ## Work Lanes
 
 | Lane | Marker | Status |

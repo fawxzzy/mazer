@@ -492,6 +492,8 @@ What `test:verify` currently means:
 
 - `tests/reset`
 - `tests/ai/demo-walker.test.ts`
+- `tests/ai/demo-walker-known-frontier.test.ts`
+- `tests/ai/demo-walker-rank-ladder.test.ts`
 - `tests/scenes/menu-render-frame.test.ts`
 - `tests/analysis/maze-cycle-telemetry-report.test.mjs`
 - `--maxWorkers 1`

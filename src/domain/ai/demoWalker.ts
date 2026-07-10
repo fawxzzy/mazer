@@ -243,39 +243,39 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
   },
   C: {
     biasProfile: 'balanced',
-    confidenceNoisePenalty: 10,
-    lookaheadDepth: 9,
+    confidenceNoisePenalty: 8,
+    lookaheadDepth: 10,
     optionalRetargetLimit: 2,
     solvePreviewBudget: 0,
-    splitUncertaintyPenalty: 1.26,
-    wrapMentalCost: 0.54
+    splitUncertaintyPenalty: 1.12,
+    wrapMentalCost: 0.46
   },
   B: {
     biasProfile: 'balanced',
-    confidenceNoisePenalty: 10,
-    lookaheadDepth: 9,
+    confidenceNoisePenalty: 6,
+    lookaheadDepth: 11,
     optionalRetargetLimit: 2,
     solvePreviewBudget: 1,
-    splitUncertaintyPenalty: 1.26,
-    wrapMentalCost: 0.54
+    splitUncertaintyPenalty: 0.98,
+    wrapMentalCost: 0.38
   },
   A: {
     biasProfile: 'balanced',
-    confidenceNoisePenalty: 10,
-    lookaheadDepth: 9,
+    confidenceNoisePenalty: 4,
+    lookaheadDepth: 12,
     optionalRetargetLimit: 2,
     solvePreviewBudget: 2,
-    splitUncertaintyPenalty: 1.26,
-    wrapMentalCost: 0.54
+    splitUncertaintyPenalty: 0.84,
+    wrapMentalCost: 0.3
   },
   S: {
     biasProfile: 'balanced',
-    confidenceNoisePenalty: 10,
-    lookaheadDepth: 9,
+    confidenceNoisePenalty: 2,
+    lookaheadDepth: 13,
     optionalRetargetLimit: 2,
     solvePreviewBudget: 4,
-    splitUncertaintyPenalty: 1.26,
-    wrapMentalCost: 0.54
+    splitUncertaintyPenalty: 0.7,
+    wrapMentalCost: 0.22
   }
 };
 

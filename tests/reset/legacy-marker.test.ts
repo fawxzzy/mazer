@@ -62,7 +62,7 @@ describe('Mazer completion markers', () => {
     const verifyScript = readRepoFile('scripts/verify/run-verify.mjs');
 
     expect(packageJson).toContain('"verify": "node ./scripts/verify/run-verify.mjs"');
-    expect(packageJson).toContain('"test:verify": "vitest run tests/reset tests/ai/demo-walker.test.ts tests/scenes/menu-render-frame.test.ts tests/analysis/maze-cycle-telemetry-report.test.mjs --maxWorkers 1"');
+    expect(packageJson).toContain('"test:verify": "vitest run tests/reset tests/ai/demo-walker.test.ts tests/ai/demo-walker-known-frontier.test.ts tests/ai/demo-walker-rank-ladder.test.ts tests/scenes/menu-render-frame.test.ts tests/analysis/maze-cycle-telemetry-report.test.mjs --maxWorkers 1"');
     expect(verifyScript).toContain("runNpm(['run', 'test:verify'])");
     expect(verifyScript).toContain("runNpm(['run', 'build'])");
     expect(currentTruth).toContain('Current `verify` means:');
@@ -71,6 +71,8 @@ describe('Mazer completion markers', () => {
     expect(currentTruth).toContain('Current `test:verify` means:');
     expect(currentTruth).toContain('- `tests/reset`');
     expect(currentTruth).toContain('- `tests/ai/demo-walker.test.ts`');
+    expect(currentTruth).toContain('- `tests/ai/demo-walker-known-frontier.test.ts`');
+    expect(currentTruth).toContain('- `tests/ai/demo-walker-rank-ladder.test.ts`');
     expect(currentTruth).toContain('- `tests/scenes/menu-render-frame.test.ts`');
     expect(currentTruth).toContain('- `tests/analysis/maze-cycle-telemetry-report.test.mjs`');
     expect(currentTruth).toContain('- `--maxWorkers 1`');
@@ -81,6 +83,8 @@ describe('Mazer completion markers', () => {
     expect(systemMap).toContain('- `npm run build`');
     expect(systemMap).toContain('- `tests/reset`');
     expect(systemMap).toContain('- `tests/ai/demo-walker.test.ts`');
+    expect(systemMap).toContain('- `tests/ai/demo-walker-known-frontier.test.ts`');
+    expect(systemMap).toContain('- `tests/ai/demo-walker-rank-ladder.test.ts`');
     expect(systemMap).toContain('- `tests/scenes/menu-render-frame.test.ts`');
     expect(systemMap).toContain('- `tests/analysis/maze-cycle-telemetry-report.test.mjs`');
     expect(systemMap).toContain('- `--maxWorkers 1`');

@@ -804,6 +804,15 @@ describe('demo walker', () => {
             aiSkillRank: 'B'
           }
         }),
+        cautiousMapper: collectDemoWalkerRouteDiagnostics(episode, {
+          ...baseConfig,
+          behavior: {
+            ...baseConfig.behavior,
+            aiBiasProfile: 'cautious-mapper',
+            aiSkillLevel: 60,
+            aiSkillRank: 'B'
+          }
+        }),
         speedrunner: collectDemoWalkerRouteDiagnostics(episode, {
           ...baseConfig,
           behavior: {
@@ -821,12 +830,14 @@ describe('demo walker', () => {
     const balancedDiagnostics = profileDiagnostics[0]!.balanced;
     const speedrunnerDiagnostics = profileDiagnostics[0]!.speedrunner;
     const shortcutGamblerDiagnostics = profileDiagnostics[0]!.shortcutGambler;
+    const cautiousMapperDiagnostics = profileDiagnostics[0]!.cautiousMapper;
 
     expect(balancedDiagnostics.perception.biasProfile).toBe('balanced');
     expect(speedrunnerDiagnostics.perception.biasProfile).toBe('speedrunner');
     expect(shortcutGamblerDiagnostics.perception.biasProfile).toBe('shortcut-gambler');
+    expect(cautiousMapperDiagnostics.perception.biasProfile).toBe('cautious-mapper');
     expect(averageRouteLength((entry) => entry.speedrunner.routeLength)).toBeLessThan(
-      averageRouteLength((entry) => entry.shortcutGambler.routeLength)
+      averageRouteLength((entry) => entry.cautiousMapper.routeLength)
     );
   });
 
