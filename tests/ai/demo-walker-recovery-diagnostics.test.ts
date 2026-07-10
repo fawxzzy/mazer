@@ -48,12 +48,16 @@ describe('human-memory AI recovery diagnostics', () => {
       }
 
       for (const decision of diagnostics.recoveryDecisions) {
+        expect(decision.candidateCount).toBeGreaterThanOrEqual(1);
         expect(decision.knownRouteStepCount).toBeGreaterThanOrEqual(0);
         expect(decision.routeCursor).toBeGreaterThanOrEqual(0);
         expect(decision.routeCursor).toBeLessThan(diagnostics.routeLength);
         expect(isTileFloor(episode.raster.tiles, decision.fromIndex)).toBe(true);
         expect(isTileFloor(episode.raster.tiles, decision.splitIndex)).toBe(true);
         expect(isTileFloor(episode.raster.tiles, decision.targetIndex)).toBe(true);
+        if (decision.selectedScoreMargin !== null) {
+          expect(decision.selectedScoreMargin).toBeGreaterThanOrEqual(0);
+        }
         if (decision.kind === 'frontier-recovery') {
           frontierRecoveryCount += 1;
         }

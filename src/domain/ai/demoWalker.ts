@@ -73,12 +73,14 @@ export interface DemoRunnerTelemetry {
 }
 
 export interface DemoRunnerRecoveryDecision {
+  candidateCount: number;
   choiceClass: DemoWalkerChoiceClass;
   confidence: number;
   fromIndex: number;
   kind: 'frontier-recovery' | 'optional-retarget';
   knownRouteStepCount: number;
   routeCursor: number;
+  selectedScoreMargin: number | null;
   splitIndex: number;
   targetIndex: number;
   thoughtState: DemoWalkerThoughtState;
@@ -195,6 +197,12 @@ interface LocalMemorySplit {
   choices: number[];
   index: number;
   tried: Set<number>;
+}
+
+interface LocalMemoryRecoveryTarget {
+  candidateCount: number;
+  selectedScoreMargin: number | null;
+  split: LocalMemorySplit | null;
 }
 
 const defaultConfig: DemoWalkerConfig = {
@@ -1248,6 +1256,8 @@ const buildHumanLocalMemoryRunnerPlan = (
       score: number;
       split: LocalMemorySplit;
     } | null = null;
+    let candidateCount = 0;
+    let runnerUpScore = Number.POSITIVE_INFINITY;
 
     for (const split of splitRecords.values()) {
       if (split.index === fromIndex) {
@@ -1283,13 +1293,17 @@ const buildHumanLocalMemoryRunnerPlan = (
       if (score + LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN >= currentBestScore) {
         continue;
       }
+      candidateCount += 1;
       if (bestCandidate === null || score < bestCandidate.score) {
+        runnerUpScore = bestCandidate?.score ?? Number.POSITIVE_INFINITY;
         bestCandidate = {
           choice,
           route,
           score,
           split
         };
+      } else if (score < runnerUpScore) {
+        runnerUpScore = score;
       }
     }
 
@@ -1331,12 +1345,14 @@ const buildHumanLocalMemoryRunnerPlan = (
     telemetry.recoveryCount += 1;
     telemetry.optionalRetargetCount += 1;
     recoveryDecisions.push({
+      candidateCount,
       choiceClass: retargetReview.choiceClass,
       confidence: retargetReview.confidence,
       fromIndex,
       kind: 'optional-retarget',
       knownRouteStepCount: Math.max(0, bestCandidate.route.length - 1),
       routeCursor: Math.max(0, routeIndices.length - 1),
+      selectedScoreMargin: Number.isFinite(runnerUpScore) ? runnerUpScore - bestCandidate.score : null,
       splitIndex: bestCandidate.split.index,
       targetIndex: bestCandidate.choice,
       thoughtState: retargetReview.thoughtState
@@ -1798,7 +1814,8 @@ const backtrackToBestLocalMemorySplit = (input: {
       input.deadEnds.add(index);
     }
   };
-  const targetSplit = resolveBestLocalMemorySplitTarget(input);
+  const targetSelection = resolveBestLocalMemorySplitTarget(input);
+  const targetSplit = targetSelection.split;
   if (targetSplit === null) {
     return null;
   }
@@ -1875,12 +1892,14 @@ const backtrackToBestLocalMemorySplit = (input: {
   input.appendStep(nextChoice, 'explore', 'reacquire', input.createMemoryFrame?.(nextChoice, review.thoughtState, review));
   input.telemetry.recoveryCount += 1;
   input.recoveryDecisions.push({
+    candidateCount: targetSelection.candidateCount,
     choiceClass: review.choiceClass,
     confidence: review.confidence,
     fromIndex: input.currentIndex,
     kind: 'frontier-recovery',
     knownRouteStepCount: recoveryRouteStepCount,
     routeCursor: input.getRouteCursor(),
+    selectedScoreMargin: targetSelection.selectedScoreMargin,
     splitIndex: targetSplit.index,
     targetIndex: nextChoice,
     thoughtState: review.thoughtState
@@ -1900,9 +1919,11 @@ const resolveBestLocalMemorySplitTarget = (input: {
   splitRecords: Map<number, LocalMemorySplit>;
   visited: ReadonlySet<number>;
   perception: DemoWalkerAiPerceptionProfile;
-}): LocalMemorySplit | null => {
+}): LocalMemoryRecoveryTarget => {
   let bestSplit: LocalMemorySplit | null = null;
   let bestScore = Number.POSITIVE_INFINITY;
+  let candidateCount = 0;
+  let runnerUpScore = Number.POSITIVE_INFINITY;
 
   const registerCandidate = (split: LocalMemorySplit): void => {
     const bestChoice = resolveBestLocalMemorySplitChoice(split, input);
@@ -1924,9 +1945,13 @@ const resolveBestLocalMemorySplitTarget = (input: {
     const routeStepCount = Math.max(0, route.length - 1);
     const score = scoreLocalMemoryChoice(split.index, bestChoice, input.episode, input.seed, input.perception)
       + (routeStepCount * LOCAL_MEMORY_RECOVERY_PATH_PENALTY);
+    candidateCount += 1;
     if (score < bestScore) {
+      runnerUpScore = bestScore;
       bestScore = score;
       bestSplit = split;
+    } else if (score < runnerUpScore) {
+      runnerUpScore = score;
     }
   };
 
@@ -1949,7 +1974,11 @@ const resolveBestLocalMemorySplitTarget = (input: {
     registerCandidate(split);
   }
 
-  return bestSplit;
+  return {
+    candidateCount,
+    selectedScoreMargin: Number.isFinite(runnerUpScore) ? runnerUpScore - bestScore : null,
+    split: bestSplit
+  };
 };
 
 const resolveBestLocalMemorySplitChoice = (

@@ -53,11 +53,14 @@ interface CalibrationProgressionSnapshot {
 }
 
 interface RecoveryDecisionSummary {
+  averageCandidateCount: number;
   averageKnownRouteSteps: number;
+  averageSelectedMargin: number | null;
   frontierRecoveryCount: number;
   maxKnownRouteSteps: number;
   optionalRetargetCount: number;
   totalCount: number;
+  uncertainSelectionCount: number;
 }
 
 interface RecoveryDecisionByScale extends RecoveryDecisionSummary {
@@ -305,15 +308,25 @@ const round = (value: number, precision = 3): number => {
 const summarizeRecoveryDecisions = (
   decisions: readonly DemoRunnerRecoveryDecision[]
 ): RecoveryDecisionSummary => {
+  const scoredMargins = decisions
+    .map((entry) => entry.selectedScoreMargin)
+    .filter((margin): margin is number => margin !== null);
   const knownRouteSteps = decisions.map((entry) => entry.knownRouteStepCount);
   return {
+    averageCandidateCount: decisions.length > 0
+      ? round(decisions.reduce((total, entry) => total + entry.candidateCount, 0) / decisions.length)
+      : 0,
     averageKnownRouteSteps: knownRouteSteps.length > 0
       ? round(knownRouteSteps.reduce((total, value) => total + value, 0) / knownRouteSteps.length)
       : 0,
+    averageSelectedMargin: scoredMargins.length > 0
+      ? round(scoredMargins.reduce((total, value) => total + value, 0) / scoredMargins.length)
+      : null,
     frontierRecoveryCount: decisions.filter((entry) => entry.kind === 'frontier-recovery').length,
     maxKnownRouteSteps: Math.max(0, ...knownRouteSteps),
     optionalRetargetCount: decisions.filter((entry) => entry.kind === 'optional-retarget').length,
-    totalCount: decisions.length
+    totalCount: decisions.length,
+    uncertainSelectionCount: scoredMargins.filter((margin) => margin < 0.35).length
   };
 };
 
@@ -388,12 +401,27 @@ const summarizeCalibrationRecoveryDecisions = (
   cases: readonly CalibrationCase[]
 ): RecoveryDecisionSummary => {
   const totalCount = cases.reduce((total, entry) => total + entry.recoveryDecision.totalCount, 0);
+  const scoredCaseCount = cases.reduce((total, entry) => (
+    total + (entry.recoveryDecision.averageSelectedMargin === null ? 0 : entry.recoveryDecision.totalCount)
+  ), 0);
   return {
+    averageCandidateCount: totalCount > 0
+      ? round(cases.reduce((total, entry) => (
+        total + (entry.recoveryDecision.averageCandidateCount * entry.recoveryDecision.totalCount)
+      ), 0) / totalCount)
+      : 0,
     averageKnownRouteSteps: totalCount > 0
       ? round(cases.reduce((total, entry) => (
         total + (entry.recoveryDecision.averageKnownRouteSteps * entry.recoveryDecision.totalCount)
       ), 0) / totalCount)
       : 0,
+    averageSelectedMargin: scoredCaseCount > 0
+      ? round(cases.reduce((total, entry) => (
+        entry.recoveryDecision.averageSelectedMargin === null
+          ? total
+          : total + (entry.recoveryDecision.averageSelectedMargin * entry.recoveryDecision.totalCount)
+      ), 0) / scoredCaseCount)
+      : null,
     frontierRecoveryCount: cases.reduce((total, entry) => (
       total + entry.recoveryDecision.frontierRecoveryCount
     ), 0),
@@ -401,7 +429,10 @@ const summarizeCalibrationRecoveryDecisions = (
     optionalRetargetCount: cases.reduce((total, entry) => (
       total + entry.recoveryDecision.optionalRetargetCount
     ), 0),
-    totalCount
+    totalCount,
+    uncertainSelectionCount: cases.reduce((total, entry) => (
+      total + entry.recoveryDecision.uncertainSelectionCount
+    ), 0)
   };
 };
 
