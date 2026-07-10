@@ -267,6 +267,7 @@ describe('Mazer completion markers', () => {
     expect(markerDoc).toContain('`monotonicRouteEfficiencyPass`');
     expect(markerDoc).toContain('route-efficiency-pressure deltas');
     expect(markerDoc).toContain('This closes the false-positive path where a coarsely improving progression score could certify a slower controller.');
+    expect(markerDoc).toContain('Branch-decision diagnostics now record the competing local candidates');
     expect(markerDoc).toContain('Rank defaults now use a non-degrading competent-scout floor');
     expect(markerDoc).toContain('`goalTargetLeakPass = true`, `monotonicAverageScorePass = true`, and `monotonicRouteEfficiencyPass = true`');
     expect(markerDoc).toContain('score E/D/C/B/A/S = `65 / 75.8 / 75.8 / 75.8 / 75.8 / 75.8`');

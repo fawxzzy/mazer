@@ -84,8 +84,25 @@ export interface DemoRunnerRecoveryDecision {
   thoughtState: DemoWalkerThoughtState;
 }
 
+export interface DemoRunnerBranchCandidate {
+  choiceClass: DemoWalkerChoiceClass;
+  confidence: number;
+  index: number;
+  score: number;
+}
+
+export interface DemoRunnerBranchDecision {
+  candidates: readonly DemoRunnerBranchCandidate[];
+  canonicalChoiceIndex: number | null;
+  canonicalSelection: boolean | null;
+  fromIndex: number;
+  routeCursor: number;
+  selectedIndex: number;
+}
+
 export interface DemoRunnerRouteDiagnostics {
   aiResetPathCursor: number | null;
+  branchDecisions: readonly DemoRunnerBranchDecision[];
   canonicalPathLength: number;
   cueCounts: Partial<Record<DemoWalkerCue, number>>;
   perception: DemoWalkerAiPerceptionProfile;
@@ -164,6 +181,7 @@ export interface DemoWalkerState {
 
 interface DemoRunnerPlan {
   routeIndices: Uint32Array;
+  branchDecisions: readonly DemoRunnerBranchDecision[];
   canonicalCursors: Uint32Array;
   segmentTrailModes: readonly DemoTrailMode[];
   cueOverrides: readonly (DemoSegmentCue | DemoWalkerCue | null)[];
@@ -565,6 +583,7 @@ export const collectDemoWalkerRouteDiagnostics = (
 
   return {
     aiResetPathCursor: runnerPlan.aiResetPathCursor,
+    branchDecisions: runnerPlan.branchDecisions,
     canonicalPathLength: episode.raster.pathIndices.length,
     cueCounts,
     perception: resolveDemoWalkerAiPerceptionProfile(config),
@@ -858,6 +877,7 @@ const buildPreciseRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     cueOverrides: Array.from({ length: segmentCount }, () => null),
     telemetry: EMPTY_TELEMETRY,
     aiResetPathCursor: null,
+    branchDecisions: [],
     memoryFrames: Array.from({ length: canonicalPath.length }, () => EMPTY_MEMORY_FRAME),
     recoveryDecisions: []
   };
@@ -1056,6 +1076,7 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     cueOverrides,
     telemetry,
     aiResetPathCursor,
+    branchDecisions: [],
     memoryFrames,
     recoveryDecisions: []
   };
@@ -1067,9 +1088,14 @@ const buildHumanLocalMemoryRunnerPlan = (
 ): DemoRunnerPlan => {
   const canonicalPath = Array.from(episode.raster.pathIndices);
   const canonicalCursorByIndex = new Map<number, number>();
+  const canonicalNextByIndex = new Map<number, number>();
   canonicalPath.forEach((index, cursor) => {
     if (!canonicalCursorByIndex.has(index)) {
       canonicalCursorByIndex.set(index, cursor);
+    }
+    const nextIndex = canonicalPath[cursor + 1];
+    if (nextIndex !== undefined && !canonicalNextByIndex.has(index)) {
+      canonicalNextByIndex.set(index, nextIndex);
     }
   });
 
@@ -1079,6 +1105,7 @@ const buildHumanLocalMemoryRunnerPlan = (
   const cueOverrides: Array<DemoSegmentCue | DemoWalkerCue | null> = [];
   const memoryFrames: DemoWalkerMemoryFrame[] = [EMPTY_MEMORY_FRAME];
   const recoveryDecisions: DemoRunnerRecoveryDecision[] = [];
+  const branchDecisions: DemoRunnerBranchDecision[] = [];
   const telemetry: DemoRunnerTelemetry = {
     wrongBranchCount: 0,
     backtrackCount: 0,
@@ -1158,6 +1185,41 @@ const buildHumanLocalMemoryRunnerPlan = (
     cueOverrides.push(cue);
     memoryFrames.push(cloneMemoryFrame(memoryFrame));
     return true;
+  };
+
+  const recordBranchDecision = (
+    fromIndex: number,
+    choices: readonly number[],
+    selectedIndex: number
+  ): void => {
+    const candidates = choices
+      .filter((choice) => choice !== episode.raster.endIndex)
+      .map((choice) => {
+        const review = reviewLocalMemoryChoice(fromIndex, choice, episode, config.seed, perception);
+        return {
+          choiceClass: review.choiceClass,
+          confidence: review.confidence,
+          index: choice,
+          score: review.score
+        };
+      });
+    if (candidates.length < 2 || !candidates.some((candidate) => candidate.index === selectedIndex)) {
+      return;
+    }
+    const canonicalChoice = canonicalNextByIndex.get(fromIndex) ?? null;
+    const canonicalChoiceIndex = canonicalChoice === episode.raster.endIndex
+      ? null
+      : candidates.some((candidate) => candidate.index === canonicalChoice)
+        ? canonicalChoice
+        : null;
+    branchDecisions.push({
+      candidates,
+      canonicalChoiceIndex,
+      canonicalSelection: canonicalChoiceIndex === null ? null : canonicalChoiceIndex === selectedIndex,
+      fromIndex,
+      routeCursor: Math.max(0, routeIndices.length - 1),
+      selectedIndex
+    });
   };
 
   const markWrongBranchIfNeeded = (fromIndex: number, nextIndex: number): void => {
@@ -1306,6 +1368,7 @@ const buildHumanLocalMemoryRunnerPlan = (
     if (choices.length > 0) {
       const split = resolveLocalMemorySplit(splitRecords, currentIndex, choices);
       const nextIndex = choices[0]!;
+      recordBranchDecision(currentIndex, choices, nextIndex);
       split.tried.add(nextIndex);
       visited.add(nextIndex);
       pathStack.push(nextIndex);
@@ -1369,6 +1432,7 @@ const buildHumanLocalMemoryRunnerPlan = (
     aiResetPathCursor: currentIndex === episode.raster.endIndex
       ? null
       : Math.max(1, routeIndices.length - 1),
+    branchDecisions,
     memoryFrames,
     recoveryDecisions
   };

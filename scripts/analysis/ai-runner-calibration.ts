@@ -6,6 +6,7 @@ import {
   type DemoWalkerAiPerceptionProfile,
   type DemoWalkerAiSkillRank,
   type DemoWalkerChoiceClass,
+  type DemoRunnerBranchDecision,
   type DemoRunnerRecoveryDecision,
   type DemoWalkerThoughtState
 } from '../../src/domain/ai';
@@ -65,6 +66,16 @@ interface RecoveryDecisionByScale extends RecoveryDecisionSummary {
   scale: number;
 }
 
+interface BranchDecisionSummary {
+  averageCandidateCount: number;
+  averageSelectedMargin: number;
+  canonicalCandidateCount: number;
+  canonicalSelectionCount: number;
+  canonicalSelectionRate: number | null;
+  totalCount: number;
+  uncertainSelectionCount: number;
+}
+
 interface CalibrationCase {
   adjacentMoveFailures: number;
   canonicalPathLength: number;
@@ -81,6 +92,7 @@ interface CalibrationCase {
   traverseMs: number;
   wrongBranchCount: number;
   backtrackCount: number;
+  branchDecision: BranchDecisionSummary;
   recoveryCount: number;
   recoveryDecision: RecoveryDecisionSummary;
   optionalRetargetCount: number;
@@ -129,6 +141,7 @@ interface CalibrationSummary {
   seeds: number[];
   thoughtStateCounts: Partial<Record<DemoWalkerThoughtState, number>>;
   choiceClassCounts: Partial<Record<DemoWalkerChoiceClass, number>>;
+  branchDecision: BranchDecisionSummary;
 }
 
 interface CalibrationSweepSummary {
@@ -301,6 +314,73 @@ const summarizeRecoveryDecisions = (
     maxKnownRouteSteps: Math.max(0, ...knownRouteSteps),
     optionalRetargetCount: decisions.filter((entry) => entry.kind === 'optional-retarget').length,
     totalCount: decisions.length
+  };
+};
+
+const resolveBranchDecisionMargin = (decision: DemoRunnerBranchDecision): number => {
+  const selected = decision.candidates.find((candidate) => candidate.index === decision.selectedIndex);
+  if (!selected) {
+    return 0;
+  }
+  const nearestAlternative = decision.candidates
+    .filter((candidate) => candidate.index !== decision.selectedIndex)
+    .reduce((best, candidate) => Math.min(best, candidate.score), Number.POSITIVE_INFINITY);
+  return Number.isFinite(nearestAlternative) ? round(nearestAlternative - selected.score) : 0;
+};
+
+const summarizeBranchDecisions = (
+  decisions: readonly DemoRunnerBranchDecision[]
+): BranchDecisionSummary => {
+  const margins = decisions.map(resolveBranchDecisionMargin);
+  const canonicalCandidateCount = decisions.filter((entry) => entry.canonicalSelection !== null).length;
+  const canonicalSelectionCount = decisions.filter((entry) => entry.canonicalSelection === true).length;
+  return {
+    averageCandidateCount: decisions.length > 0
+      ? round(decisions.reduce((total, entry) => total + entry.candidates.length, 0) / decisions.length)
+      : 0,
+    averageSelectedMargin: margins.length > 0
+      ? round(margins.reduce((total, value) => total + value, 0) / margins.length)
+      : 0,
+    canonicalCandidateCount,
+    canonicalSelectionCount,
+    canonicalSelectionRate: canonicalCandidateCount > 0
+      ? round(canonicalSelectionCount / canonicalCandidateCount)
+      : null,
+    totalCount: decisions.length,
+    uncertainSelectionCount: margins.filter((margin) => margin < 0.35).length
+  };
+};
+
+const summarizeCalibrationBranchDecisions = (
+  cases: readonly CalibrationCase[]
+): BranchDecisionSummary => {
+  const totalCount = cases.reduce((total, entry) => total + entry.branchDecision.totalCount, 0);
+  const canonicalCandidateCount = cases.reduce((total, entry) => (
+    total + entry.branchDecision.canonicalCandidateCount
+  ), 0);
+  const canonicalSelectionCount = cases.reduce((total, entry) => (
+    total + entry.branchDecision.canonicalSelectionCount
+  ), 0);
+  return {
+    averageCandidateCount: totalCount > 0
+      ? round(cases.reduce((total, entry) => (
+        total + (entry.branchDecision.averageCandidateCount * entry.branchDecision.totalCount)
+      ), 0) / totalCount)
+      : 0,
+    averageSelectedMargin: totalCount > 0
+      ? round(cases.reduce((total, entry) => (
+        total + (entry.branchDecision.averageSelectedMargin * entry.branchDecision.totalCount)
+      ), 0) / totalCount)
+      : 0,
+    canonicalCandidateCount,
+    canonicalSelectionCount,
+    canonicalSelectionRate: canonicalCandidateCount > 0
+      ? round(canonicalSelectionCount / canonicalCandidateCount)
+      : null,
+    totalCount,
+    uncertainSelectionCount: cases.reduce((total, entry) => (
+      total + entry.branchDecision.uncertainSelectionCount
+    ), 0)
   };
 };
 
@@ -523,6 +603,7 @@ const calibrateCase = (
     caseResult: {
     adjacentMoveFailures,
     backtrackCount: diagnostics.telemetry.backtrackCount,
+    branchDecision: summarizeBranchDecisions(diagnostics.branchDecisions),
     canonicalPathLength: diagnostics.canonicalPathLength,
     choiceClassCounts,
     floorFailures,
@@ -582,12 +663,14 @@ const buildSummary = (
   const scores = cases.map((entry) => entry.progression.after.score);
   const routeEfficiencyPressureScores = cases.map((entry) => entry.progression.routeEfficiencyPressureScore);
   const performanceScores = cases.map((entry) => entry.progression.performanceScore);
+  const branchDecision = summarizeCalibrationBranchDecisions(cases);
   const recoveryDecision = summarizeCalibrationRecoveryDecisions(cases);
   const aiDecisionScores = cases
     .map((entry) => entry.progression.aiDecisionScore)
     .filter((score): score is MazeCycleAiDecisionScore => score !== null);
 
   const summary: CalibrationSummary = {
+    branchDecision,
     choiceClassCounts,
     count: cases.length,
     generatedAt: new Date().toISOString(),
