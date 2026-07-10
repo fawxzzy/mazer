@@ -246,9 +246,6 @@ export interface MenuSceneRuntimeDiagnostics {
       trailPulseEnabled?: boolean;
       trailPulseColor?: number;
       trailPulseEdgeColor?: number;
-      trailShineColor?: number;
-      trailShineEnabled?: boolean;
-      trailShinePeriodMs?: number;
       iridescentMaterial?: {
         minPathColorDistance: number;
         playerAccentColor: number;

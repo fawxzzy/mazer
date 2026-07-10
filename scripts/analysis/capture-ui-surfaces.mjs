@@ -34,7 +34,6 @@ const DEFAULT_DEVICE_SCALE_FACTOR = 2;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const EXPECTED_PLAYER_CORE_COLOR = 0x36ff7d;
 const EXPECTED_GOAL_CORE_COLOR = 0xff263f;
-const EXPECTED_TRAIL_SHINE_COLOR = 0xc8fff4;
 
 const runNpmCommand = (args) => {
   if (process.platform === 'win32') {
@@ -356,7 +355,7 @@ const seedPlayTrailForVisualProof = async (page, { timeoutMs = DEFAULT_TIMEOUT_M
 
       try {
         const visual = JSON.parse(raw);
-        return visual?.markerStyle?.trailShineEnabled === true;
+        return visual?.markerStyle?.trailPulseEnabled === true;
       } catch {
         return false;
       }
@@ -843,12 +842,6 @@ const buildSurfaceChecks = ({
       surfaces.play.markerStyle?.trailPulseEnabled === true,
       `trailPulseEnabled=${surfaces.play.markerStyle?.trailPulseEnabled ?? 'missing'}`
     ),
-    createCheck(
-      'play-trail-shine-green',
-      surfaces.play.markerStyle?.trailShineEnabled === true
-        && surfaces.play.markerStyle?.trailShineColor === EXPECTED_TRAIL_SHINE_COLOR,
-      `trailShineEnabled=${surfaces.play.markerStyle?.trailShineEnabled ?? 'missing'} trailShineColor=${surfaces.play.markerStyle?.trailShineColor ?? 'missing'}`
-    )
   ];
   const textChecks = [
     createCheck(

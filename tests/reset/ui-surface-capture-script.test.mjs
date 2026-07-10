@@ -11,7 +11,6 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';");
     expect(source).toContain("const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';");
     expect(source).toContain('const DEFAULT_DEVICE_SCALE_FACTOR = 2;');
-    expect(source).toContain('const EXPECTED_TRAIL_SHINE_COLOR = 0xc8fff4;');
     expect(source).toContain("assertVisualScreenContract(screenContract);");
     expect(source).toContain('buildVisualScreenContract({');
     expect(source).toContain('const waitForVisualBuildSettled = async (page, { requireReadableTitle = false, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
@@ -50,7 +49,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const PLAY_TRAIL_SEED_MOVES = Object.freeze([');
     expect(source).toContain('const seedPlayTrailForVisualProof = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
     expect(source).toContain('window.__MAZER_QA__?.movePlayPlayer');
-    expect(source).toContain('visual?.markerStyle?.trailShineEnabled === true');
+    expect(source).toContain('visual?.markerStyle?.trailPulseEnabled === true');
     expect(source).toContain('Unable to seed play trail for visual proof');
     expect(source).toContain("id: '01-menu'");
     expect(source).toContain("id: '02-auth'");
@@ -81,8 +80,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'play-player-green'");
     expect(source).toContain("createCheck(\n      'play-goal-red'");
     expect(source).toContain("createCheck(\n      'play-stick-controls'");
-    expect(source).toContain("createCheck(\n      'play-trail-shine-green'");
-    expect(source).toContain('surfaces.play.markerStyle?.trailShineColor === EXPECTED_TRAIL_SHINE_COLOR');
+    expect(source).toContain("createCheck(\n      'play-trail-pulse-seeded-on'");
     expect(source).toContain('deviceScaleFactor,');
     expect(source).toContain('authFixture: authFixture ?? null');
     expect(source).toContain('playTrailSeed,');

@@ -423,9 +423,6 @@ describe('menu runtime diagnostics', () => {
           playerHaloRadius: 3.22,
           startCoreColor: 0xfff05a,
           startEdgeColor: 0xffc629,
-          trailShineColor: 0xc8fff4,
-          trailShineEnabled: true,
-          trailShinePeriodMs: 1800
         }
       },
       menuDemo: {

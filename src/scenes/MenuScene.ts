@@ -406,9 +406,6 @@ interface MenuSceneVisualDiagnostics {
     playerBeaconPeriodMs: number;
     startCoreColor: number;
     startEdgeColor: number;
-    trailShineColor: number;
-    trailShineEnabled: boolean;
-    trailShinePeriodMs: number;
     trailPulseEnabled: boolean;
     trailPulseColor: number;
     trailPulseEdgeColor: number;
@@ -867,10 +864,6 @@ const LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER = 20;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
 const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;
-const LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_PERIOD_MS = 1800;
-const LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_WINDOW = 2.8;
-const LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_COLOR = 0xc8fff4;
-const LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_EDGE = 0xb6ffd0;
 const LEGACY_PLAY_DIAGONAL_SPRINT_STEP_MS = 56;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
 const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 64;
@@ -1700,9 +1693,6 @@ export class MenuScene extends Phaser.Scene {
           playerHaloRadius: playerMarkerMetrics.haloRadius,
           startCoreColor: LEGACY_PLAY_START_MARKER_CORE,
           startEdgeColor: LEGACY_PLAY_START_MARKER_EDGE,
-          trailShineColor: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_COLOR,
-          trailShineEnabled: this.trail.length > 1,
-          trailShinePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_PERIOD_MS,
           trailPulseEnabled: this.settings.toggleTrailPulse,
           trailPulseColor: progressionPalette.trailPulseColor,
           trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor,
@@ -5672,22 +5662,6 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    if (menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
-      this.drawLegacyDynamicTrailShine(
-        visibleTrail,
-        mazeLeft,
-        mazeTop,
-        resolvedBoardLeft,
-        resolvedBoardTop,
-        boardSize,
-        mazeRenderFrame.boardSize,
-        mazeTileSize,
-        time,
-        dynamicTrailPathSource,
-        menuTrailAlphaMultiplier
-      );
-    }
-
     if (this.mode === 'menu' && menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
       this.drawLegacyMenuAiMemoryOverlay(
         mazeLeft,
@@ -6215,76 +6189,6 @@ export class MenuScene extends Phaser.Scene {
       LEGACY_PLAY_PATH_EDGE_ALPHA,
       0.96
     );
-  }
-
-  private drawLegacyDynamicTrailShine(
-    trail: readonly LegacyPoint[],
-    originX: number,
-    originY: number,
-    boardLeft: number,
-    boardTop: number,
-    boardSize: number,
-    mazeSize: number,
-    tileSize: number,
-    time: number,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
-    alphaMultiplier: number
-  ): void {
-    if (trail.length < 2) {
-      return;
-    }
-
-    const maxShineIndex = Math.max(1, trail.length - 1);
-    const phase = (time % LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_PERIOD_MS) / LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_PERIOD_MS;
-    const shineCenterIndex = (trail.length - 1) - (phase * maxShineIndex);
-
-    for (let index = trail.length - 1; index >= 0; index -= 1) {
-      const point = trail[index];
-      if (!point) {
-        continue;
-      }
-
-      const distance = Math.abs(index - shineCenterIndex);
-      if (distance > LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_WINDOW) {
-        continue;
-      }
-
-      const falloff = smoothstep(1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_WINDOW));
-      const shineAlpha = clamp((0.07 + (falloff * 0.38)) * alphaMultiplier, 0.04, 0.48);
-      this.drawLegacyPathMaterialTile(
-        this.boardDynamicGraphics,
-        point,
-        pathSource,
-        originX,
-        originY,
-        tileSize,
-        {
-          coreAlpha: shineAlpha,
-          coreColor: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_COLOR,
-          cueAlpha: Math.min(0.42, shineAlpha * 0.78),
-          cueColor: 0xffffff,
-          drawCue: true,
-          edgeAlpha: Math.min(0.28, shineAlpha * 0.62),
-          edgeColor: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_EDGE
-        }
-      );
-      this.drawLegacyDynamicTrailBorderDock(
-        point,
-        LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_COLOR,
-        LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_EDGE,
-        LEGACY_PLAY_PATH_EDGE_ALPHA,
-        0.72,
-        shineAlpha,
-        boardLeft,
-        boardTop,
-        boardSize,
-        originX,
-        originY,
-        mazeSize,
-        tileSize,
-        pathSource
-      );
-    }
   }
 
   private drawLegacyPlayDynamicTrailPulse(
@@ -10270,9 +10174,6 @@ export class MenuScene extends Phaser.Scene {
         playerHaloRadius: playerMarkerMetrics.haloRadius,
         startCoreColor: LEGACY_PLAY_START_MARKER_CORE,
         startEdgeColor: LEGACY_PLAY_START_MARKER_EDGE,
-        trailShineColor: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_COLOR,
-        trailShineEnabled: this.trail.length > 1,
-        trailShinePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_PERIOD_MS,
         trailPulseEnabled: this.settings.toggleTrailPulse,
         trailPulseColor: progressionPalette.trailPulseColor,
         trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor,

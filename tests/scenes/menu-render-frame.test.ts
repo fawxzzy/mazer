@@ -788,13 +788,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('palette.trailPulseEdgeColor');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_PERIOD_MS = 1800;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_COLOR = 0xc8fff4;');
     expect(menuSceneSource).toContain('const falloff = smoothstep(1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW));');
-    expect(menuSceneSource).toContain('private drawLegacyDynamicTrailShine(');
-    expect(menuSceneSource).toContain('this.drawLegacyDynamicTrailShine(');
-    expect(menuSceneSource).toContain('const shineCenterIndex = (trail.length - 1) - (phase * maxShineIndex);');
-    expect(menuSceneSource).toContain('coreColor: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_COLOR');
+    expect(menuSceneSource).not.toContain('drawLegacyDynamicTrailShine');
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_DYNAMIC_TRAIL_SHINE');
     expect(menuSceneSource).toContain('this.fillLegacyPlayDynamicPathTile(');
     expect(menuSceneSource).toContain('LEGACY_PLAY_PATH_EDGE,');
     expect(menuSceneSource).toContain('LEGACY_PLAY_PATH_EDGE_ALPHA,');
@@ -823,9 +819,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('startEdgeColor: LEGACY_PLAY_START_MARKER_EDGE');
     expect(menuSceneSource).toContain('trailPulseColor: progressionPalette.trailPulseColor');
     expect(menuSceneSource).toContain('trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor');
-    expect(menuSceneSource).toContain('trailShineColor: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_COLOR');
-    expect(menuSceneSource).toContain('trailShineEnabled: this.trail.length > 1');
-    expect(menuSceneSource).toContain('trailShinePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_SHINE_PERIOD_MS');
     expect(menuSceneSource).toContain('iridescentMaterial: this.resolveLegacyIridescentMaterialDiagnostics(time, progressionPalette)');
     expect(menuSceneSource).toContain('private resolveLegacyIridescentMaterialDiagnostics(');
     expect(menuSceneSource).toContain('minPathColorDistance: LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE');

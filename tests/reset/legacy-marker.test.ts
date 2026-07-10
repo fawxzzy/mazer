@@ -365,8 +365,8 @@ describe('Mazer completion markers', () => {
     expect(markerDoc).toContain('trail pulse is pinned to the purple pulse anchor');
     expect(markerDoc).toContain('temporary green/purple lock cannot drift back to blue, pink, or yellow trail/player colors');
     expect(markerDoc).toContain('Runtime/visual diagnostics still expose compact material samples');
-    expect(markerDoc).toContain('green-white moving shine over the traveled trail');
-    expect(markerDoc).toContain('capture-ui-surfaces.mjs` now seeds one real QA move');
+    expect(markerDoc).toContain('purple pulse is the only animated trail treatment');
+    expect(markerDoc).toContain('capture-ui-surfaces.mjs` seeds one real QA move');
     expect(markerDoc).toContain('The played-game player and main-menu AI runner share the green anchor as a louder beacon treatment');
     expect(markerDoc).toContain('explicit advanced field commits now enter the same compact cyber message-card queue');
     expect(markerDoc).toContain('Bulk overlay field commits stay silent');
