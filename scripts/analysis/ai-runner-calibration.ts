@@ -6,6 +6,7 @@ import {
   type DemoWalkerAiPerceptionProfile,
   type DemoWalkerAiSkillRank,
   type DemoWalkerChoiceClass,
+  type DemoRunnerRecoveryDecision,
   type DemoWalkerThoughtState
 } from '../../src/domain/ai';
 import { isTileFloor, resolveDirectionBetween } from '../../src/domain/maze';
@@ -50,6 +51,14 @@ interface CalibrationProgressionSnapshot {
   targetComplexity: number;
 }
 
+interface RecoveryDecisionSummary {
+  averageKnownRouteSteps: number;
+  frontierRecoveryCount: number;
+  maxKnownRouteSteps: number;
+  optionalRetargetCount: number;
+  totalCount: number;
+}
+
 interface CalibrationCase {
   adjacentMoveFailures: number;
   canonicalPathLength: number;
@@ -67,6 +76,7 @@ interface CalibrationCase {
   wrongBranchCount: number;
   backtrackCount: number;
   recoveryCount: number;
+  recoveryDecision: RecoveryDecisionSummary;
   optionalRetargetCount: number;
   perception: DemoWalkerAiPerceptionProfile;
   progression: {
@@ -107,6 +117,7 @@ interface CalibrationSummary {
     p50: number;
     p90: number;
   };
+  recoveryDecision: RecoveryDecisionSummary;
   scales: number[];
   seeds: number[];
   thoughtStateCounts: Partial<Record<DemoWalkerThoughtState, number>>;
@@ -265,6 +276,21 @@ const parseBiasListFlag = (
 const round = (value: number, precision = 3): number => {
   const scale = 10 ** precision;
   return Math.round(value * scale) / scale;
+};
+
+const summarizeRecoveryDecisions = (
+  decisions: readonly DemoRunnerRecoveryDecision[]
+): RecoveryDecisionSummary => {
+  const knownRouteSteps = decisions.map((entry) => entry.knownRouteStepCount);
+  return {
+    averageKnownRouteSteps: knownRouteSteps.length > 0
+      ? round(knownRouteSteps.reduce((total, value) => total + value, 0) / knownRouteSteps.length)
+      : 0,
+    frontierRecoveryCount: decisions.filter((entry) => entry.kind === 'frontier-recovery').length,
+    maxKnownRouteSteps: Math.max(0, ...knownRouteSteps),
+    optionalRetargetCount: decisions.filter((entry) => entry.kind === 'optional-retarget').length,
+    totalCount: decisions.length
+  };
 };
 
 const increment = <T extends string>(counts: Partial<Record<T, number>>, key: T | null | undefined): void => {
@@ -456,6 +482,7 @@ const calibrateCase = (
     perception: diagnostics.perception,
     reachedGoal: state.phase === 'goal-hold',
     recoveryCount: diagnostics.telemetry.recoveryCount,
+    recoveryDecision: summarizeRecoveryDecisions(diagnostics.recoveryDecisions),
     requestedRegeneration,
     routeLength: diagnostics.routeLength,
     routeRatio: round(diagnostics.routeLength / Math.max(1, diagnostics.canonicalPathLength)),
@@ -506,6 +533,13 @@ const buildSummary = (
   const scores = cases.map((entry) => entry.progression.after.score);
   const routeEfficiencyPressureScores = cases.map((entry) => entry.progression.routeEfficiencyPressureScore);
   const performanceScores = cases.map((entry) => entry.progression.performanceScore);
+  const recoveryDecisions = cases.flatMap((entry) => (
+    Array.from({ length: entry.recoveryDecision.frontierRecoveryCount }, () => ({ kind: 'frontier-recovery' as const }))
+      .concat(Array.from({ length: entry.recoveryDecision.optionalRetargetCount }, () => ({ kind: 'optional-retarget' as const })))
+  ));
+  const knownRecoveryRouteSteps = cases.flatMap((entry) => (
+    Array.from({ length: entry.recoveryDecision.totalCount }, () => entry.recoveryDecision.averageKnownRouteSteps)
+  ));
   const aiDecisionScores = cases
     .map((entry) => entry.progression.aiDecisionScore)
     .filter((score): score is MazeCycleAiDecisionScore => score !== null);
@@ -539,6 +573,15 @@ const buildSummary = (
       min: round(routeRatios[0] ?? 0),
       p50: round(percentile(routeRatios, 0.5)),
       p90: round(percentile(routeRatios, 0.9))
+    },
+    recoveryDecision: {
+      averageKnownRouteSteps: knownRecoveryRouteSteps.length > 0
+        ? round(knownRecoveryRouteSteps.reduce((total, value) => total + value, 0) / knownRecoveryRouteSteps.length)
+        : 0,
+      frontierRecoveryCount: recoveryDecisions.filter((entry) => entry.kind === 'frontier-recovery').length,
+      maxKnownRouteSteps: Math.max(0, ...cases.map((entry) => entry.recoveryDecision.maxKnownRouteSteps)),
+      optionalRetargetCount: recoveryDecisions.filter((entry) => entry.kind === 'optional-retarget').length,
+      totalCount: recoveryDecisions.length
     },
     scales,
     seeds,

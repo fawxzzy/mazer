@@ -62,7 +62,7 @@ describe('Mazer completion markers', () => {
     const verifyScript = readRepoFile('scripts/verify/run-verify.mjs');
 
     expect(packageJson).toContain('"verify": "node ./scripts/verify/run-verify.mjs"');
-    expect(packageJson).toContain('"test:verify": "vitest run tests/reset tests/ai/demo-walker.test.ts tests/ai/demo-walker-known-frontier.test.ts tests/ai/demo-walker-rank-ladder.test.ts tests/scenes/menu-render-frame.test.ts tests/analysis/maze-cycle-telemetry-report.test.mjs --maxWorkers 1"');
+    expect(packageJson).toContain('"test:verify": "vitest run tests/reset tests/ai/demo-walker.test.ts tests/ai/demo-walker-known-frontier.test.ts tests/ai/demo-walker-rank-ladder.test.ts tests/ai/demo-walker-recovery-diagnostics.test.ts tests/scenes/menu-render-frame.test.ts tests/analysis/maze-cycle-telemetry-report.test.mjs --maxWorkers 1"');
     expect(verifyScript).toContain("runNpm(['run', 'test:verify'])");
     expect(verifyScript).toContain("runNpm(['run', 'build'])");
     expect(currentTruth).toContain('Current `verify` means:');
@@ -73,6 +73,7 @@ describe('Mazer completion markers', () => {
     expect(currentTruth).toContain('- `tests/ai/demo-walker.test.ts`');
     expect(currentTruth).toContain('- `tests/ai/demo-walker-known-frontier.test.ts`');
     expect(currentTruth).toContain('- `tests/ai/demo-walker-rank-ladder.test.ts`');
+    expect(currentTruth).toContain('- `tests/ai/demo-walker-recovery-diagnostics.test.ts`');
     expect(currentTruth).toContain('- `tests/scenes/menu-render-frame.test.ts`');
     expect(currentTruth).toContain('- `tests/analysis/maze-cycle-telemetry-report.test.mjs`');
     expect(currentTruth).toContain('- `--maxWorkers 1`');
@@ -85,6 +86,7 @@ describe('Mazer completion markers', () => {
     expect(systemMap).toContain('- `tests/ai/demo-walker.test.ts`');
     expect(systemMap).toContain('- `tests/ai/demo-walker-known-frontier.test.ts`');
     expect(systemMap).toContain('- `tests/ai/demo-walker-rank-ladder.test.ts`');
+    expect(systemMap).toContain('- `tests/ai/demo-walker-recovery-diagnostics.test.ts`');
     expect(systemMap).toContain('- `tests/scenes/menu-render-frame.test.ts`');
     expect(systemMap).toContain('- `tests/analysis/maze-cycle-telemetry-report.test.mjs`');
     expect(systemMap).toContain('- `--maxWorkers 1`');
@@ -175,7 +177,7 @@ describe('Mazer completion markers', () => {
     expect(markerDoc).toContain('tmp/captures/mazer-ui-surfaces/2026-07-10T06-51-59-043Z/summary.json');
     expect(markerDoc).toContain('runtime-diagnostics auth fixture');
     expect(markerDoc).toContain('tmp/captures/mazer-ui-surfaces/2026-07-10T15-12-27-898Z/summary.json');
-    expect(markerDoc).toContain('| AI/playbook progression contracts | 97% |');
+    expect(markerDoc).toContain('| AI/playbook progression contracts | 98% |');
     expect(markerDoc).toContain('removes the remaining visual-goal inference fallback');
     expect(markerDoc).toContain('wrapped compass-local pressure');
     expect(markerDoc).toContain('compass-trap regression');

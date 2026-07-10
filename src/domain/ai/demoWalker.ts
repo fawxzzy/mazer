@@ -72,12 +72,25 @@ export interface DemoRunnerTelemetry {
   optionalRetargetCount: number;
 }
 
+export interface DemoRunnerRecoveryDecision {
+  choiceClass: DemoWalkerChoiceClass;
+  confidence: number;
+  fromIndex: number;
+  kind: 'frontier-recovery' | 'optional-retarget';
+  knownRouteStepCount: number;
+  routeCursor: number;
+  splitIndex: number;
+  targetIndex: number;
+  thoughtState: DemoWalkerThoughtState;
+}
+
 export interface DemoRunnerRouteDiagnostics {
   aiResetPathCursor: number | null;
   canonicalPathLength: number;
   cueCounts: Partial<Record<DemoWalkerCue, number>>;
   perception: DemoWalkerAiPerceptionProfile;
   routeLength: number;
+  recoveryDecisions: readonly DemoRunnerRecoveryDecision[];
   segmentCount: number;
   telemetry: DemoRunnerTelemetry;
   trailModeCounts: Partial<Record<DemoTrailMode, number>>;
@@ -157,6 +170,7 @@ interface DemoRunnerPlan {
   telemetry: DemoRunnerTelemetry;
   aiResetPathCursor: number | null;
   memoryFrames: readonly DemoWalkerMemoryFrame[];
+  recoveryDecisions: readonly DemoRunnerRecoveryDecision[];
 }
 
 interface LocalMemorySplit {
@@ -555,6 +569,7 @@ export const collectDemoWalkerRouteDiagnostics = (
     cueCounts,
     perception: resolveDemoWalkerAiPerceptionProfile(config),
     routeLength: runnerPlan.routeIndices.length,
+    recoveryDecisions: runnerPlan.recoveryDecisions,
     segmentCount,
     telemetry: runnerPlan.telemetry,
     trailModeCounts,
@@ -843,7 +858,8 @@ const buildPreciseRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     cueOverrides: Array.from({ length: segmentCount }, () => null),
     telemetry: EMPTY_TELEMETRY,
     aiResetPathCursor: null,
-    memoryFrames: Array.from({ length: canonicalPath.length }, () => EMPTY_MEMORY_FRAME)
+    memoryFrames: Array.from({ length: canonicalPath.length }, () => EMPTY_MEMORY_FRAME),
+    recoveryDecisions: []
   };
 };
 
@@ -1040,7 +1056,8 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     cueOverrides,
     telemetry,
     aiResetPathCursor,
-    memoryFrames
+    memoryFrames,
+    recoveryDecisions: []
   };
 };
 
@@ -1061,6 +1078,7 @@ const buildHumanLocalMemoryRunnerPlan = (
   const segmentTrailModes: DemoTrailMode[] = [];
   const cueOverrides: Array<DemoSegmentCue | DemoWalkerCue | null> = [];
   const memoryFrames: DemoWalkerMemoryFrame[] = [EMPTY_MEMORY_FRAME];
+  const recoveryDecisions: DemoRunnerRecoveryDecision[] = [];
   const telemetry: DemoRunnerTelemetry = {
     wrongBranchCount: 0,
     backtrackCount: 0,
@@ -1250,6 +1268,17 @@ const buildHumanLocalMemoryRunnerPlan = (
     );
     telemetry.recoveryCount += 1;
     telemetry.optionalRetargetCount += 1;
+    recoveryDecisions.push({
+      choiceClass: retargetReview.choiceClass,
+      confidence: retargetReview.confidence,
+      fromIndex,
+      kind: 'optional-retarget',
+      knownRouteStepCount: Math.max(0, bestCandidate.route.length - 1),
+      routeCursor: Math.max(0, routeIndices.length - 1),
+      splitIndex: bestCandidate.split.index,
+      targetIndex: bestCandidate.choice,
+      thoughtState: retargetReview.thoughtState
+    });
     optionalRetargetCount += 1;
     lastOptionalRetargetRouteLength = routeIndices.length;
     return bestCandidate.choice;
@@ -1301,13 +1330,15 @@ const buildHumanLocalMemoryRunnerPlan = (
       currentIndex,
       deadEnds,
       episode,
+      getRouteCursor: () => Math.max(0, routeIndices.length - 1),
       pathStack,
       seed: config.seed,
       splitRecords,
       telemetry,
       visited,
       createMemoryFrame,
-      perception
+      perception,
+      recoveryDecisions
     });
     if (recovered !== null) {
       currentIndex = recovered;
@@ -1338,7 +1369,8 @@ const buildHumanLocalMemoryRunnerPlan = (
     aiResetPathCursor: currentIndex === episode.raster.endIndex
       ? null
       : Math.max(1, routeIndices.length - 1),
-    memoryFrames
+    memoryFrames,
+    recoveryDecisions
   };
 };
 
@@ -1681,7 +1713,9 @@ const backtrackToBestLocalMemorySplit = (input: {
   currentIndex: number;
   deadEnds: Set<number>;
   episode: MazeEpisode;
+  getRouteCursor: () => number;
   pathStack: number[];
+  recoveryDecisions: DemoRunnerRecoveryDecision[];
   seed: number;
   splitRecords: Map<number, LocalMemorySplit>;
   telemetry: DemoRunnerTelemetry;
@@ -1694,6 +1728,7 @@ const backtrackToBestLocalMemorySplit = (input: {
   ) => DemoWalkerMemoryFrame;
 }): number | null => {
   let currentIndex = input.currentIndex;
+  let recoveryRouteStepCount = 0;
   const markDeadEndIfExhausted = (index: number): void => {
     if (collectLocalMemoryChoices(input.episode, index, input.visited, input.deadEnds).length === 0) {
       input.deadEnds.add(index);
@@ -1727,6 +1762,7 @@ const backtrackToBestLocalMemorySplit = (input: {
         input.createMemoryFrame?.(targetSplit.index, 'recovering')
       );
       input.telemetry.backtrackCount += 1;
+      recoveryRouteStepCount += 1;
       currentIndex = nextBacktrackIndex;
     }
     const targetStackIndex = input.pathStack.lastIndexOf(targetSplit.index);
@@ -1756,6 +1792,7 @@ const backtrackToBestLocalMemorySplit = (input: {
         input.createMemoryFrame?.(targetSplit.index, 'recovering')
       );
       input.telemetry.backtrackCount += 1;
+      recoveryRouteStepCount += 1;
       pendingDeadEndCue = false;
       currentIndex = nextBacktrackIndex;
     }
@@ -1773,6 +1810,17 @@ const backtrackToBestLocalMemorySplit = (input: {
   const review = reviewLocalMemoryChoice(targetSplit.index, nextChoice, input.episode, input.seed, input.perception);
   input.appendStep(nextChoice, 'explore', 'reacquire', input.createMemoryFrame?.(nextChoice, review.thoughtState, review));
   input.telemetry.recoveryCount += 1;
+  input.recoveryDecisions.push({
+    choiceClass: review.choiceClass,
+    confidence: review.confidence,
+    fromIndex: input.currentIndex,
+    kind: 'frontier-recovery',
+    knownRouteStepCount: recoveryRouteStepCount,
+    routeCursor: input.getRouteCursor(),
+    splitIndex: targetSplit.index,
+    targetIndex: nextChoice,
+    thoughtState: review.thoughtState
+  });
   if (!input.canonicalCursorByIndex.has(nextChoice) || !input.canonicalCursorByIndex.has(currentIndex)) {
     input.telemetry.wrongBranchCount += 1;
   }
