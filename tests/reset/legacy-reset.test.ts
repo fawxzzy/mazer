@@ -15,8 +15,21 @@ import {
   resolveLegacyTrailFromDemoSteps
 } from '../../src/legacy-runtime/legacyDemoWalker';
 import { collectDemoWalkerTelemetry, createDemoWalkerState } from '../../src/domain/ai';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+const resolveLegacyUnrealSource = (...segments: string[]): string => {
+  const legacyRoot = [
+    resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore'),
+    resolve(process.cwd(), '..', '..', '..', 'tmp', 'mazer-legacy-unreal-restore')
+  ].find((candidate) => existsSync(candidate));
+
+  if (!legacyRoot) {
+    throw new Error('Missing local mazer-legacy-unreal-restore fixture.');
+  }
+
+  return resolve(legacyRoot, ...segments);
+};
 
 const countLegacyShortcutBridgeFloors = (maze: ReturnType<typeof createLegacyMaze>): number => {
   let bridges = 0;
@@ -415,7 +428,7 @@ describe('legacy reset lane', () => {
 
   test('resumes from the next tile selected during legacy backtracking', () => {
     const legacyMazeSource = readFileSync(
-      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'MazerGameModeBase.cpp'),
+      resolveLegacyUnrealSource('Source', 'Mazer', 'MazerGameModeBase.cpp'),
       'utf8'
     );
     const webMazeSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMaze.ts'), 'utf8');
@@ -824,7 +837,7 @@ describe('legacy reset lane', () => {
   test('defers overlay rebuild travel until closing the options surface', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const legacyPauseMenuSource = readFileSync(
-      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'PauseMenuWidget.cpp'),
+      resolveLegacyUnrealSource('Source', 'Mazer', 'Private', 'UI', 'PauseMenuWidget.cpp'),
       'utf8'
     );
 
@@ -842,7 +855,7 @@ describe('legacy reset lane', () => {
     const pauseLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPauseLifecycle.ts'), 'utf8');
     const playLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayLifecycle.ts'), 'utf8');
     const legacyGamePauseSource = readFileSync(
-      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'GamePauseMenu.cpp'),
+      resolveLegacyUnrealSource('Source', 'Mazer', 'Private', 'UI', 'GamePauseMenu.cpp'),
       'utf8'
     );
 
@@ -915,7 +928,7 @@ describe('legacy reset lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const overlayFieldCommitSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayFieldCommit.ts'), 'utf8');
     const legacyPauseMenuSource = readFileSync(
-      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'PauseMenuWidget.cpp'),
+      resolveLegacyUnrealSource('Source', 'Mazer', 'Private', 'UI', 'PauseMenuWidget.cpp'),
       'utf8'
     );
 

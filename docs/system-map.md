@@ -21,13 +21,15 @@ When sources disagree, read in this order:
 The active app entry path is:
 
 1. `src/boot/main.ts`
-2. `src/boot/phaserConfig.ts`
-3. `src/scenes/BootScene.ts`
-4. `src/scenes/MenuScene.ts`
+2. `src/boot/viewportGeometry.ts`
+3. `src/boot/phaserConfig.ts`
+4. `src/scenes/BootScene.ts`
+5. `src/scenes/MenuScene.ts`
 
 Meaning:
 
-- `main.ts` owns localhost service-worker/cache cleanup and boot-status milestones
+- `main.ts` owns localhost service-worker/cache cleanup, boot-status milestones, and attaches the canonical viewport subscriber
+- `viewportGeometry.ts` owns normalized browser geometry, safe-area CSS variables, and coalesced resize/orientation lifecycle events
 - `phaserConfig.ts` owns the scene list and Phaser boot config
 - `BootScene.ts` is only a handoff
 - `MenuScene.ts` is the real application surface for the reset lane
@@ -38,7 +40,7 @@ Use this before large edits so you know the whole app, not just the current scre
 
 | Area | Ownership |
 | --- | --- |
-| `src/boot/*` | browser boot, localhost cleanup, Phaser startup, live boot diagnostics |
+| `src/boot/*` | browser boot, canonical viewport geometry, localhost cleanup, Phaser startup, live boot diagnostics |
 | `src/scenes/*` | runtime shell, front door, overlays, play loop, HUD, live presentation |
 | `src/legacy-runtime/*` | legacy-owned defaults, menu layout, menu snapshot, maze conversion, play HUD geometry, option field parsing, overlay field-commit contracts, overlay toggle contracts, overlay routing contracts, pause command contracts |
 | `src/domain/ai/*` | deterministic demo walker stepping and attract behavior |
@@ -59,6 +61,7 @@ Use this as the top-level "where does this actually live?" map before editing:
 | Surface | Current owner | Supporting truth/proof |
 | --- | --- | --- |
 | boot + localhost cleanup | `src/boot/main.ts` | `tests/reset/legacy-reset.test.ts` |
+| viewport geometry and phone-landscape safety | `src/boot/viewportGeometry.ts`, `src/boot/orientationLock.ts`, `src/boot/main.ts` | `tests/boot/viewport-geometry.test.ts`, `tests/boot/orientation-lock.test.ts`, `docs/ops/MAZER-VIEWPORT-LAYOUT-CONTRACT-PACKET-2026-07-11.md`; viewport-derived geometry intentionally does not persist |
 | boot diagnostics readback | `src/boot/bootStatus.ts`, `src/boot/main.ts` | `tests/boot/boot-status.test.ts` |
 | Phaser scene wiring | `src/boot/phaserConfig.ts` | `npm run build` |
 | active front door and play shell | `src/scenes/MenuScene.ts` | in-app browser, `npm run verify`; play board rendering owns connected corridor material for generated mazes and consumes responsive dynamic overlay metrics from `legacyMenuRender.ts` |
@@ -96,7 +99,7 @@ This is the active state contract for the current app front door.
 | current maze snapshot | `LegacyMazeSnapshot` | `src/legacy-runtime/legacyMaze.ts` | menu mode uses `createLegacyGeneratedMenuMaze()`, play mode uses `createLegacyMaze()`, and `createLegacyMenuMaze()` remains a fixed screenshot fixture |
 | menu demo episode/config/state | `MazeEpisode`, `DemoWalkerConfig`, `DemoWalkerState` | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | menu-only attract route and preroll truth |
 | player/trail/goal live state | `player`, `trail`, `goal` | `src/scenes/MenuScene.ts` | trail presentation differs between menu and play, but ownership stays local to the scene |
-| visual diagnostics | `window.__MAZER_VISUAL_DIAGNOSTICS__`, `data-mazer-visual-diagnostics` | `src/scenes/MenuScene.ts` | visual proof scripts treat this as route-aware readback, not gameplay truth; active-play board bounds use the same camera-follow offset as the rendered static/dynamic board layers, and the DOM attribute is the maintained-browser fallback when automation cannot read hidden window globals |
+| visual diagnostics | `window.__MAZER_VISUAL_DIAGNOSTICS__`, `data-mazer-visual-diagnostics` | `src/scenes/MenuScene.ts`, `src/boot/viewportGeometry.ts` | visual proof scripts treat this as route-aware readback, not gameplay truth; the normalized viewport snapshot, safe insets, effective content rect, canvas backing dimensions, and no-overlap/offscreen results are included for resize proof; active-play board bounds use the same camera-follow offset as the rendered static/dynamic board layers, and the DOM attribute is the maintained-browser fallback when automation cannot read hidden window globals |
 | runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts`, `src/legacy-runtime/mazeCycleTelemetry.ts`, `scripts/analysis/maze-cycle-telemetry-report.mjs` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; browser automation still may not see the `window` globals directly, but the DOM attribute is the repo-owned fallback surface and now exposes active menu-demo cue, route shape, mistake-enabled lane state, AI wrong-branch/backtrack/recovery counters, generation stage cursor, stage-6 draw progress, compact maze source/build/quality readback, and compact local cycle-learning summaries without drawing visible debug text; `cycle:report` is the supported Atlas-safe export path for those bounded local-learning summaries |
 
 ## End-to-end flow map
@@ -104,7 +107,7 @@ This is the active state contract for the current app front door.
 Use this when you need to understand the app as a system instead of a file list.
 
 1. Boot:
-   `src/boot/main.ts` clears localhost service-worker/cache drift, then starts Phaser through `src/boot/phaserConfig.ts`.
+   `src/boot/main.ts` clears localhost service-worker/cache drift, installs `viewportGeometry.ts`, then starts Phaser through `src/boot/phaserConfig.ts` from the normalized content rectangle.
 2. Scene handoff:
    `src/scenes/BootScene.ts` hands off immediately to `src/scenes/MenuScene.ts`.
 3. Front door build:

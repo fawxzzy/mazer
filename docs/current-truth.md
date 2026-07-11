@@ -222,6 +222,12 @@ Current fast iteration rule:
 
 The older visual matrix / Edge live proof lane is now archival for comparison, not current closure truth for the reset lane.
 
+## Viewport Layout Contract
+
+- Browser viewport geometry is now owned by `src/boot/viewportGeometry.ts`. It normalizes layout and usable visual viewport measurements, safe-area insets, effective content bounds, device pixel ratio, and phone-landscape classification before publishing one snapshot to CSS, Phaser, `MenuScene`, and visual diagnostics. Derived geometry is intentionally not persisted: Mazer has no supported free-positioned UI intent, so raw dimensions and coordinates must be recomputed after resize, maximize/restore, browser chrome changes, or rotation.
+- Phone landscape no longer rotates `#app`. The runtime requests portrait where supported; otherwise a single accessible rotate-device shell blocks and sleeps gameplay until portrait returns. Desktop landscape stays normal. The first `390x844 -> 844x390 -> 390x844` contract proof restored the original portrait canvas/board geometry with `transform: none`, native DPR-2 backing, and no overlap/offscreen diagnostics. See `docs/ops/MAZER-VIEWPORT-LAYOUT-CONTRACT-PACKET-2026-07-11.md`.
+- The maintained `390x844` authenticated Options/Play/Pause capture now checks a single normalized viewport owner across those surfaces. Mobile progression-badge and Pause toggle-description text use explicit padding/fit rules so high-DPI glyph descenders and second-row descriptions do not bleed outside their frames.
+
 Localhost operation rule:
 
 - keep one maintained preview server on `http://127.0.0.1:4173/`

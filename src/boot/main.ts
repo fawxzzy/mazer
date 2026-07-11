@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import '../styles/base.css';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
-import { installMazerPortraitLock } from './orientationLock';
-import { phaserConfig } from './phaserConfig';
+import { installMazerPortraitLock, shouldBlockMazerLandscape } from './orientationLock';
+import { createMazerPhaserConfig } from './phaserConfig';
+import { installMazerViewportGeometry, syncMazerGameToViewport } from './viewportGeometry';
 
 const LOCALHOST_SW_RESET_KEY = 'mazer:localhost-sw-reset:v1';
 const PRODUCTION_SW_UPDATE_RELOAD_KEY = 'mazer:production-sw-update-reload-at:v1';
@@ -83,7 +84,20 @@ const registerProductionServiceWorker = (): void => {
 
 const boot = async (): Promise<void> => {
   markMazerBootStatus('boot-start');
-  installMazerPortraitLock();
+  let game: Phaser.Game | null = null;
+  const syncLandscapeBlock = (blocked: boolean): void => {
+    if (!game) {
+      return;
+    }
+
+    if (blocked) {
+      game.loop.sleep();
+    } else {
+      game.loop.wake();
+    }
+  };
+  const viewportGeometry = installMazerViewportGeometry();
+  installMazerPortraitLock(window, syncLandscapeBlock);
 
   if (isLocalhostRuntime()) {
     const changed = await resetLocalhostServiceWorkers();
@@ -100,8 +114,14 @@ const boot = async (): Promise<void> => {
   }
 
   markMazerBootStatus('game-creating');
-  const game = new Phaser.Game(phaserConfig);
+  game = new Phaser.Game(createMazerPhaserConfig(viewportGeometry.getSnapshot().content));
   attachMazerGameToWindow(game);
+  viewportGeometry.subscribe((geometry) => {
+    if (game) {
+      syncMazerGameToViewport(game, geometry);
+    }
+  });
+  syncLandscapeBlock(shouldBlockMazerLandscape(window));
   registerProductionServiceWorker();
   markMazerBootStatus('game-created');
 };

@@ -68,7 +68,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
   test('keeps the Options overlay player guide simple and player-facing', () => {
-    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
     const buildOptionsSource = menuSceneSource.slice(
       menuSceneSource.indexOf('private buildOptionsOverlay(): void {'),
       menuSceneSource.indexOf('private createLegacyOptionsInfoSection(')
@@ -83,7 +83,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     );
 
     expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);');
-    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(\n      panel.top + (stacked ? 110 : 120)');
+    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(\n      panel.top + (stacked ? 110 : 120) + (hasOverlayMessage ? 22 : 0),');
     expect(menuSceneSource).toContain("addText('PLAYER GUIDE'");
     expect(buildOptionsSource.indexOf('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);')).toBeLessThan(
       buildOptionsSource.indexOf('this.createFeatureControlRows(viewport.top, panel')
@@ -1157,7 +1157,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
   test('keeps account login/logout inside the shared player-facing overlay system', () => {
-    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
     const playerMessageSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayerMessage.ts'), 'utf8');
     const overlayRoutingSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayRouting.ts'), 'utf8');
@@ -1193,7 +1193,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const shouldReturnToMainMenuAfterLogin = this.authForm.mode === \'login\'');
     expect(menuSceneSource).toContain('private closeLegacyAuthOverlayToMainMenu(): void');
     expect(menuSceneSource).toContain("const isAuthenticated = this.authSnapshot.status === 'authenticated';");
-    expect(menuSceneSource).toContain("this.createButton(\n              this.layout.centerButtonX,\n              this.layout.centerButtonY,");
+    expect(menuSceneSource).toContain("'Login',\n              () => this.openOverlay('auth')");
+    expect(menuSceneSource).toContain('this.layout.centerButtonX,');
+    expect(menuSceneSource).toContain('this.layout.centerButtonY,');
     expect(menuSceneSource).not.toContain('const accountActionLabel =');
     expect(menuSceneSource).toContain('private createLegacyOptionsAccountActionRow(panel: OverlayPanelFrame): void');
     expect(menuSceneSource).toContain('this.createLegacyOptionsAccountActionRow(panel);');
@@ -1256,11 +1258,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private resolveLegacyProgressionBadgeText(_palette: LegacyProgressionPalette): string');
     expect(menuSceneSource).toContain('const text = this.resolveLegacyProgressionBadgeText(palette);');
     expect(menuSceneSource).toContain("const skillLine = `AI Skill Lvl: ${aiTrack.rank}/${String(aiTrack.level).padStart(2, '0')}`;");
-    expect(menuSceneSource).toContain("const runLine = `Score: ${scoreLabel}  Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}  Maze: ${this.resolveLegacyCurrentMazeLevel()}`;");
-    expect(menuSceneSource).toContain("return `${timerLabel}\\n${skillLine}\\n${runLine}`;");
+    expect(menuSceneSource).toContain("const scoreLine = `Score: ${scoreLabel}`;");
+    expect(menuSceneSource).toContain("const runLine = `Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}`;");
+    expect(menuSceneSource).toContain("const mazeLine = `Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;");
+    expect(menuSceneSource).toContain("return `${timerLabel}\\n${skillLine}\\n${scoreLine}  ${runLine}\\n${mazeLine}`;");
     expect(menuSceneSource).toContain("const timerLine = this.formatLegacyElapsedLabel(this.resolveLegacyPlayElapsedMs());");
     expect(menuSceneSource).toContain("const skillLine = `Skill Lvl: ${playerTrack.rank}/${String(playerTrack.level).padStart(2, '0')}`;");
-    expect(menuSceneSource).toContain("const runLine = `Score: ${scoreLabel}  Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}  Maze: ${this.resolveLegacyCurrentMazeLevel()}`;");
+    expect(menuSceneSource).toContain("const runLine = `Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}`;");
+    expect(menuSceneSource).toContain("return `${timerLine}\\n${skillLine}\\n${scoreLine}  ${runLine}\\n${mazeLine}`;");
     expect(menuSceneSource).not.toContain('const complexityLabel =');
     expect(menuSceneSource).not.toContain('const signalLabel =');
     expect(menuSceneSource).not.toContain('Sig:');

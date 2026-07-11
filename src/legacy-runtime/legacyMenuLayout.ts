@@ -211,7 +211,13 @@ export const resolveLegacyMenuLayout = (
       )
       : clamp((height - snappedBoardSize) / 2, 56, height - snappedBoardSize - 12);
   const boardTop = Math.round(isPlaySurface ? playBoardTop : menuBoardTop);
-  const menuRowButtonY = boardTop + snappedBoardSize + menuButtonGap + Math.round(buttonHeight / 2);
+  const mobileMenuActionCenterY = height - Math.round(clamp(height * 0.18, 120, 170));
+  const menuRowButtonY = isPortrait && !isPlaySurface && !usesStackedButtons
+    ? Math.max(
+      boardTop + snappedBoardSize + menuButtonGap + Math.round(buttonHeight / 2),
+      mobileMenuActionCenterY
+    )
+    : boardTop + snappedBoardSize + menuButtonGap + Math.round(buttonHeight / 2);
   const playRowButtonY = isPortrait
     ? boardTop + snappedBoardSize + Math.round(buttonHeight * 0.86)
     : boardTop + snappedBoardSize + Math.round(buttonHeight * 0.54);
