@@ -207,9 +207,10 @@ Current `test:verify` means:
 - `tests/ai/demo-walker-recovery-diagnostics.test.ts`
 - `tests/scenes/menu-render-frame.test.ts`
 - `tests/analysis/maze-cycle-telemetry-report.test.mjs`
+- `tests/analysis/ai-run-corpus-audit.test.mjs`
 - `--maxWorkers 1`
 
-That proof spine currently guards marker arithmetic/current-truth sync, reset and generation lifecycle, topology scale audits, menu AI recovery/replay, active play movement/HUD/reset contracts, and render-frame layout/readability contracts. `npm run lint` remains a separate TypeScript gate for code-edit packets and should still be run before commit when implementation files change.
+That proof spine currently guards marker arithmetic/current-truth sync, reset and generation lifecycle, topology scale audits, menu AI recovery/replay, active play movement/HUD/reset contracts, render-frame layout/readability contracts, and the export-only AI corpus audit contract. `npm run lint` remains a separate TypeScript gate for code-edit packets and should still be run before commit when implementation files change.
 
 Current fast iteration rule:
 
