@@ -28,12 +28,12 @@ const createViewport = ({
 });
 
 describe('Mazer portrait orientation lock', () => {
-  test('keeps phone-like landscape in app-side portrait lock without showing a blocker', () => {
+  test('blocks phone-like landscape without rotating the application', () => {
     expect(isMazerLandscapeViewport(createViewport({ width: 844, height: 390 }))).toBe(true);
-    expect(shouldUseMazerCssPortraitLock(createViewport({ width: 844, height: 390, touchPoints: 2 }))).toBe(true);
-    expect(shouldUseMazerCssPortraitLock(createViewport({ width: 844, height: 390, coarse: true }))).toBe(true);
-    expect(shouldBlockMazerLandscape(createViewport({ width: 844, height: 390, touchPoints: 2 }))).toBe(false);
-    expect(shouldBlockMazerLandscape(createViewport({ width: 844, height: 390, coarse: true }))).toBe(false);
+    expect(shouldUseMazerCssPortraitLock(createViewport({ width: 844, height: 390, touchPoints: 2 }))).toBe(false);
+    expect(shouldUseMazerCssPortraitLock(createViewport({ width: 844, height: 390, coarse: true }))).toBe(false);
+    expect(shouldBlockMazerLandscape(createViewport({ width: 844, height: 390, touchPoints: 2 }))).toBe(true);
+    expect(shouldBlockMazerLandscape(createViewport({ width: 844, height: 390, coarse: true }))).toBe(true);
     expect(shouldBlockMazerLandscape(createViewport({ width: 390, height: 844, touchPoints: 2 }))).toBe(false);
     expect(shouldBlockMazerLandscape(createViewport({ width: 1280, height: 720 }))).toBe(false);
   });
@@ -54,7 +54,7 @@ describe('Mazer portrait orientation lock', () => {
     expect(calls).toEqual(['portrait-primary']);
   });
 
-  test('wires portrait lock into app shell, manifest, and CSS rotation fallback', () => {
+  test('wires portrait lock into app shell, manifest, and non-rotating blocker', () => {
     const mainSource = readFileSync(resolve(process.cwd(), 'src/boot/main.ts'), 'utf8');
     const orientationLockSource = readFileSync(resolve(process.cwd(), 'src/boot/orientationLock.ts'), 'utf8');
     const cssSource = readFileSync(resolve(process.cwd(), 'src/styles/base.css'), 'utf8');
@@ -63,13 +63,13 @@ describe('Mazer portrait orientation lock', () => {
     };
 
     expect(manifest.orientation).toBe('portrait-primary');
-    expect(mainSource).toContain("import { installMazerPortraitLock } from './orientationLock';");
-    expect(mainSource).toContain('installMazerPortraitLock();');
+    expect(mainSource).toContain("import { installMazerPortraitLock, shouldBlockMazerLandscape } from './orientationLock';");
+    expect(mainSource).toContain('installMazerPortraitLock(window, syncLandscapeBlock);');
     expect(cssSource).toContain(`#${MAZER_PORTRAIT_LOCK_OVERLAY_ID}`);
-    expect(cssSource).toContain(`body.${MAZER_PORTRAIT_LOCK_BODY_CLASS} #app`);
-    expect(cssSource).toContain('transform: rotate(90deg);');
-    expect(orientationLockSource).not.toContain('Portrait Locked');
-    expect(orientationLockSource).toContain('portrait-css-lock');
+    expect(orientationLockSource).toContain(MAZER_PORTRAIT_LOCK_BODY_CLASS);
+    expect(cssSource).not.toContain('transform: rotate(90deg);');
+    expect(orientationLockSource).toContain('Rotate your device');
+    expect(orientationLockSource).toContain('portrait-blocked');
     expect(orientationLockSource).toContain('portrait-primary');
     expect(cssSource).not.toContain('"orientation": "landscape"');
     expect(cssSource).not.toContain('filter: blur');

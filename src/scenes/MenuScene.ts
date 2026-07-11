@@ -6,6 +6,7 @@ import {
   type MazerRenderResolutionDiagnostics,
   type MazerRenderResolutionStatus
 } from '../boot/canvasResolution';
+import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry } from '../boot/viewportGeometry';
 import {
   collectDemoWalkerRouteDiagnostics,
   type DemoRunnerTelemetry,
@@ -722,7 +723,26 @@ interface MenuSceneVisualDiagnostics {
   revision: number;
   updatedAt: number;
   viewport: {
+    geometry: {
+      content: VisualRect;
+      devicePixelRatio: number;
+      isLandscape: boolean;
+      isPhoneLike: boolean;
+      layoutHeight: number;
+      layoutWidth: number;
+      revision: number;
+      visualHeight: number;
+      visualOffsetLeft: number;
+      visualOffsetTop: number;
+      visualScale: number;
+      visualUsedForContent: boolean;
+      visualWidth: number;
+    };
     height: number;
+    integrity: {
+      offscreenBoundsViolations: string[];
+      overlapViolations: string[];
+    };
     safeInsets: {
       bottom: number;
       left: number;
@@ -1044,6 +1064,7 @@ export class MenuScene extends Phaser.Scene {
   private overlayScrollPointerStartY = 0;
   private overlayScrollPointerStartOffset = 0;
   private overlayScrollPointerHasMoved = false;
+  private viewportGeometryListener: (() => void) | null = null;
   private stars: LegacyMenuBackdropStar[] = [];
   private layout!: LegacyMenuLayout;
   private hudBounds: VisualRect | null = null;
@@ -1186,6 +1207,10 @@ export class MenuScene extends Phaser.Scene {
     this.scale.on('resize', () => {
       this.refreshLayout();
     });
+    if (typeof window !== 'undefined') {
+      this.viewportGeometryListener = () => this.refreshLayout();
+      window.addEventListener(MAZER_VIEWPORT_CHANGE_EVENT, this.viewportGeometryListener);
+    }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.authUnsubscribe?.();
       this.authUnsubscribe = null;
@@ -1195,6 +1220,10 @@ export class MenuScene extends Phaser.Scene {
       this.detachLegacyPlayKeyboardFallback();
       this.detachLegacyPlayTouchControlFallback();
       this.detachLegacyQaDiagnosticsSurface();
+      if (this.viewportGeometryListener !== null && typeof window !== 'undefined') {
+        window.removeEventListener(MAZER_VIEWPORT_CHANGE_EVENT, this.viewportGeometryListener);
+        this.viewportGeometryListener = null;
+      }
       this.clearVisualDiagnostics();
       clearMenuSceneRuntimeDiagnostics();
     });
@@ -3189,8 +3218,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private refreshLayout(): void {
-    const width = this.scale.width;
-    const height = this.scale.height;
+    const viewportGeometry = readMazerViewportGeometry();
+    const width = viewportGeometry.content.width;
+    const height = viewportGeometry.content.height;
     const backingResolution = resolveMazerCanvasBackingResolution({
       canvasCssHeight: height,
       canvasCssWidth: width
@@ -5752,11 +5782,14 @@ export class MenuScene extends Phaser.Scene {
     const horizontalPadding = this.mode === 'menu'
       ? clampInteger(Math.round(mazeRenderFrame.tileSize * 2.85), 22, 30)
       : clampInteger(Math.round(mazeRenderFrame.tileSize * 3.3), 24, 34);
-    const verticalPadding = clampInteger(Math.round(mazeRenderFrame.tileSize * 1.35), 9, 14);
+    const verticalPadding = clampInteger(Math.round(mazeRenderFrame.tileSize * 1.35), 9, 14)
+      + (this.mode === 'menu' && this.layout.height > this.layout.width ? 20 : 0);
     this.progressionBadgeText
       .setText(text)
       .setFontSize(baseFontSize)
       .setLineSpacing(2)
+      // Bitmap glyph descenders can paint beyond Phaser's logical line box on HiDPI phones.
+      .setPadding(0, 0, 0, 8)
       .setColor(LEGACY_MENU_ACTION_GREEN);
     this.fitLegacyUiTextToWidth(
       this.progressionBadgeText,
@@ -5771,7 +5804,11 @@ export class MenuScene extends Phaser.Scene {
       178,
       maxWidth
     );
-    const height = clampInteger(fittedTextHeight + verticalPadding, 38, 76);
+    const height = clampInteger(
+      fittedTextHeight + verticalPadding,
+      38,
+      this.mode === 'menu' && this.layout.height > this.layout.width ? 98 : this.mode === 'menu' ? 90 : 76
+    );
     const centerX = mazeRenderFrame.boardLeft + (mazeRenderFrame.boardSize / 2);
     const centerY = this.mode === 'play'
       ? this.resolveLegacyPlayProgressionBadgeCenterY(mazeRenderFrame, height)
@@ -5789,8 +5826,9 @@ export class MenuScene extends Phaser.Scene {
     });
     this.boardDynamicGraphics.lineStyle(1, palette.rankColor, 0.72);
     this.boardDynamicGraphics.strokeRoundedRect(centerX - (width / 2), centerY - (height / 2), width, height, 7);
+    const portraitMenuBadgeTextOffset = this.mode === 'menu' && this.layout.height > this.layout.width ? 10 : 0;
     this.progressionBadgeText
-      .setPosition(centerX, centerY)
+      .setPosition(centerX, centerY - portraitMenuBadgeTextOffset)
       .setVisible(true);
 
     const badgeBounds = createVisualRect(centerX - (width / 2), centerY - (height / 2), width, height);
@@ -5888,18 +5926,22 @@ export class MenuScene extends Phaser.Scene {
       const timerLine = this.formatLegacyElapsedLabel(this.resolveLegacyPlayElapsedMs());
       const scoreLabel = playerTrack.paceScore > 0 ? String(playerTrack.paceScore) : '--';
       const skillLine = `Skill Lvl: ${playerTrack.rank}/${String(playerTrack.level).padStart(2, '0')}`;
-      const runLine = `Score: ${scoreLabel}  Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}  Maze: ${this.resolveLegacyCurrentMazeLevel()}`;
+      const scoreLine = `Score: ${scoreLabel}`;
+      const runLine = `Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}`;
+      const mazeLine = `Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;
 
-      return `${timerLine}\n${skillLine}\n${runLine}`;
+      return `${timerLine}\n${skillLine}\n${scoreLine}  ${runLine}\n${mazeLine}`;
     }
 
     const timerLabel = this.formatLegacyElapsedLabel(this.resolveLegacyMenuAiElapsedMs());
     const aiTrack = this.progressionState.tracks['ai-runner'];
     const scoreLabel = aiTrack.paceScore > 0 ? String(aiTrack.paceScore) : '--';
     const skillLine = `AI Skill Lvl: ${aiTrack.rank}/${String(aiTrack.level).padStart(2, '0')}`;
-    const runLine = `Score: ${scoreLabel}  Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}  Maze: ${this.resolveLegacyCurrentMazeLevel()}`;
+    const scoreLine = `Score: ${scoreLabel}`;
+    const runLine = `Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}`;
+    const mazeLine = `Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;
 
-    return `${timerLabel}\n${skillLine}\n${runLine}`;
+    return `${timerLabel}\n${skillLine}\n${scoreLine}  ${runLine}\n${mazeLine}`;
   }
 
   private drawLegacyMenuCompass(
@@ -8098,8 +8140,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings),
         description: this.settings.toggleCameraFollow
-          ? 'On: follows your position.'
-          : 'Off: keeps the full maze in view.',
+          ? 'On: camera follows you.'
+          : 'Off: full maze view.',
         label: 'Camera Follow',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleCameraFollow'),
@@ -8109,8 +8151,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
         description: this.settings.toggleTrailFade
-          ? 'On: old trail tiles fade.'
-          : 'Off: your full trail remains.',
+          ? 'On: old trail fades.'
+          : 'Off: trail stays.',
         label: 'Trail Fade',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailFade'),
@@ -8120,7 +8162,7 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
         description: this.settings.toggleTrailPulse
-          ? 'On: purple pulse moves along the trail.'
+          ? 'On: purple trail pulse.'
           : 'Off: no trail pulse.',
         label: 'Trail Pulse',
         offLabel: 'Off',
@@ -8131,8 +8173,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
         description: this.settings.toggleAnimatedBackdrop
-          ? 'On: stars and sigils move.'
-          : 'Off: background stays still.',
+          ? 'On: background moves.'
+          : 'Off: background still.',
         label: 'Animated BG',
         offLabel: 'Stagnant',
         onClick: () => this.applyLegacyOverlayToggleField('toggleAnimatedBackdrop'),
@@ -8142,8 +8184,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings),
         description: this.settings.darkMode
-          ? 'On: darker, higher contrast.'
-          : 'Off: brighter board treatment.',
+          ? 'On: darker contrast.'
+          : 'Off: brighter view.',
         label: 'Dark Mode',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('darkMode'),
@@ -8153,8 +8195,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings),
         description: this.settings.controlMode === 'stick'
-          ? 'Stick: drag the compass to move.'
-          : 'Arrows: tap directional buttons.',
+          ? 'Stick: drag to move.'
+          : 'Arrows: tap to move.',
         label: 'Controls',
         offLabel: 'Arrows',
         onClick: () => this.applyLegacyOverlayToggleField('controlMode'),
@@ -8272,12 +8314,13 @@ export class MenuScene extends Phaser.Scene {
       this.uiTexts.push(stateLabel);
     }
 
+    const descriptionMaxWidth = Math.max(72, input.width - (rowPaddingX * 2) - 24);
     const description = hasDescription
       ? this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, input.y + Math.round(input.height * 0.3), input.description!, {
         color: '#bfe9de',
         fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: `${Math.max(11, Math.min(13, Math.round(input.height * 0.18)))}px`
-      })), input.width - (rowPaddingX * 2), Math.max(11, Math.min(13, Math.round(input.height * 0.18))), 10)
+      })), descriptionMaxWidth, Math.max(11, Math.min(13, Math.round(input.height * 0.18))), 10)
         .setOrigin(0, 0.5)
         .setAlpha(0.84)
       : null;
@@ -9938,6 +9981,37 @@ export class MenuScene extends Phaser.Scene {
       devicePixelRatio
     });
     const playLifecycle = this.resolveLegacyPlayLifecycleDiagnostics(time);
+    const viewportGeometry = readMazerViewportGeometry();
+    const measuredRects = [
+      { id: 'board', bounds: mazeRenderBounds },
+      { id: 'progression-badge', bounds: this.progressionBadgeBounds },
+      { id: 'hud', bounds: this.hudBounds },
+      { id: 'touch-controls', bounds: touchControls.frame },
+      { id: 'overlay', bounds: overlayPanel }
+    ].filter((entry): entry is { id: string; bounds: VisualRect } => entry.bounds !== null);
+    const offscreenBoundsViolations = measuredRects
+      .filter(({ bounds }) => (
+        bounds.left < safeBounds.left
+        || bounds.top < safeBounds.top
+        || bounds.right > safeBounds.right
+        || bounds.bottom > safeBounds.bottom
+      ))
+      .map(({ id }) => id);
+    const overlaps = (left: VisualRect | null, right: VisualRect | null): boolean => (
+      left !== null
+      && right !== null
+      && left.left < right.right
+      && left.right > right.left
+      && left.top < right.bottom
+      && left.bottom > right.top
+    );
+    const overlapViolations = this.overlay === 'none'
+      ? [
+        ...(overlaps(mazeRenderBounds, this.progressionBadgeBounds) ? ['board-progression-badge'] : []),
+        ...(overlaps(mazeRenderBounds, this.hudBounds) ? ['board-hud'] : []),
+        ...(overlaps(mazeRenderBounds, touchControls.frame) ? ['board-touch-controls'] : [])
+      ]
+      : [];
 
     this.visualDiagnosticsRevision += 1;
     const diagnostics: MenuSceneVisualDiagnostics = {
@@ -9946,11 +10020,31 @@ export class MenuScene extends Phaser.Scene {
       viewport: {
         width: this.layout.width,
         height: this.layout.height,
-        safeInsets: {
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: 0
+        geometry: {
+          revision: viewportGeometry.revision,
+          layoutWidth: viewportGeometry.layout.width,
+          layoutHeight: viewportGeometry.layout.height,
+          visualWidth: viewportGeometry.visual.width,
+          visualHeight: viewportGeometry.visual.height,
+          visualOffsetLeft: viewportGeometry.visual.offsetLeft,
+          visualOffsetTop: viewportGeometry.visual.offsetTop,
+          visualScale: viewportGeometry.visual.scale,
+          visualUsedForContent: viewportGeometry.visual.usedForContent,
+          content: createVisualRect(
+            viewportGeometry.content.left,
+            viewportGeometry.content.top,
+            viewportGeometry.content.width,
+            viewportGeometry.content.height
+          ),
+          devicePixelRatio: viewportGeometry.devicePixelRatio,
+          isLandscape: viewportGeometry.isLandscape,
+          isPhoneLike: viewportGeometry.isPhoneLike
+        }
+        ,
+        safeInsets: viewportGeometry.safeArea,
+        integrity: {
+          offscreenBoundsViolations,
+          overlapViolations
         }
       },
       runtime: {

@@ -18,7 +18,7 @@ body,
 #app {
   width: var(--mazer-viewport-width);
   height: var(--mazer-viewport-height);
-  min-height: 100dvh;
+  min-height: var(--mazer-viewport-height);
   max-width: var(--mazer-viewport-width);
   max-height: var(--mazer-viewport-height);
 }
@@ -44,7 +44,8 @@ body {
 
 #app {
   position: fixed;
-  inset: 0;
+  left: 0;
+  top: 0;
   overflow: hidden;
 }
 
@@ -63,20 +64,34 @@ canvas {
 }
 
 #mazer-portrait-lock-overlay {
-  display: none !important;
+  align-items: center;
+  background: rgba(2, 8, 15, 0.96);
+  color: #d7fff8;
+  display: grid;
+  inset: 0;
+  justify-items: center;
+  padding: 24px;
+  position: fixed;
+  text-align: center;
+  z-index: 20;
 }
 
-@media (orientation: landscape) and (pointer: coarse) {
-  body.mazer-phone-landscape-locked #app {
-    bottom: auto;
-    height: 100dvw;
-    left: 100vw;
-    max-height: 100dvw;
-    max-width: 100dvh;
-    right: auto;
-    top: 0;
-    transform: rotate(90deg);
-    transform-origin: top left;
-    width: 100dvh;
-  }
+.mazer-portrait-lock-card {
+  border: 1px solid rgba(117, 245, 224, 0.82);
+  box-shadow: 0 0 26px rgba(89, 242, 221, 0.22);
+  display: grid;
+  gap: 10px;
+  max-width: 320px;
+  padding: 24px;
+}
+
+.mazer-portrait-lock-card strong {
+  color: #72f5de;
+  font-size: 1.2rem;
+}
+
+.mazer-portrait-lock-card span {
+  color: #d7fff8;
+  font-size: 0.92rem;
+  line-height: 1.45;
 }

@@ -42,7 +42,7 @@ describe('legacy menu layout', () => {
     expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.225));
   });
 
-  test('keeps the portrait board dominant with separated buttons near the board edge', () => {
+  test('keeps the portrait board dominant with separated buttons in the lower action lane', () => {
     const layout = resolveLegacyMenuLayout(430, 932, 50, 49);
 
     expect(layout.boardSize).toBeLessThan(layout.width);
@@ -51,12 +51,11 @@ describe('legacy menu layout', () => {
     expect(layout.centerButtonY).toBe(layout.buttonY);
     expect(layout.buttonLayout).toBe('row');
     expect(layout.leftButtonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
-    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(108);
-    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(114);
+    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(120);
     expect(layout.leftButtonY - (layout.buttonHeight / 2)).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 84);
     expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
     expect(layout.buttonY - layout.leftButtonY).toBe(0);
-    expect(layout.buttonY).toBeLessThan(layout.height);
+    expect(layout.buttonY + (layout.buttonHeight / 2)).toBeLessThan(layout.footerY);
     expect(layout.buttonWidth).toBeLessThanOrEqual(144);
     expect(layout.buttonHeight).toBeLessThanOrEqual(62);
     expect(layout.leftButtonX).toBeLessThan(layout.centerButtonX);

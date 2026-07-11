@@ -4,7 +4,8 @@ import { describe, expect, test } from 'vitest';
 
 describe('UI surface capture script contract', () => {
   test('captures menu, options, play, and pause from runtime diagnostics', () => {
-    const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-ui-surfaces.mjs'), 'utf8');
+    const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-ui-surfaces.mjs'), 'utf8')
+      .replace(/\r\n/g, '\n');
     const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'));
 
     expect(packageJson.scripts['visual:ui-surfaces']).toBe('node ./scripts/analysis/capture-ui-surfaces.mjs');
