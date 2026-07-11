@@ -378,7 +378,14 @@ const summarizeLifecycleTraceSamples = (samples) => {
   return trace;
 };
 
-export const summarizePostGoalLifecycleSamples = (samples, initialSeed) => {
+const REQUIRED_INPUT_LOCK_PROBE_PHASES = Object.freeze([
+  'goal-hold',
+  'deconstructing',
+  'handoff',
+  'building'
+]);
+
+export const summarizePostGoalLifecycleSamples = (samples, initialSeed, inputLockProbes = null) => {
   const phases = [...new Set(samples.map((sample) => sample.lifecyclePhase).filter(Boolean))];
   const explicitPhases = [...new Set(samples.map((sample) => sample.explicitLifecyclePhase).filter(Boolean))];
   const settledFreshSample = samples.find((sample) => (
@@ -415,13 +422,28 @@ export const summarizePostGoalLifecycleSamples = (samples, initialSeed) => {
     && sawExplicitInputLock
     && sawExplicitReady
   );
+  const inputLockProbePass = inputLockProbes === null
+    ? null
+    : REQUIRED_INPUT_LOCK_PROBE_PHASES.every((phase) => inputLockProbes.some((probe) => (
+      probe.phase === phase && probe.pass === true
+    )));
 
   return {
-    pass: Boolean(settledFreshSample && sawDeconstructing && sawBuilding && sawFreshSeedQueued && sawHandoff && explicitLifecyclePass),
+    pass: Boolean(
+      settledFreshSample
+      && sawDeconstructing
+      && sawBuilding
+      && sawFreshSeedQueued
+      && sawHandoff
+      && explicitLifecyclePass
+      && inputLockProbePass !== false
+    ),
     explicitLifecyclePass,
     explicitPhaseSequence: explicitPhases,
     freshSeed,
     hasExplicitLifecycle,
+    inputLockProbePass,
+    inputLockProbes: inputLockProbes ?? [],
     lifecycleTrace: summarizeLifecycleTraceSamples(samples),
     phaseSequence: phases,
     sampleCount: samples.length,
@@ -448,6 +470,7 @@ export const collectPostGoalLifecycleProof = async ({
 }) => {
   const startedAt = performance.now();
   const samples = [];
+  const inputLockProbes = [];
   let finalDiagnostics = null;
 
   while (performance.now() - startedAt < timeoutMs) {
@@ -457,8 +480,29 @@ export const collectPostGoalLifecycleProof = async ({
       ...snapshot,
       elapsedMs: round(performance.now() - startedAt)
     });
+    if (
+      snapshot.inputLocked === true
+      && REQUIRED_INPUT_LOCK_PROBE_PHASES.includes(snapshot.explicitLifecyclePhase)
+      && !inputLockProbes.some((probe) => probe.phase === snapshot.explicitLifecyclePhase)
+    ) {
+      const result = await page.evaluate(() => window.__MAZER_QA__?.movePlayPlayer?.('move_up') ?? null);
+      const playerUnchanged = Boolean(
+        result?.player
+        && snapshot.player
+        && result.player.x === snapshot.player.x
+        && result.player.y === snapshot.player.y
+      );
+      inputLockProbes.push({
+        accepted: result?.accepted ?? null,
+        lifecycleLocked: result?.lifecycleLocked ?? null,
+        pass: result?.accepted === false && result?.lifecycleLocked === true && playerUnchanged,
+        phase: snapshot.explicitLifecyclePhase,
+        playerUnchanged,
+        reason: result?.reason ?? null
+      });
+    }
 
-    const summary = summarizePostGoalLifecycleSamples(samples, initialSeed);
+    const summary = summarizePostGoalLifecycleSamples(samples, initialSeed, inputLockProbes);
     if (summary.pass) {
       return {
         ...summary,
@@ -472,7 +516,7 @@ export const collectPostGoalLifecycleProof = async ({
     await page.waitForTimeout(pollMs);
   }
 
-  const summary = summarizePostGoalLifecycleSamples(samples, initialSeed);
+  const summary = summarizePostGoalLifecycleSamples(samples, initialSeed, inputLockProbes);
   return {
     ...summary,
     elapsedMs: round(performance.now() - startedAt),
@@ -849,6 +893,8 @@ export const runLivePlayQa = async (options = {}) => {
         explicitPhaseSequence: lifecycleProof.explicitPhaseSequence,
         freshSeed: lifecycleProof.freshSeed,
         hasExplicitLifecycle: lifecycleProof.hasExplicitLifecycle,
+        inputLockProbePass: lifecycleProof.inputLockProbePass,
+        inputLockProbes: lifecycleProof.inputLockProbes,
         lifecycleTrace: lifecycleProof.lifecycleTrace,
         pass: lifecycleProof.pass,
         phaseSequence: lifecycleProof.phaseSequence,
