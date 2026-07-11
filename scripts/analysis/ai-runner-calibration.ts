@@ -27,10 +27,14 @@ import {
   type LegacyProgressionSignal
 } from '../../src/legacy-runtime/legacyProgression';
 import {
-  createMazeCycleTelemetryReceipt,
+  createMazeCycleTelemetryReceipt
+} from '../../src/legacy-runtime/mazeCycleTelemetry';
+import {
+  MAZE_CYCLE_AI_SCORER_ID,
+  MAZE_CYCLE_AI_SCORER_VERSION,
   scoreMazeCycleAiDecisionSummary,
   type MazeCycleAiDecisionScore
-} from '../../src/legacy-runtime/mazeCycleTelemetry';
+} from '../../src/legacy-runtime/mazeCycleAiScorer.mjs';
 
 class MemoryStorage {
   readonly values = new Map<string, string>();
@@ -120,7 +124,11 @@ interface CalibrationSummary {
   perfectRouteCount: number;
   regenerationCount: number;
   progression: {
-    averageAiDecisionScore: Omit<MazeCycleAiDecisionScore, 'signal'> | null;
+    aiScorer: {
+      id: string;
+      version: string;
+    };
+    averageAiDecisionScore: Omit<MazeCycleAiDecisionScore, 'signal' | 'scorerId' | 'scorerVersion'> | null;
     averageRouteEfficiencyPressureScore: number | null;
     averageScore: number | null;
     averagePerformanceScore: Omit<LegacyProgressionPerformanceScore, 'signal'> | null;
@@ -500,7 +508,7 @@ const averagePerformanceScores = (
 
 const averageAiDecisionScores = (
   scores: readonly MazeCycleAiDecisionScore[]
-): Omit<MazeCycleAiDecisionScore, 'signal'> | null => {
+): Omit<MazeCycleAiDecisionScore, 'signal' | 'scorerId' | 'scorerVersion'> | null => {
   if (scores.length === 0) {
     return null;
   }
@@ -709,6 +717,10 @@ const buildSummary = (
     perception,
     perfectRouteCount: cases.filter((entry) => entry.routeRatio <= 1.05).length,
     progression: {
+      aiScorer: {
+        id: MAZE_CYCLE_AI_SCORER_ID,
+        version: MAZE_CYCLE_AI_SCORER_VERSION
+      },
       averageAiDecisionScore: averageAiDecisionScores(aiDecisionScores),
       averageRouteEfficiencyPressureScore: routeEfficiencyPressureScores.length > 0
         ? round(routeEfficiencyPressureScores.reduce((total, value) => total + value, 0) / routeEfficiencyPressureScores.length)

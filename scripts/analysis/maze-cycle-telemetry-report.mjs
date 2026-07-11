@@ -1,6 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import {
+  MAZE_CYCLE_AI_SCORER_ID,
+  MAZE_CYCLE_AI_SCORER_VERSION,
+  compareMazeCycleAiDecisionScore,
+  scoreMazeCycleAiDecisionSummary
+} from '../../src/legacy-runtime/mazeCycleAiScorer.mjs';
 
 export const MAZER_CYCLE_TELEMETRY_STORAGE_KEY = 'mazer.cycle-telemetry.v1';
 export const MAZER_CYCLE_LEARNING_REPORT_SCHEMA = 'mazer.cycle-learning.report.v1';
@@ -22,47 +28,6 @@ const averageOrNull = (values) => {
   return safeValues.length > 0
     ? roundNumber(safeValues.reduce((total, value) => total + value, 0) / safeValues.length)
     : null;
-};
-
-const clampScore = (value) => Math.max(0, Math.min(100, roundNumber(value)));
-
-const scoreAiDecisionSummary = (summary) => {
-  if (!isRecord(summary)) {
-    return null;
-  }
-
-  const decisionCount = Math.max(1, Number.isFinite(summary.decisionCount) ? Math.round(summary.decisionCount) : 0);
-  const wrongBranchCount = Number.isFinite(summary.wrongBranchCount) ? Math.max(0, Math.round(summary.wrongBranchCount)) : 0;
-  const backtrackCount = Number.isFinite(summary.backtrackCount) ? Math.max(0, Math.round(summary.backtrackCount)) : 0;
-  const recoveryCount = Number.isFinite(summary.recoveryCount) ? Math.max(0, Math.round(summary.recoveryCount)) : 0;
-  const optionalRetargetCount = Number.isFinite(summary.optionalRetargetCount)
-    ? Math.max(0, Math.round(summary.optionalRetargetCount))
-    : 0;
-  const visitedUndoCount = Number.isFinite(summary.visitedUndoCount) ? Math.max(0, Math.round(summary.visitedUndoCount)) : 0;
-  const routeNoiseScore = clampScore(((
-    wrongBranchCount * 3
-    + optionalRetargetCount * 1.5
-    + visitedUndoCount * 4
-  ) / decisionCount) * 100);
-  const recoveryPressureScore = clampScore(((
-    backtrackCount * 1.2
-    + recoveryCount * 3
-  ) / decisionCount) * 100);
-  const retargetPressureScore = clampScore((optionalRetargetCount / decisionCount) * 100);
-  const pressureScore = clampScore((
-    routeNoiseScore * 0.45
-    + recoveryPressureScore * 0.45
-    + retargetPressureScore * 0.1
-  ));
-
-  return {
-    pressureScore,
-    reliabilityScore: clampScore(100 - pressureScore),
-    recoveryPressureScore,
-    routeNoiseScore,
-    retargetPressureScore,
-    signal: pressureScore >= 60 ? 'chaotic' : pressureScore >= 25 ? 'searching' : 'clean'
-  };
 };
 
 const countBy = (items, resolveKey, allowedKeys) => {
@@ -252,12 +217,17 @@ const normalizeReceipt = (receipt) => {
   const fallbackRouteOverrunSteps = Math.max(0, normalizedPlayerPathLength - normalizedShortestViablePathLength);
   const routeOverrunSteps = readReceiptField(mergedReceipt, 'routeOverrunSteps');
   const routeOverrunRatio = readReceiptField(mergedReceipt, 'routeOverrunRatio');
+  const aiDecisionScoreComparison = compareMazeCycleAiDecisionScore(
+    readReceiptField(mergedReceipt, 'aiDecisionScore', 'ai_decision_score'),
+    normalizedAiDecisionSummary
+  );
 
   return {
     id: typeof mergedReceipt.id === 'string' ? mergedReceipt.id : null,
     surface: surface === 'menu-demo' || surface === 'play' ? surface : 'unknown',
     aiDecisionSummary: normalizedAiDecisionSummary,
-    aiDecisionScore: scoreAiDecisionSummary(normalizedAiDecisionSummary),
+    aiDecisionScore: aiDecisionScoreComparison.recomputed,
+    aiDecisionScoreComparison,
     mazeSeed: Number.isFinite(readReceiptField(mergedReceipt, 'mazeSeed', 'maze_seed'))
       ? Math.round(readReceiptField(mergedReceipt, 'mazeSeed', 'maze_seed'))
       : null,
@@ -525,10 +495,18 @@ const buildAiDecisionReview = (receipts, learning) => {
     .map((receipt) => receipt.aiDecisionSummary)
     .filter(Boolean);
   const scores = summaries
-    .map(scoreAiDecisionSummary)
+    .map(scoreMazeCycleAiDecisionSummary)
     .filter(Boolean);
+  const comparisonCounts = countBy(
+    receipts.map((receipt) => receipt.aiDecisionScoreComparison),
+    (comparison) => comparison?.status,
+    ['match', 'mismatch', 'stored-missing', 'stored-incomplete', 'recomputation-unavailable', 'unavailable', 'unknown']
+  );
 
   return {
+    scorerId: MAZE_CYCLE_AI_SCORER_ID,
+    scorerVersion: MAZE_CYCLE_AI_SCORER_VERSION,
+    scoreComparisonCounts: comparisonCounts,
     menuDemoReceipts: learning.menuDemoSampleCount,
     playReceipts: learning.playSampleCount,
     aiDecisionReceiptCount: summaries.length,
@@ -652,6 +630,13 @@ export const validateMazeCycleTelemetryAtlasReport = (report) => {
   if (!isRecord(report.aiReview)) {
     issues.push('ai-review-missing');
   }
+  if (
+    !isRecord(report.aiScorer)
+    || report.aiScorer.id !== MAZE_CYCLE_AI_SCORER_ID
+    || report.aiScorer.version !== MAZE_CYCLE_AI_SCORER_VERSION
+  ) {
+    issues.push('ai-scorer-contract-missing');
+  }
   if (!isRecord(report.complexityReview)) {
     issues.push('complexity-review-missing');
   }
@@ -770,6 +755,12 @@ export const createMazeCycleTelemetryAtlasReport = (payload, options = {}) => {
     cohorts: buildCohorts(receipts),
     latestReceipt: recentReceipts[0] ?? null,
     recentReceipts,
+    aiScorer: {
+      id: MAZE_CYCLE_AI_SCORER_ID,
+      version: MAZE_CYCLE_AI_SCORER_VERSION,
+      historicalStoredScoresImmutable: true,
+      reportScoresRecomputed: true
+    },
     aiReview: buildAiDecisionReview(receipts, learning),
     complexityReview: buildComplexityReview(receipts),
     performancePressureReview: buildPerformancePressureReview(receipts),

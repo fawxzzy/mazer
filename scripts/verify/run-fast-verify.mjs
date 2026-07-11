@@ -92,18 +92,24 @@ const selectionRules = [
   {
     reason: 'progression/scoring/remote receipt contracts',
     tests: [
+      'tests/reset/maze-cycle-ai-scorer.test.ts',
       'tests/reset/legacy-progression.test.ts',
       'tests/reset/legacy-cycle-telemetry.test.ts',
       'tests/reset/legacy-remote-progression.test.ts',
-      'tests/analysis/maze-cycle-telemetry-report.test.mjs'
+      'tests/analysis/maze-cycle-telemetry-report.test.mjs',
+      'tests/analysis/ai-run-corpus-audit.test.mjs'
     ],
     patterns: [
       /^src\/legacy-runtime\/legacyProgression\.ts$/,
       /^src\/legacy-runtime\/legacyRemoteProgression\.ts$/,
+      /^src\/legacy-runtime\/mazeCycleAiScorer\.(mjs|d\.mts)$/,
       /^src\/legacy-runtime\/mazeCycleTelemetry\.ts$/,
+      /^scripts\/analysis\/ai-run-corpus-audit\.mjs$/,
       /^scripts\/analysis\/maze-cycle-telemetry-report\.mjs$/,
+      /^tests\/analysis\/ai-run-corpus-audit\.test\.mjs$/,
       /^tests\/analysis\/maze-cycle-telemetry-report\.test\.mjs$/,
-      /^tests\/reset\/legacy-(progression|cycle-telemetry|remote-progression)\.test\.ts$/
+      /^tests\/reset\/legacy-(progression|cycle-telemetry|remote-progression)\.test\.ts$/,
+      /^tests\/reset\/maze-cycle-ai-scorer\.test\.ts$/
     ]
   },
   {

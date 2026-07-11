@@ -734,13 +734,7 @@ describe('legacy progression', () => {
 
   test('allows S-rank AI progression to keep leveling past the old level-44 cap', () => {
     const storage = new MemoryStorage();
-    const maze = createProgressionTestMaze({
-      size: 21,
-      solutionPath: Array.from({ length: 60 }, (_, index) => ({
-        x: Math.min(20, 1 + (index % 20)),
-        y: Math.min(20, 1 + Math.floor(index / 20))
-      }))
-    });
+    const maze = createProgressionTestMaze();
     const baseState = createEmptyLegacyProgressionState();
     let state = {
       ...baseState,
@@ -769,7 +763,7 @@ describe('legacy progression', () => {
         wrongBranchCount: 2
       },
       averageFrameMs: 16,
-      completedAt: '2026-07-10T08:20:00.000Z',
+      completedAt,
       completionTimeMs: 16_500,
       controlMode: 'stick',
       maze,

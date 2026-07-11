@@ -53,6 +53,13 @@ describe('ai-run-corpus-audit', () => {
     expect(audit.cohorts).toMatchObject({ distinctMazeSeedCount: 3, repeatedMazeSeedCount: 1, bySurface: { 'menu-demo': 3, play: 1 } });
     expect(audit.quality).toMatchObject({ behaviorReadyCount: 3, routeCalibrationReadyCount: 2, performanceReadyCount: 3 });
     expect(audit.quality.reasonCodeCounts).toMatchObject({ benchmark_graph_mismatch: 1, performance_metric_missing: 1, legacy_schema: 1, human_sample_only: 1 });
+    expect(audit.aiScorer).toMatchObject({
+      version: '1.0.0',
+      recomputedReceiptCount: 3,
+      storedScoreReceiptCount: 4,
+      historicalStoredScoresImmutable: true,
+      calibrationUsesRecomputedScores: true
+    });
     expect(audit.routeBenchmark).toMatchObject({ comparableReceiptCount: 4, actualShorterThanBenchmarkCount: 1, wrappedActualShorterThanBenchmarkCount: 1, routeEfficiencyCalibrationBlocked: true });
     expect(JSON.stringify(audit)).not.toContain('must-not-leak');
     expect(JSON.stringify(audit)).not.toContain('user_id');

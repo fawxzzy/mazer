@@ -20,6 +20,7 @@ import { resolve } from 'node:path';
 
 const resolveLegacyUnrealSource = (...segments: string[]): string => {
   const legacyRoot = [
+    resolve(process.cwd(), '..', 'tmp', 'mazer-legacy-unreal-restore'),
     resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore'),
     resolve(process.cwd(), '..', '..', '..', 'tmp', 'mazer-legacy-unreal-restore')
   ].find((candidate) => existsSync(candidate));

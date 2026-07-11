@@ -1,6 +1,13 @@
 import type { LegacyControlMode } from './legacyDefaults';
 import { resolveLegacyPlayableShortestPath, type LegacyMazeSnapshot, type LegacyPoint } from './legacyMaze';
 import {
+  MAZE_CYCLE_AI_SCORER_ID,
+  MAZE_CYCLE_AI_SCORER_VERSION,
+  scoreMazeCycleAiDecisionSummary,
+  type MazeCycleAiDecisionScore,
+  type MazeCycleAiDecisionSignal
+} from './mazeCycleAiScorer.mjs';
+import {
   resolveLegacyMazeComplexity,
   type LegacyMazeComplexityBreakdown
 } from './legacyProgression';
@@ -15,7 +22,12 @@ export type MazeCycleRouteQuality = NonNullable<LegacyMazeSnapshot['routeQuality
 export type MazeCycleTelemetrySurface = 'menu-demo' | 'play';
 export type MazeCycleTelemetryLearningSignal = 'challenge' | 'ease' | 'hold';
 export type MazeCycleAiThinkingModel = 'human-local-memory' | 'legacy-source' | 'unknown';
-export type MazeCycleAiDecisionSignal = 'clean' | 'searching' | 'chaotic';
+export type { MazeCycleAiDecisionScore, MazeCycleAiDecisionSignal } from './mazeCycleAiScorer.mjs';
+export {
+  MAZE_CYCLE_AI_SCORER_ID,
+  MAZE_CYCLE_AI_SCORER_VERSION,
+  scoreMazeCycleAiDecisionSummary
+};
 
 export interface MazeCycleAiDecisionSummary {
   backtrackCount: number;
@@ -25,15 +37,6 @@ export interface MazeCycleAiDecisionSummary {
   thinkingModel: MazeCycleAiThinkingModel;
   visitedUndoCount: number;
   wrongBranchCount: number;
-}
-
-export interface MazeCycleAiDecisionScore {
-  pressureScore: number;
-  reliabilityScore: number;
-  recoveryPressureScore: number;
-  routeNoiseScore: number;
-  retargetPressureScore: number;
-  signal: MazeCycleAiDecisionSignal;
 }
 
 export interface MazeCycleTelemetryReceipt {
@@ -215,41 +218,6 @@ const normalizeMazeComplexityBreakdown = (value: unknown): LegacyMazeComplexityB
     total: normalizeNonNegativeInteger(value.total),
     weightedDeadEndPressureScore: normalizeNonNegativeNumber(value.weightedDeadEndPressureScore),
     weightedSplitPressureScore: normalizeNonNegativeNumber(value.weightedSplitPressureScore)
-  };
-};
-
-export const scoreMazeCycleAiDecisionSummary = (
-  summary: MazeCycleAiDecisionSummary | null
-): MazeCycleAiDecisionScore | null => {
-  const normalized = normalizeAiDecisionSummary(summary);
-  if (normalized === null) {
-    return null;
-  }
-
-  const decisionCount = Math.max(1, normalized.decisionCount);
-  const routeNoiseScore = clampScore(((
-    normalized.wrongBranchCount
-    + normalized.optionalRetargetCount * 1.5
-    + normalized.visitedUndoCount * 4
-  ) / decisionCount) * 100);
-  const recoveryPressureScore = clampScore(((
-    normalized.backtrackCount * 0.75
-    + normalized.recoveryCount * 2.25
-  ) / decisionCount) * 100);
-  const retargetPressureScore = clampScore((normalized.optionalRetargetCount / decisionCount) * 100);
-  const pressureScore = clampScore((
-    routeNoiseScore * 0.45
-    + recoveryPressureScore * 0.45
-    + retargetPressureScore * 0.1
-  ));
-
-  return {
-    pressureScore,
-    reliabilityScore: clampScore(100 - pressureScore),
-    recoveryPressureScore,
-    routeNoiseScore,
-    retargetPressureScore,
-    signal: pressureScore >= 60 ? 'chaotic' : pressureScore >= 25 ? 'searching' : 'clean'
   };
 };
 

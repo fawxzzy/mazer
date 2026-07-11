@@ -1,6 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import {
+  MAZE_CYCLE_AI_SCORER_ID,
+  MAZE_CYCLE_AI_SCORER_VERSION,
+  compareMazeCycleAiDecisionScore
+} from '../../src/legacy-runtime/mazeCycleAiScorer.mjs';
 
 export const MAZER_AI_RUN_CORPUS_AUDIT_SCHEMA = 'mazer.ai-run-corpus-audit.v1';
 
@@ -73,9 +78,11 @@ const normalizeReceipt = (receipt) => {
     ? Math.round(shortestPathLength)
     : null;
   const safePathLength = Number.isFinite(pathLength) && pathLength >= 0 ? Math.round(pathLength) : null;
-  const storedSignal = ['clean', 'searching', 'chaotic'].includes(aiDecisionScore?.signal)
-    ? aiDecisionScore.signal
+  const aiDecisionScoreComparison = compareMazeCycleAiDecisionScore(aiDecisionScore, aiDecisionSummary);
+  const storedSignal = ['clean', 'searching', 'chaotic'].includes(aiDecisionScoreComparison.stored?.signal)
+    ? aiDecisionScoreComparison.stored.signal
     : 'unknown';
+  const recomputedSignal = aiDecisionScoreComparison.recomputed?.signal ?? 'unknown';
   const schemaVersion = readEmbeddedField(receipt, 'receiptSchemaVersion', 'receipt_schema_version');
   const buildVersion = readEmbeddedField(receipt, 'appBuild', 'app_build');
   const aiAlgorithmVersion = readEmbeddedField(receipt, 'aiAlgorithmVersion', 'ai_algorithm_version');
@@ -96,11 +103,15 @@ const normalizeReceipt = (receipt) => {
     reasonCodes.push('benchmark_graph_mismatch');
   }
   if (surface === 'play') reasonCodes.push('human_sample_only');
+  if (aiDecisionScoreComparison.status === 'mismatch') reasonCodes.push('stored_scorer_mismatch');
+  if (aiDecisionScoreComparison.status === 'stored-incomplete') reasonCodes.push('stored_scorer_incomplete');
 
   return {
     surface: surface === 'menu-demo' || surface === 'play' ? surface : 'unknown',
     aiDecisionPresent: isRecord(aiDecisionSummary),
-    aiSignal: storedSignal,
+    aiSignal: recomputedSignal,
+    storedAiSignal: storedSignal,
+    aiDecisionScoreComparison,
     mazeComplexityPresent: isRecord(mazeComplexity),
     edgeWrapCount,
     shortestPathLength: safeShortestPathLength,
@@ -148,6 +159,10 @@ export const createMazerAiRunCorpusAudit = (payload, options = {}) => {
   const exactDuplicateCount = Object.values(countBy(rawReceipts.filter(isRecord), (receipt) => (
     typeof receipt.id === 'string' && receipt.id ? receipt.id : null
   ))).filter((count) => count > 1).reduce((total, count) => total + count - 1, 0);
+  const scoreComparisonCounts = countBy(
+    receipts,
+    (receipt) => receipt.aiDecisionScoreComparison.status
+  );
 
   return {
     schema: MAZER_AI_RUN_CORPUS_AUDIT_SCHEMA,
@@ -191,7 +206,17 @@ export const createMazerAiRunCorpusAudit = (payload, options = {}) => {
       progressionSimulationReadyCount: countPurposeReady(classifications, 'progressionSimulation'),
       legacyOnlyReviewCount: countPurposeReady(classifications, 'legacyOnlyReview'),
       reasonCodeCounts: countBy(receipts.flatMap((receipt) => receipt.reasonCodes), (reasonCode) => reasonCode),
-      decisionSignalCounts: countBy(receipts, (receipt) => receipt.aiSignal)
+      decisionSignalCounts: countBy(receipts, (receipt) => receipt.aiSignal),
+      storedDecisionSignalCounts: countBy(receipts, (receipt) => receipt.storedAiSignal)
+    },
+    aiScorer: {
+      id: MAZE_CYCLE_AI_SCORER_ID,
+      version: MAZE_CYCLE_AI_SCORER_VERSION,
+      recomputedReceiptCount: receipts.filter((receipt) => receipt.aiDecisionScoreComparison.recomputed !== null).length,
+      storedScoreReceiptCount: receipts.filter((receipt) => receipt.aiDecisionScoreComparison.stored !== null).length,
+      comparisonStatusCounts: scoreComparisonCounts,
+      historicalStoredScoresImmutable: true,
+      calibrationUsesRecomputedScores: true
     },
     routeBenchmark: {
       comparableReceiptCount: benchmarkComparable.length,
@@ -214,8 +239,7 @@ export const createMazerAiRunCorpusAudit = (payload, options = {}) => {
       receiptDeletionPerformed: false
     },
     nextActions: [
-      'correct shortest-path and route-efficiency graph parity before changing progression thresholds',
-      'move runtime and reporting to one canonical versioned AI scorer',
+      're-export the corpus after graph parity when current route-benchmark calibration is required',
       'add future-only receipt versioning and idempotent coverage metadata',
       'generate deterministic representative, stress, and wrap-anomaly seed packs from quality-approved cohorts'
     ]
