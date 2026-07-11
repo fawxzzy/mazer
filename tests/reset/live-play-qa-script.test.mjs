@@ -261,6 +261,26 @@ describe('live play QA script helpers', () => {
     expect(summary.freshSeed).toBeNull();
   });
 
+  test('requires rejected movement probes across every locked lifecycle boundary when probes are enabled', () => {
+    const samples = [
+      { complete: false, explicitLifecyclePhase: 'goal-hold', inputLocked: true, lifecyclePhase: 'settled', mode: 'play', seed: 101 },
+      { complete: false, explicitLifecyclePhase: 'deconstructing', inputLocked: true, lifecyclePhase: 'deconstructing', mode: 'play', nextSeedQueued: true, seed: 101 },
+      { complete: false, explicitLifecyclePhase: 'handoff', handoffActive: true, inputLocked: true, lifecyclePhase: 'deconstructing', mode: 'play', nextSeedQueued: true, seed: 101 },
+      { complete: false, explicitLifecyclePhase: 'building', inputLocked: true, lifecyclePhase: 'building', mode: 'play', rowsVisible: 4, seed: 202 },
+      { complete: true, explicitLifecyclePhase: 'ready', inputLocked: false, lifecyclePhase: 'settled', mode: 'play', seed: 202 }
+    ];
+    const passingProbes = ['goal-hold', 'deconstructing', 'handoff', 'building'].map((phase) => ({ phase, pass: true }));
+
+    expect(summarizePostGoalLifecycleSamples(samples, 101, passingProbes)).toMatchObject({
+      inputLockProbePass: true,
+      pass: true
+    });
+    expect(summarizePostGoalLifecycleSamples(samples, 101, passingProbes.slice(0, 3))).toMatchObject({
+      inputLockProbePass: false,
+      pass: false
+    });
+  });
+
   test('fails explicit lifecycle proof when new diagnostics skip goal hold', () => {
     const summary = summarizePostGoalLifecycleSamples([
       {

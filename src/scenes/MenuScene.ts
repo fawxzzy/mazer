@@ -919,6 +919,7 @@ const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;
 const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;
 const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;
 const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;
+const LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS = 64;
 const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;
 const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;
 const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;
@@ -1283,6 +1284,13 @@ export class MenuScene extends Phaser.Scene {
         ...base,
         accepted: false,
         reason: 'overlay-open'
+      };
+    }
+    if (base.lifecycleLocked) {
+      return {
+        ...base,
+        accepted: false,
+        reason: 'lifecycle-locked'
       };
     }
 
@@ -3679,7 +3687,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyMenuStaticDrawTileBatchSize(): number {
-    return Math.max(1, Math.ceil(this.menuStaticDrawTileOrder.length / LEGACY_MENU_STATIC_DRAW_TARGET_TICKS));
+    const targetTicks = this.mode === 'play'
+      ? LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS
+      : LEGACY_MENU_STATIC_DRAW_TARGET_TICKS;
+    return Math.max(1, Math.ceil(this.menuStaticDrawTileOrder.length / targetTicks));
   }
 
   private refreshLegacyMenuStaticDrawVisibleTileKeys(): void {

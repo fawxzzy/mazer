@@ -720,6 +720,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS = 64;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;');
@@ -782,6 +783,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.menuStaticDrawNextTileAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;');
     expect(menuSceneSource).toContain('time >= this.menuStaticBuildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS');
     expect(menuSceneSource).toContain('const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);');
+    expect(menuSceneSource).toContain("const targetTicks = this.mode === 'play'");
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase !== 'settled'");
     expect(menuSceneSource).toContain('if (nextFrame.shouldRegenerateMaze) {');
     expect(menuSceneSource).toContain('if (this.shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame)) {');
