@@ -80,14 +80,12 @@ const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
     requiresControlEvents: false,
     movementWaitMs: 220,
     controlWaitMs: 180,
-    restartWaitMs: 900,
     steps: [
       { id: 'move-1', kind: 'movement', candidates: ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'] },
       { id: 'move-2', kind: 'movement', candidates: ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'] },
       { id: 'pause', kind: 'control', key: 'p' },
       { id: 'resume', kind: 'control', key: 'p' },
       { id: 'toggle-thoughts', kind: 'control', key: 't' },
-      { id: 'restart', kind: 'control', key: 'r' },
       { id: 'move-3', kind: 'movement', candidates: ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'], waitMs: 320 }
     ]
   }),
@@ -97,13 +95,11 @@ const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
     requiresControlEvents: false,
     movementWaitMs: 260,
     controlWaitMs: 850,
-    restartWaitMs: 900,
     steps: [
       { id: 'move-1', kind: 'movement', candidates: ['move_up', 'move_right', 'move_down', 'move_left'] },
       { id: 'move-2', kind: 'movement', candidates: ['move_up', 'move_right', 'move_down', 'move_left'] },
       { id: 'pause', kind: 'control', control: 'pause' },
       { id: 'resume', kind: 'control', control: 'pause' },
-      { id: 'restart', kind: 'control', control: 'restart_attempt' },
       { id: 'move-3', kind: 'movement', candidates: ['move_up', 'move_right', 'move_down', 'move_left'], waitMs: 360 }
     ]
   })
@@ -525,12 +521,22 @@ export const resolveRestartTrailResetVerdict = (timeline) => {
   const restartStep = Array.isArray(timeline)
     ? timeline.find((step) => step?.id === 'restart')
     : null;
+  if (!restartStep) {
+    return {
+      pass: true,
+      applicable: false,
+      beforeTrailSegmentCount: null,
+      afterTrailSegmentCount: null
+    };
+  }
+
   const beforeCount = restartStep?.before?.resources?.trailSegmentCount ?? null;
   const afterCount = restartStep?.after?.resources?.trailSegmentCount ?? null;
   const pass = Number.isFinite(afterCount) && afterCount <= 1;
 
   return {
     pass,
+    applicable: true,
     beforeTrailSegmentCount: Number.isFinite(beforeCount) ? beforeCount : null,
     afterTrailSegmentCount: Number.isFinite(afterCount) ? afterCount : null
   };
@@ -545,11 +551,17 @@ export const resolvePlayMarkerStyleVerdict = (state) => {
     && style.playerCoreColor === EXPECTED_PLAY_MARKER_STYLE.playerCoreColor
     && style.playerHaloColor === EXPECTED_PLAY_MARKER_STYLE.playerHaloColor;
   const radiusFitsTile = Boolean(style)
+    && Number.isFinite(style.playerCoreRadius)
     && Number.isFinite(style.playerHaloRadius)
+    && style.playerCoreRadius > 0
     && style.playerHaloRadius > 0
     && (
       !Number.isFinite(tileSize)
-      || (style.playerHaloRadius * 2) <= (tileSize + 0.01)
+      || (
+        // The core belongs inside its tile; the intentionally louder play beacon may extend beyond it.
+        (style.playerCoreRadius * 2) <= (tileSize + 0.01)
+        && style.playerHaloRadius <= (tileSize * 0.9)
+      )
     );
 
   return {
@@ -820,7 +832,17 @@ export const resolveEdgeLiveViewports = (presetGroup, runId) => {
   return viewports.filter((viewport) => allowedSet.has(viewport.id));
 };
 
-const resolveTouchControlPoint = ({ viewport, diagnostics, control }) => {
+export const resolveTouchControlPoint = ({ viewport, diagnostics, control }) => {
+  const publishedControl = diagnostics?.visual?.touchControls?.controls?.[control] ?? null;
+  if (
+    Number.isFinite(publishedControl?.centerX)
+    && Number.isFinite(publishedControl?.centerY)
+    && publishedControl.width > 0
+    && publishedControl.height > 0
+  ) {
+    return { x: publishedControl.centerX, y: publishedControl.centerY };
+  }
+
   const safeInsets = diagnostics?.visual?.viewport?.safeInsets ?? {};
   const layout = resolveTouchControlLayout({
     width: viewport.width,
@@ -832,8 +854,24 @@ const resolveTouchControlPoint = ({ viewport, diagnostics, control }) => {
   const rect = layout.controls[control];
 
   return rect
+    && rect.width > 0
+    && rect.height > 0
     ? { x: rect.centerX, y: rect.centerY }
     : null;
+};
+
+export const resolveInteractivePlayReadiness = (runtime, requiredMode = 'play') => {
+  const projection = runtime?.projection ?? null;
+  const projectionReady = projection?.mode === requiredMode && projection?.state === 'watching';
+  const surfaceReady = runtime?.surface?.mode === requiredMode;
+  const lifecycle = runtime?.play?.lifecycle ?? null;
+  const lifecycleReady = lifecycle === null || (
+    lifecycle.inputLocked !== true
+    && lifecycle.playerVisible !== false
+    && lifecycle.trailVisible !== false
+  );
+
+  return (projectionReady || surfaceReady) && lifecycleReady;
 };
 
 const runEdgeLiveInteraction = async ({
@@ -890,7 +928,13 @@ const runEdgeLiveInteraction = async ({
         const projection = runtime?.projection ?? null;
         const projectionReady = projection?.mode === requiredMode && projection?.state === 'watching';
         const surfaceReady = runtime?.surface?.mode === requiredMode;
-        return projectionReady || surfaceReady;
+        const lifecycle = runtime?.play?.lifecycle ?? null;
+        const lifecycleReady = lifecycle === null || (
+          lifecycle.inputLocked !== true
+          && lifecycle.playerVisible !== false
+          && lifecycle.trailVisible !== false
+        );
+        return (projectionReady || surfaceReady) && lifecycleReady;
       },
       {
         runtimeKey: RUNTIME_DIAGNOSTICS_KEY,
@@ -1272,23 +1316,23 @@ export const resolvePlayTouchChromeVerdict = (diagnostics) => {
   const down = controls?.move_down ?? null;
   const left = controls?.move_left ?? null;
   const right = controls?.move_right ?? null;
-  const actionControls = [pause, restart];
   const dpadControls = [up, down, left, right];
-  const hasActionControls = actionControls.every(isFiniteRect);
+  const hasPauseControl = isFiniteRect(pause) && pause.width > 0 && pause.height > 0;
+  const restartHidden = !isFiniteRect(restart) || restart.width <= 0 || restart.height <= 0;
   const hasDpadControls = dpadControls.every(isFiniteRect);
   const rowTolerance = 3;
   const dpadCenterX = hasDpadControls ? (left.centerX + right.centerX) / 2 : null;
   const dpadCenterY = hasDpadControls ? (up.centerY + down.centerY) / 2 : null;
   const viewportCenterX = Number.isFinite(visual?.viewport?.width) ? visual.viewport.width / 2 : null;
-  const topActionBar = hasActionControls
+  const topActionBar = hasPauseControl
     && isFiniteRect(hud?.timerBounds)
-    && actionControls.every((rect) => Math.abs(rect.top - pause.top) <= rowTolerance)
-    && actionControls.every((rect) => Math.abs(rect.bottom - pause.bottom) <= rowTolerance)
-    && pause.right < hud.timerBounds.left
-    && hud.timerBounds.right < restart.left
+    && Math.abs(pause.top - hud.timerBounds.top) <= rowTolerance
+    && Math.abs(pause.bottom - hud.timerBounds.bottom) <= rowTolerance + 3
+    && hud.timerBounds.right < pause.left
     && (viewportCenterX === null || Math.abs(hud.timerBounds.centerX - viewportCenterX) <= 2)
+    && restartHidden
     && !isFiniteRect(trail)
-    && (!isFiniteRect(boardBounds) || Math.max(pause.bottom, restart.bottom, hud.timerBounds.bottom) < boardBounds.top);
+    && (!isFiniteRect(boardBounds) || Math.max(pause.bottom, hud.timerBounds.bottom) < boardBounds.top);
   const bottomDpad = hasDpadControls
     && up.centerY < left.centerY
     && up.centerY < right.centerY
@@ -2195,7 +2239,7 @@ const buildMarkdownSummary = ({ runId, sourceMode, baseUrl, explicitUrl, presetG
       `- Watch -> play switches: ${interaction.watchToPlaySwitchCount ?? 0}`,
       `- Input timing: ${interaction.input ? `accepted ${interaction.input.acceptedCount}, dropped ${interaction.input.droppedCount}, merged ${interaction.input.mergedCount}` : 'n/a'}`,
       `- HUD state: ${interaction.hud ? `${interaction.hud.statusText ?? 'status-hidden'} | ${interaction.hud.nextRiskLabel ?? 'risk-hidden'}` : 'n/a'}`,
-      `- Restart trail reset: ${interaction.restartTrailReset?.pass ? 'pass' : 'fail'} (${interaction.restartTrailReset?.beforeTrailSegmentCount ?? 'n/a'} -> ${interaction.restartTrailReset?.afterTrailSegmentCount ?? 'n/a'})`,
+      `- Restart trail reset: ${interaction.restartTrailReset?.applicable === false ? 'not applicable (reset disabled)' : interaction.restartTrailReset?.pass ? 'pass' : 'fail'} (${interaction.restartTrailReset?.beforeTrailSegmentCount ?? 'n/a'} -> ${interaction.restartTrailReset?.afterTrailSegmentCount ?? 'n/a'})`,
       `- Marker style: ${interaction.markerStyleVerdict?.pass ? 'pass' : 'fail'} (player ${interaction.markerStyleVerdict?.observed?.playerCoreColor ?? 'n/a'}, goal ${interaction.markerStyleVerdict?.observed?.goalCoreColor ?? 'n/a'}, haloRadius ${interaction.markerStyleVerdict?.observed?.playerHaloRadius ?? 'n/a'}, tile ${interaction.markerStyleVerdict?.observed?.tileSize ?? 'n/a'})`,
       `- Touch chrome: ${interaction.touchChromeVerdict?.pass ? 'pass' : 'fail'} (top actions ${interaction.touchChromeVerdict?.topActionBar ? 'pass' : 'fail'}, bottom D-pad ${interaction.touchChromeVerdict?.bottomDpad ? 'pass' : 'fail'}, compass ${interaction.touchChromeVerdict?.compass ? 'pass' : 'fail'})`,
       `- Marker pixels: ${interaction.markerPixelVerdict?.pass ? 'pass' : 'fail'} (player matches ${interaction.markerPixelVerdict?.player?.matchCount ?? 'n/a'}, goal matches ${interaction.markerPixelVerdict?.goal?.matchCount ?? 'n/a'})`,

@@ -763,6 +763,7 @@ describe('edge live check', () => {
       }
     ])).toEqual({
       pass: true,
+      applicable: true,
       beforeTrailSegmentCount: 7,
       afterTrailSegmentCount: 1
     });
@@ -783,13 +784,25 @@ describe('edge live check', () => {
       }
     ])).toEqual({
       pass: false,
+      applicable: true,
       beforeTrailSegmentCount: 7,
       afterTrailSegmentCount: 4
     });
+
+    expect(resolveRestartTrailResetVerdict([])).toEqual({
+      pass: true,
+      applicable: false,
+      beforeTrailSegmentCount: null,
+      afterTrailSegmentCount: null
+    });
   }, 15_000);
 
-  test('proves the mobile touch chrome uses two top actions, bottom D-pad, and centered compass', async () => {
-    const { resolvePlayTouchChromeVerdict } = await loadEdgeLiveHelpers();
+  test('proves the mobile touch chrome uses one top-right pause action, centered status, bottom D-pad, and centered compass', async () => {
+    const {
+      resolveInteractivePlayReadiness,
+      resolvePlayTouchChromeVerdict,
+      resolveTouchControlPoint
+    } = await loadEdgeLiveHelpers();
 
     const passingVerdict = resolvePlayTouchChromeVerdict({
       visual: {
@@ -803,8 +816,8 @@ describe('edge live check', () => {
         },
         touchControls: {
           controls: {
-            pause: { left: 36, top: 8, right: 118, bottom: 46, width: 82, height: 38, centerX: 77, centerY: 27 },
-            restart_attempt: { left: 272, top: 8, right: 354, bottom: 46, width: 82, height: 38, centerX: 313, centerY: 27 },
+            pause: { left: 272, top: 8, right: 354, bottom: 46, width: 82, height: 38, centerX: 313, centerY: 27 },
+            restart_attempt: { left: -10000, top: -10000, right: -10000, bottom: -10000, width: 0, height: 0, centerX: -10000, centerY: -10000 },
             toggle_thoughts: null,
             move_up: { left: 163, top: 636, right: 227, bottom: 700, width: 64, height: 64, centerX: 195, centerY: 668 },
             move_left: { left: 96, top: 703, right: 160, bottom: 767, width: 64, height: 64, centerX: 128, centerY: 735 },
@@ -822,6 +835,29 @@ describe('edge live check', () => {
       compass: true
     });
 
+    expect(resolveTouchControlPoint({
+      viewport: { width: 390, height: 844 },
+      diagnostics: {
+        visual: {
+          touchControls: {
+            controls: {
+              move_up: { left: 171, top: 535, right: 220, bottom: 584, width: 49, height: 49, centerX: 195.5, centerY: 559.5 }
+            }
+          }
+        }
+      },
+      control: 'move_up'
+    })).toEqual({ x: 195.5, y: 559.5 });
+
+    expect(resolveInteractivePlayReadiness({
+      surface: { mode: 'play' },
+      play: { lifecycle: { inputLocked: true, playerVisible: false, trailVisible: false } }
+    })).toBe(false);
+    expect(resolveInteractivePlayReadiness({
+      surface: { mode: 'play' },
+      play: { lifecycle: { inputLocked: false, playerVisible: true, trailVisible: true } }
+    })).toBe(true);
+
     const failingVerdict = resolvePlayTouchChromeVerdict({
       visual: {
         viewport: { width: 390, height: 844 },
@@ -835,7 +871,7 @@ describe('edge live check', () => {
         touchControls: {
           controls: {
             pause: { left: 14, top: 686, right: 102, bottom: 730, width: 88, height: 44, centerX: 58, centerY: 708 },
-            restart_attempt: { left: 151, top: 686, right: 239, bottom: 730, width: 88, height: 44, centerX: 195, centerY: 708 },
+            restart_attempt: { left: -10000, top: -10000, right: -10000, bottom: -10000, width: 0, height: 0, centerX: -10000, centerY: -10000 },
             toggle_thoughts: { left: 288, top: 686, right: 376, bottom: 730, width: 88, height: 44, centerX: 332, centerY: 708 },
             move_up: { left: 151, top: 742, right: 239, bottom: 786, width: 88, height: 44, centerX: 195, centerY: 764 },
             move_left: { left: 14, top: 742, right: 102, bottom: 786, width: 88, height: 44, centerX: 58, centerY: 764 },
