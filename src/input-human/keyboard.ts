@@ -101,6 +101,8 @@ export class HumanInputRepeatGate {
 
   private readonly lastAcceptedAtMs = new Map<HumanInputActionKind, number>();
 
+  private lastAcceptedMovementAtMs: number | null = null;
+
   private acceptedCount = 0;
 
   private droppedCount = 0;
@@ -121,13 +123,27 @@ export class HumanInputRepeatGate {
     this.moveRepeatMinIntervalMs = Math.max(42, Math.round(options.moveRepeatMinIntervalMs ?? 112));
   }
 
-  inspect(action: HumanInputAction, nowMs = action.atMs ?? Date.now()): HumanInputRepeatGateDecision {
+  inspect(
+    action: HumanInputAction,
+    nowMs = action.atMs ?? Date.now(),
+    options: HumanInputRepeatGateOptions = {}
+  ): HumanInputRepeatGateDecision {
     const acceptedAtMs = Number.isFinite(nowMs) ? Math.max(0, Math.round(nowMs)) : Date.now();
-    const lastAcceptedAt = this.lastAcceptedAtMs.get(action.kind) ?? null;
+    const movementAction = isMovementActionKind(action.kind);
+    const lastAcceptedAt = movementAction
+      ? this.lastAcceptedMovementAtMs
+      : this.lastAcceptedAtMs.get(action.kind) ?? null;
+    const moveRepeatMinIntervalMs = Math.max(
+      42,
+      Math.round(options.moveRepeatMinIntervalMs ?? this.moveRepeatMinIntervalMs)
+    );
 
     if (!action.repeat) {
       this.acceptedCount += 1;
       this.lastAcceptedAtMs.set(action.kind, acceptedAtMs);
+      if (movementAction) {
+        this.lastAcceptedMovementAtMs = acceptedAtMs;
+      }
       this.lastAcceptedActionKind = action.kind;
       this.lastAcceptedAtMsValue = acceptedAtMs;
       return {
@@ -136,7 +152,7 @@ export class HumanInputRepeatGate {
       };
     }
 
-    if (!isMovementActionKind(action.kind)) {
+    if (!movementAction) {
       this.droppedCount += 1;
       this.lastDroppedActionKind = action.kind;
       this.lastDroppedReason = 'repeat_blocked';
@@ -147,7 +163,7 @@ export class HumanInputRepeatGate {
       };
     }
 
-    if (lastAcceptedAt !== null && (acceptedAtMs - lastAcceptedAt) < this.moveRepeatMinIntervalMs) {
+    if (lastAcceptedAt !== null && (acceptedAtMs - lastAcceptedAt) < moveRepeatMinIntervalMs) {
       this.mergedCount += 1;
       this.lastDroppedActionKind = action.kind;
       this.lastDroppedReason = 'repeat_merged';
@@ -160,6 +176,7 @@ export class HumanInputRepeatGate {
 
     this.acceptedCount += 1;
     this.lastAcceptedAtMs.set(action.kind, acceptedAtMs);
+    this.lastAcceptedMovementAtMs = acceptedAtMs;
     this.lastAcceptedActionKind = action.kind;
     this.lastAcceptedAtMsValue = acceptedAtMs;
     return {
@@ -168,8 +185,12 @@ export class HumanInputRepeatGate {
     };
   }
 
-  accept(action: HumanInputAction, nowMs = action.atMs ?? Date.now()): boolean {
-    return this.inspect(action, nowMs).accepted;
+  accept(
+    action: HumanInputAction,
+    nowMs = action.atMs ?? Date.now(),
+    options: HumanInputRepeatGateOptions = {}
+  ): boolean {
+    return this.inspect(action, nowMs, options).accepted;
   }
 
   getSnapshot(): HumanInputRepeatGateSnapshot {
@@ -187,6 +208,7 @@ export class HumanInputRepeatGate {
 
   reset(): void {
     this.lastAcceptedAtMs.clear();
+    this.lastAcceptedMovementAtMs = null;
     this.acceptedCount = 0;
     this.droppedCount = 0;
     this.mergedCount = 0;
