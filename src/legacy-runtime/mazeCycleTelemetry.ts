@@ -1,5 +1,5 @@
 import type { LegacyControlMode } from './legacyDefaults';
-import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
+import { resolveLegacyPlayableShortestPath, type LegacyMazeSnapshot, type LegacyPoint } from './legacyMaze';
 import {
   resolveLegacyMazeComplexity,
   type LegacyMazeComplexityBreakdown
@@ -468,9 +468,13 @@ export const createMazeCycleTelemetryReceipt = (
 ): MazeCycleTelemetryReceipt => {
   const normalizedPath = normalizePlayerPath(input.playerPath, MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT);
   const derivedDeviation = summarizeMazeCyclePathDeviation(normalizedPath.playerPath, input.maze.solutionPath);
+  const playableShortestPath = resolveLegacyPlayableShortestPath(input.maze.grid, input.maze.start, input.maze.goal);
+  const shortestViablePathLength = playableShortestPath.found
+    ? playableShortestPath.path.length
+    : input.maze.solutionPath.length;
   const shortestPathComparison = summarizeMazeCycleShortestPathComparison(
     normalizedPath.playerPathLength,
-    input.maze.solutionPath.length
+    shortestViablePathLength
   );
   const completedAt = input.completedAt ?? new Date().toISOString();
   const averageFrameMs = normalizeNonNegativeNumber(input.averageFrameMs);
@@ -493,7 +497,7 @@ export const createMazeCycleTelemetryReceipt = (
     renderSafetyPenaltyScore: scoreMazeCycleRenderSafetyPenalty(averageFrameMs),
     routeEfficiencyPressureScore: scoreMazeCycleRouteEfficiencyPressure(
       normalizedPath.playerPathLength,
-      input.maze.solutionPath.length
+      shortestViablePathLength
     ),
     shortestViablePathLength: shortestPathComparison.shortestViablePathLength,
     wrongTurns: normalizeNonNegativeInteger(input.wrongTurns, derivedDeviation.wrongTurns),
