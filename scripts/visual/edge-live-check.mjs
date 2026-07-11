@@ -1,6 +1,7 @@
 import { copyFile, unlink, writeFile } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inflateSync } from 'node:zlib';
 import { chromium } from 'playwright';
 import {
   DEFAULT_BASE_URL,
@@ -14,6 +15,10 @@ import {
 } from './common.mjs';
 import { resolveLayoutMatrixRoute, resolveLayoutMatrixViewports } from './layout-matrix.config.mjs';
 import { launchPreviewServer, stopPreviewServer } from './preview-server.mjs';
+import {
+  assertVisualScreenContract,
+  buildVisualScreenContract
+} from './screen-contract.mjs';
 import {
   buildExperimentManifest,
   buildTelemetryReceipt,
@@ -52,7 +57,7 @@ const EDGE_LIVE_SPECIAL_ROUTES = Object.freeze({
   'play-mode-smoke': '/?content=core-only&mode=play&theme=ember',
   'play-hud-trim': '/?content=core-only&mode=play&theme=aurora',
   'play-mode-interactive': '/?content=core-only&mode=play&theme=aurora',
-  'mobile-touch-smoke': '/?content=core-only&mode=play&theme=aurora',
+  'mobile-touch-smoke': '/?content=core-only&mode=play&theme=aurora&mazeSeed=3749',
   'core-only-watch': '/?content=core-only&theme=aurora',
   'core-only-play': '/?content=core-only&mode=play&theme=aurora',
   'core-only-cycle': '/?content=core-only&theme=aurora',
@@ -75,14 +80,12 @@ const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
     requiresControlEvents: false,
     movementWaitMs: 220,
     controlWaitMs: 180,
-    restartWaitMs: 900,
     steps: [
       { id: 'move-1', kind: 'movement', candidates: ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'] },
       { id: 'move-2', kind: 'movement', candidates: ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'] },
       { id: 'pause', kind: 'control', key: 'p' },
       { id: 'resume', kind: 'control', key: 'p' },
       { id: 'toggle-thoughts', kind: 'control', key: 't' },
-      { id: 'restart', kind: 'control', key: 'r' },
       { id: 'move-3', kind: 'movement', candidates: ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'], waitMs: 320 }
     ]
   }),
@@ -92,14 +95,11 @@ const EDGE_LIVE_INTERACTION_RUNS = Object.freeze({
     requiresControlEvents: false,
     movementWaitMs: 260,
     controlWaitMs: 850,
-    restartWaitMs: 900,
     steps: [
       { id: 'move-1', kind: 'movement', candidates: ['move_up', 'move_right', 'move_down', 'move_left'] },
       { id: 'move-2', kind: 'movement', candidates: ['move_up', 'move_right', 'move_down', 'move_left'] },
       { id: 'pause', kind: 'control', control: 'pause' },
       { id: 'resume', kind: 'control', control: 'pause' },
-      { id: 'toggle-thoughts', kind: 'control', control: 'toggle_thoughts' },
-      { id: 'restart', kind: 'control', control: 'restart_attempt' },
       { id: 'move-3', kind: 'movement', candidates: ['move_up', 'move_right', 'move_down', 'move_left'], waitMs: 360 }
     ]
   })
@@ -303,10 +303,28 @@ const resolveInteractiveSurfaceMode = (surface) => (
     : null
 );
 
+const EXPECTED_PLAY_MARKER_STYLE = Object.freeze({
+  goalCoreColor: 0xff263f,
+  goalEdgeColor: 0xd81b2a,
+  playerCoreColor: 0x36ff7d,
+  playerHaloColor: 0x00b84a
+});
+
+const isFiniteRect = (rect) => (
+  rect
+  && Number.isFinite(rect.left)
+  && Number.isFinite(rect.top)
+  && Number.isFinite(rect.right)
+  && Number.isFinite(rect.bottom)
+  && Number.isFinite(rect.width)
+  && Number.isFinite(rect.height)
+);
+
 export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
   const runtime = diagnostics?.runtime ?? null;
   const visual = diagnostics?.visual ?? null;
   const visualRuntime = visual?.runtime ?? null;
+  const markerStyle = visual?.markerStyle ?? runtime?.play?.markerStyle ?? null;
   const surface = runtime?.surface ?? (
     visualRuntime
       ? {
@@ -315,12 +333,30 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
         }
       : null
   );
-  const player = visualRuntime?.player ?? runtime?.play?.player ?? runtime?.player ?? null;
+  const player = runtime?.play?.player ?? visualRuntime?.player ?? runtime?.player ?? null;
   const telemetrySummary = runtime?.telemetry?.summary ?? null;
   const telemetryEvents = Array.isArray(runtime?.telemetry?.events) ? runtime.telemetry.events : [];
   const projection = runtime?.projection ?? null;
   const feed = runtime?.feed ?? null;
   const playMetrics = telemetrySummary?.playMetrics ?? null;
+  const goal = runtime?.play?.goal ?? visualRuntime?.goal ?? runtime?.goal ?? null;
+  const playBoard = runtime?.play?.board ?? null;
+  const resolveScreenCoordinate = (point, axis) => {
+    const screenKey = axis === 'x' ? 'screenX' : 'screenY';
+    if (Number.isFinite(point?.[screenKey])) {
+      return point[screenKey];
+    }
+
+    const boardOrigin = axis === 'x'
+      ? playBoard?.left ?? visual?.board?.bounds?.left ?? null
+      : playBoard?.top ?? visual?.board?.bounds?.top ?? null;
+    const tileSize = playBoard?.tileSize ?? visual?.board?.tileSize ?? null;
+    if (!Number.isFinite(point?.[axis]) || !Number.isFinite(boardOrigin) || !Number.isFinite(tileSize)) {
+      return null;
+    }
+
+    return boardOrigin + ((point[axis] + 0.5) * tileSize);
+  };
   const controlUsedCount = Math.max(
     telemetrySummary?.eventCounts?.control_used ?? 0,
     telemetryEvents.filter((event) => event?.kind === 'control_used').length
@@ -351,6 +387,13 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
           step: feed.step ?? null,
           changeCount: feed.changeCount ?? null,
           visibleEntryCount: feed.visibleEntryCount ?? null
+        }
+      : null,
+    playBoard: playBoard
+      ? {
+          left: playBoard.left ?? null,
+          top: playBoard.top ?? null,
+          tileSize: playBoard.tileSize ?? null
         }
       : null,
     input: runtime?.input
@@ -391,6 +434,16 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
             trailSegmentCount: visualRuntime.trailLength ?? null
           }
         : null,
+    markerStyle: markerStyle
+      ? {
+          goalCoreColor: markerStyle.goalCoreColor ?? null,
+          goalEdgeColor: markerStyle.goalEdgeColor ?? null,
+          playerCoreColor: markerStyle.playerCoreColor ?? null,
+          playerCoreRadius: markerStyle.playerCoreRadius ?? null,
+          playerHaloColor: markerStyle.playerHaloColor ?? null,
+          playerHaloRadius: markerStyle.playerHaloRadius ?? null
+        }
+      : null,
     trail: visual?.trail
       ? {
           currentIndex: visual.trail.currentIndex ?? null,
@@ -403,8 +456,16 @@ export const summarizeEdgeLiveInteractiveState = (diagnostics) => {
       ? {
           x: Number.isFinite(player.x) ? player.x : null,
           y: Number.isFinite(player.y) ? player.y : null,
-          screenX: Number.isFinite(player.screenX) ? player.screenX : null,
-          screenY: Number.isFinite(player.screenY) ? player.screenY : null
+          screenX: resolveScreenCoordinate(player, 'x'),
+          screenY: resolveScreenCoordinate(player, 'y')
+        }
+      : null,
+    goal: goal
+      ? {
+          x: Number.isFinite(goal.x) ? goal.x : null,
+          y: Number.isFinite(goal.y) ? goal.y : null,
+          screenX: resolveScreenCoordinate(goal, 'x'),
+          screenY: resolveScreenCoordinate(goal, 'y')
         }
       : null
   };
@@ -455,6 +516,229 @@ export const resolvePlayModeMovementKeyFromTrail = (trail, rasterWidth = null) =
 const buildInteractiveStateSignature = (state) => JSON.stringify(state ?? null);
 
 const hasInteractiveStateDelta = (before, after) => buildInteractiveStateSignature(before) !== buildInteractiveStateSignature(after);
+
+export const resolveRestartTrailResetVerdict = (timeline) => {
+  const restartStep = Array.isArray(timeline)
+    ? timeline.find((step) => step?.id === 'restart')
+    : null;
+  if (!restartStep) {
+    return {
+      pass: true,
+      applicable: false,
+      beforeTrailSegmentCount: null,
+      afterTrailSegmentCount: null
+    };
+  }
+
+  const beforeCount = restartStep?.before?.resources?.trailSegmentCount ?? null;
+  const afterCount = restartStep?.after?.resources?.trailSegmentCount ?? null;
+  const pass = Number.isFinite(afterCount) && afterCount <= 1;
+
+  return {
+    pass,
+    applicable: true,
+    beforeTrailSegmentCount: Number.isFinite(beforeCount) ? beforeCount : null,
+    afterTrailSegmentCount: Number.isFinite(afterCount) ? afterCount : null
+  };
+};
+
+export const resolvePlayMarkerStyleVerdict = (state) => {
+  const style = state?.markerStyle ?? null;
+  const tileSize = state?.playBoard?.tileSize ?? null;
+  const colorMatches = Boolean(style)
+    && style.goalCoreColor === EXPECTED_PLAY_MARKER_STYLE.goalCoreColor
+    && style.goalEdgeColor === EXPECTED_PLAY_MARKER_STYLE.goalEdgeColor
+    && style.playerCoreColor === EXPECTED_PLAY_MARKER_STYLE.playerCoreColor
+    && style.playerHaloColor === EXPECTED_PLAY_MARKER_STYLE.playerHaloColor;
+  const radiusFitsTile = Boolean(style)
+    && Number.isFinite(style.playerCoreRadius)
+    && Number.isFinite(style.playerHaloRadius)
+    && style.playerCoreRadius > 0
+    && style.playerHaloRadius > 0
+    && (
+      !Number.isFinite(tileSize)
+      || (
+        // The core belongs inside its tile; the intentionally louder play beacon may extend beyond it.
+        (style.playerCoreRadius * 2) <= (tileSize + 0.01)
+        && style.playerHaloRadius <= (tileSize * 0.9)
+      )
+    );
+
+  return {
+    pass: colorMatches && radiusFitsTile,
+    colorMatches,
+    radiusFitsTile,
+    expected: EXPECTED_PLAY_MARKER_STYLE,
+    observed: style
+      ? {
+          goalCoreColor: style.goalCoreColor ?? null,
+          goalEdgeColor: style.goalEdgeColor ?? null,
+          playerCoreColor: style.playerCoreColor ?? null,
+          playerHaloColor: style.playerHaloColor ?? null,
+          playerHaloRadius: style.playerHaloRadius ?? null,
+          tileSize: Number.isFinite(tileSize) ? tileSize : null
+        }
+      : null
+  };
+};
+
+const parsePngRgba = (pngBytes) => {
+  const bytes = Buffer.from(pngBytes);
+  const signature = '89504e470d0a1a0a';
+  if (bytes.subarray(0, 8).toString('hex') !== signature) {
+    throw new Error('Marker pixel proof expected a PNG screenshot.');
+  }
+
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  const idatChunks = [];
+  let offset = 8;
+  while (offset < bytes.length) {
+    const length = bytes.readUInt32BE(offset);
+    const type = bytes.subarray(offset + 4, offset + 8).toString('ascii');
+    const data = bytes.subarray(offset + 8, offset + 8 + length);
+    offset += 12 + length;
+
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8];
+      colorType = data[9];
+    } else if (type === 'IDAT') {
+      idatChunks.push(data);
+    } else if (type === 'IEND') {
+      break;
+    }
+  }
+
+  if (bitDepth !== 8 || (colorType !== 6 && colorType !== 2)) {
+    throw new Error(`Marker pixel proof only supports 8-bit RGB/RGBA PNG screenshots; received bitDepth=${bitDepth}, colorType=${colorType}.`);
+  }
+
+  const sourceChannels = colorType === 6 ? 4 : 3;
+  const stride = width * sourceChannels;
+  const inflated = inflateSync(Buffer.concat(idatChunks));
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  let sourceOffset = 0;
+  let previous = new Uint8Array(stride);
+
+  for (let row = 0; row < height; row += 1) {
+    const filter = inflated[sourceOffset];
+    sourceOffset += 1;
+    const current = Uint8Array.from(inflated.subarray(sourceOffset, sourceOffset + stride));
+    sourceOffset += stride;
+
+    for (let index = 0; index < stride; index += 1) {
+      const left = index >= sourceChannels ? current[index - sourceChannels] : 0;
+      const up = previous[index] ?? 0;
+      const upLeft = index >= sourceChannels ? previous[index - sourceChannels] ?? 0 : 0;
+      if (filter === 1) {
+        current[index] = (current[index] + left) & 0xff;
+      } else if (filter === 2) {
+        current[index] = (current[index] + up) & 0xff;
+      } else if (filter === 3) {
+        current[index] = (current[index] + Math.floor((left + up) / 2)) & 0xff;
+      } else if (filter === 4) {
+        const p = left + up - upLeft;
+        const pa = Math.abs(p - left);
+        const pb = Math.abs(p - up);
+        const pc = Math.abs(p - upLeft);
+        const paeth = pa <= pb && pa <= pc ? left : pb <= pc ? up : upLeft;
+        current[index] = (current[index] + paeth) & 0xff;
+      } else if (filter !== 0) {
+        throw new Error(`Marker pixel proof received unsupported PNG filter ${filter}.`);
+      }
+    }
+
+    for (let x = 0; x < width; x += 1) {
+      const sourceIndex = x * sourceChannels;
+      const targetIndex = ((row * width) + x) * 4;
+      rgba[targetIndex] = current[sourceIndex];
+      rgba[targetIndex + 1] = current[sourceIndex + 1];
+      rgba[targetIndex + 2] = current[sourceIndex + 2];
+      rgba[targetIndex + 3] = sourceChannels === 4 ? current[sourceIndex + 3] : 255;
+    }
+
+    previous = current;
+  }
+
+  return {
+    width,
+    height,
+    rgba
+  };
+};
+
+export const sampleScreenshotMarkerPixels = async (page, state) => {
+  const screenshot = await page.screenshot({
+    fullPage: false,
+    animations: 'disabled'
+  });
+  const image = parsePngRgba(screenshot);
+  const player = state?.player ?? null;
+  const goal = state?.goal ?? null;
+  const sampleRadius = Math.max(1, Math.ceil((state?.markerStyle?.playerHaloRadius ?? 2) + 1));
+  const samplePoint = (point, classifier) => {
+    if (!Number.isFinite(point?.screenX) || !Number.isFinite(point?.screenY)) {
+      return {
+        pass: false,
+        reason: 'missing-point',
+        matchCount: 0,
+        sampledCount: 0
+      };
+    }
+
+    const centerX = Math.round(point.screenX);
+    const centerY = Math.round(point.screenY);
+    let matchCount = 0;
+    let sampledCount = 0;
+    const colorCounts = new Map();
+    for (let y = centerY - sampleRadius; y <= centerY + sampleRadius; y += 1) {
+      for (let x = centerX - sampleRadius; x <= centerX + sampleRadius; x += 1) {
+        if (x < 0 || y < 0 || x >= image.width || y >= image.height) {
+          continue;
+        }
+        const pixelIndex = ((y * image.width) + x) * 4;
+        const red = image.rgba[pixelIndex];
+        const green = image.rgba[pixelIndex + 1];
+        const blue = image.rgba[pixelIndex + 2];
+        const alpha = image.rgba[pixelIndex + 3];
+        if (alpha > 0) {
+          sampledCount += 1;
+          const colorKey = `${red},${green},${blue},${alpha}`;
+          colorCounts.set(colorKey, (colorCounts.get(colorKey) ?? 0) + 1);
+          if (classifier(red, green, blue, alpha)) {
+            matchCount += 1;
+          }
+        }
+      }
+    }
+
+    return {
+      pass: matchCount >= 3,
+      centerX,
+      centerY,
+      matchCount,
+      sampledCount,
+      topColors: [...colorCounts.entries()]
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 6)
+        .map(([rgba, count]) => ({ rgba, count }))
+    };
+  };
+
+  const playerSample = samplePoint(player, (red, green, blue) => green >= 170 && red <= 120 && blue >= 70);
+  const goalSample = samplePoint(goal, (red, green, blue) => red >= 180 && green <= 120 && blue <= 140);
+
+  return {
+    pass: playerSample.pass && goalSample.pass,
+    reason: playerSample.pass && goalSample.pass ? null : 'marker-pixel-mismatch',
+    player: playerSample,
+    goal: goalSample
+  };
+};
 
 const buildMovementDelta = (before, after) => {
   const beforeTrail = before?.trail ?? null;
@@ -548,7 +832,17 @@ export const resolveEdgeLiveViewports = (presetGroup, runId) => {
   return viewports.filter((viewport) => allowedSet.has(viewport.id));
 };
 
-const resolveTouchControlPoint = ({ viewport, diagnostics, control }) => {
+export const resolveTouchControlPoint = ({ viewport, diagnostics, control }) => {
+  const publishedControl = diagnostics?.visual?.touchControls?.controls?.[control] ?? null;
+  if (
+    Number.isFinite(publishedControl?.centerX)
+    && Number.isFinite(publishedControl?.centerY)
+    && publishedControl.width > 0
+    && publishedControl.height > 0
+  ) {
+    return { x: publishedControl.centerX, y: publishedControl.centerY };
+  }
+
   const safeInsets = diagnostics?.visual?.viewport?.safeInsets ?? {};
   const layout = resolveTouchControlLayout({
     width: viewport.width,
@@ -560,48 +854,24 @@ const resolveTouchControlPoint = ({ viewport, diagnostics, control }) => {
   const rect = layout.controls[control];
 
   return rect
+    && rect.width > 0
+    && rect.height > 0
     ? { x: rect.centerX, y: rect.centerY }
     : null;
 };
 
-const TOUCH_MOVEMENT_CONTROLS = new Set(['move_up', 'move_right', 'move_down', 'move_left']);
+export const resolveInteractivePlayReadiness = (runtime, requiredMode = 'play') => {
+  const projection = runtime?.projection ?? null;
+  const projectionReady = projection?.mode === requiredMode && projection?.state === 'watching';
+  const surfaceReady = runtime?.surface?.mode === requiredMode;
+  const lifecycle = runtime?.play?.lifecycle ?? null;
+  const lifecycleReady = lifecycle === null || (
+    lifecycle.inputLocked !== true
+    && lifecycle.playerVisible !== false
+    && lifecycle.trailVisible !== false
+  );
 
-const resolveTouchMovementSwipe = ({ diagnostics, control }) => {
-  if (!TOUCH_MOVEMENT_CONTROLS.has(control)) {
-    return null;
-  }
-
-  const player = diagnostics?.runtime?.play?.player ?? null;
-  const board = diagnostics?.runtime?.play?.board ?? null;
-  if (
-    !Number.isFinite(player?.screenX)
-    || !Number.isFinite(player?.screenY)
-    || !Number.isFinite(board?.left)
-    || !Number.isFinite(board?.right)
-    || !Number.isFinite(board?.top)
-    || !Number.isFinite(board?.bottom)
-  ) {
-    return null;
-  }
-
-  const distance = Math.max(18, Math.round((board.tileSize ?? 8) * 1.8));
-  const deltaByControl = {
-    move_up: { x: 0, y: -distance },
-    move_right: { x: distance, y: 0 },
-    move_down: { x: 0, y: distance },
-    move_left: { x: -distance, y: 0 }
-  };
-  const delta = deltaByControl[control];
-  return {
-    start: {
-      x: Math.min(board.right - 1, Math.max(board.left + 1, player.screenX)),
-      y: Math.min(board.bottom - 1, Math.max(board.top + 1, player.screenY))
-    },
-    end: {
-      x: Math.min(board.right - 1, Math.max(board.left + 1, player.screenX + delta.x)),
-      y: Math.min(board.bottom - 1, Math.max(board.top + 1, player.screenY + delta.y))
-    }
-  };
+  return (projectionReady || surfaceReady) && lifecycleReady;
 };
 
 const runEdgeLiveInteraction = async ({
@@ -658,7 +928,13 @@ const runEdgeLiveInteraction = async ({
         const projection = runtime?.projection ?? null;
         const projectionReady = projection?.mode === requiredMode && projection?.state === 'watching';
         const surfaceReady = runtime?.surface?.mode === requiredMode;
-        return projectionReady || surfaceReady;
+        const lifecycle = runtime?.play?.lifecycle ?? null;
+        const lifecycleReady = lifecycle === null || (
+          lifecycle.inputLocked !== true
+          && lifecycle.playerVisible !== false
+          && lifecycle.trailVisible !== false
+        );
+        return (projectionReady || surfaceReady) && lifecycleReady;
       },
       {
         runtimeKey: RUNTIME_DIAGNOSTICS_KEY,
@@ -671,15 +947,6 @@ const runEdgeLiveInteraction = async ({
   };
 
   const triggerTouchStep = async (diagnostics, control) => {
-    const swipe = resolveTouchMovementSwipe({ diagnostics, control });
-    if (swipe) {
-      await page.mouse.move(swipe.start.x, swipe.start.y);
-      await page.mouse.down();
-      await page.mouse.move(swipe.end.x, swipe.end.y, { steps: 4 });
-      await page.mouse.up();
-      return;
-    }
-
     const point = resolveTouchControlPoint({ viewport, diagnostics, control });
     if (!point) {
       const error = new Error(`Interactive touch workflow could not resolve ${control} touch coordinates on ${viewport.id}.`);
@@ -894,6 +1161,74 @@ const runEdgeLiveInteraction = async ({
     throw error;
   }
 
+  const restartTrailReset = resolveRestartTrailResetVerdict(timeline);
+  if (timeline.some((step) => step.id === 'restart') && !restartTrailReset.pass) {
+    const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not clear trail on restart/reset.`);
+    error.code = INTERACTIVE_PLAY_FAILURE_CODE;
+    error.failureStage = 'restart-trail-reset';
+    error.interaction = {
+      runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
+      baseline: baselineState,
+      timeline,
+      final: finalState,
+      restartTrailReset
+    };
+    throw error;
+  }
+
+  const markerStyleVerdict = resolvePlayMarkerStyleVerdict(finalState);
+  if (!markerStyleVerdict.pass) {
+    const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not publish the expected green player/red goal marker style.`);
+    error.code = INTERACTIVE_PLAY_FAILURE_CODE;
+    error.failureStage = 'marker-style';
+    error.interaction = {
+      runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
+      baseline: baselineState,
+      timeline,
+      final: finalState,
+      restartTrailReset,
+      markerStyleVerdict
+    };
+    throw error;
+  }
+
+  const touchChromeVerdict = interaction.kind === 'touch'
+    ? resolvePlayTouchChromeVerdict(finalDiagnostics)
+    : { pass: true, topActionBar: true, bottomDpad: true, compass: true, observed: null };
+  if (!touchChromeVerdict.pass) {
+    const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not publish the expected top action bar, bottom D-pad, and compass layout.`);
+    error.code = INTERACTIVE_PLAY_FAILURE_CODE;
+    error.failureStage = 'touch-chrome';
+    error.interaction = {
+      runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
+      baseline: baselineState,
+      timeline,
+      final: finalState,
+      restartTrailReset,
+      markerStyleVerdict,
+      touchChromeVerdict
+    };
+    throw error;
+  }
+
+  const markerPixelVerdict = await sampleScreenshotMarkerPixels(page, finalState);
+  if (!markerPixelVerdict.pass) {
+    const error = new Error(`Interactive ${interaction.kind} workflow on ${viewport.id} did not render visible green player/red goal pixels: ${JSON.stringify(markerPixelVerdict)}`);
+    error.code = INTERACTIVE_PLAY_FAILURE_CODE;
+    error.failureStage = 'marker-pixels';
+    error.interaction = {
+      runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
+      baseline: baselineState,
+      timeline,
+      final: finalState,
+      restartTrailReset,
+      markerStyleVerdict,
+      touchChromeVerdict,
+      markerPixelVerdict
+    };
+    throw error;
+  }
+
   return {
     runId: interaction.kind === 'touch' ? MOBILE_TOUCH_SMOKE_RUN_ID : INTERACTIVE_PLAY_MODE_RUN_ID,
     inputKind: interaction.kind,
@@ -909,6 +1244,10 @@ const runEdgeLiveInteraction = async ({
     failToRetryContinuation: finalState.failToRetryContinuation,
     hud: finalState.hud,
     input: finalState.input,
+    restartTrailReset,
+    markerStyleVerdict,
+    touchChromeVerdict,
+    markerPixelVerdict,
     changed: hasInteractiveStateDelta(baselineState, finalState),
     mode: finalState.mode
   };
@@ -964,6 +1303,71 @@ const doRectsOverlap = (left, right) => (
   && left.top < right.bottom
   && left.bottom > right.top
 );
+
+export const resolvePlayTouchChromeVerdict = (diagnostics) => {
+  const visual = diagnostics?.visual ?? diagnostics ?? null;
+  const controls = visual?.touchControls?.controls ?? null;
+  const boardBounds = visual?.board?.bounds ?? null;
+  const hud = visual?.hud ?? null;
+  const pause = controls?.pause ?? null;
+  const restart = controls?.restart_attempt ?? null;
+  const trail = controls?.toggle_thoughts ?? null;
+  const up = controls?.move_up ?? null;
+  const down = controls?.move_down ?? null;
+  const left = controls?.move_left ?? null;
+  const right = controls?.move_right ?? null;
+  const dpadControls = [up, down, left, right];
+  const hasPauseControl = isFiniteRect(pause) && pause.width > 0 && pause.height > 0;
+  const restartHidden = !isFiniteRect(restart) || restart.width <= 0 || restart.height <= 0;
+  const hasDpadControls = dpadControls.every(isFiniteRect);
+  const rowTolerance = 3;
+  const dpadCenterX = hasDpadControls ? (left.centerX + right.centerX) / 2 : null;
+  const dpadCenterY = hasDpadControls ? (up.centerY + down.centerY) / 2 : null;
+  const viewportCenterX = Number.isFinite(visual?.viewport?.width) ? visual.viewport.width / 2 : null;
+  const topActionBar = hasPauseControl
+    && isFiniteRect(hud?.timerBounds)
+    && Math.abs(pause.top - hud.timerBounds.top) <= rowTolerance
+    && Math.abs(pause.bottom - hud.timerBounds.bottom) <= rowTolerance + 3
+    && hud.timerBounds.right < pause.left
+    && (viewportCenterX === null || Math.abs(hud.timerBounds.centerX - viewportCenterX) <= 2)
+    && restartHidden
+    && !isFiniteRect(trail)
+    && (!isFiniteRect(boardBounds) || Math.max(pause.bottom, hud.timerBounds.bottom) < boardBounds.top);
+  const bottomDpad = hasDpadControls
+    && up.centerY < left.centerY
+    && up.centerY < right.centerY
+    && down.centerY > left.centerY
+    && down.centerY > right.centerY
+    && left.centerX < up.centerX
+    && right.centerX > up.centerX
+    && (!isFiniteRect(boardBounds) || Math.min(up.top, left.top, right.top, down.top) > boardBounds.bottom);
+  const compass = isFiniteRect(hud?.arrowBounds)
+    && hud.arrowBounds.width >= 32
+    && hud.arrowBounds.height >= 32
+    && dpadCenterX !== null
+    && dpadCenterY !== null
+    && Math.abs(hud.arrowBounds.centerX - dpadCenterX) <= 2
+    && Math.abs(hud.arrowBounds.centerY - dpadCenterY) <= 2;
+
+  return {
+    pass: Boolean(topActionBar && bottomDpad && compass),
+    topActionBar,
+    bottomDpad,
+    compass,
+    observed: {
+      pause,
+      restart,
+      trail,
+      up,
+      down,
+      left,
+      right,
+      boardBounds,
+      arrowBounds: hud?.arrowBounds ?? null,
+      timerBounds: hud?.timerBounds ?? null
+    }
+  };
+};
 
 const resolveExperimentSelection = (args = {}) => {
   const readToggle = (camelKey, kebabKey) => (
@@ -1072,6 +1476,18 @@ export const resolveEdgeLiveTargetUrl = (viewport, options = {}) => resolveViewp
   baseUrl: options.baseUrl ?? DEFAULT_BASE_URL,
   route: options.route,
   explicitUrl: options.url
+});
+
+const buildEdgeLiveScreenContract = ({
+  expectedRoute,
+  actualUrl,
+  viewport,
+  diagnostics
+}) => buildVisualScreenContract({
+  expectedRoute: expectedRoute ?? actualUrl,
+  actualUrl,
+  viewport,
+  diagnostics: diagnostics?.visual ?? diagnostics
 });
 
 export const resolveEdgeLiveVerdicts = (diagnostics) => {
@@ -1597,6 +2013,7 @@ const captureViewport = async ({
   });
 
   const url = resolveViewportTargetUrl({ viewport, baseUrl, route, explicitUrl });
+  const expectedScreenRoute = explicitUrl ?? route ?? resolveLayoutMatrixRoute(viewport);
   const firstLoadPath = resolve(screenshotsDir, `${viewport.id}-first-load.png`);
   const secondLoadPath = resolve(screenshotsDir, `${viewport.id}-second-load.png`);
   const lifecyclePath = resolve(screenshotsDir, `${viewport.id}-attempt-lifecycle.png`);
@@ -1610,6 +2027,13 @@ const captureViewport = async ({
     }).catch(() => {});
     await page.waitForTimeout(250);
     const firstDiagnostics = await waitForDiagnostics(page, timeoutMs);
+    const firstLoadScreenContract = buildEdgeLiveScreenContract({
+      expectedRoute: expectedScreenRoute,
+      actualUrl: page.url(),
+      viewport,
+      diagnostics: firstDiagnostics
+    });
+    assertVisualScreenContract(firstLoadScreenContract);
     await page.screenshot({
       path: firstLoadPath,
       fullPage: false,
@@ -1622,6 +2046,13 @@ const captureViewport = async ({
     }).catch(() => {});
     await page.waitForTimeout(250);
     const secondDiagnostics = await waitForDiagnostics(page, timeoutMs);
+    const secondLoadScreenContract = buildEdgeLiveScreenContract({
+      expectedRoute: expectedScreenRoute,
+      actualUrl: page.url(),
+      viewport,
+      diagnostics: secondDiagnostics
+    });
+    assertVisualScreenContract(secondLoadScreenContract);
     await page.screenshot({
       path: secondLoadPath,
       fullPage: false,
@@ -1631,6 +2062,7 @@ const captureViewport = async ({
     let lifecycle = null;
     let interactionRecord = null;
     let endWindow = null;
+    let lifecycleScreenContract = null;
     try {
       let lifecycleDiagnostics = null;
       if (interaction) {
@@ -1644,6 +2076,13 @@ const captureViewport = async ({
       } else {
         lifecycleDiagnostics = await waitForDiagnostics(page, Math.max(2_000, Math.round(timeoutMs / 3)), { requireActiveTrail: true });
       }
+      lifecycleScreenContract = buildEdgeLiveScreenContract({
+        expectedRoute: expectedScreenRoute,
+        actualUrl: page.url(),
+        viewport,
+        diagnostics: lifecycleDiagnostics
+      });
+      assertVisualScreenContract(lifecycleScreenContract);
       await page.screenshot({
         path: lifecyclePath,
         fullPage: false,
@@ -1682,9 +2121,15 @@ const captureViewport = async ({
     const record = {
       viewport,
       url,
+      actualUrl: page.url(),
       route: explicitUrl ? null : route,
       experiment,
       consoleMessages,
+      screenContracts: {
+        firstLoad: firstLoadScreenContract,
+        secondLoad: secondLoadScreenContract,
+        lifecycle: lifecycle?.available === false ? null : lifecycleScreenContract
+      },
       firstLoad: createSnapshot('first-load', firstDiagnostics, relativeToRun(runDir, firstLoadPath)),
       secondLoad: createSnapshot('second-load', secondDiagnostics, relativeToRun(runDir, secondLoadPath)),
       lifecycle,
@@ -1794,6 +2239,10 @@ const buildMarkdownSummary = ({ runId, sourceMode, baseUrl, explicitUrl, presetG
       `- Watch -> play switches: ${interaction.watchToPlaySwitchCount ?? 0}`,
       `- Input timing: ${interaction.input ? `accepted ${interaction.input.acceptedCount}, dropped ${interaction.input.droppedCount}, merged ${interaction.input.mergedCount}` : 'n/a'}`,
       `- HUD state: ${interaction.hud ? `${interaction.hud.statusText ?? 'status-hidden'} | ${interaction.hud.nextRiskLabel ?? 'risk-hidden'}` : 'n/a'}`,
+      `- Restart trail reset: ${interaction.restartTrailReset?.applicable === false ? 'not applicable (reset disabled)' : interaction.restartTrailReset?.pass ? 'pass' : 'fail'} (${interaction.restartTrailReset?.beforeTrailSegmentCount ?? 'n/a'} -> ${interaction.restartTrailReset?.afterTrailSegmentCount ?? 'n/a'})`,
+      `- Marker style: ${interaction.markerStyleVerdict?.pass ? 'pass' : 'fail'} (player ${interaction.markerStyleVerdict?.observed?.playerCoreColor ?? 'n/a'}, goal ${interaction.markerStyleVerdict?.observed?.goalCoreColor ?? 'n/a'}, haloRadius ${interaction.markerStyleVerdict?.observed?.playerHaloRadius ?? 'n/a'}, tile ${interaction.markerStyleVerdict?.observed?.tileSize ?? 'n/a'})`,
+      `- Touch chrome: ${interaction.touchChromeVerdict?.pass ? 'pass' : 'fail'} (top actions ${interaction.touchChromeVerdict?.topActionBar ? 'pass' : 'fail'}, bottom D-pad ${interaction.touchChromeVerdict?.bottomDpad ? 'pass' : 'fail'}, compass ${interaction.touchChromeVerdict?.compass ? 'pass' : 'fail'})`,
+      `- Marker pixels: ${interaction.markerPixelVerdict?.pass ? 'pass' : 'fail'} (player matches ${interaction.markerPixelVerdict?.player?.matchCount ?? 'n/a'}, goal matches ${interaction.markerPixelVerdict?.goal?.matchCount ?? 'n/a'})`,
       `- State changed: ${interaction.changed ? 'yes' : 'no'}`,
       '- Input timeline:'
     );
@@ -2488,8 +2937,10 @@ export const captureEdgeLive = async ({
         viewport: capture.viewport,
         route: capture.route,
         url: capture.url,
+        actualUrl: capture.actualUrl,
         experiment: capture.experiment,
         files: capture.files,
+        screenContracts: capture.screenContracts,
         board: capture.secondLoad.board,
         hud: capture.secondLoad.hud,
         verdicts: capture.secondLoad.verdicts,

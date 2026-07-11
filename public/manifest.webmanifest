@@ -7,7 +7,7 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "landscape",
+  "orientation": "portrait-primary",
   "background_color": "#0d1218",
   "theme_color": "#0d1218",
   "icons": [
@@ -34,9 +34,9 @@
       "purpose": "maskable"
     },
     {
-      "src": "/icons/mazer-emblem.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "/icons/mazer-app-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png"
     }
   ]
 }

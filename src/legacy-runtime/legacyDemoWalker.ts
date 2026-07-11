@@ -48,9 +48,20 @@ const inferLegacyMazeDifficulty = (maze: LegacyMazeSnapshot): MazeDifficulty => 
 export const createLegacyMenuDemoWalkerConfig = (seed: number): DemoWalkerConfig => ({
   ...legacyTuning.demo,
   seed,
+  cadence: {
+    ...legacyTuning.demo.cadence,
+    exploreStepMs: 88,
+    backtrackStepMs: 88,
+    goalHoldMs: 0,
+    resetHoldMs: 0
+  },
   behavior: {
     ...legacyTuning.demo.behavior,
-    enableRunnerMistakes: true
+    trailMaxLength: 2048,
+    enableRunnerMistakes: true,
+    emulateLogicSwitchPotentialCheckBug: false,
+    runnerThinkingModel: 'human-local-memory',
+    prerollSteps: 0
   }
 });
 
@@ -61,14 +72,16 @@ export const createLegacyMenuSnapshotDemoWalkerConfig = (seed: number): DemoWalk
     ...baseConfig,
     cadence: {
       ...baseConfig.cadence,
-      ...LEGACY_MENU_SNAPSHOT_CADENCE
+      ...LEGACY_MENU_SNAPSHOT_CADENCE,
+      goalHoldMs: 0,
+      resetHoldMs: 0
     },
     behavior: {
       ...baseConfig.behavior,
-      prerollSteps: Math.max(
-        baseConfig.behavior.prerollSteps ?? 0,
-        LEGACY_MENU_SNAPSHOT_PREROLL_STEPS
-      )
+      enableRunnerMistakes: true,
+      emulateLogicSwitchPotentialCheckBug: false,
+      runnerThinkingModel: 'human-local-memory',
+      prerollSteps: 0
     }
   };
 };

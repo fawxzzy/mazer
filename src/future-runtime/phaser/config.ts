@@ -16,6 +16,10 @@ export const createFuturePhaserGameConfig = (): Phaser.Types.Core.GameConfig => 
   audio: {
     noAudio: true
   },
+  fps: {
+    target: 60,
+    min: 30
+  },
   scene: [FuturePhaserScene],
   scale: {
     mode: Phaser.Scale.RESIZE,

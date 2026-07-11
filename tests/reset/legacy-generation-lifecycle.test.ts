@@ -4,6 +4,7 @@ import {
   consumeLegacyGenerationRequestState,
   createLegacyGenerationRequest,
   createLegacyMenuResetGenerationRequest,
+  createLegacyPlayResetGenerationRequest,
   createLegacyRuntimeMazeForMode,
   LEGACY_OPTIONAL_SHORTCUT_PROCESS_STAGE_ID,
   LEGACY_REQUIRED_GENERATION_PROCESS_STAGE_IDS,
@@ -16,6 +17,7 @@ import {
   shouldConsumeLegacyGenerationRequest,
   stepLegacyGenerationSeed
 } from '../../src/legacy-runtime/legacyGenerationLifecycle';
+import { resolveLegacyMazeComplexity } from '../../src/legacy-runtime/legacyProgression';
 
 describe('legacy generation lifecycle', () => {
   test('keeps the required process-count stages in legacy order', () => {
@@ -78,7 +80,7 @@ describe('legacy generation lifecycle', () => {
       { id: 3, name: 'MapPath', completionSignal: 'checkpoint-budget-exhausted', advancesToStageId: 4, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
       { id: 4, name: 'CreatePath', completionSignal: 'path-array-exhausted', advancesToStageId: 5, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
       { id: 5, name: 'CreateShortCuts', completionSignal: 'shortcut-budget-exhausted', advancesToStageId: 6, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: 6 },
-      { id: 6, name: 'Draw', completionSignal: 'draw-iteration-complete', advancesToStageId: 7, executionKind: 'full-stage', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
+      { id: 6, name: 'Draw', completionSignal: 'draw-iteration-complete', advancesToStageId: 7, executionKind: 'row-slice', batchSize: 1, batchUnit: 'rows', skipToStageIdWhenDisabled: null },
       { id: 7, name: 'Finalize', completionSignal: 'player-finalized', advancesToStageId: null, executionKind: 'finalize-state', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null },
       { id: 8, name: 'Reset', completionSignal: 'play-reset-template-return', advancesToStageId: null, executionKind: 'reset-branch', batchSize: null, batchUnit: null, skipToStageIdWhenDisabled: null }
     ]);
@@ -164,6 +166,124 @@ describe('legacy generation lifecycle', () => {
     expect(playMaze.shortcutStats?.requested).toBe(9);
   });
 
+  test('selects the generated maze closest to target complexity from a bounded seed window', () => {
+    const mode = 'menu';
+    const scale = 50;
+    const seed = 3749;
+    const targetComplexity = 64;
+    const candidateCount = 3;
+    const candidateSeeds = [
+      seed,
+      stepLegacyGenerationSeed(seed),
+      stepLegacyGenerationSeed(stepLegacyGenerationSeed(seed))
+    ];
+    const candidates = candidateSeeds.map((candidateSeed) => {
+      const maze = createLegacyRuntimeMazeForMode(mode, scale, candidateSeed);
+      const complexity = resolveLegacyMazeComplexity(maze).total;
+      return {
+        complexity,
+        distance: Math.abs(complexity - targetComplexity),
+        seed: candidateSeed
+      };
+    });
+    const expected = candidates.reduce((best, candidate) => (
+      candidate.distance < best.distance ? candidate : best
+    ));
+
+    const selected = createLegacyRuntimeMazeForMode(mode, scale, seed, null, {
+      candidateCount,
+      targetComplexity
+    });
+
+    expect(selected.seed).toBe(expected.seed);
+    expect(selected.generation?.selection).toMatchObject({
+      adaptiveRetryCandidateCount: 0,
+      adaptiveRetryScale: null,
+      adaptiveRetryUsed: false,
+      candidateCount,
+      measuredComplexity: expected.complexity,
+      pressureRetryCandidateCount: 0,
+      pressureRetryUsed: false,
+      searchedCandidateCount: candidateCount,
+      selectedSeed: expected.seed,
+      targetComplexity,
+      tolerance: 8
+    });
+    expect(selected.generation?.selection?.candidateComplexityMin).toBe(Math.min(...candidates.map((candidate) => candidate.complexity)));
+    expect(selected.generation?.selection?.candidateComplexityMax).toBe(Math.max(...candidates.map((candidate) => candidate.complexity)));
+    expect(selected.generation?.selection?.selectedDistance).toBe(expected.distance);
+    expect(selected.generation?.selection?.allCandidatesUnderTarget).toBe(
+      Math.max(...candidates.map((candidate) => candidate.complexity)) < targetComplexity - 8
+    );
+    expect(selected.generation?.selection?.allCandidatesOverTarget).toBe(
+      Math.min(...candidates.map((candidate) => candidate.complexity)) > targetComplexity + 8
+    );
+    expect(selected.generation?.selection?.initialWindowUnderTarget).toBe(selected.generation?.selection?.allCandidatesUnderTarget);
+    expect(selected.generation?.selection?.initialWindowOverTarget).toBe(selected.generation?.selection?.allCandidatesOverTarget);
+    expect(['under-target', 'on-target', 'over-target']).toContain(selected.generation?.selection?.delivery);
+  }, 15_000);
+
+  test('runs a bounded pressure retry when the initial sampled window under-delivers', () => {
+    const selected = createLegacyRuntimeMazeForMode('menu', 50, 3749, null, {
+      candidateCount: 3,
+      targetComplexity: 999
+    });
+
+    expect(selected.generation?.selection).toMatchObject({
+      adaptiveRetryCandidateCount: 3,
+      adaptiveRetryScale: 57,
+      adaptiveRetryUsed: true,
+      candidateCount: 3,
+      delivery: 'under-target',
+      initialWindowOverTarget: false,
+      initialWindowUnderTarget: true,
+      pressureRetryCandidateCount: 3,
+      pressureRetryUsed: true,
+      searchedCandidateCount: 9,
+      targetComplexity: 999,
+      tolerance: 8
+    });
+    expect(selected.generation?.selection?.candidateComplexityMax).toBeLessThan(991);
+    expect(selected.generation?.selection?.candidateComplexityMin).toBeLessThanOrEqual(
+      selected.generation?.selection?.candidateComplexityMax ?? 0
+    );
+    expect(selected.generation?.selection?.selectedDistance).toBe(Math.abs(
+      (selected.generation?.selection?.measuredComplexity ?? 0) - 999
+    ));
+  });
+
+  test('widens the default seed search window for high target complexity', () => {
+    const mode = 'menu';
+    const scale = 96;
+    const seed = 3749;
+    const targetComplexity = 180;
+    const candidateCount = 9;
+
+    const selected = createLegacyRuntimeMazeForMode(mode, scale, seed, null, {
+      targetComplexity
+    });
+
+    expect(selected.generation?.selection).toMatchObject({
+      candidateCount,
+      targetComplexity
+    });
+    expect(selected.generation?.selection?.selectedSeed).toBeGreaterThanOrEqual(seed);
+    expect(selected.generation?.selection?.selectedSeed).toBeLessThan(
+      seed + (selected.generation?.selection?.searchedCandidateCount ?? candidateCount)
+    );
+    expect(selected.generation?.selection?.measuredComplexity).toBe(resolveLegacyMazeComplexity(selected).total);
+    expect(selected.generation?.selection?.candidateComplexityMax).toBeGreaterThanOrEqual(
+      selected.generation?.selection?.candidateComplexityMin ?? 0
+    );
+    expect(typeof selected.generation?.selection?.allCandidatesUnderTarget).toBe('boolean');
+    expect(typeof selected.generation?.selection?.allCandidatesOverTarget).toBe('boolean');
+    expect(selected.generation?.selection?.searchedCandidateCount).toBe(
+      candidateCount
+        + (selected.generation?.selection?.pressureRetryCandidateCount ?? 0)
+        + (selected.generation?.selection?.adaptiveRetryCandidateCount ?? 0)
+    );
+  }, 15_000);
+
   test('steps regeneration seeds deterministically', () => {
     expect(stepLegacyGenerationSeed(0)).toBe(1);
     expect(stepLegacyGenerationSeed(3749)).toBe(3750);
@@ -246,8 +366,17 @@ describe('legacy generation lifecycle', () => {
       reason: 'play-start',
       scale: 50
     });
+    const targetedMenuRequest = createLegacyGenerationRequest({
+      currentSeed: 3749,
+      dueAtMs: 0,
+      mode: 'menu',
+      reason: 'boot-menu',
+      scale: 50,
+      targetComplexity: 64
+    });
 
     const playMaze = consumeLegacyGenerationRequest(playRequest, 50);
+    const targetedMenuMaze = consumeLegacyGenerationRequest(targetedMenuRequest, 50);
 
     expect(playMaze.generation?.buildKind).toBe('play-generated');
     expect(playMaze.generation?.processStageIds).toEqual([0, 3, 4, 5, 6, 7, 8]);
@@ -270,6 +399,13 @@ describe('legacy generation lifecycle', () => {
       skipToStageIdWhenDisabled: null
     });
     expect(playMaze.seed).toBe(902);
+    expect(targetedMenuRequest.targetComplexity).toBe(64);
+    expect(targetedMenuMaze.generation?.selection).toMatchObject({
+      candidateCount: 3,
+      selectedSeed: targetedMenuMaze.seed,
+      targetComplexity: 64,
+      tolerance: 8
+    });
   });
 
   test('converts menu process-8 reset into the next queued process-0 generation request', () => {
@@ -292,6 +428,24 @@ describe('legacy generation lifecycle', () => {
       remainingStageIds: [3, 4, 5, 6, 7, 8],
       processComplete: false
     });
+  });
+
+  test('allows play regeneration to use a fresh procedural seed override', () => {
+    const resetGenerationRequest = createLegacyPlayResetGenerationRequest({
+      currentSeed: 3749,
+      nowMs: 2220,
+      seedOverride: 982_451_653,
+      scale: 64
+    });
+
+    expect(resetGenerationRequest.reason).toBe('play-goal-reset');
+    expect(resetGenerationRequest.mode).toBe('play');
+    expect(resetGenerationRequest.seed).toBe(982_451_653);
+    expect(resetGenerationRequest.seed).not.toBe(3749);
+    expect(resetGenerationRequest.seed).not.toBe(3750);
+    expect(resetGenerationRequest.budget.scale).toBe(64);
+    expect(resetGenerationRequest.budget.shortcutCountModifier).toBe(0.18);
+    expect(resetGenerationRequest.buildKind).toBe('play-generated');
   });
 
   test('makes legacy stage-7 finalize responsibilities explicit for play and menu requests', () => {

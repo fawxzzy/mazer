@@ -1,6 +1,6 @@
 import type { LegacyPoint } from './legacyMaze';
 
-export type LegacyPauseCommand = 'reset-player' | 'return-menu' | 'resume';
+export type LegacyPauseCommand = 'reset-player' | 'return-menu' | 'resume' | 'reset-progression';
 
 export interface LegacyPauseCommandResult {
   closesOverlay: boolean;
@@ -14,7 +14,7 @@ const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y
 export const resolveLegacyPauseCommand = (
   command: LegacyPauseCommand,
   start: LegacyPoint,
-  currentTrail: readonly LegacyPoint[] = []
+  _currentTrail: readonly LegacyPoint[] = []
 ): LegacyPauseCommandResult => {
   switch (command) {
     case 'resume':
@@ -23,25 +23,27 @@ export const resolveLegacyPauseCommand = (
         enterMenu: false,
         nextPlayer: null,
         nextTrail: null
-      };
+    };
     case 'reset-player': {
       const nextPlayer = copyPoint(start);
-      const preservedTrail = currentTrail.map(copyPoint);
-      const trailAlreadyEndsAtStart = preservedTrail.at(-1)?.x === nextPlayer.x
-        && preservedTrail.at(-1)?.y === nextPlayer.y;
       return {
         closesOverlay: true,
         enterMenu: false,
         nextPlayer,
-        nextTrail: trailAlreadyEndsAtStart
-          ? preservedTrail
-          : [...preservedTrail, copyPoint(nextPlayer)]
+        nextTrail: [copyPoint(nextPlayer)]
       };
     }
     case 'return-menu':
       return {
         closesOverlay: false,
         enterMenu: true,
+        nextPlayer: null,
+        nextTrail: null
+      };
+    case 'reset-progression':
+      return {
+        closesOverlay: false,
+        enterMenu: false,
         nextPlayer: null,
         nextTrail: null
       };

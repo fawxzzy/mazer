@@ -18,6 +18,19 @@ describe('edge live check', () => {
       expect(source).toContain('document.documentElement.getAttribute');
       expect(source).toContain('JSON.parse(serialized)');
     }
+
+    for (const source of [edgeLiveSource, captureSource, layoutMatrixSource]) {
+      expect(source).toContain('assertVisualScreenContract');
+      expect(source).toContain('buildVisualScreenContract');
+    }
+
+    for (const source of [captureSource, layoutMatrixSource]) {
+      expect(source).toContain('screenContract');
+      expect(source).toContain('actualUrl');
+    }
+
+    expect(edgeLiveSource).toContain('screenContracts');
+    expect(edgeLiveSource).toContain('buildEdgeLiveScreenContract');
   });
 
   test('builds edge-live experiment metadata from toggles', async () => {
@@ -74,7 +87,7 @@ describe('edge live check', () => {
     expect(resolveEdgeLiveDefaultRoute('play-mode-smoke')).toBe('/?content=core-only&mode=play&theme=ember');
     expect(resolveEdgeLiveDefaultRoute('play-hud-trim')).toBe('/?content=core-only&mode=play&theme=aurora');
     expect(resolveEdgeLiveDefaultRoute('play-mode-interactive')).toBe('/?content=core-only&mode=play&theme=aurora');
-    expect(resolveEdgeLiveDefaultRoute('mobile-touch-smoke')).toBe('/?content=core-only&mode=play&theme=aurora');
+    expect(resolveEdgeLiveDefaultRoute('mobile-touch-smoke')).toBe('/?content=core-only&mode=play&theme=aurora&mazeSeed=3749');
     expect(resolveEdgeLiveDefaultRoute('core-only-watch')).toBe('/?content=core-only&theme=aurora');
     expect(resolveEdgeLiveDefaultRoute('core-only-play')).toBe('/?content=core-only&mode=play&theme=aurora');
     expect(resolveEdgeLiveDefaultRoute('core-only-cycle')).toBe('/?content=core-only&theme=aurora');
@@ -432,7 +445,10 @@ describe('edge live check', () => {
   test('summarizes interactive state and resolves movement keys from trail deltas', async () => {
     const {
       prioritizeMovementCandidates,
+      resolvePlayMarkerStyleVerdict,
       resolvePlayModeMovementKeyFromTrail,
+      resolveRestartTrailResetVerdict,
+      sampleScreenshotMarkerPixels,
       summarizeEdgeLiveInteractiveState
     } = await loadEdgeLiveHelpers();
 
@@ -523,9 +539,36 @@ describe('edge live check', () => {
           step: 4,
           changeCount: 2,
           visibleEntryCount: 2
+        },
+        play: {
+          board: {
+            tileSize: 7
+          },
+          markerStyle: {
+            goalCoreColor: 0xff263f,
+            goalEdgeColor: 0xd81b2a,
+            playerCoreColor: 0x36ff7d,
+            playerCoreRadius: 2.38,
+            playerHaloColor: 0x00b84a,
+            playerHaloRadius: 3.22
+          },
+          goal: {
+            x: 44,
+            y: 1,
+            screenX: 332,
+            screenY: 258
+          }
         }
       },
       visual: {
+        markerStyle: {
+          goalCoreColor: 0xff263f,
+          goalEdgeColor: 0xd81b2a,
+          playerCoreColor: 0x36ff7d,
+          playerCoreRadius: 2.38,
+          playerHaloColor: 0x00b84a,
+          playerHaloRadius: 3.22
+        },
         intentFeed: {
           visible: true,
           compact: true,
@@ -555,6 +598,21 @@ describe('edge live check', () => {
         trailSegmentCap: 16,
         trailSegmentCount: 7
       },
+      playBoard: {
+        tileSize: 7
+      },
+      markerStyle: {
+        goalCoreColor: 0xff263f,
+        goalEdgeColor: 0xd81b2a,
+        playerCoreColor: 0x36ff7d,
+        playerHaloColor: 0x00b84a
+      },
+      goal: {
+        x: 44,
+        y: 1,
+        screenX: 332,
+        screenY: 258
+      },
       hud: {
         statusText: 'Gate timing ahead'
       },
@@ -568,6 +626,69 @@ describe('edge live check', () => {
       trail: {
         nextIndex: 10
       }
+    });
+    expect(typeof sampleScreenshotMarkerPixels).toBe('function');
+
+    expect(resolvePlayMarkerStyleVerdict(summarizeEdgeLiveInteractiveState({
+      runtime: {
+        surface: {
+          mode: 'play',
+          overlay: 'none'
+        },
+        play: {
+          board: {
+            tileSize: 7
+          },
+          markerStyle: {
+            goalCoreColor: 0xff263f,
+            goalEdgeColor: 0xd81b2a,
+            playerCoreColor: 0x36ff7d,
+            playerCoreRadius: 2.38,
+            playerHaloColor: 0x00b84a,
+            playerHaloRadius: 3.22
+          }
+        },
+        telemetry: {
+          summary: {
+            eventCounts: {}
+          }
+        }
+      }
+    }))).toMatchObject({
+      pass: true,
+      colorMatches: true,
+      radiusFitsTile: true
+    });
+
+    expect(resolvePlayMarkerStyleVerdict(summarizeEdgeLiveInteractiveState({
+      runtime: {
+        surface: {
+          mode: 'play',
+          overlay: 'none'
+        },
+        play: {
+          board: {
+            tileSize: 7
+          },
+          markerStyle: {
+            goalCoreColor: 0xffffff,
+            goalEdgeColor: 0xd81b2a,
+            playerCoreColor: 0x000000,
+            playerCoreRadius: 4.5,
+            playerHaloColor: 0xffffff,
+            playerHaloRadius: 4.1
+          }
+        },
+        telemetry: {
+          summary: {
+            eventCounts: {}
+          }
+        }
+      }
+    }))).toMatchObject({
+      pass: false,
+      colorMatches: false,
+      radiusFitsTile: false
     });
 
     expect(summarizeEdgeLiveInteractiveState({
@@ -624,6 +745,147 @@ describe('edge live check', () => {
         screenX: 144,
         screenY: 176
       }
+    });
+
+    expect(resolveRestartTrailResetVerdict([
+      {
+        id: 'restart',
+        before: {
+          resources: {
+            trailSegmentCount: 7
+          }
+        },
+        after: {
+          resources: {
+            trailSegmentCount: 1
+          }
+        }
+      }
+    ])).toEqual({
+      pass: true,
+      applicable: true,
+      beforeTrailSegmentCount: 7,
+      afterTrailSegmentCount: 1
+    });
+
+    expect(resolveRestartTrailResetVerdict([
+      {
+        id: 'restart',
+        before: {
+          resources: {
+            trailSegmentCount: 7
+          }
+        },
+        after: {
+          resources: {
+            trailSegmentCount: 4
+          }
+        }
+      }
+    ])).toEqual({
+      pass: false,
+      applicable: true,
+      beforeTrailSegmentCount: 7,
+      afterTrailSegmentCount: 4
+    });
+
+    expect(resolveRestartTrailResetVerdict([])).toEqual({
+      pass: true,
+      applicable: false,
+      beforeTrailSegmentCount: null,
+      afterTrailSegmentCount: null
+    });
+  }, 15_000);
+
+  test('proves the mobile touch chrome uses one top-right pause action, centered status, bottom D-pad, and centered compass', async () => {
+    const {
+      resolveInteractivePlayReadiness,
+      resolvePlayTouchChromeVerdict,
+      resolveTouchControlPoint
+    } = await loadEdgeLiveHelpers();
+
+    const passingVerdict = resolvePlayTouchChromeVerdict({
+      visual: {
+        viewport: { width: 390, height: 844 },
+        board: {
+          bounds: { left: 24, top: 251, right: 367, bottom: 594, width: 343, height: 343 }
+        },
+        hud: {
+          timerBounds: { left: 139, top: 10, right: 251, bottom: 48, width: 112, height: 38, centerX: 195, centerY: 29 },
+          arrowBounds: { left: 179, top: 719, right: 211, bottom: 751, width: 32, height: 32, centerX: 195, centerY: 735 }
+        },
+        touchControls: {
+          controls: {
+            pause: { left: 272, top: 8, right: 354, bottom: 46, width: 82, height: 38, centerX: 313, centerY: 27 },
+            restart_attempt: { left: -10000, top: -10000, right: -10000, bottom: -10000, width: 0, height: 0, centerX: -10000, centerY: -10000 },
+            toggle_thoughts: null,
+            move_up: { left: 163, top: 636, right: 227, bottom: 700, width: 64, height: 64, centerX: 195, centerY: 668 },
+            move_left: { left: 96, top: 703, right: 160, bottom: 767, width: 64, height: 64, centerX: 128, centerY: 735 },
+            move_right: { left: 230, top: 703, right: 294, bottom: 767, width: 64, height: 64, centerX: 262, centerY: 735 },
+            move_down: { left: 163, top: 770, right: 227, bottom: 834, width: 64, height: 64, centerX: 195, centerY: 802 }
+          }
+        }
+      }
+    });
+
+    expect(passingVerdict).toMatchObject({
+      pass: true,
+      topActionBar: true,
+      bottomDpad: true,
+      compass: true
+    });
+
+    expect(resolveTouchControlPoint({
+      viewport: { width: 390, height: 844 },
+      diagnostics: {
+        visual: {
+          touchControls: {
+            controls: {
+              move_up: { left: 171, top: 535, right: 220, bottom: 584, width: 49, height: 49, centerX: 195.5, centerY: 559.5 }
+            }
+          }
+        }
+      },
+      control: 'move_up'
+    })).toEqual({ x: 195.5, y: 559.5 });
+
+    expect(resolveInteractivePlayReadiness({
+      surface: { mode: 'play' },
+      play: { lifecycle: { inputLocked: true, playerVisible: false, trailVisible: false } }
+    })).toBe(false);
+    expect(resolveInteractivePlayReadiness({
+      surface: { mode: 'play' },
+      play: { lifecycle: { inputLocked: false, playerVisible: true, trailVisible: true } }
+    })).toBe(true);
+
+    const failingVerdict = resolvePlayTouchChromeVerdict({
+      visual: {
+        viewport: { width: 390, height: 844 },
+        board: {
+          bounds: { left: 24, top: 251, right: 367, bottom: 594, width: 343, height: 343 }
+        },
+        hud: {
+          timerBounds: { left: 14, top: 14, right: 78, bottom: 36, width: 64, height: 22, centerX: 46, centerY: 25 },
+          arrowBounds: { left: 250, top: 20, right: 286, bottom: 56, width: 36, height: 36 }
+        },
+        touchControls: {
+          controls: {
+            pause: { left: 14, top: 686, right: 102, bottom: 730, width: 88, height: 44, centerX: 58, centerY: 708 },
+            restart_attempt: { left: -10000, top: -10000, right: -10000, bottom: -10000, width: 0, height: 0, centerX: -10000, centerY: -10000 },
+            toggle_thoughts: { left: 288, top: 686, right: 376, bottom: 730, width: 88, height: 44, centerX: 332, centerY: 708 },
+            move_up: { left: 151, top: 742, right: 239, bottom: 786, width: 88, height: 44, centerX: 195, centerY: 764 },
+            move_left: { left: 14, top: 742, right: 102, bottom: 786, width: 88, height: 44, centerX: 58, centerY: 764 },
+            move_right: { left: 288, top: 742, right: 376, bottom: 786, width: 88, height: 44, centerX: 332, centerY: 764 },
+            move_down: { left: 151, top: 798, right: 239, bottom: 842, width: 88, height: 44, centerX: 195, centerY: 820 }
+          }
+        }
+      }
+    });
+
+    expect(failingVerdict).toMatchObject({
+      pass: false,
+      topActionBar: false,
+      compass: false
     });
   }, 15_000);
 

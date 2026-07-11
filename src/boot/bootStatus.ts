@@ -1,4 +1,8 @@
 import type Phaser from 'phaser';
+import {
+  resolveLegacyBootMessage,
+  type LegacyPlayerMessage
+} from '../legacy-runtime/legacyPlayerMessage';
 
 export const MAZER_BOOT_STATUS_WINDOW_KEY = '__MAZER_BOOT_STATUS__' as const;
 export const MAZER_GAME_WINDOW_KEY = '__MAZER_GAME__' as const;
@@ -8,6 +12,7 @@ export type MazerBootStage =
   | 'reload-requested'
   | 'game-creating'
   | 'game-created'
+  | 'service-worker-error'
   | 'menu-scene-create'
   | 'error';
 
@@ -15,6 +20,7 @@ export interface MazerBootStatus {
   errorMessage?: string;
   gameCreated: boolean;
   menuSceneCreated: boolean;
+  playerMessage?: LegacyPlayerMessage;
   stage: MazerBootStage;
   updatedAtIso: string;
 }
@@ -30,13 +36,20 @@ const buildStatus = (
   stage: MazerBootStage,
   previous: MazerBootStatus | undefined,
   errorMessage?: string
-): MazerBootStatus => ({
-  stage,
-  updatedAtIso: new Date().toISOString(),
-  gameCreated: previous?.gameCreated === true || stage === 'game-created' || stage === 'menu-scene-create',
-  menuSceneCreated: previous?.menuSceneCreated === true || stage === 'menu-scene-create',
-  ...(errorMessage ? { errorMessage } : previous?.errorMessage ? { errorMessage: previous.errorMessage } : {})
-});
+): MazerBootStatus => {
+  const playerMessage = stage === 'error' || stage === 'service-worker-error'
+    ? resolveLegacyBootMessage(stage, errorMessage)
+    : previous?.playerMessage;
+
+  return {
+    stage,
+    updatedAtIso: new Date().toISOString(),
+    gameCreated: previous?.gameCreated === true || stage === 'game-created' || stage === 'menu-scene-create',
+    menuSceneCreated: previous?.menuSceneCreated === true || stage === 'menu-scene-create',
+    ...(errorMessage ? { errorMessage } : previous?.errorMessage ? { errorMessage: previous.errorMessage } : {}),
+    ...(playerMessage ? { playerMessage } : {})
+  };
+};
 
 export const markMazerBootStatus = (stage: MazerBootStage, errorMessage?: string): void => {
   if (typeof window === 'undefined') {

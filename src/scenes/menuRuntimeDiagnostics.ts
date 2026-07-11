@@ -1,5 +1,7 @@
 import type { RunProjection } from '../projections/runProjection.ts';
 import type { TelemetryEvent, TelemetrySemanticSummary } from '../telemetry';
+import type { MazeCycleTelemetryDiagnostics } from '../legacy-runtime/mazeCycleTelemetry';
+import type { LegacyProgressionDiagnostics } from '../legacy-runtime/legacyProgression';
 import type { HumanInputTimingSnapshot } from '../input-human';
 
 export const MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY = '__MAZER_RUNTIME_DIAGNOSTICS__' as const;
@@ -72,6 +74,9 @@ export interface MenuSceneGenerationDrawStageProgress {
   progressPercent: number | null;
   rowCount: number | null;
   rowsRemaining: number | null;
+  tileCount?: number | null;
+  tilesRemaining?: number | null;
+  tilesVisible?: number | null;
 }
 
 export interface MenuSceneRuntimeDiagnostics {
@@ -83,6 +88,63 @@ export interface MenuSceneRuntimeDiagnostics {
     mode: 'menu' | 'play';
     overlay: string;
   };
+  auth?: {
+    configured: boolean;
+    displayName: string | null;
+    email: string | null;
+    emailPresent: boolean;
+    formMode: 'login' | 'signup';
+    rememberedIdentity: {
+      displayName: string;
+      email: string;
+      sessionState: 'ready' | 'reauth-required';
+      updatedAt: string;
+    } | null;
+    status: 'guest' | 'authenticated' | 'unavailable';
+    userIdPresent: boolean;
+    latestMessage: {
+      copy: string;
+      id: string;
+      source: string;
+      tone: string;
+    } | null;
+  };
+  gameToggles?: {
+    animatedBackdrop: {
+      enabled: boolean;
+      switchIsOn: boolean;
+      stateText: string;
+    };
+    cameraFollow: {
+      enabled: boolean;
+      switchIsOn: boolean;
+      stateText: string;
+    };
+    controlMode: {
+      mode: 'arrows' | 'stick';
+      switchIsOn: boolean;
+      stateText: string;
+    };
+    darkMode: {
+      enabled: boolean;
+      switchIsOn: boolean;
+      stateText: string;
+    };
+    movementSpeed: {
+      label: string;
+      value: number;
+    };
+    trailFade: {
+      enabled: boolean;
+      switchIsOn: boolean;
+      stateText: string;
+    };
+    trailPulse: {
+      enabled: boolean;
+      switchIsOn: boolean;
+      stateText: string;
+    };
+  };
   play?: {
     board: {
       bottom: number;
@@ -91,6 +153,29 @@ export interface MenuSceneRuntimeDiagnostics {
       top: number;
       size: number;
       tileSize: number;
+      renderBounds?: {
+        bottom: number;
+        left: number;
+        right: number;
+        top: number;
+      };
+      renderSafeInset?: number;
+      renderSize?: number;
+      renderTileSize?: number;
+    };
+    lifecycle?: {
+      compassSpinExpected: boolean;
+      drawPhase: 'idle' | 'building' | 'settled' | 'deconstructing';
+      generationPending: boolean;
+      inputLocked: boolean;
+      nextSeedQueued: boolean;
+      overlayOpen: boolean;
+      phase: 'idle' | 'building' | 'ready' | 'playing' | 'goal-hold' | 'deconstructing' | 'handoff';
+      playerVisible: boolean;
+      resetPending: boolean;
+      timerRunning: boolean;
+      trailLength: number;
+      trailVisible: boolean;
     };
     inputBuffer: {
       held: {
@@ -101,6 +186,22 @@ export interface MenuSceneRuntimeDiagnostics {
       };
       pendingTimerActive: boolean;
       pointerStartActive: boolean;
+      touchSprint: {
+        activeControls: string[];
+        heldControl: string | null;
+        movementSpeed: number;
+        movementSpeedLabel: string;
+        repeatInitialDelayMs: number;
+        repeatIntervalMs: number;
+        stickInitialDelayMaxMs: number;
+        stickRepeatIntervalMaxMs: number;
+        stickRetargetDelayMs: number;
+        stickTurnDelayMaxMs: number;
+        turnDelayMs: number;
+        pendingStepCount: number;
+        repeatTimerActive: boolean;
+        stepTimerActive: boolean;
+      };
       resolvedVector: {
         deltaX: number;
         deltaY: number;
@@ -108,19 +209,82 @@ export interface MenuSceneRuntimeDiagnostics {
       simultaneousDelayMs: number;
     };
     player: {
+      renderScreenX?: number;
+      renderScreenY?: number;
       x: number;
       y: number;
       screenX: number;
       screenY: number;
+      visualMotionActive?: boolean;
+      visualMotionSnapReason?: 'wrapped-step' | null;
+      visualX?: number;
+      visualY?: number;
+    };
+    goal: {
+      x: number;
+      y: number;
+      screenX: number;
+      screenY: number;
+    };
+    playtest: {
+      encoding: 'walkable-rows-v1';
+      mazeSize: number;
+      walkableRows: string[];
+    };
+    markerStyle: {
+      goalCoreColor: number;
+      goalEdgeColor: number;
+      playerCoreColor: number;
+      playerCoreRadius: number;
+      playerBeaconAccentColor?: number;
+      playerBeaconColor?: number;
+      playerBeaconPeriodMs?: number;
+      playerHaloColor: number;
+      playerHaloRadius: number;
+      startCoreColor?: number;
+      startEdgeColor?: number;
+      trailPulseEnabled?: boolean;
+      trailPulseColor?: number;
+      trailPulseEdgeColor?: number;
+      iridescentMaterial?: {
+        minPathColorDistance: number;
+        playerAccentColor: number;
+        playerCoreColor: number;
+        playerHaloShiftColor: number;
+        pulseHeadColor: number;
+        pulseTailColor: number;
+        shiftPeriodMs: {
+          playerAccent: number;
+          playerHalo: number;
+          pulse: number;
+          trail: number;
+        };
+        trailHeadColor: number;
+        trailTailColor: number;
+      };
+      trailPulsePeriodMs?: number;
     };
   };
   menuDemo?: {
     phase: string | null;
     cue: string | null;
     pathCursor: number | null;
+    gate: {
+      nextMoveAtMs: number;
+      released: boolean;
+      waitingForBuild: boolean;
+    };
     reachedGoal: boolean;
     prerollSteps: number;
     runnerMistakesEnabled: boolean | null;
+    aiMemory?: {
+      choiceClass: string | null;
+      confidence: number;
+      optionCount: number;
+      optionPoints: Array<{ x: number; y: number }>;
+      targetPoint: { x: number; y: number } | null;
+      thoughtState: string;
+    };
     route?: {
       aiResetPathCursor: number | null;
       canonicalPathLength: number;
@@ -133,10 +297,17 @@ export interface MenuSceneRuntimeDiagnostics {
   };
   generation?: {
     maze?: {
+      buildTrace?: {
+        checkpointTileCount: number;
+        pathTileCount: number;
+        reinforcementShortcutTileCount: number;
+        shortcutTileCount: number;
+      };
       buildKind: 'menu-snapshot' | 'menu-generated' | 'play-generated' | null;
       source: 'menu-snapshot' | 'menu-generated' | 'play-generated';
       size: number;
       seed: number;
+      seedSource: 'query' | 'runtime-random';
       solutionPathLength: number;
       shortcutStats?: {
         requested: number;
@@ -173,12 +344,29 @@ export interface MenuSceneRuntimeDiagnostics {
     drawStage?: {
       batchSize: number | null;
       batchUnit: string | null;
+      buildPrerollActive?: boolean;
+      buildPrerollDurationMs?: number;
+      buildPrerollProgress?: number;
       complete: boolean | null;
+      handoffActive?: boolean;
+      handoffEndsAtMs?: number | null;
+      handoffDurationMs?: number;
+      handoffProgress?: number;
+      lifecyclePhase?: 'idle' | 'building' | 'settled' | 'deconstructing';
+      nextSeedQueued?: boolean;
       progressPercent: number | null;
       rowCount: number | null;
       rowsRemaining: number | null;
       rowsVisible: number | null;
       staged: boolean;
+      titleFullyDeconstructed?: boolean;
+      titlePieceCount?: number;
+      titlePiecesRemaining?: number;
+      titleVisiblePieces?: number;
+      tileCount?: number | null;
+      tilesRemaining?: number | null;
+      tilesVisible?: number | null;
+      zeroHoldStartedAtMs?: number | null;
     };
     stageCursor: {
       completionSignal: string | null;
@@ -226,9 +414,16 @@ export interface MenuSceneRuntimeDiagnostics {
     events: TelemetryEvent[];
     summary: TelemetrySemanticSummary;
   };
+  cycleTelemetry: MazeCycleTelemetryDiagnostics;
+  progression?: LegacyProgressionDiagnostics;
   resources: {
     activeTweens: number;
     activeTimers: number;
+    animatedBackdropEnabled?: boolean;
+    backdropDirty?: boolean;
+    boardDynamicDirty?: boolean;
+    boardPathDirty?: boolean;
+    boardStaticDirty?: boolean;
     listenerCount: number;
     listenerBreakdown: {
       sceneUpdate: number;
@@ -245,6 +440,7 @@ export interface MenuSceneRuntimeDiagnostics {
       wrongBranchCount: number;
       backtrackCount: number;
       recoveryCount: number;
+      optionalRetargetCount: number;
     };
     intentEntryCount: number;
     intentEntryCap: number;
@@ -253,10 +449,13 @@ export interface MenuSceneRuntimeDiagnostics {
     background: {
       clouds: number;
       farStars: number;
+      starMotion?: string;
       nearStars: number;
       twinkles: number;
-      veils: number;
-      driftMotes: number;
+      shards?: number;
+      glassShards: number;
+      driftRunes: number;
+      sigils?: number;
       moving: number;
       movingCap: number;
       signatureCap: number;
@@ -486,7 +685,28 @@ export const summarizeMenuSceneRuntimeFeed = (options: {
 export const resolveMenuSceneGenerationDrawStageProgress = (options: {
   rowCount?: number | null;
   rowsVisible?: number | null;
+  tileCount?: number | null;
+  tilesVisible?: number | null;
 }): MenuSceneGenerationDrawStageProgress => {
+  const tileCount = Number.isFinite(options.tileCount)
+    ? Math.max(0, Math.trunc(options.tileCount ?? 0))
+    : null;
+  if (tileCount !== null && tileCount > 0 && Number.isFinite(options.tilesVisible)) {
+    const tilesVisible = Math.min(tileCount, Math.max(0, Math.trunc(options.tilesVisible ?? 0)));
+    const tilesRemaining = Math.max(0, tileCount - tilesVisible);
+    return {
+      complete: tilesRemaining === 0,
+      progressPercent: Number(((tilesVisible / tileCount) * 100).toFixed(1)),
+      rowCount: Number.isFinite(options.rowCount)
+        ? Math.max(0, Math.trunc(options.rowCount ?? 0))
+        : null,
+      rowsRemaining: null,
+      tileCount,
+      tilesRemaining,
+      tilesVisible
+    };
+  }
+
   const rowCount = Number.isFinite(options.rowCount)
     ? Math.max(0, Math.trunc(options.rowCount ?? 0))
     : null;
@@ -495,7 +715,10 @@ export const resolveMenuSceneGenerationDrawStageProgress = (options: {
       complete: null,
       progressPercent: null,
       rowCount,
-      rowsRemaining: null
+      rowsRemaining: null,
+      tileCount,
+      tilesRemaining: null,
+      tilesVisible: null
     };
   }
 
@@ -506,7 +729,10 @@ export const resolveMenuSceneGenerationDrawStageProgress = (options: {
     complete: rowsRemaining === 0,
     progressPercent: Number(((rowsVisible / rowCount) * 100).toFixed(1)),
     rowCount,
-    rowsRemaining
+    rowsRemaining,
+    tileCount,
+    tilesRemaining: null,
+    tilesVisible: null
   };
 };
 

@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { resolveLegacyMenuTitlePresentation } from '../../src/legacy-runtime/legacyMenuTitle';
+import {
+  LEGACY_MENU_PATH_TITLE_CELLS,
+  LEGACY_MENU_PATH_TITLE_COLUMNS,
+  LEGACY_MENU_PATH_TITLE_GRID,
+  resolveLegacyMenuPathTitleLayout,
+  resolveLegacyMenuTitlePresentation
+} from '../../src/legacy-runtime/legacyMenuTitle';
 
 describe('legacy menu title presentation', () => {
   test('keeps the desktop wordmark large enough to overlap the board like the legacy screen', () => {
@@ -30,6 +36,17 @@ describe('legacy menu title presentation', () => {
     expect(presentation.shadowAlpha).toBeLessThan(presentation.titleAlpha);
   });
 
+  test('uses a wide portrait wordmark for generated menu boards while layout owns border clearance', () => {
+    const snapshotPresentation = resolveLegacyMenuTitlePresentation(387, 7, true, 430, 'snapshot');
+    const proceduralPresentation = resolveLegacyMenuTitlePresentation(387, 7, true, 430, 'procedural');
+
+    expect(proceduralPresentation.fontSize).toBeGreaterThan(snapshotPresentation.fontSize);
+    expect(proceduralPresentation.fontSize).toBeGreaterThanOrEqual(102);
+    expect(proceduralPresentation.fontSize).toBeLessThanOrEqual(104);
+    expect(proceduralPresentation.titleAlpha).toBeGreaterThan(snapshotPresentation.titleAlpha);
+    expect(proceduralPresentation.shadowAlpha).toBeLessThan(proceduralPresentation.titleAlpha);
+  });
+
   test('caps the wordmark in ultra-narrow side panels without changing normal portrait scale', () => {
     const presentation = resolveLegacyMenuTitlePresentation(147, 3, true, 172);
 
@@ -46,10 +63,30 @@ describe('legacy menu title presentation', () => {
     const proceduralPresentation = resolveLegacyMenuTitlePresentation(147, 3, true, 172, 'procedural');
 
     expect(proceduralPresentation.fontSize).toBeLessThan(snapshotPresentation.fontSize);
-    expect(proceduralPresentation.fontSize).toBeGreaterThanOrEqual(34);
-    expect(proceduralPresentation.fontSize).toBeLessThanOrEqual(36);
-    expect(proceduralPresentation.fontSize * 3.25).toBeLessThanOrEqual(118);
+    expect(proceduralPresentation.fontSize).toBeGreaterThanOrEqual(46);
+    expect(proceduralPresentation.fontSize).toBeLessThanOrEqual(48);
+    expect(proceduralPresentation.fontSize * 3.25).toBeLessThanOrEqual(172);
     expect(proceduralPresentation.titleAlpha).toBeLessThan(snapshotPresentation.titleAlpha);
     expect(proceduralPresentation.titleAlpha).toBeGreaterThan(proceduralPresentation.shadowAlpha);
+  });
+
+  test('builds the menu title from reusable maze path cells', () => {
+    const layout = resolveLegacyMenuPathTitleLayout(200, 72, 72);
+
+    expect(LEGACY_MENU_PATH_TITLE_COLUMNS).toBe(29);
+    expect(LEGACY_MENU_PATH_TITLE_CELLS).toHaveLength(87);
+    expect(layout.cells).toBe(LEGACY_MENU_PATH_TITLE_CELLS);
+    expect(layout.grid).toBe(LEGACY_MENU_PATH_TITLE_GRID);
+    expect(layout.cellSize).toBe(8);
+    expect(layout.coreInset).toBe(1);
+    expect(layout.width).toBe(232);
+    expect(layout.height).toBe(56);
+    expect(layout.left).toBe(84);
+    expect(layout.top).toBe(44);
+    expect(layout.cells[0]).toEqual({ column: 0, row: 0, order: 0 });
+    expect(layout.cells.at(-1)).toEqual({ column: 28, row: 6, order: 86 });
+    expect(layout.grid[0]?.[0]).toBe(true);
+    expect(layout.grid[0]?.[1]).toBe(false);
+    expect(layout.grid[6]?.[28]).toBe(true);
   });
 });

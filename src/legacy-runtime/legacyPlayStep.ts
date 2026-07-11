@@ -1,4 +1,4 @@
-import { isWalkableTile, movePoint, type LegacyMazeSnapshot, type LegacyPoint } from './legacyMaze';
+import { isWalkableTile, movePoint, resolveLegacyNavigationTarget, type LegacyMazeSnapshot, type LegacyPoint } from './legacyMaze';
 
 export const LEGACY_PLAY_TRAIL_FADE_TAIL = 16;
 export const LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS = 50;
@@ -27,6 +27,16 @@ export interface LegacyPlayStepResult {
   player: LegacyPoint;
   reachedGoal: boolean;
   trail: LegacyPoint[];
+}
+
+export interface LegacyPlayDiagonalSequenceInput extends LegacyPlayStepInput {
+  maxSteps?: number;
+}
+
+export interface LegacyPlayDiagonalSequencePlan {
+  moved: boolean;
+  reachedGoal: boolean;
+  steps: Array<{ deltaX: number; deltaY: number }>;
 }
 
 export interface LegacyPointerMoveInput {
@@ -165,10 +175,10 @@ export const resolveLegacyPlayCollisionDelta = (
 ): { deltaX: number; deltaY: number } => {
   const normalizedDeltaX = normalizeDelta(deltaX);
   const normalizedDeltaY = normalizeDelta(deltaY);
-  const gatedDeltaX = normalizedDeltaX !== 0 && isWalkableTile(maze, movePoint(player, normalizedDeltaX, 0))
+  const gatedDeltaX = normalizedDeltaX !== 0 && resolveLegacyNavigationTarget(maze, player, normalizedDeltaX, 0)
     ? normalizedDeltaX
     : 0;
-  const gatedDeltaY = normalizedDeltaY !== 0 && isWalkableTile(maze, movePoint(player, 0, normalizedDeltaY))
+  const gatedDeltaY = normalizedDeltaY !== 0 && resolveLegacyNavigationTarget(maze, player, 0, normalizedDeltaY)
     ? normalizedDeltaY
     : 0;
 
@@ -176,7 +186,7 @@ export const resolveLegacyPlayCollisionDelta = (
     return { deltaX: 0, deltaY: 0 };
   }
 
-  const finalTarget = movePoint(player, gatedDeltaX, gatedDeltaY);
+  const finalTarget = resolveLegacyNavigationTarget(maze, player, gatedDeltaX, gatedDeltaY) ?? movePoint(player, gatedDeltaX, gatedDeltaY);
   if (!isWalkableTile(maze, finalTarget)) {
     return { deltaX: 0, deltaY: 0 };
   }
@@ -203,7 +213,8 @@ export const advanceLegacyPlayStep = ({
     };
   }
 
-  const next = movePoint(player, gatedDelta.deltaX, gatedDelta.deltaY);
+  const next = resolveLegacyNavigationTarget(maze, player, gatedDelta.deltaX, gatedDelta.deltaY)
+    ?? movePoint(player, gatedDelta.deltaX, gatedDelta.deltaY);
   const nextPlayer = copyPoint(next);
   const nextTrail = [...trail.map(copyPoint), copyPoint(nextPlayer)];
   const boundedTrail = toggleTrailFade && nextTrail.length > trailFadeTail
@@ -215,5 +226,171 @@ export const advanceLegacyPlayStep = ({
     player: nextPlayer,
     reachedGoal: nextPlayer.x === maze.goal.x && nextPlayer.y === maze.goal.y,
     trail: boundedTrail
+  };
+};
+
+export const resolveLegacyPlayDiagonalSequenceSteps = ({
+  deltaX,
+  deltaY,
+  maxSteps,
+  maze,
+  player,
+  toggleTrailFade,
+  trail,
+  trailFadeTail = LEGACY_PLAY_TRAIL_FADE_TAIL
+}: LegacyPlayDiagonalSequenceInput): LegacyPlayDiagonalSequencePlan => {
+  const normalizedX = normalizeDelta(deltaX);
+  const normalizedY = normalizeDelta(deltaY);
+  if (normalizedX === 0 || normalizedY === 0) {
+    const singleStep = advanceLegacyPlayStep({
+      deltaX: normalizedX,
+      deltaY: normalizedY,
+      maze,
+      player,
+      toggleTrailFade,
+      trail,
+      trailFadeTail
+    });
+    return {
+      moved: singleStep.moved,
+      reachedGoal: singleStep.reachedGoal,
+      steps: singleStep.moved ? [{ deltaX: normalizedX, deltaY: normalizedY }] : []
+    };
+  }
+
+  const horizontal = { deltaX: normalizedX, deltaY: 0 };
+  const vertical = { deltaX: 0, deltaY: normalizedY };
+  const stepLimit = Math.max(1, Math.round(maxSteps ?? maze.size * 2));
+  let currentPlayer = copyPoint(player);
+  let currentTrail = trail.map(copyPoint);
+  let reachedGoal = false;
+  const steps: Array<{ deltaX: number; deltaY: number }> = [];
+  let preferHorizontalFirst = true;
+
+  const resolveOrder = (
+    order: Array<{ deltaX: number; deltaY: number }>,
+    remainingSteps: number
+  ): {
+    movedCount: number;
+    player: LegacyPoint;
+    reachedGoal: boolean;
+    steps: Array<{ deltaX: number; deltaY: number }>;
+    trail: LegacyPoint[];
+  } => {
+    let orderPlayer = copyPoint(currentPlayer);
+    let orderTrail = currentTrail.map(copyPoint);
+    let orderReachedGoal = false;
+    let movedCount = 0;
+    const orderSteps: Array<{ deltaX: number; deltaY: number }> = [];
+
+    for (const delta of order) {
+      const next = advanceLegacyPlayStep({
+        deltaX: delta.deltaX,
+        deltaY: delta.deltaY,
+        maze,
+        player: orderPlayer,
+        toggleTrailFade,
+        trail: orderTrail,
+        trailFadeTail
+      });
+      if (!next.moved) {
+        continue;
+      }
+
+      movedCount += 1;
+      orderSteps.push({ deltaX: delta.deltaX, deltaY: delta.deltaY });
+      orderPlayer = next.player;
+      orderTrail = next.trail;
+      orderReachedGoal = next.reachedGoal;
+      if (orderReachedGoal || movedCount >= remainingSteps) {
+        break;
+      }
+    }
+
+    return {
+      movedCount,
+      player: orderPlayer,
+      reachedGoal: orderReachedGoal,
+      steps: orderSteps,
+      trail: orderTrail
+    };
+  };
+
+  while (steps.length < stepLimit && !reachedGoal) {
+    const remainingSteps = stepLimit - steps.length;
+    const firstOrder = preferHorizontalFirst ? [horizontal, vertical] : [vertical, horizontal];
+    const secondOrder = preferHorizontalFirst ? [vertical, horizontal] : [horizontal, vertical];
+    const firstResult = resolveOrder(firstOrder, remainingSteps);
+    const secondResult = resolveOrder(secondOrder, remainingSteps);
+    const chosen = secondResult.movedCount > firstResult.movedCount ? secondResult : firstResult;
+    if (chosen.movedCount === 0) {
+      break;
+    }
+
+    steps.push(...chosen.steps);
+    currentPlayer = chosen.player;
+    currentTrail = chosen.trail;
+    reachedGoal = chosen.reachedGoal;
+    preferHorizontalFirst = !preferHorizontalFirst;
+  }
+
+  return {
+    moved: steps.length > 0,
+    reachedGoal,
+    steps
+  };
+};
+
+export const advanceLegacyPlayDiagonalSequence = ({
+  deltaX,
+  deltaY,
+  maxSteps,
+  maze,
+  player,
+  toggleTrailFade,
+  trail,
+  trailFadeTail = LEGACY_PLAY_TRAIL_FADE_TAIL
+}: LegacyPlayDiagonalSequenceInput): LegacyPlayStepResult => {
+  const plan = resolveLegacyPlayDiagonalSequenceSteps({
+    deltaX,
+    deltaY,
+    maxSteps,
+    maze,
+    player,
+    toggleTrailFade,
+    trail,
+    trailFadeTail
+  });
+  let currentPlayer = copyPoint(player);
+  let currentTrail = trail.map(copyPoint);
+  let reachedGoal = false;
+
+  for (const step of plan.steps) {
+    const next = advanceLegacyPlayStep({
+      deltaX: step.deltaX,
+      deltaY: step.deltaY,
+      maze,
+      player: currentPlayer,
+      toggleTrailFade,
+      trail: currentTrail,
+      trailFadeTail
+    });
+    if (!next.moved) {
+      break;
+    }
+
+    currentPlayer = next.player;
+    currentTrail = next.trail;
+    reachedGoal = next.reachedGoal;
+    if (reachedGoal) {
+      break;
+    }
+  }
+
+  return {
+    moved: plan.moved,
+    player: currentPlayer,
+    reachedGoal,
+    trail: currentTrail
   };
 };

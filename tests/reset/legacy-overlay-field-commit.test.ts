@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { LEGACY_DEFAULTS, copyLegacySettings } from '../../src/legacy-runtime/legacyDefaults';
+import {
+  LEGACY_DEFAULTS,
+  copyLegacySettings,
+  srgbByteToLinearChannel
+} from '../../src/legacy-runtime/legacyDefaults';
 import { createLegacyOptionFieldDrafts } from '../../src/legacy-runtime/legacyOptionFields';
 import { applyLegacyOverlayFieldCommit } from '../../src/legacy-runtime/legacyOverlayFieldCommit';
 
@@ -21,12 +25,12 @@ describe('legacy overlay field commit', () => {
   test('treats material channels as deferred reload-on-back fields', () => {
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
     const drafts = createLegacyOptionFieldDrafts(settings);
-    drafts.pathR = '0.500000';
+    drafts.pathR = '128';
 
     const result = applyLegacyOverlayFieldCommit(settings, drafts, 'pathR');
 
     expect(result.commitKind).toBe('material-change');
-    expect(result.settings.pathColor.r).toBe(0.5);
+    expect(result.settings.pathColor.r).toBeCloseTo(srgbByteToLinearChannel(128), 6);
     expect(result.triggersReloadOnBack).toBe(true);
     expect(result.triggersCameraFlag).toBe(false);
     expect(result.refreshLayout).toBe(false);

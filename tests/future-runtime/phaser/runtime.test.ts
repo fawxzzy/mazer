@@ -102,6 +102,7 @@ describe('future phaser runtime', () => {
 
     expect(config.parent).toBe(FUTURE_PHASER_GAME_PARENT_ID);
     expect(config.type).toBe('CANVAS');
+    expect(config.fps).toEqual({ target: 60, min: 30 });
     expect(scenes).toHaveLength(1);
     expect(scenes[0]).toBe(FuturePhaserScene);
   });

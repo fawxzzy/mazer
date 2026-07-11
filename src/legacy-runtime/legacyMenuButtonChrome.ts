@@ -24,27 +24,31 @@ export const resolveLegacyMenuButtonChrome = (
   input: ResolveLegacyMenuButtonChromeInput
 ): LegacyMenuButtonChrome => {
   const { height, isPrimary, textLength, width } = input;
+  const compact = height <= 44 || width <= 132;
   const fitSize = Math.floor((width * 1.4) / Math.max(4, textLength));
+  const minimumFontSize = compact ? 16 : (isPrimary ? 24 : 20);
+  const maximumFontSize = compact ? 20 : (isPrimary ? 40 : 32);
+  const heightRatio = compact ? 0.46 : (isPrimary ? 0.58 : 0.52);
   const fontSize = Math.max(
-    isPrimary ? 24 : 20,
+    minimumFontSize,
     Math.min(
-      isPrimary ? 40 : 32,
-      Math.min(Math.round(height * (isPrimary ? 0.58 : 0.52)), fitSize)
+      maximumFontSize,
+      Math.min(Math.round(height * heightRatio), fitSize)
     )
   );
 
   return {
     baseAlpha: isPrimary ? 0.34 : 0.3,
     baseStroke: isPrimary ? 0.72 : 0.52,
-    fillColor: 0x0d0715,
+    fillColor: isPrimary ? 0x06170f : 0x0d0715,
     fontSize,
-    hoverFillColor: 0x151021,
+    hoverFillColor: isPrimary ? 0x0a2a1a : 0x151021,
     hoverAlpha: isPrimary ? 0.162 : 0.126,
     hoverLabelAlpha: 1,
     hoverStroke: isPrimary ? 0.92 : 0.8,
     labelAlpha: isPrimary ? 1 : 0.98,
-    strokeColor: isPrimary ? 0xd3cae0 : 0xc2b8d1,
+    strokeColor: isPrimary ? 0x36ff7d : 0xc2b8d1,
     strokeWidth: 2,
-    textColor: isPrimary ? '#18a52c' : '#129224'
+    textColor: isPrimary ? '#36ff7d' : '#ecfff5'
   };
 };

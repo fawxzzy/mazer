@@ -41,9 +41,13 @@ export const applyHumanInputAction = (
 
   switch (action.kind) {
     case 'move_up':
+    case 'move_up_right':
     case 'move_down':
+    case 'move_down_right':
     case 'move_left':
+    case 'move_down_left':
     case 'move_right':
+    case 'move_up_left':
       return {
         ...nextState,
         movementCount: state.movementCount + 1
@@ -54,12 +58,7 @@ export const applyHumanInputAction = (
         paused: !state.paused
       };
     case 'restart_attempt':
-      return {
-        ...nextState,
-        paused: false,
-        attempt: state.attempt + 1,
-        movementCount: 0
-      };
+      return nextState;
     case 'toggle_thoughts':
       return {
         ...nextState,

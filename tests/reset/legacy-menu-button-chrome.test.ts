@@ -18,11 +18,13 @@ describe('legacy menu button chrome', () => {
 
     expect(primary.baseAlpha).toBeGreaterThan(secondary.baseAlpha);
     expect(primary.baseStroke).toBeGreaterThan(secondary.baseStroke);
-    expect(primary.fillColor).toBe(0x0d0715);
-    expect(primary.hoverFillColor).toBe(0x151021);
+    expect(primary.fillColor).toBe(0x06170f);
+    expect(primary.hoverFillColor).toBe(0x0a2a1a);
     expect(primary.fontSize).toBeGreaterThanOrEqual(secondary.fontSize);
     expect(primary.labelAlpha).toBeGreaterThan(secondary.labelAlpha);
     expect(primary.strokeWidth).toBeGreaterThanOrEqual(secondary.strokeWidth);
+    expect(primary.textColor).toBe('#36ff7d');
+    expect(secondary.textColor).toBe('#ecfff5');
   });
 
   test('keeps side-button chrome visible enough to survive the narrow live browser pane', () => {
@@ -42,5 +44,25 @@ describe('legacy menu button chrome', () => {
     expect(secondary.hoverAlpha).toBeGreaterThan(0.12);
     expect(secondary.labelAlpha).toBeGreaterThanOrEqual(0.98);
     expect(secondary.strokeWidth).toBe(2);
+  });
+
+  test('reserves vertical breathing room for compact mobile menu buttons', () => {
+    const primary = resolveLegacyMenuButtonChrome({
+      width: 118,
+      height: 42,
+      textLength: 5,
+      isPrimary: true
+    });
+    const secondary = resolveLegacyMenuButtonChrome({
+      width: 118,
+      height: 42,
+      textLength: 7,
+      isPrimary: false
+    });
+
+    expect(primary.fontSize).toBeLessThan(24);
+    expect(secondary.fontSize).toBeLessThan(20);
+    expect(primary.fontSize).toBeGreaterThanOrEqual(16);
+    expect(secondary.fontSize).toBeGreaterThanOrEqual(16);
   });
 });

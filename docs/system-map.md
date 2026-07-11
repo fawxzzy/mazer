@@ -63,14 +63,14 @@ Use this as the top-level "where does this actually live?" map before editing:
 | Phaser scene wiring | `src/boot/phaserConfig.ts` | `npm run build` |
 | active front door and play shell | `src/scenes/MenuScene.ts` | in-app browser, `npm run verify`; play board rendering owns connected corridor material for generated mazes and consumes responsive dynamic overlay metrics from `legacyMenuRender.ts` |
 | active-play keyboard, focus-loss, and mobile pointer/control movement | `src/legacy-runtime/legacyPlayStep.ts`, `src/input-human/touch.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-play-step.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/input-human/touch.test.ts`, `tests/scenes/menu-runtime-diagnostics.test.ts`, `docs/research/MAZER_MOBILE_TOUCH_LIVE_PROOF_2026_07_03.md`, localhost mobile/play proof; accepted movement keys are consumed at the scene boundary, browser focus loss clears held movement flags and pending movement timers, generated play maze solution paths walk start-to-goal through `advanceLegacyPlayStep()`, pointer/touch swipes plus short taps resolve into the same one-step vector and axis-gated collision path as keyboard input with pointer starts bounded to the active board rectangle, one active pointer identity owns each in-flight swipe, competing touches cannot overwrite it, `pointerupoutside` can complete inside-board swipes, game-out clears stale pointer starts, touch action controls are separated from D-pad hit slop, Phaser owns touch pointer controls while the non-touch pointer fallback ignores touch duplicates, maintained `mobile-touch-smoke` proof covers touch movement plus pause/resume/toggle/restart state changes, and runtime diagnostics publish the live input-buffer state for maintained-browser feel review |
-| live runtime diagnostics bridge | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/visual/edge-live-check.test.ts`, localhost; diagnostics are data-only and do not draw a visible proof/debug panel over the game, and `generation.maze` exposes source/build family plus compact maze quality stats for maintained-browser proof |
+| live runtime diagnostics bridge | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts`, `src/legacy-runtime/mazeCycleTelemetry.ts`, `scripts/analysis/maze-cycle-telemetry-report.mjs` | `tests/scenes/menu-runtime-diagnostics.test.ts`, `tests/reset/legacy-reset.test.ts`, `tests/reset/legacy-cycle-telemetry.test.ts`, `tests/analysis/maze-cycle-telemetry-report.test.mjs`, `tests/visual/edge-live-check.test.ts`, localhost; diagnostics are data-only and do not draw a visible proof/debug panel over the game, `generation.maze` exposes source/build family plus compact maze quality stats, `cycleTelemetry.learning` exposes local-only completion-pattern summaries for maintained-browser proof, and `cycle:report` turns browser-local receipts into Atlas-safe compact reports |
 | active-play HUD timer and goal arrow | `src/legacy-runtime/legacyPlayHud.ts`, `src/scenes/MenuScene.ts#drawHud()` | `tests/reset/legacy-play-hud.test.ts`, `tests/reset/legacy-reset.test.ts`, desktop/mobile play-route screenshots, `window.__MAZER_VISUAL_DIAGNOSTICS__` / `data-mazer-visual-diagnostics` with bare `timerText`, `arrowAngleRadians`, and `arrowAngleDegrees`; source-shaped minimal Timer/EndArrow chrome |
 | fixed menu maze shape | `src/legacy-runtime/legacyMenuSnapshot.ts` | `tests/reset/legacy-reset.test.ts`, screenshots |
 | generated play maze | `src/legacy-runtime/legacyMaze.ts` | `tests/reset/legacy-reset.test.ts`; includes source-shaped checkpoint pathing, shortcut bridges, disconnected-floor pruning, weak-goal rebasing, and weak-route reinforcement for playable browser topology |
 | menu/play dynamic overlay sizing | `src/legacy-runtime/legacyMenuRender.ts`, `src/scenes/MenuScene.ts` | `tests/scenes/menu-render-frame.test.ts`; trail stroke width, start/goal marker inset, and player halo/core metrics clamp for ultra-narrow mobile tiles while preserving desktop weight |
 | menu title/board/button layout math | `src/legacy-runtime/legacyMenuLayout.ts`, `src/legacy-runtime/legacyMenuTitle.ts` | `tests/reset/legacy-menu-layout.test.ts`, `tests/reset/legacy-menu-title.test.ts`; `menu-generated` uses a tighter ultra-narrow title cap than fixed screenshot snapshots so dense procedural boards stay legible in the maintained side browser |
 | menu demo behavior | `src/legacy-runtime/legacyMenuDemoLifecycle.ts`, `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts` | `tests/ai/demo-walker.test.ts`, `tests/reset/legacy-menu-demo-lifecycle.test.ts`, live menu preview; humanized wrong-branch recovery must reconnect through adjacent floor movement, not a non-adjacent canonical splice, representative first-mistake routes must stay bounded instead of continuing exploratory construction after cue evidence exists, generated `menu-generated` seed families must keep AI moves adjacent/bounded/on-floor, and cue labels must not reintroduce independent AI timers |
-| options field parsing | `src/legacy-runtime/legacyOptionFields.ts` | `tests/reset/legacy-option-fields.test.ts` |
+| options field parsing and advanced visibility | `src/legacy-runtime/legacyOptionFields.ts`, `src/legacy-runtime/legacyAdvancedOptions.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-option-fields.test.ts`, `tests/reset/legacy-advanced-options.test.ts`; normal player `Options` shows game toggles and move speed, while maze/camera/color tuning requires `advancedOptions=1` or `devOptions=1` |
 | options + pause field commit roles | `src/legacy-runtime/legacyOverlayFieldCommit.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-field-commit.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | features + game-modes toggle routing | `src/legacy-runtime/legacyOverlayToggleFields.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-toggle-fields.test.ts`, `tests/reset/legacy-reset.test.ts` |
 | nested overlay return routing | `src/legacy-runtime/legacyOverlayRouting.ts`, `src/scenes/MenuScene.ts` | `tests/reset/legacy-overlay-routing.test.ts`, `tests/reset/legacy-reset.test.ts` |
@@ -97,7 +97,7 @@ This is the active state contract for the current app front door.
 | menu demo episode/config/state | `MazeEpisode`, `DemoWalkerConfig`, `DemoWalkerState` | `src/legacy-runtime/legacyDemoWalker.ts`, `src/domain/ai/demoWalker.ts`, `src/scenes/MenuScene.ts` | menu-only attract route and preroll truth |
 | player/trail/goal live state | `player`, `trail`, `goal` | `src/scenes/MenuScene.ts` | trail presentation differs between menu and play, but ownership stays local to the scene |
 | visual diagnostics | `window.__MAZER_VISUAL_DIAGNOSTICS__`, `data-mazer-visual-diagnostics` | `src/scenes/MenuScene.ts` | visual proof scripts treat this as route-aware readback, not gameplay truth; active-play board bounds use the same camera-follow offset as the rendered static/dynamic board layers, and the DOM attribute is the maintained-browser fallback when automation cannot read hidden window globals |
-| runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; browser automation still may not see the `window` globals directly, but the DOM attribute is the repo-owned fallback surface and now exposes active menu-demo cue, route shape, mistake-enabled lane state, AI wrong-branch/backtrack/recovery counters, generation stage cursor, stage-6 draw progress, and compact maze source/build/quality readback without drawing visible debug text |
+| runtime diagnostics | `window.__MAZER_RUNTIME_DIAGNOSTICS__`, `data-mazer-runtime-diagnostics` | `src/scenes/menuRuntimeDiagnostics.ts`, `src/scenes/MenuScene.ts`, `src/legacy-runtime/mazeCycleTelemetry.ts`, `scripts/analysis/maze-cycle-telemetry-report.mjs` | runtime proof now publishes from the actual scene loop when `runtimeDiagnostics=1`; browser automation still may not see the `window` globals directly, but the DOM attribute is the repo-owned fallback surface and now exposes active menu-demo cue, route shape, mistake-enabled lane state, AI wrong-branch/backtrack/recovery counters, generation stage cursor, stage-6 draw progress, compact maze source/build/quality readback, and compact local cycle-learning summaries without drawing visible debug text; `cycle:report` is the supported Atlas-safe export path for those bounded local-learning summaries |
 
 ## End-to-end flow map
 
@@ -360,10 +360,10 @@ Rule:
 
 - `src/legacy-runtime/legacyDefaults.ts`
   - canonical legacy defaults
-  - `Exit / Start / Options`
+  - active front-door buttons: `Start / Options`
 - `src/legacy-runtime/legacyMenuLayout.ts`
   - title, board, and button frame math
-  - spacing contract between board edge and `Exit / Start / Options`
+  - spacing contract between board edge and the centered `Start / Options` pair
 - `src/legacy-runtime/legacyOptionFields.ts`
   - text-field draft parsing and settings mutation
   - maze-affecting option edits now defer runtime rebuild until overlay close, matching the legacy menu/pause contract more closely
@@ -492,7 +492,11 @@ What `test:verify` currently means:
 
 - `tests/reset`
 - `tests/ai/demo-walker.test.ts`
+- `tests/ai/demo-walker-known-frontier.test.ts`
+- `tests/ai/demo-walker-rank-ladder.test.ts`
+- `tests/ai/demo-walker-recovery-diagnostics.test.ts`
 - `tests/scenes/menu-render-frame.test.ts`
+- `tests/analysis/maze-cycle-telemetry-report.test.mjs`
 - `--maxWorkers 1`
 
 ### Visual comparison surfaces

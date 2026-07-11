@@ -27,6 +27,16 @@ const buildPathTrail = (
   return points.slice(Math.max(0, points.length - limit)).map(copyPoint);
 };
 
+export const resolveLegacyMenuDemoTrail = (
+  state: DemoWalkerState,
+  width: number,
+  toggleTrailFade: boolean,
+  trailFadeTail: number
+): LegacyPoint[] => buildPathTrail(
+  resolveLegacyTrailFromDemoSteps(state.trailSteps, width),
+  toggleTrailFade ? trailFadeTail : null
+);
+
 export const isFixedLegacyMenuSnapshot = (maze: Pick<LegacyMazeSnapshot, 'source'>): boolean => (
   maze.source === 'menu-snapshot'
 );
@@ -71,12 +81,13 @@ export const createLegacyMenuDemoBootstrap = (
     ? createLegacyMenuSnapshotDemoWalkerConfig(maze.seed)
     : createLegacyMenuDemoWalkerConfig(maze.seed);
   let state = createDemoWalkerState(episode, config);
+  const shouldBootstrapSnapshotRoute = isFixedSnapshot && config.behavior.enableRunnerMistakes === true;
   const basePrerollSteps = Math.max(0, config.behavior.prerollSteps ?? legacyTuning.demo.behavior.prerollSteps ?? 0);
-  const prerollSteps = isFixedSnapshot
+  const prerollSteps = shouldBootstrapSnapshotRoute
     ? Math.min(basePrerollSteps, Math.max(0, maze.solutionPath.length - 8))
     : basePrerollSteps;
 
-  if (isFixedSnapshot) {
+  if (shouldBootstrapSnapshotRoute) {
     const minVisibleCursor = Math.min(
       Math.max(1, LEGACY_MENU_SNAPSHOT_BOOTSTRAP_MIN_VISIBLE_CURSOR),
       Math.max(1, maze.solutionPath.length - 4)
@@ -123,10 +134,7 @@ export const createLegacyMenuDemoBootstrap = (
     config,
     state,
     player: resolveLegacyPointFromDemoIndex(state.currentIndex, episode.raster.width),
-    trail: buildPathTrail(
-      resolveLegacyTrailFromDemoSteps(state.trailSteps, episode.raster.width),
-      toggleTrailFade ? trailFadeTail : null
-    )
+    trail: resolveLegacyMenuDemoTrail(state, episode.raster.width, toggleTrailFade, trailFadeTail)
   };
 };
 
@@ -144,10 +152,7 @@ export const advanceLegacyMenuDemoFrame = (
     shouldRegenerateMaze: Boolean(advance.shouldRegenerateMaze),
     state: advance.state,
     player: resolveLegacyPointFromDemoIndex(advance.state.currentIndex, episode.raster.width),
-    trail: buildPathTrail(
-      resolveLegacyTrailFromDemoSteps(advance.state.trailSteps, episode.raster.width),
-      toggleTrailFade ? trailFadeTail : null
-    )
+    trail: resolveLegacyMenuDemoTrail(advance.state, episode.raster.width, toggleTrailFade, trailFadeTail)
   };
 };
 

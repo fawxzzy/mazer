@@ -9,19 +9,7 @@ const readDevicePixelRatio = (): number => {
   return Math.max(1, window.devicePixelRatio);
 };
 
-const isAutomatedBrowser = (): boolean => {
-  if (typeof navigator === 'undefined') {
-    return false;
-  }
-
-  return navigator.webdriver === true || /HeadlessChrome|Playwright/u.test(navigator.userAgent ?? '');
-};
-
 export const resolveHudTextResolution = (viewport: { width: number; height: number }): number => {
-  if (isAutomatedBrowser()) {
-    return 1;
-  }
-
   const devicePixelRatio = readDevicePixelRatio();
   const resolutionCap = viewport.width <= legacyTuning.menu.layout.narrowBreakpoint ? 1.4 : 1.85;
   return Phaser.Math.Clamp(Math.min(devicePixelRatio, resolutionCap), 1, resolutionCap);

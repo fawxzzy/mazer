@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  advanceLegacyPlayDiagonalSequence,
   advanceLegacyPlayStep,
   createLegacyPlayPointerStart,
   createLegacyPlayMoveFlags,
@@ -8,6 +9,7 @@ import {
   LEGACY_PLAY_TRAIL_FADE_TAIL,
   LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS,
   resolveLegacyPointerMoveVector,
+  resolveLegacyPlayDiagonalSequenceSteps,
   resolveLegacyPlayCollisionDelta,
   resolveLegacyPlayMoveVector
 } from '../../src/legacy-runtime/legacyPlayStep';
@@ -55,6 +57,50 @@ describe('legacy play step', () => {
     expect(result.player).toEqual({ x: 2, y: 1 });
     expect(result.reachedGoal).toBe(false);
     expect(result.trail).toEqual([{ x: 1, y: 1 }, { x: 2, y: 1 }]);
+  });
+
+  test('treats paired off-border paths as one navigable step', () => {
+    const maze: LegacyMazeSnapshot = {
+      ...createTestMaze(),
+      grid: [
+        [false, false, true, false, false],
+        [false, false, false, false, false],
+        [true, false, false, false, true],
+        [false, false, false, false, false],
+        [false, false, true, false, false]
+      ],
+      start: { x: 0, y: 2 },
+      goal: { x: 4, y: 2 },
+      solutionPath: [
+        { x: 0, y: 2 },
+        { x: 4, y: 2 }
+      ]
+    };
+
+    const leftWrap = advanceLegacyPlayStep({
+      maze,
+      player: { x: 0, y: 2 },
+      trail: [{ x: 0, y: 2 }],
+      deltaX: -1,
+      deltaY: 0,
+      toggleTrailFade: false
+    });
+    const upWrap = advanceLegacyPlayStep({
+      maze,
+      player: { x: 2, y: 0 },
+      trail: [{ x: 2, y: 0 }],
+      deltaX: 0,
+      deltaY: -1,
+      toggleTrailFade: false
+    });
+
+    expect(resolveLegacyPlayCollisionDelta(maze, { x: 0, y: 2 }, -1, 0)).toEqual({ deltaX: -1, deltaY: 0 });
+    expect(leftWrap.moved).toBe(true);
+    expect(leftWrap.player).toEqual({ x: 4, y: 2 });
+    expect(leftWrap.reachedGoal).toBe(true);
+    expect(leftWrap.trail).toEqual([{ x: 0, y: 2 }, { x: 4, y: 2 }]);
+    expect(upWrap.moved).toBe(true);
+    expect(upWrap.player).toEqual({ x: 2, y: 4 });
   });
 
   test('resolves held direction flags after the legacy simultaneous-key delay', () => {
@@ -270,6 +316,153 @@ describe('legacy play step', () => {
     expect(result.moved).toBe(true);
     expect(result.player).toEqual({ x: 2, y: 1 });
     expect(result.trail).toEqual([{ x: 1, y: 1 }, { x: 2, y: 1 }]);
+  });
+
+  test('walks a touch diagonal sequence through the first open cardinal order', () => {
+    const maze: LegacyMazeSnapshot = {
+      ...createTestMaze(),
+      grid: [
+        [false, false, false, false, false],
+        [false, true, false, false, false],
+        [false, true, true, false, false],
+        [false, false, true, false, false],
+        [false, false, false, false, false]
+      ],
+      goal: { x: 2, y: 3 }
+    };
+
+    const result = advanceLegacyPlayDiagonalSequence({
+      maze,
+      player: { x: 1, y: 1 },
+      trail: [{ x: 1, y: 1 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false,
+      maxSteps: 4
+    });
+
+    expect(result.moved).toBe(true);
+    expect(result.player).toEqual({ x: 2, y: 3 });
+    expect(result.reachedGoal).toBe(true);
+    expect(result.trail).toEqual([
+      { x: 1, y: 1 },
+      { x: 1, y: 2 },
+      { x: 2, y: 2 },
+      { x: 2, y: 3 }
+    ]);
+  });
+
+  test('plans a single touch diagonal command as visible cardinal substeps', () => {
+    const maze: LegacyMazeSnapshot = {
+      ...createTestMaze(),
+      grid: [
+        [false, false, false, false, false],
+        [false, true, false, false, false],
+        [false, true, true, false, false],
+        [false, false, true, false, false],
+        [false, false, false, false, false]
+      ],
+      goal: { x: 2, y: 3 }
+    };
+
+    expect(resolveLegacyPlayDiagonalSequenceSteps({
+      maze,
+      player: { x: 1, y: 1 },
+      trail: [{ x: 1, y: 1 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false,
+      maxSteps: 1
+    })).toMatchObject({
+      moved: true,
+      steps: [
+        { deltaX: 0, deltaY: 1 }
+      ]
+    });
+  });
+
+  test('walks a touch diagonal sequence through the alternate cardinal order when that opens first', () => {
+    const maze: LegacyMazeSnapshot = {
+      ...createTestMaze(),
+      grid: [
+        [false, false, false, false, false],
+        [false, true, true, false, false],
+        [false, false, true, true, false],
+        [false, false, false, true, false],
+        [false, false, false, false, false]
+      ],
+      goal: { x: 3, y: 3 }
+    };
+
+    const result = advanceLegacyPlayDiagonalSequence({
+      maze,
+      player: { x: 1, y: 1 },
+      trail: [{ x: 1, y: 1 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false,
+      maxSteps: 4
+    });
+
+    expect(result.moved).toBe(true);
+    expect(result.player).toEqual({ x: 3, y: 3 });
+    expect(result.reachedGoal).toBe(true);
+    expect(result.trail).toEqual([
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 2, y: 2 },
+      { x: 3, y: 2 },
+      { x: 3, y: 3 }
+    ]);
+  });
+
+  test('prefers the diagonal cardinal order that can make the longer valid segment', () => {
+    const maze: LegacyMazeSnapshot = {
+      ...createTestMaze(),
+      grid: [
+        [false, false, false, false, false],
+        [false, true, true, false, false],
+        [false, true, false, false, false],
+        [false, true, true, false, false],
+        [false, false, false, false, false]
+      ],
+      goal: { x: 2, y: 3 }
+    };
+
+    const result = advanceLegacyPlayDiagonalSequence({
+      maze,
+      player: { x: 1, y: 1 },
+      trail: [{ x: 1, y: 1 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false,
+      maxSteps: 1
+    });
+
+    expect(result.moved).toBe(true);
+    expect(result.player).toEqual({ x: 2, y: 1 });
+    expect(result.trail).toEqual([
+      { x: 1, y: 1 },
+      { x: 2, y: 1 }
+    ]);
+
+    const alternate = advanceLegacyPlayDiagonalSequence({
+      maze,
+      player: { x: 1, y: 2 },
+      trail: [{ x: 1, y: 2 }],
+      deltaX: 1,
+      deltaY: 1,
+      toggleTrailFade: false,
+      maxSteps: 2
+    });
+
+    expect(alternate.moved).toBe(true);
+    expect(alternate.player).toEqual({ x: 2, y: 3 });
+    expect(alternate.trail).toEqual([
+      { x: 1, y: 2 },
+      { x: 1, y: 3 },
+      { x: 2, y: 3 }
+    ]);
   });
 
   test('blocks a simultaneous corner move when the final diagonal target is a wall', () => {

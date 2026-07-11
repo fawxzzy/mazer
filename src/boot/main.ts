@@ -1,9 +1,12 @@
 import Phaser from 'phaser';
 import '../styles/base.css';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
+import { installMazerPortraitLock } from './orientationLock';
 import { phaserConfig } from './phaserConfig';
 
 const LOCALHOST_SW_RESET_KEY = 'mazer:localhost-sw-reset:v1';
+const PRODUCTION_SW_UPDATE_RELOAD_KEY = 'mazer:production-sw-update-reload-at:v1';
+const PRODUCTION_SW_UPDATE_RELOAD_WINDOW_MS = 10_000;
 
 const isLocalhostRuntime = (): boolean => {
   if (typeof window === 'undefined') {
@@ -45,8 +48,42 @@ const resetLocalhostServiceWorkers = async (): Promise<boolean> => {
   return changed;
 };
 
+const shouldReloadForProductionServiceWorkerUpdate = (nowMs: number): boolean => {
+  const lastReloadAtMs = Number(window.sessionStorage.getItem(PRODUCTION_SW_UPDATE_RELOAD_KEY) ?? '0');
+  return Number.isNaN(lastReloadAtMs) || nowMs - lastReloadAtMs > PRODUCTION_SW_UPDATE_RELOAD_WINDOW_MS;
+};
+
+const markProductionServiceWorkerUpdateReload = (nowMs: number): void => {
+  window.sessionStorage.setItem(PRODUCTION_SW_UPDATE_RELOAD_KEY, String(nowMs));
+};
+
+const registerProductionServiceWorker = (): void => {
+  if (isLocalhostRuntime() || !('serviceWorker' in navigator)) {
+    return;
+  }
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      const nowMs = Date.now();
+      if (!shouldReloadForProductionServiceWorkerUpdate(nowMs)) {
+        return;
+      }
+
+      markProductionServiceWorkerUpdateReload(nowMs);
+      window.location.reload();
+    }, { once: true });
+
+    void navigator.serviceWorker.register('/sw.js')
+      .then((registration) => registration.update())
+      .catch((error: unknown) => {
+        markMazerBootStatus('service-worker-error', error instanceof Error ? error.message : String(error));
+      });
+  }, { once: true });
+};
+
 const boot = async (): Promise<void> => {
   markMazerBootStatus('boot-start');
+  installMazerPortraitLock();
 
   if (isLocalhostRuntime()) {
     const changed = await resetLocalhostServiceWorkers();
@@ -65,6 +102,7 @@ const boot = async (): Promise<void> => {
   markMazerBootStatus('game-creating');
   const game = new Phaser.Game(phaserConfig);
   attachMazerGameToWindow(game);
+  registerProductionServiceWorker();
   markMazerBootStatus('game-created');
 };
 

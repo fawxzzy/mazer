@@ -18,6 +18,10 @@ import {
 } from './common.mjs';
 import { resolveLayoutMatrixRoute, resolveLayoutMatrixViewports } from './layout-matrix.config.mjs';
 import { launchPreviewServer, stopPreviewServer } from './preview-server.mjs';
+import {
+  assertVisualScreenContract,
+  buildVisualScreenContract
+} from './screen-contract.mjs';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
@@ -266,6 +270,7 @@ const writeLayoutMatrixFailureReceipt = async ({
       reason: error?.lastReadiness?.reason ?? error?.message ?? 'unknown error',
       message: error?.message ?? 'unknown error'
     },
+    screenContract: error?.screenContract ?? null,
     lastKnownDiagnosticsSnapshot: error?.lastReadiness?.snapshot ?? {
       route,
       url,
@@ -365,6 +370,13 @@ const captureViewport = async ({
       url,
       viewport
     });
+    const screenContract = buildVisualScreenContract({
+      expectedRoute: route,
+      actualUrl: page.url(),
+      viewport,
+      diagnostics
+    });
+    assertVisualScreenContract(screenContract);
     await page.screenshot({
       path: fullPath,
       fullPage: false,
@@ -380,6 +392,8 @@ const captureViewport = async ({
       viewport,
       route,
       url,
+      actualUrl: page.url(),
+      screenContract,
       diagnostics,
       files: {
         full: relativeToRun(runDir, fullPath),
@@ -538,6 +552,8 @@ export const captureLayoutMatrix = async ({
         viewport: capture.viewport,
         route: capture.route,
         url: capture.url,
+        actualUrl: capture.actualUrl,
+        screenContract: capture.screenContract,
         files: capture.files,
         board: {
           safeBounds: capture.diagnostics.board.safeBounds,

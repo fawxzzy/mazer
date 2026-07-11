@@ -16,7 +16,7 @@ param(
 
 $launcherPath = Resolve-Path (Join-Path $PSScriptRoot 'Launch-Mazer.cmd')
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
-$iconPath = Join-Path $repoRoot 'public\icons\mazer-emblem.ico'
+$iconPath = Join-Path $repoRoot 'public\icons\mazer-app-icon.ico'
 $arguments = @()
 
 if ($Profile -ne 'default') {

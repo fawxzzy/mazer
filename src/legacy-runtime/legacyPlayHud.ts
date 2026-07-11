@@ -15,6 +15,12 @@ export interface LegacyHudRect {
 }
 
 export interface LegacyPlayHudFrameInput {
+  compassBounds?: {
+    height: number;
+    left: number;
+    top: number;
+    width: number;
+  };
   elapsedMs: number;
   goalScreen: LegacyHudPoint;
   layoutWidth: number;
@@ -32,6 +38,20 @@ export interface LegacyPlayHudFrame {
   bounds: LegacyHudRect;
   timerBounds: LegacyHudRect;
   timerText: string;
+}
+
+export interface LegacyCompassSpinFrameInput {
+  durationMs: number;
+  elapsedMs: number;
+  targetAngleRadians: number;
+  turns: number;
+}
+
+export interface LegacyCompassSpinFrame {
+  active: boolean;
+  angleDegrees: number;
+  angleRadians: number;
+  progress: number;
 }
 
 const createLegacyHudRect = (left: number, top: number, width: number, height: number): LegacyHudRect => ({
@@ -67,16 +87,38 @@ export const resolveLegacyHudArrowAngle = (
   goalScreen: LegacyHudPoint
 ): number => Math.atan2(goalScreen.y - playerScreen.y, goalScreen.x - playerScreen.x);
 
+export const resolveLegacyCompassSpinFrame = ({
+  durationMs,
+  elapsedMs,
+  targetAngleRadians,
+  turns
+}: LegacyCompassSpinFrameInput): LegacyCompassSpinFrame => {
+  const safeDurationMs = Math.max(1, Math.round(durationMs));
+  const progress = Math.max(0, Math.min(1, elapsedMs / safeDurationMs));
+  const remaining = Math.pow(1 - progress, 3);
+  const angleRadians = targetAngleRadians + (remaining * turns * Math.PI * 2);
+
+  return {
+    active: progress < 1,
+    angleDegrees: (angleRadians * 180) / Math.PI,
+    angleRadians,
+    progress
+  };
+};
+
 export const resolveLegacyPlayHudFrame = (input: LegacyPlayHudFrameInput): LegacyPlayHudFrame => {
   const timerText = formatLegacyHudClock(input.elapsedMs);
+  const compassBounds = input.compassBounds
+    ? createLegacyHudRect(input.compassBounds.left, input.compassBounds.top, input.compassBounds.width, input.compassBounds.height)
+    : createLegacyHudRect(input.layoutWidth - 56, 8, 44, 44);
   const arrowOrigin = {
-    x: input.layoutWidth - 30,
-    y: 22
+    x: compassBounds.centerX,
+    y: compassBounds.centerY
   };
   const arrowAngleRadians = resolveLegacyHudArrowAngle(input.playerScreen, input.goalScreen);
   const arrowAngleDegrees = (arrowAngleRadians * 180) / Math.PI;
-  const length = 18;
-  const timerBounds = createLegacyHudRect(14, 14, 64, 22);
+  const length = 14;
+  const timerBounds = createLegacyHudRect(Math.round((input.layoutWidth - 112) / 2), 10, 112, 38);
   const arrowTip = {
     x: arrowOrigin.x + (Math.cos(arrowAngleRadians) * length),
     y: arrowOrigin.y + (Math.sin(arrowAngleRadians) * length)
@@ -89,16 +131,7 @@ export const resolveLegacyPlayHudFrame = (input: LegacyPlayHudFrameInput): Legac
     x: arrowOrigin.x + (Math.cos(arrowAngleRadians - 2.42) * 6),
     y: arrowOrigin.y + (Math.sin(arrowAngleRadians - 2.42) * 6)
   };
-  const arrowBoundsLeft = Math.floor(Math.min(arrowOrigin.x, arrowTip.x, arrowLeft.x, arrowRight.x)) - 2;
-  const arrowBoundsTop = Math.floor(Math.min(arrowOrigin.y, arrowTip.y, arrowLeft.y, arrowRight.y)) - 2;
-  const arrowBoundsRight = Math.ceil(Math.max(arrowOrigin.x, arrowTip.x, arrowLeft.x, arrowRight.x)) + 2;
-  const arrowBoundsBottom = Math.ceil(Math.max(arrowOrigin.y, arrowTip.y, arrowLeft.y, arrowRight.y)) + 2;
-  const arrowBounds = createLegacyHudRect(
-    arrowBoundsLeft,
-    arrowBoundsTop,
-    arrowBoundsRight - arrowBoundsLeft,
-    arrowBoundsBottom - arrowBoundsTop
-  );
+  const arrowBounds = compassBounds;
 
   return {
     arrowAngleDegrees,

@@ -125,7 +125,10 @@ describe('menu runtime diagnostics', () => {
       complete: false,
       progressPercent: 28,
       rowCount: 25,
-      rowsRemaining: 18
+      rowsRemaining: 18,
+      tileCount: null,
+      tilesRemaining: null,
+      tilesVisible: null
     });
 
     expect(resolveMenuSceneGenerationDrawStageProgress({
@@ -135,7 +138,25 @@ describe('menu runtime diagnostics', () => {
       complete: true,
       progressPercent: 100,
       rowCount: 25,
-      rowsRemaining: 0
+      rowsRemaining: 0,
+      tileCount: null,
+      tilesRemaining: null,
+      tilesVisible: null
+    });
+
+    expect(resolveMenuSceneGenerationDrawStageProgress({
+      rowsVisible: 25,
+      rowCount: 25,
+      tilesVisible: 21,
+      tileCount: 84
+    })).toEqual({
+      complete: false,
+      progressPercent: 25,
+      rowCount: 25,
+      rowsRemaining: null,
+      tileCount: 84,
+      tilesRemaining: 63,
+      tilesVisible: 21
     });
 
     expect(resolveMenuSceneGenerationDrawStageProgress({
@@ -145,7 +166,10 @@ describe('menu runtime diagnostics', () => {
       complete: null,
       progressPercent: null,
       rowCount: null,
-      rowsRemaining: null
+      rowsRemaining: null,
+      tileCount: null,
+      tilesRemaining: null,
+      tilesVisible: null
     });
   });
 
@@ -272,6 +296,63 @@ describe('menu runtime diagnostics', () => {
         mode: 'menu',
         overlay: 'none'
       },
+      auth: {
+        configured: true,
+        displayName: 'Mazer Owner',
+        email: 'fawxzzy@example.test',
+        emailPresent: true,
+        formMode: 'login',
+        rememberedIdentity: {
+          displayName: 'Mazer Owner',
+          email: 'fawxzzy@example.test',
+          sessionState: 'ready',
+          updatedAt: '2026-07-09T12:00:00.000Z'
+        },
+        status: 'authenticated',
+        userIdPresent: true,
+        latestMessage: {
+          copy: 'Signed in.',
+          id: 'auth:signed-in',
+          source: 'auth',
+          tone: 'success'
+        }
+      },
+      gameToggles: {
+        animatedBackdrop: {
+          enabled: false,
+          switchIsOn: false,
+          stateText: 'Stagnant'
+        },
+        cameraFollow: {
+          enabled: false,
+          switchIsOn: false,
+          stateText: 'Off'
+        },
+        controlMode: {
+          mode: 'arrows',
+          switchIsOn: false,
+          stateText: 'Arrows'
+        },
+        darkMode: {
+          enabled: false,
+          switchIsOn: false,
+          stateText: 'Off'
+        },
+        movementSpeed: {
+          label: '30%',
+          value: 0.3
+        },
+        trailFade: {
+          enabled: false,
+          switchIsOn: false,
+          stateText: 'Off'
+        },
+        trailPulse: {
+          enabled: true,
+          switchIsOn: true,
+          stateText: 'On'
+        }
+      },
       play: {
         board: {
           bottom: 420,
@@ -290,6 +371,22 @@ describe('menu runtime diagnostics', () => {
           },
           pendingTimerActive: true,
           pointerStartActive: false,
+          touchSprint: {
+            activeControls: [],
+            heldControl: null,
+            movementSpeed: 0.3,
+            movementSpeedLabel: '30%',
+            repeatInitialDelayMs: 258,
+            repeatIntervalMs: 112,
+            stickInitialDelayMaxMs: 144,
+            stickRepeatIntervalMaxMs: 104,
+            stickRetargetDelayMs: 64,
+            stickTurnDelayMaxMs: 144,
+            turnDelayMs: 300,
+            pendingStepCount: 0,
+            repeatTimerActive: false,
+            stepTimerActive: false
+          },
           resolvedVector: {
             deltaX: 1,
             deltaY: 1
@@ -301,6 +398,31 @@ describe('menu runtime diagnostics', () => {
           y: 2,
           screenX: 35,
           screenY: 105
+        },
+        goal: {
+          x: 47,
+          y: 46,
+          screenX: 1735,
+          screenY: 1715
+        },
+        playtest: {
+          encoding: 'walkable-rows-v1',
+          mazeSize: 3,
+          walkableRows: [
+            '111',
+            '010',
+            '111'
+          ]
+        },
+        markerStyle: {
+          goalCoreColor: 0xff263f,
+          goalEdgeColor: 0xd81b2a,
+          playerCoreColor: 0x36ff7d,
+          playerCoreRadius: 2.38,
+          playerHaloColor: 0x00b84a,
+          playerHaloRadius: 3.22,
+          startCoreColor: 0xfff05a,
+          startEdgeColor: 0xffc629,
         }
       },
       menuDemo: {
@@ -459,7 +581,8 @@ describe('menu runtime diagnostics', () => {
         runnerPolicy: {
           wrongBranchCount: 2,
           backtrackCount: 5,
-          recoveryCount: 2
+          recoveryCount: 2,
+          optionalRetargetCount: 1
         },
         intentEntryCount: 0,
         intentEntryCap: 0,
@@ -470,8 +593,9 @@ describe('menu runtime diagnostics', () => {
           farStars: 0,
           nearStars: 0,
           twinkles: 0,
-          veils: 0,
-          driftMotes: 0,
+          shards: 0,
+          glassShards: 0,
+          driftRunes: 0,
           moving: 0,
           movingCap: 0,
           signatureCap: 0
@@ -491,6 +615,32 @@ describe('menu runtime diagnostics', () => {
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )?.play?.inputBuffer.simultaneousDelayMs).toBe(50);
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.play?.inputBuffer.touchSprint.repeatInitialDelayMs).toBe(258);
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.play?.inputBuffer.touchSprint.repeatIntervalMs).toBe(112);
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.play?.inputBuffer.touchSprint.turnDelayMs).toBe(300);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.auth?.status)
+        .toBe('authenticated');
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.auth?.rememberedIdentity?.sessionState)
+        .toBe('ready');
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.auth?.latestMessage?.copy)
+        .toBe('Signed in.');
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.auth?.userIdPresent).toBe(true);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.animatedBackdrop.stateText)
+        .toBe('Stagnant');
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.darkMode.stateText)
+        .toBe('Off');
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.trailPulse.enabled)
+        .toBe(true);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.trailPulse.switchIsOn)
+        .toBe(true);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.menuDemo?.route?.cueCounts.reacquire).toBe(2);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.source).toBe('menu-generated');
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.generation?.maze?.routeQualityStats?.routeQuality)

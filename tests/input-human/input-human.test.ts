@@ -5,6 +5,8 @@ import {
   createHumanRunState,
   createKeyboardSimulationPolicy,
   createScriptedSimulationPolicy,
+  resolveHumanMovementActionFromPriorityStack,
+  resolveHumanMovementPriorityCandidates,
   resolveHumanInputActionKindFromKeyboard
 } from '../../src/input-human';
 import type { HumanInputAction } from '../../src/input-human';
@@ -18,7 +20,7 @@ describe('input-human bridge', () => {
     expect(resolveHumanInputActionKindFromKeyboard({ code: 'KeyD' })).toBe('move_right');
     expect(resolveHumanInputActionKindFromKeyboard({ key: ' ' })).toBe('pause');
     expect(resolveHumanInputActionKindFromKeyboard({ code: 'KeyP' })).toBe('pause');
-    expect(resolveHumanInputActionKindFromKeyboard({ key: 'r' })).toBe('restart_attempt');
+    expect(resolveHumanInputActionKindFromKeyboard({ key: 'r' })).toBeNull();
     expect(resolveHumanInputActionKindFromKeyboard({ key: 't' })).toBe('toggle_thoughts');
     expect(resolveHumanInputActionKindFromKeyboard({ key: 'q' })).toBeNull();
   });
@@ -72,9 +74,11 @@ describe('input-human bridge', () => {
     expect(humanPolicy.kind).toBe('human');
     expect(aiPolicy.kind).toBe('ai');
     expect(humanFirst.state.thoughtsVisible).toBe(false);
-    expect(humanSecond.state.attempt).toBe(2);
+    expect(humanSecond.action).toBeNull();
+    expect(humanSecond.state.attempt).toBe(1);
     expect(aiFirst.state.thoughtsVisible).toBe(true);
-    expect(aiSecond.state.attempt).toBe(2);
+    expect(aiSecond.state.attempt).toBe(1);
+    expect(aiSecond.state.movementCount).toBe(0);
   });
 
   test('lets controls jump ahead of queued moves in the shared keyboard policy', () => {
@@ -92,5 +96,27 @@ describe('input-human bridge', () => {
     expect(first.action?.kind).toBe('pause');
     expect(second.action?.kind).toBe('pause');
     expect(third.action?.kind).toBe('move_up');
+  });
+
+  test('combines up to two held movement controls by first-pressed axis priority', () => {
+    expect(resolveHumanMovementActionFromPriorityStack(['move_right', 'move_down'])).toBe('move_down_right');
+    expect(resolveHumanMovementActionFromPriorityStack(['move_down', 'move_right'])).toBe('move_down_right');
+    expect(resolveHumanMovementActionFromPriorityStack(['move_left', 'move_right'])).toBe('move_left');
+    expect(resolveHumanMovementActionFromPriorityStack(['move_up', 'move_down'])).toBe('move_up');
+    expect(resolveHumanMovementActionFromPriorityStack(['move_up_right', 'move_down'])).toBe('move_up_right');
+    expect(resolveHumanMovementActionFromPriorityStack(['move_right', 'move_down', 'move_left'])).toBe('move_down_right');
+  });
+
+  test('keeps held movement fallback candidates in press order with a two-control cap', () => {
+    expect(resolveHumanMovementPriorityCandidates(['move_down', 'move_right'])).toEqual(['move_down', 'move_right']);
+    expect(resolveHumanMovementPriorityCandidates(['move_right', 'move_down'])).toEqual(['move_right', 'move_down']);
+    expect(resolveHumanMovementPriorityCandidates(['move_down', 'move_down', 'move_right'])).toEqual([
+      'move_down',
+      'move_right'
+    ]);
+    expect(resolveHumanMovementPriorityCandidates(['move_down', 'move_right', 'move_left'])).toEqual([
+      'move_down',
+      'move_right'
+    ]);
   });
 });

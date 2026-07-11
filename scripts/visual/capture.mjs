@@ -17,6 +17,10 @@ import {
   writeJson,
   writeSessionPointer
 } from './common.mjs';
+import {
+  assertVisualScreenContract,
+  buildVisualScreenContract
+} from './screen-contract.mjs';
 
 const CAPTURE_KEY = '__MAZER_VISUAL_CAPTURE__';
 const DIAGNOSTICS_KEY = '__MAZER_VISUAL_DIAGNOSTICS__';
@@ -445,14 +449,23 @@ const captureTargetAttempt = async (browser, baseUrl, target, outputDir, metrics
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
     const diagnostics = await waitForDiagnostics(page, timeoutMs);
+    const screenContract = buildVisualScreenContract({
+      expectedRoute: target.path,
+      actualUrl: page.url(),
+      viewport: target.viewport,
+      diagnostics
+    });
+    assertVisualScreenContract(screenContract);
     const validation = validateDiagnostics(diagnostics);
     await page.screenshot({ path: screenshotPath, fullPage: false, animations: 'disabled' });
 
     const record = {
       target,
       url,
+      actualUrl: page.url(),
       attempt,
       screenshotPath,
+      screenContract,
       diagnostics,
       consoleMessages,
       ...validation
@@ -526,7 +539,9 @@ export const captureVisualSet = async ({
     targets: records.map((record) => ({
       id: record.target.id,
       url: record.url,
+      actualUrl: record.actualUrl,
       screenshotPath: record.screenshotPath,
+      screenContract: record.screenContract,
       passed: record.passed,
       failedChecks: record.checks.filter((check) => !check.pass)
     }))
