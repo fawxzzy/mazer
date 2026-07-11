@@ -70,7 +70,7 @@ describe('Mazer viewport geometry', () => {
       layout: { width: 390, height: 844 },
       visual: { width: 390, height: 780, offsetLeft: 0, offsetTop: 12, scale: 1 },
       safeArea: { top: 24, right: 0, bottom: 34, left: 0 },
-      content: { left: 0, top: 24, width: 390, height: 722 },
+      content: { left: 0, top: 36, width: 390, height: 722 },
       devicePixelRatio: 2,
       isPhoneLike: true,
       isLandscape: false
@@ -85,9 +85,40 @@ describe('Mazer viewport geometry', () => {
 
     expect(cssValues.get('--mazer-viewport-width')).toBe('390px');
     expect(cssValues.get('--mazer-viewport-height')).toBe('722px');
+    expect(cssValues.get('--mazer-viewport-left')).toBe('0px');
+    expect(cssValues.get('--mazer-viewport-top')).toBe('36px');
     expect(cssValues.get('--mazer-safe-area-top')).toBe('24px');
     expect(cssValues.get('--mazer-safe-area-bottom')).toBe('34px');
     expect(root.dataset).toMatchObject({ mazerViewportRevision: '3' });
+  });
+
+  test('anchors iPhone and Android cutout content inside visual viewport offsets', () => {
+    const iphone = createRuntime({ height: 852, visualHeight: 852, visualWidth: 393, width: 393 });
+    iphone.cssValues.set('--mazer-safe-area-top', '59px');
+    iphone.cssValues.set('--mazer-safe-area-right', '6px');
+    iphone.cssValues.set('--mazer-safe-area-bottom', '34px');
+    iphone.cssValues.set('--mazer-safe-area-left', '8px');
+    iphone.runtime.visualViewport.offsetLeft = 3;
+    iphone.runtime.visualViewport.offsetTop = 47;
+
+    expect(resolveMazerViewportGeometryFromRuntime(iphone.runtime as never).content).toEqual({
+      left: 11,
+      top: 106,
+      width: 379,
+      height: 759
+    });
+
+    const android = createRuntime({ height: 915, visualHeight: 875, visualWidth: 412, width: 412 });
+    android.cssValues.set('--mazer-safe-area-top', '32px');
+    android.cssValues.set('--mazer-safe-area-bottom', '20px');
+    android.runtime.visualViewport.offsetTop = 18;
+
+    expect(resolveMazerViewportGeometryFromRuntime(android.runtime as never).content).toEqual({
+      left: 0,
+      top: 50,
+      width: 412,
+      height: 823
+    });
   });
 
   test('avoids duplicate Phaser resize work and forwards the active geometry exactly once', () => {

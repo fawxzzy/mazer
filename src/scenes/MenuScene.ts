@@ -5772,13 +5772,11 @@ export class MenuScene extends Phaser.Scene {
     const baseFontSize = this.mode === 'menu'
       ? clampInteger(Math.round(mazeRenderFrame.tileSize * 0.64), 11, 14)
       : clampInteger(Math.round(mazeRenderFrame.tileSize * 0.68), 11, 14);
-    const maxWidth = Math.max(
-      178,
-      Math.min(
-        this.layout.width - 18,
-        Math.round(mazeRenderFrame.boardSize + (mazeRenderFrame.safeInset * 2))
-      )
-    );
+    const minBadgeWidth = Math.min(178, Math.max(120, this.layout.width - 18));
+    const maxWidth = Math.max(minBadgeWidth, Math.min(
+      this.layout.width - 18,
+      Math.round(mazeRenderFrame.boardSize + (mazeRenderFrame.safeInset * 2))
+    ));
     const horizontalPadding = this.mode === 'menu'
       ? clampInteger(Math.round(mazeRenderFrame.tileSize * 2.85), 22, 30)
       : clampInteger(Math.round(mazeRenderFrame.tileSize * 3.3), 24, 34);
@@ -5801,7 +5799,7 @@ export class MenuScene extends Phaser.Scene {
     const fittedTextHeight = Math.ceil(this.progressionBadgeText.height);
     const width = clampInteger(
       fittedTextWidth + horizontalPadding,
-      178,
+      minBadgeWidth,
       maxWidth
     );
     const height = clampInteger(
@@ -5809,7 +5807,9 @@ export class MenuScene extends Phaser.Scene {
       38,
       this.mode === 'menu' && this.layout.height > this.layout.width ? 98 : this.mode === 'menu' ? 90 : 76
     );
-    const centerX = mazeRenderFrame.boardLeft + (mazeRenderFrame.boardSize / 2);
+    const centerX = this.mode === 'play' && this.layout.height > this.layout.width
+      ? Math.round(this.layout.width * 0.32)
+      : mazeRenderFrame.boardLeft + (mazeRenderFrame.boardSize / 2);
     const centerY = this.mode === 'play'
       ? this.resolveLegacyPlayProgressionBadgeCenterY(mazeRenderFrame, height)
       : this.resolveLegacyMenuProgressionBadgeCenterY(mazeRenderFrame, height);
@@ -5848,6 +5848,10 @@ export class MenuScene extends Phaser.Scene {
     mazeRenderFrame: LegacyMazeRenderFrame,
     height: number
   ): number {
+    if (this.layout.lanes.rank !== null) {
+      return Math.round(this.layout.lanes.rank.top + (this.layout.lanes.rank.height / 2));
+    }
+
     const outerInset = Math.max(0, (this.layout.boardSize - mazeRenderFrame.boardSize) / 2);
     const boardBottom = mazeRenderFrame.boardTop + mazeRenderFrame.boardSize + outerInset;
     const authenticatedStack = this.authSnapshot.status === 'authenticated'
@@ -5870,6 +5874,10 @@ export class MenuScene extends Phaser.Scene {
     mazeRenderFrame: LegacyMazeRenderFrame,
     height: number
   ): number {
+    if (this.layout.lanes.hud !== null) {
+      return Math.round(this.layout.lanes.hud.top + (this.layout.lanes.hud.height / 2));
+    }
+
     const mazeGap = clampInteger(Math.round(mazeRenderFrame.tileSize * 2.4), 16, 28);
     const minimumTop = this.layout.height > this.layout.width ? 8 : 10;
     const maximumTopBeforeMaze = mazeRenderFrame.boardTop - mazeGap - height;

@@ -7,6 +7,8 @@
   --mazer-safe-area-left: env(safe-area-inset-left, 0px);
   --mazer-viewport-width: 100vw;
   --mazer-viewport-height: 100dvh;
+  --mazer-viewport-left: 0px;
+  --mazer-viewport-top: 0px;
 }
 
 * {
@@ -44,8 +46,8 @@ body {
 
 #app {
   position: fixed;
-  left: 0;
-  top: 0;
+  left: var(--mazer-viewport-left);
+  top: var(--mazer-viewport-top);
   overflow: hidden;
 }
 

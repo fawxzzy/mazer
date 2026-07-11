@@ -25,17 +25,25 @@ describe('layout matrix config', () => {
     const { resolveLayoutMatrixRoute, resolveLayoutMatrixViewports } = await loadConfig();
 
     const extended = resolveLayoutMatrixViewports('extended');
+    const platform = resolveLayoutMatrixViewports('platform');
     const all = resolveLayoutMatrixViewports('all');
 
     expect(extended).toEqual([
       { id: 'ultrawide', label: 'Ultrawide', width: 2560, height: 1080 },
       { id: 'short-desktop', label: 'Short Desktop', width: 1280, height: 720 }
     ]);
+    expect(platform).toEqual([
+      { id: 'iphone-dynamic-island', label: 'iPhone Dynamic Island', width: 393, height: 852 },
+      { id: 'android-cutout', label: 'Android Cutout', width: 412, height: 915 },
+      { id: 'macos-browser', label: 'macOS Browser', width: 1440, height: 900 },
+      { id: 'windows-browser', label: 'Windows Browser', width: 1365, height: 768 }
+    ]);
     expect(new Set(all.map((viewport: { id: string }) => viewport.id)).size).toBe(all.length);
-    expect(all).toHaveLength(10);
+    expect(all).toHaveLength(14);
     expect(resolveLayoutMatrixRoute(all[0])).toBe('/?profile=mobile&theme=aurora');
     expect(resolveLayoutMatrixRoute(all[7])).toBe('/?profile=tv&theme=noir');
     expect(resolveLayoutMatrixRoute(all[5], '/?theme=ember')).toBe('/?theme=ember');
+    expect(resolveLayoutMatrixRoute(platform[0])).toBe('/?profile=mobile&theme=aurora');
     expect(resolveLayoutMatrixRoute(all[0], undefined, { design: 'recovery' })).toBe('/?profile=mobile&theme=aurora&design=recovery');
     expect(resolveLayoutMatrixRoute(all[7], undefined, { design: 'recovery' })).toBe('/?profile=tv&theme=noir&design=recovery');
     expect(resolveLayoutMatrixRoute(all[5], '/?theme=ember', { design: 'recovery' })).toBe('/?theme=ember&design=recovery');

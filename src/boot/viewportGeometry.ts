@@ -163,6 +163,8 @@ export const resolveMazerViewportGeometryFromRuntime = (
   });
   const effectiveWidth = useVisualViewport ? visualWidth : layoutWidth;
   const effectiveHeight = useVisualViewport ? visualHeight : layoutHeight;
+  const effectiveLeft = useVisualViewport ? normalizeOffset(runtime.visualViewport?.offsetLeft) : 0;
+  const effectiveTop = useVisualViewport ? normalizeOffset(runtime.visualViewport?.offsetTop) : 0;
   const safeArea = readSafeArea(runtime);
   const devicePixelRatio = normalizeScale(runtime.devicePixelRatio);
 
@@ -181,8 +183,8 @@ export const resolveMazerViewportGeometryFromRuntime = (
       usedForContent: useVisualViewport
     },
     content: {
-      left: safeArea.left,
-      top: safeArea.top,
+      left: effectiveLeft + safeArea.left,
+      top: effectiveTop + safeArea.top,
       width: Math.max(1, effectiveWidth - safeArea.left - safeArea.right),
       height: Math.max(1, effectiveHeight - safeArea.top - safeArea.bottom)
     },
@@ -220,6 +222,8 @@ export const applyMazerViewportCssVariables = (
 
   root.style.setProperty('--mazer-viewport-width', `${geometry.content.width}px`);
   root.style.setProperty('--mazer-viewport-height', `${geometry.content.height}px`);
+  root.style.setProperty('--mazer-viewport-left', `${geometry.content.left}px`);
+  root.style.setProperty('--mazer-viewport-top', `${geometry.content.top}px`);
   root.style.setProperty('--mazer-safe-area-top', `${geometry.safeArea.top}px`);
   root.style.setProperty('--mazer-safe-area-right', `${geometry.safeArea.right}px`);
   root.style.setProperty('--mazer-safe-area-bottom', `${geometry.safeArea.bottom}px`);
