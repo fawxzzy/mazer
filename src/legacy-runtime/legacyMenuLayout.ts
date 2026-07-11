@@ -1,9 +1,4 @@
 import { clampInteger } from './legacyDefaults';
-import {
-  resolveLegacyMenuPathTitleLayout,
-  resolveLegacyMenuPathTitleOrbitGeometry,
-  resolveLegacyMenuTitlePresentation
-} from './legacyMenuTitle';
 
 export interface LegacyMenuLayout {
   width: number;
@@ -26,6 +21,20 @@ export interface LegacyMenuLayout {
   rightButtonX: number;
   buttonWidth: number;
   buttonHeight: number;
+  lanes: {
+    actions: LegacyMenuLayoutLane | null;
+    controls: LegacyMenuLayoutLane | null;
+    hud: LegacyMenuLayoutLane | null;
+    maze: LegacyMenuLayoutLane;
+    rank: LegacyMenuLayoutLane | null;
+    title: LegacyMenuLayoutLane | null;
+  };
+}
+
+export interface LegacyMenuLayoutLane {
+  bottom: number;
+  height: number;
+  top: number;
 }
 
 export interface LegacyAuthenticatedMenuButtonStack {
@@ -50,43 +59,14 @@ const LEGACY_PLAY_ULTRA_NARROW_WIDTH = 360;
 const LEGACY_PHONE_CLEAN_ZOOM_WIDTH = 420;
 const LEGACY_PHONE_CLEAN_TILE_SIZE = 8;
 const LEGACY_PHONE_CLEAN_SAFE_INSET = 7;
-const LEGACY_BOARD_SIGIL_BORDER_INSET = 2;
-const LEGACY_PLAY_TOP_HUD_MIN = 62;
-const LEGACY_PLAY_TOP_HUD_MAX = 84;
+const LEGACY_PLAY_TOP_HUD_MIN = 84;
+const LEGACY_PLAY_TOP_HUD_MAX = 112;
 
-const resolveMenuPortraitTitleY = (
-  width: number,
-  boardTop: number,
-  boardSize: number,
-  tileSize: number,
-  fallbackTitleY: number,
-  isProceduralMenu: boolean
-): number => {
-  const titlePresentation = resolveLegacyMenuTitlePresentation(
-    boardSize,
-    tileSize,
-    true,
-    width,
-    isProceduralMenu ? 'procedural' : 'snapshot'
-  );
-  const titleLayout = resolveLegacyMenuPathTitleLayout(
-    Math.round(width / 2),
-    fallbackTitleY,
-    titlePresentation.fontSize
-  );
-  const orbitGeometry = resolveLegacyMenuPathTitleOrbitGeometry(
-    titleLayout.left,
-    titleLayout.top,
-    titleLayout.width,
-    titleLayout.height,
-    titleLayout.cellSize
-  );
-  const titleOrbitClearance = Math.max(9, Math.round(titleLayout.cellSize * 1.5));
-  const targetCrownBottomY = boardTop - LEGACY_BOARD_SIGIL_BORDER_INSET - titleOrbitClearance;
-  const alignedTitleY = fallbackTitleY - Math.max(0, Math.round(orbitGeometry.crownBottom - targetCrownBottomY));
-
-  return Math.max(28, alignedTitleY);
-};
+const createLane = (top: number, height: number): LegacyMenuLayoutLane => ({
+  top: Math.round(top),
+  height: Math.max(0, Math.round(height)),
+  bottom: Math.round(top) + Math.max(0, Math.round(height))
+});
 
 export const resolveLegacyAuthenticatedMenuButtonStack = (
   layout: Pick<LegacyMenuLayout, 'boardSize' | 'boardTop' | 'buttonHeight' | 'buttonLayout' | 'centerButtonX' | 'centerButtonY' | 'footerY' | 'height' | 'leftButtonX' | 'leftButtonY' | 'rightButtonX' | 'rightButtonY' | 'width'>
@@ -155,17 +135,54 @@ export const resolveLegacyMenuLayout = (
   const usesStackedButtons = isSidePanelPortrait;
   const shouldUseCleanPhoneCadence = isPortrait && !isUltraNarrow && width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH;
   const isShortLandscapeMenu = !isPlaySurface && !isPortrait && height < 820;
+  const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
+  const stackGap = Math.round(clamp(height * 0.02, 7, 12));
+  const laneGap = isUltraNarrow ? 4 : 8;
+  const menuTopReserve = isUltraNarrow ? 6 : Math.round(clamp(height * 0.02, 16, 20));
+  const menuFooterReserve = isUltraNarrow ? 10 : 18;
+  const menuTitleReserve = isUltraNarrow
+    ? 50
+    : isPortrait
+      ? Math.round(clamp(width * 0.26, 72, 112))
+      : Math.round(clamp(height * 0.16, 110, 150));
+  const menuRankReserve = isUltraNarrow
+    ? 42
+    : Math.round(clamp(height * (isPortrait ? 0.095 : 0.085), 76, isPortrait ? 90 : 82));
+  const menuActionReserve = usesStackedButtons
+    ? (buttonHeight * 2) + stackGap
+    : isPortrait
+      ? buttonHeight
+      : buttonHeight + clampInteger(Math.round(buttonHeight * LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_RATIO), LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MIN, LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MAX) + Math.max(38, Math.round(buttonHeight * 0.78));
+  const playTopHudReserve = isPlaySurface && isPortrait
+    ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
+    : 56;
+  const playControlReserve = isPlaySurface && isPortrait
+    ? Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230))
+    : 0;
+  const menuVerticalBoardLimit = height
+    - menuTopReserve
+    - menuTitleReserve
+    - menuRankReserve
+    - menuActionReserve
+    - (laneGap * 3)
+    - menuFooterReserve;
+  const playVerticalBoardLimit = height
+    - playTopHudReserve
+    - (isPortrait ? playControlReserve + (laneGap * 2) : laneGap + 12);
+  const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuVerticalBoardLimit);
   const baseBoardScale = isUltraNarrow ? 0.98 : (isPortrait ? (isPlaySurface ? 0.92 : 0.86) : (isPlaySurface ? 0.62 : 0.52));
   const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const maxBoardSize = Math.min(
     width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78))),
-    height * (isPlaySurface ? (isPortrait ? 0.74 : 0.86) : (isPortrait ? 0.82 : (isShortLandscapeMenu ? 0.6 : 0.72)))
+    height * (isPlaySurface ? (isPortrait ? 0.74 : 0.86) : (isPortrait ? 0.82 : (isShortLandscapeMenu ? 0.6 : 0.72))),
+    laneBoardLimit
   );
   const minBoardSize = Math.min(300, Math.max(120, maxBoardSize));
   const rawBoardSize = Math.min(
     width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias,
-    height * (isPlaySurface ? (isPortrait ? 0.64 : 0.84) : (isPortrait ? 0.54 : (isShortLandscapeMenu ? 0.6 : 0.72))) * scaleBias
+    height * (isPlaySurface ? (isPortrait ? 0.64 : 0.84) : (isPortrait ? 0.54 : (isShortLandscapeMenu ? 0.6 : 0.72))) * scaleBias,
+    laneBoardLimit
   );
   const boardSize = Math.round(clamp(rawBoardSize, minBoardSize, maxBoardSize));
   const rawTileSize = boardSize / Math.max(1, mazeSize);
@@ -181,43 +198,19 @@ export const resolveLegacyMenuLayout = (
     ? Math.round((tileSize * mazeSize) + (LEGACY_PHONE_CLEAN_SAFE_INSET * 2))
     : Math.round(tileSize * mazeSize * 1000) / 1000;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
-  const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
-  const stackGap = Math.round(clamp(height * 0.02, 7, 12));
-  const titleClearance = Math.round(clamp(snappedBoardSize * (isPortrait ? 0.13 : 0.11), isPortrait ? 42 : 36, isPortrait ? 68 : 74));
-  const menuButtonGap = Math.round(clamp(buttonHeight * (isPortrait ? 1.82 : 1.2), isPortrait ? 76 : 70, isPortrait ? 96 : 90));
-  const menuStackHeight = titleClearance + snappedBoardSize + menuButtonGap + buttonHeight;
-  const centeredMenuBoardTop = Math.round((height - menuStackHeight) / 2 + titleClearance);
-  const menuBoardTop = isUltraNarrow
-    ? clamp(height * 0.104, 32, 72)
-    : clamp(
-      centeredMenuBoardTop,
-      isPortrait ? 128 : 48,
-      Math.max(isPortrait ? 128 : 48, height - snappedBoardSize - menuButtonGap - buttonHeight - 24)
-    );
-  const playTopHudReserve = isPlaySurface && isPortrait
-    ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
-    : 56;
-  const playBoardTop = isUltraNarrow
-    ? clamp(
-      height * 0.14,
-      isPlaySurface ? Math.min(48, playTopHudReserve) : 48,
-      Math.max(48, height - snappedBoardSize - Math.round(height * 0.38))
-    )
-    : isPortrait
-      ? clamp(
-        playTopHudReserve,
-        playTopHudReserve,
-        Math.max(playTopHudReserve, height - snappedBoardSize - Math.round(height * 0.24))
-      )
-      : clamp((height - snappedBoardSize) / 2, 56, height - snappedBoardSize - 12);
+  const menuGroupHeight = menuTitleReserve + snappedBoardSize + menuRankReserve + menuActionReserve + (laneGap * 3);
+  const menuGroupTop = Math.max(
+    menuTopReserve,
+    Math.round((height - menuFooterReserve - menuGroupHeight) / 2)
+  );
+  const menuBoardTop = menuGroupTop + menuTitleReserve + laneGap;
+  const playBoardTop = isPortrait
+    ? playTopHudReserve + laneGap
+    : Math.round(clamp((height - snappedBoardSize) / 2, playTopHudReserve + laneGap, height - snappedBoardSize - 12));
   const boardTop = Math.round(isPlaySurface ? playBoardTop : menuBoardTop);
-  const mobileMenuActionCenterY = height - Math.round(clamp(height * 0.18, 120, 170));
-  const menuRowButtonY = isPortrait && !isPlaySurface && !usesStackedButtons
-    ? Math.max(
-      boardTop + snappedBoardSize + menuButtonGap + Math.round(buttonHeight / 2),
-      mobileMenuActionCenterY
-    )
-    : boardTop + snappedBoardSize + menuButtonGap + Math.round(buttonHeight / 2);
+  const menuRankLaneTop = boardTop + snappedBoardSize + laneGap;
+  const menuActionLaneTop = menuRankLaneTop + menuRankReserve + laneGap;
+  const menuRowButtonY = menuActionLaneTop + Math.round(buttonHeight / 2);
   const playRowButtonY = isPortrait
     ? boardTop + snappedBoardSize + Math.round(buttonHeight * 0.86)
     : boardTop + snappedBoardSize + Math.round(buttonHeight * 0.54);
@@ -248,20 +241,18 @@ export const resolveLegacyMenuLayout = (
   const leftButtonY = usesStackedButtons ? stackTop + Math.round(buttonHeight / 2) : rowButtonY;
   const rightButtonY = usesStackedButtons ? leftButtonY + buttonHeight + stackGap : rowButtonY;
   const centerButtonY = rowButtonY;
-  const titleOverlapY = Math.round(boardTop + (snappedBoardSize * (isPortrait ? 0.216 : 0.221)));
-  const menuPortraitTitleClearance = titleClearance;
-  const menuPortraitTitleFallbackY = Math.max(34, boardTop - menuPortraitTitleClearance);
-  const menuPortraitTitleY = resolveMenuPortraitTitleY(
-    width,
-    boardTop,
-    snappedBoardSize,
-    tileSize,
-    menuPortraitTitleFallbackY,
-    true
+  const titleLaneTop = Math.max(0, boardTop - laneGap - menuTitleReserve);
+  const menuPortraitTitleFallbackY = Math.max(
+    titleLaneTop + 20,
+    Math.round(titleLaneTop + (menuTitleReserve / 2) - (isPortrait ? 16 : 0))
   );
-  const titleX = !isPlaySurface && isPortrait
-    ? boardLeft + (snappedBoardSize / 2)
-    : Math.round(width / 2);
+  const menuPortraitTitleY = menuPortraitTitleFallbackY;
+  const titleX = !isPlaySurface && isPortrait ? boardLeft + (snappedBoardSize / 2) : Math.round(width / 2);
+  const rankLane = isPlaySurface ? null : createLane(menuRankLaneTop, menuRankReserve);
+  const actionsLane = isPlaySurface ? null : createLane(menuActionLaneTop, menuActionReserve);
+  const controlsLane = isPlaySurface && isPortrait
+    ? createLane(boardTop + snappedBoardSize + laneGap, Math.max(0, height - (boardTop + snappedBoardSize + laneGap)))
+    : null;
 
   return {
     width,
@@ -271,7 +262,7 @@ export const resolveLegacyMenuLayout = (
     boardSize: snappedBoardSize,
     tileSize,
     titleX,
-    titleY: Math.round(!isPlaySurface && isPortrait ? menuPortraitTitleY : titleOverlapY),
+    titleY: Math.round(!isPlaySurface ? menuPortraitTitleY : boardTop),
     footerY: height - 18,
     buttonLayout: usesStackedButtons ? 'stack' : 'row',
     buttonY: rowButtonY,
@@ -283,6 +274,14 @@ export const resolveLegacyMenuLayout = (
     centerButtonX,
     rightButtonX: usesStackedButtons ? centerButtonX : centerButtonX + rowButtonOffset,
     buttonWidth,
-    buttonHeight
+    buttonHeight,
+    lanes: {
+      actions: actionsLane,
+      controls: controlsLane,
+      hud: isPlaySurface ? createLane(0, playTopHudReserve) : null,
+      maze: createLane(boardTop, snappedBoardSize),
+      rank: rankLane,
+      title: isPlaySurface ? null : createLane(titleLaneTop, menuTitleReserve)
+    }
   };
 };

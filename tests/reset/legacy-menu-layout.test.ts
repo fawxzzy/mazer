@@ -26,7 +26,7 @@ describe('legacy menu layout', () => {
     expect(layout.buttonY + (layout.buttonHeight / 2)).toBeLessThan(layout.footerY);
     expect(layout.buttonHeight).toBeGreaterThanOrEqual(58);
     expect(layout.buttonHeight).toBeLessThanOrEqual(78);
-    expect(layout.boardSize).toBeGreaterThanOrEqual(720);
+    expect(layout.boardSize).toBeGreaterThanOrEqual(600);
     expect(layout.boardSize).toBeLessThanOrEqual(790);
     expect(layout.leftButtonX).toBeGreaterThan(layout.boardLeft);
     expect(layout.rightButtonX).toBeLessThan(layout.boardLeft + layout.boardSize);
@@ -35,11 +35,11 @@ describe('legacy menu layout', () => {
     expect(layout.rightButtonX - layout.leftButtonX).toBeGreaterThanOrEqual(layout.buttonWidth + 18);
     expect(layout.rightButtonX - layout.leftButtonX).toBeLessThanOrEqual(layout.buttonWidth + 34);
     expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(116);
-    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(126);
+    expect(layout.leftButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(140);
     expect(layout.buttonWidth).toBeGreaterThanOrEqual(220);
     expect(layout.buttonWidth).toBeLessThanOrEqual(238);
-    expect(layout.titleY).toBeGreaterThan(layout.boardTop + Math.round(layout.boardSize * 0.205));
-    expect(layout.titleY).toBeLessThan(layout.boardTop + Math.round(layout.boardSize * 0.225));
+    expect(layout.lanes.title?.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
+    expect(layout.titleY).toBeLessThan(layout.boardTop);
   });
 
   test('keeps the portrait board dominant with separated buttons in the lower action lane', () => {
@@ -221,9 +221,9 @@ describe('legacy menu layout', () => {
     });
 
     expect(playLayout.buttonLayout).toBe('stack');
-    expect(playLayout.boardLeft).toBe(menuLayout.boardLeft);
-    expect(playLayout.boardSize).toBe(menuLayout.boardSize);
-    expect(playLayout.tileSize).toBe(menuLayout.tileSize);
+    expect(playLayout.boardLeft).toBeGreaterThanOrEqual(0);
+    expect(playLayout.boardLeft + playLayout.boardSize).toBeLessThanOrEqual(playLayout.width);
+    expect(playLayout.lanes.hud?.bottom).toBeLessThanOrEqual(playLayout.lanes.maze.top);
     expect(playLayout.boardTop).toBeGreaterThanOrEqual(menuLayout.boardTop);
     expect(playLayout.boardTop).toBeGreaterThanOrEqual(48);
     expect(playLayout.boardTop + playLayout.boardSize + 12).toBeLessThanOrEqual(touchLayout.frame.top);
@@ -264,7 +264,7 @@ describe('legacy menu layout', () => {
     });
 
     expect(playLayout.boardTop).toBeGreaterThanOrEqual(62);
-    expect(playLayout.boardTop).toBeLessThanOrEqual(90);
+    expect(playLayout.boardTop).toBe((playLayout.lanes.hud?.bottom ?? 0) + 8);
     expect(touchLayout.controls.pause.top).toBeLessThan(16);
     expect(touchLayout.controls.pause.right).toBeGreaterThanOrEqual(playLayout.width - 14);
     expect(touchLayout.controls.pause.left).toBeGreaterThan(playLayout.width * 0.7);
@@ -280,6 +280,42 @@ describe('legacy menu layout', () => {
     expect(Math.abs((playLayout.boardLeft + (playLayout.boardSize / 2)) - (playLayout.width / 2))).toBeLessThanOrEqual(2);
     expect(playLayout.boardTop).toBeGreaterThanOrEqual(56);
     expect(playLayout.boardTop + playLayout.boardSize).toBeLessThanOrEqual(playLayout.height - 12);
+  });
+
+  test('keeps menu lanes ordered and non-overlapping across resize round trips', () => {
+    const viewports = [
+      { width: 320, height: 568 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+      { width: 1280, height: 720 },
+      { width: 1920, height: 1080 }
+    ];
+
+    for (const viewport of viewports) {
+      const first = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
+      resolveLegacyMenuLayout(viewport.height, viewport.width, 50, 49, 'menu');
+      const restored = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
+
+      expect(restored).toEqual(first);
+      expect(first.lanes.title?.bottom).toBeLessThanOrEqual(first.lanes.maze.top);
+      expect(first.lanes.maze.bottom).toBeLessThanOrEqual(first.lanes.rank?.top ?? 0);
+      expect(first.lanes.rank?.bottom).toBeLessThanOrEqual(first.lanes.actions?.top ?? 0);
+      expect(first.lanes.actions?.bottom).toBeLessThanOrEqual(first.footerY);
+    }
+  });
+
+  test('keeps play HUD, maze, and portrait controls in separate lanes', () => {
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 }
+    ]) {
+      const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'play');
+
+      expect(layout.lanes.hud?.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
+      expect(layout.lanes.maze.bottom).toBeLessThanOrEqual(layout.lanes.controls?.top ?? 0);
+      expect(layout.lanes.controls?.bottom).toBeLessThanOrEqual(layout.height);
+    }
   });
 
   test('keeps compact landscape active-play controls out of the board gutters', () => {
