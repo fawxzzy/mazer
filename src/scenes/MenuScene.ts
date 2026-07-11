@@ -261,7 +261,9 @@ import {
 } from './menuRuntimeDiagnostics';
 import { summarizeTelemetrySemantics } from '../telemetry';
 import {
+  HumanInputRepeatGate,
   isMovementActionKind,
+  resolveHumanKeyboardAction,
   resolveHumanMovementActionVector,
   resolveHumanMovementPriorityCandidates,
   type HumanMovementActionKind
@@ -1025,6 +1027,7 @@ export class MenuScene extends Phaser.Scene {
   private pendingResetRequest: LegacyResetRequest | null = null;
   private pendingOverlayMazeRebuild = false;
   private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();
+  private readonly playKeyboardRepeatGate = new HumanInputRepeatGate();
   private playMoveTimer: Phaser.Time.TimerEvent | null = null;
   private playDiagonalMoveQueue: Array<{ deltaX: number; deltaY: number }> = [];
   private playDiagonalMoveTimer: Phaser.Time.TimerEvent | null = null;
@@ -1667,6 +1670,10 @@ export class MenuScene extends Phaser.Scene {
             up: this.playMoveFlags.up
           },
           pendingTimerActive: this.playMoveTimer !== null,
+          keyboardRepeat: {
+            ...this.playKeyboardRepeatGate.getSnapshot(),
+            repeatIntervalMs: movementSpeedProfile.repeatIntervalMs
+          },
           pointerStartActive: this.playPointerStart !== null,
           touchSprint: {
             activeControls: this.playHeldTouchMoves.map((move) => move.control),
@@ -2441,6 +2448,15 @@ export class MenuScene extends Phaser.Scene {
     }
 
     event.preventDefault();
+    const action = resolveHumanKeyboardAction(event, this.time.now);
+    if (
+      action === null
+      || !this.playKeyboardRepeatGate.accept(action, this.time.now, {
+        moveRepeatMinIntervalMs: resolveLegacyMovementSpeedProfile(this.settings.movementSpeed).repeatIntervalMs
+      })
+    ) {
+      return true;
+    }
     const wasHeld = this.playMoveFlags[direction];
     this.playMoveFlags[direction] = true;
     if (!wasHeld) {
@@ -2462,6 +2478,9 @@ export class MenuScene extends Phaser.Scene {
 
     event.preventDefault();
     const wasHeld = this.playMoveFlags[direction];
+    if (wasHeld && this.playMoveTimer !== null) {
+      this.resolveLegacyPlayInputBuffer();
+    }
     this.playMoveFlags[direction] = false;
     if (wasHeld) {
       this.boardDynamicDirty = true;
@@ -3114,6 +3133,7 @@ export class MenuScene extends Phaser.Scene {
     this.playTouchStickPointerId = null;
     this.playTouchStickPull = null;
     this.playMoveFlags = createLegacyPlayMoveFlags();
+    this.playKeyboardRepeatGate.reset();
     this.playPointerStart = null;
   }
 
@@ -3124,6 +3144,7 @@ export class MenuScene extends Phaser.Scene {
     this.playDiagonalMoveTimer = null;
     this.playDiagonalMoveQueue = [];
     this.playMoveFlags = createLegacyPlayMoveFlags();
+    this.playKeyboardRepeatGate.reset();
     this.playPointerStart = null;
   }
 

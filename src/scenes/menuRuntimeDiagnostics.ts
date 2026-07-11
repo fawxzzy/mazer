@@ -184,6 +184,17 @@ export interface MenuSceneRuntimeDiagnostics {
         right: boolean;
         up: boolean;
       };
+      keyboardRepeat: {
+        acceptedCount: number;
+        droppedCount: number;
+        mergedCount: number;
+        lastAcceptedActionKind: string | null;
+        lastAcceptedAtMs: number | null;
+        lastDroppedActionKind: string | null;
+        lastDroppedAtMs: number | null;
+        lastDroppedReason: string | null;
+        repeatIntervalMs: number;
+      };
       pendingTimerActive: boolean;
       pointerStartActive: boolean;
       touchSprint: {
