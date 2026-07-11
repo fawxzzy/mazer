@@ -109,6 +109,35 @@ describe('legacy maze cycle telemetry', () => {
     expect(JSON.parse(storage.getItem(MAZE_CYCLE_TELEMETRY_STORAGE_KEY) ?? '{}').receipts).toHaveLength(1);
   });
 
+  test('uses the legal wrap-aware path length for route-efficiency telemetry', () => {
+    const maze: LegacyMazeSnapshot = {
+      ...createTestMaze(),
+      grid: [[true, false, true]],
+      size: 3,
+      start: { x: 0, y: 0 },
+      goal: { x: 2, y: 0 },
+      solutionPath: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }]
+    };
+
+    const receipt = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 16,
+      completedAt: '2026-07-11T08:00:00.000Z',
+      completionTimeMs: 100,
+      controlMode: 'arrows',
+      maze,
+      playerPath: [{ x: 0, y: 0 }, { x: 2, y: 0 }],
+      resetUsed: false,
+      surface: 'play'
+    });
+
+    expect(receipt).toMatchObject({
+      shortestViablePathLength: 2,
+      routeOverrunRatio: 0,
+      routeOverrunSteps: 0,
+      routeEfficiencyPressureScore: 0
+    });
+  });
+
   test('caps local history to the recent receipt limit and keeps newest first', () => {
     const storage = new MemoryStorage();
     const maze = createTestMaze();

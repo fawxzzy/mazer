@@ -7,6 +7,15 @@ export interface LegacyPoint {
   y: number;
 }
 
+export type LegacyGridGraphPolicy = 'direct-floor' | 'playable-wrap-aware';
+
+export interface LegacyShortestPathResult {
+  found: boolean;
+  path: LegacyPoint[];
+  policy: LegacyGridGraphPolicy;
+  stepCount: number | null;
+}
+
 export interface LegacyMazeGenerationProfile {
   borderFeederTargetPerSide: number | null;
   checkpointCountMultiplier: number;
@@ -279,7 +288,11 @@ const resolveLegacyGridStepTarget = (
   }
 
   const wrapped = resolveWrappedGridPoint(grid, direct);
-  return wrapped && grid[wrapped.y]?.[wrapped.x] === true ? wrapped : null;
+  return wrapped
+    && grid[wrapped.y]?.[wrapped.x] === true
+    && (wrapped.x !== point.x || wrapped.y !== point.y)
+    ? wrapped
+    : null;
 };
 
 export const resolveLegacyWalkableGridNeighbors = (grid: boolean[][], point: LegacyPoint): LegacyPoint[] => {
@@ -312,7 +325,26 @@ const walkableNeighbors = (grid: boolean[][], point: LegacyPoint): LegacyPoint[]
   return neighbors;
 };
 
-const buildShortestPath = (grid: boolean[][], start: LegacyPoint, goal: LegacyPoint): LegacyPoint[] => {
+const resolveLegacyGridNeighbors = (
+  grid: boolean[][],
+  point: LegacyPoint,
+  policy: LegacyGridGraphPolicy
+): LegacyPoint[] => (
+  policy === 'playable-wrap-aware'
+    ? resolveLegacyWalkableGridNeighbors(grid, point)
+    : walkableNeighbors(grid, point)
+);
+
+export const resolveLegacyShortestPath = (
+  grid: boolean[][],
+  start: LegacyPoint,
+  goal: LegacyPoint,
+  policy: LegacyGridGraphPolicy
+): LegacyShortestPathResult => {
+  if (grid[start.y]?.[start.x] !== true || grid[goal.y]?.[goal.x] !== true) {
+    return { found: false, path: [], policy, stepCount: null };
+  }
+
   const queue: LegacyPoint[] = [start];
   const previous = new Map<string, string | null>();
   previous.set(keyForPoint(start), null);
@@ -327,7 +359,7 @@ const buildShortestPath = (grid: boolean[][], start: LegacyPoint, goal: LegacyPo
       break;
     }
 
-    for (const neighbor of walkableNeighbors(grid, current)) {
+    for (const neighbor of resolveLegacyGridNeighbors(grid, current, policy)) {
       const neighborKey = keyForPoint(neighbor);
       if (previous.has(neighborKey)) {
         continue;
@@ -338,8 +370,13 @@ const buildShortestPath = (grid: boolean[][], start: LegacyPoint, goal: LegacyPo
     }
   }
 
+  const goalKey = keyForPoint(goal);
+  if (!previous.has(goalKey)) {
+    return { found: false, path: [], policy, stepCount: null };
+  }
+
   const path: LegacyPoint[] = [];
-  let cursor: string | null = keyForPoint(goal);
+  let cursor: string | null = goalKey;
 
   while (cursor) {
     const [x, y] = cursor.split(',').map((value) => Number.parseInt(value, 10));
@@ -348,8 +385,23 @@ const buildShortestPath = (grid: boolean[][], start: LegacyPoint, goal: LegacyPo
   }
 
   path.reverse();
-  return path;
+  return {
+    found: true,
+    path,
+    policy,
+    stepCount: Math.max(0, path.length - 1)
+  };
 };
+
+export const resolveLegacyPlayableShortestPath = (
+  grid: boolean[][],
+  start: LegacyPoint,
+  goal: LegacyPoint
+): LegacyShortestPathResult => resolveLegacyShortestPath(grid, start, goal, 'playable-wrap-aware');
+
+const buildShortestPath = (grid: boolean[][], start: LegacyPoint, goal: LegacyPoint): LegacyPoint[] => (
+  resolveLegacyShortestPath(grid, start, goal, 'direct-floor').path
+);
 
 const measureAlternativeRouteDistanceWithoutEdge = (
   grid: boolean[][],
