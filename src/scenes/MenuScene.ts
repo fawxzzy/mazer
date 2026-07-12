@@ -4691,6 +4691,7 @@ export class MenuScene extends Phaser.Scene {
         boardTop,
         boardSize,
         cornerGuardSize,
+        continuationLength: Math.max(2, Math.round(tileSize * 0.32)),
         materialTileSize,
         mazeLeft,
         mazeTop,

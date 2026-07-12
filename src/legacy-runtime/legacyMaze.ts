@@ -1905,12 +1905,12 @@ export const createLegacyMenuMaze = (seed: number): LegacyMazeSnapshot => {
   };
 };
 
-export const isWalkableTile = (maze: LegacyMazeSnapshot, point: LegacyPoint): boolean => (
+export const isWalkableTile = (maze: Pick<LegacyMazeSnapshot, 'grid'>, point: LegacyPoint): boolean => (
   maze.grid[point.y]?.[point.x] === true
 );
 
 export const resolveLegacyNavigationTarget = (
-  maze: LegacyMazeSnapshot,
+  maze: Pick<LegacyMazeSnapshot, 'grid'>,
   point: LegacyPoint,
   deltaX: number,
   deltaY: number

@@ -3,6 +3,7 @@ import {
   resolveLegacyDynamicMarkerInset,
   resolveLegacyDynamicTrailStrokeWidth,
   resolveLegacyEndpointMarkerRenderMetrics,
+  resolveLegacyBleedOffPaths,
   resolveLegacyMenuBorderDockDirections,
   resolveLegacyMenuBorderDockRenderAreas,
   resolveLegacyMenuPathRenderFrame,
@@ -15,6 +16,7 @@ import {
   resolveLegacyMenuPathTitleOrbitGeometry,
   resolveLegacyMenuPathTitleOrbitPoint
 } from '../../src/legacy-runtime/legacyMenuTitle';
+import { resolveLegacyNavigationTarget } from '../../src/legacy-runtime/legacyMaze';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -201,6 +203,29 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     });
   });
 
+  test('classifies only orthogonal legal opposite-edge paths as bleed-off continuations', () => {
+    const maze = {
+      size: 5,
+      grid: [
+        [false, false, true, false, false],
+        [false, false, true, false, false],
+        [true, true, true, true, true],
+        [false, false, true, false, false],
+        [false, false, true, false, false]
+      ]
+    };
+
+    expect(resolveLegacyBleedOffPaths(maze, { x: 0, y: 2 })).toEqual([
+      { source: { x: 0, y: 2 }, destination: { x: 4, y: 2 }, direction: 'left' }
+    ]);
+    expect(resolveLegacyNavigationTarget(maze, { x: 0, y: 2 }, -1, 0)).toEqual({ x: 4, y: 2 });
+    expect(resolveLegacyBleedOffPaths(maze, { x: 2, y: 0 })).toEqual([
+      { source: { x: 2, y: 0 }, destination: { x: 2, y: 4 }, direction: 'top' }
+    ]);
+    expect(resolveLegacyNavigationTarget(maze, { x: 2, y: 0 }, 0, -1)).toEqual({ x: 2, y: 4 });
+    expect(resolveLegacyBleedOffPaths(maze, { x: 0, y: 0 })).toEqual([]);
+  });
+
   test('keeps folded-corner border cells capped so the corner facets stay clean', () => {
     const maze = {
       size: 3,
@@ -337,6 +362,28 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
         bottom: 5
       }
     ]);
+  });
+
+  test('extends approved bleed-off continuations beyond the visible board frame', () => {
+    const areas = resolveLegacyMenuBorderDockRenderAreas('right', {
+      leftInset: 0,
+      topInset: 0,
+      width: 6,
+      height: 6
+    }, {
+      boardLeft: 10,
+      boardTop: 20,
+      boardSize: 100,
+      cornerGuardSize: 18,
+      continuationLength: 4,
+      materialTileSize: 6,
+      mazeLeft: 15,
+      mazeTop: 25,
+      mazeSize: 90,
+      tileRect: { left: 99, top: 50, width: 6, height: 6 }
+    });
+
+    expect(areas).toEqual([{ left: 105, top: 50, right: 114, bottom: 56 }]);
   });
 
   test('bridges the light core across connected neighbors for a less checkerboarded slab read', () => {
