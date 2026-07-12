@@ -145,9 +145,10 @@ export const resolveLegacyMenuLayout = (
     : isPortrait
       ? Math.round(clamp(width * 0.26, 72, 112))
       : Math.round(clamp(height * 0.16, 110, 150));
-  const menuRankReserve = isUltraNarrow
+  const menuRankReserve = (isUltraNarrow
     ? 42
-    : Math.round(clamp(height * (isPortrait ? 0.095 : 0.085), 76, isPortrait ? 90 : 82));
+    : Math.round(clamp(height * (isPortrait ? 0.095 : 0.085), 76, isPortrait ? 90 : 82)))
+    + (shouldUseCleanPhoneCadence && !isPlaySurface ? 22 : 0);
   const menuActionReserve = usesStackedButtons
     ? (buttonHeight * 2) + stackGap
     : isPortrait
