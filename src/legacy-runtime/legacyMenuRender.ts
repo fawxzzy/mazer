@@ -1,4 +1,9 @@
-import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
+import {
+  isLegacyWrappedStepTransition,
+  resolveLegacyNavigationTarget,
+  type LegacyMazeSnapshot,
+  type LegacyPoint
+} from './legacyMaze';
 
 export interface LegacyMenuPathRenderFrame {
   leftInset: number;
@@ -19,6 +24,12 @@ export interface LegacyMenuPathRenderSegments {
 
 export type LegacyMenuBorderDockDirection = 'bottom' | 'left' | 'right' | 'top';
 
+export interface LegacyBleedOffPath {
+  destination: LegacyPoint;
+  direction: LegacyMenuBorderDockDirection;
+  source: LegacyPoint;
+}
+
 export interface LegacyMenuPixelRect {
   height: number;
   left: number;
@@ -38,6 +49,7 @@ export interface LegacyMenuBorderDockRenderOptions {
   boardSize: number;
   boardTop: number;
   cornerGuardSize: number;
+  continuationLength?: number;
   materialTileSize: number;
   mazeLeft: number;
   mazeSize: number;
@@ -177,58 +189,32 @@ const isNonCornerBorderPoint = (
   && !((point.x === 0 || point.x === maze.size - 1) && (point.y === 0 || point.y === maze.size - 1))
 );
 
-const resolveOppositeBorderPoint = (
-  maze: Pick<LegacyMazeSnapshot, 'size'>,
-  point: LegacyPoint
-): LegacyPoint | null => {
-  if (!isNonCornerBorderPoint(maze, point)) {
-    return null;
-  }
-
-  if (point.x === 0) {
-    return { x: maze.size - 1, y: point.y };
-  }
-  if (point.x === maze.size - 1) {
-    return { x: 0, y: point.y };
-  }
-  if (point.y === 0) {
-    return { x: point.x, y: maze.size - 1 };
-  }
-  if (point.y === maze.size - 1) {
-    return { x: point.x, y: 0 };
-  }
-
-  return null;
-};
-
 export const resolveLegacyMenuBorderDockDirections = (
   maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
   point: LegacyPoint
-): LegacyMenuBorderDockDirection[] => {
+): LegacyMenuBorderDockDirection[] => resolveLegacyBleedOffPaths(maze, point).map((path) => path.direction);
+
+export const resolveLegacyBleedOffPaths = (
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  point: LegacyPoint
+): LegacyBleedOffPath[] => {
   if (!isWalkableGridPoint(maze, point) || !isNonCornerBorderPoint(maze, point)) {
     return [];
   }
 
-  const opposite = resolveOppositeBorderPoint(maze, point);
-  if (!opposite || !isWalkableGridPoint(maze, opposite)) {
+  const direction = point.x === 0
+    ? { deltaX: -1, deltaY: 0, name: 'left' as const }
+    : point.x === maze.size - 1
+      ? { deltaX: 1, deltaY: 0, name: 'right' as const }
+      : point.y === 0
+        ? { deltaX: 0, deltaY: -1, name: 'top' as const }
+        : { deltaX: 0, deltaY: 1, name: 'bottom' as const };
+  const destination = resolveLegacyNavigationTarget(maze, point, direction.deltaX, direction.deltaY);
+  if (!destination || !isLegacyWrappedStepTransition(point, destination)) {
     return [];
   }
 
-  const directions: LegacyMenuBorderDockDirection[] = [];
-  if (point.x === 0) {
-    directions.push('left');
-  }
-  if (point.x === maze.size - 1) {
-    directions.push('right');
-  }
-  if (point.y === 0) {
-    directions.push('top');
-  }
-  if (point.y === maze.size - 1) {
-    directions.push('bottom');
-  }
-
-  return directions;
+  return [{ destination, direction: direction.name, source: { ...point } }];
 };
 
 const isLegacyMenuPathConnected = (
@@ -313,6 +299,7 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
   const bandRight = options.tileRect.left + Math.round(((frame.leftInset + frame.width) / materialTileSize) * options.tileRect.width);
   const bandBottom = options.tileRect.top + Math.round(((frame.topInset + frame.height) / materialTileSize) * options.tileRect.height);
   const cornerGuardSize = Math.max(0, Math.round(options.cornerGuardSize));
+  const continuationLength = Math.max(1, Math.round(options.continuationLength ?? 1));
   const topGuard = options.boardTop + cornerGuardSize;
   const bottomGuard = boardBottom - cornerGuardSize;
   const leftGuard = options.boardLeft + cornerGuardSize;
@@ -338,7 +325,7 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
   };
 
   if (direction === 'left') {
-    const left = options.boardLeft - 1;
+    const left = options.boardLeft - continuationLength;
     const right = options.mazeLeft;
     pushArea({ left, top: bandTop, right, bottom: bandBottom });
     if (bandTop < topGuard) {
@@ -352,7 +339,7 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
 
   if (direction === 'right') {
     const left = mazeRight;
-    const right = boardRight + 1;
+    const right = boardRight + continuationLength;
     pushArea({ left, top: bandTop, right, bottom: bandBottom });
     if (bandTop < topGuard) {
       pushArea({ left, top: bandTop, right, bottom: topGuard });
@@ -364,7 +351,7 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
   }
 
   if (direction === 'top') {
-    const top = options.boardTop - 1;
+    const top = options.boardTop - continuationLength;
     const bottom = options.mazeTop;
     pushTopArea({ left: bandLeft, top, right: bandRight, bottom });
     if (bandLeft < leftGuard) {
@@ -377,7 +364,7 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
   }
 
   const top = mazeBottom;
-  const bottom = boardBottom + 1;
+  const bottom = boardBottom + continuationLength;
   pushArea({ left: bandLeft, top, right: bandRight, bottom });
   if (bandLeft < leftGuard) {
     pushArea({ left: bandLeft, top, right: leftGuard, bottom });
