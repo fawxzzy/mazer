@@ -142,6 +142,15 @@ describe('legacy menu layout', () => {
     }
   });
 
+  test('reserves a positive 360x720 rank-to-action lane gap', () => {
+    const layout = resolveLegacyMenuLayout(360, 720, 50, 49, 'menu');
+
+    expect(layout.lanes.rank?.bottom).toBeLessThan(layout.lanes.actions?.top ?? Number.NEGATIVE_INFINITY);
+    expect(layout.lanes.actions?.top).toBeLessThanOrEqual(
+      layout.buttonY - (layout.buttonHeight / 2)
+    );
+  });
+
   test('keeps authenticated start and options side-by-side on portrait phones', () => {
     for (const viewport of [
       { width: 405, height: 958 },
