@@ -1002,6 +1002,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.tryMovePlayer(1, 0);');
     expect(menuSceneSource).toContain('this.tryMovePlayer(0, 1);');
     expect(menuSceneSource).toContain('this.tryMovePlayer(-1, 0);');
+    expect(menuSceneSource).toContain('private legacyWorldTurnSystem = this.createLegacyWorldTurnSystem();');
+    expect(menuSceneSource).toContain("'player-movement': (): WorldTurnPhaseResult => this.applyLegacyWorldTurnPlayerMovement()");
+    expect(menuSceneSource).toContain('receipt = this.legacyWorldTurnSystem.advance({');
+    expect(menuSceneSource).toContain('simulationPaused: this.mode !== \'play\'');
+    expect(menuSceneSource).toContain('worldTurn: {');
   });
 
   test('keeps camera-follow static and dynamic board layers on the same offset', () => {
