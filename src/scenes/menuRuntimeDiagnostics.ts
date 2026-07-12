@@ -177,6 +177,26 @@ export interface MenuSceneRuntimeDiagnostics {
       trailLength: number;
       trailVisible: boolean;
     };
+    worldTurn: {
+      acceptedTurnCount: number;
+      lastCommandId: string | null;
+      lastReceipt: {
+        admitted: boolean;
+        commandId: string;
+        commandKind: 'player-move' | 'timed-mode-tick';
+        eventCount: number;
+        nextTurn: number;
+        phases: Array<{
+          phase: 'player-movement' | 'enemy-movement' | 'projectile-movement' | 'pickups' | 'item-effects' | 'duration-expiry' | 'collisions';
+          status: 'applied' | 'skipped' | 'rejected';
+          eventCount: number;
+        }>;
+        reason: string | null;
+        turn: number | null;
+      } | null;
+      nextTurn: number;
+      rejectedCommandCount: number;
+    };
     inputBuffer: {
       held: {
         down: boolean;

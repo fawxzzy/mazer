@@ -705,6 +705,29 @@ const summarizeTimings = (durations) => {
   };
 };
 
+export const summarizeGoalWorldTurn = (worldTurn, plannedMoveCount) => ({
+  atGoal: worldTurn ?? null,
+  pass: Boolean(
+    worldTurn
+    && worldTurn.acceptedTurnCount === plannedMoveCount
+    && worldTurn.nextTurn === plannedMoveCount
+    && worldTurn.lastReceipt?.admitted === true
+    && worldTurn.lastReceipt?.turn === plannedMoveCount - 1
+  )
+});
+
+export const summarizeFreshWorldTurn = (worldTurn) => ({
+  freshMaze: worldTurn ?? null,
+  pass: Boolean(
+    worldTurn
+    && worldTurn.acceptedTurnCount === 0
+    && worldTurn.nextTurn === 0
+    && worldTurn.rejectedCommandCount >= 1
+    && worldTurn.lastReceipt?.admitted === false
+    && worldTurn.lastReceipt?.reason === 'simulation-paused'
+  )
+});
+
 export const runLivePlayQa = async (options = {}) => {
   const label = options.label ?? DEFAULT_LABEL;
   const sessionId = resolveSessionId(options.sessionId);
@@ -852,6 +875,12 @@ export const runLivePlayQa = async (options = {}) => {
     const reached = Boolean(goalReachedPlayer && goal && goalReachedPlayer.x === goal.x && goalReachedPlayer.y === goal.y);
     const durations = stepRecords.map((step) => step.durationMs).filter(Number.isFinite);
     const lifecyclePassed = lifecycleProof === null ? true : lifecycleProof.pass;
+    const goalWorldTurn = goalReachedDiagnostics.runtime?.play?.worldTurn ?? null;
+    const worldTurnProof = summarizeGoalWorldTurn(goalWorldTurn, routePlan.moves.length);
+    const freshWorldTurnProof = lifecycleProof === null
+      ? { freshMaze: null, pass: true }
+      : summarizeFreshWorldTurn(lifecycleProof.finalDiagnostics?.runtime?.play?.worldTurn ?? null);
+    const worldTurnPassed = worldTurnProof.pass && freshWorldTurnProof.pass;
 
     summary = {
       schema: 'mazer.live-play-qa.v1',
@@ -872,7 +901,7 @@ export const runLivePlayQa = async (options = {}) => {
       },
       viewport,
       result: {
-        pass: reached && failedAt === null && routePlan.moves.length <= moveCap && lifecyclePassed,
+        pass: reached && failedAt === null && routePlan.moves.length <= moveCap && lifecyclePassed && worldTurnPassed,
         reached,
         failedAt,
         capped: routePlan.moves.length > moveCap,
@@ -914,6 +943,11 @@ export const runLivePlayQa = async (options = {}) => {
         timedOut: lifecycleProof.timedOut,
         timeoutMs: lifecycleProof.timeoutMs
       } : null,
+      worldTurn: {
+        ...worldTurnProof,
+        freshMaze: freshWorldTurnProof.freshMaze,
+        freshMazePass: freshWorldTurnProof.pass
+      },
       controls: {
         controlMode: finalDiagnostics.visual?.touchControls?.controlMode ?? null,
         visible: finalDiagnostics.visual?.touchControls?.visible ?? false,

@@ -17,6 +17,11 @@ import {
 } from '../domain/ai';
 import type { MazeEpisode } from '../domain/maze';
 import { markMazerBootStatus } from '../boot/bootStatus';
+import {
+  WorldTurnSystem,
+  type WorldTurnPhaseResult,
+  type WorldTurnReceipt
+} from '../mazer-core/world';
 import { legacyTuning } from '../config/tuning';
 import {
   LEGACY_DEFAULTS,
@@ -1028,6 +1033,9 @@ export class MenuScene extends Phaser.Scene {
   private pendingResetRequest: LegacyResetRequest | null = null;
   private pendingOverlayMazeRebuild = false;
   private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();
+  private legacyWorldTurnMove: { deltaX: number; deltaY: number } | null = null;
+  private legacyWorldTurnCommandSequence = 0;
+  private legacyWorldTurnSystem = this.createLegacyWorldTurnSystem();
   private readonly playKeyboardRepeatGate = new HumanInputRepeatGate();
   private playMoveTimer: Phaser.Time.TimerEvent | null = null;
   private playDiagonalMoveQueue: Array<{ deltaX: number; deltaY: number }> = [];
@@ -1287,6 +1295,8 @@ export class MenuScene extends Phaser.Scene {
       };
     }
     if (base.lifecycleLocked) {
+      const vector = resolveHumanMovementActionVector(normalizedMove);
+      this.tryMovePlayerFromInput(vector.deltaX, vector.deltaY);
       return {
         ...base,
         accepted: false,
@@ -1590,6 +1600,7 @@ export class MenuScene extends Phaser.Scene {
       this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : undefined
     );
     const playLifecycle = this.resolveLegacyPlayLifecycleDiagnostics(time);
+    const worldTurnDiagnostics = this.legacyWorldTurnSystem.getDiagnostics();
 
     publishMenuSceneRuntimeDiagnostics({
       revision: this.runtimeDiagnosticsRevision,
@@ -1670,6 +1681,24 @@ export class MenuScene extends Phaser.Scene {
           renderTileSize: mazeRenderFrame.tileSize
         },
         lifecycle: playLifecycle,
+        worldTurn: {
+          acceptedTurnCount: worldTurnDiagnostics.acceptedTurnCount,
+          lastCommandId: worldTurnDiagnostics.lastCommandId,
+          lastReceipt: worldTurnDiagnostics.lastReceipt
+            ? {
+                admitted: worldTurnDiagnostics.lastReceipt.admitted,
+                commandId: worldTurnDiagnostics.lastReceipt.commandId,
+                commandKind: worldTurnDiagnostics.lastReceipt.commandKind,
+                eventCount: worldTurnDiagnostics.lastReceipt.events.length,
+                nextTurn: worldTurnDiagnostics.lastReceipt.nextTurn,
+                phases: worldTurnDiagnostics.lastReceipt.phases.map((phase) => ({ ...phase })),
+                reason: worldTurnDiagnostics.lastReceipt.reason,
+                turn: worldTurnDiagnostics.lastReceipt.turn
+              }
+            : null,
+          nextTurn: worldTurnDiagnostics.nextTurn,
+          rejectedCommandCount: worldTurnDiagnostics.rejectedCommandCount
+        },
         inputBuffer: {
           held: {
             down: this.playMoveFlags.down,
@@ -3288,6 +3317,7 @@ export class MenuScene extends Phaser.Scene {
     this.mode = request.mode;
     this.mazeSeed = request.seed;
     this.maze = generationState.maze;
+    this.resetLegacyWorldTurnSystem();
     this.titleGraphics.setVisible(generationState.titleVisible);
     this.menuDemoEpisode = this.mode === 'menu' ? createLegacyDemoWalkerEpisode(this.maze) : null;
     if (this.mode === 'menu') {
@@ -4002,22 +4032,57 @@ export class MenuScene extends Phaser.Scene {
     ].join(':');
   }
 
+  private createLegacyWorldTurnSystem(): WorldTurnSystem {
+    return new WorldTurnSystem({
+      'player-movement': (): WorldTurnPhaseResult => this.applyLegacyWorldTurnPlayerMovement()
+    });
+  }
+
+  private resetLegacyWorldTurnSystem(): void {
+    this.legacyWorldTurnMove = null;
+    this.legacyWorldTurnCommandSequence = 0;
+    this.legacyWorldTurnSystem = this.createLegacyWorldTurnSystem();
+  }
+
   private tryMovePlayer(deltaX: number, deltaY: number): boolean {
-    if (this.isLegacyPlayLifecycleInputLocked()) {
-      return false;
+    this.legacyWorldTurnCommandSequence += 1;
+    const diagnostics = this.legacyWorldTurnSystem.getDiagnostics();
+    this.legacyWorldTurnMove = { deltaX, deltaY };
+    let receipt: WorldTurnReceipt;
+    try {
+      receipt = this.legacyWorldTurnSystem.advance({
+        expectedTurn: diagnostics.nextTurn,
+        id: `${this.mazeSeed}:move:${this.legacyWorldTurnCommandSequence}`,
+        inputId: `${deltaX},${deltaY}`,
+        kind: 'player-move',
+        simulationPaused: this.mode !== 'play'
+          || this.overlay !== 'none'
+          || this.isLegacyPlayLifecycleInputLocked()
+      });
+    } finally {
+      this.legacyWorldTurnMove = null;
+    }
+    this.publishInteractionDiagnostics();
+    return receipt.admitted;
+  }
+
+  private applyLegacyWorldTurnPlayerMovement(): WorldTurnPhaseResult {
+    const move = this.legacyWorldTurnMove;
+    if (move === null) {
+      return { accepted: false };
     }
 
     const nextStep = advanceLegacyPlayStep({
       maze: this.maze,
       player: this.player,
       trail: this.trail,
-      deltaX,
-      deltaY,
+      deltaX: move.deltaX,
+      deltaY: move.deltaY,
       toggleTrailFade: this.settings.toggleTrailFade,
       trailFadeTail: TRAIL_FADE_TAIL
     });
     if (!nextStep.moved) {
-      return false;
+      return { accepted: false };
     }
 
     const previousPlayer = copyPoint(this.player);
@@ -4034,13 +4099,17 @@ export class MenuScene extends Phaser.Scene {
       this.recordMazeCycleCompletion('play');
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
-      this.publishInteractionDiagnostics();
-      return true;
+      return {
+        accepted: true,
+        events: [{ type: 'player-reached-goal', entityId: 'player' }]
+      };
     }
 
     this.boardDynamicDirty = true;
-    this.publishInteractionDiagnostics();
-    return true;
+    return {
+      accepted: true,
+      events: [{ type: 'player-moved', entityId: 'player' }]
+    };
   }
 
   private tryMovePlayerFromInput(deltaX: number, deltaY: number): boolean {
@@ -9335,6 +9404,7 @@ export class MenuScene extends Phaser.Scene {
       this.playCyclePath = [copyPoint(result.nextPlayer)];
       this.playCycleResetUsed = true;
       this.playStartedAtMs = this.time.now;
+      this.resetLegacyWorldTurnSystem();
       this.resetLegacyPlayInputBuffer();
       this.boardDynamicDirty = true;
       this.publishInteractionDiagnostics();

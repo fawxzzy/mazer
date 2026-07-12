@@ -7,11 +7,41 @@ import {
   resolveLivePlayRouteProgressIndex,
   resolveStickHoldMsForMove,
   resolveStickPointForMove,
+  summarizeFreshWorldTurn,
+  summarizeGoalWorldTurn,
   summarizePostGoalLifecycleSamples,
   solveWalkableRoute
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
+  test('requires one admitted world turn per planned route move at the goal', () => {
+    expect(summarizeGoalWorldTurn({
+      acceptedTurnCount: 12,
+      nextTurn: 12,
+      lastReceipt: { admitted: true, turn: 11 }
+    }, 12).pass).toBe(true);
+    expect(summarizeGoalWorldTurn({
+      acceptedTurnCount: 11,
+      nextTurn: 11,
+      lastReceipt: { admitted: true, turn: 10 }
+    }, 12).pass).toBe(false);
+  });
+
+  test('requires a fresh maze to remain at turn zero after a locked build-phase probe', () => {
+    expect(summarizeFreshWorldTurn({
+      acceptedTurnCount: 0,
+      nextTurn: 0,
+      rejectedCommandCount: 1,
+      lastReceipt: { admitted: false, reason: 'simulation-paused' }
+    }).pass).toBe(true);
+    expect(summarizeFreshWorldTurn({
+      acceptedTurnCount: 1,
+      nextTurn: 1,
+      rejectedCommandCount: 0,
+      lastReceipt: { admitted: true, reason: null }
+    }).pass).toBe(false);
+  });
+
   test('defaults live proof input to the diagnostics QA bridge while preserving explicit control modes', () => {
     expect(normalizeLivePlayInputMethod(undefined)).toBe('qa');
     expect(normalizeLivePlayInputMethod('')).toBe('qa');
