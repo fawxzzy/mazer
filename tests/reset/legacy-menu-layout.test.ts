@@ -40,6 +40,7 @@ describe('legacy menu layout', () => {
     expect(layout.buttonWidth).toBeLessThanOrEqual(238);
     expect(layout.lanes.title?.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
     expect(layout.titleY).toBeLessThan(layout.boardTop);
+    expect((layout.lanes.actions?.top ?? 0) - (layout.lanes.rank?.bottom ?? 0)).toBeGreaterThanOrEqual(10);
   });
 
   test('keeps the portrait board dominant with separated buttons in the lower action lane', () => {

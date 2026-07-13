@@ -138,6 +138,7 @@ export const resolveLegacyMenuLayout = (
   const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
   const stackGap = Math.round(clamp(height * 0.02, 7, 12));
   const laneGap = isUltraNarrow ? 4 : 8;
+  const menuActionGap = isUltraNarrow ? laneGap : 10;
   const menuTopReserve = isUltraNarrow ? 6 : Math.round(clamp(height * 0.02, 16, 20));
   const menuFooterReserve = isUltraNarrow ? 10 : 18;
   const menuTitleReserve = isUltraNarrow
@@ -165,7 +166,8 @@ export const resolveLegacyMenuLayout = (
     - menuTitleReserve
     - menuRankReserve
     - menuActionReserve
-    - (laneGap * 3)
+    - (laneGap * 2)
+    - menuActionGap
     - menuFooterReserve;
   const playVerticalBoardLimit = height
     - playTopHudReserve
@@ -199,7 +201,7 @@ export const resolveLegacyMenuLayout = (
     ? Math.round((tileSize * mazeSize) + (LEGACY_PHONE_CLEAN_SAFE_INSET * 2))
     : Math.round(tileSize * mazeSize * 1000) / 1000;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
-  const menuGroupHeight = menuTitleReserve + snappedBoardSize + menuRankReserve + menuActionReserve + (laneGap * 3);
+  const menuGroupHeight = menuTitleReserve + snappedBoardSize + menuRankReserve + menuActionReserve + (laneGap * 2) + menuActionGap;
   const menuGroupTop = Math.max(
     menuTopReserve,
     Math.round((height - menuFooterReserve - menuGroupHeight) / 2)
@@ -210,7 +212,7 @@ export const resolveLegacyMenuLayout = (
     : menuBoardTop;
   const boardTop = Math.round(isPlaySurface ? playBoardTop : menuBoardTop);
   const menuRankLaneTop = boardTop + snappedBoardSize + laneGap;
-  const menuActionLaneTop = menuRankLaneTop + menuRankReserve + laneGap;
+  const menuActionLaneTop = menuRankLaneTop + menuRankReserve + menuActionGap;
   const menuRowButtonY = menuActionLaneTop + Math.round(buttonHeight / 2);
   const playRowButtonY = isPortrait
     ? boardTop + snappedBoardSize + Math.round(buttonHeight * 0.86)
