@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import {
   ACTIVE_PLAY_GOAL_RESET_HOLD_MS,
+  createLegacyEndlessLifecycleState,
   createLegacyResetRequest,
   hasPendingLegacyResetRequest,
+  resolveLegacyEndlessLifecycleTransition,
   resolveLegacyPlayLifecycleSnapshot,
   resolveLegacyResetEntryContract,
   resolveLegacyResetAction,
@@ -10,6 +12,39 @@ import {
 } from '../../src/legacy-runtime/legacyPlayLifecycle';
 
 describe('legacy play lifecycle', () => {
+  test('keeps an Endless checkpoint while a failed attempt resets only the current level', () => {
+    const started = createLegacyEndlessLifecycleState();
+    const completed = resolveLegacyEndlessLifecycleTransition(started, 'complete');
+    const failed = resolveLegacyEndlessLifecycleTransition(completed.state, 'fail-current-attempt');
+
+    expect(completed).toMatchObject({
+      effect: 'advance-checkpoint',
+      state: { checkpointLevel: 0, currentLevel: 1, attempt: 1, status: 'active', version: 1 }
+    });
+    expect(failed).toMatchObject({
+      effect: 'reset-current-attempt',
+      state: { checkpointLevel: 0, currentLevel: 1, attempt: 2, status: 'active', version: 1 }
+    });
+  });
+
+  test('marks an Endless run abandoned without losing its next checkpoint-resume target', () => {
+    const afterCompletion = resolveLegacyEndlessLifecycleTransition(
+      createLegacyEndlessLifecycleState(7),
+      'complete'
+    ).state;
+    const abandoned = resolveLegacyEndlessLifecycleTransition(afterCompletion, 'abandon');
+    const resumed = resolveLegacyEndlessLifecycleTransition(abandoned.state, 'resume');
+
+    expect(abandoned).toMatchObject({
+      effect: 'none',
+      state: { checkpointLevel: 7, currentLevel: 8, attempt: 1, status: 'abandoned' }
+    });
+    expect(resumed).toMatchObject({
+      effect: 'resume-current-attempt',
+      state: { checkpointLevel: 7, currentLevel: 8, attempt: 1, status: 'active' }
+    });
+  });
+
   test('uses the legacy goal-reset hold duration', () => {
     expect(ACTIVE_PLAY_GOAL_RESET_HOLD_MS).toBe(340);
   });
