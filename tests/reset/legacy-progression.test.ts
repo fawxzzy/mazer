@@ -801,11 +801,12 @@ describe('legacy progression', () => {
 
     expect(basePalette.playerCoreColor).toBe(0x36ff7d);
     expect(basePalette.trailColor).toBe(0x36ff7d);
-    expect(basePalette.trailPulseColor).toBe(0xff61c7);
-    expect(basePalette.trailPulseEdgeColor).not.toBe(0xecfff5);
+    expect(basePalette.trailPulseColor).toBe(0xffffff);
+    expect(basePalette.trailPulseEdgeColor).toBe(0xe8fff5);
     expect(advancedPalette.playerCoreColor).toBe(0x36ff7d);
     expect(advancedPalette.trailColor).toBe(0x36ff7d);
-    expect(advancedPalette.trailPulseColor).toBe(0xff61c7);
+    expect(advancedPalette.trailPulseColor).toBe(0xffffff);
+    expect(advancedPalette.trailPulseEdgeColor).toBe(0xe8fff5);
     expect(resolveLegacyProgressionGenerationScale(50, advancedTrack)).toBeGreaterThan(50);
   });
 
@@ -908,7 +909,8 @@ describe('legacy progression', () => {
 
       expect(colorDistance(palette.playerCoreColor)).toBeGreaterThanOrEqual(145);
       expect(colorDistance(palette.trailColor)).toBeGreaterThanOrEqual(145);
-      expect(colorDistance(palette.trailPulseColor)).toBeGreaterThanOrEqual(145);
+      expect(palette.trailPulseColor).toBe(0xffffff);
+      expect(palette.trailPulseEdgeColor).toBe(0xe8fff5);
     }
   });
 

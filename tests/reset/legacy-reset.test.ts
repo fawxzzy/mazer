@@ -894,7 +894,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private createToggleSwitchRow(');
     expect(menuSceneSource).toContain("label: 'Camera Follow'");
     expect(menuSceneSource).toContain("label: 'Trail Fade'");
-    expect(menuSceneSource).toContain("label: 'Trail Pulse'");
+    expect(menuSceneSource).toContain("label: 'Trail Shine'");
+    expect(menuSceneSource).toContain("? 'On: white shine moves along the trail.'");
     expect(menuSceneSource).toContain("label: 'Animated BG'");
     expect(menuSceneSource).toContain("label: 'Dark Mode'");
     expect(menuSceneSource).toContain("label: 'Controls'");

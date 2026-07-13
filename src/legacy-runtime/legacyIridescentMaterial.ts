@@ -1,6 +1,8 @@
 export const LEGACY_IRIDESCENT_PATH_CORE_CONTRAST_COLOR = 0xe7fff4;
 export const LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE = 145;
 export const LEGACY_IRIDESCENT_GREEN_ANCHOR = 0x36ff7d;
+export const LEGACY_TRAIL_SHINE_COLOR = 0xffffff;
+export const LEGACY_TRAIL_SHINE_EDGE_COLOR = 0xe8fff5;
 
 export const LEGACY_IRIDESCENT_MIDNIGHT_STOPS = [
   0x36ff7d,
@@ -105,8 +107,8 @@ export const resolveLegacyIridescentPulseColor = (
   _index: number,
   _total: number,
   _timeMs: number,
-  _anchorColor = 0xff61c7
-): number => 0xff61c7;
+  anchorColor = LEGACY_TRAIL_SHINE_COLOR
+): number => anchorColor;
 
 export const resolveLegacyIridescentPlayerHaloColor = (
   _timeMs: number,

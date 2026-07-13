@@ -368,6 +368,8 @@ interface LegacyIridescentMaterialDiagnostics {
   playerHaloShiftColor: number;
   pulseHeadColor: number;
   pulseTailColor: number;
+  shineHeadColor: number;
+  shineTailColor: number;
   shiftPeriodMs: {
     playerAccent: number;
     playerHalo: number;
@@ -416,6 +418,9 @@ interface MenuSceneVisualDiagnostics {
     trailPulseEnabled: boolean;
     trailPulseColor: number;
     trailPulseEdgeColor: number;
+    trailShineEnabled: boolean;
+    trailShineColor: number;
+    trailShineEdgeColor: number;
     iridescentMaterial: LegacyIridescentMaterialDiagnostics;
     trailPulsePeriodMs: number;
   };
@@ -1768,6 +1773,9 @@ export class MenuScene extends Phaser.Scene {
           trailPulseEnabled: this.settings.toggleTrailPulse,
           trailPulseColor: progressionPalette.trailPulseColor,
           trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor,
+          trailShineEnabled: this.settings.toggleTrailPulse,
+          trailShineColor: progressionPalette.trailPulseColor,
+          trailShineEdgeColor: progressionPalette.trailPulseEdgeColor,
           iridescentMaterial: this.resolveLegacyIridescentMaterialDiagnostics(time, progressionPalette),
           trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
         }
@@ -6672,6 +6680,8 @@ export class MenuScene extends Phaser.Scene {
       playerHaloShiftColor: resolveLegacyIridescentPlayerHaloColor(time, palette.playerHaloColor),
       pulseHeadColor: resolveLegacyIridescentPulseColor(trailHeadIndex, trailLength, time, palette.trailPulseColor),
       pulseTailColor: resolveLegacyIridescentPulseColor(trailTailIndex, trailLength, time, palette.trailPulseEdgeColor),
+      shineHeadColor: resolveLegacyIridescentPulseColor(trailHeadIndex, trailLength, time, palette.trailPulseColor),
+      shineTailColor: resolveLegacyIridescentPulseColor(trailTailIndex, trailLength, time, palette.trailPulseEdgeColor),
       shiftPeriodMs: {
         playerAccent: 4200,
         playerHalo: 3600,
@@ -8262,9 +8272,9 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
         description: this.settings.toggleTrailPulse
-          ? 'On: purple trail pulse.'
-          : 'Off: no trail pulse.',
-        label: 'Trail Pulse',
+          ? 'On: white shine moves along the trail.'
+          : 'Off: no trail shine.',
+        label: 'Trail Shine',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailPulse'),
         onLabel: 'On',
@@ -10361,6 +10371,9 @@ export class MenuScene extends Phaser.Scene {
         trailPulseEnabled: this.settings.toggleTrailPulse,
         trailPulseColor: progressionPalette.trailPulseColor,
         trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor,
+        trailShineEnabled: this.settings.toggleTrailPulse,
+        trailShineColor: progressionPalette.trailPulseColor,
+        trailShineEdgeColor: progressionPalette.trailPulseEdgeColor,
         iridescentMaterial: this.resolveLegacyIridescentMaterialDiagnostics(time, progressionPalette),
         trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
       },

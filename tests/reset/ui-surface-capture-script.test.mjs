@@ -54,7 +54,11 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const PLAY_TRAIL_SEED_MOVES = Object.freeze([');
     expect(source).toContain('const seedPlayTrailForVisualProof = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
     expect(source).toContain('window.__MAZER_QA__?.movePlayPlayer');
-    expect(source).toContain('visual?.markerStyle?.trailPulseEnabled === true');
+    expect(source).toContain('visual?.markerStyle?.trailShineEnabled === true');
+    expect(source).toContain("const trailShineChecks = ['menu', 'play'].map((id) => createCheck(");
+    expect(source).toContain('`${id}-trail-shine-white`');
+    expect(source).toContain('EXPECTED_TRAIL_SHINE_COLOR = 0xffffff');
+    expect(source).toContain('EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe8fff5');
     expect(source).toContain('Unable to seed play trail for visual proof');
     expect(source).toContain("id: '01-menu'");
     expect(source).toContain("id: '02-auth'");
@@ -75,6 +79,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const playTrailSeed = await seedPlayTrailForVisualProof(page, { timeoutMs });');
     expect(source).toContain('const latestMenuDiagnostics = await readDiagnostics(page);');
     expect(source).toContain('const latestMenuButtons = getMenuButtonPoints(latestMenuDiagnostics.visual);');
+    expect(source).toContain('markerStyle: menu.diagnostics.visual?.markerStyle');
     expect(source).toContain("expectedLabels: ['PAUSE']");
     expect(source).toContain("expectedLabels: ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu']");
     expect(source).toContain("url.searchParams.set('mazeSeed', mazeSeed);");
@@ -87,7 +92,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'play-player-green'");
     expect(source).toContain("createCheck(\n      'play-goal-red'");
     expect(source).toContain("createCheck(\n      'play-stick-controls'");
-    expect(source).toContain("createCheck(\n      'play-trail-pulse-seeded-on'");
+    expect(source).toContain("createCheck(\n      'play-trail-shine-seeded-on'");
+    expect(source).toContain('...trailShineChecks');
     expect(source).toContain('deviceScaleFactor,');
     expect(source).toContain('authFixture: authFixture ?? null');
     expect(source).toContain('playTrailSeed,');

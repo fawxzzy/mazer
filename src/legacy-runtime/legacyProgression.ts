@@ -1,6 +1,7 @@
 import { clampInteger } from './legacyDefaults';
 import type { LegacyMazeGenerationProfile, LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 import { resolveLegacyMenuLayout } from './legacyMenuLayout';
+import { LEGACY_TRAIL_SHINE_COLOR, LEGACY_TRAIL_SHINE_EDGE_COLOR } from './legacyIridescentMaterial';
 import {
   scoreMazeCycleAiDecisionSummary,
   type MazeCycleTelemetryReceipt,
@@ -195,8 +196,8 @@ const LEGACY_PROGRESS_COLOR_TIERS: Array<Omit<LegacyProgressionPalette, 'label' 
     playerHaloColor: 0x00b84a,
     rankColor: 0x36ff7d,
     trailColor: 0x36ff7d,
-    trailPulseColor: 0xff61c7,
-    trailPulseEdgeColor: 0xc21b8c
+    trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
+    trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   },
   {
     badgeColor: '#59fff0',
@@ -204,8 +205,8 @@ const LEGACY_PROGRESS_COLOR_TIERS: Array<Omit<LegacyProgressionPalette, 'label' 
     playerHaloColor: 0x00b84a,
     rankColor: 0x59fff0,
     trailColor: 0x36ff7d,
-    trailPulseColor: 0xff61c7,
-    trailPulseEdgeColor: 0xc21b8c
+    trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
+    trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   },
   {
     badgeColor: '#7da8ff',
@@ -213,8 +214,8 @@ const LEGACY_PROGRESS_COLOR_TIERS: Array<Omit<LegacyProgressionPalette, 'label' 
     playerHaloColor: 0x00b84a,
     rankColor: 0x7da8ff,
     trailColor: 0x36ff7d,
-    trailPulseColor: 0xff61c7,
-    trailPulseEdgeColor: 0xc21b8c
+    trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
+    trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   },
   {
     badgeColor: '#fff05a',
@@ -222,8 +223,8 @@ const LEGACY_PROGRESS_COLOR_TIERS: Array<Omit<LegacyProgressionPalette, 'label' 
     playerHaloColor: 0x00b84a,
     rankColor: 0xfff05a,
     trailColor: 0x36ff7d,
-    trailPulseColor: 0xff61c7,
-    trailPulseEdgeColor: 0xc21b8c
+    trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
+    trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   },
   {
     badgeColor: '#ff61c7',
@@ -231,8 +232,8 @@ const LEGACY_PROGRESS_COLOR_TIERS: Array<Omit<LegacyProgressionPalette, 'label' 
     playerHaloColor: 0x00b84a,
     rankColor: 0xff61c7,
     trailColor: 0x36ff7d,
-    trailPulseColor: 0xff61c7,
-    trailPulseEdgeColor: 0xc21b8c
+    trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
+    trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   },
   {
     badgeColor: '#ffd36a',
@@ -240,8 +241,8 @@ const LEGACY_PROGRESS_COLOR_TIERS: Array<Omit<LegacyProgressionPalette, 'label' 
     playerHaloColor: 0x00b84a,
     rankColor: 0xffd36a,
     trailColor: 0x36ff7d,
-    trailPulseColor: 0xff61c7,
-    trailPulseEdgeColor: 0xc21b8c
+    trailPulseColor: LEGACY_TRAIL_SHINE_COLOR,
+    trailPulseEdgeColor: LEGACY_TRAIL_SHINE_EDGE_COLOR
   }
 ];
 
@@ -249,7 +250,7 @@ const LEGACY_PROGRESS_PATH_CORE_CONTRAST_COLOR = 0xe7fff4;
 const LEGACY_PROGRESS_MIN_PATH_COLOR_DISTANCE = 145;
 const LEGACY_PROGRESS_FALLBACK_PLAYER_COLOR = 0x36ff7d;
 const LEGACY_PROGRESS_FALLBACK_TRAIL_COLOR = 0x36ff7d;
-const LEGACY_PROGRESS_FALLBACK_TRAIL_PULSE_COLOR = 0xff61c7;
+const LEGACY_PROGRESS_FALLBACK_TRAIL_PULSE_COLOR = LEGACY_TRAIL_SHINE_COLOR;
 
 const copyTrack = (track: LegacyProgressionTrack): LegacyProgressionTrack => ({
   ...track,
