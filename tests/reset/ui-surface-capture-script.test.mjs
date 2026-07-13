@@ -12,6 +12,9 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';");
     expect(source).toContain("const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';");
     expect(source).toContain('const DEFAULT_DEVICE_SCALE_FACTOR = 2;');
+    expect(source).toContain('const mobileViewport = viewport.width < 720;');
+    expect(source).toContain('hasTouch: mobileViewport');
+    expect(source).toContain('isMobile: mobileViewport');
     expect(source).toContain("assertVisualScreenContract(screenContract);");
     expect(source).toContain('buildVisualScreenContract({');
     expect(source).toContain('const waitForVisualBuildSettled = async (page, { requireReadableTitle = false, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
@@ -105,6 +108,9 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-affordance'");
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-reachability'");
     expect(source).toContain('const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
+    expect(source).toContain('const desktopViewport = (before.visual?.viewport?.width ?? 0) >= 720;');
+    expect(source).toContain('const wheelDelta = Math.max(scroll.maxOffset * 4, dragDistance);');
+    expect(source).toContain('await page.mouse.wheel(0, wheelDelta);');
     expect(source).toContain("expectedLabels: ['Controls']");
     expect(source).toContain("expectedLabels: ['Move Speed', 'Reset Progress', 'Reset', 'Menu']");
     expect(source).toContain('optionsSurface.diagnostics.visual?.overlayUi');

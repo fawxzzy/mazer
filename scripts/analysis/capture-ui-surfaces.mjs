@@ -570,12 +570,25 @@ const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = 
   const dragStartY = scroll.track.bottom - 2;
   const dragEndY = scroll.track.top + 2;
   const dragDistance = Math.max(1, dragStartY - dragEndY);
-  const dragCount = Math.max(1, Math.ceil(scroll.maxOffset / dragDistance));
-  for (let index = 0; index < dragCount; index += 1) {
-    await page.mouse.move(scroll.track.centerX, dragStartY);
-    await page.mouse.down();
-    await page.mouse.move(scroll.track.centerX, dragEndY, { steps: 8 });
-    await page.mouse.up();
+  const desktopViewport = (before.visual?.viewport?.width ?? 0) >= 720;
+  if (desktopViewport) {
+    await page.mouse.move(scroll.viewport.centerX, scroll.viewport.centerY);
+    const wheelDelta = Math.max(scroll.maxOffset * 4, dragDistance);
+    await page.mouse.wheel(0, wheelDelta);
+    await page.mouse.wheel(0, wheelDelta);
+    await page.waitForTimeout(200);
+    const desktopAfter = await readDiagnostics(page);
+    if ((desktopAfter.visual?.overlayUi?.scroll?.offset ?? 0) < scroll.maxOffset - 1) {
+      throw new Error(`Desktop overlay wheel did not reach bottom: offset=${desktopAfter.visual?.overlayUi?.scroll?.offset ?? 0} max=${scroll.maxOffset}`);
+    }
+  } else {
+    const dragCount = Math.max(1, Math.ceil(scroll.maxOffset / dragDistance));
+    for (let index = 0; index < dragCount; index += 1) {
+      await page.mouse.move(scroll.track.centerX, dragStartY);
+      await page.mouse.down();
+      await page.mouse.move(scroll.track.centerX, dragEndY, { steps: 8 });
+      await page.mouse.up();
+    }
   }
   await page.waitForFunction(
     ({ visualAttribute }) => {
@@ -1098,10 +1111,11 @@ export const runUiSurfaceCapture = async (options = {}) => {
   const browser = await chromium.launch({ headless: options.headless !== false });
 
   try {
+    const mobileViewport = viewport.width < 720;
     const context = await browser.newContext({
       deviceScaleFactor,
-      hasTouch: true,
-      isMobile: true,
+      hasTouch: mobileViewport,
+      isMobile: mobileViewport,
       viewport
     });
     const page = await context.newPage();
