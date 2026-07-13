@@ -100,6 +100,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const collectNativeInputBoundsIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain('const collectTextOverlapIssues = (surfaceId, surface) => {');
     expect(source).toContain('const collectMenuControlSpacingIssues = (surface) => {');
+    expect(source).toContain('const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {');
+    expect(source).toContain("'progression-badge-geometry'");
     expect(source).toContain("createCheck(\n      'mobile-text-label-bounds'");
     expect(source).toContain("createCheck(\n      'mobile-native-input-bounds'");
     expect(source).toContain("createCheck(\n      'mobile-text-overlap'");

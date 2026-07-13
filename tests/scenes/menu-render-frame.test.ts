@@ -97,7 +97,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(guideSource).toContain("drawLegendRow(1, 'start', 'Start'");
     expect(guideSource).toContain("drawLegendRow(2, 'end', 'End'");
     expect(guideSource).toContain("'Player: green beacon + trail.'");
-    expect(guideSource).toContain("'Score grades each run.'");
+    expect(guideSource).toContain("'Score grades run quality.'");
     expect(guideSource).not.toContain('activeTargetComplexity');
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
@@ -788,8 +788,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('clampInteger(Math.round(mazeRenderFrame.tileSize * 2.85), 22, 30)');
     expect(menuSceneSource).toContain('clampInteger(Math.round(mazeRenderFrame.tileSize * 3.3), 24, 34);');
     expect(menuSceneSource).toContain('this.fitLegacyUiTextToWidth(');
-    expect(menuSceneSource).toContain('const fittedTextWidth = Math.ceil(this.progressionBadgeText.width);');
-    expect(menuSceneSource).toContain('fittedTextWidth + horizontalPadding');
+    expect(menuSceneSource).toContain('const verticalPadding = clampInteger(Math.round(mazeRenderFrame.tileSize * 1.35), 9, 14);');
+    expect(menuSceneSource).toContain("const width = this.mode === 'menu' || !portraitPlay");
+    expect(menuSceneSource).toContain('const portraitPauseBounds = portraitPlay');
+    expect(menuSceneSource).toContain('portraitPauseBounds.left - 8 - (this.layout.width / 2)');
+    expect(menuSceneSource).toContain('? Math.round(this.layout.width / 2)');
+    expect(menuSceneSource).not.toContain('portraitMenuBadgeTextOffset');
     expect(menuSceneSource).toContain('const visibleTrail = trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point));');
     expect(menuSceneSource).toContain('trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))');
     expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.maze;');
@@ -1299,29 +1303,29 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('.setColor(palette.badgeColor)');
   });
 
-  test('surfaces the menu AI skill, timer, and score inside a readable progression badge', () => {
+  test('surfaces rank-only public progression inside a maze-width badge', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('private formatLegacyElapsedLabel(elapsedMs: number): string');
-    expect(menuSceneSource).toContain('private formatLegacyProgressionRunCount(completedCycles: number): string');
     expect(menuSceneSource).toContain('private resolveLegacyMenuAiElapsedMs(): number');
     expect(menuSceneSource).toContain('private resolveLegacyPlayElapsedMs(): number');
-    expect(menuSceneSource).toContain('private resolveLegacyCurrentMazeLevel(): number');
     expect(menuSceneSource).toContain('private resolveLegacyProgressionBadgeText(_palette: LegacyProgressionPalette): string');
     expect(menuSceneSource).toContain('const text = this.resolveLegacyProgressionBadgeText(palette);');
-    expect(menuSceneSource).toContain("const skillLine = `AI Skill Lvl: ${aiTrack.rank}/${String(aiTrack.level).padStart(2, '0')}`;");
-    expect(menuSceneSource).toContain("const scoreLine = `Score: ${scoreLabel}`;");
-    expect(menuSceneSource).toContain("const runLine = `Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}`;");
-    expect(menuSceneSource).toContain("const mazeLine = `Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;");
-    expect(menuSceneSource).toContain("return `${timerLabel}\\n${skillLine}\\n${scoreLine}  ${runLine}\\n${mazeLine}`;");
+    expect(menuSceneSource).toContain("const rankLine = `AI Rank: ${aiTrack.rank}`;");
+    expect(menuSceneSource).toContain("return `${timerLabel}  ${rankLine}`;");
     expect(menuSceneSource).toContain("const timerLine = this.formatLegacyElapsedLabel(this.resolveLegacyPlayElapsedMs());");
-    expect(menuSceneSource).toContain("const skillLine = `Skill Lvl: ${playerTrack.rank}/${String(playerTrack.level).padStart(2, '0')}`;");
-    expect(menuSceneSource).toContain("const runLine = `Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}`;");
-    expect(menuSceneSource).toContain("return `${timerLine}\\n${skillLine}\\n${scoreLine}  ${runLine}\\n${mazeLine}`;");
+    expect(menuSceneSource).toContain("const rankLine = `Rank: ${playerTrack.rank}`;");
+    expect(menuSceneSource).toContain("return `${timerLine}  ${rankLine}`;");
+    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} is the public progression tier.`");
+    expect(menuSceneSource).toContain('This resets your rank progress, score, runs, and maze level');
+    expect(menuSceneSource).not.toContain('Skill Lvl');
+    expect(menuSceneSource).not.toContain('Player Skill');
     expect(menuSceneSource).not.toContain('const complexityLabel =');
     expect(menuSceneSource).not.toContain('const signalLabel =');
     expect(menuSceneSource).not.toContain('Sig:');
     expect(menuSceneSource).not.toContain('return palette.label;');
+    expect(menuSceneSource).not.toContain('private formatLegacyProgressionRunCount');
+    expect(menuSceneSource).not.toContain('private resolveLegacyCurrentMazeLevel');
   });
 
   test('places the played-game level badge in the top HUD lane without overlapping the maze', () => {
@@ -1331,11 +1335,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('? this.resolveLegacyPlayProgressionBadgeCenterY(mazeRenderFrame, height)');
     expect(menuSceneSource).toContain(': this.resolveLegacyMenuProgressionBadgeCenterY(mazeRenderFrame, height);');
     expect(menuSceneSource).toContain('private resolveLegacyPlayProgressionBadgeCenterY(');
+    expect(menuSceneSource).toContain('const maximumCenter = mazeRenderFrame.boardTop - 4 - (height / 2);');
     expect(menuSceneSource).toContain('const mazeGap = clampInteger(Math.round(mazeRenderFrame.tileSize * 2.4), 16, 28);');
     expect(menuSceneSource).toContain('const minimumTop = this.layout.height > this.layout.width ? 8 : 10;');
     expect(menuSceneSource).toContain('const maximumTopBeforeMaze = mazeRenderFrame.boardTop - mazeGap - height;');
     expect(menuSceneSource).toContain('return Math.round(top + (height / 2));');
     expect(menuSceneSource).toContain('private resolveLegacyMenuProgressionBadgeCenterY(');
+    expect(menuSceneSource).toContain('return Math.round(this.layout.lanes.rank.top + (height / 2));');
   });
 
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {
@@ -1350,8 +1356,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');");
     expect(menuSceneSource).toContain("'Player: green beacon + trail.'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
-    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Skill' : 'AI skill'}: rank + level.`");
-    expect(menuSceneSource).toContain("'Score grades each run.'");
+    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public progression tier.`");
+    expect(menuSceneSource).toContain("'Score grades run quality.'");
     expect(menuSceneSource).toContain("'Maze Lvl sets challenge.'");
   });
 

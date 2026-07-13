@@ -898,6 +898,44 @@ const collectMenuControlSpacingIssues = (surface) => {
     : [];
 };
 
+const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {
+  if (surface?.skipped === true || surface?.overlay !== 'none') {
+    return [];
+  }
+
+  const badge = surface.progressionBadge?.bounds;
+  const board = surface.board?.bounds;
+  if (!isFiniteBounds(badge) || !isFiniteBounds(board)) {
+    return [`${surfaceId}:missing-progression-badge-or-board-bounds`];
+  }
+
+  const issues = [];
+  if (badge.left < -1 || badge.right > viewport.width + 1 || badge.top < -1 || badge.bottom > viewport.height + 1) {
+    issues.push(`${surfaceId}:progression-badge-outside-viewport`);
+  }
+
+  const portraitPlay = surface.mode === 'play' && viewport.height > viewport.width;
+  if (!portraitPlay && Math.abs(badge.width - board.width) > 1) {
+    issues.push(`${surfaceId}:progression-badge-width=${badge.width.toFixed(1)}!=board=${board.width.toFixed(1)}`);
+  }
+  if (surface.mode === 'menu') {
+    const mazeGap = badge.top - board.bottom;
+    if (mazeGap < 4) {
+      issues.push(`${surfaceId}:board-to-progression-badge-gap=${mazeGap.toFixed(1)}<4`);
+    }
+  }
+  if (portraitPlay) {
+    if (Math.abs(badge.centerX - (viewport.width / 2)) > 1) {
+      issues.push(`${surfaceId}:progression-badge-not-centered`);
+    }
+    const pause = surface.touchControls?.controls?.pause;
+    if (isFiniteBounds(pause) && pause.left - badge.right < 4) {
+      issues.push(`${surfaceId}:progression-badge-to-pause-gap=${(pause.left - badge.right).toFixed(1)}<4`);
+    }
+  }
+  return issues;
+};
+
 const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {
   if (surface?.skipped === true) {
     return [];
@@ -991,6 +1029,10 @@ const buildSurfaceChecks = ({
   ];
   const controlSpacingIssues = [
     ...collectMenuControlSpacingIssues(surfaces.menu)
+  ];
+  const badgeGeometryIssues = [
+    ...collectProgressionBadgeGeometryIssues('menu', surfaces.menu, viewport),
+    ...collectProgressionBadgeGeometryIssues('play', surfaces.play, viewport)
   ];
   const overlayScrollIssues = [
     ...collectOverlayScrollAffordanceIssues('options', surfaces.options),
@@ -1138,6 +1180,11 @@ const buildSurfaceChecks = ({
       'mobile-badge-text-fit',
       badgeFitIssues.length === 0,
       badgeFitIssues.length === 0 ? 'visible progression badges fit their chrome' : badgeFitIssues.join('; ')
+    ),
+    createCheck(
+      'progression-badge-geometry',
+      badgeGeometryIssues.length === 0,
+      badgeGeometryIssues.length === 0 ? 'progression badges respect maze width, viewport, and pause lanes' : badgeGeometryIssues.join('; ')
     ),
     createCheck(
       'mobile-overlay-scroll-affordance',
