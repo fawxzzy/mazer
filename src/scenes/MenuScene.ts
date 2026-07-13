@@ -3079,6 +3079,9 @@ export class MenuScene extends Phaser.Scene {
     }, {
       compact: true,
       controlMode: this.settings.controlMode,
+      placement: this.layout.width >= 720 && this.layout.height >= 600
+        ? 'bottom-centered'
+        : undefined,
       avoidRect: {
         left: boardBounds.left,
         top: boardBounds.top,

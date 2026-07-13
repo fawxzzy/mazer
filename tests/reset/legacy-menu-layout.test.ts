@@ -360,4 +360,26 @@ describe('legacy menu layout', () => {
     expect(touchLayout.controls.restart_attempt.width).toBe(0);
     expect(touchLayout.controls.toggle_thoughts.width).toBe(0);
   });
+
+  test('centers wide play controls in the reserved lower lane and keeps pause above the maze', () => {
+    const playLayout = resolveLegacyMenuLayout(1280, 720, 50, 49, 'play');
+    const touchLayout = resolveTouchControlLayout({
+      width: playLayout.width,
+      height: playLayout.height
+    }, {
+      compact: true,
+      placement: 'bottom-centered',
+      avoidRect: {
+        left: playLayout.boardLeft,
+        top: playLayout.boardTop,
+        width: playLayout.boardSize,
+        height: playLayout.boardSize
+      }
+    });
+
+    expect(Math.abs(touchLayout.frame.centerX - (playLayout.width / 2))).toBeLessThanOrEqual(1);
+    expect(touchLayout.frame.top).toBeGreaterThanOrEqual(playLayout.boardTop + playLayout.boardSize);
+    expect(touchLayout.controls.pause.left).toBeGreaterThanOrEqual(playLayout.boardLeft + playLayout.boardSize + 8);
+    expect(touchLayout.controls.pause.bottom).toBeLessThanOrEqual(playLayout.boardTop);
+  });
 });

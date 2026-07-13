@@ -75,6 +75,7 @@ export interface TouchControlLayoutOptions {
   safeInsets?: TouchSafeInsetsLike;
   compact?: boolean;
   controlMode?: TouchControlMode;
+  placement?: 'bottom-centered';
   avoidRect?: {
     left: number;
     top: number;
@@ -383,6 +384,88 @@ export const resolveTouchControlLayout = (
   }
 
   const avoidRect = options.avoidRect;
+  if (options.placement === 'bottom-centered' && avoidRect !== undefined) {
+    const boardRight = clamp(Math.round(avoidRect.left + avoidRect.width), safeInsets.left, viewport.width - safeInsets.right);
+    const boardBottom = clamp(Math.round(avoidRect.top + avoidRect.height), safeInsets.top, viewport.height - safeInsets.bottom);
+    const buttonSize = clamp(Math.round(minDim * 0.078), 44, 64);
+    const gap = Math.max(8, Math.round(buttonSize * 0.16));
+    const framePad = 8;
+    const dpadSpan = (buttonSize * 3) + (gap * 2);
+    const dpadFrameWidth = dpadSpan + (framePad * 2);
+    const dpadFrameHeight = dpadSpan + (framePad * 2);
+    const bottomLaneTop = Math.min(
+      viewport.height - safeInsets.bottom - dpadFrameHeight,
+      boardBottom + Math.max(10, Math.round(buttonSize * 0.2))
+    );
+    const dpadFrameTop = clamp(
+      Math.round(bottomLaneTop + (((viewport.height - safeInsets.bottom) - bottomLaneTop - dpadFrameHeight) / 2)),
+      bottomLaneTop,
+      Math.max(bottomLaneTop, viewport.height - safeInsets.bottom - dpadFrameHeight)
+    );
+    const dpadFrameLeft = clamp(
+      Math.round((viewport.width - dpadFrameWidth) / 2),
+      safeInsets.left,
+      Math.max(safeInsets.left, viewport.width - safeInsets.right - dpadFrameWidth)
+    );
+    const dpadLeft = dpadFrameLeft + framePad;
+    const dpadTop = dpadFrameTop + framePad;
+    const actionWidth = clamp(Math.round(buttonSize * 1.24), 58, 86);
+    const actionHeight = clamp(Math.round(buttonSize * 0.78), 38, 52);
+    const actionLeft = clamp(
+      boardRight + Math.max(10, Math.round(buttonSize * 0.18)),
+      safeInsets.left + 4,
+      Math.max(safeInsets.left + 4, viewport.width - safeInsets.right - actionWidth - 4)
+    );
+    const actionTop = clamp(
+      safeInsets.top + 10,
+      safeInsets.top + 4,
+      Math.max(safeInsets.top + 4, Math.round(avoidRect.top) - actionHeight - 4)
+    );
+    const dpadFrame = createRect(dpadFrameLeft, dpadFrameTop, dpadFrameWidth, dpadFrameHeight);
+    const actionFrame = createRect(actionLeft, actionTop, actionWidth, actionHeight);
+    const stickOuterSize = Math.min(dpadFrame.width - (framePad * 2), dpadFrame.height - (framePad * 2));
+    const stickOuter = createRect(
+      Math.round(dpadFrame.centerX - (stickOuterSize / 2)),
+      Math.round(dpadFrame.centerY - (stickOuterSize / 2)),
+      stickOuterSize,
+      stickOuterSize
+    );
+    const stickInnerSize = clamp(Math.round(stickOuterSize * 0.34), 34, 54);
+    const stickInner = createRect(
+      Math.round(stickOuter.centerX - (stickInnerSize / 2)),
+      Math.round(stickOuter.centerY - (stickInnerSize / 2)),
+      stickInnerSize,
+      stickInnerSize
+    );
+
+    return {
+      compact,
+      controlMode,
+      frame: dpadFrame,
+      frames: [actionFrame, dpadFrame],
+      stick: controlMode === 'stick'
+        ? {
+          deadzoneRadius: Math.max(16, Math.round(stickOuterSize * 0.18)),
+          inner: stickInner,
+          outer: stickOuter
+        }
+        : null,
+      controls: {
+        move_up_left: createRect(dpadLeft, dpadTop, buttonSize, buttonSize),
+        move_up: createRect(dpadLeft + buttonSize + gap, dpadTop, buttonSize, buttonSize),
+        move_up_right: createRect(dpadLeft + ((buttonSize + gap) * 2), dpadTop, buttonSize, buttonSize),
+        move_down_left: createRect(dpadLeft, dpadTop + ((buttonSize + gap) * 2), buttonSize, buttonSize),
+        move_down: createRect(dpadLeft + buttonSize + gap, dpadTop + ((buttonSize + gap) * 2), buttonSize, buttonSize),
+        move_down_right: createRect(dpadLeft + ((buttonSize + gap) * 2), dpadTop + ((buttonSize + gap) * 2), buttonSize, buttonSize),
+        move_left: createRect(dpadLeft, dpadTop + buttonSize + gap, buttonSize, buttonSize),
+        move_right: createRect(dpadLeft + ((buttonSize + gap) * 2), dpadTop + buttonSize + gap, buttonSize, buttonSize),
+        pause: createRect(actionFrame.left, actionFrame.top, actionFrame.width, actionFrame.height),
+        restart_attempt: EMPTY_TOUCH_RECT,
+        toggle_thoughts: EMPTY_TOUCH_RECT
+      }
+    };
+  }
+
   const splitLandscape = compact && viewport.width > viewport.height && avoidRect !== undefined;
   if (splitLandscape) {
     const avoidLeft = clamp(Math.round(avoidRect.left), safeInsets.left, viewport.width - safeInsets.right);
