@@ -66,3 +66,9 @@ lock probes passed, all initial and fresh seeds were distinct, every cycle
 finished at 60 FPS with zero recent spikes, and average post-goal lifecycle
 time was 8940.3 ms. Receipt:
 `tmp/captures/mazer-live-play-soak/2026-07-13-play-loop-stick-soak/play-loop-stick-soak.summary.json`.
+
+The maintained `npm run live:input-equivalence` matrix reuses the same live
+movement and lifecycle contract for keyboard and on-screen stick input. It
+compares accepted route/world-turn outcomes rather than requiring identical
+gesture counts, so stick overshoot remains legal only when it lands on the
+planned route and both methods still prove fresh-maze and lock invariants.

@@ -52,6 +52,7 @@
     "live:menu-ai-qa": "node ./scripts/analysis/live-menu-ai-qa.mjs",
     "live:play-qa": "node ./scripts/analysis/live-play-qa.mjs",
     "live:play-soak": "node ./scripts/analysis/live-play-soak.mjs",
+    "live:input-equivalence": "node ./scripts/analysis/live-play-input-equivalence.mjs",
     "visual:ui-surfaces": "node ./scripts/analysis/capture-ui-surfaces.mjs",
     "visual:ui-transitions": "node ./scripts/analysis/capture-ui-transitions.mjs",
     "runtime:soak": "node ./scripts/analysis/capture-runtime-soak.mjs",
