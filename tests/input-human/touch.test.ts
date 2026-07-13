@@ -263,6 +263,30 @@ describe('input-human touch bridge', () => {
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_left.centerX, layout.controls.move_left.centerY)).toBe('move_left');
   });
 
+  test('centers wide play controls below the board while reserving the top-right pause lane', () => {
+    const board = {
+      left: 444,
+      top: 64,
+      width: 392,
+      height: 392
+    };
+    const layout = resolveTouchControlLayout({
+      width: 1280,
+      height: 720
+    }, {
+      compact: true,
+      placement: 'bottom-centered',
+      avoidRect: board
+    });
+
+    expect(Math.abs(layout.frame.centerX - 640)).toBeLessThanOrEqual(1);
+    expect(layout.frame.top).toBeGreaterThanOrEqual(board.top + board.height);
+    expect(layout.frame.bottom).toBeLessThanOrEqual(720);
+    expect(layout.controls.pause.left).toBeGreaterThanOrEqual(board.left + board.width + 8);
+    expect(layout.controls.pause.bottom).toBeLessThanOrEqual(board.top);
+    expect(layout.frames).toHaveLength(2);
+  });
+
   test('maps touch points into the shared human action schema and releases held pointers', () => {
     const layout = resolveTouchControlLayout({
       width: 390,
