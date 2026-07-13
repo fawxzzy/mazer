@@ -30,6 +30,11 @@ const DEFAULT_ARTIFACT_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-ui-s
 const DEFAULT_LABEL = 'ui-surfaces';
 const DEFAULT_ROUTE = '/?content=core-only&theme=aurora&runtimeDiagnostics=1';
 const DEFAULT_VIEWPORT = Object.freeze({ width: 405, height: 958 });
+const DEFAULT_TRANSITION_VIEWPORTS = Object.freeze({
+  initial: Object.freeze({ width: 360, height: 720 }),
+  desktop: Object.freeze({ width: 1440, height: 900 }),
+  endpoint: Object.freeze({ width: 405, height: 958 })
+});
 const DEFAULT_DEVICE_SCALE_FACTOR = 2;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const EXPECTED_PLAYER_CORE_COLOR = 0x36ff7d;
@@ -457,6 +462,144 @@ const captureSurface = async ({
   };
 };
 
+const openAuthOverlayFromMenu = async (page, timeoutMs) => {
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const diagnostics = await readDiagnostics(page);
+    const buttons = getMenuButtonPoints(diagnostics.visual);
+    await clickPoint(page, buttons.login, 'Login');
+    try {
+      await waitForSurface(page, {
+        expectedLabels: ['Account', 'Login', 'Create Account', 'Reset Password'],
+        mode: 'menu',
+        overlay: 'auth',
+        timeoutMs: Math.min(timeoutMs, 10_000)
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+      await page.waitForTimeout(150);
+    }
+  }
+  throw lastError ?? new Error('Unable to open auth overlay from menu.');
+};
+
+const toSurfaceState = (capture) => ({
+  mode: capture.diagnostics.visual?.runtime?.mode ?? capture.diagnostics.runtime?.surface?.mode,
+  overlay: capture.diagnostics.visual?.runtime?.overlay ?? capture.diagnostics.runtime?.surface?.overlay,
+  board: capture.diagnostics.visual?.board,
+  layout: capture.diagnostics.visual?.layout,
+  progressionBadge: capture.diagnostics.visual?.progressionBadge,
+  title: capture.diagnostics.visual?.title,
+  overlayUi: capture.diagnostics.visual?.overlayUi,
+  nativeInputs: capture.nativeInputs,
+  textLabels: capture.diagnostics.visual?.textLabels,
+  touchControls: capture.diagnostics.visual?.touchControls,
+  screenContract: capture.screenContract
+});
+
+const waitForViewportGeometry = async (page, viewport, timeoutMs = DEFAULT_TIMEOUT_MS) => {
+  await page.waitForFunction(
+    ({ visualAttribute, width, height }) => {
+      const raw = document.documentElement.getAttribute(visualAttribute);
+      if (!raw) {
+        return false;
+      }
+
+      try {
+        const visual = JSON.parse(raw);
+        return visual?.viewport?.width === width && visual?.viewport?.height === height;
+      } catch {
+        return false;
+      }
+    },
+    {
+      visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE,
+      width: viewport.width,
+      height: viewport.height
+    },
+    { timeout: timeoutMs }
+  );
+};
+
+const stableBoardDiagnostics = (board) => board ? {
+  bounds: board.bounds ?? null,
+  renderBounds: board.renderBounds ?? null,
+  renderSafeInset: board.renderSafeInset ?? null,
+  safeBounds: board.safeBounds ?? null,
+  pathVisualStyle: board.pathVisualStyle ?? null,
+  tileSize: board.tileSize ?? null,
+  topCenterNotch: board.topCenterNotch ?? null
+} : null;
+
+const stableTransitionDiagnostics = (surface) => ({
+  board: stableBoardDiagnostics(surface.board),
+  layout: surface.layout ?? null,
+  mode: surface.mode ?? null,
+  overlay: surface.overlay ?? null,
+  touchControls: surface.touchControls ?? null
+});
+
+const collectTransitionLayoutIssues = (surfaceId, surface, viewport) => [
+  ...collectTextBoundsIssues(surfaceId, surface, viewport),
+  ...collectNativeInputBoundsIssues(surfaceId, surface, viewport),
+  ...collectTextOverlapIssues(surfaceId, surface)
+];
+
+const captureViewportTransition = async ({
+  id,
+  mode,
+  overlay,
+  page,
+  route,
+  timeoutMs,
+  transition
+}) => {
+  const captureEndpoint = async (name, viewport) => {
+    await page.setViewportSize(viewport);
+    await waitForViewportGeometry(page, viewport, timeoutMs);
+    await waitForVisualBuildSettled(page, { timeoutMs });
+    const capture = await captureSurface({
+      page,
+      outputDir: transition.outputDir,
+      expectedLabels: [],
+      id: `${id}-transition-${name}`,
+      mode,
+      overlay,
+      route,
+      timeoutMs,
+      viewport
+    });
+    const surface = toSurfaceState(capture);
+    return {
+      name,
+      viewport,
+      diagnostics: stableTransitionDiagnostics(surface),
+      nativeInputs: surface.nativeInputs,
+      layoutIssues: collectTransitionLayoutIssues(id, surface, viewport),
+      screenshotPath: capture.screenshotPath
+    };
+  };
+
+  const initial = await captureEndpoint('initial', transition.initial);
+  const desktop = await captureEndpoint('desktop', transition.desktop);
+  const restored = await captureEndpoint('restored', transition.initial);
+  const endpoint = await captureEndpoint('endpoint', transition.endpoint);
+  await page.setViewportSize(transition.initial);
+  await waitForViewportGeometry(page, transition.initial, timeoutMs);
+  await waitForVisualBuildSettled(page, { timeoutMs });
+
+  return {
+    initial,
+    desktop,
+    restored,
+    endpoint,
+    restoredDiagnosticsMatch: JSON.stringify(initial.diagnostics) === JSON.stringify(restored.diagnostics),
+    layoutIssues: [initial, desktop, restored, endpoint]
+      .flatMap((entry) => entry.layoutIssues.map((issue) => `${entry.name}:${issue}`))
+  };
+};
+
 const seedPreferences = async (page, preferences) => {
   await page.addInitScript(({ storageKey, value }) => {
     window.localStorage.setItem(storageKey, JSON.stringify(value));
@@ -808,6 +951,7 @@ const collectOverlayScrollBottomIssues = (surfaceId, surface, expectedLabels) =>
 
 const buildSurfaceChecks = ({
   consoleMessages,
+  includeOverlayBottom = true,
   pageErrors,
   surfaces,
   viewport
@@ -852,10 +996,10 @@ const buildSurfaceChecks = ({
     ...collectOverlayScrollAffordanceIssues('options', surfaces.options),
     ...collectOverlayScrollAffordanceIssues('pause', surfaces.pause)
   ];
-  const overlayScrollBottomIssues = [
+  const overlayScrollBottomIssues = includeOverlayBottom ? [
     ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, ['Controls']),
     ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Move Speed', 'Reset Progress', 'Reset', 'Menu'])
-  ];
+  ] : [];
   const menuTitle = surfaces.menu.title;
   const badgeFitIssues = [
     ['menu', surfaces.menu],
@@ -1028,6 +1172,23 @@ const buildSurfaceChecks = ({
   ];
 };
 
+const buildViewportTransitionChecks = (transitions) => Object.entries(transitions ?? {}).flatMap(([surfaceId, transition]) => [
+  createCheck(
+    `${surfaceId}-transition-restored-diagnostics`,
+    transition.restoredDiagnosticsMatch === true,
+    transition.restoredDiagnosticsMatch === true
+      ? 'canonical diagnostics restored after desktop transition'
+      : 'canonical diagnostics changed after desktop transition'
+  ),
+  createCheck(
+    `${surfaceId}-transition-layout`,
+    transition.layoutIssues.length === 0,
+    transition.layoutIssues.length === 0
+      ? 'no text/input bounds or text collisions across transition endpoints'
+      : transition.layoutIssues.join('; ')
+  )
+]);
+
 const buildMarkdownReport = (summary) => {
   const checkRows = summary.checks
     .map((check) => `| ${check.id} | ${check.passed ? 'pass' : 'fail'} | ${check.detail.replace(/\|/g, '\\|')} |`)
@@ -1080,7 +1241,14 @@ export const runUiSurfaceCapture = async (options = {}) => {
   const artifactRoot = resolve(options.artifactRoot ?? DEFAULT_ARTIFACT_ROOT);
   const outputDir = resolve(artifactRoot, sessionId);
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
-  const viewport = options.viewport ?? DEFAULT_VIEWPORT;
+  const transition = options.transition
+    ? {
+      ...DEFAULT_TRANSITION_VIEWPORTS,
+      ...options.transition,
+      outputDir
+    }
+    : null;
+  const viewport = transition?.initial ?? options.viewport ?? DEFAULT_VIEWPORT;
   const deviceScaleFactor = options.deviceScaleFactor ?? DEFAULT_DEVICE_SCALE_FACTOR;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const authFixture = typeof options.authFixture === 'string' ? options.authFixture : undefined;
@@ -1114,8 +1282,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const mobileViewport = viewport.width < 720;
     const context = await browser.newContext({
       deviceScaleFactor,
-      hasTouch: mobileViewport,
-      isMobile: mobileViewport,
+      hasTouch: transition ? false : mobileViewport,
+      isMobile: transition ? false : mobileViewport,
       viewport
     });
     const page = await context.newPage();
@@ -1161,15 +1329,20 @@ export const runUiSurfaceCapture = async (options = {}) => {
       timeoutMs,
       viewport
     });
+    const menuTransition = transition
+      ? await captureViewportTransition({
+        id: '01-menu', mode: 'menu', overlay: 'none', page, route, timeoutMs, transition
+      })
+      : null;
     const authGatedMenu = isAuthGatedMenuSurface(menu.diagnostics.visual);
     const authenticatedMenu = authFixture === 'authenticated' || menu.diagnostics.runtime?.auth?.status === 'authenticated';
     const optionsExpectedLabels = resolveOptionsExpectedLabels(authenticatedMenu);
-    const menuButtons = authGatedMenu ? null : getMenuButtonPoints(menu.diagnostics.visual);
+    const currentMenuDiagnostics = transition ? await readDiagnostics(page) : menu.diagnostics;
+    const menuButtons = authGatedMenu ? null : getMenuButtonPoints(currentMenuDiagnostics.visual);
     await waitForVisualBuildSettled(page, { timeoutMs });
     const authSurface = authGatedMenu
       ? await (async () => {
-        const guestButtons = getMenuButtonPoints(menu.diagnostics.visual);
-        await clickPoint(page, guestButtons.login, 'Login');
+        await openAuthOverlayFromMenu(page, timeoutMs);
         const captured = await captureSurface({
           page,
           outputDir,
@@ -1181,6 +1354,11 @@ export const runUiSurfaceCapture = async (options = {}) => {
           timeoutMs,
           viewport
         });
+        captured.transition = transition
+          ? await captureViewportTransition({
+            id: '02-auth', mode: 'menu', overlay: 'auth', page, route, timeoutMs, transition
+          })
+          : null;
         return captured;
       })()
       : {
@@ -1228,19 +1406,33 @@ export const runUiSurfaceCapture = async (options = {}) => {
           timeoutMs,
           viewport
         });
-        await scrollOverlayToBottom(page, { timeoutMs });
-        optionsBottomSurface = await captureSurface({
-          page,
-          outputDir,
-          expectedLabels: ['Controls'],
-          id: '02-options-bottom',
-          mode: 'menu',
-          overlay: 'options',
-          route,
-          skipWait: true,
-          timeoutMs,
-          viewport
-        });
+        captured.transition = transition
+          ? await captureViewportTransition({
+            id: '02-options', mode: 'menu', overlay: 'options', page, route, timeoutMs, transition
+          })
+          : null;
+        if (transition) {
+          optionsBottomSurface = {
+            diagnostics: { runtime: null, visual: null },
+            nativeInputs: [],
+            screenContract: null,
+            skipped: true
+          };
+        } else {
+          await scrollOverlayToBottom(page, { timeoutMs });
+          optionsBottomSurface = await captureSurface({
+            page,
+            outputDir,
+            expectedLabels: ['Controls'],
+            id: '02-options-bottom',
+            mode: 'menu',
+            overlay: 'options',
+            route,
+            skipWait: true,
+            timeoutMs,
+            viewport
+          });
+        }
         await page.keyboard.press('Escape');
         await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs });
         return captured;
@@ -1266,8 +1458,14 @@ export const runUiSurfaceCapture = async (options = {}) => {
       timeoutMs,
       viewport
     });
+    const playTransition = transition
+      ? await captureViewportTransition({
+        id: '03-play', mode: 'play', overlay: 'none', page, route: playRoute, timeoutMs, transition
+      })
+      : null;
 
-    await clickPoint(page, getPauseButtonPoint(play.diagnostics.visual), 'Pause');
+    const currentPlayDiagnostics = transition ? await readDiagnostics(page) : play.diagnostics;
+    await clickPoint(page, getPauseButtonPoint(currentPlayDiagnostics.visual), 'Pause');
     const pause = await captureSurface({
       page,
       outputDir,
@@ -1279,19 +1477,28 @@ export const runUiSurfaceCapture = async (options = {}) => {
       timeoutMs,
       viewport
     });
-    await scrollOverlayToBottom(page, { timeoutMs });
-    const pauseBottomSurface = await captureSurface({
-      page,
-      outputDir,
-      expectedLabels: ['Move Speed', 'Reset Progress', 'Reset', 'Menu'],
-      id: '04-pause-bottom',
-      mode: 'play',
-      overlay: 'pause',
-      route: playRoute,
-      skipWait: true,
-      timeoutMs,
-      viewport
-    });
+    const pauseTransition = transition
+      ? await captureViewportTransition({
+        id: '04-pause', mode: 'play', overlay: 'pause', page, route: playRoute, timeoutMs, transition
+      })
+      : null;
+    const pauseBottomSurface = transition
+      ? { diagnostics: { runtime: null, visual: null }, nativeInputs: [], screenContract: null, skipped: true }
+      : await (async () => {
+        await scrollOverlayToBottom(page, { timeoutMs });
+        return captureSurface({
+          page,
+          outputDir,
+          expectedLabels: ['Move Speed', 'Reset Progress', 'Reset', 'Menu'],
+          id: '04-pause-bottom',
+          mode: 'play',
+          overlay: 'pause',
+          route: playRoute,
+          skipWait: true,
+          timeoutMs,
+          viewport
+        });
+      })();
 
     const surfaces = {
       menu: {
@@ -1399,13 +1606,22 @@ export const runUiSurfaceCapture = async (options = {}) => {
       pause: pause.screenshotPath,
       pauseBottom: pauseBottomSurface.screenshotPath
     };
+    const transitions = transition ? {
+      menu: menuTransition,
+      ...(authGatedMenu ? { auth: authSurface.transition } : {}),
+      ...(authGatedMenu ? {} : { options: optionsSurface.transition }),
+      play: playTransition,
+      pause: pauseTransition
+    } : null;
     const checks = buildSurfaceChecks({
       consoleMessages,
+      includeOverlayBottom: !transition,
       pageErrors,
       surfaces,
       targetUrl,
       viewport
     });
+    checks.push(...buildViewportTransitionChecks(transitions));
     const summary = {
       pass: checks.every((check) => check.passed),
       label,
@@ -1413,6 +1629,12 @@ export const runUiSurfaceCapture = async (options = {}) => {
       targetUrl,
       viewport,
       deviceScaleFactor,
+      transition: transition ? {
+        initial: transition.initial,
+        desktop: transition.desktop,
+        endpoint: transition.endpoint,
+        surfaces: transitions
+      } : null,
       authFixture: authFixture ?? null,
       playTrailSeed,
       repo: {

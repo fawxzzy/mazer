@@ -9,12 +9,13 @@ describe('UI surface capture script contract', () => {
     const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'));
 
     expect(packageJson.scripts['visual:ui-surfaces']).toBe('node ./scripts/analysis/capture-ui-surfaces.mjs');
+    expect(packageJson.scripts['visual:ui-transitions']).toBe('node ./scripts/analysis/capture-ui-transitions.mjs');
     expect(source).toContain("const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';");
     expect(source).toContain("const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';");
     expect(source).toContain('const DEFAULT_DEVICE_SCALE_FACTOR = 2;');
     expect(source).toContain('const mobileViewport = viewport.width < 720;');
-    expect(source).toContain('hasTouch: mobileViewport');
-    expect(source).toContain('isMobile: mobileViewport');
+    expect(source).toContain('hasTouch: transition ? false : mobileViewport');
+    expect(source).toContain('isMobile: transition ? false : mobileViewport');
     expect(source).toContain("assertVisualScreenContract(screenContract);");
     expect(source).toContain('buildVisualScreenContract({');
     expect(source).toContain('const waitForVisualBuildSettled = async (page, { requireReadableTitle = false, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
@@ -146,5 +147,13 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const reportPath = resolve(outputDir, \'report.md\');');
     expect(source).toContain('![Menu](${summary.screenshots.menu})');
     expect(source).toContain('![Auth](${summary.screenshots.auth})');
+    expect(source).toContain('const DEFAULT_TRANSITION_VIEWPORTS = Object.freeze({');
+    expect(source).toContain('const captureViewportTransition = async ({');
+    expect(source).toContain('const stableBoardDiagnostics = (board) => board ? {');
+    expect(source).toContain('await page.setViewportSize(viewport);');
+    expect(source).toContain('restoredDiagnosticsMatch: JSON.stringify(initial.diagnostics) === JSON.stringify(restored.diagnostics)');
+    expect(source).toContain('nativeInputs: surface.nativeInputs');
+    expect(source).toContain('const buildViewportTransitionChecks = (transitions) =>');
+    expect(source).toContain('checks.push(...buildViewportTransitionChecks(transitions));');
   });
 });
