@@ -334,6 +334,22 @@ export const resolveLivePlayLifecycleSnapshot = (diagnostics) => {
   };
 };
 
+export const summarizeFreshReadyState = (diagnostics) => {
+  const snapshot = resolveLivePlayLifecycleSnapshot(diagnostics);
+  return {
+    explicitLifecyclePhase: snapshot.explicitLifecyclePhase,
+    inputLocked: snapshot.inputLocked,
+    lifecyclePhase: snapshot.lifecyclePhase,
+    pass: snapshot.mode === 'play'
+      && snapshot.explicitLifecyclePhase === 'ready'
+      && snapshot.lifecyclePhase === 'settled'
+      && snapshot.inputLocked === false
+      && snapshot.timerRunning === true,
+    seed: snapshot.seed,
+    timerRunning: snapshot.timerRunning
+  };
+};
+
 const summarizeLifecycleTraceSamples = (samples) => {
   const trace = [];
   for (const sample of samples) {
@@ -880,7 +896,10 @@ export const runLivePlayQa = async (options = {}) => {
     const freshWorldTurnProof = lifecycleProof === null
       ? { freshMaze: null, pass: true }
       : summarizeFreshWorldTurn(lifecycleProof.finalDiagnostics?.runtime?.play?.worldTurn ?? null);
-    const worldTurnPassed = worldTurnProof.pass && freshWorldTurnProof.pass;
+    const freshReadyProof = lifecycleProof === null
+      ? { pass: true }
+      : summarizeFreshReadyState(lifecycleProof.finalDiagnostics);
+    const worldTurnPassed = worldTurnProof.pass && freshWorldTurnProof.pass && freshReadyProof.pass;
 
     summary = {
       schema: 'mazer.live-play-qa.v1',
@@ -940,6 +959,7 @@ export const runLivePlayQa = async (options = {}) => {
         sawFreshSeedQueued: lifecycleProof.sawFreshSeedQueued,
         sawHandoff: lifecycleProof.sawHandoff,
         settledFreshSeed: lifecycleProof.settledFreshSeed,
+        freshReady: freshReadyProof,
         timedOut: lifecycleProof.timedOut,
         timeoutMs: lifecycleProof.timeoutMs
       } : null,
