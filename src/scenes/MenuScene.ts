@@ -205,6 +205,7 @@ import {
   type LegacyAuthSessionSnapshot,
   type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
+import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_REMOTE_MESSAGE_COPY,
@@ -8724,12 +8725,11 @@ export class MenuScene extends Phaser.Scene {
     input.type = fieldId === 'password' ? 'password' : fieldId === 'email' ? 'email' : 'text';
     input.value = this.authForm[fieldId];
     const rect = canvas.getBoundingClientRect();
-    const scaleX = rect.width / Math.max(1, this.scale.width);
-    const scaleY = rect.height / Math.max(1, this.scale.height);
-    input.style.left = `${rect.left + ((bounds.x - (bounds.width / 2)) * scaleX)}px`;
-    input.style.top = `${rect.top + ((bounds.y - (bounds.height / 2)) * scaleY)}px`;
-    input.style.width = `${bounds.width * scaleX}px`;
-    input.style.height = `${bounds.height * scaleY}px`;
+    const cssRect = resolveLegacyAuthInputCssRect(bounds, rect, this.layout);
+    input.style.left = `${cssRect.left}px`;
+    input.style.top = `${cssRect.top}px`;
+    input.style.width = `${cssRect.width}px`;
+    input.style.height = `${cssRect.height}px`;
     window.setTimeout(() => input.focus({ preventScroll: true }), 0);
   }
 
