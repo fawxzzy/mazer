@@ -44,6 +44,7 @@ const summarizeSurface = ({ runtime, visual }) => ({
   buttons: (visual?.buttons ?? []).map((button) => button.text),
   mode: visual?.runtime?.mode ?? null,
   overlay: visual?.runtime?.overlay ?? null,
+  trailShineEnabled: runtime?.gameToggles?.trailPulse?.enabled ?? null,
   userIdPresent: runtime?.auth?.userIdPresent === true
 });
 
@@ -90,6 +91,24 @@ const openOptionsViaQa = async (page) => {
   }
 };
 
+const waitForTrailShine = async (page, expected) => {
+  await page.waitForFunction(({ runtimeAttribute, expectedValue }) => {
+    const runtimeRaw = document.documentElement.getAttribute(runtimeAttribute);
+    if (!runtimeRaw) {
+      return false;
+    }
+    try {
+      return JSON.parse(runtimeRaw)?.gameToggles?.trailPulse?.enabled === expectedValue;
+    } catch {
+      return false;
+    }
+  }, {
+    runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
+    expectedValue: expected
+  }, { timeout: TIMEOUT_MS });
+  return summarizeSurface(await readDiagnostics(page));
+};
+
 const buildRoute = (authenticated) => (
   `/?content=core-only&theme=aurora&runtimeDiagnostics=1${authenticated ? '&authFixture=authenticated' : ''}&v=auth-persistence-soak`
 );
@@ -98,6 +117,7 @@ export const summarizeAuthPersistenceSoak = (steps, consoleMessages, pageErrors)
   const required = [
     'guest-entry',
     'authenticated-entry',
+    'authenticated-setting-change',
     'authenticated-reload',
     'logout-to-guest',
     'fixture-reentry'
@@ -159,14 +179,35 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     });
     steps.push({ id: 'authenticated-entry', pass: authenticatedEntry.userIdPresent, surface: authenticatedEntry });
 
+    await openOptionsViaQa(page);
+    const options = await waitForSurface(page, {
+      authenticated: true, buttons: ['Trail Shine', 'Log out'], mode: 'menu', overlay: 'options'
+    });
+    const initialTrailShine = options.trailShineEnabled;
+    if (typeof initialTrailShine !== 'boolean') {
+      throw new Error('trail_shine_diagnostic_missing');
+    }
+    const trailShinePoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Trail Shine');
+    await page.mouse.click(trailShinePoint.x, trailShinePoint.y);
+    const changedTrailShine = await waitForTrailShine(page, !initialTrailShine);
+    steps.push({
+      id: 'authenticated-setting-change',
+      pass: changedTrailShine.trailShineEnabled === !initialTrailShine,
+      surface: changedTrailShine
+    });
+
     await page.reload({ waitUntil: 'networkidle', timeout: TIMEOUT_MS });
     const authenticatedReload = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Options'], mode: 'menu', overlay: 'none'
     });
-    steps.push({ id: 'authenticated-reload', pass: authenticatedReload.userIdPresent, surface: authenticatedReload });
+    steps.push({
+      id: 'authenticated-reload',
+      pass: authenticatedReload.userIdPresent && authenticatedReload.trailShineEnabled === !initialTrailShine,
+      surface: authenticatedReload
+    });
 
     await openOptionsViaQa(page);
-    const options = await waitForSurface(page, {
+    await waitForSurface(page, {
       authenticated: true, buttons: ['Log out'], mode: 'menu', overlay: 'options'
     });
     const logoutPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Log out');
@@ -174,13 +215,24 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     const logout = await waitForSurface(page, {
       authenticated: false, buttons: ['Account'], mode: 'menu', overlay: 'options'
     });
-    steps.push({ id: 'logout-to-guest', pass: options.authStatus === 'authenticated' && !logout.userIdPresent, surface: logout });
+    steps.push({
+      id: 'logout-to-guest',
+      pass: options.authStatus === 'authenticated'
+        && !logout.userIdPresent
+        && logout.trailShineEnabled === initialTrailShine,
+      surface: logout
+    });
 
     await page.goto(`${preview.baseUrl}${buildRoute(true)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
     const reentry = await waitForSurface(page, {
       authenticated: true, buttons: ['Start', 'Options'], mode: 'menu', overlay: 'none'
     });
-    steps.push({ id: 'fixture-reentry', pass: reentry.userIdPresent, surface: reentry, fixtureOnly: true });
+    steps.push({
+      id: 'fixture-reentry',
+      pass: reentry.userIdPresent && reentry.trailShineEnabled === !initialTrailShine,
+      surface: reentry,
+      fixtureOnly: true
+    });
 
     const screenshotPath = resolve(outputDir, `${label}.png`);
     await page.screenshot({ path: screenshotPath });

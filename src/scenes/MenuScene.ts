@@ -9533,8 +9533,8 @@ export class MenuScene extends Phaser.Scene {
   private loadPersistedLegacyGameToggleSettings(): void {
     const browserStorage = this.resolveBrowserLocalStorage();
     const scopedStorage = this.resolveLegacyGameToggleStorage();
-    migrateLegacyGameToggleSettingsFromGlobalStorage(browserStorage, scopedStorage, this.settings);
-    this.settings = readLegacyGameToggleSettings(scopedStorage, this.settings);
+    migrateLegacyGameToggleSettingsFromGlobalStorage(browserStorage, scopedStorage, LEGACY_DEFAULTS);
+    this.settings = readLegacyGameToggleSettings(scopedStorage, LEGACY_DEFAULTS);
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
   }
 
