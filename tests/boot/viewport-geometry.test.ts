@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   applyMazerViewportCssVariables,
+  installMazerViewportGeometry,
   resolveMazerViewportGeometryFromRuntime,
   syncMazerGameToViewport
 } from '../../src/boot/viewportGeometry';
@@ -58,6 +59,52 @@ const createRuntime = ({
   };
 
   return { cssValues, root, runtime };
+};
+
+const createObservableRuntime = (dimensions?: Parameters<typeof createRuntime>[0]) => {
+  const { cssValues, root, runtime } = createRuntime(dimensions);
+  const runtimeListeners = new Map<string, Set<() => void>>();
+  const visualViewportListeners = new Map<string, Set<() => void>>();
+  const animationFrames: FrameRequestCallback[] = [];
+  const register = (listeners: Map<string, Set<() => void>>, type: string, listener: () => void): void => {
+    const entries = listeners.get(type) ?? new Set<() => void>();
+    entries.add(listener);
+    listeners.set(type, entries);
+  };
+  const unregister = (listeners: Map<string, Set<() => void>>, type: string, listener: () => void): void => {
+    listeners.get(type)?.delete(listener);
+  };
+  const emit = (listeners: Map<string, Set<() => void>>, type: string): void => {
+    for (const listener of listeners.get(type) ?? []) {
+      listener();
+    }
+  };
+
+  Object.assign(runtime, {
+    addEventListener: (type: string, listener: () => void): void => register(runtimeListeners, type, listener),
+    removeEventListener: (type: string, listener: () => void): void => unregister(runtimeListeners, type, listener),
+    requestAnimationFrame: (callback: FrameRequestCallback): number => {
+      animationFrames.push(callback);
+      return animationFrames.length;
+    }
+  });
+  Object.assign(runtime.visualViewport, {
+    addEventListener: (type: string, listener: () => void): void => register(visualViewportListeners, type, listener),
+    removeEventListener: (type: string, listener: () => void): void => unregister(visualViewportListeners, type, listener)
+  });
+
+  return {
+    cssValues,
+    root,
+    runtime,
+    emitRuntime: (type: string): void => emit(runtimeListeners, type),
+    emitVisualViewport: (type: string): void => emit(visualViewportListeners, type),
+    flushAnimationFrame: (): void => {
+      const callbacks = animationFrames.splice(0);
+      callbacks.forEach((callback) => callback(0));
+    },
+    scheduledFrameCount: (): number => animationFrames.length
+  };
 };
 
 describe('Mazer viewport geometry', () => {
@@ -136,5 +183,70 @@ describe('Mazer viewport geometry', () => {
     expect(syncMazerGameToViewport(game as never, { content: { width: 390, height: 844 } })).toBe(false);
     expect(syncMazerGameToViewport(game as never, { content: { width: 844, height: 390 } })).toBe(true);
     expect(resizeCalls).toEqual([[844, 390]]);
+  });
+
+  test('recomputes shared content geometry once when browser chrome changes the visual viewport', () => {
+    const observed = createObservableRuntime({ height: 844, visualHeight: 844, visualWidth: 390, width: 390 });
+    const controller = installMazerViewportGeometry(observed.runtime as never);
+    const snapshots = [] as ReturnType<typeof controller.getSnapshot>[];
+    controller.subscribe((snapshot) => snapshots.push(snapshot));
+
+    observed.runtime.visualViewport.height = 780;
+    observed.runtime.visualViewport.offsetTop = 18;
+    observed.emitVisualViewport('resize');
+    observed.emitVisualViewport('scroll');
+
+    expect(observed.scheduledFrameCount()).toBe(1);
+    observed.flushAnimationFrame();
+
+    expect(controller.getSnapshot()).toMatchObject({
+      revision: 2,
+      content: { left: 0, top: 42, width: 390, height: 722 },
+      visual: { height: 780, offsetTop: 18, usedForContent: true }
+    });
+    expect(observed.cssValues.get('--mazer-viewport-top')).toBe('42px');
+    expect(observed.cssValues.get('--mazer-viewport-height')).toBe('722px');
+    expect(snapshots).toHaveLength(2);
+
+    controller.dispose();
+    observed.runtime.visualViewport.height = 760;
+    observed.emitVisualViewport('resize');
+    observed.flushAnimationFrame();
+    expect(controller.getSnapshot().revision).toBe(2);
+  });
+
+  test('recomputes desktop maximize and restore from the current runtime snapshot', () => {
+    const observed = createObservableRuntime({ height: 720, visualHeight: 720, visualWidth: 360, width: 360 });
+    const controller = installMazerViewportGeometry(observed.runtime as never);
+    const initial = controller.getSnapshot();
+
+    observed.root.clientWidth = 1440;
+    observed.root.clientHeight = 900;
+    observed.runtime.innerWidth = 1440;
+    observed.runtime.innerHeight = 900;
+    observed.runtime.visualViewport.width = 1440;
+    observed.runtime.visualViewport.height = 900;
+    observed.runtime.visualViewport.offsetTop = 0;
+    observed.emitRuntime('resize');
+    observed.flushAnimationFrame();
+
+    expect(controller.getSnapshot()).toMatchObject({
+      revision: 2,
+      content: { left: 0, top: 24, width: 1440, height: 842 },
+      isLandscape: true
+    });
+
+    observed.root.clientWidth = 360;
+    observed.root.clientHeight = 720;
+    observed.runtime.innerWidth = 360;
+    observed.runtime.innerHeight = 720;
+    observed.runtime.visualViewport.width = 360;
+    observed.runtime.visualViewport.height = 720;
+    observed.runtime.visualViewport.offsetTop = 12;
+    observed.emitRuntime('resize');
+    observed.flushAnimationFrame();
+
+    expect(controller.getSnapshot()).toEqual({ ...initial, revision: 3 });
+    controller.dispose();
   });
 });
