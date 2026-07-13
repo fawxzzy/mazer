@@ -3070,7 +3070,7 @@ export class MenuScene extends Phaser.Scene {
       width: this.layout.width,
       height: this.layout.height
     }, {
-      compact: this.layout.width < 720 || this.layout.height < 720,
+      compact: true,
       controlMode: this.settings.controlMode,
       avoidRect: {
         left: boardBounds.left,
@@ -3084,7 +3084,8 @@ export class MenuScene extends Phaser.Scene {
   private shouldRenderLegacyPlayTouchControls(
     touchControlLayout = this.resolveLegacyPlayTouchControlLayout()
   ): boolean {
-    return this.mode === 'play' && this.overlay === 'none' && touchControlLayout.compact;
+    void touchControlLayout;
+    return this.mode === 'play' && this.overlay === 'none';
   }
 
   private handleLegacyPlayPointerUp(pointer: Phaser.Input.Pointer): boolean {

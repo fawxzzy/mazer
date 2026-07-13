@@ -157,7 +157,7 @@ export const resolveLegacyMenuLayout = (
   const playTopHudReserve = isPlaySurface && isPortrait
     ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
     : 56;
-  const playControlReserve = isPlaySurface && isPortrait
+  const playControlReserve = isPlaySurface
     ? Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230))
     : 0;
   const menuVerticalBoardLimit = height
@@ -169,7 +169,7 @@ export const resolveLegacyMenuLayout = (
     - menuFooterReserve;
   const playVerticalBoardLimit = height
     - playTopHudReserve
-    - (isPortrait ? playControlReserve + (laneGap * 2) : laneGap + 12);
+    - (playControlReserve + (laneGap * 2));
   const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuVerticalBoardLimit);
   const baseBoardScale = isUltraNarrow ? 0.98 : (isPortrait ? (isPlaySurface ? 0.92 : 0.86) : (isPlaySurface ? 0.62 : 0.52));
   const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
@@ -205,9 +205,9 @@ export const resolveLegacyMenuLayout = (
     Math.round((height - menuFooterReserve - menuGroupHeight) / 2)
   );
   const menuBoardTop = menuGroupTop + menuTitleReserve + laneGap;
-  const playBoardTop = isPortrait
+  const playBoardTop = isPlaySurface
     ? playTopHudReserve + laneGap
-    : Math.round(clamp((height - snappedBoardSize) / 2, playTopHudReserve + laneGap, height - snappedBoardSize - 12));
+    : menuBoardTop;
   const boardTop = Math.round(isPlaySurface ? playBoardTop : menuBoardTop);
   const menuRankLaneTop = boardTop + snappedBoardSize + laneGap;
   const menuActionLaneTop = menuRankLaneTop + menuRankReserve + laneGap;
@@ -251,7 +251,7 @@ export const resolveLegacyMenuLayout = (
   const titleX = !isPlaySurface && isPortrait ? boardLeft + (snappedBoardSize / 2) : Math.round(width / 2);
   const rankLane = isPlaySurface ? null : createLane(menuRankLaneTop, menuRankReserve);
   const actionsLane = isPlaySurface ? null : createLane(menuActionLaneTop, menuActionReserve);
-  const controlsLane = isPlaySurface && isPortrait
+  const controlsLane = isPlaySurface
     ? createLane(boardTop + snappedBoardSize + laneGap, Math.max(0, height - (boardTop + snappedBoardSize + laneGap)))
     : null;
 

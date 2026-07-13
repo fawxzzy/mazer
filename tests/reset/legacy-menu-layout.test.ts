@@ -241,6 +241,15 @@ describe('legacy menu layout', () => {
     expect(menuLayout.leftButtonY + menuLayout.buttonHeight).toBeLessThan(menuLayout.rightButtonY);
   });
 
+  test('reserves play HUD and controller lanes on desktop as well as phones', () => {
+    const layout = resolveLegacyMenuLayout(1440, 900, 50, 49, 'play');
+
+    expect(layout.lanes.hud).not.toBeNull();
+    expect(layout.lanes.controls).not.toBeNull();
+    expect(layout.lanes.hud?.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
+    expect(layout.lanes.maze.bottom).toBeLessThanOrEqual(layout.lanes.controls?.top ?? Number.NEGATIVE_INFINITY);
+  });
+
   test('keeps the compact phone control deck below the active-play board', () => {
     const playLayout = resolveLegacyMenuLayout(360, 740, 50, 49, 'play');
     const touchLayout = resolveTouchControlLayout({
