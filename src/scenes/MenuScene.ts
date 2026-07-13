@@ -169,10 +169,8 @@ import {
   createEmptyLegacyProgressionState,
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
-  resolveLegacyMazeComplexity,
   resolveLegacyMazeGenerationProfileForProgression,
   resolveLegacyProgressionGenerationScale,
-  resolveLegacyProgressionLevel,
   resolveLegacyProgressionPalette,
   resolveLegacyProgressionTrackIdForSurface,
   summarizeLegacyProgressionDiagnostics,
@@ -5884,8 +5882,7 @@ export class MenuScene extends Phaser.Scene {
     const horizontalPadding = this.mode === 'menu'
       ? clampInteger(Math.round(mazeRenderFrame.tileSize * 2.85), 22, 30)
       : clampInteger(Math.round(mazeRenderFrame.tileSize * 3.3), 24, 34);
-    const verticalPadding = clampInteger(Math.round(mazeRenderFrame.tileSize * 1.35), 9, 14)
-      + (this.mode === 'menu' && this.layout.height > this.layout.width ? 20 : 0);
+    const verticalPadding = clampInteger(Math.round(mazeRenderFrame.tileSize * 1.35), 9, 14);
     this.progressionBadgeText
       .setText(text)
       .setFontSize(baseFontSize)
@@ -5901,18 +5898,27 @@ export class MenuScene extends Phaser.Scene {
     );
     const fittedTextWidth = Math.ceil(this.progressionBadgeText.width);
     const fittedTextHeight = Math.ceil(this.progressionBadgeText.height);
-    const width = clampInteger(
-      fittedTextWidth + horizontalPadding,
-      minBadgeWidth,
-      maxWidth
-    );
+    const portraitPlay = this.mode === 'play' && this.layout.height > this.layout.width;
+    const portraitPauseBounds = portraitPlay
+      ? this.resolveLegacyPlayTouchControlLayout().controls.pause
+      : null;
+    const portraitPlayMaxWidth = portraitPauseBounds
+      ? Math.max(120, Math.floor((portraitPauseBounds.left - 8 - (this.layout.width / 2)) * 2))
+      : maxWidth;
+    const width = this.mode === 'menu' || !portraitPlay
+      ? maxWidth
+      : clampInteger(
+        fittedTextWidth + horizontalPadding,
+        120,
+        Math.min(maxWidth, portraitPlay ? portraitPlayMaxWidth : maxWidth)
+      );
     const height = clampInteger(
       fittedTextHeight + verticalPadding,
       38,
       this.mode === 'menu' && this.layout.height > this.layout.width ? 98 : this.mode === 'menu' ? 90 : 76
     );
-    const centerX = this.mode === 'play' && this.layout.height > this.layout.width
-      ? Math.round(this.layout.width * 0.32)
+    const centerX = portraitPlay
+      ? Math.round(this.layout.width / 2)
       : mazeRenderFrame.boardLeft + (mazeRenderFrame.boardSize / 2);
     const centerY = this.mode === 'play'
       ? this.resolveLegacyPlayProgressionBadgeCenterY(mazeRenderFrame, height)
@@ -5930,9 +5936,8 @@ export class MenuScene extends Phaser.Scene {
     });
     this.boardDynamicGraphics.lineStyle(1, palette.rankColor, 0.72);
     this.boardDynamicGraphics.strokeRoundedRect(centerX - (width / 2), centerY - (height / 2), width, height, 7);
-    const portraitMenuBadgeTextOffset = this.mode === 'menu' && this.layout.height > this.layout.width ? 10 : 0;
     this.progressionBadgeText
-      .setPosition(centerX, centerY - portraitMenuBadgeTextOffset)
+      .setPosition(centerX, centerY)
       .setVisible(true);
 
     const badgeBounds = createVisualRect(centerX - (width / 2), centerY - (height / 2), width, height);
@@ -5953,7 +5958,7 @@ export class MenuScene extends Phaser.Scene {
     height: number
   ): number {
     if (this.layout.lanes.rank !== null) {
-      return Math.round(this.layout.lanes.rank.top + (this.layout.lanes.rank.height / 2));
+      return Math.round(this.layout.lanes.rank.top + (height / 2));
     }
 
     const outerInset = Math.max(0, (this.layout.boardSize - mazeRenderFrame.boardSize) / 2);
@@ -5979,7 +5984,10 @@ export class MenuScene extends Phaser.Scene {
     height: number
   ): number {
     if (this.layout.lanes.hud !== null) {
-      return Math.round(this.layout.lanes.hud.top + (this.layout.lanes.hud.height / 2));
+      const laneCenter = this.layout.lanes.hud.top + (this.layout.lanes.hud.height / 2);
+      const minimumCenter = 4 + (height / 2);
+      const maximumCenter = mazeRenderFrame.boardTop - 4 - (height / 2);
+      return Math.round(Math.max(minimumCenter, Math.min(laneCenter, maximumCenter)));
     }
 
     const mazeGap = clampInteger(Math.round(mazeRenderFrame.tileSize * 2.4), 16, 28);
@@ -5996,12 +6004,6 @@ export class MenuScene extends Phaser.Scene {
     const seconds = totalSeconds % 60;
 
     return `${minutes}:${String(seconds).padStart(2, '0')}`;
-  }
-
-  private formatLegacyProgressionRunCount(completedCycles: number): string {
-    const roundedCycles = Math.max(0, Math.round(completedCycles));
-
-    return `${Math.min(99_999, roundedCycles)}${roundedCycles > 99_999 ? '+' : ''}`;
   }
 
   private resolveLegacyMenuAiElapsedMs(): number {
@@ -6028,32 +6030,18 @@ export class MenuScene extends Phaser.Scene {
       : 0;
   }
 
-  private resolveLegacyCurrentMazeLevel(): number {
-    return resolveLegacyProgressionLevel(resolveLegacyMazeComplexity(this.maze).total);
-  }
-
   private resolveLegacyProgressionBadgeText(_palette: LegacyProgressionPalette): string {
     if (this.mode !== 'menu') {
       const playerTrack = this.progressionState.tracks.player;
       const timerLine = this.formatLegacyElapsedLabel(this.resolveLegacyPlayElapsedMs());
-      const scoreLabel = playerTrack.paceScore > 0 ? String(playerTrack.paceScore) : '--';
-      const skillLine = `Skill Lvl: ${playerTrack.rank}/${String(playerTrack.level).padStart(2, '0')}`;
-      const scoreLine = `Score: ${scoreLabel}`;
-      const runLine = `Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}`;
-      const mazeLine = `Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;
-
-      return `${timerLine}\n${skillLine}\n${scoreLine}  ${runLine}\n${mazeLine}`;
+      const rankLine = `Rank: ${playerTrack.rank}`;
+      return `${timerLine}  ${rankLine}`;
     }
 
     const timerLabel = this.formatLegacyElapsedLabel(this.resolveLegacyMenuAiElapsedMs());
     const aiTrack = this.progressionState.tracks['ai-runner'];
-    const scoreLabel = aiTrack.paceScore > 0 ? String(aiTrack.paceScore) : '--';
-    const skillLine = `AI Skill Lvl: ${aiTrack.rank}/${String(aiTrack.level).padStart(2, '0')}`;
-    const scoreLine = `Score: ${scoreLabel}`;
-    const runLine = `Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}`;
-    const mazeLine = `Maze Lvl: ${this.resolveLegacyCurrentMazeLevel()}`;
-
-    return `${timerLabel}\n${skillLine}\n${scoreLine}  ${runLine}\n${mazeLine}`;
+    const rankLine = `AI Rank: ${aiTrack.rank}`;
+    return `${timerLabel}  ${rankLine}`;
   }
 
   private drawLegacyMenuCompass(
@@ -7738,14 +7726,14 @@ export class MenuScene extends Phaser.Scene {
     const bullets = compact
       ? [
         'Player: green beacon + trail.',
-        `${this.mode === 'play' ? 'Skill' : 'AI skill'}: rank + level.`,
-        'Score grades each run.',
+        `${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public progression tier.`,
+        'Score grades run quality.',
         'Maze Lvl sets challenge.'
       ]
       : [
         'Player: green beacon; the trail marks your route.',
-        `${this.mode === 'play' ? 'Skill Lvl' : 'AI Skill Lvl'} combines rank and level.`,
-        'Score grades route quality; Runs count completed mazes.',
+        `${this.mode === 'play' ? 'Rank' : 'AI Rank'} is the public progression tier.`,
+        'Score grades run quality; Runs count completed mazes.',
         'Maze Lvl sets the current procedural challenge tier.'
       ];
     bullets.forEach((copy, index) => {
@@ -7870,7 +7858,7 @@ export class MenuScene extends Phaser.Scene {
     const actionY = panel.top + panel.height - (compact ? 72 : 84);
 
     this.createOverlayTitle('Reset Progress?', panel.top + (compact ? 52 : 58));
-    const body = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(panel.centerX, bodyY, 'This resets your Player Skill, score, runs, and maze level to the starting baseline. Your menu AI progression stays unchanged.', {
+    const body = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(panel.centerX, bodyY, 'This resets your rank progress, score, runs, and maze level to the starting baseline. Your menu AI progression stays unchanged.', {
       align: 'center',
       color: '#d9fff5',
       fontFamily: LEGACY_UI_FONT_FAMILY,
