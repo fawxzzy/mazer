@@ -8,12 +8,29 @@ import {
   resolveStickHoldMsForMove,
   resolveStickPointForMove,
   summarizeFreshWorldTurn,
+  summarizeFreshReadyState,
   summarizeGoalWorldTurn,
   summarizePostGoalLifecycleSamples,
   solveWalkableRoute
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
+  test('requires the rebuilt maze to be ready, settled, unlocked, and timing play', () => {
+    expect(summarizeFreshReadyState({
+      runtime: {
+        surface: { mode: 'play' },
+        generation: { drawStage: { lifecyclePhase: 'settled' }, maze: { seed: 202 } },
+        play: { lifecycle: { drawPhase: 'settled', inputLocked: false, phase: 'ready', timerRunning: true } }
+      }
+    })).toMatchObject({ pass: true, seed: 202, timerRunning: true });
+    expect(summarizeFreshReadyState({
+      runtime: {
+        surface: { mode: 'play' },
+        generation: { drawStage: { lifecyclePhase: 'settled' }, maze: { seed: 202 } },
+        play: { lifecycle: { drawPhase: 'settled', inputLocked: true, phase: 'ready', timerRunning: false } }
+      }
+    }).pass).toBe(false);
+  });
   test('requires one admitted world turn per planned route move at the goal', () => {
     expect(summarizeGoalWorldTurn({
       acceptedTurnCount: 12,
