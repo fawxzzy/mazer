@@ -11,6 +11,9 @@ export type LegacyPlayLifecyclePhase =
 export type LegacyResetEntryStageId = 8;
 export type LegacyResetAction = 'regenerate-maze' | 'return-menu';
 export type LegacyResetReason = 'goal';
+export type LegacyEndlessLifecycleEvent = 'abandon' | 'complete' | 'fail-current-attempt' | 'resume' | 'start';
+export type LegacyEndlessLifecycleEffect = 'advance-checkpoint' | 'none' | 'reset-current-attempt' | 'resume-current-attempt';
+export type LegacyEndlessLifecycleStatus = 'active' | 'abandoned';
 
 export interface LegacyResetEntryContract {
   bypassesLevelBuildingDelay: boolean;
@@ -27,6 +30,22 @@ export interface LegacyResetRequest {
   dueAtMs: number;
   mode: LegacyPlayMode;
   reason: LegacyResetReason;
+}
+
+// This is deliberately storage- and scene-agnostic. Runtime wiring follows only after
+// this contract has fixture proof and an explicit migration plan.
+export interface LegacyEndlessLifecycleState {
+  attempt: number;
+  checkpointLevel: number | null;
+  currentLevel: number;
+  status: LegacyEndlessLifecycleStatus;
+  version: 1;
+}
+
+export interface LegacyEndlessLifecycleTransition {
+  effect: LegacyEndlessLifecycleEffect;
+  event: LegacyEndlessLifecycleEvent;
+  state: LegacyEndlessLifecycleState;
 }
 
 export interface LegacyPlayLifecycleSnapshot {
@@ -46,6 +65,62 @@ export interface LegacyPlayLifecycleSnapshot {
 
 export const ACTIVE_PLAY_GOAL_RESET_HOLD_MS = 340;
 export const LEGACY_RESET_ENTRY_STAGE_ID: LegacyResetEntryStageId = 8;
+
+const normalizeEndlessLevel = (level: number): number => Math.max(0, Math.round(level));
+
+const copyLegacyEndlessLifecycleState = (
+  state: LegacyEndlessLifecycleState
+): LegacyEndlessLifecycleState => ({ ...state });
+
+export const createLegacyEndlessLifecycleState = (
+  initialLevel = 0
+): LegacyEndlessLifecycleState => ({
+  attempt: 1,
+  checkpointLevel: null,
+  currentLevel: normalizeEndlessLevel(initialLevel),
+  status: 'active',
+  version: 1
+});
+
+export const resolveLegacyEndlessLifecycleTransition = (
+  state: LegacyEndlessLifecycleState,
+  event: LegacyEndlessLifecycleEvent
+): LegacyEndlessLifecycleTransition => {
+  const current = copyLegacyEndlessLifecycleState(state);
+
+  switch (event) {
+    case 'start':
+      return { effect: 'none', event, state: { ...current, status: 'active' } };
+    case 'complete':
+      return {
+        effect: 'advance-checkpoint',
+        event,
+        state: {
+          ...current,
+          attempt: 1,
+          checkpointLevel: current.currentLevel,
+          currentLevel: current.currentLevel + 1,
+          status: 'active'
+        }
+      };
+    case 'fail-current-attempt':
+      return {
+        effect: 'reset-current-attempt',
+        event,
+        state: { ...current, attempt: current.attempt + 1, status: 'active' }
+      };
+    case 'abandon':
+      return { effect: 'none', event, state: { ...current, status: 'abandoned' } };
+    case 'resume':
+      return {
+        effect: 'resume-current-attempt',
+        event,
+        state: { ...current, status: 'active' }
+      };
+    default:
+      return event satisfies never;
+  }
+};
 
 export const resolveLegacyResetAction = (_mode: LegacyPlayMode): LegacyResetAction => (
   'regenerate-maze'
