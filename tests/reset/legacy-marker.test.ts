@@ -374,12 +374,12 @@ describe('Mazer completion markers', () => {
     expect(markerDoc).toContain('diagonal neighbor legality');
     expect(markerDoc).toContain('rainbow shifting is deliberately paused for readability');
     expect(markerDoc).toContain('pins player core, halo/accent, and all trail tiles to the green readability anchor');
-    expect(markerDoc).toContain('trail pulse is pinned to the purple pulse anchor');
-    expect(markerDoc).toContain('temporary green/purple lock cannot drift back to blue, pink, or yellow trail/player colors');
-    expect(markerDoc).toContain('Runtime/visual diagnostics still expose compact material samples');
-    expect(markerDoc).toContain('purple pulse is the only animated trail treatment');
-    expect(markerDoc).toContain('capture-ui-surfaces.mjs` seeds one real QA move');
-    expect(markerDoc).toContain('The played-game player and main-menu AI runner share the green anchor as a louder beacon treatment');
+    expect(markerDoc).toContain('exactly one white fading shine over the green trail');
+    expect(markerDoc).toContain('pin the shine core/edge to white anchors');
+    expect(markerDoc).toContain('Runtime/visual diagnostics expose compact samples');
+    expect(markerDoc).toContain('white shine is the only animated trail treatment');
+    expect(markerDoc).toContain('capture-ui-surfaces.mjs` seeds one accepted QA move');
+    expect(markerDoc).toContain('both the played-game player marker and main-menu AI runner use the high-contrast green beacon language');
     expect(markerDoc).toContain('explicit advanced field commits now enter the same compact cyber message-card queue');
     expect(markerDoc).toContain('Bulk overlay field commits stay silent');
   });

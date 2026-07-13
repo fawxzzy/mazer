@@ -277,6 +277,9 @@ export interface MenuSceneRuntimeDiagnostics {
       trailPulseEnabled?: boolean;
       trailPulseColor?: number;
       trailPulseEdgeColor?: number;
+      trailShineEnabled?: boolean;
+      trailShineColor?: number;
+      trailShineEdgeColor?: number;
       iridescentMaterial?: {
         minPathColorDistance: number;
         playerAccentColor: number;
@@ -284,6 +287,8 @@ export interface MenuSceneRuntimeDiagnostics {
         playerHaloShiftColor: number;
         pulseHeadColor: number;
         pulseTailColor: number;
+        shineHeadColor: number;
+        shineTailColor: number;
         shiftPeriodMs: {
           playerAccent: number;
           playerHalo: number;

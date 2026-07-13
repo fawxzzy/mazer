@@ -39,6 +39,8 @@ const DEFAULT_DEVICE_SCALE_FACTOR = 2;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const EXPECTED_PLAYER_CORE_COLOR = 0x36ff7d;
 const EXPECTED_GOAL_CORE_COLOR = 0xff263f;
+const EXPECTED_TRAIL_SHINE_COLOR = 0xffffff;
+const EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe8fff5;
 
 const runNpmCommand = (args) => {
   if (process.platform === 'win32') {
@@ -360,7 +362,7 @@ const seedPlayTrailForVisualProof = async (page, { timeoutMs = DEFAULT_TIMEOUT_M
 
       try {
         const visual = JSON.parse(raw);
-        return visual?.markerStyle?.trailPulseEnabled === true;
+        return visual?.markerStyle?.trailShineEnabled === true;
       } catch {
         return false;
       }
@@ -1093,6 +1095,12 @@ const buildSurfaceChecks = ({
     surfaces[id].board?.pathVisualStyle === 'corridor',
     `${id} pathVisualStyle=${surfaces[id].board?.pathVisualStyle ?? 'missing'} expected=corridor`
   ));
+  const trailShineChecks = ['menu', 'play'].map((id) => createCheck(
+    `${id}-trail-shine-white`,
+    surfaces[id].markerStyle?.trailShineColor === EXPECTED_TRAIL_SHINE_COLOR
+      && surfaces[id].markerStyle?.trailShineEdgeColor === EXPECTED_TRAIL_SHINE_EDGE_COLOR,
+    `shine=${surfaces[id].markerStyle?.trailShineColor ?? 'missing'} edge=${surfaces[id].markerStyle?.trailShineEdgeColor ?? 'missing'}`
+  ));
   const playChecks = [
     createCheck(
       'play-player-green',
@@ -1110,10 +1118,10 @@ const buildSurfaceChecks = ({
       `visible=${surfaces.play.touchControls?.visible ?? 'missing'} controlMode=${surfaces.play.touchControls?.controlMode ?? 'missing'}`
     ),
     createCheck(
-      'play-trail-pulse-seeded-on',
-      surfaces.play.markerStyle?.trailPulseEnabled === true,
-      `trailPulseEnabled=${surfaces.play.markerStyle?.trailPulseEnabled ?? 'missing'}`
-    ),
+      'play-trail-shine-seeded-on',
+      surfaces.play.markerStyle?.trailShineEnabled === true,
+      `trailShineEnabled=${surfaces.play.markerStyle?.trailShineEnabled ?? 'missing'}`
+    )
   ];
   const textChecks = [
     createCheck(
@@ -1213,6 +1221,7 @@ const buildSurfaceChecks = ({
   return [
     ...surfaceChecks,
     ...pathStyleChecks,
+    ...trailShineChecks,
     ...playChecks,
     ...textChecks,
     ...runtimeChecks
@@ -1553,6 +1562,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         overlay: menu.diagnostics.visual?.runtime?.overlay ?? menu.diagnostics.runtime?.surface?.overlay,
         board: menu.diagnostics.visual?.board,
         layout: menu.diagnostics.visual?.layout,
+        markerStyle: menu.diagnostics.visual?.markerStyle,
         progressionBadge: menu.diagnostics.visual?.progressionBadge,
         title: menu.diagnostics.visual?.title,
         nativeInputs: menu.nativeInputs,

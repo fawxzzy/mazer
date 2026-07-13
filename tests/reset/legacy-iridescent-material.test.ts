@@ -3,6 +3,8 @@ import {
   LEGACY_IRIDESCENT_GREEN_ANCHOR,
   LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE,
   LEGACY_IRIDESCENT_PATH_CORE_CONTRAST_COLOR,
+  LEGACY_TRAIL_SHINE_COLOR,
+  LEGACY_TRAIL_SHINE_EDGE_COLOR,
   measureLegacyIridescentColorDistance,
   resolveLegacyIridescentPlayerAccentColor,
   resolveLegacyIridescentPlayerCoreColor,
@@ -17,7 +19,6 @@ describe('legacy iridescent material', () => {
     const colors = [
       resolveLegacyIridescentTrailColor(0, 8, 0),
       resolveLegacyIridescentTrailColor(4, 8, 1800),
-      resolveLegacyIridescentPulseColor(3, 8, 900),
       resolveLegacyIridescentPlayerHaloColor(1200),
       resolveLegacyIridescentPlayerAccentColor(2200)
     ];
@@ -38,7 +39,7 @@ describe('legacy iridescent material', () => {
     expect(laterHeadColor).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
   });
 
-  test('pins player halo/accent green and keeps trail pulse purple until material QA resumes', () => {
+  test('pins player halo/accent green and keeps one white trail shine while material QA is deferred', () => {
     const earlyHalo = resolveLegacyIridescentPlayerHaloColor(0);
     const lateHalo = resolveLegacyIridescentPlayerHaloColor(1800);
     const earlyAccent = resolveLegacyIridescentPlayerAccentColor(0);
@@ -50,10 +51,12 @@ describe('legacy iridescent material', () => {
     expect(lateHalo).toBe(0x00b84a);
     expect(earlyAccent).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
     expect(lateAccent).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
-    expect(earlyPulse).toBe(0xff61c7);
-    expect(latePulse).toBe(0xff61c7);
+    expect(earlyPulse).toBe(LEGACY_TRAIL_SHINE_COLOR);
+    expect(latePulse).toBe(LEGACY_TRAIL_SHINE_COLOR);
+    expect(resolveLegacyIridescentPulseColor(2, 10, 900, LEGACY_TRAIL_SHINE_EDGE_COLOR))
+      .toBe(LEGACY_TRAIL_SHINE_EDGE_COLOR);
 
-    for (const color of [lateHalo, lateAccent, latePulse]) {
+    for (const color of [lateHalo, lateAccent]) {
       expect(measureLegacyIridescentColorDistance(color, LEGACY_IRIDESCENT_PATH_CORE_CONTRAST_COLOR))
         .toBeGreaterThanOrEqual(LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE);
     }
