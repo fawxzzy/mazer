@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 const passingSteps = [
   'guest-entry',
   'authenticated-entry',
+  'authenticated-setting-change',
   'authenticated-reload',
   'logout-to-guest',
   'fixture-reentry'
@@ -23,9 +24,9 @@ describe('live auth persistence soak summary', () => {
       pass: true,
       missingSteps: []
     });
-    expect(summarizeAuthPersistenceSoak(passingSteps.slice(0, -1), [], [])).toMatchObject({
+    expect(summarizeAuthPersistenceSoak(passingSteps.filter((step) => step.id !== 'authenticated-setting-change'), [], [])).toMatchObject({
       pass: false,
-      missingSteps: ['fixture-reentry']
+      missingSteps: ['authenticated-setting-change']
     });
   });
 
