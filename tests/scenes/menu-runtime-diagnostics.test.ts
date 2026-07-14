@@ -363,6 +363,14 @@ describe('menu runtime diagnostics', () => {
           tileSize: 10
         },
         inputBuffer: {
+          directionalIntent: {
+            activeDirection: 'right',
+            assistedTurnCount: 0,
+            assistedTurnLimit: 4,
+            lastDecision: 'continued',
+            queuedDirection: 'down',
+            requestedDirections: ['right', 'down']
+          },
           held: {
             down: true,
             left: false,
@@ -383,9 +391,7 @@ describe('menu runtime diagnostics', () => {
             stickRetargetDelayMs: 64,
             stickTurnDelayMaxMs: 144,
             turnDelayMs: 300,
-            pendingStepCount: 0,
-            repeatTimerActive: false,
-            stepTimerActive: false
+            repeatTimerActive: false
           },
           resolvedVector: {
             deltaX: 1,

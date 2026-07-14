@@ -215,7 +215,7 @@ This is the fastest way to answer "if I click or press this, what actually owns 
 | `Game Modes` click | `MenuScene.openNestedOverlay('gameModes', ...)` | `legacyOverlayToggleFields.ts` -> dark-mode flag -> backdrop/static-board redraw |
 | `Escape` | `MenuScene.handleBackAction()` | close overlay, open pause, or return to menu depending on current state |
 | `Back` / `Reset` / `Main Menu` inside pause | `MenuScene.applyLegacyPauseCommand()` | `legacyPauseLifecycle.ts` -> overlay close, player reset, or menu return |
-| movement keys / arrows | `MenuScene.handleLegacyPlayMovementKeyDown()` | `legacyPlayStep.ts` input buffer -> `MenuScene.tryMovePlayer()` -> `legacyMaze.ts` walkability gate -> trail/win reset |
+| movement keys / arrows / stick drag / swipe | `MenuScene` input adapters | `legacyDirectionalIntent.ts` active + latest-wins queued direction -> `WorldTurnSystem` player phase -> `legacyPlayStep.ts` / `legacyMaze.ts` legality -> trail/win reset |
 | menu screenshot parity tweak | `legacyMenuSnapshot.ts`, `legacyMenuLayout.ts`, `MenuScene.ts` | geometry -> composition -> presentation |
 
 ## Active reset-lane subsystems
@@ -250,6 +250,14 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - simultaneous blocked-axis slide and diagonal corner-block behavior
   - trail append and trim behavior
   - goal-step detection
+
+- `src/legacy-runtime/legacyDirectionalIntent.ts`
+  - one active run direction and one latest-wins queued direction
+  - immediate queued turns at the first legal opening
+  - direct and paired-wrap legality through the shared navigation resolver
+  - bounded four-turn assistance through unambiguous non-reversing corners
+  - hard stops at dead ends, genuine branch ambiguity, mismatched queued turns, and the assistance limit
+  - bounded diagnostics without solver-route exposure
 
 - `src/legacy-runtime/legacyMenuDemoLifecycle.ts`
   - menu demo bootstrap and preroll

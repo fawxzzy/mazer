@@ -40,7 +40,8 @@ turn.
 
 ## Current Boundary
 
-This first pass establishes and tests the contract but does not yet route the
-legacy `MenuScene` movement path or future enemy/item implementations through
-it. That integration must be incremental and preserve existing movement,
-completion, progression, and telemetry behavior.
+The legacy `MenuScene` player-movement path now enters this coordinator after
+the shared directional-intent resolver selects one legal cardinal step. Future
+enemy, projectile, item, duration, collision, and timed-mode handlers remain
+unintegrated. Those integrations must be incremental and preserve existing
+movement, completion, progression, and telemetry behavior.

@@ -198,6 +198,14 @@ export interface MenuSceneRuntimeDiagnostics {
       rejectedCommandCount: number;
     };
     inputBuffer: {
+      directionalIntent: {
+        activeDirection: 'up' | 'right' | 'down' | 'left' | null;
+        assistedTurnCount: number;
+        assistedTurnLimit: number;
+        lastDecision: string;
+        queuedDirection: 'up' | 'right' | 'down' | 'left' | null;
+        requestedDirections: Array<'up' | 'right' | 'down' | 'left'>;
+      };
       held: {
         down: boolean;
         left: boolean;
@@ -229,9 +237,7 @@ export interface MenuSceneRuntimeDiagnostics {
         stickRetargetDelayMs: number;
         stickTurnDelayMaxMs: number;
         turnDelayMs: number;
-        pendingStepCount: number;
         repeatTimerActive: boolean;
-        stepTimerActive: boolean;
       };
       resolvedVector: {
         deltaX: number;
