@@ -97,7 +97,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(guideSource).toContain("drawLegendRow(1, 'start', 'Start'");
     expect(guideSource).toContain("drawLegendRow(2, 'end', 'End'");
     expect(guideSource).toContain("'Player: green beacon + trail.'");
-    expect(guideSource).toContain("'Score grades run quality.'");
+    expect(guideSource).toContain("'Score: run quality.'");
     expect(guideSource).not.toContain('activeTargetComplexity');
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
@@ -1543,7 +1543,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('centerY - (height / 2) >= viewport.top + 2');
     expect(menuSceneSource).toContain('centerY + (height / 2) <= viewport.bottom - 2');
     expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
-    expect(menuSceneSource).toContain('const showStateLabel = input.width >= 320;');
+    expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const stateLabelRight = trackLeft - trackGap;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
     expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 0.92 : 0)');
