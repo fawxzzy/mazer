@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   normalizeLivePlayInputMethod,
+  resolveLivePlayBrowserContextOptions,
   resolveLivePlayLifecycleSnapshot,
   resolveArrowPointForMove,
   resolveLivePlayRouteProgressIndex,
@@ -16,6 +17,24 @@ import {
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
+  test('uses a touch-capable mobile context by default and permits explicit desktop proof', () => {
+    expect(resolveLivePlayBrowserContextOptions({
+      viewport: { width: 405, height: 958 }
+    })).toEqual({
+      hasTouch: true,
+      isMobile: true,
+      viewport: { width: 405, height: 958 }
+    });
+    expect(resolveLivePlayBrowserContextOptions({
+      isMobile: false,
+      viewport: { width: 1280, height: 720 }
+    })).toEqual({
+      hasTouch: false,
+      isMobile: false,
+      viewport: { width: 1280, height: 720 }
+    });
+  });
+
   test('reprobes the build lock after the fresh maze replaces the world-turn system', () => {
     const probes = [
       { phase: 'building', pass: true, seed: 101 }

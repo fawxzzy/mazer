@@ -120,6 +120,16 @@ export const normalizeLivePlayInputMethod = (value) => (
     : DEFAULT_INPUT_METHOD
 );
 
+export const resolveLivePlayBrowserContextOptions = ({
+  hasTouch,
+  isMobile = true,
+  viewport = DEFAULT_VIEWPORT
+} = {}) => ({
+  hasTouch: hasTouch ?? isMobile,
+  isMobile,
+  viewport
+});
+
 export const solveWalkableRoute = ({
   player,
   goal,
@@ -778,6 +788,11 @@ export const runLivePlayQa = async (options = {}) => {
   const moveCap = options.moveCap ?? DEFAULT_MOVE_CAP;
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
   const inputMethod = normalizeLivePlayInputMethod(options.inputMethod);
+  const browserContextOptions = resolveLivePlayBrowserContextOptions({
+    hasTouch: options.hasTouch,
+    isMobile: options.isMobile,
+    viewport
+  });
 
   await ensureDir(outputDir);
 
@@ -795,11 +810,7 @@ export const runLivePlayQa = async (options = {}) => {
   const resolvedBaseUrl = preview?.baseUrl ?? baseUrl;
   const targetUrl = new URL(route, resolvedBaseUrl).toString();
   const browser = await chromium.launch({ headless: options.headless !== false });
-  const context = await browser.newContext({
-    hasTouch: true,
-    isMobile: true,
-    viewport
-  });
+  const context = await browser.newContext(browserContextOptions);
   const page = await context.newPage();
   await setQaPreferences(page, {
     inputMethod,
@@ -941,6 +952,10 @@ export const runLivePlayQa = async (options = {}) => {
         source: initialRuntime?.generation?.maze?.source ?? null
       },
       viewport,
+      browserContext: {
+        hasTouch: browserContextOptions.hasTouch,
+        isMobile: browserContextOptions.isMobile
+      },
       result: {
         pass: reached && failedAt === null && routePlan.moves.length <= moveCap && lifecyclePassed && worldTurnPassed,
         reached,
@@ -1064,6 +1079,7 @@ if (isDirectRun) {
       ? Number(args.movementSpeed ?? args['movement-speed'])
       : 0.42,
     inputMethod: normalizeLivePlayInputMethod(rawInputMethod),
+    isMobile: args.mobile === undefined ? true : isTruthy(args.mobile),
     postGoalTimeoutMs: parseIntegerArg(args.postGoalTimeoutMs ?? args['post-goal-timeout-ms'], DEFAULT_POST_GOAL_TIMEOUT_MS),
     previewTimeoutMs: parseIntegerArg(args.previewTimeoutMs ?? args['preview-timeout-ms'], DEFAULT_PREVIEW_TIMEOUT_MS),
     route: resolveRoute(args, label),
