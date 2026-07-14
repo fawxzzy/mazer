@@ -45,6 +45,53 @@ const normalizeBoolean = (value: unknown, fallback: boolean): boolean => {
   return fallback;
 };
 
+const isMigratableBoolean = (value: unknown): boolean => (
+  typeof value === 'boolean'
+  || (
+    typeof value === 'string'
+    && ['true', '1', 'yes', 'on', 'false', '0', 'no', 'off'].includes(value.trim().toLowerCase())
+  )
+);
+
+const isMigratableMovementSpeed = (value: unknown): boolean => (
+  (typeof value === 'number' && Number.isFinite(value))
+  || (typeof value === 'string' && value.trim().length > 0 && Number.isFinite(Number(value)))
+);
+
+const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Partial<LegacyGameTogglePreferences> => {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  const hasOwn = (key: keyof LegacyGameTogglePreferences): boolean => (
+    Object.prototype.hasOwnProperty.call(record, key)
+  );
+  const presentKeys = [
+    'controlMode',
+    'darkMode',
+    'movementSpeed',
+    'toggleAnimatedBackdrop',
+    'toggleCameraFollow',
+    'toggleTrailFade',
+    'toggleTrailPulse'
+  ] satisfies Array<keyof LegacyGameTogglePreferences>;
+
+  if (!presentKeys.some(hasOwn)) {
+    return false;
+  }
+  if (hasOwn('controlMode') && !isControlMode(record.controlMode)) {
+    return false;
+  }
+  if (hasOwn('movementSpeed') && !isMigratableMovementSpeed(record.movementSpeed)) {
+    return false;
+  }
+
+  return presentKeys
+    .filter((key) => key !== 'controlMode' && key !== 'movementSpeed' && hasOwn(key))
+    .every((key) => isMigratableBoolean(record[key]));
+};
+
 export const pickLegacyGameTogglePreferences = (
   settings: LegacySettings
 ): LegacyGameTogglePreferences => ({
@@ -131,17 +178,20 @@ export const writeLegacyGameToggleSettings = (
   return normalizedSettings;
 };
 
-export const migrateLegacyGameToggleSettingsFromGlobalStorage = (
-  rootStorage: Pick<Storage, 'getItem' | 'setItem'> | undefined,
-  scopedStorage: Pick<Storage, 'getItem' | 'setItem'> | undefined,
+export const migrateLegacyGameToggleSettingsToGuestScope = (
+  rootStorage: (
+    Pick<Storage, 'getItem' | 'setItem'>
+    & Partial<Pick<Storage, 'removeItem'>>
+  ) | undefined,
+  guestStorage: Pick<Storage, 'getItem' | 'setItem'> | undefined,
   fallback: LegacySettings = LEGACY_DEFAULTS
 ): boolean => {
-  if (!rootStorage || !scopedStorage) {
+  if (!rootStorage || !guestStorage) {
     return false;
   }
 
   try {
-    if (scopedStorage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY) !== null) {
+    if (guestStorage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY) !== null) {
       return false;
     }
 
@@ -150,15 +200,21 @@ export const migrateLegacyGameToggleSettingsFromGlobalStorage = (
       return false;
     }
 
-    const normalizedPreferences = normalizeLegacyGameTogglePreferences(
-      JSON.parse(rawLegacyPreferences) as Partial<LegacyGameTogglePreferences>,
-      fallback
-    );
+    const parsedPreferences = JSON.parse(rawLegacyPreferences) as unknown;
+    if (!isMigratableLegacyGameTogglePreferences(parsedPreferences)) {
+      return false;
+    }
+    const normalizedPreferences = normalizeLegacyGameTogglePreferences(parsedPreferences, fallback);
 
-    scopedStorage.setItem(
+    guestStorage.setItem(
       LEGACY_GAME_TOGGLE_STORAGE_KEY,
       JSON.stringify(normalizedPreferences)
     );
+    try {
+      rootStorage.removeItem?.(LEGACY_GAME_TOGGLE_STORAGE_KEY);
+    } catch {
+      // The scoped write already succeeded. A stale global key cannot overwrite guest or account data.
+    }
     return true;
   } catch {
     return false;

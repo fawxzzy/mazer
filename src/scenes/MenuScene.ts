@@ -156,7 +156,7 @@ import {
 } from '../legacy-runtime/legacyOverlayToggleFields';
 import {
   LEGACY_GAME_TOGGLE_STORAGE_KEY,
-  migrateLegacyGameToggleSettingsFromGlobalStorage,
+  migrateLegacyGameToggleSettingsToGuestScope,
   readLegacyGameToggleSettings,
   writeLegacyGameToggleSettings
 } from '../legacy-runtime/legacyGameTogglePreferences';
@@ -804,6 +804,8 @@ interface LegacyQaOverlayResult {
 interface LegacyQaDiagnosticsApi {
   movePlayPlayer(move: string): LegacyQaMoveResult;
   openOptionsOverlay(): LegacyQaOverlayResult;
+  openPauseOverlay(): LegacyQaOverlayResult;
+  startPlayMode(): LegacyQaOverlayResult;
 }
 
 declare global {
@@ -1262,7 +1264,9 @@ export class MenuScene extends Phaser.Scene {
 
     window.__MAZER_QA__ = {
       movePlayPlayer: (move: string): LegacyQaMoveResult => this.handleLegacyQaPlayMove(move),
-      openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay()
+      openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay(),
+      openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay(),
+      startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode()
     };
   }
 
@@ -1349,6 +1353,72 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.openOverlay('options');
+    this.rebuildUi();
+    this.publishVisualDiagnostics(this.time.now, true);
+    this.publishRuntimeDiagnostics(this.time.now, true);
+    return {
+      accepted: true,
+      mode: this.mode,
+      overlay: this.overlay,
+      reason: null
+    };
+  }
+
+  private handleLegacyQaStartPlayMode(): LegacyQaOverlayResult {
+    const base = {
+      mode: this.mode,
+      overlay: this.overlay
+    };
+
+    if (this.authSnapshot.status !== 'authenticated') {
+      return {
+        ...base,
+        accepted: false,
+        reason: 'auth-required'
+      };
+    }
+    if (this.mode !== 'menu' || this.overlay !== 'none') {
+      return {
+        ...base,
+        accepted: false,
+        reason: this.mode !== 'menu' ? 'not-menu-mode' : 'overlay-open'
+      };
+    }
+
+    this.startPlayMode();
+    this.rebuildUi();
+    this.publishVisualDiagnostics(this.time.now, true);
+    this.publishRuntimeDiagnostics(this.time.now, true);
+    return {
+      accepted: true,
+      mode: this.mode,
+      overlay: this.overlay,
+      reason: null
+    };
+  }
+
+  private handleLegacyQaOpenPauseOverlay(): LegacyQaOverlayResult {
+    const base = {
+      mode: this.mode,
+      overlay: this.overlay
+    };
+
+    if (this.mode !== 'play') {
+      return {
+        ...base,
+        accepted: false,
+        reason: 'not-play-mode'
+      };
+    }
+    if (this.overlay !== 'none' && this.overlay !== 'pause') {
+      return {
+        ...base,
+        accepted: false,
+        reason: 'overlay-open'
+      };
+    }
+
+    this.openOverlay('pause');
     this.rebuildUi();
     this.publishVisualDiagnostics(this.time.now, true);
     this.publishRuntimeDiagnostics(this.time.now, true);
@@ -9542,8 +9612,12 @@ export class MenuScene extends Phaser.Scene {
 
   private loadPersistedLegacyGameToggleSettings(): void {
     const browserStorage = this.resolveBrowserLocalStorage();
+    migrateLegacyGameToggleSettingsToGuestScope(
+      browserStorage,
+      this.resolveLegacyGuestGameToggleStorage(),
+      LEGACY_DEFAULTS
+    );
     const scopedStorage = this.resolveLegacyGameToggleStorage();
-    migrateLegacyGameToggleSettingsFromGlobalStorage(browserStorage, scopedStorage, LEGACY_DEFAULTS);
     this.settings = readLegacyGameToggleSettings(scopedStorage, LEGACY_DEFAULTS);
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
   }
@@ -9666,7 +9740,15 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  private resolveBrowserLocalStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
+  private resolveLegacyGuestGameToggleStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
+    return createLegacyAuthScopedStorage(
+      this.resolveBrowserLocalStorage(),
+      LEGACY_GAME_TOGGLE_STORAGE_KEY,
+      { userId: null }
+    );
+  }
+
+  private resolveBrowserLocalStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | undefined {
     if (typeof window === 'undefined') {
       return undefined;
     }

@@ -8,6 +8,8 @@ const passingSteps = [
   'authenticated-entry',
   'authenticated-setting-change',
   'authenticated-reload',
+  'authenticated-options-reload',
+  'authenticated-pause-reentry',
   'logout-to-guest',
   'fixture-reentry'
 ].map((id) => ({ id, pass: true }));
@@ -27,6 +29,10 @@ describe('live auth persistence soak summary', () => {
     expect(summarizeAuthPersistenceSoak(passingSteps.filter((step) => step.id !== 'authenticated-setting-change'), [], [])).toMatchObject({
       pass: false,
       missingSteps: ['authenticated-setting-change']
+    });
+    expect(summarizeAuthPersistenceSoak(passingSteps.filter((step) => step.id !== 'authenticated-pause-reentry'), [], [])).toMatchObject({
+      pass: false,
+      missingSteps: ['authenticated-pause-reentry']
     });
   });
 

@@ -1425,7 +1425,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('window.__MAZER_QA__ = {');
     expect(menuSceneSource).toContain('movePlayPlayer: (move: string): LegacyQaMoveResult => this.handleLegacyQaPlayMove(move)');
     expect(menuSceneSource).toContain('openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay()');
+    expect(menuSceneSource).toContain('openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay()');
+    expect(menuSceneSource).toContain('startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode()');
     expect(menuSceneSource).toContain('private handleLegacyQaOpenOptionsOverlay(): LegacyQaOverlayResult');
+    expect(menuSceneSource).toContain('private handleLegacyQaOpenPauseOverlay(): LegacyQaOverlayResult');
+    expect(menuSceneSource).toContain('private handleLegacyQaStartPlayMode(): LegacyQaOverlayResult');
     expect(menuSceneSource).toContain("this.openOverlay('options');");
     expect(menuSceneSource).toContain('this.rebuildUi();');
     expect(menuSceneSource).toContain('this.publishVisualDiagnostics(this.time.now, true);');
