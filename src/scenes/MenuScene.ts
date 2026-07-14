@@ -104,6 +104,11 @@ import {
 } from '../legacy-runtime/legacyPathVisualStyle';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import {
+  resolveLegacyOptionsGuideLayout,
+  resolveLegacyToggleRowLayout,
+  resolveLegacyUiLabelCenterY
+} from '../legacy-runtime/legacyUiStandards';
+import {
   resolveLegacyMenuPathTitleLayout,
   resolveLegacyMenuPathTitleOrbitGeometry,
   resolveLegacyMenuPathTitleOrbitPoint,
@@ -460,6 +465,7 @@ interface MenuSceneVisualDiagnostics {
   };
   buttons: Array<{
     bounds: VisualRect;
+    labelBounds: VisualRect | null;
     text: string;
   }>;
   title: {
@@ -548,6 +554,7 @@ interface MenuSceneVisualDiagnostics {
   };
   overlayUi: {
     backChevron: VisualRect | null;
+    guidePanel: VisualRect | null;
     latestAuthMessage: LegacyPlayerMessage | null;
     latestMessage: LegacyPlayerMessage | null;
     panel: VisualRect | null;
@@ -1068,6 +1075,7 @@ export class MenuScene extends Phaser.Scene {
   private uiTexts: Phaser.GameObjects.Text[] = [];
   private uiButtons: UiButton[] = [];
   private overlayBackChevronBounds: VisualRect | null = null;
+  private overlayGuideBounds: VisualRect | null = null;
   private overlayScrollOffset = 0;
   private overlayScrollMax = 0;
   private overlayScrollContentHeight = 0;
@@ -7350,6 +7358,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGraphics.clear();
     this.clearUi();
     this.overlayBackChevronBounds = null;
+    this.overlayGuideBounds = null;
     this.overlayScrollViewportBounds = null;
     this.overlayScrollTrackBounds = null;
     this.overlayScrollThumbBounds = null;
@@ -7644,24 +7653,27 @@ export class MenuScene extends Phaser.Scene {
     panel: OverlayPanelFrame
   ): number {
     const compact = panel.width < 420;
-    const cardHeight = compact ? 250 : 260;
+    const guideLayout = resolveLegacyOptionsGuideLayout(panel.width);
+    const cardHeight = guideLayout.cardHeight;
     const cardWidth = Math.min(
-      panel.width - (compact ? 48 : 72),
-      compact ? 350 : 540
+      panel.width - guideLayout.horizontalMargin,
+      guideLayout.cardWidthLimit
     );
     const cardLeft = panel.centerX - (cardWidth / 2);
     const cardTop = Math.max(panel.top + (compact ? 82 : 88), rowY + (compact ? 8 : 10));
 
-    const inset = compact ? 14 : 18;
-    const titleY = cardTop + (compact ? 18 : 21);
-    const legendTop = cardTop + (compact ? 47 : 56);
-    const rowHeight = compact ? 27 : 31;
-    const guideTitleFontSize = compact ? 18 : 21;
-    const guideRowFontSize = compact ? 13 : 15;
-    const guideRowMinFontSize = compact ? 11 : 13;
+    const inset = guideLayout.inset;
+    const titleY = cardTop + guideLayout.titleOffset;
+    const titleRuleY = cardTop + guideLayout.titleRuleOffset;
+    const legendTop = cardTop + guideLayout.legendTopOffset;
+    const rowHeight = guideLayout.rowHeight;
+    const guideTitleFontSize = guideLayout.titleFontSize;
+    const guideRowFontSize = guideLayout.rowFontSize;
+    const guideRowMinFontSize = guideLayout.rowMinFontSize;
     const detailLeft = cardLeft + inset;
     const detailWidth = cardWidth - (inset * 2);
     const detailRight = detailLeft + detailWidth;
+    this.overlayGuideBounds = createVisualRect(cardLeft, cardTop, cardWidth, cardHeight);
 
     this.drawLegacyCyberPanel(this.overlayGraphics, {
       active: true,
@@ -7676,7 +7688,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
     this.overlayGraphics.strokeRoundedRect(cardLeft + 4, cardTop + 4, cardWidth - 8, cardHeight - 8, 9);
     this.overlayGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.26);
-    this.overlayGraphics.lineBetween(cardLeft + inset, legendTop - 15, cardLeft + cardWidth - inset, legendTop - 15);
+    this.overlayGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);
 
     const addText = (
       copy: string,
@@ -7736,19 +7748,12 @@ export class MenuScene extends Phaser.Scene {
     drawLegendRow(1, 'start', 'Start', 'run begins', '#fff05a');
     drawLegendRow(2, 'end', 'End', 'clear here', '#ff5264');
     const bulletTop = legendTop + (3 * rowHeight) + (compact ? 18 : 12);
-    const bullets = compact
-      ? [
-        'Player: green beacon + trail.',
-        `${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public progression tier.`,
-        'Score grades run quality.',
-        'Maze Lvl sets challenge.'
-      ]
-      : [
-        'Player: green beacon; the trail marks your route.',
-        `${this.mode === 'play' ? 'Rank' : 'AI Rank'} is the public progression tier.`,
-        'Score grades run quality; Runs count completed mazes.',
-        'Maze Lvl sets the current procedural challenge tier.'
-      ];
+    const bullets = [
+      'Player: green beacon + trail.',
+      `${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public progression tier.`,
+      'Score: run quality; Runs: clears.',
+      'Maze Lvl: challenge tier.'
+    ];
     bullets.forEach((copy, index) => {
       addText(`• ${copy}`, detailLeft, bulletTop + (index * rowHeight), detailWidth, '#d9fff5', guideRowFontSize, 0, 0.92, guideRowMinFontSize);
     });
@@ -8275,7 +8280,7 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
         description: this.settings.toggleTrailPulse
-          ? 'On: white shine moves along the trail.'
+          ? 'On: white shine travels.'
           : 'Off: no trail shine.',
         label: 'Trail Shine',
         offLabel: 'Off',
@@ -8381,44 +8386,43 @@ export class MenuScene extends Phaser.Scene {
     const rowFill = input.checked ? 0x10251e : LEGACY_CYBER_PANEL_FILL;
     const rowStroke = input.checked ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
     const stateColor = input.checked ? '#72e0bf' : '#b7f2ff';
-    const rowPaddingX = Math.max(12, Math.min(18, Math.round(input.width * 0.055)));
-    const trackWidth = 42;
-    const trackHeight = 24;
+    const hasDescription = Boolean(input.description);
+    const uiLayout = resolveLegacyToggleRowLayout(input.width, input.height, hasDescription);
+    const rowPaddingX = uiLayout.rowPaddingX;
+    const trackWidth = uiLayout.trackWidth;
+    const trackHeight = uiLayout.trackHeight;
     const trackX = left + input.width - rowPaddingX - Math.round(trackWidth / 2);
     const trackLeft = trackX - Math.round(trackWidth / 2);
-    const trackGap = 10;
-    const showStateLabel = input.width >= 320;
-    const stateLaneWidth = showStateLabel
-      ? Math.max(54, Math.min(92, Math.round(input.width * 0.24)))
-      : 0;
+    const trackGap = uiLayout.trackGap;
+    const showStateLabel = uiLayout.showStateLabel;
+    const stateLaneWidth = uiLayout.stateLaneWidth;
     const stateLabelRight = trackLeft - trackGap;
     const labelX = left + rowPaddingX;
     const labelRight = showStateLabel
       ? stateLabelRight - stateLaneWidth - trackGap
       : stateLabelRight - trackGap;
     const labelMaxWidth = Math.max(54, labelRight - labelX);
-    const hasDescription = Boolean(input.description);
-    const labelFontSize = hasDescription
-      ? Math.max(14, Math.min(18, Math.round(input.height * 0.27)))
-      : Math.max(15, Math.min(20, Math.round(input.height * 0.4)));
-    const stateFontSize = Math.max(11, Math.min(13, Math.round(input.height * 0.28)));
-    const titleY = input.y + (hasDescription ? -Math.round(input.height * 0.24) : 0);
+    const titleY = resolveLegacyUiLabelCenterY(
+      input.y + (hasDescription ? -Math.round(input.height * 0.24) : 0),
+      uiLayout.labelFontSize,
+      'toggle-title'
+    );
     const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, input.checked ? 0.62 : 0.5);
     background.setStrokeStyle(1, rowStroke, input.checked ? 0.56 : 0.38);
     background.setInteractive({ useHandCursor: true });
 
     const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, titleY, input.label, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${labelFontSize}px`,
+      fontSize: `${uiLayout.labelFontSize}px`,
       color: '#ecfff5'
-    })), labelMaxWidth, labelFontSize, 11).setOrigin(0, 0.5).setAlpha(0.94);
+    })), labelMaxWidth, uiLayout.labelFontSize, 11).setOrigin(0, 0.5).setAlpha(0.94);
 
     const displayStateText = input.stateText || (input.checked ? input.onLabel : input.offLabel);
     const stateLabel = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(stateLabelRight, titleY, displayStateText || input.stateText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${stateFontSize}px`,
+      fontSize: `${uiLayout.stateFontSize}px`,
       color: stateColor
-    })), stateLaneWidth, stateFontSize, 9)
+    })), stateLaneWidth, uiLayout.stateFontSize, 9)
       .setOrigin(1, 0.5)
       .setAlpha(showStateLabel ? 0.92 : 0)
       .setVisible(showStateLabel);
@@ -9026,9 +9030,14 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createOverlayTitle(text: string, y: number): void {
-    const label = this.padLegacyUiText(this.add.text(this.layout.width / 2, y, text, {
+    const fontSize = this.layout.width < 420 ? 24 : (this.layout.width < 480 ? 28 : 34);
+    const label = this.padLegacyUiText(this.add.text(
+      this.layout.width / 2,
+      resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title'),
+      text,
+      {
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${this.layout.width < 420 ? 24 : (this.layout.width < 480 ? 28 : 34)}px`,
+      fontSize: `${fontSize}px`,
       color: '#6bc96f'
     })).setOrigin(0.5);
     this.uiTexts.push(label);
@@ -9248,7 +9257,8 @@ export class MenuScene extends Phaser.Scene {
       ? LEGACY_MENU_ACTION_GREEN
       : frontDoorChrome?.textColor ?? MENU_TEXT_COLOR;
 
-    const label = this.padLegacyUiText(this.add.text(x, y, text, {
+    const labelY = resolveLegacyUiLabelCenterY(y, buttonFontSize, 'button');
+    const label = this.padLegacyUiText(this.add.text(x, labelY, text, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${buttonFontSize}px`,
       color: buttonTextColor
@@ -10427,6 +10437,9 @@ export class MenuScene extends Phaser.Scene {
             button.background.width,
             button.background.height
           ),
+          labelBounds: button.label.active && button.label.visible
+            ? visualRectFromBounds(button.label.getBounds())
+            : null,
           text: button.text
         })),
       title: this.resolveLegacyMenuPathTitleDiagnostics(),
@@ -10451,6 +10464,7 @@ export class MenuScene extends Phaser.Scene {
       touchControls,
       overlayUi: {
         backChevron: cloneVisualRect(this.overlayBackChevronBounds),
+        guidePanel: cloneVisualRect(this.overlayGuideBounds),
         latestAuthMessage: this.latestAuthMessage,
         latestMessage: this.latestOverlayMessage,
         visibleMessages: this.resolveVisibleLegacyPlayerMessages(),

@@ -97,7 +97,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(guideSource).toContain("drawLegendRow(1, 'start', 'Start'");
     expect(guideSource).toContain("drawLegendRow(2, 'end', 'End'");
     expect(guideSource).toContain("'Player: green beacon + trail.'");
-    expect(guideSource).toContain("'Score grades run quality.'");
+    expect(guideSource).toContain("'Score: run quality; Runs: clears.'");
     expect(guideSource).not.toContain('activeTargetComplexity');
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
@@ -1320,7 +1320,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("const timerLine = this.formatLegacyElapsedLabel(this.resolveLegacyPlayElapsedMs());");
     expect(menuSceneSource).toContain("const rankLine = `Rank: ${playerTrack.rank}`;");
     expect(menuSceneSource).toContain("return `${timerLine}  ${rankLine}`;");
-    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} is the public progression tier.`");
+    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public progression tier.`");
     expect(menuSceneSource).toContain('This resets your rank progress, score, runs, and maze level');
     expect(menuSceneSource).not.toContain('Skill Lvl');
     expect(menuSceneSource).not.toContain('Player Skill');
@@ -1348,21 +1348,32 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('return Math.round(this.layout.lanes.rank.top + (height / 2));');
   });
 
+  test('consumes shared UI standards for buttons, titles, guides, and toggles', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain("from '../legacy-runtime/legacyUiStandards';");
+    expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, buttonFontSize, 'button')");
+    expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title')");
+    expect(menuSceneSource).toContain('resolveLegacyToggleRowLayout(input.width, input.height, hasDescription)');
+  });
+
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const cardHeight = compact ? 250 : 260;');
+    expect(menuSceneSource).toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width);');
     expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);');
-    expect(menuSceneSource).toContain('const guideTitleFontSize = compact ? 18 : 21;');
-    expect(menuSceneSource).toContain('const guideRowFontSize = compact ? 13 : 15;');
-    expect(menuSceneSource).toContain('const guideRowMinFontSize = compact ? 11 : 13;');
+    expect(menuSceneSource).toContain('const guideTitleFontSize = guideLayout.titleFontSize;');
+    expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
+    expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
+    expect(menuSceneSource).toContain('this.overlayGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);');
     expect(menuSceneSource).toContain("addText('PLAYER GUIDE', panel.centerX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);");
     expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');");
     expect(menuSceneSource).toContain("'Player: green beacon + trail.'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
     expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public progression tier.`");
-    expect(menuSceneSource).toContain("'Score grades run quality.'");
-    expect(menuSceneSource).toContain("'Maze Lvl sets challenge.'");
+    expect(menuSceneSource).toContain("'Score: run quality; Runs: clears.'");
+    expect(menuSceneSource).toContain("'Maze Lvl: challenge tier.'");
+    expect(menuSceneSource).not.toContain('the current procedural challenge tier');
   });
 
   test('exposes wrapped edge player snaps in runtime diagnostics', () => {
@@ -1533,7 +1544,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('centerY - (height / 2) >= viewport.top + 2');
     expect(menuSceneSource).toContain('centerY + (height / 2) <= viewport.bottom - 2');
     expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
-    expect(menuSceneSource).toContain('const showStateLabel = input.width >= 320;');
+    expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const stateLabelRight = trackLeft - trackGap;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
     expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 0.92 : 0)');
