@@ -7,6 +7,7 @@ import {
   resolveLivePlayRouteProgressIndex,
   resolveStickHoldMsForMove,
   resolveStickPointForMove,
+  shouldCollectInputLockProbe,
   summarizeFreshWorldTurn,
   summarizeFreshReadyState,
   summarizeGoalWorldTurn,
@@ -15,6 +16,28 @@ import {
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
+  test('reprobes the build lock after the fresh maze replaces the world-turn system', () => {
+    const probes = [
+      { phase: 'building', pass: true, seed: 101 }
+    ];
+
+    expect(shouldCollectInputLockProbe({
+      explicitLifecyclePhase: 'building',
+      inputLocked: true,
+      seed: 202
+    }, 101, probes)).toBe(true);
+    expect(shouldCollectInputLockProbe({
+      explicitLifecyclePhase: 'building',
+      inputLocked: true,
+      seed: 202
+    }, 101, [...probes, { phase: 'building', pass: true, seed: 202 }])).toBe(false);
+    expect(shouldCollectInputLockProbe({
+      explicitLifecyclePhase: 'handoff',
+      inputLocked: true,
+      seed: 101
+    }, 101, [{ phase: 'handoff', pass: true, seed: 101 }])).toBe(false);
+  });
+
   test('requires the rebuilt maze to be ready, settled, unlocked, and timing play', () => {
     expect(summarizeFreshReadyState({
       runtime: {

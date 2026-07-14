@@ -401,6 +401,31 @@ const REQUIRED_INPUT_LOCK_PROBE_PHASES = Object.freeze([
   'building'
 ]);
 
+export const shouldCollectInputLockProbe = (
+  snapshot,
+  initialSeed,
+  inputLockProbes = []
+) => {
+  if (
+    snapshot.inputLocked !== true
+    || !REQUIRED_INPUT_LOCK_PROBE_PHASES.includes(snapshot.explicitLifecyclePhase)
+  ) {
+    return false;
+  }
+
+  if (
+    snapshot.explicitLifecyclePhase === 'building'
+    && Number.isFinite(snapshot.seed)
+    && snapshot.seed !== initialSeed
+  ) {
+    return !inputLockProbes.some((probe) => (
+      probe.phase === 'building' && probe.seed === snapshot.seed
+    ));
+  }
+
+  return !inputLockProbes.some((probe) => probe.phase === snapshot.explicitLifecyclePhase);
+};
+
 export const summarizePostGoalLifecycleSamples = (samples, initialSeed, inputLockProbes = null) => {
   const phases = [...new Set(samples.map((sample) => sample.lifecyclePhase).filter(Boolean))];
   const explicitPhases = [...new Set(samples.map((sample) => sample.explicitLifecyclePhase).filter(Boolean))];
@@ -496,11 +521,7 @@ export const collectPostGoalLifecycleProof = async ({
       ...snapshot,
       elapsedMs: round(performance.now() - startedAt)
     });
-    if (
-      snapshot.inputLocked === true
-      && REQUIRED_INPUT_LOCK_PROBE_PHASES.includes(snapshot.explicitLifecyclePhase)
-      && !inputLockProbes.some((probe) => probe.phase === snapshot.explicitLifecyclePhase)
-    ) {
+    if (shouldCollectInputLockProbe(snapshot, initialSeed, inputLockProbes)) {
       const result = await page.evaluate(() => window.__MAZER_QA__?.movePlayPlayer?.('move_up') ?? null);
       const playerUnchanged = Boolean(
         result?.player
@@ -514,7 +535,8 @@ export const collectPostGoalLifecycleProof = async ({
         pass: result?.accepted === false && result?.lifecycleLocked === true && playerUnchanged,
         phase: snapshot.explicitLifecyclePhase,
         playerUnchanged,
-        reason: result?.reason ?? null
+        reason: result?.reason ?? null,
+        seed: snapshot.seed ?? null
       });
     }
 
