@@ -16,6 +16,42 @@ export interface LegacyShortestPathResult {
   stepCount: number | null;
 }
 
+export interface LegacyCompletedRouteAudit {
+  actualStepCount: number;
+  firstIllegalStepIndex: number | null;
+  lowerBoundSatisfied: boolean;
+  playableShortestPathFound: boolean;
+  playableShortestStepCount: number | null;
+  startsAtMazeStart: boolean;
+  endsAtMazeGoal: boolean;
+  validCompletedRoute: boolean;
+}
+
+export interface LegacyWrapTopologyAxisDiagnostics {
+  endpointCount: number;
+  pairCount: number;
+  required: boolean;
+  requiredSatisfied: boolean;
+  unpairedEndpoints: LegacyPoint[];
+}
+
+export interface LegacyWrapTopologyDiagnostics {
+  contractVersion: 'legacy-wrap-topology-v1';
+  decorativeCutoutCandidates: LegacyPoint[];
+  decorativeCutoutPolicy: 'renderer-mask-owned';
+  directShortestStepCount: number | null;
+  graphPolicy: 'playable-wrap-aware';
+  graphTopologyValid: boolean;
+  horizontal: LegacyWrapTopologyAxisDiagnostics;
+  inwardDisconnectedEndpoints: LegacyPoint[];
+  cornerBorderFloors: LegacyPoint[];
+  playableShortcutDelta: number | null;
+  playableShortestStepCount: number | null;
+  solutionPathPolicy: 'direct-floor';
+  solutionRouteAudit: LegacyCompletedRouteAudit;
+  vertical: LegacyWrapTopologyAxisDiagnostics;
+}
+
 export interface LegacyMazeGenerationProfile {
   borderFeederTargetPerSide: number | null;
   checkpointCountMultiplier: number;
@@ -35,6 +71,7 @@ export interface LegacyMazeSnapshot {
   goal: LegacyPoint;
   solutionPath: LegacyPoint[];
   seed: number;
+  wrapTopologyDiagnostics?: LegacyWrapTopologyDiagnostics;
   generationBuildTrace?: {
     checkpointTiles: LegacyPoint[];
     finalGoal: LegacyPoint;
@@ -297,10 +334,17 @@ const resolveLegacyGridStepTarget = (
 
 export const resolveLegacyWalkableGridNeighbors = (grid: boolean[][], point: LegacyPoint): LegacyPoint[] => {
   const neighbors: LegacyPoint[] = [];
+  const seen = new Set<string>();
 
   for (const direction of LEGACY_STEP_DIRECTIONS) {
     const next = resolveLegacyGridStepTarget(grid, point, direction);
-    if (next) {
+    if (!next) {
+      continue;
+    }
+
+    const key = keyForPoint(next);
+    if (!seen.has(key)) {
+      seen.add(key);
       neighbors.push(next);
     }
   }
@@ -398,6 +442,152 @@ export const resolveLegacyPlayableShortestPath = (
   start: LegacyPoint,
   goal: LegacyPoint
 ): LegacyShortestPathResult => resolveLegacyShortestPath(grid, start, goal, 'playable-wrap-aware');
+
+export const auditLegacyCompletedRouteAgainstPlayableShortestPath = (
+  maze: Pick<LegacyMazeSnapshot, 'goal' | 'grid' | 'start'>,
+  route: readonly LegacyPoint[]
+): LegacyCompletedRouteAudit => {
+  const playableShortest = resolveLegacyPlayableShortestPath(maze.grid, maze.start, maze.goal);
+  const startsAtMazeStart = route[0]?.x === maze.start.x && route[0]?.y === maze.start.y;
+  const finalPoint = route.at(-1);
+  const endsAtMazeGoal = finalPoint?.x === maze.goal.x && finalPoint?.y === maze.goal.y;
+  let firstIllegalStepIndex: number | null = null;
+
+  for (let index = 1; index < route.length; index += 1) {
+    const previous = route[index - 1];
+    const next = route[index];
+    if (!previous || !next) {
+      firstIllegalStepIndex = index;
+      break;
+    }
+
+    const legal = resolveLegacyWalkableGridNeighbors(maze.grid, previous)
+      .some((candidate) => candidate.x === next.x && candidate.y === next.y);
+    if (!legal) {
+      firstIllegalStepIndex = index;
+      break;
+    }
+  }
+
+  const actualStepCount = Math.max(0, route.length - 1);
+  const validCompletedRoute = startsAtMazeStart
+    && endsAtMazeGoal
+    && firstIllegalStepIndex === null
+    && playableShortest.found;
+  const lowerBoundSatisfied = validCompletedRoute
+    && playableShortest.stepCount !== null
+    && actualStepCount >= playableShortest.stepCount;
+
+  return {
+    actualStepCount,
+    firstIllegalStepIndex,
+    lowerBoundSatisfied,
+    playableShortestPathFound: playableShortest.found,
+    playableShortestStepCount: playableShortest.stepCount,
+    startsAtMazeStart,
+    endsAtMazeGoal,
+    validCompletedRoute
+  };
+};
+
+export const resolveLegacyWrapTopologyDiagnostics = (
+  maze: Pick<LegacyMazeSnapshot, 'goal' | 'grid' | 'size' | 'solutionPath' | 'start'>,
+  requiredConnections: LegacyMazeGenerationProfile['requiredOppositeBorderConnections'] = {
+    horizontal: false,
+    vertical: false
+  }
+): LegacyWrapTopologyDiagnostics => {
+  const horizontal: LegacyWrapTopologyAxisDiagnostics = {
+    endpointCount: 0,
+    pairCount: 0,
+    required: requiredConnections.horizontal,
+    requiredSatisfied: false,
+    unpairedEndpoints: []
+  };
+  const vertical: LegacyWrapTopologyAxisDiagnostics = {
+    endpointCount: 0,
+    pairCount: 0,
+    required: requiredConnections.vertical,
+    requiredSatisfied: false,
+    unpairedEndpoints: []
+  };
+  const cornerBorderFloors: LegacyPoint[] = [];
+  const decorativeCutoutCandidates: LegacyPoint[] = [];
+  const inwardDisconnectedEndpoints: LegacyPoint[] = [];
+
+  for (let y = 0; y < maze.size; y += 1) {
+    for (let x = 0; x < maze.size; x += 1) {
+      if (maze.grid[y]?.[x] !== true) {
+        continue;
+      }
+
+      const point = { x, y };
+      if (!isLegacyBorderPoint(maze.size, point)) {
+        continue;
+      }
+      if (isLegacyCornerBorderPoint(maze.size, point)) {
+        cornerBorderFloors.push(point);
+        continue;
+      }
+
+      const axis = point.x === 0 || point.x === maze.size - 1 ? horizontal : vertical;
+      axis.endpointCount += 1;
+      const line = point.x === 0 || point.x === maze.size - 1 ? point.y : point.x;
+      if (isLegacyBorderFeederLineReserved(maze.size, line)) {
+        decorativeCutoutCandidates.push(point);
+      }
+
+      const opposite = resolveLegacyOppositeBorderPoint(maze.size, point);
+      if (!opposite || maze.grid[opposite.y]?.[opposite.x] !== true) {
+        axis.unpairedEndpoints.push(point);
+      } else if (point.x === 0 || point.y === 0) {
+        axis.pairCount += 1;
+      }
+
+      const inward = point.x === 0
+        ? { x: 1, y: point.y }
+        : point.x === maze.size - 1
+          ? { x: maze.size - 2, y: point.y }
+          : point.y === 0
+            ? { x: point.x, y: 1 }
+            : { x: point.x, y: maze.size - 2 };
+      if (maze.grid[inward.y]?.[inward.x] !== true) {
+        inwardDisconnectedEndpoints.push(point);
+      }
+    }
+  }
+
+  horizontal.requiredSatisfied = !horizontal.required || horizontal.pairCount > 0;
+  vertical.requiredSatisfied = !vertical.required || vertical.pairCount > 0;
+  const directShortest = resolveLegacyShortestPath(maze.grid, maze.start, maze.goal, 'direct-floor');
+  const playableShortest = resolveLegacyPlayableShortestPath(maze.grid, maze.start, maze.goal);
+  const solutionRouteAudit = auditLegacyCompletedRouteAgainstPlayableShortestPath(maze, maze.solutionPath);
+  const graphTopologyValid = cornerBorderFloors.length === 0
+    && horizontal.unpairedEndpoints.length === 0
+    && vertical.unpairedEndpoints.length === 0
+    && inwardDisconnectedEndpoints.length === 0
+    && horizontal.requiredSatisfied
+    && vertical.requiredSatisfied;
+
+  return {
+    contractVersion: 'legacy-wrap-topology-v1',
+    cornerBorderFloors,
+    decorativeCutoutCandidates,
+    decorativeCutoutPolicy: 'renderer-mask-owned',
+    directShortestStepCount: directShortest.stepCount,
+    graphPolicy: 'playable-wrap-aware',
+    graphTopologyValid,
+    horizontal,
+    inwardDisconnectedEndpoints,
+    playableShortcutDelta: directShortest.stepCount !== null && playableShortest.stepCount !== null
+      ? directShortest.stepCount - playableShortest.stepCount
+      : null,
+    playableShortestStepCount: playableShortest.stepCount,
+    solutionPathPolicy: 'direct-floor',
+    solutionRouteAudit,
+    vertical
+  };
+};
 
 const buildShortestPath = (grid: boolean[][], start: LegacyPoint, goal: LegacyPoint): LegacyPoint[] => (
   resolveLegacyShortestPath(grid, start, goal, 'direct-floor').path
@@ -1827,6 +2017,13 @@ export const createLegacyMaze = (
   }
   playableTopologyStats.reachableFloors = resolveReachableFloorDistances(grid, start).size;
   playableTopologyStats.resolvedGoalDistance = Math.max(0, solutionPath.length - 1);
+  const wrapTopologyDiagnostics = resolveLegacyWrapTopologyDiagnostics({
+    goal,
+    grid,
+    size,
+    solutionPath,
+    start
+  }, profile.requiredOppositeBorderConnections);
 
   return {
     source: 'play-generated',
@@ -1836,6 +2033,7 @@ export const createLegacyMaze = (
     goal: clonePoint(goal),
     solutionPath,
     seed,
+    wrapTopologyDiagnostics,
     generationBuildTrace: {
       ...generationBuildTrace,
       finalGoal: clonePoint(goal),
