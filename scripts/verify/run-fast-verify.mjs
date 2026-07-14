@@ -143,9 +143,15 @@ const selectionRules = [
   },
   {
     reason: 'input/touch/movement controls',
-    tests: ['tests/input-human/touch.test.ts', 'tests/reset/legacy-movement-speed.test.ts'],
+    tests: [
+      'tests/input-human/directional-intent.test.ts',
+      'tests/input-human/touch.test.ts',
+      'tests/reset/legacy-play-step.test.ts',
+      'tests/reset/legacy-movement-speed.test.ts'
+    ],
     patterns: [
       /^src\/input-human\//,
+      /^src\/legacy-runtime\/legacy(DirectionalIntent|PlayStep)\.ts$/,
       /^src\/legacy-runtime\/legacyMovementSpeed\.ts$/,
       /^tests\/input-human\//,
       /^tests\/reset\/legacy-movement-speed\.test\.ts$/

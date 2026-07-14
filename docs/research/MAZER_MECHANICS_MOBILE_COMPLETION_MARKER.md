@@ -163,3 +163,10 @@ Do not ratchet for wording changes alone. Do not ratchet the retired legacy visu
 - The rebuild guard now waits for both maze tiles and title pieces to reach zero before the 1000ms empty-board handoff can finish.
 - Diagnostics now expose title piece counts inside the draw-stage payload for mobile proof scripts.
 - Local 390x844 proof captured `tilesVisible: 0`, `titleVisiblePieces: 0`, `titleFullyDeconstructed: true`, `handoffActive: true`, and rebuild after the hold.
+
+## 2026-07-14 - Shared directional-intent maintenance receipt
+
+- Stayed at `100%`: this was a proof-backed mechanics/mobile maintenance packet, not a scope expansion.
+- Keyboard, touch arrows, stick drag, board swipe, and the QA bridge now share one wrap-aware resolver with an active direction, exactly one latest-wins queued turn, immediate legal turns, and at most four unambiguous assisted corners.
+- The resolver stops at dead ends, genuine branch ambiguity, mismatched queued intent, and the assistance bound; release and lifecycle boundaries clear stale input before it can replay.
+- Proof: pure directional fixtures `10/10`; focused scene/control `5 files / 96 tests`; architecture `3 files / 16 tests`; proof harness `2 files / 19 tests`; full `npm run verify` `47 files / 354 tests` plus Vite/PWA build; clean-commit phone keyboard `74/74`, phone stick `58/58`, and true desktop keyboard `70/70` live turns with lifecycle/fresh-world gates, `60 FPS`, and clean visual inspection. Durable packet: `docs/ops/MAZER-FLUID-ZIGZAG-DIRECTIONAL-INTENT-PACKET-2026-07-14.md`.

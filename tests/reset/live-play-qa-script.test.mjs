@@ -2,11 +2,13 @@ import { describe, expect, test } from 'vitest';
 
 import {
   normalizeLivePlayInputMethod,
+  resolveLivePlayBrowserContextOptions,
   resolveLivePlayLifecycleSnapshot,
   resolveArrowPointForMove,
   resolveLivePlayRouteProgressIndex,
   resolveStickHoldMsForMove,
   resolveStickPointForMove,
+  shouldCollectInputLockProbe,
   summarizeFreshWorldTurn,
   summarizeFreshReadyState,
   summarizeGoalWorldTurn,
@@ -15,6 +17,46 @@ import {
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
+  test('uses a touch-capable mobile context by default and permits explicit desktop proof', () => {
+    expect(resolveLivePlayBrowserContextOptions({
+      viewport: { width: 405, height: 958 }
+    })).toEqual({
+      hasTouch: true,
+      isMobile: true,
+      viewport: { width: 405, height: 958 }
+    });
+    expect(resolveLivePlayBrowserContextOptions({
+      isMobile: false,
+      viewport: { width: 1280, height: 720 }
+    })).toEqual({
+      hasTouch: false,
+      isMobile: false,
+      viewport: { width: 1280, height: 720 }
+    });
+  });
+
+  test('reprobes the build lock after the fresh maze replaces the world-turn system', () => {
+    const probes = [
+      { phase: 'building', pass: true, seed: 101 }
+    ];
+
+    expect(shouldCollectInputLockProbe({
+      explicitLifecyclePhase: 'building',
+      inputLocked: true,
+      seed: 202
+    }, 101, probes)).toBe(true);
+    expect(shouldCollectInputLockProbe({
+      explicitLifecyclePhase: 'building',
+      inputLocked: true,
+      seed: 202
+    }, 101, [...probes, { phase: 'building', pass: true, seed: 202 }])).toBe(false);
+    expect(shouldCollectInputLockProbe({
+      explicitLifecyclePhase: 'handoff',
+      inputLocked: true,
+      seed: 101
+    }, 101, [{ phase: 'handoff', pass: true, seed: 101 }])).toBe(false);
+  });
+
   test('requires the rebuilt maze to be ready, settled, unlocked, and timing play', () => {
     expect(summarizeFreshReadyState({
       runtime: {
