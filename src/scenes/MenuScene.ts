@@ -1662,7 +1662,7 @@ export class MenuScene extends Phaser.Scene {
       visitedUndoCount: 0,
       optionalRetargetCount: 0
     };
-    const movementSpeedProfile = resolveLegacyMovementSpeedProfile(this.settings.movementSpeed);
+    const movementSpeedProfile = this.resolveLegacyPlayMovementSpeedProfile();
     const trailSegmentCap = this.settings.toggleTrailFade
       ? TRAIL_FADE_TAIL
       : Math.max(this.trail.length, this.menuDemoConfig?.behavior.trailMaxLength ?? this.trail.length);
@@ -1799,9 +1799,16 @@ export class MenuScene extends Phaser.Scene {
           pointerStartActive: this.playPointerStart !== null,
           touchSprint: {
             activeControls: this.playHeldTouchMoves.map((move) => move.control),
+            baseMovementSpeed: movementSpeedProfile.baseSpeed,
+            effectiveMovementSpeed: movementSpeedProfile.effectiveSpeed,
+            formulaVersion: movementSpeedProfile.formulaVersion,
             heldControl: this.resolveLegacyPlayHeldTouchControl(),
             movementSpeed: normalizeLegacyMovementSpeed(this.settings.movementSpeed),
             movementSpeedLabel: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
+            progressionCompletedCycles: movementSpeedProfile.completedCycles,
+            progressionContextApplied: movementSpeedProfile.contextApplied,
+            progressionLevel: movementSpeedProfile.level,
+            progressionPaceScore: movementSpeedProfile.paceScore,
             repeatInitialDelayMs: movementSpeedProfile.initialDelayMs,
             repeatIntervalMs: movementSpeedProfile.repeatIntervalMs,
             stickInitialDelayMaxMs: LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS,
@@ -2608,7 +2615,7 @@ export class MenuScene extends Phaser.Scene {
     if (
       action === null
       || !this.playKeyboardRepeatGate.accept(action, this.time.now, {
-        moveRepeatMinIntervalMs: resolveLegacyMovementSpeedProfile(this.settings.movementSpeed).repeatIntervalMs
+        moveRepeatMinIntervalMs: this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs
       })
     ) {
       return true;
@@ -3000,7 +3007,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyPlayHeldTouchDelay(kind: 'initial' | 'repeat' | 'turn'): number {
-    const profile = resolveLegacyMovementSpeedProfile(this.settings.movementSpeed);
+    const profile = this.resolveLegacyPlayMovementSpeedProfile();
     const stickActive = this.playTouchStickPointerId !== null;
     switch (kind) {
       case 'initial':
@@ -3052,6 +3059,15 @@ export class MenuScene extends Phaser.Scene {
 
     this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
     this.publishInteractionDiagnostics();
+  }
+
+  private resolveLegacyPlayMovementSpeedProfile() {
+    const playerTrack = this.progressionState.tracks.player;
+    return resolveLegacyMovementSpeedProfile(this.settings.movementSpeed, {
+      completedCycles: playerTrack.completedCycles,
+      level: playerTrack.level,
+      paceScore: playerTrack.paceScore
+    });
   }
 
   private normalizeLegacyPlayTouchPointerId(pointerId: number | null | undefined): number | null {

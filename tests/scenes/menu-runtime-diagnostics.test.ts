@@ -381,9 +381,16 @@ describe('menu runtime diagnostics', () => {
           pointerStartActive: false,
           touchSprint: {
             activeControls: [],
+            baseMovementSpeed: 0.3,
+            effectiveMovementSpeed: 0.3,
+            formulaVersion: 'legacy-movement-pace-v1',
             heldControl: null,
             movementSpeed: 0.3,
             movementSpeedLabel: '30%',
+            progressionCompletedCycles: 0,
+            progressionContextApplied: false,
+            progressionLevel: 1,
+            progressionPaceScore: 0,
             repeatInitialDelayMs: 258,
             repeatIntervalMs: 112,
             stickInitialDelayMaxMs: 144,
@@ -630,6 +637,12 @@ describe('menu runtime diagnostics', () => {
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
       )?.play?.inputBuffer.touchSprint.turnDelayMs).toBe(300);
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.play?.inputBuffer.touchSprint.formulaVersion).toBe('legacy-movement-pace-v1');
+      expect(parseMenuSceneRuntimeDiagnosticsAttribute(
+        documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
+      )?.play?.inputBuffer.touchSprint.effectiveMovementSpeed).toBe(0.3);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.auth?.status)
         .toBe('authenticated');
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.auth?.rememberedIdentity?.sessionState)
