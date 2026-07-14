@@ -345,6 +345,39 @@ export interface MenuSceneRuntimeDiagnostics {
       seed: number;
       seedSource: 'query' | 'runtime-random';
       solutionPathLength: number;
+      wrapTopologyDiagnostics?: {
+        contractVersion: 'legacy-wrap-topology-v1';
+        cornerBorderFloorCount: number;
+        decorativeCutoutCandidateCount: number;
+        decorativeCutoutPolicy: 'renderer-mask-owned';
+        directShortestStepCount: number | null;
+        graphPolicy: 'playable-wrap-aware';
+        graphTopologyValid: boolean;
+        horizontal: {
+          endpointCount: number;
+          pairCount: number;
+          required: boolean;
+          requiredSatisfied: boolean;
+          unpairedEndpointCount: number;
+        };
+        inwardDisconnectedEndpointCount: number;
+        playableShortcutDelta: number | null;
+        playableShortestStepCount: number | null;
+        solutionPathPolicy: 'direct-floor';
+        solutionRouteAudit: {
+          actualStepCount: number;
+          firstIllegalStepIndex: number | null;
+          lowerBoundSatisfied: boolean;
+          validCompletedRoute: boolean;
+        };
+        vertical: {
+          endpointCount: number;
+          pairCount: number;
+          required: boolean;
+          requiredSatisfied: boolean;
+          unpairedEndpointCount: number;
+        };
+      };
       shortcutStats?: {
         requested: number;
         attempts: number;

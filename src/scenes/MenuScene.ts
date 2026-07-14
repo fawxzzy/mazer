@@ -1906,6 +1906,39 @@ export class MenuScene extends Phaser.Scene {
           seed: this.maze.seed,
           seedSource: this.mode === 'play' || !this.explicitRuntimeMazeSeed ? 'runtime-random' : 'query',
           solutionPathLength: this.maze.solutionPath.length,
+          wrapTopologyDiagnostics: this.maze.wrapTopologyDiagnostics ? {
+            contractVersion: this.maze.wrapTopologyDiagnostics.contractVersion,
+            cornerBorderFloorCount: this.maze.wrapTopologyDiagnostics.cornerBorderFloors.length,
+            decorativeCutoutCandidateCount: this.maze.wrapTopologyDiagnostics.decorativeCutoutCandidates.length,
+            decorativeCutoutPolicy: this.maze.wrapTopologyDiagnostics.decorativeCutoutPolicy,
+            directShortestStepCount: this.maze.wrapTopologyDiagnostics.directShortestStepCount,
+            graphPolicy: this.maze.wrapTopologyDiagnostics.graphPolicy,
+            graphTopologyValid: this.maze.wrapTopologyDiagnostics.graphTopologyValid,
+            horizontal: {
+              endpointCount: this.maze.wrapTopologyDiagnostics.horizontal.endpointCount,
+              pairCount: this.maze.wrapTopologyDiagnostics.horizontal.pairCount,
+              required: this.maze.wrapTopologyDiagnostics.horizontal.required,
+              requiredSatisfied: this.maze.wrapTopologyDiagnostics.horizontal.requiredSatisfied,
+              unpairedEndpointCount: this.maze.wrapTopologyDiagnostics.horizontal.unpairedEndpoints.length
+            },
+            inwardDisconnectedEndpointCount: this.maze.wrapTopologyDiagnostics.inwardDisconnectedEndpoints.length,
+            playableShortcutDelta: this.maze.wrapTopologyDiagnostics.playableShortcutDelta,
+            playableShortestStepCount: this.maze.wrapTopologyDiagnostics.playableShortestStepCount,
+            solutionPathPolicy: this.maze.wrapTopologyDiagnostics.solutionPathPolicy,
+            solutionRouteAudit: {
+              actualStepCount: this.maze.wrapTopologyDiagnostics.solutionRouteAudit.actualStepCount,
+              firstIllegalStepIndex: this.maze.wrapTopologyDiagnostics.solutionRouteAudit.firstIllegalStepIndex,
+              lowerBoundSatisfied: this.maze.wrapTopologyDiagnostics.solutionRouteAudit.lowerBoundSatisfied,
+              validCompletedRoute: this.maze.wrapTopologyDiagnostics.solutionRouteAudit.validCompletedRoute
+            },
+            vertical: {
+              endpointCount: this.maze.wrapTopologyDiagnostics.vertical.endpointCount,
+              pairCount: this.maze.wrapTopologyDiagnostics.vertical.pairCount,
+              required: this.maze.wrapTopologyDiagnostics.vertical.required,
+              requiredSatisfied: this.maze.wrapTopologyDiagnostics.vertical.requiredSatisfied,
+              unpairedEndpointCount: this.maze.wrapTopologyDiagnostics.vertical.unpairedEndpoints.length
+            }
+          } : undefined,
           shortcutStats: this.maze.shortcutStats ? {
             requested: this.maze.shortcutStats.requested,
             attempts: this.maze.shortcutStats.attempts,

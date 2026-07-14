@@ -26,6 +26,7 @@ const isDirectRun = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
 const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';
 const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
 const STORAGE_KEY = 'mazer.game-toggles.v1';
+const WRAP_TOPOLOGY_PROGRESSION_STORAGE_KEY = 'mazer.progression.v1:user:runtime-diagnostics-auth-fixture';
 const DEFAULT_ARTIFACT_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-ui-surfaces');
 const DEFAULT_LABEL = 'ui-surfaces';
 const DEFAULT_ROUTE = '/?content=core-only&theme=aurora&runtimeDiagnostics=1';
@@ -1063,10 +1064,71 @@ const collectGuideTextContainmentIssues = (surfaceId, surface) => {
     });
 };
 
+const seedTopologyFixture = async (page, fixture) => {
+  if (fixture !== 'wrap-enabled') {
+    return;
+  }
+
+  await page.addInitScript(({ storageKey }) => {
+    window.localStorage.setItem(storageKey, JSON.stringify({
+      version: 1,
+      aiRunnerBaselineVersion: 3,
+      updatedAt: null,
+      tracks: {
+        player: { targetComplexity: 70 },
+        'ai-runner': { targetComplexity: 70 }
+      }
+    }));
+  }, {
+    storageKey: WRAP_TOPOLOGY_PROGRESSION_STORAGE_KEY
+  });
+};
+
+const collectWrapTopologyDiagnosticIssues = (surfaceId, surface, { requirePairs = false } = {}) => {
+  const maze = surface?.generation?.maze;
+  if (maze?.source === 'menu-snapshot') {
+    return [];
+  }
+
+  const diagnostics = maze?.wrapTopologyDiagnostics;
+  if (!diagnostics) {
+    return [`${surfaceId}:missing-wrap-topology-diagnostics`];
+  }
+
+  const issues = [];
+  if (diagnostics.contractVersion !== 'legacy-wrap-topology-v1') {
+    issues.push(`${surfaceId}:contract=${diagnostics.contractVersion ?? 'missing'}`);
+  }
+  if (diagnostics.graphPolicy !== 'playable-wrap-aware' || diagnostics.solutionPathPolicy !== 'direct-floor') {
+    issues.push(`${surfaceId}:policies=${diagnostics.graphPolicy ?? 'missing'}/${diagnostics.solutionPathPolicy ?? 'missing'}`);
+  }
+  if (diagnostics.graphTopologyValid !== true) {
+    issues.push(`${surfaceId}:graphTopologyValid=${diagnostics.graphTopologyValid ?? 'missing'}`);
+  }
+  if (diagnostics.horizontal?.requiredSatisfied !== true || diagnostics.vertical?.requiredSatisfied !== true) {
+    issues.push(`${surfaceId}:requiredAxesUnsatisfied`);
+  }
+  if (requirePairs && ((diagnostics.horizontal?.pairCount ?? 0) < 1 || (diagnostics.vertical?.pairCount ?? 0) < 1)) {
+    issues.push(`${surfaceId}:requiredPairs=${diagnostics.horizontal?.pairCount ?? 'missing'}/${diagnostics.vertical?.pairCount ?? 'missing'}`);
+  }
+  if ((diagnostics.horizontal?.unpairedEndpointCount ?? -1) !== 0 || (diagnostics.vertical?.unpairedEndpointCount ?? -1) !== 0) {
+    issues.push(`${surfaceId}:unpairedEndpoints=${diagnostics.horizontal?.unpairedEndpointCount ?? 'missing'}/${diagnostics.vertical?.unpairedEndpointCount ?? 'missing'}`);
+  }
+  if ((diagnostics.cornerBorderFloorCount ?? -1) !== 0 || (diagnostics.inwardDisconnectedEndpointCount ?? -1) !== 0) {
+    issues.push(`${surfaceId}:unsafeEndpoints=${diagnostics.cornerBorderFloorCount ?? 'missing'}/${diagnostics.inwardDisconnectedEndpointCount ?? 'missing'}`);
+  }
+  if (diagnostics.solutionRouteAudit?.validCompletedRoute !== true || diagnostics.solutionRouteAudit?.lowerBoundSatisfied !== true) {
+    issues.push(`${surfaceId}:solutionRouteAuditFailed`);
+  }
+  return issues;
+};
+
 const buildSurfaceChecks = ({
   consoleMessages,
   includeOverlayBottom = true,
   pageErrors,
+  requirePlayTrailSeed = true,
+  requireWrapPairs = false,
   surfaces,
   viewport
 }) => {
@@ -1131,6 +1193,10 @@ const buildSurfaceChecks = ({
     ...collectGuideTextContainmentIssues('options', surfaces.options),
     ...collectGuideTextContainmentIssues('pause', surfaces.pause)
   ];
+  const wrapTopologyDiagnosticIssues = [
+    ...collectWrapTopologyDiagnosticIssues('menu', surfaces.menu, { requirePairs: requireWrapPairs }),
+    ...collectWrapTopologyDiagnosticIssues('play', surfaces.play, { requirePairs: requireWrapPairs })
+  ];
   const menuTitle = surfaces.menu.title;
   const badgeFitIssues = [
     ['menu', surfaces.menu],
@@ -1184,9 +1250,13 @@ const buildSurfaceChecks = ({
   ));
   const trailShineChecks = ['menu', 'play'].map((id) => createCheck(
     `${id}-trail-shine-white`,
-    surfaces[id].markerStyle?.trailShineColor === EXPECTED_TRAIL_SHINE_COLOR
-      && surfaces[id].markerStyle?.trailShineEdgeColor === EXPECTED_TRAIL_SHINE_EDGE_COLOR,
-    `shine=${surfaces[id].markerStyle?.trailShineColor ?? 'missing'} edge=${surfaces[id].markerStyle?.trailShineEdgeColor ?? 'missing'}`
+    !requirePlayTrailSeed || (
+      surfaces[id].markerStyle?.trailShineColor === EXPECTED_TRAIL_SHINE_COLOR
+      && surfaces[id].markerStyle?.trailShineEdgeColor === EXPECTED_TRAIL_SHINE_EDGE_COLOR
+    ),
+    requirePlayTrailSeed
+      ? `shine=${surfaces[id].markerStyle?.trailShineColor ?? 'missing'} edge=${surfaces[id].markerStyle?.trailShineEdgeColor ?? 'missing'}`
+      : 'skipped for focused topology proof'
   ));
   const playChecks = [
     createCheck(
@@ -1206,8 +1276,10 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'play-trail-shine-seeded-on',
-      surfaces.play.markerStyle?.trailShineEnabled === true,
-      `trailShineEnabled=${surfaces.play.markerStyle?.trailShineEnabled ?? 'missing'}`
+      !requirePlayTrailSeed || surfaces.play.markerStyle?.trailShineEnabled === true,
+      requirePlayTrailSeed
+        ? `trailShineEnabled=${surfaces.play.markerStyle?.trailShineEnabled ?? 'missing'}`
+        : 'skipped for focused topology proof'
     )
   ];
   const textChecks = [
@@ -1300,6 +1372,13 @@ const buildSurfaceChecks = ({
       'guide-text-containment',
       guideTextContainmentIssues.length === 0,
       guideTextContainmentIssues.length === 0 ? 'guide copy remains inside the guide panel' : guideTextContainmentIssues.join('; ')
+    ),
+    createCheck(
+      'wrap-topology-diagnostics',
+      wrapTopologyDiagnosticIssues.length === 0,
+      wrapTopologyDiagnosticIssues.length === 0
+        ? 'generated menu/play topology is paired, connected, and route-lower-bound valid'
+        : wrapTopologyDiagnosticIssues.join('; ')
     )
   ];
   const runtimeChecks = [
@@ -1354,6 +1433,7 @@ const buildMarkdownReport = (summary) => {
     `- Target: ${summary.targetUrl}`,
     `- Viewport: ${summary.viewport.width}x${summary.viewport.height} @ ${summary.deviceScaleFactor}x DPR`,
     `- Auth fixture: ${summary.authFixture ?? 'none'}`,
+    `- Topology fixture: ${summary.topologyFixture ?? 'none'}`,
     `- Repo commit: ${summary.repo.commit}`,
     `- Dirty worktree: ${summary.repo.dirty ? 'yes' : 'no'}`,
     '',
@@ -1405,6 +1485,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
   const deviceScaleFactor = options.deviceScaleFactor ?? DEFAULT_DEVICE_SCALE_FACTOR;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const authFixture = typeof options.authFixture === 'string' ? options.authFixture : undefined;
+  const topologyFixture = typeof options.topologyFixture === 'string' ? options.topologyFixture : undefined;
   const route = options.route ?? resolveRoute({
     authFixture,
     route: DEFAULT_ROUTE,
@@ -1462,6 +1543,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       toggleTrailFade: true,
       toggleTrailPulse: true
     });
+    await seedTopologyFixture(page, topologyFixture);
 
     await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: timeoutMs });
     if (authFixture === 'authenticated') {
@@ -1601,7 +1683,14 @@ export const runUiSurfaceCapture = async (options = {}) => {
       await clickPoint(page, menuButtons.start, 'Start');
     }
     await waitForVisualBuildSettled(page, { timeoutMs });
-    const playTrailSeed = await seedPlayTrailForVisualProof(page, { timeoutMs });
+    const playTrailSeed = options.skipPlayTrailSeed
+      ? {
+        accepted: false,
+        attemptedMoves: 0,
+        reason: 'focused-topology-proof',
+        skipped: true
+      }
+      : await seedPlayTrailForVisualProof(page, { timeoutMs });
     const play = await captureSurface({
       page,
       outputDir,
@@ -1664,6 +1753,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         markerStyle: menu.diagnostics.visual?.markerStyle,
         progressionBadge: menu.diagnostics.visual?.progressionBadge,
         title: menu.diagnostics.visual?.title,
+        generation: menu.diagnostics.runtime?.generation,
         buttons: menu.diagnostics.visual?.buttons,
         nativeInputs: menu.nativeInputs,
         textLabels: menu.diagnostics.visual?.textLabels,
@@ -1730,6 +1820,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         markerStyle: play.diagnostics.visual?.markerStyle,
         progressionBadge: play.diagnostics.visual?.progressionBadge,
         title: play.diagnostics.visual?.title,
+        generation: play.diagnostics.runtime?.generation,
         nativeInputs: play.nativeInputs,
         textLabels: play.diagnostics.visual?.textLabels,
         touchControls: play.diagnostics.visual?.touchControls,
@@ -1779,6 +1870,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
       consoleMessages,
       includeOverlayBottom: !transition,
       pageErrors,
+      requirePlayTrailSeed: !options.skipPlayTrailSeed,
+      requireWrapPairs: topologyFixture === 'wrap-enabled',
       surfaces,
       targetUrl,
       viewport
@@ -1798,6 +1891,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         surfaces: transitions
       } : null,
       authFixture: authFixture ?? null,
+      topologyFixture: topologyFixture ?? null,
       playTrailSeed,
       repo: {
         commit: getCommitSha(),
@@ -1856,7 +1950,9 @@ if (isDirectRun) {
       : undefined,
     sessionId: args.session,
     skipBuild: args['skip-build'] === true || args['skip-build'] === 'true',
+    skipPlayTrailSeed: args['skip-play-trail-seed'] === true || args['skip-play-trail-seed'] === 'true',
     timeoutMs: parseIntegerArg(args['timeout-ms'], DEFAULT_TIMEOUT_MS),
+    topologyFixture: typeof args['topology-fixture'] === 'string' ? args['topology-fixture'] : undefined,
     useExistingServer: args['no-preview'] === true || args['no-preview'] === 'true',
     viewport: parseViewport(args.viewport)
   }).then((result) => {

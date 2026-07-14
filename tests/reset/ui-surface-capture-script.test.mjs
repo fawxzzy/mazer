@@ -11,6 +11,7 @@ describe('UI surface capture script contract', () => {
     expect(packageJson.scripts['visual:ui-surfaces']).toBe('node ./scripts/analysis/capture-ui-surfaces.mjs');
     expect(packageJson.scripts['visual:ui-transitions']).toBe('node ./scripts/analysis/capture-ui-transitions.mjs');
     expect(source).toContain("const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';");
+    expect(source).toContain("const WRAP_TOPOLOGY_PROGRESSION_STORAGE_KEY = 'mazer.progression.v1:user:runtime-diagnostics-auth-fixture';");
     expect(source).toContain("const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';");
     expect(source).toContain('const DEFAULT_DEVICE_SCALE_FACTOR = 2;');
     expect(source).toContain('const mobileViewport = viewport.width < 720;');
@@ -76,7 +77,11 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('expectedLabels: []');
     expect(source).toContain("reason: 'auth-gated-menu'");
     expect(source).toContain("const playRoute = authGatedMenu ? resolveRouteWithParams(route, { mode: 'play', overlay: null }) : route;");
-    expect(source).toContain('const playTrailSeed = await seedPlayTrailForVisualProof(page, { timeoutMs });');
+    expect(source).toContain('const playTrailSeed = options.skipPlayTrailSeed');
+    expect(source).toContain(': await seedPlayTrailForVisualProof(page, { timeoutMs });');
+    expect(source).toContain("reason: 'focused-topology-proof'");
+    expect(source).toContain("const seedTopologyFixture = async (page, fixture) => {");
+    expect(source).toContain("fixture !== 'wrap-enabled'");
     expect(source).toContain('const latestMenuDiagnostics = await readDiagnostics(page);');
     expect(source).toContain('const latestMenuButtons = getMenuButtonPoints(latestMenuDiagnostics.visual);');
     expect(source).toContain('markerStyle: menu.diagnostics.visual?.markerStyle');
@@ -87,6 +92,9 @@ describe('UI surface capture script contract', () => {
     expect(source).not.toContain("url.searchParams.set('pathStyle', pathStyle);");
     expect(source).toContain('expected=corridor');
     expect(source).toContain('const checks = buildSurfaceChecks({');
+    expect(source).toContain('requirePlayTrailSeed: !options.skipPlayTrailSeed');
+    expect(source).toContain("requireWrapPairs: topologyFixture === 'wrap-enabled'");
+    expect(source).toContain('requirePlayTrailSeed = true');
     expect(source).toContain('const isIgnorableConsoleMessage = (message) => (');
     expect(source).toContain("message.text.includes('WebGL: CONTEXT_LOST_WEBGL')");
     expect(source).toContain("createCheck(\n      'play-player-green'");
@@ -97,6 +105,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('deviceScaleFactor,');
     expect(source).toContain('authFixture: authFixture ?? null');
     expect(source).toContain('playTrailSeed,');
+    expect(source).toContain('topologyFixture: topologyFixture ?? null');
+    expect(source).toContain("`- Topology fixture: ${summary.topologyFixture ?? 'none'}`");
     expect(source).toContain("createCheck(\n      'menu-text-labels'");
     expect(source).toContain("createCheck(\n      'menu-title-readable'");
     expect(source).toContain("createCheck(\n      'auth-surface'");
@@ -116,10 +126,12 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {');
     expect(source).toContain('const collectButtonLabelContainmentIssues = (surfaceId, surface) =>');
     expect(source).toContain('const collectGuideTextContainmentIssues = (surfaceId, surface) => {');
+    expect(source).toContain('const collectWrapTopologyDiagnosticIssues = (surfaceId, surface, { requirePairs = false } = {}) => {');
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-affordance'");
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-reachability'");
     expect(source).toContain("createCheck(\n      'button-label-containment'");
     expect(source).toContain("createCheck(\n      'guide-text-containment'");
+    expect(source).toContain("createCheck(\n      'wrap-topology-diagnostics'");
     expect(source).toContain('const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
     expect(source).toContain('const desktopViewport = (before.visual?.viewport?.width ?? 0) >= 720;');
     expect(source).toContain('const wheelDelta = Math.max(scroll.maxOffset * 4, dragDistance);');
@@ -131,11 +143,15 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("nativeInputs: authSurface.nativeInputs");
     expect(source).toContain('progressionBadge: menu.diagnostics.visual?.progressionBadge');
     expect(source).toContain('title: menu.diagnostics.visual?.title');
+    expect(source).toContain('generation: menu.diagnostics.runtime?.generation');
     expect(source).toContain('progressionBadge: authSurface.diagnostics.visual?.progressionBadge');
     expect(source).toContain('progressionBadge: play.diagnostics.visual?.progressionBadge');
+    expect(source).toContain('generation: play.diagnostics.runtime?.generation');
     expect(source).toContain('all active text labels stay inside viewport');
     expect(source).toContain('visible progression badges fit their chrome');
     expect(source).toContain("deviceScaleFactor: parseIntegerArg(args['device-scale-factor'], DEFAULT_DEVICE_SCALE_FACTOR)");
+    expect(source).toContain("skipPlayTrailSeed: args['skip-play-trail-seed'] === true || args['skip-play-trail-seed'] === 'true'");
+    expect(source).toContain("topologyFixture: typeof args['topology-fixture'] === 'string' ? args['topology-fixture'] : undefined");
     expect(source).toContain("authFixture: typeof args['auth-fixture'] === 'string' ? args['auth-fixture'] : undefined");
     expect(source).toContain("authFixture: result.authFixture");
     expect(source).not.toContain("expectedLabels: ['Exit', 'Start', 'Options']");
