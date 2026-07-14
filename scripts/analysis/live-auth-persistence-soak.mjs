@@ -49,28 +49,33 @@ const summarizeSurface = ({ runtime, visual }) => ({
 });
 
 const waitForSurface = async (page, expected) => {
-  await page.waitForFunction(({ runtimeAttribute, visualAttribute, expectedSurface }) => {
-    const runtimeRaw = document.documentElement.getAttribute(runtimeAttribute);
-    const visualRaw = document.documentElement.getAttribute(visualAttribute);
-    if (!runtimeRaw || !visualRaw) {
-      return false;
-    }
-    try {
-      const runtime = JSON.parse(runtimeRaw);
-      const visual = JSON.parse(visualRaw);
-      const labels = new Set((visual?.buttons ?? []).map((button) => button.text));
-      return (expectedSurface.authenticated === undefined || (runtime?.auth?.status === 'authenticated') === expectedSurface.authenticated)
-        && visual?.runtime?.mode === expectedSurface.mode
-        && visual?.runtime?.overlay === expectedSurface.overlay
-        && expectedSurface.buttons.every((label) => labels.has(label));
-    } catch {
-      return false;
-    }
-  }, {
-    runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
-    visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE,
-    expectedSurface: expected
-  }, { timeout: TIMEOUT_MS });
+  try {
+    await page.waitForFunction(({ runtimeAttribute, visualAttribute, expectedSurface }) => {
+      const runtimeRaw = document.documentElement.getAttribute(runtimeAttribute);
+      const visualRaw = document.documentElement.getAttribute(visualAttribute);
+      if (!runtimeRaw || !visualRaw) {
+        return false;
+      }
+      try {
+        const runtime = JSON.parse(runtimeRaw);
+        const visual = JSON.parse(visualRaw);
+        const labels = new Set((visual?.buttons ?? []).map((button) => button.text));
+        return (expectedSurface.authenticated === undefined || (runtime?.auth?.status === 'authenticated') === expectedSurface.authenticated)
+          && visual?.runtime?.mode === expectedSurface.mode
+          && visual?.runtime?.overlay === expectedSurface.overlay
+          && expectedSurface.buttons.every((label) => labels.has(label));
+      } catch {
+        return false;
+      }
+    }, {
+      runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
+      visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE,
+      expectedSurface: expected
+    }, { timeout: TIMEOUT_MS });
+  } catch (error) {
+    const observed = summarizeSurface(await readDiagnostics(page));
+    throw new Error(`surface_timeout:${JSON.stringify({ expected, observed })}`, { cause: error });
+  }
   return summarizeSurface(await readDiagnostics(page));
 };
 
@@ -88,6 +93,22 @@ const openOptionsViaQa = async (page) => {
   const result = await page.evaluate(() => window.__MAZER_QA__?.openOptionsOverlay?.() ?? null);
   if (result?.accepted !== true) {
     throw new Error('options_fixture_action_rejected');
+  }
+};
+
+const startPlayViaQa = async (page) => {
+  await page.waitForFunction(() => Boolean(window.__MAZER_QA__?.startPlayMode), {}, { timeout: TIMEOUT_MS });
+  const result = await page.evaluate(() => window.__MAZER_QA__?.startPlayMode?.() ?? null);
+  if (result?.accepted !== true) {
+    throw new Error(`play_fixture_action_rejected:${result?.reason ?? 'unknown'}`);
+  }
+};
+
+const openPauseViaQa = async (page) => {
+  await page.waitForFunction(() => Boolean(window.__MAZER_QA__?.openPauseOverlay), {}, { timeout: TIMEOUT_MS });
+  const result = await page.evaluate(() => window.__MAZER_QA__?.openPauseOverlay?.() ?? null);
+  if (result?.accepted !== true) {
+    throw new Error(`pause_fixture_action_rejected:${result?.reason ?? 'unknown'}`);
   }
 };
 
@@ -119,6 +140,8 @@ export const summarizeAuthPersistenceSoak = (steps, consoleMessages, pageErrors)
     'authenticated-entry',
     'authenticated-setting-change',
     'authenticated-reload',
+    'authenticated-options-reload',
+    'authenticated-pause-reentry',
     'logout-to-guest',
     'fixture-reentry'
   ];
@@ -165,6 +188,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   });
   page.on('pageerror', (error) => pageErrors.push(error.message));
   const steps = [];
+  const screenshots = {};
 
   try {
     await page.goto(`${preview.baseUrl}${buildRoute(false)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
@@ -207,6 +231,41 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     });
 
     await openOptionsViaQa(page);
+    const authenticatedOptionsReload = await waitForSurface(page, {
+      authenticated: true, buttons: ['Log out'], mode: 'menu', overlay: 'options'
+    });
+    steps.push({
+      id: 'authenticated-options-reload',
+      pass: authenticatedOptionsReload.userIdPresent
+        && authenticatedOptionsReload.trailShineEnabled === !initialTrailShine,
+      surface: authenticatedOptionsReload
+    });
+    screenshots.authenticatedOptions = resolve(outputDir, `${label}-authenticated-options.png`);
+    await page.screenshot({ path: screenshots.authenticatedOptions });
+    await page.keyboard.press('Escape');
+    await waitForSurface(page, {
+      authenticated: true, buttons: ['Start', 'Options'], mode: 'menu', overlay: 'none'
+    });
+
+    await startPlayViaQa(page);
+    await openPauseViaQa(page);
+    const authenticatedPauseReentry = await waitForSurface(page, {
+      authenticated: true, buttons: ['Back', 'Trail Shine', 'Reset', 'Menu'], mode: 'play', overlay: 'pause'
+    });
+    steps.push({
+      id: 'authenticated-pause-reentry',
+      pass: authenticatedPauseReentry.userIdPresent
+        && authenticatedPauseReentry.trailShineEnabled === !initialTrailShine,
+      surface: authenticatedPauseReentry
+    });
+    screenshots.authenticatedPause = resolve(outputDir, `${label}-authenticated-pause.png`);
+    await page.screenshot({ path: screenshots.authenticatedPause });
+
+    await page.goto(`${preview.baseUrl}${buildRoute(true)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
+    await waitForSurface(page, {
+      authenticated: true, buttons: ['Start', 'Options'], mode: 'menu', overlay: 'none'
+    });
+    await openOptionsViaQa(page);
     await waitForSurface(page, {
       authenticated: true, buttons: ['Log out'], mode: 'menu', overlay: 'options'
     });
@@ -236,19 +295,20 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     const screenshotPath = resolve(outputDir, `${label}.png`);
     await page.screenshot({ path: screenshotPath });
+    screenshots.fixtureReentry = screenshotPath;
     const result = summarizeAuthPersistenceSoak(steps, consoleMessages, pageErrors);
     const summary = {
       schema: 'mazer.live-auth-persistence-soak.v1',
       label,
       generatedAt: new Date().toISOString(),
       fixtureOnly: true,
-      note: 'This verifies the visible mobile fixture contract. Real provider login evidence remains credential-gated and is not replayed by this harness.',
+      note: 'This verifies the visible authenticated mobile fixture contract across menu Options, reload, played-game Pause, logout, and re-entry without using account credentials.',
       viewport: MOBILE_VIEWPORT,
       deviceScaleFactor: MOBILE_DPR,
       result,
       consoleMessages,
       pageErrors,
-      artifacts: { screenshotPath }
+      artifacts: { screenshotPath, screenshots }
     };
     const summaryPath = resolve(outputDir, `${label}.summary.json`);
     await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');

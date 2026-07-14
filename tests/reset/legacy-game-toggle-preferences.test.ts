@@ -6,7 +6,7 @@ import {
 } from '../../src/legacy-runtime/legacyAuth';
 import {
   LEGACY_GAME_TOGGLE_STORAGE_KEY,
-  migrateLegacyGameToggleSettingsFromGlobalStorage,
+  migrateLegacyGameToggleSettingsToGuestScope,
   mergeLegacyGameTogglePreferences,
   pickLegacyGameTogglePreferences,
   readLegacyGameToggleSettings,
@@ -22,6 +22,10 @@ class MemoryStorage {
 
   public setItem(key: string, value: string): void {
     this.values.set(key, value);
+  }
+
+  public removeItem(key: string): void {
+    this.values.delete(key);
   }
 }
 
@@ -180,8 +184,13 @@ describe('legacy game toggle preferences', () => {
     expect(readLegacyGameToggleSettings(userStorage, LEGACY_DEFAULTS).toggleCameraFollow).toBe(true);
   });
 
-  test('migrates old unscoped game toggles into the current account scope once', () => {
+  test('migrates valid old unscoped game toggles into guest scope once', () => {
     const storage = new MemoryStorage();
+    const guestStorage = createLegacyAuthScopedStorage(
+      storage,
+      LEGACY_GAME_TOGGLE_STORAGE_KEY,
+      { userId: null }
+    );
     const userStorage = createLegacyAuthScopedStorage(
       storage,
       LEGACY_GAME_TOGGLE_STORAGE_KEY,
@@ -197,9 +206,9 @@ describe('legacy game toggle preferences', () => {
       toggleTrailPulse: false
     }));
 
-    expect(migrateLegacyGameToggleSettingsFromGlobalStorage(storage, userStorage, LEGACY_DEFAULTS)).toBe(true);
+    expect(migrateLegacyGameToggleSettingsToGuestScope(storage, guestStorage, LEGACY_DEFAULTS)).toBe(true);
 
-    const migrated = readLegacyGameToggleSettings(userStorage, LEGACY_DEFAULTS);
+    const migrated = readLegacyGameToggleSettings(guestStorage, LEGACY_DEFAULTS);
     expect(pickLegacyGameTogglePreferences(migrated)).toEqual({
       controlMode: 'arrows',
       darkMode: false,
@@ -209,28 +218,34 @@ describe('legacy game toggle preferences', () => {
       toggleTrailFade: true,
       toggleTrailPulse: false
     });
-    expect(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY)).not.toBeNull();
+    expect(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(resolveLegacyAuthScopedStorageKey(
+      LEGACY_GAME_TOGGLE_STORAGE_KEY,
+      { userId: 'user-456' }
+    ))).toBeNull();
+    expect(readLegacyGameToggleSettings(userStorage, LEGACY_DEFAULTS)).toEqual(LEGACY_DEFAULTS);
+    expect(migrateLegacyGameToggleSettingsToGuestScope(storage, guestStorage, LEGACY_DEFAULTS)).toBe(false);
   });
 
-  test('does not let old unscoped toggles overwrite existing scoped preferences', () => {
+  test('does not let old unscoped toggles overwrite existing guest preferences', () => {
     const storage = new MemoryStorage();
-    const userStorage = createLegacyAuthScopedStorage(
+    const guestStorage = createLegacyAuthScopedStorage(
       storage,
       LEGACY_GAME_TOGGLE_STORAGE_KEY,
-      { userId: 'user-789' }
+      { userId: null }
     );
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
       controlMode: 'arrows',
       toggleCameraFollow: true
     }));
-    writeLegacyGameToggleSettings(userStorage, mergeLegacyGameTogglePreferences(LEGACY_DEFAULTS, {
+    writeLegacyGameToggleSettings(guestStorage, mergeLegacyGameTogglePreferences(LEGACY_DEFAULTS, {
       controlMode: 'stick',
       toggleCameraFollow: false
     }));
 
-    expect(migrateLegacyGameToggleSettingsFromGlobalStorage(storage, userStorage, LEGACY_DEFAULTS)).toBe(false);
+    expect(migrateLegacyGameToggleSettingsToGuestScope(storage, guestStorage, LEGACY_DEFAULTS)).toBe(false);
 
-    const retained = readLegacyGameToggleSettings(userStorage, LEGACY_DEFAULTS);
+    const retained = readLegacyGameToggleSettings(guestStorage, LEGACY_DEFAULTS);
     expect(retained.controlMode).toBe('stick');
     expect(retained.toggleCameraFollow).toBe(false);
   });
@@ -244,7 +259,60 @@ describe('legacy game toggle preferences', () => {
     );
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, '{');
 
-    expect(migrateLegacyGameToggleSettingsFromGlobalStorage(storage, guestStorage, LEGACY_DEFAULTS)).toBe(false);
+    expect(migrateLegacyGameToggleSettingsToGuestScope(storage, guestStorage, LEGACY_DEFAULTS)).toBe(false);
     expect(storage.getItem(resolveLegacyAuthScopedStorageKey(LEGACY_GAME_TOGGLE_STORAGE_KEY, { userId: null }))).toBeNull();
+    expect(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY)).toBe('{');
+  });
+
+  test('rejects parseable legacy data when every recognized value is invalid', () => {
+    const storage = new MemoryStorage();
+    const guestStorage = createLegacyAuthScopedStorage(
+      storage,
+      LEGACY_GAME_TOGGLE_STORAGE_KEY,
+      { userId: null }
+    );
+    storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
+      controlMode: 'teleport',
+      movementSpeed: 'fast',
+      toggleTrailPulse: 'maybe'
+    }));
+
+    expect(migrateLegacyGameToggleSettingsToGuestScope(storage, guestStorage, LEGACY_DEFAULTS)).toBe(false);
+    expect(storage.getItem(resolveLegacyAuthScopedStorageKey(LEGACY_GAME_TOGGLE_STORAGE_KEY, { userId: null }))).toBeNull();
+    expect(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY)).not.toBeNull();
+  });
+
+  test('keeps the legacy key when the guest-scoped write fails', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({ controlMode: 'arrows' }));
+
+    expect(migrateLegacyGameToggleSettingsToGuestScope(storage, {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('blocked');
+      }
+    }, LEGACY_DEFAULTS)).toBe(false);
+    expect(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY)).not.toBeNull();
+  });
+
+  test('keeps a successful guest migration when legacy-key removal is blocked', () => {
+    const values = new Map<string, string>();
+    values.set(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({ toggleTrailPulse: false }));
+    const rootStorage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: () => {
+        throw new Error('blocked');
+      }
+    };
+    const guestStorage = createLegacyAuthScopedStorage(
+      rootStorage,
+      LEGACY_GAME_TOGGLE_STORAGE_KEY,
+      { userId: null }
+    );
+
+    expect(migrateLegacyGameToggleSettingsToGuestScope(rootStorage, guestStorage, LEGACY_DEFAULTS)).toBe(true);
+    expect(readLegacyGameToggleSettings(guestStorage, LEGACY_DEFAULTS).toggleTrailPulse).toBe(false);
+    expect(values.get(LEGACY_GAME_TOGGLE_STORAGE_KEY)).not.toBeUndefined();
   });
 });
