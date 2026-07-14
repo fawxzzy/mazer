@@ -97,7 +97,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(guideSource).toContain("drawLegendRow(1, 'start', 'Start'");
     expect(guideSource).toContain("drawLegendRow(2, 'end', 'End'");
     expect(guideSource).toContain("'Player: green beacon + trail.'");
-    expect(guideSource).toContain("'Score: run quality.'");
+    expect(guideSource).toContain("'Score: run quality; Runs: clears.'");
     expect(guideSource).not.toContain('activeTargetComplexity');
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
@@ -1320,7 +1320,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("const timerLine = this.formatLegacyElapsedLabel(this.resolveLegacyPlayElapsedMs());");
     expect(menuSceneSource).toContain("const rankLine = `Rank: ${playerTrack.rank}`;");
     expect(menuSceneSource).toContain("return `${timerLine}  ${rankLine}`;");
-    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} is the public progression tier.`");
+    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public progression tier.`");
     expect(menuSceneSource).toContain('This resets your rank progress, score, runs, and maze level');
     expect(menuSceneSource).not.toContain('Skill Lvl');
     expect(menuSceneSource).not.toContain('Player Skill');
@@ -1370,9 +1370,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');");
     expect(menuSceneSource).toContain("'Player: green beacon + trail.'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
-    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'}: progression tier.`");
-    expect(menuSceneSource).toContain("'Score: run quality.'");
-    expect(menuSceneSource).toContain("'Maze Lvl: challenge.'");
+    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public progression tier.`");
+    expect(menuSceneSource).toContain("'Score: run quality; Runs: clears.'");
+    expect(menuSceneSource).toContain("'Maze Lvl: challenge tier.'");
+    expect(menuSceneSource).not.toContain('the current procedural challenge tier');
   });
 
   test('exposes wrapped edge player snaps in runtime diagnostics', () => {

@@ -493,6 +493,7 @@ const toSurfaceState = (capture) => ({
   layout: capture.diagnostics.visual?.layout,
   progressionBadge: capture.diagnostics.visual?.progressionBadge,
   title: capture.diagnostics.visual?.title,
+  buttons: capture.diagnostics.visual?.buttons,
   overlayUi: capture.diagnostics.visual?.overlayUi,
   nativeInputs: capture.nativeInputs,
   textLabels: capture.diagnostics.visual?.textLabels,
@@ -978,7 +979,15 @@ const collectOverlayScrollBottomIssues = (surfaceId, surface, expectedLabels) =>
   }
 
   const scroll = surface.overlayUi?.scroll;
-  if (scroll?.enabled !== true || !Number.isFinite(scroll.maxOffset) || !Number.isFinite(scroll.offset)) {
+  if (!scroll || !Number.isFinite(scroll.maxOffset) || !Number.isFinite(scroll.offset)) {
+    return [`${surfaceId}:missing-scroll-bottom-diagnostics`];
+  }
+  if (scroll.enabled !== true && scroll.maxOffset === 0) {
+    return hasTextLabels(surface, expectedLabels)
+      ? []
+      : [`${surfaceId}:non-scrollable-missing-labels=${expectedLabels.join(',')}`];
+  }
+  if (scroll.enabled !== true) {
     return [`${surfaceId}:missing-scroll-bottom-diagnostics`];
   }
   if (scroll.offset < scroll.maxOffset - 1) {
@@ -987,6 +996,71 @@ const collectOverlayScrollBottomIssues = (surfaceId, surface, expectedLabels) =>
   return hasTextLabels(surface, expectedLabels)
     ? []
     : [`${surfaceId}:missing-bottom-labels=${expectedLabels.join(',')}`];
+};
+
+const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.buttons ?? []).flatMap((button) => {
+  if (!isFiniteBounds(button?.bounds) || !isFiniteBounds(button?.labelBounds)) {
+    return [`${surfaceId}:${button?.text ?? 'unknown'}:missing-button-label-bounds`];
+  }
+  const edgeTolerance = 1.5;
+  const issues = button.labelBounds.left < button.bounds.left - edgeTolerance
+    || button.labelBounds.right > button.bounds.right + edgeTolerance
+    || button.labelBounds.top < button.bounds.top - edgeTolerance
+    || button.labelBounds.bottom > button.bounds.bottom + edgeTolerance
+    ? [`${surfaceId}:${button.text}:label-outside-button`]
+    : [];
+  const actionLabels = new Set([
+    'Account',
+    'Back',
+    'Create Account',
+    'Log out',
+    'Login',
+    'Menu',
+    'Options',
+    'Reset',
+    'Reset Progress',
+    'Start'
+  ]);
+  if (actionLabels.has(button.text)) {
+    const buttonCenterY = (button.bounds.top + button.bounds.bottom) / 2;
+    const labelCenterY = (button.labelBounds.top + button.labelBounds.bottom) / 2;
+    if (Math.abs(labelCenterY - buttonCenterY) > 6) {
+      issues.push(`${surfaceId}:${button.text}:label-center-delta=${(labelCenterY - buttonCenterY).toFixed(1)}`);
+    }
+  }
+  return issues;
+});
+
+const isGuideLabel = (text) => [
+  'PLAYER GUIDE',
+  'Compass',
+  'points to End',
+  'Start',
+  'run begins',
+  'End',
+  'clear here'
+].includes(text) || text.includes('Player:') || text.includes('Rank:') || text.includes('Score:') || text.includes('Maze Lvl:');
+
+const collectGuideTextContainmentIssues = (surfaceId, surface) => {
+  const guide = surface?.overlayUi?.guidePanel;
+  if (!isFiniteBounds(guide)) {
+    return surface?.skipped === true ? [] : [`${surfaceId}:missing-guide-panel-bounds`];
+  }
+  return collectTextLabelEntries(surface)
+    .filter((entry) => isGuideLabel(String(entry?.text ?? '')))
+    .flatMap((entry) => {
+      const bounds = entry?.bounds;
+      if (!isFiniteBounds(bounds)) {
+        return [`${surfaceId}:${entry?.text ?? 'unknown'}:missing-guide-label-bounds`];
+      }
+      const edgeTolerance = 1.5;
+      return bounds.left < guide.left - edgeTolerance
+        || bounds.right > guide.right + edgeTolerance
+        || bounds.top < guide.top - edgeTolerance
+        || bounds.bottom > guide.bottom + edgeTolerance
+        ? [`${surfaceId}:${entry.text}:outside-guide-panel`]
+        : [];
+    });
 };
 
 const buildSurfaceChecks = ({
@@ -1044,6 +1118,19 @@ const buildSurfaceChecks = ({
     ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, ['Controls']),
     ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Move Speed', 'Reset Progress', 'Reset', 'Menu'])
   ] : [];
+  const buttonLabelContainmentIssues = [
+    ...collectButtonLabelContainmentIssues('menu', surfaces.menu),
+    ...collectButtonLabelContainmentIssues('auth', surfaces.auth),
+    ...collectButtonLabelContainmentIssues('options', surfaces.options),
+    ...collectButtonLabelContainmentIssues('options-bottom', surfaces.optionsBottom),
+    ...collectButtonLabelContainmentIssues('play', surfaces.play),
+    ...collectButtonLabelContainmentIssues('pause', surfaces.pause),
+    ...collectButtonLabelContainmentIssues('pause-bottom', surfaces.pauseBottom)
+  ];
+  const guideTextContainmentIssues = [
+    ...collectGuideTextContainmentIssues('options', surfaces.options),
+    ...collectGuideTextContainmentIssues('pause', surfaces.pause)
+  ];
   const menuTitle = surfaces.menu.title;
   const badgeFitIssues = [
     ['menu', surfaces.menu],
@@ -1203,6 +1290,16 @@ const buildSurfaceChecks = ({
       'mobile-overlay-scroll-reachability',
       overlayScrollBottomIssues.length === 0,
       overlayScrollBottomIssues.length === 0 ? 'options and pause bottom controls are reached through real scroll input' : overlayScrollBottomIssues.join('; ')
+    ),
+    createCheck(
+      'button-label-containment',
+      buttonLabelContainmentIssues.length === 0,
+      buttonLabelContainmentIssues.length === 0 ? 'button labels remain inside their interactive chrome' : buttonLabelContainmentIssues.join('; ')
+    ),
+    createCheck(
+      'guide-text-containment',
+      guideTextContainmentIssues.length === 0,
+      guideTextContainmentIssues.length === 0 ? 'guide copy remains inside the guide panel' : guideTextContainmentIssues.join('; ')
     )
   ];
   const runtimeChecks = [
@@ -1475,19 +1572,21 @@ export const runUiSurfaceCapture = async (options = {}) => {
             skipped: true
           };
         } else {
-          await scrollOverlayToBottom(page, { timeoutMs });
-          optionsBottomSurface = await captureSurface({
-            page,
-            outputDir,
-            expectedLabels: ['Controls'],
-            id: '02-options-bottom',
-            mode: 'menu',
-            overlay: 'options',
-            route,
-            skipWait: true,
-            timeoutMs,
-            viewport
-          });
+          const optionsScrollResult = await scrollOverlayToBottom(page, { timeoutMs });
+          optionsBottomSurface = optionsScrollResult.visual?.overlayUi?.scroll?.enabled === true
+            ? await captureSurface({
+              page,
+              outputDir,
+              expectedLabels: ['Controls'],
+              id: '02-options-bottom',
+              mode: 'menu',
+              overlay: 'options',
+              route,
+              skipWait: true,
+              timeoutMs,
+              viewport
+            })
+            : { ...captured, diagnostics: optionsScrollResult };
         }
         await page.keyboard.press('Escape');
         await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs });
@@ -1565,6 +1664,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         markerStyle: menu.diagnostics.visual?.markerStyle,
         progressionBadge: menu.diagnostics.visual?.progressionBadge,
         title: menu.diagnostics.visual?.title,
+        buttons: menu.diagnostics.visual?.buttons,
         nativeInputs: menu.nativeInputs,
         textLabels: menu.diagnostics.visual?.textLabels,
         screenContract: menu.screenContract,
@@ -1602,6 +1702,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         progressionBadge: optionsSurface.diagnostics.visual?.progressionBadge,
         title: optionsSurface.diagnostics.visual?.title,
         overlayUi: optionsSurface.diagnostics.visual?.overlayUi,
+        buttons: optionsSurface.diagnostics.visual?.buttons,
         nativeInputs: optionsSurface.nativeInputs,
         textLabels: optionsSurface.diagnostics.visual?.textLabels,
         screenContract: optionsSurface.screenContract
@@ -1616,6 +1717,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         mode: optionsBottomSurface.diagnostics.visual?.runtime?.mode ?? optionsBottomSurface.diagnostics.runtime?.surface?.mode,
         overlay: optionsBottomSurface.diagnostics.visual?.runtime?.overlay ?? optionsBottomSurface.diagnostics.runtime?.surface?.overlay,
         overlayUi: optionsBottomSurface.diagnostics.visual?.overlayUi,
+        buttons: optionsBottomSurface.diagnostics.visual?.buttons,
         nativeInputs: optionsBottomSurface.nativeInputs,
         textLabels: optionsBottomSurface.diagnostics.visual?.textLabels,
         screenContract: optionsBottomSurface.screenContract
@@ -1631,6 +1733,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         nativeInputs: play.nativeInputs,
         textLabels: play.diagnostics.visual?.textLabels,
         touchControls: play.diagnostics.visual?.touchControls,
+        buttons: play.diagnostics.visual?.buttons,
         screenContract: play.screenContract
       },
       pause: {
@@ -1641,6 +1744,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         progressionBadge: pause.diagnostics.visual?.progressionBadge,
         title: pause.diagnostics.visual?.title,
         overlayUi: pause.diagnostics.visual?.overlayUi,
+        buttons: pause.diagnostics.visual?.buttons,
         nativeInputs: pause.nativeInputs,
         textLabels: pause.diagnostics.visual?.textLabels,
         screenContract: pause.screenContract
@@ -1649,6 +1753,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         mode: pauseBottomSurface.diagnostics.visual?.runtime?.mode ?? pauseBottomSurface.diagnostics.runtime?.surface?.mode,
         overlay: pauseBottomSurface.diagnostics.visual?.runtime?.overlay ?? pauseBottomSurface.diagnostics.runtime?.surface?.overlay,
         overlayUi: pauseBottomSurface.diagnostics.visual?.overlayUi,
+        buttons: pauseBottomSurface.diagnostics.visual?.buttons,
         nativeInputs: pauseBottomSurface.nativeInputs,
         textLabels: pauseBottomSurface.diagnostics.visual?.textLabels,
         screenContract: pauseBottomSurface.screenContract

@@ -8,8 +8,8 @@ import {
 
 describe('legacy UI standards', () => {
   test('lifts legacy glyph labels to optical center without changing horizontal geometry', () => {
-    expect(resolveLegacyUiLabelCenterY(100, 40, 'button')).toBe(97);
-    expect(resolveLegacyUiLabelCenterY(100, 20, 'toggle-title')).toBe(99);
+    expect(resolveLegacyUiLabelCenterY(100, 40, 'button')).toBe(93);
+    expect(resolveLegacyUiLabelCenterY(100, 20, 'toggle-title')).toBe(98);
   });
 
   test('keeps compact guide copy smaller and clears the title rule', () => {
@@ -19,7 +19,8 @@ describe('legacy UI standards', () => {
     expect(compact.rowFontSize).toBe(12);
     expect(compact.rowMinFontSize).toBe(9);
     expect(compact.titleRuleOffset).toBeGreaterThan(compact.titleOffset + (compact.titleFontSize / 2));
-    expect(wide.rowFontSize).toBe(14);
+    expect(wide.rowFontSize).toBe(13);
+    expect(wide.rowHeight).toBe(27);
   });
 
   test('reserves the compact toggle switch lane before showing state copy', () => {

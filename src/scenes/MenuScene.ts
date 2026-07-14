@@ -465,6 +465,7 @@ interface MenuSceneVisualDiagnostics {
   };
   buttons: Array<{
     bounds: VisualRect;
+    labelBounds: VisualRect | null;
     text: string;
   }>;
   title: {
@@ -553,6 +554,7 @@ interface MenuSceneVisualDiagnostics {
   };
   overlayUi: {
     backChevron: VisualRect | null;
+    guidePanel: VisualRect | null;
     latestAuthMessage: LegacyPlayerMessage | null;
     latestMessage: LegacyPlayerMessage | null;
     panel: VisualRect | null;
@@ -1073,6 +1075,7 @@ export class MenuScene extends Phaser.Scene {
   private uiTexts: Phaser.GameObjects.Text[] = [];
   private uiButtons: UiButton[] = [];
   private overlayBackChevronBounds: VisualRect | null = null;
+  private overlayGuideBounds: VisualRect | null = null;
   private overlayScrollOffset = 0;
   private overlayScrollMax = 0;
   private overlayScrollContentHeight = 0;
@@ -7355,6 +7358,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGraphics.clear();
     this.clearUi();
     this.overlayBackChevronBounds = null;
+    this.overlayGuideBounds = null;
     this.overlayScrollViewportBounds = null;
     this.overlayScrollTrackBounds = null;
     this.overlayScrollThumbBounds = null;
@@ -7669,6 +7673,7 @@ export class MenuScene extends Phaser.Scene {
     const detailLeft = cardLeft + inset;
     const detailWidth = cardWidth - (inset * 2);
     const detailRight = detailLeft + detailWidth;
+    this.overlayGuideBounds = createVisualRect(cardLeft, cardTop, cardWidth, cardHeight);
 
     this.drawLegacyCyberPanel(this.overlayGraphics, {
       active: true,
@@ -7743,19 +7748,12 @@ export class MenuScene extends Phaser.Scene {
     drawLegendRow(1, 'start', 'Start', 'run begins', '#fff05a');
     drawLegendRow(2, 'end', 'End', 'clear here', '#ff5264');
     const bulletTop = legendTop + (3 * rowHeight) + (compact ? 18 : 12);
-    const bullets = compact
-      ? [
-        'Player: green beacon + trail.',
-        `${this.mode === 'play' ? 'Rank' : 'AI Rank'}: progression tier.`,
-        'Score: run quality.',
-        'Maze Lvl: challenge.'
-      ]
-      : [
-        'Player: green beacon; the trail marks your route.',
-        `${this.mode === 'play' ? 'Rank' : 'AI Rank'} is the public progression tier.`,
-        'Score grades run quality; Runs count completed mazes.',
-        'Maze Lvl sets the current procedural challenge tier.'
-      ];
+    const bullets = [
+      'Player: green beacon + trail.',
+      `${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public progression tier.`,
+      'Score: run quality; Runs: clears.',
+      'Maze Lvl: challenge tier.'
+    ];
     bullets.forEach((copy, index) => {
       addText(`• ${copy}`, detailLeft, bulletTop + (index * rowHeight), detailWidth, '#d9fff5', guideRowFontSize, 0, 0.92, guideRowMinFontSize);
     });
@@ -8282,7 +8280,7 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
         description: this.settings.toggleTrailPulse
-          ? 'On: white shine moves along the trail.'
+          ? 'On: white shine travels.'
           : 'Off: no trail shine.',
         label: 'Trail Shine',
         offLabel: 'Off',
@@ -10439,6 +10437,9 @@ export class MenuScene extends Phaser.Scene {
             button.background.width,
             button.background.height
           ),
+          labelBounds: button.label.active && button.label.visible
+            ? visualRectFromBounds(button.label.getBounds())
+            : null,
           text: button.text
         })),
       title: this.resolveLegacyMenuPathTitleDiagnostics(),
@@ -10463,6 +10464,7 @@ export class MenuScene extends Phaser.Scene {
       touchControls,
       overlayUi: {
         backChevron: cloneVisualRect(this.overlayBackChevronBounds),
+        guidePanel: cloneVisualRect(this.overlayGuideBounds),
         latestAuthMessage: this.latestAuthMessage,
         latestMessage: this.latestOverlayMessage,
         visibleMessages: this.resolveVisibleLegacyPlayerMessages(),

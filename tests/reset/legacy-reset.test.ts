@@ -895,7 +895,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("label: 'Camera Follow'");
     expect(menuSceneSource).toContain("label: 'Trail Fade'");
     expect(menuSceneSource).toContain("label: 'Trail Shine'");
-    expect(menuSceneSource).toContain("? 'On: white shine moves along the trail.'");
+    expect(menuSceneSource).toContain("? 'On: white shine travels.'");
     expect(menuSceneSource).toContain("label: 'Animated BG'");
     expect(menuSceneSource).toContain("label: 'Dark Mode'");
     expect(menuSceneSource).toContain("label: 'Controls'");
@@ -915,7 +915,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings)");
     expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
-    expect(menuSceneSource).toContain('const showStateLabel = input.width >= 320;');
+    expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
     expect(menuSceneSource).toContain('controls.length * (rowHeight + rowGap)');
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleCameraFollow')");

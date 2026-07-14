@@ -3,9 +3,9 @@ export const LEGACY_UI_COMPACT_BREAKPOINT = 420;
 export type LegacyUiLabelRole = 'button' | 'overlay-title' | 'toggle-title';
 
 const LABEL_LIFT_RATIOS: Record<LegacyUiLabelRole, number> = {
-  button: 0.08,
-  'overlay-title': 0.04,
-  'toggle-title': 0.03
+  button: 0.18,
+  'overlay-title': 0.08,
+  'toggle-title': 0.08
 };
 
 export const resolveLegacyUiLabelCenterY = (
@@ -41,10 +41,10 @@ export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptio
     cardWidthLimit: compact ? 350 : 540,
     horizontalMargin: compact ? 48 : 72,
     inset: compact ? 14 : 18,
-    legendTopOffset: compact ? 50 : 60,
-    rowHeight: compact ? 27 : 31,
-    rowFontSize: compact ? 12 : 14,
-    rowMinFontSize: compact ? 9 : 11,
+    legendTopOffset: compact ? 50 : 56,
+    rowHeight: 27,
+    rowFontSize: compact ? 12 : 13,
+    rowMinFontSize: compact ? 9 : 10,
     titleFontSize,
     titleOffset,
     titleRuleOffset: titleOffset + Math.ceil(titleFontSize * 0.72) + (compact ? 7 : 8)

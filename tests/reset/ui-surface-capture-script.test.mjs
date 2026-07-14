@@ -114,8 +114,12 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'mobile-control-spacing'");
     expect(source).toContain("createCheck(\n      'mobile-badge-text-fit'");
     expect(source).toContain('const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {');
+    expect(source).toContain('const collectButtonLabelContainmentIssues = (surfaceId, surface) =>');
+    expect(source).toContain('const collectGuideTextContainmentIssues = (surfaceId, surface) => {');
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-affordance'");
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-reachability'");
+    expect(source).toContain("createCheck(\n      'button-label-containment'");
+    expect(source).toContain("createCheck(\n      'guide-text-containment'");
     expect(source).toContain('const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
     expect(source).toContain('const desktopViewport = (before.visual?.viewport?.width ?? 0) >= 720;');
     expect(source).toContain('const wheelDelta = Math.max(scroll.maxOffset * 4, dragDistance);');
