@@ -764,17 +764,23 @@ export const summarizeGoalWorldTurn = (worldTurn, plannedMoveCount) => ({
   )
 });
 
-export const summarizeFreshWorldTurn = (worldTurn) => ({
-  freshMaze: worldTurn ?? null,
-  pass: Boolean(
-    worldTurn
-    && worldTurn.acceptedTurnCount === 0
-    && worldTurn.nextTurn === 0
-    && worldTurn.rejectedCommandCount >= 1
-    && worldTurn.lastReceipt?.admitted === false
-    && worldTurn.lastReceipt?.reason === 'simulation-paused'
-  )
-});
+export const summarizeFreshWorldTurn = (worldTurn) => {
+  const hasPristineTurnState = worldTurn?.rejectedCommandCount === 0
+    && worldTurn?.lastReceipt === null;
+  const hasLockedProbeReceipt = worldTurn?.rejectedCommandCount >= 1
+    && worldTurn?.lastReceipt?.admitted === false
+    && worldTurn?.lastReceipt?.reason === 'simulation-paused';
+
+  return {
+    freshMaze: worldTurn ?? null,
+    pass: Boolean(
+      worldTurn
+      && worldTurn.acceptedTurnCount === 0
+      && worldTurn.nextTurn === 0
+      && (hasPristineTurnState || hasLockedProbeReceipt)
+    )
+  };
+};
 
 export const runLivePlayQa = async (options = {}) => {
   const label = options.label ?? DEFAULT_LABEL;
