@@ -1022,6 +1022,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const sameControlIndex = this.playHeldTouchMoves.findIndex((move) => move.control === control);');
     expect(menuSceneSource).toContain('if (this.playHeldTouchMoves.length >= LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT) {');
     expect(menuSceneSource).toContain('private resolveLegacyPlayHeldTouchDelay(kind:');
+    expect(menuSceneSource).toContain('private resolveLegacyPlayMovementSpeedProfile()');
+    expect(menuSceneSource).toContain('completedCycles: playerTrack.completedCycles');
+    expect(menuSceneSource).toContain('effectiveMovementSpeed: movementSpeedProfile.effectiveSpeed');
+    expect(menuSceneSource).toContain('formulaVersion: movementSpeedProfile.formulaVersion');
     expect(menuSceneSource).toContain("this.resolveLegacyPlayHeldTouchDelay(hadActiveMove ? 'turn' : 'initial')");
     expect(menuSceneSource).toContain("this.resolveLegacyPlayHeldTouchDelay('repeat')");
     expect(menuSceneSource).toContain('repeatInitialDelayMs: movementSpeedProfile.initialDelayMs');

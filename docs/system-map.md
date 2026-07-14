@@ -259,6 +259,13 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - hard stops at dead ends, genuine branch ambiguity, mismatched queued turns, and the assistance limit
   - bounded diagnostics without solver-route exposure
 
+- `src/legacy-runtime/legacyMovementSpeed.ts`
+  - persisted Move Speed as the player-owned base preference
+  - versioned `legacy-movement-pace-v1` effective timing formula
+  - neutral no-history behavior and bounded completed-cycle level/pace adjustment
+  - shared initial, repeat, and turn delays for keyboard, touch arrows, and stick
+  - explicit `0%` / `100%` endpoint preservation and bounded diagnostics
+
 - `src/legacy-runtime/legacyMenuDemoLifecycle.ts`
   - menu demo bootstrap and preroll
   - menu demo trail/player projection

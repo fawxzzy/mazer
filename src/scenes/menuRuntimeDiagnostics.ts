@@ -227,9 +227,16 @@ export interface MenuSceneRuntimeDiagnostics {
       pointerStartActive: boolean;
       touchSprint: {
         activeControls: string[];
+        baseMovementSpeed: number;
+        effectiveMovementSpeed: number;
+        formulaVersion: string;
         heldControl: string | null;
         movementSpeed: number;
         movementSpeedLabel: string;
+        progressionCompletedCycles: number;
+        progressionContextApplied: boolean;
+        progressionLevel: number;
+        progressionPaceScore: number;
         repeatInitialDelayMs: number;
         repeatIntervalMs: number;
         stickInitialDelayMaxMs: number;

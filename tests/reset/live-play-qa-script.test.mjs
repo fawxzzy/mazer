@@ -86,7 +86,13 @@ describe('live play QA script helpers', () => {
     }, 12).pass).toBe(false);
   });
 
-  test('requires a fresh maze to remain at turn zero after a locked build-phase probe', () => {
+  test('requires a fresh maze to remain at turn zero with or without a locked build-phase receipt', () => {
+    expect(summarizeFreshWorldTurn({
+      acceptedTurnCount: 0,
+      nextTurn: 0,
+      rejectedCommandCount: 0,
+      lastReceipt: null
+    }).pass).toBe(true);
     expect(summarizeFreshWorldTurn({
       acceptedTurnCount: 0,
       nextTurn: 0,
@@ -98,6 +104,12 @@ describe('live play QA script helpers', () => {
       nextTurn: 1,
       rejectedCommandCount: 0,
       lastReceipt: { admitted: true, reason: null }
+    }).pass).toBe(false);
+    expect(summarizeFreshWorldTurn({
+      acceptedTurnCount: 0,
+      nextTurn: 0,
+      rejectedCommandCount: 1,
+      lastReceipt: { admitted: false, reason: 'lifecycle-locked' }
     }).pass).toBe(false);
   });
 

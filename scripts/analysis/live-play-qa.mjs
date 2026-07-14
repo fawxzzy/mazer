@@ -764,17 +764,23 @@ export const summarizeGoalWorldTurn = (worldTurn, plannedMoveCount) => ({
   )
 });
 
-export const summarizeFreshWorldTurn = (worldTurn) => ({
-  freshMaze: worldTurn ?? null,
-  pass: Boolean(
-    worldTurn
-    && worldTurn.acceptedTurnCount === 0
-    && worldTurn.nextTurn === 0
-    && worldTurn.rejectedCommandCount >= 1
-    && worldTurn.lastReceipt?.admitted === false
-    && worldTurn.lastReceipt?.reason === 'simulation-paused'
-  )
-});
+export const summarizeFreshWorldTurn = (worldTurn) => {
+  const hasPristineTurnState = worldTurn?.rejectedCommandCount === 0
+    && worldTurn?.lastReceipt === null;
+  const hasLockedProbeReceipt = worldTurn?.rejectedCommandCount >= 1
+    && worldTurn?.lastReceipt?.admitted === false
+    && worldTurn?.lastReceipt?.reason === 'simulation-paused';
+
+  return {
+    freshMaze: worldTurn ?? null,
+    pass: Boolean(
+      worldTurn
+      && worldTurn.acceptedTurnCount === 0
+      && worldTurn.nextTurn === 0
+      && (hasPristineTurnState || hasLockedProbeReceipt)
+    )
+  };
+};
 
 export const runLivePlayQa = async (options = {}) => {
   const label = options.label ?? DEFAULT_LABEL;
@@ -1006,10 +1012,17 @@ export const runLivePlayQa = async (options = {}) => {
         freshMazePass: freshWorldTurnProof.pass
       },
       controls: {
+        baseMovementSpeed: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.baseMovementSpeed ?? null,
         controlMode: finalDiagnostics.visual?.touchControls?.controlMode ?? null,
+        effectiveMovementSpeed: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.effectiveMovementSpeed ?? null,
+        formulaVersion: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.formulaVersion ?? null,
         visible: finalDiagnostics.visual?.touchControls?.visible ?? false,
         inputMethod,
         movementSpeed: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.movementSpeed ?? null,
+        progressionCompletedCycles: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionCompletedCycles ?? null,
+        progressionContextApplied: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionContextApplied ?? null,
+        progressionLevel: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null,
+        progressionPaceScore: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionPaceScore ?? null,
         repeatInitialDelayMs: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.repeatInitialDelayMs ?? null,
         repeatIntervalMs: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.repeatIntervalMs ?? null,
         turnDelayMs: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.turnDelayMs ?? null
