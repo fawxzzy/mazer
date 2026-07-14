@@ -1348,21 +1348,31 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('return Math.round(this.layout.lanes.rank.top + (height / 2));');
   });
 
+  test('consumes shared UI standards for buttons, titles, guides, and toggles', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain("from '../legacy-runtime/legacyUiStandards';");
+    expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, buttonFontSize, 'button')");
+    expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title')");
+    expect(menuSceneSource).toContain('resolveLegacyToggleRowLayout(input.width, input.height, hasDescription)');
+  });
+
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const cardHeight = compact ? 250 : 260;');
+    expect(menuSceneSource).toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width);');
     expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);');
-    expect(menuSceneSource).toContain('const guideTitleFontSize = compact ? 18 : 21;');
-    expect(menuSceneSource).toContain('const guideRowFontSize = compact ? 13 : 15;');
-    expect(menuSceneSource).toContain('const guideRowMinFontSize = compact ? 11 : 13;');
+    expect(menuSceneSource).toContain('const guideTitleFontSize = guideLayout.titleFontSize;');
+    expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
+    expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
+    expect(menuSceneSource).toContain('this.overlayGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);');
     expect(menuSceneSource).toContain("addText('PLAYER GUIDE', panel.centerX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);");
     expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');");
     expect(menuSceneSource).toContain("'Player: green beacon + trail.'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
-    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public progression tier.`");
-    expect(menuSceneSource).toContain("'Score grades run quality.'");
-    expect(menuSceneSource).toContain("'Maze Lvl sets challenge.'");
+    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'}: progression tier.`");
+    expect(menuSceneSource).toContain("'Score: run quality.'");
+    expect(menuSceneSource).toContain("'Maze Lvl: challenge.'");
   });
 
   test('exposes wrapped edge player snaps in runtime diagnostics', () => {
