@@ -289,6 +289,15 @@ import {
   type TouchStickPullVector
 } from '../input-human/touch';
 import { applyTextResolution, resolveHudTextResolution } from '../render/textCrispness';
+import {
+  CYBER_ARCADE_ICON_TARGET,
+  CYBER_ARCADE_MATERIAL_VERSION,
+  cyberArcadeMaterial,
+  snapCyberArcadeRect,
+  snapCyberArcadeStrokeCoordinate,
+  summarizeCyberArcadeMaterial,
+  toCyberArcadeCssHex
+} from '../render/cyberArcadeMaterial';
 
 type RuntimeMode = LegacyRuntimeMode;
 type OverlayKind = LegacyOverlayKind;
@@ -391,6 +400,17 @@ interface LegacyIridescentMaterialDiagnostics {
 }
 
 interface MenuSceneVisualDiagnostics {
+  materialSystem: {
+    version: typeof CYBER_ARCADE_MATERIAL_VERSION;
+    iconTarget: typeof CYBER_ARCADE_ICON_TARGET;
+    surfaceRoles: string[];
+    geometry: {
+      fillAlignment: string;
+      strokeAlignment: string;
+      backingScale: string;
+      sharedPanelBounds: 'snapped-at-draw-boundary';
+    };
+  };
   board: {
     bounds: VisualRect;
     renderBounds: VisualRect;
@@ -832,14 +852,14 @@ const BOARD_SHADOW_OFFSET = 0;
 const MENU_BUTTON_ALPHA = 0.34;
 const LEGACY_UI_FONT_FAMILY = '"Trebuchet MS", "Segoe UI", sans-serif';
 const LEGACY_UI_MONO_FONT_FAMILY = 'Consolas, "Lucida Console", monospace';
-const MENU_TEXT_COLOR = '#ecfff5';
-const LEGACY_MENU_ACTION_GREEN = '#36ff7d';
-const LEGACY_MENU_PATH_TITLE_SHADOW = 0x02070d;
-const LEGACY_MENU_PATH_TITLE_ACCENT = 0x36ff7d;
-const LEGACY_MENU_PATH_TITLE_PRISM = 0xb7f2ff;
-const LEGACY_MENU_PATH_TITLE_RUNE = 0xfff05a;
-const LEGACY_MENU_PATH_TITLE_GEM = 0x8fffe8;
-const LEGACY_MENU_PATH_TITLE_FACET_WARM = 0xffd36a;
+const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
+const LEGACY_MENU_ACTION_GREEN = toCyberArcadeCssHex(cyberArcadeMaterial.signal.player);
+const LEGACY_MENU_PATH_TITLE_SHADOW = cyberArcadeMaterial.substrate.shadow;
+const LEGACY_MENU_PATH_TITLE_ACCENT = cyberArcadeMaterial.signal.player;
+const LEGACY_MENU_PATH_TITLE_PRISM = cyberArcadeMaterial.rail.cyan;
+const LEGACY_MENU_PATH_TITLE_RUNE = cyberArcadeMaterial.signal.start;
+const LEGACY_MENU_PATH_TITLE_GEM = cyberArcadeMaterial.signal.playerAccent;
+const LEGACY_MENU_PATH_TITLE_FACET_WARM = cyberArcadeMaterial.signal.warning;
 const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;
 const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;
 const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
@@ -851,30 +871,30 @@ const LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA = 0.92;
 const LEGACY_BOARD_GRID_ALPHA = 0;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
-const LEGACY_MENU_SLAB_FILL = 0x101824;
+const LEGACY_MENU_SLAB_FILL = cyberArcadeMaterial.substrate.fieldRaised;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;
-const LEGACY_MENU_PATH_CORE = 0xe7fff4;
-const LEGACY_MENU_PATH_EDGE = 0x0d3c4f;
+const LEGACY_MENU_PATH_CORE = cyberArcadeMaterial.path.core;
+const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;
 const LEGACY_MENU_PATH_EDGE_ALPHA = 0.58;
-const LEGACY_MENU_WALL_FILL = 0x07111d;
+const LEGACY_MENU_WALL_FILL = cyberArcadeMaterial.substrate.field;
 const LEGACY_MENU_WALL_GLASS_ALPHA = 0.18;
 const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.1;
-const LEGACY_PLAY_PATH_CORE = 0xe7fff4;
-const LEGACY_PLAY_PATH_EDGE = 0x0d3c4f;
+const LEGACY_PLAY_PATH_CORE = cyberArcadeMaterial.path.core;
+const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;
 const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
-const LEGACY_PLAY_WALL_FILL = 0x07111d;
+const LEGACY_PLAY_WALL_FILL = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;
 const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.1;
-const LEGACY_PLAY_BOARD_FILL = 0x08111d;
+const LEGACY_PLAY_BOARD_FILL = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_BOARD_EDGE = 0x031022;
-const LEGACY_PATH_TILE_CUE_COLOR = 0x0d3c4f;
+const LEGACY_PATH_TILE_CUE_COLOR = cyberArcadeMaterial.path.edge;
 const LEGACY_PATH_TILE_CUE_ALPHA = 0.42;
 const LEGACY_PATH_CONNECTOR_SEAM_PAD_RATIO = 0.16;
 const LEGACY_PATH_CONNECTOR_SEAM_EDGE_ALPHA_RATIO = 0.72;
 const LEGACY_PATH_CONNECTOR_SEAM_CORE_ALPHA_RATIO = 0.94;
-const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = 0x72e0bf;
-const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = 0xb7f2ff;
-const LEGACY_BOARD_SIGIL_BORDER_SHADOW = 0x02070d;
+const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = cyberArcadeMaterial.rail.mint;
+const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = cyberArcadeMaterial.rail.cyan;
+const LEGACY_BOARD_SIGIL_BORDER_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_BOARD_SIGIL_BORDER_ALPHA = 0.82;
 const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;
 const LEGACY_BOARD_SIGIL_CORNER_FACET_BASE = 0x10293a;
@@ -889,20 +909,20 @@ const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 33;
 const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;
-const LEGACY_PLAY_HUD_TIMER_PANE = 0x07131d;
-const LEGACY_PLAY_HUD_TIMER_TEXT = '#ecfff5';
-const LEGACY_PLAY_HUD_ARROW = 0xff263f;
-const LEGACY_PLAY_HUD_ARROW_TAIL = 0xecfff5;
+const LEGACY_PLAY_HUD_TIMER_PANE = cyberArcadeMaterial.substrate.panel;
+const LEGACY_PLAY_HUD_TIMER_TEXT = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
+const LEGACY_PLAY_HUD_ARROW = cyberArcadeMaterial.signal.goal;
+const LEGACY_PLAY_HUD_ARROW_TAIL = cyberArcadeMaterial.rail.white;
 const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;
-const LEGACY_PLAY_TOUCH_FRAME_FILL = 0x06121c;
-const LEGACY_PLAY_TOUCH_BUTTON_FILL = 0x0c2633;
-const LEGACY_PLAY_TOUCH_BUTTON_STROKE = 0xb7f2ff;
-const LEGACY_PLAY_TOUCH_ICON = 0xecfff5;
-const LEGACY_PLAY_TOUCH_ACCENT = 0x72e0bf;
-const LEGACY_CYBER_PANEL_FILL = 0x07131d;
-const LEGACY_CYBER_PANEL_STROKE = 0x72e0bf;
-const LEGACY_CYBER_PANEL_STROKE_ALT = 0xb7f2ff;
-const LEGACY_CYBER_PANEL_SHADOW = 0x02070d;
+const LEGACY_PLAY_TOUCH_FRAME_FILL = cyberArcadeMaterial.substrate.field;
+const LEGACY_PLAY_TOUCH_BUTTON_FILL = cyberArcadeMaterial.substrate.panelRaised;
+const LEGACY_PLAY_TOUCH_BUTTON_STROKE = cyberArcadeMaterial.rail.cyan;
+const LEGACY_PLAY_TOUCH_ICON = cyberArcadeMaterial.rail.white;
+const LEGACY_PLAY_TOUCH_ACCENT = cyberArcadeMaterial.rail.mint;
+const LEGACY_CYBER_PANEL_FILL = cyberArcadeMaterial.substrate.panel;
+const LEGACY_CYBER_PANEL_STROKE = cyberArcadeMaterial.rail.mint;
+const LEGACY_CYBER_PANEL_STROKE_ALT = cyberArcadeMaterial.rail.cyan;
+const LEGACY_CYBER_PANEL_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_OVERLAY_SCROLL_WHEEL_STEP = 42;
 const LEGACY_OVERLAY_SCROLL_DRAG_START_PX = 3;
 const LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER = 20;
@@ -924,19 +944,19 @@ const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
 const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.46;
 const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.72;
-const LEGACY_PLAY_PLAYER_BEACON_COLOR = 0x36ff7d;
-const LEGACY_PLAY_PLAYER_BEACON_ACCENT = 0xb6ffd0;
+const LEGACY_PLAY_PLAYER_BEACON_COLOR = cyberArcadeMaterial.signal.player;
+const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent;
 const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;
 const LEGACY_MENU_AI_BEACON_ALPHA_RATIO = 0.74;
 const LEGACY_MENU_AI_BEACON_RADIUS_RATIO = 0.16;
-const LEGACY_PLAY_START_MARKER_CORE = 0xfff05a;
-const LEGACY_PLAY_START_MARKER_EDGE = 0xffc629;
-const LEGACY_PLAY_GOAL_MARKER_CORE = 0xff263f;
-const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xd81b2a;
-const LEGACY_MENU_AI_MEMORY_OPTION_CORE = 0x2de8ff;
-const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = 0x72e0bf;
-const LEGACY_MENU_AI_MEMORY_TARGET_CORE = 0xffd36a;
-const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = 0xff7a3d;
+const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;
+const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;
+const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;
+const LEGACY_PLAY_GOAL_MARKER_EDGE = cyberArcadeMaterial.signal.goalEdge;
+const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
+const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
+const LEGACY_MENU_AI_MEMORY_TARGET_CORE = cyberArcadeMaterial.signal.warning;
+const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = cyberArcadeMaterial.signal.warningEdge;
 const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;
 const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;
 const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;
@@ -6829,45 +6849,61 @@ export class MenuScene extends Phaser.Scene {
       height: number;
       left: number;
       radius?: number;
+      stroke?: number;
+      strokeAlt?: number;
       top: number;
       width: number;
     }
   ): void {
     const alpha = rect.alpha ?? 0.48;
-    const radius = this.resolveLegacyRoundedRectRadius(rect.width, rect.height, rect.radius ?? 10);
+    const panelRect = snapCyberArcadeRect(rect);
+    const { height, left, top, width } = panelRect;
+    const radius = this.resolveLegacyRoundedRectRadius(width, height, rect.radius ?? 10);
     const active = rect.active ?? false;
-    const corner = Math.max(7, Math.min(16, Math.round(Math.min(rect.width, rect.height) * 0.28)));
+    const corner = Math.max(7, Math.min(16, Math.round(Math.min(width, height) * 0.28)));
     const inset = 4;
 
     graphics.fillStyle(LEGACY_CYBER_PANEL_SHADOW, Math.min(0.42, alpha * 0.42));
-    graphics.fillRoundedRect(rect.left + 2, rect.top + 3, rect.width, rect.height, radius);
+    graphics.fillRoundedRect(left + 2, top + 3, width, height, radius);
     graphics.fillStyle(rect.fill ?? LEGACY_CYBER_PANEL_FILL, alpha);
-    graphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
-    graphics.lineStyle(active ? 2 : 1, LEGACY_CYBER_PANEL_STROKE, active ? 0.86 : 0.5);
-    graphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
-    graphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, active ? 0.34 : 0.2);
+    graphics.fillRoundedRect(left, top, width, height, radius);
+    const stroke = rect.stroke ?? LEGACY_CYBER_PANEL_STROKE;
+    const strokeAlt = rect.strokeAlt ?? LEGACY_CYBER_PANEL_STROKE_ALT;
+    const outerStrokeWidth = active ? 2 : 1;
+    const outerStrokeInset = outerStrokeWidth % 2 === 1 ? 0.5 : 0;
+    graphics.lineStyle(outerStrokeWidth, stroke, active ? 0.86 : 0.5);
     graphics.strokeRoundedRect(
-      rect.left + inset,
-      rect.top + inset,
-      Math.max(1, rect.width - (inset * 2)),
-      Math.max(1, rect.height - (inset * 2)),
+      left + outerStrokeInset,
+      top + outerStrokeInset,
+      Math.max(1, width - (outerStrokeInset * 2)),
+      Math.max(1, height - (outerStrokeInset * 2)),
+      Math.max(1, radius - outerStrokeInset)
+    );
+    graphics.lineStyle(1, strokeAlt, active ? 0.34 : 0.2);
+    graphics.strokeRoundedRect(
+      snapCyberArcadeStrokeCoordinate(left + inset),
+      snapCyberArcadeStrokeCoordinate(top + inset),
+      Math.max(1, width - (inset * 2) - 1),
+      Math.max(1, height - (inset * 2) - 1),
       Math.max(2, radius - 4)
     );
 
-    graphics.lineStyle(active ? 2 : 1, active ? LEGACY_CYBER_PANEL_STROKE_ALT : LEGACY_CYBER_PANEL_STROKE, active ? 0.9 : 0.62);
+    const cornerStrokeWidth = active ? 2 : 1;
+    const cornerStrokeOffset = cornerStrokeWidth % 2 === 1 ? 0.5 : 0;
+    graphics.lineStyle(cornerStrokeWidth, active ? strokeAlt : stroke, active ? 0.9 : 0.62);
     graphics.beginPath();
-    graphics.moveTo(rect.left + inset, rect.top + corner);
-    graphics.lineTo(rect.left + inset, rect.top + inset);
-    graphics.lineTo(rect.left + corner, rect.top + inset);
-    graphics.moveTo(rect.left + rect.width - corner, rect.top + inset);
-    graphics.lineTo(rect.left + rect.width - inset, rect.top + inset);
-    graphics.lineTo(rect.left + rect.width - inset, rect.top + corner);
-    graphics.moveTo(rect.left + inset, rect.top + rect.height - corner);
-    graphics.lineTo(rect.left + inset, rect.top + rect.height - inset);
-    graphics.lineTo(rect.left + corner, rect.top + rect.height - inset);
-    graphics.moveTo(rect.left + rect.width - corner, rect.top + rect.height - inset);
-    graphics.lineTo(rect.left + rect.width - inset, rect.top + rect.height - inset);
-    graphics.lineTo(rect.left + rect.width - inset, rect.top + rect.height - corner);
+    graphics.moveTo(left + inset + cornerStrokeOffset, top + corner + cornerStrokeOffset);
+    graphics.lineTo(left + inset + cornerStrokeOffset, top + inset + cornerStrokeOffset);
+    graphics.lineTo(left + corner + cornerStrokeOffset, top + inset + cornerStrokeOffset);
+    graphics.moveTo(left + width - corner - cornerStrokeOffset, top + inset + cornerStrokeOffset);
+    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + inset + cornerStrokeOffset);
+    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + corner + cornerStrokeOffset);
+    graphics.moveTo(left + inset + cornerStrokeOffset, top + height - corner - cornerStrokeOffset);
+    graphics.lineTo(left + inset + cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
+    graphics.lineTo(left + corner + cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
+    graphics.moveTo(left + width - corner - cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
+    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
+    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + height - corner - cornerStrokeOffset);
     graphics.strokePath();
   }
 
@@ -7305,7 +7341,7 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyCyberPanel(this.hudGraphics, {
       active: active || accented,
       alpha: active ? 0.7 : (accented ? 0.56 : 0.44),
-      fill: active ? 0x123a2d : LEGACY_PLAY_TOUCH_BUTTON_FILL,
+      fill: active ? cyberArcadeMaterial.substrate.panelActive : LEGACY_PLAY_TOUCH_BUTTON_FILL,
       height: rect.height,
       left: rect.left,
       radius: accented ? 8 : 10,
@@ -9250,7 +9286,7 @@ export class MenuScene extends Phaser.Scene {
       this.drawLegacyCyberPanel(chrome, {
         active,
         alpha: active ? 0.76 : 0.56,
-        fill: active ? 0x123a2d : LEGACY_CYBER_PANEL_FILL,
+        fill: active ? cyberArcadeMaterial.substrate.panelActive : LEGACY_CYBER_PANEL_FILL,
         height: size,
         left: x - (size / 2),
         radius: 999,
@@ -9326,10 +9362,16 @@ export class MenuScene extends Phaser.Scene {
         alpha: active
           ? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)
           : baseAlpha,
-        fill: active ? 0x123a2d : LEGACY_CYBER_PANEL_FILL,
+        fill: active
+          ? frontDoorChrome?.hoverFillColor ?? cyberArcadeMaterial.substrate.panelActive
+          : frontDoorChrome?.fillColor ?? LEGACY_CYBER_PANEL_FILL,
         height,
         left: x - (width / 2),
         radius: isMenuFrontDoor ? 8 : 10,
+        stroke: frontDoorChrome?.strokeColor,
+        strokeAlt: isPrimaryFrontDoorButton
+          ? cyberArcadeMaterial.rail.mint
+          : cyberArcadeMaterial.rail.mint,
         top: y - (height / 2),
         width
       });
@@ -10237,9 +10279,17 @@ export class MenuScene extends Phaser.Scene {
         ...(overlaps(mazeRenderBounds, touchControls.frame) ? ['board-touch-controls'] : [])
       ]
       : [];
+    const materialSystem = summarizeCyberArcadeMaterial();
 
     this.visualDiagnosticsRevision += 1;
     const diagnostics: MenuSceneVisualDiagnostics = {
+      materialSystem: {
+        ...materialSystem,
+        geometry: {
+          ...materialSystem.geometry,
+          sharedPanelBounds: 'snapped-at-draw-boundary'
+        }
+      },
       revision: this.visualDiagnosticsRevision,
       updatedAt: Math.max(0, Math.round(time)),
       viewport: {

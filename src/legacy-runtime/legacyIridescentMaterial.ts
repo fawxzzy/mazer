@@ -1,8 +1,10 @@
-export const LEGACY_IRIDESCENT_PATH_CORE_CONTRAST_COLOR = 0xe7fff4;
+import { cyberArcadeMaterial } from '../render/cyberArcadeMaterial';
+
+export const LEGACY_IRIDESCENT_PATH_CORE_CONTRAST_COLOR = cyberArcadeMaterial.path.core;
 export const LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE = 145;
-export const LEGACY_IRIDESCENT_GREEN_ANCHOR = 0x36ff7d;
-export const LEGACY_TRAIL_SHINE_COLOR = 0xffffff;
-export const LEGACY_TRAIL_SHINE_EDGE_COLOR = 0xe8fff5;
+export const LEGACY_IRIDESCENT_GREEN_ANCHOR = cyberArcadeMaterial.signal.player;
+export const LEGACY_TRAIL_SHINE_COLOR = cyberArcadeMaterial.shine.core;
+export const LEGACY_TRAIL_SHINE_EDGE_COLOR = cyberArcadeMaterial.shine.edge;
 
 export const LEGACY_IRIDESCENT_MIDNIGHT_STOPS = [
   0x36ff7d,
@@ -56,7 +58,7 @@ export const measureLegacyIridescentColorDistance = (left: number, right: number
 
 export const resolveLegacyPathSafeIridescentColor = (
   color: number,
-  fallback = LEGACY_IRIDESCENT_GREEN_ANCHOR
+  fallback: number = LEGACY_IRIDESCENT_GREEN_ANCHOR
 ): number => {
   if (
     measureLegacyIridescentColorDistance(color, LEGACY_IRIDESCENT_PATH_CORE_CONTRAST_COLOR)
@@ -100,24 +102,24 @@ export const resolveLegacyIridescentTrailColor = (
   _index: number,
   _total: number,
   _timeMs: number,
-  _anchorColor = LEGACY_IRIDESCENT_GREEN_ANCHOR
+  _anchorColor: number = LEGACY_IRIDESCENT_GREEN_ANCHOR
 ): number => LEGACY_IRIDESCENT_GREEN_ANCHOR;
 
 export const resolveLegacyIridescentPulseColor = (
   _index: number,
   _total: number,
   _timeMs: number,
-  anchorColor = LEGACY_TRAIL_SHINE_COLOR
+  anchorColor: number = LEGACY_TRAIL_SHINE_COLOR
 ): number => anchorColor;
 
 export const resolveLegacyIridescentPlayerHaloColor = (
   _timeMs: number,
-  _anchorColor = 0x00b84a
-): number => 0x00b84a;
+  _anchorColor: number = cyberArcadeMaterial.signal.playerHalo
+): number => cyberArcadeMaterial.signal.playerHalo;
 
 export const resolveLegacyIridescentPlayerCoreColor = (): number => LEGACY_IRIDESCENT_GREEN_ANCHOR;
 
 export const resolveLegacyIridescentPlayerAccentColor = (
   _timeMs: number,
-  _anchorColor = LEGACY_IRIDESCENT_GREEN_ANCHOR
+  _anchorColor: number = LEGACY_IRIDESCENT_GREEN_ANCHOR
 ): number => LEGACY_IRIDESCENT_GREEN_ANCHOR;

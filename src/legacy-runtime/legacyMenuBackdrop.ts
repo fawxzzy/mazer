@@ -1,3 +1,5 @@
+import { cyberArcadeMaterial } from '../render/cyberArcadeMaterial';
+
 export interface LegacyMenuBackdropStar {
   alpha: number;
   drift: number;
@@ -185,14 +187,14 @@ function resetLegacyMenuBackdropStarNearWarpOrigin(
 export function resolveLegacyMenuBackdropPalette(darkMode: boolean): LegacyMenuBackdropPalette {
   if (darkMode) {
     return {
-      fieldColor: 0x090d19,
+      fieldColor: cyberArcadeMaterial.substrate.field,
       starAlphaScale: 0.74,
       overlayAlpha: 0.1
     };
   }
 
   return {
-    fieldColor: 0x10172c,
+    fieldColor: cyberArcadeMaterial.substrate.fieldRaised,
     starAlphaScale: 1.08,
     overlayAlpha: 0
   };
@@ -255,7 +257,12 @@ export function resolveLegacyMenuBackdropDriftRunes(
   const progress = animated ? timeMs / 14000 : 0;
   const minDimension = Math.min(width, height);
   const alphaScale = darkMode ? 0.68 : 1;
-  const colors = [0x72e0bf, 0xb7f2ff, 0x9cffd2, 0xd8cbff];
+  const colors = [
+    cyberArcadeMaterial.rail.mint,
+    cyberArcadeMaterial.rail.cyan,
+    cyberArcadeMaterial.signal.playerAccent,
+    cyberArcadeMaterial.signal.violet
+  ];
 
   return Array.from({ length: LEGACY_MENU_DRIFT_RUNE_COUNT }, (_, index) => {
     const laneSeed = (index * 0.61803398875) % 1;
@@ -269,7 +276,7 @@ export function resolveLegacyMenuBackdropDriftRunes(
       size: Math.max(3, minDimension * (0.0072 + (laneSeed * 0.004))),
       angle: (laneSeed * Math.PI) + (animated ? progress * 1.7 : 0),
       alpha: (0.14 + (driftSeed * 0.1)) * alphaScale,
-      color: colors[index % colors.length] ?? 0xb7f2ff
+      color: colors[index % colors.length] ?? cyberArcadeMaterial.rail.cyan
     };
   });
 }

@@ -506,16 +506,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xe7fff4;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x0d3c4f;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = cyberArcadeMaterial.path.core;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.58;');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x07111d;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GLASS_ALPHA = 0.18;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.1;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = 0x72e0bf;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = 0xb7f2ff;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = cyberArcadeMaterial.rail.mint;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = cyberArcadeMaterial.rail.cyan;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_BASE = 0x10293a;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW = 0xc8fff4;');
@@ -606,8 +606,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const backdropSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuBackdrop.ts'), 'utf8');
 
-    expect(backdropSource).toContain('fieldColor: 0x090d19');
-    expect(backdropSource).toContain('fieldColor: 0x10172c');
+    expect(backdropSource).toContain('fieldColor: cyberArcadeMaterial.substrate.field');
+    expect(backdropSource).toContain('fieldColor: cyberArcadeMaterial.substrate.fieldRaised');
     expect(menuSceneSource).toContain('this.drawLegacyBackdropSigils(width, height, this.time.now);');
     expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_SHARD_COUNT');
     expect(backdropSource).toContain('LEGACY_MENU_GLASS_SHARD_COUNT');
@@ -637,10 +637,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps active play maze rendering on connected corridors instead of square debug cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_CORE = 0xe7fff4;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = 0x0d3c4f;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_CORE = cyberArcadeMaterial.path.core;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_FILL = 0x07111d;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.1;');
     expect(menuSceneSource).toContain("private pathVisualStyle: LegacyPathVisualStyle = 'corridor';");
@@ -653,7 +653,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('buttons: this.uiButtons');
     expect(menuSceneSource).toContain('text: button.text');
     expect(menuSceneSource).toContain('this.uiTexts.push(label, stateLabel);');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_FILL = 0x08111d;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_EDGE = 0x031022;');
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
@@ -663,9 +663,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('private titleGraphics!: Phaser.GameObjects.Graphics;');
     expect(menuSceneSource).toContain('this.titleGraphics = this.add.graphics();');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_PRISM = 0xb7f2ff;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM = 0x8fffe8;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FACET_WARM = 0xffd36a;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_PRISM = cyberArcadeMaterial.rail.cyan;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM = cyberArcadeMaterial.signal.playerAccent;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FACET_WARM = cyberArcadeMaterial.signal.warning;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;');
@@ -738,9 +738,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_TEXT =');
-    expect(menuSceneSource).toContain('const LEGACY_CYBER_PANEL_STROKE = 0x72e0bf;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW = 0xff263f;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_TAIL = 0xecfff5;');
+    expect(menuSceneSource).toContain('const LEGACY_CYBER_PANEL_STROKE = cyberArcadeMaterial.rail.mint;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW = cyberArcadeMaterial.signal.goal;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_TAIL = cyberArcadeMaterial.rail.white;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
@@ -860,10 +860,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('private resolveLegacyPointPathSource(');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');");
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95, 'goal');");
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_CORE = 0xfff05a;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_EDGE = 0xffc629;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_CORE = 0xff263f;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xd81b2a;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_EDGE = cyberArcadeMaterial.signal.goalEdge;');
     expect(menuSceneSource).toContain('markerStyle: {');
     expect(menuSceneSource).toContain('playerCoreColor: resolveLegacyIridescentPlayerCoreColor()');
     expect(menuSceneSource).toContain('playerHaloColor: progressionPalette.playerHaloColor');
@@ -898,8 +898,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('visualMotionActive: this.hasLegacyPlayerVisualMotionPendingFrame(time)');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.46;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.72;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_COLOR = 0x36ff7d;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_ACCENT = 0xb6ffd0;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_COLOR = cyberArcadeMaterial.signal.player;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_AI_BEACON_ALPHA_RATIO = 0.74;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_AI_BEACON_RADIUS_RATIO = 0.16;');
@@ -1208,8 +1208,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('const panel = this.add.graphics();');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(panel, {');
-    expect(menuSceneSource).toContain('fill: active ? 0x123a2d : LEGACY_CYBER_PANEL_FILL');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_ACTION_GREEN = \'#36ff7d\';');
+    expect(menuSceneSource).toContain('frontDoorChrome?.hoverFillColor ?? cyberArcadeMaterial.substrate.panelActive');
+    expect(menuSceneSource).toContain('frontDoorChrome?.fillColor ?? LEGACY_CYBER_PANEL_FILL');
+    expect(menuSceneSource).toContain('stroke: frontDoorChrome?.strokeColor');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_ACTION_GREEN = toCyberArcadeCssHex(cyberArcadeMaterial.signal.player);');
     expect(menuSceneSource).toContain('const buttonTextColor = isPrimaryFrontDoorButton');
     expect(menuSceneSource).toContain('? LEGACY_MENU_ACTION_GREEN');
     expect(menuSceneSource).toContain('resolveLegacyAuthenticatedMenuButtonStack');
@@ -1487,8 +1489,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(aiSource).toContain('aiMemory: DemoWalkerMemoryFrame;');
     expect(aiSource).toContain('memoryFrames: readonly DemoWalkerMemoryFrame[];');
     expect(aiSource).toContain('optionIndices: resolveMemoryOptionIndices()');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_OPTION_CORE = 0x2de8ff;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_TARGET_CORE = 0xffd36a;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_TARGET_CORE = cyberArcadeMaterial.signal.warning;');
     expect(menuSceneSource).toContain('private resolveLegacyMenuAiThoughtStyle(');
     expect(menuSceneSource).toContain('coreColor: LEGACY_MENU_AI_MEMORY_TARGET_CORE');
     expect(menuSceneSource).toContain('edgeColor: LEGACY_MENU_AI_MEMORY_TARGET_EDGE');
@@ -1571,9 +1573,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps menu maze visuals aligned with the cleaned play maze language', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xe7fff4;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x0d3c4f;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x07111d;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = cyberArcadeMaterial.path.core;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE,');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE_ALPHA,');
     expect(menuSceneSource).toContain('this.drawLegacyPathMaterialTile(');

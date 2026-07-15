@@ -49,15 +49,15 @@ describe('legacyMenuBackdrop', () => {
     expect(LEGACY_MENU_BACKDROP_STAR_MOTION).toBe('radial-warp');
   });
 
-  test('publishes a deep blue-violet palette and bounded angular shards', () => {
+  test('publishes the canonical deep navy substrate and bounded angular shards', () => {
     expect(resolveLegacyMenuBackdropPalette(false)).toEqual({
-      fieldColor: 0x10172c,
+      fieldColor: 0x0b1628,
       starAlphaScale: 1.08,
       overlayAlpha: 0
     });
 
     expect(resolveLegacyMenuBackdropPalette(true)).toEqual({
-      fieldColor: 0x090d19,
+      fieldColor: 0x07111d,
       starAlphaScale: 0.74,
       overlayAlpha: 0.1
     });
