@@ -7,7 +7,8 @@ import {
   type WorldTurnPhaseReceipt,
   type WorldTurnPhaseResult,
   type WorldTurnReceipt,
-  type WorldTurnRejectionReason
+  type WorldTurnRejectionReason,
+  type WorldTurnSystemOptions
 } from './types';
 
 const cloneReceipt = (receipt: WorldTurnReceipt): WorldTurnReceipt => structuredClone(receipt);
@@ -20,8 +21,14 @@ export class WorldTurnSystem {
   #acceptedTurnCount = 0;
   #rejectedCommandCount = 0;
   #lastReceipt: WorldTurnReceipt | null = null;
+  readonly #timedModeEnabled: boolean;
 
-  constructor(private readonly handlers: WorldTurnHandlers) {}
+  constructor(
+    private readonly handlers: WorldTurnHandlers,
+    options: WorldTurnSystemOptions = {}
+  ) {
+    this.#timedModeEnabled = options.timedModeEnabled === true;
+  }
 
   advance(command: WorldTurnCommand): WorldTurnReceipt {
     const commandId = command.id.trim();
@@ -36,6 +43,9 @@ export class WorldTurnSystem {
     }
     if (command.simulationPaused === true) {
       return this.#reject(command, 'simulation-paused');
+    }
+    if (command.kind === 'timed-mode-tick' && !this.#timedModeEnabled) {
+      return this.#reject(command, 'timed-mode-disabled');
     }
     if (command.kind === 'player-move' && !this.handlers['player-movement']) {
       return this.#reject(command, 'player-move-handler-missing');
@@ -96,7 +106,9 @@ export class WorldTurnSystem {
       lastCommandId: this.#lastReceipt?.commandId ?? null,
       lastReceipt: this.#lastReceipt ? cloneReceipt(this.#lastReceipt) : null,
       nextTurn: this.#nextTurn,
-      rejectedCommandCount: this.#rejectedCommandCount
+      registeredPhases: WORLD_TURN_PHASES.filter((phase) => this.handlers[phase] !== undefined),
+      rejectedCommandCount: this.#rejectedCommandCount,
+      timedModeEnabled: this.#timedModeEnabled
     };
   }
 

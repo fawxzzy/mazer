@@ -70,6 +70,8 @@ describe('WorldTurnSystem', () => {
       'enemy-movement': makeRecorder(order, 'enemy-movement'),
       'projectile-movement': makeRecorder(order, 'projectile-movement'),
       collisions: makeRecorder(order, 'collisions')
+    }, {
+      timedModeEnabled: true
     });
 
     expect(system.advance({
@@ -84,6 +86,23 @@ describe('WorldTurnSystem', () => {
     expect(receipt.admitted).toBe(true);
     expect(receipt.phases[0]).toEqual({ phase: 'player-movement', status: 'skipped', eventCount: 0 });
     expect(order).toEqual(['enemy-movement', 'projectile-movement', 'collisions']);
+  });
+
+  test('keeps timed-mode advancement disabled unless the host policy opts in', () => {
+    const system = new WorldTurnSystem({
+      collisions: () => ({ events: [{ type: 'collision-tick' }] })
+    });
+
+    expect(system.advance({ id: 'clock-1', kind: 'timed-mode-tick', tickId: 'clock-1' })).toMatchObject({
+      admitted: false,
+      nextTurn: 0,
+      reason: 'timed-mode-disabled'
+    });
+    expect(system.getDiagnostics()).toMatchObject({
+      acceptedTurnCount: 0,
+      registeredPhases: ['collisions'],
+      timedModeEnabled: false
+    });
   });
 
   test('rejects duplicate and stale commands without repeating mutations', () => {

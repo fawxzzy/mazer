@@ -195,7 +195,18 @@ export interface MenuSceneRuntimeDiagnostics {
         turn: number | null;
       } | null;
       nextTurn: number;
+      registeredPhases: Array<
+        'player-movement'
+        | 'enemy-movement'
+        | 'projectile-movement'
+        | 'pickups'
+        | 'item-effects'
+        | 'duration-expiry'
+        | 'collisions'
+      >;
       rejectedCommandCount: number;
+      state: 'running' | 'paused' | 'stopped';
+      timedModeEnabled: boolean;
     };
     inputBuffer: {
       directionalIntent: {
