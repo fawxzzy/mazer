@@ -11,6 +11,25 @@ The card remains non-terminal until the repaired build is exercised on a
 physical iPhone installed-PWA/browser-chrome path. Maintained browser proof is
 complete for `360x720 -> 1440x900 -> 360x720 -> 405x958`.
 
+## Physical iPhone changed evidence
+
+Seven operator captures on 2026-07-15 reopened the visual closeout without
+invalidating the live viewport owner. They proved separate component defects:
+
+- the play run-status panel could shrink below its text while the menu panel
+  used a different width and field set
+- Options and Pause did not share the same scroll-body/pinned-footer rhythm
+- the player guide could draw a nearly empty clipped panel fragment and did
+  not reserve the scroll rail from its content width
+- described toggle rows and Move Speed placed text and controls too close to
+  their borders
+- purple page and Phaser shell colors remained visible above and below the
+  normalized canvas on a physical phone
+
+The follow-up keeps the viewport authority intact while repairing those shared
+components. The seven original photos remain immutable external evidence in the
+current Mazer task attachment set.
+
 ## Root Cause
 
 Two values owned by the browser were accidentally converted into published
@@ -57,9 +76,23 @@ layout matrix on an unrelated random wrap-topology sample. Transition mode now:
 
 ## Verification
 
-- Focused viewport/layout/proof-harness gate: `31/31` tests passed.
-- Full repository verification: `48/48` files and `360/360` tests passed,
-  followed by a successful production bundle build.
+The physical-evidence follow-up checklist is also reconciled:
+
+- `landed` - menu and play render the same two-row time/rank/score/maze-level
+  component; the play instance fits its measured lane beside Pause
+- `landed` - Options and Pause use a shared scroll-body/pinned-footer
+  composition, with the guide and control rows inside the same measured gutter
+- `landed` - Move Speed owns separate title/value and slider lanes; described
+  toggles have enough height for their second line
+- `landed` - body, app, Phaser, theme, and install backgrounds use one near-black
+  safe-area color instead of the purple fallback field
+- `blocked` - a fresh physical iPhone capture of this follow-up build is still
+  required; the seven operator captures are failure evidence, not passing proof
+
+- Focused viewport/layout/proof-harness gate: `57/57` tests passed.
+- Full repository verification passed `360/362` tests in the serial run; the
+  only two misses were fixed-timeout AI/generation tests. Their exact isolated
+  rerun passed `11/11`, yielding correlated `362/362` coverage.
 - TypeScript: `npm run lint` passed.
 - Production bundle: `npm run build` passed.
 - Maintained transition capture: passed, including exact restored diagnostics,
@@ -73,6 +106,17 @@ layout matrix on an unrelated random wrap-topology sample. Transition mode now:
   - offscreen and overlap violation lists stayed empty
 - Restored Pause proof at `390x844` kept the overlay panel inside
   `20,58 350x770`, disabled play input/timer, and hid play controls.
+- Follow-up in-app browser proof at `390x844`:
+  - menu and play run-status panels both resolved to `236x58`
+  - play status text fit inside `34,13 236x58` beside Pause at
+    `294,10 86x35`
+  - Options guide resolved to `40,156 290x232`; its content and pinned `Log out`
+    footer were visible, and the final no-overflow facade path suppresses the
+    fake scroll rail
+  - Pause reached exact scroll max `244`; all six described toggles and Move
+    Speed stayed inside `44,170 302x528`, while fixed actions stayed reachable
+  - body and app computed backgrounds were both `rgb(2, 8, 15)` and the capture
+    showed no purple top/bottom bands
 
 Durable local capture:
 
