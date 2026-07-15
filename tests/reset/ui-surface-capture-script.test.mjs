@@ -138,6 +138,9 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const requiredRects = scroll.enabled === true');
     expect(source).toContain("if (scroll.enabled !== true) {");
     expect(source).toContain('const collectButtonLabelContainmentIssues = (surfaceId, surface) =>');
+    expect(source).toContain('const collectButtonLabelFillIssues = (surfaceId, surface) =>');
+    expect(source).toContain('progressionBadge fontSize=');
+    expect(source).toContain('pause-height=');
     expect(source).toContain('const collectGuideTextContainmentIssues = (surfaceId, surface) => {');
     expect(source).toContain('const collectWrapTopologyDiagnosticIssues = (surfaceId, surface, { requirePairs = false } = {}) => {');
     expect(source).toContain('const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {');
@@ -148,6 +151,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-affordance'");
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-reachability'");
     expect(source).toContain("createCheck(\n      'button-label-containment'");
+    expect(source).toContain("createCheck(\n      'button-label-fill'");
     expect(source).toContain("createCheck(\n      'guide-text-containment'");
     expect(source).toContain("createCheck(\n      'wrap-topology-diagnostics'");
     expect(source).toContain('const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');

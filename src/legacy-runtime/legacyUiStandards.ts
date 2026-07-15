@@ -18,11 +18,11 @@ export const resolveLegacyRunStatusPanelLayout = (
   const preferredWidth = compact ? 260 : 292;
 
   return {
-    fontSize: compact ? 11 : 12,
+    fontSize: compact ? 14 : 15,
     height: compact ? 62 : 66,
-    horizontalPadding: compact ? 36 : 40,
-    lineSpacing: compact ? 5 : 4,
-    textWidthSafetyRatio: compact ? 0.62 : 0.7,
+    horizontalPadding: compact ? 18 : 22,
+    lineSpacing: compact ? 3 : 2,
+    textWidthSafetyRatio: 0.96,
     width: Math.min(preferredWidth, maximumWidth)
   };
 };
@@ -62,7 +62,7 @@ export interface LegacyOptionsGuideLayout {
 
 export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptionsGuideLayout => {
   const compact = panelWidth < LEGACY_UI_COMPACT_BREAKPOINT;
-  const titleFontSize = compact ? 16 : 18;
+  const titleFontSize = compact ? 17 : 19;
   const titleOffset = compact ? 18 : 20;
 
   return {
@@ -72,9 +72,9 @@ export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptio
     inset: compact ? 18 : 22,
     legendTopOffset: compact ? 48 : 52,
     rowHeight: compact ? 19 : 22,
-    rowFontSize: compact ? 10 : 11,
-    rowMinFontSize: compact ? 9 : 9,
-    textWidthSafetyRatio: compact ? 0.68 : 0.74,
+    rowFontSize: compact ? 11 : 12,
+    rowMinFontSize: compact ? 10 : 10,
+    textWidthSafetyRatio: compact ? 0.86 : 0.88,
     titleFontSize,
     titleOffset,
     titleRuleOffset: titleOffset + Math.ceil(titleFontSize * 0.72) + (compact ? 12 : 8)
@@ -164,8 +164,8 @@ export const resolveLegacyToggleRowLayout = (
   const showStateLabel = width >= 380;
   return {
     labelFontSize: hasDescription
-      ? Math.max(11, Math.min(compact ? 14 : 16, Math.round(height * 0.23)))
-      : Math.max(12, Math.min(compact ? 15 : 17, Math.round(height * 0.31))),
+      ? Math.max(13, Math.min(compact ? 16 : 18, Math.round(height * 0.25)))
+      : Math.max(14, Math.min(compact ? 17 : 19, Math.round(height * 0.33))),
     rowPaddingX: Math.max(12, Math.min(compact ? 14 : 18, Math.round(width * 0.05))),
     showStateLabel,
     stateFontSize: Math.max(10, Math.min(12, Math.round(height * 0.24))),

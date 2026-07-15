@@ -62,9 +62,27 @@ describe('legacy menu button chrome', () => {
       isPrimary: false
     });
 
-    expect(primary.fontSize).toBeLessThan(24);
-    expect(secondary.fontSize).toBeLessThan(20);
-    expect(primary.fontSize).toBeGreaterThanOrEqual(16);
-    expect(secondary.fontSize).toBeGreaterThanOrEqual(16);
+    expect(primary.fontSize).toBeGreaterThanOrEqual(23);
+    expect(secondary.fontSize).toBeGreaterThanOrEqual(23);
+    expect(primary.fontSize).toBeLessThanOrEqual(26);
+    expect(secondary.fontSize).toBeLessThanOrEqual(26);
+  });
+
+  test('lets standard phone-width buttons use their available vertical lane', () => {
+    const primary = resolveLegacyMenuButtonChrome({
+      width: 132,
+      height: 58,
+      textLength: 5,
+      isPrimary: true
+    });
+    const secondary = resolveLegacyMenuButtonChrome({
+      width: 132,
+      height: 58,
+      textLength: 7,
+      isPrimary: false
+    });
+
+    expect(primary.fontSize).toBeGreaterThanOrEqual(30);
+    expect(secondary.fontSize).toBeGreaterThanOrEqual(24);
   });
 });

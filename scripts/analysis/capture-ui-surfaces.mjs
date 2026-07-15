@@ -949,6 +949,9 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
     if (isFiniteBounds(pause) && pause.left - badge.right < 4) {
       issues.push(`${surfaceId}:progression-badge-to-pause-gap=${(pause.left - badge.right).toFixed(1)}<4`);
     }
+    if (isFiniteBounds(pause) && Math.abs(pause.height - badge.height) > 1) {
+      issues.push(`${surfaceId}:pause-height=${pause.height.toFixed(1)}!=badge-height=${badge.height.toFixed(1)}`);
+    }
   }
   return issues;
 };
@@ -1067,6 +1070,31 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
     }
   }
   return issues;
+});
+
+const collectButtonLabelFillIssues = (surfaceId, surface) => (surface?.buttons ?? []).flatMap((button) => {
+  const actionLabels = new Set([
+    'Account',
+    'Create Account',
+    'Log out',
+    'Login',
+    'Menu',
+    'Options',
+    'Reset',
+    'Reset Progress',
+    'Start'
+  ]);
+  if (!actionLabels.has(button?.text)) {
+    return [];
+  }
+  if (!isFiniteBounds(button?.bounds) || !Number.isFinite(button?.labelFontSize)) {
+    return [`${surfaceId}:${button?.text ?? 'unknown'}:missing-button-label-font-size`];
+  }
+  const lengthRatio = button.text.length >= 12 ? 0.28 : button.text.length >= 8 ? 0.33 : 0.38;
+  const minimumFontSize = Math.min(24, Math.floor(button.bounds.height * lengthRatio));
+  return button.labelFontSize + 0.01 < minimumFontSize
+    ? [`${surfaceId}:${button.text}:label-font-size=${button.labelFontSize}<${minimumFontSize}`]
+    : [];
 });
 
 const collectOverlayScrollFadeTextIssues = (surfaceId, surface) => {
@@ -1316,6 +1344,15 @@ const buildSurfaceChecks = ({
     ...collectButtonLabelContainmentIssues('pause', surfaces.pause),
     ...collectButtonLabelContainmentIssues('pause-bottom', surfaces.pauseBottom)
   ];
+  const buttonLabelFillIssues = [
+    ...collectButtonLabelFillIssues('menu', surfaces.menu),
+    ...collectButtonLabelFillIssues('auth', surfaces.auth),
+    ...collectButtonLabelFillIssues('options', surfaces.options),
+    ...collectButtonLabelFillIssues('options-bottom', surfaces.optionsBottom),
+    ...collectButtonLabelFillIssues('play', surfaces.play),
+    ...collectButtonLabelFillIssues('pause', surfaces.pause),
+    ...collectButtonLabelFillIssues('pause-bottom', surfaces.pauseBottom)
+  ];
   const guideTextContainmentIssues = [
     ...collectGuideTextContainmentIssues('options', surfaces.options),
     ...collectGuideTextContainmentIssues('pause', surfaces.pause)
@@ -1333,9 +1370,19 @@ const buildSurfaceChecks = ({
     ['play', surfaces.play]
   ].flatMap(([id, surface]) => {
     const badge = surface.progressionBadge;
-    return badge?.text && badge.textFits !== true
+    if (!badge?.text) {
+      return [];
+    }
+    const issues = badge.textFits !== true
       ? [`${id}:progressionBadge textFits=${badge.textFits}`]
       : [];
+    const minimumFontSize = isFiniteBounds(badge.bounds)
+      ? Math.min(15, Math.floor(badge.bounds.height * 0.21))
+      : 13;
+    if (!Number.isFinite(badge.textFontSize) || badge.textFontSize + 0.01 < minimumFontSize) {
+      issues.push(`${id}:progressionBadge fontSize=${badge.textFontSize ?? 'missing'}<${minimumFontSize}`);
+    }
+    return issues;
   });
   const surfaceChecks = [
     createCheck(
@@ -1537,6 +1584,11 @@ const buildSurfaceChecks = ({
       'button-label-containment',
       buttonLabelContainmentIssues.length === 0,
       buttonLabelContainmentIssues.length === 0 ? 'button labels remain inside their interactive chrome' : buttonLabelContainmentIssues.join('; ')
+    ),
+    createCheck(
+      'button-label-fill',
+      buttonLabelFillIssues.length === 0,
+      buttonLabelFillIssues.length === 0 ? 'action labels fill their chrome while retaining padding' : buttonLabelFillIssues.join('; ')
     ),
     createCheck(
       'guide-text-containment',

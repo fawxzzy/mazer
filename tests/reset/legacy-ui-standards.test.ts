@@ -12,11 +12,11 @@ import {
 describe('legacy UI standards', () => {
   test('uses one two-row run-status component in menu and play lanes', () => {
     expect(resolveLegacyRunStatusPanelLayout(390)).toEqual({
-      fontSize: 11,
+      fontSize: 14,
       height: 62,
-      horizontalPadding: 36,
-      lineSpacing: 5,
-      textWidthSafetyRatio: 0.62,
+      horizontalPadding: 18,
+      lineSpacing: 3,
+      textWidthSafetyRatio: 0.96,
       width: 260
     });
     expect(resolveLegacyRunStatusPanelLayout(390, 208).width).toBe(208);
@@ -34,11 +34,11 @@ describe('legacy UI standards', () => {
     const wide = resolveLegacyOptionsGuideLayout(LEGACY_UI_COMPACT_BREAKPOINT);
 
     expect(compact.cardHeight).toBe(196);
-    expect(compact.rowFontSize).toBe(10);
-    expect(compact.rowMinFontSize).toBe(9);
-    expect(compact.textWidthSafetyRatio).toBe(0.68);
+    expect(compact.rowFontSize).toBe(11);
+    expect(compact.rowMinFontSize).toBe(10);
+    expect(compact.textWidthSafetyRatio).toBe(0.86);
     expect(compact.titleRuleOffset).toBeGreaterThan(compact.titleOffset + compact.titleFontSize);
-    expect(wide.rowFontSize).toBe(11);
+    expect(wide.rowFontSize).toBe(12);
     expect(wide.rowHeight).toBe(22);
   });
 

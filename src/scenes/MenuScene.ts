@@ -37,7 +37,6 @@ import {
   isLegacyWrappedStepTransition,
   type LegacyMazeGenerationProfile,
   type LegacyMazeSnapshot,
-  resolveLegacyNavigationTarget,
   type LegacyPoint
 } from '../legacy-runtime/legacyMaze';
 import { resolveInitialRuntimeMode } from '../legacy-runtime/legacyLaunchMode';
@@ -84,6 +83,7 @@ import {
 } from '../legacy-runtime/legacyPlayStep';
 import {
   LegacyDirectionalIntentResolver,
+  resolveLegacyAnalogCardinalDirectionsFromVector,
   resolveLegacyCardinalDirectionsFromVector,
   type LegacyCardinalDirection
 } from '../legacy-runtime/legacyDirectionalIntent';
@@ -477,6 +477,7 @@ interface MenuSceneVisualDiagnostics {
     bounds: VisualRect | null;
     text: string | null;
     textBounds: VisualRect | null;
+    textFontSize: number | null;
     textFits: boolean;
   };
   menuCompass: {
@@ -509,6 +510,7 @@ interface MenuSceneVisualDiagnostics {
   buttons: Array<{
     bounds: VisualRect;
     labelBounds: VisualRect | null;
+    labelFontSize: number | null;
     text: string;
   }>;
   title: {
@@ -1119,6 +1121,8 @@ export class MenuScene extends Phaser.Scene {
   private overlayGraphics!: Phaser.GameObjects.Graphics;
   private overlayScrollGraphics: Phaser.GameObjects.Graphics | null = null;
   private overlayGuideGraphics: Phaser.GameObjects.Graphics | null = null;
+  private overlayGuideMask: Phaser.Display.Masks.GeometryMask | null = null;
+  private overlayGuideMaskGraphics: Phaser.GameObjects.Graphics | null = null;
   private hudGraphics!: Phaser.GameObjects.Graphics;
   private uiTexts: Phaser.GameObjects.Text[] = [];
   private uiButtons: UiButton[] = [];
@@ -1136,6 +1140,8 @@ export class MenuScene extends Phaser.Scene {
   private overlayScrollPointerStartY = 0;
   private overlayScrollPointerStartOffset = 0;
   private overlayScrollPointerHasMoved = false;
+  private overlayScrollGestureLockPointerId: number | null = null;
+  private overlayMovementSpeedSliderBounds: VisualRect | null = null;
   private viewportGeometryListener: (() => void) | null = null;
   private stars: LegacyMenuBackdropStar[] = [];
   private layout!: LegacyMenuLayout;
@@ -2301,6 +2307,7 @@ export class MenuScene extends Phaser.Scene {
     });
     this.input.on('gameout', () => {
       this.releaseOverlayScrollPointer();
+      this.overlayScrollGestureLockPointerId = null;
       this.playPointerStart = null;
     });
 
@@ -2566,6 +2573,8 @@ export class MenuScene extends Phaser.Scene {
     this.overlayScrollViewportBounds = null;
     this.overlayScrollTrackBounds = null;
     this.overlayScrollThumbBounds = null;
+    this.overlayMovementSpeedSliderBounds = null;
+    this.overlayScrollGestureLockPointerId = null;
     this.releaseOverlayScrollPointer();
   }
 
@@ -2604,7 +2613,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleOverlayScrollWheel(pointer: Phaser.Input.Pointer, deltaY: number): boolean {
-    if (this.overlay === 'none' || this.overlayScrollMax <= 0) {
+    if (
+      this.overlay === 'none'
+      || this.overlayScrollMax <= 0
+      || this.overlayScrollGestureLockPointerId !== null
+    ) {
       return false;
     }
     if (!this.isPointInVisualRect(this.overlayScrollViewportBounds, pointer.x, pointer.y, 12)) {
@@ -2619,13 +2632,19 @@ export class MenuScene extends Phaser.Scene {
     if (this.overlay === 'none' || this.overlayScrollMax <= 0) {
       return false;
     }
+    const pointerId = this.normalizeLegacyPlayTouchPointerId(pointer.id) ?? -1;
+    if (this.isPointInVisualRect(this.overlayMovementSpeedSliderBounds, pointer.x, pointer.y, 2)) {
+      this.releaseOverlayScrollPointer();
+      this.overlayScrollGestureLockPointerId = pointerId;
+      return false;
+    }
     const onViewport = this.isPointInVisualRect(this.overlayScrollViewportBounds, pointer.x, pointer.y, 0);
     const onRail = this.isPointInVisualRect(this.overlayScrollTrackBounds, pointer.x, pointer.y, 20);
     if (!onViewport && !onRail) {
       return false;
     }
 
-    this.overlayScrollPointerId = this.normalizeLegacyPlayTouchPointerId(pointer.id) ?? -1;
+    this.overlayScrollPointerId = pointerId;
     this.overlayScrollPointerStartY = pointer.y;
     this.overlayScrollPointerStartOffset = this.overlayScrollOffset;
     this.overlayScrollPointerHasMoved = false;
@@ -2634,6 +2653,9 @@ export class MenuScene extends Phaser.Scene {
 
   private handleOverlayScrollPointerMove(pointer: Phaser.Input.Pointer): boolean {
     const pointerId = this.normalizeLegacyPlayTouchPointerId(pointer.id) ?? -1;
+    if (this.overlayScrollGestureLockPointerId === pointerId) {
+      return false;
+    }
     if (this.overlayScrollPointerId === null || this.overlayScrollPointerId !== pointerId) {
       return false;
     }
@@ -2650,6 +2672,10 @@ export class MenuScene extends Phaser.Scene {
 
   private handleOverlayScrollPointerUp(pointer: Phaser.Input.Pointer): boolean {
     const pointerId = this.normalizeLegacyPlayTouchPointerId(pointer.id) ?? -1;
+    if (this.overlayScrollGestureLockPointerId === pointerId) {
+      this.overlayScrollGestureLockPointerId = null;
+      return false;
+    }
     if (this.overlayScrollPointerId === null || this.overlayScrollPointerId !== pointerId) {
       return false;
     }
@@ -3190,12 +3216,16 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private performLegacyPlayHeldTouchMove(): boolean {
-    const candidates = this.resolveLegacyPlayStickIntentMoveCandidates()
-      ?? resolveHumanMovementPriorityCandidates(
+    const analogDirections = this.resolveLegacyPlayStickIntentDirections();
+    if (analogDirections !== null) {
+      this.playDirectionalIntent.request(analogDirections);
+    } else {
+      const candidates = resolveHumanMovementPriorityCandidates(
         this.playHeldTouchMoves.map((move) => move.control),
         LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT
       );
-    this.requestLegacyPlayDirectionalIntent(candidates);
+      this.requestLegacyPlayDirectionalIntent(candidates);
+    }
     return this.performLegacyPlayDirectionalIntentStep();
   }
 
@@ -3238,51 +3268,15 @@ export class MenuScene extends Phaser.Scene {
     return this.tryMovePlayer(step.deltaX, step.deltaY);
   }
 
-  private resolveLegacyPlayStickIntentMoveCandidates(): HumanMovementActionKind[] | null {
+  private resolveLegacyPlayStickIntentDirections(): LegacyCardinalDirection[] | null {
     if (this.playTouchStickPointerId === null || this.playTouchStickPull === null) {
       return null;
     }
 
-    const pullVector = this.playTouchStickPull;
-    const axes: Array<{
-      control: HumanMovementActionKind;
-      deltaX: number;
-      deltaY: number;
-      magnitude: number;
-    }> = [];
-    const absoluteX = Math.abs(pullVector.normalizedX);
-    const absoluteY = Math.abs(pullVector.normalizedY);
-    if (absoluteX >= 0.08) {
-      axes.push({
-        control: pullVector.normalizedX > 0 ? 'move_right' : 'move_left',
-        deltaX: pullVector.normalizedX > 0 ? 1 : -1,
-        deltaY: 0,
-        magnitude: absoluteX
-      });
-    }
-    if (absoluteY >= 0.08) {
-      axes.push({
-        control: pullVector.normalizedY > 0 ? 'move_down' : 'move_up',
-        deltaX: 0,
-        deltaY: pullVector.normalizedY > 0 ? 1 : -1,
-        magnitude: absoluteY
-      });
-    }
-
-    const vectorOrderedControls = axes
-      .sort((left, right) => right.magnitude - left.magnitude)
-      .map((axis) => axis.control);
-    const legalOrderedControls = axes
-      .filter((axis) => resolveLegacyNavigationTarget(this.maze, this.player, axis.deltaX, axis.deltaY) !== null)
-      .sort((left, right) => right.magnitude - left.magnitude)
-      .map((axis) => axis.control);
-    const candidateSource = legalOrderedControls.length > 0
-      ? legalOrderedControls
-      : vectorOrderedControls.length > 0
-        ? vectorOrderedControls
-        : pullVector.movementCandidates;
-
-    return resolveHumanMovementPriorityCandidates(candidateSource, LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT);
+    return resolveLegacyAnalogCardinalDirectionsFromVector(
+      this.playTouchStickPull.normalizedX,
+      this.playTouchStickPull.normalizedY
+    );
   }
 
   private resolveLegacyPlayTouchControlLayout(): ReturnType<typeof resolveTouchControlLayout> {
@@ -3297,6 +3291,7 @@ export class MenuScene extends Phaser.Scene {
       placement: this.layout.width >= 720 && this.layout.height >= 600
         ? 'bottom-centered'
         : undefined,
+      topActionHeight: resolveLegacyRunStatusPanelLayout(this.layout.width).height,
       avoidRect: {
         left: boardBounds.left,
         top: boardBounds.top,
@@ -7453,9 +7448,9 @@ export class MenuScene extends Phaser.Scene {
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
     label: string
   ): void {
-    const text = this.padLegacyUiText(this.add.text(rect.centerX, rect.bottom - Math.max(8, Math.round(rect.height * 0.22)), label, {
+    const text = this.padLegacyCompactUiText(this.add.text(rect.centerX, rect.bottom - Math.max(12, Math.round(rect.height * 0.22)), label, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${Math.max(8, Math.min(12, Math.round(rect.height * 0.26)))}px`,
+      fontSize: `${Math.max(12, Math.min(16, Math.round(rect.height * 0.26)))}px`,
       color: LEGACY_PLAY_HUD_TIMER_TEXT
     })).setOrigin(0.5).setAlpha(0.88);
     text.setData('hud', true);
@@ -7632,7 +7627,9 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyOverlayScrollRenderViewport(metrics: LegacyOverlayScrollMetrics): VisualRect {
     const viewport = metrics.viewport;
     const fadeHeight = Math.min(34, Math.max(18, Math.round(viewport.height * 0.12)));
-    const topInset = metrics.topFadeAlpha > 0 ? fadeHeight + 4 : 2;
+    const topInset = metrics.topFadeAlpha > 0
+      ? Math.min(fadeHeight + 4, Math.max(2, metrics.offset + 2))
+      : 2;
     const bottomInset = metrics.bottomFadeAlpha > 0 ? fadeHeight + 4 : 2;
 
     return createVisualRect(
@@ -7675,7 +7672,7 @@ export class MenuScene extends Phaser.Scene {
       graphics.fillStyle(LEGACY_CYBER_PANEL_SHADOW, metrics.topFadeAlpha);
       graphics.fillRect(viewport.left, viewport.top, viewport.width, fadeHeight);
       graphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.22);
-      graphics.lineBetween(viewport.left + 8, viewport.top + fadeHeight, viewport.left + viewport.width - 20, viewport.top + fadeHeight);
+      graphics.lineBetween(viewport.left + 8, viewport.top, viewport.left + viewport.width - 20, viewport.top);
     }
 
     if (metrics.bottomFadeAlpha > 0) {
@@ -7828,10 +7825,8 @@ export class MenuScene extends Phaser.Scene {
       : Math.max(panel.top + (compact ? 82 : 88), rowY + (compact ? 8 : 10));
     const cardTop = contentCardTop - (options.scrollOffset ?? 0);
     const viewport = options.viewport ?? null;
-    const cardIntersectsViewport = viewport === null || (
-      cardTop >= viewport.top + 2
-      && cardTop + cardHeight <= viewport.bottom - 2
-    );
+    const cardIntersectsViewport = viewport === null
+      || (cardTop < viewport.bottom - 2 && cardTop + cardHeight > viewport.top + 2);
 
     if (!cardIntersectsViewport) {
       this.overlayGuideBounds = null;
@@ -7840,6 +7835,15 @@ export class MenuScene extends Phaser.Scene {
 
     const guideGraphics = this.add.graphics();
     this.overlayGuideGraphics = guideGraphics;
+    if (viewport !== null) {
+      const maskGraphics = this.make.graphics({ x: 0, y: 0 }, false);
+      maskGraphics.fillStyle(0xffffff, 1);
+      maskGraphics.fillRect(viewport.left, viewport.top, viewport.width, viewport.height);
+      const guideMask = maskGraphics.createGeometryMask();
+      guideGraphics.setMask(guideMask);
+      this.overlayGuideMaskGraphics = maskGraphics;
+      this.overlayGuideMask = guideMask;
+    }
 
     const inset = guideLayout.inset;
     const titleY = cardTop + guideLayout.titleOffset;
@@ -7852,8 +7856,8 @@ export class MenuScene extends Phaser.Scene {
     const detailLeft = cardLeft + inset;
     const detailWidth = cardWidth - (inset * 2);
     const detailRight = detailLeft + detailWidth;
-    const visibleCardTop = cardTop;
-    const visibleCardBottom = cardTop + cardHeight;
+    const visibleCardTop = viewport === null ? cardTop : Math.max(cardTop, viewport.top);
+    const visibleCardBottom = viewport === null ? cardTop + cardHeight : Math.min(cardTop + cardHeight, viewport.bottom);
     const visibleCardHeight = Math.max(0, visibleCardBottom - visibleCardTop);
     if (visibleCardHeight < 44) {
       this.overlayGuideBounds = null;
@@ -7873,10 +7877,8 @@ export class MenuScene extends Phaser.Scene {
     });
     guideGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
     guideGraphics.strokeRoundedRect(cardLeft + 4, cardTop + 4, cardWidth - 8, cardHeight - 8, 9);
-    if (titleRuleY >= visibleCardTop + 2 && titleRuleY <= visibleCardBottom - 2) {
-      guideGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.26);
-      guideGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);
-    }
+    guideGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.26);
+    guideGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);
 
     const addText = (
       copy: string,
@@ -7898,12 +7900,12 @@ export class MenuScene extends Phaser.Scene {
         .setOrigin(originX, 0.5)
         .setAlpha(alpha);
       const bounds = visualRectFromBounds(label.getBounds());
-      if (viewport !== null && (
-        bounds.top < viewport.top + 2
-        || bounds.bottom > viewport.bottom - 2
-      )) {
+      if (viewport !== null && (bounds.top < viewport.top + 2 || bounds.bottom > viewport.bottom - 2)) {
         label.destroy();
         return null;
+      }
+      if (this.overlayGuideMask !== null) {
+        label.setMask(this.overlayGuideMask);
       }
       this.uiTexts.push(label);
       return label;
@@ -7923,9 +7925,7 @@ export class MenuScene extends Phaser.Scene {
       const glyphY = rowTop + (rowHeight / 2);
       const labelX = detailLeft + (compact ? 28 : 34);
       if (compact) {
-        if (viewport === null || (glyphY - 6 >= viewport.top + 2 && glyphY + 6 <= viewport.bottom - 2)) {
-          this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, 12, guideGraphics);
-        }
+        this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, 12, guideGraphics);
         addText(
           `${title}: ${copy}`,
           labelX,
@@ -7942,9 +7942,7 @@ export class MenuScene extends Phaser.Scene {
       const labelWidth = Math.min(compact ? 76 : 118, Math.round(detailWidth * (compact ? 0.32 : 0.36)));
       const copyX = labelX + labelWidth + (compact ? 4 : 8);
       const copyWidth = Math.max(compact ? 82 : 104, detailRight - copyX);
-      if (viewport === null || (glyphY - 7 >= viewport.top + 2 && glyphY + 7 <= viewport.bottom - 2)) {
-        this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, 13, guideGraphics);
-      }
+      this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, 13, guideGraphics);
       addText(title, labelX, glyphY, labelWidth, color, guideRowFontSize, 0, 1, guideRowMinFontSize);
       addText(
         copy,
@@ -8048,7 +8046,7 @@ export class MenuScene extends Phaser.Scene {
     }
     const actionButtonHeight = stacked ? 42 : 48;
     const actionY = panel.top + panel.height - (stacked ? 42 : 54);
-    const viewportTop = panel.top + (stacked ? 112 : 120) + (hasOverlayMessage ? 22 : 0);
+    const viewportTop = panel.top + (stacked ? 76 : 84) + (hasOverlayMessage ? 22 : 0);
     const viewportBottom = actionY - (actionButtonHeight * 2) - 4;
     const viewport = createVisualRect(
       panel.left + 24,
@@ -8773,9 +8771,10 @@ export class MenuScene extends Phaser.Scene {
     const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, 0.5);
     background.setStrokeStyle(1, rowStroke, 0.38);
     background.setInteractive({ useHandCursor: true });
+    this.overlayMovementSpeedSliderBounds = createVisualRect(left, input.y - (input.height / 2), input.width, input.height);
 
-    const labelFontSize = Math.max(14, Math.min(18, Math.round(input.height * 0.28)));
-    const stateFontSize = Math.max(10, Math.min(12, Math.round(input.height * 0.18)));
+    const labelFontSize = Math.max(16, Math.min(20, Math.round(input.height * 0.3)));
+    const stateFontSize = Math.max(11, Math.min(13, Math.round(input.height * 0.2)));
     const labelY = resolveLegacyUiLabelCenterY(input.y - Math.round(input.height * 0.2), labelFontSize, 'toggle-title');
     const trackY = input.y + Math.round(input.height * 0.23);
     const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(left + 16, labelY, input.label, {
@@ -8837,7 +8836,11 @@ export class MenuScene extends Phaser.Scene {
 
     background.on('pointerover', () => setActive(true));
     background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', (pointer: Phaser.Input.Pointer) => commitPointerSpeed(pointer.x));
+    background.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      this.overlayScrollGestureLockPointerId = this.normalizeLegacyPlayTouchPointerId(pointer.id) ?? -1;
+      this.releaseOverlayScrollPointer();
+      commitPointerSpeed(pointer.x);
+    });
     background.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (pointer.isDown) {
         commitPointerSpeed(pointer.x);
@@ -9532,18 +9535,18 @@ export class MenuScene extends Phaser.Scene {
       : frontDoorChrome?.textColor ?? MENU_TEXT_COLOR;
 
     const labelY = resolveLegacyUiLabelCenterY(y, buttonFontSize, options.labelRole ?? 'button');
-    const label = this.padLegacyUiText(this.add.text(x, labelY, text, {
+    const label = this.padLegacyCompactUiText(this.add.text(x, labelY, text, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${buttonFontSize}px`,
       color: buttonTextColor
     })).setOrigin(0.5).setAlpha(frontDoorChrome?.labelAlpha ?? 0.92);
-    const buttonHorizontalInset = Math.max(16, Math.min(32, Math.round(width * 0.16)));
+    const buttonHorizontalInset = Math.max(10, Math.min(18, Math.round(width * 0.08)));
     this.fitLegacyUiTextToWidth(
       label,
       Math.max(44, width - (buttonHorizontalInset * 2)),
       buttonFontSize,
       isMenuFrontDoor ? 15 : 13,
-      isMenuFrontDoor ? 0.72 : 0.76
+      0.96
     );
     this.uiTexts.push(label);
 
@@ -9579,6 +9582,13 @@ export class MenuScene extends Phaser.Scene {
   private clearUi(): void {
     this.overlayScrollGraphics?.destroy();
     this.overlayScrollGraphics = null;
+    this.overlayMovementSpeedSliderBounds = null;
+
+    this.overlayGuideGraphics?.clearMask(false);
+    this.overlayGuideMask?.destroy();
+    this.overlayGuideMask = null;
+    this.overlayGuideMaskGraphics?.destroy();
+    this.overlayGuideMaskGraphics = null;
 
     for (const button of this.uiButtons) {
       button.destroy();
@@ -10722,6 +10732,9 @@ export class MenuScene extends Phaser.Scene {
         bounds: cloneVisualRect(this.progressionBadgeBounds),
         text: this.progressionBadgeText.visible ? this.progressionBadgeText.text : null,
         textBounds: cloneVisualRect(this.progressionBadgeTextBounds),
+        textFontSize: Number.isFinite(Number.parseFloat(String(this.progressionBadgeText.style.fontSize)))
+          ? Number.parseFloat(String(this.progressionBadgeText.style.fontSize))
+          : null,
         textFits: this.progressionBadgeTextFits
       },
       menuCompass: {
@@ -10766,6 +10779,9 @@ export class MenuScene extends Phaser.Scene {
           ),
           labelBounds: button.label.active && button.label.visible
             ? visualRectFromBounds(button.label.getBounds())
+            : null,
+          labelFontSize: Number.isFinite(Number.parseFloat(String(button.label.style.fontSize)))
+            ? Number.parseFloat(String(button.label.style.fontSize))
             : null,
           text: button.text
         })),

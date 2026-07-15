@@ -188,6 +188,28 @@ describe('input-human touch bridge', () => {
     expect(farPull?.normalizedY).toBe(0);
   });
 
+  test('matches the phone Pause action height to the shared run-status panel height', () => {
+    const layout = resolveTouchControlLayout({
+      width: 390,
+      height: 844
+    }, {
+      controlMode: 'stick',
+      topActionHeight: 62
+    });
+
+    expect(layout.controls.pause.height).toBe(62);
+    expect(layout.frames?.[0].height).toBe(62);
+
+    const ultraNarrow = resolveTouchControlLayout({
+      width: 220,
+      height: 480
+    }, {
+      controlMode: 'stick',
+      topActionHeight: 62
+    });
+    expect(ultraNarrow.controls.pause.height).toBe(62);
+  });
+
   test('centers phone controls within the bottom lane below the board when board bounds are known', () => {
     const board = {
       left: 31,

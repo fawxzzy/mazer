@@ -76,6 +76,7 @@ export interface TouchControlLayoutOptions {
   compact?: boolean;
   controlMode?: TouchControlMode;
   placement?: 'bottom-centered';
+  topActionHeight?: number;
   avoidRect?: {
     left: number;
     top: number;
@@ -325,7 +326,11 @@ export const resolveTouchControlLayout = (
       );
     const dpadLeft = Math.round(frameLeft + ((dpadFrameWidth - dpadSpan) / 2));
     const dpadTop = Math.round(frameTop + ((dpadFrameHeight - dpadSpan) / 2));
-    const topActionHeight = clamp(Math.round(buttonSize * 0.72), 30, ultraNarrow ? 34 : 38);
+    const topActionHeight = clamp(
+      Math.round(options.topActionHeight ?? (buttonSize * 0.72)),
+      30,
+      70
+    );
     const actionWidth = clamp(Math.round(viewport.width * 0.22), ultraNarrow ? 58 : 78, ultraNarrow ? 76 : 96);
     const actionTop = safeInsets.top + (ultraNarrow ? 8 : 10);
     const actionLeft = clamp(
@@ -410,7 +415,11 @@ export const resolveTouchControlLayout = (
     const dpadLeft = dpadFrameLeft + framePad;
     const dpadTop = dpadFrameTop + framePad;
     const actionWidth = clamp(Math.round(buttonSize * 1.24), 58, 86);
-    const actionHeight = clamp(Math.round(buttonSize * 0.78), 38, 52);
+    const actionHeight = clamp(
+      Math.round(options.topActionHeight ?? (buttonSize * 0.78)),
+      38,
+      70
+    );
     const actionLeft = clamp(
       boardRight + Math.max(10, Math.round(buttonSize * 0.18)),
       safeInsets.left + 4,

@@ -6,6 +6,8 @@ import {
 
 export const LEGACY_DIRECTIONAL_INTENT_LANE_SHIFT_TILE_LIMIT = 1;
 
+export const LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO = 0.65;
+
 export const LEGACY_CARDINAL_DIRECTIONS = [
   'up',
   'right',
@@ -99,6 +101,33 @@ export const resolveLegacyCardinalDirectionsFromVector = (
     directions.push('up');
   }
   return directions;
+};
+
+export const resolveLegacyAnalogCardinalDirectionsFromVector = (
+  deltaX: number,
+  deltaY: number,
+  secondaryDirectionRatio = LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO
+): LegacyCardinalDirection[] => {
+  const axes: Array<{ direction: LegacyCardinalDirection; magnitude: number }> = [];
+  if (Math.abs(deltaX) > 0.001) {
+    axes.push({
+      direction: deltaX > 0 ? 'right' : 'left',
+      magnitude: Math.abs(deltaX)
+    });
+  }
+  if (Math.abs(deltaY) > 0.001) {
+    axes.push({
+      direction: deltaY > 0 ? 'down' : 'up',
+      magnitude: Math.abs(deltaY)
+    });
+  }
+  axes.sort((left, right) => right.magnitude - left.magnitude);
+  const dominantMagnitude = axes[0]?.magnitude ?? 0;
+  const secondaryThreshold = dominantMagnitude * Math.max(0, Math.min(1, secondaryDirectionRatio));
+
+  return axes
+    .filter((axis, index) => index === 0 || axis.magnitude >= secondaryThreshold)
+    .map((axis) => axis.direction);
 };
 
 export class LegacyDirectionalIntentResolver {
