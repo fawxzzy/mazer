@@ -1,4 +1,5 @@
 const IGNORED_QUERY_PARAMS = new Set([
+  '_vercel_share',
   'runtimeDiagnostics',
   'v'
 ]);
