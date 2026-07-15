@@ -117,11 +117,23 @@ The physical-evidence follow-up checklist is also reconciled:
     Speed stayed inside `44,170 302x528`, while fixed actions stayed reachable
   - body and app computed backgrounds were both `rgb(2, 8, 15)` and the capture
     showed no purple top/bottom bands
+- Final deployed preview `dpl_EhUgoVRq8V1X43h6x6aQirPx6Q28` was `READY` at
+  `https://fawxzzy-mazer-ntcdngn51-fawxzzy.vercel.app`:
+  - Options reported `contentHeight=600`, `enabled=false`, and truthful
+    `track=null` / `thumb=null` diagnostics
+  - active play reported `236x58`, two-row status text with `textFits=true`
+  - Pause reported real overflow with `maxOffset=244`; at exact max, Move Speed
+    kept separate label/value and slider lanes while all fixed actions remained
+    reachable
+  - the only console noise was Vercel deployment-protection manifest/JWT access;
+    no application runtime error was observed
 
 Durable local capture:
 
 - `C:/ATLAS/tmp/captures/mazer-ui-surfaces/2026-07-15T07-57-26-575Z/report.md`
 - `C:/ATLAS/tmp/captures/mazer-ui-surfaces/2026-07-15T07-57-26-575Z/summary.json`
+- `C:/ATLAS/tmp/captures/mazer-ui-pr72-2026-07-15/mazer-ui-pr72-final-preview-options-390x844.png`
+- `C:/ATLAS/tmp/captures/mazer-ui-pr72-2026-07-15/mazer-ui-pr72-final-preview-pause-bottom-390x844.png`
 
 The archived `tests/scenes/demo-build.test.ts` suite still contains unrelated
 expectations for a removed presentation prototype. Its focused shell-CSS
