@@ -1,5 +1,10 @@
+import {
+  MAZER_ICON_QUALITY_TARGET,
+  MAZER_ICON_QUALITY_TARGET_VERSION
+} from '../brand/mazerIconQualityTarget';
+
 export const CYBER_ARCADE_MATERIAL_VERSION = 'mazer-cyber-arcade-material-v1' as const;
-export const CYBER_ARCADE_ICON_TARGET = 'public/icons/mazer-app-icon.png' as const;
+export const CYBER_ARCADE_ICON_TARGET = MAZER_ICON_QUALITY_TARGET.canonicalAsset.repositoryPath;
 
 export const cyberArcadeMaterial = Object.freeze({
   substrate: Object.freeze({
@@ -109,6 +114,8 @@ export const CYBER_ARCADE_MATERIAL_SURFACE_ROLES = Object.freeze([
 export const summarizeCyberArcadeMaterial = () => ({
   version: CYBER_ARCADE_MATERIAL_VERSION,
   iconTarget: CYBER_ARCADE_ICON_TARGET,
+  iconTargetSha256: MAZER_ICON_QUALITY_TARGET.canonicalAsset.sha256,
+  iconQualityTargetVersion: MAZER_ICON_QUALITY_TARGET_VERSION,
   surfaceRoles: [...CYBER_ARCADE_MATERIAL_SURFACE_ROLES],
   geometry: { ...cyberArcadeMaterial.geometry }
 });
