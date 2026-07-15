@@ -1123,11 +1123,56 @@ const collectWrapTopologyDiagnosticIssues = (surfaceId, surface, { requirePairs 
   return issues;
 };
 
+const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {
+  if (surface?.skipped === true) {
+    return [];
+  }
+
+  const material = surface?.materialSystem;
+  if (!material) {
+    return [`${surfaceId}:missing-material-system`];
+  }
+
+  const issues = [];
+  const expectedRoles = [
+    'background',
+    'maze',
+    'path',
+    'trail',
+    'player',
+    'title',
+    'border',
+    'button',
+    'compass',
+    'overlay'
+  ];
+  const missingRoles = expectedRoles.filter((role) => !material.surfaceRoles?.includes(role));
+  if (material.version !== 'mazer-cyber-arcade-material-v1') {
+    issues.push(`${surfaceId}:version=${material.version ?? 'missing'}`);
+  }
+  if (material.iconTarget !== 'public/icons/mazer-app-icon.png') {
+    issues.push(`${surfaceId}:iconTarget=${material.iconTarget ?? 'missing'}`);
+  }
+  if (missingRoles.length > 0) {
+    issues.push(`${surfaceId}:missingRoles=${missingRoles.join(',')}`);
+  }
+  if (
+    material.geometry?.fillAlignment !== 'integer-logical-pixels'
+    || material.geometry?.strokeAlignment !== 'half-pixel-centered'
+    || material.geometry?.backingScale !== 'dpr-aware-capped-2'
+    || material.geometry?.sharedPanelBounds !== 'snapped-at-draw-boundary'
+  ) {
+    issues.push(`${surfaceId}:geometry=${JSON.stringify(material.geometry ?? null)}`);
+  }
+  return issues;
+};
+
 const buildSurfaceChecks = ({
   consoleMessages,
   includeOverlayBottom = true,
   pageErrors,
   requirePlayTrailSeed = true,
+  requireTopologyDiagnostics = true,
   requireWrapPairs = false,
   surfaces,
   viewport
@@ -1193,10 +1238,13 @@ const buildSurfaceChecks = ({
     ...collectGuideTextContainmentIssues('options', surfaces.options),
     ...collectGuideTextContainmentIssues('pause', surfaces.pause)
   ];
-  const wrapTopologyDiagnosticIssues = [
+  const wrapTopologyDiagnosticIssues = requireTopologyDiagnostics ? [
     ...collectWrapTopologyDiagnosticIssues('menu', surfaces.menu, { requirePairs: requireWrapPairs }),
     ...collectWrapTopologyDiagnosticIssues('play', surfaces.play, { requirePairs: requireWrapPairs })
-  ];
+  ] : [];
+  const materialSystemIssues = Object.entries(surfaces).flatMap(([surfaceId, surface]) => (
+    collectCyberArcadeMaterialIssues(surfaceId, surface)
+  ));
   const menuTitle = surfaces.menu.title;
   const badgeFitIssues = [
     ['menu', surfaces.menu],
@@ -1376,9 +1424,18 @@ const buildSurfaceChecks = ({
     createCheck(
       'wrap-topology-diagnostics',
       wrapTopologyDiagnosticIssues.length === 0,
-      wrapTopologyDiagnosticIssues.length === 0
+      !requireTopologyDiagnostics
+        ? 'skipped for focused material and layout proof'
+        : wrapTopologyDiagnosticIssues.length === 0
         ? 'generated menu/play topology is paired, connected, and route-lower-bound valid'
         : wrapTopologyDiagnosticIssues.join('; ')
+    ),
+    createCheck(
+      'cyber-arcade-material-system',
+      materialSystemIssues.length === 0,
+      materialSystemIssues.length === 0
+        ? 'all captured surfaces publish the icon-aligned material and pixel-geometry contract'
+        : materialSystemIssues.join('; ')
     )
   ];
   const runtimeChecks = [
@@ -1759,7 +1816,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         textLabels: menu.diagnostics.visual?.textLabels,
         screenContract: menu.screenContract,
         authGated: authGatedMenu,
-        authStatus: menu.diagnostics.runtime?.auth?.status ?? null
+        authStatus: menu.diagnostics.runtime?.auth?.status ?? null,
+        materialSystem: menu.diagnostics.visual?.materialSystem
       },
       auth: authGatedMenu ? {
         mode: authSurface.diagnostics.visual?.runtime?.mode ?? authSurface.diagnostics.runtime?.surface?.mode,
@@ -1770,7 +1828,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         title: authSurface.diagnostics.visual?.title,
         nativeInputs: authSurface.nativeInputs,
         textLabels: authSurface.diagnostics.visual?.textLabels,
-        screenContract: authSurface.screenContract
+        screenContract: authSurface.screenContract,
+        materialSystem: authSurface.diagnostics.visual?.materialSystem
       } : {
         skipped: true,
         reason: 'already-authenticated',
@@ -1795,7 +1854,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         buttons: optionsSurface.diagnostics.visual?.buttons,
         nativeInputs: optionsSurface.nativeInputs,
         textLabels: optionsSurface.diagnostics.visual?.textLabels,
-        screenContract: optionsSurface.screenContract
+        screenContract: optionsSurface.screenContract,
+        materialSystem: optionsSurface.diagnostics.visual?.materialSystem
       },
       optionsBottom: authGatedMenu ? {
         skipped: true,
@@ -1810,7 +1870,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         buttons: optionsBottomSurface.diagnostics.visual?.buttons,
         nativeInputs: optionsBottomSurface.nativeInputs,
         textLabels: optionsBottomSurface.diagnostics.visual?.textLabels,
-        screenContract: optionsBottomSurface.screenContract
+        screenContract: optionsBottomSurface.screenContract,
+        materialSystem: optionsBottomSurface.diagnostics.visual?.materialSystem
       },
       play: {
         mode: play.diagnostics.visual?.runtime?.mode ?? play.diagnostics.runtime?.surface?.mode,
@@ -1825,7 +1886,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         textLabels: play.diagnostics.visual?.textLabels,
         touchControls: play.diagnostics.visual?.touchControls,
         buttons: play.diagnostics.visual?.buttons,
-        screenContract: play.screenContract
+        screenContract: play.screenContract,
+        materialSystem: play.diagnostics.visual?.materialSystem
       },
       pause: {
         mode: pause.diagnostics.visual?.runtime?.mode ?? pause.diagnostics.runtime?.surface?.mode,
@@ -1838,7 +1900,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         buttons: pause.diagnostics.visual?.buttons,
         nativeInputs: pause.nativeInputs,
         textLabels: pause.diagnostics.visual?.textLabels,
-        screenContract: pause.screenContract
+        screenContract: pause.screenContract,
+        materialSystem: pause.diagnostics.visual?.materialSystem
       },
       pauseBottom: {
         mode: pauseBottomSurface.diagnostics.visual?.runtime?.mode ?? pauseBottomSurface.diagnostics.runtime?.surface?.mode,
@@ -1847,7 +1910,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         buttons: pauseBottomSurface.diagnostics.visual?.buttons,
         nativeInputs: pauseBottomSurface.nativeInputs,
         textLabels: pauseBottomSurface.diagnostics.visual?.textLabels,
-        screenContract: pauseBottomSurface.screenContract
+        screenContract: pauseBottomSurface.screenContract,
+        materialSystem: pauseBottomSurface.diagnostics.visual?.materialSystem
       }
     };
     const screenshots = {
@@ -1871,6 +1935,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       includeOverlayBottom: !transition,
       pageErrors,
       requirePlayTrailSeed: !options.skipPlayTrailSeed,
+      requireTopologyDiagnostics: !options.skipTopologyDiagnostics,
       requireWrapPairs: topologyFixture === 'wrap-enabled',
       surfaces,
       targetUrl,
@@ -1951,6 +2016,7 @@ if (isDirectRun) {
     sessionId: args.session,
     skipBuild: args['skip-build'] === true || args['skip-build'] === 'true',
     skipPlayTrailSeed: args['skip-play-trail-seed'] === true || args['skip-play-trail-seed'] === 'true',
+    skipTopologyDiagnostics: args['skip-topology-diagnostics'] === true || args['skip-topology-diagnostics'] === 'true',
     timeoutMs: parseIntegerArg(args['timeout-ms'], DEFAULT_TIMEOUT_MS),
     topologyFixture: typeof args['topology-fixture'] === 'string' ? args['topology-fixture'] : undefined,
     useExistingServer: args['no-preview'] === true || args['no-preview'] === 'true',

@@ -40,7 +40,9 @@ describe('legacy menu button chrome', () => {
     expect(secondary.baseAlpha).toBeGreaterThanOrEqual(0.3);
     expect(secondary.baseAlpha).toBeLessThanOrEqual(0.31);
     expect(secondary.baseStroke).toBeGreaterThanOrEqual(0.52);
-    expect(secondary.fillColor).toBe(0x0d0715);
+    expect(secondary.fillColor).toBe(0x07131d);
+    expect(secondary.hoverFillColor).toBe(0x0b1f2b);
+    expect(secondary.strokeColor).toBe(0xb7f2ff);
     expect(secondary.hoverAlpha).toBeGreaterThan(0.12);
     expect(secondary.labelAlpha).toBeGreaterThanOrEqual(0.98);
     expect(secondary.strokeWidth).toBe(2);

@@ -9,6 +9,8 @@ describe('UI surface capture script contract', () => {
     const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'));
 
     expect(packageJson.scripts['visual:ui-surfaces']).toBe('node ./scripts/analysis/capture-ui-surfaces.mjs');
+    expect(packageJson.scripts['visual:cyber-arcade-matrix']).toBe('node ./scripts/analysis/capture-cyber-arcade-matrix.mjs');
+    expect(packageJson.scripts['visual:cyber-arcade-compare']).toBe('node ./scripts/analysis/build-cyber-arcade-comparison.mjs');
     expect(packageJson.scripts['visual:ui-transitions']).toBe('node ./scripts/analysis/capture-ui-transitions.mjs');
     expect(source).toContain("const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';");
     expect(source).toContain("const WRAP_TOPOLOGY_PROGRESSION_STORAGE_KEY = 'mazer.progression.v1:user:runtime-diagnostics-auth-fixture';");
@@ -95,6 +97,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('requirePlayTrailSeed: !options.skipPlayTrailSeed');
     expect(source).toContain("requireWrapPairs: topologyFixture === 'wrap-enabled'");
     expect(source).toContain('requirePlayTrailSeed = true');
+    expect(source).toContain('requireTopologyDiagnostics = true');
+    expect(source).toContain("'skipped for focused material and layout proof'");
     expect(source).toContain('const isIgnorableConsoleMessage = (message) => (');
     expect(source).toContain("message.text.includes('WebGL: CONTEXT_LOST_WEBGL')");
     expect(source).toContain("createCheck(\n      'play-player-green'");
@@ -127,6 +131,9 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const collectButtonLabelContainmentIssues = (surfaceId, surface) =>');
     expect(source).toContain('const collectGuideTextContainmentIssues = (surfaceId, surface) => {');
     expect(source).toContain('const collectWrapTopologyDiagnosticIssues = (surfaceId, surface, { requirePairs = false } = {}) => {');
+    expect(source).toContain('const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {');
+    expect(source).toContain("'cyber-arcade-material-system'");
+    expect(source).toContain('materialSystem: menu.diagnostics.visual?.materialSystem');
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-affordance'");
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-reachability'");
     expect(source).toContain("createCheck(\n      'button-label-containment'");
