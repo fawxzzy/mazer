@@ -2,18 +2,19 @@
 
 ## Ownership
 
-`WorldTurnSystem` is the future gameplay-mutation coordinator. Player movement,
-enemy movement, projectiles, pickups, item effects, duration expiry, and
-collisions must enter through one admitted turn command before those systems are
-wired into the shipping scene.
+`WorldTurnHost` is the scene-consumable gameplay-mutation boundary and owns one
+`WorldTurnSystem`. Player movement, enemy movement, projectiles, pickups, item
+effects, duration expiry, and collisions must enter through one admitted turn
+command before those systems are wired into the shipping scene.
 
 ## Admission
 
 - A `player-move` command advances the world only when the player-movement
   handler accepts the move.
-- A `timed-mode-tick` explicitly advances modes whose rules continue without a
-  player move.
-- Paused simulation rejects both command kinds.
+- A `timed-mode-tick` advances only when the host explicitly enables that
+  capability. Timed mode is disabled by default.
+- Paused and stopped host states reject both command kinds without consuming the
+  command ID or turn number.
 - Command IDs are idempotent and `expectedTurn` rejects stale multiplayer or
   replay input before mutation.
 
@@ -29,6 +30,8 @@ wired into the shipping scene.
 
 Each admitted turn returns an ordered receipt with phase and event sequencing.
 Rejected movement cannot run downstream phases or consume a turn number.
+Handlers are registered once at host construction, and bounded diagnostics list
+the registered phases in this same canonical order.
 
 ## Cosmetic Clock
 
@@ -40,8 +43,10 @@ turn.
 
 ## Current Boundary
 
-The legacy `MenuScene` player-movement path now enters this coordinator after
-the shared directional-intent resolver selects one legal cardinal step. Future
-enemy, projectile, item, duration, collision, and timed-mode handlers remain
-unintegrated. Those integrations must be incremental and preserve existing
-movement, completion, progression, and telemetry behavior.
+The legacy `MenuScene` player-movement path now enters `WorldTurnHost` after the
+shared directional-intent resolver selects one legal cardinal step. The scene
+maps non-play mode to stopped, overlays and lifecycle locks to paused, and active
+play to running. Timed mode remains disabled. Future enemy, projectile, item,
+duration, and collision handlers remain unintegrated. Those integrations must
+be incremental and preserve existing movement, completion, progression, and
+telemetry behavior.

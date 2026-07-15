@@ -1060,10 +1060,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const directions = resolveLegacyCardinalDirectionsFromVector(deltaX, deltaY);');
     expect(menuSceneSource).toContain('return this.performLegacyPlayDirectionalIntentStep();');
     expect(menuSceneSource).toContain('const accepted = this.tryMovePlayerFromInput(vector.deltaX, vector.deltaY, { releaseAfterStep: true });');
-    expect(menuSceneSource).toContain('private legacyWorldTurnSystem = this.createLegacyWorldTurnSystem();');
+    expect(menuSceneSource).toContain('private legacyWorldTurnHost = this.createLegacyWorldTurnHost();');
     expect(menuSceneSource).toContain("'player-movement': (): WorldTurnPhaseResult => this.applyLegacyWorldTurnPlayerMovement()");
-    expect(menuSceneSource).toContain('receipt = this.legacyWorldTurnSystem.advance({');
-    expect(menuSceneSource).toContain('simulationPaused: this.mode !== \'play\'');
+    expect(menuSceneSource).toContain('this.legacyWorldTurnHost.setState(this.resolveLegacyWorldTurnHostState());');
+    expect(menuSceneSource).toContain('receipt = this.legacyWorldTurnHost.advance({');
+    expect(menuSceneSource).toContain("return 'stopped';");
+    expect(menuSceneSource).toContain("return 'paused';");
+    expect(menuSceneSource).toContain('registeredPhases: [...worldTurnDiagnostics.registeredPhases]');
+    expect(menuSceneSource).toContain('timedModeEnabled: worldTurnDiagnostics.timedModeEnabled');
     expect(menuSceneSource).toContain('worldTurn: {');
   });
 

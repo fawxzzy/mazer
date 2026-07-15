@@ -57,6 +57,10 @@ export type WorldTurnPhaseHandler = (
 
 export type WorldTurnHandlers = Partial<Record<WorldTurnPhase, WorldTurnPhaseHandler>>;
 
+export interface WorldTurnSystemOptions {
+  timedModeEnabled?: boolean;
+}
+
 export interface WorldTurnPhaseReceipt {
   phase: WorldTurnPhase;
   status: 'applied' | 'skipped' | 'rejected';
@@ -69,7 +73,8 @@ export type WorldTurnRejectionReason =
   | 'invalid-command-id'
   | 'player-move-handler-missing'
   | 'player-move-rejected'
-  | 'simulation-paused';
+  | 'simulation-paused'
+  | 'timed-mode-disabled';
 
 export interface WorldTurnReceipt {
   admitted: boolean;
@@ -87,5 +92,21 @@ export interface WorldTurnDiagnostics {
   lastCommandId: string | null;
   lastReceipt: WorldTurnReceipt | null;
   nextTurn: number;
+  registeredPhases: readonly WorldTurnPhase[];
   rejectedCommandCount: number;
+  timedModeEnabled: boolean;
+}
+
+export type WorldTurnHostState = 'running' | 'paused' | 'stopped';
+
+export type WorldTurnHostCommand =
+  | Omit<PlayerMoveTurnCommand, 'simulationPaused'>
+  | Omit<TimedModeTurnCommand, 'simulationPaused'>;
+
+export interface WorldTurnHostOptions extends WorldTurnSystemOptions {
+  initialState?: WorldTurnHostState;
+}
+
+export interface WorldTurnHostDiagnostics extends WorldTurnDiagnostics {
+  state: WorldTurnHostState;
 }
