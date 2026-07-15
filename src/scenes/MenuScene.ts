@@ -6789,7 +6789,7 @@ export class MenuScene extends Phaser.Scene {
       shiftPeriodMs: {
         playerAccent: 4200,
         playerHalo: 3600,
-        pulse: 2600,
+        pulse: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS,
         trail: 7200
       },
       trailHeadColor: resolveLegacyIridescentTrailColor(trailHeadIndex, trailLength, time, palette.trailColor),

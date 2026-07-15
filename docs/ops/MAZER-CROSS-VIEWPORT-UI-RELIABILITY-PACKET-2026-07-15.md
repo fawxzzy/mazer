@@ -1,5 +1,9 @@
 # Mazer Cross-Viewport UI Reliability Packet — 2026-07-15
 
+## Reduced-motion follow-up
+
+The production candidate slows the single white trail shine from `2600ms` to `8000ms` per one-way pass (`5200ms` to `16000ms` round trip), a little over three times slower. The cadence contract is versioned as `legacy-animation-cadence-v2`, runtime material diagnostics report the same source constant, and focused cadence/render tests guard the gentler speed.
+
 ## Outcome
 
 Mazer now keeps one live viewport authority across phone browser-chrome changes,

@@ -1,7 +1,7 @@
 import type { LegacyPoint } from './legacyMaze';
 
-export const LEGACY_ANIMATION_CADENCE_VERSION = 'legacy-animation-cadence-v1' as const;
-export const LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS = 2600;
+export const LEGACY_ANIMATION_CADENCE_VERSION = 'legacy-animation-cadence-v2' as const;
+export const LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS = 8000;
 export const LEGACY_TRAIL_SHINE_CYCLE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS * 2;
 export const LEGACY_MAZE_REVEAL_STRATEGY_VERSION = 'interleaved-non-solution-v1' as const;
 export const LEGACY_MAZE_REVEAL_NON_SOLUTION_BURST = 2;
