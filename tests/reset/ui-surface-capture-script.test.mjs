@@ -162,6 +162,14 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("topologyFixture: typeof args['topology-fixture'] === 'string' ? args['topology-fixture'] : undefined");
     expect(source).toContain("authFixture: typeof args['auth-fixture'] === 'string' ? args['auth-fixture'] : undefined");
     expect(source).toContain("authFixture: result.authFixture");
+    expect(source).toContain("preferenceFixture: typeof args['preference-fixture'] === 'string' ? args['preference-fixture'] : undefined");
+    expect(source).toContain("if (preferenceFixture !== 'fresh') {");
+    expect(source).toContain("'fresh-session-defaults'");
+    expect(source).toContain("hasLabels(surfaces.pause, ['Off: full maze view.', 'Off: trail stays.'])");
+    expect(source).toContain("'On: white shine travels.'");
+    expect(source).toContain('preferenceFixture: result.preferenceFixture');
+    expect(source).toContain('window.requestAnimationFrame(() => {');
+    expect(source).toContain('window.requestAnimationFrame(resolvePaint);');
     expect(source).not.toContain("expectedLabels: ['Exit', 'Start', 'Options']");
     expect(source).toContain("authGated ? hasLabels(surfaces.menu, ['Login']) : hasLabels(surfaces.menu, ['Start', 'Options'])");
     expect(source).toContain("authGated\n        ? surfaces.options.skipped === true");
