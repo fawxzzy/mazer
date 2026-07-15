@@ -9,6 +9,7 @@ export type LegacyOverlayToggleFieldId =
   | 'toggleTrailPulse'
   | 'toggleAnimatedBackdrop'
   | 'darkMode'
+  | 'smartSteering'
   | 'controlMode';
 export type LegacyOverlayToggleStateText = 'On' | 'Off' | 'Arrows' | 'Stick' | 'Animated' | 'Stagnant';
 
@@ -36,6 +37,7 @@ export const resolveLegacyOverlayToggleStateText = (
     case 'toggleTrailFade':
     case 'toggleTrailPulse':
     case 'darkMode':
+    case 'smartSteering':
       return value ? 'On' : 'Off';
     case 'toggleAnimatedBackdrop':
       return value ? 'Animated' : 'Stagnant';
@@ -61,6 +63,8 @@ export const resolveLegacyOverlayToggleSwitchIsOn = (
       return settings.toggleAnimatedBackdrop;
     case 'darkMode':
       return settings.darkMode;
+    case 'smartSteering':
+      return settings.smartSteering;
     case 'controlMode':
       return settings.controlMode === 'stick';
     default:
@@ -146,6 +150,18 @@ export const applyLegacyOverlayToggleField = (
         legacyDirectionalLightIntensity: nextSettings.darkMode ? 0.3 : 2.0,
         switchIsOn: darkModeDisplayState.switchIsOn,
         stateText: darkModeDisplayState.stateText
+      };
+    case 'smartSteering':
+      nextSettings.smartSteering = !nextSettings.smartSteering;
+      const smartSteeringDisplayState = resolveLegacyOverlayToggleDisplayState(fieldId, nextSettings);
+      return {
+        settings: nextSettings,
+        affectsBackdrop: false,
+        affectsBoardStatic: false,
+        affectsBoardDynamic: false,
+        legacyDirectionalLightIntensity: null,
+        switchIsOn: smartSteeringDisplayState.switchIsOn,
+        stateText: smartSteeringDisplayState.stateText
       };
     case 'controlMode':
       nextSettings.controlMode = nextSettings.controlMode === 'stick' ? 'arrows' : 'stick';

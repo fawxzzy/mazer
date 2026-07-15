@@ -18,14 +18,14 @@
 2. A held press or drag repeats at the configured movement-speed cadence while the active direction remains legal.
 3. A newer direction replaces the previous queued direction. The resolver never stores a multi-command turn queue.
 4. A queued direction turns immediately when it becomes legal, including at the first matching side opening while the current run direction remains legal.
-5. If the held direction is blocked and no queued direction exists, the resolver may move one tile on the perpendicular axis only when exactly one side tile is legal and the held direction is legal again from that tile.
+5. If the held direction is blocked, no queued direction exists, and Smart Steering is enabled, the resolver may move one tile on the perpendicular axis when either side immediately restores the held lane. If both sides qualify, a stable orthogonal ordering chooses one instead of freezing the held input.
 6. A lane shift never changes the active held direction. The next cadence step resumes that direction through the wall opening.
-7. Automatic assistance stops when neither side can resume the held lane after one tile or when both sides qualify. Reversing and ordinary corridor turns always require explicit input.
+7. Automatic assistance stops when neither side can resume the held lane after one tile, when Smart Steering is disabled, or when another side-step would be required before the held lane resumes. Reversing and ordinary corridor turns still require explicit input.
 8. Release, focus loss, pause, menu entry, reset, generation, and lifecycle locks clear or synchronize intent so stale input cannot replay.
 
 ## One-tile assistance boundary
 
-Assistance performs only the immediate perpendicular step and one-cell lookahead needed to prove that the held lane resumes. It never changes the held heading, follows a route, chooses between two valid sides, or accepts a two-tile detour. A mismatched queued turn still waits for explicit intent rather than falling through to automatic assistance.
+Assistance performs only the immediate perpendicular step and one-cell lookahead needed to prove that the held lane resumes. It never changes the held heading, follows a route, or accepts a two-tile detour. When both one-tile sides qualify, the resolver uses stable orthogonal ordering rather than exposing a solver path. A mismatched queued turn still waits for explicit intent rather than falling through to automatic assistance.
 
 ## Diagnostics
 
@@ -33,7 +33,7 @@ Runtime diagnostics publish only bounded intent state: active direction, queued 
 
 ## Verification spine
 
-- Pure fixtures: immediate turn, delayed opening, latest-wins replacement, dead end, horizontal and vertical one-tile shifts with held-direction resumption, ambiguous side choices, rejected two-tile detours, paired wrap, and release cleanup.
+- Pure fixtures: immediate turn, delayed opening, latest-wins replacement, dead end, horizontal and vertical one-tile shifts with held-direction resumption, stable two-sided choice, disabled assistance, rejected chained/two-tile detours, paired wrap, and release cleanup.
 - Scene contract: every live input adapter enters `LegacyDirectionalIntentResolver`, then `WorldTurnSystem`.
 - Regression packet: touch/stick, legacy play-step, runtime diagnostics, MenuScene, keyboard/world-turn, and input-equivalence tests.
 - Route-aware proof: a clean-commit phone control trace and desktop keyboard trace, including release cleanup and zero console/page errors.

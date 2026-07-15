@@ -1789,6 +1789,11 @@ export class MenuScene extends Phaser.Scene {
           label: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
           value: normalizeLegacyMovementSpeed(this.settings.movementSpeed)
         },
+        smartSteering: {
+          enabled: this.settings.smartSteering,
+          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('smartSteering', this.settings),
+          stateText: resolveLegacyOverlayToggleStateText('smartSteering', this.settings.smartSteering) ?? 'Off'
+        },
         trailFade: {
           enabled: this.settings.toggleTrailFade,
           switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
@@ -3221,7 +3226,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private performLegacyPlayDirectionalIntentStep(): boolean {
-    const step = this.playDirectionalIntent.step(this.maze, this.player);
+    const step = this.playDirectionalIntent.step(this.maze, this.player, {
+      assistedLaneShiftEnabled: this.settings.smartSteering
+    });
     if (!step.moved) {
       this.publishInteractionDiagnostics();
       return false;
@@ -6150,10 +6157,10 @@ export class MenuScene extends Phaser.Scene {
     const timerLabel = this.formatLegacyElapsedLabel(
       menu ? this.resolveLegacyMenuAiElapsedMs() : this.resolveLegacyPlayElapsedMs()
     );
-    const rankLabel = `${menu ? 'AI ' : ''}Rank: ${track.rank}`;
+    const rankLabel = `${menu ? 'AI ' : ''}Rank ${track.rank}`;
     const score = clampInteger(Math.round(track.paceScore), 0, 100);
 
-    return `${timerLabel}  ${rankLabel}\nScore: ${score}/100  Maze Lvl: ${track.level}`;
+    return `${timerLabel}   ${rankLabel}\nScore ${score}/100   Maze ${track.level}`;
   }
 
   private drawLegacyMenuCompass(
@@ -7627,7 +7634,7 @@ export class MenuScene extends Phaser.Scene {
     const controlLayout = resolveLegacyFeatureControlLayout(panel.width, options.showDescriptions === true);
     const rowHeight = controlLayout.rowHeight;
     const rowGap = controlLayout.rowGap;
-    const toggleRowCount = 6;
+    const toggleRowCount = 7;
 
     return 4
       + (toggleRowCount * (rowHeight + rowGap))
@@ -7951,15 +7958,15 @@ export class MenuScene extends Phaser.Scene {
       );
     };
 
-    drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');
-    drawLegendRow(1, 'start', 'Start', 'run begins', '#fff05a');
-    drawLegendRow(2, 'end', 'End', 'clear here', '#ff5264');
-    const bulletTop = legendTop + (3 * rowHeight) + 10;
+    drawLegendRow(0, 'compass', 'Compass', 'points to exit', '#b7f2ff');
+    drawLegendRow(1, 'start', 'Start', 'begin here', '#fff05a');
+    drawLegendRow(2, 'end', 'Exit', 'finish here', '#ff5264');
+    const bulletTop = legendTop + (3 * rowHeight) + 8;
     const bullets = [
-      'Player: green beacon + trail',
-      `${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public tier`,
-      'Score: run quality',
-      'Maze Lvl: challenge tier'
+      'Player • green trail',
+      `${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`,
+      'Score • run quality',
+      'Maze • difficulty'
     ];
     bullets.forEach((copy, index) => {
       addText(`• ${copy}`, detailLeft, bulletTop + (index * rowHeight), detailWidth, '#d9fff5', guideRowFontSize, 0, 0.92, guideRowMinFontSize);
@@ -8498,8 +8505,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings),
         description: this.settings.toggleCameraFollow
-          ? 'On: camera follows you.'
-          : 'Off: full maze view.',
+          ? 'Camera follows you.'
+          : 'Full maze view.',
         label: 'Camera Follow',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleCameraFollow'),
@@ -8509,8 +8516,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
         description: this.settings.toggleTrailFade
-          ? 'On: old trail fades.'
-          : 'Off: trail stays.',
+          ? 'Old trail fades.'
+          : 'Trail stays.',
         label: 'Trail Fade',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailFade'),
@@ -8520,8 +8527,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
         description: this.settings.toggleTrailPulse
-          ? 'On: white shine travels.'
-          : 'Off: no trail shine.',
+          ? 'Slow white shine.'
+          : 'No trail shine.',
         label: 'Trail Shine',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('toggleTrailPulse'),
@@ -8531,8 +8538,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
         description: this.settings.toggleAnimatedBackdrop
-          ? 'On: background moves.'
-          : 'Off: background still.',
+          ? 'Moving background.'
+          : 'Background still.',
         label: 'Animated BG',
         offLabel: 'Stagnant',
         onClick: () => this.applyLegacyOverlayToggleField('toggleAnimatedBackdrop'),
@@ -8542,8 +8549,8 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings),
         description: this.settings.darkMode
-          ? 'On: darker contrast.'
-          : 'Off: brighter view.',
+          ? 'Darker contrast.'
+          : 'Brighter view.',
         label: 'Dark Mode',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('darkMode'),
@@ -8553,13 +8560,24 @@ export class MenuScene extends Phaser.Scene {
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings),
         description: this.settings.controlMode === 'stick'
-          ? 'Stick: drag to move.'
-          : 'Arrows: tap to move.',
-        label: 'Controls',
+          ? 'Drag the stick to move.'
+          : 'Tap arrows to move.',
+        label: 'Control Style',
         offLabel: 'Arrows',
         onClick: () => this.applyLegacyOverlayToggleField('controlMode'),
         onLabel: 'Stick',
         stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'
+      },
+      {
+        checked: resolveLegacyOverlayToggleSwitchIsOn('smartSteering', this.settings),
+        description: this.settings.smartSteering
+          ? 'Shifts 1 tile at walls.'
+          : 'Stops when a wall blocks you.',
+        label: 'Smart Steering',
+        offLabel: 'Off',
+        onClick: () => this.applyLegacyOverlayToggleField('smartSteering'),
+        onLabel: 'On',
+        stateText: resolveLegacyOverlayToggleStateText('smartSteering', this.settings.smartSteering) ?? 'Off'
       }
     ];
 
@@ -9724,6 +9742,9 @@ export class MenuScene extends Phaser.Scene {
       this.resetLegacyPlayInputBuffer();
       this.hudDirty = true;
     }
+    if (fieldId === 'smartSteering') {
+      this.resetLegacyPlayDirectionalInputBuffer();
+    }
     if (fieldId === 'toggleTrailPulse') {
       this.legacyPlayTrailPulseNextFrameAtMs = 0;
     }
@@ -9790,8 +9811,10 @@ export class MenuScene extends Phaser.Scene {
         return 'Animated BG';
       case 'darkMode':
         return 'Dark Mode';
+      case 'smartSteering':
+        return 'Smart Steering';
       case 'controlMode':
-        return 'Controls';
+        return 'Control Style';
       default:
         return fieldId satisfies never;
     }

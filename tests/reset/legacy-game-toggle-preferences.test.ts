@@ -38,6 +38,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.3,
+      smartSteering: true,
       toggleAnimatedBackdrop: true,
       toggleCameraFollow: false,
       toggleTrailFade: false,
@@ -52,6 +53,7 @@ describe('legacy game toggle preferences', () => {
     settings.controlMode = 'stick';
     settings.darkMode = true;
     settings.movementSpeed = 0.82;
+    settings.smartSteering = false;
     settings.toggleAnimatedBackdrop = false;
     settings.toggleCameraFollow = true;
     settings.toggleTrailFade = true;
@@ -64,6 +66,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.82,
+      smartSteering: false,
       toggleAnimatedBackdrop: false,
       toggleCameraFollow: true,
       toggleTrailFade: true,
@@ -79,6 +82,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.33,
+      smartSteering: false,
       toggleAnimatedBackdrop: false,
       toggleCameraFollow: true,
       toggleTrailFade: true,
@@ -92,6 +96,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.33,
+      smartSteering: false,
       toggleAnimatedBackdrop: false,
       toggleCameraFollow: true,
       toggleTrailFade: true,
@@ -117,6 +122,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'teleport',
       darkMode: 'yes',
       movementSpeed: '1.4',
+      smartSteering: 'off',
       toggleAnimatedBackdrop: 'no',
       toggleCameraFollow: 1,
       toggleTrailFade: null,
@@ -128,6 +134,7 @@ describe('legacy game toggle preferences', () => {
     expect(settings.controlMode).toBe('stick');
     expect(settings.darkMode).toBe(true);
     expect(settings.movementSpeed).toBe(1);
+    expect(settings.smartSteering).toBe(false);
     expect(settings.toggleAnimatedBackdrop).toBe(false);
     expect(settings.toggleCameraFollow).toBe(false);
     expect(settings.toggleTrailFade).toBe(false);
@@ -200,6 +207,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'arrows',
       darkMode: false,
       movementSpeed: 0.72,
+      smartSteering: false,
       toggleAnimatedBackdrop: false,
       toggleCameraFollow: true,
       toggleTrailFade: true,
@@ -213,6 +221,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'arrows',
       darkMode: false,
       movementSpeed: 0.72,
+      smartSteering: false,
       toggleAnimatedBackdrop: false,
       toggleCameraFollow: true,
       toggleTrailFade: true,

@@ -134,6 +134,11 @@ export interface MenuSceneRuntimeDiagnostics {
       label: string;
       value: number;
     };
+    smartSteering: {
+      enabled: boolean;
+      switchIsOn: boolean;
+      stateText: string;
+    };
     trailFade: {
       enabled: boolean;
       switchIsOn: boolean;

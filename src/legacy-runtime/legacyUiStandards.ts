@@ -15,14 +15,14 @@ export const resolveLegacyRunStatusPanelLayout = (
 ): LegacyRunStatusPanelLayout => {
   const compact = viewportWidth < LEGACY_UI_COMPACT_BREAKPOINT;
   const maximumWidth = Math.max(160, Math.min(viewportWidth - 18, availableWidth));
-  const preferredWidth = compact ? 252 : 272;
+  const preferredWidth = compact ? 252 : 284;
 
   return {
-    fontSize: compact ? 10 : 11,
-    height: compact ? 60 : 64,
-    horizontalPadding: compact ? 24 : 28,
-    lineSpacing: 2,
-    textWidthSafetyRatio: compact ? 0.86 : 0.9,
+    fontSize: compact ? 12 : 13,
+    height: compact ? 64 : 68,
+    horizontalPadding: compact ? 28 : 30,
+    lineSpacing: compact ? 4 : 3,
+    textWidthSafetyRatio: compact ? 0.78 : 0.84,
     width: Math.min(preferredWidth, maximumWidth)
   };
 };
@@ -62,19 +62,19 @@ export interface LegacyOptionsGuideLayout {
 
 export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptionsGuideLayout => {
   const compact = panelWidth < LEGACY_UI_COMPACT_BREAKPOINT;
-  const titleFontSize = compact ? 17 : 20;
-  const titleOffset = compact ? 17 : 20;
+  const titleFontSize = compact ? 18 : 20;
+  const titleOffset = compact ? 18 : 20;
 
   return {
-    cardHeight: compact ? 220 : 248,
+    cardHeight: compact ? 204 : 228,
     cardWidthLimit: compact ? 350 : 540,
-    horizontalMargin: compact ? 32 : 64,
-    inset: compact ? 12 : 18,
-    legendTopOffset: compact ? 50 : 54,
-    rowHeight: compact ? 23 : 26,
-    rowFontSize: compact ? 10 : 12,
-    rowMinFontSize: compact ? 8 : 9,
-    textWidthSafetyRatio: compact ? 0.86 : 0.9,
+    horizontalMargin: compact ? 28 : 60,
+    inset: compact ? 14 : 18,
+    legendTopOffset: compact ? 48 : 52,
+    rowHeight: compact ? 20 : 24,
+    rowFontSize: compact ? 11 : 12,
+    rowMinFontSize: compact ? 10 : 10,
+    textWidthSafetyRatio: compact ? 0.8 : 0.86,
     titleFontSize,
     titleOffset,
     titleRuleOffset: titleOffset + Math.ceil(titleFontSize * 0.72) + (compact ? 12 : 8)
@@ -93,14 +93,14 @@ export const resolveLegacyFeatureControlLayout = (
   const compact = panelWidth < LEGACY_UI_COMPACT_BREAKPOINT;
   if (showDescriptions) {
     return {
-      rowGap: compact ? 7 : 9,
-      rowHeight: compact ? 72 : 74
+      rowGap: compact ? 10 : 11,
+      rowHeight: compact ? 82 : 84
     };
   }
 
   return {
-    rowGap: compact ? 6 : 8,
-    rowHeight: compact ? 42 : 46
+    rowGap: compact ? 8 : 9,
+    rowHeight: compact ? 48 : 50
   };
 };
 

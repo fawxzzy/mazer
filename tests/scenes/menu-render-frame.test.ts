@@ -95,9 +95,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     );
     expect(guideSource).toContain("drawLegendRow(0, 'compass', 'Compass'");
     expect(guideSource).toContain("drawLegendRow(1, 'start', 'Start'");
-    expect(guideSource).toContain("drawLegendRow(2, 'end', 'End'");
-    expect(guideSource).toContain("'Player: green beacon + trail'");
-    expect(guideSource).toContain("'Score: run quality'");
+    expect(guideSource).toContain("drawLegendRow(2, 'end', 'Exit'");
+    expect(guideSource).toContain("'Player • green trail'");
+    expect(guideSource).toContain("'Score • run quality'");
     expect(guideSource).not.toContain('activeTargetComplexity');
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
@@ -1057,7 +1057,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("'Reset', resetAction");
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
-    expect(menuSceneSource).toContain('this.playDirectionalIntent.step(this.maze, this.player);');
+    expect(menuSceneSource).toContain('this.playDirectionalIntent.step(this.maze, this.player, {');
+    expect(menuSceneSource).toContain('assistedLaneShiftEnabled: this.settings.smartSteering');
     expect(menuSceneSource).toContain('private tryMovePlayerFromInput(');
     expect(menuSceneSource).toContain('const directions = resolveLegacyCardinalDirectionsFromVector(deltaX, deltaY);');
     expect(menuSceneSource).toContain('return this.performLegacyPlayDirectionalIntentStep();');
@@ -1328,10 +1329,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private resolveLegacyProgressionBadgeText(_palette: LegacyProgressionPalette): string');
     expect(menuSceneSource).toContain('const text = this.resolveLegacyProgressionBadgeText(palette);');
     expect(menuSceneSource).toContain("const track = this.progressionState.tracks[menu ? 'ai-runner' : 'player'];");
-    expect(menuSceneSource).toContain("const rankLabel = `${menu ? 'AI ' : ''}Rank: ${track.rank}`;");
+    expect(menuSceneSource).toContain("const rankLabel = `${menu ? 'AI ' : ''}Rank ${track.rank}`;");
     expect(menuSceneSource).toContain('const score = clampInteger(Math.round(track.paceScore), 0, 100);');
-    expect(menuSceneSource).toContain('return `${timerLabel}  ${rankLabel}\\nScore: ${score}/100  Maze Lvl: ${track.level}`;');
-    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public tier`");
+    expect(menuSceneSource).toContain('return `${timerLabel}   ${rankLabel}\\nScore ${score}/100   Maze ${track.level}`;');
+    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`");
     expect(menuSceneSource).toContain('This resets your rank progress, score, runs, and maze level');
     expect(menuSceneSource).not.toContain('Skill Lvl');
     expect(menuSceneSource).not.toContain('Player Skill');
@@ -1378,12 +1379,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
     expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);');
     expect(menuSceneSource).toContain("addText('PLAYER GUIDE', cardCenterX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);");
-    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');");
-    expect(menuSceneSource).toContain("'Player: green beacon + trail'");
+    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'points to exit', '#b7f2ff');");
+    expect(menuSceneSource).toContain("'Player • green trail'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
-    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public tier`");
-    expect(menuSceneSource).toContain("'Score: run quality'");
-    expect(menuSceneSource).toContain("'Maze Lvl: challenge tier'");
+    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`");
+    expect(menuSceneSource).toContain("'Score • run quality'");
+    expect(menuSceneSource).toContain("'Maze • difficulty'");
     expect(menuSceneSource).not.toContain('the current procedural challenge tier');
   });
 

@@ -12,15 +12,15 @@ import {
 describe('legacy UI standards', () => {
   test('uses one two-row run-status component in menu and play lanes', () => {
     expect(resolveLegacyRunStatusPanelLayout(390)).toEqual({
-      fontSize: 10,
-      height: 60,
-      horizontalPadding: 24,
-      lineSpacing: 2,
-      textWidthSafetyRatio: 0.86,
+      fontSize: 12,
+      height: 64,
+      horizontalPadding: 28,
+      lineSpacing: 4,
+      textWidthSafetyRatio: 0.78,
       width: 252
     });
     expect(resolveLegacyRunStatusPanelLayout(390, 208).width).toBe(208);
-    expect(resolveLegacyRunStatusPanelLayout(900).width).toBe(272);
+    expect(resolveLegacyRunStatusPanelLayout(900).width).toBe(284);
   });
 
   test('lifts legacy glyph labels to optical center without changing horizontal geometry', () => {
@@ -33,13 +33,13 @@ describe('legacy UI standards', () => {
     const compact = resolveLegacyOptionsGuideLayout(LEGACY_UI_COMPACT_BREAKPOINT - 1);
     const wide = resolveLegacyOptionsGuideLayout(LEGACY_UI_COMPACT_BREAKPOINT);
 
-    expect(compact.cardHeight).toBe(220);
-    expect(compact.rowFontSize).toBe(10);
-    expect(compact.rowMinFontSize).toBe(8);
-    expect(compact.textWidthSafetyRatio).toBe(0.86);
+    expect(compact.cardHeight).toBe(204);
+    expect(compact.rowFontSize).toBe(11);
+    expect(compact.rowMinFontSize).toBe(10);
+    expect(compact.textWidthSafetyRatio).toBe(0.8);
     expect(compact.titleRuleOffset).toBeGreaterThan(compact.titleOffset + compact.titleFontSize);
     expect(wide.rowFontSize).toBe(12);
-    expect(wide.rowHeight).toBe(26);
+    expect(wide.rowHeight).toBe(24);
   });
 
   test('reserves the compact toggle switch lane before showing state copy', () => {
@@ -55,16 +55,16 @@ describe('legacy UI standards', () => {
 
   test('uses one compact control rhythm for measurement and rendering', () => {
     expect(resolveLegacyFeatureControlLayout(360, false)).toEqual({
-      rowGap: 6,
-      rowHeight: 42
+      rowGap: 8,
+      rowHeight: 48
     });
     expect(resolveLegacyFeatureControlLayout(360, true)).toEqual({
-      rowGap: 7,
-      rowHeight: 72
+      rowGap: 10,
+      rowHeight: 82
     });
     expect(resolveLegacyFeatureControlLayout(540, true)).toEqual({
-      rowGap: 9,
-      rowHeight: 74
+      rowGap: 11,
+      rowHeight: 84
     });
   });
 

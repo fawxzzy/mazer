@@ -669,7 +669,8 @@ const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
 ]);
 
 const resolveOptionsBottomExpectedLabels = (authenticated) => [
-  'Controls',
+  'Smart Steering',
+  'Control Style',
   authenticated ? 'Log out' : 'Account'
 ];
 
@@ -1203,6 +1204,10 @@ const buildSurfaceChecks = ({
   viewport
 }) => {
   const hasLabels = (surface, expectedLabels) => hasTextLabels(surface, expectedLabels);
+  const hasLabelsAcross = (surfaceGroup, expectedLabels) => {
+    const labels = new Set(surfaceGroup.flatMap((surface) => collectTextLabels(surface)));
+    return expectedLabels.every((label) => labels.has(label));
+  };
   const labelDetail = (surface) => collectTextLabels(surface)
     .join(', ');
   const authGated = surfaces.menu.authGated === true;
@@ -1247,7 +1252,7 @@ const buildSurfaceChecks = ({
     ...collectOverlayScrollAffordanceIssues('pause', surfaces.pause)
   ];
   const overlayScrollBottomIssues = includeOverlayBottom ? [
-    ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, ['Controls']),
+    ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, ['Smart Steering', 'Control Style']),
     ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Move Speed', 'Reset Progress', 'Reset', 'Menu'])
   ] : [];
   const buttonLabelContainmentIssues = [
@@ -1400,16 +1405,19 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'fresh-session-defaults',
-      preferenceFixture !== 'fresh' || !includeOverlayBottom || (
-        hasLabels(surfaces.pause, ['Off: full maze view.', 'Off: trail stays.'])
-        && hasLabels(surfaces.pauseBottom, [
-          'On: white shine travels.',
-          'On: background moves.',
-          'On: darker contrast.',
-          'Stick: drag to move.',
+      preferenceFixture !== 'fresh' || !includeOverlayBottom || hasLabelsAcross(
+        [surfaces.pause, surfaces.pauseBottom],
+        [
+          'Full maze view.',
+          'Trail stays.',
+          'Slow white shine.',
+          'Moving background.',
+          'Darker contrast.',
+          'Shifts 1 tile at walls.',
+          'Drag the stick to move.',
           'Move Speed',
           '30%'
-        ])
+        ]
       ),
       preferenceFixture !== 'fresh'
         ? 'not requested'
