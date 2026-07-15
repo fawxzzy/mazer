@@ -13,6 +13,7 @@ No production deployment occurred.
 - Product base: `926bf96e39d066afff25ac51d6c546b9ea00289f` (`origin/main`)
 - Product branch: `codex/crisp-cyber-graphics-completion`
 - Product implementation commit: `1a622065e5d38e0135a639a781744bdfff74d392`
+- Pixel-center review correction: `765e899c24487fb3af33c20557e9b8f5c25b450f`
 - DiscordOS admission PR: `#78`, merged at `ad4fd8df6d0f15cc9485b371b02ae6000bf30854`
 - Card: `mazer-crisp-cyber-arcade-graphics`
 - Source thread/starter: `1524889578408771696`
@@ -26,7 +27,7 @@ No production deployment occurred.
 - The player/trail remain green with white shine; start remains yellow; goal and compass direction remain red.
 - Menu title facets, drift runes, HUD, touch controls, overlay chrome, and front-door buttons consume the same palette instead of maintaining disconnected literals.
 - Front-door button fills and strokes now reach the actual graphics draw path. Previously calculated button chrome was not rendered.
-- Shared cyber panels snap their logical bounds to integer pixels before drawing; DPR-aware canvas backing remains capped at `2x`.
+- Shared cyber panels snap their logical bounds to integer pixels before drawing; odd-width rails are centered on half pixels and DPR-aware canvas backing remains capped at `2x`.
 - Runtime visual diagnostics publish `mazer-cyber-arcade-material-v1`, the approved icon path, all ten surface roles, and the geometry policy on every captured screen.
 - The route-aware capture harness enforces that material contract and supports a narrowly declared topology skip for focused graphics/layout proof without changing the default topology gate.
 - Reusable scripts capture the required four-viewport matrix and generate a hash-correlated icon-to-runtime comparison sheet.
@@ -51,7 +52,7 @@ No production deployment occurred.
 
 ## Route-aware browser proof
 
-Clean implementation commit `1a622065e5d38e0135a639a781744bdfff74d392` passed the four-profile matrix. Every profile reported `dirty=false`, `34/34` checks, zero console warnings/errors, and zero page errors.
+The clean product head containing implementation commit `1a622065e5d38e0135a639a781744bdfff74d392` and pixel-center correction `765e899c24487fb3af33c20557e9b8f5c25b450f` passed the four-profile matrix. Every profile reported `dirty=false`, `34/34` checks, zero console warnings/errors, and zero page errors.
 
 - `390x844`, DPR `2`: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-clean-1a622065-20260714-iphone-390x844\summary.json`
 - `405x958`, DPR `2`: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-clean-1a622065-20260714-tall-mobile-405x958\summary.json`
