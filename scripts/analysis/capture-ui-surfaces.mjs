@@ -914,6 +914,7 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
 
   const badge = surface.progressionBadge?.bounds;
   const board = surface.board?.bounds;
+  const renderBoard = surface.board?.renderBounds;
   if (!isFiniteBounds(badge) || !isFiniteBounds(board)) {
     return [`${surfaceId}:missing-progression-badge-or-board-bounds`];
   }
@@ -924,8 +925,11 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
   }
 
   const portraitPlay = surface.mode === 'play' && viewport.height > viewport.width;
-  if (!portraitPlay && Math.abs(badge.width - board.width) > 1) {
-    issues.push(`${surfaceId}:progression-badge-width=${badge.width.toFixed(1)}!=board=${board.width.toFixed(1)}`);
+  if (!portraitPlay && badge.width > board.width + 1) {
+    issues.push(`${surfaceId}:progression-badge-width=${badge.width.toFixed(1)}>board=${board.width.toFixed(1)}`);
+  }
+  if (!portraitPlay && Math.abs(badge.centerX - board.centerX) > 1) {
+    issues.push(`${surfaceId}:progression-badge-not-board-centered`);
   }
   if (surface.mode === 'menu') {
     const mazeGap = badge.top - board.bottom;
@@ -934,10 +938,13 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
     }
   }
   if (portraitPlay) {
-    if (Math.abs(badge.centerX - (viewport.width / 2)) > 1) {
-      issues.push(`${surfaceId}:progression-badge-not-centered`);
-    }
     const pause = surface.touchControls?.controls?.pause;
+    const playLaneLeft = Math.max(9, isFiniteBounds(renderBoard) ? renderBoard.left : board.left);
+    const playLaneRight = isFiniteBounds(pause) ? pause.left - 8 : viewport.width - 9;
+    const playLaneCenter = playLaneLeft + ((playLaneRight - playLaneLeft) / 2);
+    if (Math.abs(badge.centerX - playLaneCenter) > 1) {
+      issues.push(`${surfaceId}:progression-badge-not-play-lane-centered`);
+    }
     if (isFiniteBounds(pause) && pause.left - badge.right < 4) {
       issues.push(`${surfaceId}:progression-badge-to-pause-gap=${(pause.left - badge.right).toFixed(1)}<4`);
     }
@@ -955,11 +962,13 @@ const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {
     return [`${surfaceId}:missing-scroll-diagnostics`];
   }
 
-  const requiredRects = [
-    ['viewport', scroll.viewport],
-    ['track', scroll.track],
-    ['thumb', scroll.thumb]
-  ];
+  const requiredRects = scroll.enabled === true
+    ? [
+      ['viewport', scroll.viewport],
+      ['track', scroll.track],
+      ['thumb', scroll.thumb]
+    ]
+    : [['viewport', scroll.viewport]];
   const rectIssues = requiredRects.flatMap(([name, rect]) => {
     if (!isFiniteBounds(rect) || rect.width <= 0 || rect.height <= 0) {
       return [`${surfaceId}:${name}:missing-or-empty-scroll-rect`];
@@ -968,6 +977,10 @@ const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {
   });
   if (rectIssues.length > 0) {
     return rectIssues;
+  }
+
+  if (scroll.enabled !== true) {
+    return [];
   }
 
   const trackContainsThumb = scroll.thumb.top >= scroll.track.top - 1.5
@@ -1448,7 +1461,7 @@ const buildSurfaceChecks = ({
     createCheck(
       'mobile-overlay-scroll-affordance',
       overlayScrollIssues.length === 0,
-      overlayScrollIssues.length === 0 ? 'options and pause expose scroll viewport, rail, and thumb diagnostics' : overlayScrollIssues.join('; ')
+      overlayScrollIssues.length === 0 ? 'options and pause expose truthful scroll viewports and enabled rails' : overlayScrollIssues.join('; ')
     ),
     createCheck(
       'mobile-overlay-scroll-reachability',

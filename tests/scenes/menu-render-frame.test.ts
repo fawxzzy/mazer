@@ -97,7 +97,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(guideSource).toContain("drawLegendRow(1, 'start', 'Start'");
     expect(guideSource).toContain("drawLegendRow(2, 'end', 'End'");
     expect(guideSource).toContain("'Player: green beacon + trail'");
-    expect(guideSource).toContain("'Score: run quality; Runs: clears'");
+    expect(guideSource).toContain("'Score: run quality'");
     expect(guideSource).not.toContain('activeTargetComplexity');
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
@@ -1382,7 +1382,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("'Player: green beacon + trail'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
     expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public tier`");
-    expect(menuSceneSource).toContain("'Score: run quality; Runs: clears'");
+    expect(menuSceneSource).toContain("'Score: run quality'");
     expect(menuSceneSource).toContain("'Maze Lvl: challenge tier'");
     expect(menuSceneSource).not.toContain('the current procedural challenge tier');
   });

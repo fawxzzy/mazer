@@ -12,14 +12,15 @@ import {
 describe('legacy UI standards', () => {
   test('uses one two-row run-status component in menu and play lanes', () => {
     expect(resolveLegacyRunStatusPanelLayout(390)).toEqual({
-      fontSize: 11,
-      height: 58,
-      horizontalPadding: 20,
+      fontSize: 10,
+      height: 60,
+      horizontalPadding: 24,
       lineSpacing: 2,
-      width: 236
+      textWidthSafetyRatio: 0.86,
+      width: 252
     });
     expect(resolveLegacyRunStatusPanelLayout(390, 208).width).toBe(208);
-    expect(resolveLegacyRunStatusPanelLayout(900).width).toBe(252);
+    expect(resolveLegacyRunStatusPanelLayout(900).width).toBe(272);
   });
 
   test('lifts legacy glyph labels to optical center without changing horizontal geometry', () => {
@@ -32,12 +33,13 @@ describe('legacy UI standards', () => {
     const compact = resolveLegacyOptionsGuideLayout(LEGACY_UI_COMPACT_BREAKPOINT - 1);
     const wide = resolveLegacyOptionsGuideLayout(LEGACY_UI_COMPACT_BREAKPOINT);
 
-    expect(compact.cardHeight).toBe(232);
-    expect(compact.rowFontSize).toBe(11);
-    expect(compact.rowMinFontSize).toBe(9);
+    expect(compact.cardHeight).toBe(220);
+    expect(compact.rowFontSize).toBe(10);
+    expect(compact.rowMinFontSize).toBe(8);
+    expect(compact.textWidthSafetyRatio).toBe(0.86);
     expect(compact.titleRuleOffset).toBeGreaterThan(compact.titleOffset + compact.titleFontSize);
-    expect(wide.rowFontSize).toBe(13);
-    expect(wide.rowHeight).toBe(27);
+    expect(wide.rowFontSize).toBe(12);
+    expect(wide.rowHeight).toBe(26);
   });
 
   test('reserves the compact toggle switch lane before showing state copy', () => {
@@ -58,11 +60,11 @@ describe('legacy UI standards', () => {
     });
     expect(resolveLegacyFeatureControlLayout(360, true)).toEqual({
       rowGap: 7,
-      rowHeight: 66
+      rowHeight: 72
     });
     expect(resolveLegacyFeatureControlLayout(540, true)).toEqual({
       rowGap: 9,
-      rowHeight: 68
+      rowHeight: 74
     });
   });
 
@@ -71,12 +73,12 @@ describe('legacy UI standards', () => {
       actionHeight: 44,
       contentTop: 100,
       controlsHeight: 300,
-      guideHeight: 232,
+      guideHeight: 220,
       panelWidth: 360
     })).toEqual({
-      actionCenterY: 678,
-      contentHeight: 604,
-      controlsTop: 346,
+      actionCenterY: 666,
+      contentHeight: 592,
+      controlsTop: 334,
       guideTop: 104
     });
   });
