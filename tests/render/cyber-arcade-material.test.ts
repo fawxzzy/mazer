@@ -9,6 +9,7 @@ import {
   snapCyberArcadeStrokeCoordinate,
   summarizeCyberArcadeMaterial
 } from '../../src/render/cyberArcadeMaterial';
+import { MAZER_ICON_QUALITY_TARGET } from '../../src/brand/mazerIconQualityTarget';
 
 describe('cyber arcade material', () => {
   test('publishes the approved icon target and every shared runtime surface role', () => {
@@ -16,6 +17,8 @@ describe('cyber arcade material', () => {
 
     expect(summary.version).toBe(CYBER_ARCADE_MATERIAL_VERSION);
     expect(summary.iconTarget).toBe(CYBER_ARCADE_ICON_TARGET);
+    expect(summary.iconQualityTargetVersion).toBe(MAZER_ICON_QUALITY_TARGET.version);
+    expect(summary.iconTargetSha256).toBe(MAZER_ICON_QUALITY_TARGET.canonicalAsset.sha256);
     expect(summary.surfaceRoles).toEqual(CYBER_ARCADE_MATERIAL_SURFACE_ROLES);
     expect(summary.surfaceRoles).toEqual(expect.arrayContaining([
       'background', 'maze', 'path', 'trail', 'player', 'title', 'border', 'button', 'compass', 'overlay'
