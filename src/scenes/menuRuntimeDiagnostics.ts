@@ -211,8 +211,8 @@ export interface MenuSceneRuntimeDiagnostics {
     inputBuffer: {
       directionalIntent: {
         activeDirection: 'up' | 'right' | 'down' | 'left' | null;
-        assistedTurnCount: number;
-        assistedTurnLimit: number;
+        assistedLaneShiftCount: number;
+        assistedLaneShiftTileLimit: number;
         lastDecision: string;
         queuedDirection: 'up' | 'right' | 'down' | 'left' | null;
         requestedDirections: Array<'up' | 'right' | 'down' | 'left'>;
