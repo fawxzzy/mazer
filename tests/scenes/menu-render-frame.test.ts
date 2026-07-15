@@ -1166,7 +1166,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.footerText = this.applyLegacyUiTextCrispness(this.add.text');
     expect(menuSceneSource).toContain('this.progressionBadgeText = this.applyLegacyUiTextCrispness(this.add.text');
     expect(menuSceneSource).toContain('this.applyLegacyUiTextCrispness(text);');
-    expect(textCrispnessSource).toContain('const devicePixelRatio = readDevicePixelRatio();');
+    expect(menuSceneSource).toContain('textTextureResolution: this.resolveLegacyUiTextResolution()');
+    expect(menuSceneSource).toContain("textTransformOwner: 'game-canvas-only'");
+    expect(textCrispnessSource).toContain("import { MAZER_CANVAS_RESOLUTION_MIN } from '../boot/canvasResolution';");
+    expect(textCrispnessSource).toContain('return MAZER_CANVAS_RESOLUTION_MIN;');
+    expect(textCrispnessSource).not.toContain('resolutionCap');
     expect(textCrispnessSource).not.toContain('navigator.webdriver');
     expect(textCrispnessSource).not.toContain('HeadlessChrome');
   });

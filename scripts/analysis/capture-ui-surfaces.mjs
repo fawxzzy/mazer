@@ -1230,6 +1230,8 @@ const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {
     || material.geometry?.strokeAlignment !== 'half-pixel-centered'
     || material.geometry?.backingScale !== 'dpr-aware-capped-2'
     || material.geometry?.sharedPanelBounds !== 'snapped-at-draw-boundary'
+    || material.geometry?.textTextureResolution !== 1
+    || material.geometry?.textTransformOwner !== 'game-canvas-only'
   ) {
     issues.push(`${surfaceId}:geometry=${JSON.stringify(material.geometry ?? null)}`);
   }

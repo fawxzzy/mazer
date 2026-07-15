@@ -141,6 +141,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const collectGuideTextContainmentIssues = (surfaceId, surface) => {');
     expect(source).toContain('const collectWrapTopologyDiagnosticIssues = (surfaceId, surface, { requirePairs = false } = {}) => {');
     expect(source).toContain('const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {');
+    expect(source).toContain('material.geometry?.textTextureResolution !== 1');
+    expect(source).toContain("material.geometry?.textTransformOwner !== 'game-canvas-only'");
     expect(source).toContain("'cyber-arcade-material-system'");
     expect(source).toContain('materialSystem: menu.diagnostics.visual?.materialSystem');
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-affordance'");

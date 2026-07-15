@@ -420,6 +420,8 @@ interface MenuSceneVisualDiagnostics {
       strokeAlignment: string;
       backingScale: string;
       sharedPanelBounds: 'snapped-at-draw-boundary';
+      textTextureResolution: number;
+      textTransformOwner: 'game-canvas-only';
     };
   };
   board: {
@@ -10448,7 +10450,9 @@ export class MenuScene extends Phaser.Scene {
         ...materialSystem,
         geometry: {
           ...materialSystem.geometry,
-          sharedPanelBounds: 'snapped-at-draw-boundary'
+          sharedPanelBounds: 'snapped-at-draw-boundary',
+          textTextureResolution: this.resolveLegacyUiTextResolution(),
+          textTransformOwner: 'game-canvas-only'
         }
       },
       revision: this.visualDiagnosticsRevision,
