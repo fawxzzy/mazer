@@ -454,6 +454,11 @@ const captureSurface = async ({
       }
     };
   }));
+  await page.evaluate(() => new Promise((resolvePaint) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(resolvePaint);
+    });
+  }));
   await page.screenshot({ path: screenshotPath, fullPage: false });
   return {
     id,
@@ -1177,6 +1182,7 @@ const buildSurfaceChecks = ({
   consoleMessages,
   includeOverlayBottom = true,
   pageErrors,
+  preferenceFixture,
   requirePlayTrailSeed = true,
   requireTopologyDiagnostics = true,
   requireWrapPairs = false,
@@ -1376,6 +1382,23 @@ const buildSurfaceChecks = ({
         : `labels=${labelDetail(surfaces.optionsBottom)}`
     ),
     createCheck(
+      'fresh-session-defaults',
+      preferenceFixture !== 'fresh' || (
+        hasLabels(surfaces.pause, ['Off: full maze view.', 'Off: trail stays.'])
+        && hasLabels(surfaces.pauseBottom, [
+          'On: white shine travels.',
+          'On: background moves.',
+          'On: darker contrast.',
+          'Stick: drag to move.',
+          'Move Speed',
+          '30%'
+        ])
+      ),
+      preferenceFixture !== 'fresh'
+        ? 'not requested'
+        : `pause=${labelDetail(surfaces.pause)}; pause-bottom=${labelDetail(surfaces.pauseBottom)}`
+    ),
+    createCheck(
       'play-text-labels',
       hasLabels(surfaces.play, ['PAUSE']) && !hasLabels(surfaces.play, ['RESET']),
       `labels=${labelDetail(surfaces.play)}`
@@ -1505,6 +1528,7 @@ const buildMarkdownReport = (summary) => {
     `- Target: ${summary.targetUrl}`,
     `- Viewport: ${summary.viewport.width}x${summary.viewport.height} @ ${summary.deviceScaleFactor}x DPR`,
     `- Auth fixture: ${summary.authFixture ?? 'none'}`,
+    `- Preference fixture: ${summary.preferenceFixture ?? 'seeded-proof-state'}`,
     `- Topology fixture: ${summary.topologyFixture ?? 'none'}`,
     `- Repo commit: ${summary.repo.commit}`,
     `- Dirty worktree: ${summary.repo.dirty ? 'yes' : 'no'}`,
@@ -1557,6 +1581,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
   const deviceScaleFactor = options.deviceScaleFactor ?? DEFAULT_DEVICE_SCALE_FACTOR;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const authFixture = typeof options.authFixture === 'string' ? options.authFixture : undefined;
+  const preferenceFixture = typeof options.preferenceFixture === 'string' ? options.preferenceFixture : undefined;
   const topologyFixture = typeof options.topologyFixture === 'string' ? options.topologyFixture : undefined;
   const route = options.route ?? resolveRoute({
     authFixture,
@@ -1606,15 +1631,17 @@ export const runUiSurfaceCapture = async (options = {}) => {
       pageErrors.push(error.message);
     });
 
-    await seedPreferences(page, {
-      controlMode: 'stick',
-      darkMode: false,
-      movementSpeed: 0.38,
-      toggleAnimatedBackdrop: true,
-      toggleCameraFollow: true,
-      toggleTrailFade: true,
-      toggleTrailPulse: true
-    });
+    if (preferenceFixture !== 'fresh') {
+      await seedPreferences(page, {
+        controlMode: 'stick',
+        darkMode: false,
+        movementSpeed: 0.38,
+        toggleAnimatedBackdrop: true,
+        toggleCameraFollow: true,
+        toggleTrailFade: true,
+        toggleTrailPulse: true
+      });
+    }
     await seedTopologyFixture(page, topologyFixture);
 
     await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: timeoutMs });
@@ -1949,6 +1976,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       consoleMessages,
       includeOverlayBottom: !transition,
       pageErrors,
+      preferenceFixture,
       requirePlayTrailSeed: !options.skipPlayTrailSeed,
       requireTopologyDiagnostics: !options.skipTopologyDiagnostics,
       requireWrapPairs: topologyFixture === 'wrap-enabled',
@@ -1971,6 +1999,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         surfaces: transitions
       } : null,
       authFixture: authFixture ?? null,
+      preferenceFixture: preferenceFixture ?? null,
       topologyFixture: topologyFixture ?? null,
       playTrailSeed,
       repo: {
@@ -2032,6 +2061,7 @@ if (isDirectRun) {
     skipBuild: args['skip-build'] === true || args['skip-build'] === 'true',
     skipPlayTrailSeed: args['skip-play-trail-seed'] === true || args['skip-play-trail-seed'] === 'true',
     skipTopologyDiagnostics: args['skip-topology-diagnostics'] === true || args['skip-topology-diagnostics'] === 'true',
+    preferenceFixture: typeof args['preference-fixture'] === 'string' ? args['preference-fixture'] : undefined,
     timeoutMs: parseIntegerArg(args['timeout-ms'], DEFAULT_TIMEOUT_MS),
     topologyFixture: typeof args['topology-fixture'] === 'string' ? args['topology-fixture'] : undefined,
     useExistingServer: args['no-preview'] === true || args['no-preview'] === 'true',
@@ -2042,6 +2072,7 @@ if (isDirectRun) {
       reportPath: result.reportPath,
       summaryPath: result.summaryPath,
       authFixture: result.authFixture,
+      preferenceFixture: result.preferenceFixture,
       deviceScaleFactor: result.deviceScaleFactor,
       screenshots: result.screenshots,
       targetUrl: result.targetUrl
