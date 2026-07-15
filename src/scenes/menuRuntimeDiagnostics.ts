@@ -304,6 +304,11 @@ export interface MenuSceneRuntimeDiagnostics {
       trailShineEnabled?: boolean;
       trailShineColor?: number;
       trailShineEdgeColor?: number;
+      trailShineCenterIndex?: number;
+      trailShineCyclePeriodMs?: number;
+      trailShineDirection?: 'away-from-player' | 'toward-player';
+      trailShineProgress?: number;
+      trailShineSpeedTilesPerSecond?: number;
       iridescentMaterial?: {
         minPathColorDistance: number;
         playerAccentColor: number;
@@ -447,7 +452,9 @@ export interface MenuSceneRuntimeDiagnostics {
       handoffProgress?: number;
       lifecyclePhase?: 'idle' | 'building' | 'settled' | 'deconstructing';
       nextSeedQueued?: boolean;
+      nonSolutionTileCountBeforeSolutionComplete?: number;
       progressPercent: number | null;
+      revealStrategyVersion?: string;
       rowCount: number | null;
       rowsRemaining: number | null;
       rowsVisible: number | null;
@@ -457,6 +464,9 @@ export interface MenuSceneRuntimeDiagnostics {
       titlePiecesRemaining?: number;
       titleVisiblePieces?: number;
       tileCount?: number | null;
+      solutionCompletedAtIndex?: number | null;
+      solutionFirstRevealPrevented?: boolean;
+      solutionPrefixLength?: number;
       tilesRemaining?: number | null;
       tilesVisible?: number | null;
       zeroHoldStartedAtMs?: number | null;

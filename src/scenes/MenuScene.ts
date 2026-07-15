@@ -148,6 +148,13 @@ import {
   resolveLegacyIridescentTrailColor
 } from '../legacy-runtime/legacyIridescentMaterial';
 import {
+  LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS,
+  buildLegacyMazeRevealOrder,
+  resolveLegacyTrailShineMotion,
+  summarizeLegacyMazeRevealOrder,
+  type LegacyTrailShineDirection
+} from '../legacy-runtime/legacyAnimationCadence';
+import {
   createLegacyOptionFieldDrafts,
   type LegacyOptionFieldDrafts,
   type LegacyOptionFieldId
@@ -451,6 +458,11 @@ interface MenuSceneVisualDiagnostics {
     trailShineEnabled: boolean;
     trailShineColor: number;
     trailShineEdgeColor: number;
+    trailShineCenterIndex: number;
+    trailShineCyclePeriodMs: number;
+    trailShineDirection: LegacyTrailShineDirection;
+    trailShineProgress: number;
+    trailShineSpeedTilesPerSecond: number;
     iridescentMaterial: LegacyIridescentMaterialDiagnostics;
     trailPulsePeriodMs: number;
   };
@@ -679,7 +691,9 @@ interface MenuSceneVisualDiagnostics {
         lifecyclePhase: LegacyMenuStaticDrawLifecyclePhase;
         zeroHoldStartedAtMs: number | null;
         nextSeedQueued: boolean;
+        nonSolutionTileCountBeforeSolutionComplete: number;
         progressPercent: number | null;
+        revealStrategyVersion: string;
         rowCount: number | null;
         rowsRemaining: number | null;
         rowsVisible: number | null;
@@ -689,6 +703,9 @@ interface MenuSceneVisualDiagnostics {
         titlePiecesRemaining: number;
         titleVisiblePieces: number;
         tileCount?: number | null;
+        solutionCompletedAtIndex: number | null;
+        solutionFirstRevealPrevented: boolean;
+        solutionPrefixLength: number;
         tilesRemaining?: number | null;
         tilesVisible?: number | null;
       };
@@ -926,7 +943,7 @@ const LEGACY_CYBER_PANEL_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_OVERLAY_SCROLL_WHEEL_STEP = 42;
 const LEGACY_OVERLAY_SCROLL_DRAG_START_PX = 3;
 const LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER = 20;
-const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;
+const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
 const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
@@ -977,7 +994,6 @@ const smoothstep = (value: number): number => {
   return x * x * (3 - (2 * x));
 };
 const legacyScenePointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
-const cloneLegacyScenePoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
 
 const createVisualRect = (left: number, top: number, width: number, height: number): VisualRect => ({
   left,
@@ -1663,6 +1679,10 @@ export class MenuScene extends Phaser.Scene {
       tilesVisible: drawTilesVisible,
       tileCount: drawTileCount
     });
+    const revealOrderDiagnostics = summarizeLegacyMazeRevealOrder(
+      this.menuStaticDrawTileOrder,
+      this.maze.solutionPath
+    );
     const titlePieceCount = this.mode === 'menu'
       ? this.resolveLegacyMenuPathTitlePieceCount()
       : 0;
@@ -1695,6 +1715,10 @@ export class MenuScene extends Phaser.Scene {
       this.layout.boardSize
     );
     const progressionPalette = this.resolveActiveLegacyProgressionPalette();
+    const trailShineMotion = resolveLegacyTrailShineMotion({
+      timeMs: time,
+      trailLength: this.trail.length
+    });
     const rememberedAuthIdentity = readLegacyRememberedIdentityState(this.resolveBrowserLocalStorage());
     const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
     const playerMarkerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
@@ -1887,6 +1911,11 @@ export class MenuScene extends Phaser.Scene {
           trailShineEnabled: this.settings.toggleTrailPulse,
           trailShineColor: progressionPalette.trailPulseColor,
           trailShineEdgeColor: progressionPalette.trailPulseEdgeColor,
+          trailShineCenterIndex: trailShineMotion.centerIndex,
+          trailShineCyclePeriodMs: trailShineMotion.cyclePeriodMs,
+          trailShineDirection: trailShineMotion.direction,
+          trailShineProgress: trailShineMotion.distanceProgress,
+          trailShineSpeedTilesPerSecond: trailShineMotion.speedTilesPerSecond,
           iridescentMaterial: this.resolveLegacyIridescentMaterialDiagnostics(time, progressionPalette),
           trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
         }
@@ -2021,18 +2050,23 @@ export class MenuScene extends Phaser.Scene {
           zeroHoldStartedAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null
             ? null
             : Math.round(this.menuStaticDeconstructZeroHoldStartedAtMs),
-          nextSeedQueued: this.isLegacyDeconstructGenerationReason(this.pendingGenerationRequest?.reason ?? null),
-          progressPercent: drawStageProgress.progressPercent,
-          rowCount: drawStageProgress.rowCount,
+            nextSeedQueued: this.isLegacyDeconstructGenerationReason(this.pendingGenerationRequest?.reason ?? null),
+            nonSolutionTileCountBeforeSolutionComplete: revealOrderDiagnostics.nonSolutionTileCountBeforeSolutionComplete,
+            progressPercent: drawStageProgress.progressPercent,
+            revealStrategyVersion: revealOrderDiagnostics.strategyVersion,
+            rowCount: drawStageProgress.rowCount,
           rowsRemaining: drawStageProgress.rowsRemaining,
           rowsVisible: drawRowsVisible,
           staged: drawStageStaged,
           titleFullyDeconstructed: titleVisiblePieces === 0,
           titlePieceCount,
           titlePiecesRemaining,
-          titleVisiblePieces,
-          tileCount: drawStageProgress.tileCount,
-          tilesRemaining: drawStageProgress.tilesRemaining,
+            titleVisiblePieces,
+            tileCount: drawStageProgress.tileCount,
+            solutionCompletedAtIndex: revealOrderDiagnostics.solutionCompletedAtIndex,
+            solutionFirstRevealPrevented: revealOrderDiagnostics.solutionFirstRevealPrevented,
+            solutionPrefixLength: revealOrderDiagnostics.solutionPrefixLength,
+            tilesRemaining: drawStageProgress.tilesRemaining,
           tilesVisible: drawStageProgress.tilesVisible
         },
         stageCursor: {
@@ -3686,52 +3720,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private buildLegacyMenuStaticDrawTileOrder(): LegacyPoint[] {
-    const orderedTiles: LegacyPoint[] = [];
-    const seen = new Set<string>();
-    const solutionKeys = new Set(this.maze.solutionPath.map(legacyScenePointKey));
-    const appendTile = (point: LegacyPoint | undefined): void => {
-      if (!point || this.maze.grid[point.y]?.[point.x] !== true) {
-        return;
-      }
-      const key = legacyScenePointKey(point);
-      if (seen.has(key)) {
-        return;
-      }
-      seen.add(key);
-      orderedTiles.push(cloneLegacyScenePoint(point));
-    };
-
-    appendTile(this.maze.generationBuildTrace?.start ?? this.maze.start);
-    appendTile(this.maze.generationBuildTrace?.finalGoal ?? this.maze.goal);
-
-    for (const point of this.maze.solutionPath) {
-      appendTile(point);
-    }
-
-    for (const point of this.maze.generationBuildTrace?.pathTiles ?? []) {
-      if (!solutionKeys.has(legacyScenePointKey(point))) {
-        appendTile(point);
-      }
-    }
-
-    for (const point of this.maze.generationBuildTrace?.shortcutTiles ?? []) {
-      appendTile(point);
-    }
-
-    for (const point of this.maze.generationBuildTrace?.reinforcementShortcutTiles ?? []) {
-      appendTile(point);
-    }
-
-    for (let y = 0; y < this.maze.size; y += 1) {
-      for (let x = 0; x < this.maze.size; x += 1) {
-        if (this.maze.grid[y]?.[x] !== true) {
-          continue;
-        }
-        appendTile({ x, y });
-      }
-    }
-
-    return orderedTiles;
+    return buildLegacyMazeRevealOrder(this.maze);
   }
 
   private resolveLegacyMenuStaticDrawDemoGateAtMs(): number {
@@ -6479,10 +6468,11 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const maxPulseIndex = Math.max(1, trail.length - 1);
-    const phase = (time % LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS) / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS;
-    const pulseDistanceFromPlayer = phase * maxPulseIndex;
-    const pulseCenterIndex = (trail.length - 1) - pulseDistanceFromPlayer;
+    const pulseCenterIndex = resolveLegacyTrailShineMotion({
+      timeMs: time,
+      trailLength: trail.length,
+      oneWayPeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
+    }).centerIndex;
 
     for (let index = trail.length - 1; index >= 0; index -= 1) {
       const point = trail[index];
@@ -10208,6 +10198,10 @@ export class MenuScene extends Phaser.Scene {
       tilesVisible: drawTilesVisible,
       tileCount: drawTileCount
     });
+    const revealOrderDiagnostics = summarizeLegacyMazeRevealOrder(
+      this.menuStaticDrawTileOrder,
+      this.maze.solutionPath
+    );
     const titlePieceCount = this.mode === 'menu'
       ? this.resolveLegacyMenuPathTitlePieceCount()
       : 0;
@@ -10233,6 +10227,10 @@ export class MenuScene extends Phaser.Scene {
       this.resolveLegacyProgressionStorageKey()
     );
     const progressionPalette = progressionDiagnostics.palette;
+    const trailShineMotion = resolveLegacyTrailShineMotion({
+      timeMs: time,
+      trailLength: this.trail.length
+    });
     const menuAiMemory = this.resolveLegacyMenuAiMemoryPoints();
     const canvasBounds = this.game.canvas.getBoundingClientRect();
     const canvasCssWidth = Math.max(1, Math.round(canvasBounds.width));
@@ -10387,18 +10385,23 @@ export class MenuScene extends Phaser.Scene {
             zeroHoldStartedAtMs: this.menuStaticDeconstructZeroHoldStartedAtMs === null
               ? null
               : Math.round(this.menuStaticDeconstructZeroHoldStartedAtMs),
-            nextSeedQueued: this.isLegacyDeconstructGenerationReason(this.pendingGenerationRequest?.reason ?? null),
-            progressPercent: drawStageProgress.progressPercent,
-            rowCount: drawStageProgress.rowCount,
+          nextSeedQueued: this.isLegacyDeconstructGenerationReason(this.pendingGenerationRequest?.reason ?? null),
+          nonSolutionTileCountBeforeSolutionComplete: revealOrderDiagnostics.nonSolutionTileCountBeforeSolutionComplete,
+          progressPercent: drawStageProgress.progressPercent,
+          revealStrategyVersion: revealOrderDiagnostics.strategyVersion,
+          rowCount: drawStageProgress.rowCount,
             rowsRemaining: drawStageProgress.rowsRemaining,
             rowsVisible: drawRowsVisible,
             staged: drawStageStaged,
             titleFullyDeconstructed: titleVisiblePieces === 0,
             titlePieceCount,
             titlePiecesRemaining,
-            titleVisiblePieces,
-            tileCount: drawStageProgress.tileCount,
-            tilesRemaining: drawStageProgress.tilesRemaining,
+          titleVisiblePieces,
+          tileCount: drawStageProgress.tileCount,
+          solutionCompletedAtIndex: revealOrderDiagnostics.solutionCompletedAtIndex,
+          solutionFirstRevealPrevented: revealOrderDiagnostics.solutionFirstRevealPrevented,
+          solutionPrefixLength: revealOrderDiagnostics.solutionPrefixLength,
+          tilesRemaining: drawStageProgress.tilesRemaining,
             tilesVisible: drawStageProgress.tilesVisible
           },
           pendingRequest: {
@@ -10539,6 +10542,11 @@ export class MenuScene extends Phaser.Scene {
         trailShineEnabled: this.settings.toggleTrailPulse,
         trailShineColor: progressionPalette.trailPulseColor,
         trailShineEdgeColor: progressionPalette.trailPulseEdgeColor,
+        trailShineCenterIndex: trailShineMotion.centerIndex,
+        trailShineCyclePeriodMs: trailShineMotion.cyclePeriodMs,
+        trailShineDirection: trailShineMotion.direction,
+        trailShineProgress: trailShineMotion.distanceProgress,
+        trailShineSpeedTilesPerSecond: trailShineMotion.speedTilesPerSecond,
         iridescentMaterial: this.resolveLegacyIridescentMaterialDiagnostics(time, progressionPalette),
         trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
       },
