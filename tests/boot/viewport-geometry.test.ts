@@ -18,6 +18,10 @@ const createRuntime = ({
   width?: number;
 } = {}) => {
   const cssValues = new Map<string, string>([
+    ['--mazer-environment-safe-area-top', '24px'],
+    ['--mazer-environment-safe-area-right', '0px'],
+    ['--mazer-environment-safe-area-bottom', '34px'],
+    ['--mazer-environment-safe-area-left', '0px'],
     ['--mazer-safe-area-top', '24px'],
     ['--mazer-safe-area-right', '0px'],
     ['--mazer-safe-area-bottom', '34px'],
@@ -141,10 +145,10 @@ describe('Mazer viewport geometry', () => {
 
   test('anchors iPhone and Android cutout content inside visual viewport offsets', () => {
     const iphone = createRuntime({ height: 852, visualHeight: 852, visualWidth: 393, width: 393 });
-    iphone.cssValues.set('--mazer-safe-area-top', '59px');
-    iphone.cssValues.set('--mazer-safe-area-right', '6px');
-    iphone.cssValues.set('--mazer-safe-area-bottom', '34px');
-    iphone.cssValues.set('--mazer-safe-area-left', '8px');
+    iphone.cssValues.set('--mazer-environment-safe-area-top', '59px');
+    iphone.cssValues.set('--mazer-environment-safe-area-right', '6px');
+    iphone.cssValues.set('--mazer-environment-safe-area-bottom', '34px');
+    iphone.cssValues.set('--mazer-environment-safe-area-left', '8px');
     iphone.runtime.visualViewport.offsetLeft = 3;
     iphone.runtime.visualViewport.offsetTop = 47;
 
@@ -156,8 +160,8 @@ describe('Mazer viewport geometry', () => {
     });
 
     const android = createRuntime({ height: 915, visualHeight: 875, visualWidth: 412, width: 412 });
-    android.cssValues.set('--mazer-safe-area-top', '32px');
-    android.cssValues.set('--mazer-safe-area-bottom', '20px');
+    android.cssValues.set('--mazer-environment-safe-area-top', '32px');
+    android.cssValues.set('--mazer-environment-safe-area-bottom', '20px');
     android.runtime.visualViewport.offsetTop = 18;
 
     expect(resolveMazerViewportGeometryFromRuntime(android.runtime as never).content).toEqual({
@@ -215,13 +219,35 @@ describe('Mazer viewport geometry', () => {
     expect(controller.getSnapshot().revision).toBe(2);
   });
 
+  test('re-reads environment-owned safe areas after the published CSS contract is written', () => {
+    const observed = createObservableRuntime({ height: 852, visualHeight: 852, visualWidth: 393, width: 393 });
+    const controller = installMazerViewportGeometry(observed.runtime as never);
+
+    expect(controller.getSnapshot().safeArea).toEqual({ top: 24, right: 0, bottom: 34, left: 0 });
+    expect(observed.cssValues.get('--mazer-safe-area-top')).toBe('24px');
+
+    observed.cssValues.set('--mazer-environment-safe-area-top', '59px');
+    observed.cssValues.set('--mazer-environment-safe-area-right', '6px');
+    observed.cssValues.set('--mazer-environment-safe-area-bottom', '21px');
+    observed.cssValues.set('--mazer-environment-safe-area-left', '8px');
+    observed.emitRuntime('orientationchange');
+    observed.flushAnimationFrame();
+
+    expect(controller.getSnapshot()).toMatchObject({
+      revision: 2,
+      safeArea: { top: 59, right: 6, bottom: 21, left: 8 },
+      content: { left: 8, top: 71, width: 379, height: 772 }
+    });
+    expect(observed.cssValues.get('--mazer-safe-area-top')).toBe('59px');
+    expect(observed.cssValues.get('--mazer-safe-area-bottom')).toBe('21px');
+    controller.dispose();
+  });
+
   test('recomputes desktop maximize and restore from the current runtime snapshot', () => {
     const observed = createObservableRuntime({ height: 720, visualHeight: 720, visualWidth: 360, width: 360 });
     const controller = installMazerViewportGeometry(observed.runtime as never);
     const initial = controller.getSnapshot();
 
-    observed.root.clientWidth = 1440;
-    observed.root.clientHeight = 900;
     observed.runtime.innerWidth = 1440;
     observed.runtime.innerHeight = 900;
     observed.runtime.visualViewport.width = 1440;
@@ -236,8 +262,6 @@ describe('Mazer viewport geometry', () => {
       isLandscape: true
     });
 
-    observed.root.clientWidth = 360;
-    observed.root.clientHeight = 720;
     observed.runtime.innerWidth = 360;
     observed.runtime.innerHeight = 720;
     observed.runtime.visualViewport.width = 360;
