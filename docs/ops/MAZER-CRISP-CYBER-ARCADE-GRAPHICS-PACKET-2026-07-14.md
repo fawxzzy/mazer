@@ -52,16 +52,16 @@ No production deployment occurred.
 
 ## Route-aware browser proof
 
-The clean product head containing implementation commit `1a622065e5d38e0135a639a781744bdfff74d392` and pixel-center correction `765e899c24487fb3af33c20557e9b8f5c25b450f` passed the four-profile matrix. Every profile reported `dirty=false`, `34/34` checks, zero console warnings/errors, and zero page errors.
+Clean runtime head `67ff1b3d9b4884dc0efd612f739bb024e878a746`, containing implementation commit `1a622065e5d38e0135a639a781744bdfff74d392` and pixel-center correction `765e899c24487fb3af33c20557e9b8f5c25b450f`, passed the four-profile matrix. Every profile reported `dirty=false`, `34/34` checks, zero console warnings/errors, and zero page errors.
 
-- `390x844`, DPR `2`: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-clean-1a622065-20260714-iphone-390x844\summary.json`
-- `405x958`, DPR `2`: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-clean-1a622065-20260714-tall-mobile-405x958\summary.json`
-- `430x932`, DPR `2`: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-clean-1a622065-20260714-wide-mobile-430x932\summary.json`
-- `1440x900`, DPR `1`: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-clean-1a622065-20260714-desktop-1440x900\summary.json`
-- Authenticated Options mobile: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-clean-1a622065-auth-405\summary.json`
-- Authenticated Options desktop: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-clean-1a622065-auth-desktop\summary.json`
-- Icon comparison HTML: `C:\ATLAS\tmp\captures\mazer-cyber-arcade-comparison\crisp-cyber-clean-1a622065-20260714.html`
-- Comparison receipt: `C:\ATLAS\tmp\captures\mazer-cyber-arcade-comparison\crisp-cyber-clean-1a622065-20260714.json`
+- `390x844`, DPR `2`: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-final-67ff1b3d-20260714-iphone-390x844\summary.json`
+- `405x958`, DPR `2`: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-final-67ff1b3d-20260714-tall-mobile-405x958\summary.json`
+- `430x932`, DPR `2`: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-final-67ff1b3d-20260714-wide-mobile-430x932\summary.json`
+- `1440x900`, DPR `1`: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-final-67ff1b3d-20260714-desktop-1440x900\summary.json`
+- Authenticated Options mobile: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-final-67ff1b3d-auth-405\summary.json`
+- Authenticated Options desktop: `C:\ATLAS\tmp\captures\mazer-cyber-arcade\crisp-cyber-final-67ff1b3d-auth-desktop\summary.json`
+- Icon comparison HTML: `C:\ATLAS\tmp\captures\mazer-cyber-arcade-comparison\crisp-cyber-final-67ff1b3d-20260714.html`
+- Comparison receipt: `C:\ATLAS\tmp\captures\mazer-cyber-arcade-comparison\crisp-cyber-final-67ff1b3d-20260714.json`
 
 Visual review found every captured surface on-screen with crisp rails and panel edges, coherent signal colors, no visible text/control overlap, and a consistent icon-derived navy/mint/cyan/green/red material hierarchy.
 
