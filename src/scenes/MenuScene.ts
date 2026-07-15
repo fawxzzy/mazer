@@ -6026,7 +6026,8 @@ export class MenuScene extends Phaser.Scene {
       this.progressionBadgeText,
       statusLayout.width - statusLayout.horizontalPadding,
       baseFontSize,
-      9
+      8,
+      statusLayout.textWidthSafetyRatio
     );
     const width = statusLayout.width;
     const height = statusLayout.height;
@@ -6915,13 +6916,21 @@ export class MenuScene extends Phaser.Scene {
     return text;
   }
 
+  private padLegacyCompactUiText<T extends Phaser.GameObjects.Text>(text: T): T {
+    this.applyLegacyUiTextCrispness(text);
+    text.setPadding(8, 1, 8, 1);
+    return text;
+  }
+
   private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>(
     text: T,
     maxWidth: number,
     maxFontSize: number,
-    minFontSize: number
+    minFontSize: number,
+    physicalWidthSafetyRatio = 1
   ): T {
-    const safeMaxWidth = Math.max(1, Math.floor(maxWidth));
+    const safeWidthRatio = Math.max(0.5, Math.min(1, physicalWidthSafetyRatio));
+    const safeMaxWidth = Math.max(1, Math.floor(maxWidth * safeWidthRatio));
     const safeMaxFontSize = Math.max(1, Math.floor(maxFontSize));
     const safeMinFontSize = Math.max(1, Math.min(safeMaxFontSize, Math.floor(minFontSize)));
     for (let fontSize = safeMaxFontSize; fontSize >= safeMinFontSize; fontSize -= 1) {
@@ -7827,18 +7836,35 @@ export class MenuScene extends Phaser.Scene {
     }
     this.overlayGuideBounds = createVisualRect(cardLeft, visibleCardTop, cardWidth, visibleCardHeight);
 
-    this.drawLegacyCyberPanel(guideGraphics, {
-      active: true,
-      alpha: 0.66,
-      fill: LEGACY_PLAY_HUD_TIMER_PANE,
-      height: visibleCardHeight,
-      left: cardLeft,
-      radius: 12,
-      top: visibleCardTop,
-      width: cardWidth
-    });
-    guideGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
-    guideGraphics.strokeRoundedRect(cardLeft + 4, visibleCardTop + 4, cardWidth - 8, Math.max(1, visibleCardHeight - 8), 9);
+    const cardFullyVisible = visibleCardTop === cardTop && visibleCardBottom === cardTop + cardHeight;
+    if (cardFullyVisible) {
+      this.drawLegacyCyberPanel(guideGraphics, {
+        active: true,
+        alpha: 0.66,
+        fill: LEGACY_PLAY_HUD_TIMER_PANE,
+        height: cardHeight,
+        left: cardLeft,
+        radius: 12,
+        top: cardTop,
+        width: cardWidth
+      });
+      guideGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
+      guideGraphics.strokeRoundedRect(cardLeft + 4, cardTop + 4, cardWidth - 8, cardHeight - 8, 9);
+    } else {
+      // A scrolled card remains one card. Do not redraw a rounded top or bottom at the
+      // viewport edge, which made clipped guide fragments look like empty nested panels.
+      guideGraphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, 0.66);
+      guideGraphics.fillRect(cardLeft, visibleCardTop, cardWidth, visibleCardHeight);
+      guideGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
+      guideGraphics.lineBetween(cardLeft + 4, visibleCardTop, cardLeft + 4, visibleCardBottom);
+      guideGraphics.lineBetween(cardLeft + cardWidth - 4, visibleCardTop, cardLeft + cardWidth - 4, visibleCardBottom);
+      if (visibleCardTop === cardTop) {
+        guideGraphics.lineBetween(cardLeft + 4, cardTop + 4, cardLeft + cardWidth - 4, cardTop + 4);
+      }
+      if (visibleCardBottom === cardTop + cardHeight) {
+        guideGraphics.lineBetween(cardLeft + 4, visibleCardBottom - 4, cardLeft + cardWidth - 4, visibleCardBottom - 4);
+      }
+    }
     if (titleRuleY >= visibleCardTop + 2 && titleRuleY <= visibleCardBottom - 2) {
       guideGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.26);
       guideGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);
@@ -7855,12 +7881,12 @@ export class MenuScene extends Phaser.Scene {
       alpha = 0.94,
       minFontSize = 9
     ): Phaser.GameObjects.Text | null => {
-      const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(x, y, copy, {
+      const label = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(x, y, copy, {
         align: 'left',
         color,
         fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: `${fontSize}px`
-      })), width, fontSize, minFontSize)
+      })), width, fontSize, minFontSize, guideLayout.textWidthSafetyRatio)
         .setOrigin(originX, 0.5)
         .setAlpha(alpha);
       const bounds = visualRectFromBounds(label.getBounds());
@@ -7928,11 +7954,11 @@ export class MenuScene extends Phaser.Scene {
     drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');
     drawLegendRow(1, 'start', 'Start', 'run begins', '#fff05a');
     drawLegendRow(2, 'end', 'End', 'clear here', '#ff5264');
-    const bulletTop = legendTop + (3 * rowHeight) + (compact ? 14 : 12);
+    const bulletTop = legendTop + (3 * rowHeight) + 10;
     const bullets = [
       'Player: green beacon + trail',
       `${this.mode === 'play' ? 'Rank' : 'AI Rank'}: public tier`,
-      'Score: run quality; Runs: clears',
+      'Score: run quality',
       'Maze Lvl: challenge tier'
     ];
     bullets.forEach((copy, index) => {
@@ -8617,7 +8643,7 @@ export class MenuScene extends Phaser.Scene {
       : stateLabelRight - trackGap;
     const labelMaxWidth = Math.max(54, labelRight - labelX);
     const titleY = resolveLegacyUiLabelCenterY(
-      input.y + (hasDescription ? -Math.round(input.height * 0.24) : 0),
+      input.y + (hasDescription ? -Math.round(input.height * 0.2) : 0),
       uiLayout.labelFontSize,
       'toggle-title'
     );
@@ -8648,11 +8674,11 @@ export class MenuScene extends Phaser.Scene {
     const descriptionFontSize = Math.max(10, Math.min(12, Math.round(input.height * 0.18)));
     const descriptionMaxWidth = Math.max(72, labelRight - labelX);
     const description = hasDescription
-      ? this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, input.y + Math.round(input.height * 0.3), input.description!, {
+      ? this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(labelX, input.y + Math.round(input.height * 0.18), input.description!, {
         color: '#bfe9de',
         fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: `${descriptionFontSize}px`
-      })), descriptionMaxWidth, descriptionFontSize, 9)
+      })), descriptionMaxWidth, descriptionFontSize, 9, 0.9)
         .setOrigin(0, 0.5)
         .setAlpha(0.84)
       : null;

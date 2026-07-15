@@ -125,6 +125,9 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const collectTextOverlapIssues = (surfaceId, surface) => {');
     expect(source).toContain('const collectMenuControlSpacingIssues = (surface) => {');
     expect(source).toContain('const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {');
+    expect(source).toContain('badge.width > board.width + 1');
+    expect(source).toContain('progression-badge-not-play-lane-centered');
+    expect(source).toContain('isFiniteBounds(renderBoard) ? renderBoard.left : board.left');
     expect(source).toContain("'progression-badge-geometry'");
     expect(source).toContain("createCheck(\n      'mobile-text-label-bounds'");
     expect(source).toContain("createCheck(\n      'mobile-native-input-bounds'");
@@ -132,6 +135,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'mobile-control-spacing'");
     expect(source).toContain("createCheck(\n      'mobile-badge-text-fit'");
     expect(source).toContain('const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {');
+    expect(source).toContain('const requiredRects = scroll.enabled === true');
+    expect(source).toContain("if (scroll.enabled !== true) {");
     expect(source).toContain('const collectButtonLabelContainmentIssues = (surfaceId, surface) =>');
     expect(source).toContain('const collectGuideTextContainmentIssues = (surfaceId, surface) => {');
     expect(source).toContain('const collectWrapTopologyDiagnosticIssues = (surfaceId, surface, { requirePairs = false } = {}) => {');

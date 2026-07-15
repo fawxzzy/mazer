@@ -5,6 +5,7 @@ export interface LegacyRunStatusPanelLayout {
   height: number;
   horizontalPadding: number;
   lineSpacing: number;
+  textWidthSafetyRatio: number;
   width: number;
 }
 
@@ -14,13 +15,14 @@ export const resolveLegacyRunStatusPanelLayout = (
 ): LegacyRunStatusPanelLayout => {
   const compact = viewportWidth < LEGACY_UI_COMPACT_BREAKPOINT;
   const maximumWidth = Math.max(160, Math.min(viewportWidth - 18, availableWidth));
-  const preferredWidth = compact ? 236 : 252;
+  const preferredWidth = compact ? 252 : 272;
 
   return {
-    fontSize: compact ? 11 : 12,
-    height: compact ? 58 : 62,
-    horizontalPadding: compact ? 20 : 24,
+    fontSize: compact ? 10 : 11,
+    height: compact ? 60 : 64,
+    horizontalPadding: compact ? 24 : 28,
     lineSpacing: 2,
+    textWidthSafetyRatio: compact ? 0.86 : 0.9,
     width: Math.min(preferredWidth, maximumWidth)
   };
 };
@@ -52,6 +54,7 @@ export interface LegacyOptionsGuideLayout {
   rowHeight: number;
   rowFontSize: number;
   rowMinFontSize: number;
+  textWidthSafetyRatio: number;
   titleFontSize: number;
   titleOffset: number;
   titleRuleOffset: number;
@@ -59,18 +62,19 @@ export interface LegacyOptionsGuideLayout {
 
 export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptionsGuideLayout => {
   const compact = panelWidth < LEGACY_UI_COMPACT_BREAKPOINT;
-  const titleFontSize = compact ? 18 : 21;
-  const titleOffset = compact ? 18 : 21;
+  const titleFontSize = compact ? 17 : 20;
+  const titleOffset = compact ? 17 : 20;
 
   return {
-    cardHeight: compact ? 232 : 260,
+    cardHeight: compact ? 220 : 248,
     cardWidthLimit: compact ? 350 : 540,
-    horizontalMargin: compact ? 40 : 72,
+    horizontalMargin: compact ? 32 : 64,
     inset: compact ? 12 : 18,
-    legendTopOffset: compact ? 54 : 56,
-    rowHeight: compact ? 24 : 27,
-    rowFontSize: compact ? 11 : 13,
-    rowMinFontSize: compact ? 9 : 10,
+    legendTopOffset: compact ? 50 : 54,
+    rowHeight: compact ? 23 : 26,
+    rowFontSize: compact ? 10 : 12,
+    rowMinFontSize: compact ? 8 : 9,
+    textWidthSafetyRatio: compact ? 0.86 : 0.9,
     titleFontSize,
     titleOffset,
     titleRuleOffset: titleOffset + Math.ceil(titleFontSize * 0.72) + (compact ? 12 : 8)
@@ -90,7 +94,7 @@ export const resolveLegacyFeatureControlLayout = (
   if (showDescriptions) {
     return {
       rowGap: compact ? 7 : 9,
-      rowHeight: compact ? 66 : 68
+      rowHeight: compact ? 72 : 74
     };
   }
 
