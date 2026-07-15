@@ -1,7 +1,9 @@
 # Mazer Icon-Quality 2026 Visual Target
 
-Status: canonical target contract v1  
-Runtime material: `mazer-cyber-arcade-material-v1`  
+Status: canonical target contract v1
+
+Runtime material: `mazer-cyber-arcade-material-v1`
+
 Contract owner: `src/brand/mazerIconQualityTarget.ts`
 
 ## Authority
