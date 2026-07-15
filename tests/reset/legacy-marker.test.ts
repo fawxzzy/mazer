@@ -364,8 +364,9 @@ describe('Mazer completion markers', () => {
   test('keeps the shifting player and trail material lane tracked', () => {
     const markerDoc = readRepoFile('docs/research/MAZER_AUTH_AI_VISUAL_COMPLETION_MARKER.md');
 
-    expect(markerDoc).toContain('| Icon-quality 2026 visual target | 5% |');
-    expect(markerDoc).toContain('matching the supplied app icon');
+    expect(markerDoc).toContain('| Icon-quality 2026 visual target | 100% |');
+    expect(markerDoc).toContain('versioned, hash-pinned brand authority');
+    expect(markerDoc).toContain('icon target version and canonical SHA');
     expect(markerDoc).toContain('data/atlas/brand/mazer/mazer-app-icon-2026-07-09-source.png');
     expect(markerDoc).toContain('| Shifting color player/trail/pulse material | 50% |');
     expect(markerDoc).toContain('| Diagonal paths and true diagonal travel | 8% |');
