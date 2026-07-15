@@ -781,7 +781,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, radius);');
     expect(menuSceneSource).toContain('progressionBadge: {');
     expect(menuSceneSource).toContain('menuCompass: {');
-    expect(menuSceneSource).toContain('this.progressionBadgeTextFits = textBounds.left >= badgeBounds.left + 4');
+    expect(menuSceneSource).toContain('const textInsetX = Math.max(14, Math.round(statusLayout.horizontalPadding / 2));');
+    expect(menuSceneSource).toContain('this.progressionBadgeTextFits = textBounds.left >= badgeBounds.left + textInsetX');
     expect(menuSceneSource).toContain('mazeRenderFrame.boardSize + (mazeRenderFrame.safeInset * 2)');
     expect(menuSceneSource).toContain('this.layout.width - 18');
     expect(menuSceneSource).toContain('const statusLayout = resolveLegacyRunStatusPanelLayout(this.layout.width, availableWidth);');
@@ -1547,6 +1548,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('top = Math.max(timerBottom + (compact ? 10 : 14), 58);');
     expect(menuSceneSource).toContain('rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER');
     expect(menuSceneSource).toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics);');
+    expect(menuSceneSource).toContain('private resolveLegacyOverlayScrollRenderViewport(metrics: LegacyOverlayScrollMetrics): VisualRect');
+    expect(menuSceneSource).toContain('const renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);');
+    expect(menuSceneSource).toContain('cardTop >= viewport.top + 2');
+    expect(menuSceneSource).toContain('cardTop + cardHeight <= viewport.bottom - 2');
     expect(menuSceneSource).not.toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics, true);');
     expect(menuSceneSource).toContain('this.overlayScrollTrackBounds = metrics.enabled');
     expect(menuSceneSource).toContain('this.overlayScrollThumbBounds = metrics.enabled');
@@ -1563,6 +1568,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('centerY - (height / 2) >= viewport.top + 2');
     expect(menuSceneSource).toContain('centerY + (height / 2) <= viewport.bottom - 2');
     expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
+    expect(menuSceneSource).toContain('const buttonHorizontalInset = Math.max(16, Math.min(32, Math.round(width * 0.16)));');
+    expect(menuSceneSource).toContain("isMenuFrontDoor ? 0.72 : 0.76");
     expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const stateLabelRight = trackLeft - trackGap;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');

@@ -6064,12 +6064,13 @@ export class MenuScene extends Phaser.Scene {
     const badgeBounds = createVisualRect(centerX - (width / 2), centerY - (height / 2), width, height);
     const rawTextBounds = this.progressionBadgeText.getBounds();
     const textBounds = createVisualRect(rawTextBounds.x, rawTextBounds.y, rawTextBounds.width, rawTextBounds.height);
+    const textInsetX = Math.max(14, Math.round(statusLayout.horizontalPadding / 2));
     this.progressionBadgeBounds = badgeBounds;
     this.progressionBadgeTextBounds = textBounds;
-    this.progressionBadgeTextFits = textBounds.left >= badgeBounds.left + 4
-      && textBounds.right <= badgeBounds.right - 4
-      && textBounds.top >= badgeBounds.top + 2
-      && textBounds.bottom <= badgeBounds.bottom - 2;
+    this.progressionBadgeTextFits = textBounds.left >= badgeBounds.left + textInsetX
+      && textBounds.right <= badgeBounds.right - textInsetX
+      && textBounds.top >= badgeBounds.top + 5
+      && textBounds.bottom <= badgeBounds.bottom - 5;
 
     return badgeBounds;
   }
@@ -7626,6 +7627,20 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
+  private resolveLegacyOverlayScrollRenderViewport(metrics: LegacyOverlayScrollMetrics): VisualRect {
+    const viewport = metrics.viewport;
+    const fadeHeight = Math.min(34, Math.max(18, Math.round(viewport.height * 0.12)));
+    const topInset = metrics.topFadeAlpha > 0 ? fadeHeight + 4 : 2;
+    const bottomInset = metrics.bottomFadeAlpha > 0 ? fadeHeight + 4 : 2;
+
+    return createVisualRect(
+      viewport.left,
+      viewport.top + topInset,
+      viewport.width,
+      Math.max(1, viewport.height - topInset - bottomInset)
+    );
+  }
+
   private resolveFeatureControlRowsContentHeight(
     panel: OverlayPanelFrame,
     options: { includeMovementSpeed?: boolean; showDescriptions?: boolean } = {}
@@ -7751,17 +7766,18 @@ export class MenuScene extends Phaser.Scene {
         viewport: this.visualRectToLegacyOverlayScrollRect(viewport)
       });
       this.applyLegacyOverlayScrollMetrics(scrollMetrics);
+      const renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);
       this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {
         exactTop: true,
         rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
         scrollOffset: scrollMetrics.offset,
-        viewport
+        viewport: renderViewport
       });
       this.createFeatureControlRows(contentFlow.controlsTop, panel, {
         includeMovementSpeed: false,
         rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
         scrollOffset: scrollMetrics.offset,
-        viewport
+        viewport: renderViewport
       });
       this.createLegacyOptionsAccountActionRow(panel, { contentCenterY: actionY });
       this.drawLegacyOverlayScrollFacade(scrollMetrics);
@@ -7811,8 +7827,8 @@ export class MenuScene extends Phaser.Scene {
     const cardTop = contentCardTop - (options.scrollOffset ?? 0);
     const viewport = options.viewport ?? null;
     const cardIntersectsViewport = viewport === null || (
-      cardTop < viewport.bottom
-      && cardTop + cardHeight > viewport.top
+      cardTop >= viewport.top + 2
+      && cardTop + cardHeight <= viewport.bottom - 2
     );
 
     if (!cardIntersectsViewport) {
@@ -7834,8 +7850,8 @@ export class MenuScene extends Phaser.Scene {
     const detailLeft = cardLeft + inset;
     const detailWidth = cardWidth - (inset * 2);
     const detailRight = detailLeft + detailWidth;
-    const visibleCardTop = viewport === null ? cardTop : Math.max(cardTop, viewport.top);
-    const visibleCardBottom = viewport === null ? cardTop + cardHeight : Math.min(cardTop + cardHeight, viewport.bottom);
+    const visibleCardTop = cardTop;
+    const visibleCardBottom = cardTop + cardHeight;
     const visibleCardHeight = Math.max(0, visibleCardBottom - visibleCardTop);
     if (visibleCardHeight < 44) {
       this.overlayGuideBounds = null;
@@ -7843,35 +7859,18 @@ export class MenuScene extends Phaser.Scene {
     }
     this.overlayGuideBounds = createVisualRect(cardLeft, visibleCardTop, cardWidth, visibleCardHeight);
 
-    const cardFullyVisible = visibleCardTop === cardTop && visibleCardBottom === cardTop + cardHeight;
-    if (cardFullyVisible) {
-      this.drawLegacyCyberPanel(guideGraphics, {
-        active: true,
-        alpha: 0.66,
-        fill: LEGACY_PLAY_HUD_TIMER_PANE,
-        height: cardHeight,
-        left: cardLeft,
-        radius: 12,
-        top: cardTop,
-        width: cardWidth
-      });
-      guideGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
-      guideGraphics.strokeRoundedRect(cardLeft + 4, cardTop + 4, cardWidth - 8, cardHeight - 8, 9);
-    } else {
-      // A scrolled card remains one card. Do not redraw a rounded top or bottom at the
-      // viewport edge, which made clipped guide fragments look like empty nested panels.
-      guideGraphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, 0.66);
-      guideGraphics.fillRect(cardLeft, visibleCardTop, cardWidth, visibleCardHeight);
-      guideGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
-      guideGraphics.lineBetween(cardLeft + 4, visibleCardTop, cardLeft + 4, visibleCardBottom);
-      guideGraphics.lineBetween(cardLeft + cardWidth - 4, visibleCardTop, cardLeft + cardWidth - 4, visibleCardBottom);
-      if (visibleCardTop === cardTop) {
-        guideGraphics.lineBetween(cardLeft + 4, cardTop + 4, cardLeft + cardWidth - 4, cardTop + 4);
-      }
-      if (visibleCardBottom === cardTop + cardHeight) {
-        guideGraphics.lineBetween(cardLeft + 4, visibleCardBottom - 4, cardLeft + cardWidth - 4, visibleCardBottom - 4);
-      }
-    }
+    this.drawLegacyCyberPanel(guideGraphics, {
+      active: true,
+      alpha: 0.66,
+      fill: LEGACY_PLAY_HUD_TIMER_PANE,
+      height: cardHeight,
+      left: cardLeft,
+      radius: 12,
+      top: cardTop,
+      width: cardWidth
+    });
+    guideGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
+    guideGraphics.strokeRoundedRect(cardLeft + 4, cardTop + 4, cardWidth - 8, cardHeight - 8, 9);
     if (titleRuleY >= visibleCardTop + 2 && titleRuleY <= visibleCardBottom - 2) {
       guideGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.26);
       guideGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);
@@ -8071,18 +8070,19 @@ export class MenuScene extends Phaser.Scene {
       viewport: this.visualRectToLegacyOverlayScrollRect(viewport)
     });
     this.applyLegacyOverlayScrollMetrics(scrollMetrics);
+    const renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);
     this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {
       exactTop: true,
       rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
       scrollOffset: scrollMetrics.offset,
-      viewport
+      viewport: renderViewport
     });
     this.createFeatureControlRows(contentFlow.controlsTop, panel, {
       includeMovementSpeed: true,
       rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
       scrollOffset: scrollMetrics.offset,
       showDescriptions: true,
-      viewport
+      viewport: renderViewport
     });
     this.drawLegacyOverlayScrollFacade(scrollMetrics);
 
@@ -8689,7 +8689,7 @@ export class MenuScene extends Phaser.Scene {
       this.uiTexts.push(stateLabel);
     }
 
-    const descriptionFontSize = Math.max(10, Math.min(12, Math.round(input.height * 0.18)));
+    const descriptionFontSize = Math.max(9, Math.min(10, Math.round(input.height * 0.16)));
     const descriptionMaxWidth = Math.max(72, labelRight - labelX);
     const description = hasDescription
       ? this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(labelX, input.y + Math.round(input.height * 0.18), input.description!, {
@@ -9535,9 +9535,14 @@ export class MenuScene extends Phaser.Scene {
       fontSize: `${buttonFontSize}px`,
       color: buttonTextColor
     })).setOrigin(0.5).setAlpha(frontDoorChrome?.labelAlpha ?? 0.92);
-    if (isMenuFrontDoor) {
-      this.fitLegacyUiTextToWidth(label, Math.max(56, width - 24), buttonFontSize, 15);
-    }
+    const buttonHorizontalInset = Math.max(16, Math.min(32, Math.round(width * 0.16)));
+    this.fitLegacyUiTextToWidth(
+      label,
+      Math.max(44, width - (buttonHorizontalInset * 2)),
+      buttonFontSize,
+      isMenuFrontDoor ? 15 : 13,
+      isMenuFrontDoor ? 0.72 : 0.76
+    );
     this.uiTexts.push(label);
 
     const setActive = (active: boolean): void => {

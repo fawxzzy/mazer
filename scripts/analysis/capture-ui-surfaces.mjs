@@ -1029,6 +1029,24 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
     || button.labelBounds.bottom > button.bounds.bottom + edgeTolerance
     ? [`${surfaceId}:${button.text}:label-outside-button`]
     : [];
+  const horizontalInset = Math.max(10, Math.min(28, button.bounds.width * 0.1));
+  const paddedActionLabels = new Set([
+    'Account',
+    'Create Account',
+    'Log out',
+    'Login',
+    'Menu',
+    'Options',
+    'Reset',
+    'Reset Progress',
+    'Start'
+  ]);
+  if (paddedActionLabels.has(button.text) && (
+    button.labelBounds.left < button.bounds.left + horizontalInset
+    || button.labelBounds.right > button.bounds.right - horizontalInset
+  )) {
+    issues.push(`${surfaceId}:${button.text}:label-inside-padding`);
+  }
   const actionLabels = new Set([
     'Account',
     'Back',
@@ -1050,6 +1068,32 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
   }
   return issues;
 });
+
+const collectOverlayScrollFadeTextIssues = (surfaceId, surface) => {
+  if (surface?.skipped === true) {
+    return [];
+  }
+  const scroll = surface?.overlayUi?.scroll;
+  const viewport = scroll?.viewport;
+  if (!scroll || !isFiniteBounds(viewport)) {
+    return [`${surfaceId}:missing-scroll-fade-diagnostics`];
+  }
+  const fadeHeight = Math.min(34, Math.max(18, Math.round(viewport.height * 0.12)));
+  return collectTextLabelEntries(surface).flatMap((entry) => {
+    const bounds = entry?.bounds;
+    if (!isFiniteBounds(bounds) || bounds.bottom <= viewport.top || bounds.top >= viewport.bottom) {
+      return [];
+    }
+    const issues = [];
+    if (scroll.topFadeAlpha > 0 && bounds.top < viewport.top + fadeHeight) {
+      issues.push(`${surfaceId}:${entry.text}:text-under-top-fade`);
+    }
+    if (scroll.bottomFadeAlpha > 0 && bounds.bottom > viewport.bottom - fadeHeight) {
+      issues.push(`${surfaceId}:${entry.text}:text-under-bottom-fade`);
+    }
+    return issues;
+  });
+};
 
 const isGuideLabel = (text) => [
   'PLAYER GUIDE',
@@ -1255,6 +1299,12 @@ const buildSurfaceChecks = ({
     ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, ['Smart Steering', 'Control Style']),
     ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Move Speed', 'Reset Progress', 'Reset', 'Menu'])
   ] : [];
+  const overlayScrollFadeTextIssues = [
+    ...collectOverlayScrollFadeTextIssues('options', surfaces.options),
+    ...collectOverlayScrollFadeTextIssues('options-bottom', surfaces.optionsBottom),
+    ...collectOverlayScrollFadeTextIssues('pause', surfaces.pause),
+    ...collectOverlayScrollFadeTextIssues('pause-bottom', surfaces.pauseBottom)
+  ];
   const buttonLabelContainmentIssues = [
     ...collectButtonLabelContainmentIssues('menu', surfaces.menu),
     ...collectButtonLabelContainmentIssues('auth', surfaces.auth),
@@ -1475,6 +1525,11 @@ const buildSurfaceChecks = ({
       'mobile-overlay-scroll-reachability',
       overlayScrollBottomIssues.length === 0,
       overlayScrollBottomIssues.length === 0 ? 'options and pause bottom controls are reached through real scroll input' : overlayScrollBottomIssues.join('; ')
+    ),
+    createCheck(
+      'overlay-scroll-fade-text-clearance',
+      overlayScrollFadeTextIssues.length === 0,
+      overlayScrollFadeTextIssues.length === 0 ? 'no text is painted beneath a scroll fade' : overlayScrollFadeTextIssues.join('; ')
     ),
     createCheck(
       'button-label-containment',

@@ -15,14 +15,14 @@ export const resolveLegacyRunStatusPanelLayout = (
 ): LegacyRunStatusPanelLayout => {
   const compact = viewportWidth < LEGACY_UI_COMPACT_BREAKPOINT;
   const maximumWidth = Math.max(160, Math.min(viewportWidth - 18, availableWidth));
-  const preferredWidth = compact ? 252 : 284;
+  const preferredWidth = compact ? 260 : 292;
 
   return {
-    fontSize: compact ? 12 : 13,
-    height: compact ? 64 : 68,
-    horizontalPadding: compact ? 28 : 30,
-    lineSpacing: compact ? 4 : 3,
-    textWidthSafetyRatio: compact ? 0.78 : 0.84,
+    fontSize: compact ? 11 : 12,
+    height: compact ? 62 : 66,
+    horizontalPadding: compact ? 36 : 40,
+    lineSpacing: compact ? 5 : 4,
+    textWidthSafetyRatio: compact ? 0.62 : 0.7,
     width: Math.min(preferredWidth, maximumWidth)
   };
 };
@@ -62,19 +62,19 @@ export interface LegacyOptionsGuideLayout {
 
 export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptionsGuideLayout => {
   const compact = panelWidth < LEGACY_UI_COMPACT_BREAKPOINT;
-  const titleFontSize = compact ? 18 : 20;
+  const titleFontSize = compact ? 16 : 18;
   const titleOffset = compact ? 18 : 20;
 
   return {
-    cardHeight: compact ? 204 : 228,
+    cardHeight: compact ? 196 : 216,
     cardWidthLimit: compact ? 350 : 540,
-    horizontalMargin: compact ? 28 : 60,
-    inset: compact ? 14 : 18,
+    horizontalMargin: compact ? 36 : 64,
+    inset: compact ? 18 : 22,
     legendTopOffset: compact ? 48 : 52,
-    rowHeight: compact ? 20 : 24,
-    rowFontSize: compact ? 11 : 12,
-    rowMinFontSize: compact ? 10 : 10,
-    textWidthSafetyRatio: compact ? 0.8 : 0.86,
+    rowHeight: compact ? 19 : 22,
+    rowFontSize: compact ? 10 : 11,
+    rowMinFontSize: compact ? 9 : 9,
+    textWidthSafetyRatio: compact ? 0.68 : 0.74,
     titleFontSize,
     titleOffset,
     titleRuleOffset: titleOffset + Math.ceil(titleFontSize * 0.72) + (compact ? 12 : 8)
@@ -94,13 +94,13 @@ export const resolveLegacyFeatureControlLayout = (
   if (showDescriptions) {
     return {
       rowGap: compact ? 10 : 11,
-      rowHeight: compact ? 82 : 84
+      rowHeight: compact ? 76 : 80
     };
   }
 
   return {
-    rowGap: compact ? 8 : 9,
-    rowHeight: compact ? 48 : 50
+      rowGap: compact ? 9 : 10,
+      rowHeight: compact ? 52 : 54
   };
 };
 
@@ -164,8 +164,8 @@ export const resolveLegacyToggleRowLayout = (
   const showStateLabel = width >= 380;
   return {
     labelFontSize: hasDescription
-      ? Math.max(12, Math.min(compact ? 15 : 17, Math.round(height * 0.25)))
-      : Math.max(13, Math.min(compact ? 17 : 19, Math.round(height * 0.36))),
+      ? Math.max(11, Math.min(compact ? 14 : 16, Math.round(height * 0.23)))
+      : Math.max(12, Math.min(compact ? 15 : 17, Math.round(height * 0.31))),
     rowPaddingX: Math.max(12, Math.min(compact ? 14 : 18, Math.round(width * 0.05))),
     showStateLabel,
     stateFontSize: Math.max(10, Math.min(12, Math.round(height * 0.24))),
