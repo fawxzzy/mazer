@@ -215,7 +215,7 @@ This is the fastest way to answer "if I click or press this, what actually owns 
 | `Game Modes` click | `MenuScene.openNestedOverlay('gameModes', ...)` | `legacyOverlayToggleFields.ts` -> dark-mode flag -> backdrop/static-board redraw |
 | `Escape` | `MenuScene.handleBackAction()` | close overlay, open pause, or return to menu depending on current state |
 | `Back` / `Reset` / `Main Menu` inside pause | `MenuScene.applyLegacyPauseCommand()` | `legacyPauseLifecycle.ts` -> overlay close, player reset, or menu return |
-| movement keys / arrows / stick drag / swipe | `MenuScene` input adapters | `legacyDirectionalIntent.ts` active + latest-wins queued direction -> `WorldTurnSystem` player phase -> `legacyPlayStep.ts` / `legacyMaze.ts` legality -> trail/win reset |
+| movement keys / arrows / stick drag / swipe | `MenuScene` input adapters | `legacyDirectionalIntent.ts` active + latest-wins queued direction -> `WorldTurnHost` running/paused/stopped gate -> `WorldTurnSystem` player phase -> `legacyPlayStep.ts` / `legacyMaze.ts` legality -> trail/win reset |
 | menu screenshot parity tweak | `legacyMenuSnapshot.ts`, `legacyMenuLayout.ts`, `MenuScene.ts` | geometry -> composition -> presentation |
 
 ## Active reset-lane subsystems
