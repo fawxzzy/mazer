@@ -1,5 +1,30 @@
 export const LEGACY_UI_COMPACT_BREAKPOINT = 420;
 
+export interface LegacyRunStatusPanelLayout {
+  fontSize: number;
+  height: number;
+  horizontalPadding: number;
+  lineSpacing: number;
+  width: number;
+}
+
+export const resolveLegacyRunStatusPanelLayout = (
+  viewportWidth: number,
+  availableWidth = viewportWidth
+): LegacyRunStatusPanelLayout => {
+  const compact = viewportWidth < LEGACY_UI_COMPACT_BREAKPOINT;
+  const maximumWidth = Math.max(160, Math.min(viewportWidth - 18, availableWidth));
+  const preferredWidth = compact ? 236 : 252;
+
+  return {
+    fontSize: compact ? 11 : 12,
+    height: compact ? 58 : 62,
+    horizontalPadding: compact ? 20 : 24,
+    lineSpacing: 2,
+    width: Math.min(preferredWidth, maximumWidth)
+  };
+};
+
 export type LegacyUiLabelRole = 'button' | 'overlay-action' | 'overlay-title' | 'toggle-title';
 
 const LABEL_LIFT_RATIOS: Record<LegacyUiLabelRole, number> = {
@@ -65,7 +90,7 @@ export const resolveLegacyFeatureControlLayout = (
   if (showDescriptions) {
     return {
       rowGap: compact ? 7 : 9,
-      rowHeight: compact ? 58 : 64
+      rowHeight: compact ? 66 : 68
     };
   }
 

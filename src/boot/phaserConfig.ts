@@ -14,7 +14,7 @@ export const createMazerPhaserConfig = (
   parent: 'app',
   width: viewport.width,
   height: viewport.height,
-  backgroundColor: '#1d1330',
+  backgroundColor: '#02080f',
   pixelArt: false,
   antialias: true,
   antialiasGL: true,

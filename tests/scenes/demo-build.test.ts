@@ -1840,7 +1840,8 @@ describe('demo-only build', () => {
   test('shell css keeps the viewport full-bleed while board framing stays in-scene', () => {
     const baseCss = readFileSync(resolve(process.cwd(), 'src/styles/base.css'), 'utf8');
 
-    expect(baseCss).toContain('--mazer-safe-area-top: env(safe-area-inset-top, 0px);');
+    expect(baseCss).toContain('--mazer-environment-safe-area-top: env(safe-area-inset-top, 0px);');
+    expect(baseCss).toContain('--mazer-safe-area-top: var(--mazer-environment-safe-area-top);');
     expect(baseCss).toContain('--mazer-viewport-width: 100vw;');
     expect(baseCss).toContain('--mazer-viewport-height: 100dvh;');
     expect(baseCss).toContain('#app {');

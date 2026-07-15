@@ -4,11 +4,24 @@ import {
   resolveLegacyFeatureControlLayout,
   resolveLegacyOverlayContentFlowLayout,
   resolveLegacyOptionsGuideLayout,
+  resolveLegacyRunStatusPanelLayout,
   resolveLegacyToggleRowLayout,
   resolveLegacyUiLabelCenterY
 } from '../../src/legacy-runtime/legacyUiStandards';
 
 describe('legacy UI standards', () => {
+  test('uses one two-row run-status component in menu and play lanes', () => {
+    expect(resolveLegacyRunStatusPanelLayout(390)).toEqual({
+      fontSize: 11,
+      height: 58,
+      horizontalPadding: 20,
+      lineSpacing: 2,
+      width: 236
+    });
+    expect(resolveLegacyRunStatusPanelLayout(390, 208).width).toBe(208);
+    expect(resolveLegacyRunStatusPanelLayout(900).width).toBe(252);
+  });
+
   test('lifts legacy glyph labels to optical center without changing horizontal geometry', () => {
     expect(resolveLegacyUiLabelCenterY(100, 40, 'button')).toBe(93);
     expect(resolveLegacyUiLabelCenterY(100, 20, 'overlay-action')).toBe(98);
@@ -45,11 +58,11 @@ describe('legacy UI standards', () => {
     });
     expect(resolveLegacyFeatureControlLayout(360, true)).toEqual({
       rowGap: 7,
-      rowHeight: 58
+      rowHeight: 66
     });
     expect(resolveLegacyFeatureControlLayout(540, true)).toEqual({
       rowGap: 9,
-      rowHeight: 64
+      rowHeight: 68
     });
   });
 

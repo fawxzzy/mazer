@@ -18,6 +18,7 @@ const result = await runUiSurfaceCapture({
   mazeSeed: typeof args['maze-seed'] === 'string' ? args['maze-seed'] : undefined,
   sessionId: args.session,
   skipBuild: args['skip-build'] === true || args['skip-build'] === 'true',
+  skipTopologyDiagnostics: true,
   timeoutMs: parseIntegerArg(args['timeout-ms'], 30_000),
   transition: TRANSITION_VIEWPORTS,
   useExistingServer: args['no-preview'] === true || args['no-preview'] === 'true'

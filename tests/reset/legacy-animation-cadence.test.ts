@@ -10,6 +10,12 @@ import {
 } from '../../src/legacy-runtime/legacyAnimationCadence';
 
 describe('legacy animation cadence', () => {
+  test('uses the reduced-motion trail shine cadence', () => {
+    expect(LEGACY_ANIMATION_CADENCE_VERSION).toBe('legacy-animation-cadence-v2');
+    expect(LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS).toBe(8000);
+    expect(LEGACY_TRAIL_SHINE_CYCLE_PERIOD_MS).toBe(16000);
+  });
+
   test('moves one shine from player to origin and continuously back to the player', () => {
     const samples = [
       resolveLegacyTrailShineMotion({ timeMs: 0, trailLength: 11 }),
@@ -38,12 +44,12 @@ describe('legacy animation cadence', () => {
       direction: 'away-from-player',
       distanceProgress: 0
     });
-    expect(samples[0]?.speedTilesPerSecond).toBeCloseTo(10 / 2.6, 5);
+    expect(samples[0]?.speedTilesPerSecond).toBeCloseTo(10 / 8, 5);
   });
 
   test('scales shine speed with the live trail length while preserving one-way timing', () => {
-    const short = resolveLegacyTrailShineMotion({ timeMs: 1300, trailLength: 5 });
-    const long = resolveLegacyTrailShineMotion({ timeMs: 1300, trailLength: 21 });
+    const short = resolveLegacyTrailShineMotion({ timeMs: 4000, trailLength: 5 });
+    const long = resolveLegacyTrailShineMotion({ timeMs: 4000, trailLength: 21 });
 
     expect(short.distanceProgress).toBe(0.5);
     expect(long.distanceProgress).toBe(0.5);

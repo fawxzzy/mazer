@@ -1374,16 +1374,20 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'options-bottom-account-action',
-      authGated
+      !includeOverlayBottom
+        ? surfaces.optionsBottom.skipped === true
+        : authGated
         ? surfaces.optionsBottom.skipped === true
         : hasLabels(surfaces.optionsBottom, optionsBottomExpectedLabels),
-      authGated
+      !includeOverlayBottom
+        ? 'skipped for viewport-transition proof'
+        : authGated
         ? `skipped=${surfaces.optionsBottom.skipped === true}`
         : `labels=${labelDetail(surfaces.optionsBottom)}`
     ),
     createCheck(
       'fresh-session-defaults',
-      preferenceFixture !== 'fresh' || (
+      preferenceFixture !== 'fresh' || !includeOverlayBottom || (
         hasLabels(surfaces.pause, ['Off: full maze view.', 'Off: trail stays.'])
         && hasLabels(surfaces.pauseBottom, [
           'On: white shine travels.',
@@ -1396,6 +1400,8 @@ const buildSurfaceChecks = ({
       ),
       preferenceFixture !== 'fresh'
         ? 'not requested'
+        : !includeOverlayBottom
+        ? 'skipped for viewport-transition proof'
         : `pause=${labelDetail(surfaces.pause)}; pause-bottom=${labelDetail(surfaces.pauseBottom)}`
     ),
     createCheck(
@@ -1906,6 +1912,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         nativeInputs: [],
         textLabels: []
       } : {
+        skipped: optionsBottomSurface.skipped === true,
+        reason: optionsBottomSurface.reason ?? null,
         mode: optionsBottomSurface.diagnostics.visual?.runtime?.mode ?? optionsBottomSurface.diagnostics.runtime?.surface?.mode,
         overlay: optionsBottomSurface.diagnostics.visual?.runtime?.overlay ?? optionsBottomSurface.diagnostics.runtime?.surface?.overlay,
         overlayUi: optionsBottomSurface.diagnostics.visual?.overlayUi,
@@ -1946,6 +1954,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         materialSystem: pause.diagnostics.visual?.materialSystem
       },
       pauseBottom: {
+        skipped: pauseBottomSurface.skipped === true,
+        reason: pauseBottomSurface.reason ?? null,
         mode: pauseBottomSurface.diagnostics.visual?.runtime?.mode ?? pauseBottomSurface.diagnostics.runtime?.surface?.mode,
         overlay: pauseBottomSurface.diagnostics.visual?.runtime?.overlay ?? pauseBottomSurface.diagnostics.runtime?.surface?.overlay,
         overlayUi: pauseBottomSurface.diagnostics.visual?.overlayUi,
