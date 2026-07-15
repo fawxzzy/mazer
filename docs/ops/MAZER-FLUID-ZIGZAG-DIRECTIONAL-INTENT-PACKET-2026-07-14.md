@@ -2,6 +2,39 @@
 
 Date: `2026-07-14`
 
+## 2026-07-15 Physical-Control Correction
+
+The operator's fresh iPhone review proved that the original corner-following
+assistance below was too permissive. Draft PR
+[#74](https://github.com/fawxzzy/mazer/pull/74), commit `e18d2043`, replaces that
+behavior with a strict one-tile wall sidestep:
+
+- a held north/south direction may move one tile east or west only when exactly
+  one of those tiles is legal and the original north/south lane is legal from
+  that tile
+- held east/west movement follows the mirrored rule with one north/south tile
+- the sidestep never replaces the held direction; the next cadence resumes the
+  original heading
+- an ordinary corner, ambiguous side choice, immediate bypass, two-tile detour,
+  dead end, or mismatched queued turn stops instead of choosing a route
+- all four held directions have direct fixtures; runtime diagnostics now expose
+  `assistedLaneShiftCount` and an invariant one-tile limit
+
+Verification for the correction:
+
+- focused resolver/diagnostic/architecture packet: `20/20` passed
+- serial repository gate: `359/360` passed; the sole fixed-timeout generated
+  edge-dock test passed immediately in an exact isolated rerun, for correlated
+  `360/360` coverage
+- `npm run lint`, `npm run build`, and `git diff --check`: passed
+- the protected canonical `tests/ai/demo-walker.test.ts` modification was not
+  touched
+
+PR `#74` remains draft until its preview receives fresh route/device proof. The
+original PR `#64` evidence below remains immutable historical evidence and does
+not override this corrected steering contract. No production deployment
+occurred.
+
 ## Outcome
 
 The bounded directional-intent slice of `mazer-fluid-controls-and-motion` is complete and review-ready in draft PR [#64](https://github.com/fawxzzy/mazer/pull/64). The parent card remains open: this packet closes shared run-to-block steering, latest-wins queued turns, bounded zigzag assistance, and exact browser proof, but does not claim the card's broader pace/feel tuning is terminal.
