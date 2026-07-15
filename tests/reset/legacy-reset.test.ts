@@ -677,6 +677,7 @@ describe('legacy reset lane', () => {
   test('routes generation and reset through explicit queued request contracts', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const generationLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyGenerationLifecycle.ts'), 'utf8');
+    const animationCadenceSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAnimationCadence.ts'), 'utf8');
 
     expect(generationLifecycleSource).toContain("type LegacyGenerationRequestReason =");
     expect(generationLifecycleSource).toContain('createLegacyGenerationRequest');
@@ -754,9 +755,10 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('for (let index = 0; index < Math.min(tileLimit, this.menuStaticDrawTileOrder.length); index += 1)');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawRowLimit(): number | null');
     expect(menuSceneSource).toContain('private buildLegacyMenuStaticDrawTileOrder(): LegacyPoint[]');
-    expect(menuSceneSource).toContain('this.maze.generationBuildTrace?.pathTiles');
-    expect(menuSceneSource).toContain('this.maze.generationBuildTrace?.shortcutTiles');
-    expect(menuSceneSource).toContain('this.maze.generationBuildTrace?.reinforcementShortcutTiles');
+    expect(menuSceneSource).toContain('return buildLegacyMazeRevealOrder(this.maze);');
+    expect(animationCadenceSource).toContain('maze.generationBuildTrace?.pathTiles');
+    expect(animationCadenceSource).toContain('maze.generationBuildTrace?.shortcutTiles');
+    expect(animationCadenceSource).toContain('maze.generationBuildTrace?.reinforcementShortcutTiles');
     expect(menuSceneSource).toContain('private refreshLegacyMenuStaticDrawVisibleTileKeys(): void');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawDemoGateAtMs(): number');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDeconstructDurationMs(): number');

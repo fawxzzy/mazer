@@ -838,7 +838,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolveLegacyIridescentPlayerAccentColor(time, playerCoreColor)');
     expect(menuSceneSource).toContain('palette.trailPulseColor');
     expect(menuSceneSource).toContain('palette.trailPulseEdgeColor');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS;');
+    expect(menuSceneSource).toContain('const pulseCenterIndex = resolveLegacyTrailShineMotion({');
+    expect(menuSceneSource).toContain('trailShineDirection: trailShineMotion.direction');
+    expect(menuSceneSource).toContain('trailShineCyclePeriodMs: trailShineMotion.cyclePeriodMs');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;');
     expect(menuSceneSource).toContain('const falloff = smoothstep(1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW));');
     expect(menuSceneSource).not.toContain('drawLegacyDynamicTrailShine');
@@ -855,8 +858,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('mazeRenderFrame.boardSize,');
     expect(menuSceneSource).toContain("const active = this.settings.toggleTrailPulse && this.overlay === 'none' && this.trail.length > 1;");
     expect(menuSceneSource).toContain('this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;');
-    expect(menuSceneSource).toContain('const pulseDistanceFromPlayer = phase * maxPulseIndex;');
-    expect(menuSceneSource).toContain('const pulseCenterIndex = (trail.length - 1) - pulseDistanceFromPlayer;');
+    expect(menuSceneSource).toContain('const pulseCenterIndex = resolveLegacyTrailShineMotion({');
+    expect(menuSceneSource).toContain('oneWayPeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
     expect(menuSceneSource).not.toContain('private resolveLegacyPointPathSource(');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');");
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95, 'goal');");
