@@ -294,6 +294,7 @@ import {
   CYBER_ARCADE_MATERIAL_VERSION,
   cyberArcadeMaterial,
   snapCyberArcadeRect,
+  snapCyberArcadeStrokeCoordinate,
   summarizeCyberArcadeMaterial,
   toCyberArcadeCssHex
 } from '../render/cyberArcadeMaterial';
@@ -6868,31 +6869,41 @@ export class MenuScene extends Phaser.Scene {
     graphics.fillRoundedRect(left, top, width, height, radius);
     const stroke = rect.stroke ?? LEGACY_CYBER_PANEL_STROKE;
     const strokeAlt = rect.strokeAlt ?? LEGACY_CYBER_PANEL_STROKE_ALT;
-    graphics.lineStyle(active ? 2 : 1, stroke, active ? 0.86 : 0.5);
-    graphics.strokeRoundedRect(left, top, width, height, radius);
+    const outerStrokeWidth = active ? 2 : 1;
+    const outerStrokeInset = outerStrokeWidth % 2 === 1 ? 0.5 : 0;
+    graphics.lineStyle(outerStrokeWidth, stroke, active ? 0.86 : 0.5);
+    graphics.strokeRoundedRect(
+      left + outerStrokeInset,
+      top + outerStrokeInset,
+      Math.max(1, width - (outerStrokeInset * 2)),
+      Math.max(1, height - (outerStrokeInset * 2)),
+      Math.max(1, radius - outerStrokeInset)
+    );
     graphics.lineStyle(1, strokeAlt, active ? 0.34 : 0.2);
     graphics.strokeRoundedRect(
-      left + inset,
-      top + inset,
-      Math.max(1, width - (inset * 2)),
-      Math.max(1, height - (inset * 2)),
+      snapCyberArcadeStrokeCoordinate(left + inset),
+      snapCyberArcadeStrokeCoordinate(top + inset),
+      Math.max(1, width - (inset * 2) - 1),
+      Math.max(1, height - (inset * 2) - 1),
       Math.max(2, radius - 4)
     );
 
-    graphics.lineStyle(active ? 2 : 1, active ? strokeAlt : stroke, active ? 0.9 : 0.62);
+    const cornerStrokeWidth = active ? 2 : 1;
+    const cornerStrokeOffset = cornerStrokeWidth % 2 === 1 ? 0.5 : 0;
+    graphics.lineStyle(cornerStrokeWidth, active ? strokeAlt : stroke, active ? 0.9 : 0.62);
     graphics.beginPath();
-    graphics.moveTo(left + inset, top + corner);
-    graphics.lineTo(left + inset, top + inset);
-    graphics.lineTo(left + corner, top + inset);
-    graphics.moveTo(left + width - corner, top + inset);
-    graphics.lineTo(left + width - inset, top + inset);
-    graphics.lineTo(left + width - inset, top + corner);
-    graphics.moveTo(left + inset, top + height - corner);
-    graphics.lineTo(left + inset, top + height - inset);
-    graphics.lineTo(left + corner, top + height - inset);
-    graphics.moveTo(left + width - corner, top + height - inset);
-    graphics.lineTo(left + width - inset, top + height - inset);
-    graphics.lineTo(left + width - inset, top + height - corner);
+    graphics.moveTo(left + inset + cornerStrokeOffset, top + corner + cornerStrokeOffset);
+    graphics.lineTo(left + inset + cornerStrokeOffset, top + inset + cornerStrokeOffset);
+    graphics.lineTo(left + corner + cornerStrokeOffset, top + inset + cornerStrokeOffset);
+    graphics.moveTo(left + width - corner - cornerStrokeOffset, top + inset + cornerStrokeOffset);
+    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + inset + cornerStrokeOffset);
+    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + corner + cornerStrokeOffset);
+    graphics.moveTo(left + inset + cornerStrokeOffset, top + height - corner - cornerStrokeOffset);
+    graphics.lineTo(left + inset + cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
+    graphics.lineTo(left + corner + cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
+    graphics.moveTo(left + width - corner - cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
+    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
+    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + height - corner - cornerStrokeOffset);
     graphics.strokePath();
   }
 
