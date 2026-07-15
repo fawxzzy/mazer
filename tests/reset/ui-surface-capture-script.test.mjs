@@ -37,10 +37,11 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const isAuthGatedMenuSurface = (surface) => (');
     expect(source).toContain("hasTextLabels(surface, ['Login'])");
     expect(source).toContain('const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([');
-    expect(source).toContain('const resolveOptionsExpectedLabels = (authenticated) => [');
+    expect(source).toContain('const resolveOptionsBottomExpectedLabels = (authenticated) => [');
     expect(source).toContain("authenticated ? 'Log out' : 'Account'");
     expect(source).toContain("authFixture === 'authenticated' || menu.diagnostics.runtime?.auth?.status === 'authenticated'");
     expect(source).toContain("surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out'])");
+    expect(source).toContain('hasLabels(surfaces.optionsBottom, optionsBottomExpectedLabels)');
     expect(source).toContain('const getVisualButtonPoint = (visual, text) => {');
     expect(source).toContain("const button = (visual?.buttons ?? []).find((entry) => entry?.text === text && isFiniteBounds(entry?.bounds));");
     expect(source).toContain("login: getVisualButtonPoint(visual, 'Login') ?? {");
@@ -143,7 +144,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const desktopViewport = (before.visual?.viewport?.width ?? 0) >= 720;');
     expect(source).toContain('const wheelDelta = Math.max(scroll.maxOffset * 4, dragDistance);');
     expect(source).toContain('await page.mouse.wheel(0, wheelDelta);');
-    expect(source).toContain("expectedLabels: ['Controls']");
+    expect(source).toContain('expectedLabels: optionsBottomExpectedLabels');
     expect(source).toContain("expectedLabels: ['Move Speed', 'Reset Progress', 'Reset', 'Menu']");
     expect(source).toContain('optionsSurface.diagnostics.visual?.overlayUi');
     expect(source).toContain('pause.diagnostics.visual?.overlayUi');
@@ -165,6 +166,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("authGated ? hasLabels(surfaces.menu, ['Login']) : hasLabels(surfaces.menu, ['Start', 'Options'])");
     expect(source).toContain("authGated\n        ? surfaces.options.skipped === true");
     expect(source).toContain('const optionsCaptureExpectedLabels = [...OPTIONS_BASE_EXPECTED_LABELS];');
+    expect(source).toContain('expectedLabels: optionsBottomExpectedLabels');
     expect(source).toContain('await openOptionsOverlayFromMenu(page, latestMenuButtons.options, optionsCaptureExpectedLabels, timeoutMs);');
     expect(source).toContain("if (authFixture === 'authenticated') {");
     expect(source).toContain('skipWait = false');
@@ -174,7 +176,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('await openOptionsOverlayViaQa(page, timeoutMs);');
     expect(source).toContain("skipWait: authFixture === 'authenticated'");
     expect(source).toContain('expectedLabels: optionsCaptureExpectedLabels');
-    expect(source).toContain('hasLabels(surfaces.options, optionsExpectedLabels)');
+    expect(source).toContain('hasLabels(surfaces.options, OPTIONS_BASE_EXPECTED_LABELS)');
     expect(source).toContain("!hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale'])");
     expect(source).toContain("hasLabels(surfaces.play, ['PAUSE']) && !hasLabels(surfaces.play, ['RESET'])");
     expect(source).toContain("hasLabels(surfaces.pause, ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu'])");

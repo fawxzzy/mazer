@@ -84,14 +84,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       menuSceneSource.indexOf('private createFeatureControlRows(')
     );
 
-    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);');
-    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(\n      panel.top + (stacked ? 110 : 120) + (hasOverlayMessage ? 22 : 0),');
+    expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
+    expect(menuSceneSource).toContain('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {');
     expect(menuSceneSource).toContain("addText('PLAYER GUIDE'");
-    expect(buildOptionsSource.indexOf('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);')).toBeLessThan(
-      buildOptionsSource.indexOf('this.createFeatureControlRows(viewport.top, panel')
+    expect(buildOptionsSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
+      buildOptionsSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel')
     );
-    expect(buildPauseSource.indexOf('const guideEndY = this.createLegacyOptionsInfoSection(')).toBeLessThan(
-      buildPauseSource.indexOf('this.createFeatureControlRows(viewport.top, panel, {')
+    expect(buildPauseSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
+      buildPauseSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel, {')
     );
     expect(guideSource).toContain("drawLegendRow(0, 'compass', 'Compass'");
     expect(guideSource).toContain("drawLegendRow(1, 'start', 'Start'");
@@ -1269,8 +1269,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.layout.centerButtonX,');
     expect(menuSceneSource).toContain('this.layout.centerButtonY,');
     expect(menuSceneSource).not.toContain('const accountActionLabel =');
-    expect(menuSceneSource).toContain('private createLegacyOptionsAccountActionRow(panel: OverlayPanelFrame): void');
+    expect(menuSceneSource).toContain('private createLegacyOptionsAccountActionRow(');
     expect(menuSceneSource).toContain('this.createLegacyOptionsAccountActionRow(panel);');
+    expect(menuSceneSource).toContain('contentCenterY: contentFlow.actionCenterY');
     expect(menuSceneSource).toContain("const label = this.authSnapshot.status === 'authenticated' ? 'Log out' : 'Account';");
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain('Account login needs Supabase env vars before it can be enabled.');
@@ -1364,7 +1365,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain("from '../legacy-runtime/legacyUiStandards';");
-    expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, buttonFontSize, 'button')");
+    expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, buttonFontSize, options.labelRole ?? 'button')");
     expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title')");
     expect(menuSceneSource).toContain('resolveLegacyToggleRowLayout(input.width, input.height, hasDescription)');
   });
@@ -1373,11 +1374,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width);');
-    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);');
+    expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
     expect(menuSceneSource).toContain('const guideTitleFontSize = guideLayout.titleFontSize;');
     expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
     expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
-    expect(menuSceneSource).toContain('this.overlayGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);');
+    expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);');
     expect(menuSceneSource).toContain("addText('PLAYER GUIDE', panel.centerX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);");
     expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');");
     expect(menuSceneSource).toContain("'Player: green beacon + trail.'");
@@ -1550,8 +1551,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.overlayScrollThumbBounds = this.legacyOverlayScrollRectToVisualRect(metrics.thumb);');
     expect(menuSceneSource).toContain('const thumbAlpha = metrics.enabled ? 0.92 : 0.58;');
     expect(menuSceneSource).toContain('if (!showAdvancedOptions) {');
-    expect(menuSceneSource).toContain('const viewportTop = guideEndY + (compact ? 8 : 10);');
-    expect(menuSceneSource).toContain('const contentHeight = this.resolveFeatureControlRowsContentHeight(panel, {');
+    expect(menuSceneSource).toContain('const viewportTop = rowY + (compact ? 4 : 6);');
+    expect(menuSceneSource).toContain('const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {');
+    expect(menuSceneSource).toContain('contentHeight: contentFlow.contentHeight');
     expect(menuSceneSource).toContain('this.input.on(\'wheel\'');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerDown(pointer: Phaser.Input.Pointer): boolean');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerMove(pointer: Phaser.Input.Pointer): boolean');

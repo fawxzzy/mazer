@@ -663,8 +663,8 @@ const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
   'Camera Follow'
 ]);
 
-const resolveOptionsExpectedLabels = (authenticated) => [
-  ...OPTIONS_BASE_EXPECTED_LABELS,
+const resolveOptionsBottomExpectedLabels = (authenticated) => [
+  'Controls',
   authenticated ? 'Log out' : 'Account'
 ];
 
@@ -1188,7 +1188,7 @@ const buildSurfaceChecks = ({
     .join(', ');
   const authGated = surfaces.menu.authGated === true;
   const authenticatedMenu = surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out']);
-  const optionsExpectedLabels = resolveOptionsExpectedLabels(authenticatedMenu);
+  const optionsBottomExpectedLabels = resolveOptionsBottomExpectedLabels(authenticatedMenu);
   const textBoundsIssues = [
     ...collectTextBoundsIssues('menu', surfaces.menu, viewport),
     ...collectTextBoundsIssues('auth', surfaces.auth, viewport),
@@ -1351,7 +1351,7 @@ const buildSurfaceChecks = ({
       'options-text-labels',
       authGated
         ? surfaces.options.skipped === true
-        : hasLabels(surfaces.options, optionsExpectedLabels)
+        : hasLabels(surfaces.options, OPTIONS_BASE_EXPECTED_LABELS)
           && !hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale']),
       authGated
         ? `skipped=${surfaces.options.skipped === true} reason=${surfaces.options.reason ?? 'missing'}`
@@ -1365,6 +1365,15 @@ const buildSurfaceChecks = ({
       authGated
         ? `labels=${labelDetail(surfaces.auth)}`
         : `skipped=${surfaces.auth.skipped === true} reason=${surfaces.auth.reason ?? 'missing'}`
+    ),
+    createCheck(
+      'options-bottom-account-action',
+      authGated
+        ? surfaces.optionsBottom.skipped === true
+        : hasLabels(surfaces.optionsBottom, optionsBottomExpectedLabels),
+      authGated
+        ? `skipped=${surfaces.optionsBottom.skipped === true}`
+        : `labels=${labelDetail(surfaces.optionsBottom)}`
     ),
     createCheck(
       'play-text-labels',
@@ -1634,7 +1643,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       : null;
     const authGatedMenu = isAuthGatedMenuSurface(menu.diagnostics.visual);
     const authenticatedMenu = authFixture === 'authenticated' || menu.diagnostics.runtime?.auth?.status === 'authenticated';
-    const optionsExpectedLabels = resolveOptionsExpectedLabels(authenticatedMenu);
+    const optionsBottomExpectedLabels = resolveOptionsBottomExpectedLabels(authenticatedMenu);
     const currentMenuDiagnostics = transition ? await readDiagnostics(page) : menu.diagnostics;
     const menuButtons = authGatedMenu ? null : getMenuButtonPoints(currentMenuDiagnostics.visual);
     await waitForVisualBuildSettled(page, { timeoutMs });
@@ -1722,7 +1731,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
             ? await captureSurface({
               page,
               outputDir,
-              expectedLabels: ['Controls'],
+              expectedLabels: optionsBottomExpectedLabels,
               id: '02-options-bottom',
               mode: 'menu',
               overlay: 'options',
