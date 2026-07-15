@@ -10,6 +10,8 @@ import {
 import {
   MAZE_CYCLE_RUN_QUALITY_SCORER_ID,
   MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION,
+  MAZE_CYCLE_RUN_QUALITY_EXPLORER_THRESHOLD,
+  MAZE_CYCLE_RUN_QUALITY_METRICS_VERSION,
   MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL,
   compareMazeCycleRunQualityScore
 } from '../../src/legacy-runtime/mazeCycleRunQualityScorer.mjs';
@@ -170,6 +172,7 @@ const normalizeReceipt = (receipt) => {
     routeOverrunSteps: receipt.routeOverrunSteps ?? embeddedReceipt.routeOverrunSteps,
     renderSafetyPenaltyScore: receipt.renderSafetyPenaltyScore ?? embeddedReceipt.renderSafetyPenaltyScore,
     routeEfficiencyPressureScore: receipt.routeEfficiencyPressureScore ?? embeddedReceipt.routeEfficiencyPressureScore,
+    runQualityMetrics: receipt.runQualityMetrics ?? embeddedReceipt.runQualityMetrics,
     runQualityScore: receipt.runQualityScore ?? embeddedReceipt.runQualityScore,
     shortestViablePathLength: receipt.shortestViablePathLength ?? embeddedReceipt.shortestViablePathLength
   };
@@ -259,6 +262,10 @@ const normalizeReceipt = (receipt) => {
         wrongTurns: normalizedWrongTurns
       }
   );
+  const storedRunQualityMetrics = readReceiptField(mergedReceipt, 'runQualityMetrics', 'run_quality_metrics');
+  const runQualityMetrics = isRecord(storedRunQualityMetrics)
+    ? { ...storedRunQualityMetrics }
+    : null;
 
   return {
     id: typeof mergedReceipt.id === 'string' ? mergedReceipt.id : null,
@@ -289,6 +296,7 @@ const normalizeReceipt = (receipt) => {
     renderSafetyPenaltyScore: readNumber(readReceiptField(mergedReceipt, 'renderSafetyPenaltyScore')),
     routeEfficiencyPressureScore: readNumber(readReceiptField(mergedReceipt, 'routeEfficiencyPressureScore')),
     shortestViablePathLength: normalizedShortestViablePathLength,
+    runQualityMetrics,
     runQualityScore: runQualityScoreComparison.recomputed,
     runQualityScoreComparison,
     wrongTurns: normalizedWrongTurns,
@@ -562,6 +570,8 @@ const buildPerformancePressureReview = (receipts) => ({
   scorerId: MAZE_CYCLE_RUN_QUALITY_SCORER_ID,
   scorerVersion: MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION,
   shortestPathModel: MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL,
+  topologyMetricsVersion: MAZE_CYCLE_RUN_QUALITY_METRICS_VERSION,
+  explorerThreshold: MAZE_CYCLE_RUN_QUALITY_EXPLORER_THRESHOLD,
   receiptCount: receipts.length,
   averageRunQualityScore: averageOrNull(receipts.map((receipt) => receipt.runQualityScore?.total)),
   averageRouteEfficiencyPressureScore: averageOrNull(receipts.map((receipt) => receipt.runQualityScore?.routeEfficiencyPressureScore)),
@@ -569,6 +579,12 @@ const buildPerformancePressureReview = (receipts) => ({
   averageRouteOverrunRatio: averageOrNull(receipts.map((receipt) => receipt.runQualityScore?.routeOverrunRatio)),
   averageRouteOverrunSteps: averageOrNull(receipts.map((receipt) => receipt.runQualityScore?.routeOverrunSteps)),
   averageShortestViablePathLength: averageOrNull(receipts.map((receipt) => receipt.runQualityScore?.shortestViablePathLength)),
+  averageCoverageRatio: averageOrNull(receipts.map((receipt) => receipt.runQualityMetrics?.coverageRatio)),
+  averageExplorationRatio: averageOrNull(receipts.map((receipt) => receipt.runQualityMetrics?.explorationRatio)),
+  averageRevisitSteps: averageOrNull(receipts.map((receipt) => receipt.runQualityMetrics?.revisitSteps)),
+  cleanRunReceiptCount: receipts.filter((receipt) => receipt.runQualityMetrics?.cleanRun === true).length,
+  explorerReceiptCount: receipts.filter((receipt) => receipt.runQualityMetrics?.explorer === true).length,
+  topologyMetricsReceiptCount: receipts.filter((receipt) => receipt.runQualityMetrics !== null).length,
   routeEfficiencyPressureReceiptCount: receipts.filter((receipt) => (receipt.runQualityScore?.routeEfficiencyPressureScore ?? 0) > 0).length,
   routeOverrunReceiptCount: receipts.filter((receipt) => (receipt.runQualityScore?.routeOverrunSteps ?? 0) > 0).length,
   renderSafetyPenaltyReceiptCount: receipts.filter((receipt) => (receipt.runQualityScore?.renderSafetyPenaltyScore ?? 0) > 0).length,
@@ -789,6 +805,8 @@ export const createMazeCycleTelemetryAtlasReport = (payload, options = {}) => {
       id: MAZE_CYCLE_RUN_QUALITY_SCORER_ID,
       version: MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION,
       shortestPathModel: MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL,
+      topologyMetricsVersion: MAZE_CYCLE_RUN_QUALITY_METRICS_VERSION,
+      explorerThreshold: MAZE_CYCLE_RUN_QUALITY_EXPLORER_THRESHOLD,
       historicalStoredScoresImmutable: true,
       reportScoresRecomputed: true
     },

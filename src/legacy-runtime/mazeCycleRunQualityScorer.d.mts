@@ -8,6 +8,7 @@ export interface MazeCycleRunQualityInput {
   backtracks: number;
   completionTimeMs: number;
   complexity: number;
+  completed?: boolean;
   playerPathLength: number;
   resetUsed: boolean;
   shortestViablePathLength: number;
@@ -45,6 +46,8 @@ export interface MazeCycleRunQualityScoreComparison {
 export const MAZE_CYCLE_RUN_QUALITY_SCORER_ID: string;
 export const MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION: string;
 export const MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL: string;
+export const MAZE_CYCLE_RUN_QUALITY_METRICS_VERSION: string;
+export const MAZE_CYCLE_RUN_QUALITY_EXPLORER_THRESHOLD: number;
 export const MAZE_CYCLE_RUN_QUALITY_AI_CHALLENGE_SCORE_THRESHOLD: number;
 export const MAZE_CYCLE_RUN_QUALITY_AI_EASE_SCORE_THRESHOLD: number;
 export const MAZE_CYCLE_RUN_QUALITY_AI_CHAOTIC_PRESSURE_THRESHOLD: number;

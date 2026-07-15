@@ -21,6 +21,12 @@ import {
   type MazeCycleRunQualityScoreComparison
 } from './mazeCycleRunQualityScorer.mjs';
 import {
+  MAZE_CYCLE_RUN_QUALITY_METRICS_VERSION,
+  normalizeStoredMazeCycleRunQualityTopologyMetrics,
+  summarizeMazeCycleRunQualityTopology,
+  type MazeCycleRunQualityTopologyMetrics
+} from './mazeCycleRunQualityTopology';
+import {
   resolveLegacyMazeComplexity,
   type LegacyMazeComplexityBreakdown
 } from './legacyProgression';
@@ -52,6 +58,8 @@ export {
   summarizeMazeCycleShortestPathComparison
 };
 export type { MazeCycleRunQualityScore, MazeCycleRunQualityScoreComparison } from './mazeCycleRunQualityScorer.mjs';
+export { MAZE_CYCLE_RUN_QUALITY_METRICS_VERSION, summarizeMazeCycleRunQualityTopology };
+export type { MazeCycleRunQualityTopologyMetrics } from './mazeCycleRunQualityTopology';
 
 export interface MazeCycleAiDecisionSummary {
   backtrackCount: number;
@@ -80,6 +88,7 @@ export interface MazeCycleTelemetryReceipt {
   routeOverrunSteps: number;
   renderSafetyPenaltyScore: number;
   routeEfficiencyPressureScore: number;
+  runQualityMetrics: MazeCycleRunQualityTopologyMetrics | null;
   runQualityScore: MazeCycleRunQualityScore | null;
   shortestViablePathLength: number;
   wrongTurns: number;
@@ -353,6 +362,7 @@ const normalizeReceipt = (value: unknown): MazeCycleTelemetryReceipt | null => {
     routeOverrunSteps: normalizeNonNegativeInteger(value.routeOverrunSteps),
     renderSafetyPenaltyScore: normalizeNonNegativeNumber(value.renderSafetyPenaltyScore),
     routeEfficiencyPressureScore: normalizeNonNegativeNumber(value.routeEfficiencyPressureScore),
+    runQualityMetrics: normalizeStoredMazeCycleRunQualityTopologyMetrics(value.runQualityMetrics),
     runQualityScore: normalizeStoredMazeCycleRunQualityScore(value.runQualityScore) as MazeCycleRunQualityScore | null,
     shortestViablePathLength: normalizeNonNegativeInteger(value.shortestViablePathLength, 1),
     wrongTurns: normalizeNonNegativeInteger(value.wrongTurns),
@@ -419,8 +429,9 @@ export const writeMazeCycleTelemetryHistory = (
 export const createMazeCycleTelemetryReceipt = (
   input: MazeCycleTelemetryRecordInput
 ): MazeCycleTelemetryReceipt => {
+  const completeSourcePath = normalizePlayerPath(input.playerPath, Number.MAX_SAFE_INTEGER);
   const normalizedPath = normalizePlayerPath(input.playerPath, MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT);
-  const derivedDeviation = summarizeMazeCyclePathDeviation(normalizedPath.playerPath, input.maze.solutionPath);
+  const derivedDeviation = summarizeMazeCyclePathDeviation(completeSourcePath.playerPath, input.maze.solutionPath);
   const playableShortestPath = resolveLegacyPlayableShortestPath(input.maze.grid, input.maze.start, input.maze.goal);
   const shortestViablePathLength = playableShortestPath.found
     ? playableShortestPath.path.length
@@ -447,6 +458,17 @@ export const createMazeCycleTelemetryReceipt = (
     surface: input.surface,
     wrongTurns
   });
+  const runQualityMetrics = summarizeMazeCycleRunQualityTopology({
+    backtracks,
+    completed: true,
+    maze: input.maze,
+    playerPath: completeSourcePath.playerPath,
+    playerPathLength: completeSourcePath.playerPathLength,
+    playerPathTruncated: normalizedPath.playerPathTruncated,
+    resetUsed: input.resetUsed,
+    sourcePathComplete: true,
+    wrongTurns
+  });
 
   return {
     id: `${input.surface}-${input.maze.seed}-${Date.parse(completedAt) || Date.now()}`,
@@ -468,6 +490,7 @@ export const createMazeCycleTelemetryReceipt = (
       normalizedPath.playerPathLength,
       shortestViablePathLength
     ),
+    runQualityMetrics,
     runQualityScore,
     shortestViablePathLength: shortestPathComparison.shortestViablePathLength,
     wrongTurns,
@@ -517,6 +540,7 @@ const toDiagnosticReceipt = (
     routeOverrunSteps: receipt.routeOverrunSteps,
     renderSafetyPenaltyScore: receipt.renderSafetyPenaltyScore,
     routeEfficiencyPressureScore: receipt.routeEfficiencyPressureScore,
+    runQualityMetrics: receipt.runQualityMetrics ? { ...receipt.runQualityMetrics } : null,
     runQualityScore: receipt.runQualityScore ? { ...receipt.runQualityScore } : null,
     runQualityScoreComparison: compareMazeCycleRunQualityScore(receipt.runQualityScore, {
       aiDecisionSummary: receipt.aiDecisionSummary,

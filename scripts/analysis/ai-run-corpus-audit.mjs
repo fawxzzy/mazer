@@ -9,6 +9,8 @@ import {
 import {
   MAZE_CYCLE_RUN_QUALITY_SCORER_ID,
   MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION,
+  MAZE_CYCLE_RUN_QUALITY_EXPLORER_THRESHOLD,
+  MAZE_CYCLE_RUN_QUALITY_METRICS_VERSION,
   MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL,
   compareMazeCycleRunQualityScore
 } from '../../src/legacy-runtime/mazeCycleRunQualityScorer.mjs';
@@ -116,6 +118,8 @@ const normalizeReceipt = (receipt) => {
       }
       : null
   );
+  const storedRunQualityMetrics = readEmbeddedField(receipt, 'runQualityMetrics', 'run_quality_metrics');
+  const runQualityMetrics = isRecord(storedRunQualityMetrics) ? { ...storedRunQualityMetrics } : null;
   const storedSignal = ['clean', 'searching', 'chaotic'].includes(aiDecisionScoreComparison.stored?.signal)
     ? aiDecisionScoreComparison.stored.signal
     : 'unknown';
@@ -154,6 +158,7 @@ const normalizeReceipt = (receipt) => {
     aiDecisionScoreComparison,
     runQualityScoreComparison,
     runQualityScore: runQualityScoreComparison.recomputed,
+    runQualityMetrics,
     mazeComplexityPresent: isRecord(mazeComplexity),
     edgeWrapCount,
     shortestPathLength: safeShortestPathLength,
@@ -268,9 +273,22 @@ export const createMazerAiRunCorpusAudit = (payload, options = {}) => {
       id: MAZE_CYCLE_RUN_QUALITY_SCORER_ID,
       version: MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION,
       shortestPathModel: MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL,
+      topologyMetricsVersion: MAZE_CYCLE_RUN_QUALITY_METRICS_VERSION,
+      explorerThreshold: MAZE_CYCLE_RUN_QUALITY_EXPLORER_THRESHOLD,
       recomputedReceiptCount: receipts.filter((receipt) => receipt.runQualityScoreComparison.recomputed !== null).length,
       storedScoreReceiptCount: receipts.filter((receipt) => receipt.runQualityScoreComparison.stored !== null).length,
       comparisonStatusCounts: runQualityComparisonCounts,
+      topologyMetricsReceiptCount: receipts.filter((receipt) => receipt.runQualityMetrics !== null).length,
+      topologyMetricsVersionCounts: countBy(
+        receipts.filter((receipt) => receipt.runQualityMetrics !== null),
+        (receipt) => receipt.runQualityMetrics.metricsVersion
+      ),
+      undefinedTopologyReasonCodeCounts: countBy(
+        receipts.flatMap((receipt) => Array.isArray(receipt.runQualityMetrics?.undefinedReasonCodes)
+          ? receipt.runQualityMetrics.undefinedReasonCodes
+          : []),
+        (reasonCode) => reasonCode
+      ),
       historicalStoredScoresImmutable: true,
       calibrationUsesRecomputedScores: true
     },
@@ -286,7 +304,10 @@ export const createMazerAiRunCorpusAudit = (payload, options = {}) => {
       pathLength: distribution(receipts.map((receipt) => receipt.pathLength)),
       shortestPathLength: distribution(receipts.map((receipt) => receipt.shortestPathLength)),
       averageFrameMs: distribution(receipts.map((receipt) => receipt.averageFrameMs)),
-      runQualityScore: distribution(receipts.map((receipt) => receipt.runQualityScore?.total))
+      runQualityScore: distribution(receipts.map((receipt) => receipt.runQualityScore?.total)),
+      coverageRatio: distribution(receipts.map((receipt) => receipt.runQualityMetrics?.coverageRatio)),
+      explorationRatio: distribution(receipts.map((receipt) => receipt.runQualityMetrics?.explorationRatio)),
+      revisitSteps: distribution(receipts.map((receipt) => receipt.runQualityMetrics?.revisitSteps))
     },
     dataPolicy: {
       rawReceiptsImmutable: true,

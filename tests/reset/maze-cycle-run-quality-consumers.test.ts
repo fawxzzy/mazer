@@ -23,11 +23,15 @@ describe('maze cycle run-quality scorer consumers', () => {
     const scorer = read('src/legacy-runtime/mazeCycleRunQualityScorer.mjs');
     const progression = read('src/legacy-runtime/legacyProgression.ts');
     const remote = read('src/legacy-runtime/legacyRemoteProgression.ts');
+    const topology = read('src/legacy-runtime/mazeCycleRunQualityTopology.ts');
 
     expect(scorer).toContain('(timeScore * 0.38)');
     expect(scorer).toContain('(base.timeScore * 0.22)');
     expect(progression).not.toContain('(timeScore * 0.38)');
     expect(progression).not.toContain('(baseScore.timeScore * 0.22)');
     expect(remote).toContain('runQualityScore: receipt.runQualityScore');
+    expect(remote).toContain('runQualityMetrics: receipt.runQualityMetrics');
+    expect(topology).toContain('fromStart + fromGoal === optimalSteps');
+    expect(topology).toContain("graphPolicy: 'playable-wrap-aware'");
   });
 });

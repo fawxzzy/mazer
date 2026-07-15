@@ -131,6 +131,8 @@ describe('maze-cycle-telemetry-report', () => {
       id: 'mazer.maze-cycle-run-quality',
       version: '1.0.0',
       shortestPathModel: 'playable-wrap-aware-shortest-path-v1',
+      topologyMetricsVersion: '1.0.0',
+      explorerThreshold: 0.25,
       historicalStoredScoresImmutable: true,
       reportScoresRecomputed: true
     });

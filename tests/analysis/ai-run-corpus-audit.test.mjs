@@ -67,6 +67,8 @@ describe('ai-run-corpus-audit', () => {
       id: 'mazer.maze-cycle-run-quality',
       version: '1.0.0',
       shortestPathModel: 'playable-wrap-aware-shortest-path-v1',
+      topologyMetricsVersion: '1.0.0',
+      explorerThreshold: 0.25,
       recomputedReceiptCount: 4,
       storedScoreReceiptCount: 0,
       historicalStoredScoresImmutable: true,

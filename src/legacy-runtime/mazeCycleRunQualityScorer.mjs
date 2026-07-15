@@ -3,6 +3,8 @@ import { scoreMazeCycleAiDecisionSummary } from './mazeCycleAiScorer.mjs';
 export const MAZE_CYCLE_RUN_QUALITY_SCORER_ID = 'mazer.maze-cycle-run-quality';
 export const MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION = '1.0.0';
 export const MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL = 'playable-wrap-aware-shortest-path-v1';
+export const MAZE_CYCLE_RUN_QUALITY_METRICS_VERSION = '1.0.0';
+export const MAZE_CYCLE_RUN_QUALITY_EXPLORER_THRESHOLD = 0.25;
 
 export const MAZE_CYCLE_RUN_QUALITY_AI_CHALLENGE_SCORE_THRESHOLD = 58;
 export const MAZE_CYCLE_RUN_QUALITY_AI_EASE_SCORE_THRESHOLD = 34;
@@ -144,6 +146,7 @@ const scoreBaseRunQuality = (input, complexity) => {
 
 export const scoreMazeCycleRunQuality = (input) => {
   if (!isRecord(input)) return null;
+  if (input.completed === false) return null;
   if (!['menu-demo', 'play'].includes(input.surface)) return null;
   if (!Number.isFinite(input.playerPathLength) || !Number.isFinite(input.shortestViablePathLength)) return null;
   if (input.shortestViablePathLength <= 0) return null;
