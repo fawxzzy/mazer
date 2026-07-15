@@ -2576,8 +2576,12 @@ export class MenuScene extends Phaser.Scene {
     this.overlayScrollTopFadeAlpha = metrics.topFadeAlpha;
     this.overlayScrollBottomFadeAlpha = metrics.bottomFadeAlpha;
     this.overlayScrollViewportBounds = this.legacyOverlayScrollRectToVisualRect(metrics.viewport);
-    this.overlayScrollTrackBounds = this.legacyOverlayScrollRectToVisualRect(metrics.track);
-    this.overlayScrollThumbBounds = this.legacyOverlayScrollRectToVisualRect(metrics.thumb);
+    this.overlayScrollTrackBounds = metrics.enabled
+      ? this.legacyOverlayScrollRectToVisualRect(metrics.track)
+      : null;
+    this.overlayScrollThumbBounds = metrics.enabled
+      ? this.legacyOverlayScrollRectToVisualRect(metrics.thumb)
+      : null;
   }
 
   private setLegacyOverlayScrollOffset(offset: number): boolean {

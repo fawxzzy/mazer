@@ -1547,7 +1547,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER');
     expect(menuSceneSource).toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics);');
     expect(menuSceneSource).not.toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics, true);');
-    expect(menuSceneSource).toContain('this.overlayScrollThumbBounds = this.legacyOverlayScrollRectToVisualRect(metrics.thumb);');
+    expect(menuSceneSource).toContain('this.overlayScrollTrackBounds = metrics.enabled');
+    expect(menuSceneSource).toContain('this.overlayScrollThumbBounds = metrics.enabled');
     expect(menuSceneSource).toContain('const thumbAlpha = metrics.enabled ? 0.92 : 0.58;');
     expect(menuSceneSource).toContain('if (!showAdvancedOptions) {');
     expect(menuSceneSource).toContain('const viewportTop = rowY + (compact ? 4 : 6);');
