@@ -35,6 +35,11 @@ import {
   scoreMazeCycleAiDecisionSummary,
   type MazeCycleAiDecisionScore
 } from '../../src/legacy-runtime/mazeCycleAiScorer.mjs';
+import {
+  MAZE_CYCLE_RUN_QUALITY_SCORER_ID,
+  MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION,
+  MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL
+} from '../../src/legacy-runtime/mazeCycleRunQualityScorer.mjs';
 
 class MemoryStorage {
   readonly values = new Map<string, string>();
@@ -127,6 +132,11 @@ interface CalibrationSummary {
     aiScorer: {
       id: string;
       version: string;
+    };
+    runQualityScorer: {
+      id: string;
+      version: string;
+      shortestPathModel: string;
     };
     averageAiDecisionScore: Omit<MazeCycleAiDecisionScore, 'signal' | 'scorerId' | 'scorerVersion'> | null;
     averageRouteEfficiencyPressureScore: number | null;
@@ -720,6 +730,11 @@ const buildSummary = (
       aiScorer: {
         id: MAZE_CYCLE_AI_SCORER_ID,
         version: MAZE_CYCLE_AI_SCORER_VERSION
+      },
+      runQualityScorer: {
+        id: MAZE_CYCLE_RUN_QUALITY_SCORER_ID,
+        version: MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION,
+        shortestPathModel: MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL
       },
       averageAiDecisionScore: averageAiDecisionScores(aiDecisionScores),
       averageRouteEfficiencyPressureScore: routeEfficiencyPressureScores.length > 0

@@ -6,6 +6,12 @@ import {
   MAZE_CYCLE_AI_SCORER_VERSION,
   compareMazeCycleAiDecisionScore
 } from '../../src/legacy-runtime/mazeCycleAiScorer.mjs';
+import {
+  MAZE_CYCLE_RUN_QUALITY_SCORER_ID,
+  MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION,
+  MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL,
+  compareMazeCycleRunQualityScore
+} from '../../src/legacy-runtime/mazeCycleRunQualityScorer.mjs';
 
 export const MAZER_AI_RUN_CORPUS_AUDIT_SCHEMA = 'mazer.ai-run-corpus-audit.v1';
 
@@ -71,6 +77,10 @@ const normalizeReceipt = (receipt) => {
   const shortestPathLength = readEmbeddedField(receipt, 'shortestViablePathLength', 'shortest_viable_path_length');
   const pathLength = readEmbeddedField(receipt, 'playerPathLength', 'path_length');
   const averageFrameMs = readEmbeddedField(receipt, 'averageFrameMs', 'average_frame_ms');
+  const completionTimeMs = readEmbeddedField(receipt, 'completionTimeMs', 'completion_time_ms');
+  const wrongTurns = readEmbeddedField(receipt, 'wrongTurns', 'wrong_turns');
+  const backtracks = readEmbeddedField(receipt, 'backtracks');
+  const resetUsed = readEmbeddedField(receipt, 'resetUsed', 'reset_used');
   const edgeWrapCount = Number.isFinite(mazeComplexity?.edgeWrapCount)
     ? Math.max(0, Math.round(mazeComplexity.edgeWrapCount))
     : 0;
@@ -79,6 +89,33 @@ const normalizeReceipt = (receipt) => {
     : null;
   const safePathLength = Number.isFinite(pathLength) && pathLength >= 0 ? Math.round(pathLength) : null;
   const aiDecisionScoreComparison = compareMazeCycleAiDecisionScore(aiDecisionScore, aiDecisionSummary);
+  const normalizedSurface = surface === 'menu-demo' || surface === 'play' ? surface : 'unknown';
+  const runQualityInputComplete = normalizedSurface !== 'unknown'
+    && Number.isFinite(mazeComplexity?.total)
+    && safeShortestPathLength !== null
+    && safePathLength !== null
+    && Number.isFinite(averageFrameMs)
+    && Number.isFinite(completionTimeMs)
+    && Number.isFinite(wrongTurns)
+    && Number.isFinite(backtracks)
+    && typeof resetUsed === 'boolean';
+  const runQualityScoreComparison = compareMazeCycleRunQualityScore(
+    readEmbeddedField(receipt, 'runQualityScore', 'run_quality_score'),
+    runQualityInputComplete
+      ? {
+        aiDecisionSummary,
+        averageFrameMs,
+        backtracks,
+        completionTimeMs,
+        complexity: mazeComplexity.total,
+        playerPathLength: safePathLength,
+        resetUsed,
+        shortestViablePathLength: safeShortestPathLength,
+        surface: normalizedSurface,
+        wrongTurns
+      }
+      : null
+  );
   const storedSignal = ['clean', 'searching', 'chaotic'].includes(aiDecisionScoreComparison.stored?.signal)
     ? aiDecisionScoreComparison.stored.signal
     : 'unknown';
@@ -105,13 +142,18 @@ const normalizeReceipt = (receipt) => {
   if (surface === 'play') reasonCodes.push('human_sample_only');
   if (aiDecisionScoreComparison.status === 'mismatch') reasonCodes.push('stored_scorer_mismatch');
   if (aiDecisionScoreComparison.status === 'stored-incomplete') reasonCodes.push('stored_scorer_incomplete');
+  if (runQualityScoreComparison.status === 'mismatch') reasonCodes.push('stored_run_quality_mismatch');
+  if (runQualityScoreComparison.status === 'stored-incomplete') reasonCodes.push('stored_run_quality_incomplete');
+  if (runQualityScoreComparison.status === 'recomputation-unavailable') reasonCodes.push('run_quality_recomputation_unavailable');
 
   return {
-    surface: surface === 'menu-demo' || surface === 'play' ? surface : 'unknown',
+    surface: normalizedSurface,
     aiDecisionPresent: isRecord(aiDecisionSummary),
     aiSignal: recomputedSignal,
     storedAiSignal: storedSignal,
     aiDecisionScoreComparison,
+    runQualityScoreComparison,
+    runQualityScore: runQualityScoreComparison.recomputed,
     mazeComplexityPresent: isRecord(mazeComplexity),
     edgeWrapCount,
     shortestPathLength: safeShortestPathLength,
@@ -162,6 +204,10 @@ export const createMazerAiRunCorpusAudit = (payload, options = {}) => {
   const scoreComparisonCounts = countBy(
     receipts,
     (receipt) => receipt.aiDecisionScoreComparison.status
+  );
+  const runQualityComparisonCounts = countBy(
+    receipts,
+    (receipt) => receipt.runQualityScoreComparison.status
   );
 
   return {
@@ -218,6 +264,16 @@ export const createMazerAiRunCorpusAudit = (payload, options = {}) => {
       historicalStoredScoresImmutable: true,
       calibrationUsesRecomputedScores: true
     },
+    runQualityScorer: {
+      id: MAZE_CYCLE_RUN_QUALITY_SCORER_ID,
+      version: MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION,
+      shortestPathModel: MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL,
+      recomputedReceiptCount: receipts.filter((receipt) => receipt.runQualityScoreComparison.recomputed !== null).length,
+      storedScoreReceiptCount: receipts.filter((receipt) => receipt.runQualityScoreComparison.stored !== null).length,
+      comparisonStatusCounts: runQualityComparisonCounts,
+      historicalStoredScoresImmutable: true,
+      calibrationUsesRecomputedScores: true
+    },
     routeBenchmark: {
       comparableReceiptCount: benchmarkComparable.length,
       actualShorterThanBenchmarkCount: actualShorter.length,
@@ -229,7 +285,8 @@ export const createMazerAiRunCorpusAudit = (payload, options = {}) => {
       completionTimeMs: distribution(rawReceipts.filter(isRecord).map((receipt) => readEmbeddedField(receipt, 'completionTimeMs', 'completion_time_ms'))),
       pathLength: distribution(receipts.map((receipt) => receipt.pathLength)),
       shortestPathLength: distribution(receipts.map((receipt) => receipt.shortestPathLength)),
-      averageFrameMs: distribution(receipts.map((receipt) => receipt.averageFrameMs))
+      averageFrameMs: distribution(receipts.map((receipt) => receipt.averageFrameMs)),
+      runQualityScore: distribution(receipts.map((receipt) => receipt.runQualityScore?.total))
     },
     dataPolicy: {
       rawReceiptsImmutable: true,

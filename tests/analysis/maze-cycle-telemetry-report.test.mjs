@@ -127,6 +127,18 @@ describe('maze-cycle-telemetry-report', () => {
       historicalStoredScoresImmutable: true,
       reportScoresRecomputed: true
     });
+    expect(report.runQualityScorer).toEqual({
+      id: 'mazer.maze-cycle-run-quality',
+      version: '1.0.0',
+      shortestPathModel: 'playable-wrap-aware-shortest-path-v1',
+      historicalStoredScoresImmutable: true,
+      reportScoresRecomputed: true
+    });
+    expect(report.latestReceipt.runQualityScoreComparison).toMatchObject({
+      status: 'stored-missing',
+      stored: null,
+      recomputed: { scorerVersion: '1.0.0' }
+    });
     expect(report.aiReview).toMatchObject({
       aiDecisionReceiptCount: 1,
       averageBacktrackCount: 2,
@@ -408,9 +420,9 @@ describe('maze-cycle-telemetry-report', () => {
     });
     expect(report.performancePressureReview).toMatchObject({
       averageRenderSafetyPenaltyScore: 0,
-      averageRouteEfficiencyPressureScore: 12.5,
+      averageRouteEfficiencyPressureScore: 0,
       receiptCount: 1,
-      routeEfficiencyPressureReceiptCount: 1
+      routeEfficiencyPressureReceiptCount: 0
     });
     expect(report.aiReview).toMatchObject({
       aiDecisionReceiptCount: 1,
@@ -455,9 +467,9 @@ describe('maze-cycle-telemetry-report', () => {
       sourceSchema: MAZER_CYCLE_LEARNING_REPORT_SCHEMA,
       validation,
       decision: {
-        focus: 'route-efficiency',
-        reportSignal: 'ease',
-        recommendedAction: 'reduce-pressure'
+        focus: 'increase-complexity',
+        reportSignal: 'challenge',
+        recommendedAction: 'increase-pressure'
       },
       safeguards: {
         noAutoTuningWithoutValidator: true,

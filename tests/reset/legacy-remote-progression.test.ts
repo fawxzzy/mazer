@@ -12,6 +12,27 @@ import {
 } from '../../src/legacy-runtime/legacyRemoteProgression';
 import { createEmptyLegacyProgressionState } from '../../src/legacy-runtime/legacyProgression';
 import { LEGACY_REMOTE_MESSAGE_COPY } from '../../src/legacy-runtime/legacyPlayerMessage';
+import { scoreMazeCycleRunQuality } from '../../src/legacy-runtime/mazeCycleRunQualityScorer.mjs';
+
+const storedRunQualityScore = scoreMazeCycleRunQuality({
+  aiDecisionSummary: {
+    backtrackCount: 2,
+    decisionCount: 12,
+    optionalRetargetCount: 1,
+    recoveryCount: 1,
+    visitedUndoCount: 3,
+    wrongBranchCount: 1
+  },
+  averageFrameMs: 12.3,
+  backtracks: 2,
+  completionTimeMs: 4321,
+  complexity: 87,
+  playerPathLength: 16,
+  resetUsed: false,
+  shortestViablePathLength: 14,
+  surface: 'menu-demo',
+  wrongTurns: 1
+});
 
 vi.mock('../../src/legacy-runtime/legacyAuth', () => ({
   getLegacyAuthClient: vi.fn(async () => null)
@@ -172,9 +193,13 @@ describe('legacy remote progression', () => {
       playerPathLength: 16,
       playerPathTruncated: false,
       renderSafetyPenaltyScore: 0,
+      routeOverrunRatio: 0.143,
+      routeOverrunSteps: 2,
       resetUsed: false,
       routeQuality: 'multi-route',
       routeEfficiencyPressureScore: 12.5,
+      runQualityScore: storedRunQualityScore,
+      shortestViablePathLength: 14,
       start: { x: 1, y: 2 },
       surface: 'menu-demo',
       wrongTurns: 1
@@ -216,7 +241,12 @@ describe('legacy remote progression', () => {
         playerPathLength: 16,
         playerPathPreview: expect.arrayContaining([{ x: 15, y: 16 }]),
         renderSafetyPenaltyScore: 0,
-        routeEfficiencyPressureScore: 12.5
+        routeEfficiencyPressureScore: 12.5,
+        runQualityScore: expect.objectContaining({
+          scorerId: 'mazer.maze-cycle-run-quality',
+          scorerVersion: '1.0.0',
+          shortestPathModel: 'playable-wrap-aware-shortest-path-v1'
+        })
       })
     }));
   });

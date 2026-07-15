@@ -134,7 +134,11 @@ describe('legacy maze cycle telemetry', () => {
       shortestViablePathLength: 2,
       routeOverrunRatio: 0,
       routeOverrunSteps: 0,
-      routeEfficiencyPressureScore: 0
+      routeEfficiencyPressureScore: 0,
+      runQualityScore: {
+        shortestPathModel: 'playable-wrap-aware-shortest-path-v1',
+        shortestViablePathLength: 2
+      }
     });
   });
 

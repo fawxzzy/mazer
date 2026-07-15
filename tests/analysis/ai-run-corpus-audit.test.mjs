@@ -16,6 +16,9 @@ const receipt = ({ receipt: receiptOverrides = {}, ...overrides } = {}) => ({
   path_length: overrides.path_length ?? 12,
   completion_time_ms: overrides.completion_time_ms ?? 1_000,
   average_frame_ms: overrides.average_frame_ms ?? 16.7,
+  wrong_turns: overrides.wrong_turns ?? 0,
+  backtracks: overrides.backtracks ?? 0,
+  reset_used: overrides.reset_used ?? false,
   receipt: {
     receiptSchemaVersion: '2',
     appBuild: 'build-a',
@@ -24,7 +27,7 @@ const receipt = ({ receipt: receiptOverrides = {}, ...overrides } = {}) => ({
     benchmarkGraphVersion: 'graph-v2',
     runOrigin: 'organic-menu',
     shortestViablePathLength: overrides.shortestViablePathLength ?? 10,
-    mazeComplexity: { edgeWrapCount: overrides.edgeWrapCount ?? 0 },
+    mazeComplexity: { edgeWrapCount: overrides.edgeWrapCount ?? 0, total: 90 },
     aiDecisionSummary: { decisionCount: 4 },
     aiDecisionScore: { signal: overrides.signal ?? 'searching' },
     ...receiptOverrides
@@ -57,6 +60,15 @@ describe('ai-run-corpus-audit', () => {
       version: '1.0.0',
       recomputedReceiptCount: 3,
       storedScoreReceiptCount: 4,
+      historicalStoredScoresImmutable: true,
+      calibrationUsesRecomputedScores: true
+    });
+    expect(audit.runQualityScorer).toMatchObject({
+      id: 'mazer.maze-cycle-run-quality',
+      version: '1.0.0',
+      shortestPathModel: 'playable-wrap-aware-shortest-path-v1',
+      recomputedReceiptCount: 4,
+      storedScoreReceiptCount: 0,
       historicalStoredScoresImmutable: true,
       calibrationUsesRecomputedScores: true
     });
