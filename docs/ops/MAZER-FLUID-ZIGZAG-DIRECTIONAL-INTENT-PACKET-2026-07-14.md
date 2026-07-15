@@ -2,6 +2,60 @@
 
 Date: `2026-07-14`
 
+## 2026-07-15 Physical-Control Correction
+
+The operator's fresh iPhone review proved that the original corner-following
+assistance below was too permissive. Draft PR
+[#74](https://github.com/fawxzzy/mazer/pull/74), commit `e18d2043`, replaces that
+behavior with a strict one-tile wall sidestep:
+
+- a held north/south direction may move one tile east or west only when exactly
+  one of those tiles is legal and the original north/south lane is legal from
+  that tile
+- held east/west movement follows the mirrored rule with one north/south tile
+- the sidestep never replaces the held direction; the next cadence resumes the
+  original heading
+- an ordinary corner, ambiguous side choice, immediate bypass, two-tile detour,
+  dead end, or mismatched queued turn stops instead of choosing a route
+- all four held directions have direct fixtures; runtime diagnostics now expose
+  `assistedLaneShiftCount` and an invariant one-tile limit
+
+Verification for the correction:
+
+- focused resolver/diagnostic/architecture packet: `20/20` passed
+- serial repository gate: `359/360` passed; the sole fixed-timeout generated
+  edge-dock test passed immediately in an exact isolated rerun, for correlated
+  `360/360` coverage
+- `npm run lint`, `npm run build`, and `git diff --check`: passed
+- the protected canonical `tests/ai/demo-walker.test.ts` modification was not
+  touched
+
+Deployed 405x958 stick proof on the code-bearing commit:
+
+- deployment: `dpl_DBjfTqLeeZ96FDkSKQre3ma3mZhs`
+- route fixture: player at `(3,14)`, held `up`, direct `up` blocked, the only
+  one-tile restoring lane on the right
+- first accepted cadence: `(3,14) -> (4,14)`, decision
+  `assisted-lane-shift`, active direction still `up`, count `1`, tile limit `1`
+- next accepted cadence without releasing the stick: `(4,14) -> (4,13)`,
+  decision `continued`, active direction still `up`, count still `1`
+- pointer release cleared the active direction, assistance count, held control,
+  stick pull, and repeat timer
+- screenshot:
+  `C:/ATLAS/tmp/captures/mazer-controls-pr74-2026-07-15/mazer-controls-pr74-stick-resume-405x958.png`
+
+The controls worktree lacked the canonical Vercel link. `vercel deploy` therefore
+auto-created isolated project `mazer-fluid-zigzag-intent-resolver` and labeled
+its first deployment `production`. It did not deploy, promote, alias, or mutate
+the canonical `fawxzzy-mazer` production project. Further Vercel mutation was
+stopped immediately, the generated local link and `.gitignore` residue were
+removed, and deletion of the isolated remote project is left for an explicit
+operator decision.
+
+PR `#74` remains draft for operator review. The original PR `#64` evidence below
+remains immutable historical evidence and does not override this corrected
+steering contract. No canonical Mazer production deployment occurred.
+
 ## Outcome
 
 The bounded directional-intent slice of `mazer-fluid-controls-and-motion` is complete and review-ready in draft PR [#64](https://github.com/fawxzzy/mazer/pull/64). The parent card remains open: this packet closes shared run-to-block steering, latest-wins queued turns, bounded zigzag assistance, and exact browser proof, but does not claim the card's broader pace/feel tuning is terminal.

@@ -365,8 +365,8 @@ describe('menu runtime diagnostics', () => {
         inputBuffer: {
           directionalIntent: {
             activeDirection: 'right',
-            assistedTurnCount: 0,
-            assistedTurnLimit: 4,
+            assistedLaneShiftCount: 0,
+            assistedLaneShiftTileLimit: 1,
             lastDecision: 'continued',
             queuedDirection: 'down',
             requestedDirections: ['right', 'down']

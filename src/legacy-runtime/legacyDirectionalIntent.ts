@@ -4,7 +4,7 @@ import {
   type LegacyPoint
 } from './legacyMaze';
 
-export const LEGACY_DIRECTIONAL_INTENT_ASSISTED_TURN_LIMIT = 4;
+export const LEGACY_DIRECTIONAL_INTENT_LANE_SHIFT_TILE_LIMIT = 1;
 
 export const LEGACY_CARDINAL_DIRECTIONS = [
   'up',
@@ -20,16 +20,15 @@ export type LegacyDirectionalIntentDecision =
   | 'requested'
   | 'continued'
   | 'queued-turn'
-  | 'assisted-corner'
+  | 'assisted-lane-shift'
   | 'stopped-awaiting-queued-direction'
   | 'stopped-at-dead-end'
-  | 'stopped-at-intersection'
-  | 'stopped-at-assist-limit';
+  | 'stopped-at-ambiguous-lane-shift';
 
 export interface LegacyDirectionalIntentDiagnostics {
   activeDirection: LegacyCardinalDirection | null;
-  assistedTurnCount: number;
-  assistedTurnLimit: number;
+  assistedLaneShiftCount: number;
+  assistedLaneShiftTileLimit: number;
   lastDecision: LegacyDirectionalIntentDecision;
   queuedDirection: LegacyCardinalDirection | null;
   requestedDirections: LegacyCardinalDirection[];
@@ -51,11 +50,11 @@ const DIRECTION_DELTAS: Record<LegacyCardinalDirection, LegacyPoint> = {
   left: { x: -1, y: 0 }
 };
 
-const OPPOSITE_DIRECTIONS: Record<LegacyCardinalDirection, LegacyCardinalDirection> = {
-  up: 'down',
-  right: 'left',
-  down: 'up',
-  left: 'right'
+const ORTHOGONAL_DIRECTIONS: Record<LegacyCardinalDirection, readonly LegacyCardinalDirection[]> = {
+  up: ['left', 'right'],
+  right: ['up', 'down'],
+  down: ['left', 'right'],
+  left: ['up', 'down']
 };
 
 const uniqueDirections = (
@@ -100,7 +99,7 @@ export const resolveLegacyCardinalDirectionsFromVector = (
 export class LegacyDirectionalIntentResolver {
   private activeDirection: LegacyCardinalDirection | null = null;
 
-  private assistedTurnCount = 0;
+  private assistedLaneShiftCount = 0;
 
   private lastDecision: LegacyDirectionalIntentDecision = 'idle';
 
@@ -115,7 +114,7 @@ export class LegacyDirectionalIntentResolver {
     }
 
     this.requestedDirections = requestedDirections;
-    this.assistedTurnCount = 0;
+    this.assistedLaneShiftCount = 0;
     this.lastDecision = requestedDirections.length > 0 ? 'requested' : 'idle';
 
     const preferredDirection = requestedDirections[0] ?? null;
@@ -150,7 +149,7 @@ export class LegacyDirectionalIntentResolver {
 
     if (this.activeDirection === null || !requestedDirections.includes(this.activeDirection)) {
       this.activeDirection = requestedDirections[0] ?? null;
-      this.assistedTurnCount = 0;
+      this.assistedLaneShiftCount = 0;
     }
     if (this.queuedDirection !== null && !requestedDirections.includes(this.queuedDirection)) {
       this.queuedDirection = null;
@@ -183,7 +182,7 @@ export class LegacyDirectionalIntentResolver {
       if (queuedTarget !== null) {
         this.activeDirection = this.queuedDirection;
         this.queuedDirection = null;
-        this.assistedTurnCount = 0;
+        this.assistedLaneShiftCount = 0;
         return this.createMoveStep('queued-turn', this.activeDirection, queuedTarget);
       }
     }
@@ -201,32 +200,39 @@ export class LegacyDirectionalIntentResolver {
       return this.createStopStep('stopped-awaiting-queued-direction');
     }
 
-    const reverseDirection = OPPOSITE_DIRECTIONS[this.activeDirection];
-    const forwardContinuations = LEGACY_CARDINAL_DIRECTIONS.filter((direction) => (
-      direction !== reverseDirection && legalTargets.has(direction)
-    ));
-    if (forwardContinuations.length === 0) {
+    const heldDirection = this.activeDirection;
+    const heldDelta = DIRECTION_DELTAS[heldDirection];
+    const laneShiftCandidates = ORTHOGONAL_DIRECTIONS[heldDirection].flatMap((direction) => {
+      const target = legalTargets.get(direction) ?? null;
+      if (target === null) {
+        return [];
+      }
+
+      const resumedTarget = resolveLegacyNavigationTarget(
+        maze,
+        target,
+        heldDelta.x,
+        heldDelta.y
+      );
+      return resumedTarget === null ? [] : [{ direction, target }];
+    });
+    if (laneShiftCandidates.length === 0) {
       return this.createStopStep('stopped-at-dead-end');
     }
-    if (forwardContinuations.length > 1) {
-      return this.createStopStep('stopped-at-intersection');
-    }
-    if (this.assistedTurnCount >= LEGACY_DIRECTIONAL_INTENT_ASSISTED_TURN_LIMIT) {
-      return this.createStopStep('stopped-at-assist-limit');
+    if (laneShiftCandidates.length > 1) {
+      return this.createStopStep('stopped-at-ambiguous-lane-shift');
     }
 
-    const assistedDirection = forwardContinuations[0]!;
-    const assistedTarget = legalTargets.get(assistedDirection)!;
-    this.activeDirection = assistedDirection;
-    this.assistedTurnCount += 1;
-    return this.createMoveStep('assisted-corner', assistedDirection, assistedTarget);
+    const laneShift = laneShiftCandidates[0]!;
+    this.assistedLaneShiftCount += 1;
+    return this.createMoveStep('assisted-lane-shift', laneShift.direction, laneShift.target);
   }
 
   getDiagnostics(): LegacyDirectionalIntentDiagnostics {
     return {
       activeDirection: this.activeDirection,
-      assistedTurnCount: this.assistedTurnCount,
-      assistedTurnLimit: LEGACY_DIRECTIONAL_INTENT_ASSISTED_TURN_LIMIT,
+      assistedLaneShiftCount: this.assistedLaneShiftCount,
+      assistedLaneShiftTileLimit: LEGACY_DIRECTIONAL_INTENT_LANE_SHIFT_TILE_LIMIT,
       lastDecision: this.lastDecision,
       queuedDirection: this.queuedDirection,
       requestedDirections: [...this.requestedDirections]
@@ -235,7 +241,7 @@ export class LegacyDirectionalIntentResolver {
 
   reset(): void {
     this.activeDirection = null;
-    this.assistedTurnCount = 0;
+    this.assistedLaneShiftCount = 0;
     this.lastDecision = 'idle';
     this.queuedDirection = null;
     this.requestedDirections = [];

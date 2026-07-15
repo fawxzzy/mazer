@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  LEGACY_DIRECTIONAL_INTENT_ASSISTED_TURN_LIMIT,
+  LEGACY_DIRECTIONAL_INTENT_LANE_SHIFT_TILE_LIMIT,
   LegacyDirectionalIntentResolver
 } from '../../src/legacy-runtime/legacyDirectionalIntent';
 import type { LegacyMazeSnapshot, LegacyPoint } from '../../src/legacy-runtime/legacyMaze';
@@ -103,36 +103,134 @@ describe('LegacyDirectionalIntentResolver', () => {
     });
   });
 
-  test('assists only the single non-reversing continuation at an unambiguous corner', () => {
+  test('sidesteps one tile at a horizontal wall and then resumes the held direction', () => {
     const maze = createMaze(5, [
       { x: 1, y: 1 },
       { x: 2, y: 1 },
-      { x: 2, y: 2 }
+      { x: 2, y: 2 },
+      { x: 3, y: 2 },
+      { x: 4, y: 2 }
     ]);
     const resolver = new LegacyDirectionalIntentResolver();
     resolver.request(['right']);
     resolver.step(maze, { x: 1, y: 1 });
 
     expect(resolver.step(maze, { x: 2, y: 1 })).toMatchObject({
-      decision: 'assisted-corner',
+      decision: 'assisted-lane-shift',
       direction: 'down',
       target: { x: 2, y: 2 }
     });
+    expect(resolver.getDiagnostics()).toMatchObject({
+      activeDirection: 'right',
+      assistedLaneShiftCount: 1,
+      assistedLaneShiftTileLimit: LEGACY_DIRECTIONAL_INTENT_LANE_SHIFT_TILE_LIMIT
+    });
+    expect(resolver.step(maze, { x: 2, y: 2 })).toMatchObject({
+      decision: 'continued',
+      direction: 'right',
+      target: { x: 3, y: 2 }
+    });
   });
 
-  test('stops at a genuine intersection instead of choosing an arbitrary branch', () => {
+  test('sidesteps one tile at a vertical wall and then resumes the held direction', () => {
+    const maze = createMaze(6, [
+      { x: 3, y: 1 },
+      { x: 3, y: 2 },
+      { x: 2, y: 2 },
+      { x: 2, y: 3 },
+      { x: 2, y: 4 }
+    ]);
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.request(['down']);
+    resolver.step(maze, { x: 3, y: 1 });
+
+    expect(resolver.step(maze, { x: 3, y: 2 })).toMatchObject({
+      decision: 'assisted-lane-shift',
+      direction: 'left',
+      target: { x: 2, y: 2 }
+    });
+    expect(resolver.step(maze, { x: 2, y: 2 })).toMatchObject({
+      decision: 'continued',
+      direction: 'down',
+      target: { x: 2, y: 3 }
+    });
+  });
+
+  test('mirrors one-tile lane shifts for left and up movement', () => {
+    const horizontalMaze = createMaze(6, [
+      { x: 4, y: 3 },
+      { x: 3, y: 3 },
+      { x: 3, y: 2 },
+      { x: 2, y: 2 }
+    ]);
+    const leftResolver = new LegacyDirectionalIntentResolver();
+    leftResolver.request(['left']);
+    leftResolver.step(horizontalMaze, { x: 4, y: 3 });
+    expect(leftResolver.step(horizontalMaze, { x: 3, y: 3 })).toMatchObject({
+      decision: 'assisted-lane-shift',
+      direction: 'up',
+      target: { x: 3, y: 2 }
+    });
+    expect(leftResolver.step(horizontalMaze, { x: 3, y: 2 })).toMatchObject({
+      decision: 'continued',
+      direction: 'left',
+      target: { x: 2, y: 2 }
+    });
+
+    const verticalMaze = createMaze(6, [
+      { x: 2, y: 4 },
+      { x: 2, y: 3 },
+      { x: 3, y: 3 },
+      { x: 3, y: 2 }
+    ]);
+    const upResolver = new LegacyDirectionalIntentResolver();
+    upResolver.request(['up']);
+    upResolver.step(verticalMaze, { x: 2, y: 4 });
+    expect(upResolver.step(verticalMaze, { x: 2, y: 3 })).toMatchObject({
+      decision: 'assisted-lane-shift',
+      direction: 'right',
+      target: { x: 3, y: 3 }
+    });
+    expect(upResolver.step(verticalMaze, { x: 3, y: 3 })).toMatchObject({
+      decision: 'continued',
+      direction: 'up',
+      target: { x: 3, y: 2 }
+    });
+  });
+
+  test('stops when both one-tile lane shifts could resume the held direction', () => {
     const maze = createMaze(5, [
       { x: 1, y: 2 },
       { x: 2, y: 2 },
       { x: 2, y: 1 },
-      { x: 2, y: 3 }
+      { x: 3, y: 1 },
+      { x: 2, y: 3 },
+      { x: 3, y: 3 }
     ]);
     const resolver = new LegacyDirectionalIntentResolver();
     resolver.request(['right']);
     resolver.step(maze, { x: 1, y: 2 });
 
     expect(resolver.step(maze, { x: 2, y: 2 })).toMatchObject({
-      decision: 'stopped-at-intersection',
+      decision: 'stopped-at-ambiguous-lane-shift',
+      moved: false
+    });
+  });
+
+  test('refuses a detour that cannot resume the held lane after one side tile', () => {
+    const maze = createMaze(6, [
+      { x: 1, y: 2 },
+      { x: 2, y: 2 },
+      { x: 2, y: 3 },
+      { x: 2, y: 4 },
+      { x: 3, y: 4 }
+    ]);
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.request(['right']);
+    resolver.step(maze, { x: 1, y: 2 });
+
+    expect(resolver.step(maze, { x: 2, y: 2 })).toMatchObject({
+      decision: 'stopped-at-dead-end',
       moved: false
     });
   });
@@ -181,37 +279,6 @@ describe('LegacyDirectionalIntentResolver', () => {
       decision: 'continued',
       direction: 'right',
       target: { x: 0, y: 2 }
-    });
-  });
-
-  test('bounds automatic zigzag assistance and then requires fresh intent', () => {
-    const maze = createMaze(8, [
-      { x: 1, y: 1 },
-      { x: 2, y: 1 },
-      { x: 2, y: 2 },
-      { x: 3, y: 2 },
-      { x: 3, y: 3 },
-      { x: 4, y: 3 },
-      { x: 4, y: 4 }
-    ]);
-    const resolver = new LegacyDirectionalIntentResolver();
-    resolver.request(['right']);
-    const points = [
-      { x: 1, y: 1 },
-      { x: 2, y: 1 },
-      { x: 2, y: 2 },
-      { x: 3, y: 2 },
-      { x: 3, y: 3 },
-      { x: 4, y: 3 }
-    ];
-    const steps = points.map((point) => resolver.step(maze, point));
-
-    expect(steps.filter((step) => step.decision === 'assisted-corner')).toHaveLength(
-      LEGACY_DIRECTIONAL_INTENT_ASSISTED_TURN_LIMIT
-    );
-    expect(steps.at(-1)).toMatchObject({
-      decision: 'stopped-at-assist-limit',
-      moved: false
     });
   });
 
