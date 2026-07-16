@@ -295,6 +295,7 @@ import {
 } from '../input-human';
 import {
   resolveStickPullVector,
+  resolveTouchClientPoint,
   resolveTouchArrowMovementKindAtPoint,
   resolveTouchControlKindAtPoint,
   resolveTouchControlLayout,
@@ -578,8 +579,8 @@ interface MenuSceneVisualDiagnostics {
       knobRadius: number;
       outer: VisualRect;
       pull: {
+        angleRadians: number;
         distanceRatio: number;
-        intentSegment: number;
         movement: HumanMovementActionKind;
         movementCandidates: HumanMovementActionKind[];
         normalizedX: number;
@@ -2555,13 +2556,27 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyPlayTouchClientPoint(clientX: number, clientY: number): { x: number; y: number } {
     const rect = this.game.canvas.getBoundingClientRect();
-    const width = Math.max(1, rect.width);
-    const height = Math.max(1, rect.height);
+    return resolveTouchClientPoint({
+      canvas: rect,
+      clientX,
+      clientY,
+      logicalHeight: this.layout.height,
+      logicalWidth: this.layout.width
+    });
+  }
 
-    return {
-      x: ((clientX - rect.left) / width) * this.layout.width,
-      y: ((clientY - rect.top) / height) * this.layout.height
-    };
+  private resolveLegacyInputPointerPoint(pointer: Phaser.Input.Pointer): { x: number; y: number } {
+    const event = pointer.event;
+    if ('changedTouches' in event) {
+      const touch = event.changedTouches.item(0) ?? event.touches.item(0);
+      if (touch !== null) {
+        return this.resolveLegacyPlayTouchClientPoint(touch.clientX, touch.clientY);
+      }
+    }
+    if ('clientX' in event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+      return this.resolveLegacyPlayTouchClientPoint(event.clientX, event.clientY);
+    }
+    return { x: pointer.x, y: pointer.y };
   }
 
   private legacyOverlayScrollRectToVisualRect(rect: LegacyOverlayScrollRect): VisualRect {
@@ -2635,7 +2650,8 @@ export class MenuScene extends Phaser.Scene {
     ) {
       return false;
     }
-    if (!this.isPointInVisualRect(this.overlayScrollViewportBounds, pointer.x, pointer.y, 12)) {
+    const point = this.resolveLegacyInputPointerPoint(pointer);
+    if (!this.isPointInVisualRect(this.overlayScrollViewportBounds, point.x, point.y, 12)) {
       return false;
     }
 
@@ -2648,19 +2664,20 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
     const pointerId = this.normalizeLegacyPlayTouchPointerId(pointer.id) ?? -1;
-    if (this.isPointInVisualRect(this.overlayMovementSpeedSliderBounds, pointer.x, pointer.y, 2)) {
+    const point = this.resolveLegacyInputPointerPoint(pointer);
+    if (this.isPointInVisualRect(this.overlayMovementSpeedSliderBounds, point.x, point.y, 2)) {
       this.releaseOverlayScrollPointer();
       this.overlayScrollGestureLockPointerId = pointerId;
       return false;
     }
-    const onViewport = this.isPointInVisualRect(this.overlayScrollViewportBounds, pointer.x, pointer.y, 0);
-    const onRail = this.isPointInVisualRect(this.overlayScrollTrackBounds, pointer.x, pointer.y, 20);
+    const onViewport = this.isPointInVisualRect(this.overlayScrollViewportBounds, point.x, point.y, 0);
+    const onRail = this.isPointInVisualRect(this.overlayScrollTrackBounds, point.x, point.y, 20);
     if (!onViewport && !onRail) {
       return false;
     }
 
     this.overlayScrollPointerId = pointerId;
-    this.overlayScrollPointerStartY = pointer.y;
+    this.overlayScrollPointerStartY = point.y;
     this.overlayScrollPointerStartOffset = this.overlayScrollOffset;
     this.overlayScrollPointerHasMoved = false;
     return true;
@@ -2675,7 +2692,8 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
-    const deltaY = pointer.y - this.overlayScrollPointerStartY;
+    const point = this.resolveLegacyInputPointerPoint(pointer);
+    const deltaY = point.y - this.overlayScrollPointerStartY;
     if (!this.overlayScrollPointerHasMoved && Math.abs(deltaY) < LEGACY_OVERLAY_SCROLL_DRAG_START_PX) {
       return true;
     }
@@ -2772,7 +2790,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyPlayPointerDown(pointer: Phaser.Input.Pointer): boolean {
-    if (this.handleLegacyPlayTouchControl(pointer.x, pointer.y, pointer.id)) {
+    const point = this.resolveLegacyInputPointerPoint(pointer);
+    if (this.handleLegacyPlayTouchControl(point.x, point.y, pointer.id)) {
       this.playPointerStart = null;
       return true;
     }
@@ -2782,7 +2801,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyPlayPointerMove(pointer: Phaser.Input.Pointer): boolean {
-    return this.handleLegacyPlayTouchControlMove(pointer.x, pointer.y, pointer.id);
+    const point = this.resolveLegacyInputPointerPoint(pointer);
+    return this.handleLegacyPlayTouchControlMove(point.x, point.y, pointer.id);
   }
 
   private handleLegacyPlayTouchControl(x: number, y: number, pointerId: number | null = null): boolean {
@@ -2894,8 +2914,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const pullVector = resolveStickPullVector(touchControlLayout.stick, x, y, {
-      allowBeyondOuter: true,
-      previousIntentSegment: this.playTouchStickPull?.intentSegment ?? null
+      allowBeyondOuter: true
     });
     const pullChanged = this.hasLegacyPlayTouchStickPullChanged(pullVector);
     this.playTouchStickPull = pullVector;
@@ -2953,6 +2972,7 @@ export class MenuScene extends Phaser.Scene {
     const candidatesUnchanged = existingForPointer.length === uniqueControls.length
       && existingForPointer.every((control, index) => control === uniqueControls[index]);
     if (candidatesUnchanged) {
+      this.requestLegacyPlayDirectionalIntent(uniqueControls);
       if (
         this.playHeldTouchRepeatTimer === null
         && (this.playTouchArrowPointerId === normalizedPointerId || this.playTouchStickPointerId === normalizedPointerId)
@@ -3124,7 +3144,6 @@ export class MenuScene extends Phaser.Scene {
 
   private releaseLegacyPlayTouchPointer(pointerId: number | null = null): boolean {
     const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
-    const releasedMove = this.releaseLegacyPlayHeldTouchMove(pointerId);
     const releasedArrow = this.playTouchArrowPointerId === normalizedPointerId;
     if (releasedArrow) {
       this.playTouchArrowPointerId = null;
@@ -3138,6 +3157,7 @@ export class MenuScene extends Phaser.Scene {
       this.boardDynamicDirty = true;
       this.publishInteractionDiagnostics();
     }
+    const releasedMove = this.releaseLegacyPlayHeldTouchMove(pointerId);
 
     return releasedMove || releasedArrow || releasedStick;
   }
@@ -3297,10 +3317,24 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void {
+    if (this.playTouchStickPointerId !== null && this.playTouchStickPull !== null) {
+      this.playDirectionalIntent.requestAnalog(
+        this.playTouchStickPull.normalizedX,
+        this.playTouchStickPull.normalizedY
+      );
+      return;
+    }
     this.playDirectionalIntent.request(this.resolveLegacyPlayCardinalDirections(controls));
   }
 
   private synchronizeLegacyPlayDirectionalIntent(): void {
+    if (this.playTouchStickPointerId !== null && this.playTouchStickPull !== null) {
+      this.playDirectionalIntent.requestAnalog(
+        this.playTouchStickPull.normalizedX,
+        this.playTouchStickPull.normalizedY
+      );
+      return;
+    }
     this.playDirectionalIntent.synchronize(
       this.resolveLegacyPlayCardinalDirections(this.resolveLegacyPlayActiveTouchControls())
     );
@@ -3364,10 +3398,8 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
-    const { deltaX, deltaY } = this.resolveLegacyPlayPointerMoveVector(pointerStart, {
-      x: pointer.x,
-      y: pointer.y
-    });
+    const point = this.resolveLegacyInputPointerPoint(pointer);
+    const { deltaX, deltaY } = this.resolveLegacyPlayPointerMoveVector(pointerStart, point);
     if (deltaX === 0 && deltaY === 0) {
       return false;
     }
@@ -6069,7 +6101,7 @@ export class MenuScene extends Phaser.Scene {
       .setAlign('center')
       .setLineSpacing(statusLayout.lineSpacing)
       // Bitmap glyph descenders can paint beyond Phaser's logical line box on HiDPI phones.
-      .setPadding(0, 0, 0, 8)
+      .setPadding(0, 4, 0, 4)
       .setColor(LEGACY_MENU_ACTION_GREEN);
     this.fitLegacyUiTextToWidth(
       this.progressionBadgeText,
@@ -10296,8 +10328,8 @@ export class MenuScene extends Phaser.Scene {
           pull: this.playTouchStickPull === null
             ? null
             : {
+              angleRadians: this.playTouchStickPull.angleRadians,
               distanceRatio: this.playTouchStickPull.distanceRatio,
-              intentSegment: this.playTouchStickPull.intentSegment,
               movement: this.playTouchStickPull.movement,
               movementCandidates: [...this.playTouchStickPull.movementCandidates],
               normalizedX: this.playTouchStickPull.normalizedX,

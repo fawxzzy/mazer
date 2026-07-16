@@ -8,17 +8,19 @@ describe('directional intent architecture contract', () => {
     const intentSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyDirectionalIntent.ts'), 'utf8');
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(contract).toContain('`legacy-directional-intent-v3`');
-    expect(contract).toContain('exactly one bounded secondary direction with an explicit turn-or-fallback role');
-    expect(contract).toContain('A secondary analog candidate is a fallback, not a turn');
+    expect(contract).toContain('`legacy-directional-intent-v4`');
+    expect(contract).toContain('continuous projection ranking');
+    expect(contract).toContain('Stick input remains a 360-degree vector.');
+    expect(contract).toContain('without a 6-, 8-, or 16-sector boundary');
     expect(contract).toContain('keeps a bounded repeat scheduled at blocked cells');
-    expect(contract).toContain('the fallback may move one perpendicular tile only when that tile immediately restores the held lane');
-    expect(contract).toContain('A lane shift never changes the active held direction.');
+    expect(contract).toContain('it is classified as a bounded lane shift and does not replace the held heading');
     expect(contract).toContain('`resolveLegacyNavigationTarget(...)` owns direct and paired-wrap legality.');
     expect(contract).toContain('`WorldTurnSystem` remains the mutation boundary.');
     expect(contract).toContain('Render interpolation remains cosmetic.');
     expect(contract).toContain('They do not expose a solver path or future route.');
     expect(intentSource).toContain('export const LEGACY_DIRECTIONAL_INTENT_LANE_SHIFT_TILE_LIMIT = 1;');
+    expect(intentSource).toContain('requestAnalog(deltaX: number, deltaY: number)');
+    expect(intentSource).toContain('resolveLegacyAnalogDirectionScore(direction, vector)');
     expect(intentSource).toContain("return this.createStopStep('stopped-at-assist-limit');");
     expect(intentSource).toContain("return this.createStopStep('stopped-assistance-disabled');");
     expect(intentSource).toContain("return this.createStopStep('stopped-awaiting-queued-direction');");

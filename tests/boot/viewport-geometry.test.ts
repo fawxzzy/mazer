@@ -173,10 +173,14 @@ describe('Mazer viewport geometry', () => {
   });
 
   test('avoids duplicate Phaser resize work and forwards the active geometry exactly once', () => {
+    let refreshCount = 0;
     const resizeCalls: Array<[number, number]> = [];
     const game = {
       scale: {
         height: 844,
+        refresh: (): void => {
+          refreshCount += 1;
+        },
         resize: (width: number, height: number): void => {
           resizeCalls.push([width, height]);
         },
@@ -186,6 +190,7 @@ describe('Mazer viewport geometry', () => {
 
     expect(syncMazerGameToViewport(game as never, { content: { width: 390, height: 844 } })).toBe(false);
     expect(syncMazerGameToViewport(game as never, { content: { width: 844, height: 390 } })).toBe(true);
+    expect(refreshCount).toBe(1);
     expect(resizeCalls).toEqual([[844, 390]]);
   });
 

@@ -251,6 +251,11 @@ export const syncMazerGameToViewport = (
   const width = geometry.content.width;
   const height = geometry.content.height;
   if (game.scale.width === width && game.scale.height === height) {
+    // The visual viewport and safe-area origin can move without changing its
+    // dimensions (notably when iOS browser chrome collapses or expands).
+    // Refreshing keeps Phaser's cached canvasBounds aligned with the fixed
+    // #app origin so touch hit-testing does not drift below the finger.
+    game.scale.refresh();
     return false;
   }
 

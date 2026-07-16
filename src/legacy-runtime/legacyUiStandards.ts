@@ -29,21 +29,11 @@ export const resolveLegacyRunStatusPanelLayout = (
 
 export type LegacyUiLabelRole = 'button' | 'overlay-action' | 'overlay-title' | 'toggle-title';
 
-const LABEL_LIFT_RATIOS: Record<LegacyUiLabelRole, number> = {
-  button: 0.18,
-  'overlay-action': 0.08,
-  'overlay-title': 0.08,
-  'toggle-title': 0.08
-};
-
 export const resolveLegacyUiLabelCenterY = (
   centerY: number,
-  fontSize: number,
-  role: LegacyUiLabelRole
-): number => {
-  const lift = Math.max(1, Math.round(Math.max(1, fontSize) * LABEL_LIFT_RATIOS[role]));
-  return Math.round(centerY - lift);
-};
+  _fontSize: number,
+  _role: LegacyUiLabelRole
+): number => Math.round(centerY);
 
 export interface LegacyOptionsGuideLayout {
   cardHeight: number;

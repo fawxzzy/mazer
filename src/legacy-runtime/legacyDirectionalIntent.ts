@@ -5,8 +5,7 @@ import {
 } from './legacyMaze';
 
 export const LEGACY_DIRECTIONAL_INTENT_LANE_SHIFT_TILE_LIMIT = 1;
-
-export const LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO = 0.82;
+export const LEGACY_ANALOG_DIRECTION_EPSILON = 0.001;
 
 export const LEGACY_CARDINAL_DIRECTIONS = [
   'up',
@@ -22,6 +21,7 @@ export type LegacyDirectionalIntentDecision =
   | 'requested'
   | 'continued'
   | 'queued-turn'
+  | 'steered-turn'
   | 'assisted-lane-shift'
   | 'stopped-assistance-disabled'
   | 'stopped-at-assist-limit'
@@ -30,8 +30,10 @@ export type LegacyDirectionalIntentDecision =
 
 export interface LegacyDirectionalIntentDiagnostics {
   activeDirection: LegacyCardinalDirection | null;
+  analogVector: { x: number; y: number } | null;
   assistedLaneShiftCount: number;
   assistedLaneShiftTileLimit: number;
+  inputMode: 'analog' | 'discrete';
   lastDecision: LegacyDirectionalIntentDecision;
   queuedDirection: LegacyCardinalDirection | null;
   requestedDirections: LegacyCardinalDirection[];
@@ -107,39 +109,50 @@ export const resolveLegacyCardinalDirectionsFromVector = (
 
 export const resolveLegacyAnalogCardinalDirectionsFromVector = (
   deltaX: number,
-  deltaY: number,
-  secondaryDirectionRatio = LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO
+  deltaY: number
 ): LegacyCardinalDirection[] => {
-  const axes: Array<{ direction: LegacyCardinalDirection; magnitude: number }> = [];
-  if (Math.abs(deltaX) > 0.001) {
+  const axes: Array<{ direction: LegacyCardinalDirection; magnitude: number; order: number }> = [];
+  if (Math.abs(deltaX) > LEGACY_ANALOG_DIRECTION_EPSILON) {
     axes.push({
       direction: deltaX > 0 ? 'right' : 'left',
-      magnitude: Math.abs(deltaX)
+      magnitude: Math.abs(deltaX),
+      order: 0
     });
   }
-  if (Math.abs(deltaY) > 0.001) {
+  if (Math.abs(deltaY) > LEGACY_ANALOG_DIRECTION_EPSILON) {
     axes.push({
       direction: deltaY > 0 ? 'down' : 'up',
-      magnitude: Math.abs(deltaY)
+      magnitude: Math.abs(deltaY),
+      order: 1
     });
   }
-  axes.sort((left, right) => right.magnitude - left.magnitude);
-  const dominantMagnitude = axes[0]?.magnitude ?? 0;
-  const secondaryThreshold = dominantMagnitude * Math.max(0, Math.min(1, secondaryDirectionRatio));
+  axes.sort((left, right) => {
+    const magnitudeDelta = right.magnitude - left.magnitude;
+    return Math.abs(magnitudeDelta) <= 0.000_001 ? left.order - right.order : magnitudeDelta;
+  });
+  return axes.map((axis) => axis.direction);
+};
 
-  return axes
-    .filter((axis, index) => index === 0 || axis.magnitude >= secondaryThreshold)
-    .map((axis) => axis.direction);
+const resolveLegacyAnalogDirectionScore = (
+  direction: LegacyCardinalDirection,
+  vector: { x: number; y: number }
+): number => {
+  const delta = DIRECTION_DELTAS[direction];
+  return (delta.x * vector.x) + (delta.y * vector.y);
 };
 
 export class LegacyDirectionalIntentResolver {
   private activeDirection: LegacyCardinalDirection | null = null;
+
+  private analogVector: { x: number; y: number } | null = null;
 
   private assistedLaneShiftCount = 0;
 
   private assistedLaneShiftPendingResume = false;
 
   private lastDecision: LegacyDirectionalIntentDecision = 'idle';
+
+  private inputMode: 'analog' | 'discrete' = 'discrete';
 
   private queuedDirection: LegacyCardinalDirection | null = null;
 
@@ -148,8 +161,11 @@ export class LegacyDirectionalIntentResolver {
   private requestedDirections: LegacyCardinalDirection[] = [];
 
   request(directions: readonly LegacyCardinalDirection[]): LegacyDirectionalIntentDiagnostics {
+    const wasDiscrete = this.inputMode === 'discrete';
+    this.inputMode = 'discrete';
+    this.analogVector = null;
     const requestedDirections = uniqueDirections(directions);
-    if (directionsEqual(requestedDirections, this.requestedDirections)) {
+    if (wasDiscrete && directionsEqual(requestedDirections, this.requestedDirections)) {
       return this.getDiagnostics();
     }
 
@@ -187,6 +203,8 @@ export class LegacyDirectionalIntentResolver {
   }
 
   synchronize(directions: readonly LegacyCardinalDirection[]): LegacyDirectionalIntentDiagnostics {
+    this.inputMode = 'discrete';
+    this.analogVector = null;
     const requestedDirections = uniqueDirections(directions);
     this.requestedDirections = requestedDirections;
     if (requestedDirections.length === 0) {
@@ -212,6 +230,47 @@ export class LegacyDirectionalIntentResolver {
     return this.getDiagnostics();
   }
 
+  requestAnalog(deltaX: number, deltaY: number): LegacyDirectionalIntentDiagnostics {
+    const magnitude = Math.hypot(deltaX, deltaY);
+    if (!Number.isFinite(magnitude) || magnitude <= LEGACY_ANALOG_DIRECTION_EPSILON) {
+      this.reset();
+      return this.getDiagnostics();
+    }
+
+    const nextVector = {
+      x: deltaX / magnitude,
+      y: deltaY / magnitude
+    };
+    const unchanged = this.inputMode === 'analog'
+      && this.analogVector !== null
+      && Math.max(
+        Math.abs(this.analogVector.x - nextVector.x),
+        Math.abs(this.analogVector.y - nextVector.y)
+      ) < 0.008;
+    if (unchanged) {
+      return this.getDiagnostics();
+    }
+
+    const previousPrimaryDirection = this.requestedDirections[0] ?? null;
+    const nextRequestedDirections = resolveLegacyAnalogCardinalDirectionsFromVector(nextVector.x, nextVector.y);
+    const dominantDirectionChanged = this.inputMode !== 'analog'
+      || previousPrimaryDirection !== (nextRequestedDirections[0] ?? null);
+    this.inputMode = 'analog';
+    this.analogVector = nextVector;
+    this.requestedDirections = nextRequestedDirections;
+    this.queuedDirection = null;
+    this.queuedDirectionRole = null;
+    if (dominantDirectionChanged) {
+      this.assistedLaneShiftCount = 0;
+      this.assistedLaneShiftPendingResume = false;
+    }
+    this.lastDecision = 'requested';
+    if (this.activeDirection === null) {
+      this.activeDirection = this.requestedDirections[0] ?? null;
+    }
+    return this.getDiagnostics();
+  }
+
   step(
     maze: Pick<LegacyMazeSnapshot, 'grid'>,
     player: LegacyPoint,
@@ -224,6 +283,10 @@ export class LegacyDirectionalIntentResolver {
       if (target !== null) {
         legalTargets.set(direction, target);
       }
+    }
+
+    if (this.inputMode === 'analog' && this.analogVector !== null) {
+      return this.stepAnalog(maze, legalTargets, options);
     }
 
     if (this.queuedDirection !== null && this.queuedDirectionRole === 'turn') {
@@ -295,8 +358,10 @@ export class LegacyDirectionalIntentResolver {
   getDiagnostics(): LegacyDirectionalIntentDiagnostics {
     return {
       activeDirection: this.activeDirection,
+      analogVector: this.analogVector === null ? null : { ...this.analogVector },
       assistedLaneShiftCount: this.assistedLaneShiftCount,
       assistedLaneShiftTileLimit: LEGACY_DIRECTIONAL_INTENT_LANE_SHIFT_TILE_LIMIT,
+      inputMode: this.inputMode,
       lastDecision: this.lastDecision,
       queuedDirection: this.queuedDirection,
       requestedDirections: [...this.requestedDirections]
@@ -305,12 +370,92 @@ export class LegacyDirectionalIntentResolver {
 
   reset(): void {
     this.activeDirection = null;
+    this.analogVector = null;
     this.assistedLaneShiftCount = 0;
     this.assistedLaneShiftPendingResume = false;
     this.lastDecision = 'idle';
+    this.inputMode = 'discrete';
     this.queuedDirection = null;
     this.queuedDirectionRole = null;
     this.requestedDirections = [];
+  }
+
+  private stepAnalog(
+    maze: Pick<LegacyMazeSnapshot, 'grid'>,
+    legalTargets: ReadonlyMap<LegacyCardinalDirection, LegacyPoint>,
+    options: LegacyDirectionalIntentStepOptions
+  ): LegacyDirectionalIntentStep {
+    const vector = this.analogVector;
+    if (vector === null) {
+      return this.createStopStep('idle');
+    }
+
+    const desiredDirections = resolveLegacyAnalogCardinalDirectionsFromVector(vector.x, vector.y);
+    const heldDirection = desiredDirections[0] ?? null;
+    const directDirection = desiredDirections.find((direction) => legalTargets.has(direction)) ?? null;
+    if (
+      heldDirection !== null
+      && directDirection !== null
+      && directDirection !== heldDirection
+      && options.assistedLaneShiftEnabled !== false
+      && !this.assistedLaneShiftPendingResume
+    ) {
+      const directTarget = legalTargets.get(directDirection)!;
+      const heldDelta = DIRECTION_DELTAS[heldDirection];
+      if (resolveLegacyNavigationTarget(maze, directTarget, heldDelta.x, heldDelta.y) !== null) {
+        this.activeDirection = heldDirection;
+        this.assistedLaneShiftCount += 1;
+        this.assistedLaneShiftPendingResume = true;
+        return this.createMoveStep('assisted-lane-shift', directDirection, directTarget);
+      }
+    }
+    if (directDirection !== null) {
+      const decision = this.activeDirection === null || this.activeDirection === directDirection
+        ? 'continued'
+        : 'steered-turn';
+      this.activeDirection = directDirection;
+      this.assistedLaneShiftPendingResume = false;
+      return this.createMoveStep(decision, directDirection, legalTargets.get(directDirection)!);
+    }
+
+    if (heldDirection === null) {
+      return this.createStopStep('idle');
+    }
+    this.activeDirection = heldDirection;
+    if (options.assistedLaneShiftEnabled === false) {
+      return this.createStopStep('stopped-assistance-disabled');
+    }
+    if (this.assistedLaneShiftPendingResume) {
+      return this.createStopStep('stopped-at-assist-limit');
+    }
+
+    const heldDelta = DIRECTION_DELTAS[heldDirection];
+    const laneShiftCandidates = ORTHOGONAL_DIRECTIONS[heldDirection]
+      .map((direction) => ({
+        direction,
+        score: resolveLegacyAnalogDirectionScore(direction, vector),
+        target: legalTargets.get(direction) ?? null
+      }))
+      .filter((candidate): candidate is { direction: LegacyCardinalDirection; score: number; target: LegacyPoint } => {
+        if (candidate.target === null) {
+          return false;
+        }
+        return resolveLegacyNavigationTarget(
+          maze,
+          candidate.target,
+          heldDelta.x,
+          heldDelta.y
+        ) !== null;
+      })
+      .sort((left, right) => right.score - left.score);
+    const laneShift = laneShiftCandidates[0] ?? null;
+    if (laneShift === null) {
+      return this.createStopStep('stopped-at-dead-end');
+    }
+
+    this.assistedLaneShiftCount += 1;
+    this.assistedLaneShiftPendingResume = true;
+    return this.createMoveStep('assisted-lane-shift', laneShift.direction, laneShift.target);
   }
 
   private createMoveStep(

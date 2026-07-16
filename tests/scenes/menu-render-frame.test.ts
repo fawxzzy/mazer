@@ -1010,9 +1010,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.setLegacyPlayHeldTouchMoveCandidates(this.playTouchStickPull.movementCandidates');
     expect(menuSceneSource).toContain('this.setLegacyPlayHeldTouchMoveCandidates(pullVector.movementCandidates');
     expect(menuSceneSource).toContain('movementCandidates: [...this.playTouchStickPull.movementCandidates]');
-    expect(menuSceneSource).toContain('intentSegment: this.playTouchStickPull.intentSegment');
+    expect(menuSceneSource).toContain('angleRadians: this.playTouchStickPull.angleRadians');
     expect(menuSceneSource).toContain('allowBeyondOuter: true');
-    expect(menuSceneSource).toContain('previousIntentSegment: this.playTouchStickPull?.intentSegment ?? null');
+    expect(menuSceneSource).toContain('this.playDirectionalIntent.requestAnalog(');
+    expect(menuSceneSource).toContain('private resolveLegacyInputPointerPoint(pointer: Phaser.Input.Pointer)');
+    expect(menuSceneSource).toContain('return this.resolveLegacyPlayTouchClientPoint(touch.clientX, touch.clientY);');
     expect(menuSceneSource).toContain('keepWhenBlocked: true');
     expect(menuSceneSource).toContain('allowBeyondFrame: true');
     expect(menuSceneSource).toContain('centerFallback: existingMovement');
@@ -1377,6 +1379,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("from '../legacy-runtime/legacyUiStandards';");
     expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, buttonFontSize, options.labelRole ?? 'button')");
     expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title')");
+    expect(menuSceneSource).toContain('.setPadding(0, 4, 0, 4)');
     expect(menuSceneSource).toContain('resolveLegacyToggleRowLayout(input.width, input.height, hasDescription)');
   });
 
