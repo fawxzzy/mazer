@@ -1,5 +1,81 @@
 export const LEGACY_UI_COMPACT_BREAKPOINT = 420;
 
+export interface LegacyOverlayPanelLayout {
+  centerX: number;
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+}
+
+export const resolveLegacyOverlayPanelLayout = (
+  viewportWidth: number,
+  viewportHeight: number
+): LegacyOverlayPanelLayout => {
+  const compact = viewportWidth < 480;
+  const horizontalInset = compact ? 8 : 16;
+  const verticalInset = compact ? 8 : 16;
+  const availableWidth = Math.max(1, viewportWidth - (horizontalInset * 2));
+  const width = Math.min(720, availableWidth);
+  const height = Math.max(1, viewportHeight - (verticalInset * 2));
+  const left = Math.round((viewportWidth - width) / 2);
+
+  return {
+    centerX: left + Math.round(width / 2),
+    height,
+    left,
+    top: verticalInset,
+    width
+  };
+};
+
+export interface LegacyOverlayShellLayout {
+  actionCenterY: number;
+  contentHeight: number;
+  contentLeft: number;
+  contentTop: number;
+  contentWidth: number;
+  messageCenterY: number;
+  titleCenterY: number;
+}
+
+export const resolveLegacyOverlayShellLayout = ({
+  actionHeight,
+  actionRows,
+  hasMessage,
+  panel
+}: {
+  actionHeight: number;
+  actionRows: number;
+  hasMessage: boolean;
+  panel: LegacyOverlayPanelLayout;
+}): LegacyOverlayShellLayout => {
+  const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
+  const contentHorizontalInset = compact ? 16 : 24;
+  const actionBottomInset = compact ? 20 : 24;
+  const actionRowGap = compact ? 10 : 14;
+  const actionContentGap = compact ? 12 : 16;
+  const titleCenterY = panel.top + (compact ? 52 : 56);
+  const messageCenterY = panel.top + (compact ? 82 : 88);
+  const contentTop = panel.top + (compact ? 76 : 84) + (hasMessage ? 22 : 0);
+  const panelBottom = panel.top + panel.height;
+  const actionCenterY = panelBottom - actionBottomInset - (actionHeight / 2);
+  const actionStackTop = actionCenterY
+    - ((Math.max(1, actionRows) - 1) * (actionHeight + actionRowGap))
+    - (actionHeight / 2);
+  const contentBottom = Math.max(contentTop, actionStackTop - actionContentGap);
+
+  return {
+    actionCenterY,
+    contentHeight: Math.max(0, contentBottom - contentTop),
+    contentLeft: panel.left + contentHorizontalInset,
+    contentTop,
+    contentWidth: Math.max(1, panel.width - (contentHorizontalInset * 2)),
+    messageCenterY,
+    titleCenterY
+  };
+};
+
 export interface LegacyRunStatusPanelLayout {
   fontSize: number;
   height: number;

@@ -111,6 +111,8 @@ import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButto
 import {
   resolveLegacyFeatureControlLayout,
   resolveLegacyOverlayContentFlowLayout,
+  resolveLegacyOverlayPanelLayout,
+  resolveLegacyOverlayShellLayout,
   resolveLegacyOptionsGuideLayout,
   resolveLegacyRunStatusPanelLayout,
   resolveLegacyToggleRowLayout,
@@ -247,6 +249,8 @@ import {
 } from '../legacy-runtime/legacyRemoteProgression';
 import {
   clampLegacyOverlayScrollOffset,
+  legacyOverlayScrollRectIntersectsViewport,
+  resolveLegacyOverlayScrollRenderRect,
   resolveLegacyOverlayScrollMetrics,
   type LegacyOverlayScrollMetrics,
   type LegacyOverlayScrollRect
@@ -7670,41 +7674,8 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private resolveOverlayPanelFrame(kind: OverlayKind = this.overlay): OverlayPanelFrame {
-    const width = Math.min(720, this.layout.width - 40);
-    const compact = this.layout.width < 480;
-    const mobilePortrait = compact && this.layout.height > this.layout.width;
-    const mobileTopInset = mobilePortrait
-      ? clampInteger(Math.round(this.layout.height * 0.055), 30, 44)
-      : 16;
-    const maxCompactHeight = kind === 'pause' ? 820 : this.layout.height - 32;
-    const maxDesktopHeight = kind === 'pause' ? 700 : 620;
-    let height = Math.min(
-      compact ? maxCompactHeight : maxDesktopHeight,
-      this.layout.height - mobileTopInset - 16
-    );
-    const left = Math.round((this.layout.width - width) / 2);
-    let top = Math.max(mobileTopInset, Math.round((this.layout.height - height) / 2));
-
-    if (kind === 'pause' && this.mode === 'play') {
-      const timerFrame = resolveLegacyPlayHudFrame({
-        elapsedMs: 0,
-        goalScreen: { x: 0, y: 0 },
-        layoutWidth: this.layout.width,
-        playerScreen: { x: 0, y: 0 }
-      });
-      const timerBottom = timerFrame.timerBounds.top + timerFrame.timerBounds.height;
-      top = Math.max(timerBottom + (compact ? 10 : 14), 58);
-      height = Math.min(height, Math.max(180, this.layout.height - top - 16));
-    }
-
-    return {
-      centerX: left + Math.round(width / 2),
-      height,
-      left,
-      top,
-      width
-    };
+  private resolveOverlayPanelFrame(_kind: OverlayKind = this.overlay): OverlayPanelFrame {
+    return resolveLegacyOverlayPanelLayout(this.layout.width, this.layout.height);
   }
 
   private visualRectToLegacyOverlayScrollRect(rect: VisualRect): LegacyOverlayScrollRect {
@@ -7717,18 +7688,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyOverlayScrollRenderViewport(metrics: LegacyOverlayScrollMetrics): VisualRect {
-    const viewport = metrics.viewport;
-    const fadeHeight = Math.min(34, Math.max(18, Math.round(viewport.height * 0.12)));
-    const topInset = metrics.topFadeAlpha > 0
-      ? Math.min(fadeHeight + 4, Math.max(2, metrics.offset + 2))
-      : 2;
-    const bottomInset = metrics.bottomFadeAlpha > 0 ? fadeHeight + 4 : 2;
-
-    return createVisualRect(
-      viewport.left,
-      viewport.top + topInset,
-      viewport.width,
-      Math.max(1, viewport.height - topInset - bottomInset)
+    return this.legacyOverlayScrollRectToVisualRect(
+      resolveLegacyOverlayScrollRenderRect(metrics.viewport)
     );
   }
 
@@ -7823,24 +7784,29 @@ export class MenuScene extends Phaser.Scene {
     const compact = panel.width < 420;
     const showAdvancedOptions = this.shouldShowLegacyAdvancedOptions();
     const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
-    let rowY = panel.top + 104;
+    const actionButtonHeight = compact ? 44 : 48;
+    const shell = resolveLegacyOverlayShellLayout({
+      actionHeight: actionButtonHeight,
+      actionRows: 1,
+      hasMessage: visibleMessages.length > 0,
+      panel
+    });
+    let rowY = shell.contentTop;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    this.createOverlayTitle('Options', panel.top + 52);
+    this.createOverlayTitle('Options', shell.titleCenterY);
     if (visibleMessages.length > 0) {
-      this.createOverlayPlayerMessageStack(visibleMessages, panel.top + 76, panel);
-      rowY += visibleMessages.length * (compact ? 18 : 19);
+      this.createOverlayPlayerMessageStack(visibleMessages, shell.messageCenterY, panel);
+      rowY += Math.max(0, visibleMessages.length - 1) * (compact ? 18 : 19);
     }
 
     if (!showAdvancedOptions) {
-      const actionButtonHeight = compact ? 44 : 48;
-      const actionY = panel.top + panel.height - (compact ? 42 : 54);
+      const actionY = shell.actionCenterY;
       const viewportTop = rowY + (compact ? 4 : 6);
-      const viewportBottom = actionY - (actionButtonHeight / 2) - (compact ? 12 : 16);
       const viewport = createVisualRect(
-        panel.left + 24,
+        shell.contentLeft,
         viewportTop,
-        panel.width - 48,
-        Math.max(140, viewportBottom - viewportTop)
+        shell.contentWidth,
+        Math.max(140, shell.contentHeight - (viewportTop - shell.contentTop))
       );
       const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {
         includeMovementSpeed: false
@@ -7992,7 +7958,7 @@ export class MenuScene extends Phaser.Scene {
         .setOrigin(originX, 0.5)
         .setAlpha(alpha);
       const bounds = visualRectFromBounds(label.getBounds());
-      if (viewport !== null && (bounds.top < viewport.top + 2 || bounds.bottom > viewport.bottom - 2)) {
+      if (viewport !== null && !legacyOverlayScrollRectIntersectsViewport(bounds, viewport)) {
         label.destroy();
         return null;
       }
@@ -8127,24 +8093,28 @@ export class MenuScene extends Phaser.Scene {
 
   private buildPauseOverlay(): void {
     const panel = this.resolveOverlayPanelFrame('pause');
-    this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand('resume')));
-    this.createOverlayTitle('Paused', panel.top + 52);
     const stacked = panel.width < 420;
-    const messageY = panel.top + (stacked ? 86 : 92);
     const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
     const hasOverlayMessage = visibleMessages.length > 0;
-    if (hasOverlayMessage) {
-      this.createOverlayPlayerMessageStack(visibleMessages, messageY, panel);
-    }
     const actionButtonHeight = stacked ? 42 : 48;
-    const actionY = panel.top + panel.height - (stacked ? 42 : 54);
-    const viewportTop = panel.top + (stacked ? 76 : 84) + (hasOverlayMessage ? 22 : 0);
-    const viewportBottom = actionY - (actionButtonHeight * 2) - 4;
+    const shell = resolveLegacyOverlayShellLayout({
+      actionHeight: actionButtonHeight,
+      actionRows: 2,
+      hasMessage: hasOverlayMessage,
+      panel
+    });
+    this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand('resume')));
+    this.createOverlayTitle('Paused', shell.titleCenterY);
+    if (hasOverlayMessage) {
+      this.createOverlayPlayerMessageStack(visibleMessages, shell.messageCenterY, panel);
+    }
+    const actionY = shell.actionCenterY;
+    const viewportTop = shell.contentTop;
     const viewport = createVisualRect(
-      panel.left + 24,
+      shell.contentLeft,
       viewportTop,
-      panel.width - 48,
-      Math.max(120, viewportBottom - viewportTop)
+      shell.contentWidth,
+      Math.max(120, shell.contentHeight)
     );
     const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {
       includeMovementSpeed: true,

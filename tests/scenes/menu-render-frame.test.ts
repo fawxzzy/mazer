@@ -1548,7 +1548,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('Guest mode is active. Sign in to keep account progress separate.');
   });
 
-  test('keeps pause overflow behind a mobile scroll facade and icon-only overlay back control', () => {
+  test('keeps full-height overlay content behind one mobile scroll facade and icon-only back control', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');
@@ -1556,9 +1556,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand(\'resume\')));');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));');
-    expect(menuSceneSource).toContain("if (kind === 'pause' && this.mode === 'play')");
-    expect(menuSceneSource).toContain('const timerBottom = timerFrame.timerBounds.top + timerFrame.timerBounds.height;');
-    expect(menuSceneSource).toContain('top = Math.max(timerBottom + (compact ? 10 : 14), 58);');
+    expect(menuSceneSource).toContain('return resolveLegacyOverlayPanelLayout(this.layout.width, this.layout.height);');
+    expect(menuSceneSource).toContain('const shell = resolveLegacyOverlayShellLayout({');
+    expect(menuSceneSource).not.toContain("if (kind === 'pause' && this.mode === 'play')");
     expect(menuSceneSource).toContain('rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER');
     expect(menuSceneSource).toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics);');
     expect(menuSceneSource).toContain('private resolveLegacyOverlayScrollRenderViewport(metrics: LegacyOverlayScrollMetrics): VisualRect');
@@ -1566,8 +1566,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const maskGraphics = this.make.graphics({ x: 0, y: 0 }, false);');
     expect(menuSceneSource).toContain('label.setMask(this.overlayGuideMask);');
     expect(menuSceneSource).toContain('cardTop < viewport.bottom - 2 && cardTop + cardHeight > viewport.top + 2');
-    expect(menuSceneSource).toContain('Math.min(fadeHeight + 4, Math.max(2, metrics.offset + 2))');
-    expect(menuSceneSource).toContain('const viewportTop = panel.top + (stacked ? 76 : 84) + (hasOverlayMessage ? 22 : 0);');
+    expect(menuSceneSource).toContain('resolveLegacyOverlayScrollRenderRect(metrics.viewport)');
+    expect(menuSceneSource).toContain('legacyOverlayScrollRectIntersectsViewport(bounds, viewport)');
+    expect(menuSceneSource).toContain('const viewportTop = shell.contentTop;');
     expect(menuSceneSource).toContain('cardTop < viewport.bottom - 2 && cardTop + cardHeight > viewport.top + 2');
     expect(menuSceneSource).not.toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics, true);');
     expect(menuSceneSource).toContain('this.overlayScrollTrackBounds = metrics.enabled');
