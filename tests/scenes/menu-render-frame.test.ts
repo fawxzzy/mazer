@@ -1014,12 +1014,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('allowBeyondOuter: true');
     expect(menuSceneSource).toContain('previousIntentSegment: this.playTouchStickPull?.intentSegment ?? null');
     expect(menuSceneSource).toContain('keepWhenBlocked: true');
-    expect(menuSceneSource).toContain('private resolveLegacyPlayStickIntentDirections(): LegacyCardinalDirection[] | null');
-    expect(menuSceneSource).toContain('resolveLegacyAnalogCardinalDirectionsFromVector(');
-    expect(menuSceneSource).toContain('this.playTouchStickPull.normalizedX');
-    expect(menuSceneSource).toContain('this.playTouchStickPull.normalizedY');
-    expect(menuSceneSource).toContain('const analogDirections = this.resolveLegacyPlayStickIntentDirections();');
-    expect(menuSceneSource).toContain('this.playDirectionalIntent.request(analogDirections);');
+    expect(menuSceneSource).toContain('allowBeyondFrame: true');
+    expect(menuSceneSource).toContain('centerFallback: existingMovement');
+    expect(menuSceneSource).toContain('const candidates = resolveHumanMovementPriorityCandidates(');
+    expect(menuSceneSource).toContain('this.requestLegacyPlayDirectionalIntent(candidates);');
+    expect(menuSceneSource).toContain('this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay(\'repeat\'));');
     expect(menuSceneSource).toContain('if (this.playTouchArrowPointerId !== null || this.playTouchStickPointerId !== null) {');
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchStick(');
     expect(menuSceneSource).toContain('const knobRadius = stick.knobRadius;');

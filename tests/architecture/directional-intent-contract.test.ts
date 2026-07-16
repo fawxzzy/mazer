@@ -8,9 +8,11 @@ describe('directional intent architecture contract', () => {
     const intentSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyDirectionalIntent.ts'), 'utf8');
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(contract).toContain('`legacy-directional-intent-v2`');
-    expect(contract).toContain('exactly one latest-wins queued direction');
-    expect(contract).toContain('the resolver may move one tile on the perpendicular axis when either side immediately restores the held lane');
+    expect(contract).toContain('`legacy-directional-intent-v3`');
+    expect(contract).toContain('exactly one bounded secondary direction with an explicit turn-or-fallback role');
+    expect(contract).toContain('A secondary analog candidate is a fallback, not a turn');
+    expect(contract).toContain('keeps a bounded repeat scheduled at blocked cells');
+    expect(contract).toContain('the fallback may move one perpendicular tile only when that tile immediately restores the held lane');
     expect(contract).toContain('A lane shift never changes the active held direction.');
     expect(contract).toContain('`resolveLegacyNavigationTarget(...)` owns direct and paired-wrap legality.');
     expect(contract).toContain('`WorldTurnSystem` remains the mutation boundary.');
@@ -20,6 +22,7 @@ describe('directional intent architecture contract', () => {
     expect(intentSource).toContain("return this.createStopStep('stopped-at-assist-limit');");
     expect(intentSource).toContain("return this.createStopStep('stopped-assistance-disabled');");
     expect(intentSource).toContain("return this.createStopStep('stopped-awaiting-queued-direction');");
+    expect(intentSource).toContain("type LegacyQueuedDirectionRole = 'turn' | 'fallback';");
     expect(intentSource).toContain('resolveLegacyNavigationTarget(maze, player, delta.x, delta.y)');
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('assistedLaneShiftEnabled: this.settings.smartSteering');

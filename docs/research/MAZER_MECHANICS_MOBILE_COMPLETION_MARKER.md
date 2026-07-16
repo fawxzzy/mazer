@@ -143,6 +143,14 @@ Ratchet this marker only when a bounded packet changes implemented state or proo
 
 Do not ratchet for wording changes alone. Do not ratchet the retired legacy visual 1:1 marker from this lane.
 
+## 2026-07-16 - Mobile control intent and guide-clipping maintenance receipt
+
+- Stayed at `100%`: this fixes regression evidence inside the already-complete mechanics/mobile lane and does not expand its denominator.
+- The compact Player Guide now begins at the overlay viewport mask instead of six pixels behind it.
+- Directional intent is versioned as `legacy-directional-intent-v3`: weak analog secondary input is a wall-only one-tile fallback, decisive retargeting remains a queued turn, and a legal dominant run no longer peels into a T-junction branch.
+- Captured stick/arrow holds retain a bounded repeat while blocked; arrow drags remain captured beyond the visible frame and through the center deadzone until release.
+- Proof: focused `5` files / `84` tests, TypeScript, clean full `npm run verify` at `49` files / `367` tests plus Vite/PWA build, and isolated 390x844 browser proof for guide containment, real T-junction continuity, beyond-frame/center arrow capture, blocked retry, release cleanup, and zero page/console errors. Durable packet: `docs/ops/MAZER-MOBILE-CONTROL-INTENT-REWORK-2026-07-16.md`.
+
 ## 2026-07-10 - Pause guide and progression-reset maintenance receipt
 
 - Stayed at `100%`: the active mechanics/mobile lane is already closed, so this focused maintenance pass did not ratchet it.

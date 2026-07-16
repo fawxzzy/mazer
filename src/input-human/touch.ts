@@ -127,6 +127,11 @@ export interface StickPullOptions {
   previousIntentSegment?: number | null;
 }
 
+export interface TouchArrowMovementOptions {
+  allowBeyondFrame?: boolean;
+  centerFallback?: HumanMovementActionKind | null;
+}
+
 const isPointInRect = (rect: TouchRect, x: number, y: number): boolean => (
   rect.width > 0
   && rect.height > 0
@@ -656,7 +661,8 @@ export const resolveTouchControlKindAtPoint = (
 export const resolveTouchArrowMovementKindAtPoint = (
   layout: TouchControlLayout,
   x: number,
-  y: number
+  y: number,
+  options: TouchArrowMovementOptions = {}
 ): HumanMovementActionKind | null => {
   if (layout.controlMode !== 'arrows') {
     return null;
@@ -667,7 +673,7 @@ export const resolveTouchArrowMovementKindAtPoint = (
     return exactControl as HumanMovementActionKind;
   }
 
-  if (!isPointInRect(layout.frame, x, y)) {
+  if (!options.allowBeyondFrame && !isPointInRect(layout.frame, x, y)) {
     return null;
   }
 
@@ -678,7 +684,7 @@ export const resolveTouchArrowMovementKindAtPoint = (
     Math.min(layout.controls.move_up.width, layout.controls.move_left.height) * 0.34
   );
   if (Math.hypot(dx, dy) <= centerDeadzoneRadius) {
-    return null;
+    return options.centerFallback ?? null;
   }
 
   return resolveStickMovementIntent(Math.atan2(dy, dx)).movement;

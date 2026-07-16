@@ -83,7 +83,6 @@ import {
 } from '../legacy-runtime/legacyPlayStep';
 import {
   LegacyDirectionalIntentResolver,
-  resolveLegacyAnalogCardinalDirectionsFromVector,
   resolveLegacyCardinalDirectionsFromVector,
   type LegacyCardinalDirection
 } from '../legacy-runtime/legacyDirectionalIntent';
@@ -2868,10 +2867,14 @@ export class MenuScene extends Phaser.Scene {
       touchControlLayout.controlMode === 'arrows'
       && this.playTouchArrowPointerId === normalizedPointerId
     ) {
-      const movement = resolveTouchArrowMovementKindAtPoint(touchControlLayout, x, y);
-      if (movement === null) {
-        this.releaseLegacyPlayHeldTouchMove(pointerId);
-      } else {
+      const existingMovement = this.playHeldTouchMoves.find(
+        (move) => move.pointerId === normalizedPointerId
+      )?.control ?? null;
+      const movement = resolveTouchArrowMovementKindAtPoint(touchControlLayout, x, y, {
+        allowBeyondFrame: true,
+        centerFallback: existingMovement
+      });
+      if (movement !== null) {
         this.setLegacyPlayHeldTouchMoveCandidates([movement], pointerId, {
           keepWhenBlocked: true,
           smoothRetarget: true
@@ -2950,6 +2953,12 @@ export class MenuScene extends Phaser.Scene {
     const candidatesUnchanged = existingForPointer.length === uniqueControls.length
       && existingForPointer.every((control, index) => control === uniqueControls[index]);
     if (candidatesUnchanged) {
+      if (
+        this.playHeldTouchRepeatTimer === null
+        && (this.playTouchArrowPointerId === normalizedPointerId || this.playTouchStickPointerId === normalizedPointerId)
+      ) {
+        this.scheduleLegacyPlayHeldTouchRepeat(LEGACY_PLAY_STICK_RETARGET_STEP_MS);
+      }
       return true;
     }
 
@@ -3190,7 +3199,7 @@ export class MenuScene extends Phaser.Scene {
     const moved = this.performLegacyPlayHeldTouchMove();
     if (!moved) {
       if (this.playTouchArrowPointerId !== null || this.playTouchStickPointerId !== null) {
-        this.clearLegacyPlayHeldTouchRepeat();
+        this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
         this.publishInteractionDiagnostics();
         return;
       }
@@ -3261,16 +3270,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private performLegacyPlayHeldTouchMove(): boolean {
-    const analogDirections = this.resolveLegacyPlayStickIntentDirections();
-    if (analogDirections !== null) {
-      this.playDirectionalIntent.request(analogDirections);
-    } else {
-      const candidates = resolveHumanMovementPriorityCandidates(
-        this.playHeldTouchMoves.map((move) => move.control),
-        LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT
-      );
-      this.requestLegacyPlayDirectionalIntent(candidates);
-    }
+    const candidates = resolveHumanMovementPriorityCandidates(
+      this.playHeldTouchMoves.map((move) => move.control),
+      LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT
+    );
+    this.requestLegacyPlayDirectionalIntent(candidates);
     return this.performLegacyPlayDirectionalIntentStep();
   }
 
@@ -3311,17 +3315,6 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
     return this.tryMovePlayer(step.deltaX, step.deltaY);
-  }
-
-  private resolveLegacyPlayStickIntentDirections(): LegacyCardinalDirection[] | null {
-    if (this.playTouchStickPointerId === null || this.playTouchStickPull === null) {
-      return null;
-    }
-
-    return resolveLegacyAnalogCardinalDirectionsFromVector(
-      this.playTouchStickPull.normalizedX,
-      this.playTouchStickPull.normalizedY
-    );
   }
 
   private resolveLegacyPlayTouchControlLayout(): ReturnType<typeof resolveTouchControlLayout> {

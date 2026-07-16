@@ -50,6 +50,8 @@ export interface LegacyDirectionalIntentStepOptions {
   assistedLaneShiftEnabled?: boolean;
 }
 
+type LegacyQueuedDirectionRole = 'turn' | 'fallback';
+
 const DIRECTION_DELTAS: Record<LegacyCardinalDirection, LegacyPoint> = {
   up: { x: 0, y: -1 },
   right: { x: 1, y: 0 },
@@ -141,6 +143,8 @@ export class LegacyDirectionalIntentResolver {
 
   private queuedDirection: LegacyCardinalDirection | null = null;
 
+  private queuedDirectionRole: LegacyQueuedDirectionRole | null = null;
+
   private requestedDirections: LegacyCardinalDirection[] = [];
 
   request(directions: readonly LegacyCardinalDirection[]): LegacyDirectionalIntentDiagnostics {
@@ -158,21 +162,27 @@ export class LegacyDirectionalIntentResolver {
     if (preferredDirection === null) {
       this.activeDirection = null;
       this.queuedDirection = null;
+      this.queuedDirectionRole = null;
       return this.getDiagnostics();
     }
 
+    const secondaryDirection = requestedDirections.find((direction) => direction !== preferredDirection) ?? null;
+
     if (this.activeDirection === null) {
       this.activeDirection = preferredDirection;
-      this.queuedDirection = requestedDirections.find((direction) => direction !== preferredDirection) ?? null;
+      this.queuedDirection = secondaryDirection;
+      this.queuedDirectionRole = secondaryDirection === null ? null : 'fallback';
       return this.getDiagnostics();
     }
 
     if (preferredDirection !== this.activeDirection) {
       this.queuedDirection = preferredDirection;
+      this.queuedDirectionRole = 'turn';
       return this.getDiagnostics();
     }
 
-    this.queuedDirection = requestedDirections.find((direction) => direction !== this.activeDirection) ?? null;
+    this.queuedDirection = secondaryDirection;
+    this.queuedDirectionRole = secondaryDirection === null ? null : 'fallback';
     return this.getDiagnostics();
   }
 
@@ -184,19 +194,19 @@ export class LegacyDirectionalIntentResolver {
       return this.getDiagnostics();
     }
 
-    if (this.activeDirection === null || !requestedDirections.includes(this.activeDirection)) {
+    if (this.activeDirection === null) {
       this.activeDirection = requestedDirections[0] ?? null;
       this.assistedLaneShiftCount = 0;
       this.assistedLaneShiftPendingResume = false;
     }
-    if (this.queuedDirection !== null && !requestedDirections.includes(this.queuedDirection)) {
-      this.queuedDirection = null;
-    }
-    if (this.queuedDirection === this.activeDirection) {
-      this.queuedDirection = null;
-    }
-    if (this.queuedDirection === null) {
-      this.queuedDirection = requestedDirections.find((direction) => direction !== this.activeDirection) ?? null;
+    const preferredDirection = requestedDirections[0] ?? null;
+    const secondaryDirection = requestedDirections.find((direction) => direction !== preferredDirection) ?? null;
+    if (preferredDirection !== null && preferredDirection !== this.activeDirection) {
+      this.queuedDirection = preferredDirection;
+      this.queuedDirectionRole = 'turn';
+    } else {
+      this.queuedDirection = secondaryDirection;
+      this.queuedDirectionRole = secondaryDirection === null ? null : 'fallback';
     }
     this.lastDecision = 'requested';
     return this.getDiagnostics();
@@ -216,11 +226,13 @@ export class LegacyDirectionalIntentResolver {
       }
     }
 
-    if (this.queuedDirection !== null) {
+    if (this.queuedDirection !== null && this.queuedDirectionRole === 'turn') {
       const queuedTarget = legalTargets.get(this.queuedDirection) ?? null;
       if (queuedTarget !== null) {
         this.activeDirection = this.queuedDirection;
-        this.queuedDirection = null;
+        const fallbackDirection = this.requestedDirections.find((direction) => direction !== this.activeDirection) ?? null;
+        this.queuedDirection = fallbackDirection;
+        this.queuedDirectionRole = fallbackDirection === null ? null : 'fallback';
         this.assistedLaneShiftCount = 0;
         this.assistedLaneShiftPendingResume = false;
         return this.createMoveStep('queued-turn', this.activeDirection, queuedTarget);
@@ -237,7 +249,7 @@ export class LegacyDirectionalIntentResolver {
       return this.createMoveStep('continued', this.activeDirection, activeTarget);
     }
 
-    if (this.queuedDirection !== null) {
+    if (this.queuedDirection !== null && this.queuedDirectionRole === 'turn') {
       return this.createStopStep('stopped-awaiting-queued-direction');
     }
 
@@ -251,7 +263,10 @@ export class LegacyDirectionalIntentResolver {
 
     const heldDirection = this.activeDirection;
     const heldDelta = DIRECTION_DELTAS[heldDirection];
-    const laneShiftCandidates = ORTHOGONAL_DIRECTIONS[heldDirection].flatMap((direction) => {
+    const orthogonalDirections = this.queuedDirectionRole === 'fallback' && this.queuedDirection !== null
+      ? ORTHOGONAL_DIRECTIONS[heldDirection].filter((direction) => direction === this.queuedDirection)
+      : ORTHOGONAL_DIRECTIONS[heldDirection];
+    const laneShiftCandidates = orthogonalDirections.flatMap((direction) => {
       const target = legalTargets.get(direction) ?? null;
       if (target === null) {
         return [];
@@ -294,6 +309,7 @@ export class LegacyDirectionalIntentResolver {
     this.assistedLaneShiftPendingResume = false;
     this.lastDecision = 'idle';
     this.queuedDirection = null;
+    this.queuedDirectionRole = null;
     this.requestedDirections = [];
   }
 

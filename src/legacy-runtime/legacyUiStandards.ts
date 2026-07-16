@@ -68,7 +68,7 @@ export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptio
   return {
     cardHeight: compact ? 196 : 216,
     cardWidthLimit: compact ? 350 : 540,
-    horizontalMargin: compact ? 36 : 64,
+    horizontalMargin: compact ? 48 : 64,
     inset: compact ? 18 : 22,
     legendTopOffset: compact ? 48 : 52,
     rowHeight: compact ? 19 : 22,
