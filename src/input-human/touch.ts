@@ -90,6 +90,7 @@ export interface TouchControlLayoutOptions {
   compact?: boolean;
   controlMode?: TouchControlMode;
   placement?: 'bottom-centered';
+  phonePortraitOverride?: boolean;
   topActionHeight?: number;
   avoidRect?: {
     left: number;
@@ -279,7 +280,9 @@ export const resolveTouchControlLayout = (
     left: normalizeInset(options.safeInsets?.left)
   };
   const minDim = Math.max(1, Math.min(viewport.width, viewport.height));
-  const phonePortrait = compact && viewport.height > viewport.width && viewport.width <= 430;
+  const phonePortrait = compact
+    && viewport.height > viewport.width
+    && (viewport.width <= 430 || options.phonePortraitOverride === true);
   if (phonePortrait) {
     const ultraNarrow = viewport.width < 240;
     const buttonSize = clamp(

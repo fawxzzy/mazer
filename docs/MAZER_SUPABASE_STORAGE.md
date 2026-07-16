@@ -58,7 +58,16 @@ When enabled, `src/legacy-runtime/legacyRemoteProgression.ts` writes:
 - Menu AI runner state to `mazer_ai_progression_states` with `runner_key = 'menu-runner'`.
 - Compact menu/play cycle receipts to `mazer_cycle_receipts`; this stores bounded summaries and path previews, not high-volume frame streams.
 
+It also hydrates authenticated account state before Phaser creates the first maze:
+
+- `mazer_progression_states.state` is the canonical combined player/AI progression save; the separate AI row remains an indexed mirror.
+- `mazer_profiles.settings` is the canonical cross-device game-toggle/control preference row.
+- `revision` on progression and profile rows is a monotonic optimistic-concurrency guard. Normal advancement can rebase forward once after a conflict; destructive replacement/reset refuses to overwrite a newer revision.
+- A scoped local sync envelope records the last observed revision and local fingerprints so offline/local advancement can be reconciled without resurrecting a previously accepted reset.
+
 The app remains playable local-first if Supabase is unavailable or remote progression is disabled.
+
+Live migration `account_state_revisions` was applied on 2026-07-16. Readback confirmed the existing three progression rows were preserved at revision `0`; the profile table remained empty until an authenticated client seeds its first settings row.
 
 ## 2026-07-09 Auth QA Notes
 

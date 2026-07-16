@@ -50,6 +50,10 @@ export interface LegacyAuthenticatedMenuButtonStack {
 
 export type LegacyMenuLayoutSurface = 'menu' | 'play';
 
+export interface LegacyMenuLayoutOptions {
+  browserMobileParity?: boolean;
+}
+
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 export const LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_RATIO = 0.22;
 export const LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MIN = 10;
@@ -124,7 +128,8 @@ export const resolveLegacyMenuLayout = (
   height: number,
   scale: number,
   mazeSize: number,
-  surface: LegacyMenuLayoutSurface = 'menu'
+  surface: LegacyMenuLayoutSurface = 'menu',
+  options: LegacyMenuLayoutOptions = {}
 ): LegacyMenuLayout => {
   const normalizedScale = clampInteger(scale, 25, 150);
   const isPortrait = height > width;
@@ -133,7 +138,9 @@ export const resolveLegacyMenuLayout = (
   const isPlayUltraNarrow = isPlaySurface && isPortrait && width < LEGACY_PLAY_ULTRA_NARROW_WIDTH;
   const isUltraNarrow = isSidePanelPortrait || isPlayUltraNarrow;
   const usesStackedButtons = isSidePanelPortrait;
-  const shouldUseCleanPhoneCadence = isPortrait && !isUltraNarrow && width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH;
+  const shouldUseCleanPhoneCadence = isPortrait
+    && !isUltraNarrow
+    && (width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH || options.browserMobileParity === true);
   const isShortLandscapeMenu = !isPlaySurface && !isPortrait && height < 820;
   const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
   const stackGap = Math.round(clamp(height * 0.02, 7, 12));
