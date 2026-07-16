@@ -971,8 +971,8 @@ describe('legacy progression', () => {
     expect(unrestrictedScale).toBeGreaterThan(viewportCap);
     expect(phoneScale).toBe(viewportCap);
     expect(narrowScale).toBe(narrowViewportCap);
-    expect(narrowScale).toBe(37);
-    expect(phoneScale).toBe(41);
+    expect(narrowScale).toBe(38);
+    expect(phoneScale).toBe(42);
     expect(normalPhoneViewportCap).toBe(46);
     expect(playViewportCap).toBeGreaterThan(narrowViewportCap);
 
@@ -983,7 +983,7 @@ describe('legacy progression', () => {
       normalPhoneViewportCap,
       'menu'
     );
-    expect(normalPhoneLayout.tileSize).toBe(8);
+    expect(normalPhoneLayout.tileSize).toBeCloseTo(8.152, 3);
     expect(normalPhoneLayout.boardLeft).toBeGreaterThanOrEqual(8);
     expect(normalPhoneLayout.boardLeft + normalPhoneLayout.boardSize).toBeLessThanOrEqual(normalPhoneViewport.width - 8);
 
@@ -1003,8 +1003,9 @@ describe('legacy progression', () => {
         'menu'
       );
 
-      expect(layout.tileSize).toBe(8);
-      expect(layout.boardLeft).toBeGreaterThanOrEqual(8);
+      expect(layout.tileSize).toBeGreaterThanOrEqual(8.15);
+      expect(layout.boardSize).toBe(389);
+      expect(layout.boardLeft).toBe(8);
       expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(normalPhoneViewport.width - 8);
     }
   });

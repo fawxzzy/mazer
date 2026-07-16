@@ -988,6 +988,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('resolveTouchControlKindAtPoint');
+    expect(menuSceneSource).toContain('resolveTouchArrowMovementKindAtPoint');
     expect(menuSceneSource).toContain('resolveTouchControlLayout');
     expect(menuSceneSource).toContain('private resolveLegacyPlayTouchControlLayout()');
     expect(menuSceneSource).toContain('private handleLegacyPlayTouchControl');
@@ -1003,6 +1004,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.releaseLegacyPlayTouchPointer(event.pointerId)');
     expect(menuSceneSource).toContain("controlMode: this.settings.controlMode");
     expect(menuSceneSource).toContain("touchControlLayout.controlMode === 'stick'");
+    expect(menuSceneSource).toContain("touchControlLayout.controlMode === 'arrows'");
+    expect(menuSceneSource).toContain('this.playTouchArrowPointerId === normalizedPointerId');
+    expect(menuSceneSource).toContain('this.setLegacyPlayHeldTouchMoveCandidates([movement], pointerId');
     expect(menuSceneSource).toContain('this.setLegacyPlayHeldTouchMoveCandidates(this.playTouchStickPull.movementCandidates');
     expect(menuSceneSource).toContain('this.setLegacyPlayHeldTouchMoveCandidates(pullVector.movementCandidates');
     expect(menuSceneSource).toContain('movementCandidates: [...this.playTouchStickPull.movementCandidates]');
@@ -1016,8 +1020,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.playTouchStickPull.normalizedY');
     expect(menuSceneSource).toContain('const analogDirections = this.resolveLegacyPlayStickIntentDirections();');
     expect(menuSceneSource).toContain('this.playDirectionalIntent.request(analogDirections);');
-    expect(menuSceneSource).toContain('if (this.playTouchStickPointerId !== null) {');
+    expect(menuSceneSource).toContain('if (this.playTouchArrowPointerId !== null || this.playTouchStickPointerId !== null) {');
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchStick(');
+    expect(menuSceneSource).toContain('const knobRadius = stick.knobRadius;');
+    expect(menuSceneSource).toContain('const travel = stick.travelRadius;');
+    expect(menuSceneSource).toContain('deadzoneRadius: touchControlLayout.stick.deadzoneRadius');
+    expect(menuSceneSource).toContain('knobRadius: touchControlLayout.stick.knobRadius');
+    expect(menuSceneSource).toContain('travelRadius: touchControlLayout.stick.travelRadius');
     expect(menuSceneSource).toContain('private setLegacyPlayHeldTouchMoveCandidates(');
     expect(menuSceneSource).toContain('const wasHeld = this.playMoveFlags[direction];');
     expect(menuSceneSource).toContain('const sameControlIndex = this.playHeldTouchMoves.findIndex((move) => move.control === control);');

@@ -89,6 +89,7 @@ import {
 } from '../legacy-runtime/legacyDirectionalIntent';
 import {
   resolveLegacyCompassSpinFrame,
+  resolveLegacyFrozenElapsedMs,
   resolveLegacyPlayHudFrame,
   type LegacyPlayHudFrame
 } from '../legacy-runtime/legacyPlayHud';
@@ -295,6 +296,7 @@ import {
 } from '../input-human';
 import {
   resolveStickPullVector,
+  resolveTouchArrowMovementKindAtPoint,
   resolveTouchControlKindAtPoint,
   resolveTouchControlLayout,
   type TouchStickPullVector
@@ -572,7 +574,9 @@ interface MenuSceneVisualDiagnostics {
     activeControls: HumanMovementActionKind[];
     frame: VisualRect | null;
     stick: {
+      deadzoneRadius: number;
       inner: VisualRect;
+      knobRadius: number;
       outer: VisualRect;
       pull: {
         distanceRatio: number;
@@ -582,6 +586,7 @@ interface MenuSceneVisualDiagnostics {
         normalizedX: number;
         normalizedY: number;
       } | null;
+      travelRadius: number;
     } | null;
     controls: {
       move_up: VisualRect | null;
@@ -955,7 +960,7 @@ const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PER
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
 const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
-const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 64;
+const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 32;
 const LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS = 16;
 const LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS = 144;
 const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = 104;
@@ -1076,9 +1081,11 @@ export class MenuScene extends Phaser.Scene {
   private menuDemoConfig!: DemoWalkerConfig;
   private nextDemoMoveAtMs = 0;
   private playStartedAtMs = 0;
+  private playCompletedAtMs: number | null = null;
   private playCyclePath: LegacyPoint[] = [];
   private playCycleResetUsed = false;
   private menuDemoCycleStartedAtMs = 0;
+  private menuDemoCompletedAtMs: number | null = null;
   private menuDemoCycleRecorded = false;
   private mazeCycleTelemetryHistory: MazeCycleTelemetryHistory = readMazeCycleTelemetryHistory(undefined);
   private progressionState: LegacyProgressionState = readLegacyProgressionState(undefined);
@@ -1104,6 +1111,7 @@ export class MenuScene extends Phaser.Scene {
   private playHeldTouchSequence = 0;
   private playHeldTouchRepeatTimer: Phaser.Time.TimerEvent | null = null;
   private playHeldTouchRepeatDueAtMs: number | null = null;
+  private playTouchArrowPointerId: number | null = null;
   private playTouchStickPointerId: number | null = null;
   private playTouchStickPull: TouchStickPullVector | null = null;
   private playPointerStart: LegacyPlayPointerStart | null = null;
@@ -1829,6 +1837,12 @@ export class MenuScene extends Phaser.Scene {
           renderTileSize: mazeRenderFrame.tileSize
         },
         lifecycle: playLifecycle,
+        timer: {
+          completedAtMs: this.playCompletedAtMs,
+          elapsedMs: this.resolveLegacyPlayElapsedMs(),
+          frozen: this.playCompletedAtMs !== null,
+          startedAtMs: this.playStartedAtMs
+        },
         worldTurn: {
           acceptedTurnCount: worldTurnDiagnostics.acceptedTurnCount,
           lastCommandId: worldTurnDiagnostics.lastCommandId,
@@ -1866,6 +1880,7 @@ export class MenuScene extends Phaser.Scene {
           pointerStartActive: this.playPointerStart !== null,
           touchSprint: {
             activeControls: this.playHeldTouchMoves.map((move) => move.control),
+            arrowPointerActive: this.playTouchArrowPointerId !== null,
             baseMovementSpeed: movementSpeedProfile.baseSpeed,
             effectiveMovementSpeed: movementSpeedProfile.effectiveSpeed,
             formulaVersion: movementSpeedProfile.formulaVersion,
@@ -1879,6 +1894,7 @@ export class MenuScene extends Phaser.Scene {
             repeatInitialDelayMs: movementSpeedProfile.initialDelayMs,
             repeatIntervalMs: movementSpeedProfile.repeatIntervalMs,
             stickInitialDelayMaxMs: LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS,
+            stickPointerActive: this.playTouchStickPointerId !== null,
             stickRepeatIntervalMaxMs: LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS,
             stickRetargetDelayMs: LEGACY_PLAY_STICK_RETARGET_STEP_MS,
             stickTurnDelayMaxMs: LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS,
@@ -2788,6 +2804,7 @@ export class MenuScene extends Phaser.Scene {
       }
 
       this.resetLegacyPlayDirectionalInputBuffer();
+      this.playTouchArrowPointerId = null;
       this.playTouchStickPointerId = normalizedPointerId;
       this.playHeldTouchMoves = [];
       this.clearLegacyPlayHeldTouchRepeat();
@@ -2812,6 +2829,9 @@ export class MenuScene extends Phaser.Scene {
       }
 
       this.resetLegacyPlayDirectionalInputBuffer();
+      this.playTouchArrowPointerId = normalizedPointerId;
+      this.playTouchStickPointerId = null;
+      this.playTouchStickPull = null;
       this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
       return true;
     }
@@ -2843,11 +2863,28 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
+    const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
+    if (
+      touchControlLayout.controlMode === 'arrows'
+      && this.playTouchArrowPointerId === normalizedPointerId
+    ) {
+      const movement = resolveTouchArrowMovementKindAtPoint(touchControlLayout, x, y);
+      if (movement === null) {
+        this.releaseLegacyPlayHeldTouchMove(pointerId);
+      } else {
+        this.setLegacyPlayHeldTouchMoveCandidates([movement], pointerId, {
+          keepWhenBlocked: true,
+          smoothRetarget: true
+        });
+      }
+      this.boardDynamicDirty = true;
+      return true;
+    }
+
     if (this.playTouchStickPointerId !== normalizedPointerId) {
       return false;
     }
 
-    const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
     if (touchControlLayout.controlMode !== 'stick' || touchControlLayout.stick === null) {
       this.releaseLegacyPlayTouchPointer(pointerId);
       return true;
@@ -3079,6 +3116,12 @@ export class MenuScene extends Phaser.Scene {
   private releaseLegacyPlayTouchPointer(pointerId: number | null = null): boolean {
     const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
     const releasedMove = this.releaseLegacyPlayHeldTouchMove(pointerId);
+    const releasedArrow = this.playTouchArrowPointerId === normalizedPointerId;
+    if (releasedArrow) {
+      this.playTouchArrowPointerId = null;
+      this.boardDynamicDirty = true;
+      this.publishInteractionDiagnostics();
+    }
     const releasedStick = this.playTouchStickPointerId === normalizedPointerId;
     if (releasedStick) {
       this.playTouchStickPointerId = null;
@@ -3087,7 +3130,7 @@ export class MenuScene extends Phaser.Scene {
       this.publishInteractionDiagnostics();
     }
 
-    return releasedMove || releasedStick;
+    return releasedMove || releasedArrow || releasedStick;
   }
 
   private clearLegacyPlayHeldTouchRepeat(): void {
@@ -3136,6 +3179,7 @@ export class MenuScene extends Phaser.Scene {
       || hasPendingLegacyResetRequest(this.pendingResetRequest)
     ) {
       this.playHeldTouchMoves = [];
+      this.playTouchArrowPointerId = null;
       this.playTouchStickPointerId = null;
       this.playTouchStickPull = null;
       this.clearLegacyPlayHeldTouchRepeat();
@@ -3145,12 +3189,13 @@ export class MenuScene extends Phaser.Scene {
 
     const moved = this.performLegacyPlayHeldTouchMove();
     if (!moved) {
-      if (this.playTouchStickPointerId !== null) {
+      if (this.playTouchArrowPointerId !== null || this.playTouchStickPointerId !== null) {
         this.clearLegacyPlayHeldTouchRepeat();
         this.publishInteractionDiagnostics();
         return;
       }
       this.playHeldTouchMoves = [];
+      this.playTouchArrowPointerId = null;
       this.playTouchStickPointerId = null;
       this.playTouchStickPull = null;
       this.clearLegacyPlayHeldTouchRepeat();
@@ -3385,6 +3430,7 @@ export class MenuScene extends Phaser.Scene {
     this.playMoveTimer = null;
     this.clearLegacyPlayHeldTouchRepeat();
     this.playHeldTouchMoves = [];
+    this.playTouchArrowPointerId = null;
     this.playTouchStickPointerId = null;
     this.playTouchStickPull = null;
     this.playMoveFlags = createLegacyPlayMoveFlags();
@@ -3546,6 +3592,7 @@ export class MenuScene extends Phaser.Scene {
       this.syncLegacyPlayerVisualMotionTo(bootstrap.player);
       this.trail = bootstrap.trail;
       this.menuDemoCycleStartedAtMs = this.time.now;
+      this.menuDemoCompletedAtMs = null;
       this.menuDemoCycleRecorded = false;
       this.playCyclePath = [];
       this.playCycleResetUsed = false;
@@ -3557,6 +3604,7 @@ export class MenuScene extends Phaser.Scene {
       this.trail = generationState.initialTrail;
       this.playCyclePath = generationState.initialTrail.map(copyPoint);
       this.playCycleResetUsed = false;
+      this.playCompletedAtMs = null;
       this.startLegacyPlayCompassSpin(this.time.now);
     }
     this.nextDemoMoveAtMs = nextDemoMoveAtMs;
@@ -3754,6 +3802,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.nextDemoMoveAtMs = Math.min(this.nextDemoMoveAtMs, time);
     this.menuDemoCycleStartedAtMs = time;
+    this.menuDemoCompletedAtMs = null;
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
@@ -4138,6 +4187,7 @@ export class MenuScene extends Phaser.Scene {
     if (nextFrame.shouldRegenerateMaze) {
       this.menuDemoState = nextFrame.state;
       this.nextDemoMoveAtMs = time + nextFrame.delayMs;
+      this.menuDemoCompletedAtMs ??= time;
       this.recordMazeCycleCompletion('menu-demo');
       this.armLegacyMenuStaticDeconstructStage(time);
       this.boardDynamicDirty = true;
@@ -4157,6 +4207,7 @@ export class MenuScene extends Phaser.Scene {
     this.nextDemoMoveAtMs = time + nextFrame.delayMs;
     if (this.shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame)) {
       this.nextDemoMoveAtMs = time;
+      this.menuDemoCompletedAtMs ??= time;
       this.recordMazeCycleCompletion('menu-demo');
       this.armLegacyMenuStaticDeconstructStage(time);
       this.boardDynamicDirty = true;
@@ -4276,6 +4327,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (nextStep.reachedGoal) {
+      this.playCompletedAtMs ??= this.time.now;
       this.recordMazeCycleCompletion('play');
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
@@ -6130,6 +6182,14 @@ export class MenuScene extends Phaser.Scene {
       return 0;
     }
 
+    if (this.menuDemoCompletedAtMs !== null) {
+      return resolveLegacyFrozenElapsedMs({
+        completedAtMs: this.menuDemoCompletedAtMs,
+        nowMs: this.time.now,
+        startedAtMs: this.menuDemoCycleStartedAtMs
+      });
+    }
+
     const activeTrack = this.progressionState.tracks['ai-runner'];
     if (
       this.menuStaticDrawLifecyclePhase === 'settled'
@@ -6137,7 +6197,10 @@ export class MenuScene extends Phaser.Scene {
       && this.menuStaticDrawTilesVisible === null
       && !this.menuDemoCycleRecorded
     ) {
-      return Math.max(0, Math.round(this.time.now - this.menuDemoCycleStartedAtMs));
+      return resolveLegacyFrozenElapsedMs({
+        nowMs: this.time.now,
+        startedAtMs: this.menuDemoCycleStartedAtMs
+      });
     }
 
     return activeTrack.lastCompletionTimeMs ?? 0;
@@ -6145,7 +6208,11 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyPlayElapsedMs(): number {
     return this.mode === 'play'
-      ? Math.max(0, Math.round(this.time.now - this.playStartedAtMs))
+      ? resolveLegacyFrozenElapsedMs({
+        completedAtMs: this.playCompletedAtMs,
+        nowMs: this.time.now,
+        startedAtMs: this.playStartedAtMs
+      })
       : 0;
   }
 
@@ -6982,7 +7049,7 @@ export class MenuScene extends Phaser.Scene {
     const touchCompassBounds = this.resolveLegacyPlayTouchCompassBounds(touchControlLayout);
     const hudFrame = resolveLegacyPlayHudFrame({
       compassBounds: touchCompassBounds ?? undefined,
-      elapsedMs: time - this.playStartedAtMs,
+      elapsedMs: this.resolveLegacyPlayElapsedMs(),
       goalScreen: { x: goalScreenX, y: goalScreenY },
       layoutWidth: this.layout.width,
       playerScreen: { x: playerScreenX, y: playerScreenY }
@@ -7293,11 +7360,11 @@ export class MenuScene extends Phaser.Scene {
     const innerRadius = stick.inner.width / 2;
     const centerX = stick.outer.centerX;
     const centerY = stick.outer.centerY;
-    const knobRadius = Math.max(10, innerRadius * 0.42);
+    const knobRadius = stick.knobRadius;
     let knobX = centerX;
     let knobY = centerY;
 
-    const travel = Math.max(outerRadius * 0.26, outerRadius - innerRadius - knobRadius);
+    const travel = stick.travelRadius;
     if (pullVector !== null) {
       knobX += pullVector.normalizedX * travel;
       knobY += pullVector.normalizedY * travel;
@@ -9709,6 +9776,7 @@ export class MenuScene extends Phaser.Scene {
       this.playCyclePath = [copyPoint(result.nextPlayer)];
       this.playCycleResetUsed = true;
       this.playStartedAtMs = this.time.now;
+      this.playCompletedAtMs = null;
       this.resetLegacyWorldTurnHost();
       this.resetLegacyPlayInputBuffer();
       this.boardDynamicDirty = true;
@@ -10062,12 +10130,19 @@ export class MenuScene extends Phaser.Scene {
     const startedAtMs = surface === 'play'
       ? this.playStartedAtMs
       : this.menuDemoCycleStartedAtMs;
+    const completedAtMs = surface === 'play'
+      ? this.playCompletedAtMs
+      : this.menuDemoCompletedAtMs;
 
     this.mazeCycleTelemetryHistory = recordMazeCycleTelemetryReceipt(
       this.resolveMazeCycleTelemetryStorage(),
       {
         averageFrameMs: this.resolveRuntimeAverageFrameMs(),
-        completionTimeMs: Math.max(0, Math.round(this.time.now - startedAtMs)),
+        completionTimeMs: resolveLegacyFrozenElapsedMs({
+          completedAtMs,
+          nowMs: this.time.now,
+          startedAtMs
+        }),
         controlMode: this.settings.controlMode,
         maze: this.maze,
         playerPath,
@@ -10211,6 +10286,7 @@ export class MenuScene extends Phaser.Scene {
       stick: touchControlLayout.stick === null
         ? null
         : {
+          deadzoneRadius: touchControlLayout.stick.deadzoneRadius,
           inner: createVisualRect(
             touchControlLayout.stick.inner.left,
             touchControlLayout.stick.inner.top,
@@ -10223,6 +10299,7 @@ export class MenuScene extends Phaser.Scene {
             touchControlLayout.stick.outer.width,
             touchControlLayout.stick.outer.height
           ),
+          knobRadius: touchControlLayout.stick.knobRadius,
           pull: this.playTouchStickPull === null
             ? null
             : {
@@ -10232,7 +10309,8 @@ export class MenuScene extends Phaser.Scene {
               movementCandidates: [...this.playTouchStickPull.movementCandidates],
               normalizedX: this.playTouchStickPull.normalizedX,
               normalizedY: this.playTouchStickPull.normalizedY
-            }
+            },
+          travelRadius: touchControlLayout.stick.travelRadius
         },
       controls: {
         move_up: createVisualRect(controls.move_up.left, controls.move_up.top, controls.move_up.width, controls.move_up.height),

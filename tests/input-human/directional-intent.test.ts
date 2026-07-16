@@ -30,11 +30,12 @@ const createMaze = (
 
 describe('LegacyDirectionalIntentResolver', () => {
   test('treats small analog off-axis noise as one held cardinal direction', () => {
-    expect(LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO).toBe(0.65);
+    expect(LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO).toBe(0.82);
     expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.18, 0.96)).toEqual(['down']);
     expect(resolveLegacyAnalogCardinalDirectionsFromVector(-0.2, -0.94)).toEqual(['up']);
     expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.98, -0.16)).toEqual(['right']);
     expect(resolveLegacyAnalogCardinalDirectionsFromVector(-0.92, 0.22)).toEqual(['left']);
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.65, 0.85)).toEqual(['down']);
     expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.72, 0.7)).toEqual(['right', 'down']);
   });
 

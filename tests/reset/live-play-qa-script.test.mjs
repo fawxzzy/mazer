@@ -11,6 +11,7 @@ import {
   shouldCollectInputLockProbe,
   summarizeFreshWorldTurn,
   summarizeFreshReadyState,
+  summarizeGoalTimerFreeze,
   summarizeGoalWorldTurn,
   summarizePostGoalLifecycleSamples,
   solveWalkableRoute
@@ -111,6 +112,22 @@ describe('live play QA script helpers', () => {
       rejectedCommandCount: 1,
       lastReceipt: { admitted: false, reason: 'lifecycle-locked' }
     }).pass).toBe(false);
+  });
+
+  test('requires the goal timer to stay frozen across a real post-arrival resample', () => {
+    expect(summarizeGoalTimerFreeze(
+      { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true },
+      { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true }
+    )).toMatchObject({
+      elapsedMs: 8_420,
+      frozen: true,
+      pass: true,
+      resampleElapsedMs: 8_420
+    });
+    expect(summarizeGoalTimerFreeze(
+      { completedAtMs: null, elapsedMs: 8_420, frozen: false },
+      { completedAtMs: null, elapsedMs: 8_516, frozen: false }
+    ).pass).toBe(false);
   });
 
   test('defaults live proof input to the diagnostics QA bridge while preserving explicit control modes', () => {
