@@ -103,6 +103,7 @@ import {
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
 } from '../legacy-runtime/legacyMenuLayout';
+import { shouldUseLegacyBrowserMobileParity } from '../legacy-runtime/legacyBrowserMobileParity';
 import {
   resolveLegacyPathVisualStyle,
   type LegacyPathVisualStyle
@@ -188,6 +189,7 @@ import {
   type MazeCycleTelemetrySurface
 } from '../legacy-runtime/mazeCycleTelemetry';
 import {
+  LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH,
   LEGACY_PROGRESSION_STORAGE_KEY,
   createEmptyLegacyProgressionState,
   readLegacyProgressionState,
@@ -243,8 +245,10 @@ import {
   type LegacyPlayerMessage
 } from '../legacy-runtime/legacyPlayerMessage';
 import {
+  readLegacyBootstrappedAuthSnapshot,
   writeLegacyRemoteCycleReceipt,
   writeLegacyRemoteProgressionState,
+  writeLegacyRemoteSettings,
   type LegacyRemoteProgressionSyncResult
 } from '../legacy-runtime/legacyRemoteProgression';
 import {
@@ -1095,6 +1099,8 @@ export class MenuScene extends Phaser.Scene {
   private progressionState: LegacyProgressionState = readLegacyProgressionState(undefined);
   private latestAuthMessage: LegacyPlayerMessage | null = null;
   private latestRemoteSyncResult: LegacyRemoteProgressionSyncResult | null = null;
+  private remoteSettingsSyncQueue: Promise<void> = Promise.resolve();
+  private remoteSettingsSyncTimer: ReturnType<typeof setTimeout> | null = null;
   private latestOverlayMessage: LegacyPlayerMessage | null = null;
   private latestAuthActionDiagnostics: LegacyAuthActionDiagnostics | null = null;
   private authActionDiagnosticsSequence = 0;
@@ -1302,6 +1308,10 @@ export class MenuScene extends Phaser.Scene {
       window.addEventListener(MAZER_VIEWPORT_CHANGE_EVENT, this.viewportGeometryListener);
     }
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.remoteSettingsSyncTimer !== null) {
+        clearTimeout(this.remoteSettingsSyncTimer);
+        this.remoteSettingsSyncTimer = null;
+      }
       this.authUnsubscribe?.();
       this.authUnsubscribe = null;
       this.destroyLegacyAuthNativeInput();
@@ -3357,6 +3367,7 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyPlayTouchControlLayout(): ReturnType<typeof resolveTouchControlLayout> {
     const boardBounds = this.resolveLegacyPlayBoardBounds();
+    const browserMobileParity = this.resolveLegacyBrowserMobileParity();
 
     return resolveTouchControlLayout({
       width: this.layout.width,
@@ -3364,6 +3375,7 @@ export class MenuScene extends Phaser.Scene {
     }, {
       compact: true,
       controlMode: this.settings.controlMode,
+      phonePortraitOverride: browserMobileParity,
       placement: this.layout.width >= 720 && this.layout.height >= 600
         ? 'bottom-centered'
         : undefined,
@@ -3593,7 +3605,8 @@ export class MenuScene extends Phaser.Scene {
       height,
       this.settings.scale + this.settings.camScale,
       this.maze.size,
-      layoutSurface
+      layoutSurface,
+      { browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height) }
     );
     this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
 
@@ -9804,7 +9817,7 @@ export class MenuScene extends Phaser.Scene {
       source: 'progression',
       tone: 'success'
     }));
-    this.syncLegacyRemoteProgressionState();
+    this.syncLegacyRemoteProgressionState('replace');
     this.openOverlay('pause');
     this.boardDynamicDirty = true;
     this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
@@ -9814,6 +9827,7 @@ export class MenuScene extends Phaser.Scene {
   private applyLegacyOverlayToggleField(fieldId: LegacyOverlayToggleFieldId): void {
     const result = applyLegacyOverlayToggleField(this.settings, fieldId);
     this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), result.settings);
+    this.syncLegacyRemoteSettings();
     this.setLatestOverlayMessage(resolveLegacyOverlayToggleMessage(
       this.resolveLegacyOverlayToggleLabel(fieldId),
       result.stateText ?? 'Updated'
@@ -9867,6 +9881,7 @@ export class MenuScene extends Phaser.Scene {
     const nextSettings = copyLegacySettings(this.settings);
     nextSettings.movementSpeed = nextSpeed;
     this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), nextSettings);
+    this.syncLegacyRemoteSettings();
     this.setLatestOverlayMessage(resolveLegacyOverlayMovementSpeedMessage(
       formatLegacyMovementSpeedPercent(nextSpeed)
     ));
@@ -9914,7 +9929,7 @@ export class MenuScene extends Phaser.Scene {
 
   private loadPersistedLegacyAuthForm(): void {
     const rememberedIdentity = readLegacyRememberedIdentity(this.resolveBrowserLocalStorage());
-    this.authSnapshot = createLegacyGuestAuthSnapshot();
+    this.authSnapshot = readLegacyBootstrappedAuthSnapshot() ?? createLegacyGuestAuthSnapshot();
     this.authForm = createEmptyLegacyAuthFormState('login', rememberedIdentity);
   }
 
@@ -10081,13 +10096,21 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyProgressionScaleForMode(mode: RuntimeMode): number {
     const trackId: LegacyProgressionTrackId = mode === 'play' ? 'player' : 'ai-runner';
+    const browserMobileParity = this.resolveLegacyBrowserMobileParity(this.scale.width, this.scale.height);
     return resolveLegacyProgressionGenerationScale(this.settings.scale, this.progressionState.tracks[trackId], {
       surface: mode === 'play' ? 'play' : 'menu-demo',
       viewport: {
-        width: this.scale.width,
+        width: browserMobileParity ? LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH : this.scale.width,
         height: this.scale.height
       }
     });
+  }
+
+  private resolveLegacyBrowserMobileParity(
+    width = this.layout?.width ?? this.scale.width,
+    height = this.layout?.height ?? this.scale.height
+  ): boolean {
+    return shouldUseLegacyBrowserMobileParity({ width, height });
   }
 
   private resolveLegacyMazeGenerationProfileForMode(mode: RuntimeMode) {
@@ -10184,13 +10207,60 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
-  private syncLegacyRemoteProgressionState(): void {
-    void writeLegacyRemoteProgressionState(this.authSnapshot, this.progressionState)
+  private syncLegacyRemoteProgressionState(mode: 'advance' | 'replace' = 'advance'): void {
+    void writeLegacyRemoteProgressionState(this.authSnapshot, this.progressionState, undefined, mode)
       .then((result) => {
+        if (result.progressionState) {
+          this.progressionState = writeLegacyProgressionState(
+            this.resolveLegacyProgressionStorage(),
+            result.progressionState
+          );
+          this.boardDynamicDirty = true;
+          this.uiDirty = true;
+        }
         this.publishLegacyRemoteSyncResult(result);
       })
       .catch((error: unknown) => {
         this.publishLegacyRemoteSyncException('progression', error);
+      });
+  }
+
+  private syncLegacyRemoteSettings(): void {
+    if (this.remoteSettingsSyncTimer !== null) {
+      clearTimeout(this.remoteSettingsSyncTimer);
+    }
+    this.remoteSettingsSyncTimer = setTimeout(() => {
+      this.remoteSettingsSyncTimer = null;
+      const snapshot = { ...this.authSnapshot };
+      const settings = copyLegacySettings(this.settings);
+      this.remoteSettingsSyncQueue = this.remoteSettingsSyncQueue.then(() => (
+        this.flushLegacyRemoteSettings(snapshot, settings)
+      ));
+    }, 240);
+  }
+
+  private async flushLegacyRemoteSettings(
+    snapshot: LegacyAuthSessionSnapshot,
+    settings: LegacySettings
+  ): Promise<void> {
+    await writeLegacyRemoteSettings(snapshot, settings)
+      .then((result) => {
+        if (result.settings) {
+          this.settings = writeLegacyGameToggleSettings(
+            this.resolveLegacyGameToggleStorage(),
+            result.settings
+          );
+          this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
+          this.boardStaticDirty = true;
+          this.boardPathDirty = true;
+          this.boardDynamicDirty = true;
+          this.backdropDirty = true;
+          this.uiDirty = true;
+        }
+        this.publishLegacyRemoteSyncResult(result);
+      })
+      .catch((error: unknown) => {
+        this.publishLegacyRemoteSyncException('settings', error);
       });
   }
 
@@ -10201,7 +10271,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private publishLegacyRemoteSyncException(
-    context: 'cycle-receipt' | 'progression',
+    context: 'cycle-receipt' | 'progression' | 'settings',
     error: unknown
   ): void {
     const technicalDetail = error instanceof Error
@@ -10212,7 +10282,9 @@ export class MenuScene extends Phaser.Scene {
       playerMessage: createLegacyPlayerMessage({
         copy: context === 'cycle-receipt'
           ? LEGACY_REMOTE_MESSAGE_COPY.cycleReceiptFailed
-          : LEGACY_REMOTE_MESSAGE_COPY.progressionFailed,
+          : context === 'settings'
+            ? LEGACY_REMOTE_MESSAGE_COPY.settingsFailed
+            : LEGACY_REMOTE_MESSAGE_COPY.progressionFailed,
         id: `remote.${context}.exception`,
         source: 'progression',
         technicalDetail,

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import '../styles/base.css';
+import { bootstrapLegacyRemoteAccountState } from '../legacy-runtime/legacyRemoteProgression';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { installMazerPortraitLock, shouldBlockMazerLandscape } from './orientationLock';
 import { createMazerPhaserConfig } from './phaserConfig';
@@ -113,6 +114,7 @@ const boot = async (): Promise<void> => {
     window.sessionStorage.removeItem(LOCALHOST_SW_RESET_KEY);
   }
 
+  await bootstrapLegacyRemoteAccountState();
   markMazerBootStatus('game-creating');
   game = new Phaser.Game(createMazerPhaserConfig(viewportGeometry.getSnapshot().content));
   attachMazerGameToWindow(game);
