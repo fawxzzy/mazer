@@ -897,10 +897,11 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("label: 'Camera Follow'");
     expect(menuSceneSource).toContain("label: 'Trail Fade'");
     expect(menuSceneSource).toContain("label: 'Trail Shine'");
-    expect(menuSceneSource).toContain("? 'On: white shine travels.'");
+    expect(menuSceneSource).toContain("? 'Slow white shine.'");
     expect(menuSceneSource).toContain("label: 'Animated BG'");
     expect(menuSceneSource).toContain("label: 'Dark Mode'");
-    expect(menuSceneSource).toContain("label: 'Controls'");
+    expect(menuSceneSource).toContain("label: 'Control Style'");
+    expect(menuSceneSource).toContain("label: 'Smart Steering'");
     expect(menuSceneSource).toContain("label: 'Move Speed'");
     expect(menuSceneSource).toContain('private createMovementSpeedSliderRow(');
     expect(menuSceneSource).toContain('private applyLegacyMovementSpeed(speed: number): void {');

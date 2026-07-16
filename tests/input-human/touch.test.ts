@@ -7,6 +7,7 @@ import {
   resolveStickMovementIntent,
   resolveStickMovementKind,
   resolveStickPullVector,
+  resolveTouchArrowMovementKindAtPoint,
   resolveTouchControlLayout,
   resolveTouchControlKindAtPoint,
   resolveTouchInputCapability
@@ -70,6 +71,26 @@ describe('input-human touch bridge', () => {
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_up_left.centerX, layout.controls.move_up_left.centerY)).toBe('move_up_left');
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_down_right.centerX, layout.controls.move_down_right.centerY)).toBe('move_down_right');
     expect(resolveTouchControlKindAtPoint(layout, layout.controls.move_right.centerX, layout.controls.move_right.centerY)).toBe('move_right');
+    expect(resolveTouchArrowMovementKindAtPoint(
+      layout,
+      layout.controls.move_up.centerX,
+      layout.controls.move_up.centerY
+    )).toBe('move_up');
+    expect(resolveTouchArrowMovementKindAtPoint(
+      layout,
+      layout.controls.move_right.centerX,
+      layout.controls.move_down.centerY
+    )).toBe('move_down_right');
+    expect(resolveTouchArrowMovementKindAtPoint(
+      layout,
+      layout.frame.centerX,
+      layout.frame.centerY
+    )).toBeNull();
+    expect(resolveTouchArrowMovementKindAtPoint(
+      layout,
+      layout.frame.right + 20,
+      layout.frame.centerY
+    )).toBeNull();
   });
 
   test('supports a stick control mode with a compass deadzone and 360-degree movement ring', () => {
@@ -82,6 +103,10 @@ describe('input-human touch bridge', () => {
 
     expect(layout.controlMode).toBe('stick');
     expect(layout.stick).not.toBeNull();
+    expect(layout.stick!.deadzoneRadius).toBeLessThan(layout.stick!.inner.width / 2);
+    expect(layout.stick!.knobRadius).toBeGreaterThanOrEqual(10);
+    expect(layout.stick!.travelRadius).toBeGreaterThan(layout.stick!.outer.width * 0.3);
+    expect(layout.stick!.travelRadius + layout.stick!.knobRadius).toBeLessThan(layout.stick!.outer.width / 2);
     expect(Math.abs(layout.stick!.inner.centerX - layout.stick!.outer.centerX)).toBeLessThanOrEqual(1);
     expect(Math.abs(layout.stick!.inner.centerY - layout.stick!.outer.centerY)).toBeLessThanOrEqual(1);
     expect(resolveTouchControlKindAtPoint(layout, layout.stick!.inner.centerX, layout.stick!.inner.centerY)).toBeNull();
@@ -150,9 +175,9 @@ describe('input-human touch bridge', () => {
       movementCandidates: ['move_right', 'move_down']
     });
     expect(resolveStickMovementIntent(Math.PI / 12, { previousIntentSegment: 0 })).toEqual({
-      intentSegment: 1,
+      intentSegment: 0,
       movement: 'move_right',
-      movementCandidates: ['move_right', 'move_down']
+      movementCandidates: ['move_right']
     });
     expect(resolveStickMovementIntent(Math.PI / 2, { previousIntentSegment: 0 }).intentSegment).toBe(4);
     const partialPull = resolveStickPullVector(
@@ -188,12 +213,34 @@ describe('input-human touch bridge', () => {
     expect(farPull?.normalizedY).toBe(0);
   });
 
-  test('centers phone controls within the bottom lane below the board when board bounds are known', () => {
+  test('matches the phone Pause action height to the shared run-status panel height', () => {
+    const layout = resolveTouchControlLayout({
+      width: 390,
+      height: 844
+    }, {
+      controlMode: 'stick',
+      topActionHeight: 62
+    });
+
+    expect(layout.controls.pause.height).toBe(62);
+    expect(layout.frames?.[0].height).toBe(62);
+
+    const ultraNarrow = resolveTouchControlLayout({
+      width: 220,
+      height: 480
+    }, {
+      controlMode: 'stick',
+      topActionHeight: 62
+    });
+    expect(ultraNarrow.controls.pause.height).toBe(62);
+  });
+
+  test('places phone controls low in the bottom lane below the board when board bounds are known', () => {
     const board = {
       left: 31,
-      top: 308,
-      width: 343,
-      height: 343
+      top: 70,
+      width: 374,
+      height: 374
     };
     const layout = resolveTouchControlLayout({
       width: 390,
@@ -207,7 +254,8 @@ describe('input-human touch bridge', () => {
 
     expect(layout.frame.top).toBeGreaterThanOrEqual(bottomLaneTop);
     expect(layout.frame.bottom).toBeLessThanOrEqual(844);
-    expect(Math.abs(layout.frame.centerY - bottomLaneCenterY)).toBeLessThanOrEqual(1);
+    expect(layout.frame.centerY).toBeGreaterThan(bottomLaneCenterY);
+    expect(layout.frame.bottom).toBeLessThanOrEqual(844);
     expect(Math.abs(layout.stick!.outer.centerX - 195)).toBeLessThanOrEqual(1);
     expect(Math.abs(layout.stick!.outer.centerY - layout.frame.centerY)).toBeLessThanOrEqual(1);
   });

@@ -782,6 +782,22 @@ export const summarizeFreshWorldTurn = (worldTurn) => {
   };
 };
 
+export const summarizeGoalTimerFreeze = (firstSample, secondSample) => ({
+  completedAtMs: firstSample?.completedAtMs ?? null,
+  elapsedMs: firstSample?.elapsedMs ?? null,
+  frozen: firstSample?.frozen === true && secondSample?.frozen === true,
+  pass: Boolean(
+    firstSample
+    && secondSample
+    && firstSample.frozen === true
+    && secondSample.frozen === true
+    && Number.isFinite(firstSample.completedAtMs)
+    && firstSample.completedAtMs === secondSample.completedAtMs
+    && firstSample.elapsedMs === secondSample.elapsedMs
+  ),
+  resampleElapsedMs: secondSample?.elapsedMs ?? null
+});
+
 export const runLivePlayQa = async (options = {}) => {
   const label = options.label ?? DEFAULT_LABEL;
   const sessionId = resolveSessionId(options.sessionId);
@@ -914,6 +930,13 @@ export const runLivePlayQa = async (options = {}) => {
     }
 
     const goalReachedDiagnostics = await readLivePlayDiagnostics(page);
+    const goalTimerFirstSample = goalReachedDiagnostics.runtime?.play?.timer ?? null;
+    await page.waitForTimeout(96);
+    const goalTimerSecondDiagnostics = await readLivePlayDiagnostics(page);
+    const goalTimerProof = summarizeGoalTimerFreeze(
+      goalTimerFirstSample,
+      goalTimerSecondDiagnostics.runtime?.play?.timer ?? null
+    );
     const lifecycleProof = options.verifyPostGoalLifecycle === false || failedAt !== null
       ? null
       : await collectPostGoalLifecycleProof({
@@ -963,7 +986,7 @@ export const runLivePlayQa = async (options = {}) => {
         isMobile: browserContextOptions.isMobile
       },
       result: {
-        pass: reached && failedAt === null && routePlan.moves.length <= moveCap && lifecyclePassed && worldTurnPassed,
+        pass: reached && failedAt === null && routePlan.moves.length <= moveCap && lifecyclePassed && worldTurnPassed && goalTimerProof.pass,
         reached,
         failedAt,
         capped: routePlan.moves.length > moveCap,
@@ -978,6 +1001,7 @@ export const runLivePlayQa = async (options = {}) => {
           ? { x: goalReachedPlayer.x, y: goalReachedPlayer.y }
           : null
       },
+      goalTimer: goalTimerProof,
       postGoalLifecycle: lifecycleProof ? {
         elapsedMs: lifecycleProof.elapsedMs,
         explicitLifecyclePass: lifecycleProof.explicitLifecyclePass,

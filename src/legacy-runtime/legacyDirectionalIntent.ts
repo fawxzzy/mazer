@@ -6,6 +6,8 @@ import {
 
 export const LEGACY_DIRECTIONAL_INTENT_LANE_SHIFT_TILE_LIMIT = 1;
 
+export const LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO = 0.82;
+
 export const LEGACY_CARDINAL_DIRECTIONS = [
   'up',
   'right',
@@ -21,9 +23,10 @@ export type LegacyDirectionalIntentDecision =
   | 'continued'
   | 'queued-turn'
   | 'assisted-lane-shift'
+  | 'stopped-assistance-disabled'
+  | 'stopped-at-assist-limit'
   | 'stopped-awaiting-queued-direction'
-  | 'stopped-at-dead-end'
-  | 'stopped-at-ambiguous-lane-shift';
+  | 'stopped-at-dead-end';
 
 export interface LegacyDirectionalIntentDiagnostics {
   activeDirection: LegacyCardinalDirection | null;
@@ -41,6 +44,10 @@ export interface LegacyDirectionalIntentStep {
   direction: LegacyCardinalDirection | null;
   moved: boolean;
   target: LegacyPoint | null;
+}
+
+export interface LegacyDirectionalIntentStepOptions {
+  assistedLaneShiftEnabled?: boolean;
 }
 
 const DIRECTION_DELTAS: Record<LegacyCardinalDirection, LegacyPoint> = {
@@ -96,10 +103,39 @@ export const resolveLegacyCardinalDirectionsFromVector = (
   return directions;
 };
 
+export const resolveLegacyAnalogCardinalDirectionsFromVector = (
+  deltaX: number,
+  deltaY: number,
+  secondaryDirectionRatio = LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO
+): LegacyCardinalDirection[] => {
+  const axes: Array<{ direction: LegacyCardinalDirection; magnitude: number }> = [];
+  if (Math.abs(deltaX) > 0.001) {
+    axes.push({
+      direction: deltaX > 0 ? 'right' : 'left',
+      magnitude: Math.abs(deltaX)
+    });
+  }
+  if (Math.abs(deltaY) > 0.001) {
+    axes.push({
+      direction: deltaY > 0 ? 'down' : 'up',
+      magnitude: Math.abs(deltaY)
+    });
+  }
+  axes.sort((left, right) => right.magnitude - left.magnitude);
+  const dominantMagnitude = axes[0]?.magnitude ?? 0;
+  const secondaryThreshold = dominantMagnitude * Math.max(0, Math.min(1, secondaryDirectionRatio));
+
+  return axes
+    .filter((axis, index) => index === 0 || axis.magnitude >= secondaryThreshold)
+    .map((axis) => axis.direction);
+};
+
 export class LegacyDirectionalIntentResolver {
   private activeDirection: LegacyCardinalDirection | null = null;
 
   private assistedLaneShiftCount = 0;
+
+  private assistedLaneShiftPendingResume = false;
 
   private lastDecision: LegacyDirectionalIntentDecision = 'idle';
 
@@ -115,6 +151,7 @@ export class LegacyDirectionalIntentResolver {
 
     this.requestedDirections = requestedDirections;
     this.assistedLaneShiftCount = 0;
+    this.assistedLaneShiftPendingResume = false;
     this.lastDecision = requestedDirections.length > 0 ? 'requested' : 'idle';
 
     const preferredDirection = requestedDirections[0] ?? null;
@@ -150,6 +187,7 @@ export class LegacyDirectionalIntentResolver {
     if (this.activeDirection === null || !requestedDirections.includes(this.activeDirection)) {
       this.activeDirection = requestedDirections[0] ?? null;
       this.assistedLaneShiftCount = 0;
+      this.assistedLaneShiftPendingResume = false;
     }
     if (this.queuedDirection !== null && !requestedDirections.includes(this.queuedDirection)) {
       this.queuedDirection = null;
@@ -166,7 +204,8 @@ export class LegacyDirectionalIntentResolver {
 
   step(
     maze: Pick<LegacyMazeSnapshot, 'grid'>,
-    player: LegacyPoint
+    player: LegacyPoint,
+    options: LegacyDirectionalIntentStepOptions = {}
   ): LegacyDirectionalIntentStep {
     const legalTargets = new Map<LegacyCardinalDirection, LegacyPoint>();
     for (const direction of LEGACY_CARDINAL_DIRECTIONS) {
@@ -183,6 +222,7 @@ export class LegacyDirectionalIntentResolver {
         this.activeDirection = this.queuedDirection;
         this.queuedDirection = null;
         this.assistedLaneShiftCount = 0;
+        this.assistedLaneShiftPendingResume = false;
         return this.createMoveStep('queued-turn', this.activeDirection, queuedTarget);
       }
     }
@@ -193,11 +233,20 @@ export class LegacyDirectionalIntentResolver {
 
     const activeTarget = legalTargets.get(this.activeDirection) ?? null;
     if (activeTarget !== null) {
+      this.assistedLaneShiftPendingResume = false;
       return this.createMoveStep('continued', this.activeDirection, activeTarget);
     }
 
     if (this.queuedDirection !== null) {
       return this.createStopStep('stopped-awaiting-queued-direction');
+    }
+
+    if (options.assistedLaneShiftEnabled === false) {
+      return this.createStopStep('stopped-assistance-disabled');
+    }
+
+    if (this.assistedLaneShiftPendingResume) {
+      return this.createStopStep('stopped-at-assist-limit');
     }
 
     const heldDirection = this.activeDirection;
@@ -219,12 +268,12 @@ export class LegacyDirectionalIntentResolver {
     if (laneShiftCandidates.length === 0) {
       return this.createStopStep('stopped-at-dead-end');
     }
-    if (laneShiftCandidates.length > 1) {
-      return this.createStopStep('stopped-at-ambiguous-lane-shift');
-    }
-
+    // If both sides qualify, prefer the stable orthogonal ordering. A held cardinal
+    // direction should never feel dead merely because a one-tile opening exists on
+    // both sides; the move remains bounded and the held lane must resume next.
     const laneShift = laneShiftCandidates[0]!;
     this.assistedLaneShiftCount += 1;
+    this.assistedLaneShiftPendingResume = true;
     return this.createMoveStep('assisted-lane-shift', laneShift.direction, laneShift.target);
   }
 
@@ -242,6 +291,7 @@ export class LegacyDirectionalIntentResolver {
   reset(): void {
     this.activeDirection = null;
     this.assistedLaneShiftCount = 0;
+    this.assistedLaneShiftPendingResume = false;
     this.lastDecision = 'idle';
     this.queuedDirection = null;
     this.requestedDirections = [];

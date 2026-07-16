@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import {
+  LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO,
   LEGACY_DIRECTIONAL_INTENT_LANE_SHIFT_TILE_LIMIT,
-  LegacyDirectionalIntentResolver
+  LegacyDirectionalIntentResolver,
+  resolveLegacyAnalogCardinalDirectionsFromVector
 } from '../../src/legacy-runtime/legacyDirectionalIntent';
 import type { LegacyMazeSnapshot, LegacyPoint } from '../../src/legacy-runtime/legacyMaze';
 
@@ -27,6 +29,41 @@ const createMaze = (
 };
 
 describe('LegacyDirectionalIntentResolver', () => {
+  test('treats small analog off-axis noise as one held cardinal direction', () => {
+    expect(LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO).toBe(0.82);
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.18, 0.96)).toEqual(['down']);
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(-0.2, -0.94)).toEqual(['up']);
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.98, -0.16)).toEqual(['right']);
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(-0.92, 0.22)).toEqual(['left']);
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.65, 0.85)).toEqual(['down']);
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.72, 0.7)).toEqual(['right', 'down']);
+  });
+
+  test('uses a noisy held vertical stick intent to follow a one-tile horizontal corridor jog', () => {
+    const maze = createMaze(6, [
+      { x: 3, y: 1 },
+      { x: 3, y: 2 },
+      { x: 2, y: 2 },
+      { x: 2, y: 3 },
+      { x: 2, y: 4 }
+    ]);
+    const resolver = new LegacyDirectionalIntentResolver();
+    const noisyDown = resolveLegacyAnalogCardinalDirectionsFromVector(-0.19, 0.97);
+    resolver.request(noisyDown);
+    resolver.step(maze, { x: 3, y: 1 });
+
+    expect(resolver.step(maze, { x: 3, y: 2 })).toMatchObject({
+      decision: 'assisted-lane-shift',
+      direction: 'left',
+      target: { x: 2, y: 2 }
+    });
+    expect(resolver.step(maze, { x: 2, y: 2 })).toMatchObject({
+      decision: 'continued',
+      direction: 'down',
+      target: { x: 2, y: 3 }
+    });
+  });
+
   test('turns immediately when the latest requested direction is legal', () => {
     const maze = createMaze(5, [
       { x: 1, y: 1 },
@@ -198,7 +235,7 @@ describe('LegacyDirectionalIntentResolver', () => {
     });
   });
 
-  test('stops when both one-tile lane shifts could resume the held direction', () => {
+  test('chooses one stable one-tile shift when both sides can resume the held direction', () => {
     const maze = createMaze(5, [
       { x: 1, y: 2 },
       { x: 2, y: 2 },
@@ -212,7 +249,49 @@ describe('LegacyDirectionalIntentResolver', () => {
     resolver.step(maze, { x: 1, y: 2 });
 
     expect(resolver.step(maze, { x: 2, y: 2 })).toMatchObject({
-      decision: 'stopped-at-ambiguous-lane-shift',
+      decision: 'assisted-lane-shift',
+      direction: 'up',
+      moved: true,
+      target: { x: 2, y: 1 }
+    });
+    expect(resolver.step(maze, { x: 2, y: 1 })).toMatchObject({
+      decision: 'continued',
+      direction: 'right',
+      target: { x: 3, y: 1 }
+    });
+  });
+
+  test('can disable one-tile assistance without changing direct movement', () => {
+    const maze = createMaze(5, [
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 2, y: 2 },
+      { x: 3, y: 2 }
+    ]);
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.request(['right']);
+    resolver.step(maze, { x: 1, y: 1 });
+
+    expect(resolver.step(maze, { x: 2, y: 1 }, { assistedLaneShiftEnabled: false })).toMatchObject({
+      decision: 'stopped-assistance-disabled',
+      moved: false
+    });
+  });
+
+  test('cannot chain another assisted side-step before the held lane resumes', () => {
+    const maze = createMaze(5, [
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 2, y: 2 },
+      { x: 3, y: 2 }
+    ]);
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.request(['right']);
+    resolver.step(maze, { x: 1, y: 1 });
+    resolver.step(maze, { x: 2, y: 1 });
+
+    expect(resolver.step(maze, { x: 2, y: 1 })).toMatchObject({
+      decision: 'stopped-at-assist-limit',
       moved: false
     });
   });

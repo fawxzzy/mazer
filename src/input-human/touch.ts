@@ -50,7 +50,9 @@ export interface TouchControlLayout {
   stick: {
     deadzoneRadius: number;
     inner: TouchRect;
+    knobRadius: number;
     outer: TouchRect;
+    travelRadius: number;
   } | null;
   controls: Record<HumanInputActionKind, TouchRect>;
 }
@@ -76,6 +78,7 @@ export interface TouchControlLayoutOptions {
   compact?: boolean;
   controlMode?: TouchControlMode;
   placement?: 'bottom-centered';
+  topActionHeight?: number;
   avoidRect?: {
     left: number;
     top: number;
@@ -106,8 +109,18 @@ const normalizeInset = (value: unknown): number => (
 const EMPTY_TOUCH_RECT = createRect(-10_000, -10_000, 0, 0);
 const STICK_INTENT_SEGMENT_COUNT = 16;
 const STICK_INTENT_SEGMENT_RADIANS = (Math.PI * 2) / STICK_INTENT_SEGMENT_COUNT;
-const STICK_INTENT_SEGMENT_HYSTERESIS_RADIANS = STICK_INTENT_SEGMENT_RADIANS * 0.12;
+const STICK_INTENT_SEGMENT_HYSTERESIS_RADIANS = STICK_INTENT_SEGMENT_RADIANS * 0.32;
 const FULL_CIRCLE_RADIANS = Math.PI * 2;
+const TOUCH_MOVEMENT_KINDS = [
+  'move_up',
+  'move_up_right',
+  'move_right',
+  'move_down_right',
+  'move_down',
+  'move_down_left',
+  'move_left',
+  'move_up_left'
+] as const satisfies readonly HumanMovementActionKind[];
 
 export interface StickPullOptions {
   allowBeyondOuter?: boolean;
@@ -314,7 +327,7 @@ export const resolveTouchControlLayout = (
       : null;
     const frameTop = bottomLaneTop !== null
       ? clamp(
-        Math.round(bottomLaneTop + (((viewport.height - safeInsets.bottom) - bottomLaneTop - dpadFrameHeight) / 2)),
+        Math.round(bottomLaneTop + (((viewport.height - safeInsets.bottom) - bottomLaneTop - dpadFrameHeight) * 0.72)),
         bottomLaneTop,
         Math.max(bottomLaneTop, viewport.height - safeInsets.bottom - dpadFrameHeight)
       )
@@ -325,7 +338,11 @@ export const resolveTouchControlLayout = (
       );
     const dpadLeft = Math.round(frameLeft + ((dpadFrameWidth - dpadSpan) / 2));
     const dpadTop = Math.round(frameTop + ((dpadFrameHeight - dpadSpan) / 2));
-    const topActionHeight = clamp(Math.round(buttonSize * 0.72), 30, ultraNarrow ? 34 : 38);
+    const topActionHeight = clamp(
+      Math.round(options.topActionHeight ?? (buttonSize * 0.72)),
+      30,
+      70
+    );
     const actionWidth = clamp(Math.round(viewport.width * 0.22), ultraNarrow ? 58 : 78, ultraNarrow ? 76 : 96);
     const actionTop = safeInsets.top + (ultraNarrow ? 8 : 10);
     const actionLeft = clamp(
@@ -354,6 +371,11 @@ export const resolveTouchControlLayout = (
       stickInnerSize,
       stickInnerSize
     );
+    const stickKnobRadius = clamp(Math.round(stickOuterSize * 0.075), 10, 14);
+    const stickTravelRadius = Math.round(Math.max(
+      stickOuterSize * 0.3,
+      (stickOuterSize / 2) - stickKnobRadius - Math.max(5, Math.round(stickOuterSize * 0.04))
+    ));
 
     return {
       compact,
@@ -362,9 +384,11 @@ export const resolveTouchControlLayout = (
       frames: [actionFrame, dpadFrame],
       stick: controlMode === 'stick'
         ? {
-          deadzoneRadius: Math.max(16, Math.round(stickOuterSize * 0.18)),
+          deadzoneRadius: Math.max(12, Math.round(stickOuterSize * 0.12)),
           inner: stickInner,
-          outer: stickOuter
+          knobRadius: stickKnobRadius,
+          outer: stickOuter,
+          travelRadius: stickTravelRadius
         }
         : null,
       controls: {
@@ -410,7 +434,11 @@ export const resolveTouchControlLayout = (
     const dpadLeft = dpadFrameLeft + framePad;
     const dpadTop = dpadFrameTop + framePad;
     const actionWidth = clamp(Math.round(buttonSize * 1.24), 58, 86);
-    const actionHeight = clamp(Math.round(buttonSize * 0.78), 38, 52);
+    const actionHeight = clamp(
+      Math.round(options.topActionHeight ?? (buttonSize * 0.78)),
+      38,
+      70
+    );
     const actionLeft = clamp(
       boardRight + Math.max(10, Math.round(buttonSize * 0.18)),
       safeInsets.left + 4,
@@ -437,6 +465,11 @@ export const resolveTouchControlLayout = (
       stickInnerSize,
       stickInnerSize
     );
+    const stickKnobRadius = clamp(Math.round(stickOuterSize * 0.075), 10, 14);
+    const stickTravelRadius = Math.round(Math.max(
+      stickOuterSize * 0.3,
+      (stickOuterSize / 2) - stickKnobRadius - Math.max(5, Math.round(stickOuterSize * 0.04))
+    ));
 
     return {
       compact,
@@ -445,9 +478,11 @@ export const resolveTouchControlLayout = (
       frames: [actionFrame, dpadFrame],
       stick: controlMode === 'stick'
         ? {
-          deadzoneRadius: Math.max(16, Math.round(stickOuterSize * 0.18)),
+          deadzoneRadius: Math.max(12, Math.round(stickOuterSize * 0.12)),
           inner: stickInner,
-          outer: stickOuter
+          knobRadius: stickKnobRadius,
+          outer: stickOuter,
+          travelRadius: stickTravelRadius
         }
         : null,
       controls: {
@@ -608,16 +643,7 @@ export const resolveTouchControlKindAtPoint = (
     return resolveStickMovementKind(layout.stick, x, y);
   }
 
-  for (const kind of [
-    'move_up',
-    'move_up_right',
-    'move_right',
-    'move_down_right',
-    'move_down',
-    'move_down_left',
-    'move_left',
-    'move_up_left'
-  ] as const) {
+  for (const kind of TOUCH_MOVEMENT_KINDS) {
     const rect = layout.controls[kind];
     if (isPointInRect(rect, x, y)) {
       return kind;
@@ -625,6 +651,37 @@ export const resolveTouchControlKindAtPoint = (
   }
 
   return null;
+};
+
+export const resolveTouchArrowMovementKindAtPoint = (
+  layout: TouchControlLayout,
+  x: number,
+  y: number
+): HumanMovementActionKind | null => {
+  if (layout.controlMode !== 'arrows') {
+    return null;
+  }
+
+  const exactControl = resolveTouchControlKindAtPoint(layout, x, y);
+  if (exactControl !== null && TOUCH_MOVEMENT_KINDS.includes(exactControl as HumanMovementActionKind)) {
+    return exactControl as HumanMovementActionKind;
+  }
+
+  if (!isPointInRect(layout.frame, x, y)) {
+    return null;
+  }
+
+  const dx = x - layout.frame.centerX;
+  const dy = y - layout.frame.centerY;
+  const centerDeadzoneRadius = Math.max(
+    12,
+    Math.min(layout.controls.move_up.width, layout.controls.move_left.height) * 0.34
+  );
+  if (Math.hypot(dx, dy) <= centerDeadzoneRadius) {
+    return null;
+  }
+
+  return resolveStickMovementIntent(Math.atan2(dy, dx)).movement;
 };
 
 export const createTouchInputState = (): TouchInputState => ({
