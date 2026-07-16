@@ -3,6 +3,8 @@ import {
   LEGACY_UI_COMPACT_BREAKPOINT,
   resolveLegacyFeatureControlLayout,
   resolveLegacyOverlayContentFlowLayout,
+  resolveLegacyOverlayPanelLayout,
+  resolveLegacyOverlayShellLayout,
   resolveLegacyOptionsGuideLayout,
   resolveLegacyRunStatusPanelLayout,
   resolveLegacyToggleRowLayout,
@@ -10,6 +12,43 @@ import {
 } from '../../src/legacy-runtime/legacyUiStandards';
 
 describe('legacy UI standards', () => {
+  test('fills the safe phone viewport instead of preserving the hidden play HUD lane', () => {
+    expect(resolveLegacyOverlayPanelLayout(390, 844)).toEqual({
+      centerX: 195,
+      height: 828,
+      left: 8,
+      top: 8,
+      width: 374
+    });
+
+    expect(resolveLegacyOverlayPanelLayout(1440, 900)).toEqual({
+      centerX: 720,
+      height: 868,
+      left: 360,
+      top: 16,
+      width: 720
+    });
+  });
+
+  test('uses one header, scroll, and action rhythm for phone overlays', () => {
+    const panel = resolveLegacyOverlayPanelLayout(390, 844);
+
+    expect(resolveLegacyOverlayShellLayout({
+      actionHeight: 42,
+      actionRows: 2,
+      hasMessage: false,
+      panel
+    })).toEqual({
+      actionCenterY: 795,
+      contentHeight: 626,
+      contentLeft: 24,
+      contentTop: 84,
+      contentWidth: 342,
+      messageCenterY: 90,
+      titleCenterY: 60
+    });
+  });
+
   test('uses one two-row run-status component in menu and play lanes', () => {
     expect(resolveLegacyRunStatusPanelLayout(390)).toEqual({
       fontSize: 14,
