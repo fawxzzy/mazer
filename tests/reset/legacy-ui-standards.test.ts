@@ -36,6 +36,7 @@ describe('legacy UI standards', () => {
     expect(compact.cardHeight).toBe(196);
     expect(compact.rowFontSize).toBe(11);
     expect(compact.rowMinFontSize).toBe(10);
+    expect(compact.horizontalMargin).toBe(48);
     expect(compact.textWidthSafetyRatio).toBe(0.86);
     expect(compact.titleRuleOffset).toBeGreaterThan(compact.titleOffset + compact.titleFontSize);
     expect(wide.rowFontSize).toBe(12);

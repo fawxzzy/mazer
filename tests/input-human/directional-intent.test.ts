@@ -113,6 +113,69 @@ describe('LegacyDirectionalIntentResolver', () => {
     });
   });
 
+  test('keeps the dominant direction through a T opening until the player decisively retargets', () => {
+    const maze = createMaze(6, [
+      { x: 1, y: 2 },
+      { x: 2, y: 2 },
+      { x: 3, y: 2 },
+      { x: 2, y: 3 }
+    ]);
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.request(['right']);
+    resolver.step(maze, { x: 1, y: 2 });
+    resolver.request(['right', 'down']);
+
+    expect(resolver.step(maze, { x: 2, y: 2 })).toMatchObject({
+      decision: 'continued',
+      direction: 'right',
+      target: { x: 3, y: 2 }
+    });
+  });
+
+  test('uses a secondary pull only for a one-tile jog and then resumes the dominant direction', () => {
+    const maze = createMaze(6, [
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 2, y: 2 },
+      { x: 3, y: 2 },
+      { x: 4, y: 2 }
+    ]);
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.request(['right']);
+    resolver.step(maze, { x: 1, y: 1 });
+    resolver.request(['right', 'down']);
+
+    expect(resolver.step(maze, { x: 2, y: 1 })).toMatchObject({
+      decision: 'assisted-lane-shift',
+      direction: 'down',
+      target: { x: 2, y: 2 }
+    });
+    expect(resolver.step(maze, { x: 2, y: 2 })).toMatchObject({
+      decision: 'continued',
+      direction: 'right',
+      target: { x: 3, y: 2 }
+    });
+  });
+
+  test('takes a decisively retargeted branch immediately at a T opening', () => {
+    const maze = createMaze(6, [
+      { x: 2, y: 3 },
+      { x: 2, y: 2 },
+      { x: 2, y: 1 },
+      { x: 3, y: 2 }
+    ]);
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.request(['up']);
+    resolver.step(maze, { x: 2, y: 3 });
+    resolver.request(['right', 'up']);
+
+    expect(resolver.step(maze, { x: 2, y: 2 })).toMatchObject({
+      decision: 'queued-turn',
+      direction: 'right',
+      target: { x: 3, y: 2 }
+    });
+  });
+
   test('replaces the queued turn with the latest request and never builds a command queue', () => {
     const maze = createMaze(6, [
       { x: 1, y: 2 },

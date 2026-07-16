@@ -91,6 +91,18 @@ describe('input-human touch bridge', () => {
       layout.frame.right + 20,
       layout.frame.centerY
     )).toBeNull();
+    expect(resolveTouchArrowMovementKindAtPoint(
+      layout,
+      layout.frame.right + 120,
+      layout.frame.centerY,
+      { allowBeyondFrame: true }
+    )).toBe('move_right');
+    expect(resolveTouchArrowMovementKindAtPoint(
+      layout,
+      layout.frame.centerX,
+      layout.frame.centerY,
+      { centerFallback: 'move_left' }
+    )).toBe('move_left');
   });
 
   test('supports a stick control mode with a compass deadzone and 360-degree movement ring', () => {
