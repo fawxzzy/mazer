@@ -23,10 +23,11 @@ describe('legacy UI standards', () => {
     expect(resolveLegacyRunStatusPanelLayout(900).width).toBe(292);
   });
 
-  test('lifts legacy glyph labels to optical center without changing horizontal geometry', () => {
-    expect(resolveLegacyUiLabelCenterY(100, 40, 'button')).toBe(93);
-    expect(resolveLegacyUiLabelCenterY(100, 20, 'overlay-action')).toBe(98);
-    expect(resolveLegacyUiLabelCenterY(100, 20, 'toggle-title')).toBe(98);
+  test('centers every text role on the same vertical box midpoint', () => {
+    expect(resolveLegacyUiLabelCenterY(100, 40, 'button')).toBe(100);
+    expect(resolveLegacyUiLabelCenterY(100, 20, 'overlay-action')).toBe(100);
+    expect(resolveLegacyUiLabelCenterY(100, 20, 'overlay-title')).toBe(100);
+    expect(resolveLegacyUiLabelCenterY(100, 20, 'toggle-title')).toBe(100);
   });
 
   test('keeps compact guide copy smaller and clears the title rule', () => {

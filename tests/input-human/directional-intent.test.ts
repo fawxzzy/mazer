@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import {
-  LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO,
   LEGACY_DIRECTIONAL_INTENT_LANE_SHIFT_TILE_LIMIT,
   LegacyDirectionalIntentResolver,
   resolveLegacyAnalogCardinalDirectionsFromVector
@@ -29,17 +28,16 @@ const createMaze = (
 };
 
 describe('LegacyDirectionalIntentResolver', () => {
-  test('treats small analog off-axis noise as one held cardinal direction', () => {
-    expect(LEGACY_ANALOG_SECONDARY_DIRECTION_RATIO).toBe(0.82);
-    expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.18, 0.96)).toEqual(['down']);
-    expect(resolveLegacyAnalogCardinalDirectionsFromVector(-0.2, -0.94)).toEqual(['up']);
-    expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.98, -0.16)).toEqual(['right']);
-    expect(resolveLegacyAnalogCardinalDirectionsFromVector(-0.92, 0.22)).toEqual(['left']);
-    expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.65, 0.85)).toEqual(['down']);
+  test('ranks every continuous analog vector by its actual axis projection without sectors', () => {
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.18, 0.96)).toEqual(['down', 'right']);
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(-0.2, -0.94)).toEqual(['up', 'left']);
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.98, -0.16)).toEqual(['right', 'up']);
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(-0.92, 0.22)).toEqual(['left', 'down']);
+    expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.65, 0.85)).toEqual(['down', 'right']);
     expect(resolveLegacyAnalogCardinalDirectionsFromVector(0.72, 0.7)).toEqual(['right', 'down']);
   });
 
-  test('uses a noisy held vertical stick intent to follow a one-tile horizontal corridor jog', () => {
+  test('uses continuous vertical stick intent to follow a one-tile horizontal corridor jog', () => {
     const maze = createMaze(6, [
       { x: 3, y: 1 },
       { x: 3, y: 2 },
@@ -48,8 +46,7 @@ describe('LegacyDirectionalIntentResolver', () => {
       { x: 2, y: 4 }
     ]);
     const resolver = new LegacyDirectionalIntentResolver();
-    const noisyDown = resolveLegacyAnalogCardinalDirectionsFromVector(-0.19, 0.97);
-    resolver.request(noisyDown);
+    resolver.requestAnalog(-0.19, 0.97);
     resolver.step(maze, { x: 3, y: 1 });
 
     expect(resolver.step(maze, { x: 3, y: 2 })).toMatchObject({
@@ -61,6 +58,65 @@ describe('LegacyDirectionalIntentResolver', () => {
       decision: 'continued',
       direction: 'down',
       target: { x: 2, y: 3 }
+    });
+  });
+
+  test('turns directly up at a T as soon as the live vector favors up over the current lane', () => {
+    const maze = createMaze(6, [
+      { x: 1, y: 3 },
+      { x: 2, y: 3 },
+      { x: 3, y: 3 },
+      { x: 2, y: 2 },
+      { x: 2, y: 1 }
+    ]);
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.requestAnalog(1, 0);
+    resolver.step(maze, { x: 1, y: 3 });
+    resolver.requestAnalog(0.18, -0.98);
+
+    expect(resolver.step(maze, { x: 2, y: 3 })).toMatchObject({
+      decision: 'steered-turn',
+      direction: 'up',
+      target: { x: 2, y: 2 }
+    });
+    expect(resolver.getDiagnostics()).toMatchObject({
+      activeDirection: 'up',
+      inputMode: 'analog',
+      queuedDirection: null,
+      requestedDirections: ['up', 'right']
+    });
+  });
+
+  test('retains the full live vector when the ranked axes stay in the same order', () => {
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.requestAnalog(0.18, -0.98);
+    const first = resolver.getDiagnostics().analogVector;
+    resolver.requestAnalog(0.52, -0.85);
+    const second = resolver.getDiagnostics().analogVector;
+
+    expect(first).not.toEqual(second);
+    expect(second?.x).toBeGreaterThan(first?.x ?? 0);
+    expect(resolver.getDiagnostics()).toMatchObject({
+      inputMode: 'analog',
+      requestedDirections: ['up', 'right']
+    });
+  });
+
+  test('uses the best legal projection through a corner instead of sticking to the blocked axis', () => {
+    const maze = createMaze(6, [
+      { x: 2, y: 4 },
+      { x: 2, y: 3 },
+      { x: 3, y: 3 },
+      { x: 4, y: 3 }
+    ]);
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.requestAnalog(0.38, -0.92);
+    resolver.step(maze, { x: 2, y: 4 });
+
+    expect(resolver.step(maze, { x: 2, y: 3 })).toMatchObject({
+      decision: 'steered-turn',
+      direction: 'right',
+      target: { x: 3, y: 3 }
     });
   });
 

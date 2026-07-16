@@ -8,6 +8,7 @@ import {
   resolveStickMovementKind,
   resolveStickPullVector,
   resolveTouchArrowMovementKindAtPoint,
+  resolveTouchClientPoint,
   resolveTouchControlLayout,
   resolveTouchControlKindAtPoint,
   resolveTouchInputCapability
@@ -130,7 +131,7 @@ describe('input-human touch bridge', () => {
       layout,
       layout.stick!.outer.centerX + (layout.stick!.outer.width * 0.32),
       layout.stick!.outer.centerY + (layout.stick!.outer.height * 0.32)
-    )).toBe('move_down_right');
+    )).toBe('move_right');
     expect(resolveTouchControlKindAtPoint(
       layout,
       layout.stick!.outer.right + 20,
@@ -153,7 +154,7 @@ describe('input-human touch bridge', () => {
       layout.stick!.outer.centerX - 500,
       layout.stick!.outer.centerY - 500,
       { allowBeyondOuter: true }
-    )).toBe('move_up_left');
+    )).toBe('move_left');
     expect(resolveStickMovementKind(
       layout.stick!,
       layout.stick!.outer.centerX - 48,
@@ -167,40 +168,37 @@ describe('input-human touch bridge', () => {
       { allowBeyondOuter: true }
     )).toBe('move_left');
     expect(resolveStickMovementIntent(-Math.PI / 2)).toEqual({
-      intentSegment: 12,
       movement: 'move_up',
       movementCandidates: ['move_up']
     });
     expect(resolveStickMovementIntent(-Math.PI / 4)).toEqual({
-      intentSegment: 14,
-      movement: 'move_up_right',
+      movement: 'move_right',
       movementCandidates: ['move_right', 'move_up']
     });
-    expect(resolveStickMovementIntent(Math.PI / 16, { previousIntentSegment: 0 })).toEqual({
-      intentSegment: 0,
-      movement: 'move_right',
-      movementCandidates: ['move_right']
-    });
-    expect(resolveStickMovementIntent(Math.PI / 8, { previousIntentSegment: 0 })).toEqual({
-      intentSegment: 1,
+    expect(resolveStickMovementIntent(Math.PI / 16)).toEqual({
       movement: 'move_right',
       movementCandidates: ['move_right', 'move_down']
     });
-    expect(resolveStickMovementIntent(Math.PI / 12, { previousIntentSegment: 0 })).toEqual({
-      intentSegment: 0,
+    expect(resolveStickMovementIntent(Math.PI / 8)).toEqual({
       movement: 'move_right',
-      movementCandidates: ['move_right']
+      movementCandidates: ['move_right', 'move_down']
     });
-    expect(resolveStickMovementIntent(Math.PI / 2, { previousIntentSegment: 0 }).intentSegment).toBe(4);
+    expect(resolveStickMovementIntent(Math.PI / 12)).toEqual({
+      movement: 'move_right',
+      movementCandidates: ['move_right', 'move_down']
+    });
+    expect(resolveStickMovementIntent(Math.PI / 2)).toEqual({
+      movement: 'move_down',
+      movementCandidates: ['move_down']
+    });
     const partialPull = resolveStickPullVector(
       layout.stick!,
       layout.stick!.outer.centerX + (layout.stick!.outer.width * 0.18),
       layout.stick!.outer.centerY - (layout.stick!.outer.height * 0.22),
       { allowBeyondOuter: true }
     );
-    expect(partialPull?.movement).toBe('move_up_right');
-    expect(partialPull?.intentSegment).toBe(14);
-    expect(partialPull?.movementCandidates).toEqual(['move_right', 'move_up']);
+    expect(partialPull?.movement).toBe('move_up');
+    expect(partialPull?.movementCandidates).toEqual(['move_up', 'move_right']);
     expect(partialPull?.distanceRatio).toBeGreaterThan(0);
     expect(partialPull?.distanceRatio).toBeLessThan(1);
     expect(partialPull?.normalizedX).toBeGreaterThan(0);
@@ -209,10 +207,9 @@ describe('input-human touch bridge', () => {
       layout.stick!,
       layout.stick!.outer.centerX + 90,
       layout.stick!.outer.centerY + 18,
-      { allowBeyondOuter: true, previousIntentSegment: 0 }
+      { allowBeyondOuter: true }
     );
-    expect(stickyBoundaryPull?.intentSegment).toBe(0);
-    expect(stickyBoundaryPull?.movementCandidates).toEqual(['move_right']);
+    expect(stickyBoundaryPull?.movementCandidates).toEqual(['move_right', 'move_down']);
     const farPull = resolveStickPullVector(
       layout.stick!,
       layout.stick!.outer.centerX + 900,
@@ -223,6 +220,24 @@ describe('input-human touch bridge', () => {
     expect(farPull?.distanceRatio).toBe(1);
     expect(farPull?.normalizedX).toBe(1);
     expect(farPull?.normalizedY).toBe(0);
+  });
+
+  test('maps DOM client coordinates through the live canvas rectangle without DPR or safe-area drift', () => {
+    expect(resolveTouchClientPoint({
+      canvas: { left: 12, top: 106, width: 379, height: 759 },
+      clientX: 201.5,
+      clientY: 485.5,
+      logicalWidth: 379,
+      logicalHeight: 759
+    })).toEqual({ x: 189.5, y: 379.5 });
+
+    expect(resolveTouchClientPoint({
+      canvas: { left: 0, top: 50, width: 412, height: 823 },
+      clientX: 309,
+      clientY: 667.25,
+      logicalWidth: 412,
+      logicalHeight: 823
+    })).toEqual({ x: 309, y: 617.25 });
   });
 
   test('matches the phone Pause action height to the shared run-status panel height', () => {
