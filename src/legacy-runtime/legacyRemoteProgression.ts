@@ -583,6 +583,8 @@ const createRemoteCycleReceiptPayload = (
     resetUsed: receipt.resetUsed,
     routeQuality: receipt.routeQuality,
     routeEfficiencyPressureScore: receipt.routeEfficiencyPressureScore,
+    runQualityMetrics: receipt.runQualityMetrics,
+    runQualityScore: receipt.runQualityScore,
     shortestViablePathLength: receipt.shortestViablePathLength,
     start: receipt.start,
     surface: receipt.surface,

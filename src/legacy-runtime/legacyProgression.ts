@@ -3,10 +3,16 @@ import type { LegacyMazeGenerationProfile, LegacyMazeSnapshot, LegacyPoint } fro
 import { resolveLegacyMenuLayout } from './legacyMenuLayout';
 import { LEGACY_TRAIL_SHINE_COLOR, LEGACY_TRAIL_SHINE_EDGE_COLOR } from './legacyIridescentMaterial';
 import {
-  scoreMazeCycleAiDecisionSummary,
   type MazeCycleTelemetryReceipt,
   type MazeCycleTelemetrySurface
 } from './mazeCycleTelemetry';
+import {
+  MAZE_CYCLE_RUN_QUALITY_AI_CHALLENGE_SCORE_THRESHOLD,
+  MAZE_CYCLE_RUN_QUALITY_AI_EASE_SCORE_THRESHOLD,
+  resolveMazeCycleExpectedCompletionMs,
+  scoreMazeCyclePace,
+  scoreMazeCycleRunQuality
+} from './mazeCycleRunQualityScorer.mjs';
 
 export const LEGACY_PROGRESSION_STORAGE_KEY = 'mazer.progression.v1';
 export const LEGACY_PROGRESSION_MIN_COMPLEXITY = 8;
@@ -23,10 +29,8 @@ export const LEGACY_PROGRESSION_CONSISTENT_SIGNAL_THRESHOLD = 2;
 export const LEGACY_PROGRESSION_MAX_CHALLENGE_STEP = 3;
 export const LEGACY_PROGRESSION_EASE_STEP = -1;
 export const LEGACY_PROGRESSION_EASE_PRESSURE_STEP = -2;
-export const LEGACY_PROGRESSION_AI_CHALLENGE_SCORE_THRESHOLD = 58;
-export const LEGACY_PROGRESSION_AI_EASE_SCORE_THRESHOLD = 34;
-export const LEGACY_PROGRESSION_AI_CHAOTIC_PRESSURE_THRESHOLD = 60;
-export const LEGACY_PROGRESSION_AI_SEARCHING_EXHAUSTION_SCORE_CAP = 56;
+export const LEGACY_PROGRESSION_AI_CHALLENGE_SCORE_THRESHOLD = MAZE_CYCLE_RUN_QUALITY_AI_CHALLENGE_SCORE_THRESHOLD;
+export const LEGACY_PROGRESSION_AI_EASE_SCORE_THRESHOLD = MAZE_CYCLE_RUN_QUALITY_AI_EASE_SCORE_THRESHOLD;
 export const LEGACY_PROGRESSION_MENU_MIN_TILE_PX = 5.35;
 export const LEGACY_PROGRESSION_PHONE_MENU_TARGET_TILE_PX = 8;
 export const LEGACY_PROGRESSION_PLAY_MIN_TILE_PX = 5.25;
@@ -870,106 +874,70 @@ export const resolveLegacyProgressionTrackIdForSurface = (
 export const resolveLegacyProgressionExpectedCompletionMs = (
   receipt: Pick<MazeCycleTelemetryReceipt, 'playerPathLength' | 'surface'>,
   complexity: number
-): number => {
-  const surfaceMultiplier = receipt.surface === 'menu-demo' ? 1.18 : 1;
-  const routePressureMs = Math.max(8_000, receipt.playerPathLength * 440);
-  const complexityPressureMs = Math.max(10_000, complexity * 360);
-
-  return Math.round(Math.max(routePressureMs, complexityPressureMs) * surfaceMultiplier);
-};
+): number => resolveMazeCycleExpectedCompletionMs(receipt, complexity);
 
 export const resolveLegacyProgressionPaceScore = (
   receipt: Pick<MazeCycleTelemetryReceipt, 'completionTimeMs' | 'playerPathLength' | 'surface'>,
   complexity: number
-): number => {
-  if (!Number.isFinite(receipt.completionTimeMs) || receipt.completionTimeMs <= 0) {
-    return 0;
-  }
+): number => scoreMazeCyclePace(receipt, complexity);
 
-  const expectedMs = resolveLegacyProgressionExpectedCompletionMs(receipt, complexity);
-  const ratio = receipt.completionTimeMs / Math.max(1, expectedMs);
-  if (ratio <= 0.68) {
-    return 100;
-  }
-  if (ratio >= 1.7) {
-    return 0;
-  }
-
-  return clampInteger(100 - (((ratio - 0.68) / (1.7 - 0.68)) * 100), 0, 100);
-};
-
-export const resolveLegacyProgressionPerformanceScore = (
+const scoreLegacyProgressionReceipt = (
   receipt: Pick<
     MazeCycleTelemetryReceipt,
+    | 'aiDecisionSummary'
     | 'averageFrameMs'
     | 'backtracks'
     | 'completionTimeMs'
     | 'playerPathLength'
-    | 'renderSafetyPenaltyScore'
     | 'resetUsed'
-    | 'routeEfficiencyPressureScore'
+    | 'shortestViablePathLength'
     | 'surface'
     | 'wrongTurns'
   >,
   complexity: number
 ): LegacyProgressionPerformanceScore => {
-  const timeScore = resolveLegacyProgressionPaceScore(receipt, complexity);
-  const routeEfficiencyScore = clampInteger(100 - receipt.routeEfficiencyPressureScore, 0, 100);
-  const wrongTurnScore = clampInteger(100 - (receipt.wrongTurns * 16), 0, 100);
-  const backtrackScore = clampInteger(100 - (receipt.backtracks * 14), 0, 100);
-  const resetScore = receipt.resetUsed ? 0 : 100;
-  const stabilityScore = clampInteger(
-    100 - Math.max(receipt.renderSafetyPenaltyScore, receipt.averageFrameMs >= 24 ? 75 : 0),
-    0,
-    100
-  );
-  const weightedTotal = (
-    (timeScore * 0.38)
-    + (routeEfficiencyScore * 0.22)
-    + (wrongTurnScore * 0.14)
-    + (backtrackScore * 0.12)
-    + (resetScore * 0.08)
-    + (stabilityScore * 0.06)
-  );
-  const timeStruggleCap = timeScore <= 5 && (receipt.wrongTurns >= 2 || receipt.backtracks >= 2)
-    ? 28
-    : 100;
-  const resetStruggleCap = receipt.resetUsed ? 36 : 100;
-  const unsafeRenderCap = stabilityScore <= 25 ? 62 : 100;
-  const total = clampInteger(Math.min(weightedTotal, timeStruggleCap, resetStruggleCap, unsafeRenderCap), 0, 100);
-  let signal: LegacyProgressionSignal = 'hold';
-
-  if (stabilityScore <= 25 || receipt.averageFrameMs >= 24) {
-    signal = 'hold';
-  } else if (
-    receipt.resetUsed
-    || receipt.wrongTurns >= 6
-    || receipt.backtracks >= 6
-    || receipt.routeEfficiencyPressureScore >= 75
-    || total <= 38
-    || (total <= 48 && (receipt.wrongTurns >= 2 || receipt.backtracks >= 2))
-  ) {
-    signal = 'ease';
-  } else if (
-    total >= 72
-    && receipt.wrongTurns <= 1
-    && receipt.backtracks <= 1
-    && receipt.routeEfficiencyPressureScore <= 25
-  ) {
-    signal = 'challenge';
+  const score = scoreMazeCycleRunQuality({
+    aiDecisionSummary: receipt.aiDecisionSummary,
+    averageFrameMs: receipt.averageFrameMs,
+    backtracks: receipt.backtracks,
+    completionTimeMs: receipt.completionTimeMs,
+    complexity,
+    playerPathLength: receipt.playerPathLength,
+    resetUsed: receipt.resetUsed,
+    shortestViablePathLength: receipt.shortestViablePathLength,
+    surface: receipt.surface,
+    wrongTurns: receipt.wrongTurns
+  });
+  if (!score) {
+    throw new Error('maze_cycle_run_quality_input_incomplete');
   }
-
   return {
-    backtrackScore,
-    resetScore,
-    routeEfficiencyScore,
-    signal,
-    stabilityScore,
-    timeScore,
-    total,
-    wrongTurnScore
+    backtrackScore: score.backtrackScore,
+    resetScore: score.resetScore,
+    routeEfficiencyScore: score.routeEfficiencyScore,
+    signal: score.signal,
+    stabilityScore: score.stabilityScore,
+    timeScore: score.timeScore,
+    total: score.total,
+    wrongTurnScore: score.wrongTurnScore
   };
 };
+
+export const resolveLegacyProgressionPerformanceScore = (
+  receipt: Pick<
+    MazeCycleTelemetryReceipt,
+    | 'aiDecisionSummary'
+    | 'averageFrameMs'
+    | 'backtracks'
+    | 'completionTimeMs'
+    | 'playerPathLength'
+    | 'resetUsed'
+    | 'shortestViablePathLength'
+    | 'surface'
+    | 'wrongTurns'
+  >,
+  complexity: number
+): LegacyProgressionPerformanceScore => scoreLegacyProgressionReceipt(receipt, complexity);
 
 const resolveProgressionSignal = (
   receipt: MazeCycleTelemetryReceipt,
@@ -979,93 +947,7 @@ const resolveProgressionSignal = (
 export const resolveLegacyProgressionPerformanceScoreForReceipt = (
   receipt: MazeCycleTelemetryReceipt,
   complexity: number
-): LegacyProgressionPerformanceScore => {
-  const baseScore = resolveLegacyProgressionPerformanceScore(receipt, complexity);
-  if (receipt.surface !== 'menu-demo') {
-    return baseScore;
-  }
-
-  const aiScore = scoreMazeCycleAiDecisionSummary(receipt.aiDecisionSummary);
-  if (!aiScore) {
-    return baseScore;
-  }
-
-  const routeEfficiencyScore = clampInteger(
-    Math.round((baseScore.routeEfficiencyScore * 0.86) + (aiScore.reliabilityScore * 0.14)),
-    0,
-    100
-  );
-  const backtrackScore = clampInteger(
-    Math.round(
-      100
-      - (aiScore.recoveryPressureScore * 0.48)
-      - (receipt.routeEfficiencyPressureScore * 0.22)
-      - (receipt.resetUsed ? 18 : 0)
-    ),
-    0,
-    100
-  );
-  const wrongTurnScore = clampInteger(
-    Math.round(
-      100
-      - (aiScore.routeNoiseScore * 0.52)
-      - (receipt.routeEfficiencyPressureScore * 0.24)
-      - (receipt.resetUsed ? 18 : 0)
-    ),
-    0,
-    100
-  );
-  const weightedTotal = (
-    (baseScore.timeScore * 0.22)
-    + (routeEfficiencyScore * 0.32)
-    + (wrongTurnScore * 0.16)
-    + (backtrackScore * 0.14)
-    + (baseScore.resetScore * 0.06)
-    + (baseScore.stabilityScore * 0.05)
-    + (aiScore.reliabilityScore * 0.05)
-  );
-  const isSearchingExhaustion = receipt.resetUsed
-    && aiScore.signal === 'searching'
-    && aiScore.pressureScore < LEGACY_PROGRESSION_AI_CHAOTIC_PRESSURE_THRESHOLD;
-  const total = clampInteger(Math.min(
-    weightedTotal,
-    aiScore.signal === 'chaotic' ? LEGACY_PROGRESSION_AI_EASE_SCORE_THRESHOLD : 100,
-    receipt.resetUsed
-      ? isSearchingExhaustion
-        ? LEGACY_PROGRESSION_AI_SEARCHING_EXHAUSTION_SCORE_CAP
-        : 38
-      : 100,
-    receipt.routeEfficiencyPressureScore >= 88 ? 45 : 100,
-    baseScore.stabilityScore <= 25 ? 62 : 100
-  ), 0, 100);
-  let signal: LegacyProgressionSignal = 'hold';
-
-  if (baseScore.stabilityScore <= 25 || receipt.averageFrameMs >= 24) {
-    signal = 'hold';
-  } else if (
-    aiScore.pressureScore >= LEGACY_PROGRESSION_AI_CHAOTIC_PRESSURE_THRESHOLD
-    || (total <= LEGACY_PROGRESSION_AI_EASE_SCORE_THRESHOLD && !isSearchingExhaustion)
-    || (receipt.routeEfficiencyPressureScore >= 88 && !isSearchingExhaustion)
-  ) {
-    signal = 'ease';
-  } else if (
-    total >= LEGACY_PROGRESSION_AI_CHALLENGE_SCORE_THRESHOLD
-    && !isSearchingExhaustion
-    && aiScore.pressureScore < LEGACY_PROGRESSION_AI_CHAOTIC_PRESSURE_THRESHOLD
-    && receipt.routeEfficiencyPressureScore <= 70
-  ) {
-    signal = 'challenge';
-  }
-
-  return {
-    ...baseScore,
-    backtrackScore,
-    routeEfficiencyScore,
-    signal,
-    total,
-    wrongTurnScore
-  };
-};
+): LegacyProgressionPerformanceScore => scoreLegacyProgressionReceipt(receipt, complexity);
 
 const resolveLegacyProgressionTargetAdjustment = (
   track: LegacyProgressionTrack,
