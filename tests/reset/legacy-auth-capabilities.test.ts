@@ -7,8 +7,10 @@ import {
   LEGACY_AUTH_PASSWORD_MIN_LENGTH,
   LEGACY_AUTH_RESET_COOLDOWN_MS,
   createEmptyLegacyAuthFormState,
+  createLegacyGuestAuthSnapshot,
   readLegacyAuthSessionSnapshot,
   requestLegacyPasswordReset,
+  resolveLegacyAuthCallbackPresentation,
   resolveLegacyAuthCallbackState,
   resolveLegacyAuthPlatformCapabilities,
   resolveLegacyAuthRedirectContract,
@@ -121,23 +123,49 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
   });
 
   test('[auth.recovery-callback] classifies callbacks without exposing provider detail', () => {
-    expect(resolveLegacyAuthCallbackState({ hash: '', search: '?auth=recovery' })).toEqual({
+    const recoveryState = resolveLegacyAuthCallbackState({ hash: '', search: '?auth=recovery' });
+    expect(recoveryState).toEqual({
       kind: 'recovery',
       message: LEGACY_AUTH_MESSAGE_COPY.recoveryReady
     });
-    expect(resolveLegacyAuthCallbackState({ hash: '', search: '?auth=confirmed' })).toEqual({
+    const successState = resolveLegacyAuthCallbackState({ hash: '', search: '?auth=confirmed' });
+    expect(successState).toEqual({
       kind: 'success',
       message: LEGACY_AUTH_MESSAGE_COPY.emailConfirmed
     });
-    expect(resolveLegacyAuthCallbackState({ hash: '#error=access_denied&error_description=raw-secret-detail', search: '' })).toEqual({
+    const errorState = resolveLegacyAuthCallbackState({
+      hash: '#error=unknown_provider_failure&error_description=raw-secret-detail',
+      search: ''
+    });
+    expect(errorState).toEqual({
       kind: 'error',
       message: LEGACY_AUTH_MESSAGE_COPY.callbackInvalid
     });
-    expect(resolveSanitizedLegacyAuthCallbackPath({
+    const guestSnapshot = createLegacyGuestAuthSnapshot(true);
+    expect(resolveLegacyAuthCallbackPresentation(errorState, guestSnapshot)).toEqual({
+      formMode: 'login',
+      snapshot: {
+        ...guestSnapshot,
+        error: LEGACY_AUTH_MESSAGE_COPY.callbackInvalid,
+        info: null
+      }
+    });
+    expect(resolveLegacyAuthCallbackPresentation(successState, guestSnapshot)).toEqual({
+      formMode: 'login',
+      snapshot: {
+        ...guestSnapshot,
+        error: null,
+        info: LEGACY_AUTH_MESSAGE_COPY.emailConfirmed
+      }
+    });
+    const sanitizedPath = resolveSanitizedLegacyAuthCallbackPath({
       hash: '#access_token=secret',
       pathname: '/',
       search: '?auth=recovery&code=one-time-code&content=core-only'
-    })).toBe('/?content=core-only');
+    });
+    expect(sanitizedPath).toBe('/?content=core-only');
+    const repeatedLocation = new URL(sanitizedPath, 'https://mazer.local');
+    expect(resolveLegacyAuthCallbackState(repeatedLocation)).toEqual({ kind: 'none', message: null });
   });
 
   test('[auth.password-submission] submits the validated password through updateUser', async () => {
@@ -161,7 +189,9 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     expect(captureSource).toContain("engine: 'webkit'");
     expect(captureSource).toContain("fixture: 'recovery'");
     expect(captureSource).toContain("id: 'confirmation'");
+    expect(captureSource).toContain("id: 'invalid-confirmation'");
     expect(captureSource).toContain("auth=confirmed");
+    expect(captureSource).toContain('error=access_denied');
     expect(captureSource).toContain('auth-stack-dead-zone=');
   });
 

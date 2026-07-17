@@ -26,6 +26,11 @@ const SURFACES = Object.freeze([
     id: 'confirmation',
     route: '/?content=core-only&theme=aurora&runtimeDiagnostics=1&auth=confirmed',
     expectedLabels: ['Account', 'Email confirmed. You can log in.', 'Login', 'Create Account', 'Reset Password']
+  }),
+  Object.freeze({
+    id: 'invalid-confirmation',
+    route: '/?content=core-only&theme=aurora&runtimeDiagnostics=1&auth=error&error=access_denied&error_description=raw-provider-detail',
+    expectedLabels: ['Account', 'This account link is invalid or expired. Request a new one.', 'Login', 'Create Account', 'Reset Password']
   })
 ]);
 const TARGETS = Object.freeze([

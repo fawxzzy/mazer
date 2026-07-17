@@ -215,6 +215,7 @@ import {
   readLegacyRememberedIdentityState,
   normalizeLegacyAuthEmail,
   requestLegacyPasswordReset,
+  resolveLegacyAuthCallbackPresentation,
   resolveLegacyAuthCallbackState,
   resolveLegacyAuthAccountLabel,
   resolveLegacyAuthPlatformCapabilities,
@@ -10120,26 +10121,15 @@ export class MenuScene extends Phaser.Scene {
     });
 
     const snapshot = await readLegacyAuthSessionSnapshot();
-    if (callbackState.kind === 'error') {
-      this.applyLegacyAuthSnapshot({
-        ...snapshot,
-        error: callbackState.message,
-        info: null
-      });
-      this.setLegacyAuthFormMode('login');
+    const callbackPresentation = resolveLegacyAuthCallbackPresentation(callbackState, snapshot);
+    if (callbackPresentation) {
+      this.setLegacyAuthFormMode(callbackPresentation.formMode);
+      this.applyLegacyAuthSnapshot(callbackPresentation.snapshot);
       this.openOverlay('auth');
     } else {
       this.applyLegacyAuthSnapshot(snapshot);
       if (callbackState.kind === 'recovery' || consumeLegacyAuthRecoveryIntent()) {
         this.enterLegacyAuthRecoveryMode(callbackState.message ?? LEGACY_AUTH_MESSAGE_COPY.recoveryReady);
-      } else if (callbackState.kind === 'success') {
-        this.setLegacyAuthFormMode(snapshot.status === 'authenticated' ? 'account' : 'login');
-        this.applyLegacyAuthSnapshot({
-          ...snapshot,
-          error: null,
-          info: callbackState.message
-        });
-        this.openOverlay('auth');
       }
     }
     if (callbackState.kind !== 'none' && typeof window !== 'undefined') {

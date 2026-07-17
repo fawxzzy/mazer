@@ -68,6 +68,11 @@ export interface LegacyAuthCallbackState {
   message: string | null;
 }
 
+export interface LegacyAuthCallbackPresentation {
+  formMode: Extract<LegacyAuthFormMode, 'account' | 'login'>;
+  snapshot: LegacyAuthSessionSnapshot;
+}
+
 export interface LegacyAuthResetCooldownState {
   allowed: boolean;
   remainingSeconds: number;
@@ -221,6 +226,33 @@ export const resolveLegacyAuthCallbackState = (
     return { kind: 'success', message: LEGACY_AUTH_MESSAGE_COPY.emailConfirmed };
   }
   return { kind: 'none', message: null };
+};
+
+export const resolveLegacyAuthCallbackPresentation = (
+  callbackState: LegacyAuthCallbackState,
+  snapshot: LegacyAuthSessionSnapshot
+): LegacyAuthCallbackPresentation | null => {
+  if (callbackState.kind === 'error') {
+    return {
+      formMode: 'login',
+      snapshot: {
+        ...snapshot,
+        error: callbackState.message ?? LEGACY_AUTH_MESSAGE_COPY.callbackInvalid,
+        info: null
+      }
+    };
+  }
+  if (callbackState.kind === 'success') {
+    return {
+      formMode: snapshot.status === 'authenticated' ? 'account' : 'login',
+      snapshot: {
+        ...snapshot,
+        error: null,
+        info: callbackState.message ?? LEGACY_AUTH_MESSAGE_COPY.emailConfirmed
+      }
+    };
+  }
+  return null;
 };
 
 export const resolveSanitizedLegacyAuthCallbackPath = (
