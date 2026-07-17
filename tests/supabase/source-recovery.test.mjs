@@ -6,7 +6,9 @@ import {
   classifyMigrationHistory,
   findDuplicateMigrationIdentities,
   parseAppliedVersionsArgument,
+  parseConfirmedPrerequisitesArgument,
   parsePostgresMajor,
+  requiredPreRepairPrerequisites,
   sha256,
   verifySourceRecovery,
 } from "../../scripts/supabase/verify-source-recovery.mjs";
@@ -24,12 +26,22 @@ describe("Mazer Supabase source recovery", () => {
     targetVersions: target,
     disposableDatabaseDisposition: "RESET_AND_REPLAY_FROM_ZERO",
     retainedDatabaseDisposition: "EXACT_CATALOG_PROOF_THEN_HISTORY_REPAIR",
-    retainedDatabasePrerequisites: ["exact_live_mazer_catalog_signature_match"],
+    retainedDatabasePrerequisites: [
+      "target_specific_migration_lease",
+      "exact_live_mazer_catalog_signature_match",
+      "verified_backup_or_disposable_classification",
+      "post_repair_migration_history_readback",
+    ],
     repairSteps: [
       ...legacy.map((version) => ({ version, status: "reverted" })),
       ...target.map((version) => ({ version, status: "applied" })),
     ],
   };
+  const preRepairProofs = [
+    "target_specific_migration_lease",
+    "exact_live_mazer_catalog_signature_match",
+    "verified_backup_or_disposable_classification",
+  ];
 
   it("maps exactly one canonical source to every live migration version", () => {
     const result = verifySourceRecovery();
@@ -79,7 +91,11 @@ describe("Mazer Supabase source recovery", () => {
       classifyMigrationHistory([...legacy, target[0]], legacy, target),
     ).toBe("BLOCKED");
 
-    const plan = buildLegacyRepairPlan(legacyContract, legacy);
+    const plan = buildLegacyRepairPlan(
+      legacyContract,
+      legacy,
+      preRepairProofs,
+    );
     expect(plan.ok).toBe(true);
     expect(plan.failClosed).toBe(true);
     expect(plan.normalApplyAllowed).toBe(false);
@@ -119,7 +135,24 @@ describe("Mazer Supabase source recovery", () => {
     expect(unknownPlan.commands).toEqual([]);
   });
 
-  it("emits commands only for explicitly observed exact legacy history", () => {
+  it("requires explicit prerequisite proof input", () => {
+    const missing = parseConfirmedPrerequisitesArgument([
+      "--legacy-repair-plan",
+    ]);
+    expect(missing.ok).toBe(false);
+    expect(missing.inputState).toBe("MISSING");
+    expect(missing.confirmedPrerequisites).toEqual([]);
+
+    const empty = parseConfirmedPrerequisitesArgument([
+      "--confirmed-prerequisites",
+      "",
+    ]);
+    expect(empty.ok).toBe(false);
+    expect(empty.inputState).toBe("EMPTY");
+    expect(empty.confirmedPrerequisites).toEqual([]);
+  });
+
+  it("emits commands only for exact history with all pre-repair proofs", () => {
     const observed = parseAppliedVersionsArgument([
       "--applied-versions",
       legacy.join(","),
@@ -131,10 +164,27 @@ describe("Mazer Supabase source recovery", () => {
     const plan = buildLegacyRepairPlan(
       legacyContract,
       observed.appliedVersions,
+      preRepairProofs,
     );
     expect(plan.ok).toBe(true);
     expect(plan.historyState).toBe("REPAIR_REQUIRED");
     expect(plan.commands).toHaveLength(7);
+    expect(plan.prerequisiteState).toBe("CONFIRMED");
+    expect(plan.requiredPostRepairProofs).toEqual([
+      "post_repair_migration_history_readback",
+    ]);
+  });
+
+  it.each([
+    ["missing", [], "MISSING"],
+    ["partial", preRepairProofs.slice(0, 2), "MISSING"],
+    ["unknown", [...preRepairProofs, "invented_proof"], "BLOCKED"],
+  ])("emits no commands when prerequisite proof is %s", (_label, proofs, state) => {
+    const plan = buildLegacyRepairPlan(legacyContract, legacy, proofs);
+    expect(plan.ok).toBe(false);
+    expect(plan.historyState).toBe("REPAIR_REQUIRED");
+    expect(plan.prerequisiteState).toBe(state);
+    expect(plan.commands).toEqual([]);
   });
 
   it.each([
@@ -143,9 +193,19 @@ describe("Mazer Supabase source recovery", () => {
     ["partial", legacy.slice(0, 2), "BLOCKED"],
     ["unknown", ["19990101000000"], "BLOCKED"],
   ])("emits no commands for %s observed history", (_label, versions, state) => {
-    const plan = buildLegacyRepairPlan(legacyContract, versions);
+    const plan = buildLegacyRepairPlan(
+      legacyContract,
+      versions,
+      preRepairProofs,
+    );
     expect(plan.ok).toBe(false);
     expect(plan.historyState).toBe(state);
     expect(plan.commands).toEqual([]);
+  });
+
+  it("derives pre-repair proofs without treating readback as precondition", () => {
+    expect(requiredPreRepairPrerequisites(legacyContract)).toEqual(
+      preRepairProofs,
+    );
   });
 });

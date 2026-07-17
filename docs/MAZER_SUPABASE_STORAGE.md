@@ -92,6 +92,7 @@ repair plan by passing that observed history explicitly:
 
 ```sh
 npm run supabase:legacy-repair-plan -- --applied-versions 20260709005739,20260709011209,20260716205924
+  --confirmed-prerequisites target_specific_migration_lease,exact_live_mazer_catalog_signature_match,verified_backup_or_disposable_classification
 ```
 
 The plan emits ordered `supabase migration repair` commands for the three
@@ -99,7 +100,11 @@ legacy versions as `reverted` and all four recovered versions as `applied`.
 Omitting `--applied-versions` or passing an empty value yields `UNKNOWN`, emits
 no commands, and exits non-zero. Current, mixed, partial, or unknown observed
 histories likewise emit no commands; only the exact observed legacy history
-produces a successful executable plan.
+plus explicit confirmation of every target-specific pre-repair prerequisite
+produces a successful executable plan. Do not pass a prerequisite name until
+its target-specific lease, catalog comparison, or backup/classification receipt
+exists. The post-repair migration-history readback remains mandatory after the
+commands execute and is listed separately in the plan output.
 Generating a valid plan changes nothing. Executing its commands is a separately
 authorized target mutation and is forbidden without the prerequisites above.
 The disposable replay gate proves the legacy history is detected, normal apply

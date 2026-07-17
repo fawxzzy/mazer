@@ -2,7 +2,7 @@
 
 - Packet: `FP-MZR-REC-001`
 - Captured: `2026-07-17T07:57:13.968Z`
-- Verified: `2026-07-17T08:47:56.012Z`
+- Verified: `2026-07-17T08:58:52.915Z`
 - Project ref: `geknvnrmktchljnyddwp`
 - Source base: `origin/main@3bd13233dc33fc721f8ccf105d2cc51f1a8dd8d4`
 - Scope: repository-source recovery only
@@ -59,13 +59,14 @@ production parity.
 
 ## Verification
 
-- `npm run test:supabase-source-recovery`: 1 file, 11 focused
+- `npm run test:supabase-source-recovery`: 1 file, 16 focused
   migration/source/history contract tests passed
 - `npm run supabase:verify-source-recovery`: passed; four sources, zero
   duplicate versions, zero duplicate names
 - `npm run supabase:legacy-repair-plan`: passed; fail-closed ordered plan,
   explicit observed history required, missing/empty/current/mixed/partial/unknown
-  histories emit no commands, no mutation performed
+  histories emit no commands, and exact history still emits no commands without
+  all target-specific pre-repair proofs; no mutation performed
 - `npm run supabase:replay-source-recovery`: passed with the bounded
   provider-extension `UNKNOWN` described above
 - `npm run verify`: 53 files, 387 tests passed; production build passed

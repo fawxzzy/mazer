@@ -220,7 +220,17 @@ export function classifyMigrationHistory(
   return "BLOCKED";
 }
 
-export function buildLegacyRepairPlan(contract, appliedVersions) {
+export function requiredPreRepairPrerequisites(contract) {
+  return contract.retainedDatabasePrerequisites.filter(
+    (prerequisite) => !prerequisite.startsWith("post_"),
+  );
+}
+
+export function buildLegacyRepairPlan(
+  contract,
+  appliedVersions,
+  confirmedPrerequisites = [],
+) {
   const legacyVersions = contract.legacyVersions.map(({ version }) => version);
   const historyState =
     appliedVersions === undefined
@@ -230,10 +240,28 @@ export function buildLegacyRepairPlan(contract, appliedVersions) {
           legacyVersions,
           contract.targetVersions,
         );
+  const requiredPrerequisites = requiredPreRepairPrerequisites(contract);
+  const confirmed = sortedUnique(confirmedPrerequisites);
+  const missingPrerequisites = requiredPrerequisites.filter(
+    (prerequisite) => !confirmed.includes(prerequisite),
+  );
+  const unknownPrerequisites = confirmed.filter(
+    (prerequisite) =>
+      !contract.retainedDatabasePrerequisites.includes(prerequisite),
+  );
+  const prerequisiteState =
+    unknownPrerequisites.length > 0
+      ? "BLOCKED"
+      : missingPrerequisites.length > 0
+        ? "MISSING"
+        : "CONFIRMED";
+  const commandsAllowed =
+    historyState === "REPAIR_REQUIRED" && prerequisiteState === "CONFIRMED";
 
   return {
-    ok: historyState === "REPAIR_REQUIRED",
+    ok: commandsAllowed,
     historyState,
+    prerequisiteState,
     failClosed: true,
     normalApplyAllowed:
       historyState === "FRESH" || historyState === "CURRENT",
@@ -241,15 +269,23 @@ export function buildLegacyRepairPlan(contract, appliedVersions) {
     disposableDatabaseDisposition: contract.disposableDatabaseDisposition,
     retainedDatabaseDisposition: contract.retainedDatabaseDisposition,
     retainedDatabasePrerequisites: contract.retainedDatabasePrerequisites,
-    commands:
-      historyState === "REPAIR_REQUIRED"
-        ? contract.repairSteps.map(
-            ({ version, status }) =>
-              "supabase migration repair " + version + " --status " + status,
-          )
-        : [],
+    requiredPreRepairPrerequisites: requiredPrerequisites,
+    confirmedPrerequisites: confirmed,
+    missingPrerequisites,
+    unknownPrerequisites,
+    requiredPostRepairProofs: contract.retainedDatabasePrerequisites.filter(
+      (prerequisite) => prerequisite.startsWith("post_"),
+    ),
+    commands: commandsAllowed
+      ? contract.repairSteps.map(
+          ({ version, status }) =>
+            "supabase migration repair " + version + " --status " + status,
+        )
+      : [],
     reason:
-      historyState === "REPAIR_REQUIRED"
+      historyState === "REPAIR_REQUIRED" && prerequisiteState !== "CONFIRMED"
+        ? "All required retained-database proofs must be confirmed before commands can be emitted."
+        : historyState === "REPAIR_REQUIRED"
         ? "Legacy repository timestamps must be remapped before normal apply."
         : historyState === "UNKNOWN"
           ? "Observed migration history is required before a plan can be emitted."
@@ -292,6 +328,42 @@ export function parseAppliedVersionsArgument(argv) {
       .map((value) => value.trim())
       .filter(Boolean),
     reason: "Observed migration history supplied explicitly.",
+  };
+}
+
+export function parseConfirmedPrerequisitesArgument(argv) {
+  const valueIndex = argv.indexOf("--confirmed-prerequisites");
+  if (valueIndex === -1) {
+    return {
+      ok: false,
+      inputState: "MISSING",
+      confirmedPrerequisites: [],
+      reason: "--confirmed-prerequisites is required before repair commands can be emitted.",
+    };
+  }
+
+  const rawValue = argv[valueIndex + 1];
+  if (
+    rawValue === undefined ||
+    rawValue.trim() === "" ||
+    rawValue.startsWith("--")
+  ) {
+    return {
+      ok: false,
+      inputState: "EMPTY",
+      confirmedPrerequisites: [],
+      reason: "--confirmed-prerequisites must contain the exact prerequisite names backed by target-specific evidence.",
+    };
+  }
+
+  return {
+    ok: true,
+    inputState: "CONFIRMED",
+    confirmedPrerequisites: rawValue
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+    reason: "Retained-database prerequisites supplied explicitly.",
   };
 }
 
@@ -889,6 +961,7 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
     const legacyPlan = buildLegacyRepairPlan(
       manifest.legacyRepositoryHistory,
       legacyHistoryBefore,
+      requiredPreRepairPrerequisites(manifest.legacyRepositoryHistory),
     );
     const legacyCatalogMismatches = compareCatalog(
       legacyCatalogBefore,
@@ -1054,14 +1127,22 @@ async function main() {
   if (process.argv.includes("--legacy-repair-plan")) {
     const manifest = loadManifest(REPO_ROOT);
     const parsedInput = parseAppliedVersionsArgument(process.argv.slice(2));
+    const parsedPrerequisites = parseConfirmedPrerequisitesArgument(
+      process.argv.slice(2),
+    );
     const plan = buildLegacyRepairPlan(
       manifest.legacyRepositoryHistory,
       parsedInput.appliedVersions,
+      parsedPrerequisites.confirmedPrerequisites,
     );
     const output = {
       ...plan,
-      inputState: parsedInput.inputState,
-      reason: parsedInput.ok ? plan.reason : parsedInput.reason,
+      appliedVersionsInputState: parsedInput.inputState,
+      prerequisiteInputState: parsedPrerequisites.inputState,
+      inputIssues: [
+        ...(parsedInput.ok ? [] : [parsedInput.reason]),
+        ...(parsedPrerequisites.ok ? [] : [parsedPrerequisites.reason]),
+      ],
     };
     process.stdout.write(JSON.stringify(output, null, 2) + "\n");
     process.exitCode = output.ok ? 0 : 1;
