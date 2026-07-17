@@ -128,8 +128,15 @@ const waitForSurface = async (page, {
 
         try {
           const visual = JSON.parse(raw);
-          const labels = new Set((visual?.textLabels ?? []).map((entry) => entry.text));
-          return expected.every((label) => labels.has(label));
+          const labels = (visual?.textLabels ?? []).map((entry) => entry.text);
+          return expected.every((expectedLabel) => labels.some((actualLabel) => (
+            actualLabel === expectedLabel
+            || (
+              typeof actualLabel === 'string'
+              && actualLabel.startsWith(`${expectedLabel}: `)
+              && actualLabel.length > expectedLabel.length + 2
+            )
+          )));
         } catch {
           return false;
         }
@@ -396,8 +403,10 @@ const captureSurface = async ({
     timeoutMs
   });
   if (skipWait && expectedLabels.length > 0) {
-    let labels = new Set((diagnostics.visual?.textLabels ?? []).map((entry) => entry.text));
-    let missingLabels = expectedLabels.filter((label) => !labels.has(label));
+    let labels = (diagnostics.visual?.textLabels ?? []).map((entry) => entry.text);
+    let missingLabels = expectedLabels.filter((expectedLabel) => (
+      !labels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
+    ));
     if (missingLabels.length > 0) {
       await page.waitForFunction(
         ({ expected, visualAttribute }) => {
@@ -408,8 +417,15 @@ const captureSurface = async ({
 
           try {
             const visual = JSON.parse(raw);
-            const currentLabels = new Set((visual?.textLabels ?? []).map((entry) => entry.text));
-            return expected.every((label) => currentLabels.has(label));
+            const currentLabels = (visual?.textLabels ?? []).map((entry) => entry.text);
+            return expected.every((expectedLabel) => currentLabels.some((actualLabel) => (
+              actualLabel === expectedLabel
+              || (
+                typeof actualLabel === 'string'
+                && actualLabel.startsWith(`${expectedLabel}: `)
+                && actualLabel.length > expectedLabel.length + 2
+              )
+            )));
           } catch {
             return false;
           }
@@ -421,8 +437,10 @@ const captureSurface = async ({
         { timeout: timeoutMs }
       );
       diagnostics = await readDiagnostics(page);
-      labels = new Set((diagnostics.visual?.textLabels ?? []).map((entry) => entry.text));
-      missingLabels = expectedLabels.filter((label) => !labels.has(label));
+      labels = (diagnostics.visual?.textLabels ?? []).map((entry) => entry.text);
+      missingLabels = expectedLabels.filter((expectedLabel) => (
+        !labels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
+      ));
     }
     if (missingLabels.length > 0) {
       throw new Error(`Surface ${id} missing labels after direct diagnostics read: ${missingLabels.join(', ')}`);
@@ -657,9 +675,24 @@ const collectNativeInputEntries = (surface) => (
   surface?.nativeInputs ?? []
 );
 
+export const matchesExpectedTextLabel = (actualLabel, expectedLabel) => (
+  actualLabel === expectedLabel
+  || (
+    typeof actualLabel === 'string'
+    && actualLabel.startsWith(`${expectedLabel}: `)
+    && actualLabel.length > expectedLabel.length + 2
+  )
+);
+
+export const hasExpectedTextLabels = (actualLabels, expectedLabels) => (
+  expectedLabels.every((expectedLabel) => (
+    actualLabels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
+  ))
+);
+
 const hasTextLabels = (surface, expectedLabels) => {
-  const labels = new Set(collectTextLabels(surface));
-  return expectedLabels.every((label) => labels.has(label));
+  const labels = collectTextLabels(surface);
+  return hasExpectedTextLabels(labels, expectedLabels);
 };
 
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
@@ -1293,8 +1326,8 @@ const buildSurfaceChecks = ({
 }) => {
   const hasLabels = (surface, expectedLabels) => hasTextLabels(surface, expectedLabels);
   const hasLabelsAcross = (surfaceGroup, expectedLabels) => {
-    const labels = new Set(surfaceGroup.flatMap((surface) => collectTextLabels(surface)));
-    return expectedLabels.every((label) => labels.has(label));
+    const labels = surfaceGroup.flatMap((surface) => collectTextLabels(surface));
+    return hasExpectedTextLabels(labels, expectedLabels);
   };
   const labelDetail = (surface) => collectTextLabels(surface)
     .join(', ');

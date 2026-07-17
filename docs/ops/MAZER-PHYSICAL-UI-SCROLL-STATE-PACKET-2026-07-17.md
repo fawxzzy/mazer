@@ -42,3 +42,18 @@ The previously shared Vercel Preview is Ready but redirects anonymous access to 
 ## Disposition
 
 This packet is ready for bounded PR review. It does not deploy or mutate production.
+
+## Exact-head review correction
+
+Codex review on `b6dd898cab73e0aefa27a6e990818ade05065733` identified that narrow rows intentionally publish inline state labels such as `Camera Follow: Off` while the capture runner still waited for and validated only the base label. The capture contract now treats either the exact base label or a non-empty `: state` suffix as the same expected control identity. The rule is used by browser-side surface waits, direct diagnostics reads, single-surface checks, and cross-surface checks; unrelated prefixes remain rejected.
+
+Review-fix proof:
+
+- Focused regression: 3 files, 60 tests passed, including direct matcher coverage and a 283-pixel row contract.
+- Production-mode build: passed, 228 modules transformed.
+- Narrow phone proof, 375 x 812 at DPR 2: `C:\ATLAS\tmp\captures\mazer-ui-surfaces\2026-07-17T06-50-40-864Z\report.md`
+- Desktop confirmation, 1440 x 900 at DPR 1: `C:\ATLAS\tmp\captures\mazer-ui-surfaces\2026-07-17T06-51-20-808Z\report.md`
+
+The narrow capture visibly retained `Camera Follow: Off`, `Control Style: Stick`, and `Smart Steering: On`, and all applicable surface, bounds, overlap, scroll, console, and page-error checks passed.
+
+The required full `npm run verify` was attempted once under active ATLAS/DiscordOS machine contention. It completed with 382 passing tests and six unrelated generation/AI timeout failures; an isolated attribution run likewise produced timeout-only failures without assertion mismatches. No timeout or protected test was changed. One pre-merge full `npm run verify` remains required after the concurrent heavy verification processes release and machine contention materially changes. PR #81 must stay draft and unmerged until that changed-environment gate passes or receives an explicit disposition.
