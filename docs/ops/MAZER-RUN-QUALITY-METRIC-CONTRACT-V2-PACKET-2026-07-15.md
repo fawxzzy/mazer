@@ -121,18 +121,37 @@ default is:
 
 ## Verification
 
-- focused scorer, topology, telemetry, progression, remote receipt, report,
-  audit, and consumer-boundary suite: `54/54` passed;
-- fast calibration completed across five deterministic scale-37 seeds and
-  reported scorer ID/version/path-model/topology-version correlation;
-- TypeScript no-emit compilation passed;
-- production bundle build passed;
-- the final serial repository verifier passed `370/370` across `51/51` files.
+- On the original scorer branch baseline, the focused scorer, topology,
+  telemetry, progression, remote receipt, report, audit, and consumer-boundary
+  suite passed `54/54`; the final serial repository verifier passed `370/370`
+  across `51/51` files.
+- The branch was refreshed onto Mazer `main` at
+  `c633315de2d1759ce4aed42f0b49d59a03dee98d` on `2026-07-16` so the scorer
+  contract was verified with the merged account-state revision sync and shared
+  browser/mobile UI work from PR #80.
+- After that refresh, the focused scorer, topology, telemetry, progression,
+  remote receipt, report, audit, and consumer-boundary suite passed `56/56`
+  across `8/8` files.
+- Fast calibration completed across five deterministic scale-37 seeds, reached
+  the goal in `5/5` runs, and reported scorer ID `mazer.maze-cycle-run-quality`,
+  version `1.0.0`, path model `playable-wrap-aware-shortest-path-v1`, and
+  topology metrics version `1.0.0`.
+- TypeScript no-emit compilation and the production bundle build passed after
+  the current-main refresh.
+- The current-main aggregate repository verifier passed `381/387` assertions
+  across `49/53` files before six wall-clock timeouts accumulated in four
+  unchanged generator/AI test files. Each affected file then passed unchanged
+  in isolation (`29/29`): menu demo lifecycle `10/10`, generation lifecycle
+  `17/17`, known-frontier demo walker `1/1`, and rank-ladder demo walker `1/1`.
+  Two aggregate Vitest worker task-update timeouts occurred in the same run.
+  No scorer, topology, progression, remote-sync, report, or audit assertion
+  failed, and no timeout value or unrelated generator/AI test was changed.
 
 Earlier pre-topology aggregate attempts exposed machine-load timeouts in
 unchanged rank-ladder/topology tests; every affected test passed in isolated
-reruns, and the final serial verifier is fully green. No timeout value or
-unrelated generator/AI test was changed in this packet.
+reruns, and the original branch baseline reached a fully green serial run. The
+current-main refresh deliberately preserves the later aggregate timeout as a
+non-green command result while recording the green focused and isolated proof.
 
 No production deployment, Supabase mutation, historical receipt rewrite, or
 automatic live calibration is authorized by this packet.
