@@ -33,6 +33,9 @@ const EXPECTED_KINDS = [
   "triggers",
 ];
 const PROVIDER_MANAGED_KINDS = new Set(["extensions"]);
+const MAZER_SCHEMA_KINDS = EXPECTED_KINDS.filter(
+  (kind) => !PROVIDER_MANAGED_KINDS.has(kind),
+);
 const FORBIDDEN_PORTS = new Set([5432, 5433]);
 
 const CATALOG_SIGNATURE_SQL = [
@@ -219,17 +222,66 @@ function sortedUnique(values) {
   return [...new Set(values)].sort();
 }
 
+export function evaluateEmptySchemaProof(proof) {
+  if (proof === undefined) {
+    return {
+      state: "UNPROVEN",
+      reason: "Independent empty disposable Mazer catalog evidence is required.",
+    };
+  }
+  if (
+    proof?.databaseClass !== "OWNED_DISPOSABLE" ||
+    proof?.evidenceClass !== "INDEPENDENT_MAZER_CATALOG_SIGNATURE" ||
+    typeof proof?.catalogCounts !== "object" ||
+    proof.catalogCounts === null
+  ) {
+    return {
+      state: "BLOCKED",
+      reason: "Empty-schema evidence is missing or contradicts the owned disposable catalog contract.",
+    };
+  }
+
+  const keys = Object.keys(proof.catalogCounts).sort();
+  if (JSON.stringify(keys) !== JSON.stringify([...MAZER_SCHEMA_KINDS].sort())) {
+    return {
+      state: "BLOCKED",
+      reason: "Empty-schema evidence must cover every governed Mazer catalog kind.",
+    };
+  }
+  if (
+    MAZER_SCHEMA_KINDS.some(
+      (kind) =>
+        !Number.isInteger(proof.catalogCounts[kind]) ||
+        proof.catalogCounts[kind] !== 0,
+    )
+  ) {
+    return {
+      state: "BLOCKED",
+      reason: "The independently queried Mazer catalog is populated or invalid.",
+    };
+  }
+  return {
+    state: "PROVEN_EMPTY",
+    reason: "An independently queried owned disposable Mazer catalog is empty.",
+  };
+}
+
 export function classifyMigrationHistory(
   appliedVersions,
   legacyVersions,
   targetVersions,
+  emptySchemaProof,
 ) {
   const applied = sortedUnique(appliedVersions);
   const legacy = sortedUnique(legacyVersions);
   const target = sortedUnique(targetVersions);
 
   if (applied.length === 0) {
-    return "FRESH";
+    const proofState = evaluateEmptySchemaProof(emptySchemaProof).state;
+    if (proofState === "PROVEN_EMPTY") {
+      return "FRESH";
+    }
+    return proofState === "UNPROVEN" ? "EMPTY_UNPROVEN" : "BLOCKED";
   }
   if (JSON.stringify(applied) === JSON.stringify(legacy)) {
     return "REPAIR_REQUIRED";
@@ -269,6 +321,7 @@ export function buildLegacyRepairPlan(
   contract,
   appliedVersions,
   confirmedPrerequisites = [],
+  emptySchemaProof,
 ) {
   const legacyVersions = contract.legacyVersions.map(({ version }) => version);
   const repairSteps = interruptionSafeRepairSteps(contract, legacyVersions);
@@ -279,7 +332,12 @@ export function buildLegacyRepairPlan(
           appliedVersions,
           legacyVersions,
           contract.targetVersions,
+          emptySchemaProof,
         );
+  const emptyHistory = Array.isArray(appliedVersions) && appliedVersions.length === 0;
+  const emptySchemaProofResult = emptyHistory
+    ? evaluateEmptySchemaProof(emptySchemaProof)
+    : { state: "NOT_APPLICABLE", reason: "Migration history is not empty." };
   const requiredPrerequisites = requiredPreRepairPrerequisites(contract);
   const confirmed = sortedUnique(confirmedPrerequisites);
   const missingPrerequisites = requiredPrerequisites.filter(
@@ -313,6 +371,7 @@ export function buildLegacyRepairPlan(
     confirmedPrerequisites: confirmed,
     missingPrerequisites,
     unknownPrerequisites,
+    emptySchemaProofState: emptySchemaProofResult.state,
     requiredPostRepairProofs: contract.retainedDatabasePrerequisites.filter(
       (prerequisite) => prerequisite.startsWith("post_"),
     ),
@@ -329,6 +388,12 @@ export function buildLegacyRepairPlan(
         ? "Legacy repository timestamps must be remapped before normal apply."
         : historyState === "UNKNOWN"
           ? "Observed migration history is required before a plan can be emitted."
+        : historyState === "EMPTY_UNPROVEN"
+          ? emptySchemaProofResult.reason
+        : historyState === "FRESH"
+          ? emptySchemaProofResult.reason
+        : emptyHistory && historyState === "BLOCKED"
+          ? emptySchemaProofResult.reason
         : historyState === "BLOCKED"
           ? "Mixed, partial, or unknown migration history requires manual disposition."
           : "No legacy history repair is required.",
@@ -825,6 +890,16 @@ function readCatalog(psql, port, database) {
   );
 }
 
+function emptySchemaProofFromCatalog(catalog) {
+  return {
+    databaseClass: "OWNED_DISPOSABLE",
+    evidenceClass: "INDEPENDENT_MAZER_CATALOG_SIGNATURE",
+    catalogCounts: Object.fromEntries(
+      MAZER_SCHEMA_KINDS.map((kind) => [kind, catalog[kind]?.count ?? null]),
+    ),
+  };
+}
+
 async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
   const executionUser = assertUnprivilegedReplayUser();
   const staticReceipt = verifySourceRecovery(repoRoot);
@@ -909,6 +984,7 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
     const legacyDatabase = "mazer_legacy_history";
     const catalogs = {};
     const extensionDetails = {};
+    const emptySchemaPreflights = {};
 
     for (const [receiptKey, database] of replayDatabases) {
       runCommand(
@@ -919,6 +995,33 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
         psql,
         psqlArgs(port, database, ["-qAt", "-c", BOOTSTRAP_DATABASE_SQL]),
       );
+
+      const emptySchemaProof = emptySchemaProofFromCatalog(
+        readCatalog(psql, port, database),
+      );
+      const emptySchemaPlan = buildLegacyRepairPlan(
+        manifest.legacyRepositoryHistory,
+        [],
+        [],
+        emptySchemaProof,
+      );
+      if (
+        emptySchemaPlan.historyState !== "FRESH" ||
+        !emptySchemaPlan.normalApplyAllowed ||
+        emptySchemaPlan.commands.length > 0
+      ) {
+        throw new Error(
+          "Owned replay database did not prove an empty disposable Mazer catalog: " +
+            JSON.stringify({ emptySchemaProof, emptySchemaPlan }),
+        );
+      }
+      emptySchemaPreflights[receiptKey] = {
+        proof: emptySchemaProof,
+        proofState: emptySchemaPlan.emptySchemaProofState,
+        historyState: emptySchemaPlan.historyState,
+        normalApplyAllowed: emptySchemaPlan.normalApplyAllowed,
+        emittedCommands: emptySchemaPlan.commands,
+      };
 
       for (const fileName of manifest.migrationOrder) {
         runCommand(
@@ -942,9 +1045,7 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
       JSON.stringify(catalogs.replayA) === JSON.stringify(catalogs.replayB) &&
       JSON.stringify(extensionDetails.replayA) ===
         JSON.stringify(extensionDetails.replayB);
-    const exactKinds = EXPECTED_KINDS.filter(
-      (kind) => !PROVIDER_MANAGED_KINDS.has(kind),
-    );
+    const exactKinds = MAZER_SCHEMA_KINDS;
     const exactMismatches = compareCatalog(
       catalogs.replayA,
       manifest.liveCatalogSignature.kinds,
@@ -1094,6 +1195,7 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
         ],
       },
       fixtureClass: manifest.replayContract.fixtureClass,
+      emptySchemaPreflights,
       appliedPrefix,
       catalogSignatures: catalogs.replayA,
       deterministicReplay: deterministic,

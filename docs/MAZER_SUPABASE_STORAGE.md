@@ -83,7 +83,12 @@ objects before reaching the final state.
 The required fail-closed preflight is:
 
 1. Read the target migration history before any push or replay.
-2. If the history is empty, replay the canonical four-source chain from zero.
+2. If the history is empty, treat the schema as `EMPTY_UNPROVEN`; history alone
+   does not authorize normal apply. Independently create or prove an empty
+   disposable database and query every governed Mazer catalog kind. Normal apply
+   is allowed only when that independent catalog proof reports zero objects in
+   every kind; missing, malformed, contradictory, or populated evidence remains
+   blocked. Then replay the canonical four-source chain from zero.
 3. If it exactly matches the four recovered versions, no repair is needed.
 4. If it exactly matches the three legacy versions:
    - reset and replay from zero when the database is disposable; or
@@ -106,7 +111,10 @@ emits `reverted` commands for the three legacy versions. This forward-first
 ordering means an interruption cannot expose an empty, falsely fresh migration
 history.
 Omitting `--applied-versions` or passing an empty value yields `UNKNOWN`, emits
-no commands, and exits non-zero. Current, mixed, partial, or unknown observed
+no commands, and exits non-zero. An explicitly observed empty history yields
+`EMPTY_UNPROVEN` and cannot authorize normal apply until a separate empty
+disposable Mazer catalog is established. A populated or contradictory catalog
+proof is `BLOCKED`. Current, mixed, partial, or unknown observed
 histories likewise emit no commands; only the exact observed legacy history
 plus explicit confirmation of every target-specific pre-repair prerequisite
 produces a successful executable plan. Do not pass a prerequisite name until

@@ -46,6 +46,21 @@ describe("Mazer Supabase source recovery", () => {
     "exact_live_mazer_catalog_signature_match",
     "verified_backup_or_disposable_classification",
   ];
+  const emptyCatalogCounts = {
+    columns: 0,
+    constraints: 0,
+    functions: 0,
+    grants: 0,
+    indexes: 0,
+    policies: 0,
+    tables: 0,
+    triggers: 0,
+  };
+  const emptySchemaProof = {
+    databaseClass: "OWNED_DISPOSABLE",
+    evidenceClass: "INDEPENDENT_MAZER_CATALOG_SIGNATURE",
+    catalogCounts: emptyCatalogCounts,
+  };
 
   it("maps exactly one canonical source to every live migration version", () => {
     const result = verifySourceRecovery();
@@ -105,7 +120,9 @@ describe("Mazer Supabase source recovery", () => {
   });
 
   it("fails closed and emits deterministic legacy history repair steps", () => {
-    expect(classifyMigrationHistory([], legacy, target)).toBe("FRESH");
+    expect(classifyMigrationHistory([], legacy, target)).toBe(
+      "EMPTY_UNPROVEN",
+    );
     expect(classifyMigrationHistory(legacy, legacy, target)).toBe(
       "REPAIR_REQUIRED",
     );
@@ -134,6 +151,64 @@ describe("Mazer Supabase source recovery", () => {
       ),
     ]);
 
+  });
+
+  it("fails closed when empty-history catalog proof is missing or contradictory", () => {
+    const missing = buildLegacyRepairPlan(
+      legacyContract,
+      [],
+      preRepairProofs,
+    );
+    const contradictory = buildLegacyRepairPlan(
+      legacyContract,
+      [],
+      preRepairProofs,
+      { ...emptySchemaProof, databaseClass: "RETAINED" },
+    );
+
+    expect(missing.historyState).toBe("EMPTY_UNPROVEN");
+    expect(missing.emptySchemaProofState).toBe("UNPROVEN");
+    expect(missing.normalApplyAllowed).toBe(false);
+    expect(missing.commands).toEqual([]);
+    expect(contradictory.historyState).toBe("BLOCKED");
+    expect(contradictory.emptySchemaProofState).toBe("BLOCKED");
+    expect(contradictory.normalApplyAllowed).toBe(false);
+    expect(contradictory.commands).toEqual([]);
+  });
+
+  it("blocks empty history when the independent Mazer catalog is populated", () => {
+    const plan = buildLegacyRepairPlan(
+      legacyContract,
+      [],
+      preRepairProofs,
+      {
+        ...emptySchemaProof,
+        catalogCounts: { ...emptyCatalogCounts, tables: 1 },
+      },
+    );
+
+    expect(plan.historyState).toBe("BLOCKED");
+    expect(plan.emptySchemaProofState).toBe("BLOCKED");
+    expect(plan.normalApplyAllowed).toBe(false);
+    expect(plan.commands).toEqual([]);
+    expect(plan.reason).toMatch(/catalog is populated or invalid/);
+  });
+
+  it("allows zero-to-head replay only with proven empty disposable catalog evidence", () => {
+    const plan = buildLegacyRepairPlan(
+      legacyContract,
+      [],
+      preRepairProofs,
+      emptySchemaProof,
+    );
+
+    expect(
+      classifyMigrationHistory([], legacy, target, emptySchemaProof),
+    ).toBe("FRESH");
+    expect(plan.historyState).toBe("FRESH");
+    expect(plan.emptySchemaProofState).toBe("PROVEN_EMPTY");
+    expect(plan.normalApplyAllowed).toBe(true);
+    expect(plan.commands).toEqual([]);
   });
 
   it("requires the applied-versions flag and rejects an empty value", () => {
