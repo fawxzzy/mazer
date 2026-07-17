@@ -56,16 +56,17 @@ describe('legacy player-facing message system', () => {
       tone: 'warning'
     });
     expect(resolveLegacyAuthFeedbackMessage('Bad password.', null)).toMatchObject({
-      copy: 'Bad password.',
+      copy: LEGACY_AUTH_MESSAGE_COPY.genericFailure,
       id: 'auth.feedback.error',
       source: 'auth',
+      technicalDetail: null,
       tone: 'error'
     });
     expect(resolveLegacyAuthFeedbackMessage('Failed to fetch', null)).toMatchObject({
       copy: LEGACY_AUTH_MESSAGE_COPY.networkUnavailable,
       id: 'auth.feedback.error',
       source: 'auth',
-      technicalDetail: 'Failed to fetch',
+      technicalDetail: null,
       tone: 'error'
     });
     expect(resolveLegacyAuthFeedbackMessage(null, LEGACY_AUTH_MESSAGE_COPY.signedIn)).toMatchObject({

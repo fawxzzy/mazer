@@ -43,22 +43,79 @@ export const LEGACY_PLAYER_MESSAGE_COLORS: Record<LegacyPlayerMessageTone, strin
 };
 
 export const LEGACY_AUTH_MESSAGE_COPY = {
+  accountReady: 'Ready to save account changes.',
+  accountUpdateFailed: 'Account changes could not be saved. Try again.',
+  accountUpdated: 'Account details updated.',
   accountCreated: 'Account created.',
   authUnavailable: 'Account login needs Supabase env vars before it can be enabled.',
+  callbackInvalid: 'This account link is invalid or expired. Request a new one.',
   createReady: 'Ready to create.',
+  emailConfirmed: 'Email confirmed. You can log in.',
   enterEmail: 'Enter an email.',
+  genericFailure: 'That account action could not be completed. Try again.',
+  invalidCredentials: 'Email or password is incorrect.',
   loginNotConfigured: 'Account login is not configured for this build.',
   loginReady: 'Ready to login.',
   networkUnavailable: 'Account service is unreachable. Try again shortly.',
-  passwordMinimum: 'Password needs 6+ characters.',
+  passwordConfirmation: 'Passwords do not match.',
+  passwordMinimum: 'Password needs at least 10 characters.',
+  passwordUpdateReady: 'Ready to update password.',
+  passwordUpdated: 'Password updated.',
   passwordResetEmailRequired: 'Enter an email before reset.',
   passwordResetNotConfigured: 'Password reset is not configured for this build.',
-  passwordResetSent: 'Password reset email sent.',
+  passwordResetSent: 'If that email has an account, a reset link is on the way.',
+  passwordResetWait: 'Please wait before requesting another reset link.',
+  recoveryReady: 'Choose a new password.',
   signupNotConfigured: 'Account signup is not configured for this build.',
+  signupUnavailable: 'Account could not be created. Check the details and try again.',
   signedIn: 'Signed in.',
   signedOut: 'Signed out. Guest progress is active.',
   verifyEmail: 'Check your email to finish account setup.'
 } as const;
+
+export type LegacyAuthErrorAction =
+  | 'account-update'
+  | 'callback'
+  | 'login'
+  | 'password-update'
+  | 'reset-request'
+  | 'session'
+  | 'signup'
+  | 'signout';
+
+export const resolveLegacyAuthSafeErrorCopy = (
+  error: string | null | undefined,
+  action: LegacyAuthErrorAction = 'session'
+): string | null => {
+  const rawError = error?.trim() ?? '';
+  if (!rawError) {
+    return null;
+  }
+
+  const normalized = rawError.toLowerCase();
+  if (normalized.includes('fetch') || normalized.includes('network') || normalized.includes('offline')) {
+    return LEGACY_AUTH_MESSAGE_COPY.networkUnavailable;
+  }
+  if (action === 'login') {
+    return LEGACY_AUTH_MESSAGE_COPY.invalidCredentials;
+  }
+  if (action === 'signup') {
+    return LEGACY_AUTH_MESSAGE_COPY.signupUnavailable;
+  }
+  if (action === 'callback') {
+    return LEGACY_AUTH_MESSAGE_COPY.callbackInvalid;
+  }
+  if (action === 'reset-request') {
+    return normalized.includes('rate') || normalized.includes('limit') || normalized.includes('too many')
+      ? LEGACY_AUTH_MESSAGE_COPY.passwordResetWait
+      : LEGACY_AUTH_MESSAGE_COPY.passwordResetSent;
+  }
+  if (action === 'account-update' || action === 'password-update') {
+    return LEGACY_AUTH_MESSAGE_COPY.accountUpdateFailed;
+  }
+
+  return LEGACY_AUTH_MESSAGE_COPY.genericFailure;
+};
 
 export const LEGACY_BOOT_MESSAGE_COPY = {
   bootError: 'The maze did not finish loading. Try refreshing once.',
@@ -149,14 +206,11 @@ export const resolveLegacyAuthFeedbackMessage = (
 ): LegacyPlayerMessage | null => {
   if (error?.trim()) {
     const rawError = error.trim();
-    const isNetworkError = rawError.toLowerCase() === 'failed to fetch'
-      || rawError.toLowerCase().includes('network')
-      || rawError.toLowerCase().includes('fetch');
     return createLegacyPlayerMessage({
-      copy: isNetworkError ? LEGACY_AUTH_MESSAGE_COPY.networkUnavailable : rawError,
+      copy: resolveLegacyAuthSafeErrorCopy(rawError),
       id: 'auth.feedback.error',
       source: 'auth',
-      technicalDetail: isNetworkError ? rawError : null,
+      technicalDetail: null,
       tone: 'error'
     });
   }

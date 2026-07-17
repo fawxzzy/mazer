@@ -1,12 +1,19 @@
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
-import { LEGACY_AUTH_MESSAGE_COPY } from './legacyPlayerMessage';
+import {
+  LEGACY_AUTH_MESSAGE_COPY,
+  resolveLegacyAuthSafeErrorCopy
+} from './legacyPlayerMessage';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
+export const LEGACY_AUTH_RESET_COOLDOWN_KEY = 'mazer.auth.reset-cooldown.v1';
 export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
+export const LEGACY_AUTH_PASSWORD_MIN_LENGTH = 10;
+export const LEGACY_AUTH_RESET_COOLDOWN_MS = 60_000;
+export const LEGACY_AUTH_FUTURE_PLATFORM_ORIGIN = 'https://account.fawxzzy.com';
 
 export type LegacyAuthStatus = 'guest' | 'authenticated' | 'unavailable';
-export type LegacyAuthFormMode = 'login' | 'signup';
-export type LegacyAuthFieldId = 'email' | 'password' | 'displayName';
+export type LegacyAuthFormMode = 'account' | 'login' | 'recovery' | 'signup';
+export type LegacyAuthFieldId = 'confirmPassword' | 'displayName' | 'email' | 'password' | 'username';
 export type LegacyRememberedIdentitySessionState = 'ready' | 'reauth-required';
 
 export interface LegacyAuthConfig {
@@ -22,13 +29,16 @@ export interface LegacyAuthSessionSnapshot {
   info: string | null;
   status: LegacyAuthStatus;
   userId: string | null;
+  username?: string | null;
 }
 
 export interface LegacyAuthFormState {
+  confirmPassword: string;
   displayName: string;
   email: string;
   mode: LegacyAuthFormMode;
   password: string;
+  username: string;
 }
 
 export interface LegacyAuthSubmitState {
@@ -37,7 +47,35 @@ export interface LegacyAuthSubmitState {
 }
 
 export interface LegacyAuthActionResult {
+  cooldownSeconds?: number;
   snapshot: LegacyAuthSessionSnapshot;
+}
+
+export interface LegacyAuthRedirectContract {
+  confirmationRedirectTo: string;
+  futurePlatformOrigin: typeof LEGACY_AUTH_FUTURE_PLATFORM_ORIGIN;
+  owner: 'mazer-compatible' | 'platform-configured';
+  recoveryRedirectTo: string;
+}
+
+export interface LegacyAuthPlatformCapabilities {
+  usernameProfile: 'disabled' | 'read-write';
+}
+
+export interface LegacyAuthCallbackState {
+  kind: 'error' | 'none' | 'recovery' | 'success';
+  message: string | null;
+}
+
+export interface LegacyAuthResetCooldownState {
+  allowed: boolean;
+  remainingSeconds: number;
+}
+
+export interface LegacyAuthAccountUpdate {
+  displayName: string;
+  email: string;
+  username: string;
 }
 
 export interface LegacyRememberedIdentityState {
@@ -61,6 +99,20 @@ export type LegacyAuthStateListener = (
 
 type LegacyAuthStorage = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>;
 
+const AUTH_CALLBACK_PARAMETER_NAMES = [
+  'access_token',
+  'auth',
+  'code',
+  'error',
+  'error_code',
+  'error_description',
+  'expires_at',
+  'expires_in',
+  'refresh_token',
+  'token_type',
+  'type'
+] as const;
+
 const createGuestSnapshot = (
   configured: boolean,
   overrides: Partial<Omit<LegacyAuthSessionSnapshot, 'configured' | 'status' | 'userId'>> = {}
@@ -81,9 +133,140 @@ const readRuntimeEnv = (): Record<string, string | undefined> => {
 
   return {
     ...env,
+    VITE_MAZER_AUTH_CONFIRMATION_REDIRECT_URL: env.VITE_MAZER_AUTH_CONFIRMATION_REDIRECT_URL,
+    VITE_MAZER_AUTH_RECOVERY_REDIRECT_URL: env.VITE_MAZER_AUTH_RECOVERY_REDIRECT_URL,
+    VITE_MAZER_PLATFORM_USERNAME_CAPABILITY: env.VITE_MAZER_PLATFORM_USERNAME_CAPABILITY,
     VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL
   };
+};
+
+const resolveSafeRuntimeOrigin = (origin: string | undefined): string => {
+  try {
+    const url = new URL(origin ?? '');
+    if (url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) {
+      return url.origin;
+    }
+  } catch {
+    // Fall through to the deterministic local-only compatibility origin.
+  }
+  return 'http://localhost:5173';
+};
+
+const resolveExactRedirectUrl = (candidate: string | undefined): URL | null => {
+  const value = candidate?.trim() ?? '';
+  if (!value || value.includes('*')) {
+    return null;
+  }
+  try {
+    const url = new URL(value);
+    const safeProtocol = url.protocol === 'https:'
+      || (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname));
+    if (!safeProtocol || url.username || url.password || url.hash) {
+      return null;
+    }
+    return url;
+  } catch {
+    return null;
+  }
+};
+
+export const resolveLegacyAuthRedirectContract = (
+  env: Record<string, string | undefined> = readRuntimeEnv(),
+  runtimeOrigin = typeof window === 'undefined' ? undefined : window.location.origin
+): LegacyAuthRedirectContract => {
+  const origin = resolveSafeRuntimeOrigin(runtimeOrigin);
+  const configuredConfirmation = resolveExactRedirectUrl(env.VITE_MAZER_AUTH_CONFIRMATION_REDIRECT_URL);
+  const configuredRecovery = resolveExactRedirectUrl(env.VITE_MAZER_AUTH_RECOVERY_REDIRECT_URL);
+  return {
+    confirmationRedirectTo: configuredConfirmation?.toString()
+      ?? new URL('/?auth=confirmed', origin).toString(),
+    futurePlatformOrigin: LEGACY_AUTH_FUTURE_PLATFORM_ORIGIN,
+    owner: configuredConfirmation && configuredRecovery ? 'platform-configured' : 'mazer-compatible',
+    recoveryRedirectTo: configuredRecovery?.toString()
+      ?? new URL('/?auth=recovery', origin).toString()
+  };
+};
+
+export const resolveLegacyAuthPlatformCapabilities = (
+  env: Record<string, string | undefined> = readRuntimeEnv()
+): LegacyAuthPlatformCapabilities => ({
+  usernameProfile: env.VITE_MAZER_PLATFORM_USERNAME_CAPABILITY?.trim().toLowerCase() === 'read-write'
+    ? 'read-write'
+    : 'disabled'
+});
+
+const readCallbackParams = (value: string): URLSearchParams => (
+  new URLSearchParams(value.startsWith('?') || value.startsWith('#') ? value.slice(1) : value)
+);
+
+export const resolveLegacyAuthCallbackState = (
+  location: Pick<Location, 'hash' | 'search'>
+): LegacyAuthCallbackState => {
+  const search = readCallbackParams(location.search);
+  const hash = readCallbackParams(location.hash);
+  const error = search.get('error') ?? search.get('error_code') ?? hash.get('error') ?? hash.get('error_code');
+  if (error) {
+    return {
+      kind: 'error',
+      message: resolveLegacyAuthSafeErrorCopy(error, 'callback')
+    };
+  }
+  const intent = search.get('auth') ?? search.get('type') ?? hash.get('type');
+  if (intent === 'recovery') {
+    return { kind: 'recovery', message: LEGACY_AUTH_MESSAGE_COPY.recoveryReady };
+  }
+  if (intent === 'confirmed' || intent === 'signup') {
+    return { kind: 'success', message: LEGACY_AUTH_MESSAGE_COPY.emailConfirmed };
+  }
+  return { kind: 'none', message: null };
+};
+
+export const resolveSanitizedLegacyAuthCallbackPath = (
+  location: Pick<Location, 'hash' | 'pathname' | 'search'>
+): string => {
+  const search = readCallbackParams(location.search);
+  for (const name of AUTH_CALLBACK_PARAMETER_NAMES) {
+    search.delete(name);
+  }
+  const query = search.toString();
+  return `${location.pathname}${query ? `?${query}` : ''}`;
+};
+
+export const sanitizeLegacyAuthCallbackUrl = (
+  location: Pick<Location, 'hash' | 'pathname' | 'search'>,
+  history: Pick<History, 'replaceState'>
+): void => {
+  history.replaceState(null, '', resolveSanitizedLegacyAuthCallbackPath(location));
+};
+
+export const resolveLegacyAuthResetCooldown = (
+  storage: Pick<Storage, 'getItem'> | undefined,
+  nowMs = Date.now()
+): LegacyAuthResetCooldownState => {
+  let startedAt = 0;
+  try {
+    startedAt = Number(storage?.getItem(LEGACY_AUTH_RESET_COOLDOWN_KEY) ?? 0);
+  } catch {
+    startedAt = 0;
+  }
+  const remainingMs = Math.max(0, LEGACY_AUTH_RESET_COOLDOWN_MS - Math.max(0, nowMs - startedAt));
+  return {
+    allowed: remainingMs === 0,
+    remainingSeconds: Math.ceil(remainingMs / 1000)
+  };
+};
+
+export const startLegacyAuthResetCooldown = (
+  storage: Pick<Storage, 'setItem'> | undefined,
+  nowMs = Date.now()
+): LegacyAuthResetCooldownState => {
+  try {
+    storage?.setItem(LEGACY_AUTH_RESET_COOLDOWN_KEY, String(nowMs));
+  } catch {
+    // Cooldown persistence is defensive UX; provider limits remain authoritative.
+  }
+  return resolveLegacyAuthResetCooldown(storage as Pick<Storage, 'getItem'> | undefined, nowMs);
 };
 
 export const resolveLegacyAuthConfig = (
@@ -118,6 +301,11 @@ const resolveDisplayName = (user: User): string | null => {
   return candidates.find((candidate) => candidate !== null && candidate.trim().length > 0)?.trim() ?? null;
 };
 
+const resolveUsername = (user: User): string | null => {
+  const value = user.user_metadata.username;
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
+};
+
 export const createLegacyAuthSessionSnapshot = (
   session: Session | null,
   env: Record<string, string | undefined> = readRuntimeEnv(),
@@ -144,13 +332,15 @@ export const createLegacyAuthSessionSnapshot = (
     error: overrides.error ?? null,
     info: overrides.info ?? null,
     status: 'authenticated',
-    userId: user.id
+    userId: user.id,
+    username: resolveUsername(user)
   };
 };
 
 let legacyAuthClient: SupabaseClient | null = null;
 let legacyAuthPersistenceListenerInstalled = false;
 let legacyAuthLastSessionSignature: string | null = null;
+let legacyAuthRecoveryIntentPending = false;
 
 export const deriveLegacyRememberedIdentityDisplayName = (email: string): string => {
   const localPart = normalizeLegacyAuthEmail(email).split('@')[0] ?? '';
@@ -316,6 +506,9 @@ const installLegacyAuthPersistenceListener = (client: SupabaseClient): void => {
 
   legacyAuthPersistenceListenerInstalled = true;
   client.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      legacyAuthRecoveryIntentPending = true;
+    }
     syncLegacyAuthPersistenceFromSession(session, event);
   });
   void client.auth.getSession()
@@ -325,6 +518,12 @@ const installLegacyAuthPersistenceListener = (client: SupabaseClient): void => {
     .catch(() => {
       // Bootstrap session sync is best-effort; explicit auth reads still drive UI state.
     });
+};
+
+export const consumeLegacyAuthRecoveryIntent = (): boolean => {
+  const pending = legacyAuthRecoveryIntentPending;
+  legacyAuthRecoveryIntentPending = false;
+  return pending;
 };
 
 export const getLegacyAuthClient = async (): Promise<SupabaseClient | null> => {
@@ -357,7 +556,7 @@ export const readLegacyAuthSessionSnapshot = async (): Promise<LegacyAuthSession
 
   const { data, error } = await client.auth.getSession();
   const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-    error: error?.message ?? null
+    error: resolveLegacyAuthSafeErrorCopy(error?.message, 'session')
   });
   if (snapshot.status === 'authenticated') {
     syncLegacyRememberedIdentityFromAuthenticatedSession(
@@ -391,7 +590,7 @@ export const signInLegacyAuth = async (
   });
 
   const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-    error: error?.message ?? null,
+    error: resolveLegacyAuthSafeErrorCopy(error?.message, 'login'),
     info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedIn
   });
   if (snapshot.status === 'authenticated') {
@@ -421,12 +620,14 @@ export const signUpLegacyAuth = async (
   }
 
   const normalizedDisplayName = displayName.trim();
+  const redirectContract = resolveLegacyAuthRedirectContract();
   const { data, error } = await client.auth.signUp({
     email: normalizeLegacyAuthEmail(email),
     password,
-    options: normalizedDisplayName.length > 0
-      ? { data: { display_name: normalizedDisplayName } }
-      : undefined
+    options: {
+      data: normalizedDisplayName.length > 0 ? { display_name: normalizedDisplayName } : undefined,
+      emailRedirectTo: redirectContract.confirmationRedirectTo
+    }
   });
 
   const info = error
@@ -435,7 +636,7 @@ export const signUpLegacyAuth = async (
       ? LEGACY_AUTH_MESSAGE_COPY.accountCreated
       : LEGACY_AUTH_MESSAGE_COPY.verifyEmail;
   const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
-    error: error?.message ?? null,
+    error: resolveLegacyAuthSafeErrorCopy(error?.message, 'signup'),
     info
   });
   if (snapshot.status === 'authenticated') {
@@ -460,15 +661,88 @@ export const requestLegacyPasswordReset = async (email: string): Promise<LegacyA
     };
   }
 
-  const redirectTo = typeof window === 'undefined' ? undefined : window.location.origin;
+  const storage = typeof window === 'undefined' ? undefined : window.localStorage;
+  const cooldown = resolveLegacyAuthResetCooldown(storage);
+  if (!cooldown.allowed) {
+    return {
+      cooldownSeconds: cooldown.remainingSeconds,
+      snapshot: createGuestSnapshot(true, {
+        error: LEGACY_AUTH_MESSAGE_COPY.passwordResetWait
+      })
+    };
+  }
+  const nextCooldown = startLegacyAuthResetCooldown(storage);
+  const redirectTo = resolveLegacyAuthRedirectContract().recoveryRedirectTo;
   const { error } = await client.auth.resetPasswordForEmail(normalizeLegacyAuthEmail(email), {
     redirectTo
   });
+  const safeError = resolveLegacyAuthSafeErrorCopy(error?.message, 'reset-request');
 
   return {
+    cooldownSeconds: nextCooldown.remainingSeconds,
     snapshot: createGuestSnapshot(true, {
-      error: error?.message ?? null,
-      info: error ? null : LEGACY_AUTH_MESSAGE_COPY.passwordResetSent
+      error: safeError === LEGACY_AUTH_MESSAGE_COPY.networkUnavailable ? safeError : null,
+      info: safeError === LEGACY_AUTH_MESSAGE_COPY.networkUnavailable
+        ? null
+        : LEGACY_AUTH_MESSAGE_COPY.passwordResetSent
+    })
+  };
+};
+
+export const updateLegacyPassword = async (password: string): Promise<LegacyAuthActionResult> => {
+  const client = await getLegacyAuthClient();
+  if (!client) {
+    return {
+      snapshot: createGuestSnapshot(false, { error: LEGACY_AUTH_MESSAGE_COPY.passwordResetNotConfigured })
+    };
+  }
+  if (password.length < LEGACY_AUTH_PASSWORD_MIN_LENGTH) {
+    const { data } = await client.auth.getSession();
+    return {
+      snapshot: createLegacyAuthSessionSnapshot(data.session, undefined, {
+        error: LEGACY_AUTH_MESSAGE_COPY.passwordMinimum
+      })
+    };
+  }
+
+  const { error } = await client.auth.updateUser({ password });
+  const { data: sessionData } = await client.auth.getSession();
+  return {
+    snapshot: createLegacyAuthSessionSnapshot(sessionData.session, undefined, {
+      error: resolveLegacyAuthSafeErrorCopy(error?.message, 'password-update'),
+      info: error ? null : LEGACY_AUTH_MESSAGE_COPY.passwordUpdated
+    })
+  };
+};
+
+export const updateLegacyAccount = async (
+  update: LegacyAuthAccountUpdate,
+  capabilities = resolveLegacyAuthPlatformCapabilities()
+): Promise<LegacyAuthActionResult> => {
+  const client = await getLegacyAuthClient();
+  if (!client) {
+    return {
+      snapshot: createGuestSnapshot(false, { error: LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured })
+    };
+  }
+
+  const data: Record<string, string> = {};
+  const displayName = update.displayName.trim();
+  if (displayName) {
+    data.display_name = displayName;
+  }
+  if (capabilities.usernameProfile === 'read-write' && update.username.trim()) {
+    data.username = update.username.trim();
+  }
+  const { error } = await client.auth.updateUser({
+    data,
+    email: normalizeLegacyAuthEmail(update.email)
+  });
+  const { data: sessionData } = await client.auth.getSession();
+  return {
+    snapshot: createLegacyAuthSessionSnapshot(sessionData.session, undefined, {
+      error: resolveLegacyAuthSafeErrorCopy(error?.message, 'account-update'),
+      info: error ? null : LEGACY_AUTH_MESSAGE_COPY.accountUpdated
     })
   };
 };
@@ -489,7 +763,7 @@ export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
 
   return {
     snapshot: createGuestSnapshot(true, {
-      error: error?.message ?? null,
+      error: resolveLegacyAuthSafeErrorCopy(error?.message, 'signout'),
       info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedOut
     })
   };
@@ -503,6 +777,9 @@ export const subscribeLegacyAuthState = (
   }
 
   const { data } = client.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      legacyAuthRecoveryIntentPending = true;
+    }
     const snapshot = createLegacyAuthSessionSnapshot(session);
     if (snapshot.status === 'authenticated') {
       syncLegacyRememberedIdentityFromAuthenticatedSession(
@@ -524,10 +801,12 @@ export const createEmptyLegacyAuthFormState = (
   mode: LegacyAuthFormMode,
   rememberedEmail = ''
 ): LegacyAuthFormState => ({
+  confirmPassword: '',
   displayName: '',
   email: rememberedEmail,
   mode,
-  password: ''
+  password: '',
+  username: ''
 });
 
 export const resolveLegacyAuthSubmitState = (
@@ -541,17 +820,31 @@ export const resolveLegacyAuthSubmitState = (
     };
   }
 
-  if (!normalizeLegacyAuthEmail(form.email).includes('@')) {
+  if (form.mode !== 'recovery' && !normalizeLegacyAuthEmail(form.email).includes('@')) {
     return {
       canSubmit: false,
       reason: LEGACY_AUTH_MESSAGE_COPY.enterEmail
     };
   }
 
-  if (form.password.length < 6) {
+  if (form.mode === 'account') {
+    return {
+      canSubmit: true,
+      reason: null
+    };
+  }
+
+  if (form.password.length < LEGACY_AUTH_PASSWORD_MIN_LENGTH) {
     return {
       canSubmit: false,
       reason: LEGACY_AUTH_MESSAGE_COPY.passwordMinimum
+    };
+  }
+
+  if (form.mode === 'recovery' && form.password !== form.confirmPassword) {
+    return {
+      canSubmit: false,
+      reason: LEGACY_AUTH_MESSAGE_COPY.passwordConfirmation
     };
   }
 

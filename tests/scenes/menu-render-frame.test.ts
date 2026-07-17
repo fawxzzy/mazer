@@ -1258,7 +1258,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.authSnapshot');
     expect(menuSceneSource).toContain('private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null');
     expect(menuSceneSource).toContain("runtimeDiagnostics !== '1' && runtimeDiagnostics !== 'true'");
-    expect(menuSceneSource).toContain("searchParams.get('authFixture')?.trim().toLowerCase() !== 'authenticated'");
+    expect(menuSceneSource).toContain("fixture !== 'account' && fixture !== 'authenticated' && fixture !== 'recovery'");
     expect(menuSceneSource).toContain("userId: 'runtime-diagnostics-auth-fixture'");
     expect(menuSceneSource).toContain('const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();');
     expect(menuSceneSource).toContain('if (runtimeAuthFixtureSnapshot) {');
@@ -1285,7 +1285,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createLegacyOptionsAccountActionRow(');
     expect(menuSceneSource).toContain('this.createLegacyOptionsAccountActionRow(panel);');
     expect(menuSceneSource).toContain('contentCenterY: actionY');
-    expect(menuSceneSource).toContain("const label = this.authSnapshot.status === 'authenticated' ? 'Log out' : 'Account';");
+    expect(menuSceneSource).toContain("const label = 'Account';");
+    expect(menuSceneSource).toContain("'Change Password'");
+    expect(menuSceneSource).toContain("'Save Password'");
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain('Account login needs Supabase env vars before it can be enabled.');
     expect(playerMessageSource).toContain('export interface LegacyQueuedPlayerMessage');

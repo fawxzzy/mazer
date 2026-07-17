@@ -1,0 +1,25 @@
+{
+  "contract": "fitness-to-mazer-auth-capability-parity",
+  "version": "1.0.0",
+  "denominator": 18,
+  "capabilities": [
+    { "id": "auth.email-password-login", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.signup-confirmation-redirect", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.reset-request", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.recovery-callback", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.password-submission", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.safe-errors", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.password-visibility", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.password-contract", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.redirect-ownership", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.reset-cooldown", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.session-restoration", "disposition": "equivalent", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.local-signout", "disposition": "equivalent", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.account-reachability", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.account-information-update", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.account-password-change", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.global-username-slot", "disposition": "capability-gated", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.deferred-methods", "disposition": "deferred", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.leaked-password-protection", "disposition": "provider-setting", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" }
+  ]
+}

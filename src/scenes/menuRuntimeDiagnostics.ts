@@ -93,7 +93,7 @@ export interface MenuSceneRuntimeDiagnostics {
     displayName: string | null;
     email: string | null;
     emailPresent: boolean;
-    formMode: 'login' | 'signup';
+    formMode: 'account' | 'login' | 'recovery' | 'signup';
     rememberedIdentity: {
       displayName: string;
       email: string;
