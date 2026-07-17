@@ -1258,7 +1258,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.authSnapshot');
     expect(menuSceneSource).toContain('private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null');
     expect(menuSceneSource).toContain("runtimeDiagnostics !== '1' && runtimeDiagnostics !== 'true'");
-    expect(menuSceneSource).toContain("fixture !== 'account' && fixture !== 'authenticated' && fixture !== 'recovery'");
+    expect(menuSceneSource).toContain("fixture !== 'account' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait'");
     expect(menuSceneSource).toContain("userId: 'runtime-diagnostics-auth-fixture'");
     expect(menuSceneSource).toContain('const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();');
     expect(menuSceneSource).toContain('if (runtimeAuthFixtureSnapshot) {');
@@ -1291,6 +1291,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolveLegacyAuthCallbackPresentation(callbackState, snapshot)');
     expect(menuSceneSource).toContain('this.setLegacyAuthFormMode(callbackPresentation.formMode)');
     expect(menuSceneSource).toContain('this.applyLegacyAuthSnapshot(callbackPresentation.snapshot)');
+    expect(menuSceneSource).toContain('error: LEGACY_AUTH_MESSAGE_COPY.passwordResetWait');
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain('Account login needs Supabase env vars before it can be enabled.');
     expect(playerMessageSource).toContain('export interface LegacyQueuedPlayerMessage');

@@ -23,6 +23,11 @@ const SURFACES = Object.freeze([
     expectedLabels: ['Reset Password', 'Save Password', 'Back to Account', 'Request New Link', 'Show']
   }),
   Object.freeze({
+    id: 'reset-wait',
+    fixture: 'reset-wait',
+    expectedLabels: ['Reset Password', 'Please wait before requesting another reset link.', 'Save Password', 'Back to Account', 'Request New Link', 'Show']
+  }),
+  Object.freeze({
     id: 'confirmation',
     route: '/?content=core-only&theme=aurora&runtimeDiagnostics=1&auth=confirmed',
     expectedLabels: ['Account', 'Email confirmed. You can log in.', 'Login', 'Create Account', 'Reset Password']

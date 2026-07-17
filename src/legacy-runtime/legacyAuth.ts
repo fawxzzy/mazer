@@ -710,14 +710,16 @@ export const requestLegacyPasswordReset = async (email: string): Promise<LegacyA
     redirectTo
   });
   const safeError = resolveLegacyAuthSafeErrorCopy(error?.message, 'reset-request');
+  const visibleError = safeError === LEGACY_AUTH_MESSAGE_COPY.networkUnavailable
+    || safeError === LEGACY_AUTH_MESSAGE_COPY.passwordResetWait
+    ? safeError
+    : null;
 
   return {
     cooldownSeconds: nextCooldown.remainingSeconds,
     snapshot: createGuestSnapshot(true, {
-      error: safeError === LEGACY_AUTH_MESSAGE_COPY.networkUnavailable ? safeError : null,
-      info: safeError === LEGACY_AUTH_MESSAGE_COPY.networkUnavailable
-        ? null
-        : LEGACY_AUTH_MESSAGE_COPY.passwordResetSent
+      error: visibleError,
+      info: visibleError ? null : LEGACY_AUTH_MESSAGE_COPY.passwordResetSent
     })
   };
 };

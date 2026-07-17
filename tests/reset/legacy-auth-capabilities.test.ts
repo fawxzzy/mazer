@@ -122,6 +122,16 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     expect(result.snapshot.info).toBe(LEGACY_AUTH_MESSAGE_COPY.passwordResetSent);
   });
 
+  test('[auth.reset-request] preserves the approved provider rate-limit feedback', async () => {
+    mockAuth.resetPasswordForEmail.mockResolvedValueOnce({
+      data: {},
+      error: { message: 'Rate limit exceeded. Too many requests.' }
+    });
+    const result = await requestLegacyPasswordReset('player@example.com');
+    expect(result.snapshot.error).toBe(LEGACY_AUTH_MESSAGE_COPY.passwordResetWait);
+    expect(result.snapshot.info).toBeNull();
+  });
+
   test('[auth.recovery-callback] classifies callbacks without exposing provider detail', () => {
     const recoveryState = resolveLegacyAuthCallbackState({ hash: '', search: '?auth=recovery' });
     expect(recoveryState).toEqual({
@@ -188,6 +198,7 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     const captureSource = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-auth-capability-surfaces.mjs'), 'utf8');
     expect(captureSource).toContain("engine: 'webkit'");
     expect(captureSource).toContain("fixture: 'recovery'");
+    expect(captureSource).toContain("fixture: 'reset-wait'");
     expect(captureSource).toContain("id: 'confirmation'");
     expect(captureSource).toContain("id: 'invalid-confirmation'");
     expect(captureSource).toContain("auth=confirmed");
@@ -265,7 +276,7 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     expect(source).toContain("const label = 'Account';");
     expect(source).toContain("this.openOverlay('auth');");
     expect(source).toContain("this.authSnapshot.status === 'authenticated' ? 'account'");
-    expect(source).toContain("fixture === 'recovery' || fixture === 'account'");
+    expect(source).toContain("fixture === 'recovery' || fixture === 'reset-wait' || fixture === 'account'");
   });
 
   test('[auth.account-information-update] updates email and display name through Supabase Auth', async () => {

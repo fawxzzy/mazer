@@ -10096,10 +10096,17 @@ export class MenuScene extends Phaser.Scene {
       const fixture = typeof window === 'undefined'
         ? null
         : new URLSearchParams(window.location.search).get('authFixture')?.trim().toLowerCase();
-      if (fixture === 'recovery' || fixture === 'account') {
+      if (fixture === 'recovery' || fixture === 'reset-wait' || fixture === 'account') {
         await Promise.resolve();
-        if (fixture === 'recovery') {
+        if (fixture === 'recovery' || fixture === 'reset-wait') {
           this.enterLegacyAuthRecoveryMode(LEGACY_AUTH_MESSAGE_COPY.recoveryReady);
+          if (fixture === 'reset-wait') {
+            this.applyLegacyAuthSnapshot({
+              ...runtimeAuthFixtureSnapshot,
+              error: LEGACY_AUTH_MESSAGE_COPY.passwordResetWait,
+              info: null
+            });
+          }
         } else {
           this.openOverlay('auth');
         }
@@ -10166,7 +10173,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const fixture = searchParams.get('authFixture')?.trim().toLowerCase();
-    if (fixture !== 'account' && fixture !== 'authenticated' && fixture !== 'recovery') {
+    if (fixture !== 'account' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait') {
       return null;
     }
 
@@ -10175,7 +10182,7 @@ export class MenuScene extends Phaser.Scene {
       displayName: 'QA Player',
       email: 'qa@mazer.local',
       error: null,
-      info: 'Runtime diagnostics authenticated fixture.',
+      info: fixture === 'reset-wait' ? null : 'Runtime diagnostics authenticated fixture.',
       status: 'authenticated',
       userId: 'runtime-diagnostics-auth-fixture'
     };
