@@ -2,7 +2,7 @@
 
 - Packet: `FP-MZR-REC-001`
 - Captured: `2026-07-17T07:57:13.968Z`
-- Verified: `2026-07-17T09:53:54.806Z`
+- Verified: `2026-07-17T10:15:32.6110036Z`
 - Project ref: `geknvnrmktchljnyddwp`
 - Source base: `origin/main@3bd13233dc33fc721f8ccf105d2cc51f1a8dd8d4`
 - Scope: repository-source recovery only
@@ -46,6 +46,12 @@ digests exactly equal their live statement digests.
   midpoint, did not change schema, and passed an idempotent second repair
 - Exact live Mazer signatures: columns, constraints, functions, grants,
   indexes, policies, tables, and triggers all matched
+- Grant signatures expand underlying table ACLs, including PostgreSQL
+  `PUBLIC`; the sanitized live read-only baseline is 59 ACL entries at digest
+  `e9411fbe6a112547da746a04f454a26a383f7ac9a9f0f7f19165fce0226e3c0b`.
+  An owned-fixture `PUBLIC SELECT` probe changed that to 60 entries at digest
+  `dbf4ddb6119d923d7ab0c8bc2818905221a1fb6b85c305c6fad25a29db4cccb6`,
+  and its bounded revoke restored the exact baseline
 - Cleanup: owned listener closed; owned data/log directory removed
 
 The first harness invocation timed out before role, database, or migration
@@ -62,7 +68,7 @@ production parity.
 
 ## Verification
 
-- `npm run test:supabase-source-recovery`: 1 file, 23 focused
+- `npm run test:supabase-source-recovery`: 1 file, 24 focused
   migration/source/history contract tests passed
 - `npm run supabase:verify-source-recovery`: passed; four sources, zero
   duplicate versions, zero duplicate names
@@ -77,6 +83,12 @@ production parity.
   empty-history authorization path
 - `npm run verify`: 53 files, 387 tests passed; production build passed
 - `git diff --check`: passed
+
+The first full repository run encountered six timeout-only failures in
+unrelated legacy maze-generation tests plus two Vitest worker RPC timeouts.
+After that process exited, a measured low-contention unchanged rerun passed all
+387 tests and the production build. No timeout or product-test contract was
+changed to obtain the passing result.
 
 ## Safety Disposition
 

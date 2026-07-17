@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  CATALOG_SIGNATURE_SQL,
   assertUnprivilegedReplayUser,
   buildLegacyRepairPlan,
   canonicalizeSql,
@@ -71,6 +72,15 @@ describe("Mazer Supabase source recovery", () => {
     expect(result.duplicateNames).toEqual([]);
     expect(result.legacyHistory.historyState).toBe("REPAIR_REQUIRED");
     expect(result.legacyHistory.normalApplyAllowed).toBe(false);
+  });
+
+  it("derives table grants from ACLs including PUBLIC", () => {
+    expect(CATALOG_SIGNATURE_SQL).toContain("aclexplode(");
+    expect(CATALOG_SIGNATURE_SQL).toContain("acl.grantee = 0 then 'PUBLIC'");
+    expect(CATALOG_SIGNATURE_SQL).toContain("acl.privilege_type");
+    expect(CATALOG_SIGNATURE_SQL).not.toContain(
+      "information_schema.role_table_grants",
+    );
   });
 
   it("uses newline-insensitive canonical SQL digests", () => {

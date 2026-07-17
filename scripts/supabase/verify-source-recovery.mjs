@@ -38,7 +38,7 @@ const MAZER_SCHEMA_KINDS = EXPECTED_KINDS.filter(
 );
 const FORBIDDEN_PORTS = new Set([5432, 5433]);
 
-const CATALOG_SIGNATURE_SQL = [
+export const CATALOG_SIGNATURE_SQL = [
   "with signatures(kind, signature) as (",
   "  select 'tables',",
   "         format('%I.%I|rls=%s|force_rls=%s|replica=%s',",
@@ -83,11 +83,14 @@ const CATALOG_SIGNATURE_SQL = [
   "  where schemaname = 'public' and left(tablename, 6) = 'mazer_'",
   "  union all",
   "  select 'grants',",
-  "         format('%I.%I|%I|%s|grantable=%s', table_schema, table_name, grantee,",
-  "           privilege_type, is_grantable)",
-  "  from information_schema.role_table_grants",
-  "  where table_schema = 'public' and left(table_name, 6) = 'mazer_'",
-  "    and grantee in ('anon', 'authenticated', 'service_role')",
+  "         format('%I.%I|grantor=%I|grantee=%I|%s|grantable=%s',",
+  "           n.nspname, c.relname, pg_get_userbyid(acl.grantor),",
+  "           case when acl.grantee = 0 then 'PUBLIC' else pg_get_userbyid(acl.grantee) end,",
+  "           acl.privilege_type, acl.is_grantable)",
+  "  from pg_class c",
+  "  join pg_namespace n on n.oid = c.relnamespace",
+  "  cross join lateral aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) acl",
+  "  where n.nspname = 'public' and c.relkind = 'r' and left(c.relname, 6) = 'mazer_'",
   "  union all",
   "  select 'functions',",
   "         format('%I.%I|%s', n.nspname, p.proname, pg_get_function_identity_arguments(p.oid))",
@@ -1041,6 +1044,56 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
         .filter(Boolean);
     }
 
+    const publicAclProbeDatabase = replayDatabases[1][1];
+    const baselineGrantSignature = catalogs.replayB.grants;
+    runCommand(
+      psql,
+      psqlArgs(port, publicAclProbeDatabase, [
+        "-qAt",
+        "-c",
+        "grant select on table public.mazer_profiles to public;",
+      ]),
+    );
+    const publicGrantCatalog = readCatalog(psql, port, publicAclProbeDatabase);
+    const publicGrantChanged =
+      JSON.stringify(publicGrantCatalog.grants) !==
+      JSON.stringify(baselineGrantSignature);
+    runCommand(
+      psql,
+      psqlArgs(port, publicAclProbeDatabase, [
+        "-qAt",
+        "-c",
+        "revoke select on table public.mazer_profiles from public;",
+      ]),
+    );
+    const restoredCatalog = readCatalog(psql, port, publicAclProbeDatabase);
+    const publicGrantRestored =
+      JSON.stringify(restoredCatalog.grants) ===
+      JSON.stringify(baselineGrantSignature);
+    if (!publicGrantChanged || !publicGrantRestored) {
+      throw new Error(
+        "PUBLIC table ACL probe did not change and restore the grant signature: " +
+          JSON.stringify({
+            baselineGrantSignature,
+            publicGrantSignature: publicGrantCatalog.grants,
+            restoredGrantSignature: restoredCatalog.grants,
+          }),
+      );
+    }
+    catalogs.replayB = restoredCatalog;
+    const publicAclGrantGuard = {
+      database: publicAclProbeDatabase,
+      table: "public.mazer_profiles",
+      privilege: "SELECT",
+      grantee: "PUBLIC",
+      baseline: baselineGrantSignature,
+      changed: publicGrantCatalog.grants,
+      signatureChanged: publicGrantChanged,
+      restored: restoredCatalog.grants,
+      signatureRestored: publicGrantRestored,
+      mutationScope: "owned-disposable-fixture-only",
+    };
+
     const deterministic =
       JSON.stringify(catalogs.replayA) === JSON.stringify(catalogs.replayB) &&
       JSON.stringify(extensionDetails.replayA) ===
@@ -1198,6 +1251,7 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
       emptySchemaPreflights,
       appliedPrefix,
       catalogSignatures: catalogs.replayA,
+      publicAclGrantGuard,
       deterministicReplay: deterministic,
       legacyHistoryFixture: legacyHistoryReceipt,
       exactLiveMazerContractKinds: exactKinds,
