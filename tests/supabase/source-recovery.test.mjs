@@ -5,12 +5,32 @@ import {
   canonicalizeSql,
   classifyMigrationHistory,
   findDuplicateMigrationIdentities,
+  parseAppliedVersionsArgument,
   parsePostgresMajor,
   sha256,
   verifySourceRecovery,
 } from "../../scripts/supabase/verify-source-recovery.mjs";
 
 describe("Mazer Supabase source recovery", () => {
+  const legacy = ["20260709005739", "20260709011209", "20260716205924"];
+  const target = [
+    "20260709045557",
+    "20260709045648",
+    "20260709045725",
+    "20260716211513",
+  ];
+  const legacyContract = {
+    legacyVersions: legacy.map((version) => ({ version })),
+    targetVersions: target,
+    disposableDatabaseDisposition: "RESET_AND_REPLAY_FROM_ZERO",
+    retainedDatabaseDisposition: "EXACT_CATALOG_PROOF_THEN_HISTORY_REPAIR",
+    retainedDatabasePrerequisites: ["exact_live_mazer_catalog_signature_match"],
+    repairSteps: [
+      ...legacy.map((version) => ({ version, status: "reverted" })),
+      ...target.map((version) => ({ version, status: "applied" })),
+    ],
+  };
+
   it("maps exactly one canonical source to every live migration version", () => {
     const result = verifySourceRecovery();
 
@@ -50,25 +70,6 @@ describe("Mazer Supabase source recovery", () => {
   });
 
   it("fails closed and emits deterministic legacy history repair steps", () => {
-    const legacy = ["20260709005739", "20260709011209", "20260716205924"];
-    const target = [
-      "20260709045557",
-      "20260709045648",
-      "20260709045725",
-      "20260716211513",
-    ];
-    const contract = {
-      legacyVersions: legacy.map((version) => ({ version })),
-      targetVersions: target,
-      disposableDatabaseDisposition: "RESET_AND_REPLAY_FROM_ZERO",
-      retainedDatabaseDisposition: "EXACT_CATALOG_PROOF_THEN_HISTORY_REPAIR",
-      retainedDatabasePrerequisites: ["exact_live_mazer_catalog_signature_match"],
-      repairSteps: [
-        ...legacy.map((version) => ({ version, status: "reverted" })),
-        ...target.map((version) => ({ version, status: "applied" })),
-      ],
-    };
-
     expect(classifyMigrationHistory([], legacy, target)).toBe("FRESH");
     expect(classifyMigrationHistory(legacy, legacy, target)).toBe(
       "REPAIR_REQUIRED",
@@ -78,7 +79,7 @@ describe("Mazer Supabase source recovery", () => {
       classifyMigrationHistory([...legacy, target[0]], legacy, target),
     ).toBe("BLOCKED");
 
-    const plan = buildLegacyRepairPlan(contract, legacy);
+    const plan = buildLegacyRepairPlan(legacyContract, legacy);
     expect(plan.ok).toBe(true);
     expect(plan.failClosed).toBe(true);
     expect(plan.normalApplyAllowed).toBe(false);
@@ -93,5 +94,58 @@ describe("Mazer Supabase source recovery", () => {
           "supabase migration repair " + version + " --status applied",
       ),
     ]);
+
+  });
+
+  it("requires the applied-versions flag and rejects an empty value", () => {
+    const missing = parseAppliedVersionsArgument(["--legacy-repair-plan"]);
+    expect(missing.ok).toBe(false);
+    expect(missing.inputState).toBe("MISSING");
+    expect(missing.appliedVersions).toBeUndefined();
+
+    const empty = parseAppliedVersionsArgument([
+      "--legacy-repair-plan",
+      "--applied-versions",
+      "",
+    ]);
+    expect(empty.ok).toBe(false);
+    expect(empty.inputState).toBe("EMPTY");
+    expect(empty.appliedVersions).toBeUndefined();
+
+    const unknownPlan = buildLegacyRepairPlan(legacyContract);
+    expect(unknownPlan.ok).toBe(false);
+    expect(unknownPlan.historyState).toBe("UNKNOWN");
+    expect(unknownPlan.normalApplyAllowed).toBe(false);
+    expect(unknownPlan.commands).toEqual([]);
+  });
+
+  it("emits commands only for explicitly observed exact legacy history", () => {
+    const observed = parseAppliedVersionsArgument([
+      "--applied-versions",
+      legacy.join(","),
+    ]);
+    expect(observed.ok).toBe(true);
+    expect(observed.inputState).toBe("OBSERVED");
+    expect(observed.appliedVersions).toEqual(legacy);
+
+    const plan = buildLegacyRepairPlan(
+      legacyContract,
+      observed.appliedVersions,
+    );
+    expect(plan.ok).toBe(true);
+    expect(plan.historyState).toBe("REPAIR_REQUIRED");
+    expect(plan.commands).toHaveLength(7);
+  });
+
+  it.each([
+    ["current", target, "CURRENT"],
+    ["mixed", [...legacy, target[0]], "BLOCKED"],
+    ["partial", legacy.slice(0, 2), "BLOCKED"],
+    ["unknown", ["19990101000000"], "BLOCKED"],
+  ])("emits no commands for %s observed history", (_label, versions, state) => {
+    const plan = buildLegacyRepairPlan(legacyContract, versions);
+    expect(plan.ok).toBe(false);
+    expect(plan.historyState).toBe(state);
+    expect(plan.commands).toEqual([]);
   });
 });

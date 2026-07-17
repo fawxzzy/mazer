@@ -87,15 +87,20 @@ The required fail-closed preflight is:
 5. Treat mixed, partial, or unknown histories as `BLOCKED`; do not run normal
    migration application or history repair.
 
-Generate the non-mutating repair plan with:
+After obtaining the exact read-only version list, generate the non-mutating
+repair plan by passing that observed history explicitly:
 
 ```sh
-npm run supabase:legacy-repair-plan
+npm run supabase:legacy-repair-plan -- --applied-versions 20260709005739,20260709011209,20260716205924
 ```
 
 The plan emits ordered `supabase migration repair` commands for the three
 legacy versions as `reverted` and all four recovered versions as `applied`.
-Generating the plan changes nothing. Executing those commands is a separately
+Omitting `--applied-versions` or passing an empty value yields `UNKNOWN`, emits
+no commands, and exits non-zero. Current, mixed, partial, or unknown observed
+histories likewise emit no commands; only the exact observed legacy history
+produces a successful executable plan.
+Generating a valid plan changes nothing. Executing its commands is a separately
 authorized target mutation and is forbidden without the prerequisites above.
 The disposable replay gate proves the legacy history is detected, normal apply
 is refused, history-only repair leaves the exact Mazer schema unchanged, and a

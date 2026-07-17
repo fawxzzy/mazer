@@ -222,12 +222,14 @@ export function classifyMigrationHistory(
 
 export function buildLegacyRepairPlan(contract, appliedVersions) {
   const legacyVersions = contract.legacyVersions.map(({ version }) => version);
-  const suppliedVersions = appliedVersions ?? legacyVersions;
-  const historyState = classifyMigrationHistory(
-    suppliedVersions,
-    legacyVersions,
-    contract.targetVersions,
-  );
+  const historyState =
+    appliedVersions === undefined
+      ? "UNKNOWN"
+      : classifyMigrationHistory(
+          appliedVersions,
+          legacyVersions,
+          contract.targetVersions,
+        );
 
   return {
     ok: historyState === "REPAIR_REQUIRED",
@@ -249,9 +251,47 @@ export function buildLegacyRepairPlan(contract, appliedVersions) {
     reason:
       historyState === "REPAIR_REQUIRED"
         ? "Legacy repository timestamps must be remapped before normal apply."
+        : historyState === "UNKNOWN"
+          ? "Observed migration history is required before a plan can be emitted."
         : historyState === "BLOCKED"
           ? "Mixed, partial, or unknown migration history requires manual disposition."
           : "No legacy history repair is required.",
+  };
+}
+
+export function parseAppliedVersionsArgument(argv) {
+  const valueIndex = argv.indexOf("--applied-versions");
+  if (valueIndex === -1) {
+    return {
+      ok: false,
+      inputState: "MISSING",
+      appliedVersions: undefined,
+      reason: "--applied-versions is required and must come from observed migration history.",
+    };
+  }
+
+  const rawValue = argv[valueIndex + 1];
+  if (
+    rawValue === undefined ||
+    rawValue.trim() === "" ||
+    rawValue.startsWith("--")
+  ) {
+    return {
+      ok: false,
+      inputState: "EMPTY",
+      appliedVersions: undefined,
+      reason: "--applied-versions must contain the explicitly observed migration versions.",
+    };
+  }
+
+  return {
+    ok: true,
+    inputState: "OBSERVED",
+    appliedVersions: rawValue
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+    reason: "Observed migration history supplied explicitly.",
   };
 }
 
@@ -1013,22 +1053,18 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
 async function main() {
   if (process.argv.includes("--legacy-repair-plan")) {
     const manifest = loadManifest(REPO_ROOT);
-    const valueIndex = process.argv.indexOf("--applied-versions");
-    const appliedVersions =
-      valueIndex === -1
-        ? undefined
-        : (process.argv[valueIndex + 1] ?? "")
-            .split(",")
-            .map((value) => value.trim())
-            .filter(Boolean);
+    const parsedInput = parseAppliedVersionsArgument(process.argv.slice(2));
     const plan = buildLegacyRepairPlan(
       manifest.legacyRepositoryHistory,
-      appliedVersions,
+      parsedInput.appliedVersions,
     );
-    process.stdout.write(JSON.stringify(plan, null, 2) + "\n");
-    if (plan.historyState === "BLOCKED") {
-      process.exitCode = 1;
-    }
+    const output = {
+      ...plan,
+      inputState: parsedInput.inputState,
+      reason: parsedInput.ok ? plan.reason : parsedInput.reason,
+    };
+    process.stdout.write(JSON.stringify(output, null, 2) + "\n");
+    process.exitCode = output.ok ? 0 : 1;
     return;
   }
 
