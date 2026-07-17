@@ -59,6 +59,7 @@ export const LEGACY_AUTH_MESSAGE_COPY = {
   networkUnavailable: 'Account service is unreachable. Try again shortly.',
   passwordConfirmation: 'Passwords do not match.',
   passwordMinimum: 'Password needs at least 10 characters.',
+  passwordRequired: 'Enter your complete password.',
   passwordUpdateReady: 'Ready to update password.',
   passwordUpdated: 'Password updated.',
   passwordResetEmailRequired: 'Enter an email before reset.',
@@ -72,6 +73,24 @@ export const LEGACY_AUTH_MESSAGE_COPY = {
   signedOut: 'Signed out. Guest progress is active.',
   verifyEmail: 'Check your email to finish account setup.'
 } as const;
+
+const LEGACY_AUTH_SAFE_ERROR_COPY = new Set<string>([
+  LEGACY_AUTH_MESSAGE_COPY.accountUpdateFailed,
+  LEGACY_AUTH_MESSAGE_COPY.authUnavailable,
+  LEGACY_AUTH_MESSAGE_COPY.callbackInvalid,
+  LEGACY_AUTH_MESSAGE_COPY.genericFailure,
+  LEGACY_AUTH_MESSAGE_COPY.invalidCredentials,
+  LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured,
+  LEGACY_AUTH_MESSAGE_COPY.networkUnavailable,
+  LEGACY_AUTH_MESSAGE_COPY.passwordConfirmation,
+  LEGACY_AUTH_MESSAGE_COPY.passwordMinimum,
+  LEGACY_AUTH_MESSAGE_COPY.passwordRequired,
+  LEGACY_AUTH_MESSAGE_COPY.passwordResetEmailRequired,
+  LEGACY_AUTH_MESSAGE_COPY.passwordResetNotConfigured,
+  LEGACY_AUTH_MESSAGE_COPY.passwordResetWait,
+  LEGACY_AUTH_MESSAGE_COPY.signupNotConfigured,
+  LEGACY_AUTH_MESSAGE_COPY.signupUnavailable
+]);
 
 export type LegacyAuthErrorAction =
   | 'account-update'
@@ -207,7 +226,9 @@ export const resolveLegacyAuthFeedbackMessage = (
   if (error?.trim()) {
     const rawError = error.trim();
     return createLegacyPlayerMessage({
-      copy: resolveLegacyAuthSafeErrorCopy(rawError),
+      copy: LEGACY_AUTH_SAFE_ERROR_COPY.has(rawError)
+        ? rawError
+        : resolveLegacyAuthSafeErrorCopy(rawError),
       id: 'auth.feedback.error',
       source: 'auth',
       technicalDetail: null,

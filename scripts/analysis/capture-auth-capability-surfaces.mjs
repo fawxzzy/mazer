@@ -21,6 +21,11 @@ const SURFACES = Object.freeze([
     id: 'recovery',
     fixture: 'recovery',
     expectedLabels: ['Reset Password', 'Save Password', 'Back to Account', 'Request New Link', 'Show']
+  }),
+  Object.freeze({
+    id: 'confirmation',
+    route: '/?content=core-only&theme=aurora&runtimeDiagnostics=1&auth=confirmed',
+    expectedLabels: ['Account', 'Email confirmed. You can log in.', 'Login', 'Create Account', 'Reset Password']
   })
 ]);
 const TARGETS = Object.freeze([
@@ -104,7 +109,9 @@ const captureTarget = async ({ artifactDir, baseUrl, target, timeoutMs }) => {
 
   try {
     for (const surface of SURFACES) {
-      const route = `/?content=core-only&theme=aurora&runtimeDiagnostics=1&authFixture=${surface.fixture}&v=auth-parity-${target.id}-${surface.id}`;
+      const route = surface.route
+        ? `${surface.route}&v=auth-parity-${target.id}-${surface.id}`
+        : `/?content=core-only&theme=aurora&runtimeDiagnostics=1&authFixture=${surface.fixture}&v=auth-parity-${target.id}-${surface.id}`;
       await page.goto(new URL(route, baseUrl).toString(), { waitUntil: 'networkidle', timeout: timeoutMs });
       await waitForAuthSurface(page, surface.expectedLabels, timeoutMs);
       await page.evaluate(() => new Promise((resolvePaint) => requestAnimationFrame(() => requestAnimationFrame(resolvePaint))));

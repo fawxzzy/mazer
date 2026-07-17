@@ -7,6 +7,7 @@ import {
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
 export const LEGACY_AUTH_RESET_COOLDOWN_KEY = 'mazer.auth.reset-cooldown.v1';
 export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
+export const LEGACY_AUTH_LEGACY_LOGIN_PASSWORD_MIN_LENGTH = 6;
 export const LEGACY_AUTH_PASSWORD_MIN_LENGTH = 10;
 export const LEGACY_AUTH_RESET_COOLDOWN_MS = 60_000;
 export const LEGACY_AUTH_FUTURE_PLATFORM_ORIGIN = 'https://account.fawxzzy.com';
@@ -834,10 +835,15 @@ export const resolveLegacyAuthSubmitState = (
     };
   }
 
-  if (form.password.length < LEGACY_AUTH_PASSWORD_MIN_LENGTH) {
+  const minimumPasswordLength = form.mode === 'login'
+    ? LEGACY_AUTH_LEGACY_LOGIN_PASSWORD_MIN_LENGTH
+    : LEGACY_AUTH_PASSWORD_MIN_LENGTH;
+  if (form.password.length < minimumPasswordLength) {
     return {
       canSubmit: false,
-      reason: LEGACY_AUTH_MESSAGE_COPY.passwordMinimum
+      reason: form.mode === 'login'
+        ? LEGACY_AUTH_MESSAGE_COPY.passwordRequired
+        : LEGACY_AUTH_MESSAGE_COPY.passwordMinimum
     };
   }
 

@@ -10132,6 +10132,14 @@ export class MenuScene extends Phaser.Scene {
       this.applyLegacyAuthSnapshot(snapshot);
       if (callbackState.kind === 'recovery' || consumeLegacyAuthRecoveryIntent()) {
         this.enterLegacyAuthRecoveryMode(callbackState.message ?? LEGACY_AUTH_MESSAGE_COPY.recoveryReady);
+      } else if (callbackState.kind === 'success') {
+        this.setLegacyAuthFormMode(snapshot.status === 'authenticated' ? 'account' : 'login');
+        this.applyLegacyAuthSnapshot({
+          ...snapshot,
+          error: null,
+          info: callbackState.message
+        });
+        this.openOverlay('auth');
       }
     }
     if (callbackState.kind !== 'none' && typeof window !== 'undefined') {

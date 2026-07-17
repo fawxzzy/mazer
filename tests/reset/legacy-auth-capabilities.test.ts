@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { beforeAll, describe, expect, test, vi } from 'vitest';
 import {
   LEGACY_AUTH_FUTURE_PLATFORM_ORIGIN,
+  LEGACY_AUTH_LEGACY_LOGIN_PASSWORD_MIN_LENGTH,
   LEGACY_AUTH_PASSWORD_MIN_LENGTH,
   LEGACY_AUTH_RESET_COOLDOWN_MS,
   createEmptyLegacyAuthFormState,
@@ -159,14 +160,26 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     const captureSource = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-auth-capability-surfaces.mjs'), 'utf8');
     expect(captureSource).toContain("engine: 'webkit'");
     expect(captureSource).toContain("fixture: 'recovery'");
+    expect(captureSource).toContain("id: 'confirmation'");
+    expect(captureSource).toContain("auth=confirmed");
     expect(captureSource).toContain('auth-stack-dead-zone=');
   });
 
-  test('[auth.password-contract] requires 10 and preserves passwords longer than 128', () => {
-    const form = createEmptyLegacyAuthFormState('login', 'player@example.com');
+  test('[auth.password-contract] preserves legacy login access while requiring 10 for new passwords', () => {
+    const loginForm = createEmptyLegacyAuthFormState('login', 'player@example.com');
+    const signupForm = createEmptyLegacyAuthFormState('signup', 'player@example.com');
+    const recoveryForm = createEmptyLegacyAuthFormState('recovery');
+    expect(LEGACY_AUTH_LEGACY_LOGIN_PASSWORD_MIN_LENGTH).toBe(6);
     expect(LEGACY_AUTH_PASSWORD_MIN_LENGTH).toBe(10);
-    expect(resolveLegacyAuthSubmitState({ ...form, password: '123456789' }, true).canSubmit).toBe(false);
-    expect(resolveLegacyAuthSubmitState({ ...form, password: 'x'.repeat(128) }, true).canSubmit).toBe(true);
+    expect(resolveLegacyAuthSubmitState({ ...loginForm, password: '12345' }, true).canSubmit).toBe(false);
+    expect(resolveLegacyAuthSubmitState({ ...loginForm, password: '123456' }, true).canSubmit).toBe(true);
+    expect(resolveLegacyAuthSubmitState({ ...signupForm, password: '123456789' }, true).canSubmit).toBe(false);
+    expect(resolveLegacyAuthSubmitState({ ...signupForm, password: '1234567890' }, true).canSubmit).toBe(true);
+    expect(resolveLegacyAuthSubmitState({
+      ...recoveryForm,
+      confirmPassword: 'x'.repeat(128),
+      password: 'x'.repeat(128)
+    }, true).canSubmit).toBe(true);
     const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     expect(source).toContain('password: null');
     expect(source).toContain('confirmPassword: null');

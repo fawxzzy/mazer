@@ -1288,6 +1288,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("const label = 'Account';");
     expect(menuSceneSource).toContain("'Change Password'");
     expect(menuSceneSource).toContain("'Save Password'");
+    expect(menuSceneSource).toContain("callbackState.kind === 'success'");
+    expect(menuSceneSource).toContain("info: callbackState.message");
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain('Account login needs Supabase env vars before it can be enabled.');
     expect(playerMessageSource).toContain('export interface LegacyQueuedPlayerMessage');

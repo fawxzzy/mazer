@@ -69,6 +69,10 @@ describe('legacy player-facing message system', () => {
       technicalDetail: null,
       tone: 'error'
     });
+    expect(resolveLegacyAuthFeedbackMessage(LEGACY_AUTH_MESSAGE_COPY.invalidCredentials, null)?.copy)
+      .toBe(LEGACY_AUTH_MESSAGE_COPY.invalidCredentials);
+    expect(resolveLegacyAuthFeedbackMessage(LEGACY_AUTH_MESSAGE_COPY.networkUnavailable, null)?.copy)
+      .toBe(LEGACY_AUTH_MESSAGE_COPY.networkUnavailable);
     expect(resolveLegacyAuthFeedbackMessage(null, LEGACY_AUTH_MESSAGE_COPY.signedIn)).toMatchObject({
       copy: LEGACY_AUTH_MESSAGE_COPY.signedIn,
       id: 'auth.feedback.info',

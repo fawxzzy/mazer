@@ -7,7 +7,7 @@ The machine-readable denominator is `docs/contracts/fitness-mazer-auth-capabilit
 ## Phase-one contract
 
 - Email and password remain the only login credentials. Mazer never resolves usernames client-side.
-- Passwords require at least 10 characters. The client does not truncate passwords or impose an application maximum; 128-character values are covered by regression proof.
+- New signup and updated passwords require at least 10 characters. Existing 6–9 character Mazer credentials remain login-compatible so adopting the stronger policy cannot lock out legacy accounts. The client does not truncate passwords or impose an application maximum; 128-character values are covered by regression proof.
 - Supabase owns browser session persistence through `persistSession`, `autoRefreshToken`, `detectSessionInUrl`, and browser `localStorage`. This is Mazer's client-only equivalent of Fitness's server cookie synchronization, not a cookie implementation.
 - Signup confirmation and password recovery always provide an explicit exact redirect URL. `VITE_MAZER_AUTH_CONFIRMATION_REDIRECT_URL` and `VITE_MAZER_AUTH_RECOVERY_REDIRECT_URL` may transfer ownership to the shared account portal when it exists. Until then, exact same-origin Mazer callback URLs remain the compatibility owner.
 - `https://account.fawxzzy.com` is the approved future central origin. It is declared as future authority, not used as a false live cutover.
