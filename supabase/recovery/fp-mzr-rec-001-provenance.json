@@ -73,6 +73,77 @@
       "priorRepositoryFile": "20260716205924_account_state_revisions.sql"
     }
   ],
+  "legacyRepositoryHistory": {
+    "sourceBase": "3bd13233dc33fc721f8ccf105d2cc51f1a8dd8d4",
+    "normalApplyDisposition": "REFUSE",
+    "disposableDatabaseDisposition": "RESET_AND_REPLAY_FROM_ZERO",
+    "retainedDatabaseDisposition": "EXACT_CATALOG_PROOF_THEN_HISTORY_REPAIR",
+    "legacyVersions": [
+      {
+        "version": "20260709005739",
+        "name": "mazer_progression_state",
+        "recoveredVersion": "20260709045557",
+        "fixtureTransform": "restore_post_apply_progression_revoke",
+        "canonicalSqlSha256": "c3408c1fb6e92cb3b2dd7b2b3b6dae91660da24049a7cd925421a685f8dadd34"
+      },
+      {
+        "version": "20260709011209",
+        "name": "mazer_account_storage_contracts",
+        "recoveredVersion": "20260709045648",
+        "fixtureTransform": "restore_post_apply_account_revokes",
+        "canonicalSqlSha256": "8f23bbf9d7d4b037307fd0783606ec2d8f093d9f5c51cf3d61812744d00b872f"
+      },
+      {
+        "version": "20260716205924",
+        "name": "account_state_revisions",
+        "recoveredVersion": "20260716211513",
+        "fixtureTransform": "body_unchanged",
+        "canonicalSqlSha256": "8d999773d9c46a135f304bb3357e72ae99c773f859c1da1eb712680028d9ea01"
+      }
+    ],
+    "targetVersions": [
+      "20260709045557",
+      "20260709045648",
+      "20260709045725",
+      "20260716211513"
+    ],
+    "repairSteps": [
+      {
+        "version": "20260709005739",
+        "status": "reverted"
+      },
+      {
+        "version": "20260709011209",
+        "status": "reverted"
+      },
+      {
+        "version": "20260716205924",
+        "status": "reverted"
+      },
+      {
+        "version": "20260709045557",
+        "status": "applied"
+      },
+      {
+        "version": "20260709045648",
+        "status": "applied"
+      },
+      {
+        "version": "20260709045725",
+        "status": "applied"
+      },
+      {
+        "version": "20260716211513",
+        "status": "applied"
+      }
+    ],
+    "retainedDatabasePrerequisites": [
+      "target_specific_migration_lease",
+      "exact_live_mazer_catalog_signature_match",
+      "verified_backup_or_disposable_classification",
+      "post_repair_migration_history_readback"
+    ]
+  },
   "liveCatalogSignature": {
     "algorithm": "sorted_utf8_lines_sha256_v1",
     "postgresVersion": "17.6.1.141",

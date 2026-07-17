@@ -61,6 +61,46 @@ historical SQL. It is not production parity. Supabase-managed extension
 behavior, including `supabase_vault`, remains `UNKNOWN` when unavailable in
 the disposable PostgreSQL runtime.
 
+### Existing Database History Guard
+
+Do not apply the recovered timestamp chain normally to a database that already
+recorded any of these prior repository versions:
+
+- `20260709005739`
+- `20260709011209`
+- `20260716205924`
+
+Those historical sources already created the same objects and policies. Normal
+application of the recovered timestamps can therefore stop on duplicate
+objects before reaching the final state.
+
+The required fail-closed preflight is:
+
+1. Read the target migration history before any push or replay.
+2. If the history is empty, replay the canonical four-source chain from zero.
+3. If it exactly matches the four recovered versions, no repair is needed.
+4. If it exactly matches the three legacy versions:
+   - reset and replay from zero when the database is disposable; or
+   - for a retained database, first prove its Mazer catalog matches every
+     captured live non-provider signature, obtain a target-specific migration
+     lease and verified backup, then use the emitted history-repair plan.
+5. Treat mixed, partial, or unknown histories as `BLOCKED`; do not run normal
+   migration application or history repair.
+
+Generate the non-mutating repair plan with:
+
+```sh
+npm run supabase:legacy-repair-plan
+```
+
+The plan emits ordered `supabase migration repair` commands for the three
+legacy versions as `reverted` and all four recovered versions as `applied`.
+Generating the plan changes nothing. Executing those commands is a separately
+authorized target mutation and is forbidden without the prerequisites above.
+The disposable replay gate proves the legacy history is detected, normal apply
+is refused, history-only repair leaves the exact Mazer schema unchanged, and a
+second repair is deterministic.
+
 ## Tables
 
 - `public.mazer_profiles`: player-facing profile/settings row keyed by `auth.users.id`.

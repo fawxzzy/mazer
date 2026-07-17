@@ -2,7 +2,7 @@
 
 - Packet: `FP-MZR-REC-001`
 - Captured: `2026-07-17T07:57:13.968Z`
-- Verified: `2026-07-17T08:21:14.872Z`
+- Verified: `2026-07-17T08:35:24.272Z`
 - Project ref: `geknvnrmktchljnyddwp`
 - Source base: `origin/main@3bd13233dc33fc721f8ccf105d2cc51f1a8dd8d4`
 - Scope: repository-source recovery only
@@ -38,6 +38,9 @@ digests exactly equal their live statement digests.
 - Replay A: four of four migrations applied from zero
 - Replay B: four of four migrations applied from zero
 - Deterministic rerun: passed
+- Legacy-history fixture: all three prior repository versions detected;
+  normal application refused; history-only repair mapped to all four live
+  versions without changing schema; idempotent second repair passed
 - Exact live Mazer signatures: columns, constraints, functions, grants,
   indexes, policies, tables, and triggers all matched
 - Cleanup: owned listener closed; owned data/log directory removed
@@ -56,9 +59,12 @@ production parity.
 
 ## Verification
 
-- `npm run test:supabase-source-recovery`: 1 file, 4 tests passed
+- `npm run test:supabase-source-recovery`: 1 file, 5 focused
+  migration/source/history contract tests passed
 - `npm run supabase:verify-source-recovery`: passed; four sources, zero
   duplicate versions, zero duplicate names
+- `npm run supabase:legacy-repair-plan`: passed; fail-closed ordered plan,
+  no mutation performed
 - `npm run supabase:replay-source-recovery`: passed with the bounded
   provider-extension `UNKNOWN` described above
 - `npm run verify`: 53 files, 387 tests passed; production build passed

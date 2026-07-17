@@ -195,6 +195,138 @@ function loadManifest(repoRoot) {
   return JSON.parse(readFileSync(manifestPath, "utf8"));
 }
 
+function sortedUnique(values) {
+  return [...new Set(values)].sort();
+}
+
+export function classifyMigrationHistory(
+  appliedVersions,
+  legacyVersions,
+  targetVersions,
+) {
+  const applied = sortedUnique(appliedVersions);
+  const legacy = sortedUnique(legacyVersions);
+  const target = sortedUnique(targetVersions);
+
+  if (applied.length === 0) {
+    return "FRESH";
+  }
+  if (JSON.stringify(applied) === JSON.stringify(legacy)) {
+    return "REPAIR_REQUIRED";
+  }
+  if (JSON.stringify(applied) === JSON.stringify(target)) {
+    return "CURRENT";
+  }
+  return "BLOCKED";
+}
+
+export function buildLegacyRepairPlan(contract, appliedVersions) {
+  const legacyVersions = contract.legacyVersions.map(({ version }) => version);
+  const suppliedVersions = appliedVersions ?? legacyVersions;
+  const historyState = classifyMigrationHistory(
+    suppliedVersions,
+    legacyVersions,
+    contract.targetVersions,
+  );
+
+  return {
+    ok: historyState === "REPAIR_REQUIRED",
+    historyState,
+    failClosed: true,
+    normalApplyAllowed:
+      historyState === "FRESH" || historyState === "CURRENT",
+    mutationPerformed: false,
+    disposableDatabaseDisposition: contract.disposableDatabaseDisposition,
+    retainedDatabaseDisposition: contract.retainedDatabaseDisposition,
+    retainedDatabasePrerequisites: contract.retainedDatabasePrerequisites,
+    commands:
+      historyState === "REPAIR_REQUIRED"
+        ? contract.repairSteps.map(
+            ({ version, status }) =>
+              "supabase migration repair " + version + " --status " + status,
+          )
+        : [],
+    reason:
+      historyState === "REPAIR_REQUIRED"
+        ? "Legacy repository timestamps must be remapped before normal apply."
+        : historyState === "BLOCKED"
+          ? "Mixed, partial, or unknown migration history requires manual disposition."
+          : "No legacy history repair is required.",
+  };
+}
+
+function replaceExactlyOnce(value, search, replacement, label) {
+  const firstIndex = value.indexOf(search);
+  if (firstIndex === -1 || value.indexOf(search, firstIndex + search.length) !== -1) {
+    throw new Error("Expected exactly one legacy fixture transform marker: " + label);
+  }
+  return value.slice(0, firstIndex) + replacement +
+    value.slice(firstIndex + search.length);
+}
+
+function materializeLegacyFixtureSources(repoRoot, manifest) {
+  const migrationsPath = join(repoRoot, MIGRATIONS_RELATIVE_PATH);
+  return manifest.legacyRepositoryHistory.legacyVersions.map((legacy) => {
+    const recovered = manifest.migrations.find(
+      ({ version }) => version === legacy.recoveredVersion,
+    );
+    if (!recovered) {
+      throw new Error(
+        "Legacy fixture target is missing: " + legacy.recoveredVersion,
+      );
+    }
+
+    let sql = canonicalizeSql(
+      readFileSync(join(migrationsPath, recovered.file), "utf8"),
+    );
+    if (legacy.fixtureTransform === "restore_post_apply_progression_revoke") {
+      const grant =
+        "grant select, insert, update on public.mazer_progression_states to authenticated;";
+      sql = replaceExactlyOnce(
+        sql,
+        grant,
+        "revoke all on table public.mazer_progression_states from anon, authenticated, service_role;\n\n" +
+          grant,
+        legacy.version,
+      );
+    } else if (
+      legacy.fixtureTransform === "restore_post_apply_account_revokes"
+    ) {
+      for (const table of [
+        "mazer_profiles",
+        "mazer_ai_progression_states",
+        "mazer_cycle_receipts",
+      ]) {
+        const original =
+          "revoke all on table public." + table + " from anon;";
+        sql = replaceExactlyOnce(
+          sql,
+          original,
+          "revoke all on table public." + table +
+            " from anon, authenticated, service_role;",
+          legacy.version + ":" + table,
+        );
+      }
+    } else if (legacy.fixtureTransform !== "body_unchanged") {
+      throw new Error(
+        "Unknown legacy fixture transform: " + legacy.fixtureTransform,
+      );
+    }
+
+    assertEqual(
+      sha256(sql),
+      legacy.canonicalSqlSha256,
+      legacy.version + " legacy canonical SQL digest",
+    );
+    return {
+      version: legacy.version,
+      name: legacy.name,
+      file: legacy.version + "_" + legacy.name + ".sql",
+      sql: sql + "\n",
+    };
+  });
+}
+
 export function verifySourceRecovery(repoRoot = REPO_ROOT) {
   const manifest = loadManifest(repoRoot);
   const migrationsPath = join(repoRoot, MIGRATIONS_RELATIVE_PATH);
@@ -218,6 +350,16 @@ export function verifySourceRecovery(repoRoot = REPO_ROOT) {
   );
   assertArrayEqual(duplicates.versions, [], "duplicate migration versions");
   assertArrayEqual(duplicates.names, [], "duplicate migration names");
+  assertEqual(
+    manifest.legacyRepositoryHistory.normalApplyDisposition,
+    "REFUSE",
+    "legacy normal apply disposition",
+  );
+  assertArrayEqual(
+    manifest.legacyRepositoryHistory.targetVersions,
+    manifest.migrations.map(({ version }) => version),
+    "legacy repair target versions",
+  );
 
   for (const migration of manifest.migrations) {
     const identity = parseMigrationIdentity(migration.file);
@@ -274,6 +416,13 @@ export function verifySourceRecovery(repoRoot = REPO_ROOT) {
     [...EXPECTED_KINDS].sort(),
     "live catalog signature kinds",
   );
+  const legacySources = materializeLegacyFixtureSources(repoRoot, manifest);
+  const legacyPlan = buildLegacyRepairPlan(
+    manifest.legacyRepositoryHistory,
+    legacySources.map(({ version }) => version),
+  );
+  assertEqual(legacyPlan.historyState, "REPAIR_REQUIRED", "legacy history detection");
+  assertEqual(legacyPlan.normalApplyAllowed, false, "legacy normal apply guard");
 
   const checkedFiles = [
     join(repoRoot, MANIFEST_RELATIVE_PATH),
@@ -299,6 +448,12 @@ export function verifySourceRecovery(repoRoot = REPO_ROOT) {
     migrationOrder: executableFiles,
     duplicateVersions: duplicates.versions,
     duplicateNames: duplicates.names,
+    legacyHistory: {
+      versions: legacySources.map(({ version }) => version),
+      historyState: legacyPlan.historyState,
+      normalApplyAllowed: legacyPlan.normalApplyAllowed,
+      deterministicRepairSteps: manifest.legacyRepositoryHistory.repairSteps,
+    },
     liveCatalogSignature: manifest.liveCatalogSignature,
     liveMutationPerformed: false,
   };
@@ -431,6 +586,93 @@ function psqlArgs(port, database, extraArgs) {
   ];
 }
 
+function sqlLiteral(value) {
+  return "'" + String(value).replaceAll("'", "''") + "'";
+}
+
+function migrationHistoryFixtureSql(legacySources) {
+  const values = legacySources
+    .map(
+      ({ version, name }) =>
+        "(" + sqlLiteral(version) + ", " + sqlLiteral(name) + ", '{}'::text[])",
+    )
+    .join(",\n");
+  return [
+    "create schema supabase_migrations;",
+    "create table supabase_migrations.schema_migrations (",
+    "  version text primary key,",
+    "  name text not null,",
+    "  statements text[] not null default '{}'",
+    ");",
+    "insert into supabase_migrations.schema_migrations (version, name, statements)",
+    "values",
+    values + ";",
+  ].join("\n");
+}
+
+function migrationHistoryRepairSql(manifest) {
+  const contract = manifest.legacyRepositoryHistory;
+  const reverted = contract.repairSteps
+    .filter(({ status }) => status === "reverted")
+    .map(({ version }) => sqlLiteral(version))
+    .join(", ");
+  const appliedRows = contract.repairSteps
+    .filter(({ status }) => status === "applied")
+    .map(({ version }) => {
+      const migration = manifest.migrations.find(
+        (candidate) => candidate.version === version,
+      );
+      if (!migration) {
+        throw new Error("Repair target migration is missing: " + version);
+      }
+      return (
+        "(" + sqlLiteral(version) + ", " + sqlLiteral(migration.name) +
+        ", '{}'::text[])"
+      );
+    })
+    .join(",\n");
+
+  return [
+    "begin;",
+    "delete from supabase_migrations.schema_migrations",
+    "where version in (" + reverted + ");",
+    "insert into supabase_migrations.schema_migrations (version, name, statements)",
+    "values",
+    appliedRows,
+    "on conflict (version) do update",
+    "set name = excluded.name, statements = excluded.statements;",
+    "commit;",
+  ].join("\n");
+}
+
+function readMigrationHistory(psql, port, database) {
+  return runCommand(
+    psql,
+    psqlArgs(port, database, [
+      "-qAt",
+      "-c",
+      "select version from supabase_migrations.schema_migrations order by version;",
+    ]),
+  )
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean);
+}
+
+function readCatalog(psql, port, database) {
+  return parseCatalogRows(
+    runCommand(
+      psql,
+      psqlArgs(port, database, [
+        "-qAt",
+        "--field-separator=|",
+        "-c",
+        CATALOG_SIGNATURE_SQL,
+      ]),
+    ),
+  );
+}
+
 async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
   const staticReceipt = verifySourceRecovery(repoRoot);
   const manifest = loadManifest(repoRoot);
@@ -444,7 +686,7 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
   const psql = resolvePgBinary("psql");
   const postgres = resolvePgBinary("postgres");
   const toolchain = {};
-  const appliedPrefix = { replayA: [], replayB: [] };
+  const appliedPrefix = { replayA: [], replayB: [], legacyHistory: [] };
   let started = false;
   let replayError = null;
   let replayReceipt = null;
@@ -511,6 +753,7 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
       ["replayA", "mazer_replay_a"],
       ["replayB", "mazer_replay_b"],
     ];
+    const legacyDatabase = "mazer_legacy_history";
     const catalogs = {};
     const extensionDetails = {};
 
@@ -532,17 +775,7 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
         appliedPrefix[receiptKey].push(fileName);
       }
 
-      catalogs[receiptKey] = parseCatalogRows(
-        runCommand(
-          psql,
-          psqlArgs(port, database, [
-            "-qAt",
-            "--field-separator=|",
-            "-c",
-            CATALOG_SIGNATURE_SQL,
-          ]),
-        ),
-      );
+      catalogs[receiptKey] = readCatalog(psql, port, database);
       extensionDetails[receiptKey] = runCommand(
         psql,
         psqlArgs(port, database, ["-qAt", "-c", EXTENSION_DETAIL_SQL]),
@@ -580,6 +813,118 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
       );
     }
 
+    const legacySources = materializeLegacyFixtureSources(repoRoot, manifest);
+    runCommand(
+      psql,
+      psqlArgs(port, "postgres", [
+        "-qAt",
+        "-c",
+        "create database " + legacyDatabase + ";",
+      ]),
+    );
+    runCommand(
+      psql,
+      psqlArgs(port, legacyDatabase, ["-qAt", "-c", BOOTSTRAP_DATABASE_SQL]),
+    );
+    runCommand(
+      psql,
+      psqlArgs(port, legacyDatabase, ["-qAt", "-f", "-"]),
+      { input: migrationHistoryFixtureSql(legacySources) },
+    );
+    for (const legacySource of legacySources) {
+      runCommand(
+        psql,
+        psqlArgs(port, legacyDatabase, ["-qAt", "-f", "-"]),
+        { input: legacySource.sql },
+      );
+      appliedPrefix.legacyHistory.push(legacySource.file);
+    }
+
+    const legacyHistoryBefore = readMigrationHistory(
+      psql,
+      port,
+      legacyDatabase,
+    );
+    const legacyCatalogBefore = readCatalog(psql, port, legacyDatabase);
+    const legacyPlan = buildLegacyRepairPlan(
+      manifest.legacyRepositoryHistory,
+      legacyHistoryBefore,
+    );
+    const legacyCatalogMismatches = compareCatalog(
+      legacyCatalogBefore,
+      manifest.liveCatalogSignature.kinds,
+      exactKinds,
+    );
+    if (
+      legacyPlan.historyState !== "REPAIR_REQUIRED" ||
+      legacyPlan.normalApplyAllowed ||
+      legacyCatalogMismatches.length > 0
+    ) {
+      throw new Error(
+        "Legacy migration history did not fail closed with an exact catalog: " +
+          JSON.stringify({ legacyPlan, legacyCatalogMismatches }),
+      );
+    }
+
+    const repairSql = migrationHistoryRepairSql(manifest);
+    runCommand(
+      psql,
+      psqlArgs(port, legacyDatabase, ["-qAt", "-f", "-"]),
+      { input: repairSql },
+    );
+    const historyAfterFirstRepair = readMigrationHistory(
+      psql,
+      port,
+      legacyDatabase,
+    );
+    const catalogAfterFirstRepair = readCatalog(psql, port, legacyDatabase);
+    runCommand(
+      psql,
+      psqlArgs(port, legacyDatabase, ["-qAt", "-f", "-"]),
+      { input: repairSql },
+    );
+    const historyAfterSecondRepair = readMigrationHistory(
+      psql,
+      port,
+      legacyDatabase,
+    );
+    const catalogAfterSecondRepair = readCatalog(psql, port, legacyDatabase);
+    const repairedHistoryState = classifyMigrationHistory(
+      historyAfterFirstRepair,
+      manifest.legacyRepositoryHistory.legacyVersions.map(
+        ({ version }) => version,
+      ),
+      manifest.legacyRepositoryHistory.targetVersions,
+    );
+    const deterministicHistoryRepair =
+      repairedHistoryState === "CURRENT" &&
+      JSON.stringify(historyAfterFirstRepair) ===
+        JSON.stringify(historyAfterSecondRepair) &&
+      JSON.stringify(legacyCatalogBefore) ===
+        JSON.stringify(catalogAfterFirstRepair) &&
+      JSON.stringify(catalogAfterFirstRepair) ===
+        JSON.stringify(catalogAfterSecondRepair);
+    if (!deterministicHistoryRepair) {
+      throw new Error(
+        "Legacy migration-history repair was not deterministic or changed schema.",
+      );
+    }
+
+    const legacyHistoryReceipt = {
+      fixtureClass: "prior-repository-history-with-exact-source-digests",
+      historyBefore: legacyHistoryBefore,
+      detection: legacyPlan.historyState,
+      normalApplyRefused: !legacyPlan.normalApplyAllowed,
+      catalogBeforeRepair: legacyCatalogBefore,
+      exactLiveCatalogMismatches: legacyCatalogMismatches,
+      emittedRepairCommands: legacyPlan.commands,
+      historyAfterRepair: historyAfterFirstRepair,
+      repairedHistoryState,
+      schemaChangedByRepair: false,
+      deterministicRepairReplay: deterministicHistoryRepair,
+      mutationScope: "owned-disposable-fixture-only",
+    };
+
     replayReceipt = {
       ok: true,
       packetId: manifest.packetId,
@@ -588,12 +933,16 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
         engine: toolchain.postgres.version,
         toolchain,
         port,
-        databases: replayDatabases.map(([, database]) => database),
+        databases: [
+          ...replayDatabases.map(([, database]) => database),
+          legacyDatabase,
+        ],
       },
       fixtureClass: manifest.replayContract.fixtureClass,
       appliedPrefix,
       catalogSignatures: catalogs.replayA,
       deterministicReplay: deterministic,
+      legacyHistoryFixture: legacyHistoryReceipt,
       exactLiveMazerContractKinds: exactKinds,
       exactLiveMazerContractMismatches: exactMismatches,
       localInstalledExtensions: extensionDetails.replayA,
@@ -662,6 +1011,27 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
 }
 
 async function main() {
+  if (process.argv.includes("--legacy-repair-plan")) {
+    const manifest = loadManifest(REPO_ROOT);
+    const valueIndex = process.argv.indexOf("--applied-versions");
+    const appliedVersions =
+      valueIndex === -1
+        ? undefined
+        : (process.argv[valueIndex + 1] ?? "")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean);
+    const plan = buildLegacyRepairPlan(
+      manifest.legacyRepositoryHistory,
+      appliedVersions,
+    );
+    process.stdout.write(JSON.stringify(plan, null, 2) + "\n");
+    if (plan.historyState === "BLOCKED") {
+      process.exitCode = 1;
+    }
+    return;
+  }
+
   if (process.argv.includes("--replay")) {
     const receipt = await runReplay();
     process.stdout.write(JSON.stringify(receipt, null, 2) + "\n");

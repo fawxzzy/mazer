@@ -28,6 +28,7 @@
     "test:supabase-source-recovery": "vitest run tests/supabase/source-recovery.test.mjs",
     "supabase:verify-source-recovery": "node ./scripts/supabase/verify-source-recovery.mjs",
     "supabase:replay-source-recovery": "node ./scripts/supabase/verify-source-recovery.mjs --replay",
+    "supabase:legacy-repair-plan": "node ./scripts/supabase/verify-source-recovery.mjs --legacy-repair-plan",
     "visual:capture": "node ./scripts/visual/capture.mjs",
     "visual:matrix": "node ./scripts/visual/capture-layout-matrix.mjs",
     "visual:matrix:recovery": "node ./scripts/visual/capture-layout-matrix.mjs --preset core --design recovery",
