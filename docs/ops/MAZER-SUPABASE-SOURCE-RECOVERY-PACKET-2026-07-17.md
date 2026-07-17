@@ -2,7 +2,7 @@
 
 - Packet: `FP-MZR-REC-001`
 - Captured: `2026-07-17T07:57:13.968Z`
-- Verified: `2026-07-17T08:11:05.531Z`
+- Verified: `2026-07-17T08:21:14.872Z`
 - Project ref: `geknvnrmktchljnyddwp`
 - Source base: `origin/main@3bd13233dc33fc721f8ccf105d2cc51f1a8dd8d4`
 - Scope: repository-source recovery only
@@ -30,6 +30,8 @@ digests exactly equal their live statement digests.
 ## Disposable Replay
 
 - Runtime: PostgreSQL `17.9`
+- Toolchain gate: `postgres`, `initdb`, `pg_ctl`, and `psql` must all
+  report major version 17 before cluster creation
 - Owned port: `55432` (ports `5432` and `5433` untouched)
 - Fixtures: roles `anon`, `authenticated`, `service_role`; minimal
   `auth.users` and `auth.uid()`; locally available extension contracts
@@ -54,7 +56,7 @@ production parity.
 
 ## Verification
 
-- `npm run test:supabase-source-recovery`: 1 file, 3 tests passed
+- `npm run test:supabase-source-recovery`: 1 file, 4 tests passed
 - `npm run supabase:verify-source-recovery`: passed; four sources, zero
   duplicate versions, zero duplicate names
 - `npm run supabase:replay-source-recovery`: passed with the bounded

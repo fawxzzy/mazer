@@ -139,6 +139,17 @@ export function canonicalizeSql(value) {
   return value.replace(/\r\n/g, "\n").trim();
 }
 
+export function parsePostgresMajor(versionOutput) {
+  const match = /\(PostgreSQL\)\s+(\d+)(?:\.|\s|$)/.exec(versionOutput);
+  if (!match) {
+    throw new Error(
+      "Unable to determine PostgreSQL major version from: " +
+        JSON.stringify(versionOutput),
+    );
+  }
+  return Number(match[1]);
+}
+
 function parseMigrationIdentity(fileName) {
   const match = MIGRATION_PATTERN.exec(fileName);
   if (!match) {
@@ -431,6 +442,8 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
   const initdb = resolvePgBinary("initdb");
   const pgCtl = resolvePgBinary("pg_ctl");
   const psql = resolvePgBinary("psql");
+  const postgres = resolvePgBinary("postgres");
+  const toolchain = {};
   const appliedPrefix = { replayA: [], replayB: [] };
   let started = false;
   let replayError = null;
@@ -445,6 +458,23 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
   }
 
   try {
+    for (const [name, binary] of Object.entries({
+      postgres,
+      initdb,
+      pg_ctl: pgCtl,
+      psql,
+    })) {
+      const version = runCommand(binary, ["--version"]).trim();
+      const major = parsePostgresMajor(version);
+      if (major !== 17) {
+        throw new Error(
+          "Replay requires PostgreSQL 17, but " + name +
+            " reported major " + major + ": " + version,
+        );
+      }
+      toolchain[name] = { binary, version, major };
+    }
+
     mkdirSync(ownedRoot, { recursive: false });
     runCommand(initdb, [
       "-D",
@@ -555,7 +585,8 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
       packetId: manifest.packetId,
       staticReceipt,
       runtime: {
-        engine: runCommand(resolvePgBinary("postgres"), ["--version"]).trim(),
+        engine: toolchain.postgres.version,
+        toolchain,
         port,
         databases: replayDatabases.map(([, database]) => database),
       },

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canonicalizeSql,
   findDuplicateMigrationIdentities,
+  parsePostgresMajor,
   sha256,
   verifySourceRecovery,
 } from "../../scripts/supabase/verify-source-recovery.mjs";
@@ -34,5 +35,13 @@ describe("Mazer Supabase source recovery", () => {
 
     expect(duplicates.versions).toEqual(["20260709045557"]);
     expect(duplicates.names).toEqual(["mazer_progression_state"]);
+  });
+
+  it("identifies the PostgreSQL major version before replay", () => {
+    expect(parsePostgresMajor("postgres (PostgreSQL) 17.9")).toBe(17);
+    expect(parsePostgresMajor("psql (PostgreSQL) 16.10")).toBe(16);
+    expect(() => parsePostgresMajor("unknown database")).toThrow(
+      /Unable to determine PostgreSQL major version/,
+    );
   });
 });
