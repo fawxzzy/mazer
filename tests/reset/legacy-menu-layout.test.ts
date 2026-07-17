@@ -95,15 +95,15 @@ describe('legacy menu layout', () => {
     expect(titleLayout.width).toBeLessThanOrEqual(layout.width - 48);
   });
 
-  test('uses the cleaner 110-percent-style tile cadence on normal portrait phones', () => {
+  test('uses one edge-tight board frame while scaling maze tiles on normal portrait phones', () => {
     const menuLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 'menu');
     const playLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 'play');
 
-    expect(menuLayout.tileSize).toBe(7);
-    expect(playLayout.tileSize).toBe(7);
-    expect(menuLayout.boardSize).toBe(357);
-    expect(playLayout.boardSize).toBe(357);
-    expect(menuLayout.boardLeft).toBeGreaterThanOrEqual(24);
+    expect(menuLayout.tileSize).toBeCloseTo(7.653, 3);
+    expect(playLayout.tileSize).toBeCloseTo(7.653, 3);
+    expect(menuLayout.boardSize).toBe(389);
+    expect(playLayout.boardSize).toBe(389);
+    expect(menuLayout.boardLeft).toBe(8);
     expect(playLayout.boardLeft).toBe(menuLayout.boardLeft);
     expect(menuLayout.buttonLayout).toBe('row');
     expect(playLayout.buttonLayout).toBe('row');
@@ -112,12 +112,23 @@ describe('legacy menu layout', () => {
   test('lets phone menu mazes reach the screen edge when progression scale permits fewer cells', () => {
     const layout = resolveLegacyMenuLayout(405, 958, 50, 46, 'menu');
 
-    expect(layout.tileSize).toBe(8);
-    expect(layout.boardSize).toBe(382);
-    expect(layout.boardLeft).toBeGreaterThanOrEqual(8);
+    expect(layout.tileSize).toBeCloseTo(8.152, 3);
+    expect(layout.boardSize).toBe(389);
+    expect(layout.boardLeft).toBe(8);
     expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width - 8);
     expect(layout.titleY).toBeLessThan(layout.boardTop);
     expect(layout.buttonLayout).toBe('row');
+  });
+
+  test('holds the same phone maze border across small and large cell counts', () => {
+    const layouts = [37, 45, 49].map((mazeSize) => (
+      resolveLegacyMenuLayout(390, 844, 50, mazeSize, 'menu')
+    ));
+
+    expect(layouts.map((layout) => layout.boardSize)).toEqual([374, 374, 374]);
+    expect(layouts.map((layout) => layout.boardLeft)).toEqual([8, 8, 8]);
+    expect(layouts[0]!.tileSize).toBeGreaterThan(layouts[1]!.tileSize);
+    expect(layouts[1]!.tileSize).toBeGreaterThan(layouts[2]!.tileSize);
   });
 
   test('keeps normal phone-width menu buttons horizontal instead of using the side-panel stack', () => {
@@ -139,7 +150,7 @@ describe('legacy menu layout', () => {
       expect(layout.boardLeft).toBeGreaterThanOrEqual(8);
       expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width - 8);
       expect(layout.titleY).toBeLessThan(layout.boardTop);
-      expect(layout.leftButtonY + (layout.buttonHeight / 2)).toBeLessThan(layout.footerY);
+      expect(layout.leftButtonY + (layout.buttonHeight / 2)).toBeLessThanOrEqual(layout.footerY);
     }
   });
 

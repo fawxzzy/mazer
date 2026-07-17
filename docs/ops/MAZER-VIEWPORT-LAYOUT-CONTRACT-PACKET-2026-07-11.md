@@ -71,7 +71,7 @@ No Vercel production deployment or promotion was performed.
 
 ## Follow-On Work
 
-- Extend the transition matrix to desktop maximize/restore and real device browser-chrome changes.
-- Add route-aware guest/auth/play/pause transition coverage at `360x720` and `405x958`.
-- Move the browser-layout card from investigation to normalized responsive layout only after those matrices pass.
+- Completed on 2026-07-15: desktop maximize/restore and route-aware menu/Options/play/Pause transition coverage at `360x720`, `1440x900`, restored `360x720`, and `405x958`.
+- Completed on 2026-07-15: environment-owned safe-area variables remain live after the first published viewport snapshot.
+- Keep the browser-layout card on normalized responsive layout now that the maintained transition matrix passes.
 - Advance the mobile shell card only after maintained device-harness coverage proves the safe-area/orientation behavior outside emulation.

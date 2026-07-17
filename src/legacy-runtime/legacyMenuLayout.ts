@@ -50,6 +50,10 @@ export interface LegacyAuthenticatedMenuButtonStack {
 
 export type LegacyMenuLayoutSurface = 'menu' | 'play';
 
+export interface LegacyMenuLayoutOptions {
+  browserMobileParity?: boolean;
+}
+
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 export const LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_RATIO = 0.22;
 export const LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MIN = 10;
@@ -57,8 +61,8 @@ export const LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MAX = 14;
 const LEGACY_MENU_SIDE_PANEL_WIDTH = 300;
 const LEGACY_PLAY_ULTRA_NARROW_WIDTH = 360;
 const LEGACY_PHONE_CLEAN_ZOOM_WIDTH = 420;
-const LEGACY_PHONE_CLEAN_TILE_SIZE = 8;
 const LEGACY_PHONE_CLEAN_SAFE_INSET = 7;
+const LEGACY_PHONE_CLEAN_OUTER_MARGIN = 8;
 const LEGACY_PLAY_TOP_HUD_MIN = 84;
 const LEGACY_PLAY_TOP_HUD_MAX = 112;
 
@@ -124,7 +128,8 @@ export const resolveLegacyMenuLayout = (
   height: number,
   scale: number,
   mazeSize: number,
-  surface: LegacyMenuLayoutSurface = 'menu'
+  surface: LegacyMenuLayoutSurface = 'menu',
+  options: LegacyMenuLayoutOptions = {}
 ): LegacyMenuLayout => {
   const normalizedScale = clampInteger(scale, 25, 150);
   const isPortrait = height > width;
@@ -133,7 +138,9 @@ export const resolveLegacyMenuLayout = (
   const isPlayUltraNarrow = isPlaySurface && isPortrait && width < LEGACY_PLAY_ULTRA_NARROW_WIDTH;
   const isUltraNarrow = isSidePanelPortrait || isPlayUltraNarrow;
   const usesStackedButtons = isSidePanelPortrait;
-  const shouldUseCleanPhoneCadence = isPortrait && !isUltraNarrow && width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH;
+  const shouldUseCleanPhoneCadence = isPortrait
+    && !isUltraNarrow
+    && (width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH || options.browserMobileParity === true);
   const isShortLandscapeMenu = !isPlaySurface && !isPortrait && height < 820;
   const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
   const stackGap = Math.round(clamp(height * 0.02, 7, 12));
@@ -189,16 +196,20 @@ export const resolveLegacyMenuLayout = (
   );
   const boardSize = Math.round(clamp(rawBoardSize, minBoardSize, maxBoardSize));
   const rawTileSize = boardSize / Math.max(1, mazeSize);
-  const cleanPhoneMaxTileSize = Math.floor(
-    Math.max(1, width - 16 - (LEGACY_PHONE_CLEAN_SAFE_INSET * 2)) / Math.max(1, mazeSize)
+  const cleanPhoneBoardSize = Math.max(
+    1,
+    Math.min(boardSize, width - (LEGACY_PHONE_CLEAN_OUTER_MARGIN * 2))
   );
   const tileSize = isUltraNarrow
     ? Math.max(3, Number(rawTileSize.toFixed(3)))
     : shouldUseCleanPhoneCadence
-      ? Math.max(4, Math.min(LEGACY_PHONE_CLEAN_TILE_SIZE, cleanPhoneMaxTileSize, Math.floor(rawTileSize)))
+      ? Math.max(
+        4,
+        Number(((cleanPhoneBoardSize - (LEGACY_PHONE_CLEAN_SAFE_INSET * 2)) / Math.max(1, mazeSize)).toFixed(3))
+      )
     : Math.max(4, Math.floor(rawTileSize));
   const snappedBoardSize = shouldUseCleanPhoneCadence
-    ? Math.round((tileSize * mazeSize) + (LEGACY_PHONE_CLEAN_SAFE_INSET * 2))
+    ? Math.round(cleanPhoneBoardSize)
     : Math.round(tileSize * mazeSize * 1000) / 1000;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
   const menuGroupHeight = menuTitleReserve + snappedBoardSize + menuRankReserve + menuActionReserve + (laneGap * 2) + menuActionGap;

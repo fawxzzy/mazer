@@ -143,6 +143,14 @@ Ratchet this marker only when a bounded packet changes implemented state or proo
 
 Do not ratchet for wording changes alone. Do not ratchet the retired legacy visual 1:1 marker from this lane.
 
+## 2026-07-16 - Mobile control intent and guide-clipping maintenance receipt
+
+- Stayed at `100%`: this fixes regression evidence inside the already-complete mechanics/mobile lane and does not expand its denominator.
+- The compact Player Guide now begins at the overlay viewport mask instead of six pixels behind it.
+- Directional intent is versioned as `legacy-directional-intent-v3`: weak analog secondary input is a wall-only one-tile fallback, decisive retargeting remains a queued turn, and a legal dominant run no longer peels into a T-junction branch.
+- Captured stick/arrow holds retain a bounded repeat while blocked; arrow drags remain captured beyond the visible frame and through the center deadzone until release.
+- Proof: focused `5` files / `84` tests, TypeScript, clean full `npm run verify` at `49` files / `367` tests plus Vite/PWA build, and isolated 390x844 browser proof for guide containment, real T-junction continuity, beyond-frame/center arrow capture, blocked retry, release cleanup, and zero page/console errors. Durable packet: `docs/ops/MAZER-MOBILE-CONTROL-INTENT-REWORK-2026-07-16.md`.
+
 ## 2026-07-10 - Pause guide and progression-reset maintenance receipt
 
 - Stayed at `100%`: the active mechanics/mobile lane is already closed, so this focused maintenance pass did not ratchet it.
@@ -172,3 +180,11 @@ Do not ratchet for wording changes alone. Do not ratchet the retired legacy visu
 - Keyboard, touch arrows, stick drag, board swipe, and the QA bridge now share one wrap-aware resolver with an active direction, exactly one latest-wins queued turn, immediate legal turns, and at most four unambiguous assisted corners.
 - The resolver stops at dead ends, genuine branch ambiguity, mismatched queued intent, and the assistance bound; release and lifecycle boundaries clear stale input before it can replay.
 - Proof: pure directional fixtures `10/10`; focused scene/control `5 files / 96 tests`; architecture `3 files / 16 tests`; proof harness `2 files / 19 tests`; full `npm run verify` `47 files / 354 tests` plus Vite/PWA build; clean-commit phone keyboard `74/74`, phone stick `58/58`, and true desktop keyboard `70/70` live turns with lifecycle/fresh-world gates, `60 FPS`, and clean visual inspection. Durable packet: `docs/ops/MAZER-FLUID-ZIGZAG-DIRECTIONAL-INTENT-PACKET-2026-07-14.md`.
+
+## 2026-07-16 - Continuous stick, touch-coordinate, and UI-padding maintenance receipt
+
+- Stayed at `100%`: this repaired operator-found regressions inside the closed mechanics/mobile denominator; it did not widen the scope.
+- Shared button, title, toggle, and run-status text now uses centered geometry with symmetric padding instead of role-specific upward lift or bottom-only padding.
+- Same-size iOS visual-viewport/safe-area origin changes now refresh Phaser canvas bounds, and custom gestures transform native client coordinates through the live canvas rectangle.
+- `legacy-directional-intent-v4` replaces stick sectors and secondary-axis thresholding with a normalized 360-degree vector ranked against legal grid exits on every cadence step. Direct upward T turns, legal corners, release cleanup, and bounded one-tile Smart Steering have pure regression fixtures.
+- Proof: TypeScript and the production build passed; focused `6` files / `95` tests passed; final canonical verification passed `49` files / `367` tests, including the procedural seed family that timed out once on the first attempt; isolated in-app browser proof at `390x844` reported native canvas geometry, zero viewport/overlap violations, zero warning/error logs, and an exact upper-stick hit moving `(26,36) -> (26,35)` through one accepted world turn before clean release. Durable packet: `docs/ops/MAZER-MOBILE-TOUCH-STEERING-V4-PACKET-2026-07-16.md`.

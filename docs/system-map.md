@@ -255,8 +255,8 @@ This is the fastest way to answer "if I click or press this, what actually owns 
   - one active run direction and one latest-wins queued direction
   - immediate queued turns at the first legal opening
   - direct and paired-wrap legality through the shared navigation resolver
-  - bounded four-turn assistance through unambiguous non-reversing corners
-  - hard stops at dead ends, genuine branch ambiguity, mismatched queued turns, and the assistance limit
+  - one-tile perpendicular wall assistance only when that tile immediately restores the held lane
+  - held-direction resumption after the side step, with hard stops for dead ends, ambiguous sides, two-tile detours, ordinary corners, and mismatched queued turns
   - bounded diagnostics without solver-route exposure
 
 - `src/legacy-runtime/legacyMovementSpeed.ts`

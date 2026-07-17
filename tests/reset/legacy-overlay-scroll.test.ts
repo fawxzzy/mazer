@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import {
   clampLegacyOverlayScrollOffset,
+  legacyOverlayScrollRectIntersectsViewport,
+  resolveLegacyOverlayScrollRenderRect,
   resolveLegacyOverlayScrollMetrics
 } from '../../src/legacy-runtime/legacyOverlayScroll';
 
@@ -43,5 +45,29 @@ describe('legacy overlay scroll', () => {
   test('prevents negative and over-max scroll offsets', () => {
     expect(clampLegacyOverlayScrollOffset(-20, 120)).toBe(0);
     expect(clampLegacyOverlayScrollOffset(200, 120)).toBe(120);
+  });
+
+  test('clips scrolling at the real viewport edge instead of double-counting the offset', () => {
+    const viewport = { left: 24, top: 84, width: 342, height: 626 };
+
+    expect(resolveLegacyOverlayScrollRenderRect(viewport)).toEqual({
+      height: 622,
+      left: 24,
+      top: 86,
+      width: 342
+    });
+  });
+
+  test('keeps partially visible labels mounted so the mask can clip them smoothly', () => {
+    const viewport = { left: 24, top: 86, width: 342, height: 622 };
+
+    expect(legacyOverlayScrollRectIntersectsViewport(
+      { left: 123, top: 83.5, width: 123, height: 21 },
+      viewport
+    )).toBe(true);
+    expect(legacyOverlayScrollRectIntersectsViewport(
+      { left: 123, top: 60, width: 123, height: 20 },
+      viewport
+    )).toBe(false);
   });
 });

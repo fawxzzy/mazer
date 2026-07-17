@@ -134,6 +134,11 @@ export interface MenuSceneRuntimeDiagnostics {
       label: string;
       value: number;
     };
+    smartSteering: {
+      enabled: boolean;
+      switchIsOn: boolean;
+      stateText: string;
+    };
     trailFade: {
       enabled: boolean;
       switchIsOn: boolean;
@@ -177,6 +182,12 @@ export interface MenuSceneRuntimeDiagnostics {
       trailLength: number;
       trailVisible: boolean;
     };
+    timer: {
+      completedAtMs: number | null;
+      elapsedMs: number;
+      frozen: boolean;
+      startedAtMs: number;
+    };
     worldTurn: {
       acceptedTurnCount: number;
       lastCommandId: string | null;
@@ -211,8 +222,8 @@ export interface MenuSceneRuntimeDiagnostics {
     inputBuffer: {
       directionalIntent: {
         activeDirection: 'up' | 'right' | 'down' | 'left' | null;
-        assistedTurnCount: number;
-        assistedTurnLimit: number;
+        assistedLaneShiftCount: number;
+        assistedLaneShiftTileLimit: number;
         lastDecision: string;
         queuedDirection: 'up' | 'right' | 'down' | 'left' | null;
         requestedDirections: Array<'up' | 'right' | 'down' | 'left'>;
@@ -238,6 +249,7 @@ export interface MenuSceneRuntimeDiagnostics {
       pointerStartActive: boolean;
       touchSprint: {
         activeControls: string[];
+        arrowPointerActive: boolean;
         baseMovementSpeed: number;
         effectiveMovementSpeed: number;
         formulaVersion: string;
@@ -251,6 +263,7 @@ export interface MenuSceneRuntimeDiagnostics {
         repeatInitialDelayMs: number;
         repeatIntervalMs: number;
         stickInitialDelayMaxMs: number;
+        stickPointerActive: boolean;
         stickRepeatIntervalMaxMs: number;
         stickRetargetDelayMs: number;
         stickTurnDelayMaxMs: number;

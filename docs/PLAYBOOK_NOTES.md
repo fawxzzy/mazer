@@ -1,5 +1,9 @@
 # Playbook Notes
 
+- WHAT changed: Added pre-scene authenticated progression/settings hydration, revision-aware cross-device writes, safe advancement rebasing, reset conflict refusal, and a fine-pointer portrait browser adapter that reuses the phone maze/control composition without changing the phone branch.
+- WHY it changed: The same login previously produced different stats because the app only wrote remote progression and continued to read device-local caches; a `499x958` narrow browser pane also missed the phone-specific maze/control cadence used at `390x844`.
+- Evidence: `npm run verify:fast` (`13` files / `184` tests), focused account/browser parity packet (`4` files / `41` tests), `npm run build`, additive live Supabase migration/readback, and route-aware Preview captures at `390x844` and `499x958`.
+
 Use this file to record meaningful Playbook-governed repo changes in a concise, reviewable format.
 
 ## 2026-07-04

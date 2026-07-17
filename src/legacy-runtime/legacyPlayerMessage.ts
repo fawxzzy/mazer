@@ -69,7 +69,8 @@ export const LEGACY_REMOTE_MESSAGE_COPY = {
   cycleReceiptFailed: 'Run history saved locally. Cloud sync will retry later.',
   guest: 'Sign in to sync progress across devices.',
   missingClient: 'Cloud sync is not ready in this build.',
-  progressionFailed: 'Progress saved locally. Cloud sync will retry later.'
+  progressionFailed: 'Progress saved locally. Cloud sync will retry later.',
+  settingsFailed: 'Settings saved locally. Cloud sync will retry later.'
 } as const;
 
 export const LEGACY_OVERLAY_MESSAGE_COPY = {
@@ -78,7 +79,7 @@ export const LEGACY_OVERLAY_MESSAGE_COPY = {
   settingsUpdated: 'Settings updated.'
 } as const;
 
-export type LegacyRemoteMessageContext = 'cycle-receipt' | 'progression';
+export type LegacyRemoteMessageContext = 'cycle-receipt' | 'progression' | 'settings';
 export type LegacyRemoteSkippedReason = 'disabled' | 'guest' | 'missing-client' | null;
 
 export const createLegacyPlayerMessage = (
@@ -197,7 +198,9 @@ export const resolveLegacyRemoteSyncMessage = (
     return createLegacyPlayerMessage({
       copy: context === 'cycle-receipt'
         ? LEGACY_REMOTE_MESSAGE_COPY.cycleReceiptFailed
-        : LEGACY_REMOTE_MESSAGE_COPY.progressionFailed,
+        : context === 'settings'
+          ? LEGACY_REMOTE_MESSAGE_COPY.settingsFailed
+          : LEGACY_REMOTE_MESSAGE_COPY.progressionFailed,
       id: `remote.${context}.failed`,
       source: 'progression',
       technicalDetail: result.error,

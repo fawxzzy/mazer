@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   formatLegacyHudClock,
   resolveLegacyCompassSpinFrame,
+  resolveLegacyFrozenElapsedMs,
   resolveLegacyHudArrowAngle,
   resolveLegacyPlayHudFrame
 } from '../../src/legacy-runtime/legacyPlayHud';
@@ -13,6 +14,18 @@ describe('legacy play HUD', () => {
     expect(formatLegacyHudClock(1_000)).toBe('0:01');
     expect(formatLegacyHudClock(61_200)).toBe('1:01');
     expect(formatLegacyHudClock(600_000)).toBe('0:00');
+  });
+
+  test('freezes elapsed time at the exact goal-arrival timestamp', () => {
+    expect(resolveLegacyFrozenElapsedMs({
+      nowMs: 18_000,
+      startedAtMs: 10_000
+    })).toBe(8_000);
+    expect(resolveLegacyFrozenElapsedMs({
+      completedAtMs: 16_240,
+      nowMs: 99_000,
+      startedAtMs: 10_000
+    })).toBe(6_240);
   });
 
   test('points the goal arrow from player screen position toward the end tile', () => {

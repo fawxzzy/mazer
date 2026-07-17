@@ -116,13 +116,20 @@ const parseCssPixels = (value: string): number => {
 const readSafeArea = (runtime: MazerViewportRuntime): MazerViewportInsets => {
   const root = runtime.document?.documentElement;
   const style = root && runtime.getComputedStyle ? runtime.getComputedStyle(root) : null;
-  const readInset = (name: string): number => style ? parseCssPixels(style.getPropertyValue(name)) : 0;
+  const readInset = (environmentName: string, publishedName: string): number => {
+    if (!style) {
+      return 0;
+    }
+
+    const environmentValue = style.getPropertyValue(environmentName);
+    return parseCssPixels(environmentValue || style.getPropertyValue(publishedName));
+  };
 
   return {
-    top: readInset('--mazer-safe-area-top'),
-    right: readInset('--mazer-safe-area-right'),
-    bottom: readInset('--mazer-safe-area-bottom'),
-    left: readInset('--mazer-safe-area-left')
+    top: readInset('--mazer-environment-safe-area-top', '--mazer-safe-area-top'),
+    right: readInset('--mazer-environment-safe-area-right', '--mazer-safe-area-right'),
+    bottom: readInset('--mazer-environment-safe-area-bottom', '--mazer-safe-area-bottom'),
+    left: readInset('--mazer-environment-safe-area-left', '--mazer-safe-area-left')
   };
 };
 
@@ -149,8 +156,8 @@ export const resolveMazerViewportGeometryFromRuntime = (
   }
 
   const root = runtime.document?.documentElement;
-  const layoutWidth = normalizeDimension(root?.clientWidth ?? runtime.innerWidth, DEFAULT_VIEWPORT_WIDTH);
-  const layoutHeight = normalizeDimension(root?.clientHeight ?? runtime.innerHeight, DEFAULT_VIEWPORT_HEIGHT);
+  const layoutWidth = normalizeDimension(runtime.innerWidth ?? root?.clientWidth, DEFAULT_VIEWPORT_WIDTH);
+  const layoutHeight = normalizeDimension(runtime.innerHeight ?? root?.clientHeight, DEFAULT_VIEWPORT_HEIGHT);
   const visualWidth = normalizeDimension(runtime.visualViewport?.width, layoutWidth);
   const visualHeight = normalizeDimension(runtime.visualViewport?.height, layoutHeight);
   const visualScale = normalizeScale(runtime.visualViewport?.scale);
@@ -244,6 +251,11 @@ export const syncMazerGameToViewport = (
   const width = geometry.content.width;
   const height = geometry.content.height;
   if (game.scale.width === width && game.scale.height === height) {
+    // The visual viewport and safe-area origin can move without changing its
+    // dimensions (notably when iOS browser chrome collapses or expands).
+    // Refreshing keeps Phaser's cached canvasBounds aligned with the fixed
+    // #app origin so touch hit-testing does not drift below the finger.
+    game.scale.refresh();
     return false;
   }
 

@@ -54,6 +54,12 @@ export interface LegacyCompassSpinFrame {
   progress: number;
 }
 
+export interface LegacyFrozenElapsedInput {
+  completedAtMs?: number | null;
+  nowMs: number;
+  startedAtMs: number;
+}
+
 const createLegacyHudRect = (left: number, top: number, width: number, height: number): LegacyHudRect => ({
   left,
   top,
@@ -81,6 +87,15 @@ export const formatLegacyHudClock = (elapsedMs: number): string => {
 
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
+
+export const resolveLegacyFrozenElapsedMs = ({
+  completedAtMs,
+  nowMs,
+  startedAtMs
+}: LegacyFrozenElapsedInput): number => Math.max(
+  0,
+  Math.round((completedAtMs ?? nowMs) - startedAtMs)
+);
 
 export const resolveLegacyHudArrowAngle = (
   playerScreen: LegacyHudPoint,

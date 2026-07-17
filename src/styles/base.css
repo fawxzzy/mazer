@@ -1,10 +1,14 @@
 :root {
   color-scheme: dark;
   font-family: "Courier New", monospace;
-  --mazer-safe-area-top: env(safe-area-inset-top, 0px);
-  --mazer-safe-area-right: env(safe-area-inset-right, 0px);
-  --mazer-safe-area-bottom: env(safe-area-inset-bottom, 0px);
-  --mazer-safe-area-left: env(safe-area-inset-left, 0px);
+  --mazer-environment-safe-area-top: env(safe-area-inset-top, 0px);
+  --mazer-environment-safe-area-right: env(safe-area-inset-right, 0px);
+  --mazer-environment-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --mazer-environment-safe-area-left: env(safe-area-inset-left, 0px);
+  --mazer-safe-area-top: var(--mazer-environment-safe-area-top);
+  --mazer-safe-area-right: var(--mazer-environment-safe-area-right);
+  --mazer-safe-area-bottom: var(--mazer-environment-safe-area-bottom);
+  --mazer-safe-area-left: var(--mazer-environment-safe-area-left);
   --mazer-viewport-width: 100vw;
   --mazer-viewport-height: 100dvh;
   --mazer-viewport-left: 0px;
@@ -16,7 +20,15 @@
 }
 
 html,
-body,
+body {
+  background: #02080f;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
 #app {
   width: var(--mazer-viewport-width);
   height: var(--mazer-viewport-height);
@@ -36,15 +48,11 @@ body {
 
 body {
   min-width: 0;
-  background:
-    radial-gradient(circle at 24% 18%, rgba(104, 76, 138, 0.45) 0, rgba(104, 76, 138, 0) 26%),
-    radial-gradient(circle at 78% 18%, rgba(132, 96, 176, 0.38) 0, rgba(132, 96, 176, 0) 24%),
-    radial-gradient(circle at 52% 78%, rgba(98, 70, 132, 0.3) 0, rgba(98, 70, 132, 0) 22%),
-    linear-gradient(180deg, #261630 0, #2b1b39 40%, #24152f 100%);
   color: #f3f4f8;
 }
 
 #app {
+  background: #02080f;
   position: fixed;
   left: var(--mazer-viewport-left);
   top: var(--mazer-viewport-top);

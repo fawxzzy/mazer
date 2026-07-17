@@ -17,6 +17,7 @@ export interface LegacyGameTogglePreferences {
   controlMode: LegacyControlMode;
   darkMode: boolean;
   movementSpeed: number;
+  smartSteering: boolean;
   toggleAnimatedBackdrop: boolean;
   toggleCameraFollow: boolean;
   toggleTrailFade: boolean;
@@ -71,6 +72,7 @@ const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Parti
     'controlMode',
     'darkMode',
     'movementSpeed',
+    'smartSteering',
     'toggleAnimatedBackdrop',
     'toggleCameraFollow',
     'toggleTrailFade',
@@ -98,6 +100,7 @@ export const pickLegacyGameTogglePreferences = (
   controlMode: settings.controlMode,
   darkMode: settings.darkMode,
   movementSpeed: normalizeLegacyMovementSpeed(settings.movementSpeed),
+  smartSteering: settings.smartSteering,
   toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop,
   toggleCameraFollow: settings.toggleCameraFollow,
   toggleTrailFade: settings.toggleTrailFade,
@@ -116,6 +119,7 @@ export const normalizeLegacyGameTogglePreferences = (
       : Number(value?.movementSpeed),
     clampNumber(fallback.movementSpeed, LEGACY_MOVEMENT_SPEED_MIN, LEGACY_MOVEMENT_SPEED_MAX)
   ),
+  smartSteering: normalizeBoolean(value?.smartSteering, fallback.smartSteering),
   toggleAnimatedBackdrop: normalizeBoolean(value?.toggleAnimatedBackdrop, fallback.toggleAnimatedBackdrop),
   toggleCameraFollow: normalizeBoolean(value?.toggleCameraFollow, fallback.toggleCameraFollow),
   toggleTrailFade: normalizeBoolean(value?.toggleTrailFade, fallback.toggleTrailFade),

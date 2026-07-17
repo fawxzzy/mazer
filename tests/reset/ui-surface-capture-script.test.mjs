@@ -6,12 +6,15 @@ describe('UI surface capture script contract', () => {
   test('captures menu, options, play, and pause from runtime diagnostics', () => {
     const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-ui-surfaces.mjs'), 'utf8')
       .replace(/\r\n/g, '\n');
+    const transitionSource = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-ui-transitions.mjs'), 'utf8')
+      .replace(/\r\n/g, '\n');
     const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'));
 
     expect(packageJson.scripts['visual:ui-surfaces']).toBe('node ./scripts/analysis/capture-ui-surfaces.mjs');
     expect(packageJson.scripts['visual:cyber-arcade-matrix']).toBe('node ./scripts/analysis/capture-cyber-arcade-matrix.mjs');
     expect(packageJson.scripts['visual:cyber-arcade-compare']).toBe('node ./scripts/analysis/build-cyber-arcade-comparison.mjs');
     expect(packageJson.scripts['visual:ui-transitions']).toBe('node ./scripts/analysis/capture-ui-transitions.mjs');
+    expect(transitionSource).toContain('skipTopologyDiagnostics: true');
     expect(source).toContain("const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';");
     expect(source).toContain("const WRAP_TOPOLOGY_PROGRESSION_STORAGE_KEY = 'mazer.progression.v1:user:runtime-diagnostics-auth-fixture';");
     expect(source).toContain("const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';");
@@ -122,6 +125,9 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const collectTextOverlapIssues = (surfaceId, surface) => {');
     expect(source).toContain('const collectMenuControlSpacingIssues = (surface) => {');
     expect(source).toContain('const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {');
+    expect(source).toContain('badge.width > board.width + 1');
+    expect(source).toContain('progression-badge-not-play-lane-centered');
+    expect(source).toContain('isFiniteBounds(renderBoard) ? renderBoard.left : board.left');
     expect(source).toContain("'progression-badge-geometry'");
     expect(source).toContain("createCheck(\n      'mobile-text-label-bounds'");
     expect(source).toContain("createCheck(\n      'mobile-native-input-bounds'");
@@ -129,15 +135,23 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'mobile-control-spacing'");
     expect(source).toContain("createCheck(\n      'mobile-badge-text-fit'");
     expect(source).toContain('const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {');
+    expect(source).toContain('const requiredRects = scroll.enabled === true');
+    expect(source).toContain("if (scroll.enabled !== true) {");
     expect(source).toContain('const collectButtonLabelContainmentIssues = (surfaceId, surface) =>');
+    expect(source).toContain('const collectButtonLabelFillIssues = (surfaceId, surface) =>');
+    expect(source).toContain('progressionBadge fontSize=');
+    expect(source).toContain('pause-height=');
     expect(source).toContain('const collectGuideTextContainmentIssues = (surfaceId, surface) => {');
     expect(source).toContain('const collectWrapTopologyDiagnosticIssues = (surfaceId, surface, { requirePairs = false } = {}) => {');
     expect(source).toContain('const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {');
+    expect(source).toContain('material.geometry?.textTextureResolution !== 1');
+    expect(source).toContain("material.geometry?.textTransformOwner !== 'game-canvas-only'");
     expect(source).toContain("'cyber-arcade-material-system'");
     expect(source).toContain('materialSystem: menu.diagnostics.visual?.materialSystem');
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-affordance'");
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-reachability'");
     expect(source).toContain("createCheck(\n      'button-label-containment'");
+    expect(source).toContain("createCheck(\n      'button-label-fill'");
     expect(source).toContain("createCheck(\n      'guide-text-containment'");
     expect(source).toContain("createCheck(\n      'wrap-topology-diagnostics'");
     expect(source).toContain('const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
@@ -165,8 +179,11 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("preferenceFixture: typeof args['preference-fixture'] === 'string' ? args['preference-fixture'] : undefined");
     expect(source).toContain("if (preferenceFixture !== 'fresh') {");
     expect(source).toContain("'fresh-session-defaults'");
-    expect(source).toContain("hasLabels(surfaces.pause, ['Off: full maze view.', 'Off: trail stays.'])");
-    expect(source).toContain("'On: white shine travels.'");
+    expect(source).toContain('hasLabelsAcross(');
+    expect(source).toContain("'Full maze view.'");
+    expect(source).toContain("'Trail stays.'");
+    expect(source).toContain("'Slow white shine.'");
+    expect(source).toContain("'Shifts 1 tile at walls.'");
     expect(source).toContain('preferenceFixture: result.preferenceFixture');
     expect(source).toContain('window.requestAnimationFrame(() => {');
     expect(source).toContain('window.requestAnimationFrame(resolvePaint);');

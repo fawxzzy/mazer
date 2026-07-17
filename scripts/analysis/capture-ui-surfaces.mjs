@@ -669,7 +669,8 @@ const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
 ]);
 
 const resolveOptionsBottomExpectedLabels = (authenticated) => [
-  'Controls',
+  'Smart Steering',
+  'Control Style',
   authenticated ? 'Log out' : 'Account'
 ];
 
@@ -914,6 +915,7 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
 
   const badge = surface.progressionBadge?.bounds;
   const board = surface.board?.bounds;
+  const renderBoard = surface.board?.renderBounds;
   if (!isFiniteBounds(badge) || !isFiniteBounds(board)) {
     return [`${surfaceId}:missing-progression-badge-or-board-bounds`];
   }
@@ -924,8 +926,11 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
   }
 
   const portraitPlay = surface.mode === 'play' && viewport.height > viewport.width;
-  if (!portraitPlay && Math.abs(badge.width - board.width) > 1) {
-    issues.push(`${surfaceId}:progression-badge-width=${badge.width.toFixed(1)}!=board=${board.width.toFixed(1)}`);
+  if (!portraitPlay && badge.width > board.width + 1) {
+    issues.push(`${surfaceId}:progression-badge-width=${badge.width.toFixed(1)}>board=${board.width.toFixed(1)}`);
+  }
+  if (!portraitPlay && Math.abs(badge.centerX - board.centerX) > 1) {
+    issues.push(`${surfaceId}:progression-badge-not-board-centered`);
   }
   if (surface.mode === 'menu') {
     const mazeGap = badge.top - board.bottom;
@@ -934,12 +939,18 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
     }
   }
   if (portraitPlay) {
-    if (Math.abs(badge.centerX - (viewport.width / 2)) > 1) {
-      issues.push(`${surfaceId}:progression-badge-not-centered`);
-    }
     const pause = surface.touchControls?.controls?.pause;
+    const playLaneLeft = Math.max(9, isFiniteBounds(renderBoard) ? renderBoard.left : board.left);
+    const playLaneRight = isFiniteBounds(pause) ? pause.left - 8 : viewport.width - 9;
+    const playLaneCenter = playLaneLeft + ((playLaneRight - playLaneLeft) / 2);
+    if (Math.abs(badge.centerX - playLaneCenter) > 1) {
+      issues.push(`${surfaceId}:progression-badge-not-play-lane-centered`);
+    }
     if (isFiniteBounds(pause) && pause.left - badge.right < 4) {
       issues.push(`${surfaceId}:progression-badge-to-pause-gap=${(pause.left - badge.right).toFixed(1)}<4`);
+    }
+    if (isFiniteBounds(pause) && Math.abs(pause.height - badge.height) > 1) {
+      issues.push(`${surfaceId}:pause-height=${pause.height.toFixed(1)}!=badge-height=${badge.height.toFixed(1)}`);
     }
   }
   return issues;
@@ -955,11 +966,13 @@ const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {
     return [`${surfaceId}:missing-scroll-diagnostics`];
   }
 
-  const requiredRects = [
-    ['viewport', scroll.viewport],
-    ['track', scroll.track],
-    ['thumb', scroll.thumb]
-  ];
+  const requiredRects = scroll.enabled === true
+    ? [
+      ['viewport', scroll.viewport],
+      ['track', scroll.track],
+      ['thumb', scroll.thumb]
+    ]
+    : [['viewport', scroll.viewport]];
   const rectIssues = requiredRects.flatMap(([name, rect]) => {
     if (!isFiniteBounds(rect) || rect.width <= 0 || rect.height <= 0) {
       return [`${surfaceId}:${name}:missing-or-empty-scroll-rect`];
@@ -968,6 +981,10 @@ const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {
   });
   if (rectIssues.length > 0) {
     return rectIssues;
+  }
+
+  if (scroll.enabled !== true) {
+    return [];
   }
 
   const trackContainsThumb = scroll.thumb.top >= scroll.track.top - 1.5
@@ -1015,6 +1032,24 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
     || button.labelBounds.bottom > button.bounds.bottom + edgeTolerance
     ? [`${surfaceId}:${button.text}:label-outside-button`]
     : [];
+  const horizontalInset = Math.max(10, Math.min(28, button.bounds.width * 0.1));
+  const paddedActionLabels = new Set([
+    'Account',
+    'Create Account',
+    'Log out',
+    'Login',
+    'Menu',
+    'Options',
+    'Reset',
+    'Reset Progress',
+    'Start'
+  ]);
+  if (paddedActionLabels.has(button.text) && (
+    button.labelBounds.left < button.bounds.left + horizontalInset
+    || button.labelBounds.right > button.bounds.right - horizontalInset
+  )) {
+    issues.push(`${surfaceId}:${button.text}:label-inside-padding`);
+  }
   const actionLabels = new Set([
     'Account',
     'Back',
@@ -1036,6 +1071,57 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
   }
   return issues;
 });
+
+const collectButtonLabelFillIssues = (surfaceId, surface) => (surface?.buttons ?? []).flatMap((button) => {
+  const actionLabels = new Set([
+    'Account',
+    'Create Account',
+    'Log out',
+    'Login',
+    'Menu',
+    'Options',
+    'Reset',
+    'Reset Progress',
+    'Start'
+  ]);
+  if (!actionLabels.has(button?.text)) {
+    return [];
+  }
+  if (!isFiniteBounds(button?.bounds) || !Number.isFinite(button?.labelFontSize)) {
+    return [`${surfaceId}:${button?.text ?? 'unknown'}:missing-button-label-font-size`];
+  }
+  const lengthRatio = button.text.length >= 12 ? 0.28 : button.text.length >= 8 ? 0.33 : 0.38;
+  const minimumFontSize = Math.min(24, Math.floor(button.bounds.height * lengthRatio));
+  return button.labelFontSize + 0.01 < minimumFontSize
+    ? [`${surfaceId}:${button.text}:label-font-size=${button.labelFontSize}<${minimumFontSize}`]
+    : [];
+});
+
+const collectOverlayScrollFadeTextIssues = (surfaceId, surface) => {
+  if (surface?.skipped === true) {
+    return [];
+  }
+  const scroll = surface?.overlayUi?.scroll;
+  const viewport = scroll?.viewport;
+  if (!scroll || !isFiniteBounds(viewport)) {
+    return [`${surfaceId}:missing-scroll-fade-diagnostics`];
+  }
+  const fadeHeight = Math.min(34, Math.max(18, Math.round(viewport.height * 0.12)));
+  return collectTextLabelEntries(surface).flatMap((entry) => {
+    const bounds = entry?.bounds;
+    if (!isFiniteBounds(bounds) || bounds.bottom <= viewport.top || bounds.top >= viewport.bottom) {
+      return [];
+    }
+    const issues = [];
+    if (scroll.topFadeAlpha > 0 && bounds.top < viewport.top + fadeHeight) {
+      issues.push(`${surfaceId}:${entry.text}:text-under-top-fade`);
+    }
+    if (scroll.bottomFadeAlpha > 0 && bounds.bottom > viewport.bottom - fadeHeight) {
+      issues.push(`${surfaceId}:${entry.text}:text-under-bottom-fade`);
+    }
+    return issues;
+  });
+};
 
 const isGuideLabel = (text) => [
   'PLAYER GUIDE',
@@ -1172,6 +1258,8 @@ const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {
     || material.geometry?.strokeAlignment !== 'half-pixel-centered'
     || material.geometry?.backingScale !== 'dpr-aware-capped-2'
     || material.geometry?.sharedPanelBounds !== 'snapped-at-draw-boundary'
+    || material.geometry?.textTextureResolution !== 1
+    || material.geometry?.textTransformOwner !== 'game-canvas-only'
   ) {
     issues.push(`${surfaceId}:geometry=${JSON.stringify(material.geometry ?? null)}`);
   }
@@ -1190,6 +1278,10 @@ const buildSurfaceChecks = ({
   viewport
 }) => {
   const hasLabels = (surface, expectedLabels) => hasTextLabels(surface, expectedLabels);
+  const hasLabelsAcross = (surfaceGroup, expectedLabels) => {
+    const labels = new Set(surfaceGroup.flatMap((surface) => collectTextLabels(surface)));
+    return expectedLabels.every((label) => labels.has(label));
+  };
   const labelDetail = (surface) => collectTextLabels(surface)
     .join(', ');
   const authGated = surfaces.menu.authGated === true;
@@ -1234,9 +1326,15 @@ const buildSurfaceChecks = ({
     ...collectOverlayScrollAffordanceIssues('pause', surfaces.pause)
   ];
   const overlayScrollBottomIssues = includeOverlayBottom ? [
-    ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, ['Controls']),
+    ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, ['Smart Steering', 'Control Style']),
     ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Move Speed', 'Reset Progress', 'Reset', 'Menu'])
   ] : [];
+  const overlayScrollFadeTextIssues = [
+    ...collectOverlayScrollFadeTextIssues('options', surfaces.options),
+    ...collectOverlayScrollFadeTextIssues('options-bottom', surfaces.optionsBottom),
+    ...collectOverlayScrollFadeTextIssues('pause', surfaces.pause),
+    ...collectOverlayScrollFadeTextIssues('pause-bottom', surfaces.pauseBottom)
+  ];
   const buttonLabelContainmentIssues = [
     ...collectButtonLabelContainmentIssues('menu', surfaces.menu),
     ...collectButtonLabelContainmentIssues('auth', surfaces.auth),
@@ -1245,6 +1343,15 @@ const buildSurfaceChecks = ({
     ...collectButtonLabelContainmentIssues('play', surfaces.play),
     ...collectButtonLabelContainmentIssues('pause', surfaces.pause),
     ...collectButtonLabelContainmentIssues('pause-bottom', surfaces.pauseBottom)
+  ];
+  const buttonLabelFillIssues = [
+    ...collectButtonLabelFillIssues('menu', surfaces.menu),
+    ...collectButtonLabelFillIssues('auth', surfaces.auth),
+    ...collectButtonLabelFillIssues('options', surfaces.options),
+    ...collectButtonLabelFillIssues('options-bottom', surfaces.optionsBottom),
+    ...collectButtonLabelFillIssues('play', surfaces.play),
+    ...collectButtonLabelFillIssues('pause', surfaces.pause),
+    ...collectButtonLabelFillIssues('pause-bottom', surfaces.pauseBottom)
   ];
   const guideTextContainmentIssues = [
     ...collectGuideTextContainmentIssues('options', surfaces.options),
@@ -1263,9 +1370,19 @@ const buildSurfaceChecks = ({
     ['play', surfaces.play]
   ].flatMap(([id, surface]) => {
     const badge = surface.progressionBadge;
-    return badge?.text && badge.textFits !== true
+    if (!badge?.text) {
+      return [];
+    }
+    const issues = badge.textFits !== true
       ? [`${id}:progressionBadge textFits=${badge.textFits}`]
       : [];
+    const minimumFontSize = isFiniteBounds(badge.bounds)
+      ? Math.min(15, Math.floor(badge.bounds.height * 0.21))
+      : 13;
+    if (!Number.isFinite(badge.textFontSize) || badge.textFontSize + 0.01 < minimumFontSize) {
+      issues.push(`${id}:progressionBadge fontSize=${badge.textFontSize ?? 'missing'}<${minimumFontSize}`);
+    }
+    return issues;
   });
   const surfaceChecks = [
     createCheck(
@@ -1374,28 +1491,37 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'options-bottom-account-action',
-      authGated
+      !includeOverlayBottom
+        ? surfaces.optionsBottom.skipped === true
+        : authGated
         ? surfaces.optionsBottom.skipped === true
         : hasLabels(surfaces.optionsBottom, optionsBottomExpectedLabels),
-      authGated
+      !includeOverlayBottom
+        ? 'skipped for viewport-transition proof'
+        : authGated
         ? `skipped=${surfaces.optionsBottom.skipped === true}`
         : `labels=${labelDetail(surfaces.optionsBottom)}`
     ),
     createCheck(
       'fresh-session-defaults',
-      preferenceFixture !== 'fresh' || (
-        hasLabels(surfaces.pause, ['Off: full maze view.', 'Off: trail stays.'])
-        && hasLabels(surfaces.pauseBottom, [
-          'On: white shine travels.',
-          'On: background moves.',
-          'On: darker contrast.',
-          'Stick: drag to move.',
+      preferenceFixture !== 'fresh' || !includeOverlayBottom || hasLabelsAcross(
+        [surfaces.pause, surfaces.pauseBottom],
+        [
+          'Full maze view.',
+          'Trail stays.',
+          'Slow white shine.',
+          'Moving background.',
+          'Darker contrast.',
+          'Shifts 1 tile at walls.',
+          'Drag the stick to move.',
           'Move Speed',
           '30%'
-        ])
+        ]
       ),
       preferenceFixture !== 'fresh'
         ? 'not requested'
+        : !includeOverlayBottom
+        ? 'skipped for viewport-transition proof'
         : `pause=${labelDetail(surfaces.pause)}; pause-bottom=${labelDetail(surfaces.pauseBottom)}`
     ),
     createCheck(
@@ -1442,7 +1568,7 @@ const buildSurfaceChecks = ({
     createCheck(
       'mobile-overlay-scroll-affordance',
       overlayScrollIssues.length === 0,
-      overlayScrollIssues.length === 0 ? 'options and pause expose scroll viewport, rail, and thumb diagnostics' : overlayScrollIssues.join('; ')
+      overlayScrollIssues.length === 0 ? 'options and pause expose truthful scroll viewports and enabled rails' : overlayScrollIssues.join('; ')
     ),
     createCheck(
       'mobile-overlay-scroll-reachability',
@@ -1450,9 +1576,19 @@ const buildSurfaceChecks = ({
       overlayScrollBottomIssues.length === 0 ? 'options and pause bottom controls are reached through real scroll input' : overlayScrollBottomIssues.join('; ')
     ),
     createCheck(
+      'overlay-scroll-fade-text-clearance',
+      overlayScrollFadeTextIssues.length === 0,
+      overlayScrollFadeTextIssues.length === 0 ? 'no text is painted beneath a scroll fade' : overlayScrollFadeTextIssues.join('; ')
+    ),
+    createCheck(
       'button-label-containment',
       buttonLabelContainmentIssues.length === 0,
       buttonLabelContainmentIssues.length === 0 ? 'button labels remain inside their interactive chrome' : buttonLabelContainmentIssues.join('; ')
+    ),
+    createCheck(
+      'button-label-fill',
+      buttonLabelFillIssues.length === 0,
+      buttonLabelFillIssues.length === 0 ? 'action labels fill their chrome while retaining padding' : buttonLabelFillIssues.join('; ')
     ),
     createCheck(
       'guide-text-containment',
@@ -1906,6 +2042,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         nativeInputs: [],
         textLabels: []
       } : {
+        skipped: optionsBottomSurface.skipped === true,
+        reason: optionsBottomSurface.reason ?? null,
         mode: optionsBottomSurface.diagnostics.visual?.runtime?.mode ?? optionsBottomSurface.diagnostics.runtime?.surface?.mode,
         overlay: optionsBottomSurface.diagnostics.visual?.runtime?.overlay ?? optionsBottomSurface.diagnostics.runtime?.surface?.overlay,
         overlayUi: optionsBottomSurface.diagnostics.visual?.overlayUi,
@@ -1946,6 +2084,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         materialSystem: pause.diagnostics.visual?.materialSystem
       },
       pauseBottom: {
+        skipped: pauseBottomSurface.skipped === true,
+        reason: pauseBottomSurface.reason ?? null,
         mode: pauseBottomSurface.diagnostics.visual?.runtime?.mode ?? pauseBottomSurface.diagnostics.runtime?.surface?.mode,
         overlay: pauseBottomSurface.diagnostics.visual?.runtime?.overlay ?? pauseBottomSurface.diagnostics.runtime?.surface?.overlay,
         overlayUi: pauseBottomSurface.diagnostics.visual?.overlayUi,
