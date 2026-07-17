@@ -2,7 +2,7 @@
 
 - Packet: `FP-MZR-REC-001`
 - Captured: `2026-07-17T07:57:13.968Z`
-- Verified: `2026-07-17T10:15:32.6110036Z`
+- Verified: `2026-07-17T10:32:33.0622761Z`
 - Project ref: `geknvnrmktchljnyddwp`
 - Source base: `origin/main@3bd13233dc33fc721f8ccf105d2cc51f1a8dd8d4`
 - Scope: repository-source recovery only
@@ -52,7 +52,11 @@ digests exactly equal their live statement digests.
   An owned-fixture `PUBLIC SELECT` probe changed that to 60 entries at digest
   `dbf4ddb6119d923d7ab0c8bc2818905221a1fb6b85c305c6fad25a29db4cccb6`,
   and its bounded revoke restored the exact baseline
-- Cleanup: owned listener closed; owned data/log directory removed
+- Cleanup: owned listener closed; owned data/log directory removed only after
+  successful `pg_ctl stop` and port-release confirmation. Any unconfirmed
+  shutdown preserves the owned directory and returns explicit
+  `POSTGRES_STOP_UNCONFIRMED`, `POSTGRES_STARTUP_OUTCOME_UNCONFIRMED`, and/or
+  `OWNED_PORT_RELEASE_UNCONFIRMED` receipt blockers
 
 The first harness invocation timed out before role, database, or migration
 creation because PostgreSQL on Windows retained the launcher's captured output
@@ -68,7 +72,7 @@ production parity.
 
 ## Verification
 
-- `npm run test:supabase-source-recovery`: 1 file, 24 focused
+- `npm run test:supabase-source-recovery`: 1 file, 27 focused
   migration/source/history contract tests passed
 - `npm run supabase:verify-source-recovery`: passed; four sources, zero
   duplicate versions, zero duplicate names

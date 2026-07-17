@@ -176,6 +176,43 @@ export function assertUnprivilegedReplayUser(
   return { platform, uid, status: "SATISFIED" };
 }
 
+export function shouldRemoveOwnedReplayPath({
+  startAttempted,
+  started = false,
+  stopSucceeded,
+  portReleased,
+}) {
+  return ownedReplayCleanupDecision({
+    startAttempted,
+    started,
+    stopSucceeded,
+    portReleased,
+  }).pathRemovalAllowed;
+}
+
+export function ownedReplayCleanupDecision({
+  startAttempted,
+  started,
+  stopSucceeded,
+  portReleased,
+}) {
+  const blockers = [];
+  if (startAttempted && !stopSucceeded) {
+    blockers.push(
+      started
+        ? "POSTGRES_STOP_UNCONFIRMED"
+        : "POSTGRES_STARTUP_OUTCOME_UNCONFIRMED",
+    );
+  }
+  if (!portReleased) {
+    blockers.push("OWNED_PORT_RELEASE_UNCONFIRMED");
+  }
+  return {
+    pathRemovalAllowed: blockers.length === 0,
+    blockers,
+  };
+}
+
 function parseMigrationIdentity(fileName) {
   const match = MIGRATION_PATTERN.exec(fileName);
   if (!match) {
@@ -918,6 +955,7 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
   const postgres = resolvePgBinary("postgres");
   const toolchain = {};
   const appliedPrefix = { replayA: [], replayB: [], legacyHistory: [] };
+  let startAttempted = false;
   let started = false;
   let replayError = null;
   let replayReceipt = null;
@@ -959,6 +997,7 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
       "--encoding=UTF8",
       "--no-locale",
     ]);
+    startAttempted = true;
     runCommand(pgCtl, [
       "-D",
       dataDirectory,
@@ -1268,40 +1307,69 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
     replayError = error;
   } finally {
     let stopError = null;
-    if (started) {
+    let stopAttempted = false;
+    let stopSucceeded = false;
+    if (startAttempted && existsSync(dataDirectory)) {
+      stopAttempted = true;
       try {
         runCommand(
           pgCtl,
           ["-D", dataDirectory, "-m", "fast", "-w", "stop"],
           { stdio: "ignore" },
         );
+        stopSucceeded = true;
       } catch (error) {
         stopError = error;
       }
     }
     const portReleased = await waitForPortRelease(port);
+    const cleanupDecision = ownedReplayCleanupDecision({
+      startAttempted,
+      started,
+      stopSucceeded,
+      portReleased,
+    });
+    const { pathRemovalAllowed } = cleanupDecision;
     let pathRemoved = false;
-    try {
-      if (existsSync(ownedRoot)) {
-        rmSync(ownedRoot, { recursive: true, force: true });
+    if (pathRemovalAllowed) {
+      try {
+        if (existsSync(ownedRoot)) {
+          rmSync(ownedRoot, { recursive: true, force: true });
+        }
+        pathRemoved = !existsSync(ownedRoot);
+      } catch {
+        pathRemoved = false;
       }
-      pathRemoved = !existsSync(ownedRoot);
-    } catch {
-      pathRemoved = false;
+    }
+    const cleanupBlockers = [...cleanupDecision.blockers];
+    if (pathRemovalAllowed && !pathRemoved) {
+      cleanupBlockers.push("OWNED_PATH_REMOVAL_FAILED");
     }
     cleanupReceipt = {
       ownedPort: port,
+      startAttempted,
+      started,
+      stopAttempted,
+      stopSucceeded,
       portReleased,
+      shutdownConfirmed: pathRemovalAllowed,
       ownedPath: ownedRoot,
       pathRemoved,
+      pathPreserved: existsSync(ownedRoot),
+      cleanupDisposition: pathRemoved
+        ? "REMOVED_AFTER_CONFIRMED_SHUTDOWN"
+        : "PRESERVED_FOR_EXPLICIT_CLEANUP",
+      cleanupBlockers,
       stopError: stopError?.message ?? null,
     };
-    if (
-      (!portReleased || !pathRemoved || stopError) &&
-      replayError === null
-    ) {
+    if (!portReleased || !pathRemoved || stopError) {
+      const cleanupBlocker =
+        "Owned replay cleanup was incomplete: " +
+        JSON.stringify(cleanupReceipt);
       replayError = new Error(
-        "Owned replay cleanup was incomplete: " + JSON.stringify(cleanupReceipt),
+        replayError
+          ? replayError.message + "; " + cleanupBlocker
+          : cleanupBlocker,
       );
     }
   }

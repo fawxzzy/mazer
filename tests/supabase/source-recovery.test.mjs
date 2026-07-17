@@ -13,8 +13,10 @@ import {
   parseAppliedVersionsArgument,
   parseConfirmedPrerequisitesArgument,
   parsePostgresMajor,
+  ownedReplayCleanupDecision,
   requiredPreRepairPrerequisites,
   sha256,
+  shouldRemoveOwnedReplayPath,
   verifySourceRecovery,
 } from "../../scripts/supabase/verify-source-recovery.mjs";
 
@@ -127,6 +129,68 @@ describe("Mazer Supabase source recovery", () => {
     expect(() => assertUnprivilegedReplayUser("linux", null)).toThrow(
       /could not determine the POSIX user id/,
     );
+  });
+
+  it("preserves the owned replay path until shutdown is confirmed", () => {
+    expect(
+      shouldRemoveOwnedReplayPath({
+        startAttempted: false,
+        stopSucceeded: false,
+        portReleased: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRemoveOwnedReplayPath({
+        startAttempted: true,
+        stopSucceeded: true,
+        portReleased: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRemoveOwnedReplayPath({
+        startAttempted: true,
+        stopSucceeded: false,
+        portReleased: true,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRemoveOwnedReplayPath({
+        startAttempted: true,
+        stopSucceeded: true,
+        portReleased: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("returns a precise blocker when PostgreSQL stop is unconfirmed", () => {
+    expect(
+      ownedReplayCleanupDecision({
+        startAttempted: true,
+        started: true,
+        stopSucceeded: false,
+        portReleased: true,
+      }),
+    ).toEqual({
+      pathRemovalAllowed: false,
+      blockers: ["POSTGRES_STOP_UNCONFIRMED"],
+    });
+  });
+
+  it("preserves partial-start artifacts when startup outcome is unconfirmed", () => {
+    expect(
+      ownedReplayCleanupDecision({
+        startAttempted: true,
+        started: false,
+        stopSucceeded: false,
+        portReleased: false,
+      }),
+    ).toEqual({
+      pathRemovalAllowed: false,
+      blockers: [
+        "POSTGRES_STARTUP_OUTCOME_UNCONFIRMED",
+        "OWNED_PORT_RELEASE_UNCONFIRMED",
+      ],
+    });
   });
 
   it("fails closed and emits deterministic legacy history repair steps", () => {
