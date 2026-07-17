@@ -350,4 +350,19 @@ describe("Mazer Supabase source recovery", () => {
 
     expect(documentation).toContain(documentedCommand);
   });
+
+  it("documents empty-history authorization as owned-replay-only", () => {
+    const documentation = readFileSync(
+      resolve("docs/MAZER_SUPABASE_STORAGE.md"),
+      "utf8",
+    ).replaceAll("\r\n", "\n");
+
+    expect(documentation).toContain(
+      "The legacy repair-plan CLI intentionally does not accept or authorize\n" +
+        "empty-history catalog proof.",
+    );
+    expect(documentation).toContain(
+      "Only the owned replay harness can return `FRESH`",
+    );
+  });
 });

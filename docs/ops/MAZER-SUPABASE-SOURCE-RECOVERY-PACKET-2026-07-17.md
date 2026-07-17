@@ -2,7 +2,7 @@
 
 - Packet: `FP-MZR-REC-001`
 - Captured: `2026-07-17T07:57:13.968Z`
-- Verified: `2026-07-17T09:43:04.925Z`
+- Verified: `2026-07-17T09:53:54.806Z`
 - Project ref: `geknvnrmktchljnyddwp`
 - Source base: `origin/main@3bd13233dc33fc721f8ccf105d2cc51f1a8dd8d4`
 - Scope: repository-source recovery only
@@ -62,19 +62,19 @@ production parity.
 
 ## Verification
 
-- `npm run test:supabase-source-recovery`: 1 file, 22 focused
+- `npm run test:supabase-source-recovery`: 1 file, 23 focused
   migration/source/history contract tests passed
 - `npm run supabase:verify-source-recovery`: passed; four sources, zero
   duplicate versions, zero duplicate names
 - `npm run supabase:legacy-repair-plan`: passed; fail-closed ordered plan,
-  explicit observed history required, missing/current/mixed/partial/unknown
-  histories emit no commands; empty history stays `EMPTY_UNPROVEN` or `BLOCKED`
-  unless an independent owned-disposable catalog query proves every governed
-  Mazer object count is zero; exact history still emits no commands without
-  all target-specific pre-repair proofs; no mutation performed
+  explicit non-empty observed history required;
+  missing/empty/current/mixed/partial/unknown histories emit no commands; exact
+  legacy history still emits no commands without all target-specific pre-repair
+  proofs; no mutation performed and no external empty-history authorization
 - `npm run supabase:replay-source-recovery`: passed with the bounded
   provider-extension `UNKNOWN` described above; both replay databases proved an
-  empty disposable Mazer catalog before normal apply
+  empty disposable Mazer catalog before normal apply; this is the packet's only
+  empty-history authorization path
 - `npm run verify`: 53 files, 387 tests passed; production build passed
 - `git diff --check`: passed
 

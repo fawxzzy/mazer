@@ -83,12 +83,12 @@ objects before reaching the final state.
 The required fail-closed preflight is:
 
 1. Read the target migration history before any push or replay.
-2. If the history is empty, treat the schema as `EMPTY_UNPROVEN`; history alone
-   does not authorize normal apply. Independently create or prove an empty
-   disposable database and query every governed Mazer catalog kind. Normal apply
-   is allowed only when that independent catalog proof reports zero objects in
-   every kind; missing, malformed, contradictory, or populated evidence remains
-   blocked. Then replay the canonical four-source chain from zero.
+2. If an external target's history is empty, treat the schema as
+   `EMPTY_UNPROVEN`; history alone does not authorize normal apply. This packet's
+   only empty-history authorization path is the owned disposable replay harness:
+   it creates the database, independently queries every governed Mazer catalog
+   kind, and permits replay only when every count is zero. Missing, malformed,
+   contradictory, or populated evidence remains blocked.
 3. If it exactly matches the four recovered versions, no repair is needed.
 4. If it exactly matches the three legacy versions:
    - reset and replay from zero when the database is disposable; or
@@ -111,16 +111,20 @@ emits `reverted` commands for the three legacy versions. This forward-first
 ordering means an interruption cannot expose an empty, falsely fresh migration
 history.
 Omitting `--applied-versions` or passing an empty value yields `UNKNOWN`, emits
-no commands, and exits non-zero. An explicitly observed empty history yields
-`EMPTY_UNPROVEN` and cannot authorize normal apply until a separate empty
-disposable Mazer catalog is established. A populated or contradictory catalog
-proof is `BLOCKED`. Current, mixed, partial, or unknown observed
+no commands, and exits non-zero. Outside this CLI, an independently observed
+empty history is `EMPTY_UNPROVEN`; a populated or contradictory catalog proof
+is `BLOCKED`. Current, mixed, partial, or unknown observed
 histories likewise emit no commands; only the exact observed legacy history
 plus explicit confirmation of every target-specific pre-repair prerequisite
 produces a successful executable plan. Do not pass a prerequisite name until
 its target-specific lease, catalog comparison, or backup/classification receipt
 exists. The post-repair migration-history readback remains mandatory after the
 commands execute and is listed separately in the plan output.
+The legacy repair-plan CLI intentionally does not accept or authorize
+empty-history catalog proof. Only the owned replay harness can return `FRESH`
+in this packet because it creates the disposable database and performs the
+independent catalog query itself. External empty-history targets remain blocked
+for separately governed disposition.
 Generating a valid plan changes nothing. Executing its commands is a separately
 authorized target mutation and is forbidden without the prerequisites above.
 The disposable replay gate proves the legacy history is detected, normal apply
