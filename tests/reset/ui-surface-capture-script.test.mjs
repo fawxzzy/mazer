@@ -135,6 +135,10 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'mobile-control-spacing'");
     expect(source).toContain("createCheck(\n      'mobile-badge-text-fit'");
     expect(source).toContain('const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {');
+    expect(source).toContain('const collectOverlayScrollCueTextIssues = (surfaceId, surface) => {');
+    expect(source).toContain('text-crosses-scroll-edge-cue');
+    expect(source).toContain("'overlay-scroll-edge-cue-text-clearance'");
+    expect(source).not.toContain('text-under-bottom-fade');
     expect(source).toContain('const requiredRects = scroll.enabled === true');
     expect(source).toContain("if (scroll.enabled !== true) {");
     expect(source).toContain('const collectButtonLabelContainmentIssues = (surfaceId, surface) =>');

@@ -1097,29 +1097,43 @@ const collectButtonLabelFillIssues = (surfaceId, surface) => (surface?.buttons ?
     : [];
 });
 
-const collectOverlayScrollFadeTextIssues = (surfaceId, surface) => {
+const collectOverlayScrollCueTextIssues = (surfaceId, surface) => {
   if (surface?.skipped === true) {
     return [];
   }
   const scroll = surface?.overlayUi?.scroll;
   const viewport = scroll?.viewport;
+  const track = scroll?.track;
   if (!scroll || !isFiniteBounds(viewport)) {
-    return [`${surfaceId}:missing-scroll-fade-diagnostics`];
+    return [`${surfaceId}:missing-scroll-cue-diagnostics`];
   }
-  const fadeHeight = Math.min(34, Math.max(18, Math.round(viewport.height * 0.12)));
+  if (scroll.enabled !== true) {
+    return [];
+  }
+  if (!isFiniteBounds(track)) {
+    return [`${surfaceId}:missing-scroll-cue-track`];
+  }
+  const cueBounds = {
+    left: track.left - 5,
+    right: track.right + 5,
+    top: viewport.top,
+    bottom: viewport.bottom
+  };
   return collectTextLabelEntries(surface).flatMap((entry) => {
     const bounds = entry?.bounds;
     if (!isFiniteBounds(bounds) || bounds.bottom <= viewport.top || bounds.top >= viewport.bottom) {
       return [];
     }
-    const issues = [];
-    if (scroll.topFadeAlpha > 0 && bounds.top < viewport.top + fadeHeight) {
-      issues.push(`${surfaceId}:${entry.text}:text-under-top-fade`);
-    }
-    if (scroll.bottomFadeAlpha > 0 && bounds.bottom > viewport.bottom - fadeHeight) {
-      issues.push(`${surfaceId}:${entry.text}:text-under-bottom-fade`);
-    }
-    return issues;
+    const overlapsCueGutter = bounds.right > cueBounds.left && bounds.left < cueBounds.right;
+    const crossesTopCue = scroll.topFadeAlpha > 0
+      && bounds.top <= cueBounds.top + 3
+      && bounds.bottom >= cueBounds.top + 1;
+    const crossesBottomCue = scroll.bottomFadeAlpha > 0
+      && bounds.top <= cueBounds.bottom - 1
+      && bounds.bottom >= cueBounds.bottom - 3;
+    return overlapsCueGutter && (crossesTopCue || crossesBottomCue)
+      ? [`${surfaceId}:${entry.text}:text-crosses-scroll-edge-cue`]
+      : [];
   });
 };
 
@@ -1330,10 +1344,10 @@ const buildSurfaceChecks = ({
     ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Move Speed', 'Reset Progress', 'Reset', 'Menu'])
   ] : [];
   const overlayScrollFadeTextIssues = [
-    ...collectOverlayScrollFadeTextIssues('options', surfaces.options),
-    ...collectOverlayScrollFadeTextIssues('options-bottom', surfaces.optionsBottom),
-    ...collectOverlayScrollFadeTextIssues('pause', surfaces.pause),
-    ...collectOverlayScrollFadeTextIssues('pause-bottom', surfaces.pauseBottom)
+    ...collectOverlayScrollCueTextIssues('options', surfaces.options),
+    ...collectOverlayScrollCueTextIssues('options-bottom', surfaces.optionsBottom),
+    ...collectOverlayScrollCueTextIssues('pause', surfaces.pause),
+    ...collectOverlayScrollCueTextIssues('pause-bottom', surfaces.pauseBottom)
   ];
   const buttonLabelContainmentIssues = [
     ...collectButtonLabelContainmentIssues('menu', surfaces.menu),
@@ -1576,9 +1590,9 @@ const buildSurfaceChecks = ({
       overlayScrollBottomIssues.length === 0 ? 'options and pause bottom controls are reached through real scroll input' : overlayScrollBottomIssues.join('; ')
     ),
     createCheck(
-      'overlay-scroll-fade-text-clearance',
+      'overlay-scroll-edge-cue-text-clearance',
       overlayScrollFadeTextIssues.length === 0,
-      overlayScrollFadeTextIssues.length === 0 ? 'no text is painted beneath a scroll fade' : overlayScrollFadeTextIssues.join('; ')
+      overlayScrollFadeTextIssues.length === 0 ? 'scroll edge cues stay clear of text' : overlayScrollFadeTextIssues.join('; ')
     ),
     createCheck(
       'button-label-containment',
