@@ -24,6 +24,43 @@ Live audit result after migration hardening:
 - `authenticated` has only the client-needed progression/profile/cycle grants.
 - Stripe/license tables are not applied yet.
 
+## Canonical Migration Source Chain
+
+The repository migration tree mirrors the four live migration identities in
+their live order:
+
+1. `20260709045557_mazer_progression_state.sql`
+2. `20260709045648_mazer_account_storage_contracts.sql`
+3. `20260709045725_mazer_tighten_public_table_grants.sql`
+4. `20260716211513_account_state_revisions.sql`
+
+The first two sources intentionally preserve their original pre-hardening grant
+statements. The third migration owns the later all-role revoke/regrant step.
+Do not fold that tightening backward into an already-applied historical source.
+
+The secret-free provenance record is
+`supabase/recovery/fp-mzr-rec-001-provenance.json`. It binds each committed
+source to sanitized read-only live migration evidence using independent live
+raw, canonical SQL, and repository-LF digests. Run:
+
+```sh
+npm run supabase:verify-source-recovery
+```
+
+For an owned disposable PostgreSQL 17 replay:
+
+```sh
+npm run supabase:replay-source-recovery
+```
+
+Replay creates two fresh databases on an owned non-production listener, applies
+all four migrations from zero, compares deterministic catalog signatures, and
+removes its listener and data directory. The replay uses only sanitized fixture
+roles plus the minimal `auth.users`/`auth.uid()` contract needed to parse the
+historical SQL. It is not production parity. Supabase-managed extension
+behavior, including `supabase_vault`, remains `UNKNOWN` when unavailable in
+the disposable PostgreSQL runtime.
+
 ## Tables
 
 - `public.mazer_profiles`: player-facing profile/settings row keyed by `auth.users.id`.

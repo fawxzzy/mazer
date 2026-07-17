@@ -1,0 +1,136 @@
+{
+  "schemaVersion": "mazer.supabase-source-recovery.v1",
+  "packetId": "FP-MZR-REC-001",
+  "projectRef": "geknvnrmktchljnyddwp",
+  "capturedAtUtc": "2026-07-17T07:57:13.968Z",
+  "captureBoundary": {
+    "mode": "authorized-read-only-provider-catalog",
+    "liveMutationPerformed": false,
+    "secretsReadOrStored": false,
+    "providerBundleEquality": "UNKNOWN"
+  },
+  "migrationOrder": [
+    "20260709045557_mazer_progression_state.sql",
+    "20260709045648_mazer_account_storage_contracts.sql",
+    "20260709045725_mazer_tighten_public_table_grants.sql",
+    "20260716211513_account_state_revisions.sql"
+  ],
+  "migrations": [
+    {
+      "version": "20260709045557",
+      "name": "mazer_progression_state",
+      "file": "20260709045557_mazer_progression_state.sql",
+      "provenanceClass": "sanitized-live-migration-statement",
+      "sourceReference": "supabase_migrations.schema_migrations.statements[1]",
+      "liveStatementRawBytes": 1600,
+      "liveStatementRawSha256": "4476161ea667383d3eca49b846036dfb2eee73109ea86c8809666a9934f1ce0e",
+      "canonicalSqlSha256": "4476161ea667383d3eca49b846036dfb2eee73109ea86c8809666a9934f1ce0e",
+      "repositoryLfRawBytes": 1601,
+      "repositoryLfRawSha256": "8df9389fd41e293814fbf8f65caef0555a077e55314d9ac58ef04dc78eb3411a",
+      "recoveryDisposition": "renamed_to_live_version_and_restored_original_pre_tightening_body",
+      "priorRepositoryFile": "20260709005739_mazer_progression_state.sql"
+    },
+    {
+      "version": "20260709045648",
+      "name": "mazer_account_storage_contracts",
+      "file": "20260709045648_mazer_account_storage_contracts.sql",
+      "provenanceClass": "sanitized-live-migration-statement",
+      "sourceReference": "supabase_migrations.schema_migrations.statements[1]",
+      "liveStatementRawBytes": 8714,
+      "liveStatementRawSha256": "a9b35bdb2637490290de5cd74ef920f996da0bc8460b84e39e5d7c1563e5e37a",
+      "canonicalSqlSha256": "a9b35bdb2637490290de5cd74ef920f996da0bc8460b84e39e5d7c1563e5e37a",
+      "repositoryLfRawBytes": 8715,
+      "repositoryLfRawSha256": "ff1bc232ab0383acd3fbf4f6d5147a17639be5f2f45585cd26f148b18ec88943",
+      "recoveryDisposition": "renamed_to_live_version_and_restored_original_pre_tightening_body",
+      "priorRepositoryFile": "20260709011209_mazer_account_storage_contracts.sql"
+    },
+    {
+      "version": "20260709045725",
+      "name": "mazer_tighten_public_table_grants",
+      "file": "20260709045725_mazer_tighten_public_table_grants.sql",
+      "provenanceClass": "sanitized-live-migration-statement",
+      "sourceReference": "supabase_migrations.schema_migrations.statements[1]",
+      "liveStatementRawBytes": 1012,
+      "liveStatementRawSha256": "04a4e445de3a65db32b10422e081fe5914ae541240a83d98b6014b7b18c947a5",
+      "canonicalSqlSha256": "04a4e445de3a65db32b10422e081fe5914ae541240a83d98b6014b7b18c947a5",
+      "repositoryLfRawBytes": 1013,
+      "repositoryLfRawSha256": "4bf5fd2cc2f4156615461d144279ed67cfb3d65a5277e1acdda4c2b0c2fbd6c5",
+      "recoveryDisposition": "recovered_missing_canonical_source",
+      "priorRepositoryFile": null
+    },
+    {
+      "version": "20260716211513",
+      "name": "account_state_revisions",
+      "file": "20260716211513_account_state_revisions.sql",
+      "provenanceClass": "sanitized-live-migration-statement",
+      "sourceReference": "supabase_migrations.schema_migrations.statements[1]",
+      "liveStatementRawBytes": 592,
+      "liveStatementRawSha256": "8d999773d9c46a135f304bb3357e72ae99c773f859c1da1eb712680028d9ea01",
+      "canonicalSqlSha256": "8d999773d9c46a135f304bb3357e72ae99c773f859c1da1eb712680028d9ea01",
+      "repositoryLfRawBytes": 593,
+      "repositoryLfRawSha256": "ce2916685ab9a7734988a1e0403bb03818f78c6f2fbcc9832ce5f552086448ae",
+      "recoveryDisposition": "renamed_to_live_version_body_already_matched",
+      "priorRepositoryFile": "20260716205924_account_state_revisions.sql"
+    }
+  ],
+  "liveCatalogSignature": {
+    "algorithm": "sorted_utf8_lines_sha256_v1",
+    "postgresVersion": "17.6.1.141",
+    "kinds": {
+      "columns": {
+        "count": 48,
+        "sha256": "18990bd41f572486c3ad9bf90ba73f19f33c5f9747a47c87f2b29d75590a67ba"
+      },
+      "constraints": {
+        "count": 37,
+        "sha256": "876167f1d1b0545c7617c57227f9c993fc2db978e8049827ba5e452ea30485e2"
+      },
+      "extensions": {
+        "count": 5,
+        "sha256": "cef15d4b07d7c6e88cbcd657b54315d3c70bbe07e8dd1a76ca2ca9141751f601"
+      },
+      "functions": {
+        "count": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "grants": {
+        "count": 27,
+        "sha256": "0fc827b7e90d6a75e97e8bd4fb91e501b951170b41d6f17b2178129737fd2f35"
+      },
+      "indexes": {
+        "count": 8,
+        "sha256": "c8a634b7a188262142e3d8e1d862672ee4ee2bbb19aa25812580485077448d42"
+      },
+      "policies": {
+        "count": 11,
+        "sha256": "1642c9997148511bc501dabd66a0670b348bfa6784800333d49ab94d7ac3df02"
+      },
+      "tables": {
+        "count": 4,
+        "sha256": "6621585f3850369ed35d4c6c8dda77b99780ee3e7f9401b5c39efaa4f284184d"
+      },
+      "triggers": {
+        "count": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "installedExtensions": [
+      "pg_stat_statements|1.11|extensions",
+      "pgcrypto|1.3|extensions",
+      "plpgsql|1.0|pg_catalog",
+      "supabase_vault|0.3.1|vault",
+      "\"uuid-ossp\"|1.1|extensions"
+    ]
+  },
+  "replayContract": {
+    "runtime": "owned-disposable-postgresql-17",
+    "fixtureClass": "minimal-sanitized-auth-roles-and-uid-contract",
+    "productionParityClaim": false,
+    "providerManagedExtensionParity": "UNKNOWN",
+    "forbiddenPorts": [
+      5432,
+      5433
+    ],
+    "defaultOwnedPort": 55432
+  }
+}
