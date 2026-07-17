@@ -53,6 +53,12 @@ For an owned disposable PostgreSQL 17 replay:
 npm run supabase:replay-source-recovery
 ```
 
+The replay requires PostgreSQL major 17 for `postgres`, `initdb`, `pg_ctl`, and
+`psql`. On POSIX systems it must also run as a known non-root user because
+PostgreSQL refuses `initdb` as root. The verifier rejects root, an unknown
+POSIX uid, or a mixed/non-17 toolchain before cluster creation. This packet
+proves the Windows replay path only; Linux/container replay remains unproven.
+
 Replay creates two fresh databases on an owned non-production listener, applies
 all four migrations from zero, compares deterministic catalog signatures, and
 removes its listener and data directory. The replay uses only sanitized fixture

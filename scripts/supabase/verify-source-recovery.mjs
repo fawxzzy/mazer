@@ -150,6 +150,26 @@ export function parsePostgresMajor(versionOutput) {
   return Number(match[1]);
 }
 
+export function assertUnprivilegedReplayUser(
+  platform = process.platform,
+  uid = typeof process.getuid === "function" ? process.getuid() : null,
+) {
+  if (platform === "win32") {
+    return { platform, uid: null, status: "NOT_APPLICABLE" };
+  }
+  if (!Number.isInteger(uid)) {
+    throw new Error(
+      "Replay could not determine the POSIX user id; run it as a known unprivileged user.",
+    );
+  }
+  if (uid === 0) {
+    throw new Error(
+      "Replay must run as an unprivileged user because PostgreSQL initdb refuses the root user.",
+    );
+  }
+  return { platform, uid, status: "SATISFIED" };
+}
+
 function parseMigrationIdentity(fileName) {
   const match = MIGRATION_PATTERN.exec(fileName);
   if (!match) {
@@ -806,6 +826,7 @@ function readCatalog(psql, port, database) {
 }
 
 async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
+  const executionUser = assertUnprivilegedReplayUser();
   const staticReceipt = verifySourceRecovery(repoRoot);
   const manifest = loadManifest(repoRoot);
   const port = parsePort(argv);
@@ -1064,6 +1085,7 @@ async function runReplay(repoRoot = REPO_ROOT, argv = process.argv.slice(2)) {
       staticReceipt,
       runtime: {
         engine: toolchain.postgres.version,
+        executionUser,
         toolchain,
         port,
         databases: [

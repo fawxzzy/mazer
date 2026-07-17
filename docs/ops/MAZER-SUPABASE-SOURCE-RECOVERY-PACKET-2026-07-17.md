@@ -2,7 +2,7 @@
 
 - Packet: `FP-MZR-REC-001`
 - Captured: `2026-07-17T07:57:13.968Z`
-- Verified: `2026-07-17T09:14:04.371Z`
+- Verified: `2026-07-17T09:25:20.177Z`
 - Project ref: `geknvnrmktchljnyddwp`
 - Source base: `origin/main@3bd13233dc33fc721f8ccf105d2cc51f1a8dd8d4`
 - Scope: repository-source recovery only
@@ -32,6 +32,8 @@ digests exactly equal their live statement digests.
 - Runtime: PostgreSQL `17.9`
 - Toolchain gate: `postgres`, `initdb`, `pg_ctl`, and `psql` must all
   report major version 17 before cluster creation
+- Execution-user gate: POSIX replay must run as a known non-root user before
+  `initdb`; Windows records this gate as not applicable
 - Owned port: `55432` (ports `5432` and `5433` untouched)
 - Fixtures: roles `anon`, `authenticated`, `service_role`; minimal
   `auth.users` and `auth.uid()`; locally available extension contracts
@@ -60,7 +62,7 @@ production parity.
 
 ## Verification
 
-- `npm run test:supabase-source-recovery`: 1 file, 18 focused
+- `npm run test:supabase-source-recovery`: 1 file, 19 focused
   migration/source/history contract tests passed
 - `npm run supabase:verify-source-recovery`: passed; four sources, zero
   duplicate versions, zero duplicate names

@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  assertUnprivilegedReplayUser,
   buildLegacyRepairPlan,
   canonicalizeSql,
   classifyMigrationHistory,
@@ -81,6 +82,25 @@ describe("Mazer Supabase source recovery", () => {
     expect(parsePostgresMajor("psql (PostgreSQL) 16.10")).toBe(16);
     expect(() => parsePostgresMajor("unknown database")).toThrow(
       /Unable to determine PostgreSQL major version/,
+    );
+  });
+
+  it("rejects root before POSIX cluster initialization", () => {
+    expect(assertUnprivilegedReplayUser("win32", null)).toEqual({
+      platform: "win32",
+      uid: null,
+      status: "NOT_APPLICABLE",
+    });
+    expect(assertUnprivilegedReplayUser("linux", 1000)).toEqual({
+      platform: "linux",
+      uid: 1000,
+      status: "SATISFIED",
+    });
+    expect(() => assertUnprivilegedReplayUser("linux", 0)).toThrow(
+      /must run as an unprivileged user/,
+    );
+    expect(() => assertUnprivilegedReplayUser("linux", null)).toThrow(
+      /could not determine the POSIX user id/,
     );
   });
 
