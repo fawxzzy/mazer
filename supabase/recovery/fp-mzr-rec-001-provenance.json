@@ -109,18 +109,6 @@
     ],
     "repairSteps": [
       {
-        "version": "20260709005739",
-        "status": "reverted"
-      },
-      {
-        "version": "20260709011209",
-        "status": "reverted"
-      },
-      {
-        "version": "20260716205924",
-        "status": "reverted"
-      },
-      {
         "version": "20260709045557",
         "status": "applied"
       },
@@ -135,6 +123,18 @@
       {
         "version": "20260716211513",
         "status": "applied"
+      },
+      {
+        "version": "20260709005739",
+        "status": "reverted"
+      },
+      {
+        "version": "20260709011209",
+        "status": "reverted"
+      },
+      {
+        "version": "20260716205924",
+        "status": "reverted"
       }
     ],
     "retainedDatabasePrerequisites": [

@@ -226,12 +226,32 @@ export function requiredPreRepairPrerequisites(contract) {
   );
 }
 
+function interruptionSafeRepairSteps(contract, legacyVersions) {
+  const expectedSteps = [
+    ...contract.targetVersions.map((version) => ({
+      version,
+      status: "applied",
+    })),
+    ...legacyVersions.map((version) => ({
+      version,
+      status: "reverted",
+    })),
+  ];
+  if (JSON.stringify(contract.repairSteps) !== JSON.stringify(expectedSteps)) {
+    throw new Error(
+      "Repair steps must register every recovered version before reverting any legacy version.",
+    );
+  }
+  return expectedSteps;
+}
+
 export function buildLegacyRepairPlan(
   contract,
   appliedVersions,
   confirmedPrerequisites = [],
 ) {
   const legacyVersions = contract.legacyVersions.map(({ version }) => version);
+  const repairSteps = interruptionSafeRepairSteps(contract, legacyVersions);
   const historyState =
     appliedVersions === undefined
       ? "UNKNOWN"
@@ -277,7 +297,7 @@ export function buildLegacyRepairPlan(
       (prerequisite) => prerequisite.startsWith("post_"),
     ),
     commands: commandsAllowed
-      ? contract.repairSteps.map(
+      ? repairSteps.map(
           ({ version, status }) =>
             "supabase migration repair " + version + " --status " + status,
         )

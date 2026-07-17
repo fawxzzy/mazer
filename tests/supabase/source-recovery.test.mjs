@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -33,8 +36,8 @@ describe("Mazer Supabase source recovery", () => {
       "post_repair_migration_history_readback",
     ],
     repairSteps: [
-      ...legacy.map((version) => ({ version, status: "reverted" })),
       ...target.map((version) => ({ version, status: "applied" })),
+      ...legacy.map((version) => ({ version, status: "reverted" })),
     ],
   };
   const preRepairProofs = [
@@ -101,13 +104,13 @@ describe("Mazer Supabase source recovery", () => {
     expect(plan.normalApplyAllowed).toBe(false);
     expect(plan.mutationPerformed).toBe(false);
     expect(plan.commands).toEqual([
-      ...legacy.map(
-        (version) =>
-          "supabase migration repair " + version + " --status reverted",
-      ),
       ...target.map(
         (version) =>
           "supabase migration repair " + version + " --status applied",
+      ),
+      ...legacy.map(
+        (version) =>
+          "supabase migration repair " + version + " --status reverted",
       ),
     ]);
 
@@ -207,5 +210,49 @@ describe("Mazer Supabase source recovery", () => {
     expect(requiredPreRepairPrerequisites(legacyContract)).toEqual(
       preRepairProofs,
     );
+  });
+
+  it("never exposes a falsely fresh history at a repair interruption point", () => {
+    const plan = buildLegacyRepairPlan(
+      legacyContract,
+      legacy,
+      preRepairProofs,
+    );
+    const history = new Set(legacy);
+
+    for (const command of plan.commands) {
+      const match = command.match(
+        /^supabase migration repair (\d+) --status (applied|reverted)$/,
+      );
+      expect(match).not.toBeNull();
+      const [, version, status] = match;
+      if (status === "applied") {
+        history.add(version);
+      } else {
+        history.delete(version);
+      }
+      expect(
+        classifyMigrationHistory([...history], legacy, target),
+      ).not.toBe("FRESH");
+    }
+
+    expect(classifyMigrationHistory([...history], legacy, target)).toBe(
+      "CURRENT",
+    );
+  });
+
+  it("keeps the documented POSIX repair command on one continued invocation", () => {
+    const documentation = readFileSync(
+      resolve("docs/MAZER_SUPABASE_STORAGE.md"),
+      "utf8",
+    ).replaceAll("\r\n", "\n");
+    const documentedCommand =
+      "npm run supabase:legacy-repair-plan -- --applied-versions " +
+      legacy.join(",") +
+      " \\\n" +
+      "  --confirmed-prerequisites " +
+      preRepairProofs.join(",");
+
+    expect(documentation).toContain(documentedCommand);
   });
 });

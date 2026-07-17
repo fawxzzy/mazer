@@ -91,12 +91,14 @@ After obtaining the exact read-only version list, generate the non-mutating
 repair plan by passing that observed history explicitly:
 
 ```sh
-npm run supabase:legacy-repair-plan -- --applied-versions 20260709005739,20260709011209,20260716205924
+npm run supabase:legacy-repair-plan -- --applied-versions 20260709005739,20260709011209,20260716205924 \
   --confirmed-prerequisites target_specific_migration_lease,exact_live_mazer_catalog_signature_match,verified_backup_or_disposable_classification
 ```
 
-The plan emits ordered `supabase migration repair` commands for the three
-legacy versions as `reverted` and all four recovered versions as `applied`.
+The plan first emits `applied` commands for all four recovered versions, then
+emits `reverted` commands for the three legacy versions. This forward-first
+ordering means an interruption cannot expose an empty, falsely fresh migration
+history.
 Omitting `--applied-versions` or passing an empty value yields `UNKNOWN`, emits
 no commands, and exits non-zero. Current, mixed, partial, or unknown observed
 histories likewise emit no commands; only the exact observed legacy history
