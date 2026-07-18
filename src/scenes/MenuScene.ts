@@ -206,6 +206,7 @@ import {
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
 import {
+  captureLegacyAuthSubmitIntent,
   consumeLegacyAuthRecoveryIntent,
   createEmptyLegacyAuthFormState,
   createLegacyAuthScopedStorage,
@@ -224,6 +225,7 @@ import {
   resolveLegacyAuthPlatformCapabilities,
   resolveLegacyAuthScopedStorageKey,
   resolveLegacyAuthSubmitState,
+  resolveLegacyAuthSubmitCompletion,
   resolveLegacyAuthUsernameDraft,
   sanitizeLegacyAuthCallbackUrl,
   signInLegacyAuth,
@@ -239,6 +241,7 @@ import {
   type LegacyAuthFormState,
   type LegacyAuthStateListener,
   type LegacyAuthSessionSnapshot,
+  type LegacyAuthSubmitIntent,
   type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
@@ -9301,41 +9304,21 @@ export class MenuScene extends Phaser.Scene {
 
     this.authSubmitting = true;
     this.uiDirty = true;
+    const submitIntent = captureLegacyAuthSubmitIntent(this.authForm.mode);
     this.recordLegacyAuthActionDiagnostics({
       canSubmit: true,
       stage: 'submitting'
     });
-    if (this.authForm.mode === 'login' || this.authForm.mode === 'signup') {
+    if (submitIntent.action === 'login' || submitIntent.action === 'signup') {
       writeLegacyRememberedIdentity(this.resolveBrowserLocalStorage(), this.authForm.email);
     }
 
     let result: LegacyAuthActionResult;
     try {
-      if (this.authForm.mode === 'signup') {
-        result = await signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.displayName);
-      } else if (this.authForm.mode === 'recovery') {
-        result = await updateLegacyPassword(this.authForm.password);
-      } else if (this.authForm.mode === 'account') {
-        result = await updateLegacyAccount({
-          displayName: this.authForm.displayName,
-          email: this.authForm.email,
-          username: this.authForm.username
-        });
-      } else {
-        result = await signInLegacyAuth(this.authForm.email, this.authForm.password);
-      }
+      result = await this.executeLegacyAuthSubmitIntent(submitIntent);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const safeMessage = resolveLegacyAuthSafeErrorCopy(
-        message,
-        this.authForm.mode === 'login'
-          ? 'login'
-          : this.authForm.mode === 'signup'
-            ? 'signup'
-            : this.authForm.mode === 'recovery'
-              ? 'password-update'
-              : 'account-update'
-      );
+      const safeMessage = resolveLegacyAuthSafeErrorCopy(message, submitIntent.action);
       this.authSubmitting = false;
       this.authSnapshot = {
         ...this.authSnapshot,
@@ -9364,17 +9347,35 @@ export class MenuScene extends Phaser.Scene {
       stage: 'result',
       status: result.snapshot.status
     });
-    const shouldReturnToMainMenuAfterLogin = this.authForm.mode === 'login'
-      && result.snapshot.status === 'authenticated';
-    const completedRecovery = this.authForm.mode === 'recovery' && result.snapshot.error === null;
+    const { completedRecovery, shouldReturnToMainMenu } = resolveLegacyAuthSubmitCompletion(
+      submitIntent,
+      result.snapshot
+    );
     this.applyLegacyAuthSnapshot(result.snapshot);
     if (completedRecovery) {
       this.setLegacyAuthFormMode(result.snapshot.status === 'authenticated' ? 'account' : 'login');
     }
-    if (shouldReturnToMainMenuAfterLogin) {
+    if (shouldReturnToMainMenu) {
       this.closeLegacyAuthOverlayToMainMenu();
     }
     this.uiDirty = true;
+  }
+
+  private executeLegacyAuthSubmitIntent(intent: LegacyAuthSubmitIntent): Promise<LegacyAuthActionResult> {
+    if (intent.action === 'signup') {
+      return signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.displayName);
+    }
+    if (intent.action === 'password-update') {
+      return updateLegacyPassword(this.authForm.password);
+    }
+    if (intent.action === 'account-update') {
+      return updateLegacyAccount({
+        displayName: this.authForm.displayName,
+        email: this.authForm.email,
+        username: this.authForm.username
+      });
+    }
+    return signInLegacyAuth(this.authForm.email, this.authForm.password);
   }
 
   private async handleLegacyAuthPasswordReset(): Promise<void> {

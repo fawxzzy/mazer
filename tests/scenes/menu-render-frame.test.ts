@@ -1276,12 +1276,18 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private handleLegacyAuthStateChange(');
     expect(menuSceneSource).toContain('resolveLegacyAuthFormModeAfterStateChange(this.authForm.mode, event, snapshot.status)');
     expect(menuSceneSource.match(/resolveLegacyAuthNativeInputType\(fieldId, this\.authPasswordVisible\)/g)).toHaveLength(2);
-    expect(menuSceneSource).toContain("} else if (this.authForm.mode === 'account') {");
-    expect(menuSceneSource).toContain('result = await updateLegacyAccount({');
+    expect(menuSceneSource).toContain("if (intent.action === 'account-update') {");
+    expect(menuSceneSource).toContain('return updateLegacyAccount({');
     expect(menuSceneSource).toContain('this.handleLegacyAuthStateChange(snapshot, event);');
     expect(menuSceneSource).toContain("this.openOverlay('auth')");
     expect(menuSceneSource).toContain('private buildAuthOverlay(): void');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSubmit(): Promise<void>');
+    expect(menuSceneSource).toContain('const submitIntent = captureLegacyAuthSubmitIntent(this.authForm.mode);');
+    expect(menuSceneSource).toContain('result = await this.executeLegacyAuthSubmitIntent(submitIntent);');
+    expect(menuSceneSource).toContain('resolveLegacyAuthSafeErrorCopy(message, submitIntent.action)');
+    expect(menuSceneSource).toContain('resolveLegacyAuthSubmitCompletion(\n      submitIntent,\n      result.snapshot\n    )');
+    expect(menuSceneSource).toContain('private executeLegacyAuthSubmitIntent(intent: LegacyAuthSubmitIntent)');
+    expect(menuSceneSource).not.toContain("const shouldReturnToMainMenuAfterLogin = this.authForm.mode === 'login'");
     expect(menuSceneSource).toContain('private async handleLegacyAuthSignOut(): Promise<void>');
     expect(menuSceneSource).toContain('interface LegacyAuthActionDiagnostics');
     expect(menuSceneSource).toContain('private latestAuthActionDiagnostics: LegacyAuthActionDiagnostics | null = null;');
@@ -1293,7 +1299,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("stage: 'result'");
     expect(menuSceneSource).toContain("stage: 'exception'");
     expect(menuSceneSource).toContain('authAction: this.latestAuthActionDiagnostics');
-    expect(menuSceneSource).toContain('const shouldReturnToMainMenuAfterLogin = this.authForm.mode === \'login\'');
     expect(menuSceneSource).toContain('private closeLegacyAuthOverlayToMainMenu(): void');
     expect(menuSceneSource).toContain("const isAuthenticated = this.authSnapshot.status === 'authenticated';");
     expect(menuSceneSource).toContain("'Login',\n              () => this.openOverlay('auth')");

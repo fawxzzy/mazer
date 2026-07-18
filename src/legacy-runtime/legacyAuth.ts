@@ -1,7 +1,8 @@
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
-  resolveLegacyAuthSafeErrorCopy
+  resolveLegacyAuthSafeErrorCopy,
+  type LegacyAuthErrorAction
 } from './legacyPlayerMessage';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
@@ -50,6 +51,16 @@ export interface LegacyAuthSubmitState {
 export interface LegacyAuthActionResult {
   cooldownSeconds?: number;
   snapshot: LegacyAuthSessionSnapshot;
+}
+
+export interface LegacyAuthSubmitIntent {
+  readonly action: Extract<LegacyAuthErrorAction, 'account-update' | 'login' | 'password-update' | 'signup'>;
+  readonly mode: LegacyAuthFormMode;
+}
+
+export interface LegacyAuthSubmitCompletion {
+  completedRecovery: boolean;
+  shouldReturnToMainMenu: boolean;
 }
 
 export interface LegacyAuthRedirectContract {
@@ -890,6 +901,27 @@ export const createEmptyLegacyAuthFormState = (
   mode,
   password: '',
   username: ''
+});
+
+export const captureLegacyAuthSubmitIntent = (
+  mode: LegacyAuthFormMode
+): LegacyAuthSubmitIntent => Object.freeze({
+  action: mode === 'login'
+    ? 'login'
+    : mode === 'signup'
+      ? 'signup'
+      : mode === 'recovery'
+        ? 'password-update'
+        : 'account-update',
+  mode
+});
+
+export const resolveLegacyAuthSubmitCompletion = (
+  intent: LegacyAuthSubmitIntent,
+  snapshot: Pick<LegacyAuthSessionSnapshot, 'error' | 'status'>
+): LegacyAuthSubmitCompletion => ({
+  completedRecovery: intent.action === 'password-update' && snapshot.error === null,
+  shouldReturnToMainMenu: intent.action === 'login' && snapshot.status === 'authenticated'
 });
 
 export const resolveLegacyAuthSubmitState = (

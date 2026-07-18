@@ -6,6 +6,7 @@ import {
   LEGACY_AUTH_LEGACY_LOGIN_PASSWORD_MIN_LENGTH,
   LEGACY_AUTH_PASSWORD_MIN_LENGTH,
   LEGACY_AUTH_RESET_COOLDOWN_MS,
+  captureLegacyAuthSubmitIntent,
   createEmptyLegacyAuthFormState,
   createLegacyAuthSessionSnapshot,
   createLegacyGuestAuthSnapshot,
@@ -19,6 +20,7 @@ import {
   resolveLegacyAuthPlatformCapabilities,
   resolveLegacyAuthRedirectContract,
   resolveLegacyAuthResetCooldown,
+  resolveLegacyAuthSubmitCompletion,
   resolveLegacyAuthSubmitState,
   resolveLegacyAuthUsernameDraft,
   resolveSanitizedLegacyAuthCallbackPath,
@@ -290,6 +292,46 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     expect(resolveLegacyAuthFormModeAfterStateChange('account', 'USER_UPDATED', 'authenticated')).toBe('account');
     expect(resolveLegacyAuthFormModeAfterStateChange('login', 'PASSWORD_RECOVERY', 'authenticated')).toBe('login');
     expect(resolveLegacyAuthFormModeAfterStateChange('signup', 'PASSWORD_RECOVERY', 'authenticated')).toBe('signup');
+  });
+
+  test.each(['INITIAL_SESSION', 'SIGNED_IN'] as const)(
+    '[auth.login] preserves immutable login completion while %s renders Account during the provider await',
+    async (event) => {
+      const submittedIntent = captureLegacyAuthSubmitIntent('login');
+      let resolveProvider!: (snapshot: { error: null; status: 'authenticated' }) => void;
+      const providerResult = new Promise<{ error: null; status: 'authenticated' }>((resolveResult) => {
+        resolveProvider = resolveResult;
+      });
+      const completion = providerResult.then((snapshot) => resolveLegacyAuthSubmitCompletion(submittedIntent, snapshot));
+
+      expect(resolveLegacyAuthFormModeAfterStateChange('login', event, 'authenticated')).toBe('account');
+      resolveProvider({ error: null, status: 'authenticated' });
+
+      await expect(completion).resolves.toEqual({
+        completedRecovery: false,
+        shouldReturnToMainMenu: true
+      });
+      expect(submittedIntent).toEqual({ action: 'login', mode: 'login' });
+      expect(Object.isFrozen(submittedIntent)).toBe(true);
+    }
+  );
+
+  test('[auth.submit-intent] keeps signup, recovery, and account completion semantics distinct', () => {
+    expect(captureLegacyAuthSubmitIntent('signup')).toEqual({ action: 'signup', mode: 'signup' });
+    expect(captureLegacyAuthSubmitIntent('recovery')).toEqual({ action: 'password-update', mode: 'recovery' });
+    expect(captureLegacyAuthSubmitIntent('account')).toEqual({ action: 'account-update', mode: 'account' });
+    expect(resolveLegacyAuthSubmitCompletion(captureLegacyAuthSubmitIntent('signup'), {
+      error: null,
+      status: 'authenticated'
+    })).toEqual({ completedRecovery: false, shouldReturnToMainMenu: false });
+    expect(resolveLegacyAuthSubmitCompletion(captureLegacyAuthSubmitIntent('recovery'), {
+      error: null,
+      status: 'authenticated'
+    })).toEqual({ completedRecovery: true, shouldReturnToMainMenu: false });
+    expect(resolveLegacyAuthSubmitCompletion(captureLegacyAuthSubmitIntent('account'), {
+      error: null,
+      status: 'authenticated'
+    })).toEqual({ completedRecovery: false, shouldReturnToMainMenu: false });
   });
 
   test('[auth.native-input] preserves semantic email and password input types through rebinds', () => {
