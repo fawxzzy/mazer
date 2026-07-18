@@ -12,6 +12,7 @@ import {
   requestLegacyPasswordReset,
   resolveLegacyAuthCallbackPresentation,
   resolveLegacyAuthCallbackState,
+  resolveLegacyAuthFormModeAfterStateChange,
   resolveLegacyAuthPlatformCapabilities,
   resolveLegacyAuthRedirectContract,
   resolveLegacyAuthResetCooldown,
@@ -199,6 +200,8 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     expect(captureSource).toContain("engine: 'webkit'");
     expect(captureSource).toContain("fixture: 'recovery'");
     expect(captureSource).toContain("fixture: 'reset-wait'");
+    expect(captureSource).toContain("fixture: 'session-ended'");
+    expect(captureSource).toContain("const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';");
     expect(captureSource).toContain("id: 'confirmation'");
     expect(captureSource).toContain("id: 'invalid-confirmation'");
     expect(captureSource).toContain("auth=confirmed");
@@ -257,6 +260,25 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     });
   });
 
+  test('[auth.reset-cooldown] fails open for malformed or impossible persisted timestamps', () => {
+    const storage = new MemoryStorage();
+    for (const invalidValue of ['not-a-number', 'NaN', 'Infinity', '-1', '100001', '9007199254740992']) {
+      storage.setItem('mazer.auth.reset-cooldown.v1', invalidValue);
+      expect(resolveLegacyAuthResetCooldown(storage, 100_000)).toEqual({ allowed: true, remainingSeconds: 0 });
+    }
+
+    storage.setItem('mazer.auth.reset-cooldown.v1', 'not-a-number');
+    expect(startLegacyAuthResetCooldown(storage, 100_000)).toEqual({ allowed: false, remainingSeconds: 60 });
+  });
+
+  test('[auth.session-restoration] normalizes unauthenticated events without disrupting recovery or Account', () => {
+    expect(resolveLegacyAuthFormModeAfterStateChange('account', 'SIGNED_OUT', 'guest')).toBe('login');
+    expect(resolveLegacyAuthFormModeAfterStateChange('account', 'INITIAL_SESSION', 'guest')).toBe('login');
+    expect(resolveLegacyAuthFormModeAfterStateChange('account', 'TOKEN_REFRESHED', 'guest')).toBe('login');
+    expect(resolveLegacyAuthFormModeAfterStateChange('account', 'USER_UPDATED', 'authenticated')).toBe('account');
+    expect(resolveLegacyAuthFormModeAfterStateChange('login', 'PASSWORD_RECOVERY', 'authenticated')).toBe('login');
+  });
+
   test('[auth.session-restoration] reads the persisted Supabase browser session', async () => {
     const snapshot = await readLegacyAuthSessionSnapshot();
     expect(snapshot).toMatchObject({ email: 'player@example.com', status: 'authenticated', userId: 'user-1' });
@@ -285,6 +307,12 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     await updateLegacyAccount({ displayName: 'Maze Owner', email: 'owner@example.com', username: 'ignored' });
     expect(mockAuth.updateUser).toHaveBeenCalledWith({
       data: { display_name: 'Maze Owner' },
+      email: 'owner@example.com'
+    });
+
+    await updateLegacyAccount({ displayName: '   ', email: 'owner@example.com', username: 'ignored' });
+    expect(mockAuth.updateUser).toHaveBeenLastCalledWith({
+      data: { display_name: '' },
       email: 'owner@example.com'
     });
   });

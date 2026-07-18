@@ -283,6 +283,9 @@ export const resolveLegacyAuthResetCooldown = (
   } catch {
     startedAt = 0;
   }
+  if (!Number.isSafeInteger(startedAt) || startedAt <= 0 || startedAt > nowMs) {
+    startedAt = 0;
+  }
   const remainingMs = Math.max(0, LEGACY_AUTH_RESET_COOLDOWN_MS - Math.max(0, nowMs - startedAt));
   return {
     allowed: remainingMs === 0,
@@ -763,9 +766,7 @@ export const updateLegacyAccount = async (
 
   const data: Record<string, string> = {};
   const displayName = update.displayName.trim();
-  if (displayName) {
-    data.display_name = displayName;
-  }
+  data.display_name = displayName;
   if (capabilities.usernameProfile === 'read-write' && update.username.trim()) {
     data.username = update.username.trim();
   }
@@ -803,6 +804,14 @@ export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
     })
   };
 };
+
+export const resolveLegacyAuthFormModeAfterStateChange = (
+  currentMode: LegacyAuthFormMode,
+  event: AuthChangeEvent,
+  status: LegacyAuthStatus
+): LegacyAuthFormMode => event !== 'PASSWORD_RECOVERY' && status !== 'authenticated'
+  ? 'login'
+  : currentMode;
 
 export const subscribeLegacyAuthState = (
   listener: LegacyAuthStateListener

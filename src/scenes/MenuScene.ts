@@ -217,6 +217,7 @@ import {
   requestLegacyPasswordReset,
   resolveLegacyAuthCallbackPresentation,
   resolveLegacyAuthCallbackState,
+  resolveLegacyAuthFormModeAfterStateChange,
   resolveLegacyAuthAccountLabel,
   resolveLegacyAuthPlatformCapabilities,
   resolveLegacyAuthScopedStorageKey,
@@ -233,6 +234,7 @@ import {
   type LegacyAuthActionResult,
   type LegacyAuthFieldId,
   type LegacyAuthFormState,
+  type LegacyAuthStateListener,
   type LegacyAuthSessionSnapshot,
   type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
@@ -10096,7 +10098,20 @@ export class MenuScene extends Phaser.Scene {
       const fixture = typeof window === 'undefined'
         ? null
         : new URLSearchParams(window.location.search).get('authFixture')?.trim().toLowerCase();
-      if (fixture === 'recovery' || fixture === 'reset-wait' || fixture === 'account') {
+      if (fixture === 'session-ended') {
+        await Promise.resolve();
+        this.setLegacyAuthFormMode('account');
+        this.openOverlay('auth');
+        this.handleLegacyAuthStateChange({
+          ...runtimeAuthFixtureSnapshot,
+          displayName: null,
+          email: null,
+          error: null,
+          info: null,
+          status: 'guest',
+          userId: null
+        }, 'SIGNED_OUT');
+      } else if (fixture === 'recovery' || fixture === 'reset-wait' || fixture === 'account') {
         await Promise.resolve();
         if (fixture === 'recovery' || fixture === 'reset-wait') {
           this.enterLegacyAuthRecoveryMode(LEGACY_AUTH_MESSAGE_COPY.recoveryReady);
@@ -10118,13 +10133,7 @@ export class MenuScene extends Phaser.Scene {
       ? { kind: 'none' as const, message: null }
       : resolveLegacyAuthCallbackState(window.location);
     this.authUnsubscribe = await subscribeLegacyAuthState((snapshot, event) => {
-      this.applyLegacyAuthSnapshot(snapshot);
-      if (event === 'PASSWORD_RECOVERY') {
-        this.enterLegacyAuthRecoveryMode(LEGACY_AUTH_MESSAGE_COPY.recoveryReady);
-        if (typeof window !== 'undefined') {
-          sanitizeLegacyAuthCallbackUrl(window.location, window.history);
-        }
-      }
+      this.handleLegacyAuthStateChange(snapshot, event);
     });
 
     const snapshot = await readLegacyAuthSessionSnapshot();
@@ -10141,6 +10150,23 @@ export class MenuScene extends Phaser.Scene {
     }
     if (callbackState.kind !== 'none' && typeof window !== 'undefined') {
       sanitizeLegacyAuthCallbackUrl(window.location, window.history);
+    }
+  }
+
+  private handleLegacyAuthStateChange(
+    snapshot: LegacyAuthSessionSnapshot,
+    event: Parameters<LegacyAuthStateListener>[1]
+  ): void {
+    const nextMode = resolveLegacyAuthFormModeAfterStateChange(this.authForm.mode, event, snapshot.status);
+    if (nextMode !== this.authForm.mode) {
+      this.setLegacyAuthFormMode(nextMode);
+    }
+    this.applyLegacyAuthSnapshot(snapshot);
+    if (event === 'PASSWORD_RECOVERY') {
+      this.enterLegacyAuthRecoveryMode(LEGACY_AUTH_MESSAGE_COPY.recoveryReady);
+      if (typeof window !== 'undefined') {
+        sanitizeLegacyAuthCallbackUrl(window.location, window.history);
+      }
     }
   }
 
@@ -10173,7 +10199,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const fixture = searchParams.get('authFixture')?.trim().toLowerCase();
-    if (fixture !== 'account' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait') {
+    if (fixture !== 'account' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended') {
       return null;
     }
 

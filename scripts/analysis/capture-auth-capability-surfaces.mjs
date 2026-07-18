@@ -10,6 +10,7 @@ import {
 import { launchPreviewServer, stopPreviewServer } from '../visual/preview-server.mjs';
 
 const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
+const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const SURFACES = Object.freeze([
   Object.freeze({
@@ -26,6 +27,12 @@ const SURFACES = Object.freeze([
     id: 'reset-wait',
     fixture: 'reset-wait',
     expectedLabels: ['Reset Password', 'Please wait before requesting another reset link.', 'Save Password', 'Back to Account', 'Request New Link', 'Show']
+  }),
+  Object.freeze({
+    id: 'session-ended',
+    fixture: 'session-ended',
+    expectedAuth: { formMode: 'login', status: 'guest' },
+    expectedLabels: ['Account', 'Login', 'Create Account', 'Reset Password']
   }),
   Object.freeze({
     id: 'confirmation',
@@ -48,22 +55,36 @@ const readVisualDiagnostics = async (page) => page.evaluate((attribute) => {
   return raw ? JSON.parse(raw) : null;
 }, VISUAL_DIAGNOSTICS_ATTRIBUTE);
 
-const waitForAuthSurface = async (page, expectedLabels, timeoutMs) => {
-  await page.waitForFunction(({ attribute, expected }) => {
-    const raw = document.documentElement.getAttribute(attribute);
+const readRuntimeDiagnostics = async (page) => page.evaluate((attribute) => {
+  const raw = document.documentElement.getAttribute(attribute);
+  return raw ? JSON.parse(raw) : null;
+}, RUNTIME_DIAGNOSTICS_ATTRIBUTE);
+
+const waitForAuthSurface = async (page, expectedLabels, expectedAuth, timeoutMs) => {
+  await page.waitForFunction(({ expected, expectedRuntime, runtimeAttribute, visualAttribute }) => {
+    const raw = document.documentElement.getAttribute(visualAttribute);
     if (!raw) {
       return false;
     }
     try {
       const diagnostics = JSON.parse(raw);
       const labels = new Set((diagnostics?.textLabels ?? []).map((entry) => entry.text));
+      const runtimeRaw = document.documentElement.getAttribute(runtimeAttribute);
+      const runtime = runtimeRaw ? JSON.parse(runtimeRaw) : null;
       return diagnostics?.runtime?.mode === 'menu'
         && diagnostics?.runtime?.overlay === 'auth'
-        && expected.every((label) => labels.has(label));
+        && expected.every((label) => labels.has(label))
+        && (!expectedRuntime
+          || (runtime?.auth?.formMode === expectedRuntime.formMode && runtime?.auth?.status === expectedRuntime.status));
     } catch {
       return false;
     }
-  }, { attribute: VISUAL_DIAGNOSTICS_ATTRIBUTE, expected: expectedLabels }, { timeout: timeoutMs });
+  }, {
+    expected: expectedLabels,
+    expectedRuntime: expectedAuth ?? null,
+    runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
+    visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
+  }, { timeout: timeoutMs });
 };
 
 const collectGeometryIssues = (diagnostics, viewport) => {
@@ -123,9 +144,21 @@ const captureTarget = async ({ artifactDir, baseUrl, target, timeoutMs }) => {
         ? `${surface.route}&v=auth-parity-${target.id}-${surface.id}`
         : `/?content=core-only&theme=aurora&runtimeDiagnostics=1&authFixture=${surface.fixture}&v=auth-parity-${target.id}-${surface.id}`;
       await page.goto(new URL(route, baseUrl).toString(), { waitUntil: 'networkidle', timeout: timeoutMs });
-      await waitForAuthSurface(page, surface.expectedLabels, timeoutMs);
+      try {
+        await waitForAuthSurface(page, surface.expectedLabels, surface.expectedAuth, timeoutMs);
+      } catch (error) {
+        const observedVisual = await readVisualDiagnostics(page);
+        const observedRuntime = await readRuntimeDiagnostics(page);
+        const observedLabels = (observedVisual?.textLabels ?? []).map((entry) => entry.text);
+        throw new Error(
+          `${target.id}/${surface.id} did not reach the expected Auth surface; `
+          + `auth=${JSON.stringify(observedRuntime?.auth ?? null)}; labels=${JSON.stringify(observedLabels)}; `
+          + `cause=${error instanceof Error ? error.message : String(error)}`
+        );
+      }
       await page.evaluate(() => new Promise((resolvePaint) => requestAnimationFrame(() => requestAnimationFrame(resolvePaint))));
       const diagnostics = await readVisualDiagnostics(page);
+      const runtimeDiagnostics = await readRuntimeDiagnostics(page);
       const nativeInputs = await page.locator('[data-mazer-auth-input]').evaluateAll((inputs) => inputs.map((input) => {
         const bounds = input.getBoundingClientRect();
         return {
@@ -142,13 +175,18 @@ const captureTarget = async ({ artifactDir, baseUrl, target, timeoutMs }) => {
       await page.screenshot({ path: screenshotPath, fullPage: false });
       const geometryIssues = collectGeometryIssues(diagnostics, target.viewport);
       const labels = new Set((diagnostics?.textLabels ?? []).map((entry) => entry.text));
+      const authStateMatches = !surface.expectedAuth
+        || (runtimeDiagnostics?.auth?.formMode === surface.expectedAuth.formMode
+          && runtimeDiagnostics?.auth?.status === surface.expectedAuth.status);
       captures.push({
+        authState: runtimeDiagnostics?.auth ?? null,
+        authStateMatches,
         id: surface.id,
         expectedLabels: surface.expectedLabels,
         geometryIssues,
         labelsPresent: surface.expectedLabels.every((label) => labels.has(label)),
         nativeInputs,
-        pass: geometryIssues.length === 0 && surface.expectedLabels.every((label) => labels.has(label)),
+        pass: authStateMatches && geometryIssues.length === 0 && surface.expectedLabels.every((label) => labels.has(label)),
         screenshotPath
       });
     }
