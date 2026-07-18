@@ -91,9 +91,10 @@ export interface MenuSceneRuntimeDiagnostics {
   auth?: {
     configured: boolean;
     displayName: string | null;
+    displayNameDraft: string;
     email: string | null;
     emailPresent: boolean;
-    formMode: 'login' | 'signup';
+    formMode: 'account' | 'login' | 'recovery' | 'signup';
     rememberedIdentity: {
       displayName: string;
       email: string;
@@ -102,6 +103,7 @@ export interface MenuSceneRuntimeDiagnostics {
     } | null;
     status: 'guest' | 'authenticated' | 'unavailable';
     userIdPresent: boolean;
+    usernameDraftEmpty: boolean;
     latestMessage: {
       copy: string;
       id: string;

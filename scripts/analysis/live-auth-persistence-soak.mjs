@@ -205,7 +205,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     await openOptionsViaQa(page);
     const options = await waitForSurface(page, {
-      authenticated: true, buttons: ['Trail Shine', 'Log out'], mode: 'menu', overlay: 'options'
+      authenticated: true, buttons: ['Trail Shine', 'Account'], mode: 'menu', overlay: 'options'
     });
     const initialTrailShine = options.trailShineEnabled;
     if (typeof initialTrailShine !== 'boolean') {
@@ -232,7 +232,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     await openOptionsViaQa(page);
     const authenticatedOptionsReload = await waitForSurface(page, {
-      authenticated: true, buttons: ['Log out'], mode: 'menu', overlay: 'options'
+      authenticated: true, buttons: ['Account'], mode: 'menu', overlay: 'options'
     });
     steps.push({
       id: 'authenticated-options-reload',
@@ -267,12 +267,17 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     });
     await openOptionsViaQa(page);
     await waitForSurface(page, {
-      authenticated: true, buttons: ['Log out'], mode: 'menu', overlay: 'options'
+      authenticated: true, buttons: ['Account'], mode: 'menu', overlay: 'options'
+    });
+    const accountPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Account');
+    await page.mouse.click(accountPoint.x, accountPoint.y);
+    await waitForSurface(page, {
+      authenticated: true, buttons: ['Save Account', 'Change Password', 'Log out'], mode: 'menu', overlay: 'auth'
     });
     const logoutPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Log out');
     await page.mouse.click(logoutPoint.x, logoutPoint.y);
     const logout = await waitForSurface(page, {
-      authenticated: false, buttons: ['Account'], mode: 'menu', overlay: 'options'
+      authenticated: false, buttons: ['Login', 'Create Account', 'Reset Password'], mode: 'menu', overlay: 'auth'
     });
     steps.push({
       id: 'logout-to-guest',
