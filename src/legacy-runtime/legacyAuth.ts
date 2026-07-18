@@ -328,14 +328,26 @@ export const createLegacyGuestAuthSnapshot = (
 
 const resolveDisplayName = (user: User): string | null => {
   const metadata = user.user_metadata;
+  if (Object.prototype.hasOwnProperty.call(metadata, 'display_name')) {
+    const displayName = metadata.display_name;
+    return typeof displayName === 'string' && displayName.trim().length > 0
+      ? displayName.trim()
+      : null;
+  }
   const candidates = [
-    typeof metadata.display_name === 'string' ? metadata.display_name : null,
     typeof metadata.full_name === 'string' ? metadata.full_name : null,
     user.email?.split('@')[0] ?? null
   ];
 
   return candidates.find((candidate) => candidate !== null && candidate.trim().length > 0)?.trim() ?? null;
 };
+
+export const resolveLegacyAuthDisplayNameDraft = (
+  snapshot: Pick<LegacyAuthSessionSnapshot, 'displayName' | 'status'>,
+  currentDisplayName: string
+): string => snapshot.status === 'authenticated'
+  ? snapshot.displayName ?? ''
+  : snapshot.displayName ?? currentDisplayName;
 
 const resolveUsername = (user: User): string | null => {
   const value = user.user_metadata.username;

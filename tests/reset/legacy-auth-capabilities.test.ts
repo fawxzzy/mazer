@@ -7,11 +7,13 @@ import {
   LEGACY_AUTH_PASSWORD_MIN_LENGTH,
   LEGACY_AUTH_RESET_COOLDOWN_MS,
   createEmptyLegacyAuthFormState,
+  createLegacyAuthSessionSnapshot,
   createLegacyGuestAuthSnapshot,
   readLegacyAuthSessionSnapshot,
   requestLegacyPasswordReset,
   resolveLegacyAuthCallbackPresentation,
   resolveLegacyAuthCallbackState,
+  resolveLegacyAuthDisplayNameDraft,
   resolveLegacyAuthFormModeAfterStateChange,
   resolveLegacyAuthPlatformCapabilities,
   resolveLegacyAuthRedirectContract,
@@ -315,6 +317,71 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
       data: { display_name: '' },
       email: 'owner@example.com'
     });
+  });
+
+  test('[auth.account-information-update] preserves an explicitly cleared display name across refresh and later saves', async () => {
+    const originalMetadata = mockAuth.session.user.user_metadata;
+    mockAuth.session.user.user_metadata = {
+      display_name: 'Existing Name',
+      full_name: 'Provider Fallback'
+    };
+    mockAuth.updateUser.mockImplementationOnce(async (...args: unknown[]) => {
+      const attributes = args[0] as { data?: Record<string, unknown> };
+      mockAuth.session.user.user_metadata = {
+        ...mockAuth.session.user.user_metadata,
+        ...attributes.data
+      };
+      return { data: { user: mockAuth.session.user }, error: null };
+    });
+
+    try {
+      const cleared = await updateLegacyAccount({
+        displayName: '   ',
+        email: 'player@example.com',
+        username: 'ignored'
+      });
+      expect(cleared.snapshot).toMatchObject({ displayName: null, status: 'authenticated' });
+      expect(mockAuth.session.user.user_metadata).toMatchObject({
+        display_name: '',
+        full_name: 'Provider Fallback'
+      });
+
+      const refreshed = await readLegacyAuthSessionSnapshot();
+      expect(refreshed.displayName).toBeNull();
+      const reopenedDraft = resolveLegacyAuthDisplayNameDraft(refreshed, 'Existing Name');
+      expect(reopenedDraft).toBe('');
+
+      await updateLegacyAccount({
+        displayName: reopenedDraft,
+        email: 'player@example.com',
+        username: 'ignored'
+      });
+      expect(mockAuth.updateUser).toHaveBeenLastCalledWith({
+        data: { display_name: '' },
+        email: 'player@example.com'
+      });
+    } finally {
+      mockAuth.session.user.user_metadata = originalMetadata;
+    }
+  });
+
+  test('[auth.account-information-update] falls back only when display_name is absent', () => {
+    const snapshotFor = (userMetadata: Record<string, unknown>) => createLegacyAuthSessionSnapshot({
+      ...mockAuth.session,
+      user: {
+        ...mockAuth.session.user,
+        user_metadata: userMetadata
+      }
+    });
+
+    expect(snapshotFor({ display_name: '   ', full_name: 'Provider Fallback' }).displayName).toBeNull();
+    expect(snapshotFor({ display_name: null, full_name: 'Provider Fallback' }).displayName).toBeNull();
+    expect(snapshotFor({ full_name: '  Provider Fallback  ' }).displayName).toBe('Provider Fallback');
+    expect(snapshotFor({}).displayName).toBe('player');
+    expect(resolveLegacyAuthDisplayNameDraft(
+      createLegacyGuestAuthSnapshot(true),
+      'Unsaved guest draft'
+    )).toBe('Unsaved guest draft');
   });
 
   test('[auth.account-password-change] authenticated Account reaches the recovery form', () => {

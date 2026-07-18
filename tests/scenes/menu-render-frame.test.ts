@@ -1258,11 +1258,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.authSnapshot');
     expect(menuSceneSource).toContain('private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null');
     expect(menuSceneSource).toContain("runtimeDiagnostics !== '1' && runtimeDiagnostics !== 'true'");
-    expect(menuSceneSource).toContain("fixture !== 'account' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended'");
+    expect(menuSceneSource).toContain("fixture !== 'account' && fixture !== 'account-cleared' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended'");
     expect(menuSceneSource).toContain("userId: 'runtime-diagnostics-auth-fixture'");
     expect(menuSceneSource).toContain('const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();');
     expect(menuSceneSource).toContain('if (runtimeAuthFixtureSnapshot) {');
     expect(menuSceneSource).toContain("if (fixture === 'session-ended') {");
+    expect(menuSceneSource).toContain("} else if (fixture === 'account-cleared') {");
+    expect(menuSceneSource).toContain('displayName: resolveLegacyAuthDisplayNameDraft(snapshot, this.authForm.displayName)');
+    expect(menuSceneSource).toContain('displayName: resolveLegacyAuthDisplayNameDraft(this.authSnapshot, this.authForm.displayName)');
     expect(menuSceneSource).toContain("}, 'SIGNED_OUT');");
     expect(menuSceneSource).toContain('private handleLegacyAuthStateChange(');
     expect(menuSceneSource).toContain('resolveLegacyAuthFormModeAfterStateChange(this.authForm.mode, event, snapshot.status)');
@@ -1273,6 +1276,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private async handleLegacyAuthSignOut(): Promise<void>');
     expect(menuSceneSource).toContain('interface LegacyAuthActionDiagnostics');
     expect(menuSceneSource).toContain('private latestAuthActionDiagnostics: LegacyAuthActionDiagnostics | null = null;');
+    expect(menuSceneSource).toContain('displayNameDraft: this.authForm.displayName');
     expect(menuSceneSource).toContain('private recordLegacyAuthActionDiagnostics(');
     expect(menuSceneSource).toContain("stage: 'started'");
     expect(menuSceneSource).toContain("stage: 'blocked'");

@@ -91,6 +91,7 @@ export interface MenuSceneRuntimeDiagnostics {
   auth?: {
     configured: boolean;
     displayName: string | null;
+    displayNameDraft: string;
     email: string | null;
     emailPresent: boolean;
     formMode: 'account' | 'login' | 'recovery' | 'signup';

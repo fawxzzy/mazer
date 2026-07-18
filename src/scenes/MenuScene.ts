@@ -217,6 +217,7 @@ import {
   requestLegacyPasswordReset,
   resolveLegacyAuthCallbackPresentation,
   resolveLegacyAuthCallbackState,
+  resolveLegacyAuthDisplayNameDraft,
   resolveLegacyAuthFormModeAfterStateChange,
   resolveLegacyAuthAccountLabel,
   resolveLegacyAuthPlatformCapabilities,
@@ -1791,6 +1792,7 @@ export class MenuScene extends Phaser.Scene {
       auth: {
         configured: this.authSnapshot.configured,
         displayName: this.authSnapshot.displayName,
+        displayNameDraft: this.authForm.displayName,
         email: this.authSnapshot.email,
         emailPresent: this.authSnapshot.email !== null,
         formMode: this.authForm.mode,
@@ -9842,7 +9844,7 @@ export class MenuScene extends Phaser.Scene {
       const rememberedIdentity = readLegacyRememberedIdentity(this.resolveBrowserLocalStorage());
       this.authForm = {
         ...this.authForm,
-        displayName: this.authSnapshot.displayName ?? this.authForm.displayName,
+        displayName: resolveLegacyAuthDisplayNameDraft(this.authSnapshot, this.authForm.displayName),
         email: (this.authSnapshot.email ?? this.authForm.email) || rememberedIdentity,
         mode: this.authForm.mode === 'recovery'
           ? 'recovery'
@@ -10111,6 +10113,14 @@ export class MenuScene extends Phaser.Scene {
           status: 'guest',
           userId: null
         }, 'SIGNED_OUT');
+      } else if (fixture === 'account-cleared') {
+        await Promise.resolve();
+        this.applyLegacyAuthSnapshot({
+          ...runtimeAuthFixtureSnapshot,
+          displayName: null,
+          info: LEGACY_AUTH_MESSAGE_COPY.accountUpdated
+        });
+        this.openOverlay('auth');
       } else if (fixture === 'recovery' || fixture === 'reset-wait' || fixture === 'account') {
         await Promise.resolve();
         if (fixture === 'recovery' || fixture === 'reset-wait') {
@@ -10199,7 +10209,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const fixture = searchParams.get('authFixture')?.trim().toLowerCase();
-    if (fixture !== 'account' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended') {
+    if (fixture !== 'account' && fixture !== 'account-cleared' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended') {
       return null;
     }
 
@@ -10228,7 +10238,7 @@ export class MenuScene extends Phaser.Scene {
       }
       this.authForm = {
         ...this.authForm,
-        displayName: snapshot.displayName ?? this.authForm.displayName,
+        displayName: resolveLegacyAuthDisplayNameDraft(snapshot, this.authForm.displayName),
         email: snapshot.email,
         username: snapshot.username ?? this.authForm.username
       };

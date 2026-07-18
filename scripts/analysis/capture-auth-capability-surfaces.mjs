@@ -19,6 +19,13 @@ const SURFACES = Object.freeze([
     expectedLabels: ['Account', 'Save Account', 'Change Password', 'Log out']
   }),
   Object.freeze({
+    id: 'account-cleared',
+    fixture: 'account-cleared',
+    expectedAuth: { displayName: null, displayNameDraft: '', formMode: 'account', status: 'authenticated' },
+    expectedLabels: ['Account', 'Signed in as qa@mazer.local', 'Save Account', 'Change Password', 'Log out'],
+    forbiddenLabels: ['QA Player', 'Signed in as QA Player']
+  }),
+  Object.freeze({
     id: 'recovery',
     fixture: 'recovery',
     expectedLabels: ['Reset Password', 'Save Password', 'Back to Account', 'Request New Link', 'Show']
@@ -60,8 +67,8 @@ const readRuntimeDiagnostics = async (page) => page.evaluate((attribute) => {
   return raw ? JSON.parse(raw) : null;
 }, RUNTIME_DIAGNOSTICS_ATTRIBUTE);
 
-const waitForAuthSurface = async (page, expectedLabels, expectedAuth, timeoutMs) => {
-  await page.waitForFunction(({ expected, expectedRuntime, runtimeAttribute, visualAttribute }) => {
+const waitForAuthSurface = async (page, expectedLabels, forbiddenLabels, expectedAuth, timeoutMs) => {
+  await page.waitForFunction(({ expected, forbidden, expectedRuntime, runtimeAttribute, visualAttribute }) => {
     const raw = document.documentElement.getAttribute(visualAttribute);
     if (!raw) {
       return false;
@@ -74,13 +81,15 @@ const waitForAuthSurface = async (page, expectedLabels, expectedAuth, timeoutMs)
       return diagnostics?.runtime?.mode === 'menu'
         && diagnostics?.runtime?.overlay === 'auth'
         && expected.every((label) => labels.has(label))
+        && forbidden.every((label) => !labels.has(label))
         && (!expectedRuntime
-          || (runtime?.auth?.formMode === expectedRuntime.formMode && runtime?.auth?.status === expectedRuntime.status));
+          || Object.entries(expectedRuntime).every(([key, value]) => runtime?.auth?.[key] === value));
     } catch {
       return false;
     }
   }, {
     expected: expectedLabels,
+    forbidden: forbiddenLabels ?? [],
     expectedRuntime: expectedAuth ?? null,
     runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
     visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
@@ -145,7 +154,7 @@ const captureTarget = async ({ artifactDir, baseUrl, target, timeoutMs }) => {
         : `/?content=core-only&theme=aurora&runtimeDiagnostics=1&authFixture=${surface.fixture}&v=auth-parity-${target.id}-${surface.id}`;
       await page.goto(new URL(route, baseUrl).toString(), { waitUntil: 'networkidle', timeout: timeoutMs });
       try {
-        await waitForAuthSurface(page, surface.expectedLabels, surface.expectedAuth, timeoutMs);
+        await waitForAuthSurface(page, surface.expectedLabels, surface.forbiddenLabels, surface.expectedAuth, timeoutMs);
       } catch (error) {
         const observedVisual = await readVisualDiagnostics(page);
         const observedRuntime = await readRuntimeDiagnostics(page);
@@ -175,18 +184,20 @@ const captureTarget = async ({ artifactDir, baseUrl, target, timeoutMs }) => {
       await page.screenshot({ path: screenshotPath, fullPage: false });
       const geometryIssues = collectGeometryIssues(diagnostics, target.viewport);
       const labels = new Set((diagnostics?.textLabels ?? []).map((entry) => entry.text));
+      const forbiddenLabelsAbsent = (surface.forbiddenLabels ?? []).every((label) => !labels.has(label));
       const authStateMatches = !surface.expectedAuth
-        || (runtimeDiagnostics?.auth?.formMode === surface.expectedAuth.formMode
-          && runtimeDiagnostics?.auth?.status === surface.expectedAuth.status);
+        || Object.entries(surface.expectedAuth).every(([key, value]) => runtimeDiagnostics?.auth?.[key] === value);
       captures.push({
         authState: runtimeDiagnostics?.auth ?? null,
         authStateMatches,
         id: surface.id,
         expectedLabels: surface.expectedLabels,
+        forbiddenLabels: surface.forbiddenLabels ?? [],
+        forbiddenLabelsAbsent,
         geometryIssues,
         labelsPresent: surface.expectedLabels.every((label) => labels.has(label)),
         nativeInputs,
-        pass: authStateMatches && geometryIssues.length === 0 && surface.expectedLabels.every((label) => labels.has(label)),
+        pass: authStateMatches && forbiddenLabelsAbsent && geometryIssues.length === 0 && surface.expectedLabels.every((label) => labels.has(label)),
         screenshotPath
       });
     }
