@@ -19,6 +19,7 @@ import {
   resolveLegacyAuthRedirectContract,
   resolveLegacyAuthResetCooldown,
   resolveLegacyAuthSubmitState,
+  resolveLegacyAuthUsernameDraft,
   resolveSanitizedLegacyAuthCallbackPath,
   signInLegacyAuth,
   signOutLegacyAuth,
@@ -203,6 +204,11 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     expect(captureSource).toContain("fixture: 'recovery'");
     expect(captureSource).toContain("fixture: 'reset-wait'");
     expect(captureSource).toContain("fixture: 'session-ended'");
+    expect(captureSource).toContain("fixture: 'account-username-cleared'");
+    expect(captureSource).toContain("fixture: 'account-user-switch'");
+    expect(captureSource).toContain('usernameDraftEmpty: true');
+    expect(captureSource).toContain("expectedFieldIds: ['username']");
+    expect(captureSource).toContain('expectedFields.every((fieldId) => fields.has(fieldId))');
     expect(captureSource).toContain("const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';");
     expect(captureSource).toContain("id: 'confirmation'");
     expect(captureSource).toContain("id: 'invalid-confirmation'");
@@ -396,6 +402,8 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     expect(resolveLegacyAuthPlatformCapabilities({ VITE_MAZER_PLATFORM_USERNAME_CAPABILITY: 'read-write' })).toEqual({
       usernameProfile: 'read-write'
     });
+    const source = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
+    expect(source).toContain('VITE_MAZER_PLATFORM_USERNAME_CAPABILITY: import.meta.env.VITE_MAZER_PLATFORM_USERNAME_CAPABILITY');
     await updateLegacyAccount(
       { displayName: 'Maze Owner', email: 'owner@example.com', username: 'global-owner' },
       { usernameProfile: 'read-write' }
@@ -404,8 +412,81 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
       data: { display_name: 'Maze Owner', username: 'global-owner' },
       email: 'owner@example.com'
     });
-    const source = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
+    await updateLegacyAccount(
+      { displayName: 'Maze Owner', email: 'owner@example.com', username: '   ' },
+      { usernameProfile: 'read-write' }
+    );
+    expect(mockAuth.updateUser).toHaveBeenLastCalledWith({
+      data: { display_name: 'Maze Owner', username: '' },
+      email: 'owner@example.com'
+    });
+    await updateLegacyAccount(
+      { displayName: 'Maze Owner', email: 'owner@example.com', username: 'must-stay-local' },
+      { usernameProfile: 'disabled' }
+    );
+    expect(mockAuth.updateUser).toHaveBeenLastCalledWith({
+      data: { display_name: 'Maze Owner' },
+      email: 'owner@example.com'
+    });
     expect(source).not.toContain('signInWithPassword({ username');
+  });
+
+  test('[auth.global-username-slot] isolates username drafts across authenticated users', async () => {
+    const originalId = mockAuth.session.user.id;
+    const originalMetadata = mockAuth.session.user.user_metadata;
+    const userASnapshot = createLegacyAuthSessionSnapshot({
+      ...mockAuth.session,
+      user: {
+        ...mockAuth.session.user,
+        id: 'user-a',
+        user_metadata: { username: '  player-a  ' }
+      }
+    });
+    const userADraft = resolveLegacyAuthUsernameDraft(userASnapshot, '', null);
+    expect(userADraft).toBe('player-a');
+    expect(resolveLegacyAuthUsernameDraft({
+      ...userASnapshot,
+      username: null
+    }, 'unsaved-same-user', 'user-a')).toBe('unsaved-same-user');
+
+    const userBBlankSnapshot = createLegacyAuthSessionSnapshot({
+      ...mockAuth.session,
+      user: {
+        ...mockAuth.session.user,
+        id: 'user-b',
+        user_metadata: {}
+      }
+    });
+    const userBBlankDraft = resolveLegacyAuthUsernameDraft(userBBlankSnapshot, userADraft, 'user-a');
+    expect(userBBlankDraft).toBe('');
+
+    const userBHydratedSnapshot = createLegacyAuthSessionSnapshot({
+      ...mockAuth.session,
+      user: {
+        ...mockAuth.session.user,
+        id: 'user-b',
+        user_metadata: { username: '  player-b  ' }
+      }
+    });
+    expect(resolveLegacyAuthUsernameDraft(userBHydratedSnapshot, userADraft, 'user-a')).toBe('player-b');
+
+    try {
+      mockAuth.session.user.id = 'user-b';
+      mockAuth.session.user.user_metadata = {};
+      await updateLegacyAccount(
+        { displayName: 'Player B', email: 'player-b@example.com', username: userBBlankDraft },
+        { usernameProfile: 'read-write' }
+      );
+      expect(mockAuth.updateUser).toHaveBeenLastCalledWith({
+        data: { display_name: 'Player B', username: '' },
+        email: 'player-b@example.com'
+      });
+      const latestUpdate = mockAuth.updateUser.mock.calls.at(-1)?.[0] as { data?: Record<string, string> };
+      expect(latestUpdate.data?.username).not.toBe('player-a');
+    } finally {
+      mockAuth.session.user.id = originalId;
+      mockAuth.session.user.user_metadata = originalMetadata;
+    }
   });
 
   test('[auth.deferred-methods] records non-phase-one methods as deferred', () => {

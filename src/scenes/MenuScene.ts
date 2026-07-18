@@ -223,6 +223,7 @@ import {
   resolveLegacyAuthPlatformCapabilities,
   resolveLegacyAuthScopedStorageKey,
   resolveLegacyAuthSubmitState,
+  resolveLegacyAuthUsernameDraft,
   sanitizeLegacyAuthCallbackUrl,
   signInLegacyAuth,
   signOutLegacyAuth,
@@ -1799,6 +1800,7 @@ export class MenuScene extends Phaser.Scene {
         rememberedIdentity: rememberedAuthIdentity,
         status: this.authSnapshot.status,
         userIdPresent: this.authSnapshot.userId !== null,
+        usernameDraftEmpty: this.authForm.username.length === 0,
         latestMessage: this.latestAuthMessage
           ? {
               copy: this.latestAuthMessage.copy,
@@ -9849,7 +9851,11 @@ export class MenuScene extends Phaser.Scene {
         mode: this.authForm.mode === 'recovery'
           ? 'recovery'
           : this.authSnapshot.status === 'authenticated' ? 'account' : this.authForm.mode === 'account' ? 'login' : this.authForm.mode,
-        username: this.authSnapshot.username ?? this.authForm.username
+        username: resolveLegacyAuthUsernameDraft(
+          this.authSnapshot,
+          this.authForm.username,
+          this.authSnapshot.userId
+        )
       };
       this.activeAuthField = this.authForm.mode === 'recovery'
         ? 'password'
@@ -10121,6 +10127,29 @@ export class MenuScene extends Phaser.Scene {
           info: LEGACY_AUTH_MESSAGE_COPY.accountUpdated
         });
         this.openOverlay('auth');
+      } else if (fixture === 'account-username-cleared') {
+        await Promise.resolve();
+        this.authForm = {
+          ...this.authForm,
+          username: ''
+        };
+        this.applyLegacyAuthSnapshot({
+          ...runtimeAuthFixtureSnapshot,
+          info: LEGACY_AUTH_MESSAGE_COPY.accountUpdated,
+          username: null
+        });
+        this.openOverlay('auth');
+      } else if (fixture === 'account-user-switch') {
+        await Promise.resolve();
+        this.applyLegacyAuthSnapshot({
+          ...runtimeAuthFixtureSnapshot,
+          displayName: 'QA Player B',
+          email: 'qa-b@mazer.local',
+          info: null,
+          userId: 'runtime-diagnostics-auth-fixture-b',
+          username: null
+        });
+        this.openOverlay('auth');
       } else if (fixture === 'recovery' || fixture === 'reset-wait' || fixture === 'account') {
         await Promise.resolve();
         if (fixture === 'recovery' || fixture === 'reset-wait') {
@@ -10209,7 +10238,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const fixture = searchParams.get('authFixture')?.trim().toLowerCase();
-    if (fixture !== 'account' && fixture !== 'account-cleared' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended') {
+    if (fixture !== 'account' && fixture !== 'account-cleared' && fixture !== 'account-username-cleared' && fixture !== 'account-user-switch' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended') {
       return null;
     }
 
@@ -10220,7 +10249,10 @@ export class MenuScene extends Phaser.Scene {
       error: null,
       info: fixture === 'reset-wait' ? null : 'Runtime diagnostics authenticated fixture.',
       status: 'authenticated',
-      userId: 'runtime-diagnostics-auth-fixture'
+      userId: 'runtime-diagnostics-auth-fixture',
+      username: fixture === 'account-username-cleared' || fixture === 'account-user-switch'
+        ? 'qa-player-a'
+        : null
     };
   }
 
@@ -10240,7 +10272,7 @@ export class MenuScene extends Phaser.Scene {
         ...this.authForm,
         displayName: resolveLegacyAuthDisplayNameDraft(snapshot, this.authForm.displayName),
         email: snapshot.email,
-        username: snapshot.username ?? this.authForm.username
+        username: resolveLegacyAuthUsernameDraft(snapshot, this.authForm.username, previousUserId)
       };
     }
     if (snapshot.status === 'authenticated') {

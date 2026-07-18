@@ -141,7 +141,7 @@ const readRuntimeEnv = (): Record<string, string | undefined> => {
     ...env,
     VITE_MAZER_AUTH_CONFIRMATION_REDIRECT_URL: env.VITE_MAZER_AUTH_CONFIRMATION_REDIRECT_URL,
     VITE_MAZER_AUTH_RECOVERY_REDIRECT_URL: env.VITE_MAZER_AUTH_RECOVERY_REDIRECT_URL,
-    VITE_MAZER_PLATFORM_USERNAME_CAPABILITY: env.VITE_MAZER_PLATFORM_USERNAME_CAPABILITY,
+    VITE_MAZER_PLATFORM_USERNAME_CAPABILITY: import.meta.env.VITE_MAZER_PLATFORM_USERNAME_CAPABILITY,
     VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL
   };
@@ -348,6 +348,22 @@ export const resolveLegacyAuthDisplayNameDraft = (
 ): string => snapshot.status === 'authenticated'
   ? snapshot.displayName ?? ''
   : snapshot.displayName ?? currentDisplayName;
+
+export const resolveLegacyAuthUsernameDraft = (
+  snapshot: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId' | 'username'>,
+  currentUsername: string,
+  previousUserId: string | null
+): string => {
+  const snapshotUsername = typeof snapshot.username === 'string' && snapshot.username.trim().length > 0
+    ? snapshot.username.trim()
+    : null;
+  if (snapshot.status !== 'authenticated') {
+    return snapshotUsername ?? currentUsername;
+  }
+  return snapshot.userId !== previousUserId
+    ? snapshotUsername ?? ''
+    : snapshotUsername ?? currentUsername;
+};
 
 const resolveUsername = (user: User): string | null => {
   const value = user.user_metadata.username;
@@ -779,7 +795,7 @@ export const updateLegacyAccount = async (
   const data: Record<string, string> = {};
   const displayName = update.displayName.trim();
   data.display_name = displayName;
-  if (capabilities.usernameProfile === 'read-write' && update.username.trim()) {
+  if (capabilities.usernameProfile === 'read-write') {
     data.username = update.username.trim();
   }
   const { error } = await client.auth.updateUser({

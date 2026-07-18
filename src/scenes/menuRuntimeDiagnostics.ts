@@ -103,6 +103,7 @@ export interface MenuSceneRuntimeDiagnostics {
     } | null;
     status: 'guest' | 'authenticated' | 'unavailable';
     userIdPresent: boolean;
+    usernameDraftEmpty: boolean;
     latestMessage: {
       copy: string;
       id: string;
