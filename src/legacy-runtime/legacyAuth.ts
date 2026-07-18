@@ -837,9 +837,20 @@ export const resolveLegacyAuthFormModeAfterStateChange = (
   currentMode: LegacyAuthFormMode,
   event: AuthChangeEvent,
   status: LegacyAuthStatus
-): LegacyAuthFormMode => event !== 'PASSWORD_RECOVERY' && status !== 'authenticated'
-  ? 'login'
-  : currentMode;
+): LegacyAuthFormMode => event === 'PASSWORD_RECOVERY'
+  ? currentMode
+  : status === 'authenticated'
+    ? 'account'
+    : 'login';
+
+export const resolveLegacyAuthNativeInputType = (
+  fieldId: LegacyAuthFieldId,
+  passwordVisible: boolean
+): 'email' | 'password' | 'text' => fieldId === 'email'
+  ? 'email'
+  : (fieldId === 'password' || fieldId === 'confirmPassword') && !passwordVisible
+    ? 'password'
+    : 'text';
 
 export const subscribeLegacyAuthState = (
   listener: LegacyAuthStateListener

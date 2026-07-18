@@ -219,6 +219,7 @@ import {
   resolveLegacyAuthCallbackState,
   resolveLegacyAuthDisplayNameDraft,
   resolveLegacyAuthFormModeAfterStateChange,
+  resolveLegacyAuthNativeInputType,
   resolveLegacyAuthAccountLabel,
   resolveLegacyAuthPlatformCapabilities,
   resolveLegacyAuthScopedStorageKey,
@@ -9055,7 +9056,7 @@ export class MenuScene extends Phaser.Scene {
     this.destroyLegacyAuthNativeInput();
     const input = document.createElement('input');
     const passwordField = fieldId === 'password' || fieldId === 'confirmPassword';
-    input.type = passwordField && !this.authPasswordVisible ? 'password' : 'text';
+    input.type = resolveLegacyAuthNativeInputType(fieldId, this.authPasswordVisible);
     input.autocomplete = passwordField
       ? this.authForm.mode === 'login' ? 'current-password' : 'new-password'
       : fieldId === 'email' ? 'email' : fieldId === 'username' ? 'username' : 'name';
@@ -9163,8 +9164,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const passwordField = fieldId === 'password' || fieldId === 'confirmPassword';
-    input.type = passwordField && !this.authPasswordVisible ? 'password' : 'text';
+    input.type = resolveLegacyAuthNativeInputType(fieldId, this.authPasswordVisible);
     input.value = this.authForm[fieldId];
     const rect = canvas.getBoundingClientRect();
     const cssRect = resolveLegacyAuthInputCssRect(bounds, rect, this.layout);
@@ -10119,6 +10119,11 @@ export class MenuScene extends Phaser.Scene {
           status: 'guest',
           userId: null
         }, 'SIGNED_OUT');
+      } else if (fixture === 'session-established') {
+        await Promise.resolve();
+        this.openOverlay('auth');
+        this.setLegacyAuthFormMode('signup');
+        this.handleLegacyAuthStateChange(runtimeAuthFixtureSnapshot, 'SIGNED_IN');
       } else if (fixture === 'account-cleared') {
         await Promise.resolve();
         this.applyLegacyAuthSnapshot({
@@ -10238,7 +10243,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const fixture = searchParams.get('authFixture')?.trim().toLowerCase();
-    if (fixture !== 'account' && fixture !== 'account-cleared' && fixture !== 'account-username-cleared' && fixture !== 'account-user-switch' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended') {
+    if (fixture !== 'account' && fixture !== 'account-cleared' && fixture !== 'account-username-cleared' && fixture !== 'account-user-switch' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended' && fixture !== 'session-established') {
       return null;
     }
 

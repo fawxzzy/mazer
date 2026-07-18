@@ -1258,11 +1258,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.authSnapshot');
     expect(menuSceneSource).toContain('private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null');
     expect(menuSceneSource).toContain("runtimeDiagnostics !== '1' && runtimeDiagnostics !== 'true'");
-    expect(menuSceneSource).toContain("fixture !== 'account' && fixture !== 'account-cleared' && fixture !== 'account-username-cleared' && fixture !== 'account-user-switch' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended'");
+    expect(menuSceneSource).toContain("fixture !== 'account' && fixture !== 'account-cleared' && fixture !== 'account-username-cleared' && fixture !== 'account-user-switch' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended' && fixture !== 'session-established'");
     expect(menuSceneSource).toContain("userId: 'runtime-diagnostics-auth-fixture'");
     expect(menuSceneSource).toContain('const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();');
     expect(menuSceneSource).toContain('if (runtimeAuthFixtureSnapshot) {');
     expect(menuSceneSource).toContain("if (fixture === 'session-ended') {");
+    expect(menuSceneSource).toContain("} else if (fixture === 'session-established') {");
+    expect(menuSceneSource).toContain("this.handleLegacyAuthStateChange(runtimeAuthFixtureSnapshot, 'SIGNED_IN');");
     expect(menuSceneSource).toContain("} else if (fixture === 'account-cleared') {");
     expect(menuSceneSource).toContain("} else if (fixture === 'account-username-cleared') {");
     expect(menuSceneSource).toContain("} else if (fixture === 'account-user-switch') {");
@@ -1273,6 +1275,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("}, 'SIGNED_OUT');");
     expect(menuSceneSource).toContain('private handleLegacyAuthStateChange(');
     expect(menuSceneSource).toContain('resolveLegacyAuthFormModeAfterStateChange(this.authForm.mode, event, snapshot.status)');
+    expect(menuSceneSource.match(/resolveLegacyAuthNativeInputType\(fieldId, this\.authPasswordVisible\)/g)).toHaveLength(2);
+    expect(menuSceneSource).toContain("} else if (this.authForm.mode === 'account') {");
+    expect(menuSceneSource).toContain('result = await updateLegacyAccount({');
     expect(menuSceneSource).toContain('this.handleLegacyAuthStateChange(snapshot, event);');
     expect(menuSceneSource).toContain("this.openOverlay('auth')");
     expect(menuSceneSource).toContain('private buildAuthOverlay(): void');

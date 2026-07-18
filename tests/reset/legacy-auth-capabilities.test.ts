@@ -15,6 +15,7 @@ import {
   resolveLegacyAuthCallbackState,
   resolveLegacyAuthDisplayNameDraft,
   resolveLegacyAuthFormModeAfterStateChange,
+  resolveLegacyAuthNativeInputType,
   resolveLegacyAuthPlatformCapabilities,
   resolveLegacyAuthRedirectContract,
   resolveLegacyAuthResetCooldown,
@@ -279,12 +280,28 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     expect(startLegacyAuthResetCooldown(storage, 100_000)).toEqual({ allowed: false, remainingSeconds: 60 });
   });
 
-  test('[auth.session-restoration] normalizes unauthenticated events without disrupting recovery or Account', () => {
+  test('[auth.session-restoration] normalizes authenticated and guest events without disrupting recovery', () => {
     expect(resolveLegacyAuthFormModeAfterStateChange('account', 'SIGNED_OUT', 'guest')).toBe('login');
     expect(resolveLegacyAuthFormModeAfterStateChange('account', 'INITIAL_SESSION', 'guest')).toBe('login');
     expect(resolveLegacyAuthFormModeAfterStateChange('account', 'TOKEN_REFRESHED', 'guest')).toBe('login');
+    expect(resolveLegacyAuthFormModeAfterStateChange('login', 'INITIAL_SESSION', 'authenticated')).toBe('account');
+    expect(resolveLegacyAuthFormModeAfterStateChange('signup', 'SIGNED_IN', 'authenticated')).toBe('account');
+    expect(resolveLegacyAuthFormModeAfterStateChange('recovery', 'SIGNED_IN', 'authenticated')).toBe('account');
     expect(resolveLegacyAuthFormModeAfterStateChange('account', 'USER_UPDATED', 'authenticated')).toBe('account');
     expect(resolveLegacyAuthFormModeAfterStateChange('login', 'PASSWORD_RECOVERY', 'authenticated')).toBe('login');
+    expect(resolveLegacyAuthFormModeAfterStateChange('signup', 'PASSWORD_RECOVERY', 'authenticated')).toBe('signup');
+  });
+
+  test('[auth.native-input] preserves semantic email and password input types through rebinds', () => {
+    expect(resolveLegacyAuthNativeInputType('email', false)).toBe('email');
+    expect(resolveLegacyAuthNativeInputType('email', true)).toBe('email');
+    expect(resolveLegacyAuthNativeInputType('password', false)).toBe('password');
+    expect(resolveLegacyAuthNativeInputType('confirmPassword', false)).toBe('password');
+    expect(resolveLegacyAuthNativeInputType('password', true)).toBe('text');
+    expect(resolveLegacyAuthNativeInputType('displayName', false)).toBe('text');
+
+    const menuSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    expect(menuSource.match(/resolveLegacyAuthNativeInputType\(fieldId, this\.authPasswordVisible\)/g)).toHaveLength(2);
   });
 
   test('[auth.session-restoration] reads the persisted Supabase browser session', async () => {
