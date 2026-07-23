@@ -14,6 +14,9 @@ describe('UI surface capture label matching', () => {
     expect(matchesExpectedTextLabel('Control Style: Arrows', 'Control Style')).toBe(true);
     expect(matchesExpectedTextLabel('Camera Follower: On', 'Camera Follow')).toBe(false);
     expect(matchesExpectedTextLabel('Camera Follow: ', 'Camera Follow')).toBe(false);
+    expect(matchesExpectedTextLabel('Camera Follow:    ', 'Camera Follow')).toBe(false);
+    expect(matchesExpectedTextLabel('Login: Error', 'Login')).toBe(false);
+    expect(matchesExpectedTextLabel('Start: Disabled', 'Start')).toBe(false);
     expect(hasExpectedTextLabels(
       ['Camera Follow: On', 'Smart Steering: Off', 'Control Style: Stick'],
       ['Camera Follow', 'Smart Steering', 'Control Style']
@@ -22,6 +25,8 @@ describe('UI surface capture label matching', () => {
       ['Camera Follower: On', 'Smart Steering: Off', 'Control Style: Stick'],
       ['Camera Follow', 'Smart Steering', 'Control Style']
     )).toBe(false);
+    expect(hasExpectedTextLabels(['Login: Error'], ['Login'])).toBe(false);
+    expect(hasExpectedTextLabels(['Start: Disabled'], ['Start'])).toBe(false);
   });
 });
 
@@ -65,8 +70,12 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([');
     expect(source).toContain('export const matchesExpectedTextLabel = (actualLabel, expectedLabel) => (');
     expect(source).toContain('export const hasExpectedTextLabels = (actualLabels, expectedLabels) => (');
+    expect(source).toContain('const INLINE_STATE_TEXT_LABELS = Object.freeze([');
+    expect(source).toContain('allowStateSuffix: INLINE_STATE_TEXT_LABELS.includes(expectedLabel)');
+    expect(source).toContain('expected: expectedLabelDescriptors');
     expect(source).toContain('return hasExpectedTextLabels(labels, expectedLabels);');
     expect(source).toContain("actualLabel.startsWith(`${expectedLabel}: `)");
+    expect(source).toContain('actualLabel.slice(expectedLabel.length + 2).trim().length > 0');
     expect(source).toContain('const resolveOptionsBottomExpectedLabels = (authenticated) => [');
     expect(source).toContain("authenticated ? 'Log out' : 'Account'");
     expect(source).toContain("authFixture === 'authenticated' || menu.diagnostics.runtime?.auth?.status === 'authenticated'");
@@ -227,7 +236,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("if (authFixture === 'authenticated') {");
     expect(source).toContain('skipWait = false');
     expect(source).toContain('skipWait ? await readDiagnostics(page)');
-    expect(source).toContain('return expected.every((expectedLabel) => currentLabels.some((actualLabel) => (');
+    expect(source).toContain('return expected.every(({ allowStateSuffix, expectedLabel }) => currentLabels.some((actualLabel) => (');
     expect(source).toContain('Surface ${id} missing labels after direct diagnostics read');
     expect(source).toContain('await openOptionsOverlayViaQa(page, timeoutMs);');
     expect(source).toContain("skipWait: authFixture === 'authenticated'");

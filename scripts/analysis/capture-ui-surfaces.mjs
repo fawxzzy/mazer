@@ -42,6 +42,28 @@ const EXPECTED_PLAYER_CORE_COLOR = 0x36ff7d;
 const EXPECTED_GOAL_CORE_COLOR = 0xff263f;
 const EXPECTED_TRAIL_SHINE_COLOR = 0xffffff;
 const EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe8fff5;
+const INLINE_STATE_TEXT_LABELS = Object.freeze([
+  'Camera Follow',
+  'Control Style',
+  'Smart Steering'
+]);
+
+const buildExpectedTextLabelDescriptors = (expectedLabels) => (
+  expectedLabels.map((expectedLabel) => ({
+    allowStateSuffix: INLINE_STATE_TEXT_LABELS.includes(expectedLabel),
+    expectedLabel
+  }))
+);
+
+export const matchesExpectedTextLabel = (actualLabel, expectedLabel) => (
+  actualLabel === expectedLabel
+  || (
+    INLINE_STATE_TEXT_LABELS.includes(expectedLabel)
+    && typeof actualLabel === 'string'
+    && actualLabel.startsWith(`${expectedLabel}: `)
+    && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
+  )
+);
 
 const runNpmCommand = (args) => {
   if (process.platform === 'win32') {
@@ -119,6 +141,7 @@ const waitForSurface = async (page, {
     { timeout: timeoutMs }
   );
   if (expectedLabels.length > 0) {
+    const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
     await page.waitForFunction(
       ({ expected, visualAttribute }) => {
         const raw = document.documentElement.getAttribute(visualAttribute);
@@ -129,12 +152,13 @@ const waitForSurface = async (page, {
         try {
           const visual = JSON.parse(raw);
           const labels = (visual?.textLabels ?? []).map((entry) => entry.text);
-          return expected.every((expectedLabel) => labels.some((actualLabel) => (
+          return expected.every(({ allowStateSuffix, expectedLabel }) => labels.some((actualLabel) => (
             actualLabel === expectedLabel
             || (
-              typeof actualLabel === 'string'
+              allowStateSuffix
+              && typeof actualLabel === 'string'
               && actualLabel.startsWith(`${expectedLabel}: `)
-              && actualLabel.length > expectedLabel.length + 2
+              && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
             )
           )));
         } catch {
@@ -142,7 +166,7 @@ const waitForSurface = async (page, {
         }
       },
       {
-        expected: expectedLabels,
+        expected: expectedLabelDescriptors,
         visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
       },
       { timeout: timeoutMs }
@@ -408,6 +432,7 @@ const captureSurface = async ({
       !labels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
     ));
     if (missingLabels.length > 0) {
+      const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
       await page.waitForFunction(
         ({ expected, visualAttribute }) => {
           const raw = document.documentElement.getAttribute(visualAttribute);
@@ -418,12 +443,13 @@ const captureSurface = async ({
           try {
             const visual = JSON.parse(raw);
             const currentLabels = (visual?.textLabels ?? []).map((entry) => entry.text);
-            return expected.every((expectedLabel) => currentLabels.some((actualLabel) => (
+            return expected.every(({ allowStateSuffix, expectedLabel }) => currentLabels.some((actualLabel) => (
               actualLabel === expectedLabel
               || (
-                typeof actualLabel === 'string'
+                allowStateSuffix
+                && typeof actualLabel === 'string'
                 && actualLabel.startsWith(`${expectedLabel}: `)
-                && actualLabel.length > expectedLabel.length + 2
+                && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
               )
             )));
           } catch {
@@ -431,7 +457,7 @@ const captureSurface = async ({
           }
         },
         {
-          expected: expectedLabels,
+          expected: expectedLabelDescriptors,
           visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
         },
         { timeout: timeoutMs }
@@ -673,15 +699,6 @@ const collectTextLabelEntries = (surface) => (
 
 const collectNativeInputEntries = (surface) => (
   surface?.nativeInputs ?? []
-);
-
-export const matchesExpectedTextLabel = (actualLabel, expectedLabel) => (
-  actualLabel === expectedLabel
-  || (
-    typeof actualLabel === 'string'
-    && actualLabel.startsWith(`${expectedLabel}: `)
-    && actualLabel.length > expectedLabel.length + 2
-  )
 );
 
 export const hasExpectedTextLabels = (actualLabels, expectedLabels) => (

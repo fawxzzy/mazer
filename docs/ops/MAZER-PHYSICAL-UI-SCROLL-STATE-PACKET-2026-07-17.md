@@ -74,6 +74,15 @@ Semantics and performance proof:
 - shortcut-enabled topology scale-band audit after the change: 2,427 ms with the original 30-second timeout;
 - protected `tests/ai/demo-walker.test.ts`: executed but not modified.
 
+The snapshot digest byte contract is:
+
+1. Iterate factories in this exact order: `play` using `createLegacyMaze`, then `menu` using `createLegacyGeneratedMenuMaze`.
+2. For each factory, iterate seeds in this exact order: `3749`, `1511518221` (`0x5a17f00d`), `2`, `777`, `1001`, `1`, `3`, `4`, `5`, `6`.
+3. Call each factory as `factory(50, seed)` and hash the complete returned snapshot without projection: `sha256(UTF8(JSON.stringify(snapshot)))`, rendered as lowercase hexadecimal. The JSON string has no trailing newline or byte-order mark.
+4. For each case, form one ASCII record as `${kind}:${seed}:${snapshotDigest}`. Template interpolation renders every seed in decimal.
+5. Join the 20 records in iteration order with a single LF byte (`0x0a`), with no final LF, carriage return, or byte-order mark.
+6. Hash that exact UTF-8 aggregate byte stream with SHA-256 and render it as lowercase hexadecimal. Timing fields and console formatting are excluded.
+
 No timeout was increased, no seed or factory was removed, and no production/provider state was touched.
 
 Closure verification:
