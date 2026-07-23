@@ -57,3 +57,29 @@ Review-fix proof:
 The narrow capture visibly retained `Camera Follow: Off`, `Control Style: Stick`, and `Smart Steering: On`, and all applicable surface, bounds, overlap, scroll, console, and page-error checks passed.
 
 The required full `npm run verify` was attempted once under active ATLAS/DiscordOS machine contention. It completed with 382 passing tests and six unrelated generation/AI timeout failures; an isolated attribution run likewise produced timeout-only failures without assertion mismatches. No timeout or protected test was changed. One pre-merge full `npm run verify` remains required after the concurrent heavy verification processes release and machine contention materially changes. PR #81 must stay draft and unmerged until that changed-environment gate passes or receives an explicit disposition.
+
+## Full-gate recovery — 2026-07-22
+
+The authorized low-contention rerun at `d787b44577b22b62d55548a0b01b2680245ca46b` reproduced eight timeouts across five generation/AI files plus two Vitest worker `onTaskUpdate` timeouts. An exact five-file attribution run then passed 77 of 78 tests under the existing limits; the only isolated failure was the edge-dock continuation audit, which took about 5.4 seconds against Vitest's default 5-second limit. No assertion mismatch occurred.
+
+CPU profiling located the dominant cost in `measureAlternativeRouteDistanceWithoutEdge()`: every solution edge allocated a fresh string-keyed `Set`, object queue, and coordinate objects for another full grid traversal. Route-quality measurement now reuses one typed-array BFS workspace and numeric cell indices for the complete measurement. The seed/factory denominator, test timeouts, route-quality rules, and generated-maze contract are unchanged.
+
+Semantics and performance proof:
+
+- exact 20-maze edge-dock fixture denominator: play and generated-menu factories across seeds `3749`, `0x5a17f00d`, `2`, `777`, `1001`, `1`, `3`, `4`, `5`, and `6`;
+- aggregate full-snapshot SHA-256 before and after: `fbd4400f614d30e47318685d8468e936f49a9fd7e39a257d573b8fb3419dba0a`;
+- fixture generation time in the same owned process: 2,721 ms before and 675 ms after;
+- exact five-file timeout denominator after the change: 5 files / 78 tests passed in 46.89 seconds;
+- edge-dock continuation audit after the change: 804 ms with the original default timeout;
+- shortcut-enabled topology scale-band audit after the change: 2,427 ms with the original 30-second timeout;
+- protected `tests/ai/demo-walker.test.ts`: executed but not modified.
+
+No timeout was increased, no seed or factory was removed, and no production/provider state was touched.
+
+Closure verification:
+
+- focused UI/capture contract: 3 files / 60 tests passed;
+- full `npm run verify`: 53 files / 388 tests passed with no worker RPC errors;
+- full-gate test phase: 64.74 seconds;
+- production build phase: passed, 228 modules transformed in 11.47 seconds;
+- total full-gate wall time: 99.05 seconds, compared with the prior 411.4-second failed run.
