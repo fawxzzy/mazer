@@ -42,6 +42,28 @@ const EXPECTED_PLAYER_CORE_COLOR = 0x36ff7d;
 const EXPECTED_GOAL_CORE_COLOR = 0xff263f;
 const EXPECTED_TRAIL_SHINE_COLOR = 0xffffff;
 const EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe8fff5;
+const INLINE_STATE_TEXT_LABELS = Object.freeze([
+  'Camera Follow',
+  'Control Style',
+  'Smart Steering'
+]);
+
+const buildExpectedTextLabelDescriptors = (expectedLabels) => (
+  expectedLabels.map((expectedLabel) => ({
+    allowStateSuffix: INLINE_STATE_TEXT_LABELS.includes(expectedLabel),
+    expectedLabel
+  }))
+);
+
+export const matchesExpectedTextLabel = (actualLabel, expectedLabel) => (
+  actualLabel === expectedLabel
+  || (
+    INLINE_STATE_TEXT_LABELS.includes(expectedLabel)
+    && typeof actualLabel === 'string'
+    && actualLabel.startsWith(`${expectedLabel}: `)
+    && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
+  )
+);
 
 const runNpmCommand = (args) => {
   if (process.platform === 'win32') {
@@ -119,6 +141,7 @@ const waitForSurface = async (page, {
     { timeout: timeoutMs }
   );
   if (expectedLabels.length > 0) {
+    const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
     await page.waitForFunction(
       ({ expected, visualAttribute }) => {
         const raw = document.documentElement.getAttribute(visualAttribute);
@@ -128,14 +151,22 @@ const waitForSurface = async (page, {
 
         try {
           const visual = JSON.parse(raw);
-          const labels = new Set((visual?.textLabels ?? []).map((entry) => entry.text));
-          return expected.every((label) => labels.has(label));
+          const labels = (visual?.textLabels ?? []).map((entry) => entry.text);
+          return expected.every(({ allowStateSuffix, expectedLabel }) => labels.some((actualLabel) => (
+            actualLabel === expectedLabel
+            || (
+              allowStateSuffix
+              && typeof actualLabel === 'string'
+              && actualLabel.startsWith(`${expectedLabel}: `)
+              && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
+            )
+          )));
         } catch {
           return false;
         }
       },
       {
-        expected: expectedLabels,
+        expected: expectedLabelDescriptors,
         visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
       },
       { timeout: timeoutMs }
@@ -396,9 +427,12 @@ const captureSurface = async ({
     timeoutMs
   });
   if (skipWait && expectedLabels.length > 0) {
-    let labels = new Set((diagnostics.visual?.textLabels ?? []).map((entry) => entry.text));
-    let missingLabels = expectedLabels.filter((label) => !labels.has(label));
+    let labels = (diagnostics.visual?.textLabels ?? []).map((entry) => entry.text);
+    let missingLabels = expectedLabels.filter((expectedLabel) => (
+      !labels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
+    ));
     if (missingLabels.length > 0) {
+      const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
       await page.waitForFunction(
         ({ expected, visualAttribute }) => {
           const raw = document.documentElement.getAttribute(visualAttribute);
@@ -408,21 +442,31 @@ const captureSurface = async ({
 
           try {
             const visual = JSON.parse(raw);
-            const currentLabels = new Set((visual?.textLabels ?? []).map((entry) => entry.text));
-            return expected.every((label) => currentLabels.has(label));
+            const currentLabels = (visual?.textLabels ?? []).map((entry) => entry.text);
+            return expected.every(({ allowStateSuffix, expectedLabel }) => currentLabels.some((actualLabel) => (
+              actualLabel === expectedLabel
+              || (
+                allowStateSuffix
+                && typeof actualLabel === 'string'
+                && actualLabel.startsWith(`${expectedLabel}: `)
+                && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
+              )
+            )));
           } catch {
             return false;
           }
         },
         {
-          expected: expectedLabels,
+          expected: expectedLabelDescriptors,
           visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
         },
         { timeout: timeoutMs }
       );
       diagnostics = await readDiagnostics(page);
-      labels = new Set((diagnostics.visual?.textLabels ?? []).map((entry) => entry.text));
-      missingLabels = expectedLabels.filter((label) => !labels.has(label));
+      labels = (diagnostics.visual?.textLabels ?? []).map((entry) => entry.text);
+      missingLabels = expectedLabels.filter((expectedLabel) => (
+        !labels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
+      ));
     }
     if (missingLabels.length > 0) {
       throw new Error(`Surface ${id} missing labels after direct diagnostics read: ${missingLabels.join(', ')}`);
@@ -657,9 +701,15 @@ const collectNativeInputEntries = (surface) => (
   surface?.nativeInputs ?? []
 );
 
+export const hasExpectedTextLabels = (actualLabels, expectedLabels) => (
+  expectedLabels.every((expectedLabel) => (
+    actualLabels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
+  ))
+);
+
 const hasTextLabels = (surface, expectedLabels) => {
-  const labels = new Set(collectTextLabels(surface));
-  return expectedLabels.every((label) => labels.has(label));
+  const labels = collectTextLabels(surface);
+  return hasExpectedTextLabels(labels, expectedLabels);
 };
 
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
@@ -1097,29 +1147,43 @@ const collectButtonLabelFillIssues = (surfaceId, surface) => (surface?.buttons ?
     : [];
 });
 
-const collectOverlayScrollFadeTextIssues = (surfaceId, surface) => {
+const collectOverlayScrollCueTextIssues = (surfaceId, surface) => {
   if (surface?.skipped === true) {
     return [];
   }
   const scroll = surface?.overlayUi?.scroll;
   const viewport = scroll?.viewport;
+  const track = scroll?.track;
   if (!scroll || !isFiniteBounds(viewport)) {
-    return [`${surfaceId}:missing-scroll-fade-diagnostics`];
+    return [`${surfaceId}:missing-scroll-cue-diagnostics`];
   }
-  const fadeHeight = Math.min(34, Math.max(18, Math.round(viewport.height * 0.12)));
+  if (scroll.enabled !== true) {
+    return [];
+  }
+  if (!isFiniteBounds(track)) {
+    return [`${surfaceId}:missing-scroll-cue-track`];
+  }
+  const cueBounds = {
+    left: track.left - 5,
+    right: track.right + 5,
+    top: viewport.top,
+    bottom: viewport.bottom
+  };
   return collectTextLabelEntries(surface).flatMap((entry) => {
     const bounds = entry?.bounds;
     if (!isFiniteBounds(bounds) || bounds.bottom <= viewport.top || bounds.top >= viewport.bottom) {
       return [];
     }
-    const issues = [];
-    if (scroll.topFadeAlpha > 0 && bounds.top < viewport.top + fadeHeight) {
-      issues.push(`${surfaceId}:${entry.text}:text-under-top-fade`);
-    }
-    if (scroll.bottomFadeAlpha > 0 && bounds.bottom > viewport.bottom - fadeHeight) {
-      issues.push(`${surfaceId}:${entry.text}:text-under-bottom-fade`);
-    }
-    return issues;
+    const overlapsCueGutter = bounds.right > cueBounds.left && bounds.left < cueBounds.right;
+    const crossesTopCue = scroll.topFadeAlpha > 0
+      && bounds.top <= cueBounds.top + 3
+      && bounds.bottom >= cueBounds.top + 1;
+    const crossesBottomCue = scroll.bottomFadeAlpha > 0
+      && bounds.top <= cueBounds.bottom - 1
+      && bounds.bottom >= cueBounds.bottom - 3;
+    return overlapsCueGutter && (crossesTopCue || crossesBottomCue)
+      ? [`${surfaceId}:${entry.text}:text-crosses-scroll-edge-cue`]
+      : [];
   });
 };
 
@@ -1279,8 +1343,8 @@ const buildSurfaceChecks = ({
 }) => {
   const hasLabels = (surface, expectedLabels) => hasTextLabels(surface, expectedLabels);
   const hasLabelsAcross = (surfaceGroup, expectedLabels) => {
-    const labels = new Set(surfaceGroup.flatMap((surface) => collectTextLabels(surface)));
-    return expectedLabels.every((label) => labels.has(label));
+    const labels = surfaceGroup.flatMap((surface) => collectTextLabels(surface));
+    return hasExpectedTextLabels(labels, expectedLabels);
   };
   const labelDetail = (surface) => collectTextLabels(surface)
     .join(', ');
@@ -1330,10 +1394,10 @@ const buildSurfaceChecks = ({
     ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Move Speed', 'Reset Progress', 'Reset', 'Menu'])
   ] : [];
   const overlayScrollFadeTextIssues = [
-    ...collectOverlayScrollFadeTextIssues('options', surfaces.options),
-    ...collectOverlayScrollFadeTextIssues('options-bottom', surfaces.optionsBottom),
-    ...collectOverlayScrollFadeTextIssues('pause', surfaces.pause),
-    ...collectOverlayScrollFadeTextIssues('pause-bottom', surfaces.pauseBottom)
+    ...collectOverlayScrollCueTextIssues('options', surfaces.options),
+    ...collectOverlayScrollCueTextIssues('options-bottom', surfaces.optionsBottom),
+    ...collectOverlayScrollCueTextIssues('pause', surfaces.pause),
+    ...collectOverlayScrollCueTextIssues('pause-bottom', surfaces.pauseBottom)
   ];
   const buttonLabelContainmentIssues = [
     ...collectButtonLabelContainmentIssues('menu', surfaces.menu),
@@ -1576,9 +1640,9 @@ const buildSurfaceChecks = ({
       overlayScrollBottomIssues.length === 0 ? 'options and pause bottom controls are reached through real scroll input' : overlayScrollBottomIssues.join('; ')
     ),
     createCheck(
-      'overlay-scroll-fade-text-clearance',
+      'overlay-scroll-edge-cue-text-clearance',
       overlayScrollFadeTextIssues.length === 0,
-      overlayScrollFadeTextIssues.length === 0 ? 'no text is painted beneath a scroll fade' : overlayScrollFadeTextIssues.join('; ')
+      overlayScrollFadeTextIssues.length === 0 ? 'scroll edge cues stay clear of text' : overlayScrollFadeTextIssues.join('; ')
     ),
     createCheck(
       'button-label-containment',

@@ -83,11 +83,15 @@ describe('legacy UI standards', () => {
     expect(wide.rowHeight).toBe(22);
   });
 
-  test('reserves the compact toggle switch lane before showing state copy', () => {
+  test('shows state copy on normal phone rows and keeps an inline fallback for narrower rows', () => {
+    const narrow = resolveLegacyToggleRowLayout(283, 46, false);
     const compact = resolveLegacyToggleRowLayout(300, 46, false);
     const wide = resolveLegacyToggleRowLayout(380, 70, true);
 
-    expect(compact.showStateLabel).toBe(false);
+    expect(narrow.showStateLabel).toBe(false);
+    expect(narrow.stateLaneWidth).toBe(0);
+    expect(compact.showStateLabel).toBe(true);
+    expect(compact.stateLaneWidth).toBe(51);
     expect(compact.trackWidth).toBe(36);
     expect(compact.labelFontSize).toBeLessThanOrEqual(17);
     expect(wide.showStateLabel).toBe(true);

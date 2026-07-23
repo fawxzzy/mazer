@@ -227,7 +227,7 @@ export const resolveLegacyToggleRowLayout = (
   hasDescription: boolean
 ): LegacyToggleRowLayout => {
   const compact = width < 340;
-  const showStateLabel = width >= 380;
+  const showStateLabel = width >= 286;
   return {
     labelFontSize: hasDescription
       ? Math.max(13, Math.min(compact ? 16 : 18, Math.round(height * 0.25)))
@@ -235,7 +235,11 @@ export const resolveLegacyToggleRowLayout = (
     rowPaddingX: Math.max(12, Math.min(compact ? 14 : 18, Math.round(width * 0.05))),
     showStateLabel,
     stateFontSize: Math.max(10, Math.min(12, Math.round(height * 0.24))),
-    stateLaneWidth: showStateLabel ? Math.max(54, Math.min(82, Math.round(width * 0.22))) : 0,
+    stateLaneWidth: showStateLabel
+      ? compact
+        ? Math.max(44, Math.min(58, Math.round(width * 0.17)))
+        : Math.max(54, Math.min(82, Math.round(width * 0.22)))
+      : 0,
     trackGap: compact ? 8 : 10,
     trackHeight: compact ? 20 : 23,
     trackWidth: compact ? 36 : 40
