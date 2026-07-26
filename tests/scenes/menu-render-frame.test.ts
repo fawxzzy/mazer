@@ -1574,6 +1574,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.overlayScrollTrackBounds = metrics.enabled');
     expect(menuSceneSource).toContain('this.overlayScrollThumbBounds = metrics.enabled');
     expect(menuSceneSource).toContain('const thumbAlpha = metrics.enabled ? 0.92 : 0.58;');
+    expect(menuSceneSource).toContain('const drawScrollEdgeCue = (y: number, alpha: number): void => {');
+    expect(menuSceneSource).toContain('drawScrollEdgeCue(viewport.top + viewport.height - 2, metrics.bottomFadeAlpha);');
+    expect(menuSceneSource).not.toContain('graphics.fillRect(viewport.left, viewport.top, viewport.width, fadeHeight);');
+    expect(menuSceneSource).not.toContain('viewport.top + viewport.height - fadeHeight');
     expect(menuSceneSource).toContain('if (!showAdvancedOptions) {');
     expect(menuSceneSource).toContain('const viewportTop = rowY + (compact ? 4 : 6);');
     expect(menuSceneSource).toContain('const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {');
@@ -1597,6 +1601,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const stateLabelRight = trackLeft - trackGap;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
+    expect(menuSceneSource).toContain('const visibleLabelText = showStateLabel || !displayStateText');
+    expect(menuSceneSource).toContain('`${input.label}: ${displayStateText}`');
     expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 0.92 : 0)');
     expect(menuSceneSource).toContain('setVisible(showStateLabel)');
     expect(menuSceneSource).not.toContain("const tightWidth = input.width < 260;");

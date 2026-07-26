@@ -7732,25 +7732,21 @@ export class MenuScene extends Phaser.Scene {
     const viewport = metrics.viewport;
     const track = metrics.track;
     const thumb = metrics.thumb;
-    const fadeHeight = Math.min(34, Math.max(18, Math.round(viewport.height * 0.12)));
 
+    const drawScrollEdgeCue = (y: number, alpha: number): void => {
+      const cueHalfWidth = Math.max(5, Math.round((track.width + 8) / 2));
+      const cueCenterX = track.left + (track.width / 2);
+      graphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, Math.min(0.54, alpha + 0.22));
+      graphics.lineBetween(cueCenterX - cueHalfWidth, y, cueCenterX + cueHalfWidth, y);
+    };
+
+    // The geometry masks own content disappearance. Keep scroll affordances inside
+    // the reserved rail gutter so a full-width fade boundary can never cross text.
     if (metrics.topFadeAlpha > 0) {
-      graphics.fillStyle(LEGACY_CYBER_PANEL_SHADOW, metrics.topFadeAlpha);
-      graphics.fillRect(viewport.left, viewport.top, viewport.width, fadeHeight);
-      graphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.22);
-      graphics.lineBetween(viewport.left + 8, viewport.top, viewport.left + viewport.width - 20, viewport.top);
+      drawScrollEdgeCue(viewport.top + 2, metrics.topFadeAlpha);
     }
-
     if (metrics.bottomFadeAlpha > 0) {
-      graphics.fillStyle(LEGACY_CYBER_PANEL_SHADOW, metrics.bottomFadeAlpha);
-      graphics.fillRect(viewport.left, viewport.top + viewport.height - fadeHeight, viewport.width, fadeHeight);
-      graphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.2);
-      graphics.lineBetween(
-        viewport.left + 8,
-        viewport.top + viewport.height - fadeHeight,
-        viewport.left + viewport.width - 20,
-        viewport.top + viewport.height - fadeHeight
-      );
+      drawScrollEdgeCue(viewport.top + viewport.height - 2, metrics.bottomFadeAlpha);
     }
 
     const fillScrollPill = (
@@ -8740,17 +8736,20 @@ export class MenuScene extends Phaser.Scene {
       uiLayout.labelFontSize,
       'toggle-title'
     );
+    const displayStateText = input.stateText || (input.checked ? input.onLabel : input.offLabel);
+    const visibleLabelText = showStateLabel || !displayStateText
+      ? input.label
+      : `${input.label}: ${displayStateText}`;
     const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, input.checked ? 0.62 : 0.5);
     background.setStrokeStyle(1, rowStroke, input.checked ? 0.56 : 0.38);
     background.setInteractive({ useHandCursor: true });
 
-    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, titleY, input.label, {
+    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, titleY, visibleLabelText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${uiLayout.labelFontSize}px`,
       color: '#ecfff5'
     })), labelMaxWidth, uiLayout.labelFontSize, 11).setOrigin(0, 0.5).setAlpha(0.94);
 
-    const displayStateText = input.stateText || (input.checked ? input.onLabel : input.offLabel);
     const stateLabel = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(stateLabelRight, titleY, displayStateText || input.stateText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${uiLayout.stateFontSize}px`,

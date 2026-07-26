@@ -593,50 +593,92 @@ const buildShortestPath = (grid: boolean[][], start: LegacyPoint, goal: LegacyPo
   resolveLegacyShortestPath(grid, start, goal, 'direct-floor').path
 );
 
+type LegacyRouteQualityBfsWorkspace = {
+  height: number;
+  queueDistances: Int32Array;
+  queueIndices: Int32Array;
+  visitId: number;
+  visitedAt: Uint32Array;
+  width: number;
+};
+
+const createLegacyRouteQualityBfsWorkspace = (
+  grid: boolean[][]
+): LegacyRouteQualityBfsWorkspace => {
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const cellCount = width * height;
+
+  return {
+    height,
+    queueDistances: new Int32Array(cellCount),
+    queueIndices: new Int32Array(cellCount),
+    visitId: 0,
+    visitedAt: new Uint32Array(cellCount),
+    width
+  };
+};
+
 const measureAlternativeRouteDistanceWithoutEdge = (
   grid: boolean[][],
   start: LegacyPoint,
   goal: LegacyPoint,
   blockedFrom: LegacyPoint,
-  blockedTo: LegacyPoint
+  blockedTo: LegacyPoint,
+  workspace: LegacyRouteQualityBfsWorkspace
 ): number | null => {
-  const queue: Array<{ point: LegacyPoint; distance: number }> = [{ point: start, distance: 0 }];
-  const visited = new Set<string>([keyForPoint(start)]);
+  const { height, queueDistances, queueIndices, visitedAt, width } = workspace;
+  if (width === 0 || height === 0) {
+    return null;
+  }
 
-  for (let index = 0; index < queue.length; index += 1) {
-    const current = queue[index];
-    if (!current) {
-      continue;
+  workspace.visitId = (workspace.visitId + 1) >>> 0;
+  if (workspace.visitId === 0) {
+    visitedAt.fill(0);
+    workspace.visitId = 1;
+  }
+  const visitId = workspace.visitId;
+  const startIndex = (start.y * width) + start.x;
+  const goalIndex = (goal.y * width) + goal.x;
+  const blockedFromIndex = (blockedFrom.y * width) + blockedFrom.x;
+  const blockedToIndex = (blockedTo.y * width) + blockedTo.x;
+  let head = 0;
+  let tail = 1;
+  queueIndices[0] = startIndex;
+  queueDistances[0] = 0;
+  visitedAt[startIndex] = visitId;
+
+  while (head < tail) {
+    const currentIndex = queueIndices[head] ?? -1;
+    const currentDistance = queueDistances[head] ?? 0;
+    head += 1;
+
+    if (currentIndex === goalIndex) {
+      return currentDistance;
     }
 
-    if (isSamePoint(current.point, goal)) {
-      return current.distance;
-    }
-
+    const currentX = currentIndex % width;
+    const currentY = Math.floor(currentIndex / width);
     for (const direction of LEGACY_STEP_DIRECTIONS) {
-      const next = {
-        x: current.point.x + direction.x,
-        y: current.point.y + direction.y
-      };
-      if (grid[next.y]?.[next.x] !== true) {
+      const nextX = currentX + direction.x;
+      const nextY = currentY + direction.y;
+      if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height || grid[nextY]?.[nextX] !== true) {
         continue;
       }
 
+      const nextIndex = (nextY * width) + nextX;
       const crossesBlockedEdge = (
-        (isSamePoint(current.point, blockedFrom) && isSamePoint(next, blockedTo))
-        || (isSamePoint(current.point, blockedTo) && isSamePoint(next, blockedFrom))
+        (currentIndex === blockedFromIndex && nextIndex === blockedToIndex)
+        || (currentIndex === blockedToIndex && nextIndex === blockedFromIndex)
       );
-      if (crossesBlockedEdge) {
+      if (crossesBlockedEdge || visitedAt[nextIndex] === visitId) {
         continue;
       }
 
-      const nextKey = keyForPoint(next);
-      if (visited.has(nextKey)) {
-        continue;
-      }
-
-      visited.add(nextKey);
-      queue.push({ point: next, distance: current.distance + 1 });
+      visitedAt[nextIndex] = visitId;
+      queueIndices[tail] = nextIndex;
+      queueDistances[tail] = currentDistance + 1;
+      tail += 1;
     }
   }
 
@@ -650,6 +692,7 @@ const measureLegacyRouteQuality = (
   solutionPath: readonly LegacyPoint[]
 ): NonNullable<LegacyMazeSnapshot['routeQualityStats']> => {
   const sampledSolutionEdges = Math.max(0, solutionPath.length - 1);
+  const bfsWorkspace = createLegacyRouteQualityBfsWorkspace(grid);
   const bypassableBands = new Set<number>();
   const meaningfulBypassableBands = new Set<number>();
   let bypassableSolutionEdges = 0;
@@ -663,7 +706,14 @@ const measureLegacyRouteQuality = (
       continue;
     }
 
-    const alternativeDistance = measureAlternativeRouteDistanceWithoutEdge(grid, start, goal, from, to);
+    const alternativeDistance = measureAlternativeRouteDistanceWithoutEdge(
+      grid,
+      start,
+      goal,
+      from,
+      to,
+      bfsWorkspace
+    );
     if (alternativeDistance === null) {
       continue;
     }
