@@ -20,7 +20,6 @@ describe('Mazer installable PWA contract', () => {
     expect(manifest.scope).toBe('/');
     expect(manifest.display).toBe('standalone');
     expect(manifest.display_override).toEqual([
-      'window-controls-overlay',
       'standalone',
       'minimal-ui'
     ]);
