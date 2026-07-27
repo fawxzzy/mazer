@@ -6,10 +6,33 @@
   "lang": "en-US",
   "start_url": "/",
   "scope": "/",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#02080f",
   "theme_color": "#02080f",
+  "prefer_related_applications": false,
+  "categories": [
+    "games",
+    "entertainment"
+  ],
+  "shortcuts": [
+    {
+      "name": "Play Mazer",
+      "short_name": "Play",
+      "url": "/?mode=play",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",
