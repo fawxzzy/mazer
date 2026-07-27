@@ -32,14 +32,17 @@ describe('Mazer installable PWA contract', () => {
 
   test('keeps mobile/PWA head metadata and production-only service worker registration explicit', () => {
     const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
-    const bootSource = readFileSync(resolve(process.cwd(), 'src/boot/main.ts'), 'utf8');
+    const lifecycleSource = readFileSync(
+      resolve(process.cwd(), 'src/boot/serviceWorkerLifecycle.ts'),
+      'utf8'
+    );
 
     expect(html).toContain('viewport-fit=cover');
     expect(html).toContain('name="theme-color"');
     expect(html).toContain('name="apple-mobile-web-app-capable"');
     expect(html).toContain('rel="manifest"');
     expect(html).toContain('rel="apple-touch-icon"');
-    expect(bootSource).toContain("if (isLocalhostRuntime() || !('serviceWorker' in navigator))");
-    expect(bootSource).toContain("navigator.serviceWorker.register('/sw.js')");
+    expect(lifecycleSource).toContain("isLocalhostHostname(runtime.hostname)");
+    expect(lifecycleSource).toContain("runtime.register?.('/sw.js')");
   });
 });
