@@ -49,6 +49,7 @@ describe('human-memory AI recovery diagnostics', () => {
 
       for (const decision of diagnostics.recoveryDecisions) {
         expect(decision.candidateCount).toBeGreaterThanOrEqual(1);
+        expect(decision.evaluatedCandidateCount).toBeGreaterThanOrEqual(decision.candidateCount);
         expect(decision.knownRouteStepCount).toBeGreaterThanOrEqual(0);
         expect(decision.routeCursor).toBeGreaterThanOrEqual(0);
         expect(decision.routeCursor).toBeLessThan(diagnostics.routeLength);
@@ -88,6 +89,8 @@ describe('human-memory AI recovery diagnostics', () => {
       for (const decision of diagnostics.recoveryDecisions) {
         expect(decision.candidateCount).toBeGreaterThanOrEqual(1);
         expect(decision.candidateCount).toBeLessThanOrEqual(16);
+        expect(decision.evaluatedCandidateCount).toBeGreaterThanOrEqual(decision.candidateCount);
+        expect(decision.evaluatedCandidateCount).toBeLessThanOrEqual(16);
         if (decision.kind === 'frontier-recovery') {
           frontierRecoveryCount += 1;
         }
