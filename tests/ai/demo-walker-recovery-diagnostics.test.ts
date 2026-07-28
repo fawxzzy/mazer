@@ -67,4 +67,33 @@ describe('human-memory AI recovery diagnostics', () => {
     expect(frontierRecoveryCount).toBeGreaterThan(0);
     expect(branchDecisionCount).toBeGreaterThan(0);
   });
+
+  test('keeps the D-rank recovery pool bounded to nearby remembered frontiers', () => {
+    const seeds = [1, 2, 3, 5, 8] as const;
+    let frontierRecoveryCount = 0;
+
+    for (const seed of seeds) {
+      const maze = createLegacyGeneratedMenuMaze(75, seed);
+      const episode = createLegacyDemoWalkerEpisode(maze);
+      const baseConfig = createLegacyMenuDemoWalkerConfig(seed);
+      const diagnostics = collectDemoWalkerRouteDiagnostics(episode, {
+        ...baseConfig,
+        behavior: {
+          ...baseConfig.behavior,
+          aiSkillLevel: 1,
+          aiSkillRank: 'D'
+        }
+      });
+
+      for (const decision of diagnostics.recoveryDecisions) {
+        expect(decision.candidateCount).toBeGreaterThanOrEqual(1);
+        expect(decision.candidateCount).toBeLessThanOrEqual(16);
+        if (decision.kind === 'frontier-recovery') {
+          frontierRecoveryCount += 1;
+        }
+      }
+    }
+
+    expect(frontierRecoveryCount).toBeGreaterThan(0);
+  });
 });

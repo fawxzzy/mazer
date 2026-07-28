@@ -259,6 +259,7 @@ const cloneMemoryFrame = (frame: DemoWalkerMemoryFrame): DemoWalkerMemoryFrame =
 const LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN = -4.2;
 const LOCAL_MEMORY_OPTIONAL_RETARGET_PATH_PENALTY = 0.2;
 const LOCAL_MEMORY_RECOVERY_PATH_PENALTY = 0.55;
+const D_RANK_RECOVERY_CANDIDATE_LIMIT = 16;
 
 const AI_SKILL_RANK_ORDER: readonly DemoWalkerAiSkillRank[] = ['E', 'D', 'C', 'B', 'A', 'S'];
 
@@ -1922,8 +1923,19 @@ const resolveBestLocalMemorySplitTarget = (input: {
 }): LocalMemoryRecoveryTarget => {
   let bestSplit: LocalMemorySplit | null = null;
   let bestScore = Number.POSITIVE_INFINITY;
-  let candidateCount = 0;
   let runnerUpScore = Number.POSITIVE_INFINITY;
+  const candidates: Array<{
+    choice: number;
+    routeStepCount: number;
+    score: number | null;
+    split: LocalMemorySplit;
+  }> = [];
+  const dRankCandidatesBySplit = new Map<number, {
+    choice: number;
+    routeStepCount: number;
+    score: number | null;
+    split: LocalMemorySplit;
+  }>();
 
   const registerCandidate = (split: LocalMemorySplit): void => {
     const bestChoice = resolveBestLocalMemorySplitChoice(split, input);
@@ -1943,9 +1955,32 @@ const resolveBestLocalMemorySplitTarget = (input: {
     }
 
     const routeStepCount = Math.max(0, route.length - 1);
-    const score = scoreLocalMemoryChoice(split.index, bestChoice, input.episode, input.seed, input.perception)
-      + (routeStepCount * LOCAL_MEMORY_RECOVERY_PATH_PENALTY);
-    candidateCount += 1;
+    const score = input.perception.rank === 'D'
+      ? null
+      : scoreLocalMemoryChoice(split.index, bestChoice, input.episode, input.seed, input.perception)
+        + (routeStepCount * LOCAL_MEMORY_RECOVERY_PATH_PENALTY);
+    const candidate = { choice: bestChoice, routeStepCount, score, split };
+    if (input.perception.rank === 'D') {
+      const existing = dRankCandidatesBySplit.get(split.index);
+      if (existing === undefined || routeStepCount < existing.routeStepCount) {
+        dRankCandidatesBySplit.set(split.index, candidate);
+      }
+      return;
+    }
+    candidates.push(candidate);
+  };
+
+  const selectCandidate = (candidate: {
+    choice: number;
+    routeStepCount: number;
+    score: number | null;
+    split: LocalMemorySplit;
+  }): void => {
+    const { split } = candidate;
+    const score = candidate.score ?? (
+      scoreLocalMemoryChoice(split.index, candidate.choice, input.episode, input.seed, input.perception)
+      + (candidate.routeStepCount * LOCAL_MEMORY_RECOVERY_PATH_PENALTY)
+    );
     if (score < bestScore) {
       runnerUpScore = bestScore;
       bestScore = score;
@@ -1974,8 +2009,20 @@ const resolveBestLocalMemorySplitTarget = (input: {
     registerCandidate(split);
   }
 
+  const selectableCandidates = input.perception.rank === 'D'
+    ? [...dRankCandidatesBySplit.values()]
+      .sort((left, right) => (
+        left.routeStepCount - right.routeStepCount
+        || left.split.index - right.split.index
+      ))
+      .slice(0, D_RANK_RECOVERY_CANDIDATE_LIMIT)
+    : candidates;
+  for (const candidate of selectableCandidates) {
+    selectCandidate(candidate);
+  }
+
   return {
-    candidateCount,
+    candidateCount: selectableCandidates.length,
     selectedScoreMargin: Number.isFinite(runnerUpScore) ? runnerUpScore - bestScore : null,
     split: bestSplit
   };

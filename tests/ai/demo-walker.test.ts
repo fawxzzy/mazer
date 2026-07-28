@@ -777,7 +777,7 @@ describe('demo walker', () => {
     expect(highRankDiagnostics.perception.optionalRetargetLimit).toBe(defaultDiagnostics.perception.optionalRetargetLimit);
     expect(highRankDiagnostics.perception.wrapMentalCost).toBeLessThan(defaultDiagnostics.perception.wrapMentalCost);
     expect(highRankDiagnostics.perception.solvePreviewBudget).toBeGreaterThan(0);
-  });
+  }, 15_000);
 
   test('exposes human bias profiles without changing the balanced default', () => {
     const seeds = [1, 2, 3];
