@@ -296,7 +296,7 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
   B: {
     biasProfile: 'balanced',
     confidenceNoisePenalty: 6,
-    lookaheadDepth: 11,
+    lookaheadDepth: 10,
     optionalRetargetLimit: 2,
     solvePreviewBudget: 1,
     splitUncertaintyPenalty: 0.98,
