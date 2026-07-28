@@ -47,6 +47,9 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("const WRAP_TOPOLOGY_PROGRESSION_STORAGE_KEY = 'mazer.progression.v1:user:runtime-diagnostics-auth-fixture';");
     expect(source).toContain("const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';");
     expect(source).toContain('const DEFAULT_DEVICE_SCALE_FACTOR = 2;');
+    expect(source).toContain('const gameScale = window.__MAZER_GAME__?.scale;');
+    expect(source).toContain('gameScale?.width === width');
+    expect(source).toContain('gameScale?.height === height');
     expect(source).toContain('const mobileViewport = viewport.width < 720;');
     expect(source).toContain('hasTouch: transition ? false : mobileViewport');
     expect(source).toContain('isMobile: transition ? false : mobileViewport');

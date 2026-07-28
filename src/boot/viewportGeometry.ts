@@ -259,7 +259,13 @@ export const syncMazerGameToViewport = (
     return false;
   }
 
-  game.scale.resize(width, height);
+  // RESIZE mode normally re-measures its parent during refresh. That DOM
+  // measurement can still describe the previous viewport while a rapid
+  // maximize/restore sequence is in flight, allowing a late stale resize to
+  // leave pointer transforms out of sync with the authoritative geometry.
+  // The viewport controller already owns the settled parent dimensions, so
+  // publish them directly to Phaser instead of asking it to measure again.
+  game.scale.setParentSize(width, height);
   return true;
 };
 

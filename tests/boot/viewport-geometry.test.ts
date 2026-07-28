@@ -174,15 +174,15 @@ describe('Mazer viewport geometry', () => {
 
   test('avoids duplicate Phaser resize work and forwards the active geometry exactly once', () => {
     let refreshCount = 0;
-    const resizeCalls: Array<[number, number]> = [];
+    const parentSizeCalls: Array<[number, number]> = [];
     const game = {
       scale: {
         height: 844,
         refresh: (): void => {
           refreshCount += 1;
         },
-        resize: (width: number, height: number): void => {
-          resizeCalls.push([width, height]);
+        setParentSize: (width: number, height: number): void => {
+          parentSizeCalls.push([width, height]);
         },
         width: 390
       }
@@ -191,7 +191,36 @@ describe('Mazer viewport geometry', () => {
     expect(syncMazerGameToViewport(game as never, { content: { width: 390, height: 844 } })).toBe(false);
     expect(syncMazerGameToViewport(game as never, { content: { width: 844, height: 390 } })).toBe(true);
     expect(refreshCount).toBe(1);
-    expect(resizeCalls).toEqual([[844, 390]]);
+    expect(parentSizeCalls).toEqual([[844, 390]]);
+  });
+
+  test('keeps rapid viewport restores bound to the latest authoritative parent size', () => {
+    const parentSizeCalls: Array<[number, number]> = [];
+    const scale = {
+      height: 720,
+      refresh: (): void => undefined,
+      setParentSize: (width: number, height: number): void => {
+        parentSizeCalls.push([width, height]);
+        scale.width = width;
+        scale.height = height;
+      },
+      width: 360
+    };
+    const game = { scale };
+
+    expect(syncMazerGameToViewport(game as never, { content: { width: 1440, height: 900 } })).toBe(true);
+    expect(syncMazerGameToViewport(game as never, { content: { width: 360, height: 720 } })).toBe(true);
+    expect(syncMazerGameToViewport(game as never, { content: { width: 405, height: 958 } })).toBe(true);
+    expect(syncMazerGameToViewport(game as never, { content: { width: 360, height: 720 } })).toBe(true);
+
+    expect(parentSizeCalls).toEqual([
+      [1440, 900],
+      [360, 720],
+      [405, 958],
+      [360, 720]
+    ]);
+    expect(scale.width).toBe(360);
+    expect(scale.height).toBe(720);
   });
 
   test('recomputes shared content geometry once when browser chrome changes the visual viewport', () => {
