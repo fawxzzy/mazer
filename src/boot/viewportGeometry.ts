@@ -250,17 +250,19 @@ export const syncMazerGameToViewport = (
 ): boolean => {
   const width = geometry.content.width;
   const height = geometry.content.height;
-  if (game.scale.width === width && game.scale.height === height) {
-    // The visual viewport and safe-area origin can move without changing its
-    // dimensions (notably when iOS browser chrome collapses or expands).
-    // Refreshing keeps Phaser's cached canvasBounds aligned with the fixed
-    // #app origin so touch hit-testing does not drift below the finger.
-    game.scale.refresh();
-    return false;
-  }
+  const sizeChanged = game.scale.width !== width || game.scale.height !== height;
 
-  game.scale.resize(width, height);
-  return true;
+  // RESIZE mode normally re-measures its parent during refresh. That DOM
+  // measurement can still describe the previous viewport while a rapid
+  // maximize/restore sequence is in flight, allowing a late stale resize to
+  // leave pointer transforms out of sync with the authoritative geometry.
+  // The viewport controller already owns the settled parent dimensions, so
+  // publish them directly to Phaser on every geometry update. This remains
+  // necessary when the game dimensions already match: the parent measurement
+  // may still be stale, and setParentSize refreshes Phaser only after replacing
+  // that stale measurement with the authoritative dimensions.
+  game.scale.setParentSize(width, height);
+  return sizeChanged;
 };
 
 export const installMazerViewportGeometry = (

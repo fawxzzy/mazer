@@ -561,7 +561,11 @@ const waitForViewportGeometry = async (page, viewport, timeoutMs = DEFAULT_TIMEO
 
       try {
         const visual = JSON.parse(raw);
-        return visual?.viewport?.width === width && visual?.viewport?.height === height;
+        const gameScale = window.__MAZER_GAME__?.scale;
+        return visual?.viewport?.width === width
+          && visual?.viewport?.height === height
+          && gameScale?.width === width
+          && gameScale?.height === height;
       } catch {
         return false;
       }
