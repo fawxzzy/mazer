@@ -18,8 +18,8 @@ The canvas looked restored because Mazer drew from the shared geometry, while Ph
 
 ## Change
 
-- The viewport controller now passes its already-authoritative content dimensions to Phaser with `setParentSize`.
-- Same-size safe-area and browser-chrome movements still call `refresh` so cached canvas bounds stay current.
+- The viewport controller passes its already-authoritative content dimensions to Phaser with `setParentSize` on every geometry publication.
+- Same-size safe-area and browser-chrome movements also publish the parent size before Phaser refreshes, so a matching game size cannot hide a stale parent measurement.
 - The UI transition harness now requires both the shared visual viewport and Phaser's game scale to match before declaring an endpoint settled.
 - Focused regression proof covers the full rapid transition order and exact final parent dimensions.
 

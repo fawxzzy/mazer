@@ -172,15 +172,11 @@ describe('Mazer viewport geometry', () => {
     });
   });
 
-  test('avoids duplicate Phaser resize work and forwards the active geometry exactly once', () => {
-    let refreshCount = 0;
+  test('reports whether game dimensions changed while always publishing the active parent geometry', () => {
     const parentSizeCalls: Array<[number, number]> = [];
     const game = {
       scale: {
         height: 844,
-        refresh: (): void => {
-          refreshCount += 1;
-        },
         setParentSize: (width: number, height: number): void => {
           parentSizeCalls.push([width, height]);
         },
@@ -190,15 +186,34 @@ describe('Mazer viewport geometry', () => {
 
     expect(syncMazerGameToViewport(game as never, { content: { width: 390, height: 844 } })).toBe(false);
     expect(syncMazerGameToViewport(game as never, { content: { width: 844, height: 390 } })).toBe(true);
-    expect(refreshCount).toBe(1);
-    expect(parentSizeCalls).toEqual([[844, 390]]);
+    expect(parentSizeCalls).toEqual([
+      [390, 844],
+      [844, 390]
+    ]);
+  });
+
+  test('replaces stale parent geometry even when game dimensions already match the restored viewport', () => {
+    const scale = {
+      height: 720,
+      parentHeight: 958,
+      parentWidth: 405,
+      setParentSize: (width: number, height: number): void => {
+        scale.parentWidth = width;
+        scale.parentHeight = height;
+      },
+      width: 360
+    };
+
+    expect(syncMazerGameToViewport({ scale } as never, {
+      content: { width: 360, height: 720 }
+    })).toBe(false);
+    expect([scale.parentWidth, scale.parentHeight]).toEqual([360, 720]);
   });
 
   test('keeps rapid viewport restores bound to the latest authoritative parent size', () => {
     const parentSizeCalls: Array<[number, number]> = [];
     const scale = {
       height: 720,
-      refresh: (): void => undefined,
       setParentSize: (width: number, height: number): void => {
         parentSizeCalls.push([width, height]);
         scale.width = width;
