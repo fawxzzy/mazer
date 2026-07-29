@@ -89,6 +89,20 @@ export interface DemoRunnerRecoveryDecision {
   thoughtState: DemoWalkerThoughtState;
 }
 
+export interface DemoRunnerOptionalRetargetEvaluation {
+  admitted: boolean;
+  admissionDelta: number;
+  candidateCount: number;
+  comparisonMargin: number;
+  currentBestScore: number;
+  effectiveCandidateScore: number;
+  fromIndex: number;
+  knownRouteStepCount: number;
+  routeCursor: number;
+  splitIndex: number;
+  targetIndex: number;
+}
+
 export interface DemoRunnerBranchCandidate {
   choiceClass: DemoWalkerChoiceClass;
   confidence: number;
@@ -112,6 +126,7 @@ export interface DemoRunnerRouteDiagnostics {
   cueCounts: Partial<Record<DemoWalkerCue, number>>;
   perception: DemoWalkerAiPerceptionProfile;
   routeLength: number;
+  optionalRetargetEvaluations: readonly DemoRunnerOptionalRetargetEvaluation[];
   recoveryDecisions: readonly DemoRunnerRecoveryDecision[];
   segmentCount: number;
   telemetry: DemoRunnerTelemetry;
@@ -193,6 +208,7 @@ interface DemoRunnerPlan {
   telemetry: DemoRunnerTelemetry;
   aiResetPathCursor: number | null;
   memoryFrames: readonly DemoWalkerMemoryFrame[];
+  optionalRetargetEvaluations: readonly DemoRunnerOptionalRetargetEvaluation[];
   recoveryDecisions: readonly DemoRunnerRecoveryDecision[];
 }
 
@@ -613,6 +629,7 @@ export const collectDemoWalkerRouteDiagnostics = (
     cueCounts,
     perception: resolveDemoWalkerAiPerceptionProfile(config),
     routeLength: runnerPlan.routeIndices.length,
+    optionalRetargetEvaluations: runnerPlan.optionalRetargetEvaluations,
     recoveryDecisions: runnerPlan.recoveryDecisions,
     segmentCount,
     telemetry: runnerPlan.telemetry,
@@ -904,6 +921,7 @@ const buildPreciseRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     aiResetPathCursor: null,
     branchDecisions: [],
     memoryFrames: Array.from({ length: canonicalPath.length }, () => EMPTY_MEMORY_FRAME),
+    optionalRetargetEvaluations: [],
     recoveryDecisions: []
   };
 };
@@ -1103,6 +1121,7 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     aiResetPathCursor,
     branchDecisions: [],
     memoryFrames,
+    optionalRetargetEvaluations: [],
     recoveryDecisions: []
   };
 };
@@ -1129,6 +1148,7 @@ const buildHumanLocalMemoryRunnerPlan = (
   const segmentTrailModes: DemoTrailMode[] = [];
   const cueOverrides: Array<DemoSegmentCue | DemoWalkerCue | null> = [];
   const memoryFrames: DemoWalkerMemoryFrame[] = [EMPTY_MEMORY_FRAME];
+  const optionalRetargetEvaluations: DemoRunnerOptionalRetargetEvaluation[] = [];
   const recoveryDecisions: DemoRunnerRecoveryDecision[] = [];
   const branchDecisions: DemoRunnerBranchDecision[] = [];
   const telemetry: DemoRunnerTelemetry = {
@@ -1274,6 +1294,13 @@ const buildHumanLocalMemoryRunnerPlan = (
       split: LocalMemorySplit;
     } | null = null;
     let candidateCount = 0;
+    let evaluatedCandidateCount = 0;
+    let strongestEvaluatedCandidate: {
+      choice: number;
+      knownRouteStepCount: number;
+      score: number;
+      split: LocalMemorySplit;
+    } | null = null;
     let runnerUpScore = Number.POSITIVE_INFINITY;
 
     for (const split of splitRecords.values()) {
@@ -1307,6 +1334,15 @@ const buildHumanLocalMemoryRunnerPlan = (
 
       const score = scoreLocalMemoryChoice(split.index, choice, episode, config.seed, perception)
         + (routeStepCount * LOCAL_MEMORY_OPTIONAL_RETARGET_PATH_PENALTY);
+      evaluatedCandidateCount += 1;
+      if (strongestEvaluatedCandidate === null || score < strongestEvaluatedCandidate.score) {
+        strongestEvaluatedCandidate = {
+          choice,
+          knownRouteStepCount: routeStepCount,
+          score,
+          split
+        };
+      }
       if (score + LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN >= currentBestScore) {
         continue;
       }
@@ -1322,6 +1358,24 @@ const buildHumanLocalMemoryRunnerPlan = (
       } else if (score < runnerUpScore) {
         runnerUpScore = score;
       }
+    }
+
+    if (strongestEvaluatedCandidate !== null) {
+      optionalRetargetEvaluations.push({
+        admitted: bestCandidate !== null,
+        admissionDelta: currentBestScore - (
+          strongestEvaluatedCandidate.score + LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN
+        ),
+        candidateCount: evaluatedCandidateCount,
+        comparisonMargin: LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN,
+        currentBestScore,
+        effectiveCandidateScore: strongestEvaluatedCandidate.score,
+        fromIndex,
+        knownRouteStepCount: strongestEvaluatedCandidate.knownRouteStepCount,
+        routeCursor: Math.max(0, routeIndices.length - 1),
+        splitIndex: strongestEvaluatedCandidate.split.index,
+        targetIndex: strongestEvaluatedCandidate.choice
+      });
     }
 
     if (bestCandidate === null) {
@@ -1468,6 +1522,7 @@ const buildHumanLocalMemoryRunnerPlan = (
       : Math.max(1, routeIndices.length - 1),
     branchDecisions,
     memoryFrames,
+    optionalRetargetEvaluations,
     recoveryDecisions
   };
 };

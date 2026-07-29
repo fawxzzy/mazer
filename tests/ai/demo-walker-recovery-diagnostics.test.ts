@@ -24,6 +24,28 @@ describe('human-memory AI recovery diagnostics', () => {
 
       expect(diagnostics.recoveryDecisions).toHaveLength(diagnostics.telemetry.recoveryCount);
 
+      for (const evaluation of diagnostics.optionalRetargetEvaluations) {
+        expect(evaluation.candidateCount).toBeGreaterThanOrEqual(1);
+        expect(evaluation.comparisonMargin).toBe(-4.2);
+        expect(evaluation.routeCursor).toBeGreaterThanOrEqual(0);
+        expect(evaluation.routeCursor).toBeLessThan(diagnostics.routeLength);
+        expect(evaluation.knownRouteStepCount).toBeGreaterThan(0);
+        expect(Number.isFinite(evaluation.currentBestScore)).toBe(true);
+        expect(Number.isFinite(evaluation.effectiveCandidateScore)).toBe(true);
+        expect(Number.isFinite(evaluation.admissionDelta)).toBe(true);
+        expect(evaluation.admissionDelta).toBeCloseTo(
+          evaluation.currentBestScore - (
+            evaluation.effectiveCandidateScore + evaluation.comparisonMargin
+          ),
+          12
+        );
+        expect(evaluation.admitted).toBe(evaluation.admissionDelta > 0);
+        expect(isTileFloor(episode.raster.tiles, evaluation.fromIndex)).toBe(true);
+        expect(isTileFloor(episode.raster.tiles, evaluation.splitIndex)).toBe(true);
+        expect(isTileFloor(episode.raster.tiles, evaluation.targetIndex)).toBe(true);
+        expect(evaluation.targetIndex).not.toBe(episode.raster.endIndex);
+      }
+
       for (const decision of diagnostics.branchDecisions) {
         branchDecisionCount += 1;
         expect(decision.candidates.length).toBeGreaterThanOrEqual(2);
@@ -98,5 +120,83 @@ describe('human-memory AI recovery diagnostics', () => {
     }
 
     expect(frontierRecoveryCount).toBeGreaterThan(0);
+  });
+
+  test('exposes the deterministic accepted and rejected sides of the A-rank hold boundary', () => {
+    const seed = 8;
+    const maze = createLegacyGeneratedMenuMaze(50, seed);
+    const episode = createLegacyDemoWalkerEpisode(maze);
+    const baseConfig = createLegacyMenuDemoWalkerConfig(seed);
+    const collectForRank = (aiSkillRank: 'B' | 'A') => collectDemoWalkerRouteDiagnostics(
+      episode,
+      {
+        ...baseConfig,
+        behavior: {
+          ...baseConfig.behavior,
+          aiSkillLevel: 1,
+          aiSkillRank
+        }
+      }
+    );
+
+    const bFirst = collectForRank('B');
+    const bSecond = collectForRank('B');
+    const aFirst = collectForRank('A');
+    const aSecond = collectForRank('A');
+    const matchesDecisiveComparison = (evaluation: {
+      fromIndex: number;
+      splitIndex: number;
+      targetIndex: number;
+    }) => (
+      evaluation.fromIndex === 1163
+      && evaluation.splitIndex === 1114
+      && evaluation.targetIndex === 1113
+    );
+
+    expect(bSecond).toEqual(bFirst);
+    expect(aSecond).toEqual(aFirst);
+    expect(bFirst.routeLength).toBe(111);
+    expect(aFirst.routeLength).toBe(239);
+    expect(bFirst.telemetry).toMatchObject({
+      backtrackCount: 6,
+      recoveryCount: 4,
+      wrongBranchCount: 4
+    });
+    expect(aFirst.telemetry).toMatchObject({
+      backtrackCount: 54,
+      recoveryCount: 11,
+      wrongBranchCount: 153
+    });
+
+    const bEvaluation = bFirst.optionalRetargetEvaluations.find(matchesDecisiveComparison);
+    const aEvaluation = aFirst.optionalRetargetEvaluations.find(matchesDecisiveComparison);
+
+    expect(bEvaluation).toMatchObject({
+      admitted: true,
+      candidateCount: 2,
+      comparisonMargin: -4.2,
+      fromIndex: 1163,
+      knownRouteStepCount: 1,
+      routeCursor: 17,
+      splitIndex: 1114,
+      targetIndex: 1113
+    });
+    expect(bEvaluation?.currentBestScore).toBeCloseTo(34.11885591973797, 12);
+    expect(bEvaluation?.effectiveCandidateScore).toBeCloseTo(38.08968228478288, 12);
+    expect(bEvaluation?.admissionDelta).toBeCloseTo(0.2291736349550888, 12);
+
+    expect(aEvaluation).toMatchObject({
+      admitted: false,
+      candidateCount: 2,
+      comparisonMargin: -4.2,
+      fromIndex: 1163,
+      knownRouteStepCount: 1,
+      routeCursor: 17,
+      splitIndex: 1114,
+      targetIndex: 1113
+    });
+    expect(aEvaluation?.currentBestScore).toBeCloseTo(33.505964950894594, 12);
+    expect(aEvaluation?.effectiveCandidateScore).toBeCloseTo(37.99670569106149, 12);
+    expect(aEvaluation?.admissionDelta).toBeCloseTo(-0.2907407401668962, 12);
   });
 });

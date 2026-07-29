@@ -7,6 +7,7 @@ import {
   type DemoWalkerAiSkillRank,
   type DemoWalkerChoiceClass,
   type DemoRunnerBranchDecision,
+  type DemoRunnerOptionalRetargetEvaluation,
   type DemoRunnerRecoveryDecision,
   type DemoWalkerThoughtState
 } from '../../src/domain/ai';
@@ -89,6 +90,17 @@ interface BranchDecisionSummary {
   uncertainSelectionCount: number;
 }
 
+interface OptionalRetargetEvaluationSummary {
+  admittedCount: number;
+  averageAdmissionDelta: number | null;
+  averageCandidateCount: number;
+  comparisonMargin: number | null;
+  maximumAdmissionDelta: number | null;
+  minimumAdmissionDelta: number | null;
+  rejectedCount: number;
+  totalCount: number;
+}
+
 interface CalibrationCase {
   adjacentMoveFailures: number;
   canonicalPathLength: number;
@@ -108,6 +120,7 @@ interface CalibrationCase {
   branchDecision: BranchDecisionSummary;
   recoveryCount: number;
   recoveryDecision: RecoveryDecisionSummary;
+  optionalRetargetEvaluation: OptionalRetargetEvaluationSummary;
   optionalRetargetCount: number;
   perception: DemoWalkerAiPerceptionProfile;
   progression: {
@@ -158,6 +171,7 @@ interface CalibrationSummary {
     p50: number;
     p90: number;
   };
+  optionalRetargetEvaluation: OptionalRetargetEvaluationSummary;
   recoveryDecision: RecoveryDecisionSummary;
   recoveryDecisionByScale: RecoveryDecisionByScale[];
   scales: number[];
@@ -381,6 +395,84 @@ const summarizeBranchDecisions = (
       : null,
     totalCount: decisions.length,
     uncertainSelectionCount: margins.filter((margin) => margin < 0.35).length
+  };
+};
+
+const summarizeOptionalRetargetEvaluations = (
+  evaluations: readonly DemoRunnerOptionalRetargetEvaluation[]
+): OptionalRetargetEvaluationSummary => {
+  const admissionDeltas = evaluations.map((entry) => entry.admissionDelta);
+  return {
+    admittedCount: evaluations.filter((entry) => entry.admitted).length,
+    averageAdmissionDelta: admissionDeltas.length > 0
+      ? round(admissionDeltas.reduce((total, value) => total + value, 0) / admissionDeltas.length)
+      : null,
+    averageCandidateCount: evaluations.length > 0
+      ? round(evaluations.reduce((total, entry) => total + entry.candidateCount, 0) / evaluations.length)
+      : 0,
+    comparisonMargin: evaluations[0]?.comparisonMargin ?? null,
+    maximumAdmissionDelta: admissionDeltas.length > 0
+      ? round(Math.max(...admissionDeltas))
+      : null,
+    minimumAdmissionDelta: admissionDeltas.length > 0
+      ? round(Math.min(...admissionDeltas))
+      : null,
+    rejectedCount: evaluations.filter((entry) => !entry.admitted).length,
+    totalCount: evaluations.length
+  };
+};
+
+const summarizeCalibrationOptionalRetargetEvaluations = (
+  cases: readonly CalibrationCase[]
+): OptionalRetargetEvaluationSummary => {
+  const totalCount = cases.reduce((total, entry) => (
+    total + entry.optionalRetargetEvaluation.totalCount
+  ), 0);
+  const casesWithEvaluations = cases.filter((entry) => (
+    entry.optionalRetargetEvaluation.totalCount > 0
+  ));
+  const deltas = casesWithEvaluations.flatMap((entry) => {
+    const summary = entry.optionalRetargetEvaluation;
+    if (
+      summary.minimumAdmissionDelta === null
+      || summary.maximumAdmissionDelta === null
+      || summary.averageAdmissionDelta === null
+    ) {
+      return [];
+    }
+    return [{
+      average: summary.averageAdmissionDelta,
+      count: summary.totalCount,
+      maximum: summary.maximumAdmissionDelta,
+      minimum: summary.minimumAdmissionDelta
+    }];
+  });
+  return {
+    admittedCount: cases.reduce((total, entry) => (
+      total + entry.optionalRetargetEvaluation.admittedCount
+    ), 0),
+    averageAdmissionDelta: totalCount > 0
+      ? round(deltas.reduce((total, entry) => total + (entry.average * entry.count), 0) / totalCount)
+      : null,
+    averageCandidateCount: totalCount > 0
+      ? round(cases.reduce((total, entry) => (
+        total + (
+          entry.optionalRetargetEvaluation.averageCandidateCount
+          * entry.optionalRetargetEvaluation.totalCount
+        )
+      ), 0) / totalCount)
+      : 0,
+    comparisonMargin: casesWithEvaluations[0]?.optionalRetargetEvaluation.comparisonMargin ?? null,
+    maximumAdmissionDelta: deltas.length > 0
+      ? round(Math.max(...deltas.map((entry) => entry.maximum)))
+      : null,
+    minimumAdmissionDelta: deltas.length > 0
+      ? round(Math.min(...deltas.map((entry) => entry.minimum)))
+      : null,
+    rejectedCount: cases.reduce((total, entry) => (
+      total + entry.optionalRetargetEvaluation.rejectedCount
+    ), 0),
+    totalCount
   };
 };
 
@@ -660,6 +752,9 @@ const calibrateCase = (
     floorFailures,
     goalTargetLeaks,
     optionalRetargetCount: diagnostics.telemetry.optionalRetargetCount,
+    optionalRetargetEvaluation: summarizeOptionalRetargetEvaluations(
+      diagnostics.optionalRetargetEvaluations
+    ),
     perception: diagnostics.perception,
     reachedGoal: state.phase === 'goal-hold',
     recoveryCount: diagnostics.telemetry.recoveryCount,
@@ -715,6 +810,7 @@ const buildSummary = (
   const routeEfficiencyPressureScores = cases.map((entry) => entry.progression.routeEfficiencyPressureScore);
   const performanceScores = cases.map((entry) => entry.progression.performanceScore);
   const branchDecision = summarizeCalibrationBranchDecisions(cases);
+  const optionalRetargetEvaluation = summarizeCalibrationOptionalRetargetEvaluations(cases);
   const recoveryDecision = summarizeCalibrationRecoveryDecisions(cases);
   const aiDecisionScores = cases
     .map((entry) => entry.progression.aiDecisionScore)
@@ -728,6 +824,7 @@ const buildSummary = (
     goalTargetLeakCount: cases.reduce((total, entry) => total + entry.goalTargetLeaks, 0),
     perception,
     perfectRouteCount: cases.filter((entry) => entry.routeRatio <= 1.05).length,
+    optionalRetargetEvaluation,
     progression: {
       aiScorer: {
         id: MAZE_CYCLE_AI_SCORER_ID,
