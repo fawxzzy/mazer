@@ -1452,7 +1452,7 @@ const buildHumanLocalMemoryRunnerPlan = (
       candidateCount,
       choiceClass: retargetReview.choiceClass,
       confidence: retargetReview.confidence,
-      evaluatedCandidateCount: candidateCount,
+      evaluatedCandidateCount,
       fromIndex,
       kind: 'optional-retarget',
       knownRouteStepCount: Math.max(0, bestCandidate.route.length - 1),

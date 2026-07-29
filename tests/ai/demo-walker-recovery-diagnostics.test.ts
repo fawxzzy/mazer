@@ -179,6 +179,14 @@ describe('human-memory AI recovery diagnostics', () => {
     const bEvaluation = bFirst.optionalRetargetEvaluations.find(matchesDecisiveComparison);
     const aEvaluation = aFirst.optionalRetargetEvaluations.find(matchesDecisiveComparison);
     const sEvaluation = sFirst.optionalRetargetEvaluations.find(matchesDecisiveComparison);
+    const aRecoveryDecision = aFirst.recoveryDecisions.find((decision) => (
+      decision.kind === 'optional-retarget'
+      && matchesDecisiveComparison(decision)
+    ));
+    const sRecoveryDecision = sFirst.recoveryDecisions.find((decision) => (
+      decision.kind === 'optional-retarget'
+      && matchesDecisiveComparison(decision)
+    ));
 
     expect(bEvaluation).toMatchObject({
       admitted: true,
@@ -221,6 +229,25 @@ describe('human-memory AI recovery diagnostics', () => {
     expect(sEvaluation?.currentBestScore).toBeCloseTo(33.24349116955439, 12);
     expect(sEvaluation?.effectiveCandidateScore).toBeCloseTo(37.91719063580163, 12);
     expect(sEvaluation?.admissionDelta).toBeCloseTo(-0.4736994662472398, 12);
+
+    expect(aRecoveryDecision).toMatchObject({
+      candidateCount: 1,
+      evaluatedCandidateCount: 2,
+      fromIndex: 1163,
+      kind: 'optional-retarget',
+      knownRouteStepCount: 1,
+      splitIndex: 1114,
+      targetIndex: 1113
+    });
+    expect(sRecoveryDecision).toMatchObject({
+      candidateCount: 1,
+      evaluatedCandidateCount: 2,
+      fromIndex: 1163,
+      kind: 'optional-retarget',
+      knownRouteStepCount: 1,
+      splitIndex: 1114,
+      targetIndex: 1113
+    });
   });
 
   test('keeps the S-rank grace blocked before the existing cooldown warm-up', () => {
