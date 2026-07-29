@@ -26,6 +26,10 @@ import {
   resolveLegacyStaticSlowTileRemainingMs,
   type LegacyStaticSlowTileState
 } from '../../src/legacy-runtime/legacyStaticSlowTile';
+import {
+  createLegacyRoomCandidateMetadata,
+  type LegacyRoomCandidateMetadata
+} from '../../src/legacy-runtime/legacyRoomCandidateMetadata';
 import { MenuScene } from '../../src/scenes/MenuScene';
 
 vi.mock('phaser', () => ({
@@ -50,6 +54,7 @@ interface PauseResetSceneHarness {
   playCompletedAtMs: number | null;
   playCyclePath: Array<{ x: number; y: number }>;
   playCycleResetUsed: boolean;
+  playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
   playStartedAtMs: number;
   playStaticSlowTile: LegacyStaticSlowTileState | null;
   player: { x: number; y: number };
@@ -66,6 +71,7 @@ interface ProgressionResetSceneHarness {
   boardDynamicDirty: boolean;
   maze: LegacyMazeSnapshot;
   openOverlay: (overlay: 'pause') => void;
+  playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
   playStaticSlowTile: LegacyStaticSlowTileState | null;
   progressionState: LegacyProgressionState;
   resolveLegacyProgressionStorage: () => undefined;
@@ -300,6 +306,11 @@ describe('legacy static slow tile', () => {
       playCompletedAtMs: 1_500,
       playCyclePath: [{ x: 4, y: 2 }],
       playCycleResetUsed: false,
+      playRoomCandidateMetadata: createLegacyRoomCandidateMetadata(
+        maze,
+        'architect',
+        initial.placement?.point ?? null
+      ),
       playStartedAtMs: 500,
       playStaticSlowTile: entered,
       player: { x: 4, y: 2 },
@@ -327,6 +338,11 @@ describe('legacy static slow tile', () => {
       enteredAtMs: null,
       entryCount: 0
     });
+    expect(scene.playRoomCandidateMetadata).toEqual(createLegacyRoomCandidateMetadata(
+      maze,
+      'architect',
+      scene.playStaticSlowTile?.placement?.point ?? null
+    ));
     expect(scene.player).toEqual(maze.start);
     expect(scene.trail).toEqual([maze.start]);
     expect(scene.playStartedAtMs).toBe(resetAtMs);
@@ -367,6 +383,11 @@ describe('legacy static slow tile', () => {
       boardDynamicDirty: false,
       maze,
       openOverlay: vi.fn(),
+      playRoomCandidateMetadata: createLegacyRoomCandidateMetadata(
+        maze,
+        'architect',
+        initial.placement?.point ?? null
+      ),
       playStaticSlowTile: entered,
       player,
       progressionState,
@@ -397,6 +418,7 @@ describe('legacy static slow tile', () => {
       placement: null
     });
     expect(isLegacyStaticSlowTileDelayActive(scene.playStaticSlowTile, resetAtMs)).toBe(false);
+    expect(scene.playRoomCandidateMetadata).toBeNull();
     expect(scene.player).toBe(player);
     expect(scene.trail).toBe(trail);
     expect(scene.syncLegacyRemoteProgressionState).toHaveBeenCalledWith('replace');

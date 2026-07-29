@@ -182,6 +182,23 @@ export interface MenuSceneRuntimeDiagnostics {
       trailLength: number;
       trailVisible: boolean;
     };
+    roomCandidate?: {
+      band: 'architect' | 'mythic';
+      candidate: {
+        footprintHeight: 2;
+        footprintWidth: 2;
+        solutionPathIndex: number;
+        topLeft: {
+          x: number;
+          y: number;
+        };
+      };
+      candidateCount: 1;
+      contractVersion: 'legacy-room-candidate-metadata-v1';
+      evaluatedCandidateCount: number;
+      roomsEnabled: false;
+      source: 'existing-floor-metadata-only';
+    } | null;
     pressure?: {
       activeWindowMs: number | null;
       alternateRouteStepCount: number | null;

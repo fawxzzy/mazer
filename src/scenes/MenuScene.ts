@@ -219,6 +219,10 @@ import {
   type LegacyStaticSlowTileState
 } from '../legacy-runtime/legacyStaticSlowTile';
 import {
+  createLegacyRoomCandidateMetadata,
+  type LegacyRoomCandidateMetadata
+} from '../legacy-runtime/legacyRoomCandidateMetadata';
+import {
   createEmptyLegacyAuthFormState,
   createLegacyAuthScopedStorage,
   createLegacyGuestAuthSnapshot,
@@ -1109,6 +1113,7 @@ export class MenuScene extends Phaser.Scene {
   private playCyclePath: LegacyPoint[] = [];
   private playCycleResetUsed = false;
   private playStaticSlowTile: LegacyStaticSlowTileState | null = null;
+  private playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null = null;
   private menuDemoCycleStartedAtMs = 0;
   private menuDemoCompletedAtMs: number | null = null;
   private menuDemoCycleRecorded = false;
@@ -1885,6 +1890,22 @@ export class MenuScene extends Phaser.Scene {
           renderTileSize: mazeRenderFrame.tileSize
         },
         lifecycle: playLifecycle,
+        roomCandidate: this.playRoomCandidateMetadata
+          ? {
+              band: this.playRoomCandidateMetadata.band,
+              candidate: {
+                footprintHeight: this.playRoomCandidateMetadata.candidate.footprintHeight,
+                footprintWidth: this.playRoomCandidateMetadata.candidate.footprintWidth,
+                solutionPathIndex: this.playRoomCandidateMetadata.candidate.solutionPathIndex,
+                topLeft: { ...this.playRoomCandidateMetadata.candidate.topLeft }
+              },
+              candidateCount: this.playRoomCandidateMetadata.candidateCount,
+              contractVersion: this.playRoomCandidateMetadata.contractVersion,
+              evaluatedCandidateCount: this.playRoomCandidateMetadata.evaluatedCandidateCount,
+              roomsEnabled: this.playRoomCandidateMetadata.roomsEnabled,
+              source: this.playRoomCandidateMetadata.source
+            }
+          : null,
         pressure: this.playStaticSlowTile
           ? {
               activeWindowMs: slowTilePhase.activeWindowMs,
@@ -3717,6 +3738,7 @@ export class MenuScene extends Phaser.Scene {
       this.playCyclePath = [];
       this.playCycleResetUsed = false;
       this.playStaticSlowTile = null;
+      this.playRoomCandidateMetadata = null;
     } else {
       this.menuDemoConfig = createLegacyMenuDemoWalkerConfig(this.maze.seed);
       this.menuDemoState = null;
@@ -3726,9 +3748,14 @@ export class MenuScene extends Phaser.Scene {
       this.playCyclePath = generationState.initialTrail.map(copyPoint);
       this.playCycleResetUsed = false;
       this.playCompletedAtMs = null;
-      this.playStaticSlowTile = createLegacyStaticSlowTileState(
+      const progressionBand = resolveLegacyProgressionDifficultyProfile(
+        this.progressionState.tracks.player
+      ).band;
+      this.playStaticSlowTile = createLegacyStaticSlowTileState(this.maze, progressionBand);
+      this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
         this.maze,
-        resolveLegacyProgressionDifficultyProfile(this.progressionState.tracks.player).band
+        progressionBand,
+        this.playStaticSlowTile.placement?.point ?? null
       );
       this.startLegacyPlayCompassSpin(this.time.now);
     }
@@ -9990,9 +10017,14 @@ export class MenuScene extends Phaser.Scene {
       this.playCycleResetUsed = true;
       this.playStartedAtMs = this.time.now;
       this.playCompletedAtMs = null;
-      this.playStaticSlowTile = createLegacyStaticSlowTileState(
+      const progressionBand = resolveLegacyProgressionDifficultyProfile(
+        this.progressionState.tracks.player
+      ).band;
+      this.playStaticSlowTile = createLegacyStaticSlowTileState(this.maze, progressionBand);
+      this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
         this.maze,
-        resolveLegacyProgressionDifficultyProfile(this.progressionState.tracks.player).band
+        progressionBand,
+        this.playStaticSlowTile.placement?.point ?? null
       );
       this.resetLegacyWorldTurnHost();
       this.resetLegacyPlayInputBuffer();
@@ -10020,9 +10052,14 @@ export class MenuScene extends Phaser.Scene {
         'ai-runner': this.progressionState.tracks['ai-runner']
       }
     });
-    this.playStaticSlowTile = createLegacyStaticSlowTileState(
+    const progressionBand = resolveLegacyProgressionDifficultyProfile(
+      this.progressionState.tracks.player
+    ).band;
+    this.playStaticSlowTile = createLegacyStaticSlowTileState(this.maze, progressionBand);
+    this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
       this.maze,
-      resolveLegacyProgressionDifficultyProfile(this.progressionState.tracks.player).band
+      progressionBand,
+      this.playStaticSlowTile.placement?.point ?? null
     );
     this.setLatestOverlayMessage(createLegacyPlayerMessage({
       copy: 'Player progression reset. AI progression was kept.',
