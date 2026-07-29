@@ -13,12 +13,16 @@ import {
   type LegacyProgressionDifficultyBand
 } from '../../src/legacy-runtime/legacyProgression';
 import {
+  LEGACY_MYTHIC_TIMED_SLOW_GATE_ACTIVE_MS,
+  LEGACY_MYTHIC_TIMED_SLOW_GATE_CYCLE_MS,
+  LEGACY_MYTHIC_TIMED_SLOW_GATE_SAFE_MS,
   LEGACY_STATIC_SLOW_TILE_CONTRACT_VERSION,
   LEGACY_STATIC_SLOW_TILE_PENALTY_MS,
   applyLegacyStaticSlowTileEntry,
   createLegacyStaticSlowTileState,
   isLegacyStaticSlowTileDelayActive,
   recordLegacyStaticSlowTileBlockedMove,
+  resolveLegacyStaticSlowTilePhase,
   resolveLegacyStaticSlowTileRemainingMs,
   type LegacyStaticSlowTileState
 } from '../../src/legacy-runtime/legacyStaticSlowTile';
@@ -157,11 +161,21 @@ describe('legacy static slow tile', () => {
     expect(JSON.stringify(maze)).toBe(before);
   });
 
-  test('applies exactly one 440 ms movement gate and keeps later re-entry inert', () => {
-    const placement = createLegacyStaticSlowTileState(createBypassableMaze(), 'mythic');
+  test('keeps Architect static with exactly one 440 ms movement gate and inert re-entry', () => {
+    const placement = createLegacyStaticSlowTileState(createBypassableMaze(), 'architect');
     const entry = applyLegacyStaticSlowTileEntry(placement, placement.placement!.point, 1_000.4);
 
     expect(entry.triggered).toBe(true);
+    expect(entry.penaltyAppliedMs).toBe(440);
+    expect(entry.phase).toEqual({
+      active: true,
+      activeWindowMs: null,
+      armed: true,
+      cycleElapsedMs: null,
+      cycleMs: null,
+      mode: 'static',
+      safeWindowMs: null
+    });
     expect(entry.state).toMatchObject({
       consumed: true,
       delayUntilMs: 1_440,
@@ -180,6 +194,94 @@ describe('legacy static slow tile', () => {
     const reentry = applyLegacyStaticSlowTileEntry(blocked, placement.placement!.point, 2_000);
     expect(reentry.triggered).toBe(false);
     expect(reentry.state).toEqual(blocked);
+  });
+
+  test.each([
+    { active: true, cycleElapsedMs: 0, nowMs: 10_000 },
+    { active: true, cycleElapsedMs: 439, nowMs: 10_439 },
+    { active: false, cycleElapsedMs: 440, nowMs: 10_440 },
+    { active: false, cycleElapsedMs: 879, nowMs: 10_879 },
+    { active: true, cycleElapsedMs: 0, nowMs: 10_880 },
+    { active: true, cycleElapsedMs: 439, nowMs: 12_199 },
+    { active: false, cycleElapsedMs: 440, nowMs: 12_200 }
+  ])(
+    'anchors the Mythic 880 ms phase to the play epoch at $nowMs ms',
+    ({ active, cycleElapsedMs, nowMs }) => {
+      const state = createLegacyStaticSlowTileState(createBypassableMaze(), 'mythic');
+
+      expect(resolveLegacyStaticSlowTilePhase(state, nowMs, 10_000)).toEqual({
+        active,
+        activeWindowMs: LEGACY_MYTHIC_TIMED_SLOW_GATE_ACTIVE_MS,
+        armed: active,
+        cycleElapsedMs,
+        cycleMs: LEGACY_MYTHIC_TIMED_SLOW_GATE_CYCLE_MS,
+        mode: 'timed',
+        safeWindowMs: LEGACY_MYTHIC_TIMED_SLOW_GATE_SAFE_MS
+      });
+    }
+  );
+
+  test('consumes Mythic entry once in either phase and applies delay only in the active half', () => {
+    const epochMs = 10_000;
+    const activeState = createLegacyStaticSlowTileState(createBypassableMaze(), 'mythic');
+    const activeEntry = applyLegacyStaticSlowTileEntry(
+      activeState,
+      activeState.placement!.point,
+      epochMs + 439,
+      epochMs
+    );
+
+    expect(activeEntry).toMatchObject({
+      penaltyAppliedMs: 440,
+      phase: {
+        active: true,
+        armed: true,
+        cycleElapsedMs: 439,
+        mode: 'timed'
+      },
+      state: {
+        consumed: true,
+        delayUntilMs: epochMs + 879,
+        enteredAtMs: epochMs + 439,
+        entryCount: 1
+      },
+      triggered: true
+    });
+
+    const safeState = createLegacyStaticSlowTileState(createBypassableMaze(), 'mythic');
+    const safeEntry = applyLegacyStaticSlowTileEntry(
+      safeState,
+      safeState.placement!.point,
+      epochMs + 440,
+      epochMs
+    );
+
+    expect(safeEntry).toMatchObject({
+      penaltyAppliedMs: 0,
+      phase: {
+        active: false,
+        armed: false,
+        cycleElapsedMs: 440,
+        mode: 'timed'
+      },
+      state: {
+        consumed: true,
+        delayUntilMs: null,
+        enteredAtMs: epochMs + 440,
+        entryCount: 1
+      },
+      triggered: true
+    });
+    expect(isLegacyStaticSlowTileDelayActive(safeEntry.state, epochMs + 440)).toBe(false);
+
+    const safeReentry = applyLegacyStaticSlowTileEntry(
+      safeEntry.state,
+      safeState.placement!.point,
+      epochMs + 880,
+      epochMs
+    );
+    expect(safeReentry.triggered).toBe(false);
+    expect(safeReentry.state).toEqual(safeEntry.state);
   });
 
   test.each([
@@ -341,9 +443,11 @@ describe('legacy static slow tile', () => {
     expect(menuSceneSource).toContain('this.playStaticSlowTile = createLegacyStaticSlowTileState(');
     expect(menuSceneSource).toContain('if (isLegacyStaticSlowTileDelayActive(this.playStaticSlowTile, this.time.now))');
     expect(menuSceneSource).toContain("type: 'static-slow-tile-entered'");
-    expect(menuSceneSource).toContain('this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize);');
+    expect(menuSceneSource).toContain('this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize, time);');
     expect(menuSceneSource).toContain('pressure: this.playStaticSlowTile');
-    expect(diagnosticsSource).toContain("contractVersion: 'legacy-static-slow-tile-v1';");
+    expect(menuSceneSource).toContain('this.playStartedAtMs');
+    expect(diagnosticsSource).toContain("contractVersion: 'legacy-static-slow-tile-v2';");
     expect(diagnosticsSource).toContain('penaltyMs: 440;');
+    expect(diagnosticsSource).toContain("timingMode: 'disabled' | 'static' | 'timed';");
   });
 });

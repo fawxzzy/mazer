@@ -183,18 +183,24 @@ export interface MenuSceneRuntimeDiagnostics {
       trailVisible: boolean;
     };
     pressure?: {
+      activeWindowMs: number | null;
       alternateRouteStepCount: number | null;
+      armed: boolean;
       band: 'tutorial' | 'starter' | 'explorer' | 'navigator' | 'architect' | 'mythic';
       blockedMoveCount: number;
       consumed: boolean;
-      contractVersion: 'legacy-static-slow-tile-v1';
+      contractVersion: 'legacy-static-slow-tile-v2';
+      cycleElapsedMs: number | null;
+      cycleMs: number | null;
       delayActive: boolean;
       delayUntilMs: number | null;
       eligible: boolean;
       enteredAtMs: number | null;
       entryCount: number;
       penaltyMs: 440;
+      phaseActive: boolean;
       remainingMs: number;
+      safeWindowMs: number | null;
       solutionPathIndex: number | null;
       tile: {
         screenX: number;
@@ -202,6 +208,7 @@ export interface MenuSceneRuntimeDiagnostics {
         x: number;
         y: number;
       } | null;
+      timingMode: 'disabled' | 'static' | 'timed';
     } | null;
     timer: {
       completedAtMs: number | null;

@@ -6,7 +6,22 @@ import {
 import type { LegacyProgressionDifficultyBand } from './legacyProgression';
 
 export const LEGACY_STATIC_SLOW_TILE_PENALTY_MS = 440;
-export const LEGACY_STATIC_SLOW_TILE_CONTRACT_VERSION = 'legacy-static-slow-tile-v1' as const;
+export const LEGACY_MYTHIC_TIMED_SLOW_GATE_CYCLE_MS = 880;
+export const LEGACY_MYTHIC_TIMED_SLOW_GATE_ACTIVE_MS = 440;
+export const LEGACY_MYTHIC_TIMED_SLOW_GATE_SAFE_MS = 440;
+export const LEGACY_STATIC_SLOW_TILE_CONTRACT_VERSION = 'legacy-static-slow-tile-v2' as const;
+
+export type LegacyStaticSlowTileTimingMode = 'disabled' | 'static' | 'timed';
+
+export interface LegacyStaticSlowTilePhase {
+  active: boolean;
+  activeWindowMs: number | null;
+  armed: boolean;
+  cycleElapsedMs: number | null;
+  cycleMs: number | null;
+  mode: LegacyStaticSlowTileTimingMode;
+  safeWindowMs: number | null;
+}
 
 export interface LegacyStaticSlowTilePlacement {
   alternateRouteStepCount: number;
@@ -28,6 +43,8 @@ export interface LegacyStaticSlowTileState {
 }
 
 export interface LegacyStaticSlowTileEntryResult {
+  penaltyAppliedMs: number;
+  phase: LegacyStaticSlowTilePhase | null;
   state: LegacyStaticSlowTileState | null;
   triggered: boolean;
 }
@@ -38,6 +55,10 @@ const pointsMatch = (left: LegacyPoint, right: LegacyPoint): boolean => (
 
 const normalizeNowMs = (nowMs: number): number => (
   Number.isFinite(nowMs) ? Math.max(0, Math.round(nowMs)) : 0
+);
+
+const normalizePhaseTimeMs = (timeMs: number): number => (
+  Number.isFinite(timeMs) ? Math.max(0, timeMs) : 0
 );
 
 const isEligibleBand = (band: LegacyProgressionDifficultyBand): boolean => (
@@ -130,10 +151,58 @@ export const isLegacyStaticSlowTileDelayActive = (
   nowMs: number
 ): boolean => resolveLegacyStaticSlowTileRemainingMs(state, nowMs) > 0;
 
+export const resolveLegacyStaticSlowTilePhase = (
+  state: LegacyStaticSlowTileState | null,
+  nowMs: number,
+  playTimerEpochMs: number
+): LegacyStaticSlowTilePhase => {
+  if (state === null || !state.eligible || state.placement === null) {
+    return {
+      active: false,
+      activeWindowMs: null,
+      armed: false,
+      cycleElapsedMs: null,
+      cycleMs: null,
+      mode: 'disabled',
+      safeWindowMs: null
+    };
+  }
+
+  if (state.band !== 'mythic') {
+    return {
+      active: true,
+      activeWindowMs: null,
+      armed: !state.consumed,
+      cycleElapsedMs: null,
+      cycleMs: null,
+      mode: 'static',
+      safeWindowMs: null
+    };
+  }
+
+  const elapsedMs = Math.max(
+    0,
+    normalizePhaseTimeMs(nowMs) - normalizePhaseTimeMs(playTimerEpochMs)
+  );
+  const cycleElapsedMs = elapsedMs % LEGACY_MYTHIC_TIMED_SLOW_GATE_CYCLE_MS;
+  const active = cycleElapsedMs < LEGACY_MYTHIC_TIMED_SLOW_GATE_ACTIVE_MS;
+
+  return {
+    active,
+    activeWindowMs: LEGACY_MYTHIC_TIMED_SLOW_GATE_ACTIVE_MS,
+    armed: !state.consumed && active,
+    cycleElapsedMs,
+    cycleMs: LEGACY_MYTHIC_TIMED_SLOW_GATE_CYCLE_MS,
+    mode: 'timed',
+    safeWindowMs: LEGACY_MYTHIC_TIMED_SLOW_GATE_SAFE_MS
+  };
+};
+
 export const applyLegacyStaticSlowTileEntry = (
   state: LegacyStaticSlowTileState | null,
   player: LegacyPoint,
-  nowMs: number
+  nowMs: number,
+  playTimerEpochMs = 0
 ): LegacyStaticSlowTileEntryResult => {
   if (
     state === null
@@ -141,15 +210,24 @@ export const applyLegacyStaticSlowTileEntry = (
     || state.placement === null
     || !pointsMatch(state.placement.point, player)
   ) {
-    return { state, triggered: false };
+    return {
+      penaltyAppliedMs: 0,
+      phase: null,
+      state,
+      triggered: false
+    };
   }
 
   const enteredAtMs = normalizeNowMs(nowMs);
+  const phase = resolveLegacyStaticSlowTilePhase(state, nowMs, playTimerEpochMs);
+  const penaltyAppliedMs = phase.active ? state.penaltyMs : 0;
   return {
+    penaltyAppliedMs,
+    phase,
     state: {
       ...state,
       consumed: true,
-      delayUntilMs: enteredAtMs + state.penaltyMs,
+      delayUntilMs: penaltyAppliedMs > 0 ? enteredAtMs + penaltyAppliedMs : null,
       enteredAtMs,
       entryCount: state.entryCount + 1
     },
