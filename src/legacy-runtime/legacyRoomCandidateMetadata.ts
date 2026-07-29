@@ -1,10 +1,12 @@
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 import type { LegacyProgressionDifficultyBand } from './legacyProgression';
 
-export const LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION = 'legacy-room-candidate-metadata-v3' as const;
+export const LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION = 'legacy-room-candidate-metadata-v4' as const;
 export const LEGACY_ROOM_CANDIDATE_FOOTPRINT_TILES = 2 as const;
 export const LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE = 1 as const;
 export const LEGACY_ROOM_CANDIDATE_MAX_ROUTE_INTERIOR_TILES = 4 as const;
+export const LEGACY_ROOM_CANDIDATE_MAX_PERIMETER_OPENINGS = 4 as const;
+export const LEGACY_ROOM_CANDIDATE_MIN_PERIMETER_OPENINGS = 2 as const;
 export const LEGACY_ROOM_CANDIDATE_ROUTE_THRESHOLD_COUNT = 2 as const;
 
 export interface LegacyRoomCandidate {
@@ -33,6 +35,7 @@ export interface LegacyRoomCandidateMetadata {
   candidateCount: typeof LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE;
   contractVersion: typeof LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION;
   evaluatedCandidateCount: number;
+  perimeterOpeningCount: number;
   routeInteriorTileCount: number;
   routeThresholds: LegacyRoomCandidateRouteThresholds;
   roomsEnabled: false;
@@ -102,6 +105,38 @@ const createRouteThresholds = (
   return [thresholds[0], thresholds[1]];
 };
 
+const countPerimeterOpenings = (
+  grid: LegacyMazeSnapshot['grid'],
+  candidate: LegacyRoomCandidate
+): number => {
+  const footprint = buildFootprint(candidate.topLeft.x, candidate.topLeft.y);
+  const footprintKeys = new Set(footprint.map(pointKey));
+  const cardinalOffsets = [
+    { x: 1, y: 0 },
+    { x: -1, y: 0 },
+    { x: 0, y: 1 },
+    { x: 0, y: -1 }
+  ];
+  let openingCount = 0;
+
+  for (const point of footprint) {
+    for (const offset of cardinalOffsets) {
+      const adjacent = {
+        x: point.x + offset.x,
+        y: point.y + offset.y
+      };
+      if (
+        !footprintKeys.has(pointKey(adjacent))
+        && grid[adjacent.y]?.[adjacent.x] === true
+      ) {
+        openingCount += 1;
+      }
+    }
+  }
+
+  return openingCount;
+};
+
 export const createLegacyRoomCandidateMetadata = (
   maze: Pick<LegacyMazeSnapshot, 'goal' | 'grid' | 'size' | 'solutionPath' | 'start'>,
   band: LegacyProgressionDifficultyBand,
@@ -161,43 +196,51 @@ export const createLegacyRoomCandidateMetadata = (
     || left.orderY - right.orderY
     || left.orderX - right.orderX
   ));
-  const selected = candidates[0];
-  if (!selected) {
-    return null;
+
+  for (const selected of candidates) {
+    const candidate: LegacyRoomCandidate = {
+      footprintHeight: selected.footprintHeight,
+      footprintWidth: selected.footprintWidth,
+      solutionPathIndex: selected.solutionPathIndex,
+      topLeft: { ...selected.topLeft }
+    };
+    const routeThresholds = createRouteThresholds(maze.solutionPath, candidate);
+    if (!routeThresholds) {
+      continue;
+    }
+    const routeInteriorTileCount = (
+      routeThresholds[1].fromSolutionPathIndex
+      - routeThresholds[0].toSolutionPathIndex
+      + 1
+    );
+    if (
+      !Number.isInteger(routeInteriorTileCount)
+      || routeInteriorTileCount < 1
+      || routeInteriorTileCount > LEGACY_ROOM_CANDIDATE_MAX_ROUTE_INTERIOR_TILES
+    ) {
+      continue;
+    }
+    const perimeterOpeningCount = countPerimeterOpenings(maze.grid, candidate);
+    if (
+      perimeterOpeningCount < LEGACY_ROOM_CANDIDATE_MIN_PERIMETER_OPENINGS
+      || perimeterOpeningCount > LEGACY_ROOM_CANDIDATE_MAX_PERIMETER_OPENINGS
+    ) {
+      continue;
+    }
+
+    return {
+      band,
+      candidate,
+      candidateCount: LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE,
+      contractVersion: LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION,
+      evaluatedCandidateCount: candidates.length,
+      perimeterOpeningCount,
+      routeInteriorTileCount,
+      routeThresholds,
+      roomsEnabled: false,
+      source: 'existing-floor-metadata-only'
+    };
   }
 
-  const candidate: LegacyRoomCandidate = {
-    footprintHeight: selected.footprintHeight,
-    footprintWidth: selected.footprintWidth,
-    solutionPathIndex: selected.solutionPathIndex,
-    topLeft: { ...selected.topLeft }
-  };
-  const routeThresholds = createRouteThresholds(maze.solutionPath, candidate);
-  if (!routeThresholds) {
-    return null;
-  }
-  const routeInteriorTileCount = (
-    routeThresholds[1].fromSolutionPathIndex
-    - routeThresholds[0].toSolutionPathIndex
-    + 1
-  );
-  if (
-    !Number.isInteger(routeInteriorTileCount)
-    || routeInteriorTileCount < 1
-    || routeInteriorTileCount > LEGACY_ROOM_CANDIDATE_MAX_ROUTE_INTERIOR_TILES
-  ) {
-    return null;
-  }
-
-  return {
-    band,
-    candidate,
-    candidateCount: LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE,
-    contractVersion: LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION,
-    evaluatedCandidateCount: candidates.length,
-    routeInteriorTileCount,
-    routeThresholds,
-    roomsEnabled: false,
-    source: 'existing-floor-metadata-only'
-  };
+  return null;
 };
