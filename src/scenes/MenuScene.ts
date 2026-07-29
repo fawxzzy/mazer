@@ -198,6 +198,7 @@ import {
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
   resolveLegacyMazeGenerationProfileForProgression,
+  resolveLegacyProgressionDifficultyProfile,
   resolveLegacyProgressionGenerationScale,
   resolveLegacyProgressionPalette,
   resolveLegacyProgressionTrackIdForSurface,
@@ -208,6 +209,14 @@ import {
   type LegacyProgressionState,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
+import {
+  applyLegacyStaticSlowTileEntry,
+  createLegacyStaticSlowTileState,
+  isLegacyStaticSlowTileDelayActive,
+  recordLegacyStaticSlowTileBlockedMove,
+  resolveLegacyStaticSlowTileRemainingMs,
+  type LegacyStaticSlowTileState
+} from '../legacy-runtime/legacyStaticSlowTile';
 import {
   createEmptyLegacyAuthFormState,
   createLegacyAuthScopedStorage,
@@ -994,6 +1003,9 @@ const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;
 const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;
 const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = cyberArcadeMaterial.signal.goalEdge;
+const LEGACY_PLAY_SLOW_TILE_CORE = cyberArcadeMaterial.signal.warning;
+const LEGACY_PLAY_SLOW_TILE_EDGE = cyberArcadeMaterial.signal.warningEdge;
+const LEGACY_PLAY_SLOW_TILE_SPENT = cyberArcadeMaterial.rail.muted;
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
 const LEGACY_MENU_AI_MEMORY_TARGET_CORE = cyberArcadeMaterial.signal.warning;
@@ -1095,6 +1107,7 @@ export class MenuScene extends Phaser.Scene {
   private playCompletedAtMs: number | null = null;
   private playCyclePath: LegacyPoint[] = [];
   private playCycleResetUsed = false;
+  private playStaticSlowTile: LegacyStaticSlowTileState | null = null;
   private menuDemoCycleStartedAtMs = 0;
   private menuDemoCompletedAtMs: number | null = null;
   private menuDemoCycleRecorded = false;
@@ -1854,6 +1867,33 @@ export class MenuScene extends Phaser.Scene {
           renderTileSize: mazeRenderFrame.tileSize
         },
         lifecycle: playLifecycle,
+        pressure: this.playStaticSlowTile
+          ? {
+              alternateRouteStepCount: this.playStaticSlowTile.placement?.alternateRouteStepCount ?? null,
+              band: this.playStaticSlowTile.band,
+              blockedMoveCount: this.playStaticSlowTile.blockedMoveCount,
+              consumed: this.playStaticSlowTile.consumed,
+              contractVersion: this.playStaticSlowTile.contractVersion,
+              delayActive: isLegacyStaticSlowTileDelayActive(this.playStaticSlowTile, time),
+              delayUntilMs: this.playStaticSlowTile.delayUntilMs,
+              eligible: this.playStaticSlowTile.eligible,
+              enteredAtMs: this.playStaticSlowTile.enteredAtMs,
+              entryCount: this.playStaticSlowTile.entryCount,
+              penaltyMs: this.playStaticSlowTile.penaltyMs,
+              remainingMs: resolveLegacyStaticSlowTileRemainingMs(this.playStaticSlowTile, time),
+              solutionPathIndex: this.playStaticSlowTile.placement?.solutionPathIndex ?? null,
+              tile: this.playStaticSlowTile.placement
+                ? {
+                    screenX: mazeRenderFrame.boardLeft
+                      + ((this.playStaticSlowTile.placement.point.x + 0.5) * mazeRenderFrame.tileSize),
+                    screenY: mazeRenderFrame.boardTop
+                      + ((this.playStaticSlowTile.placement.point.y + 0.5) * mazeRenderFrame.tileSize),
+                    x: this.playStaticSlowTile.placement.point.x,
+                    y: this.playStaticSlowTile.placement.point.y
+                  }
+                : null
+            }
+          : null,
         timer: {
           completedAtMs: this.playCompletedAtMs,
           elapsedMs: this.resolveLegacyPlayElapsedMs(),
@@ -3199,22 +3239,29 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyPlayHeldTouchDelay(kind: 'initial' | 'repeat' | 'turn'): number {
     const profile = this.resolveLegacyPlayMovementSpeedProfile();
     const stickActive = this.playTouchStickPointerId !== null;
+    const pressureDelayMs = resolveLegacyStaticSlowTileRemainingMs(this.playStaticSlowTile, this.time.now);
+    let movementDelayMs: number;
     switch (kind) {
       case 'initial':
-        return stickActive
+        movementDelayMs = stickActive
           ? Math.min(profile.initialDelayMs, LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS)
           : profile.initialDelayMs;
+        break;
       case 'repeat':
-        return stickActive
+        movementDelayMs = stickActive
           ? Math.min(profile.repeatIntervalMs, LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS)
           : profile.repeatIntervalMs;
+        break;
       case 'turn':
-        return stickActive
+        movementDelayMs = stickActive
           ? Math.min(profile.turnDelayMs, LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS)
           : profile.turnDelayMs;
+        break;
       default:
         return kind satisfies never;
     }
+
+    return Math.max(movementDelayMs, pressureDelayMs);
   }
 
   private repeatLegacyPlayHeldTouchMove(): void {
@@ -3644,6 +3691,7 @@ export class MenuScene extends Phaser.Scene {
       this.menuDemoCycleRecorded = false;
       this.playCyclePath = [];
       this.playCycleResetUsed = false;
+      this.playStaticSlowTile = null;
     } else {
       this.menuDemoConfig = createLegacyMenuDemoWalkerConfig(this.maze.seed);
       this.menuDemoState = null;
@@ -3653,6 +3701,10 @@ export class MenuScene extends Phaser.Scene {
       this.playCyclePath = generationState.initialTrail.map(copyPoint);
       this.playCycleResetUsed = false;
       this.playCompletedAtMs = null;
+      this.playStaticSlowTile = createLegacyStaticSlowTileState(
+        this.maze,
+        resolveLegacyProgressionDifficultyProfile(this.progressionState.tracks.player).band
+      );
       this.startLegacyPlayCompassSpin(this.time.now);
     }
     this.nextDemoMoveAtMs = nextDemoMoveAtMs;
@@ -4354,6 +4406,16 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private tryMovePlayer(deltaX: number, deltaY: number): boolean {
+    if (isLegacyStaticSlowTileDelayActive(this.playStaticSlowTile, this.time.now)) {
+      this.playStaticSlowTile = recordLegacyStaticSlowTileBlockedMove(
+        this.playStaticSlowTile,
+        this.time.now
+      );
+      this.boardDynamicDirty = true;
+      this.publishRuntimeDiagnostics(this.time.now, true);
+      return false;
+    }
+
     this.legacyWorldTurnCommandSequence += 1;
     this.legacyWorldTurnHost.setState(this.resolveLegacyWorldTurnHostState());
     const diagnostics = this.legacyWorldTurnHost.getDiagnostics();
@@ -4397,6 +4459,12 @@ export class MenuScene extends Phaser.Scene {
     this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, LEGACY_PLAY_PLAYER_VISUAL_MOVE_MS);
     this.trail = nextStep.trail;
     this.appendLegacyPlayCyclePoint(nextStep.player);
+    const slowTileEntry = applyLegacyStaticSlowTileEntry(
+      this.playStaticSlowTile,
+      nextStep.player,
+      this.time.now
+    );
+    this.playStaticSlowTile = slowTileEntry.state;
     if (this.settings.toggleCameraFollow) {
       this.boardStaticDirty = true;
       this.boardPathDirty = true;
@@ -4416,7 +4484,18 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicDirty = true;
     return {
       accepted: true,
-      events: [{ type: 'player-moved', entityId: 'player' }]
+      events: [
+        { type: 'player-moved', entityId: 'player' },
+        ...(slowTileEntry.triggered
+          ? [{
+              type: 'static-slow-tile-entered',
+              entityId: 'player',
+              payload: {
+                penaltyMs: this.playStaticSlowTile?.penaltyMs ?? 0
+              }
+            }]
+          : [])
+      ]
     };
   }
 
@@ -6053,6 +6132,8 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
+    this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize);
+
     if (this.mode === 'menu' && menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
       this.drawLegacyMenuAiMemoryOverlay(
         mazeLeft,
@@ -6115,6 +6196,46 @@ export class MenuScene extends Phaser.Scene {
       );
     }
     this.boardDynamicDirty = false;
+  }
+
+  private drawLegacyPlayStaticSlowTile(
+    mazeLeft: number,
+    mazeTop: number,
+    tileSize: number
+  ): void {
+    const placement = this.playStaticSlowTile?.placement;
+    if (this.mode !== 'play' || placement === null || placement === undefined) {
+      return;
+    }
+
+    const centerX = mazeLeft + ((placement.point.x + 0.5) * tileSize);
+    const centerY = mazeTop + ((placement.point.y + 0.5) * tileSize);
+    const radius = Math.max(1.5, tileSize * 0.34);
+    const color = this.playStaticSlowTile?.consumed
+      ? LEGACY_PLAY_SLOW_TILE_SPENT
+      : LEGACY_PLAY_SLOW_TILE_CORE;
+    const edge = this.playStaticSlowTile?.consumed
+      ? LEGACY_PLAY_SLOW_TILE_SPENT
+      : LEGACY_PLAY_SLOW_TILE_EDGE;
+    const alpha = this.playStaticSlowTile?.consumed ? 0.58 : 0.96;
+
+    this.boardDynamicGraphics.fillStyle(color, alpha * 0.32);
+    this.boardDynamicGraphics.fillCircle(centerX, centerY, radius);
+    this.boardDynamicGraphics.fillStyle(color, alpha);
+    this.boardDynamicGraphics.beginPath();
+    this.boardDynamicGraphics.moveTo(centerX, centerY - radius);
+    this.boardDynamicGraphics.lineTo(centerX + radius, centerY);
+    this.boardDynamicGraphics.lineTo(centerX, centerY + radius);
+    this.boardDynamicGraphics.lineTo(centerX - radius, centerY);
+    this.boardDynamicGraphics.closePath();
+    this.boardDynamicGraphics.fillPath();
+    this.boardDynamicGraphics.lineStyle(Math.max(1, tileSize * 0.08), edge, alpha);
+    this.boardDynamicGraphics.strokePath();
+    this.boardDynamicGraphics.lineStyle(Math.max(1, tileSize * 0.07), cyberArcadeMaterial.substrate.field, alpha);
+    this.boardDynamicGraphics.beginPath();
+    this.boardDynamicGraphics.moveTo(centerX - (radius * 0.42), centerY);
+    this.boardDynamicGraphics.lineTo(centerX + (radius * 0.42), centerY);
+    this.boardDynamicGraphics.strokePath();
   }
 
   private drawLegacyProgressionBadge(
@@ -9827,6 +9948,10 @@ export class MenuScene extends Phaser.Scene {
       this.playCycleResetUsed = true;
       this.playStartedAtMs = this.time.now;
       this.playCompletedAtMs = null;
+      this.playStaticSlowTile = createLegacyStaticSlowTileState(
+        this.maze,
+        resolveLegacyProgressionDifficultyProfile(this.progressionState.tracks.player).band
+      );
       this.resetLegacyWorldTurnHost();
       this.resetLegacyPlayInputBuffer();
       this.boardDynamicDirty = true;
@@ -9853,6 +9978,10 @@ export class MenuScene extends Phaser.Scene {
         'ai-runner': this.progressionState.tracks['ai-runner']
       }
     });
+    this.playStaticSlowTile = createLegacyStaticSlowTileState(
+      this.maze,
+      resolveLegacyProgressionDifficultyProfile(this.progressionState.tracks.player).band
+    );
     this.setLatestOverlayMessage(createLegacyPlayerMessage({
       copy: 'Player progression reset. AI progression was kept.',
       id: 'progression.player.reset',

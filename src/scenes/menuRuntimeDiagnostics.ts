@@ -182,6 +182,27 @@ export interface MenuSceneRuntimeDiagnostics {
       trailLength: number;
       trailVisible: boolean;
     };
+    pressure?: {
+      alternateRouteStepCount: number | null;
+      band: 'tutorial' | 'starter' | 'explorer' | 'navigator' | 'architect' | 'mythic';
+      blockedMoveCount: number;
+      consumed: boolean;
+      contractVersion: 'legacy-static-slow-tile-v1';
+      delayActive: boolean;
+      delayUntilMs: number | null;
+      eligible: boolean;
+      enteredAtMs: number | null;
+      entryCount: number;
+      penaltyMs: 440;
+      remainingMs: number;
+      solutionPathIndex: number | null;
+      tile: {
+        screenX: number;
+        screenY: number;
+        x: number;
+        y: number;
+      } | null;
+    } | null;
     timer: {
       completedAtMs: number | null;
       elapsedMs: number;
