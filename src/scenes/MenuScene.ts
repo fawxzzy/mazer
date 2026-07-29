@@ -63,6 +63,8 @@ import {
   createLegacyResetRequest,
   hasPendingLegacyResetRequest,
   resolveLegacyPlayLifecycleSnapshot,
+  resolveLegacyStaticDrawPlayTimerStartAtMs,
+  shouldFreezeLegacyPlayElapsedForStaticDraw,
   shouldSettleLegacyStaticDrawStage,
   shouldConsumeLegacyResetRequest,
   type LegacyPlayLifecycleSnapshot,
@@ -3665,7 +3667,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.mode === 'menu') {
       this.nextDemoMoveAtMs = Math.max(this.nextDemoMoveAtMs, this.resolveLegacyMenuStaticDrawDemoGateAtMs());
     } else if (generationState.startsPlayTimer) {
-      this.playStartedAtMs = Math.max(this.time.now, this.resolveLegacyMenuStaticDrawDemoGateAtMs());
+      this.playStartedAtMs = this.time.now;
     }
   }
 
@@ -4090,6 +4092,14 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private settleLegacyMenuStaticDrawStageIfComplete(time: number): void {
+    const settledPlayStartedAtMs = resolveLegacyStaticDrawPlayTimerStartAtMs({
+      currentStartedAtMs: this.playStartedAtMs,
+      drawPhase: this.menuStaticDrawLifecyclePhase,
+      mode: this.mode,
+      nowMs: time,
+      rowsVisible: this.menuStaticDrawRowsVisible,
+      tilesVisible: this.menuStaticDrawTilesVisible
+    });
     if (!shouldSettleLegacyStaticDrawStage({
       drawPhase: this.menuStaticDrawLifecyclePhase,
       rowsVisible: this.menuStaticDrawRowsVisible,
@@ -4098,6 +4108,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    this.playStartedAtMs = settledPlayStartedAtMs;
     this.menuStaticDrawLifecyclePhase = 'settled';
     this.menuStaticDeconstructStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
@@ -4295,7 +4306,13 @@ export class MenuScene extends Phaser.Scene {
       playerAlpha: this.resolveLegacyMenuDeconstructPlayerAlpha(time),
       resetPending: hasPendingLegacyResetRequest(this.pendingResetRequest),
       stagedBuildVisible: this.menuStaticDrawRowsVisible !== null || this.menuStaticDrawTilesVisible !== null,
-      timerStarted: this.mode === 'play' && time >= this.playStartedAtMs,
+      timerStarted: this.mode === 'play'
+        && !shouldFreezeLegacyPlayElapsedForStaticDraw({
+          drawPhase: this.menuStaticDrawLifecyclePhase,
+          rowsVisible: this.menuStaticDrawRowsVisible,
+          tilesVisible: this.menuStaticDrawTilesVisible
+        })
+        && time >= this.playStartedAtMs,
       trailAlpha: this.resolveLegacyMenuDeconstructTrailAlpha(time),
       trailLength: this.trail.length
     });
@@ -6266,13 +6283,22 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyPlayElapsedMs(): number {
-    return this.mode === 'play'
-      ? resolveLegacyFrozenElapsedMs({
-        completedAtMs: this.playCompletedAtMs,
-        nowMs: this.time.now,
-        startedAtMs: this.playStartedAtMs
+    if (
+      this.mode !== 'play'
+      || shouldFreezeLegacyPlayElapsedForStaticDraw({
+        drawPhase: this.menuStaticDrawLifecyclePhase,
+        rowsVisible: this.menuStaticDrawRowsVisible,
+        tilesVisible: this.menuStaticDrawTilesVisible
       })
-      : 0;
+    ) {
+      return 0;
+    }
+
+    return resolveLegacyFrozenElapsedMs({
+      completedAtMs: this.playCompletedAtMs,
+      nowMs: this.time.now,
+      startedAtMs: this.playStartedAtMs
+    });
   }
 
   private resolveLegacyProgressionBadgeText(_palette: LegacyProgressionPalette): string {

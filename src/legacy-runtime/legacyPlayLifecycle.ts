@@ -176,6 +176,44 @@ export const shouldSettleLegacyStaticDrawStage = ({
   && tilesVisible === null
 );
 
+export const resolveLegacyStaticDrawPlayTimerStartAtMs = ({
+  currentStartedAtMs,
+  drawPhase,
+  mode,
+  nowMs,
+  rowsVisible,
+  tilesVisible
+}: {
+  currentStartedAtMs: number;
+  drawPhase: LegacyPlayDrawLifecyclePhase;
+  mode: LegacyPlayMode;
+  nowMs: number;
+  rowsVisible: number | null;
+  tilesVisible: number | null;
+}): number => (
+  mode === 'play' && shouldSettleLegacyStaticDrawStage({
+    drawPhase,
+    rowsVisible,
+    tilesVisible
+  })
+    ? nowMs
+    : currentStartedAtMs
+);
+
+export const shouldFreezeLegacyPlayElapsedForStaticDraw = ({
+  drawPhase,
+  rowsVisible,
+  tilesVisible
+}: {
+  drawPhase: LegacyPlayDrawLifecyclePhase;
+  rowsVisible: number | null;
+  tilesVisible: number | null;
+}): boolean => (
+  drawPhase === 'building'
+  || rowsVisible !== null
+  || tilesVisible !== null
+);
+
 export const resolveLegacyPlayLifecycleSnapshot = ({
   drawPhase,
   generationPending,
