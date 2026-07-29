@@ -9978,6 +9978,10 @@ export class MenuScene extends Phaser.Scene {
         'ai-runner': this.progressionState.tracks['ai-runner']
       }
     });
+    this.playStaticSlowTile = createLegacyStaticSlowTileState(
+      this.maze,
+      resolveLegacyProgressionDifficultyProfile(this.progressionState.tracks.player).band
+    );
     this.setLatestOverlayMessage(createLegacyPlayerMessage({
       copy: 'Player progression reset. AI progression was kept.',
       id: 'progression.player.reset',

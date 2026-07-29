@@ -58,6 +58,19 @@ interface PauseResetSceneHarness {
   trail: Array<{ x: number; y: number }>;
 }
 
+interface ProgressionResetSceneHarness {
+  boardDynamicDirty: boolean;
+  maze: LegacyMazeSnapshot;
+  openOverlay: (overlay: 'pause') => void;
+  playStaticSlowTile: LegacyStaticSlowTileState | null;
+  progressionState: LegacyProgressionState;
+  resolveLegacyProgressionStorage: () => undefined;
+  runtimeDiagnosticsLastPublishedAtMs: number;
+  setLatestOverlayMessage: (message: unknown) => void;
+  syncLegacyRemoteProgressionState: (mode: 'replace') => void;
+  visualDiagnosticsLastPublishedAtMs: number;
+}
+
 const applyPauseCommand = (
   MenuScene.prototype as unknown as {
     applyLegacyPauseCommand: (
@@ -66,6 +79,14 @@ const applyPauseCommand = (
     ) => void;
   }
 ).applyLegacyPauseCommand;
+
+const resetPlayerProgression = (
+  MenuScene.prototype as unknown as {
+    resetLegacyPlayerProgression: (
+      this: ProgressionResetSceneHarness
+    ) => void;
+  }
+).resetLegacyPlayerProgression;
 
 const createBypassableMaze = (): LegacyMazeSnapshot => ({
   source: 'play-generated',
@@ -223,6 +244,61 @@ describe('legacy static slow tile', () => {
         penaltyMs: 440
       }
     });
+  });
+
+  test.each([
+    { label: 'consumed state', resetAtMs: 2_000 },
+    { label: 'in-flight delay', resetAtMs: 1_100 }
+  ])('disables pressure through the actual Reset Progression path from $label', ({ resetAtMs }) => {
+    const maze = createBypassableMaze();
+    const progressionState = createEmptyLegacyProgressionState();
+    progressionState.tracks.player.targetComplexity = 132;
+    progressionState.tracks['ai-runner'].targetComplexity = 180;
+    const initial = createLegacyStaticSlowTileState(maze, 'architect');
+    const entered = applyLegacyStaticSlowTileEntry(initial, initial.placement!.point, 1_000).state;
+    const player = { x: 4, y: 2 };
+    const trail = [{ x: 4, y: 2 }, { x: 5, y: 2 }];
+    const scene: ProgressionResetSceneHarness & {
+      player: { x: number; y: number };
+      trail: Array<{ x: number; y: number }>;
+    } = {
+      boardDynamicDirty: false,
+      maze,
+      openOverlay: vi.fn(),
+      playStaticSlowTile: entered,
+      player,
+      progressionState,
+      resolveLegacyProgressionStorage: () => undefined,
+      runtimeDiagnosticsLastPublishedAtMs: 4_000,
+      setLatestOverlayMessage: vi.fn(),
+      syncLegacyRemoteProgressionState: vi.fn(),
+      trail,
+      visualDiagnosticsLastPublishedAtMs: 3_000
+    };
+
+    expect(isLegacyStaticSlowTileDelayActive(entered, resetAtMs)).toBe(resetAtMs < 1_440);
+    resetPlayerProgression.call(scene);
+
+    expect(scene.progressionState.tracks.player).toEqual(
+      createEmptyLegacyProgressionState().tracks.player
+    );
+    expect(scene.progressionState.tracks['ai-runner'].targetComplexity).toBe(180);
+    expect(scene.playStaticSlowTile).toEqual(createLegacyStaticSlowTileState(maze, 'starter'));
+    expect(scene.playStaticSlowTile).toMatchObject({
+      band: 'starter',
+      blockedMoveCount: 0,
+      consumed: false,
+      delayUntilMs: null,
+      eligible: false,
+      enteredAtMs: null,
+      entryCount: 0,
+      placement: null
+    });
+    expect(isLegacyStaticSlowTileDelayActive(scene.playStaticSlowTile, resetAtMs)).toBe(false);
+    expect(scene.player).toBe(player);
+    expect(scene.trail).toBe(trail);
+    expect(scene.syncLegacyRemoteProgressionState).toHaveBeenCalledWith('replace');
+    expect(scene.openOverlay).toHaveBeenCalledWith('pause');
   });
 
   test('finds deterministic bypassable placements across the fixed Architect/Mythic corpus', () => {
