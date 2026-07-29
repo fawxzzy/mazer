@@ -278,6 +278,8 @@ const cloneMemoryFrame = (frame: DemoWalkerMemoryFrame): DemoWalkerMemoryFrame =
 
 const LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN = -4.2;
 const LOCAL_MEMORY_OPTIONAL_RETARGET_PATH_PENALTY = 0.2;
+const A_RANK_OPTIONAL_RETARGET_GRACE = 0.3;
+const S_RANK_OPTIONAL_RETARGET_GRACE = 0.48;
 const LOCAL_MEMORY_RECOVERY_PATH_PENALTY = 0.55;
 const D_RANK_RECOVERY_CANDIDATE_LIMIT = 16;
 
@@ -1298,6 +1300,7 @@ const buildHumanLocalMemoryRunnerPlan = (
     let strongestEvaluatedCandidate: {
       choice: number;
       knownRouteStepCount: number;
+      route: number[];
       score: number;
       split: LocalMemorySplit;
     } | null = null;
@@ -1339,6 +1342,7 @@ const buildHumanLocalMemoryRunnerPlan = (
         strongestEvaluatedCandidate = {
           choice,
           knownRouteStepCount: routeStepCount,
+          route,
           score,
           split
         };
@@ -1357,6 +1361,35 @@ const buildHumanLocalMemoryRunnerPlan = (
         };
       } else if (score < runnerUpScore) {
         runnerUpScore = score;
+      }
+    }
+
+    if (bestCandidate === null && strongestEvaluatedCandidate !== null) {
+      const routeCursor = Math.max(0, routeIndices.length - 1);
+      const rankGrace = perception.rank === 'A'
+        ? A_RANK_OPTIONAL_RETARGET_GRACE
+        : perception.rank === 'S'
+          ? S_RANK_OPTIONAL_RETARGET_GRACE
+          : 0;
+      const admissionDelta = currentBestScore - (
+        strongestEvaluatedCandidate.score + LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN
+      );
+      const warmedRankGraceApplies = (
+        rankGrace > 0
+        && routeCursor >= optionalRetargetCooldownSteps
+        && evaluatedCandidateCount === 2
+        && strongestEvaluatedCandidate.knownRouteStepCount === 1
+        && admissionDelta >= -rankGrace
+        && admissionDelta < 0
+      );
+      if (warmedRankGraceApplies) {
+        bestCandidate = {
+          choice: strongestEvaluatedCandidate.choice,
+          route: strongestEvaluatedCandidate.route,
+          score: strongestEvaluatedCandidate.score,
+          split: strongestEvaluatedCandidate.split
+        };
+        candidateCount = 1;
       }
     }
 
@@ -1419,7 +1452,7 @@ const buildHumanLocalMemoryRunnerPlan = (
       candidateCount,
       choiceClass: retargetReview.choiceClass,
       confidence: retargetReview.confidence,
-      evaluatedCandidateCount: candidateCount,
+      evaluatedCandidateCount,
       fromIndex,
       kind: 'optional-retarget',
       knownRouteStepCount: Math.max(0, bestCandidate.route.length - 1),
