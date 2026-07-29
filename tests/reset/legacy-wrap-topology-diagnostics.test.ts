@@ -10,6 +10,7 @@ import {
   type LegacyMazeGenerationProfile,
   type LegacyPoint
 } from '../../src/legacy-runtime/legacyMaze';
+import { resolveLegacyMazeGenerationProfileForProgression } from '../../src/legacy-runtime/legacyProgression';
 
 const createGrid = (size: number): boolean[][] => (
   Array.from({ length: size }, () => Array.from({ length: size }, () => false))
@@ -206,5 +207,41 @@ describe('legacy wrap topology diagnostics', () => {
     }
 
     expect(failures).toEqual([]);
+  }, 30_000);
+
+  test('pairs the starter optional horizontal feeders before independent side filling', () => {
+    const starterProfile = resolveLegacyMazeGenerationProfileForProgression(28);
+    const failures: unknown[] = [];
+
+    for (let seed = 1; seed <= 60; seed += 1) {
+      const maze = createLegacyMaze(39, seed, undefined, starterProfile);
+      const diagnostics = maze.wrapTopologyDiagnostics;
+      if (
+        !diagnostics
+        || diagnostics.horizontal.required
+        || diagnostics.horizontal.endpointCount !== 2
+        || diagnostics.horizontal.pairCount !== 1
+        || diagnostics.horizontal.unpairedEndpoints.length > 0
+        || !diagnostics.vertical.required
+        || diagnostics.vertical.endpointCount !== 2
+        || diagnostics.vertical.pairCount !== 1
+        || diagnostics.vertical.unpairedEndpoints.length > 0
+        || diagnostics.cornerBorderFloors.length > 0
+        || diagnostics.inwardDisconnectedEndpoints.length > 0
+        || !diagnostics.graphTopologyValid
+        || !diagnostics.solutionRouteAudit.validCompletedRoute
+        || !diagnostics.solutionRouteAudit.lowerBoundSatisfied
+      ) {
+        failures.push({ diagnostics, seed });
+      }
+    }
+
+    expect(failures).toEqual([]);
+
+    for (const seed of [577196704, 577196705, 577196706]) {
+      const first = createLegacyMaze(39, seed, undefined, starterProfile);
+      const second = createLegacyMaze(39, seed, undefined, starterProfile);
+      expect(second).toEqual(first);
+    }
   }, 30_000);
 });

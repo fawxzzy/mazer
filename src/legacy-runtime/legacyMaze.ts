@@ -2058,7 +2058,17 @@ export const createLegacyMaze = (
     } = resolveLegacyFinalRouteState(grid, start, goal, minimumSolutionPathLength, playableTopologyStats));
   }
 
-  const mandatoryBorderWrapTiles = applyLegacyMandatoryOppositeBorderConnections(grid, seed, profile.requiredOppositeBorderConnections);
+  const feederPairingConnections = (
+    profile.borderFeederTargetPerSide === 1
+    && !profile.requiredOppositeBorderConnections.horizontal
+    && profile.requiredOppositeBorderConnections.vertical
+  )
+    ? {
+        horizontal: true,
+        vertical: profile.requiredOppositeBorderConnections.vertical
+      }
+    : profile.requiredOppositeBorderConnections;
+  const mandatoryBorderWrapTiles = applyLegacyMandatoryOppositeBorderConnections(grid, seed, feederPairingConnections);
   const perimeterFeederTiles = applyLegacyPerimeterFeederConnections(grid, seed, profile.borderFeederTargetPerSide);
   const borderWrapTiles = applyLegacyOppositeBorderConnections(grid, profile.requiredOppositeBorderConnections);
   if (mandatoryBorderWrapTiles.length > 0 || perimeterFeederTiles.length > 0 || borderWrapTiles.length > 0) {
