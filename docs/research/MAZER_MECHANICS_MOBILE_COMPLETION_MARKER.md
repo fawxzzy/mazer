@@ -160,7 +160,7 @@ Do not ratchet for wording changes alone. Do not ratchet the retired legacy visu
 - Both guide surfaces now center `PLAYER GUIDE`, reuse the literal compass/start/end board renderers, and use concise player/status bullets instead of a duplicate player icon.
 - Played-game Pause now has a confirmation-gated `Reset Progress` action that clears only the player progression track, preserves the AI track, and uses the existing scoped local/remote progression persistence path.
 - Focused proof: `npm run lint`; `npx vitest run tests/ai/demo-walker.test.ts tests/reset/legacy-progression.test.ts tests/reset/legacy-game-toggle-preferences.test.ts tests/scenes/menu-render-frame.test.ts --maxWorkers 1` (`101` tests); and `npm run build`.
-- Open handoff: do not treat finite local AI route exhaustion as a valid end-of-maze outcome. The next AI slice must replace the reset/regeneration branch with persistent known-frontier expansion and prove no undiscovered goal target, teleport, or silent route reset occurs before genuine goal discovery.
+- Historical handoff, now closed for the human-memory lane: finite local AI route exhaustion is not a valid end-of-maze outcome. Persistent remembered-frontier recovery now reaches the genuine goal before regeneration without an undiscovered goal target, teleport, or silent route reset. The legacy source-demonstration plan still retains its staged `ai-path-exhausted` reset behavior, and the separate exact route/backtrack parity gaps remain listed in `docs/current-truth.md`.
 
 ## 2026-07-10 - Authenticated mobile overlay and proof-harness maintenance receipt
 
