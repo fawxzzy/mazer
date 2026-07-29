@@ -1,9 +1,10 @@
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 import type { LegacyProgressionDifficultyBand } from './legacyProgression';
 
-export const LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION = 'legacy-room-candidate-metadata-v2' as const;
+export const LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION = 'legacy-room-candidate-metadata-v3' as const;
 export const LEGACY_ROOM_CANDIDATE_FOOTPRINT_TILES = 2 as const;
 export const LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE = 1 as const;
+export const LEGACY_ROOM_CANDIDATE_MAX_ROUTE_INTERIOR_TILES = 4 as const;
 export const LEGACY_ROOM_CANDIDATE_ROUTE_THRESHOLD_COUNT = 2 as const;
 
 export interface LegacyRoomCandidate {
@@ -32,6 +33,7 @@ export interface LegacyRoomCandidateMetadata {
   candidateCount: typeof LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE;
   contractVersion: typeof LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION;
   evaluatedCandidateCount: number;
+  routeInteriorTileCount: number;
   routeThresholds: LegacyRoomCandidateRouteThresholds;
   roomsEnabled: false;
   source: 'existing-floor-metadata-only';
@@ -174,6 +176,18 @@ export const createLegacyRoomCandidateMetadata = (
   if (!routeThresholds) {
     return null;
   }
+  const routeInteriorTileCount = (
+    routeThresholds[1].fromSolutionPathIndex
+    - routeThresholds[0].toSolutionPathIndex
+    + 1
+  );
+  if (
+    !Number.isInteger(routeInteriorTileCount)
+    || routeInteriorTileCount < 1
+    || routeInteriorTileCount > LEGACY_ROOM_CANDIDATE_MAX_ROUTE_INTERIOR_TILES
+  ) {
+    return null;
+  }
 
   return {
     band,
@@ -181,6 +195,7 @@ export const createLegacyRoomCandidateMetadata = (
     candidateCount: LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE,
     contractVersion: LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION,
     evaluatedCandidateCount: candidates.length,
+    routeInteriorTileCount,
     routeThresholds,
     roomsEnabled: false,
     source: 'existing-floor-metadata-only'

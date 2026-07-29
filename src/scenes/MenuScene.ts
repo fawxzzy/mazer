@@ -1902,6 +1902,7 @@ export class MenuScene extends Phaser.Scene {
               candidateCount: this.playRoomCandidateMetadata.candidateCount,
               contractVersion: this.playRoomCandidateMetadata.contractVersion,
               evaluatedCandidateCount: this.playRoomCandidateMetadata.evaluatedCandidateCount,
+              routeInteriorTileCount: this.playRoomCandidateMetadata.routeInteriorTileCount,
               routeThresholds: this.playRoomCandidateMetadata.routeThresholds.map((threshold) => ({
                 from: { ...threshold.from },
                 fromSolutionPathIndex: threshold.fromSolutionPathIndex,

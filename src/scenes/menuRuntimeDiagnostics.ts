@@ -194,8 +194,9 @@ export interface MenuSceneRuntimeDiagnostics {
         };
       };
       candidateCount: 1;
-      contractVersion: 'legacy-room-candidate-metadata-v2';
+      contractVersion: 'legacy-room-candidate-metadata-v3';
       evaluatedCandidateCount: number;
+      routeInteriorTileCount: number;
       routeThresholds: Array<{
         from: {
           x: number;

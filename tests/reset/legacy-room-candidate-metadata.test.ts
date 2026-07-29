@@ -7,6 +7,7 @@ import { resolveLegacyMazeGenerationProfileForProgression } from '../../src/lega
 import {
   LEGACY_ROOM_CANDIDATE_FOOTPRINT_TILES,
   LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE,
+  LEGACY_ROOM_CANDIDATE_MAX_ROUTE_INTERIOR_TILES,
   LEGACY_ROOM_CANDIDATE_ROUTE_THRESHOLD_COUNT,
   createLegacyRoomCandidateMetadata
 } from '../../src/legacy-runtime/legacyRoomCandidateMetadata';
@@ -53,7 +54,7 @@ describe('legacy room-candidate metadata', () => {
           expect(metadata).toMatchObject({
             band,
             candidateCount: LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE,
-            contractVersion: 'legacy-room-candidate-metadata-v2',
+            contractVersion: 'legacy-room-candidate-metadata-v3',
             roomsEnabled: false,
             source: 'existing-floor-metadata-only'
           });
@@ -97,6 +98,15 @@ describe('legacy room-candidate metadata', () => {
             Math.abs(threshold.from.x - threshold.to.x)
             + Math.abs(threshold.from.y - threshold.to.y)
           ) === 1)).toBe(true);
+          const expectedRouteInterior = maze.solutionPath.slice(
+            metadata!.routeThresholds[0].toSolutionPathIndex,
+            metadata!.routeThresholds[1].fromSolutionPathIndex + 1
+          );
+          expect(expectedRouteInterior).toHaveLength(metadata!.routeInteriorTileCount);
+          expect(expectedRouteInterior.every((point) => footprintKeys.has(pointKey(point)))).toBe(true);
+          expect(metadata!.routeInteriorTileCount).toBeGreaterThanOrEqual(1);
+          expect(metadata!.routeInteriorTileCount)
+            .toBeLessThanOrEqual(LEGACY_ROOM_CANDIDATE_MAX_ROUTE_INTERIOR_TILES);
           expect(JSON.stringify(maze)).toBe(before);
 
           observedMinimum = Math.min(observedMinimum, metadata!.evaluatedCandidateCount);
@@ -106,6 +116,7 @@ describe('legacy room-candidate metadata', () => {
             candidateCount: metadata!.candidateCount,
             evaluatedCandidateCount: metadata!.evaluatedCandidateCount,
             pressurePoint: slowTile.placement?.point ?? null,
+            routeInteriorTileCount: metadata!.routeInteriorTileCount,
             roomsEnabled: metadata!.roomsEnabled,
             routeThresholds: metadata!.routeThresholds,
             seed,
@@ -140,6 +151,13 @@ describe('legacy room-candidate metadata', () => {
       routeThresholds: row.routeThresholds
     }))))
       .toBe('d5cd000adc68fe242ff5b4f9060ecf10061045bd699716ab489e871a8d92d8bd');
+    expect(sha256(passes[0].map((row) => ({
+      band: row.band,
+      seed: row.seed,
+      size: row.size,
+      routeInteriorTileCount: row.routeInteriorTileCount
+    }))))
+      .toBe('9981185146657b2752d84bc37541858326c85396612ae6ebfd61e93d620c7e46');
   }, 30_000);
 
   test('keeps Tutorial through Navigator ineligible', () => {
@@ -165,7 +183,9 @@ describe('legacy room-candidate metadata', () => {
     expect(menuSceneSource).toContain('private playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null = null;');
     expect(menuSceneSource).toContain('this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(');
     expect(menuSceneSource).toContain('roomCandidate: this.playRoomCandidateMetadata');
-    expect(diagnosticsSource).toContain("contractVersion: 'legacy-room-candidate-metadata-v2';");
+    expect(diagnosticsSource).toContain("contractVersion: 'legacy-room-candidate-metadata-v3';");
+    expect(menuSceneSource)
+      .toContain('routeInteriorTileCount: this.playRoomCandidateMetadata.routeInteriorTileCount');
     expect(menuSceneSource).toContain('routeThresholds: this.playRoomCandidateMetadata.routeThresholds.map(');
     expect(menuSceneSource).not.toContain('drawLegacyRoomCandidate');
     expect(menuSceneSource).not.toContain('applyLegacyRoomCandidate');
