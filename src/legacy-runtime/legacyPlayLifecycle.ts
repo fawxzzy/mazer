@@ -162,6 +162,20 @@ export const shouldConsumeLegacyResetRequest = (
   nowMs: number
 ): boolean => request !== null && nowMs >= request.dueAtMs;
 
+export const shouldSettleLegacyStaticDrawStage = ({
+  drawPhase,
+  rowsVisible,
+  tilesVisible
+}: {
+  drawPhase: LegacyPlayDrawLifecyclePhase;
+  rowsVisible: number | null;
+  tilesVisible: number | null;
+}): boolean => (
+  drawPhase === 'building'
+  && rowsVisible === null
+  && tilesVisible === null
+);
+
 export const resolveLegacyPlayLifecycleSnapshot = ({
   drawPhase,
   generationPending,

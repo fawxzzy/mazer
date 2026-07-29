@@ -8,7 +8,8 @@ import {
   resolveLegacyPlayLifecycleSnapshot,
   resolveLegacyResetEntryContract,
   resolveLegacyResetAction,
-  shouldConsumeLegacyResetRequest
+  shouldConsumeLegacyResetRequest,
+  shouldSettleLegacyStaticDrawStage
 } from '../../src/legacy-runtime/legacyPlayLifecycle';
 
 describe('legacy play lifecycle', () => {
@@ -214,5 +215,28 @@ describe('legacy play lifecycle', () => {
       nextSeedQueued: true,
       compassSpinExpected: true
     });
+  });
+
+  test('settles a staged draw only after both row and tile stages complete', () => {
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'building',
+      rowsVisible: 46,
+      tilesVisible: null
+    })).toBe(false);
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'building',
+      rowsVisible: null,
+      tilesVisible: 120
+    })).toBe(false);
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'building',
+      rowsVisible: null,
+      tilesVisible: null
+    })).toBe(true);
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'deconstructing',
+      rowsVisible: null,
+      tilesVisible: null
+    })).toBe(false);
   });
 });

@@ -63,6 +63,7 @@ import {
   createLegacyResetRequest,
   hasPendingLegacyResetRequest,
   resolveLegacyPlayLifecycleSnapshot,
+  shouldSettleLegacyStaticDrawStage,
   shouldConsumeLegacyResetRequest,
   type LegacyPlayLifecycleSnapshot,
   type LegacyResetRequest,
@@ -4088,6 +4089,22 @@ export class MenuScene extends Phaser.Scene {
       && nextFrame.state.phase === 'goal-hold';
   }
 
+  private settleLegacyMenuStaticDrawStageIfComplete(time: number): void {
+    if (!shouldSettleLegacyStaticDrawStage({
+      drawPhase: this.menuStaticDrawLifecyclePhase,
+      rowsVisible: this.menuStaticDrawRowsVisible,
+      tilesVisible: this.menuStaticDrawTilesVisible
+    })) {
+      return;
+    }
+
+    this.menuStaticDrawLifecyclePhase = 'settled';
+    this.menuStaticDeconstructStartedAtMs = null;
+    this.menuStaticBuildPrerollStartedAtMs = null;
+    this.refreshLegacyMenuStaticDrawVisibleTileKeys();
+    this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);
+  }
+
   private advanceLegacyMenuStaticDrawStage(time: number): void {
     if (this.menuStaticDrawRowsVisible === null && this.menuStaticDrawTilesVisible === null) {
       return;
@@ -4117,6 +4134,7 @@ export class MenuScene extends Phaser.Scene {
       if (this.menuStaticDrawRowsVisible >= this.maze.size) {
         this.menuStaticDrawRowsVisible = null;
         this.menuStaticDrawNextRowAtMs = 0;
+        this.settleLegacyMenuStaticDrawStageIfComplete(time);
       }
     }
 
@@ -4158,11 +4176,7 @@ export class MenuScene extends Phaser.Scene {
       if (this.menuStaticDrawTilesVisible >= this.menuStaticDrawTileOrder.length) {
         this.menuStaticDrawTilesVisible = null;
         this.menuStaticDrawNextTileAtMs = 0;
-        this.menuStaticDrawLifecyclePhase = 'settled';
-        this.menuStaticDeconstructStartedAtMs = null;
-        this.menuStaticBuildPrerollStartedAtMs = null;
-        this.refreshLegacyMenuStaticDrawVisibleTileKeys();
-        this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);
+        this.settleLegacyMenuStaticDrawStageIfComplete(time);
       }
     }
   }
