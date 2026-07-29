@@ -194,8 +194,21 @@ export interface MenuSceneRuntimeDiagnostics {
         };
       };
       candidateCount: 1;
-      contractVersion: 'legacy-room-candidate-metadata-v1';
+      contractVersion: 'legacy-room-candidate-metadata-v2';
       evaluatedCandidateCount: number;
+      routeThresholds: Array<{
+        from: {
+          x: number;
+          y: number;
+        };
+        fromSolutionPathIndex: number;
+        kind: 'enter' | 'exit';
+        to: {
+          x: number;
+          y: number;
+        };
+        toSolutionPathIndex: number;
+      }>;
       roomsEnabled: false;
       source: 'existing-floor-metadata-only';
     } | null;
