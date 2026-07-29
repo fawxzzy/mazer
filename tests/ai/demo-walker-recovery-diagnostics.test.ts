@@ -122,12 +122,12 @@ describe('human-memory AI recovery diagnostics', () => {
     expect(frontierRecoveryCount).toBeGreaterThan(0);
   });
 
-  test('exposes the deterministic accepted and rejected sides of the A-rank hold boundary', () => {
+  test('applies the warmed A/S retarget grace at the decisive one-step comparison', () => {
     const seed = 8;
     const maze = createLegacyGeneratedMenuMaze(50, seed);
     const episode = createLegacyDemoWalkerEpisode(maze);
     const baseConfig = createLegacyMenuDemoWalkerConfig(seed);
-    const collectForRank = (aiSkillRank: 'B' | 'A') => collectDemoWalkerRouteDiagnostics(
+    const collectForRank = (aiSkillRank: 'B' | 'A' | 'S') => collectDemoWalkerRouteDiagnostics(
       episode,
       {
         ...baseConfig,
@@ -143,6 +143,8 @@ describe('human-memory AI recovery diagnostics', () => {
     const bSecond = collectForRank('B');
     const aFirst = collectForRank('A');
     const aSecond = collectForRank('A');
+    const sFirst = collectForRank('S');
+    const sSecond = collectForRank('S');
     const matchesDecisiveComparison = (evaluation: {
       fromIndex: number;
       splitIndex: number;
@@ -155,21 +157,28 @@ describe('human-memory AI recovery diagnostics', () => {
 
     expect(bSecond).toEqual(bFirst);
     expect(aSecond).toEqual(aFirst);
+    expect(sSecond).toEqual(sFirst);
     expect(bFirst.routeLength).toBe(111);
-    expect(aFirst.routeLength).toBe(239);
+    expect(aFirst.routeLength).toBe(111);
+    expect(sFirst.routeLength).toBe(113);
     expect(bFirst.telemetry).toMatchObject({
       backtrackCount: 6,
       recoveryCount: 4,
       wrongBranchCount: 4
     });
     expect(aFirst.telemetry).toMatchObject({
-      backtrackCount: 54,
-      recoveryCount: 11,
-      wrongBranchCount: 153
+      backtrackCount: 6,
+      recoveryCount: 4,
+      wrongBranchCount: 4
     });
-
+    expect(sFirst.telemetry).toMatchObject({
+      backtrackCount: 6,
+      recoveryCount: 4,
+      wrongBranchCount: 7
+    });
     const bEvaluation = bFirst.optionalRetargetEvaluations.find(matchesDecisiveComparison);
     const aEvaluation = aFirst.optionalRetargetEvaluations.find(matchesDecisiveComparison);
+    const sEvaluation = sFirst.optionalRetargetEvaluations.find(matchesDecisiveComparison);
 
     expect(bEvaluation).toMatchObject({
       admitted: true,
@@ -186,7 +195,7 @@ describe('human-memory AI recovery diagnostics', () => {
     expect(bEvaluation?.admissionDelta).toBeCloseTo(0.2291736349550888, 12);
 
     expect(aEvaluation).toMatchObject({
-      admitted: false,
+      admitted: true,
       candidateCount: 2,
       comparisonMargin: -4.2,
       fromIndex: 1163,
@@ -198,5 +207,57 @@ describe('human-memory AI recovery diagnostics', () => {
     expect(aEvaluation?.currentBestScore).toBeCloseTo(33.505964950894594, 12);
     expect(aEvaluation?.effectiveCandidateScore).toBeCloseTo(37.99670569106149, 12);
     expect(aEvaluation?.admissionDelta).toBeCloseTo(-0.2907407401668962, 12);
+
+    expect(sEvaluation).toMatchObject({
+      admitted: true,
+      candidateCount: 2,
+      comparisonMargin: -4.2,
+      fromIndex: 1163,
+      knownRouteStepCount: 1,
+      routeCursor: 17,
+      splitIndex: 1114,
+      targetIndex: 1113
+    });
+    expect(sEvaluation?.currentBestScore).toBeCloseTo(33.24349116955439, 12);
+    expect(sEvaluation?.effectiveCandidateScore).toBeCloseTo(37.91719063580163, 12);
+    expect(sEvaluation?.admissionDelta).toBeCloseTo(-0.4736994662472398, 12);
+  });
+
+  test('keeps the S-rank grace blocked before the existing cooldown warm-up', () => {
+    const seed = 6765;
+    const maze = createLegacyGeneratedMenuMaze(50, seed);
+    const episode = createLegacyDemoWalkerEpisode(maze);
+    const baseConfig = createLegacyMenuDemoWalkerConfig(seed);
+    const collect = () => collectDemoWalkerRouteDiagnostics(
+      episode,
+      {
+        ...baseConfig,
+        behavior: {
+          ...baseConfig.behavior,
+          aiSkillLevel: 1,
+          aiSkillRank: 'S'
+        }
+      }
+    );
+    const first = collect();
+    const second = collect();
+    const evaluation = first.optionalRetargetEvaluations.find((candidate) => (
+      candidate.fromIndex === 1912
+      && candidate.splitIndex === 1961
+      && candidate.targetIndex === 1960
+    ));
+
+    expect(second).toEqual(first);
+    expect(evaluation).toMatchObject({
+      admitted: false,
+      candidateCount: 2,
+      comparisonMargin: -4.2,
+      fromIndex: 1912,
+      knownRouteStepCount: 1,
+      routeCursor: 3,
+      splitIndex: 1961,
+      targetIndex: 1960
+    });
+    expect(evaluation?.admissionDelta).toBeCloseTo(-0.31862306111398553, 12);
   });
 });
