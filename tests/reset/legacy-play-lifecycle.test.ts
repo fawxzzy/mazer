@@ -8,8 +8,12 @@ import {
   resolveLegacyPlayLifecycleSnapshot,
   resolveLegacyResetEntryContract,
   resolveLegacyResetAction,
-  shouldConsumeLegacyResetRequest
+  resolveLegacyStaticDrawPlayTimerStartAtMs,
+  shouldConsumeLegacyResetRequest,
+  shouldFreezeLegacyPlayElapsedForStaticDraw,
+  shouldSettleLegacyStaticDrawStage
 } from '../../src/legacy-runtime/legacyPlayLifecycle';
+import { resolveLegacyFrozenElapsedMs } from '../../src/legacy-runtime/legacyPlayHud';
 
 describe('legacy play lifecycle', () => {
   test('keeps an Endless checkpoint while a failed attempt resets only the current level', () => {
@@ -214,5 +218,70 @@ describe('legacy play lifecycle', () => {
       nextSeedQueued: true,
       compassSpinExpected: true
     });
+  });
+
+  test('settles a staged draw only after both row and tile stages complete', () => {
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'building',
+      rowsVisible: 46,
+      tilesVisible: null
+    })).toBe(false);
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'building',
+      rowsVisible: null,
+      tilesVisible: 120
+    })).toBe(false);
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'building',
+      rowsVisible: null,
+      tilesVisible: null
+    })).toBe(true);
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'deconstructing',
+      rowsVisible: null,
+      tilesVisible: null
+    })).toBe(false);
+  });
+
+  test('rebinds the play timer only at order-independent dual-stage settlement', () => {
+    const timerInput = {
+      currentStartedAtMs: 900,
+      drawPhase: 'building' as const,
+      mode: 'play' as const,
+      nowMs: 4600
+    };
+    const rowFirstStartedAtMs = resolveLegacyStaticDrawPlayTimerStartAtMs({
+      ...timerInput,
+      rowsVisible: null,
+      tilesVisible: 120
+    });
+    const tileFirstStartedAtMs = resolveLegacyStaticDrawPlayTimerStartAtMs({
+      ...timerInput,
+      rowsVisible: 46,
+      tilesVisible: null
+    });
+    const settledStartedAtMs = resolveLegacyStaticDrawPlayTimerStartAtMs({
+      ...timerInput,
+      rowsVisible: null,
+      tilesVisible: null
+    });
+
+    expect(rowFirstStartedAtMs).toBe(900);
+    expect(tileFirstStartedAtMs).toBe(900);
+    expect(settledStartedAtMs).toBe(4600);
+    expect(shouldFreezeLegacyPlayElapsedForStaticDraw({
+      drawPhase: 'building',
+      rowsVisible: null,
+      tilesVisible: null
+    })).toBe(true);
+    expect(shouldFreezeLegacyPlayElapsedForStaticDraw({
+      drawPhase: 'settled',
+      rowsVisible: null,
+      tilesVisible: null
+    })).toBe(false);
+    expect(resolveLegacyFrozenElapsedMs({
+      nowMs: 4600,
+      startedAtMs: settledStartedAtMs
+    })).toBe(0);
   });
 });

@@ -687,6 +687,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitleSigilRails(visibleCells, titleLayout, time, titlePresentation.titleAlpha);');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase === 'building'");
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase === 'deconstructing'");
+    expect(menuSceneSource).toContain('this.settleLegacyMenuStaticDrawStageIfComplete(time);');
+    expect(menuSceneSource).toContain('rowsVisible: this.menuStaticDrawRowsVisible');
+    expect(menuSceneSource).toContain('tilesVisible: this.menuStaticDrawTilesVisible');
     expect(menuSceneSource).toContain("const syncedToLifecycle = mode !== 'idle';");
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitlePrismSweep(');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleGemFacets(');

@@ -721,7 +721,10 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("scale: this.resolveLegacyProgressionScaleForMode('menu')");
     expect(menuSceneSource).toContain('scale: this.resolveLegacyProgressionScaleForMode(mode)');
     expect(menuSceneSource).toContain('if (generationState.startsPlayTimer) {');
-    expect(menuSceneSource).toContain('this.playStartedAtMs = Math.max(this.time.now, this.resolveLegacyMenuStaticDrawDemoGateAtMs());');
+    expect(menuSceneSource).toContain('this.playStartedAtMs = this.time.now;');
+    expect(menuSceneSource).toContain('const settledPlayStartedAtMs = resolveLegacyStaticDrawPlayTimerStartAtMs({');
+    expect(menuSceneSource).toContain('this.playStartedAtMs = settledPlayStartedAtMs;');
+    expect(menuSceneSource).toContain('shouldFreezeLegacyPlayElapsedForStaticDraw({');
     expect(menuSceneSource).toContain('private menuStaticDrawRowsVisible: number | null = null;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;');
