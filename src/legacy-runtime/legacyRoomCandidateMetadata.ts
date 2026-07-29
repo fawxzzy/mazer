@@ -1,7 +1,7 @@
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 import type { LegacyProgressionDifficultyBand } from './legacyProgression';
 
-export const LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION = 'legacy-room-candidate-metadata-v4' as const;
+export const LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION = 'legacy-room-candidate-metadata-v5' as const;
 export const LEGACY_ROOM_CANDIDATE_FOOTPRINT_TILES = 2 as const;
 export const LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE = 1 as const;
 export const LEGACY_ROOM_CANDIDATE_MAX_ROUTE_INTERIOR_TILES = 4 as const;
@@ -29,6 +29,16 @@ export type LegacyRoomCandidateRouteThresholds = [
   LegacyRoomCandidateRouteThreshold
 ];
 
+export type LegacyRoomCandidatePerimeterOpeningKind = 'route-enter' | 'route-exit' | 'side';
+export type LegacyRoomCandidatePerimeterSide = 'top' | 'right' | 'bottom' | 'left';
+
+export interface LegacyRoomCandidatePerimeterOpening {
+  inside: LegacyPoint;
+  kind: LegacyRoomCandidatePerimeterOpeningKind;
+  outside: LegacyPoint;
+  side: LegacyRoomCandidatePerimeterSide;
+}
+
 export interface LegacyRoomCandidateMetadata {
   band: 'architect' | 'mythic';
   candidate: LegacyRoomCandidate;
@@ -36,6 +46,7 @@ export interface LegacyRoomCandidateMetadata {
   contractVersion: typeof LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION;
   evaluatedCandidateCount: number;
   perimeterOpeningCount: number;
+  perimeterOpenings: LegacyRoomCandidatePerimeterOpening[];
   routeInteriorTileCount: number;
   routeThresholds: LegacyRoomCandidateRouteThresholds;
   roomsEnabled: false;
@@ -105,36 +116,60 @@ const createRouteThresholds = (
   return [thresholds[0], thresholds[1]];
 };
 
-const countPerimeterOpenings = (
+const createPerimeterOpenings = (
   grid: LegacyMazeSnapshot['grid'],
-  candidate: LegacyRoomCandidate
-): number => {
-  const footprint = buildFootprint(candidate.topLeft.x, candidate.topLeft.y);
-  const footprintKeys = new Set(footprint.map(pointKey));
-  const cardinalOffsets = [
-    { x: 1, y: 0 },
-    { x: -1, y: 0 },
-    { x: 0, y: 1 },
-    { x: 0, y: -1 }
+  candidate: LegacyRoomCandidate,
+  routeThresholds: LegacyRoomCandidateRouteThresholds
+): LegacyRoomCandidatePerimeterOpening[] => {
+  const { x, y } = candidate.topLeft;
+  const perimeterEdges: Array<{
+    inside: LegacyPoint;
+    outside: LegacyPoint;
+    side: LegacyRoomCandidatePerimeterSide;
+  }> = [
+    { inside: { x, y }, outside: { x, y: y - 1 }, side: 'top' },
+    { inside: { x: x + 1, y }, outside: { x: x + 1, y: y - 1 }, side: 'top' },
+    { inside: { x: x + 1, y }, outside: { x: x + 2, y }, side: 'right' },
+    {
+      inside: { x: x + 1, y: y + 1 },
+      outside: { x: x + 2, y: y + 1 },
+      side: 'right'
+    },
+    {
+      inside: { x: x + 1, y: y + 1 },
+      outside: { x: x + 1, y: y + 2 },
+      side: 'bottom'
+    },
+    { inside: { x, y: y + 1 }, outside: { x, y: y + 2 }, side: 'bottom' },
+    { inside: { x, y: y + 1 }, outside: { x: x - 1, y: y + 1 }, side: 'left' },
+    { inside: { x, y }, outside: { x: x - 1, y }, side: 'left' }
   ];
-  let openingCount = 0;
 
-  for (const point of footprint) {
-    for (const offset of cardinalOffsets) {
-      const adjacent = {
-        x: point.x + offset.x,
-        y: point.y + offset.y
-      };
-      if (
-        !footprintKeys.has(pointKey(adjacent))
-        && grid[adjacent.y]?.[adjacent.x] === true
-      ) {
-        openingCount += 1;
-      }
+  return perimeterEdges.flatMap(({ inside, outside, side }) => {
+    if (grid[outside.y]?.[outside.x] !== true) {
+      return [];
     }
-  }
-
-  return openingCount;
+    const matchingThreshold = routeThresholds.find((threshold) => (
+      (
+        threshold.kind === 'enter'
+        && pointsMatch(threshold.from, outside)
+        && pointsMatch(threshold.to, inside)
+      )
+      || (
+        threshold.kind === 'exit'
+        && pointsMatch(threshold.from, inside)
+        && pointsMatch(threshold.to, outside)
+      )
+    ));
+    return [{
+      inside: { ...inside },
+      kind: matchingThreshold
+        ? `route-${matchingThreshold.kind}` as LegacyRoomCandidatePerimeterOpeningKind
+        : 'side',
+      outside: { ...outside },
+      side
+    }];
+  });
 };
 
 export const createLegacyRoomCandidateMetadata = (
@@ -220,7 +255,12 @@ export const createLegacyRoomCandidateMetadata = (
     ) {
       continue;
     }
-    const perimeterOpeningCount = countPerimeterOpenings(maze.grid, candidate);
+    const perimeterOpenings = createPerimeterOpenings(
+      maze.grid,
+      candidate,
+      routeThresholds
+    );
+    const perimeterOpeningCount = perimeterOpenings.length;
     if (
       perimeterOpeningCount < LEGACY_ROOM_CANDIDATE_MIN_PERIMETER_OPENINGS
       || perimeterOpeningCount > LEGACY_ROOM_CANDIDATE_MAX_PERIMETER_OPENINGS
@@ -235,6 +275,7 @@ export const createLegacyRoomCandidateMetadata = (
       contractVersion: LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION,
       evaluatedCandidateCount: candidates.length,
       perimeterOpeningCount,
+      perimeterOpenings,
       routeInteriorTileCount,
       routeThresholds,
       roomsEnabled: false,

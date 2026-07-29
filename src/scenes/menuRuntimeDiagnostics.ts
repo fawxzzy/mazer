@@ -194,9 +194,21 @@ export interface MenuSceneRuntimeDiagnostics {
         };
       };
       candidateCount: 1;
-      contractVersion: 'legacy-room-candidate-metadata-v4';
+      contractVersion: 'legacy-room-candidate-metadata-v5';
       evaluatedCandidateCount: number;
       perimeterOpeningCount: number;
+      perimeterOpenings: Array<{
+        inside: {
+          x: number;
+          y: number;
+        };
+        kind: 'route-enter' | 'route-exit' | 'side';
+        outside: {
+          x: number;
+          y: number;
+        };
+        side: 'top' | 'right' | 'bottom' | 'left';
+      }>;
       routeInteriorTileCount: number;
       routeThresholds: Array<{
         from: {
