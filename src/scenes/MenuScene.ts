@@ -214,6 +214,7 @@ import {
   createLegacyStaticSlowTileState,
   isLegacyStaticSlowTileDelayActive,
   recordLegacyStaticSlowTileBlockedMove,
+  resolveLegacyStaticSlowTilePhase,
   resolveLegacyStaticSlowTileRemainingMs,
   type LegacyStaticSlowTileState
 } from '../legacy-runtime/legacyStaticSlowTile';
@@ -1579,6 +1580,18 @@ export class MenuScene extends Phaser.Scene {
     if (this.hasLegacyBoardCornerShimmerPendingFrame(time)) {
       this.boardDynamicDirty = true;
     }
+    const slowTilePhase = resolveLegacyStaticSlowTilePhase(
+      this.playStaticSlowTile,
+      time,
+      this.playStartedAtMs
+    );
+    if (
+      this.mode === 'play'
+      && slowTilePhase.mode === 'timed'
+      && this.playStaticSlowTile?.consumed === false
+    ) {
+      this.boardDynamicDirty = true;
+    }
     if (this.isLegacyMenuHandoffAnimationActive(time)) {
       this.boardDynamicDirty = true;
       this.backdropDirty = true;
@@ -1780,6 +1793,11 @@ export class MenuScene extends Phaser.Scene {
       this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : undefined
     );
     const playLifecycle = this.resolveLegacyPlayLifecycleDiagnostics(time);
+    const slowTilePhase = resolveLegacyStaticSlowTilePhase(
+      this.playStaticSlowTile,
+      time,
+      this.playStartedAtMs
+    );
     this.legacyWorldTurnHost.setState(this.resolveLegacyWorldTurnHostState());
     const worldTurnDiagnostics = this.legacyWorldTurnHost.getDiagnostics();
 
@@ -1869,18 +1887,24 @@ export class MenuScene extends Phaser.Scene {
         lifecycle: playLifecycle,
         pressure: this.playStaticSlowTile
           ? {
+              activeWindowMs: slowTilePhase.activeWindowMs,
               alternateRouteStepCount: this.playStaticSlowTile.placement?.alternateRouteStepCount ?? null,
+              armed: slowTilePhase.armed,
               band: this.playStaticSlowTile.band,
               blockedMoveCount: this.playStaticSlowTile.blockedMoveCount,
               consumed: this.playStaticSlowTile.consumed,
               contractVersion: this.playStaticSlowTile.contractVersion,
+              cycleElapsedMs: slowTilePhase.cycleElapsedMs,
+              cycleMs: slowTilePhase.cycleMs,
               delayActive: isLegacyStaticSlowTileDelayActive(this.playStaticSlowTile, time),
               delayUntilMs: this.playStaticSlowTile.delayUntilMs,
               eligible: this.playStaticSlowTile.eligible,
               enteredAtMs: this.playStaticSlowTile.enteredAtMs,
               entryCount: this.playStaticSlowTile.entryCount,
               penaltyMs: this.playStaticSlowTile.penaltyMs,
+              phaseActive: slowTilePhase.active,
               remainingMs: resolveLegacyStaticSlowTileRemainingMs(this.playStaticSlowTile, time),
+              safeWindowMs: slowTilePhase.safeWindowMs,
               solutionPathIndex: this.playStaticSlowTile.placement?.solutionPathIndex ?? null,
               tile: this.playStaticSlowTile.placement
                 ? {
@@ -1891,7 +1915,8 @@ export class MenuScene extends Phaser.Scene {
                     x: this.playStaticSlowTile.placement.point.x,
                     y: this.playStaticSlowTile.placement.point.y
                   }
-                : null
+                : null,
+              timingMode: slowTilePhase.mode
             }
           : null,
         timer: {
@@ -4462,7 +4487,8 @@ export class MenuScene extends Phaser.Scene {
     const slowTileEntry = applyLegacyStaticSlowTileEntry(
       this.playStaticSlowTile,
       nextStep.player,
-      this.time.now
+      this.time.now,
+      this.playStartedAtMs
     );
     this.playStaticSlowTile = slowTileEntry.state;
     if (this.settings.toggleCameraFollow) {
@@ -4491,7 +4517,9 @@ export class MenuScene extends Phaser.Scene {
               type: 'static-slow-tile-entered',
               entityId: 'player',
               payload: {
-                penaltyMs: this.playStaticSlowTile?.penaltyMs ?? 0
+                penaltyMs: slowTileEntry.penaltyAppliedMs,
+                phaseActive: slowTileEntry.phase?.active ?? false,
+                timingMode: slowTileEntry.phase?.mode ?? 'disabled'
               }
             }]
           : [])
@@ -6132,7 +6160,7 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize);
+    this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize, time);
 
     if (this.mode === 'menu' && menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
       this.drawLegacyMenuAiMemoryOverlay(
@@ -6201,7 +6229,8 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyPlayStaticSlowTile(
     mazeLeft: number,
     mazeTop: number,
-    tileSize: number
+    tileSize: number,
+    time: number
   ): void {
     const placement = this.playStaticSlowTile?.placement;
     if (this.mode !== 'play' || placement === null || placement === undefined) {
@@ -6211,13 +6240,26 @@ export class MenuScene extends Phaser.Scene {
     const centerX = mazeLeft + ((placement.point.x + 0.5) * tileSize);
     const centerY = mazeTop + ((placement.point.y + 0.5) * tileSize);
     const radius = Math.max(1.5, tileSize * 0.34);
+    const phase = resolveLegacyStaticSlowTilePhase(
+      this.playStaticSlowTile,
+      time,
+      this.playStartedAtMs
+    );
     const color = this.playStaticSlowTile?.consumed
       ? LEGACY_PLAY_SLOW_TILE_SPENT
-      : LEGACY_PLAY_SLOW_TILE_CORE;
+      : phase.active
+        ? LEGACY_PLAY_SLOW_TILE_CORE
+        : LEGACY_PLAY_SLOW_TILE_EDGE;
     const edge = this.playStaticSlowTile?.consumed
       ? LEGACY_PLAY_SLOW_TILE_SPENT
-      : LEGACY_PLAY_SLOW_TILE_EDGE;
-    const alpha = this.playStaticSlowTile?.consumed ? 0.58 : 0.96;
+      : phase.active
+        ? LEGACY_PLAY_SLOW_TILE_EDGE
+        : LEGACY_PLAY_SLOW_TILE_CORE;
+    const alpha = this.playStaticSlowTile?.consumed
+      ? 0.58
+      : phase.active
+        ? 0.96
+        : 0.48;
 
     this.boardDynamicGraphics.fillStyle(color, alpha * 0.32);
     this.boardDynamicGraphics.fillCircle(centerX, centerY, radius);
