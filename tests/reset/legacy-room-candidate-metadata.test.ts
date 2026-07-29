@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -6,6 +7,7 @@ import { resolveLegacyMazeGenerationProfileForProgression } from '../../src/lega
 import {
   LEGACY_ROOM_CANDIDATE_FOOTPRINT_TILES,
   LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE,
+  LEGACY_ROOM_CANDIDATE_ROUTE_THRESHOLD_COUNT,
   createLegacyRoomCandidateMetadata
 } from '../../src/legacy-runtime/legacyRoomCandidateMetadata';
 import { createLegacyStaticSlowTileState } from '../../src/legacy-runtime/legacyStaticSlowTile';
@@ -17,62 +19,127 @@ const footprintPoints = (topLeft: { x: number; y: number }): Array<{ x: number; 
   { x: topLeft.x + 1, y: topLeft.y + 1 }
 ];
 
+const pointKey = (point: { x: number; y: number }): string => `${point.x},${point.y}`;
+
+const sha256 = (value: unknown): string => createHash('sha256')
+  .update(JSON.stringify(value))
+  .digest('hex');
+
 describe('legacy room-candidate metadata', () => {
-  test('emits one deterministic state-neutral candidate across the fixed Architect/Mythic corpus', () => {
+  test('preserves candidate identity and emits exactly two deterministic route thresholds', () => {
     const bands = [
       { band: 'architect' as const, targetComplexity: 132, scale: 71, minimumEvaluated: 2 },
       { band: 'mythic' as const, targetComplexity: 180, scale: 96, minimumEvaluated: 3 }
     ];
     const seeds = Array.from({ length: 20 }, (_, index) => index + 1);
+    const passes = Array.from({ length: 2 }, () => {
+      const rows = [];
 
-    for (const { band, minimumEvaluated, scale, targetComplexity } of bands) {
-      const generationProfile = resolveLegacyMazeGenerationProfileForProgression(targetComplexity);
-      let observedMinimum = Number.POSITIVE_INFINITY;
+      for (const { band, minimumEvaluated, scale, targetComplexity } of bands) {
+        const generationProfile = resolveLegacyMazeGenerationProfileForProgression(targetComplexity);
+        let observedMinimum = Number.POSITIVE_INFINITY;
 
-      for (const seed of seeds) {
-        const maze = createLegacyRuntimeMazeForMode('play', scale, seed, generationProfile);
-        const slowTile = createLegacyStaticSlowTileState(maze, band);
-        const before = JSON.stringify(maze);
-        const first = createLegacyRoomCandidateMetadata(
-          maze,
-          band,
-          slowTile.placement?.point ?? null
-        );
-        const second = createLegacyRoomCandidateMetadata(
-          maze,
-          band,
-          slowTile.placement?.point ?? null
-        );
+        for (const seed of seeds) {
+          const maze = createLegacyRuntimeMazeForMode('play', scale, seed, generationProfile);
+          const slowTile = createLegacyStaticSlowTileState(maze, band);
+          const before = JSON.stringify(maze);
+          const metadata = createLegacyRoomCandidateMetadata(
+            maze,
+            band,
+            slowTile.placement?.point ?? null
+          );
 
-        expect(first, `${band} seed ${seed}`).not.toBeNull();
-        expect(first).toEqual(second);
-        expect(first).toMatchObject({
-          band,
-          candidateCount: LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE,
-          contractVersion: 'legacy-room-candidate-metadata-v1',
-          roomsEnabled: false,
-          source: 'existing-floor-metadata-only'
-        });
-        expect(first!.candidate).toMatchObject({
-          footprintHeight: LEGACY_ROOM_CANDIDATE_FOOTPRINT_TILES,
-          footprintWidth: LEGACY_ROOM_CANDIDATE_FOOTPRINT_TILES
-        });
+          expect(metadata, `${band} seed ${seed}`).not.toBeNull();
+          expect(metadata).toMatchObject({
+            band,
+            candidateCount: LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE,
+            contractVersion: 'legacy-room-candidate-metadata-v2',
+            roomsEnabled: false,
+            source: 'existing-floor-metadata-only'
+          });
+          expect(metadata!.candidate).toMatchObject({
+            footprintHeight: LEGACY_ROOM_CANDIDATE_FOOTPRINT_TILES,
+            footprintWidth: LEGACY_ROOM_CANDIDATE_FOOTPRINT_TILES
+          });
 
-        const footprint = footprintPoints(first!.candidate.topLeft);
-        expect(footprint.every((point) => maze.grid[point.y]?.[point.x] === true)).toBe(true);
-        expect(footprint).not.toContainEqual(maze.start);
-        expect(footprint).not.toContainEqual(maze.goal);
-        expect(footprint).not.toContainEqual(slowTile.placement?.point);
-        expect(first!.candidate.solutionPathIndex).toBeGreaterThanOrEqual(2);
-        expect(first!.candidate.solutionPathIndex).toBeLessThanOrEqual(maze.solutionPath.length - 3);
-        expect(footprint).toContainEqual(maze.solutionPath[first!.candidate.solutionPathIndex]);
-        expect(JSON.stringify(maze)).toBe(before);
+          const footprint = footprintPoints(metadata!.candidate.topLeft);
+          const footprintKeys = new Set(footprint.map(pointKey));
+          const expectedThresholds = maze.solutionPath.flatMap((to, toSolutionPathIndex) => {
+            if (toSolutionPathIndex === 0) {
+              return [];
+            }
+            const fromSolutionPathIndex = toSolutionPathIndex - 1;
+            const from = maze.solutionPath[fromSolutionPathIndex]!;
+            const fromInside = footprintKeys.has(pointKey(from));
+            const toInside = footprintKeys.has(pointKey(to));
+            return fromInside === toInside
+              ? []
+              : [{
+                  from,
+                  fromSolutionPathIndex,
+                  kind: toInside ? 'enter' as const : 'exit' as const,
+                  to,
+                  toSolutionPathIndex
+                }];
+          });
 
-        observedMinimum = Math.min(observedMinimum, first!.evaluatedCandidateCount);
+          expect(footprint.every((point) => maze.grid[point.y]?.[point.x] === true)).toBe(true);
+          expect(footprint).not.toContainEqual(maze.start);
+          expect(footprint).not.toContainEqual(maze.goal);
+          expect(footprint).not.toContainEqual(slowTile.placement?.point);
+          expect(metadata!.candidate.solutionPathIndex).toBeGreaterThanOrEqual(2);
+          expect(metadata!.candidate.solutionPathIndex).toBeLessThanOrEqual(maze.solutionPath.length - 3);
+          expect(footprint).toContainEqual(maze.solutionPath[metadata!.candidate.solutionPathIndex]);
+          expect(expectedThresholds).toHaveLength(LEGACY_ROOM_CANDIDATE_ROUTE_THRESHOLD_COUNT);
+          expect(metadata!.routeThresholds).toEqual(expectedThresholds);
+          expect(metadata!.routeThresholds.map((threshold) => threshold.kind)).toEqual(['enter', 'exit']);
+          expect(metadata!.routeThresholds.every((threshold) => (
+            Math.abs(threshold.from.x - threshold.to.x)
+            + Math.abs(threshold.from.y - threshold.to.y)
+          ) === 1)).toBe(true);
+          expect(JSON.stringify(maze)).toBe(before);
+
+          observedMinimum = Math.min(observedMinimum, metadata!.evaluatedCandidateCount);
+          rows.push({
+            band,
+            candidate: metadata!.candidate,
+            candidateCount: metadata!.candidateCount,
+            evaluatedCandidateCount: metadata!.evaluatedCandidateCount,
+            pressurePoint: slowTile.placement?.point ?? null,
+            roomsEnabled: metadata!.roomsEnabled,
+            routeThresholds: metadata!.routeThresholds,
+            seed,
+            size: maze.size,
+            source: metadata!.source
+          });
+        }
+
+        expect(observedMinimum).toBe(minimumEvaluated);
       }
 
-      expect(observedMinimum).toBe(minimumEvaluated);
-    }
+      return rows;
+    });
+
+    expect(passes[0]).toEqual(passes[1]);
+    expect(sha256(passes[0].map((row) => ({
+      band: row.band,
+      seed: row.seed,
+      size: row.size,
+      candidate: row.candidate,
+      candidateCount: row.candidateCount,
+      evaluatedCandidateCount: row.evaluatedCandidateCount,
+      roomsEnabled: row.roomsEnabled,
+      source: row.source,
+      pressurePoint: row.pressurePoint
+    }))))
+      .toBe('0f5d7d2d9a4131049e1d571664c3430cd99b0b3ebfd32a5983bc4201c02db8b4');
+    expect(sha256(passes[0].map((row) => ({
+      band: row.band,
+      seed: row.seed,
+      size: row.size,
+      routeThresholds: row.routeThresholds
+    }))))
+      .toBe('d5cd000adc68fe242ff5b4f9060ecf10061045bd699716ab489e871a8d92d8bd');
   }, 30_000);
 
   test('keeps Tutorial through Navigator ineligible', () => {
@@ -98,8 +165,11 @@ describe('legacy room-candidate metadata', () => {
     expect(menuSceneSource).toContain('private playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null = null;');
     expect(menuSceneSource).toContain('this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(');
     expect(menuSceneSource).toContain('roomCandidate: this.playRoomCandidateMetadata');
-    expect(diagnosticsSource).toContain("contractVersion: 'legacy-room-candidate-metadata-v1';");
+    expect(diagnosticsSource).toContain("contractVersion: 'legacy-room-candidate-metadata-v2';");
+    expect(menuSceneSource).toContain('routeThresholds: this.playRoomCandidateMetadata.routeThresholds.map(');
     expect(menuSceneSource).not.toContain('drawLegacyRoomCandidate');
     expect(menuSceneSource).not.toContain('applyLegacyRoomCandidate');
+    expect(menuSceneSource).not.toContain('drawLegacyRoomRouteThreshold');
+    expect(menuSceneSource).not.toContain('applyLegacyRoomRouteThreshold');
   });
 });
