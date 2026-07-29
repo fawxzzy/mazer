@@ -3606,7 +3606,10 @@ export class MenuScene extends Phaser.Scene {
       this.settings.scale + this.settings.camScale,
       this.maze.size,
       layoutSurface,
-      { browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height) }
+      {
+        browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height),
+        menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest'
+      }
     );
     this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
 
@@ -9974,10 +9977,12 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private applyLegacyAuthSnapshot(snapshot: LegacyAuthSessionSnapshot): void {
+    const previousMenuActionMode = this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest';
     const previousUserId = this.authSnapshot.userId;
     const previousProgressionState = this.progressionState;
 
     this.authSnapshot = snapshot;
+    const menuActionMode = snapshot.status === 'authenticated' ? 'authenticated' : 'guest';
     this.armLegacyAuthFeedbackMessage();
     if (snapshot.email !== null) {
       if (snapshot.status === 'authenticated') {
@@ -10004,6 +10009,13 @@ export class MenuScene extends Phaser.Scene {
       this.uiDirty = true;
       this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
       this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+    }
+    if (
+      previousMenuActionMode !== menuActionMode
+      && this.layout !== undefined
+      && this.footerText !== undefined
+    ) {
+      this.refreshLayout();
     }
   }
 

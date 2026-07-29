@@ -52,6 +52,7 @@ export type LegacyMenuLayoutSurface = 'menu' | 'play';
 
 export interface LegacyMenuLayoutOptions {
   browserMobileParity?: boolean;
+  menuActionMode?: 'authenticated' | 'guest';
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
@@ -157,11 +158,13 @@ export const resolveLegacyMenuLayout = (
     ? 42
     : Math.round(clamp(height * (isPortrait ? 0.095 : 0.085), 76, isPortrait ? 90 : 82)))
     + (shouldUseCleanPhoneCadence && !isPlaySurface ? 22 : 0);
-  const menuActionReserve = usesStackedButtons
-    ? (buttonHeight * 2) + stackGap
-    : isPortrait
-      ? buttonHeight
-      : buttonHeight + clampInteger(Math.round(buttonHeight * LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_RATIO), LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MIN, LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MAX) + Math.max(38, Math.round(buttonHeight * 0.78));
+  const menuActionReserve = !isPlaySurface && !isPortrait && options.menuActionMode === 'guest'
+    ? buttonHeight
+    : usesStackedButtons
+      ? (buttonHeight * 2) + stackGap
+      : isPortrait
+        ? buttonHeight
+        : buttonHeight + clampInteger(Math.round(buttonHeight * LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_RATIO), LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MIN, LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MAX) + Math.max(38, Math.round(buttonHeight * 0.78));
   const playTopHudReserve = isPlaySurface && isPortrait
     ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
     : 56;
