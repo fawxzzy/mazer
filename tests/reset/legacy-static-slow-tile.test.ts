@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
@@ -7,7 +7,9 @@ import {
   type LegacyMazeSnapshot
 } from '../../src/legacy-runtime/legacyMaze';
 import {
+  createEmptyLegacyProgressionState,
   resolveLegacyMazeGenerationProfileForProgression,
+  type LegacyProgressionState,
   type LegacyProgressionDifficultyBand
 } from '../../src/legacy-runtime/legacyProgression';
 import {
@@ -17,8 +19,53 @@ import {
   createLegacyStaticSlowTileState,
   isLegacyStaticSlowTileDelayActive,
   recordLegacyStaticSlowTileBlockedMove,
-  resolveLegacyStaticSlowTileRemainingMs
+  resolveLegacyStaticSlowTileRemainingMs,
+  type LegacyStaticSlowTileState
 } from '../../src/legacy-runtime/legacyStaticSlowTile';
+import { MenuScene } from '../../src/scenes/MenuScene';
+
+vi.mock('phaser', () => ({
+  default: {
+    AUTO: 'AUTO',
+    Math: {
+      Clamp: (value: number, min: number, max: number) => Math.max(min, Math.min(max, value)),
+      Linear: (from: number, to: number, t: number) => from + ((to - from) * t)
+    },
+    Scale: {
+      RESIZE: 'RESIZE',
+      CENTER_BOTH: 'CENTER_BOTH'
+    },
+    Scene: class {}
+  }
+}));
+
+interface PauseResetSceneHarness {
+  boardDynamicDirty: boolean;
+  closeOverlay: () => void;
+  maze: LegacyMazeSnapshot;
+  playCompletedAtMs: number | null;
+  playCyclePath: Array<{ x: number; y: number }>;
+  playCycleResetUsed: boolean;
+  playStartedAtMs: number;
+  playStaticSlowTile: LegacyStaticSlowTileState | null;
+  player: { x: number; y: number };
+  progressionState: LegacyProgressionState;
+  publishInteractionDiagnostics: () => void;
+  resetLegacyPlayInputBuffer: () => void;
+  resetLegacyWorldTurnHost: () => void;
+  syncLegacyPlayerVisualMotionTo: (point: { x: number; y: number }) => void;
+  time: { now: number };
+  trail: Array<{ x: number; y: number }>;
+}
+
+const applyPauseCommand = (
+  MenuScene.prototype as unknown as {
+    applyLegacyPauseCommand: (
+      this: PauseResetSceneHarness,
+      command: 'reset-player'
+    ) => void;
+  }
+).applyLegacyPauseCommand;
 
 const createBypassableMaze = (): LegacyMazeSnapshot => ({
   source: 'play-generated',
@@ -112,6 +159,70 @@ describe('legacy static slow tile', () => {
     const reentry = applyLegacyStaticSlowTileEntry(blocked, placement.placement!.point, 2_000);
     expect(reentry.triggered).toBe(false);
     expect(reentry.state).toEqual(blocked);
+  });
+
+  test.each([
+    { label: 'consumed state', resetAtMs: 2_000 },
+    { label: 'in-flight delay', resetAtMs: 1_100 }
+  ])('re-arms the actual pause Reset path from $label', ({ resetAtMs }) => {
+    const maze = createBypassableMaze();
+    const progressionState = createEmptyLegacyProgressionState();
+    progressionState.tracks.player.targetComplexity = 132;
+    const initial = createLegacyStaticSlowTileState(maze, 'architect');
+    const entered = applyLegacyStaticSlowTileEntry(initial, initial.placement!.point, 1_000).state;
+    const scene: PauseResetSceneHarness = {
+      boardDynamicDirty: false,
+      closeOverlay: vi.fn(),
+      maze,
+      playCompletedAtMs: 1_500,
+      playCyclePath: [{ x: 4, y: 2 }],
+      playCycleResetUsed: false,
+      playStartedAtMs: 500,
+      playStaticSlowTile: entered,
+      player: { x: 4, y: 2 },
+      progressionState,
+      publishInteractionDiagnostics: vi.fn(),
+      resetLegacyPlayInputBuffer: vi.fn(),
+      resetLegacyWorldTurnHost: vi.fn(),
+      syncLegacyPlayerVisualMotionTo: vi.fn(),
+      time: { now: resetAtMs },
+      trail: [{ x: 4, y: 2 }, { x: 5, y: 2 }]
+    };
+
+    expect(entered).toMatchObject({
+      consumed: true,
+      delayUntilMs: 1_440,
+      entryCount: 1
+    });
+    applyPauseCommand.call(scene, 'reset-player');
+
+    expect(scene.playStaticSlowTile).toEqual(createLegacyStaticSlowTileState(maze, 'architect'));
+    expect(scene.playStaticSlowTile).toMatchObject({
+      blockedMoveCount: 0,
+      consumed: false,
+      delayUntilMs: null,
+      enteredAtMs: null,
+      entryCount: 0
+    });
+    expect(scene.player).toEqual(maze.start);
+    expect(scene.trail).toEqual([maze.start]);
+    expect(scene.playStartedAtMs).toBe(resetAtMs);
+    expect(scene.closeOverlay).toHaveBeenCalledOnce();
+
+    const freshEntry = applyLegacyStaticSlowTileEntry(
+      scene.playStaticSlowTile,
+      scene.playStaticSlowTile!.placement!.point,
+      resetAtMs + 10
+    );
+    expect(freshEntry).toMatchObject({
+      triggered: true,
+      state: {
+        consumed: true,
+        delayUntilMs: resetAtMs + 450,
+        entryCount: 1,
+        penaltyMs: 440
+      }
+    });
   });
 
   test('finds deterministic bypassable placements across the fixed Architect/Mythic corpus', () => {

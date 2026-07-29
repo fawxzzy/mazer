@@ -9948,6 +9948,10 @@ export class MenuScene extends Phaser.Scene {
       this.playCycleResetUsed = true;
       this.playStartedAtMs = this.time.now;
       this.playCompletedAtMs = null;
+      this.playStaticSlowTile = createLegacyStaticSlowTileState(
+        this.maze,
+        resolveLegacyProgressionDifficultyProfile(this.progressionState.tracks.player).band
+      );
       this.resetLegacyWorldTurnHost();
       this.resetLegacyPlayInputBuffer();
       this.boardDynamicDirty = true;
