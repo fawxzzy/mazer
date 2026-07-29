@@ -22,6 +22,8 @@ export interface DemoWalkerAiPerceptionProfile {
   lookaheadDepth: number;
   optionalRetargetLimit: number;
   rank: DemoWalkerAiSkillRank;
+  rankedLookaheadAmbiguityWeight: number;
+  rankedLookaheadProgressWeight: number;
   solvePreviewBudget: number;
   splitUncertaintyPenalty: number;
   wrapMentalCost: number;
@@ -271,6 +273,8 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
     confidenceNoisePenalty: 14,
     lookaheadDepth: 5,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 0,
+    rankedLookaheadProgressWeight: 0,
     solvePreviewBudget: 0,
     splitUncertaintyPenalty: 1.5,
     wrapMentalCost: 0.72
@@ -280,6 +284,8 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
     confidenceNoisePenalty: 10,
     lookaheadDepth: 9,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 1,
+    rankedLookaheadProgressWeight: 0.75,
     solvePreviewBudget: 0,
     splitUncertaintyPenalty: 1.26,
     wrapMentalCost: 0.54
@@ -289,6 +295,8 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
     confidenceNoisePenalty: 8,
     lookaheadDepth: 10,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 1,
+    rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 0,
     splitUncertaintyPenalty: 1.12,
     wrapMentalCost: 0.46
@@ -298,6 +306,8 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
     confidenceNoisePenalty: 6,
     lookaheadDepth: 10,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 1,
+    rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 1,
     splitUncertaintyPenalty: 0.98,
     wrapMentalCost: 0.38
@@ -307,6 +317,8 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
     confidenceNoisePenalty: 4,
     lookaheadDepth: 12,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 1,
+    rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 2,
     splitUncertaintyPenalty: 0.84,
     wrapMentalCost: 0.3
@@ -316,6 +328,8 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
     confidenceNoisePenalty: 2,
     lookaheadDepth: 13,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 1,
+    rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 4,
     splitUncertaintyPenalty: 0.7,
     wrapMentalCost: 0.22
@@ -1576,7 +1590,7 @@ const reviewLocalMemoryChoice = (
         * (0.11 + (Math.min(16, perception.lookaheadDepth) * 0.014))
         * biasWeights.progressRewardMultiplier
       ) / lookaheadProgressDepthTax
-    )
+    ) * perception.rankedLookaheadProgressWeight
     : 0;
   const localAmbiguityPenalty = usesRankedLookaheadScoring
     ? Math.min(
@@ -1584,7 +1598,7 @@ const reviewLocalMemoryChoice = (
       (lookahead.splitCount / Math.max(1, lookahead.reachableCount))
       * (0.72 + (Math.min(16, perception.lookaheadDepth) * 0.035))
       * biasWeights.splitPenaltyMultiplier
-    )
+    ) * perception.rankedLookaheadAmbiguityWeight
     : 0;
   const reachableReward = Math.min(
     0.72,
