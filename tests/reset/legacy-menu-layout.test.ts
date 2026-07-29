@@ -43,6 +43,50 @@ describe('legacy menu layout', () => {
     expect((layout.lanes.actions?.top ?? 0) - (layout.lanes.rank?.bottom ?? 0)).toBeGreaterThanOrEqual(10);
   });
 
+  test('centers the visible guest desktop stack without changing phone geometry', () => {
+    const authenticatedDesktop = resolveLegacyMenuLayout(1440, 900, 50, 49, 'menu', {
+      menuActionMode: 'authenticated'
+    });
+    const guestDesktop = resolveLegacyMenuLayout(1440, 900, 50, 49, 'menu', {
+      menuActionMode: 'guest'
+    });
+    const authenticatedPhone = resolveLegacyMenuLayout(405, 958, 50, 49, 'menu', {
+      menuActionMode: 'authenticated'
+    });
+    const guestPhone = resolveLegacyMenuLayout(405, 958, 50, 49, 'menu', {
+      menuActionMode: 'guest'
+    });
+    const authenticatedPlay = resolveLegacyMenuLayout(1440, 900, 50, 49, 'play', {
+      menuActionMode: 'authenticated'
+    });
+    const guestPlay = resolveLegacyMenuLayout(1440, 900, 50, 49, 'play', {
+      menuActionMode: 'guest'
+    });
+    const presentation = resolveLegacyMenuTitlePresentation(
+      guestDesktop.boardSize,
+      guestDesktop.tileSize,
+      false,
+      guestDesktop.width,
+      'procedural'
+    );
+    const title = resolveLegacyMenuPathTitleLayout(
+      guestDesktop.titleX,
+      guestDesktop.titleY,
+      presentation.fontSize
+    );
+    const visibleStackCenter = (
+      title.top
+      + guestDesktop.centerButtonY
+      + (guestDesktop.buttonHeight / 2)
+    ) / 2;
+
+    expect(Math.abs(visibleStackCenter - (guestDesktop.height / 2))).toBeLessThanOrEqual(12);
+    expect(guestDesktop.boardTop).toBeGreaterThan(authenticatedDesktop.boardTop);
+    expect(guestDesktop.centerButtonY).toBeGreaterThan(authenticatedDesktop.centerButtonY);
+    expect(guestPhone).toEqual(authenticatedPhone);
+    expect(guestPlay).toEqual(authenticatedPlay);
+  });
+
   test('keeps the portrait board dominant with separated buttons in the lower action lane', () => {
     const layout = resolveLegacyMenuLayout(430, 932, 50, 49);
 

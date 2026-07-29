@@ -1278,6 +1278,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const shouldReturnToMainMenuAfterLogin = this.authForm.mode === \'login\'');
     expect(menuSceneSource).toContain('private closeLegacyAuthOverlayToMainMenu(): void');
     expect(menuSceneSource).toContain("const isAuthenticated = this.authSnapshot.status === 'authenticated';");
+    expect(menuSceneSource).toContain("menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest'");
+    expect(menuSceneSource).toContain("const previousMenuActionMode = this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest';");
+    expect(menuSceneSource).toContain("const menuActionMode = snapshot.status === 'authenticated' ? 'authenticated' : 'guest';");
+    expect(menuSceneSource).toContain('previousMenuActionMode !== menuActionMode');
+    expect(menuSceneSource).toContain('this.refreshLayout();');
     expect(menuSceneSource).toContain("'Login',\n              () => this.openOverlay('auth')");
     expect(menuSceneSource).toContain('this.layout.centerButtonX,');
     expect(menuSceneSource).toContain('this.layout.centerButtonY,');
