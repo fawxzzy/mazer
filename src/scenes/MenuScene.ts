@@ -3801,7 +3801,6 @@ export class MenuScene extends Phaser.Scene {
     this.mode = request.mode;
     this.mazeSeed = request.seed;
     this.maze = generationState.maze;
-    this.resetLegacyWorldTurnHost();
     this.titleGraphics.setVisible(generationState.titleVisible);
     this.menuDemoEpisode = this.mode === 'menu' ? createLegacyDemoWalkerEpisode(this.maze) : null;
     if (this.mode === 'menu') {
@@ -3839,9 +3838,9 @@ export class MenuScene extends Phaser.Scene {
         this.playStaticSlowTile.placement?.point ?? null
       );
       this.playPatrolAgent = this.createLegacyPlayPatrolAgent(progressionBand);
-      this.resetLegacyWorldTurnHost();
       this.startLegacyPlayCompassSpin(this.time.now);
     }
+    this.resetLegacyWorldTurnHost();
     this.nextDemoMoveAtMs = nextDemoMoveAtMs;
     this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
     this.activeInputField = null;

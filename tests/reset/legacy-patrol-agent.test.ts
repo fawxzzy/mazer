@@ -1,7 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
-import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
+import {
+  createLegacyGenerationRequest,
+  createLegacyRuntimeMazeForMode,
+  type LegacyGenerationRequest
+} from '../../src/legacy-runtime/legacyGenerationLifecycle';
+import {
+  LEGACY_DEFAULTS,
+  copyLegacySettings
+} from '../../src/legacy-runtime/legacyDefaults';
 import {
   createLegacyRoomCandidateMetadata,
   type LegacyRoomCandidateMetadata
@@ -32,6 +40,7 @@ import {
   type LegacyStaticSlowTileState
 } from '../../src/legacy-runtime/legacyStaticSlowTile';
 import type { LegacyMazeSnapshot, LegacyPoint } from '../../src/legacy-runtime/legacyMaze';
+import { WorldTurnHost } from '../../src/mazer-core/world';
 import { MenuScene } from '../../src/scenes/MenuScene';
 
 vi.mock('phaser', () => ({
@@ -145,6 +154,28 @@ const resetPlayerProgression = (
     ) => void;
   }
 ).resetLegacyPlayerProgression;
+
+const applyGenerationRequest = (
+  MenuScene.prototype as unknown as {
+    applyGenerationRequest: (
+      this: MenuScene,
+      request: LegacyGenerationRequest,
+      nextDemoMoveAtMs?: number
+    ) => void;
+  }
+).applyGenerationRequest;
+
+const createWorldTurnHost = (
+  MenuScene.prototype as unknown as {
+    createLegacyWorldTurnHost: (this: MenuScene) => WorldTurnHost;
+  }
+).createLegacyWorldTurnHost;
+
+const resetWorldTurnHost = (
+  MenuScene.prototype as unknown as {
+    resetLegacyWorldTurnHost: (this: MenuScene) => void;
+  }
+).resetLegacyWorldTurnHost;
 
 describe('legacy Mythic patrol agent', () => {
   test('selects one deterministic bypassable two-tile route and preserves every excluded surface', () => {
@@ -346,6 +377,79 @@ describe('legacy Mythic patrol agent', () => {
     expect(progressionScene.playRoomCandidateMetadata).toBeNull();
     expect(progressionScene.resetLegacyWorldTurnHost).toHaveBeenCalledOnce();
     expect(JSON.stringify(maze)).toBe(before);
+  });
+
+  test('recreates the immutable timed-mode host after play-to-menu patrol state settles', () => {
+    const progressionState = createEmptyLegacyProgressionState();
+    progressionState.tracks.player.targetComplexity = 180;
+    const scene = {
+      activeInputField: null,
+      armLegacyMenuStaticDrawStage: vi.fn(),
+      boardDynamicDirty: false,
+      boardPathDirty: false,
+      boardStaticDirty: false,
+      createLegacyPlayPatrolAgent(
+        this: {
+          maze: LegacyMazeSnapshot;
+          playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
+          playStaticSlowTile: LegacyStaticSlowTileState;
+        },
+        band: LegacyProgressionDifficultyBand
+      ) {
+        return createLegacyPatrolAgentState(this.maze, band, [
+          ...(this.playStaticSlowTile.placement ? [this.playStaticSlowTile.placement.point] : []),
+          ...roomFootprint(this.playRoomCandidateMetadata)
+        ]);
+      },
+      createLegacyWorldTurnHost: createWorldTurnHost,
+      legacyWorldTurnCommandSequence: 0,
+      legacyWorldTurnHost: new WorldTurnHost({}, { timedModeEnabled: false }),
+      legacyWorldTurnMove: null,
+      playPatrolAgent: null,
+      progressionState,
+      refreshLayout: vi.fn(),
+      resetLegacyWorldTurnHost: resetWorldTurnHost,
+      resolveLegacyMenuStaticDrawDemoGateAtMs: () => 1_000,
+      settings: copyLegacySettings(LEGACY_DEFAULTS),
+      startLegacyPlayCompassSpin: vi.fn(),
+      syncLegacyPlayerVisualMotionTo: vi.fn(),
+      time: { now: 1_000 },
+      titleGraphics: { setVisible: vi.fn() },
+      uiDirty: false
+    } as unknown as MenuScene;
+    const readback = () => scene as unknown as {
+      legacyWorldTurnHost: WorldTurnHost;
+      playPatrolAgent: LegacyPatrolAgentState | null;
+    };
+    const generationProfile = resolveLegacyMazeGenerationProfileForProgression(180);
+
+    applyGenerationRequest.call(scene, createLegacyGenerationRequest({
+      currentSeed: 577_196_705,
+      dueAtMs: 1_000,
+      generationProfile,
+      mode: 'play',
+      reason: 'play-start',
+      scale: 96,
+      targetComplexity: 180
+    }));
+    expect(readback().playPatrolAgent).not.toBeNull();
+    expect(readback().legacyWorldTurnHost.getDiagnostics().timedModeEnabled).toBe(true);
+
+    applyGenerationRequest.call(scene, createLegacyGenerationRequest({
+      currentSeed: 577_196_705,
+      dueAtMs: 1_000,
+      generationProfile,
+      mode: 'menu',
+      reason: 'boot-menu',
+      scale: 96,
+      targetComplexity: 180
+    }));
+    readback().legacyWorldTurnHost.setState('stopped');
+    expect(readback().playPatrolAgent).toBeNull();
+    expect(readback().legacyWorldTurnHost.getDiagnostics()).toMatchObject({
+      state: 'stopped',
+      timedModeEnabled: false
+    });
   });
 
   test('wires the visible patrol through timed world turns and cloned diagnostics', () => {
