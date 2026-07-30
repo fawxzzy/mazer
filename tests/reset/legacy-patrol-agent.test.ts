@@ -400,10 +400,16 @@ describe('legacy Mythic patrol agent', () => {
     });
     expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_219))
       .toMatchObject({ active: false, elapsedMs: null, remainingMs: 221 });
+    expect(resolveLegacyPatrolAgentCollisionFeedback(collision.state, 1_219.5))
+      .toMatchObject({ active: true, elapsedMs: 220 });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_219.5))
+      .toMatchObject({ active: false, elapsedMs: null, remainingMs: 221 });
     expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_220))
       .toMatchObject({ active: true, elapsedMs: 0, remainingMs: 220, windowMs: 220 });
     expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_439))
       .toMatchObject({ active: true, elapsedMs: 219, remainingMs: 1 });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_439.5))
+      .toMatchObject({ active: true, elapsedMs: 220, remainingMs: 1 });
     expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_440))
       .toMatchObject({ active: false, elapsedMs: 220, remainingMs: 0 });
     expect(LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS).toBe(220);

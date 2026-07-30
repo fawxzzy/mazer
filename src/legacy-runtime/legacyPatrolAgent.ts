@@ -324,10 +324,14 @@ export const resolveLegacyPatrolAgentCollisionFeedback = (
   }
 
   const collisionAtMs = state.collisionDelayUntilMs - LEGACY_PATROL_AGENT_COLLISION_DELAY_MS;
-  const elapsedMs = Math.max(0, Math.round(normalizeTimeMs(nowMs) - collisionAtMs));
+  const normalizedNowMs = normalizeTimeMs(nowMs);
+  const rawElapsedMs = Math.max(0, normalizedNowMs - collisionAtMs);
   return {
-    active: elapsedMs < LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
-    elapsedMs,
+    active: (
+      rawElapsedMs < LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS
+      && normalizedNowMs < state.collisionDelayUntilMs
+    ),
+    elapsedMs: Math.round(rawElapsedMs),
     windowMs: LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS
   };
 };
@@ -346,17 +350,15 @@ export const resolveLegacyPatrolAgentCollisionRecovery = (
   }
 
   const collisionAtMs = state.collisionDelayUntilMs - LEGACY_PATROL_AGENT_COLLISION_DELAY_MS;
-  const elapsedSinceCollisionMs = Math.max(
-    0,
-    Math.round(normalizeTimeMs(nowMs) - collisionAtMs)
-  );
+  const normalizedNowMs = normalizeTimeMs(nowMs);
+  const elapsedSinceCollisionMs = Math.max(0, normalizedNowMs - collisionAtMs);
   const remainingMs = resolveLegacyPatrolAgentRemainingMs(state, nowMs);
   const recoveryElapsedMs = elapsedSinceCollisionMs
     - LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS;
 
   return {
-    active: recoveryElapsedMs >= 0 && remainingMs > 0,
-    elapsedMs: recoveryElapsedMs >= 0 ? recoveryElapsedMs : null,
+    active: recoveryElapsedMs >= 0 && normalizedNowMs < state.collisionDelayUntilMs,
+    elapsedMs: recoveryElapsedMs >= 0 ? Math.round(recoveryElapsedMs) : null,
     remainingMs,
     windowMs: LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS
   };
