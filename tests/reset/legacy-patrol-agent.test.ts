@@ -17,6 +17,7 @@ import {
 import {
   LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
   LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
+  LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS,
   LEGACY_PATROL_AGENT_CONTRACT_VERSION,
   LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
   LEGACY_PATROL_AGENT_STEP_MS,
@@ -28,6 +29,7 @@ import {
   recordLegacyPatrolAgentBlockedMove,
   resolveLegacyPatrolAgentPoint,
   resolveLegacyPatrolAgentCollisionFeedback,
+  resolveLegacyPatrolAgentCollisionRecovery,
   resolveLegacyPatrolAgentRemainingMs,
   resolveLegacyPatrolAgentTelegraph,
   resolveLegacyPatrolAgentTick,
@@ -142,10 +144,10 @@ interface ProgressionResetHarness {
   visualDiagnosticsLastPublishedAtMs: number;
 }
 
-interface CollisionFeedbackVisualHarness {
+interface CollisionVisualHarness {
   boardDynamicDirty: boolean;
   mode: 'menu' | 'play';
-  playPatrolCollisionFeedbackActive: boolean;
+  playPatrolCollisionVisualActive: boolean;
 }
 
 const applyPauseCommand = (
@@ -187,14 +189,14 @@ const resetWorldTurnHost = (
   }
 ).resetLegacyWorldTurnHost;
 
-const refreshCollisionFeedbackVisualState = (
+const refreshCollisionVisualState = (
   MenuScene.prototype as unknown as {
-    refreshLegacyPatrolCollisionFeedbackVisualState: (
-      this: CollisionFeedbackVisualHarness,
+    refreshLegacyPatrolCollisionVisualState: (
+      this: CollisionVisualHarness,
       active: boolean
     ) => void;
   }
-).refreshLegacyPatrolCollisionFeedbackVisualState;
+).refreshLegacyPatrolCollisionVisualState;
 
 describe('legacy Mythic patrol agent', () => {
   test('selects one deterministic bypassable two-tile route and preserves every excluded surface', () => {
@@ -383,32 +385,56 @@ describe('legacy Mythic patrol agent', () => {
     expect(LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS).toBe(220);
   });
 
-  test('forces one final dynamic redraw on the first inactive collision-feedback frame', () => {
-    const scene: CollisionFeedbackVisualHarness = {
+  test('shows one recovery cue only for the final 220 ms of the existing delay', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const point = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, point, 1_000);
+
+    expect(resolveLegacyPatrolAgentCollisionRecovery(null, 1_000)).toEqual({
+      active: false,
+      elapsedMs: null,
+      remainingMs: 0,
+      windowMs: 220
+    });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_219))
+      .toMatchObject({ active: false, elapsedMs: null, remainingMs: 221 });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_220))
+      .toMatchObject({ active: true, elapsedMs: 0, remainingMs: 220, windowMs: 220 });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_439))
+      .toMatchObject({ active: true, elapsedMs: 219, remainingMs: 1 });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_440))
+      .toMatchObject({ active: false, elapsedMs: 220, remainingMs: 0 });
+    expect(LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS).toBe(220);
+  });
+
+  test('animates collision visuals and forces one final redraw when recovery expires', () => {
+    const scene: CollisionVisualHarness = {
       boardDynamicDirty: false,
       mode: 'play',
-      playPatrolCollisionFeedbackActive: false
+      playPatrolCollisionVisualActive: false
     };
 
-    refreshCollisionFeedbackVisualState.call(scene, true);
+    refreshCollisionVisualState.call(scene, true);
     expect(scene).toMatchObject({
       boardDynamicDirty: true,
-      playPatrolCollisionFeedbackActive: true
+      playPatrolCollisionVisualActive: true
     });
 
     scene.boardDynamicDirty = false;
-    refreshCollisionFeedbackVisualState.call(scene, true);
+    refreshCollisionVisualState.call(scene, true);
     expect(scene.boardDynamicDirty).toBe(true);
 
     scene.boardDynamicDirty = false;
-    refreshCollisionFeedbackVisualState.call(scene, false);
+    refreshCollisionVisualState.call(scene, false);
     expect(scene).toMatchObject({
       boardDynamicDirty: true,
-      playPatrolCollisionFeedbackActive: false
+      playPatrolCollisionVisualActive: false
     });
 
     scene.boardDynamicDirty = false;
-    refreshCollisionFeedbackVisualState.call(scene, false);
+    refreshCollisionVisualState.call(scene, false);
     expect(scene.boardDynamicDirty).toBe(false);
   });
 
@@ -580,9 +606,11 @@ describe('legacy Mythic patrol agent', () => {
     expect(menuSceneSource).toContain('patrol: this.playPatrolAgent && patrolPoint');
     expect(menuSceneSource).toContain('resolveLegacyPatrolAgentTelegraph(');
     expect(menuSceneSource).toContain('telegraphActive: patrolTelegraph.active');
-    expect(diagnosticsSource).toContain("contractVersion: 'legacy-patrol-agent-v3';");
+    expect(diagnosticsSource).toContain("contractVersion: 'legacy-patrol-agent-v4';");
     expect(diagnosticsSource).toContain('collisionFeedbackWindowMs: 220;');
     expect(menuSceneSource).toContain('collisionFeedbackActive: patrolCollisionFeedback.active');
+    expect(diagnosticsSource).toContain('collisionRecoveryWindowMs: 220;');
+    expect(menuSceneSource).toContain('collisionRecoveryActive: patrolCollisionRecovery.active');
     expect(diagnosticsSource).toContain('telegraphWindowMs: 220;');
   });
 });

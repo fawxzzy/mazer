@@ -5,12 +5,13 @@ import {
 } from './legacyMaze';
 import type { LegacyProgressionDifficultyBand } from './legacyProgression';
 
-export const LEGACY_PATROL_AGENT_CONTRACT_VERSION = 'legacy-patrol-agent-v3' as const;
+export const LEGACY_PATROL_AGENT_CONTRACT_VERSION = 'legacy-patrol-agent-v4' as const;
 export const LEGACY_PATROL_AGENT_ROUTE_TILE_COUNT = 2 as const;
 export const LEGACY_PATROL_AGENT_STEP_MS = 440 as const;
 export const LEGACY_PATROL_AGENT_ROUND_TRIP_MS = 880 as const;
 export const LEGACY_PATROL_AGENT_COLLISION_DELAY_MS = 440 as const;
 export const LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS = 220 as const;
+export const LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS = 220 as const;
 export const LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS = 220 as const;
 
 export interface LegacyPatrolAgentPlacement {
@@ -51,6 +52,13 @@ export interface LegacyPatrolAgentCollisionFeedbackFrame {
   active: boolean;
   elapsedMs: number | null;
   windowMs: typeof LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS;
+}
+
+export interface LegacyPatrolAgentCollisionRecoveryFrame {
+  active: boolean;
+  elapsedMs: number | null;
+  remainingMs: number;
+  windowMs: typeof LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS;
 }
 
 export interface LegacyPatrolAgentTelegraphFrame {
@@ -321,6 +329,36 @@ export const resolveLegacyPatrolAgentCollisionFeedback = (
     active: elapsedMs < LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
     elapsedMs,
     windowMs: LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS
+  };
+};
+
+export const resolveLegacyPatrolAgentCollisionRecovery = (
+  state: LegacyPatrolAgentState | null,
+  nowMs: number
+): LegacyPatrolAgentCollisionRecoveryFrame => {
+  if (state?.collisionDelayUntilMs === null || state?.collisionDelayUntilMs === undefined) {
+    return {
+      active: false,
+      elapsedMs: null,
+      remainingMs: 0,
+      windowMs: LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS
+    };
+  }
+
+  const collisionAtMs = state.collisionDelayUntilMs - LEGACY_PATROL_AGENT_COLLISION_DELAY_MS;
+  const elapsedSinceCollisionMs = Math.max(
+    0,
+    Math.round(normalizeTimeMs(nowMs) - collisionAtMs)
+  );
+  const remainingMs = resolveLegacyPatrolAgentRemainingMs(state, nowMs);
+  const recoveryElapsedMs = elapsedSinceCollisionMs
+    - LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS;
+
+  return {
+    active: recoveryElapsedMs >= 0 && remainingMs > 0,
+    elapsedMs: recoveryElapsedMs >= 0 ? recoveryElapsedMs : null,
+    remainingMs,
+    windowMs: LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS
   };
 };
 
