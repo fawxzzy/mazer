@@ -1230,6 +1230,7 @@ export class MenuScene extends Phaser.Scene {
   private boardStaticDirty = true;
   private boardPathDirty = true;
   private boardDynamicDirty = true;
+  private playPatrolCollisionFeedbackActive = false;
   private hudDirty = true;
   private backdropDirty = true;
   private uiDirty = true;
@@ -1636,9 +1637,7 @@ export class MenuScene extends Phaser.Scene {
       this.playPatrolAgent,
       time
     );
-    if (this.mode === 'play' && patrolCollisionFeedback.active) {
-      this.boardDynamicDirty = true;
-    }
+    this.refreshLegacyPatrolCollisionFeedbackVisualState(patrolCollisionFeedback.active);
     if (this.isLegacyMenuHandoffAnimationActive(time)) {
       this.boardDynamicDirty = true;
       this.backdropDirty = true;
@@ -6500,6 +6499,14 @@ export class MenuScene extends Phaser.Scene {
       );
     }
     this.boardDynamicDirty = false;
+  }
+
+  private refreshLegacyPatrolCollisionFeedbackVisualState(active: boolean): void {
+    const nextActive = this.mode === 'play' && active;
+    if (nextActive || this.playPatrolCollisionFeedbackActive !== nextActive) {
+      this.boardDynamicDirty = true;
+    }
+    this.playPatrolCollisionFeedbackActive = nextActive;
   }
 
   private drawLegacyPlayStaticSlowTile(
