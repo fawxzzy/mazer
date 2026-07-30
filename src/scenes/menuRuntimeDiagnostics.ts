@@ -260,7 +260,10 @@ export interface MenuSceneRuntimeDiagnostics {
       collisionDelayMs: 440;
       collisionDelayUntilMs: number | null;
       collisionEpisodeActive: boolean;
-      contractVersion: 'legacy-patrol-agent-v2';
+      collisionFeedbackActive: boolean;
+      collisionFeedbackElapsedMs: number | null;
+      collisionFeedbackWindowMs: 220;
+      contractVersion: 'legacy-patrol-agent-v3';
       currentRouteIndex: 0 | 1;
       elapsedInStepMs: number;
       lastResolvedTickIndex: number;
