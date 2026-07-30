@@ -260,11 +260,20 @@ export interface MenuSceneRuntimeDiagnostics {
       collisionDelayMs: 440;
       collisionDelayUntilMs: number | null;
       collisionEpisodeActive: boolean;
-      contractVersion: 'legacy-patrol-agent-v1';
+      contractVersion: 'legacy-patrol-agent-v2';
       currentRouteIndex: 0 | 1;
+      elapsedInStepMs: number;
       lastResolvedTickIndex: number;
       lastStepAtMs: number | null;
       maximumAgents: 1;
+      msUntilStep: number;
+      nextPoint: {
+        screenX: number;
+        screenY: number;
+        x: number;
+        y: number;
+      };
+      nextRouteIndex: 0 | 1;
       penaltyCount: number;
       remainingMs: number;
       roundTripMs: 880;
@@ -281,6 +290,8 @@ export interface MenuSceneRuntimeDiagnostics {
       solutionPathIndices: number[];
       stepCount: number;
       stepMs: 440;
+      telegraphActive: boolean;
+      telegraphWindowMs: 220;
     } | null;
     pressure?: {
       activeWindowMs: number | null;

@@ -228,6 +228,7 @@ import {
   LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
   LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
   LEGACY_PATROL_AGENT_STEP_MS,
+  LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS,
   advanceLegacyPatrolAgent,
   applyLegacyPatrolAgentCollision,
   createLegacyPatrolAgentState,
@@ -235,6 +236,7 @@ import {
   recordLegacyPatrolAgentBlockedMove,
   resolveLegacyPatrolAgentPoint,
   resolveLegacyPatrolAgentRemainingMs,
+  resolveLegacyPatrolAgentTelegraph,
   resolveLegacyPatrolAgentTick,
   type LegacyPatrolAgentState
 } from '../legacy-runtime/legacyPatrolAgent';
@@ -1029,6 +1031,7 @@ const LEGACY_PLAY_SLOW_TILE_EDGE = cyberArcadeMaterial.signal.warningEdge;
 const LEGACY_PLAY_SLOW_TILE_SPENT = cyberArcadeMaterial.rail.muted;
 const LEGACY_PLAY_PATROL_CORE = cyberArcadeMaterial.signal.violet;
 const LEGACY_PLAY_PATROL_EDGE = cyberArcadeMaterial.signal.memory;
+const LEGACY_PLAY_PATROL_TELEGRAPH = cyberArcadeMaterial.rail.mint;
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
 const LEGACY_MENU_AI_MEMORY_TARGET_CORE = cyberArcadeMaterial.signal.warning;
@@ -1617,6 +1620,15 @@ export class MenuScene extends Phaser.Scene {
     ) {
       this.boardDynamicDirty = true;
     }
+    const patrolTelegraph = resolveLegacyPatrolAgentTelegraph(
+      this.playPatrolAgent,
+      time,
+      this.playStartedAtMs,
+      this.resolveLegacyWorldTurnHostState() === 'running'
+    );
+    if (this.mode === 'play' && patrolTelegraph.active) {
+      this.boardDynamicDirty = true;
+    }
     if (this.isLegacyMenuHandoffAnimationActive(time)) {
       this.boardDynamicDirty = true;
       this.backdropDirty = true;
@@ -1826,6 +1838,12 @@ export class MenuScene extends Phaser.Scene {
     const patrolPoint = resolveLegacyPatrolAgentPoint(this.playPatrolAgent);
     this.legacyWorldTurnHost.setState(this.resolveLegacyWorldTurnHostState());
     const worldTurnDiagnostics = this.legacyWorldTurnHost.getDiagnostics();
+    const patrolTelegraph = resolveLegacyPatrolAgentTelegraph(
+      this.playPatrolAgent,
+      time,
+      this.playStartedAtMs,
+      worldTurnDiagnostics.state === 'running'
+    );
 
     publishMenuSceneRuntimeDiagnostics({
       revision: this.runtimeDiagnosticsRevision,
@@ -1967,9 +1985,18 @@ export class MenuScene extends Phaser.Scene {
               collisionEpisodeActive: this.playPatrolAgent.collisionEpisodeActive,
               contractVersion: this.playPatrolAgent.contractVersion,
               currentRouteIndex: this.playPatrolAgent.currentRouteIndex,
+              elapsedInStepMs: patrolTelegraph.elapsedInStepMs ?? 0,
               lastResolvedTickIndex: this.playPatrolAgent.lastResolvedTickIndex,
               lastStepAtMs: this.playPatrolAgent.lastStepAtMs,
               maximumAgents: 1,
+              msUntilStep: patrolTelegraph.msUntilStep ?? LEGACY_PATROL_AGENT_STEP_MS,
+              nextPoint: {
+                screenX: mazeRenderFrame.boardLeft + (((patrolTelegraph.nextPoint?.x ?? patrolPoint.x) + 0.5) * mazeRenderFrame.tileSize),
+                screenY: mazeRenderFrame.boardTop + (((patrolTelegraph.nextPoint?.y ?? patrolPoint.y) + 0.5) * mazeRenderFrame.tileSize),
+                x: patrolTelegraph.nextPoint?.x ?? patrolPoint.x,
+                y: patrolTelegraph.nextPoint?.y ?? patrolPoint.y
+              },
+              nextRouteIndex: patrolTelegraph.nextRouteIndex ?? this.playPatrolAgent.currentRouteIndex,
               penaltyCount: this.playPatrolAgent.penaltyCount,
               remainingMs: resolveLegacyPatrolAgentRemainingMs(this.playPatrolAgent, time),
               roundTripMs: LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
@@ -1982,7 +2009,9 @@ export class MenuScene extends Phaser.Scene {
               },
               solutionPathIndices: [...this.playPatrolAgent.placement.solutionPathIndices],
               stepCount: this.playPatrolAgent.stepCount,
-              stepMs: LEGACY_PATROL_AGENT_STEP_MS
+              stepMs: LEGACY_PATROL_AGENT_STEP_MS,
+              telegraphActive: patrolTelegraph.active,
+              telegraphWindowMs: LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS
             }
           : null,
         pressure: this.playStaticSlowTile
@@ -4506,6 +4535,12 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyPlayLifecycleDiagnosticsSignature(time: number): string {
     const lifecycle = this.resolveLegacyPlayLifecycleDiagnostics(time);
+    const patrolTelegraph = resolveLegacyPatrolAgentTelegraph(
+      this.playPatrolAgent,
+      time,
+      this.playStartedAtMs,
+      this.resolveLegacyWorldTurnHostState() === 'running'
+    );
     return [
       lifecycle.phase,
       lifecycle.drawPhase,
@@ -4513,7 +4548,8 @@ export class MenuScene extends Phaser.Scene {
       lifecycle.nextSeedQueued ? 'seed' : 'no-seed',
       lifecycle.timerRunning ? 'timer' : 'no-timer',
       lifecycle.playerVisible ? 'player' : 'no-player',
-      lifecycle.trailVisible ? 'trail' : 'no-trail'
+      lifecycle.trailVisible ? 'trail' : 'no-trail',
+      patrolTelegraph.active ? 'patrol-intent' : 'no-patrol-intent'
     ].join(':');
   }
 
@@ -6378,7 +6414,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize, time);
-    this.drawLegacyPlayPatrolAgent(mazeLeft, mazeTop, mazeTileSize);
+    this.drawLegacyPlayPatrolAgent(mazeLeft, mazeTop, mazeTileSize, time);
 
     if (this.mode === 'menu' && menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
       this.drawLegacyMenuAiMemoryOverlay(
@@ -6501,11 +6537,40 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyPlayPatrolAgent(
     mazeLeft: number,
     mazeTop: number,
-    tileSize: number
+    tileSize: number,
+    time: number
   ): void {
     const point = resolveLegacyPatrolAgentPoint(this.playPatrolAgent);
     if (this.mode !== 'play' || point === null) {
       return;
+    }
+
+    const telegraph = resolveLegacyPatrolAgentTelegraph(
+      this.playPatrolAgent,
+      time,
+      this.playStartedAtMs,
+      this.resolveLegacyWorldTurnHostState() === 'running'
+    );
+    if (telegraph.active && telegraph.nextPoint) {
+      const targetX = mazeLeft + ((telegraph.nextPoint.x + 0.5) * tileSize);
+      const targetY = mazeTop + ((telegraph.nextPoint.y + 0.5) * tileSize);
+      const targetRadius = Math.max(1.5, tileSize * 0.28);
+      const urgency = 1 - ((telegraph.msUntilStep ?? LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS)
+        / LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS);
+      const alpha = 0.34 + (urgency * 0.42);
+      this.boardDynamicGraphics.lineStyle(
+        Math.max(1, tileSize * 0.08),
+        LEGACY_PLAY_PATROL_TELEGRAPH,
+        alpha
+      );
+      this.boardDynamicGraphics.strokeCircle(targetX, targetY, targetRadius * 1.24);
+      this.boardDynamicGraphics.beginPath();
+      this.boardDynamicGraphics.moveTo(targetX, targetY - targetRadius);
+      this.boardDynamicGraphics.lineTo(targetX + targetRadius, targetY);
+      this.boardDynamicGraphics.lineTo(targetX, targetY + targetRadius);
+      this.boardDynamicGraphics.lineTo(targetX - targetRadius, targetY);
+      this.boardDynamicGraphics.closePath();
+      this.boardDynamicGraphics.strokePath();
     }
 
     const centerX = mazeLeft + ((point.x + 0.5) * tileSize);
