@@ -142,6 +142,12 @@ interface ProgressionResetHarness {
   visualDiagnosticsLastPublishedAtMs: number;
 }
 
+interface CollisionFeedbackVisualHarness {
+  boardDynamicDirty: boolean;
+  mode: 'menu' | 'play';
+  playPatrolCollisionFeedbackActive: boolean;
+}
+
 const applyPauseCommand = (
   MenuScene.prototype as unknown as {
     applyLegacyPauseCommand: (
@@ -180,6 +186,15 @@ const resetWorldTurnHost = (
     resetLegacyWorldTurnHost: (this: MenuScene) => void;
   }
 ).resetLegacyWorldTurnHost;
+
+const refreshCollisionFeedbackVisualState = (
+  MenuScene.prototype as unknown as {
+    refreshLegacyPatrolCollisionFeedbackVisualState: (
+      this: CollisionFeedbackVisualHarness,
+      active: boolean
+    ) => void;
+  }
+).refreshLegacyPatrolCollisionFeedbackVisualState;
 
 describe('legacy Mythic patrol agent', () => {
   test('selects one deterministic bypassable two-tile route and preserves every excluded surface', () => {
@@ -366,6 +381,35 @@ describe('legacy Mythic patrol agent', () => {
     expect(resolveLegacyPatrolAgentCollisionFeedback(collision.state, 1_220))
       .toMatchObject({ active: false, elapsedMs: 220 });
     expect(LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS).toBe(220);
+  });
+
+  test('forces one final dynamic redraw on the first inactive collision-feedback frame', () => {
+    const scene: CollisionFeedbackVisualHarness = {
+      boardDynamicDirty: false,
+      mode: 'play',
+      playPatrolCollisionFeedbackActive: false
+    };
+
+    refreshCollisionFeedbackVisualState.call(scene, true);
+    expect(scene).toMatchObject({
+      boardDynamicDirty: true,
+      playPatrolCollisionFeedbackActive: true
+    });
+
+    scene.boardDynamicDirty = false;
+    refreshCollisionFeedbackVisualState.call(scene, true);
+    expect(scene.boardDynamicDirty).toBe(true);
+
+    scene.boardDynamicDirty = false;
+    refreshCollisionFeedbackVisualState.call(scene, false);
+    expect(scene).toMatchObject({
+      boardDynamicDirty: true,
+      playPatrolCollisionFeedbackActive: false
+    });
+
+    scene.boardDynamicDirty = false;
+    refreshCollisionFeedbackVisualState.call(scene, false);
+    expect(scene.boardDynamicDirty).toBe(false);
   });
 
   test('re-arms on Pause Reset and clears on Reset Progression without maze regeneration', () => {
