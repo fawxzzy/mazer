@@ -226,6 +226,7 @@ import {
 } from '../legacy-runtime/legacyRoomCandidateMetadata';
 import {
   LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
+  LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
   LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
   LEGACY_PATROL_AGENT_STEP_MS,
   LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS,
@@ -235,6 +236,7 @@ import {
   isLegacyPatrolAgentDelayActive,
   recordLegacyPatrolAgentBlockedMove,
   resolveLegacyPatrolAgentPoint,
+  resolveLegacyPatrolAgentCollisionFeedback,
   resolveLegacyPatrolAgentRemainingMs,
   resolveLegacyPatrolAgentTelegraph,
   resolveLegacyPatrolAgentTick,
@@ -1032,6 +1034,7 @@ const LEGACY_PLAY_SLOW_TILE_SPENT = cyberArcadeMaterial.rail.muted;
 const LEGACY_PLAY_PATROL_CORE = cyberArcadeMaterial.signal.violet;
 const LEGACY_PLAY_PATROL_EDGE = cyberArcadeMaterial.signal.memory;
 const LEGACY_PLAY_PATROL_TELEGRAPH = cyberArcadeMaterial.rail.mint;
+const LEGACY_PLAY_PATROL_COLLISION_FEEDBACK = cyberArcadeMaterial.signal.warning;
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
 const LEGACY_MENU_AI_MEMORY_TARGET_CORE = cyberArcadeMaterial.signal.warning;
@@ -1629,6 +1632,13 @@ export class MenuScene extends Phaser.Scene {
     if (this.mode === 'play' && patrolTelegraph.active) {
       this.boardDynamicDirty = true;
     }
+    const patrolCollisionFeedback = resolveLegacyPatrolAgentCollisionFeedback(
+      this.playPatrolAgent,
+      time
+    );
+    if (this.mode === 'play' && patrolCollisionFeedback.active) {
+      this.boardDynamicDirty = true;
+    }
     if (this.isLegacyMenuHandoffAnimationActive(time)) {
       this.boardDynamicDirty = true;
       this.backdropDirty = true;
@@ -1844,6 +1854,10 @@ export class MenuScene extends Phaser.Scene {
       this.playStartedAtMs,
       worldTurnDiagnostics.state === 'running'
     );
+    const patrolCollisionFeedback = resolveLegacyPatrolAgentCollisionFeedback(
+      this.playPatrolAgent,
+      time
+    );
 
     publishMenuSceneRuntimeDiagnostics({
       revision: this.runtimeDiagnosticsRevision,
@@ -1983,6 +1997,9 @@ export class MenuScene extends Phaser.Scene {
               collisionDelayMs: LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
               collisionDelayUntilMs: this.playPatrolAgent.collisionDelayUntilMs,
               collisionEpisodeActive: this.playPatrolAgent.collisionEpisodeActive,
+              collisionFeedbackActive: patrolCollisionFeedback.active,
+              collisionFeedbackElapsedMs: patrolCollisionFeedback.elapsedMs,
+              collisionFeedbackWindowMs: LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
               contractVersion: this.playPatrolAgent.contractVersion,
               currentRouteIndex: this.playPatrolAgent.currentRouteIndex,
               elapsedInStepMs: patrolTelegraph.elapsedInStepMs ?? 0,
@@ -4541,6 +4558,10 @@ export class MenuScene extends Phaser.Scene {
       this.playStartedAtMs,
       this.resolveLegacyWorldTurnHostState() === 'running'
     );
+    const patrolCollisionFeedback = resolveLegacyPatrolAgentCollisionFeedback(
+      this.playPatrolAgent,
+      time
+    );
     return [
       lifecycle.phase,
       lifecycle.drawPhase,
@@ -4549,7 +4570,8 @@ export class MenuScene extends Phaser.Scene {
       lifecycle.timerRunning ? 'timer' : 'no-timer',
       lifecycle.playerVisible ? 'player' : 'no-player',
       lifecycle.trailVisible ? 'trail' : 'no-trail',
-      patrolTelegraph.active ? 'patrol-intent' : 'no-patrol-intent'
+      patrolTelegraph.active ? 'patrol-intent' : 'no-patrol-intent',
+      patrolCollisionFeedback.active ? 'patrol-impact' : 'no-patrol-impact'
     ].join(':');
   }
 
@@ -6551,6 +6573,23 @@ export class MenuScene extends Phaser.Scene {
       this.playStartedAtMs,
       this.resolveLegacyWorldTurnHostState() === 'running'
     );
+    const collisionFeedback = resolveLegacyPatrolAgentCollisionFeedback(
+      this.playPatrolAgent,
+      time
+    );
+    if (collisionFeedback.active) {
+      const playerX = mazeLeft + ((this.player.x + 0.5) * tileSize);
+      const playerY = mazeTop + ((this.player.y + 0.5) * tileSize);
+      const elapsedRatio = (collisionFeedback.elapsedMs ?? 0)
+        / LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS;
+      const impactRadius = Math.max(2, tileSize * (0.34 + (elapsedRatio * 0.24)));
+      this.boardDynamicGraphics.lineStyle(
+        Math.max(1, tileSize * 0.1),
+        LEGACY_PLAY_PATROL_COLLISION_FEEDBACK,
+        Math.max(0.24, 0.92 - (elapsedRatio * 0.68))
+      );
+      this.boardDynamicGraphics.strokeCircle(playerX, playerY, impactRadius);
+    }
     if (telegraph.active && telegraph.nextPoint) {
       const targetX = mazeLeft + ((telegraph.nextPoint.x + 0.5) * tileSize);
       const targetY = mazeTop + ((telegraph.nextPoint.y + 0.5) * tileSize);

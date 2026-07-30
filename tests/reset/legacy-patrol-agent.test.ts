@@ -16,6 +16,7 @@ import {
 } from '../../src/legacy-runtime/legacyRoomCandidateMetadata';
 import {
   LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
+  LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
   LEGACY_PATROL_AGENT_CONTRACT_VERSION,
   LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
   LEGACY_PATROL_AGENT_STEP_MS,
@@ -26,6 +27,7 @@ import {
   isLegacyPatrolAgentDelayActive,
   recordLegacyPatrolAgentBlockedMove,
   resolveLegacyPatrolAgentPoint,
+  resolveLegacyPatrolAgentCollisionFeedback,
   resolveLegacyPatrolAgentRemainingMs,
   resolveLegacyPatrolAgentTelegraph,
   resolveLegacyPatrolAgentTick,
@@ -345,6 +347,27 @@ describe('legacy Mythic patrol agent', () => {
     });
   });
 
+  test('shows collision feedback only for the first 220 ms of the existing delay', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const point = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, point, 1_000);
+
+    expect(resolveLegacyPatrolAgentCollisionFeedback(null, 1_000)).toEqual({
+      active: false,
+      elapsedMs: null,
+      windowMs: 220
+    });
+    expect(resolveLegacyPatrolAgentCollisionFeedback(collision.state, 1_000))
+      .toMatchObject({ active: true, elapsedMs: 0, windowMs: 220 });
+    expect(resolveLegacyPatrolAgentCollisionFeedback(collision.state, 1_219))
+      .toMatchObject({ active: true, elapsedMs: 219 });
+    expect(resolveLegacyPatrolAgentCollisionFeedback(collision.state, 1_220))
+      .toMatchObject({ active: false, elapsedMs: 220 });
+    expect(LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS).toBe(220);
+  });
+
   test('re-arms on Pause Reset and clears on Reset Progression without maze regeneration', () => {
     const maze = createMythicMaze();
     const before = JSON.stringify(maze);
@@ -513,7 +536,9 @@ describe('legacy Mythic patrol agent', () => {
     expect(menuSceneSource).toContain('patrol: this.playPatrolAgent && patrolPoint');
     expect(menuSceneSource).toContain('resolveLegacyPatrolAgentTelegraph(');
     expect(menuSceneSource).toContain('telegraphActive: patrolTelegraph.active');
-    expect(diagnosticsSource).toContain("contractVersion: 'legacy-patrol-agent-v2';");
+    expect(diagnosticsSource).toContain("contractVersion: 'legacy-patrol-agent-v3';");
+    expect(diagnosticsSource).toContain('collisionFeedbackWindowMs: 220;');
+    expect(menuSceneSource).toContain('collisionFeedbackActive: patrolCollisionFeedback.active');
     expect(diagnosticsSource).toContain('telegraphWindowMs: 220;');
   });
 });
