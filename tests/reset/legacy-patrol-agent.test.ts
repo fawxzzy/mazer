@@ -19,6 +19,7 @@ import {
   LEGACY_PATROL_AGENT_CONTRACT_VERSION,
   LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
   LEGACY_PATROL_AGENT_STEP_MS,
+  LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS,
   advanceLegacyPatrolAgent,
   applyLegacyPatrolAgentCollision,
   createLegacyPatrolAgentState,
@@ -26,6 +27,7 @@ import {
   recordLegacyPatrolAgentBlockedMove,
   resolveLegacyPatrolAgentPoint,
   resolveLegacyPatrolAgentRemainingMs,
+  resolveLegacyPatrolAgentTelegraph,
   resolveLegacyPatrolAgentTick,
   type LegacyPatrolAgentState
 } from '../../src/legacy-runtime/legacyPatrolAgent';
@@ -258,6 +260,50 @@ describe('legacy Mythic patrol agent', () => {
     expect(LEGACY_PATROL_AGENT_ROUND_TRIP_MS).toBe(880);
   });
 
+  test('telegraphs exactly the final 220 ms before each existing patrol step', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints)!;
+    const epochMs = 10_000;
+    const expectedNextPoint = initial.placement.route[1];
+
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs, epochMs, true)).toMatchObject({
+      active: false,
+      elapsedInStepMs: 0,
+      msUntilStep: 440,
+      nextPoint: expectedNextPoint,
+      nextRouteIndex: 1,
+      telegraphWindowMs: 220
+    });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 219, epochMs, true))
+      .toMatchObject({ active: false, elapsedInStepMs: 219, msUntilStep: 221 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 220, epochMs, true))
+      .toMatchObject({ active: true, elapsedInStepMs: 220, msUntilStep: 220 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 439, epochMs, true))
+      .toMatchObject({ active: true, elapsedInStepMs: 439, msUntilStep: 1 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 440, epochMs, true))
+      .toMatchObject({ active: false, elapsedInStepMs: 0, msUntilStep: 440 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 660, epochMs, true))
+      .toMatchObject({ active: true, elapsedInStepMs: 220, msUntilStep: 220 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 1_319, epochMs, true))
+      .toMatchObject({ active: true, elapsedInStepMs: 439, msUntilStep: 1 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 220, epochMs, false))
+      .toMatchObject({
+        active: false,
+        nextPoint: expectedNextPoint,
+        nextRouteIndex: 1
+      });
+    expect(resolveLegacyPatrolAgentTelegraph(null, epochMs + 220, epochMs, true))
+      .toMatchObject({
+        active: false,
+        elapsedInStepMs: null,
+        msUntilStep: null,
+        nextPoint: null,
+        nextRouteIndex: null
+      });
+    expect(LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS).toBe(220);
+  });
+
   test('applies one non-additive 440 ms delay per overlap episode', () => {
     const maze = createMythicMaze();
     const { excludedPoints } = createPatrolDependencies(maze);
@@ -465,6 +511,9 @@ describe('legacy Mythic patrol agent', () => {
     expect(menuSceneSource).toContain("kind: 'timed-mode-tick'");
     expect(menuSceneSource).toContain('this.drawLegacyPlayPatrolAgent(');
     expect(menuSceneSource).toContain('patrol: this.playPatrolAgent && patrolPoint');
-    expect(diagnosticsSource).toContain("contractVersion: 'legacy-patrol-agent-v1';");
+    expect(menuSceneSource).toContain('resolveLegacyPatrolAgentTelegraph(');
+    expect(menuSceneSource).toContain('telegraphActive: patrolTelegraph.active');
+    expect(diagnosticsSource).toContain("contractVersion: 'legacy-patrol-agent-v2';");
+    expect(diagnosticsSource).toContain('telegraphWindowMs: 220;');
   });
 });

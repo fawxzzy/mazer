@@ -5,11 +5,12 @@ import {
 } from './legacyMaze';
 import type { LegacyProgressionDifficultyBand } from './legacyProgression';
 
-export const LEGACY_PATROL_AGENT_CONTRACT_VERSION = 'legacy-patrol-agent-v1' as const;
+export const LEGACY_PATROL_AGENT_CONTRACT_VERSION = 'legacy-patrol-agent-v2' as const;
 export const LEGACY_PATROL_AGENT_ROUTE_TILE_COUNT = 2 as const;
 export const LEGACY_PATROL_AGENT_STEP_MS = 440 as const;
 export const LEGACY_PATROL_AGENT_ROUND_TRIP_MS = 880 as const;
 export const LEGACY_PATROL_AGENT_COLLISION_DELAY_MS = 440 as const;
+export const LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS = 220 as const;
 
 export interface LegacyPatrolAgentPlacement {
   alternateRouteStepCount: number;
@@ -43,6 +44,15 @@ export interface LegacyPatrolAgentCollisionResult {
   penaltyAppliedMs: number;
   state: LegacyPatrolAgentState | null;
   triggered: boolean;
+}
+
+export interface LegacyPatrolAgentTelegraphFrame {
+  active: boolean;
+  elapsedInStepMs: number | null;
+  msUntilStep: number | null;
+  nextPoint: LegacyPoint | null;
+  nextRouteIndex: 0 | 1 | null;
+  telegraphWindowMs: typeof LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS;
 }
 
 const pointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
@@ -147,6 +157,41 @@ export const resolveLegacyPatrolAgentPoint = (
     return null;
   }
   return { ...state.placement.route[state.currentRouteIndex] };
+};
+
+export const resolveLegacyPatrolAgentTelegraph = (
+  state: LegacyPatrolAgentState | null,
+  nowMs: number,
+  playTimerEpochMs: number,
+  simulationRunning: boolean
+): LegacyPatrolAgentTelegraphFrame => {
+  if (state === null) {
+    return {
+      active: false,
+      elapsedInStepMs: null,
+      msUntilStep: null,
+      nextPoint: null,
+      nextRouteIndex: null,
+      telegraphWindowMs: LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS
+    };
+  }
+
+  const elapsedMs = Math.max(
+    0,
+    normalizeTimeMs(nowMs) - normalizeTimeMs(playTimerEpochMs)
+  );
+  const elapsedInStepMs = elapsedMs % LEGACY_PATROL_AGENT_STEP_MS;
+  const nextRouteIndex = state.currentRouteIndex === 0 ? 1 : 0;
+
+  return {
+    active: simulationRunning
+      && elapsedInStepMs >= LEGACY_PATROL_AGENT_STEP_MS - LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS,
+    elapsedInStepMs,
+    msUntilStep: Math.ceil(LEGACY_PATROL_AGENT_STEP_MS - elapsedInStepMs),
+    nextPoint: { ...state.placement.route[nextRouteIndex] },
+    nextRouteIndex,
+    telegraphWindowMs: LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS
+  };
 };
 
 export const resolveLegacyPatrolAgentTick = (
