@@ -228,16 +228,20 @@ import {
   LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
   LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
   LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS,
+  LEGACY_PATROL_AGENT_MAXIMUM_PENDING_COLLISION_INTENTS,
   LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
   LEGACY_PATROL_AGENT_STEP_MS,
   LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS,
   advanceLegacyPatrolAgent,
   applyLegacyPatrolAgentCollision,
+  clearLegacyPatrolAgentCollisionIntent,
   createLegacyPatrolAgentState,
   isLegacyPatrolAgentDelayActive,
+  queueLegacyPatrolAgentCollisionIntent,
   recordLegacyPatrolAgentBlockedMove,
   resolveLegacyPatrolAgentPoint,
   resolveLegacyPatrolAgentCollisionFeedback,
+  resolveLegacyPatrolAgentCollisionIntent,
   resolveLegacyPatrolAgentCollisionRecovery,
   resolveLegacyPatrolAgentRemainingMs,
   resolveLegacyPatrolAgentTelegraph,
@@ -1588,6 +1592,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.advanceLegacyMenuStaticDrawStage(time);
     this.advanceLegacyPatrolTimer(time);
+    this.flushLegacyPatrolCollisionIntent(time);
     if (
       this.menuStaticDrawLifecyclePhase === 'deconstructing'
       && (
@@ -2022,6 +2027,7 @@ export class MenuScene extends Phaser.Scene {
               lastResolvedTickIndex: this.playPatrolAgent.lastResolvedTickIndex,
               lastStepAtMs: this.playPatrolAgent.lastStepAtMs,
               maximumAgents: 1,
+              maximumPendingCollisionIntents: LEGACY_PATROL_AGENT_MAXIMUM_PENDING_COLLISION_INTENTS,
               msUntilStep: patrolTelegraph.msUntilStep ?? LEGACY_PATROL_AGENT_STEP_MS,
               nextPoint: {
                 screenX: mazeRenderFrame.boardLeft + (((patrolTelegraph.nextPoint?.x ?? patrolPoint.x) + 0.5) * mazeRenderFrame.tileSize),
@@ -2030,6 +2036,10 @@ export class MenuScene extends Phaser.Scene {
                 y: patrolTelegraph.nextPoint?.y ?? patrolPoint.y
               },
               nextRouteIndex: patrolTelegraph.nextRouteIndex ?? this.playPatrolAgent.currentRouteIndex,
+              pendingCollisionIntent: this.playPatrolAgent.pendingCollisionIntent
+                ? { ...this.playPatrolAgent.pendingCollisionIntent }
+                : null,
+              pendingCollisionIntentCount: this.playPatrolAgent.pendingCollisionIntent === null ? 0 : 1,
               penaltyCount: this.playPatrolAgent.penaltyCount,
               remainingMs: resolveLegacyPatrolAgentRemainingMs(this.playPatrolAgent, time),
               roundTripMs: LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
@@ -3716,6 +3726,7 @@ export class MenuScene extends Phaser.Scene {
     this.playKeyboardRepeatGate.reset();
     this.playDirectionalIntent.reset();
     this.playPointerStart = null;
+    this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
   }
 
   private resetLegacyPlayDirectionalInputBuffer(): void {
@@ -3725,6 +3736,7 @@ export class MenuScene extends Phaser.Scene {
     this.playKeyboardRepeatGate.reset();
     this.playDirectionalIntent.reset();
     this.playPointerStart = null;
+    this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
   }
 
   private handleLegacyPlayInputFocusLoss(): void {
@@ -4592,7 +4604,8 @@ export class MenuScene extends Phaser.Scene {
       lifecycle.trailVisible ? 'trail' : 'no-trail',
       patrolTelegraph.active ? 'patrol-intent' : 'no-patrol-intent',
       patrolCollisionFeedback.active ? 'patrol-impact' : 'no-patrol-impact',
-      patrolCollisionRecovery.active ? 'patrol-recovery' : 'no-patrol-recovery'
+      patrolCollisionRecovery.active ? 'patrol-recovery' : 'no-patrol-recovery',
+      this.playPatrolAgent?.pendingCollisionIntent ? 'patrol-input-pending' : 'no-patrol-input-pending'
     ].join(':');
   }
 
@@ -4671,6 +4684,32 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  private flushLegacyPatrolCollisionIntent(time: number): void {
+    if (this.resolveLegacyWorldTurnHostState() !== 'running') {
+      this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
+      return;
+    }
+    const resolution = resolveLegacyPatrolAgentCollisionIntent(this.playPatrolAgent, time);
+    this.playPatrolAgent = resolution.state;
+    if (resolution.intent === null) {
+      return;
+    }
+
+    const heldTouchActive = this.playHeldTouchMoves.length > 0;
+    if (heldTouchActive) {
+      this.clearLegacyPlayHeldTouchRepeat();
+    }
+    this.tryMovePlayerFromInput(
+      resolution.intent.deltaX,
+      resolution.intent.deltaY,
+      { releaseAfterStep: true }
+    );
+    if (heldTouchActive && this.playHeldTouchMoves.length > 0) {
+      this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
+    }
+    this.publishRuntimeDiagnostics(time, true);
+  }
+
   private tryMovePlayer(deltaX: number, deltaY: number): boolean {
     const slowTileDelayActive = isLegacyStaticSlowTileDelayActive(
       this.playStaticSlowTile,
@@ -4688,6 +4727,12 @@ export class MenuScene extends Phaser.Scene {
         );
       }
       if (patrolDelayActive) {
+        this.playPatrolAgent = queueLegacyPatrolAgentCollisionIntent(
+          this.playPatrolAgent,
+          deltaX,
+          deltaY,
+          this.time.now
+        );
         this.playPatrolAgent = recordLegacyPatrolAgentBlockedMove(
           this.playPatrolAgent,
           this.time.now
@@ -4698,6 +4743,7 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
+    this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
     this.legacyWorldTurnCommandSequence += 1;
     this.legacyWorldTurnHost.setState(this.resolveLegacyWorldTurnHostState());
     const diagnostics = this.legacyWorldTurnHost.getDiagnostics();
