@@ -11,6 +11,7 @@ import {
   LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE,
   LEGACY_ROOM_CANDIDATE_MAX_PERIMETER_OPENINGS,
   LEGACY_ROOM_CANDIDATE_MAX_ROUTE_INTERIOR_TILES,
+  LEGACY_ROOM_CANDIDATE_MAX_SIDE_CLOSURE_EDGES,
   LEGACY_ROOM_CANDIDATE_MIN_PERIMETER_OPENINGS,
   LEGACY_ROOM_CANDIDATE_ROUTE_THRESHOLD_COUNT,
   createLegacyRoomCandidateMetadata,
@@ -213,7 +214,7 @@ const runCorpusPass = (seeds: number[], assertContracts: boolean) => {
         expect(metadata).toMatchObject({
           band,
           candidateCount: LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE,
-          contractVersion: 'legacy-room-candidate-metadata-v5',
+          contractVersion: 'legacy-room-candidate-metadata-v6',
           roomsEnabled: false,
           source: 'existing-floor-metadata-only'
         });
@@ -281,6 +282,16 @@ const runCorpusPass = (seeds: number[], assertContracts: boolean) => {
             + Math.abs(opening.inside.y - opening.outside.y)
           ) === 1
         ))).toBe(true);
+        const expectedSideClosureEdges = metadata!.perimeterOpenings.filter((opening) => (
+          opening.kind === 'side'
+        ));
+        expect(metadata!.sideClosureEdges).toEqual(expectedSideClosureEdges);
+        expect(metadata!.sideClosureCount).toBe(expectedSideClosureEdges.length);
+        expect(metadata!.sideClosureCount)
+          .toBe(metadata!.perimeterOpeningCount - LEGACY_ROOM_CANDIDATE_ROUTE_THRESHOLD_COUNT);
+        expect(metadata!.sideClosureCount)
+          .toBeLessThanOrEqual(LEGACY_ROOM_CANDIDATE_MAX_SIDE_CLOSURE_EDGES);
+        expect(metadata!.sideClosureEdges.every((edge) => edge.kind === 'side')).toBe(true);
         expect(metadata!.routeThresholds.map((threshold) => threshold.kind))
           .toEqual(['enter', 'exit']);
         expect(metadata!.routeThresholds.every((threshold) => (
@@ -330,6 +341,8 @@ const runCorpusPass = (seeds: number[], assertContracts: boolean) => {
         routeInteriorTileCount: metadata!.routeInteriorTileCount,
         roomsEnabled: metadata!.roomsEnabled,
         routeThresholds: metadata!.routeThresholds,
+        sideClosureCount: metadata!.sideClosureCount,
+        sideClosureEdges: metadata!.sideClosureEdges,
         seed,
         size: maze.size,
         source: metadata!.source
@@ -482,6 +495,16 @@ if (corpusWorkerFirstSeed !== null) {
       3: 103,
       4: 77
     });
+    expect(firstPassRows.reduce<Record<number, number>>((distribution, row) => {
+      distribution[row.sideClosureCount] = (
+        distribution[row.sideClosureCount] ?? 0
+      ) + 1;
+      return distribution;
+    }, {})).toEqual({
+      0: 20,
+      1: 103,
+      2: 77
+    });
     expect(sha256(firstPassRows.map((row) => ({
       band: row.band,
       seed: row.seed,
@@ -522,6 +545,14 @@ if (corpusWorkerFirstSeed !== null) {
       perimeterOpenings: row.perimeterOpenings
     }))))
       .toBe('f9717acd531e163e81b47b1dc2776a04413eea8b70f9a23ee494a78ae67292f0');
+    expect(sha256(firstPassRows.map((row) => ({
+      band: row.band,
+      seed: row.seed,
+      size: row.size,
+      sideClosureCount: row.sideClosureCount,
+      sideClosureEdges: row.sideClosureEdges
+    }))))
+      .toBe('6dcbdbbd2cd97705f71251a2da86763dd64f6f168f55d2b6ef47dd8393d0bd68');
     }, 120_000);
 
     test('keeps Tutorial through Navigator ineligible', () => {
@@ -547,7 +578,7 @@ if (corpusWorkerFirstSeed !== null) {
       expect(menuSceneSource).toContain('private playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null = null;');
       expect(menuSceneSource).toContain('this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(');
       expect(menuSceneSource).toContain('roomCandidate: this.playRoomCandidateMetadata');
-      expect(diagnosticsSource).toContain("contractVersion: 'legacy-room-candidate-metadata-v5';");
+      expect(diagnosticsSource).toContain("contractVersion: 'legacy-room-candidate-metadata-v6';");
       expect(menuSceneSource)
         .toContain('perimeterOpeningCount: this.playRoomCandidateMetadata.perimeterOpeningCount');
       expect(menuSceneSource)
@@ -558,12 +589,18 @@ if (corpusWorkerFirstSeed !== null) {
         .toContain('routeInteriorTileCount: this.playRoomCandidateMetadata.routeInteriorTileCount');
       expect(menuSceneSource)
         .toContain('routeThresholds: this.playRoomCandidateMetadata.routeThresholds.map(');
+      expect(menuSceneSource)
+        .toContain('sideClosureCount: this.playRoomCandidateMetadata.sideClosureCount');
+      expect(menuSceneSource)
+        .toContain('sideClosureEdges: this.playRoomCandidateMetadata.sideClosureEdges.map(');
       expect(menuSceneSource).not.toContain('drawLegacyRoomCandidate');
       expect(menuSceneSource).not.toContain('applyLegacyRoomCandidate');
       expect(menuSceneSource).not.toContain('drawLegacyRoomRouteThreshold');
       expect(menuSceneSource).not.toContain('applyLegacyRoomRouteThreshold');
       expect(menuSceneSource).not.toContain('drawLegacyRoomPerimeterOpening');
       expect(menuSceneSource).not.toContain('applyLegacyRoomPerimeterOpening');
+      expect(menuSceneSource).not.toContain('drawLegacyRoomSideClosure');
+      expect(menuSceneSource).not.toContain('applyLegacyRoomSideClosure');
     });
   });
 }
