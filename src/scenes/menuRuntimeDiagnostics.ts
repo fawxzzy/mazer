@@ -194,7 +194,7 @@ export interface MenuSceneRuntimeDiagnostics {
         };
       };
       candidateCount: 1;
-      contractVersion: 'legacy-room-candidate-metadata-v6';
+      contractVersion: 'legacy-room-candidate-metadata-v7';
       evaluatedCandidateCount: number;
       perimeterOpeningCount: number;
       perimeterOpenings: Array<{
@@ -210,6 +210,19 @@ export interface MenuSceneRuntimeDiagnostics {
         side: 'top' | 'right' | 'bottom' | 'left';
       }>;
       routeInteriorTileCount: number;
+      routeOpeningCount: 2;
+      routeOpeningEdges: Array<{
+        inside: {
+          x: number;
+          y: number;
+        };
+        kind: 'route-enter' | 'route-exit';
+        outside: {
+          x: number;
+          y: number;
+        };
+        side: 'top' | 'right' | 'bottom' | 'left';
+      }>;
       routeThresholds: Array<{
         from: {
           x: number;
