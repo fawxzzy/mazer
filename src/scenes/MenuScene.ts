@@ -1910,6 +1910,13 @@ export class MenuScene extends Phaser.Scene {
                 side: opening.side
               })),
               routeInteriorTileCount: this.playRoomCandidateMetadata.routeInteriorTileCount,
+              routeOpeningCount: this.playRoomCandidateMetadata.routeOpeningCount,
+              routeOpeningEdges: this.playRoomCandidateMetadata.routeOpeningEdges.map((edge) => ({
+                inside: { ...edge.inside },
+                kind: edge.kind,
+                outside: { ...edge.outside },
+                side: edge.side
+              })),
               routeThresholds: this.playRoomCandidateMetadata.routeThresholds.map((threshold) => ({
                 from: { ...threshold.from },
                 fromSolutionPathIndex: threshold.fromSolutionPathIndex,

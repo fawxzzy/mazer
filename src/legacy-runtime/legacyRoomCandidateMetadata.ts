@@ -1,13 +1,14 @@
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 import type { LegacyProgressionDifficultyBand } from './legacyProgression';
 
-export const LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION = 'legacy-room-candidate-metadata-v6' as const;
+export const LEGACY_ROOM_CANDIDATE_METADATA_CONTRACT_VERSION = 'legacy-room-candidate-metadata-v7' as const;
 export const LEGACY_ROOM_CANDIDATE_FOOTPRINT_TILES = 2 as const;
 export const LEGACY_ROOM_CANDIDATE_MAX_EMITTED_PER_MAZE = 1 as const;
 export const LEGACY_ROOM_CANDIDATE_MAX_ROUTE_INTERIOR_TILES = 4 as const;
 export const LEGACY_ROOM_CANDIDATE_MAX_PERIMETER_OPENINGS = 4 as const;
 export const LEGACY_ROOM_CANDIDATE_MIN_PERIMETER_OPENINGS = 2 as const;
 export const LEGACY_ROOM_CANDIDATE_ROUTE_THRESHOLD_COUNT = 2 as const;
+export const LEGACY_ROOM_CANDIDATE_ROUTE_OPENING_COUNT = 2 as const;
 export const LEGACY_ROOM_CANDIDATE_MAX_SIDE_CLOSURE_EDGES = 2 as const;
 
 export interface LegacyRoomCandidate {
@@ -47,6 +48,13 @@ export interface LegacyRoomCandidateSideClosureEdge {
   side: LegacyRoomCandidatePerimeterSide;
 }
 
+export interface LegacyRoomCandidateRouteOpeningEdge {
+  inside: LegacyPoint;
+  kind: 'route-enter' | 'route-exit';
+  outside: LegacyPoint;
+  side: LegacyRoomCandidatePerimeterSide;
+}
+
 export interface LegacyRoomCandidateMetadata {
   band: 'architect' | 'mythic';
   candidate: LegacyRoomCandidate;
@@ -56,6 +64,8 @@ export interface LegacyRoomCandidateMetadata {
   perimeterOpeningCount: number;
   perimeterOpenings: LegacyRoomCandidatePerimeterOpening[];
   routeInteriorTileCount: number;
+  routeOpeningCount: typeof LEGACY_ROOM_CANDIDATE_ROUTE_OPENING_COUNT;
+  routeOpeningEdges: LegacyRoomCandidateRouteOpeningEdge[];
   routeThresholds: LegacyRoomCandidateRouteThresholds;
   roomsEnabled: false;
   sideClosureCount: number;
@@ -277,6 +287,24 @@ export const createLegacyRoomCandidateMetadata = (
     ) {
       continue;
     }
+    const routeOpeningEdges: LegacyRoomCandidateRouteOpeningEdge[] = perimeterOpenings.flatMap(
+      (opening) => opening.kind !== 'side'
+        ? [{
+            inside: { ...opening.inside },
+            kind: opening.kind,
+            outside: { ...opening.outside },
+            side: opening.side
+          }]
+        : []
+    );
+    const routeOpeningCount = routeOpeningEdges.length;
+    if (
+      routeOpeningCount !== LEGACY_ROOM_CANDIDATE_ROUTE_OPENING_COUNT
+      || routeOpeningEdges.filter((edge) => edge.kind === 'route-enter').length !== 1
+      || routeOpeningEdges.filter((edge) => edge.kind === 'route-exit').length !== 1
+    ) {
+      continue;
+    }
     const sideClosureEdges: LegacyRoomCandidateSideClosureEdge[] = perimeterOpenings.flatMap(
       (opening) => opening.kind === 'side'
         ? [{
@@ -304,6 +332,8 @@ export const createLegacyRoomCandidateMetadata = (
       perimeterOpeningCount,
       perimeterOpenings,
       routeInteriorTileCount,
+      routeOpeningCount: LEGACY_ROOM_CANDIDATE_ROUTE_OPENING_COUNT,
+      routeOpeningEdges,
       routeThresholds,
       roomsEnabled: false,
       sideClosureCount,
