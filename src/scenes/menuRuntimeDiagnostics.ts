@@ -194,7 +194,7 @@ export interface MenuSceneRuntimeDiagnostics {
         };
       };
       candidateCount: 1;
-      contractVersion: 'legacy-room-candidate-metadata-v5';
+      contractVersion: 'legacy-room-candidate-metadata-v6';
       evaluatedCandidateCount: number;
       perimeterOpeningCount: number;
       perimeterOpenings: Array<{
@@ -224,6 +224,19 @@ export interface MenuSceneRuntimeDiagnostics {
         toSolutionPathIndex: number;
       }>;
       roomsEnabled: false;
+      sideClosureCount: number;
+      sideClosureEdges: Array<{
+        inside: {
+          x: number;
+          y: number;
+        };
+        kind: 'side';
+        outside: {
+          x: number;
+          y: number;
+        };
+        side: 'top' | 'right' | 'bottom' | 'left';
+      }>;
       source: 'existing-floor-metadata-only';
     } | null;
     pressure?: {

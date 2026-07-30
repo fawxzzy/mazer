@@ -1918,6 +1918,13 @@ export class MenuScene extends Phaser.Scene {
                 toSolutionPathIndex: threshold.toSolutionPathIndex
               })),
               roomsEnabled: this.playRoomCandidateMetadata.roomsEnabled,
+              sideClosureCount: this.playRoomCandidateMetadata.sideClosureCount,
+              sideClosureEdges: this.playRoomCandidateMetadata.sideClosureEdges.map((edge) => ({
+                inside: { ...edge.inside },
+                kind: edge.kind,
+                outside: { ...edge.outside },
+                side: edge.side
+              })),
               source: this.playRoomCandidateMetadata.source
             }
           : null,
