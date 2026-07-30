@@ -619,4 +619,21 @@ describe('legacy Mythic patrol agent', () => {
     expect(menuSceneSource).toContain('collisionRecoveryActive: patrolCollisionRecovery.active');
     expect(diagnosticsSource).toContain('telegraphWindowMs: 220;');
   });
+
+  test('draws the recovery cue after the player without moving patrol or destination layers', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const patrolDrawIndex = menuSceneSource.indexOf('this.drawLegacyPlayPatrolAgent(');
+    const playerDrawIndex = menuSceneSource.indexOf('this.fillLegacyPlayerMarkerTile(');
+    const recoveryDrawIndex = menuSceneSource.indexOf(
+      'this.drawLegacyPlayPatrolCollisionRecovery('
+    );
+
+    expect(patrolDrawIndex).toBeGreaterThan(-1);
+    expect(playerDrawIndex).toBeGreaterThan(patrolDrawIndex);
+    expect(recoveryDrawIndex).toBeGreaterThan(playerDrawIndex);
+    expect(menuSceneSource.match(/this\.drawLegacyPlayPatrolCollisionRecovery\(/g)).toHaveLength(1);
+    expect(menuSceneSource).toContain(
+      'const collisionRecovery = resolveLegacyPatrolAgentCollisionRecovery('
+    );
+  });
 });
