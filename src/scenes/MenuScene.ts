@@ -227,6 +227,7 @@ import {
 import {
   LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
   LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
+  LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS,
   LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
   LEGACY_PATROL_AGENT_STEP_MS,
   LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS,
@@ -237,6 +238,7 @@ import {
   recordLegacyPatrolAgentBlockedMove,
   resolveLegacyPatrolAgentPoint,
   resolveLegacyPatrolAgentCollisionFeedback,
+  resolveLegacyPatrolAgentCollisionRecovery,
   resolveLegacyPatrolAgentRemainingMs,
   resolveLegacyPatrolAgentTelegraph,
   resolveLegacyPatrolAgentTick,
@@ -1035,6 +1037,7 @@ const LEGACY_PLAY_PATROL_CORE = cyberArcadeMaterial.signal.violet;
 const LEGACY_PLAY_PATROL_EDGE = cyberArcadeMaterial.signal.memory;
 const LEGACY_PLAY_PATROL_TELEGRAPH = cyberArcadeMaterial.rail.mint;
 const LEGACY_PLAY_PATROL_COLLISION_FEEDBACK = cyberArcadeMaterial.signal.warning;
+const LEGACY_PLAY_PATROL_COLLISION_RECOVERY = cyberArcadeMaterial.rail.mint;
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
 const LEGACY_MENU_AI_MEMORY_TARGET_CORE = cyberArcadeMaterial.signal.warning;
@@ -1230,7 +1233,7 @@ export class MenuScene extends Phaser.Scene {
   private boardStaticDirty = true;
   private boardPathDirty = true;
   private boardDynamicDirty = true;
-  private playPatrolCollisionFeedbackActive = false;
+  private playPatrolCollisionVisualActive = false;
   private hudDirty = true;
   private backdropDirty = true;
   private uiDirty = true;
@@ -1637,7 +1640,13 @@ export class MenuScene extends Phaser.Scene {
       this.playPatrolAgent,
       time
     );
-    this.refreshLegacyPatrolCollisionFeedbackVisualState(patrolCollisionFeedback.active);
+    const patrolCollisionRecovery = resolveLegacyPatrolAgentCollisionRecovery(
+      this.playPatrolAgent,
+      time
+    );
+    this.refreshLegacyPatrolCollisionVisualState(
+      patrolCollisionFeedback.active || patrolCollisionRecovery.active
+    );
     if (this.isLegacyMenuHandoffAnimationActive(time)) {
       this.boardDynamicDirty = true;
       this.backdropDirty = true;
@@ -1857,6 +1866,10 @@ export class MenuScene extends Phaser.Scene {
       this.playPatrolAgent,
       time
     );
+    const patrolCollisionRecovery = resolveLegacyPatrolAgentCollisionRecovery(
+      this.playPatrolAgent,
+      time
+    );
 
     publishMenuSceneRuntimeDiagnostics({
       revision: this.runtimeDiagnosticsRevision,
@@ -1999,6 +2012,10 @@ export class MenuScene extends Phaser.Scene {
               collisionFeedbackActive: patrolCollisionFeedback.active,
               collisionFeedbackElapsedMs: patrolCollisionFeedback.elapsedMs,
               collisionFeedbackWindowMs: LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
+              collisionRecoveryActive: patrolCollisionRecovery.active,
+              collisionRecoveryElapsedMs: patrolCollisionRecovery.elapsedMs,
+              collisionRecoveryRemainingMs: patrolCollisionRecovery.remainingMs,
+              collisionRecoveryWindowMs: LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS,
               contractVersion: this.playPatrolAgent.contractVersion,
               currentRouteIndex: this.playPatrolAgent.currentRouteIndex,
               elapsedInStepMs: patrolTelegraph.elapsedInStepMs ?? 0,
@@ -4561,6 +4578,10 @@ export class MenuScene extends Phaser.Scene {
       this.playPatrolAgent,
       time
     );
+    const patrolCollisionRecovery = resolveLegacyPatrolAgentCollisionRecovery(
+      this.playPatrolAgent,
+      time
+    );
     return [
       lifecycle.phase,
       lifecycle.drawPhase,
@@ -4570,7 +4591,8 @@ export class MenuScene extends Phaser.Scene {
       lifecycle.playerVisible ? 'player' : 'no-player',
       lifecycle.trailVisible ? 'trail' : 'no-trail',
       patrolTelegraph.active ? 'patrol-intent' : 'no-patrol-intent',
-      patrolCollisionFeedback.active ? 'patrol-impact' : 'no-patrol-impact'
+      patrolCollisionFeedback.active ? 'patrol-impact' : 'no-patrol-impact',
+      patrolCollisionRecovery.active ? 'patrol-recovery' : 'no-patrol-recovery'
     ].join(':');
   }
 
@@ -6501,12 +6523,12 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicDirty = false;
   }
 
-  private refreshLegacyPatrolCollisionFeedbackVisualState(active: boolean): void {
+  private refreshLegacyPatrolCollisionVisualState(active: boolean): void {
     const nextActive = this.mode === 'play' && active;
-    if (nextActive || this.playPatrolCollisionFeedbackActive !== nextActive) {
+    if (nextActive || this.playPatrolCollisionVisualActive !== nextActive) {
       this.boardDynamicDirty = true;
     }
-    this.playPatrolCollisionFeedbackActive = nextActive;
+    this.playPatrolCollisionVisualActive = nextActive;
   }
 
   private drawLegacyPlayStaticSlowTile(
@@ -6584,6 +6606,10 @@ export class MenuScene extends Phaser.Scene {
       this.playPatrolAgent,
       time
     );
+    const collisionRecovery = resolveLegacyPatrolAgentCollisionRecovery(
+      this.playPatrolAgent,
+      time
+    );
     if (collisionFeedback.active) {
       const playerX = mazeLeft + ((this.player.x + 0.5) * tileSize);
       const playerY = mazeTop + ((this.player.y + 0.5) * tileSize);
@@ -6596,6 +6622,19 @@ export class MenuScene extends Phaser.Scene {
         Math.max(0.24, 0.92 - (elapsedRatio * 0.68))
       );
       this.boardDynamicGraphics.strokeCircle(playerX, playerY, impactRadius);
+    }
+    if (collisionRecovery.active) {
+      const playerX = mazeLeft + ((this.player.x + 0.5) * tileSize);
+      const playerY = mazeTop + ((this.player.y + 0.5) * tileSize);
+      const recoveryRatio = (collisionRecovery.elapsedMs ?? 0)
+        / LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS;
+      const recoveryRadius = Math.max(2, tileSize * (0.58 - (recoveryRatio * 0.24)));
+      this.boardDynamicGraphics.lineStyle(
+        Math.max(1, tileSize * 0.08),
+        LEGACY_PLAY_PATROL_COLLISION_RECOVERY,
+        Math.min(0.92, 0.32 + (recoveryRatio * 0.6))
+      );
+      this.boardDynamicGraphics.strokeCircle(playerX, playerY, recoveryRadius);
     }
     if (telegraph.active && telegraph.nextPoint) {
       const targetX = mazeLeft + ((telegraph.nextPoint.x + 0.5) * tileSize);

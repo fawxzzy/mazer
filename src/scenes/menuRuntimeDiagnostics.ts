@@ -263,7 +263,11 @@ export interface MenuSceneRuntimeDiagnostics {
       collisionFeedbackActive: boolean;
       collisionFeedbackElapsedMs: number | null;
       collisionFeedbackWindowMs: 220;
-      contractVersion: 'legacy-patrol-agent-v3';
+      collisionRecoveryActive: boolean;
+      collisionRecoveryElapsedMs: number | null;
+      collisionRecoveryRemainingMs: number;
+      collisionRecoveryWindowMs: 220;
+      contractVersion: 'legacy-patrol-agent-v4';
       currentRouteIndex: 0 | 1;
       elapsedInStepMs: number;
       lastResolvedTickIndex: number;
