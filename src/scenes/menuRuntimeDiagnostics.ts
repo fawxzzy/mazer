@@ -252,6 +252,36 @@ export interface MenuSceneRuntimeDiagnostics {
       }>;
       source: 'existing-floor-metadata-only';
     } | null;
+    patrol?: {
+      alternateRouteStepCount: number;
+      blockedMoveCount: number;
+      collisionCount: number;
+      collisionDelayActive: boolean;
+      collisionDelayMs: 440;
+      collisionDelayUntilMs: number | null;
+      collisionEpisodeActive: boolean;
+      contractVersion: 'legacy-patrol-agent-v1';
+      currentRouteIndex: 0 | 1;
+      lastResolvedTickIndex: number;
+      lastStepAtMs: number | null;
+      maximumAgents: 1;
+      penaltyCount: number;
+      remainingMs: number;
+      roundTripMs: 880;
+      route: Array<{
+        x: number;
+        y: number;
+      }>;
+      screenPoint: {
+        screenX: number;
+        screenY: number;
+        x: number;
+        y: number;
+      };
+      solutionPathIndices: number[];
+      stepCount: number;
+      stepMs: 440;
+    } | null;
     pressure?: {
       activeWindowMs: number | null;
       alternateRouteStepCount: number | null;

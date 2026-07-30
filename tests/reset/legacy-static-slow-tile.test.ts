@@ -30,6 +30,10 @@ import {
   createLegacyRoomCandidateMetadata,
   type LegacyRoomCandidateMetadata
 } from '../../src/legacy-runtime/legacyRoomCandidateMetadata';
+import {
+  createLegacyPatrolAgentState,
+  type LegacyPatrolAgentState
+} from '../../src/legacy-runtime/legacyPatrolAgent';
 import { MenuScene } from '../../src/scenes/MenuScene';
 
 vi.mock('phaser', () => ({
@@ -54,6 +58,7 @@ interface PauseResetSceneHarness {
   playCompletedAtMs: number | null;
   playCyclePath: Array<{ x: number; y: number }>;
   playCycleResetUsed: boolean;
+  playPatrolAgent: LegacyPatrolAgentState | null;
   playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
   playStartedAtMs: number;
   playStaticSlowTile: LegacyStaticSlowTileState | null;
@@ -62,6 +67,9 @@ interface PauseResetSceneHarness {
   publishInteractionDiagnostics: () => void;
   resetLegacyPlayInputBuffer: () => void;
   resetLegacyWorldTurnHost: () => void;
+  createLegacyPlayPatrolAgent: (
+    band: LegacyProgressionDifficultyBand
+  ) => LegacyPatrolAgentState | null;
   syncLegacyPlayerVisualMotionTo: (point: { x: number; y: number }) => void;
   time: { now: number };
   trail: Array<{ x: number; y: number }>;
@@ -71,11 +79,13 @@ interface ProgressionResetSceneHarness {
   boardDynamicDirty: boolean;
   maze: LegacyMazeSnapshot;
   openOverlay: (overlay: 'pause') => void;
+  playPatrolAgent: LegacyPatrolAgentState | null;
   playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
   playStaticSlowTile: LegacyStaticSlowTileState | null;
   progressionState: LegacyProgressionState;
   resolveLegacyProgressionStorage: () => undefined;
   runtimeDiagnosticsLastPublishedAtMs: number;
+  resetLegacyWorldTurnHost: () => void;
   setLatestOverlayMessage: (message: unknown) => void;
   syncLegacyRemoteProgressionState: (mode: 'replace') => void;
   visualDiagnosticsLastPublishedAtMs: number;
@@ -121,6 +131,28 @@ const createBypassableMaze = (): LegacyMazeSnapshot => ({
   ],
   seed: 0x5a17f00d
 });
+
+const createPatrolForState = (
+  maze: LegacyMazeSnapshot,
+  band: LegacyProgressionDifficultyBand,
+  slowTile: LegacyStaticSlowTileState | null,
+  roomMetadata: LegacyRoomCandidateMetadata | null
+): LegacyPatrolAgentState | null => {
+  const excludedPoints = [];
+  if (slowTile?.placement) {
+    excludedPoints.push(slowTile.placement.point);
+  }
+  if (roomMetadata) {
+    const { x, y } = roomMetadata.candidate.topLeft;
+    excludedPoints.push(
+      { x, y },
+      { x: x + 1, y },
+      { x, y: y + 1 },
+      { x: x + 1, y: y + 1 }
+    );
+  }
+  return createLegacyPatrolAgentState(maze, band, excludedPoints);
+};
 
 describe('legacy static slow tile', () => {
   test('keeps the primitive disabled outside Architect and Mythic progression', () => {
@@ -299,18 +331,30 @@ describe('legacy static slow tile', () => {
     progressionState.tracks.player.targetComplexity = 132;
     const initial = createLegacyStaticSlowTileState(maze, 'architect');
     const entered = applyLegacyStaticSlowTileEntry(initial, initial.placement!.point, 1_000).state;
+    const initialRoomMetadata = createLegacyRoomCandidateMetadata(
+      maze,
+      'architect',
+      initial.placement?.point ?? null
+    );
     const scene: PauseResetSceneHarness = {
       boardDynamicDirty: false,
       closeOverlay: vi.fn(),
+      createLegacyPlayPatrolAgent: (band) => createPatrolForState(
+        maze,
+        band,
+        createLegacyStaticSlowTileState(maze, band),
+        createLegacyRoomCandidateMetadata(
+          maze,
+          band,
+          createLegacyStaticSlowTileState(maze, band).placement?.point ?? null
+        )
+      ),
       maze,
       playCompletedAtMs: 1_500,
       playCyclePath: [{ x: 4, y: 2 }],
       playCycleResetUsed: false,
-      playRoomCandidateMetadata: createLegacyRoomCandidateMetadata(
-        maze,
-        'architect',
-        initial.placement?.point ?? null
-      ),
+      playPatrolAgent: createPatrolForState(maze, 'architect', entered, initialRoomMetadata),
+      playRoomCandidateMetadata: initialRoomMetadata,
       playStartedAtMs: 500,
       playStaticSlowTile: entered,
       player: { x: 4, y: 2 },
@@ -343,6 +387,7 @@ describe('legacy static slow tile', () => {
       'architect',
       scene.playStaticSlowTile?.placement?.point ?? null
     ));
+    expect(scene.playPatrolAgent).toBeNull();
     expect(scene.player).toEqual(maze.start);
     expect(scene.trail).toEqual([maze.start]);
     expect(scene.playStartedAtMs).toBe(resetAtMs);
@@ -383,6 +428,16 @@ describe('legacy static slow tile', () => {
       boardDynamicDirty: false,
       maze,
       openOverlay: vi.fn(),
+      playPatrolAgent: createPatrolForState(
+        maze,
+        'mythic',
+        entered,
+        createLegacyRoomCandidateMetadata(
+          maze,
+          'mythic',
+          initial.placement?.point ?? null
+        )
+      ),
       playRoomCandidateMetadata: createLegacyRoomCandidateMetadata(
         maze,
         'architect',
@@ -391,6 +446,7 @@ describe('legacy static slow tile', () => {
       playStaticSlowTile: entered,
       player,
       progressionState,
+      resetLegacyWorldTurnHost: vi.fn(),
       resolveLegacyProgressionStorage: () => undefined,
       runtimeDiagnosticsLastPublishedAtMs: 4_000,
       setLatestOverlayMessage: vi.fn(),
@@ -419,6 +475,7 @@ describe('legacy static slow tile', () => {
     });
     expect(isLegacyStaticSlowTileDelayActive(scene.playStaticSlowTile, resetAtMs)).toBe(false);
     expect(scene.playRoomCandidateMetadata).toBeNull();
+    expect(scene.playPatrolAgent).toBeNull();
     expect(scene.player).toBe(player);
     expect(scene.trail).toBe(trail);
     expect(scene.syncLegacyRemoteProgressionState).toHaveBeenCalledWith('replace');
@@ -463,7 +520,7 @@ describe('legacy static slow tile', () => {
 
     expect(menuSceneSource).toContain('this.playStaticSlowTile = null;');
     expect(menuSceneSource).toContain('this.playStaticSlowTile = createLegacyStaticSlowTileState(');
-    expect(menuSceneSource).toContain('if (isLegacyStaticSlowTileDelayActive(this.playStaticSlowTile, this.time.now))');
+    expect(menuSceneSource).toContain('const slowTileDelayActive = isLegacyStaticSlowTileDelayActive(');
     expect(menuSceneSource).toContain("type: 'static-slow-tile-entered'");
     expect(menuSceneSource).toContain('this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize, time);');
     expect(menuSceneSource).toContain('pressure: this.playStaticSlowTile');
