@@ -6506,6 +6506,8 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
+    this.drawLegacyPlayPatrolCollisionRecovery(mazeLeft, mazeTop, mazeTileSize, time);
+
     if (this.mode === 'menu' || this.mode === 'play') {
       this.drawLegacyMenuDeconstructHandoffBurst(
         boardLeft,
@@ -6606,10 +6608,6 @@ export class MenuScene extends Phaser.Scene {
       this.playPatrolAgent,
       time
     );
-    const collisionRecovery = resolveLegacyPatrolAgentCollisionRecovery(
-      this.playPatrolAgent,
-      time
-    );
     if (collisionFeedback.active) {
       const playerX = mazeLeft + ((this.player.x + 0.5) * tileSize);
       const playerY = mazeTop + ((this.player.y + 0.5) * tileSize);
@@ -6622,19 +6620,6 @@ export class MenuScene extends Phaser.Scene {
         Math.max(0.24, 0.92 - (elapsedRatio * 0.68))
       );
       this.boardDynamicGraphics.strokeCircle(playerX, playerY, impactRadius);
-    }
-    if (collisionRecovery.active) {
-      const playerX = mazeLeft + ((this.player.x + 0.5) * tileSize);
-      const playerY = mazeTop + ((this.player.y + 0.5) * tileSize);
-      const recoveryRatio = (collisionRecovery.elapsedMs ?? 0)
-        / LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS;
-      const recoveryRadius = Math.max(2, tileSize * (0.58 - (recoveryRatio * 0.24)));
-      this.boardDynamicGraphics.lineStyle(
-        Math.max(1, tileSize * 0.08),
-        LEGACY_PLAY_PATROL_COLLISION_RECOVERY,
-        Math.min(0.92, 0.32 + (recoveryRatio * 0.6))
-      );
-      this.boardDynamicGraphics.strokeCircle(playerX, playerY, recoveryRadius);
     }
     if (telegraph.active && telegraph.nextPoint) {
       const targetX = mazeLeft + ((telegraph.nextPoint.x + 0.5) * tileSize);
@@ -6688,6 +6673,33 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicGraphics.moveTo(centerX, centerY - (radius * 0.45));
     this.boardDynamicGraphics.lineTo(centerX, centerY + (radius * 0.45));
     this.boardDynamicGraphics.strokePath();
+  }
+
+  private drawLegacyPlayPatrolCollisionRecovery(
+    mazeLeft: number,
+    mazeTop: number,
+    tileSize: number,
+    time: number
+  ): void {
+    const collisionRecovery = resolveLegacyPatrolAgentCollisionRecovery(
+      this.playPatrolAgent,
+      time
+    );
+    if (this.mode !== 'play' || !collisionRecovery.active) {
+      return;
+    }
+
+    const playerX = mazeLeft + ((this.player.x + 0.5) * tileSize);
+    const playerY = mazeTop + ((this.player.y + 0.5) * tileSize);
+    const recoveryRatio = (collisionRecovery.elapsedMs ?? 0)
+      / LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS;
+    const recoveryRadius = Math.max(2, tileSize * (0.58 - (recoveryRatio * 0.24)));
+    this.boardDynamicGraphics.lineStyle(
+      Math.max(1, tileSize * 0.08),
+      LEGACY_PLAY_PATROL_COLLISION_RECOVERY,
+      Math.min(0.92, 0.32 + (recoveryRatio * 0.6))
+    );
+    this.boardDynamicGraphics.strokeCircle(playerX, playerY, recoveryRadius);
   }
 
   private drawLegacyProgressionBadge(
