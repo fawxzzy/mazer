@@ -19,16 +19,20 @@ import {
   LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
   LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS,
   LEGACY_PATROL_AGENT_CONTRACT_VERSION,
+  LEGACY_PATROL_AGENT_MAXIMUM_PENDING_COLLISION_INTENTS,
   LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
   LEGACY_PATROL_AGENT_STEP_MS,
   LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS,
   advanceLegacyPatrolAgent,
   applyLegacyPatrolAgentCollision,
+  clearLegacyPatrolAgentCollisionIntent,
   createLegacyPatrolAgentState,
   isLegacyPatrolAgentDelayActive,
+  queueLegacyPatrolAgentCollisionIntent,
   recordLegacyPatrolAgentBlockedMove,
   resolveLegacyPatrolAgentPoint,
   resolveLegacyPatrolAgentCollisionFeedback,
+  resolveLegacyPatrolAgentCollisionIntent,
   resolveLegacyPatrolAgentCollisionRecovery,
   resolveLegacyPatrolAgentRemainingMs,
   resolveLegacyPatrolAgentTelegraph,
@@ -45,7 +49,12 @@ import {
   createLegacyStaticSlowTileState,
   type LegacyStaticSlowTileState
 } from '../../src/legacy-runtime/legacyStaticSlowTile';
-import type { LegacyMazeSnapshot, LegacyPoint } from '../../src/legacy-runtime/legacyMaze';
+import { LegacyDirectionalIntentResolver } from '../../src/legacy-runtime/legacyDirectionalIntent';
+import {
+  resolveLegacyNavigationTarget,
+  type LegacyMazeSnapshot,
+  type LegacyPoint
+} from '../../src/legacy-runtime/legacyMaze';
 import { WorldTurnHost } from '../../src/mazer-core/world';
 import { MenuScene } from '../../src/scenes/MenuScene';
 
@@ -150,6 +159,37 @@ interface CollisionVisualHarness {
   playPatrolCollisionVisualActive: boolean;
 }
 
+interface DirectionalIntentFailureHarness {
+  maze: LegacyMazeSnapshot;
+  playDirectionalIntent: {
+    getDiagnostics: () => {
+      requestedDirections: string[];
+    };
+    reset: () => void;
+    step: (
+      maze: Pick<LegacyMazeSnapshot, 'grid'>,
+      player: LegacyPoint,
+      options?: { assistedLaneShiftEnabled?: boolean }
+    ) => {
+      decision?: string;
+      deltaX: number;
+      deltaY: number;
+      direction?: string | null;
+      moved: boolean;
+    };
+  };
+  playPatrolAgent: LegacyPatrolAgentState | null;
+  player: LegacyPoint;
+  publishInteractionDiagnostics: () => void;
+  settings: {
+    smartSteering: boolean;
+  };
+  time?: {
+    now: number;
+  };
+  tryMovePlayer?: (deltaX: number, deltaY: number) => boolean;
+}
+
 const applyPauseCommand = (
   MenuScene.prototype as unknown as {
     applyLegacyPauseCommand: (
@@ -197,6 +237,14 @@ const refreshCollisionVisualState = (
     ) => void;
   }
 ).refreshLegacyPatrolCollisionVisualState;
+
+const performDirectionalIntentStep = (
+  MenuScene.prototype as unknown as {
+    performLegacyPlayDirectionalIntentStep: (
+      this: DirectionalIntentFailureHarness
+    ) => boolean;
+  }
+).performLegacyPlayDirectionalIntentStep;
 
 describe('legacy Mythic patrol agent', () => {
   test('selects one deterministic bypassable two-tile route and preserves every excluded surface', () => {
@@ -362,6 +410,179 @@ describe('legacy Mythic patrol agent', () => {
       },
       triggered: true
     });
+  });
+
+  test('retains only the latest legal intent through the existing collision delay', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const point = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, point, 1_000);
+
+    const first = queueLegacyPatrolAgentCollisionIntent(collision.state, 1, 0, 1_100);
+    expect(first?.pendingCollisionIntent).toEqual({
+      deltaX: 1,
+      deltaY: 0,
+      queuedAtMs: 1_100
+    });
+    const latest = queueLegacyPatrolAgentCollisionIntent(first, 0, -1, 1_219.5);
+    expect(latest?.pendingCollisionIntent).toEqual({
+      deltaX: 0,
+      deltaY: -1,
+      queuedAtMs: 1_219.5
+    });
+    expect(queueLegacyPatrolAgentCollisionIntent(latest, 1, 1, 1_300)).toBe(latest);
+    expect(queueLegacyPatrolAgentCollisionIntent(latest, -1, 0, 1_219)).toBe(latest);
+    expect(LEGACY_PATROL_AGENT_MAXIMUM_PENDING_COLLISION_INTENTS).toBe(1);
+
+    expect(resolveLegacyPatrolAgentCollisionIntent(latest, 1_439)).toEqual({
+      intent: null,
+      state: latest
+    });
+    const resolved = resolveLegacyPatrolAgentCollisionIntent(latest, 1_440);
+    expect(resolved.intent).toEqual({
+      deltaX: 0,
+      deltaY: -1,
+      queuedAtMs: 1_219.5
+    });
+    expect(resolved.state?.pendingCollisionIntent).toBeNull();
+    expect(resolveLegacyPatrolAgentCollisionIntent(resolved.state, 1_440).intent).toBeNull();
+    expect(clearLegacyPatrolAgentCollisionIntent(latest)?.pendingCollisionIntent).toBeNull();
+  });
+
+  test('clears a pending intent when a newer overlap episode refreshes the delay', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const firstPoint = resolveLegacyPatrolAgentPoint(initial)!;
+    const firstCollision = applyLegacyPatrolAgentCollision(initial, firstPoint, 1_000);
+    const queued = queueLegacyPatrolAgentCollisionIntent(firstCollision.state, 1, 0, 1_100);
+    const movedAway = advanceLegacyPatrolAgent(queued, 1_150);
+    const released = applyLegacyPatrolAgentCollision(movedAway, firstPoint, 1_150);
+    const returned = advanceLegacyPatrolAgent(released.state, 1_200);
+    const secondCollision = applyLegacyPatrolAgentCollision(returned, firstPoint, 1_200);
+
+    expect(secondCollision).toMatchObject({
+      state: {
+        collisionDelayUntilMs: 1_640,
+        pendingCollisionIntent: null
+      },
+      triggered: true
+    });
+  });
+
+  test('clears the older pending intent when the newest direction is blocked by topology', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const point = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, point, 1_000);
+    const queued = queueLegacyPatrolAgentCollisionIntent(collision.state, 1, 0, 1_100);
+    const publishInteractionDiagnostics = vi.fn();
+    const harness: DirectionalIntentFailureHarness = {
+      maze,
+      playDirectionalIntent: {
+        getDiagnostics: () => ({ requestedDirections: [] }),
+        reset: vi.fn(),
+        step: () => ({
+          deltaX: 0,
+          deltaY: 0,
+          direction: null,
+          moved: false
+        })
+      },
+      playPatrolAgent: queued,
+      player: maze.start,
+      publishInteractionDiagnostics,
+      settings: {
+        smartSteering: false
+      }
+    };
+
+    expect(performDirectionalIntentStep.call(harness)).toBe(false);
+    expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
+    expect(resolveLegacyPatrolAgentCollisionIntent(harness.playPatrolAgent, 1_440).intent).toBeNull();
+    expect(publishInteractionDiagnostics).toHaveBeenCalledOnce();
+  });
+
+  test('clears the older pending intent when the real resolver continues past a blocked newest turn', () => {
+    const maze = createMythicMaze();
+    const player = maze.solutionPath.find((point) => (
+      resolveLegacyNavigationTarget(maze, point, 1, 0) !== null
+      && resolveLegacyNavigationTarget(maze, point, 0, -1) === null
+    ));
+    expect(player).toBeDefined();
+
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.request(['right']);
+    expect(resolver.step(maze, player!)).toMatchObject({
+      direction: 'right',
+      moved: true
+    });
+    resolver.request(['up']);
+    expect(resolver.getDiagnostics()).toMatchObject({
+      activeDirection: 'right',
+      queuedDirection: 'up',
+      requestedDirections: ['up']
+    });
+
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const collisionPoint = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, collisionPoint, 1_000);
+    const queued = queueLegacyPatrolAgentCollisionIntent(collision.state, 1, 0, 1_100);
+    const publishInteractionDiagnostics = vi.fn();
+    const playerMovement = vi.fn(() => ({ accepted: true }));
+    const worldTurnHost = new WorldTurnHost({
+      'player-movement': playerMovement
+    }, {
+      timedModeEnabled: true
+    });
+    const tryMovePlayer = vi.fn(() => worldTurnHost.advance({
+      id: 'stale-resolver-expiry-player-move',
+      inputId: 'stale-resolver-expiry-player-move',
+      kind: 'player-move'
+    }).admitted);
+    const harness: DirectionalIntentFailureHarness = {
+      maze,
+      playDirectionalIntent: resolver,
+      playPatrolAgent: queued,
+      player: player!,
+      publishInteractionDiagnostics,
+      settings: {
+        smartSteering: false
+      },
+      time: {
+        now: 1_100
+      },
+      tryMovePlayer
+    };
+
+    expect(performDirectionalIntentStep.call(harness)).toBe(false);
+    expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
+    expect(resolver.getDiagnostics()).toMatchObject({
+      activeDirection: null,
+      queuedDirection: null,
+      requestedDirections: []
+    });
+    expect(resolveLegacyPatrolAgentCollisionIntent(harness.playPatrolAgent, 1_440).intent).toBeNull();
+
+    harness.time!.now = 1_440;
+    resolver.request(['up']);
+    expect(performDirectionalIntentStep.call(harness)).toBe(false);
+    expect(resolver.getDiagnostics()).toMatchObject({
+      activeDirection: 'up',
+      queuedDirection: null,
+      requestedDirections: ['up']
+    });
+    expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
+    expect(tryMovePlayer).not.toHaveBeenCalled();
+    expect(playerMovement).not.toHaveBeenCalled();
+    expect(worldTurnHost.getDiagnostics()).toMatchObject({
+      acceptedTurnCount: 0,
+      lastReceipt: null
+    });
+    expect(publishInteractionDiagnostics).toHaveBeenCalledTimes(2);
   });
 
   test('shows collision feedback only for the first 220 ms of the existing delay', () => {
@@ -612,12 +833,51 @@ describe('legacy Mythic patrol agent', () => {
     expect(menuSceneSource).toContain('patrol: this.playPatrolAgent && patrolPoint');
     expect(menuSceneSource).toContain('resolveLegacyPatrolAgentTelegraph(');
     expect(menuSceneSource).toContain('telegraphActive: patrolTelegraph.active');
-    expect(diagnosticsSource).toContain("contractVersion: 'legacy-patrol-agent-v4';");
+    expect(diagnosticsSource).toContain("contractVersion: 'legacy-patrol-agent-v5';");
     expect(diagnosticsSource).toContain('collisionFeedbackWindowMs: 220;');
     expect(menuSceneSource).toContain('collisionFeedbackActive: patrolCollisionFeedback.active');
     expect(diagnosticsSource).toContain('collisionRecoveryWindowMs: 220;');
     expect(menuSceneSource).toContain('collisionRecoveryActive: patrolCollisionRecovery.active');
+    expect(diagnosticsSource).toContain('maximumPendingCollisionIntents: 1;');
+    expect(diagnosticsSource).toContain('pendingCollisionIntentCount: 0 | 1;');
+    expect(menuSceneSource).toContain('pendingCollisionIntent: this.playPatrolAgent.pendingCollisionIntent');
+    expect(menuSceneSource).toContain('this.flushLegacyPatrolCollisionIntent(time);');
+    expect(menuSceneSource).toContain('this.playPatrolAgent = queueLegacyPatrolAgentCollisionIntent(');
+    expect(menuSceneSource).toContain('this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);');
     expect(diagnosticsSource).toContain('telegraphWindowMs: 220;');
+  });
+
+  test('flushes the pending intent after the patrol tick and clears it at lifecycle boundaries', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const timerAdvanceIndex = menuSceneSource.indexOf('this.advanceLegacyPatrolTimer(time);');
+    const intentFlushIndex = menuSceneSource.indexOf('this.flushLegacyPatrolCollisionIntent(time);');
+    const pendingQueueIndex = menuSceneSource.indexOf(
+      'this.playPatrolAgent = queueLegacyPatrolAgentCollisionIntent('
+    );
+    const worldTurnAdvanceIndex = menuSceneSource.indexOf(
+      'receipt = this.legacyWorldTurnHost.advance({',
+      pendingQueueIndex
+    );
+    const resetStartIndex = menuSceneSource.indexOf('private resetLegacyPlayInputBuffer(): void');
+    const resetEndIndex = menuSceneSource.indexOf(
+      'private resetLegacyPlayDirectionalInputBuffer(): void',
+      resetStartIndex
+    );
+    const resetSource = menuSceneSource.slice(resetStartIndex, resetEndIndex);
+
+    expect(timerAdvanceIndex).toBeGreaterThan(-1);
+    expect(intentFlushIndex).toBeGreaterThan(timerAdvanceIndex);
+    expect(pendingQueueIndex).toBeGreaterThan(-1);
+    expect(worldTurnAdvanceIndex).toBeGreaterThan(pendingQueueIndex);
+    expect(pendingQueueIndex).toBeLessThan(worldTurnAdvanceIndex);
+    expect(resetSource).toContain(
+      'this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);'
+    );
+    expect(menuSceneSource).toContain(
+      "this.resolveLegacyWorldTurnHostState() !== 'running'"
+    );
+    expect(menuSceneSource).toContain('this.tryMovePlayerFromInput(');
+    expect(menuSceneSource).toContain('resolution.intent.deltaX,');
   });
 
   test('draws the recovery cue after the player without moving patrol or destination layers', () => {

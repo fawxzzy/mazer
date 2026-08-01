@@ -267,12 +267,13 @@ export interface MenuSceneRuntimeDiagnostics {
       collisionRecoveryElapsedMs: number | null;
       collisionRecoveryRemainingMs: number;
       collisionRecoveryWindowMs: 220;
-      contractVersion: 'legacy-patrol-agent-v4';
+      contractVersion: 'legacy-patrol-agent-v5';
       currentRouteIndex: 0 | 1;
       elapsedInStepMs: number;
       lastResolvedTickIndex: number;
       lastStepAtMs: number | null;
       maximumAgents: 1;
+      maximumPendingCollisionIntents: 1;
       msUntilStep: number;
       nextPoint: {
         screenX: number;
@@ -281,6 +282,12 @@ export interface MenuSceneRuntimeDiagnostics {
         y: number;
       };
       nextRouteIndex: 0 | 1;
+      pendingCollisionIntent: {
+        deltaX: -1 | 0 | 1;
+        deltaY: -1 | 0 | 1;
+        queuedAtMs: number;
+      } | null;
+      pendingCollisionIntentCount: 0 | 1;
       penaltyCount: number;
       remainingMs: number;
       roundTripMs: 880;

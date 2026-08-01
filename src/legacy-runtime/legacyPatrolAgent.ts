@@ -5,7 +5,7 @@ import {
 } from './legacyMaze';
 import type { LegacyProgressionDifficultyBand } from './legacyProgression';
 
-export const LEGACY_PATROL_AGENT_CONTRACT_VERSION = 'legacy-patrol-agent-v4' as const;
+export const LEGACY_PATROL_AGENT_CONTRACT_VERSION = 'legacy-patrol-agent-v5' as const;
 export const LEGACY_PATROL_AGENT_ROUTE_TILE_COUNT = 2 as const;
 export const LEGACY_PATROL_AGENT_STEP_MS = 440 as const;
 export const LEGACY_PATROL_AGENT_ROUND_TRIP_MS = 880 as const;
@@ -13,11 +13,18 @@ export const LEGACY_PATROL_AGENT_COLLISION_DELAY_MS = 440 as const;
 export const LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS = 220 as const;
 export const LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS = 220 as const;
 export const LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS = 220 as const;
+export const LEGACY_PATROL_AGENT_MAXIMUM_PENDING_COLLISION_INTENTS = 1 as const;
 
 export interface LegacyPatrolAgentPlacement {
   alternateRouteStepCount: number;
   route: [LegacyPoint, LegacyPoint];
   solutionPathIndices: [number, number];
+}
+
+export interface LegacyPatrolAgentCollisionIntent {
+  deltaX: -1 | 0 | 1;
+  deltaY: -1 | 0 | 1;
+  queuedAtMs: number;
 }
 
 export interface LegacyPatrolAgentState {
@@ -31,6 +38,7 @@ export interface LegacyPatrolAgentState {
   eligible: true;
   lastResolvedTickIndex: number;
   lastStepAtMs: number | null;
+  pendingCollisionIntent: LegacyPatrolAgentCollisionIntent | null;
   penaltyCount: number;
   placement: LegacyPatrolAgentPlacement;
   stepCount: number;
@@ -61,6 +69,11 @@ export interface LegacyPatrolAgentCollisionRecoveryFrame {
   windowMs: typeof LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS;
 }
 
+export interface LegacyPatrolAgentCollisionIntentResolution {
+  intent: LegacyPatrolAgentCollisionIntent | null;
+  state: LegacyPatrolAgentState | null;
+}
+
 export interface LegacyPatrolAgentTelegraphFrame {
   active: boolean;
   elapsedInStepMs: number | null;
@@ -79,6 +92,30 @@ const pointsMatch = (left: LegacyPoint, right: LegacyPoint): boolean => (
 const normalizeTimeMs = (value: number): number => (
   Number.isFinite(value) ? Math.max(0, value) : 0
 );
+
+const normalizeCollisionIntent = (
+  deltaX: number,
+  deltaY: number,
+  queuedAtMs: number
+): LegacyPatrolAgentCollisionIntent | null => {
+  if (!Number.isFinite(deltaX) || !Number.isFinite(deltaY)) {
+    return null;
+  }
+  const normalizedDeltaX = Math.trunc(deltaX);
+  const normalizedDeltaY = Math.trunc(deltaY);
+  if (
+    normalizedDeltaX !== deltaX
+    || normalizedDeltaY !== deltaY
+    || Math.abs(normalizedDeltaX) + Math.abs(normalizedDeltaY) !== 1
+  ) {
+    return null;
+  }
+  return {
+    deltaX: normalizedDeltaX as -1 | 0 | 1,
+    deltaY: normalizedDeltaY as -1 | 0 | 1,
+    queuedAtMs: normalizeTimeMs(queuedAtMs)
+  };
+};
 
 const cloneGridWithoutPoints = (
   grid: LegacyMazeSnapshot['grid'],
@@ -159,6 +196,7 @@ export const createLegacyPatrolAgentState = (
     eligible: true,
     lastResolvedTickIndex: 0,
     lastStepAtMs: null,
+    pendingCollisionIntent: null,
     penaltyCount: 0,
     placement,
     stepCount: 0
@@ -295,6 +333,7 @@ export const applyLegacyPatrolAgentCollision = (
         collisionAtMs + LEGACY_PATROL_AGENT_COLLISION_DELAY_MS
       ),
       collisionEpisodeActive: true,
+      pendingCollisionIntent: null,
       penaltyCount: state.penaltyCount + 1
     },
     triggered: true
@@ -368,6 +407,68 @@ export const isLegacyPatrolAgentDelayActive = (
   state: LegacyPatrolAgentState | null,
   nowMs: number
 ): boolean => resolveLegacyPatrolAgentRemainingMs(state, nowMs) > 0;
+
+export const queueLegacyPatrolAgentCollisionIntent = (
+  state: LegacyPatrolAgentState | null,
+  deltaX: number,
+  deltaY: number,
+  nowMs: number
+): LegacyPatrolAgentState | null => {
+  if (state === null || !isLegacyPatrolAgentDelayActive(state, nowMs)) {
+    return state;
+  }
+  const pendingCollisionIntent = normalizeCollisionIntent(deltaX, deltaY, nowMs);
+  if (pendingCollisionIntent === null) {
+    return state;
+  }
+  if (
+    state.pendingCollisionIntent !== null
+    && pendingCollisionIntent.queuedAtMs < state.pendingCollisionIntent.queuedAtMs
+  ) {
+    return state;
+  }
+  return {
+    ...state,
+    pendingCollisionIntent
+  };
+};
+
+export const clearLegacyPatrolAgentCollisionIntent = (
+  state: LegacyPatrolAgentState | null
+): LegacyPatrolAgentState | null => {
+  if (state === null || state.pendingCollisionIntent === null) {
+    return state;
+  }
+  return {
+    ...state,
+    pendingCollisionIntent: null
+  };
+};
+
+export const resolveLegacyPatrolAgentCollisionIntent = (
+  state: LegacyPatrolAgentState | null,
+  nowMs: number
+): LegacyPatrolAgentCollisionIntentResolution => {
+  if (state === null || state.pendingCollisionIntent === null) {
+    return {
+      intent: null,
+      state
+    };
+  }
+  if (isLegacyPatrolAgentDelayActive(state, nowMs)) {
+    return {
+      intent: null,
+      state
+    };
+  }
+  return {
+    intent: { ...state.pendingCollisionIntent },
+    state: {
+      ...state,
+      pendingCollisionIntent: null
+    }
+  };
+};
 
 export const recordLegacyPatrolAgentBlockedMove = (
   state: LegacyPatrolAgentState | null,
