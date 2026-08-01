@@ -49,7 +49,12 @@ import {
   createLegacyStaticSlowTileState,
   type LegacyStaticSlowTileState
 } from '../../src/legacy-runtime/legacyStaticSlowTile';
-import type { LegacyMazeSnapshot, LegacyPoint } from '../../src/legacy-runtime/legacyMaze';
+import { LegacyDirectionalIntentResolver } from '../../src/legacy-runtime/legacyDirectionalIntent';
+import {
+  resolveLegacyNavigationTarget,
+  type LegacyMazeSnapshot,
+  type LegacyPoint
+} from '../../src/legacy-runtime/legacyMaze';
 import { WorldTurnHost } from '../../src/mazer-core/world';
 import { MenuScene } from '../../src/scenes/MenuScene';
 
@@ -157,9 +162,18 @@ interface CollisionVisualHarness {
 interface DirectionalIntentFailureHarness {
   maze: LegacyMazeSnapshot;
   playDirectionalIntent: {
-    step: () => {
+    getDiagnostics: () => {
+      requestedDirections: string[];
+    };
+    step: (
+      maze: Pick<LegacyMazeSnapshot, 'grid'>,
+      player: LegacyPoint,
+      options?: { assistedLaneShiftEnabled?: boolean }
+    ) => {
+      decision?: string;
       deltaX: number;
       deltaY: number;
+      direction?: string | null;
       moved: boolean;
     };
   };
@@ -169,6 +183,10 @@ interface DirectionalIntentFailureHarness {
   settings: {
     smartSteering: boolean;
   };
+  time?: {
+    now: number;
+  };
+  tryMovePlayer?: (deltaX: number, deltaY: number) => boolean;
 }
 
 const applyPauseCommand = (
@@ -463,9 +481,11 @@ describe('legacy Mythic patrol agent', () => {
     const harness: DirectionalIntentFailureHarness = {
       maze,
       playDirectionalIntent: {
+        getDiagnostics: () => ({ requestedDirections: [] }),
         step: () => ({
           deltaX: 0,
           deltaY: 0,
+          direction: null,
           moved: false
         })
       },
@@ -480,6 +500,56 @@ describe('legacy Mythic patrol agent', () => {
     expect(performDirectionalIntentStep.call(harness)).toBe(false);
     expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
     expect(resolveLegacyPatrolAgentCollisionIntent(harness.playPatrolAgent, 1_440).intent).toBeNull();
+    expect(publishInteractionDiagnostics).toHaveBeenCalledOnce();
+  });
+
+  test('clears the older pending intent when the real resolver continues past a blocked newest turn', () => {
+    const maze = createMythicMaze();
+    const player = maze.solutionPath.find((point) => (
+      resolveLegacyNavigationTarget(maze, point, 1, 0) !== null
+      && resolveLegacyNavigationTarget(maze, point, 0, -1) === null
+    ));
+    expect(player).toBeDefined();
+
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.request(['right']);
+    expect(resolver.step(maze, player!)).toMatchObject({
+      direction: 'right',
+      moved: true
+    });
+    resolver.request(['up']);
+    expect(resolver.getDiagnostics()).toMatchObject({
+      activeDirection: 'right',
+      queuedDirection: 'up',
+      requestedDirections: ['up']
+    });
+
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const collisionPoint = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, collisionPoint, 1_000);
+    const queued = queueLegacyPatrolAgentCollisionIntent(collision.state, 1, 0, 1_100);
+    const publishInteractionDiagnostics = vi.fn();
+    const tryMovePlayer = vi.fn(() => true);
+    const harness: DirectionalIntentFailureHarness = {
+      maze,
+      playDirectionalIntent: resolver,
+      playPatrolAgent: queued,
+      player: player!,
+      publishInteractionDiagnostics,
+      settings: {
+        smartSteering: false
+      },
+      time: {
+        now: 1_100
+      },
+      tryMovePlayer
+    };
+
+    expect(performDirectionalIntentStep.call(harness)).toBe(false);
+    expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
+    expect(resolveLegacyPatrolAgentCollisionIntent(harness.playPatrolAgent, 1_440).intent).toBeNull();
+    expect(tryMovePlayer).not.toHaveBeenCalled();
     expect(publishInteractionDiagnostics).toHaveBeenCalledOnce();
   });
 

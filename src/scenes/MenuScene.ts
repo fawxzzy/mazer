@@ -3603,9 +3603,20 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private performLegacyPlayDirectionalIntentStep(): boolean {
+    const latestRequestedDirection = this.playDirectionalIntent.getDiagnostics().requestedDirections[0] ?? null;
     const step = this.playDirectionalIntent.step(this.maze, this.player, {
       assistedLaneShiftEnabled: this.settings.smartSteering
     });
+    if (
+      step.moved
+      && isLegacyPatrolAgentDelayActive(this.playPatrolAgent, this.time.now)
+      && latestRequestedDirection !== null
+      && step.direction !== latestRequestedDirection
+    ) {
+      this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
+      this.publishInteractionDiagnostics();
+      return false;
+    }
     if (!step.moved) {
       this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
       this.publishInteractionDiagnostics();
