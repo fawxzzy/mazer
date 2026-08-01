@@ -3607,6 +3607,7 @@ export class MenuScene extends Phaser.Scene {
       assistedLaneShiftEnabled: this.settings.smartSteering
     });
     if (!step.moved) {
+      this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
       this.publishInteractionDiagnostics();
       return false;
     }

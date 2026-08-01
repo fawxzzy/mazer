@@ -154,6 +154,23 @@ interface CollisionVisualHarness {
   playPatrolCollisionVisualActive: boolean;
 }
 
+interface DirectionalIntentFailureHarness {
+  maze: LegacyMazeSnapshot;
+  playDirectionalIntent: {
+    step: () => {
+      deltaX: number;
+      deltaY: number;
+      moved: boolean;
+    };
+  };
+  playPatrolAgent: LegacyPatrolAgentState | null;
+  player: LegacyPoint;
+  publishInteractionDiagnostics: () => void;
+  settings: {
+    smartSteering: boolean;
+  };
+}
+
 const applyPauseCommand = (
   MenuScene.prototype as unknown as {
     applyLegacyPauseCommand: (
@@ -201,6 +218,14 @@ const refreshCollisionVisualState = (
     ) => void;
   }
 ).refreshLegacyPatrolCollisionVisualState;
+
+const performDirectionalIntentStep = (
+  MenuScene.prototype as unknown as {
+    performLegacyPlayDirectionalIntentStep: (
+      this: DirectionalIntentFailureHarness
+    ) => boolean;
+  }
+).performLegacyPlayDirectionalIntentStep;
 
 describe('legacy Mythic patrol agent', () => {
   test('selects one deterministic bypassable two-tile route and preserves every excluded surface', () => {
@@ -425,6 +450,37 @@ describe('legacy Mythic patrol agent', () => {
       },
       triggered: true
     });
+  });
+
+  test('clears the older pending intent when the newest direction is blocked by topology', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const point = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, point, 1_000);
+    const queued = queueLegacyPatrolAgentCollisionIntent(collision.state, 1, 0, 1_100);
+    const publishInteractionDiagnostics = vi.fn();
+    const harness: DirectionalIntentFailureHarness = {
+      maze,
+      playDirectionalIntent: {
+        step: () => ({
+          deltaX: 0,
+          deltaY: 0,
+          moved: false
+        })
+      },
+      playPatrolAgent: queued,
+      player: maze.start,
+      publishInteractionDiagnostics,
+      settings: {
+        smartSteering: false
+      }
+    };
+
+    expect(performDirectionalIntentStep.call(harness)).toBe(false);
+    expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
+    expect(resolveLegacyPatrolAgentCollisionIntent(harness.playPatrolAgent, 1_440).intent).toBeNull();
+    expect(publishInteractionDiagnostics).toHaveBeenCalledOnce();
   });
 
   test('shows collision feedback only for the first 220 ms of the existing delay', () => {
