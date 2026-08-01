@@ -212,6 +212,55 @@ describe('legacy room activation feasibility plan', () => {
     expectRejectedWithoutThrow(maze, metadataWithNestedAccessor, 'nested point accessor');
   });
 
+  test('rejects custom prototypes and proxies without changing canonical results or inputs', () => {
+    const { maze, metadata } = createFixture(1, 12);
+    const mazeBefore = JSON.stringify(maze);
+    const metadataBefore = JSON.stringify(metadata);
+    const canonicalPlan = createLegacyRoomActivationPlan(maze, metadata);
+    expect(canonicalPlan).not.toBeNull();
+
+    const mazeWithCustomPrototype = structuredClone(maze);
+    Object.setPrototypeOf(mazeWithCustomPrototype, { hostile: true });
+    const metadataWithCustomPrototype = structuredClone(metadata);
+    Object.setPrototypeOf(metadataWithCustomPrototype, { hostile: true });
+    const candidateWithCustomPrototype = structuredClone(metadata);
+    Object.setPrototypeOf(candidateWithCustomPrototype.candidate, { hostile: true });
+    const pointWithCustomPrototype = structuredClone(metadata);
+    Object.setPrototypeOf(pointWithCustomPrototype.routeOpeningEdges[0]!.inside, { hostile: true });
+    const arrayWithCustomPrototype = structuredClone(metadata);
+    Object.setPrototypeOf(arrayWithCustomPrototype.routeOpeningEdges, { hostile: true });
+
+    const cases: Array<{ label: string; maze: unknown; metadata: unknown }> = [
+      { label: 'maze root custom prototype', maze: mazeWithCustomPrototype, metadata },
+      { label: 'metadata root custom prototype', maze, metadata: metadataWithCustomPrototype },
+      { label: 'candidate custom prototype', maze, metadata: candidateWithCustomPrototype },
+      { label: 'route-opening point custom prototype', maze, metadata: pointWithCustomPrototype },
+      { label: 'route-opening array custom prototype', maze, metadata: arrayWithCustomPrototype },
+      { label: 'transparent metadata proxy', maze, metadata: new Proxy(metadata, {}) },
+      {
+        label: 'get-prototype trap proxy',
+        maze,
+        metadata: new Proxy(metadata, {
+          getPrototypeOf: () => { throw new Error('prototype trap must not escape'); }
+        })
+      },
+      {
+        label: 'own-keys trap proxy',
+        maze,
+        metadata: new Proxy(metadata, {
+          ownKeys: () => { throw new Error('own-keys trap must not escape'); }
+        })
+      }
+    ];
+    for (const runtimeCase of cases) {
+      expectRejectedWithoutThrow(runtimeCase.maze, runtimeCase.metadata, runtimeCase.label);
+    }
+
+    expect(createLegacyRoomActivationPlan(maze, metadata)).toEqual(canonicalPlan);
+    expect(JSON.stringify(maze)).toBe(mazeBefore);
+    expect(JSON.stringify(metadata)).toBe(metadataBefore);
+  });
+
   test('binds route openings and side closures to the exact ordered v7 perimeter subsets', () => {
     const { maze, metadata } = createFixture(1, 13);
     const duplicateEnter = structuredClone(metadata);

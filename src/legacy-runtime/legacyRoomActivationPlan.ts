@@ -54,8 +54,84 @@ const CARDINAL_OFFSETS: ReadonlyArray<LegacyPoint> = [
 const INVALID_DATA_PROPERTY = Symbol('invalid-data-property');
 
 const isObjectRecord = (value: unknown): value is object => (
-  typeof value === 'object' && value !== null && !Array.isArray(value)
+  typeof value === 'object'
+  && value !== null
+  && !Array.isArray(value)
+  && Object.getPrototypeOf(value) === Object.prototype
 );
+
+const hasCanonicalRuntimeRepresentation = (
+  value: unknown,
+  seen = new WeakSet<object>()
+): boolean => {
+  if (
+    value === null
+    || value === undefined
+    || typeof value === 'boolean'
+    || typeof value === 'number'
+    || typeof value === 'string'
+  ) {
+    return true;
+  }
+  if (typeof value !== 'object' || seen.has(value)) {
+    return false;
+  }
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype) {
+      return false;
+    }
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+    if (
+      !lengthDescriptor
+      || !('value' in lengthDescriptor)
+      || !Number.isInteger(lengthDescriptor.value)
+      || lengthDescriptor.value < 0
+    ) {
+      return false;
+    }
+    const keys = Reflect.ownKeys(value);
+    if (
+      keys.length !== lengthDescriptor.value + 1
+      || keys.some((key) => (
+        key !== 'length'
+        && (typeof key !== 'string' || !/^\d+$/.test(key) || Number(key) >= lengthDescriptor.value)
+      ))
+    ) {
+      return false;
+    }
+    for (let index = 0; index < lengthDescriptor.value; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, index);
+      if (!descriptor || !('value' in descriptor) || !hasCanonicalRuntimeRepresentation(descriptor.value, seen)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  if (Object.getPrototypeOf(value) !== Object.prototype) {
+    return false;
+  }
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') {
+      return false;
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !('value' in descriptor) || !hasCanonicalRuntimeRepresentation(descriptor.value, seen)) {
+      return false;
+    }
+  }
+  return true;
+};
+
+const hasCloneableCanonicalRuntimeRepresentation = (value: unknown): boolean => {
+  if (!hasCanonicalRuntimeRepresentation(value)) {
+    return false;
+  }
+  structuredClone(value);
+  return true;
+};
 
 const readOwnDataProperty = (value: object, key: PropertyKey): unknown | typeof INVALID_DATA_PROPERTY => {
   const descriptor = Object.getOwnPropertyDescriptor(value, key);
@@ -530,6 +606,12 @@ export const createLegacyRoomActivationPlan = (
   metadataValue: unknown
 ): LegacyRoomActivationPlan | null => {
   try {
+    if (
+      !hasCloneableCanonicalRuntimeRepresentation(mazeValue)
+      || !hasCloneableCanonicalRuntimeRepresentation(metadataValue)
+    ) {
+      return null;
+    }
     const maze = readMaze(mazeValue);
     const metadata = readMetadata(metadataValue);
     if (
