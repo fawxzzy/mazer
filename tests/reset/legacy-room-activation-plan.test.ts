@@ -261,6 +261,85 @@ describe('legacy room activation feasibility plan', () => {
     expect(JSON.stringify(metadata)).toBe(metadataBefore);
   });
 
+  test('rejects repeated, diagonal, and multi-cell solution-path steps without throwing', () => {
+    const { maze, metadata } = createFixture(1, 14);
+    const footprintKeys = new Set(
+      Array.from({ length: metadata.candidate.footprintHeight }, (_, dy) => (
+        Array.from({ length: metadata.candidate.footprintWidth }, (_, dx) => (
+          `${metadata.candidate.topLeft.x + dx},${metadata.candidate.topLeft.y + dy}`
+        ))
+      )).flat()
+    );
+    const protectedIndices = new Set([
+      0,
+      maze.solutionPath.length - 1,
+      ...metadata.routeThresholds.flatMap((threshold) => [
+        threshold.fromSolutionPathIndex,
+        threshold.toSolutionPathIndex
+      ])
+    ]);
+    const isProtectedPoint = (point: { x: number; y: number }) => (
+      footprintKeys.has(`${point.x},${point.y}`)
+      || (point.x === maze.start.x && point.y === maze.start.y)
+      || (point.x === maze.goal.x && point.y === maze.goal.y)
+    );
+    const safeIndices = maze.solutionPath
+      .map((point, index) => ({ index, point }))
+      .filter(({ index, point }) => (
+        index > 0
+        && index < maze.solutionPath.length - 1
+        && !protectedIndices.has(index)
+        && !isProtectedPoint(point)
+        && !isProtectedPoint(maze.solutionPath[index - 1]!)
+      ));
+    expect(safeIndices.length).toBeGreaterThan(0);
+
+    const repeated = structuredClone(maze);
+    const repeatIndex = safeIndices[0]!.index;
+    repeated.solutionPath[repeatIndex] = { ...repeated.solutionPath[repeatIndex - 1]! };
+
+    const findReplacement = (
+      predicate: (dx: number, dy: number) => boolean
+    ): { index: number; point: { x: number; y: number } } | null => {
+      for (const { index } of safeIndices) {
+        const previous = maze.solutionPath[index - 1]!;
+        for (let y = 0; y < maze.grid.length; y += 1) {
+          for (let x = 0; x < maze.grid[y]!.length; x += 1) {
+            const point = { x, y };
+            if (
+              maze.grid[y]![x]
+              && !isProtectedPoint(point)
+              && predicate(Math.abs(x - previous.x), Math.abs(y - previous.y))
+            ) {
+              return { index, point };
+            }
+          }
+        }
+      }
+      return null;
+    };
+    const diagonalReplacement = findReplacement((dx, dy) => dx === 1 && dy === 1);
+    const jumpReplacement = findReplacement((dx, dy) => (
+      (dx === 0 && dy > 1) || (dy === 0 && dx > 1)
+    ));
+    expect(diagonalReplacement).not.toBeNull();
+    expect(jumpReplacement).not.toBeNull();
+
+    const diagonal = structuredClone(maze);
+    diagonal.solutionPath[diagonalReplacement!.index] = diagonalReplacement!.point;
+    const jump = structuredClone(maze);
+    jump.solutionPath[jumpReplacement!.index] = jumpReplacement!.point;
+
+    for (const runtimeCase of [
+      { label: 'repeated solution-path point', maze: repeated },
+      { label: 'diagonal solution-path step', maze: diagonal },
+      { label: 'multi-cell solution-path jump', maze: jump }
+    ]) {
+      expectRejectedWithoutThrow(runtimeCase.maze, metadata, runtimeCase.label);
+    }
+    expect(createLegacyRoomActivationPlan(maze, metadata)).not.toBeNull();
+  });
+
   test('binds route openings and side closures to the exact ordered v7 perimeter subsets', () => {
     const { maze, metadata } = createFixture(1, 13);
     const duplicateEnter = structuredClone(metadata);

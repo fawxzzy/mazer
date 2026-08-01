@@ -252,7 +252,15 @@ const readMaze = (value: unknown): LegacyRoomActivationPlanMaze | null => {
   const solutionPath: LegacyPoint[] = [];
   for (const pointValue of solutionPathValues) {
     const point = readPoint(pointValue);
-    if (point === null || !isFloorPoint(grid, point)) {
+    const previousPoint = solutionPath[solutionPath.length - 1];
+    if (
+      point === null
+      || !isFloorPoint(grid, point)
+      || (
+        previousPoint !== undefined
+        && Math.abs(point.x - previousPoint.x) + Math.abs(point.y - previousPoint.y) !== 1
+      )
+    ) {
       return null;
     }
     solutionPath.push(point);
