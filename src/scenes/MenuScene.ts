@@ -3613,6 +3613,7 @@ export class MenuScene extends Phaser.Scene {
       && latestRequestedDirection !== null
       && step.direction !== latestRequestedDirection
     ) {
+      this.playDirectionalIntent.reset();
       this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
       this.publishInteractionDiagnostics();
       return false;

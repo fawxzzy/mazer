@@ -165,6 +165,7 @@ interface DirectionalIntentFailureHarness {
     getDiagnostics: () => {
       requestedDirections: string[];
     };
+    reset: () => void;
     step: (
       maze: Pick<LegacyMazeSnapshot, 'grid'>,
       player: LegacyPoint,
@@ -482,6 +483,7 @@ describe('legacy Mythic patrol agent', () => {
       maze,
       playDirectionalIntent: {
         getDiagnostics: () => ({ requestedDirections: [] }),
+        reset: vi.fn(),
         step: () => ({
           deltaX: 0,
           deltaY: 0,
@@ -530,7 +532,17 @@ describe('legacy Mythic patrol agent', () => {
     const collision = applyLegacyPatrolAgentCollision(initial, collisionPoint, 1_000);
     const queued = queueLegacyPatrolAgentCollisionIntent(collision.state, 1, 0, 1_100);
     const publishInteractionDiagnostics = vi.fn();
-    const tryMovePlayer = vi.fn(() => true);
+    const playerMovement = vi.fn(() => ({ accepted: true }));
+    const worldTurnHost = new WorldTurnHost({
+      'player-movement': playerMovement
+    }, {
+      timedModeEnabled: true
+    });
+    const tryMovePlayer = vi.fn(() => worldTurnHost.advance({
+      id: 'stale-resolver-expiry-player-move',
+      inputId: 'stale-resolver-expiry-player-move',
+      kind: 'player-move'
+    }).admitted);
     const harness: DirectionalIntentFailureHarness = {
       maze,
       playDirectionalIntent: resolver,
@@ -548,9 +560,29 @@ describe('legacy Mythic patrol agent', () => {
 
     expect(performDirectionalIntentStep.call(harness)).toBe(false);
     expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
+    expect(resolver.getDiagnostics()).toMatchObject({
+      activeDirection: null,
+      queuedDirection: null,
+      requestedDirections: []
+    });
     expect(resolveLegacyPatrolAgentCollisionIntent(harness.playPatrolAgent, 1_440).intent).toBeNull();
+
+    harness.time!.now = 1_440;
+    resolver.request(['up']);
+    expect(performDirectionalIntentStep.call(harness)).toBe(false);
+    expect(resolver.getDiagnostics()).toMatchObject({
+      activeDirection: 'up',
+      queuedDirection: null,
+      requestedDirections: ['up']
+    });
+    expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
     expect(tryMovePlayer).not.toHaveBeenCalled();
-    expect(publishInteractionDiagnostics).toHaveBeenCalledOnce();
+    expect(playerMovement).not.toHaveBeenCalled();
+    expect(worldTurnHost.getDiagnostics()).toMatchObject({
+      acceptedTurnCount: 0,
+      lastReceipt: null
+    });
+    expect(publishInteractionDiagnostics).toHaveBeenCalledTimes(2);
   });
 
   test('shows collision feedback only for the first 220 ms of the existing delay', () => {
