@@ -159,6 +159,19 @@ interface CollisionVisualHarness {
   playPatrolCollisionVisualActive: boolean;
 }
 
+interface PendingIntentCueHarness {
+  boardDynamicGraphics: {
+    beginPath: ReturnType<typeof vi.fn>;
+    lineStyle: ReturnType<typeof vi.fn>;
+    lineTo: ReturnType<typeof vi.fn>;
+    moveTo: ReturnType<typeof vi.fn>;
+    strokePath: ReturnType<typeof vi.fn>;
+  };
+  mode: 'menu' | 'play';
+  playPatrolAgent: LegacyPatrolAgentState | null;
+  player: LegacyPoint;
+}
+
 interface DirectionalIntentFailureHarness {
   maze: LegacyMazeSnapshot;
   playDirectionalIntent: {
@@ -245,6 +258,18 @@ const performDirectionalIntentStep = (
     ) => boolean;
   }
 ).performLegacyPlayDirectionalIntentStep;
+
+const drawPendingIntentCue = (
+  MenuScene.prototype as unknown as {
+    drawLegacyPlayPatrolPendingIntent: (
+      this: PendingIntentCueHarness,
+      mazeLeft: number,
+      mazeTop: number,
+      tileSize: number,
+      time: number
+    ) => void;
+  }
+).drawLegacyPlayPatrolPendingIntent;
 
 describe('legacy Mythic patrol agent', () => {
   test('selects one deterministic bypassable two-tile route and preserves every excluded surface', () => {
@@ -895,5 +920,79 @@ describe('legacy Mythic patrol agent', () => {
     expect(menuSceneSource).toContain(
       'const collisionRecovery = resolveLegacyPatrolAgentCollisionRecovery('
     );
+  });
+
+  test('draws one cardinal pending-intent chevron above the player during the collision delay', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const playerDrawIndex = menuSceneSource.indexOf('this.fillLegacyPlayerMarkerTile(');
+    const recoveryDrawIndex = menuSceneSource.indexOf(
+      'this.drawLegacyPlayPatrolCollisionRecovery('
+    );
+    const pendingIntentDrawIndex = menuSceneSource.indexOf(
+      'this.drawLegacyPlayPatrolPendingIntent('
+    );
+    const pendingIntentMethodIndex = menuSceneSource.indexOf(
+      'private drawLegacyPlayPatrolPendingIntent('
+    );
+    const pendingIntentMethodEndIndex = menuSceneSource.indexOf(
+      'private drawLegacyProgressionBadge(',
+      pendingIntentMethodIndex
+    );
+    const pendingIntentMethodSource = menuSceneSource.slice(
+      pendingIntentMethodIndex,
+      pendingIntentMethodEndIndex
+    );
+
+    expect(playerDrawIndex).toBeGreaterThan(-1);
+    expect(recoveryDrawIndex).toBeGreaterThan(playerDrawIndex);
+    expect(pendingIntentDrawIndex).toBeGreaterThan(recoveryDrawIndex);
+    expect(menuSceneSource.match(/this\.drawLegacyPlayPatrolPendingIntent\(/g)).toHaveLength(1);
+    expect(pendingIntentMethodSource).toContain(
+      'const pendingIntent = this.playPatrolAgent?.pendingCollisionIntent ?? null;'
+    );
+    expect(pendingIntentMethodSource).toContain(
+      '|| !isLegacyPatrolAgentDelayActive(this.playPatrolAgent, time)'
+    );
+    expect(pendingIntentMethodSource).toContain(
+      '|| Math.abs(pendingIntent.deltaX) + Math.abs(pendingIntent.deltaY) !== 1'
+    );
+    expect(pendingIntentMethodSource.match(/this\.boardDynamicGraphics\.beginPath\(\);/g)).toHaveLength(1);
+    expect(pendingIntentMethodSource.match(/this\.boardDynamicGraphics\.lineTo\(/g)).toHaveLength(2);
+    expect(pendingIntentMethodSource.match(/this\.boardDynamicGraphics\.strokePath\(\);/g)).toHaveLength(1);
+
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const collisionPoint = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, collisionPoint, 1_000);
+    const queued = queueLegacyPatrolAgentCollisionIntent(collision.state, 1, 0, 1_100);
+    const boardDynamicGraphics = {
+      beginPath: vi.fn(),
+      lineStyle: vi.fn(),
+      lineTo: vi.fn(),
+      moveTo: vi.fn(),
+      strokePath: vi.fn()
+    };
+    const harness: PendingIntentCueHarness = {
+      boardDynamicGraphics,
+      mode: 'play',
+      playPatrolAgent: queued,
+      player: { x: 2, y: 3 }
+    };
+
+    drawPendingIntentCue.call(harness, 100, 200, 20, 1_100);
+    expect(boardDynamicGraphics.beginPath).toHaveBeenCalledOnce();
+    expect(boardDynamicGraphics.strokePath).toHaveBeenCalledOnce();
+    expect(boardDynamicGraphics.moveTo).toHaveBeenCalledWith(155.6, 273.2);
+    expect(boardDynamicGraphics.lineTo).toHaveBeenNthCalledWith(1, 159.6, 270);
+    expect(boardDynamicGraphics.lineTo).toHaveBeenNthCalledWith(2, 155.6, 266.8);
+
+    drawPendingIntentCue.call(harness, 100, 200, 20, 1_440);
+    harness.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(queued);
+    drawPendingIntentCue.call(harness, 100, 200, 20, 1_100);
+    harness.playPatrolAgent = queued;
+    harness.mode = 'menu';
+    drawPendingIntentCue.call(harness, 100, 200, 20, 1_100);
+    expect(boardDynamicGraphics.strokePath).toHaveBeenCalledOnce();
   });
 });

@@ -1042,6 +1042,7 @@ const LEGACY_PLAY_PATROL_EDGE = cyberArcadeMaterial.signal.memory;
 const LEGACY_PLAY_PATROL_TELEGRAPH = cyberArcadeMaterial.rail.mint;
 const LEGACY_PLAY_PATROL_COLLISION_FEEDBACK = cyberArcadeMaterial.signal.warning;
 const LEGACY_PLAY_PATROL_COLLISION_RECOVERY = cyberArcadeMaterial.rail.mint;
+const LEGACY_PLAY_PATROL_PENDING_INTENT = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
 const LEGACY_MENU_AI_MEMORY_TARGET_CORE = cyberArcadeMaterial.signal.warning;
@@ -6566,6 +6567,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.drawLegacyPlayPatrolCollisionRecovery(mazeLeft, mazeTop, mazeTileSize, time);
+    this.drawLegacyPlayPatrolPendingIntent(mazeLeft, mazeTop, mazeTileSize, time);
 
     if (this.mode === 'menu' || this.mode === 'play') {
       this.drawLegacyMenuDeconstructHandoffBurst(
@@ -6759,6 +6761,46 @@ export class MenuScene extends Phaser.Scene {
       Math.min(0.92, 0.32 + (recoveryRatio * 0.6))
     );
     this.boardDynamicGraphics.strokeCircle(playerX, playerY, recoveryRadius);
+  }
+
+  private drawLegacyPlayPatrolPendingIntent(
+    mazeLeft: number,
+    mazeTop: number,
+    tileSize: number,
+    time: number
+  ): void {
+    const pendingIntent = this.playPatrolAgent?.pendingCollisionIntent ?? null;
+    if (
+      this.mode !== 'play'
+      || pendingIntent === null
+      || !isLegacyPatrolAgentDelayActive(this.playPatrolAgent, time)
+      || Math.abs(pendingIntent.deltaX) + Math.abs(pendingIntent.deltaY) !== 1
+    ) {
+      return;
+    }
+
+    const playerX = mazeLeft + ((this.player.x + 0.5) * tileSize);
+    const playerY = mazeTop + ((this.player.y + 0.5) * tileSize);
+    const tipDistance = Math.max(3, tileSize * 0.48);
+    const chevronDepth = Math.max(2, tileSize * 0.2);
+    const chevronWidth = Math.max(2, tileSize * 0.16);
+    const tipX = playerX + (pendingIntent.deltaX * tipDistance);
+    const tipY = playerY + (pendingIntent.deltaY * tipDistance);
+    const baseX = tipX - (pendingIntent.deltaX * chevronDepth);
+    const baseY = tipY - (pendingIntent.deltaY * chevronDepth);
+    const perpendicularX = -pendingIntent.deltaY * chevronWidth;
+    const perpendicularY = pendingIntent.deltaX * chevronWidth;
+
+    this.boardDynamicGraphics.lineStyle(
+      Math.max(1, tileSize * 0.1),
+      LEGACY_PLAY_PATROL_PENDING_INTENT,
+      0.96
+    );
+    this.boardDynamicGraphics.beginPath();
+    this.boardDynamicGraphics.moveTo(baseX + perpendicularX, baseY + perpendicularY);
+    this.boardDynamicGraphics.lineTo(tipX, tipY);
+    this.boardDynamicGraphics.lineTo(baseX - perpendicularX, baseY - perpendicularY);
+    this.boardDynamicGraphics.strokePath();
   }
 
   private drawLegacyProgressionBadge(
