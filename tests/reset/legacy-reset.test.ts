@@ -15,22 +15,9 @@ import {
   resolveLegacyTrailFromDemoSteps
 } from '../../src/legacy-runtime/legacyDemoWalker';
 import { collectDemoWalkerTelemetry, createDemoWalkerState } from '../../src/domain/ai';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-
-const resolveLegacyUnrealSource = (...segments: string[]): string => {
-  const legacyRoot = [
-    resolve(process.cwd(), '..', 'tmp', 'mazer-legacy-unreal-restore'),
-    resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore'),
-    resolve(process.cwd(), '..', '..', '..', 'tmp', 'mazer-legacy-unreal-restore')
-  ].find((candidate) => existsSync(candidate));
-
-  if (!legacyRoot) {
-    throw new Error('Missing local mazer-legacy-unreal-restore fixture.');
-  }
-
-  return resolve(legacyRoot, ...segments);
-};
+import { resolveLegacyUnrealSource } from './legacyUnrealSourceFixture';
 
 const countLegacyShortcutBridgeFloors = (maze: ReturnType<typeof createLegacyMaze>): number => {
   let bridges = 0;
