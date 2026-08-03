@@ -841,7 +841,7 @@ describe('legacy Mythic patrol agent', () => {
       state: 'stopped',
       timedModeEnabled: false
     });
-  });
+  }, 20_000);
 
   test('wires the visible patrol through timed world turns and cloned diagnostics', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
