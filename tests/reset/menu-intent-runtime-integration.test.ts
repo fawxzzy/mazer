@@ -152,9 +152,11 @@ describe('menu intent runtime integration', () => {
   });
 
   test('a short path below the spectator segment floor falls back to core-only board state, matching the unit-level contract', () => {
-    // demoSpectator.ts's own unit tests already prove the 6-segment floor
-    // boundary for createDemoSpectatorPlan directly; this proves the same
-    // boundary is honored end-to-end once wired through the runtime host.
+    // demoSpectator.ts's own unit tests already prove the segment-count
+    // floor boundary for createDemoSpectatorPlan directly (the floor is
+    // DEMO_SPECTATOR_FULL_PROFILE_MINIMUM_SEGMENT_COUNT, currently 17);
+    // this proves the same boundary is honored end-to-end once wired
+    // through the runtime host.
     const shortEpisode = createShippingSpectatorEpisode(6); // segmentCount = 5, below the floor
     const session = createMenuIntentRuntimeSession(shortEpisode, 'full');
     session.advanceToStep(4);

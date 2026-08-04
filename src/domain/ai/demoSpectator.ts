@@ -104,6 +104,16 @@ export interface DemoSpectatorPlan {
   failureReasonSubtitle: string;
 }
 
+// Below this segment count the six full-profile mechanics (key, plate, door,
+// patrol lane, hazard, gate) cannot be spread across the path without at
+// least two of them landing on the exact same tile: door and the patrol
+// lane's leading edge collide for every segmentCount from 6 through 16
+// (verified by exhaustive enumeration), and the patrol lane's trailing edge
+// can additionally collide with the hazard tile in that same range. 17 is
+// the smallest segmentCount where every mechanic's cursor bound clears the
+// previous mechanic's full occupied tile range, eliminating the overlap.
+const DEMO_SPECTATOR_FULL_PROFILE_MINIMUM_SEGMENT_COUNT = 17;
+
 const buildCoreOnlySpectatorPlan = (
   pathLength: number,
   segmentCount: number,
@@ -185,7 +195,7 @@ export const createDemoSpectatorPlan = (
     );
   }
 
-  if (segmentCount < 6) {
+  if (segmentCount < DEMO_SPECTATOR_FULL_PROFILE_MINIMUM_SEGMENT_COUNT) {
     return buildCoreOnlySpectatorPlan(
       path.length,
       segmentCount,
