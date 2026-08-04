@@ -11,9 +11,25 @@ export function buildLegacyUnrealParentWalkCandidates(cwd: string): string[] {
 }
 
 function resolveLegacyUnrealRoot(): string {
-  const explicitRoot = process.env[LEGACY_UNREAL_FIXTURE_ROOT_ENV_VAR]?.trim();
+  const rawValue = process.env[LEGACY_UNREAL_FIXTURE_ROOT_ENV_VAR];
 
-  if (explicitRoot) {
+  // Distinguish "not set at all" (undefined -- parent-walk fallback is fine)
+  // from "set, but blank after trimming" (a real misconfiguration -- e.g. a
+  // CI/shell env template that substitutes an empty value). Trimming and
+  // then checking truthiness alone conflates the two, since `''` and
+  // `undefined` are both falsy: an explicitly-set-but-whitespace-only value
+  // would silently and indistinguishably fall through to parent-walk
+  // discovery instead of failing loudly on the misconfiguration.
+  if (rawValue !== undefined) {
+    const explicitRoot = rawValue.trim();
+    if (!explicitRoot) {
+      throw new Error(
+        `${LEGACY_UNREAL_FIXTURE_ROOT_ENV_VAR} is set but empty or whitespace-only. Unset it entirely to use ` +
+          `automatic parent-directory discovery, or set it to an absolute path to the ` +
+          `${LEGACY_UNREAL_FIXTURE_DIR_NAME} fixture directory.`
+      );
+    }
+
     const candidate = isAbsolute(explicitRoot) ? explicitRoot : resolve(process.cwd(), explicitRoot);
     if (!existsSync(candidate)) {
       throw new Error(

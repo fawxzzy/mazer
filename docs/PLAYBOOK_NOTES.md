@@ -52,6 +52,14 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHY it changed: Mazer needs its own tight data boundary before remote learning, per-account AI progression, account progression sync, and future paid licenses can ship without mixing game data into Fitness-owned storage.
 - Evidence: `npx vitest run tests/reset/legacy-remote-progression.test.ts tests/reset/legacy-auth.test.ts tests/reset/legacy-progression.test.ts --maxWorkers 1`; `npm run lint`; `npm run build`.
 
+## 2026-08-04
+
+- WHAT changed: Fixed `tests/reset/legacyUnrealSourceFixture.ts` so an explicitly-set-but-blank `MAZER_LEGACY_UNREAL_RESTORE_ROOT` (empty string, spaces-only, or tabs/newlines-only) throws an actionable error instead of silently falling through to parent-directory discovery. The prior guard (`process.env[VAR]?.trim()` then `if (explicitRoot)`) treated `''` and `undefined` identically, since both are falsy -- now the raw value's presence is checked separately from its trimmed content, so "truly unset" still uses parent-walk (unchanged) while "set but blank" fails loudly. Added 4 new tests (empty string, spaces-only, tabs/newlines-only, and an explicit control test confirming truly-unset behavior is unchanged) to `tests/reset/legacy-unreal-source-fixture.test.ts`.
+- WHY it changed: A whitespace-only explicit value is a real misconfiguration signal (e.g. a CI/shell template substituting an empty value into the variable) that should be surfaced, not silently masked by falling back to a fixture that happens to exist via parent-walk for an unrelated reason -- concealing exactly the kind of broken environment setup this variable exists to make visible.
+- Rule: When distinguishing "not configured" from "configured but blank" for an environment variable, check the raw value's presence (`!== undefined`) before trimming/testing truthiness -- collapsing both into one falsy check silently treats a real misconfiguration as if the setting were absent.
+- Evidence: `npx vitest run tests/reset/legacy-unreal-source-fixture.test.ts` (12/12 pass, 4 new), `npx vitest run tests/reset/legacy-reset.test.ts` with a valid `MAZER_LEGACY_UNREAL_RESTORE_ROOT` set (35/35 pass, unchanged), `npm run test` (canonical, 489/489 pass), `npx tsc --noEmit` (clean), `npm run build` (succeeds, no unintended tracked-file changes).
+- Status: Applied
+
 ## 2026-08-03
 
 - WHAT changed: Removed `src/render/hudRenderer.ts` (the `createDemoStatusHud` Phaser HUD overlay and its supporting types/profiles), confirmed dead: zero references to the file path or any of its exported symbols (`HudThemeStyle`, `createDemoStatusHud`) anywhere in source, tests, or scripts. Last touched 2026-06-27, from the original "menu demo AI" build, superseded by the current `legacy-runtime/legacyPlayHud.ts` HUD system.
