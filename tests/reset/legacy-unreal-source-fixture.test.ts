@@ -101,6 +101,67 @@ describe('legacy unreal source fixture resolution', () => {
     expect(() => resolveLegacyUnrealSource('marker.txt')).toThrow(bogusPath);
   });
 
+  test('an env var explicitly set to an empty string fails loudly instead of silently falling back to parent-walk', () => {
+    // A real fixture exists via parent-walk here -- if the empty explicit
+    // value were silently treated as "not set," this would incorrectly
+    // succeed via the fallback instead of surfacing the misconfiguration.
+    const fakeCwd = join(scratchRoot, 'checkout', 'nested');
+    mkdirSync(fakeCwd, { recursive: true });
+    const fixtureRoot = resolve(fakeCwd, '..', '..', 'tmp', LEGACY_UNREAL_FIXTURE_DIR_NAME);
+    mkdirSync(fixtureRoot, { recursive: true });
+    writeFileSync(join(fixtureRoot, 'marker.txt'), 'ok');
+
+    process.env[ENV_VAR] = '';
+    process.chdir(fakeCwd);
+
+    expect(() => resolveLegacyUnrealSource('marker.txt')).toThrow(
+      new RegExp(`${ENV_VAR} is set but empty or whitespace-only`)
+    );
+  });
+
+  test('an env var explicitly set to whitespace-only (spaces) fails loudly instead of silently falling back', () => {
+    const fakeCwd = join(scratchRoot, 'checkout', 'nested');
+    mkdirSync(fakeCwd, { recursive: true });
+    const fixtureRoot = resolve(fakeCwd, '..', '..', 'tmp', LEGACY_UNREAL_FIXTURE_DIR_NAME);
+    mkdirSync(fixtureRoot, { recursive: true });
+    writeFileSync(join(fixtureRoot, 'marker.txt'), 'ok');
+
+    process.env[ENV_VAR] = '   ';
+    process.chdir(fakeCwd);
+
+    expect(() => resolveLegacyUnrealSource('marker.txt')).toThrow(
+      new RegExp(`${ENV_VAR} is set but empty or whitespace-only`)
+    );
+  });
+
+  test('an env var explicitly set to tabs/newlines only fails loudly instead of silently falling back', () => {
+    const fakeCwd = join(scratchRoot, 'checkout', 'nested');
+    mkdirSync(fakeCwd, { recursive: true });
+    const fixtureRoot = resolve(fakeCwd, '..', '..', 'tmp', LEGACY_UNREAL_FIXTURE_DIR_NAME);
+    mkdirSync(fixtureRoot, { recursive: true });
+    writeFileSync(join(fixtureRoot, 'marker.txt'), 'ok');
+
+    process.env[ENV_VAR] = '\t\n  \n\t';
+    process.chdir(fakeCwd);
+
+    expect(() => resolveLegacyUnrealSource('marker.txt')).toThrow(
+      new RegExp(`${ENV_VAR} is set but empty or whitespace-only`)
+    );
+  });
+
+  test('leaves the fallback-eligible contract intact: truly unset still uses parent-walk, not the blank-value error', () => {
+    const fakeCwd = join(scratchRoot, 'checkout', 'nested');
+    mkdirSync(fakeCwd, { recursive: true });
+    const fixtureRoot = resolve(fakeCwd, '..', '..', 'tmp', LEGACY_UNREAL_FIXTURE_DIR_NAME);
+    mkdirSync(fixtureRoot, { recursive: true });
+    writeFileSync(join(fixtureRoot, 'marker.txt'), 'ok');
+
+    delete process.env[ENV_VAR];
+    process.chdir(fakeCwd);
+
+    expect(resolveLegacyUnrealSource('marker.txt')).toBe(resolve(fixtureRoot, 'marker.txt'));
+  });
+
   test('handles a fixture-root path containing spaces', () => {
     const fixtureRoot = join(scratchRoot, 'path with spaces', LEGACY_UNREAL_FIXTURE_DIR_NAME);
     mkdirSync(fixtureRoot, { recursive: true });
