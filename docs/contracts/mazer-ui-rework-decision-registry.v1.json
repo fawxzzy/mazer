@@ -1,0 +1,314 @@
+{
+  "schemaVersion": 1,
+  "waveId": "0A",
+  "waveName": "Decision registry and architecture guardrails",
+  "waveOwnership": "new docs/specs/tests only; no runtime visual mutation",
+  "planningSource": {
+    "bundle": "mazer-everything-bundle-20260803",
+    "evidenceSnapshotCommit": "462030ac942e4ffecd442fe0ceeb22584dcda931",
+    "evidenceSnapshotTree": "ff6c09346ca47f62056f71ff96f12362639bb537",
+    "readmeRef": "01_FINAL_AUTHORITATIVE_HANDOFF/README.md",
+    "executiveDecisionsRef": "01_FINAL_AUTHORITATIVE_HANDOFF/blueprint/00_EXECUTIVE_DECISIONS.md",
+    "migrationWavesRef": "01_FINAL_AUTHORITATIVE_HANDOFF/blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md"
+  },
+  "decisions": [
+    {
+      "id": "product-direction-precision-arcade",
+      "category": "product-direction",
+      "locked": true,
+      "statement": "Mazer's target product is the Fawxzzy Precision Arcade direction: a mobile-first, installable, precision-arcade maze game where the board is the hero and application chrome only explains, enables, or protects play.",
+      "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#chosen-direction--fawxzzy-precision-arcade"
+    },
+    {
+      "id": "renderer-ownership-split",
+      "category": "architecture",
+      "locked": true,
+      "statement": "Phaser owns world/maze simulation-facing presentation (board rendering, title path animation, world-space entities, camera/world effects, menu demonstration maze, world diagnostics). DOM owns application shell, forms, HUD, touch controls, settings, dialogs, guide/confirmations, and system chrome. Semantic tokens, state registry, commands, view models, responsive metrics, platform profiles, topology/path geometry, icon definitions, motion semantics, diagnostics schema, and capture IDs are shared contracts owned by neither renderer alone.",
+      "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#architecture-decision"
+    },
+    {
+      "id": "shipping-corridor-not-tiles",
+      "category": "rendering",
+      "locked": true,
+      "statement": "The shipping maze presentation remains connected corridors, not exposed square tiles. Tile topology stays canonical underlying data; visible square-tile boundaries are optional proof/debug treatment only, never the shipping default.",
+      "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#rejected-alternatives (Visible tile-square board)"
+    },
+    {
+      "id": "profiles-not-themes",
+      "category": "product-boundary",
+      "locked": true,
+      "statement": "Mobile, desktop, TV, OBS, arcade, and cyberdeck are output profiles, not public themes. Profiles vary layout and density; they never vary brand identity.",
+      "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#locked-decisions"
+    },
+    {
+      "id": "single-canonical-theme",
+      "category": "product-boundary",
+      "locked": true,
+      "statement": "One canonical player-facing theme (Fawxzzy Precision Arcade) replaces the public theme matrix. The noir, ember, vellum, aurora, and monolith theme variants are archived historical experiments, not live public options, and no public theme switch ships in the canonical product.",
+      "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#product-boundary-decisions"
+    },
+    {
+      "id": "proof-surfaces-internal-only",
+      "category": "surface-classification",
+      "locked": true,
+      "statement": "proof-surfaces.html and visual-proof.html remain internal verification tools (projection QA / critical internal verification), not public product, and are not release-gating core surfaces.",
+      "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#product-boundary-decisions"
+    },
+    {
+      "id": "watch-pass-incubating-no-billing",
+      "category": "surface-classification",
+      "locked": true,
+      "statement": "Watch Pass (watch-pass-setup.html, watch-pass-preview.html) remains an incubating companion product behind a feature boundary. watch-pass-paywall.html is a commerce prototype only; no production billing or entitlement claim is permitted until real billing exists.",
+      "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#product-boundary-decisions"
+    },
+    {
+      "id": "planet3d-isolated-lab-excluded-from-core-v1",
+      "category": "surface-classification",
+      "locked": true,
+      "statement": "planet3d.html is an isolated lab, explicitly excluded from core-v1 release acceptance.",
+      "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#product-boundary-decisions"
+    },
+    {
+      "id": "future-phaser-retire-after-adapter-extraction",
+      "category": "surface-classification",
+      "locked": true,
+      "statement": "future-phaser.html is slated for adapter-lesson extraction (its useful adapter contracts become tests) and then entrypoint retirement.",
+      "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#product-boundary-decisions"
+    },
+    {
+      "id": "no-big-bang-menuscene-rewrite",
+      "category": "migration-strategy",
+      "locked": true,
+      "statement": "MenuScene.ts is decomposed through characterization and adapters across later waves, not replaced in one rewrite. A big-bang rewrite is rejected because PR #83 overlaps core ownership and mechanics are already proof-backed.",
+      "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#rejected-alternatives (Big-bang rewrite)"
+    },
+    {
+      "id": "pr83-protected-paths-hold",
+      "category": "governance",
+      "locked": true,
+      "statement": "PR #83's listed collision paths (MenuScene.ts, menuRuntimeDiagnostics.ts, legacyAuth.ts, legacyPlayerMessage.ts, shared capture scripts, plus the always-protected vite.config.ts and package.json) are protected and single-owner until PR #83's disposition clears, to be reconciled via a separate later integrator-exclusive PR (Wave 0B), not any parallel lane including this one.",
+      "sourceRef": "blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md#file-ownership-guardrails"
+    },
+    {
+      "id": "no-redesign-complete-without-acceptance-matrix",
+      "category": "governance",
+      "locked": true,
+      "statement": "No source lane may claim the redesign complete until the final acceptance matrix (the nine-point Definition of Complete) passes and old duplicated UI paths are removed or formally retained with an owner and purpose.",
+      "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#definition-of-complete"
+    }
+  ],
+  "renderOwnership": {
+    "phaserOwns": [
+      "maze simulation-facing presentation",
+      "connected corridor board rendering",
+      "title path animation",
+      "world-space player, start, goal, trail, cues, and future Fragment entities",
+      "camera and world effects",
+      "menu demonstration maze",
+      "world diagnostics"
+    ],
+    "domOwns": [
+      "boot/session/application shell",
+      "authentication forms",
+      "home actions",
+      "HUD and metrics",
+      "touch controls and pause control",
+      "settings/options",
+      "guide/tutorial UI",
+      "confirmations",
+      "run result",
+      "install/offline/update/sync feedback",
+      "Watch Pass and proof-page chrome",
+      "accessible text and focus behavior"
+    ],
+    "sharedContractsOwn": [
+      "semantic tokens",
+      "state registry",
+      "commands",
+      "view models",
+      "responsive metrics",
+      "platform profiles",
+      "topology/path geometry",
+      "icon definitions",
+      "motion semantics",
+      "diagnostics schema",
+      "capture IDs"
+    ],
+    "decisionRef": "renderer-ownership-split"
+  },
+  "themes": {
+    "registry": [
+      {
+        "id": "fawxzzy-precision-arcade",
+        "kind": "theme",
+        "role": "canonical",
+        "public": true,
+        "decisionRef": "single-canonical-theme"
+      },
+      {
+        "id": "noir",
+        "kind": "theme",
+        "role": "archived",
+        "public": false,
+        "decisionRef": "single-canonical-theme"
+      },
+      {
+        "id": "ember",
+        "kind": "theme",
+        "role": "archived",
+        "public": false,
+        "decisionRef": "single-canonical-theme"
+      },
+      {
+        "id": "vellum",
+        "kind": "theme",
+        "role": "archived",
+        "public": false,
+        "decisionRef": "single-canonical-theme"
+      },
+      {
+        "id": "aurora",
+        "kind": "theme",
+        "role": "archived",
+        "public": false,
+        "decisionRef": "single-canonical-theme"
+      },
+      {
+        "id": "monolith",
+        "kind": "theme",
+        "role": "archived",
+        "public": false,
+        "decisionRef": "single-canonical-theme"
+      }
+    ]
+  },
+  "profiles": {
+    "registry": [
+      { "id": "web", "kind": "profile", "decisionRef": "profiles-not-themes" },
+      { "id": "mobile", "kind": "profile", "decisionRef": "profiles-not-themes" },
+      { "id": "desktop", "kind": "profile", "decisionRef": "profiles-not-themes" },
+      { "id": "tv", "kind": "profile", "decisionRef": "profiles-not-themes" },
+      { "id": "obs", "kind": "profile", "decisionRef": "profiles-not-themes" },
+      { "id": "arcade", "kind": "profile", "decisionRef": "profiles-not-themes" },
+      { "id": "cyberdeck", "kind": "profile", "decisionRef": "profiles-not-themes" }
+    ],
+    "sourceRef": "spec/platform-profiles.json"
+  },
+  "shippingPresentation": {
+    "default": "corridor",
+    "tileSquareIsDefault": false,
+    "tileSquareTreatment": "optional-proof-debug-only",
+    "decisionRef": "shipping-corridor-not-tiles"
+  },
+  "entrypoints": [
+    {
+      "entrypoint": "index.html",
+      "classification": "product",
+      "releaseGate": true,
+      "action": "migrate",
+      "owner": "core-product",
+      "decisionRefs": ["product-direction-precision-arcade"]
+    },
+    {
+      "entrypoint": "proof-surfaces.html",
+      "classification": "internal",
+      "releaseGate": false,
+      "action": "retain-redesign-isolate",
+      "owner": "projection-qa",
+      "decisionRefs": ["proof-surfaces-internal-only"]
+    },
+    {
+      "entrypoint": "watch-pass-setup.html",
+      "classification": "incubator",
+      "releaseGate": false,
+      "action": "retain-feature-flag",
+      "owner": "watch-pass",
+      "decisionRefs": ["watch-pass-incubating-no-billing"]
+    },
+    {
+      "entrypoint": "watch-pass-preview.html",
+      "classification": "incubator",
+      "releaseGate": false,
+      "action": "retain-feature-flag",
+      "owner": "watch-pass",
+      "decisionRefs": ["watch-pass-incubating-no-billing"]
+    },
+    {
+      "entrypoint": "watch-pass-paywall.html",
+      "classification": "incubator-commerce-prototype",
+      "releaseGate": false,
+      "action": "disable-production",
+      "owner": "watch-pass",
+      "decisionRefs": ["watch-pass-incubating-no-billing"]
+    },
+    {
+      "entrypoint": "visual-proof.html",
+      "classification": "internal",
+      "releaseGate": false,
+      "action": "retain-redesign-isolate",
+      "owner": "visual-proof",
+      "decisionRefs": ["proof-surfaces-internal-only"]
+    },
+    {
+      "entrypoint": "future-phaser.html",
+      "classification": "retire",
+      "releaseGate": false,
+      "action": "extract-tests-remove-entrypoint",
+      "owner": "adapter-contract",
+      "decisionRefs": ["future-phaser-retire-after-adapter-extraction"]
+    },
+    {
+      "entrypoint": "planet3d.html",
+      "classification": "lab",
+      "releaseGate": false,
+      "action": "isolate-exclude-core",
+      "owner": "planet3d-lab",
+      "decisionRefs": ["planet3d-isolated-lab-excluded-from-core-v1"]
+    }
+  ],
+  "coreReleaseAcceptanceSet": ["index.html"],
+  "watchPass": {
+    "productionBillingClaim": false,
+    "entitlement": "prototype-only",
+    "featureBoundary": "flag",
+    "decisionRef": "watch-pass-incubating-no-billing"
+  },
+  "planet3d": {
+    "isolatedLab": true,
+    "includedInCoreV1": false,
+    "decisionRef": "planet3d-isolated-lab-excluded-from-core-v1"
+  },
+  "menuSceneDecomposition": {
+    "bigBangRewrite": false,
+    "approach": "characterization-and-adapters-across-later-waves",
+    "decisionRef": "no-big-bang-menuscene-rewrite"
+  },
+  "prProtection": {
+    "openPrsAtWaveTime": [82, 83],
+    "protectedPaths": [
+      "src/scenes/MenuScene.ts",
+      "src/scenes/menuRuntimeDiagnostics.ts",
+      "src/legacy-runtime/legacyAuth.ts",
+      "src/legacy-runtime/legacyPlayerMessage.ts",
+      "scripts/analysis/capture-auth-capability-surfaces.mjs",
+      "scripts/analysis/capture-ui-surfaces.mjs",
+      "scripts/analysis/live-auth-persistence-soak.mjs",
+      "vite.config.ts",
+      "package.json"
+    ],
+    "note": "protectedPaths is a snapshot of PR #83's file-ownership collision list (per blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md file ownership guardrails) plus the always-protected vite.config.ts and package.json. Reconciliation is Wave 0B, integrator-exclusive, not this lane (0A has exclusiveFiles: [] per spec/pr-lanes.json).",
+    "additionalOwnershipGuardrails": [
+      {
+        "surface": "shared token exports",
+        "status": "not-yet-created",
+        "note": "Listed as a single-owner/integrator surface in blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md's file ownership guardrails table, alongside the paths above. No concrete file exists yet -- Wave 1B (PR 1B, semantic tokens and cross-renderer consumption) is what creates it. Recorded here so the exact path can be added to protectedPaths the moment it exists, rather than the guardrail being silently dropped."
+      }
+    ],
+    "decisionRef": "pr83-protected-paths-hold"
+  },
+  "redesignComplete": {
+    "claimed": false,
+    "acceptanceEvidenceRef": null,
+    "decisionRef": "no-redesign-complete-without-acceptance-matrix"
+  }
+}
