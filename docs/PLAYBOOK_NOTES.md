@@ -51,3 +51,9 @@ Use this file to record meaningful Playbook-governed repo changes in a concise, 
 - WHAT changed: Added the Mazer-only Supabase storage contract, migration-backed account/profile tables, separate player and AI-runner progression storage, compact cycle receipt storage, and server-owned Stripe license/payment-wall tables.
 - WHY it changed: Mazer needs its own tight data boundary before remote learning, per-account AI progression, account progression sync, and future paid licenses can ship without mixing game data into Fitness-owned storage.
 - Evidence: `npx vitest run tests/reset/legacy-remote-progression.test.ts tests/reset/legacy-auth.test.ts tests/reset/legacy-progression.test.ts --maxWorkers 1`; `npm run lint`; `npm run build`.
+
+## 2026-08-03
+
+- WHAT changed: Removed `src/render/hudRenderer.ts` (the `createDemoStatusHud` Phaser HUD overlay and its supporting types/profiles), confirmed dead: zero references to the file path or any of its exported symbols (`HudThemeStyle`, `createDemoStatusHud`) anywhere in source, tests, or scripts. Last touched 2026-06-27, from the original "menu demo AI" build, superseded by the current `legacy-runtime/legacyPlayHud.ts` HUD system.
+- WHY it changed: A 409-line Phaser-rendering module with a full theme/chrome/deployment-profile configuration surface was carrying real maintenance weight (it would need updating alongside any future HUD/theme/viewport refactor) while contributing nothing -- confirmed unreachable via a repo-wide grep for both the file path and every exported symbol, plus a clean `tsc --noEmit` and `npm run build` both before and after removal.
+- Evidence: `npx tsc --noEmit` (clean both before and after removal), `npm run build` (succeeds, no unresolved imports, no unintended tracked-file changes from the build itself), `npm run test` (485/485 pass, matching the pre-removal baseline exactly), repo-wide grep for `hudRenderer|createDemoStatusHud|HudThemeStyle` returning zero hits after removal.
