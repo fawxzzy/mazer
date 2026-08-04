@@ -1234,8 +1234,8 @@ describe('createDemoSpectatorPlan', () => {
     expect(plan.segmentCount).toBe(39);
   });
 
-  test('full profile on a short path (segmentCount < 6) falls back to the core-only shape with clipped-route text', () => {
-    const episode = buildDemoSpectatorEpisode(6); // segmentCount = 5, below the 6-segment floor
+  test('full profile on a short path (segmentCount below the 17-segment floor) falls back to the core-only shape with clipped-route text', () => {
+    const episode = buildDemoSpectatorEpisode(6); // segmentCount = 5, well below the floor
     const plan = createDemoSpectatorPlan(episode, 'full');
 
     expect(plan.keyItem).toBeNull();
@@ -1244,11 +1244,52 @@ describe('createDemoSpectatorPlan', () => {
     expect(plan.failureReasonSubtitle).toBe('The route stayed too short to justify a longer ritual pass.');
   });
 
-  test('full profile at exactly the 6-segment floor still falls back to core-only (boundary is exclusive)', () => {
-    const episode = buildDemoSpectatorEpisode(7); // segmentCount = 6
-    const plan = createDemoSpectatorPlan(episode, 'full');
-    // segmentCount < 6 is false at 6, so this should NOT be core-only -- confirms the exact boundary.
+  test('full profile still falls back to core-only for every segmentCount from 6 through 16 (mechanics would otherwise overlap)', () => {
+    // segmentCount 6..16 (pathLength 7..17) cannot fit all six full-profile
+    // mechanics without at least two landing on the same tile -- see the
+    // DEMO_SPECTATOR_FULL_PROFILE_MINIMUM_SEGMENT_COUNT comment in
+    // src/domain/ai/demoSpectator.ts. Confirmed by exhaustive enumeration.
+    for (let pathLength = 7; pathLength <= 17; pathLength += 1) {
+      const episode = buildDemoSpectatorEpisode(pathLength);
+      const plan = createDemoSpectatorPlan(episode, 'full');
+
+      expect(plan.keyItem).toBeNull();
+      expect(plan.failureReasonTitle).toBe('Route clipped');
+    }
+  });
+
+  test('full profile at exactly the 17-segment floor populates every mechanic without any tile collisions (boundary is exclusive)', () => {
+    const belowFloor = buildDemoSpectatorEpisode(17); // segmentCount = 16, still clipped
+    const atFloor = buildDemoSpectatorEpisode(18); // segmentCount = 17, first populated case
+
+    expect(createDemoSpectatorPlan(belowFloor, 'full').keyItem).toBeNull();
+
+    const plan = createDemoSpectatorPlan(atFloor, 'full');
     expect(plan.keyItem).not.toBeNull();
+
+    const path = Array.from(atFloor.raster.pathIndices);
+    const tileOwners: Array<[string, number]> = [
+      ['key', plan.keyItem!.tileIndex],
+      ['plate', plan.pressurePlate!.tileIndex],
+      ['door', plan.pressureDoor!.fromTileIndex],
+      ['door', plan.pressureDoor!.toTileIndex],
+      ...plan.patrolLane!.tileIndices.map((tileIndex): [string, number] => ['patrol', tileIndex]),
+      ['hazard', plan.hazardTile!.tileIndex],
+      ['gate', plan.timedGate!.fromTileIndex],
+      ['gate', plan.timedGate!.toTileIndex]
+    ];
+    const mechanicsByTile = new Map<number, Set<string>>();
+    for (const [mechanic, tileIndex] of tileOwners) {
+      const owners = mechanicsByTile.get(tileIndex) ?? new Set<string>();
+      owners.add(mechanic);
+      mechanicsByTile.set(tileIndex, owners);
+    }
+    for (const owners of mechanicsByTile.values()) {
+      expect(owners.size).toBe(1);
+    }
+    for (const tileIndex of tileOwners.map(([, tile]) => tile)) {
+      expect(path).toContain(tileIndex);
+    }
   });
 
   test('full profile on a long path populates every mechanic with cursors in strictly non-decreasing path order', () => {
