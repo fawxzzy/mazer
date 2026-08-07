@@ -79,10 +79,10 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('return hasExpectedTextLabels(labels, expectedLabels);');
     expect(source).toContain("actualLabel.startsWith(`${expectedLabel}: `)");
     expect(source).toContain('actualLabel.slice(expectedLabel.length + 2).trim().length > 0');
-    expect(source).toContain('const resolveOptionsBottomExpectedLabels = (authenticated) => [');
-    expect(source).toContain("authenticated ? 'Log out' : 'Account'");
+    expect(source).toContain('const resolveOptionsBottomExpectedLabels = (_authenticated) => [');
+    expect(source).toContain("'Account'\n];");
     expect(source).toContain("authFixture === 'authenticated' || menu.diagnostics.runtime?.auth?.status === 'authenticated'");
-    expect(source).toContain("surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out'])");
+    expect(source).toContain("surfaces.menu.authStatus === 'authenticated'");
     expect(source).toContain('hasLabels(surfaces.optionsBottom, optionsBottomExpectedLabels)');
     expect(source).toContain('const getVisualButtonPoint = (visual, text) => {');
     expect(source).toContain("const button = (visual?.buttons ?? []).find((entry) => entry?.text === text && isFiniteBounds(entry?.bounds));");
