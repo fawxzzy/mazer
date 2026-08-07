@@ -287,8 +287,70 @@ export const collectProtectedPathViolations = (changedFiles, registry) => {
   return violations;
 };
 
-// Reads real `git status --short` output relative to repoRoot and returns the changed file list.
-export const readGitChangedFiles = (root = repoRoot) => {
+// Resolves which ref to diff HEAD against for *committed*-change detection. Tried in order:
+// an explicit caller-supplied override, a manual `PROTECTED_PATH_BASE_REF` env var escape hatch,
+// a CI-provided base ref (`GITHUB_BASE_REF`, set by GitHub Actions on `pull_request` events, in
+// case this ever runs under CI in the future), then whichever of `origin/main` / `main` actually
+// resolves in this checkout. Returns null (rather than throwing) if none resolve -- e.g. a
+// shallow single-branch checkout with no remote and no local `main` -- so callers can degrade to
+// uncommitted-only checking instead of crashing the whole guard.
+const resolveProtectedPathBaseRef = (root, explicitBaseRef) => {
+  const candidates = [
+    explicitBaseRef,
+    process.env.PROTECTED_PATH_BASE_REF,
+    process.env.GITHUB_BASE_REF ? `origin/${process.env.GITHUB_BASE_REF}` : undefined,
+    'origin/main',
+    'main'
+  ].filter((candidate) => typeof candidate === 'string' && candidate.length > 0);
+
+  for (const candidate of candidates) {
+    try {
+      execFileSync('git', ['rev-parse', '--verify', '--quiet', `${candidate}^{commit}`], {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore']
+      });
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+};
+
+// Files that differ between HEAD and the merge-base with the resolved base ref -- i.e. everything
+// a real PR branch has *committed*, independent of working-tree state. This is the half of the
+// check that was previously missing entirely: once a branch is committed and pushed (the normal
+// state of any real PR head, and of any CI checkout), `git status --short` alone is empty and a
+// protected-path violation baked into history would go completely undetected.
+const readGitCommittedChangedFiles = (root, explicitBaseRef) => {
+  const baseRef = resolveProtectedPathBaseRef(root, explicitBaseRef);
+  if (!baseRef) {
+    return [];
+  }
+
+  let mergeBase;
+  try {
+    mergeBase = execFileSync('git', ['merge-base', baseRef, 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  } catch {
+    return [];
+  }
+  if (!mergeBase) {
+    return [];
+  }
+
+  try {
+    const output = execFileSync('git', ['diff', '--name-only', mergeBase, 'HEAD'], { cwd: root, encoding: 'utf8' });
+    return output.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+  } catch {
+    return [];
+  }
+};
+
+// Uncommitted working-tree changes only (staged, unstaged, untracked) via `git status --short`.
+// This is what the guard used to rely on *exclusively* -- correct for a live local edit, but blind
+// to anything already committed.
+const readGitUncommittedChangedFiles = (root) => {
   const output = execFileSync('git', ['status', '--short'], { cwd: root, encoding: 'utf8' });
   return output
     .split('\n')
@@ -301,6 +363,16 @@ export const readGitChangedFiles = (root = repoRoot) => {
       const path = arrowIndex === -1 ? withoutStatus : withoutStatus.slice(arrowIndex + 4);
       return path.replace(/^"(.*)"$/, '$1');
     });
+};
+
+// Union of committed (base...HEAD) and uncommitted (working tree) changed files, relative to
+// repoRoot. Governance must catch both: a fully-committed, clean-status PR head (the normal state
+// of anything actually mergeable) must not be read as "nothing changed" just because nothing is
+// staged or dirty right now.
+export const readGitChangedFiles = (root = repoRoot, options = {}) => {
+  const uncommitted = readGitUncommittedChangedFiles(root);
+  const committed = readGitCommittedChangedFiles(root, options.baseRef);
+  return Array.from(new Set([...committed, ...uncommitted]));
 };
 
 export const formatViolations = (violations) => {

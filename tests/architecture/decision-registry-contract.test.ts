@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 interface DecisionRegistryViolation {
   rule: string;
@@ -11,7 +15,7 @@ interface DecisionRegistryCheckerModule {
   collectDecisionRegistryViolations: (registry: Record<string, unknown>) => DecisionRegistryViolation[];
   collectEntrypointExistenceViolations: (registry: Record<string, unknown>, root?: string) => DecisionRegistryViolation[];
   collectProtectedPathViolations: (changedFiles: string[], registry: Record<string, unknown>) => DecisionRegistryViolation[];
-  readGitChangedFiles: (root?: string) => string[];
+  readGitChangedFiles: (root?: string, options?: { baseRef?: string }) => string[];
   formatViolations: (violations: DecisionRegistryViolation[]) => string;
   checkDecisionRegistry: (registry?: Record<string, unknown>, root?: string) => true;
 }
@@ -238,7 +242,7 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(violations).toEqual([]);
     });
 
-    it('runs the same checker against this working tree\'s real `git status --short` output and finds no protected path touched', async () => {
+    it('runs the same checker against this working tree\'s real committed-and-uncommitted changed files and finds no protected path touched', async () => {
       const { readDecisionRegistry, collectProtectedPathViolations, readGitChangedFiles } = await loadChecker();
       const registry = await readDecisionRegistry();
 
@@ -253,6 +257,84 @@ describe('Mazer UI rework decision registry contract', () => {
 
       const violations = collectProtectedPathViolations(changedFiles, registry);
       expect(violations).toEqual([]);
+    });
+  });
+
+  describe('protected-path guard closes the committed-diff gap (regression)', () => {
+    // Builds a throwaway, isolated git repository under the OS temp dir -- never the real mazer
+    // repo, never a real branch, never a real PR -- that reproduces exactly the shape of a real,
+    // pushed, mergeable PR head: a base commit on "main", then a feature branch that COMMITS a
+    // change to a path matching the registry's protectedPaths list, ending with a fully clean
+    // working tree (`git status --short` empty). Before this fix, readGitChangedFiles ignored
+    // committed history entirely and read only `git status --short`, so this exact scenario would
+    // have produced an empty changed-file list and a false "zero violations" pass -- exactly the
+    // gap the reported defect described. This proves the fixed guard actually closes it.
+    const runGit = (root: string, ...args: string[]): string => (
+      execFileSync('git', args, { cwd: root, encoding: 'utf8' })
+    );
+
+    const initFixtureRepo = (root: string): void => {
+      runGit(root, 'init', '-q', '-b', 'main');
+      runGit(root, 'config', 'user.email', 'fixture@example.invalid');
+      runGit(root, 'config', 'user.name', 'Protected Path Fixture');
+      writeFileSync(join(root, 'README.md'), 'fixture baseline\n');
+      runGit(root, 'add', 'README.md');
+      runGit(root, 'commit', '-q', '-m', 'baseline');
+    };
+
+    it('detects a fully-committed protected-path change even though `git status --short` is clean', async () => {
+      const { readGitChangedFiles, collectProtectedPathViolations, readDecisionRegistry } = await loadChecker();
+      const registry = readDecisionRegistry();
+
+      const root = mkdtempSync(join(tmpdir(), 'mazer-protected-path-fixture-'));
+      try {
+        initFixtureRepo(root);
+
+        runGit(root, 'checkout', '-q', '-b', 'feature/protected-path-regression');
+        mkdirSync(join(root, 'src', 'scenes'), { recursive: true });
+        writeFileSync(join(root, 'src', 'scenes', 'MenuScene.ts'), '// disposable fixture edit, not the real file\n');
+        runGit(root, 'add', 'src/scenes/MenuScene.ts');
+        runGit(root, 'commit', '-q', '-m', 'touches a protected path, fully committed');
+
+        // Sanity precondition: the fixture's working tree is clean, exactly like a real pushed PR
+        // head. This is precisely the state that made the old git-status-only implementation blind.
+        expect(runGit(root, 'status', '--short').trim()).toBe('');
+
+        const changedFiles = readGitChangedFiles(root, { baseRef: 'main' });
+        expect(changedFiles).toContain('src/scenes/MenuScene.ts');
+
+        const violations = collectProtectedPathViolations(changedFiles, registry);
+        expect(violations.some((entry) => (
+          entry.rule === 'protected-path-touched' && entry.path === 'src/scenes/MenuScene.ts'
+        ))).toBe(true);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it('still returns zero violations for a fixture branch whose committed changes never touch a protected path', async () => {
+      const { readGitChangedFiles, collectProtectedPathViolations, readDecisionRegistry } = await loadChecker();
+      const registry = readDecisionRegistry();
+
+      const root = mkdtempSync(join(tmpdir(), 'mazer-protected-path-fixture-clean-'));
+      try {
+        initFixtureRepo(root);
+
+        runGit(root, 'checkout', '-q', '-b', 'feature/unrelated-change');
+        writeFileSync(join(root, 'unrelated.txt'), 'not a protected path\n');
+        runGit(root, 'add', 'unrelated.txt');
+        runGit(root, 'commit', '-q', '-m', 'unrelated committed change');
+
+        expect(runGit(root, 'status', '--short').trim()).toBe('');
+
+        const changedFiles = readGitChangedFiles(root, { baseRef: 'main' });
+        expect(changedFiles).toContain('unrelated.txt');
+
+        const violations = collectProtectedPathViolations(changedFiles, registry);
+        expect(violations).toEqual([]);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
     });
   });
 });

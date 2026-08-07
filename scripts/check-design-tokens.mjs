@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { readGitChangedFiles } from './check-decision-registry.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TOKENS_PATH = 'docs/contracts/mazer-ui-rework-design-tokens.v1.json';
@@ -192,19 +192,13 @@ export const collectProtectedPathViolationsForTokens = (changedFiles, decisionRe
   return violations;
 };
 
-export const readGitChangedFilesForTokens = (root = repoRoot) => {
-  const output = execFileSync('git', ['status', '--short'], { cwd: root, encoding: 'utf8' });
-  return output
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => {
-      const withoutStatus = line.slice(2).trim();
-      const arrowIndex = withoutStatus.indexOf(' -> ');
-      const path = arrowIndex === -1 ? withoutStatus : withoutStatus.slice(arrowIndex + 4);
-      return path.replace(/^"(.*)"$/, '$1');
-    });
-};
+// Delegates to scripts/check-decision-registry.mjs's readGitChangedFiles, which unions committed
+// (base...HEAD) changes with uncommitted working-tree changes. Kept as its own exported name
+// (rather than re-exporting readGitChangedFiles directly) so existing callers/tests that import
+// readGitChangedFilesForTokens from this module keep working unchanged.
+export const readGitChangedFilesForTokens = (root = repoRoot, options = {}) => (
+  readGitChangedFiles(root, options)
+);
 
 export const formatViolations = (violations) => {
   if (violations.length === 0) {
