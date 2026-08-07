@@ -93,8 +93,14 @@ export interface UiStateSnapshot {
   readonly effectsQuality: EffectsQualityLiteral;
 }
 
+// Sentinel `field` value used only when the top-level snapshot itself is malformed (not an
+// object, or `null`) -- i.e. there is no single per-field culprit to name. Kept distinct from any
+// real `keyof UiStateSnapshot` so callers can tell "the whole snapshot was rejected" apart from
+// "one field's value was out of range" if they need to.
+const SNAPSHOT_ROOT_FIELD = '(snapshot)' as const;
+
 export interface UiStateSnapshotViolation {
-  field: keyof UiStateSnapshot;
+  field: keyof UiStateSnapshot | typeof SNAPSHOT_ROOT_FIELD;
   value: unknown;
   message: string;
 }
@@ -115,17 +121,39 @@ const memberCheck = <T extends string>(
  * snapshot. This is the runtime counterpart to the compile-time literal-union types above -- useful
  * once a real value (e.g. deserialized, or produced by a future legacy-state adapter) needs
  * checking rather than trusted at the type level alone.
+ *
+ * Takes `unknown` rather than `UiStateSnapshot` deliberately: the whole point of a runtime
+ * validator is to handle values the type system has not (yet) vouched for. A `UiStateSnapshot`
+ * argument is still accepted (it's assignable to `unknown`), so this is strictly wider, not a
+ * breaking change for any well-typed caller.
+ *
+ * Fails closed on a malformed *top-level* value too, not just malformed field values: `null`,
+ * `undefined`, or any other non-object top-level value produces a single violation (sentinel field
+ * `"(snapshot)"`) instead of throwing. Property access on a non-null primitive (a string, number,
+ * boolean, array, or object missing fields) never throws in JS -- it already fell through to
+ * per-field violations correctly (`undefined` is simply not a member of any registered enum) -- but
+ * `null`/`undefined` throw on property access (`Cannot read properties of null/undefined`) rather
+ * than producing a violation, which this top-level guard closes.
  */
-export const collectUiStateSnapshotViolations = (snapshot: UiStateSnapshot): UiStateSnapshotViolation[] => (
-  [
-    memberCheck('primarySurface', snapshot.primarySurface, PRIMARY_SURFACES),
-    memberCheck('modalSurface', snapshot.modalSurface, MODAL_SURFACES),
-    memberCheck('gamePhase', snapshot.gamePhase, GAME_PHASES),
-    memberCheck('authPhase', snapshot.authPhase, AUTH_PHASES),
-    memberCheck('connectionPhase', snapshot.connectionPhase, CONNECTION_PHASES),
-    memberCheck('installPhase', snapshot.installPhase, INSTALL_PHASES),
-    memberCheck('controlMode', snapshot.controlMode, CONTROL_MODES),
-    memberCheck('motionMode', snapshot.motionMode, MOTION_MODES),
-    memberCheck('effectsQuality', snapshot.effectsQuality, EFFECTS_QUALITY)
-  ].filter((entry): entry is UiStateSnapshotViolation => entry !== null)
-);
+export const collectUiStateSnapshotViolations = (snapshot: unknown): UiStateSnapshotViolation[] => {
+  if (typeof snapshot !== 'object' || snapshot === null) {
+    return [{
+      field: SNAPSHOT_ROOT_FIELD,
+      value: snapshot,
+      message: `snapshot must be a non-null object, received ${snapshot === null ? 'null' : typeof snapshot}.`
+    }];
+  }
+
+  const candidate = snapshot as Record<keyof UiStateSnapshot, unknown>;
+  return [
+    memberCheck('primarySurface', candidate.primarySurface, PRIMARY_SURFACES),
+    memberCheck('modalSurface', candidate.modalSurface, MODAL_SURFACES),
+    memberCheck('gamePhase', candidate.gamePhase, GAME_PHASES),
+    memberCheck('authPhase', candidate.authPhase, AUTH_PHASES),
+    memberCheck('connectionPhase', candidate.connectionPhase, CONNECTION_PHASES),
+    memberCheck('installPhase', candidate.installPhase, INSTALL_PHASES),
+    memberCheck('controlMode', candidate.controlMode, CONTROL_MODES),
+    memberCheck('motionMode', candidate.motionMode, MOTION_MODES),
+    memberCheck('effectsQuality', candidate.effectsQuality, EFFECTS_QUALITY)
+  ].filter((entry): entry is UiStateSnapshotViolation => entry !== null);
+};

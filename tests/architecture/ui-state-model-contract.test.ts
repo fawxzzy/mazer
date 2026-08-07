@@ -178,6 +178,49 @@ describe('Mazer UI rework state model contract', () => {
       const violations = collectUiStateSnapshotViolations(snapshot);
       expect(violations.some((entry) => entry.field === 'effectsQuality')).toBe(true);
     });
+
+    // Regression coverage for the fail-closed top-level validation gap: a malformed/non-object
+    // top-level value (as an untrusted caller might genuinely pass -- e.g. a failed JSON.parse
+    // result, a missing field from a deserialized payload, or simply `undefined`) must be handled
+    // as a clean violation, not throw an uncaught TypeError from property access on `null`/
+    // `undefined`. Before the fix, `null` and `undefined` specifically threw
+    // ("Cannot read properties of null/undefined (reading 'primarySurface')") instead of returning
+    // a violation array, even though other non-object values (strings, numbers, arrays, `{}`)
+    // already failed closed correctly by construction.
+    it.each([
+      ['null', null],
+      ['undefined', undefined],
+      ['a string', 'not-a-snapshot'],
+      ['a number', 42],
+      ['a boolean', true],
+      ['an array', ['not', 'a', 'snapshot']],
+      ['an empty object', {}]
+    ])('collectUiStateSnapshotViolations does not throw and returns a violation for %s', (_label, malformed) => {
+      let violations: ReturnType<typeof collectUiStateSnapshotViolations> | undefined;
+      expect(() => {
+        violations = collectUiStateSnapshotViolations(malformed as unknown as UiStateSnapshot);
+      }).not.toThrow();
+
+      expect(violations).toBeDefined();
+      expect(violations!.length).toBeGreaterThan(0);
+    });
+
+    it('collectUiStateSnapshotViolations reports a single sentinel-field violation for a malformed top-level value', () => {
+      const violations = collectUiStateSnapshotViolations(null as unknown as UiStateSnapshot);
+      expect(violations).toEqual([
+        {
+          field: '(snapshot)',
+          value: null,
+          message: 'snapshot must be a non-null object, received null.'
+        }
+      ]);
+    });
+
+    it('collectUiStateSnapshotViolations reports one violation per field for a well-formed-but-empty object', () => {
+      const violations = collectUiStateSnapshotViolations({} as unknown as UiStateSnapshot);
+      expect(violations).toHaveLength(9);
+      expect(violations.every((entry) => entry.value === undefined)).toBe(true);
+    });
   });
 
   describe('PR #83 / PR #82 protected-path self-check (reused from Wave 0A/1B)', () => {
