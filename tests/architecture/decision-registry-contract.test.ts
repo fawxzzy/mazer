@@ -448,5 +448,58 @@ describe('Mazer UI rework decision registry contract', () => {
         rmSync(root, { recursive: true, force: true });
       }
     });
+
+    // Proves resolveCurrentGitBranch survives a DETACHED HEAD checkout by exact commit SHA -- the
+    // same shape a clean-room "clone fresh, checkout the exact pushed commit" verification pass
+    // produces (this repo's own established verification convention), and the same shape most CI
+    // checkout actions produce. Caught for real: an earlier version of this mechanism relied only
+    // on `git rev-parse --abbrev-ref HEAD`, which returns the literal string "HEAD" once detached,
+    // silently making every branch-scoped release inapplicable and reintroducing exactly the 3
+    // self-check failures this release mechanism exists to fix, the moment anyone re-verified the
+    // exact pushed commit instead of the live branch.
+    it('resolves the branch name from a remote-tracking ref pointing at HEAD even when HEAD is detached', async () => {
+      const { resolveCurrentGitBranch } = await loadChecker();
+
+      const root = mkdtempSync(join(tmpdir(), 'mazer-protected-path-fixture-detached-'));
+      try {
+        initFixtureRepo(root);
+        runGit(root, 'checkout', '-q', '-b', 'claude/example-successor-branch');
+        writeFileSync(join(root, 'feature.txt'), 'feature commit\n');
+        runGit(root, 'add', 'feature.txt');
+        runGit(root, 'commit', '-q', '-m', 'feature commit');
+        const featureSha = runGit(root, 'rev-parse', 'HEAD').trim();
+
+        // No real "origin" remote is needed to reproduce the bug: what matters is a ref under
+        // refs/remotes/origin/* pointing at the same commit, which is exactly what `git fetch`
+        // from a real remote leaves behind.
+        runGit(root, 'update-ref', 'refs/remotes/origin/claude/example-successor-branch', featureSha);
+        runGit(root, 'checkout', '-q', '--detach', featureSha);
+        expect(runGit(root, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('HEAD');
+
+        expect(resolveCurrentGitBranch(root)).toBe('claude/example-successor-branch');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it('returns null (not a crash, not a false match) when HEAD is detached and no ref points at it', async () => {
+      const { resolveCurrentGitBranch } = await loadChecker();
+
+      const root = mkdtempSync(join(tmpdir(), 'mazer-protected-path-fixture-detached-orphan-'));
+      try {
+        initFixtureRepo(root);
+        // Detach first (still at the baseline commit, so `main` is untouched), then commit while
+        // detached -- the new commit has no branch and no remote-tracking ref pointing at it.
+        runGit(root, 'checkout', '-q', '--detach', 'HEAD');
+        writeFileSync(join(root, 'unreachable.txt'), 'orphaned commit\n');
+        runGit(root, 'add', 'unreachable.txt');
+        runGit(root, 'commit', '-q', '-m', 'orphaned commit, no branch or remote ref will point here');
+        expect(runGit(root, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('HEAD');
+
+        expect(resolveCurrentGitBranch(root)).toBeNull();
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
   });
 });

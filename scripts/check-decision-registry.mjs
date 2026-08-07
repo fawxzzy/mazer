@@ -320,14 +320,47 @@ export const collectEntrypointExistenceViolations = (registry, root = repoRoot) 
   return violations;
 };
 
+// Reads every ref (local branch or origin remote-tracking branch) that currently points at HEAD's
+// exact commit, and returns the first branch-name match. This is what makes branch resolution
+// survive a DETACHED HEAD checkout -- e.g. `git clone` + `git checkout <exact-sha>`, the standard
+// pattern this repo's own clean-room verification passes use to re-verify an exact pushed commit,
+// and the same shape most CI checkout actions produce. In that state
+// `git rev-parse --abbrev-ref HEAD` returns the literal string "HEAD", not a branch name, even
+// though the commit is unambiguously the tip of exactly one real branch.
+const resolveGitBranchFromRefsPointingAtHead = (root) => {
+  try {
+    const output = execFileSync('git', ['for-each-ref', '--points-at', 'HEAD', '--format=%(refname)'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    });
+    const refs = output.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+    for (const ref of refs) {
+      if (ref.startsWith('refs/heads/')) {
+        return ref.slice('refs/heads/'.length);
+      }
+    }
+    for (const ref of refs) {
+      if (ref.startsWith('refs/remotes/origin/')) {
+        return ref.slice('refs/remotes/origin/'.length);
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+};
+
 // Resolves the current branch name for protected-path *release* scoping (deliberately separate
 // from resolveProtectedPathBaseRef below, which resolves the *base* to diff against -- this
 // resolves HEAD's own branch identity). Tried in order: an explicit caller-supplied override, a
 // manual PROTECTED_PATH_RELEASE_BRANCH env var escape hatch, CI's GITHUB_HEAD_REF (set by GitHub
-// Actions on pull_request events, in case this ever runs under CI in the future), then
-// `git rev-parse --abbrev-ref HEAD`. Returns null (never throws) if none resolve -- e.g. a
-// detached HEAD checkout with no CI env set -- so callers must treat null as "no branch-scoped
-// release can possibly apply," not as an error.
+// Actions on pull_request events, in case this ever runs under CI in the future),
+// `git rev-parse --abbrev-ref HEAD` (the common case: an actual checked-out branch), then a
+// detached-HEAD-safe fallback that finds a local or origin remote-tracking ref pointing at the
+// exact same commit (see resolveGitBranchFromRefsPointingAtHead). Returns null (never throws) if
+// none resolve -- so callers must treat null as "no branch-scoped release can possibly apply," not
+// as an error.
 export const resolveCurrentGitBranch = (root = repoRoot, explicitBranch) => {
   const candidates = [explicitBranch, process.env.PROTECTED_PATH_RELEASE_BRANCH, process.env.GITHUB_HEAD_REF]
     .filter((candidate) => typeof candidate === 'string' && candidate.length > 0);
@@ -340,10 +373,13 @@ export const resolveCurrentGitBranch = (root = repoRoot, explicitBranch) => {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore']
     }).trim();
-    return output && output !== 'HEAD' ? output : null;
+    if (output && output !== 'HEAD') {
+      return output;
+    }
   } catch {
-    return null;
+    // fall through to the detached-HEAD-safe resolver
   }
+  return resolveGitBranchFromRefsPointingAtHead(root);
 };
 
 // Returns the Set of protectedPaths that are actively released for exactly `branchName`, per
