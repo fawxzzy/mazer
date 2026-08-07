@@ -24,6 +24,113 @@ Live audit result after migration hardening:
 - `authenticated` has only the client-needed progression/profile/cycle grants.
 - Stripe/license tables are not applied yet.
 
+## Canonical Migration Source Chain
+
+The repository migration tree mirrors the four live migration identities in
+their live order:
+
+1. `20260709045557_mazer_progression_state.sql`
+2. `20260709045648_mazer_account_storage_contracts.sql`
+3. `20260709045725_mazer_tighten_public_table_grants.sql`
+4. `20260716211513_account_state_revisions.sql`
+
+The first two sources intentionally preserve their original pre-hardening grant
+statements. The third migration owns the later all-role revoke/regrant step.
+Do not fold that tightening backward into an already-applied historical source.
+
+The secret-free provenance record is
+`supabase/recovery/fp-mzr-rec-001-provenance.json`. It binds each committed
+source to sanitized read-only live migration evidence using independent live
+raw, canonical SQL, and repository-LF digests. Run:
+
+```sh
+npm run supabase:verify-source-recovery
+```
+
+For an owned disposable PostgreSQL 17 replay:
+
+```sh
+npm run supabase:replay-source-recovery
+```
+
+The replay requires PostgreSQL major 17 for `postgres`, `initdb`, `pg_ctl`, and
+`psql`. On POSIX systems it must also run as a known non-root user because
+PostgreSQL refuses `initdb` as root. The verifier rejects root, an unknown
+POSIX uid, or a mixed/non-17 toolchain before cluster creation. This packet
+proves the Windows replay path only; Linux/container replay remains unproven.
+
+Replay creates two fresh databases on an owned non-production listener, applies
+all four migrations from zero, compares deterministic catalog signatures, and
+removes its listener and data directory. The replay uses only sanitized fixture
+roles plus the minimal `auth.users`/`auth.uid()` contract needed to parse the
+historical SQL. It is not production parity. Supabase-managed extension
+behavior, including `supabase_vault`, remains `UNKNOWN` when unavailable in
+the disposable PostgreSQL runtime.
+
+### Existing Database History Guard
+
+Do not apply the recovered timestamp chain normally to a database that already
+recorded any of these prior repository versions:
+
+- `20260709005739`
+- `20260709011209`
+- `20260716205924`
+
+Those historical sources already created the same objects and policies. Normal
+application of the recovered timestamps can therefore stop on duplicate
+objects before reaching the final state.
+
+The required fail-closed preflight is:
+
+1. Read the target migration history before any push or replay.
+2. If an external target's history is empty, treat the schema as
+   `EMPTY_UNPROVEN`; history alone does not authorize normal apply. This packet's
+   only empty-history authorization path is the owned disposable replay harness:
+   it creates the database, independently queries every governed Mazer catalog
+   kind, and permits replay only when every count is zero. Missing, malformed,
+   contradictory, or populated evidence remains blocked.
+3. If it exactly matches the four recovered versions, no repair is needed.
+4. If it exactly matches the three legacy versions:
+   - reset and replay from zero when the database is disposable; or
+   - for a retained database, first prove its Mazer catalog matches every
+     captured live non-provider signature, obtain a target-specific migration
+     lease and verified backup, then use the emitted history-repair plan.
+5. Treat mixed, partial, or unknown histories as `BLOCKED`; do not run normal
+   migration application or history repair.
+
+After obtaining the exact read-only version list, generate the non-mutating
+repair plan by passing that observed history explicitly:
+
+```sh
+npm run supabase:legacy-repair-plan -- --applied-versions 20260709005739,20260709011209,20260716205924 \
+  --confirmed-prerequisites target_specific_migration_lease,exact_live_mazer_catalog_signature_match,verified_backup_or_disposable_classification
+```
+
+The plan first emits `applied` commands for all four recovered versions, then
+emits `reverted` commands for the three legacy versions. This forward-first
+ordering means an interruption cannot expose an empty, falsely fresh migration
+history.
+Omitting `--applied-versions` or passing an empty value yields `UNKNOWN`, emits
+no commands, and exits non-zero. Outside this CLI, an independently observed
+empty history is `EMPTY_UNPROVEN`; a populated or contradictory catalog proof
+is `BLOCKED`. Current, mixed, partial, or unknown observed
+histories likewise emit no commands; only the exact observed legacy history
+plus explicit confirmation of every target-specific pre-repair prerequisite
+produces a successful executable plan. Do not pass a prerequisite name until
+its target-specific lease, catalog comparison, or backup/classification receipt
+exists. The post-repair migration-history readback remains mandatory after the
+commands execute and is listed separately in the plan output.
+The legacy repair-plan CLI intentionally does not accept or authorize
+empty-history catalog proof. Only the owned replay harness can return `FRESH`
+in this packet because it creates the disposable database and performs the
+independent catalog query itself. External empty-history targets remain blocked
+for separately governed disposition.
+Generating a valid plan changes nothing. Executing its commands is a separately
+authorized target mutation and is forbidden without the prerequisites above.
+The disposable replay gate proves the legacy history is detected, normal apply
+is refused, history-only repair leaves the exact Mazer schema unchanged, and a
+second repair is deterministic.
+
 ## Tables
 
 - `public.mazer_profiles`: player-facing profile/settings row keyed by `auth.users.id`.

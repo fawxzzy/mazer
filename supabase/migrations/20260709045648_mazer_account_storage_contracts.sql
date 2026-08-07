@@ -85,9 +85,9 @@ create index if not exists mazer_cycle_receipts_user_completed_idx
 create index if not exists mazer_cycle_receipts_surface_completed_idx
   on public.mazer_cycle_receipts (surface, completed_at desc);
 
-revoke all on table public.mazer_profiles from anon, authenticated, service_role;
-revoke all on table public.mazer_ai_progression_states from anon, authenticated, service_role;
-revoke all on table public.mazer_cycle_receipts from anon, authenticated, service_role;
+revoke all on table public.mazer_profiles from anon;
+revoke all on table public.mazer_ai_progression_states from anon;
+revoke all on table public.mazer_cycle_receipts from anon;
 
 grant select, insert, update on public.mazer_profiles to authenticated;
 grant select, insert, update on public.mazer_ai_progression_states to authenticated;
