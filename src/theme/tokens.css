@@ -1,0 +1,61 @@
+/*
+ * Mazer UI rework -- Wave 1B semantic design tokens (Fawxzzy Precision Arcade).
+ *
+ * Source of truth: docs/contracts/mazer-ui-rework-design-tokens.v1.json
+ * Cross-checked by: scripts/check-design-tokens.mjs / tests/architecture/design-tokens-contract.test.ts
+ *
+ * This file is NOT imported by index.html, vite.config.ts, src/styles/base.css, or any other
+ * live-render path yet. It is registered and contract-tested plumbing for later waves (2A DOM
+ * foundation, 4D shared path renderer/title) to consume -- wiring it into the shipping shell is
+ * explicitly out of scope for this wave. See docs/architecture/MAZER-UI-REWORK-DESIGN-TOKENS.md.
+ */
+
+:root {
+  --mazer-token-color-bg-canvas: #03070B;
+  --mazer-token-color-bg-shell: #07131A;
+  --mazer-token-color-bg-panel: #0B1A22;
+  --mazer-token-color-bg-elevated: #10242B;
+  --mazer-token-color-line-subtle: #23434A;
+  --mazer-token-color-line-normal: #5D9F98;
+  --mazer-token-color-line-active: #A7E7D9;
+  --mazer-token-color-brand-mint: #C3F4B9;
+  --mazer-token-color-world-pathCore: #E9FFF1;
+  --mazer-token-color-semantic-energy: #39F58A;
+  --mazer-token-color-semantic-info: #6BE8E1;
+  --mazer-token-color-semantic-reward: #F4C84A;
+  --mazer-token-color-semantic-danger: #FF405D;
+  --mazer-token-color-semantic-anomaly: #AF79FF;
+  --mazer-token-color-text-primary: #F1FAF6;
+  --mazer-token-color-text-muted: #94AAA8;
+  --mazer-token-color-text-disabled: #5D7478;
+
+  --mazer-token-spacing-4: 4px;
+  --mazer-token-spacing-8: 8px;
+  --mazer-token-spacing-12: 12px;
+  --mazer-token-spacing-16: 16px;
+  --mazer-token-spacing-20: 20px;
+  --mazer-token-spacing-24: 24px;
+  --mazer-token-spacing-32: 32px;
+  --mazer-token-spacing-48: 48px;
+  --mazer-token-spacing-64: 64px;
+
+  --mazer-token-radius-control: 8px;
+  --mazer-token-radius-panel: 12px;
+  --mazer-token-radius-sheet: 16px;
+  --mazer-token-radius-round: 999px;
+
+  --mazer-token-stroke-hairline: 1px;
+  --mazer-token-stroke-normal: 2px;
+  --mazer-token-stroke-focus: 3px;
+
+  --mazer-token-motion-instant: 90ms;
+  --mazer-token-motion-press: 140ms;
+  --mazer-token-motion-panel: 220ms;
+  --mazer-token-motion-emphasis: 420ms;
+
+  --mazer-token-touch-target-min: 44px;
+  --mazer-token-touch-target-preferred: 56px;
+
+  --mazer-token-font-ui: Space Grotesk, ui-sans-serif, system-ui;
+  --mazer-token-font-metrics: IBM Plex Mono, ui-monospace, monospace;
+}
