@@ -2,7 +2,7 @@
 
 ## Authority
 
-The machine-readable denominator is `docs/contracts/fitness-mazer-auth-capability-matrix.v1.json` (18 rows). It measures capability parity with Fitness without copying Fitness's server-rendered implementation into Mazer's client-only Phaser runtime.
+The machine-readable denominator is `docs/contracts/fitness-mazer-auth-capability-matrix.v1.json` (19 rows). It measures capability parity with Fitness without copying Fitness's server-rendered implementation into Mazer's client-only Phaser runtime.
 
 ## Phase-one contract
 
@@ -13,7 +13,7 @@ The machine-readable denominator is `docs/contracts/fitness-mazer-auth-capabilit
 - `https://account.fawxzzy.com` is the approved future central origin. It is declared as future authority, not used as a false live cutover.
 - Wildcard, credential-bearing, fragment-bearing, non-HTTPS, and otherwise invalid configured redirects fail closed to the exact same-origin compatibility route. Provider callback credentials are never logged and callback parameters are removed after Supabase consumes the callback.
 - Reset requests use neutral copy for known and unknown accounts and a deterministic 60-second client cooldown. Provider rate limits remain authoritative.
-- Provider errors are mapped into an allowlisted player-safe vocabulary. Raw provider messages are not rendered.
+- Provider errors are mapped into an allowlisted player-safe vocabulary. Raw provider messages are not rendered. The raw provider error is still captured separately as `LegacyAuthActionResult.providerDiagnostic` and surfaced only into the `runtimeDiagnostics=1`-gated diagnostics attribute (`authAction.providerDetail`), never into any player-visible label -- this exists so a misconfigured redirect allowlist or an unreachable/misconfigured provider cannot masquerade as a clean success (e.g. reset-request's neutral "email sent" copy) with zero trace anywhere.
 - Authenticated users can reach Account from Options to update email/display name, change or recover a password, and sign out locally.
 - The canonical global username slot exists behind `VITE_MAZER_PLATFORM_USERNAME_CAPABILITY=read-write`. The default is disabled. Enabling the slot permits profile metadata editing only; it does not claim uniqueness, privileged resolution, or username login.
 

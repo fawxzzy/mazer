@@ -50,6 +50,17 @@ export interface LegacyAuthSubmitState {
 
 export interface LegacyAuthActionResult {
   cooldownSeconds?: number;
+  /**
+   * The raw, untouched provider error message (e.g. "Redirect URL not allowed for this project"),
+   * captured for internal/non-user-facing diagnostics ONLY. `snapshot.error`/`snapshot.info` are
+   * what the player actually sees and stay enumeration-safe and provider-detail-free via
+   * `resolveLegacyAuthSafeErrorCopy`; this field exists so a misconfigured redirect allowlist or
+   * unreachable/misconfigured provider does not masquerade as a clean success with zero trace
+   * anywhere. Callers must never render this value in player-facing UI -- route it only to a
+   * diagnostics surface gated behind an explicit opt-in (see MenuScene's runtimeDiagnostics=1
+   * `authAction.providerDetail`). `null` when the action succeeded or no provider call was made.
+   */
+  providerDiagnostic?: string | null;
   snapshot: LegacyAuthSessionSnapshot;
 }
 
@@ -676,6 +687,7 @@ export const signInLegacyAuth = async (
   }
 
   return {
+    providerDiagnostic: error?.message ?? null,
     snapshot
   };
 };
@@ -722,6 +734,7 @@ export const signUpLegacyAuth = async (
   }
 
   return {
+    providerDiagnostic: error?.message ?? null,
     snapshot
   };
 };
@@ -757,8 +770,15 @@ export const requestLegacyPasswordReset = async (email: string): Promise<LegacyA
     ? safeError
     : null;
 
+  // Every other provider error (e.g. a misconfigured/disallowed redirectTo, an unreachable
+  // project, an invalid API key) deliberately still shows the player the same neutral
+  // "if that email has an account..." copy -- that is what keeps reset-request enumeration-safe.
+  // Without providerDiagnostic, that same design would let a bad redirect allowlist masquerade as
+  // a clean "reset email sent" with zero trace anywhere; providerDiagnostic preserves the raw
+  // provider error for internal/non-user-facing diagnostics only (see LegacyAuthActionResult).
   return {
     cooldownSeconds: nextCooldown.remainingSeconds,
+    providerDiagnostic: error?.message ?? null,
     snapshot: createGuestSnapshot(true, {
       error: visibleError,
       info: visibleError ? null : LEGACY_AUTH_MESSAGE_COPY.passwordResetSent
@@ -785,6 +805,7 @@ export const updateLegacyPassword = async (password: string): Promise<LegacyAuth
   const { error } = await client.auth.updateUser({ password });
   const { data: sessionData } = await client.auth.getSession();
   return {
+    providerDiagnostic: error?.message ?? null,
     snapshot: createLegacyAuthSessionSnapshot(sessionData.session, undefined, {
       error: resolveLegacyAuthSafeErrorCopy(error?.message, 'password-update'),
       info: error ? null : LEGACY_AUTH_MESSAGE_COPY.passwordUpdated
@@ -815,6 +836,7 @@ export const updateLegacyAccount = async (
   });
   const { data: sessionData } = await client.auth.getSession();
   return {
+    providerDiagnostic: error?.message ?? null,
     snapshot: createLegacyAuthSessionSnapshot(sessionData.session, undefined, {
       error: resolveLegacyAuthSafeErrorCopy(error?.message, 'account-update'),
       info: error ? null : LEGACY_AUTH_MESSAGE_COPY.accountUpdated
@@ -837,6 +859,7 @@ export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
   }
 
   return {
+    providerDiagnostic: error?.message ?? null,
     snapshot: createGuestSnapshot(true, {
       error: resolveLegacyAuthSafeErrorCopy(error?.message, 'signout'),
       info: error ? null : LEGACY_AUTH_MESSAGE_COPY.signedOut

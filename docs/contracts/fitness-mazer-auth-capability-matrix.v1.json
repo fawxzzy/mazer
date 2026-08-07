@@ -1,7 +1,7 @@
 {
   "contract": "fitness-to-mazer-auth-capability-parity",
   "version": "1.0.0",
-  "denominator": 18,
+  "denominator": 19,
   "capabilities": [
     { "id": "auth.email-password-login", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
     { "id": "auth.signup-confirmation-redirect", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
@@ -20,6 +20,7 @@
     { "id": "auth.account-password-change", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
     { "id": "auth.global-username-slot", "disposition": "capability-gated", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
     { "id": "auth.deferred-methods", "disposition": "deferred", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
-    { "id": "auth.leaked-password-protection", "disposition": "provider-setting", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" }
+    { "id": "auth.leaked-password-protection", "disposition": "provider-setting", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" },
+    { "id": "auth.provider-diagnostic-capture", "disposition": "implemented", "evidence": "tests/reset/legacy-auth-capabilities.test.ts" }
   ]
 }

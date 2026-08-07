@@ -901,6 +901,14 @@ interface LegacyAuthActionDiagnostics {
   info: string | null;
   mode: LegacyAuthFormState['mode'];
   passwordLength: number;
+  /**
+   * The raw, untouched provider error (LegacyAuthActionResult.providerDiagnostic), exposed ONLY
+   * through this runtimeDiagnostics=1-gated diagnostics attribute -- never rendered as a visible
+   * player-facing label. `error`/`info` above are the enumeration-safe copy the player actually
+   * sees; this lets a misconfigured redirect allowlist or unreachable provider be diagnosed
+   * without ever weakening the player-facing message.
+   */
+  providerDetail: string | null;
   reason: string | null;
   sequence: number;
   stage: 'started' | 'blocked' | 'submitting' | 'result' | 'exception';
@@ -9877,6 +9885,7 @@ export class MenuScene extends Phaser.Scene {
       info: input.info ?? null,
       mode: input.mode ?? this.authForm.mode,
       passwordLength: input.passwordLength ?? this.authForm.password.length,
+      providerDetail: input.providerDetail ?? null,
       reason: input.reason ?? null,
       sequence: this.authActionDiagnosticsSequence,
       stage: input.stage,
@@ -10055,6 +10064,7 @@ export class MenuScene extends Phaser.Scene {
       };
       this.recordLegacyAuthActionDiagnostics({
         error: safeMessage,
+        providerDetail: message,
         stage: 'exception',
         status: this.authSnapshot.status
       });
@@ -10072,6 +10082,7 @@ export class MenuScene extends Phaser.Scene {
     this.recordLegacyAuthActionDiagnostics({
       error: result.snapshot.error,
       info: result.snapshot.info,
+      providerDetail: result.providerDiagnostic ?? null,
       stage: 'result',
       status: result.snapshot.status
     });
@@ -10143,6 +10154,7 @@ export class MenuScene extends Phaser.Scene {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       result = {
+        providerDiagnostic: detail,
         snapshot: {
           ...this.authSnapshot,
           error: resolveLegacyAuthSafeErrorCopy(detail, 'reset-request'),
@@ -10151,6 +10163,18 @@ export class MenuScene extends Phaser.Scene {
       };
     }
     this.authSubmitting = false;
+    // The player-facing snapshot (result.snapshot) always stays enumeration-safe -- a real
+    // provider/config error (e.g. a disallowed redirectTo) still resolves to the same neutral
+    // "if that email has an account..." copy. providerDiagnostic is recorded separately, only
+    // into the runtimeDiagnostics=1-gated diagnostics attribute, so that kind of misconfiguration
+    // remains diagnosable without ever weakening the player-facing message.
+    this.recordLegacyAuthActionDiagnostics({
+      error: result.snapshot.error,
+      info: result.snapshot.info,
+      providerDetail: result.providerDiagnostic ?? null,
+      stage: 'result',
+      status: result.snapshot.status
+    });
     this.applyLegacyAuthSnapshot(result.snapshot);
     this.uiDirty = true;
   }
@@ -10170,6 +10194,13 @@ export class MenuScene extends Phaser.Scene {
       readLegacyRememberedIdentity(this.resolveBrowserLocalStorage())
     );
     this.activeAuthField = null;
+    this.recordLegacyAuthActionDiagnostics({
+      error: result.snapshot.error,
+      info: result.snapshot.info,
+      providerDetail: result.providerDiagnostic ?? null,
+      stage: 'result',
+      status: result.snapshot.status
+    });
     this.applyLegacyAuthSnapshot(result.snapshot);
     this.uiDirty = true;
   }

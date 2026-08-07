@@ -97,7 +97,8 @@ const capabilityIds = [
   'auth.account-password-change',
   'auth.global-username-slot',
   'auth.deferred-methods',
-  'auth.leaked-password-protection'
+  'auth.leaked-password-protection',
+  'auth.provider-diagnostic-capture'
 ] as const;
 
 beforeAll(() => {
@@ -185,6 +186,49 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     expect(resolveLegacyAuthCallbackState(repeatedLocation)).toEqual({ kind: 'none', message: null });
   });
 
+  test('[auth.recovery-callback] classifies the real Supabase implicit-flow hash shape (access_token/refresh_token/type in the fragment), not just Mazer\'s ?auth= convenience param', () => {
+    // This is the literal shape Supabase Auth appends to a redirectTo URL for the implicit flow:
+    // #access_token=...&expires_in=...&refresh_token=...&token_type=bearer&type=recovery
+    const realRecoveryHash = resolveLegacyAuthCallbackState({
+      hash: '#access_token=eyJreal.jwt.value&expires_in=3600&refresh_token=v1.refresh&token_type=bearer&type=recovery',
+      search: ''
+    });
+    expect(realRecoveryHash).toEqual({ kind: 'recovery', message: LEGACY_AUTH_MESSAGE_COPY.recoveryReady });
+
+    const realSignupHash = resolveLegacyAuthCallbackState({
+      hash: '#access_token=eyJreal.jwt.value&expires_in=3600&refresh_token=v1.refresh&token_type=bearer&type=signup',
+      search: ''
+    });
+    expect(realSignupHash).toEqual({ kind: 'success', message: LEGACY_AUTH_MESSAGE_COPY.emailConfirmed });
+
+    // The real Supabase error redirect shape: #error=access_denied&error_code=otp_expired&error_description=...
+    const realErrorHash = resolveLegacyAuthCallbackState({
+      hash: '#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired',
+      search: ''
+    });
+    expect(realErrorHash).toEqual({ kind: 'error', message: LEGACY_AUTH_MESSAGE_COPY.callbackInvalid });
+
+    // Sanitizing a real implicit-flow callback URL must strip the token material from the fragment
+    // before it is ever preserved in browser history/referrers -- proven against the real shape,
+    // not just Mazer's own simplified query convenience param.
+    const sanitizedRealPath = resolveSanitizedLegacyAuthCallbackPath({
+      hash: '#access_token=eyJreal.jwt.value&refresh_token=v1.refresh&type=recovery',
+      pathname: '/',
+      search: '?content=core-only'
+    });
+    expect(sanitizedRealPath).toBe('/?content=core-only');
+    expect(sanitizedRealPath).not.toContain('access_token');
+    expect(sanitizedRealPath).not.toContain('refresh_token');
+
+    // The PKCE-flow shape (?code=...&type=recovery in the query string, no hash) classifies the
+    // same way.
+    const realPkceRecovery = resolveLegacyAuthCallbackState({
+      hash: '',
+      search: '?code=00000000-0000-0000-0000-000000000000&type=recovery'
+    });
+    expect(realPkceRecovery).toEqual({ kind: 'recovery', message: LEGACY_AUTH_MESSAGE_COPY.recoveryReady });
+  });
+
   test('[auth.password-submission] submits the validated password through updateUser', async () => {
     const result = await updateLegacyPassword('a-secure-password');
     expect(mockAuth.updateUser).toHaveBeenCalledWith({ password: 'a-secure-password' });
@@ -255,6 +299,55 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
       VITE_MAZER_AUTH_CONFIRMATION_REDIRECT_URL: 'https://account.fawxzzy.com/confirmed',
       VITE_MAZER_AUTH_RECOVERY_REDIRECT_URL: 'https://account.fawxzzy.com/recovery'
     })).toMatchObject({ owner: 'platform-configured' });
+  });
+
+  test('[auth.redirect-ownership] the exact-URL allowlist fails closed for every other unsafe shape a misconfiguration could introduce', () => {
+    const unsafeConfigured = [
+      'https://user:pass@account.fawxzzy.com/confirmed', // embedded credentials
+      'https://account.fawxzzy.com/confirmed#token=leak', // hash fragment
+      'http://account.fawxzzy.com/confirmed', // non-HTTPS, non-localhost
+      'https://*.fawxzzy.com/confirmed', // wildcard host
+      'not a url at all', // unparseable
+      '   ', // blank/whitespace-only
+      'ftp://account.fawxzzy.com/confirmed' // non-http(s) scheme
+    ];
+    for (const unsafeUrl of unsafeConfigured) {
+      const contract = resolveLegacyAuthRedirectContract({
+        VITE_MAZER_AUTH_CONFIRMATION_REDIRECT_URL: unsafeUrl,
+        VITE_MAZER_AUTH_RECOVERY_REDIRECT_URL: unsafeUrl
+      }, 'https://fawxzzy-mazer.vercel.app');
+      expect(contract.owner).toBe('mazer-compatible');
+      expect(contract.confirmationRedirectTo).toBe('https://fawxzzy-mazer.vercel.app/?auth=confirmed');
+      expect(contract.recoveryRedirectTo).toBe('https://fawxzzy-mazer.vercel.app/?auth=recovery');
+    }
+
+    // http is accepted ONLY for localhost/127.0.0.1 (local dev), matching resolveSafeRuntimeOrigin.
+    expect(resolveLegacyAuthRedirectContract({
+      VITE_MAZER_AUTH_CONFIRMATION_REDIRECT_URL: 'http://localhost:5173/confirmed',
+      VITE_MAZER_AUTH_RECOVERY_REDIRECT_URL: 'http://127.0.0.1:5173/recovery'
+    })).toMatchObject({
+      confirmationRedirectTo: 'http://localhost:5173/confirmed',
+      owner: 'platform-configured',
+      recoveryRedirectTo: 'http://127.0.0.1:5173/recovery'
+    });
+
+    // Mixed configuration (only one of the two set) never claims platform-configured ownership --
+    // both must be independently valid before ownership transfers.
+    expect(resolveLegacyAuthRedirectContract({
+      VITE_MAZER_AUTH_CONFIRMATION_REDIRECT_URL: 'https://account.fawxzzy.com/confirmed',
+      VITE_MAZER_AUTH_RECOVERY_REDIRECT_URL: ''
+    }, 'https://fawxzzy-mazer.vercel.app').owner).toBe('mazer-compatible');
+
+    // An unsafe/unparseable runtimeOrigin itself falls back to a deterministic, safe local origin
+    // rather than propagating attacker-influenced input into the redirect target.
+    expect(resolveLegacyAuthRedirectContract({}, 'javascript:alert(1)')).toMatchObject({
+      confirmationRedirectTo: 'http://localhost:5173/?auth=confirmed',
+      recoveryRedirectTo: 'http://localhost:5173/?auth=recovery'
+    });
+    expect(resolveLegacyAuthRedirectContract({}, undefined)).toMatchObject({
+      confirmationRedirectTo: 'http://localhost:5173/?auth=confirmed',
+      recoveryRedirectTo: 'http://localhost:5173/?auth=recovery'
+    });
   });
 
   test('[auth.reset-cooldown] is deterministic across the exact 60-second boundary', () => {
@@ -558,6 +651,83 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
     expect(doc).toContain('Leaked-password protection is a future Supabase provider setting');
   });
 
+  describe('[auth.provider-diagnostic-capture] raw provider/config errors are preserved for internal diagnostics without ever weakening player-facing copy', () => {
+    test('reset-request: a non-network, non-rate-limit provider error (e.g. a disallowed redirectTo) still shows the neutral "reset email sent" copy, while providerDiagnostic carries the raw detail', async () => {
+      mockAuth.resetPasswordForEmail.mockResolvedValueOnce({
+        data: {},
+        error: { message: 'Redirect URL not allowed for this project.' }
+      });
+      const result = await requestLegacyPasswordReset('player@example.com');
+
+      // Enumeration-safe, unchanged: the player never learns their redirect allowlist is broken.
+      expect(result.snapshot.error).toBeNull();
+      expect(result.snapshot.info).toBe(LEGACY_AUTH_MESSAGE_COPY.passwordResetSent);
+      // But the raw provider detail is not silently discarded -- it is preserved for a
+      // non-user-facing diagnostics consumer, so the misconfiguration is still diagnosable.
+      expect(result.providerDiagnostic).toBe('Redirect URL not allowed for this project.');
+    });
+
+    test('reset-request: providerDiagnostic is null on a clean success', async () => {
+      mockAuth.resetPasswordForEmail.mockResolvedValueOnce({ data: {}, error: null });
+      const result = await requestLegacyPasswordReset('player@example.com');
+      expect(result.providerDiagnostic).toBeNull();
+    });
+
+    test('login: an invalid-credentials provider error is captured verbatim in providerDiagnostic while the player only ever sees the generic safe copy', async () => {
+      mockAuth.signInWithPassword.mockResolvedValueOnce({
+        data: { session: null },
+        error: { message: 'Invalid login credentials' }
+      });
+      const result = await signInLegacyAuth('player@example.com', 'wrong-password');
+      expect(result.snapshot.error).toBe(LEGACY_AUTH_MESSAGE_COPY.invalidCredentials);
+      expect(result.providerDiagnostic).toBe('Invalid login credentials');
+    });
+
+    test('signup: a provider config/reachability error is captured in providerDiagnostic', async () => {
+      mockAuth.signUp.mockResolvedValueOnce({
+        data: { session: null, user: null },
+        error: { message: 'Database error saving new user' }
+      });
+      const result = await signUpLegacyAuth('player@example.com', 'a-secure-password', 'Player');
+      expect(result.snapshot.error).toBe(LEGACY_AUTH_MESSAGE_COPY.signupUnavailable);
+      expect(result.providerDiagnostic).toBe('Database error saving new user');
+    });
+
+    test('password-update and account-update: provider errors are captured in providerDiagnostic', async () => {
+      mockAuth.updateUser.mockResolvedValueOnce({ data: { user: null }, error: { message: 'Auth session missing.' } });
+      const passwordResult = await updateLegacyPassword('a-secure-password');
+      expect(passwordResult.snapshot.error).toBe(LEGACY_AUTH_MESSAGE_COPY.accountUpdateFailed);
+      expect(passwordResult.providerDiagnostic).toBe('Auth session missing.');
+
+      mockAuth.updateUser.mockResolvedValueOnce({ data: { user: null }, error: { message: 'Email rate limit exceeded' } });
+      const accountResult = await updateLegacyAccount({ displayName: 'Player', email: 'player@example.com', username: 'ignored' });
+      expect(accountResult.snapshot.error).toBe(LEGACY_AUTH_MESSAGE_COPY.accountUpdateFailed);
+      expect(accountResult.providerDiagnostic).toBe('Email rate limit exceeded');
+    });
+
+    test('signout: a provider error is captured in providerDiagnostic; a clean signout leaves it null', async () => {
+      mockAuth.signOut.mockResolvedValueOnce({ error: { message: 'Auth session missing.' } });
+      const failed = await signOutLegacyAuth();
+      expect(failed.providerDiagnostic).toBe('Auth session missing.');
+
+      mockAuth.signOut.mockResolvedValueOnce({ error: null });
+      const clean = await signOutLegacyAuth();
+      expect(clean.providerDiagnostic).toBeNull();
+      expect(clean.snapshot.info).toBe(LEGACY_AUTH_MESSAGE_COPY.signedOut);
+    });
+
+    test('providerDiagnostic is never one of the allowlisted safe-copy strings when the two happen to differ, proving it carries the raw message and not a re-derived safe copy', async () => {
+      mockAuth.resetPasswordForEmail.mockResolvedValueOnce({
+        data: {},
+        error: { message: 'smtp: 550 mailbox configuration error' }
+      });
+      const result = await requestLegacyPasswordReset('player@example.com');
+      expect(result.snapshot.info).toBe(LEGACY_AUTH_MESSAGE_COPY.passwordResetSent);
+      expect(result.providerDiagnostic).toBe('smtp: 550 mailbox configuration error');
+      expect(Object.values(LEGACY_AUTH_MESSAGE_COPY)).not.toContain(result.providerDiagnostic);
+    });
+  });
+
   test('keeps the versioned matrix denominator exact and every row covered', () => {
     const matrixPath = resolve(process.cwd(), 'docs/contracts/fitness-mazer-auth-capability-matrix.v1.json');
     expect(existsSync(matrixPath)).toBe(true);
@@ -567,7 +737,7 @@ describe('versioned Fitness-to-Mazer auth capability parity', () => {
       version: string;
     };
     expect(matrix.version).toBe('1.0.0');
-    expect(matrix.denominator).toBe(18);
+    expect(matrix.denominator).toBe(19);
     expect(matrix.capabilities).toHaveLength(matrix.denominator);
     expect(matrix.capabilities.map((row) => row.id)).toEqual(capabilityIds);
     expect(new Set(matrix.capabilities.map((row) => row.id)).size).toBe(matrix.denominator);
