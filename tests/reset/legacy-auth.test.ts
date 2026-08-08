@@ -83,7 +83,7 @@ describe('legacy auth runtime', () => {
     expect(resolveLegacyAuthSubmitState({
       ...form,
       email: 'player@example.com',
-      password: 'secret1'
+      password: 'secure-pass'
     }, true)).toEqual({
       canSubmit: true,
       reason: null
@@ -91,13 +91,24 @@ describe('legacy auth runtime', () => {
     expect(resolveLegacyAuthSubmitState({
       ...form,
       email: 'player',
-      password: 'secret1'
+      password: 'secure-pass'
     }, true).reason).toBe('Enter an email.');
     expect(resolveLegacyAuthSubmitState({
       ...form,
       email: 'player@example.com',
       password: 'short'
-    }, true).reason).toBe('Password needs 6+ characters.');
+    }, true).reason).toBe('Enter your complete password.');
+    expect(resolveLegacyAuthSubmitState({
+      ...form,
+      email: 'player@example.com',
+      password: 'legacy'
+    }, true)).toEqual({ canSubmit: true, reason: null });
+    expect(resolveLegacyAuthSubmitState({
+      ...form,
+      mode: 'signup',
+      email: 'player@example.com',
+      password: '123456789'
+    }, true).reason).toBe('Password needs at least 10 characters.');
   });
 
   test('normalizes remembered identity without making it required for guest play', () => {

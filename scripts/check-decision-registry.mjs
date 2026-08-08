@@ -69,6 +69,56 @@ const checkDuplicateAndUnknownDecisionIds = (registry) => {
     }
   }
 
+  for (const entry of (registry?.prProtection?.releases ?? [])) {
+    const ref = entry.decisionRef;
+    if (ref !== undefined && ref !== null && !knownIds.has(ref)) {
+      violations.push(violation('unknown-decision-reference', `prProtection.releases[${entry.id ?? '?'}]`, `references unknown decision id "${ref}".`));
+    }
+  }
+
+  return violations;
+};
+
+// A protected-path release (prProtection.releases[]) must only ever narrow existing protection,
+// never invent new scope: every path it releases must already be a member of protectedPaths, and
+// it must name an exact branch to scope itself to (an unscoped release would be a footgun -- it
+// would either release nothing, silently, or -- if a future edit made branch matching optional --
+// release everywhere, exactly the "broadly remove the guard" outcome this mechanism exists to
+// avoid).
+const checkPrProtectionReleases = (registry) => {
+  const violations = [];
+  const protectedPaths = new Set(registry?.prProtection?.protectedPaths ?? []);
+  const releases = Array.isArray(registry?.prProtection?.releases) ? registry.prProtection.releases : [];
+
+  const seenIds = new Set();
+  for (const release of releases) {
+    const label = release?.id ?? '?';
+    if (release?.id && seenIds.has(release.id)) {
+      violations.push(violation('duplicate-release-id', 'prProtection.releases', `release id "${release.id}" is registered more than once.`));
+    }
+    if (release?.id) {
+      seenIds.add(release.id);
+    }
+
+    if (typeof release?.grantedTo?.successorBranch !== 'string' || release.grantedTo.successorBranch.length === 0) {
+      violations.push(violation(
+        'release-missing-successor-branch',
+        `prProtection.releases[${label}]`,
+        'a protected-path release must name an exact, non-empty grantedTo.successorBranch; releases are matched by exact branch name and must never apply to every branch.'
+      ));
+    }
+
+    for (const path of release?.releasedPaths ?? []) {
+      if (!protectedPaths.has(path)) {
+        violations.push(violation(
+          'release-path-not-protected',
+          `prProtection.releases[${label}]`,
+          `releasedPaths entry "${path}" is not a member of prProtection.protectedPaths -- a release may only narrow existing protection, not declare scope that was never protected.`
+        ));
+      }
+    }
+  }
+
   return violations;
 };
 
@@ -251,7 +301,8 @@ export const collectDecisionRegistryViolations = (registry) => ([
   ...checkPlanet3d(registry),
   ...checkShippingPresentation(registry),
   ...checkEntrypointReclassification(registry),
-  ...checkRedesignComplete(registry)
+  ...checkRedesignComplete(registry),
+  ...checkPrProtectionReleases(registry)
 ]);
 
 export const collectEntrypointExistenceViolations = (registry, root = repoRoot) => {
@@ -269,18 +320,111 @@ export const collectEntrypointExistenceViolations = (registry, root = repoRoot) 
   return violations;
 };
 
+// Reads every ref (local branch or origin remote-tracking branch) that currently points at HEAD's
+// exact commit, and returns the first branch-name match. This is what makes branch resolution
+// survive a DETACHED HEAD checkout -- e.g. `git clone` + `git checkout <exact-sha>`, the standard
+// pattern this repo's own clean-room verification passes use to re-verify an exact pushed commit,
+// and the same shape most CI checkout actions produce. In that state
+// `git rev-parse --abbrev-ref HEAD` returns the literal string "HEAD", not a branch name, even
+// though the commit is unambiguously the tip of exactly one real branch.
+const resolveGitBranchFromRefsPointingAtHead = (root) => {
+  try {
+    const output = execFileSync('git', ['for-each-ref', '--points-at', 'HEAD', '--format=%(refname)'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    });
+    const refs = output.split('\n').map((line) => line.trim()).filter((line) => line.length > 0);
+    for (const ref of refs) {
+      if (ref.startsWith('refs/heads/')) {
+        return ref.slice('refs/heads/'.length);
+      }
+    }
+    for (const ref of refs) {
+      if (ref.startsWith('refs/remotes/origin/')) {
+        return ref.slice('refs/remotes/origin/'.length);
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+};
+
+// Resolves the current branch name for protected-path *release* scoping (deliberately separate
+// from resolveProtectedPathBaseRef below, which resolves the *base* to diff against -- this
+// resolves HEAD's own branch identity). Tried in order: an explicit caller-supplied override, a
+// manual PROTECTED_PATH_RELEASE_BRANCH env var escape hatch, CI's GITHUB_HEAD_REF (set by GitHub
+// Actions on pull_request events, in case this ever runs under CI in the future),
+// `git rev-parse --abbrev-ref HEAD` (the common case: an actual checked-out branch), then a
+// detached-HEAD-safe fallback that finds a local or origin remote-tracking ref pointing at the
+// exact same commit (see resolveGitBranchFromRefsPointingAtHead). Returns null (never throws) if
+// none resolve -- so callers must treat null as "no branch-scoped release can possibly apply," not
+// as an error.
+export const resolveCurrentGitBranch = (root = repoRoot, explicitBranch) => {
+  const candidates = [explicitBranch, process.env.PROTECTED_PATH_RELEASE_BRANCH, process.env.GITHUB_HEAD_REF]
+    .filter((candidate) => typeof candidate === 'string' && candidate.length > 0);
+  if (candidates.length > 0) {
+    return candidates[0];
+  }
+  try {
+    const output = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim();
+    if (output && output !== 'HEAD') {
+      return output;
+    }
+  } catch {
+    // fall through to the detached-HEAD-safe resolver
+  }
+  return resolveGitBranchFromRefsPointingAtHead(root);
+};
+
+// Returns the Set of protectedPaths that are actively released for exactly `branchName`, per
+// registry.prProtection.releases. A release only applies when its grantedTo.successorBranch is an
+// EXACT string match for branchName -- this is the whole mechanism that keeps a release narrowly
+// scoped to one specific integrator-exclusive successor branch/PR, rather than broadly
+// unprotecting a path for every branch that happens to touch it. A null/undefined/empty
+// branchName (e.g. detached HEAD, or no git available) always resolves to an empty release set,
+// i.e. fails closed -- unable to identify the branch means no release can be proven to apply.
+export const resolveReleasedProtectedPaths = (registry, branchName) => {
+  const released = new Set();
+  if (!branchName) {
+    return released;
+  }
+  const releases = Array.isArray(registry?.prProtection?.releases) ? registry.prProtection.releases : [];
+  for (const release of releases) {
+    if (release?.grantedTo?.successorBranch === branchName) {
+      for (const path of release.releasedPaths ?? []) {
+        released.add(path);
+      }
+    }
+  }
+  return released;
+};
+
 // Pure, independently-testable: given a list of changed/untracked file paths (repo-relative,
-// forward-slash), flag any that match a protected path from the registry's prProtection list.
-export const collectProtectedPathViolations = (changedFiles, registry) => {
+// forward-slash), flag any that match a protected path from the registry's prProtection list --
+// UNLESS that exact path is in options.releasedPaths (see resolveReleasedProtectedPaths above),
+// in which case it is a deliberately, narrowly authorized exception rather than a violation.
+// options.releasedPaths defaults to empty, so every existing caller that doesn't pass it keeps the
+// exact pre-release behavior (nothing is ever silently exempted by default).
+export const collectProtectedPathViolations = (changedFiles, registry, options = {}) => {
   const protectedPaths = new Set(registry?.prProtection?.protectedPaths ?? []);
+  const releasedPaths = options.releasedPaths instanceof Set
+    ? options.releasedPaths
+    : new Set(options.releasedPaths ?? []);
+  const waveLabel = options.waveLabel ?? 'Wave 0A';
   const violations = [];
   for (const file of changedFiles) {
     const normalized = file.replace(/\\/g, '/');
-    if (protectedPaths.has(normalized)) {
+    if (protectedPaths.has(normalized) && !releasedPaths.has(normalized)) {
       violations.push(violation(
         'protected-path-touched',
         normalized,
-        `"${normalized}" is a PR #83/#82 protected path (prProtection.protectedPaths) and must not be modified by Wave 0A.`
+        `"${normalized}" is a PR #83/#82 protected path (prProtection.protectedPaths) and must not be modified by ${waveLabel}.`
       ));
     }
   }
