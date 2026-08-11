@@ -389,6 +389,77 @@ describe('legacy maze cycle telemetry', () => {
     });
   });
 
+  test('does not flag an optimal shortcut route as wrong turns when the generator solutionPath took the long way', () => {
+    // Regression for a real player-progression defect: the maze generator's recorded
+    // `solutionPath` is a construction-order path, not necessarily the graph's true
+    // shortest path. This fixture's grid connects start (1,1) to goal (3,1) two ways:
+    // a direct 2-step shortcut along row 1, and a 6-step loop the generator happened to
+    // carve as its canonical `solutionPath`. A player who takes the objectively optimal
+    // shortcut must not be penalized with false wrong-turn counts just because their path
+    // differs from the generator's own (longer) reference route.
+    const mazeWithUncreditedShortcut: LegacyMazeSnapshot = {
+      source: 'play-generated',
+      size: 5,
+      grid: [
+        [false, false, false, false, false],
+        [false, true, true, true, false],
+        [false, true, false, true, false],
+        [false, true, true, true, false],
+        [false, false, false, false, false]
+      ],
+      start: { x: 1, y: 1 },
+      goal: { x: 3, y: 1 },
+      solutionPath: [
+        { x: 1, y: 1 },
+        { x: 1, y: 2 },
+        { x: 1, y: 3 },
+        { x: 2, y: 3 },
+        { x: 3, y: 3 },
+        { x: 3, y: 2 },
+        { x: 3, y: 1 }
+      ],
+      seed: 456,
+      routeQualityStats: {
+        bypassableRouteBands: 1,
+        bypassableSolutionEdges: 1,
+        meaningfulBypassableRouteBands: 1,
+        meaningfulBypassableSolutionEdges: 1,
+        minimumMeaningfulDetour: 4,
+        routeQuality: 'multi-route',
+        sampledSolutionEdges: 6
+      }
+    };
+    const optimalShortcutPath = [
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 3, y: 1 }
+    ];
+
+    expect(summarizeMazeCyclePathDeviation(
+      optimalShortcutPath,
+      mazeWithUncreditedShortcut.solutionPath
+    )).not.toEqual({ backtracks: 0, wrongTurns: 0 });
+
+    const receipt = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 15,
+      completedAt: '2026-07-08T16:00:00.000Z',
+      completionTimeMs: 2000,
+      controlMode: 'stick',
+      maze: mazeWithUncreditedShortcut,
+      playerPath: optimalShortcutPath,
+      resetUsed: false,
+      surface: 'play'
+    });
+
+    expect(receipt.shortestViablePathLength).toBe(3);
+    expect(receipt.routeOverrunSteps).toBe(0);
+    expect(receipt).toMatchObject({
+      backtracks: 0,
+      wrongTurns: 0
+    });
+    expect(receipt.runQualityScore?.signal).toBe('challenge');
+  });
+
   test('uses route inefficiency and render safety as learning pressure', () => {
     const inefficientStorage = new MemoryStorage();
     const unsafeRenderStorage = new MemoryStorage();

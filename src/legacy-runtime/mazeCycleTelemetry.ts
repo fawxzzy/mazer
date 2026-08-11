@@ -431,11 +431,24 @@ export const createMazeCycleTelemetryReceipt = (
 ): MazeCycleTelemetryReceipt => {
   const completeSourcePath = normalizePlayerPath(input.playerPath, Number.MAX_SAFE_INTEGER);
   const normalizedPath = normalizePlayerPath(input.playerPath, MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT);
-  const derivedDeviation = summarizeMazeCyclePathDeviation(completeSourcePath.playerPath, input.maze.solutionPath);
   const playableShortestPath = resolveLegacyPlayableShortestPath(input.maze.grid, input.maze.start, input.maze.goal);
   const shortestViablePathLength = playableShortestPath.found
     ? playableShortestPath.path.length
     : input.maze.solutionPath.length;
+  // Wrong-turn/backtrack detection must be judged against the actual graph shortest
+  // path, not the maze generator's construction-order `solutionPath`. The generator's
+  // solutionPath is whichever route the carving algorithm happened to walk first; it is
+  // frequently much longer than the true shortest route once shortcuts/edge-wraps/loops
+  // are considered (observed in practice: a generator solutionPath of 144 tiles against a
+  // true shortest path of 47 tiles on the same maze). Scoring a player's optimal, shortest
+  // route against that longer reference falsely flags every tile off the generator's path
+  // as a "wrong turn", even when the player's route is provably at least as short (zero
+  // route-overrun). Fall back to the generator's solutionPath only when no playable
+  // shortest path could be resolved at all.
+  const derivedDeviation = summarizeMazeCyclePathDeviation(
+    completeSourcePath.playerPath,
+    playableShortestPath.found ? playableShortestPath.path : input.maze.solutionPath
+  );
   const shortestPathComparison = summarizeMazeCycleShortestPathComparison(
     normalizedPath.playerPathLength,
     shortestViablePathLength
