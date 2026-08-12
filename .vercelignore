@@ -21,7 +21,45 @@ fawxzzy-mazer.code-workspace
 
 # Non-build repo surfaces
 artifacts/
-docs/
+# docs/ is excluded except docs/contracts/, which is a genuine build-time
+# dependency: src/theme/tokens.ts, src/state/uiState.ts, and
+# src/geometry/topologyPath.ts import their canonical *.v1.json contracts
+# directly from docs/contracts/ (see docs/architecture/MAZER-UI-REWORK-
+# DECISION-REGISTRY.md, "Registry shape" -- these are shared contracts, not
+# documentation). A flat `docs/` exclusion plus a `!docs/contracts/`
+# negation was tried first and confirmed NOT to work against a real
+# `vercel deploy` (verified live: the negation is honored by git's own
+# gitignore engine but Vercel's own upload-filter did not restore the
+# negated files -- the deployed build still failed with the same TS2307
+# errors and the uploaded file count did not change). To avoid relying on
+# negation support at all, every current non-contracts entry under docs/ is
+# excluded explicitly instead, leaving docs/contracts/ untouched by any
+# pattern. If a new top-level entry is added directly under docs/ in the
+# future that is not meant to ship, it must be added to this list --
+# scripts/checks/verify-vercelignore-imports.mjs (runs automatically as
+# part of `npm run build` via scripts/build/run-build.mjs; invoke directly
+# with `node ./scripts/checks/verify-vercelignore-imports.mjs`) will NOT
+# catch a newly-added stray docs/ file on its own; it only guards against
+# runtime imports resolving to an excluded path. Not wired in as its own
+# package.json script because package.json is a protected path
+# (docs/contracts/mazer-ui-rework-decision-registry.v1.json
+# prProtection.protectedPaths) owned by PR #83/#82's Wave 0B reconciliation,
+# not this lane.
+docs/architecture/
+docs/architecture.md
+docs/COMMANDS.md
+docs/current-truth.md
+docs/INTEGRATION_SCOPE.md
+docs/legacy/
+docs/MAZER_SUPABASE_STORAGE.md
+docs/mobile-plan.md
+docs/ops/
+docs/PLAYBOOK_NOTES.md
+docs/PLAYBOOK_VISUAL_EVIDENCE.md
+docs/research/
+docs/roadmap.md
+docs/system-map.md
+docs/templates/
 legacy/
 tests/
 tools/
