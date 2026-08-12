@@ -48,5 +48,11 @@ const runNodeScript = (scriptPath, args = []) => {
 };
 
 loadLocalViteEnv();
+// Runs first, and cheaply (no compiler invocation), so a stale .vercelignore
+// exclusion is caught with a clear, targeted message before tsc/vite ever
+// run. Harmless (and a guaranteed pass) when invoked inside Vercel's own
+// remote build, where already-excluded files are simply absent -- the real
+// enforcement value is here, in the unfiltered local/CI checkout.
+runNodeScript(resolve(REPO_ROOT, 'scripts', 'checks', 'verify-vercelignore-imports.mjs'));
 runNodeScript(resolve(REPO_ROOT, 'node_modules', 'typescript', 'bin', 'tsc'), ['--noEmit']);
 runNodeScript(resolve(REPO_ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), ['build']);
