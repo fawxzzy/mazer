@@ -435,6 +435,10 @@ export const createMazeCycleTelemetryReceipt = (
   const shortestViablePathLength = playableShortestPath.found
     ? playableShortestPath.path.length
     : input.maze.solutionPath.length;
+  const shortestPathComparison = summarizeMazeCycleShortestPathComparison(
+    normalizedPath.playerPathLength,
+    shortestViablePathLength
+  );
   // Wrong-turn/backtrack detection must be judged against the actual graph shortest
   // path, not the maze generator's construction-order `solutionPath`. The generator's
   // solutionPath is whichever route the carving algorithm happened to walk first; it is
@@ -445,14 +449,29 @@ export const createMazeCycleTelemetryReceipt = (
   // as a "wrong turn", even when the player's route is provably at least as short (zero
   // route-overrun). Fall back to the generator's solutionPath only when no playable
   // shortest path could be resolved at all.
-  const derivedDeviation = summarizeMazeCyclePathDeviation(
+  //
+  // That per-step comparison is still judged against a single, arbitrarily-chosen shortest
+  // path -- `resolveLegacyPlayableShortestPath` runs a plain BFS and returns exactly one
+  // route out of possibly several equally-short routes through a maze with ties. A player
+  // who takes a *different*, equally optimal route than the one the BFS happened to return
+  // would still fail exact-tile-membership against that one reference for most of their
+  // path, reproducing the same false "wrong turn" penalty this fix targets -- just triggered
+  // by a tie instead of by a long carve-path reference. `routeOverrunSteps` (directly above)
+  // is not a heuristic here: reaching the goal in exactly the shortest possible number of
+  // steps is only possible if every single step strictly reduced the remaining distance to
+  // the goal, which mathematically rules out any wrong turn or backtrack, regardless of
+  // which tied shortest route was actually walked. So a zero route-overrun always overrides
+  // the single-reference-path scan below to zero; that per-step scan is only trusted to size
+  // the deviation when the player's path is genuinely longer than optimal
+  // (`routeOverrunSteps > 0`), where no single reference path is being asked to stand in for
+  // "the" unique shortest route.
+  const rawDerivedDeviation = summarizeMazeCyclePathDeviation(
     completeSourcePath.playerPath,
     playableShortestPath.found ? playableShortestPath.path : input.maze.solutionPath
   );
-  const shortestPathComparison = summarizeMazeCycleShortestPathComparison(
-    normalizedPath.playerPathLength,
-    shortestViablePathLength
-  );
+  const derivedDeviation = shortestPathComparison.routeOverrunSteps === 0
+    ? { backtracks: 0, wrongTurns: 0 }
+    : rawDerivedDeviation;
   const completedAt = input.completedAt ?? new Date().toISOString();
   const averageFrameMs = normalizeNonNegativeNumber(input.averageFrameMs);
   const mazeComplexity = resolveLegacyMazeComplexity(input.maze);
