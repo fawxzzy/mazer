@@ -389,6 +389,204 @@ describe('legacy maze cycle telemetry', () => {
     });
   });
 
+  test('does not flag an optimal shortcut route as wrong turns when the generator solutionPath took the long way', () => {
+    // Regression for a real player-progression defect: the maze generator's recorded
+    // `solutionPath` is a construction-order path, not necessarily the graph's true
+    // shortest path. This fixture's grid connects start (1,1) to goal (3,1) two ways:
+    // a direct 2-step shortcut along row 1, and a 6-step loop the generator happened to
+    // carve as its canonical `solutionPath`. A player who takes the objectively optimal
+    // shortcut must not be penalized with false wrong-turn counts just because their path
+    // differs from the generator's own (longer) reference route.
+    const mazeWithUncreditedShortcut: LegacyMazeSnapshot = {
+      source: 'play-generated',
+      size: 5,
+      grid: [
+        [false, false, false, false, false],
+        [false, true, true, true, false],
+        [false, true, false, true, false],
+        [false, true, true, true, false],
+        [false, false, false, false, false]
+      ],
+      start: { x: 1, y: 1 },
+      goal: { x: 3, y: 1 },
+      solutionPath: [
+        { x: 1, y: 1 },
+        { x: 1, y: 2 },
+        { x: 1, y: 3 },
+        { x: 2, y: 3 },
+        { x: 3, y: 3 },
+        { x: 3, y: 2 },
+        { x: 3, y: 1 }
+      ],
+      seed: 456,
+      routeQualityStats: {
+        bypassableRouteBands: 1,
+        bypassableSolutionEdges: 1,
+        meaningfulBypassableRouteBands: 1,
+        meaningfulBypassableSolutionEdges: 1,
+        minimumMeaningfulDetour: 4,
+        routeQuality: 'multi-route',
+        sampledSolutionEdges: 6
+      }
+    };
+    const optimalShortcutPath = [
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+      { x: 3, y: 1 }
+    ];
+
+    expect(summarizeMazeCyclePathDeviation(
+      optimalShortcutPath,
+      mazeWithUncreditedShortcut.solutionPath
+    )).not.toEqual({ backtracks: 0, wrongTurns: 0 });
+
+    const receipt = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 15,
+      completedAt: '2026-07-08T16:00:00.000Z',
+      completionTimeMs: 2000,
+      controlMode: 'stick',
+      maze: mazeWithUncreditedShortcut,
+      playerPath: optimalShortcutPath,
+      resetUsed: false,
+      surface: 'play'
+    });
+
+    expect(receipt.shortestViablePathLength).toBe(3);
+    expect(receipt.routeOverrunSteps).toBe(0);
+    expect(receipt).toMatchObject({
+      backtracks: 0,
+      wrongTurns: 0
+    });
+    expect(receipt.runQualityScore?.signal).toBe('challenge');
+  });
+
+  test('does not flag a player who takes a different, equally-optimal route than the one the playable-shortest-path BFS happened to resolve', () => {
+    // Regression for a narrower defect left behind by the fix above: comparing
+    // deviation against a single playable-shortest-path reference is still an
+    // exact-tile-membership comparison against exactly one route. When a maze
+    // has two (or more) genuinely tied shortest routes, a player who takes the
+    // *other* equally optimal route than the one the BFS solver happened to
+    // return must not be penalized just because their path differs pointwise
+    // from that one arbitrarily-chosen reference. This fixture is a symmetric
+    // "ring": start and goal connect via a top corridor (row 1) or a bottom
+    // corridor (row 3), both exactly 6 steps / 7 points -- a true tie, not a
+    // shortcut. Padded with a false border on all sides so no edge-wrap
+    // shortcut can interfere with the tie.
+    const ringMazeWithTiedRoutes: LegacyMazeSnapshot = {
+      source: 'play-generated',
+      size: 5,
+      grid: [
+        [false, false, false, false, false, false, false],
+        [false, true, true, true, true, true, false],
+        [false, true, false, false, false, true, false],
+        [false, true, true, true, true, true, false],
+        [false, false, false, false, false, false, false]
+      ],
+      start: { x: 1, y: 2 },
+      goal: { x: 5, y: 2 },
+      solutionPath: [
+        { x: 1, y: 2 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 },
+        { x: 4, y: 1 }, { x: 5, y: 1 }, { x: 5, y: 2 }
+      ],
+      seed: 789,
+      routeQualityStats: {
+        bypassableRouteBands: 1,
+        bypassableSolutionEdges: 1,
+        meaningfulBypassableRouteBands: 1,
+        meaningfulBypassableSolutionEdges: 1,
+        minimumMeaningfulDetour: 6,
+        routeQuality: 'multi-route',
+        sampledSolutionEdges: 6
+      }
+    };
+    // The bottom corridor: equally 6 steps / 7 points, but pointwise disjoint
+    // (other than the shared start/goal endpoints) from `solutionPath` above,
+    // which is exactly what the BFS in `resolveLegacyPlayableShortestPath`
+    // resolves to for this grid (verified directly: it walks the up-neighbor
+    // direction first, so it also resolves the top route, same as
+    // `solutionPath` here -- making the bottom route the genuinely "other" tie).
+    const tiedAlternateRoute = [
+      { x: 1, y: 2 }, { x: 1, y: 3 }, { x: 2, y: 3 }, { x: 3, y: 3 },
+      { x: 4, y: 3 }, { x: 5, y: 3 }, { x: 5, y: 2 }
+    ];
+
+    expect(summarizeMazeCyclePathDeviation(
+      tiedAlternateRoute,
+      ringMazeWithTiedRoutes.solutionPath
+    )).not.toEqual({ backtracks: 0, wrongTurns: 0 });
+
+    const receipt = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 15,
+      completedAt: '2026-08-11T16:00:00.000Z',
+      completionTimeMs: 2000,
+      controlMode: 'stick',
+      maze: ringMazeWithTiedRoutes,
+      playerPath: tiedAlternateRoute,
+      resetUsed: false,
+      surface: 'play'
+    });
+
+    expect(receipt.shortestViablePathLength).toBe(7);
+    expect(receipt.routeOverrunSteps).toBe(0);
+    expect(receipt).toMatchObject({
+      backtracks: 0,
+      wrongTurns: 0
+    });
+    expect(receipt.runQualityScore?.signal).toBe('challenge');
+  });
+
+  test('still flags a genuinely longer/wandering route as having wrong turns and route overrun on the same tied-route maze', () => {
+    // Companion to the tie-regression test above: confirms the zero-route-overrun
+    // override does not swallow real deviation. This player backtracks once
+    // before finding the bottom corridor, so their path is strictly longer
+    // than the true 7-point shortest distance.
+    const ringMazeWithTiedRoutes: LegacyMazeSnapshot = {
+      source: 'play-generated',
+      size: 5,
+      grid: [
+        [false, false, false, false, false, false, false],
+        [false, true, true, true, true, true, false],
+        [false, true, false, false, false, true, false],
+        [false, true, true, true, true, true, false],
+        [false, false, false, false, false, false, false]
+      ],
+      start: { x: 1, y: 2 },
+      goal: { x: 5, y: 2 },
+      solutionPath: [
+        { x: 1, y: 2 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 },
+        { x: 4, y: 1 }, { x: 5, y: 1 }, { x: 5, y: 2 }
+      ],
+      seed: 790,
+      routeQualityStats: {
+        bypassableRouteBands: 1,
+        bypassableSolutionEdges: 1,
+        meaningfulBypassableRouteBands: 1,
+        meaningfulBypassableSolutionEdges: 1,
+        minimumMeaningfulDetour: 6,
+        routeQuality: 'multi-route',
+        sampledSolutionEdges: 6
+      }
+    };
+    const wanderingRoute = [
+      { x: 1, y: 2 }, { x: 1, y: 1 }, { x: 1, y: 2 }, { x: 1, y: 3 },
+      { x: 2, y: 3 }, { x: 3, y: 3 }, { x: 4, y: 3 }, { x: 5, y: 3 }, { x: 5, y: 2 }
+    ];
+
+    const receipt = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 15,
+      completedAt: '2026-08-11T16:05:00.000Z',
+      completionTimeMs: 2500,
+      controlMode: 'stick',
+      maze: ringMazeWithTiedRoutes,
+      playerPath: wanderingRoute,
+      resetUsed: false,
+      surface: 'play'
+    });
+
+    expect(receipt.routeOverrunSteps).toBeGreaterThan(0);
+    expect(receipt.wrongTurns + receipt.backtracks).toBeGreaterThan(0);
+  });
+
   test('uses route inefficiency and render safety as learning pressure', () => {
     const inefficientStorage = new MemoryStorage();
     const unsafeRenderStorage = new MemoryStorage();
