@@ -514,6 +514,7 @@ export const summarizePostGoalLifecycleSamples = (samples, initialSeed, inputLoc
 };
 
 export const collectPostGoalLifecycleProof = async ({
+  initialDiagnostics = null,
   initialSeed,
   page,
   pollMs = DEFAULT_POST_GOAL_POLL_MS,
@@ -522,11 +523,11 @@ export const collectPostGoalLifecycleProof = async ({
   const startedAt = performance.now();
   const samples = [];
   const inputLockProbes = [];
-  let finalDiagnostics = null;
+  let finalDiagnostics = initialDiagnostics;
 
-  while (performance.now() - startedAt < timeoutMs) {
-    finalDiagnostics = await readLivePlayDiagnostics(page);
-    const snapshot = resolveLivePlayLifecycleSnapshot(finalDiagnostics);
+  const collectDiagnosticsSample = async (diagnostics) => {
+    finalDiagnostics = diagnostics;
+    const snapshot = resolveLivePlayLifecycleSnapshot(diagnostics);
     samples.push({
       ...snapshot,
       elapsedMs: round(performance.now() - startedAt)
@@ -549,6 +550,14 @@ export const collectPostGoalLifecycleProof = async ({
         seed: snapshot.seed ?? null
       });
     }
+  };
+
+  if (initialDiagnostics) {
+    await collectDiagnosticsSample(initialDiagnostics);
+  }
+
+  while (performance.now() - startedAt < timeoutMs) {
+    await collectDiagnosticsSample(await readLivePlayDiagnostics(page));
 
     const summary = summarizePostGoalLifecycleSamples(samples, initialSeed, inputLockProbes);
     if (summary.pass) {
@@ -798,6 +807,27 @@ export const summarizeGoalTimerFreeze = (firstSample, secondSample) => ({
   resampleElapsedMs: secondSample?.elapsedMs ?? null
 });
 
+export const summarizePlayerProgressionCompletion = (visibleMessages) => {
+  const message = Array.isArray(visibleMessages)
+    ? visibleMessages.find((candidate) => (
+      candidate?.id?.startsWith('progression.player.cycle.')
+      && candidate?.source === 'progression'
+      && candidate?.tone === 'success'
+    )) ?? null
+    : null;
+  const copy = typeof message?.copy === 'string' ? message.copy : null;
+
+  return {
+    copy,
+    id: message?.id ?? null,
+    message,
+    pass: Boolean(
+      copy
+      && /^Maze \d+ (cleared\. (\d+ steps to Maze \d+\.|Progress is steady\.|Next maze tuned to your run\.)|unlocked\. Rank [A-Z]\.)$/.test(copy)
+    )
+  };
+};
+
 export const runLivePlayQa = async (options = {}) => {
   const label = options.label ?? DEFAULT_LABEL;
   const sessionId = resolveSessionId(options.sessionId);
@@ -937,13 +967,20 @@ export const runLivePlayQa = async (options = {}) => {
       goalTimerFirstSample,
       goalTimerSecondDiagnostics.runtime?.play?.timer ?? null
     );
-    const lifecycleProof = options.verifyPostGoalLifecycle === false || failedAt !== null
+    const progressionCompletionProof = summarizePlayerProgressionCompletion(
+      goalTimerSecondDiagnostics.visual?.overlayUi?.visibleMessages
+    );
+    const lifecycleProofPromise = options.verifyPostGoalLifecycle === false || failedAt !== null
       ? null
-      : await collectPostGoalLifecycleProof({
+      : collectPostGoalLifecycleProof({
+        initialDiagnostics: goalTimerSecondDiagnostics,
         initialSeed: initialRuntime?.generation?.maze?.seed ?? null,
         page,
         timeoutMs: options.postGoalTimeoutMs ?? DEFAULT_POST_GOAL_TIMEOUT_MS
       });
+    const progressionScreenshotPath = resolve(outputDir, `${label}.progression.png`);
+    await page.screenshot({ path: progressionScreenshotPath, fullPage: false });
+    const lifecycleProof = lifecycleProofPromise ? await lifecycleProofPromise : null;
     const finalDiagnostics = lifecycleProof?.finalDiagnostics ?? goalReachedDiagnostics;
     const screenshotPath = resolve(outputDir, `${label}.png`);
     await page.screenshot({ path: screenshotPath, fullPage: false });
@@ -986,7 +1023,7 @@ export const runLivePlayQa = async (options = {}) => {
         isMobile: browserContextOptions.isMobile
       },
       result: {
-        pass: reached && failedAt === null && routePlan.moves.length <= moveCap && lifecyclePassed && worldTurnPassed && goalTimerProof.pass,
+        pass: reached && failedAt === null && routePlan.moves.length <= moveCap && lifecyclePassed && worldTurnPassed && goalTimerProof.pass && progressionCompletionProof.pass,
         reached,
         failedAt,
         capped: routePlan.moves.length > moveCap,
@@ -1002,6 +1039,7 @@ export const runLivePlayQa = async (options = {}) => {
           : null
       },
       goalTimer: goalTimerProof,
+      progressionCompletion: progressionCompletionProof,
       postGoalLifecycle: lifecycleProof ? {
         elapsedMs: lifecycleProof.elapsedMs,
         explicitLifecyclePass: lifecycleProof.explicitLifecyclePass,
@@ -1061,6 +1099,7 @@ export const runLivePlayQa = async (options = {}) => {
       },
       timings: summarizeTimings(durations),
       artifacts: {
+        progressionScreenshotPath,
         screenshotPath,
         summaryPath: resolve(outputDir, `${label}.summary.json`),
         stepsPath: resolve(outputDir, `${label}.steps.json`)
