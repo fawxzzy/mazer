@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readGitChangedFiles } from './check-decision-registry.mjs';
+import {
+  readGitChangedFiles,
+  collectProtectedPathViolations,
+  resolveCurrentGitBranch,
+  resolveReleasedProtectedPaths
+} from './check-decision-registry.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const STATE_MODEL_PATH = 'docs/contracts/mazer-ui-rework-state-model.v1.json';
@@ -134,23 +139,14 @@ export const collectUiStateModelViolations = (model, root = repoRoot) => ([
   ...checkDecisionRefs(model, root)
 ]);
 
-// Reused from scripts/check-decision-registry.mjs's protected-path convention: this wave must not
-// touch any of PR #83/#82's collision files either, so the self-check is applied here too.
-export const collectProtectedPathViolationsForStateModel = (changedFiles, decisionRegistry) => {
-  const protectedPaths = new Set(decisionRegistry?.prProtection?.protectedPaths ?? []);
-  const violations = [];
-  for (const file of changedFiles) {
-    const normalized = file.replace(/\\/g, '/');
-    if (protectedPaths.has(normalized)) {
-      violations.push(violation(
-        'protected-path-touched',
-        normalized,
-        `"${normalized}" is a PR #83/#82 protected path (prProtection.protectedPaths) and must not be modified by Wave 1A.`
-      ));
-    }
-  }
-  return violations;
-};
+// Delegates to scripts/check-decision-registry.mjs's collectProtectedPathViolations -- the single
+// implementation of the protected-path check (this module previously carried its own independent
+// duplicate of the same Set-membership logic). Kept as its own exported name, with its own wave
+// label baked in, so existing callers/tests that import collectProtectedPathViolationsForStateModel
+// from this module keep working unchanged; options (e.g. { releasedPaths }) pass through untouched.
+export const collectProtectedPathViolationsForStateModel = (changedFiles, decisionRegistry, options = {}) => (
+  collectProtectedPathViolations(changedFiles, decisionRegistry, { waveLabel: 'Wave 1A', ...options })
+);
 
 // Delegates to scripts/check-decision-registry.mjs's readGitChangedFiles, which unions committed
 // (base...HEAD) changes with uncommitted working-tree changes -- see that module for why both
@@ -159,6 +155,17 @@ export const collectProtectedPathViolationsForStateModel = (changedFiles, decisi
 // readGitChangedFilesForStateModel from this module keep working unchanged.
 export const readGitChangedFilesForStateModel = (root = repoRoot, options = {}) => (
   readGitChangedFiles(root, options)
+);
+
+// Thin delegations so this module's callers/tests can resolve the current branch and its actively
+// released protected paths without a second import from check-decision-registry.mjs -- same
+// rationale as readGitChangedFilesForStateModel above.
+export const resolveCurrentGitBranchForStateModel = (root = repoRoot, explicitBranch) => (
+  resolveCurrentGitBranch(root, explicitBranch)
+);
+
+export const resolveReleasedProtectedPathsForStateModel = (decisionRegistry, branchName) => (
+  resolveReleasedProtectedPaths(decisionRegistry, branchName)
 );
 
 export const formatViolations = (violations) => {

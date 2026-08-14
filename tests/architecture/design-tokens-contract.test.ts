@@ -24,9 +24,12 @@ interface DesignTokenCheckerModule {
   collectDesignTokenViolations: (registry: Record<string, unknown>, root?: string) => DesignTokenViolation[];
   collectProtectedPathViolationsForTokens: (
     changedFiles: string[],
-    decisionRegistry: Record<string, unknown>
+    decisionRegistry: Record<string, unknown>,
+    options?: { releasedPaths?: Iterable<string>; waveLabel?: string }
   ) => DesignTokenViolation[];
   readGitChangedFilesForTokens: (root?: string, options?: { baseRef?: string }) => string[];
+  resolveCurrentGitBranchForTokens: (root?: string, explicitBranch?: string) => string | null;
+  resolveReleasedProtectedPathsForTokens: (decisionRegistry: Record<string, unknown>, branchName: string | null) => Set<string>;
   formatViolations: (violations: DesignTokenViolation[]) => string;
   checkDesignTokens: (registry?: Record<string, unknown>, root?: string) => true;
 }
@@ -180,8 +183,14 @@ describe('Mazer UI rework design token contract', () => {
       expect(violations).toEqual([]);
     });
 
-    it('runs the same checker against this working tree\'s real committed-and-uncommitted changed files and finds no protected path touched', async () => {
-      const { readDecisionRegistryForTokens, collectProtectedPathViolationsForTokens, readGitChangedFilesForTokens } = await loadChecker();
+    it('runs the same checker against this working tree\'s real committed-and-uncommitted changed files and finds no protected path touched (honoring any active, branch-scoped Wave 0B release)', async () => {
+      const {
+        readDecisionRegistryForTokens,
+        collectProtectedPathViolationsForTokens,
+        readGitChangedFilesForTokens,
+        resolveCurrentGitBranchForTokens,
+        resolveReleasedProtectedPathsForTokens
+      } = await loadChecker();
       const decisionRegistry = await readDecisionRegistryForTokens();
 
       let changedFiles: string[];
@@ -191,7 +200,10 @@ describe('Mazer UI rework design token contract', () => {
         return;
       }
 
-      const violations = collectProtectedPathViolationsForTokens(changedFiles, decisionRegistry);
+      const branchName = resolveCurrentGitBranchForTokens();
+      const releasedPaths = resolveReleasedProtectedPathsForTokens(decisionRegistry, branchName);
+
+      const violations = collectProtectedPathViolationsForTokens(changedFiles, decisionRegistry, { releasedPaths });
       expect(violations).toEqual([]);
     });
 

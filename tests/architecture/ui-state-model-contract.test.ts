@@ -29,9 +29,12 @@ interface StateModelCheckerModule {
   collectUiStateModelViolations: (model: Record<string, unknown>, root?: string) => StateModelViolation[];
   collectProtectedPathViolationsForStateModel: (
     changedFiles: string[],
-    decisionRegistry: Record<string, unknown>
+    decisionRegistry: Record<string, unknown>,
+    options?: { releasedPaths?: Iterable<string>; waveLabel?: string }
   ) => StateModelViolation[];
   readGitChangedFilesForStateModel: (root?: string, options?: { baseRef?: string }) => string[];
+  resolveCurrentGitBranchForStateModel: (root?: string, explicitBranch?: string) => string | null;
+  resolveReleasedProtectedPathsForStateModel: (decisionRegistry: Record<string, unknown>, branchName: string | null) => Set<string>;
   formatViolations: (violations: StateModelViolation[]) => string;
   checkUiStateModel: (model?: Record<string, unknown>, root?: string) => true;
 }
@@ -251,11 +254,13 @@ describe('Mazer UI rework state model contract', () => {
       expect(violations).toEqual([]);
     });
 
-    it('runs the same checker against this working tree\'s real committed-and-uncommitted changed files and finds no protected path touched', async () => {
+    it('runs the same checker against this working tree\'s real committed-and-uncommitted changed files and finds no protected path touched (honoring any active, branch-scoped Wave 0B release)', async () => {
       const {
         readDecisionRegistryForStateModel,
         collectProtectedPathViolationsForStateModel,
-        readGitChangedFilesForStateModel
+        readGitChangedFilesForStateModel,
+        resolveCurrentGitBranchForStateModel,
+        resolveReleasedProtectedPathsForStateModel
       } = await loadChecker();
       const decisionRegistry = await readDecisionRegistryForStateModel();
 
@@ -266,7 +271,10 @@ describe('Mazer UI rework state model contract', () => {
         return;
       }
 
-      const violations = collectProtectedPathViolationsForStateModel(changedFiles, decisionRegistry);
+      const branchName = resolveCurrentGitBranchForStateModel();
+      const releasedPaths = resolveReleasedProtectedPathsForStateModel(decisionRegistry, branchName);
+
+      const violations = collectProtectedPathViolationsForStateModel(changedFiles, decisionRegistry, { releasedPaths });
       expect(violations).toEqual([]);
     });
 

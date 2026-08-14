@@ -722,10 +722,10 @@ const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
   'Camera Follow'
 ]);
 
-const resolveOptionsBottomExpectedLabels = (authenticated) => [
+const resolveOptionsBottomExpectedLabels = (_authenticated) => [
   'Smart Steering',
   'Control Style',
-  authenticated ? 'Log out' : 'Account'
+  'Account'
 ];
 
 const isAuthGatedMenuSurface = (surface) => (
@@ -1353,7 +1353,7 @@ const buildSurfaceChecks = ({
   const labelDetail = (surface) => collectTextLabels(surface)
     .join(', ');
   const authGated = surfaces.menu.authGated === true;
-  const authenticatedMenu = surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out']);
+  const authenticatedMenu = surfaces.menu.authStatus === 'authenticated';
   const optionsBottomExpectedLabels = resolveOptionsBottomExpectedLabels(authenticatedMenu);
   const textBoundsIssues = [
     ...collectTextBoundsIssues('menu', surfaces.menu, viewport),

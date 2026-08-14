@@ -249,26 +249,42 @@ import {
   type LegacyPatrolAgentState
 } from '../legacy-runtime/legacyPatrolAgent';
 import {
+  captureLegacyAuthSubmitIntent,
+  consumeLegacyAuthRecoveryIntent,
   createEmptyLegacyAuthFormState,
   createLegacyAuthScopedStorage,
   createLegacyGuestAuthSnapshot,
   readLegacyAuthSessionSnapshot,
   readLegacyRememberedIdentity,
   readLegacyRememberedIdentityState,
-  requestLegacyPasswordReset,
   normalizeLegacyAuthEmail,
+  requestLegacyPasswordReset,
+  resolveLegacyAuthCallbackPresentation,
+  resolveLegacyAuthCallbackState,
+  resolveLegacyAuthDisplayNameDraft,
+  resolveLegacyAuthFormModeAfterStateChange,
+  resolveLegacyAuthNativeInputType,
   resolveLegacyAuthAccountLabel,
+  resolveLegacyAuthPlatformCapabilities,
   resolveLegacyAuthScopedStorageKey,
   resolveLegacyAuthSubmitState,
+  resolveLegacyAuthSubmitCompletion,
+  resolveLegacyAuthUsernameDraft,
+  sanitizeLegacyAuthCallbackUrl,
   signInLegacyAuth,
   signOutLegacyAuth,
   signUpLegacyAuth,
   subscribeLegacyAuthState,
   syncLegacyRememberedIdentityFromAuthenticatedSession,
+  updateLegacyAccount,
+  updateLegacyPassword,
   writeLegacyRememberedIdentity,
+  type LegacyAuthActionResult,
   type LegacyAuthFieldId,
   type LegacyAuthFormState,
+  type LegacyAuthStateListener,
   type LegacyAuthSessionSnapshot,
+  type LegacyAuthSubmitIntent,
   type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
@@ -279,6 +295,7 @@ import {
   enqueueLegacyPlayerMessage,
   expireLegacyPlayerMessageQueue,
   resolveLegacyAuthFeedbackMessage,
+  resolveLegacyAuthSafeErrorCopy,
   resolveLegacyAuthValidationMessage,
   resolveLegacyOverlayFieldCommitMessage,
   resolveLegacyOverlayMovementSpeedMessage,
@@ -884,6 +901,14 @@ interface LegacyAuthActionDiagnostics {
   info: string | null;
   mode: LegacyAuthFormState['mode'];
   passwordLength: number;
+  /**
+   * The raw, untouched provider error (LegacyAuthActionResult.providerDiagnostic), exposed ONLY
+   * through this runtimeDiagnostics=1-gated diagnostics attribute -- never rendered as a visible
+   * player-facing label. `error`/`info` above are the enumeration-safe copy the player actually
+   * sees; this lets a misconfigured redirect allowlist or unreachable provider be diagnosed
+   * without ever weakening the player-facing message.
+   */
+  providerDetail: string | null;
   reason: string | null;
   sequence: number;
   stage: 'started' | 'blocked' | 'submitting' | 'result' | 'exception';
@@ -1125,6 +1150,7 @@ export class MenuScene extends Phaser.Scene {
   private authNativeInputHandler: ((event: Event) => void) | null = null;
   private authNativeKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
   private authSubmitting = false;
+  private authPasswordVisible = false;
   private authUnsubscribe: (() => void) | null = null;
   private mazeSeed = DEFAULT_LEGACY_RUNTIME_SEED;
   private explicitRuntimeMazeSeed = false;
@@ -1888,12 +1914,14 @@ export class MenuScene extends Phaser.Scene {
       auth: {
         configured: this.authSnapshot.configured,
         displayName: this.authSnapshot.displayName,
+        displayNameDraft: this.authForm.displayName,
         email: this.authSnapshot.email,
         emailPresent: this.authSnapshot.email !== null,
         formMode: this.authForm.mode,
         rememberedIdentity: rememberedAuthIdentity,
         status: this.authSnapshot.status,
         userIdPresent: this.authSnapshot.userId !== null,
+        usernameDraftEmpty: this.authForm.username.length === 0,
         latestMessage: this.latestAuthMessage
           ? {
               copy: this.latestAuthMessage.copy,
@@ -8787,7 +8815,7 @@ export class MenuScene extends Phaser.Scene {
     } = {}
   ): void {
     const compact = panel.width < 420;
-    const label = this.authSnapshot.status === 'authenticated' ? 'Log out' : 'Account';
+    const label = 'Account';
     const buttonWidth = Math.min(panel.width - 72, compact ? 190 : 220);
     const buttonHeight = compact ? 44 : 48;
     const contentCenterY = options.contentCenterY ?? panel.top + panel.height - (compact ? 48 : 56);
@@ -8800,11 +8828,6 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
     const action = (): void => {
-      if (this.authSnapshot.status === 'authenticated') {
-        void this.handleLegacyAuthSignOut();
-        return;
-      }
-
       this.openOverlay('auth');
     };
 
@@ -8954,7 +8977,7 @@ export class MenuScene extends Phaser.Scene {
     let rowY = panel.top + (stacked ? 106 : 122);
 
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    this.createOverlayTitle('Account', panel.top + (stacked ? 46 : 54));
+    this.createOverlayTitle(this.authForm.mode === 'recovery' ? 'Reset Password' : 'Account', panel.top + (stacked ? 46 : 54));
 
     const accountLabel = resolveLegacyAuthAccountLabel(this.authSnapshot);
     this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
@@ -8964,27 +8987,63 @@ export class MenuScene extends Phaser.Scene {
       rowY += visibleMessages.length * (stacked ? 18 : 20);
     }
 
+    const bottomButtonGap = stacked ? 54 : 58;
+    const latestAllowedActionStartY = panelBottom - (stacked ? 184 : 196);
+
+    if (this.authForm.mode === 'recovery') {
+      this.createLegacyAuthPasswordFieldRow(centerX, rowY, fieldWidth, fieldHeight, 'password', 'new password');
+      rowY += stacked ? 56 : 62;
+      this.createLegacyAuthPasswordFieldRow(centerX, rowY, fieldWidth, fieldHeight, 'confirmPassword', 'confirm password');
+      rowY += stacked ? 56 : 62;
+      const actionStartY = Math.min(latestAllowedActionStartY, rowY + (stacked ? 34 : 40));
+      this.uiButtons.push(
+        this.createButton(centerX, actionStartY, buttonWidth, buttonHeight, this.authSubmitting ? 'Working' : 'Save Password', () => {
+          void this.handleLegacyAuthSubmit();
+        }),
+        this.createButton(centerX, actionStartY + bottomButtonGap, buttonWidth, buttonHeight, this.authSnapshot.status === 'authenticated' ? 'Back to Account' : 'Use Login', () => {
+          this.setLegacyAuthFormMode(this.authSnapshot.status === 'authenticated' ? 'account' : 'login');
+        }),
+        this.createButton(centerX, actionStartY + (bottomButtonGap * 2), buttonWidth, buttonHeight, 'Request New Link', () => {
+          this.setLegacyAuthFormMode('login');
+          this.activeAuthField = 'email';
+        })
+      );
+      return;
+    }
+
     if (this.authSnapshot.status === 'authenticated') {
       this.createAuthInfoText(`Signed in as ${accountLabel}`, rowY, panel, '#72e0bf');
-      rowY += stacked ? 48 : 54;
-      const detail = this.authSnapshot.email ?? this.authSnapshot.userId ?? '';
-      if (detail.length > 0) {
-        this.createAuthInfoText(detail, rowY, panel, '#b7f2ff', stacked ? 14 : 16);
-        rowY += stacked ? 50 : 58;
+      rowY += stacked ? 42 : 48;
+      this.createAuthFieldBox(centerX, rowY, fieldWidth, fieldHeight, 'email', this.authForm.email || 'email', this.authForm.email.length === 0);
+      rowY += stacked ? 56 : 62;
+      this.createAuthFieldBox(centerX, rowY, fieldWidth, fieldHeight, 'displayName', this.authForm.displayName || 'display name', this.authForm.displayName.length === 0);
+      rowY += stacked ? 56 : 62;
+      const capabilities = resolveLegacyAuthPlatformCapabilities();
+      if (capabilities.usernameProfile === 'read-write') {
+        this.createAuthFieldBox(centerX, rowY, fieldWidth, fieldHeight, 'username', this.authForm.username || 'global username', this.authForm.username.length === 0);
+      } else {
+        this.createAuthInfoText('Username: available after platform connection', rowY, panel, '#b7f2ff', stacked ? 13 : 15);
       }
+      rowY += stacked ? 56 : 62;
+      const actionStartY = Math.min(latestAllowedActionStartY, rowY + (stacked ? 30 : 36));
 
       this.uiButtons.push(
-        this.createButton(centerX, panelBottom - (stacked ? 116 : 126), buttonWidth, buttonHeight, 'Log out', () => {
-          void this.handleLegacyAuthSignOut();
+        this.createButton(centerX, actionStartY, buttonWidth, buttonHeight, this.authSubmitting ? 'Working' : 'Save Account', () => {
+          void this.handleLegacyAuthSubmit();
         }),
-        this.createButton(centerX, panelBottom - (stacked ? 62 : 68), buttonWidth, buttonHeight, 'Close', () => this.closeOverlay())
+        this.createButton(centerX, actionStartY + bottomButtonGap, buttonWidth, buttonHeight, 'Change Password', () => {
+          this.setLegacyAuthFormMode('recovery');
+        }),
+        this.createButton(centerX, actionStartY + (bottomButtonGap * 2), buttonWidth, buttonHeight, 'Log out', () => {
+          void this.handleLegacyAuthSignOut();
+        })
       );
       return;
     }
 
     this.createAuthFieldBox(centerX, rowY, fieldWidth, fieldHeight, 'email', this.authForm.email || 'email', this.authForm.email.length === 0);
     rowY += stacked ? 56 : 62;
-    this.createAuthFieldBox(centerX, rowY, fieldWidth, fieldHeight, 'password', this.maskLegacyAuthPassword(), this.authForm.password.length === 0);
+    this.createLegacyAuthPasswordFieldRow(centerX, rowY, fieldWidth, fieldHeight, 'password', 'password');
     rowY += stacked ? 56 : 62;
 
     if (this.authForm.mode === 'signup') {
@@ -9006,21 +9065,54 @@ export class MenuScene extends Phaser.Scene {
         ? 'Create'
         : 'Login';
     const secondaryModeLabel = this.authForm.mode === 'signup' ? 'Use Login' : 'Create Account';
-    const bottomButtonGap = stacked ? 54 : 58;
-    const bottomStartY = panelBottom - (stacked ? 184 : 196);
+    const actionStartY = Math.min(latestAllowedActionStartY, rowY + (stacked ? 34 : 40));
 
     this.uiButtons.push(
-      this.createButton(centerX, bottomStartY, buttonWidth, buttonHeight, primaryLabel, () => {
+      this.createButton(centerX, actionStartY, buttonWidth, buttonHeight, primaryLabel, () => {
         void this.handleLegacyAuthSubmit();
       }),
-      this.createButton(centerX, bottomStartY + bottomButtonGap, buttonWidth, buttonHeight, secondaryModeLabel, () => {
+      this.createButton(centerX, actionStartY + bottomButtonGap, buttonWidth, buttonHeight, secondaryModeLabel, () => {
         this.setLegacyAuthFormMode(this.authForm.mode === 'signup' ? 'login' : 'signup');
       }),
-      this.createButton(centerX, bottomStartY + (bottomButtonGap * 2), buttonWidth, buttonHeight, 'Reset Password', () => {
+      this.createButton(centerX, actionStartY + (bottomButtonGap * 2), buttonWidth, buttonHeight, 'Reset Password', () => {
         void this.handleLegacyAuthPasswordReset();
       })
     );
     this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
+  }
+
+  private createLegacyAuthPasswordFieldRow(
+    centerX: number,
+    y: number,
+    width: number,
+    height: number,
+    fieldId: 'confirmPassword' | 'password',
+    placeholder: string
+  ): void {
+    const gap = 8;
+    const toggleWidth = Math.min(92, Math.max(76, Math.round(width * 0.26)));
+    const fieldWidth = width - toggleWidth - gap;
+    const left = centerX - (width / 2);
+    const fieldCenterX = left + (fieldWidth / 2);
+    const toggleCenterX = left + fieldWidth + gap + (toggleWidth / 2);
+    const value = this.maskLegacyAuthPassword(fieldId, placeholder);
+    this.createAuthFieldBox(fieldCenterX, y, fieldWidth, height, fieldId, value, this.authForm[fieldId].length === 0);
+    this.uiButtons.push(this.createButton(
+      toggleCenterX,
+      y,
+      toggleWidth,
+      height,
+      this.authPasswordVisible ? 'Hide' : 'Show',
+      () => {
+        this.authPasswordVisible = !this.authPasswordVisible;
+        if (this.authNativeInput && (this.authNativeInputField === 'password' || this.authNativeInputField === 'confirmPassword')) {
+          this.authNativeInput.type = this.authPasswordVisible ? 'text' : 'password';
+          this.authNativeInput.setAttribute('aria-label', `${this.authNativeInputField === 'confirmPassword' ? 'confirm password' : 'password'}; ${this.authPasswordVisible ? 'visible' : 'hidden'}`);
+        }
+        this.uiDirty = true;
+      },
+      { labelRole: 'overlay-action' }
+    ));
   }
 
   private resolveLegacyCurrentAuthMessage(): LegacyPlayerMessage | null {
@@ -9037,7 +9129,11 @@ export class MenuScene extends Phaser.Scene {
     const validationCopy = submitState.reason ?? (
       this.authForm.mode === 'signup'
         ? LEGACY_AUTH_MESSAGE_COPY.createReady
-        : LEGACY_AUTH_MESSAGE_COPY.loginReady
+        : this.authForm.mode === 'recovery'
+          ? LEGACY_AUTH_MESSAGE_COPY.passwordUpdateReady
+          : this.authForm.mode === 'account'
+            ? LEGACY_AUTH_MESSAGE_COPY.accountReady
+            : LEGACY_AUTH_MESSAGE_COPY.loginReady
     );
 
     return resolveLegacyAuthValidationMessage(validationCopy, submitState.canSubmit);
@@ -9692,11 +9788,20 @@ export class MenuScene extends Phaser.Scene {
 
     this.destroyLegacyAuthNativeInput();
     const input = document.createElement('input');
-    input.type = fieldId === 'password' ? 'password' : fieldId === 'email' ? 'email' : 'text';
-    input.autocomplete = fieldId === 'password' ? 'current-password' : fieldId === 'email' ? 'email' : 'name';
-    input.autocapitalize = fieldId === 'email' || fieldId === 'password' ? 'none' : 'words';
+    const passwordField = fieldId === 'password' || fieldId === 'confirmPassword';
+    input.type = resolveLegacyAuthNativeInputType(fieldId, this.authPasswordVisible);
+    input.autocomplete = passwordField
+      ? this.authForm.mode === 'login' ? 'current-password' : 'new-password'
+      : fieldId === 'email' ? 'email' : fieldId === 'username' ? 'username' : 'name';
+    input.autocapitalize = fieldId === 'email' || passwordField || fieldId === 'username' ? 'none' : 'words';
     input.spellcheck = false;
-    input.setAttribute('aria-label', fieldId === 'displayName' ? 'display name' : fieldId);
+    input.setAttribute('aria-label', fieldId === 'displayName'
+      ? 'display name'
+      : fieldId === 'confirmPassword'
+        ? `confirm password; ${this.authPasswordVisible ? 'visible' : 'hidden'}`
+        : fieldId === 'password'
+          ? `password; ${this.authPasswordVisible ? 'visible' : 'hidden'}`
+          : fieldId);
     input.setAttribute('data-mazer-auth-input', fieldId);
     input.value = this.authForm[fieldId];
     Object.assign(input.style, {
@@ -9774,6 +9879,7 @@ export class MenuScene extends Phaser.Scene {
       info: input.info ?? null,
       mode: input.mode ?? this.authForm.mode,
       passwordLength: input.passwordLength ?? this.authForm.password.length,
+      providerDetail: input.providerDetail ?? null,
       reason: input.reason ?? null,
       sequence: this.authActionDiagnosticsSequence,
       stage: input.stage,
@@ -9792,7 +9898,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    input.type = fieldId === 'password' ? 'password' : fieldId === 'email' ? 'email' : 'text';
+    input.type = resolveLegacyAuthNativeInputType(fieldId, this.authPasswordVisible);
     input.value = this.authForm[fieldId];
     const rect = canvas.getBoundingClientRect();
     const cssRect = resolveLegacyAuthInputCssRect(bounds, rect, this.layout);
@@ -9820,9 +9926,16 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private selectNextLegacyAuthField(direction: -1 | 1): void {
+    const capabilities = resolveLegacyAuthPlatformCapabilities();
     const fields: LegacyAuthFieldId[] = this.authForm.mode === 'signup'
       ? ['email', 'password', 'displayName']
-      : ['email', 'password'];
+      : this.authForm.mode === 'recovery'
+        ? ['password', 'confirmPassword']
+        : this.authForm.mode === 'account'
+          ? capabilities.usernameProfile === 'read-write'
+            ? ['email', 'displayName', 'username']
+            : ['email', 'displayName']
+          : ['email', 'password'];
     const currentIndex = Math.max(0, fields.indexOf(this.activeAuthField ?? 'email'));
     const nextIndex = (currentIndex + direction + fields.length) % fields.length;
     this.activeAuthField = fields[nextIndex] ?? fields[0] ?? null;
@@ -9833,12 +9946,16 @@ export class MenuScene extends Phaser.Scene {
     fieldId: LegacyAuthFieldId,
     update: (value: string) => string
   ): void {
-    const maxLengthByField: Record<LegacyAuthFieldId, number> = {
+    const maxLengthByField: Record<LegacyAuthFieldId, number | null> = {
+      confirmPassword: null,
       displayName: 32,
       email: 96,
-      password: 72
+      password: null,
+      username: 64
     };
-    const nextValue = update(this.authForm[fieldId]).slice(0, maxLengthByField[fieldId]);
+    const updatedValue = update(this.authForm[fieldId]);
+    const maxLength = maxLengthByField[fieldId];
+    const nextValue = maxLength === null ? updatedValue : updatedValue.slice(0, maxLength);
     this.authForm = {
       ...this.authForm,
       [fieldId]: nextValue
@@ -9859,9 +9976,16 @@ export class MenuScene extends Phaser.Scene {
   private setLegacyAuthFormMode(mode: LegacyAuthFormState['mode']): void {
     this.authForm = {
       ...this.authForm,
-      mode
+      confirmPassword: mode === 'recovery' ? this.authForm.confirmPassword : '',
+      mode,
+      password: mode === 'recovery' ? this.authForm.password : ''
     };
-    this.activeAuthField = this.authForm.email.length > 0 ? 'password' : 'email';
+    this.authPasswordVisible = false;
+    this.activeAuthField = mode === 'recovery'
+      ? 'password'
+      : mode === 'account'
+        ? 'email'
+        : this.authForm.email.length > 0 ? 'password' : 'email';
     this.destroyLegacyAuthNativeInput();
     this.authSnapshot = {
       ...this.authSnapshot,
@@ -9873,12 +9997,16 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
-  private maskLegacyAuthPassword(): string {
-    if (this.authForm.password.length === 0) {
-      return 'password';
+  private maskLegacyAuthPassword(
+    fieldId: 'confirmPassword' | 'password' = 'password',
+    placeholder = 'password'
+  ): string {
+    const value = this.authForm[fieldId];
+    if (value.length === 0) {
+      return placeholder;
     }
 
-    return '*'.repeat(Math.min(24, this.authForm.password.length));
+    return this.authPasswordVisible ? value : '*'.repeat(Math.min(24, value.length));
   }
 
   private async handleLegacyAuthSubmit(): Promise<void> {
@@ -9907,27 +10035,30 @@ export class MenuScene extends Phaser.Scene {
 
     this.authSubmitting = true;
     this.uiDirty = true;
+    const submitIntent = captureLegacyAuthSubmitIntent(this.authForm.mode);
     this.recordLegacyAuthActionDiagnostics({
       canSubmit: true,
       stage: 'submitting'
     });
-    writeLegacyRememberedIdentity(this.resolveBrowserLocalStorage(), this.authForm.email);
+    if (submitIntent.action === 'login' || submitIntent.action === 'signup') {
+      writeLegacyRememberedIdentity(this.resolveBrowserLocalStorage(), this.authForm.email);
+    }
 
-    let result: Awaited<ReturnType<typeof signInLegacyAuth | typeof signUpLegacyAuth>>;
+    let result: LegacyAuthActionResult;
     try {
-      result = this.authForm.mode === 'signup'
-        ? await signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.displayName)
-        : await signInLegacyAuth(this.authForm.email, this.authForm.password);
+      result = await this.executeLegacyAuthSubmitIntent(submitIntent);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      const safeMessage = resolveLegacyAuthSafeErrorCopy(message, submitIntent.action);
       this.authSubmitting = false;
       this.authSnapshot = {
         ...this.authSnapshot,
-        error: message,
+        error: safeMessage,
         info: null
       };
       this.recordLegacyAuthActionDiagnostics({
-        error: message,
+        error: safeMessage,
+        providerDetail: message,
         stage: 'exception',
         status: this.authSnapshot.status
       });
@@ -9939,21 +10070,45 @@ export class MenuScene extends Phaser.Scene {
     this.authSubmitting = false;
     this.authForm = {
       ...this.authForm,
-      password: result.snapshot.status === 'authenticated' ? '' : this.authForm.password
+      confirmPassword: result.snapshot.error === null ? '' : this.authForm.confirmPassword,
+      password: result.snapshot.error === null ? '' : this.authForm.password
     };
     this.recordLegacyAuthActionDiagnostics({
       error: result.snapshot.error,
       info: result.snapshot.info,
+      providerDetail: result.providerDiagnostic ?? null,
       stage: 'result',
       status: result.snapshot.status
     });
-    const shouldReturnToMainMenuAfterLogin = this.authForm.mode === 'login'
-      && result.snapshot.status === 'authenticated';
+    const { completedRecovery, shouldReturnToMainMenu } = resolveLegacyAuthSubmitCompletion(
+      submitIntent,
+      result.snapshot
+    );
     this.applyLegacyAuthSnapshot(result.snapshot);
-    if (shouldReturnToMainMenuAfterLogin) {
+    if (completedRecovery) {
+      this.setLegacyAuthFormMode(result.snapshot.status === 'authenticated' ? 'account' : 'login');
+    }
+    if (shouldReturnToMainMenu) {
       this.closeLegacyAuthOverlayToMainMenu();
     }
     this.uiDirty = true;
+  }
+
+  private executeLegacyAuthSubmitIntent(intent: LegacyAuthSubmitIntent): Promise<LegacyAuthActionResult> {
+    if (intent.action === 'signup') {
+      return signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.displayName);
+    }
+    if (intent.action === 'password-update') {
+      return updateLegacyPassword(this.authForm.password);
+    }
+    if (intent.action === 'account-update') {
+      return updateLegacyAccount({
+        displayName: this.authForm.displayName,
+        email: this.authForm.email,
+        username: this.authForm.username
+      });
+    }
+    return signInLegacyAuth(this.authForm.email, this.authForm.password);
   }
 
   private async handleLegacyAuthPasswordReset(): Promise<void> {
@@ -9987,8 +10142,33 @@ export class MenuScene extends Phaser.Scene {
 
     this.authSubmitting = true;
     this.uiDirty = true;
-    const result = await requestLegacyPasswordReset(this.authForm.email);
+    let result: LegacyAuthActionResult;
+    try {
+      result = await requestLegacyPasswordReset(this.authForm.email);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      result = {
+        providerDiagnostic: detail,
+        snapshot: {
+          ...this.authSnapshot,
+          error: resolveLegacyAuthSafeErrorCopy(detail, 'reset-request'),
+          info: null
+        }
+      };
+    }
     this.authSubmitting = false;
+    // The player-facing snapshot (result.snapshot) always stays enumeration-safe -- a real
+    // provider/config error (e.g. a disallowed redirectTo) still resolves to the same neutral
+    // "if that email has an account..." copy. providerDiagnostic is recorded separately, only
+    // into the runtimeDiagnostics=1-gated diagnostics attribute, so that kind of misconfiguration
+    // remains diagnosable without ever weakening the player-facing message.
+    this.recordLegacyAuthActionDiagnostics({
+      error: result.snapshot.error,
+      info: result.snapshot.info,
+      providerDetail: result.providerDiagnostic ?? null,
+      stage: 'result',
+      status: result.snapshot.status
+    });
     this.applyLegacyAuthSnapshot(result.snapshot);
     this.uiDirty = true;
   }
@@ -10008,6 +10188,13 @@ export class MenuScene extends Phaser.Scene {
       readLegacyRememberedIdentity(this.resolveBrowserLocalStorage())
     );
     this.activeAuthField = null;
+    this.recordLegacyAuthActionDiagnostics({
+      error: result.snapshot.error,
+      info: result.snapshot.info,
+      providerDetail: result.providerDiagnostic ?? null,
+      stage: 'result',
+      status: result.snapshot.status
+    });
     this.applyLegacyAuthSnapshot(result.snapshot);
     this.uiDirty = true;
   }
@@ -10413,9 +10600,20 @@ export class MenuScene extends Phaser.Scene {
       const rememberedIdentity = readLegacyRememberedIdentity(this.resolveBrowserLocalStorage());
       this.authForm = {
         ...this.authForm,
-        email: this.authForm.email || rememberedIdentity
+        displayName: resolveLegacyAuthDisplayNameDraft(this.authSnapshot, this.authForm.displayName),
+        email: (this.authSnapshot.email ?? this.authForm.email) || rememberedIdentity,
+        mode: this.authForm.mode === 'recovery'
+          ? 'recovery'
+          : this.authSnapshot.status === 'authenticated' ? 'account' : this.authForm.mode === 'account' ? 'login' : this.authForm.mode,
+        username: resolveLegacyAuthUsernameDraft(
+          this.authSnapshot,
+          this.authForm.username,
+          this.authSnapshot.userId
+        )
       };
-      this.activeAuthField = this.authSnapshot.status === 'authenticated'
+      this.activeAuthField = this.authForm.mode === 'recovery'
+        ? 'password'
+        : this.authSnapshot.status === 'authenticated'
         ? null
         : this.authForm.email.length > 0
           ? 'password'
@@ -10680,15 +10878,132 @@ export class MenuScene extends Phaser.Scene {
     const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();
     if (runtimeAuthFixtureSnapshot) {
       this.applyLegacyAuthSnapshot(runtimeAuthFixtureSnapshot);
+      const fixture = typeof window === 'undefined'
+        ? null
+        : new URLSearchParams(window.location.search).get('authFixture')?.trim().toLowerCase();
+      if (fixture === 'session-ended') {
+        await Promise.resolve();
+        this.setLegacyAuthFormMode('account');
+        this.openOverlay('auth');
+        this.handleLegacyAuthStateChange({
+          ...runtimeAuthFixtureSnapshot,
+          displayName: null,
+          email: null,
+          error: null,
+          info: null,
+          status: 'guest',
+          userId: null
+        }, 'SIGNED_OUT');
+      } else if (fixture === 'session-established') {
+        await Promise.resolve();
+        this.openOverlay('auth');
+        this.setLegacyAuthFormMode('signup');
+        this.handleLegacyAuthStateChange(runtimeAuthFixtureSnapshot, 'SIGNED_IN');
+      } else if (fixture === 'account-cleared') {
+        await Promise.resolve();
+        this.applyLegacyAuthSnapshot({
+          ...runtimeAuthFixtureSnapshot,
+          displayName: null,
+          info: LEGACY_AUTH_MESSAGE_COPY.accountUpdated
+        });
+        this.openOverlay('auth');
+      } else if (fixture === 'account-username-cleared') {
+        await Promise.resolve();
+        this.authForm = {
+          ...this.authForm,
+          username: ''
+        };
+        this.applyLegacyAuthSnapshot({
+          ...runtimeAuthFixtureSnapshot,
+          info: LEGACY_AUTH_MESSAGE_COPY.accountUpdated,
+          username: null
+        });
+        this.openOverlay('auth');
+      } else if (fixture === 'account-user-switch') {
+        await Promise.resolve();
+        this.applyLegacyAuthSnapshot({
+          ...runtimeAuthFixtureSnapshot,
+          displayName: 'QA Player B',
+          email: 'qa-b@mazer.local',
+          info: null,
+          userId: 'runtime-diagnostics-auth-fixture-b',
+          username: null
+        });
+        this.openOverlay('auth');
+      } else if (fixture === 'recovery' || fixture === 'reset-wait' || fixture === 'account') {
+        await Promise.resolve();
+        if (fixture === 'recovery' || fixture === 'reset-wait') {
+          this.enterLegacyAuthRecoveryMode(LEGACY_AUTH_MESSAGE_COPY.recoveryReady);
+          if (fixture === 'reset-wait') {
+            this.applyLegacyAuthSnapshot({
+              ...runtimeAuthFixtureSnapshot,
+              error: LEGACY_AUTH_MESSAGE_COPY.passwordResetWait,
+              info: null
+            });
+          }
+        } else {
+          this.openOverlay('auth');
+        }
+      }
       return;
     }
 
-    this.authUnsubscribe = await subscribeLegacyAuthState((snapshot) => {
-      this.applyLegacyAuthSnapshot(snapshot);
+    const callbackState = typeof window === 'undefined'
+      ? { kind: 'none' as const, message: null }
+      : resolveLegacyAuthCallbackState(window.location);
+    this.authUnsubscribe = await subscribeLegacyAuthState((snapshot, event) => {
+      this.handleLegacyAuthStateChange(snapshot, event);
     });
 
     const snapshot = await readLegacyAuthSessionSnapshot();
+    const callbackPresentation = resolveLegacyAuthCallbackPresentation(callbackState, snapshot);
+    if (callbackPresentation) {
+      this.setLegacyAuthFormMode(callbackPresentation.formMode);
+      this.applyLegacyAuthSnapshot(callbackPresentation.snapshot);
+      this.openOverlay('auth');
+    } else {
+      this.applyLegacyAuthSnapshot(snapshot);
+      if (callbackState.kind === 'recovery' || consumeLegacyAuthRecoveryIntent()) {
+        this.enterLegacyAuthRecoveryMode(callbackState.message ?? LEGACY_AUTH_MESSAGE_COPY.recoveryReady);
+      }
+    }
+    if (callbackState.kind !== 'none' && typeof window !== 'undefined') {
+      sanitizeLegacyAuthCallbackUrl(window.location, window.history);
+    }
+  }
+
+  private handleLegacyAuthStateChange(
+    snapshot: LegacyAuthSessionSnapshot,
+    event: Parameters<LegacyAuthStateListener>[1]
+  ): void {
+    const nextMode = resolveLegacyAuthFormModeAfterStateChange(this.authForm.mode, event, snapshot.status);
+    if (nextMode !== this.authForm.mode) {
+      this.setLegacyAuthFormMode(nextMode);
+    }
     this.applyLegacyAuthSnapshot(snapshot);
+    if (event === 'PASSWORD_RECOVERY') {
+      this.enterLegacyAuthRecoveryMode(LEGACY_AUTH_MESSAGE_COPY.recoveryReady);
+      if (typeof window !== 'undefined') {
+        sanitizeLegacyAuthCallbackUrl(window.location, window.history);
+      }
+    }
+  }
+
+  private enterLegacyAuthRecoveryMode(info: string): void {
+    this.authForm = {
+      ...this.authForm,
+      confirmPassword: '',
+      mode: 'recovery',
+      password: ''
+    };
+    this.authSnapshot = {
+      ...this.authSnapshot,
+      error: null,
+      info
+    };
+    this.authPasswordVisible = false;
+    this.activeAuthField = 'password';
+    this.openOverlay('auth');
   }
 
   private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null {
@@ -10702,7 +11017,8 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }
 
-    if (searchParams.get('authFixture')?.trim().toLowerCase() !== 'authenticated') {
+    const fixture = searchParams.get('authFixture')?.trim().toLowerCase();
+    if (fixture !== 'account' && fixture !== 'account-cleared' && fixture !== 'account-username-cleared' && fixture !== 'account-user-switch' && fixture !== 'authenticated' && fixture !== 'recovery' && fixture !== 'reset-wait' && fixture !== 'session-ended' && fixture !== 'session-established') {
       return null;
     }
 
@@ -10711,9 +11027,12 @@ export class MenuScene extends Phaser.Scene {
       displayName: 'QA Player',
       email: 'qa@mazer.local',
       error: null,
-      info: 'Runtime diagnostics authenticated fixture.',
+      info: fixture === 'reset-wait' ? null : 'Runtime diagnostics authenticated fixture.',
       status: 'authenticated',
-      userId: 'runtime-diagnostics-auth-fixture'
+      userId: 'runtime-diagnostics-auth-fixture',
+      username: fixture === 'account-username-cleared' || fixture === 'account-user-switch'
+        ? 'qa-player-a'
+        : null
     };
   }
 
@@ -10733,7 +11052,9 @@ export class MenuScene extends Phaser.Scene {
       }
       this.authForm = {
         ...this.authForm,
-        email: snapshot.email
+        displayName: resolveLegacyAuthDisplayNameDraft(snapshot, this.authForm.displayName),
+        email: snapshot.email,
+        username: resolveLegacyAuthUsernameDraft(snapshot, this.authForm.username, previousUserId)
       };
     }
     if (snapshot.status === 'authenticated') {

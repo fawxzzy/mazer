@@ -14,8 +14,14 @@ interface DecisionRegistryCheckerModule {
   readDecisionRegistry: (registryPath?: string) => Record<string, unknown>;
   collectDecisionRegistryViolations: (registry: Record<string, unknown>) => DecisionRegistryViolation[];
   collectEntrypointExistenceViolations: (registry: Record<string, unknown>, root?: string) => DecisionRegistryViolation[];
-  collectProtectedPathViolations: (changedFiles: string[], registry: Record<string, unknown>) => DecisionRegistryViolation[];
+  collectProtectedPathViolations: (
+    changedFiles: string[],
+    registry: Record<string, unknown>,
+    options?: { releasedPaths?: Iterable<string>; waveLabel?: string }
+  ) => DecisionRegistryViolation[];
   readGitChangedFiles: (root?: string, options?: { baseRef?: string }) => string[];
+  resolveCurrentGitBranch: (root?: string, explicitBranch?: string) => string | null;
+  resolveReleasedProtectedPaths: (registry: Record<string, unknown>, branchName: string | null) => Set<string>;
   formatViolations: (violations: DecisionRegistryViolation[]) => string;
   checkDecisionRegistry: (registry?: Record<string, unknown>, root?: string) => true;
 }
@@ -242,8 +248,14 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(violations).toEqual([]);
     });
 
-    it('runs the same checker against this working tree\'s real committed-and-uncommitted changed files and finds no protected path touched', async () => {
-      const { readDecisionRegistry, collectProtectedPathViolations, readGitChangedFiles } = await loadChecker();
+    it('runs the same checker against this working tree\'s real committed-and-uncommitted changed files and finds no protected path touched (honoring any active, branch-scoped Wave 0B release)', async () => {
+      const {
+        readDecisionRegistry,
+        collectProtectedPathViolations,
+        readGitChangedFiles,
+        resolveCurrentGitBranch,
+        resolveReleasedProtectedPaths
+      } = await loadChecker();
       const registry = await readDecisionRegistry();
 
       let changedFiles: string[];
@@ -255,8 +267,108 @@ describe('Mazer UI rework decision registry contract', () => {
         return;
       }
 
-      const violations = collectProtectedPathViolations(changedFiles, registry);
+      // A real PR branch that is itself the subject of a recorded prProtection.releases[] grant
+      // (e.g. PR #131, the Wave 0B integrator-exclusive reconciliation of PR #83) is expected to
+      // touch exactly its released paths and no others -- resolving the release here, by the
+      // actual current branch name, is what lets this assertion stay "zero violations" for real,
+      // rather than by weakening collectProtectedPathViolations itself for every caller. Any
+      // branch that is NOT named in a release (the overwhelming common case) gets an empty
+      // releasedPaths set and this reduces to the exact pre-release check.
+      const branchName = resolveCurrentGitBranch();
+      const releasedPaths = resolveReleasedProtectedPaths(registry, branchName);
+
+      const violations = collectProtectedPathViolations(changedFiles, registry, { releasedPaths });
       expect(violations).toEqual([]);
+    });
+
+    it('does NOT release a protected path for a branch name that does not exactly match any release grant', async () => {
+      const { readDecisionRegistry, collectProtectedPathViolations, resolveReleasedProtectedPaths } = await loadChecker();
+      const registry = await readDecisionRegistry();
+
+      // PR #82's own branch, and an arbitrary unrelated branch, must each get zero release even
+      // though PR #131's release exists in the registry -- proving the release is scoped by exact
+      // branch identity, not applied globally the moment any release exists.
+      for (const otherBranch of ['codex/fp-mzr-rec-001-supabase-source-recovery', 'main', 'some/unrelated-branch']) {
+        const releasedPaths = resolveReleasedProtectedPaths(registry, otherBranch);
+        expect(releasedPaths.size).toBe(0);
+
+        const violations = collectProtectedPathViolations(
+          ['src/scenes/MenuScene.ts', 'package.json'],
+          registry,
+          { releasedPaths }
+        );
+        expect(violations.map((entry) => entry.path).sort()).toEqual(['package.json', 'src/scenes/MenuScene.ts']);
+      }
+    });
+
+    it('releases exactly PR #131\'s touched protected paths on its own branch, and nothing else, and never releases vite.config.ts', async () => {
+      const { readDecisionRegistry, collectProtectedPathViolations, resolveReleasedProtectedPaths } = await loadChecker();
+      const registry = await readDecisionRegistry();
+
+      const successorBranch = 'claude/mazer-pr83-fitness-auth-parity-successor';
+      const releasedPaths = resolveReleasedProtectedPaths(registry, successorBranch);
+
+      expect(Array.from(releasedPaths).sort()).toEqual([
+        'package.json',
+        'scripts/analysis/capture-auth-capability-surfaces.mjs',
+        'scripts/analysis/capture-ui-surfaces.mjs',
+        'scripts/analysis/live-auth-persistence-soak.mjs',
+        'src/legacy-runtime/legacyAuth.ts',
+        'src/legacy-runtime/legacyPlayerMessage.ts',
+        'src/scenes/MenuScene.ts',
+        'src/scenes/menuRuntimeDiagnostics.ts'
+      ]);
+
+      // vite.config.ts is a protected path that PR #131 never touches -- it must stay flagged even
+      // on the successor branch's own release.
+      const violations = collectProtectedPathViolations(['vite.config.ts'], registry, { releasedPaths });
+      expect(violations.some((entry) => entry.rule === 'protected-path-touched' && entry.path === 'vite.config.ts')).toBe(true);
+    });
+
+    it('a release\'s decisionRef, successorBranch, and releasedPaths (subset of protectedPaths) all validate structurally', async () => {
+      const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
+      const registry = await readDecisionRegistry();
+      // Full structural validation (unknown decisionRef, releasedPaths not a protectedPaths
+      // subset, missing successorBranch, duplicate release id) is exercised via mutation tests
+      // below; this just confirms the real, shipped release is itself clean.
+      const violations = collectDecisionRegistryViolations(registry);
+      expect(violations.filter((entry) => entry.rule.startsWith('release-') || entry.rule === 'duplicate-release-id')).toEqual([]);
+    });
+
+    it('flags a release whose releasedPaths includes a path that is not in protectedPaths', async () => {
+      const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
+      const registry = cloneRegistry(await readDecisionRegistry());
+      registry.prProtection.releases[0].releasedPaths.push('src/not-a-protected-path.ts');
+
+      const violations = collectDecisionRegistryViolations(registry);
+      expect(violations.some((entry) => entry.rule === 'release-path-not-protected')).toBe(true);
+    });
+
+    it('flags a release with no successorBranch named', async () => {
+      const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
+      const registry = cloneRegistry(await readDecisionRegistry());
+      delete registry.prProtection.releases[0].grantedTo.successorBranch;
+
+      const violations = collectDecisionRegistryViolations(registry);
+      expect(violations.some((entry) => entry.rule === 'release-missing-successor-branch')).toBe(true);
+    });
+
+    it('flags a release referencing an unknown decisionRef', async () => {
+      const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
+      const registry = cloneRegistry(await readDecisionRegistry());
+      registry.prProtection.releases[0].decisionRef = 'not-a-real-decision-id';
+
+      const violations = collectDecisionRegistryViolations(registry);
+      expect(violations.some((entry) => entry.rule === 'unknown-decision-reference' && entry.path.startsWith('prProtection.releases'))).toBe(true);
+    });
+
+    it('flags a duplicate release id', async () => {
+      const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
+      const registry = cloneRegistry(await readDecisionRegistry());
+      registry.prProtection.releases.push({ ...registry.prProtection.releases[0] });
+
+      const violations = collectDecisionRegistryViolations(registry);
+      expect(violations.some((entry) => entry.rule === 'duplicate-release-id')).toBe(true);
     });
   });
 
@@ -332,6 +444,59 @@ describe('Mazer UI rework decision registry contract', () => {
 
         const violations = collectProtectedPathViolations(changedFiles, registry);
         expect(violations).toEqual([]);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    // Proves resolveCurrentGitBranch survives a DETACHED HEAD checkout by exact commit SHA -- the
+    // same shape a clean-room "clone fresh, checkout the exact pushed commit" verification pass
+    // produces (this repo's own established verification convention), and the same shape most CI
+    // checkout actions produce. Caught for real: an earlier version of this mechanism relied only
+    // on `git rev-parse --abbrev-ref HEAD`, which returns the literal string "HEAD" once detached,
+    // silently making every branch-scoped release inapplicable and reintroducing exactly the 3
+    // self-check failures this release mechanism exists to fix, the moment anyone re-verified the
+    // exact pushed commit instead of the live branch.
+    it('resolves the branch name from a remote-tracking ref pointing at HEAD even when HEAD is detached', async () => {
+      const { resolveCurrentGitBranch } = await loadChecker();
+
+      const root = mkdtempSync(join(tmpdir(), 'mazer-protected-path-fixture-detached-'));
+      try {
+        initFixtureRepo(root);
+        runGit(root, 'checkout', '-q', '-b', 'claude/example-successor-branch');
+        writeFileSync(join(root, 'feature.txt'), 'feature commit\n');
+        runGit(root, 'add', 'feature.txt');
+        runGit(root, 'commit', '-q', '-m', 'feature commit');
+        const featureSha = runGit(root, 'rev-parse', 'HEAD').trim();
+
+        // No real "origin" remote is needed to reproduce the bug: what matters is a ref under
+        // refs/remotes/origin/* pointing at the same commit, which is exactly what `git fetch`
+        // from a real remote leaves behind.
+        runGit(root, 'update-ref', 'refs/remotes/origin/claude/example-successor-branch', featureSha);
+        runGit(root, 'checkout', '-q', '--detach', featureSha);
+        expect(runGit(root, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('HEAD');
+
+        expect(resolveCurrentGitBranch(root)).toBe('claude/example-successor-branch');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it('returns null (not a crash, not a false match) when HEAD is detached and no ref points at it', async () => {
+      const { resolveCurrentGitBranch } = await loadChecker();
+
+      const root = mkdtempSync(join(tmpdir(), 'mazer-protected-path-fixture-detached-orphan-'));
+      try {
+        initFixtureRepo(root);
+        // Detach first (still at the baseline commit, so `main` is untouched), then commit while
+        // detached -- the new commit has no branch and no remote-tracking ref pointing at it.
+        runGit(root, 'checkout', '-q', '--detach', 'HEAD');
+        writeFileSync(join(root, 'unreachable.txt'), 'orphaned commit\n');
+        runGit(root, 'add', 'unreachable.txt');
+        runGit(root, 'commit', '-q', '-m', 'orphaned commit, no branch or remote ref will point here');
+        expect(runGit(root, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe('HEAD');
+
+        expect(resolveCurrentGitBranch(root)).toBeNull();
       } finally {
         rmSync(root, { recursive: true, force: true });
       }

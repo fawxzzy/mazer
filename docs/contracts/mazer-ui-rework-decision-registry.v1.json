@@ -95,6 +95,13 @@
       "locked": true,
       "statement": "No source lane may claim the redesign complete until the final acceptance matrix (the nine-point Definition of Complete) passes and old duplicated UI paths are removed or formally retained with an owner and purpose.",
       "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#definition-of-complete"
+    },
+    {
+      "id": "wave-0b-pr83-successor-release-pr131",
+      "category": "governance",
+      "locked": true,
+      "statement": "Wave 0B (the integrator-exclusive reconciliation the `pr83-protected-paths-hold` decision names as the path to releasing PR #83's hold) is PR #131 (`claude/mazer-pr83-fitness-auth-parity-successor`), which merges PR #83's original, committed, Codex-reviewed intent (`codex/fitness-auth-capability-parity-20260717`, head `3eab0e3cc534d5a38edbcb7c72ceb99f3db48467`) into current `main`, with two narrow, hand-resolved conflicts (an additive MenuScene.ts import-block conflict, and a bottom-options-label test assertion updated to match main's own already-merged behavior). PR #83 is the branch this reconciliation supersedes and is intended to be closed as superseded once PR #131 merges; PR #83 itself was never commented on, pushed to, or otherwise modified as part of this reconciliation. `pr83-protected-paths-hold` is released for PR #131's own reconciled content ONLY: `prProtection.releases[]` records a release that is narrowly scoped by exact branch name (`grantedTo.successorBranch`) to PR #131's branch alone, and by exact path list (`releasedPaths`) to precisely the protected paths PR #131 actually touches. This release: (a) does NOT modify or shrink `prProtection.protectedPaths` itself -- every one of those 9 paths remains listed and remains protected for every branch other than PR #131's own; (b) does NOT cover `vite.config.ts`, which PR #131 does not touch and which stays fully protected everywhere, including on PR #131's own branch; (c) does NOT extend to PR #82 (`codex/fp-mzr-rec-001-supabase-source-recovery`) or to any branch other than PR #131's -- PR #82 touches only `package.json` among the protected paths, and that file's protection remains fully enforced for PR #82's branch, for `main`, and for every branch except PR #131's exact branch name; (d) is evaluated at check time by `scripts/check-decision-registry.mjs`'s `resolveCurrentGitBranch` + `resolveReleasedProtectedPaths` + `collectProtectedPathViolations(changedFiles, registry, { releasedPaths })`, not by disabling, skipping, or weakening the guard itself. A full, unconditional drop of these paths from `protectedPaths` (ending the hold for every branch, not just PR #131's) is deliberately left for a separate future step, to be taken only once PR #131 actually merges and PR #83 is closed as superseded -- this decision documents the interim, PR-131-scoped release only.",
+      "sourceRef": "docs/contracts/mazer-ui-rework-decision-registry.v1.json#prProtection.releases"
     }
   ],
   "renderOwnership": {
@@ -296,12 +303,37 @@
       "vite.config.ts",
       "package.json"
     ],
-    "note": "protectedPaths is a snapshot of PR #83's file-ownership collision list (per blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md file ownership guardrails) plus the always-protected vite.config.ts and package.json. Reconciliation is Wave 0B, integrator-exclusive, not this lane (0A has exclusiveFiles: [] per spec/pr-lanes.json).",
+    "note": "protectedPaths is a snapshot of PR #83's file-ownership collision list (per blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md file ownership guardrails) plus the always-protected vite.config.ts and package.json. Reconciliation is Wave 0B, integrator-exclusive, not this lane (0A has exclusiveFiles: [] per spec/pr-lanes.json). protectedPaths itself is intentionally left unchanged by the Wave 0B release below -- these paths remain protected in general, for every branch except the one specific release grants below.",
     "additionalOwnershipGuardrails": [
       {
         "surface": "shared token exports",
         "status": "not-yet-created",
         "note": "Listed as a single-owner/integrator surface in blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md's file ownership guardrails table, alongside the paths above. No concrete file exists yet -- Wave 1B (PR 1B, semantic tokens and cross-renderer consumption) is what creates it. Recorded here so the exact path can be added to protectedPaths the moment it exists, rather than the guardrail being silently dropped."
+      }
+    ],
+    "releases": [
+      {
+        "id": "wave-0b-release-pr131",
+        "wave": "0B",
+        "decisionRef": "wave-0b-pr83-successor-release-pr131",
+        "grantedTo": {
+          "successorPr": 131,
+          "successorBranch": "claude/mazer-pr83-fitness-auth-parity-successor",
+          "originalPr": 83,
+          "originalBranch": "codex/fitness-auth-capability-parity-20260717"
+        },
+        "releasedPaths": [
+          "src/scenes/MenuScene.ts",
+          "src/scenes/menuRuntimeDiagnostics.ts",
+          "src/legacy-runtime/legacyAuth.ts",
+          "src/legacy-runtime/legacyPlayerMessage.ts",
+          "scripts/analysis/capture-auth-capability-surfaces.mjs",
+          "scripts/analysis/capture-ui-surfaces.mjs",
+          "scripts/analysis/live-auth-persistence-soak.mjs",
+          "package.json"
+        ],
+        "notReleased": ["vite.config.ts"],
+        "scopeNote": "Applies ONLY to commits on grantedTo.successorBranch, matched by exact string equality against the branch name scripts/check-decision-registry.mjs's resolveCurrentGitBranch() resolves at check time. Any other branch -- including main, PR #82's branch, and any future/unrelated branch that happens to touch one of releasedPaths -- gets zero release and the full protectedPaths violation still fires. vite.config.ts is deliberately excluded from releasedPaths: PR #131 does not touch it, so it stays protected even on PR #131's own branch. package.json IS included because PR #131 legitimately adds one new script entry (visual:auth-capabilities) alongside the already-protected capture scripts it wires up; this does not touch or authorize any of PR #82's separate, unrelated package.json changes, and PR #82's own branch remains fully subject to protectedPaths for package.json exactly as before this release existed."
       }
     ],
     "decisionRef": "pr83-protected-paths-hold"
