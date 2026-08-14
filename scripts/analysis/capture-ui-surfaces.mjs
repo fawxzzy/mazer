@@ -223,7 +223,7 @@ const waitForAuthenticatedFixtureReady = async (page, { timeoutMs = DEFAULT_TIME
           && visual?.runtime?.mode === 'menu'
           && visual?.runtime?.overlay === 'none'
           && labels.has('Start')
-          && labels.has('Options');
+          && (visual?.buttons ?? []).some((button) => button?.text === 'Options' && button?.iconOnly === true);
       } catch {
         return false;
       }
@@ -678,6 +678,14 @@ const getVisualButtonPoint = (visual, text) => {
   };
 };
 
+const hasVisualButton = (surface, text, { iconOnly = null } = {}) => (
+  (surface?.buttons ?? []).some((button) => (
+    button?.text === text
+    && isFiniteBounds(button?.bounds)
+    && (iconOnly === null || button?.iconOnly === iconOnly)
+  ))
+);
+
 const getMenuButtonPoints = (visual) => ({
   login: getVisualButtonPoint(visual, 'Login') ?? {
     x: Math.round(visual?.layout?.centerButtonX ?? 0),
@@ -730,7 +738,8 @@ const resolveOptionsBottomExpectedLabels = (authenticated) => [
 
 const isAuthGatedMenuSurface = (surface) => (
   hasTextLabels(surface, ['Login'])
-  && !hasTextLabels(surface, ['Start', 'Options'])
+  && !hasVisualButton(surface, 'Start')
+  && !hasVisualButton(surface, 'Options', { iconOnly: true })
 );
 
 const getPauseButtonPoint = (visual) => {
@@ -942,20 +951,13 @@ const collectMenuControlSpacingIssues = (surface) => {
     return [];
   }
 
-  const layout = surface.layout;
+  const startButton = (surface.buttons ?? []).find((button) => button?.text === 'Start' && isFiniteBounds(button?.bounds));
   const badge = surface.progressionBadge;
-  if (!layout || !badge?.bounds || !Number.isFinite(layout.buttonHeight)) {
+  if (!startButton || !badge?.bounds) {
     return [];
   }
 
-  const buttonCenterY = Number.isFinite(layout.leftButtonY) && Number.isFinite(layout.rightButtonY)
-    ? Math.min(layout.leftButtonY, layout.rightButtonY)
-    : layout.centerButtonY;
-  if (!Number.isFinite(buttonCenterY)) {
-    return [];
-  }
-
-  const buttonTop = buttonCenterY - (layout.buttonHeight / 2);
+  const buttonTop = startButton.bounds.top;
   const badgeGap = buttonTop - badge.bounds.bottom;
   return badgeGap < 10
     ? [`menu:progressionBadge-to-buttons-gap=${badgeGap.toFixed(1)}<10`]
@@ -969,7 +971,6 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
 
   const badge = surface.progressionBadge?.bounds;
   const board = surface.board?.bounds;
-  const renderBoard = surface.board?.renderBounds;
   if (!isFiniteBounds(badge) || !isFiniteBounds(board)) {
     return [`${surfaceId}:missing-progression-badge-or-board-bounds`];
   }
@@ -979,32 +980,24 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
     issues.push(`${surfaceId}:progression-badge-outside-viewport`);
   }
 
-  const portraitPlay = surface.mode === 'play' && viewport.height > viewport.width;
-  if (!portraitPlay && badge.width > board.width + 1) {
+  if (surface.mode === 'menu') {
+    const settings = (surface.buttons ?? []).find((button) => button?.text === 'Options' && button?.iconOnly === true);
+    if (badge.bottom > board.top - 4) {
+      issues.push(`${surfaceId}:progression-badge-not-above-menu-board`);
+    }
+    if (isFiniteBounds(settings?.bounds) && settings.bounds.left - badge.right < 8) {
+      issues.push(`${surfaceId}:progression-badge-to-settings-gap=${(settings.bounds.left - badge.right).toFixed(1)}<8`);
+    }
+  } else if (surface.mode === 'play' && badge.width > board.width + 1) {
     issues.push(`${surfaceId}:progression-badge-width=${badge.width.toFixed(1)}>board=${board.width.toFixed(1)}`);
   }
-  if (!portraitPlay && Math.abs(badge.centerX - board.centerX) > 1) {
-    issues.push(`${surfaceId}:progression-badge-not-board-centered`);
-  }
-  if (surface.mode === 'menu') {
-    const mazeGap = badge.top - board.bottom;
-    if (mazeGap < 4) {
-      issues.push(`${surfaceId}:board-to-progression-badge-gap=${mazeGap.toFixed(1)}<4`);
-    }
-  }
-  if (portraitPlay) {
+  if (surface.mode === 'play') {
     const pause = surface.touchControls?.controls?.pause;
-    const playLaneLeft = Math.max(9, isFiniteBounds(renderBoard) ? renderBoard.left : board.left);
-    const playLaneRight = isFiniteBounds(pause) ? pause.left - 8 : viewport.width - 9;
-    const playLaneCenter = playLaneLeft + ((playLaneRight - playLaneLeft) / 2);
-    if (Math.abs(badge.centerX - playLaneCenter) > 1) {
-      issues.push(`${surfaceId}:progression-badge-not-play-lane-centered`);
+    if (badge.bottom > board.top - 8) {
+      issues.push(`${surfaceId}:progression-badge-not-above-play-board`);
     }
-    if (isFiniteBounds(pause) && pause.left - badge.right < 4) {
-      issues.push(`${surfaceId}:progression-badge-to-pause-gap=${(pause.left - badge.right).toFixed(1)}<4`);
-    }
-    if (isFiniteBounds(pause) && Math.abs(pause.height - badge.height) > 1) {
-      issues.push(`${surfaceId}:pause-height=${pause.height.toFixed(1)}!=badge-height=${badge.height.toFixed(1)}`);
+    if (isFiniteBounds(pause) && pause.left - badge.right < 8) {
+      issues.push(`${surfaceId}:progression-badge-to-pause-gap=${(pause.left - badge.right).toFixed(1)}<8`);
     }
   }
   return issues;
@@ -1076,6 +1069,9 @@ const collectOverlayScrollBottomIssues = (surfaceId, surface, expectedLabels) =>
 };
 
 const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.buttons ?? []).flatMap((button) => {
+  if (button?.iconOnly === true) {
+    return [];
+  }
   if (!isFiniteBounds(button?.bounds) || !isFiniteBounds(button?.labelBounds)) {
     return [`${surfaceId}:${button?.text ?? 'unknown'}:missing-button-label-bounds`];
   }
@@ -1127,6 +1123,9 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
 });
 
 const collectButtonLabelFillIssues = (surfaceId, surface) => (surface?.buttons ?? []).flatMap((button) => {
+  if (button?.iconOnly === true) {
+    return [];
+  }
   const actionLabels = new Set([
     'Account',
     'Create Account',
@@ -1530,7 +1529,9 @@ const buildSurfaceChecks = ({
   const textChecks = [
     createCheck(
       'menu-text-labels',
-      authGated ? hasLabels(surfaces.menu, ['Login']) : hasLabels(surfaces.menu, ['Start', 'Options']),
+      authGated
+        ? hasLabels(surfaces.menu, ['Login'])
+        : hasLabels(surfaces.menu, ['Start']) && hasVisualButton(surfaces.menu, 'Options', { iconOnly: true }),
       `labels=${labelDetail(surfaces.menu)}`
     ),
     createCheck(
@@ -1593,9 +1594,10 @@ const buildSurfaceChecks = ({
         : `pause=${labelDetail(surfaces.pause)}; pause-bottom=${labelDetail(surfaces.pauseBottom)}`
     ),
     createCheck(
-      'play-text-labels',
-      hasLabels(surfaces.play, ['PAUSE']) && !hasLabels(surfaces.play, ['RESET']),
-      `labels=${labelDetail(surfaces.play)}`
+      'play-settings-cog',
+      isFiniteBounds(surfaces.play?.touchControls?.controls?.pause)
+        && !hasLabels(surfaces.play, ['PAUSE', 'RESET']),
+      `settingsCog=${isFiniteBounds(surfaces.play?.touchControls?.controls?.pause)}; labels=${labelDetail(surfaces.play)}`
     ),
     createCheck(
       'pause-text-labels',
@@ -1997,7 +1999,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const play = await captureSurface({
       page,
       outputDir,
-      expectedLabels: ['PAUSE'],
+      expectedLabels: [],
       id: '03-play',
       mode: 'play',
       overlay: 'none',

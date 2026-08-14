@@ -62,6 +62,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const waitForAuthenticatedFixtureReady = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
     expect(source).toContain("runtime?.auth?.status === 'authenticated'");
     expect(source).toContain("labels.has('Start')");
+    expect(source).toContain("button?.text === 'Options' && button?.iconOnly === true");
     expect(source).toContain("if (authFixture === 'authenticated') {");
     expect(source).toContain('await waitForAuthenticatedFixtureReady(page, { timeoutMs });');
     expect(source).toContain('expectedOverlay: overlay');
@@ -70,6 +71,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const resolveRouteWithParams = (route, params) => {');
     expect(source).toContain('const isAuthGatedMenuSurface = (surface) => (');
     expect(source).toContain("hasTextLabels(surface, ['Login'])");
+    expect(source).toContain("const hasVisualButton = (surface, text, { iconOnly = null } = {}) => (");
     expect(source).toContain('const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([');
     expect(source).toContain('export const matchesExpectedTextLabel = (actualLabel, expectedLabel) => (');
     expect(source).toContain('export const hasExpectedTextLabels = (actualLabels, expectedLabels) => (');
@@ -89,6 +91,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("login: getVisualButtonPoint(visual, 'Login') ?? {");
     expect(source).toContain("start: getVisualButtonPoint(visual, 'Start') ?? {");
     expect(source).toContain("options: getVisualButtonPoint(visual, 'Options') ?? {");
+    expect(source).toContain("hasVisualButton(surfaces.menu, 'Options', { iconOnly: true })");
     expect(source).toContain('const openOptionsOverlayFromMenu = async (page, point, expectedLabels, timeoutMs) => {');
     expect(source).toContain("await clickPoint(page, point, 'Options');");
     expect(source).toContain('await page.touchscreen.tap(point.x, point.y);');
@@ -130,7 +133,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const latestMenuDiagnostics = await readDiagnostics(page);');
     expect(source).toContain('const latestMenuButtons = getMenuButtonPoints(latestMenuDiagnostics.visual);');
     expect(source).toContain('markerStyle: menu.diagnostics.visual?.markerStyle');
-    expect(source).toContain("expectedLabels: ['PAUSE']");
+    expect(source).toContain('expectedLabels: []');
     expect(source).toContain("expectedLabels: ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu']");
     expect(source).toContain("url.searchParams.set('mazeSeed', mazeSeed);");
     expect(source).toContain("url.searchParams.set('authFixture', authFixture);");
@@ -165,8 +168,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const collectMenuControlSpacingIssues = (surface) => {');
     expect(source).toContain('const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain('badge.width > board.width + 1');
-    expect(source).toContain('progression-badge-not-play-lane-centered');
-    expect(source).toContain('isFiniteBounds(renderBoard) ? renderBoard.left : board.left');
+    expect(source).toContain('progression-badge-not-above-play-board');
+    expect(source).toContain('progression-badge-to-pause-gap=');
     expect(source).toContain("'progression-badge-geometry'");
     expect(source).toContain("createCheck(\n      'mobile-text-label-bounds'");
     expect(source).toContain("createCheck(\n      'mobile-native-input-bounds'");
@@ -183,7 +186,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const collectButtonLabelContainmentIssues = (surfaceId, surface) =>');
     expect(source).toContain('const collectButtonLabelFillIssues = (surfaceId, surface) =>');
     expect(source).toContain('progressionBadge fontSize=');
-    expect(source).toContain('pause-height=');
+    expect(source).not.toContain('pause-height=');
     expect(source).toContain('const collectGuideTextContainmentIssues = (surfaceId, surface) => {');
     expect(source).toContain('const collectWrapTopologyDiagnosticIssues = (surfaceId, surface, { requirePairs = false } = {}) => {');
     expect(source).toContain('const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {');
@@ -231,7 +234,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('window.requestAnimationFrame(() => {');
     expect(source).toContain('window.requestAnimationFrame(resolvePaint);');
     expect(source).not.toContain("expectedLabels: ['Exit', 'Start', 'Options']");
-    expect(source).toContain("authGated ? hasLabels(surfaces.menu, ['Login']) : hasLabels(surfaces.menu, ['Start', 'Options'])");
+    expect(source).toContain("hasLabels(surfaces.menu, ['Start']) && hasVisualButton(surfaces.menu, 'Options', { iconOnly: true })");
     expect(source).toContain("authGated\n        ? surfaces.options.skipped === true");
     expect(source).toContain('const optionsCaptureExpectedLabels = [...OPTIONS_BASE_EXPECTED_LABELS];');
     expect(source).toContain('expectedLabels: optionsBottomExpectedLabels');
@@ -246,7 +249,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('expectedLabels: optionsCaptureExpectedLabels');
     expect(source).toContain('hasLabels(surfaces.options, OPTIONS_BASE_EXPECTED_LABELS)');
     expect(source).toContain("!hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale'])");
-    expect(source).toContain("hasLabels(surfaces.play, ['PAUSE']) && !hasLabels(surfaces.play, ['RESET'])");
+    expect(source).toContain("'play-settings-cog'");
+    expect(source).toContain("!hasLabels(surfaces.play, ['PAUSE', 'RESET'])");
     expect(source).toContain("hasLabels(surfaces.pause, ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu'])");
     expect(source).toContain("!hasLabels(surfaces.pause, ['Game Toggles', 'Account', 'Resume'])");
     expect(source).toContain('const reportPath = resolve(outputDir, \'report.md\');');

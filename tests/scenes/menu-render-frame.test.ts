@@ -784,18 +784,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, radius);');
     expect(menuSceneSource).toContain('progressionBadge: {');
     expect(menuSceneSource).toContain('menuCompass: {');
-    expect(menuSceneSource).toContain('const textInsetX = Math.max(14, Math.round(statusLayout.horizontalPadding / 2));');
-    expect(menuSceneSource).toContain('this.progressionBadgeTextFits = textBounds.left >= badgeBounds.left + textInsetX');
-    expect(menuSceneSource).toContain('mazeRenderFrame.boardSize + (mazeRenderFrame.safeInset * 2)');
-    expect(menuSceneSource).toContain('this.layout.width - 18');
-    expect(menuSceneSource).toContain('const statusLayout = resolveLegacyRunStatusPanelLayout(this.layout.width, availableWidth);');
-    expect(menuSceneSource).toContain('statusLayout.width - statusLayout.horizontalPadding');
-    expect(menuSceneSource).toContain('this.fitLegacyUiTextToWidth(');
-    expect(menuSceneSource).toContain('const width = statusLayout.width;');
-    expect(menuSceneSource).toContain('const height = statusLayout.height;');
-    expect(menuSceneSource).toContain("if (this.mode === 'play') {");
-    expect(menuSceneSource).toContain('return this.drawLegacyPlayProgressionGlyph(palette);');
-    expect(menuSceneSource).toContain('private drawLegacyPlayProgressionGlyph(palette: LegacyProgressionPalette): VisualRect');
+    expect(menuSceneSource).toContain('return this.drawLegacyPlayerProgressionGlyph(palette);');
+    expect(menuSceneSource).toContain('private drawLegacyPlayerProgressionGlyph(palette: LegacyProgressionPalette): VisualRect');
+    expect(menuSceneSource).not.toContain('resolveLegacyRunStatusPanelLayout');
+    expect(menuSceneSource).not.toContain('resolveLegacyProgressionBadgeText');
     expect(menuSceneSource).not.toContain('portraitMenuBadgeTextOffset');
     expect(menuSceneSource).toContain('const visibleTrail = trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point));');
     expect(menuSceneSource).toContain('trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))');
@@ -1233,11 +1225,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_ACTION_GREEN = toCyberArcadeCssHex(cyberArcadeMaterial.signal.player);');
     expect(menuSceneSource).toContain('const buttonTextColor = isPrimaryFrontDoorButton');
     expect(menuSceneSource).toContain('? LEGACY_MENU_ACTION_GREEN');
-    expect(menuSceneSource).toContain('resolveLegacyAuthenticatedMenuButtonStack');
-    expect(menuSceneSource).toContain('const authenticatedMenuButtonStack = resolveLegacyAuthenticatedMenuButtonStack(this.layout);');
-    expect(menuSceneSource).toContain('authenticatedMenuButtonStack.startButtonY');
-    expect(menuSceneSource).toContain('authenticatedMenuButtonStack.optionsButtonY');
-    expect(menuSceneSource).toContain('authenticatedMenuButtonStack.optionsButtonHeight');
+    expect(menuSceneSource).toContain('private createLegacyMenuSettingsCogButton(onClick: () => void): UiButton');
+    expect(menuSceneSource).toContain("text: 'Options'");
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCog(panel, pauseRect, active);');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCog(this.hudGraphics, controls.pause);');
+    expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
     expect(menuSceneSource).toContain('const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);');
     expect(menuSceneSource).toContain('bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height)');
     expect(menuSceneSource).toContain('text,');
@@ -1344,19 +1336,18 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
 
-  test('keeps player progression quiet and uses one compact level glyph in active play', () => {
+  test('keeps player progression quiet and uses one compact level glyph on both game surfaces', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('private drawLegacyPlayProgressionGlyph(palette: LegacyProgressionPalette): VisualRect');
+    expect(menuSceneSource).toContain('private drawLegacyPlayerProgressionGlyph(palette: LegacyProgressionPalette): VisualRect');
     expect(menuSceneSource).toContain('.setText(String(track.level))');
-    expect(menuSceneSource).toContain("const track = this.progressionState.tracks['ai-runner'];");
     expect(menuSceneSource).not.toContain('publishLegacyPlayerProgressionCompletion');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayerProgressionOutcomeReason');
     expect(menuSceneSource).not.toContain('progression.player.cycle.');
     expect(menuSceneSource).not.toContain('No unlock.');
   });
 
-  test('places the played-game level glyph in the compact HUD lane', () => {
+  test('places the shared player level glyph in the compact top HUD lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');
@@ -1364,8 +1355,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const top = clampInteger(');
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillRoundedRect(left, top, size, size');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayProgressionBadgeCenterY');
-    expect(menuSceneSource).toContain('private resolveLegacyMenuProgressionBadgeCenterY(');
-    expect(menuSceneSource).toContain('return Math.round(this.layout.lanes.rank.top + (height / 2));');
+    expect(menuSceneSource).not.toContain('resolveLegacyMenuProgressionBadgeCenterY');
+    expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');
   });
 
   test('consumes shared UI standards for buttons, titles, guides, and toggles', () => {
@@ -1374,7 +1365,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("from '../legacy-runtime/legacyUiStandards';");
     expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, buttonFontSize, options.labelRole ?? 'button')");
     expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title')");
-    expect(menuSceneSource).toContain('.setPadding(0, 4, 0, 4)');
     expect(menuSceneSource).toContain('resolveLegacyToggleRowLayout(input.width, input.height, hasDescription)');
   });
 
