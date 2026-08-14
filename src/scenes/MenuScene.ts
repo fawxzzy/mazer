@@ -193,7 +193,10 @@ import {
   type MazeCycleTelemetryReceipt,
   type MazeCycleTelemetrySurface
 } from '../legacy-runtime/mazeCycleTelemetry';
-import { MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD } from '../legacy-runtime/mazeCycleRunQualityScorer.mjs';
+import {
+  MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD,
+  MAZE_CYCLE_RUN_QUALITY_PLAYER_EXTREME_DETOUR_PRESSURE_THRESHOLD
+} from '../legacy-runtime/mazeCycleRunQualityScorer.mjs';
 import {
   LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH,
   LEGACY_PROGRESSION_STORAGE_KEY,
@@ -10899,16 +10902,10 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyPlayerProgressionOutcomeReason(receipt: MazeCycleTelemetryReceipt, score: number): string {
     if (receipt.resetUsed) {
-      return 'Finish the maze without resetting to advance.';
+      return 'A reset was used, so the next maze eased instead of advancing.';
     }
-    if (receipt.wrongTurns >= 6) {
-      return `${receipt.wrongTurns} wrong turns triggered a difficulty ease; keep them below 6 to advance.`;
-    }
-    if (receipt.backtracks >= 6) {
-      return `${receipt.backtracks} backtracks triggered a difficulty ease; keep them below 6 to advance.`;
-    }
-    if (receipt.routeEfficiencyPressureScore >= 75) {
-      return 'Your route was much longer than the viable path; take a more direct route to advance.';
+    if (receipt.routeEfficiencyPressureScore >= MAZE_CYCLE_RUN_QUALITY_PLAYER_EXTREME_DETOUR_PRESSURE_THRESHOLD) {
+      return 'Your route was more than twice the viable path, so the next maze eased.';
     }
     if (score < MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD) {
       return `Reach ${MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD}+ to advance.`;

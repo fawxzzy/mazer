@@ -1,7 +1,7 @@
 import { scoreMazeCycleAiDecisionSummary } from './mazeCycleAiScorer.mjs';
 
 export const MAZE_CYCLE_RUN_QUALITY_SCORER_ID = 'mazer.maze-cycle-run-quality';
-export const MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION = '1.0.0';
+export const MAZE_CYCLE_RUN_QUALITY_SCORER_VERSION = '1.1.0';
 export const MAZE_CYCLE_RUN_QUALITY_SHORTEST_PATH_MODEL = 'playable-wrap-aware-shortest-path-v1';
 export const MAZE_CYCLE_RUN_QUALITY_METRICS_VERSION = '1.0.0';
 export const MAZE_CYCLE_RUN_QUALITY_EXPLORER_THRESHOLD = 0.25;
@@ -15,6 +15,7 @@ export const MAZE_CYCLE_RUN_QUALITY_AI_SEARCHING_EXHAUSTION_SCORE_CAP = 56;
 // already reflected in the weighted score; only explicit failure conditions
 // below may override it.
 export const MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD = 70;
+export const MAZE_CYCLE_RUN_QUALITY_PLAYER_EXTREME_DETOUR_PRESSURE_THRESHOLD = 75;
 
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -116,7 +117,20 @@ const scoreBaseRunQuality = (input, complexity) => {
   const total = clampInteger(Math.min(weightedTotal, timeStruggleCap, resetStruggleCap, unsafeRenderCap));
   let signal = 'hold';
 
-  if (isMenuDemo && (stabilityScore <= 25 || averageFrameMs >= 24)) {
+  if (!isMenuDemo) {
+    // Players progress from the score the HUD actually shows. Wrong turns and
+    // backtracks lower that score, but they never become a second hidden
+    // perfection test. A reset or a route more than twice the viable path
+    // remains a clear anti-cheese guard that can ease the next maze.
+    if (
+      resetUsed
+      || routeEfficiencyPressureScore >= MAZE_CYCLE_RUN_QUALITY_PLAYER_EXTREME_DETOUR_PRESSURE_THRESHOLD
+    ) {
+      signal = 'ease';
+    } else if (total >= MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD) {
+      signal = 'challenge';
+    }
+  } else if (stabilityScore <= 25 || averageFrameMs >= 24) {
     signal = 'hold';
   } else if (
     resetUsed
@@ -128,14 +142,10 @@ const scoreBaseRunQuality = (input, complexity) => {
   ) {
     signal = 'ease';
   } else if (
-    (!isMenuDemo && total >= MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD)
-    || (
-      isMenuDemo
-      && total >= 72
-      && wrongTurns <= 1
-      && backtracks <= 1
-      && routeEfficiencyPressureScore <= 25
-    )
+    total >= 72
+    && wrongTurns <= 1
+    && backtracks <= 1
+    && routeEfficiencyPressureScore <= 25
   ) {
     signal = 'challenge';
   }

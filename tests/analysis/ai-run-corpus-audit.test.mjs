@@ -65,7 +65,7 @@ describe('ai-run-corpus-audit', () => {
     });
     expect(audit.runQualityScorer).toMatchObject({
       id: 'mazer.maze-cycle-run-quality',
-      version: '1.0.0',
+      version: '1.1.0',
       shortestPathModel: 'playable-wrap-aware-shortest-path-v1',
       topologyMetricsVersion: '1.0.0',
       explorerThreshold: 0.25,
