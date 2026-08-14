@@ -209,6 +209,45 @@ const waitForVisualBuildSettled = async (page, { requireReadableTitle = false, t
   );
 };
 
+const exerciseReducedMotionPreferenceChange = async (page, timeoutMs) => {
+  const readPreference = async () => page.evaluate((visualAttribute) => {
+    const raw = document.documentElement.getAttribute(visualAttribute);
+    if (!raw) {
+      return null;
+    }
+    try {
+      const visual = JSON.parse(raw);
+      return visual?.accessibility?.reducedMotion ?? null;
+    } catch {
+      return null;
+    }
+  }, VISUAL_DIAGNOSTICS_ATTRIBUTE);
+  const waitForPreference = async (expected) => page.waitForFunction(
+    ({ expectedReducedMotion, visualAttribute }) => {
+      const raw = document.documentElement.getAttribute(visualAttribute);
+      if (!raw) {
+        return false;
+      }
+      try {
+        return JSON.parse(raw)?.accessibility?.reducedMotion === expectedReducedMotion;
+      } catch {
+        return false;
+      }
+    },
+    { expectedReducedMotion: expected, visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE },
+    { timeout: timeoutMs }
+  );
+
+  const initial = await readPreference();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await waitForPreference(true);
+  const reduced = await readPreference();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await waitForPreference(false);
+  const restored = await readPreference();
+  return { initial, reduced, restored };
+};
+
 const waitForAuthenticatedFixtureReady = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
   await page.waitForFunction(
     ({ runtimeAttribute, visualAttribute }) => {
@@ -226,7 +265,7 @@ const waitForAuthenticatedFixtureReady = async (page, { timeoutMs = DEFAULT_TIME
           && visual?.runtime?.mode === 'menu'
           && visual?.runtime?.overlay === 'none'
           && labels.has('Start')
-          && (visual?.buttons ?? []).some((button) => button?.text === 'Options' && button?.iconOnly === true);
+          && (visual?.buttons ?? []).some((button) => button?.text === 'Settings' && button?.iconOnly === true);
       } catch {
         return false;
       }
@@ -300,7 +339,7 @@ const openOptionsOverlayFromMenu = async (page, point, expectedLabels, timeoutMs
     if (attempt === 1) {
       await page.touchscreen.tap(point.x, point.y);
     } else {
-      await clickPoint(page, point, 'Options');
+      await clickPoint(page, point, 'Settings');
     }
     try {
       await waitForSurface(page, {
@@ -316,19 +355,19 @@ const openOptionsOverlayFromMenu = async (page, point, expectedLabels, timeoutMs
     }
   }
 
-  throw lastError ?? new Error('Unable to open Options overlay from menu.');
+  throw lastError ?? new Error('Unable to open Settings from the menu cog.');
 };
 
 const openOptionsOverlayViaQa = async (page, timeoutMs) => {
   await page.waitForFunction(
-    () => Boolean(window.__MAZER_QA__?.openOptionsOverlay),
+    () => Boolean(window.__MAZER_QA__?.openSettingsOverlay),
     {},
     { timeout: timeoutMs }
   );
   const result = await page.evaluate(() => {
     const api = window.__MAZER_QA__;
-    return api?.openOptionsOverlay
-      ? api.openOptionsOverlay()
+    return api?.openSettingsOverlay
+      ? api.openSettingsOverlay()
       : {
           accepted: false,
           mode: null,
@@ -337,7 +376,7 @@ const openOptionsOverlayViaQa = async (page, timeoutMs) => {
         };
   });
   if (result?.accepted !== true) {
-    throw new Error(`Unable to open Options overlay through QA bridge: ${result?.reason ?? 'unknown'}`);
+    throw new Error(`Unable to open Settings through QA bridge: ${result?.reason ?? 'unknown'}`);
   }
   await page.waitForTimeout(Math.min(timeoutMs, 500));
 };
@@ -702,7 +741,7 @@ const getMenuButtonPoints = (visual) => ({
     x: Math.round(visual?.layout?.leftButtonX ?? 0),
     y: Math.round(visual?.layout?.leftButtonY ?? 0)
   },
-  options: getVisualButtonPoint(visual, 'Options') ?? {
+  options: getVisualButtonPoint(visual, 'Settings') ?? {
     x: Math.round(visual?.layout?.rightButtonX ?? 0),
     y: Math.round(visual?.layout?.rightButtonY ?? 0)
   }
@@ -732,7 +771,7 @@ const hasTextLabels = (surface, expectedLabels) => {
 };
 
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
-  'Options',
+  'Settings',
   'PLAYER GUIDE',
   'Camera Follow'
 ]);
@@ -746,7 +785,6 @@ const resolveOptionsBottomExpectedLabels = (authenticated) => [
 const isAuthGatedMenuSurface = (surface) => (
   hasTextLabels(surface, ['Login'])
   && !hasVisualButton(surface, 'Start')
-  && !hasVisualButton(surface, 'Options', { iconOnly: true })
 );
 
 const getPauseButtonPoint = (visual) => {
@@ -754,6 +792,20 @@ const getPauseButtonPoint = (visual) => {
   return pause
     ? { x: Math.round(pause.centerX), y: Math.round(pause.centerY) }
     : null;
+};
+
+const closeOverlayToMenu = async (page, timeoutMs) => {
+  const diagnostics = await readDiagnostics(page);
+  const bounds = diagnostics.visual?.overlayUi?.backChevron;
+  if (!bounds) {
+    throw new Error('Missing Back control for overlay close.');
+  }
+
+  await clickPoint(page, {
+    x: Math.round(bounds.centerX),
+    y: Math.round(bounds.centerY)
+  }, 'Back');
+  await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs });
 };
 
 const createCheck = (id, passed, detail) => ({
@@ -988,7 +1040,7 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
   }
 
   if (surface.mode === 'menu') {
-    const settings = (surface.buttons ?? []).find((button) => button?.text === 'Options' && button?.iconOnly === true);
+    const settings = (surface.buttons ?? []).find((button) => button?.text === 'Settings' && button?.iconOnly === true);
     if (badge.bottom > board.top - 4) {
       issues.push(`${surfaceId}:progression-badge-not-above-menu-board`);
     }
@@ -1096,7 +1148,7 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
     'Log out',
     'Login',
     'Menu',
-    'Options',
+    'Settings',
     'Reset',
     'Reset Progress',
     'Start'
@@ -1114,7 +1166,7 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
     'Log out',
     'Login',
     'Menu',
-    'Options',
+    'Settings',
     'Reset',
     'Reset Progress',
     'Start'
@@ -1139,7 +1191,7 @@ const collectButtonLabelFillIssues = (surfaceId, surface) => (surface?.buttons ?
     'Log out',
     'Login',
     'Menu',
-    'Options',
+    'Settings',
     'Reset',
     'Reset Progress',
     'Start'
@@ -1467,12 +1519,8 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'options-surface',
-      authGated
-        ? surfaces.options.skipped === true
-        : surfaces.options.mode === 'menu' && surfaces.options.overlay === 'options',
-      authGated
-        ? `skipped=${surfaces.options.skipped === true} reason=${surfaces.options.reason ?? 'missing'}`
-        : `options mode=${surfaces.options.mode ?? 'missing'} overlay=${surfaces.options.overlay ?? 'missing'}`
+      surfaces.options.mode === 'menu' && surfaces.options.overlay === 'options',
+      `options mode=${surfaces.options.mode ?? 'missing'} overlay=${surfaces.options.overlay ?? 'missing'}`
     ),
     createCheck(
       'auth-surface',
@@ -1494,7 +1542,7 @@ const buildSurfaceChecks = ({
       `pause mode=${surfaces.pause.mode ?? 'missing'} overlay=${surfaces.pause.overlay ?? 'missing'}`
     )
   ];
-  const pathStyleSurfaceIds = authGated ? ['menu', 'play', 'pause'] : ['menu', 'options', 'play', 'pause'];
+  const pathStyleSurfaceIds = ['menu', 'options', 'play', 'pause'];
   const pathStyleChecks = pathStyleSurfaceIds.map((id) => createCheck(
     `${id}-path-style`,
     surfaces[id].board?.pathVisualStyle === 'corridor',
@@ -1547,8 +1595,8 @@ const buildSurfaceChecks = ({
     createCheck(
       'menu-text-labels',
       authGated
-        ? hasLabels(surfaces.menu, ['Login'])
-        : hasLabels(surfaces.menu, ['Start']) && hasVisualButton(surfaces.menu, 'Options', { iconOnly: true }),
+        ? hasLabels(surfaces.menu, ['Login']) && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })
+        : hasLabels(surfaces.menu, ['Start']) && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true }),
       `labels=${labelDetail(surfaces.menu)}`
     ),
     createCheck(
@@ -1558,13 +1606,9 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'options-text-labels',
-      authGated
-        ? surfaces.options.skipped === true
-        : hasLabels(surfaces.options, OPTIONS_BASE_EXPECTED_LABELS)
-          && !hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale']),
-      authGated
-        ? `skipped=${surfaces.options.skipped === true} reason=${surfaces.options.reason ?? 'missing'}`
-        : `labels=${labelDetail(surfaces.options)}`
+      hasLabels(surfaces.options, OPTIONS_BASE_EXPECTED_LABELS)
+        && !hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale']),
+      `labels=${labelDetail(surfaces.options)}`
     ),
     createCheck(
       'auth-text-labels',
@@ -1578,8 +1622,6 @@ const buildSurfaceChecks = ({
     createCheck(
       'options-bottom-account-action',
       !includeOverlayBottom
-        ? surfaces.optionsBottom.skipped === true
-        : authGated
         ? surfaces.optionsBottom.skipped === true
         : hasLabels(surfaces.optionsBottom, optionsBottomExpectedLabels),
       !includeOverlayBottom
@@ -1771,12 +1813,12 @@ const buildMarkdownReport = (summary) => {
       : '_Auth capture skipped because the captured session is already authenticated._',
     '',
     summary.screenshots.options
-      ? `![Options](${summary.screenshots.options})`
-      : '_Options capture skipped because the menu is auth-gated in the captured session._',
+      ? `![Settings](${summary.screenshots.options})`
+      : '_Settings capture skipped because the menu is auth-gated in the captured session._',
     '',
     summary.screenshots.optionsBottom
-      ? `![Options bottom](${summary.screenshots.optionsBottom})`
-      : '_Options bottom capture skipped because the menu is auth-gated in the captured session._',
+      ? `![Settings bottom](${summary.screenshots.optionsBottom})`
+      : '_Settings bottom capture skipped because the menu is auth-gated in the captured session._',
     '',
     `![Play](${summary.screenshots.play})`,
     '',
@@ -1876,6 +1918,9 @@ export const runUiSurfaceCapture = async (options = {}) => {
       requireReadableTitle: true,
       timeoutMs
     });
+    const reducedMotionToggle = options.reducedMotion
+      ? null
+      : await exerciseReducedMotionPreferenceChange(page, timeoutMs);
     const menu = await captureSurface({
       page,
       outputDir,
@@ -1896,7 +1941,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const authenticatedMenu = authFixture === 'authenticated' || menu.diagnostics.runtime?.auth?.status === 'authenticated';
     const optionsBottomExpectedLabels = resolveOptionsBottomExpectedLabels(authenticatedMenu);
     const currentMenuDiagnostics = transition ? await readDiagnostics(page) : menu.diagnostics;
-    const menuButtons = authGatedMenu ? null : getMenuButtonPoints(currentMenuDiagnostics.visual);
+    const menuButtons = getMenuButtonPoints(currentMenuDiagnostics.visual);
     await waitForVisualBuildSettled(page, { timeoutMs });
     const authSurface = authGatedMenu
       ? await (async () => {
@@ -1917,6 +1962,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
             id: '02-auth', mode: 'menu', overlay: 'auth', page, route, timeoutMs, transition
           })
           : null;
+        await closeOverlayToMenu(page, timeoutMs);
         return captured;
       })()
       : {
@@ -1931,18 +1977,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       };
 
     let optionsBottomSurface = null;
-    const optionsSurface = authGatedMenu
-      ? {
-        diagnostics: {
-          runtime: null,
-          visual: null
-        },
-        screenContract: null,
-        screenshotPath: null,
-        skipped: true,
-        reason: 'auth-gated-menu'
-      }
-      : await (async () => {
+    const optionsSurface = await (async () => {
         await waitForVisualBuildSettled(page, { timeoutMs });
         const optionsCaptureExpectedLabels = [...OPTIONS_BASE_EXPECTED_LABELS];
         if (authFixture === 'authenticated') {
@@ -1993,8 +2028,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
             })
             : { ...captured, diagnostics: optionsScrollResult };
         }
-        await page.keyboard.press('Escape');
-        await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs });
+        await closeOverlayToMenu(page, timeoutMs);
         return captured;
       })();
 
@@ -2106,13 +2140,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         nativeInputs: [],
         textLabels: []
       },
-      options: authGatedMenu ? {
-        skipped: true,
-        reason: 'auth-gated-menu',
-        screenContract: null,
-        nativeInputs: [],
-        textLabels: []
-      } : {
+      options: {
         mode: optionsSurface.diagnostics.visual?.runtime?.mode ?? optionsSurface.diagnostics.runtime?.surface?.mode,
         overlay: optionsSurface.diagnostics.visual?.runtime?.overlay ?? optionsSurface.diagnostics.runtime?.surface?.overlay,
         board: optionsSurface.diagnostics.visual?.board,
@@ -2126,13 +2154,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         screenContract: optionsSurface.screenContract,
         materialSystem: optionsSurface.diagnostics.visual?.materialSystem
       },
-      optionsBottom: authGatedMenu ? {
-        skipped: true,
-        reason: 'auth-gated-menu',
-        screenContract: null,
-        nativeInputs: [],
-        textLabels: []
-      } : {
+      optionsBottom: {
         skipped: optionsBottomSurface.skipped === true,
         reason: optionsBottomSurface.reason ?? null,
         mode: optionsBottomSurface.diagnostics.visual?.runtime?.mode ?? optionsBottomSurface.diagnostics.runtime?.surface?.mode,
@@ -2200,7 +2222,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const transitions = transition ? {
       menu: menuTransition,
       ...(authGatedMenu ? { auth: authSurface.transition } : {}),
-      ...(authGatedMenu ? {} : { options: optionsSurface.transition }),
+      options: optionsSurface.transition,
       play: playTransition,
       pause: pauseTransition
     } : null;
@@ -2217,6 +2239,15 @@ export const runUiSurfaceCapture = async (options = {}) => {
       targetUrl,
       viewport
     });
+    if (reducedMotionToggle !== null) {
+      checks.push(createCheck(
+        'reduced-motion-preference-change',
+        reducedMotionToggle.initial === false
+          && reducedMotionToggle.reduced === true
+          && reducedMotionToggle.restored === false,
+        JSON.stringify(reducedMotionToggle)
+      ));
+    }
     checks.push(...buildViewportTransitionChecks(transitions));
     const summary = {
       pass: checks.every((check) => check.passed),
@@ -2233,6 +2264,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       } : null,
       authFixture: authFixture ?? null,
       preferenceFixture: preferenceFixture ?? null,
+      reducedMotionToggle,
       topologyFixture: topologyFixture ?? null,
       playTrailSeed,
       repo: {

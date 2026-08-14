@@ -884,7 +884,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('trailHeadColor: resolveLegacyIridescentTrailColor(trailHeadIndex, trailLength, time, palette.trailColor)');
     expect(menuSceneSource).toContain('trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
     expect(menuSceneSource).toContain('trailPulseEnabled: this.isLegacyTrailShineVisible()');
-    expect(menuSceneSource).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
+    expect(menuSceneSource).toContain('return this.legacyReducedMotionEnabled;');
     expect(menuSceneSource).toContain('private isLegacyTrailShineVisible(): boolean');
     expect(menuSceneSource).toContain('playerCoreRadius: playerMarkerMetrics.coreRadius');
     expect(menuSceneSource).toContain('playerBeaconColor: LEGACY_PLAY_PLAYER_BEACON_COLOR');
@@ -1219,6 +1219,30 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(tuningSource).toContain('throttled: 250,');
   });
 
+  test('caches OS reduced motion and settles only visual state when it changes', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const preferenceSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private installLegacyReducedMotionPreference(): void'),
+      menuSceneSource.indexOf('private isLegacyTrailShineVisible(): boolean')
+    );
+
+    expect(menuSceneSource).toContain('private legacyReducedMotionEnabled = false;');
+    expect(menuSceneSource).toContain('private legacyReducedMotionMediaQuery: MediaQueryList | null = null;');
+    expect(menuSceneSource).toContain('this.installLegacyReducedMotionPreference();');
+    expect(menuSceneSource).toContain('this.detachLegacyReducedMotionPreference();');
+    expect(preferenceSource).toContain("window.matchMedia('(prefers-reduced-motion: reduce)')");
+    expect(preferenceSource).toContain("mediaQuery.addEventListener('change', this.legacyReducedMotionMediaQueryListener)");
+    expect(preferenceSource).toContain("mediaQuery.removeEventListener('change', listener)");
+    expect(preferenceSource).toContain('this.syncLegacyPlayerVisualMotionTo(this.playerVisualMotion.to);');
+    expect(preferenceSource).toContain('this.hudCompassSpinStartedAtMs = null;');
+    expect(preferenceSource).toContain('this.backdropDirty = true;');
+    expect(preferenceSource).toContain('this.boardDynamicDirty = true;');
+    expect(preferenceSource).toContain('this.hudDirty = true;');
+    expect(preferenceSource).toContain('return this.legacyReducedMotionEnabled;');
+    expect(preferenceSource).not.toContain('tryMovePlayerFromInput');
+    expect(preferenceSource).not.toContain('legacyWorldTurnHost');
+  });
+
   test('keeps front-door buttons in the shared cyber chrome path', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
@@ -1231,7 +1255,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const buttonTextColor = isPrimaryFrontDoorButton');
     expect(menuSceneSource).toContain('? LEGACY_MENU_ACTION_GREEN');
     expect(menuSceneSource).toContain('private createLegacyMenuSettingsCogButton(onClick: () => void): UiButton');
-    expect(menuSceneSource).toContain("text: 'Options'");
+    expect(menuSceneSource).toContain("semanticAction: 'Settings'");
+    expect(menuSceneSource).toContain("text: 'Settings'");
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;');
+    expect(menuSceneSource).not.toContain('fillStyle(0x05070a');
     expect(menuSceneSource).toContain('this.drawLegacySettingsCog(panel, pauseRect, active);');
     expect(menuSceneSource).toContain('this.drawLegacySettingsCog(this.hudGraphics, controls.pause);');
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
@@ -1239,6 +1266,19 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height)');
     expect(menuSceneSource).toContain('text,');
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
+  });
+
+  test('keeps settings semantic while the compact level baseline stays free of board decorations', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain("this.createOverlayTitle('Settings', shell.titleCenterY);");
+    expect(menuSceneSource).not.toContain("this.createOverlayTitle('Options', shell.titleCenterY);");
+    expect(menuSceneSource).toContain("semanticAction: 'Settings'");
+    expect(menuSceneSource).toContain("text: 'Settings'");
+    expect(menuSceneSource).toContain('private readonly legacyPrecisionArcadeDecorationsEnabled = false;');
+    expect(menuSceneSource).toContain('this.stars = this.legacyPrecisionArcadeDecorationsEnabled');
+    expect(menuSceneSource).toContain('if (this.legacyPrecisionArcadeDecorationsEnabled) {');
+    expect(menuSceneSource).not.toContain('createLegacyRoomActivationPreviewCue(');
   });
 
   test('keeps account login/logout inside the shared player-facing overlay system', () => {
@@ -1440,10 +1480,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (!this.runtimeDiagnosticsConfig.enabled || typeof window === \'undefined\')');
     expect(menuSceneSource).toContain('window.__MAZER_QA__ = {');
     expect(menuSceneSource).toContain('movePlayPlayer: (move: string): LegacyQaMoveResult => this.handleLegacyQaPlayMove(move)');
-    expect(menuSceneSource).toContain('openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay()');
+    expect(menuSceneSource).toContain('openSettingsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenSettingsOverlay()');
     expect(menuSceneSource).toContain('openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay()');
     expect(menuSceneSource).toContain('startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode()');
-    expect(menuSceneSource).toContain('private handleLegacyQaOpenOptionsOverlay(): LegacyQaOverlayResult');
+    expect(menuSceneSource).toContain('private handleLegacyQaOpenSettingsOverlay(): LegacyQaOverlayResult');
     expect(menuSceneSource).toContain('private handleLegacyQaOpenPauseOverlay(): LegacyQaOverlayResult');
     expect(menuSceneSource).toContain('private handleLegacyQaStartPlayMode(): LegacyQaOverlayResult');
     expect(menuSceneSource).toContain("this.openOverlay('options');");

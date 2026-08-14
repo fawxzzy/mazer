@@ -386,6 +386,8 @@ interface UiButton {
   bounds: VisualRect;
   iconOnly?: boolean;
   label: Phaser.GameObjects.Text;
+  /** The player-facing action name published to visual QA. */
+  semanticAction?: string;
   setActive(active: boolean): void;
   text: string;
   destroy(): void;
@@ -462,6 +464,10 @@ interface LegacyIridescentMaterialDiagnostics {
 }
 
 interface MenuSceneVisualDiagnostics {
+  accessibility: {
+    reducedMotion: boolean;
+    reducedMotionSource: 'os-media-query-cache';
+  };
   materialSystem: {
     version: typeof CYBER_ARCADE_MATERIAL_VERSION;
     iconTarget: typeof CYBER_ARCADE_ICON_TARGET;
@@ -563,6 +569,7 @@ interface MenuSceneVisualDiagnostics {
     iconOnly: boolean;
     labelBounds: VisualRect | null;
     labelFontSize: number | null;
+    semanticAction: string;
     text: string;
   }>;
   title: {
@@ -908,6 +915,8 @@ interface LegacyQaOverlayResult {
 
 interface LegacyQaDiagnosticsApi {
   movePlayPlayer(move: string): LegacyQaMoveResult;
+  /** Player-facing Settings action; the internal overlay id remains options. */
+  openSettingsOverlay(): LegacyQaOverlayResult;
   openOptionsOverlay(): LegacyQaOverlayResult;
   openPauseOverlay(): LegacyQaOverlayResult;
   startPlayMode(): LegacyQaOverlayResult;
@@ -995,6 +1004,7 @@ const LEGACY_PLAY_HUD_ARROW_TAIL = cyberArcadeMaterial.rail.white;
 const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;
 const LEGACY_PLAY_TOUCH_FRAME_FILL = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_TOUCH_BUTTON_FILL = cyberArcadeMaterial.substrate.panelRaised;
+const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_TOUCH_BUTTON_STROKE = cyberArcadeMaterial.rail.cyan;
 const LEGACY_PLAY_TOUCH_ICON = cyberArcadeMaterial.rail.white;
 const LEGACY_PLAY_TOUCH_ACCENT = cyberArcadeMaterial.rail.mint;
@@ -1216,6 +1226,10 @@ export class MenuScene extends Phaser.Scene {
   private overlayScrollGestureLockPointerId: number | null = null;
   private overlayMovementSpeedSliderBounds: VisualRect | null = null;
   private viewportGeometryListener: (() => void) | null = null;
+  /** Cached OS accessibility preference; never read from the render loop. */
+  private legacyReducedMotionEnabled = false;
+  private legacyReducedMotionMediaQuery: MediaQueryList | null = null;
+  private legacyReducedMotionMediaQueryListener: ((event: MediaQueryListEvent) => void) | null = null;
   private stars: LegacyMenuBackdropStar[] = [];
   private layout!: LegacyMenuLayout;
   private hudBounds: VisualRect | null = null;
@@ -1310,6 +1324,7 @@ export class MenuScene extends Phaser.Scene {
     this.loadPersistedLegacyGameToggleSettings();
     this.loadPersistedMazeCycleTelemetryHistory();
     this.loadPersistedLegacyProgressionState();
+    this.installLegacyReducedMotionPreference();
     void this.initializeLegacyAuth();
     this.initializeRuntimeDiagnostics();
     this.backdropGraphics = this.add.graphics();
@@ -1376,6 +1391,7 @@ export class MenuScene extends Phaser.Scene {
       this.detachLegacyPlayKeyboardFallback();
       this.detachLegacyPlayTouchControlFallback();
       this.detachLegacyQaDiagnosticsSurface();
+      this.detachLegacyReducedMotionPreference();
       if (this.viewportGeometryListener !== null && typeof window !== 'undefined') {
         window.removeEventListener(MAZER_VIEWPORT_CHANGE_EVENT, this.viewportGeometryListener);
         this.viewportGeometryListener = null;
@@ -1394,6 +1410,7 @@ export class MenuScene extends Phaser.Scene {
 
     window.__MAZER_QA__ = {
       movePlayPlayer: (move: string): LegacyQaMoveResult => this.handleLegacyQaPlayMove(move),
+      openSettingsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenSettingsOverlay(),
       openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay(),
       openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay(),
       startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode()
@@ -1462,6 +1479,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyQaOpenOptionsOverlay(): LegacyQaOverlayResult {
+    return this.handleLegacyQaOpenSettingsOverlay();
+  }
+
+  private handleLegacyQaOpenSettingsOverlay(): LegacyQaOverlayResult {
     const base = {
       mode: this.mode,
       overlay: this.overlay
@@ -5022,17 +5043,75 @@ export class MenuScene extends Phaser.Scene {
   }
 
   /**
-   * OS-level reduced motion is a render-only preference. It never changes an
-   * input interval, world turn, collision, or persisted game setting.
+   * OS-level reduced motion is cached once and event-driven afterwards. It
+   * only settles presentation state; input cadence, world turns, collisions,
+   * and persisted settings remain untouched.
    */
-  private prefersLegacyReducedMotion(): boolean {
-    try {
-      return typeof window !== 'undefined'
-        && typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch {
-      return false;
+  private installLegacyReducedMotionPreference(): void {
+    this.detachLegacyReducedMotionPreference();
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
     }
+
+    try {
+      const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+      this.legacyReducedMotionMediaQuery = mediaQuery;
+      this.legacyReducedMotionEnabled = mediaQuery.matches;
+      this.legacyReducedMotionMediaQueryListener = (event) => {
+        this.applyLegacyReducedMotionPreference(event.matches);
+      };
+      if (typeof mediaQuery.addEventListener === 'function') {
+        mediaQuery.addEventListener('change', this.legacyReducedMotionMediaQueryListener);
+      } else {
+        mediaQuery.addListener(this.legacyReducedMotionMediaQueryListener);
+      }
+    } catch {
+      this.detachLegacyReducedMotionPreference();
+    }
+  }
+
+  private detachLegacyReducedMotionPreference(): void {
+    const mediaQuery = this.legacyReducedMotionMediaQuery;
+    const listener = this.legacyReducedMotionMediaQueryListener;
+    if (mediaQuery !== null && listener !== null) {
+      if (typeof mediaQuery.removeEventListener === 'function') {
+        mediaQuery.removeEventListener('change', listener);
+      } else {
+        mediaQuery.removeListener(listener);
+      }
+    }
+    this.legacyReducedMotionMediaQuery = null;
+    this.legacyReducedMotionMediaQueryListener = null;
+  }
+
+  private applyLegacyReducedMotionPreference(reducedMotion: boolean): void {
+    if (this.legacyReducedMotionEnabled === reducedMotion) {
+      return;
+    }
+
+    this.legacyReducedMotionEnabled = reducedMotion;
+    this.backdropAccumulatedDeltaMs = 0;
+    this.backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
+    this.legacyPlayTrailPulseNextFrameAtMs = 0;
+    this.legacyBoardCornerShimmerNextFrameAtMs = Number.NEGATIVE_INFINITY;
+    this.legacyMenuTitleAnimationNextFrameAtMs = Number.NEGATIVE_INFINITY;
+    if (reducedMotion) {
+      if (this.playerVisualMotion !== null) {
+        this.syncLegacyPlayerVisualMotionTo(this.playerVisualMotion.to);
+      }
+      this.hudCompassSpinStartedAtMs = null;
+      this.hudCompassSpinActive = false;
+      this.hudCompassSpinProgress = null;
+    }
+    this.backdropDirty = true;
+    this.boardDynamicDirty = true;
+    this.hudDirty = true;
+    this.uiDirty = true;
+    this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
+  }
+
+  private prefersLegacyReducedMotion(): boolean {
+    return this.legacyReducedMotionEnabled;
   }
 
   private isLegacyTrailShineVisible(): boolean {
@@ -8042,7 +8121,7 @@ export class MenuScene extends Phaser.Scene {
       this.hudGraphics.lineTo(centerX + (Math.cos(angle) * (outerRadius - 8)), centerY + (Math.sin(angle) * (outerRadius - 8)));
       this.hudGraphics.strokePath();
     }
-    this.hudGraphics.fillStyle(0x05070a, 0.45);
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_COG_HUB, 0.45);
     this.hudGraphics.fillCircle(centerX, centerY, innerRadius);
     this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.38);
     this.hudGraphics.strokeCircle(centerX, centerY, innerRadius);
@@ -8182,7 +8261,7 @@ export class MenuScene extends Phaser.Scene {
       graphics.strokePath();
     }
     graphics.strokeCircle(rect.centerX, rect.centerY, radius);
-    graphics.fillStyle(0x05070a, 0.58);
+    graphics.fillStyle(LEGACY_PLAY_TOUCH_COG_HUB, 0.58);
     graphics.fillCircle(rect.centerX, rect.centerY, hubRadius);
     graphics.lineStyle(Math.max(1, Math.round(lineWidth * 0.72)), color, active ? 0.9 : 0.76);
     graphics.strokeCircle(rect.centerX, rect.centerY, hubRadius);
@@ -8251,10 +8330,10 @@ export class MenuScene extends Phaser.Scene {
               this.layout.buttonHeight,
               startLabel,
               () => this.startPlayMode()
-            ),
-            this.createLegacyMenuSettingsCogButton(() => this.openOverlay('options'))
+            )
           );
         }
+        this.uiButtons.push(this.createLegacyMenuSettingsCogButton(() => this.openOverlay('options')));
       }
 
       this.uiDirty = false;
@@ -8413,7 +8492,7 @@ export class MenuScene extends Phaser.Scene {
     });
     let rowY = shell.contentTop;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    this.createOverlayTitle('Options', shell.titleCenterY);
+    this.createOverlayTitle('Settings', shell.titleCenterY);
     if (visibleMessages.length > 0) {
       this.createOverlayPlayerMessageStack(visibleMessages, shell.messageCenterY, panel);
       rowY += Math.max(0, visibleMessages.length - 1) * (compact ? 18 : 19);
@@ -10305,8 +10384,9 @@ export class MenuScene extends Phaser.Scene {
       bounds: createVisualRect(pauseRect.left, pauseRect.top, pauseRect.width, pauseRect.height),
       iconOnly: true,
       label,
+      semanticAction: 'Settings',
       setActive: drawSettingsButton,
-      text: 'Options',
+      text: 'Settings',
       destroy: () => {
         panel.destroy();
         background.destroy();
@@ -11294,6 +11374,10 @@ export class MenuScene extends Phaser.Scene {
 
     this.visualDiagnosticsRevision += 1;
     const diagnostics: MenuSceneVisualDiagnostics = {
+      accessibility: {
+        reducedMotion: this.prefersLegacyReducedMotion(),
+        reducedMotionSource: 'os-media-query-cache'
+      },
       materialSystem: {
         ...materialSystem,
         geometry: {
@@ -11622,6 +11706,7 @@ export class MenuScene extends Phaser.Scene {
           labelFontSize: Number.isFinite(Number.parseFloat(String(button.label.style.fontSize)))
             ? Number.parseFloat(String(button.label.style.fontSize))
             : null,
+          semanticAction: button.semanticAction ?? button.text,
           text: button.text
         })),
       title: this.resolveLegacyMenuPathTitleDiagnostics(),
