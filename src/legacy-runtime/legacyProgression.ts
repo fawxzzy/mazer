@@ -21,7 +21,12 @@ export const LEGACY_PROGRESSION_BASE_TARGET_COMPLEXITY = 24;
 export const LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY = LEGACY_PROGRESSION_MIN_COMPLEXITY;
 export const LEGACY_PROGRESSION_AI_BASE_TARGET_COMPLEXITY = LEGACY_PROGRESSION_MIN_COMPLEXITY;
 export const LEGACY_PROGRESSION_AI_BASELINE_VERSION = 3;
-export const LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION = 3;
+export const LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION = 4;
+// Player difficulty does not consume `struggleCycles`; it is legacy AI
+// telemetry. Reserve an impossible player count in that existing v3-compatible
+// field so a stale v3 tab cannot erase the v4 baseline provenance when it
+// rewrites the top-level baseline version during remote sync.
+const LEGACY_PROGRESSION_PLAYER_BASELINE_V4_PROVENANCE_STRUGGLE_CYCLES = Number.MAX_SAFE_INTEGER;
 export const LEGACY_PROGRESSION_CHALLENGE_STEP = 1;
 export const LEGACY_PROGRESSION_CHALLENGE_PRESSURE_BONUS = 1;
 export const LEGACY_PROGRESSION_CHALLENGE_STREAK_BONUS_EVERY = 3;
@@ -651,6 +656,11 @@ const createTrack = (targetComplexity = LEGACY_PROGRESSION_BASE_TARGET_COMPLEXIT
   };
 };
 
+const createPlayerBaselineTrack = (): LegacyProgressionTrack => ({
+  ...createTrack(LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY),
+  struggleCycles: LEGACY_PROGRESSION_PLAYER_BASELINE_V4_PROVENANCE_STRUGGLE_CYCLES
+});
+
 const formatLegacyProgressionCycleCount = (completedCycles: number): string => (
   `${Math.min(99_999, Math.max(0, Math.round(completedCycles)))}${completedCycles > 99_999 ? '+' : ''}`
 );
@@ -661,7 +671,7 @@ export const createEmptyLegacyProgressionState = (): LegacyProgressionState => (
   playerProgressionBaselineVersion: LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION,
   updatedAt: null,
   tracks: {
-    player: createTrack(LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY),
+    player: createPlayerBaselineTrack(),
     'ai-runner': createTrack(LEGACY_PROGRESSION_AI_BASE_TARGET_COMPLEXITY)
   }
 });
@@ -738,58 +748,18 @@ const normalizeTrack = (value: unknown, fallback: LegacyProgressionTrack): Legac
   };
 };
 
-const migrateLegacyPlayerTutorialPlateau = (track: LegacyProgressionTrack): LegacyProgressionTrack => {
-  // Version-one player state started at a hidden level-five baseline and then
-  // advanced complexity a point at a time. Only repair that invisible plateau:
-  // established players who already reached a visible level or rank keep their
-  // earned target intact.
-  if (track.targetComplexity >= 28 || track.level !== 5 || track.rank !== 'E') {
-    return track;
-  }
-
-  const targetComplexity = clampInteger(
-    LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY + (track.cleanCycles * 4),
-    LEGACY_PROGRESSION_MIN_COMPLEXITY,
-    LEGACY_PROGRESSION_MAX_COMPLEXITY
-  );
-
-  return {
-    ...track,
-    colorTier: resolveLegacyProgressionColorTier(targetComplexity),
-    level: resolveLegacyProgressionLevel(targetComplexity),
-    peakComplexity: Math.max(track.peakComplexity, targetComplexity),
-    rank: resolveLegacyProgressionRank(targetComplexity),
-    targetComplexity
-  };
+const rebaseLegacyPlayerProgressionBaseline = (): LegacyProgressionTrack => {
+  // Completion counts created before baseline v4 are lifetime history, not
+  // evidence of an earned visible difficulty level. Reusing them made a player
+  // jump straight into late-game generation and hazards. Start the player lane
+  // from the gentle, complete Level 1 state instead; every new player clear
+  // then advances exactly one level through the current contract.
+  return createPlayerBaselineTrack();
 };
 
-const updateLegacyProgressionTarget = (
-  track: LegacyProgressionTrack,
-  targetComplexity: number
-): LegacyProgressionTrack => ({
-  ...track,
-  colorTier: resolveLegacyProgressionColorTier(targetComplexity),
-  level: resolveLegacyProgressionLevel(targetComplexity),
-  peakComplexity: Math.max(track.peakComplexity, targetComplexity),
-  rank: resolveLegacyProgressionRank(targetComplexity),
-  targetComplexity
-});
-
-const migrateLegacyPlayerVisibleLevels = (track: LegacyProgressionTrack): LegacyProgressionTrack => {
-  const plateauRepaired = migrateLegacyPlayerTutorialPlateau(track);
-  // Version two still stored progress behind score gates. The player-facing
-  // level now represents completed mazes directly, so never leave a valid
-  // completed cycle invisible during migration. Existing higher targets win.
-  const completedMazeTarget = clampInteger(
-    LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY + (plateauRepaired.completedCycles * 4),
-    LEGACY_PROGRESSION_MIN_COMPLEXITY,
-    LEGACY_PROGRESSION_MAX_COMPLEXITY
-  );
-
-  return completedMazeTarget > plateauRepaired.targetComplexity
-    ? updateLegacyProgressionTarget(plateauRepaired, completedMazeTarget)
-    : plateauRepaired;
-};
+const hasLegacyPlayerBaselineV4Provenance = (track: LegacyProgressionTrack): boolean => (
+  track.struggleCycles >= LEGACY_PROGRESSION_PLAYER_BASELINE_V4_PROVENANCE_STRUGGLE_CYCLES
+);
 
 export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressionState => {
   const fallback = createEmptyLegacyProgressionState();
@@ -807,17 +777,18 @@ export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressi
     0
   );
   const shouldResetLegacyAiRunner = aiRunnerBaselineVersion < LEGACY_PROGRESSION_AI_BASELINE_VERSION;
-  const shouldMigrateLegacyPlayerVisibleLevels = playerProgressionBaselineVersion
-    < LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION;
   const normalizedPlayer = normalizeTrack(tracks.player, fallback.tracks.player);
+  const shouldRebaseLegacyPlayerProgression = playerProgressionBaselineVersion
+    < LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION
+    && !hasLegacyPlayerBaselineV4Provenance(normalizedPlayer);
   return {
     version: 1,
     aiRunnerBaselineVersion: LEGACY_PROGRESSION_AI_BASELINE_VERSION,
     playerProgressionBaselineVersion: LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION,
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : null,
     tracks: {
-      player: shouldMigrateLegacyPlayerVisibleLevels
-        ? migrateLegacyPlayerVisibleLevels(normalizedPlayer)
+      player: shouldRebaseLegacyPlayerProgression
+        ? rebaseLegacyPlayerProgressionBaseline()
         : normalizedPlayer,
       'ai-runner': shouldResetLegacyAiRunner
         ? copyTrack(fallback.tracks['ai-runner'])
