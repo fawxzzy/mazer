@@ -356,7 +356,6 @@ import {
   CYBER_ARCADE_MATERIAL_VERSION,
   cyberArcadeMaterial,
   snapCyberArcadeRect,
-  snapCyberArcadeStrokeCoordinate,
   summarizeCyberArcadeMaterial,
   toCyberArcadeCssHex
 } from '../render/cyberArcadeMaterial';
@@ -1151,6 +1150,8 @@ export class MenuScene extends Phaser.Scene {
   private menuDemoCycleRecorded = false;
   private mazeCycleTelemetryHistory: MazeCycleTelemetryHistory = readMazeCycleTelemetryHistory(undefined);
   private progressionState: LegacyProgressionState = readLegacyProgressionState(undefined);
+  /** The historical particle/rune treatment is retained only as an off-by-default parity path. */
+  private readonly legacyPrecisionArcadeDecorationsEnabled = false;
   private latestAuthMessage: LegacyPlayerMessage | null = null;
   private latestRemoteSyncResult: LegacyRemoteProgressionSyncResult | null = null;
   private remoteSettingsSyncQueue: Promise<void> = Promise.resolve();
@@ -2193,10 +2194,10 @@ export class MenuScene extends Phaser.Scene {
           playerHaloRadius: playerMarkerMetrics.haloRadius,
           startCoreColor: LEGACY_PLAY_START_MARKER_CORE,
           startEdgeColor: LEGACY_PLAY_START_MARKER_EDGE,
-          trailPulseEnabled: this.settings.toggleTrailPulse,
+          trailPulseEnabled: this.isLegacyTrailShineVisible(),
           trailPulseColor: progressionPalette.trailPulseColor,
           trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor,
-          trailShineEnabled: this.settings.toggleTrailPulse,
+          trailShineEnabled: this.isLegacyTrailShineVisible(),
           trailShineColor: progressionPalette.trailPulseColor,
           trailShineEdgeColor: progressionPalette.trailPulseEdgeColor,
           trailShineCenterIndex: trailShineMotion.centerIndex,
@@ -4930,11 +4931,16 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createStars(): void {
-    this.stars = createLegacyMenuBackdropStars().slice(0, LEGACY_MENU_STAR_COUNT);
+    // Precision Arcade keeps the play field visually quiet. The old radial star
+    // field competed with title, board, and settings text without communicating
+    // state, so the canvas deliberately has no decorative particle layer.
+    this.stars = this.legacyPrecisionArcadeDecorationsEnabled
+      ? createLegacyMenuBackdropStars().slice(0, LEGACY_MENU_STAR_COUNT)
+      : [];
   }
 
   private updateStars(time: number, delta: number): void {
-    if (!this.settings.toggleAnimatedBackdrop) {
+    if (this.stars.length === 0 || !this.settings.toggleAnimatedBackdrop || this.prefersLegacyReducedMotion()) {
       this.backdropAccumulatedDeltaMs = 0;
       this.backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
       return;
@@ -4956,70 +4962,81 @@ export class MenuScene extends Phaser.Scene {
   private drawBackdrop(): void {
     const { width, height } = this.layout;
     this.backdropGraphics.clear();
-    const palette = resolveLegacyMenuBackdropPalette(this.settings.darkMode);
-    const backdropShards = resolveLegacyMenuBackdropShards(width, height, this.settings.darkMode);
-    const backdropAnimationTime = this.settings.toggleAnimatedBackdrop ? this.time.now : 0;
-    const glassShards = resolveLegacyMenuBackdropGlassShards(
-      width,
-      height,
-      this.settings.darkMode,
-      backdropAnimationTime,
-      this.settings.toggleAnimatedBackdrop
-    );
-    const driftRunes = resolveLegacyMenuBackdropDriftRunes(
-      width,
-      height,
-      this.settings.darkMode,
-      backdropAnimationTime,
-      this.settings.toggleAnimatedBackdrop
-    );
-
-    this.backdropGraphics.fillStyle(palette.fieldColor, 1);
+    this.backdropGraphics.fillStyle(cyberArcadeMaterial.substrate.field, 1);
     this.backdropGraphics.fillRect(0, 0, width, height);
-    for (const shard of backdropShards) {
-      this.drawLegacyBackdropShard(shard, 0.36);
-    }
-    for (const shard of glassShards) {
-      this.drawLegacyBackdropShard(shard, 0.74);
-    }
-    for (const rune of driftRunes) {
-      this.drawLegacyBackdropRune(rune);
-    }
-    this.drawLegacyBackdropSigils(width, height, this.time.now);
+    const inset = Math.max(10, Math.round(Math.min(width, height) * 0.018));
+    const rail = cyberArcadeMaterial.rail.edge;
+    this.backdropGraphics.lineStyle(1, rail, 0.32);
+    this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);
+    this.backdropGraphics.lineStyle(1, cyberArcadeMaterial.rail.mint, 0.28);
+    const accentLength = Math.max(24, Math.round(width * 0.12));
+    this.backdropGraphics.lineBetween(inset, inset, inset + accentLength, inset);
+    this.backdropGraphics.lineBetween(width - inset - accentLength, height - inset, width - inset, height - inset);
 
-    const starAlphaScale = palette.starAlphaScale;
-    for (const star of this.stars) {
-      const pixelX = Math.round(star.x * width);
-      const pixelY = Math.round(star.y * height);
-      const streakLength = resolveLegacyMenuBackdropStreakLength(star);
-      const coreSize = Math.max(1, Math.round(star.radius));
-      const { x: stepX, y: stepY } = resolveLegacyMenuBackdropTailStep(star);
-      const haloAlpha = star.alpha * starAlphaScale * (coreSize > 1 ? 0.16 : 0.07);
-
-      if (coreSize > 1) {
-        this.backdropGraphics.fillStyle(0xffffff, haloAlpha);
-        this.backdropGraphics.fillRect(pixelX - 1, pixelY - 1, coreSize + 2, coreSize + 2);
+    if (this.legacyPrecisionArcadeDecorationsEnabled) {
+      const palette = resolveLegacyMenuBackdropPalette(this.settings.darkMode);
+      const animationTime = this.settings.toggleAnimatedBackdrop ? this.time.now : 0;
+      for (const shard of resolveLegacyMenuBackdropShards(width, height, this.settings.darkMode)) {
+        this.drawLegacyBackdropShard(shard, 0.36);
       }
-
-      this.backdropGraphics.fillStyle(0xffffff, star.alpha * starAlphaScale);
-      this.backdropGraphics.fillRect(pixelX, pixelY, coreSize, coreSize);
-
-      for (let index = 1; index <= streakLength; index += 1) {
-        this.backdropGraphics.fillStyle(0xffffff, star.alpha * starAlphaScale * (0.54 - (index * 0.07)));
-        this.backdropGraphics.fillRect(
-          Math.round(pixelX + (stepX * index)),
-          Math.round(pixelY + (stepY * index)),
-          1,
-          1
-        );
+      for (const shard of resolveLegacyMenuBackdropGlassShards(
+        width,
+        height,
+        this.settings.darkMode,
+        animationTime,
+        this.settings.toggleAnimatedBackdrop
+      )) {
+        this.drawLegacyBackdropShard(shard, 0.74);
       }
-    }
-    if (palette.overlayAlpha > 0) {
-      this.backdropGraphics.fillStyle(0x000000, palette.overlayAlpha);
-      this.backdropGraphics.fillRect(0, 0, width, height);
+      for (const rune of resolveLegacyMenuBackdropDriftRunes(
+        width,
+        height,
+        this.settings.darkMode,
+        animationTime,
+        this.settings.toggleAnimatedBackdrop
+      )) {
+        this.drawLegacyBackdropRune(rune);
+      }
+      this.drawLegacyBackdropSigils(width, height, animationTime);
+      for (const star of this.stars) {
+        const pixelX = Math.round(star.x * width);
+        const pixelY = Math.round(star.y * height);
+        const streakLength = resolveLegacyMenuBackdropStreakLength(star);
+        const coreSize = Math.max(1, Math.round(star.radius));
+        const step = resolveLegacyMenuBackdropTailStep(star);
+        this.backdropGraphics.fillStyle(0xffffff, star.alpha * palette.starAlphaScale);
+        this.backdropGraphics.fillRect(pixelX, pixelY, coreSize, coreSize);
+        for (let index = 1; index <= streakLength; index += 1) {
+          this.backdropGraphics.fillStyle(0xffffff, star.alpha * palette.starAlphaScale * 0.34);
+          this.backdropGraphics.fillRect(
+            Math.round(pixelX + (step.x * index)),
+            Math.round(pixelY + (step.y * index)),
+            1,
+            1
+          );
+        }
+      }
     }
 
     this.backdropDirty = false;
+  }
+
+  /**
+   * OS-level reduced motion is a render-only preference. It never changes an
+   * input interval, world turn, collision, or persisted game setting.
+   */
+  private prefersLegacyReducedMotion(): boolean {
+    try {
+      return typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      return false;
+    }
+  }
+
+  private isLegacyTrailShineVisible(): boolean {
+    return this.settings.toggleTrailPulse && !this.prefersLegacyReducedMotion();
   }
 
   private drawLegacyBackdropShard(
@@ -5556,7 +5573,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hasLegacyMenuTitleAnimationPendingFrame(time: number): boolean {
-    if (this.mode !== 'menu' || this.overlay !== 'none') {
+    if (this.mode !== 'menu' || this.overlay !== 'none' || this.prefersLegacyReducedMotion()) {
       return false;
     }
     if (time < this.legacyMenuTitleAnimationNextFrameAtMs) {
@@ -6023,7 +6040,9 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    this.drawLegacyMenuPathTitleSigilRails(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
+    if (this.legacyPrecisionArcadeDecorationsEnabled) {
+      this.drawLegacyMenuPathTitleSigilRails(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
+    }
 
     if (visibleCells.length > 0) {
       for (const cell of visibleCells) {
@@ -6042,10 +6061,15 @@ export class MenuScene extends Phaser.Scene {
         );
       }
 
-      this.drawLegacyMenuPathTitleGemFacets(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
-      this.drawLegacyMenuPathTitlePrismSweep(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
+      if (this.legacyPrecisionArcadeDecorationsEnabled) {
+        this.drawLegacyMenuPathTitleGemFacets(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
+        this.drawLegacyMenuPathTitlePrismSweep(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
+      }
     }
-    this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);
+
+    if (this.legacyPrecisionArcadeDecorationsEnabled) {
+      this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);
+    }
 
     const cursorCell = visibleCells.at(-1);
     if (cursorCell && visiblePieceCount < titleLayout.cells.length) {
@@ -6209,6 +6233,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyBoardCornerFacetAlpha(time: number): number {
+    if (this.prefersLegacyReducedMotion()) {
+      return LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA;
+    }
     const phase = (time % LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS) / LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS;
     const wave = 0.5 + (Math.sin(phase * Math.PI * 2) * 0.5);
     const glint = Math.max(0, Math.sin((phase * Math.PI * 4) - 0.6));
@@ -6216,6 +6243,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hasLegacyBoardCornerShimmerPendingFrame(time: number): boolean {
+    if (this.prefersLegacyReducedMotion()) {
+      return false;
+    }
     if (time < this.legacyBoardCornerShimmerNextFrameAtMs) {
       return false;
     }
@@ -6528,7 +6558,7 @@ export class MenuScene extends Phaser.Scene {
       );
     }
 
-    if (this.settings.toggleTrailPulse) {
+    if (this.isLegacyTrailShineVisible()) {
       if (menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
         this.drawLegacyPlayDynamicTrailPulse(
           visibleTrail,
@@ -7468,7 +7498,7 @@ export class MenuScene extends Phaser.Scene {
     time: number,
     durationMs: number
   ): void {
-    if (from.x === to.x && from.y === to.y) {
+    if (from.x === to.x && from.y === to.y || this.prefersLegacyReducedMotion()) {
       this.syncLegacyPlayerVisualMotionTo(to);
       return;
     }
@@ -7561,20 +7591,16 @@ export class MenuScene extends Phaser.Scene {
       width: number;
     }
   ): void {
-    const alpha = rect.alpha ?? 0.48;
+    const alpha = rect.alpha ?? 0.9;
     const panelRect = snapCyberArcadeRect(rect);
     const { height, left, top, width } = panelRect;
     const radius = this.resolveLegacyRoundedRectRadius(width, height, rect.radius ?? 10);
     const active = rect.active ?? false;
-    const corner = Math.max(7, Math.min(16, Math.round(Math.min(width, height) * 0.28)));
-    const inset = 4;
-
-    graphics.fillStyle(LEGACY_CYBER_PANEL_SHADOW, Math.min(0.42, alpha * 0.42));
-    graphics.fillRoundedRect(left + 2, top + 3, width, height, radius);
+    graphics.fillStyle(LEGACY_CYBER_PANEL_SHADOW, Math.min(0.28, alpha * 0.28));
+    graphics.fillRoundedRect(left + 1, top + 2, width, height, radius);
     graphics.fillStyle(rect.fill ?? LEGACY_CYBER_PANEL_FILL, alpha);
     graphics.fillRoundedRect(left, top, width, height, radius);
     const stroke = rect.stroke ?? LEGACY_CYBER_PANEL_STROKE;
-    const strokeAlt = rect.strokeAlt ?? LEGACY_CYBER_PANEL_STROKE_ALT;
     const outerStrokeWidth = active ? 2 : 1;
     const outerStrokeInset = outerStrokeWidth % 2 === 1 ? 0.5 : 0;
     graphics.lineStyle(outerStrokeWidth, stroke, active ? 0.86 : 0.5);
@@ -7585,32 +7611,6 @@ export class MenuScene extends Phaser.Scene {
       Math.max(1, height - (outerStrokeInset * 2)),
       Math.max(1, radius - outerStrokeInset)
     );
-    graphics.lineStyle(1, strokeAlt, active ? 0.34 : 0.2);
-    graphics.strokeRoundedRect(
-      snapCyberArcadeStrokeCoordinate(left + inset),
-      snapCyberArcadeStrokeCoordinate(top + inset),
-      Math.max(1, width - (inset * 2) - 1),
-      Math.max(1, height - (inset * 2) - 1),
-      Math.max(2, radius - 4)
-    );
-
-    const cornerStrokeWidth = active ? 2 : 1;
-    const cornerStrokeOffset = cornerStrokeWidth % 2 === 1 ? 0.5 : 0;
-    graphics.lineStyle(cornerStrokeWidth, active ? strokeAlt : stroke, active ? 0.9 : 0.62);
-    graphics.beginPath();
-    graphics.moveTo(left + inset + cornerStrokeOffset, top + corner + cornerStrokeOffset);
-    graphics.lineTo(left + inset + cornerStrokeOffset, top + inset + cornerStrokeOffset);
-    graphics.lineTo(left + corner + cornerStrokeOffset, top + inset + cornerStrokeOffset);
-    graphics.moveTo(left + width - corner - cornerStrokeOffset, top + inset + cornerStrokeOffset);
-    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + inset + cornerStrokeOffset);
-    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + corner + cornerStrokeOffset);
-    graphics.moveTo(left + inset + cornerStrokeOffset, top + height - corner - cornerStrokeOffset);
-    graphics.lineTo(left + inset + cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
-    graphics.lineTo(left + corner + cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
-    graphics.moveTo(left + width - corner - cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
-    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + height - inset - cornerStrokeOffset);
-    graphics.lineTo(left + width - inset - cornerStrokeOffset, top + height - corner - cornerStrokeOffset);
-    graphics.strokePath();
   }
 
   private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number {
@@ -7776,6 +7776,13 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startLegacyPlayCompassSpin(time: number): void {
+    if (this.prefersLegacyReducedMotion()) {
+      this.hudCompassSpinStartedAtMs = null;
+      this.hudCompassSpinActive = false;
+      this.hudCompassSpinProgress = null;
+      this.hudDirty = true;
+      return;
+    }
     this.hudCompassSpinStartedAtMs = time;
     this.hudCompassSpinActive = true;
     this.hudCompassSpinProgress = 0;
@@ -7825,11 +7832,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hasLegacyPlayCompassSpinPendingFrame(): boolean {
-    return this.hudCompassSpinStartedAtMs !== null;
+    return !this.prefersLegacyReducedMotion() && this.hudCompassSpinStartedAtMs !== null;
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
-    const active = this.settings.toggleTrailPulse && this.overlay === 'none' && this.trail.length > 1;
+    const active = this.isLegacyTrailShineVisible() && this.overlay === 'none' && this.trail.length > 1;
     if (!active) {
       this.legacyPlayTrailPulseNextFrameAtMs = 0;
       return false;
@@ -11544,10 +11551,10 @@ export class MenuScene extends Phaser.Scene {
         playerHaloRadius: playerMarkerMetrics.haloRadius,
         startCoreColor: LEGACY_PLAY_START_MARKER_CORE,
         startEdgeColor: LEGACY_PLAY_START_MARKER_EDGE,
-        trailPulseEnabled: this.settings.toggleTrailPulse,
+          trailPulseEnabled: this.isLegacyTrailShineVisible(),
         trailPulseColor: progressionPalette.trailPulseColor,
         trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor,
-        trailShineEnabled: this.settings.toggleTrailPulse,
+          trailShineEnabled: this.isLegacyTrailShineVisible(),
         trailShineColor: progressionPalette.trailPulseColor,
         trailShineEdgeColor: progressionPalette.trailPulseEdgeColor,
         trailShineCenterIndex: trailShineMotion.centerIndex,

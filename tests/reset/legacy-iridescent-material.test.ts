@@ -13,6 +13,7 @@ import {
   resolveLegacyIridescentTrailColor,
   resolveLegacyPathSafeIridescentColor
 } from '../../src/legacy-runtime/legacyIridescentMaterial';
+import { cyberArcadeMaterial } from '../../src/render/cyberArcadeMaterial';
 
 describe('legacy iridescent material', () => {
   test('keeps generated material colors separated from the pale maze path', () => {
@@ -39,7 +40,7 @@ describe('legacy iridescent material', () => {
     expect(laterHeadColor).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
   });
 
-  test('pins player halo/accent green and keeps one white trail shine while material QA is deferred', () => {
+  test('uses the canonical halo, energy accent, and quiet path shine', () => {
     const earlyHalo = resolveLegacyIridescentPlayerHaloColor(0);
     const lateHalo = resolveLegacyIridescentPlayerHaloColor(1800);
     const earlyAccent = resolveLegacyIridescentPlayerAccentColor(0);
@@ -47,8 +48,8 @@ describe('legacy iridescent material', () => {
     const earlyPulse = resolveLegacyIridescentPulseColor(2, 10, 0);
     const latePulse = resolveLegacyIridescentPulseColor(2, 10, 900);
 
-    expect(earlyHalo).toBe(0x00b84a);
-    expect(lateHalo).toBe(0x00b84a);
+    expect(earlyHalo).toBe(cyberArcadeMaterial.signal.playerHalo);
+    expect(lateHalo).toBe(cyberArcadeMaterial.signal.playerHalo);
     expect(earlyAccent).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
     expect(lateAccent).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
     expect(earlyPulse).toBe(LEGACY_TRAIL_SHINE_COLOR);
@@ -68,6 +69,6 @@ describe('legacy iridescent material', () => {
   });
 
   test('keeps the player core locked to the green readability anchor', () => {
-    expect(resolveLegacyIridescentPlayerCoreColor()).toBe(0x36ff7d);
+    expect(resolveLegacyIridescentPlayerCoreColor()).toBe(0x39f58a);
   });
 });

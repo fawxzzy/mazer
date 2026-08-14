@@ -2,48 +2,57 @@ import {
   MAZER_ICON_QUALITY_TARGET,
   MAZER_ICON_QUALITY_TARGET_VERSION
 } from '../brand/mazerIconQualityTarget';
+import { phaserMaterialAliases } from '../theme/tokens';
 
-export const CYBER_ARCADE_MATERIAL_VERSION = 'mazer-cyber-arcade-material-v1' as const;
+/**
+ * The live Phaser material is deliberately fed from the same token registry as
+ * the shell work. Keeping the historical export name avoids a renderer-wide
+ * rename while the visual system moves to the single Precision Arcade theme.
+ */
+export const PRECISION_ARCADE_MATERIAL_VERSION = 'mazer-precision-arcade-material-v2' as const;
+export const CYBER_ARCADE_MATERIAL_VERSION = PRECISION_ARCADE_MATERIAL_VERSION;
 export const CYBER_ARCADE_ICON_TARGET = MAZER_ICON_QUALITY_TARGET.canonicalAsset.repositoryPath;
+
+const color = phaserMaterialAliases;
 
 export const cyberArcadeMaterial = Object.freeze({
   substrate: Object.freeze({
-    field: 0x07111d,
-    fieldRaised: 0x0b1628,
-    panel: 0x07131d,
-    panelRaised: 0x0b1f2b,
-    panelActive: 0x0d2b25,
-    playerPanel: 0x06170f,
-    playerPanelActive: 0x0a2a1a,
-    shadow: 0x02070d
+    field: color['bg.canvas'],
+    fieldRaised: color['bg.shell'],
+    panel: color['bg.panel'],
+    panelRaised: color['bg.elevated'],
+    panelActive: color['bg.elevated'],
+    playerPanel: color['bg.shell'],
+    playerPanelActive: color['bg.elevated'],
+    shadow: color['bg.canvas']
   }),
   rail: Object.freeze({
-    edge: 0x0d3c4f,
-    muted: 0x245263,
-    mint: 0x72e0bf,
-    cyan: 0xb7f2ff,
-    white: 0xecfff5
+    edge: color['line.subtle'],
+    muted: color['text.muted'],
+    mint: color['brand.mint'],
+    cyan: color['semantic.info'],
+    white: color['text.primary']
   }),
   path: Object.freeze({
-    core: 0xe7fff4,
-    edge: 0x0d3c4f
+    core: color['world.pathCore'],
+    edge: color['line.normal']
   }),
   signal: Object.freeze({
-    player: 0x36ff7d,
-    playerAccent: 0xb6ffd0,
-    playerHalo: 0x00b84a,
-    start: 0xfff05a,
-    startEdge: 0xffc629,
-    goal: 0xff263f,
-    goalEdge: 0xd81b2a,
-    warning: 0xffd36a,
-    warningEdge: 0xff7a3d,
-    memory: 0x2de8ff,
-    violet: 0xb87dff
+    player: color['semantic.energy'],
+    playerAccent: color['brand.mint'],
+    playerHalo: color['line.active'],
+    start: color['semantic.reward'],
+    startEdge: color['semantic.reward'],
+    goal: color['semantic.danger'],
+    goalEdge: color['semantic.danger'],
+    warning: color['semantic.reward'],
+    warningEdge: color['semantic.danger'],
+    memory: color['semantic.info'],
+    violet: color['semantic.anomaly']
   }),
   shine: Object.freeze({
-    core: 0xffffff,
-    edge: 0xe8fff5
+    core: color['text.primary'],
+    edge: color['world.pathCore']
   }),
   geometry: Object.freeze({
     fillAlignment: 'integer-logical-pixels',

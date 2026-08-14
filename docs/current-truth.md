@@ -37,6 +37,10 @@ If the current web app disagrees with restored gameplay/mechanics truth, restore
 
 ## Current implementation truth
 
+### Current Precision Arcade visual integration
+
+The live Phaser renderer now consumes the canonical Fawxzzy Precision Arcade token map. The first shipping visual slice keeps the maze as the hero: a quiet navy canvas, crisp ivory connected corridors, mint/aqua structural rails, one-surface panels, a topology-rendered menu title, compact level/cog controls, and the same shared panel shell for settings and pause. Decorative star/rune fields and nested neon panel borders are retired from the active presentation. This is render-only; gameplay topology, progression, inputs, collision, scoring, persistence, tutorial, and menu AI remain unchanged.
+
 - The current web runtime has been reset to a smaller legacy-first Phaser shell.
 - The old productized menu shell is no longer the active source of truth.
 - The current front-door contract is mobile-clean and play-focused:

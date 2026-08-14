@@ -3,7 +3,7 @@ export const MAZER_ICON_SOURCE_SHA256 = '55677db4dff3896979d3e00e1b9ebcb85fd9fc0
 
 export const MAZER_ICON_QUALITY_TARGET = Object.freeze({
   version: MAZER_ICON_QUALITY_TARGET_VERSION,
-  materialVersion: 'mazer-cyber-arcade-material-v1',
+  materialVersion: 'mazer-precision-arcade-material-v2',
   canonicalAsset: Object.freeze({
     repositoryPath: 'public/icons/mazer-app-icon.png',
     publicUrl: '/icons/mazer-app-icon.png',

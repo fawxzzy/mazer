@@ -602,13 +602,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.');
   });
 
-  test('reflects the gothic cyber border motif into the backdrop layer', () => {
+  test('keeps the Precision Arcade backdrop quiet while retaining historical effects outside the active renderer', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const backdropSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuBackdrop.ts'), 'utf8');
 
     expect(backdropSource).toContain('fieldColor: cyberArcadeMaterial.substrate.field');
     expect(backdropSource).toContain('fieldColor: cyberArcadeMaterial.substrate.fieldRaised');
-    expect(menuSceneSource).toContain('this.drawLegacyBackdropSigils(width, height, this.time.now);');
+    expect(menuSceneSource).toContain('private readonly legacyPrecisionArcadeDecorationsEnabled = false;');
+    expect(menuSceneSource).toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
+    expect(menuSceneSource).toContain('this.stars = this.legacyPrecisionArcadeDecorationsEnabled');
+    expect(menuSceneSource).toContain('if (this.legacyPrecisionArcadeDecorationsEnabled) {');
     expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_SHARD_COUNT');
     expect(backdropSource).toContain('LEGACY_MENU_GLASS_SHARD_COUNT');
     expect(backdropSource).toContain('LEGACY_MENU_DRIFT_RUNE_COUNT');
@@ -618,14 +621,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('starMotion: LEGACY_MENU_BACKDROP_STAR_MOTION');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropGlassShards');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropDriftRunes');
-    expect(menuSceneSource).toContain('0.7 + (Math.sin(time / 1800) * 0.3)');
+    expect(menuSceneSource).not.toContain('this.drawLegacyBackdropSigils(width, height, this.time.now);');
     expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(shard.color, shard.alpha * 0.038);');
     expect(backdropSource).toContain('const roundBackdropNumber = (value: number): number => Math.round(value * 1000) / 1000;');
     expect(backdropSource).toContain('const localPhase = phase * (0.16 + (index * 0.022)) + (index * 1.73);');
     expect(backdropSource).toContain('const driftX = Math.sin(localPhase) * 0.026;');
     expect(backdropSource).toContain('const driftY = Math.cos(localPhase * 0.74) * 0.017;');
     expect(backdropSource).toContain('const tailMagnitude = 0.68 + Math.min(0.28, distanceFromCenter * 0.42);');
-    expect(menuSceneSource).toContain('Math.round(pixelX + (stepX * index))');
+    expect(menuSceneSource).toContain('Math.round(pixelX + (step.x * index))');
     expect(menuSceneSource).toContain('const upperRailStart = this.rotateBackdropPoint(shard, -halfLength * 0.86, -halfThickness * 0.58);');
     expect(menuSceneSource).toContain('const upperRailBreakEnd = this.rotateBackdropPoint(shard, halfLength * 0.1, -halfThickness * 0.58);');
     expect(menuSceneSource).toContain('const leadingCutStart = this.rotateBackdropPoint(shard, halfLength * 0.54, -halfThickness - taper);');
@@ -847,11 +850,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.hasLegacyPlayTrailPulsePendingFrame(time)');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;');
     expect(menuSceneSource).toContain('private legacyPlayTrailPulseNextFrameAtMs = 0;');
-    expect(menuSceneSource).toContain('if (this.settings.toggleTrailPulse) {');
+    expect(menuSceneSource).toContain('if (this.isLegacyTrailShineVisible()) {');
     expect(menuSceneSource).toContain('this.drawLegacyPlayDynamicTrailPulse(');
     expect(menuSceneSource).toContain('resolvedBoardLeft,');
     expect(menuSceneSource).toContain('mazeRenderFrame.boardSize,');
-    expect(menuSceneSource).toContain("const active = this.settings.toggleTrailPulse && this.overlay === 'none' && this.trail.length > 1;");
+    expect(menuSceneSource).toContain("const active = this.isLegacyTrailShineVisible() && this.overlay === 'none' && this.trail.length > 1;");
     expect(menuSceneSource).toContain('this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;');
     expect(menuSceneSource).toContain('const pulseCenterIndex = resolveLegacyTrailShineMotion({');
     expect(menuSceneSource).toContain('oneWayPeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
@@ -869,7 +872,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('startEdgeColor: LEGACY_PLAY_START_MARKER_EDGE');
     expect(menuSceneSource).toContain('trailPulseColor: progressionPalette.trailPulseColor');
     expect(menuSceneSource).toContain('trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor');
-    expect(menuSceneSource).toContain('trailShineEnabled: this.settings.toggleTrailPulse');
+    expect(menuSceneSource).toContain('trailShineEnabled: this.isLegacyTrailShineVisible()');
     expect(menuSceneSource).toContain('trailShineColor: progressionPalette.trailPulseColor');
     expect(menuSceneSource).toContain('trailShineEdgeColor: progressionPalette.trailPulseEdgeColor');
     expect(menuSceneSource).toContain('iridescentMaterial: this.resolveLegacyIridescentMaterialDiagnostics(time, progressionPalette)');
@@ -880,7 +883,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('shineHeadColor: resolveLegacyIridescentPulseColor(trailHeadIndex, trailLength, time, palette.trailPulseColor)');
     expect(menuSceneSource).toContain('trailHeadColor: resolveLegacyIridescentTrailColor(trailHeadIndex, trailLength, time, palette.trailColor)');
     expect(menuSceneSource).toContain('trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
-    expect(menuSceneSource).toContain('trailPulseEnabled: this.settings.toggleTrailPulse');
+    expect(menuSceneSource).toContain('trailPulseEnabled: this.isLegacyTrailShineVisible()');
+    expect(menuSceneSource).toContain("window.matchMedia('(prefers-reduced-motion: reduce)').matches");
+    expect(menuSceneSource).toContain('private isLegacyTrailShineVisible(): boolean');
     expect(menuSceneSource).toContain('playerCoreRadius: playerMarkerMetrics.coreRadius');
     expect(menuSceneSource).toContain('playerBeaconColor: LEGACY_PLAY_PLAYER_BEACON_COLOR');
     expect(menuSceneSource).toContain('playerBeaconPeriodMs: LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS');

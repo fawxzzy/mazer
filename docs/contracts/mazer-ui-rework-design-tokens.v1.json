@@ -3,13 +3,13 @@
   "wave": "1B",
   "themeId": "precision-arcade",
   "canonicalThemeId": "precision-arcade",
-  "status": "registered-not-wired",
+  "status": "live-phaser-material",
   "sourceRef": "01_FINAL_AUTHORITATIVE_HANDOFF/spec/design-tokens.json (mazer-everything-bundle-20260803)",
   "decisionRefs": [
     "single-canonical-theme",
     "renderer-ownership-split"
   ],
-  "notes": "Wave 1B ('Tokens/theme/profile aliases') per blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md: 'CSS variables; TypeScript token map; Phaser material aliases; canonical theme; archived theme mapping.' This registry is the single source of truth both src/theme/tokens.ts and src/theme/tokens.css are hand-derived from, and scripts/check-design-tokens.mjs cross-checks the CSS side against. No file in this wave is wired into index.html, vite.config.ts, MenuScene.ts, or any other protected/live-render path -- per Wave 1's own acceptance criteria ('no gameplay/UI behavior change; old captures remain structurally equivalent') and the still-open PR83_PROTECTED_HOLD status of src/scenes/MenuScene.ts, this is registration and shared-contract plumbing only, not a visual migration.",
+  "notes": "Wave 1B ('Tokens/theme/profile aliases') established the source of truth for the Fawxzzy Precision Arcade palette. The live Phaser material now imports phaserMaterialAliases from src/theme/tokens.ts, so the board, title, panels, HUD, and controls consume this registry instead of a parallel hard-coded palette. This integration is render-only: maze topology, progression, input, collision, persistence, and lifecycle behavior remain outside the token contract. DOM-shell extraction remains a separately staged future renderer-ownership migration.",
   "cssVariablePrefix": "--mazer-token-",
   "tokens": {
     "color": {

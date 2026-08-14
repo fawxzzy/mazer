@@ -38,10 +38,13 @@ const DEFAULT_TRANSITION_VIEWPORTS = Object.freeze({
 });
 const DEFAULT_DEVICE_SCALE_FACTOR = 2;
 const DEFAULT_TIMEOUT_MS = 30_000;
-const EXPECTED_PLAYER_CORE_COLOR = 0x36ff7d;
-const EXPECTED_GOAL_CORE_COLOR = 0xff263f;
-const EXPECTED_TRAIL_SHINE_COLOR = 0xffffff;
-const EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe8fff5;
+// These numeric values are the live Phaser aliases for the Precision Arcade
+// registry. Keep this proof independent of stylesheet-only tokens so it
+// validates the actual canvas material players see.
+const EXPECTED_PLAYER_CORE_COLOR = 0x39f58a;
+const EXPECTED_GOAL_CORE_COLOR = 0xff405d;
+const EXPECTED_TRAIL_SHINE_COLOR = 0xf1faf6;
+const EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe9fff1;
 const INLINE_STATE_TEXT_LABELS = Object.freeze([
   'Camera Follow',
   'Control Style',
@@ -346,7 +349,10 @@ const PLAY_TRAIL_SEED_MOVES = Object.freeze([
   'move_up'
 ]);
 
-const seedPlayTrailForVisualProof = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
+const seedPlayTrailForVisualProof = async (
+  page,
+  { expectTrailShineEnabled = true, timeoutMs = DEFAULT_TIMEOUT_MS } = {}
+) => {
   await page.waitForFunction(
     () => Boolean(window.__MAZER_QA__?.movePlayPlayer),
     {},
@@ -386,7 +392,7 @@ const seedPlayTrailForVisualProof = async (page, { timeoutMs = DEFAULT_TIMEOUT_M
   }
 
   await page.waitForFunction(
-    ({ visualAttribute }) => {
+    ({ expectTrailShineEnabled: expected, visualAttribute }) => {
       const raw = document.documentElement.getAttribute(visualAttribute);
       if (!raw) {
         return false;
@@ -394,12 +400,13 @@ const seedPlayTrailForVisualProof = async (page, { timeoutMs = DEFAULT_TIMEOUT_M
 
       try {
         const visual = JSON.parse(raw);
-        return visual?.markerStyle?.trailShineEnabled === true;
+        return visual?.markerStyle?.trailShineEnabled === expected;
       } catch {
         return false;
       }
     },
     {
+      expectTrailShineEnabled,
       visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
     },
     { timeout: timeoutMs }
@@ -1305,7 +1312,7 @@ const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {
     'overlay'
   ];
   const missingRoles = expectedRoles.filter((role) => !material.surfaceRoles?.includes(role));
-  if (material.version !== 'mazer-cyber-arcade-material-v1') {
+  if (material.version !== 'mazer-precision-arcade-material-v2') {
     issues.push(`${surfaceId}:version=${material.version ?? 'missing'}`);
   }
   if (material.iconTarget !== 'public/icons/mazer-app-icon.png') {
@@ -1338,6 +1345,7 @@ const buildSurfaceChecks = ({
   includeOverlayBottom = true,
   pageErrors,
   preferenceFixture,
+  reducedMotion = false,
   requirePlayTrailSeed = true,
   requireTopologyDiagnostics = true,
   requireWrapPairs = false,
@@ -1520,11 +1528,20 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'play-trail-shine-seeded-on',
-      !requirePlayTrailSeed || surfaces.play.markerStyle?.trailShineEnabled === true,
+      !requirePlayTrailSeed || surfaces.play.markerStyle?.trailShineEnabled === !reducedMotion,
       requirePlayTrailSeed
-        ? `trailShineEnabled=${surfaces.play.markerStyle?.trailShineEnabled ?? 'missing'}`
+        ? `trailShineEnabled=${surfaces.play.markerStyle?.trailShineEnabled ?? 'missing'} expected=${!reducedMotion}`
         : 'skipped for focused topology proof'
-    )
+    ),
+    ...(reducedMotion ? [
+      createCheck(
+        'reduced-motion-rendering',
+        surfaces.menu.markerStyle?.trailShineEnabled === false
+          && surfaces.play.markerStyle?.trailShineEnabled === false
+          && surfaces.play.hud?.compassSpinActive === false,
+        `menuTrail=${surfaces.menu.markerStyle?.trailShineEnabled ?? 'missing'} playTrail=${surfaces.play.markerStyle?.trailShineEnabled ?? 'missing'} compassSpin=${surfaces.play.hud?.compassSpinActive ?? 'missing'}`
+      )
+    ] : [])
   ];
   const textChecks = [
     createCheck(
@@ -1821,6 +1838,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       deviceScaleFactor,
       hasTouch: transition ? false : mobileViewport,
       isMobile: transition ? false : mobileViewport,
+      reducedMotion: options.reducedMotion ? 'reduce' : 'no-preference',
       viewport
     });
     const page = await context.newPage();
@@ -1995,7 +2013,10 @@ export const runUiSurfaceCapture = async (options = {}) => {
         reason: 'focused-topology-proof',
         skipped: true
       }
-      : await seedPlayTrailForVisualProof(page, { timeoutMs });
+      : await seedPlayTrailForVisualProof(page, {
+        expectTrailShineEnabled: !options.reducedMotion,
+        timeoutMs
+      });
     const play = await captureSurface({
       page,
       outputDir,
@@ -2129,6 +2150,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         board: play.diagnostics.visual?.board,
         layout: play.diagnostics.visual?.layout,
         markerStyle: play.diagnostics.visual?.markerStyle,
+        hud: play.diagnostics.visual?.hud,
         progressionBadge: play.diagnostics.visual?.progressionBadge,
         title: play.diagnostics.visual?.title,
         generation: play.diagnostics.runtime?.generation,
@@ -2187,6 +2209,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       includeOverlayBottom: !transition,
       pageErrors,
       preferenceFixture,
+      reducedMotion: options.reducedMotion,
       requirePlayTrailSeed: !options.skipPlayTrailSeed,
       requireTopologyDiagnostics: !options.skipTopologyDiagnostics,
       requireWrapPairs: topologyFixture === 'wrap-enabled',
@@ -2272,6 +2295,7 @@ if (isDirectRun) {
     skipPlayTrailSeed: args['skip-play-trail-seed'] === true || args['skip-play-trail-seed'] === 'true',
     skipTopologyDiagnostics: args['skip-topology-diagnostics'] === true || args['skip-topology-diagnostics'] === 'true',
     preferenceFixture: typeof args['preference-fixture'] === 'string' ? args['preference-fixture'] : undefined,
+    reducedMotion: args['reduced-motion'] === true || args['reduced-motion'] === 'true',
     timeoutMs: parseIntegerArg(args['timeout-ms'], DEFAULT_TIMEOUT_MS),
     topologyFixture: typeof args['topology-fixture'] === 'string' ? args['topology-fixture'] : undefined,
     useExistingServer: args['no-preview'] === true || args['no-preview'] === 'true',

@@ -2,9 +2,9 @@
 
 ## Status
 
-Wave 1B ("Tokens/theme/profile aliases") of the Mazer UI rework, per `blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md` in the `mazer-everything-bundle-20260803` authoritative handoff: "CSS variables; TypeScript token map; Phaser material aliases; canonical theme; archived theme mapping." Per `spec/pr-lanes.json`, lane 1B is `parallel: yes` with `exclusiveFiles: ["token exports"]` -- it is independent of PR #83's collision files and does not require PR #83 (Wave 0B) to be reconciled first.
+Wave 1B ("Tokens/theme/profile aliases") established the shared source of truth for the Fawxzzy Precision Arcade direction: CSS variables, a typed TypeScript map, Phaser numeric aliases, one canonical player-facing theme, and archived legacy aliases.
 
-This wave registers and contract-tests the token set; it does **not** wire tokens into `index.html`, `vite.config.ts`, `src/styles/base.css`, `src/scenes/MenuScene.ts`, or any other live-render path. `src/scenes/MenuScene.ts`, `src/scenes/menuRuntimeDiagnostics.ts`, `src/legacy-runtime/legacyAuth.ts`, `src/legacy-runtime/legacyPlayerMessage.ts`, the three `scripts/analysis/*capture*` scripts, `vite.config.ts`, and `package.json` remain untouched -- they are `prProtection.protectedPaths` in `docs/contracts/mazer-ui-rework-decision-registry.v1.json`, held for PR #83's Wave 0B integrator-exclusive reconciliation. Consuming these tokens from the shipping DOM shell or Phaser scenes is Wave 2A (DOM foundation) and Wave 4D (shared path renderer/title) work.
+The Phaser integration is now live. `src/render/cyberArcadeMaterial.ts` imports `phaserMaterialAliases` directly from `src/theme/tokens.ts`; `MenuScene` uses that material for the board, connected corridors, title, HUD, controls, settings, and pause shell. The first live pass removes decorative star/rune noise, uses a quiet structured canvas, reduces every shared panel to one surfaced fill and one outline, and renders the topology title without orbit/facet effects. This is explicitly render-only: maze topology, progression, input admission, collision, scoring, persistence, and lifecycle contracts remain unchanged. DOM-shell extraction remains separately staged.
 
 ## Files
 
@@ -18,12 +18,12 @@ This wave registers and contract-tests the token set; it does **not** wire token
 
 Every CSS custom property is `${cssVariablePrefix}<group>-<name>`, where `cssVariablePrefix` is `--mazer-token-` (registered in the JSON, not hardcoded independently in the checker, CSS, or TS). Colors keep their dotted registry key with the dot replaced by a dash (e.g. `color.bg.canvas` -> `--mazer-token-color-bg-canvas`); spacing steps are named by their pixel value (`--mazer-token-spacing-16`); radius/stroke/motion keep their registry key (`--mazer-token-radius-panel`, `--mazer-token-motion-press`). `fonts.title` (`"topology-rendered"`) is intentionally excluded from the CSS file -- it is not a CSS font stack, it flags that the title is rendered via the topology/path geometry source (Wave 2B/4D), not set with `font-family`.
 
-## Why this is safe to land independently of PR #83 / Wave 0B
+## Live integration boundary
 
-- No file this wave adds or edits appears in `prProtection.protectedPaths`; the test suite re-asserts this via `git status --short` against the real working tree, the same pattern Wave 0A's `decision-registry-contract.test.ts` established.
-- Nothing is imported by a live entrypoint (`index.html`, `proof-surfaces.html`, etc.) or by `vite.config.ts`'s build input map, so there is no visual or behavioral change to verify beyond "the new files exist, are internally consistent, and type-check."
-- `docs/contracts/mazer-ui-rework-decision-registry.v1.json` already locks `single-canonical-theme` and `renderer-ownership-split`; this wave's `decisionRefs` point at those same two decisions rather than inventing new ones, keeping one registry of decisions.
+- `docs/contracts/mazer-ui-rework-design-tokens.v1.json` remains the single source of truth. The material contract test asserts that the live renderer maps its semantic roles back to those exact aliases instead of duplicating color literals.
+- `docs/contracts/mazer-ui-rework-decision-registry.v1.json` still locks `single-canonical-theme` and `renderer-ownership-split`. Phaser owns the world visual pass in this release; a DOM shell remains a separate, compatible future lane.
+- Visual capture supports `--reduced-motion` and records the exact material version so phone and desktop evidence can verify the same live contract rather than a static token-only registry.
 
 ## Non-goals of this wave
 
-This wave does not implement the Fawxzzy Precision Arcade visual redesign, does not add a theme switcher, does not touch `src/boot/presentation.ts` (whose `PresentationTheme` naming-collision caveat is recorded separately in `docs/architecture/MAZER-UI-REWORK-WAVE-0A-RECONCILIATION.md` and is out of scope here), and does not begin DOM extraction or Phaser material migration -- those are Waves 2 and 4.
+This pass does not add a public theme switcher, does not activate rooms or new gameplay objects, and does not extract the DOM shell or touch `src/boot/presentation.ts`. The presentation-theme naming caveat in `docs/architecture/MAZER-UI-REWORK-WAVE-0A-RECONCILIATION.md` remains separate from this material integration.

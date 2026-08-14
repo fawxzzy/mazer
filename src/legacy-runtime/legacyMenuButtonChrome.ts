@@ -1,4 +1,4 @@
-import { cyberArcadeMaterial } from '../render/cyberArcadeMaterial';
+import { cyberArcadeMaterial, toCyberArcadeCssHex } from '../render/cyberArcadeMaterial';
 
 export interface LegacyMenuButtonChrome {
   baseAlpha: number;
@@ -51,6 +51,8 @@ export const resolveLegacyMenuButtonChrome = (
     labelAlpha: isPrimary ? 1 : 0.98,
     strokeColor: isPrimary ? cyberArcadeMaterial.signal.player : cyberArcadeMaterial.rail.cyan,
     strokeWidth: 2,
-    textColor: isPrimary ? '#36ff7d' : '#ecfff5'
+    textColor: isPrimary
+      ? toCyberArcadeCssHex(cyberArcadeMaterial.signal.player)
+      : toCyberArcadeCssHex(cyberArcadeMaterial.rail.white)
   };
 };
