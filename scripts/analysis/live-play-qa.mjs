@@ -823,7 +823,7 @@ export const summarizePlayerProgressionCompletion = (visibleMessages) => {
     message,
     pass: Boolean(
       copy
-      && /^(Great clear — Maze \d+ unlocked\. Rank [A-Z]\. Score \d+\/100\.|Nice clear — progress advanced\. Score \d+\/100\. \d+ steps to Maze \d+\.)$/.test(copy)
+      && /^Maze \d+ unlocked! (Score \d+\/100\.|Rank up: [A-Z] → [A-Z]\.)$/.test(copy)
     )
   };
 };

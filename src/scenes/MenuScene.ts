@@ -203,13 +203,11 @@ import {
   createEmptyLegacyProgressionState,
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
-  resolveLegacyMazeComplexity,
   resolveLegacyMazeGenerationProfileForProgression,
   resolveLegacyProgressionDifficultyProfile,
   resolveLegacyProgressionGenerationScale,
   resolveLegacyProgressionPalette,
   resolveLegacyProgressionTrackIdForSurface,
-  summarizeLegacyProgressionPacing,
   summarizeLegacyProgressionDiagnostics,
   writeLegacyProgressionState,
   type LegacyProgressionDiagnostics,
@@ -10900,17 +10898,22 @@ export class MenuScene extends Phaser.Scene {
     this.playCyclePath = [firstPoint, ...tail.map(copyPoint)];
   }
 
-  private resolveLegacyPlayerProgressionOutcomeReason(receipt: MazeCycleTelemetryReceipt, score: number): string {
+  private resolveLegacyPlayerProgressionOutcomeReason(
+    receipt: MazeCycleTelemetryReceipt,
+    score: number,
+    track: LegacyProgressionTrack
+  ): string {
+    const nextMaze = `Maze ${Math.min(99, track.level + 1)}`;
     if (receipt.resetUsed) {
-      return 'A reset was used, so the next maze eased instead of advancing.';
+      return `Restart used. ${nextMaze} needs a restart-free ${MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD}+ clear.`;
     }
     if (receipt.routeEfficiencyPressureScore >= MAZE_CYCLE_RUN_QUALITY_PLAYER_EXTREME_DETOUR_PRESSURE_THRESHOLD) {
-      return 'Your route was more than twice the viable path, so the next maze eased.';
+      return `Route over 2× shortest. ${nextMaze} needs a shorter route.`;
     }
     if (score < MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD) {
-      return `Reach ${MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD}+ to advance.`;
+      return `Score ${score}/100. Reach ${MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD}+ to unlock ${nextMaze}.`;
     }
-    return 'Keep the next clear steady to advance.';
+    return `Finish another ${MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD}+ clear to unlock ${nextMaze}.`;
   }
 
   private publishLegacyPlayerProgressionCompletion(
@@ -10922,28 +10925,23 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const pacing = summarizeLegacyProgressionPacing(track, resolveLegacyMazeComplexity(this.maze).total);
     const targetDelta = track.targetComplexity - previousTrack.targetComplexity;
     const score = clampInteger(Math.round(track.paceScore), 0, 100);
-    const reason = this.resolveLegacyPlayerProgressionOutcomeReason(receipt, score);
+    const reason = this.resolveLegacyPlayerProgressionOutcomeReason(receipt, score, track);
     const levelOrRankAdvanced = track.level > previousTrack.level || track.rank !== previousTrack.rank;
-    const levelOrRankDropped = track.level < previousTrack.level || track.rank !== previousTrack.rank;
-    const copy = targetDelta > 0
-      ? levelOrRankAdvanced
-        ? `Great clear — Maze ${track.level} unlocked. Rank ${track.rank}. Score ${score}/100.`
-        : `Nice clear — progress advanced. Score ${score}/100. ${pacing.complexityUntilNextLevel} steps to Maze ${track.level + 1}.`
-      : targetDelta < 0
-        ? levelOrRankDropped
-          ? `Maze cleared, but you dropped to Maze ${track.level}, Rank ${track.rank}. ${reason}`
-          : `Maze cleared, but the next maze eased. ${reason}`
-        : `Maze cleared. Score ${score}/100 — progress held. ${reason}`;
+    const rankSummary = track.rank === previousTrack.rank
+      ? `Score ${score}/100.`
+      : `Rank up: ${previousTrack.rank} → ${track.rank}.`;
+    const copy = targetDelta > 0 && levelOrRankAdvanced
+      ? `Maze ${track.level} unlocked! ${rankSummary}`
+      : `No unlock. ${reason}`;
 
     this.pushLegacyPlayerMessage(createLegacyPlayerMessage({
       copy,
       durationMs: 3_400,
       id: `progression.player.cycle.${track.completedCycles}`,
       source: 'progression',
-      tone: targetDelta > 0 ? 'success' : targetDelta < 0 ? 'warning' : 'info'
+      tone: targetDelta > 0 && levelOrRankAdvanced ? 'success' : 'info'
     }));
   }
 

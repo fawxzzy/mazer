@@ -59,7 +59,8 @@ const resolveLegacyPlayerProgressionOutcomeReason = (
     resolveLegacyPlayerProgressionOutcomeReason: (
       this: PlayerProgressionSceneHarness,
       receipt: MazeCycleTelemetryHistory['receipts'][number],
-      score: number
+      score: number,
+      track: LegacyProgressionTrack
     ) => string;
   }
 ).resolveLegacyPlayerProgressionOutcomeReason;
@@ -111,7 +112,8 @@ interface PlayerProgressionSceneHarness {
   progressionState: LegacyProgressionState;
   resolveLegacyPlayerProgressionOutcomeReason: (
     receipt: MazeCycleTelemetryHistory['receipts'][number],
-    score: number
+    score: number,
+    track: LegacyProgressionTrack
   ) => string;
   publishLegacyPlayerProgressionCompletion: (
     previousTrack: LegacyProgressionTrack,
@@ -222,8 +224,8 @@ const createScene = (): { scene: PlayerProgressionSceneHarness; storage: MemoryS
     playCycleResetUsed: false,
     playStartedAtMs: 0,
     progressionState,
-    resolveLegacyPlayerProgressionOutcomeReason(receipt, score) {
-      return resolveLegacyPlayerProgressionOutcomeReason.call(this, receipt, score);
+    resolveLegacyPlayerProgressionOutcomeReason(receipt, score, track) {
+      return resolveLegacyPlayerProgressionOutcomeReason.call(this, receipt, score, track);
     },
     publishLegacyPlayerProgressionCompletion(previousTrack, receipt) {
       publishLegacyPlayerProgressionCompletion.call(this, previousTrack, receipt);
@@ -260,11 +262,12 @@ describe('player progression completion flow', () => {
     expect(scene.progressionState.tracks.player).toMatchObject({
       completedCycles: 1,
       lastSignal: 'challenge',
-      targetComplexity: 26
+      level: 2,
+      targetComplexity: 12
     });
     expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}').tracks.player.completedCycles).toBe(1);
     expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
-      copy: 'Nice clear — progress advanced. Score 100/100. 2 steps to Maze 6.',
+      copy: 'Maze 2 unlocked! Score 100/100.',
       durationMs: 3_400,
       id: 'progression.player.cycle.1',
       source: 'progression',
@@ -275,7 +278,7 @@ describe('player progression completion flow', () => {
 
     expect(scene.pendingGenerationRequest).toMatchObject({
       reason: 'play-goal-reset',
-      targetComplexity: 26
+      targetComplexity: 12
     });
     expect(scene.boardDynamicDirty).toBe(true);
     expect(scene.boardPathDirty).toBe(true);
@@ -323,12 +326,12 @@ describe('player progression completion flow', () => {
     publishLegacyPlayerProgressionCompletion.call(scene, previousTrack, receipt);
 
     expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
-      copy: 'Great clear — Maze 6 unlocked. Rank D. Score 100/100.',
+      copy: 'Maze 6 unlocked! Rank up: E → D.',
       id: 'progression.player.cycle.4'
     }));
   });
 
-  test('explains an extreme detour when it eases difficulty instead of reporting misleading steady progress', () => {
+  test('explains that an extreme detour holds the current maze instead of demoting the player', () => {
     const { scene } = createScene();
     scene.playCyclePath = [
       ...scene.maze.solutionPath,
@@ -339,15 +342,15 @@ describe('player progression completion flow', () => {
     recordMazeCycleCompletion.call(scene, 'play');
 
     expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
-      copy: expect.stringContaining('you dropped to Maze 4, Rank E'),
-      tone: 'warning'
+      copy: expect.stringContaining('No unlock.'),
+      tone: 'info'
     }));
     expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
-      copy: expect.stringContaining('more than twice the viable path')
+      copy: expect.stringContaining('Route over 2× shortest')
     }));
   });
 
-  test('explains a held clear and the score needed to advance', () => {
+  test('explains a held clear with the exact score needed to unlock the next maze', () => {
     const { scene } = createScene();
     scene.playCompletedAtMs = 100_000;
     scene.time.now = 100_000;
@@ -355,11 +358,11 @@ describe('player progression completion flow', () => {
     recordMazeCycleCompletion.call(scene, 'play');
 
     expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
-      copy: expect.stringContaining('progress held'),
+      copy: expect.stringContaining('No unlock.'),
       tone: 'info'
     }));
     expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
-      copy: expect.stringContaining('Reach 70+ to advance')
+      copy: expect.stringContaining('Reach 70+ to unlock Maze 2')
     }));
   });
 
