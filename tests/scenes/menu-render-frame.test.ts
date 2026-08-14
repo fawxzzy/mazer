@@ -1323,7 +1323,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.setLatestOverlayMessage(resolveLegacyOverlayToggleMessage(');
     expect(menuSceneSource).toContain('this.setLatestOverlayMessage(resolveLegacyOverlayMovementSpeedMessage(');
     expect(menuSceneSource).toContain('this.armLegacyAuthFeedbackMessage();');
-    expect(menuSceneSource).toContain('this.pushLegacyPlayerMessage(result.playerMessage);');
+    expect(menuSceneSource).toContain('this.latestRemoteSyncResult = result;');
+    expect(menuSceneSource).not.toContain('this.pushLegacyPlayerMessage(result.playerMessage);');
     expect(menuSceneSource).toContain('visibleMessages: this.resolveVisibleLegacyPlayerMessages()');
     expect(menuSceneSource).not.toContain('private createOverlayPlayerMessageText');
     expect(menuSceneSource).not.toContain('private createAuthFeedbackText');
