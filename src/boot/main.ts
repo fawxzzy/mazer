@@ -54,15 +54,9 @@ const registerProductionServiceWorker = (): void => {
     hostname: window.location.hostname,
     readyState: document.readyState,
     addLoadListener: (listener) => window.addEventListener('load', listener, { once: true }),
-    addControllerChangeListener: (listener) =>
-      navigator.serviceWorker.addEventListener('controllerchange', listener, { once: true }),
     register: 'serviceWorker' in navigator
       ? async (scriptUrl) => navigator.serviceWorker.register(scriptUrl)
-      : null,
-    getSessionValue: (key) => window.sessionStorage.getItem(key),
-    setSessionValue: (key, value) => window.sessionStorage.setItem(key, value),
-    now: () => Date.now(),
-    reload: () => window.location.reload()
+      : null
   }, (message) => {
     markMazerBootStatus('service-worker-error', message);
   });

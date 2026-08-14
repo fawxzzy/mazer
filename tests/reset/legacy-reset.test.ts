@@ -703,14 +703,10 @@ describe('legacy reset lane', () => {
     expect(bootSource).toContain('installMazerProductionServiceWorker({');
     expect(bootSource).toContain("markMazerBootStatus('boot-start');");
     expect(bootSource).toContain("markMazerBootStatus('game-created');");
-    expect(lifecycleSource).toContain(
-      "const PRODUCTION_SW_UPDATE_RELOAD_KEY = 'mazer:production-sw-update-reload-at:v1';"
-    );
-    expect(lifecycleSource).toContain('const PRODUCTION_SW_UPDATE_RELOAD_WINDOW_MS = 10_000;');
-    expect(lifecycleSource).toContain('const shouldReloadForUpdate = (');
-    expect(lifecycleSource).toContain('runtime.addControllerChangeListener(() => {');
     expect(lifecycleSource).toContain("runtime.register?.('/sw.js')");
     expect(lifecycleSource).toContain('.then((registration) => registration.update())');
+    expect(lifecycleSource).not.toContain('addControllerChangeListener');
+    expect(lifecycleSource).not.toContain('reload:');
     expect(viteConfigSource).toContain('injectRegister: false');
     expect(viteConfigSource).not.toContain("injectRegister: 'auto'");
   });

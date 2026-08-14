@@ -17,6 +17,7 @@ The active shipped/runtime path is a small Phaser shell with one boot scene and 
 
 - `src/boot/main.ts`
   - clears localhost service-worker/cache drift before boot
+  - registers production service-worker updates without reloading an active maze; a newly controlled client takes effect on the next navigation
   - starts Phaser with the repo-owned config
 - `src/boot/phaserConfig.ts`
   - wires only `BootScene` and `MenuScene`
