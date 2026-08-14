@@ -22,6 +22,11 @@ export const LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY = LEGACY_PROGRESSI
 export const LEGACY_PROGRESSION_AI_BASE_TARGET_COMPLEXITY = LEGACY_PROGRESSION_MIN_COMPLEXITY;
 export const LEGACY_PROGRESSION_AI_BASELINE_VERSION = 3;
 export const LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION = 4;
+// Player difficulty does not consume `struggleCycles`; it is legacy AI
+// telemetry. Reserve an impossible player count in that existing v3-compatible
+// field so a stale v3 tab cannot erase the v4 baseline provenance when it
+// rewrites the top-level baseline version during remote sync.
+const LEGACY_PROGRESSION_PLAYER_BASELINE_V4_PROVENANCE_STRUGGLE_CYCLES = Number.MAX_SAFE_INTEGER;
 export const LEGACY_PROGRESSION_CHALLENGE_STEP = 1;
 export const LEGACY_PROGRESSION_CHALLENGE_PRESSURE_BONUS = 1;
 export const LEGACY_PROGRESSION_CHALLENGE_STREAK_BONUS_EVERY = 3;
@@ -651,6 +656,11 @@ const createTrack = (targetComplexity = LEGACY_PROGRESSION_BASE_TARGET_COMPLEXIT
   };
 };
 
+const createPlayerBaselineTrack = (): LegacyProgressionTrack => ({
+  ...createTrack(LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY),
+  struggleCycles: LEGACY_PROGRESSION_PLAYER_BASELINE_V4_PROVENANCE_STRUGGLE_CYCLES
+});
+
 const formatLegacyProgressionCycleCount = (completedCycles: number): string => (
   `${Math.min(99_999, Math.max(0, Math.round(completedCycles)))}${completedCycles > 99_999 ? '+' : ''}`
 );
@@ -661,7 +671,7 @@ export const createEmptyLegacyProgressionState = (): LegacyProgressionState => (
   playerProgressionBaselineVersion: LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION,
   updatedAt: null,
   tracks: {
-    player: createTrack(LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY),
+    player: createPlayerBaselineTrack(),
     'ai-runner': createTrack(LEGACY_PROGRESSION_AI_BASE_TARGET_COMPLEXITY)
   }
 });
@@ -744,8 +754,12 @@ const rebaseLegacyPlayerProgressionBaseline = (): LegacyProgressionTrack => {
   // jump straight into late-game generation and hazards. Start the player lane
   // from the gentle, complete Level 1 state instead; every new player clear
   // then advances exactly one level through the current contract.
-  return createTrack(LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY);
+  return createPlayerBaselineTrack();
 };
+
+const hasLegacyPlayerBaselineV4Provenance = (track: LegacyProgressionTrack): boolean => (
+  track.struggleCycles >= LEGACY_PROGRESSION_PLAYER_BASELINE_V4_PROVENANCE_STRUGGLE_CYCLES
+);
 
 export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressionState => {
   const fallback = createEmptyLegacyProgressionState();
@@ -763,8 +777,10 @@ export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressi
     0
   );
   const shouldResetLegacyAiRunner = aiRunnerBaselineVersion < LEGACY_PROGRESSION_AI_BASELINE_VERSION;
+  const normalizedPlayer = normalizeTrack(tracks.player, fallback.tracks.player);
   const shouldRebaseLegacyPlayerProgression = playerProgressionBaselineVersion
-    < LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION;
+    < LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION
+    && !hasLegacyPlayerBaselineV4Provenance(normalizedPlayer);
   return {
     version: 1,
     aiRunnerBaselineVersion: LEGACY_PROGRESSION_AI_BASELINE_VERSION,
@@ -773,7 +789,7 @@ export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressi
     tracks: {
       player: shouldRebaseLegacyPlayerProgression
         ? rebaseLegacyPlayerProgressionBaseline()
-        : normalizeTrack(tracks.player, fallback.tracks.player),
+        : normalizedPlayer,
       'ai-runner': shouldResetLegacyAiRunner
         ? copyTrack(fallback.tracks['ai-runner'])
         : normalizeTrack(tracks['ai-runner'], fallback.tracks['ai-runner'])

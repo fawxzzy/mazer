@@ -118,6 +118,7 @@ describe('legacy progression', () => {
       level: 1,
       rank: 'E',
       recentSignals: [],
+      struggleCycles: Number.MAX_SAFE_INTEGER,
       targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
     });
     expect(state.tracks['ai-runner']).toMatchObject({
@@ -135,6 +136,7 @@ describe('legacy progression', () => {
         player: {
           ...state.tracks.player,
           completedCycles: 9,
+          struggleCycles: 0,
           targetComplexity: 64
         },
         'ai-runner': {
@@ -153,6 +155,7 @@ describe('legacy progression', () => {
       level: 1,
       rank: 'E',
       recentSignals: [],
+      struggleCycles: Number.MAX_SAFE_INTEGER,
       targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
     });
     expect(normalized.tracks['ai-runner']).toMatchObject({
@@ -234,6 +237,7 @@ describe('legacy progression', () => {
           completedCycles: 5_180,
           level: 99,
           rank: 'S',
+          struggleCycles: 0,
           targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
         },
         'ai-runner': createEmptyLegacyProgressionState().tracks['ai-runner']
@@ -248,6 +252,7 @@ describe('legacy progression', () => {
       completedCycles: 0,
       level: 1,
       rank: 'E',
+      struggleCycles: Number.MAX_SAFE_INTEGER,
       targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
     });
     expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}'))
@@ -286,6 +291,25 @@ describe('legacy progression', () => {
       completedCycles: 1,
       level: 2,
       rank: 'E',
+      struggleCycles: Number.MAX_SAFE_INTEGER,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4
+    });
+
+    // A still-open v3 client preserves recognized track fields but rewrites
+    // the top-level baseline version during a remote sync. The v4 provenance
+    // must keep a legitimately advanced post-rebase player from being reset
+    // again when they later return to an updated client.
+    const staleV3RemoteWrite = {
+      ...advanced,
+      playerProgressionBaselineVersion: 3
+    };
+    const syncedStorage = new MemoryStorage();
+    syncedStorage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify(staleV3RemoteWrite));
+    expect(readLegacyProgressionState(syncedStorage).tracks.player).toMatchObject({
+      completedCycles: 1,
+      level: 2,
+      rank: 'E',
+      struggleCycles: Number.MAX_SAFE_INTEGER,
       targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4
     });
   });
