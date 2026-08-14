@@ -198,17 +198,20 @@ import {
   createEmptyLegacyProgressionState,
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
+  resolveLegacyMazeComplexity,
   resolveLegacyMazeGenerationProfileForProgression,
   resolveLegacyProgressionDifficultyProfile,
   resolveLegacyProgressionGenerationScale,
   resolveLegacyProgressionPalette,
   resolveLegacyProgressionTrackIdForSurface,
+  summarizeLegacyProgressionPacing,
   summarizeLegacyProgressionDiagnostics,
   writeLegacyProgressionState,
   type LegacyProgressionDiagnostics,
   type LegacyProgressionDifficultyBand,
   type LegacyProgressionPalette,
   type LegacyProgressionState,
+  type LegacyProgressionTrack,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
 import {
@@ -10892,6 +10895,31 @@ export class MenuScene extends Phaser.Scene {
     this.playCyclePath = [firstPoint, ...tail.map(copyPoint)];
   }
 
+  private publishLegacyPlayerProgressionCompletion(previousTrack: LegacyProgressionTrack): void {
+    const track = this.progressionState.tracks.player;
+    if (track.completedCycles <= previousTrack.completedCycles) {
+      return;
+    }
+
+    const pacing = summarizeLegacyProgressionPacing(track, resolveLegacyMazeComplexity(this.maze).total);
+    const targetDelta = track.targetComplexity - previousTrack.targetComplexity;
+    const copy = track.level > previousTrack.level
+      ? `Maze ${track.level} unlocked. Rank ${track.rank}.`
+      : targetDelta > 0 && pacing.complexityUntilNextLevel > 0
+        ? `Maze ${track.level} cleared. ${pacing.complexityUntilNextLevel} steps to Maze ${track.level + 1}.`
+        : targetDelta < 0
+          ? `Maze ${track.level} cleared. Next maze tuned to your run.`
+          : `Maze ${track.level} cleared. Progress is steady.`;
+
+    this.pushLegacyPlayerMessage(createLegacyPlayerMessage({
+      copy,
+      durationMs: 3_400,
+      id: `progression.player.cycle.${track.completedCycles}`,
+      source: 'progression',
+      tone: 'success'
+    }));
+  }
+
   private recordMazeCycleCompletion(surface: MazeCycleTelemetrySurface): void {
     if (surface === 'menu-demo' && this.menuDemoCycleRecorded) {
       return;
@@ -10941,12 +10969,16 @@ export class MenuScene extends Phaser.Scene {
     );
     const latestReceipt = this.mazeCycleTelemetryHistory.receipts[0] ?? null;
     if (latestReceipt) {
+      const previousPlayerTrack = { ...this.progressionState.tracks.player };
       this.progressionState = recordLegacyProgressionCycle(
         this.resolveLegacyProgressionStorage(),
         this.progressionState,
         latestReceipt,
         this.maze
       );
+      if (surface === 'play') {
+        this.publishLegacyPlayerProgressionCompletion(previousPlayerTrack);
+      }
       void writeLegacyRemoteCycleReceipt(this.authSnapshot, latestReceipt)
         .then((result) => {
           this.publishLegacyRemoteSyncResult(result);
