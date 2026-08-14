@@ -64,8 +64,10 @@ const LEGACY_PLAY_ULTRA_NARROW_WIDTH = 360;
 const LEGACY_PHONE_CLEAN_ZOOM_WIDTH = 420;
 const LEGACY_PHONE_CLEAN_SAFE_INSET = 7;
 const LEGACY_PHONE_CLEAN_OUTER_MARGIN = 8;
-const LEGACY_PLAY_TOP_HUD_MIN = 84;
-const LEGACY_PLAY_TOP_HUD_MAX = 112;
+// Play now uses a compact level glyph, centered timer, and icon-only Pause
+// control. Keep the HUD lane slim so the maze earns the reclaimed space.
+const LEGACY_PLAY_TOP_HUD_MIN = 56;
+const LEGACY_PLAY_TOP_HUD_MAX = 72;
 
 const createLane = (top: number, height: number): LegacyMenuLayoutLane => ({
   top: Math.round(top),

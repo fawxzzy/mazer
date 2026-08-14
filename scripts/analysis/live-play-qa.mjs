@@ -807,25 +807,28 @@ export const summarizeGoalTimerFreeze = (firstSample, secondSample) => ({
   resampleElapsedMs: secondSample?.elapsedMs ?? null
 });
 
-export const summarizePlayerProgressionCompletion = (visibleMessages) => {
-  const message = Array.isArray(visibleMessages)
-    ? visibleMessages.find((candidate) => (
+export const summarizePlayerProgressionCompletion = ({
+  initialLevel,
+  finalLevel,
+  visibleMessages
+} = {}) => {
+  const progressionMessages = Array.isArray(visibleMessages)
+    ? visibleMessages.filter((candidate) => (
       candidate?.id?.startsWith('progression.player.cycle.')
       && candidate?.source === 'progression'
-      && candidate?.tone === 'success'
-    )) ?? null
-    : null;
-  const copy = typeof message?.copy === 'string' ? message.copy : null;
+    ))
+    : [];
 
   return {
-    copy,
-    id: message?.id ?? null,
-    message,
-    pass: Boolean(
-      copy
-      && /^(Great clear — Maze \d+ unlocked\. Rank [A-Z]\. Score \d+\/100\.|Nice clear — progress advanced\. Score \d+\/100\. \d+ steps to Maze \d+\.)$/.test(copy)
-    )
+    finalLevel: Number.isFinite(finalLevel) ? finalLevel : null,
+    initialLevel: Number.isFinite(initialLevel) ? initialLevel : null,
+    progressionMessages,
+    pass: Number.isFinite(initialLevel)
+      && Number.isFinite(finalLevel)
+      && finalLevel === initialLevel + 1
+      && progressionMessages.length === 0
   };
+
 };
 
 export const runLivePlayQa = async (options = {}) => {
@@ -874,6 +877,7 @@ export const runLivePlayQa = async (options = {}) => {
     await page.goto(targetUrl, { waitUntil: 'load', timeout: options.captureTimeoutMs ?? 45_000 });
     const initialDiagnostics = await waitForDiagnosticsReady(page, options.captureTimeoutMs ?? 45_000);
     const initialRuntime = initialDiagnostics.runtime;
+    const initialProgressionLevel = initialRuntime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null;
     const playtest = initialRuntime?.play?.playtest ?? null;
     const routePlan = solveWalkableRoute({
       player: initialRuntime?.play?.player ?? null,
@@ -967,9 +971,6 @@ export const runLivePlayQa = async (options = {}) => {
       goalTimerFirstSample,
       goalTimerSecondDiagnostics.runtime?.play?.timer ?? null
     );
-    const progressionCompletionProof = summarizePlayerProgressionCompletion(
-      goalTimerSecondDiagnostics.visual?.overlayUi?.visibleMessages
-    );
     const lifecycleProofPromise = options.verifyPostGoalLifecycle === false || failedAt !== null
       ? null
       : collectPostGoalLifecycleProof({
@@ -978,10 +979,15 @@ export const runLivePlayQa = async (options = {}) => {
         page,
         timeoutMs: options.postGoalTimeoutMs ?? DEFAULT_POST_GOAL_TIMEOUT_MS
       });
-    const progressionScreenshotPath = resolve(outputDir, `${label}.progression.png`);
-    await page.screenshot({ path: progressionScreenshotPath, fullPage: false });
     const lifecycleProof = lifecycleProofPromise ? await lifecycleProofPromise : null;
     const finalDiagnostics = lifecycleProof?.finalDiagnostics ?? goalReachedDiagnostics;
+    const progressionCompletionProof = summarizePlayerProgressionCompletion({
+      finalLevel: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null,
+      initialLevel: initialProgressionLevel,
+      visibleMessages: finalDiagnostics.visual?.overlayUi?.visibleMessages
+    });
+    const progressionScreenshotPath = resolve(outputDir, `${label}.progression.png`);
+    await page.screenshot({ path: progressionScreenshotPath, fullPage: false });
     const screenshotPath = resolve(outputDir, `${label}.png`);
     await page.screenshot({ path: screenshotPath, fullPage: false });
 

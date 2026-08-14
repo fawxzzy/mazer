@@ -50,7 +50,7 @@ describe('input-human touch bridge', () => {
     expect(layout.controls.pause.top).toBeLessThan(16);
     expect(layout.controls.pause.right).toBeGreaterThan(370);
     expect(layout.frames?.[0].right).toBeGreaterThan(370);
-    expect(layout.frames?.[0].height).toBeLessThan(layout.controls.move_up.height);
+    expect(layout.frames?.[0]).toEqual(layout.controls.pause);
     expect(layout.controls.pause.width).toBeLessThan(90);
     expect(layout.controls.pause.left).toBeGreaterThan(280);
     expect(layout.controls.restart_attempt.width).toBe(0);
@@ -240,26 +240,29 @@ describe('input-human touch bridge', () => {
     })).toEqual({ x: 309, y: 617.25 });
   });
 
-  test('matches the phone Pause action height to the shared run-status panel height', () => {
+  test('keeps the icon-only Pause action square and anchored in the top-right corner', () => {
     const layout = resolveTouchControlLayout({
       width: 390,
       height: 844
     }, {
-      controlMode: 'stick',
-      topActionHeight: 62
+      controlMode: 'stick'
     });
 
-    expect(layout.controls.pause.height).toBe(62);
-    expect(layout.frames?.[0].height).toBe(62);
+    expect(layout.controls.pause.height).toBe(layout.controls.pause.width);
+    expect(layout.controls.pause.width).toBeGreaterThanOrEqual(44);
+    expect(layout.controls.pause.width).toBeLessThanOrEqual(56);
+    expect(layout.controls.pause.top).toBeLessThan(16);
+    expect(layout.controls.pause.right).toBeGreaterThan(370);
+    expect(layout.frames?.[0]).toEqual(layout.controls.pause);
 
     const ultraNarrow = resolveTouchControlLayout({
       width: 220,
       height: 480
     }, {
-      controlMode: 'stick',
-      topActionHeight: 62
+      controlMode: 'stick'
     });
-    expect(ultraNarrow.controls.pause.height).toBe(62);
+    expect(ultraNarrow.controls.pause.height).toBe(ultraNarrow.controls.pause.width);
+    expect(ultraNarrow.controls.pause.right).toBeLessThanOrEqual(220);
   });
 
   test('places phone controls low in the bottom lane below the board when board bounds are known', () => {

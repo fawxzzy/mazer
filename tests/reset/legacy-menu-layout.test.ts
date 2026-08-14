@@ -282,14 +282,20 @@ describe('legacy menu layout', () => {
       width: playLayout.width,
       height: playLayout.height
     }, {
-      compact: true
+      compact: true,
+      avoidRect: {
+        left: playLayout.boardLeft,
+        top: playLayout.boardTop,
+        width: playLayout.boardSize,
+        height: playLayout.boardSize
+      }
     });
 
     expect(playLayout.buttonLayout).toBe('stack');
     expect(playLayout.boardLeft).toBeGreaterThanOrEqual(0);
     expect(playLayout.boardLeft + playLayout.boardSize).toBeLessThanOrEqual(playLayout.width);
     expect(playLayout.lanes.hud?.bottom).toBeLessThanOrEqual(playLayout.lanes.maze.top);
-    expect(playLayout.boardTop).toBeGreaterThanOrEqual(menuLayout.boardTop);
+    expect(playLayout.boardTop).toBe((playLayout.lanes.hud?.bottom ?? 0) + 4);
     expect(playLayout.boardTop).toBeGreaterThanOrEqual(48);
     expect(playLayout.boardTop + playLayout.boardSize + 12).toBeLessThanOrEqual(touchLayout.frame.top);
     expect(touchLayout.frame.right).toBeLessThanOrEqual(playLayout.width);
@@ -316,7 +322,7 @@ describe('legacy menu layout', () => {
     });
 
     expect(playLayout.boardTop + playLayout.boardSize + 24).toBeLessThanOrEqual(touchLayout.frame.top);
-    expect(touchLayout.controls.pause.width).toBeGreaterThan(touchLayout.controls.move_up.width);
+    expect(touchLayout.controls.pause.width).toBe(touchLayout.controls.move_up.width);
     expect(touchLayout.controls.restart_attempt.width).toBe(0);
     expect(touchLayout.controls.toggle_thoughts.width).toBe(0);
   });

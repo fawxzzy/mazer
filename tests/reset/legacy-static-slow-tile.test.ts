@@ -462,9 +462,9 @@ describe('legacy static slow tile', () => {
       createEmptyLegacyProgressionState().tracks.player
     );
     expect(scene.progressionState.tracks['ai-runner'].targetComplexity).toBe(180);
-    expect(scene.playStaticSlowTile).toEqual(createLegacyStaticSlowTileState(maze, 'starter'));
+    expect(scene.playStaticSlowTile).toEqual(createLegacyStaticSlowTileState(maze, 'tutorial'));
     expect(scene.playStaticSlowTile).toMatchObject({
-      band: 'starter',
+      band: 'tutorial',
       blockedMoveCount: 0,
       consumed: false,
       delayUntilMs: null,

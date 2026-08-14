@@ -131,20 +131,30 @@ describe('live play QA script helpers', () => {
     ).pass).toBe(false);
   });
 
-  test('requires the live player journey to surface a concrete progression completion outcome', () => {
-    expect(summarizePlayerProgressionCompletion([
-      { copy: 'Nice clear — progress advanced. Score 84/100. 2 steps to Maze 6.', id: 'progression.player.cycle.1', source: 'progression', tone: 'success' }
-    ])).toMatchObject({
-      copy: 'Nice clear — progress advanced. Score 84/100. 2 steps to Maze 6.',
-      id: 'progression.player.cycle.1',
-      pass: true
+
+  test('requires the live player journey to advance exactly one silent visible level', () => {
+    expect(summarizePlayerProgressionCompletion({
+      finalLevel: 2,
+      initialLevel: 1,
+      visibleMessages: []
+    })).toMatchObject({
+      finalLevel: 2,
+      initialLevel: 1,
+      pass: true,
+      progressionMessages: []
     });
-    expect(summarizePlayerProgressionCompletion([
-      { copy: 'Great clear — Maze 6 unlocked. Rank D. Score 91/100.', id: 'progression.player.cycle.4', source: 'progression', tone: 'success' }
-    ]).pass).toBe(true);
-    expect(summarizePlayerProgressionCompletion([
-      { copy: 'Sign in to sync progress across devices.', id: 'remote.progression.guest', source: 'progression', tone: 'info' }
-    ]).pass).toBe(false);
+    expect(summarizePlayerProgressionCompletion({
+      finalLevel: 3,
+      initialLevel: 1,
+      visibleMessages: []
+    }).pass).toBe(false);
+    expect(summarizePlayerProgressionCompletion({
+      finalLevel: 2,
+      initialLevel: 1,
+      visibleMessages: [
+        { copy: 'Maze 2 unlocked!', id: 'progression.player.cycle.1', source: 'progression', tone: 'success' }
+      ]
+    }).pass).toBe(false);
   });
 
   test('defaults live proof input to the diagnostics QA bridge while preserving explicit control modes', () => {

@@ -190,33 +190,25 @@ import {
   recordMazeCycleTelemetryReceipt,
   summarizeMazeCycleTelemetryDiagnostics,
   type MazeCycleTelemetryHistory,
-  type MazeCycleTelemetryReceipt,
   type MazeCycleTelemetrySurface
 } from '../legacy-runtime/mazeCycleTelemetry';
-import {
-  MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD,
-  MAZE_CYCLE_RUN_QUALITY_PLAYER_EXTREME_DETOUR_PRESSURE_THRESHOLD
-} from '../legacy-runtime/mazeCycleRunQualityScorer.mjs';
 import {
   LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH,
   LEGACY_PROGRESSION_STORAGE_KEY,
   createEmptyLegacyProgressionState,
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
-  resolveLegacyMazeComplexity,
   resolveLegacyMazeGenerationProfileForProgression,
   resolveLegacyProgressionDifficultyProfile,
   resolveLegacyProgressionGenerationScale,
   resolveLegacyProgressionPalette,
   resolveLegacyProgressionTrackIdForSurface,
-  summarizeLegacyProgressionPacing,
   summarizeLegacyProgressionDiagnostics,
   writeLegacyProgressionState,
   type LegacyProgressionDiagnostics,
   type LegacyProgressionDifficultyBand,
   type LegacyProgressionPalette,
   type LegacyProgressionState,
-  type LegacyProgressionTrack,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
 import {
@@ -999,7 +991,6 @@ const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;
 const LEGACY_PLAY_HUD_TIMER_PANE = cyberArcadeMaterial.substrate.panel;
-const LEGACY_PLAY_HUD_TIMER_TEXT = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 const LEGACY_PLAY_HUD_ARROW = cyberArcadeMaterial.signal.goal;
 const LEGACY_PLAY_HUD_ARROW_TAIL = cyberArcadeMaterial.rail.white;
 const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;
@@ -3649,7 +3640,6 @@ export class MenuScene extends Phaser.Scene {
       placement: this.layout.width >= 720 && this.layout.height >= 600
         ? 'bottom-centered'
         : undefined,
-      topActionHeight: resolveLegacyRunStatusPanelLayout(this.layout.width).height,
       avoidRect: {
         left: boardBounds.left,
         top: boardBounds.top,
@@ -6823,21 +6813,15 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }
 
+    if (this.mode === 'play') {
+      return this.drawLegacyPlayProgressionGlyph(palette);
+    }
+
     const text = this.resolveLegacyProgressionBadgeText(palette);
-    const portraitPlay = this.mode === 'play' && this.layout.height > this.layout.width;
-    const portraitPauseBounds = portraitPlay
-      ? this.resolveLegacyPlayTouchControlLayout().controls.pause
-      : null;
-    const playLaneLeft = Math.max(9, mazeRenderFrame.boardLeft);
-    const playLaneRight = portraitPauseBounds
-      ? Math.max(playLaneLeft, portraitPauseBounds.left - 8)
-      : this.layout.width - 9;
-    const availableWidth = portraitPlay
-      ? Math.max(160, playLaneRight - playLaneLeft)
-      : Math.min(
-        this.layout.width - 18,
-        Math.round(mazeRenderFrame.boardSize + (mazeRenderFrame.safeInset * 2))
-      );
+    const availableWidth = Math.min(
+      this.layout.width - 18,
+      Math.round(mazeRenderFrame.boardSize + (mazeRenderFrame.safeInset * 2))
+    );
     const statusLayout = resolveLegacyRunStatusPanelLayout(this.layout.width, availableWidth);
     const baseFontSize = statusLayout.fontSize;
     this.progressionBadgeText
@@ -6857,12 +6841,8 @@ export class MenuScene extends Phaser.Scene {
     );
     const width = statusLayout.width;
     const height = statusLayout.height;
-    const centerX = portraitPlay
-      ? Math.round(playLaneLeft + ((playLaneRight - playLaneLeft) / 2))
-      : mazeRenderFrame.boardLeft + (mazeRenderFrame.boardSize / 2);
-    const centerY = this.mode === 'play'
-      ? this.resolveLegacyPlayProgressionBadgeCenterY(mazeRenderFrame, height)
-      : this.resolveLegacyMenuProgressionBadgeCenterY(mazeRenderFrame, height);
+    const centerX = mazeRenderFrame.boardLeft + (mazeRenderFrame.boardSize / 2);
+    const centerY = this.resolveLegacyMenuProgressionBadgeCenterY(mazeRenderFrame, height);
 
     this.drawLegacyCyberPanel(this.boardDynamicGraphics, {
       active: true,
@@ -6894,6 +6874,49 @@ export class MenuScene extends Phaser.Scene {
     return badgeBounds;
   }
 
+  private drawLegacyPlayProgressionGlyph(palette: LegacyProgressionPalette): VisualRect {
+    const track = this.progressionState.tracks.player;
+    const size = clampInteger(Math.round(Math.min(this.layout.width, this.layout.height) * 0.095), 38, 48);
+    const inset = Math.max(8, Math.round(size * 0.2));
+    const left = clampInteger(inset, 8, Math.max(8, this.layout.width - size - inset));
+    const laneTop = this.layout.lanes.hud?.top ?? 0;
+    const laneHeight = this.layout.lanes.hud?.height ?? size + (inset * 2);
+    const top = clampInteger(
+      Math.round(laneTop + ((laneHeight - size) / 2)),
+      6,
+      Math.max(6, this.layout.height - size - 6)
+    );
+    const centerX = left + (size / 2);
+    const centerY = top + (size / 2);
+
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, 0.42);
+    this.boardDynamicGraphics.fillRoundedRect(left, top, size, size, Math.max(9, Math.round(size * 0.24)));
+    this.boardDynamicGraphics.lineStyle(2, palette.rankColor, 0.88);
+    this.boardDynamicGraphics.strokeRoundedRect(left, top, size, size, Math.max(9, Math.round(size * 0.24)));
+    this.progressionBadgeText
+      .setText(String(track.level))
+      .setFontSize(Math.max(18, Math.round(size * 0.5)))
+      .setAlign('center')
+      .setLineSpacing(0)
+      .setPadding(0)
+      .setColor(palette.badgeColor)
+      .setPosition(centerX, centerY)
+      .setVisible(true);
+
+    const badgeBounds = createVisualRect(left, top, size, size);
+    const rawTextBounds = this.progressionBadgeText.getBounds();
+    this.progressionBadgeBounds = badgeBounds;
+    this.progressionBadgeTextBounds = createVisualRect(
+      rawTextBounds.x,
+      rawTextBounds.y,
+      rawTextBounds.width,
+      rawTextBounds.height
+    );
+    this.progressionBadgeTextFits = true;
+
+    return badgeBounds;
+  }
+
   private resolveLegacyMenuProgressionBadgeCenterY(
     mazeRenderFrame: LegacyMazeRenderFrame,
     height: number
@@ -6918,25 +6941,6 @@ export class MenuScene extends Phaser.Scene {
     return maximumCenterY >= minimumCenterY
       ? Math.round((minimumCenterY + maximumCenterY) / 2)
       : minimumCenterY;
-  }
-
-  private resolveLegacyPlayProgressionBadgeCenterY(
-    mazeRenderFrame: LegacyMazeRenderFrame,
-    height: number
-  ): number {
-    if (this.layout.lanes.hud !== null) {
-      const laneCenter = this.layout.lanes.hud.top + (this.layout.lanes.hud.height / 2);
-      const minimumCenter = 4 + (height / 2);
-      const maximumCenter = mazeRenderFrame.boardTop - 4 - (height / 2);
-      return Math.round(Math.max(minimumCenter, Math.min(laneCenter, maximumCenter)));
-    }
-
-    const mazeGap = clampInteger(Math.round(mazeRenderFrame.tileSize * 2.4), 16, 28);
-    const minimumTop = this.layout.height > this.layout.width ? 8 : 10;
-    const maximumTopBeforeMaze = mazeRenderFrame.boardTop - mazeGap - height;
-    const top = Math.max(4, Math.min(minimumTop, maximumTopBeforeMaze));
-
-    return Math.round(top + (height / 2));
   }
 
   private formatLegacyElapsedLabel(elapsedMs: number): string {
@@ -6996,12 +7000,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyProgressionBadgeText(_palette: LegacyProgressionPalette): string {
-    const menu = this.mode === 'menu';
-    const track = this.progressionState.tracks[menu ? 'ai-runner' : 'player'];
-    const timerLabel = this.formatLegacyElapsedLabel(
-      menu ? this.resolveLegacyMenuAiElapsedMs() : this.resolveLegacyPlayElapsedMs()
-    );
-    const rankLabel = `${menu ? 'AI ' : ''}Rank ${track.rank}`;
+    const track = this.progressionState.tracks['ai-runner'];
+    const timerLabel = this.formatLegacyElapsedLabel(this.resolveLegacyMenuAiElapsedMs());
+    const rankLabel = `AI Rank ${track.rank}`;
     const score = clampInteger(Math.round(track.paceScore), 0, 100);
 
     return `${timerLabel}   ${rankLabel}\nScore ${score}/100   Maze ${track.level}`;
@@ -8102,7 +8103,6 @@ export class MenuScene extends Phaser.Scene {
       this.drawLegacyPlayTouchStick(touchControlLayout.stick, this.resolveLegacyPlayHeldTouchControl(), this.playTouchStickPull);
       this.drawLegacyPlayTouchButton(controls.pause, true, false);
       this.drawLegacyPlayTouchPauseIcon(controls.pause);
-      this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');
       return createVisualRect(frame.left, frame.top, frame.width, frame.height);
     }
 
@@ -8125,7 +8125,6 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPlayTouchArrow(controls.move_left, 'left', activeControls.has('move_left'));
     this.drawLegacyPlayTouchArrow(controls.move_up_left, 'up-left', activeControls.has('move_up_left'));
     this.drawLegacyPlayTouchPauseIcon(controls.pause);
-    this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');
 
     return createVisualRect(frame.left, frame.top, frame.width, frame.height);
   }
@@ -8288,19 +8287,6 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.86);
     this.hudGraphics.fillRoundedRect(rect.centerX - gap - barWidth, top, barWidth, barHeight, 2);
     this.hudGraphics.fillRoundedRect(rect.centerX + gap, top, barWidth, barHeight, 2);
-  }
-
-  private drawLegacyPlayTouchLabel(
-    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
-    label: string
-  ): void {
-    const text = this.padLegacyCompactUiText(this.add.text(rect.centerX, rect.bottom - Math.max(12, Math.round(rect.height * 0.22)), label, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${Math.max(12, Math.min(16, Math.round(rect.height * 0.26)))}px`,
-      color: LEGACY_PLAY_HUD_TIMER_TEXT
-    })).setOrigin(0.5).setAlpha(0.88);
-    text.setData('hud', true);
-    this.uiTexts.push(text);
   }
 
   private clearHudTexts(): void {
@@ -10900,53 +10886,6 @@ export class MenuScene extends Phaser.Scene {
     this.playCyclePath = [firstPoint, ...tail.map(copyPoint)];
   }
 
-  private resolveLegacyPlayerProgressionOutcomeReason(receipt: MazeCycleTelemetryReceipt, score: number): string {
-    if (receipt.resetUsed) {
-      return 'A reset was used, so the next maze eased instead of advancing.';
-    }
-    if (receipt.routeEfficiencyPressureScore >= MAZE_CYCLE_RUN_QUALITY_PLAYER_EXTREME_DETOUR_PRESSURE_THRESHOLD) {
-      return 'Your route was more than twice the viable path, so the next maze eased.';
-    }
-    if (score < MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD) {
-      return `Reach ${MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD}+ to advance.`;
-    }
-    return 'Keep the next clear steady to advance.';
-  }
-
-  private publishLegacyPlayerProgressionCompletion(
-    previousTrack: LegacyProgressionTrack,
-    receipt: MazeCycleTelemetryReceipt
-  ): void {
-    const track = this.progressionState.tracks.player;
-    if (track.completedCycles <= previousTrack.completedCycles) {
-      return;
-    }
-
-    const pacing = summarizeLegacyProgressionPacing(track, resolveLegacyMazeComplexity(this.maze).total);
-    const targetDelta = track.targetComplexity - previousTrack.targetComplexity;
-    const score = clampInteger(Math.round(track.paceScore), 0, 100);
-    const reason = this.resolveLegacyPlayerProgressionOutcomeReason(receipt, score);
-    const levelOrRankAdvanced = track.level > previousTrack.level || track.rank !== previousTrack.rank;
-    const levelOrRankDropped = track.level < previousTrack.level || track.rank !== previousTrack.rank;
-    const copy = targetDelta > 0
-      ? levelOrRankAdvanced
-        ? `Great clear — Maze ${track.level} unlocked. Rank ${track.rank}. Score ${score}/100.`
-        : `Nice clear — progress advanced. Score ${score}/100. ${pacing.complexityUntilNextLevel} steps to Maze ${track.level + 1}.`
-      : targetDelta < 0
-        ? levelOrRankDropped
-          ? `Maze cleared, but you dropped to Maze ${track.level}, Rank ${track.rank}. ${reason}`
-          : `Maze cleared, but the next maze eased. ${reason}`
-        : `Maze cleared. Score ${score}/100 — progress held. ${reason}`;
-
-    this.pushLegacyPlayerMessage(createLegacyPlayerMessage({
-      copy,
-      durationMs: 3_400,
-      id: `progression.player.cycle.${track.completedCycles}`,
-      source: 'progression',
-      tone: targetDelta > 0 ? 'success' : targetDelta < 0 ? 'warning' : 'info'
-    }));
-  }
-
   private recordMazeCycleCompletion(surface: MazeCycleTelemetrySurface): void {
     if (surface === 'menu-demo' && this.menuDemoCycleRecorded) {
       return;
@@ -10996,16 +10935,12 @@ export class MenuScene extends Phaser.Scene {
     );
     const latestReceipt = this.mazeCycleTelemetryHistory.receipts[0] ?? null;
     if (latestReceipt) {
-      const previousPlayerTrack = { ...this.progressionState.tracks.player };
       this.progressionState = recordLegacyProgressionCycle(
         this.resolveLegacyProgressionStorage(),
         this.progressionState,
         latestReceipt,
         this.maze
       );
-      if (surface === 'play') {
-        this.publishLegacyPlayerProgressionCompletion(previousPlayerTrack, latestReceipt);
-      }
       void writeLegacyRemoteCycleReceipt(this.authSnapshot, latestReceipt)
         .then((result) => {
           this.publishLegacyRemoteSyncResult(result);

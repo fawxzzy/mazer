@@ -109,8 +109,15 @@ const createProgressionTestMaze = (overrides: Partial<LegacyMazeSnapshot> = {}):
 });
 
 describe('legacy progression', () => {
-  test('starts and normalizes the menu AI runner back to a level-one baseline', () => {
+  test('starts both tracks at a real level-one tutorial baseline', () => {
     const state = createEmptyLegacyProgressionState();
+    expect(state.tracks.player).toMatchObject({
+      completedCycles: 0,
+      level: 1,
+      rank: 'E',
+      recentSignals: [],
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
+    });
     expect(state.tracks['ai-runner']).toMatchObject({
       completedCycles: 0,
       level: 1,
@@ -175,7 +182,11 @@ describe('legacy progression', () => {
     expect(state.tracks.player.bestCompletionTimeMs).toBe(8000);
     expect(state.tracks.player.paceScore).toBeGreaterThanOrEqual(70);
     expect(state.tracks.player.recentSignals).toEqual(['challenge']);
-    expect(state.tracks.player.targetComplexity).toBe(26);
+    expect(state.tracks.player).toMatchObject({
+      level: 2,
+      rank: 'E',
+      targetComplexity: 12
+    });
     expect(state.tracks['ai-runner'].completedCycles).toBe(0);
     expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}').tracks.player.completedCycles).toBe(1);
 
@@ -202,6 +213,49 @@ describe('legacy progression', () => {
     expect(state.tracks['ai-runner'].recentSignals).toEqual(['ease']);
     expect(state.tracks['ai-runner'].targetComplexity).toBe(LEGACY_PROGRESSION_MIN_COMPLEXITY);
     expect(readLegacyProgressionState(storage).tracks['ai-runner'].completedCycles).toBe(1);
+  });
+
+  test('repairs only the legacy invisible player plateau into visible earned maze levels', () => {
+    const storage = new MemoryStorage();
+    const legacyState = {
+      version: 1,
+      tracks: {
+        player: {
+          ...createEmptyLegacyProgressionState().tracks.player,
+          cleanCycles: 3,
+          completedCycles: 3,
+          level: 5,
+          rank: 'E',
+          targetComplexity: 27
+        },
+        'ai-runner': createEmptyLegacyProgressionState().tracks['ai-runner']
+      }
+    };
+    storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify(legacyState));
+
+    const repaired = readLegacyProgressionState(storage);
+    expect(repaired.playerProgressionBaselineVersion).toBeGreaterThanOrEqual(2);
+    expect(repaired.tracks.player).toMatchObject({
+      cleanCycles: 3,
+      completedCycles: 3,
+      level: 4,
+      rank: 'E',
+      targetComplexity: 20
+    });
+    expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}'))
+      .toMatchObject({ playerProgressionBaselineVersion: 3 });
+
+    const established = readLegacyProgressionState({
+      getItem: () => JSON.stringify({
+        ...legacyState,
+        tracks: {
+          ...legacyState.tracks,
+          player: { ...legacyState.tracks.player, level: 12, rank: 'C', targetComplexity: 52 }
+        }
+      }),
+      setItem: () => undefined
+    });
+    expect(established.tracks.player.targetComplexity).toBe(52);
   });
 
   test('scores completion time against route and complexity pressure for level pacing', () => {
@@ -444,7 +498,7 @@ describe('legacy progression', () => {
     expect(state.tracks['ai-runner'].struggleCycles).toBe(0);
   });
 
-  test('uses shortest-path waste for player progression and reserves render safety for the AI demo', () => {
+  test('keeps route-quality telemetry for players while every completed maze advances', () => {
     const storage = new MemoryStorage();
     const maze = createProgressionTestMaze();
     const complexity = resolveLegacyMazeComplexity(maze).total;
@@ -518,12 +572,12 @@ describe('legacy progression', () => {
     expect(resolveLegacyProgressionPerformanceScore(unsafeAiFrameReceipt, complexity).signal).toBe('hold');
 
     let state = recordLegacyProgressionCycle(storage, createEmptyLegacyProgressionState(), routeWasteReceipt, maze);
-    expect(state.tracks.player.lastSignal).toBe('ease');
-    expect(state.tracks.player.targetComplexity).toBe(22);
+    expect(state.tracks.player.lastSignal).toBe('challenge');
+    expect(state.tracks.player.targetComplexity).toBe(12);
 
     state = recordLegacyProgressionCycle(storage, createEmptyLegacyProgressionState(), unsafeFrameReceipt, maze);
     expect(state.tracks.player.lastSignal).toBe('challenge');
-    expect(state.tracks.player.targetComplexity).toBe(26);
+    expect(state.tracks.player.targetComplexity).toBe(12);
   });
 
   test('uses the displayed player score without a hidden wrong-turn or backtrack gate', () => {
@@ -577,10 +631,21 @@ describe('legacy progression', () => {
       signal: 'challenge',
       total: expect.any(Number)
     });
+    const progressedState = recordLegacyProgressionCycle(
+      new MemoryStorage(),
+      createEmptyLegacyProgressionState(),
+      highScoreWithManyMistakes,
+      maze
+    );
+    expect(progressedState.tracks.player).toMatchObject({
+      lastSignal: 'challenge',
+      level: 2,
+      targetComplexity: 12
+    });
     expect(resolveLegacyProgressionPerformanceScore(extremeDetour, complexity).signal).toBe('ease');
   });
 
-  test('holds a low visible player score without lowering progression for ordinary mistakes', () => {
+  test('advances a low-score completed player maze while retaining its raw quality telemetry', () => {
     const storage = new MemoryStorage();
     const maze = createProgressionTestMaze();
     const initialState = createEmptyLegacyProgressionState();
@@ -602,12 +667,12 @@ describe('legacy progression', () => {
     });
     expect(recordLegacyProgressionCycle(storage, initialState, lowScoreClear, maze).tracks.player)
       .toMatchObject({
-        lastSignal: 'hold',
-        targetComplexity: initialState.tracks.player.targetComplexity
+        lastSignal: 'challenge',
+        targetComplexity: initialState.tracks.player.targetComplexity + 4
       });
   });
 
-  test('advances player level and rank across high-quality runs on a slower device', () => {
+  test('unlocks one visible player maze level per qualifying clear, even on a slower device', () => {
     const storage = new MemoryStorage();
     const maze = createProgressionTestMaze();
     let state = createEmptyLegacyProgressionState();
@@ -630,13 +695,41 @@ describe('legacy progression', () => {
     expect(state.tracks.player).toMatchObject({
       completedCycles: 3,
       lastSignal: 'challenge',
-      level: 7,
-      rank: 'D',
-      targetComplexity: 32
+      level: 4,
+      rank: 'E',
+      targetComplexity: 20
     });
   });
 
-  test('paces level changes from a recent signal window instead of only the latest cycle', () => {
+  test('raises the player rank at the documented maze-level milestone', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    let state = createEmptyLegacyProgressionState();
+
+    for (let run = 0; run < 5; run += 1) {
+      state = recordLegacyProgressionCycle(storage, state, createMazeCycleTelemetryReceipt({
+        averageFrameMs: 16,
+        completedAt: `2026-08-14T03:0${run}:00.000Z`,
+        completionTimeMs: 8_000,
+        controlMode: 'stick',
+        maze,
+        playerPath: maze.solutionPath,
+        resetUsed: false,
+        surface: 'play',
+        backtracks: 0,
+        wrongTurns: 0
+      }), maze);
+    }
+
+    expect(state.tracks.player).toMatchObject({
+      completedCycles: 5,
+      level: 6,
+      rank: 'D',
+      targetComplexity: 28
+    });
+  });
+
+  test('advances a completed player maze even after a restart without demotion', () => {
     const storage = new MemoryStorage();
     const maze = createProgressionTestMaze();
     let state = createEmptyLegacyProgressionState();
@@ -666,12 +759,12 @@ describe('legacy progression', () => {
     });
 
     state = recordLegacyProgressionCycle(storage, state, firstChallengeReceipt, maze);
-    expect(state.tracks.player.targetComplexity).toBe(26);
+    expect(state.tracks.player.targetComplexity).toBe(12);
 
     state = recordLegacyProgressionCycle(storage, state, secondChallengeReceipt, maze);
     expect(state.tracks.player.recentSignals).toEqual(['challenge', 'challenge']);
-    expect(state.tracks.player.targetComplexity).toBe(29);
-    expect(state.tracks.player.level).toBe(resolveLegacyProgressionLevel(29));
+    expect(state.tracks.player.targetComplexity).toBe(16);
+    expect(state.tracks.player.level).toBe(resolveLegacyProgressionLevel(16));
 
     const strugglingReceipt = createMazeCycleTelemetryReceipt({
       averageFrameMs: 16,
@@ -697,8 +790,9 @@ describe('legacy progression', () => {
     };
 
     state = recordLegacyProgressionCycle(storage, state, strugglingReceipt, maze);
-    expect(state.tracks.player.recentSignals.slice(0, 2)).toEqual(['ease', 'ease']);
-    expect(state.tracks.player.targetComplexity).toBe(27);
+    expect(state.tracks.player.recentSignals.slice(0, 2)).toEqual(['challenge', 'ease']);
+    expect(state.tracks.player.targetComplexity).toBe(20);
+    expect(state.tracks.player.level).toBe(4);
   });
 
   test('scores real maze complexity from route, shortcut, floor, and solution shape', () => {
@@ -944,6 +1038,7 @@ describe('legacy progression', () => {
 
   test('defines level-one mazes as small simple no-room routes', () => {
     const state = createEmptyLegacyProgressionState();
+    const playerTrack = state.tracks.player;
     const aiTrack = state.tracks['ai-runner'];
     const profile = resolveLegacyProgressionDifficultyProfile(aiTrack);
     const generationProfile = resolveLegacyMazeGenerationProfileForProgression(aiTrack);
@@ -952,6 +1047,14 @@ describe('legacy progression', () => {
     const maze = createLegacyRuntimeMazeForMode('menu', scale, 3749, generationProfile);
     const complexity = resolveLegacyMazeComplexity(maze);
 
+    expect(playerTrack).toMatchObject({ level: 1, targetComplexity: 8 });
+    expect(resolveLegacyProgressionDifficultyProfile(playerTrack)).toMatchObject({
+      band: 'tutorial',
+      branchPressure: 'minimal',
+      deadEndPressure: 'minimal',
+      expectedEdgeWraps: { horizontal: 0, vertical: 0 },
+      shortcutPressure: 'off'
+    });
     expect(aiTrack.level).toBe(1);
     expect(profile).toMatchObject({
       band: 'tutorial',
