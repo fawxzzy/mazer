@@ -48,10 +48,21 @@ const publishLegacyPlayerProgressionCompletion = (
   MenuScene.prototype as unknown as {
     publishLegacyPlayerProgressionCompletion: (
       this: PlayerProgressionSceneHarness,
-      previousTrack: LegacyProgressionTrack
+      previousTrack: LegacyProgressionTrack,
+      receipt: MazeCycleTelemetryHistory['receipts'][number]
     ) => void;
   }
 ).publishLegacyPlayerProgressionCompletion;
+
+const resolveLegacyPlayerProgressionOutcomeReason = (
+  MenuScene.prototype as unknown as {
+    resolveLegacyPlayerProgressionOutcomeReason: (
+      this: PlayerProgressionSceneHarness,
+      receipt: MazeCycleTelemetryHistory['receipts'][number],
+      score: number
+    ) => string;
+  }
+).resolveLegacyPlayerProgressionOutcomeReason;
 
 const publishLegacyRemoteSyncResult = (
   MenuScene.prototype as unknown as {
@@ -98,7 +109,14 @@ interface PlayerProgressionSceneHarness {
   playCycleResetUsed: boolean;
   playStartedAtMs: number;
   progressionState: LegacyProgressionState;
-  publishLegacyPlayerProgressionCompletion: (previousTrack: LegacyProgressionTrack) => void;
+  resolveLegacyPlayerProgressionOutcomeReason: (
+    receipt: MazeCycleTelemetryHistory['receipts'][number],
+    score: number
+  ) => string;
+  publishLegacyPlayerProgressionCompletion: (
+    previousTrack: LegacyProgressionTrack,
+    receipt: MazeCycleTelemetryHistory['receipts'][number]
+  ) => void;
   publishLegacyRemoteSyncException: ReturnType<typeof vi.fn>;
   publishLegacyRemoteSyncResult: ReturnType<typeof vi.fn>;
   pushLegacyPlayerMessage: ReturnType<typeof vi.fn>;
@@ -204,8 +222,11 @@ const createScene = (): { scene: PlayerProgressionSceneHarness; storage: MemoryS
     playCycleResetUsed: false,
     playStartedAtMs: 0,
     progressionState,
-    publishLegacyPlayerProgressionCompletion(previousTrack) {
-      publishLegacyPlayerProgressionCompletion.call(this, previousTrack);
+    resolveLegacyPlayerProgressionOutcomeReason(receipt, score) {
+      return resolveLegacyPlayerProgressionOutcomeReason.call(this, receipt, score);
+    },
+    publishLegacyPlayerProgressionCompletion(previousTrack, receipt) {
+      publishLegacyPlayerProgressionCompletion.call(this, previousTrack, receipt);
     },
     publishLegacyRemoteSyncException: vi.fn(),
     publishLegacyRemoteSyncResult: vi.fn(),
@@ -243,7 +264,7 @@ describe('player progression completion flow', () => {
     });
     expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}').tracks.player.completedCycles).toBe(1);
     expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
-      copy: 'Maze 5 cleared. 2 steps to Maze 6.',
+      copy: 'Nice clear — progress advanced. Score 100/100. 2 steps to Maze 6.',
       durationMs: 3_400,
       id: 'progression.player.cycle.1',
       source: 'progression',
@@ -282,11 +303,63 @@ describe('player progression completion flow', () => {
       }
     };
 
-    publishLegacyPlayerProgressionCompletion.call(scene, previousTrack);
+    recordMazeCycleCompletion.call(scene, 'play');
+    const receipt = scene.mazeCycleTelemetryHistory.receipts[0]!;
+    scene.pushLegacyPlayerMessage.mockClear();
+    scene.progressionState = {
+      ...scene.progressionState,
+      tracks: {
+        ...scene.progressionState.tracks,
+        player: {
+          ...previousTrack,
+          completedCycles: 4,
+          level: 6,
+          paceScore: 100,
+          rank: 'D',
+          targetComplexity: 29
+        }
+      }
+    };
+    publishLegacyPlayerProgressionCompletion.call(scene, previousTrack, receipt);
 
     expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
-      copy: 'Maze 6 unlocked. Rank D.',
+      copy: 'Great clear — Maze 6 unlocked. Rank D. Score 100/100.',
       id: 'progression.player.cycle.4'
+    }));
+  });
+
+  test('explains why a clear drops difficulty instead of reporting misleading steady progress', () => {
+    const { scene } = createScene();
+    scene.playCyclePath = [
+      ...scene.maze.solutionPath,
+      ...scene.maze.solutionPath,
+      ...scene.maze.solutionPath
+    ];
+
+    recordMazeCycleCompletion.call(scene, 'play');
+
+    expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
+      copy: expect.stringContaining('you dropped to Maze 4, Rank E'),
+      tone: 'warning'
+    }));
+    expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
+      copy: expect.stringContaining('8 backtracks triggered a difficulty ease')
+    }));
+  });
+
+  test('explains a held clear and the score needed to advance', () => {
+    const { scene } = createScene();
+    scene.playCompletedAtMs = 100_000;
+    scene.time.now = 100_000;
+
+    recordMazeCycleCompletion.call(scene, 'play');
+
+    expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
+      copy: expect.stringContaining('progress held'),
+      tone: 'info'
+    }));
+    expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
+      copy: expect.stringContaining('Reach 70+ to advance')
     }));
   });
 
