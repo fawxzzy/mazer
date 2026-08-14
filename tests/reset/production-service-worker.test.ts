@@ -9,28 +9,19 @@ const createRuntime = (
 ): {
   runtime: MazerServiceWorkerLifecycleRuntime;
   loadListeners: Array<() => void>;
-  controllerListeners: Array<() => void>;
-  sessionValues: Map<string, string>;
   update: ReturnType<typeof vi.fn>;
 } => {
   const loadListeners: Array<() => void> = [];
-  const controllerListeners: Array<() => void> = [];
-  const sessionValues = new Map<string, string>();
   const update = vi.fn(async () => undefined);
   const runtime: MazerServiceWorkerLifecycleRuntime = {
     hostname: 'fawxzzy-mazer.vercel.app',
     readyState: 'loading',
     addLoadListener: (listener) => loadListeners.push(listener),
-    addControllerChangeListener: (listener) => controllerListeners.push(listener),
     register: vi.fn(async () => ({ update })),
-    getSessionValue: (key) => sessionValues.get(key) ?? null,
-    setSessionValue: (key, value) => sessionValues.set(key, value),
-    now: () => 20_000,
-    reload: vi.fn(),
     ...overrides
   };
 
-  return { runtime, loadListeners, controllerListeners, sessionValues, update };
+  return { runtime, loadListeners, update };
 };
 
 describe('production service worker lifecycle', () => {
@@ -53,7 +44,7 @@ describe('production service worker lifecycle', () => {
   });
 
   test('defers registration until load while the document is still loading', async () => {
-    const { runtime, loadListeners, controllerListeners, update } = createRuntime();
+    const { runtime, loadListeners, update } = createRuntime();
 
     expect(installMazerProductionServiceWorker(runtime, vi.fn())).toBe(true);
     expect(loadListeners).toHaveLength(1);
@@ -62,11 +53,10 @@ describe('production service worker lifecycle', () => {
     loadListeners[0]();
     await vi.waitFor(() => expect(runtime.register).toHaveBeenCalledWith('/sw.js'));
     await vi.waitFor(() => expect(update).toHaveBeenCalledOnce());
-    expect(controllerListeners).toHaveLength(1);
   });
 
   test('registers immediately when asynchronous boot finishes after page load', async () => {
-    const { runtime, loadListeners, controllerListeners, update } = createRuntime({
+    const { runtime, loadListeners, update } = createRuntime({
       readyState: 'complete'
     });
 
@@ -74,35 +64,26 @@ describe('production service worker lifecycle', () => {
     expect(loadListeners).toHaveLength(0);
     await vi.waitFor(() => expect(runtime.register).toHaveBeenCalledWith('/sw.js'));
     await vi.waitFor(() => expect(update).toHaveBeenCalledOnce());
-    expect(controllerListeners).toHaveLength(1);
   });
 
   test('starts registration only once if a load callback is replayed', async () => {
-    const { runtime, loadListeners, controllerListeners } = createRuntime();
+    const { runtime, loadListeners } = createRuntime();
 
     installMazerProductionServiceWorker(runtime, vi.fn());
     loadListeners[0]();
     loadListeners[0]();
 
     await vi.waitFor(() => expect(runtime.register).toHaveBeenCalledOnce());
-    expect(controllerListeners).toHaveLength(1);
   });
 
-  test('reloads once for a new controller and suppresses a reload loop inside ten seconds', () => {
-    const now = vi.fn(() => 20_000);
-    const { runtime, controllerListeners, sessionValues } = createRuntime({
-      readyState: 'complete',
-      now
-    });
+  test('keeps the active session intact while checking for an update', async () => {
+    const { runtime, update } = createRuntime({ readyState: 'complete' });
 
     installMazerProductionServiceWorker(runtime, vi.fn());
-    controllerListeners[0]();
-    expect(runtime.reload).toHaveBeenCalledOnce();
-    expect(sessionValues.get('mazer:production-sw-update-reload-at:v1')).toBe('20000');
 
-    now.mockReturnValue(25_000);
-    controllerListeners[0]();
-    expect(runtime.reload).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(update).toHaveBeenCalledOnce());
+    expect(runtime).not.toHaveProperty('reload');
+    expect(runtime).not.toHaveProperty('addControllerChangeListener');
   });
 
   test('reports a safe registration failure without throwing from boot', async () => {
@@ -117,6 +98,6 @@ describe('production service worker lifecycle', () => {
     installMazerProductionServiceWorker(runtime, onError);
 
     await vi.waitFor(() => expect(onError).toHaveBeenCalledWith('registration unavailable'));
-    expect(runtime.reload).not.toHaveBeenCalled();
+    expect(runtime).not.toHaveProperty('reload');
   });
 });
