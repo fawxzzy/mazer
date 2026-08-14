@@ -526,7 +526,7 @@ describe('legacy progression', () => {
     expect(state.tracks.player.targetComplexity).toBe(26);
   });
 
-  test('uses the displayed player score for progression unless the run explicitly fails', () => {
+  test('uses the displayed player score without a hidden wrong-turn or backtrack gate', () => {
     const maze = createProgressionTestMaze();
     const complexity = resolveLegacyMazeComplexity(maze).total;
     const highScoreWithNormalMistakes = createMazeCycleTelemetryReceipt({
@@ -541,7 +541,7 @@ describe('legacy progression', () => {
       backtracks: 2,
       wrongTurns: 2
     });
-    const failedRoute = createMazeCycleTelemetryReceipt({
+    const highScoreWithManyMistakes = createMazeCycleTelemetryReceipt({
       averageFrameMs: 16,
       completedAt: '2026-08-14T02:41:00.000Z',
       completionTimeMs: 8000,
@@ -551,13 +551,60 @@ describe('legacy progression', () => {
       resetUsed: false,
       surface: 'play',
       backtracks: 6,
+      wrongTurns: 6
+    });
+    const extremeDetour = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 16,
+      completedAt: '2026-08-14T02:42:00.000Z',
+      completionTimeMs: 8000,
+      controlMode: 'stick',
+      maze,
+      playerPath: [
+        ...maze.solutionPath,
+        ...maze.solutionPath,
+        ...maze.solutionPath
+      ],
+      resetUsed: false,
+      surface: 'play',
+      backtracks: 0,
       wrongTurns: 0
     });
 
     const highScore = resolveLegacyProgressionPerformanceScore(highScoreWithNormalMistakes, complexity);
     expect(highScore.signal).toBe('challenge');
     expect(highScore.total).toBeGreaterThanOrEqual(70);
-    expect(resolveLegacyProgressionPerformanceScore(failedRoute, complexity).signal).toBe('ease');
+    expect(resolveLegacyProgressionPerformanceScore(highScoreWithManyMistakes, complexity)).toMatchObject({
+      signal: 'challenge',
+      total: expect.any(Number)
+    });
+    expect(resolveLegacyProgressionPerformanceScore(extremeDetour, complexity).signal).toBe('ease');
+  });
+
+  test('holds a low visible player score without lowering progression for ordinary mistakes', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    const initialState = createEmptyLegacyProgressionState();
+    const lowScoreClear = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 16,
+      completedAt: '2026-08-14T02:43:00.000Z',
+      completionTimeMs: 90_000,
+      controlMode: 'stick',
+      maze,
+      playerPath: maze.solutionPath,
+      resetUsed: false,
+      surface: 'play',
+      backtracks: 7,
+      wrongTurns: 7
+    });
+
+    expect(resolveLegacyProgressionPerformanceScore(lowScoreClear, resolveLegacyMazeComplexity(maze).total)).toMatchObject({
+      signal: 'hold'
+    });
+    expect(recordLegacyProgressionCycle(storage, initialState, lowScoreClear, maze).tracks.player)
+      .toMatchObject({
+        lastSignal: 'hold',
+        targetComplexity: initialState.tracks.player.targetComplexity
+      });
   });
 
   test('advances player level and rank across high-quality runs on a slower device', () => {

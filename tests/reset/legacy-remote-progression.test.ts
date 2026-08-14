@@ -350,7 +350,7 @@ describe('legacy remote progression', () => {
         routeEfficiencyPressureScore: 12.5,
         runQualityScore: expect.objectContaining({
           scorerId: 'mazer.maze-cycle-run-quality',
-          scorerVersion: '1.0.0',
+          scorerVersion: '1.1.0',
           shortestPathModel: 'playable-wrap-aware-shortest-path-v1'
         })
       })

@@ -328,7 +328,7 @@ describe('player progression completion flow', () => {
     }));
   });
 
-  test('explains why a clear drops difficulty instead of reporting misleading steady progress', () => {
+  test('explains an extreme detour when it eases difficulty instead of reporting misleading steady progress', () => {
     const { scene } = createScene();
     scene.playCyclePath = [
       ...scene.maze.solutionPath,
@@ -343,7 +343,7 @@ describe('player progression completion flow', () => {
       tone: 'warning'
     }));
     expect(scene.pushLegacyPlayerMessage).toHaveBeenCalledWith(expect.objectContaining({
-      copy: expect.stringContaining('8 backtracks triggered a difficulty ease')
+      copy: expect.stringContaining('more than twice the viable path')
     }));
   });
 

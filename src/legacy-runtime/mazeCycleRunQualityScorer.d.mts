@@ -53,6 +53,7 @@ export const MAZE_CYCLE_RUN_QUALITY_AI_EASE_SCORE_THRESHOLD: number;
 export const MAZE_CYCLE_RUN_QUALITY_AI_CHAOTIC_PRESSURE_THRESHOLD: number;
 export const MAZE_CYCLE_RUN_QUALITY_AI_SEARCHING_EXHAUSTION_SCORE_CAP: number;
 export const MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD: number;
+export const MAZE_CYCLE_RUN_QUALITY_PLAYER_EXTREME_DETOUR_PRESSURE_THRESHOLD: number;
 
 export const summarizeMazeCycleShortestPathComparison: (playerPathLength: number, shortestPathLength: number) => {
   routeOverrunRatio: number;

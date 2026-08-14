@@ -129,7 +129,7 @@ describe('maze-cycle-telemetry-report', () => {
     });
     expect(report.runQualityScorer).toEqual({
       id: 'mazer.maze-cycle-run-quality',
-      version: '1.0.0',
+      version: '1.1.0',
       shortestPathModel: 'playable-wrap-aware-shortest-path-v1',
       topologyMetricsVersion: '1.0.0',
       explorerThreshold: 0.25,
@@ -139,7 +139,7 @@ describe('maze-cycle-telemetry-report', () => {
     expect(report.latestReceipt.runQualityScoreComparison).toMatchObject({
       status: 'stored-missing',
       stored: null,
-      recomputed: { scorerVersion: '1.0.0' }
+      recomputed: { scorerVersion: '1.1.0' }
     });
     expect(report.aiReview).toMatchObject({
       aiDecisionReceiptCount: 1,
