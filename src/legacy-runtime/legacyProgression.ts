@@ -21,7 +21,7 @@ export const LEGACY_PROGRESSION_BASE_TARGET_COMPLEXITY = 24;
 export const LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY = LEGACY_PROGRESSION_MIN_COMPLEXITY;
 export const LEGACY_PROGRESSION_AI_BASE_TARGET_COMPLEXITY = LEGACY_PROGRESSION_MIN_COMPLEXITY;
 export const LEGACY_PROGRESSION_AI_BASELINE_VERSION = 3;
-export const LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION = 2;
+export const LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION = 3;
 export const LEGACY_PROGRESSION_CHALLENGE_STEP = 1;
 export const LEGACY_PROGRESSION_CHALLENGE_PRESSURE_BONUS = 1;
 export const LEGACY_PROGRESSION_CHALLENGE_STREAK_BONUS_EVERY = 3;
@@ -480,17 +480,21 @@ export const resolveLegacyProgressionDifficultyProfile = (
   }
 
   if (normalizedLevel <= 8) {
+    // The first several clears are deliberately gentle. A player should be
+    // able to feel a new maze arrive after each clear without jumping from the
+    // first tutorial board into the full starter pressure profile.
+    const starterDepth = clampInteger(normalizedLevel - 2, 0, 6);
     return {
       band: 'starter',
-      branchPressure: 'light',
-      deadEndPressure: 'light',
-      expectedEdgeWraps: { horizontal: 0, vertical: 1 },
+      branchPressure: starterDepth <= 1 ? 'minimal' : 'light',
+      deadEndPressure: starterDepth <= 2 ? 'minimal' : 'light',
+      expectedEdgeWraps: { horizontal: 0, vertical: starterDepth >= 4 ? 1 : 0 },
       fillPressure: 'open',
       label: 'Starter maze',
       levelRange: { min: 2, max: 8 },
       roomsEnabled: false,
-      shortcutPressure: 'rare',
-      targetScale: 35
+      shortcutPressure: starterDepth <= 2 ? 'off' : starterDepth <= 4 ? 'rare' : 'light',
+      targetScale: 29 + Math.min(6, starterDepth + 1)
     };
   }
 
@@ -557,6 +561,9 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
   trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number
 ): LegacyMazeGenerationProfile => {
   const profile = resolveLegacyProgressionDifficultyProfile(trackOrTargetComplexity);
+  const level = typeof trackOrTargetComplexity === 'number'
+    ? resolveLegacyProgressionLevel(trackOrTargetComplexity)
+    : trackOrTargetComplexity.level;
 
   switch (profile.band) {
     case 'tutorial':
@@ -568,13 +575,16 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
         shortcutCountMultiplier: 0
       };
     case 'starter':
+      {
+        const starterDepth = clampInteger(level - 2, 0, 6);
       return {
-        borderFeederTargetPerSide: 1,
-        checkpointCountMultiplier: 0.64,
-        requiredOppositeBorderConnections: { horizontal: false, vertical: true },
-        routeQualityReinforcementMultiplier: 0.35,
-        shortcutCountMultiplier: 0.35
+        borderFeederTargetPerSide: starterDepth >= 4 ? 1 : 0,
+        checkpointCountMultiplier: 0.44 + (starterDepth * (0.2 / 6)),
+        requiredOppositeBorderConnections: { horizontal: false, vertical: starterDepth >= 4 },
+        routeQualityReinforcementMultiplier: Math.min(0.35, starterDepth * (0.35 / 6)),
+        shortcutCountMultiplier: Math.min(0.35, starterDepth * (0.35 / 6))
       };
+      }
     case 'explorer':
       return {
         borderFeederTargetPerSide: 2,
@@ -614,7 +624,7 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
 
 const resolveLegacyProgressionColorTier = (targetComplexity: number): number => (
   clampInteger(
-    Math.floor(Math.max(0, targetComplexity - LEGACY_PROGRESSION_BASE_TARGET_COMPLEXITY) / 24),
+    Math.floor((resolveLegacyProgressionLevel(targetComplexity) - 1) / 5),
     0,
     LEGACY_PROGRESS_COLOR_TIERS.length - 1
   )
@@ -753,6 +763,34 @@ const migrateLegacyPlayerTutorialPlateau = (track: LegacyProgressionTrack): Lega
   };
 };
 
+const updateLegacyProgressionTarget = (
+  track: LegacyProgressionTrack,
+  targetComplexity: number
+): LegacyProgressionTrack => ({
+  ...track,
+  colorTier: resolveLegacyProgressionColorTier(targetComplexity),
+  level: resolveLegacyProgressionLevel(targetComplexity),
+  peakComplexity: Math.max(track.peakComplexity, targetComplexity),
+  rank: resolveLegacyProgressionRank(targetComplexity),
+  targetComplexity
+});
+
+const migrateLegacyPlayerVisibleLevels = (track: LegacyProgressionTrack): LegacyProgressionTrack => {
+  const plateauRepaired = migrateLegacyPlayerTutorialPlateau(track);
+  // Version two still stored progress behind score gates. The player-facing
+  // level now represents completed mazes directly, so never leave a valid
+  // completed cycle invisible during migration. Existing higher targets win.
+  const completedMazeTarget = clampInteger(
+    LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY + (plateauRepaired.completedCycles * 4),
+    LEGACY_PROGRESSION_MIN_COMPLEXITY,
+    LEGACY_PROGRESSION_MAX_COMPLEXITY
+  );
+
+  return completedMazeTarget > plateauRepaired.targetComplexity
+    ? updateLegacyProgressionTarget(plateauRepaired, completedMazeTarget)
+    : plateauRepaired;
+};
+
 export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressionState => {
   const fallback = createEmptyLegacyProgressionState();
   if (!isRecord(value)) {
@@ -769,7 +807,7 @@ export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressi
     0
   );
   const shouldResetLegacyAiRunner = aiRunnerBaselineVersion < LEGACY_PROGRESSION_AI_BASELINE_VERSION;
-  const shouldMigrateLegacyPlayerTutorialPlateau = playerProgressionBaselineVersion
+  const shouldMigrateLegacyPlayerVisibleLevels = playerProgressionBaselineVersion
     < LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION;
   const normalizedPlayer = normalizeTrack(tracks.player, fallback.tracks.player);
   return {
@@ -778,8 +816,8 @@ export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressi
     playerProgressionBaselineVersion: LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION,
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : null,
     tracks: {
-      player: shouldMigrateLegacyPlayerTutorialPlateau
-        ? migrateLegacyPlayerTutorialPlateau(normalizedPlayer)
+      player: shouldMigrateLegacyPlayerVisibleLevels
+        ? migrateLegacyPlayerVisibleLevels(normalizedPlayer)
         : normalizedPlayer,
       'ai-runner': shouldResetLegacyAiRunner
         ? copyTrack(fallback.tracks['ai-runner'])
@@ -985,11 +1023,14 @@ const resolveProgressionSignal = (
   receipt: MazeCycleTelemetryReceipt,
   complexity: number
 ): LegacyProgressionSignal => {
+  if (receipt.surface === 'play') {
+    // A player completion is the visible advancement contract. Quality data is
+    // still stored for diagnostics, but it cannot hide a completed maze behind
+    // an opaque score or route-perfectness threshold.
+    return 'challenge';
+  }
   const signal = resolveLegacyProgressionPerformanceScoreForReceipt(receipt, complexity).signal;
-  // A completed player maze never reduces the player's unlocked difficulty.
-  // Reset and extreme-detour guards still block a new unlock, but they hold the
-  // current maze instead of treating an ordinary completed run as a demotion.
-  return receipt.surface === 'play' && signal === 'ease' ? 'hold' : signal;
+  return signal;
 };
 
 export const resolveLegacyProgressionPerformanceScoreForReceipt = (
@@ -1004,7 +1045,7 @@ const resolveLegacyProgressionTargetAdjustment = (
   trackId: LegacyProgressionTrackId = 'ai-runner'
 ): number => {
   if (trackId === 'player') {
-    return signal === 'challenge' ? 4 : 0;
+    return 4;
   }
 
   const nextSignals = appendLegacyProgressionSignal(track, signal);
