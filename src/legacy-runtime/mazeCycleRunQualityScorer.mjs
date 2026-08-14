@@ -10,6 +10,11 @@ export const MAZE_CYCLE_RUN_QUALITY_AI_CHALLENGE_SCORE_THRESHOLD = 58;
 export const MAZE_CYCLE_RUN_QUALITY_AI_EASE_SCORE_THRESHOLD = 34;
 export const MAZE_CYCLE_RUN_QUALITY_AI_CHAOTIC_PRESSURE_THRESHOLD = 60;
 export const MAZE_CYCLE_RUN_QUALITY_AI_SEARCHING_EXHAUSTION_SCORE_CAP = 56;
+// The player-facing HUD publishes this total, so it must be the primary
+// advancement threshold for a completed player maze. Route mistakes are
+// already reflected in the weighted score; only explicit failure conditions
+// below may override it.
+export const MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD = 70;
 
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -123,10 +128,14 @@ const scoreBaseRunQuality = (input, complexity) => {
   ) {
     signal = 'ease';
   } else if (
-    total >= 72
-    && wrongTurns <= 1
-    && backtracks <= 1
-    && routeEfficiencyPressureScore <= 25
+    (!isMenuDemo && total >= MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD)
+    || (
+      isMenuDemo
+      && total >= 72
+      && wrongTurns <= 1
+      && backtracks <= 1
+      && routeEfficiencyPressureScore <= 25
+    )
   ) {
     signal = 'challenge';
   }

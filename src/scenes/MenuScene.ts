@@ -190,8 +190,10 @@ import {
   recordMazeCycleTelemetryReceipt,
   summarizeMazeCycleTelemetryDiagnostics,
   type MazeCycleTelemetryHistory,
+  type MazeCycleTelemetryReceipt,
   type MazeCycleTelemetrySurface
 } from '../legacy-runtime/mazeCycleTelemetry';
+import { MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD } from '../legacy-runtime/mazeCycleRunQualityScorer.mjs';
 import {
   LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH,
   LEGACY_PROGRESSION_STORAGE_KEY,
@@ -10895,7 +10897,29 @@ export class MenuScene extends Phaser.Scene {
     this.playCyclePath = [firstPoint, ...tail.map(copyPoint)];
   }
 
-  private publishLegacyPlayerProgressionCompletion(previousTrack: LegacyProgressionTrack): void {
+  private resolveLegacyPlayerProgressionOutcomeReason(receipt: MazeCycleTelemetryReceipt, score: number): string {
+    if (receipt.resetUsed) {
+      return 'Finish the maze without resetting to advance.';
+    }
+    if (receipt.wrongTurns >= 6) {
+      return `${receipt.wrongTurns} wrong turns triggered a difficulty ease; keep them below 6 to advance.`;
+    }
+    if (receipt.backtracks >= 6) {
+      return `${receipt.backtracks} backtracks triggered a difficulty ease; keep them below 6 to advance.`;
+    }
+    if (receipt.routeEfficiencyPressureScore >= 75) {
+      return 'Your route was much longer than the viable path; take a more direct route to advance.';
+    }
+    if (score < MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD) {
+      return `Reach ${MAZE_CYCLE_RUN_QUALITY_PLAYER_CHALLENGE_SCORE_THRESHOLD}+ to advance.`;
+    }
+    return 'Keep the next clear steady to advance.';
+  }
+
+  private publishLegacyPlayerProgressionCompletion(
+    previousTrack: LegacyProgressionTrack,
+    receipt: MazeCycleTelemetryReceipt
+  ): void {
     const track = this.progressionState.tracks.player;
     if (track.completedCycles <= previousTrack.completedCycles) {
       return;
@@ -10903,20 +10927,26 @@ export class MenuScene extends Phaser.Scene {
 
     const pacing = summarizeLegacyProgressionPacing(track, resolveLegacyMazeComplexity(this.maze).total);
     const targetDelta = track.targetComplexity - previousTrack.targetComplexity;
-    const copy = track.level > previousTrack.level
-      ? `Maze ${track.level} unlocked. Rank ${track.rank}.`
-      : targetDelta > 0 && pacing.complexityUntilNextLevel > 0
-        ? `Maze ${track.level} cleared. ${pacing.complexityUntilNextLevel} steps to Maze ${track.level + 1}.`
-        : targetDelta < 0
-          ? `Maze ${track.level} cleared. Next maze tuned to your run.`
-          : `Maze ${track.level} cleared. Progress is steady.`;
+    const score = clampInteger(Math.round(track.paceScore), 0, 100);
+    const reason = this.resolveLegacyPlayerProgressionOutcomeReason(receipt, score);
+    const levelOrRankAdvanced = track.level > previousTrack.level || track.rank !== previousTrack.rank;
+    const levelOrRankDropped = track.level < previousTrack.level || track.rank !== previousTrack.rank;
+    const copy = targetDelta > 0
+      ? levelOrRankAdvanced
+        ? `Great clear — Maze ${track.level} unlocked. Rank ${track.rank}. Score ${score}/100.`
+        : `Nice clear — progress advanced. Score ${score}/100. ${pacing.complexityUntilNextLevel} steps to Maze ${track.level + 1}.`
+      : targetDelta < 0
+        ? levelOrRankDropped
+          ? `Maze cleared, but you dropped to Maze ${track.level}, Rank ${track.rank}. ${reason}`
+          : `Maze cleared, but the next maze eased. ${reason}`
+        : `Maze cleared. Score ${score}/100 — progress held. ${reason}`;
 
     this.pushLegacyPlayerMessage(createLegacyPlayerMessage({
       copy,
       durationMs: 3_400,
       id: `progression.player.cycle.${track.completedCycles}`,
       source: 'progression',
-      tone: 'success'
+      tone: targetDelta > 0 ? 'success' : targetDelta < 0 ? 'warning' : 'info'
     }));
   }
 
@@ -10977,7 +11007,7 @@ export class MenuScene extends Phaser.Scene {
         this.maze
       );
       if (surface === 'play') {
-        this.publishLegacyPlayerProgressionCompletion(previousPlayerTrack);
+        this.publishLegacyPlayerProgressionCompletion(previousPlayerTrack, latestReceipt);
       }
       void writeLegacyRemoteCycleReceipt(this.authSnapshot, latestReceipt)
         .then((result) => {
