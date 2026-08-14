@@ -9,6 +9,7 @@ import {
 } from '../../src/legacy-runtime/legacyProgression';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
 import type { MazeCycleTelemetryHistory } from '../../src/legacy-runtime/mazeCycleTelemetry';
+import type { LegacyRemoteProgressionSyncResult } from '../../src/legacy-runtime/legacyRemoteProgression';
 
 vi.mock('phaser', () => ({
   default: {
@@ -52,6 +53,15 @@ const publishLegacyPlayerProgressionCompletion = (
   }
 ).publishLegacyPlayerProgressionCompletion;
 
+const publishLegacyRemoteSyncResult = (
+  MenuScene.prototype as unknown as {
+    publishLegacyRemoteSyncResult: (
+      this: PlayerProgressionSceneHarness,
+      result: LegacyRemoteProgressionSyncResult
+    ) => void;
+  }
+).publishLegacyRemoteSyncResult;
+
 const armLegacyMenuStaticDeconstructStage = (
   MenuScene.prototype as unknown as {
     armLegacyMenuStaticDeconstructStage: (this: PlayerProgressionSceneHarness, time: number) => void;
@@ -65,6 +75,7 @@ interface PlayerProgressionSceneHarness {
   maze: LegacyMazeSnapshot;
   mazeCycleTelemetryHistory: MazeCycleTelemetryHistory;
   mazeSeed: number;
+  latestRemoteSyncResult: LegacyRemoteProgressionSyncResult | null;
   menuDemoCompletedAtMs: number | null;
   menuDemoCycleRecorded: boolean;
   menuDemoCycleStartedAtMs: number;
@@ -170,6 +181,7 @@ const createScene = (): { scene: PlayerProgressionSceneHarness; storage: MemoryS
     maze,
     mazeCycleTelemetryHistory: { receipts: [], version: 1 },
     mazeSeed: maze.seed,
+    latestRemoteSyncResult: null,
     menuDemoCompletedAtMs: null,
     menuDemoCycleRecorded: false,
     menuDemoCycleStartedAtMs: 0,
@@ -276,5 +288,28 @@ describe('player progression completion flow', () => {
       copy: 'Maze 6 unlocked. Rank D.',
       id: 'progression.player.cycle.4'
     }));
+  });
+
+  test('keeps local and cloud persistence outcomes out of player messaging while retaining diagnostics', () => {
+    const { scene } = createScene();
+    const result: LegacyRemoteProgressionSyncResult = {
+      error: 'network unavailable',
+      playerMessage: {
+        copy: 'Progress saved locally. Cloud sync will retry later.',
+        durationMs: 2_400,
+        id: 'remote.progression.error',
+        source: 'progression',
+        technicalDetail: 'network unavailable',
+        tone: 'warning'
+      },
+      skippedReason: null,
+      synced: false
+    };
+
+    publishLegacyRemoteSyncResult.call(scene, result);
+
+    expect(scene.latestRemoteSyncResult).toBe(result);
+    expect(scene.pushLegacyPlayerMessage).not.toHaveBeenCalled();
+    expect(scene.visualDiagnosticsLastPublishedAtMs).toBe(Number.NEGATIVE_INFINITY);
   });
 });

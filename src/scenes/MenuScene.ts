@@ -11056,7 +11056,9 @@ export class MenuScene extends Phaser.Scene {
 
   private publishLegacyRemoteSyncResult(result: LegacyRemoteProgressionSyncResult): void {
     this.latestRemoteSyncResult = result;
-    this.pushLegacyPlayerMessage(result.playerMessage);
+    // Sync is deliberately silent for players. The full outcome remains in
+    // diagnostics so failed writes can be observed and retried without turning
+    // routine local persistence or cloud availability into gameplay chrome.
     this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 

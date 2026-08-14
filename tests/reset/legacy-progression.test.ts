@@ -444,7 +444,7 @@ describe('legacy progression', () => {
     expect(state.tracks['ai-runner'].struggleCycles).toBe(0);
   });
 
-  test('uses shortest-path waste and render safety in the progression score', () => {
+  test('uses shortest-path waste for player progression and reserves render safety for the AI demo', () => {
     const storage = new MemoryStorage();
     const maze = createProgressionTestMaze();
     const complexity = resolveLegacyMazeComplexity(maze).total;
@@ -488,20 +488,71 @@ describe('legacy progression', () => {
       backtracks: 0,
       wrongTurns: 0
     });
+    const unsafeAiFrameReceipt = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 34,
+      aiDecisionSummary: {
+        backtrackCount: 0,
+        decisionCount: maze.solutionPath.length,
+        optionalRetargetCount: 0,
+        recoveryCount: 0,
+        thinkingModel: 'legacy-source',
+        visitedUndoCount: 0,
+        wrongBranchCount: 0
+      },
+      completedAt: '2026-07-08T12:02:00.000Z',
+      completionTimeMs: 8000,
+      controlMode: 'stick',
+      maze,
+      playerPath: maze.solutionPath,
+      resetUsed: false,
+      surface: 'menu-demo',
+      backtracks: 0,
+      wrongTurns: 0
+    });
 
     expect(routeWasteReceipt.shortestViablePathLength).toBe(maze.solutionPath.length);
     expect(routeWasteReceipt.routeEfficiencyPressureScore).toBeGreaterThanOrEqual(75);
     expect(resolveLegacyProgressionPerformanceScore(efficientReceipt, complexity).signal).toBe('challenge');
     expect(resolveLegacyProgressionPerformanceScore(routeWasteReceipt, complexity).signal).toBe('ease');
-    expect(resolveLegacyProgressionPerformanceScore(unsafeFrameReceipt, complexity).signal).toBe('hold');
+    expect(resolveLegacyProgressionPerformanceScore(unsafeFrameReceipt, complexity).signal).toBe('challenge');
+    expect(resolveLegacyProgressionPerformanceScore(unsafeAiFrameReceipt, complexity).signal).toBe('hold');
 
     let state = recordLegacyProgressionCycle(storage, createEmptyLegacyProgressionState(), routeWasteReceipt, maze);
     expect(state.tracks.player.lastSignal).toBe('ease');
     expect(state.tracks.player.targetComplexity).toBe(22);
 
     state = recordLegacyProgressionCycle(storage, createEmptyLegacyProgressionState(), unsafeFrameReceipt, maze);
-    expect(state.tracks.player.lastSignal).toBe('hold');
-    expect(state.tracks.player.targetComplexity).toBe(24);
+    expect(state.tracks.player.lastSignal).toBe('challenge');
+    expect(state.tracks.player.targetComplexity).toBe(26);
+  });
+
+  test('advances player level and rank across high-quality runs on a slower device', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    let state = createEmptyLegacyProgressionState();
+
+    for (const [index, averageFrameMs] of [24, 30, 34].entries()) {
+      state = recordLegacyProgressionCycle(storage, state, createMazeCycleTelemetryReceipt({
+        averageFrameMs,
+        completedAt: `2026-07-08T12:0${index}:00.000Z`,
+        completionTimeMs: 8_000,
+        controlMode: 'stick',
+        maze,
+        playerPath: maze.solutionPath,
+        resetUsed: false,
+        surface: 'play',
+        backtracks: 0,
+        wrongTurns: 0
+      }), maze);
+    }
+
+    expect(state.tracks.player).toMatchObject({
+      completedCycles: 3,
+      lastSignal: 'challenge',
+      level: 7,
+      rank: 'D',
+      targetComplexity: 32
+    });
   });
 
   test('paces level changes from a recent signal window instead of only the latest cycle', () => {

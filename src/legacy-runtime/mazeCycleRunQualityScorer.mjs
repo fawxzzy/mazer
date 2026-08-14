@@ -81,6 +81,7 @@ const scoreBaseRunQuality = (input, complexity) => {
     shortestPath.shortestViablePathLength
   );
   const averageFrameMs = normalizeNumber(input.averageFrameMs);
+  const isMenuDemo = input.surface === 'menu-demo';
   const renderSafetyPenaltyScore = scoreMazeCycleRenderSafetyPenalty(averageFrameMs);
   const wrongTurns = normalizeCount(input.wrongTurns);
   const backtracks = normalizeCount(input.backtracks);
@@ -103,11 +104,14 @@ const scoreBaseRunQuality = (input, complexity) => {
   );
   const timeStruggleCap = timeScore <= 5 && (wrongTurns >= 2 || backtracks >= 2) ? 28 : 100;
   const resetStruggleCap = resetUsed ? 36 : 100;
-  const unsafeRenderCap = stabilityScore <= 25 ? 62 : 100;
+  // Browser frame pacing is a renderer health signal, not a player-skill signal.
+  // Keep it in the menu-demo calibration, where the AI owns both movement and
+  // rendering, but never let a slower player device block earned progression.
+  const unsafeRenderCap = isMenuDemo && stabilityScore <= 25 ? 62 : 100;
   const total = clampInteger(Math.min(weightedTotal, timeStruggleCap, resetStruggleCap, unsafeRenderCap));
   let signal = 'hold';
 
-  if (stabilityScore <= 25 || averageFrameMs >= 24) {
+  if (isMenuDemo && (stabilityScore <= 25 || averageFrameMs >= 24)) {
     signal = 'hold';
   } else if (
     resetUsed
