@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import '../styles/base.css';
 import { bootstrapLegacyRemoteAccountState } from '../legacy-runtime/legacyRemoteProgression';
+import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { installMazerPortraitLock, shouldBlockMazerLandscape } from './orientationLock';
 import { createMazerPhaserConfig } from './phaserConfig';
@@ -97,6 +98,7 @@ const boot = async (): Promise<void> => {
   markMazerBootStatus('game-creating');
   game = new Phaser.Game(createMazerPhaserConfig(viewportGeometry.getSnapshot().content));
   attachMazerGameToWindow(game);
+  installMazerAccessibilitySurface(document, game.canvas);
   viewportGeometry.subscribe((geometry) => {
     if (game) {
       syncMazerGameToViewport(game, geometry);
