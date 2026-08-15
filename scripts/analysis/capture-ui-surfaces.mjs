@@ -1009,21 +1009,21 @@ const collectMenuControlSpacingIssues = (surface) => {
     return [];
   }
 
-  const startButton = (surface.buttons ?? []).find((button) => button?.text === 'Start' && isFiniteBounds(button?.bounds));
-  const badge = surface.progressionBadge;
-  if (!startButton || !badge?.bounds) {
-    return [];
+  const settings = (surface.buttons ?? []).find((button) => button?.text === 'Settings' && button?.iconOnly === true);
+  const issues = [];
+  if (surface.progressionBadge?.bounds) {
+    issues.push('menu:unexpected-progression-badge');
   }
-
-  const buttonTop = startButton.bounds.top;
-  const badgeGap = buttonTop - badge.bounds.bottom;
-  return badgeGap < 10
-    ? [`menu:progressionBadge-to-buttons-gap=${badgeGap.toFixed(1)}<10`]
-    : [];
+  if (!isFiniteBounds(settings?.bounds)) {
+    issues.push('menu:missing-settings-control');
+  } else if (settings.bounds.width < 44 || settings.bounds.height < 44) {
+    issues.push(`menu:settings-target=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}<44`);
+  }
+  return issues;
 };
 
 const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {
-  if (surface?.skipped === true || surface?.overlay !== 'none') {
+  if (surface?.skipped === true || surface?.overlay !== 'none' || surface?.mode !== 'play') {
     return [];
   }
 
@@ -1038,25 +1038,15 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
     issues.push(`${surfaceId}:progression-badge-outside-viewport`);
   }
 
-  if (surface.mode === 'menu') {
-    const settings = (surface.buttons ?? []).find((button) => button?.text === 'Settings' && button?.iconOnly === true);
-    if (badge.bottom > board.top - 4) {
-      issues.push(`${surfaceId}:progression-badge-not-above-menu-board`);
-    }
-    if (isFiniteBounds(settings?.bounds) && settings.bounds.left - badge.right < 8) {
-      issues.push(`${surfaceId}:progression-badge-to-settings-gap=${(settings.bounds.left - badge.right).toFixed(1)}<8`);
-    }
-  } else if (surface.mode === 'play' && badge.width > board.width + 1) {
+  if (badge.width > board.width + 1) {
     issues.push(`${surfaceId}:progression-badge-width=${badge.width.toFixed(1)}>board=${board.width.toFixed(1)}`);
   }
-  if (surface.mode === 'play') {
-    const pause = surface.touchControls?.controls?.pause;
-    if (badge.bottom > board.top - 8) {
-      issues.push(`${surfaceId}:progression-badge-not-above-play-board`);
-    }
-    if (isFiniteBounds(pause) && pause.left - badge.right < 8) {
-      issues.push(`${surfaceId}:progression-badge-to-pause-gap=${(pause.left - badge.right).toFixed(1)}<8`);
-    }
+  const pause = surface.touchControls?.controls?.pause;
+  if (badge.bottom > board.top - 8) {
+    issues.push(`${surfaceId}:progression-badge-not-above-play-board`);
+  }
+  if (isFiniteBounds(pause) && pause.left - badge.right < 8) {
+    issues.push(`${surfaceId}:progression-badge-to-pause-gap=${(pause.left - badge.right).toFixed(1)}<8`);
   }
   return issues;
 };
@@ -1444,7 +1434,6 @@ const buildSurfaceChecks = ({
     ...collectMenuControlSpacingIssues(surfaces.menu)
   ];
   const badgeGeometryIssues = [
-    ...collectProgressionBadgeGeometryIssues('menu', surfaces.menu, viewport),
     ...collectProgressionBadgeGeometryIssues('play', surfaces.play, viewport)
   ];
   const overlayScrollIssues = [
@@ -1492,7 +1481,6 @@ const buildSurfaceChecks = ({
   ));
   const menuTitle = surfaces.menu.title;
   const badgeFitIssues = [
-    ['menu', surfaces.menu],
     ['play', surfaces.play]
   ].flatMap(([id, surface]) => {
     const badge = surface.progressionBadge;
@@ -1681,17 +1669,17 @@ const buildSurfaceChecks = ({
     createCheck(
       'mobile-control-spacing',
       controlSpacingIssues.length === 0,
-      controlSpacingIssues.length === 0 ? 'menu controls keep readable spacing' : controlSpacingIssues.join('; ')
+      controlSpacingIssues.length === 0 ? 'menu has no level box and Settings keeps a 44px target' : controlSpacingIssues.join('; ')
     ),
     createCheck(
       'mobile-badge-text-fit',
       badgeFitIssues.length === 0,
-      badgeFitIssues.length === 0 ? 'visible progression badges fit their chrome' : badgeFitIssues.join('; ')
+      badgeFitIssues.length === 0 ? 'the active-play level glyph fits its chrome' : badgeFitIssues.join('; ')
     ),
     createCheck(
       'progression-badge-geometry',
       badgeGeometryIssues.length === 0,
-      badgeGeometryIssues.length === 0 ? 'progression badges respect maze width, viewport, and pause lanes' : badgeGeometryIssues.join('; ')
+      badgeGeometryIssues.length === 0 ? 'the active-play level glyph respects the maze width, viewport, and cog lane' : badgeGeometryIssues.join('; ')
     ),
     createCheck(
       'mobile-overlay-scroll-affordance',

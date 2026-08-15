@@ -174,8 +174,11 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const collectTextOverlapIssues = (surfaceId, surface) => {');
     expect(source).toContain('const collectMenuControlSpacingIssues = (surface) => {');
     expect(source).toContain('const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {');
+    expect(source).toContain("issues.push('menu:unexpected-progression-badge');");
+    expect(source).toContain("surface?.mode !== 'play'");
     expect(source).toContain('badge.width > board.width + 1');
     expect(source).toContain('progression-badge-not-above-play-board');
+    expect(source).not.toContain('progression-badge-not-above-menu-board');
     expect(source).toContain('progression-badge-to-pause-gap=');
     expect(source).toContain("'progression-badge-geometry'");
     expect(source).toContain("createCheck(\n      'mobile-text-label-bounds'");
@@ -223,7 +226,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('progressionBadge: play.diagnostics.visual?.progressionBadge');
     expect(source).toContain('generation: play.diagnostics.runtime?.generation');
     expect(source).toContain('all active text labels stay inside viewport');
-    expect(source).toContain('visible progression badges fit their chrome');
+    expect(source).toContain('the active-play level glyph fits its chrome');
     expect(source).toContain("deviceScaleFactor: parseIntegerArg(args['device-scale-factor'], DEFAULT_DEVICE_SCALE_FACTOR)");
     expect(source).toContain("reducedMotion: args['reduced-motion'] === true || args['reduced-motion'] === 'true'");
     expect(source).toContain("reducedMotion: options.reducedMotion ? 'reduce' : 'no-preference'");
