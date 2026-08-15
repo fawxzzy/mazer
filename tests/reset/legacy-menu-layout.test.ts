@@ -3,6 +3,7 @@ import { resolveTouchControlLayout } from '../../src/input-human';
 import {
   resolveLegacyMenuLayout
 } from '../../src/legacy-runtime/legacyMenuLayout';
+import { LEGACY_UI_MIN_TOUCH_TARGET } from '../../src/legacy-runtime/legacyUiStandards';
 import {
   resolveLegacyMenuPathTitleLayout,
   resolveLegacyMenuPathTitleOrbitGeometry,
@@ -190,6 +191,7 @@ describe('legacy menu layout', () => {
       expect(layout.rightButtonX).toBeGreaterThan(layout.centerButtonX);
       expect(layout.leftButtonX - (layout.buttonWidth / 2)).toBeGreaterThanOrEqual(8);
       expect(layout.rightButtonX + (layout.buttonWidth / 2)).toBeLessThanOrEqual(layout.width - 8);
+      expect(layout.buttonHeight).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
       expect(layout.boardLeft).toBeGreaterThanOrEqual(8);
       expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width - 8);
       expect(layout.titleY).toBeLessThan(layout.boardTop);

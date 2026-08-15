@@ -1,4 +1,5 @@
 import { clampInteger } from './legacyDefaults';
+import { LEGACY_UI_MIN_TOUCH_TARGET } from './legacyUiStandards';
 
 export interface LegacyMenuLayout {
   width: number;
@@ -80,7 +81,17 @@ export const resolveLegacyMenuLayout = (
     && !isUltraNarrow
     && (width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH || options.browserMobileParity === true);
   const isShortLandscapeMenu = !isPlaySurface && !isPortrait && height < 820;
-  const buttonHeight = Math.round(clamp(height * (isPortrait ? 0.05 : 0.066), isPortrait ? 42 : 58, isPortrait ? 62 : 78));
+  // The 172px diagnostic side panel cannot fit two 44px actions plus the maze
+  // without overlap. Preserve that constrained fallback; normal phone layouts
+  // use the canonical touch target below.
+  const minimumMenuActionHeight = isUltraNarrow
+    ? 42
+    : (isPortrait ? LEGACY_UI_MIN_TOUCH_TARGET : 58);
+  const buttonHeight = Math.round(clamp(
+    height * (isPortrait ? 0.05 : 0.066),
+    minimumMenuActionHeight,
+    isPortrait ? 62 : 78
+  ));
   const stackGap = Math.round(clamp(height * 0.02, 7, 12));
   const laneGap = isUltraNarrow ? 4 : 8;
   const menuActionGap = isUltraNarrow ? laneGap : 10;

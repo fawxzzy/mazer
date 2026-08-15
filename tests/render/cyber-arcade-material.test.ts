@@ -10,7 +10,7 @@ import {
   summarizeCyberArcadeMaterial
 } from '../../src/render/cyberArcadeMaterial';
 import { MAZER_ICON_QUALITY_TARGET } from '../../src/brand/mazerIconQualityTarget';
-import { phaserMaterialAliases } from '../../src/theme/tokens';
+import { designTokens, phaserMaterialAliases } from '../../src/theme/tokens';
 
 describe('cyber arcade material', () => {
   test('publishes the approved icon target and every shared runtime surface role', () => {
@@ -39,6 +39,22 @@ describe('cyber arcade material', () => {
     expect(cyberArcadeMaterial.shine).toEqual({
       core: phaserMaterialAliases['text.primary'],
       edge: phaserMaterialAliases['world.pathCore']
+    });
+    expect(cyberArcadeMaterial.typography).toEqual({
+      metrics: designTokens.fonts.metrics,
+      title: designTokens.fonts.title,
+      ui: designTokens.fonts.ui
+    });
+    expect(cyberArcadeMaterial.controls).toEqual({
+      minimumTouchTarget: designTokens.touchTargetMinPx,
+      panelRadius: designTokens.radiusPx.panel,
+      preferredTouchTarget: designTokens.preferredTouchTargetPx,
+      radius: designTokens.radiusPx.control,
+      sheetRadius: designTokens.radiusPx.sheet
+    });
+    expect(cyberArcadeMaterial.motion).toEqual({
+      panelMs: designTokens.motionMs.panel,
+      pressMs: designTokens.motionMs.press
     });
   });
 

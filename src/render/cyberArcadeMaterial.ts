@@ -2,7 +2,7 @@ import {
   MAZER_ICON_QUALITY_TARGET,
   MAZER_ICON_QUALITY_TARGET_VERSION
 } from '../brand/mazerIconQualityTarget';
-import { phaserMaterialAliases } from '../theme/tokens';
+import { designTokens, phaserMaterialAliases } from '../theme/tokens';
 
 /**
  * The live Phaser material is deliberately fed from the same token registry as
@@ -53,6 +53,22 @@ export const cyberArcadeMaterial = Object.freeze({
   shine: Object.freeze({
     core: color['text.primary'],
     edge: color['world.pathCore']
+  }),
+  typography: Object.freeze({
+    metrics: designTokens.fonts.metrics,
+    title: designTokens.fonts.title,
+    ui: designTokens.fonts.ui
+  }),
+  controls: Object.freeze({
+    minimumTouchTarget: designTokens.touchTargetMinPx,
+    panelRadius: designTokens.radiusPx.panel,
+    preferredTouchTarget: designTokens.preferredTouchTargetPx,
+    radius: designTokens.radiusPx.control,
+    sheetRadius: designTokens.radiusPx.sheet
+  }),
+  motion: Object.freeze({
+    panelMs: designTokens.motionMs.panel,
+    pressMs: designTokens.motionMs.press
   }),
   geometry: Object.freeze({
     fillAlignment: 'integer-logical-pixels',
@@ -126,5 +142,8 @@ export const summarizeCyberArcadeMaterial = () => ({
   iconTargetSha256: MAZER_ICON_QUALITY_TARGET.canonicalAsset.sha256,
   iconQualityTargetVersion: MAZER_ICON_QUALITY_TARGET_VERSION,
   surfaceRoles: [...CYBER_ARCADE_MATERIAL_SURFACE_ROLES],
+  typography: { ...cyberArcadeMaterial.typography },
+  controls: { ...cyberArcadeMaterial.controls },
+  motion: { ...cyberArcadeMaterial.motion },
   geometry: { ...cyberArcadeMaterial.geometry }
 });

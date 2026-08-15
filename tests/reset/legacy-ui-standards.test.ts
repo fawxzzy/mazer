@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   LEGACY_UI_COMPACT_BREAKPOINT,
+  LEGACY_UI_MIN_TOUCH_TARGET,
   resolveLegacyFeatureControlLayout,
   resolveLegacyOverlayContentFlowLayout,
   resolveLegacyOverlayPanelLayout,
@@ -30,7 +31,7 @@ describe('legacy UI standards', () => {
     });
   });
 
-  test('uses one header, scroll, and action rhythm for phone overlays', () => {
+  test('uses one header, scroll, and minimum-touch action rhythm for phone overlays', () => {
     const panel = resolveLegacyOverlayPanelLayout(390, 844);
 
     expect(resolveLegacyOverlayShellLayout({
@@ -39,14 +40,15 @@ describe('legacy UI standards', () => {
       hasMessage: false,
       panel
     })).toEqual({
-      actionCenterY: 795,
-      contentHeight: 626,
+      actionCenterY: 794,
+      contentHeight: 622,
       contentLeft: 24,
       contentTop: 84,
       contentWidth: 342,
       messageCenterY: 90,
       titleCenterY: 60
     });
+    expect(LEGACY_UI_MIN_TOUCH_TARGET).toBe(44);
   });
 
   test('uses one two-row run-status component in menu and play lanes', () => {
@@ -116,6 +118,21 @@ describe('legacy UI standards', () => {
   test('places guide, controls, and account action in one measured scroll flow', () => {
     expect(resolveLegacyOverlayContentFlowLayout({
       actionHeight: 44,
+      contentTop: 100,
+      controlsHeight: 300,
+      guideHeight: 220,
+      panelWidth: 360
+    })).toEqual({
+      actionCenterY: 666,
+      contentHeight: 592,
+      controlsTop: 334,
+      guideTop: 104
+    });
+  });
+
+  test('does not allow a positive overlay action request below the mobile touch target', () => {
+    expect(resolveLegacyOverlayContentFlowLayout({
+      actionHeight: 42,
       contentTop: 100,
       controlsHeight: 300,
       guideHeight: 220,
