@@ -69,7 +69,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(phaserConfigSource).not.toContain('forceSetTimeOut: true');
   });
 
-  test('keeps the Options overlay player guide simple and player-facing', () => {
+  test('keeps the Settings and Pause overlays compact, player-facing, and grouped by purpose', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
     const buildOptionsSource = menuSceneSource.slice(
       menuSceneSource.indexOf('private buildOptionsOverlay(): void {'),
@@ -86,7 +86,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
     expect(menuSceneSource).toContain('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {');
-    expect(menuSceneSource).toContain("addText('PLAYER GUIDE'");
+    expect(menuSceneSource).toContain("addText('QUICK PLAY'");
     expect(buildOptionsSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
       buildOptionsSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel')
     );
@@ -96,13 +96,20 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(guideSource).toContain("drawLegendRow(0, 'compass', 'Compass'");
     expect(guideSource).toContain("drawLegendRow(1, 'start', 'Start'");
     expect(guideSource).toContain("drawLegendRow(2, 'end', 'Exit'");
-    expect(guideSource).toContain("'Player • green trail'");
-    expect(guideSource).toContain("'Score • run quality'");
+    expect(guideSource).toContain("'follow it to the exit'");
+    expect(guideSource).toContain("'begin at gold'");
+    expect(guideSource).toContain("'finish at red'");
+    expect(guideSource).not.toContain("'Player • green trail'");
+    expect(guideSource).not.toContain("'Score • run quality'");
     expect(guideSource).not.toContain('activeTargetComplexity');
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
     expect(menuSceneSource).toContain('private drawLegacyCompassGlyph(');
     expect(menuSceneSource).toContain('drawLegacyOptionsGuideGlyph');
+    expect(menuSceneSource).toContain("addSectionHeading('Controls'");
+    expect(menuSceneSource).toContain("addSectionHeading('Display'");
+    expect(menuSceneSource).toContain("label: 'Animated Background'");
+    expect(menuSceneSource).toContain("label: 'High Contrast'");
   });
 
   test('aligns title orbit diamonds through the fixed top and bottom crown diamonds', () => {
@@ -1422,13 +1429,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
     expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
     expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);');
-    expect(menuSceneSource).toContain("addText('PLAYER GUIDE', cardCenterX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);");
-    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'points to exit', '#b7f2ff');");
-    expect(menuSceneSource).toContain("'Player • green trail'");
+    expect(menuSceneSource).toContain("addText('QUICK PLAY', cardCenterX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);");
+    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', '#b7f2ff');");
+    expect(menuSceneSource).not.toContain("'Player • green trail'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
-    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`");
-    expect(menuSceneSource).toContain("'Score • run quality'");
-    expect(menuSceneSource).toContain("'Maze • difficulty'");
+    expect(menuSceneSource).not.toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`");
+    expect(menuSceneSource).not.toContain("'Score • run quality'");
+    expect(menuSceneSource).not.toContain("'Maze • difficulty'");
     expect(menuSceneSource).not.toContain('the current procedural challenge tier');
   });
 
