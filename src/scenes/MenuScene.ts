@@ -113,6 +113,11 @@ import {
 } from '../legacy-runtime/legacyPathVisualStyle';
 import { resolveLegacyMenuButtonChrome } from '../legacy-runtime/legacyMenuButtonChrome';
 import {
+  resolveLegacyHeaderControlFrame,
+  resolveLegacyHeaderControlMetricFontSize,
+  type LegacyHeaderControlFrame
+} from '../legacy-runtime/legacyHeaderControl';
+import {
   resolveLegacyFeatureControlLayout,
   resolveLegacyOverlayContentFlowLayout,
   resolveLegacyOverlayPanelLayout,
@@ -1195,6 +1200,7 @@ export class MenuScene extends Phaser.Scene {
   private progressionBadgeBounds: VisualRect | null = null;
   private progressionBadgeTextBounds: VisualRect | null = null;
   private progressionBadgeTextFits = false;
+  private progressionBadgePulseStartedAtMs: number | null = null;
   private menuCompassBounds: VisualRect | null = null;
   private backdropGraphics!: Phaser.GameObjects.Graphics;
   private boardStaticGraphics!: Phaser.GameObjects.Graphics;
@@ -1639,6 +1645,9 @@ export class MenuScene extends Phaser.Scene {
       }
     }
     if (this.hasLegacyBoardCornerShimmerPendingFrame(time)) {
+      this.boardDynamicDirty = true;
+    }
+    if (this.hasLegacyProgressionBadgePulsePendingFrame(time)) {
       this.boardDynamicDirty = true;
     }
     const slowTilePhase = resolveLegacyStaticSlowTilePhase(
@@ -6914,34 +6923,29 @@ export class MenuScene extends Phaser.Scene {
     track: LegacyProgressionState['tracks'][LegacyProgressionTrackId],
     palette: LegacyProgressionPalette
   ): VisualRect {
-    const size = clampInteger(Math.round(Math.min(this.layout.width, this.layout.height) * 0.095), 38, 48);
-    const inset = Math.max(8, Math.round(size * 0.2));
-    const left = clampInteger(inset, 8, Math.max(8, this.layout.width - size - inset));
     const laneTop = this.layout.lanes.hud?.top ?? 0;
-    const laneHeight = this.layout.lanes.hud?.height ?? size + (inset * 2);
-    const top = clampInteger(
-      Math.round(laneTop + ((laneHeight - size) / 2)),
-      6,
-      Math.max(6, this.layout.height - size - 6)
-    );
-    const centerX = left + (size / 2);
-    const centerY = top + (size / 2);
-
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, 0.42);
-    this.boardDynamicGraphics.fillRoundedRect(left, top, size, size, Math.max(9, Math.round(size * 0.24)));
-    this.boardDynamicGraphics.lineStyle(2, palette.rankColor, 0.88);
-    this.boardDynamicGraphics.strokeRoundedRect(left, top, size, size, Math.max(9, Math.round(size * 0.24)));
+    const laneHeight = this.layout.lanes.hud?.height ?? 64;
+    const frame = resolveLegacyHeaderControlFrame({
+      height: this.layout.height,
+      hudHeight: laneHeight,
+      hudTop: laneTop,
+      placement: 'leading',
+      width: this.layout.width
+    });
+    const badgePulse = this.resolveLegacyProgressionBadgePulse();
+    this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);
     this.progressionBadgeText
       .setText(String(track.level))
-      .setFontSize(Math.max(18, Math.round(size * 0.5)))
+      .setFontSize(resolveLegacyHeaderControlMetricFontSize(track.level, frame.width))
       .setAlign('center')
       .setLineSpacing(0)
       .setPadding(0)
       .setColor(palette.badgeColor)
-      .setPosition(centerX, centerY)
+      .setPosition(frame.centerX, frame.centerY)
+      .setScale(badgePulse)
       .setVisible(true);
 
-    const badgeBounds = createVisualRect(left, top, size, size);
+    const badgeBounds = createVisualRect(frame.left, frame.top, frame.width, frame.height);
     const rawTextBounds = this.progressionBadgeText.getBounds();
     this.progressionBadgeBounds = badgeBounds;
     this.progressionBadgeTextBounds = createVisualRect(
@@ -6953,6 +6957,26 @@ export class MenuScene extends Phaser.Scene {
     this.progressionBadgeTextFits = true;
 
     return badgeBounds;
+  }
+
+  private hasLegacyProgressionBadgePulsePendingFrame(time: number): boolean {
+    if (this.progressionBadgePulseStartedAtMs === null || this.legacyReducedMotionEnabled === true) {
+      this.progressionBadgePulseStartedAtMs = null;
+      return false;
+    }
+    if (time - this.progressionBadgePulseStartedAtMs >= 420) {
+      this.progressionBadgePulseStartedAtMs = null;
+      return false;
+    }
+    return true;
+  }
+
+  private resolveLegacyProgressionBadgePulse(): number {
+    if (this.progressionBadgePulseStartedAtMs === null || this.legacyReducedMotionEnabled === true) {
+      return 1;
+    }
+    const progress = Math.max(0, Math.min(1, (this.time.now - this.progressionBadgePulseStartedAtMs) / 420));
+    return 1 + (Math.sin(progress * Math.PI) * 0.12);
   }
 
   private resolveLegacyPlayElapsedMs(): number {
@@ -8146,8 +8170,37 @@ export class MenuScene extends Phaser.Scene {
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
     active = false
   ): void {
-    this.drawLegacyTouchButtonChrome(graphics, rect, true, active);
+    this.drawLegacyHeaderControlChrome(
+      graphics,
+      rect,
+      active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,
+      active
+    );
     this.drawLegacySettingsCog(graphics, rect, active);
+  }
+
+  private drawLegacyHeaderControlChrome(
+    graphics: Phaser.GameObjects.Graphics,
+    rect: Pick<LegacyHeaderControlFrame, 'height' | 'left' | 'top' | 'width'>,
+    accentColor: number,
+    active = false
+  ): void {
+    const radius = Math.min(8, Math.max(6, Math.round(Math.min(rect.width, rect.height) * 0.18)));
+    const notchWidth = Math.max(4, Math.round(rect.width * 0.13));
+    const notchHeight = Math.max(2, Math.round(rect.height * 0.07));
+    graphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, active ? 0.64 : 0.46);
+    graphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
+    graphics.lineStyle(2, accentColor, active ? 0.96 : 0.86);
+    graphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
+    graphics.fillStyle(accentColor, active ? 0.88 : 0.62);
+    graphics.fillRect(rect.left + rect.width - notchWidth - 7, rect.top + 6, notchWidth, notchHeight);
+    graphics.lineStyle(1, 0xffffff, active ? 0.3 : 0.18);
+    graphics.lineBetween(
+      rect.left + 8,
+      rect.top + rect.height - 7,
+      rect.left + Math.round(rect.width * 0.42),
+      rect.top + rect.height - 7
+    );
   }
 
   private drawLegacyPlayTouchArrow(
@@ -10379,11 +10432,32 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createLegacyMenuSettingsCogButton(onClick: () => void): UiButton {
-    const pauseRect = this.resolveLegacyPlayTouchControlLayout().controls.pause;
+    const laneTop = this.layout.lanes.hud?.top ?? 0;
+    const pauseRect = resolveLegacyHeaderControlFrame({
+      height: this.layout.height,
+      hudHeight: this.layout.lanes.hud?.height ?? 64,
+      hudTop: laneTop,
+      placement: 'trailing',
+      width: this.layout.width
+    });
     const panel = this.add.graphics();
+    const icon = this.add.graphics();
+    icon.setPosition(pauseRect.centerX, pauseRect.centerY);
     const drawSettingsButton = (active: boolean): void => {
       panel.clear();
-      this.drawLegacySettingsCogControl(panel, pauseRect, active);
+      this.drawLegacyHeaderControlChrome(
+        panel,
+        pauseRect,
+        active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,
+        active
+      );
+      icon.clear();
+      this.drawLegacySettingsCog(icon, {
+        centerX: 0,
+        centerY: 0,
+        height: pauseRect.height,
+        width: pauseRect.width
+      }, active);
     };
     drawSettingsButton(false);
 
@@ -10400,8 +10474,22 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '18px'
     }).setOrigin(0.5).setVisible(false);
-    background.on('pointerover', () => drawSettingsButton(true));
-    background.on('pointerout', () => drawSettingsButton(false));
+    const setActive = (active: boolean): void => {
+      drawSettingsButton(active);
+      this.tweens.killTweensOf(icon);
+      if (this.prefersLegacyReducedMotion()) {
+        icon.setRotation(0);
+        return;
+      }
+      this.tweens.add({
+        duration: 140,
+        ease: active ? 'Sine.Out' : 'Sine.In',
+        rotation: active ? (Math.PI / 8) : 0,
+        targets: icon
+      });
+    };
+    background.on('pointerover', () => setActive(true));
+    background.on('pointerout', () => setActive(false));
     background.on('pointerdown', onClick);
 
     return {
@@ -10410,10 +10498,12 @@ export class MenuScene extends Phaser.Scene {
       iconOnly: true,
       label,
       semanticAction: 'Settings',
-      setActive: drawSettingsButton,
+      setActive,
       text: 'Settings',
       destroy: () => {
+        this.tweens.killTweensOf(icon);
         panel.destroy();
+        icon.destroy();
         background.destroy();
         label.destroy();
       }
@@ -10985,6 +11075,9 @@ export class MenuScene extends Phaser.Scene {
         latestReceipt,
         this.maze
       );
+      this.progressionBadgePulseStartedAtMs = this.legacyReducedMotionEnabled === true
+        ? null
+        : this.time.now;
       void writeLegacyRemoteCycleReceipt(this.authSnapshot, latestReceipt)
         .then((result) => {
           this.publishLegacyRemoteSyncResult(result);

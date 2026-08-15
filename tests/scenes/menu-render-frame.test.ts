@@ -796,6 +796,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('menuCompass: {');
     expect(menuSceneSource).toContain('return this.drawLegacyProgressionGlyph(this.progressionState.tracks[trackId], palette);');
     expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
+    expect(menuSceneSource).toContain("placement: 'leading'");
+    expect(menuSceneSource).toContain("placement: 'trailing'");
+    expect(menuSceneSource).toContain('resolveLegacyHeaderControlMetricFontSize(track.level, frame.width)');
+    expect(menuSceneSource).toContain('private drawLegacyHeaderControlChrome(');
+    expect(menuSceneSource).toContain('duration: 140,');
+    expect(menuSceneSource).toContain('this.prefersLegacyReducedMotion()');
     expect(menuSceneSource).not.toContain('resolveLegacyRunStatusPanelLayout');
     expect(menuSceneSource).not.toContain('resolveLegacyProgressionBadgeText');
     expect(menuSceneSource).not.toContain('portraitMenuBadgeTextOffset');
@@ -1250,7 +1256,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(preferenceSource).not.toContain('legacyWorldTurnHost');
   });
 
-  test('keeps front-door buttons in the shared cyber chrome path', () => {
+  test('keeps front-door buttons and header controls on their shared chrome paths', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const panel = this.add.graphics();');
@@ -1267,12 +1273,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).not.toContain('fillStyle(0x05070a');
     expect(menuSceneSource).toContain('private drawLegacySettingsCogControl(');
-    expect(menuSceneSource).toContain('this.drawLegacyTouchButtonChrome(graphics, rect, true, active);');
-    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(panel, pauseRect, active);');
+    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(\n        panel,\n        pauseRect,');
+    expect(menuSceneSource).toContain('active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCog(icon, {\n        centerX: 0,\n        centerY: 0,');
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
+    expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
-    expect(menuSceneSource).toContain('const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);');
-    expect(menuSceneSource).toContain('bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height)');
+    expect(menuSceneSource).toContain('const background = this.add.rectangle(\r\n      pauseRect.centerX,');
+    expect(menuSceneSource).toContain('bounds: createVisualRect(pauseRect.left, pauseRect.top, pauseRect.width, pauseRect.height)');
     expect(menuSceneSource).toContain('text,');
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
   });
@@ -1386,7 +1394,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.progressionBadgeText');
     expect(menuSceneSource).toContain('.setText(String(track.level))');
     expect(menuSceneSource).toContain('.setColor(palette.badgeColor)');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.strokeRoundedRect(left, top, size, size');
+    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);');
+    expect(menuSceneSource).toContain('resolveLegacyHeaderControlMetricFontSize(track.level, frame.width)');
   });
 
 
@@ -1408,9 +1417,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');
-    expect(menuSceneSource).toContain('const laneHeight = this.layout.lanes.hud?.height ?? size + (inset * 2);');
-    expect(menuSceneSource).toContain('const top = clampInteger(');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillRoundedRect(left, top, size, size');
+    expect(menuSceneSource).toContain('const laneHeight = this.layout.lanes.hud?.height ?? 64;');
+    expect(menuSceneSource).toContain('const frame = resolveLegacyHeaderControlFrame({');
+    expect(menuSceneSource).toContain("placement: 'leading'");
+    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayProgressionBadgeCenterY');
     expect(menuSceneSource).not.toContain('resolveLegacyMenuProgressionBadgeCenterY');
     expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');

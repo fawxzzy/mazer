@@ -1,0 +1,55 @@
+import { describe, expect, test } from 'vitest';
+import {
+  resolveLegacyHeaderControlFrame,
+  resolveLegacyHeaderControlMetricFontSize
+} from '../../src/legacy-runtime/legacyHeaderControl';
+
+describe('legacy header controls', () => {
+  test('uses one square size for the level and settings controls', () => {
+    const shared = {
+      height: 958,
+      hudHeight: 64,
+      hudTop: 0,
+      width: 405
+    };
+    const level = resolveLegacyHeaderControlFrame({ ...shared, placement: 'leading' });
+    const settings = resolveLegacyHeaderControlFrame({ ...shared, placement: 'trailing' });
+
+    expect(level.width).toBe(44);
+    expect(level.height).toBe(44);
+    expect(settings.width).toBe(level.width);
+    expect(settings.height).toBe(level.height);
+    expect(settings.top).toBe(level.top);
+    expect(settings.left).toBeGreaterThan(level.left);
+  });
+
+  test('stays in the declared compact range at phone and desktop sizes', () => {
+    const phone = resolveLegacyHeaderControlFrame({
+      height: 844,
+      hudHeight: 60,
+      hudTop: 0,
+      placement: 'leading',
+      width: 390
+    });
+    const desktop = resolveLegacyHeaderControlFrame({
+      height: 900,
+      hudHeight: 72,
+      hudTop: 0,
+      placement: 'leading',
+      width: 1440
+    });
+
+    expect(phone.width).toBe(44);
+    expect(desktop.width).toBe(48);
+    expect(desktop.left).toBeGreaterThanOrEqual(8);
+    expect(desktop.top).toBeGreaterThanOrEqual(6);
+  });
+
+  test('keeps current and future metric values readable without widening the square', () => {
+    expect(resolveLegacyHeaderControlMetricFontSize(7, 44)).toBeGreaterThan(
+      resolveLegacyHeaderControlMetricFontSize(99, 44)
+    );
+    expect(resolveLegacyHeaderControlMetricFontSize(99, 44)).toBeGreaterThanOrEqual(14);
+    expect(resolveLegacyHeaderControlMetricFontSize(100, 44)).toBeGreaterThanOrEqual(14);
+  });
+});
