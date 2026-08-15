@@ -609,16 +609,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.');
   });
 
-  test('keeps the Precision Arcade backdrop quiet while retaining historical effects outside the active renderer', () => {
+  test('restores a restrained animated backdrop without a full-screen perimeter frame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const backdropSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuBackdrop.ts'), 'utf8');
 
     expect(backdropSource).toContain('fieldColor: cyberArcadeMaterial.substrate.field');
     expect(backdropSource).toContain('fieldColor: cyberArcadeMaterial.substrate.fieldRaised');
-    expect(menuSceneSource).toContain('private readonly legacyPrecisionArcadeDecorationsEnabled = false;');
-    expect(menuSceneSource).toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
-    expect(menuSceneSource).toContain('this.stars = this.legacyPrecisionArcadeDecorationsEnabled');
-    expect(menuSceneSource).toContain('if (this.legacyPrecisionArcadeDecorationsEnabled) {');
+    expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
+    expect(menuSceneSource).not.toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
+    expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars().slice(0, LEGACY_MENU_STAR_COUNT);');
+    expect(menuSceneSource).toContain('const backdropMotionEnabled = this.settings.toggleAnimatedBackdrop && !this.prefersLegacyReducedMotion();');
     expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_SHARD_COUNT');
     expect(backdropSource).toContain('LEGACY_MENU_GLASS_SHARD_COUNT');
     expect(backdropSource).toContain('LEGACY_MENU_DRIFT_RUNE_COUNT');
@@ -628,7 +628,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('starMotion: LEGACY_MENU_BACKDROP_STAR_MOTION');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropGlassShards');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropDriftRunes');
-    expect(menuSceneSource).not.toContain('this.drawLegacyBackdropSigils(width, height, this.time.now);');
+    expect(menuSceneSource).toContain('this.drawLegacyBackdropSigils(width, height, animationTime);');
     expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(shard.color, shard.alpha * 0.038);');
     expect(backdropSource).toContain('const roundBackdropNumber = (value: number): number => Math.round(value * 1000) / 1000;');
     expect(backdropSource).toContain('const localPhase = phase * (0.16 + (index * 0.022)) + (index * 1.73);');
@@ -794,8 +794,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, radius);');
     expect(menuSceneSource).toContain('progressionBadge: {');
     expect(menuSceneSource).toContain('menuCompass: {');
-    expect(menuSceneSource).toContain('return this.drawLegacyPlayerProgressionGlyph(palette);');
-    expect(menuSceneSource).toContain('private drawLegacyPlayerProgressionGlyph(palette: LegacyProgressionPalette): VisualRect');
+    expect(menuSceneSource).toContain('return this.drawLegacyProgressionGlyph(this.progressionState.tracks[trackId], palette);');
+    expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
     expect(menuSceneSource).not.toContain('resolveLegacyRunStatusPanelLayout');
     expect(menuSceneSource).not.toContain('resolveLegacyProgressionBadgeText');
     expect(menuSceneSource).not.toContain('portraitMenuBadgeTextOffset');
@@ -1277,16 +1277,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
   });
 
-  test('keeps settings semantic while the compact level baseline stays free of board decorations', () => {
+  test('keeps settings semantic while the compact active-track level baseline stays free of board decorations', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain("this.createOverlayTitle('Settings', shell.titleCenterY);");
     expect(menuSceneSource).not.toContain("this.createOverlayTitle('Options', shell.titleCenterY);");
     expect(menuSceneSource).toContain("semanticAction: 'Settings'");
     expect(menuSceneSource).toContain("text: 'Settings'");
-    expect(menuSceneSource).toContain('private readonly legacyPrecisionArcadeDecorationsEnabled = false;');
-    expect(menuSceneSource).toContain('this.stars = this.legacyPrecisionArcadeDecorationsEnabled');
-    expect(menuSceneSource).toContain('if (this.legacyPrecisionArcadeDecorationsEnabled) {');
+    expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
+    expect(menuSceneSource).toContain('const trackId = this.resolveActiveLegacyProgressionTrackId();');
+    expect(menuSceneSource).toContain('this.progressionState.tracks[trackId]');
     expect(menuSceneSource).not.toContain('createLegacyRoomActivationPreviewCue(');
   });
 
@@ -1380,7 +1380,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.resolveLegacyProgressionStorageKey()');
   });
 
-  test('uses a level number with a consistent progression color tier in active play', () => {
+  test('uses a level number with a consistent progression color tier on each active surface', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('this.progressionBadgeText');
@@ -1390,11 +1390,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
 
-  test('keeps player progression quiet and limits the compact level glyph to active play', () => {
+  test('keeps progression quiet while the compact glyph follows the independent active track', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('private drawLegacyPlayerProgressionGlyph(palette: LegacyProgressionPalette): VisualRect');
-    expect(menuSceneSource).toContain("if (this.mode !== 'play' || this.overlay !== 'none') {");
+    expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
+    expect(menuSceneSource).toContain("return resolveLegacyProgressionTrackIdForSurface(this.mode === 'play' ? 'play' : 'menu-demo');");
+    expect(menuSceneSource).toContain("if (this.overlay !== 'none') {");
+    expect(menuSceneSource).toContain('return this.drawLegacyProgressionGlyph(this.progressionState.tracks[trackId], palette);');
     expect(menuSceneSource).toContain('.setText(String(track.level))');
     expect(menuSceneSource).not.toContain('publishLegacyPlayerProgressionCompletion');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayerProgressionOutcomeReason');
