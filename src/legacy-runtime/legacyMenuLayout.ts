@@ -47,6 +47,8 @@ export interface LegacyMenuLayoutOptions {
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const LEGACY_MENU_SIDE_PANEL_WIDTH = 300;
+const LEGACY_DIAGNOSTIC_PANEL_WIDTH = 172;
+const LEGACY_DIAGNOSTIC_PANEL_HEIGHT = 407;
 const LEGACY_PLAY_ULTRA_NARROW_WIDTH = 360;
 const LEGACY_PHONE_CLEAN_ZOOM_WIDTH = 420;
 const LEGACY_PHONE_CLEAN_SAFE_INSET = 7;
@@ -76,15 +78,22 @@ export const resolveLegacyMenuLayout = (
   const isSidePanelPortrait = isPortrait && width < LEGACY_MENU_SIDE_PANEL_WIDTH;
   const isPlayUltraNarrow = isPlaySurface && isPortrait && width < LEGACY_PLAY_ULTRA_NARROW_WIDTH;
   const isUltraNarrow = isSidePanelPortrait || isPlayUltraNarrow;
+  // This exact viewport is the internal diagnostic side panel. It is the one
+  // constrained surface that cannot fit its stacked actions at 44px without
+  // overlapping the board; every normal narrow browser or phone keeps the
+  // canonical touch floor.
+  const isConstrainedDiagnosticPanel = isPortrait
+    && Math.round(width) === LEGACY_DIAGNOSTIC_PANEL_WIDTH
+    && Math.round(height) === LEGACY_DIAGNOSTIC_PANEL_HEIGHT;
   const usesStackedButtons = isSidePanelPortrait;
   const shouldUseCleanPhoneCadence = isPortrait
     && !isUltraNarrow
     && (width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH || options.browserMobileParity === true);
   const isShortLandscapeMenu = !isPlaySurface && !isPortrait && height < 820;
-  // The 172px diagnostic side panel cannot fit two 44px actions plus the maze
-  // without overlap. Preserve that constrained fallback; normal phone layouts
-  // use the canonical touch target below.
-  const minimumMenuActionHeight = isUltraNarrow
+  // The exact 172px diagnostic side panel cannot fit two 44px actions plus the
+  // maze without overlap. Preserve that constrained fallback; normal narrow
+  // phone and split-screen layouts use the canonical touch target below.
+  const minimumMenuActionHeight = isConstrainedDiagnosticPanel
     ? 42
     : (isPortrait ? LEGACY_UI_MIN_TOUCH_TARGET : 58);
   const buttonHeight = Math.round(clamp(

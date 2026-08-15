@@ -236,6 +236,7 @@ describe('legacy menu layout', () => {
     const layout = resolveLegacyMenuLayout(172, 407, 50, 49);
 
     expect(layout.buttonLayout).toBe('stack');
+    expect(layout.buttonHeight).toBe(42);
     expect(layout.boardLeft).toBeGreaterThanOrEqual(0);
     expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width);
     expect(layout.tileSize).toBeGreaterThanOrEqual(3);
@@ -247,6 +248,15 @@ describe('legacy menu layout', () => {
     expect(layout.rightButtonY + (layout.buttonHeight / 2)).toBeLessThanOrEqual(layout.footerY);
     expect(layout.buttonWidth).toBeLessThanOrEqual(layout.width - 36);
     expect(layout.centerButtonWidth).toBeLessThanOrEqual(layout.width - 20);
+  });
+
+  test('keeps ordinary narrow portrait views at the canonical touch floor', () => {
+    const layout = resolveLegacyMenuLayout(280, 600, 50, 49, 'menu');
+
+    expect(layout.buttonLayout).toBe('stack');
+    expect(layout.buttonHeight).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
+    expect(layout.leftButtonY + layout.buttonHeight).toBeLessThan(layout.rightButtonY);
+    expect(layout.rightButtonY + (layout.buttonHeight / 2)).toBeLessThanOrEqual(layout.footerY);
   });
 
   test('keeps active-play controls clear of the board in ultra-narrow side panels without changing menu button math', () => {
