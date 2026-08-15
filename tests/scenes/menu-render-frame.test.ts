@@ -762,7 +762,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("showPane: touchControlLayout.controlMode !== 'stick'");
     expect(menuSceneSource).toContain('if (options.showPane) {');
     expect(menuSceneSource).toContain('this.hudGraphics.fillTriangle(');
-    expect(menuSceneSource).toContain('this.drawLegacyPlayTouchButton(controls.pause, true, false);');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
     expect(menuSceneSource).not.toContain('this.drawLegacyPlayTouchButton(controls.restart_attempt, true, false);');
     expect(menuSceneSource).not.toContain('this.hudGraphics.strokeRect(');
   });
@@ -1266,8 +1266,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("text: 'Settings'");
     expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).not.toContain('fillStyle(0x05070a');
-    expect(menuSceneSource).toContain('this.drawLegacySettingsCog(panel, pauseRect, active);');
-    expect(menuSceneSource).toContain('this.drawLegacySettingsCog(this.hudGraphics, controls.pause);');
+    expect(menuSceneSource).toContain('private drawLegacySettingsCogControl(');
+    expect(menuSceneSource).toContain('this.drawLegacyTouchButtonChrome(graphics, rect, true, active);');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(panel, pauseRect, active);');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
     expect(menuSceneSource).toContain('const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);');
     expect(menuSceneSource).toContain('bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height)');
@@ -1388,10 +1390,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
 
-  test('keeps player progression quiet and uses one compact level glyph on both game surfaces', () => {
+  test('keeps player progression quiet and limits the compact level glyph to active play', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('private drawLegacyPlayerProgressionGlyph(palette: LegacyProgressionPalette): VisualRect');
+    expect(menuSceneSource).toContain("if (this.mode !== 'play' || this.overlay !== 'none') {");
     expect(menuSceneSource).toContain('.setText(String(track.level))');
     expect(menuSceneSource).not.toContain('publishLegacyPlayerProgressionCompletion');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayerProgressionOutcomeReason');

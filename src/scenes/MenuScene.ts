@@ -6914,7 +6914,10 @@ export class MenuScene extends Phaser.Scene {
     _mazeRenderFrame: LegacyMazeRenderFrame,
     palette: LegacyProgressionPalette
   ): VisualRect | null {
-    if (this.overlay !== 'none') {
+    // The menu already owns its title and Start hierarchy. Keep progression
+    // available during active play, where it helps the player read the current
+    // challenge, without turning the menu into a second status surface.
+    if (this.mode !== 'play' || this.overlay !== 'none') {
       this.progressionBadgeBounds = null;
       this.progressionBadgeTextBounds = null;
       this.progressionBadgeTextFits = false;
@@ -8057,8 +8060,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (touchControlLayout.controlMode === 'stick' && touchControlLayout.stick !== null) {
       this.drawLegacyPlayTouchStick(touchControlLayout.stick, this.resolveLegacyPlayHeldTouchControl(), this.playTouchStickPull);
-      this.drawLegacyPlayTouchButton(controls.pause, true, false);
-      this.drawLegacySettingsCog(this.hudGraphics, controls.pause);
+      this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);
       return createVisualRect(frame.left, frame.top, frame.width, frame.height);
     }
 
@@ -8070,7 +8072,7 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPlayTouchButton(controls.move_down_left, false, activeControls.has('move_down_left'));
     this.drawLegacyPlayTouchButton(controls.move_left, false, activeControls.has('move_left'));
     this.drawLegacyPlayTouchButton(controls.move_up_left, false, activeControls.has('move_up_left'));
-    this.drawLegacyPlayTouchButton(controls.pause, true, false);
+    this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);
 
     this.drawLegacyPlayTouchArrow(controls.move_up, 'up', activeControls.has('move_up'));
     this.drawLegacyPlayTouchArrow(controls.move_up_right, 'up-right', activeControls.has('move_up_right'));
@@ -8080,8 +8082,6 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPlayTouchArrow(controls.move_down_left, 'down-left', activeControls.has('move_down_left'));
     this.drawLegacyPlayTouchArrow(controls.move_left, 'left', activeControls.has('move_left'));
     this.drawLegacyPlayTouchArrow(controls.move_up_left, 'up-left', activeControls.has('move_up_left'));
-    this.drawLegacySettingsCog(this.hudGraphics, controls.pause);
-
     return createVisualRect(frame.left, frame.top, frame.width, frame.height);
   }
 
@@ -8136,7 +8136,16 @@ export class MenuScene extends Phaser.Scene {
     accented: boolean,
     active = false
   ): void {
-    this.drawLegacyCyberPanel(this.hudGraphics, {
+    this.drawLegacyTouchButtonChrome(this.hudGraphics, rect, accented, active);
+  }
+
+  private drawLegacyTouchButtonChrome(
+    graphics: Phaser.GameObjects.Graphics,
+    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['move_up'],
+    accented: boolean,
+    active = false
+  ): void {
+    this.drawLegacyCyberPanel(graphics, {
       active: active || accented,
       alpha: active ? 0.7 : (accented ? 0.56 : 0.44),
       fill: active ? cyberArcadeMaterial.substrate.panelActive : LEGACY_PLAY_TOUCH_BUTTON_FILL,
@@ -8146,6 +8155,15 @@ export class MenuScene extends Phaser.Scene {
       top: rect.top,
       width: rect.width
     });
+  }
+
+  private drawLegacySettingsCogControl(
+    graphics: Phaser.GameObjects.Graphics,
+    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
+    active = false
+  ): void {
+    this.drawLegacyTouchButtonChrome(graphics, rect, true, active);
+    this.drawLegacySettingsCog(graphics, rect, active);
   }
 
   private drawLegacyPlayTouchArrow(
@@ -10378,17 +10396,7 @@ export class MenuScene extends Phaser.Scene {
     const panel = this.add.graphics();
     const drawSettingsButton = (active: boolean): void => {
       panel.clear();
-      this.drawLegacyCyberPanel(panel, {
-        active: true,
-        alpha: active ? 0.7 : 0.56,
-        fill: active ? cyberArcadeMaterial.substrate.panelActive : LEGACY_PLAY_TOUCH_BUTTON_FILL,
-        height: pauseRect.height,
-        left: pauseRect.left,
-        radius: 8,
-        top: pauseRect.top,
-        width: pauseRect.width
-      });
-      this.drawLegacySettingsCog(panel, pauseRect, active);
+      this.drawLegacySettingsCogControl(panel, pauseRect, active);
     };
     drawSettingsButton(false);
 
