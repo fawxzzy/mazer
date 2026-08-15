@@ -1,4 +1,7 @@
+import { designTokens } from '../theme/tokens';
+
 export const LEGACY_UI_COMPACT_BREAKPOINT = 420;
+export const LEGACY_UI_MIN_TOUCH_TARGET = designTokens.touchTargetMinPx;
 
 export interface LegacyOverlayPanelLayout {
   centerX: number;
@@ -50,6 +53,7 @@ export const resolveLegacyOverlayShellLayout = ({
   hasMessage: boolean;
   panel: LegacyOverlayPanelLayout;
 }): LegacyOverlayShellLayout => {
+  const resolvedActionHeight = Math.max(LEGACY_UI_MIN_TOUCH_TARGET, Math.round(actionHeight));
   const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
   const contentHorizontalInset = compact ? 16 : 24;
   const actionBottomInset = compact ? 20 : 24;
@@ -59,10 +63,10 @@ export const resolveLegacyOverlayShellLayout = ({
   const messageCenterY = panel.top + (compact ? 82 : 88);
   const contentTop = panel.top + (compact ? 76 : 84) + (hasMessage ? 22 : 0);
   const panelBottom = panel.top + panel.height;
-  const actionCenterY = panelBottom - actionBottomInset - (actionHeight / 2);
+  const actionCenterY = panelBottom - actionBottomInset - (resolvedActionHeight / 2);
   const actionStackTop = actionCenterY
-    - ((Math.max(1, actionRows) - 1) * (actionHeight + actionRowGap))
-    - (actionHeight / 2);
+    - ((Math.max(1, actionRows) - 1) * (resolvedActionHeight + actionRowGap))
+    - (resolvedActionHeight / 2);
   const contentBottom = Math.max(contentTop, actionStackTop - actionContentGap);
 
   return {
@@ -190,17 +194,20 @@ export const resolveLegacyOverlayContentFlowLayout = ({
   guideHeight: number;
   panelWidth: number;
 }): LegacyOverlayContentFlowLayout => {
+  const resolvedActionHeight = actionHeight > 0
+    ? Math.max(LEGACY_UI_MIN_TOUCH_TARGET, Math.round(actionHeight))
+    : 0;
   const compact = panelWidth < LEGACY_UI_COMPACT_BREAKPOINT;
   const edgeInset = compact ? 4 : 6;
   const sectionGap = compact ? 10 : 12;
   const guideTop = contentTop + edgeInset;
   const controlsTop = guideTop + guideHeight + sectionGap;
-  const actionCenterY = actionHeight > 0
-    ? controlsTop + controlsHeight + sectionGap + (actionHeight / 2)
+  const actionCenterY = resolvedActionHeight > 0
+    ? controlsTop + controlsHeight + sectionGap + (resolvedActionHeight / 2)
     : null;
   const contentBottom = actionCenterY === null
     ? controlsTop + controlsHeight + edgeInset
-    : actionCenterY + (actionHeight / 2) + edgeInset;
+    : actionCenterY + (resolvedActionHeight / 2) + edgeInset;
 
   return {
     actionCenterY,

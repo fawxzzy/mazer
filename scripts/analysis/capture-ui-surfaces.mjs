@@ -130,7 +130,20 @@ const waitForSurface = async (page, {
 
       try {
         const visual = JSON.parse(visualRaw);
-        return visual?.runtime?.mode === expectedMode && visual?.runtime?.overlay === expectedOverlay;
+        const badge = visual?.progressionBadge?.bounds;
+        const board = visual?.board?.bounds;
+        // Starting a game changes the mode before the next layout publication.
+        // Do not capture that transitional diagnostics frame as active play UI.
+        const playGeometrySettled = expectedMode !== 'play'
+          || expectedOverlay !== 'none'
+          || (
+            Number.isFinite(badge?.bottom)
+            && Number.isFinite(board?.top)
+            && badge.bottom <= board.top - 8
+          );
+        return visual?.runtime?.mode === expectedMode
+          && visual?.runtime?.overlay === expectedOverlay
+          && playGeometrySettled;
       } catch {
         return false;
       }

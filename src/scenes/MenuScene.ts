@@ -939,8 +939,9 @@ export const MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagno
 
 const BOARD_SHADOW_OFFSET = 0;
 const MENU_BUTTON_ALPHA = 0.34;
-const LEGACY_UI_FONT_FAMILY = '"Trebuchet MS", "Segoe UI", sans-serif';
-const LEGACY_UI_MONO_FONT_FAMILY = 'Consolas, "Lucida Console", monospace';
+const LEGACY_UI_FONT_FAMILY = cyberArcadeMaterial.typography.ui;
+const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
+const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 const LEGACY_MENU_ACTION_GREEN = toCyberArcadeCssHex(cyberArcadeMaterial.signal.player);
 const LEGACY_MENU_PATH_TITLE_SHADOW = cyberArcadeMaterial.substrate.shadow;
@@ -8151,7 +8152,7 @@ export class MenuScene extends Phaser.Scene {
       fill: active ? cyberArcadeMaterial.substrate.panelActive : LEGACY_PLAY_TOUCH_BUTTON_FILL,
       height: rect.height,
       left: rect.left,
-      radius: accented ? 8 : 10,
+      radius: LEGACY_UI_CONTROL_RADIUS,
       top: rect.top,
       width: rect.width
     });
@@ -8389,7 +8390,7 @@ export class MenuScene extends Phaser.Scene {
       fill: 0x08131d,
       height: panel.height,
       left: panel.left,
-      radius: 14,
+      radius: cyberArcadeMaterial.controls.sheetRadius,
       top: panel.top,
       width: panel.width
     });
@@ -8809,7 +8810,7 @@ export class MenuScene extends Phaser.Scene {
     const stacked = panel.width < 420;
     const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
     const hasOverlayMessage = visibleMessages.length > 0;
-    const actionButtonHeight = stacked ? 42 : 48;
+    const actionButtonHeight = stacked ? cyberArcadeMaterial.controls.minimumTouchTarget : 48;
     const shell = resolveLegacyOverlayShellLayout({
       actionHeight: actionButtonHeight,
       actionRows: 2,
@@ -10231,7 +10232,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton {
-    const size = this.layout.width < 480 ? 42 : 46;
+    const size = Math.max(
+      cyberArcadeMaterial.controls.minimumTouchTarget,
+      this.layout.width < 480 ? 42 : 46
+    );
     const x = panel.left + Math.round(size * 0.86);
     const y = panel.top + Math.round(size * 0.82);
     const chrome = this.add.graphics();
@@ -10324,7 +10328,7 @@ export class MenuScene extends Phaser.Scene {
           : frontDoorChrome?.fillColor ?? LEGACY_CYBER_PANEL_FILL,
         height,
         left: x - (width / 2),
-        radius: isMenuFrontDoor ? 8 : 10,
+        radius: LEGACY_UI_CONTROL_RADIUS,
         stroke: frontDoorChrome?.strokeColor,
         strokeAlt: isPrimaryFrontDoorButton
           ? cyberArcadeMaterial.rail.mint

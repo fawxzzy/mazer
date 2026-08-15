@@ -41,6 +41,8 @@ If the current web app disagrees with restored gameplay/mechanics truth, restore
 
 The live Phaser renderer now consumes the canonical Fawxzzy Precision Arcade token map. The first shipping visual slice keeps the maze as the hero: a quiet navy canvas, crisp ivory connected corridors, mint/aqua structural rails, one-surface panels, a topology-rendered menu title, an active-play level glyph, and one shared cog-button shell for menu Settings and play controls. The menu has no duplicate player-progression box. Decorative star/rune fields and nested neon panel borders are retired from the active presentation. This is render-only; gameplay topology, progression, inputs, collision, scoring, persistence, tutorial, and menu AI remain unchanged.
 
+The shared Phaser material also owns the live UI font stacks, control/panel/sheet radii, press/panel motion values, and the 44px normal-phone touch floor. Main-menu actions, pause actions, and overlay navigation consume that same contract; only the constrained 172px diagnostic side panel retains a 42px fallback so its two actions and board cannot overlap.
+
 The shared DOM shell now also gives the canvas an explicit accessible name, keyboard-shortcut contract, and visible focus treatment. A focus-only semantic command rail exposes the existing Enter, O, P, and Escape commands without adding a second gameplay input path or crowding the player-facing board. Phaser remains the owner of the maze and input behavior.
 
 - The current web runtime has been reset to a smaller legacy-first Phaser shell.
