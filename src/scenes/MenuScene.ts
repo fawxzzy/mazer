@@ -8404,12 +8404,19 @@ export class MenuScene extends Phaser.Scene {
     const controlLayout = resolveLegacyFeatureControlLayout(panel.width, options.showDescriptions === true);
     const rowHeight = controlLayout.rowHeight;
     const rowGap = controlLayout.rowGap;
-    const toggleRowCount = 7;
+    const sectionHeaderHeight = stacked ? 18 : 20;
+    const sectionHeaderGap = stacked ? 5 : 6;
+    const sectionGap = stacked ? 12 : 14;
+    const controlsGroupCount = 3 + (options.includeMovementSpeed ? 1 : 0);
+    const displayGroupCount = 4;
+    const groupHeight = (count: number): number => (
+      sectionHeaderHeight
+      + sectionHeaderGap
+      + (count * rowHeight)
+      + (Math.max(0, count - 1) * rowGap)
+    );
 
-    return 4
-      + (toggleRowCount * (rowHeight + rowGap))
-      + (options.includeMovementSpeed ? rowHeight + (stacked ? 10 : 6) : 0)
-      + 4;
+    return 4 + groupHeight(controlsGroupCount) + sectionGap + groupHeight(displayGroupCount) + 4;
   }
 
   private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void {
@@ -8668,7 +8675,7 @@ export class MenuScene extends Phaser.Scene {
       return label;
     };
 
-    addText('PLAYER GUIDE', cardCenterX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);
+    addText('QUICK PLAY', cardCenterX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);
 
     const drawLegendRow = (
       index: number,
@@ -8714,20 +8721,9 @@ export class MenuScene extends Phaser.Scene {
       );
     };
 
-    drawLegendRow(0, 'compass', 'Compass', 'points to exit', '#b7f2ff');
-    drawLegendRow(1, 'start', 'Start', 'begin here', '#fff05a');
-    drawLegendRow(2, 'end', 'Exit', 'finish here', '#ff5264');
-    const bulletTop = legendTop + (3 * rowHeight) + 8;
-    const bullets = [
-      'Player • green trail',
-      `${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`,
-      'Score • run quality',
-      'Maze • difficulty'
-    ];
-    bullets.forEach((copy, index) => {
-      addText(`• ${copy}`, detailLeft, bulletTop + (index * rowHeight), detailWidth, '#d9fff5', guideRowFontSize, 0, 0.92, guideRowMinFontSize);
-    });
-
+    drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', '#b7f2ff');
+    drawLegendRow(1, 'start', 'Start', 'begin at gold', '#fff05a');
+    drawLegendRow(2, 'end', 'Exit', 'finish at red', '#ff5264');
     return contentCardTop + cardHeight + (options.exactTop === true ? 0 : (compact ? 14 : 16));
   }
 
@@ -8816,8 +8812,7 @@ export class MenuScene extends Phaser.Scene {
       Math.max(120, shell.contentHeight)
     );
     const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {
-      includeMovementSpeed: true,
-      showDescriptions: true
+      includeMovementSpeed: true
     });
     const contentFlow = resolveLegacyOverlayContentFlowLayout({
       contentTop: viewport.top,
@@ -8842,7 +8837,6 @@ export class MenuScene extends Phaser.Scene {
       includeMovementSpeed: true,
       rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
       scrollOffset: scrollMetrics.offset,
-      showDescriptions: true,
       viewport: renderViewport
     });
     this.drawLegacyOverlayScrollFacade(scrollMetrics);
@@ -9245,6 +9239,9 @@ export class MenuScene extends Phaser.Scene {
     const controlLayout = resolveLegacyFeatureControlLayout(panel.width, showDescriptions);
     const rowHeight = controlLayout.rowHeight;
     const rowGap = controlLayout.rowGap;
+    const sectionHeaderHeight = stacked ? 18 : 20;
+    const sectionHeaderGap = stacked ? 5 : 6;
+    const sectionGap = stacked ? 12 : 14;
     const scrollOffset = options.scrollOffset ?? 0;
     const viewport = options.viewport ?? null;
     const toRenderY = (contentY: number): number => contentY - scrollOffset;
@@ -9301,18 +9298,18 @@ export class MenuScene extends Phaser.Scene {
         description: this.settings.toggleAnimatedBackdrop
           ? 'Moving background.'
           : 'Background still.',
-        label: 'Animated BG',
-        offLabel: 'Stagnant',
+        label: 'Animated Background',
+        offLabel: 'Still',
         onClick: () => this.applyLegacyOverlayToggleField('toggleAnimatedBackdrop'),
         onLabel: 'Animated',
-        stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'
+        stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Still'
       },
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings),
         description: this.settings.darkMode
           ? 'Darker contrast.'
           : 'Brighter view.',
-        label: 'Dark Mode',
+        label: 'High Contrast',
         offLabel: 'Off',
         onClick: () => this.applyLegacyOverlayToggleField('darkMode'),
         onLabel: 'On',
@@ -9342,50 +9339,83 @@ export class MenuScene extends Phaser.Scene {
       }
     ];
 
-    const gridTop = y + (stacked ? 4 : 6);
-    controls.forEach((control, index) => {
-      const rowCenterY = gridTop + (index * (rowHeight + rowGap)) + Math.round(rowHeight / 2);
-      const renderY = toRenderY(rowCenterY);
-      if (!isVisible(renderY, rowHeight)) {
-        return;
+    const addSectionHeading = (copy: string, contentTop: number): number => {
+      const centerY = contentTop + Math.round(sectionHeaderHeight / 2);
+      const renderY = toRenderY(centerY);
+      if (isVisible(renderY, sectionHeaderHeight)) {
+        const label = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(left, renderY, copy.toUpperCase(), {
+          color: '#72e0bf',
+          fontFamily: LEGACY_UI_FONT_FAMILY,
+          fontSize: `${stacked ? 11 : 12}px`
+        })), width, stacked ? 11 : 12, 10).setOrigin(0, 0.5).setAlpha(0.9);
+        this.uiTexts.push(label);
+        this.overlayGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.32);
+        this.overlayGraphics.lineBetween(left, renderY + Math.round(sectionHeaderHeight / 2), left + width, renderY + Math.round(sectionHeaderHeight / 2));
       }
+      return contentTop + sectionHeaderHeight + sectionHeaderGap;
+    };
 
-      this.uiButtons.push(
-        this.createToggleSwitchRow({
-          checked: control.checked,
-          description: showDescriptions ? control.description : undefined,
-          label: control.label,
-          offLabel: control.offLabel,
-          onClick: control.onClick,
-          onLabel: control.onLabel,
-          stateText: control.stateText,
-          x: left + Math.round(width / 2),
-          y: renderY,
-          width,
-          height: rowHeight
-        })
-      );
+    const addToggleRow = (control: typeof controls[number], contentTop: number): number => {
+      const rowCenterY = contentTop + Math.round(rowHeight / 2);
+      const renderY = toRenderY(rowCenterY);
+      if (isVisible(renderY, rowHeight)) {
+        this.uiButtons.push(
+          this.createToggleSwitchRow({
+            checked: control.checked,
+            description: showDescriptions ? control.description : undefined,
+            label: control.label,
+            offLabel: control.offLabel,
+            onClick: control.onClick,
+            onLabel: control.onLabel,
+            stateText: control.stateText,
+            x: left + Math.round(width / 2),
+            y: renderY,
+            width,
+            height: rowHeight
+          })
+        );
+      }
+      return contentTop + rowHeight;
+    };
+
+    let contentTop = y + (stacked ? 4 : 6);
+    contentTop = addSectionHeading('Controls', contentTop);
+    [controls[5], controls[6], controls[0]].forEach((control, index) => {
+      contentTop = addToggleRow(control, contentTop);
+      if (index < 2 || options.includeMovementSpeed === true) {
+        contentTop += rowGap;
+      }
     });
 
-    const sliderY = gridTop + (controls.length * (rowHeight + rowGap)) + Math.round(rowHeight / 2);
-    const sliderRenderY = toRenderY(sliderY);
-    if (options.includeMovementSpeed === true && isVisible(sliderRenderY, rowHeight)) {
-      this.uiButtons.push(
-        this.createMovementSpeedSliderRow({
-          height: rowHeight,
-          label: 'Move Speed',
-          stateText: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
-          value: normalizeLegacyMovementSpeed(this.settings.movementSpeed),
-          x: left + Math.round(width / 2),
-          y: sliderRenderY,
-          width
-        })
-      );
+    if (options.includeMovementSpeed === true) {
+      const sliderY = contentTop + Math.round(rowHeight / 2);
+      const sliderRenderY = toRenderY(sliderY);
+      if (isVisible(sliderRenderY, rowHeight)) {
+        this.uiButtons.push(
+          this.createMovementSpeedSliderRow({
+            height: rowHeight,
+            label: 'Move Speed',
+            stateText: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
+            value: normalizeLegacyMovementSpeed(this.settings.movementSpeed),
+            x: left + Math.round(width / 2),
+            y: sliderRenderY,
+            width
+          })
+        );
+      }
+      contentTop += rowHeight;
     }
 
-    return options.includeMovementSpeed === true
-      ? sliderY + Math.round(rowHeight / 2) + (stacked ? 10 : 6)
-      : gridTop + (controls.length * (rowHeight + rowGap));
+    contentTop += sectionGap;
+    contentTop = addSectionHeading('Display', contentTop);
+    [controls[1], controls[2], controls[3], controls[4]].forEach((control, index) => {
+      contentTop = addToggleRow(control, contentTop);
+      if (index < 3) {
+        contentTop += rowGap;
+      }
+    });
+
+    return contentTop + 4;
   }
 
   private createToggleSwitchRow(input: {

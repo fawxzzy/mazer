@@ -128,22 +128,22 @@ export interface LegacyOptionsGuideLayout {
 
 export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptionsGuideLayout => {
   const compact = panelWidth < LEGACY_UI_COMPACT_BREAKPOINT;
-  const titleFontSize = compact ? 17 : 19;
-  const titleOffset = compact ? 18 : 20;
+  const titleFontSize = compact ? 15 : 17;
+  const titleOffset = compact ? 16 : 18;
 
   return {
-    cardHeight: compact ? 196 : 216,
+    cardHeight: compact ? 112 : 122,
     cardWidthLimit: compact ? 350 : 540,
     horizontalMargin: compact ? 48 : 64,
     inset: compact ? 18 : 22,
-    legendTopOffset: compact ? 48 : 52,
-    rowHeight: compact ? 19 : 22,
+    legendTopOffset: compact ? 43 : 47,
+    rowHeight: compact ? 18 : 20,
     rowFontSize: compact ? 11 : 12,
     rowMinFontSize: compact ? 10 : 10,
-    textWidthSafetyRatio: compact ? 0.86 : 0.88,
+    textWidthSafetyRatio: compact ? 0.9 : 0.92,
     titleFontSize,
     titleOffset,
-    titleRuleOffset: titleOffset + Math.ceil(titleFontSize * 0.72) + (compact ? 12 : 8)
+    titleRuleOffset: titleOffset + Math.ceil(titleFontSize * 0.72) + (compact ? 9 : 8)
   };
 };
 

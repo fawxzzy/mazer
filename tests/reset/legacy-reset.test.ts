@@ -940,8 +940,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("label: 'Trail Fade'");
     expect(menuSceneSource).toContain("label: 'Trail Shine'");
     expect(menuSceneSource).toContain("? 'Slow white shine.'");
-    expect(menuSceneSource).toContain("label: 'Animated BG'");
-    expect(menuSceneSource).toContain("label: 'Dark Mode'");
+    expect(menuSceneSource).toContain("label: 'Animated Background'");
+    expect(menuSceneSource).toContain("label: 'High Contrast'");
     expect(menuSceneSource).toContain("label: 'Control Style'");
     expect(menuSceneSource).toContain("label: 'Smart Steering'");
     expect(menuSceneSource).toContain("label: 'Move Speed'");
@@ -962,7 +962,10 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
     expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
-    expect(menuSceneSource).toContain('controls.length * (rowHeight + rowGap)');
+    expect(menuSceneSource).toContain('const groupHeight = (count: number): number => (');
+    expect(menuSceneSource).toContain('groupHeight(controlsGroupCount) + sectionGap + groupHeight(displayGroupCount)');
+    expect(menuSceneSource).toContain("addSectionHeading('Controls', contentTop)");
+    expect(menuSceneSource).toContain("addSectionHeading('Display', contentTop)");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleCameraFollow')");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailFade')");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailPulse')");

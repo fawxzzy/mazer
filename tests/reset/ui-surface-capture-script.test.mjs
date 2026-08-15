@@ -139,7 +139,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('markerStyle: menu.diagnostics.visual?.markerStyle');
     expect(source).toContain('hud: play.diagnostics.visual?.hud');
     expect(source).toContain('expectedLabels: []');
-    expect(source).toContain("expectedLabels: ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu']");
+    expect(source).toContain("expectedLabels: ['Paused', 'QUICK PLAY', 'Reset', 'Menu']");
     expect(source).toContain("url.searchParams.set('mazeSeed', mazeSeed);");
     expect(source).toContain("url.searchParams.set('authFixture', authFixture);");
     expect(source).not.toContain("url.searchParams.set('pathStyle', pathStyle);");
@@ -265,7 +265,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("!hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale'])");
     expect(source).toContain("'play-settings-cog'");
     expect(source).toContain("!hasLabels(surfaces.play, ['PAUSE', 'RESET'])");
-    expect(source).toContain("hasLabels(surfaces.pause, ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu'])");
+    expect(source).toContain("hasLabels(surfaces.pause, ['Paused', 'QUICK PLAY', 'Reset', 'Menu'])");
     expect(source).toContain("!hasLabels(surfaces.pause, ['Game Toggles', 'Account', 'Resume'])");
     expect(source).toContain('const reportPath = resolve(outputDir, \'report.md\');');
     expect(source).toContain('![Menu](${summary.screenshots.menu})');

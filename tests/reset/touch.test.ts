@@ -265,7 +265,7 @@ describe('input-human touch bridge', () => {
     expect(ultraNarrow.controls.pause.right).toBeLessThanOrEqual(220);
   });
 
-  test('places phone controls low in the bottom lane below the board when board bounds are known', () => {
+  test('places phone controls below and visually connected to the board when bounds are known', () => {
     const board = {
       left: 31,
       top: 70,
@@ -280,11 +280,9 @@ describe('input-human touch bridge', () => {
       controlMode: 'stick'
     });
     const bottomLaneTop = board.top + board.height;
-    const bottomLaneCenterY = bottomLaneTop + ((844 - bottomLaneTop) / 2);
-
     expect(layout.frame.top).toBeGreaterThanOrEqual(bottomLaneTop);
     expect(layout.frame.bottom).toBeLessThanOrEqual(844);
-    expect(layout.frame.centerY).toBeGreaterThan(bottomLaneCenterY);
+    expect(layout.frame.top - bottomLaneTop).toBeLessThanOrEqual(90);
     expect(layout.frame.bottom).toBeLessThanOrEqual(844);
     expect(Math.abs(layout.stick!.outer.centerX - 195)).toBeLessThanOrEqual(1);
     expect(Math.abs(layout.stick!.outer.centerY - layout.frame.centerY)).toBeLessThanOrEqual(1);

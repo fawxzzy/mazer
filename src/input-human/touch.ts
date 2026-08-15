@@ -331,11 +331,20 @@ export const resolveTouchControlLayout = (
       )
       : null;
     const frameTop = bottomLaneTop !== null
-      ? clamp(
-        Math.round(bottomLaneTop + (((viewport.height - safeInsets.bottom) - bottomLaneTop - dpadFrameHeight) * 0.72)),
-        bottomLaneTop,
-        Math.max(bottomLaneTop, viewport.height - safeInsets.bottom - dpadFrameHeight)
-      )
+      ? (() => {
+        const availableLaneSpace = Math.max(
+          0,
+          (viewport.height - safeInsets.bottom) - bottomLaneTop - dpadFrameHeight
+        );
+        // Keep the controller visually connected to the board instead of marooning it
+        // at the bottom of a tall phone. The bottom safe area remains available for thumb reach.
+        const boardControlGap = Math.round(availableLaneSpace * 0.42);
+        return clamp(
+          Math.round(bottomLaneTop + boardControlGap),
+          bottomLaneTop,
+          Math.max(bottomLaneTop, viewport.height - safeInsets.bottom - dpadFrameHeight)
+        );
+      })()
       : clamp(
         Math.round(viewport.height - safeInsets.bottom - dpadFrameHeight - Math.max(12, buttonSize * 0.25)),
         0,

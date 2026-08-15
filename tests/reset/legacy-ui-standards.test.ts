@@ -69,18 +69,18 @@ describe('legacy UI standards', () => {
     expect(resolveLegacyUiLabelCenterY(100, 20, 'toggle-title')).toBe(100);
   });
 
-  test('keeps compact guide copy smaller and clears the title rule', () => {
+  test('keeps the compact Quick Play guide concise and clear of the title rule', () => {
     const compact = resolveLegacyOptionsGuideLayout(LEGACY_UI_COMPACT_BREAKPOINT - 1);
     const wide = resolveLegacyOptionsGuideLayout(LEGACY_UI_COMPACT_BREAKPOINT);
 
-    expect(compact.cardHeight).toBe(196);
+    expect(compact.cardHeight).toBe(112);
     expect(compact.rowFontSize).toBe(11);
     expect(compact.rowMinFontSize).toBe(10);
     expect(compact.horizontalMargin).toBe(48);
-    expect(compact.textWidthSafetyRatio).toBe(0.86);
+    expect(compact.textWidthSafetyRatio).toBe(0.9);
     expect(compact.titleRuleOffset).toBeGreaterThan(compact.titleOffset + compact.titleFontSize);
     expect(wide.rowFontSize).toBe(12);
-    expect(wide.rowHeight).toBe(22);
+    expect(wide.rowHeight).toBe(20);
   });
 
   test('shows state copy on normal phone rows and keeps an inline fallback for narrower rows', () => {

@@ -299,7 +299,7 @@ describe('legacy menu layout', () => {
     expect(touchLayout.controls.toggle_thoughts.width).toBe(0);
   });
 
-  test('reserves a top mobile HUD lane for played-game badge and pause without overlapping the maze', () => {
+  test('reserves a top mobile HUD lane and keeps the controller visually connected to the maze', () => {
     const playLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 'play');
     const touchLayout = resolveTouchControlLayout({
       width: playLayout.width,
@@ -322,6 +322,7 @@ describe('legacy menu layout', () => {
     expect(touchLayout.controls.pause.left).toBeGreaterThan(playLayout.width * 0.7);
     expect(touchLayout.controls.pause.bottom + 12).toBeLessThanOrEqual(playLayout.boardTop);
     expect(playLayout.boardTop + playLayout.boardSize + 24).toBeLessThanOrEqual(touchLayout.frame.top);
+    expect(touchLayout.frame.top).toBeLessThanOrEqual(playLayout.boardTop + playLayout.boardSize + 124);
   });
 
   test('lets the menu reclaim the same desktop maze size as active play', () => {

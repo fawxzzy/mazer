@@ -772,13 +772,12 @@ const hasTextLabels = (surface, expectedLabels) => {
 
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
   'Settings',
-  'PLAYER GUIDE',
-  'Camera Follow'
+  'QUICK PLAY',
+  'Control Style'
 ]);
 
 const resolveOptionsBottomExpectedLabels = (authenticated) => [
-  'Smart Steering',
-  'Control Style',
+  'High Contrast',
   authenticated ? 'Log out' : 'Account'
 ];
 
@@ -1250,14 +1249,14 @@ const collectOverlayScrollCueTextIssues = (surfaceId, surface) => {
 };
 
 const isGuideLabel = (text) => [
-  'PLAYER GUIDE',
+  'QUICK PLAY',
   'Compass',
-  'points to End',
+  'follow it to the exit',
   'Start',
-  'run begins',
-  'End',
-  'clear here'
-].includes(text) || text.includes('Player:') || text.includes('Rank:') || text.includes('Score:') || text.includes('Maze Lvl:');
+  'begin at gold',
+  'Exit',
+  'finish at red'
+].includes(text);
 
 const collectGuideTextContainmentIssues = (surfaceId, surface) => {
   const guide = surface?.overlayUi?.guidePanel;
@@ -1660,7 +1659,7 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'pause-text-labels',
-      hasLabels(surfaces.pause, ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu'])
+      hasLabels(surfaces.pause, ['Paused', 'QUICK PLAY', 'Reset', 'Menu'])
         && !hasLabels(surfaces.pause, ['Game Toggles', 'Account', 'Resume']),
       `labels=${labelDetail(surfaces.pause)}`
     ),
@@ -2073,7 +2072,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const pause = await captureSurface({
       page,
       outputDir,
-      expectedLabels: ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu'],
+      expectedLabels: ['Paused', 'QUICK PLAY', 'Reset', 'Menu'],
       id: '04-pause',
       mode: 'play',
       overlay: 'pause',

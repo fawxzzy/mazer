@@ -180,7 +180,7 @@ Do not ratchet for wording changes alone. Do not ratchet the retired legacy visu
 
 - Stayed at `100%`: the active mechanics/mobile lane is already closed, so this focused maintenance pass did not ratchet it.
 - Main-menu Options no longer exposes Move Speed; played-game Pause retains Move Speed and now gives every Game Toggle an on/off meaning line.
-- Both guide surfaces now center `PLAYER GUIDE`, reuse the literal compass/start/end board renderers, and use concise player/status bullets instead of a duplicate player icon.
+- Both guide surfaces now render `Quick Play` before grouped controls, reuse the literal compass/start/end board renderers, and keep only the player-facing direction, start, and exit cues.
 - Played-game Pause now has a confirmation-gated `Reset Progress` action that clears only the player progression track, preserves the AI track, and uses the existing scoped local/remote progression persistence path.
 - Focused proof: `npm run lint`; `npx vitest run tests/ai/demo-walker.test.ts tests/reset/legacy-progression.test.ts tests/reset/legacy-game-toggle-preferences.test.ts tests/scenes/menu-render-frame.test.ts --maxWorkers 1` (`101` tests); and `npm run build`.
 - Historical handoff, now closed for the human-memory lane: finite local AI route exhaustion is not a valid end-of-maze outcome. Persistent remembered-frontier recovery now reaches the genuine goal before regeneration without an undiscovered goal target, teleport, or silent route reset. The legacy source-demonstration plan still retains its staged `ai-path-exhausted` reset behavior, and the separate exact route/backtrack parity gaps remain listed in `docs/current-truth.md`.
