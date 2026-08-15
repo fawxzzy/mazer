@@ -15,6 +15,7 @@ import {
   resolveLegacyMenuBackdropTailStep,
   resolveLegacyMenuBackdropWarpDistance
 } from '../../src/legacy-runtime/legacyMenuBackdrop';
+import { cyberArcadeMaterial } from '../../src/render/cyberArcadeMaterial';
 
 describe('legacyMenuBackdrop', () => {
   test('creates the denser legacy-directed backdrop starfield with bounded motion data', () => {
@@ -49,15 +50,15 @@ describe('legacyMenuBackdrop', () => {
     expect(LEGACY_MENU_BACKDROP_STAR_MOTION).toBe('radial-warp');
   });
 
-  test('publishes the canonical deep navy substrate and bounded angular shards', () => {
+  test('publishes the canonical Precision Arcade substrate and bounded legacy shards', () => {
     expect(resolveLegacyMenuBackdropPalette(false)).toEqual({
-      fieldColor: 0x0b1628,
+      fieldColor: cyberArcadeMaterial.substrate.fieldRaised,
       starAlphaScale: 1.08,
       overlayAlpha: 0
     });
 
     expect(resolveLegacyMenuBackdropPalette(true)).toEqual({
-      fieldColor: 0x07111d,
+      fieldColor: cyberArcadeMaterial.substrate.field,
       starAlphaScale: 0.74,
       overlayAlpha: 0.1
     });

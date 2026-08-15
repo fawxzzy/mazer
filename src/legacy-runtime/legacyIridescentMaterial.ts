@@ -1,7 +1,13 @@
 import { cyberArcadeMaterial } from '../render/cyberArcadeMaterial';
 
 export const LEGACY_IRIDESCENT_PATH_CORE_CONTRAST_COLOR = cyberArcadeMaterial.path.core;
-export const LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE = 145;
+/**
+ * The active rail is intentionally quieter than the energy/player signal, but
+ * still must remain distinct from the pale path core. This bound is calibrated
+ * to the canonical Precision Arcade active token rather than the retired neon
+ * palette.
+ */
+export const LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE = 72;
 export const LEGACY_IRIDESCENT_GREEN_ANCHOR = cyberArcadeMaterial.signal.player;
 export const LEGACY_TRAIL_SHINE_COLOR = cyberArcadeMaterial.shine.core;
 export const LEGACY_TRAIL_SHINE_EDGE_COLOR = cyberArcadeMaterial.shine.edge;

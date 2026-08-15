@@ -10,6 +10,7 @@ import {
   summarizeCyberArcadeMaterial
 } from '../../src/render/cyberArcadeMaterial';
 import { MAZER_ICON_QUALITY_TARGET } from '../../src/brand/mazerIconQualityTarget';
+import { phaserMaterialAliases } from '../../src/theme/tokens';
 
 describe('cyber arcade material', () => {
   test('publishes the approved icon target and every shared runtime surface role', () => {
@@ -25,14 +26,20 @@ describe('cyber arcade material', () => {
     ]));
   });
 
-  test('keeps the icon-derived material vocabulary fixed and bounded', () => {
-    expect(cyberArcadeMaterial.substrate.field).toBe(0x07111d);
-    expect(cyberArcadeMaterial.substrate.panel).toBe(0x07131d);
-    expect(cyberArcadeMaterial.path).toEqual({ core: 0xe7fff4, edge: 0x0d3c4f });
-    expect(cyberArcadeMaterial.rail.mint).toBe(0x72e0bf);
-    expect(cyberArcadeMaterial.rail.cyan).toBe(0xb7f2ff);
-    expect(cyberArcadeMaterial.signal.player).toBe(0x36ff7d);
-    expect(cyberArcadeMaterial.shine).toEqual({ core: 0xffffff, edge: 0xe8fff5 });
+  test('binds the live material to the canonical Precision Arcade token vocabulary', () => {
+    expect(cyberArcadeMaterial.substrate.field).toBe(phaserMaterialAliases['bg.canvas']);
+    expect(cyberArcadeMaterial.substrate.panel).toBe(phaserMaterialAliases['bg.panel']);
+    expect(cyberArcadeMaterial.path).toEqual({
+      core: phaserMaterialAliases['world.pathCore'],
+      edge: phaserMaterialAliases['line.normal']
+    });
+    expect(cyberArcadeMaterial.rail.mint).toBe(phaserMaterialAliases['brand.mint']);
+    expect(cyberArcadeMaterial.rail.cyan).toBe(phaserMaterialAliases['semantic.info']);
+    expect(cyberArcadeMaterial.signal.player).toBe(phaserMaterialAliases['semantic.energy']);
+    expect(cyberArcadeMaterial.shine).toEqual({
+      core: phaserMaterialAliases['text.primary'],
+      edge: phaserMaterialAliases['world.pathCore']
+    });
   });
 
   test('snaps shared fill geometry to integer logical pixels without cumulative edge drift', () => {

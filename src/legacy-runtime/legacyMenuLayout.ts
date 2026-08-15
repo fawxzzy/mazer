@@ -37,17 +37,6 @@ export interface LegacyMenuLayoutLane {
   top: number;
 }
 
-export interface LegacyAuthenticatedMenuButtonStack {
-  authenticatedButtonGap: number;
-  buttonLayout: 'row' | 'stack';
-  authenticatedStackHeight: number;
-  optionsButtonHeight: number;
-  optionsButtonX: number;
-  optionsButtonY: number;
-  startButtonX: number;
-  startButtonY: number;
-}
-
 export type LegacyMenuLayoutSurface = 'menu' | 'play';
 
 export interface LegacyMenuLayoutOptions {
@@ -56,9 +45,6 @@ export interface LegacyMenuLayoutOptions {
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
-export const LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_RATIO = 0.22;
-export const LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MIN = 10;
-export const LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MAX = 14;
 const LEGACY_MENU_SIDE_PANEL_WIDTH = 300;
 const LEGACY_PLAY_ULTRA_NARROW_WIDTH = 360;
 const LEGACY_PHONE_CLEAN_ZOOM_WIDTH = 420;
@@ -74,57 +60,6 @@ const createLane = (top: number, height: number): LegacyMenuLayoutLane => ({
   height: Math.max(0, Math.round(height)),
   bottom: Math.round(top) + Math.max(0, Math.round(height))
 });
-
-export const resolveLegacyAuthenticatedMenuButtonStack = (
-  layout: Pick<LegacyMenuLayout, 'boardSize' | 'boardTop' | 'buttonHeight' | 'buttonLayout' | 'centerButtonX' | 'centerButtonY' | 'footerY' | 'height' | 'leftButtonX' | 'leftButtonY' | 'rightButtonX' | 'rightButtonY' | 'width'>
-): LegacyAuthenticatedMenuButtonStack => {
-  const safeButtonHeight = Math.max(1, Math.round(layout.buttonHeight));
-  const isMobilePortraitRow = layout.height > layout.width && layout.buttonLayout === 'row';
-  if (isMobilePortraitRow) {
-    return {
-      authenticatedButtonGap: Math.max(0, Math.round(layout.rightButtonX - layout.leftButtonX)),
-      buttonLayout: 'row',
-      authenticatedStackHeight: safeButtonHeight,
-      optionsButtonHeight: safeButtonHeight,
-      optionsButtonX: layout.rightButtonX,
-      optionsButtonY: layout.rightButtonY,
-      startButtonX: layout.leftButtonX,
-      startButtonY: layout.leftButtonY
-    };
-  }
-
-  const optionsButtonHeight = Math.max(38, Math.round(safeButtonHeight * 0.78));
-  const authenticatedButtonGap = clampInteger(
-    Math.round(safeButtonHeight * LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_RATIO),
-    LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MIN,
-    LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MAX
-  );
-  const authenticatedStackHeight = safeButtonHeight + authenticatedButtonGap + optionsButtonHeight;
-  const stackHalfHeight = authenticatedStackHeight / 2;
-  const boardBottom = layout.boardTop + layout.boardSize;
-  const availableHeight = layout.footerY - boardBottom;
-  const minCenterY = boardBottom + stackHalfHeight + 8;
-  const maxCenterY = layout.footerY - stackHalfHeight - 2;
-  const stackCenterY = maxCenterY >= minCenterY
-    ? clamp(Math.round(layout.centerButtonY), minCenterY, maxCenterY)
-    : availableHeight >= authenticatedStackHeight + 2
-      ? boardBottom + (availableHeight / 2)
-      : Math.round(layout.centerButtonY);
-  const startButtonY = Math.round(stackCenterY - ((authenticatedStackHeight - safeButtonHeight) / 2));
-  const optionsButtonY = startButtonY
-    + Math.round((safeButtonHeight / 2) + authenticatedButtonGap + (optionsButtonHeight / 2));
-
-  return {
-    authenticatedButtonGap,
-    buttonLayout: 'stack',
-    authenticatedStackHeight,
-    optionsButtonHeight,
-    optionsButtonX: layout.centerButtonX,
-    optionsButtonY,
-    startButtonX: layout.centerButtonX,
-    startButtonY
-  };
-};
 
 export const resolveLegacyMenuLayout = (
   width: number,
@@ -156,17 +91,8 @@ export const resolveLegacyMenuLayout = (
     : isPortrait
       ? Math.round(clamp(width * 0.26, 72, 112))
       : Math.round(clamp(height * 0.16, 110, 150));
-  const menuRankReserve = (isUltraNarrow
-    ? 42
-    : Math.round(clamp(height * (isPortrait ? 0.095 : 0.085), 76, isPortrait ? 90 : 82)))
-    + (shouldUseCleanPhoneCadence && !isPlaySurface ? 22 : 0);
-  const menuActionReserve = !isPlaySurface && !isPortrait && options.menuActionMode === 'guest'
-    ? buttonHeight
-    : usesStackedButtons
-      ? (buttonHeight * 2) + stackGap
-      : isPortrait
-        ? buttonHeight
-        : buttonHeight + clampInteger(Math.round(buttonHeight * LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_RATIO), LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MIN, LEGACY_AUTHENTICATED_MENU_BUTTON_GAP_MAX) + Math.max(38, Math.round(buttonHeight * 0.78));
+  const menuRankReserve = 0;
+  const menuActionReserve = buttonHeight;
   const playTopHudReserve = isPlaySurface && isPortrait
     ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
     : 56;
@@ -228,7 +154,7 @@ export const resolveLegacyMenuLayout = (
     : menuBoardTop;
   const boardTop = Math.round(isPlaySurface ? playBoardTop : menuBoardTop);
   const menuRankLaneTop = boardTop + snappedBoardSize + laneGap;
-  const menuActionLaneTop = menuRankLaneTop + menuRankReserve + menuActionGap;
+  const menuActionLaneTop = menuRankLaneTop + menuActionGap;
   const menuRowButtonY = menuActionLaneTop + Math.round(buttonHeight / 2);
   const playRowButtonY = isPortrait
     ? boardTop + snappedBoardSize + Math.round(buttonHeight * 0.86)
@@ -267,7 +193,7 @@ export const resolveLegacyMenuLayout = (
   );
   const menuPortraitTitleY = menuPortraitTitleFallbackY;
   const titleX = !isPlaySurface && isPortrait ? boardLeft + (snappedBoardSize / 2) : Math.round(width / 2);
-  const rankLane = isPlaySurface ? null : createLane(menuRankLaneTop, menuRankReserve);
+  const rankLane = null;
   const actionsLane = isPlaySurface ? null : createLane(menuActionLaneTop, menuActionReserve);
   const controlsLane = isPlaySurface
     ? createLane(boardTop + snappedBoardSize + laneGap, Math.max(0, height - (boardTop + snappedBoardSize + laneGap)))

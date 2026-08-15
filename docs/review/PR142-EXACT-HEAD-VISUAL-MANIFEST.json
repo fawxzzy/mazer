@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "mazer.exact-head-visual-manifest.v1",
+  "reviewKind": "draft-pr-exact-head-evidence",
+  "repository": "fawxzzy/mazer",
+  "pullRequest": 142,
+  "branch": "codex/mazer-menu-level-settings-cog-20260814",
+  "base": "0f885d67eb621094f2e6e1f5357e42577b5e4f1c",
+  "baseline": "e2107f2325020dc094646603c0d4210458edcc57",
+  "objectBinding": {
+    "sourceCommit": "Published in the PR #142 exact-head body after the one normal correction commit; this committed manifest binds the captured source surface to that immutable PR head.",
+    "sourceTree": "Published alongside sourceCommit in the PR #142 body because a Git commit cannot contain its own object id.",
+    "build": "vite production build: 234 modules; PWA precache: 34 entries"
+  },
+  "captureWindowUtc": {
+    "started": "2026-08-14T23:00:40Z",
+    "completed": "2026-08-14T23:02:41Z"
+  },
+  "browser": {
+    "engine": "Playwright Chromium",
+    "version": "147.0.7727.15",
+    "headless": true
+  },
+  "contactSheet": {
+    "path": "docs/review/PR142-EXACT-HEAD-VISUAL-PROOF.png",
+    "sha256": "dc5a0c61fcc0ff6b38fb9f1aae842241fe6780530d14196da73390d6eac8ad75",
+    "bytes": 156783
+  },
+  "matrix": [
+    {
+      "id": "phone-guest",
+      "viewport": "405x958",
+      "dpr": 2,
+      "authentication": "guest",
+      "reducedMotion": false,
+      "screenshots": {
+        "menu": "b286ec814f47f413332e6b7a66f24c0cd7cdeeba979119ee73e7feb8491c6ddc",
+        "auth": "9eb958e720b1e171e0b1dde7d469f49637d05bc752360eb6ac8bf374d032a4dd",
+        "settings": "b2be2c892c748e22df3810a868e46187c1f1b7b2b8d4439aa6d710e2966cf35f",
+        "play": "0b56cac1a40b0fd2e4b85838eff64269415b003d423dff16bbe30b0e4b3604c8",
+        "paused": "37ad15fd9f7e877af1105ff4c4ac0ebe5ec440f0d4d2fa1bfb45f62c8781fa21"
+      },
+      "consoleErrors": 0,
+      "pageErrors": 0
+    },
+    {
+      "id": "phone-authenticated",
+      "viewport": "405x958",
+      "dpr": 2,
+      "authentication": "authenticated fixture",
+      "reducedMotion": false,
+      "screenshots": {
+        "menu": "b091710f159349056e9fd7a2801ee05669fdcc6cb71f618198c2bdbc782c7781",
+        "settings": "c80f1e9ced72687c67a368ea1cb3697019210e51e7f0aedf1e3742baf2216922",
+        "play": "061900da738addb63409c790a210ff1171b818b93d256f876ded60bc599344ea",
+        "paused": "e99264d9f8ad37e09f06caccb67b5a8f4af81fcac179c37593dae2e4855eed51"
+      },
+      "consoleErrors": 0,
+      "pageErrors": 0
+    },
+    {
+      "id": "phone-authenticated-reduced-motion",
+      "viewport": "405x958",
+      "dpr": 2,
+      "authentication": "authenticated fixture",
+      "reducedMotion": true,
+      "screenshots": {
+        "menu": "0de7b295e37a5fa11e952267adb869da3776871775dfb8d4ef257be4fbd82ef6",
+        "settings": "df3b11f992c5ece4df94d0e4bd95e57ce3cd4afae72c1e7fb1a7cfb4ddf1eb2f",
+        "play": "66548ff45988d33e6fa1027b205e7d29dabb3a9343517328ec96856b8612260a",
+        "paused": "f701e2282b61140428eeaa1d412c5ee5f731de33260556c104bc2004b98347de"
+      },
+      "consoleErrors": 0,
+      "pageErrors": 0
+    },
+    {
+      "id": "desktop-guest",
+      "viewport": "1440x900",
+      "dpr": 2,
+      "authentication": "guest",
+      "reducedMotion": false,
+      "screenshots": {
+        "menu": "a452f9411d4a75f24cc7d1c200b3e37937aefcdd282180bee52f91c9856a11f1",
+        "auth": "75dac20ba3e712fb1c1968f32d46517219d64dee70b24c613f63c945542947e8",
+        "settings": "576b0ba32b3c6785e3cdb29cd24871e273b9e7e15d8638727d53943983bb0a9b",
+        "play": "2e46fecfd579e722b58a9c7d2a9d16432cf78470f92d4f94a49359e1f0e4f331",
+        "paused": "eeea870c1474ebe00d212872ca29e6fa722897799d59ae194d07caa002b53a5d"
+      },
+      "consoleErrors": 0,
+      "pageErrors": 0
+    },
+    {
+      "id": "desktop-authenticated",
+      "viewport": "1440x900",
+      "dpr": 2,
+      "authentication": "authenticated fixture",
+      "reducedMotion": false,
+      "screenshots": {
+        "menu": "875097589c22518efde3f09fe5ef3e19a1f89b8abf184d5fd3d060d4f8d0a953",
+        "settings": "ac53173026ccf6f94ad1251ed8bb0251b782a7cfdf0f7fd3c9d88265ec75bdb7",
+        "play": "1b600f0eea884ad78b7550ef4325038659ed1bc8651dda52abd8e9ed5e1bdef0",
+        "paused": "bf95d0891ab4e6334ec2e53c1e010a8c8bbaced4d0c58db714047d32a1318520"
+      },
+      "consoleErrors": 0,
+      "pageErrors": 0
+    }
+  ],
+  "validation": {
+    "exactCaptureRuns": "5 of 5 passed",
+    "livePreferenceChange": "false -> true -> false passed",
+    "githubActionsWorkflow": "No repository workflow exists; no hosted status was run for this source head.",
+    "baselineComparison": "Compared against e2107f23 in the paired source review: this correction changes only reduced-motion ownership, semantic cog material, Settings semantics, behavior proof, and evidence plumbing. It does not change gameplay, progression, generation, collision, input, persistence, scoring, AI, or hazard rules."
+  }
+}
