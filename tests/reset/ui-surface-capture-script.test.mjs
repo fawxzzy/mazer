@@ -62,11 +62,15 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const waitForAuthenticatedFixtureReady = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
     expect(source).toContain("runtime?.auth?.status === 'authenticated'");
     expect(source).toContain("labels.has('Start')");
+    expect(source).toContain('const playGeometrySettled = expectedMode !== \'play\'');
+    expect(source).toContain('badge.bottom <= board.top - 8');
+    expect(source).toContain('Number.isFinite(badge?.bottom)');
+    expect(source).toContain('Number.isFinite(board?.top)');
     expect(source).toContain("button?.text === 'Settings' && button?.iconOnly === true");
     expect(source).toContain("if (authFixture === 'authenticated') {");
     expect(source).toContain('await waitForAuthenticatedFixtureReady(page, { timeoutMs });');
     expect(source).toContain('expectedOverlay: overlay');
-    expect(source).toContain('return visual?.runtime?.mode === expectedMode && visual?.runtime?.overlay === expectedOverlay;');
+    expect(source).toContain("visual?.runtime?.mode === expectedMode\n          && visual?.runtime?.overlay === expectedOverlay");
     expect(source).toContain('screenContract: optionsSurface.screenContract');
     expect(source).toContain('const resolveRouteWithParams = (route, params) => {');
     expect(source).toContain('const isAuthGatedMenuSurface = (surface) => (');
