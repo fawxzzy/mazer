@@ -18,7 +18,7 @@
     "legacy:extract": "node ./scripts/legacy/extract-legacy-truth.mjs",
     "gate:future-lane": "node ./scripts/gates/future-lane-health.mjs",
     "test": "vitest run tests/reset tests/ai/demo-walker.test.ts tests/ai/demo-walker-known-frontier.test.ts tests/ai/demo-walker-rank-ladder.test.ts tests/ai/demo-walker-recovery-diagnostics.test.ts tests/scenes/menu-render-frame.test.ts tests/analysis/maze-cycle-telemetry-report.test.mjs tests/analysis/ai-run-corpus-audit.test.mjs",
-    "test:verify": "vitest run tests/reset tests/ai/demo-walker.test.ts tests/ai/demo-walker-known-frontier.test.ts tests/ai/demo-walker-rank-ladder.test.ts tests/ai/demo-walker-recovery-diagnostics.test.ts tests/scenes/menu-render-frame.test.ts tests/analysis/maze-cycle-telemetry-report.test.mjs tests/analysis/ai-run-corpus-audit.test.mjs --maxWorkers 1",
+    "test:verify": "node ./scripts/verify/run-test-verify.mjs",
     "test:architecture": "vitest run tests/architecture",
     "architecture:check": "node ./scripts/check-architecture.mjs",
     "test:soak": "vitest run tests/maze/maze-soak.test.ts",

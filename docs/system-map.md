@@ -516,7 +516,8 @@ What `test:verify` currently means:
 - `tests/scenes/menu-render-frame.test.ts`
 - `tests/analysis/maze-cycle-telemetry-report.test.mjs`
 - `tests/analysis/ai-run-corpus-audit.test.mjs`
-- `--maxWorkers 1`
+- every normal file runs with `--maxWorkers 1 --pool=threads --poolOptions.threads.singleThread`, avoiding the default fork-worker RPC timeout on long deterministic corpus checks
+- `legacy-unreal-source-fixture.test.ts` runs in the fork pool with `--maxWorkers 1`, because it deliberately verifies `process.chdir` isolation
 
 ### Visual comparison surfaces
 
