@@ -1017,20 +1017,36 @@ const collectTextOverlapIssues = (surfaceId, surface) => {
   return issues;
 };
 
-const collectMenuControlSpacingIssues = (surface) => {
+export const collectMenuControlSpacingIssues = (surface) => {
   if (surface?.skipped === true || surface?.mode !== 'menu' || surface?.overlay !== 'none') {
     return [];
   }
 
+  const playerLevel = surface.progressionBadge?.bounds;
   const settings = (surface.buttons ?? []).find((button) => button?.text === 'Settings' && button?.iconOnly === true);
   const issues = [];
-  if (surface.progressionBadge?.bounds) {
-    issues.push('menu:unexpected-progression-badge');
+  if (!isFiniteBounds(playerLevel)) {
+    issues.push('menu:missing-player-level-glyph');
+  } else if (playerLevel.width < 44 || playerLevel.height < 44) {
+    issues.push(`menu:player-level-target=${playerLevel.width.toFixed(1)}x${playerLevel.height.toFixed(1)}<44`);
   }
   if (!isFiniteBounds(settings?.bounds)) {
     issues.push('menu:missing-settings-control');
   } else if (settings.bounds.width < 44 || settings.bounds.height < 44) {
     issues.push(`menu:settings-target=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}<44`);
+  }
+  if (isFiniteBounds(playerLevel) && isFiniteBounds(settings?.bounds)) {
+    const sizeMismatch = Math.abs(playerLevel.width - settings.bounds.width) > 1
+      || Math.abs(playerLevel.height - settings.bounds.height) > 1;
+    if (sizeMismatch) {
+      issues.push(`menu:player-level-settings-size-mismatch=${playerLevel.width.toFixed(1)}x${playerLevel.height.toFixed(1)}!=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}`);
+    }
+    if (Math.abs(playerLevel.top - settings.bounds.top) > 1) {
+      issues.push(`menu:player-level-settings-top-mismatch=${playerLevel.top.toFixed(1)}!=${settings.bounds.top.toFixed(1)}`);
+    }
+    if (settings.bounds.left - playerLevel.right < 8) {
+      issues.push(`menu:player-level-to-settings-gap=${(settings.bounds.left - playerLevel.right).toFixed(1)}<8`);
+    }
   }
   return issues;
 };
@@ -1682,7 +1698,7 @@ const buildSurfaceChecks = ({
     createCheck(
       'mobile-control-spacing',
       controlSpacingIssues.length === 0,
-      controlSpacingIssues.length === 0 ? 'menu has no level box and Settings keeps a 44px target' : controlSpacingIssues.join('; ')
+      controlSpacingIssues.length === 0 ? 'menu player level and Settings share one 44px-or-larger header-control contract' : controlSpacingIssues.join('; ')
     ),
     createCheck(
       'mobile-badge-text-fit',
