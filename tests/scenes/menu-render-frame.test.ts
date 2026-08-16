@@ -1608,7 +1608,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps full-height overlay content behind one mobile scroll facade and icon-only back control', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const overlayPanelStart = menuSceneSource.indexOf('  private drawOverlayPanel(): void {');
+    const overlayPanelEnd = menuSceneSource.indexOf('  private resolveOverlayPanelFrame(', overlayPanelStart);
+    const overlayPanelSource = menuSceneSource.slice(overlayPanelStart, overlayPanelEnd);
 
+    expect(overlayPanelStart).toBeGreaterThanOrEqual(0);
+    expect(overlayPanelEnd).toBeGreaterThan(overlayPanelStart);
+    expect(overlayPanelSource).toContain('this.overlayGraphics.fillStyle(0x02040a, 0.82);');
+    expect(overlayPanelSource).toContain('this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);');
+    expect(overlayPanelSource).not.toContain('drawLegacyCyberPanel');
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');
     expect(menuSceneSource).toContain('private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void');
     expect(menuSceneSource).toContain('private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton');
