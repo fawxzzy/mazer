@@ -208,7 +208,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'menu-title-readable'");
     expect(source).toContain("createCheck(\n      'auth-surface'");
     expect(source).toContain("createCheck(\n      'auth-text-labels'");
-    expect(source).toContain("hasLabels(surfaces.auth, ['Account', 'Login', 'Create Account', 'Reset Password'])");
+    expect(source).toContain("hasLabels(surfaces.auth, ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'])");
     expect(source).toContain('const collectTextBoundsIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain('const collectNativeInputBoundsIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain('const collectTextOverlapIssues = (surfaceId, surface) => {');

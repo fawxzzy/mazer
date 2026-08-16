@@ -274,6 +274,7 @@ import {
   type LegacyAuthSessionSnapshot,
   type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
+import { resolveLegacyAuthPresentation } from '../legacy-runtime/legacyAuthPresentation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
@@ -8710,17 +8711,30 @@ export class MenuScene extends Phaser.Scene {
     const buttonWidth = Math.min(panel.width - 72, stacked ? 260 : 320);
     const centerX = panel.centerX;
     const panelBottom = panel.top + panel.height;
-    let rowY = panel.top + (stacked ? 106 : 122);
+    const presentation = resolveLegacyAuthPresentation({
+      mode: this.authForm.mode,
+      rememberedIdentity: readLegacyRememberedIdentityState(this.resolveBrowserLocalStorage()),
+      snapshot: this.authSnapshot
+    });
+    let rowY = panel.top + (stacked ? 150 : 168);
 
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    this.createOverlayTitle('Account', panel.top + (stacked ? 46 : 54));
+    this.createOverlayTitle(presentation.title, panel.top + (stacked ? 46 : 54));
 
     const accountLabel = resolveLegacyAuthAccountLabel(this.authSnapshot);
     this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
     const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
     if (visibleMessages.length > 0) {
-      this.createOverlayPlayerMessageStack(visibleMessages, panel.top + (stacked ? 80 : 88), panel);
+      this.createOverlayPlayerMessageStack(visibleMessages, panel.top + (stacked ? 98 : 112), panel);
       rowY += visibleMessages.length * (stacked ? 18 : 20);
+    } else {
+      this.createAuthInfoText(
+        presentation.helper,
+        panel.top + (stacked ? 90 : 104),
+        panel,
+        '#b7f2ff',
+        stacked ? 13 : 15
+      );
     }
 
     if (this.authSnapshot.status === 'authenticated') {
@@ -8741,12 +8755,15 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    this.createAuthFieldLabel(presentation.emailLabel, centerX, rowY - (stacked ? 18 : 20), fieldWidth);
     this.createAuthFieldBox(centerX, rowY, fieldWidth, fieldHeight, 'email', this.authForm.email || 'email', this.authForm.email.length === 0);
-    rowY += stacked ? 56 : 62;
+    rowY += stacked ? 70 : 76;
+    this.createAuthFieldLabel(presentation.passwordLabel, centerX, rowY - (stacked ? 18 : 20), fieldWidth);
     this.createAuthFieldBox(centerX, rowY, fieldWidth, fieldHeight, 'password', this.maskLegacyAuthPassword(), this.authForm.password.length === 0);
-    rowY += stacked ? 56 : 62;
+    rowY += stacked ? 70 : 76;
 
     if (this.authForm.mode === 'signup') {
+      this.createAuthFieldLabel(presentation.displayNameLabel, centerX, rowY - (stacked ? 18 : 20), fieldWidth);
       this.createAuthFieldBox(
         centerX,
         rowY,
@@ -8756,17 +8773,15 @@ export class MenuScene extends Phaser.Scene {
         this.authForm.displayName || 'display name',
         this.authForm.displayName.length === 0
       );
-      rowY += stacked ? 56 : 62;
+      rowY += stacked ? 70 : 76;
     }
 
     const primaryLabel = this.authSubmitting
       ? 'Working'
-      : this.authForm.mode === 'signup'
-        ? 'Create'
-        : 'Login';
-    const secondaryModeLabel = this.authForm.mode === 'signup' ? 'Use Login' : 'Create Account';
+      : presentation.primaryActionLabel;
+    const secondaryModeLabel = presentation.alternateActionLabel;
     const bottomButtonGap = stacked ? 54 : 58;
-    const bottomStartY = panelBottom - (stacked ? 184 : 196);
+    const bottomStartY = rowY + (stacked ? 24 : 28);
 
     this.uiButtons.push(
       this.createButton(centerX, bottomStartY, buttonWidth, buttonHeight, primaryLabel, () => {
@@ -8775,7 +8790,7 @@ export class MenuScene extends Phaser.Scene {
       this.createButton(centerX, bottomStartY + bottomButtonGap, buttonWidth, buttonHeight, secondaryModeLabel, () => {
         this.setLegacyAuthFormMode(this.authForm.mode === 'signup' ? 'login' : 'signup');
       }),
-      this.createButton(centerX, bottomStartY + (bottomButtonGap * 2), buttonWidth, buttonHeight, 'Reset Password', () => {
+      this.createButton(centerX, bottomStartY + (bottomButtonGap * 2), buttonWidth, buttonHeight, presentation.recoveryActionLabel, () => {
         void this.handleLegacyAuthPasswordReset();
       })
     );
@@ -8920,6 +8935,20 @@ export class MenuScene extends Phaser.Scene {
       fontSize: `${fontSize ?? (panel.width < 420 ? 16 : 18)}px`,
       wordWrap: { width: maxWidth, useAdvancedWrap: true }
     })), maxWidth, fontSize ?? 18, 11).setOrigin(0.5);
+    this.uiTexts.push(label);
+  }
+
+  private createAuthFieldLabel(
+    copy: string,
+    x: number,
+    y: number,
+    width: number
+  ): void {
+    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(x - (width / 2), y, copy, {
+      color: '#72e0bf',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '12px'
+    })), width, 12, 11).setOrigin(0, 0.5);
     this.uiTexts.push(label);
   }
 
