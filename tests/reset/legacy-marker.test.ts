@@ -102,6 +102,16 @@ describe('Mazer completion markers', () => {
     expect(systemMap).toContain('scale-`149` smoke');
   });
 
+  test('keeps the player-owned level glyph truth synchronized across menu and play', () => {
+    const currentTruth = readRepoFile('docs/current-truth.md');
+
+    expect(currentTruth).toContain('The glyph is bound to the player progression track on both menu and play');
+    expect(currentTruth).toContain('the independent menu-AI progression remains internal-only and has no raw numeric menu display');
+    expect(currentTruth).toContain('Menu and active play each use only a color-tiered numeric player-level glyph at the top-left');
+    expect(currentTruth).not.toContain('The menu glyph is bound to the independent menu-AI progression track');
+    expect(currentTruth).not.toContain('the menu glyph belongs to the AI runner');
+  });
+
   test('keeps the level/rank/complexity progression contract tracked', () => {
     const markerDoc = readRepoFile('docs/research/MAZER_AUTH_AI_VISUAL_COMPLETION_MARKER.md');
     const contractDoc = readRepoFile('docs/research/MAZER_LEVEL_RANK_COMPLEXITY_CONTRACT.md');
