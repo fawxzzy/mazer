@@ -188,6 +188,19 @@ describe('legacy auth runtime', () => {
     expect(authSource).toContain("event === 'SIGNED_OUT'");
   });
 
+  test('binds browser data queries to the migrated Mazer schema', () => {
+    const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
+    const progressionSource = readFileSync(
+      resolve(process.cwd(), 'src/legacy-runtime/legacyRemoteProgression.ts'),
+      'utf8'
+    );
+
+    expect(authSource).toMatch(/db:\s*\{\s*schema:\s*'mazer'\s*\}/);
+    expect(authSource).not.toMatch(/schema:\s*'public'/);
+    expect(progressionSource.match(/\.from\(/g)).toHaveLength(3);
+    expect(progressionSource).not.toContain('.schema(');
+  });
+
   test('scopes learning storage by guest versus signed-in account', () => {
     const storage = new MemoryStorage();
     const baseKey = 'mazer.progression.v1';

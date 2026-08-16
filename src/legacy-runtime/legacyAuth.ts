@@ -60,6 +60,7 @@ export type LegacyAuthStateListener = (
 ) => void;
 
 type LegacyAuthStorage = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>;
+type LegacyAuthClient = SupabaseClient<any, any, 'mazer'>;
 
 const createGuestSnapshot = (
   configured: boolean,
@@ -148,7 +149,7 @@ export const createLegacyAuthSessionSnapshot = (
   };
 };
 
-let legacyAuthClient: SupabaseClient | null = null;
+let legacyAuthClient: LegacyAuthClient | null = null;
 let legacyAuthPersistenceListenerInstalled = false;
 let legacyAuthLastSessionSignature: string | null = null;
 
@@ -309,7 +310,7 @@ const syncLegacyAuthPersistenceFromSession = (
   return snapshot;
 };
 
-const installLegacyAuthPersistenceListener = (client: SupabaseClient): void => {
+const installLegacyAuthPersistenceListener = (client: LegacyAuthClient): void => {
   if (legacyAuthPersistenceListenerInstalled) {
     return;
   }
@@ -327,7 +328,7 @@ const installLegacyAuthPersistenceListener = (client: SupabaseClient): void => {
     });
 };
 
-export const getLegacyAuthClient = async (): Promise<SupabaseClient | null> => {
+export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> => {
   const config = resolveLegacyAuthConfig();
   if (!config) {
     return null;
@@ -341,6 +342,9 @@ export const getLegacyAuthClient = async (): Promise<SupabaseClient | null> => {
         detectSessionInUrl: true,
         persistSession: true,
         storage: typeof window === 'undefined' ? undefined : window.localStorage
+      },
+      db: {
+        schema: 'mazer'
       }
     });
     installLegacyAuthPersistenceListener(legacyAuthClient);
