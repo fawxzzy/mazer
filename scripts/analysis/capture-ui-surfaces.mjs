@@ -46,6 +46,7 @@ const EXPECTED_GOAL_CORE_COLOR = 0xff405d;
 const EXPECTED_TRAIL_SHINE_COLOR = 0xf1faf6;
 const EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe9fff1;
 const INLINE_STATE_TEXT_LABELS = Object.freeze([
+  'High Contrast',
   'Camera Follow',
   'Control Style',
   'Smart Steering'
@@ -795,7 +796,7 @@ const resolveOptionsBottomExpectedLabels = (authenticated) => [
 ];
 
 const isAuthGatedMenuSurface = (surface) => (
-  hasTextLabels(surface, ['Login'])
+  hasVisualButton(surface, 'Login')
   && !hasVisualButton(surface, 'Start')
 );
 
@@ -1475,7 +1476,7 @@ const buildSurfaceChecks = ({
     ...collectOverlayScrollAffordanceIssues('pause', surfaces.pause)
   ];
   const overlayScrollBottomIssues = includeOverlayBottom ? [
-    ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, ['Smart Steering', 'Control Style']),
+    ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, optionsBottomExpectedLabels),
     ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Move Speed', 'Reset Progress', 'Reset', 'Menu'])
   ] : [];
   const overlayScrollFadeTextIssues = [
@@ -1942,6 +1943,13 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const reducedMotionToggle = options.reducedMotion
       ? null
       : await exerciseReducedMotionPreferenceChange(page, timeoutMs);
+    // Restoring the operating-system motion preference redraws the canvas UI.
+    // Wait for that redraw before inferring the guest Login/Start action from
+    // the diagnostic surface or driving any route transition.
+    await waitForVisualBuildSettled(page, {
+      requireReadableTitle: true,
+      timeoutMs
+    });
     const menu = await captureSurface({
       page,
       outputDir,

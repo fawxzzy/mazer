@@ -11,6 +11,7 @@ describe('UI surface capture label matching', () => {
   test('accepts explicit inline state labels without weakening unrelated label matching', () => {
     expect(matchesExpectedTextLabel('Camera Follow', 'Camera Follow')).toBe(true);
     expect(matchesExpectedTextLabel('Camera Follow: On', 'Camera Follow')).toBe(true);
+    expect(matchesExpectedTextLabel('High Contrast: On', 'High Contrast')).toBe(true);
     expect(matchesExpectedTextLabel('Smart Steering: Off', 'Smart Steering')).toBe(true);
     expect(matchesExpectedTextLabel('Control Style: Arrows', 'Control Style')).toBe(true);
     expect(matchesExpectedTextLabel('Camera Follower: On', 'Camera Follow')).toBe(false);
@@ -22,6 +23,7 @@ describe('UI surface capture label matching', () => {
       ['Camera Follow: On', 'Smart Steering: Off', 'Control Style: Stick'],
       ['Camera Follow', 'Smart Steering', 'Control Style']
     )).toBe(true);
+    expect(hasExpectedTextLabels(['High Contrast: On', 'Account'], ['High Contrast', 'Account'])).toBe(true);
     expect(hasExpectedTextLabels(
       ['Camera Follower: On', 'Smart Steering: Off', 'Control Style: Stick'],
       ['Camera Follow', 'Smart Steering', 'Control Style']
@@ -110,7 +112,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('screenContract: optionsSurface.screenContract');
     expect(source).toContain('const resolveRouteWithParams = (route, params) => {');
     expect(source).toContain('const isAuthGatedMenuSurface = (surface) => (');
-    expect(source).toContain("hasTextLabels(surface, ['Login'])");
+    expect(source).toContain("hasVisualButton(surface, 'Login')");
     expect(source).toContain("const hasVisualButton = (surface, text, { iconOnly = null } = {}) => (");
     expect(source).toContain('const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([');
     expect(source).toContain('export const matchesExpectedTextLabel = (actualLabel, expectedLabel) => (');
@@ -126,6 +128,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("authFixture === 'authenticated' || menu.diagnostics.runtime?.auth?.status === 'authenticated'");
     expect(source).toContain("surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out'])");
     expect(source).toContain('hasLabels(surfaces.optionsBottom, optionsBottomExpectedLabels)');
+    expect(source).toContain("collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, optionsBottomExpectedLabels)");
     expect(source).toContain('const getVisualButtonPoint = (visual, text) => {');
     expect(source).toContain("const button = (visual?.buttons ?? []).find((entry) => entry?.text === text && isFiniteBounds(entry?.bounds));");
     expect(source).toContain("login: getVisualButtonPoint(visual, 'Login') ?? {");
@@ -292,6 +295,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("await page.emulateMedia({ reducedMotion: 'no-preference' });");
     expect(source).toContain("'reduced-motion-preference-change'");
     expect(source).toContain('reducedMotionToggle.initial === false');
+    expect(source).toContain('// Restoring the operating-system motion preference redraws the canvas UI.');
+    expect(source).toContain('requireReadableTitle: true,\n      timeoutMs\n    });\n    const menu = await captureSurface({');
     expect(source).not.toContain("expectedLabels: ['Exit', 'Start', 'Options']");
     expect(source).toContain("hasLabels(surfaces.menu, ['Start']) && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })");
     expect(source).toContain("surfaces.options.mode === 'menu' && surfaces.options.overlay === 'options'");
