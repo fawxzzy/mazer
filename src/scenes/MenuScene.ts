@@ -8160,20 +8160,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawOverlayPanel(): void {
-    const panel = this.resolveOverlayPanelFrame(this.overlay);
-
-    this.overlayGraphics.fillStyle(0x06060b, 0.94);
+    // Overlays use the animated board as their backdrop. A full-height framed
+    // card duplicated the chrome already carried by fields, buttons, and
+    // content rows, and made every screen read like it had an extra border.
+    this.overlayGraphics.fillStyle(0x02040a, 0.82);
     this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);
-    this.drawLegacyCyberPanel(this.overlayGraphics, {
-      active: true,
-      alpha: 0.98,
-      fill: 0x08131d,
-      height: panel.height,
-      left: panel.left,
-      radius: cyberArcadeMaterial.controls.sheetRadius,
-      top: panel.top,
-      width: panel.width
-    });
   }
 
   private resolveOverlayPanelFrame(_kind: OverlayKind = this.overlay): OverlayPanelFrame {
