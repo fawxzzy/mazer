@@ -31,6 +31,7 @@ export const resolveLegacyAuthPresentation = (
 ): LegacyAuthPresentation => {
   const isSignup = input.mode === 'signup';
   const hasRememberedIdentity = input.rememberedIdentity !== null;
+  const requiresReauthentication = input.rememberedIdentity?.sessionState === 'reauth-required';
   const accountUnavailable = !input.snapshot.configured || input.snapshot.status === 'unavailable';
 
   return {
@@ -41,7 +42,9 @@ export const resolveLegacyAuthPresentation = (
       ? LEGACY_AUTH_MESSAGE_COPY.authUnavailable
       : isSignup
         ? 'Create a Mazer profile with your email and password.'
-        : hasRememberedIdentity
+        : requiresReauthentication
+          ? `Welcome back, ${input.rememberedIdentity?.displayName ?? 'Player'}. Enter your password to restore your saved progress. If you need it, use Forgot Password.`
+          : hasRememberedIdentity
           ? `Welcome back, ${input.rememberedIdentity?.displayName ?? 'Player'}. Enter your password to continue.`
           : 'Sign in with the account you use for Mazer. Guest play is always available.',
     passwordLabel: 'Password',
@@ -51,7 +54,9 @@ export const resolveLegacyAuthPresentation = (
       ? 'Account Unavailable'
       : isSignup
         ? 'Create Account'
-        : hasRememberedIdentity
+        : requiresReauthentication
+          ? 'Sign In Again'
+          : hasRememberedIdentity
           ? 'Welcome Back'
           : 'Sign In'
   };

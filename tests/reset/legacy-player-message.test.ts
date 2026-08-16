@@ -55,8 +55,8 @@ describe('legacy player-facing message system', () => {
       source: 'auth',
       tone: 'warning'
     });
-    expect(resolveLegacyAuthFeedbackMessage('Bad password.', null)).toMatchObject({
-      copy: 'Bad password.',
+    expect(resolveLegacyAuthFeedbackMessage('Invalid login credentials', null)).toMatchObject({
+      copy: 'That email and password do not match. Check them or use Forgot Password.',
       id: 'auth.feedback.error',
       source: 'auth',
       tone: 'error'
@@ -73,6 +73,18 @@ describe('legacy player-facing message system', () => {
       id: 'auth.feedback.info',
       source: 'auth',
       tone: 'success'
+    });
+  });
+
+  test('keeps provider details out of player copy while retaining a recovery path', () => {
+    expect(resolveLegacyAuthFeedbackMessage('Email rate limit exceeded', null)).toMatchObject({
+      copy: 'Too many attempts. Wait a moment, then try again.',
+      technicalDetail: 'Email rate limit exceeded',
+      tone: 'error'
+    });
+    expect(resolveLegacyAuthFeedbackMessage('User already registered', null)).toMatchObject({
+      copy: 'That email already has an account. Sign in instead.',
+      tone: 'error'
     });
   });
 

@@ -105,6 +105,36 @@ describe('legacy menu layout', () => {
     }
   });
 
+  test('keeps the complete animated title shell out of the header controls and maze', () => {
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 405, height: 958 },
+      { width: 430, height: 932 },
+      { width: 1280, height: 720 },
+      { width: 1440, height: 900 }
+    ]) {
+      const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
+      const presentation = resolveLegacyMenuTitlePresentation(
+        layout.boardSize,
+        layout.tileSize,
+        viewport.height > viewport.width,
+        viewport.width,
+        'procedural'
+      );
+      const title = resolveLegacyMenuPathTitleLayout(layout.titleX, layout.titleY, presentation.fontSize);
+      const orbit = resolveLegacyMenuPathTitleOrbitGeometry(
+        title.left,
+        title.top,
+        title.width,
+        title.height,
+        title.cellSize
+      );
+
+      expect(orbit.top).toBeGreaterThanOrEqual((layout.lanes.hud?.bottom ?? 0) + 4);
+      expect(orbit.bottom).toBeLessThanOrEqual(layout.lanes.maze.top - 4);
+    }
+  });
+
   test('keeps the portrait board dominant with one compact lower action', () => {
     const layout = resolveLegacyMenuLayout(430, 932, 50, 49);
 
@@ -152,7 +182,7 @@ describe('legacy menu layout', () => {
 
     expect(Math.abs(orbitGeometry.centerX - (layout.boardLeft + (layout.boardSize / 2)))).toBeLessThanOrEqual(0.5);
     expect(orbitGeometry.crownBottom + orbitClearance).toBeLessThanOrEqual(borderTop + 1);
-    expect(orbitGeometry.crownBottom).toBeGreaterThanOrEqual(layout.boardTop - 32);
+    expect(orbitGeometry.crownBottom).toBeLessThanOrEqual(layout.boardTop - 24);
     expect(titleLayout.width).toBeGreaterThanOrEqual(300);
     expect(titleLayout.width).toBeLessThanOrEqual(layout.width - 48);
   });
@@ -355,11 +385,12 @@ describe('legacy menu layout', () => {
     expect(touchLayout.frame.top).toBeLessThanOrEqual(playLayout.boardTop + playLayout.boardSize + 124);
   });
 
-  test('lets the menu reclaim the same desktop maze size as active play', () => {
+  test('keeps a substantial desktop maze after reserving the complete title shell', () => {
     const menuLayout = resolveLegacyMenuLayout(1920, 1080, 50, 49, 'menu');
     const playLayout = resolveLegacyMenuLayout(1920, 1080, 50, 49, 'play');
 
-    expect(menuLayout.boardSize).toBeGreaterThanOrEqual(playLayout.boardSize);
+    expect(menuLayout.boardSize).toBeGreaterThanOrEqual(600);
+    expect(menuLayout.boardSize).toBeLessThan(playLayout.boardSize);
     expect(Math.abs((playLayout.boardLeft + (playLayout.boardSize / 2)) - (playLayout.width / 2))).toBeLessThanOrEqual(2);
     expect(playLayout.boardTop).toBeGreaterThanOrEqual(56);
     expect(playLayout.boardTop + playLayout.boardSize).toBeLessThanOrEqual(playLayout.height - 12);
