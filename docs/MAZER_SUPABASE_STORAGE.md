@@ -10,7 +10,7 @@ Master consolidation target:
 - schema: `mazer`
 - materialized tables: `mazer_profiles`, `mazer_progression_states`, `mazer_ai_progression_states`, and `mazer_cycle_receipts`
 - materialized rows: 1,300 across the four tables, mapped to eight canonical users
-- access posture: forced RLS, zero client grants, zero policies, zero schema usage, and no Data API exposure
+- access posture: forced RLS, 11 authenticated client privileges, 11 owner-only RLS policies, authenticated schema usage, and Data API exposure limited to the four Mazer table paths plus the PostgREST root
 
 Legacy source/rollback project:
 
@@ -18,7 +18,7 @@ Legacy source/rollback project:
 - project ref: `geknvnrmktchljnyddwp`
 - retirement status: held; it is not safe to delete
 
-The master schema exists, but client access is intentionally not active. Policies, grants, custom-schema Data API exposure, environment cutover, deployment, and observation are separate protected gates. Stripe/license tables remain deferred.
+The master schema and bounded client-access layer are active. Postapply proof confirmed the exact five-entry Data API allowlist, 13 rows visible to the authenticated owner, and zero rows visible to an unknown or cross-owner identity. Environment configuration, deployment, production cutover, observation, rollback expiry, credential retirement, and legacy deletion remain separate protected gates. Stripe/license tables remain deferred.
 
 ## Tables
 
@@ -35,8 +35,10 @@ Deferred Stripe/payment-wall tables:
 ## Access Rules
 
 - `anon` receives no direct table access.
-- The master schema currently grants no client access and is not exposed through the Data API.
-- A future protected access packet may allow authenticated users to read/write only their own profile, progression, AI progression, and cycle receipts.
+- `authenticated` has 11 scoped table privileges guarded by 11 owner-only RLS policies and one schema-usage grant.
+- The Data API exposes only the four required Mazer table paths plus the PostgREST root; no additional Mazer path is allowlisted.
+- Live aggregate proof confirms 13 rows visible to the authenticated owner, zero rows visible to an unknown owner, and zero cross-owner visibility.
+- Authenticated users can read or write only their own profile, progression, AI progression, and cycle receipts within those grants and policies.
 - Future authenticated users can only read their own license account and entitlement rows after the Stripe lane is unlocked.
 - Future license account, entitlement, and webhook-event writes are server-only through `service_role`.
 - Future client-visible payment-wall state must be read from `mazer_license_entitlements`; never trust client-written profile/settings data for paid access.
@@ -64,7 +66,7 @@ It also hydrates authenticated account state before Phaser creates the first maz
 - `revision` on progression and profile rows is a monotonic optimistic-concurrency guard. Normal advancement can rebase forward once after a conflict; destructive replacement/reset refuses to overwrite a newer revision.
 - A scoped local sync envelope records the last observed revision and local fingerprints so offline/local advancement can be reconciled without resurrecting a previously accepted reset.
 
-The app remains playable local-first if Supabase is unavailable or remote progression is disabled. This source binding does not change environment values, enable the feature flag, grant client access, expose the schema, deploy, or cut over the application.
+The app remains playable local-first if Supabase is unavailable or remote progression is disabled. This source binding itself did not change environment values, enable the feature flag, grant client access, expose the schema, deploy, or cut over the application; the bounded access and Data API postimage above was completed and verified through a separate governed provider wave.
 
 In the legacy source project, live migration `account_state_revisions` was applied on 2026-07-16. Readback confirmed the existing three progression rows were preserved at revision `0`; the profile table remained empty until an authenticated client seeds its first settings row. This remains source-contract evidence for the consolidated runtime behavior.
 
@@ -77,14 +79,15 @@ Remaining UI proof gap: browser automation did not inject typed characters into 
 ## Apply Order
 
 1. The master project contains the forced-RLS `mazer` schema and the verified 1,300-row postimage.
-2. The browser client source binds data queries to the `mazer` schema while remote sync stays disabled.
-3. Apply a separately authorized client-access packet for exact RLS policies, grants, schema usage, and custom-schema Data API exposure.
+2. The governed access wave applied 11 authenticated privileges, 11 owner-only policies, authenticated schema usage, and the exact five-entry Data API allowlist; aggregate owner-isolation proof passed.
+3. The browser client source binds data queries to the `mazer` schema while remote sync stays disabled.
 4. Configure nonproduction environment values for the master project and run authenticated QA before any production cutover:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
    - `VITE_MAZER_REMOTE_PROGRESSION=true` only after access proof passes.
-5. Observe the bounded nonproduction lane, preserve rollback, and require separate deployment/cutover authority.
-6. Keep Stripe/license tables deferred until the payment wall lane is explicitly unlocked; add future server-only Stripe webhook env vars only to backend/server contexts, never browser env.
+5. Observe the bounded nonproduction lane, preserve rollback, and require separate deployment and production-cutover authority.
+6. Close observation, rollback-expiry, credential-retirement, and deletion-readiness gates independently before any legacy retirement.
+7. Keep Stripe/license tables deferred until the payment wall lane is explicitly unlocked; add future server-only Stripe webhook env vars only to backend/server contexts, never browser env.
 
 ## Stripe Boundary
 
