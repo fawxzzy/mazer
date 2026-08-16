@@ -105,10 +105,10 @@ describe('legacy remote progression', () => {
     state.updatedAt = '2026-07-09T01:00:00.000Z';
     state.tracks.player = {
       ...state.tracks.player,
-      completedCycles: 3,
+      completedCycles: 10,
       lastCompletedAt: '2026-07-09T01:00:00.000Z',
-      level: 7,
-      rank: 'D',
+      level: 11,
+      rank: 'C',
       targetComplexity: 48
     };
     state.tracks['ai-runner'] = {
@@ -165,7 +165,7 @@ describe('legacy remote progression', () => {
     expect(from).toHaveBeenNthCalledWith(2, LEGACY_REMOTE_PROGRESSION_TABLE);
     expect(from).toHaveBeenNthCalledWith(3, LEGACY_REMOTE_AI_PROGRESSION_TABLE);
     expect(updatePayloads[0]).toEqual(expect.objectContaining({
-      player_completed_cycles: 3,
+      player_completed_cycles: 10,
       player_level: 11,
       player_rank: 'C',
       player_target_complexity: 48,
@@ -185,7 +185,7 @@ describe('legacy remote progression', () => {
   test('merges first-contact device progress without lowering a newer canonical track', () => {
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-07-16T12:00:00.000Z';
-    remote.tracks.player.completedCycles = 12;
+    remote.tracks.player.completedCycles = 11;
     remote.tracks.player.targetComplexity = 52;
     const local = createEmptyLegacyProgressionState();
     local.updatedAt = '2026-07-16T13:00:00.000Z';
@@ -195,7 +195,7 @@ describe('legacy remote progression', () => {
 
     const merged = mergeLegacyProgressionStateAdvancements(remote, local);
 
-    expect(merged.tracks.player.completedCycles).toBe(12);
+    expect(merged.tracks.player.completedCycles).toBe(11);
     expect(merged.tracks.player.targetComplexity).toBe(52);
     expect(merged.tracks['ai-runner'].completedCycles).toBe(18);
     expect(merged.tracks['ai-runner'].targetComplexity).toBe(64);
@@ -205,7 +205,7 @@ describe('legacy remote progression', () => {
   test('hydrates canonical progression and settings into account-scoped storage before scene creation', async () => {
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-07-16T14:00:00.000Z';
-    remote.tracks.player.completedCycles = 12;
+    remote.tracks.player.completedCycles = 11;
     remote.tracks.player.targetComplexity = 52;
     const values = new Map<string, string>();
     const storage = {
@@ -238,7 +238,7 @@ describe('legacy remote progression', () => {
     );
 
     expect(result.error).toBeNull();
-    expect(result.progressionState?.tracks.player.completedCycles).toBe(12);
+    expect(result.progressionState?.tracks.player.completedCycles).toBe(11);
     expect(result.progressionState?.tracks.player.targetComplexity).toBe(52);
     expect(result.settings?.controlMode).toBe('arrows');
     expect(result.settings?.movementSpeed).toBe(0.65);

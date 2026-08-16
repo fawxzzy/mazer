@@ -21,12 +21,12 @@ export const LEGACY_PROGRESSION_BASE_TARGET_COMPLEXITY = 24;
 export const LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY = LEGACY_PROGRESSION_MIN_COMPLEXITY;
 export const LEGACY_PROGRESSION_AI_BASE_TARGET_COMPLEXITY = LEGACY_PROGRESSION_MIN_COMPLEXITY;
 export const LEGACY_PROGRESSION_AI_BASELINE_VERSION = 3;
-export const LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION = 4;
+export const LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION = 5;
 // Player difficulty does not consume `struggleCycles`; it is legacy AI
-// telemetry. Reserve an impossible player count in that existing v3-compatible
-// field so a stale v3 tab cannot erase the v4 baseline provenance when it
-// rewrites the top-level baseline version during remote sync.
-const LEGACY_PROGRESSION_PLAYER_BASELINE_V4_PROVENANCE_STRUGGLE_CYCLES = Number.MAX_SAFE_INTEGER;
+// telemetry. Reserve an impossible player count in that existing compatible
+// field so a stale tab cannot erase baseline provenance when it rewrites the
+// top-level baseline version during remote sync.
+const LEGACY_PROGRESSION_PLAYER_BASELINE_V5_PROVENANCE_STRUGGLE_CYCLES = Number.MAX_SAFE_INTEGER;
 export const LEGACY_PROGRESSION_CHALLENGE_STEP = 1;
 export const LEGACY_PROGRESSION_CHALLENGE_PRESSURE_BONUS = 1;
 export const LEGACY_PROGRESSION_CHALLENGE_STREAK_BONUS_EVERY = 3;
@@ -658,7 +658,7 @@ const createTrack = (targetComplexity = LEGACY_PROGRESSION_BASE_TARGET_COMPLEXIT
 
 const createPlayerBaselineTrack = (): LegacyProgressionTrack => ({
   ...createTrack(LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY),
-  struggleCycles: LEGACY_PROGRESSION_PLAYER_BASELINE_V4_PROVENANCE_STRUGGLE_CYCLES
+  struggleCycles: LEGACY_PROGRESSION_PLAYER_BASELINE_V5_PROVENANCE_STRUGGLE_CYCLES
 });
 
 const formatLegacyProgressionCycleCount = (completedCycles: number): string => (
@@ -749,16 +749,26 @@ const normalizeTrack = (value: unknown, fallback: LegacyProgressionTrack): Legac
 };
 
 const rebaseLegacyPlayerProgressionBaseline = (): LegacyProgressionTrack => {
-  // Completion counts created before baseline v4 are lifetime history, not
-  // evidence of an earned visible difficulty level. Reusing them made a player
-  // jump straight into late-game generation and hazards. Start the player lane
-  // from the gentle, complete Level 1 state instead; every new player clear
-  // then advances exactly one level through the current contract.
+  // Historical completion counts are lifetime history, not evidence of an
+  // earned visible difficulty level. Reusing them can put a player straight
+  // into late-game generation and hazards. Start the player lane from the
+  // gentle, complete Level 1 state instead; every new player clear then
+  // advances exactly one level through the current contract.
   return createPlayerBaselineTrack();
 };
 
-const hasLegacyPlayerBaselineV4Provenance = (track: LegacyProgressionTrack): boolean => (
-  track.struggleCycles >= LEGACY_PROGRESSION_PLAYER_BASELINE_V4_PROVENANCE_STRUGGLE_CYCLES
+const hasLegacyPlayerBaselineV5Provenance = (track: LegacyProgressionTrack): boolean => (
+  track.struggleCycles >= LEGACY_PROGRESSION_PLAYER_BASELINE_V5_PROVENANCE_STRUGGLE_CYCLES
+);
+
+const resolveLegacyPlayerTargetComplexityForCompletedCycles = (completedCycles: number): number => clampInteger(
+  LEGACY_PROGRESSION_MIN_COMPLEXITY + (normalizeNonNegativeInteger(completedCycles) * 4),
+  LEGACY_PROGRESSION_MIN_COMPLEXITY,
+  LEGACY_PROGRESSION_MAX_COMPLEXITY
+);
+
+const hasCoherentLegacyPlayerProgression = (track: LegacyProgressionTrack): boolean => (
+  track.targetComplexity === resolveLegacyPlayerTargetComplexityForCompletedCycles(track.completedCycles)
 );
 
 export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressionState => {
@@ -772,15 +782,12 @@ export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressi
     value.aiRunnerBaselineVersion,
     0
   );
-  const playerProgressionBaselineVersion = normalizeNonNegativeInteger(
-    value.playerProgressionBaselineVersion,
-    0
-  );
   const shouldResetLegacyAiRunner = aiRunnerBaselineVersion < LEGACY_PROGRESSION_AI_BASELINE_VERSION;
   const normalizedPlayer = normalizeTrack(tracks.player, fallback.tracks.player);
-  const shouldRebaseLegacyPlayerProgression = playerProgressionBaselineVersion
-    < LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION
-    && !hasLegacyPlayerBaselineV4Provenance(normalizedPlayer);
+  const shouldRebaseLegacyPlayerProgression = (
+    !hasLegacyPlayerBaselineV5Provenance(normalizedPlayer)
+    || !hasCoherentLegacyPlayerProgression(normalizedPlayer)
+  );
   return {
     version: 1,
     aiRunnerBaselineVersion: LEGACY_PROGRESSION_AI_BASELINE_VERSION,

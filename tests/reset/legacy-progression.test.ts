@@ -246,7 +246,7 @@ describe('legacy progression', () => {
     storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify(legacyState));
 
     const repaired = readLegacyProgressionState(storage);
-    expect(repaired.playerProgressionBaselineVersion).toBeGreaterThanOrEqual(4);
+    expect(repaired.playerProgressionBaselineVersion).toBeGreaterThanOrEqual(5);
     expect(repaired.tracks.player).toMatchObject({
       cleanCycles: 0,
       completedCycles: 0,
@@ -256,7 +256,7 @@ describe('legacy progression', () => {
       targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
     });
     expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}'))
-      .toMatchObject({ playerProgressionBaselineVersion: 4 });
+      .toMatchObject({ playerProgressionBaselineVersion: 5 });
 
     const profile = resolveLegacyProgressionDifficultyProfile(repaired.tracks.player);
     expect(profile.band).toBe('tutorial');
@@ -295,8 +295,8 @@ describe('legacy progression', () => {
       targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4
     });
 
-    // A still-open v3 client preserves recognized track fields but rewrites
-    // the top-level baseline version during a remote sync. The v4 provenance
+    // A still-open client preserves recognized track fields but rewrites
+    // the top-level baseline version during a remote sync. The baseline provenance
     // must keep a legitimately advanced post-rebase player from being reset
     // again when they later return to an updated client.
     const staleV3RemoteWrite = {
@@ -311,6 +311,68 @@ describe('legacy progression', () => {
       rank: 'E',
       struggleCycles: Number.MAX_SAFE_INTEGER,
       targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4
+    });
+  });
+
+  test('rebases a versioned but impossible player level before it can unlock late-game hazards', () => {
+    const storage = new MemoryStorage();
+    const baseline = createEmptyLegacyProgressionState();
+    storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify({
+      ...baseline,
+      playerProgressionBaselineVersion: 4,
+      tracks: {
+        ...baseline.tracks,
+        player: {
+          ...baseline.tracks.player,
+          completedCycles: 3,
+          level: 99,
+          rank: 'S',
+          targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
+        }
+      }
+    }));
+
+    const repaired = readLegacyProgressionState(storage);
+    expect(repaired.playerProgressionBaselineVersion).toBe(5);
+    expect(repaired.tracks.player).toMatchObject({
+      completedCycles: 0,
+      level: 1,
+      rank: 'E',
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
+    });
+
+    const profile = resolveLegacyProgressionDifficultyProfile(repaired.tracks.player);
+    expect(profile.band).toBe('tutorial');
+    expect(createLegacyStaticSlowTileState(createProgressionTestMaze(), profile.band))
+      .toMatchObject({ eligible: false, placement: null });
+    expect(createLegacyPatrolAgentState(createProgressionTestMaze(), profile.band)).toBeNull();
+  });
+
+  test('keeps a coherent earned player trajectory when it migrates to the current baseline', () => {
+    const storage = new MemoryStorage();
+    const baseline = createEmptyLegacyProgressionState();
+    storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify({
+      ...baseline,
+      playerProgressionBaselineVersion: 4,
+      tracks: {
+        ...baseline.tracks,
+        player: {
+          ...baseline.tracks.player,
+          completedCycles: 3,
+          level: 4,
+          rank: 'E',
+          targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 12
+        }
+      }
+    }));
+
+    const migrated = readLegacyProgressionState(storage);
+    expect(migrated.playerProgressionBaselineVersion).toBe(5);
+    expect(migrated.tracks.player).toMatchObject({
+      completedCycles: 3,
+      level: 4,
+      rank: 'E',
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 12
     });
   });
 
