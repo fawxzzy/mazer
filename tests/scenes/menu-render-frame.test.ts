@@ -1257,7 +1257,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
   test('keeps front-door buttons and header controls on their shared chrome paths', () => {
-    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
 
     expect(menuSceneSource).toContain('const panel = this.add.graphics();');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(panel, {');
@@ -1279,7 +1279,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
-    expect(menuSceneSource).toContain('const background = this.add.rectangle(\r\n      pauseRect.centerX,');
+    expect(menuSceneSource).toContain('const background = this.add.rectangle(\n      pauseRect.centerX,');
     expect(menuSceneSource).toContain('bounds: createVisualRect(pauseRect.left, pauseRect.top, pauseRect.width, pauseRect.height)');
     expect(menuSceneSource).toContain('text,');
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');

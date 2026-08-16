@@ -14,7 +14,7 @@ const createRuntime = (
   const loadListeners: Array<() => void> = [];
   const update = vi.fn(async () => undefined);
   const runtime: MazerServiceWorkerLifecycleRuntime = {
-    hostname: 'fawxzzy-mazer.vercel.app',
+    hostname: 'mazer.fawxzzy.com',
     readyState: 'loading',
     addLoadListener: (listener) => loadListeners.push(listener),
     register: vi.fn(async () => ({ update })),
