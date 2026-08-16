@@ -149,14 +149,26 @@ export const resolveLegacyAuthFeedbackMessage = (
 ): LegacyPlayerMessage | null => {
   if (error?.trim()) {
     const rawError = error.trim();
-    const isNetworkError = rawError.toLowerCase() === 'failed to fetch'
-      || rawError.toLowerCase().includes('network')
-      || rawError.toLowerCase().includes('fetch');
+    const normalizedError = rawError.toLowerCase();
+    const isNetworkError = normalizedError === 'failed to fetch'
+      || normalizedError.includes('network')
+      || normalizedError.includes('fetch');
+    const copy = isNetworkError
+      ? LEGACY_AUTH_MESSAGE_COPY.networkUnavailable
+      : normalizedError.includes('invalid login credentials') || normalizedError.includes('invalid credentials')
+        ? 'That email and password do not match. Check them or use Forgot Password.'
+        : normalizedError.includes('email not confirmed')
+          ? 'Confirm your email, then sign in again.'
+          : normalizedError.includes('rate limit')
+            ? 'Too many attempts. Wait a moment, then try again.'
+            : normalizedError.includes('already registered')
+              ? 'That email already has an account. Sign in instead.'
+              : 'Account sign-in did not finish. Check your details and try again.';
     return createLegacyPlayerMessage({
-      copy: isNetworkError ? LEGACY_AUTH_MESSAGE_COPY.networkUnavailable : rawError,
+      copy,
       id: 'auth.feedback.error',
       source: 'auth',
-      technicalDetail: isNetworkError ? rawError : null,
+      technicalDetail: rawError,
       tone: 'error'
     });
   }

@@ -9606,6 +9606,8 @@ export class MenuScene extends Phaser.Scene {
     const input = document.createElement('input');
     input.type = fieldId === 'password' ? 'password' : fieldId === 'email' ? 'email' : 'text';
     input.autocomplete = fieldId === 'password' ? 'current-password' : fieldId === 'email' ? 'email' : 'name';
+    input.inputMode = fieldId === 'email' ? 'email' : 'text';
+    input.enterKeyHint = fieldId === 'password' ? 'done' : 'next';
     input.autocapitalize = fieldId === 'email' || fieldId === 'password' ? 'none' : 'words';
     input.spellcheck = false;
     input.setAttribute('aria-label', fieldId === 'displayName' ? 'display name' : fieldId);

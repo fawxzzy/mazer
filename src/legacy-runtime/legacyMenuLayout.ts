@@ -117,11 +117,15 @@ export const resolveLegacyMenuLayout = (
   const menuTitleReserve = isUltraNarrow
     ? 50
     : isPortrait
-      ? Math.round(clamp(width * 0.26, 72, 112))
-      // The title no longer carries a large decorative rail frame. Keep a
-      // compact, readable title lane so the menu can reserve its header
-      // controls without shrinking the desktop maze beneath active play.
-      : Math.round(clamp(height * 0.12, 72, 104));
+      // The animated title extends above and below its core grid through its
+      // orbit and crown. Reserve that complete visual footprint—not only the
+      // letter cells—so it cannot sit beneath the level, AI, or settings
+      // controls on a real phone.
+      ? Math.round(clamp(width * 0.38, 136, 156))
+      // Landscape needs the same outer-title clearance. Keeping this larger
+      // than the letter-grid height makes the board and Start action move as a
+      // coherent group rather than solving the header collision ad hoc.
+      : Math.round(clamp(height * 0.21, 140, 152));
   const menuRankReserve = 0;
   const menuActionReserve = buttonHeight;
   const playTopHudReserve = isPlaySurface && isPortrait
