@@ -540,6 +540,15 @@ interface MenuSceneVisualDiagnostics {
     textFontSize: number | null;
     textFits: boolean;
   };
+  menuAiProgressionBadge: {
+    bounds: VisualRect | null;
+    label: string | null;
+    labelBounds: VisualRect | null;
+    text: string | null;
+    textBounds: VisualRect | null;
+    textFontSize: number | null;
+    textFits: boolean;
+  };
   menuCompass: {
     bounds: VisualRect | null;
     notchBounds: VisualRect;
@@ -1188,6 +1197,12 @@ export class MenuScene extends Phaser.Scene {
   private progressionBadgeBounds: VisualRect | null = null;
   private progressionBadgeTextBounds: VisualRect | null = null;
   private progressionBadgeTextFits = false;
+  private menuAiProgressionBadgeText!: Phaser.GameObjects.Text;
+  private menuAiProgressionBadgeLabelText!: Phaser.GameObjects.Text;
+  private menuAiProgressionBadgeBounds: VisualRect | null = null;
+  private menuAiProgressionBadgeLabelBounds: VisualRect | null = null;
+  private menuAiProgressionBadgeTextBounds: VisualRect | null = null;
+  private menuAiProgressionBadgeTextFits = false;
   private progressionBadgePulseStartedAtMs: number | null = null;
   private menuSettingsCogActive = false;
   private menuCompassBounds: VisualRect | null = null;
@@ -1341,6 +1356,20 @@ export class MenuScene extends Phaser.Scene {
       color: '#36ff7d',
       align: 'center'
     })).setOrigin(0.5).setAlpha(0.96).setVisible(false);
+    this.menuAiProgressionBadgeText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
+      fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
+      fontSize: '13px',
+      fontStyle: 'bold',
+      color: '#8ac6ff',
+      align: 'center'
+    })).setOrigin(0.5).setAlpha(0.96).setVisible(false);
+    this.menuAiProgressionBadgeLabelText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
+      fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
+      fontSize: '9px',
+      fontStyle: 'bold',
+      color: '#8ac6ff',
+      align: 'center'
+    })).setOrigin(0.5).setAlpha(0.82).setVisible(false);
 
     this.createStars();
     if (resolveInitialRuntimeMode(runtimeSearch) === 'play') {
@@ -6624,21 +6653,28 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyProgressionBadge(): VisualRect | null {
     // One compact number keeps the player-facing progression legible without
     // reviving the old score/rank panel. The menu demo keeps its independent AI
-    // progression internally, but it must not replace the player's visible
-    // level with an indistinguishable number when the scene returns to menu.
+    // progression, so the menu presents it in its own explicitly marked square
+    // rather than substituting it for the player's visible level.
     if (this.overlay !== 'none') {
       this.progressionBadgeBounds = null;
       this.progressionBadgeTextBounds = null;
       this.progressionBadgeTextFits = false;
       this.progressionBadgeText.setVisible(false);
+      this.clearLegacyMenuAiProgressionBadge();
       return null;
     }
 
     const playerTrack = this.progressionState.tracks.player;
-    return this.drawLegacyProgressionGlyph(
+    const playerBadgeBounds = this.drawLegacyProgressionGlyph(
       playerTrack,
       resolveLegacyProgressionPalette(playerTrack, 'player')
     );
+    if (this.mode === 'menu') {
+      this.drawLegacyMenuAiProgressionBadge();
+    } else {
+      this.clearLegacyMenuAiProgressionBadge();
+    }
+    return playerBadgeBounds;
   }
 
   private drawLegacyProgressionGlyph(
@@ -6677,6 +6713,65 @@ export class MenuScene extends Phaser.Scene {
       rawTextBounds.height
     );
     this.progressionBadgeTextFits = true;
+
+    return badgeBounds;
+  }
+
+  private clearLegacyMenuAiProgressionBadge(): void {
+    this.menuAiProgressionBadgeBounds = null;
+    this.menuAiProgressionBadgeLabelBounds = null;
+    this.menuAiProgressionBadgeTextBounds = null;
+    this.menuAiProgressionBadgeTextFits = false;
+    this.menuAiProgressionBadgeText.setVisible(false);
+    this.menuAiProgressionBadgeLabelText.setVisible(false);
+  }
+
+  private drawLegacyMenuAiProgressionBadge(): VisualRect {
+    const aiTrack = this.progressionState.tracks['ai-runner'];
+    const palette = resolveLegacyProgressionPalette(aiTrack, 'ai-runner');
+    const laneTop = this.layout.lanes.hud?.top ?? 0;
+    const frame = resolveLegacyHeaderControlFrame({
+      height: this.layout.height,
+      hudHeight: this.layout.lanes.hud?.height ?? 64,
+      hudTop: laneTop,
+      placement: 'leading',
+      slot: 1,
+      width: this.layout.width
+    });
+    this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);
+    this.menuAiProgressionBadgeText
+      .setText(String(aiTrack.level))
+      .setFontSize(resolveLegacyHeaderControlMetricFontSize(aiTrack.level, frame.width))
+      .setAlign('center')
+      .setLineSpacing(0)
+      .setPadding(0)
+      .setColor(palette.badgeColor)
+      .setPosition(frame.centerX, frame.centerY + Math.round(frame.height * 0.06))
+      .setVisible(true);
+    this.menuAiProgressionBadgeLabelText
+      .setText('AI')
+      .setFontSize(Math.max(9, Math.round(frame.height * 0.2)))
+      .setColor(palette.badgeColor)
+      .setPosition(frame.left + Math.round(frame.width * 0.24), frame.top + Math.round(frame.height * 0.2))
+      .setVisible(true);
+
+    const badgeBounds = createVisualRect(frame.left, frame.top, frame.width, frame.height);
+    const rawLabelBounds = this.menuAiProgressionBadgeLabelText.getBounds();
+    const rawTextBounds = this.menuAiProgressionBadgeText.getBounds();
+    this.menuAiProgressionBadgeBounds = badgeBounds;
+    this.menuAiProgressionBadgeLabelBounds = createVisualRect(
+      rawLabelBounds.x,
+      rawLabelBounds.y,
+      rawLabelBounds.width,
+      rawLabelBounds.height
+    );
+    this.menuAiProgressionBadgeTextBounds = createVisualRect(
+      rawTextBounds.x,
+      rawTextBounds.y,
+      rawTextBounds.width,
+      rawTextBounds.height
+    );
+    this.menuAiProgressionBadgeTextFits = true;
 
     return badgeBounds;
   }
@@ -8099,6 +8194,8 @@ export class MenuScene extends Phaser.Scene {
     this.overlayScrollTopFadeAlpha = 0;
     this.overlayScrollBottomFadeAlpha = 0;
     this.progressionBadgeText.setVisible(this.overlay === 'none');
+    this.menuAiProgressionBadgeText.setVisible(this.mode === 'menu' && this.overlay === 'none');
+    this.menuAiProgressionBadgeLabelText.setVisible(this.mode === 'menu' && this.overlay === 'none');
 
     if (this.overlay === 'none') {
       if (this.mode === 'menu') {
@@ -11125,6 +11222,7 @@ export class MenuScene extends Phaser.Scene {
     const measuredRects = [
       { id: 'board', bounds: mazeRenderBounds },
       { id: 'progression-badge', bounds: this.progressionBadgeBounds },
+      { id: 'menu-ai-progression-badge', bounds: this.menuAiProgressionBadgeBounds },
       { id: 'hud', bounds: this.hudBounds },
       { id: 'touch-controls', bounds: touchControls.frame },
       { id: 'overlay', bounds: overlayPanel }
@@ -11147,8 +11245,10 @@ export class MenuScene extends Phaser.Scene {
     );
     const overlapViolations = this.overlay === 'none'
       ? [
-        ...(overlaps(mazeRenderBounds, this.progressionBadgeBounds) ? ['board-progression-badge'] : []),
-        ...(overlaps(mazeRenderBounds, this.hudBounds) ? ['board-hud'] : []),
+          ...(overlaps(mazeRenderBounds, this.progressionBadgeBounds) ? ['board-progression-badge'] : []),
+          ...(overlaps(mazeRenderBounds, this.menuAiProgressionBadgeBounds) ? ['board-menu-ai-progression-badge'] : []),
+          ...(overlaps(this.progressionBadgeBounds, this.menuAiProgressionBadgeBounds) ? ['player-menu-ai-progression-badge'] : []),
+          ...(overlaps(mazeRenderBounds, this.hudBounds) ? ['board-hud'] : []),
         ...(overlaps(mazeRenderBounds, touchControls.frame) ? ['board-touch-controls'] : [])
       ]
       : [];
@@ -11440,6 +11540,17 @@ export class MenuScene extends Phaser.Scene {
           ? Number.parseFloat(String(this.progressionBadgeText.style.fontSize))
           : null,
         textFits: this.progressionBadgeTextFits
+      },
+      menuAiProgressionBadge: {
+        bounds: cloneVisualRect(this.menuAiProgressionBadgeBounds),
+        label: this.menuAiProgressionBadgeLabelText.visible ? this.menuAiProgressionBadgeLabelText.text : null,
+        labelBounds: cloneVisualRect(this.menuAiProgressionBadgeLabelBounds),
+        text: this.menuAiProgressionBadgeText.visible ? this.menuAiProgressionBadgeText.text : null,
+        textBounds: cloneVisualRect(this.menuAiProgressionBadgeTextBounds),
+        textFontSize: Number.isFinite(Number.parseFloat(String(this.menuAiProgressionBadgeText.style.fontSize)))
+          ? Number.parseFloat(String(this.menuAiProgressionBadgeText.style.fontSize))
+          : null,
+        textFits: this.menuAiProgressionBadgeTextFits
       },
       menuCompass: {
         bounds: cloneVisualRect(this.menuCompassBounds),

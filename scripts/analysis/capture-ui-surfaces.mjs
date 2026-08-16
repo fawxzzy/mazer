@@ -1024,12 +1024,22 @@ export const collectMenuControlSpacingIssues = (surface) => {
   }
 
   const playerLevel = surface.progressionBadge?.bounds;
+  const aiLevel = surface.menuAiProgressionBadge?.bounds;
+  const aiLabel = surface.menuAiProgressionBadge?.label;
   const settings = (surface.buttons ?? []).find((button) => button?.text === 'Settings' && button?.iconOnly === true);
   const issues = [];
   if (!isFiniteBounds(playerLevel)) {
     issues.push('menu:missing-player-level-glyph');
   } else if (playerLevel.width < 44 || playerLevel.height < 44) {
     issues.push(`menu:player-level-target=${playerLevel.width.toFixed(1)}x${playerLevel.height.toFixed(1)}<44`);
+  }
+  if (!isFiniteBounds(aiLevel)) {
+    issues.push('menu:missing-ai-level-glyph');
+  } else if (aiLevel.width < 44 || aiLevel.height < 44) {
+    issues.push(`menu:ai-level-target=${aiLevel.width.toFixed(1)}x${aiLevel.height.toFixed(1)}<44`);
+  }
+  if (aiLabel !== 'AI') {
+    issues.push(`menu:ai-level-label=${aiLabel ?? 'missing'}!=AI`);
   }
   if (!isFiniteBounds(settings?.bounds)) {
     issues.push('menu:missing-settings-control');
@@ -1048,6 +1058,22 @@ export const collectMenuControlSpacingIssues = (surface) => {
     if (settings.bounds.left - playerLevel.right < 8) {
       issues.push(`menu:player-level-to-settings-gap=${(settings.bounds.left - playerLevel.right).toFixed(1)}<8`);
     }
+  }
+  if (isFiniteBounds(playerLevel) && isFiniteBounds(aiLevel)) {
+    const sizeMismatch = Math.abs(playerLevel.width - aiLevel.width) > 1
+      || Math.abs(playerLevel.height - aiLevel.height) > 1;
+    if (sizeMismatch) {
+      issues.push(`menu:player-level-ai-level-size-mismatch=${playerLevel.width.toFixed(1)}x${playerLevel.height.toFixed(1)}!=${aiLevel.width.toFixed(1)}x${aiLevel.height.toFixed(1)}`);
+    }
+    if (Math.abs(playerLevel.top - aiLevel.top) > 1) {
+      issues.push(`menu:player-level-ai-level-top-mismatch=${playerLevel.top.toFixed(1)}!=${aiLevel.top.toFixed(1)}`);
+    }
+    if (aiLevel.left - playerLevel.right < 8) {
+      issues.push(`menu:player-level-to-ai-level-gap=${(aiLevel.left - playerLevel.right).toFixed(1)}<8`);
+    }
+  }
+  if (isFiniteBounds(aiLevel) && isFiniteBounds(settings?.bounds) && settings.bounds.left - aiLevel.right < 8) {
+    issues.push(`menu:ai-level-to-settings-gap=${(settings.bounds.left - aiLevel.right).toFixed(1)}<8`);
   }
   return issues;
 };
@@ -1704,7 +1730,7 @@ const buildSurfaceChecks = ({
     createCheck(
       'mobile-control-spacing',
       controlSpacingIssues.length === 0,
-      controlSpacingIssues.length === 0 ? 'menu player level and Settings share one 44px-or-larger header-control contract' : controlSpacingIssues.join('; ')
+      controlSpacingIssues.length === 0 ? 'menu player/AI levels and Settings share one 44px-or-larger header-control contract' : controlSpacingIssues.join('; ')
     ),
     createCheck(
       'mobile-badge-text-fit',
@@ -2141,6 +2167,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         layout: menu.diagnostics.visual?.layout,
         markerStyle: menu.diagnostics.visual?.markerStyle,
         progressionBadge: menu.diagnostics.visual?.progressionBadge,
+        menuAiProgressionBadge: menu.diagnostics.visual?.menuAiProgressionBadge,
         title: menu.diagnostics.visual?.title,
         generation: menu.diagnostics.runtime?.generation,
         buttons: menu.diagnostics.visual?.buttons,
