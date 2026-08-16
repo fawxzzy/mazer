@@ -23,6 +23,24 @@ describe('legacy header controls', () => {
     expect(settings.left).toBeGreaterThan(level.left);
   });
 
+  test('keeps a secondary menu metric square between the player level and settings control', () => {
+    const shared = {
+      height: 568,
+      hudHeight: 56,
+      hudTop: 0,
+      width: 320
+    };
+    const playerLevel = resolveLegacyHeaderControlFrame({ ...shared, placement: 'leading' });
+    const aiLevel = resolveLegacyHeaderControlFrame({ ...shared, placement: 'leading', slot: 1 });
+    const settings = resolveLegacyHeaderControlFrame({ ...shared, placement: 'trailing' });
+
+    expect(aiLevel.width).toBe(playerLevel.width);
+    expect(aiLevel.height).toBe(playerLevel.height);
+    expect(aiLevel.left - playerLevel.right).toBeGreaterThanOrEqual(8);
+    expect(settings.left - aiLevel.right).toBeGreaterThanOrEqual(8);
+    expect(aiLevel.top).toBe(playerLevel.top);
+  });
+
   test('stays in the declared compact range at phone and desktop sizes', () => {
     const phone = resolveLegacyHeaderControlFrame({
       height: 844,

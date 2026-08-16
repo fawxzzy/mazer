@@ -45,14 +45,20 @@ describe('UI surface capture menu header controls', () => {
     centerY: top + (height / 2)
   });
 
-  const menuSurface = ({ playerLevel = bounds(9, 13, 44, 44), settings = bounds(352, 13, 44, 44) } = {}) => ({
+  const menuSurface = ({
+    playerLevel = bounds(9, 13, 44, 44),
+    aiLevel = bounds(61, 13, 44, 44),
+    aiLabel = 'AI',
+    settings = bounds(352, 13, 44, 44)
+  } = {}) => ({
     mode: 'menu',
     overlay: 'none',
     progressionBadge: { bounds: playerLevel },
+    menuAiProgressionBadge: { bounds: aiLevel, label: aiLabel },
     buttons: [{ bounds: settings, iconOnly: true, text: 'Settings' }]
   });
 
-  test('accepts the player-owned menu glyph paired with the same square settings cog', () => {
+  test('accepts the player and AI menu glyphs paired with the same square settings cog', () => {
     expect(collectMenuControlSpacingIssues(menuSurface())).toEqual([]);
   });
 
@@ -65,6 +71,13 @@ describe('UI surface capture menu header controls', () => {
         'menu:player-level-settings-size-mismatch=44.0x44.0!=42.0x42.0',
         'menu:player-level-settings-top-mismatch=13.0!=15.0'
       ]));
+    expect(collectMenuControlSpacingIssues(menuSurface({ aiLevel: null, aiLabel: null })))
+      .toEqual(expect.arrayContaining([
+        'menu:missing-ai-level-glyph',
+        'menu:ai-level-label=missing!=AI'
+      ]));
+    expect(collectMenuControlSpacingIssues(menuSurface({ aiLevel: bounds(52, 13, 44, 44) })))
+      .toContain('menu:player-level-to-ai-level-gap=-1.0<8');
   });
 });
 
@@ -220,6 +233,9 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("issues.push('menu:missing-player-level-glyph');");
     expect(source).toContain('menu:player-level-settings-size-mismatch=');
     expect(source).toContain('menu:player-level-to-settings-gap=');
+    expect(source).toContain("issues.push('menu:missing-ai-level-glyph');");
+    expect(source).toContain('menu:player-level-to-ai-level-gap=');
+    expect(source).toContain('menu:ai-level-to-settings-gap=');
     expect(source).toContain("surface?.mode !== 'play'");
     expect(source).toContain('badge.width > board.width + 1');
     expect(source).toContain('progression-badge-not-above-play-board');
@@ -265,6 +281,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('pause.diagnostics.visual?.overlayUi');
     expect(source).toContain("nativeInputs: authSurface.nativeInputs");
     expect(source).toContain('progressionBadge: menu.diagnostics.visual?.progressionBadge');
+    expect(source).toContain('menuAiProgressionBadge: menu.diagnostics.visual?.menuAiProgressionBadge');
     expect(source).toContain('title: menu.diagnostics.visual?.title');
     expect(source).toContain('generation: menu.diagnostics.runtime?.generation');
     expect(source).toContain('progressionBadge: authSurface.diagnostics.visual?.progressionBadge');

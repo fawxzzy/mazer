@@ -16,6 +16,12 @@ interface ResolveLegacyHeaderControlFrameInput {
   hudHeight: number;
   hudTop: number;
   placement: LegacyHeaderControlPlacement;
+  /**
+   * Header controls can share a side without inventing a second visual
+   * language. Slot zero is the original leading/trailing control; later
+   * slots flow inward with the same safe gap.
+   */
+  slot?: number;
   width: number;
 }
 
@@ -45,14 +51,20 @@ export const resolveLegacyHeaderControlFrame = (
   const minDimension = Math.max(1, Math.min(input.width, input.height));
   const size = clamp(Math.round(minDimension * 0.1), 44, 48);
   const inset = Math.max(8, Math.round(size * 0.2));
+  const slot = Math.max(0, Math.round(input.slot ?? 0));
+  const gap = Math.max(8, Math.round(size * 0.18));
   const top = clamp(
     Math.round(input.hudTop + ((input.hudHeight - size) / 2)),
     6,
     Math.max(6, input.height - size - 6)
   );
   const left = input.placement === 'leading'
-    ? clamp(inset, 8, Math.max(8, input.width - size - inset))
-    : clamp(input.width - size - inset, 8, Math.max(8, input.width - size - 8));
+    ? clamp(inset + (slot * (size + gap)), 8, Math.max(8, input.width - size - inset))
+    : clamp(
+      input.width - size - inset - (slot * (size + gap)),
+      8,
+      Math.max(8, input.width - size - 8)
+    );
 
   return {
     bottom: top + size,

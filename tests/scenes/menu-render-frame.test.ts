@@ -789,6 +789,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const playerTrack = this.progressionState.tracks.player;');
     expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(playerTrack, 'player')");
     expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
+    expect(menuSceneSource).toContain('private drawLegacyMenuAiProgressionBadge(');
+    expect(menuSceneSource).toContain("const aiTrack = this.progressionState.tracks['ai-runner'];");
+    expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(aiTrack, 'ai-runner')");
+    expect(menuSceneSource).toContain(".setText('AI')");
+    expect(menuSceneSource).toContain('slot: 1,');
+    expect(menuSceneSource).toContain('menuAiProgressionBadge: {');
     expect(menuSceneSource).toContain("placement: 'leading'");
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).toContain('resolveLegacyHeaderControlMetricFontSize(track.level, frame.width)');
@@ -1403,7 +1409,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
 
-  test('keeps progression quiet while the compact glyph always follows the player track', () => {
+  test('keeps player progression quiet while the menu exposes the independent AI level in its own compact glyph', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
@@ -1411,8 +1417,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("if (this.overlay !== 'none') {");
     expect(menuSceneSource).toContain('const playerTrack = this.progressionState.tracks.player;');
     expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(playerTrack, 'player')");
-    expect(menuSceneSource).toContain("must not replace the player's visible");
+    expect(menuSceneSource).toContain('this.drawLegacyMenuAiProgressionBadge();');
+    expect(menuSceneSource).toContain('this.clearLegacyMenuAiProgressionBadge();');
+    expect(menuSceneSource).toContain(".setText('AI')");
     expect(menuSceneSource).toContain('.setText(String(track.level))');
+    expect(menuSceneSource).toContain('.setText(String(aiTrack.level))');
     expect(menuSceneSource).not.toContain('publishLegacyPlayerProgressionCompletion');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayerProgressionOutcomeReason');
     expect(menuSceneSource).not.toContain('progression.player.cycle.');
@@ -1430,6 +1439,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('resolveLegacyPlayProgressionBadgeCenterY');
     expect(menuSceneSource).not.toContain('resolveLegacyMenuProgressionBadgeCenterY');
     expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');
+    expect(menuSceneSource).toContain('slot: 1,');
+    expect(menuSceneSource).toContain('menu-ai-progression-badge');
+    expect(menuSceneSource).toContain('player-menu-ai-progression-badge');
   });
 
   test('consumes shared UI standards for buttons, titles, guides, and toggles', () => {
