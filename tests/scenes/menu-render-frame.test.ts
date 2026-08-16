@@ -762,7 +762,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO =');
     expect(menuSceneSource).not.toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO =');
     expect(menuSceneSource).toContain('const progressionPalette = this.resolveActiveLegacyProgressionPalette();');
-    expect(menuSceneSource).toContain('this.drawLegacyProgressionBadge(mazeRenderFrame, progressionPalette);');
+    expect(menuSceneSource).toContain('this.drawLegacyProgressionBadge();');
     expect(menuSceneSource).toContain('this.drawLegacyMenuCompass(mazeRenderFrame, progressionPalette, time);');
     expect(menuSceneSource).toContain("const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'");
     expect(menuSceneSource).toContain("|| this.menuStaticDrawLifecyclePhase === 'deconstructing';");
@@ -782,7 +782,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, radius);');
     expect(menuSceneSource).toContain('progressionBadge: {');
     expect(menuSceneSource).toContain('menuCompass: {');
-    expect(menuSceneSource).toContain('return this.drawLegacyProgressionGlyph(this.progressionState.tracks[trackId], palette);');
+    expect(menuSceneSource).toContain('const playerTrack = this.progressionState.tracks.player;');
+    expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(playerTrack, 'player')");
     expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
     expect(menuSceneSource).toContain("placement: 'leading'");
     expect(menuSceneSource).toContain("placement: 'trailing'");
@@ -1381,7 +1382,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.resolveLegacyProgressionStorageKey()');
   });
 
-  test('uses a level number with a consistent progression color tier on each active surface', () => {
+  test('uses a player-facing level number with a consistent progression color tier', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('this.progressionBadgeText');
@@ -1392,13 +1393,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
 
-  test('keeps progression quiet while the compact glyph follows the independent active track', () => {
+  test('keeps progression quiet while the compact glyph always follows the player track', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
     expect(menuSceneSource).toContain("return resolveLegacyProgressionTrackIdForSurface(this.mode === 'play' ? 'play' : 'menu-demo');");
     expect(menuSceneSource).toContain("if (this.overlay !== 'none') {");
-    expect(menuSceneSource).toContain('return this.drawLegacyProgressionGlyph(this.progressionState.tracks[trackId], palette);');
+    expect(menuSceneSource).toContain('const playerTrack = this.progressionState.tracks.player;');
+    expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(playerTrack, 'player')");
+    expect(menuSceneSource).toContain("must not replace the player's visible");
     expect(menuSceneSource).toContain('.setText(String(track.level))');
     expect(menuSceneSource).not.toContain('publishLegacyPlayerProgressionCompletion');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayerProgressionOutcomeReason');

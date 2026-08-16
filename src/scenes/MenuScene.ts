@@ -6236,7 +6236,7 @@ export class MenuScene extends Phaser.Scene {
     const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
 
     this.menuCompassBounds = null;
-    this.drawLegacyProgressionBadge(mazeRenderFrame, progressionPalette);
+    this.drawLegacyProgressionBadge();
     this.drawLegacyMenuSettingsCog();
     if (this.mode === 'menu' && this.overlay === 'none') {
       this.drawLegacyMenuCompass(mazeRenderFrame, progressionPalette, time);
@@ -6616,13 +6616,11 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicGraphics.strokePath();
   }
 
-  private drawLegacyProgressionBadge(
-    _mazeRenderFrame: LegacyMazeRenderFrame,
-    palette: LegacyProgressionPalette
-  ): VisualRect | null {
-    // One compact number keeps each active surface legible without reviving the
-    // old score/rank panel. Menu uses the autonomous runner's independent
-    // progression; active play uses the player's independent progression.
+  private drawLegacyProgressionBadge(): VisualRect | null {
+    // One compact number keeps the player-facing progression legible without
+    // reviving the old score/rank panel. The menu demo keeps its independent AI
+    // progression internally, but it must not replace the player's visible
+    // level with an indistinguishable number when the scene returns to menu.
     if (this.overlay !== 'none') {
       this.progressionBadgeBounds = null;
       this.progressionBadgeTextBounds = null;
@@ -6631,8 +6629,11 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }
 
-    const trackId = this.resolveActiveLegacyProgressionTrackId();
-    return this.drawLegacyProgressionGlyph(this.progressionState.tracks[trackId], palette);
+    const playerTrack = this.progressionState.tracks.player;
+    return this.drawLegacyProgressionGlyph(
+      playerTrack,
+      resolveLegacyProgressionPalette(playerTrack, 'player')
+    );
   }
 
   private drawLegacyProgressionGlyph(
