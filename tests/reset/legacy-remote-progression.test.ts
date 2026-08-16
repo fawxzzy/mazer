@@ -5,6 +5,7 @@ import {
 } from '../../src/legacy-runtime/legacyAuth';
 import {
   bootstrapLegacyRemoteAccountState,
+  hydrateLegacyRemoteAccountState,
   LEGACY_REMOTE_AI_PROGRESSION_TABLE,
   LEGACY_REMOTE_AI_RUNNER_KEY,
   LEGACY_REMOTE_CYCLE_RECEIPTS_TABLE,
@@ -245,6 +246,54 @@ describe('legacy remote progression', () => {
     expect(values.has('mazer.progression.v1:user:user-hydrate')).toBe(true);
     expect(values.has('mazer.game-toggles.v1:user:user-hydrate')).toBe(true);
     expect(values.has('mazer.remote-account-sync.v1:user:user-hydrate')).toBe(true);
+  });
+
+  test('reloads the selected account after sign-in without merging guest or writing remote progress', async () => {
+    const remote = createEmptyLegacyProgressionState();
+    remote.updatedAt = '2026-08-16T18:00:00.000Z';
+    remote.tracks.player.completedCycles = 11;
+    remote.tracks.player.targetComplexity = 52;
+    const local = createEmptyLegacyProgressionState();
+    local.updatedAt = '2026-08-16T18:10:00.000Z';
+    local.tracks.player.completedCycles = 21;
+    local.tracks.player.targetComplexity = 72;
+    const values = new Map<string, string>([
+      ['mazer.progression.v1:user:user-refresh', JSON.stringify(local)],
+      ['mazer.progression.v1:guest', JSON.stringify(local)]
+    ]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value)
+    };
+    const from = vi.fn((table: string) => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => table === LEGACY_REMOTE_PROGRESSION_TABLE
+            ? { data: { revision: 8, state: remote }, error: null }
+            : { data: { revision: 3, selected_control_mode: 'arrows', settings: { movementSpeed: 0.65 } }, error: null }
+        })
+      })
+    }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ from } as never);
+
+    const result = await hydrateLegacyRemoteAccountState({
+      configured: true,
+      displayName: 'Player',
+      email: 'player@example.test',
+      error: null,
+      info: null,
+      status: 'authenticated',
+      userId: 'user-refresh'
+    }, storage, { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' });
+
+    expect(result.error).toBeNull();
+    expect(result.progressionState?.tracks.player.completedCycles).toBe(11);
+    expect(result.settings?.controlMode).toBe('arrows');
+    expect(result.settings?.movementSpeed).toBe(0.65);
+    expect(from).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(values.get('mazer.progression.v1:user:user-refresh') ?? '{}')).toEqual(
+      expect.objectContaining({ tracks: expect.any(Object) })
+    );
   });
 
   test('syncs compact completed-cycle receipts when enabled and authenticated', async () => {

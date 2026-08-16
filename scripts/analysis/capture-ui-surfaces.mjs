@@ -51,6 +51,13 @@ const INLINE_STATE_TEXT_LABELS = Object.freeze([
   'Control Style',
   'Smart Steering'
 ]);
+const AUTH_EXPECTED_LABELS = Object.freeze([
+  'EMAIL',
+  'PASSWORD',
+  'Sign In',
+  'Create Account',
+  'Forgot Password?'
+]);
 
 const buildExpectedTextLabelDescriptors = (expectedLabels) => (
   expectedLabels.map((expectedLabel) => ({
@@ -582,7 +589,7 @@ const openAuthOverlayFromMenu = async (page, timeoutMs) => {
     await clickPoint(page, buttons.login, 'Login');
     try {
       await waitForSurface(page, {
-        expectedLabels: ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'],
+        expectedLabels: AUTH_EXPECTED_LABELS,
         mode: 'menu',
         overlay: 'auth',
         timeoutMs: Math.min(timeoutMs, 10_000)
@@ -790,10 +797,10 @@ const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
   'Control Style'
 ]);
 
-const resolveOptionsBottomExpectedLabels = (authenticated) => [
+const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([
   'High Contrast',
-  authenticated ? 'Log out' : 'Account'
-];
+  'Account'
+]);
 
 const isAuthGatedMenuSurface = (surface) => (
   hasVisualButton(surface, 'Login')
@@ -1028,10 +1035,8 @@ export const collectMenuControlSpacingIssues = (surface) => {
   const aiLabel = surface.menuAiProgressionBadge?.label;
   const settings = (surface.buttons ?? []).find((button) => button?.text === 'Settings' && button?.iconOnly === true);
   const issues = [];
-  if (!isFiniteBounds(playerLevel)) {
-    issues.push('menu:missing-player-level-glyph');
-  } else if (playerLevel.width < 44 || playerLevel.height < 44) {
-    issues.push(`menu:player-level-target=${playerLevel.width.toFixed(1)}x${playerLevel.height.toFixed(1)}<44`);
+  if (isFiniteBounds(playerLevel)) {
+    issues.push('menu:player-level-glyph-visible');
   }
   if (!isFiniteBounds(aiLevel)) {
     issues.push('menu:missing-ai-level-glyph');
@@ -1046,34 +1051,18 @@ export const collectMenuControlSpacingIssues = (surface) => {
   } else if (settings.bounds.width < 44 || settings.bounds.height < 44) {
     issues.push(`menu:settings-target=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}<44`);
   }
-  if (isFiniteBounds(playerLevel) && isFiniteBounds(settings?.bounds)) {
-    const sizeMismatch = Math.abs(playerLevel.width - settings.bounds.width) > 1
-      || Math.abs(playerLevel.height - settings.bounds.height) > 1;
+  if (isFiniteBounds(aiLevel) && isFiniteBounds(settings?.bounds)) {
+    const sizeMismatch = Math.abs(aiLevel.width - settings.bounds.width) > 1
+      || Math.abs(aiLevel.height - settings.bounds.height) > 1;
     if (sizeMismatch) {
-      issues.push(`menu:player-level-settings-size-mismatch=${playerLevel.width.toFixed(1)}x${playerLevel.height.toFixed(1)}!=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}`);
+      issues.push(`menu:ai-level-settings-size-mismatch=${aiLevel.width.toFixed(1)}x${aiLevel.height.toFixed(1)}!=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}`);
     }
-    if (Math.abs(playerLevel.top - settings.bounds.top) > 1) {
-      issues.push(`menu:player-level-settings-top-mismatch=${playerLevel.top.toFixed(1)}!=${settings.bounds.top.toFixed(1)}`);
+    if (Math.abs(aiLevel.top - settings.bounds.top) > 1) {
+      issues.push(`menu:ai-level-settings-top-mismatch=${aiLevel.top.toFixed(1)}!=${settings.bounds.top.toFixed(1)}`);
     }
-    if (settings.bounds.left - playerLevel.right < 8) {
-      issues.push(`menu:player-level-to-settings-gap=${(settings.bounds.left - playerLevel.right).toFixed(1)}<8`);
+    if (settings.bounds.left - aiLevel.right < 8) {
+      issues.push(`menu:ai-level-to-settings-gap=${(settings.bounds.left - aiLevel.right).toFixed(1)}<8`);
     }
-  }
-  if (isFiniteBounds(playerLevel) && isFiniteBounds(aiLevel)) {
-    const sizeMismatch = Math.abs(playerLevel.width - aiLevel.width) > 1
-      || Math.abs(playerLevel.height - aiLevel.height) > 1;
-    if (sizeMismatch) {
-      issues.push(`menu:player-level-ai-level-size-mismatch=${playerLevel.width.toFixed(1)}x${playerLevel.height.toFixed(1)}!=${aiLevel.width.toFixed(1)}x${aiLevel.height.toFixed(1)}`);
-    }
-    if (Math.abs(playerLevel.top - aiLevel.top) > 1) {
-      issues.push(`menu:player-level-ai-level-top-mismatch=${playerLevel.top.toFixed(1)}!=${aiLevel.top.toFixed(1)}`);
-    }
-    if (aiLevel.left - playerLevel.right < 8) {
-      issues.push(`menu:player-level-to-ai-level-gap=${(aiLevel.left - playerLevel.right).toFixed(1)}<8`);
-    }
-  }
-  if (isFiniteBounds(aiLevel) && isFiniteBounds(settings?.bounds) && settings.bounds.left - aiLevel.right < 8) {
-    issues.push(`menu:ai-level-to-settings-gap=${(settings.bounds.left - aiLevel.right).toFixed(1)}<8`);
   }
   return issues;
 };
@@ -1462,8 +1451,7 @@ const buildSurfaceChecks = ({
   const labelDetail = (surface) => collectTextLabels(surface)
     .join(', ');
   const authGated = surfaces.menu.authGated === true;
-  const authenticatedMenu = surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out']);
-  const optionsBottomExpectedLabels = resolveOptionsBottomExpectedLabels(authenticatedMenu);
+  const optionsBottomExpectedLabels = OPTIONS_BOTTOM_EXPECTED_LABELS;
   const textBoundsIssues = [
     ...collectTextBoundsIssues('menu', surfaces.menu, viewport),
     ...collectTextBoundsIssues('auth', surfaces.auth, viewport),
@@ -1661,7 +1649,7 @@ const buildSurfaceChecks = ({
     createCheck(
       'auth-text-labels',
       authGated
-        ? hasLabels(surfaces.auth, ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'])
+        ? hasLabels(surfaces.auth, AUTH_EXPECTED_LABELS)
         : surfaces.auth.skipped === true,
       authGated
         ? `labels=${labelDetail(surfaces.auth)}`
@@ -1730,7 +1718,7 @@ const buildSurfaceChecks = ({
     createCheck(
       'mobile-control-spacing',
       controlSpacingIssues.length === 0,
-      controlSpacingIssues.length === 0 ? 'menu player/AI levels and Settings share one 44px-or-larger header-control contract' : controlSpacingIssues.join('; ')
+      controlSpacingIssues.length === 0 ? 'menu AI level and Settings share one 44px-or-larger header-control contract while the player level stays out of the menu' : controlSpacingIssues.join('; ')
     ),
     createCheck(
       'mobile-badge-text-fit',
@@ -1993,8 +1981,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       })
       : null;
     const authGatedMenu = isAuthGatedMenuSurface(menu.diagnostics.visual);
-    const authenticatedMenu = authFixture === 'authenticated' || menu.diagnostics.runtime?.auth?.status === 'authenticated';
-    const optionsBottomExpectedLabels = resolveOptionsBottomExpectedLabels(authenticatedMenu);
+    const optionsBottomExpectedLabels = OPTIONS_BOTTOM_EXPECTED_LABELS;
     const currentMenuDiagnostics = transition ? await readDiagnostics(page) : menu.diagnostics;
     const menuButtons = getMenuButtonPoints(currentMenuDiagnostics.visual);
     await waitForVisualBuildSettled(page, { timeoutMs });
@@ -2004,7 +1991,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         const captured = await captureSurface({
           page,
           outputDir,
-          expectedLabels: ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'],
+          expectedLabels: AUTH_EXPECTED_LABELS,
           id: '02-auth',
           mode: 'menu',
           overlay: 'auth',

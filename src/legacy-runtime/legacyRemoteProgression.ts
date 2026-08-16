@@ -11,6 +11,7 @@ import {
 } from './legacyDefaults';
 import {
   LEGACY_GAME_TOGGLE_STORAGE_KEY,
+  mergeLegacyGameTogglePreferences,
   normalizeLegacyGameTogglePreferences,
   pickLegacyGameTogglePreferences,
   readLegacyGameToggleSettings,
@@ -554,6 +555,83 @@ export const bootstrapLegacyRemoteAccountState = async (
     snapshot
   };
   return legacyRemoteAccountBootstrap;
+};
+
+/**
+ * Reloads the signed-in account's persisted state without merging guest state
+ * or writing to Supabase. This is deliberately separate from bootstrapping:
+ * bootstrapping may reconcile first-contact local progress, whereas a completed
+ * sign-in must immediately present the account that was actually selected.
+ */
+export const hydrateLegacyRemoteAccountState = async (
+  snapshot: LegacyAuthSessionSnapshot,
+  storage: LegacyRootStorage | undefined = resolveRootStorage(),
+  env: Record<string, string | undefined> = readRuntimeEnv()
+): Promise<LegacyRemoteAccountBootstrapResult> => {
+  const emptyResult: LegacyRemoteAccountBootstrapResult = {
+    error: null,
+    progressionState: null,
+    settings: null,
+    snapshot
+  };
+
+  if (!isLegacyRemoteProgressionEnabled(env) || snapshot.status !== 'authenticated' || !snapshot.userId) {
+    return emptyResult;
+  }
+
+  const client = await getLegacyAuthClient();
+  if (!client || !storage) {
+    return emptyResult;
+  }
+
+  const progressionStorage = createLegacyAuthScopedStorage(storage, LEGACY_PROGRESSION_STORAGE_KEY, snapshot);
+  const settingsStorage = createLegacyAuthScopedStorage(storage, LEGACY_GAME_TOGGLE_STORAGE_KEY, snapshot);
+  const localProgression = readLegacyProgressionState(progressionStorage);
+  const localSettings = readLegacyGameToggleSettings(settingsStorage, LEGACY_DEFAULTS);
+
+  let progressionRead: Awaited<ReturnType<typeof readRemoteProgressionRow>>;
+  let profileRead: Awaited<ReturnType<typeof readRemoteProfileRow>>;
+  try {
+    [progressionRead, profileRead] = await Promise.all([
+      readRemoteProgressionRow(client, snapshot.userId),
+      readRemoteProfileRow(client, snapshot.userId)
+    ]);
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+      progressionState: localProgression,
+      settings: localSettings,
+      snapshot
+    };
+  }
+
+  const errors = [progressionRead.error, profileRead.error].filter((value): value is string => Boolean(value));
+  const progressionState = progressionRead.row
+    ? writeLegacyProgressionState(progressionStorage, normalizeLegacyProgressionState(progressionRead.row.state))
+    : localProgression;
+  const settings = profileRead.row
+    ? writeLegacyGameToggleSettings(
+      settingsStorage,
+      mergeLegacyGameTogglePreferences(
+        localSettings,
+        normalizeRemoteProfileSettings(profileRead.row, localSettings)
+      )
+    )
+    : localSettings;
+
+  writeAccountSyncMetadata(storage, snapshot.userId, {
+    progressionRevision: progressionRead.row?.revision ?? null,
+    progressionUpdatedAt: progressionState.updatedAt,
+    settingsFingerprint: fingerprintSettings(settings),
+    settingsRevision: profileRead.row?.revision ?? null
+  });
+
+  return {
+    error: errors.length > 0 ? errors.join('; ') : null,
+    progressionState,
+    settings,
+    snapshot
+  };
 };
 
 const createRemoteCycleReceiptPayload = (

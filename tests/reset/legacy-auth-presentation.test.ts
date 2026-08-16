@@ -53,6 +53,17 @@ describe('legacy auth presentation', () => {
     expect(presentation.helper).not.toContain('runner@example.com');
   });
 
+  test('presents an authenticated session as an account surface instead of a second sign-in form', () => {
+    expect(resolveLegacyAuthPresentation({
+      mode: 'login',
+      rememberedIdentity: null,
+      snapshot: { configured: true, status: 'authenticated' }
+    })).toEqual(expect.objectContaining({
+      helper: 'Review your saved Mazer account or sign out on this device.',
+      title: 'Account'
+    }));
+  });
+
   test('uses plain language when the client cannot reach an account configuration', () => {
     expect(resolveLegacyAuthPresentation({
       mode: 'signup',
