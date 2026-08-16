@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   LEGACY_MENU_BACKDROP_SHARD_COUNT,
+  LEGACY_MENU_BACKDROP_MOTION_PROFILE,
   LEGACY_MENU_BACKDROP_STAR_MOTION,
   LEGACY_MENU_DRIFT_RUNE_COUNT,
   LEGACY_MENU_GLASS_SHARD_COUNT,
@@ -48,6 +49,7 @@ describe('legacyMenuBackdrop', () => {
     expect(stars[0].y).toBeCloseTo(0.553, 3);
     expect(resolveLegacyMenuBackdropWarpDistance(stars[0])).toBeLessThan(0.06);
     expect(LEGACY_MENU_BACKDROP_STAR_MOTION).toBe('radial-warp');
+    expect(LEGACY_MENU_BACKDROP_MOTION_PROFILE).toBe('visible-parallax-warp');
   });
 
   test('publishes the canonical Precision Arcade substrate and bounded legacy shards', () => {
@@ -73,11 +75,12 @@ describe('legacyMenuBackdrop', () => {
     expect(shards[5].alpha).toBeGreaterThan(0.017);
   });
 
-  test('resolves low-count glass shards and runes that animate only when requested', () => {
+  test('resolves low-count glass shards and runes with visible motion only when requested', () => {
     const staticShards = resolveLegacyMenuBackdropGlassShards(390, 844, false, 0, false);
     const animatedShards = resolveLegacyMenuBackdropGlassShards(390, 844, false, 4000, true);
     const staticRunes = resolveLegacyMenuBackdropDriftRunes(390, 844, false, 0, false);
     const animatedRunes = resolveLegacyMenuBackdropDriftRunes(390, 844, false, 4000, true);
+    const staticAtLaterTime = resolveLegacyMenuBackdropGlassShards(390, 844, false, 4000, false);
 
     expect(staticShards).toHaveLength(LEGACY_MENU_GLASS_SHARD_COUNT);
     expect(staticRunes).toHaveLength(LEGACY_MENU_DRIFT_RUNE_COUNT);
@@ -85,8 +88,13 @@ describe('legacyMenuBackdrop', () => {
     expect(staticShards[0].thickness).toBeCloseTo(3, 1);
     expect(staticShards[0].alpha).toBeCloseTo(0.042, 3);
     expect(staticRunes[0].size).toBeGreaterThanOrEqual(3);
+    expect(staticAtLaterTime).toEqual(staticShards);
     expect(animatedShards[0].x).not.toBe(staticShards[0].x);
     expect(animatedRunes[1].x).not.toBe(staticRunes[1].x);
+    expect(Math.abs(animatedShards[0].x - staticShards[0].x)).toBeGreaterThan(5);
+    expect(Math.abs(animatedRunes[1].x - staticRunes[1].x)).toBeGreaterThan(20);
+    expect(animatedShards[0].alpha).not.toBe(staticShards[0].alpha);
+    expect(animatedRunes[1].alpha).not.toBe(staticRunes[1].alpha);
 
     const darkShards = resolveLegacyMenuBackdropGlassShards(390, 844, true, 0, false);
     const darkRunes = resolveLegacyMenuBackdropDriftRunes(390, 844, true, 0, false);

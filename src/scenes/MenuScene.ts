@@ -5006,6 +5006,10 @@ export class MenuScene extends Phaser.Scene {
       const streakLength = resolveLegacyMenuBackdropStreakLength(star);
       const coreSize = Math.max(1, Math.round(star.radius));
       const step = resolveLegacyMenuBackdropTailStep(star);
+      if (coreSize > 1) {
+        this.backdropGraphics.fillStyle(0xffffff, star.alpha * palette.starAlphaScale * 0.14);
+        this.backdropGraphics.fillRect(pixelX - 1, pixelY - 1, coreSize + 2, coreSize + 2);
+      }
       this.backdropGraphics.fillStyle(0xffffff, star.alpha * palette.starAlphaScale);
       this.backdropGraphics.fillRect(pixelX, pixelY, coreSize, coreSize);
       for (let index = 1; index <= streakLength; index += 1) {
