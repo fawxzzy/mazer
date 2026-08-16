@@ -786,14 +786,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, radius);');
     expect(menuSceneSource).toContain('progressionBadge: {');
     expect(menuSceneSource).toContain('menuCompass: {');
-    expect(menuSceneSource).toContain('const playerTrack = this.progressionState.tracks.player;');
-    expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(playerTrack, 'player')");
+    expect(menuSceneSource).toContain('this.clearLegacyPlayerProgressionBadge();');
+    expect(menuSceneSource).toContain("if (this.mode === 'menu') {");
     expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
     expect(menuSceneSource).toContain('private drawLegacyMenuAiProgressionBadge(');
     expect(menuSceneSource).toContain("const aiTrack = this.progressionState.tracks['ai-runner'];");
     expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(aiTrack, 'ai-runner')");
     expect(menuSceneSource).toContain(".setText('AI')");
-    expect(menuSceneSource).toContain('slot: 1,');
+    expect(menuSceneSource).toContain('slot: 0,');
     expect(menuSceneSource).toContain('menuAiProgressionBadge: {');
     expect(menuSceneSource).toContain("placement: 'leading'");
     expect(menuSceneSource).toContain("placement: 'trailing'");
@@ -1325,8 +1325,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("this.openOverlay('auth')");
     expect(menuSceneSource).toContain('private buildAuthOverlay(): void');
     expect(menuSceneSource).toContain('resolveLegacyAuthPresentation({');
-    expect(menuSceneSource).toContain('this.createAuthFieldLabel(presentation.emailLabel');
-    expect(menuSceneSource).toContain('this.createAuthFieldLabel(presentation.passwordLabel');
+    expect(menuSceneSource).toContain("fieldId === 'password'");
+    expect(menuSceneSource).toContain('private createLegacyAuthPasswordVisibilityButton(');
+    expect(menuSceneSource).toContain("this.authPasswordVisible ? 'text' : 'password'");
+    expect(menuSceneSource).toContain('this.createLegacyAuthActionButton(');
     expect(menuSceneSource).toContain('presentation.primaryActionLabel');
     expect(menuSceneSource).toContain('presentation.recoveryActionLabel');
     expect(menuSceneSource).toContain('const bottomStartY = rowY + (stacked ? 24 : 28);');
@@ -1356,7 +1358,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createLegacyOptionsAccountActionRow(');
     expect(menuSceneSource).toContain('this.createLegacyOptionsAccountActionRow(panel);');
     expect(menuSceneSource).toContain('contentCenterY: actionY');
-    expect(menuSceneSource).toContain("const label = this.authSnapshot.status === 'authenticated' ? 'Log out' : 'Account';");
+    expect(menuSceneSource).toContain("const label = 'Account';");
+    expect(menuSceneSource).toContain("const action = (): void => this.openOverlay('auth');");
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain('Account access is unavailable right now. You can still play as a guest.');
     expect(playerMessageSource).toContain('export interface LegacyQueuedPlayerMessage');
@@ -1394,8 +1397,26 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('private createAuthFeedbackText');
     expect(menuSceneSource).not.toContain('private createAuthMessageText');
     expect(menuSceneSource).not.toContain('Guest mode is active. Account login needs Supabase env vars.');
-    expect(menuSceneSource).toContain('this.seedSignedInProgressionFromGuest(previousProgressionState, snapshot);');
+    expect(menuSceneSource).toContain('void this.hydrateLegacyAccountDataAfterAuth(snapshot, hydrationSequence);');
+    expect(menuSceneSource).toContain('private async hydrateLegacyAccountDataAfterAuth(');
+    expect(menuSceneSource).not.toContain('seedSignedInProgressionFromGuest');
     expect(menuSceneSource).toContain('this.resolveLegacyProgressionStorageKey()');
+  });
+
+  test('records the Fitness account-surface reuse contract without coupling Phaser to Fitness React components', () => {
+    const authReuseContract = readFileSync(
+      resolve(process.cwd(), 'docs/ops/MAZER-FITNESS-AUTH-SURFACE-REUSE-2026-08-16.md'),
+      'utf8'
+    );
+
+    expect(authReuseContract).toContain('fawxzzy-fitness/src/components/ui/LabeledEditorField.tsx');
+    expect(authReuseContract).toContain('fawxzzy-fitness/src/components/ui/PasswordInput.tsx');
+    expect(authReuseContract).toContain('The auth overlay is fully opaque');
+    expect(authReuseContract).toContain('Native password input width reserves a touch target');
+    expect(authReuseContract).toContain('Settings always opens the Account surface for both guest and signed-in players.');
+    expect(authReuseContract).toContain('It does not update, insert, upsert, or otherwise mutate the provider.');
+    expect(authReuseContract).toContain('The main menu renders the independent menu-AI level only.');
+    expect(authReuseContract).toContain('No shared React component import into Phaser.');
   });
 
   test('uses a player-facing level number with a consistent progression color tier', () => {
@@ -1415,8 +1436,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
     expect(menuSceneSource).toContain("return resolveLegacyProgressionTrackIdForSurface(this.mode === 'play' ? 'play' : 'menu-demo');");
     expect(menuSceneSource).toContain("if (this.overlay !== 'none') {");
-    expect(menuSceneSource).toContain('const playerTrack = this.progressionState.tracks.player;');
-    expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(playerTrack, 'player')");
+    expect(menuSceneSource).toContain('private clearLegacyPlayerProgressionBadge(): void');
+    expect(menuSceneSource).toContain("if (this.mode === 'menu') {");
     expect(menuSceneSource).toContain('this.drawLegacyMenuAiProgressionBadge();');
     expect(menuSceneSource).toContain('this.clearLegacyMenuAiProgressionBadge();');
     expect(menuSceneSource).toContain(".setText('AI')");
@@ -1439,7 +1460,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('resolveLegacyPlayProgressionBadgeCenterY');
     expect(menuSceneSource).not.toContain('resolveLegacyMenuProgressionBadgeCenterY');
     expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');
-    expect(menuSceneSource).toContain('slot: 1,');
+    expect(menuSceneSource).toContain('slot: 0,');
     expect(menuSceneSource).toContain('menu-ai-progression-badge');
     expect(menuSceneSource).toContain('player-menu-ai-progression-badge');
   });
@@ -1610,7 +1631,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('input.addEventListener(\'input\', this.authNativeInputHandler);');
     expect(menuSceneSource).toContain('input.addEventListener(\'keydown\', this.authNativeKeyDownHandler);');
     expect(menuSceneSource).toContain('this.add.rectangle(');
-    expect(menuSceneSource).toContain("placeholder ? x - (width / 2) + 22 : Math.min(x + (width / 2) - 18, label.x + (label.displayWidth / 2) + 6)");
+    expect(menuSceneSource).toContain('const contentRightInset = hasPasswordToggle ? 54 : 16;');
+    expect(menuSceneSource).toContain('this.createLegacyAuthPasswordVisibilityButton(');
+    expect(menuSceneSource).toContain('const passwordToggleReserve = fieldId === \'password\'');
+    expect(menuSceneSource).toContain("this.authPasswordVisible ? 'text' : 'password'");
     expect(menuSceneSource).toContain("ease: 'Sine.easeInOut'");
     expect(menuSceneSource).toContain('this.syncLegacyAuthNativeInputValue();');
     expect(menuSceneSource).toContain('this.destroyLegacyAuthNativeInput();');
@@ -1626,7 +1650,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(overlayPanelStart).toBeGreaterThanOrEqual(0);
     expect(overlayPanelEnd).toBeGreaterThan(overlayPanelStart);
-    expect(overlayPanelSource).toContain('this.overlayGraphics.fillStyle(0x02040a, 0.82);');
+    expect(overlayPanelSource).toContain("this.overlay === 'auth' ? 1 : 0.82");
     expect(overlayPanelSource).toContain('this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);');
     expect(overlayPanelSource).not.toContain('drawLegacyCyberPanel');
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');

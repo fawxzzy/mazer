@@ -32,13 +32,16 @@ export const resolveLegacyAuthPresentation = (
   const isSignup = input.mode === 'signup';
   const hasRememberedIdentity = input.rememberedIdentity !== null;
   const requiresReauthentication = input.rememberedIdentity?.sessionState === 'reauth-required';
+  const authenticated = input.snapshot.status === 'authenticated';
   const accountUnavailable = !input.snapshot.configured || input.snapshot.status === 'unavailable';
 
   return {
     alternateActionLabel: isSignup ? 'Use Sign In' : 'Create Account',
     displayNameLabel: 'Display name',
     emailLabel: 'Email',
-    helper: accountUnavailable
+    helper: authenticated
+      ? 'Review your saved Mazer account or sign out on this device.'
+      : accountUnavailable
       ? LEGACY_AUTH_MESSAGE_COPY.authUnavailable
       : isSignup
         ? 'Create a Mazer profile with your email and password.'
@@ -50,7 +53,9 @@ export const resolveLegacyAuthPresentation = (
     passwordLabel: 'Password',
     primaryActionLabel: isSignup ? 'Create Account' : 'Sign In',
     recoveryActionLabel: 'Forgot Password?',
-    title: accountUnavailable
+    title: authenticated
+      ? 'Account'
+      : accountUnavailable
       ? 'Account Unavailable'
       : isSignup
         ? 'Create Account'

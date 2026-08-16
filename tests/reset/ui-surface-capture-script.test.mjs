@@ -46,8 +46,8 @@ describe('UI surface capture menu header controls', () => {
   });
 
   const menuSurface = ({
-    playerLevel = bounds(9, 13, 44, 44),
-    aiLevel = bounds(61, 13, 44, 44),
+    playerLevel = null,
+    aiLevel = bounds(9, 13, 44, 44),
     aiLabel = 'AI',
     settings = bounds(352, 13, 44, 44)
   } = {}) => ({
@@ -58,26 +58,26 @@ describe('UI surface capture menu header controls', () => {
     buttons: [{ bounds: settings, iconOnly: true, text: 'Settings' }]
   });
 
-  test('accepts the player and AI menu glyphs paired with the same square settings cog', () => {
+  test('accepts the AI-only menu glyph paired with the same square settings cog', () => {
     expect(collectMenuControlSpacingIssues(menuSurface())).toEqual([]);
   });
 
   test('rejects missing, undersized, or misaligned menu header controls', () => {
-    expect(collectMenuControlSpacingIssues(menuSurface({ playerLevel: null })))
-      .toContain('menu:missing-player-level-glyph');
+    expect(collectMenuControlSpacingIssues(menuSurface({ playerLevel: bounds(9, 13, 44, 44) })))
+      .toContain('menu:player-level-glyph-visible');
     expect(collectMenuControlSpacingIssues(menuSurface({ settings: bounds(350, 15, 42, 42) })))
       .toEqual(expect.arrayContaining([
         'menu:settings-target=42.0x42.0<44',
-        'menu:player-level-settings-size-mismatch=44.0x44.0!=42.0x42.0',
-        'menu:player-level-settings-top-mismatch=13.0!=15.0'
+        'menu:ai-level-settings-size-mismatch=44.0x44.0!=42.0x42.0',
+        'menu:ai-level-settings-top-mismatch=13.0!=15.0'
       ]));
     expect(collectMenuControlSpacingIssues(menuSurface({ aiLevel: null, aiLabel: null })))
       .toEqual(expect.arrayContaining([
         'menu:missing-ai-level-glyph',
         'menu:ai-level-label=missing!=AI'
       ]));
-    expect(collectMenuControlSpacingIssues(menuSurface({ aiLevel: bounds(52, 13, 44, 44) })))
-      .toContain('menu:player-level-to-ai-level-gap=-1.0<8');
+    expect(collectMenuControlSpacingIssues(menuSurface({ aiLevel: bounds(301, 13, 44, 44) })))
+      .toContain('menu:ai-level-to-settings-gap=7.0<8');
   });
 });
 
@@ -136,10 +136,10 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('return hasExpectedTextLabels(labels, expectedLabels);');
     expect(source).toContain("actualLabel.startsWith(`${expectedLabel}: `)");
     expect(source).toContain('actualLabel.slice(expectedLabel.length + 2).trim().length > 0');
-    expect(source).toContain('const resolveOptionsBottomExpectedLabels = (authenticated) => [');
-    expect(source).toContain("authenticated ? 'Log out' : 'Account'");
-    expect(source).toContain("authFixture === 'authenticated' || menu.diagnostics.runtime?.auth?.status === 'authenticated'");
-    expect(source).toContain("surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out'])");
+    expect(source).toContain('const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([');
+    expect(source).toContain("'Account'");
+    expect(source).not.toContain("authenticated ? 'Log out' : 'Account'");
+    expect(source).not.toContain("surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out'])");
     expect(source).toContain('hasLabels(surfaces.optionsBottom, optionsBottomExpectedLabels)');
     expect(source).toContain("collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, optionsBottomExpectedLabels)");
     expect(source).toContain('const getVisualButtonPoint = (visual, text) => {');
@@ -224,17 +224,19 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'menu-title-readable'");
     expect(source).toContain("createCheck(\n      'auth-surface'");
     expect(source).toContain("createCheck(\n      'auth-text-labels'");
-    expect(source).toContain("hasLabels(surfaces.auth, ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'])");
+    expect(source).toContain('const AUTH_EXPECTED_LABELS = Object.freeze([');
+    expect(source).toContain("'EMAIL'");
+    expect(source).toContain("'PASSWORD'");
+    expect(source).toContain('hasLabels(surfaces.auth, AUTH_EXPECTED_LABELS)');
     expect(source).toContain('const collectTextBoundsIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain('const collectNativeInputBoundsIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain('const collectTextOverlapIssues = (surfaceId, surface) => {');
     expect(source).toContain('export const collectMenuControlSpacingIssues = (surface) => {');
     expect(source).toContain('const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {');
-    expect(source).toContain("issues.push('menu:missing-player-level-glyph');");
-    expect(source).toContain('menu:player-level-settings-size-mismatch=');
-    expect(source).toContain('menu:player-level-to-settings-gap=');
+    expect(source).toContain("issues.push('menu:player-level-glyph-visible');");
+    expect(source).toContain('menu:ai-level-settings-size-mismatch=');
+    expect(source).toContain('menu:ai-level-settings-top-mismatch=');
     expect(source).toContain("issues.push('menu:missing-ai-level-glyph');");
-    expect(source).toContain('menu:player-level-to-ai-level-gap=');
     expect(source).toContain('menu:ai-level-to-settings-gap=');
     expect(source).toContain("surface?.mode !== 'play'");
     expect(source).toContain('badge.width > board.width + 1');

@@ -102,14 +102,14 @@ describe('Mazer completion markers', () => {
     expect(systemMap).toContain('scale-`149` smoke');
   });
 
-  test('keeps the player-owned level glyph truth synchronized across menu and play', () => {
+  test('keeps the menu-AI and active-player level glyph truth synchronized across surfaces', () => {
     const currentTruth = readRepoFile('docs/current-truth.md');
 
-    expect(currentTruth).toContain('The glyph is bound to the player progression track on both menu and play');
-    expect(currentTruth).toContain('the independent menu-AI progression remains internal-only and has no raw numeric menu display');
-    expect(currentTruth).toContain('Menu and active play each use only a color-tiered numeric player-level glyph at the top-left');
-    expect(currentTruth).not.toContain('The menu glyph is bound to the independent menu-AI progression track');
-    expect(currentTruth).not.toContain('the menu glyph belongs to the AI runner');
+    expect(currentTruth).toContain('Active play binds its glyph to the player progression track.');
+    expect(currentTruth).toContain('The main menu instead exposes only the independent menu-AI level');
+    expect(currentTruth).toContain('The menu shows only the compact menu-AI level glyph at the top-left');
+    expect(currentTruth).not.toContain('The glyph is bound to the player progression track on both menu and play');
+    expect(currentTruth).not.toContain('Menu and active play each use only a color-tiered numeric player-level glyph at the top-left');
   });
 
   test('keeps the level/rank/complexity progression contract tracked', () => {
