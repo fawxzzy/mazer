@@ -1,45 +1,44 @@
 # Mazer Supabase Storage Contract
 
-Mazer uses a Mazer-owned Supabase project and Mazer-prefixed tables. Do not store Mazer account, progression, AI, cycle, or license data in the Fitness project tables.
+Mazer's consolidation target is the master Supabase project `bxtcuhkotumitoqtrcej`, isolated in the custom `mazer` schema. Do not store Mazer account, progression, AI, cycle, or license data in the Fitness namespace. The legacy Mazer project remains a rollback source until client cutover, observation, deletion-grade restore, and explicit retirement gates close.
 
 ## Live Setup Status
 
-Dedicated Mazer Supabase project:
+Master consolidation target:
+
+- project ref: `bxtcuhkotumitoqtrcej`
+- schema: `mazer`
+- materialized tables: `mazer_profiles`, `mazer_progression_states`, `mazer_ai_progression_states`, and `mazer_cycle_receipts`
+- materialized rows: 1,300 across the four tables, mapped to eight canonical users
+- access posture: forced RLS, 11 authenticated client privileges, 11 owner-only RLS policies, authenticated schema usage, and Data API exposure limited to the four Mazer table paths plus the PostgREST root
+
+Legacy source/rollback project:
 
 - project name: `Mazer`
 - project ref: `geknvnrmktchljnyddwp`
-- status verified through Supabase MCP: `ACTIVE_HEALTHY`
+- retirement status: held; it is not safe to delete
 
-Applied live schema:
-
-- `public.mazer_progression_states`
-- `public.mazer_profiles`
-- `public.mazer_ai_progression_states`
-- `public.mazer_cycle_receipts`
-
-Live audit result after migration hardening:
-
-- RLS enabled on all Mazer tables.
-- `anon` has zero direct table grants.
-- `authenticated` has only the client-needed progression/profile/cycle grants.
-- Stripe/license tables are not applied yet.
+The master schema and bounded client-access layer are active. Postapply proof confirmed the exact five-entry Data API allowlist, 13 rows visible to the authenticated owner, and zero rows visible to an unknown or cross-owner identity. Environment configuration, deployment, production cutover, observation, rollback expiry, credential retirement, and legacy deletion remain separate protected gates. Stripe/license tables remain deferred.
 
 ## Tables
 
-- `public.mazer_profiles`: player-facing profile/settings row keyed by `auth.users.id`.
-- `public.mazer_progression_states`: local-first human player progression blob plus indexed level/rank/complexity columns.
-- `public.mazer_ai_progression_states`: per-user AI-runner progression, separate from the human player track.
-- `public.mazer_cycle_receipts`: compact completed-cycle summaries for learning/tuning. Store summaries, not high-volume frame streams.
+- `mazer.mazer_profiles`: player-facing profile/settings row keyed by `auth.users.id`.
+- `mazer.mazer_progression_states`: local-first human player progression blob plus indexed level/rank/complexity columns.
+- `mazer.mazer_ai_progression_states`: per-user AI-runner progression, separate from the human player track.
+- `mazer.mazer_cycle_receipts`: compact completed-cycle summaries for learning/tuning. Store summaries, not high-volume frame streams.
 Deferred Stripe/payment-wall tables:
 
-- `public.mazer_license_accounts`: server-owned Supabase user to Stripe customer mapping.
-- `public.mazer_license_entitlements`: server-owned paid-access/license state derived from verified Stripe events or admin migration.
-- `public.mazer_license_events`: server-only Stripe webhook receipt ledger for idempotency and audit.
+- `mazer.mazer_license_accounts`: server-owned Supabase user to Stripe customer mapping.
+- `mazer.mazer_license_entitlements`: server-owned paid-access/license state derived from verified Stripe events or admin migration.
+- `mazer.mazer_license_events`: server-only Stripe webhook receipt ledger for idempotency and audit.
 
 ## Access Rules
 
 - `anon` receives no direct table access.
-- Authenticated users can read/write only their own profile, progression, AI progression, and cycle receipts.
+- `authenticated` has 11 scoped table privileges guarded by 11 owner-only RLS policies and one schema-usage grant.
+- The Data API exposes only the four required Mazer table paths plus the PostgREST root; no additional Mazer path is allowlisted.
+- Live aggregate proof confirms 13 rows visible to the authenticated owner, zero rows visible to an unknown owner, and zero cross-owner visibility.
+- Authenticated users can read or write only their own profile, progression, AI progression, and cycle receipts within those grants and policies.
 - Future authenticated users can only read their own license account and entitlement rows after the Stripe lane is unlocked.
 - Future license account, entitlement, and webhook-event writes are server-only through `service_role`.
 - Future client-visible payment-wall state must be read from `mazer_license_entitlements`; never trust client-written profile/settings data for paid access.
@@ -51,6 +50,8 @@ Remote progression sync is feature-gated by:
 ```env
 VITE_MAZER_REMOTE_PROGRESSION=false
 ```
+
+The shared browser Supabase client binds data queries to `db.schema = 'mazer'`. Auth remains project-level; unqualified `.from(...)` calls in the remote progression adapter therefore target the custom Mazer schema without duplicating schema selection at every query site.
 
 When enabled, `src/legacy-runtime/legacyRemoteProgression.ts` writes:
 
@@ -65,26 +66,28 @@ It also hydrates authenticated account state before Phaser creates the first maz
 - `revision` on progression and profile rows is a monotonic optimistic-concurrency guard. Normal advancement can rebase forward once after a conflict; destructive replacement/reset refuses to overwrite a newer revision.
 - A scoped local sync envelope records the last observed revision and local fingerprints so offline/local advancement can be reconciled without resurrecting a previously accepted reset.
 
-The app remains playable local-first if Supabase is unavailable or remote progression is disabled.
+The app remains playable local-first if Supabase is unavailable or remote progression is disabled. This source binding itself did not change environment values, enable the feature flag, grant client access, expose the schema, deploy, or cut over the application; the bounded access and Data API postimage above was completed and verified through a separate governed provider wave.
 
-Live migration `account_state_revisions` was applied on 2026-07-16. Readback confirmed the existing three progression rows were preserved at revision `0`; the profile table remained empty until an authenticated client seeds its first settings row.
+In the legacy source project, live migration `account_state_revisions` was applied on 2026-07-16. Readback confirmed the existing three progression rows were preserved at revision `0`; the profile table remained empty until an authenticated client seeds its first settings row. This remains source-contract evidence for the consolidated runtime behavior.
 
 ## 2026-07-09 Auth QA Notes
 
-Local browser-safe env wiring was verified with `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_MAZER_REMOTE_PROGRESSION`. The first generated QA signup proved project reachability but was blocked by email confirmation. After email confirmation was disabled for the QA lane, a generated QA account proved signup session creation, logout, login-again, authenticated `mazer_cycle_receipts` insert/read, authenticated `mazer_progression_states` upsert/read, and authenticated `mazer_ai_progression_states` upsert/read.
+The legacy source project previously verified browser-safe env wiring with `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_MAZER_REMOTE_PROGRESSION`. That QA proved signup session creation, logout, login-again, authenticated cycle-receipt insert/read, progression upsert/read, and AI progression upsert/read under the legacy project contract. It is historical evidence, not proof that master-project client access or cutover is complete.
 
 Remaining UI proof gap: browser automation did not inject typed characters into the Phaser canvas auth fields, so visible app form-entry persistence still needs manual QA or a dedicated hidden test hook. Backend auth and storage are proven with browser-safe keys under authenticated RLS.
 
 ## Apply Order
 
-1. Dedicated Mazer Supabase project exists.
-2. Auth/progression/cycle receipt schema is applied.
-3. Keep Stripe/license tables deferred until the payment wall lane is explicitly unlocked.
-4. Configure local and Vercel env vars for the Mazer project before real auth QA:
+1. The master project contains the forced-RLS `mazer` schema and the verified 1,300-row postimage.
+2. The governed access wave applied 11 authenticated privileges, 11 owner-only policies, authenticated schema usage, and the exact five-entry Data API allowlist; aggregate owner-isolation proof passed.
+3. The browser client source binds data queries to the `mazer` schema while remote sync stays disabled.
+4. Configure nonproduction environment values for the master project and run authenticated QA before any production cutover:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_MAZER_REMOTE_PROGRESSION=true` after the schema is applied.
-5. Add future server-only Stripe webhook env vars only to backend/server contexts, never browser env.
+   - `VITE_MAZER_REMOTE_PROGRESSION=true` only after access proof passes.
+5. Observe the bounded nonproduction lane, preserve rollback, and require separate deployment and production-cutover authority.
+6. Close observation, rollback-expiry, credential-retirement, and deletion-readiness gates independently before any legacy retirement.
+7. Keep Stripe/license tables deferred until the payment wall lane is explicitly unlocked; add future server-only Stripe webhook env vars only to backend/server contexts, never browser env.
 
 ## Stripe Boundary
 
