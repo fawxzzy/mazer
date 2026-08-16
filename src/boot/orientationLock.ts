@@ -27,15 +27,15 @@ export const isMazerLandscapeViewport = (targetWindow: Pick<Window, 'innerHeight
 );
 
 export const shouldBlockMazerLandscape = (
-  _targetWindow: Pick<Window, 'innerHeight' | 'innerWidth' | 'matchMedia' | 'navigator'>
-): boolean => false;
-
-export const shouldUseMazerCssPortraitLock = (
   targetWindow: Pick<Window, 'innerHeight' | 'innerWidth' | 'matchMedia' | 'navigator'>
 ): boolean => (
   isMazerPhoneLikeViewport(targetWindow)
   && isMazerLandscapeViewport(targetWindow)
 );
+
+export const shouldUseMazerCssPortraitLock = (
+  _targetWindow: Pick<Window, 'innerHeight' | 'innerWidth' | 'matchMedia' | 'navigator'>
+): boolean => false;
 
 const removePortraitLockOverlay = (documentRef: Document): void => {
   const existing = documentRef.getElementById(MAZER_PORTRAIT_LOCK_OVERLAY_ID);
@@ -44,15 +44,28 @@ const removePortraitLockOverlay = (documentRef: Document): void => {
   }
 };
 
+const installPortraitLockOverlay = (documentRef: Document): void => {
+  const overlay = documentRef.createElement('section');
+  overlay.id = MAZER_PORTRAIT_LOCK_OVERLAY_ID;
+  overlay.setAttribute('aria-live', 'assertive');
+  overlay.setAttribute('role', 'alertdialog');
+  overlay.setAttribute('aria-label', 'Rotate device to continue');
+  overlay.innerHTML = '<div class="mazer-portrait-lock-card"><strong>Rotate your device</strong><span>Mazer continues in portrait.</span></div>';
+  documentRef.body.append(overlay);
+};
+
 export const syncMazerPortraitLockOverlay = (
   targetWindow: MazerOrientationWindow = window as MazerOrientationWindow
 ): boolean => {
-  const cssLocked = shouldUseMazerCssPortraitLock(targetWindow);
+  const blocked = shouldBlockMazerLandscape(targetWindow);
   removePortraitLockOverlay(targetWindow.document);
-  targetWindow.document.body.classList.toggle(MAZER_PORTRAIT_LOCK_BODY_CLASS, cssLocked);
-  targetWindow.document.documentElement.dataset.mazerOrientation = cssLocked ? 'portrait-css-lock' : 'portrait-ready';
+  targetWindow.document.body.classList.toggle(MAZER_PORTRAIT_LOCK_BODY_CLASS, blocked);
+  targetWindow.document.documentElement.dataset.mazerOrientation = blocked ? 'portrait-blocked' : 'portrait-ready';
+  if (blocked) {
+    installPortraitLockOverlay(targetWindow.document);
+  }
 
-  return false;
+  return blocked;
 };
 
 export const requestMazerPortraitOrientationLock = async (
@@ -73,10 +86,11 @@ export const requestMazerPortraitOrientationLock = async (
 };
 
 export const installMazerPortraitLock = (
-  targetWindow: MazerOrientationWindow = window as MazerOrientationWindow
+  targetWindow: MazerOrientationWindow = window as MazerOrientationWindow,
+  onBlockStateChange?: (blocked: boolean) => void
 ): (() => void) => {
   const sync = (): void => {
-    syncMazerPortraitLockOverlay(targetWindow);
+    onBlockStateChange?.(syncMazerPortraitLockOverlay(targetWindow));
   };
 
   void requestMazerPortraitOrientationLock(targetWindow);

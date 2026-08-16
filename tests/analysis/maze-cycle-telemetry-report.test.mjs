@@ -77,6 +77,14 @@ describe('maze-cycle-telemetry-report', () => {
             thinkingModel: 'human-local-memory',
             visitedUndoCount: 0,
             wrongBranchCount: 3
+          },
+          aiDecisionScore: {
+            pressureScore: 40.305,
+            reliabilityScore: 59.695,
+            recoveryPressureScore: 30,
+            routeNoiseScore: 58.333,
+            retargetPressureScore: 5.556,
+            signal: 'searching'
           }
         }),
         createReceipt({ mazeSeed: 102, completedAt: '2026-07-08T12:00:02.000Z' }),
@@ -104,22 +112,47 @@ describe('maze-cycle-telemetry-report', () => {
     expect(report.latestReceipt.playerPath).toBeUndefined();
     expect(report.latestReceipt.playerPathPreview).toHaveLength(8);
     expect(report.latestReceipt.aiDecisionScore).toMatchObject({
-      pressureScore: 40.305,
-      reliabilityScore: 59.695,
-      signal: 'searching'
+      scorerVersion: '1.0.0',
+      pressureScore: 21.18,
+      reliabilityScore: 78.82,
+      signal: 'clean'
+    });
+    expect(report.latestReceipt.aiDecisionScoreComparison).toMatchObject({
+      status: 'mismatch',
+      stored: { pressureScore: 40.305, signal: 'searching' },
+      recomputed: { pressureScore: 21.18 }
+    });
+    expect(report.aiScorer).toMatchObject({
+      version: '1.0.0',
+      historicalStoredScoresImmutable: true,
+      reportScoresRecomputed: true
+    });
+    expect(report.runQualityScorer).toEqual({
+      id: 'mazer.maze-cycle-run-quality',
+      version: '1.1.0',
+      shortestPathModel: 'playable-wrap-aware-shortest-path-v1',
+      topologyMetricsVersion: '1.0.0',
+      explorerThreshold: 0.25,
+      historicalStoredScoresImmutable: true,
+      reportScoresRecomputed: true
+    });
+    expect(report.latestReceipt.runQualityScoreComparison).toMatchObject({
+      status: 'stored-missing',
+      stored: null,
+      recomputed: { scorerVersion: '1.1.0' }
     });
     expect(report.aiReview).toMatchObject({
       aiDecisionReceiptCount: 1,
       averageBacktrackCount: 2,
       averageDecisionCount: 18,
       averageOptionalRetargetCount: 1,
-      averagePressureScore: 40.305,
+      averagePressureScore: 21.18,
       averageRecoveryCount: 1,
-      averageReliabilityScore: 59.695,
+      averageReliabilityScore: 78.82,
       averageWrongBranchCount: 3,
       decisionSignalCounts: {
-        clean: 0,
-        searching: 1,
+        clean: 1,
+        searching: 0,
         chaotic: 0
       },
       thinkingModelCounts: {
@@ -365,8 +398,8 @@ describe('maze-cycle-telemetry-report', () => {
       decisionCount: 19
     });
     expect(report.latestReceipt.aiDecisionScore).toMatchObject({
-      pressureScore: 55.474,
-      reliabilityScore: 44.526,
+      pressureScore: 52.631,
+      reliabilityScore: 47.369,
       signal: 'searching'
     });
     expect(report.latestReceipt.mazeComplexity).toMatchObject({
@@ -389,15 +422,15 @@ describe('maze-cycle-telemetry-report', () => {
     });
     expect(report.performancePressureReview).toMatchObject({
       averageRenderSafetyPenaltyScore: 0,
-      averageRouteEfficiencyPressureScore: 12.5,
+      averageRouteEfficiencyPressureScore: 0,
       receiptCount: 1,
-      routeEfficiencyPressureReceiptCount: 1
+      routeEfficiencyPressureReceiptCount: 0
     });
     expect(report.aiReview).toMatchObject({
       aiDecisionReceiptCount: 1,
       averageDecisionCount: 19,
-      averagePressureScore: 55.474,
-      averageReliabilityScore: 44.526,
+      averagePressureScore: 52.631,
+      averageReliabilityScore: 47.369,
       decisionSignalCounts: {
         clean: 0,
         searching: 1,
@@ -436,9 +469,9 @@ describe('maze-cycle-telemetry-report', () => {
       sourceSchema: MAZER_CYCLE_LEARNING_REPORT_SCHEMA,
       validation,
       decision: {
-        focus: 'route-efficiency',
-        reportSignal: 'ease',
-        recommendedAction: 'reduce-pressure'
+        focus: 'increase-complexity',
+        reportSignal: 'challenge',
+        recommendedAction: 'increase-pressure'
       },
       safeguards: {
         noAutoTuningWithoutValidator: true,

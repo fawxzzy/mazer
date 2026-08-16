@@ -21,6 +21,35 @@ export const clampLegacyOverlayScrollOffset = (offset: number, maxOffset: number
   Math.max(0, Math.min(Math.max(0, maxOffset), offset))
 );
 
+export const resolveLegacyOverlayScrollRenderRect = (
+  viewport: LegacyOverlayScrollRect,
+  inset = 2
+): LegacyOverlayScrollRect => {
+  const safeInset = Math.max(0, Math.min(
+    Math.max(0, Math.floor((viewport.height - 1) / 2)),
+    inset
+  ));
+
+  return {
+    height: Math.max(1, viewport.height - (safeInset * 2)),
+    left: viewport.left,
+    top: viewport.top + safeInset,
+    width: viewport.width
+  };
+};
+
+export const legacyOverlayScrollRectIntersectsViewport = (
+  item: LegacyOverlayScrollRect,
+  viewport: LegacyOverlayScrollRect,
+  inset = 2
+): boolean => {
+  const viewportTop = viewport.top + inset;
+  const viewportBottom = viewport.top + viewport.height - inset;
+  const itemBottom = item.top + item.height;
+
+  return itemBottom > viewportTop && item.top < viewportBottom;
+};
+
 export function resolveLegacyOverlayScrollMetrics(input: {
   contentHeight: number;
   minThumbHeight?: number;

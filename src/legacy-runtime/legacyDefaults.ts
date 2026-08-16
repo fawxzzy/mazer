@@ -17,6 +17,7 @@ export interface LegacySettings {
   toggleTrailFade: boolean;
   toggleTrailPulse: boolean;
   toggleAnimatedBackdrop: boolean;
+  smartSteering: boolean;
   controlMode: LegacyControlMode;
 }
 
@@ -39,6 +40,7 @@ export const LEGACY_DEFAULTS: LegacySettings = {
   toggleTrailFade: false,
   toggleTrailPulse: true,
   toggleAnimatedBackdrop: true,
+  smartSteering: true,
   controlMode: 'stick'
 };
 
@@ -95,5 +97,6 @@ export const copyLegacySettings = (settings: LegacySettings): LegacySettings => 
   toggleTrailFade: settings.toggleTrailFade,
   toggleTrailPulse: settings.toggleTrailPulse ?? true,
   toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop ?? LEGACY_DEFAULTS.toggleAnimatedBackdrop,
+  smartSteering: settings.smartSteering ?? LEGACY_DEFAULTS.smartSteering,
   controlMode: settings.controlMode
 });

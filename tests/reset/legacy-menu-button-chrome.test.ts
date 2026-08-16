@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuButtonChrome } from '../../src/legacy-runtime/legacyMenuButtonChrome';
+import { cyberArcadeMaterial, toCyberArcadeCssHex } from '../../src/render/cyberArcadeMaterial';
 
 describe('legacy menu button chrome', () => {
   test('gives the primary Start button slightly stronger chrome than the side buttons', () => {
@@ -18,13 +19,13 @@ describe('legacy menu button chrome', () => {
 
     expect(primary.baseAlpha).toBeGreaterThan(secondary.baseAlpha);
     expect(primary.baseStroke).toBeGreaterThan(secondary.baseStroke);
-    expect(primary.fillColor).toBe(0x06170f);
-    expect(primary.hoverFillColor).toBe(0x0a2a1a);
+    expect(primary.fillColor).toBe(cyberArcadeMaterial.substrate.playerPanel);
+    expect(primary.hoverFillColor).toBe(cyberArcadeMaterial.substrate.playerPanelActive);
     expect(primary.fontSize).toBeGreaterThanOrEqual(secondary.fontSize);
     expect(primary.labelAlpha).toBeGreaterThan(secondary.labelAlpha);
     expect(primary.strokeWidth).toBeGreaterThanOrEqual(secondary.strokeWidth);
-    expect(primary.textColor).toBe('#36ff7d');
-    expect(secondary.textColor).toBe('#ecfff5');
+    expect(primary.textColor).toBe(toCyberArcadeCssHex(cyberArcadeMaterial.signal.player));
+    expect(secondary.textColor).toBe(toCyberArcadeCssHex(cyberArcadeMaterial.rail.white));
   });
 
   test('keeps side-button chrome visible enough to survive the narrow live browser pane', () => {
@@ -40,7 +41,9 @@ describe('legacy menu button chrome', () => {
     expect(secondary.baseAlpha).toBeGreaterThanOrEqual(0.3);
     expect(secondary.baseAlpha).toBeLessThanOrEqual(0.31);
     expect(secondary.baseStroke).toBeGreaterThanOrEqual(0.52);
-    expect(secondary.fillColor).toBe(0x0d0715);
+    expect(secondary.fillColor).toBe(cyberArcadeMaterial.substrate.panel);
+    expect(secondary.hoverFillColor).toBe(cyberArcadeMaterial.substrate.panelRaised);
+    expect(secondary.strokeColor).toBe(cyberArcadeMaterial.rail.cyan);
     expect(secondary.hoverAlpha).toBeGreaterThan(0.12);
     expect(secondary.labelAlpha).toBeGreaterThanOrEqual(0.98);
     expect(secondary.strokeWidth).toBe(2);
@@ -60,9 +63,27 @@ describe('legacy menu button chrome', () => {
       isPrimary: false
     });
 
-    expect(primary.fontSize).toBeLessThan(24);
-    expect(secondary.fontSize).toBeLessThan(20);
-    expect(primary.fontSize).toBeGreaterThanOrEqual(16);
-    expect(secondary.fontSize).toBeGreaterThanOrEqual(16);
+    expect(primary.fontSize).toBeGreaterThanOrEqual(23);
+    expect(secondary.fontSize).toBeGreaterThanOrEqual(23);
+    expect(primary.fontSize).toBeLessThanOrEqual(26);
+    expect(secondary.fontSize).toBeLessThanOrEqual(26);
+  });
+
+  test('lets standard phone-width buttons use their available vertical lane', () => {
+    const primary = resolveLegacyMenuButtonChrome({
+      width: 132,
+      height: 58,
+      textLength: 5,
+      isPrimary: true
+    });
+    const secondary = resolveLegacyMenuButtonChrome({
+      width: 132,
+      height: 58,
+      textLength: 7,
+      isPrimary: false
+    });
+
+    expect(primary.fontSize).toBeGreaterThanOrEqual(30);
+    expect(secondary.fontSize).toBeGreaterThanOrEqual(24);
   });
 });

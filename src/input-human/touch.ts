@@ -50,7 +50,9 @@ export interface TouchControlLayout {
   stick: {
     deadzoneRadius: number;
     inner: TouchRect;
+    knobRadius: number;
     outer: TouchRect;
+    travelRadius: number;
   } | null;
   controls: Record<HumanInputActionKind, TouchRect>;
 }
@@ -66,15 +68,29 @@ export interface TouchStickPullVector {
   distanceRatio: number;
   movement: HumanMovementActionKind;
   movementCandidates: HumanMovementActionKind[];
-  intentSegment: number;
   normalizedX: number;
   normalizedY: number;
+}
+
+export interface TouchClientPointTransformInput {
+  canvas: {
+    height: number;
+    left: number;
+    top: number;
+    width: number;
+  };
+  clientX: number;
+  clientY: number;
+  logicalHeight: number;
+  logicalWidth: number;
 }
 
 export interface TouchControlLayoutOptions {
   safeInsets?: TouchSafeInsetsLike;
   compact?: boolean;
   controlMode?: TouchControlMode;
+  placement?: 'bottom-centered';
+  phonePortraitOverride?: boolean;
   avoidRect?: {
     left: number;
     top: number;
@@ -103,14 +119,45 @@ const normalizeInset = (value: unknown): number => (
 );
 
 const EMPTY_TOUCH_RECT = createRect(-10_000, -10_000, 0, 0);
-const STICK_INTENT_SEGMENT_COUNT = 16;
-const STICK_INTENT_SEGMENT_RADIANS = (Math.PI * 2) / STICK_INTENT_SEGMENT_COUNT;
-const STICK_INTENT_SEGMENT_HYSTERESIS_RADIANS = STICK_INTENT_SEGMENT_RADIANS * 0.12;
-const FULL_CIRCLE_RADIANS = Math.PI * 2;
+
+const resolveTopRightPauseRect = (
+  viewport: TouchViewportLike,
+  safeInsets: Required<TouchSafeInsetsLike>,
+  requestedSize: number
+): TouchRect => {
+  const size = clamp(Math.round(requestedSize), 36, 56);
+  const inset = Math.max(8, Math.round(size * 0.18));
+  const left = clamp(
+    Math.round(viewport.width - safeInsets.right - size - inset),
+    safeInsets.left + 4,
+    Math.max(safeInsets.left + 4, viewport.width - safeInsets.right - size - 4)
+  );
+  const top = clamp(
+    safeInsets.top + 4,
+    safeInsets.top + 4,
+    Math.max(safeInsets.top + 4, viewport.height - safeInsets.bottom - size - 4)
+  );
+
+  return createRect(left, top, size, size);
+};
+const TOUCH_MOVEMENT_KINDS = [
+  'move_up',
+  'move_up_right',
+  'move_right',
+  'move_down_right',
+  'move_down',
+  'move_down_left',
+  'move_left',
+  'move_up_left'
+] as const satisfies readonly HumanMovementActionKind[];
 
 export interface StickPullOptions {
   allowBeyondOuter?: boolean;
-  previousIntentSegment?: number | null;
+}
+
+export interface TouchArrowMovementOptions {
+  allowBeyondFrame?: boolean;
+  centerFallback?: HumanMovementActionKind | null;
 }
 
 const isPointInRect = (rect: TouchRect, x: number, y: number): boolean => (
@@ -134,75 +181,48 @@ const uniqueMovementCandidates = (
   return unique;
 };
 
-const normalizeAngleRadians = (angle: number): number => (
-  ((angle % FULL_CIRCLE_RADIANS) + FULL_CIRCLE_RADIANS) % FULL_CIRCLE_RADIANS
-);
-
-const resolveCircularSegmentDistance = (left: number, right: number): number => {
-  const direct = Math.abs(left - right);
-  return Math.min(direct, STICK_INTENT_SEGMENT_COUNT - direct);
-};
-
-const resolveAngleDistanceRadians = (left: number, right: number): number => {
-  const distance = Math.abs(normalizeAngleRadians(left) - normalizeAngleRadians(right));
-  return Math.min(distance, FULL_CIRCLE_RADIANS - distance);
-};
-
-const normalizeIntentSegment = (segment: number | null | undefined): number | null => {
-  if (!Number.isFinite(segment ?? NaN)) {
-    return null;
-  }
-
-  return ((Math.round(segment ?? 0) % STICK_INTENT_SEGMENT_COUNT) + STICK_INTENT_SEGMENT_COUNT) % STICK_INTENT_SEGMENT_COUNT;
-};
-
 export const resolveStickMovementIntent = (
-  angle: number,
-  options: { previousIntentSegment?: number | null } = {}
+  angle: number
 ): {
-  intentSegment: number;
   movement: HumanMovementActionKind;
   movementCandidates: HumanMovementActionKind[];
 } => {
-  const normalizedAngle = normalizeAngleRadians(angle);
-  const rawIntentSegment = Math.floor((normalizedAngle + (STICK_INTENT_SEGMENT_RADIANS / 2)) / STICK_INTENT_SEGMENT_RADIANS) % STICK_INTENT_SEGMENT_COUNT;
-  const previousIntentSegment = normalizeIntentSegment(options.previousIntentSegment);
-  let intentSegment = rawIntentSegment;
-  if (previousIntentSegment !== null && rawIntentSegment !== previousIntentSegment) {
-    const segmentDistance = resolveCircularSegmentDistance(previousIntentSegment, rawIntentSegment);
-    const rawSegmentCenter = rawIntentSegment * STICK_INTENT_SEGMENT_RADIANS;
-    const angleDistanceFromRawCenter = resolveAngleDistanceRadians(normalizedAngle, rawSegmentCenter);
-    const switchThreshold = (STICK_INTENT_SEGMENT_RADIANS / 2) - STICK_INTENT_SEGMENT_HYSTERESIS_RADIANS;
-    if (segmentDistance === 1 && angleDistanceFromRawCenter > switchThreshold) {
-      intentSegment = previousIntentSegment;
+  const axes: Array<{ magnitude: number; movement: HumanMovementActionKind; order: number }> = [
+    {
+      magnitude: Math.abs(Math.cos(angle)),
+      movement: Math.cos(angle) >= 0 ? 'move_right' : 'move_left',
+      order: 0
+    },
+    {
+      magnitude: Math.abs(Math.sin(angle)),
+      movement: Math.sin(angle) >= 0 ? 'move_down' : 'move_up',
+      order: 1
     }
-  }
-  const intents: Array<{
-    movement: HumanMovementActionKind;
-    movementCandidates: HumanMovementActionKind[];
-  }> = [
-    { movement: 'move_right', movementCandidates: ['move_right'] },
-    { movement: 'move_right', movementCandidates: ['move_right', 'move_down'] },
-    { movement: 'move_down_right', movementCandidates: ['move_right', 'move_down'] },
-    { movement: 'move_down', movementCandidates: ['move_down', 'move_right'] },
-    { movement: 'move_down', movementCandidates: ['move_down'] },
-    { movement: 'move_down', movementCandidates: ['move_down', 'move_left'] },
-    { movement: 'move_down_left', movementCandidates: ['move_left', 'move_down'] },
-    { movement: 'move_left', movementCandidates: ['move_left', 'move_down'] },
-    { movement: 'move_left', movementCandidates: ['move_left'] },
-    { movement: 'move_left', movementCandidates: ['move_left', 'move_up'] },
-    { movement: 'move_up_left', movementCandidates: ['move_left', 'move_up'] },
-    { movement: 'move_up', movementCandidates: ['move_up', 'move_left'] },
-    { movement: 'move_up', movementCandidates: ['move_up'] },
-    { movement: 'move_up', movementCandidates: ['move_up', 'move_right'] },
-    { movement: 'move_up_right', movementCandidates: ['move_right', 'move_up'] },
-    { movement: 'move_right', movementCandidates: ['move_right', 'move_up'] }
   ];
-  const intent = intents[intentSegment] ?? intents[0];
+  const rankedAxes = axes.filter((axis) => axis.magnitude > 0.001);
+  rankedAxes.sort((left, right) => {
+    const magnitudeDelta = right.magnitude - left.magnitude;
+    return Math.abs(magnitudeDelta) <= 0.000_001 ? left.order - right.order : magnitudeDelta;
+  });
+  const movementCandidates = uniqueMovementCandidates(rankedAxes.map((axis) => axis.movement));
   return {
-    intentSegment,
-    movement: intent.movement,
-    movementCandidates: uniqueMovementCandidates(intent.movementCandidates)
+    movement: movementCandidates[0] ?? 'move_right',
+    movementCandidates
+  };
+};
+
+export const resolveTouchClientPoint = ({
+  canvas,
+  clientX,
+  clientY,
+  logicalHeight,
+  logicalWidth
+}: TouchClientPointTransformInput): { x: number; y: number } => {
+  const canvasWidth = Math.max(1, canvas.width);
+  const canvasHeight = Math.max(1, canvas.height);
+  return {
+    x: ((clientX - canvas.left) / canvasWidth) * Math.max(1, logicalWidth),
+    y: ((clientY - canvas.top) / canvasHeight) * Math.max(1, logicalHeight)
   };
 };
 
@@ -232,9 +252,7 @@ export const resolveStickPullVector = (
   }
 
   const angle = Math.atan2(dy, dx);
-  const intent = resolveStickMovementIntent(angle, {
-    previousIntentSegment: options.previousIntentSegment
-  });
+  const intent = resolveStickMovementIntent(angle);
 
   const outerRadius = stick.outer.width / 2;
   const usableRadius = Math.max(1, outerRadius - stick.deadzoneRadius);
@@ -246,7 +264,6 @@ export const resolveStickPullVector = (
   return {
     angleRadians: angle,
     distanceRatio,
-    intentSegment: intent.intentSegment,
     movement: intent.movement,
     movementCandidates: intent.movementCandidates,
     normalizedX: unitX * distanceRatio,
@@ -283,7 +300,9 @@ export const resolveTouchControlLayout = (
     left: normalizeInset(options.safeInsets?.left)
   };
   const minDim = Math.max(1, Math.min(viewport.width, viewport.height));
-  const phonePortrait = compact && viewport.height > viewport.width && viewport.width <= 430;
+  const phonePortrait = compact
+    && viewport.height > viewport.width
+    && (viewport.width <= 430 || options.phonePortraitOverride === true);
   if (phonePortrait) {
     const ultraNarrow = viewport.width < 240;
     const buttonSize = clamp(
@@ -312,11 +331,20 @@ export const resolveTouchControlLayout = (
       )
       : null;
     const frameTop = bottomLaneTop !== null
-      ? clamp(
-        Math.round(bottomLaneTop + (((viewport.height - safeInsets.bottom) - bottomLaneTop - dpadFrameHeight) / 2)),
-        bottomLaneTop,
-        Math.max(bottomLaneTop, viewport.height - safeInsets.bottom - dpadFrameHeight)
-      )
+      ? (() => {
+        const availableLaneSpace = Math.max(
+          0,
+          (viewport.height - safeInsets.bottom) - bottomLaneTop - dpadFrameHeight
+        );
+        // Keep the controller visually connected to the board instead of marooning it
+        // at the bottom of a tall phone. The bottom safe area remains available for thumb reach.
+        const boardControlGap = Math.round(availableLaneSpace * 0.42);
+        return clamp(
+          Math.round(bottomLaneTop + boardControlGap),
+          bottomLaneTop,
+          Math.max(bottomLaneTop, viewport.height - safeInsets.bottom - dpadFrameHeight)
+        );
+      })()
       : clamp(
         Math.round(viewport.height - safeInsets.bottom - dpadFrameHeight - Math.max(12, buttonSize * 0.25)),
         0,
@@ -324,20 +352,7 @@ export const resolveTouchControlLayout = (
       );
     const dpadLeft = Math.round(frameLeft + ((dpadFrameWidth - dpadSpan) / 2));
     const dpadTop = Math.round(frameTop + ((dpadFrameHeight - dpadSpan) / 2));
-    const topActionHeight = clamp(Math.round(buttonSize * 0.72), 30, ultraNarrow ? 34 : 38);
-    const actionWidth = clamp(Math.round(viewport.width * 0.22), ultraNarrow ? 58 : 78, ultraNarrow ? 76 : 96);
-    const actionTop = safeInsets.top + (ultraNarrow ? 8 : 10);
-    const actionLeft = clamp(
-      Math.round(viewport.width - safeInsets.right - actionWidth - 10),
-      safeInsets.left + 4,
-      Math.max(safeInsets.left + 4, viewport.width - safeInsets.right - actionWidth - 4)
-    );
-    const actionFrame = createRect(
-      actionLeft,
-      actionTop,
-      actionWidth,
-      topActionHeight
-    );
+    const actionFrame = resolveTopRightPauseRect(viewport, safeInsets, buttonSize);
     const dpadFrame = createRect(frameLeft, frameTop, dpadFrameWidth, dpadFrameHeight);
     const stickOuterSize = Math.min(dpadFrame.width - (dpadPad * 2), dpadFrame.height - (dpadPad * 2));
     const stickOuter = createRect(
@@ -353,6 +368,11 @@ export const resolveTouchControlLayout = (
       stickInnerSize,
       stickInnerSize
     );
+    const stickKnobRadius = clamp(Math.round(stickOuterSize * 0.075), 10, 14);
+    const stickTravelRadius = Math.round(Math.max(
+      stickOuterSize * 0.3,
+      (stickOuterSize / 2) - stickKnobRadius - Math.max(5, Math.round(stickOuterSize * 0.04))
+    ));
 
     return {
       compact,
@@ -361,9 +381,11 @@ export const resolveTouchControlLayout = (
       frames: [actionFrame, dpadFrame],
       stick: controlMode === 'stick'
         ? {
-          deadzoneRadius: Math.max(16, Math.round(stickOuterSize * 0.18)),
+          deadzoneRadius: Math.max(12, Math.round(stickOuterSize * 0.12)),
           inner: stickInner,
-          outer: stickOuter
+          knobRadius: stickKnobRadius,
+          outer: stickOuter,
+          travelRadius: stickTravelRadius
         }
         : null,
       controls: {
@@ -383,6 +405,82 @@ export const resolveTouchControlLayout = (
   }
 
   const avoidRect = options.avoidRect;
+  if (options.placement === 'bottom-centered' && avoidRect !== undefined) {
+    const boardBottom = clamp(Math.round(avoidRect.top + avoidRect.height), safeInsets.top, viewport.height - safeInsets.bottom);
+    const buttonSize = clamp(Math.round(minDim * 0.078), 44, 64);
+    const gap = Math.max(8, Math.round(buttonSize * 0.16));
+    const framePad = 8;
+    const dpadSpan = (buttonSize * 3) + (gap * 2);
+    const dpadFrameWidth = dpadSpan + (framePad * 2);
+    const dpadFrameHeight = dpadSpan + (framePad * 2);
+    const bottomLaneTop = Math.min(
+      viewport.height - safeInsets.bottom - dpadFrameHeight,
+      boardBottom + Math.max(10, Math.round(buttonSize * 0.2))
+    );
+    const dpadFrameTop = clamp(
+      Math.round(bottomLaneTop + (((viewport.height - safeInsets.bottom) - bottomLaneTop - dpadFrameHeight) / 2)),
+      bottomLaneTop,
+      Math.max(bottomLaneTop, viewport.height - safeInsets.bottom - dpadFrameHeight)
+    );
+    const dpadFrameLeft = clamp(
+      Math.round((viewport.width - dpadFrameWidth) / 2),
+      safeInsets.left,
+      Math.max(safeInsets.left, viewport.width - safeInsets.right - dpadFrameWidth)
+    );
+    const dpadLeft = dpadFrameLeft + framePad;
+    const dpadTop = dpadFrameTop + framePad;
+    const dpadFrame = createRect(dpadFrameLeft, dpadFrameTop, dpadFrameWidth, dpadFrameHeight);
+    const actionFrame = resolveTopRightPauseRect(viewport, safeInsets, buttonSize);
+    const stickOuterSize = Math.min(dpadFrame.width - (framePad * 2), dpadFrame.height - (framePad * 2));
+    const stickOuter = createRect(
+      Math.round(dpadFrame.centerX - (stickOuterSize / 2)),
+      Math.round(dpadFrame.centerY - (stickOuterSize / 2)),
+      stickOuterSize,
+      stickOuterSize
+    );
+    const stickInnerSize = clamp(Math.round(stickOuterSize * 0.34), 34, 54);
+    const stickInner = createRect(
+      Math.round(stickOuter.centerX - (stickInnerSize / 2)),
+      Math.round(stickOuter.centerY - (stickInnerSize / 2)),
+      stickInnerSize,
+      stickInnerSize
+    );
+    const stickKnobRadius = clamp(Math.round(stickOuterSize * 0.075), 10, 14);
+    const stickTravelRadius = Math.round(Math.max(
+      stickOuterSize * 0.3,
+      (stickOuterSize / 2) - stickKnobRadius - Math.max(5, Math.round(stickOuterSize * 0.04))
+    ));
+
+    return {
+      compact,
+      controlMode,
+      frame: dpadFrame,
+      frames: [actionFrame, dpadFrame],
+      stick: controlMode === 'stick'
+        ? {
+          deadzoneRadius: Math.max(12, Math.round(stickOuterSize * 0.12)),
+          inner: stickInner,
+          knobRadius: stickKnobRadius,
+          outer: stickOuter,
+          travelRadius: stickTravelRadius
+        }
+        : null,
+      controls: {
+        move_up_left: createRect(dpadLeft, dpadTop, buttonSize, buttonSize),
+        move_up: createRect(dpadLeft + buttonSize + gap, dpadTop, buttonSize, buttonSize),
+        move_up_right: createRect(dpadLeft + ((buttonSize + gap) * 2), dpadTop, buttonSize, buttonSize),
+        move_down_left: createRect(dpadLeft, dpadTop + ((buttonSize + gap) * 2), buttonSize, buttonSize),
+        move_down: createRect(dpadLeft + buttonSize + gap, dpadTop + ((buttonSize + gap) * 2), buttonSize, buttonSize),
+        move_down_right: createRect(dpadLeft + ((buttonSize + gap) * 2), dpadTop + ((buttonSize + gap) * 2), buttonSize, buttonSize),
+        move_left: createRect(dpadLeft, dpadTop + buttonSize + gap, buttonSize, buttonSize),
+        move_right: createRect(dpadLeft + ((buttonSize + gap) * 2), dpadTop + buttonSize + gap, buttonSize, buttonSize),
+        pause: createRect(actionFrame.left, actionFrame.top, actionFrame.width, actionFrame.height),
+        restart_attempt: EMPTY_TOUCH_RECT,
+        toggle_thoughts: EMPTY_TOUCH_RECT
+      }
+    };
+  }
+
   const splitLandscape = compact && viewport.width > viewport.height && avoidRect !== undefined;
   if (splitLandscape) {
     const avoidLeft = clamp(Math.round(avoidRect.left), safeInsets.left, viewport.width - safeInsets.right);
@@ -406,14 +504,11 @@ export const resolveTouchControlLayout = (
     const dpadSpan = (buttonSize * 3) + (gap * 2);
     const clusterHeight = dpadSpan;
     const dpadFrameWidth = dpadSpan + (framePad * 2);
-    const actionFrameWidth = buttonSize + (framePad * 2);
     const frameHeight = clusterHeight + (framePad * 2);
     const leftSlotWidth = leftGutter - boardGap;
-    const rightSlotWidth = rightGutter - boardGap;
 
     if (
       leftSlotWidth >= dpadFrameWidth
-      && rightSlotWidth >= actionFrameWidth
       && verticalSpace >= frameHeight
     ) {
       const clusterTop = clamp(
@@ -422,11 +517,9 @@ export const resolveTouchControlLayout = (
         viewport.height - safeInsets.bottom - clusterHeight - framePad
       );
       const dpadFrameLeft = Math.round(safeInsets.left + ((leftSlotWidth - dpadFrameWidth) / 2));
-      const actionFrameLeft = Math.round(avoidRight + boardGap + ((rightSlotWidth - actionFrameWidth) / 2));
       const dpadLeft = dpadFrameLeft + framePad;
-      const actionLeft = actionFrameLeft + framePad;
       const dpadFrame = createRect(dpadFrameLeft, clusterTop - framePad, dpadFrameWidth, frameHeight);
-      const actionFrame = createRect(actionFrameLeft, clusterTop - framePad, actionFrameWidth, frameHeight);
+      const actionFrame = resolveTopRightPauseRect(viewport, safeInsets, buttonSize);
       const frame = createRect(
         dpadFrame.left,
         Math.min(dpadFrame.top, actionFrame.top),
@@ -449,7 +542,7 @@ export const resolveTouchControlLayout = (
           move_down_right: createRect(dpadLeft + ((buttonSize + gap) * 2), clusterTop + ((buttonSize + gap) * 2), buttonSize, buttonSize),
           move_left: createRect(dpadLeft, clusterTop + buttonSize + gap, buttonSize, buttonSize),
           move_right: createRect(dpadLeft + ((buttonSize + gap) * 2), clusterTop + buttonSize + gap, buttonSize, buttonSize),
-          pause: createRect(actionLeft, clusterTop, buttonSize, buttonSize),
+          pause: actionFrame,
           restart_attempt: EMPTY_TOUCH_RECT,
           toggle_thoughts: EMPTY_TOUCH_RECT
         }
@@ -479,12 +572,7 @@ export const resolveTouchControlLayout = (
 
   const dpadCenterX = frameLeft + buttonSize + gap + Math.round(buttonSize * 0.5);
   const dpadCenterY = frameTop + buttonSize + gap + Math.round(buttonSize * 0.5);
-  const buttonStackLeft = clamp(
-    frameLeft + frameWidth - buttonSize - gap,
-    frameLeft,
-    Math.max(frameLeft, viewport.width - safeInsets.right - buttonSize)
-  );
-  const buttonColumnTop = frameTop + Math.round(buttonSize * 0.05);
+  const pauseFrame = resolveTopRightPauseRect(viewport, safeInsets, buttonSize);
 
   const controls: Record<HumanInputActionKind, TouchRect> = {
     move_up_left: createRect(frameLeft, frameTop, buttonSize, buttonSize),
@@ -495,7 +583,7 @@ export const resolveTouchControlLayout = (
     move_down_right: createRect(frameLeft + (buttonSize + gap) * 2, frameTop + (buttonSize + gap) * 2, buttonSize, buttonSize),
     move_left: createRect(frameLeft, dpadCenterY - Math.round(buttonSize / 2), buttonSize, buttonSize),
     move_right: createRect(frameLeft + (buttonSize + gap) * 2, dpadCenterY - Math.round(buttonSize / 2), buttonSize, buttonSize),
-    pause: createRect(buttonStackLeft, buttonColumnTop, buttonSize, buttonSize),
+    pause: pauseFrame,
     restart_attempt: EMPTY_TOUCH_RECT,
     toggle_thoughts: EMPTY_TOUCH_RECT
   };
@@ -504,6 +592,7 @@ export const resolveTouchControlLayout = (
     compact,
     controlMode,
     frame: createRect(frameLeft, frameTop, frameWidth, frameHeight),
+    frames: [pauseFrame, createRect(frameLeft, frameTop, frameWidth, frameHeight)],
     stick: null,
     controls
   };
@@ -525,16 +614,7 @@ export const resolveTouchControlKindAtPoint = (
     return resolveStickMovementKind(layout.stick, x, y);
   }
 
-  for (const kind of [
-    'move_up',
-    'move_up_right',
-    'move_right',
-    'move_down_right',
-    'move_down',
-    'move_down_left',
-    'move_left',
-    'move_up_left'
-  ] as const) {
+  for (const kind of TOUCH_MOVEMENT_KINDS) {
     const rect = layout.controls[kind];
     if (isPointInRect(rect, x, y)) {
       return kind;
@@ -542,6 +622,38 @@ export const resolveTouchControlKindAtPoint = (
   }
 
   return null;
+};
+
+export const resolveTouchArrowMovementKindAtPoint = (
+  layout: TouchControlLayout,
+  x: number,
+  y: number,
+  options: TouchArrowMovementOptions = {}
+): HumanMovementActionKind | null => {
+  if (layout.controlMode !== 'arrows') {
+    return null;
+  }
+
+  const exactControl = resolveTouchControlKindAtPoint(layout, x, y);
+  if (exactControl !== null && TOUCH_MOVEMENT_KINDS.includes(exactControl as HumanMovementActionKind)) {
+    return exactControl as HumanMovementActionKind;
+  }
+
+  if (!options.allowBeyondFrame && !isPointInRect(layout.frame, x, y)) {
+    return null;
+  }
+
+  const dx = x - layout.frame.centerX;
+  const dy = y - layout.frame.centerY;
+  const centerDeadzoneRadius = Math.max(
+    12,
+    Math.min(layout.controls.move_up.width, layout.controls.move_left.height) * 0.34
+  );
+  if (Math.hypot(dx, dy) <= centerDeadzoneRadius) {
+    return options.centerFallback ?? null;
+  }
+
+  return resolveStickMovementIntent(Math.atan2(dy, dx)).movement;
 };
 
 export const createTouchInputState = (): TouchInputState => ({

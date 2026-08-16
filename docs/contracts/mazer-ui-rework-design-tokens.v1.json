@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "wave": "1B",
+  "themeId": "precision-arcade",
+  "canonicalThemeId": "precision-arcade",
+  "status": "live-phaser-material",
+  "sourceRef": "01_FINAL_AUTHORITATIVE_HANDOFF/spec/design-tokens.json (mazer-everything-bundle-20260803)",
+  "decisionRefs": [
+    "single-canonical-theme",
+    "renderer-ownership-split"
+  ],
+  "notes": "Wave 1B ('Tokens/theme/profile aliases') established the source of truth for the Fawxzzy Precision Arcade palette. The live Phaser material now imports phaserMaterialAliases from src/theme/tokens.ts, so the board, title, panels, HUD, and controls consume this registry instead of a parallel hard-coded palette. This integration is render-only: maze topology, progression, input, collision, persistence, and lifecycle behavior remain outside the token contract. DOM-shell extraction remains a separately staged future renderer-ownership migration.",
+  "cssVariablePrefix": "--mazer-token-",
+  "tokens": {
+    "color": {
+      "bg.canvas": "#03070B",
+      "bg.shell": "#07131A",
+      "bg.panel": "#0B1A22",
+      "bg.elevated": "#10242B",
+      "line.subtle": "#23434A",
+      "line.normal": "#5D9F98",
+      "line.active": "#A7E7D9",
+      "brand.mint": "#C3F4B9",
+      "world.pathCore": "#E9FFF1",
+      "semantic.energy": "#39F58A",
+      "semantic.info": "#6BE8E1",
+      "semantic.reward": "#F4C84A",
+      "semantic.danger": "#FF405D",
+      "semantic.anomaly": "#AF79FF",
+      "text.primary": "#F1FAF6",
+      "text.muted": "#94AAA8",
+      "text.disabled": "#5D7478"
+    },
+    "spacingPx": [4, 8, 12, 16, 20, 24, 32, 48, 64],
+    "radiusPx": {
+      "control": 8,
+      "panel": 12,
+      "sheet": 16,
+      "round": 999
+    },
+    "strokePx": {
+      "hairline": 1,
+      "normal": 2,
+      "focus": 3
+    },
+    "motionMs": {
+      "instant": 90,
+      "press": 140,
+      "panel": 220,
+      "emphasis": 420
+    },
+    "touchTargetMinPx": 44,
+    "preferredTouchTargetPx": 56,
+    "fonts": {
+      "ui": "Space Grotesk, ui-sans-serif, system-ui",
+      "metrics": "IBM Plex Mono, ui-monospace, monospace",
+      "title": "topology-rendered"
+    }
+  },
+  "legacyThemeAliases": ["root", "noir", "ember", "vellum", "aurora", "monolith"],
+  "archivedThemeAliasMap": {
+    "root": "precision-arcade",
+    "noir": "precision-arcade",
+    "ember": "precision-arcade",
+    "vellum": "precision-arcade",
+    "aurora": "precision-arcade",
+    "monolith": "precision-arcade"
+  }
+}

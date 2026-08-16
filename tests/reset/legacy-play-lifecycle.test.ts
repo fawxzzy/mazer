@@ -1,15 +1,54 @@
 import { describe, expect, test } from 'vitest';
 import {
   ACTIVE_PLAY_GOAL_RESET_HOLD_MS,
+  createLegacyEndlessLifecycleState,
   createLegacyResetRequest,
   hasPendingLegacyResetRequest,
+  resolveLegacyEndlessLifecycleTransition,
   resolveLegacyPlayLifecycleSnapshot,
   resolveLegacyResetEntryContract,
   resolveLegacyResetAction,
-  shouldConsumeLegacyResetRequest
+  resolveLegacyStaticDrawPlayTimerStartAtMs,
+  shouldConsumeLegacyResetRequest,
+  shouldFreezeLegacyPlayElapsedForStaticDraw,
+  shouldSettleLegacyStaticDrawStage
 } from '../../src/legacy-runtime/legacyPlayLifecycle';
+import { resolveLegacyFrozenElapsedMs } from '../../src/legacy-runtime/legacyPlayHud';
 
 describe('legacy play lifecycle', () => {
+  test('keeps an Endless checkpoint while a failed attempt resets only the current level', () => {
+    const started = createLegacyEndlessLifecycleState();
+    const completed = resolveLegacyEndlessLifecycleTransition(started, 'complete');
+    const failed = resolveLegacyEndlessLifecycleTransition(completed.state, 'fail-current-attempt');
+
+    expect(completed).toMatchObject({
+      effect: 'advance-checkpoint',
+      state: { checkpointLevel: 0, currentLevel: 1, attempt: 1, status: 'active', version: 1 }
+    });
+    expect(failed).toMatchObject({
+      effect: 'reset-current-attempt',
+      state: { checkpointLevel: 0, currentLevel: 1, attempt: 2, status: 'active', version: 1 }
+    });
+  });
+
+  test('marks an Endless run abandoned without losing its next checkpoint-resume target', () => {
+    const afterCompletion = resolveLegacyEndlessLifecycleTransition(
+      createLegacyEndlessLifecycleState(7),
+      'complete'
+    ).state;
+    const abandoned = resolveLegacyEndlessLifecycleTransition(afterCompletion, 'abandon');
+    const resumed = resolveLegacyEndlessLifecycleTransition(abandoned.state, 'resume');
+
+    expect(abandoned).toMatchObject({
+      effect: 'none',
+      state: { checkpointLevel: 7, currentLevel: 8, attempt: 1, status: 'abandoned' }
+    });
+    expect(resumed).toMatchObject({
+      effect: 'resume-current-attempt',
+      state: { checkpointLevel: 7, currentLevel: 8, attempt: 1, status: 'active' }
+    });
+  });
+
   test('uses the legacy goal-reset hold duration', () => {
     expect(ACTIVE_PLAY_GOAL_RESET_HOLD_MS).toBe(340);
   });
@@ -179,5 +218,70 @@ describe('legacy play lifecycle', () => {
       nextSeedQueued: true,
       compassSpinExpected: true
     });
+  });
+
+  test('settles a staged draw only after both row and tile stages complete', () => {
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'building',
+      rowsVisible: 46,
+      tilesVisible: null
+    })).toBe(false);
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'building',
+      rowsVisible: null,
+      tilesVisible: 120
+    })).toBe(false);
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'building',
+      rowsVisible: null,
+      tilesVisible: null
+    })).toBe(true);
+    expect(shouldSettleLegacyStaticDrawStage({
+      drawPhase: 'deconstructing',
+      rowsVisible: null,
+      tilesVisible: null
+    })).toBe(false);
+  });
+
+  test('rebinds the play timer only at order-independent dual-stage settlement', () => {
+    const timerInput = {
+      currentStartedAtMs: 900,
+      drawPhase: 'building' as const,
+      mode: 'play' as const,
+      nowMs: 4600
+    };
+    const rowFirstStartedAtMs = resolveLegacyStaticDrawPlayTimerStartAtMs({
+      ...timerInput,
+      rowsVisible: null,
+      tilesVisible: 120
+    });
+    const tileFirstStartedAtMs = resolveLegacyStaticDrawPlayTimerStartAtMs({
+      ...timerInput,
+      rowsVisible: 46,
+      tilesVisible: null
+    });
+    const settledStartedAtMs = resolveLegacyStaticDrawPlayTimerStartAtMs({
+      ...timerInput,
+      rowsVisible: null,
+      tilesVisible: null
+    });
+
+    expect(rowFirstStartedAtMs).toBe(900);
+    expect(tileFirstStartedAtMs).toBe(900);
+    expect(settledStartedAtMs).toBe(4600);
+    expect(shouldFreezeLegacyPlayElapsedForStaticDraw({
+      drawPhase: 'building',
+      rowsVisible: null,
+      tilesVisible: null
+    })).toBe(true);
+    expect(shouldFreezeLegacyPlayElapsedForStaticDraw({
+      drawPhase: 'settled',
+      rowsVisible: null,
+      tilesVisible: null
+    })).toBe(false);
+    expect(resolveLegacyFrozenElapsedMs({
+      nowMs: 4600,
+      startedAtMs: settledStartedAtMs
+    })).toBe(0);
   });
 });

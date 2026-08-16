@@ -1,3 +1,5 @@
+import { cyberArcadeMaterial } from '../render/cyberArcadeMaterial';
+
 export interface LegacyMenuBackdropStar {
   alpha: number;
   drift: number;
@@ -59,6 +61,7 @@ export const LEGACY_MENU_BACKDROP_SHARD_COUNT = 8;
 export const LEGACY_MENU_GLASS_SHARD_COUNT = 5;
 export const LEGACY_MENU_DRIFT_RUNE_COUNT = 14;
 export const LEGACY_MENU_BACKDROP_STAR_MOTION = 'radial-warp';
+export const LEGACY_MENU_BACKDROP_MOTION_PROFILE = 'visible-parallax-warp';
 
 const LEGACY_MENU_BACKDROP_WARP_CENTER_X = 0.5;
 const LEGACY_MENU_BACKDROP_WARP_CENTER_Y = 0.5;
@@ -66,6 +69,11 @@ const LEGACY_MENU_BACKDROP_WARP_WRAP_RADIUS = 0.82;
 const LEGACY_MENU_BACKDROP_WARP_RESPAWN_MIN_RADIUS = 0.018;
 const LEGACY_MENU_BACKDROP_WARP_RESPAWN_RADIUS_RANGE = 0.14;
 const LEGACY_MENU_BACKDROP_WARP_EDGE_MARGIN = 0.08;
+const LEGACY_MENU_BACKDROP_LIGHT_STAR_SPEED_SCALE = 1.04;
+const LEGACY_MENU_BACKDROP_DARK_STAR_SPEED_SCALE = 0.68;
+const LEGACY_MENU_BACKDROP_GLASS_DRIFT_X_RATIO = 0.038;
+const LEGACY_MENU_BACKDROP_GLASS_DRIFT_Y_RATIO = 0.024;
+const LEGACY_MENU_BACKDROP_RUNE_CYCLE_MS = 9000;
 
 const LIGHT_BACKDROP_SHARDS: LegacyMenuBackdropShardTemplate[] = [
   { xRatio: 0.055, yRatio: 0.2, lengthRatio: 0.155, thicknessRatio: 0.0038, angle: 0.78, alpha: 0.024, color: 0xb7f2ff },
@@ -117,7 +125,9 @@ export function advanceLegacyMenuBackdropStars(
   random: () => number = Math.random
 ): void {
   const elapsedSeconds = Math.min(0.25, Math.max(0, deltaMs / 1000));
-  const speedScale = darkMode ? 0.46 : 0.72;
+  const speedScale = darkMode
+    ? LEGACY_MENU_BACKDROP_DARK_STAR_SPEED_SCALE
+    : LEGACY_MENU_BACKDROP_LIGHT_STAR_SPEED_SCALE;
   const tangentScale = darkMode ? 0.026 : 0.04;
 
   for (const star of stars) {
@@ -185,14 +195,14 @@ function resetLegacyMenuBackdropStarNearWarpOrigin(
 export function resolveLegacyMenuBackdropPalette(darkMode: boolean): LegacyMenuBackdropPalette {
   if (darkMode) {
     return {
-      fieldColor: 0x090d19,
+      fieldColor: cyberArcadeMaterial.substrate.field,
       starAlphaScale: 0.74,
       overlayAlpha: 0.1
     };
   }
 
   return {
-    fieldColor: 0x10172c,
+    fieldColor: cyberArcadeMaterial.substrate.fieldRaised,
     starAlphaScale: 1.08,
     overlayAlpha: 0
   };
@@ -229,17 +239,20 @@ export function resolveLegacyMenuBackdropGlassShards(
   const alphaScale = darkMode ? 0.7 : 1;
 
   return GLASS_SHARD_TEMPLATES.map((template, index) => {
-    const localPhase = phase * (0.16 + (index * 0.022)) + (index * 1.73);
-    const driftX = Math.sin(localPhase) * 0.026;
-    const driftY = Math.cos(localPhase * 0.74) * 0.017;
+    const localPhase = phase * (0.34 + (index * 0.034)) + (index * 1.73);
+    const driftX = Math.sin(localPhase) * LEGACY_MENU_BACKDROP_GLASS_DRIFT_X_RATIO;
+    const driftY = Math.cos(localPhase * 0.76) * LEGACY_MENU_BACKDROP_GLASS_DRIFT_Y_RATIO;
+    const motionAlpha = animated
+      ? 0.86 + (Math.sin((localPhase * 0.68) + (index * 0.4)) * 0.14)
+      : 1;
 
     return {
       x: width * (template.xRatio + driftX),
       y: height * (template.yRatio + driftY),
       length: minDimension * template.lengthRatio,
       thickness: Math.max(3, minDimension * template.thicknessRatio),
-      angle: template.angle + (animated ? Math.sin(localPhase * 0.48) * 0.052 : 0),
-      alpha: template.alpha * alphaScale,
+      angle: template.angle + (animated ? Math.sin(localPhase * 0.56) * 0.078 : 0),
+      alpha: template.alpha * alphaScale * motionAlpha,
       color: template.color
     };
   });
@@ -252,10 +265,15 @@ export function resolveLegacyMenuBackdropDriftRunes(
   timeMs: number,
   animated: boolean
 ): LegacyMenuBackdropDriftRune[] {
-  const progress = animated ? timeMs / 14000 : 0;
+  const progress = animated ? timeMs / LEGACY_MENU_BACKDROP_RUNE_CYCLE_MS : 0;
   const minDimension = Math.min(width, height);
   const alphaScale = darkMode ? 0.68 : 1;
-  const colors = [0x72e0bf, 0xb7f2ff, 0x9cffd2, 0xd8cbff];
+  const colors = [
+    cyberArcadeMaterial.rail.mint,
+    cyberArcadeMaterial.rail.cyan,
+    cyberArcadeMaterial.signal.playerAccent,
+    cyberArcadeMaterial.signal.violet
+  ];
 
   return Array.from({ length: LEGACY_MENU_DRIFT_RUNE_COUNT }, (_, index) => {
     const laneSeed = (index * 0.61803398875) % 1;
@@ -263,13 +281,17 @@ export function resolveLegacyMenuBackdropDriftRunes(
     const x = width * ((laneSeed + (progress * (0.32 + (driftSeed * 0.18)))) % 1);
     const y = height * ((driftSeed + (progress * (0.12 + (laneSeed * 0.1))) + (Math.sin((progress * 8) + index) * 0.022)) % 1);
 
+    const motionAlpha = animated
+      ? 0.84 + (Math.sin((progress * 7) + index) * 0.16)
+      : 1;
+
     return {
       x,
       y,
       size: Math.max(3, minDimension * (0.0072 + (laneSeed * 0.004))),
       angle: (laneSeed * Math.PI) + (animated ? progress * 1.7 : 0),
-      alpha: (0.14 + (driftSeed * 0.1)) * alphaScale,
-      color: colors[index % colors.length] ?? 0xb7f2ff
+      alpha: (0.16 + (driftSeed * 0.1)) * alphaScale * motionAlpha,
+      color: colors[index % colors.length] ?? cyberArcadeMaterial.rail.cyan
     };
   });
 }

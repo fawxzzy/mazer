@@ -2,5 +2,18 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "git": {
     "deploymentEnabled": false
-  }
+  },
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "fawxzzy-mazer.vercel.app"
+        }
+      ],
+      "destination": "https://mazer.fawxzzy.com/:path*",
+      "permanent": true
+    }
+  ]
 }

@@ -134,6 +134,11 @@ export interface MenuSceneRuntimeDiagnostics {
       label: string;
       value: number;
     };
+    smartSteering: {
+      enabled: boolean;
+      switchIsOn: boolean;
+      stateText: string;
+    };
     trailFade: {
       enabled: boolean;
       switchIsOn: boolean;
@@ -177,30 +182,246 @@ export interface MenuSceneRuntimeDiagnostics {
       trailLength: number;
       trailVisible: boolean;
     };
+    roomCandidate?: {
+      band: 'architect' | 'mythic';
+      candidate: {
+        footprintHeight: 2;
+        footprintWidth: 2;
+        solutionPathIndex: number;
+        topLeft: {
+          x: number;
+          y: number;
+        };
+      };
+      candidateCount: 1;
+      contractVersion: 'legacy-room-candidate-metadata-v7';
+      evaluatedCandidateCount: number;
+      perimeterOpeningCount: number;
+      perimeterOpenings: Array<{
+        inside: {
+          x: number;
+          y: number;
+        };
+        kind: 'route-enter' | 'route-exit' | 'side';
+        outside: {
+          x: number;
+          y: number;
+        };
+        side: 'top' | 'right' | 'bottom' | 'left';
+      }>;
+      routeInteriorTileCount: number;
+      routeOpeningCount: 2;
+      routeOpeningEdges: Array<{
+        inside: {
+          x: number;
+          y: number;
+        };
+        kind: 'route-enter' | 'route-exit';
+        outside: {
+          x: number;
+          y: number;
+        };
+        side: 'top' | 'right' | 'bottom' | 'left';
+      }>;
+      routeThresholds: Array<{
+        from: {
+          x: number;
+          y: number;
+        };
+        fromSolutionPathIndex: number;
+        kind: 'enter' | 'exit';
+        to: {
+          x: number;
+          y: number;
+        };
+        toSolutionPathIndex: number;
+      }>;
+      roomsEnabled: false;
+      sideClosureCount: number;
+      sideClosureEdges: Array<{
+        inside: {
+          x: number;
+          y: number;
+        };
+        kind: 'side';
+        outside: {
+          x: number;
+          y: number;
+        };
+        side: 'top' | 'right' | 'bottom' | 'left';
+      }>;
+      source: 'existing-floor-metadata-only';
+    } | null;
+    patrol?: {
+      alternateRouteStepCount: number;
+      blockedMoveCount: number;
+      collisionCount: number;
+      collisionDelayActive: boolean;
+      collisionDelayMs: 440;
+      collisionDelayUntilMs: number | null;
+      collisionEpisodeActive: boolean;
+      collisionFeedbackActive: boolean;
+      collisionFeedbackElapsedMs: number | null;
+      collisionFeedbackWindowMs: 220;
+      collisionRecoveryActive: boolean;
+      collisionRecoveryElapsedMs: number | null;
+      collisionRecoveryRemainingMs: number;
+      collisionRecoveryWindowMs: 220;
+      contractVersion: 'legacy-patrol-agent-v5';
+      currentRouteIndex: 0 | 1;
+      elapsedInStepMs: number;
+      lastResolvedTickIndex: number;
+      lastStepAtMs: number | null;
+      maximumAgents: 1;
+      maximumPendingCollisionIntents: 1;
+      msUntilStep: number;
+      nextPoint: {
+        screenX: number;
+        screenY: number;
+        x: number;
+        y: number;
+      };
+      nextRouteIndex: 0 | 1;
+      pendingCollisionIntent: {
+        deltaX: -1 | 0 | 1;
+        deltaY: -1 | 0 | 1;
+        queuedAtMs: number;
+      } | null;
+      pendingCollisionIntentCount: 0 | 1;
+      penaltyCount: number;
+      remainingMs: number;
+      roundTripMs: 880;
+      route: Array<{
+        x: number;
+        y: number;
+      }>;
+      screenPoint: {
+        screenX: number;
+        screenY: number;
+        x: number;
+        y: number;
+      };
+      solutionPathIndices: number[];
+      stepCount: number;
+      stepMs: 440;
+      telegraphActive: boolean;
+      telegraphWindowMs: 220;
+    } | null;
+    pressure?: {
+      activeWindowMs: number | null;
+      alternateRouteStepCount: number | null;
+      armed: boolean;
+      band: 'tutorial' | 'starter' | 'explorer' | 'navigator' | 'architect' | 'mythic';
+      blockedMoveCount: number;
+      consumed: boolean;
+      contractVersion: 'legacy-static-slow-tile-v2';
+      cycleElapsedMs: number | null;
+      cycleMs: number | null;
+      delayActive: boolean;
+      delayUntilMs: number | null;
+      eligible: boolean;
+      enteredAtMs: number | null;
+      entryCount: number;
+      penaltyMs: 440;
+      phaseActive: boolean;
+      remainingMs: number;
+      safeWindowMs: number | null;
+      solutionPathIndex: number | null;
+      tile: {
+        screenX: number;
+        screenY: number;
+        x: number;
+        y: number;
+      } | null;
+      timingMode: 'disabled' | 'static' | 'timed';
+    } | null;
+    timer: {
+      completedAtMs: number | null;
+      elapsedMs: number;
+      frozen: boolean;
+      startedAtMs: number;
+    };
+    worldTurn: {
+      acceptedTurnCount: number;
+      lastCommandId: string | null;
+      lastReceipt: {
+        admitted: boolean;
+        commandId: string;
+        commandKind: 'player-move' | 'timed-mode-tick';
+        eventCount: number;
+        nextTurn: number;
+        phases: Array<{
+          phase: 'player-movement' | 'enemy-movement' | 'projectile-movement' | 'pickups' | 'item-effects' | 'duration-expiry' | 'collisions';
+          status: 'applied' | 'skipped' | 'rejected';
+          eventCount: number;
+        }>;
+        reason: string | null;
+        turn: number | null;
+      } | null;
+      nextTurn: number;
+      registeredPhases: Array<
+        'player-movement'
+        | 'enemy-movement'
+        | 'projectile-movement'
+        | 'pickups'
+        | 'item-effects'
+        | 'duration-expiry'
+        | 'collisions'
+      >;
+      rejectedCommandCount: number;
+      state: 'running' | 'paused' | 'stopped';
+      timedModeEnabled: boolean;
+    };
     inputBuffer: {
+      directionalIntent: {
+        activeDirection: 'up' | 'right' | 'down' | 'left' | null;
+        assistedLaneShiftCount: number;
+        assistedLaneShiftTileLimit: number;
+        lastDecision: string;
+        queuedDirection: 'up' | 'right' | 'down' | 'left' | null;
+        requestedDirections: Array<'up' | 'right' | 'down' | 'left'>;
+      };
       held: {
         down: boolean;
         left: boolean;
         right: boolean;
         up: boolean;
       };
+      keyboardRepeat: {
+        acceptedCount: number;
+        droppedCount: number;
+        mergedCount: number;
+        lastAcceptedActionKind: string | null;
+        lastAcceptedAtMs: number | null;
+        lastDroppedActionKind: string | null;
+        lastDroppedAtMs: number | null;
+        lastDroppedReason: string | null;
+        repeatIntervalMs: number;
+      };
       pendingTimerActive: boolean;
       pointerStartActive: boolean;
       touchSprint: {
         activeControls: string[];
+        arrowPointerActive: boolean;
+        baseMovementSpeed: number;
+        effectiveMovementSpeed: number;
+        formulaVersion: string;
         heldControl: string | null;
         movementSpeed: number;
         movementSpeedLabel: string;
+        progressionCompletedCycles: number;
+        progressionContextApplied: boolean;
+        progressionLevel: number;
+        progressionPaceScore: number;
         repeatInitialDelayMs: number;
         repeatIntervalMs: number;
         stickInitialDelayMaxMs: number;
+        stickPointerActive: boolean;
         stickRepeatIntervalMaxMs: number;
         stickRetargetDelayMs: number;
         stickTurnDelayMaxMs: number;
         turnDelayMs: number;
-        pendingStepCount: number;
         repeatTimerActive: boolean;
-        stepTimerActive: boolean;
       };
       resolvedVector: {
         deltaX: number;
@@ -246,6 +467,14 @@ export interface MenuSceneRuntimeDiagnostics {
       trailPulseEnabled?: boolean;
       trailPulseColor?: number;
       trailPulseEdgeColor?: number;
+      trailShineEnabled?: boolean;
+      trailShineColor?: number;
+      trailShineEdgeColor?: number;
+      trailShineCenterIndex?: number;
+      trailShineCyclePeriodMs?: number;
+      trailShineDirection?: 'away-from-player' | 'toward-player';
+      trailShineProgress?: number;
+      trailShineSpeedTilesPerSecond?: number;
       iridescentMaterial?: {
         minPathColorDistance: number;
         playerAccentColor: number;
@@ -253,6 +482,8 @@ export interface MenuSceneRuntimeDiagnostics {
         playerHaloShiftColor: number;
         pulseHeadColor: number;
         pulseTailColor: number;
+        shineHeadColor: number;
+        shineTailColor: number;
         shiftPeriodMs: {
           playerAccent: number;
           playerHalo: number;
@@ -309,6 +540,39 @@ export interface MenuSceneRuntimeDiagnostics {
       seed: number;
       seedSource: 'query' | 'runtime-random';
       solutionPathLength: number;
+      wrapTopologyDiagnostics?: {
+        contractVersion: 'legacy-wrap-topology-v1';
+        cornerBorderFloorCount: number;
+        decorativeCutoutCandidateCount: number;
+        decorativeCutoutPolicy: 'renderer-mask-owned';
+        directShortestStepCount: number | null;
+        graphPolicy: 'playable-wrap-aware';
+        graphTopologyValid: boolean;
+        horizontal: {
+          endpointCount: number;
+          pairCount: number;
+          required: boolean;
+          requiredSatisfied: boolean;
+          unpairedEndpointCount: number;
+        };
+        inwardDisconnectedEndpointCount: number;
+        playableShortcutDelta: number | null;
+        playableShortestStepCount: number | null;
+        solutionPathPolicy: 'direct-floor';
+        solutionRouteAudit: {
+          actualStepCount: number;
+          firstIllegalStepIndex: number | null;
+          lowerBoundSatisfied: boolean;
+          validCompletedRoute: boolean;
+        };
+        vertical: {
+          endpointCount: number;
+          pairCount: number;
+          required: boolean;
+          requiredSatisfied: boolean;
+          unpairedEndpointCount: number;
+        };
+      };
       shortcutStats?: {
         requested: number;
         attempts: number;
@@ -354,7 +618,9 @@ export interface MenuSceneRuntimeDiagnostics {
       handoffProgress?: number;
       lifecyclePhase?: 'idle' | 'building' | 'settled' | 'deconstructing';
       nextSeedQueued?: boolean;
+      nonSolutionTileCountBeforeSolutionComplete?: number;
       progressPercent: number | null;
+      revealStrategyVersion?: string;
       rowCount: number | null;
       rowsRemaining: number | null;
       rowsVisible: number | null;
@@ -364,6 +630,9 @@ export interface MenuSceneRuntimeDiagnostics {
       titlePiecesRemaining?: number;
       titleVisiblePieces?: number;
       tileCount?: number | null;
+      solutionCompletedAtIndex?: number | null;
+      solutionFirstRevealPrevented?: boolean;
+      solutionPrefixLength?: number;
       tilesRemaining?: number | null;
       tilesVisible?: number | null;
       zeroHoldStartedAtMs?: number | null;

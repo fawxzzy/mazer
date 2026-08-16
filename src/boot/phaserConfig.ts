@@ -2,12 +2,19 @@ import Phaser from 'phaser';
 import { BootScene } from '../scenes/BootScene';
 import { MenuScene } from '../scenes/MenuScene';
 
-export const phaserConfig: Phaser.Types.Core.GameConfig = {
+export interface MazerPhaserViewport {
+  height: number;
+  width: number;
+}
+
+export const createMazerPhaserConfig = (
+  viewport: MazerPhaserViewport = { width: 1280, height: 720 }
+): Phaser.Types.Core.GameConfig => ({
   type: Phaser.CANVAS,
   parent: 'app',
-  width: 1280,
-  height: 720,
-  backgroundColor: '#1d1330',
+  width: viewport.width,
+  height: viewport.height,
+  backgroundColor: '#02080f',
   pixelArt: false,
   antialias: true,
   antialiasGL: true,
@@ -28,4 +35,6 @@ export const phaserConfig: Phaser.Types.Core.GameConfig = {
     autoRound: true,
     autoCenter: Phaser.Scale.CENTER_BOTH
   }
-};
+});
+
+export const phaserConfig: Phaser.Types.Core.GameConfig = createMazerPhaserConfig();

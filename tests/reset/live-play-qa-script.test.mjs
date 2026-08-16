@@ -2,16 +2,161 @@ import { describe, expect, test } from 'vitest';
 
 import {
   normalizeLivePlayInputMethod,
+  resolveLivePlayBrowserContextOptions,
   resolveLivePlayLifecycleSnapshot,
   resolveArrowPointForMove,
   resolveLivePlayRouteProgressIndex,
   resolveStickHoldMsForMove,
   resolveStickPointForMove,
+  shouldCollectInputLockProbe,
+  summarizeFreshWorldTurn,
+  summarizeFreshReadyState,
+  summarizeGoalTimerFreeze,
+  summarizeGoalWorldTurn,
+  summarizePlayerProgressionCompletion,
   summarizePostGoalLifecycleSamples,
   solveWalkableRoute
 } from '../../scripts/analysis/live-play-qa.mjs';
 
 describe('live play QA script helpers', () => {
+  test('uses a touch-capable mobile context by default and permits explicit desktop proof', () => {
+    expect(resolveLivePlayBrowserContextOptions({
+      viewport: { width: 405, height: 958 }
+    })).toEqual({
+      hasTouch: true,
+      isMobile: true,
+      viewport: { width: 405, height: 958 }
+    });
+    expect(resolveLivePlayBrowserContextOptions({
+      isMobile: false,
+      viewport: { width: 1280, height: 720 }
+    })).toEqual({
+      hasTouch: false,
+      isMobile: false,
+      viewport: { width: 1280, height: 720 }
+    });
+  });
+
+  test('reprobes the build lock after the fresh maze replaces the world-turn system', () => {
+    const probes = [
+      { phase: 'building', pass: true, seed: 101 }
+    ];
+
+    expect(shouldCollectInputLockProbe({
+      explicitLifecyclePhase: 'building',
+      inputLocked: true,
+      seed: 202
+    }, 101, probes)).toBe(true);
+    expect(shouldCollectInputLockProbe({
+      explicitLifecyclePhase: 'building',
+      inputLocked: true,
+      seed: 202
+    }, 101, [...probes, { phase: 'building', pass: true, seed: 202 }])).toBe(false);
+    expect(shouldCollectInputLockProbe({
+      explicitLifecyclePhase: 'handoff',
+      inputLocked: true,
+      seed: 101
+    }, 101, [{ phase: 'handoff', pass: true, seed: 101 }])).toBe(false);
+  });
+
+  test('requires the rebuilt maze to be ready, settled, unlocked, and timing play', () => {
+    expect(summarizeFreshReadyState({
+      runtime: {
+        surface: { mode: 'play' },
+        generation: { drawStage: { lifecyclePhase: 'settled' }, maze: { seed: 202 } },
+        play: { lifecycle: { drawPhase: 'settled', inputLocked: false, phase: 'ready', timerRunning: true } }
+      }
+    })).toMatchObject({ pass: true, seed: 202, timerRunning: true });
+    expect(summarizeFreshReadyState({
+      runtime: {
+        surface: { mode: 'play' },
+        generation: { drawStage: { lifecyclePhase: 'settled' }, maze: { seed: 202 } },
+        play: { lifecycle: { drawPhase: 'settled', inputLocked: true, phase: 'ready', timerRunning: false } }
+      }
+    }).pass).toBe(false);
+  });
+  test('requires one admitted world turn per planned route move at the goal', () => {
+    expect(summarizeGoalWorldTurn({
+      acceptedTurnCount: 12,
+      nextTurn: 12,
+      lastReceipt: { admitted: true, turn: 11 }
+    }, 12).pass).toBe(true);
+    expect(summarizeGoalWorldTurn({
+      acceptedTurnCount: 11,
+      nextTurn: 11,
+      lastReceipt: { admitted: true, turn: 10 }
+    }, 12).pass).toBe(false);
+  });
+
+  test('requires a fresh maze to remain at turn zero with or without a locked build-phase receipt', () => {
+    expect(summarizeFreshWorldTurn({
+      acceptedTurnCount: 0,
+      nextTurn: 0,
+      rejectedCommandCount: 0,
+      lastReceipt: null
+    }).pass).toBe(true);
+    expect(summarizeFreshWorldTurn({
+      acceptedTurnCount: 0,
+      nextTurn: 0,
+      rejectedCommandCount: 1,
+      lastReceipt: { admitted: false, reason: 'simulation-paused' }
+    }).pass).toBe(true);
+    expect(summarizeFreshWorldTurn({
+      acceptedTurnCount: 1,
+      nextTurn: 1,
+      rejectedCommandCount: 0,
+      lastReceipt: { admitted: true, reason: null }
+    }).pass).toBe(false);
+    expect(summarizeFreshWorldTurn({
+      acceptedTurnCount: 0,
+      nextTurn: 0,
+      rejectedCommandCount: 1,
+      lastReceipt: { admitted: false, reason: 'lifecycle-locked' }
+    }).pass).toBe(false);
+  });
+
+  test('requires the goal timer to stay frozen across a real post-arrival resample', () => {
+    expect(summarizeGoalTimerFreeze(
+      { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true },
+      { completedAtMs: 18_420, elapsedMs: 8_420, frozen: true }
+    )).toMatchObject({
+      elapsedMs: 8_420,
+      frozen: true,
+      pass: true,
+      resampleElapsedMs: 8_420
+    });
+    expect(summarizeGoalTimerFreeze(
+      { completedAtMs: null, elapsedMs: 8_420, frozen: false },
+      { completedAtMs: null, elapsedMs: 8_516, frozen: false }
+    ).pass).toBe(false);
+  });
+
+
+  test('requires the live player journey to advance exactly one silent visible level', () => {
+    expect(summarizePlayerProgressionCompletion({
+      finalLevel: 2,
+      initialLevel: 1,
+      visibleMessages: []
+    })).toMatchObject({
+      finalLevel: 2,
+      initialLevel: 1,
+      pass: true,
+      progressionMessages: []
+    });
+    expect(summarizePlayerProgressionCompletion({
+      finalLevel: 3,
+      initialLevel: 1,
+      visibleMessages: []
+    }).pass).toBe(false);
+    expect(summarizePlayerProgressionCompletion({
+      finalLevel: 2,
+      initialLevel: 1,
+      visibleMessages: [
+        { copy: 'Maze 2 unlocked!', id: 'progression.player.cycle.1', source: 'progression', tone: 'success' }
+      ]
+    }).pass).toBe(false);
+  });
+
   test('defaults live proof input to the diagnostics QA bridge while preserving explicit control modes', () => {
     expect(normalizeLivePlayInputMethod(undefined)).toBe('qa');
     expect(normalizeLivePlayInputMethod('')).toBe('qa');
@@ -259,6 +404,26 @@ describe('live play QA script helpers', () => {
     expect(summary.pass).toBe(false);
     expect(summary.settledFreshSeed).toBe(false);
     expect(summary.freshSeed).toBeNull();
+  });
+
+  test('requires rejected movement probes across every locked lifecycle boundary when probes are enabled', () => {
+    const samples = [
+      { complete: false, explicitLifecyclePhase: 'goal-hold', inputLocked: true, lifecyclePhase: 'settled', mode: 'play', seed: 101 },
+      { complete: false, explicitLifecyclePhase: 'deconstructing', inputLocked: true, lifecyclePhase: 'deconstructing', mode: 'play', nextSeedQueued: true, seed: 101 },
+      { complete: false, explicitLifecyclePhase: 'handoff', handoffActive: true, inputLocked: true, lifecyclePhase: 'deconstructing', mode: 'play', nextSeedQueued: true, seed: 101 },
+      { complete: false, explicitLifecyclePhase: 'building', inputLocked: true, lifecyclePhase: 'building', mode: 'play', rowsVisible: 4, seed: 202 },
+      { complete: true, explicitLifecyclePhase: 'ready', inputLocked: false, lifecyclePhase: 'settled', mode: 'play', seed: 202 }
+    ];
+    const passingProbes = ['goal-hold', 'deconstructing', 'handoff', 'building'].map((phase) => ({ phase, pass: true }));
+
+    expect(summarizePostGoalLifecycleSamples(samples, 101, passingProbes)).toMatchObject({
+      inputLockProbePass: true,
+      pass: true
+    });
+    expect(summarizePostGoalLifecycleSamples(samples, 101, passingProbes.slice(0, 3))).toMatchObject({
+      inputLockProbePass: false,
+      pass: false
+    });
   });
 
   test('fails explicit lifecycle proof when new diagnostics skip goal hold', () => {

@@ -22,6 +22,8 @@ export interface DemoWalkerAiPerceptionProfile {
   lookaheadDepth: number;
   optionalRetargetLimit: number;
   rank: DemoWalkerAiSkillRank;
+  rankedLookaheadAmbiguityWeight: number;
+  rankedLookaheadProgressWeight: number;
   solvePreviewBudget: number;
   splitUncertaintyPenalty: number;
   wrapMentalCost: number;
@@ -76,6 +78,7 @@ export interface DemoRunnerRecoveryDecision {
   candidateCount: number;
   choiceClass: DemoWalkerChoiceClass;
   confidence: number;
+  evaluatedCandidateCount: number;
   fromIndex: number;
   kind: 'frontier-recovery' | 'optional-retarget';
   knownRouteStepCount: number;
@@ -84,6 +87,20 @@ export interface DemoRunnerRecoveryDecision {
   splitIndex: number;
   targetIndex: number;
   thoughtState: DemoWalkerThoughtState;
+}
+
+export interface DemoRunnerOptionalRetargetEvaluation {
+  admitted: boolean;
+  admissionDelta: number;
+  candidateCount: number;
+  comparisonMargin: number;
+  currentBestScore: number;
+  effectiveCandidateScore: number;
+  fromIndex: number;
+  knownRouteStepCount: number;
+  routeCursor: number;
+  splitIndex: number;
+  targetIndex: number;
 }
 
 export interface DemoRunnerBranchCandidate {
@@ -109,6 +126,7 @@ export interface DemoRunnerRouteDiagnostics {
   cueCounts: Partial<Record<DemoWalkerCue, number>>;
   perception: DemoWalkerAiPerceptionProfile;
   routeLength: number;
+  optionalRetargetEvaluations: readonly DemoRunnerOptionalRetargetEvaluation[];
   recoveryDecisions: readonly DemoRunnerRecoveryDecision[];
   segmentCount: number;
   telemetry: DemoRunnerTelemetry;
@@ -190,6 +208,7 @@ interface DemoRunnerPlan {
   telemetry: DemoRunnerTelemetry;
   aiResetPathCursor: number | null;
   memoryFrames: readonly DemoWalkerMemoryFrame[];
+  optionalRetargetEvaluations: readonly DemoRunnerOptionalRetargetEvaluation[];
   recoveryDecisions: readonly DemoRunnerRecoveryDecision[];
 }
 
@@ -201,6 +220,7 @@ interface LocalMemorySplit {
 
 interface LocalMemoryRecoveryTarget {
   candidateCount: number;
+  evaluatedCandidateCount: number;
   selectedScoreMargin: number | null;
   split: LocalMemorySplit | null;
 }
@@ -258,7 +278,10 @@ const cloneMemoryFrame = (frame: DemoWalkerMemoryFrame): DemoWalkerMemoryFrame =
 
 const LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN = -4.2;
 const LOCAL_MEMORY_OPTIONAL_RETARGET_PATH_PENALTY = 0.2;
+const A_RANK_OPTIONAL_RETARGET_GRACE = 0.3;
+const S_RANK_OPTIONAL_RETARGET_GRACE = 0.48;
 const LOCAL_MEMORY_RECOVERY_PATH_PENALTY = 0.55;
+const D_RANK_RECOVERY_CANDIDATE_LIMIT = 16;
 
 const AI_SKILL_RANK_ORDER: readonly DemoWalkerAiSkillRank[] = ['E', 'D', 'C', 'B', 'A', 'S'];
 
@@ -268,6 +291,8 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
     confidenceNoisePenalty: 14,
     lookaheadDepth: 5,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 0,
+    rankedLookaheadProgressWeight: 0,
     solvePreviewBudget: 0,
     splitUncertaintyPenalty: 1.5,
     wrapMentalCost: 0.72
@@ -277,6 +302,8 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
     confidenceNoisePenalty: 10,
     lookaheadDepth: 9,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 1,
+    rankedLookaheadProgressWeight: 0.75,
     solvePreviewBudget: 0,
     splitUncertaintyPenalty: 1.26,
     wrapMentalCost: 0.54
@@ -286,6 +313,8 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
     confidenceNoisePenalty: 8,
     lookaheadDepth: 10,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 1,
+    rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 0,
     splitUncertaintyPenalty: 1.12,
     wrapMentalCost: 0.46
@@ -293,8 +322,10 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
   B: {
     biasProfile: 'balanced',
     confidenceNoisePenalty: 6,
-    lookaheadDepth: 11,
+    lookaheadDepth: 10,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 1,
+    rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 1,
     splitUncertaintyPenalty: 0.98,
     wrapMentalCost: 0.38
@@ -304,6 +335,8 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
     confidenceNoisePenalty: 4,
     lookaheadDepth: 12,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 1,
+    rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 2,
     splitUncertaintyPenalty: 0.84,
     wrapMentalCost: 0.3
@@ -313,6 +346,8 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
     confidenceNoisePenalty: 2,
     lookaheadDepth: 13,
     optionalRetargetLimit: 2,
+    rankedLookaheadAmbiguityWeight: 1,
+    rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 4,
     splitUncertaintyPenalty: 0.7,
     wrapMentalCost: 0.22
@@ -596,6 +631,7 @@ export const collectDemoWalkerRouteDiagnostics = (
     cueCounts,
     perception: resolveDemoWalkerAiPerceptionProfile(config),
     routeLength: runnerPlan.routeIndices.length,
+    optionalRetargetEvaluations: runnerPlan.optionalRetargetEvaluations,
     recoveryDecisions: runnerPlan.recoveryDecisions,
     segmentCount,
     telemetry: runnerPlan.telemetry,
@@ -887,6 +923,7 @@ const buildPreciseRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     aiResetPathCursor: null,
     branchDecisions: [],
     memoryFrames: Array.from({ length: canonicalPath.length }, () => EMPTY_MEMORY_FRAME),
+    optionalRetargetEvaluations: [],
     recoveryDecisions: []
   };
 };
@@ -1086,6 +1123,7 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
     aiResetPathCursor,
     branchDecisions: [],
     memoryFrames,
+    optionalRetargetEvaluations: [],
     recoveryDecisions: []
   };
 };
@@ -1112,6 +1150,7 @@ const buildHumanLocalMemoryRunnerPlan = (
   const segmentTrailModes: DemoTrailMode[] = [];
   const cueOverrides: Array<DemoSegmentCue | DemoWalkerCue | null> = [];
   const memoryFrames: DemoWalkerMemoryFrame[] = [EMPTY_MEMORY_FRAME];
+  const optionalRetargetEvaluations: DemoRunnerOptionalRetargetEvaluation[] = [];
   const recoveryDecisions: DemoRunnerRecoveryDecision[] = [];
   const branchDecisions: DemoRunnerBranchDecision[] = [];
   const telemetry: DemoRunnerTelemetry = {
@@ -1257,6 +1296,14 @@ const buildHumanLocalMemoryRunnerPlan = (
       split: LocalMemorySplit;
     } | null = null;
     let candidateCount = 0;
+    let evaluatedCandidateCount = 0;
+    let strongestEvaluatedCandidate: {
+      choice: number;
+      knownRouteStepCount: number;
+      route: number[];
+      score: number;
+      split: LocalMemorySplit;
+    } | null = null;
     let runnerUpScore = Number.POSITIVE_INFINITY;
 
     for (const split of splitRecords.values()) {
@@ -1290,6 +1337,16 @@ const buildHumanLocalMemoryRunnerPlan = (
 
       const score = scoreLocalMemoryChoice(split.index, choice, episode, config.seed, perception)
         + (routeStepCount * LOCAL_MEMORY_OPTIONAL_RETARGET_PATH_PENALTY);
+      evaluatedCandidateCount += 1;
+      if (strongestEvaluatedCandidate === null || score < strongestEvaluatedCandidate.score) {
+        strongestEvaluatedCandidate = {
+          choice,
+          knownRouteStepCount: routeStepCount,
+          route,
+          score,
+          split
+        };
+      }
       if (score + LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN >= currentBestScore) {
         continue;
       }
@@ -1305,6 +1362,53 @@ const buildHumanLocalMemoryRunnerPlan = (
       } else if (score < runnerUpScore) {
         runnerUpScore = score;
       }
+    }
+
+    if (bestCandidate === null && strongestEvaluatedCandidate !== null) {
+      const routeCursor = Math.max(0, routeIndices.length - 1);
+      const rankGrace = perception.rank === 'A'
+        ? A_RANK_OPTIONAL_RETARGET_GRACE
+        : perception.rank === 'S'
+          ? S_RANK_OPTIONAL_RETARGET_GRACE
+          : 0;
+      const admissionDelta = currentBestScore - (
+        strongestEvaluatedCandidate.score + LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN
+      );
+      const warmedRankGraceApplies = (
+        rankGrace > 0
+        && routeCursor >= optionalRetargetCooldownSteps
+        && evaluatedCandidateCount === 2
+        && strongestEvaluatedCandidate.knownRouteStepCount === 1
+        && admissionDelta >= -rankGrace
+        && admissionDelta < 0
+      );
+      if (warmedRankGraceApplies) {
+        bestCandidate = {
+          choice: strongestEvaluatedCandidate.choice,
+          route: strongestEvaluatedCandidate.route,
+          score: strongestEvaluatedCandidate.score,
+          split: strongestEvaluatedCandidate.split
+        };
+        candidateCount = 1;
+      }
+    }
+
+    if (strongestEvaluatedCandidate !== null) {
+      optionalRetargetEvaluations.push({
+        admitted: bestCandidate !== null,
+        admissionDelta: currentBestScore - (
+          strongestEvaluatedCandidate.score + LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN
+        ),
+        candidateCount: evaluatedCandidateCount,
+        comparisonMargin: LOCAL_MEMORY_OPTIONAL_RETARGET_SCORE_MARGIN,
+        currentBestScore,
+        effectiveCandidateScore: strongestEvaluatedCandidate.score,
+        fromIndex,
+        knownRouteStepCount: strongestEvaluatedCandidate.knownRouteStepCount,
+        routeCursor: Math.max(0, routeIndices.length - 1),
+        splitIndex: strongestEvaluatedCandidate.split.index,
+        targetIndex: strongestEvaluatedCandidate.choice
+      });
     }
 
     if (bestCandidate === null) {
@@ -1348,6 +1452,7 @@ const buildHumanLocalMemoryRunnerPlan = (
       candidateCount,
       choiceClass: retargetReview.choiceClass,
       confidence: retargetReview.confidence,
+      evaluatedCandidateCount,
       fromIndex,
       kind: 'optional-retarget',
       knownRouteStepCount: Math.max(0, bestCandidate.route.length - 1),
@@ -1450,6 +1555,7 @@ const buildHumanLocalMemoryRunnerPlan = (
       : Math.max(1, routeIndices.length - 1),
     branchDecisions,
     memoryFrames,
+    optionalRetargetEvaluations,
     recoveryDecisions
   };
 };
@@ -1572,7 +1678,7 @@ const reviewLocalMemoryChoice = (
         * (0.11 + (Math.min(16, perception.lookaheadDepth) * 0.014))
         * biasWeights.progressRewardMultiplier
       ) / lookaheadProgressDepthTax
-    )
+    ) * perception.rankedLookaheadProgressWeight
     : 0;
   const localAmbiguityPenalty = usesRankedLookaheadScoring
     ? Math.min(
@@ -1580,7 +1686,7 @@ const reviewLocalMemoryChoice = (
       (lookahead.splitCount / Math.max(1, lookahead.reachableCount))
       * (0.72 + (Math.min(16, perception.lookaheadDepth) * 0.035))
       * biasWeights.splitPenaltyMultiplier
-    )
+    ) * perception.rankedLookaheadAmbiguityWeight
     : 0;
   const reachableReward = Math.min(
     0.72,
@@ -1895,6 +2001,7 @@ const backtrackToBestLocalMemorySplit = (input: {
     candidateCount: targetSelection.candidateCount,
     choiceClass: review.choiceClass,
     confidence: review.confidence,
+    evaluatedCandidateCount: targetSelection.evaluatedCandidateCount,
     fromIndex: input.currentIndex,
     kind: 'frontier-recovery',
     knownRouteStepCount: recoveryRouteStepCount,
@@ -1922,8 +2029,14 @@ const resolveBestLocalMemorySplitTarget = (input: {
 }): LocalMemoryRecoveryTarget => {
   let bestSplit: LocalMemorySplit | null = null;
   let bestScore = Number.POSITIVE_INFINITY;
-  let candidateCount = 0;
   let runnerUpScore = Number.POSITIVE_INFINITY;
+  const candidates: Array<{
+    choice: number;
+    routeStepCount: number;
+    score: number | null;
+    split: LocalMemorySplit;
+  }> = [];
+  let evaluatedCandidateCount = 0;
 
   const registerCandidate = (split: LocalMemorySplit): void => {
     const bestChoice = resolveBestLocalMemorySplitChoice(split, input);
@@ -1945,7 +2058,20 @@ const resolveBestLocalMemorySplitTarget = (input: {
     const routeStepCount = Math.max(0, route.length - 1);
     const score = scoreLocalMemoryChoice(split.index, bestChoice, input.episode, input.seed, input.perception)
       + (routeStepCount * LOCAL_MEMORY_RECOVERY_PATH_PENALTY);
-    candidateCount += 1;
+    candidates.push({ choice: bestChoice, routeStepCount, score, split });
+  };
+
+  const selectCandidate = (candidate: {
+    choice: number;
+    routeStepCount: number;
+    score: number | null;
+    split: LocalMemorySplit;
+  }): void => {
+    const { split } = candidate;
+    const score = candidate.score ?? (
+      scoreLocalMemoryChoice(split.index, candidate.choice, input.episode, input.seed, input.perception)
+      + (candidate.routeStepCount * LOCAL_MEMORY_RECOVERY_PATH_PENALTY)
+    );
     if (score < bestScore) {
       runnerUpScore = bestScore;
       bestScore = score;
@@ -1955,27 +2081,138 @@ const resolveBestLocalMemorySplitTarget = (input: {
     }
   };
 
-  for (const split of input.splitRecords.values()) {
-    registerCandidate(split);
-  }
-
-  for (const visitedIndex of input.visited) {
-    const frontierChoices = collectLocalMemoryChoices(
-      input.episode,
-      visitedIndex,
-      input.visited,
-      input.deadEnds
-    );
-    if (frontierChoices.length === 0) {
-      continue;
+  if (input.perception.rank === 'D') {
+    const splitsByIndex = new Map<number, LocalMemorySplit>();
+    const pendingChoiceUpdates = new Map<number, number[]>();
+    for (const split of input.splitRecords.values()) {
+      splitsByIndex.set(split.index, split);
+    }
+    for (const visitedIndex of input.visited) {
+      const frontierChoices = collectLocalMemoryChoices(
+        input.episode,
+        visitedIndex,
+        input.visited,
+        input.deadEnds
+      );
+      if (frontierChoices.length > 0) {
+        let split = splitsByIndex.get(visitedIndex);
+        if (split === undefined) {
+          split = {
+            choices: [...frontierChoices],
+            index: visitedIndex,
+            tried: new Set<number>()
+          };
+          input.splitRecords.set(visitedIndex, split);
+        }
+        splitsByIndex.set(split.index, split);
+        const pendingChoices = pendingChoiceUpdates.get(visitedIndex) ?? [];
+        pendingChoices.push(...frontierChoices);
+        pendingChoiceUpdates.set(visitedIndex, pendingChoices);
+      }
     }
 
-    const split = resolveLocalMemorySplit(input.splitRecords, visitedIndex, frontierChoices);
-    registerCandidate(split);
+    const hasAvailableChoice = (split: LocalMemorySplit): boolean => {
+      const floorNeighbors = collectFloorNeighbors(
+        split.index,
+        input.episode.raster.width,
+        input.episode.raster.height,
+        input.episode.raster.tiles
+      );
+      return split.choices.some((choice) => (
+        !split.tried.has(choice)
+        && !input.deadEnds.has(choice)
+        && (choice === input.episode.raster.endIndex || !input.visited.has(choice))
+        && floorNeighbors.includes(choice)
+      ));
+    };
+
+    const shortlist = [...splitsByIndex.values()]
+      .flatMap((split) => {
+        const pendingChoices = pendingChoiceUpdates.get(split.index) ?? [];
+        const selectionSplit = hasAvailableChoice(split)
+          ? split
+          : {
+            ...split,
+            choices: [...split.choices, ...pendingChoices]
+          };
+        if (!hasAvailableChoice(selectionSplit)) {
+          return [];
+        }
+        const route = findKnownFloorPath(
+          input.currentIndex,
+          split.index,
+          input.episode.raster.width,
+          input.episode.raster.height,
+          input.episode.raster.tiles,
+          input.visited
+        );
+        if (input.currentIndex !== split.index && route.length <= 1) {
+          return [];
+        }
+        return [{
+          routeStepCount: Math.max(0, route.length - 1),
+          selectionSplit,
+          split
+        }];
+      })
+      .sort((left, right) => (
+        left.routeStepCount - right.routeStepCount
+        || left.split.index - right.split.index
+      ))
+      .slice(0, D_RANK_RECOVERY_CANDIDATE_LIMIT);
+
+    for (const candidate of shortlist) {
+      evaluatedCandidateCount += 1;
+      const bestChoice = resolveBestLocalMemorySplitChoice(candidate.selectionSplit, input);
+      if (bestChoice === null) {
+        continue;
+      }
+      candidates.push({
+        choice: bestChoice,
+        routeStepCount: candidate.routeStepCount,
+        score: scoreLocalMemoryChoice(
+          candidate.split.index,
+          bestChoice,
+          input.episode,
+          input.seed,
+          input.perception
+        ) + (candidate.routeStepCount * LOCAL_MEMORY_RECOVERY_PATH_PENALTY),
+        split: candidate.split
+      });
+    }
+
+    for (const [splitIndex, choices] of pendingChoiceUpdates) {
+      resolveLocalMemorySplit(input.splitRecords, splitIndex, choices);
+    }
+  } else {
+    for (const split of input.splitRecords.values()) {
+      registerCandidate(split);
+    }
+
+    for (const visitedIndex of input.visited) {
+      const frontierChoices = collectLocalMemoryChoices(
+        input.episode,
+        visitedIndex,
+        input.visited,
+        input.deadEnds
+      );
+      if (frontierChoices.length === 0) {
+        continue;
+      }
+
+      const split = resolveLocalMemorySplit(input.splitRecords, visitedIndex, frontierChoices);
+      registerCandidate(split);
+    }
+    evaluatedCandidateCount = candidates.length;
+  }
+
+  for (const candidate of candidates) {
+    selectCandidate(candidate);
   }
 
   return {
-    candidateCount,
+    candidateCount: candidates.length,
+    evaluatedCandidateCount,
     selectedScoreMargin: Number.isFinite(runnerUpScore) ? runnerUpScore - bestScore : null,
     split: bestSplit
   };

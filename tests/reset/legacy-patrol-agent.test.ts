@@ -1,0 +1,998 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, test, vi } from 'vitest';
+import {
+  createLegacyGenerationRequest,
+  createLegacyRuntimeMazeForMode,
+  type LegacyGenerationRequest
+} from '../../src/legacy-runtime/legacyGenerationLifecycle';
+import {
+  LEGACY_DEFAULTS,
+  copyLegacySettings
+} from '../../src/legacy-runtime/legacyDefaults';
+import {
+  createLegacyRoomCandidateMetadata,
+  type LegacyRoomCandidateMetadata
+} from '../../src/legacy-runtime/legacyRoomCandidateMetadata';
+import {
+  LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
+  LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
+  LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS,
+  LEGACY_PATROL_AGENT_CONTRACT_VERSION,
+  LEGACY_PATROL_AGENT_MAXIMUM_PENDING_COLLISION_INTENTS,
+  LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
+  LEGACY_PATROL_AGENT_STEP_MS,
+  LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS,
+  advanceLegacyPatrolAgent,
+  applyLegacyPatrolAgentCollision,
+  clearLegacyPatrolAgentCollisionIntent,
+  createLegacyPatrolAgentState,
+  isLegacyPatrolAgentDelayActive,
+  queueLegacyPatrolAgentCollisionIntent,
+  recordLegacyPatrolAgentBlockedMove,
+  resolveLegacyPatrolAgentPoint,
+  resolveLegacyPatrolAgentCollisionFeedback,
+  resolveLegacyPatrolAgentCollisionIntent,
+  resolveLegacyPatrolAgentCollisionRecovery,
+  resolveLegacyPatrolAgentRemainingMs,
+  resolveLegacyPatrolAgentTelegraph,
+  resolveLegacyPatrolAgentTick,
+  type LegacyPatrolAgentState
+} from '../../src/legacy-runtime/legacyPatrolAgent';
+import {
+  createEmptyLegacyProgressionState,
+  resolveLegacyMazeGenerationProfileForProgression,
+  type LegacyProgressionDifficultyBand,
+  type LegacyProgressionState
+} from '../../src/legacy-runtime/legacyProgression';
+import {
+  createLegacyStaticSlowTileState,
+  type LegacyStaticSlowTileState
+} from '../../src/legacy-runtime/legacyStaticSlowTile';
+import { LegacyDirectionalIntentResolver } from '../../src/legacy-runtime/legacyDirectionalIntent';
+import {
+  resolveLegacyNavigationTarget,
+  type LegacyMazeSnapshot,
+  type LegacyPoint
+} from '../../src/legacy-runtime/legacyMaze';
+import { WorldTurnHost } from '../../src/mazer-core/world';
+import { MenuScene } from '../../src/scenes/MenuScene';
+
+vi.mock('phaser', () => ({
+  default: {
+    AUTO: 'AUTO',
+    Math: {
+      Clamp: (value: number, min: number, max: number) => Math.max(min, Math.min(max, value)),
+      Linear: (from: number, to: number, t: number) => from + ((to - from) * t)
+    },
+    Scale: {
+      RESIZE: 'RESIZE',
+      CENTER_BOTH: 'CENTER_BOTH'
+    },
+    Scene: class {}
+  }
+}));
+
+const pointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
+
+const roomFootprint = (room: LegacyRoomCandidateMetadata | null): LegacyPoint[] => {
+  if (!room) {
+    return [];
+  }
+  const { x, y } = room.candidate.topLeft;
+  return [
+    { x, y },
+    { x: x + 1, y },
+    { x, y: y + 1 },
+    { x: x + 1, y: y + 1 }
+  ];
+};
+
+const createPatrolDependencies = (maze: LegacyMazeSnapshot) => {
+  const slowTile = createLegacyStaticSlowTileState(maze, 'mythic');
+  const room = createLegacyRoomCandidateMetadata(
+    maze,
+    'mythic',
+    slowTile.placement?.point ?? null
+  );
+  const excludedPoints = [
+    ...(slowTile.placement ? [slowTile.placement.point] : []),
+    ...roomFootprint(room)
+  ];
+  return {
+    excludedPoints,
+    room,
+    slowTile
+  };
+};
+
+const createMythicMaze = (seed = 1): LegacyMazeSnapshot => createLegacyRuntimeMazeForMode(
+  'play',
+  96,
+  seed,
+  resolveLegacyMazeGenerationProfileForProgression(180)
+);
+
+interface PauseResetHarness {
+  boardDynamicDirty: boolean;
+  closeOverlay: () => void;
+  createLegacyPlayPatrolAgent: (
+    band: LegacyProgressionDifficultyBand
+  ) => LegacyPatrolAgentState | null;
+  maze: LegacyMazeSnapshot;
+  playCompletedAtMs: number | null;
+  playCyclePath: LegacyPoint[];
+  playCycleResetUsed: boolean;
+  playPatrolAgent: LegacyPatrolAgentState | null;
+  playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
+  playStartedAtMs: number;
+  playStaticSlowTile: LegacyStaticSlowTileState | null;
+  player: LegacyPoint;
+  progressionState: LegacyProgressionState;
+  publishInteractionDiagnostics: () => void;
+  resetLegacyPlayInputBuffer: () => void;
+  resetLegacyWorldTurnHost: () => void;
+  syncLegacyPlayerVisualMotionTo: (point: LegacyPoint) => void;
+  time: { now: number };
+  trail: LegacyPoint[];
+}
+
+interface ProgressionResetHarness {
+  boardDynamicDirty: boolean;
+  maze: LegacyMazeSnapshot;
+  openOverlay: (overlay: 'pause') => void;
+  playPatrolAgent: LegacyPatrolAgentState | null;
+  playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
+  playStaticSlowTile: LegacyStaticSlowTileState | null;
+  progressionState: LegacyProgressionState;
+  resetLegacyWorldTurnHost: () => void;
+  resolveLegacyProgressionStorage: () => undefined;
+  runtimeDiagnosticsLastPublishedAtMs: number;
+  setLatestOverlayMessage: (message: unknown) => void;
+  syncLegacyRemoteProgressionState: (mode: 'replace') => void;
+  visualDiagnosticsLastPublishedAtMs: number;
+}
+
+interface CollisionVisualHarness {
+  boardDynamicDirty: boolean;
+  mode: 'menu' | 'play';
+  playPatrolCollisionVisualActive: boolean;
+}
+
+interface PendingIntentCueHarness {
+  boardDynamicGraphics: {
+    beginPath: ReturnType<typeof vi.fn>;
+    lineStyle: ReturnType<typeof vi.fn>;
+    lineTo: ReturnType<typeof vi.fn>;
+    moveTo: ReturnType<typeof vi.fn>;
+    strokePath: ReturnType<typeof vi.fn>;
+  };
+  mode: 'menu' | 'play';
+  playPatrolAgent: LegacyPatrolAgentState | null;
+  player: LegacyPoint;
+}
+
+interface DirectionalIntentFailureHarness {
+  maze: LegacyMazeSnapshot;
+  playDirectionalIntent: {
+    getDiagnostics: () => {
+      requestedDirections: string[];
+    };
+    reset: () => void;
+    step: (
+      maze: Pick<LegacyMazeSnapshot, 'grid'>,
+      player: LegacyPoint,
+      options?: { assistedLaneShiftEnabled?: boolean }
+    ) => {
+      decision?: string;
+      deltaX: number;
+      deltaY: number;
+      direction?: string | null;
+      moved: boolean;
+    };
+  };
+  playPatrolAgent: LegacyPatrolAgentState | null;
+  player: LegacyPoint;
+  publishInteractionDiagnostics: () => void;
+  settings: {
+    smartSteering: boolean;
+  };
+  time?: {
+    now: number;
+  };
+  tryMovePlayer?: (deltaX: number, deltaY: number) => boolean;
+}
+
+const applyPauseCommand = (
+  MenuScene.prototype as unknown as {
+    applyLegacyPauseCommand: (
+      this: PauseResetHarness,
+      command: 'reset-player'
+    ) => void;
+  }
+).applyLegacyPauseCommand;
+
+const resetPlayerProgression = (
+  MenuScene.prototype as unknown as {
+    resetLegacyPlayerProgression: (
+      this: ProgressionResetHarness
+    ) => void;
+  }
+).resetLegacyPlayerProgression;
+
+const applyGenerationRequest = (
+  MenuScene.prototype as unknown as {
+    applyGenerationRequest: (
+      this: MenuScene,
+      request: LegacyGenerationRequest,
+      nextDemoMoveAtMs?: number
+    ) => void;
+  }
+).applyGenerationRequest;
+
+const createWorldTurnHost = (
+  MenuScene.prototype as unknown as {
+    createLegacyWorldTurnHost: (this: MenuScene) => WorldTurnHost;
+  }
+).createLegacyWorldTurnHost;
+
+const resetWorldTurnHost = (
+  MenuScene.prototype as unknown as {
+    resetLegacyWorldTurnHost: (this: MenuScene) => void;
+  }
+).resetLegacyWorldTurnHost;
+
+const refreshCollisionVisualState = (
+  MenuScene.prototype as unknown as {
+    refreshLegacyPatrolCollisionVisualState: (
+      this: CollisionVisualHarness,
+      active: boolean
+    ) => void;
+  }
+).refreshLegacyPatrolCollisionVisualState;
+
+const performDirectionalIntentStep = (
+  MenuScene.prototype as unknown as {
+    performLegacyPlayDirectionalIntentStep: (
+      this: DirectionalIntentFailureHarness
+    ) => boolean;
+  }
+).performLegacyPlayDirectionalIntentStep;
+
+const drawPendingIntentCue = (
+  MenuScene.prototype as unknown as {
+    drawLegacyPlayPatrolPendingIntent: (
+      this: PendingIntentCueHarness,
+      mazeLeft: number,
+      mazeTop: number,
+      tileSize: number,
+      time: number
+    ) => void;
+  }
+).drawLegacyPlayPatrolPendingIntent;
+
+describe('legacy Mythic patrol agent', () => {
+  test('selects one deterministic bypassable two-tile route and preserves every excluded surface', () => {
+    const rows = [];
+    for (let seed = 1; seed <= 20; seed += 1) {
+      const maze = createMythicMaze(seed);
+      const before = JSON.stringify(maze);
+      const { excludedPoints } = createPatrolDependencies(maze);
+      const first = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+      const second = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+
+      expect(first, `seed ${seed}`).not.toBeNull();
+      expect(first).toEqual(second);
+      expect(first).toMatchObject({
+        band: 'mythic',
+        contractVersion: LEGACY_PATROL_AGENT_CONTRACT_VERSION,
+        currentRouteIndex: 0,
+        eligible: true,
+        stepCount: 0
+      });
+      expect(first!.placement.route).toHaveLength(2);
+      expect(first!.placement.solutionPathIndices[1]).toBe(
+        first!.placement.solutionPathIndices[0] + 1
+      );
+      const excludedKeys = new Set(excludedPoints.map(pointKey));
+      expect(first!.placement.route.every((point) => !excludedKeys.has(pointKey(point)))).toBe(true);
+      expect(JSON.stringify(maze)).toBe(before);
+      rows.push({
+        route: first!.placement.route,
+        seed,
+        solutionPathIndices: first!.placement.solutionPathIndices
+      });
+    }
+
+    expect(rows).toHaveLength(20);
+    for (const band of ['tutorial', 'starter', 'explorer', 'navigator', 'architect'] as const) {
+      expect(createLegacyPatrolAgentState(createMythicMaze(), band)).toBeNull();
+    }
+  }, 20_000);
+
+  test('uses exact 440 ms ticks, skips paused time, and never catches up in a burst', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const epochMs = 10_000;
+
+    expect(resolveLegacyPatrolAgentTick(initial, epochMs, epochMs, true)).toMatchObject({
+      tickIndex: 0,
+      triggered: false
+    });
+    expect(resolveLegacyPatrolAgentTick(initial, epochMs + 439, epochMs, true)).toMatchObject({
+      tickIndex: 0,
+      triggered: false
+    });
+    const firstTick = resolveLegacyPatrolAgentTick(initial, epochMs + 440, epochMs, true);
+    expect(firstTick).toMatchObject({ tickIndex: 1, triggered: true });
+    const firstStep = advanceLegacyPatrolAgent(firstTick.state, epochMs + 440);
+    expect(firstStep).toMatchObject({
+      currentRouteIndex: 1,
+      lastResolvedTickIndex: 1,
+      lastStepAtMs: epochMs + 440,
+      stepCount: 1
+    });
+
+    const paused = resolveLegacyPatrolAgentTick(firstStep, epochMs + 5_280, epochMs, false);
+    expect(paused).toMatchObject({
+      state: { lastResolvedTickIndex: 12, stepCount: 1 },
+      tickIndex: 12,
+      triggered: false
+    });
+    expect(resolveLegacyPatrolAgentTick(paused.state, epochMs + 5_280, epochMs, true))
+      .toMatchObject({ tickIndex: 12, triggered: false });
+    const resumed = resolveLegacyPatrolAgentTick(paused.state, epochMs + 5_720, epochMs, true);
+    expect(resumed).toMatchObject({ tickIndex: 13, triggered: true });
+    expect(advanceLegacyPatrolAgent(resumed.state, epochMs + 5_720)).toMatchObject({
+      currentRouteIndex: 0,
+      stepCount: 2
+    });
+    expect(LEGACY_PATROL_AGENT_STEP_MS).toBe(440);
+    expect(LEGACY_PATROL_AGENT_ROUND_TRIP_MS).toBe(880);
+  });
+
+  test('telegraphs exactly the final 220 ms before each existing patrol step', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints)!;
+    const epochMs = 10_000;
+    const expectedNextPoint = initial.placement.route[1];
+
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs, epochMs, true)).toMatchObject({
+      active: false,
+      elapsedInStepMs: 0,
+      msUntilStep: 440,
+      nextPoint: expectedNextPoint,
+      nextRouteIndex: 1,
+      telegraphWindowMs: 220
+    });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 219, epochMs, true))
+      .toMatchObject({ active: false, elapsedInStepMs: 219, msUntilStep: 221 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 220, epochMs, true))
+      .toMatchObject({ active: true, elapsedInStepMs: 220, msUntilStep: 220 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 439, epochMs, true))
+      .toMatchObject({ active: true, elapsedInStepMs: 439, msUntilStep: 1 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 440, epochMs, true))
+      .toMatchObject({ active: false, elapsedInStepMs: 0, msUntilStep: 440 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 660, epochMs, true))
+      .toMatchObject({ active: true, elapsedInStepMs: 220, msUntilStep: 220 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 1_319, epochMs, true))
+      .toMatchObject({ active: true, elapsedInStepMs: 439, msUntilStep: 1 });
+    expect(resolveLegacyPatrolAgentTelegraph(initial, epochMs + 220, epochMs, false))
+      .toMatchObject({
+        active: false,
+        nextPoint: expectedNextPoint,
+        nextRouteIndex: 1
+      });
+    expect(resolveLegacyPatrolAgentTelegraph(null, epochMs + 220, epochMs, true))
+      .toMatchObject({
+        active: false,
+        elapsedInStepMs: null,
+        msUntilStep: null,
+        nextPoint: null,
+        nextRouteIndex: null
+      });
+    expect(LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS).toBe(220);
+  });
+
+  test('applies one non-additive 440 ms delay per overlap episode', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const firstPoint = resolveLegacyPatrolAgentPoint(initial)!;
+    const firstCollision = applyLegacyPatrolAgentCollision(initial, firstPoint, 1_000);
+
+    expect(firstCollision).toMatchObject({
+      penaltyAppliedMs: LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
+      state: {
+        collisionCount: 1,
+        collisionDelayUntilMs: 1_440,
+        collisionEpisodeActive: true,
+        penaltyCount: 1
+      },
+      triggered: true
+    });
+    expect(applyLegacyPatrolAgentCollision(firstCollision.state, firstPoint, 1_010))
+      .toMatchObject({ penaltyAppliedMs: 0, triggered: false });
+    expect(isLegacyPatrolAgentDelayActive(firstCollision.state, 1_439)).toBe(true);
+    expect(resolveLegacyPatrolAgentRemainingMs(firstCollision.state, 1_439)).toBe(1);
+    expect(isLegacyPatrolAgentDelayActive(firstCollision.state, 1_440)).toBe(false);
+    expect(recordLegacyPatrolAgentBlockedMove(firstCollision.state, 1_100))
+      .toMatchObject({ blockedMoveCount: 1 });
+
+    const movedAway = advanceLegacyPatrolAgent(firstCollision.state, 1_100);
+    const released = applyLegacyPatrolAgentCollision(movedAway, firstPoint, 1_100);
+    expect(released.state).toMatchObject({ collisionEpisodeActive: false });
+    const returned = advanceLegacyPatrolAgent(released.state, 1_200);
+    const secondCollision = applyLegacyPatrolAgentCollision(returned, firstPoint, 1_200);
+    expect(secondCollision).toMatchObject({
+      penaltyAppliedMs: 440,
+      state: {
+        collisionCount: 2,
+        collisionDelayUntilMs: 1_640,
+        penaltyCount: 2
+      },
+      triggered: true
+    });
+  });
+
+  test('retains only the latest legal intent through the existing collision delay', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const point = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, point, 1_000);
+
+    const first = queueLegacyPatrolAgentCollisionIntent(collision.state, 1, 0, 1_100);
+    expect(first?.pendingCollisionIntent).toEqual({
+      deltaX: 1,
+      deltaY: 0,
+      queuedAtMs: 1_100
+    });
+    const latest = queueLegacyPatrolAgentCollisionIntent(first, 0, -1, 1_219.5);
+    expect(latest?.pendingCollisionIntent).toEqual({
+      deltaX: 0,
+      deltaY: -1,
+      queuedAtMs: 1_219.5
+    });
+    expect(queueLegacyPatrolAgentCollisionIntent(latest, 1, 1, 1_300)).toBe(latest);
+    expect(queueLegacyPatrolAgentCollisionIntent(latest, -1, 0, 1_219)).toBe(latest);
+    expect(LEGACY_PATROL_AGENT_MAXIMUM_PENDING_COLLISION_INTENTS).toBe(1);
+
+    expect(resolveLegacyPatrolAgentCollisionIntent(latest, 1_439)).toEqual({
+      intent: null,
+      state: latest
+    });
+    const resolved = resolveLegacyPatrolAgentCollisionIntent(latest, 1_440);
+    expect(resolved.intent).toEqual({
+      deltaX: 0,
+      deltaY: -1,
+      queuedAtMs: 1_219.5
+    });
+    expect(resolved.state?.pendingCollisionIntent).toBeNull();
+    expect(resolveLegacyPatrolAgentCollisionIntent(resolved.state, 1_440).intent).toBeNull();
+    expect(clearLegacyPatrolAgentCollisionIntent(latest)?.pendingCollisionIntent).toBeNull();
+  });
+
+  test('clears a pending intent when a newer overlap episode refreshes the delay', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const firstPoint = resolveLegacyPatrolAgentPoint(initial)!;
+    const firstCollision = applyLegacyPatrolAgentCollision(initial, firstPoint, 1_000);
+    const queued = queueLegacyPatrolAgentCollisionIntent(firstCollision.state, 1, 0, 1_100);
+    const movedAway = advanceLegacyPatrolAgent(queued, 1_150);
+    const released = applyLegacyPatrolAgentCollision(movedAway, firstPoint, 1_150);
+    const returned = advanceLegacyPatrolAgent(released.state, 1_200);
+    const secondCollision = applyLegacyPatrolAgentCollision(returned, firstPoint, 1_200);
+
+    expect(secondCollision).toMatchObject({
+      state: {
+        collisionDelayUntilMs: 1_640,
+        pendingCollisionIntent: null
+      },
+      triggered: true
+    });
+  });
+
+  test('clears the older pending intent when the newest direction is blocked by topology', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const point = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, point, 1_000);
+    const queued = queueLegacyPatrolAgentCollisionIntent(collision.state, 1, 0, 1_100);
+    const publishInteractionDiagnostics = vi.fn();
+    const harness: DirectionalIntentFailureHarness = {
+      maze,
+      playDirectionalIntent: {
+        getDiagnostics: () => ({ requestedDirections: [] }),
+        reset: vi.fn(),
+        step: () => ({
+          deltaX: 0,
+          deltaY: 0,
+          direction: null,
+          moved: false
+        })
+      },
+      playPatrolAgent: queued,
+      player: maze.start,
+      publishInteractionDiagnostics,
+      settings: {
+        smartSteering: false
+      }
+    };
+
+    expect(performDirectionalIntentStep.call(harness)).toBe(false);
+    expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
+    expect(resolveLegacyPatrolAgentCollisionIntent(harness.playPatrolAgent, 1_440).intent).toBeNull();
+    expect(publishInteractionDiagnostics).toHaveBeenCalledOnce();
+  });
+
+  test('clears the older pending intent when the real resolver continues past a blocked newest turn', () => {
+    const maze = createMythicMaze();
+    const player = maze.solutionPath.find((point) => (
+      resolveLegacyNavigationTarget(maze, point, 1, 0) !== null
+      && resolveLegacyNavigationTarget(maze, point, 0, -1) === null
+    ));
+    expect(player).toBeDefined();
+
+    const resolver = new LegacyDirectionalIntentResolver();
+    resolver.request(['right']);
+    expect(resolver.step(maze, player!)).toMatchObject({
+      direction: 'right',
+      moved: true
+    });
+    resolver.request(['up']);
+    expect(resolver.getDiagnostics()).toMatchObject({
+      activeDirection: 'right',
+      queuedDirection: 'up',
+      requestedDirections: ['up']
+    });
+
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const collisionPoint = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, collisionPoint, 1_000);
+    const queued = queueLegacyPatrolAgentCollisionIntent(collision.state, 1, 0, 1_100);
+    const publishInteractionDiagnostics = vi.fn();
+    const playerMovement = vi.fn(() => ({ accepted: true }));
+    const worldTurnHost = new WorldTurnHost({
+      'player-movement': playerMovement
+    }, {
+      timedModeEnabled: true
+    });
+    const tryMovePlayer = vi.fn(() => worldTurnHost.advance({
+      id: 'stale-resolver-expiry-player-move',
+      inputId: 'stale-resolver-expiry-player-move',
+      kind: 'player-move'
+    }).admitted);
+    const harness: DirectionalIntentFailureHarness = {
+      maze,
+      playDirectionalIntent: resolver,
+      playPatrolAgent: queued,
+      player: player!,
+      publishInteractionDiagnostics,
+      settings: {
+        smartSteering: false
+      },
+      time: {
+        now: 1_100
+      },
+      tryMovePlayer
+    };
+
+    expect(performDirectionalIntentStep.call(harness)).toBe(false);
+    expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
+    expect(resolver.getDiagnostics()).toMatchObject({
+      activeDirection: null,
+      queuedDirection: null,
+      requestedDirections: []
+    });
+    expect(resolveLegacyPatrolAgentCollisionIntent(harness.playPatrolAgent, 1_440).intent).toBeNull();
+
+    harness.time!.now = 1_440;
+    resolver.request(['up']);
+    expect(performDirectionalIntentStep.call(harness)).toBe(false);
+    expect(resolver.getDiagnostics()).toMatchObject({
+      activeDirection: 'up',
+      queuedDirection: null,
+      requestedDirections: ['up']
+    });
+    expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
+    expect(tryMovePlayer).not.toHaveBeenCalled();
+    expect(playerMovement).not.toHaveBeenCalled();
+    expect(worldTurnHost.getDiagnostics()).toMatchObject({
+      acceptedTurnCount: 0,
+      lastReceipt: null
+    });
+    expect(publishInteractionDiagnostics).toHaveBeenCalledTimes(2);
+  });
+
+  test('shows collision feedback only for the first 220 ms of the existing delay', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const point = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, point, 1_000);
+
+    expect(resolveLegacyPatrolAgentCollisionFeedback(null, 1_000)).toEqual({
+      active: false,
+      elapsedMs: null,
+      windowMs: 220
+    });
+    expect(resolveLegacyPatrolAgentCollisionFeedback(collision.state, 1_000))
+      .toMatchObject({ active: true, elapsedMs: 0, windowMs: 220 });
+    expect(resolveLegacyPatrolAgentCollisionFeedback(collision.state, 1_219))
+      .toMatchObject({ active: true, elapsedMs: 219 });
+    expect(resolveLegacyPatrolAgentCollisionFeedback(collision.state, 1_220))
+      .toMatchObject({ active: false, elapsedMs: 220 });
+    expect(LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS).toBe(220);
+  });
+
+  test('shows one recovery cue only for the final 220 ms of the existing delay', () => {
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const point = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, point, 1_000);
+
+    expect(resolveLegacyPatrolAgentCollisionRecovery(null, 1_000)).toEqual({
+      active: false,
+      elapsedMs: null,
+      remainingMs: 0,
+      windowMs: 220
+    });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_219))
+      .toMatchObject({ active: false, elapsedMs: null, remainingMs: 221 });
+    expect(resolveLegacyPatrolAgentCollisionFeedback(collision.state, 1_219.5))
+      .toMatchObject({ active: true, elapsedMs: 220 });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_219.5))
+      .toMatchObject({ active: false, elapsedMs: null, remainingMs: 221 });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_220))
+      .toMatchObject({ active: true, elapsedMs: 0, remainingMs: 220, windowMs: 220 });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_439))
+      .toMatchObject({ active: true, elapsedMs: 219, remainingMs: 1 });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_439.5))
+      .toMatchObject({ active: true, elapsedMs: 220, remainingMs: 1 });
+    expect(resolveLegacyPatrolAgentCollisionRecovery(collision.state, 1_440))
+      .toMatchObject({ active: false, elapsedMs: 220, remainingMs: 0 });
+    expect(LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS).toBe(220);
+  });
+
+  test('animates collision visuals and forces one final redraw when recovery expires', () => {
+    const scene: CollisionVisualHarness = {
+      boardDynamicDirty: false,
+      mode: 'play',
+      playPatrolCollisionVisualActive: false
+    };
+
+    refreshCollisionVisualState.call(scene, true);
+    expect(scene).toMatchObject({
+      boardDynamicDirty: true,
+      playPatrolCollisionVisualActive: true
+    });
+
+    scene.boardDynamicDirty = false;
+    refreshCollisionVisualState.call(scene, true);
+    expect(scene.boardDynamicDirty).toBe(true);
+
+    scene.boardDynamicDirty = false;
+    refreshCollisionVisualState.call(scene, false);
+    expect(scene).toMatchObject({
+      boardDynamicDirty: true,
+      playPatrolCollisionVisualActive: false
+    });
+
+    scene.boardDynamicDirty = false;
+    refreshCollisionVisualState.call(scene, false);
+    expect(scene.boardDynamicDirty).toBe(false);
+  });
+
+  test('re-arms on Pause Reset and clears on Reset Progression without maze regeneration', () => {
+    const maze = createMythicMaze();
+    const before = JSON.stringify(maze);
+    const progressionState = createEmptyLegacyProgressionState();
+    progressionState.tracks.player.targetComplexity = 180;
+    const dependencies = createPatrolDependencies(maze);
+    const fresh = createLegacyPatrolAgentState(maze, 'mythic', dependencies.excludedPoints)!;
+    const consumed = applyLegacyPatrolAgentCollision(
+      advanceLegacyPatrolAgent(fresh, 1_000),
+      fresh.placement.route[1],
+      1_000
+    ).state;
+    const createFreshPatrol = (band: LegacyProgressionDifficultyBand) => {
+      const slowTile = createLegacyStaticSlowTileState(maze, band);
+      const room = createLegacyRoomCandidateMetadata(
+        maze,
+        band,
+        slowTile.placement?.point ?? null
+      );
+      return createLegacyPatrolAgentState(maze, band, [
+        ...(slowTile.placement ? [slowTile.placement.point] : []),
+        ...roomFootprint(room)
+      ]);
+    };
+    const pauseScene: PauseResetHarness = {
+      boardDynamicDirty: false,
+      closeOverlay: vi.fn(),
+      createLegacyPlayPatrolAgent: createFreshPatrol,
+      maze,
+      playCompletedAtMs: 1_500,
+      playCyclePath: [{ x: 3, y: 3 }],
+      playCycleResetUsed: false,
+      playPatrolAgent: consumed,
+      playRoomCandidateMetadata: dependencies.room,
+      playStartedAtMs: 500,
+      playStaticSlowTile: dependencies.slowTile,
+      player: { x: 3, y: 3 },
+      progressionState,
+      publishInteractionDiagnostics: vi.fn(),
+      resetLegacyPlayInputBuffer: vi.fn(),
+      resetLegacyWorldTurnHost: vi.fn(),
+      syncLegacyPlayerVisualMotionTo: vi.fn(),
+      time: { now: 2_000 },
+      trail: [{ x: 3, y: 3 }]
+    };
+
+    applyPauseCommand.call(pauseScene, 'reset-player');
+    expect(pauseScene.playPatrolAgent).toEqual(createFreshPatrol('mythic'));
+    expect(pauseScene.playPatrolAgent).toMatchObject({
+      collisionCount: 0,
+      collisionDelayUntilMs: null,
+      currentRouteIndex: 0,
+      penaltyCount: 0,
+      stepCount: 0
+    });
+    expect(pauseScene.resetLegacyWorldTurnHost).toHaveBeenCalledOnce();
+
+    const progressionScene: ProgressionResetHarness = {
+      boardDynamicDirty: false,
+      maze,
+      openOverlay: vi.fn(),
+      playPatrolAgent: pauseScene.playPatrolAgent,
+      playRoomCandidateMetadata: pauseScene.playRoomCandidateMetadata,
+      playStaticSlowTile: pauseScene.playStaticSlowTile,
+      progressionState,
+      resetLegacyWorldTurnHost: vi.fn(),
+      resolveLegacyProgressionStorage: () => undefined,
+      runtimeDiagnosticsLastPublishedAtMs: 4_000,
+      setLatestOverlayMessage: vi.fn(),
+      syncLegacyRemoteProgressionState: vi.fn(),
+      visualDiagnosticsLastPublishedAtMs: 3_000
+    };
+
+    resetPlayerProgression.call(progressionScene);
+    expect(progressionScene.playPatrolAgent).toBeNull();
+    expect(progressionScene.playRoomCandidateMetadata).toBeNull();
+    expect(progressionScene.resetLegacyWorldTurnHost).toHaveBeenCalledOnce();
+    expect(JSON.stringify(maze)).toBe(before);
+  });
+
+  test('recreates the immutable timed-mode host after play-to-menu patrol state settles', () => {
+    const progressionState = createEmptyLegacyProgressionState();
+    progressionState.tracks.player.targetComplexity = 180;
+    const scene = {
+      activeInputField: null,
+      armLegacyMenuStaticDrawStage: vi.fn(),
+      boardDynamicDirty: false,
+      boardPathDirty: false,
+      boardStaticDirty: false,
+      createLegacyPlayPatrolAgent(
+        this: {
+          maze: LegacyMazeSnapshot;
+          playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
+          playStaticSlowTile: LegacyStaticSlowTileState;
+        },
+        band: LegacyProgressionDifficultyBand
+      ) {
+        return createLegacyPatrolAgentState(this.maze, band, [
+          ...(this.playStaticSlowTile.placement ? [this.playStaticSlowTile.placement.point] : []),
+          ...roomFootprint(this.playRoomCandidateMetadata)
+        ]);
+      },
+      createLegacyWorldTurnHost: createWorldTurnHost,
+      legacyWorldTurnCommandSequence: 0,
+      legacyWorldTurnHost: new WorldTurnHost({}, { timedModeEnabled: false }),
+      legacyWorldTurnMove: null,
+      playPatrolAgent: null,
+      progressionState,
+      refreshLayout: vi.fn(),
+      resetLegacyWorldTurnHost: resetWorldTurnHost,
+      resolveLegacyMenuStaticDrawDemoGateAtMs: () => 1_000,
+      settings: copyLegacySettings(LEGACY_DEFAULTS),
+      startLegacyPlayCompassSpin: vi.fn(),
+      syncLegacyPlayerVisualMotionTo: vi.fn(),
+      time: { now: 1_000 },
+      titleGraphics: { setVisible: vi.fn() },
+      uiDirty: false
+    } as unknown as MenuScene;
+    const readback = () => scene as unknown as {
+      legacyWorldTurnHost: WorldTurnHost;
+      playPatrolAgent: LegacyPatrolAgentState | null;
+    };
+    const generationProfile = resolveLegacyMazeGenerationProfileForProgression(180);
+
+    applyGenerationRequest.call(scene, createLegacyGenerationRequest({
+      currentSeed: 577_196_705,
+      dueAtMs: 1_000,
+      generationProfile,
+      mode: 'play',
+      reason: 'play-start',
+      scale: 96,
+      targetComplexity: 180
+    }));
+    expect(readback().playPatrolAgent).not.toBeNull();
+    expect(readback().legacyWorldTurnHost.getDiagnostics().timedModeEnabled).toBe(true);
+
+    applyGenerationRequest.call(scene, createLegacyGenerationRequest({
+      currentSeed: 577_196_705,
+      dueAtMs: 1_000,
+      generationProfile,
+      mode: 'menu',
+      reason: 'boot-menu',
+      scale: 96,
+      targetComplexity: 180
+    }));
+    readback().legacyWorldTurnHost.setState('stopped');
+    expect(readback().playPatrolAgent).toBeNull();
+    expect(readback().legacyWorldTurnHost.getDiagnostics()).toMatchObject({
+      state: 'stopped',
+      timedModeEnabled: false
+    });
+  }, 20_000);
+
+  test('wires the visible patrol through timed world turns and cloned diagnostics', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const diagnosticsSource = readFileSync(
+      resolve(process.cwd(), 'src/scenes/menuRuntimeDiagnostics.ts'),
+      'utf8'
+    );
+
+    expect(menuSceneSource).toContain("'enemy-movement': (");
+    expect(menuSceneSource).toContain('collisions: (): WorldTurnPhaseResult');
+    expect(menuSceneSource).toContain('timedModeEnabled: this.playPatrolAgent !== null');
+    expect(menuSceneSource).toContain("kind: 'timed-mode-tick'");
+    expect(menuSceneSource).toContain('this.drawLegacyPlayPatrolAgent(');
+    expect(menuSceneSource).toContain('patrol: this.playPatrolAgent && patrolPoint');
+    expect(menuSceneSource).toContain('resolveLegacyPatrolAgentTelegraph(');
+    expect(menuSceneSource).toContain('telegraphActive: patrolTelegraph.active');
+    expect(diagnosticsSource).toContain("contractVersion: 'legacy-patrol-agent-v5';");
+    expect(diagnosticsSource).toContain('collisionFeedbackWindowMs: 220;');
+    expect(menuSceneSource).toContain('collisionFeedbackActive: patrolCollisionFeedback.active');
+    expect(diagnosticsSource).toContain('collisionRecoveryWindowMs: 220;');
+    expect(menuSceneSource).toContain('collisionRecoveryActive: patrolCollisionRecovery.active');
+    expect(diagnosticsSource).toContain('maximumPendingCollisionIntents: 1;');
+    expect(diagnosticsSource).toContain('pendingCollisionIntentCount: 0 | 1;');
+    expect(menuSceneSource).toContain('pendingCollisionIntent: this.playPatrolAgent.pendingCollisionIntent');
+    expect(menuSceneSource).toContain('this.flushLegacyPatrolCollisionIntent(time);');
+    expect(menuSceneSource).toContain('this.playPatrolAgent = queueLegacyPatrolAgentCollisionIntent(');
+    expect(menuSceneSource).toContain('this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);');
+    expect(diagnosticsSource).toContain('telegraphWindowMs: 220;');
+  });
+
+  test('flushes the pending intent after the patrol tick and clears it at lifecycle boundaries', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const timerAdvanceIndex = menuSceneSource.indexOf('this.advanceLegacyPatrolTimer(time);');
+    const intentFlushIndex = menuSceneSource.indexOf('this.flushLegacyPatrolCollisionIntent(time);');
+    const pendingQueueIndex = menuSceneSource.indexOf(
+      'this.playPatrolAgent = queueLegacyPatrolAgentCollisionIntent('
+    );
+    const worldTurnAdvanceIndex = menuSceneSource.indexOf(
+      'receipt = this.legacyWorldTurnHost.advance({',
+      pendingQueueIndex
+    );
+    const resetStartIndex = menuSceneSource.indexOf('private resetLegacyPlayInputBuffer(): void');
+    const resetEndIndex = menuSceneSource.indexOf(
+      'private resetLegacyPlayDirectionalInputBuffer(): void',
+      resetStartIndex
+    );
+    const resetSource = menuSceneSource.slice(resetStartIndex, resetEndIndex);
+
+    expect(timerAdvanceIndex).toBeGreaterThan(-1);
+    expect(intentFlushIndex).toBeGreaterThan(timerAdvanceIndex);
+    expect(pendingQueueIndex).toBeGreaterThan(-1);
+    expect(worldTurnAdvanceIndex).toBeGreaterThan(pendingQueueIndex);
+    expect(pendingQueueIndex).toBeLessThan(worldTurnAdvanceIndex);
+    expect(resetSource).toContain(
+      'this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);'
+    );
+    expect(menuSceneSource).toContain(
+      "this.resolveLegacyWorldTurnHostState() !== 'running'"
+    );
+    expect(menuSceneSource).toContain('this.tryMovePlayerFromInput(');
+    expect(menuSceneSource).toContain('resolution.intent.deltaX,');
+  });
+
+  test('draws the recovery cue after the player without moving patrol or destination layers', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const patrolDrawIndex = menuSceneSource.indexOf('this.drawLegacyPlayPatrolAgent(');
+    const playerDrawIndex = menuSceneSource.indexOf('this.fillLegacyPlayerMarkerTile(');
+    const recoveryDrawIndex = menuSceneSource.indexOf(
+      'this.drawLegacyPlayPatrolCollisionRecovery('
+    );
+
+    expect(patrolDrawIndex).toBeGreaterThan(-1);
+    expect(playerDrawIndex).toBeGreaterThan(patrolDrawIndex);
+    expect(recoveryDrawIndex).toBeGreaterThan(playerDrawIndex);
+    expect(menuSceneSource.match(/this\.drawLegacyPlayPatrolCollisionRecovery\(/g)).toHaveLength(1);
+    expect(menuSceneSource).toContain(
+      'const collisionRecovery = resolveLegacyPatrolAgentCollisionRecovery('
+    );
+  });
+
+  test('draws one cardinal pending-intent chevron above the player during the collision delay', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const playerDrawIndex = menuSceneSource.indexOf('this.fillLegacyPlayerMarkerTile(');
+    const recoveryDrawIndex = menuSceneSource.indexOf(
+      'this.drawLegacyPlayPatrolCollisionRecovery('
+    );
+    const pendingIntentDrawIndex = menuSceneSource.indexOf(
+      'this.drawLegacyPlayPatrolPendingIntent('
+    );
+    const pendingIntentMethodIndex = menuSceneSource.indexOf(
+      'private drawLegacyPlayPatrolPendingIntent('
+    );
+    const pendingIntentMethodEndIndex = menuSceneSource.indexOf(
+      'private drawLegacyProgressionBadge(',
+      pendingIntentMethodIndex
+    );
+    const pendingIntentMethodSource = menuSceneSource.slice(
+      pendingIntentMethodIndex,
+      pendingIntentMethodEndIndex
+    );
+
+    expect(playerDrawIndex).toBeGreaterThan(-1);
+    expect(recoveryDrawIndex).toBeGreaterThan(playerDrawIndex);
+    expect(pendingIntentDrawIndex).toBeGreaterThan(recoveryDrawIndex);
+    expect(menuSceneSource.match(/this\.drawLegacyPlayPatrolPendingIntent\(/g)).toHaveLength(1);
+    expect(pendingIntentMethodSource).toContain(
+      'const pendingIntent = this.playPatrolAgent?.pendingCollisionIntent ?? null;'
+    );
+    expect(pendingIntentMethodSource).toContain(
+      '|| !isLegacyPatrolAgentDelayActive(this.playPatrolAgent, time)'
+    );
+    expect(pendingIntentMethodSource).toContain(
+      '|| Math.abs(pendingIntent.deltaX) + Math.abs(pendingIntent.deltaY) !== 1'
+    );
+    expect(pendingIntentMethodSource.match(/this\.boardDynamicGraphics\.beginPath\(\);/g)).toHaveLength(1);
+    expect(pendingIntentMethodSource.match(/this\.boardDynamicGraphics\.lineTo\(/g)).toHaveLength(2);
+    expect(pendingIntentMethodSource.match(/this\.boardDynamicGraphics\.strokePath\(\);/g)).toHaveLength(1);
+
+    const maze = createMythicMaze();
+    const { excludedPoints } = createPatrolDependencies(maze);
+    const initial = createLegacyPatrolAgentState(maze, 'mythic', excludedPoints);
+    const collisionPoint = resolveLegacyPatrolAgentPoint(initial)!;
+    const collision = applyLegacyPatrolAgentCollision(initial, collisionPoint, 1_000);
+    const queued = queueLegacyPatrolAgentCollisionIntent(collision.state, 1, 0, 1_100);
+    const boardDynamicGraphics = {
+      beginPath: vi.fn(),
+      lineStyle: vi.fn(),
+      lineTo: vi.fn(),
+      moveTo: vi.fn(),
+      strokePath: vi.fn()
+    };
+    const harness: PendingIntentCueHarness = {
+      boardDynamicGraphics,
+      mode: 'play',
+      playPatrolAgent: queued,
+      player: { x: 2, y: 3 }
+    };
+
+    drawPendingIntentCue.call(harness, 100, 200, 20, 1_100);
+    expect(boardDynamicGraphics.beginPath).toHaveBeenCalledOnce();
+    expect(boardDynamicGraphics.strokePath).toHaveBeenCalledOnce();
+    expect(boardDynamicGraphics.moveTo).toHaveBeenCalledWith(155.6, 273.2);
+    expect(boardDynamicGraphics.lineTo).toHaveBeenNthCalledWith(1, 159.6, 270);
+    expect(boardDynamicGraphics.lineTo).toHaveBeenNthCalledWith(2, 155.6, 266.8);
+
+    drawPendingIntentCue.call(harness, 100, 200, 20, 1_440);
+    harness.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(queued);
+    drawPendingIntentCue.call(harness, 100, 200, 20, 1_100);
+    harness.playPatrolAgent = queued;
+    harness.mode = 'menu';
+    drawPendingIntentCue.call(harness, 100, 200, 20, 1_100);
+    expect(boardDynamicGraphics.strokePath).toHaveBeenCalledOnce();
+  });
+});

@@ -1,12 +1,18 @@
 :root {
   color-scheme: dark;
   font-family: "Courier New", monospace;
-  --mazer-safe-area-top: env(safe-area-inset-top, 0px);
-  --mazer-safe-area-right: env(safe-area-inset-right, 0px);
-  --mazer-safe-area-bottom: env(safe-area-inset-bottom, 0px);
-  --mazer-safe-area-left: env(safe-area-inset-left, 0px);
+  --mazer-environment-safe-area-top: env(safe-area-inset-top, 0px);
+  --mazer-environment-safe-area-right: env(safe-area-inset-right, 0px);
+  --mazer-environment-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --mazer-environment-safe-area-left: env(safe-area-inset-left, 0px);
+  --mazer-safe-area-top: var(--mazer-environment-safe-area-top);
+  --mazer-safe-area-right: var(--mazer-environment-safe-area-right);
+  --mazer-safe-area-bottom: var(--mazer-environment-safe-area-bottom);
+  --mazer-safe-area-left: var(--mazer-environment-safe-area-left);
   --mazer-viewport-width: 100vw;
   --mazer-viewport-height: 100dvh;
+  --mazer-viewport-left: 0px;
+  --mazer-viewport-top: 0px;
 }
 
 * {
@@ -14,11 +20,19 @@
 }
 
 html,
-body,
+body {
+  background: #02080f;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+}
+
 #app {
   width: var(--mazer-viewport-width);
   height: var(--mazer-viewport-height);
-  min-height: 100dvh;
+  min-height: var(--mazer-viewport-height);
   max-width: var(--mazer-viewport-width);
   max-height: var(--mazer-viewport-height);
 }
@@ -34,17 +48,14 @@ body {
 
 body {
   min-width: 0;
-  background:
-    radial-gradient(circle at 24% 18%, rgba(104, 76, 138, 0.45) 0, rgba(104, 76, 138, 0) 26%),
-    radial-gradient(circle at 78% 18%, rgba(132, 96, 176, 0.38) 0, rgba(132, 96, 176, 0) 24%),
-    radial-gradient(circle at 52% 78%, rgba(98, 70, 132, 0.3) 0, rgba(98, 70, 132, 0) 22%),
-    linear-gradient(180deg, #261630 0, #2b1b39 40%, #24152f 100%);
   color: #f3f4f8;
 }
 
 #app {
+  background: #02080f;
   position: fixed;
-  inset: 0;
+  left: var(--mazer-viewport-left);
+  top: var(--mazer-viewport-top);
   overflow: hidden;
 }
 
@@ -62,21 +73,86 @@ canvas {
   user-select: none;
 }
 
-#mazer-portrait-lock-overlay {
-  display: none !important;
+canvas:focus-visible {
+  outline: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-focus, #6be8e1);
+  outline-offset: -6px;
 }
 
-@media (orientation: landscape) and (pointer: coarse) {
-  body.mazer-phone-landscape-locked #app {
-    bottom: auto;
-    height: 100dvw;
-    left: 100vw;
-    max-height: 100dvw;
-    max-width: 100dvh;
-    right: auto;
-    top: 0;
-    transform: rotate(90deg);
-    transform-origin: top left;
-    width: 100dvh;
-  }
+#mazer-accessibility-surface {
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 30;
+}
+
+.mazer-accessibility-description {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.mazer-accessibility-shortcut {
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
+}
+
+.mazer-accessibility-shortcut:focus-visible {
+  background: #071a22;
+  border: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-focus, #6be8e1);
+  border-radius: var(--mazer-token-radius-control, 8px);
+  box-shadow: 0 0 0 2px #03070b;
+  clip: auto;
+  clip-path: none;
+  color: #f3f4f8;
+  height: auto;
+  left: max(12px, var(--mazer-safe-area-left));
+  overflow: visible;
+  padding: 12px 16px;
+  pointer-events: auto;
+  top: max(12px, var(--mazer-safe-area-top));
+  white-space: normal;
+  width: auto;
+}
+
+#mazer-portrait-lock-overlay {
+  align-items: center;
+  background: rgba(2, 8, 15, 0.96);
+  color: #d7fff8;
+  display: grid;
+  inset: 0;
+  justify-items: center;
+  padding: 24px;
+  position: fixed;
+  text-align: center;
+  z-index: 20;
+}
+
+.mazer-portrait-lock-card {
+  border: 1px solid rgba(117, 245, 224, 0.82);
+  box-shadow: 0 0 26px rgba(89, 242, 221, 0.22);
+  display: grid;
+  gap: 10px;
+  max-width: 320px;
+  padding: 24px;
+}
+
+.mazer-portrait-lock-card strong {
+  color: #72f5de;
+  font-size: 1.2rem;
+}
+
+.mazer-portrait-lock-card span {
+  color: #d7fff8;
+  font-size: 0.92rem;
+  line-height: 1.45;
 }

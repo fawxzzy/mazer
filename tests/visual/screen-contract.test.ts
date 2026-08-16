@@ -33,6 +33,22 @@ describe('visual screen contract', () => {
     });
   });
 
+  test('ignores a Vercel share credential consumed before the app loads', async () => {
+    const { buildVisualScreenContract } = await loadScreenContract();
+
+    const contract = buildVisualScreenContract({
+      expectedRoute: '/?content=core-only&theme=aurora&_vercel_share=temporary-review-token',
+      actualUrl: 'https://preview.example.test/?content=core-only&theme=aurora',
+      viewport: { width: 393, height: 852 },
+      diagnostics: {
+        runtime: { mode: 'menu', overlay: 'none' },
+        viewport: { width: 393, height: 852 }
+      }
+    });
+
+    expect(contract.pass).toBe(true);
+  });
+
   test('passes when play route and diagnostics agree', async () => {
     const { buildVisualScreenContract } = await loadScreenContract();
 

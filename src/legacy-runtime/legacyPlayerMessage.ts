@@ -43,18 +43,18 @@ export const LEGACY_PLAYER_MESSAGE_COLORS: Record<LegacyPlayerMessageTone, strin
 };
 
 export const LEGACY_AUTH_MESSAGE_COPY = {
-  accountCreated: 'Account created.',
-  authUnavailable: 'Account login needs Supabase env vars before it can be enabled.',
-  createReady: 'Ready to create.',
+  accountCreated: 'Your account is ready.',
+  authUnavailable: 'Account access is unavailable right now. You can still play as a guest.',
+  createReady: 'Details look good. Create your account when you are ready.',
   enterEmail: 'Enter an email.',
-  loginNotConfigured: 'Account login is not configured for this build.',
-  loginReady: 'Ready to login.',
+  loginNotConfigured: 'Account access is unavailable right now. You can still play as a guest.',
+  loginReady: 'Details look good. Sign in when you are ready.',
   networkUnavailable: 'Account service is unreachable. Try again shortly.',
   passwordMinimum: 'Password needs 6+ characters.',
   passwordResetEmailRequired: 'Enter an email before reset.',
-  passwordResetNotConfigured: 'Password reset is not configured for this build.',
+  passwordResetNotConfigured: 'Password reset is unavailable right now. You can still play as a guest.',
   passwordResetSent: 'Password reset email sent.',
-  signupNotConfigured: 'Account signup is not configured for this build.',
+  signupNotConfigured: 'Account creation is unavailable right now. You can still play as a guest.',
   signedIn: 'Signed in.',
   signedOut: 'Signed out. Guest progress is active.',
   verifyEmail: 'Check your email to finish account setup.'
@@ -69,7 +69,8 @@ export const LEGACY_REMOTE_MESSAGE_COPY = {
   cycleReceiptFailed: 'Run history saved locally. Cloud sync will retry later.',
   guest: 'Sign in to sync progress across devices.',
   missingClient: 'Cloud sync is not ready in this build.',
-  progressionFailed: 'Progress saved locally. Cloud sync will retry later.'
+  progressionFailed: 'Progress saved locally. Cloud sync will retry later.',
+  settingsFailed: 'Settings saved locally. Cloud sync will retry later.'
 } as const;
 
 export const LEGACY_OVERLAY_MESSAGE_COPY = {
@@ -78,7 +79,7 @@ export const LEGACY_OVERLAY_MESSAGE_COPY = {
   settingsUpdated: 'Settings updated.'
 } as const;
 
-export type LegacyRemoteMessageContext = 'cycle-receipt' | 'progression';
+export type LegacyRemoteMessageContext = 'cycle-receipt' | 'progression' | 'settings';
 export type LegacyRemoteSkippedReason = 'disabled' | 'guest' | 'missing-client' | null;
 
 export const createLegacyPlayerMessage = (
@@ -197,7 +198,9 @@ export const resolveLegacyRemoteSyncMessage = (
     return createLegacyPlayerMessage({
       copy: context === 'cycle-receipt'
         ? LEGACY_REMOTE_MESSAGE_COPY.cycleReceiptFailed
-        : LEGACY_REMOTE_MESSAGE_COPY.progressionFailed,
+        : context === 'settings'
+          ? LEGACY_REMOTE_MESSAGE_COPY.settingsFailed
+          : LEGACY_REMOTE_MESSAGE_COPY.progressionFailed,
       id: `remote.${context}.failed`,
       source: 'progression',
       technicalDetail: result.error,

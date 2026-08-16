@@ -60,7 +60,7 @@ export type LegacyAuthStateListener = (
 ) => void;
 
 type LegacyAuthStorage = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>;
-type LegacyAuthClient = SupabaseClient<any, any, 'mazer'>;
+type LegacyAuthClient = SupabaseClient<any, any, any>;
 
 const createGuestSnapshot = (
   configured: boolean,

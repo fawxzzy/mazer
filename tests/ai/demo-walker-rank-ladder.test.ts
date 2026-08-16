@@ -46,6 +46,17 @@ describe('human-memory AI rank ladder', () => {
     }
 
     expect(perceptions.get('E')?.lookaheadDepth).toBeLessThan(perceptions.get('S')?.lookaheadDepth ?? 0);
+    expect(perceptions.get('C')?.lookaheadDepth).toBe(10);
+    expect(perceptions.get('B')?.lookaheadDepth).toBe(10);
+    expect(perceptions.get('A')?.lookaheadDepth).toBe(12);
+    expect(perceptions.get('E')?.rankedLookaheadProgressWeight).toBe(0);
+    expect(perceptions.get('E')?.rankedLookaheadAmbiguityWeight).toBe(0);
+    expect(perceptions.get('D')?.rankedLookaheadProgressWeight).toBe(0.75);
+    expect(perceptions.get('D')?.rankedLookaheadAmbiguityWeight).toBe(1);
+    for (const rank of ['C', 'B', 'A', 'S'] as const) {
+      expect(perceptions.get(rank)?.rankedLookaheadProgressWeight).toBe(1);
+      expect(perceptions.get(rank)?.rankedLookaheadAmbiguityWeight).toBe(1);
+    }
     expect(perceptions.get('E')?.confidenceNoisePenalty).toBeGreaterThan(perceptions.get('S')?.confidenceNoisePenalty ?? 0);
     expect(perceptions.get('E')?.wrapMentalCost).toBeGreaterThan(perceptions.get('S')?.wrapMentalCost ?? 0);
     expect(perceptions.get('S')?.solvePreviewBudget).toBeGreaterThan(0);

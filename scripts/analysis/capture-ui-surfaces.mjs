@@ -26,14 +26,48 @@ const isDirectRun = process.argv[1] && resolve(process.argv[1]) === SCRIPT_PATH;
 const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';
 const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';
 const STORAGE_KEY = 'mazer.game-toggles.v1';
+const WRAP_TOPOLOGY_PROGRESSION_STORAGE_KEY = 'mazer.progression.v1:user:runtime-diagnostics-auth-fixture';
 const DEFAULT_ARTIFACT_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-ui-surfaces');
 const DEFAULT_LABEL = 'ui-surfaces';
 const DEFAULT_ROUTE = '/?content=core-only&theme=aurora&runtimeDiagnostics=1';
 const DEFAULT_VIEWPORT = Object.freeze({ width: 405, height: 958 });
+const DEFAULT_TRANSITION_VIEWPORTS = Object.freeze({
+  initial: Object.freeze({ width: 360, height: 720 }),
+  desktop: Object.freeze({ width: 1440, height: 900 }),
+  endpoint: Object.freeze({ width: 405, height: 958 })
+});
 const DEFAULT_DEVICE_SCALE_FACTOR = 2;
 const DEFAULT_TIMEOUT_MS = 30_000;
-const EXPECTED_PLAYER_CORE_COLOR = 0x36ff7d;
-const EXPECTED_GOAL_CORE_COLOR = 0xff263f;
+// These numeric values are the live Phaser aliases for the Precision Arcade
+// registry. Keep this proof independent of stylesheet-only tokens so it
+// validates the actual canvas material players see.
+const EXPECTED_PLAYER_CORE_COLOR = 0x39f58a;
+const EXPECTED_GOAL_CORE_COLOR = 0xff405d;
+const EXPECTED_TRAIL_SHINE_COLOR = 0xf1faf6;
+const EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe9fff1;
+const INLINE_STATE_TEXT_LABELS = Object.freeze([
+  'High Contrast',
+  'Camera Follow',
+  'Control Style',
+  'Smart Steering'
+]);
+
+const buildExpectedTextLabelDescriptors = (expectedLabels) => (
+  expectedLabels.map((expectedLabel) => ({
+    allowStateSuffix: INLINE_STATE_TEXT_LABELS.includes(expectedLabel),
+    expectedLabel
+  }))
+);
+
+export const matchesExpectedTextLabel = (actualLabel, expectedLabel) => (
+  actualLabel === expectedLabel
+  || (
+    INLINE_STATE_TEXT_LABELS.includes(expectedLabel)
+    && typeof actualLabel === 'string'
+    && actualLabel.startsWith(`${expectedLabel}: `)
+    && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
+  )
+);
 
 const runNpmCommand = (args) => {
   if (process.platform === 'win32') {
@@ -97,7 +131,20 @@ const waitForSurface = async (page, {
 
       try {
         const visual = JSON.parse(visualRaw);
-        return visual?.runtime?.mode === expectedMode && visual?.runtime?.overlay === expectedOverlay;
+        const badge = visual?.progressionBadge?.bounds;
+        const board = visual?.board?.bounds;
+        // Starting a game changes the mode before the next layout publication.
+        // Do not capture that transitional diagnostics frame as active play UI.
+        const playGeometrySettled = expectedMode !== 'play'
+          || expectedOverlay !== 'none'
+          || (
+            Number.isFinite(badge?.bottom)
+            && Number.isFinite(board?.top)
+            && badge.bottom <= board.top - 8
+          );
+        return visual?.runtime?.mode === expectedMode
+          && visual?.runtime?.overlay === expectedOverlay
+          && playGeometrySettled;
       } catch {
         return false;
       }
@@ -111,6 +158,7 @@ const waitForSurface = async (page, {
     { timeout: timeoutMs }
   );
   if (expectedLabels.length > 0) {
+    const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
     await page.waitForFunction(
       ({ expected, visualAttribute }) => {
         const raw = document.documentElement.getAttribute(visualAttribute);
@@ -120,14 +168,22 @@ const waitForSurface = async (page, {
 
         try {
           const visual = JSON.parse(raw);
-          const labels = new Set((visual?.textLabels ?? []).map((entry) => entry.text));
-          return expected.every((label) => labels.has(label));
+          const labels = (visual?.textLabels ?? []).map((entry) => entry.text);
+          return expected.every(({ allowStateSuffix, expectedLabel }) => labels.some((actualLabel) => (
+            actualLabel === expectedLabel
+            || (
+              allowStateSuffix
+              && typeof actualLabel === 'string'
+              && actualLabel.startsWith(`${expectedLabel}: `)
+              && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
+            )
+          )));
         } catch {
           return false;
         }
       },
       {
-        expected: expectedLabels,
+        expected: expectedLabelDescriptors,
         visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
       },
       { timeout: timeoutMs }
@@ -167,6 +223,45 @@ const waitForVisualBuildSettled = async (page, { requireReadableTitle = false, t
   );
 };
 
+const exerciseReducedMotionPreferenceChange = async (page, timeoutMs) => {
+  const readPreference = async () => page.evaluate((visualAttribute) => {
+    const raw = document.documentElement.getAttribute(visualAttribute);
+    if (!raw) {
+      return null;
+    }
+    try {
+      const visual = JSON.parse(raw);
+      return visual?.accessibility?.reducedMotion ?? null;
+    } catch {
+      return null;
+    }
+  }, VISUAL_DIAGNOSTICS_ATTRIBUTE);
+  const waitForPreference = async (expected) => page.waitForFunction(
+    ({ expectedReducedMotion, visualAttribute }) => {
+      const raw = document.documentElement.getAttribute(visualAttribute);
+      if (!raw) {
+        return false;
+      }
+      try {
+        return JSON.parse(raw)?.accessibility?.reducedMotion === expectedReducedMotion;
+      } catch {
+        return false;
+      }
+    },
+    { expectedReducedMotion: expected, visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE },
+    { timeout: timeoutMs }
+  );
+
+  const initial = await readPreference();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await waitForPreference(true);
+  const reduced = await readPreference();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await waitForPreference(false);
+  const restored = await readPreference();
+  return { initial, reduced, restored };
+};
+
 const waitForAuthenticatedFixtureReady = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
   await page.waitForFunction(
     ({ runtimeAttribute, visualAttribute }) => {
@@ -184,7 +279,7 @@ const waitForAuthenticatedFixtureReady = async (page, { timeoutMs = DEFAULT_TIME
           && visual?.runtime?.mode === 'menu'
           && visual?.runtime?.overlay === 'none'
           && labels.has('Start')
-          && labels.has('Options');
+          && (visual?.buttons ?? []).some((button) => button?.text === 'Settings' && button?.iconOnly === true);
       } catch {
         return false;
       }
@@ -258,7 +353,7 @@ const openOptionsOverlayFromMenu = async (page, point, expectedLabels, timeoutMs
     if (attempt === 1) {
       await page.touchscreen.tap(point.x, point.y);
     } else {
-      await clickPoint(page, point, 'Options');
+      await clickPoint(page, point, 'Settings');
     }
     try {
       await waitForSurface(page, {
@@ -274,19 +369,19 @@ const openOptionsOverlayFromMenu = async (page, point, expectedLabels, timeoutMs
     }
   }
 
-  throw lastError ?? new Error('Unable to open Options overlay from menu.');
+  throw lastError ?? new Error('Unable to open Settings from the menu cog.');
 };
 
 const openOptionsOverlayViaQa = async (page, timeoutMs) => {
   await page.waitForFunction(
-    () => Boolean(window.__MAZER_QA__?.openOptionsOverlay),
+    () => Boolean(window.__MAZER_QA__?.openSettingsOverlay),
     {},
     { timeout: timeoutMs }
   );
   const result = await page.evaluate(() => {
     const api = window.__MAZER_QA__;
-    return api?.openOptionsOverlay
-      ? api.openOptionsOverlay()
+    return api?.openSettingsOverlay
+      ? api.openSettingsOverlay()
       : {
           accepted: false,
           mode: null,
@@ -295,7 +390,7 @@ const openOptionsOverlayViaQa = async (page, timeoutMs) => {
         };
   });
   if (result?.accepted !== true) {
-    throw new Error(`Unable to open Options overlay through QA bridge: ${result?.reason ?? 'unknown'}`);
+    throw new Error(`Unable to open Settings through QA bridge: ${result?.reason ?? 'unknown'}`);
   }
   await page.waitForTimeout(Math.min(timeoutMs, 500));
 };
@@ -307,7 +402,10 @@ const PLAY_TRAIL_SEED_MOVES = Object.freeze([
   'move_up'
 ]);
 
-const seedPlayTrailForVisualProof = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
+const seedPlayTrailForVisualProof = async (
+  page,
+  { expectTrailShineEnabled = true, timeoutMs = DEFAULT_TIMEOUT_MS } = {}
+) => {
   await page.waitForFunction(
     () => Boolean(window.__MAZER_QA__?.movePlayPlayer),
     {},
@@ -347,7 +445,7 @@ const seedPlayTrailForVisualProof = async (page, { timeoutMs = DEFAULT_TIMEOUT_M
   }
 
   await page.waitForFunction(
-    ({ visualAttribute }) => {
+    ({ expectTrailShineEnabled: expected, visualAttribute }) => {
       const raw = document.documentElement.getAttribute(visualAttribute);
       if (!raw) {
         return false;
@@ -355,12 +453,13 @@ const seedPlayTrailForVisualProof = async (page, { timeoutMs = DEFAULT_TIMEOUT_M
 
       try {
         const visual = JSON.parse(raw);
-        return visual?.markerStyle?.trailPulseEnabled === true;
+        return visual?.markerStyle?.trailShineEnabled === expected;
       } catch {
         return false;
       }
     },
     {
+      expectTrailShineEnabled,
       visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
     },
     { timeout: timeoutMs }
@@ -388,9 +487,12 @@ const captureSurface = async ({
     timeoutMs
   });
   if (skipWait && expectedLabels.length > 0) {
-    let labels = new Set((diagnostics.visual?.textLabels ?? []).map((entry) => entry.text));
-    let missingLabels = expectedLabels.filter((label) => !labels.has(label));
+    let labels = (diagnostics.visual?.textLabels ?? []).map((entry) => entry.text);
+    let missingLabels = expectedLabels.filter((expectedLabel) => (
+      !labels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
+    ));
     if (missingLabels.length > 0) {
+      const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
       await page.waitForFunction(
         ({ expected, visualAttribute }) => {
           const raw = document.documentElement.getAttribute(visualAttribute);
@@ -400,21 +502,31 @@ const captureSurface = async ({
 
           try {
             const visual = JSON.parse(raw);
-            const currentLabels = new Set((visual?.textLabels ?? []).map((entry) => entry.text));
-            return expected.every((label) => currentLabels.has(label));
+            const currentLabels = (visual?.textLabels ?? []).map((entry) => entry.text);
+            return expected.every(({ allowStateSuffix, expectedLabel }) => currentLabels.some((actualLabel) => (
+              actualLabel === expectedLabel
+              || (
+                allowStateSuffix
+                && typeof actualLabel === 'string'
+                && actualLabel.startsWith(`${expectedLabel}: `)
+                && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
+              )
+            )));
           } catch {
             return false;
           }
         },
         {
-          expected: expectedLabels,
+          expected: expectedLabelDescriptors,
           visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
         },
         { timeout: timeoutMs }
       );
       diagnostics = await readDiagnostics(page);
-      labels = new Set((diagnostics.visual?.textLabels ?? []).map((entry) => entry.text));
-      missingLabels = expectedLabels.filter((label) => !labels.has(label));
+      labels = (diagnostics.visual?.textLabels ?? []).map((entry) => entry.text);
+      missingLabels = expectedLabels.filter((expectedLabel) => (
+        !labels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
+      ));
     }
     if (missingLabels.length > 0) {
       throw new Error(`Surface ${id} missing labels after direct diagnostics read: ${missingLabels.join(', ')}`);
@@ -446,6 +558,11 @@ const captureSurface = async ({
       }
     };
   }));
+  await page.evaluate(() => new Promise((resolvePaint) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(resolvePaint);
+    });
+  }));
   await page.screenshot({ path: screenshotPath, fullPage: false });
   return {
     id,
@@ -454,6 +571,149 @@ const captureSurface = async ({
     nativeInputs,
     actualUrl: page.url(),
     screenContract
+  };
+};
+
+const openAuthOverlayFromMenu = async (page, timeoutMs) => {
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const diagnostics = await readDiagnostics(page);
+    const buttons = getMenuButtonPoints(diagnostics.visual);
+    await clickPoint(page, buttons.login, 'Login');
+    try {
+      await waitForSurface(page, {
+        expectedLabels: ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'],
+        mode: 'menu',
+        overlay: 'auth',
+        timeoutMs: Math.min(timeoutMs, 10_000)
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+      await page.waitForTimeout(150);
+    }
+  }
+  throw lastError ?? new Error('Unable to open auth overlay from menu.');
+};
+
+const toSurfaceState = (capture) => ({
+  mode: capture.diagnostics.visual?.runtime?.mode ?? capture.diagnostics.runtime?.surface?.mode,
+  overlay: capture.diagnostics.visual?.runtime?.overlay ?? capture.diagnostics.runtime?.surface?.overlay,
+  board: capture.diagnostics.visual?.board,
+  layout: capture.diagnostics.visual?.layout,
+  progressionBadge: capture.diagnostics.visual?.progressionBadge,
+  title: capture.diagnostics.visual?.title,
+  buttons: capture.diagnostics.visual?.buttons,
+  overlayUi: capture.diagnostics.visual?.overlayUi,
+  nativeInputs: capture.nativeInputs,
+  textLabels: capture.diagnostics.visual?.textLabels,
+  touchControls: capture.diagnostics.visual?.touchControls,
+  screenContract: capture.screenContract
+});
+
+const waitForViewportGeometry = async (page, viewport, timeoutMs = DEFAULT_TIMEOUT_MS) => {
+  await page.waitForFunction(
+    ({ visualAttribute, width, height }) => {
+      const raw = document.documentElement.getAttribute(visualAttribute);
+      if (!raw) {
+        return false;
+      }
+
+      try {
+        const visual = JSON.parse(raw);
+        const gameScale = window.__MAZER_GAME__?.scale;
+        return visual?.viewport?.width === width
+          && visual?.viewport?.height === height
+          && gameScale?.width === width
+          && gameScale?.height === height;
+      } catch {
+        return false;
+      }
+    },
+    {
+      visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE,
+      width: viewport.width,
+      height: viewport.height
+    },
+    { timeout: timeoutMs }
+  );
+};
+
+const stableBoardDiagnostics = (board) => board ? {
+  bounds: board.bounds ?? null,
+  renderBounds: board.renderBounds ?? null,
+  renderSafeInset: board.renderSafeInset ?? null,
+  safeBounds: board.safeBounds ?? null,
+  pathVisualStyle: board.pathVisualStyle ?? null,
+  tileSize: board.tileSize ?? null,
+  topCenterNotch: board.topCenterNotch ?? null
+} : null;
+
+const stableTransitionDiagnostics = (surface) => ({
+  board: stableBoardDiagnostics(surface.board),
+  layout: surface.layout ?? null,
+  mode: surface.mode ?? null,
+  overlay: surface.overlay ?? null,
+  touchControls: surface.touchControls ?? null
+});
+
+const collectTransitionLayoutIssues = (surfaceId, surface, viewport) => [
+  ...collectTextBoundsIssues(surfaceId, surface, viewport),
+  ...collectNativeInputBoundsIssues(surfaceId, surface, viewport),
+  ...collectTextOverlapIssues(surfaceId, surface)
+];
+
+const captureViewportTransition = async ({
+  id,
+  mode,
+  overlay,
+  page,
+  route,
+  timeoutMs,
+  transition
+}) => {
+  const captureEndpoint = async (name, viewport) => {
+    await page.setViewportSize(viewport);
+    await waitForViewportGeometry(page, viewport, timeoutMs);
+    await waitForVisualBuildSettled(page, { timeoutMs });
+    const capture = await captureSurface({
+      page,
+      outputDir: transition.outputDir,
+      expectedLabels: [],
+      id: `${id}-transition-${name}`,
+      mode,
+      overlay,
+      route,
+      timeoutMs,
+      viewport
+    });
+    const surface = toSurfaceState(capture);
+    return {
+      name,
+      viewport,
+      diagnostics: stableTransitionDiagnostics(surface),
+      nativeInputs: surface.nativeInputs,
+      layoutIssues: collectTransitionLayoutIssues(id, surface, viewport),
+      screenshotPath: capture.screenshotPath
+    };
+  };
+
+  const initial = await captureEndpoint('initial', transition.initial);
+  const desktop = await captureEndpoint('desktop', transition.desktop);
+  const restored = await captureEndpoint('restored', transition.initial);
+  const endpoint = await captureEndpoint('endpoint', transition.endpoint);
+  await page.setViewportSize(transition.initial);
+  await waitForViewportGeometry(page, transition.initial, timeoutMs);
+  await waitForVisualBuildSettled(page, { timeoutMs });
+
+  return {
+    initial,
+    desktop,
+    restored,
+    endpoint,
+    restoredDiagnosticsMatch: JSON.stringify(initial.diagnostics) === JSON.stringify(restored.diagnostics),
+    layoutIssues: [initial, desktop, restored, endpoint]
+      .flatMap((entry) => entry.layoutIssues.map((issue) => `${entry.name}:${issue}`))
   };
 };
 
@@ -478,6 +738,14 @@ const getVisualButtonPoint = (visual, text) => {
   };
 };
 
+const hasVisualButton = (surface, text, { iconOnly = null } = {}) => (
+  (surface?.buttons ?? []).some((button) => (
+    button?.text === text
+    && isFiniteBounds(button?.bounds)
+    && (iconOnly === null || button?.iconOnly === iconOnly)
+  ))
+);
+
 const getMenuButtonPoints = (visual) => ({
   login: getVisualButtonPoint(visual, 'Login') ?? {
     x: Math.round(visual?.layout?.centerButtonX ?? 0),
@@ -487,7 +755,7 @@ const getMenuButtonPoints = (visual) => ({
     x: Math.round(visual?.layout?.leftButtonX ?? 0),
     y: Math.round(visual?.layout?.leftButtonY ?? 0)
   },
-  options: getVisualButtonPoint(visual, 'Options') ?? {
+  options: getVisualButtonPoint(visual, 'Settings') ?? {
     x: Math.round(visual?.layout?.rightButtonX ?? 0),
     y: Math.round(visual?.layout?.rightButtonY ?? 0)
   }
@@ -505,25 +773,31 @@ const collectNativeInputEntries = (surface) => (
   surface?.nativeInputs ?? []
 );
 
+export const hasExpectedTextLabels = (actualLabels, expectedLabels) => (
+  expectedLabels.every((expectedLabel) => (
+    actualLabels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
+  ))
+);
+
 const hasTextLabels = (surface, expectedLabels) => {
-  const labels = new Set(collectTextLabels(surface));
-  return expectedLabels.every((label) => labels.has(label));
+  const labels = collectTextLabels(surface);
+  return hasExpectedTextLabels(labels, expectedLabels);
 };
 
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
-  'Options',
-  'PLAYER GUIDE',
-  'Camera Follow'
+  'Settings',
+  'QUICK PLAY',
+  'Control Style'
 ]);
 
-const resolveOptionsExpectedLabels = (authenticated) => [
-  ...OPTIONS_BASE_EXPECTED_LABELS,
+const resolveOptionsBottomExpectedLabels = (authenticated) => [
+  'High Contrast',
   authenticated ? 'Log out' : 'Account'
 ];
 
 const isAuthGatedMenuSurface = (surface) => (
-  hasTextLabels(surface, ['Login'])
-  && !hasTextLabels(surface, ['Start', 'Options'])
+  hasVisualButton(surface, 'Login')
+  && !hasVisualButton(surface, 'Start')
 );
 
 const getPauseButtonPoint = (visual) => {
@@ -531,6 +805,20 @@ const getPauseButtonPoint = (visual) => {
   return pause
     ? { x: Math.round(pause.centerX), y: Math.round(pause.centerY) }
     : null;
+};
+
+const closeOverlayToMenu = async (page, timeoutMs) => {
+  const diagnostics = await readDiagnostics(page);
+  const bounds = diagnostics.visual?.overlayUi?.backChevron;
+  if (!bounds) {
+    throw new Error('Missing Back control for overlay close.');
+  }
+
+  await clickPoint(page, {
+    x: Math.round(bounds.centerX),
+    y: Math.round(bounds.centerY)
+  }, 'Back');
+  await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs });
 };
 
 const createCheck = (id, passed, detail) => ({
@@ -570,12 +858,25 @@ const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = 
   const dragStartY = scroll.track.bottom - 2;
   const dragEndY = scroll.track.top + 2;
   const dragDistance = Math.max(1, dragStartY - dragEndY);
-  const dragCount = Math.max(1, Math.ceil(scroll.maxOffset / dragDistance));
-  for (let index = 0; index < dragCount; index += 1) {
-    await page.mouse.move(scroll.track.centerX, dragStartY);
-    await page.mouse.down();
-    await page.mouse.move(scroll.track.centerX, dragEndY, { steps: 8 });
-    await page.mouse.up();
+  const desktopViewport = (before.visual?.viewport?.width ?? 0) >= 720;
+  if (desktopViewport) {
+    await page.mouse.move(scroll.viewport.centerX, scroll.viewport.centerY);
+    const wheelDelta = Math.max(scroll.maxOffset * 4, dragDistance);
+    await page.mouse.wheel(0, wheelDelta);
+    await page.mouse.wheel(0, wheelDelta);
+    await page.waitForTimeout(200);
+    const desktopAfter = await readDiagnostics(page);
+    if ((desktopAfter.visual?.overlayUi?.scroll?.offset ?? 0) < scroll.maxOffset - 1) {
+      throw new Error(`Desktop overlay wheel did not reach bottom: offset=${desktopAfter.visual?.overlayUi?.scroll?.offset ?? 0} max=${scroll.maxOffset}`);
+    }
+  } else {
+    const dragCount = Math.max(1, Math.ceil(scroll.maxOffset / dragDistance));
+    for (let index = 0; index < dragCount; index += 1) {
+      await page.mouse.move(scroll.track.centerX, dragStartY);
+      await page.mouse.down();
+      await page.mouse.move(scroll.track.centerX, dragEndY, { steps: 8 });
+      await page.mouse.up();
+    }
   }
   await page.waitForFunction(
     ({ visualAttribute }) => {
@@ -717,29 +1018,93 @@ const collectTextOverlapIssues = (surfaceId, surface) => {
   return issues;
 };
 
-const collectMenuControlSpacingIssues = (surface) => {
+export const collectMenuControlSpacingIssues = (surface) => {
   if (surface?.skipped === true || surface?.mode !== 'menu' || surface?.overlay !== 'none') {
     return [];
   }
 
-  const layout = surface.layout;
-  const badge = surface.progressionBadge;
-  if (!layout || !badge?.bounds || !Number.isFinite(layout.buttonHeight)) {
+  const playerLevel = surface.progressionBadge?.bounds;
+  const aiLevel = surface.menuAiProgressionBadge?.bounds;
+  const aiLabel = surface.menuAiProgressionBadge?.label;
+  const settings = (surface.buttons ?? []).find((button) => button?.text === 'Settings' && button?.iconOnly === true);
+  const issues = [];
+  if (!isFiniteBounds(playerLevel)) {
+    issues.push('menu:missing-player-level-glyph');
+  } else if (playerLevel.width < 44 || playerLevel.height < 44) {
+    issues.push(`menu:player-level-target=${playerLevel.width.toFixed(1)}x${playerLevel.height.toFixed(1)}<44`);
+  }
+  if (!isFiniteBounds(aiLevel)) {
+    issues.push('menu:missing-ai-level-glyph');
+  } else if (aiLevel.width < 44 || aiLevel.height < 44) {
+    issues.push(`menu:ai-level-target=${aiLevel.width.toFixed(1)}x${aiLevel.height.toFixed(1)}<44`);
+  }
+  if (aiLabel !== 'AI') {
+    issues.push(`menu:ai-level-label=${aiLabel ?? 'missing'}!=AI`);
+  }
+  if (!isFiniteBounds(settings?.bounds)) {
+    issues.push('menu:missing-settings-control');
+  } else if (settings.bounds.width < 44 || settings.bounds.height < 44) {
+    issues.push(`menu:settings-target=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}<44`);
+  }
+  if (isFiniteBounds(playerLevel) && isFiniteBounds(settings?.bounds)) {
+    const sizeMismatch = Math.abs(playerLevel.width - settings.bounds.width) > 1
+      || Math.abs(playerLevel.height - settings.bounds.height) > 1;
+    if (sizeMismatch) {
+      issues.push(`menu:player-level-settings-size-mismatch=${playerLevel.width.toFixed(1)}x${playerLevel.height.toFixed(1)}!=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}`);
+    }
+    if (Math.abs(playerLevel.top - settings.bounds.top) > 1) {
+      issues.push(`menu:player-level-settings-top-mismatch=${playerLevel.top.toFixed(1)}!=${settings.bounds.top.toFixed(1)}`);
+    }
+    if (settings.bounds.left - playerLevel.right < 8) {
+      issues.push(`menu:player-level-to-settings-gap=${(settings.bounds.left - playerLevel.right).toFixed(1)}<8`);
+    }
+  }
+  if (isFiniteBounds(playerLevel) && isFiniteBounds(aiLevel)) {
+    const sizeMismatch = Math.abs(playerLevel.width - aiLevel.width) > 1
+      || Math.abs(playerLevel.height - aiLevel.height) > 1;
+    if (sizeMismatch) {
+      issues.push(`menu:player-level-ai-level-size-mismatch=${playerLevel.width.toFixed(1)}x${playerLevel.height.toFixed(1)}!=${aiLevel.width.toFixed(1)}x${aiLevel.height.toFixed(1)}`);
+    }
+    if (Math.abs(playerLevel.top - aiLevel.top) > 1) {
+      issues.push(`menu:player-level-ai-level-top-mismatch=${playerLevel.top.toFixed(1)}!=${aiLevel.top.toFixed(1)}`);
+    }
+    if (aiLevel.left - playerLevel.right < 8) {
+      issues.push(`menu:player-level-to-ai-level-gap=${(aiLevel.left - playerLevel.right).toFixed(1)}<8`);
+    }
+  }
+  if (isFiniteBounds(aiLevel) && isFiniteBounds(settings?.bounds) && settings.bounds.left - aiLevel.right < 8) {
+    issues.push(`menu:ai-level-to-settings-gap=${(settings.bounds.left - aiLevel.right).toFixed(1)}<8`);
+  }
+  return issues;
+};
+
+const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {
+  if (surface?.skipped === true || surface?.overlay !== 'none' || surface?.mode !== 'play') {
     return [];
   }
 
-  const buttonCenterY = Number.isFinite(layout.leftButtonY) && Number.isFinite(layout.rightButtonY)
-    ? Math.min(layout.leftButtonY, layout.rightButtonY)
-    : layout.centerButtonY;
-  if (!Number.isFinite(buttonCenterY)) {
-    return [];
+  const badge = surface.progressionBadge?.bounds;
+  const board = surface.board?.bounds;
+  if (!isFiniteBounds(badge) || !isFiniteBounds(board)) {
+    return [`${surfaceId}:missing-progression-badge-or-board-bounds`];
   }
 
-  const buttonTop = buttonCenterY - (layout.buttonHeight / 2);
-  const badgeGap = buttonTop - badge.bounds.bottom;
-  return badgeGap < 10
-    ? [`menu:progressionBadge-to-buttons-gap=${badgeGap.toFixed(1)}<10`]
-    : [];
+  const issues = [];
+  if (badge.left < -1 || badge.right > viewport.width + 1 || badge.top < -1 || badge.bottom > viewport.height + 1) {
+    issues.push(`${surfaceId}:progression-badge-outside-viewport`);
+  }
+
+  if (badge.width > board.width + 1) {
+    issues.push(`${surfaceId}:progression-badge-width=${badge.width.toFixed(1)}>board=${board.width.toFixed(1)}`);
+  }
+  const pause = surface.touchControls?.controls?.pause;
+  if (badge.bottom > board.top - 8) {
+    issues.push(`${surfaceId}:progression-badge-not-above-play-board`);
+  }
+  if (isFiniteBounds(pause) && pause.left - badge.right < 8) {
+    issues.push(`${surfaceId}:progression-badge-to-pause-gap=${(pause.left - badge.right).toFixed(1)}<8`);
+  }
+  return issues;
 };
 
 const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {
@@ -752,11 +1117,13 @@ const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {
     return [`${surfaceId}:missing-scroll-diagnostics`];
   }
 
-  const requiredRects = [
-    ['viewport', scroll.viewport],
-    ['track', scroll.track],
-    ['thumb', scroll.thumb]
-  ];
+  const requiredRects = scroll.enabled === true
+    ? [
+      ['viewport', scroll.viewport],
+      ['track', scroll.track],
+      ['thumb', scroll.thumb]
+    ]
+    : [['viewport', scroll.viewport]];
   const rectIssues = requiredRects.flatMap(([name, rect]) => {
     if (!isFiniteBounds(rect) || rect.width <= 0 || rect.height <= 0) {
       return [`${surfaceId}:${name}:missing-or-empty-scroll-rect`];
@@ -765,6 +1132,10 @@ const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {
   });
   if (rectIssues.length > 0) {
     return rectIssues;
+  }
+
+  if (scroll.enabled !== true) {
+    return [];
   }
 
   const trackContainsThumb = scroll.thumb.top >= scroll.track.top - 1.5
@@ -782,7 +1153,15 @@ const collectOverlayScrollBottomIssues = (surfaceId, surface, expectedLabels) =>
   }
 
   const scroll = surface.overlayUi?.scroll;
-  if (scroll?.enabled !== true || !Number.isFinite(scroll.maxOffset) || !Number.isFinite(scroll.offset)) {
+  if (!scroll || !Number.isFinite(scroll.maxOffset) || !Number.isFinite(scroll.offset)) {
+    return [`${surfaceId}:missing-scroll-bottom-diagnostics`];
+  }
+  if (scroll.enabled !== true && scroll.maxOffset === 0) {
+    return hasTextLabels(surface, expectedLabels)
+      ? []
+      : [`${surfaceId}:non-scrollable-missing-labels=${expectedLabels.join(',')}`];
+  }
+  if (scroll.enabled !== true) {
     return [`${surfaceId}:missing-scroll-bottom-diagnostics`];
   }
   if (scroll.offset < scroll.maxOffset - 1) {
@@ -793,18 +1172,298 @@ const collectOverlayScrollBottomIssues = (surfaceId, surface, expectedLabels) =>
     : [`${surfaceId}:missing-bottom-labels=${expectedLabels.join(',')}`];
 };
 
+const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.buttons ?? []).flatMap((button) => {
+  if (button?.iconOnly === true) {
+    return [];
+  }
+  if (!isFiniteBounds(button?.bounds) || !isFiniteBounds(button?.labelBounds)) {
+    return [`${surfaceId}:${button?.text ?? 'unknown'}:missing-button-label-bounds`];
+  }
+  const edgeTolerance = 1.5;
+  const issues = button.labelBounds.left < button.bounds.left - edgeTolerance
+    || button.labelBounds.right > button.bounds.right + edgeTolerance
+    || button.labelBounds.top < button.bounds.top - edgeTolerance
+    || button.labelBounds.bottom > button.bounds.bottom + edgeTolerance
+    ? [`${surfaceId}:${button.text}:label-outside-button`]
+    : [];
+  const horizontalInset = Math.max(10, Math.min(28, button.bounds.width * 0.1));
+  const paddedActionLabels = new Set([
+    'Account',
+    'Create Account',
+    'Forgot Password?',
+    'Log out',
+    'Login',
+    'Menu',
+    'Settings',
+    'Reset',
+    'Reset Progress',
+    'Start'
+  ]);
+  if (paddedActionLabels.has(button.text) && (
+    button.labelBounds.left < button.bounds.left + horizontalInset
+    || button.labelBounds.right > button.bounds.right - horizontalInset
+  )) {
+    issues.push(`${surfaceId}:${button.text}:label-inside-padding`);
+  }
+  const actionLabels = new Set([
+    'Account',
+    'Back',
+    'Create Account',
+    'Forgot Password?',
+    'Log out',
+    'Login',
+    'Sign In',
+    'Menu',
+    'Settings',
+    'Reset',
+    'Reset Progress',
+    'Start'
+  ]);
+  if (actionLabels.has(button.text)) {
+    const buttonCenterY = (button.bounds.top + button.bounds.bottom) / 2;
+    const labelCenterY = (button.labelBounds.top + button.labelBounds.bottom) / 2;
+    if (Math.abs(labelCenterY - buttonCenterY) > 6) {
+      issues.push(`${surfaceId}:${button.text}:label-center-delta=${(labelCenterY - buttonCenterY).toFixed(1)}`);
+    }
+  }
+  return issues;
+});
+
+const collectButtonLabelFillIssues = (surfaceId, surface) => (surface?.buttons ?? []).flatMap((button) => {
+  if (button?.iconOnly === true) {
+    return [];
+  }
+  const actionLabels = new Set([
+    'Account',
+    'Create Account',
+    'Forgot Password?',
+    'Log out',
+    'Login',
+    'Sign In',
+    'Menu',
+    'Settings',
+    'Reset',
+    'Reset Progress',
+    'Start'
+  ]);
+  if (!actionLabels.has(button?.text)) {
+    return [];
+  }
+  if (!isFiniteBounds(button?.bounds) || !Number.isFinite(button?.labelFontSize)) {
+    return [`${surfaceId}:${button?.text ?? 'unknown'}:missing-button-label-font-size`];
+  }
+  const lengthRatio = button.text.length >= 12 ? 0.28 : button.text.length >= 8 ? 0.33 : 0.38;
+  const minimumFontSize = Math.min(24, Math.floor(button.bounds.height * lengthRatio));
+  return button.labelFontSize + 0.01 < minimumFontSize
+    ? [`${surfaceId}:${button.text}:label-font-size=${button.labelFontSize}<${minimumFontSize}`]
+    : [];
+});
+
+const collectOverlayScrollCueTextIssues = (surfaceId, surface) => {
+  if (surface?.skipped === true) {
+    return [];
+  }
+  const scroll = surface?.overlayUi?.scroll;
+  const viewport = scroll?.viewport;
+  const track = scroll?.track;
+  if (!scroll || !isFiniteBounds(viewport)) {
+    return [`${surfaceId}:missing-scroll-cue-diagnostics`];
+  }
+  if (scroll.enabled !== true) {
+    return [];
+  }
+  if (!isFiniteBounds(track)) {
+    return [`${surfaceId}:missing-scroll-cue-track`];
+  }
+  const cueBounds = {
+    left: track.left - 5,
+    right: track.right + 5,
+    top: viewport.top,
+    bottom: viewport.bottom
+  };
+  return collectTextLabelEntries(surface).flatMap((entry) => {
+    const bounds = entry?.bounds;
+    if (!isFiniteBounds(bounds) || bounds.bottom <= viewport.top || bounds.top >= viewport.bottom) {
+      return [];
+    }
+    const overlapsCueGutter = bounds.right > cueBounds.left && bounds.left < cueBounds.right;
+    const crossesTopCue = scroll.topFadeAlpha > 0
+      && bounds.top <= cueBounds.top + 3
+      && bounds.bottom >= cueBounds.top + 1;
+    const crossesBottomCue = scroll.bottomFadeAlpha > 0
+      && bounds.top <= cueBounds.bottom - 1
+      && bounds.bottom >= cueBounds.bottom - 3;
+    return overlapsCueGutter && (crossesTopCue || crossesBottomCue)
+      ? [`${surfaceId}:${entry.text}:text-crosses-scroll-edge-cue`]
+      : [];
+  });
+};
+
+const isGuideLabel = (text) => [
+  'QUICK PLAY',
+  'Compass',
+  'follow it to the exit',
+  'Start',
+  'begin at gold',
+  'Exit',
+  'finish at red'
+].includes(text);
+
+const collectGuideTextContainmentIssues = (surfaceId, surface) => {
+  const guide = surface?.overlayUi?.guidePanel;
+  if (!isFiniteBounds(guide)) {
+    return surface?.skipped === true ? [] : [`${surfaceId}:missing-guide-panel-bounds`];
+  }
+  return collectTextLabelEntries(surface)
+    .filter((entry) => isGuideLabel(String(entry?.text ?? '')))
+    .flatMap((entry) => {
+      const bounds = entry?.bounds;
+      if (!isFiniteBounds(bounds)) {
+        return [`${surfaceId}:${entry?.text ?? 'unknown'}:missing-guide-label-bounds`];
+      }
+      const edgeTolerance = 1.5;
+      return bounds.left < guide.left - edgeTolerance
+        || bounds.right > guide.right + edgeTolerance
+        || bounds.top < guide.top - edgeTolerance
+        || bounds.bottom > guide.bottom + edgeTolerance
+        ? [`${surfaceId}:${entry.text}:outside-guide-panel`]
+        : [];
+    });
+};
+
+const seedTopologyFixture = async (page, fixture) => {
+  if (fixture !== 'wrap-enabled') {
+    return;
+  }
+
+  await page.addInitScript(({ storageKey }) => {
+    window.localStorage.setItem(storageKey, JSON.stringify({
+      version: 1,
+      aiRunnerBaselineVersion: 3,
+      updatedAt: null,
+      tracks: {
+        player: { targetComplexity: 70 },
+        'ai-runner': { targetComplexity: 70 }
+      }
+    }));
+  }, {
+    storageKey: WRAP_TOPOLOGY_PROGRESSION_STORAGE_KEY
+  });
+};
+
+const collectWrapTopologyDiagnosticIssues = (surfaceId, surface, { requirePairs = false } = {}) => {
+  const maze = surface?.generation?.maze;
+  if (maze?.source === 'menu-snapshot') {
+    return [];
+  }
+
+  const diagnostics = maze?.wrapTopologyDiagnostics;
+  if (!diagnostics) {
+    return [`${surfaceId}:missing-wrap-topology-diagnostics`];
+  }
+
+  const issues = [];
+  if (diagnostics.contractVersion !== 'legacy-wrap-topology-v1') {
+    issues.push(`${surfaceId}:contract=${diagnostics.contractVersion ?? 'missing'}`);
+  }
+  if (diagnostics.graphPolicy !== 'playable-wrap-aware' || diagnostics.solutionPathPolicy !== 'direct-floor') {
+    issues.push(`${surfaceId}:policies=${diagnostics.graphPolicy ?? 'missing'}/${diagnostics.solutionPathPolicy ?? 'missing'}`);
+  }
+  if (diagnostics.graphTopologyValid !== true) {
+    issues.push(`${surfaceId}:graphTopologyValid=${diagnostics.graphTopologyValid ?? 'missing'}`);
+  }
+  if (diagnostics.horizontal?.requiredSatisfied !== true || diagnostics.vertical?.requiredSatisfied !== true) {
+    issues.push(`${surfaceId}:requiredAxesUnsatisfied`);
+  }
+  if (requirePairs && ((diagnostics.horizontal?.pairCount ?? 0) < 1 || (diagnostics.vertical?.pairCount ?? 0) < 1)) {
+    issues.push(`${surfaceId}:requiredPairs=${diagnostics.horizontal?.pairCount ?? 'missing'}/${diagnostics.vertical?.pairCount ?? 'missing'}`);
+  }
+  if ((diagnostics.horizontal?.unpairedEndpointCount ?? -1) !== 0 || (diagnostics.vertical?.unpairedEndpointCount ?? -1) !== 0) {
+    issues.push(`${surfaceId}:unpairedEndpoints=${diagnostics.horizontal?.unpairedEndpointCount ?? 'missing'}/${diagnostics.vertical?.unpairedEndpointCount ?? 'missing'}`);
+  }
+  if ((diagnostics.cornerBorderFloorCount ?? -1) !== 0 || (diagnostics.inwardDisconnectedEndpointCount ?? -1) !== 0) {
+    issues.push(`${surfaceId}:unsafeEndpoints=${diagnostics.cornerBorderFloorCount ?? 'missing'}/${diagnostics.inwardDisconnectedEndpointCount ?? 'missing'}`);
+  }
+  if (diagnostics.solutionRouteAudit?.validCompletedRoute !== true || diagnostics.solutionRouteAudit?.lowerBoundSatisfied !== true) {
+    issues.push(`${surfaceId}:solutionRouteAuditFailed`);
+  }
+  return issues;
+};
+
+const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {
+  if (surface?.skipped === true) {
+    return [];
+  }
+
+  const material = surface?.materialSystem;
+  if (!material) {
+    return [`${surfaceId}:missing-material-system`];
+  }
+
+  const issues = [];
+  const expectedRoles = [
+    'background',
+    'maze',
+    'path',
+    'trail',
+    'player',
+    'title',
+    'border',
+    'button',
+    'compass',
+    'overlay'
+  ];
+  const missingRoles = expectedRoles.filter((role) => !material.surfaceRoles?.includes(role));
+  if (material.version !== 'mazer-precision-arcade-material-v2') {
+    issues.push(`${surfaceId}:version=${material.version ?? 'missing'}`);
+  }
+  if (material.iconTarget !== 'public/icons/mazer-app-icon.png') {
+    issues.push(`${surfaceId}:iconTarget=${material.iconTarget ?? 'missing'}`);
+  }
+  if (material.iconQualityTargetVersion !== 'mazer-icon-quality-target-v1') {
+    issues.push(`${surfaceId}:iconQualityTargetVersion=${material.iconQualityTargetVersion ?? 'missing'}`);
+  }
+  if (material.iconTargetSha256 !== '91764e546b8c1488b3d48baeda927ae18600b088178e190244fb9d8ce35e2440') {
+    issues.push(`${surfaceId}:iconTargetSha256=${material.iconTargetSha256 ?? 'missing'}`);
+  }
+  if (missingRoles.length > 0) {
+    issues.push(`${surfaceId}:missingRoles=${missingRoles.join(',')}`);
+  }
+  if (
+    material.geometry?.fillAlignment !== 'integer-logical-pixels'
+    || material.geometry?.strokeAlignment !== 'half-pixel-centered'
+    || material.geometry?.backingScale !== 'dpr-aware-capped-2'
+    || material.geometry?.sharedPanelBounds !== 'snapped-at-draw-boundary'
+    || material.geometry?.textTextureResolution !== 1
+    || material.geometry?.textTransformOwner !== 'game-canvas-only'
+  ) {
+    issues.push(`${surfaceId}:geometry=${JSON.stringify(material.geometry ?? null)}`);
+  }
+  return issues;
+};
+
 const buildSurfaceChecks = ({
   consoleMessages,
+  includeOverlayBottom = true,
   pageErrors,
+  preferenceFixture,
+  reducedMotion = false,
+  requirePlayTrailSeed = true,
+  requireTopologyDiagnostics = true,
+  requireWrapPairs = false,
   surfaces,
   viewport
 }) => {
   const hasLabels = (surface, expectedLabels) => hasTextLabels(surface, expectedLabels);
+  const hasLabelsAcross = (surfaceGroup, expectedLabels) => {
+    const labels = surfaceGroup.flatMap((surface) => collectTextLabels(surface));
+    return hasExpectedTextLabels(labels, expectedLabels);
+  };
   const labelDetail = (surface) => collectTextLabels(surface)
     .join(', ');
   const authGated = surfaces.menu.authGated === true;
   const authenticatedMenu = surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out']);
-  const optionsExpectedLabels = resolveOptionsExpectedLabels(authenticatedMenu);
+  const optionsBottomExpectedLabels = resolveOptionsBottomExpectedLabels(authenticatedMenu);
   const textBoundsIssues = [
     ...collectTextBoundsIssues('menu', surfaces.menu, viewport),
     ...collectTextBoundsIssues('auth', surfaces.auth, viewport),
@@ -835,23 +1494,70 @@ const buildSurfaceChecks = ({
   const controlSpacingIssues = [
     ...collectMenuControlSpacingIssues(surfaces.menu)
   ];
+  const badgeGeometryIssues = [
+    ...collectProgressionBadgeGeometryIssues('play', surfaces.play, viewport)
+  ];
   const overlayScrollIssues = [
     ...collectOverlayScrollAffordanceIssues('options', surfaces.options),
     ...collectOverlayScrollAffordanceIssues('pause', surfaces.pause)
   ];
-  const overlayScrollBottomIssues = [
-    ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, ['Controls']),
+  const overlayScrollBottomIssues = includeOverlayBottom ? [
+    ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, optionsBottomExpectedLabels),
     ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Move Speed', 'Reset Progress', 'Reset', 'Menu'])
+  ] : [];
+  const overlayScrollFadeTextIssues = [
+    ...collectOverlayScrollCueTextIssues('options', surfaces.options),
+    ...collectOverlayScrollCueTextIssues('options-bottom', surfaces.optionsBottom),
+    ...collectOverlayScrollCueTextIssues('pause', surfaces.pause),
+    ...collectOverlayScrollCueTextIssues('pause-bottom', surfaces.pauseBottom)
   ];
+  const buttonLabelContainmentIssues = [
+    ...collectButtonLabelContainmentIssues('menu', surfaces.menu),
+    ...collectButtonLabelContainmentIssues('auth', surfaces.auth),
+    ...collectButtonLabelContainmentIssues('options', surfaces.options),
+    ...collectButtonLabelContainmentIssues('options-bottom', surfaces.optionsBottom),
+    ...collectButtonLabelContainmentIssues('play', surfaces.play),
+    ...collectButtonLabelContainmentIssues('pause', surfaces.pause),
+    ...collectButtonLabelContainmentIssues('pause-bottom', surfaces.pauseBottom)
+  ];
+  const buttonLabelFillIssues = [
+    ...collectButtonLabelFillIssues('menu', surfaces.menu),
+    ...collectButtonLabelFillIssues('auth', surfaces.auth),
+    ...collectButtonLabelFillIssues('options', surfaces.options),
+    ...collectButtonLabelFillIssues('options-bottom', surfaces.optionsBottom),
+    ...collectButtonLabelFillIssues('play', surfaces.play),
+    ...collectButtonLabelFillIssues('pause', surfaces.pause),
+    ...collectButtonLabelFillIssues('pause-bottom', surfaces.pauseBottom)
+  ];
+  const guideTextContainmentIssues = [
+    ...collectGuideTextContainmentIssues('options', surfaces.options),
+    ...collectGuideTextContainmentIssues('pause', surfaces.pause)
+  ];
+  const wrapTopologyDiagnosticIssues = requireTopologyDiagnostics ? [
+    ...collectWrapTopologyDiagnosticIssues('menu', surfaces.menu, { requirePairs: requireWrapPairs }),
+    ...collectWrapTopologyDiagnosticIssues('play', surfaces.play, { requirePairs: requireWrapPairs })
+  ] : [];
+  const materialSystemIssues = Object.entries(surfaces).flatMap(([surfaceId, surface]) => (
+    collectCyberArcadeMaterialIssues(surfaceId, surface)
+  ));
   const menuTitle = surfaces.menu.title;
   const badgeFitIssues = [
-    ['menu', surfaces.menu],
     ['play', surfaces.play]
   ].flatMap(([id, surface]) => {
     const badge = surface.progressionBadge;
-    return badge?.text && badge.textFits !== true
+    if (!badge?.text) {
+      return [];
+    }
+    const issues = badge.textFits !== true
       ? [`${id}:progressionBadge textFits=${badge.textFits}`]
       : [];
+    const minimumFontSize = isFiniteBounds(badge.bounds)
+      ? Math.min(15, Math.floor(badge.bounds.height * 0.21))
+      : 13;
+    if (!Number.isFinite(badge.textFontSize) || badge.textFontSize + 0.01 < minimumFontSize) {
+      issues.push(`${id}:progressionBadge fontSize=${badge.textFontSize ?? 'missing'}<${minimumFontSize}`);
+    }
+    return issues;
   });
   const surfaceChecks = [
     createCheck(
@@ -861,12 +1567,8 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'options-surface',
-      authGated
-        ? surfaces.options.skipped === true
-        : surfaces.options.mode === 'menu' && surfaces.options.overlay === 'options',
-      authGated
-        ? `skipped=${surfaces.options.skipped === true} reason=${surfaces.options.reason ?? 'missing'}`
-        : `options mode=${surfaces.options.mode ?? 'missing'} overlay=${surfaces.options.overlay ?? 'missing'}`
+      surfaces.options.mode === 'menu' && surfaces.options.overlay === 'options',
+      `options mode=${surfaces.options.mode ?? 'missing'} overlay=${surfaces.options.overlay ?? 'missing'}`
     ),
     createCheck(
       'auth-surface',
@@ -888,11 +1590,21 @@ const buildSurfaceChecks = ({
       `pause mode=${surfaces.pause.mode ?? 'missing'} overlay=${surfaces.pause.overlay ?? 'missing'}`
     )
   ];
-  const pathStyleSurfaceIds = authGated ? ['menu', 'play', 'pause'] : ['menu', 'options', 'play', 'pause'];
+  const pathStyleSurfaceIds = ['menu', 'options', 'play', 'pause'];
   const pathStyleChecks = pathStyleSurfaceIds.map((id) => createCheck(
     `${id}-path-style`,
     surfaces[id].board?.pathVisualStyle === 'corridor',
     `${id} pathVisualStyle=${surfaces[id].board?.pathVisualStyle ?? 'missing'} expected=corridor`
+  ));
+  const trailShineChecks = ['menu', 'play'].map((id) => createCheck(
+    `${id}-trail-shine-white`,
+    !requirePlayTrailSeed || (
+      surfaces[id].markerStyle?.trailShineColor === EXPECTED_TRAIL_SHINE_COLOR
+      && surfaces[id].markerStyle?.trailShineEdgeColor === EXPECTED_TRAIL_SHINE_EDGE_COLOR
+    ),
+    requirePlayTrailSeed
+      ? `shine=${surfaces[id].markerStyle?.trailShineColor ?? 'missing'} edge=${surfaces[id].markerStyle?.trailShineEdgeColor ?? 'missing'}`
+      : 'skipped for focused topology proof'
   ));
   const playChecks = [
     createCheck(
@@ -911,15 +1623,28 @@ const buildSurfaceChecks = ({
       `visible=${surfaces.play.touchControls?.visible ?? 'missing'} controlMode=${surfaces.play.touchControls?.controlMode ?? 'missing'}`
     ),
     createCheck(
-      'play-trail-pulse-seeded-on',
-      surfaces.play.markerStyle?.trailPulseEnabled === true,
-      `trailPulseEnabled=${surfaces.play.markerStyle?.trailPulseEnabled ?? 'missing'}`
+      'play-trail-shine-seeded-on',
+      !requirePlayTrailSeed || surfaces.play.markerStyle?.trailShineEnabled === !reducedMotion,
+      requirePlayTrailSeed
+        ? `trailShineEnabled=${surfaces.play.markerStyle?.trailShineEnabled ?? 'missing'} expected=${!reducedMotion}`
+        : 'skipped for focused topology proof'
     ),
+    ...(reducedMotion ? [
+      createCheck(
+        'reduced-motion-rendering',
+        surfaces.menu.markerStyle?.trailShineEnabled === false
+          && surfaces.play.markerStyle?.trailShineEnabled === false
+          && surfaces.play.hud?.compassSpinActive === false,
+        `menuTrail=${surfaces.menu.markerStyle?.trailShineEnabled ?? 'missing'} playTrail=${surfaces.play.markerStyle?.trailShineEnabled ?? 'missing'} compassSpin=${surfaces.play.hud?.compassSpinActive ?? 'missing'}`
+      )
+    ] : [])
   ];
   const textChecks = [
     createCheck(
       'menu-text-labels',
-      authGated ? hasLabels(surfaces.menu, ['Login']) : hasLabels(surfaces.menu, ['Start', 'Options']),
+      authGated
+        ? hasLabels(surfaces.menu, ['Login']) && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })
+        : hasLabels(surfaces.menu, ['Start']) && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true }),
       `labels=${labelDetail(surfaces.menu)}`
     ),
     createCheck(
@@ -929,31 +1654,61 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'options-text-labels',
-      authGated
-        ? surfaces.options.skipped === true
-        : hasLabels(surfaces.options, optionsExpectedLabels)
-          && !hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale']),
-      authGated
-        ? `skipped=${surfaces.options.skipped === true} reason=${surfaces.options.reason ?? 'missing'}`
-        : `labels=${labelDetail(surfaces.options)}`
+      hasLabels(surfaces.options, OPTIONS_BASE_EXPECTED_LABELS)
+        && !hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale']),
+      `labels=${labelDetail(surfaces.options)}`
     ),
     createCheck(
       'auth-text-labels',
       authGated
-        ? hasLabels(surfaces.auth, ['Account', 'Login', 'Create Account', 'Reset Password'])
+        ? hasLabels(surfaces.auth, ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'])
         : surfaces.auth.skipped === true,
       authGated
         ? `labels=${labelDetail(surfaces.auth)}`
         : `skipped=${surfaces.auth.skipped === true} reason=${surfaces.auth.reason ?? 'missing'}`
     ),
     createCheck(
-      'play-text-labels',
-      hasLabels(surfaces.play, ['PAUSE']) && !hasLabels(surfaces.play, ['RESET']),
-      `labels=${labelDetail(surfaces.play)}`
+      'options-bottom-account-action',
+      !includeOverlayBottom
+        ? surfaces.optionsBottom.skipped === true
+        : hasLabels(surfaces.optionsBottom, optionsBottomExpectedLabels),
+      !includeOverlayBottom
+        ? 'skipped for viewport-transition proof'
+        : authGated
+        ? `skipped=${surfaces.optionsBottom.skipped === true}`
+        : `labels=${labelDetail(surfaces.optionsBottom)}`
+    ),
+    createCheck(
+      'fresh-session-defaults',
+      preferenceFixture !== 'fresh' || !includeOverlayBottom || hasLabelsAcross(
+        [surfaces.pause, surfaces.pauseBottom],
+        [
+          'Full maze view.',
+          'Trail stays.',
+          'Slow white shine.',
+          'Moving background.',
+          'Darker contrast.',
+          'Shifts 1 tile at walls.',
+          'Drag the stick to move.',
+          'Move Speed',
+          '30%'
+        ]
+      ),
+      preferenceFixture !== 'fresh'
+        ? 'not requested'
+        : !includeOverlayBottom
+        ? 'skipped for viewport-transition proof'
+        : `pause=${labelDetail(surfaces.pause)}; pause-bottom=${labelDetail(surfaces.pauseBottom)}`
+    ),
+    createCheck(
+      'play-settings-cog',
+      isFiniteBounds(surfaces.play?.touchControls?.controls?.pause)
+        && !hasLabels(surfaces.play, ['PAUSE', 'RESET']),
+      `settingsCog=${isFiniteBounds(surfaces.play?.touchControls?.controls?.pause)}; labels=${labelDetail(surfaces.play)}`
     ),
     createCheck(
       'pause-text-labels',
-      hasLabels(surfaces.pause, ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu'])
+      hasLabels(surfaces.pause, ['Paused', 'QUICK PLAY', 'Reset', 'Menu'])
         && !hasLabels(surfaces.pause, ['Game Toggles', 'Account', 'Resume']),
       `labels=${labelDetail(surfaces.pause)}`
     ),
@@ -975,22 +1730,63 @@ const buildSurfaceChecks = ({
     createCheck(
       'mobile-control-spacing',
       controlSpacingIssues.length === 0,
-      controlSpacingIssues.length === 0 ? 'menu controls keep readable spacing' : controlSpacingIssues.join('; ')
+      controlSpacingIssues.length === 0 ? 'menu player/AI levels and Settings share one 44px-or-larger header-control contract' : controlSpacingIssues.join('; ')
     ),
     createCheck(
       'mobile-badge-text-fit',
       badgeFitIssues.length === 0,
-      badgeFitIssues.length === 0 ? 'visible progression badges fit their chrome' : badgeFitIssues.join('; ')
+      badgeFitIssues.length === 0 ? 'the active-play level glyph fits its chrome' : badgeFitIssues.join('; ')
+    ),
+    createCheck(
+      'progression-badge-geometry',
+      badgeGeometryIssues.length === 0,
+      badgeGeometryIssues.length === 0 ? 'the active-play level glyph respects the maze width, viewport, and cog lane' : badgeGeometryIssues.join('; ')
     ),
     createCheck(
       'mobile-overlay-scroll-affordance',
       overlayScrollIssues.length === 0,
-      overlayScrollIssues.length === 0 ? 'options and pause expose scroll viewport, rail, and thumb diagnostics' : overlayScrollIssues.join('; ')
+      overlayScrollIssues.length === 0 ? 'options and pause expose truthful scroll viewports and enabled rails' : overlayScrollIssues.join('; ')
     ),
     createCheck(
       'mobile-overlay-scroll-reachability',
       overlayScrollBottomIssues.length === 0,
       overlayScrollBottomIssues.length === 0 ? 'options and pause bottom controls are reached through real scroll input' : overlayScrollBottomIssues.join('; ')
+    ),
+    createCheck(
+      'overlay-scroll-edge-cue-text-clearance',
+      overlayScrollFadeTextIssues.length === 0,
+      overlayScrollFadeTextIssues.length === 0 ? 'scroll edge cues stay clear of text' : overlayScrollFadeTextIssues.join('; ')
+    ),
+    createCheck(
+      'button-label-containment',
+      buttonLabelContainmentIssues.length === 0,
+      buttonLabelContainmentIssues.length === 0 ? 'button labels remain inside their interactive chrome' : buttonLabelContainmentIssues.join('; ')
+    ),
+    createCheck(
+      'button-label-fill',
+      buttonLabelFillIssues.length === 0,
+      buttonLabelFillIssues.length === 0 ? 'action labels fill their chrome while retaining padding' : buttonLabelFillIssues.join('; ')
+    ),
+    createCheck(
+      'guide-text-containment',
+      guideTextContainmentIssues.length === 0,
+      guideTextContainmentIssues.length === 0 ? 'guide copy remains inside the guide panel' : guideTextContainmentIssues.join('; ')
+    ),
+    createCheck(
+      'wrap-topology-diagnostics',
+      wrapTopologyDiagnosticIssues.length === 0,
+      !requireTopologyDiagnostics
+        ? 'skipped for focused material and layout proof'
+        : wrapTopologyDiagnosticIssues.length === 0
+        ? 'generated menu/play topology is paired, connected, and route-lower-bound valid'
+        : wrapTopologyDiagnosticIssues.join('; ')
+    ),
+    createCheck(
+      'cyber-arcade-material-system',
+      materialSystemIssues.length === 0,
+      materialSystemIssues.length === 0
+        ? 'all captured surfaces publish the icon-aligned material and pixel-geometry contract'
+        : materialSystemIssues.join('; ')
     )
   ];
   const runtimeChecks = [
@@ -1009,11 +1805,29 @@ const buildSurfaceChecks = ({
   return [
     ...surfaceChecks,
     ...pathStyleChecks,
+    ...trailShineChecks,
     ...playChecks,
     ...textChecks,
     ...runtimeChecks
   ];
 };
+
+const buildViewportTransitionChecks = (transitions) => Object.entries(transitions ?? {}).flatMap(([surfaceId, transition]) => [
+  createCheck(
+    `${surfaceId}-transition-restored-diagnostics`,
+    transition.restoredDiagnosticsMatch === true,
+    transition.restoredDiagnosticsMatch === true
+      ? 'canonical diagnostics restored after desktop transition'
+      : 'canonical diagnostics changed after desktop transition'
+  ),
+  createCheck(
+    `${surfaceId}-transition-layout`,
+    transition.layoutIssues.length === 0,
+    transition.layoutIssues.length === 0
+      ? 'no text/input bounds or text collisions across transition endpoints'
+      : transition.layoutIssues.join('; ')
+  )
+]);
 
 const buildMarkdownReport = (summary) => {
   const checkRows = summary.checks
@@ -1027,6 +1841,8 @@ const buildMarkdownReport = (summary) => {
     `- Target: ${summary.targetUrl}`,
     `- Viewport: ${summary.viewport.width}x${summary.viewport.height} @ ${summary.deviceScaleFactor}x DPR`,
     `- Auth fixture: ${summary.authFixture ?? 'none'}`,
+    `- Preference fixture: ${summary.preferenceFixture ?? 'seeded-proof-state'}`,
+    `- Topology fixture: ${summary.topologyFixture ?? 'none'}`,
     `- Repo commit: ${summary.repo.commit}`,
     `- Dirty worktree: ${summary.repo.dirty ? 'yes' : 'no'}`,
     '',
@@ -1045,12 +1861,12 @@ const buildMarkdownReport = (summary) => {
       : '_Auth capture skipped because the captured session is already authenticated._',
     '',
     summary.screenshots.options
-      ? `![Options](${summary.screenshots.options})`
-      : '_Options capture skipped because the menu is auth-gated in the captured session._',
+      ? `![Settings](${summary.screenshots.options})`
+      : '_Settings capture skipped because the menu is auth-gated in the captured session._',
     '',
     summary.screenshots.optionsBottom
-      ? `![Options bottom](${summary.screenshots.optionsBottom})`
-      : '_Options bottom capture skipped because the menu is auth-gated in the captured session._',
+      ? `![Settings bottom](${summary.screenshots.optionsBottom})`
+      : '_Settings bottom capture skipped because the menu is auth-gated in the captured session._',
     '',
     `![Play](${summary.screenshots.play})`,
     '',
@@ -1067,10 +1883,19 @@ export const runUiSurfaceCapture = async (options = {}) => {
   const artifactRoot = resolve(options.artifactRoot ?? DEFAULT_ARTIFACT_ROOT);
   const outputDir = resolve(artifactRoot, sessionId);
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
-  const viewport = options.viewport ?? DEFAULT_VIEWPORT;
+  const transition = options.transition
+    ? {
+      ...DEFAULT_TRANSITION_VIEWPORTS,
+      ...options.transition,
+      outputDir
+    }
+    : null;
+  const viewport = transition?.initial ?? options.viewport ?? DEFAULT_VIEWPORT;
   const deviceScaleFactor = options.deviceScaleFactor ?? DEFAULT_DEVICE_SCALE_FACTOR;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const authFixture = typeof options.authFixture === 'string' ? options.authFixture : undefined;
+  const preferenceFixture = typeof options.preferenceFixture === 'string' ? options.preferenceFixture : undefined;
+  const topologyFixture = typeof options.topologyFixture === 'string' ? options.topologyFixture : undefined;
   const route = options.route ?? resolveRoute({
     authFixture,
     route: DEFAULT_ROUTE,
@@ -1098,10 +1923,12 @@ export const runUiSurfaceCapture = async (options = {}) => {
   const browser = await chromium.launch({ headless: options.headless !== false });
 
   try {
+    const mobileViewport = viewport.width < 720;
     const context = await browser.newContext({
       deviceScaleFactor,
-      hasTouch: true,
-      isMobile: true,
+      hasTouch: transition ? false : mobileViewport,
+      isMobile: transition ? false : mobileViewport,
+      reducedMotion: options.reducedMotion ? 'reduce' : 'no-preference',
       viewport
     });
     const page = await context.newPage();
@@ -1118,20 +1945,33 @@ export const runUiSurfaceCapture = async (options = {}) => {
       pageErrors.push(error.message);
     });
 
-    await seedPreferences(page, {
-      controlMode: 'stick',
-      darkMode: false,
-      movementSpeed: 0.38,
-      toggleAnimatedBackdrop: true,
-      toggleCameraFollow: true,
-      toggleTrailFade: true,
-      toggleTrailPulse: true
-    });
+    if (preferenceFixture !== 'fresh') {
+      await seedPreferences(page, {
+        controlMode: 'stick',
+        darkMode: false,
+        movementSpeed: 0.38,
+        toggleAnimatedBackdrop: true,
+        toggleCameraFollow: true,
+        toggleTrailFade: true,
+        toggleTrailPulse: true
+      });
+    }
+    await seedTopologyFixture(page, topologyFixture);
 
     await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: timeoutMs });
     if (authFixture === 'authenticated') {
       await waitForAuthenticatedFixtureReady(page, { timeoutMs });
     }
+    await waitForVisualBuildSettled(page, {
+      requireReadableTitle: true,
+      timeoutMs
+    });
+    const reducedMotionToggle = options.reducedMotion
+      ? null
+      : await exerciseReducedMotionPreferenceChange(page, timeoutMs);
+    // Restoring the operating-system motion preference redraws the canvas UI.
+    // Wait for that redraw before inferring the guest Login/Start action from
+    // the diagnostic surface or driving any route transition.
     await waitForVisualBuildSettled(page, {
       requireReadableTitle: true,
       timeoutMs
@@ -1147,19 +1987,24 @@ export const runUiSurfaceCapture = async (options = {}) => {
       timeoutMs,
       viewport
     });
+    const menuTransition = transition
+      ? await captureViewportTransition({
+        id: '01-menu', mode: 'menu', overlay: 'none', page, route, timeoutMs, transition
+      })
+      : null;
     const authGatedMenu = isAuthGatedMenuSurface(menu.diagnostics.visual);
     const authenticatedMenu = authFixture === 'authenticated' || menu.diagnostics.runtime?.auth?.status === 'authenticated';
-    const optionsExpectedLabels = resolveOptionsExpectedLabels(authenticatedMenu);
-    const menuButtons = authGatedMenu ? null : getMenuButtonPoints(menu.diagnostics.visual);
+    const optionsBottomExpectedLabels = resolveOptionsBottomExpectedLabels(authenticatedMenu);
+    const currentMenuDiagnostics = transition ? await readDiagnostics(page) : menu.diagnostics;
+    const menuButtons = getMenuButtonPoints(currentMenuDiagnostics.visual);
     await waitForVisualBuildSettled(page, { timeoutMs });
     const authSurface = authGatedMenu
       ? await (async () => {
-        const guestButtons = getMenuButtonPoints(menu.diagnostics.visual);
-        await clickPoint(page, guestButtons.login, 'Login');
+        await openAuthOverlayFromMenu(page, timeoutMs);
         const captured = await captureSurface({
           page,
           outputDir,
-          expectedLabels: ['Account', 'Login', 'Create Account', 'Reset Password'],
+          expectedLabels: ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'],
           id: '02-auth',
           mode: 'menu',
           overlay: 'auth',
@@ -1167,6 +2012,12 @@ export const runUiSurfaceCapture = async (options = {}) => {
           timeoutMs,
           viewport
         });
+        captured.transition = transition
+          ? await captureViewportTransition({
+            id: '02-auth', mode: 'menu', overlay: 'auth', page, route, timeoutMs, transition
+          })
+          : null;
+        await closeOverlayToMenu(page, timeoutMs);
         return captured;
       })()
       : {
@@ -1181,18 +2032,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       };
 
     let optionsBottomSurface = null;
-    const optionsSurface = authGatedMenu
-      ? {
-        diagnostics: {
-          runtime: null,
-          visual: null
-        },
-        screenContract: null,
-        screenshotPath: null,
-        skipped: true,
-        reason: 'auth-gated-menu'
-      }
-      : await (async () => {
+    const optionsSurface = await (async () => {
         await waitForVisualBuildSettled(page, { timeoutMs });
         const optionsCaptureExpectedLabels = [...OPTIONS_BASE_EXPECTED_LABELS];
         if (authFixture === 'authenticated') {
@@ -1214,21 +2054,36 @@ export const runUiSurfaceCapture = async (options = {}) => {
           timeoutMs,
           viewport
         });
-        await scrollOverlayToBottom(page, { timeoutMs });
-        optionsBottomSurface = await captureSurface({
-          page,
-          outputDir,
-          expectedLabels: ['Controls'],
-          id: '02-options-bottom',
-          mode: 'menu',
-          overlay: 'options',
-          route,
-          skipWait: true,
-          timeoutMs,
-          viewport
-        });
-        await page.keyboard.press('Escape');
-        await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs });
+        captured.transition = transition
+          ? await captureViewportTransition({
+            id: '02-options', mode: 'menu', overlay: 'options', page, route, timeoutMs, transition
+          })
+          : null;
+        if (transition) {
+          optionsBottomSurface = {
+            diagnostics: { runtime: null, visual: null },
+            nativeInputs: [],
+            screenContract: null,
+            skipped: true
+          };
+        } else {
+          const optionsScrollResult = await scrollOverlayToBottom(page, { timeoutMs });
+          optionsBottomSurface = optionsScrollResult.visual?.overlayUi?.scroll?.enabled === true
+            ? await captureSurface({
+              page,
+              outputDir,
+              expectedLabels: optionsBottomExpectedLabels,
+              id: '02-options-bottom',
+              mode: 'menu',
+              overlay: 'options',
+              route,
+              skipWait: true,
+              timeoutMs,
+              viewport
+            })
+            : { ...captured, diagnostics: optionsScrollResult };
+        }
+        await closeOverlayToMenu(page, timeoutMs);
         return captured;
       })();
 
@@ -1240,11 +2095,21 @@ export const runUiSurfaceCapture = async (options = {}) => {
       await clickPoint(page, menuButtons.start, 'Start');
     }
     await waitForVisualBuildSettled(page, { timeoutMs });
-    const playTrailSeed = await seedPlayTrailForVisualProof(page, { timeoutMs });
+    const playTrailSeed = options.skipPlayTrailSeed
+      ? {
+        accepted: false,
+        attemptedMoves: 0,
+        reason: 'focused-topology-proof',
+        skipped: true
+      }
+      : await seedPlayTrailForVisualProof(page, {
+        expectTrailShineEnabled: !options.reducedMotion,
+        timeoutMs
+      });
     const play = await captureSurface({
       page,
       outputDir,
-      expectedLabels: ['PAUSE'],
+      expectedLabels: [],
       id: '03-play',
       mode: 'play',
       overlay: 'none',
@@ -1252,12 +2117,18 @@ export const runUiSurfaceCapture = async (options = {}) => {
       timeoutMs,
       viewport
     });
+    const playTransition = transition
+      ? await captureViewportTransition({
+        id: '03-play', mode: 'play', overlay: 'none', page, route: playRoute, timeoutMs, transition
+      })
+      : null;
 
-    await clickPoint(page, getPauseButtonPoint(play.diagnostics.visual), 'Pause');
+    const currentPlayDiagnostics = transition ? await readDiagnostics(page) : play.diagnostics;
+    await clickPoint(page, getPauseButtonPoint(currentPlayDiagnostics.visual), 'Pause');
     const pause = await captureSurface({
       page,
       outputDir,
-      expectedLabels: ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu'],
+      expectedLabels: ['Paused', 'QUICK PLAY', 'Reset', 'Menu'],
       id: '04-pause',
       mode: 'play',
       overlay: 'pause',
@@ -1265,19 +2136,28 @@ export const runUiSurfaceCapture = async (options = {}) => {
       timeoutMs,
       viewport
     });
-    await scrollOverlayToBottom(page, { timeoutMs });
-    const pauseBottomSurface = await captureSurface({
-      page,
-      outputDir,
-      expectedLabels: ['Move Speed', 'Reset Progress', 'Reset', 'Menu'],
-      id: '04-pause-bottom',
-      mode: 'play',
-      overlay: 'pause',
-      route: playRoute,
-      skipWait: true,
-      timeoutMs,
-      viewport
-    });
+    const pauseTransition = transition
+      ? await captureViewportTransition({
+        id: '04-pause', mode: 'play', overlay: 'pause', page, route: playRoute, timeoutMs, transition
+      })
+      : null;
+    const pauseBottomSurface = transition
+      ? { diagnostics: { runtime: null, visual: null }, nativeInputs: [], screenContract: null, skipped: true }
+      : await (async () => {
+        await scrollOverlayToBottom(page, { timeoutMs });
+        return captureSurface({
+          page,
+          outputDir,
+          expectedLabels: ['Move Speed', 'Reset Progress', 'Reset', 'Menu'],
+          id: '04-pause-bottom',
+          mode: 'play',
+          overlay: 'pause',
+          route: playRoute,
+          skipWait: true,
+          timeoutMs,
+          viewport
+        });
+      })();
 
     const surfaces = {
       menu: {
@@ -1285,13 +2165,18 @@ export const runUiSurfaceCapture = async (options = {}) => {
         overlay: menu.diagnostics.visual?.runtime?.overlay ?? menu.diagnostics.runtime?.surface?.overlay,
         board: menu.diagnostics.visual?.board,
         layout: menu.diagnostics.visual?.layout,
+        markerStyle: menu.diagnostics.visual?.markerStyle,
         progressionBadge: menu.diagnostics.visual?.progressionBadge,
+        menuAiProgressionBadge: menu.diagnostics.visual?.menuAiProgressionBadge,
         title: menu.diagnostics.visual?.title,
+        generation: menu.diagnostics.runtime?.generation,
+        buttons: menu.diagnostics.visual?.buttons,
         nativeInputs: menu.nativeInputs,
         textLabels: menu.diagnostics.visual?.textLabels,
         screenContract: menu.screenContract,
         authGated: authGatedMenu,
-        authStatus: menu.diagnostics.runtime?.auth?.status ?? null
+        authStatus: menu.diagnostics.runtime?.auth?.status ?? null,
+        materialSystem: menu.diagnostics.visual?.materialSystem
       },
       auth: authGatedMenu ? {
         mode: authSurface.diagnostics.visual?.runtime?.mode ?? authSurface.diagnostics.runtime?.surface?.mode,
@@ -1302,7 +2187,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         title: authSurface.diagnostics.visual?.title,
         nativeInputs: authSurface.nativeInputs,
         textLabels: authSurface.diagnostics.visual?.textLabels,
-        screenContract: authSurface.screenContract
+        screenContract: authSurface.screenContract,
+        materialSystem: authSurface.diagnostics.visual?.materialSystem
       } : {
         skipped: true,
         reason: 'already-authenticated',
@@ -1310,13 +2196,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         nativeInputs: [],
         textLabels: []
       },
-      options: authGatedMenu ? {
-        skipped: true,
-        reason: 'auth-gated-menu',
-        screenContract: null,
-        nativeInputs: [],
-        textLabels: []
-      } : {
+      options: {
         mode: optionsSurface.diagnostics.visual?.runtime?.mode ?? optionsSurface.diagnostics.runtime?.surface?.mode,
         overlay: optionsSurface.diagnostics.visual?.runtime?.overlay ?? optionsSurface.diagnostics.runtime?.surface?.overlay,
         board: optionsSurface.diagnostics.visual?.board,
@@ -1324,23 +2204,23 @@ export const runUiSurfaceCapture = async (options = {}) => {
         progressionBadge: optionsSurface.diagnostics.visual?.progressionBadge,
         title: optionsSurface.diagnostics.visual?.title,
         overlayUi: optionsSurface.diagnostics.visual?.overlayUi,
+        buttons: optionsSurface.diagnostics.visual?.buttons,
         nativeInputs: optionsSurface.nativeInputs,
         textLabels: optionsSurface.diagnostics.visual?.textLabels,
-        screenContract: optionsSurface.screenContract
+        screenContract: optionsSurface.screenContract,
+        materialSystem: optionsSurface.diagnostics.visual?.materialSystem
       },
-      optionsBottom: authGatedMenu ? {
-        skipped: true,
-        reason: 'auth-gated-menu',
-        screenContract: null,
-        nativeInputs: [],
-        textLabels: []
-      } : {
+      optionsBottom: {
+        skipped: optionsBottomSurface.skipped === true,
+        reason: optionsBottomSurface.reason ?? null,
         mode: optionsBottomSurface.diagnostics.visual?.runtime?.mode ?? optionsBottomSurface.diagnostics.runtime?.surface?.mode,
         overlay: optionsBottomSurface.diagnostics.visual?.runtime?.overlay ?? optionsBottomSurface.diagnostics.runtime?.surface?.overlay,
         overlayUi: optionsBottomSurface.diagnostics.visual?.overlayUi,
+        buttons: optionsBottomSurface.diagnostics.visual?.buttons,
         nativeInputs: optionsBottomSurface.nativeInputs,
         textLabels: optionsBottomSurface.diagnostics.visual?.textLabels,
-        screenContract: optionsBottomSurface.screenContract
+        screenContract: optionsBottomSurface.screenContract,
+        materialSystem: optionsBottomSurface.diagnostics.visual?.materialSystem
       },
       play: {
         mode: play.diagnostics.visual?.runtime?.mode ?? play.diagnostics.runtime?.surface?.mode,
@@ -1348,12 +2228,16 @@ export const runUiSurfaceCapture = async (options = {}) => {
         board: play.diagnostics.visual?.board,
         layout: play.diagnostics.visual?.layout,
         markerStyle: play.diagnostics.visual?.markerStyle,
+        hud: play.diagnostics.visual?.hud,
         progressionBadge: play.diagnostics.visual?.progressionBadge,
         title: play.diagnostics.visual?.title,
+        generation: play.diagnostics.runtime?.generation,
         nativeInputs: play.nativeInputs,
         textLabels: play.diagnostics.visual?.textLabels,
         touchControls: play.diagnostics.visual?.touchControls,
-        screenContract: play.screenContract
+        buttons: play.diagnostics.visual?.buttons,
+        screenContract: play.screenContract,
+        materialSystem: play.diagnostics.visual?.materialSystem
       },
       pause: {
         mode: pause.diagnostics.visual?.runtime?.mode ?? pause.diagnostics.runtime?.surface?.mode,
@@ -1363,17 +2247,23 @@ export const runUiSurfaceCapture = async (options = {}) => {
         progressionBadge: pause.diagnostics.visual?.progressionBadge,
         title: pause.diagnostics.visual?.title,
         overlayUi: pause.diagnostics.visual?.overlayUi,
+        buttons: pause.diagnostics.visual?.buttons,
         nativeInputs: pause.nativeInputs,
         textLabels: pause.diagnostics.visual?.textLabels,
-        screenContract: pause.screenContract
+        screenContract: pause.screenContract,
+        materialSystem: pause.diagnostics.visual?.materialSystem
       },
       pauseBottom: {
+        skipped: pauseBottomSurface.skipped === true,
+        reason: pauseBottomSurface.reason ?? null,
         mode: pauseBottomSurface.diagnostics.visual?.runtime?.mode ?? pauseBottomSurface.diagnostics.runtime?.surface?.mode,
         overlay: pauseBottomSurface.diagnostics.visual?.runtime?.overlay ?? pauseBottomSurface.diagnostics.runtime?.surface?.overlay,
         overlayUi: pauseBottomSurface.diagnostics.visual?.overlayUi,
+        buttons: pauseBottomSurface.diagnostics.visual?.buttons,
         nativeInputs: pauseBottomSurface.nativeInputs,
         textLabels: pauseBottomSurface.diagnostics.visual?.textLabels,
-        screenContract: pauseBottomSurface.screenContract
+        screenContract: pauseBottomSurface.screenContract,
+        materialSystem: pauseBottomSurface.diagnostics.visual?.materialSystem
       }
     };
     const screenshots = {
@@ -1385,13 +2275,36 @@ export const runUiSurfaceCapture = async (options = {}) => {
       pause: pause.screenshotPath,
       pauseBottom: pauseBottomSurface.screenshotPath
     };
+    const transitions = transition ? {
+      menu: menuTransition,
+      ...(authGatedMenu ? { auth: authSurface.transition } : {}),
+      options: optionsSurface.transition,
+      play: playTransition,
+      pause: pauseTransition
+    } : null;
     const checks = buildSurfaceChecks({
       consoleMessages,
+      includeOverlayBottom: !transition,
       pageErrors,
+      preferenceFixture,
+      reducedMotion: options.reducedMotion,
+      requirePlayTrailSeed: !options.skipPlayTrailSeed,
+      requireTopologyDiagnostics: !options.skipTopologyDiagnostics,
+      requireWrapPairs: topologyFixture === 'wrap-enabled',
       surfaces,
       targetUrl,
       viewport
     });
+    if (reducedMotionToggle !== null) {
+      checks.push(createCheck(
+        'reduced-motion-preference-change',
+        reducedMotionToggle.initial === false
+          && reducedMotionToggle.reduced === true
+          && reducedMotionToggle.restored === false,
+        JSON.stringify(reducedMotionToggle)
+      ));
+    }
+    checks.push(...buildViewportTransitionChecks(transitions));
     const summary = {
       pass: checks.every((check) => check.passed),
       label,
@@ -1399,7 +2312,16 @@ export const runUiSurfaceCapture = async (options = {}) => {
       targetUrl,
       viewport,
       deviceScaleFactor,
+      transition: transition ? {
+        initial: transition.initial,
+        desktop: transition.desktop,
+        endpoint: transition.endpoint,
+        surfaces: transitions
+      } : null,
       authFixture: authFixture ?? null,
+      preferenceFixture: preferenceFixture ?? null,
+      reducedMotionToggle,
+      topologyFixture: topologyFixture ?? null,
       playTrailSeed,
       repo: {
         commit: getCommitSha(),
@@ -1458,7 +2380,12 @@ if (isDirectRun) {
       : undefined,
     sessionId: args.session,
     skipBuild: args['skip-build'] === true || args['skip-build'] === 'true',
+    skipPlayTrailSeed: args['skip-play-trail-seed'] === true || args['skip-play-trail-seed'] === 'true',
+    skipTopologyDiagnostics: args['skip-topology-diagnostics'] === true || args['skip-topology-diagnostics'] === 'true',
+    preferenceFixture: typeof args['preference-fixture'] === 'string' ? args['preference-fixture'] : undefined,
+    reducedMotion: args['reduced-motion'] === true || args['reduced-motion'] === 'true',
     timeoutMs: parseIntegerArg(args['timeout-ms'], DEFAULT_TIMEOUT_MS),
+    topologyFixture: typeof args['topology-fixture'] === 'string' ? args['topology-fixture'] : undefined,
     useExistingServer: args['no-preview'] === true || args['no-preview'] === 'true',
     viewport: parseViewport(args.viewport)
   }).then((result) => {
@@ -1467,6 +2394,7 @@ if (isDirectRun) {
       reportPath: result.reportPath,
       summaryPath: result.summaryPath,
       authFixture: result.authFixture,
+      preferenceFixture: result.preferenceFixture,
       deviceScaleFactor: result.deviceScaleFactor,
       screenshots: result.screenshots,
       targetUrl: result.targetUrl

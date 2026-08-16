@@ -8,7 +8,11 @@ export const LAYOUT_MATRIX_VIEWPORTS = Object.freeze({
   desktop: Object.freeze({ id: 'desktop', label: 'Desktop', width: 1440, height: 900 }),
   'desktop-wide': Object.freeze({ id: 'desktop-wide', label: 'Desktop Wide', width: 1920, height: 1080 }),
   ultrawide: Object.freeze({ id: 'ultrawide', label: 'Ultrawide', width: 2560, height: 1080 }),
-  'short-desktop': Object.freeze({ id: 'short-desktop', label: 'Short Desktop', width: 1280, height: 720 })
+  'short-desktop': Object.freeze({ id: 'short-desktop', label: 'Short Desktop', width: 1280, height: 720 }),
+  'iphone-dynamic-island': Object.freeze({ id: 'iphone-dynamic-island', label: 'iPhone Dynamic Island', width: 393, height: 852 }),
+  'android-cutout': Object.freeze({ id: 'android-cutout', label: 'Android Cutout', width: 412, height: 915 }),
+  'macos-browser': Object.freeze({ id: 'macos-browser', label: 'macOS Browser', width: 1440, height: 900 }),
+  'windows-browser': Object.freeze({ id: 'windows-browser', label: 'Windows Browser', width: 1365, height: 768 })
 });
 
 export const LAYOUT_MATRIX_PRESET_GROUPS = Object.freeze({
@@ -25,6 +29,12 @@ export const LAYOUT_MATRIX_PRESET_GROUPS = Object.freeze({
   extended: Object.freeze([
     'ultrawide',
     'short-desktop'
+  ]),
+  platform: Object.freeze([
+    'iphone-dynamic-island',
+    'android-cutout',
+    'macos-browser',
+    'windows-browser'
   ])
 });
 
@@ -40,7 +50,7 @@ const appendQueryParam = (route, key, value) => {
 export const resolveLayoutMatrixViewports = (presetGroup = 'core') => {
   const normalizedPresetGroup = typeof presetGroup === 'string' ? presetGroup.trim().toLowerCase() : 'core';
   const selectedIds = normalizedPresetGroup === 'all'
-    ? [...LAYOUT_MATRIX_PRESET_GROUPS.core, ...LAYOUT_MATRIX_PRESET_GROUPS.extended]
+    ? [...LAYOUT_MATRIX_PRESET_GROUPS.core, ...LAYOUT_MATRIX_PRESET_GROUPS.extended, ...LAYOUT_MATRIX_PRESET_GROUPS.platform]
     : LAYOUT_MATRIX_PRESET_GROUPS[normalizedPresetGroup] ?? LAYOUT_MATRIX_PRESET_GROUPS.core;
 
   return selectedIds.map((id) => {
@@ -72,6 +82,8 @@ export const resolveLayoutMatrixRoute = (viewport, explicitRoute, options = {}) 
   if (
     viewport.id.startsWith('phone-')
     || viewport.id.startsWith('tablet-')
+    || viewport.id === 'iphone-dynamic-island'
+    || viewport.id === 'android-cutout'
   ) {
     const route = '/?profile=mobile&theme=aurora';
     return design === 'recovery'

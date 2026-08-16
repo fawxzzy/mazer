@@ -3,6 +3,7 @@ import {
   resolveLegacyDynamicMarkerInset,
   resolveLegacyDynamicTrailStrokeWidth,
   resolveLegacyEndpointMarkerRenderMetrics,
+  resolveLegacyBleedOffPaths,
   resolveLegacyMenuBorderDockDirections,
   resolveLegacyMenuBorderDockRenderAreas,
   resolveLegacyMenuPathRenderFrame,
@@ -15,6 +16,7 @@ import {
   resolveLegacyMenuPathTitleOrbitGeometry,
   resolveLegacyMenuPathTitleOrbitPoint
 } from '../../src/legacy-runtime/legacyMenuTitle';
+import { resolveLegacyNavigationTarget } from '../../src/legacy-runtime/legacyMaze';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -67,8 +69,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(phaserConfigSource).not.toContain('forceSetTimeOut: true');
   });
 
-  test('keeps the Options overlay player guide simple and player-facing', () => {
-    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+  test('keeps the Settings and Pause overlays compact, player-facing, and grouped by purpose', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
     const buildOptionsSource = menuSceneSource.slice(
       menuSceneSource.indexOf('private buildOptionsOverlay(): void {'),
       menuSceneSource.indexOf('private createLegacyOptionsInfoSection(')
@@ -82,25 +84,32 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       menuSceneSource.indexOf('private createFeatureControlRows(')
     );
 
-    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);');
-    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(\n      panel.top + (stacked ? 110 : 120)');
-    expect(menuSceneSource).toContain("addText('PLAYER GUIDE'");
-    expect(buildOptionsSource.indexOf('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);')).toBeLessThan(
-      buildOptionsSource.indexOf('this.createFeatureControlRows(viewport.top, panel')
+    expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
+    expect(menuSceneSource).toContain('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {');
+    expect(menuSceneSource).toContain("addText('QUICK PLAY'");
+    expect(buildOptionsSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
+      buildOptionsSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel')
     );
-    expect(buildPauseSource.indexOf('const guideEndY = this.createLegacyOptionsInfoSection(')).toBeLessThan(
-      buildPauseSource.indexOf('this.createFeatureControlRows(viewport.top, panel, {')
+    expect(buildPauseSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
+      buildPauseSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel, {')
     );
     expect(guideSource).toContain("drawLegendRow(0, 'compass', 'Compass'");
     expect(guideSource).toContain("drawLegendRow(1, 'start', 'Start'");
-    expect(guideSource).toContain("drawLegendRow(2, 'end', 'End'");
-    expect(guideSource).toContain("'Player: green beacon + trail.'");
-    expect(guideSource).toContain("'Score grades each run.'");
+    expect(guideSource).toContain("drawLegendRow(2, 'end', 'Exit'");
+    expect(guideSource).toContain("'follow it to the exit'");
+    expect(guideSource).toContain("'begin at gold'");
+    expect(guideSource).toContain("'finish at red'");
+    expect(guideSource).not.toContain("'Player • green trail'");
+    expect(guideSource).not.toContain("'Score • run quality'");
     expect(guideSource).not.toContain('activeTargetComplexity');
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
     expect(menuSceneSource).toContain('private drawLegacyCompassGlyph(');
     expect(menuSceneSource).toContain('drawLegacyOptionsGuideGlyph');
+    expect(menuSceneSource).toContain("addSectionHeading('Controls'");
+    expect(menuSceneSource).toContain("addSectionHeading('Display'");
+    expect(menuSceneSource).toContain("label: 'Animated Background'");
+    expect(menuSceneSource).toContain("label: 'High Contrast'");
   });
 
   test('aligns title orbit diamonds through the fixed top and bottom crown diamonds', () => {
@@ -199,6 +208,29 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       width: 18,
       height: 16
     });
+  });
+
+  test('classifies only orthogonal legal opposite-edge paths as bleed-off continuations', () => {
+    const maze = {
+      size: 5,
+      grid: [
+        [false, false, true, false, false],
+        [false, false, true, false, false],
+        [true, true, true, true, true],
+        [false, false, true, false, false],
+        [false, false, true, false, false]
+      ]
+    };
+
+    expect(resolveLegacyBleedOffPaths(maze, { x: 0, y: 2 })).toEqual([
+      { source: { x: 0, y: 2 }, destination: { x: 4, y: 2 }, direction: 'left' }
+    ]);
+    expect(resolveLegacyNavigationTarget(maze, { x: 0, y: 2 }, -1, 0)).toEqual({ x: 4, y: 2 });
+    expect(resolveLegacyBleedOffPaths(maze, { x: 2, y: 0 })).toEqual([
+      { source: { x: 2, y: 0 }, destination: { x: 2, y: 4 }, direction: 'top' }
+    ]);
+    expect(resolveLegacyNavigationTarget(maze, { x: 2, y: 0 }, 0, -1)).toEqual({ x: 2, y: 4 });
+    expect(resolveLegacyBleedOffPaths(maze, { x: 0, y: 0 })).toEqual([]);
   });
 
   test('keeps folded-corner border cells capped so the corner facets stay clean', () => {
@@ -339,6 +371,28 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     ]);
   });
 
+  test('extends approved bleed-off continuations beyond the visible board frame', () => {
+    const areas = resolveLegacyMenuBorderDockRenderAreas('right', {
+      leftInset: 0,
+      topInset: 0,
+      width: 6,
+      height: 6
+    }, {
+      boardLeft: 10,
+      boardTop: 20,
+      boardSize: 100,
+      cornerGuardSize: 18,
+      continuationLength: 4,
+      materialTileSize: 6,
+      mazeLeft: 15,
+      mazeTop: 25,
+      mazeSize: 90,
+      tileRect: { left: 99, top: 50, width: 6, height: 6 }
+    });
+
+    expect(areas).toEqual([{ left: 105, top: 50, right: 114, bottom: 56 }]);
+  });
+
   test('bridges the light core across connected neighbors for a less checkerboarded slab read', () => {
     const maze = {
       size: 3,
@@ -459,26 +513,20 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('const LEGACY_BOARD_GRID_ALPHA = 0;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xe7fff4;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x0d3c4f;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = cyberArcadeMaterial.path.core;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.58;');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x07111d;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GLASS_ALPHA = 0.18;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.1;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = 0x72e0bf;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = 0xb7f2ff;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = cyberArcadeMaterial.rail.mint;');
+    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = cyberArcadeMaterial.rail.cyan;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_BASE = 0x10293a;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW = 0xc8fff4;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS = 0x9cff7d;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM = 0x72e0bf;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT = 0xffffff;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA = 0.48;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO = 0.066;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1280;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 33;');
+    expect(menuSceneSource).not.toContain('LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS');
+    expect(menuSceneSource).not.toContain('LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;');
@@ -519,20 +567,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('renderSafeInset: mazeRenderFrame.safeInset');
     expect(menuSceneSource).toContain('isMenuMode ? LEGACY_MENU_BOARD_GLASS_ALPHA : LEGACY_PLAY_BOARD_GLASS_ALPHA');
     expect(menuSceneSource).toContain('isMenuMode ? LEGACY_MENU_WALL_GLASS_ALPHA : LEGACY_PLAY_WALL_GLASS_ALPHA');
-    expect(menuSceneSource).toContain('this.drawLegacyBoardSigilBorder(boardLeft, boardTop, boardSize);');
-    expect(menuSceneSource).toContain('private drawLegacyBoardSigilBorder(boardLeft: number, boardTop: number, boardSize: number): void');
-    expect(menuSceneSource).toContain('private drawLegacyBoardCornerFacetShimmer(boardLeft: number, boardTop: number, boardSize: number, time: number): void');
-    expect(menuSceneSource).toContain('private hasLegacyBoardCornerShimmerPendingFrame(time: number): boolean');
-    expect(menuSceneSource).toContain('this.drawLegacyBoardCornerFacetShimmer(resolvedBoardLeft, resolvedBoardTop, boardSize, time);');
-    expect(menuSceneSource).toContain('const corner = Math.max(16, Math.round(boardSize * LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO));');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW, baseAlpha * (0.18 + (wave * 0.18)));');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillTriangle(originX, originY, edgeX, originY, originX, edgeY);');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM, prismAlpha);');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineStyle(2, LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS, baseAlpha * 0.78);');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT, glintAlpha * 0.62);');
+    expect(menuSceneSource).not.toContain('drawLegacyBoardSigilBorder');
+    expect(menuSceneSource).not.toContain('drawLegacyBoardCornerFacetShimmer');
+    expect(menuSceneSource).not.toContain('hasLegacyBoardCornerShimmerPendingFrame');
+    expect(menuSceneSource).not.toContain('resolveLegacyBoardCornerFacetAlpha');
     expect(menuSceneSource).toContain('cornerFacet: {');
-    expect(menuSceneSource).toContain('animated: true');
-    expect(menuSceneSource).toContain('shimmerPeriodMs: LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS');
+    expect(menuSceneSource).toContain('animated: false');
+    expect(menuSceneSource).toContain('shimmerPeriodMs: 0');
+    expect(menuSceneSource).toContain('visible: false');
     expect(menuSceneSource).toContain('private drawLegacyMenuDeconstructHandoffBurst(');
     expect(menuSceneSource).toContain('this.drawLegacyMenuDeconstructHandoffBurst(');
     expect(menuSceneSource).toContain('this.resolveLegacyMenuBuildPrerollProgress(time)');
@@ -555,30 +597,37 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.');
   });
 
-  test('reflects the gothic cyber border motif into the backdrop layer', () => {
+  test('restores a restrained animated backdrop without a full-screen perimeter frame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const backdropSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMenuBackdrop.ts'), 'utf8');
 
-    expect(backdropSource).toContain('fieldColor: 0x090d19');
-    expect(backdropSource).toContain('fieldColor: 0x10172c');
-    expect(menuSceneSource).toContain('this.drawLegacyBackdropSigils(width, height, this.time.now);');
+    expect(backdropSource).toContain('fieldColor: cyberArcadeMaterial.substrate.field');
+    expect(backdropSource).toContain('fieldColor: cyberArcadeMaterial.substrate.fieldRaised');
+    expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
+    expect(menuSceneSource).not.toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
+    expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars().slice(0, LEGACY_MENU_STAR_COUNT);');
+    expect(menuSceneSource).toContain('const backdropMotionEnabled = this.settings.toggleAnimatedBackdrop && !this.prefersLegacyReducedMotion();');
     expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_SHARD_COUNT');
     expect(backdropSource).toContain('LEGACY_MENU_GLASS_SHARD_COUNT');
     expect(backdropSource).toContain('LEGACY_MENU_DRIFT_RUNE_COUNT');
     expect(backdropSource).toContain("LEGACY_MENU_BACKDROP_STAR_MOTION = 'radial-warp'");
+    expect(backdropSource).toContain("LEGACY_MENU_BACKDROP_MOTION_PROFILE = 'visible-parallax-warp'");
     expect(backdropSource).toContain('resolveLegacyMenuBackdropWarpVector');
     expect(backdropSource).toContain('resetLegacyMenuBackdropStarNearWarpOrigin');
     expect(menuSceneSource).toContain('starMotion: LEGACY_MENU_BACKDROP_STAR_MOTION');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropGlassShards');
     expect(backdropSource).toContain('resolveLegacyMenuBackdropDriftRunes');
-    expect(menuSceneSource).toContain('0.7 + (Math.sin(time / 1800) * 0.3)');
+    expect(menuSceneSource).toContain('this.drawLegacyBackdropSigils(width, height, animationTime);');
     expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(shard.color, shard.alpha * 0.038);');
     expect(backdropSource).toContain('const roundBackdropNumber = (value: number): number => Math.round(value * 1000) / 1000;');
-    expect(backdropSource).toContain('const localPhase = phase * (0.16 + (index * 0.022)) + (index * 1.73);');
-    expect(backdropSource).toContain('const driftX = Math.sin(localPhase) * 0.026;');
-    expect(backdropSource).toContain('const driftY = Math.cos(localPhase * 0.74) * 0.017;');
+    expect(backdropSource).toContain('const localPhase = phase * (0.34 + (index * 0.034)) + (index * 1.73);');
+    expect(backdropSource).toContain('const driftX = Math.sin(localPhase) * LEGACY_MENU_BACKDROP_GLASS_DRIFT_X_RATIO;');
+    expect(backdropSource).toContain('const driftY = Math.cos(localPhase * 0.76) * LEGACY_MENU_BACKDROP_GLASS_DRIFT_Y_RATIO;');
+    expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_GLASS_DRIFT_X_RATIO = 0.038');
+    expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_GLASS_DRIFT_Y_RATIO = 0.024');
+    expect(backdropSource).toContain('LEGACY_MENU_BACKDROP_RUNE_CYCLE_MS = 9000');
     expect(backdropSource).toContain('const tailMagnitude = 0.68 + Math.min(0.28, distanceFromCenter * 0.42);');
-    expect(menuSceneSource).toContain('Math.round(pixelX + (stepX * index))');
+    expect(menuSceneSource).toContain('Math.round(pixelX + (step.x * index))');
     expect(menuSceneSource).toContain('const upperRailStart = this.rotateBackdropPoint(shard, -halfLength * 0.86, -halfThickness * 0.58);');
     expect(menuSceneSource).toContain('const upperRailBreakEnd = this.rotateBackdropPoint(shard, halfLength * 0.1, -halfThickness * 0.58);');
     expect(menuSceneSource).toContain('const leadingCutStart = this.rotateBackdropPoint(shard, halfLength * 0.54, -halfThickness - taper);');
@@ -590,10 +639,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps active play maze rendering on connected corridors instead of square debug cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_CORE = 0xe7fff4;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = 0x0d3c4f;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_CORE = cyberArcadeMaterial.path.core;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_FILL = 0x07111d;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.1;');
     expect(menuSceneSource).toContain("private pathVisualStyle: LegacyPathVisualStyle = 'corridor';");
@@ -606,7 +655,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('buttons: this.uiButtons');
     expect(menuSceneSource).toContain('text: button.text');
     expect(menuSceneSource).toContain('this.uiTexts.push(label, stateLabel);');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_FILL = 0x08111d;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_EDGE = 0x031022;');
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
@@ -616,9 +665,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('private titleGraphics!: Phaser.GameObjects.Graphics;');
     expect(menuSceneSource).toContain('this.titleGraphics = this.add.graphics();');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_PRISM = 0xb7f2ff;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM = 0x8fffe8;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FACET_WARM = 0xffd36a;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_PRISM = cyberArcadeMaterial.rail.cyan;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM = cyberArcadeMaterial.signal.playerAccent;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FACET_WARM = cyberArcadeMaterial.signal.warning;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;');
@@ -627,7 +676,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(time: number): void');
     expect(menuSceneSource).not.toContain('if (visibleCells.length <= 0) {\n      return;\n    }');
-    expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitleSigilRails(visibleCells, titleLayout, time, titlePresentation.titleAlpha);');
+    expect(menuSceneSource).not.toContain('drawLegacyMenuPathTitleSigilRails');
     expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);');
     expect(menuSceneSource).toContain("type LegacyMenuPathTitleSweepMode = 'build' | 'deconstruct' | 'idle';");
     expect(menuSceneSource).toContain('interface LegacyMenuPathTitleSweepState');
@@ -637,9 +686,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleAnimationDirection(time: number):');
     expect(menuSceneSource).toContain('return phase <= 0.5 ? phase * 2 : (1 - phase) * 2;');
     expect(menuSceneSource).toContain('const rightmostVisibleColumn = visibleCells.reduce(');
-    expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitleSigilRails(visibleCells, titleLayout, time, titlePresentation.titleAlpha);');
+    expect(menuSceneSource).not.toContain('drawLegacyMenuPathTitleSigilRails');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase === 'building'");
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase === 'deconstructing'");
+    expect(menuSceneSource).toContain('this.settleLegacyMenuStaticDrawStageIfComplete(time);');
+    expect(menuSceneSource).toContain('rowsVisible: this.menuStaticDrawRowsVisible');
+    expect(menuSceneSource).toContain('tilesVisible: this.menuStaticDrawTilesVisible');
     expect(menuSceneSource).toContain("const syncedToLifecycle = mode !== 'idle';");
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitlePrismSweep(');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleGemFacets(');
@@ -649,7 +701,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;');
     expect(menuSceneSource).not.toContain('phase * 0.62');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleDiamond(');
-    expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleSigilRails(');
+    expect(menuSceneSource).not.toContain('private drawLegacyMenuPathTitleSigilRails(');
     expect(menuSceneSource).toContain('private hasLegacyMenuTitleAnimationPendingFrame(time: number): boolean');
     expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleProgress(): number');
     expect(menuSceneSource).toContain('const smoothstep = (value: number): number => {');
@@ -687,13 +739,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor');
   });
 
-  test('keeps active play HUD focused on compass controls while the level badge owns the timer', () => {
+  test('keeps active play HUD focused on compass controls while the level glyph stays separate', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_TEXT =');
-    expect(menuSceneSource).toContain('const LEGACY_CYBER_PANEL_STROKE = 0x72e0bf;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW = 0xff263f;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_TAIL = 0xecfff5;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_PANE =');
+    expect(menuSceneSource).toContain('const LEGACY_CYBER_PANEL_STROKE = cyberArcadeMaterial.rail.mint;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW = cyberArcadeMaterial.signal.goal;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_TAIL = cyberArcadeMaterial.rail.white;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
@@ -702,7 +754,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("showPane: touchControlLayout.controlMode !== 'stick'");
     expect(menuSceneSource).toContain('if (options.showPane) {');
     expect(menuSceneSource).toContain('this.hudGraphics.fillTriangle(');
-    expect(menuSceneSource).toContain('this.drawLegacyPlayTouchButton(controls.pause, true, false);');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
     expect(menuSceneSource).not.toContain('this.drawLegacyPlayTouchButton(controls.restart_attempt, true, false);');
     expect(menuSceneSource).not.toContain('this.hudGraphics.strokeRect(');
   });
@@ -714,7 +766,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('const LEGACY_MENU_DYNAMIC_TRAIL_CORE_RATIO =');
     expect(menuSceneSource).not.toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO =');
     expect(menuSceneSource).toContain('const progressionPalette = this.resolveActiveLegacyProgressionPalette();');
-    expect(menuSceneSource).toContain('this.drawLegacyProgressionBadge(mazeRenderFrame, progressionPalette);');
+    expect(menuSceneSource).toContain('this.drawLegacyProgressionBadge();');
     expect(menuSceneSource).toContain('this.drawLegacyMenuCompass(mazeRenderFrame, progressionPalette, time);');
     expect(menuSceneSource).toContain("const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'");
     expect(menuSceneSource).toContain("|| this.menuStaticDrawLifecyclePhase === 'deconstructing';");
@@ -734,15 +786,26 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, radius);');
     expect(menuSceneSource).toContain('progressionBadge: {');
     expect(menuSceneSource).toContain('menuCompass: {');
-    expect(menuSceneSource).toContain('this.progressionBadgeTextFits = textBounds.left >= badgeBounds.left + 4');
-    expect(menuSceneSource).toContain('mazeRenderFrame.boardSize + (mazeRenderFrame.safeInset * 2)');
-    expect(menuSceneSource).toContain('this.layout.width - 18');
-    expect(menuSceneSource).toContain("const horizontalPadding = this.mode === 'menu'");
-    expect(menuSceneSource).toContain('clampInteger(Math.round(mazeRenderFrame.tileSize * 2.85), 22, 30)');
-    expect(menuSceneSource).toContain('clampInteger(Math.round(mazeRenderFrame.tileSize * 3.3), 24, 34);');
-    expect(menuSceneSource).toContain('this.fitLegacyUiTextToWidth(');
-    expect(menuSceneSource).toContain('const fittedTextWidth = Math.ceil(this.progressionBadgeText.width);');
-    expect(menuSceneSource).toContain('fittedTextWidth + horizontalPadding');
+    expect(menuSceneSource).toContain('const playerTrack = this.progressionState.tracks.player;');
+    expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(playerTrack, 'player')");
+    expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
+    expect(menuSceneSource).toContain('private drawLegacyMenuAiProgressionBadge(');
+    expect(menuSceneSource).toContain("const aiTrack = this.progressionState.tracks['ai-runner'];");
+    expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(aiTrack, 'ai-runner')");
+    expect(menuSceneSource).toContain(".setText('AI')");
+    expect(menuSceneSource).toContain('slot: 1,');
+    expect(menuSceneSource).toContain('menuAiProgressionBadge: {');
+    expect(menuSceneSource).toContain("placement: 'leading'");
+    expect(menuSceneSource).toContain("placement: 'trailing'");
+    expect(menuSceneSource).toContain('resolveLegacyHeaderControlMetricFontSize(track.level, frame.width)');
+    expect(menuSceneSource).toContain('private drawLegacyHeaderControlChrome(');
+    expect(menuSceneSource).toContain('private menuSettingsCogActive = false;');
+    expect(menuSceneSource).toContain('this.menuSettingsCogActive = active;');
+    expect(menuSceneSource).toContain('this.boardDynamicDirty = true;');
+    expect(menuSceneSource).toContain('this.prefersLegacyReducedMotion()');
+    expect(menuSceneSource).not.toContain('resolveLegacyRunStatusPanelLayout');
+    expect(menuSceneSource).not.toContain('resolveLegacyProgressionBadgeText');
+    expect(menuSceneSource).not.toContain('portraitMenuBadgeTextOffset');
     expect(menuSceneSource).toContain('const visibleTrail = trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point));');
     expect(menuSceneSource).toContain('trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point))');
     expect(menuSceneSource).toContain('const dynamicTrailPathSource = this.maze;');
@@ -787,7 +850,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolveLegacyIridescentPlayerAccentColor(time, playerCoreColor)');
     expect(menuSceneSource).toContain('palette.trailPulseColor');
     expect(menuSceneSource).toContain('palette.trailPulseEdgeColor');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = 2600;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS;');
+    expect(menuSceneSource).toContain('const pulseCenterIndex = resolveLegacyTrailShineMotion({');
+    expect(menuSceneSource).toContain('trailShineDirection: trailShineMotion.direction');
+    expect(menuSceneSource).toContain('trailShineCyclePeriodMs: trailShineMotion.cyclePeriodMs');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;');
     expect(menuSceneSource).toContain('const falloff = smoothstep(1 - (distance / LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW));');
     expect(menuSceneSource).not.toContain('drawLegacyDynamicTrailShine');
@@ -798,21 +864,21 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.hasLegacyPlayTrailPulsePendingFrame(time)');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;');
     expect(menuSceneSource).toContain('private legacyPlayTrailPulseNextFrameAtMs = 0;');
-    expect(menuSceneSource).toContain('if (this.settings.toggleTrailPulse) {');
+    expect(menuSceneSource).toContain('if (this.isLegacyTrailShineVisible()) {');
     expect(menuSceneSource).toContain('this.drawLegacyPlayDynamicTrailPulse(');
     expect(menuSceneSource).toContain('resolvedBoardLeft,');
     expect(menuSceneSource).toContain('mazeRenderFrame.boardSize,');
-    expect(menuSceneSource).toContain("const active = this.settings.toggleTrailPulse && this.overlay === 'none' && this.trail.length > 1;");
+    expect(menuSceneSource).toContain("const active = this.isLegacyTrailShineVisible() && this.overlay === 'none' && this.trail.length > 1;");
     expect(menuSceneSource).toContain('this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;');
-    expect(menuSceneSource).toContain('const pulseDistanceFromPlayer = phase * maxPulseIndex;');
-    expect(menuSceneSource).toContain('const pulseCenterIndex = (trail.length - 1) - pulseDistanceFromPlayer;');
+    expect(menuSceneSource).toContain('const pulseCenterIndex = resolveLegacyTrailShineMotion({');
+    expect(menuSceneSource).toContain('oneWayPeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
     expect(menuSceneSource).not.toContain('private resolveLegacyPointPathSource(');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');");
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95, 'goal');");
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_CORE = 0xfff05a;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_EDGE = 0xffc629;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_CORE = 0xff263f;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_EDGE = 0xd81b2a;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_EDGE = cyberArcadeMaterial.signal.goalEdge;');
     expect(menuSceneSource).toContain('markerStyle: {');
     expect(menuSceneSource).toContain('playerCoreColor: resolveLegacyIridescentPlayerCoreColor()');
     expect(menuSceneSource).toContain('playerHaloColor: progressionPalette.playerHaloColor');
@@ -820,14 +886,20 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('startEdgeColor: LEGACY_PLAY_START_MARKER_EDGE');
     expect(menuSceneSource).toContain('trailPulseColor: progressionPalette.trailPulseColor');
     expect(menuSceneSource).toContain('trailPulseEdgeColor: progressionPalette.trailPulseEdgeColor');
+    expect(menuSceneSource).toContain('trailShineEnabled: this.isLegacyTrailShineVisible()');
+    expect(menuSceneSource).toContain('trailShineColor: progressionPalette.trailPulseColor');
+    expect(menuSceneSource).toContain('trailShineEdgeColor: progressionPalette.trailPulseEdgeColor');
     expect(menuSceneSource).toContain('iridescentMaterial: this.resolveLegacyIridescentMaterialDiagnostics(time, progressionPalette)');
     expect(menuSceneSource).toContain('private resolveLegacyIridescentMaterialDiagnostics(');
     expect(menuSceneSource).toContain('minPathColorDistance: LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE');
     expect(menuSceneSource).toContain('playerHaloShiftColor: resolveLegacyIridescentPlayerHaloColor(time, palette.playerHaloColor)');
     expect(menuSceneSource).toContain('pulseHeadColor: resolveLegacyIridescentPulseColor(trailHeadIndex, trailLength, time, palette.trailPulseColor)');
+    expect(menuSceneSource).toContain('shineHeadColor: resolveLegacyIridescentPulseColor(trailHeadIndex, trailLength, time, palette.trailPulseColor)');
     expect(menuSceneSource).toContain('trailHeadColor: resolveLegacyIridescentTrailColor(trailHeadIndex, trailLength, time, palette.trailColor)');
     expect(menuSceneSource).toContain('trailPulsePeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
-    expect(menuSceneSource).toContain('trailPulseEnabled: this.settings.toggleTrailPulse');
+    expect(menuSceneSource).toContain('trailPulseEnabled: this.isLegacyTrailShineVisible()');
+    expect(menuSceneSource).toContain('return this.legacyReducedMotionEnabled;');
+    expect(menuSceneSource).toContain('private isLegacyTrailShineVisible(): boolean');
     expect(menuSceneSource).toContain('playerCoreRadius: playerMarkerMetrics.coreRadius');
     expect(menuSceneSource).toContain('playerBeaconColor: LEGACY_PLAY_PLAYER_BEACON_COLOR');
     expect(menuSceneSource).toContain('playerBeaconPeriodMs: LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS');
@@ -843,8 +915,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('visualMotionActive: this.hasLegacyPlayerVisualMotionPendingFrame(time)');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.46;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.72;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_COLOR = 0x36ff7d;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_ACCENT = 0xb6ffd0;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_COLOR = cyberArcadeMaterial.signal.player;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_AI_BEACON_ALPHA_RATIO = 0.74;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_AI_BEACON_RADIUS_RATIO = 0.16;');
@@ -930,6 +1002,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('resolveTouchControlKindAtPoint');
+    expect(menuSceneSource).toContain('resolveTouchArrowMovementKindAtPoint');
     expect(menuSceneSource).toContain('resolveTouchControlLayout');
     expect(menuSceneSource).toContain('private resolveLegacyPlayTouchControlLayout()');
     expect(menuSceneSource).toContain('private handleLegacyPlayTouchControl');
@@ -945,28 +1018,39 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.releaseLegacyPlayTouchPointer(event.pointerId)');
     expect(menuSceneSource).toContain("controlMode: this.settings.controlMode");
     expect(menuSceneSource).toContain("touchControlLayout.controlMode === 'stick'");
+    expect(menuSceneSource).toContain("touchControlLayout.controlMode === 'arrows'");
+    expect(menuSceneSource).toContain('this.playTouchArrowPointerId === normalizedPointerId');
+    expect(menuSceneSource).toContain('this.setLegacyPlayHeldTouchMoveCandidates([movement], pointerId');
     expect(menuSceneSource).toContain('this.setLegacyPlayHeldTouchMoveCandidates(this.playTouchStickPull.movementCandidates');
     expect(menuSceneSource).toContain('this.setLegacyPlayHeldTouchMoveCandidates(pullVector.movementCandidates');
     expect(menuSceneSource).toContain('movementCandidates: [...this.playTouchStickPull.movementCandidates]');
-    expect(menuSceneSource).toContain('intentSegment: this.playTouchStickPull.intentSegment');
+    expect(menuSceneSource).toContain('angleRadians: this.playTouchStickPull.angleRadians');
     expect(menuSceneSource).toContain('allowBeyondOuter: true');
-    expect(menuSceneSource).toContain('previousIntentSegment: this.playTouchStickPull?.intentSegment ?? null');
+    expect(menuSceneSource).toContain('this.playDirectionalIntent.requestAnalog(');
+    expect(menuSceneSource).toContain('private resolveLegacyInputPointerPoint(pointer: Phaser.Input.Pointer)');
+    expect(menuSceneSource).toContain('return this.resolveLegacyPlayTouchClientPoint(touch.clientX, touch.clientY);');
     expect(menuSceneSource).toContain('keepWhenBlocked: true');
-    expect(menuSceneSource).toContain('private resolveLegacyPlayStickIntentMoveCandidates(): HumanMovementActionKind[] | null');
-    expect(menuSceneSource).toContain('const pullVector = this.playTouchStickPull;');
-    expect(menuSceneSource).toContain('const absoluteX = Math.abs(pullVector.normalizedX);');
-    expect(menuSceneSource).toContain('const absoluteY = Math.abs(pullVector.normalizedY);');
-    expect(menuSceneSource).toContain('resolveLegacyNavigationTarget(this.maze, this.player, axis.deltaX, axis.deltaY) !== null');
-    expect(menuSceneSource).toContain('right.magnitude - left.magnitude');
-    expect(menuSceneSource).toContain('pullVector.movementCandidates;');
-    expect(menuSceneSource).toContain('const candidates = this.resolveLegacyPlayStickIntentMoveCandidates()');
-    expect(menuSceneSource).toContain('if (this.playTouchStickPointerId !== null) {');
+    expect(menuSceneSource).toContain('allowBeyondFrame: true');
+    expect(menuSceneSource).toContain('centerFallback: existingMovement');
+    expect(menuSceneSource).toContain('const candidates = resolveHumanMovementPriorityCandidates(');
+    expect(menuSceneSource).toContain('this.requestLegacyPlayDirectionalIntent(candidates);');
+    expect(menuSceneSource).toContain('this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay(\'repeat\'));');
+    expect(menuSceneSource).toContain('if (this.playTouchArrowPointerId !== null || this.playTouchStickPointerId !== null) {');
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchStick(');
+    expect(menuSceneSource).toContain('const knobRadius = stick.knobRadius;');
+    expect(menuSceneSource).toContain('const travel = stick.travelRadius;');
+    expect(menuSceneSource).toContain('deadzoneRadius: touchControlLayout.stick.deadzoneRadius');
+    expect(menuSceneSource).toContain('knobRadius: touchControlLayout.stick.knobRadius');
+    expect(menuSceneSource).toContain('travelRadius: touchControlLayout.stick.travelRadius');
     expect(menuSceneSource).toContain('private setLegacyPlayHeldTouchMoveCandidates(');
     expect(menuSceneSource).toContain('const wasHeld = this.playMoveFlags[direction];');
     expect(menuSceneSource).toContain('const sameControlIndex = this.playHeldTouchMoves.findIndex((move) => move.control === control);');
     expect(menuSceneSource).toContain('if (this.playHeldTouchMoves.length >= LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT) {');
     expect(menuSceneSource).toContain('private resolveLegacyPlayHeldTouchDelay(kind:');
+    expect(menuSceneSource).toContain('private resolveLegacyPlayMovementSpeedProfile()');
+    expect(menuSceneSource).toContain('completedCycles: playerTrack.completedCycles');
+    expect(menuSceneSource).toContain('effectiveMovementSpeed: movementSpeedProfile.effectiveSpeed');
+    expect(menuSceneSource).toContain('formulaVersion: movementSpeedProfile.formulaVersion');
     expect(menuSceneSource).toContain("this.resolveLegacyPlayHeldTouchDelay(hadActiveMove ? 'turn' : 'initial')");
     expect(menuSceneSource).toContain("this.resolveLegacyPlayHeldTouchDelay('repeat')");
     expect(menuSceneSource).toContain('repeatInitialDelayMs: movementSpeedProfile.initialDelayMs');
@@ -981,7 +1065,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('touchControls');
     expect(menuSceneSource).toContain('LEGACY_CYBER_PANEL_FILL');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
-    expect(menuSceneSource).toContain("this.drawLegacyPlayTouchLabel(controls.pause, 'PAUSE');");
+    expect(menuSceneSource).not.toContain('drawLegacyPlayTouchLabel');
     expect(menuSceneSource).not.toContain("this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');");
     expect(menuSceneSource).not.toContain("this.drawLegacyPlayTouchLabel(controls.toggle_thoughts, 'TRAIL');");
     expect(menuSceneSource).toContain("this.hudGraphics.moveTo(cx, cy + stem);");
@@ -994,14 +1078,23 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("case 'restart_attempt':");
     expect(menuSceneSource).toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
     expect(menuSceneSource).toContain("'Reset', resetAction");
-    expect(menuSceneSource).toContain("case 'move_up':");
-    expect(menuSceneSource).toContain('this.tryMovePlayer(0, -1);');
-    expect(menuSceneSource).toContain('private tryMovePlayerFromInput(deltaX: number, deltaY: number): boolean');
-    expect(menuSceneSource).toContain('return this.startLegacyPlayDiagonalSprint(deltaX, deltaY);');
-    expect(menuSceneSource).toContain('const accepted = this.tryMovePlayerFromInput(vector.deltaX, vector.deltaY);');
-    expect(menuSceneSource).toContain('this.tryMovePlayer(1, 0);');
-    expect(menuSceneSource).toContain('this.tryMovePlayer(0, 1);');
-    expect(menuSceneSource).toContain('this.tryMovePlayer(-1, 0);');
+    expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
+    expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
+    expect(menuSceneSource).toContain('this.playDirectionalIntent.step(this.maze, this.player, {');
+    expect(menuSceneSource).toContain('assistedLaneShiftEnabled: this.settings.smartSteering');
+    expect(menuSceneSource).toContain('private tryMovePlayerFromInput(');
+    expect(menuSceneSource).toContain('const directions = resolveLegacyCardinalDirectionsFromVector(deltaX, deltaY);');
+    expect(menuSceneSource).toContain('return this.performLegacyPlayDirectionalIntentStep();');
+    expect(menuSceneSource).toContain('const accepted = this.tryMovePlayerFromInput(vector.deltaX, vector.deltaY, { releaseAfterStep: true });');
+    expect(menuSceneSource).toContain('private legacyWorldTurnHost = this.createLegacyWorldTurnHost();');
+    expect(menuSceneSource).toContain("'player-movement': (): WorldTurnPhaseResult => this.applyLegacyWorldTurnPlayerMovement()");
+    expect(menuSceneSource).toContain('this.legacyWorldTurnHost.setState(this.resolveLegacyWorldTurnHostState());');
+    expect(menuSceneSource).toContain('receipt = this.legacyWorldTurnHost.advance({');
+    expect(menuSceneSource).toContain("return 'stopped';");
+    expect(menuSceneSource).toContain("return 'paused';");
+    expect(menuSceneSource).toContain('registeredPhases: [...worldTurnDiagnostics.registeredPhases]');
+    expect(menuSceneSource).toContain('timedModeEnabled: worldTurnDiagnostics.timedModeEnabled');
+    expect(menuSceneSource).toContain('worldTurn: {');
   });
 
   test('keeps camera-follow static and dynamic board layers on the same offset', () => {
@@ -1095,7 +1188,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.footerText = this.applyLegacyUiTextCrispness(this.add.text');
     expect(menuSceneSource).toContain('this.progressionBadgeText = this.applyLegacyUiTextCrispness(this.add.text');
     expect(menuSceneSource).toContain('this.applyLegacyUiTextCrispness(text);');
-    expect(textCrispnessSource).toContain('const devicePixelRatio = readDevicePixelRatio();');
+    expect(menuSceneSource).toContain('textTextureResolution: this.resolveLegacyUiTextResolution()');
+    expect(menuSceneSource).toContain("textTransformOwner: 'game-canvas-only'");
+    expect(textCrispnessSource).toContain("import { MAZER_CANVAS_RESOLUTION_MIN } from '../boot/canvasResolution';");
+    expect(textCrispnessSource).toContain('return MAZER_CANVAS_RESOLUTION_MIN;');
+    expect(textCrispnessSource).not.toContain('resolutionCap');
     expect(textCrispnessSource).not.toContain('navigator.webdriver');
     expect(textCrispnessSource).not.toContain('HeadlessChrome');
   });
@@ -1136,28 +1233,76 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(tuningSource).toContain('throttled: 250,');
   });
 
-  test('keeps front-door buttons in the shared cyber chrome path', () => {
+  test('caches OS reduced motion and settles only visual state when it changes', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const preferenceSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private installLegacyReducedMotionPreference(): void'),
+      menuSceneSource.indexOf('private isLegacyTrailShineVisible(): boolean')
+    );
+
+    expect(menuSceneSource).toContain('private legacyReducedMotionEnabled = false;');
+    expect(menuSceneSource).toContain('private legacyReducedMotionMediaQuery: MediaQueryList | null = null;');
+    expect(menuSceneSource).toContain('this.installLegacyReducedMotionPreference();');
+    expect(menuSceneSource).toContain('this.detachLegacyReducedMotionPreference();');
+    expect(preferenceSource).toContain("window.matchMedia('(prefers-reduced-motion: reduce)')");
+    expect(preferenceSource).toContain("mediaQuery.addEventListener('change', this.legacyReducedMotionMediaQueryListener)");
+    expect(preferenceSource).toContain("mediaQuery.removeEventListener('change', listener)");
+    expect(preferenceSource).toContain('this.syncLegacyPlayerVisualMotionTo(this.playerVisualMotion.to);');
+    expect(preferenceSource).toContain('this.hudCompassSpinStartedAtMs = null;');
+    expect(preferenceSource).toContain('this.backdropDirty = true;');
+    expect(preferenceSource).toContain('this.boardDynamicDirty = true;');
+    expect(preferenceSource).toContain('this.hudDirty = true;');
+    expect(preferenceSource).toContain('return this.legacyReducedMotionEnabled;');
+    expect(preferenceSource).not.toContain('tryMovePlayerFromInput');
+    expect(preferenceSource).not.toContain('legacyWorldTurnHost');
+  });
+
+  test('keeps front-door buttons and header controls on their shared chrome paths', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
 
     expect(menuSceneSource).toContain('const panel = this.add.graphics();');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(panel, {');
-    expect(menuSceneSource).toContain('fill: active ? 0x123a2d : LEGACY_CYBER_PANEL_FILL');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_ACTION_GREEN = \'#36ff7d\';');
+    expect(menuSceneSource).toContain('frontDoorChrome?.hoverFillColor ?? cyberArcadeMaterial.substrate.panelActive');
+    expect(menuSceneSource).toContain('frontDoorChrome?.fillColor ?? LEGACY_CYBER_PANEL_FILL');
+    expect(menuSceneSource).toContain('stroke: frontDoorChrome?.strokeColor');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_ACTION_GREEN = toCyberArcadeCssHex(cyberArcadeMaterial.signal.player);');
     expect(menuSceneSource).toContain('const buttonTextColor = isPrimaryFrontDoorButton');
     expect(menuSceneSource).toContain('? LEGACY_MENU_ACTION_GREEN');
-    expect(menuSceneSource).toContain('resolveLegacyAuthenticatedMenuButtonStack');
-    expect(menuSceneSource).toContain('const authenticatedMenuButtonStack = resolveLegacyAuthenticatedMenuButtonStack(this.layout);');
-    expect(menuSceneSource).toContain('authenticatedMenuButtonStack.startButtonY');
-    expect(menuSceneSource).toContain('authenticatedMenuButtonStack.optionsButtonY');
-    expect(menuSceneSource).toContain('authenticatedMenuButtonStack.optionsButtonHeight');
-    expect(menuSceneSource).toContain('const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);');
-    expect(menuSceneSource).toContain('bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height)');
+    expect(menuSceneSource).toContain('private createLegacyMenuSettingsCogButton(onClick: () => void): UiButton');
+    expect(menuSceneSource).toContain("semanticAction: 'Settings'");
+    expect(menuSceneSource).toContain("text: 'Settings'");
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;');
+    expect(menuSceneSource).not.toContain('fillStyle(0x05070a');
+    expect(menuSceneSource).toContain('private drawLegacySettingsCogControl(');
+    expect(menuSceneSource).toMatch(/this\.drawLegacyHeaderControlChrome\(\s+graphics,\s+rect,/);
+    expect(menuSceneSource).toContain('active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,');
+    expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(): void');
+    expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog();');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCog(this.boardDynamicGraphics, frame, this.menuSettingsCogActive);');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
+    expect(menuSceneSource).toContain("placement: 'trailing'");
+    expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
+    expect(menuSceneSource).toContain('const background = this.add.rectangle(\n      pauseRect.centerX,');
+    expect(menuSceneSource).toContain('bounds: createVisualRect(pauseRect.left, pauseRect.top, pauseRect.width, pauseRect.height)');
     expect(menuSceneSource).toContain('text,');
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
   });
 
-  test('keeps account login/logout inside the shared player-facing overlay system', () => {
+  test('keeps settings semantic while the compact active-track level baseline stays free of board decorations', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain("this.createOverlayTitle('Settings', shell.titleCenterY);");
+    expect(menuSceneSource).not.toContain("this.createOverlayTitle('Options', shell.titleCenterY);");
+    expect(menuSceneSource).toContain("semanticAction: 'Settings'");
+    expect(menuSceneSource).toContain("text: 'Settings'");
+    expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
+    expect(menuSceneSource).toContain('const trackId = this.resolveActiveLegacyProgressionTrackId();');
+    expect(menuSceneSource).toContain('this.progressionState.tracks[trackId]');
+    expect(menuSceneSource).not.toContain('createLegacyRoomActivationPreviewCue(');
+  });
+
+  test('keeps account login/logout inside the shared player-facing overlay system', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
     const playerMessageSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayerMessage.ts'), 'utf8');
     const overlayRoutingSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayRouting.ts'), 'utf8');
@@ -1179,6 +1324,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (runtimeAuthFixtureSnapshot) {');
     expect(menuSceneSource).toContain("this.openOverlay('auth')");
     expect(menuSceneSource).toContain('private buildAuthOverlay(): void');
+    expect(menuSceneSource).toContain('resolveLegacyAuthPresentation({');
+    expect(menuSceneSource).toContain('this.createAuthFieldLabel(presentation.emailLabel');
+    expect(menuSceneSource).toContain('this.createAuthFieldLabel(presentation.passwordLabel');
+    expect(menuSceneSource).toContain('presentation.primaryActionLabel');
+    expect(menuSceneSource).toContain('presentation.recoveryActionLabel');
+    expect(menuSceneSource).toContain('const bottomStartY = rowY + (stacked ? 24 : 28);');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSubmit(): Promise<void>');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSignOut(): Promise<void>');
     expect(menuSceneSource).toContain('interface LegacyAuthActionDiagnostics');
@@ -1193,13 +1344,21 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const shouldReturnToMainMenuAfterLogin = this.authForm.mode === \'login\'');
     expect(menuSceneSource).toContain('private closeLegacyAuthOverlayToMainMenu(): void');
     expect(menuSceneSource).toContain("const isAuthenticated = this.authSnapshot.status === 'authenticated';");
-    expect(menuSceneSource).toContain("this.createButton(\n              this.layout.centerButtonX,\n              this.layout.centerButtonY,");
+    expect(menuSceneSource).toContain("menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest'");
+    expect(menuSceneSource).toContain("const previousMenuActionMode = this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest';");
+    expect(menuSceneSource).toContain("const menuActionMode = snapshot.status === 'authenticated' ? 'authenticated' : 'guest';");
+    expect(menuSceneSource).toContain('previousMenuActionMode !== menuActionMode');
+    expect(menuSceneSource).toContain('this.refreshLayout();');
+    expect(menuSceneSource).toContain("'Login',\n              () => this.openOverlay('auth')");
+    expect(menuSceneSource).toContain('this.layout.centerButtonX,');
+    expect(menuSceneSource).toContain('this.layout.centerButtonY,');
     expect(menuSceneSource).not.toContain('const accountActionLabel =');
-    expect(menuSceneSource).toContain('private createLegacyOptionsAccountActionRow(panel: OverlayPanelFrame): void');
+    expect(menuSceneSource).toContain('private createLegacyOptionsAccountActionRow(');
     expect(menuSceneSource).toContain('this.createLegacyOptionsAccountActionRow(panel);');
+    expect(menuSceneSource).toContain('contentCenterY: actionY');
     expect(menuSceneSource).toContain("const label = this.authSnapshot.status === 'authenticated' ? 'Log out' : 'Account';");
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
-    expect(playerMessageSource).toContain('Account login needs Supabase env vars before it can be enabled.');
+    expect(playerMessageSource).toContain('Account access is unavailable right now. You can still play as a guest.');
     expect(playerMessageSource).toContain('export interface LegacyQueuedPlayerMessage');
     expect(playerMessageSource).toContain('export const enqueueLegacyPlayerMessage =');
     expect(playerMessageSource).toContain('export const expireLegacyPlayerMessageQueue =');
@@ -1224,10 +1383,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private latestOverlayMessageExpiresAtMs = Number.NEGATIVE_INFINITY;');
     expect(menuSceneSource).toContain('private expireLegacyPlayerMessages(time: number): void');
     expect(menuSceneSource).toContain('this.expireLegacyPlayerMessages(time);');
-    expect(menuSceneSource).toContain('this.setLatestOverlayMessage(resolveLegacyOverlayToggleMessage(');
-    expect(menuSceneSource).toContain('this.setLatestOverlayMessage(resolveLegacyOverlayMovementSpeedMessage(');
+    expect(menuSceneSource).not.toContain('resolveLegacyOverlayFieldCommitMessage');
+    expect(menuSceneSource).not.toContain('resolveLegacyOverlayToggleMessage');
+    expect(menuSceneSource).not.toContain('resolveLegacyOverlayMovementSpeedMessage');
     expect(menuSceneSource).toContain('this.armLegacyAuthFeedbackMessage();');
-    expect(menuSceneSource).toContain('this.pushLegacyPlayerMessage(result.playerMessage);');
+    expect(menuSceneSource).toContain('this.latestRemoteSyncResult = result;');
+    expect(menuSceneSource).not.toContain('this.pushLegacyPlayerMessage(result.playerMessage);');
     expect(menuSceneSource).toContain('visibleMessages: this.resolveVisibleLegacyPlayerMessages()');
     expect(menuSceneSource).not.toContain('private createOverlayPlayerMessageText');
     expect(menuSceneSource).not.toContain('private createAuthFeedbackText');
@@ -1237,65 +1398,78 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.resolveLegacyProgressionStorageKey()');
   });
 
-  test('keeps level display text green regardless of progression color tier', () => {
+  test('uses a player-facing level number with a consistent progression color tier', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('this.progressionBadgeText');
-    expect(menuSceneSource).toContain('.setColor(LEGACY_MENU_ACTION_GREEN)');
-    expect(menuSceneSource).not.toContain('.setColor(palette.badgeColor)');
+    expect(menuSceneSource).toContain('.setText(String(track.level))');
+    expect(menuSceneSource).toContain('.setColor(palette.badgeColor)');
+    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);');
+    expect(menuSceneSource).toContain('resolveLegacyHeaderControlMetricFontSize(track.level, frame.width)');
   });
 
-  test('surfaces the menu AI skill, timer, and score inside a readable progression badge', () => {
+
+  test('keeps player progression quiet while the menu exposes the independent AI level in its own compact glyph', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('private formatLegacyElapsedLabel(elapsedMs: number): string');
-    expect(menuSceneSource).toContain('private formatLegacyProgressionRunCount(completedCycles: number): string');
-    expect(menuSceneSource).toContain('private resolveLegacyMenuAiElapsedMs(): number');
-    expect(menuSceneSource).toContain('private resolveLegacyPlayElapsedMs(): number');
-    expect(menuSceneSource).toContain('private resolveLegacyCurrentMazeLevel(): number');
-    expect(menuSceneSource).toContain('private resolveLegacyProgressionBadgeText(_palette: LegacyProgressionPalette): string');
-    expect(menuSceneSource).toContain('const text = this.resolveLegacyProgressionBadgeText(palette);');
-    expect(menuSceneSource).toContain("const skillLine = `AI Skill Lvl: ${aiTrack.rank}/${String(aiTrack.level).padStart(2, '0')}`;");
-    expect(menuSceneSource).toContain("const runLine = `Score: ${scoreLabel}  Run: ${this.formatLegacyProgressionRunCount(aiTrack.completedCycles)}  Maze: ${this.resolveLegacyCurrentMazeLevel()}`;");
-    expect(menuSceneSource).toContain("return `${timerLabel}\\n${skillLine}\\n${runLine}`;");
-    expect(menuSceneSource).toContain("const timerLine = this.formatLegacyElapsedLabel(this.resolveLegacyPlayElapsedMs());");
-    expect(menuSceneSource).toContain("const skillLine = `Skill Lvl: ${playerTrack.rank}/${String(playerTrack.level).padStart(2, '0')}`;");
-    expect(menuSceneSource).toContain("const runLine = `Score: ${scoreLabel}  Runs: ${this.formatLegacyProgressionRunCount(playerTrack.completedCycles)}  Maze: ${this.resolveLegacyCurrentMazeLevel()}`;");
-    expect(menuSceneSource).not.toContain('const complexityLabel =');
-    expect(menuSceneSource).not.toContain('const signalLabel =');
-    expect(menuSceneSource).not.toContain('Sig:');
-    expect(menuSceneSource).not.toContain('return palette.label;');
+    expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
+    expect(menuSceneSource).toContain("return resolveLegacyProgressionTrackIdForSurface(this.mode === 'play' ? 'play' : 'menu-demo');");
+    expect(menuSceneSource).toContain("if (this.overlay !== 'none') {");
+    expect(menuSceneSource).toContain('const playerTrack = this.progressionState.tracks.player;');
+    expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(playerTrack, 'player')");
+    expect(menuSceneSource).toContain('this.drawLegacyMenuAiProgressionBadge();');
+    expect(menuSceneSource).toContain('this.clearLegacyMenuAiProgressionBadge();');
+    expect(menuSceneSource).toContain(".setText('AI')");
+    expect(menuSceneSource).toContain('.setText(String(track.level))');
+    expect(menuSceneSource).toContain('.setText(String(aiTrack.level))');
+    expect(menuSceneSource).not.toContain('publishLegacyPlayerProgressionCompletion');
+    expect(menuSceneSource).not.toContain('resolveLegacyPlayerProgressionOutcomeReason');
+    expect(menuSceneSource).not.toContain('progression.player.cycle.');
+    expect(menuSceneSource).not.toContain('No unlock.');
   });
 
-  test('places the played-game level badge in the top HUD lane without overlapping the maze', () => {
+  test('places the shared player level glyph in the compact top HUD lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain("const centerY = this.mode === 'play'");
-    expect(menuSceneSource).toContain('? this.resolveLegacyPlayProgressionBadgeCenterY(mazeRenderFrame, height)');
-    expect(menuSceneSource).toContain(': this.resolveLegacyMenuProgressionBadgeCenterY(mazeRenderFrame, height);');
-    expect(menuSceneSource).toContain('private resolveLegacyPlayProgressionBadgeCenterY(');
-    expect(menuSceneSource).toContain('const mazeGap = clampInteger(Math.round(mazeRenderFrame.tileSize * 2.4), 16, 28);');
-    expect(menuSceneSource).toContain('const minimumTop = this.layout.height > this.layout.width ? 8 : 10;');
-    expect(menuSceneSource).toContain('const maximumTopBeforeMaze = mazeRenderFrame.boardTop - mazeGap - height;');
-    expect(menuSceneSource).toContain('return Math.round(top + (height / 2));');
-    expect(menuSceneSource).toContain('private resolveLegacyMenuProgressionBadgeCenterY(');
+    expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');
+    expect(menuSceneSource).toContain('const laneHeight = this.layout.lanes.hud?.height ?? 64;');
+    expect(menuSceneSource).toContain('const frame = resolveLegacyHeaderControlFrame({');
+    expect(menuSceneSource).toContain("placement: 'leading'");
+    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);');
+    expect(menuSceneSource).not.toContain('resolveLegacyPlayProgressionBadgeCenterY');
+    expect(menuSceneSource).not.toContain('resolveLegacyMenuProgressionBadgeCenterY');
+    expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');
+    expect(menuSceneSource).toContain('slot: 1,');
+    expect(menuSceneSource).toContain('menu-ai-progression-badge');
+    expect(menuSceneSource).toContain('player-menu-ai-progression-badge');
+  });
+
+  test('consumes shared UI standards for buttons, titles, guides, and toggles', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain("from '../legacy-runtime/legacyUiStandards';");
+    expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, buttonFontSize, options.labelRole ?? 'button')");
+    expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title')");
+    expect(menuSceneSource).toContain('resolveLegacyToggleRowLayout(input.width, input.height, hasDescription)');
   });
 
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const cardHeight = compact ? 250 : 260;');
-    expect(menuSceneSource).toContain('const guideEndY = this.createLegacyOptionsInfoSection(rowY, panel);');
-    expect(menuSceneSource).toContain('const guideTitleFontSize = compact ? 18 : 21;');
-    expect(menuSceneSource).toContain('const guideRowFontSize = compact ? 13 : 15;');
-    expect(menuSceneSource).toContain('const guideRowMinFontSize = compact ? 11 : 13;');
-    expect(menuSceneSource).toContain("addText('PLAYER GUIDE', panel.centerX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);");
-    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'points to End', '#b7f2ff');");
-    expect(menuSceneSource).toContain("'Player: green beacon + trail.'");
+    expect(menuSceneSource).toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width);');
+    expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
+    expect(menuSceneSource).toContain('const guideTitleFontSize = guideLayout.titleFontSize;');
+    expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
+    expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
+    expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);');
+    expect(menuSceneSource).toContain("addText('QUICK PLAY', cardCenterX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);");
+    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', '#b7f2ff');");
+    expect(menuSceneSource).not.toContain("'Player • green trail'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
-    expect(menuSceneSource).toContain("`${this.mode === 'play' ? 'Skill' : 'AI skill'}: rank + level.`");
-    expect(menuSceneSource).toContain("'Score grades each run.'");
-    expect(menuSceneSource).toContain("'Maze Lvl sets challenge.'");
+    expect(menuSceneSource).not.toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`");
+    expect(menuSceneSource).not.toContain("'Score • run quality'");
+    expect(menuSceneSource).not.toContain("'Maze • difficulty'");
+    expect(menuSceneSource).not.toContain('the current procedural challenge tier');
   });
 
   test('exposes wrapped edge player snaps in runtime diagnostics', () => {
@@ -1346,15 +1520,19 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (!this.runtimeDiagnosticsConfig.enabled || typeof window === \'undefined\')');
     expect(menuSceneSource).toContain('window.__MAZER_QA__ = {');
     expect(menuSceneSource).toContain('movePlayPlayer: (move: string): LegacyQaMoveResult => this.handleLegacyQaPlayMove(move)');
-    expect(menuSceneSource).toContain('openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay()');
-    expect(menuSceneSource).toContain('private handleLegacyQaOpenOptionsOverlay(): LegacyQaOverlayResult');
+    expect(menuSceneSource).toContain('openSettingsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenSettingsOverlay()');
+    expect(menuSceneSource).toContain('openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay()');
+    expect(menuSceneSource).toContain('startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode()');
+    expect(menuSceneSource).toContain('private handleLegacyQaOpenSettingsOverlay(): LegacyQaOverlayResult');
+    expect(menuSceneSource).toContain('private handleLegacyQaOpenPauseOverlay(): LegacyQaOverlayResult');
+    expect(menuSceneSource).toContain('private handleLegacyQaStartPlayMode(): LegacyQaOverlayResult');
     expect(menuSceneSource).toContain("this.openOverlay('options');");
     expect(menuSceneSource).toContain('this.rebuildUi();');
     expect(menuSceneSource).toContain('this.publishVisualDiagnostics(this.time.now, true);');
     expect(menuSceneSource).toContain('this.publishRuntimeDiagnostics(this.time.now, true);');
     expect(menuSceneSource).toContain('private detachLegacyQaDiagnosticsSurface(): void');
     expect(menuSceneSource).toContain('delete window.__MAZER_QA__;');
-    expect(menuSceneSource).toContain('const accepted = this.tryMovePlayerFromInput(vector.deltaX, vector.deltaY);');
+    expect(menuSceneSource).toContain('const accepted = this.tryMovePlayerFromInput(vector.deltaX, vector.deltaY, { releaseAfterStep: true });');
     expect(qaScriptSource).toContain("const DEFAULT_INPUT_METHOD = 'qa';");
     expect(qaScriptSource).toContain('const api = window.__MAZER_QA__;');
     expect(qaScriptSource).toContain('api.movePlayPlayer(actionKind)');
@@ -1398,8 +1576,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(aiSource).toContain('aiMemory: DemoWalkerMemoryFrame;');
     expect(aiSource).toContain('memoryFrames: readonly DemoWalkerMemoryFrame[];');
     expect(aiSource).toContain('optionIndices: resolveMemoryOptionIndices()');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_OPTION_CORE = 0x2de8ff;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_TARGET_CORE = 0xffd36a;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_TARGET_CORE = cyberArcadeMaterial.signal.warning;');
     expect(menuSceneSource).toContain('private resolveLegacyMenuAiThoughtStyle(');
     expect(menuSceneSource).toContain('coreColor: LEGACY_MENU_AI_MEMORY_TARGET_CORE');
     expect(menuSceneSource).toContain('edgeColor: LEGACY_MENU_AI_MEMORY_TARGET_EDGE');
@@ -1436,39 +1614,73 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("ease: 'Sine.easeInOut'");
     expect(menuSceneSource).toContain('this.syncLegacyAuthNativeInputValue();');
     expect(menuSceneSource).toContain('this.destroyLegacyAuthNativeInput();');
-    expect(menuSceneSource).toContain("const secondaryModeLabel = this.authForm.mode === 'signup' ? 'Use Login' : 'Create Account';");
+    expect(menuSceneSource).toContain('const secondaryModeLabel = presentation.alternateActionLabel;');
     expect(menuSceneSource).not.toContain('Guest mode is active. Sign in to keep account progress separate.');
   });
 
-  test('keeps pause overflow behind a mobile scroll facade and icon-only overlay back control', () => {
+  test('keeps full-height overlay content behind one mobile scroll facade and icon-only back control', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const overlayPanelStart = menuSceneSource.indexOf('  private drawOverlayPanel(): void {');
+    const overlayPanelEnd = menuSceneSource.indexOf('  private resolveOverlayPanelFrame(', overlayPanelStart);
+    const overlayPanelSource = menuSceneSource.slice(overlayPanelStart, overlayPanelEnd);
 
+    expect(overlayPanelStart).toBeGreaterThanOrEqual(0);
+    expect(overlayPanelEnd).toBeGreaterThan(overlayPanelStart);
+    expect(overlayPanelSource).toContain('this.overlayGraphics.fillStyle(0x02040a, 0.82);');
+    expect(overlayPanelSource).toContain('this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);');
+    expect(overlayPanelSource).not.toContain('drawLegacyCyberPanel');
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');
     expect(menuSceneSource).toContain('private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void');
     expect(menuSceneSource).toContain('private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand(\'resume\')));');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));');
-    expect(menuSceneSource).toContain("if (kind === 'pause' && this.mode === 'play')");
-    expect(menuSceneSource).toContain('const timerBottom = timerFrame.timerBounds.top + timerFrame.timerBounds.height;');
-    expect(menuSceneSource).toContain('top = Math.max(timerBottom + (compact ? 10 : 14), 58);');
+    expect(menuSceneSource).toContain('return resolveLegacyOverlayPanelLayout(this.layout.width, this.layout.height);');
+    expect(menuSceneSource).toContain('const shell = resolveLegacyOverlayShellLayout({');
+    expect(menuSceneSource).not.toContain("if (kind === 'pause' && this.mode === 'play')");
     expect(menuSceneSource).toContain('rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER');
-    expect(menuSceneSource).toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics, true);');
-    expect(menuSceneSource).toContain('this.overlayScrollThumbBounds = this.legacyOverlayScrollRectToVisualRect(metrics.thumb);');
+    expect(menuSceneSource).toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics);');
+    expect(menuSceneSource).toContain('private resolveLegacyOverlayScrollRenderViewport(metrics: LegacyOverlayScrollMetrics): VisualRect');
+    expect(menuSceneSource).toContain('const renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);');
+    expect(menuSceneSource).toContain('const maskGraphics = this.make.graphics({ x: 0, y: 0 }, false);');
+    expect(menuSceneSource).toContain('label.setMask(this.overlayGuideMask);');
+    expect(menuSceneSource).toContain('cardTop < viewport.bottom - 2 && cardTop + cardHeight > viewport.top + 2');
+    expect(menuSceneSource).toContain('resolveLegacyOverlayScrollRenderRect(metrics.viewport)');
+    expect(menuSceneSource).toContain('legacyOverlayScrollRectIntersectsViewport(bounds, viewport)');
+    expect(menuSceneSource).toContain('const viewportTop = shell.contentTop;');
+    expect(menuSceneSource).toContain('cardTop < viewport.bottom - 2 && cardTop + cardHeight > viewport.top + 2');
+    expect(menuSceneSource).not.toContain('this.drawLegacyOverlayScrollFacade(scrollMetrics, true);');
+    expect(menuSceneSource).toContain('this.overlayScrollTrackBounds = metrics.enabled');
+    expect(menuSceneSource).toContain('this.overlayScrollThumbBounds = metrics.enabled');
     expect(menuSceneSource).toContain('const thumbAlpha = metrics.enabled ? 0.92 : 0.58;');
+    expect(menuSceneSource).toContain('const drawScrollEdgeCue = (y: number, alpha: number): void => {');
+    expect(menuSceneSource).toContain('drawScrollEdgeCue(viewport.top + viewport.height - 2, metrics.bottomFadeAlpha);');
+    expect(menuSceneSource).not.toContain('graphics.fillRect(viewport.left, viewport.top, viewport.width, fadeHeight);');
+    expect(menuSceneSource).not.toContain('viewport.top + viewport.height - fadeHeight');
     expect(menuSceneSource).toContain('if (!showAdvancedOptions) {');
-    expect(menuSceneSource).toContain('const viewportTop = guideEndY + (compact ? 8 : 10);');
-    expect(menuSceneSource).toContain('const contentHeight = this.resolveFeatureControlRowsContentHeight(panel, {');
+    expect(menuSceneSource).toContain('const viewportTop = rowY + (compact ? 4 : 6);');
+    expect(menuSceneSource).toContain('const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {');
+    expect(menuSceneSource).toContain('contentHeight: contentFlow.contentHeight');
     expect(menuSceneSource).toContain('this.input.on(\'wheel\'');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerDown(pointer: Phaser.Input.Pointer): boolean');
     expect(menuSceneSource).toContain('private handleOverlayScrollPointerMove(pointer: Phaser.Input.Pointer): boolean');
+    expect(menuSceneSource).toContain('private overlayScrollGestureLockPointerId: number | null = null;');
+    expect(menuSceneSource).toContain('private overlayMovementSpeedSliderBounds: VisualRect | null = null;');
+    expect(menuSceneSource).toContain('this.overlayScrollGestureLockPointerId = this.normalizeLegacyPlayTouchPointerId(pointer.id) ?? -1;');
+    expect(menuSceneSource).toContain('|| this.overlayScrollGestureLockPointerId !== null');
     expect(menuSceneSource).toContain('private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number');
     expect(menuSceneSource).toContain('fillScrollPill(track.left - 3, track.top - 2, track.width + 6, track.height + 4');
     expect(menuSceneSource).toContain('centerY - (height / 2) >= viewport.top + 2');
     expect(menuSceneSource).toContain('centerY + (height / 2) <= viewport.bottom - 2');
     expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
-    expect(menuSceneSource).toContain('const showStateLabel = input.width >= 320;');
+    expect(menuSceneSource).toContain('const buttonHorizontalInset = Math.max(10, Math.min(18, Math.round(width * 0.08)));');
+    expect(menuSceneSource).not.toContain('drawLegacyPlayTouchLabel');
+    expect(menuSceneSource).toContain('labelFontSize: Number.isFinite(Number.parseFloat(String(button.label.style.fontSize)))');
+    expect(menuSceneSource).not.toContain('topActionHeight:');
+    expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const stateLabelRight = trackLeft - trackGap;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
+    expect(menuSceneSource).toContain('const visibleLabelText = showStateLabel || !displayStateText');
+    expect(menuSceneSource).toContain('`${input.label}: ${displayStateText}`');
     expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 0.92 : 0)');
     expect(menuSceneSource).toContain('setVisible(showStateLabel)');
     expect(menuSceneSource).not.toContain("const tightWidth = input.width < 260;");
@@ -1482,9 +1694,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps menu maze visuals aligned with the cleaned play maze language', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = 0xe7fff4;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = 0x0d3c4f;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = 0x07111d;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = cyberArcadeMaterial.path.core;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE,');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE_ALPHA,');
     expect(menuSceneSource).toContain('this.drawLegacyPathMaterialTile(');

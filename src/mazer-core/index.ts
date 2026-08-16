@@ -9,3 +9,4 @@ export * from './playbook';
 export * from './puzzles';
 export * from './signals';
 export * from './traps';
+export * from './world';

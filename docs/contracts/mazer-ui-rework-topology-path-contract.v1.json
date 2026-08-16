@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "wave": "2B",
+  "status": "registered-not-wired",
+  "sourceRef": "01_FINAL_AUTHORITATIVE_HANDOFF/spec/topology-path-contract.json (mazer-everything-bundle-20260803)",
+  "decisionRefs": [
+    "shipping-corridor-not-tiles",
+    "renderer-ownership-split"
+  ],
+  "notes": "Wave 2B ('Topology/path geometry') per blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md ('PR 2B -- Topology/path geometry source: Pure modules and tests. No shipping renderer switch yet.') and spec/pr-lanes.json lane 2B ('Topology/path geometry', parallel: yes, exclusiveFiles: ['geometry/render sources']). This registry is the single source of truth src/geometry/topologyPath.ts is hand-derived from, and scripts/check-topology-path-contract.mjs cross-checks both the JSON's own internal bits/masks consistency and (via the test suite) the TS module against. No file in this wave is wired into index.html, vite.config.ts, src/scenes/MenuScene.ts, src/future-runtime/phaser/topology.ts, or any other live-render/live-generation path -- this is registration of the pure 16-mask connected-corridor geometry contract only, not a renderer migration. It is unrelated to and does not modify docs/architecture/MAZER-EDGE-WRAP-TOPOLOGY-CONTRACT.md (which governs generated-maze edge-wrap endpoint pairing, a different domain: maze *generation* topology, not the shared UI-rework corridor *rendering* mask contract this file defines) or src/future-runtime/phaser/topology.ts (an unrelated fixed satellite-prototype tile graph for the future-Phaser lab surface). Per decision shipping-corridor-not-tiles, the canonical shipping presentation for this mask contract is 'connected-corridor'; tile-square/cell-outline treatment is optional proof/debug only, never the shipping default -- debugPresentations lists exactly those non-shipping debug treatments. Per decision renderer-ownership-split, this geometry contract is a shared, renderer-independent module (also named 'PathGeometry' in spec/component-registry.json's 'shared' list) both the existing Phaser board renderer and any future DOM/adapter renderer can consume identically once a later wave (PR 4D, 'Shared path renderer and title', exclusiveFiles: ['board render/title render']) actually wires it in.",
+  "bits": {
+    "N": 1,
+    "E": 2,
+    "S": 4,
+    "W": 8
+  },
+  "shippingPresentation": "connected-corridor",
+  "debugPresentations": [
+    "cell-outline",
+    "centerline",
+    "mask-label"
+  ],
+  "masks": [
+    { "mask": 0, "connections": [] },
+    { "mask": 1, "connections": ["N"] },
+    { "mask": 2, "connections": ["E"] },
+    { "mask": 3, "connections": ["N", "E"] },
+    { "mask": 4, "connections": ["S"] },
+    { "mask": 5, "connections": ["N", "S"] },
+    { "mask": 6, "connections": ["E", "S"] },
+    { "mask": 7, "connections": ["N", "E", "S"] },
+    { "mask": 8, "connections": ["W"] },
+    { "mask": 9, "connections": ["N", "W"] },
+    { "mask": 10, "connections": ["E", "W"] },
+    { "mask": 11, "connections": ["N", "E", "W"] },
+    { "mask": 12, "connections": ["S", "W"] },
+    { "mask": 13, "connections": ["N", "S", "W"] },
+    { "mask": 14, "connections": ["E", "S", "W"] },
+    { "mask": 15, "connections": ["N", "E", "S", "W"] }
+  ]
+}

@@ -1,16 +1,109 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import {
+  collectMenuControlSpacingIssues,
+  hasExpectedTextLabels,
+  matchesExpectedTextLabel
+} from '../../scripts/analysis/capture-ui-surfaces.mjs';
+
+describe('UI surface capture label matching', () => {
+  test('accepts explicit inline state labels without weakening unrelated label matching', () => {
+    expect(matchesExpectedTextLabel('Camera Follow', 'Camera Follow')).toBe(true);
+    expect(matchesExpectedTextLabel('Camera Follow: On', 'Camera Follow')).toBe(true);
+    expect(matchesExpectedTextLabel('High Contrast: On', 'High Contrast')).toBe(true);
+    expect(matchesExpectedTextLabel('Smart Steering: Off', 'Smart Steering')).toBe(true);
+    expect(matchesExpectedTextLabel('Control Style: Arrows', 'Control Style')).toBe(true);
+    expect(matchesExpectedTextLabel('Camera Follower: On', 'Camera Follow')).toBe(false);
+    expect(matchesExpectedTextLabel('Camera Follow: ', 'Camera Follow')).toBe(false);
+    expect(matchesExpectedTextLabel('Camera Follow:    ', 'Camera Follow')).toBe(false);
+    expect(matchesExpectedTextLabel('Login: Error', 'Login')).toBe(false);
+    expect(matchesExpectedTextLabel('Start: Disabled', 'Start')).toBe(false);
+    expect(hasExpectedTextLabels(
+      ['Camera Follow: On', 'Smart Steering: Off', 'Control Style: Stick'],
+      ['Camera Follow', 'Smart Steering', 'Control Style']
+    )).toBe(true);
+    expect(hasExpectedTextLabels(['High Contrast: On', 'Account'], ['High Contrast', 'Account'])).toBe(true);
+    expect(hasExpectedTextLabels(
+      ['Camera Follower: On', 'Smart Steering: Off', 'Control Style: Stick'],
+      ['Camera Follow', 'Smart Steering', 'Control Style']
+    )).toBe(false);
+    expect(hasExpectedTextLabels(['Login: Error'], ['Login'])).toBe(false);
+    expect(hasExpectedTextLabels(['Start: Disabled'], ['Start'])).toBe(false);
+  });
+});
+
+describe('UI surface capture menu header controls', () => {
+  const bounds = (left, top, width, height) => ({
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    centerX: left + (width / 2),
+    centerY: top + (height / 2)
+  });
+
+  const menuSurface = ({
+    playerLevel = bounds(9, 13, 44, 44),
+    aiLevel = bounds(61, 13, 44, 44),
+    aiLabel = 'AI',
+    settings = bounds(352, 13, 44, 44)
+  } = {}) => ({
+    mode: 'menu',
+    overlay: 'none',
+    progressionBadge: { bounds: playerLevel },
+    menuAiProgressionBadge: { bounds: aiLevel, label: aiLabel },
+    buttons: [{ bounds: settings, iconOnly: true, text: 'Settings' }]
+  });
+
+  test('accepts the player and AI menu glyphs paired with the same square settings cog', () => {
+    expect(collectMenuControlSpacingIssues(menuSurface())).toEqual([]);
+  });
+
+  test('rejects missing, undersized, or misaligned menu header controls', () => {
+    expect(collectMenuControlSpacingIssues(menuSurface({ playerLevel: null })))
+      .toContain('menu:missing-player-level-glyph');
+    expect(collectMenuControlSpacingIssues(menuSurface({ settings: bounds(350, 15, 42, 42) })))
+      .toEqual(expect.arrayContaining([
+        'menu:settings-target=42.0x42.0<44',
+        'menu:player-level-settings-size-mismatch=44.0x44.0!=42.0x42.0',
+        'menu:player-level-settings-top-mismatch=13.0!=15.0'
+      ]));
+    expect(collectMenuControlSpacingIssues(menuSurface({ aiLevel: null, aiLabel: null })))
+      .toEqual(expect.arrayContaining([
+        'menu:missing-ai-level-glyph',
+        'menu:ai-level-label=missing!=AI'
+      ]));
+    expect(collectMenuControlSpacingIssues(menuSurface({ aiLevel: bounds(52, 13, 44, 44) })))
+      .toContain('menu:player-level-to-ai-level-gap=-1.0<8');
+  });
+});
 
 describe('UI surface capture script contract', () => {
   test('captures menu, options, play, and pause from runtime diagnostics', () => {
-    const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-ui-surfaces.mjs'), 'utf8');
+    const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-ui-surfaces.mjs'), 'utf8')
+      .replace(/\r\n/g, '\n');
+    const transitionSource = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-ui-transitions.mjs'), 'utf8')
+      .replace(/\r\n/g, '\n');
     const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'));
 
     expect(packageJson.scripts['visual:ui-surfaces']).toBe('node ./scripts/analysis/capture-ui-surfaces.mjs');
+    expect(packageJson.scripts['visual:cyber-arcade-matrix']).toBe('node ./scripts/analysis/capture-cyber-arcade-matrix.mjs');
+    expect(packageJson.scripts['visual:cyber-arcade-compare']).toBe('node ./scripts/analysis/build-cyber-arcade-comparison.mjs');
+    expect(packageJson.scripts['visual:ui-transitions']).toBe('node ./scripts/analysis/capture-ui-transitions.mjs');
+    expect(transitionSource).toContain('skipTopologyDiagnostics: true');
     expect(source).toContain("const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';");
+    expect(source).toContain("const WRAP_TOPOLOGY_PROGRESSION_STORAGE_KEY = 'mazer.progression.v1:user:runtime-diagnostics-auth-fixture';");
     expect(source).toContain("const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';");
     expect(source).toContain('const DEFAULT_DEVICE_SCALE_FACTOR = 2;');
+    expect(source).toContain('const gameScale = window.__MAZER_GAME__?.scale;');
+    expect(source).toContain('gameScale?.width === width');
+    expect(source).toContain('gameScale?.height === height');
+    expect(source).toContain('const mobileViewport = viewport.width < 720;');
+    expect(source).toContain('hasTouch: transition ? false : mobileViewport');
+    expect(source).toContain('isMobile: transition ? false : mobileViewport');
     expect(source).toContain("assertVisualScreenContract(screenContract);");
     expect(source).toContain('buildVisualScreenContract({');
     expect(source).toContain('const waitForVisualBuildSettled = async (page, { requireReadableTitle = false, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
@@ -20,36 +113,58 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const waitForAuthenticatedFixtureReady = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
     expect(source).toContain("runtime?.auth?.status === 'authenticated'");
     expect(source).toContain("labels.has('Start')");
+    expect(source).toContain('const playGeometrySettled = expectedMode !== \'play\'');
+    expect(source).toContain('badge.bottom <= board.top - 8');
+    expect(source).toContain('Number.isFinite(badge?.bottom)');
+    expect(source).toContain('Number.isFinite(board?.top)');
+    expect(source).toContain("button?.text === 'Settings' && button?.iconOnly === true");
     expect(source).toContain("if (authFixture === 'authenticated') {");
     expect(source).toContain('await waitForAuthenticatedFixtureReady(page, { timeoutMs });');
     expect(source).toContain('expectedOverlay: overlay');
-    expect(source).toContain('return visual?.runtime?.mode === expectedMode && visual?.runtime?.overlay === expectedOverlay;');
+    expect(source).toContain("visual?.runtime?.mode === expectedMode\n          && visual?.runtime?.overlay === expectedOverlay");
     expect(source).toContain('screenContract: optionsSurface.screenContract');
     expect(source).toContain('const resolveRouteWithParams = (route, params) => {');
     expect(source).toContain('const isAuthGatedMenuSurface = (surface) => (');
-    expect(source).toContain("hasTextLabels(surface, ['Login'])");
+    expect(source).toContain("hasVisualButton(surface, 'Login')");
+    expect(source).toContain("const hasVisualButton = (surface, text, { iconOnly = null } = {}) => (");
     expect(source).toContain('const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([');
-    expect(source).toContain('const resolveOptionsExpectedLabels = (authenticated) => [');
+    expect(source).toContain('export const matchesExpectedTextLabel = (actualLabel, expectedLabel) => (');
+    expect(source).toContain('export const hasExpectedTextLabels = (actualLabels, expectedLabels) => (');
+    expect(source).toContain('const INLINE_STATE_TEXT_LABELS = Object.freeze([');
+    expect(source).toContain('allowStateSuffix: INLINE_STATE_TEXT_LABELS.includes(expectedLabel)');
+    expect(source).toContain('expected: expectedLabelDescriptors');
+    expect(source).toContain('return hasExpectedTextLabels(labels, expectedLabels);');
+    expect(source).toContain("actualLabel.startsWith(`${expectedLabel}: `)");
+    expect(source).toContain('actualLabel.slice(expectedLabel.length + 2).trim().length > 0');
+    expect(source).toContain('const resolveOptionsBottomExpectedLabels = (authenticated) => [');
     expect(source).toContain("authenticated ? 'Log out' : 'Account'");
     expect(source).toContain("authFixture === 'authenticated' || menu.diagnostics.runtime?.auth?.status === 'authenticated'");
     expect(source).toContain("surfaces.menu.authStatus === 'authenticated' || hasTextLabels(surfaces.options, ['Log out'])");
+    expect(source).toContain('hasLabels(surfaces.optionsBottom, optionsBottomExpectedLabels)');
+    expect(source).toContain("collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, optionsBottomExpectedLabels)");
     expect(source).toContain('const getVisualButtonPoint = (visual, text) => {');
     expect(source).toContain("const button = (visual?.buttons ?? []).find((entry) => entry?.text === text && isFiniteBounds(entry?.bounds));");
     expect(source).toContain("login: getVisualButtonPoint(visual, 'Login') ?? {");
     expect(source).toContain("start: getVisualButtonPoint(visual, 'Start') ?? {");
-    expect(source).toContain("options: getVisualButtonPoint(visual, 'Options') ?? {");
+    expect(source).toContain("options: getVisualButtonPoint(visual, 'Settings') ?? {");
+    expect(source).toContain("hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })");
     expect(source).toContain('const openOptionsOverlayFromMenu = async (page, point, expectedLabels, timeoutMs) => {');
-    expect(source).toContain("await clickPoint(page, point, 'Options');");
+    expect(source).toContain("await clickPoint(page, point, 'Settings');");
     expect(source).toContain('await page.touchscreen.tap(point.x, point.y);');
     expect(source).toContain('timeoutMs: Math.min(timeoutMs, 10_000)');
     expect(source).toContain('const openOptionsOverlayViaQa = async (page, timeoutMs) => {');
-    expect(source).toContain('window.__MAZER_QA__?.openOptionsOverlay');
-    expect(source).toContain('api.openOptionsOverlay()');
-    expect(source).toContain('Unable to open Options overlay through QA bridge');
+    expect(source).toContain('window.__MAZER_QA__?.openSettingsOverlay');
+    expect(source).toContain('api.openSettingsOverlay()');
+    expect(source).toContain('Unable to open Settings through QA bridge');
     expect(source).toContain('const PLAY_TRAIL_SEED_MOVES = Object.freeze([');
-    expect(source).toContain('const seedPlayTrailForVisualProof = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
+    expect(source).toContain('const seedPlayTrailForVisualProof = async (');
+    expect(source).toContain('{ expectTrailShineEnabled = true, timeoutMs = DEFAULT_TIMEOUT_MS } = {}');
     expect(source).toContain('window.__MAZER_QA__?.movePlayPlayer');
-    expect(source).toContain('visual?.markerStyle?.trailPulseEnabled === true');
+    expect(source).toContain('visual?.markerStyle?.trailShineEnabled === expected');
+    expect(source).toContain("const trailShineChecks = ['menu', 'play'].map((id) => createCheck(");
+    expect(source).toContain('`${id}-trail-shine-white`');
+    expect(source).toContain('EXPECTED_TRAIL_SHINE_COLOR = 0xf1faf6');
+    expect(source).toContain('EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe9fff1');
     expect(source).toContain('Unable to seed play trail for visual proof');
     expect(source).toContain("id: '01-menu'");
     expect(source).toContain("id: '02-auth'");
@@ -65,79 +180,170 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("overlay: 'auth'");
     expect(source).toContain("overlay: 'pause'");
     expect(source).toContain('expectedLabels: []');
-    expect(source).toContain("reason: 'auth-gated-menu'");
+    expect(source).toContain("hasLabels(surfaces.menu, ['Login']) && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })");
+    expect(source).toContain('const closeOverlayToMenu = async (page, timeoutMs) => {');
+    expect(source).toContain("await clickPoint(page, {\n    x: Math.round(bounds.centerX),\n    y: Math.round(bounds.centerY)\n  }, 'Back');");
+    expect(source).toContain("const pathStyleSurfaceIds = ['menu', 'options', 'play', 'pause'];");
     expect(source).toContain("const playRoute = authGatedMenu ? resolveRouteWithParams(route, { mode: 'play', overlay: null }) : route;");
-    expect(source).toContain('const playTrailSeed = await seedPlayTrailForVisualProof(page, { timeoutMs });');
+    expect(source).toContain('const playTrailSeed = options.skipPlayTrailSeed');
+    expect(source).toContain('expectTrailShineEnabled: !options.reducedMotion');
+    expect(source).toContain("reason: 'focused-topology-proof'");
+    expect(source).toContain("const seedTopologyFixture = async (page, fixture) => {");
+    expect(source).toContain("fixture !== 'wrap-enabled'");
     expect(source).toContain('const latestMenuDiagnostics = await readDiagnostics(page);');
     expect(source).toContain('const latestMenuButtons = getMenuButtonPoints(latestMenuDiagnostics.visual);');
-    expect(source).toContain("expectedLabels: ['PAUSE']");
-    expect(source).toContain("expectedLabels: ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu']");
+    expect(source).toContain('markerStyle: menu.diagnostics.visual?.markerStyle');
+    expect(source).toContain('hud: play.diagnostics.visual?.hud');
+    expect(source).toContain('expectedLabels: []');
+    expect(source).toContain("expectedLabels: ['Paused', 'QUICK PLAY', 'Reset', 'Menu']");
     expect(source).toContain("url.searchParams.set('mazeSeed', mazeSeed);");
     expect(source).toContain("url.searchParams.set('authFixture', authFixture);");
     expect(source).not.toContain("url.searchParams.set('pathStyle', pathStyle);");
     expect(source).toContain('expected=corridor');
     expect(source).toContain('const checks = buildSurfaceChecks({');
+    expect(source).toContain('requirePlayTrailSeed: !options.skipPlayTrailSeed');
+    expect(source).toContain("requireWrapPairs: topologyFixture === 'wrap-enabled'");
+    expect(source).toContain('requirePlayTrailSeed = true');
+    expect(source).toContain('requireTopologyDiagnostics = true');
+    expect(source).toContain('reducedMotion = false');
+    expect(source).toContain("'reduced-motion-rendering'");
+    expect(source).toContain("'skipped for focused material and layout proof'");
     expect(source).toContain('const isIgnorableConsoleMessage = (message) => (');
     expect(source).toContain("message.text.includes('WebGL: CONTEXT_LOST_WEBGL')");
     expect(source).toContain("createCheck(\n      'play-player-green'");
     expect(source).toContain("createCheck(\n      'play-goal-red'");
     expect(source).toContain("createCheck(\n      'play-stick-controls'");
-    expect(source).toContain("createCheck(\n      'play-trail-pulse-seeded-on'");
+    expect(source).toContain("createCheck(\n      'play-trail-shine-seeded-on'");
+    expect(source).toContain('...trailShineChecks');
     expect(source).toContain('deviceScaleFactor,');
     expect(source).toContain('authFixture: authFixture ?? null');
     expect(source).toContain('playTrailSeed,');
+    expect(source).toContain('topologyFixture: topologyFixture ?? null');
+    expect(source).toContain("`- Topology fixture: ${summary.topologyFixture ?? 'none'}`");
     expect(source).toContain("createCheck(\n      'menu-text-labels'");
     expect(source).toContain("createCheck(\n      'menu-title-readable'");
     expect(source).toContain("createCheck(\n      'auth-surface'");
     expect(source).toContain("createCheck(\n      'auth-text-labels'");
-    expect(source).toContain("hasLabels(surfaces.auth, ['Account', 'Login', 'Create Account', 'Reset Password'])");
+    expect(source).toContain("hasLabels(surfaces.auth, ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'])");
     expect(source).toContain('const collectTextBoundsIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain('const collectNativeInputBoundsIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain('const collectTextOverlapIssues = (surfaceId, surface) => {');
-    expect(source).toContain('const collectMenuControlSpacingIssues = (surface) => {');
+    expect(source).toContain('export const collectMenuControlSpacingIssues = (surface) => {');
+    expect(source).toContain('const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {');
+    expect(source).toContain("issues.push('menu:missing-player-level-glyph');");
+    expect(source).toContain('menu:player-level-settings-size-mismatch=');
+    expect(source).toContain('menu:player-level-to-settings-gap=');
+    expect(source).toContain("issues.push('menu:missing-ai-level-glyph');");
+    expect(source).toContain('menu:player-level-to-ai-level-gap=');
+    expect(source).toContain('menu:ai-level-to-settings-gap=');
+    expect(source).toContain("surface?.mode !== 'play'");
+    expect(source).toContain('badge.width > board.width + 1');
+    expect(source).toContain('progression-badge-not-above-play-board');
+    expect(source).not.toContain('progression-badge-not-above-menu-board');
+    expect(source).toContain('progression-badge-to-pause-gap=');
+    expect(source).toContain("'progression-badge-geometry'");
     expect(source).toContain("createCheck(\n      'mobile-text-label-bounds'");
     expect(source).toContain("createCheck(\n      'mobile-native-input-bounds'");
     expect(source).toContain("createCheck(\n      'mobile-text-overlap'");
     expect(source).toContain("createCheck(\n      'mobile-control-spacing'");
     expect(source).toContain("createCheck(\n      'mobile-badge-text-fit'");
     expect(source).toContain('const collectOverlayScrollAffordanceIssues = (surfaceId, surface) => {');
+    expect(source).toContain('const collectOverlayScrollCueTextIssues = (surfaceId, surface) => {');
+    expect(source).toContain('text-crosses-scroll-edge-cue');
+    expect(source).toContain("'overlay-scroll-edge-cue-text-clearance'");
+    expect(source).not.toContain('text-under-bottom-fade');
+    expect(source).toContain('const requiredRects = scroll.enabled === true');
+    expect(source).toContain("if (scroll.enabled !== true) {");
+    expect(source).toContain('const collectButtonLabelContainmentIssues = (surfaceId, surface) =>');
+    expect(source).toContain('const collectButtonLabelFillIssues = (surfaceId, surface) =>');
+    expect(source).toContain('progressionBadge fontSize=');
+    expect(source).not.toContain('pause-height=');
+    expect(source).toContain('const collectGuideTextContainmentIssues = (surfaceId, surface) => {');
+    expect(source).toContain('const collectWrapTopologyDiagnosticIssues = (surfaceId, surface, { requirePairs = false } = {}) => {');
+    expect(source).toContain('const collectCyberArcadeMaterialIssues = (surfaceId, surface) => {');
+    expect(source).toContain('material.geometry?.textTextureResolution !== 1');
+    expect(source).toContain("material.geometry?.textTransformOwner !== 'game-canvas-only'");
+    expect(source).toContain("'cyber-arcade-material-system'");
+    expect(source).toContain('materialSystem: menu.diagnostics.visual?.materialSystem');
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-affordance'");
     expect(source).toContain("createCheck(\n      'mobile-overlay-scroll-reachability'");
+    expect(source).toContain("createCheck(\n      'button-label-containment'");
+    expect(source).toContain("createCheck(\n      'button-label-fill'");
+    expect(source).toContain("createCheck(\n      'guide-text-containment'");
+    expect(source).toContain("createCheck(\n      'wrap-topology-diagnostics'");
     expect(source).toContain('const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
-    expect(source).toContain("expectedLabels: ['Controls']");
+    expect(source).toContain('const desktopViewport = (before.visual?.viewport?.width ?? 0) >= 720;');
+    expect(source).toContain('const wheelDelta = Math.max(scroll.maxOffset * 4, dragDistance);');
+    expect(source).toContain('await page.mouse.wheel(0, wheelDelta);');
+    expect(source).toContain('expectedLabels: optionsBottomExpectedLabels');
     expect(source).toContain("expectedLabels: ['Move Speed', 'Reset Progress', 'Reset', 'Menu']");
     expect(source).toContain('optionsSurface.diagnostics.visual?.overlayUi');
     expect(source).toContain('pause.diagnostics.visual?.overlayUi');
     expect(source).toContain("nativeInputs: authSurface.nativeInputs");
     expect(source).toContain('progressionBadge: menu.diagnostics.visual?.progressionBadge');
+    expect(source).toContain('menuAiProgressionBadge: menu.diagnostics.visual?.menuAiProgressionBadge');
     expect(source).toContain('title: menu.diagnostics.visual?.title');
+    expect(source).toContain('generation: menu.diagnostics.runtime?.generation');
     expect(source).toContain('progressionBadge: authSurface.diagnostics.visual?.progressionBadge');
     expect(source).toContain('progressionBadge: play.diagnostics.visual?.progressionBadge');
+    expect(source).toContain('generation: play.diagnostics.runtime?.generation');
     expect(source).toContain('all active text labels stay inside viewport');
-    expect(source).toContain('visible progression badges fit their chrome');
+    expect(source).toContain('the active-play level glyph fits its chrome');
     expect(source).toContain("deviceScaleFactor: parseIntegerArg(args['device-scale-factor'], DEFAULT_DEVICE_SCALE_FACTOR)");
+    expect(source).toContain("reducedMotion: args['reduced-motion'] === true || args['reduced-motion'] === 'true'");
+    expect(source).toContain("reducedMotion: options.reducedMotion ? 'reduce' : 'no-preference'");
+    expect(source).toContain("skipPlayTrailSeed: args['skip-play-trail-seed'] === true || args['skip-play-trail-seed'] === 'true'");
+    expect(source).toContain("topologyFixture: typeof args['topology-fixture'] === 'string' ? args['topology-fixture'] : undefined");
     expect(source).toContain("authFixture: typeof args['auth-fixture'] === 'string' ? args['auth-fixture'] : undefined");
     expect(source).toContain("authFixture: result.authFixture");
+    expect(source).toContain("preferenceFixture: typeof args['preference-fixture'] === 'string' ? args['preference-fixture'] : undefined");
+    expect(source).toContain("if (preferenceFixture !== 'fresh') {");
+    expect(source).toContain("'fresh-session-defaults'");
+    expect(source).toContain('hasLabelsAcross(');
+    expect(source).toContain("'Full maze view.'");
+    expect(source).toContain("'Trail stays.'");
+    expect(source).toContain("'Slow white shine.'");
+    expect(source).toContain("'Shifts 1 tile at walls.'");
+    expect(source).toContain('preferenceFixture: result.preferenceFixture');
+    expect(source).toContain('window.requestAnimationFrame(() => {');
+    expect(source).toContain('window.requestAnimationFrame(resolvePaint);');
+    expect(source).toContain('const exerciseReducedMotionPreferenceChange = async (page, timeoutMs) => {');
+    expect(source).toContain("await page.emulateMedia({ reducedMotion: 'reduce' });");
+    expect(source).toContain("await page.emulateMedia({ reducedMotion: 'no-preference' });");
+    expect(source).toContain("'reduced-motion-preference-change'");
+    expect(source).toContain('reducedMotionToggle.initial === false');
+    expect(source).toContain('// Restoring the operating-system motion preference redraws the canvas UI.');
+    expect(source).toContain('requireReadableTitle: true,\n      timeoutMs\n    });\n    const menu = await captureSurface({');
     expect(source).not.toContain("expectedLabels: ['Exit', 'Start', 'Options']");
-    expect(source).toContain("authGated ? hasLabels(surfaces.menu, ['Login']) : hasLabels(surfaces.menu, ['Start', 'Options'])");
-    expect(source).toContain("authGated\n        ? surfaces.options.skipped === true");
+    expect(source).toContain("hasLabels(surfaces.menu, ['Start']) && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })");
+    expect(source).toContain("surfaces.options.mode === 'menu' && surfaces.options.overlay === 'options'");
     expect(source).toContain('const optionsCaptureExpectedLabels = [...OPTIONS_BASE_EXPECTED_LABELS];');
+    expect(source).toContain('expectedLabels: optionsBottomExpectedLabels');
     expect(source).toContain('await openOptionsOverlayFromMenu(page, latestMenuButtons.options, optionsCaptureExpectedLabels, timeoutMs);');
     expect(source).toContain("if (authFixture === 'authenticated') {");
     expect(source).toContain('skipWait = false');
     expect(source).toContain('skipWait ? await readDiagnostics(page)');
-    expect(source).toContain('return expected.every((label) => currentLabels.has(label));');
+    expect(source).toContain('return expected.every(({ allowStateSuffix, expectedLabel }) => currentLabels.some((actualLabel) => (');
     expect(source).toContain('Surface ${id} missing labels after direct diagnostics read');
     expect(source).toContain('await openOptionsOverlayViaQa(page, timeoutMs);');
     expect(source).toContain("skipWait: authFixture === 'authenticated'");
     expect(source).toContain('expectedLabels: optionsCaptureExpectedLabels');
-    expect(source).toContain('hasLabels(surfaces.options, optionsExpectedLabels)');
+    expect(source).toContain('hasLabels(surfaces.options, OPTIONS_BASE_EXPECTED_LABELS)');
     expect(source).toContain("!hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale'])");
-    expect(source).toContain("hasLabels(surfaces.play, ['PAUSE']) && !hasLabels(surfaces.play, ['RESET'])");
-    expect(source).toContain("hasLabels(surfaces.pause, ['Paused', 'PLAYER GUIDE', 'Reset', 'Menu'])");
+    expect(source).toContain("'play-settings-cog'");
+    expect(source).toContain("!hasLabels(surfaces.play, ['PAUSE', 'RESET'])");
+    expect(source).toContain("hasLabels(surfaces.pause, ['Paused', 'QUICK PLAY', 'Reset', 'Menu'])");
     expect(source).toContain("!hasLabels(surfaces.pause, ['Game Toggles', 'Account', 'Resume'])");
     expect(source).toContain('const reportPath = resolve(outputDir, \'report.md\');');
     expect(source).toContain('![Menu](${summary.screenshots.menu})');
     expect(source).toContain('![Auth](${summary.screenshots.auth})');
+    expect(source).toContain('const DEFAULT_TRANSITION_VIEWPORTS = Object.freeze({');
+    expect(source).toContain('const captureViewportTransition = async ({');
+    expect(source).toContain('const stableBoardDiagnostics = (board) => board ? {');
+    expect(source).toContain('await page.setViewportSize(viewport);');
+    expect(source).toContain('restoredDiagnosticsMatch: JSON.stringify(initial.diagnostics) === JSON.stringify(restored.diagnostics)');
+    expect(source).toContain('nativeInputs: surface.nativeInputs');
+    expect(source).toContain('const buildViewportTransitionChecks = (transitions) =>');
+    expect(source).toContain('checks.push(...buildViewportTransitionChecks(transitions));');
   });
 });

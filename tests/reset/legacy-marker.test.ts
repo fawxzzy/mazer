@@ -60,11 +60,16 @@ describe('Mazer completion markers', () => {
     const systemMap = readRepoFile('docs/system-map.md');
     const packageJson = readRepoFile('package.json');
     const verifyScript = readRepoFile('scripts/verify/run-verify.mjs');
+    const testVerifyScript = readRepoFile('scripts/verify/run-test-verify.mjs');
 
     expect(packageJson).toContain('"verify": "node ./scripts/verify/run-verify.mjs"');
-    expect(packageJson).toContain('"test:verify": "vitest run tests/reset tests/ai/demo-walker.test.ts tests/ai/demo-walker-known-frontier.test.ts tests/ai/demo-walker-rank-ladder.test.ts tests/ai/demo-walker-recovery-diagnostics.test.ts tests/scenes/menu-render-frame.test.ts tests/analysis/maze-cycle-telemetry-report.test.mjs --maxWorkers 1"');
+    expect(packageJson).toContain('"test:verify": "node ./scripts/verify/run-test-verify.mjs"');
     expect(verifyScript).toContain("runNpm(['run', 'test:verify'])");
     expect(verifyScript).toContain("runNpm(['run', 'build'])");
+    expect(testVerifyScript).toContain("'tests/reset/legacy-unreal-source-fixture.test.ts'");
+    expect(testVerifyScript).toContain("'--exclude', CWD_MUTATING_FIXTURE");
+    expect(testVerifyScript).toContain("'--pool=threads'");
+    expect(testVerifyScript).toContain("'--poolOptions.threads.singleThread'");
     expect(currentTruth).toContain('Current `verify` means:');
     expect(currentTruth).toContain('- `npm run test:verify`');
     expect(currentTruth).toContain('- `npm run build`');
@@ -76,7 +81,9 @@ describe('Mazer completion markers', () => {
     expect(currentTruth).toContain('- `tests/ai/demo-walker-recovery-diagnostics.test.ts`');
     expect(currentTruth).toContain('- `tests/scenes/menu-render-frame.test.ts`');
     expect(currentTruth).toContain('- `tests/analysis/maze-cycle-telemetry-report.test.mjs`');
-    expect(currentTruth).toContain('- `--maxWorkers 1`');
+    expect(currentTruth).toContain('- `tests/analysis/ai-run-corpus-audit.test.mjs`');
+    expect(currentTruth).toContain('`--maxWorkers 1 --pool=threads --poolOptions.threads.singleThread`');
+    expect(currentTruth).toContain('`legacy-unreal-source-fixture.test.ts` runs in the fork pool');
     expect(currentTruth).toContain('npm run lint');
     expect(systemMap).toContain('docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md');
     expect(systemMap).toContain('docs/current-truth.md');
@@ -89,8 +96,20 @@ describe('Mazer completion markers', () => {
     expect(systemMap).toContain('- `tests/ai/demo-walker-recovery-diagnostics.test.ts`');
     expect(systemMap).toContain('- `tests/scenes/menu-render-frame.test.ts`');
     expect(systemMap).toContain('- `tests/analysis/maze-cycle-telemetry-report.test.mjs`');
-    expect(systemMap).toContain('- `--maxWorkers 1`');
+    expect(systemMap).toContain('- `tests/analysis/ai-run-corpus-audit.test.mjs`');
+    expect(systemMap).toContain('`--maxWorkers 1 --pool=threads --poolOptions.threads.singleThread`');
+    expect(systemMap).toContain('`legacy-unreal-source-fixture.test.ts` runs in the fork pool');
     expect(systemMap).toContain('scale-`149` smoke');
+  });
+
+  test('keeps the player-owned level glyph truth synchronized across menu and play', () => {
+    const currentTruth = readRepoFile('docs/current-truth.md');
+
+    expect(currentTruth).toContain('The glyph is bound to the player progression track on both menu and play');
+    expect(currentTruth).toContain('the independent menu-AI progression remains internal-only and has no raw numeric menu display');
+    expect(currentTruth).toContain('Menu and active play each use only a color-tiered numeric player-level glyph at the top-left');
+    expect(currentTruth).not.toContain('The menu glyph is bound to the independent menu-AI progression track');
+    expect(currentTruth).not.toContain('the menu glyph belongs to the AI runner');
   });
 
   test('keeps the level/rank/complexity progression contract tracked', () => {
@@ -149,18 +168,13 @@ describe('Mazer completion markers', () => {
     expect(markerDoc).toContain('full-height affordance when the current Options content fits without overflow');
     expect(markerDoc).toContain('30% move speed');
     expect(markerDoc).toContain('aligns the canonical fresh-session default contract');
-    expect(markerDoc).toContain('| Player-facing Options info guide | 68% |');
-    expect(markerDoc).toContain('Compass points to End');
-    expect(markerDoc).toContain('the played-game pause overlay now renders `PLAYER GUIDE` before the controls');
-    expect(markerDoc).toContain('visible `Game Toggles` section title has been removed');
-    expect(markerDoc).toContain('`Skill Lvl` / `AI Skill Lvl` means rank plus level');
-    expect(markerDoc).toContain('`Clock + Score` means current run time plus 0-100 run-quality score');
-    expect(markerDoc).toContain('`Runs + Maze Lvl` means completed clears/cycles plus the measured current maze level');
-    expect(markerDoc).toContain('now avoid the old compact `Lv` fallback');
-    expect(markerDoc).toContain('Mobile Options now uses the same scroll viewport/rail contract as played-game Pause');
-    expect(markerDoc).toContain('corrects the old misleading `AI marker + trail` guide copy to `player marker + trail`');
+    expect(markerDoc).toContain('| Player-facing Settings hierarchy | 68% |');
+    expect(markerDoc).toContain('follow the compass, begin at gold, finish at red');
+    expect(markerDoc).toContain('Settings and Pause now begin with one compact `Quick Play` legend');
+    expect(markerDoc).toContain('groups real controls under `Controls` and `Display`');
+    expect(markerDoc).toContain('Score, rank, maze-complexity, AI internals, and persistence diagnostics remain intentionally absent');
+    expect(markerDoc).toContain('preserves the scroll rail on phones');
     expect(markerDoc).toContain('no active text bounds failures, no text overlaps');
-    expect(markerDoc).toContain('`Maze Scale` and `Camera Scale` as hidden advanced controls');
     expect(markerDoc).toContain('| DiscordOS Mazer feedback board | 90% |');
     expect(markerDoc).toContain('| Visual proof verification discipline | 99% |');
     expect(markerDoc).toContain('played-game pause proof now expects the real player-facing `Reset` and `Menu` buttons');
@@ -362,8 +376,9 @@ describe('Mazer completion markers', () => {
   test('keeps the shifting player and trail material lane tracked', () => {
     const markerDoc = readRepoFile('docs/research/MAZER_AUTH_AI_VISUAL_COMPLETION_MARKER.md');
 
-    expect(markerDoc).toContain('| Icon-quality 2026 visual target | 5% |');
-    expect(markerDoc).toContain('matching the supplied app icon');
+    expect(markerDoc).toContain('| Icon-quality 2026 visual target | 100% |');
+    expect(markerDoc).toContain('versioned, hash-pinned brand authority');
+    expect(markerDoc).toContain('icon target version and canonical SHA');
     expect(markerDoc).toContain('data/atlas/brand/mazer/mazer-app-icon-2026-07-09-source.png');
     expect(markerDoc).toContain('| Shifting color player/trail/pulse material | 50% |');
     expect(markerDoc).toContain('| Diagonal paths and true diagonal travel | 8% |');
@@ -372,12 +387,12 @@ describe('Mazer completion markers', () => {
     expect(markerDoc).toContain('diagonal neighbor legality');
     expect(markerDoc).toContain('rainbow shifting is deliberately paused for readability');
     expect(markerDoc).toContain('pins player core, halo/accent, and all trail tiles to the green readability anchor');
-    expect(markerDoc).toContain('trail pulse is pinned to the purple pulse anchor');
-    expect(markerDoc).toContain('temporary green/purple lock cannot drift back to blue, pink, or yellow trail/player colors');
-    expect(markerDoc).toContain('Runtime/visual diagnostics still expose compact material samples');
-    expect(markerDoc).toContain('purple pulse is the only animated trail treatment');
-    expect(markerDoc).toContain('capture-ui-surfaces.mjs` seeds one real QA move');
-    expect(markerDoc).toContain('The played-game player and main-menu AI runner share the green anchor as a louder beacon treatment');
+    expect(markerDoc).toContain('exactly one white fading shine over the green trail');
+    expect(markerDoc).toContain('pin the shine core/edge to white anchors');
+    expect(markerDoc).toContain('Runtime/visual diagnostics expose compact samples');
+    expect(markerDoc).toContain('white shine is the only animated trail treatment');
+    expect(markerDoc).toContain('capture-ui-surfaces.mjs` seeds one accepted QA move');
+    expect(markerDoc).toContain('both the played-game player marker and main-menu AI runner use the high-contrast green beacon language');
     expect(markerDoc).toContain('explicit advanced field commits now enter the same compact cyber message-card queue');
     expect(markerDoc).toContain('Bulk overlay field commits stay silent');
   });

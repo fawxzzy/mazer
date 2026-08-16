@@ -120,6 +120,16 @@ export const normalizeLivePlayInputMethod = (value) => (
     : DEFAULT_INPUT_METHOD
 );
 
+export const resolveLivePlayBrowserContextOptions = ({
+  hasTouch,
+  isMobile = true,
+  viewport = DEFAULT_VIEWPORT
+} = {}) => ({
+  hasTouch: hasTouch ?? isMobile,
+  isMobile,
+  viewport
+});
+
 export const solveWalkableRoute = ({
   player,
   goal,
@@ -334,6 +344,22 @@ export const resolveLivePlayLifecycleSnapshot = (diagnostics) => {
   };
 };
 
+export const summarizeFreshReadyState = (diagnostics) => {
+  const snapshot = resolveLivePlayLifecycleSnapshot(diagnostics);
+  return {
+    explicitLifecyclePhase: snapshot.explicitLifecyclePhase,
+    inputLocked: snapshot.inputLocked,
+    lifecyclePhase: snapshot.lifecyclePhase,
+    pass: snapshot.mode === 'play'
+      && snapshot.explicitLifecyclePhase === 'ready'
+      && snapshot.lifecyclePhase === 'settled'
+      && snapshot.inputLocked === false
+      && snapshot.timerRunning === true,
+    seed: snapshot.seed,
+    timerRunning: snapshot.timerRunning
+  };
+};
+
 const summarizeLifecycleTraceSamples = (samples) => {
   const trace = [];
   for (const sample of samples) {
@@ -378,7 +404,39 @@ const summarizeLifecycleTraceSamples = (samples) => {
   return trace;
 };
 
-export const summarizePostGoalLifecycleSamples = (samples, initialSeed) => {
+const REQUIRED_INPUT_LOCK_PROBE_PHASES = Object.freeze([
+  'goal-hold',
+  'deconstructing',
+  'handoff',
+  'building'
+]);
+
+export const shouldCollectInputLockProbe = (
+  snapshot,
+  initialSeed,
+  inputLockProbes = []
+) => {
+  if (
+    snapshot.inputLocked !== true
+    || !REQUIRED_INPUT_LOCK_PROBE_PHASES.includes(snapshot.explicitLifecyclePhase)
+  ) {
+    return false;
+  }
+
+  if (
+    snapshot.explicitLifecyclePhase === 'building'
+    && Number.isFinite(snapshot.seed)
+    && snapshot.seed !== initialSeed
+  ) {
+    return !inputLockProbes.some((probe) => (
+      probe.phase === 'building' && probe.seed === snapshot.seed
+    ));
+  }
+
+  return !inputLockProbes.some((probe) => probe.phase === snapshot.explicitLifecyclePhase);
+};
+
+export const summarizePostGoalLifecycleSamples = (samples, initialSeed, inputLockProbes = null) => {
   const phases = [...new Set(samples.map((sample) => sample.lifecyclePhase).filter(Boolean))];
   const explicitPhases = [...new Set(samples.map((sample) => sample.explicitLifecyclePhase).filter(Boolean))];
   const settledFreshSample = samples.find((sample) => (
@@ -415,13 +473,28 @@ export const summarizePostGoalLifecycleSamples = (samples, initialSeed) => {
     && sawExplicitInputLock
     && sawExplicitReady
   );
+  const inputLockProbePass = inputLockProbes === null
+    ? null
+    : REQUIRED_INPUT_LOCK_PROBE_PHASES.every((phase) => inputLockProbes.some((probe) => (
+      probe.phase === phase && probe.pass === true
+    )));
 
   return {
-    pass: Boolean(settledFreshSample && sawDeconstructing && sawBuilding && sawFreshSeedQueued && sawHandoff && explicitLifecyclePass),
+    pass: Boolean(
+      settledFreshSample
+      && sawDeconstructing
+      && sawBuilding
+      && sawFreshSeedQueued
+      && sawHandoff
+      && explicitLifecyclePass
+      && inputLockProbePass !== false
+    ),
     explicitLifecyclePass,
     explicitPhaseSequence: explicitPhases,
     freshSeed,
     hasExplicitLifecycle,
+    inputLockProbePass,
+    inputLockProbes: inputLockProbes ?? [],
     lifecycleTrace: summarizeLifecycleTraceSamples(samples),
     phaseSequence: phases,
     sampleCount: samples.length,
@@ -441,6 +514,7 @@ export const summarizePostGoalLifecycleSamples = (samples, initialSeed) => {
 };
 
 export const collectPostGoalLifecycleProof = async ({
+  initialDiagnostics = null,
   initialSeed,
   page,
   pollMs = DEFAULT_POST_GOAL_POLL_MS,
@@ -448,17 +522,44 @@ export const collectPostGoalLifecycleProof = async ({
 }) => {
   const startedAt = performance.now();
   const samples = [];
-  let finalDiagnostics = null;
+  const inputLockProbes = [];
+  let finalDiagnostics = initialDiagnostics;
 
-  while (performance.now() - startedAt < timeoutMs) {
-    finalDiagnostics = await readLivePlayDiagnostics(page);
-    const snapshot = resolveLivePlayLifecycleSnapshot(finalDiagnostics);
+  const collectDiagnosticsSample = async (diagnostics) => {
+    finalDiagnostics = diagnostics;
+    const snapshot = resolveLivePlayLifecycleSnapshot(diagnostics);
     samples.push({
       ...snapshot,
       elapsedMs: round(performance.now() - startedAt)
     });
+    if (shouldCollectInputLockProbe(snapshot, initialSeed, inputLockProbes)) {
+      const result = await page.evaluate(() => window.__MAZER_QA__?.movePlayPlayer?.('move_up') ?? null);
+      const playerUnchanged = Boolean(
+        result?.player
+        && snapshot.player
+        && result.player.x === snapshot.player.x
+        && result.player.y === snapshot.player.y
+      );
+      inputLockProbes.push({
+        accepted: result?.accepted ?? null,
+        lifecycleLocked: result?.lifecycleLocked ?? null,
+        pass: result?.accepted === false && result?.lifecycleLocked === true && playerUnchanged,
+        phase: snapshot.explicitLifecyclePhase,
+        playerUnchanged,
+        reason: result?.reason ?? null,
+        seed: snapshot.seed ?? null
+      });
+    }
+  };
 
-    const summary = summarizePostGoalLifecycleSamples(samples, initialSeed);
+  if (initialDiagnostics) {
+    await collectDiagnosticsSample(initialDiagnostics);
+  }
+
+  while (performance.now() - startedAt < timeoutMs) {
+    await collectDiagnosticsSample(await readLivePlayDiagnostics(page));
+
+    const summary = summarizePostGoalLifecycleSamples(samples, initialSeed, inputLockProbes);
     if (summary.pass) {
       return {
         ...summary,
@@ -472,7 +573,7 @@ export const collectPostGoalLifecycleProof = async ({
     await page.waitForTimeout(pollMs);
   }
 
-  const summary = summarizePostGoalLifecycleSamples(samples, initialSeed);
+  const summary = summarizePostGoalLifecycleSamples(samples, initialSeed, inputLockProbes);
   return {
     ...summary,
     elapsedMs: round(performance.now() - startedAt),
@@ -661,6 +762,75 @@ const summarizeTimings = (durations) => {
   };
 };
 
+export const summarizeGoalWorldTurn = (worldTurn, plannedMoveCount) => ({
+  atGoal: worldTurn ?? null,
+  pass: Boolean(
+    worldTurn
+    && worldTurn.acceptedTurnCount === plannedMoveCount
+    && worldTurn.nextTurn === plannedMoveCount
+    && worldTurn.lastReceipt?.admitted === true
+    && worldTurn.lastReceipt?.turn === plannedMoveCount - 1
+  )
+});
+
+export const summarizeFreshWorldTurn = (worldTurn) => {
+  const hasPristineTurnState = worldTurn?.rejectedCommandCount === 0
+    && worldTurn?.lastReceipt === null;
+  const hasLockedProbeReceipt = worldTurn?.rejectedCommandCount >= 1
+    && worldTurn?.lastReceipt?.admitted === false
+    && worldTurn?.lastReceipt?.reason === 'simulation-paused';
+
+  return {
+    freshMaze: worldTurn ?? null,
+    pass: Boolean(
+      worldTurn
+      && worldTurn.acceptedTurnCount === 0
+      && worldTurn.nextTurn === 0
+      && (hasPristineTurnState || hasLockedProbeReceipt)
+    )
+  };
+};
+
+export const summarizeGoalTimerFreeze = (firstSample, secondSample) => ({
+  completedAtMs: firstSample?.completedAtMs ?? null,
+  elapsedMs: firstSample?.elapsedMs ?? null,
+  frozen: firstSample?.frozen === true && secondSample?.frozen === true,
+  pass: Boolean(
+    firstSample
+    && secondSample
+    && firstSample.frozen === true
+    && secondSample.frozen === true
+    && Number.isFinite(firstSample.completedAtMs)
+    && firstSample.completedAtMs === secondSample.completedAtMs
+    && firstSample.elapsedMs === secondSample.elapsedMs
+  ),
+  resampleElapsedMs: secondSample?.elapsedMs ?? null
+});
+
+export const summarizePlayerProgressionCompletion = ({
+  initialLevel,
+  finalLevel,
+  visibleMessages
+} = {}) => {
+  const progressionMessages = Array.isArray(visibleMessages)
+    ? visibleMessages.filter((candidate) => (
+      candidate?.id?.startsWith('progression.player.cycle.')
+      && candidate?.source === 'progression'
+    ))
+    : [];
+
+  return {
+    finalLevel: Number.isFinite(finalLevel) ? finalLevel : null,
+    initialLevel: Number.isFinite(initialLevel) ? initialLevel : null,
+    progressionMessages,
+    pass: Number.isFinite(initialLevel)
+      && Number.isFinite(finalLevel)
+      && finalLevel === initialLevel + 1
+      && progressionMessages.length === 0
+  };
+
+};
+
 export const runLivePlayQa = async (options = {}) => {
   const label = options.label ?? DEFAULT_LABEL;
   const sessionId = resolveSessionId(options.sessionId);
@@ -673,6 +843,11 @@ export const runLivePlayQa = async (options = {}) => {
   const moveCap = options.moveCap ?? DEFAULT_MOVE_CAP;
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL);
   const inputMethod = normalizeLivePlayInputMethod(options.inputMethod);
+  const browserContextOptions = resolveLivePlayBrowserContextOptions({
+    hasTouch: options.hasTouch,
+    isMobile: options.isMobile,
+    viewport
+  });
 
   await ensureDir(outputDir);
 
@@ -690,11 +865,7 @@ export const runLivePlayQa = async (options = {}) => {
   const resolvedBaseUrl = preview?.baseUrl ?? baseUrl;
   const targetUrl = new URL(route, resolvedBaseUrl).toString();
   const browser = await chromium.launch({ headless: options.headless !== false });
-  const context = await browser.newContext({
-    hasTouch: true,
-    isMobile: true,
-    viewport
-  });
+  const context = await browser.newContext(browserContextOptions);
   const page = await context.newPage();
   await setQaPreferences(page, {
     inputMethod,
@@ -706,6 +877,7 @@ export const runLivePlayQa = async (options = {}) => {
     await page.goto(targetUrl, { waitUntil: 'load', timeout: options.captureTimeoutMs ?? 45_000 });
     const initialDiagnostics = await waitForDiagnosticsReady(page, options.captureTimeoutMs ?? 45_000);
     const initialRuntime = initialDiagnostics.runtime;
+    const initialProgressionLevel = initialRuntime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null;
     const playtest = initialRuntime?.play?.playtest ?? null;
     const routePlan = solveWalkableRoute({
       player: initialRuntime?.play?.player ?? null,
@@ -792,14 +964,30 @@ export const runLivePlayQa = async (options = {}) => {
     }
 
     const goalReachedDiagnostics = await readLivePlayDiagnostics(page);
-    const lifecycleProof = options.verifyPostGoalLifecycle === false || failedAt !== null
+    const goalTimerFirstSample = goalReachedDiagnostics.runtime?.play?.timer ?? null;
+    await page.waitForTimeout(96);
+    const goalTimerSecondDiagnostics = await readLivePlayDiagnostics(page);
+    const goalTimerProof = summarizeGoalTimerFreeze(
+      goalTimerFirstSample,
+      goalTimerSecondDiagnostics.runtime?.play?.timer ?? null
+    );
+    const lifecycleProofPromise = options.verifyPostGoalLifecycle === false || failedAt !== null
       ? null
-      : await collectPostGoalLifecycleProof({
+      : collectPostGoalLifecycleProof({
+        initialDiagnostics: goalTimerSecondDiagnostics,
         initialSeed: initialRuntime?.generation?.maze?.seed ?? null,
         page,
         timeoutMs: options.postGoalTimeoutMs ?? DEFAULT_POST_GOAL_TIMEOUT_MS
       });
+    const lifecycleProof = lifecycleProofPromise ? await lifecycleProofPromise : null;
     const finalDiagnostics = lifecycleProof?.finalDiagnostics ?? goalReachedDiagnostics;
+    const progressionCompletionProof = summarizePlayerProgressionCompletion({
+      finalLevel: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null,
+      initialLevel: initialProgressionLevel,
+      visibleMessages: finalDiagnostics.visual?.overlayUi?.visibleMessages
+    });
+    const progressionScreenshotPath = resolve(outputDir, `${label}.progression.png`);
+    await page.screenshot({ path: progressionScreenshotPath, fullPage: false });
     const screenshotPath = resolve(outputDir, `${label}.png`);
     await page.screenshot({ path: screenshotPath, fullPage: false });
 
@@ -808,6 +996,15 @@ export const runLivePlayQa = async (options = {}) => {
     const reached = Boolean(goalReachedPlayer && goal && goalReachedPlayer.x === goal.x && goalReachedPlayer.y === goal.y);
     const durations = stepRecords.map((step) => step.durationMs).filter(Number.isFinite);
     const lifecyclePassed = lifecycleProof === null ? true : lifecycleProof.pass;
+    const goalWorldTurn = goalReachedDiagnostics.runtime?.play?.worldTurn ?? null;
+    const worldTurnProof = summarizeGoalWorldTurn(goalWorldTurn, routePlan.moves.length);
+    const freshWorldTurnProof = lifecycleProof === null
+      ? { freshMaze: null, pass: true }
+      : summarizeFreshWorldTurn(lifecycleProof.finalDiagnostics?.runtime?.play?.worldTurn ?? null);
+    const freshReadyProof = lifecycleProof === null
+      ? { pass: true }
+      : summarizeFreshReadyState(lifecycleProof.finalDiagnostics);
+    const worldTurnPassed = worldTurnProof.pass && freshWorldTurnProof.pass && freshReadyProof.pass;
 
     summary = {
       schema: 'mazer.live-play-qa.v1',
@@ -827,8 +1024,12 @@ export const runLivePlayQa = async (options = {}) => {
         source: initialRuntime?.generation?.maze?.source ?? null
       },
       viewport,
+      browserContext: {
+        hasTouch: browserContextOptions.hasTouch,
+        isMobile: browserContextOptions.isMobile
+      },
       result: {
-        pass: reached && failedAt === null && routePlan.moves.length <= moveCap && lifecyclePassed,
+        pass: reached && failedAt === null && routePlan.moves.length <= moveCap && lifecyclePassed && worldTurnPassed && goalTimerProof.pass && progressionCompletionProof.pass,
         reached,
         failedAt,
         capped: routePlan.moves.length > moveCap,
@@ -843,12 +1044,16 @@ export const runLivePlayQa = async (options = {}) => {
           ? { x: goalReachedPlayer.x, y: goalReachedPlayer.y }
           : null
       },
+      goalTimer: goalTimerProof,
+      progressionCompletion: progressionCompletionProof,
       postGoalLifecycle: lifecycleProof ? {
         elapsedMs: lifecycleProof.elapsedMs,
         explicitLifecyclePass: lifecycleProof.explicitLifecyclePass,
         explicitPhaseSequence: lifecycleProof.explicitPhaseSequence,
         freshSeed: lifecycleProof.freshSeed,
         hasExplicitLifecycle: lifecycleProof.hasExplicitLifecycle,
+        inputLockProbePass: lifecycleProof.inputLockProbePass,
+        inputLockProbes: lifecycleProof.inputLockProbes,
         lifecycleTrace: lifecycleProof.lifecycleTrace,
         pass: lifecycleProof.pass,
         phaseSequence: lifecycleProof.phaseSequence,
@@ -865,14 +1070,27 @@ export const runLivePlayQa = async (options = {}) => {
         sawFreshSeedQueued: lifecycleProof.sawFreshSeedQueued,
         sawHandoff: lifecycleProof.sawHandoff,
         settledFreshSeed: lifecycleProof.settledFreshSeed,
+        freshReady: freshReadyProof,
         timedOut: lifecycleProof.timedOut,
         timeoutMs: lifecycleProof.timeoutMs
       } : null,
+      worldTurn: {
+        ...worldTurnProof,
+        freshMaze: freshWorldTurnProof.freshMaze,
+        freshMazePass: freshWorldTurnProof.pass
+      },
       controls: {
+        baseMovementSpeed: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.baseMovementSpeed ?? null,
         controlMode: finalDiagnostics.visual?.touchControls?.controlMode ?? null,
+        effectiveMovementSpeed: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.effectiveMovementSpeed ?? null,
+        formulaVersion: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.formulaVersion ?? null,
         visible: finalDiagnostics.visual?.touchControls?.visible ?? false,
         inputMethod,
         movementSpeed: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.movementSpeed ?? null,
+        progressionCompletedCycles: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionCompletedCycles ?? null,
+        progressionContextApplied: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionContextApplied ?? null,
+        progressionLevel: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionLevel ?? null,
+        progressionPaceScore: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.progressionPaceScore ?? null,
         repeatInitialDelayMs: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.repeatInitialDelayMs ?? null,
         repeatIntervalMs: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.repeatIntervalMs ?? null,
         turnDelayMs: finalDiagnostics.runtime?.play?.inputBuffer?.touchSprint?.turnDelayMs ?? null
@@ -887,6 +1105,7 @@ export const runLivePlayQa = async (options = {}) => {
       },
       timings: summarizeTimings(durations),
       artifacts: {
+        progressionScreenshotPath,
         screenshotPath,
         summaryPath: resolve(outputDir, `${label}.summary.json`),
         stepsPath: resolve(outputDir, `${label}.steps.json`)
@@ -942,6 +1161,7 @@ if (isDirectRun) {
       ? Number(args.movementSpeed ?? args['movement-speed'])
       : 0.42,
     inputMethod: normalizeLivePlayInputMethod(rawInputMethod),
+    isMobile: args.mobile === undefined ? true : isTruthy(args.mobile),
     postGoalTimeoutMs: parseIntegerArg(args.postGoalTimeoutMs ?? args['post-goal-timeout-ms'], DEFAULT_POST_GOAL_TIMEOUT_MS),
     previewTimeoutMs: parseIntegerArg(args.previewTimeoutMs ?? args['preview-timeout-ms'], DEFAULT_PREVIEW_TIMEOUT_MS),
     route: resolveRoute(args, label),

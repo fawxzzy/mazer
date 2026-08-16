@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,7 +7,17 @@ const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const SCRIPT_DIR = dirname(SCRIPT_PATH);
 
 export const REPO_ROOT = resolve(SCRIPT_DIR, '..', '..');
-export const STACK_ROOT = resolve(REPO_ROOT, '..', '..');
+const resolveStackRoot = (repoRoot) => {
+  const candidates = [
+    resolve(repoRoot, '..', '..'),
+    resolve(repoRoot, '..', '..', '..')
+  ];
+
+  return candidates.find((candidate) => existsSync(resolve(candidate, 'stack.yaml')))
+    ?? candidates[0];
+};
+
+export const STACK_ROOT = resolveStackRoot(REPO_ROOT);
 export const CAPTURE_ROOT = resolve(STACK_ROOT, 'tmp', 'captures', 'mazer-visual');
 export const DEFAULT_BASE_URL = 'http://127.0.0.1:4173';
 export const DEFAULT_CAPTURE_TIMEOUT_MS = 45_000;

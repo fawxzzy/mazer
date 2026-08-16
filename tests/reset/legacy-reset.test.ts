@@ -15,8 +15,15 @@ import {
   resolveLegacyTrailFromDemoSteps
 } from '../../src/legacy-runtime/legacyDemoWalker';
 import { collectDemoWalkerTelemetry, createDemoWalkerState } from '../../src/domain/ai';
+import {
+  LEGACY_MENU_SNAPSHOT_SIZE,
+  resolveLegacyMenuSnapshotBlueprint,
+  type LegacyMenuSnapshotPoint,
+  type LegacyMenuSnapshotPolyline
+} from '../../src/legacy-runtime/legacyMenuSnapshot';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { resolveLegacyUnrealSource } from './legacyUnrealSourceFixture';
 
 const countLegacyShortcutBridgeFloors = (maze: ReturnType<typeof createLegacyMaze>): number => {
   let bridges = 0;
@@ -182,6 +189,48 @@ const expectScaledMenuTile = (
   sourceY: number
 ): void => {
   expect(maze.grid[sourceY * 2]?.[sourceX * 2]).toBe(true);
+};
+
+const EXPECTED_MENU_SNAPSHOT_BRANCH_IDS = [
+  'upper-ridge',
+  'top-spine',
+  'upper-left-pocket',
+  'upper-left-lattice',
+  'left-frame',
+  'center-band',
+  'center-pocket',
+  'title-trench',
+  'title-underlay-band',
+  'upper-right-lattice',
+  'left-interior-drop',
+  'mid-left-shelf',
+  'lower-left-shelves',
+  'diagonal-upper',
+  'diagonal-lower',
+  'lower-band',
+  'lower-floor-trench',
+  'lower-center-loop',
+  'right-pocket',
+  'right-spine',
+  'right-lower-notch',
+  'right-inner-pocket'
+];
+
+// appendSegment rasterizes every intermediate integer step between two points
+// in SCALED coordinate space (it runs once per already-scaled point, filling
+// single-unit steps to get there) -- so the final path moves by exactly 1
+// along a single axis per step, not by the raw-to-scaled factor itself.
+const assertMenuSnapshotOrthogonalUnitSteps = (points: LegacyMenuSnapshotPoint[], label: string): void => {
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1]!;
+    const current = points[index]!;
+    const dx = Math.abs(current.x - previous.x);
+    const dy = Math.abs(current.y - previous.y);
+
+    const isValidStep = (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+
+    expect(isValidStep, `${label}: step ${index - 1}->${index} (${previous.x},${previous.y})->(${current.x},${current.y}) must move exactly 1 along a single axis`).toBe(true);
+  }
 };
 
 describe('legacy reset lane', () => {
@@ -415,7 +464,7 @@ describe('legacy reset lane', () => {
 
   test('resumes from the next tile selected during legacy backtracking', () => {
     const legacyMazeSource = readFileSync(
-      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'MazerGameModeBase.cpp'),
+      resolveLegacyUnrealSource('Source', 'Mazer', 'MazerGameModeBase.cpp'),
       'utf8'
     );
     const webMazeSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyMaze.ts'), 'utf8');
@@ -584,6 +633,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('LEGACY_SIMULTANEOUS_KEY_PRESS_DELAY_MS');
     expect(menuSceneSource).toContain('this.handleLegacyPlayMovementKeyDown(event)');
     expect(menuSceneSource).toContain("this.input.keyboard?.on('keyup'");
+    expect(menuSceneSource).toContain('if (wasHeld && this.playMoveTimer !== null) {');
+    expect(menuSceneSource).toContain('this.resolveLegacyPlayInputBuffer();');
     expect(menuSceneSource).toContain('event.preventDefault();');
     expect(menuSceneSource).toContain('resolveLegacyPlayMoveVector(this.playMoveFlags)');
     expect(menuSceneSource).toContain('this.resetLegacyPlayInputBuffer();');
@@ -621,13 +672,17 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('bypassesLevelBuildingDelay: this.pendingResetRequest?.entry.bypassesLevelBuildingDelay ?? null,');
   });
 
-  test('keeps the menu backdrop in the denser screenshot-directed field lane', () => {
+  test('keeps a quiet animated menu backdrop without a screen-edge frame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('LEGACY_MENU_STAR_COUNT');
     expect(menuSceneSource).toContain('createLegacyMenuBackdropStars');
     expect(menuSceneSource).toContain('advanceLegacyMenuBackdropStars');
-    expect(menuSceneSource).toContain('if (!this.settings.toggleAnimatedBackdrop) {');
+    expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
+    expect(menuSceneSource).toContain('this.stars = createLegacyMenuBackdropStars().slice(0, LEGACY_MENU_STAR_COUNT);');
+    expect(menuSceneSource).not.toContain('this.backdropGraphics.strokeRoundedRect(inset, inset, width - (inset * 2), height - (inset * 2), 12);');
+    expect(menuSceneSource).toContain('if (this.stars.length === 0 || !this.settings.toggleAnimatedBackdrop || this.prefersLegacyReducedMotion()) {');
+    expect(menuSceneSource).toContain('this.backdropGraphics.fillStyle(cyberArcadeMaterial.substrate.field, 1);');
     expect(menuSceneSource).toContain('animatedBackdropEnabled: this.settings.toggleAnimatedBackdrop');
     expect(menuSceneSource).toContain('backdropDirty: this.backdropDirty');
     expect(menuSceneSource).toContain('resolveLegacyMenuBackdropPalette');
@@ -637,23 +692,25 @@ describe('legacy reset lane', () => {
 
   test('cleans up localhost service workers before booting Phaser', () => {
     const bootSource = readFileSync(resolve(process.cwd(), 'src/boot/main.ts'), 'utf8');
+    const lifecycleSource = readFileSync(
+      resolve(process.cwd(), 'src/boot/serviceWorkerLifecycle.ts'),
+      'utf8'
+    );
     const viteConfigSource = readFileSync(resolve(process.cwd(), 'vite.config.ts'), 'utf8');
 
     expect(bootSource).toContain("const LOCALHOST_SW_RESET_KEY = 'mazer:localhost-sw-reset:v1';");
-    expect(bootSource).toContain("const PRODUCTION_SW_UPDATE_RELOAD_KEY = 'mazer:production-sw-update-reload-at:v1';");
-    expect(bootSource).toContain('const PRODUCTION_SW_UPDATE_RELOAD_WINDOW_MS = 10_000;');
     expect(bootSource).toContain("['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)");
     expect(bootSource).toContain('navigator.serviceWorker.getRegistrations()');
     expect(bootSource).toContain("cacheKey.includes('mazer')");
     expect(bootSource).toContain('window.location.reload();');
-    expect(bootSource).toContain('const shouldReloadForProductionServiceWorkerUpdate = (nowMs: number): boolean => {');
     expect(bootSource).toContain('const registerProductionServiceWorker = (): void => {');
-    expect(bootSource).toContain("if (isLocalhostRuntime() || !('serviceWorker' in navigator)) {");
-    expect(bootSource).toContain("navigator.serviceWorker.addEventListener('controllerchange'");
-    expect(bootSource).toContain("navigator.serviceWorker.register('/sw.js')");
-    expect(bootSource).toContain('.then((registration) => registration.update())');
+    expect(bootSource).toContain('installMazerProductionServiceWorker({');
     expect(bootSource).toContain("markMazerBootStatus('boot-start');");
     expect(bootSource).toContain("markMazerBootStatus('game-created');");
+    expect(lifecycleSource).toContain("runtime.register?.('/sw.js')");
+    expect(lifecycleSource).toContain('.then((registration) => registration.update())');
+    expect(lifecycleSource).not.toContain('addControllerChangeListener');
+    expect(lifecycleSource).not.toContain('reload:');
     expect(viteConfigSource).toContain('injectRegister: false');
     expect(viteConfigSource).not.toContain("injectRegister: 'auto'");
   });
@@ -661,6 +718,7 @@ describe('legacy reset lane', () => {
   test('routes generation and reset through explicit queued request contracts', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const generationLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyGenerationLifecycle.ts'), 'utf8');
+    const animationCadenceSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAnimationCadence.ts'), 'utf8');
 
     expect(generationLifecycleSource).toContain("type LegacyGenerationRequestReason =");
     expect(generationLifecycleSource).toContain('createLegacyGenerationRequest');
@@ -698,12 +756,16 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("scale: this.resolveLegacyProgressionScaleForMode('menu')");
     expect(menuSceneSource).toContain('scale: this.resolveLegacyProgressionScaleForMode(mode)');
     expect(menuSceneSource).toContain('if (generationState.startsPlayTimer) {');
-    expect(menuSceneSource).toContain('this.playStartedAtMs = Math.max(this.time.now, this.resolveLegacyMenuStaticDrawDemoGateAtMs());');
+    expect(menuSceneSource).toContain('this.playStartedAtMs = this.time.now;');
+    expect(menuSceneSource).toContain('const settledPlayStartedAtMs = resolveLegacyStaticDrawPlayTimerStartAtMs({');
+    expect(menuSceneSource).toContain('this.playStartedAtMs = settledPlayStartedAtMs;');
+    expect(menuSceneSource).toContain('shouldFreezeLegacyPlayElapsedForStaticDraw({');
     expect(menuSceneSource).toContain('private menuStaticDrawRowsVisible: number | null = null;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_TILE_STEP_MS = 34;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_TARGET_TICKS = 96;');
+    expect(menuSceneSource).toContain('const LEGACY_PLAY_STATIC_DRAW_TARGET_TICKS = 64;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DRAW_SETTLE_MS = 420;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS = 500;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_HOLD_MS = 0;');
@@ -737,9 +799,10 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('for (let index = 0; index < Math.min(tileLimit, this.menuStaticDrawTileOrder.length); index += 1)');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawRowLimit(): number | null');
     expect(menuSceneSource).toContain('private buildLegacyMenuStaticDrawTileOrder(): LegacyPoint[]');
-    expect(menuSceneSource).toContain('this.maze.generationBuildTrace?.pathTiles');
-    expect(menuSceneSource).toContain('this.maze.generationBuildTrace?.shortcutTiles');
-    expect(menuSceneSource).toContain('this.maze.generationBuildTrace?.reinforcementShortcutTiles');
+    expect(menuSceneSource).toContain('return buildLegacyMazeRevealOrder(this.maze);');
+    expect(animationCadenceSource).toContain('maze.generationBuildTrace?.pathTiles');
+    expect(animationCadenceSource).toContain('maze.generationBuildTrace?.shortcutTiles');
+    expect(animationCadenceSource).toContain('maze.generationBuildTrace?.reinforcementShortcutTiles');
     expect(menuSceneSource).toContain('private refreshLegacyMenuStaticDrawVisibleTileKeys(): void');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDrawDemoGateAtMs(): number');
     expect(menuSceneSource).toContain('private resolveLegacyMenuStaticDeconstructDurationMs(): number');
@@ -766,6 +829,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.menuStaticDrawNextTileAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;');
     expect(menuSceneSource).toContain('time >= this.menuStaticBuildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS');
     expect(menuSceneSource).toContain('const tileTicks = Math.ceil(Math.max(1, this.menuStaticDrawTileOrder.length) / batchSize);');
+    expect(menuSceneSource).toContain("const targetTicks = this.mode === 'play'");
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase !== 'settled'");
     expect(menuSceneSource).toContain('if (nextFrame.shouldRegenerateMaze) {');
     expect(menuSceneSource).toContain('if (this.shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame)) {');
@@ -824,7 +888,7 @@ describe('legacy reset lane', () => {
   test('defers overlay rebuild travel until closing the options surface', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const legacyPauseMenuSource = readFileSync(
-      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'PauseMenuWidget.cpp'),
+      resolveLegacyUnrealSource('Source', 'Mazer', 'Private', 'UI', 'PauseMenuWidget.cpp'),
       'utf8'
     );
 
@@ -842,7 +906,7 @@ describe('legacy reset lane', () => {
     const pauseLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPauseLifecycle.ts'), 'utf8');
     const playLifecycleSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPlayLifecycle.ts'), 'utf8');
     const legacyGamePauseSource = readFileSync(
-      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'GamePauseMenu.cpp'),
+      resolveLegacyUnrealSource('Source', 'Mazer', 'Private', 'UI', 'GamePauseMenu.cpp'),
       'utf8'
     );
 
@@ -876,10 +940,12 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private createToggleSwitchRow(');
     expect(menuSceneSource).toContain("label: 'Camera Follow'");
     expect(menuSceneSource).toContain("label: 'Trail Fade'");
-    expect(menuSceneSource).toContain("label: 'Trail Pulse'");
-    expect(menuSceneSource).toContain("label: 'Animated BG'");
-    expect(menuSceneSource).toContain("label: 'Dark Mode'");
-    expect(menuSceneSource).toContain("label: 'Controls'");
+    expect(menuSceneSource).toContain("label: 'Trail Shine'");
+    expect(menuSceneSource).toContain("? 'Slow white shine.'");
+    expect(menuSceneSource).toContain("label: 'Animated Background'");
+    expect(menuSceneSource).toContain("label: 'High Contrast'");
+    expect(menuSceneSource).toContain("label: 'Control Style'");
+    expect(menuSceneSource).toContain("label: 'Smart Steering'");
     expect(menuSceneSource).toContain("label: 'Move Speed'");
     expect(menuSceneSource).toContain('private createMovementSpeedSliderRow(');
     expect(menuSceneSource).toContain('private applyLegacyMovementSpeed(speed: number): void {');
@@ -896,9 +962,12 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings)");
     expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
-    expect(menuSceneSource).toContain('const showStateLabel = input.width >= 320;');
+    expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
-    expect(menuSceneSource).toContain('controls.length * (rowHeight + rowGap)');
+    expect(menuSceneSource).toContain('const groupHeight = (count: number): number => (');
+    expect(menuSceneSource).toContain('groupHeight(controlsGroupCount) + sectionGap + groupHeight(displayGroupCount)');
+    expect(menuSceneSource).toContain("addSectionHeading('Controls', contentTop)");
+    expect(menuSceneSource).toContain("addSectionHeading('Display', contentTop)");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleCameraFollow')");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailFade')");
     expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailPulse')");
@@ -915,7 +984,7 @@ describe('legacy reset lane', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const overlayFieldCommitSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayFieldCommit.ts'), 'utf8');
     const legacyPauseMenuSource = readFileSync(
-      resolve(process.cwd(), '..', '..', 'tmp', 'mazer-legacy-unreal-restore', 'Source', 'Mazer', 'Private', 'UI', 'PauseMenuWidget.cpp'),
+      resolveLegacyUnrealSource('Source', 'Mazer', 'Private', 'UI', 'PauseMenuWidget.cpp'),
       'utf8'
     );
 
@@ -924,10 +993,10 @@ describe('legacy reset lane', () => {
     expect(overlayFieldCommitSource).toContain('triggersReloadOnBack');
     expect(overlayFieldCommitSource).toContain('triggersCameraFlag');
     expect(menuSceneSource).toContain("const result = applyLegacyOverlayFieldCommit(this.settings, this.optionFieldDrafts, fieldId);");
-    expect(menuSceneSource).toContain('resolveLegacyOverlayFieldCommitMessage(');
-    expect(menuSceneSource).toContain('this.resolveLegacyOverlayFieldMessageLabel(fieldId)');
-    expect(menuSceneSource).toContain('this.resolveLegacyOverlayFieldMessageState(fieldId)');
-    expect(menuSceneSource).toContain("this.commitOverlayField(fieldId, { announce: false });");
+    expect(menuSceneSource).not.toContain('resolveLegacyOverlayFieldCommitMessage(');
+    expect(menuSceneSource).not.toContain('resolveLegacyOverlayFieldMessageLabel(fieldId)');
+    expect(menuSceneSource).not.toContain('resolveLegacyOverlayFieldMessageState(fieldId)');
+    expect(menuSceneSource).toContain('this.commitOverlayField(fieldId);');
     expect(menuSceneSource).toContain('if (result.triggersReloadOnBack) {');
     expect(menuSceneSource).toContain('if (result.refreshLayout) {');
     expect(legacyPauseMenuSource).toContain('ScaleNumChanged = true;');
@@ -947,5 +1016,87 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).not.toContain('private openNestedOverlay(');
     expect(overlayRoutingSource).not.toContain('return-parent');
     expect(overlayRoutingSource).not.toContain('resolveLegacyNestedOverlayOpen');
+  });
+
+  test('returns the fixed 49-tile menu snapshot size', () => {
+    const blueprint = resolveLegacyMenuSnapshotBlueprint();
+    expect(blueprint.size).toBe(LEGACY_MENU_SNAPSHOT_SIZE);
+    expect(blueprint.size).toBe(49);
+  });
+
+  test('menu snapshot solution path starts and ends at the exact points the fixed menu maze snapshot relies on', () => {
+    const blueprint = resolveLegacyMenuSnapshotBlueprint();
+    // createLegacyMenuMaze(3749) asserts start={x:6,y:8} and goal={x:44,y:44}
+    // above in this same file -- this blueprint's raw path (3,4)->(22,22)
+    // scaled by 2 is the source of those exact values, so this is a real
+    // cross-check, not an arbitrary assertion.
+    expect(blueprint.solutionPath[0]).toEqual({ x: 6, y: 8 });
+    expect(blueprint.solutionPath.at(-1)).toEqual({ x: 44, y: 44 });
+  });
+
+  test('menu snapshot solution path is a fully connected orthogonal rasterization with no diagonal jumps', () => {
+    const blueprint = resolveLegacyMenuSnapshotBlueprint();
+    assertMenuSnapshotOrthogonalUnitSteps(blueprint.solutionPath, 'solutionPath');
+  });
+
+  test('menu snapshot produces exactly the expected 22 branch ids, no duplicates, no extras', () => {
+    const blueprint = resolveLegacyMenuSnapshotBlueprint();
+    const ids = blueprint.branches.map((branch) => branch.id);
+    expect(ids).toEqual(EXPECTED_MENU_SNAPSHOT_BRANCH_IDS);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  test('every menu snapshot branch polyline is a fully connected orthogonal rasterization, including the staircase-built diagonals', () => {
+    const blueprint = resolveLegacyMenuSnapshotBlueprint();
+    for (const branch of blueprint.branches) {
+      expect(branch.points.length).toBeGreaterThan(0);
+      assertMenuSnapshotOrthogonalUnitSteps(branch.points, branch.id);
+    }
+  });
+
+  test('the menu snapshot diagonal-upper and diagonal-lower staircases climb in a single consistent direction with the expected step count', () => {
+    const blueprint = resolveLegacyMenuSnapshotBlueprint();
+    const byId = new Map<string, LegacyMenuSnapshotPolyline>(blueprint.branches.map((branch) => [branch.id, branch]));
+
+    const diagonalUpper = byId.get('diagonal-upper')!;
+    // buildStaircase({x:5,y:4}, 8, 1, 1) produces 17 raw points, each pair 1 raw
+    // unit apart; scaling to (10,8)..(26,24) and rasterizing every intermediate
+    // scaled step (see assertMenuSnapshotOrthogonalUnitSteps) yields 33 points
+    // end to end.
+    expect(diagonalUpper.points).toHaveLength(33);
+    expect(diagonalUpper.points[0]).toEqual({ x: 10, y: 8 });
+    expect(diagonalUpper.points.at(-1)).toEqual({ x: 26, y: 24 });
+
+    const diagonalLower = byId.get('diagonal-lower')!;
+    // buildStaircase({x:8,y:14}, 7, 1, 1) -> scaled (16,28)..(30,42), 29 points
+    // once every intermediate step is rasterized.
+    expect(diagonalLower.points).toHaveLength(29);
+    expect(diagonalLower.points[0]).toEqual({ x: 16, y: 28 });
+    expect(diagonalLower.points.at(-1)).toEqual({ x: 30, y: 42 });
+  });
+
+  test('every coordinate across the whole menu snapshot blueprint stays within the 49x49 bounds', () => {
+    const blueprint = resolveLegacyMenuSnapshotBlueprint();
+    const allPoints = [blueprint.solutionPath, ...blueprint.branches.map((branch) => branch.points)].flat();
+    for (const point of allPoints) {
+      expect(point.x).toBeGreaterThanOrEqual(0);
+      expect(point.y).toBeGreaterThanOrEqual(0);
+      expect(point.x).toBeLessThan(blueprint.size);
+      expect(point.y).toBeLessThan(blueprint.size);
+    }
+  });
+
+  test('menu snapshot blueprint resolution is deterministic and produces fresh, independently-mutable objects on every call', () => {
+    const first = resolveLegacyMenuSnapshotBlueprint();
+    const second = resolveLegacyMenuSnapshotBlueprint();
+
+    expect(second).toEqual(first);
+    expect(second).not.toBe(first);
+    expect(second.solutionPath).not.toBe(first.solutionPath);
+    expect(second.branches).not.toBe(first.branches);
+
+    // Mutating one call's result must never affect another call's result.
+    first.solutionPath[0]!.x = 9999;
+    expect(second.solutionPath[0]!.x).not.toBe(9999);
   });
 });

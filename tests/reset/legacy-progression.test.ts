@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import { createLegacyRuntimeMazeForMode, resolveLegacyGenerationBudgetContract } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
+import { createLegacyPatrolAgentState } from '../../src/legacy-runtime/legacyPatrolAgent';
+import { createLegacyStaticSlowTileState } from '../../src/legacy-runtime/legacyStaticSlowTile';
 import {
   LEGACY_PROGRESSION_MENU_MIN_TILE_PX,
   LEGACY_PROGRESSION_AI_CHALLENGE_SCORE_THRESHOLD,
@@ -109,8 +111,16 @@ const createProgressionTestMaze = (overrides: Partial<LegacyMazeSnapshot> = {}):
 });
 
 describe('legacy progression', () => {
-  test('starts and normalizes the menu AI runner back to a level-one baseline', () => {
+  test('starts both tracks at a real level-one tutorial baseline', () => {
     const state = createEmptyLegacyProgressionState();
+    expect(state.tracks.player).toMatchObject({
+      completedCycles: 0,
+      level: 1,
+      rank: 'E',
+      recentSignals: [],
+      struggleCycles: Number.MAX_SAFE_INTEGER,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
+    });
     expect(state.tracks['ai-runner']).toMatchObject({
       completedCycles: 0,
       level: 1,
@@ -126,6 +136,7 @@ describe('legacy progression', () => {
         player: {
           ...state.tracks.player,
           completedCycles: 9,
+          struggleCycles: 0,
           targetComplexity: 64
         },
         'ai-runner': {
@@ -139,8 +150,14 @@ describe('legacy progression', () => {
     storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify(legacyStoredState));
     const normalized = readLegacyProgressionState(storage);
 
-    expect(normalized.tracks.player.completedCycles).toBe(9);
-    expect(normalized.tracks.player.level).toBe(resolveLegacyProgressionLevel(64));
+    expect(normalized.tracks.player).toMatchObject({
+      completedCycles: 0,
+      level: 1,
+      rank: 'E',
+      recentSignals: [],
+      struggleCycles: Number.MAX_SAFE_INTEGER,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
+    });
     expect(normalized.tracks['ai-runner']).toMatchObject({
       completedCycles: 0,
       level: 1,
@@ -175,7 +192,11 @@ describe('legacy progression', () => {
     expect(state.tracks.player.bestCompletionTimeMs).toBe(8000);
     expect(state.tracks.player.paceScore).toBeGreaterThanOrEqual(70);
     expect(state.tracks.player.recentSignals).toEqual(['challenge']);
-    expect(state.tracks.player.targetComplexity).toBe(26);
+    expect(state.tracks.player).toMatchObject({
+      level: 2,
+      rank: 'E',
+      targetComplexity: 12
+    });
     expect(state.tracks['ai-runner'].completedCycles).toBe(0);
     expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}').tracks.player.completedCycles).toBe(1);
 
@@ -202,6 +223,157 @@ describe('legacy progression', () => {
     expect(state.tracks['ai-runner'].recentSignals).toEqual(['ease']);
     expect(state.tracks['ai-runner'].targetComplexity).toBe(LEGACY_PROGRESSION_MIN_COMPLEXITY);
     expect(readLegacyProgressionState(storage).tracks['ai-runner'].completedCycles).toBe(1);
+  });
+
+  test('rebases legacy player history to the gentle baseline instead of converting it into late-game difficulty', () => {
+    const storage = new MemoryStorage();
+    const legacyState = {
+      version: 1,
+      playerProgressionBaselineVersion: 3,
+      tracks: {
+        player: {
+          ...createEmptyLegacyProgressionState().tracks.player,
+          cleanCycles: 99,
+          completedCycles: 5_180,
+          level: 99,
+          rank: 'S',
+          struggleCycles: 0,
+          targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
+        },
+        'ai-runner': createEmptyLegacyProgressionState().tracks['ai-runner']
+      }
+    };
+    storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify(legacyState));
+
+    const repaired = readLegacyProgressionState(storage);
+    expect(repaired.playerProgressionBaselineVersion).toBeGreaterThanOrEqual(5);
+    expect(repaired.tracks.player).toMatchObject({
+      cleanCycles: 0,
+      completedCycles: 0,
+      level: 1,
+      rank: 'E',
+      struggleCycles: Number.MAX_SAFE_INTEGER,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
+    });
+    expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}'))
+      .toMatchObject({ playerProgressionBaselineVersion: 5 });
+
+    const profile = resolveLegacyProgressionDifficultyProfile(repaired.tracks.player);
+    expect(profile.band).toBe('tutorial');
+    expect(createLegacyStaticSlowTileState(createProgressionTestMaze(), profile.band))
+      .toMatchObject({ eligible: false, placement: null });
+    expect(createLegacyPatrolAgentState(createProgressionTestMaze(), profile.band)).toBeNull();
+
+    const advanced = recordLegacyProgressionCycle(
+      storage,
+      repaired,
+      createMazeCycleTelemetryReceipt({
+        averageFrameMs: 16,
+        completedAt: '2026-08-14T18:00:00.000Z',
+        completionTimeMs: 8_000,
+        controlMode: 'stick',
+        maze: createProgressionTestMaze(),
+        playerPath: createProgressionTestMaze().solutionPath,
+        resetUsed: false,
+        surface: 'play',
+        backtracks: 1,
+        wrongTurns: 1
+      }),
+      createProgressionTestMaze()
+    );
+    expect(advanced.tracks.player).toMatchObject({
+      completedCycles: 1,
+      level: 2,
+      rank: 'E',
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4
+    });
+    expect(readLegacyProgressionState(storage).tracks.player).toMatchObject({
+      completedCycles: 1,
+      level: 2,
+      rank: 'E',
+      struggleCycles: Number.MAX_SAFE_INTEGER,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4
+    });
+
+    // A still-open client preserves recognized track fields but rewrites
+    // the top-level baseline version during a remote sync. The baseline provenance
+    // must keep a legitimately advanced post-rebase player from being reset
+    // again when they later return to an updated client.
+    const staleV3RemoteWrite = {
+      ...advanced,
+      playerProgressionBaselineVersion: 3
+    };
+    const syncedStorage = new MemoryStorage();
+    syncedStorage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify(staleV3RemoteWrite));
+    expect(readLegacyProgressionState(syncedStorage).tracks.player).toMatchObject({
+      completedCycles: 1,
+      level: 2,
+      rank: 'E',
+      struggleCycles: Number.MAX_SAFE_INTEGER,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4
+    });
+  });
+
+  test('rebases a versioned but impossible player level before it can unlock late-game hazards', () => {
+    const storage = new MemoryStorage();
+    const baseline = createEmptyLegacyProgressionState();
+    storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify({
+      ...baseline,
+      playerProgressionBaselineVersion: 4,
+      tracks: {
+        ...baseline.tracks,
+        player: {
+          ...baseline.tracks.player,
+          completedCycles: 3,
+          level: 99,
+          rank: 'S',
+          targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
+        }
+      }
+    }));
+
+    const repaired = readLegacyProgressionState(storage);
+    expect(repaired.playerProgressionBaselineVersion).toBe(5);
+    expect(repaired.tracks.player).toMatchObject({
+      completedCycles: 0,
+      level: 1,
+      rank: 'E',
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
+    });
+
+    const profile = resolveLegacyProgressionDifficultyProfile(repaired.tracks.player);
+    expect(profile.band).toBe('tutorial');
+    expect(createLegacyStaticSlowTileState(createProgressionTestMaze(), profile.band))
+      .toMatchObject({ eligible: false, placement: null });
+    expect(createLegacyPatrolAgentState(createProgressionTestMaze(), profile.band)).toBeNull();
+  });
+
+  test('keeps a coherent earned player trajectory when it migrates to the current baseline', () => {
+    const storage = new MemoryStorage();
+    const baseline = createEmptyLegacyProgressionState();
+    storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify({
+      ...baseline,
+      playerProgressionBaselineVersion: 4,
+      tracks: {
+        ...baseline.tracks,
+        player: {
+          ...baseline.tracks.player,
+          completedCycles: 3,
+          level: 4,
+          rank: 'E',
+          targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 12
+        }
+      }
+    }));
+
+    const migrated = readLegacyProgressionState(storage);
+    expect(migrated.playerProgressionBaselineVersion).toBe(5);
+    expect(migrated.tracks.player).toMatchObject({
+      completedCycles: 3,
+      level: 4,
+      rank: 'E',
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 12
+    });
   });
 
   test('scores completion time against route and complexity pressure for level pacing', () => {
@@ -444,7 +616,7 @@ describe('legacy progression', () => {
     expect(state.tracks['ai-runner'].struggleCycles).toBe(0);
   });
 
-  test('uses shortest-path waste and render safety in the progression score', () => {
+  test('keeps route-quality telemetry for players while every completed maze advances', () => {
     const storage = new MemoryStorage();
     const maze = createProgressionTestMaze();
     const complexity = resolveLegacyMazeComplexity(maze).total;
@@ -488,23 +660,194 @@ describe('legacy progression', () => {
       backtracks: 0,
       wrongTurns: 0
     });
+    const unsafeAiFrameReceipt = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 34,
+      aiDecisionSummary: {
+        backtrackCount: 0,
+        decisionCount: maze.solutionPath.length,
+        optionalRetargetCount: 0,
+        recoveryCount: 0,
+        thinkingModel: 'legacy-source',
+        visitedUndoCount: 0,
+        wrongBranchCount: 0
+      },
+      completedAt: '2026-07-08T12:02:00.000Z',
+      completionTimeMs: 8000,
+      controlMode: 'stick',
+      maze,
+      playerPath: maze.solutionPath,
+      resetUsed: false,
+      surface: 'menu-demo',
+      backtracks: 0,
+      wrongTurns: 0
+    });
 
     expect(routeWasteReceipt.shortestViablePathLength).toBe(maze.solutionPath.length);
     expect(routeWasteReceipt.routeEfficiencyPressureScore).toBeGreaterThanOrEqual(75);
     expect(resolveLegacyProgressionPerformanceScore(efficientReceipt, complexity).signal).toBe('challenge');
     expect(resolveLegacyProgressionPerformanceScore(routeWasteReceipt, complexity).signal).toBe('ease');
-    expect(resolveLegacyProgressionPerformanceScore(unsafeFrameReceipt, complexity).signal).toBe('hold');
+    expect(resolveLegacyProgressionPerformanceScore(unsafeFrameReceipt, complexity).signal).toBe('challenge');
+    expect(resolveLegacyProgressionPerformanceScore(unsafeAiFrameReceipt, complexity).signal).toBe('hold');
 
     let state = recordLegacyProgressionCycle(storage, createEmptyLegacyProgressionState(), routeWasteReceipt, maze);
-    expect(state.tracks.player.lastSignal).toBe('ease');
-    expect(state.tracks.player.targetComplexity).toBe(22);
+    expect(state.tracks.player.lastSignal).toBe('challenge');
+    expect(state.tracks.player.targetComplexity).toBe(12);
 
     state = recordLegacyProgressionCycle(storage, createEmptyLegacyProgressionState(), unsafeFrameReceipt, maze);
-    expect(state.tracks.player.lastSignal).toBe('hold');
-    expect(state.tracks.player.targetComplexity).toBe(24);
+    expect(state.tracks.player.lastSignal).toBe('challenge');
+    expect(state.tracks.player.targetComplexity).toBe(12);
   });
 
-  test('paces level changes from a recent signal window instead of only the latest cycle', () => {
+  test('uses the displayed player score without a hidden wrong-turn or backtrack gate', () => {
+    const maze = createProgressionTestMaze();
+    const complexity = resolveLegacyMazeComplexity(maze).total;
+    const highScoreWithNormalMistakes = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 16,
+      completedAt: '2026-08-14T02:40:00.000Z',
+      completionTimeMs: 8000,
+      controlMode: 'stick',
+      maze,
+      playerPath: maze.solutionPath,
+      resetUsed: false,
+      surface: 'play',
+      backtracks: 2,
+      wrongTurns: 2
+    });
+    const highScoreWithManyMistakes = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 16,
+      completedAt: '2026-08-14T02:41:00.000Z',
+      completionTimeMs: 8000,
+      controlMode: 'stick',
+      maze,
+      playerPath: maze.solutionPath,
+      resetUsed: false,
+      surface: 'play',
+      backtracks: 6,
+      wrongTurns: 6
+    });
+    const extremeDetour = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 16,
+      completedAt: '2026-08-14T02:42:00.000Z',
+      completionTimeMs: 8000,
+      controlMode: 'stick',
+      maze,
+      playerPath: [
+        ...maze.solutionPath,
+        ...maze.solutionPath,
+        ...maze.solutionPath
+      ],
+      resetUsed: false,
+      surface: 'play',
+      backtracks: 0,
+      wrongTurns: 0
+    });
+
+    const highScore = resolveLegacyProgressionPerformanceScore(highScoreWithNormalMistakes, complexity);
+    expect(highScore.signal).toBe('challenge');
+    expect(highScore.total).toBeGreaterThanOrEqual(70);
+    expect(resolveLegacyProgressionPerformanceScore(highScoreWithManyMistakes, complexity)).toMatchObject({
+      signal: 'challenge',
+      total: expect.any(Number)
+    });
+    const progressedState = recordLegacyProgressionCycle(
+      new MemoryStorage(),
+      createEmptyLegacyProgressionState(),
+      highScoreWithManyMistakes,
+      maze
+    );
+    expect(progressedState.tracks.player).toMatchObject({
+      lastSignal: 'challenge',
+      level: 2,
+      targetComplexity: 12
+    });
+    expect(resolveLegacyProgressionPerformanceScore(extremeDetour, complexity).signal).toBe('ease');
+  });
+
+  test('advances a low-score completed player maze while retaining its raw quality telemetry', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    const initialState = createEmptyLegacyProgressionState();
+    const lowScoreClear = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 16,
+      completedAt: '2026-08-14T02:43:00.000Z',
+      completionTimeMs: 90_000,
+      controlMode: 'stick',
+      maze,
+      playerPath: maze.solutionPath,
+      resetUsed: false,
+      surface: 'play',
+      backtracks: 7,
+      wrongTurns: 7
+    });
+
+    expect(resolveLegacyProgressionPerformanceScore(lowScoreClear, resolveLegacyMazeComplexity(maze).total)).toMatchObject({
+      signal: 'hold'
+    });
+    expect(recordLegacyProgressionCycle(storage, initialState, lowScoreClear, maze).tracks.player)
+      .toMatchObject({
+        lastSignal: 'challenge',
+        targetComplexity: initialState.tracks.player.targetComplexity + 4
+      });
+  });
+
+  test('unlocks one visible player maze level per qualifying clear, even on a slower device', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    let state = createEmptyLegacyProgressionState();
+
+    for (const [index, averageFrameMs] of [24, 30, 34].entries()) {
+      state = recordLegacyProgressionCycle(storage, state, createMazeCycleTelemetryReceipt({
+        averageFrameMs,
+        completedAt: `2026-07-08T12:0${index}:00.000Z`,
+        completionTimeMs: 8_000,
+        controlMode: 'stick',
+        maze,
+        playerPath: maze.solutionPath,
+        resetUsed: false,
+        surface: 'play',
+        backtracks: 0,
+        wrongTurns: 0
+      }), maze);
+    }
+
+    expect(state.tracks.player).toMatchObject({
+      completedCycles: 3,
+      lastSignal: 'challenge',
+      level: 4,
+      rank: 'E',
+      targetComplexity: 20
+    });
+  });
+
+  test('raises the player rank at the documented maze-level milestone', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    let state = createEmptyLegacyProgressionState();
+
+    for (let run = 0; run < 5; run += 1) {
+      state = recordLegacyProgressionCycle(storage, state, createMazeCycleTelemetryReceipt({
+        averageFrameMs: 16,
+        completedAt: `2026-08-14T03:0${run}:00.000Z`,
+        completionTimeMs: 8_000,
+        controlMode: 'stick',
+        maze,
+        playerPath: maze.solutionPath,
+        resetUsed: false,
+        surface: 'play',
+        backtracks: 0,
+        wrongTurns: 0
+      }), maze);
+    }
+
+    expect(state.tracks.player).toMatchObject({
+      completedCycles: 5,
+      level: 6,
+      rank: 'D',
+      targetComplexity: 28
+    });
+  });
+
+  test('advances a completed player maze even after a restart without demotion', () => {
     const storage = new MemoryStorage();
     const maze = createProgressionTestMaze();
     let state = createEmptyLegacyProgressionState();
@@ -534,12 +877,12 @@ describe('legacy progression', () => {
     });
 
     state = recordLegacyProgressionCycle(storage, state, firstChallengeReceipt, maze);
-    expect(state.tracks.player.targetComplexity).toBe(26);
+    expect(state.tracks.player.targetComplexity).toBe(12);
 
     state = recordLegacyProgressionCycle(storage, state, secondChallengeReceipt, maze);
     expect(state.tracks.player.recentSignals).toEqual(['challenge', 'challenge']);
-    expect(state.tracks.player.targetComplexity).toBe(29);
-    expect(state.tracks.player.level).toBe(resolveLegacyProgressionLevel(29));
+    expect(state.tracks.player.targetComplexity).toBe(16);
+    expect(state.tracks.player.level).toBe(resolveLegacyProgressionLevel(16));
 
     const strugglingReceipt = createMazeCycleTelemetryReceipt({
       averageFrameMs: 16,
@@ -565,8 +908,9 @@ describe('legacy progression', () => {
     };
 
     state = recordLegacyProgressionCycle(storage, state, strugglingReceipt, maze);
-    expect(state.tracks.player.recentSignals.slice(0, 2)).toEqual(['ease', 'ease']);
-    expect(state.tracks.player.targetComplexity).toBe(27);
+    expect(state.tracks.player.recentSignals.slice(0, 2)).toEqual(['challenge', 'ease']);
+    expect(state.tracks.player.targetComplexity).toBe(20);
+    expect(state.tracks.player.level).toBe(4);
   });
 
   test('scores real maze complexity from route, shortcut, floor, and solution shape', () => {
@@ -734,13 +1078,7 @@ describe('legacy progression', () => {
 
   test('allows S-rank AI progression to keep leveling past the old level-44 cap', () => {
     const storage = new MemoryStorage();
-    const maze = createProgressionTestMaze({
-      size: 21,
-      solutionPath: Array.from({ length: 60 }, (_, index) => ({
-        x: Math.min(20, 1 + (index % 20)),
-        y: Math.min(20, 1 + Math.floor(index / 20))
-      }))
-    });
+    const maze = createProgressionTestMaze();
     const baseState = createEmptyLegacyProgressionState();
     let state = {
       ...baseState,
@@ -769,7 +1107,7 @@ describe('legacy progression', () => {
         wrongBranchCount: 2
       },
       averageFrameMs: 16,
-      completedAt: '2026-07-10T08:20:00.000Z',
+      completedAt,
       completionTimeMs: 16_500,
       controlMode: 'stick',
       maze,
@@ -807,16 +1145,18 @@ describe('legacy progression', () => {
 
     expect(basePalette.playerCoreColor).toBe(0x36ff7d);
     expect(basePalette.trailColor).toBe(0x36ff7d);
-    expect(basePalette.trailPulseColor).toBe(0xff61c7);
-    expect(basePalette.trailPulseEdgeColor).not.toBe(0xecfff5);
+    expect(basePalette.trailPulseColor).toBe(0xf1faf6);
+    expect(basePalette.trailPulseEdgeColor).toBe(0xe9fff1);
     expect(advancedPalette.playerCoreColor).toBe(0x36ff7d);
     expect(advancedPalette.trailColor).toBe(0x36ff7d);
-    expect(advancedPalette.trailPulseColor).toBe(0xff61c7);
+    expect(advancedPalette.trailPulseColor).toBe(0xf1faf6);
+    expect(advancedPalette.trailPulseEdgeColor).toBe(0xe9fff1);
     expect(resolveLegacyProgressionGenerationScale(50, advancedTrack)).toBeGreaterThan(50);
   });
 
   test('defines level-one mazes as small simple no-room routes', () => {
     const state = createEmptyLegacyProgressionState();
+    const playerTrack = state.tracks.player;
     const aiTrack = state.tracks['ai-runner'];
     const profile = resolveLegacyProgressionDifficultyProfile(aiTrack);
     const generationProfile = resolveLegacyMazeGenerationProfileForProgression(aiTrack);
@@ -825,6 +1165,14 @@ describe('legacy progression', () => {
     const maze = createLegacyRuntimeMazeForMode('menu', scale, 3749, generationProfile);
     const complexity = resolveLegacyMazeComplexity(maze);
 
+    expect(playerTrack).toMatchObject({ level: 1, targetComplexity: 8 });
+    expect(resolveLegacyProgressionDifficultyProfile(playerTrack)).toMatchObject({
+      band: 'tutorial',
+      branchPressure: 'minimal',
+      deadEndPressure: 'minimal',
+      expectedEdgeWraps: { horizontal: 0, vertical: 0 },
+      shortcutPressure: 'off'
+    });
     expect(aiTrack.level).toBe(1);
     expect(profile).toMatchObject({
       band: 'tutorial',
@@ -914,7 +1262,8 @@ describe('legacy progression', () => {
 
       expect(colorDistance(palette.playerCoreColor)).toBeGreaterThanOrEqual(145);
       expect(colorDistance(palette.trailColor)).toBeGreaterThanOrEqual(145);
-      expect(colorDistance(palette.trailPulseColor)).toBeGreaterThanOrEqual(145);
+      expect(palette.trailPulseColor).toBe(0xf1faf6);
+      expect(palette.trailPulseEdgeColor).toBe(0xe9fff1);
     }
   });
 
@@ -975,8 +1324,8 @@ describe('legacy progression', () => {
     expect(unrestrictedScale).toBeGreaterThan(viewportCap);
     expect(phoneScale).toBe(viewportCap);
     expect(narrowScale).toBe(narrowViewportCap);
-    expect(narrowScale).toBe(37);
-    expect(phoneScale).toBe(41);
+    expect(narrowScale).toBe(38);
+    expect(phoneScale).toBe(42);
     expect(normalPhoneViewportCap).toBe(46);
     expect(playViewportCap).toBeGreaterThan(narrowViewportCap);
 
@@ -987,7 +1336,7 @@ describe('legacy progression', () => {
       normalPhoneViewportCap,
       'menu'
     );
-    expect(normalPhoneLayout.tileSize).toBe(8);
+    expect(normalPhoneLayout.tileSize).toBeCloseTo(8.152, 3);
     expect(normalPhoneLayout.boardLeft).toBeGreaterThanOrEqual(8);
     expect(normalPhoneLayout.boardLeft + normalPhoneLayout.boardSize).toBeLessThanOrEqual(normalPhoneViewport.width - 8);
 
@@ -1007,8 +1356,9 @@ describe('legacy progression', () => {
         'menu'
       );
 
-      expect(layout.tileSize).toBe(8);
-      expect(layout.boardLeft).toBeGreaterThanOrEqual(8);
+      expect(layout.tileSize).toBeGreaterThanOrEqual(8.15);
+      expect(layout.boardSize).toBe(389);
+      expect(layout.boardLeft).toBe(8);
       expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(normalPhoneViewport.width - 8);
     }
   });
