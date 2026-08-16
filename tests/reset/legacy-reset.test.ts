@@ -993,10 +993,10 @@ describe('legacy reset lane', () => {
     expect(overlayFieldCommitSource).toContain('triggersReloadOnBack');
     expect(overlayFieldCommitSource).toContain('triggersCameraFlag');
     expect(menuSceneSource).toContain("const result = applyLegacyOverlayFieldCommit(this.settings, this.optionFieldDrafts, fieldId);");
-    expect(menuSceneSource).toContain('resolveLegacyOverlayFieldCommitMessage(');
-    expect(menuSceneSource).toContain('this.resolveLegacyOverlayFieldMessageLabel(fieldId)');
-    expect(menuSceneSource).toContain('this.resolveLegacyOverlayFieldMessageState(fieldId)');
-    expect(menuSceneSource).toContain("this.commitOverlayField(fieldId, { announce: false });");
+    expect(menuSceneSource).not.toContain('resolveLegacyOverlayFieldCommitMessage(');
+    expect(menuSceneSource).not.toContain('resolveLegacyOverlayFieldMessageLabel(fieldId)');
+    expect(menuSceneSource).not.toContain('resolveLegacyOverlayFieldMessageState(fieldId)');
+    expect(menuSceneSource).toContain('this.commitOverlayField(fieldId);');
     expect(menuSceneSource).toContain('if (result.triggersReloadOnBack) {');
     expect(menuSceneSource).toContain('if (result.refreshLayout) {');
     expect(legacyPauseMenuSource).toContain('ScaleNumChanged = true;');

@@ -81,10 +81,28 @@ describe('legacy menu layout', () => {
       + (guestDesktop.buttonHeight / 2)
     ) / 2;
 
-    expect(Math.abs(visibleStackCenter - (guestDesktop.height / 2))).toBeLessThanOrEqual(12);
+    // The menu intentionally sits below its persistent header lane instead of
+    // competing with the level and settings controls at the top edge.
+    expect(visibleStackCenter).toBeGreaterThanOrEqual(guestDesktop.height / 2);
+    expect(visibleStackCenter - (guestDesktop.height / 2)).toBeLessThanOrEqual(40);
     expect(guestDesktop).toEqual(authenticatedDesktop);
     expect(guestPhone).toEqual(authenticatedPhone);
     expect(guestPlay).toEqual(authenticatedPlay);
+  });
+
+  test('reserves one menu HUD lane before the title, maze, and actions', () => {
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 405, height: 958 },
+      { width: 1440, height: 900 }
+    ]) {
+      const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
+
+      expect(layout.lanes.hud).not.toBeNull();
+      expect(layout.lanes.hud?.bottom).toBeLessThanOrEqual(layout.lanes.title?.top ?? 0);
+      expect(layout.lanes.title?.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
+      expect(layout.lanes.maze.bottom).toBeLessThanOrEqual(layout.lanes.actions?.top ?? 0);
+    }
   });
 
   test('keeps the portrait board dominant with one compact lower action', () => {

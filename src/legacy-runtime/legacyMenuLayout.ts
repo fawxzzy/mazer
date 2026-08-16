@@ -57,6 +57,11 @@ const LEGACY_PHONE_CLEAN_OUTER_MARGIN = 8;
 // control. Keep the HUD lane slim so the maze earns the reclaimed space.
 const LEGACY_PLAY_TOP_HUD_MIN = 56;
 const LEGACY_PLAY_TOP_HUD_MAX = 72;
+// The menu also owns a pair of header controls (level and settings). Reserve
+// their lane before positioning the title or maze so narrow desktop and
+// landscape layouts cannot place content underneath those controls.
+const LEGACY_MENU_TOP_HUD_MIN = 56;
+const LEGACY_MENU_TOP_HUD_MAX = 72;
 
 const createLane = (top: number, height: number): LegacyMenuLayoutLane => ({
   top: Math.round(top),
@@ -105,12 +110,18 @@ export const resolveLegacyMenuLayout = (
   const laneGap = isUltraNarrow ? 4 : 8;
   const menuActionGap = isUltraNarrow ? laneGap : 10;
   const menuTopReserve = isUltraNarrow ? 6 : Math.round(clamp(height * 0.02, 16, 20));
+  const menuTopHudReserve = !isPlaySurface && !isUltraNarrow
+    ? Math.round(clamp(height * 0.072, LEGACY_MENU_TOP_HUD_MIN, LEGACY_MENU_TOP_HUD_MAX))
+    : 0;
   const menuFooterReserve = isUltraNarrow ? 10 : 18;
   const menuTitleReserve = isUltraNarrow
     ? 50
     : isPortrait
       ? Math.round(clamp(width * 0.26, 72, 112))
-      : Math.round(clamp(height * 0.16, 110, 150));
+      // The title no longer carries a large decorative rail frame. Keep a
+      // compact, readable title lane so the menu can reserve its header
+      // controls without shrinking the desktop maze beneath active play.
+      : Math.round(clamp(height * 0.12, 72, 104));
   const menuRankReserve = 0;
   const menuActionReserve = buttonHeight;
   const playTopHudReserve = isPlaySurface && isPortrait
@@ -121,6 +132,7 @@ export const resolveLegacyMenuLayout = (
     : 0;
   const menuVerticalBoardLimit = height
     - menuTopReserve
+    - menuTopHudReserve
     - menuTitleReserve
     - menuRankReserve
     - menuActionReserve
@@ -165,7 +177,7 @@ export const resolveLegacyMenuLayout = (
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
   const menuGroupHeight = menuTitleReserve + snappedBoardSize + menuRankReserve + menuActionReserve + (laneGap * 2) + menuActionGap;
   const menuGroupTop = Math.max(
-    menuTopReserve,
+    menuTopHudReserve + menuTopReserve,
     Math.round((height - menuFooterReserve - menuGroupHeight) / 2)
   );
   const menuBoardTop = menuGroupTop + menuTitleReserve + laneGap;
@@ -243,7 +255,11 @@ export const resolveLegacyMenuLayout = (
     lanes: {
       actions: actionsLane,
       controls: controlsLane,
-      hud: isPlaySurface ? createLane(0, playTopHudReserve) : null,
+      hud: isPlaySurface
+        ? createLane(0, playTopHudReserve)
+        : menuTopHudReserve > 0
+          ? createLane(0, menuTopHudReserve)
+          : null,
       maze: createLane(boardTop, snappedBoardSize),
       rank: rankLane,
       title: isPlaySurface ? null : createLane(titleLaneTop, menuTitleReserve)

@@ -60,11 +60,16 @@ describe('Mazer completion markers', () => {
     const systemMap = readRepoFile('docs/system-map.md');
     const packageJson = readRepoFile('package.json');
     const verifyScript = readRepoFile('scripts/verify/run-verify.mjs');
+    const testVerifyScript = readRepoFile('scripts/verify/run-test-verify.mjs');
 
     expect(packageJson).toContain('"verify": "node ./scripts/verify/run-verify.mjs"');
-    expect(packageJson).toContain('"test:verify": "vitest run tests/reset tests/ai/demo-walker.test.ts tests/ai/demo-walker-known-frontier.test.ts tests/ai/demo-walker-rank-ladder.test.ts tests/ai/demo-walker-recovery-diagnostics.test.ts tests/scenes/menu-render-frame.test.ts tests/analysis/maze-cycle-telemetry-report.test.mjs tests/analysis/ai-run-corpus-audit.test.mjs --maxWorkers 1"');
+    expect(packageJson).toContain('"test:verify": "node ./scripts/verify/run-test-verify.mjs"');
     expect(verifyScript).toContain("runNpm(['run', 'test:verify'])");
     expect(verifyScript).toContain("runNpm(['run', 'build'])");
+    expect(testVerifyScript).toContain("'tests/reset/legacy-unreal-source-fixture.test.ts'");
+    expect(testVerifyScript).toContain("'--exclude', CWD_MUTATING_FIXTURE");
+    expect(testVerifyScript).toContain("'--pool=threads'");
+    expect(testVerifyScript).toContain("'--poolOptions.threads.singleThread'");
     expect(currentTruth).toContain('Current `verify` means:');
     expect(currentTruth).toContain('- `npm run test:verify`');
     expect(currentTruth).toContain('- `npm run build`');
@@ -77,7 +82,8 @@ describe('Mazer completion markers', () => {
     expect(currentTruth).toContain('- `tests/scenes/menu-render-frame.test.ts`');
     expect(currentTruth).toContain('- `tests/analysis/maze-cycle-telemetry-report.test.mjs`');
     expect(currentTruth).toContain('- `tests/analysis/ai-run-corpus-audit.test.mjs`');
-    expect(currentTruth).toContain('- `--maxWorkers 1`');
+    expect(currentTruth).toContain('`--maxWorkers 1 --pool=threads --poolOptions.threads.singleThread`');
+    expect(currentTruth).toContain('`legacy-unreal-source-fixture.test.ts` runs in the fork pool');
     expect(currentTruth).toContain('npm run lint');
     expect(systemMap).toContain('docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md');
     expect(systemMap).toContain('docs/current-truth.md');
@@ -91,8 +97,19 @@ describe('Mazer completion markers', () => {
     expect(systemMap).toContain('- `tests/scenes/menu-render-frame.test.ts`');
     expect(systemMap).toContain('- `tests/analysis/maze-cycle-telemetry-report.test.mjs`');
     expect(systemMap).toContain('- `tests/analysis/ai-run-corpus-audit.test.mjs`');
-    expect(systemMap).toContain('- `--maxWorkers 1`');
+    expect(systemMap).toContain('`--maxWorkers 1 --pool=threads --poolOptions.threads.singleThread`');
+    expect(systemMap).toContain('`legacy-unreal-source-fixture.test.ts` runs in the fork pool');
     expect(systemMap).toContain('scale-`149` smoke');
+  });
+
+  test('keeps the player-owned level glyph truth synchronized across menu and play', () => {
+    const currentTruth = readRepoFile('docs/current-truth.md');
+
+    expect(currentTruth).toContain('The glyph is bound to the player progression track on both menu and play');
+    expect(currentTruth).toContain('the independent menu-AI progression remains internal-only and has no raw numeric menu display');
+    expect(currentTruth).toContain('Menu and active play each use only a color-tiered numeric player-level glyph at the top-left');
+    expect(currentTruth).not.toContain('The menu glyph is bound to the independent menu-AI progression track');
+    expect(currentTruth).not.toContain('the menu glyph belongs to the AI runner');
   });
 
   test('keeps the level/rank/complexity progression contract tracked', () => {
