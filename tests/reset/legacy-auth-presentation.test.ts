@@ -24,7 +24,7 @@ describe('legacy auth presentation', () => {
       rememberedIdentity: {
         displayName: 'Maze Runner',
         email: 'runner@example.com',
-        sessionState: 'reauth-required',
+        sessionState: 'active',
         updatedAt: '2026-08-16T00:00:00.000Z'
       },
       snapshot: { configured: true, status: 'guest' }
@@ -32,6 +32,24 @@ describe('legacy auth presentation', () => {
 
     expect(presentation.title).toBe('Welcome Back');
     expect(presentation.helper).toBe('Welcome back, Maze Runner. Enter your password to continue.');
+    expect(presentation.helper).not.toContain('runner@example.com');
+  });
+
+  test('explains a required reauthentication without implying that saved progress was lost', () => {
+    const presentation = resolveLegacyAuthPresentation({
+      mode: 'login',
+      rememberedIdentity: {
+        displayName: 'Maze Runner',
+        email: 'runner@example.com',
+        sessionState: 'reauth-required',
+        updatedAt: '2026-08-16T00:00:00.000Z'
+      },
+      snapshot: { configured: true, status: 'guest' }
+    });
+
+    expect(presentation.title).toBe('Sign In Again');
+    expect(presentation.helper).toContain('restore your saved progress');
+    expect(presentation.helper).toContain('Forgot Password');
     expect(presentation.helper).not.toContain('runner@example.com');
   });
 
