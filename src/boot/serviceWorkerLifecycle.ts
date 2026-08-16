@@ -27,7 +27,7 @@ export const installMazerProductionServiceWorker = (
     }
     registrationStarted = true;
 
-    void runtime.register?.('/sw.js')
+    void runtime.register?.('/app-sw.js')
       .then((registration) => registration.update())
       .catch((error: unknown) => {
         onError(error instanceof Error ? error.message : String(error));

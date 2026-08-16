@@ -51,7 +51,7 @@ describe('production service worker lifecycle', () => {
     expect(runtime.register).not.toHaveBeenCalled();
 
     loadListeners[0]();
-    await vi.waitFor(() => expect(runtime.register).toHaveBeenCalledWith('/sw.js'));
+    await vi.waitFor(() => expect(runtime.register).toHaveBeenCalledWith('/app-sw.js'));
     await vi.waitFor(() => expect(update).toHaveBeenCalledOnce());
   });
 
@@ -62,7 +62,7 @@ describe('production service worker lifecycle', () => {
 
     expect(installMazerProductionServiceWorker(runtime, vi.fn())).toBe(true);
     expect(loadListeners).toHaveLength(0);
-    await vi.waitFor(() => expect(runtime.register).toHaveBeenCalledWith('/sw.js'));
+    await vi.waitFor(() => expect(runtime.register).toHaveBeenCalledWith('/app-sw.js'));
     await vi.waitFor(() => expect(update).toHaveBeenCalledOnce());
   });
 
