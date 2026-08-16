@@ -1318,6 +1318,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (runtimeAuthFixtureSnapshot) {');
     expect(menuSceneSource).toContain("this.openOverlay('auth')");
     expect(menuSceneSource).toContain('private buildAuthOverlay(): void');
+    expect(menuSceneSource).toContain('resolveLegacyAuthPresentation({');
+    expect(menuSceneSource).toContain('this.createAuthFieldLabel(presentation.emailLabel');
+    expect(menuSceneSource).toContain('this.createAuthFieldLabel(presentation.passwordLabel');
+    expect(menuSceneSource).toContain('presentation.primaryActionLabel');
+    expect(menuSceneSource).toContain('presentation.recoveryActionLabel');
+    expect(menuSceneSource).toContain('const bottomStartY = rowY + (stacked ? 24 : 28);');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSubmit(): Promise<void>');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSignOut(): Promise<void>');
     expect(menuSceneSource).toContain('interface LegacyAuthActionDiagnostics');
@@ -1346,7 +1352,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('contentCenterY: actionY');
     expect(menuSceneSource).toContain("const label = this.authSnapshot.status === 'authenticated' ? 'Log out' : 'Account';");
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
-    expect(playerMessageSource).toContain('Account login needs Supabase env vars before it can be enabled.');
+    expect(playerMessageSource).toContain('Account access is unavailable right now. You can still play as a guest.');
     expect(playerMessageSource).toContain('export interface LegacyQueuedPlayerMessage');
     expect(playerMessageSource).toContain('export const enqueueLegacyPlayerMessage =');
     expect(playerMessageSource).toContain('export const expireLegacyPlayerMessageQueue =');
@@ -1596,7 +1602,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("ease: 'Sine.easeInOut'");
     expect(menuSceneSource).toContain('this.syncLegacyAuthNativeInputValue();');
     expect(menuSceneSource).toContain('this.destroyLegacyAuthNativeInput();');
-    expect(menuSceneSource).toContain("const secondaryModeLabel = this.authForm.mode === 'signup' ? 'Use Login' : 'Create Account';");
+    expect(menuSceneSource).toContain('const secondaryModeLabel = presentation.alternateActionLabel;');
     expect(menuSceneSource).not.toContain('Guest mode is active. Sign in to keep account progress separate.');
   });
 

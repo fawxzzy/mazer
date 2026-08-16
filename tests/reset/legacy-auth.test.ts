@@ -78,7 +78,7 @@ describe('legacy auth runtime', () => {
 
     expect(resolveLegacyAuthSubmitState(form, false)).toEqual({
       canSubmit: false,
-      reason: 'Account login is not configured for this build.'
+      reason: 'Account access is unavailable right now. You can still play as a guest.'
     });
     expect(resolveLegacyAuthSubmitState({
       ...form,

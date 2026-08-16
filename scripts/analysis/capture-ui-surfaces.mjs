@@ -581,7 +581,7 @@ const openAuthOverlayFromMenu = async (page, timeoutMs) => {
     await clickPoint(page, buttons.login, 'Login');
     try {
       await waitForSurface(page, {
-        expectedLabels: ['Account', 'Login', 'Create Account', 'Reset Password'],
+        expectedLabels: ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'],
         mode: 'menu',
         overlay: 'auth',
         timeoutMs: Math.min(timeoutMs, 10_000)
@@ -1163,6 +1163,7 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
   const paddedActionLabels = new Set([
     'Account',
     'Create Account',
+    'Forgot Password?',
     'Log out',
     'Login',
     'Menu',
@@ -1181,8 +1182,10 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
     'Account',
     'Back',
     'Create Account',
+    'Forgot Password?',
     'Log out',
     'Login',
+    'Sign In',
     'Menu',
     'Settings',
     'Reset',
@@ -1206,8 +1209,10 @@ const collectButtonLabelFillIssues = (surfaceId, surface) => (surface?.buttons ?
   const actionLabels = new Set([
     'Account',
     'Create Account',
+    'Forgot Password?',
     'Log out',
     'Login',
+    'Sign In',
     'Menu',
     'Settings',
     'Reset',
@@ -1629,7 +1634,7 @@ const buildSurfaceChecks = ({
     createCheck(
       'auth-text-labels',
       authGated
-        ? hasLabels(surfaces.auth, ['Account', 'Login', 'Create Account', 'Reset Password'])
+        ? hasLabels(surfaces.auth, ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'])
         : surfaces.auth.skipped === true,
       authGated
         ? `labels=${labelDetail(surfaces.auth)}`
@@ -1965,7 +1970,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         const captured = await captureSurface({
           page,
           outputDir,
-          expectedLabels: ['Account', 'Login', 'Create Account', 'Reset Password'],
+          expectedLabels: ['Email', 'Password', 'Sign In', 'Create Account', 'Forgot Password?'],
           id: '02-auth',
           mode: 'menu',
           overlay: 'auth',
