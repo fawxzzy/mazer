@@ -707,7 +707,7 @@ describe('legacy reset lane', () => {
     expect(bootSource).toContain('installMazerProductionServiceWorker({');
     expect(bootSource).toContain("markMazerBootStatus('boot-start');");
     expect(bootSource).toContain("markMazerBootStatus('game-created');");
-    expect(lifecycleSource).toContain("runtime.register?.('/sw.js')");
+    expect(lifecycleSource).toContain("runtime.register?.('/app-sw.js')");
     expect(lifecycleSource).toContain('.then((registration) => registration.update())');
     expect(lifecycleSource).not.toContain('addControllerChangeListener');
     expect(lifecycleSource).not.toContain('reload:');

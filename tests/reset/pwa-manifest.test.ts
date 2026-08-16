@@ -19,14 +19,14 @@ describe('Mazer installable PWA contract', () => {
     expect(vercelConfig.git?.deploymentEnabled).toBe(false);
     expect(vercelConfig.redirects).toEqual([
       {
-        source: '/:path*',
+        source: '/:path((?!sw\\.js$).*)',
         has: [
           {
             type: 'host',
             value: 'fawxzzy-mazer.vercel.app'
           }
         ],
-        destination: 'https://mazer.fawxzzy.com/:path*',
+        destination: 'https://mazer.fawxzzy.com/:path',
         permanent: true
       }
     ]);
@@ -74,6 +74,22 @@ describe('Mazer installable PWA contract', () => {
     expect(html).toContain('rel="canonical" href="https://mazer.fawxzzy.com/"');
     expect(html).toContain('property="og:url" content="https://mazer.fawxzzy.com/"');
     expect(lifecycleSource).toContain("isLocalhostHostname(runtime.hostname)");
-    expect(lifecycleSource).toContain("runtime.register?.('/sw.js')");
+    expect(lifecycleSource).toContain("runtime.register?.('/app-sw.js')");
+  });
+
+  test('retires the legacy service worker before host migration', () => {
+    const retirementWorker = readFileSync(
+      resolve(process.cwd(), 'public/sw.js'),
+      'utf8'
+    );
+    const viteConfig = readFileSync(resolve(process.cwd(), 'vite.config.ts'), 'utf8');
+
+    expect(viteConfig).toContain("filename: 'app-sw.js'");
+    expect(retirementWorker).toContain("const LEGACY_ORIGIN = 'https://fawxzzy-mazer.vercel.app';");
+    expect(retirementWorker).toContain("const CANONICAL_ORIGIN = 'https://mazer.fawxzzy.com';");
+    expect(retirementWorker).toContain('await caches.delete(cacheName)');
+    expect(retirementWorker).toContain('await self.registration.unregister()');
+    expect(retirementWorker).toContain('canonicalUrl.pathname = clientUrl.pathname');
+    expect(retirementWorker).toContain('canonicalUrl.search = clientUrl.search');
   });
 });

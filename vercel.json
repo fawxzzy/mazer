@@ -5,14 +5,14 @@
   },
   "redirects": [
     {
-      "source": "/:path*",
+      "source": "/:path((?!sw\\.js$).*)",
       "has": [
         {
           "type": "host",
           "value": "fawxzzy-mazer.vercel.app"
         }
       ],
-      "destination": "https://mazer.fawxzzy.com/:path*",
+      "destination": "https://mazer.fawxzzy.com/:path",
       "permanent": true
     }
   ]

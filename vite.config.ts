@@ -32,6 +32,7 @@ export default defineConfig({
   },
   plugins: [
     VitePWA({
+      filename: 'app-sw.js',
       registerType: 'autoUpdate',
       injectRegister: false,
       manifestFilename: 'manifest.webmanifest',
