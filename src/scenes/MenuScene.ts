@@ -283,9 +283,6 @@ import {
   expireLegacyPlayerMessageQueue,
   resolveLegacyAuthFeedbackMessage,
   resolveLegacyAuthValidationMessage,
-  resolveLegacyOverlayFieldCommitMessage,
-  resolveLegacyOverlayMovementSpeedMessage,
-  resolveLegacyOverlayToggleMessage,
   resolveLegacyPlayerMessageColor,
   type LegacyQueuedPlayerMessage,
   type LegacyPlayerMessage
@@ -989,18 +986,8 @@ const LEGACY_PATH_CONNECTOR_SEAM_EDGE_ALPHA_RATIO = 0.72;
 const LEGACY_PATH_CONNECTOR_SEAM_CORE_ALPHA_RATIO = 0.94;
 const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = cyberArcadeMaterial.rail.mint;
 const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = cyberArcadeMaterial.rail.cyan;
-const LEGACY_BOARD_SIGIL_BORDER_SHADOW = cyberArcadeMaterial.substrate.shadow;
-const LEGACY_BOARD_SIGIL_BORDER_ALPHA = 0.82;
 const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_BASE = 0x10293a;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW = 0xc8fff4;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS = 0x9cff7d;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM = 0x72e0bf;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT = 0xffffff;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA = 0.48;
 const LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO = 0.066;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS = 1280;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS = 33;
 const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;
@@ -1201,6 +1188,7 @@ export class MenuScene extends Phaser.Scene {
   private progressionBadgeTextBounds: VisualRect | null = null;
   private progressionBadgeTextFits = false;
   private progressionBadgePulseStartedAtMs: number | null = null;
+  private menuSettingsCogActive = false;
   private menuCompassBounds: VisualRect | null = null;
   private backdropGraphics!: Phaser.GameObjects.Graphics;
   private boardStaticGraphics!: Phaser.GameObjects.Graphics;
@@ -1272,7 +1260,6 @@ export class MenuScene extends Phaser.Scene {
   private menuStaticDeconstructZeroHoldStartedAtMs: number | null = null;
   private menuStaticBuildPrerollStartedAtMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
-  private legacyBoardCornerShimmerNextFrameAtMs = 0;
   private legacyMenuTitleAnimationNextFrameAtMs = 0;
   private visualDiagnosticsRevision = 0;
   private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
@@ -1643,9 +1630,6 @@ export class MenuScene extends Phaser.Scene {
       if (this.mode === 'play') {
         this.hudDirty = true;
       }
-    }
-    if (this.hasLegacyBoardCornerShimmerPendingFrame(time)) {
-      this.boardDynamicDirty = true;
     }
     if (this.hasLegacyProgressionBadgePulsePendingFrame(time)) {
       this.boardDynamicDirty = true;
@@ -5089,7 +5073,6 @@ export class MenuScene extends Phaser.Scene {
     this.backdropAccumulatedDeltaMs = 0;
     this.backdropNextUpdateAtMs = Number.NEGATIVE_INFINITY;
     this.legacyPlayTrailPulseNextFrameAtMs = 0;
-    this.legacyBoardCornerShimmerNextFrameAtMs = Number.NEGATIVE_INFINITY;
     this.legacyMenuTitleAnimationNextFrameAtMs = Number.NEGATIVE_INFINITY;
     if (reducedMotion) {
       if (this.playerVisualMotion !== null) {
@@ -5313,8 +5296,6 @@ export class MenuScene extends Phaser.Scene {
         // Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.
       }
     }
-
-    this.drawLegacyBoardSigilBorder(boardLeft, boardTop, boardSize);
 
     const showMenuTitle = this.mode === 'menu' && this.overlay === 'none';
     this.titleGraphics.setVisible(showMenuTitle);
@@ -5802,89 +5783,6 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  private drawLegacyMenuPathTitleSigilRails(
-    visibleCells: LegacyMenuPathTitleCell[],
-    titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
-    time: number,
-    alphaScale: number
-  ): void {
-    const sweepState = this.resolveLegacyMenuPathTitleVisibleSweepState(visibleCells, titleLayout, time);
-    const pulsePhase = this.resolveLegacyMenuPathTitleAnimationPhase(time);
-    const pulseBoost = sweepState.syncedToLifecycle ? 1.12 : 1;
-    const pulse = (0.55 + (Math.sin((pulsePhase * Math.PI * 2) + 0.4) * 0.22)) * pulseBoost;
-    const railAlpha = clamp((0.28 + pulse * 0.3) * alphaScale, 0.16, 0.58);
-    const railGap = Math.max(5, Math.round(titleLayout.cellSize * 0.8));
-    const notch = Math.max(3, Math.round(titleLayout.cellSize * 0.46));
-    const orbitGeometry = resolveLegacyMenuPathTitleOrbitGeometry(
-      titleLayout.left,
-      titleLayout.top,
-      titleLayout.width,
-      titleLayout.height,
-      titleLayout.cellSize
-    );
-    const left = titleLayout.left - railGap;
-    const right = titleLayout.left + titleLayout.width + railGap;
-    const top = titleLayout.top - railGap;
-    const bottom = titleLayout.top + titleLayout.height + railGap;
-    const crest = Math.max(5, Math.round(titleLayout.cellSize * 0.68));
-
-    this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_EDGE, railAlpha);
-    this.strokeLegacyPolyline(this.titleGraphics, [
-      { x: left, y: top + notch },
-      { x: left + notch, y: top },
-      { x: orbitGeometry.centerX - crest, y: top },
-      { x: orbitGeometry.centerX, y: top - Math.round(crest * 0.55) },
-      { x: orbitGeometry.centerX + crest, y: top },
-      { x: right - notch, y: top },
-      { x: right, y: top + notch }
-    ]);
-    this.strokeLegacyPolyline(this.titleGraphics, [
-      { x: left, y: bottom - notch },
-      { x: left + notch, y: bottom },
-      { x: orbitGeometry.centerX - crest, y: bottom },
-      { x: orbitGeometry.centerX, y: bottom + Math.round(crest * 0.55) },
-      { x: orbitGeometry.centerX + crest, y: bottom },
-      { x: right - notch, y: bottom },
-      { x: right, y: bottom - notch }
-    ]);
-
-    this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_ACCENT, railAlpha * 1.12);
-    this.strokeLegacyPolyline(this.titleGraphics, [
-      { x: orbitGeometry.centerX, y: orbitGeometry.crownTop - orbitGeometry.crownHalf },
-      { x: orbitGeometry.centerX + orbitGeometry.crownHalf, y: orbitGeometry.crownTop },
-      { x: orbitGeometry.centerX, y: orbitGeometry.crownTop + orbitGeometry.crownHalf },
-      { x: orbitGeometry.centerX - orbitGeometry.crownHalf, y: orbitGeometry.crownTop },
-      { x: orbitGeometry.centerX, y: orbitGeometry.crownTop - orbitGeometry.crownHalf }
-    ]);
-    this.strokeLegacyPolyline(this.titleGraphics, [
-      { x: orbitGeometry.centerX, y: orbitGeometry.crownBottom - orbitGeometry.crownHalf },
-      { x: orbitGeometry.centerX + orbitGeometry.crownHalf, y: orbitGeometry.crownBottom },
-      { x: orbitGeometry.centerX, y: orbitGeometry.crownBottom + orbitGeometry.crownHalf },
-      { x: orbitGeometry.centerX - orbitGeometry.crownHalf, y: orbitGeometry.crownBottom },
-      { x: orbitGeometry.centerX, y: orbitGeometry.crownBottom - orbitGeometry.crownHalf }
-    ]);
-
-    const tickWidth = Math.max(2, Math.round(titleLayout.cellSize * 0.5));
-    const sweepX = titleLayout.left + (
-      clamp(sweepState.column, 0, titleLayout.columns)
-      * titleLayout.cellSize
-    );
-    this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, railAlpha * 1.35);
-    this.strokeLegacyPolyline(this.titleGraphics, [
-      { x: sweepX - tickWidth, y: top - 1 },
-      { x: sweepX + tickWidth, y: top - 1 }
-    ]);
-    this.strokeLegacyPolyline(this.titleGraphics, [
-      { x: sweepX - tickWidth, y: bottom + 1 },
-      { x: sweepX + tickWidth, y: bottom + 1 }
-    ]);
-    this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_ACCENT, railAlpha * 0.78);
-    this.strokeLegacyPolyline(this.titleGraphics, [
-      { x: sweepX, y: top + Math.round(titleLayout.cellSize * 0.5) },
-      { x: sweepX, y: bottom - Math.round(titleLayout.cellSize * 0.5) }
-    ]);
-  }
-
   private drawLegacyMenuPathTitlePrismSweep(
     visibleCells: LegacyMenuPathTitleCell[],
     titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
@@ -6115,8 +6013,6 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    this.drawLegacyMenuPathTitleSigilRails(visibleCells, titleLayout, time, titlePresentation.titleAlpha);
-
     if (visibleCells.length > 0) {
       for (const cell of visibleCells) {
         this.drawLegacyMenuPathTitleCell(
@@ -6230,186 +6126,6 @@ export class MenuScene extends Phaser.Scene {
     this.boardStaticGraphics.fillRect(boardLeft + boardSize, boardTop, 1, boardSize);
   }
 
-  private drawLegacyBoardSigilBorder(boardLeft: number, boardTop: number, boardSize: number): void {
-    const inset = 2;
-    const outerLeft = boardLeft - inset;
-    const outerTop = boardTop - inset;
-    const outerSize = boardSize + (inset * 2);
-    const right = outerLeft + outerSize;
-    const bottom = outerTop + outerSize;
-    const corner = Math.max(10, Math.round(boardSize * 0.045));
-    const mid = Math.max(7, Math.round(boardSize * 0.028));
-    const centerX = outerLeft + (outerSize / 2);
-    const centerY = outerTop + (outerSize / 2);
-
-    this.boardStaticGraphics.lineStyle(2, LEGACY_BOARD_SIGIL_BORDER_SHADOW, 0.62);
-    this.strokeLegacyPolyline(this.boardStaticGraphics, [
-      { x: outerLeft, y: outerTop },
-      { x: right, y: outerTop },
-      { x: right, y: bottom },
-      { x: outerLeft, y: bottom },
-      { x: outerLeft, y: outerTop }
-    ]);
-
-    this.boardStaticGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_BORDER_PRIMARY, LEGACY_BOARD_SIGIL_BORDER_ALPHA);
-    this.strokeLegacyPolyline(this.boardStaticGraphics, [
-      { x: outerLeft + corner, y: outerTop },
-      { x: centerX - mid, y: outerTop },
-      { x: centerX, y: outerTop + mid },
-      { x: centerX + mid, y: outerTop },
-      { x: right - corner, y: outerTop }
-    ]);
-    this.strokeLegacyPolyline(this.boardStaticGraphics, [
-      { x: right, y: outerTop + corner },
-      { x: right, y: centerY - mid },
-      { x: right - mid, y: centerY },
-      { x: right, y: centerY + mid },
-      { x: right, y: bottom - corner }
-    ]);
-    this.strokeLegacyPolyline(this.boardStaticGraphics, [
-      { x: right - corner, y: bottom },
-      { x: centerX + mid, y: bottom },
-      { x: centerX, y: bottom - mid },
-      { x: centerX - mid, y: bottom },
-      { x: outerLeft + corner, y: bottom }
-    ]);
-    this.strokeLegacyPolyline(this.boardStaticGraphics, [
-      { x: outerLeft, y: bottom - corner },
-      { x: outerLeft, y: centerY + mid },
-      { x: outerLeft + mid, y: centerY },
-      { x: outerLeft, y: centerY - mid },
-      { x: outerLeft, y: outerTop + corner }
-    ]);
-
-    this.boardStaticGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_BORDER_SECONDARY, 0.56);
-    const corners = [
-      { x: outerLeft, y: outerTop, sx: 1, sy: 1 },
-      { x: right, y: outerTop, sx: -1, sy: 1 },
-      { x: right, y: bottom, sx: -1, sy: -1 },
-      { x: outerLeft, y: bottom, sx: 1, sy: -1 }
-    ];
-    for (const cornerGlyph of corners) {
-      this.strokeLegacyPolyline(this.boardStaticGraphics, [
-        { x: cornerGlyph.x + (cornerGlyph.sx * 2), y: cornerGlyph.y + (cornerGlyph.sy * corner) },
-        { x: cornerGlyph.x + (cornerGlyph.sx * corner), y: cornerGlyph.y + (cornerGlyph.sy * corner) },
-        { x: cornerGlyph.x + (cornerGlyph.sx * corner), y: cornerGlyph.y + (cornerGlyph.sy * 2) }
-      ]);
-      this.strokeLegacyPolyline(this.boardStaticGraphics, [
-        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.48)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.88)) },
-        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.88)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.48)) }
-      ]);
-    }
-  }
-
-  private resolveLegacyBoardCornerFacetAlpha(time: number): number {
-    if (this.prefersLegacyReducedMotion()) {
-      return LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA;
-    }
-    const phase = (time % LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS) / LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS;
-    const wave = 0.5 + (Math.sin(phase * Math.PI * 2) * 0.5);
-    const glint = Math.max(0, Math.sin((phase * Math.PI * 4) - 0.6));
-    return LEGACY_BOARD_SIGIL_CORNER_FACET_ALPHA + (wave * 0.14) + (glint * 0.08);
-  }
-
-  private hasLegacyBoardCornerShimmerPendingFrame(time: number): boolean {
-    if (this.prefersLegacyReducedMotion()) {
-      return false;
-    }
-    if (time < this.legacyBoardCornerShimmerNextFrameAtMs) {
-      return false;
-    }
-
-    this.legacyBoardCornerShimmerNextFrameAtMs = time + LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS;
-    return true;
-  }
-
-  private drawLegacyBoardCornerFacetShimmer(boardLeft: number, boardTop: number, boardSize: number, time: number): void {
-    const inset = 2;
-    const outerLeft = boardLeft - inset;
-    const outerTop = boardTop - inset;
-    const outerSize = boardSize + (inset * 2);
-    const right = outerLeft + outerSize;
-    const bottom = outerTop + outerSize;
-    const corner = Math.max(16, Math.round(boardSize * LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO));
-    const baseAlpha = clamp(this.resolveLegacyBoardCornerFacetAlpha(time), 0.42, 0.82);
-    const phase = (time % LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS) / LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS;
-    const corners = [
-      { x: outerLeft, y: outerTop, sx: 1, sy: 1 },
-      { x: right, y: outerTop, sx: -1, sy: 1 },
-      { x: right, y: bottom, sx: -1, sy: -1 },
-      { x: outerLeft, y: bottom, sx: 1, sy: -1 }
-    ];
-
-    for (let index = 0; index < corners.length; index += 1) {
-      const cornerGlyph = corners[index];
-      if (!cornerGlyph) {
-        continue;
-      }
-
-      const localPhase = (phase + (index * 0.19)) % 1;
-      const wave = 0.5 + (Math.sin(localPhase * Math.PI * 2) * 0.5);
-      const originX = Math.round(cornerGlyph.x + (cornerGlyph.sx * 2));
-      const originY = Math.round(cornerGlyph.y + (cornerGlyph.sy * 2));
-      const edgeX = Math.round(cornerGlyph.x + (cornerGlyph.sx * (corner * 0.9)));
-      const edgeY = Math.round(cornerGlyph.y + (cornerGlyph.sy * (corner * 0.9)));
-      const innerX = Math.round(cornerGlyph.x + (cornerGlyph.sx * (corner * 0.58)));
-      const innerY = Math.round(cornerGlyph.y + (cornerGlyph.sy * (corner * 0.58)));
-      const glintStep = 0.22 + (wave * 0.52);
-      const glintX = cornerGlyph.x + (cornerGlyph.sx * (corner * glintStep));
-      const glintY = cornerGlyph.y + (cornerGlyph.sy * (corner * glintStep));
-      const prismStep = 0.3 + (wave * 0.2);
-      const prismX = Math.round(cornerGlyph.x + (cornerGlyph.sx * (corner * prismStep)));
-      const prismY = Math.round(cornerGlyph.y + (cornerGlyph.sy * (corner * prismStep)));
-      const prismAlpha = clamp(baseAlpha * (0.55 + (wave * 0.62)), 0.26, 0.74);
-      const glintAlpha = clamp(baseAlpha * (1.05 + (wave * 0.82)), 0.38, 0.96);
-
-      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW, baseAlpha * (0.18 + (wave * 0.18)));
-      this.boardDynamicGraphics.fillTriangle(originX, originY, edgeX, originY, originX, edgeY);
-      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_BASE, baseAlpha);
-      this.boardDynamicGraphics.fillTriangle(originX, originY, edgeX, originY, originX, edgeY);
-      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS, baseAlpha * (0.38 + (wave * 0.28)));
-      this.boardDynamicGraphics.fillTriangle(originX, originY, innerX, originY, originX, innerY);
-      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM, prismAlpha);
-      this.boardDynamicGraphics.fillTriangle(originX, originY, prismX, originY, originX, prismY);
-      this.boardDynamicGraphics.lineStyle(2, LEGACY_BOARD_SIGIL_CORNER_FACET_GLOW, glintAlpha);
-      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
-        { x: glintX, y: cornerGlyph.y + (cornerGlyph.sy * 3) },
-        { x: cornerGlyph.x + (cornerGlyph.sx * 3), y: glintY }
-      ]);
-      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_PRISM, glintAlpha * 0.72);
-      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
-        { x: glintX - (cornerGlyph.sx * 3), y: cornerGlyph.y + (cornerGlyph.sy * 6) },
-        { x: cornerGlyph.x + (cornerGlyph.sx * 6), y: glintY - (cornerGlyph.sy * 3) }
-      ]);
-      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT, glintAlpha * 0.38);
-      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
-        { x: glintX + (cornerGlyph.sx * 2), y: cornerGlyph.y + (cornerGlyph.sy * 5) },
-        { x: cornerGlyph.x + (cornerGlyph.sx * 5), y: glintY + (cornerGlyph.sy * 2) }
-      ]);
-      this.boardDynamicGraphics.fillStyle(LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT, glintAlpha * 0.5);
-      this.boardDynamicGraphics.fillCircle(
-        cornerGlyph.x + (cornerGlyph.sx * (corner * (0.24 + (wave * 0.38)))),
-        cornerGlyph.y + (cornerGlyph.sy * (corner * (0.24 + (wave * 0.38)))),
-        1.1 + (wave * 1.2)
-      );
-      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT, glintAlpha * 0.46);
-      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
-        { x: originX, y: originY },
-        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.32)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.32)) }
-      ]);
-      this.boardDynamicGraphics.lineStyle(2, LEGACY_BOARD_SIGIL_CORNER_FACET_IRIS, baseAlpha * 0.78);
-      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
-        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.34)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.76)) },
-        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.76)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.34)) }
-      ]);
-      this.boardDynamicGraphics.lineStyle(1, LEGACY_BOARD_SIGIL_CORNER_FACET_HOTSPOT, glintAlpha * 0.62);
-      this.strokeLegacyPolyline(this.boardDynamicGraphics, [
-        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.16)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.84)) },
-        { x: cornerGlyph.x + (cornerGlyph.sx * (corner * 0.84)), y: cornerGlyph.y + (cornerGlyph.sy * (corner * 0.16)) }
-      ]);
-    }
-  }
-
   private strokeLegacyPolyline(
     graphics: Phaser.GameObjects.Graphics,
     points: Array<{ x: number; y: number }>
@@ -6520,8 +6236,8 @@ export class MenuScene extends Phaser.Scene {
     const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
 
     this.menuCompassBounds = null;
-    this.drawLegacyBoardCornerFacetShimmer(resolvedBoardLeft, resolvedBoardTop, boardSize, time);
     this.drawLegacyProgressionBadge(mazeRenderFrame, progressionPalette);
+    this.drawLegacyMenuSettingsCog();
     if (this.mode === 'menu' && this.overlay === 'none') {
       this.drawLegacyMenuCompass(mazeRenderFrame, progressionPalette, time);
     }
@@ -6957,6 +6673,28 @@ export class MenuScene extends Phaser.Scene {
     this.progressionBadgeTextFits = true;
 
     return badgeBounds;
+  }
+
+  private drawLegacyMenuSettingsCog(): void {
+    if (this.mode !== 'menu' || this.overlay !== 'none') {
+      return;
+    }
+
+    const laneTop = this.layout.lanes.hud?.top ?? 0;
+    const frame = resolveLegacyHeaderControlFrame({
+      height: this.layout.height,
+      hudHeight: this.layout.lanes.hud?.height ?? 64,
+      hudTop: laneTop,
+      placement: 'trailing',
+      width: this.layout.width
+    });
+    this.drawLegacyHeaderControlChrome(
+      this.boardDynamicGraphics,
+      frame,
+      this.menuSettingsCogActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,
+      this.menuSettingsCogActive
+    );
+    this.drawLegacySettingsCog(this.boardDynamicGraphics, frame, this.menuSettingsCogActive);
   }
 
   private hasLegacyProgressionBadgePulsePendingFrame(time: number): boolean {
@@ -10064,27 +9802,11 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
-  private commitOverlayField(
-    fieldId: LegacyOptionFieldId,
-    options: { announce?: boolean } = {}
-  ): void {
+  private commitOverlayField(fieldId: LegacyOptionFieldId): void {
     const result = applyLegacyOverlayFieldCommit(this.settings, this.optionFieldDrafts, fieldId);
 
     this.settings = result.settings;
     this.optionFieldDrafts = result.drafts;
-    if (options.announce !== false) {
-      const outcome = result.affectsCamera
-        ? 'camera'
-        : result.affectsMaze
-          ? result.commitKind === 'material-change' ? 'material' : 'maze'
-          : 'unchanged';
-      this.setLatestOverlayMessage(resolveLegacyOverlayFieldCommitMessage(
-        this.resolveLegacyOverlayFieldMessageLabel(fieldId),
-        this.resolveLegacyOverlayFieldMessageState(fieldId),
-        outcome
-      ));
-    }
-
     if (result.triggersReloadOnBack) {
       this.pendingOverlayMazeRebuild = true;
     }
@@ -10102,7 +9824,7 @@ export class MenuScene extends Phaser.Scene {
       : ['scale', 'camScale', 'pathR', 'pathG', 'pathB', 'wallR', 'wallG', 'wallB'];
 
     for (const fieldId of fieldIds) {
-      this.commitOverlayField(fieldId, { announce: false });
+      this.commitOverlayField(fieldId);
     }
 
     if (this.pendingOverlayMazeRebuild) {
@@ -10117,33 +9839,6 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.activeInputField = null;
-  }
-
-  private resolveLegacyOverlayFieldMessageLabel(fieldId: LegacyOptionFieldId): string {
-    switch (fieldId) {
-      case 'scale':
-        return 'Maze Scale';
-      case 'camScale':
-        return 'Camera Scale';
-      case 'pathR':
-        return 'Path R';
-      case 'pathG':
-        return 'Path G';
-      case 'pathB':
-        return 'Path B';
-      case 'wallR':
-        return 'Wall R';
-      case 'wallG':
-        return 'Wall G';
-      case 'wallB':
-        return 'Wall B';
-      default:
-        return fieldId satisfies never;
-    }
-  }
-
-  private resolveLegacyOverlayFieldMessageState(fieldId: LegacyOptionFieldId): string {
-    return this.optionFieldDrafts[fieldId];
   }
 
   private createOverlayTitle(text: string, y: number): void {
@@ -10440,26 +10135,7 @@ export class MenuScene extends Phaser.Scene {
       placement: 'trailing',
       width: this.layout.width
     });
-    const panel = this.add.graphics();
-    const icon = this.add.graphics();
-    icon.setPosition(pauseRect.centerX, pauseRect.centerY);
-    const drawSettingsButton = (active: boolean): void => {
-      panel.clear();
-      this.drawLegacyHeaderControlChrome(
-        panel,
-        pauseRect,
-        active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,
-        active
-      );
-      icon.clear();
-      this.drawLegacySettingsCog(icon, {
-        centerX: 0,
-        centerY: 0,
-        height: pauseRect.height,
-        width: pauseRect.width
-      }, active);
-    };
-    drawSettingsButton(false);
+    this.menuSettingsCogActive = false;
 
     const background = this.add.rectangle(
       pauseRect.centerX,
@@ -10475,18 +10151,11 @@ export class MenuScene extends Phaser.Scene {
       fontSize: '18px'
     }).setOrigin(0.5).setVisible(false);
     const setActive = (active: boolean): void => {
-      drawSettingsButton(active);
-      this.tweens.killTweensOf(icon);
-      if (this.prefersLegacyReducedMotion()) {
-        icon.setRotation(0);
+      if (this.menuSettingsCogActive === active) {
         return;
       }
-      this.tweens.add({
-        duration: 140,
-        ease: active ? 'Sine.Out' : 'Sine.In',
-        rotation: active ? (Math.PI / 8) : 0,
-        targets: icon
-      });
+      this.menuSettingsCogActive = active;
+      this.boardDynamicDirty = true;
     };
     background.on('pointerover', () => setActive(true));
     background.on('pointerout', () => setActive(false));
@@ -10501,9 +10170,6 @@ export class MenuScene extends Phaser.Scene {
       setActive,
       text: 'Settings',
       destroy: () => {
-        this.tweens.killTweensOf(icon);
-        panel.destroy();
-        icon.destroy();
         background.destroy();
         label.destroy();
       }
@@ -10705,10 +10371,6 @@ export class MenuScene extends Phaser.Scene {
     const result = applyLegacyOverlayToggleField(this.settings, fieldId);
     this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), result.settings);
     this.syncLegacyRemoteSettings();
-    this.setLatestOverlayMessage(resolveLegacyOverlayToggleMessage(
-      this.resolveLegacyOverlayToggleLabel(fieldId),
-      result.stateText ?? 'Updated'
-    ));
     if (fieldId === 'controlMode') {
       this.resetLegacyPlayInputBuffer();
       this.hudDirty = true;
@@ -10759,36 +10421,12 @@ export class MenuScene extends Phaser.Scene {
     nextSettings.movementSpeed = nextSpeed;
     this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), nextSettings);
     this.syncLegacyRemoteSettings();
-    this.setLatestOverlayMessage(resolveLegacyOverlayMovementSpeedMessage(
-      formatLegacyMovementSpeedPercent(nextSpeed)
-    ));
     if (this.playHeldTouchMoves.length > 0 && this.playHeldTouchRepeatTimer !== null) {
       this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
     }
     this.uiDirty = true;
     if (this.mode === 'play') {
       this.publishInteractionDiagnostics();
-    }
-  }
-
-  private resolveLegacyOverlayToggleLabel(fieldId: LegacyOverlayToggleFieldId): string {
-    switch (fieldId) {
-      case 'toggleCameraFollow':
-        return 'Camera Follow';
-      case 'toggleTrailFade':
-        return 'Trail Fade';
-      case 'toggleTrailPulse':
-        return 'Trail Pulse';
-      case 'toggleAnimatedBackdrop':
-        return 'Animated BG';
-      case 'darkMode':
-        return 'Dark Mode';
-      case 'smartSteering':
-        return 'Smart Steering';
-      case 'controlMode':
-        return 'Control Style';
-      default:
-        return fieldId satisfies never;
     }
   }
 
@@ -11724,10 +11362,10 @@ export class MenuScene extends Phaser.Scene {
         pathVisualStyle: this.pathVisualStyle,
         tileSize: mazeRenderFrame.tileSize,
         cornerFacet: {
-          alpha: Number(this.resolveLegacyBoardCornerFacetAlpha(time).toFixed(3)),
-          animated: true,
-          shimmerPeriodMs: LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS,
-          visible: true
+          alpha: 0,
+          animated: false,
+          shimmerPeriodMs: 0,
+          visible: false
         },
         pathMaterial: {
           connectorSeamsEnabled: true,
