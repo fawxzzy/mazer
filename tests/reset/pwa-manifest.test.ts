@@ -3,6 +3,35 @@ import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 describe('Mazer installable PWA contract', () => {
+  test('migrates only the stable legacy host to the branded origin', () => {
+    const vercelConfig = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'vercel.json'), 'utf8')
+    ) as {
+      git?: { deploymentEnabled?: boolean };
+      redirects?: Array<{
+        destination?: string;
+        has?: Array<{ type?: string; value?: string }>;
+        permanent?: boolean;
+        source?: string;
+      }>;
+    };
+
+    expect(vercelConfig.git?.deploymentEnabled).toBe(false);
+    expect(vercelConfig.redirects).toEqual([
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'fawxzzy-mazer.vercel.app'
+          }
+        ],
+        destination: 'https://mazer.fawxzzy.com/:path*',
+        permanent: true
+      }
+    ]);
+  });
+
   test('declares standalone app behavior, safe scope, and a direct play shortcut', () => {
     const manifest = JSON.parse(
       readFileSync(resolve(process.cwd(), 'public/manifest.webmanifest'), 'utf8')
