@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
+  collectMenuControlSpacingIssues,
   hasExpectedTextLabels,
   matchesExpectedTextLabel
 } from '../../scripts/analysis/capture-ui-surfaces.mjs';
@@ -27,6 +28,41 @@ describe('UI surface capture label matching', () => {
     )).toBe(false);
     expect(hasExpectedTextLabels(['Login: Error'], ['Login'])).toBe(false);
     expect(hasExpectedTextLabels(['Start: Disabled'], ['Start'])).toBe(false);
+  });
+});
+
+describe('UI surface capture menu header controls', () => {
+  const bounds = (left, top, width, height) => ({
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    centerX: left + (width / 2),
+    centerY: top + (height / 2)
+  });
+
+  const menuSurface = ({ playerLevel = bounds(9, 13, 44, 44), settings = bounds(352, 13, 44, 44) } = {}) => ({
+    mode: 'menu',
+    overlay: 'none',
+    progressionBadge: { bounds: playerLevel },
+    buttons: [{ bounds: settings, iconOnly: true, text: 'Settings' }]
+  });
+
+  test('accepts the player-owned menu glyph paired with the same square settings cog', () => {
+    expect(collectMenuControlSpacingIssues(menuSurface())).toEqual([]);
+  });
+
+  test('rejects missing, undersized, or misaligned menu header controls', () => {
+    expect(collectMenuControlSpacingIssues(menuSurface({ playerLevel: null })))
+      .toContain('menu:missing-player-level-glyph');
+    expect(collectMenuControlSpacingIssues(menuSurface({ settings: bounds(350, 15, 42, 42) })))
+      .toEqual(expect.arrayContaining([
+        'menu:settings-target=42.0x42.0<44',
+        'menu:player-level-settings-size-mismatch=44.0x44.0!=42.0x42.0',
+        'menu:player-level-settings-top-mismatch=13.0!=15.0'
+      ]));
   });
 });
 
@@ -176,9 +212,11 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const collectTextBoundsIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain('const collectNativeInputBoundsIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain('const collectTextOverlapIssues = (surfaceId, surface) => {');
-    expect(source).toContain('const collectMenuControlSpacingIssues = (surface) => {');
+    expect(source).toContain('export const collectMenuControlSpacingIssues = (surface) => {');
     expect(source).toContain('const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {');
-    expect(source).toContain("issues.push('menu:unexpected-progression-badge');");
+    expect(source).toContain("issues.push('menu:missing-player-level-glyph');");
+    expect(source).toContain('menu:player-level-settings-size-mismatch=');
+    expect(source).toContain('menu:player-level-to-settings-gap=');
     expect(source).toContain("surface?.mode !== 'play'");
     expect(source).toContain('badge.width > board.width + 1');
     expect(source).toContain('progression-badge-not-above-play-board');
