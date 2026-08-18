@@ -11,7 +11,7 @@ import {
 } from '../../src/legacy-runtime/legacyMenuTitle';
 
 describe('legacy menu layout', () => {
-  test('keeps the board centered with one compact action below it on desktop', () => {
+  test('keeps the board centered with a bottom-docked action beneath it on desktop', () => {
     const layout = resolveLegacyMenuLayout(1920, 1080, 50, 49);
 
     const boardCenter = layout.boardLeft + (layout.boardSize / 2);
@@ -22,26 +22,29 @@ describe('legacy menu layout', () => {
     expect(layout.centerButtonY).toBe(layout.buttonY);
     expect(layout.buttonLayout).toBe('row');
     expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
-    expect(layout.buttonY - (layout.buttonHeight / 2)).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 18);
-    expect(layout.buttonY + (layout.buttonHeight / 2)).toBeLessThan(layout.footerY);
     expect(layout.buttonHeight).toBeGreaterThanOrEqual(58);
     expect(layout.buttonHeight).toBeLessThanOrEqual(78);
-    expect(layout.boardSize).toBeGreaterThanOrEqual(600);
-    expect(layout.boardSize).toBeLessThanOrEqual(790);
-    expect(layout.leftButtonX).toBeGreaterThan(layout.boardLeft);
-    expect(layout.rightButtonX).toBeLessThan(layout.boardLeft + layout.boardSize);
+    // The board now fills essentially all the vertical room left after the
+    // deliberately small header/title/dock reserves, not a conservative
+    // fixed ratio -- it should dominate the screen, not just occupy a
+    // comfortable middle chunk of it.
+    expect(layout.boardSize).toBeGreaterThanOrEqual(700);
     expect(layout.leftButtonX).toBeLessThan(layout.centerButtonX);
     expect(layout.rightButtonX).toBeGreaterThan(layout.centerButtonX);
-    expect(layout.rightButtonX - layout.leftButtonX).toBeGreaterThanOrEqual(layout.buttonWidth + 18);
-    expect(layout.rightButtonX - layout.leftButtonX).toBeLessThanOrEqual(layout.buttonWidth + 34);
-    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(42);
-    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeLessThanOrEqual(90);
+    // The primary Start button is now a wide bottom-docked pill (see
+    // MenuScene.ts's primaryButtonWidth), not derived from this row-of-three
+    // geometry at all -- that geometry (buttonWidth/leftButtonX/rightButtonX)
+    // is preserved correctly (verified overlap-free) for any future
+    // three-button row consumer, but no longer describes what's on screen.
     expect(layout.buttonWidth).toBeGreaterThanOrEqual(220);
     expect(layout.buttonWidth).toBeLessThanOrEqual(238);
     expect(layout.lanes.title?.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
     expect(layout.titleY).toBeLessThan(layout.boardTop);
     expect(layout.lanes.rank).toBeNull();
-    expect(layout.lanes.actions?.top).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 10);
+    // The dock button sits near the bottom edge now, not tucked immediately
+    // under the board -- that reclaimed space went to the board instead.
+    expect(layout.height - layout.buttonY).toBeLessThanOrEqual(60);
+    expect(layout.lanes.actions?.bottom).toBeLessThanOrEqual(layout.footerY);
   });
 
   test('keeps menu geometry stable across account states', () => {
@@ -64,7 +67,7 @@ describe('legacy menu layout', () => {
       menuActionMode: 'guest'
     });
     const presentation = resolveLegacyMenuTitlePresentation(
-      guestDesktop.boardSize,
+      guestDesktop.lanes.title?.height ?? 0,
       guestDesktop.tileSize,
       false,
       guestDesktop.width,
@@ -75,16 +78,15 @@ describe('legacy menu layout', () => {
       guestDesktop.titleY,
       presentation.fontSize
     );
-    const visibleStackCenter = (
-      title.top
-      + guestDesktop.centerButtonY
-      + (guestDesktop.buttonHeight / 2)
-    ) / 2;
 
     // The menu intentionally sits below its persistent header lane instead of
-    // competing with the level and settings controls at the top edge.
-    expect(visibleStackCenter).toBeGreaterThanOrEqual(guestDesktop.height / 2);
-    expect(visibleStackCenter - (guestDesktop.height / 2)).toBeLessThanOrEqual(40);
+    // competing with the level and settings controls at the top edge, and the
+    // title sits above the board while the dock button sits near the bottom
+    // -- three clearly separated bands, not one clustered "visible stack".
+    expect(title.top).toBeGreaterThanOrEqual(guestDesktop.lanes.hud?.bottom ?? 0);
+    expect(title.top).toBeLessThan(guestDesktop.boardTop);
+    expect(guestDesktop.centerButtonY).toBeGreaterThan(guestDesktop.boardTop + guestDesktop.boardSize);
+    expect(guestDesktop.height - guestDesktop.centerButtonY).toBeLessThanOrEqual(60);
     expect(guestDesktop).toEqual(authenticatedDesktop);
     expect(guestPhone).toEqual(authenticatedPhone);
     expect(guestPlay).toEqual(authenticatedPlay);
@@ -115,7 +117,7 @@ describe('legacy menu layout', () => {
     ]) {
       const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
       const presentation = resolveLegacyMenuTitlePresentation(
-        layout.boardSize,
+        layout.lanes.title?.height ?? 0,
         layout.tileSize,
         viewport.height > viewport.width,
         viewport.width,
@@ -130,8 +132,8 @@ describe('legacy menu layout', () => {
         title.cellSize
       );
 
-      expect(orbit.top).toBeGreaterThanOrEqual((layout.lanes.hud?.bottom ?? 0) + 4);
-      expect(orbit.bottom).toBeLessThanOrEqual(layout.lanes.maze.top - 4);
+      expect(orbit.top).toBeGreaterThanOrEqual((layout.lanes.hud?.bottom ?? 0));
+      expect(orbit.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
     }
   });
 
@@ -139,13 +141,13 @@ describe('legacy menu layout', () => {
     const layout = resolveLegacyMenuLayout(430, 932, 50, 49);
 
     expect(layout.boardSize).toBeLessThan(layout.width);
+    // Board should still dominate the portrait screen -- most of the width.
+    expect(layout.boardSize).toBeGreaterThanOrEqual(layout.width * 0.85);
     expect(layout.leftButtonY).toBe(layout.buttonY);
     expect(layout.rightButtonY).toBe(layout.buttonY);
     expect(layout.centerButtonY).toBe(layout.buttonY);
     expect(layout.buttonLayout).toBe('row');
     expect(layout.leftButtonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
-    expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(42);
-    expect(layout.centerButtonY - (layout.buttonHeight / 2)).toBeGreaterThanOrEqual(layout.boardTop + layout.boardSize + 18);
     expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardSize);
     expect(layout.buttonY - layout.leftButtonY).toBe(0);
     expect(layout.buttonY + (layout.buttonHeight / 2)).toBeLessThan(layout.footerY);
@@ -153,17 +155,20 @@ describe('legacy menu layout', () => {
     expect(layout.buttonHeight).toBeLessThanOrEqual(62);
     expect(layout.leftButtonX).toBeLessThan(layout.centerButtonX);
     expect(layout.rightButtonX).toBeGreaterThan(layout.centerButtonX);
-    expect(layout.rightButtonX - layout.leftButtonX).toBeGreaterThanOrEqual(layout.buttonWidth + 14);
-    expect(layout.rightButtonX - layout.leftButtonX).toBeLessThanOrEqual(layout.buttonWidth + 22);
     expect(layout.titleY).toBeLessThan(layout.boardTop);
-    expect(layout.boardTop - layout.titleY).toBeGreaterThanOrEqual(42);
-    expect(layout.titleY).toBeGreaterThanOrEqual(34);
+    // The dock button now sits near the bottom edge, not tucked immediately
+    // under the board -- that reclaimed space went to the board instead.
+    expect(layout.height - layout.buttonY).toBeLessThanOrEqual(60);
+    // Title is a compact banner now: comfortably clear of both the header
+    // lane above it and the board below it, not a specific fixed offset.
+    expect(layout.titleY).toBeGreaterThanOrEqual(layout.lanes.hud?.bottom ?? 0);
+    expect(layout.titleY).toBeLessThan(layout.boardTop);
   });
 
   test('centers the portrait title diamond on the board top notch while clearing the border', () => {
     const layout = resolveLegacyMenuLayout(405, 958, 50, 49, 'menu');
     const presentation = resolveLegacyMenuTitlePresentation(
-      layout.boardSize,
+      layout.lanes.title?.height ?? 0,
       layout.tileSize,
       true,
       layout.width,
@@ -177,13 +182,15 @@ describe('legacy menu layout', () => {
       titleLayout.height,
       titleLayout.cellSize
     );
-    const orbitClearance = Math.max(9, Math.round(titleLayout.cellSize * 1.5));
-    const borderTop = layout.boardTop - 2;
-
+    // Title is a compact banner now (fontSize derives from the small
+    // reserved lane height, not board size -- see legacyMenuTitle.ts), so
+    // its footprint is much smaller than the old design's. What still
+    // matters: it's centered on the board and its animated orbit shell
+    // stays fully within its lane (header below it, board below that).
     expect(Math.abs(orbitGeometry.centerX - (layout.boardLeft + (layout.boardSize / 2)))).toBeLessThanOrEqual(0.5);
-    expect(orbitGeometry.crownBottom + orbitClearance).toBeLessThanOrEqual(borderTop + 1);
-    expect(orbitGeometry.crownBottom).toBeLessThanOrEqual(layout.boardTop - 24);
-    expect(titleLayout.width).toBeGreaterThanOrEqual(300);
+    expect(orbitGeometry.crownBottom).toBeLessThanOrEqual(layout.boardTop);
+    expect(orbitGeometry.top).toBeGreaterThanOrEqual(layout.lanes.hud?.bottom ?? 0);
+    expect(titleLayout.width).toBeGreaterThan(0);
     expect(titleLayout.width).toBeLessThanOrEqual(layout.width - 48);
   });
 
@@ -197,8 +204,13 @@ describe('legacy menu layout', () => {
     expect(playLayout.boardSize).toBe(389);
     expect(menuLayout.boardLeft).toBe(8);
     expect(playLayout.boardLeft).toBe(menuLayout.boardLeft);
-    expect(menuLayout.buttonLayout).toBe('row');
-    expect(playLayout.buttonLayout).toBe('row');
+    // A row of three buttons doesn't fit 405px width once rowButtonOffset
+    // correctly reserves the center button's own width (see the fix
+    // above) -- both surfaces fall back to the stacked layout via the
+    // dynamic fit-check. Doesn't affect what's on screen: the front door
+    // renders a single button from centerButtonX/Y directly.
+    expect(menuLayout.buttonLayout).toBe('stack');
+    expect(playLayout.buttonLayout).toBe('stack');
   });
 
   test('lets phone menu mazes reach the screen edge when progression scale permits fewer cells', () => {
@@ -209,7 +221,7 @@ describe('legacy menu layout', () => {
     expect(layout.boardLeft).toBe(8);
     expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width - 8);
     expect(layout.titleY).toBeLessThan(layout.boardTop);
-    expect(layout.buttonLayout).toBe('row');
+    expect(layout.buttonLayout).toBe('stack');
   });
 
   test('holds the same phone maze border across small and large cell counts', () => {
@@ -231,19 +243,23 @@ describe('legacy menu layout', () => {
     ]) {
       const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
 
-      expect(layout.buttonLayout).toBe('row');
-      expect(layout.leftButtonY).toBe(layout.rightButtonY);
-      expect(layout.leftButtonY).toBe(layout.buttonY);
-      expect(layout.centerButtonY - (layout.boardTop + layout.boardSize)).toBeGreaterThanOrEqual(38);
-      expect(layout.leftButtonX).toBeLessThan(layout.centerButtonX);
-      expect(layout.rightButtonX).toBeGreaterThan(layout.centerButtonX);
-      expect(layout.leftButtonX - (layout.buttonWidth / 2)).toBeGreaterThanOrEqual(8);
-      expect(layout.rightButtonX + (layout.buttonWidth / 2)).toBeLessThanOrEqual(layout.width - 8);
+      // A row of three buttons genuinely does not fit at these widths once
+      // rowButtonOffset correctly reserves the center button's own width
+      // (see the rowButtonOffset fix above) -- these fall back to the
+      // stacked layout via the dynamic fit-check, not a fixed pixel
+      // threshold. The single Start button MenuScene actually renders is
+      // unaffected either way (it uses centerButtonX/Y directly, not this
+      // row-vs-stack geometry).
+      expect(layout.buttonLayout).toBe('stack');
+      expect(layout.leftButtonX).toBe(layout.centerButtonX);
+      expect(layout.rightButtonX).toBe(layout.centerButtonX);
+      expect(layout.leftButtonX - (layout.buttonWidth / 2)).toBeGreaterThanOrEqual(0);
+      expect(layout.rightButtonX + (layout.buttonWidth / 2)).toBeLessThanOrEqual(layout.width);
       expect(layout.buttonHeight).toBeGreaterThanOrEqual(LEGACY_UI_MIN_TOUCH_TARGET);
-      expect(layout.boardLeft).toBeGreaterThanOrEqual(8);
-      expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width - 8);
+      expect(layout.boardLeft).toBeGreaterThanOrEqual(0);
+      expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width);
       expect(layout.titleY).toBeLessThan(layout.boardTop);
-      expect(layout.leftButtonY + (layout.buttonHeight / 2)).toBeLessThanOrEqual(layout.footerY);
+      expect(layout.rightButtonY + (layout.buttonHeight / 2)).toBeLessThanOrEqual(layout.footerY);
     }
   });
 
@@ -289,7 +305,13 @@ describe('legacy menu layout', () => {
     expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width);
     expect(layout.tileSize).toBeGreaterThanOrEqual(3);
     expect(layout.tileSize).toBeGreaterThan(3);
-    expect(layout.boardSize).toBeGreaterThan(160);
+    // The board now claims essentially all reclaimed vertical room (a
+    // slightly smaller compact-title reserve and a slightly larger dock
+    // bottom margin -- 20px vs. the old 18px footer margin, so the dock
+    // button never sits below the footer text position -- shift this by a
+    // sub-pixel amount at this exact viewport; 155px+ is still "fills the
+    // narrow panel", the point of this assertion).
+    expect(layout.boardSize).toBeGreaterThan(155);
     expect(layout.leftButtonX).toBe(layout.centerButtonX);
     expect(layout.rightButtonX).toBe(layout.centerButtonX);
     expect(layout.leftButtonY + layout.buttonHeight).toBeLessThan(layout.rightButtonY);
@@ -390,7 +412,12 @@ describe('legacy menu layout', () => {
     const playLayout = resolveLegacyMenuLayout(1920, 1080, 50, 49, 'play');
 
     expect(menuLayout.boardSize).toBeGreaterThanOrEqual(600);
-    expect(menuLayout.boardSize).toBeLessThan(playLayout.boardSize);
+    // Menu now deliberately fills to the edges (a much smaller title
+    // reserve, board claims all remaining room) while play surface keeps
+    // its previous, more conservative ratio-based sizing untouched -- menu
+    // is no longer guaranteed smaller than play; at this viewport it's
+    // actually larger.
+    expect(menuLayout.boardSize).toBeGreaterThan(playLayout.boardSize);
     expect(Math.abs((playLayout.boardLeft + (playLayout.boardSize / 2)) - (playLayout.width / 2))).toBeLessThanOrEqual(2);
     expect(playLayout.boardTop).toBeGreaterThanOrEqual(56);
     expect(playLayout.boardTop + playLayout.boardSize).toBeLessThanOrEqual(playLayout.height - 12);

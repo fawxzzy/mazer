@@ -136,32 +136,25 @@ const buildLegacyMenuPathTitleGrid = (): boolean[][] => {
 export const LEGACY_MENU_PATH_TITLE_GRID = buildLegacyMenuPathTitleGrid();
 
 export const resolveLegacyMenuTitlePresentation = (
-  boardSize: number,
+  titleReserveHeight: number,
   tileSize: number,
   isPortrait: boolean,
-  viewportWidth = boardSize,
+  viewportWidth = titleReserveHeight,
   surface: LegacyMenuTitleSurface = 'snapshot'
 ): LegacyMenuTitlePresentation => {
   const isProceduralPortrait = isPortrait && surface === 'procedural';
-  // Title scaled to 80% of its original size, freeing up proportional room
-  // for the board (see the matching 0.8 scale on menuTitleReserve in
-  // legacyMenuLayout.ts -- keep these two in lockstep or the reserved lane
-  // and the actual rendered footprint drift apart).
-  const titleScale = 0.8;
-  const baseFontSize = Math.max(
-    Math.round((isPortrait ? 78 : 142) * titleScale),
-    Math.round(boardSize * (isProceduralPortrait ? 0.265 : (isPortrait ? 0.205 : 0.226)) * titleScale)
-  );
   const isUltraNarrow = isPortrait && viewportWidth < 360;
   const isProceduralUltraNarrow = isUltraNarrow && surface === 'procedural';
-  const fontSize = isUltraNarrow
-    ? Math.round(Math.min(
-      baseFontSize,
-      Math.max(isProceduralUltraNarrow ? 46 : 42, viewportWidth * (isProceduralUltraNarrow ? 0.24 : 0.3))
-    ))
-    : isProceduralPortrait
-      ? Math.round(Math.min(baseFontSize, Math.max(72, viewportWidth * 0.255)))
-    : baseFontSize;
+  // Font size is derived from the title's own reserved lane height, not
+  // board size -- board size and the title reserve are computed
+  // independently now (legacyMenuLayout.ts deliberately keeps the title
+  // compact regardless of how large the board grows), so deriving from
+  // board size would make the title grow right along with the board again.
+  // 0.55 leaves the rendered glyph grid plus its orbit/crown decorations
+  // (which extend roughly another ~1.4 cell-widths above and below the core
+  // 7-row grid -- see resolveLegacyMenuPathTitleOrbitGeometry) comfortably
+  // inside the reserved lane with real margin, not sized right to the edge.
+  const fontSize = Math.max(20, Math.round(titleReserveHeight * 0.55));
   const shadowOffsetX = isUltraNarrow
     ? Math.max(2, Math.round(fontSize * 0.07))
     : Math.max(isPortrait ? 4 : 5, Math.round(tileSize * 0.12));

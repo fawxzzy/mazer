@@ -5646,7 +5646,7 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyMenuPathTitlePieceCount(): number {
     const titlePresentation = resolveLegacyMenuTitlePresentation(
-      this.layout.boardSize,
+      this.layout.lanes.title?.height ?? Math.round(this.layout.height * 0.055),
       this.layout.tileSize,
       this.layout.height > this.layout.width,
       this.layout.width,
@@ -6014,7 +6014,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const titlePresentation = resolveLegacyMenuTitlePresentation(
-      this.layout.boardSize,
+      this.layout.lanes.title?.height ?? Math.round(this.layout.height * 0.055),
       this.layout.tileSize,
       this.layout.height > this.layout.width,
       this.layout.width,
@@ -8208,10 +8208,14 @@ export class MenuScene extends Phaser.Scene {
       if (this.mode === 'menu') {
         const [startLabel] = MAIN_MENU_BUTTONS;
         const isAuthenticated = this.authSnapshot.status === 'authenticated';
-        const primaryButtonWidth = Math.min(
-          this.layout.centerButtonWidth,
-          Math.max(118, Math.floor(this.layout.width * 0.34))
-        );
+        // Bottom-dock button: wide like the Fitness app's full-width
+        // BottomDockButton, not the old ~34%-of-width centered button.
+        // Capped so it doesn't look absurd on a wide desktop window.
+        const primaryButtonWidth = Math.round(clamp(
+          this.layout.width - (this.layout.width > this.layout.height ? 64 : 32),
+          160,
+          520
+        ));
 
         if (!isAuthenticated) {
           this.uiButtons.push(
@@ -10369,6 +10373,11 @@ export class MenuScene extends Phaser.Scene {
       : null;
     const baseAlpha = isMenuFrontDoor ? Math.max(frontDoorChrome?.baseAlpha ?? MENU_BUTTON_ALPHA, 0.38) : 0.54;
     const panel = this.add.graphics();
+    // Bottom-dock primary button (Fitness-app BottomDockButton style): a
+    // full pill rather than the standard control radius, plus a soft
+    // accent-tinted inner fill approximating that app's vertical gradient
+    // sheen (Phaser Graphics has no native CSS-style gradient fill, so this
+    // layers a translucent mint pass over the base panel instead).
     const drawButtonPanel = (active: boolean): void => {
       panel.clear();
       this.drawLegacyCyberPanel(panel, {
@@ -10381,7 +10390,7 @@ export class MenuScene extends Phaser.Scene {
           : frontDoorChrome?.fillColor ?? LEGACY_CYBER_PANEL_FILL,
         height,
         left: x - (width / 2),
-        radius: LEGACY_UI_CONTROL_RADIUS,
+        radius: isPrimaryFrontDoorButton ? height : LEGACY_UI_CONTROL_RADIUS,
         stroke: frontDoorChrome?.strokeColor,
         strokeAlt: isPrimaryFrontDoorButton
           ? cyberArcadeMaterial.rail.mint
@@ -10389,6 +10398,16 @@ export class MenuScene extends Phaser.Scene {
         top: y - (height / 2),
         width
       });
+      if (isPrimaryFrontDoorButton) {
+        const sheenInset = 3;
+        const sheenLeft = x - (width / 2) + sheenInset;
+        const sheenTop = y - (height / 2) + sheenInset;
+        const sheenWidth = Math.max(1, width - (sheenInset * 2));
+        const sheenHeight = Math.max(1, height - (sheenInset * 2));
+        const sheenRadius = this.resolveLegacyRoundedRectRadius(sheenWidth, sheenHeight, sheenHeight);
+        panel.fillStyle(cyberArcadeMaterial.rail.mint, active ? 0.16 : 0.1);
+        panel.fillRoundedRect(sheenLeft, sheenTop, sheenWidth, sheenHeight, sheenRadius);
+      }
     };
     drawButtonPanel(false);
 
@@ -11288,7 +11307,7 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyMenuPathTitleDiagnostics(): MenuSceneVisualDiagnostics['title'] {
     const titlePresentation = resolveLegacyMenuTitlePresentation(
-      this.layout.boardSize,
+      this.layout.lanes.title?.height ?? Math.round(this.layout.height * 0.055),
       this.layout.tileSize,
       this.layout.height > this.layout.width,
       this.layout.width,
