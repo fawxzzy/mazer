@@ -143,9 +143,14 @@ export const resolveLegacyMenuTitlePresentation = (
   surface: LegacyMenuTitleSurface = 'snapshot'
 ): LegacyMenuTitlePresentation => {
   const isProceduralPortrait = isPortrait && surface === 'procedural';
+  // Title scaled to 80% of its original size, freeing up proportional room
+  // for the board (see the matching 0.8 scale on menuTitleReserve in
+  // legacyMenuLayout.ts -- keep these two in lockstep or the reserved lane
+  // and the actual rendered footprint drift apart).
+  const titleScale = 0.8;
   const baseFontSize = Math.max(
-    isPortrait ? 78 : 142,
-    Math.round(boardSize * (isProceduralPortrait ? 0.265 : (isPortrait ? 0.205 : 0.226)))
+    Math.round((isPortrait ? 78 : 142) * titleScale),
+    Math.round(boardSize * (isProceduralPortrait ? 0.265 : (isPortrait ? 0.205 : 0.226)) * titleScale)
   );
   const isUltraNarrow = isPortrait && viewportWidth < 360;
   const isProceduralUltraNarrow = isUltraNarrow && surface === 'procedural';

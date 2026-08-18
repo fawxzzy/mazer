@@ -114,18 +114,23 @@ export const resolveLegacyMenuLayout = (
     ? Math.round(clamp(height * 0.072, LEGACY_MENU_TOP_HUD_MIN, LEGACY_MENU_TOP_HUD_MAX))
     : 0;
   const menuFooterReserve = isUltraNarrow ? 10 : 18;
+  // Scaled to 80% in lockstep with the 0.8 titleScale in
+  // resolveLegacyMenuTitlePresentation (legacyMenuTitle.ts) -- the reserved
+  // lane must shrink with the actual rendered title footprint, not
+  // independently of it, or this either overlaps or wastes board space.
+  const titleReserveScale = 0.8;
   const menuTitleReserve = isUltraNarrow
-    ? 50
+    ? Math.round(50 * titleReserveScale)
     : isPortrait
       // The animated title extends above and below its core grid through its
       // orbit and crown. Reserve that complete visual footprint—not only the
       // letter cells—so it cannot sit beneath the level, AI, or settings
       // controls on a real phone.
-      ? Math.round(clamp(width * 0.38, 136, 156))
+      ? Math.round(clamp(width * 0.38, 136, 156) * titleReserveScale)
       // Landscape needs the same outer-title clearance. Keeping this larger
       // than the letter-grid height makes the board and Start action move as a
       // coherent group rather than solving the header collision ad hoc.
-      : Math.round(clamp(height * 0.21, 140, 152));
+      : Math.round(clamp(height * 0.21, 140, 152) * titleReserveScale);
   const menuRankReserve = 0;
   const menuActionReserve = buttonHeight;
   const playTopHudReserve = isPlaySurface && isPortrait
