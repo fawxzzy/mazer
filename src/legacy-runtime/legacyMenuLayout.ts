@@ -212,7 +212,12 @@ export const resolveLegacyMenuLayout = (
     : Math.round(clamp(buttonWidth * 1.14, buttonWidth + 20, 262));
   const centerButtonX = Math.round(width * 0.5);
   const rowButtonGap = Math.round(clamp(width * (isPortrait ? 0.045 : 0.016), isPortrait ? 14 : 18, isPortrait ? 22 : 34));
-  const rowButtonOffset = Math.round((buttonWidth / 2) + (rowButtonGap / 2));
+  // Offset must clear both the flanking button's own half-width AND the
+  // center button's half-width (plus the gap) or the two boxes overlap.
+  // The previous formula only reserved half the flanking button's width and
+  // half the gap, ignoring the center button entirely -- it collided at
+  // virtually every row-layout size, not just narrow ones.
+  const rowButtonOffset = Math.round((buttonWidth / 2) + rowButtonGap + (centerButtonWidth / 2));
   const stackHeight = (buttonHeight * 2) + stackGap;
   const stackTop = Math.round(clamp(
     boardTop + snappedBoardSize + 18,
