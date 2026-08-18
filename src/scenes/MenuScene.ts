@@ -394,6 +394,8 @@ interface UiButton {
   semanticAction?: string;
   setActive(active: boolean): void;
   text: string;
+  /** Only implemented by buttons with a continuous per-frame animation (e.g. the pulsating Start glow). */
+  updateFrame?(time: number): void;
   destroy(): void;
 }
 
@@ -957,6 +959,12 @@ const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
 const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 const LEGACY_MENU_ACTION_GREEN = toCyberArcadeCssHex(cyberArcadeMaterial.signal.player);
+// Pulsating white glow ring drawn around the primary Start button in place
+// of a filled/bordered panel -- see drawLegacyMenuPulsingStartGlow.
+const LEGACY_MENU_START_GLOW_COLOR = cyberArcadeMaterial.rail.white;
+const LEGACY_MENU_START_GLOW_PULSE_MS = 1600;
+const LEGACY_MENU_START_GLOW_MIN_ALPHA = 0.32;
+const LEGACY_MENU_START_GLOW_MAX_ALPHA = 0.82;
 const LEGACY_MENU_PATH_TITLE_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_MENU_PATH_TITLE_ACCENT = cyberArcadeMaterial.signal.player;
 const LEGACY_MENU_PATH_TITLE_PRISM = cyberArcadeMaterial.rail.cyan;
@@ -1609,6 +1617,9 @@ export class MenuScene extends Phaser.Scene {
     this.recordRuntimeFrame(delta);
     this.updateStars(time, delta);
     this.expireLegacyPlayerMessages(time);
+    for (const button of this.uiButtons) {
+      button.updateFrame?.(time);
+    }
 
     const pendingReset = this.pendingResetRequest;
     if (pendingReset !== null && shouldConsumeLegacyResetRequest(pendingReset, time)) {
@@ -7548,6 +7559,50 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
+  // The primary Start button has no fill or solid stroke -- just a soft
+  // white glow tracing its pill outline that breathes continuously. Phaser's
+  // canvas renderer has no native blur/glow filter, so the "glow" is faked
+  // with a few concentric strokes offset outward from the pill edge at
+  // decreasing opacity (wide + faint furthest out, thin + crisp right at the
+  // edge), redrawn every frame from updateFrame with a time-based sine pulse.
+  private drawLegacyMenuPulsingStartGlow(
+    graphics: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    time: number,
+    active: boolean
+  ): void {
+    graphics.clear();
+    const phase = (Math.sin((time / LEGACY_MENU_START_GLOW_PULSE_MS) * Math.PI * 2) + 1) / 2;
+    const pulseAlpha = clamp(
+      LEGACY_MENU_START_GLOW_MIN_ALPHA
+        + (phase * (LEGACY_MENU_START_GLOW_MAX_ALPHA - LEGACY_MENU_START_GLOW_MIN_ALPHA))
+        + (active ? 0.14 : 0),
+      0,
+      1
+    );
+    const left = x - (width / 2);
+    const top = y - (height / 2);
+    const baseRadius = this.resolveLegacyRoundedRectRadius(width, height, height / 2);
+    const layers = [
+      { alphaScale: 0.16, inset: -7, lineWidth: 6 },
+      { alphaScale: 0.34, inset: -3.5, lineWidth: 3 },
+      { alphaScale: 1, inset: 0, lineWidth: 1.75 }
+    ];
+    for (const layer of layers) {
+      graphics.lineStyle(layer.lineWidth, LEGACY_MENU_START_GLOW_COLOR, Math.min(1, pulseAlpha * layer.alphaScale));
+      graphics.strokeRoundedRect(
+        left + layer.inset,
+        top + layer.inset,
+        Math.max(1, width - (layer.inset * 2)),
+        Math.max(1, height - (layer.inset * 2)),
+        Math.max(1, baseRadius - layer.inset)
+      );
+    }
+  }
+
   private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number {
     const safeWidth = Math.max(1, Math.abs(width));
     const safeHeight = Math.max(1, Math.abs(height));
@@ -10372,15 +10427,13 @@ export class MenuScene extends Phaser.Scene {
       : null;
     const baseAlpha = isMenuFrontDoor ? Math.max(frontDoorChrome?.baseAlpha ?? MENU_BUTTON_ALPHA, 0.38) : 0.54;
     const panel = this.add.graphics();
-    // Bottom-dock primary button (Fitness-app BottomDockButton style): a
-    // full pill rather than the standard control radius, plus a soft
-    // accent-tinted inner fill approximating that app's vertical gradient
-    // sheen (Phaser Graphics has no native CSS-style gradient fill, so this
-    // layers a translucent mint pass over the base panel instead).
+    // Every other button keeps the filled/bordered cyber panel. The primary
+    // Start button has neither -- it's just a pulsating white glow ring (see
+    // drawLegacyMenuPulsingStartGlow), redrawn continuously via updateFrame.
     const drawButtonPanel = (active: boolean): void => {
       panel.clear();
       this.drawLegacyCyberPanel(panel, {
-        active: active || isPrimaryFrontDoorButton,
+        active,
         alpha: active
           ? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)
           : baseAlpha,
@@ -10389,26 +10442,19 @@ export class MenuScene extends Phaser.Scene {
           : frontDoorChrome?.fillColor ?? LEGACY_CYBER_PANEL_FILL,
         height,
         left: x - (width / 2),
-        radius: isPrimaryFrontDoorButton ? height : LEGACY_UI_CONTROL_RADIUS,
+        radius: LEGACY_UI_CONTROL_RADIUS,
         stroke: frontDoorChrome?.strokeColor,
-        strokeAlt: isPrimaryFrontDoorButton
-          ? cyberArcadeMaterial.rail.mint
-          : cyberArcadeMaterial.rail.mint,
+        strokeAlt: cyberArcadeMaterial.rail.mint,
         top: y - (height / 2),
         width
       });
-      if (isPrimaryFrontDoorButton) {
-        const sheenInset = 3;
-        const sheenLeft = x - (width / 2) + sheenInset;
-        const sheenTop = y - (height / 2) + sheenInset;
-        const sheenWidth = Math.max(1, width - (sheenInset * 2));
-        const sheenHeight = Math.max(1, height - (sheenInset * 2));
-        const sheenRadius = this.resolveLegacyRoundedRectRadius(sheenWidth, sheenHeight, sheenHeight);
-        panel.fillStyle(cyberArcadeMaterial.rail.mint, active ? 0.16 : 0.1);
-        panel.fillRoundedRect(sheenLeft, sheenTop, sheenWidth, sheenHeight, sheenRadius);
-      }
     };
-    drawButtonPanel(false);
+    let primaryButtonActive = false;
+    if (isPrimaryFrontDoorButton) {
+      this.drawLegacyMenuPulsingStartGlow(panel, x, y, width, height, 0, false);
+    } else {
+      drawButtonPanel(false);
+    }
 
     const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
@@ -10442,7 +10488,11 @@ export class MenuScene extends Phaser.Scene {
         0x000000,
         0.001
       );
-      drawButtonPanel(active);
+      if (isPrimaryFrontDoorButton) {
+        primaryButtonActive = active;
+      } else {
+        drawButtonPanel(active);
+      }
       label.setAlpha(
         active ? (frontDoorChrome?.hoverLabelAlpha ?? 0.98) : (frontDoorChrome?.labelAlpha ?? 0.92)
       );
@@ -10458,6 +10508,11 @@ export class MenuScene extends Phaser.Scene {
       label,
       setActive,
       text,
+      updateFrame: isPrimaryFrontDoorButton
+        ? (time: number) => {
+          this.drawLegacyMenuPulsingStartGlow(panel, x, y, width, height, time, primaryButtonActive);
+        }
+        : undefined,
       destroy: () => {
         panel.destroy();
         background.destroy();
