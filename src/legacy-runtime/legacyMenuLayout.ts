@@ -1,4 +1,6 @@
 import { clampInteger } from './legacyDefaults';
+import { resolveLegacyHeaderControlFrame } from './legacyHeaderControl';
+import { resolveLegacyMenuTitleFootprintWidth } from './legacyMenuTitle';
 import { LEGACY_UI_MIN_TOUCH_TARGET } from './legacyUiStandards';
 
 export interface LegacyMenuLayout {
@@ -10,6 +12,7 @@ export interface LegacyMenuLayout {
   tileSize: number;
   titleX: number;
   titleY: number;
+  titleReserveHeight: number;
   footerY: number;
   buttonLayout: 'row' | 'stack';
   buttonY: number;
@@ -118,6 +121,39 @@ export const resolveLegacyMenuLayout = (
   const menuTopHudReserve = !isPlaySurface
     ? Math.round(clamp(height * 0.072, isUltraNarrow ? 44 : LEGACY_MENU_TOP_HUD_MIN, LEGACY_MENU_TOP_HUD_MAX))
     : 0;
+  // The title prefers to sit inline in the header row, centered in the gap
+  // between the leading (AI/level) badge and the trailing settings cog --
+  // not as a separate banner lane above the board. Only fall back to the
+  // banner lane below when that gap is too narrow to hold the wordmark
+  // legibly (e.g. the diagnostic side panel and other very narrow widths).
+  let menuTitleFitsInHeader = false;
+  let menuHeaderTitleCenterX = Math.round(width / 2);
+  let menuHeaderTitleCenterY = 0;
+  if (!isPlaySurface && menuTopHudReserve > 0) {
+    const leadingHeaderFrame = resolveLegacyHeaderControlFrame({
+      height,
+      hudHeight: menuTopHudReserve,
+      hudTop: 0,
+      placement: 'leading',
+      width
+    });
+    const trailingHeaderFrame = resolveLegacyHeaderControlFrame({
+      height,
+      hudHeight: menuTopHudReserve,
+      hudTop: 0,
+      placement: 'trailing',
+      width
+    });
+    const headerGap = trailingHeaderFrame.left - leadingHeaderFrame.right;
+    const inlineTitleFontSize = Math.max(20, Math.round(menuTopHudReserve * 0.55));
+    const inlineTitleWidth = resolveLegacyMenuTitleFootprintWidth(inlineTitleFontSize);
+    const inlineTitlePadding = 24;
+    if (headerGap >= inlineTitleWidth + inlineTitlePadding) {
+      menuTitleFitsInHeader = true;
+      menuHeaderTitleCenterX = Math.round((leadingHeaderFrame.right + trailingHeaderFrame.left) / 2);
+      menuHeaderTitleCenterY = Math.round(leadingHeaderFrame.centerY);
+    }
+  }
   // Title is deliberately compact and sized purely from viewport dimensions
   // (not from board size -- see the circular-dependency note on
   // resolveLegacyMenuTitlePresentation in legacyMenuTitle.ts). The board
@@ -145,7 +181,12 @@ export const resolveLegacyMenuLayout = (
   // the "fill to the edges" requirement.
   const menuStackTop = menuTopHudReserve + menuTopReserve;
   const menuTitleTop = menuStackTop + laneGap;
-  const menuBoardTop = menuTitleTop + menuTitleReserve + laneGap;
+  // When the title fits inline in the header row, no separate title lane is
+  // reserved at all -- the board reclaims that space, matching the "fill to
+  // the edges" requirement.
+  const menuBoardTop = menuTitleFitsInHeader
+    ? menuStackTop + laneGap
+    : menuTitleTop + menuTitleReserve + laneGap;
   const menuBottomReserve = laneGap + dockReserve;
   const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
 
@@ -256,13 +297,17 @@ export const resolveLegacyMenuLayout = (
   const leftButtonY = resolvedUsesStackedButtons ? stackTop + Math.round(buttonHeight / 2) : rowButtonY;
   const rightButtonY = resolvedUsesStackedButtons ? leftButtonY + buttonHeight + stackGap : rowButtonY;
   const centerButtonY = rowButtonY;
-  const titleLaneTop = Math.max(0, boardTop - laneGap - menuTitleReserve);
+  const titleLaneTop = menuTitleFitsInHeader ? 0 : Math.max(0, boardTop - laneGap - menuTitleReserve);
   // Simple mid-lane centering. The old formula's extra -16px portrait nudge
   // was tuned against the previous ~140-156px title reserve; against the new
   // much smaller compact reserve that same fixed offset would push the
   // title dangerously off-center within its own tiny lane.
-  const menuPortraitTitleY = Math.round(titleLaneTop + (menuTitleReserve / 2));
-  const titleX = !isPlaySurface && isPortrait ? boardLeft + (snappedBoardSize / 2) : Math.round(width / 2);
+  const menuPortraitTitleY = menuTitleFitsInHeader
+    ? menuHeaderTitleCenterY
+    : Math.round(titleLaneTop + (menuTitleReserve / 2));
+  const titleX = menuTitleFitsInHeader
+    ? menuHeaderTitleCenterX
+    : (!isPlaySurface && isPortrait ? boardLeft + (snappedBoardSize / 2) : Math.round(width / 2));
   const rankLane = null;
   const actionsLane = isPlaySurface
     ? null
@@ -280,6 +325,9 @@ export const resolveLegacyMenuLayout = (
     tileSize,
     titleX,
     titleY: Math.round(!isPlaySurface ? menuPortraitTitleY : boardTop),
+    titleReserveHeight: isPlaySurface
+      ? Math.round(height * 0.055)
+      : (menuTitleFitsInHeader ? menuTopHudReserve : menuTitleReserve),
     footerY: height - 18,
     buttonLayout: resolvedUsesStackedButtons ? 'stack' : 'row',
     buttonY: rowButtonY,
@@ -302,7 +350,7 @@ export const resolveLegacyMenuLayout = (
           : null,
       maze: createLane(boardTop, snappedBoardSize),
       rank: rankLane,
-      title: isPlaySurface ? null : createLane(titleLaneTop, menuTitleReserve)
+      title: (isPlaySurface || menuTitleFitsInHeader) ? null : createLane(titleLaneTop, menuTitleReserve)
     }
   };
 };

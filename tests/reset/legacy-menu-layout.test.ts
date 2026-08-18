@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { resolveTouchControlLayout } from '../../src/input-human';
+import { resolveLegacyHeaderControlFrame } from '../../src/legacy-runtime/legacyHeaderControl';
 import {
   resolveLegacyMenuLayout
 } from '../../src/legacy-runtime/legacyMenuLayout';
@@ -9,6 +10,23 @@ import {
   resolveLegacyMenuPathTitleOrbitGeometry,
   resolveLegacyMenuTitlePresentation
 } from '../../src/legacy-runtime/legacyMenuTitle';
+
+// The title now prefers to sit inline in the header row (centered between
+// the leading AI/level badge and the trailing settings cog) and only falls
+// back to its own banner lane above the board when that gap is too narrow
+// (see legacyMenuLayout.ts's menuTitleFitsInHeader). `lanes.title` is null
+// in the inline case -- assert against whichever mode a given layout is
+// actually in rather than assuming one or the other.
+const expectTitlePlacedSafely = (layout: ReturnType<typeof resolveLegacyMenuLayout>): void => {
+  if (layout.lanes.title) {
+    expect(layout.lanes.hud?.bottom ?? 0).toBeLessThanOrEqual(layout.lanes.title.top);
+    expect(layout.lanes.title.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
+  } else if (layout.lanes.hud) {
+    expect(layout.titleY).toBeGreaterThanOrEqual(layout.lanes.hud.top);
+    expect(layout.titleY).toBeLessThanOrEqual(layout.lanes.hud.bottom);
+  }
+  expect(layout.titleY).toBeLessThan(layout.boardTop);
+};
 
 describe('legacy menu layout', () => {
   test('keeps the board centered with a bottom-docked action beneath it on desktop', () => {
@@ -38,8 +56,10 @@ describe('legacy menu layout', () => {
     // three-button row consumer, but no longer describes what's on screen.
     expect(layout.buttonWidth).toBeGreaterThanOrEqual(220);
     expect(layout.buttonWidth).toBeLessThanOrEqual(238);
-    expect(layout.lanes.title?.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
-    expect(layout.titleY).toBeLessThan(layout.boardTop);
+    // This wide desktop viewport has plenty of header-row gap, so the title
+    // sits inline between the header icons -- no separate title lane at all.
+    expect(layout.lanes.title).toBeNull();
+    expectTitlePlacedSafely(layout);
     expect(layout.lanes.rank).toBeNull();
     // The dock button sits near the bottom edge now, not tucked immediately
     // under the board -- that reclaimed space went to the board instead.
@@ -67,7 +87,7 @@ describe('legacy menu layout', () => {
       menuActionMode: 'guest'
     });
     const presentation = resolveLegacyMenuTitlePresentation(
-      guestDesktop.lanes.title?.height ?? 0,
+      guestDesktop.titleReserveHeight,
       guestDesktop.tileSize,
       false,
       guestDesktop.width,
@@ -79,11 +99,14 @@ describe('legacy menu layout', () => {
       presentation.fontSize
     );
 
-    // The menu intentionally sits below its persistent header lane instead of
-    // competing with the level and settings controls at the top edge, and the
-    // title sits above the board while the dock button sits near the bottom
-    // -- three clearly separated bands, not one clustered "visible stack".
-    expect(title.top).toBeGreaterThanOrEqual(guestDesktop.lanes.hud?.bottom ?? 0);
+    // At this width the title sits inline inside the header row itself
+    // (between the leading AI/level badge and the trailing settings cog),
+    // not below it in its own banner lane -- the header, title, board, and
+    // dock button are still each clearly separated, just with the title
+    // sharing the header's vertical band instead of owning its own.
+    expect(guestDesktop.lanes.title).toBeNull();
+    expect(title.top).toBeGreaterThanOrEqual(guestDesktop.lanes.hud?.top ?? 0);
+    expect(title.top + title.height).toBeLessThanOrEqual(guestDesktop.lanes.hud?.bottom ?? 0);
     expect(title.top).toBeLessThan(guestDesktop.boardTop);
     expect(guestDesktop.centerButtonY).toBeGreaterThan(guestDesktop.boardTop + guestDesktop.boardSize);
     expect(guestDesktop.height - guestDesktop.centerButtonY).toBeLessThanOrEqual(60);
@@ -101,8 +124,7 @@ describe('legacy menu layout', () => {
       const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
 
       expect(layout.lanes.hud).not.toBeNull();
-      expect(layout.lanes.hud?.bottom).toBeLessThanOrEqual(layout.lanes.title?.top ?? 0);
-      expect(layout.lanes.title?.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
+      expectTitlePlacedSafely(layout);
       expect(layout.lanes.maze.bottom).toBeLessThanOrEqual(layout.lanes.actions?.top ?? 0);
     }
   });
@@ -117,7 +139,7 @@ describe('legacy menu layout', () => {
     ]) {
       const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
       const presentation = resolveLegacyMenuTitlePresentation(
-        layout.lanes.title?.height ?? 0,
+        layout.titleReserveHeight,
         layout.tileSize,
         viewport.height > viewport.width,
         viewport.width,
@@ -132,7 +154,13 @@ describe('legacy menu layout', () => {
         title.cellSize
       );
 
-      expect(orbit.top).toBeGreaterThanOrEqual((layout.lanes.hud?.bottom ?? 0));
+      // Inline mode: the orbit shell lives inside the header lane alongside
+      // the icons. Banner mode: it lives in its own lane below the header.
+      if (layout.lanes.title) {
+        expect(orbit.top).toBeGreaterThanOrEqual((layout.lanes.hud?.bottom ?? 0));
+      } else {
+        expect(orbit.top).toBeGreaterThanOrEqual((layout.lanes.hud?.top ?? 0));
+      }
       expect(orbit.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
     }
   });
@@ -159,16 +187,15 @@ describe('legacy menu layout', () => {
     // The dock button now sits near the bottom edge, not tucked immediately
     // under the board -- that reclaimed space went to the board instead.
     expect(layout.height - layout.buttonY).toBeLessThanOrEqual(60);
-    // Title is a compact banner now: comfortably clear of both the header
-    // lane above it and the board below it, not a specific fixed offset.
-    expect(layout.titleY).toBeGreaterThanOrEqual(layout.lanes.hud?.bottom ?? 0);
-    expect(layout.titleY).toBeLessThan(layout.boardTop);
+    // Title is compact and clear of the board below it -- whether it sits
+    // inline in the header row or in its own banner lane depends on width.
+    expectTitlePlacedSafely(layout);
   });
 
   test('centers the portrait title diamond on the board top notch while clearing the border', () => {
     const layout = resolveLegacyMenuLayout(405, 958, 50, 49, 'menu');
     const presentation = resolveLegacyMenuTitlePresentation(
-      layout.lanes.title?.height ?? 0,
+      layout.titleReserveHeight,
       layout.tileSize,
       true,
       layout.width,
@@ -182,14 +209,18 @@ describe('legacy menu layout', () => {
       titleLayout.height,
       titleLayout.cellSize
     );
-    // Title is a compact banner now (fontSize derives from the small
-    // reserved lane height, not board size -- see legacyMenuTitle.ts), so
-    // its footprint is much smaller than the old design's. What still
-    // matters: it's centered on the board and its animated orbit shell
-    // stays fully within its lane (header below it, board below that).
-    expect(Math.abs(orbitGeometry.centerX - (layout.boardLeft + (layout.boardSize / 2)))).toBeLessThanOrEqual(0.5);
+    // Title is compact (fontSize derives from its reserved height, not board
+    // size -- see legacyMenuTitle.ts), so its footprint is much smaller than
+    // the old design's. What still matters: it's centered on the board
+    // (the header row is symmetric about the same centerline the board is)
+    // and its animated orbit shell stays fully clear of the board below it.
+    expect(Math.abs(orbitGeometry.centerX - (layout.boardLeft + (layout.boardSize / 2)))).toBeLessThanOrEqual(1);
     expect(orbitGeometry.crownBottom).toBeLessThanOrEqual(layout.boardTop);
-    expect(orbitGeometry.top).toBeGreaterThanOrEqual(layout.lanes.hud?.bottom ?? 0);
+    if (layout.lanes.title) {
+      expect(orbitGeometry.top).toBeGreaterThanOrEqual(layout.lanes.hud?.bottom ?? 0);
+    } else {
+      expect(orbitGeometry.top).toBeGreaterThanOrEqual(layout.lanes.hud?.top ?? 0);
+    }
     expect(titleLayout.width).toBeGreaterThan(0);
     expect(titleLayout.width).toBeLessThanOrEqual(layout.width - 48);
   });
@@ -318,6 +349,49 @@ describe('legacy menu layout', () => {
     expect(layout.rightButtonY + (layout.buttonHeight / 2)).toBeLessThanOrEqual(layout.footerY);
     expect(layout.buttonWidth).toBeLessThanOrEqual(layout.width - 36);
     expect(layout.centerButtonWidth).toBeLessThanOrEqual(layout.width - 20);
+    // This exact diagnostic side panel is narrow enough that the header gap
+    // between the leading and trailing icons can't hold the title legibly --
+    // it must fall back to its own banner lane above the board.
+    expect(layout.lanes.title).not.toBeNull();
+    expectTitlePlacedSafely(layout);
+  });
+
+  test('places the title inline in the header row, centered between the leading and trailing icons, whenever the gap allows it', () => {
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 390, height: 844 },
+      { width: 405, height: 958 },
+      { width: 430, height: 932 },
+      { width: 1280, height: 720 },
+      { width: 1920, height: 1080 }
+    ]) {
+      const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
+      const hudHeight = layout.lanes.hud?.height ?? 0;
+      const leadingFrame = resolveLegacyHeaderControlFrame({
+        height: layout.height,
+        hudHeight,
+        hudTop: 0,
+        placement: 'leading',
+        width: layout.width
+      });
+      const trailingFrame = resolveLegacyHeaderControlFrame({
+        height: layout.height,
+        hudHeight,
+        hudTop: 0,
+        placement: 'trailing',
+        width: layout.width
+      });
+
+      // Every one of these viewports has enough header-row gap to fit the
+      // title inline -- confirmed live, not assumed (only the 172x407
+      // diagnostic panel above falls back to the banner lane).
+      expect(layout.lanes.title).toBeNull();
+      expect(layout.titleX).toBeGreaterThan(leadingFrame.right);
+      expect(layout.titleX).toBeLessThan(trailingFrame.left);
+      expect(Math.abs(layout.titleX - ((leadingFrame.right + trailingFrame.left) / 2))).toBeLessThanOrEqual(1);
+      expect(layout.titleY).toBe(Math.round(leadingFrame.centerY));
+      expect(layout.titleReserveHeight).toBe(hudHeight);
+    }
   });
 
   test('keeps ordinary narrow portrait views at the canonical touch floor', () => {
@@ -438,7 +512,7 @@ describe('legacy menu layout', () => {
       const restored = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 'menu');
 
       expect(restored).toEqual(first);
-      expect(first.lanes.title?.bottom).toBeLessThanOrEqual(first.lanes.maze.top);
+      expectTitlePlacedSafely(first);
       expect(first.lanes.rank).toBeNull();
       expect(first.lanes.maze.bottom).toBeLessThanOrEqual(first.lanes.actions?.top ?? 0);
       expect(first.lanes.actions?.bottom).toBeLessThanOrEqual(first.footerY);

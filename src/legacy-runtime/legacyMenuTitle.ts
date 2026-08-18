@@ -171,6 +171,19 @@ export const resolveLegacyMenuTitlePresentation = (
   };
 };
 
+/**
+ * Total on-screen width the title wordmark needs at a given font size,
+ * including the orbit/crown decorations that extend past the core letter
+ * grid -- used by legacyMenuLayout.ts to decide whether the title fits
+ * inline between the header's leading/trailing icon frames.
+ */
+export const resolveLegacyMenuTitleFootprintWidth = (fontSize: number): number => {
+  const cellSize = Math.max(4, Math.round(fontSize / 9));
+  const coreWidth = LEGACY_MENU_PATH_TITLE_COLUMNS * cellSize;
+  const orbitGap = Math.max(7, Math.round(cellSize * 1.08));
+  return coreWidth + (orbitGap * 2);
+};
+
 export const resolveLegacyMenuPathTitleLayout = (
   centerX: number,
   centerY: number,

@@ -974,7 +974,6 @@ const LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA = 0.92;
 const LEGACY_BOARD_GRID_ALPHA = 0;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
-const LEGACY_MENU_SLAB_FILL = cyberArcadeMaterial.substrate.fieldRaised;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;
 const LEGACY_MENU_PATH_CORE = cyberArcadeMaterial.path.core;
 const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;
@@ -5299,11 +5298,11 @@ export class MenuScene extends Phaser.Scene {
       this.boardStaticGraphics.fillStyle(0x000000, boardShadowAlpha);
       this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardSize, boardSize);
     }
-    if (isMenuMode) {
-      this.boardStaticGraphics.fillStyle(LEGACY_MENU_SLAB_FILL, 0.16);
-      this.boardStaticGraphics.fillRect(boardLeft - 2, boardTop - 2, boardSize + 4, boardSize + 4);
+    // Menu board intentionally has no slab backdrop or edge frame: the maze
+    // tiles should read as floating directly on the scene, not boxed in.
+    if (!isMenuMode) {
+      this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);
     }
-    this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);
     this.boardStaticGraphics.fillStyle(boardFill, isMenuMode ? LEGACY_MENU_BOARD_GLASS_ALPHA : LEGACY_PLAY_BOARD_GLASS_ALPHA);
     this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
     // Keep the board top-down: no pseudo bevel/highlight pass over the maze.
@@ -5646,7 +5645,7 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyMenuPathTitlePieceCount(): number {
     const titlePresentation = resolveLegacyMenuTitlePresentation(
-      this.layout.lanes.title?.height ?? Math.round(this.layout.height * 0.055),
+      this.layout.titleReserveHeight,
       this.layout.tileSize,
       this.layout.height > this.layout.width,
       this.layout.width,
@@ -6014,7 +6013,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const titlePresentation = resolveLegacyMenuTitlePresentation(
-      this.layout.lanes.title?.height ?? Math.round(this.layout.height * 0.055),
+      this.layout.titleReserveHeight,
       this.layout.tileSize,
       this.layout.height > this.layout.width,
       this.layout.width,
@@ -11307,7 +11306,7 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyMenuPathTitleDiagnostics(): MenuSceneVisualDiagnostics['title'] {
     const titlePresentation = resolveLegacyMenuTitlePresentation(
-      this.layout.lanes.title?.height ?? Math.round(this.layout.height * 0.055),
+      this.layout.titleReserveHeight,
       this.layout.tileSize,
       this.layout.height > this.layout.width,
       this.layout.width,
