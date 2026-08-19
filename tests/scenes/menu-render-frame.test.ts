@@ -687,7 +687,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 6200;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 8;');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(time: number): void');
     expect(menuSceneSource).not.toContain('if (visibleCells.length <= 0) {\n      return;\n    }');
     expect(menuSceneSource).not.toContain('drawLegacyMenuPathTitleSigilRails');
@@ -711,7 +711,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleGemFacets(');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleOrbitSigils(');
     expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleOrbitPhase(time: number): number');
-    expect(menuSceneSource).toContain('const orbitPhase = this.resolveLegacyMenuPathTitleOrbitPhase(time);');
+    expect(menuSceneSource).toContain('const orbitPhase = isLifecycleSpinActive ? this.resolveLegacyMenuPathTitleOrbitPhase(time) : 0;');
     expect(menuSceneSource).toContain('const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;');
     expect(menuSceneSource).not.toContain('phase * 0.62');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleDiamond(');

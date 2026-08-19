@@ -131,10 +131,10 @@ import {
 } from '../legacy-runtime/legacyUiStandards';
 import {
   resolveLegacyMenuPathTitleLayout,
-  resolveLegacyMenuPathTitleOrbitGeometry,
   resolveLegacyMenuPathTitleOrbitPoint,
   resolveLegacyMenuTitlePresentation,
-  type LegacyMenuPathTitleCell
+  type LegacyMenuPathTitleCell,
+  type LegacyMenuPathTitleOrbitGeometry
 } from '../legacy-runtime/legacyMenuTitle';
 import {
   LEGACY_MENU_BACKDROP_SHARD_COUNT,
@@ -982,7 +982,9 @@ const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;
 const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
 const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 6200;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;
-const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;
+// 8 so the frozen (idle) position lands exactly on the 4 corners and 4
+// edge midpoints of the viewport -- see drawLegacyMenuPathTitleOrbitSigils.
+const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 8;
 const LEGACY_MENU_PATH_TITLE_SHADOW_ALPHA = 0.44;
 const LEGACY_MENU_PATH_TITLE_ACCENT_ALPHA = 0.92;
 const LEGACY_BOARD_GRID_ALPHA = 0;
@@ -6028,22 +6030,42 @@ export class MenuScene extends Phaser.Scene {
     time: number,
     alphaScale: number
   ): void {
-    const orbitPhase = this.resolveLegacyMenuPathTitleOrbitPhase(time);
-    const orbitGeometry = resolveLegacyMenuPathTitleOrbitGeometry(
-      titleLayout.left,
-      titleLayout.top,
-      titleLayout.width,
-      titleLayout.height,
-      titleLayout.cellSize
-    );
+    // Only orbit while the maze is actively building or deconstructing --
+    // otherwise freeze at phase 0, which (with 8 evenly-spaced sigils)
+    // lands exactly on the 4 corners and 4 edge midpoints instead of
+    // drifting continuously while the board sits idle.
+    const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'
+      || this.menuStaticDrawLifecyclePhase === 'deconstructing';
+    const orbitPhase = isLifecycleSpinActive ? this.resolveLegacyMenuPathTitleOrbitPhase(time) : 0;
+    // Orbits the viewport's own edge instead of hugging the title glyph --
+    // same relocation the deconstruct handoff burst got earlier, just for
+    // the title's sparkle sigils.
+    const inset = 2;
+    const orbitGeometry: LegacyMenuPathTitleOrbitGeometry = {
+      bottom: this.layout.height - inset,
+      centerX: this.layout.width / 2,
+      centerY: this.layout.height / 2,
+      crownBottom: this.layout.height - inset,
+      crownHalf: titleLayout.cellSize * 0.56,
+      crownTop: inset,
+      left: inset,
+      right: this.layout.width - inset,
+      top: inset
+    };
 
     for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
       const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
       const { x, y } = resolveLegacyMenuPathTitleOrbitPoint(orbitGeometry, orbit);
 
-      const wave = 0.62 + (Math.sin((orbitPhase * Math.PI * 2) + (index * 1.38)) * 0.28);
-      const radius = Math.max(4, Math.round(titleLayout.cellSize * (0.46 + (wave * 0.32))));
-      const alpha = clamp((0.14 + (wave * 0.24)) * alphaScale, 0.1, 0.42);
+      const wave = isLifecycleSpinActive
+        ? 0.62 + (Math.sin((orbitPhase * Math.PI * 2) + (index * 1.38)) * 0.28)
+        : 0.62;
+      // Sized for legibility along the screen edge now, not scaled to the
+      // title glyph's tiny cell size -- at the old title-hugging scale
+      // these were only 4-5px and effectively invisible once spread around
+      // the much larger viewport perimeter.
+      const radius = Math.max(6, Math.round(9 + (wave * 6)));
+      const alpha = clamp((0.22 + (wave * 0.3)) * alphaScale, 0.16, 0.56);
       const fillColor = index % 3 === 0
         ? LEGACY_MENU_PATH_TITLE_FACET_WARM
         : LEGACY_MENU_PATH_TITLE_GEM;
