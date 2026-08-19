@@ -707,7 +707,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleGemFacets(');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleOrbitSigils(');
     expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleOrbitPhase(time: number): number');
-    expect(menuSceneSource).toContain('const orbitPhase = isLifecycleSpinActive ? this.resolveLegacyMenuPathTitleOrbitPhase(time) : 0;');
+    expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleOrbitSettlePhase(time: number): number');
     expect(menuSceneSource).toContain('const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;');
     expect(menuSceneSource).not.toContain('phase * 0.62');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleDiamond(');
@@ -836,7 +836,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private hasLegacyPlayerVisualMotionPendingFrame(time: number): boolean');
     expect(menuSceneSource).toContain('const centerX = originX + ((point.x + 0.5) * tileSize);');
     expect(menuSceneSource).toContain('resolveLegacyPlayerMarkerRenderMetrics(');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineTo(centerX + playerMetrics.coreRadius, centerY);');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineTo(centerX + coreRadiusX, centerY);');
     expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillPath();');
     expect(menuSceneSource).toContain('this.isLegacyMenuPointVisibleInStaticDraw(this.player)');
   });
@@ -922,13 +922,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_COLOR = cyberArcadeMaterial.signal.player;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_BEACON_ALPHA_RATIO = 0.74;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_BEACON_RADIUS_RATIO = 0.16;');
-    expect(menuSceneSource).toContain('const beaconPhase = (Math.sin((time / LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS) * Math.PI * 2) + 1) / 2;');
-    expect(menuSceneSource).toContain('? tileSize * (0.18 + (beaconPhase * 0.1))');
-    expect(menuSceneSource).toContain(': tileSize * (LEGACY_MENU_AI_BEACON_RADIUS_RATIO + (beaconPhase * 0.08));');
-    expect(menuSceneSource).toContain(': Math.min(0.5, alpha * LEGACY_MENU_AI_BEACON_ALPHA_RATIO * (0.34 + (beaconPhase * 0.22)));');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, beaconRadius);');
+    expect(menuSceneSource).toContain('const stretchAmount = Math.sin(progress * Math.PI) * 0.18;');
+    expect(menuSceneSource).toContain('const horizontalMove = Math.abs(dx) >= Math.abs(dy);');
+    expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, beaconRadius);');
     expect(menuSceneSource).toContain('resolveLegacyPlayerLocatorRenderMetrics(');
     expect(menuSceneSource).toContain('drawLocatorTick(centerX - locatorMetrics.outerRadius, centerY, centerX - locatorMetrics.innerRadius, centerY);');
     expect(menuSceneSource).toContain('const playerScreenX = mazeRenderFrame.boardLeft + ((renderedPlayerPoint.x + 0.5) * mazeRenderFrame.tileSize);');
@@ -1274,9 +1270,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacySettingsCogControl(');
     expect(menuSceneSource).toMatch(/this\.drawLegacyHeaderControlChrome\(\s+graphics,\s+rect,/);
     expect(menuSceneSource).toContain('active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,');
-    expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(): void');
-    expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog();');
-    expect(menuSceneSource).toContain('cyberArcadeMaterial.signal.player,\n      cyberArcadeMaterial.rail.mint\n    );');
+    expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(time: number): void');
+    expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog(time);');
+    expect(menuSceneSource).toContain('cyberArcadeMaterial.signal.player,\n      cyberArcadeMaterial.rail.mint,\n      blinkAlpha\n    );');
+    expect(menuSceneSource).toContain('private applyLegacyMenuBlinkPulse(');
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');

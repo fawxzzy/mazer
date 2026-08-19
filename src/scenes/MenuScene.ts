@@ -960,9 +960,9 @@ const LEGACY_UI_FONT_FAMILY = cyberArcadeMaterial.typography.ui;
 const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
 const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
-// Pulse period for the Start/Login glyph tiles' rim brightness -- see
-// drawLegacyMenuFrontDoorGlyphButton.
-const LEGACY_MENU_START_GLOW_PULSE_MS = 1600;
+// Pulse period for the classic "PRESS START" blink -- see
+// applyLegacyMenuBlinkPulse.
+const LEGACY_MENU_BLINK_PULSE_MS = 900;
 const LEGACY_MENU_PATH_TITLE_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_MENU_PATH_TITLE_ACCENT = cyberArcadeMaterial.signal.player;
 const LEGACY_MENU_PATH_TITLE_PRISM = cyberArcadeMaterial.rail.cyan;
@@ -1034,9 +1034,12 @@ const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = 104;
 const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = 144;
 const LEGACY_PLAY_COMPASS_SPIN_DURATION_MS = 1800;
 const LEGACY_PLAY_COMPASS_SPIN_TURNS = 3.25;
-const LEGACY_PLAY_PLAYER_VISUAL_MOVE_MS = 116;
+// Bumped up from 116ms -- at that duration the eased glide between tiles
+// only spans ~7 frames at 60fps, which read as a quick snap-slide rather
+// than smooth motion. A slower tween still feels responsive for a maze
+// but gives the eye enough frames to actually perceive the glide.
+const LEGACY_PLAY_PLAYER_VISUAL_MOVE_MS = 190;
 const LEGACY_MENU_PLAYER_VISUAL_MOVE_MS = 150;
-const LEGACY_PLAYER_MARKER_SHADOW = 0x00131f;
 const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
 const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.46;
@@ -1044,8 +1047,6 @@ const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.72;
 const LEGACY_PLAY_PLAYER_BEACON_COLOR = cyberArcadeMaterial.signal.player;
 const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent;
 const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;
-const LEGACY_MENU_AI_BEACON_ALPHA_RATIO = 0.74;
-const LEGACY_MENU_AI_BEACON_RADIUS_RATIO = 0.16;
 const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;
 const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;
 const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;
@@ -1286,6 +1287,11 @@ export class MenuScene extends Phaser.Scene {
   private menuStaticBuildPrerollStartedAtMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
   private legacyMenuTitleAnimationNextFrameAtMs = 0;
+  // Orbit sigils ease into their frozen resting positions instead of
+  // snapping the instant the maze finishes building/deconstructing -- see
+  // drawLegacyMenuPathTitleOrbitSigils.
+  private menuOrbitSettleStartedAtMs: number | null = null;
+  private menuOrbitSettlePhaseStart = 0;
   private visualDiagnosticsRevision = 0;
   private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   private visualDiagnosticsPlayLifecycleSignature: string | null = null;
@@ -5075,14 +5081,26 @@ export class MenuScene extends Phaser.Scene {
       const streakLength = resolveLegacyMenuBackdropStreakLength(star);
       const coreSize = Math.max(1, Math.round(star.radius));
       const step = resolveLegacyMenuBackdropTailStep(star);
+      // Deterministic per-star twinkle and color-temperature variation from
+      // the star's own position (no extra persisted state needed) -- plain
+      // uniform white squares with no shimmer read as flat/lifeless at a
+      // real starfield's scale.
+      const starSeed = ((star.x * 9973) + (star.y * 6151)) % 1;
+      const twinklePhase = backdropMotionEnabled
+        ? (Math.sin((animationTime / 1300) + (starSeed * Math.PI * 2)) + 1) / 2
+        : 0.5;
+      const twinkleAlpha = star.alpha * (0.68 + (twinklePhase * 0.32));
+      const starColor = starSeed > 0.82 ? 0xbfe3ff : (starSeed < 0.16 ? 0xffe9c2 : 0xffffff);
       if (coreSize > 1) {
-        this.backdropGraphics.fillStyle(0xffffff, star.alpha * palette.starAlphaScale * 0.14);
+        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.22);
+        this.backdropGraphics.fillRect(pixelX - 2, pixelY - 2, coreSize + 4, coreSize + 4);
+        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.18);
         this.backdropGraphics.fillRect(pixelX - 1, pixelY - 1, coreSize + 2, coreSize + 2);
       }
-      this.backdropGraphics.fillStyle(0xffffff, star.alpha * palette.starAlphaScale);
+      this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale);
       this.backdropGraphics.fillRect(pixelX, pixelY, coreSize, coreSize);
       for (let index = 1; index <= streakLength; index += 1) {
-        this.backdropGraphics.fillStyle(0xffffff, star.alpha * palette.starAlphaScale * 0.34);
+        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.4);
         this.backdropGraphics.fillRect(
           Math.round(pixelX + (step.x * index)),
           Math.round(pixelY + (step.y * index)),
@@ -5418,18 +5436,35 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
+    const hasTop = pathSource.grid[point.y - 1]?.[point.x] === true;
+    const hasLeft = pathSource.grid[point.y]?.[point.x - 1] === true;
+    const hasBottom = pathSource.grid[point.y + 1]?.[point.x] === true;
+    const hasRight = pathSource.grid[point.y]?.[point.x + 1] === true;
+
+    // Adjacent connected tiles overlap their fill by 1px into each other
+    // instead of exactly abutting -- two mathematically adjacent fillRects
+    // with identical rounded edges still render a faint 1px seam where they
+    // meet (antialiasing partial-coverage at the shared boundary), visible
+    // as thin grey lines through the corridor at larger tile sizes. A small
+    // overlap guarantees solid double-covered color at every internal
+    // boundary instead of a hairline gap.
+    const overlap = 1;
+    const fillLeft = tileRect.left - (hasLeft ? overlap : 0);
+    const fillTop = tileRect.top - (hasTop ? overlap : 0);
+    const fillRight = tileRect.left + tileRect.width + (hasRight ? overlap : 0);
+    const fillBottom = tileRect.top + tileRect.height + (hasBottom ? overlap : 0);
 
     graphics.fillStyle(options.coreColor, options.coreAlpha);
-    graphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
+    graphics.fillRect(fillLeft, fillTop, fillRight - fillLeft, fillBottom - fillTop);
     this.drawLegacyPathTileFacet(
       graphics,
       tileRect,
       options.coreAlpha,
       options.edgeColor,
-      pathSource.grid[point.y - 1]?.[point.x] === true,
-      pathSource.grid[point.y]?.[point.x - 1] === true,
-      pathSource.grid[point.y + 1]?.[point.x] === true,
-      pathSource.grid[point.y]?.[point.x + 1] === true
+      hasTop,
+      hasLeft,
+      hasBottom,
+      hasRight
     );
 
     if (options.drawCue === true) {
@@ -6042,6 +6077,27 @@ export class MenuScene extends Phaser.Scene {
     this.strokeLegacyPolyline(this.titleGraphics, [innerLeft, innerTop, innerRight]);
   }
 
+  // Eases the orbit sigils from wherever they were spinning down to their
+  // frozen resting phase (0) over a fixed short window instead of snapping
+  // there the instant the maze finishes building/deconstructing -- a hard
+  // cut to phase 0 could jump every sigil across a large chunk of the
+  // perimeter in a single frame depending on where the wall-clock spin
+  // happened to be. Takes the shorter way around the loop (never more than
+  // half an orbit) so the ease never reverses direction mid-travel.
+  private resolveLegacyMenuPathTitleOrbitSettlePhase(time: number): number {
+    const settleDurationMs = 480;
+    if (this.menuOrbitSettleStartedAtMs === null) {
+      this.menuOrbitSettleStartedAtMs = time;
+      this.menuOrbitSettlePhaseStart = this.resolveLegacyMenuPathTitleOrbitPhase(time);
+    }
+    const elapsed = time - this.menuOrbitSettleStartedAtMs;
+    const t = clamp(elapsed / settleDurationMs, 0, 1);
+    const eased = 1 - ((1 - t) ** 3);
+    const start = this.menuOrbitSettlePhaseStart;
+    const shortestDelta = ((-start % 1) + 1.5) % 1 - 0.5;
+    return ((start + (shortestDelta * eased)) % 1 + 1) % 1;
+  }
+
   private drawLegacyMenuPathTitleOrbitSigils(
     titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
     time: number,
@@ -6053,7 +6109,12 @@ export class MenuScene extends Phaser.Scene {
     // drifting continuously while the board sits idle.
     const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'
       || this.menuStaticDrawLifecyclePhase === 'deconstructing';
-    const orbitPhase = isLifecycleSpinActive ? this.resolveLegacyMenuPathTitleOrbitPhase(time) : 0;
+    const orbitPhase = isLifecycleSpinActive
+      ? this.resolveLegacyMenuPathTitleOrbitPhase(time)
+      : this.resolveLegacyMenuPathTitleOrbitSettlePhase(time);
+    if (isLifecycleSpinActive) {
+      this.menuOrbitSettleStartedAtMs = null;
+    }
     // Orbits the viewport's own edge instead of hugging the title glyph --
     // same relocation the deconstruct handoff burst got earlier, just for
     // the title's sparkle sigils.
@@ -6417,7 +6478,7 @@ export class MenuScene extends Phaser.Scene {
     const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
 
     this.drawLegacyProgressionBadge();
-    this.drawLegacyMenuSettingsCog();
+    this.drawLegacyMenuSettingsCog(time);
 
     for (let index = 0; index < visibleTrail.length; index += 1) {
       const point = visibleTrail[index];
@@ -6970,7 +7031,7 @@ export class MenuScene extends Phaser.Scene {
     return badgeBounds;
   }
 
-  private drawLegacyMenuSettingsCog(): void {
+  private drawLegacyMenuSettingsCog(time: number): void {
     if (this.mode !== 'menu' || this.overlay !== 'none') {
       return;
     }
@@ -6990,13 +7051,21 @@ export class MenuScene extends Phaser.Scene {
     // behind it to leave room inside). The Mazer signature green instead of
     // the generic white/mint touch-icon colors or cyan, matching the LVL
     // badge/player/trail green that reads as "Mazer" everywhere else.
+    // Same classic blink/grow-shrink pulse as the Start/Login glyphs --
+    // scales the radius ratio and multiplies every alpha in the draw call
+    // (there's no single object to setScale/setAlpha on here, since the
+    // gear is drawn straight onto the shared board graphics layer).
+    const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+    const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuSettingsCogActive ? 0.08 : 0), 0.14, 1);
+    const blinkScale = 0.92 + (phase * 0.08) + (this.menuSettingsCogActive ? 0.02 : 0);
     this.drawLegacySettingsCog(
       this.boardDynamicGraphics,
       frame,
       this.menuSettingsCogActive,
-      0.34,
+      0.34 * blinkScale,
       cyberArcadeMaterial.signal.player,
-      cyberArcadeMaterial.rail.mint
+      cyberArcadeMaterial.rail.mint,
+      blinkAlpha
     );
   }
 
@@ -7456,7 +7525,14 @@ export class MenuScene extends Phaser.Scene {
     kind: 'start' | 'goal'
   ): void {
     const coreColor = kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_CORE : LEGACY_PLAY_START_MARKER_CORE;
-    const rimColor = kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_EDGE : LEGACY_PLAY_START_MARKER_EDGE;
+    // LEGACY_PLAY_START/GOAL_MARKER_EDGE are literally the same value as
+    // their own core color (semantic.reward/semantic.danger have no
+    // separate "edge" tone), so using them as the rim color drew a same-
+    // color-on-same-color outline with zero contrast -- the marker read as
+    // a flat, undefined blob instead of a lit tile like the rest of the
+    // board. A bright white rim (the same tone the catchlight sparkles use
+    // elsewhere) gives it real glow definition against either color.
+    const rimColor = cyberArcadeMaterial.rail.white;
 
     graphics.fillStyle(coreColor, alpha);
     graphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
@@ -7501,44 +7577,38 @@ export class MenuScene extends Phaser.Scene {
       showLocatorTicks ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : undefined
     );
 
-    const shadowRadius = Math.min(tileSize * 0.5, playerMetrics.haloRadius + playerMetrics.strokeWidth);
-
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.36, alpha * 0.36));
-    this.boardDynamicGraphics.fillCircle(centerX, centerY, shadowRadius);
     const playerCoreColor = resolveLegacyIridescentPlayerCoreColor(time);
     const iridescentAccentColor = resolveLegacyIridescentPlayerAccentColor(time, playerCoreColor);
-    const beaconPhase = (Math.sin((time / LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS) * Math.PI * 2) + 1) / 2;
-    const beaconRadiusOffset = showLocatorTicks
-      ? tileSize * (0.18 + (beaconPhase * 0.1))
-      : tileSize * (LEGACY_MENU_AI_BEACON_RADIUS_RATIO + (beaconPhase * 0.08));
-    const beaconRadius = playerMetrics.haloRadius + playerMetrics.strokeWidth + beaconRadiusOffset;
-    const beaconAlpha = showLocatorTicks
-      ? Math.min(0.74, alpha * (0.34 + (beaconPhase * 0.28)))
-      : Math.min(0.5, alpha * LEGACY_MENU_AI_BEACON_ALPHA_RATIO * (0.34 + (beaconPhase * 0.22)));
 
-    this.boardDynamicGraphics.lineStyle(
-      Math.max(1, playerMetrics.strokeWidth * (showLocatorTicks ? 0.76 : 0.58)),
-      LEGACY_PLAY_PLAYER_BEACON_COLOR,
-      beaconAlpha
-    );
-    this.boardDynamicGraphics.strokeCircle(centerX, centerY, beaconRadius);
-    this.boardDynamicGraphics.lineStyle(
-      Math.max(1, playerMetrics.strokeWidth * (showLocatorTicks ? 0.42 : 0.32)),
-      LEGACY_PLAY_PLAYER_BEACON_ACCENT,
-      Math.min(showLocatorTicks ? 0.52 : 0.34, beaconAlpha * 0.7)
-    );
-    this.boardDynamicGraphics.strokeCircle(centerX, centerY, beaconRadius + Math.max(1, tileSize * 0.08));
+    // A small squash-and-stretch along the direction of travel while the
+    // player is gliding between tiles -- the diamond is the only shape left
+    // now that the halo/beacon rings are gone, so tying ITS animation
+    // directly to movement is what gives the marker any sense of motion
+    // instead of a rigid icon sliding in a straight line.
+    const motion = this.playerVisualMotion;
+    let coreRadiusX = playerMetrics.coreRadius;
+    let coreRadiusY = playerMetrics.coreRadius;
+    if (motion !== null && motion.durationMs > 0 && time < motion.startedAtMs + motion.durationMs) {
+      const progress = clamp((time - motion.startedAtMs) / motion.durationMs, 0, 1);
+      const dx = motion.to.x - motion.from.x;
+      const dy = motion.to.y - motion.from.y;
+      const stretchAmount = Math.sin(progress * Math.PI) * 0.18;
+      const along = 1 + stretchAmount;
+      const across = 1 - (stretchAmount * 0.6);
+      const horizontalMove = Math.abs(dx) >= Math.abs(dy);
+      coreRadiusX = playerMetrics.coreRadius * (horizontalMove ? along : across);
+      coreRadiusY = playerMetrics.coreRadius * (horizontalMove ? across : along);
+    }
 
-    this.boardDynamicGraphics.lineStyle(playerMetrics.strokeWidth, LEGACY_PLAY_PLAYER_BEACON_ACCENT, Math.min(0.95, alpha * 0.95));
-    this.boardDynamicGraphics.strokeCircle(centerX, centerY, playerMetrics.haloRadius + playerMetrics.strokeWidth);
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_PLAYER_BEACON_COLOR, Math.min(showLocatorTicks ? 0.88 : 0.78, alpha * (showLocatorTicks ? 0.88 : 0.78)));
-    this.boardDynamicGraphics.fillCircle(centerX, centerY, playerMetrics.haloRadius);
+    // No more shadow disc or halo/beacon rings -- the diamond (which
+    // already color-shifts through the midnight-rainbow cycle) is the whole
+    // marker now, plus its cut-gem catchlight.
     this.boardDynamicGraphics.fillStyle(playerCoreColor, alpha);
     this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(centerX, centerY - playerMetrics.coreRadius);
-    this.boardDynamicGraphics.lineTo(centerX + playerMetrics.coreRadius, centerY);
-    this.boardDynamicGraphics.lineTo(centerX, centerY + playerMetrics.coreRadius);
-    this.boardDynamicGraphics.lineTo(centerX - playerMetrics.coreRadius, centerY);
+    this.boardDynamicGraphics.moveTo(centerX, centerY - coreRadiusY);
+    this.boardDynamicGraphics.lineTo(centerX + coreRadiusX, centerY);
+    this.boardDynamicGraphics.lineTo(centerX, centerY + coreRadiusY);
+    this.boardDynamicGraphics.lineTo(centerX - coreRadiusX, centerY);
     this.boardDynamicGraphics.closePath();
     this.boardDynamicGraphics.fillPath();
     this.boardDynamicGraphics.lineStyle(
@@ -7551,9 +7621,9 @@ export class MenuScene extends Phaser.Scene {
     // into the top-left edge of the player's own diamond core.
     this.boardDynamicGraphics.fillStyle(cyberArcadeMaterial.rail.white, Math.min(0.6, alpha * 0.65));
     this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(centerX, centerY - playerMetrics.coreRadius);
-    this.boardDynamicGraphics.lineTo(centerX - (playerMetrics.coreRadius * 0.32), centerY - (playerMetrics.coreRadius * 0.32));
-    this.boardDynamicGraphics.lineTo(centerX - playerMetrics.coreRadius, centerY);
+    this.boardDynamicGraphics.moveTo(centerX, centerY - coreRadiusY);
+    this.boardDynamicGraphics.lineTo(centerX - (coreRadiusX * 0.32), centerY - (coreRadiusY * 0.32));
+    this.boardDynamicGraphics.lineTo(centerX - coreRadiusX, centerY);
     this.boardDynamicGraphics.closePath();
     this.boardDynamicGraphics.fillPath();
 
@@ -7719,14 +7789,14 @@ export class MenuScene extends Phaser.Scene {
   // built from the exact same tile material as the title and the maze
   // corridor (drawLegacyPathMaterialTile, same core/edge colors), so it
   // reads as made of the same substance as everything else on the board
-  // instead of separately-rendered text. It's static -- no build animation
-  // -- but the rim brightness breathes on a slow, faint sine pulse so it
-  // still feels alive; the core fill stays put so the shape stays crisp.
+  // instead of separately-rendered text. Drawn once in LOCAL coordinates
+  // (the containing Graphics object is positioned at the button's x/y) --
+  // the classic "PRESS START" blink/grow-shrink pulse is applied on top via
+  // applyLegacyMenuBlinkPulse, which just scales/fades the whole object
+  // instead of redrawing the tiles every frame.
   private drawLegacyMenuFrontDoorGlyphButton(
     graphics: Phaser.GameObjects.Graphics,
-    layout: LegacyGlyphWordLayout,
-    time: number,
-    active: boolean
+    layout: LegacyGlyphWordLayout
   ): void {
     graphics.clear();
     const pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'> = {
@@ -7734,8 +7804,6 @@ export class MenuScene extends Phaser.Scene {
       height: layout.rows,
       width: layout.columns
     };
-    const phase = (Math.sin((time / LEGACY_MENU_START_GLOW_PULSE_MS) * Math.PI * 2) + 1) / 2;
-    const rimAlpha = clamp(0.3 + (phase * 0.28) + (active ? 0.16 : 0), 0, 0.92);
     for (const cell of layout.cells) {
       this.drawLegacyPathMaterialTile(
         graphics,
@@ -7745,14 +7813,29 @@ export class MenuScene extends Phaser.Scene {
         layout.top,
         layout.cellSize,
         {
-          coreAlpha: active ? 0.98 : 0.92,
+          coreAlpha: 0.95,
           coreColor: LEGACY_MENU_PATH_CORE,
           drawCue: false,
-          edgeAlpha: rimAlpha,
+          edgeAlpha: 0.85,
           edgeColor: LEGACY_MENU_PATH_EDGE
         }
       );
     }
+  }
+
+  // Shared "classic menu blink" pulse -- alpha fades most of the way out and
+  // back, with a small synced grow/shrink, on a slow sine so it reads as a
+  // deliberate blink rather than a flicker. Used by the Start/Login glyph
+  // buttons and the menu settings gear so the front-door controls share one
+  // consistent pace.
+  private applyLegacyMenuBlinkPulse(
+    target: Phaser.GameObjects.Graphics,
+    time: number,
+    active: boolean
+  ): void {
+    const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+    target.setAlpha(clamp(0.22 + (phase * 0.78) + (active ? 0.08 : 0), 0.14, 1));
+    target.setScale(0.92 + (phase * 0.08) + (active ? 0.02 : 0));
   }
 
   private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number {
@@ -8381,7 +8464,8 @@ export class MenuScene extends Phaser.Scene {
     active = false,
     radiusRatio = 0.2,
     idleColor: number = LEGACY_PLAY_TOUCH_ICON,
-    activeColor: number = LEGACY_PLAY_TOUCH_ACCENT
+    activeColor: number = LEGACY_PLAY_TOUCH_ACCENT,
+    alphaMultiplier = 1
   ): void {
     const outerRadius = Math.max(7, Math.round(Math.min(rect.width, rect.height) * radiusRatio));
     const innerRadius = Math.max(4, Math.round(outerRadius * 0.66));
@@ -8390,7 +8474,7 @@ export class MenuScene extends Phaser.Scene {
     const pointCount = teeth * 2;
     const color = active ? activeColor : idleColor;
 
-    graphics.fillStyle(color, active ? 0.94 : 0.86);
+    graphics.fillStyle(color, (active ? 0.94 : 0.86) * alphaMultiplier);
     graphics.beginPath();
     for (let index = 0; index < pointCount; index += 1) {
       const angle = ((index / pointCount) * Math.PI * 2) - (Math.PI / 2);
@@ -8405,17 +8489,17 @@ export class MenuScene extends Phaser.Scene {
     }
     graphics.closePath();
     graphics.fillPath();
-    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, active ? 1 : 0.9);
+    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, (active ? 1 : 0.9) * alphaMultiplier);
     graphics.strokePath();
 
-    graphics.fillStyle(LEGACY_PLAY_TOUCH_COG_HUB, 0.82);
+    graphics.fillStyle(LEGACY_PLAY_TOUCH_COG_HUB, 0.82 * alphaMultiplier);
     graphics.fillCircle(rect.centerX, rect.centerY, hubRadius);
-    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, active ? 0.9 : 0.76);
+    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, (active ? 0.9 : 0.76) * alphaMultiplier);
     graphics.strokeCircle(rect.centerX, rect.centerY, hubRadius);
     // Same cut-gem catchlight as the player/start/goal markers -- ties the
     // gear into the crystal-facet family instead of reading as a plain
     // generic tech icon.
-    this.drawLegacyMarkerGemCatchlight(graphics, rect.centerX, rect.centerY, outerRadius, active ? 0.9 : 0.7);
+    this.drawLegacyMarkerGemCatchlight(graphics, rect.centerX, rect.centerY, outerRadius, (active ? 0.9 : 0.7) * alphaMultiplier);
   }
 
   private clearHudTexts(): void {
@@ -10936,8 +11020,14 @@ export class MenuScene extends Phaser.Scene {
       const cellSizeFromWidth = Math.floor(Math.max(1, width - (glyphPaddingX * 2)) / Math.max(1, glyphColumns));
       const cellSizeFromHeight = Math.floor(Math.max(1, height - (glyphPaddingY * 2)) / 7);
       const glyphCellSize = Math.max(2, Math.min(10, cellSizeFromWidth, cellSizeFromHeight));
-      glyphLayout = resolveLegacyGlyphWordLayout(text, x, y, glyphCellSize);
-      this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout, 0, false);
+      // Drawn in local coordinates around (0,0) with `panel` itself
+      // positioned at (x, y) -- setScale on the graphics object then scales
+      // around its own (x, y) origin correctly for the blink/grow-shrink
+      // pulse, instead of scaling around the scene's (0,0) corner.
+      panel.setPosition(x, y);
+      glyphLayout = resolveLegacyGlyphWordLayout(text, 0, 0, glyphCellSize);
+      this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout);
+      this.applyLegacyMenuBlinkPulse(panel, 0, false);
     }
 
     const setActive = (active: boolean): void => {
@@ -10969,7 +11059,7 @@ export class MenuScene extends Phaser.Scene {
       text,
       updateFrame: glyphLayout
         ? (time: number) => {
-          this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout as LegacyGlyphWordLayout, time, primaryButtonActive);
+          this.applyLegacyMenuBlinkPulse(panel, time, primaryButtonActive);
         }
         : undefined,
       destroy: () => {
