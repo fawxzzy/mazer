@@ -5451,7 +5451,15 @@ export class MenuScene extends Phaser.Scene {
       materialTileSize,
       options
     );
-    this.drawLegacyPathTileFacet(graphics, tileRect, options.coreAlpha);
+    this.drawLegacyPathTileFacet(
+      graphics,
+      tileRect,
+      options.coreAlpha,
+      pathSource.grid[point.y - 1]?.[point.x] === true,
+      pathSource.grid[point.y]?.[point.x - 1] === true,
+      pathSource.grid[point.y + 1]?.[point.x] === true,
+      pathSource.grid[point.y]?.[point.x + 1] === true
+    );
 
     if (options.drawCue === true) {
       const cueSize = Math.max(1, Math.floor(Math.min(tileRect.width, tileRect.height) * 0.22));
@@ -5470,43 +5478,55 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // The "crystal facet" tile treatment: a cut-corner highlight plus a
-  // cyan rim-light on the top/left edges, same technique as the Start
-  // button's facet glints and the title glyph's gem facets -- applied per
-  // physical tile cell (not the connector-merged corridor frame) so it
-  // reads as a property of the tile material itself.
+  // A cyan rim-light along the corridor's true outer boundary -- only on
+  // edges that do NOT connect to a neighboring path tile. Drawing it per
+  // physical tile unconditionally (the first version of this) put a hard
+  // diagonal cut on every single cell, so a run of connected corridor tiles
+  // read as a checkerboard of separate glass chiclets instead of one
+  // corridor. Skipping connected edges keeps interior seams flat and lets
+  // the rim trace one continuous line around the whole shape instead.
   private drawLegacyPathTileFacet(
     graphics: Phaser.GameObjects.Graphics,
     tileRect: LegacyPixelTileRect,
-    intensity: number
+    intensity: number,
+    hasTop: boolean,
+    hasLeft: boolean,
+    hasBottom: boolean,
+    hasRight: boolean
   ): void {
     const left = tileRect.left;
     const top = tileRect.top;
     const width = tileRect.width;
     const height = tileRect.height;
+    const lineWidth = Math.max(1, Math.round(Math.min(width, height) * 0.09));
 
-    graphics.fillStyle(cyberArcadeMaterial.rail.cyan, Math.min(0.4, intensity * 0.46));
-    graphics.beginPath();
-    graphics.moveTo(left, top);
-    graphics.lineTo(left + (width * 0.58), top);
-    graphics.lineTo(left, top + (height * 0.58));
-    graphics.closePath();
-    graphics.fillPath();
+    graphics.lineStyle(lineWidth, cyberArcadeMaterial.rail.cyan, Math.min(0.85, intensity * 0.9));
+    if (!hasTop) {
+      graphics.beginPath();
+      graphics.moveTo(left, top);
+      graphics.lineTo(left + width, top);
+      graphics.strokePath();
+    }
+    if (!hasLeft) {
+      graphics.beginPath();
+      graphics.moveTo(left, top);
+      graphics.lineTo(left, top + height);
+      graphics.strokePath();
+    }
 
-    graphics.fillStyle(cyberArcadeMaterial.rail.edge, Math.min(0.4, intensity * 0.46));
-    graphics.beginPath();
-    graphics.moveTo(left + width, top + height);
-    graphics.lineTo(left + width - (width * 0.5), top + height);
-    graphics.lineTo(left + width, top + height - (height * 0.5));
-    graphics.closePath();
-    graphics.fillPath();
-
-    graphics.lineStyle(Math.max(1, Math.round(Math.min(width, height) * 0.09)), cyberArcadeMaterial.rail.cyan, Math.min(0.85, intensity * 0.9));
-    graphics.beginPath();
-    graphics.moveTo(left, top + height);
-    graphics.lineTo(left, top);
-    graphics.lineTo(left + width, top);
-    graphics.strokePath();
+    graphics.lineStyle(lineWidth, cyberArcadeMaterial.rail.edge, Math.min(0.4, intensity * 0.4));
+    if (!hasBottom) {
+      graphics.beginPath();
+      graphics.moveTo(left, top + height);
+      graphics.lineTo(left + width, top + height);
+      graphics.strokePath();
+    }
+    if (!hasRight) {
+      graphics.beginPath();
+      graphics.moveTo(left + width, top);
+      graphics.lineTo(left + width, top + height);
+      graphics.strokePath();
+    }
   }
 
   private fillLegacyPathConnectorSeams(
@@ -7838,7 +7858,7 @@ export class MenuScene extends Phaser.Scene {
       1
     );
     label.setStroke(LEGACY_MENU_START_GLOW_COLOR_CSS, 2);
-    label.setShadow(0, 0, LEGACY_MENU_START_GLOW_COLOR_CSS, 4 + (pulseAlpha * 12), false, true);
+    label.setShadow(0, 0, LEGACY_MENU_START_GLOW_COLOR_CSS, 6 + (pulseAlpha * 14), false, true);
   }
 
   private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number {
@@ -8455,6 +8475,12 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.strokePath();
   }
 
+  // A solid filled gear silhouette (fillPath over an alternating
+  // outer/inner-radius polygon) instead of a thin multi-stroke wireframe --
+  // the tiles and markers are solid filled shapes with a rim highlight, and
+  // the old wireframe cog was the one element on screen still built out of
+  // bare line segments, which read as a mismatched, generic "tech icon"
+  // instead of belonging to the same crystal-facet family.
   private drawLegacySettingsCog(
     graphics: Phaser.GameObjects.Graphics,
     rect: Pick<VisualRect, 'centerX' | 'centerY' | 'height' | 'width'>,
@@ -8463,38 +8489,39 @@ export class MenuScene extends Phaser.Scene {
     idleColor: number = LEGACY_PLAY_TOUCH_ICON,
     activeColor: number = LEGACY_PLAY_TOUCH_ACCENT
   ): void {
-    const radius = Math.max(7, Math.round(Math.min(rect.width, rect.height) * radiusRatio));
-    const toothInnerRadius = Math.max(5, Math.round(radius * 0.72));
-    const toothOuterRadius = Math.max(toothInnerRadius + 3, Math.round(radius * 1.26));
-    const hubRadius = Math.max(3, Math.round(radius * 0.38));
-    const lineWidth = Math.max(2, Math.round(radius * 0.22));
+    const outerRadius = Math.max(7, Math.round(Math.min(rect.width, rect.height) * radiusRatio));
+    const innerRadius = Math.max(4, Math.round(outerRadius * 0.66));
+    const hubRadius = Math.max(2, Math.round(outerRadius * 0.32));
+    const teeth = 8;
+    const pointCount = teeth * 2;
     const color = active ? activeColor : idleColor;
 
-    graphics.lineStyle(lineWidth, color, active ? 1 : 0.9);
-    for (let index = 0; index < 8; index += 1) {
-      const angle = (index / 8) * Math.PI * 2;
-      const cosine = Math.cos(angle);
-      const sine = Math.sin(angle);
-      graphics.beginPath();
-      graphics.moveTo(
-        rect.centerX + (cosine * toothInnerRadius),
-        rect.centerY + (sine * toothInnerRadius)
-      );
-      graphics.lineTo(
-        rect.centerX + (cosine * toothOuterRadius),
-        rect.centerY + (sine * toothOuterRadius)
-      );
-      graphics.strokePath();
+    graphics.fillStyle(color, active ? 0.94 : 0.86);
+    graphics.beginPath();
+    for (let index = 0; index < pointCount; index += 1) {
+      const angle = ((index / pointCount) * Math.PI * 2) - (Math.PI / 2);
+      const pointRadius = index % 2 === 0 ? outerRadius : innerRadius;
+      const px = rect.centerX + (Math.cos(angle) * pointRadius);
+      const py = rect.centerY + (Math.sin(angle) * pointRadius);
+      if (index === 0) {
+        graphics.moveTo(px, py);
+      } else {
+        graphics.lineTo(px, py);
+      }
     }
-    graphics.strokeCircle(rect.centerX, rect.centerY, radius);
-    graphics.fillStyle(LEGACY_PLAY_TOUCH_COG_HUB, 0.58);
+    graphics.closePath();
+    graphics.fillPath();
+    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, active ? 1 : 0.9);
+    graphics.strokePath();
+
+    graphics.fillStyle(LEGACY_PLAY_TOUCH_COG_HUB, 0.82);
     graphics.fillCircle(rect.centerX, rect.centerY, hubRadius);
-    graphics.lineStyle(Math.max(1, Math.round(lineWidth * 0.72)), color, active ? 0.9 : 0.76);
+    graphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, active ? 0.9 : 0.76);
     graphics.strokeCircle(rect.centerX, rect.centerY, hubRadius);
     // Same cut-gem catchlight as the player/start/goal markers -- ties the
     // gear into the crystal-facet family instead of reading as a plain
     // generic tech icon.
-    this.drawLegacyMarkerGemCatchlight(graphics, rect.centerX, rect.centerY, radius, active ? 0.9 : 0.7);
+    this.drawLegacyMarkerGemCatchlight(graphics, rect.centerX, rect.centerY, outerRadius, active ? 0.9 : 0.7);
   }
 
   private clearHudTexts(): void {
@@ -11006,6 +11033,12 @@ export class MenuScene extends Phaser.Scene {
     );
     this.uiTexts.push(label);
     if (isPrimaryFrontDoorButton) {
+      // padLegacyCompactUiText's 1px vertical padding is meant for plain
+      // bordered labels -- a blurred glow needs real headroom around the
+      // glyphs or Phaser clips the shadow at the text texture's edge and it
+      // renders as no glow at all. Widened after fitLegacyUiTextToWidth so
+      // the fit calculation isn't thrown off by the larger padding.
+      label.setPadding(18, 18, 18, 18);
       this.applyLegacyMenuFrontDoorTextGlow(label, 0, false);
     }
 
