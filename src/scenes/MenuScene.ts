@@ -6005,12 +6005,22 @@ export class MenuScene extends Phaser.Scene {
     fillColor: number,
     fillAlpha: number,
     edgeColor: number,
-    edgeAlpha: number
+    edgeAlpha: number,
+    facing = -Math.PI / 2
   ): void {
-    const top = { x: centerX, y: centerY - radius };
-    const right = { x: centerX + radius, y: centerY };
-    const bottom = { x: centerX, y: centerY + radius };
-    const left = { x: centerX - radius, y: centerY };
+    // "facing" points the diamond's long axis (its top vertex) toward a
+    // direction of travel or, when frozen, toward the viewport center --
+    // rotate all 4 vertices around the center by that angle instead of the
+    // old fixed axis-aligned diamond.
+    const rotate = (dx: number, dy: number): { x: number; y: number } => {
+      const cos = Math.cos(facing + (Math.PI / 2));
+      const sin = Math.sin(facing + (Math.PI / 2));
+      return { x: centerX + (dx * cos) - (dy * sin), y: centerY + (dx * sin) + (dy * cos) };
+    };
+    const top = rotate(0, -radius);
+    const right = rotate(radius, 0);
+    const bottom = rotate(0, radius);
+    const left = rotate(-radius, 0);
 
     this.titleGraphics.fillStyle(fillColor, fillAlpha);
     this.titleGraphics.fillTriangle(top.x, top.y, right.x, right.y, bottom.x, bottom.y);
@@ -6018,11 +6028,10 @@ export class MenuScene extends Phaser.Scene {
     this.titleGraphics.lineStyle(1, edgeColor, edgeAlpha);
     this.strokeLegacyPolyline(this.titleGraphics, [top, right, bottom, left, top]);
     this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, edgeAlpha * 0.42);
-    this.strokeLegacyPolyline(this.titleGraphics, [
-      { x: centerX - (radius * 0.52), y: centerY },
-      { x: centerX, y: centerY - (radius * 0.52) },
-      { x: centerX + (radius * 0.52), y: centerY }
-    ]);
+    const innerLeft = rotate(-(radius * 0.52), 0);
+    const innerTop = rotate(0, -(radius * 0.52));
+    const innerRight = rotate(radius * 0.52, 0);
+    this.strokeLegacyPolyline(this.titleGraphics, [innerLeft, innerTop, innerRight]);
   }
 
   private drawLegacyMenuPathTitleOrbitSigils(
@@ -6056,6 +6065,7 @@ export class MenuScene extends Phaser.Scene {
     for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
       const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
       const { x, y } = resolveLegacyMenuPathTitleOrbitPoint(orbitGeometry, orbit);
+      const facing = this.resolveLegacyMenuPathTitleOrbitFacing(orbit, x, y, orbitGeometry, isLifecycleSpinActive);
 
       const wave = isLifecycleSpinActive
         ? 0.62 + (Math.sin((orbitPhase * Math.PI * 2) + (index * 1.38)) * 0.28)
@@ -6077,7 +6087,8 @@ export class MenuScene extends Phaser.Scene {
         fillColor,
         alpha * 0.6,
         LEGACY_MENU_PATH_TITLE_ACCENT,
-        alpha
+        alpha,
+        facing
       );
       this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, alpha * 0.32);
       this.strokeLegacyPolyline(this.titleGraphics, [
@@ -6088,6 +6099,40 @@ export class MenuScene extends Phaser.Scene {
         }
       ]);
     }
+  }
+
+  // Points each sigil in its direction of travel along the perimeter, but
+  // banks it inward toward the viewport center while it's rounding a
+  // corner (the perimeter is a sharp rectangle, not a rounded track, so
+  // this is what makes the turn read as a curve instead of a snap) --
+  // and while frozen (idle), every sigil just points straight at center.
+  private resolveLegacyMenuPathTitleOrbitFacing(
+    orbit: number,
+    x: number,
+    y: number,
+    geometry: LegacyMenuPathTitleOrbitGeometry,
+    isLifecycleSpinActive: boolean
+  ): number {
+    const centerFacing = Math.atan2(geometry.centerY - y, geometry.centerX - x);
+    if (!isLifecycleSpinActive) {
+      return centerFacing;
+    }
+
+    const perimeter = (((orbit % 1) + 1) % 1) * 4;
+    const segment = Math.floor(perimeter) % 4;
+    const segmentTangents = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+    const tangent = segmentTangents[segment] ?? 0;
+    const withinSegment = perimeter - Math.floor(perimeter);
+    const distanceToCorner = Math.min(withinSegment, 1 - withinSegment);
+    const cornerWindow = 0.15;
+    const cornerProximity = clamp(1 - (distanceToCorner / cornerWindow), 0, 1);
+    const lerpAngleShortest = (from: number, to: number, t: number): number => {
+      const twoPi = Math.PI * 2;
+      const diff = (((to - from) % twoPi) + (twoPi * 1.5)) % twoPi - Math.PI;
+      return from + (diff * t);
+    };
+
+    return lerpAngleShortest(tangent, centerFacing, cornerProximity * 0.55);
   }
 
   private drawLegacyMenuPathTitle(time: number): void {
