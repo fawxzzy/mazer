@@ -8,8 +8,6 @@ import {
 
 describe('legacy overlay toggle fields', () => {
   test('reports toggle labels from the actual setting value', () => {
-    expect(resolveLegacyOverlayToggleStateText('toggleCameraFollow', false)).toBe('Off');
-    expect(resolveLegacyOverlayToggleStateText('toggleCameraFollow', true)).toBe('On');
     expect(resolveLegacyOverlayToggleStateText('toggleTrailFade', false)).toBe('Off');
     expect(resolveLegacyOverlayToggleStateText('toggleTrailFade', true)).toBe('On');
     expect(resolveLegacyOverlayToggleStateText('toggleTrailPulse', false)).toBe('Off');
@@ -18,10 +16,6 @@ describe('legacy overlay toggle fields', () => {
     expect(resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', true)).toBe('Animated');
     expect(resolveLegacyOverlayToggleStateText('controlMode', false)).toBe('Arrows');
     expect(resolveLegacyOverlayToggleStateText('controlMode', true)).toBe('Stick');
-    expect(resolveLegacyOverlayToggleStateText('darkMode', false)).toBe('Off');
-    expect(resolveLegacyOverlayToggleStateText('darkMode', true)).toBe('On');
-    expect(resolveLegacyOverlayToggleStateText('smartSteering', false)).toBe('Off');
-    expect(resolveLegacyOverlayToggleStateText('smartSteering', true)).toBe('On');
   });
 
   test('toggles feature fields through their exact board refresh lanes', () => {
@@ -29,20 +23,10 @@ describe('legacy overlay toggle fields', () => {
 
     expect(settings.controlMode).toBe('stick');
 
-    const cameraFollow = applyLegacyOverlayToggleField(settings, 'toggleCameraFollow');
     const trailFade = applyLegacyOverlayToggleField(settings, 'toggleTrailFade');
     const trailPulse = applyLegacyOverlayToggleField(settings, 'toggleTrailPulse');
     const animatedBackdrop = applyLegacyOverlayToggleField(settings, 'toggleAnimatedBackdrop');
     const controlMode = applyLegacyOverlayToggleField(settings, 'controlMode');
-    const smartSteering = applyLegacyOverlayToggleField(settings, 'smartSteering');
-
-    expect(cameraFollow.settings.toggleCameraFollow).toBe(true);
-    expect(cameraFollow.switchIsOn).toBe(true);
-    expect(cameraFollow.stateText).toBe('On');
-    expect(cameraFollow.affectsBackdrop).toBe(false);
-    expect(cameraFollow.affectsBoardStatic).toBe(true);
-    expect(cameraFollow.affectsBoardDynamic).toBe(true);
-    expect(cameraFollow.legacyDirectionalLightIntensity).toBeNull();
 
     expect(trailFade.settings.toggleTrailFade).toBe(true);
     expect(trailFade.switchIsOn).toBe(true);
@@ -50,7 +34,6 @@ describe('legacy overlay toggle fields', () => {
     expect(trailFade.affectsBackdrop).toBe(false);
     expect(trailFade.affectsBoardStatic).toBe(false);
     expect(trailFade.affectsBoardDynamic).toBe(true);
-    expect(trailFade.legacyDirectionalLightIntensity).toBeNull();
 
     expect(trailPulse.settings.toggleTrailPulse).toBe(false);
     expect(trailPulse.switchIsOn).toBe(false);
@@ -58,7 +41,6 @@ describe('legacy overlay toggle fields', () => {
     expect(trailPulse.affectsBackdrop).toBe(false);
     expect(trailPulse.affectsBoardStatic).toBe(false);
     expect(trailPulse.affectsBoardDynamic).toBe(true);
-    expect(trailPulse.legacyDirectionalLightIntensity).toBeNull();
 
     expect(animatedBackdrop.settings.toggleAnimatedBackdrop).toBe(false);
     expect(animatedBackdrop.switchIsOn).toBe(false);
@@ -66,7 +48,6 @@ describe('legacy overlay toggle fields', () => {
     expect(animatedBackdrop.affectsBackdrop).toBe(true);
     expect(animatedBackdrop.affectsBoardStatic).toBe(false);
     expect(animatedBackdrop.affectsBoardDynamic).toBe(false);
-    expect(animatedBackdrop.legacyDirectionalLightIntensity).toBeNull();
 
     expect(controlMode.settings.controlMode).toBe('arrows');
     expect(controlMode.switchIsOn).toBe(false);
@@ -74,53 +55,20 @@ describe('legacy overlay toggle fields', () => {
     expect(controlMode.affectsBackdrop).toBe(false);
     expect(controlMode.affectsBoardStatic).toBe(false);
     expect(controlMode.affectsBoardDynamic).toBe(true);
-    expect(controlMode.legacyDirectionalLightIntensity).toBeNull();
-
-    expect(smartSteering.settings.smartSteering).toBe(false);
-    expect(smartSteering.switchIsOn).toBe(false);
-    expect(smartSteering.stateText).toBe('Off');
-    expect(smartSteering.affectsBackdrop).toBe(false);
-    expect(smartSteering.affectsBoardStatic).toBe(false);
-    expect(smartSteering.affectsBoardDynamic).toBe(false);
-  });
-
-  test('toggles dark mode through the legacy light-intensity role with exact state text', () => {
-    const settings = copyLegacySettings(LEGACY_DEFAULTS);
-    const darkModeOff = applyLegacyOverlayToggleField(settings, 'darkMode');
-    const darkModeOn = applyLegacyOverlayToggleField(darkModeOff.settings, 'darkMode');
-
-    expect(darkModeOn.settings.darkMode).toBe(true);
-    expect(darkModeOn.switchIsOn).toBe(true);
-    expect(darkModeOn.stateText).toBe('On');
-    expect(darkModeOn.affectsBackdrop).toBe(true);
-    expect(darkModeOn.affectsBoardStatic).toBe(true);
-    expect(darkModeOn.affectsBoardDynamic).toBe(true);
-    expect(darkModeOn.legacyDirectionalLightIntensity).toBe(0.3);
-
-    expect(darkModeOff.settings.darkMode).toBe(false);
-    expect(darkModeOff.switchIsOn).toBe(false);
-    expect(darkModeOff.stateText).toBe('Off');
-    expect(darkModeOff.legacyDirectionalLightIntensity).toBe(2.0);
   });
 
   test('uses the same canonical boolean for every switch position both ways', () => {
     const fields = [
-      'toggleCameraFollow',
       'toggleTrailFade',
       'toggleTrailPulse',
       'toggleAnimatedBackdrop',
-      'darkMode',
-      'smartSteering',
       'controlMode'
     ] as const;
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
 
-    expect(resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', settings)).toBe(false);
     expect(resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', settings)).toBe(false);
     expect(resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', settings)).toBe(true);
     expect(resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', settings)).toBe(true);
-    expect(resolveLegacyOverlayToggleSwitchIsOn('darkMode', settings)).toBe(true);
-    expect(resolveLegacyOverlayToggleSwitchIsOn('smartSteering', settings)).toBe(true);
     expect(resolveLegacyOverlayToggleSwitchIsOn('controlMode', settings)).toBe(true);
 
     fields.forEach((fieldId) => {

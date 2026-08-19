@@ -13,11 +13,9 @@ export interface LegacySettings {
   pathColor: LegacyLinearColor;
   wallColor: LegacyLinearColor;
   darkMode: boolean;
-  toggleCameraFollow: boolean;
   toggleTrailFade: boolean;
   toggleTrailPulse: boolean;
   toggleAnimatedBackdrop: boolean;
-  smartSteering: boolean;
   controlMode: LegacyControlMode;
 }
 
@@ -36,11 +34,9 @@ export const LEGACY_DEFAULTS: LegacySettings = {
     b: 0.067708
   },
   darkMode: true,
-  toggleCameraFollow: false,
   toggleTrailFade: false,
   toggleTrailPulse: true,
   toggleAnimatedBackdrop: true,
-  smartSteering: true,
   controlMode: 'stick'
 };
 
@@ -93,10 +89,8 @@ export const copyLegacySettings = (settings: LegacySettings): LegacySettings => 
   pathColor: { ...settings.pathColor },
   wallColor: { ...settings.wallColor },
   darkMode: settings.darkMode,
-  toggleCameraFollow: settings.toggleCameraFollow,
   toggleTrailFade: settings.toggleTrailFade,
   toggleTrailPulse: settings.toggleTrailPulse ?? true,
   toggleAnimatedBackdrop: settings.toggleAnimatedBackdrop ?? LEGACY_DEFAULTS.toggleAnimatedBackdrop,
-  smartSteering: settings.smartSteering ?? LEGACY_DEFAULTS.smartSteering,
   controlMode: settings.controlMode
 });

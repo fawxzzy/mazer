@@ -508,7 +508,7 @@ export const createMazeCycleTelemetryReceipt = (
     aiDecisionSummary,
     mazeComplexity,
     mazeSeed: input.maze.seed,
-    mazeSize: input.maze.size,
+    mazeSize: Math.max(input.maze.width, input.maze.height),
     routeQuality: input.maze.routeQualityStats?.routeQuality ?? null,
     start: copyPoint(input.maze.start),
     goal: copyPoint(input.maze.goal),

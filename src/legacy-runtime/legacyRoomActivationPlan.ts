@@ -19,7 +19,7 @@ export const LEGACY_ROOM_ACTIVATION_PLAN_CONTRACT_VERSION = 'legacy-room-activat
 
 type LegacyRoomActivationPlanMaze = Pick<
   LegacyMazeSnapshot,
-  'goal' | 'grid' | 'size' | 'solutionPath' | 'start'
+  'goal' | 'grid' | 'width' | 'height' | 'solutionPath' | 'start'
 >;
 
 export interface LegacyRoomActivationTopologyView {
@@ -221,7 +221,8 @@ const readMaze = (value: unknown): LegacyRoomActivationPlanMaze | null => {
   if (!isObjectRecord(value)) {
     return null;
   }
-  const size = readOwnDataProperty(value, 'size');
+  const width = readOwnDataProperty(value, 'width');
+  const height = readOwnDataProperty(value, 'height');
   const gridValue = readOwnDataProperty(value, 'grid');
   const solutionPathValue = readOwnDataProperty(value, 'solutionPath');
   const start = readPoint(readOwnDataProperty(value, 'start'));
@@ -229,11 +230,14 @@ const readMaze = (value: unknown): LegacyRoomActivationPlanMaze | null => {
   const gridRows = readOwnArray(gridValue);
   const solutionPathValues = readOwnArray(solutionPathValue);
   if (
-    typeof size !== 'number'
-    || !Number.isInteger(size)
-    || size <= 0
+    typeof width !== 'number'
+    || !Number.isInteger(width)
+    || width <= 0
+    || typeof height !== 'number'
+    || !Number.isInteger(height)
+    || height <= 0
     || gridRows === null
-    || gridRows.length !== size
+    || gridRows.length !== height
     || solutionPathValues === null
     || solutionPathValues.length === 0
     || start === null
@@ -244,7 +248,7 @@ const readMaze = (value: unknown): LegacyRoomActivationPlanMaze | null => {
   const grid: boolean[][] = [];
   for (const rowValue of gridRows) {
     const row = readOwnArray(rowValue);
-    if (row === null || row.length !== size || !row.every((cell) => typeof cell === 'boolean')) {
+    if (row === null || row.length !== width || !row.every((cell) => typeof cell === 'boolean')) {
       return null;
     }
     grid.push(row as boolean[]);
@@ -273,7 +277,7 @@ const readMaze = (value: unknown): LegacyRoomActivationPlanMaze | null => {
   ) {
     return null;
   }
-  return { goal, grid, size, solutionPath, start };
+  return { goal, grid, width, height, solutionPath, start };
 };
 
 const readCandidate = (value: unknown): LegacyRoomCandidateMetadata['candidate'] | null => {
@@ -436,10 +440,12 @@ const readMetadata = (value: unknown): LegacyRoomCandidateMetadata | null => {
 };
 
 const hasValidMazeShape = (maze: LegacyRoomActivationPlanMaze): boolean => (
-  Number.isInteger(maze.size)
-  && maze.size > 0
-  && maze.grid.length === maze.size
-  && maze.grid.every((row) => row.length === maze.size)
+  Number.isInteger(maze.width)
+  && maze.width > 0
+  && Number.isInteger(maze.height)
+  && maze.height > 0
+  && maze.grid.length === maze.height
+  && maze.grid.every((row) => row.length === maze.width)
   && isFloorPoint(maze.grid, maze.start)
   && isFloorPoint(maze.grid, maze.goal)
 );

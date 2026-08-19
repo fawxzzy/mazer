@@ -43,13 +43,16 @@ export const resolveLegacyHeaderControlMetricFontSize = (level: number, size: nu
 /**
  * Header actions intentionally share one square geometry. This prevents the
  * settings cog from drifting into a separate button language as progression
- * values change, while keeping each touch target at least 44 logical pixels.
+ * values change. Deliberately sized below the usual 44px touch-target floor
+ * (36-40px) per explicit design feedback that the header badges read as too
+ * large -- the settings cog is the one interactive control in this pair, so
+ * this trades a slightly smaller tap target for the requested visual scale.
  */
 export const resolveLegacyHeaderControlFrame = (
   input: ResolveLegacyHeaderControlFrameInput
 ): LegacyHeaderControlFrame => {
   const minDimension = Math.max(1, Math.min(input.width, input.height));
-  const size = clamp(Math.round(minDimension * 0.1), 44, 48);
+  const size = clamp(Math.round(minDimension * 0.085), 36, 40);
   const inset = Math.max(8, Math.round(size * 0.2));
   const slot = Math.max(0, Math.round(input.slot ?? 0));
   const gap = Math.max(8, Math.round(size * 0.18));

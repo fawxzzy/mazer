@@ -1,6 +1,6 @@
 import { clampInteger } from './legacyDefaults';
 import type { LegacyMazeGenerationProfile, LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
-import { resolveLegacyMenuLayout } from './legacyMenuLayout';
+import { resolveLegacyMenuBoardAspectRatio, resolveLegacyMenuLayout } from './legacyMenuLayout';
 import { LEGACY_TRAIL_SHINE_COLOR, LEGACY_TRAIL_SHINE_EDGE_COLOR } from './legacyIridescentMaterial';
 import {
   type MazeCycleTelemetryReceipt,
@@ -321,20 +321,27 @@ const resolveLegacyProgressionWrappedContinuityMetrics = (
 } => {
   const wrappedPairs = new Set<string>();
   let choicePressure = 0;
-  const maxIndex = maze.size - 1;
+  const maxX = maze.width - 1;
+  const maxY = maze.height - 1;
 
-  for (let index = 0; index < maze.size; index += 1) {
-    if (isLegacyProgressionWalkable(maze, 0, index) && isLegacyProgressionWalkable(maze, maxIndex, index)) {
-      wrappedPairs.add(`h:${index}`);
-      const leftChoices = Math.max(0, collectLegacyProgressionWalkableNeighbors(maze, 0, index).length - 1);
-      const rightChoices = Math.max(0, collectLegacyProgressionWalkableNeighbors(maze, maxIndex, index).length - 1);
+  // Horizontal pairs (left/right border wrap) are indexed by row, so they
+  // range over height; vertical pairs (top/bottom) are indexed by column,
+  // so they range over width -- these were conflated into one shared loop
+  // bound before, which only happened to be harmless while width === height.
+  for (let row = 0; row < maze.height; row += 1) {
+    if (isLegacyProgressionWalkable(maze, 0, row) && isLegacyProgressionWalkable(maze, maxX, row)) {
+      wrappedPairs.add(`h:${row}`);
+      const leftChoices = Math.max(0, collectLegacyProgressionWalkableNeighbors(maze, 0, row).length - 1);
+      const rightChoices = Math.max(0, collectLegacyProgressionWalkableNeighbors(maze, maxX, row).length - 1);
       choicePressure += Math.min(4, leftChoices + rightChoices);
     }
+  }
 
-    if (isLegacyProgressionWalkable(maze, index, 0) && isLegacyProgressionWalkable(maze, index, maxIndex)) {
-      wrappedPairs.add(`v:${index}`);
-      const topChoices = Math.max(0, collectLegacyProgressionWalkableNeighbors(maze, index, 0).length - 1);
-      const bottomChoices = Math.max(0, collectLegacyProgressionWalkableNeighbors(maze, index, maxIndex).length - 1);
+  for (let column = 0; column < maze.width; column += 1) {
+    if (isLegacyProgressionWalkable(maze, column, 0) && isLegacyProgressionWalkable(maze, column, maxY)) {
+      wrappedPairs.add(`v:${column}`);
+      const topChoices = Math.max(0, collectLegacyProgressionWalkableNeighbors(maze, column, 0).length - 1);
+      const bottomChoices = Math.max(0, collectLegacyProgressionWalkableNeighbors(maze, column, maxY).length - 1);
       choicePressure += Math.min(4, topChoices + bottomChoices);
     }
   }
@@ -350,23 +357,24 @@ const collectLegacyProgressionWalkableNeighbors = (
   x: number,
   y: number
 ): LegacyPoint[] => {
-  const maxIndex = maze.size - 1;
+  const maxX = maze.width - 1;
+  const maxY = maze.height - 1;
   return [
-    { x: x - 1 < 0 ? maxIndex : x - 1, y },
-    { x: x + 1 > maxIndex ? 0 : x + 1, y },
-    { x, y: y - 1 < 0 ? maxIndex : y - 1 },
-    { x, y: y + 1 > maxIndex ? 0 : y + 1 }
+    { x: x - 1 < 0 ? maxX : x - 1, y },
+    { x: x + 1 > maxX ? 0 : x + 1, y },
+    { x, y: y - 1 < 0 ? maxY : y - 1 },
+    { x, y: y + 1 > maxY ? 0 : y + 1 }
   ].filter((point) => isLegacyProgressionWalkable(maze, point.x, point.y));
 };
 
 const distanceToLegacyGoal = (maze: LegacyMazeSnapshot, point: LegacyPoint): number => {
   const dx = Math.min(
     Math.abs(point.x - maze.goal.x),
-    maze.size - Math.abs(point.x - maze.goal.x)
+    maze.width - Math.abs(point.x - maze.goal.x)
   );
   const dy = Math.min(
     Math.abs(point.y - maze.goal.y),
-    maze.size - Math.abs(point.y - maze.goal.y)
+    maze.height - Math.abs(point.y - maze.goal.y)
   );
   return Math.sqrt((dx ** 2) + (dy ** 2));
 };
@@ -383,10 +391,12 @@ const resolveLegacyProgressionTopologyMetrics = (maze: LegacyMazeSnapshot): {
   let splitCount = 0;
   let weightedDeadEndPressure = 0;
   let weightedSplitPressure = 0;
-  const maxGoalDistance = Math.max(1, Math.sqrt(2) * maze.size);
+  // Reduces to the exact old value when width === height.
+  const linearSize = (maze.width + maze.height) / 2;
+  const maxGoalDistance = Math.max(1, Math.sqrt(2) * linearSize);
 
-  for (let y = 0; y < maze.size; y += 1) {
-    for (let x = 0; x < maze.size; x += 1) {
+  for (let y = 0; y < maze.height; y += 1) {
+    for (let x = 0; x < maze.width; x += 1) {
       const neighbors = collectLegacyProgressionWalkableNeighbors(maze, x, y);
       const neighborCount = neighbors.length;
 
@@ -401,7 +411,7 @@ const resolveLegacyProgressionTopologyMetrics = (maze: LegacyMazeSnapshot): {
           splitCount += 1;
           const currentDistance = distanceToLegacyGoal(maze, { x, y });
           const plausibleChoiceCount = neighbors.filter((neighbor) => (
-            distanceToLegacyGoal(maze, neighbor) <= currentDistance + Math.max(2, maze.size * 0.08)
+            distanceToLegacyGoal(maze, neighbor) <= currentDistance + Math.max(2, linearSize * 0.08)
           )).length;
           weightedSplitPressure += 0.5 + ((neighborCount - 2) * 0.28) + (plausibleChoiceCount * 0.22);
         }
@@ -409,7 +419,7 @@ const resolveLegacyProgressionTopologyMetrics = (maze: LegacyMazeSnapshot): {
         continue;
       }
 
-      const isInterior = x > 0 && y > 0 && x < maze.size - 1 && y < maze.size - 1;
+      const isInterior = x > 0 && y > 0 && x < maze.width - 1 && y < maze.height - 1;
       if (isInterior && neighborCount >= 3) {
         isolatedGapCount += 1;
       }
@@ -850,11 +860,13 @@ export const writeLegacyProgressionState = (
 
 export const resolveLegacyMazeComplexity = (maze: LegacyMazeSnapshot): LegacyMazeComplexityBreakdown => {
   const walkableTiles = countWalkableTiles(maze);
-  const floorRatio = walkableTiles / Math.max(1, maze.size * maze.size);
+  const floorRatio = walkableTiles / Math.max(1, maze.width * maze.height);
   const topology = resolveLegacyProgressionTopologyMetrics(maze);
   const edgeWrapMetrics = resolveLegacyProgressionWrappedContinuityMetrics(maze);
   const edgeWrapCount = edgeWrapMetrics.count;
-  const sizeScore = maze.size * 0.52;
+  // Reduces to the exact old value when width === height.
+  const linearSize = (maze.width + maze.height) / 2;
+  const sizeScore = linearSize * 0.52;
   const solutionScore = maze.solutionPath.length * 0.24;
   const floorScore = floorRatio * 16;
   const routeScore = maze.routeQualityStats
@@ -870,7 +882,7 @@ export const resolveLegacyMazeComplexity = (maze: LegacyMazeSnapshot): LegacyMaz
   const edgeWrapScore = Math.min(16, edgeWrapCount * 2.4);
   const edgeWrapChoiceScore = Math.min(10, edgeWrapMetrics.choicePressure * 0.65);
   const edgeWrapShortcutReliefScore = edgeWrapCount > 0
-    ? Math.min(12, Math.max(0, ((maze.size * 0.72) - maze.solutionPath.length) * edgeWrapCount * 0.22))
+    ? Math.min(12, Math.max(0, ((linearSize * 0.72) - maze.solutionPath.length) * edgeWrapCount * 0.22))
     : 0;
   const edgeWrapReliefScore = edgeWrapShortcutReliefScore;
   const splitScore = Math.min(20, topology.splitCount * 0.78);
@@ -1165,7 +1177,11 @@ export const recordLegacyProgressionCycle = (
   const trackId = resolveLegacyProgressionTrackIdForSurface(receipt.surface);
   const complexity = resolveLegacyMazeComplexity(maze ?? {
     source: receipt.surface === 'play' ? 'play-generated' : 'menu-generated',
-    size: receipt.mazeSize,
+    // Telemetry only carries one representative size figure (see
+    // mazeCycleTelemetry.ts); square is the best available approximation
+    // when reconstructing a maze-shaped object for this fallback path.
+    width: receipt.mazeSize,
+    height: receipt.mazeSize,
     grid: [],
     start: receipt.start,
     goal: receipt.goal,
@@ -1256,22 +1272,35 @@ export const resolveLegacyProgressionViewportScaleCap = (
       ? LEGACY_PROGRESSION_PHONE_MENU_TARGET_TILE_PX
       : LEGACY_PROGRESSION_MENU_MIN_TILE_PX;
 
+  // Probe with the same width:height aspect ratio the real generation call
+  // will request for this viewport (see resolveLegacyMenuBoardAspectRatio),
+  // instead of a square candidate grid -- so the cap search reflects the
+  // actual rectangular board that gets built, not a square stand-in for it.
+  const aspectRatio = resolveLegacyMenuBoardAspectRatio(viewport.width, viewport.height, boardScale, layoutSurface);
+  const ratioRoot = Math.sqrt(aspectRatio);
+
   for (let candidateScale = 96; candidateScale >= 25; candidateScale -= 1) {
+    const candidateWidth = Math.max(1, Math.round(candidateScale * ratioRoot));
+    const candidateHeight = Math.max(1, Math.round(candidateScale / ratioRoot));
     const layout = resolveLegacyMenuLayout(
       viewport.width,
       viewport.height,
       boardScale,
-      candidateScale,
+      candidateWidth,
+      candidateHeight,
       layoutSurface
     );
+    const boardSizeForInset = Math.min(layout.boardWidth, layout.boardHeight);
     const safeInset = clampInteger(
-      Math.round(layout.boardSize * LEGACY_PROGRESSION_RENDER_SAFE_INSET_RATIO),
+      Math.round(boardSizeForInset * LEGACY_PROGRESSION_RENDER_SAFE_INSET_RATIO),
       LEGACY_PROGRESSION_RENDER_SAFE_INSET_MIN,
       LEGACY_PROGRESSION_RENDER_SAFE_INSET_MAX
     );
-    const renderSize = Math.max(1, layout.boardSize - (safeInset * 2));
+    const renderWidth = Math.max(1, layout.boardWidth - (safeInset * 2));
+    const renderHeight = Math.max(1, layout.boardHeight - (safeInset * 2));
+    const tileSize = Math.min(renderWidth / candidateWidth, renderHeight / candidateHeight);
 
-    if ((renderSize / candidateScale) >= minimumTileSize) {
+    if (tileSize >= minimumTileSize) {
       return isPhoneMenu ? Math.min(candidateScale, boardScale) : candidateScale;
     }
   }

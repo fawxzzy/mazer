@@ -115,11 +115,6 @@ export interface MenuSceneRuntimeDiagnostics {
       switchIsOn: boolean;
       stateText: string;
     };
-    cameraFollow: {
-      enabled: boolean;
-      switchIsOn: boolean;
-      stateText: string;
-    };
     controlMode: {
       mode: 'arrows' | 'stick';
       switchIsOn: boolean;
@@ -127,17 +122,10 @@ export interface MenuSceneRuntimeDiagnostics {
     };
     darkMode: {
       enabled: boolean;
-      switchIsOn: boolean;
-      stateText: string;
     };
     movementSpeed: {
       label: string;
       value: number;
-    };
-    smartSteering: {
-      enabled: boolean;
-      switchIsOn: boolean;
-      stateText: string;
     };
     trailFade: {
       enabled: boolean;
@@ -449,7 +437,8 @@ export interface MenuSceneRuntimeDiagnostics {
     };
     playtest: {
       encoding: 'walkable-rows-v1';
-      mazeSize: number;
+      mazeWidth: number;
+      mazeHeight: number;
       walkableRows: string[];
     };
     markerStyle: {

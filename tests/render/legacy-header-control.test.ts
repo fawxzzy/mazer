@@ -15,8 +15,8 @@ describe('legacy header controls', () => {
     const level = resolveLegacyHeaderControlFrame({ ...shared, placement: 'leading' });
     const settings = resolveLegacyHeaderControlFrame({ ...shared, placement: 'trailing' });
 
-    expect(level.width).toBe(44);
-    expect(level.height).toBe(44);
+    expect(level.width).toBe(36);
+    expect(level.height).toBe(36);
     expect(settings.width).toBe(level.width);
     expect(settings.height).toBe(level.height);
     expect(settings.top).toBe(level.top);
@@ -57,8 +57,8 @@ describe('legacy header controls', () => {
       width: 1440
     });
 
-    expect(phone.width).toBe(44);
-    expect(desktop.width).toBe(48);
+    expect(phone.width).toBe(36);
+    expect(desktop.width).toBe(40);
     expect(desktop.left).toBeGreaterThanOrEqual(8);
     expect(desktop.top).toBeGreaterThanOrEqual(6);
   });

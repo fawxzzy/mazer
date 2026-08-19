@@ -38,9 +38,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.3,
-      smartSteering: true,
       toggleAnimatedBackdrop: true,
-      toggleCameraFollow: false,
       toggleTrailFade: false,
       toggleTrailPulse: true
     });
@@ -53,9 +51,7 @@ describe('legacy game toggle preferences', () => {
     settings.controlMode = 'stick';
     settings.darkMode = true;
     settings.movementSpeed = 0.82;
-    settings.smartSteering = false;
     settings.toggleAnimatedBackdrop = false;
-    settings.toggleCameraFollow = true;
     settings.toggleTrailFade = true;
     settings.toggleTrailPulse = false;
 
@@ -66,9 +62,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.82,
-      smartSteering: false,
       toggleAnimatedBackdrop: false,
-      toggleCameraFollow: true,
       toggleTrailFade: true,
       toggleTrailPulse: false
     });
@@ -82,9 +76,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.33,
-      smartSteering: false,
       toggleAnimatedBackdrop: false,
-      toggleCameraFollow: true,
       toggleTrailFade: true,
       toggleTrailPulse: false
     }));
@@ -96,9 +88,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.33,
-      smartSteering: false,
       toggleAnimatedBackdrop: false,
-      toggleCameraFollow: true,
       toggleTrailFade: true,
       toggleTrailPulse: false
     });
@@ -122,9 +112,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'teleport',
       darkMode: 'yes',
       movementSpeed: '1.4',
-      smartSteering: 'off',
       toggleAnimatedBackdrop: 'no',
-      toggleCameraFollow: 1,
       toggleTrailFade: null,
       toggleTrailPulse: 'off'
     }));
@@ -134,9 +122,7 @@ describe('legacy game toggle preferences', () => {
     expect(settings.controlMode).toBe('stick');
     expect(settings.darkMode).toBe(true);
     expect(settings.movementSpeed).toBe(1);
-    expect(settings.smartSteering).toBe(false);
     expect(settings.toggleAnimatedBackdrop).toBe(false);
-    expect(settings.toggleCameraFollow).toBe(false);
     expect(settings.toggleTrailFade).toBe(false);
     expect(settings.toggleTrailPulse).toBe(false);
 
@@ -147,7 +133,7 @@ describe('legacy game toggle preferences', () => {
   test('continues when storage writes are blocked', () => {
     const settings = mergeLegacyGameTogglePreferences(LEGACY_DEFAULTS, {
       controlMode: 'stick',
-      toggleCameraFollow: true
+      toggleTrailFade: true
     });
 
     const written = writeLegacyGameToggleSettings({
@@ -157,7 +143,7 @@ describe('legacy game toggle preferences', () => {
     }, settings);
 
     expect(written.controlMode).toBe('stick');
-    expect(written.toggleCameraFollow).toBe(true);
+    expect(written.toggleTrailFade).toBe(true);
   });
 
   test('keeps game-toggle preferences isolated by guest and signed-in account scope', () => {
@@ -175,20 +161,20 @@ describe('legacy game toggle preferences', () => {
 
     writeLegacyGameToggleSettings(guestStorage, mergeLegacyGameTogglePreferences(LEGACY_DEFAULTS, {
       controlMode: 'arrows',
-      toggleCameraFollow: false
+      toggleTrailFade: false
     }));
     writeLegacyGameToggleSettings(userStorage, mergeLegacyGameTogglePreferences(LEGACY_DEFAULTS, {
       controlMode: 'stick',
-      toggleCameraFollow: true
+      toggleTrailFade: true
     }));
 
     expect(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY)).toBeNull();
     expect(storage.getItem(resolveLegacyAuthScopedStorageKey(LEGACY_GAME_TOGGLE_STORAGE_KEY, { userId: null }))).not.toBeNull();
     expect(storage.getItem(resolveLegacyAuthScopedStorageKey(LEGACY_GAME_TOGGLE_STORAGE_KEY, { userId: 'user-123' }))).not.toBeNull();
     expect(readLegacyGameToggleSettings(guestStorage, LEGACY_DEFAULTS).controlMode).toBe('arrows');
-    expect(readLegacyGameToggleSettings(guestStorage, LEGACY_DEFAULTS).toggleCameraFollow).toBe(false);
+    expect(readLegacyGameToggleSettings(guestStorage, LEGACY_DEFAULTS).toggleTrailFade).toBe(false);
     expect(readLegacyGameToggleSettings(userStorage, LEGACY_DEFAULTS).controlMode).toBe('stick');
-    expect(readLegacyGameToggleSettings(userStorage, LEGACY_DEFAULTS).toggleCameraFollow).toBe(true);
+    expect(readLegacyGameToggleSettings(userStorage, LEGACY_DEFAULTS).toggleTrailFade).toBe(true);
   });
 
   test('migrates valid old unscoped game toggles into guest scope once', () => {
@@ -207,9 +193,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'arrows',
       darkMode: false,
       movementSpeed: 0.72,
-      smartSteering: false,
       toggleAnimatedBackdrop: false,
-      toggleCameraFollow: true,
       toggleTrailFade: true,
       toggleTrailPulse: false
     }));
@@ -221,9 +205,7 @@ describe('legacy game toggle preferences', () => {
       controlMode: 'arrows',
       darkMode: false,
       movementSpeed: 0.72,
-      smartSteering: false,
       toggleAnimatedBackdrop: false,
-      toggleCameraFollow: true,
       toggleTrailFade: true,
       toggleTrailPulse: false
     });
@@ -245,18 +227,18 @@ describe('legacy game toggle preferences', () => {
     );
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
       controlMode: 'arrows',
-      toggleCameraFollow: true
+      toggleTrailFade: true
     }));
     writeLegacyGameToggleSettings(guestStorage, mergeLegacyGameTogglePreferences(LEGACY_DEFAULTS, {
       controlMode: 'stick',
-      toggleCameraFollow: false
+      toggleTrailFade: false
     }));
 
     expect(migrateLegacyGameToggleSettingsToGuestScope(storage, guestStorage, LEGACY_DEFAULTS)).toBe(false);
 
     const retained = readLegacyGameToggleSettings(guestStorage, LEGACY_DEFAULTS);
     expect(retained.controlMode).toBe('stick');
-    expect(retained.toggleCameraFollow).toBe(false);
+    expect(retained.toggleTrailFade).toBe(false);
   });
 
   test('ignores corrupt old unscoped game-toggle data during scoped migration', () => {

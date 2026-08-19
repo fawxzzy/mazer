@@ -136,27 +136,28 @@ const buildLegacyMenuPathTitleGrid = (): boolean[][] => {
 export const LEGACY_MENU_PATH_TITLE_GRID = buildLegacyMenuPathTitleGrid();
 
 export const resolveLegacyMenuTitlePresentation = (
-  boardSize: number,
+  titleReserveHeight: number,
   tileSize: number,
   isPortrait: boolean,
-  viewportWidth = boardSize,
+  viewportWidth = titleReserveHeight,
   surface: LegacyMenuTitleSurface = 'snapshot'
 ): LegacyMenuTitlePresentation => {
   const isProceduralPortrait = isPortrait && surface === 'procedural';
-  const baseFontSize = Math.max(
-    isPortrait ? 78 : 142,
-    Math.round(boardSize * (isProceduralPortrait ? 0.265 : (isPortrait ? 0.205 : 0.226)))
-  );
   const isUltraNarrow = isPortrait && viewportWidth < 360;
   const isProceduralUltraNarrow = isUltraNarrow && surface === 'procedural';
-  const fontSize = isUltraNarrow
-    ? Math.round(Math.min(
-      baseFontSize,
-      Math.max(isProceduralUltraNarrow ? 46 : 42, viewportWidth * (isProceduralUltraNarrow ? 0.24 : 0.3))
-    ))
-    : isProceduralPortrait
-      ? Math.round(Math.min(baseFontSize, Math.max(72, viewportWidth * 0.255)))
-    : baseFontSize;
+  // Font size is derived from the title's own reserved lane height, not
+  // board size -- board size and the title reserve are computed
+  // independently now (legacyMenuLayout.ts deliberately keeps the title
+  // compact regardless of how large the board grows), so deriving from
+  // board size would make the title grow right along with the board again.
+  // 0.68 leaves the rendered glyph grid plus its orbit/crown decorations
+  // (which extend roughly another ~1.4 cell-widths above and below the core
+  // 7-row grid -- see resolveLegacyMenuPathTitleOrbitGeometry) comfortably
+  // inside the reserved lane with real margin, not sized right to the edge.
+  // Bumped up from 0.55 per feedback that the title read as too small next
+  // to the (now also smaller) header badges -- keep this in sync with the
+  // identical formula in legacyMenuLayout.ts's inline-header fit check.
+  const fontSize = Math.max(22, Math.round(titleReserveHeight * 0.68));
   const shadowOffsetX = isUltraNarrow
     ? Math.max(2, Math.round(fontSize * 0.07))
     : Math.max(isPortrait ? 4 : 5, Math.round(tileSize * 0.12));
@@ -171,6 +172,19 @@ export const resolveLegacyMenuTitlePresentation = (
     shadowAlpha: isPortrait ? 0.38 : 0.34,
     titleAlpha: isProceduralUltraNarrow ? 0.64 : (isProceduralPortrait ? 0.82 : (isPortrait ? 0.76 : 0.7))
   };
+};
+
+/**
+ * Total on-screen width the title wordmark needs at a given font size,
+ * including the orbit/crown decorations that extend past the core letter
+ * grid -- used by legacyMenuLayout.ts to decide whether the title fits
+ * inline between the header's leading/trailing icon frames.
+ */
+export const resolveLegacyMenuTitleFootprintWidth = (fontSize: number): number => {
+  const cellSize = Math.max(4, Math.round(fontSize / 9));
+  const coreWidth = LEGACY_MENU_PATH_TITLE_COLUMNS * cellSize;
+  const orbitGap = Math.max(7, Math.round(cellSize * 1.08));
+  return coreWidth + (orbitGap * 2);
 };
 
 export const resolveLegacyMenuPathTitleLayout = (

@@ -89,6 +89,7 @@ export interface LegacyGenerationTickGateContract {
 }
 
 export interface LegacyGenerationRequest {
+  aspectRatio?: number;
   budget: LegacyGenerationBudgetContract;
   buildKind: LegacyMazeBuildKind;
   dueAtMs: number;
@@ -476,19 +477,37 @@ const resolveLegacyGenerationDefaultCandidateCount = (targetComplexity: number):
   return LEGACY_GENERATION_SELECTION_DEFAULT_CANDIDATES;
 };
 
+// Difficulty/complexity tuning stays anchored to the single "scale" figure
+// exactly as before -- only the final grid shape is split into
+// width/height, using aspectRatio (width/height) to distribute the same
+// approximate cell count (scale x scale) across a non-square grid instead
+// of a square one. aspectRatio defaults to 1 (square), so every existing
+// caller that doesn't pass it keeps generating exactly the same mazes as
+// before this change.
+const resolveLegacyMazeDimensionsForScale = (scale: number, aspectRatio: number): { width: number; height: number } => {
+  const safeAspectRatio = Number.isFinite(aspectRatio) && aspectRatio > 0 ? aspectRatio : 1;
+  const ratioRoot = Math.sqrt(safeAspectRatio);
+  return {
+    width: Math.round(scale * ratioRoot),
+    height: Math.round(scale / ratioRoot)
+  };
+};
+
 const buildLegacyRuntimeMazeForMode = (
   mode: LegacyGenerationMode,
   scale: number,
   seed: number,
-  generationProfile?: Partial<LegacyMazeGenerationProfile> | null
+  generationProfile?: Partial<LegacyMazeGenerationProfile> | null,
+  aspectRatio = 1
 ): Omit<LegacyMazeSnapshot, 'generation'> => {
   const buildKind = resolveLegacyMazeBuildKind(mode);
   const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
   const budget = resolveLegacyGenerationBudgetContract(mode, scale, profile);
   const resolvedShortcutCount = budget.shortcutStageEnabled ? budget.shortcutCount : 0;
+  const { width, height } = resolveLegacyMazeDimensionsForScale(scale, aspectRatio);
   return buildKind === 'menu-generated'
-    ? createLegacyGeneratedMenuMaze(scale, seed, resolvedShortcutCount, profile)
-    : createLegacyMaze(scale, seed, resolvedShortcutCount, profile);
+    ? createLegacyGeneratedMenuMaze(width, height, seed, resolvedShortcutCount, profile)
+    : createLegacyMaze(width, height, seed, resolvedShortcutCount, profile);
 };
 
 const createLegacyUnderTargetPressureProfile = (
@@ -541,7 +560,8 @@ const selectLegacyRuntimeMazeForMode = (
   scale: number,
   seed: number,
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null,
-  selectionOptions: LegacyGenerationSelectionOptions = {}
+  selectionOptions: LegacyGenerationSelectionOptions = {},
+  aspectRatio = 1
 ): {
   maze: Omit<LegacyMazeSnapshot, 'generation'>;
   review?: LegacyGenerationSelectionReview;
@@ -549,7 +569,7 @@ const selectLegacyRuntimeMazeForMode = (
   const targetComplexity = selectionOptions.targetComplexity;
   if (targetComplexity === null || targetComplexity === undefined || !Number.isFinite(targetComplexity)) {
     return {
-      maze: buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile)
+      maze: buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile, aspectRatio)
     };
   }
 
@@ -583,7 +603,7 @@ const selectLegacyRuntimeMazeForMode = (
     isInitialWindow = false
   ): void => {
     searchedCandidateCount += 1;
-    const candidateMaze = buildLegacyRuntimeMazeForMode(mode, candidateScale, candidateSeed, profile);
+    const candidateMaze = buildLegacyRuntimeMazeForMode(mode, candidateScale, candidateSeed, profile, aspectRatio);
     const measuredComplexity = resolveLegacyMazeComplexity(candidateMaze).total;
     const difference = measuredComplexity - roundedTargetComplexity;
     const distance = Math.abs(difference);
@@ -635,7 +655,7 @@ const selectLegacyRuntimeMazeForMode = (
     }
   }
 
-  const selectedMaze = bestMaze ?? buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile);
+  const selectedMaze = bestMaze ?? buildLegacyRuntimeMazeForMode(mode, scale, seed, generationProfile, aspectRatio);
 
   return {
     maze: selectedMaze,
@@ -669,14 +689,15 @@ export const createLegacyRuntimeMazeForMode = (
   scale: number,
   seed: number,
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null,
-  selectionOptions: LegacyGenerationSelectionOptions = {}
+  selectionOptions: LegacyGenerationSelectionOptions = {},
+  aspectRatio = 1
 ): LegacyMazeSnapshot => {
   const buildKind = resolveLegacyMazeBuildKind(mode);
   const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
   const executionPlan = resolveLegacyGenerationExecutionPlan(mode, scale, profile);
   const budget = resolveLegacyGenerationBudgetContract(mode, scale, profile);
   const gate = resolveLegacyGenerationTickGateContract();
-  const { maze, review } = selectLegacyRuntimeMazeForMode(mode, scale, seed, profile, selectionOptions);
+  const { maze, review } = selectLegacyRuntimeMazeForMode(mode, scale, seed, profile, selectionOptions, aspectRatio);
 
   return {
     ...maze,
@@ -696,6 +717,7 @@ export const createLegacyRuntimeMazeForMode = (
 export const stepLegacyGenerationSeed = (seed: number): number => (seed + 1) >>> 0;
 
 export const createLegacyGenerationRequest = ({
+  aspectRatio,
   currentSeed,
   dueAtMs,
   generationProfile,
@@ -709,6 +731,7 @@ export const createLegacyGenerationRequest = ({
   stepSeed = false,
   targetComplexity
 }: {
+  aspectRatio?: number;
   currentSeed: number;
   dueAtMs: number;
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null;
@@ -734,6 +757,7 @@ export const createLegacyGenerationRequest = ({
     mode,
     reason,
     seed,
+    ...(aspectRatio !== undefined ? { aspectRatio } : {}),
     ...(selectionCandidateCount !== undefined ? { selectionCandidateCount } : {}),
     ...(selectionTolerance !== undefined ? { selectionTolerance } : {}),
     dueAtMs: Math.max(0, Math.round(dueAtMs)),
@@ -750,18 +774,21 @@ export const createLegacyGenerationRequest = ({
 };
 
 export const createLegacyMenuResetGenerationRequest = ({
+  aspectRatio,
   currentSeed,
   generationProfile,
   nowMs,
   scale,
   targetComplexity
 }: {
+  aspectRatio?: number;
   currentSeed: number;
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null;
   nowMs: number;
   scale: number;
   targetComplexity?: number;
 }): LegacyGenerationRequest => createLegacyGenerationRequest({
+  ...(aspectRatio !== undefined ? { aspectRatio } : {}),
   currentSeed,
   dueAtMs: nowMs,
   generationProfile,
@@ -774,6 +801,7 @@ export const createLegacyMenuResetGenerationRequest = ({
 });
 
 export const createLegacyPlayResetGenerationRequest = ({
+  aspectRatio,
   currentSeed,
   generationProfile,
   nowMs,
@@ -781,6 +809,7 @@ export const createLegacyPlayResetGenerationRequest = ({
   scale,
   targetComplexity
 }: {
+  aspectRatio?: number;
   currentSeed: number;
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null;
   nowMs: number;
@@ -788,6 +817,7 @@ export const createLegacyPlayResetGenerationRequest = ({
   scale: number;
   targetComplexity?: number;
 }): LegacyGenerationRequest => createLegacyGenerationRequest({
+  ...(aspectRatio !== undefined ? { aspectRatio } : {}),
   currentSeed,
   dueAtMs: nowMs,
   generationProfile,
@@ -812,7 +842,7 @@ export const consumeLegacyGenerationRequest = (
   candidateCount: request.selectionCandidateCount,
   targetComplexity: request.targetComplexity,
   tolerance: request.selectionTolerance
-});
+}, request.aspectRatio ?? 1);
 
 export const consumeLegacyGenerationRequestState = (
   request: LegacyGenerationRequest,

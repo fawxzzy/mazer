@@ -94,6 +94,7 @@ interface PlayerProgressionSceneHarness {
   refreshLegacyMenuStaticDrawVisibleTileKeys: ReturnType<typeof vi.fn>;
   resolveLegacyMenuStaticDeconstructDurationMs: () => number;
   resolveLegacyMenuStaticDeconstructTileStartAtMs: (time: number) => number;
+  resolveLegacyBoardAspectRatioForMode: () => number;
   resolveLegacyMazeGenerationProfileForMode: () => object;
   resolveLegacyProgressionScaleForMode: () => number;
   resolveLegacyProgressionStorage: () => MemoryStorage;
@@ -110,7 +111,8 @@ interface PlayerProgressionSceneHarness {
 
 const createProgressionMaze = (): LegacyMazeSnapshot => ({
   source: 'play-generated',
-  size: 5,
+  width: 5,
+  height: 5,
   grid: [
     [false, false, false, false, false],
     [false, true, true, true, false],
@@ -199,6 +201,7 @@ const createScene = (): { scene: PlayerProgressionSceneHarness; storage: MemoryS
     refreshLegacyMenuStaticDrawVisibleTileKeys: vi.fn(),
     resolveLegacyMenuStaticDeconstructDurationMs: () => 120,
     resolveLegacyMenuStaticDeconstructTileStartAtMs: (time) => time,
+    resolveLegacyBoardAspectRatioForMode: () => 1,
     resolveLegacyMazeGenerationProfileForMode: () => ({}),
     resolveLegacyProgressionScaleForMode: () => 37,
     resolveLegacyProgressionStorage: () => storage,

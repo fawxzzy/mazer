@@ -28,8 +28,8 @@ import { resolveLegacyUnrealSource } from './legacyUnrealSourceFixture';
 const countLegacyShortcutBridgeFloors = (maze: ReturnType<typeof createLegacyMaze>): number => {
   let bridges = 0;
 
-  for (let y = 1; y < maze.size - 1; y += 1) {
-    for (let x = 1; x < maze.size - 1; x += 1) {
+  for (let y = 1; y < maze.height - 1; y += 1) {
+    for (let x = 1; x < maze.width - 1; x += 1) {
       if (maze.grid[y]?.[x] !== true) {
         continue;
       }
@@ -80,8 +80,8 @@ const countDetachedFloorTiles = (maze: ReturnType<typeof createLegacyMaze>): num
   }
 
   let detached = 0;
-  for (let y = 0; y < maze.size; y += 1) {
-    for (let x = 0; x < maze.size; x += 1) {
+  for (let y = 0; y < maze.height; y += 1) {
+    for (let x = 0; x < maze.width; x += 1) {
       if (maze.grid[y]?.[x] === true && !visited.has(`${x},${y}`)) {
         detached += 1;
       }
@@ -95,7 +95,7 @@ const isEndpointOnMazeBorder = (
   maze: ReturnType<typeof createLegacyMaze>,
   point: { x: number; y: number }
 ): boolean => (
-  point.x === 0 || point.y === 0 || point.x === maze.size - 1 || point.y === maze.size - 1
+  point.x === 0 || point.y === 0 || point.x === maze.width - 1 || point.y === maze.height - 1
 );
 
 const isNonCornerBorderFloor = (
@@ -104,7 +104,7 @@ const isNonCornerBorderFloor = (
 ): boolean => (
   maze.grid[point.y]?.[point.x] === true
   && isEndpointOnMazeBorder(maze, point)
-  && !((point.x === 0 || point.x === maze.size - 1) && (point.y === 0 || point.y === maze.size - 1))
+  && !((point.x === 0 || point.x === maze.width - 1) && (point.y === 0 || point.y === maze.height - 1))
 );
 
 const resolveOppositeBorderPoint = (
@@ -116,13 +116,13 @@ const resolveOppositeBorderPoint = (
   }
 
   if (point.x === 0) {
-    return { x: maze.size - 1, y: point.y };
+    return { x: maze.width - 1, y: point.y };
   }
-  if (point.x === maze.size - 1) {
+  if (point.x === maze.width - 1) {
     return { x: 0, y: point.y };
   }
   if (point.y === 0) {
-    return { x: point.x, y: maze.size - 1 };
+    return { x: point.x, y: maze.height - 1 };
   }
   return { x: point.x, y: 0 };
 };
@@ -132,8 +132,8 @@ const collectUnpairedBorderFloorBleeds = (
 ): Array<{ point: { x: number; y: number }; opposite: { x: number; y: number } | null }> => {
   const failures: Array<{ point: { x: number; y: number }; opposite: { x: number; y: number } | null }> = [];
 
-  for (let y = 0; y < maze.size; y += 1) {
-    for (let x = 0; x < maze.size; x += 1) {
+  for (let y = 0; y < maze.height; y += 1) {
+    for (let x = 0; x < maze.width; x += 1) {
       const point = { x, y };
       if (!isNonCornerBorderFloor(maze, point)) {
         continue;
@@ -155,14 +155,14 @@ const collectOppositeBorderAxisConnections = (
   let horizontal = 0;
   let vertical = 0;
 
-  for (let y = 1; y < maze.size - 1; y += 1) {
-    if (maze.grid[y]?.[0] === true && maze.grid[y]?.[maze.size - 1] === true) {
+  for (let y = 1; y < maze.height - 1; y += 1) {
+    if (maze.grid[y]?.[0] === true && maze.grid[y]?.[maze.width - 1] === true) {
       horizontal += 1;
     }
   }
 
-  for (let x = 1; x < maze.size - 1; x += 1) {
-    if (maze.grid[0]?.[x] === true && maze.grid[maze.size - 1]?.[x] === true) {
+  for (let x = 1; x < maze.width - 1; x += 1) {
+    if (maze.grid[0]?.[x] === true && maze.grid[maze.height - 1]?.[x] === true) {
       vertical += 1;
     }
   }
@@ -261,14 +261,14 @@ describe('legacy reset lane', () => {
   });
 
   test('builds a solvable legacy maze snapshot', () => {
-    const maze = createLegacyMaze(50, 0x5a17f00d);
+    const maze = createLegacyMaze(50, 50, 0x5a17f00d);
 
-    expect(maze.size).toBeGreaterThanOrEqual(25);
+    expect(maze.width).toBeGreaterThanOrEqual(25);
     expect(maze.solutionPath.length).toBeGreaterThan(2);
     expect(maze.start).not.toEqual(maze.goal);
     expect(maze.pathBuilderStats).toMatchObject({
       topology: 'legacy-checkpoint-path-builder',
-      requestedCheckpoints: Math.trunc(maze.size + (maze.size * 0.35)),
+      requestedCheckpoints: Math.trunc(maze.width + (maze.width * 0.35)),
       exhaustedCheckpoints: true
     });
     expect(maze.pathBuilderStats?.acceptedCheckpoints).toBeGreaterThan(0);
@@ -291,14 +291,14 @@ describe('legacy reset lane', () => {
 
   test('normalizes generated play mazes into one playable floor component', () => {
     for (const seed of [3749, 0x5a17f00d, 2, 777, 1001]) {
-      const maze = createLegacyMaze(50, seed);
+      const maze = createLegacyMaze(50, 50, seed);
       const borderAxisConnections = collectOppositeBorderAxisConnections(maze);
 
       expect(countDetachedFloorTiles(maze)).toBe(0);
       expect(collectUnpairedBorderFloorBleeds(maze)).toEqual([]);
       expect(borderAxisConnections.horizontal).toBeGreaterThanOrEqual(1);
       expect(borderAxisConnections.vertical).toBeGreaterThanOrEqual(1);
-      expect(maze.solutionPath.length).toBeGreaterThanOrEqual(Math.floor(maze.size * 1.5));
+      expect(maze.solutionPath.length).toBeGreaterThanOrEqual(Math.floor(maze.width * 1.5));
       expect(maze.playableTopologyStats?.reachableFloors).toBeGreaterThan(maze.solutionPath.length);
       expect(maze.playableTopologyStats?.disconnectedFloorTilesPruned).toBeGreaterThan(0);
       expect(maze.playableTopologyStats?.disconnectedComponentsPruned).toBeGreaterThan(0);
@@ -307,8 +307,8 @@ describe('legacy reset lane', () => {
   });
 
   test('rebases weak generated goals without replacing already playable routes', () => {
-    const weakGoalMaze = createLegacyMaze(50, 777);
-    const playableGoalMaze = createLegacyMaze(50, 0x5a17f00d);
+    const weakGoalMaze = createLegacyMaze(50, 50, 777);
+    const playableGoalMaze = createLegacyMaze(50, 50, 0x5a17f00d);
 
     expect(weakGoalMaze.playableTopologyStats?.goalRebasedToFarthestReachableFloor).toBe(true);
     expect(weakGoalMaze.playableTopologyStats?.originalGoalDistance).toBeLessThan(weakGoalMaze.playableTopologyStats?.resolvedGoalDistance ?? 0);
@@ -316,7 +316,7 @@ describe('legacy reset lane', () => {
   });
 
   test('applies legacy shortcut bridge openings to generated play mazes', () => {
-    const maze = createLegacyMaze(50, 0x5a17f00d, 9);
+    const maze = createLegacyMaze(50, 50, 0x5a17f00d, 9);
 
     expect(maze.shortcutsCreated).toBeGreaterThan(0);
     expect(maze.shortcutsCreated).toBeLessThanOrEqual(9);
@@ -340,13 +340,13 @@ describe('legacy reset lane', () => {
     const failures: unknown[] = [];
 
     for (const seed of DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS) {
-      const maze = createLegacyMaze(50, seed);
+      const maze = createLegacyMaze(50, 50, seed);
 
       expect(maze.source).toBe('play-generated');
       expect(countDetachedFloorTiles(maze)).toBe(0);
       const unpairedBorderBleeds = collectUnpairedBorderFloorBleeds(maze);
       const borderAxisConnections = collectOppositeBorderAxisConnections(maze);
-      const minimumSolutionPathLength = Math.floor(maze.size * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
+      const minimumSolutionPathLength = Math.floor(maze.width * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
       if (
         borderAxisConnections.horizontal < 1
         || borderAxisConnections.vertical < 1
@@ -384,13 +384,13 @@ describe('legacy reset lane', () => {
     const failures: unknown[] = [];
 
     for (const seed of DEFAULT_ROUTE_QUALITY_AUDIT_SEEDS) {
-      const maze = createLegacyGeneratedMenuMaze(50, seed);
+      const maze = createLegacyGeneratedMenuMaze(50, 50, seed);
 
       expect(maze.source).toBe('menu-generated');
       expect(countDetachedFloorTiles(maze)).toBe(0);
       const unpairedBorderBleeds = collectUnpairedBorderFloorBleeds(maze);
       const borderAxisConnections = collectOppositeBorderAxisConnections(maze);
-      const minimumSolutionPathLength = Math.floor(maze.size * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
+      const minimumSolutionPathLength = Math.floor(maze.width * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
       if (
         borderAxisConnections.horizontal < 1
         || borderAxisConnections.vertical < 1
@@ -447,7 +447,7 @@ describe('legacy reset lane', () => {
     let reinforcedMaze: ReturnType<typeof createLegacyMaze> | null = null;
 
     for (let seed = 1; seed <= 128; seed += 1) {
-      const maze = createLegacyMaze(50, seed, 3);
+      const maze = createLegacyMaze(50, 50, seed, 3);
       if ((maze.shortcutStats?.qualityReinforcementCreated ?? 0) > 0) {
         reinforcedMaze = maze;
         break;
@@ -471,14 +471,14 @@ describe('legacy reset lane', () => {
 
     expect(legacyMazeSource).toContain('PotentialTile = FindNextTile(PotentialPathArray[randTile], MazerGameInstance->_Checkpoint.GridTileInfo.GridTile);');
     expect(legacyMazeSource).toContain('PotentialTile = FindNextTile(PotentialPathArray[i], MazerGameInstance->_Checkpoint.GridTileInfo.GridTile);');
-    expect(webMazeSource).toContain('return findLegacyNextTile(size, pathMask, candidate, checkpoint, start, true, rng);');
-    expect(webMazeSource).toContain('const next = findLegacyNextTile(size, pathMask, candidate, checkpoint, start, true, rng);');
+    expect(webMazeSource).toContain('return findLegacyNextTile(width, height, pathMask, candidate, checkpoint, start, true, rng);');
+    expect(webMazeSource).toContain('const next = findLegacyNextTile(width, height, pathMask, candidate, checkpoint, start, true, rng);');
     expect(webMazeSource).toContain('return next;');
     expect(webMazeSource).toContain('pathLengths.get(keyForPoint(current)) ?? 0');
   });
 
   test('keeps shortcut-disabled generated mazes free of shortcut openings', () => {
-    const maze = createLegacyMaze(25, 0x5a17f00d, 9);
+    const maze = createLegacyMaze(25, 25, 0x5a17f00d, 9);
 
     expect(maze.shortcutsCreated).toBe(0);
     expect(maze.shortcutStats).toEqual({
@@ -494,7 +494,8 @@ describe('legacy reset lane', () => {
   test('uses a fixed legacy-shaped menu maze snapshot for the front door', () => {
     const menuMaze = createLegacyMenuMaze(3749);
 
-    expect(menuMaze.size).toBe(49);
+    expect(menuMaze.width).toBe(49);
+    expect(menuMaze.height).toBe(49);
     expect(menuMaze.start).toEqual({ x: 6, y: 8 });
     expect(menuMaze.goal).toEqual({ x: 44, y: 44 });
     expect(menuMaze.solutionPath[0]).toEqual(menuMaze.start);
@@ -554,14 +555,14 @@ describe('legacy reset lane', () => {
   });
 
   test('adapts generated legacy maze snapshots into the clean menu demo walker lane', () => {
-    const maze = createLegacyMaze(50, 3749);
+    const maze = createLegacyMaze(50, 50, 3749);
     const episode = createLegacyDemoWalkerEpisode(maze);
     const config = createLegacyMenuDemoWalkerConfig(maze.seed);
     const state = createDemoWalkerState(episode, config);
     const telemetry = collectDemoWalkerTelemetry(episode, config);
 
-    expect(episode.raster.startIndex).toBe((maze.start.y * maze.size) + maze.start.x);
-    expect(episode.raster.endIndex).toBe((maze.goal.y * maze.size) + maze.goal.x);
+    expect(episode.raster.startIndex).toBe((maze.start.y * maze.width) + maze.start.x);
+    expect(episode.raster.endIndex).toBe((maze.goal.y * maze.width) + maze.goal.x);
     expect(Array.from(episode.raster.pathIndices).at(0)).toBe(episode.raster.startIndex);
     expect(Array.from(episode.raster.pathIndices).at(-1)).toBe(episode.raster.endIndex);
     expect(config.behavior.enableRunnerMistakes).toBe(true);
@@ -789,7 +790,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);');
     expect(menuSceneSource).toContain('private advanceLegacyMenuStaticDrawStage(time: number): void {');
     expect(menuSceneSource).toContain('this.menuStaticDrawTilesVisible = Math.min(');
-    expect(menuSceneSource).toContain('this.menuStaticDrawRowsVisible = Math.min(this.maze.size, this.menuStaticDrawRowsVisible + batchSize);');
+    expect(menuSceneSource).toContain('this.menuStaticDrawRowsVisible = Math.min(this.maze.height, this.menuStaticDrawRowsVisible + batchSize);');
     expect(menuSceneSource).toContain('this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;');
     expect(menuSceneSource).toContain('this.menuStaticDrawNextTileAtMs = time + LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS;');
     expect(menuSceneSource).toContain('private boardPathGraphics!: Phaser.GameObjects.Graphics;');
@@ -935,47 +936,41 @@ describe('legacy reset lane', () => {
     expect(toggleFieldSource).toContain("| 'toggleAnimatedBackdrop'");
     expect(toggleFieldSource).toContain('resolveLegacyOverlayToggleStateText');
     expect(toggleFieldSource).toContain('resolveLegacyOverlayToggleSwitchIsOn');
-    expect(toggleFieldSource).toContain('legacyDirectionalLightIntensity');
     expect(menuSceneSource).toContain('private createFeatureControlRows(');
     expect(menuSceneSource).toContain('private createToggleSwitchRow(');
-    expect(menuSceneSource).toContain("label: 'Camera Follow'");
+    expect(menuSceneSource).not.toContain("label: 'Camera Follow'");
     expect(menuSceneSource).toContain("label: 'Trail Fade'");
     expect(menuSceneSource).toContain("label: 'Trail Shine'");
     expect(menuSceneSource).toContain("? 'Slow white shine.'");
     expect(menuSceneSource).toContain("label: 'Animated Background'");
-    expect(menuSceneSource).toContain("label: 'High Contrast'");
+    expect(menuSceneSource).not.toContain("label: 'High Contrast'");
     expect(menuSceneSource).toContain("label: 'Control Style'");
-    expect(menuSceneSource).toContain("label: 'Smart Steering'");
+    expect(menuSceneSource).not.toContain("label: 'Smart Steering'");
     expect(menuSceneSource).toContain("label: 'Move Speed'");
     expect(menuSceneSource).toContain('private createMovementSpeedSliderRow(');
     expect(menuSceneSource).toContain('private applyLegacyMovementSpeed(speed: number): void {');
-    expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'");
-    expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('darkMode', this.settings.darkMode) ?? 'Off'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings)");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings)");
     expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
     expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
     expect(menuSceneSource).toContain('const groupHeight = (count: number): number => (');
-    expect(menuSceneSource).toContain('groupHeight(controlsGroupCount) + sectionGap + groupHeight(displayGroupCount)');
+    expect(menuSceneSource).toContain('groupHeight(controlsGroupCount)');
+    expect(menuSceneSource).toContain('groupHeight(displayGroupCount)');
     expect(menuSceneSource).toContain("addSectionHeading('Controls', contentTop)");
     expect(menuSceneSource).toContain("addSectionHeading('Display', contentTop)");
-    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleCameraFollow')");
-    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailFade')");
-    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleTrailPulse')");
-    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('toggleAnimatedBackdrop')");
-    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('darkMode')");
-    expect(menuSceneSource).toContain("this.applyLegacyOverlayToggleField('controlMode')");
+    expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('toggleTrailFade')");
+    expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('toggleTrailPulse')");
+    expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('toggleAnimatedBackdrop')");
+    expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('controlMode')");
     expect(menuSceneSource).toContain('this.applyLegacyMovementSpeed(nextSpeed);');
-    expect(menuSceneSource).toContain('private applyLegacyOverlayToggleField(fieldId: LegacyOverlayToggleFieldId): void {');
+    expect(menuSceneSource).toContain('private applyOverlayToggleFieldChange(fieldId: LegacyOverlayToggleFieldId): void {');
     expect(menuSceneSource).not.toContain("this.openNestedOverlay('features'");
     expect(menuSceneSource).not.toContain("this.openNestedOverlay('gameModes'");
   });

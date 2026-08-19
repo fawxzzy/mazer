@@ -86,7 +86,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
     expect(menuSceneSource).toContain('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {');
-    expect(menuSceneSource).toContain("addText('QUICK PLAY'");
+    expect(menuSceneSource).toContain("'GUIDE',");
     expect(buildOptionsSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
       buildOptionsSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel')
     );
@@ -109,7 +109,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("addSectionHeading('Controls'");
     expect(menuSceneSource).toContain("addSectionHeading('Display'");
     expect(menuSceneSource).toContain("label: 'Animated Background'");
-    expect(menuSceneSource).toContain("label: 'High Contrast'");
+    expect(menuSceneSource).not.toContain("label: 'High Contrast'");
   });
 
   test('aligns title orbit diamonds through the fixed top and bottom crown diamonds', () => {
@@ -125,7 +125,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('bridges connected neighbors to tile edges for legacy trench continuity', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, false, false],
         [true, true, true],
@@ -143,7 +144,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps closed-edge insets where the path does not continue', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, false, false],
         [false, true, false],
@@ -161,7 +163,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('docks non-corner border paths into the board border instead of capping them', () => {
     const oneSidedMaze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, false, false],
         [true, false, false],
@@ -172,7 +175,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(resolveLegacyMenuBorderDockDirections(oneSidedMaze, { x: 0, y: 1 })).toEqual([]);
 
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, false, false],
         [true, true, true],
@@ -212,7 +216,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('classifies only orthogonal legal opposite-edge paths as bleed-off continuations', () => {
     const maze = {
-      size: 5,
+      width: 5,
+      height: 5,
       grid: [
         [false, false, true, false, false],
         [false, false, true, false, false],
@@ -235,7 +240,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps folded-corner border cells capped so the corner facets stay clean', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [true, false, false],
         [false, false, false],
@@ -261,12 +267,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     }, {
       boardLeft: 0,
       boardTop: 0,
-      boardSize: 100,
+      boardWidth: 100,
+      boardHeight: 100,
       cornerGuardSize: 18,
       materialTileSize: 30,
       mazeLeft: 6,
       mazeTop: 6,
-      mazeSize: 88,
+      mazeWidth: 88,
+      mazeHeight: 88,
       tileRect: {
         left: 35,
         top: 6,
@@ -288,12 +296,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const commonOptions = {
       boardLeft: 0,
       boardTop: 0,
-      boardSize: 100,
+      boardWidth: 100,
+      boardHeight: 100,
       cornerGuardSize: 18,
       materialTileSize: 6,
       mazeLeft: 5,
       mazeTop: 5,
-      mazeSize: 90
+      mazeWidth: 90,
+      mazeHeight: 90
     };
     const leftFrame = {
       leftInset: 0,
@@ -380,13 +390,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     }, {
       boardLeft: 10,
       boardTop: 20,
-      boardSize: 100,
+      boardWidth: 100,
+      boardHeight: 100,
       cornerGuardSize: 18,
       continuationLength: 4,
       materialTileSize: 6,
       mazeLeft: 15,
       mazeTop: 25,
-      mazeSize: 90,
+      mazeWidth: 90,
+      mazeHeight: 90,
       tileRect: { left: 99, top: 50, width: 6, height: 6 }
     });
 
@@ -395,7 +407,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('bridges the light core across connected neighbors for a less checkerboarded slab read', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, false, false],
         [true, true, true],
@@ -421,7 +434,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('preserves four-way joins as solid connected intersections', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, true, false],
         [true, true, true],
@@ -447,7 +461,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('renders four-way menu joins as corridor segments instead of one filled tile', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, true, false],
         [true, true, true],
@@ -475,7 +490,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps phone-sized tiles separated instead of merging adjacent cells into blocks', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, true, false],
         [true, true, true],
@@ -491,7 +507,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps rounded 4px mobile tiles corridor-shaped instead of full-block filled', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, true, false],
         [true, true, true],
@@ -518,9 +535,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE_ALPHA = 0.58;');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = cyberArcadeMaterial.substrate.field;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GLASS_ALPHA = 0.18;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.1;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = cyberArcadeMaterial.rail.mint;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = cyberArcadeMaterial.rail.cyan;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;');
@@ -533,10 +547,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (isMenuMode && LEGACY_BOARD_GRID_ALPHA > 0) {');
     expect(menuSceneSource).toContain('Keep the board top-down: no pseudo bevel/highlight pass over the maze.');
     expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
-    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);');
+    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardWidth, boardHeight, boardEdge);');
     expect(menuSceneSource).toContain('private fillLegacyBoardEdgeFrame(');
     expect(menuSceneSource).toContain('private resolveLegacyMazeRenderFrame(');
-    expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardSize);');
+    expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardWidth, boardHeight);');
     expect(menuSceneSource).toContain('const mazeLeft = mazeRenderFrame.boardLeft;');
     expect(menuSceneSource).toContain('const mazeTop = mazeRenderFrame.boardTop;');
     expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop - 1, boardSize + 2, boardSize + 2);');
@@ -565,8 +579,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('renderBounds: mazeRenderBounds');
     expect(menuSceneSource).toContain('renderSafeInset: mazeRenderFrame.safeInset');
-    expect(menuSceneSource).toContain('isMenuMode ? LEGACY_MENU_BOARD_GLASS_ALPHA : LEGACY_PLAY_BOARD_GLASS_ALPHA');
-    expect(menuSceneSource).toContain('isMenuMode ? LEGACY_MENU_WALL_GLASS_ALPHA : LEGACY_PLAY_WALL_GLASS_ALPHA');
+    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(boardFill, LEGACY_PLAY_BOARD_GLASS_ALPHA);');
+    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);');
     expect(menuSceneSource).not.toContain('drawLegacyBoardSigilBorder');
     expect(menuSceneSource).not.toContain('drawLegacyBoardCornerFacetShimmer');
     expect(menuSceneSource).not.toContain('hasLegacyBoardCornerShimmerPendingFrame');
@@ -594,7 +608,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('drawLegacyBackdropRune(');
     expect(menuSceneSource).not.toContain('this.backdropGraphics.fillCircle');
     expect(legacyMenuRenderSource).toContain('resolveLegacyMenuPathStrokeSegments');
-    expect(menuSceneSource).toContain('Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.');
+    expect(menuSceneSource).toContain('skip it entirely in menu mode. Play mode\'s gameplay');
   });
 
   test('restores a restrained animated backdrop without a full-screen perimeter frame', () => {
@@ -673,7 +687,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 6200;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 6;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 8;');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(time: number): void');
     expect(menuSceneSource).not.toContain('if (visibleCells.length <= 0) {\n      return;\n    }');
     expect(menuSceneSource).not.toContain('drawLegacyMenuPathTitleSigilRails');
@@ -697,7 +711,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleGemFacets(');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleOrbitSigils(');
     expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleOrbitPhase(time: number): number');
-    expect(menuSceneSource).toContain('const orbitPhase = this.resolveLegacyMenuPathTitleOrbitPhase(time);');
+    expect(menuSceneSource).toContain('const orbitPhase = isLifecycleSpinActive ? this.resolveLegacyMenuPathTitleOrbitPhase(time) : 0;');
     expect(menuSceneSource).toContain('const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;');
     expect(menuSceneSource).not.toContain('phase * 0.62');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitleDiamond(');
@@ -733,7 +747,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('coreAlpha: isMenuMode ? 0.92 : 0.96,');
     expect(menuSceneSource).toContain(': LEGACY_PLAY_PATH_CORE;');
-    expect(menuSceneSource).toContain(': LEGACY_PLAY_WALL_FILL;');
     expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
     expect(menuSceneSource).toContain('const boardEdge = LEGACY_PLAY_BOARD_EDGE;');
     expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor');
@@ -767,32 +780,28 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO =');
     expect(menuSceneSource).toContain('const progressionPalette = this.resolveActiveLegacyProgressionPalette();');
     expect(menuSceneSource).toContain('this.drawLegacyProgressionBadge();');
-    expect(menuSceneSource).toContain('this.drawLegacyMenuCompass(mazeRenderFrame, progressionPalette, time);');
-    expect(menuSceneSource).toContain("const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'");
-    expect(menuSceneSource).toContain("|| this.menuStaticDrawLifecyclePhase === 'deconstructing';");
-    expect(menuSceneSource).toContain('const angle = isLifecycleSpinActive');
-    expect(menuSceneSource).toContain('? (time / 130) % (Math.PI * 2)');
-    expect(menuSceneSource).toContain('const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardSize);');
-    expect(menuSceneSource).toContain('topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardSize)');
-    expect(menuSceneSource).toContain('notchBounds.width * 0.56');
-    expect(menuSceneSource).toContain('notchBounds.height * 0.68');
-    expect(menuSceneSource).toContain('mazeRenderFrame.tileSize * 2.15');
-    expect(menuSceneSource).toContain('const centerY = Math.round(notchBounds.top + (notchBounds.height * 0.43));');
-    expect(menuSceneSource).toContain('this.menuCompassBounds = createVisualRect(centerX - (size / 2), centerY - (size / 2), size, size);');
-    expect(menuSceneSource).toContain('const wing = Math.max(3, size * 0.26);');
-    expect(menuSceneSource).toContain('const tailLength = Math.max(4, size * 0.34);');
-    expect(menuSceneSource).toContain('const hubRadius = Math.max(2, size * 0.16);');
+    // The title-screen board-notch compass was removed entirely (it duplicated
+    // the play-mode HUD compass without serving real navigation on the menu
+    // surface) -- only the shared glyph-drawing helper remains, now used
+    // solely by the Quick Play guide card's legend icon.
+    expect(menuSceneSource).not.toContain('private drawLegacyMenuCompass(');
+    expect(menuSceneSource).not.toContain('this.drawLegacyMenuCompass(');
+    expect(menuSceneSource).not.toContain('menuCompassBounds');
+    expect(menuSceneSource).not.toContain('menuCompass: {');
+    expect(menuSceneSource).toContain('topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth)');
+    expect(menuSceneSource).toContain('const ringRadius = size * 0.86;');
+    expect(menuSceneSource).toContain('const needleWidth = Math.max(2, size * 0.15);');
+    expect(menuSceneSource).toContain('const hubRadius = Math.max(2, size * 0.15);');
     expect(menuSceneSource).toContain('private drawLegacyCompassGlyph(');
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, radius);');
     expect(menuSceneSource).toContain('progressionBadge: {');
-    expect(menuSceneSource).toContain('menuCompass: {');
     expect(menuSceneSource).toContain('this.clearLegacyPlayerProgressionBadge();');
     expect(menuSceneSource).toContain("if (this.mode === 'menu') {");
     expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
     expect(menuSceneSource).toContain('private drawLegacyMenuAiProgressionBadge(');
     expect(menuSceneSource).toContain("const aiTrack = this.progressionState.tracks['ai-runner'];");
     expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(aiTrack, 'ai-runner')");
-    expect(menuSceneSource).toContain(".setText('AI')");
+    expect(menuSceneSource).toContain(".setText('LVL')");
     expect(menuSceneSource).toContain('slot: 0,');
     expect(menuSceneSource).toContain('menuAiProgressionBadge: {');
     expect(menuSceneSource).toContain("placement: 'leading'");
@@ -815,11 +824,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacyPathBorderDock(');
     expect(menuSceneSource).toContain(': 0.94;');
     expect(menuSceneSource).toContain('this.trail = resolveLegacyMenuDemoTrail(');
-    expect(menuSceneSource).toContain('const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardSize);');
     expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(');
     expect(menuSceneSource).toContain('const mazeTileSize = mazeRenderFrame.tileSize;');
     expect(menuSceneSource).toContain('this.fillLegacyMenuDynamicPathTile(');
-    expect(menuSceneSource).toContain('pathSource: Pick<LegacyMazeSnapshot, \'grid\' | \'size\'>,');
+    expect(menuSceneSource).toContain('pathSource: Pick<LegacyMazeSnapshot, \'grid\' | \'width\' | \'height\'>,');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE,');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE_ALPHA,');
     expect(menuSceneSource).toContain('const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);');
@@ -867,7 +875,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (this.isLegacyTrailShineVisible()) {');
     expect(menuSceneSource).toContain('this.drawLegacyPlayDynamicTrailPulse(');
     expect(menuSceneSource).toContain('resolvedBoardLeft,');
-    expect(menuSceneSource).toContain('mazeRenderFrame.boardSize,');
+    expect(menuSceneSource).toContain('mazeRenderFrame.boardWidth,');
+    expect(menuSceneSource).toContain('mazeRenderFrame.boardHeight,');
     expect(menuSceneSource).toContain("const active = this.isLegacyTrailShineVisible() && this.overlay === 'none' && this.trail.length > 1;");
     expect(menuSceneSource).toContain('this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;');
     expect(menuSceneSource).toContain('const pulseCenterIndex = resolveLegacyTrailShineMotion({');
@@ -1081,7 +1090,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
     expect(menuSceneSource).toContain('this.playDirectionalIntent.step(this.maze, this.player, {');
-    expect(menuSceneSource).toContain('assistedLaneShiftEnabled: this.settings.smartSteering');
+    expect(menuSceneSource).toContain('assistedLaneShiftEnabled: true');
     expect(menuSceneSource).toContain('private tryMovePlayerFromInput(');
     expect(menuSceneSource).toContain('const directions = resolveLegacyCardinalDirectionsFromVector(deltaX, deltaY);');
     expect(menuSceneSource).toContain('return this.performLegacyPlayDirectionalIntentStep();');
@@ -1097,20 +1106,17 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('worldTurn: {');
   });
 
-  test('keeps camera-follow static and dynamic board layers on the same offset', () => {
+  test('keeps static and dynamic board layers on the same board offset', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
-    const toggleFieldSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayToggleFields.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardSize } = this.layout;');
+    expect(menuSceneSource).toContain('const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardWidth, boardHeight } = this.layout;');
     expect(menuSceneSource).toContain('const boardOffset = this.resolveBoardOffset();');
     expect(menuSceneSource).toContain('const boardLeft = layoutBoardLeft + boardOffset.x;');
     expect(menuSceneSource).toContain('const boardTop = layoutBoardTop + boardOffset.y;');
-    expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardSize);');
+    expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardWidth, boardHeight);');
     expect(menuSceneSource).toContain('this.layout.boardLeft + boardOffset.x');
     expect(menuSceneSource).toContain('this.layout.boardTop + boardOffset.y');
-    expect(menuSceneSource).toContain('if (this.settings.toggleCameraFollow) {');
-    expect(menuSceneSource).toContain('this.boardStaticDirty = true;');
-    expect(toggleFieldSource).toContain('affectsBoardStatic: true');
+    expect(menuSceneSource).not.toContain('toggleCameraFollow');
   });
 
   test('uses rendered play board bounds for compact touch-control avoidance', () => {
@@ -1167,11 +1173,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(toggleFieldSource).toContain('export const resolveLegacyOverlayToggleSwitchIsOn = (');
     expect(toggleFieldSource).toContain("case 'controlMode':");
     expect(toggleFieldSource).toContain("return settings.controlMode === 'stick';");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings)");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings)");
     expect(menuSceneSource).toContain("switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
   });
@@ -1265,9 +1269,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('frontDoorChrome?.hoverFillColor ?? cyberArcadeMaterial.substrate.panelActive');
     expect(menuSceneSource).toContain('frontDoorChrome?.fillColor ?? LEGACY_CYBER_PANEL_FILL');
     expect(menuSceneSource).toContain('stroke: frontDoorChrome?.strokeColor');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_ACTION_GREEN = toCyberArcadeCssHex(cyberArcadeMaterial.signal.player);');
     expect(menuSceneSource).toContain('const buttonTextColor = isPrimaryFrontDoorButton');
-    expect(menuSceneSource).toContain('? LEGACY_MENU_ACTION_GREEN');
+    expect(menuSceneSource).toContain('? MENU_TEXT_COLOR');
     expect(menuSceneSource).toContain('private createLegacyMenuSettingsCogButton(onClick: () => void): UiButton');
     expect(menuSceneSource).toContain("semanticAction: 'Settings'");
     expect(menuSceneSource).toContain("text: 'Settings'");
@@ -1291,8 +1294,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps settings semantic while the compact active-track level baseline stays free of board decorations', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain("this.createOverlayTitle('Settings', shell.titleCenterY);");
-    expect(menuSceneSource).not.toContain("this.createOverlayTitle('Options', shell.titleCenterY);");
+    expect(menuSceneSource).not.toContain("this.createOverlayTitle('Settings'");
+    expect(menuSceneSource).not.toContain("this.createOverlayTitle('Paused'");
     expect(menuSceneSource).toContain("semanticAction: 'Settings'");
     expect(menuSceneSource).toContain("text: 'Settings'");
     expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
@@ -1425,7 +1428,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.progressionBadgeText');
     expect(menuSceneSource).toContain('.setText(String(track.level))');
     expect(menuSceneSource).toContain('.setColor(palette.badgeColor)');
-    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);');
+    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false, true);');
     expect(menuSceneSource).toContain('resolveLegacyHeaderControlMetricFontSize(track.level, frame.width)');
   });
 
@@ -1440,7 +1443,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("if (this.mode === 'menu') {");
     expect(menuSceneSource).toContain('this.drawLegacyMenuAiProgressionBadge();');
     expect(menuSceneSource).toContain('this.clearLegacyMenuAiProgressionBadge();');
-    expect(menuSceneSource).toContain(".setText('AI')");
+    expect(menuSceneSource).toContain(".setText('LVL')");
     expect(menuSceneSource).toContain('.setText(String(track.level))');
     expect(menuSceneSource).toContain('.setText(String(aiTrack.level))');
     expect(menuSceneSource).not.toContain('publishLegacyPlayerProgressionCompletion');
@@ -1456,7 +1459,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const laneHeight = this.layout.lanes.hud?.height ?? 64;');
     expect(menuSceneSource).toContain('const frame = resolveLegacyHeaderControlFrame({');
     expect(menuSceneSource).toContain("placement: 'leading'");
-    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);');
+    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false, true);');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayProgressionBadgeCenterY');
     expect(menuSceneSource).not.toContain('resolveLegacyMenuProgressionBadgeCenterY');
     expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');
@@ -1471,7 +1474,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("from '../legacy-runtime/legacyUiStandards';");
     expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, buttonFontSize, options.labelRole ?? 'button')");
     expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title')");
-    expect(menuSceneSource).toContain('resolveLegacyToggleRowLayout(input.width, input.height, hasDescription)');
+    expect(menuSceneSource).toContain('resolveLegacyToggleRowLayout(input.width, input.height, hasDescription, input.compact)');
   });
 
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {
@@ -1482,9 +1485,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const guideTitleFontSize = guideLayout.titleFontSize;');
     expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
     expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
-    expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);');
-    expect(menuSceneSource).toContain("addText('QUICK PLAY', cardCenterX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);");
-    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', '#b7f2ff');");
+    expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);');
+    expect(menuSceneSource).toContain("'GUIDE',");
+    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', cyberArcadeMaterial.rail.cyan);");
     expect(menuSceneSource).not.toContain("'Player • green trail'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
     expect(menuSceneSource).not.toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`");
@@ -1705,7 +1708,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
     expect(menuSceneSource).toContain('const visibleLabelText = showStateLabel || !displayStateText');
     expect(menuSceneSource).toContain('`${input.label}: ${displayStateText}`');
-    expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 0.92 : 0)');
+    expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 1 : 0)');
     expect(menuSceneSource).toContain('setVisible(showStateLabel)');
     expect(menuSceneSource).not.toContain("const tightWidth = input.width < 260;");
     expect(menuSceneSource).not.toContain("tightWidth && input.label !== 'Controls'");
@@ -1720,13 +1723,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_CORE = cyberArcadeMaterial.path.core;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE,');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE_ALPHA,');
     expect(menuSceneSource).toContain('this.drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
     expect(menuSceneSource).toContain('const boardEdge = LEGACY_PLAY_BOARD_EDGE;');
-    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);');
+    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardWidth, boardHeight, boardEdge);');
     expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.start');
     expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.goal');
     expect(menuSceneSource).toContain('const trailColor = resolveLegacyIridescentTrailColor(');

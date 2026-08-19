@@ -1,4 +1,6 @@
 import { clampInteger } from './legacyDefaults';
+import { resolveLegacyHeaderControlFrame } from './legacyHeaderControl';
+import { resolveLegacyMenuTitleFootprintWidth } from './legacyMenuTitle';
 import { LEGACY_UI_MIN_TOUCH_TARGET } from './legacyUiStandards';
 
 export interface LegacyMenuLayout {
@@ -6,10 +8,12 @@ export interface LegacyMenuLayout {
   height: number;
   boardLeft: number;
   boardTop: number;
-  boardSize: number;
+  boardWidth: number;
+  boardHeight: number;
   tileSize: number;
   titleX: number;
   titleY: number;
+  titleReserveHeight: number;
   footerY: number;
   buttonLayout: 'row' | 'stack';
   buttonY: number;
@@ -52,7 +56,7 @@ const LEGACY_DIAGNOSTIC_PANEL_HEIGHT = 407;
 const LEGACY_PLAY_ULTRA_NARROW_WIDTH = 360;
 const LEGACY_PHONE_CLEAN_ZOOM_WIDTH = 420;
 const LEGACY_PHONE_CLEAN_SAFE_INSET = 7;
-const LEGACY_PHONE_CLEAN_OUTER_MARGIN = 8;
+const LEGACY_PHONE_CLEAN_OUTER_MARGIN = 4;
 // Play now uses a compact level glyph, centered timer, and icon-only Pause
 // control. Keep the HUD lane slim so the maze earns the reclaimed space.
 const LEGACY_PLAY_TOP_HUD_MIN = 56;
@@ -69,11 +73,116 @@ const createLane = (top: number, height: number): LegacyMenuLayoutLane => ({
   bottom: Math.round(top) + Math.max(0, Math.round(height))
 });
 
+// Probes the board's available pixel box (width-bound vs height-bound target)
+// purely from viewport dimensions, with no maze size input -- this lets a
+// caller pick a maze aspect ratio (width:height cell count) BEFORE
+// generating, so the eventual maze naturally fills both axes of the box
+// instead of being fit into it after the fact. This intentionally
+// duplicates the viewport-only subset of resolveLegacyMenuLayout's math
+// (through boardWidthTarget/boardHeightTarget) rather than trying to share
+// state with it, since that subset has no maze-size dependency and is safe
+// to evaluate standalone. If the reserve/board-bound formulas in
+// resolveLegacyMenuLayout change, mirror the change here too.
+export const resolveLegacyMenuBoardAspectRatio = (
+  width: number,
+  height: number,
+  scale: number,
+  surface: LegacyMenuLayoutSurface = 'menu',
+  options: LegacyMenuLayoutOptions = {}
+): number => {
+  const normalizedScale = clampInteger(scale, 25, 150);
+  const isPortrait = height > width;
+  const isPlaySurface = surface === 'play';
+  const isSidePanelPortrait = isPortrait && width < LEGACY_MENU_SIDE_PANEL_WIDTH;
+  const isPlayUltraNarrow = isPlaySurface && isPortrait && width < LEGACY_PLAY_ULTRA_NARROW_WIDTH;
+  const isUltraNarrow = isSidePanelPortrait || isPlayUltraNarrow;
+  const shouldUseCleanPhoneCadence = isPortrait
+    && !isUltraNarrow
+    && (width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH || options.browserMobileParity === true);
+  const minimumMenuActionHeight = isPortrait ? LEGACY_UI_MIN_TOUCH_TARGET : 58;
+  const buttonHeight = Math.round(clamp(
+    height * (isPortrait ? 0.05 : 0.066),
+    minimumMenuActionHeight,
+    isPortrait ? 62 : 78
+  ));
+  const laneGap = isUltraNarrow ? 4 : 8;
+  const menuTopReserve = isUltraNarrow ? 6 : Math.round(clamp(height * 0.02, 16, 20));
+  const menuTopHudReserve = !isPlaySurface
+    ? Math.round(clamp(height * 0.072, isUltraNarrow ? 44 : LEGACY_MENU_TOP_HUD_MIN, LEGACY_MENU_TOP_HUD_MAX))
+    : 0;
+  const menuTitleReserve = isUltraNarrow
+    ? 32
+    : Math.round(clamp(Math.min(height * 0.055, width * 0.11), 34, 56));
+  const dockBottomMargin = isUltraNarrow ? 10 : 20;
+  const dockReserve = buttonHeight + dockBottomMargin;
+  const playTopHudReserve = isPlaySurface && isPortrait
+    ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
+    : 56;
+  const playControlReserve = isPlaySurface
+    ? Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230))
+    : 0;
+  // Approximates whether the title fits inline in the header (skipping its
+  // own lane) as "true" whenever there's a top HUD reserve at all -- close
+  // enough for an aspect-ratio probe; a one-lane miss here only nudges the
+  // requested ratio slightly, it never breaks generation.
+  const menuStackTop = menuTopHudReserve + menuTopReserve;
+  const menuInlineTitleBoardGap = isUltraNarrow ? 2 : 4;
+  // Mirrors resolveLegacyMenuLayout's real header-icon-bottom measurement
+  // (not the abstract touch-target lane) so the probed box height -- and
+  // therefore the requested aspect ratio -- matches what the real layout
+  // will actually produce.
+  const menuHeaderContentBottom = menuTopHudReserve > 0
+    ? Math.max(
+      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: 0, placement: 'leading', width }).bottom,
+      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: 0, placement: 'trailing', width }).bottom
+    )
+    : menuStackTop;
+  const menuBoardTop = menuTopHudReserve > 0
+    ? menuHeaderContentBottom + menuInlineTitleBoardGap
+    : menuStackTop + laneGap + menuTitleReserve + laneGap;
+  const menuBottomReserve = laneGap + dockReserve;
+  const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
+  const playVerticalBoardLimit = height - playTopHudReserve - (playControlReserve + (laneGap * 2));
+  const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuAvailableBoardHeight);
+  const baseBoardScale = isPortrait ? 0.92 : 0.62;
+  const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
+  const scaleBias = 1 + ((normalizedScale - 50) / 500);
+  const menuEdgeMargin = isUltraNarrow ? 4 : (shouldUseCleanPhoneCadence ? 4 : 8);
+  const menuMaxBoardByWidth = Math.max(60, width - (menuEdgeMargin * 2));
+  const maxBoardWidthBound = isPlaySurface
+    ? width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)))
+    : menuMaxBoardByWidth;
+  const maxBoardHeightBound = isPlaySurface
+    ? Math.min(height * (isPortrait ? 0.74 : 0.86), laneBoardLimit)
+    : laneBoardLimit;
+  const minBoardWidthBound = Math.min(maxBoardWidthBound, 300);
+  const minBoardHeightBound = Math.min(maxBoardHeightBound, 300);
+  const rawBoardWidthBound = isPlaySurface
+    ? width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias
+    : menuMaxBoardByWidth * scaleBias;
+  const rawBoardHeightBound = isPlaySurface
+    ? Math.min(height * (isPortrait ? 0.64 : 0.84) * scaleBias, laneBoardLimit)
+    : laneBoardLimit * scaleBias;
+  const boardWidthTarget = Math.round(clamp(rawBoardWidthBound, minBoardWidthBound, maxBoardWidthBound));
+  const boardHeightTarget = Math.round(clamp(rawBoardHeightBound, minBoardHeightBound, maxBoardHeightBound));
+
+  if (boardWidthTarget <= 0 || boardHeightTarget <= 0) {
+    return 1;
+  }
+
+  // Clamp to a sane range so an extreme viewport (very tall phone in
+  // split-screen, ultra-wide monitor) can't request a degenerate 1-wide or
+  // 1-tall maze -- the generation pipeline's checkpoint/shortcut budgets are
+  // tuned for roughly square-ish grids and get unreliable well outside this.
+  return clamp(boardWidthTarget / boardHeightTarget, 0.45, 2.2);
+};
+
 export const resolveLegacyMenuLayout = (
   width: number,
   height: number,
   scale: number,
-  mazeSize: number,
+  mazeWidth: number,
+  mazeHeight: number,
   surface: LegacyMenuLayoutSurface = 'menu',
   options: LegacyMenuLayoutOptions = {}
 ): LegacyMenuLayout => {
@@ -94,7 +203,6 @@ export const resolveLegacyMenuLayout = (
   const shouldUseCleanPhoneCadence = isPortrait
     && !isUltraNarrow
     && (width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH || options.browserMobileParity === true);
-  const isShortLandscapeMenu = !isPlaySurface && !isPortrait && height < 820;
   // The exact 172px diagnostic side panel cannot fit two 44px actions plus the
   // maze without overlap. Preserve that constrained fallback; normal narrow
   // phone and split-screen layouts use the canonical touch target below.
@@ -108,131 +216,268 @@ export const resolveLegacyMenuLayout = (
   ));
   const stackGap = Math.round(clamp(height * 0.02, 7, 12));
   const laneGap = isUltraNarrow ? 4 : 8;
-  const menuActionGap = isUltraNarrow ? laneGap : 10;
   const menuTopReserve = isUltraNarrow ? 6 : Math.round(clamp(height * 0.02, 16, 20));
-  const menuTopHudReserve = !isPlaySurface && !isUltraNarrow
-    ? Math.round(clamp(height * 0.072, LEGACY_MENU_TOP_HUD_MIN, LEGACY_MENU_TOP_HUD_MAX))
+  // Always reserve real space for the header icons (AI badge, settings cog)
+  // on the menu surface, even in ultra-narrow width. The previous code
+  // zeroed this reserve below 300px on the theory the header would occupy
+  // no space there, but createLegacyMenuSettingsCogButton draws the header
+  // icon unconditionally regardless of width -- the reserve-vs-actual
+  // mismatch let the title lane start underneath it, causing a real,
+  // reproducible overlap at every ultra-narrow size.
+  const menuTopHudReserve = !isPlaySurface
+    ? Math.round(clamp(height * 0.072, isUltraNarrow ? 44 : LEGACY_MENU_TOP_HUD_MIN, LEGACY_MENU_TOP_HUD_MAX))
     : 0;
-  const menuFooterReserve = isUltraNarrow ? 10 : 18;
+  // The title prefers to sit inline in the header row, centered in the gap
+  // between the leading (AI/level) badge and the trailing settings cog --
+  // not as a separate banner lane above the board. Only fall back to the
+  // banner lane below when that gap is too narrow to hold the wordmark
+  // legibly (e.g. the diagnostic side panel and other very narrow widths).
+  let menuTitleFitsInHeader = false;
+  let menuHeaderTitleCenterX = Math.round(width / 2);
+  let menuHeaderTitleCenterY = 0;
+  // menuTopHudReserve is a touch-target-sized lane (clamped to a 56-72px
+  // floor for tap-target compliance), but the actual header icons rendered
+  // inside it are only ~36-40px tall and vertically centered -- leaving a
+  // lot of dead reserved space below them that the old menuStackTop-based
+  // board position paid for unnecessarily. Track the icons' real bottom
+  // edge so the board can sit right under the visible content instead of
+  // under the abstract lane.
+  let menuHeaderContentBottom = menuTopHudReserve + menuTopReserve;
+  if (!isPlaySurface && menuTopHudReserve > 0) {
+    const leadingHeaderFrame = resolveLegacyHeaderControlFrame({
+      height,
+      hudHeight: menuTopHudReserve,
+      hudTop: 0,
+      placement: 'leading',
+      width
+    });
+    const trailingHeaderFrame = resolveLegacyHeaderControlFrame({
+      height,
+      hudHeight: menuTopHudReserve,
+      hudTop: 0,
+      placement: 'trailing',
+      width
+    });
+    menuHeaderContentBottom = Math.max(leadingHeaderFrame.bottom, trailingHeaderFrame.bottom);
+    const headerGap = trailingHeaderFrame.left - leadingHeaderFrame.right;
+    // Keep this formula identical to resolveLegacyMenuTitlePresentation's
+    // fontSize in legacyMenuTitle.ts, or the fit-check here and the actual
+    // rendered size will drift apart.
+    const inlineTitleFontSize = Math.max(22, Math.round(menuTopHudReserve * 0.68));
+    const inlineTitleWidth = resolveLegacyMenuTitleFootprintWidth(inlineTitleFontSize);
+    const inlineTitlePadding = 24;
+    if (headerGap >= inlineTitleWidth + inlineTitlePadding) {
+      menuTitleFitsInHeader = true;
+      menuHeaderTitleCenterX = Math.round((leadingHeaderFrame.right + trailingHeaderFrame.left) / 2);
+      menuHeaderTitleCenterY = Math.round(leadingHeaderFrame.centerY);
+    }
+  }
+  // Title is deliberately compact and sized purely from viewport dimensions
+  // (not from board size -- see the circular-dependency note on
+  // resolveLegacyMenuTitlePresentation in legacyMenuTitle.ts). The board
+  // claims essentially everything else, so this must stay small on purpose:
+  // it is a slim wordmark banner, not a hero element.
   const menuTitleReserve = isUltraNarrow
-    ? 50
-    : isPortrait
-      // The animated title extends above and below its core grid through its
-      // orbit and crown. Reserve that complete visual footprint—not only the
-      // letter cells—so it cannot sit beneath the level, AI, or settings
-      // controls on a real phone.
-      ? Math.round(clamp(width * 0.38, 136, 156))
-      // Landscape needs the same outer-title clearance. Keeping this larger
-      // than the letter-grid height makes the board and Start action move as a
-      // coherent group rather than solving the header collision ad hoc.
-      : Math.round(clamp(height * 0.21, 140, 152));
-  const menuRankReserve = 0;
-  const menuActionReserve = buttonHeight;
+    ? 32
+    : Math.round(clamp(Math.min(height * 0.055, width * 0.11), 34, 56));
+  // Bottom-docked primary button (Fitness-app BottomDockButton style): a
+  // wide pill sitting near the bottom edge with its own margin, not tightly
+  // hugging the board like the old row/stack action lane did.
+  const dockBottomMargin = isUltraNarrow ? 10 : 20;
+  const dockReserve = buttonHeight + dockBottomMargin;
   const playTopHudReserve = isPlaySurface && isPortrait
     ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
     : 56;
   const playControlReserve = isPlaySurface
     ? Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230))
     : 0;
-  const menuVerticalBoardLimit = height
-    - menuTopReserve
-    - menuTopHudReserve
-    - menuTitleReserve
-    - menuRankReserve
-    - menuActionReserve
-    - (laneGap * 2)
-    - menuActionGap
-    - menuFooterReserve;
+  // Menu surface: explicit top-to-bottom stack (header -> title -> board ->
+  // dock button), each section computed from the one above it so nothing can
+  // ever overlap by construction, instead of several independently-guessed
+  // ratios that happened to usually avoid colliding. The board gets ALL
+  // remaining space after the other (deliberately small) reserves -- that is
+  // the "fill to the edges" requirement.
+  const menuStackTop = menuTopHudReserve + menuTopReserve;
+  const menuTitleTop = menuStackTop + laneGap;
+  // When the title fits inline in the header row, no separate title lane is
+  // reserved at all -- the board reclaims that space, matching the "fill to
+  // the edges" requirement. This junction uses a tighter gap than the
+  // general laneGap: the header row already has its own internal padding
+  // around the title/icons, so the board can sit closer beneath it without
+  // touching.
+  const menuInlineTitleBoardGap = isUltraNarrow ? 2 : 4;
+  const menuBoardTop = menuTitleFitsInHeader
+    ? menuHeaderContentBottom + menuInlineTitleBoardGap
+    : menuTitleTop + menuTitleReserve + laneGap;
+  const menuBottomReserve = laneGap + dockReserve;
+  const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
+
   const playVerticalBoardLimit = height
     - playTopHudReserve
     - (playControlReserve + (laneGap * 2));
-  const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuVerticalBoardLimit);
-  const baseBoardScale = isUltraNarrow ? 0.98 : (isPortrait ? (isPlaySurface ? 0.92 : 0.86) : (isPlaySurface ? 0.62 : 0.52));
+  const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuAvailableBoardHeight);
+  const baseBoardScale = isPortrait ? 0.92 : 0.62;
   const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
-  const maxBoardSize = Math.min(
-    width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78))),
-    height * (isPlaySurface ? (isPortrait ? 0.74 : 0.86) : (isPortrait ? 0.82 : (isShortLandscapeMenu ? 0.6 : 0.72))),
-    laneBoardLimit
-  );
-  const minBoardSize = Math.min(300, Math.max(120, maxBoardSize));
-  const rawBoardSize = Math.min(
-    width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias,
-    height * (isPlaySurface ? (isPortrait ? 0.64 : 0.84) : (isPortrait ? 0.54 : (isShortLandscapeMenu ? 0.6 : 0.72))) * scaleBias,
-    laneBoardLimit
-  );
-  const boardSize = Math.round(clamp(rawBoardSize, minBoardSize, maxBoardSize));
-  const rawTileSize = boardSize / Math.max(1, mazeSize);
-  const cleanPhoneBoardSize = Math.max(
+  // Tightened from 6/8/12 per feedback wanting the board to sit closer to
+  // the screen's left/right edges -- the maze render frame's own safe
+  // inset (LEGACY_BOARD_MAZE_SAFE_INSET_*, 4-7px) still keeps the actual
+  // tiles a little clear of the literal edge, so this isn't pixel-zero.
+  const menuEdgeMargin = isUltraNarrow ? 4 : (shouldUseCleanPhoneCadence ? 4 : 8);
+  const menuMaxBoardByWidth = Math.max(60, width - (menuEdgeMargin * 2));
+  // Width-bound and height-bound board limits are resolved independently --
+  // each axis gets its own max/min/raw target -- so a non-square maze
+  // (mazeWidth !== mazeHeight) can genuinely fill both the full available
+  // width AND the full available vertical lane at once, instead of being
+  // capped to whichever axis is smaller the way a single combined maxBoardSize
+  // forced a square box even on a non-square viewport. When mazeWidth ===
+  // mazeHeight (the pre-rectangular default), taking Math.min() of the two
+  // axis tile sizes below reduces to exactly the old combined-min formula --
+  // this is a pure axis split, not a behavior change, for the square case.
+  const maxBoardWidthBound = isPlaySurface
+    ? width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)))
+    : menuMaxBoardByWidth;
+  const maxBoardHeightBound = isPlaySurface
+    ? Math.min(height * (isPortrait ? 0.74 : 0.86), laneBoardLimit)
+    : laneBoardLimit;
+  // Must never exceed the max bound -- the old `Math.max(120, maxBoardSize)`
+  // could force a 120px floor even when maxBoardSize (the safe fill bound)
+  // was itself smaller than 120 at extreme short heights, inverting the
+  // clamp below and pushing the board past its safe bound into the dock
+  // reserve. Same self-correcting min() applies per axis here.
+  const minBoardWidthBound = Math.min(maxBoardWidthBound, 300);
+  const minBoardHeightBound = Math.min(maxBoardHeightBound, 300);
+  const rawBoardWidthBound = isPlaySurface
+    // cleanPhoneWidthScale must override baseBoardScale here exactly like it
+    // does in maxBoardWidthBound above -- dropping it silently shrank the
+    // play-surface board on clean-phone-cadence widths (<=420px portrait).
+    ? width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias
+    : menuMaxBoardByWidth * scaleBias;
+  const rawBoardHeightBound = isPlaySurface
+    ? Math.min(height * (isPortrait ? 0.64 : 0.84) * scaleBias, laneBoardLimit)
+    // scaleBias is the user's own board-scale preference (Options); let it
+    // shrink the board below the max fill, but the maxBoardHeightBound clamp
+    // below guarantees it can never grow past the safe fill bound and
+    // reintroduce overlap.
+    : laneBoardLimit * scaleBias;
+  const boardWidthTarget = Math.round(clamp(rawBoardWidthBound, minBoardWidthBound, maxBoardWidthBound));
+  const boardHeightTarget = Math.round(clamp(rawBoardHeightBound, minBoardHeightBound, maxBoardHeightBound));
+  // A uniform tileSize (square cells) is the smaller of the two axis-derived
+  // tile sizes, so the board never overflows either bound -- whichever axis
+  // is the tighter constraint fills its bound exactly, and the other axis
+  // gets centered slack (see menuBoardCenterOffset/boardLeft below).
+  const rawTileSizeFromWidth = boardWidthTarget / Math.max(1, mazeWidth);
+  const rawTileSizeFromHeight = boardHeightTarget / Math.max(1, mazeHeight);
+  const rawTileSize = Math.min(rawTileSizeFromWidth, rawTileSizeFromHeight);
+  const cleanPhoneBoardWidth = Math.max(
     1,
-    Math.min(boardSize, width - (LEGACY_PHONE_CLEAN_OUTER_MARGIN * 2))
+    Math.min(boardWidthTarget, width - (LEGACY_PHONE_CLEAN_OUTER_MARGIN * 2))
+  );
+  const cleanPhoneInsetPad = LEGACY_PHONE_CLEAN_SAFE_INSET * 2;
+  const cleanPhoneTileSize = Math.min(
+    (cleanPhoneBoardWidth - cleanPhoneInsetPad) / Math.max(1, mazeWidth),
+    boardHeightTarget / Math.max(1, mazeHeight)
   );
   const tileSize = isUltraNarrow
     ? Math.max(3, Number(rawTileSize.toFixed(3)))
     : shouldUseCleanPhoneCadence
-      ? Math.max(
-        4,
-        Number(((cleanPhoneBoardSize - (LEGACY_PHONE_CLEAN_SAFE_INSET * 2)) / Math.max(1, mazeSize)).toFixed(3))
-      )
+      ? Math.max(4, Number(cleanPhoneTileSize.toFixed(3)))
     : Math.max(4, Math.floor(rawTileSize));
-  const snappedBoardSize = shouldUseCleanPhoneCadence
-    ? Math.round(cleanPhoneBoardSize)
-    : Math.round(tileSize * mazeSize * 1000) / 1000;
-  const boardLeft = Math.round((width - snappedBoardSize) / 2);
-  const menuGroupHeight = menuTitleReserve + snappedBoardSize + menuRankReserve + menuActionReserve + (laneGap * 2) + menuActionGap;
-  const menuGroupTop = Math.max(
-    menuTopHudReserve + menuTopReserve,
-    Math.round((height - menuFooterReserve - menuGroupHeight) / 2)
+  const snappedBoardWidth = shouldUseCleanPhoneCadence
+    ? Math.round(cleanPhoneBoardWidth)
+    : Math.round(tileSize * mazeWidth * 1000) / 1000;
+  // Mirror the width axis's inset padding onto height so a clean-phone-
+  // cadence board reads with symmetric slack on all four sides instead of
+  // only left/right.
+  const snappedBoardHeight = shouldUseCleanPhoneCadence
+    ? Math.round((tileSize * mazeHeight) + cleanPhoneInsetPad)
+    : Math.round(tileSize * mazeHeight * 1000) / 1000;
+  const boardLeft = Math.round((width - snappedBoardWidth) / 2);
+  // The board claims its full width-constrained size regardless of how much
+  // vertical room is actually available (laneBoardLimit already bounds it
+  // safely) -- on most portrait phones that leaves real slack between the
+  // title/header above and the dock button below. Center the board within
+  // that slack instead of leaving it pinned to the top with a large empty
+  // gap beneath it and above the dock button.
+  const menuBoardZoneTop = menuBoardTop;
+  const menuBoardZoneBottom = height - menuBottomReserve;
+  const menuBoardZoneHeight = Math.max(0, menuBoardZoneBottom - menuBoardZoneTop);
+  const menuBoardCenterOffset = !isPlaySurface
+    ? Math.max(0, (menuBoardZoneHeight - snappedBoardHeight) / 2)
+    : 0;
+  const boardTop = Math.round(
+    isPlaySurface ? (playTopHudReserve + laneGap) : (menuBoardZoneTop + menuBoardCenterOffset)
   );
-  const menuBoardTop = menuGroupTop + menuTitleReserve + laneGap;
-  const playBoardTop = isPlaySurface
-    ? playTopHudReserve + laneGap
-    : menuBoardTop;
-  const boardTop = Math.round(isPlaySurface ? playBoardTop : menuBoardTop);
-  const menuRankLaneTop = boardTop + snappedBoardSize + laneGap;
-  const menuActionLaneTop = menuRankLaneTop + menuActionGap;
-  const menuRowButtonY = menuActionLaneTop + Math.round(buttonHeight / 2);
+  const menuDockButtonY = height - dockBottomMargin - Math.round(buttonHeight / 2);
   const playRowButtonY = isPortrait
-    ? boardTop + snappedBoardSize + Math.round(buttonHeight * 0.86)
-    : boardTop + snappedBoardSize + Math.round(buttonHeight * 0.54);
-  const rowButtonY = isPortrait
-    ? Math.round(clamp(
-      isPlaySurface ? playRowButtonY : menuRowButtonY,
-      boardTop + snappedBoardSize + 26,
-      height - Math.round(buttonHeight * 0.76)
-    ))
-    : Math.round(clamp(
-      isPlaySurface ? playRowButtonY : menuRowButtonY,
-      boardTop + snappedBoardSize + 24,
-      height - Math.round(buttonHeight * 0.54)
-    ));
+    ? boardTop + snappedBoardHeight + Math.round(buttonHeight * 0.86)
+    : boardTop + snappedBoardHeight + Math.round(buttonHeight * 0.54);
+  const rowButtonY = isPlaySurface
+    ? (isPortrait
+      ? Math.round(clamp(playRowButtonY, boardTop + snappedBoardHeight + 26, height - Math.round(buttonHeight * 0.76)))
+      : Math.round(clamp(playRowButtonY, boardTop + snappedBoardHeight + 24, height - Math.round(buttonHeight * 0.54))))
+    // Menu: the dock button's position is already guaranteed clear of the
+    // board by the menuBottomReserve subtraction above -- no clamp needed.
+    : menuDockButtonY;
   const buttonWidth = Math.round(clamp(width * (isPortrait ? 0.29 : 0.118), isUltraNarrow ? 96 : (isPortrait ? 118 : 164), isPortrait ? Math.min(132, width - 36) : 238));
   const centerButtonWidth = isPortrait
     ? buttonWidth
     : Math.round(clamp(buttonWidth * 1.14, buttonWidth + 20, 262));
   const centerButtonX = Math.round(width * 0.5);
   const rowButtonGap = Math.round(clamp(width * (isPortrait ? 0.045 : 0.016), isPortrait ? 14 : 18, isPortrait ? 22 : 34));
-  const rowButtonOffset = Math.round((buttonWidth / 2) + (rowButtonGap / 2));
+  // Offset must clear both the flanking button's own half-width AND the
+  // center button's half-width (plus the gap) or the two boxes overlap.
+  // The previous formula only reserved half the flanking button's width and
+  // half the gap, ignoring the center button entirely -- it collided at
+  // virtually every row-layout size, not just narrow ones.
+  const rowButtonOffset = Math.round((buttonWidth / 2) + rowButtonGap + (centerButtonWidth / 2));
+  // If a 3-button row genuinely doesn't fit at this width, fall back to the
+  // stacked layout instead of trusting a fixed pixel threshold that can't
+  // track button-size formula changes. This is what surfaced the
+  // rowButtonOffset fix above as a real bug in the first place: once that
+  // offset was corrected to stop overlapping, the flanking buttons ran off
+  // the left/right screen edges at ordinary narrow phone widths (320-390px)
+  // that the old fixed <300px threshold assumed were wide enough.
+  // Both flanking buttons need their own full width, not just one -- this
+  // must mirror centerX +/- rowButtonOffset +/- buttonWidth/2 exactly
+  // (rowButtonOffset already bakes in one buttonWidth/2 + one gap + one
+  // centerButtonWidth/2 per side, so the total required span is
+  // 2*rowButtonOffset + buttonWidth, i.e. 2*buttonWidth + 2*gap + centerWidth).
+  const rowFitsWidth = ((buttonWidth * 2) + (rowButtonGap * 2) + centerButtonWidth) <= (width - 16);
+  const resolvedUsesStackedButtons = usesStackedButtons || !rowFitsWidth;
   const stackHeight = (buttonHeight * 2) + stackGap;
+  // clamp(value, min, max) inverts (returns min instead of the safe max) if
+  // min ends up greater than max -- now that the board can sit lower in its
+  // zone (see menuBoardCenterOffset above), boardTop + snappedBoardHeight + 12
+  // can exceed height - stackHeight - 18 in tight ultra-narrow cases. Cap
+  // the lower bound at the upper bound so it never inverts.
+  const stackTopMax = height - stackHeight - 18;
+  const stackTopMin = Math.min(boardTop + snappedBoardHeight + 12, stackTopMax);
   const stackTop = Math.round(clamp(
-    boardTop + snappedBoardSize + 18,
-    boardTop + snappedBoardSize + 12,
-    height - stackHeight - 18
+    boardTop + snappedBoardHeight + 18,
+    stackTopMin,
+    stackTopMax
   ));
-  const leftButtonY = usesStackedButtons ? stackTop + Math.round(buttonHeight / 2) : rowButtonY;
-  const rightButtonY = usesStackedButtons ? leftButtonY + buttonHeight + stackGap : rowButtonY;
+  const leftButtonY = resolvedUsesStackedButtons ? stackTop + Math.round(buttonHeight / 2) : rowButtonY;
+  const rightButtonY = resolvedUsesStackedButtons ? leftButtonY + buttonHeight + stackGap : rowButtonY;
   const centerButtonY = rowButtonY;
-  const titleLaneTop = Math.max(0, boardTop - laneGap - menuTitleReserve);
-  const menuPortraitTitleFallbackY = Math.max(
-    titleLaneTop + 20,
-    Math.round(titleLaneTop + (menuTitleReserve / 2) - (isPortrait ? 16 : 0))
-  );
-  const menuPortraitTitleY = menuPortraitTitleFallbackY;
-  const titleX = !isPlaySurface && isPortrait ? boardLeft + (snappedBoardSize / 2) : Math.round(width / 2);
+  const titleLaneTop = menuTitleFitsInHeader ? 0 : Math.max(0, boardTop - laneGap - menuTitleReserve);
+  // Simple mid-lane centering. The old formula's extra -16px portrait nudge
+  // was tuned against the previous ~140-156px title reserve; against the new
+  // much smaller compact reserve that same fixed offset would push the
+  // title dangerously off-center within its own tiny lane.
+  const menuPortraitTitleY = menuTitleFitsInHeader
+    ? menuHeaderTitleCenterY
+    : Math.round(titleLaneTop + (menuTitleReserve / 2));
+  const titleX = menuTitleFitsInHeader
+    ? menuHeaderTitleCenterX
+    : (!isPlaySurface && isPortrait ? boardLeft + (snappedBoardWidth / 2) : Math.round(width / 2));
   const rankLane = null;
-  const actionsLane = isPlaySurface ? null : createLane(menuActionLaneTop, menuActionReserve);
+  const actionsLane = isPlaySurface
+    ? null
+    : createLane(menuDockButtonY - Math.round(buttonHeight / 2), buttonHeight);
   const controlsLane = isPlaySurface
-    ? createLane(boardTop + snappedBoardSize + laneGap, Math.max(0, height - (boardTop + snappedBoardSize + laneGap)))
+    ? createLane(boardTop + snappedBoardHeight + laneGap, Math.max(0, height - (boardTop + snappedBoardHeight + laneGap)))
     : null;
 
   return {
@@ -240,20 +485,24 @@ export const resolveLegacyMenuLayout = (
     height,
     boardLeft,
     boardTop,
-    boardSize: snappedBoardSize,
+    boardWidth: snappedBoardWidth,
+    boardHeight: snappedBoardHeight,
     tileSize,
     titleX,
     titleY: Math.round(!isPlaySurface ? menuPortraitTitleY : boardTop),
+    titleReserveHeight: isPlaySurface
+      ? Math.round(height * 0.055)
+      : (menuTitleFitsInHeader ? menuTopHudReserve : menuTitleReserve),
     footerY: height - 18,
-    buttonLayout: usesStackedButtons ? 'stack' : 'row',
+    buttonLayout: resolvedUsesStackedButtons ? 'stack' : 'row',
     buttonY: rowButtonY,
     centerButtonY,
     leftButtonY,
     rightButtonY,
     centerButtonWidth,
-    leftButtonX: usesStackedButtons ? centerButtonX : centerButtonX - rowButtonOffset,
+    leftButtonX: resolvedUsesStackedButtons ? centerButtonX : centerButtonX - rowButtonOffset,
     centerButtonX,
-    rightButtonX: usesStackedButtons ? centerButtonX : centerButtonX + rowButtonOffset,
+    rightButtonX: resolvedUsesStackedButtons ? centerButtonX : centerButtonX + rowButtonOffset,
     buttonWidth,
     buttonHeight,
     lanes: {
@@ -264,9 +513,9 @@ export const resolveLegacyMenuLayout = (
         : menuTopHudReserve > 0
           ? createLane(0, menuTopHudReserve)
           : null,
-      maze: createLane(boardTop, snappedBoardSize),
+      maze: createLane(boardTop, snappedBoardHeight),
       rank: rankLane,
-      title: isPlaySurface ? null : createLane(titleLaneTop, menuTitleReserve)
+      title: (isPlaySurface || menuTitleFitsInHeader) ? null : createLane(titleLaneTop, menuTitleReserve)
     }
   };
 };

@@ -39,8 +39,12 @@ export interface LegacyOverlayShellLayout {
   contentTop: number;
   contentWidth: number;
   messageCenterY: number;
-  titleCenterY: number;
 }
+
+// Header chrome for Settings/Pause is now just the corner back button --
+// no title text -- so this is the button's own footprint (fixed top
+// margin + diameter), not a band sized to fit a heading.
+export const LEGACY_OVERLAY_HEADER_RESERVE = 46;
 
 export const resolveLegacyOverlayShellLayout = ({
   actionHeight,
@@ -59,9 +63,10 @@ export const resolveLegacyOverlayShellLayout = ({
   const actionBottomInset = compact ? 20 : 24;
   const actionRowGap = compact ? 10 : 14;
   const actionContentGap = compact ? 12 : 16;
-  const titleCenterY = panel.top + (compact ? 52 : 56);
-  const messageCenterY = panel.top + (compact ? 82 : 88);
-  const contentTop = panel.top + (compact ? 76 : 84) + (hasMessage ? 22 : 0);
+  const messageCenterY = panel.top + LEGACY_OVERLAY_HEADER_RESERVE + (compact ? 12 : 14);
+  const contentTop = panel.top + LEGACY_OVERLAY_HEADER_RESERVE + (hasMessage
+    ? (compact ? 26 : 30)
+    : (compact ? 6 : 8));
   const panelBottom = panel.top + panel.height;
   const actionCenterY = panelBottom - actionBottomInset - (resolvedActionHeight / 2);
   const actionStackTop = actionCenterY
@@ -75,8 +80,7 @@ export const resolveLegacyOverlayShellLayout = ({
     contentLeft: panel.left + contentHorizontalInset,
     contentTop,
     contentWidth: Math.max(1, panel.width - (contentHorizontalInset * 2)),
-    messageCenterY,
-    titleCenterY
+    messageCenterY
   };
 };
 
@@ -118,10 +122,12 @@ export const resolveLegacyUiLabelCenterY = (
 export interface LegacyOptionsGuideLayout {
   cardHeight: number;
   cardWidthLimit: number;
+  collapsedHeight: number;
   horizontalMargin: number;
   inset: number;
   legendTopOffset: number;
   rowHeight: number;
+  rowCount: number;
   rowFontSize: number;
   rowMinFontSize: number;
   textWidthSafetyRatio: number;
@@ -130,18 +136,26 @@ export interface LegacyOptionsGuideLayout {
   titleRuleOffset: number;
 }
 
+// The Guide card collapses to a single tappable header row by default (a
+// "compass/start/exit + move" legend doesn't need to stay pinned open the
+// whole time a player is in Settings) and expands to the full 4-row legend
+// (compass, start, exit, move) on tap.
 export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptionsGuideLayout => {
   const compact = panelWidth < LEGACY_UI_COMPACT_BREAKPOINT;
   const titleFontSize = compact ? 15 : 17;
   const titleOffset = compact ? 16 : 18;
+  const rowHeight = compact ? 18 : 20;
+  const rowCount = 4;
 
   return {
-    cardHeight: compact ? 112 : 122,
+    cardHeight: (compact ? 112 : 122) + rowHeight,
     cardWidthLimit: compact ? 350 : 540,
+    collapsedHeight: compact ? 40 : 46,
     horizontalMargin: compact ? 48 : 64,
     inset: compact ? 18 : 22,
     legendTopOffset: compact ? 43 : 47,
-    rowHeight: compact ? 18 : 20,
+    rowHeight,
+    rowCount,
     rowFontSize: compact ? 11 : 12,
     rowMinFontSize: compact ? 10 : 10,
     textWidthSafetyRatio: compact ? 0.9 : 0.92,
@@ -231,9 +245,9 @@ export interface LegacyToggleRowLayout {
 export const resolveLegacyToggleRowLayout = (
   width: number,
   height: number,
-  hasDescription: boolean
+  hasDescription: boolean,
+  compact: boolean
 ): LegacyToggleRowLayout => {
-  const compact = width < 340;
   const showStateLabel = width >= 286;
   return {
     labelFontSize: hasDescription
@@ -250,5 +264,34 @@ export const resolveLegacyToggleRowLayout = (
     trackGap: compact ? 8 : 10,
     trackHeight: compact ? 20 : 23,
     trackWidth: compact ? 36 : 40
+  };
+};
+
+export interface LegacyTwoUpButtonLayout {
+  buttonWidth: number;
+  leftX: number;
+  rightX: number;
+}
+
+// Two side-by-side buttons, each capped to maxButtonWidth, filling the
+// panel width minus horizontalMargin and centered on centerX with gap
+// between them. Shared by every overlay that lays out an even pair of
+// buttons this way (e.g. Pause's Reset/Menu row) -- callers with a
+// genuinely different sizing rule (like a pair split from one pre-capped
+// total width) should keep their own formula rather than force-fit this one.
+export const resolveLegacyTwoUpButtonLayout = (
+  centerX: number,
+  panelWidth: number,
+  maxButtonWidth: number,
+  horizontalMargin: number,
+  gap: number
+): LegacyTwoUpButtonLayout => {
+  const buttonWidth = Math.min(maxButtonWidth, Math.floor((panelWidth - horizontalMargin) / 2));
+  const offset = (buttonWidth + gap) / 2;
+
+  return {
+    buttonWidth,
+    leftX: centerX - offset,
+    rightX: centerX + offset
   };
 };

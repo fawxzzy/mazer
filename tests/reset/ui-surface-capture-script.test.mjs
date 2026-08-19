@@ -47,9 +47,9 @@ describe('UI surface capture menu header controls', () => {
 
   const menuSurface = ({
     playerLevel = null,
-    aiLevel = bounds(9, 13, 44, 44),
-    aiLabel = 'AI',
-    settings = bounds(352, 13, 44, 44)
+    aiLevel = bounds(9, 13, 36, 36),
+    aiLabel = 'LVL',
+    settings = bounds(352, 13, 36, 36)
   } = {}) => ({
     mode: 'menu',
     overlay: 'none',
@@ -65,16 +65,16 @@ describe('UI surface capture menu header controls', () => {
   test('rejects missing, undersized, or misaligned menu header controls', () => {
     expect(collectMenuControlSpacingIssues(menuSurface({ playerLevel: bounds(9, 13, 44, 44) })))
       .toContain('menu:player-level-glyph-visible');
-    expect(collectMenuControlSpacingIssues(menuSurface({ settings: bounds(350, 15, 42, 42) })))
+    expect(collectMenuControlSpacingIssues(menuSurface({ settings: bounds(350, 15, 30, 30) })))
       .toEqual(expect.arrayContaining([
-        'menu:settings-target=42.0x42.0<44',
-        'menu:ai-level-settings-size-mismatch=44.0x44.0!=42.0x42.0',
+        'menu:settings-target=30.0x30.0<36',
+        'menu:ai-level-settings-size-mismatch=36.0x36.0!=30.0x30.0',
         'menu:ai-level-settings-top-mismatch=13.0!=15.0'
       ]));
     expect(collectMenuControlSpacingIssues(menuSurface({ aiLevel: null, aiLabel: null })))
       .toEqual(expect.arrayContaining([
         'menu:missing-ai-level-glyph',
-        'menu:ai-level-label=missing!=AI'
+        'menu:ai-level-label=missing!=LVL'
       ]));
     expect(collectMenuControlSpacingIssues(menuSurface({ aiLevel: bounds(301, 13, 44, 44) })))
       .toContain('menu:ai-level-to-settings-gap=7.0<8');

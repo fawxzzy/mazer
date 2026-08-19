@@ -28,7 +28,8 @@ class MemoryStorage {
 
 const createTestMaze = (): LegacyMazeSnapshot => ({
   source: 'play-generated',
-  size: 6,
+  width: 6,
+  height: 6,
   grid: [
     [false, false, false, false, false, false],
     [false, true, true, true, true, false],
@@ -113,7 +114,8 @@ describe('legacy maze cycle telemetry', () => {
     const maze: LegacyMazeSnapshot = {
       ...createTestMaze(),
       grid: [[true, false, true]],
-      size: 3,
+      width: 3,
+      height: 3,
       start: { x: 0, y: 0 },
       goal: { x: 2, y: 0 },
       solutionPath: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 2, y: 0 }]
@@ -399,7 +401,8 @@ describe('legacy maze cycle telemetry', () => {
     // differs from the generator's own (longer) reference route.
     const mazeWithUncreditedShortcut: LegacyMazeSnapshot = {
       source: 'play-generated',
-      size: 5,
+      width: 5,
+      height: 5,
       grid: [
         [false, false, false, false, false],
         [false, true, true, true, false],
@@ -474,7 +477,8 @@ describe('legacy maze cycle telemetry', () => {
     // shortcut can interfere with the tie.
     const ringMazeWithTiedRoutes: LegacyMazeSnapshot = {
       source: 'play-generated',
-      size: 5,
+      width: 5,
+      height: 5,
       grid: [
         [false, false, false, false, false, false, false],
         [false, true, true, true, true, true, false],
@@ -542,7 +546,8 @@ describe('legacy maze cycle telemetry', () => {
     // than the true 7-point shortest distance.
     const ringMazeWithTiedRoutes: LegacyMazeSnapshot = {
       source: 'play-generated',
-      size: 5,
+      width: 5,
+      height: 5,
       grid: [
         [false, false, false, false, false, false, false],
         [false, true, true, true, true, true, false],

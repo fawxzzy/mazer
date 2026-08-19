@@ -170,7 +170,8 @@ describe('live play QA script helpers', () => {
     const route = solveWalkableRoute({
       player: { x: 1, y: 1 },
       goal: { x: 2, y: 3 },
-      mazeSize: 4,
+      mazeWidth: 4,
+      mazeHeight: 4,
       walkableRows: [
         '0000',
         '0110',
@@ -192,7 +193,8 @@ describe('live play QA script helpers', () => {
     const horizontal = solveWalkableRoute({
       player: { x: 0, y: 2 },
       goal: { x: 4, y: 2 },
-      mazeSize: 5,
+      mazeWidth: 5,
+      mazeHeight: 5,
       walkableRows: [
         '00000',
         '00000',
@@ -204,7 +206,8 @@ describe('live play QA script helpers', () => {
     const vertical = solveWalkableRoute({
       player: { x: 2, y: 4 },
       goal: { x: 2, y: 0 },
-      mazeSize: 5,
+      mazeWidth: 5,
+      mazeHeight: 5,
       walkableRows: [
         '00100',
         '00000',
@@ -224,7 +227,8 @@ describe('live play QA script helpers', () => {
     expect(solveWalkableRoute({
       player: { x: 0, y: 0 },
       goal: { x: 2, y: 2 },
-      mazeSize: 3,
+      mazeWidth: 3,
+      mazeHeight: 3,
       walkableRows: [
         '100',
         '000',

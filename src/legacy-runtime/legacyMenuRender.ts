@@ -45,15 +45,17 @@ export interface LegacyMenuBorderDockRenderArea {
 }
 
 export interface LegacyMenuBorderDockRenderOptions {
+  boardHeight: number;
   boardLeft: number;
-  boardSize: number;
   boardTop: number;
+  boardWidth: number;
   cornerGuardSize: number;
   continuationLength?: number;
   materialTileSize: number;
+  mazeHeight: number;
   mazeLeft: number;
-  mazeSize: number;
   mazeTop: number;
+  mazeWidth: number;
   tileRect: LegacyMenuPixelRect;
   topCenterNotch?: {
     bottom: number;
@@ -167,10 +169,10 @@ export const resolveLegacyEndpointMarkerRenderMetrics = (
 };
 
 const isWalkableGridPoint = (
-  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
   point: LegacyPoint
 ): boolean => {
-  if (point.x < 0 || point.y < 0 || point.x >= maze.size || point.y >= maze.size) {
+  if (point.x < 0 || point.y < 0 || point.x >= maze.width || point.y >= maze.height) {
     return false;
   }
 
@@ -178,24 +180,24 @@ const isWalkableGridPoint = (
 };
 
 const isNonCornerBorderPoint = (
-  maze: Pick<LegacyMazeSnapshot, 'size'>,
+  maze: Pick<LegacyMazeSnapshot, 'width' | 'height'>,
   point: LegacyPoint
 ): boolean => (
   point.x >= 0
   && point.y >= 0
-  && point.x < maze.size
-  && point.y < maze.size
-  && (point.x === 0 || point.y === 0 || point.x === maze.size - 1 || point.y === maze.size - 1)
-  && !((point.x === 0 || point.x === maze.size - 1) && (point.y === 0 || point.y === maze.size - 1))
+  && point.x < maze.width
+  && point.y < maze.height
+  && (point.x === 0 || point.y === 0 || point.x === maze.width - 1 || point.y === maze.height - 1)
+  && !((point.x === 0 || point.x === maze.width - 1) && (point.y === 0 || point.y === maze.height - 1))
 );
 
 export const resolveLegacyMenuBorderDockDirections = (
-  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
   point: LegacyPoint
 ): LegacyMenuBorderDockDirection[] => resolveLegacyBleedOffPaths(maze, point).map((path) => path.direction);
 
 export const resolveLegacyBleedOffPaths = (
-  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
   point: LegacyPoint
 ): LegacyBleedOffPath[] => {
   if (!isWalkableGridPoint(maze, point) || !isNonCornerBorderPoint(maze, point)) {
@@ -204,7 +206,7 @@ export const resolveLegacyBleedOffPaths = (
 
   const direction = point.x === 0
     ? { deltaX: -1, deltaY: 0, name: 'left' as const }
-    : point.x === maze.size - 1
+    : point.x === maze.width - 1
       ? { deltaX: 1, deltaY: 0, name: 'right' as const }
       : point.y === 0
         ? { deltaX: 0, deltaY: -1, name: 'top' as const }
@@ -218,7 +220,7 @@ export const resolveLegacyBleedOffPaths = (
 };
 
 const isLegacyMenuPathConnected = (
-  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
   point: LegacyPoint,
   direction: LegacyMenuBorderDockDirection
 ): boolean => {
@@ -235,7 +237,7 @@ const isLegacyMenuPathConnected = (
 };
 
 export const resolveLegacyMenuPathRenderFrame = (
-  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
   point: LegacyPoint,
   tileSize: number
 ): LegacyMenuPathRenderFrame => {
@@ -254,7 +256,7 @@ export const resolveLegacyMenuPathRenderFrame = (
 };
 
 export const resolveLegacyMenuPathRenderFrames = (
-  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
   point: LegacyPoint,
   tileSize: number
 ): LegacyMenuPathRenderFrames => {
@@ -289,10 +291,10 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
   frame: LegacyMenuPathRenderFrame,
   options: LegacyMenuBorderDockRenderOptions
 ): LegacyMenuBorderDockRenderArea[] => {
-  const boardRight = options.boardLeft + options.boardSize;
-  const boardBottom = options.boardTop + options.boardSize;
-  const mazeRight = options.mazeLeft + options.mazeSize;
-  const mazeBottom = options.mazeTop + options.mazeSize;
+  const boardRight = options.boardLeft + options.boardWidth;
+  const boardBottom = options.boardTop + options.boardHeight;
+  const mazeRight = options.mazeLeft + options.mazeWidth;
+  const mazeBottom = options.mazeTop + options.mazeHeight;
   const materialTileSize = Math.max(1, options.materialTileSize);
   const bandLeft = options.tileRect.left + Math.round((frame.leftInset / materialTileSize) * options.tileRect.width);
   const bandTop = options.tileRect.top + Math.round((frame.topInset / materialTileSize) * options.tileRect.height);
@@ -377,7 +379,7 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
 };
 
 const resolveLegacyMenuPathStrokeSegments = (
-  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
   point: LegacyPoint,
   tileSize: number,
   strokeWidth: number
@@ -430,7 +432,7 @@ const resolveLegacyMenuPathStrokeSegments = (
 };
 
 export const resolveLegacyMenuPathRenderSegments = (
-  maze: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
   point: LegacyPoint,
   tileSize: number
 ): LegacyMenuPathRenderSegments => {

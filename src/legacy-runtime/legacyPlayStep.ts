@@ -260,7 +260,7 @@ export const resolveLegacyPlayDiagonalSequenceSteps = ({
 
   const horizontal = { deltaX: normalizedX, deltaY: 0 };
   const vertical = { deltaX: 0, deltaY: normalizedY };
-  const stepLimit = Math.max(1, Math.round(maxSteps ?? maze.size * 2));
+  const stepLimit = Math.max(1, Math.round(maxSteps ?? Math.max(maze.width, maze.height) * 2));
   let currentPlayer = copyPoint(player);
   let currentTrail = trail.map(copyPoint);
   let reachedGoal = false;
