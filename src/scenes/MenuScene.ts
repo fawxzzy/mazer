@@ -103,6 +103,7 @@ import {
   type LegacyMenuDemoAdvance
 } from '../legacy-runtime/legacyMenuDemoLifecycle';
 import {
+  resolveLegacyMenuBoardAspectRatio,
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
 } from '../legacy-runtime/legacyMenuLayout';
@@ -426,7 +427,8 @@ interface VisualTextLabel {
 interface LegacyMazeRenderFrame {
   boardLeft: number;
   boardTop: number;
-  boardSize: number;
+  boardWidth: number;
+  boardHeight: number;
   tileSize: number;
   safeInset: number;
 }
@@ -1397,6 +1399,7 @@ export class MenuScene extends Phaser.Scene {
     } else {
       this.applyGenerationRequest(
         createLegacyGenerationRequest({
+          aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu'),
           currentSeed: this.mazeSeed,
           dueAtMs: this.time.now,
           generationProfile: this.resolveLegacyMazeGenerationProfileForMode('menu'),
@@ -1903,7 +1906,8 @@ export class MenuScene extends Phaser.Scene {
     const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(
       this.layout.boardLeft + boardOffset.x,
       this.layout.boardTop + boardOffset.y,
-      this.layout.boardSize
+      this.layout.boardWidth,
+      this.layout.boardHeight
     );
     const progressionPalette = this.resolveActiveLegacyProgressionPalette();
     const trailShineMotion = resolveLegacyTrailShineMotion({
@@ -2014,16 +2018,16 @@ export class MenuScene extends Phaser.Scene {
       play: {
         board: {
           ...boardBounds,
-          size: this.layout.boardSize,
+          size: Math.max(this.layout.boardWidth, this.layout.boardHeight),
           tileSize: this.layout.tileSize,
           renderBounds: {
-            bottom: mazeRenderFrame.boardTop + mazeRenderFrame.boardSize,
+            bottom: mazeRenderFrame.boardTop + mazeRenderFrame.boardHeight,
             left: mazeRenderFrame.boardLeft,
-            right: mazeRenderFrame.boardLeft + mazeRenderFrame.boardSize,
+            right: mazeRenderFrame.boardLeft + mazeRenderFrame.boardWidth,
             top: mazeRenderFrame.boardTop
           },
           renderSafeInset: mazeRenderFrame.safeInset,
-          renderSize: mazeRenderFrame.boardSize,
+          renderSize: Math.max(mazeRenderFrame.boardWidth, mazeRenderFrame.boardHeight),
           renderTileSize: mazeRenderFrame.tileSize
         },
         lifecycle: playLifecycle,
@@ -3762,7 +3766,8 @@ export class MenuScene extends Phaser.Scene {
     const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(
       this.layout.boardLeft + boardOffset.x,
       this.layout.boardTop + boardOffset.y,
-      this.layout.boardSize
+      this.layout.boardWidth,
+      this.layout.boardHeight
     );
     return resolveLegacyPointerMoveVector({
       boardBounds,
@@ -3779,9 +3784,9 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyPlayBoardBounds(): { bottom: number; left: number; right: number; top: number } {
     const boardOffset = this.resolveBoardOffset();
     return {
-      bottom: this.layout.boardTop + boardOffset.y + this.layout.boardSize,
+      bottom: this.layout.boardTop + boardOffset.y + this.layout.boardHeight,
       left: this.layout.boardLeft + boardOffset.x,
-      right: this.layout.boardLeft + boardOffset.x + this.layout.boardSize,
+      right: this.layout.boardLeft + boardOffset.x + this.layout.boardWidth,
       top: this.layout.boardTop + boardOffset.y
     };
   }
@@ -3934,7 +3939,8 @@ export class MenuScene extends Phaser.Scene {
       width,
       height,
       this.settings.scale + this.settings.camScale,
-      Math.max(this.maze.width, this.maze.height),
+      this.maze.width,
+      this.maze.height,
       layoutSurface,
       {
         browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height),
@@ -3948,6 +3954,28 @@ export class MenuScene extends Phaser.Scene {
     this.boardDynamicDirty = true;
     this.backdropDirty = true;
     this.uiDirty = true;
+  }
+
+  // Probes the current viewport's available board box (independent of any
+  // maze already generated) and returns the width:height cell-count ratio a
+  // freshly generated maze should target so it naturally fills that box on
+  // both axes, instead of being square and then fit into a non-square box
+  // after the fact (see resolveLegacyMenuBoardAspectRatio for the box math).
+  private resolveLegacyBoardAspectRatioForMode(mode: RuntimeMode): number {
+    const viewportGeometry = readMazerViewportGeometry();
+    const width = viewportGeometry.content.width;
+    const height = viewportGeometry.content.height;
+    const layoutSurface = mode === 'play' ? 'play' : 'menu';
+    return resolveLegacyMenuBoardAspectRatio(
+      width,
+      height,
+      this.settings.scale + this.settings.camScale,
+      layoutSurface,
+      {
+        browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height),
+        menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest'
+      }
+    );
   }
 
   private applyGenerationRequest(request: LegacyGenerationRequest, nextDemoMoveAtMs = 0): void {
@@ -4034,6 +4062,7 @@ export class MenuScene extends Phaser.Scene {
       : undefined;
     this.applyGenerationRequest(
         createLegacyGenerationRequest({
+          aspectRatio: this.resolveLegacyBoardAspectRatioForMode(mode),
           currentSeed: this.mazeSeed,
           dueAtMs: this.time.now,
           generationProfile: this.resolveLegacyMazeGenerationProfileForMode(mode),
@@ -4112,6 +4141,7 @@ export class MenuScene extends Phaser.Scene {
   ): void {
     const mode = options.mode ?? this.mode;
     this.pendingGenerationRequest = createLegacyGenerationRequest({
+      aspectRatio: this.resolveLegacyBoardAspectRatioForMode(mode),
       currentSeed: this.mazeSeed,
       dueAtMs: this.time.now + Math.max(0, delayMs),
       generationProfile: this.resolveLegacyMazeGenerationProfileForMode(mode),
@@ -4395,6 +4425,7 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     if (this.mode === 'play') {
       this.pendingGenerationRequest = createLegacyPlayResetGenerationRequest({
+        aspectRatio: this.resolveLegacyBoardAspectRatioForMode('play'),
         currentSeed: this.mazeSeed,
         generationProfile: this.resolveLegacyMazeGenerationProfileForMode('play'),
         nowMs: time + this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
@@ -4542,6 +4573,7 @@ export class MenuScene extends Phaser.Scene {
     this.refreshRuntimeMazeSeedIfUnpinned();
     this.applyGenerationRequest(
       createLegacyGenerationRequest({
+        aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu'),
         currentSeed: this.mazeSeed,
         dueAtMs: this.time.now,
         generationProfile: this.resolveLegacyMazeGenerationProfileForMode('menu'),
@@ -4989,6 +5021,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.pendingGenerationRequest = createLegacyMenuResetGenerationRequest({
+      aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu'),
       currentSeed: this.mazeSeed,
       generationProfile: this.resolveLegacyMazeGenerationProfileForMode('menu'),
       nowMs: time,
@@ -5298,14 +5331,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawStaticBoard(): void {
-    const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardSize } = this.layout;
+    const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardWidth, boardHeight } = this.layout;
     const boardOffset = this.resolveBoardOffset();
     const boardLeft = layoutBoardLeft + boardOffset.x;
     const boardTop = layoutBoardTop + boardOffset.y;
-    const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardSize);
+    const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardWidth, boardHeight);
     const mazeLeft = mazeRenderFrame.boardLeft;
     const mazeTop = mazeRenderFrame.boardTop;
-    const mazeSize = mazeRenderFrame.boardSize;
+    const mazeWidth = mazeRenderFrame.boardWidth;
+    const mazeHeight = mazeRenderFrame.boardHeight;
     const tileSize = mazeRenderFrame.tileSize;
     const isMenuMode = this.mode === 'menu';
     const boardFill = LEGACY_PLAY_BOARD_FILL;
@@ -5315,15 +5349,15 @@ export class MenuScene extends Phaser.Scene {
     const boardShadowAlpha = isMenuMode ? LEGACY_MENU_PANEL_SHADOW_ALPHA : 0;
     if (boardShadowAlpha > 0) {
       this.boardStaticGraphics.fillStyle(0x000000, boardShadowAlpha);
-      this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardSize, boardSize);
+      this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardWidth, boardHeight);
     }
     // Menu board intentionally has no slab backdrop, edge frame, or glass
     // tint: the maze tiles should read as floating directly on the scene,
     // not boxed in by anything, however faint.
     if (!isMenuMode) {
-      this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);
+      this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardWidth, boardHeight, boardEdge);
       this.boardStaticGraphics.fillStyle(boardFill, LEGACY_PLAY_BOARD_GLASS_ALPHA);
-      this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
+      this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardWidth, boardHeight);
     }
     // Keep the board top-down: no pseudo bevel/highlight pass over the maze.
     // Dark-mode dimming is a gameplay-readability pass for the active play
@@ -5332,7 +5366,7 @@ export class MenuScene extends Phaser.Scene {
     // is on by default) distinguishable from the starfield around it.
     if (this.settings.darkMode && !isMenuMode) {
       this.boardStaticGraphics.fillStyle(0x000000, 0.12);
-      this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
+      this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardWidth, boardHeight);
     }
     if (isMenuMode && LEGACY_BOARD_GRID_ALPHA > 0) {
       this.boardStaticGraphics.lineStyle(1, 0x6c6673, LEGACY_BOARD_GRID_ALPHA);
@@ -5343,14 +5377,14 @@ export class MenuScene extends Phaser.Scene {
         const offset = column * tileSize;
         this.boardStaticGraphics.beginPath();
         this.boardStaticGraphics.moveTo(mazeLeft + offset, mazeTop);
-        this.boardStaticGraphics.lineTo(mazeLeft + offset, mazeTop + mazeSize);
+        this.boardStaticGraphics.lineTo(mazeLeft + offset, mazeTop + mazeHeight);
         this.boardStaticGraphics.strokePath();
       }
       for (let row = 0; row <= this.maze.height; row += 1) {
         const offset = row * tileSize;
         this.boardStaticGraphics.beginPath();
         this.boardStaticGraphics.moveTo(mazeLeft, mazeTop + offset);
-        this.boardStaticGraphics.lineTo(mazeLeft + mazeSize, mazeTop + offset);
+        this.boardStaticGraphics.lineTo(mazeLeft + mazeWidth, mazeTop + offset);
         this.boardStaticGraphics.strokePath();
       }
     }
@@ -5532,10 +5566,12 @@ export class MenuScene extends Phaser.Scene {
     pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
     boardLeft: number,
     boardTop: number,
-    boardSize: number,
+    boardWidth: number,
+    boardHeight: number,
     mazeLeft: number,
     mazeTop: number,
-    mazeSize: number,
+    mazeWidth: number,
+    mazeHeight: number,
     tileSize: number,
     options: LegacyPathMaterialOptions
   ): void {
@@ -5549,7 +5585,7 @@ export class MenuScene extends Phaser.Scene {
     const frames = resolveLegacyMenuPathRenderFrames(pathSource, point, materialTileSize);
     const cornerGuardSize = Math.max(
       mazeLeft - boardLeft,
-      Math.round(boardSize * LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO)
+      Math.round(Math.min(boardWidth, boardHeight) * LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO)
     );
     const fillDockFrame = (
       direction: LegacyMenuBorderDockDirection,
@@ -5558,15 +5594,17 @@ export class MenuScene extends Phaser.Scene {
       const dockAreas = resolveLegacyMenuBorderDockRenderAreas(direction, frame, {
         boardLeft,
         boardTop,
-        boardSize,
+        boardWidth,
+        boardHeight,
         cornerGuardSize,
         continuationLength: Math.max(2, Math.round(tileSize * 0.32)),
         materialTileSize,
         mazeLeft,
         mazeTop,
-        mazeSize,
+        mazeWidth,
+        mazeHeight,
         tileRect,
-        topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardSize)
+        topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth)
       });
 
       for (const dockArea of dockAreas) {
@@ -5591,11 +5629,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawBoardPaths(time: number): void {
-    const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardSize } = this.layout;
+    const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardWidth, boardHeight } = this.layout;
     const boardOffset = this.resolveBoardOffset();
     const boardLeft = layoutBoardLeft + boardOffset.x;
     const boardTop = layoutBoardTop + boardOffset.y;
-    const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardSize);
+    const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardWidth, boardHeight);
     const mazeLeft = mazeRenderFrame.boardLeft;
     const mazeTop = mazeRenderFrame.boardTop;
     const tileSize = mazeRenderFrame.tileSize;
@@ -5631,10 +5669,12 @@ export class MenuScene extends Phaser.Scene {
         this.maze,
         boardLeft,
         boardTop,
-        boardSize,
+        boardWidth,
+        boardHeight,
         mazeLeft,
         mazeTop,
-        mazeRenderFrame.boardSize,
+        mazeRenderFrame.boardWidth,
+        mazeRenderFrame.boardHeight,
         tileSize,
         {
           coreAlpha: isMenuMode ? 0.92 : 0.96,
@@ -6129,24 +6169,24 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyMazeRenderFrame(
     boardLeft: number,
     boardTop: number,
-    boardSize: number
+    boardWidth: number,
+    boardHeight: number
   ): LegacyMazeRenderFrame {
+    const boardSize = Math.min(boardWidth, boardHeight);
     const safeInset = clamp(
       Math.round(boardSize * LEGACY_BOARD_MAZE_SAFE_INSET_RATIO),
       LEGACY_BOARD_MAZE_SAFE_INSET_MIN,
       LEGACY_BOARD_MAZE_SAFE_INSET_MAX
     );
-    const renderSize = Math.max(1, boardSize - (safeInset * 2));
+    const renderWidth = Math.max(1, boardWidth - (safeInset * 2));
+    const renderHeight = Math.max(1, boardHeight - (safeInset * 2));
 
     return {
       boardLeft: boardLeft + safeInset,
       boardTop: boardTop + safeInset,
-      boardSize: renderSize,
-      // Interim: this render frame is still square (boardSize is one
-      // number); dividing by the larger grid dimension keeps tiles safely
-      // inside it without overflow until the frame itself becomes
-      // genuinely rectangular (tracked separately from this compile-fix).
-      tileSize: renderSize / Math.max(1, this.maze.width, this.maze.height),
+      boardWidth: renderWidth,
+      boardHeight: renderHeight,
+      tileSize: Math.min(renderWidth / Math.max(1, this.maze.width), renderHeight / Math.max(1, this.maze.height)),
       safeInset
     };
   }
@@ -6154,17 +6194,17 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyBoardTopCenterNotchBounds(
     boardLeft: number,
     boardTop: number,
-    boardSize: number
+    boardWidth: number
   ): VisualRect {
     const inset = 2;
     const outerLeft = boardLeft - inset;
     const outerTop = boardTop - inset;
-    const outerSize = boardSize + (inset * 2);
-    const mid = Math.max(7, Math.round(boardSize * 0.028));
-    const halfWidth = Math.max(mid + 5, Math.round(boardSize * 0.046));
+    const outerWidth = boardWidth + (inset * 2);
+    const mid = Math.max(7, Math.round(boardWidth * 0.028));
+    const halfWidth = Math.max(mid + 5, Math.round(boardWidth * 0.046));
     const top = Math.round(outerTop - 1);
-    const bottom = Math.round(outerTop + mid + Math.max(Math.round(boardSize * 0.04), 13));
-    const centerX = outerLeft + (outerSize / 2);
+    const bottom = Math.round(outerTop + mid + Math.max(Math.round(boardWidth * 0.04), 13));
+    const centerX = outerLeft + (outerWidth / 2);
 
     return createVisualRect(
       Math.round(centerX - halfWidth),
@@ -6196,15 +6236,16 @@ export class MenuScene extends Phaser.Scene {
   private fillLegacyBoardEdgeFrame(
     boardLeft: number,
     boardTop: number,
-    boardSize: number,
+    boardWidth: number,
+    boardHeight: number,
     color: number
   ): void {
-    const frameSize = boardSize + 2;
+    const frameWidth = boardWidth + 2;
     this.boardStaticGraphics.fillStyle(color, 1);
-    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop - 1, frameSize, 1);
-    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop + boardSize, frameSize, 1);
-    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop, 1, boardSize);
-    this.boardStaticGraphics.fillRect(boardLeft + boardSize, boardTop, 1, boardSize);
+    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop - 1, frameWidth, 1);
+    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop + boardHeight, frameWidth, 1);
+    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop, 1, boardHeight);
+    this.boardStaticGraphics.fillRect(boardLeft + boardWidth, boardTop, 1, boardHeight);
   }
 
   private strokeLegacyPolyline(
@@ -6227,7 +6268,8 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyMenuDeconstructHandoffBurst(
     boardLeft: number,
     boardTop: number,
-    boardSize: number,
+    boardWidth: number,
+    boardHeight: number,
     progress: number
   ): void {
     if (progress <= 0 || progress >= 1) {
@@ -6237,10 +6279,10 @@ export class MenuScene extends Phaser.Scene {
     const inset = 2;
     const left = boardLeft - inset;
     const top = boardTop - inset;
-    const right = boardLeft + boardSize + inset;
-    const bottom = boardTop + boardSize + inset;
-    const centerX = boardLeft + (boardSize / 2);
-    const centerY = boardTop + (boardSize / 2);
+    const right = boardLeft + boardWidth + inset;
+    const bottom = boardTop + boardHeight + inset;
+    const centerX = boardLeft + (boardWidth / 2);
+    const centerY = boardTop + (boardHeight / 2);
     const burstPoints = [
       { x: left, y: top },
       { x: centerX, y: top },
@@ -6291,7 +6333,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawDynamicBoard(time: number): void {
-    const { boardLeft, boardTop, boardSize } = this.layout;
+    const { boardLeft, boardTop, boardWidth, boardHeight } = this.layout;
     this.boardDynamicGraphics.clear();
 
     const trail = this.mode === 'menu'
@@ -6308,7 +6350,8 @@ export class MenuScene extends Phaser.Scene {
     const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(
       resolvedBoardLeft,
       resolvedBoardTop,
-      boardSize
+      boardWidth,
+      boardHeight
     );
     const mazeLeft = mazeRenderFrame.boardLeft;
     const mazeTop = mazeRenderFrame.boardTop;
@@ -6374,10 +6417,12 @@ export class MenuScene extends Phaser.Scene {
           resolvedTrailAlpha,
           resolvedBoardLeft,
           resolvedBoardTop,
-          boardSize,
+          boardWidth,
+          boardHeight,
           mazeLeft,
           mazeTop,
-          mazeRenderFrame.boardSize,
+          mazeRenderFrame.boardWidth,
+          mazeRenderFrame.boardHeight,
           mazeTileSize,
           dynamicTrailPathSource
         );
@@ -6400,10 +6445,12 @@ export class MenuScene extends Phaser.Scene {
           resolvedTrailAlpha,
           resolvedBoardLeft,
           resolvedBoardTop,
-          boardSize,
+          boardWidth,
+          boardHeight,
           mazeLeft,
           mazeTop,
-          mazeRenderFrame.boardSize,
+          mazeRenderFrame.boardWidth,
+          mazeRenderFrame.boardHeight,
           mazeTileSize,
           dynamicTrailPathSource
         );
@@ -6432,8 +6479,10 @@ export class MenuScene extends Phaser.Scene {
         mazeTop,
         resolvedBoardLeft,
         resolvedBoardTop,
-        boardSize,
-        mazeRenderFrame.boardSize,
+        boardWidth,
+        boardHeight,
+        mazeRenderFrame.boardWidth,
+        mazeRenderFrame.boardHeight,
         mazeTileSize,
         time,
         dynamicTrailPathSource,
@@ -6467,13 +6516,15 @@ export class MenuScene extends Phaser.Scene {
       this.drawLegacyMenuDeconstructHandoffBurst(
         boardLeft,
         boardTop,
-        boardSize,
+        boardWidth,
+        boardHeight,
         this.resolveLegacyMenuDeconstructHandoffProgress(time)
       );
       this.drawLegacyMenuDeconstructHandoffBurst(
         boardLeft,
         boardTop,
-        boardSize,
+        boardWidth,
+        boardHeight,
         this.resolveLegacyMenuBuildPrerollProgress(time)
       );
     }
@@ -6910,8 +6961,8 @@ export class MenuScene extends Phaser.Scene {
   ): void {
     const boardLeft = mazeRenderFrame.boardLeft - mazeRenderFrame.safeInset;
     const boardTop = mazeRenderFrame.boardTop - mazeRenderFrame.safeInset;
-    const boardSize = mazeRenderFrame.boardSize + (mazeRenderFrame.safeInset * 2);
-    const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardSize);
+    const boardWidth = mazeRenderFrame.boardWidth + (mazeRenderFrame.safeInset * 2);
+    const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth);
     const size = clampInteger(
       Math.round(Math.min(
         notchBounds.width * 0.56,
@@ -7198,8 +7249,10 @@ export class MenuScene extends Phaser.Scene {
     originY: number,
     boardLeft: number,
     boardTop: number,
-    boardSize: number,
-    mazeSize: number,
+    boardWidth: number,
+    boardHeight: number,
+    mazeWidth: number,
+    mazeHeight: number,
     tileSize: number,
     time: number,
     pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
@@ -7256,10 +7309,12 @@ export class MenuScene extends Phaser.Scene {
         alpha,
         boardLeft,
         boardTop,
-        boardSize,
+        boardWidth,
+        boardHeight,
         originX,
         originY,
-        mazeSize,
+        mazeWidth,
+        mazeHeight,
         tileSize,
         pathSource
       );
@@ -7275,10 +7330,12 @@ export class MenuScene extends Phaser.Scene {
     alpha: number,
     boardLeft: number,
     boardTop: number,
-    boardSize: number,
+    boardWidth: number,
+    boardHeight: number,
     mazeLeft: number,
     mazeTop: number,
-    mazeSize: number,
+    mazeWidth: number,
+    mazeHeight: number,
     tileSize: number,
     pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>
   ): void {
@@ -7288,10 +7345,12 @@ export class MenuScene extends Phaser.Scene {
       pathSource,
       boardLeft,
       boardTop,
-      boardSize,
+      boardWidth,
+      boardHeight,
       mazeLeft,
       mazeTop,
-      mazeSize,
+      mazeWidth,
+      mazeHeight,
       tileSize,
       {
         coreAlpha: Math.min(coreAlphaMax, coreAlphaMax * alpha),
@@ -7731,7 +7790,8 @@ export class MenuScene extends Phaser.Scene {
     const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(
       this.layout.boardLeft + boardOffset.x,
       this.layout.boardTop + boardOffset.y,
-      this.layout.boardSize
+      this.layout.boardWidth,
+      this.layout.boardHeight
     );
     const goalScreenX = mazeRenderFrame.boardLeft + ((this.maze.goal.x + 0.5) * mazeRenderFrame.tileSize);
     const goalScreenY = mazeRenderFrame.boardTop + ((this.maze.goal.y + 0.5) * mazeRenderFrame.tileSize);
@@ -11484,19 +11544,20 @@ export class MenuScene extends Phaser.Scene {
     const boardBounds = createVisualRect(
       this.layout.boardLeft + boardOffset.x,
       this.layout.boardTop + boardOffset.y,
-      this.layout.boardSize,
-      this.layout.boardSize
+      this.layout.boardWidth,
+      this.layout.boardHeight
     );
     const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(
       this.layout.boardLeft + boardOffset.x,
       this.layout.boardTop + boardOffset.y,
-      this.layout.boardSize
+      this.layout.boardWidth,
+      this.layout.boardHeight
     );
     const mazeRenderBounds = createVisualRect(
       mazeRenderFrame.boardLeft,
       mazeRenderFrame.boardTop,
-      mazeRenderFrame.boardSize,
-      mazeRenderFrame.boardSize
+      mazeRenderFrame.boardWidth,
+      mazeRenderFrame.boardHeight
     );
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     const drawStageStaged = drawStage?.executionKind === 'row-slice';
@@ -11843,7 +11904,7 @@ export class MenuScene extends Phaser.Scene {
         topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(
           this.layout.boardLeft + boardOffset.x,
           this.layout.boardTop + boardOffset.y,
-          this.layout.boardSize
+          this.layout.boardWidth
         )
       },
       markerStyle: {
@@ -11900,7 +11961,7 @@ export class MenuScene extends Phaser.Scene {
         notchBounds: this.resolveLegacyBoardTopCenterNotchBounds(
           this.layout.boardLeft + boardOffset.x,
           this.layout.boardTop + boardOffset.y,
-          this.layout.boardSize
+          this.layout.boardWidth
         ),
         visible: this.mode === 'menu' && this.overlay === 'none' && this.menuCompassBounds !== null
       },

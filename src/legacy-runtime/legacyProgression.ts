@@ -1273,19 +1273,26 @@ export const resolveLegacyProgressionViewportScaleCap = (
       : LEGACY_PROGRESSION_MENU_MIN_TILE_PX;
 
   for (let candidateScale = 96; candidateScale >= 25; candidateScale -= 1) {
+    // Square probe: this cap search doesn't know the real aspect ratio the
+    // eventual maze will generate with, so it probes a square candidateScale
+    // grid (matching the pre-rectangular behavior) and takes the tighter of
+    // the two resulting axis sizes -- conservative even if the real board
+    // ends up non-square.
     const layout = resolveLegacyMenuLayout(
       viewport.width,
       viewport.height,
       boardScale,
       candidateScale,
+      candidateScale,
       layoutSurface
     );
+    const boardSize = Math.min(layout.boardWidth, layout.boardHeight);
     const safeInset = clampInteger(
-      Math.round(layout.boardSize * LEGACY_PROGRESSION_RENDER_SAFE_INSET_RATIO),
+      Math.round(boardSize * LEGACY_PROGRESSION_RENDER_SAFE_INSET_RATIO),
       LEGACY_PROGRESSION_RENDER_SAFE_INSET_MIN,
       LEGACY_PROGRESSION_RENDER_SAFE_INSET_MAX
     );
-    const renderSize = Math.max(1, layout.boardSize - (safeInset * 2));
+    const renderSize = Math.max(1, boardSize - (safeInset * 2));
 
     if ((renderSize / candidateScale) >= minimumTileSize) {
       return isPhoneMenu ? Math.min(candidateScale, boardScale) : candidateScale;

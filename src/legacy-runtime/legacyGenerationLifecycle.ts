@@ -89,6 +89,7 @@ export interface LegacyGenerationTickGateContract {
 }
 
 export interface LegacyGenerationRequest {
+  aspectRatio?: number;
   budget: LegacyGenerationBudgetContract;
   buildKind: LegacyMazeBuildKind;
   dueAtMs: number;
@@ -716,6 +717,7 @@ export const createLegacyRuntimeMazeForMode = (
 export const stepLegacyGenerationSeed = (seed: number): number => (seed + 1) >>> 0;
 
 export const createLegacyGenerationRequest = ({
+  aspectRatio,
   currentSeed,
   dueAtMs,
   generationProfile,
@@ -729,6 +731,7 @@ export const createLegacyGenerationRequest = ({
   stepSeed = false,
   targetComplexity
 }: {
+  aspectRatio?: number;
   currentSeed: number;
   dueAtMs: number;
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null;
@@ -754,6 +757,7 @@ export const createLegacyGenerationRequest = ({
     mode,
     reason,
     seed,
+    ...(aspectRatio !== undefined ? { aspectRatio } : {}),
     ...(selectionCandidateCount !== undefined ? { selectionCandidateCount } : {}),
     ...(selectionTolerance !== undefined ? { selectionTolerance } : {}),
     dueAtMs: Math.max(0, Math.round(dueAtMs)),
@@ -770,18 +774,21 @@ export const createLegacyGenerationRequest = ({
 };
 
 export const createLegacyMenuResetGenerationRequest = ({
+  aspectRatio,
   currentSeed,
   generationProfile,
   nowMs,
   scale,
   targetComplexity
 }: {
+  aspectRatio?: number;
   currentSeed: number;
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null;
   nowMs: number;
   scale: number;
   targetComplexity?: number;
 }): LegacyGenerationRequest => createLegacyGenerationRequest({
+  ...(aspectRatio !== undefined ? { aspectRatio } : {}),
   currentSeed,
   dueAtMs: nowMs,
   generationProfile,
@@ -794,6 +801,7 @@ export const createLegacyMenuResetGenerationRequest = ({
 });
 
 export const createLegacyPlayResetGenerationRequest = ({
+  aspectRatio,
   currentSeed,
   generationProfile,
   nowMs,
@@ -801,6 +809,7 @@ export const createLegacyPlayResetGenerationRequest = ({
   scale,
   targetComplexity
 }: {
+  aspectRatio?: number;
   currentSeed: number;
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null;
   nowMs: number;
@@ -808,6 +817,7 @@ export const createLegacyPlayResetGenerationRequest = ({
   scale: number;
   targetComplexity?: number;
 }): LegacyGenerationRequest => createLegacyGenerationRequest({
+  ...(aspectRatio !== undefined ? { aspectRatio } : {}),
   currentSeed,
   dueAtMs: nowMs,
   generationProfile,
@@ -832,7 +842,7 @@ export const consumeLegacyGenerationRequest = (
   candidateCount: request.selectionCandidateCount,
   targetComplexity: request.targetComplexity,
   tolerance: request.selectionTolerance
-});
+}, request.aspectRatio ?? 1);
 
 export const consumeLegacyGenerationRequestState = (
   request: LegacyGenerationRequest,

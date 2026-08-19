@@ -45,15 +45,17 @@ export interface LegacyMenuBorderDockRenderArea {
 }
 
 export interface LegacyMenuBorderDockRenderOptions {
+  boardHeight: number;
   boardLeft: number;
-  boardSize: number;
   boardTop: number;
+  boardWidth: number;
   cornerGuardSize: number;
   continuationLength?: number;
   materialTileSize: number;
+  mazeHeight: number;
   mazeLeft: number;
-  mazeSize: number;
   mazeTop: number;
+  mazeWidth: number;
   tileRect: LegacyMenuPixelRect;
   topCenterNotch?: {
     bottom: number;
@@ -289,10 +291,10 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
   frame: LegacyMenuPathRenderFrame,
   options: LegacyMenuBorderDockRenderOptions
 ): LegacyMenuBorderDockRenderArea[] => {
-  const boardRight = options.boardLeft + options.boardSize;
-  const boardBottom = options.boardTop + options.boardSize;
-  const mazeRight = options.mazeLeft + options.mazeSize;
-  const mazeBottom = options.mazeTop + options.mazeSize;
+  const boardRight = options.boardLeft + options.boardWidth;
+  const boardBottom = options.boardTop + options.boardHeight;
+  const mazeRight = options.mazeLeft + options.mazeWidth;
+  const mazeBottom = options.mazeTop + options.mazeHeight;
   const materialTileSize = Math.max(1, options.materialTileSize);
   const bandLeft = options.tileRect.left + Math.round((frame.leftInset / materialTileSize) * options.tileRect.width);
   const bandTop = options.tileRect.top + Math.round((frame.topInset / materialTileSize) * options.tileRect.height);

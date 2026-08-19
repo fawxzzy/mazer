@@ -8,7 +8,8 @@ export interface LegacyMenuLayout {
   height: number;
   boardLeft: number;
   boardTop: number;
-  boardSize: number;
+  boardWidth: number;
+  boardHeight: number;
   tileSize: number;
   titleX: number;
   titleY: number;
@@ -72,11 +73,105 @@ const createLane = (top: number, height: number): LegacyMenuLayoutLane => ({
   bottom: Math.round(top) + Math.max(0, Math.round(height))
 });
 
+// Probes the board's available pixel box (width-bound vs height-bound target)
+// purely from viewport dimensions, with no maze size input -- this lets a
+// caller pick a maze aspect ratio (width:height cell count) BEFORE
+// generating, so the eventual maze naturally fills both axes of the box
+// instead of being fit into it after the fact. This intentionally
+// duplicates the viewport-only subset of resolveLegacyMenuLayout's math
+// (through boardWidthTarget/boardHeightTarget) rather than trying to share
+// state with it, since that subset has no maze-size dependency and is safe
+// to evaluate standalone. If the reserve/board-bound formulas in
+// resolveLegacyMenuLayout change, mirror the change here too.
+export const resolveLegacyMenuBoardAspectRatio = (
+  width: number,
+  height: number,
+  scale: number,
+  surface: LegacyMenuLayoutSurface = 'menu',
+  options: LegacyMenuLayoutOptions = {}
+): number => {
+  const normalizedScale = clampInteger(scale, 25, 150);
+  const isPortrait = height > width;
+  const isPlaySurface = surface === 'play';
+  const isSidePanelPortrait = isPortrait && width < LEGACY_MENU_SIDE_PANEL_WIDTH;
+  const isPlayUltraNarrow = isPlaySurface && isPortrait && width < LEGACY_PLAY_ULTRA_NARROW_WIDTH;
+  const isUltraNarrow = isSidePanelPortrait || isPlayUltraNarrow;
+  const shouldUseCleanPhoneCadence = isPortrait
+    && !isUltraNarrow
+    && (width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH || options.browserMobileParity === true);
+  const minimumMenuActionHeight = isPortrait ? LEGACY_UI_MIN_TOUCH_TARGET : 58;
+  const buttonHeight = Math.round(clamp(
+    height * (isPortrait ? 0.05 : 0.066),
+    minimumMenuActionHeight,
+    isPortrait ? 62 : 78
+  ));
+  const laneGap = isUltraNarrow ? 4 : 8;
+  const menuTopReserve = isUltraNarrow ? 6 : Math.round(clamp(height * 0.02, 16, 20));
+  const menuTopHudReserve = !isPlaySurface
+    ? Math.round(clamp(height * 0.072, isUltraNarrow ? 44 : LEGACY_MENU_TOP_HUD_MIN, LEGACY_MENU_TOP_HUD_MAX))
+    : 0;
+  const menuTitleReserve = isUltraNarrow
+    ? 32
+    : Math.round(clamp(Math.min(height * 0.055, width * 0.11), 34, 56));
+  const dockBottomMargin = isUltraNarrow ? 10 : 20;
+  const dockReserve = buttonHeight + dockBottomMargin;
+  const playTopHudReserve = isPlaySurface && isPortrait
+    ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
+    : 56;
+  const playControlReserve = isPlaySurface
+    ? Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230))
+    : 0;
+  // Approximates whether the title fits inline in the header (skipping its
+  // own lane) as "true" whenever there's a top HUD reserve at all -- close
+  // enough for an aspect-ratio probe; a one-lane miss here only nudges the
+  // requested ratio slightly, it never breaks generation.
+  const menuStackTop = menuTopHudReserve + menuTopReserve;
+  const menuBoardTop = menuTopHudReserve > 0
+    ? menuStackTop + laneGap
+    : menuStackTop + laneGap + menuTitleReserve + laneGap;
+  const menuBottomReserve = laneGap + dockReserve;
+  const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
+  const playVerticalBoardLimit = height - playTopHudReserve - (playControlReserve + (laneGap * 2));
+  const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuAvailableBoardHeight);
+  const baseBoardScale = isPortrait ? 0.92 : 0.62;
+  const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
+  const scaleBias = 1 + ((normalizedScale - 50) / 500);
+  const menuEdgeMargin = isUltraNarrow ? 4 : (shouldUseCleanPhoneCadence ? 4 : 8);
+  const menuMaxBoardByWidth = Math.max(60, width - (menuEdgeMargin * 2));
+  const maxBoardWidthBound = isPlaySurface
+    ? width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)))
+    : menuMaxBoardByWidth;
+  const maxBoardHeightBound = isPlaySurface
+    ? Math.min(height * (isPortrait ? 0.74 : 0.86), laneBoardLimit)
+    : laneBoardLimit;
+  const minBoardWidthBound = Math.min(maxBoardWidthBound, 300);
+  const minBoardHeightBound = Math.min(maxBoardHeightBound, 300);
+  const rawBoardWidthBound = isPlaySurface
+    ? width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias
+    : menuMaxBoardByWidth * scaleBias;
+  const rawBoardHeightBound = isPlaySurface
+    ? Math.min(height * (isPortrait ? 0.64 : 0.84) * scaleBias, laneBoardLimit)
+    : laneBoardLimit * scaleBias;
+  const boardWidthTarget = Math.round(clamp(rawBoardWidthBound, minBoardWidthBound, maxBoardWidthBound));
+  const boardHeightTarget = Math.round(clamp(rawBoardHeightBound, minBoardHeightBound, maxBoardHeightBound));
+
+  if (boardWidthTarget <= 0 || boardHeightTarget <= 0) {
+    return 1;
+  }
+
+  // Clamp to a sane range so an extreme viewport (very tall phone in
+  // split-screen, ultra-wide monitor) can't request a degenerate 1-wide or
+  // 1-tall maze -- the generation pipeline's checkpoint/shortcut budgets are
+  // tuned for roughly square-ish grids and get unreliable well outside this.
+  return clamp(boardWidthTarget / boardHeightTarget, 0.45, 2.2);
+};
+
 export const resolveLegacyMenuLayout = (
   width: number,
   height: number,
   scale: number,
-  mazeSize: number,
+  mazeWidth: number,
+  mazeHeight: number,
   surface: LegacyMenuLayoutSurface = 'menu',
   options: LegacyMenuLayoutOptions = {}
 ): LegacyMenuLayout => {
@@ -206,57 +301,74 @@ export const resolveLegacyMenuLayout = (
   // tiles a little clear of the literal edge, so this isn't pixel-zero.
   const menuEdgeMargin = isUltraNarrow ? 4 : (shouldUseCleanPhoneCadence ? 4 : 8);
   const menuMaxBoardByWidth = Math.max(60, width - (menuEdgeMargin * 2));
-  const maxBoardSize = isPlaySurface
-    ? Math.min(
-      width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78))),
-      height * (isPortrait ? 0.74 : 0.86),
-      laneBoardLimit
-    )
-    // Menu: fill to the edges (width) and to whatever vertical room the
-    // stack above left behind (laneBoardLimit already IS that fill bound).
-    : Math.min(menuMaxBoardByWidth, laneBoardLimit);
-  // Must never exceed maxBoardSize -- the old `Math.max(120, maxBoardSize)`
+  // Width-bound and height-bound board limits are resolved independently --
+  // each axis gets its own max/min/raw target -- so a non-square maze
+  // (mazeWidth !== mazeHeight) can genuinely fill both the full available
+  // width AND the full available vertical lane at once, instead of being
+  // capped to whichever axis is smaller the way a single combined maxBoardSize
+  // forced a square box even on a non-square viewport. When mazeWidth ===
+  // mazeHeight (the pre-rectangular default), taking Math.min() of the two
+  // axis tile sizes below reduces to exactly the old combined-min formula --
+  // this is a pure axis split, not a behavior change, for the square case.
+  const maxBoardWidthBound = isPlaySurface
+    ? width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)))
+    : menuMaxBoardByWidth;
+  const maxBoardHeightBound = isPlaySurface
+    ? Math.min(height * (isPortrait ? 0.74 : 0.86), laneBoardLimit)
+    : laneBoardLimit;
+  // Must never exceed the max bound -- the old `Math.max(120, maxBoardSize)`
   // could force a 120px floor even when maxBoardSize (the safe fill bound)
   // was itself smaller than 120 at extreme short heights, inverting the
   // clamp below and pushing the board past its safe bound into the dock
-  // reserve. This is behaviorally identical to the old formula whenever
-  // maxBoardSize >= 120 (the only range that mattered before), and now
-  // additionally self-corrects when it's smaller.
-  const minBoardSize = Math.min(maxBoardSize, 300);
-  const rawBoardSize = isPlaySurface
-    ? Math.min(
-      // cleanPhoneWidthScale must override baseBoardScale here exactly like
-      // it does in maxBoardSize above -- dropping it silently shrank the
-      // play-surface board on clean-phone-cadence widths (<=420px portrait),
-      // since rawBoardSize then undershot the width-based clean-phone cap
-      // in the tileSize/snappedBoardSize step below instead of hitting it.
-      width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias,
-      height * (isPortrait ? 0.64 : 0.84) * scaleBias,
-      laneBoardLimit
-    )
+  // reserve. Same self-correcting min() applies per axis here.
+  const minBoardWidthBound = Math.min(maxBoardWidthBound, 300);
+  const minBoardHeightBound = Math.min(maxBoardHeightBound, 300);
+  const rawBoardWidthBound = isPlaySurface
+    // cleanPhoneWidthScale must override baseBoardScale here exactly like it
+    // does in maxBoardWidthBound above -- dropping it silently shrank the
+    // play-surface board on clean-phone-cadence widths (<=420px portrait).
+    ? width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias
+    : menuMaxBoardByWidth * scaleBias;
+  const rawBoardHeightBound = isPlaySurface
+    ? Math.min(height * (isPortrait ? 0.64 : 0.84) * scaleBias, laneBoardLimit)
     // scaleBias is the user's own board-scale preference (Options); let it
-    // shrink the board below the max fill, but the maxBoardSize clamp below
-    // guarantees it can never grow past the safe fill bound and reintroduce
-    // overlap.
-    : Math.min(menuMaxBoardByWidth, laneBoardLimit) * scaleBias;
-  const boardSize = Math.round(clamp(rawBoardSize, minBoardSize, maxBoardSize));
-  const rawTileSize = boardSize / Math.max(1, mazeSize);
-  const cleanPhoneBoardSize = Math.max(
+    // shrink the board below the max fill, but the maxBoardHeightBound clamp
+    // below guarantees it can never grow past the safe fill bound and
+    // reintroduce overlap.
+    : laneBoardLimit * scaleBias;
+  const boardWidthTarget = Math.round(clamp(rawBoardWidthBound, minBoardWidthBound, maxBoardWidthBound));
+  const boardHeightTarget = Math.round(clamp(rawBoardHeightBound, minBoardHeightBound, maxBoardHeightBound));
+  // A uniform tileSize (square cells) is the smaller of the two axis-derived
+  // tile sizes, so the board never overflows either bound -- whichever axis
+  // is the tighter constraint fills its bound exactly, and the other axis
+  // gets centered slack (see menuBoardCenterOffset/boardLeft below).
+  const rawTileSizeFromWidth = boardWidthTarget / Math.max(1, mazeWidth);
+  const rawTileSizeFromHeight = boardHeightTarget / Math.max(1, mazeHeight);
+  const rawTileSize = Math.min(rawTileSizeFromWidth, rawTileSizeFromHeight);
+  const cleanPhoneBoardWidth = Math.max(
     1,
-    Math.min(boardSize, width - (LEGACY_PHONE_CLEAN_OUTER_MARGIN * 2))
+    Math.min(boardWidthTarget, width - (LEGACY_PHONE_CLEAN_OUTER_MARGIN * 2))
+  );
+  const cleanPhoneInsetPad = LEGACY_PHONE_CLEAN_SAFE_INSET * 2;
+  const cleanPhoneTileSize = Math.min(
+    (cleanPhoneBoardWidth - cleanPhoneInsetPad) / Math.max(1, mazeWidth),
+    boardHeightTarget / Math.max(1, mazeHeight)
   );
   const tileSize = isUltraNarrow
     ? Math.max(3, Number(rawTileSize.toFixed(3)))
     : shouldUseCleanPhoneCadence
-      ? Math.max(
-        4,
-        Number(((cleanPhoneBoardSize - (LEGACY_PHONE_CLEAN_SAFE_INSET * 2)) / Math.max(1, mazeSize)).toFixed(3))
-      )
+      ? Math.max(4, Number(cleanPhoneTileSize.toFixed(3)))
     : Math.max(4, Math.floor(rawTileSize));
-  const snappedBoardSize = shouldUseCleanPhoneCadence
-    ? Math.round(cleanPhoneBoardSize)
-    : Math.round(tileSize * mazeSize * 1000) / 1000;
-  const boardLeft = Math.round((width - snappedBoardSize) / 2);
+  const snappedBoardWidth = shouldUseCleanPhoneCadence
+    ? Math.round(cleanPhoneBoardWidth)
+    : Math.round(tileSize * mazeWidth * 1000) / 1000;
+  // Mirror the width axis's inset padding onto height so a clean-phone-
+  // cadence board reads with symmetric slack on all four sides instead of
+  // only left/right.
+  const snappedBoardHeight = shouldUseCleanPhoneCadence
+    ? Math.round((tileSize * mazeHeight) + cleanPhoneInsetPad)
+    : Math.round(tileSize * mazeHeight * 1000) / 1000;
+  const boardLeft = Math.round((width - snappedBoardWidth) / 2);
   // The board claims its full width-constrained size regardless of how much
   // vertical room is actually available (laneBoardLimit already bounds it
   // safely) -- on most portrait phones that leaves real slack between the
@@ -267,19 +379,19 @@ export const resolveLegacyMenuLayout = (
   const menuBoardZoneBottom = height - menuBottomReserve;
   const menuBoardZoneHeight = Math.max(0, menuBoardZoneBottom - menuBoardZoneTop);
   const menuBoardCenterOffset = !isPlaySurface
-    ? Math.max(0, (menuBoardZoneHeight - snappedBoardSize) / 2)
+    ? Math.max(0, (menuBoardZoneHeight - snappedBoardHeight) / 2)
     : 0;
   const boardTop = Math.round(
     isPlaySurface ? (playTopHudReserve + laneGap) : (menuBoardZoneTop + menuBoardCenterOffset)
   );
   const menuDockButtonY = height - dockBottomMargin - Math.round(buttonHeight / 2);
   const playRowButtonY = isPortrait
-    ? boardTop + snappedBoardSize + Math.round(buttonHeight * 0.86)
-    : boardTop + snappedBoardSize + Math.round(buttonHeight * 0.54);
+    ? boardTop + snappedBoardHeight + Math.round(buttonHeight * 0.86)
+    : boardTop + snappedBoardHeight + Math.round(buttonHeight * 0.54);
   const rowButtonY = isPlaySurface
     ? (isPortrait
-      ? Math.round(clamp(playRowButtonY, boardTop + snappedBoardSize + 26, height - Math.round(buttonHeight * 0.76)))
-      : Math.round(clamp(playRowButtonY, boardTop + snappedBoardSize + 24, height - Math.round(buttonHeight * 0.54))))
+      ? Math.round(clamp(playRowButtonY, boardTop + snappedBoardHeight + 26, height - Math.round(buttonHeight * 0.76)))
+      : Math.round(clamp(playRowButtonY, boardTop + snappedBoardHeight + 24, height - Math.round(buttonHeight * 0.54))))
     // Menu: the dock button's position is already guaranteed clear of the
     // board by the menuBottomReserve subtraction above -- no clamp needed.
     : menuDockButtonY;
@@ -312,13 +424,13 @@ export const resolveLegacyMenuLayout = (
   const stackHeight = (buttonHeight * 2) + stackGap;
   // clamp(value, min, max) inverts (returns min instead of the safe max) if
   // min ends up greater than max -- now that the board can sit lower in its
-  // zone (see menuBoardCenterOffset above), boardTop + snappedBoardSize + 12
+  // zone (see menuBoardCenterOffset above), boardTop + snappedBoardHeight + 12
   // can exceed height - stackHeight - 18 in tight ultra-narrow cases. Cap
   // the lower bound at the upper bound so it never inverts.
   const stackTopMax = height - stackHeight - 18;
-  const stackTopMin = Math.min(boardTop + snappedBoardSize + 12, stackTopMax);
+  const stackTopMin = Math.min(boardTop + snappedBoardHeight + 12, stackTopMax);
   const stackTop = Math.round(clamp(
-    boardTop + snappedBoardSize + 18,
+    boardTop + snappedBoardHeight + 18,
     stackTopMin,
     stackTopMax
   ));
@@ -335,13 +447,13 @@ export const resolveLegacyMenuLayout = (
     : Math.round(titleLaneTop + (menuTitleReserve / 2));
   const titleX = menuTitleFitsInHeader
     ? menuHeaderTitleCenterX
-    : (!isPlaySurface && isPortrait ? boardLeft + (snappedBoardSize / 2) : Math.round(width / 2));
+    : (!isPlaySurface && isPortrait ? boardLeft + (snappedBoardWidth / 2) : Math.round(width / 2));
   const rankLane = null;
   const actionsLane = isPlaySurface
     ? null
     : createLane(menuDockButtonY - Math.round(buttonHeight / 2), buttonHeight);
   const controlsLane = isPlaySurface
-    ? createLane(boardTop + snappedBoardSize + laneGap, Math.max(0, height - (boardTop + snappedBoardSize + laneGap)))
+    ? createLane(boardTop + snappedBoardHeight + laneGap, Math.max(0, height - (boardTop + snappedBoardHeight + laneGap)))
     : null;
 
   return {
@@ -349,7 +461,8 @@ export const resolveLegacyMenuLayout = (
     height,
     boardLeft,
     boardTop,
-    boardSize: snappedBoardSize,
+    boardWidth: snappedBoardWidth,
+    boardHeight: snappedBoardHeight,
     tileSize,
     titleX,
     titleY: Math.round(!isPlaySurface ? menuPortraitTitleY : boardTop),
@@ -376,7 +489,7 @@ export const resolveLegacyMenuLayout = (
         : menuTopHudReserve > 0
           ? createLane(0, menuTopHudReserve)
           : null,
-      maze: createLane(boardTop, snappedBoardSize),
+      maze: createLane(boardTop, snappedBoardHeight),
       rank: rankLane,
       title: (isPlaySurface || menuTitleFitsInHeader) ? null : createLane(titleLaneTop, menuTitleReserve)
     }
