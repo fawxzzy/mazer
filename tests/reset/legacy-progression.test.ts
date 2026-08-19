@@ -48,7 +48,8 @@ class MemoryStorage {
 
 const createProgressionTestMaze = (overrides: Partial<LegacyMazeSnapshot> = {}): LegacyMazeSnapshot => ({
   source: 'play-generated',
-  size: 9,
+  width: 9,
+  height: 9,
   grid: [
     [false, false, false, false, false, false, false, false, false],
     [false, true, true, true, true, true, true, true, false],
@@ -915,7 +916,8 @@ describe('legacy progression', () => {
 
   test('scores real maze complexity from route, shortcut, floor, and solution shape', () => {
     const simpleMaze = createProgressionTestMaze({
-      size: 5,
+      width: 5,
+      height: 5,
       grid: [
         [false, false, false, false, false],
         [false, true, true, true, false],
@@ -966,7 +968,8 @@ describe('legacy progression', () => {
 
   test('scores paired off-border paths as real wrapped complexity', () => {
     const wrappedMaze = createProgressionTestMaze({
-      size: 5,
+      width: 5,
+      height: 5,
       grid: [
         [false, false, false, false, false],
         [false, false, true, false, false],
@@ -1012,7 +1015,8 @@ describe('legacy progression', () => {
 
   test('separates wrapped shortcut relief from wrapped choice complexity', () => {
     const directShortcutMaze = createProgressionTestMaze({
-      size: 5,
+      width: 5,
+      height: 5,
       grid: [
         [false, false, false, false, false],
         [false, false, false, false, false],
@@ -1028,7 +1032,8 @@ describe('legacy progression', () => {
       ]
     });
     const branchyWrappedMaze = createProgressionTestMaze({
-      size: 5,
+      width: 5,
+      height: 5,
       grid: [
         [false, false, true, false, false],
         [false, false, true, false, false],
@@ -1324,9 +1329,9 @@ describe('legacy progression', () => {
     expect(unrestrictedScale).toBeGreaterThan(viewportCap);
     expect(phoneScale).toBe(viewportCap);
     expect(narrowScale).toBe(narrowViewportCap);
-    expect(narrowScale).toBe(39);
-    expect(phoneScale).toBe(43);
-    expect(normalPhoneViewportCap).toBe(47);
+    expect(narrowScale).toBe(50);
+    expect(phoneScale).toBe(50);
+    expect(normalPhoneViewportCap).toBe(50);
     expect(playViewportCap).toBeGreaterThan(narrowViewportCap);
 
     const normalPhoneLayout = resolveLegacyMenuLayout(
@@ -1334,11 +1339,12 @@ describe('legacy progression', () => {
       normalPhoneViewport.height,
       50,
       normalPhoneViewportCap,
+      normalPhoneViewportCap,
       'menu'
     );
-    expect(normalPhoneLayout.tileSize).toBeCloseTo(8.149, 3);
+    expect(normalPhoneLayout.tileSize).toBeCloseTo(7.66, 2);
     expect(normalPhoneLayout.boardLeft).toBeGreaterThanOrEqual(4);
-    expect(normalPhoneLayout.boardLeft + normalPhoneLayout.boardSize).toBeLessThanOrEqual(normalPhoneViewport.width - 4);
+    expect(normalPhoneLayout.boardLeft + normalPhoneLayout.boardWidth).toBeLessThanOrEqual(normalPhoneViewport.width - 4);
 
     for (const targetComplexity of [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 220, 300, LEGACY_PROGRESSION_MAX_COMPLEXITY]) {
       const scale = resolveLegacyProgressionGenerationScale(50, {
@@ -1353,13 +1359,14 @@ describe('legacy progression', () => {
         normalPhoneViewport.height,
         50,
         scale,
+        scale,
         'menu'
       );
 
-      expect(layout.tileSize).toBeGreaterThanOrEqual(8.149);
-      expect(layout.boardSize).toBe(397);
+      expect(layout.tileSize).toBeGreaterThanOrEqual(7.66);
+      expect(layout.boardWidth).toBe(397);
       expect(layout.boardLeft).toBe(4);
-      expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(normalPhoneViewport.width - 4);
+      expect(layout.boardLeft + layout.boardWidth).toBeLessThanOrEqual(normalPhoneViewport.width - 4);
     }
   });
 

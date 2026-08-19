@@ -30,8 +30,8 @@ describe('legacy browser mobile parity', () => {
   });
 
   test('keeps the existing 390x844 phone geometry byte-for-byte unchanged', () => {
-    const existingMenu = resolveLegacyMenuLayout(390, 844, 50, 49, 'menu');
-    const explicitUnchangedMenu = resolveLegacyMenuLayout(390, 844, 50, 49, 'menu', {
+    const existingMenu = resolveLegacyMenuLayout(390, 844, 50, 49, 49, 'menu');
+    const explicitUnchangedMenu = resolveLegacyMenuLayout(390, 844, 50, 49, 49, 'menu', {
       browserMobileParity: false
     });
     const existingControls = resolveTouchControlLayout({ width: 390, height: 844 }, {
@@ -49,10 +49,10 @@ describe('legacy browser mobile parity', () => {
   });
 
   test('gives a 499x958 fine-pointer pane the phone maze cadence and control composition', () => {
-    const browserMenu = resolveLegacyMenuLayout(499, 958, 50, 49, 'menu', {
+    const browserMenu = resolveLegacyMenuLayout(499, 958, 50, 49, 49, 'menu', {
       browserMobileParity: true
     });
-    const defaultMenu = resolveLegacyMenuLayout(499, 958, 50, 49, 'menu');
+    const defaultMenu = resolveLegacyMenuLayout(499, 958, 50, 49, 49, 'menu');
     const browserControls = resolveTouchControlLayout({ width: 499, height: 958 }, {
       compact: true,
       controlMode: 'stick',
@@ -64,7 +64,8 @@ describe('legacy browser mobile parity', () => {
     });
 
     expect(browserMenu.boardLeft).toBe(4);
-    expect(browserMenu.boardSize).toBe(491);
+    expect(browserMenu.boardWidth).toBe(491);
+    expect(browserMenu.boardHeight).toBe(491);
     expect(browserMenu.tileSize).toBeGreaterThan(defaultMenu.tileSize);
     expect(browserControls.frame.top).toBeGreaterThan(defaultControls.frame.top);
     expect(browserControls.stick?.outer.width).toBeLessThan(defaultControls.stick?.outer.width ?? Number.POSITIVE_INFINITY);
