@@ -277,7 +277,7 @@ import {
   type LegacyAuthSessionSnapshot,
   type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
-import { resolveLegacyAuthPresentation } from '../legacy-runtime/legacyAuthPresentation';
+import { resolveLegacyAuthPresentation, type LegacyAuthPresentation } from '../legacy-runtime/legacyAuthPresentation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
@@ -8953,12 +8953,7 @@ export class MenuScene extends Phaser.Scene {
   private buildAuthOverlay(): void {
     const panel = this.resolveOverlayPanelFrame();
     const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const fieldWidth = Math.min(panel.width - 56, stacked ? 330 : 420);
-    const fieldHeight = stacked ? 48 : 52;
-    const buttonHeight = stacked ? 46 : 50;
-    const buttonWidth = Math.min(panel.width - 72, stacked ? 260 : 320);
     const centerX = panel.centerX;
-    const panelBottom = panel.top + panel.height;
     const presentation = resolveLegacyAuthPresentation({
       mode: this.authForm.mode,
       rememberedIdentity: readLegacyRememberedIdentityState(this.resolveBrowserLocalStorage()),
@@ -8986,36 +8981,68 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (this.authSnapshot.status === 'authenticated') {
-      this.createAuthAccountSummaryCard(`Signed in as ${accountLabel}`, rowY, panel);
-      rowY += stacked ? 64 : 72;
-      const detail = this.authSnapshot.email ?? this.authSnapshot.userId ?? '';
-      if (detail.length > 0) {
-        this.createAuthInfoText(detail, rowY, panel, '#d7f7ee', stacked ? 14 : 16);
-        rowY += stacked ? 46 : 54;
-      }
-
-      this.uiButtons.push(
-        this.createLegacyAuthActionButton(
-          centerX,
-          panelBottom - (stacked ? 116 : 126),
-          buttonWidth,
-          buttonHeight,
-          'Log out',
-          () => { void this.handleLegacyAuthSignOut(); },
-          'danger'
-        ),
-        this.createLegacyAuthActionButton(
-          centerX,
-          panelBottom - (stacked ? 62 : 68),
-          buttonWidth,
-          buttonHeight,
-          'Done',
-          () => this.closeOverlay(),
-          'secondary'
-        )
-      );
+      this.buildAuthenticatedAccountSection(panel, stacked, centerX, rowY, accountLabel);
       return;
     }
+
+    this.buildAuthCredentialsForm(panel, stacked, centerX, rowY, presentation);
+    this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
+  }
+
+  private buildAuthenticatedAccountSection(
+    panel: OverlayPanelFrame,
+    stacked: boolean,
+    centerX: number,
+    startY: number,
+    accountLabel: string
+  ): void {
+    const panelBottom = panel.top + panel.height;
+    const buttonHeight = stacked ? 46 : 50;
+    const buttonWidth = Math.min(panel.width - 72, stacked ? 260 : 320);
+    let rowY = startY;
+
+    this.createAuthAccountSummaryCard(`Signed in as ${accountLabel}`, rowY, panel);
+    rowY += stacked ? 64 : 72;
+    const detail = this.authSnapshot.email ?? this.authSnapshot.userId ?? '';
+    if (detail.length > 0) {
+      this.createAuthInfoText(detail, rowY, panel, '#d7f7ee', stacked ? 14 : 16);
+      rowY += stacked ? 46 : 54;
+    }
+
+    this.uiButtons.push(
+      this.createLegacyAuthActionButton(
+        centerX,
+        panelBottom - (stacked ? 116 : 126),
+        buttonWidth,
+        buttonHeight,
+        'Log out',
+        () => { void this.handleLegacyAuthSignOut(); },
+        'danger'
+      ),
+      this.createLegacyAuthActionButton(
+        centerX,
+        panelBottom - (stacked ? 62 : 68),
+        buttonWidth,
+        buttonHeight,
+        'Done',
+        () => this.closeOverlay(),
+        'secondary'
+      )
+    );
+  }
+
+  private buildAuthCredentialsForm(
+    panel: OverlayPanelFrame,
+    stacked: boolean,
+    centerX: number,
+    startY: number,
+    presentation: LegacyAuthPresentation
+  ): void {
+    const fieldWidth = Math.min(panel.width - 56, stacked ? 330 : 420);
+    const fieldHeight = stacked ? 48 : 52;
+    const buttonHeight = stacked ? 46 : 50;
+    const buttonWidth = Math.min(panel.width - 72, stacked ? 260 : 320);
+    let rowY = startY;
 
     this.createAuthFieldBox(
       centerX,
@@ -9079,7 +9106,6 @@ export class MenuScene extends Phaser.Scene {
         'secondary'
       )
     );
-    this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
   }
 
   private resolveLegacyCurrentAuthMessage(): LegacyPlayerMessage | null {
