@@ -1,6 +1,6 @@
 import { clampInteger } from './legacyDefaults';
 import type { LegacyMazeGenerationProfile, LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
-import { resolveLegacyMenuLayout } from './legacyMenuLayout';
+import { resolveLegacyMenuBoardAspectRatio, resolveLegacyMenuLayout } from './legacyMenuLayout';
 import { LEGACY_TRAIL_SHINE_COLOR, LEGACY_TRAIL_SHINE_EDGE_COLOR } from './legacyIridescentMaterial';
 import {
   type MazeCycleTelemetryReceipt,
@@ -1272,29 +1272,35 @@ export const resolveLegacyProgressionViewportScaleCap = (
       ? LEGACY_PROGRESSION_PHONE_MENU_TARGET_TILE_PX
       : LEGACY_PROGRESSION_MENU_MIN_TILE_PX;
 
+  // Probe with the same width:height aspect ratio the real generation call
+  // will request for this viewport (see resolveLegacyMenuBoardAspectRatio),
+  // instead of a square candidate grid -- so the cap search reflects the
+  // actual rectangular board that gets built, not a square stand-in for it.
+  const aspectRatio = resolveLegacyMenuBoardAspectRatio(viewport.width, viewport.height, boardScale, layoutSurface);
+  const ratioRoot = Math.sqrt(aspectRatio);
+
   for (let candidateScale = 96; candidateScale >= 25; candidateScale -= 1) {
-    // Square probe: this cap search doesn't know the real aspect ratio the
-    // eventual maze will generate with, so it probes a square candidateScale
-    // grid (matching the pre-rectangular behavior) and takes the tighter of
-    // the two resulting axis sizes -- conservative even if the real board
-    // ends up non-square.
+    const candidateWidth = Math.max(1, Math.round(candidateScale * ratioRoot));
+    const candidateHeight = Math.max(1, Math.round(candidateScale / ratioRoot));
     const layout = resolveLegacyMenuLayout(
       viewport.width,
       viewport.height,
       boardScale,
-      candidateScale,
-      candidateScale,
+      candidateWidth,
+      candidateHeight,
       layoutSurface
     );
-    const boardSize = Math.min(layout.boardWidth, layout.boardHeight);
+    const boardSizeForInset = Math.min(layout.boardWidth, layout.boardHeight);
     const safeInset = clampInteger(
-      Math.round(boardSize * LEGACY_PROGRESSION_RENDER_SAFE_INSET_RATIO),
+      Math.round(boardSizeForInset * LEGACY_PROGRESSION_RENDER_SAFE_INSET_RATIO),
       LEGACY_PROGRESSION_RENDER_SAFE_INSET_MIN,
       LEGACY_PROGRESSION_RENDER_SAFE_INSET_MAX
     );
-    const renderSize = Math.max(1, boardSize - (safeInset * 2));
+    const renderWidth = Math.max(1, layout.boardWidth - (safeInset * 2));
+    const renderHeight = Math.max(1, layout.boardHeight - (safeInset * 2));
+    const tileSize = Math.min(renderWidth / candidateWidth, renderHeight / candidateHeight);
 
-    if ((renderSize / candidateScale) >= minimumTileSize) {
+    if (tileSize >= minimumTileSize) {
       return isPhoneMenu ? Math.min(candidateScale, boardScale) : candidateScale;
     }
   }
