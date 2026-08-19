@@ -8481,7 +8481,7 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveFeatureControlRowsContentHeight(
     panel: OverlayPanelFrame,
-    options: { includeMovementSpeed?: boolean; showDescriptions?: boolean } = {}
+    options: { includeControlStyle?: boolean; includeMovementSpeed?: boolean; showDescriptions?: boolean } = {}
   ): number {
     const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const controlLayout = resolveLegacyFeatureControlLayout(panel.width, options.showDescriptions === true);
@@ -8490,16 +8490,19 @@ export class MenuScene extends Phaser.Scene {
     const sectionHeaderHeight = stacked ? 18 : 20;
     const sectionHeaderGap = stacked ? 5 : 6;
     const sectionGap = stacked ? 12 : 14;
-    const controlsGroupCount = 3 + (options.includeMovementSpeed ? 1 : 0);
-    const displayGroupCount = 4;
+    const controlsGroupCount = (options.includeControlStyle !== false ? 1 : 0) + (options.includeMovementSpeed ? 1 : 0);
+    const displayGroupCount = 3;
     const groupHeight = (count: number): number => (
-      sectionHeaderHeight
-      + sectionHeaderGap
-      + (count * rowHeight)
-      + (Math.max(0, count - 1) * rowGap)
+      count > 0
+        ? sectionHeaderHeight + sectionHeaderGap + (count * rowHeight) + (Math.max(0, count - 1) * rowGap)
+        : 0
     );
 
-    return 4 + groupHeight(controlsGroupCount) + sectionGap + groupHeight(displayGroupCount) + 4;
+    return 4
+      + groupHeight(controlsGroupCount)
+      + (controlsGroupCount > 0 ? sectionGap : 0)
+      + groupHeight(displayGroupCount)
+      + 4;
   }
 
   private drawLegacyOverlayScrollFacade(metrics: LegacyOverlayScrollMetrics, forceVisible = false): void {
@@ -8597,6 +8600,7 @@ export class MenuScene extends Phaser.Scene {
         Math.max(140, shell.contentHeight - (viewportTop - shell.contentTop))
       );
       const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {
+        includeControlStyle: false,
         includeMovementSpeed: false
       });
       const contentFlow = resolveLegacyOverlayContentFlowLayout({
@@ -8619,6 +8623,7 @@ export class MenuScene extends Phaser.Scene {
         viewport: renderViewport
       });
       this.createFeatureControlRows(contentFlow.controlsTop, panel, {
+        includeControlStyle: false,
         includeMovementSpeed: false,
         rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
         scrollOffset: scrollMetrics.offset,
@@ -8636,7 +8641,7 @@ export class MenuScene extends Phaser.Scene {
       rowY = this.createInputRow('Camera Scale', 'camScale', rowY, panel);
     }
 
-    rowY = this.createFeatureControlRows(rowY, panel, { includeMovementSpeed: false });
+    rowY = this.createFeatureControlRows(rowY, panel, { includeControlStyle: false, includeMovementSpeed: false });
 
     if (showAdvancedOptions && !compact) {
       rowY = this.createColorInputRow('Path RGB 0-255', ['pathR', 'pathG', 'pathB'], rowY, panel, this.settings.pathColor);
@@ -9692,6 +9697,7 @@ export class MenuScene extends Phaser.Scene {
     y: number,
     panel: OverlayPanelFrame,
     options: {
+      includeControlStyle?: boolean;
       includeMovementSpeed?: boolean;
       rightGutter?: number;
       scrollOffset?: number;
@@ -9780,8 +9786,15 @@ export class MenuScene extends Phaser.Scene {
         stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Still'
       }
     ];
-    const controlsSection = controls.filter((control) => control.section === 'controls');
+    // Control Style only matters once a game is actually in progress -- the
+    // main-menu Settings overlay (as opposed to in-game Pause) hides it so
+    // players aren't shown a played-game setting before they've played.
+    const includeControlStyle = options.includeControlStyle !== false;
+    const controlsSection = controls.filter((control) => (
+      control.section === 'controls' && (includeControlStyle || control.label !== 'Control Style')
+    ));
     const displaySection = controls.filter((control) => control.section === 'display');
+    const hasControlsSection = controlsSection.length > 0 || options.includeMovementSpeed === true;
 
     const addSectionHeading = (copy: string, contentTop: number): number => {
       const centerY = contentTop + Math.round(sectionHeaderHeight / 2);
@@ -9824,34 +9837,36 @@ export class MenuScene extends Phaser.Scene {
     };
 
     let contentTop = y + (stacked ? 4 : 6);
-    contentTop = addSectionHeading('Controls', contentTop);
-    controlsSection.forEach((control, index) => {
-      contentTop = addToggleRow(control, contentTop);
-      if (index < controlsSection.length - 1 || options.includeMovementSpeed === true) {
-        contentTop += rowGap;
-      }
-    });
+    if (hasControlsSection) {
+      contentTop = addSectionHeading('Controls', contentTop);
+      controlsSection.forEach((control, index) => {
+        contentTop = addToggleRow(control, contentTop);
+        if (index < controlsSection.length - 1 || options.includeMovementSpeed === true) {
+          contentTop += rowGap;
+        }
+      });
 
-    if (options.includeMovementSpeed === true) {
-      const sliderY = contentTop + Math.round(rowHeight / 2);
-      const sliderRenderY = toRenderY(sliderY);
-      if (isVisible(sliderRenderY, rowHeight)) {
-        this.uiButtons.push(
-          this.createMovementSpeedSliderRow({
-            height: rowHeight,
-            label: 'Move Speed',
-            stateText: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
-            value: normalizeLegacyMovementSpeed(this.settings.movementSpeed),
-            x: left + Math.round(width / 2),
-            y: sliderRenderY,
-            width
-          })
-        );
+      if (options.includeMovementSpeed === true) {
+        const sliderY = contentTop + Math.round(rowHeight / 2);
+        const sliderRenderY = toRenderY(sliderY);
+        if (isVisible(sliderRenderY, rowHeight)) {
+          this.uiButtons.push(
+            this.createMovementSpeedSliderRow({
+              height: rowHeight,
+              label: 'Move Speed',
+              stateText: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
+              value: normalizeLegacyMovementSpeed(this.settings.movementSpeed),
+              x: left + Math.round(width / 2),
+              y: sliderRenderY,
+              width
+            })
+          );
+        }
+        contentTop += rowHeight;
       }
-      contentTop += rowHeight;
+
+      contentTop += sectionGap;
     }
-
-    contentTop += sectionGap;
     contentTop = addSectionHeading('Display', contentTop);
     displaySection.forEach((control, index) => {
       contentTop = addToggleRow(control, contentTop);

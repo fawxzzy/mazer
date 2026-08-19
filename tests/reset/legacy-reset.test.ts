@@ -961,7 +961,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
     expect(menuSceneSource).toContain('const groupHeight = (count: number): number => (');
-    expect(menuSceneSource).toContain('groupHeight(controlsGroupCount) + sectionGap + groupHeight(displayGroupCount)');
+    expect(menuSceneSource).toContain('groupHeight(controlsGroupCount)');
+    expect(menuSceneSource).toContain('groupHeight(displayGroupCount)');
     expect(menuSceneSource).toContain("addSectionHeading('Controls', contentTop)");
     expect(menuSceneSource).toContain("addSectionHeading('Display', contentTop)");
     expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('toggleTrailFade')");
