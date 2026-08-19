@@ -125,7 +125,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('bridges connected neighbors to tile edges for legacy trench continuity', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, false, false],
         [true, true, true],
@@ -143,7 +144,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps closed-edge insets where the path does not continue', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, false, false],
         [false, true, false],
@@ -161,7 +163,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('docks non-corner border paths into the board border instead of capping them', () => {
     const oneSidedMaze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, false, false],
         [true, false, false],
@@ -172,7 +175,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(resolveLegacyMenuBorderDockDirections(oneSidedMaze, { x: 0, y: 1 })).toEqual([]);
 
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, false, false],
         [true, true, true],
@@ -212,7 +216,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('classifies only orthogonal legal opposite-edge paths as bleed-off continuations', () => {
     const maze = {
-      size: 5,
+      width: 5,
+      height: 5,
       grid: [
         [false, false, true, false, false],
         [false, false, true, false, false],
@@ -235,7 +240,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps folded-corner border cells capped so the corner facets stay clean', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [true, false, false],
         [false, false, false],
@@ -261,12 +267,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     }, {
       boardLeft: 0,
       boardTop: 0,
-      boardSize: 100,
+      boardWidth: 100,
+      boardHeight: 100,
       cornerGuardSize: 18,
       materialTileSize: 30,
       mazeLeft: 6,
       mazeTop: 6,
-      mazeSize: 88,
+      mazeWidth: 88,
+      mazeHeight: 88,
       tileRect: {
         left: 35,
         top: 6,
@@ -288,12 +296,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const commonOptions = {
       boardLeft: 0,
       boardTop: 0,
-      boardSize: 100,
+      boardWidth: 100,
+      boardHeight: 100,
       cornerGuardSize: 18,
       materialTileSize: 6,
       mazeLeft: 5,
       mazeTop: 5,
-      mazeSize: 90
+      mazeWidth: 90,
+      mazeHeight: 90
     };
     const leftFrame = {
       leftInset: 0,
@@ -380,13 +390,15 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     }, {
       boardLeft: 10,
       boardTop: 20,
-      boardSize: 100,
+      boardWidth: 100,
+      boardHeight: 100,
       cornerGuardSize: 18,
       continuationLength: 4,
       materialTileSize: 6,
       mazeLeft: 15,
       mazeTop: 25,
-      mazeSize: 90,
+      mazeWidth: 90,
+      mazeHeight: 90,
       tileRect: { left: 99, top: 50, width: 6, height: 6 }
     });
 
@@ -395,7 +407,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('bridges the light core across connected neighbors for a less checkerboarded slab read', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, false, false],
         [true, true, true],
@@ -421,7 +434,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('preserves four-way joins as solid connected intersections', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, true, false],
         [true, true, true],
@@ -447,7 +461,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('renders four-way menu joins as corridor segments instead of one filled tile', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, true, false],
         [true, true, true],
@@ -475,7 +490,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps phone-sized tiles separated instead of merging adjacent cells into blocks', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, true, false],
         [true, true, true],
@@ -491,7 +507,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps rounded 4px mobile tiles corridor-shaped instead of full-block filled', () => {
     const maze = {
-      size: 3,
+      width: 3,
+      height: 3,
       grid: [
         [false, true, false],
         [true, true, true],
@@ -530,10 +547,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (isMenuMode && LEGACY_BOARD_GRID_ALPHA > 0) {');
     expect(menuSceneSource).toContain('Keep the board top-down: no pseudo bevel/highlight pass over the maze.');
     expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
-    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);');
+    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardWidth, boardHeight, boardEdge);');
     expect(menuSceneSource).toContain('private fillLegacyBoardEdgeFrame(');
     expect(menuSceneSource).toContain('private resolveLegacyMazeRenderFrame(');
-    expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardSize);');
+    expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardWidth, boardHeight);');
     expect(menuSceneSource).toContain('const mazeLeft = mazeRenderFrame.boardLeft;');
     expect(menuSceneSource).toContain('const mazeTop = mazeRenderFrame.boardTop;');
     expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop - 1, boardSize + 2, boardSize + 2);');
@@ -768,8 +785,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("|| this.menuStaticDrawLifecyclePhase === 'deconstructing';");
     expect(menuSceneSource).toContain('const angle = isLifecycleSpinActive');
     expect(menuSceneSource).toContain('? (time / 130) % (Math.PI * 2)');
-    expect(menuSceneSource).toContain('const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardSize);');
-    expect(menuSceneSource).toContain('topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardSize)');
+    expect(menuSceneSource).toContain('const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth);');
+    expect(menuSceneSource).toContain('topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth)');
     expect(menuSceneSource).toContain('notchBounds.width * 0.56');
     expect(menuSceneSource).toContain('notchBounds.height * 0.68');
     expect(menuSceneSource).toContain('mazeRenderFrame.tileSize * 2.15');
@@ -811,11 +828,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacyPathBorderDock(');
     expect(menuSceneSource).toContain(': 0.94;');
     expect(menuSceneSource).toContain('this.trail = resolveLegacyMenuDemoTrail(');
-    expect(menuSceneSource).toContain('const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardSize);');
+    expect(menuSceneSource).toContain('const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth);');
     expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(');
     expect(menuSceneSource).toContain('const mazeTileSize = mazeRenderFrame.tileSize;');
     expect(menuSceneSource).toContain('this.fillLegacyMenuDynamicPathTile(');
-    expect(menuSceneSource).toContain('pathSource: Pick<LegacyMazeSnapshot, \'grid\' | \'size\'>,');
+    expect(menuSceneSource).toContain('pathSource: Pick<LegacyMazeSnapshot, \'grid\' | \'width\' | \'height\'>,');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE,');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE_ALPHA,');
     expect(menuSceneSource).toContain('const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);');
@@ -863,7 +880,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('if (this.isLegacyTrailShineVisible()) {');
     expect(menuSceneSource).toContain('this.drawLegacyPlayDynamicTrailPulse(');
     expect(menuSceneSource).toContain('resolvedBoardLeft,');
-    expect(menuSceneSource).toContain('mazeRenderFrame.boardSize,');
+    expect(menuSceneSource).toContain('mazeRenderFrame.boardWidth,');
+    expect(menuSceneSource).toContain('mazeRenderFrame.boardHeight,');
     expect(menuSceneSource).toContain("const active = this.isLegacyTrailShineVisible() && this.overlay === 'none' && this.trail.length > 1;");
     expect(menuSceneSource).toContain('this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;');
     expect(menuSceneSource).toContain('const pulseCenterIndex = resolveLegacyTrailShineMotion({');
@@ -1097,11 +1115,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const toggleFieldSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayToggleFields.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardSize } = this.layout;');
+    expect(menuSceneSource).toContain('const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardWidth, boardHeight } = this.layout;');
     expect(menuSceneSource).toContain('const boardOffset = this.resolveBoardOffset();');
     expect(menuSceneSource).toContain('const boardLeft = layoutBoardLeft + boardOffset.x;');
     expect(menuSceneSource).toContain('const boardTop = layoutBoardTop + boardOffset.y;');
-    expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardSize);');
+    expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardWidth, boardHeight);');
     expect(menuSceneSource).toContain('this.layout.boardLeft + boardOffset.x');
     expect(menuSceneSource).toContain('this.layout.boardTop + boardOffset.y');
     expect(menuSceneSource).toContain('if (this.settings.toggleCameraFollow) {');
@@ -1720,7 +1738,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
     expect(menuSceneSource).toContain('const boardEdge = LEGACY_PLAY_BOARD_EDGE;');
-    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);');
+    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardWidth, boardHeight, boardEdge);');
     expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.start');
     expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.goal');
     expect(menuSceneSource).toContain('const trailColor = resolveLegacyIridescentTrailColor(');
