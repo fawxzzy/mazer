@@ -126,8 +126,9 @@ export const resolveLegacyMenuBoardAspectRatio = (
   // enough for an aspect-ratio probe; a one-lane miss here only nudges the
   // requested ratio slightly, it never breaks generation.
   const menuStackTop = menuTopHudReserve + menuTopReserve;
+  const menuInlineTitleBoardGap = isUltraNarrow ? 2 : 4;
   const menuBoardTop = menuTopHudReserve > 0
-    ? menuStackTop + laneGap
+    ? menuStackTop + menuInlineTitleBoardGap
     : menuStackTop + laneGap + menuTitleReserve + laneGap;
   const menuBottomReserve = laneGap + dockReserve;
   const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
@@ -281,9 +282,13 @@ export const resolveLegacyMenuLayout = (
   const menuTitleTop = menuStackTop + laneGap;
   // When the title fits inline in the header row, no separate title lane is
   // reserved at all -- the board reclaims that space, matching the "fill to
-  // the edges" requirement.
+  // the edges" requirement. This junction uses a tighter gap than the
+  // general laneGap: the header row already has its own internal padding
+  // around the title/icons, so the board can sit closer beneath it without
+  // touching.
+  const menuInlineTitleBoardGap = isUltraNarrow ? 2 : 4;
   const menuBoardTop = menuTitleFitsInHeader
-    ? menuStackTop + laneGap
+    ? menuStackTop + menuInlineTitleBoardGap
     : menuTitleTop + menuTitleReserve + laneGap;
   const menuBottomReserve = laneGap + dockReserve;
   const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
