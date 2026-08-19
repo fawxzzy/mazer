@@ -1281,7 +1281,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,');
     expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(): void');
     expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog();');
-    expect(menuSceneSource).toContain('this.drawLegacySettingsCog(this.boardDynamicGraphics, frame, this.menuSettingsCogActive, 0.42);');
+    expect(menuSceneSource).toContain('LEGACY_MENU_START_GLOW_COLOR,\n      cyberArcadeMaterial.rail.mint\n    );');
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');

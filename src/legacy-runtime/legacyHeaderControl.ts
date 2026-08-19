@@ -36,8 +36,8 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
  */
 export const resolveLegacyHeaderControlMetricFontSize = (level: number, size: number): number => {
   const digits = String(Math.max(1, Math.round(level))).length;
-  const ratio = digits >= 3 ? 0.4 : (digits === 2 ? 0.5 : 0.62);
-  return clamp(Math.round(size * ratio), 14, 26);
+  const ratio = digits >= 3 ? 0.44 : (digits === 2 ? 0.56 : 0.7);
+  return clamp(Math.round(size * ratio), 14, 28);
 };
 
 /**

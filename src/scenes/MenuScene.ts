@@ -7063,10 +7063,20 @@ export class MenuScene extends Phaser.Scene {
       width: this.layout.width
     });
     // No background panel, tint, or border -- the gear is the whole control,
-    // enlarged to fill the frame instead of sitting inside a chrome-bordered
-    // box (the in-play touch pause cog keeps its smaller default ratio,
-    // since that one still has a panel behind it to leave room inside).
-    this.drawLegacySettingsCog(this.boardDynamicGraphics, frame, this.menuSettingsCogActive, 0.42);
+    // sized to roughly match the LVL badge's visual weight instead of
+    // sitting inside a chrome-bordered box (the in-play touch pause cog
+    // keeps its smaller default ratio, since that one still has a panel
+    // behind it to leave room inside). Cyan instead of the generic
+    // white/mint touch-icon colors so it reads as the same crystal/cyan
+    // family as the title and Start/Login text, not a mismatched icon.
+    this.drawLegacySettingsCog(
+      this.boardDynamicGraphics,
+      frame,
+      this.menuSettingsCogActive,
+      0.34,
+      LEGACY_MENU_START_GLOW_COLOR,
+      cyberArcadeMaterial.rail.mint
+    );
   }
 
   private hasLegacyProgressionBadgePulsePendingFrame(time: number): boolean {
@@ -7809,6 +7819,11 @@ export class MenuScene extends Phaser.Scene {
   // text glyphs plus a soft blurred shadow (Phaser's built-in text shadow
   // doubles as a cheap glow since the canvas renderer has no blur filter),
   // both breathing continuously via a time-based sine pulse from updateFrame.
+  // Exactly two layers, not a third: a crisp static stroke is the border
+  // (always on, never animates), and a single sine pulse drives the shadow
+  // blur/alpha as the glow (the one blink). Hover just widens the pulse's
+  // intensity a little rather than adding another independently-animating
+  // property, so it never reads as multiple overlapping effects.
   private applyLegacyMenuFrontDoorTextGlow(
     label: Phaser.GameObjects.Text,
     time: number,
@@ -7818,13 +7833,12 @@ export class MenuScene extends Phaser.Scene {
     const pulseAlpha = clamp(
       LEGACY_MENU_START_GLOW_MIN_ALPHA
         + (phase * (LEGACY_MENU_START_GLOW_MAX_ALPHA - LEGACY_MENU_START_GLOW_MIN_ALPHA))
-        + (active ? 0.18 : 0),
+        + (active ? 0.12 : 0),
       0,
       1
     );
-    const strokeThickness = Math.max(2, Math.round(2 + (phase * 2) + (active ? 1 : 0)));
-    label.setStroke(LEGACY_MENU_START_GLOW_COLOR_CSS, strokeThickness);
-    label.setShadow(0, 0, LEGACY_MENU_START_GLOW_COLOR_CSS, 6 + (pulseAlpha * 10) + (active ? 4 : 0), false, true);
+    label.setStroke(LEGACY_MENU_START_GLOW_COLOR_CSS, 2);
+    label.setShadow(0, 0, LEGACY_MENU_START_GLOW_COLOR_CSS, 4 + (pulseAlpha * 12), false, true);
   }
 
   private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number {
@@ -8445,14 +8459,16 @@ export class MenuScene extends Phaser.Scene {
     graphics: Phaser.GameObjects.Graphics,
     rect: Pick<VisualRect, 'centerX' | 'centerY' | 'height' | 'width'>,
     active = false,
-    radiusRatio = 0.2
+    radiusRatio = 0.2,
+    idleColor: number = LEGACY_PLAY_TOUCH_ICON,
+    activeColor: number = LEGACY_PLAY_TOUCH_ACCENT
   ): void {
     const radius = Math.max(7, Math.round(Math.min(rect.width, rect.height) * radiusRatio));
     const toothInnerRadius = Math.max(5, Math.round(radius * 0.72));
     const toothOuterRadius = Math.max(toothInnerRadius + 3, Math.round(radius * 1.26));
     const hubRadius = Math.max(3, Math.round(radius * 0.38));
     const lineWidth = Math.max(2, Math.round(radius * 0.22));
-    const color = active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON;
+    const color = active ? activeColor : idleColor;
 
     graphics.lineStyle(lineWidth, color, active ? 1 : 0.9);
     for (let index = 0; index < 8; index += 1) {
