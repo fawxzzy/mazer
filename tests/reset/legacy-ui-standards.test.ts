@@ -74,7 +74,7 @@ describe('legacy UI standards', () => {
     const compact = resolveLegacyOptionsGuideLayout(LEGACY_UI_COMPACT_BREAKPOINT - 1);
     const wide = resolveLegacyOptionsGuideLayout(LEGACY_UI_COMPACT_BREAKPOINT);
 
-    expect(compact.cardHeight).toBe(130);
+    expect(compact.cardHeight).toBe(178);
     expect(compact.collapsedHeight).toBe(40);
     expect(compact.rowCount).toBe(4);
     expect(compact.rowFontSize).toBe(11);
@@ -83,7 +83,7 @@ describe('legacy UI standards', () => {
     expect(compact.textWidthSafetyRatio).toBe(0.9);
     expect(compact.titleRuleOffset).toBeGreaterThan(compact.titleOffset + compact.titleFontSize);
     expect(wide.rowFontSize).toBe(12);
-    expect(wide.rowHeight).toBe(20);
+    expect(wide.rowHeight).toBe(32);
     expect(wide.collapsedHeight).toBe(46);
   });
 

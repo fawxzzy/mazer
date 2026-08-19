@@ -144,16 +144,22 @@ export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptio
   const compact = panelWidth < LEGACY_UI_COMPACT_BREAKPOINT;
   const titleFontSize = compact ? 15 : 17;
   const titleOffset = compact ? 16 : 18;
-  const rowHeight = compact ? 18 : 20;
+  // Each row's icon badge is a filled circle of radius 11 (compact) / 13
+  // (regular) -- a 22-26px diameter -- so the row height has to clear that
+  // plus real padding or adjacent rows' badges overlap vertically. The
+  // previous 18/20px rows were shorter than the badge itself.
+  const rowHeight = compact ? 30 : 32;
   const rowCount = 4;
+  const legendTopOffset = compact ? 43 : 47;
+  const legendBottomPadding = 15;
 
   return {
-    cardHeight: (compact ? 112 : 122) + rowHeight,
+    cardHeight: legendTopOffset + (rowCount * rowHeight) + legendBottomPadding,
     cardWidthLimit: compact ? 350 : 540,
     collapsedHeight: compact ? 40 : 46,
     horizontalMargin: compact ? 48 : 64,
     inset: compact ? 18 : 22,
-    legendTopOffset: compact ? 43 : 47,
+    legendTopOffset,
     rowHeight,
     rowCount,
     rowFontSize: compact ? 11 : 12,

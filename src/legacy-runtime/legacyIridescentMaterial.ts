@@ -12,14 +12,20 @@ export const LEGACY_IRIDESCENT_GREEN_ANCHOR = cyberArcadeMaterial.signal.player;
 export const LEGACY_TRAIL_SHINE_COLOR = cyberArcadeMaterial.shine.core;
 export const LEGACY_TRAIL_SHINE_EDGE_COLOR = cyberArcadeMaterial.shine.edge;
 
+// Deep, saturated jewel tones -- violet through indigo, blue, teal, emerald,
+// and orchid -- instead of the bright primary-color rainbow. Modeled on
+// Terraria's Midnight Rainbow dye: the same continuous hue cycle as a
+// regular rainbow shift, just moodier/richer instead of neon-bright.
 export const LEGACY_IRIDESCENT_MIDNIGHT_STOPS = [
-  0x36ff7d,
-  0x59fff0,
-  0x7da8ff,
-  0xb87dff,
-  0xff61c7,
-  0xffd36a
+  0x6a2c8c,
+  0x3b2c8c,
+  0x2c5c8c,
+  0x2c8c7a,
+  0x2c8c4e,
+  0x8c2c6a
 ] as const;
+
+export const LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS = 6400;
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 
@@ -123,9 +129,17 @@ export const resolveLegacyIridescentPlayerHaloColor = (
   _anchorColor: number = cyberArcadeMaterial.signal.playerHalo
 ): number => cyberArcadeMaterial.signal.playerHalo;
 
-export const resolveLegacyIridescentPlayerCoreColor = (): number => LEGACY_IRIDESCENT_GREEN_ANCHOR;
+// Cycles the player's own diamond core through the midnight-rainbow stops
+// continuously over time -- a "Terraria Midnight Rainbow dye" effect for the
+// player marker instead of a fixed color.
+export const resolveLegacyIridescentPlayerCoreColor = (
+  timeMs = 0
+): number => resolveLegacyIridescentMidnightColor(timeMs / LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS);
 
+// The core's outline/accent rides the same cycle a quarter-phase ahead, so
+// the two rims of the diamond are always two adjacent hues rather than a
+// single flat color -- a subtle shimmer instead of a plain solid shift.
 export const resolveLegacyIridescentPlayerAccentColor = (
-  _timeMs: number,
+  timeMs: number,
   _anchorColor: number = LEGACY_IRIDESCENT_GREEN_ANCHOR
-): number => LEGACY_IRIDESCENT_GREEN_ANCHOR;
+): number => resolveLegacyIridescentMidnightColor((timeMs / LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS) + 0.25);

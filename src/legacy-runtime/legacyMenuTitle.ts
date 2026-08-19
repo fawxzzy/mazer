@@ -88,7 +88,7 @@ const LEGACY_MENU_PATH_TITLE_PATTERNS = [
 ] as const;
 
 const LEGACY_MENU_PATH_TITLE_LETTER_COLUMNS = 5;
-const LEGACY_MENU_PATH_TITLE_LETTER_GAP_COLUMNS = 1;
+const LEGACY_MENU_PATH_TITLE_LETTER_GAP_COLUMNS = 4;
 const LEGACY_MENU_PATH_TITLE_ROWS = 7;
 
 const buildLegacyMenuPathTitleCells = (): LegacyMenuPathTitleCell[] => {
@@ -271,5 +271,123 @@ export const resolveLegacyMenuPathTitleOrbitPoint = (
   return {
     x: geometry.left,
     y: geometry.bottom - ((geometry.bottom - geometry.top) * (perimeter - 3))
+  };
+};
+
+// A general-purpose version of the title's letter-cell system, for the
+// Start/Login front-door labels -- so they read as made of the same
+// material as the title instead of a separate rendered-font look. Static
+// (no build/deconstruct animation, no orbit) -- just the finished glyph
+// grid for whichever short word is passed in. Reuses the exact same 5x7
+// bitmap convention as LEGACY_MENU_PATH_TITLE_PATTERNS above (the M/A/Z/E/R
+// glyphs are duplicated here rather than shared, since the title array's
+// cell order also encodes its own build-animation sequence and isn't safe
+// to repurpose as a generic lookup table).
+const LEGACY_GLYPH_LETTER_PATTERNS: Readonly<Record<string, readonly string[]>> = {
+  A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
+  E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
+  G: ['01110', '10001', '10000', '10011', '10001', '10001', '01110'],
+  I: ['11111', '00100', '00100', '00100', '00100', '00100', '11111'],
+  L: ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
+  M: ['10001', '11011', '10101', '10101', '10001', '10001', '10001'],
+  N: ['10001', '11001', '10101', '10101', '10011', '10001', '10001'],
+  O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
+  R: ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
+  S: ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
+  T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
+  Z: ['11111', '00001', '00010', '00100', '01000', '10000', '11111']
+};
+
+const LEGACY_GLYPH_LETTER_COLUMNS = 5;
+const LEGACY_GLYPH_LETTER_ROWS = 7;
+const LEGACY_GLYPH_WORD_GAP_COLUMNS = 1;
+
+export interface LegacyGlyphWordCell {
+  column: number;
+  row: number;
+}
+
+export interface LegacyGlyphWordLayout {
+  cellSize: number;
+  cells: LegacyGlyphWordCell[];
+  columns: number;
+  grid: boolean[][];
+  height: number;
+  left: number;
+  rows: number;
+  top: number;
+  width: number;
+}
+
+/** Every character in `word` must have an entry in LEGACY_GLYPH_LETTER_PATTERNS (letters only, no spaces/punctuation). */
+export const isLegacyGlyphWordRenderable = (word: string): boolean => (
+  [...word.toUpperCase()].every((letter) => LEGACY_GLYPH_LETTER_PATTERNS[letter] !== undefined)
+);
+
+export const resolveLegacyGlyphWordColumns = (
+  word: string,
+  gapColumns: number = LEGACY_GLYPH_WORD_GAP_COLUMNS
+): number => {
+  const letterCount = word.length;
+  if (letterCount <= 0) {
+    return 0;
+  }
+  return (letterCount * LEGACY_GLYPH_LETTER_COLUMNS) + ((letterCount - 1) * gapColumns);
+};
+
+const buildLegacyGlyphWordCells = (
+  word: string,
+  gapColumns: number
+): LegacyGlyphWordCell[] => {
+  const cells: LegacyGlyphWordCell[] = [];
+
+  [...word.toUpperCase()].forEach((letter, letterIndex) => {
+    const pattern = LEGACY_GLYPH_LETTER_PATTERNS[letter];
+    if (!pattern) {
+      return;
+    }
+    const columnOffset = letterIndex * (LEGACY_GLYPH_LETTER_COLUMNS + gapColumns);
+    pattern.forEach((rowPattern, row) => {
+      [...rowPattern].forEach((value, column) => {
+        if (value === '1') {
+          cells.push({ column: columnOffset + column, row });
+        }
+      });
+    });
+  });
+
+  return cells;
+};
+
+export const resolveLegacyGlyphWordLayout = (
+  word: string,
+  centerX: number,
+  centerY: number,
+  cellSize: number,
+  gapColumns: number = LEGACY_GLYPH_WORD_GAP_COLUMNS
+): LegacyGlyphWordLayout => {
+  const columns = resolveLegacyGlyphWordColumns(word, gapColumns);
+  const width = columns * cellSize;
+  const height = LEGACY_GLYPH_LETTER_ROWS * cellSize;
+  const cells = buildLegacyGlyphWordCells(word, gapColumns);
+  const grid = Array.from({ length: LEGACY_GLYPH_LETTER_ROWS }, () => (
+    Array.from({ length: Math.max(1, columns) }, () => false)
+  ));
+  for (const cell of cells) {
+    if (grid[cell.row]) {
+      grid[cell.row][cell.column] = true;
+    }
+  }
+
+  return {
+    cellSize,
+    cells,
+    columns,
+    grid,
+    height,
+    left: Math.round(centerX - (width / 2)),
+    rows: LEGACY_GLYPH_LETTER_ROWS,
+    top: Math.round(centerY - (height / 2)),
+    width
   };
 };
