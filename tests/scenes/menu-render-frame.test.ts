@@ -780,25 +780,21 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO =');
     expect(menuSceneSource).toContain('const progressionPalette = this.resolveActiveLegacyProgressionPalette();');
     expect(menuSceneSource).toContain('this.drawLegacyProgressionBadge();');
-    expect(menuSceneSource).toContain('this.drawLegacyMenuCompass(mazeRenderFrame, progressionPalette, time);');
-    expect(menuSceneSource).toContain("const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'");
-    expect(menuSceneSource).toContain("|| this.menuStaticDrawLifecyclePhase === 'deconstructing';");
-    expect(menuSceneSource).toContain('const angle = isLifecycleSpinActive');
-    expect(menuSceneSource).toContain('? (time / 130) % (Math.PI * 2)');
-    expect(menuSceneSource).toContain('const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth);');
+    // The title-screen board-notch compass was removed entirely (it duplicated
+    // the play-mode HUD compass without serving real navigation on the menu
+    // surface) -- only the shared glyph-drawing helper remains, now used
+    // solely by the Quick Play guide card's legend icon.
+    expect(menuSceneSource).not.toContain('private drawLegacyMenuCompass(');
+    expect(menuSceneSource).not.toContain('this.drawLegacyMenuCompass(');
+    expect(menuSceneSource).not.toContain('menuCompassBounds');
+    expect(menuSceneSource).not.toContain('menuCompass: {');
     expect(menuSceneSource).toContain('topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth)');
-    expect(menuSceneSource).toContain('notchBounds.width * 0.56');
-    expect(menuSceneSource).toContain('notchBounds.height * 0.68');
-    expect(menuSceneSource).toContain('mazeRenderFrame.tileSize * 2.15');
-    expect(menuSceneSource).toContain('const centerY = Math.round(notchBounds.top + (notchBounds.height * 0.43));');
-    expect(menuSceneSource).toContain('this.menuCompassBounds = createVisualRect(centerX - (size / 2), centerY - (size / 2), size, size);');
     expect(menuSceneSource).toContain('const ringRadius = size * 0.86;');
     expect(menuSceneSource).toContain('const needleWidth = Math.max(2, size * 0.15);');
     expect(menuSceneSource).toContain('const hubRadius = Math.max(2, size * 0.15);');
     expect(menuSceneSource).toContain('private drawLegacyCompassGlyph(');
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, radius);');
     expect(menuSceneSource).toContain('progressionBadge: {');
-    expect(menuSceneSource).toContain('menuCompass: {');
     expect(menuSceneSource).toContain('this.clearLegacyPlayerProgressionBadge();');
     expect(menuSceneSource).toContain("if (this.mode === 'menu') {");
     expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
@@ -828,7 +824,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacyPathBorderDock(');
     expect(menuSceneSource).toContain(': 0.94;');
     expect(menuSceneSource).toContain('this.trail = resolveLegacyMenuDemoTrail(');
-    expect(menuSceneSource).toContain('const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth);');
     expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(');
     expect(menuSceneSource).toContain('const mazeTileSize = mazeRenderFrame.tileSize;');
     expect(menuSceneSource).toContain('this.fillLegacyMenuDynamicPathTile(');

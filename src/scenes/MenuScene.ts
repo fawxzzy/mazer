@@ -28,7 +28,6 @@ import { legacyTuning } from '../config/tuning';
 import {
   LEGACY_DEFAULTS,
   MAIN_MENU_BUTTONS,
-  clampInteger,
   copyLegacySettings,
   linearColorToHex,
   type LegacySettings
@@ -557,11 +556,6 @@ interface MenuSceneVisualDiagnostics {
     textBounds: VisualRect | null;
     textFontSize: number | null;
     textFits: boolean;
-  };
-  menuCompass: {
-    bounds: VisualRect | null;
-    notchBounds: VisualRect;
-    visible: boolean;
   };
   remoteSync: {
     lastError: string | null;
@@ -1222,7 +1216,6 @@ export class MenuScene extends Phaser.Scene {
   private menuAiProgressionBadgeTextFits = false;
   private progressionBadgePulseStartedAtMs: number | null = null;
   private menuSettingsCogActive = false;
-  private menuCompassBounds: VisualRect | null = null;
   private backdropGraphics!: Phaser.GameObjects.Graphics;
   private boardStaticGraphics!: Phaser.GameObjects.Graphics;
   private boardPathGraphics!: Phaser.GameObjects.Graphics;
@@ -6359,12 +6352,8 @@ export class MenuScene extends Phaser.Scene {
     const progressionPalette = this.resolveActiveLegacyProgressionPalette();
     const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
 
-    this.menuCompassBounds = null;
     this.drawLegacyProgressionBadge();
     this.drawLegacyMenuSettingsCog();
-    if (this.mode === 'menu' && this.overlay === 'none') {
-      this.drawLegacyMenuCompass(mazeRenderFrame, progressionPalette, time);
-    }
 
     if (this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
       this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');
@@ -6948,54 +6937,6 @@ export class MenuScene extends Phaser.Scene {
       nowMs: this.time.now,
       startedAtMs: this.playStartedAtMs
     });
-  }
-
-  private drawLegacyMenuCompass(
-    mazeRenderFrame: LegacyMazeRenderFrame,
-    palette: LegacyProgressionPalette,
-    time: number
-  ): void {
-    const boardLeft = mazeRenderFrame.boardLeft - mazeRenderFrame.safeInset;
-    const boardTop = mazeRenderFrame.boardTop - mazeRenderFrame.safeInset;
-    const boardWidth = mazeRenderFrame.boardWidth + (mazeRenderFrame.safeInset * 2);
-    const notchBounds = this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth);
-    const size = clampInteger(
-      Math.round(Math.min(
-        notchBounds.width * 0.56,
-        notchBounds.height * 0.68,
-        mazeRenderFrame.tileSize * 2.15
-      )),
-      14,
-      22
-    );
-    const centerX = notchBounds.centerX;
-    const centerY = Math.round(notchBounds.top + (notchBounds.height * 0.43));
-    this.menuCompassBounds = createVisualRect(centerX - (size / 2), centerY - (size / 2), size, size);
-    const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
-    const playerScreen = {
-      x: mazeRenderFrame.boardLeft + ((renderedPlayerPoint.x + 0.5) * mazeRenderFrame.tileSize),
-      y: mazeRenderFrame.boardTop + ((renderedPlayerPoint.y + 0.5) * mazeRenderFrame.tileSize)
-    };
-    const goalScreen = {
-      x: mazeRenderFrame.boardLeft + ((this.maze.goal.x + 0.5) * mazeRenderFrame.tileSize),
-      y: mazeRenderFrame.boardTop + ((this.maze.goal.y + 0.5) * mazeRenderFrame.tileSize)
-    };
-    const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'
-      || this.menuStaticDrawLifecyclePhase === 'deconstructing';
-    const goalAngle = Math.atan2(goalScreen.y - playerScreen.y, goalScreen.x - playerScreen.x);
-    const angle = isLifecycleSpinActive
-      ? (time / 130) % (Math.PI * 2)
-      : goalAngle;
-    this.drawLegacyCompassGlyph(
-      this.boardDynamicGraphics,
-      centerX,
-      centerY,
-      size,
-      angle,
-      palette,
-      time,
-      isLifecycleSpinActive
-    );
   }
 
   // Draws an actual compass: a circular bezel with cardinal tick marks and a
@@ -12069,15 +12010,6 @@ export class MenuScene extends Phaser.Scene {
           ? Number.parseFloat(String(this.menuAiProgressionBadgeText.style.fontSize))
           : null,
         textFits: this.menuAiProgressionBadgeTextFits
-      },
-      menuCompass: {
-        bounds: cloneVisualRect(this.menuCompassBounds),
-        notchBounds: this.resolveLegacyBoardTopCenterNotchBounds(
-          this.layout.boardLeft + boardOffset.x,
-          this.layout.boardTop + boardOffset.y,
-          this.layout.boardWidth
-        ),
-        visible: this.mode === 'menu' && this.overlay === 'none' && this.menuCompassBounds !== null
       },
       remoteSync: {
         lastError: this.latestRemoteSyncResult?.error ?? null,
