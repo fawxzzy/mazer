@@ -128,9 +128,6 @@ import {
   type LegacyUiLabelRole
 } from '../legacy-runtime/legacyUiStandards';
 import {
-  LEGACY_BUTTON_GLYPH_COLUMNS,
-  LEGACY_BUTTON_GLYPH_ROWS,
-  resolveLegacyButtonGlyphLayout,
   resolveLegacyMenuPathTitleLayout,
   resolveLegacyMenuPathTitleOrbitGeometry,
   resolveLegacyMenuPathTitleOrbitPoint,
@@ -7608,46 +7605,6 @@ export class MenuScene extends Phaser.Scene {
         Math.max(1, width - (layer.inset * 2)),
         Math.max(1, height - (layer.inset * 2)),
         Math.max(1, baseRadius - layer.inset)
-      );
-    }
-    this.drawLegacyMenuStartButtonGlyph(graphics, x, y, width, height, phase);
-  }
-
-  // A second, smaller "START" wordmark built from the exact same blocky
-  // maze-path-tile technique as the title (see resolveLegacyButtonGlyphLayout
-  // in legacyMenuTitle.ts), drawn as a low-alpha themed backdrop behind the
-  // button's real text label -- so the button visually matches the title's
-  // material instead of being a plain system-font label. Kept well below
-  // the label's own opacity so it reads as texture, not a second word to
-  // parse, and never interferes with the "Start" text QA/visual tooling
-  // depends on (that text is untouched and still fully opaque).
-  private drawLegacyMenuStartButtonGlyph(
-    graphics: Phaser.GameObjects.Graphics,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    phase: number
-  ): void {
-    // Generous padding so the glyph clears the glow border with real
-    // breathing room -- a tight fit read as clipped/overflowing at small
-    // button sizes rather than as a deliberate backdrop texture.
-    const horizontalPadding = 24;
-    const verticalPadding = 16;
-    const widthCellSize = Math.floor((width - horizontalPadding) / LEGACY_BUTTON_GLYPH_COLUMNS);
-    const heightCellSize = Math.floor((height - verticalPadding) / LEGACY_BUTTON_GLYPH_ROWS);
-    const cellSize = Math.max(2, Math.min(widthCellSize, heightCellSize));
-    const glyph = resolveLegacyButtonGlyphLayout(x, y, cellSize);
-    const glyphAlpha = 0.16 + (phase * 0.14);
-    const cellGap = cellSize >= 4 ? 1 : 0;
-
-    graphics.fillStyle(LEGACY_MENU_PATH_TITLE_ACCENT, glyphAlpha);
-    for (const cell of glyph.cells) {
-      graphics.fillRect(
-        glyph.left + (cell.column * cellSize) + cellGap,
-        glyph.top + (cell.row * cellSize) + cellGap,
-        Math.max(1, cellSize - cellGap),
-        Math.max(1, cellSize - cellGap)
       );
     }
   }
