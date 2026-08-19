@@ -420,7 +420,8 @@ describe('menu runtime diagnostics', () => {
         },
         playtest: {
           encoding: 'walkable-rows-v1',
-          mazeSize: 3,
+          mazeWidth: 3,
+          mazeHeight: 3,
           walkableRows: [
             '111',
             '010',

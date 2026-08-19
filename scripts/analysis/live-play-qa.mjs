@@ -83,24 +83,24 @@ const isWorktreeDirty = () => {
 
 const createPointKey = (point) => `${point.x},${point.y}`;
 
-const resolveWrappedGridPoint = (point, mazeSize) => {
-  if (point.x === -1 && point.y >= 0 && point.y < mazeSize) {
-    return { x: mazeSize - 1, y: point.y };
+const resolveWrappedGridPoint = (point, mazeWidth, mazeHeight) => {
+  if (point.x === -1 && point.y >= 0 && point.y < mazeHeight) {
+    return { x: mazeWidth - 1, y: point.y };
   }
-  if (point.x === mazeSize && point.y >= 0 && point.y < mazeSize) {
+  if (point.x === mazeWidth && point.y >= 0 && point.y < mazeHeight) {
     return { x: 0, y: point.y };
   }
-  if (point.y === -1 && point.x >= 0 && point.x < mazeSize) {
-    return { x: point.x, y: mazeSize - 1 };
+  if (point.y === -1 && point.x >= 0 && point.x < mazeWidth) {
+    return { x: point.x, y: mazeHeight - 1 };
   }
-  if (point.y === mazeSize && point.x >= 0 && point.x < mazeSize) {
+  if (point.y === mazeHeight && point.x >= 0 && point.x < mazeWidth) {
     return { x: point.x, y: 0 };
   }
 
   return null;
 };
 
-const resolveWalkableRouteStep = ({ current, delta, mazeSize, walkableRows }) => {
+const resolveWalkableRouteStep = ({ current, delta, mazeWidth, mazeHeight, walkableRows }) => {
   const direct = {
     x: current.x + delta.dx,
     y: current.y + delta.dy
@@ -110,7 +110,7 @@ const resolveWalkableRouteStep = ({ current, delta, mazeSize, walkableRows }) =>
     return direct;
   }
 
-  const wrapped = resolveWrappedGridPoint(direct, mazeSize);
+  const wrapped = resolveWrappedGridPoint(direct, mazeWidth, mazeHeight);
   return wrapped && walkableRows[wrapped.y]?.[wrapped.x] === '1' ? wrapped : null;
 };
 
@@ -133,10 +133,11 @@ export const resolveLivePlayBrowserContextOptions = ({
 export const solveWalkableRoute = ({
   player,
   goal,
-  mazeSize,
+  mazeWidth,
+  mazeHeight,
   walkableRows
 }) => {
-  if (!player || !goal || !Number.isFinite(mazeSize) || !Array.isArray(walkableRows)) {
+  if (!player || !goal || !Number.isFinite(mazeWidth) || !Number.isFinite(mazeHeight) || !Array.isArray(walkableRows)) {
     return null;
   }
 
@@ -157,7 +158,8 @@ export const solveWalkableRoute = ({
       const next = resolveWalkableRouteStep({
         current,
         delta,
-        mazeSize,
+        mazeWidth,
+        mazeHeight,
         walkableRows
       });
       if (!next) {
@@ -882,7 +884,8 @@ export const runLivePlayQa = async (options = {}) => {
     const routePlan = solveWalkableRoute({
       player: initialRuntime?.play?.player ?? null,
       goal: initialRuntime?.play?.goal ?? null,
-      mazeSize: playtest?.mazeSize,
+      mazeWidth: playtest?.mazeWidth,
+      mazeHeight: playtest?.mazeHeight,
       walkableRows: playtest?.walkableRows
     });
 

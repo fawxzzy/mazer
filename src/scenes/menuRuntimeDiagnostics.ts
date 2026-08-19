@@ -449,7 +449,8 @@ export interface MenuSceneRuntimeDiagnostics {
     };
     playtest: {
       encoding: 'walkable-rows-v1';
-      mazeSize: number;
+      mazeWidth: number;
+      mazeHeight: number;
       walkableRows: string[];
     };
     markerStyle: {

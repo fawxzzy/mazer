@@ -1866,7 +1866,7 @@ export class MenuScene extends Phaser.Scene {
       : null;
     const drawStageProgress = resolveMenuSceneGenerationDrawStageProgress({
       rowsVisible: drawRowsVisible,
-      rowCount: drawStageStaged ? this.maze.size : null,
+      rowCount: drawStageStaged ? this.maze.height : null,
       tilesVisible: drawTilesVisible,
       tileCount: drawTileCount
     });
@@ -2245,7 +2245,8 @@ export class MenuScene extends Phaser.Scene {
         },
         playtest: {
           encoding: 'walkable-rows-v1',
-          mazeSize: this.maze.size,
+          mazeWidth: this.maze.width,
+          mazeHeight: this.maze.height,
           walkableRows: this.maze.grid.map((row) => row.map((walkable) => (walkable ? '1' : '0')).join(''))
         },
         markerStyle: {
@@ -2319,7 +2320,7 @@ export class MenuScene extends Phaser.Scene {
           } : undefined,
           buildKind: this.maze.generation?.buildKind ?? null,
           source: this.maze.source,
-          size: this.maze.size,
+          size: Math.max(this.maze.width, this.maze.height),
           seed: this.maze.seed,
           seedSource: this.mode === 'play' || !this.explicitRuntimeMazeSeed ? 'runtime-random' : 'query',
           solutionPathLength: this.maze.solutionPath.length,
@@ -3933,7 +3934,7 @@ export class MenuScene extends Phaser.Scene {
       width,
       height,
       this.settings.scale + this.settings.camScale,
-      this.maze.size,
+      Math.max(this.maze.width, this.maze.height),
       layoutSurface,
       {
         browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height),
@@ -4134,7 +4135,7 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }
 
-    return this.menuStaticDrawRowsVisible ?? this.maze.size;
+    return this.menuStaticDrawRowsVisible ?? this.maze.height;
   }
 
   private resolveLegacyMenuStaticDrawTilesVisibleForDiagnostics(): number | null {
@@ -4477,11 +4478,11 @@ export class MenuScene extends Phaser.Scene {
       && this.menuStaticDrawRowsVisible !== null
       && time >= this.menuStaticDrawNextRowAtMs
     ) {
-      this.menuStaticDrawRowsVisible = Math.min(this.maze.size, this.menuStaticDrawRowsVisible + batchSize);
+      this.menuStaticDrawRowsVisible = Math.min(this.maze.height, this.menuStaticDrawRowsVisible + batchSize);
       this.menuStaticDrawNextRowAtMs = time + LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS;
       this.boardPathDirty = true;
       this.boardDynamicDirty = true;
-      if (this.menuStaticDrawRowsVisible >= this.maze.size) {
+      if (this.menuStaticDrawRowsVisible >= this.maze.height) {
         this.menuStaticDrawRowsVisible = null;
         this.menuStaticDrawNextRowAtMs = 0;
         this.settleLegacyMenuStaticDrawStageIfComplete(time);
@@ -5335,11 +5336,19 @@ export class MenuScene extends Phaser.Scene {
     }
     if (isMenuMode && LEGACY_BOARD_GRID_ALPHA > 0) {
       this.boardStaticGraphics.lineStyle(1, 0x6c6673, LEGACY_BOARD_GRID_ALPHA);
-      for (let step = 0; step <= this.maze.size; step += 1) {
-        const offset = step * tileSize;
+      // Vertical lines are spaced along the width; horizontal lines along
+      // the height -- these were drawn in one shared loop before, which
+      // only happened to be correct while width === height.
+      for (let column = 0; column <= this.maze.width; column += 1) {
+        const offset = column * tileSize;
         this.boardStaticGraphics.beginPath();
         this.boardStaticGraphics.moveTo(mazeLeft + offset, mazeTop);
         this.boardStaticGraphics.lineTo(mazeLeft + offset, mazeTop + mazeSize);
+        this.boardStaticGraphics.strokePath();
+      }
+      for (let row = 0; row <= this.maze.height; row += 1) {
+        const offset = row * tileSize;
+        this.boardStaticGraphics.beginPath();
         this.boardStaticGraphics.moveTo(mazeLeft, mazeTop + offset);
         this.boardStaticGraphics.lineTo(mazeLeft + mazeSize, mazeTop + offset);
         this.boardStaticGraphics.strokePath();
@@ -5355,8 +5364,8 @@ export class MenuScene extends Phaser.Scene {
     // the starfield -- skip it entirely in menu mode. Play mode's gameplay
     // wall rendering is untouched.
     if (!isMenuMode) {
-      for (let y = 0; y < this.maze.size; y += 1) {
-        for (let x = 0; x < this.maze.size; x += 1) {
+      for (let y = 0; y < this.maze.height; y += 1) {
+        for (let x = 0; x < this.maze.width; x += 1) {
           const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });
           this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);
           this.boardStaticGraphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
@@ -5372,7 +5381,7 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyPathMaterialTile(
     graphics: Phaser.GameObjects.Graphics,
     point: LegacyPoint,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
     originX: number,
     originY: number,
     tileSize: number,
@@ -5439,7 +5448,7 @@ export class MenuScene extends Phaser.Scene {
   private fillLegacyPathConnectorSeams(
     graphics: Phaser.GameObjects.Graphics,
     point: LegacyPoint,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
     tileRect: LegacyPixelTileRect,
     frames: ReturnType<typeof resolveLegacyMenuPathRenderFrames>,
     materialTileSize: number,
@@ -5520,7 +5529,7 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyPathBorderDock(
     graphics: Phaser.GameObjects.Graphics,
     point: LegacyPoint,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
     boardLeft: number,
     boardTop: number,
     boardSize: number,
@@ -5647,8 +5656,8 @@ export class MenuScene extends Phaser.Scene {
         }
       }
     } else {
-      for (let y = 0; y < this.maze.size; y += 1) {
-        for (let x = 0; x < this.maze.size; x += 1) {
+      for (let y = 0; y < this.maze.height; y += 1) {
+        for (let x = 0; x < this.maze.width; x += 1) {
           if (!this.isLegacyMenuPointVisibleInStaticDraw({ x, y })) {
             continue;
           }
@@ -5833,7 +5842,7 @@ export class MenuScene extends Phaser.Scene {
 
   private drawLegacyMenuPathTitleCell(
     cell: LegacyMenuPathTitleCell,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
     left: number,
     top: number,
     cellSize: number,
@@ -6057,9 +6066,10 @@ export class MenuScene extends Phaser.Scene {
     );
     const visiblePieceCount = this.resolveLegacyMenuPathTitleVisiblePieces(titleLayout.cells.length);
     const visibleCells = titleLayout.cells.slice(0, visiblePieceCount);
-    const titlePathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'> = {
+    const titlePathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'> = {
       grid: titleLayout.grid,
-      size: titleLayout.columns
+      width: titleLayout.columns,
+      height: titleLayout.rows
     };
 
     if (visibleCells.length > 0) {
@@ -6132,7 +6142,11 @@ export class MenuScene extends Phaser.Scene {
       boardLeft: boardLeft + safeInset,
       boardTop: boardTop + safeInset,
       boardSize: renderSize,
-      tileSize: renderSize / Math.max(1, this.maze.size),
+      // Interim: this render frame is still square (boardSize is one
+      // number); dividing by the larger grid dimension keeps tiles safely
+      // inside it without overflow until the frame itself becomes
+      // genuinely rectangular (tracked separately from this compile-fix).
+      tileSize: renderSize / Math.max(1, this.maze.width, this.maze.height),
       safeInset
     };
   }
@@ -7001,8 +7015,8 @@ export class MenuScene extends Phaser.Scene {
       return new Phaser.Math.Vector2(0, 0);
     }
 
-    const xRatio = this.player.x / Math.max(1, this.maze.size - 1);
-    const yRatio = this.player.y / Math.max(1, this.maze.size - 1);
+    const xRatio = this.player.x / Math.max(1, this.maze.width - 1);
+    const yRatio = this.player.y / Math.max(1, this.maze.height - 1);
     const offsetX = Math.round((0.5 - xRatio) * Math.min(42, this.layout.tileSize * 4));
     const offsetY = Math.round((0.5 - yRatio) * Math.min(42, this.layout.tileSize * 4));
     return new Phaser.Math.Vector2(offsetX, offsetY);
@@ -7015,7 +7029,7 @@ export class MenuScene extends Phaser.Scene {
     originY: number,
     tileSize: number,
     alpha: number,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>
   ): void {
     this.fillLegacyDynamicPathTile(
       point,
@@ -7110,7 +7124,7 @@ export class MenuScene extends Phaser.Scene {
     originY: number,
     tileSize: number,
     alphaMultiplier: number,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
     time: number
   ): void {
     const { choiceClass, confidence, optionPoints, targetPoint, thoughtState } = this.resolveLegacyMenuAiMemoryPoints();
@@ -7162,7 +7176,7 @@ export class MenuScene extends Phaser.Scene {
     originY: number,
     tileSize: number,
     alpha: number,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>
   ): void {
     this.fillLegacyDynamicPathTile(
       point,
@@ -7188,7 +7202,7 @@ export class MenuScene extends Phaser.Scene {
     mazeSize: number,
     tileSize: number,
     time: number,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
     palette: LegacyProgressionPalette
   ): void {
     if (trail.length < 2) {
@@ -7266,7 +7280,7 @@ export class MenuScene extends Phaser.Scene {
     mazeTop: number,
     mazeSize: number,
     tileSize: number,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>
   ): void {
     this.drawLegacyPathBorderDock(
       this.boardDynamicGraphics,
@@ -7295,7 +7309,7 @@ export class MenuScene extends Phaser.Scene {
     originY: number,
     tileSize: number,
     alpha: number,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'size'>,
+    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
     edgeColor: number,
     edgeAlpha: number,
     coreAlphaMax: number
@@ -11493,7 +11507,7 @@ export class MenuScene extends Phaser.Scene {
       : null;
     const drawStageProgress = resolveMenuSceneGenerationDrawStageProgress({
       rowsVisible: drawRowsVisible,
-      rowCount: drawStageStaged ? this.maze.size : null,
+      rowCount: drawStageStaged ? this.maze.height : null,
       tilesVisible: drawTilesVisible,
       tileCount: drawTileCount
     });
@@ -11631,7 +11645,7 @@ export class MenuScene extends Phaser.Scene {
       runtime: {
         mode: this.mode,
         overlay: this.overlay,
-        mazeSize: this.maze.size,
+        mazeSize: Math.max(this.maze.width, this.maze.height),
         generation: {
           budget: {
             checkpointCount: this.maze.generation?.budget.checkpointCount ?? null,

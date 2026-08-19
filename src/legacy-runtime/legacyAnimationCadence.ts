@@ -37,7 +37,8 @@ interface LegacyRevealMaze {
     start?: LegacyPoint;
   } | null;
   grid: readonly (readonly boolean[])[];
-  size: number;
+  width: number;
+  height: number;
   solutionPath: readonly LegacyPoint[];
   start: LegacyPoint;
 }
@@ -138,8 +139,8 @@ export const buildLegacyMazeRevealOrder = (maze: LegacyRevealMaze): LegacyPoint[
       appendCandidate(nonSolutionTiles, point);
     }
   }
-  for (let y = 0; y < maze.size; y += 1) {
-    for (let x = 0; x < maze.size; x += 1) {
+  for (let y = 0; y < maze.height; y += 1) {
+    for (let x = 0; x < maze.width; x += 1) {
       const point = { x, y };
       if (maze.grid[y]?.[x] === true && !solutionKeys.has(pointKey(point))) {
         appendCandidate(nonSolutionTiles, point);

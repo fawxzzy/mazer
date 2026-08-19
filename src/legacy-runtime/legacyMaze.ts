@@ -65,7 +65,8 @@ export interface LegacyMazeGenerationProfile {
 
 export interface LegacyMazeSnapshot {
   source: 'menu-snapshot' | 'menu-generated' | 'play-generated';
-  size: number;
+  width: number;
+  height: number;
   grid: boolean[][];
   start: LegacyPoint;
   goal: LegacyPoint;
@@ -242,14 +243,21 @@ const createSeededRng = (seed: number): (() => number) => {
   };
 };
 
-const normalizeGridSize = (scale: number): number => {
+// Applied independently per axis so width and height can differ -- each
+// axis still gets the same clamp+odd-size treatment a single square scale
+// used to get (odd sizes keep a true center cell for symmetric border/
+// corner logic on that axis).
+const normalizeGridDimension = (scale: number): number => {
   const clamped = clampInteger(scale, LEGACY_MIN_SCALE, LEGACY_MAX_SCALE);
   const normalized = clamped % 2 === 0 ? clamped - 1 : clamped;
   return Math.max(LEGACY_MIN_SCALE, normalized);
 };
 
-const resolveLegacyGeneratedMenuShortcutCount = (scale: number): number => {
-  const size = normalizeGridSize(scale);
+// A single "scale" figure for shortcut-count budgeting where a square value
+// still makes sense on its own (menu snapshot generation only) -- averages
+// width and height so the shortcut budget stays sane for any aspect ratio.
+const resolveLegacyGeneratedMenuShortcutCount = (width: number, height: number): number => {
+  const size = Math.round((normalizeGridDimension(width) + normalizeGridDimension(height)) / 2);
   if (size <= 35) {
     return Math.trunc(size * legacyTuning.board.shortcutCountModifier.menu);
   }
@@ -262,16 +270,16 @@ const resolveLegacyGeneratedMenuShortcutCount = (scale: number): number => {
 
 const keyForPoint = (point: LegacyPoint): string => `${point.x},${point.y}`;
 
-const createEmptyGrid = (size: number): boolean[][] => (
-  Array.from({ length: size }, () => Array.from({ length: size }, () => false))
+const createEmptyGrid = (width: number, height: number): boolean[][] => (
+  Array.from({ length: height }, () => Array.from({ length: width }, () => false))
 );
 
-const createLegacyFloorGrid = (size: number): boolean[][] => {
-  const grid = Array.from({ length: size }, () => Array.from({ length: size }, () => true));
+const createLegacyFloorGrid = (width: number, height: number): boolean[][] => {
+  const grid = Array.from({ length: height }, () => Array.from({ length: width }, () => true));
 
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      if (x === 0 || y === 0 || x === size - 1 || y === size - 1) {
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (x === 0 || y === 0 || x === width - 1 || y === height - 1) {
         grid[y]![x] = false;
       }
     }
@@ -491,7 +499,7 @@ export const auditLegacyCompletedRouteAgainstPlayableShortestPath = (
 };
 
 export const resolveLegacyWrapTopologyDiagnostics = (
-  maze: Pick<LegacyMazeSnapshot, 'goal' | 'grid' | 'size' | 'solutionPath' | 'start'>,
+  maze: Pick<LegacyMazeSnapshot, 'goal' | 'grid' | 'width' | 'height' | 'solutionPath' | 'start'>,
   requiredConnections: LegacyMazeGenerationProfile['requiredOppositeBorderConnections'] = {
     horizontal: false,
     vertical: false
@@ -515,29 +523,30 @@ export const resolveLegacyWrapTopologyDiagnostics = (
   const decorativeCutoutCandidates: LegacyPoint[] = [];
   const inwardDisconnectedEndpoints: LegacyPoint[] = [];
 
-  for (let y = 0; y < maze.size; y += 1) {
-    for (let x = 0; x < maze.size; x += 1) {
+  for (let y = 0; y < maze.height; y += 1) {
+    for (let x = 0; x < maze.width; x += 1) {
       if (maze.grid[y]?.[x] !== true) {
         continue;
       }
 
       const point = { x, y };
-      if (!isLegacyBorderPoint(maze.size, point)) {
+      if (!isLegacyBorderPoint(maze.width, maze.height, point)) {
         continue;
       }
-      if (isLegacyCornerBorderPoint(maze.size, point)) {
+      if (isLegacyCornerBorderPoint(maze.width, maze.height, point)) {
         cornerBorderFloors.push(point);
         continue;
       }
 
-      const axis = point.x === 0 || point.x === maze.size - 1 ? horizontal : vertical;
+      const axis = point.x === 0 || point.x === maze.width - 1 ? horizontal : vertical;
       axis.endpointCount += 1;
-      const line = point.x === 0 || point.x === maze.size - 1 ? point.y : point.x;
-      if (isLegacyBorderFeederLineReserved(maze.size, line)) {
+      const line = point.x === 0 || point.x === maze.width - 1 ? point.y : point.x;
+      const lineAxisLength = point.x === 0 || point.x === maze.width - 1 ? maze.height : maze.width;
+      if (isLegacyBorderFeederLineReserved(lineAxisLength, line)) {
         decorativeCutoutCandidates.push(point);
       }
 
-      const opposite = resolveLegacyOppositeBorderPoint(maze.size, point);
+      const opposite = resolveLegacyOppositeBorderPoint(maze.width, maze.height, point);
       if (!opposite || maze.grid[opposite.y]?.[opposite.x] !== true) {
         axis.unpairedEndpoints.push(point);
       } else if (point.x === 0 || point.y === 0) {
@@ -546,11 +555,11 @@ export const resolveLegacyWrapTopologyDiagnostics = (
 
       const inward = point.x === 0
         ? { x: 1, y: point.y }
-        : point.x === maze.size - 1
-          ? { x: maze.size - 2, y: point.y }
+        : point.x === maze.width - 1
+          ? { x: maze.width - 2, y: point.y }
           : point.y === 0
             ? { x: point.x, y: 1 }
-            : { x: point.x, y: maze.size - 2 };
+            : { x: point.x, y: maze.height - 2 };
       if (maze.grid[inward.y]?.[inward.x] !== true) {
         inwardDisconnectedEndpoints.push(point);
       }
@@ -841,7 +850,10 @@ const normalizeLegacyPlayableTopology = (
   }
 
   const originalGoalDistance = reachable.get(keyForPoint(goal))?.distance ?? null;
-  const minPlayableRouteDistance = Math.max(LEGACY_MIN_SCALE, Math.floor(grid.length * 1.5));
+  // grid.length is height only; average with width so this scales sanely
+  // for any aspect ratio (reduces to the exact old value when square).
+  const routeDistanceLinearSize = (grid.length + (grid[0]?.length ?? 0)) / 2;
+  const minPlayableRouteDistance = Math.max(LEGACY_MIN_SCALE, Math.floor(routeDistanceLinearSize * 1.5));
   const shouldRebaseGoal = (
     originalGoalDistance === null
     || originalGoalDistance < Math.min(minPlayableRouteDistance, farthest.distance)
@@ -1152,40 +1164,40 @@ const resolveLegacyFinalRouteState = (
   };
 };
 
-const isLegacyBorderPoint = (size: number, point: LegacyPoint): boolean => (
-  point.x === 0 || point.y === 0 || point.x === size - 1 || point.y === size - 1
+const isLegacyBorderPoint = (width: number, height: number, point: LegacyPoint): boolean => (
+  point.x === 0 || point.y === 0 || point.x === width - 1 || point.y === height - 1
 );
 
-const isLegacyCornerBorderPoint = (size: number, point: LegacyPoint): boolean => (
-  (point.x === 0 || point.x === size - 1) && (point.y === 0 || point.y === size - 1)
+const isLegacyCornerBorderPoint = (width: number, height: number, point: LegacyPoint): boolean => (
+  (point.x === 0 || point.x === width - 1) && (point.y === 0 || point.y === height - 1)
 );
 
-const resolveLegacyOppositeBorderPoint = (size: number, point: LegacyPoint): LegacyPoint | null => {
-  if (!isLegacyBorderPoint(size, point) || isLegacyCornerBorderPoint(size, point)) {
+const resolveLegacyOppositeBorderPoint = (width: number, height: number, point: LegacyPoint): LegacyPoint | null => {
+  if (!isLegacyBorderPoint(width, height, point) || isLegacyCornerBorderPoint(width, height, point)) {
     return null;
   }
 
   if (point.x === 0) {
-    return { x: size - 1, y: point.y };
+    return { x: width - 1, y: point.y };
   }
-  if (point.x === size - 1) {
+  if (point.x === width - 1) {
     return { x: 0, y: point.y };
   }
   if (point.y === 0) {
-    return { x: point.x, y: size - 1 };
+    return { x: point.x, y: height - 1 };
   }
-  if (point.y === size - 1) {
+  if (point.y === height - 1) {
     return { x: point.x, y: 0 };
   }
 
   return null;
 };
 
-const resolveLegacyOppositeBorderConnectorStep = (size: number, point: LegacyPoint): LegacyPoint => {
+const resolveLegacyOppositeBorderConnectorStep = (width: number, point: LegacyPoint): LegacyPoint => {
   if (point.x === 0) {
     return { x: 1, y: 0 };
   }
-  if (point.x === size - 1) {
+  if (point.x === width - 1) {
     return { x: -1, y: 0 };
   }
   if (point.y === 0) {
@@ -1199,18 +1211,19 @@ const applyLegacyOppositeBorderConnections = (
   grid: boolean[][],
   requiredConnections: LegacyMazeGenerationProfile['requiredOppositeBorderConnections']
 ): LegacyPoint[] => {
-  const size = grid.length;
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
   const createdTiles: LegacyPoint[] = [];
   const seen = new Set<string>();
   const sourceBorderPoints: LegacyPoint[] = [];
 
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
       const point = { x, y };
       if (
         grid[y]?.[x] === true
-        && isLegacyBorderPoint(size, point)
-        && !isLegacyCornerBorderPoint(size, point)
+        && isLegacyBorderPoint(width, height, point)
+        && !isLegacyCornerBorderPoint(width, height, point)
       ) {
         sourceBorderPoints.push(point);
       }
@@ -1219,25 +1232,25 @@ const applyLegacyOppositeBorderConnections = (
 
   for (const source of sourceBorderPoints) {
     if (
-      (source.x === 0 || source.x === size - 1)
+      (source.x === 0 || source.x === width - 1)
         ? !requiredConnections.horizontal
         : !requiredConnections.vertical
     ) {
       continue;
     }
 
-    const opposite = resolveLegacyOppositeBorderPoint(size, source);
+    const opposite = resolveLegacyOppositeBorderPoint(width, height, source);
     if (!opposite || grid[opposite.y]?.[opposite.x] === true) {
       continue;
     }
 
-    const step = resolveLegacyOppositeBorderConnectorStep(size, opposite);
+    const step = resolveLegacyOppositeBorderConnectorStep(width, opposite);
     let cursor = clonePoint(opposite);
     while (
       cursor.x >= 0
       && cursor.y >= 0
-      && cursor.x < size
-      && cursor.y < size
+      && cursor.x < width
+      && cursor.y < height
     ) {
       if (grid[cursor.y]?.[cursor.x] === true) {
         break;
@@ -1260,11 +1273,15 @@ const applyLegacyOppositeBorderConnections = (
 type LegacyOppositeBorderAxis = 'horizontal' | 'vertical';
 type LegacyBorderFeederSide = 'bottom' | 'left' | 'right' | 'top';
 
-const isLegacyBorderFeederLineReserved = (size: number, line: number): boolean => {
-  const center = Math.floor(size / 2);
-  const centerReserve = Math.max(2, Math.ceil(size * 0.045));
+// "line" means different things per axis: for the horizontal axis (pairing
+// the left/right borders) a line is a row position, bounded by height; for
+// the vertical axis (pairing top/bottom) it's a column position, bounded by
+// width. axisLength is whichever of those the caller means.
+const isLegacyBorderFeederLineReserved = (axisLength: number, line: number): boolean => {
+  const center = Math.floor(axisLength / 2);
+  const centerReserve = Math.max(2, Math.ceil(axisLength * 0.045));
   return line <= 1
-    || line >= size - 2
+    || line >= axisLength - 2
     || Math.abs(line - center) <= centerReserve;
 };
 
@@ -1272,12 +1289,14 @@ const hasLegacyOppositeBorderAxisConnection = (
   grid: boolean[][],
   axis: LegacyOppositeBorderAxis
 ): boolean => {
-  const size = grid.length;
-  for (let index = 1; index < size - 1; index += 1) {
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const axisLength = axis === 'horizontal' ? height : width;
+  for (let index = 1; index < axisLength - 1; index += 1) {
     if (
       axis === 'horizontal'
-        ? grid[index]?.[0] === true && grid[index]?.[size - 1] === true
-        : grid[0]?.[index] === true && grid[size - 1]?.[index] === true
+        ? grid[index]?.[0] === true && grid[index]?.[width - 1] === true
+        : grid[0]?.[index] === true && grid[height - 1]?.[index] === true
     ) {
       return true;
     }
@@ -1291,25 +1310,30 @@ const resolveLegacyMandatoryBorderLineCost = (
   axis: LegacyOppositeBorderAxis,
   line: number
 ): number => {
-  const size = grid.length;
-  let firstDistance = size;
-  let secondDistance = size;
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  // The offset walks along the OPPOSITE axis from "line" -- horizontal
+  // connections carve along a row (bounded by width), vertical along a
+  // column (bounded by height).
+  const offsetBound = axis === 'horizontal' ? width : height;
+  let firstDistance = offsetBound;
+  let secondDistance = offsetBound;
 
-  for (let offset = 1; offset < size - 1; offset += 1) {
+  for (let offset = 1; offset < offsetBound - 1; offset += 1) {
     const firstPoint = axis === 'horizontal'
       ? { x: offset, y: line }
       : { x: line, y: offset };
     const secondPoint = axis === 'horizontal'
-      ? { x: size - 1 - offset, y: line }
-      : { x: line, y: size - 1 - offset };
+      ? { x: offsetBound - 1 - offset, y: line }
+      : { x: line, y: offsetBound - 1 - offset };
 
-    if (firstDistance === size && grid[firstPoint.y]?.[firstPoint.x] === true) {
+    if (firstDistance === offsetBound && grid[firstPoint.y]?.[firstPoint.x] === true) {
       firstDistance = offset;
     }
-    if (secondDistance === size && grid[secondPoint.y]?.[secondPoint.x] === true) {
+    if (secondDistance === offsetBound && grid[secondPoint.y]?.[secondPoint.x] === true) {
       secondDistance = offset;
     }
-    if (firstDistance !== size && secondDistance !== size) {
+    if (firstDistance !== offsetBound && secondDistance !== offsetBound) {
       break;
     }
   }
@@ -1322,12 +1346,14 @@ const resolveLegacyMandatoryBorderLine = (
   axis: LegacyOppositeBorderAxis,
   seed: number
 ): number => {
-  const size = grid.length;
-  let bestLine = Math.max(1, Math.floor(size / 2));
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const axisLength = axis === 'horizontal' ? height : width;
+  let bestLine = Math.max(1, Math.floor(axisLength / 2));
   let bestScore = Number.POSITIVE_INFINITY;
 
-  for (let line = 1; line < size - 1; line += 1) {
-    if (isLegacyBorderFeederLineReserved(size, line)) {
+  for (let line = 1; line < axisLength - 1; line += 1) {
+    if (isLegacyBorderFeederLineReserved(axisLength, line)) {
       continue;
     }
 
@@ -1350,15 +1376,16 @@ const carveLegacyBorderSpoke = (
   createdTiles: LegacyPoint[],
   seen: Set<string>
 ): void => {
-  const size = grid.length;
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
   let cursor = clonePoint(origin);
   let carvedBeyondBorder = false;
 
   while (
     cursor.x >= 0
     && cursor.y >= 0
-    && cursor.x < size
-    && cursor.y < size
+    && cursor.x < width
+    && cursor.y < height
   ) {
     const wasPath = grid[cursor.y]?.[cursor.x] === true;
     grid[cursor.y]![cursor.x] = true;
@@ -1390,16 +1417,17 @@ const applyLegacyMandatoryOppositeBorderAxisConnection = (
     return;
   }
 
-  const size = grid.length;
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
   const line = resolveLegacyMandatoryBorderLine(grid, axis, seed);
   if (axis === 'horizontal') {
     carveLegacyBorderSpoke(grid, { x: 0, y: line }, { x: 1, y: 0 }, createdTiles, seen);
-    carveLegacyBorderSpoke(grid, { x: size - 1, y: line }, { x: -1, y: 0 }, createdTiles, seen);
+    carveLegacyBorderSpoke(grid, { x: width - 1, y: line }, { x: -1, y: 0 }, createdTiles, seen);
     return;
   }
 
   carveLegacyBorderSpoke(grid, { x: line, y: 0 }, { x: 0, y: 1 }, createdTiles, seen);
-  carveLegacyBorderSpoke(grid, { x: line, y: size - 1 }, { x: 0, y: -1 }, createdTiles, seen);
+  carveLegacyBorderSpoke(grid, { x: line, y: height - 1 }, { x: 0, y: -1 }, createdTiles, seen);
 };
 
 const applyLegacyMandatoryOppositeBorderConnections = (
@@ -1420,8 +1448,14 @@ const applyLegacyMandatoryOppositeBorderConnections = (
   return createdTiles;
 };
 
-const resolveLegacyBorderFeederTargetPerSide = (size: number): number => (
-  Math.max(2, Math.min(6, Math.floor(size / 18)))
+// left/right feeder "lines" are row positions (bounded by height); top/
+// bottom feeder "lines" are column positions (bounded by width).
+const resolveLegacyBorderFeederSideAxisLength = (side: LegacyBorderFeederSide, width: number, height: number): number => (
+  side === 'left' || side === 'right' ? height : width
+);
+
+const resolveLegacyBorderFeederTargetPerSide = (axisLength: number): number => (
+  Math.max(2, Math.min(6, Math.floor(axisLength / 18)))
 );
 
 const isLegacyBorderFeederPresent = (
@@ -1429,17 +1463,18 @@ const isLegacyBorderFeederPresent = (
   side: LegacyBorderFeederSide,
   line: number
 ): boolean => {
-  const size = grid.length;
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
   if (side === 'left') {
     return grid[line]?.[0] === true;
   }
   if (side === 'right') {
-    return grid[line]?.[size - 1] === true;
+    return grid[line]?.[width - 1] === true;
   }
   if (side === 'top') {
     return grid[0]?.[line] === true;
   }
-  return grid[size - 1]?.[line] === true;
+  return grid[height - 1]?.[line] === true;
 };
 
 const hasLegacyBorderFeederInnerAnchor = (
@@ -1447,17 +1482,18 @@ const hasLegacyBorderFeederInnerAnchor = (
   side: LegacyBorderFeederSide,
   line: number
 ): boolean => {
-  const size = grid.length;
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
   if (side === 'left') {
     return grid[line]?.[1] === true;
   }
   if (side === 'right') {
-    return grid[line]?.[size - 2] === true;
+    return grid[line]?.[width - 2] === true;
   }
   if (side === 'top') {
     return grid[1]?.[line] === true;
   }
-  return grid[size - 2]?.[line] === true;
+  return grid[height - 2]?.[line] === true;
 };
 
 const carveLegacyBorderFeeder = (
@@ -1467,14 +1503,15 @@ const carveLegacyBorderFeeder = (
   createdTiles: LegacyPoint[],
   seen: Set<string>
 ): void => {
-  const size = grid.length;
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
   const point = side === 'left'
     ? { x: 0, y: line }
     : side === 'right'
-      ? { x: size - 1, y: line }
+      ? { x: width - 1, y: line }
       : side === 'top'
         ? { x: line, y: 0 }
-        : { x: line, y: size - 1 };
+        : { x: line, y: height - 1 };
 
   if (grid[point.y]?.[point.x] === true) {
     return;
@@ -1493,12 +1530,13 @@ const resolveLegacyBorderFeederCandidateLines = (
   side: LegacyBorderFeederSide,
   seed: number
 ): number[] => {
-  const size = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const axisLength = resolveLegacyBorderFeederSideAxisLength(side, width, grid.length);
   const scored: Array<{ line: number; score: number }> = [];
 
-  for (let line = 2; line < size - 2; line += 1) {
+  for (let line = 2; line < axisLength - 2; line += 1) {
     if (
-      isLegacyBorderFeederLineReserved(size, line)
+      isLegacyBorderFeederLineReserved(axisLength, line)
       || isLegacyBorderFeederPresent(grid, side, line)
       || !hasLegacyBorderFeederInnerAnchor(grid, side, line)
     ) {
@@ -1522,12 +1560,13 @@ const countLegacyBorderFeedersOnSide = (
   grid: boolean[][],
   side: LegacyBorderFeederSide
 ): number => {
-  const size = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const axisLength = resolveLegacyBorderFeederSideAxisLength(side, width, grid.length);
   let count = 0;
 
-  for (let line = 2; line < size - 2; line += 1) {
+  for (let line = 2; line < axisLength - 2; line += 1) {
     if (
-      !isLegacyBorderFeederLineReserved(size, line)
+      !isLegacyBorderFeederLineReserved(axisLength, line)
       && isLegacyBorderFeederPresent(grid, side, line)
       && hasLegacyBorderFeederInnerAnchor(grid, side, line)
     ) {
@@ -1543,19 +1582,21 @@ const applyLegacyPerimeterFeederConnections = (
   seed: number,
   targetPerSideOverride?: number | null
 ): LegacyPoint[] => {
-  const size = grid.length;
-  const targetPerSide = targetPerSideOverride === undefined || targetPerSideOverride === null
-    ? resolveLegacyBorderFeederTargetPerSide(size)
-    : clampInteger(targetPerSideOverride, 0, 8);
-  if (targetPerSide <= 0) {
-    return [];
-  }
-
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
   const createdTiles: LegacyPoint[] = [];
   const seen = new Set<string>();
   const sides: LegacyBorderFeederSide[] = ['left', 'right', 'top', 'bottom'];
 
   for (const side of sides) {
+    const axisLength = resolveLegacyBorderFeederSideAxisLength(side, width, height);
+    const targetPerSide = targetPerSideOverride === undefined || targetPerSideOverride === null
+      ? resolveLegacyBorderFeederTargetPerSide(axisLength)
+      : clampInteger(targetPerSideOverride, 0, 8);
+    if (targetPerSide <= 0) {
+      continue;
+    }
+
     let currentCount = countLegacyBorderFeedersOnSide(grid, side);
     if (currentCount >= targetPerSide) {
       continue;
@@ -1563,7 +1604,7 @@ const applyLegacyPerimeterFeederConnections = (
 
     const candidates = resolveLegacyBorderFeederCandidateLines(grid, side, seed);
     const chosenLines: number[] = [];
-    const minSpacing = Math.max(3, Math.floor(size / Math.max(3, targetPerSide * 2)));
+    const minSpacing = Math.max(3, Math.floor(axisLength / Math.max(3, targetPerSide * 2)));
     for (const line of candidates) {
       if (currentCount >= targetPerSide) {
         break;
@@ -1619,8 +1660,8 @@ const distanceBetween = (left: LegacyPoint, right: LegacyPoint): number => (
   Math.hypot(left.x - right.x, left.y - right.y)
 );
 
-const hasFullLegacyNeighborContext = (size: number, point: LegacyPoint): boolean => (
-  point.x > 0 && point.y > 0 && point.x < size - 1 && point.y < size - 1
+const hasFullLegacyNeighborContext = (width: number, height: number, point: LegacyPoint): boolean => (
+  point.x > 0 && point.y > 0 && point.x < width - 1 && point.y < height - 1
 );
 
 const isPathAt = (pathMask: boolean[][], point: LegacyPoint): boolean => (
@@ -1649,7 +1690,8 @@ const countPathNeighbors = (
 };
 
 const canUseLegacyNextTile = (
-  size: number,
+  width: number,
+  height: number,
   pathMask: boolean[][],
   current: LegacyPoint,
   next: LegacyPoint,
@@ -1657,7 +1699,7 @@ const canUseLegacyNextTile = (
   checkpoint: LegacyPoint,
   backtracking: boolean
 ): boolean => {
-  if (!hasFullLegacyNeighborContext(size, next) || isPathAt(pathMask, next)) {
+  if (!hasFullLegacyNeighborContext(width, height, next) || isPathAt(pathMask, next)) {
     return false;
   }
 
@@ -1670,7 +1712,8 @@ const canUseLegacyNextTile = (
 };
 
 const findClosestLegacyNextTile = (
-  size: number,
+  width: number,
+  height: number,
   pathMask: boolean[][],
   current: LegacyPoint,
   checkpoint: LegacyPoint,
@@ -1682,7 +1725,7 @@ const findClosestLegacyNextTile = (
 
   for (const direction of LEGACY_STEP_DIRECTIONS) {
     const next = { x: current.x + direction.x, y: current.y + direction.y };
-    if (!canUseLegacyNextTile(size, pathMask, current, next, start, checkpoint, backtracking)) {
+    if (!canUseLegacyNextTile(width, height, pathMask, current, next, start, checkpoint, backtracking)) {
       continue;
     }
 
@@ -1701,7 +1744,8 @@ const findClosestLegacyNextTile = (
 };
 
 const findRandomLegacyNextTile = (
-  size: number,
+  width: number,
+  height: number,
   pathMask: boolean[][],
   current: LegacyPoint,
   checkpoint: LegacyPoint,
@@ -1715,11 +1759,12 @@ const findRandomLegacyNextTile = (
   }
 
   const next = { x: current.x + direction.x, y: current.y + direction.y };
-  return canUseLegacyNextTile(size, pathMask, current, next, start, checkpoint, backtracking) ? next : null;
+  return canUseLegacyNextTile(width, height, pathMask, current, next, start, checkpoint, backtracking) ? next : null;
 };
 
 const findPreferredLegacyNextTile = (
-  size: number,
+  width: number,
+  height: number,
   pathMask: boolean[][],
   current: LegacyPoint,
   checkpoint: LegacyPoint,
@@ -1732,11 +1777,12 @@ const findPreferredLegacyNextTile = (
     ? { x: deltaX > 0 ? 1 : -1, y: 0 }
     : { x: 0, y: deltaY > 0 ? 1 : -1 };
   const next = { x: current.x + direction.x, y: current.y + direction.y };
-  return canUseLegacyNextTile(size, pathMask, current, next, start, checkpoint, backtracking) ? next : null;
+  return canUseLegacyNextTile(width, height, pathMask, current, next, start, checkpoint, backtracking) ? next : null;
 };
 
 const findLegacyNextTile = (
-  size: number,
+  width: number,
+  height: number,
   pathMask: boolean[][],
   current: LegacyPoint,
   checkpoint: LegacyPoint,
@@ -1751,17 +1797,17 @@ const findLegacyNextTile = (
     const [selector] = selectors.splice(selectorIndex, 1);
 
     if (selector === 0) {
-      const next = findClosestLegacyNextTile(size, pathMask, current, checkpoint, start, backtracking);
+      const next = findClosestLegacyNextTile(width, height, pathMask, current, checkpoint, start, backtracking);
       if (next) {
         return next;
       }
     } else if (selector === 1) {
-      const next = findRandomLegacyNextTile(size, pathMask, current, checkpoint, start, backtracking, rng);
+      const next = findRandomLegacyNextTile(width, height, pathMask, current, checkpoint, start, backtracking, rng);
       if (next) {
         return next;
       }
     } else {
-      const next = findPreferredLegacyNextTile(size, pathMask, current, checkpoint, start, backtracking);
+      const next = findPreferredLegacyNextTile(width, height, pathMask, current, checkpoint, start, backtracking);
       if (next) {
         return next;
       }
@@ -1783,14 +1829,15 @@ const isAdjacentTo = (left: LegacyPoint, right: LegacyPoint): boolean => (
 );
 
 const resolveLegacyCheckpoint = (
-  size: number,
+  width: number,
+  height: number,
   pathMask: boolean[][],
   start: LegacyPoint,
   remainingCheckpoints: number,
   rng: () => number
 ): { checkpoint: LegacyPoint | null; remainingCheckpoints: number } => {
-  const subScale = size * 3;
-  const gridSize = size * size;
+  const subScale = width * 3;
+  const gridSize = width * height;
   let attempts = 0;
   let remaining = remainingCheckpoints;
 
@@ -1804,10 +1851,10 @@ const resolveLegacyCheckpoint = (
     }
 
     const tileIndex = subScale + Math.floor(rng() * Math.max(1, gridSize - subScale));
-    const checkpoint = { x: tileIndex % size, y: Math.floor(tileIndex / size) };
+    const checkpoint = { x: tileIndex % width, y: Math.floor(tileIndex / width) };
 
     if (
-      hasFullLegacyNeighborContext(size, checkpoint)
+      hasFullLegacyNeighborContext(width, height, checkpoint)
       && !isSamePoint(checkpoint, start)
       && !isAdjacentTo(checkpoint, start)
       && !isPathAt(pathMask, checkpoint)
@@ -1821,7 +1868,8 @@ const resolveLegacyCheckpoint = (
 };
 
 const backtrackLegacyPath = (
-  size: number,
+  width: number,
+  height: number,
   pathMask: boolean[][],
   pathTiles: LegacyPoint[],
   checkpoint: LegacyPoint,
@@ -1849,7 +1897,7 @@ const backtrackLegacyPath = (
       return null;
     }
 
-    return findLegacyNextTile(size, pathMask, candidate, checkpoint, start, true, rng);
+    return findLegacyNextTile(width, height, pathMask, candidate, checkpoint, start, true, rng);
   }
 
   for (let index = potentialPathArray.length - 1; index >= 0; index -= 1) {
@@ -1858,7 +1906,7 @@ const backtrackLegacyPath = (
       continue;
     }
 
-    const next = findLegacyNextTile(size, pathMask, candidate, checkpoint, start, true, rng);
+    const next = findLegacyNextTile(width, height, pathMask, candidate, checkpoint, start, true, rng);
     if (next) {
       return next;
     }
@@ -1868,23 +1916,28 @@ const backtrackLegacyPath = (
 };
 
 const createLegacyCheckpointPathMaze = (
-  size: number,
+  width: number,
+  height: number,
   seed: number,
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null
 ): LegacyCheckpointPathBuilderResult => {
   const rng = createSeededRng(seed);
   const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
+  // A single "linear" size figure for formulas that scaled with one square
+  // dimension before (checkpoint budget, safety limits) -- the average of
+  // width and height reduces to the exact old value when they're equal.
+  const linearSize = (width + height) / 2;
   const requestedCheckpoints = clampInteger(
-    Math.trunc((size + (size * legacyTuning.board.checkPointModifier)) * profile.checkpointCountMultiplier),
+    Math.trunc((linearSize + (linearSize * legacyTuning.board.checkPointModifier)) * profile.checkpointCountMultiplier),
     4,
-    Math.trunc(size * 2)
+    Math.trunc(linearSize * 2)
   );
-  const pathMask = createEmptyGrid(size);
+  const pathMask = createEmptyGrid(width, height);
   const pathTiles: LegacyPoint[] = [];
   const pathLengths = new Map<string, number>();
-  const randomStartIndex = Math.floor(rng() * (size * size));
-  const rawStart = { x: randomStartIndex % size, y: Math.floor(randomStartIndex / size) };
-  const deterministicSafetyStart = !hasFullLegacyNeighborContext(size, rawStart);
+  const randomStartIndex = Math.floor(rng() * (width * height));
+  const rawStart = { x: randomStartIndex % width, y: Math.floor(randomStartIndex / width) };
+  const deterministicSafetyStart = !hasFullLegacyNeighborContext(width, height, rawStart);
   const start = deterministicSafetyStart ? { x: 1, y: 1 } : rawStart;
   let current = clonePoint(start);
   let remainingCheckpoints = requestedCheckpoints;
@@ -1895,10 +1948,10 @@ const createLegacyCheckpointPathMaze = (
   const checkpointTiles: LegacyPoint[] = [];
   let pathLengthCount = 0;
   let safetyIterations = 0;
-  const safetyIterationLimit = Math.max(size * size * 8, requestedCheckpoints * size * 4);
+  const safetyIterationLimit = Math.max(width * height * 8, requestedCheckpoints * linearSize * 4);
 
   while (remainingCheckpoints > 0 && safetyIterations < safetyIterationLimit) {
-    const checkpointResult = resolveLegacyCheckpoint(size, pathMask, start, remainingCheckpoints, rng);
+    const checkpointResult = resolveLegacyCheckpoint(width, height, pathMask, start, remainingCheckpoints, rng);
     remainingCheckpoints = checkpointResult.remainingCheckpoints;
     const checkpoint = checkpointResult.checkpoint;
     if (!checkpoint) {
@@ -1921,7 +1974,7 @@ const createLegacyCheckpointPathMaze = (
       }
 
       const previous = clonePoint(current);
-      const next = findLegacyNextTile(size, pathMask, current, checkpoint, start, false, rng);
+      const next = findLegacyNextTile(width, height, pathMask, current, checkpoint, start, false, rng);
       if (next) {
         current = next;
         pathLengthCount += 1;
@@ -1933,7 +1986,7 @@ const createLegacyCheckpointPathMaze = (
         goal = previous;
       }
 
-      const backtracked = backtrackLegacyPath(size, pathMask, pathTiles, checkpoint, start, rng);
+      const backtracked = backtrackLegacyPath(width, height, pathMask, pathTiles, checkpoint, start, rng);
       backtracks += 1;
       if (!backtracked) {
         break;
@@ -1949,14 +2002,14 @@ const createLegacyCheckpointPathMaze = (
     longestPathLength = Math.max(longestPathLength, pathTiles.length - 1);
   }
 
-  const grid = createLegacyFloorGrid(size);
+  const grid = createLegacyFloorGrid(width, height);
   const wallArray: LegacyPoint[] = [];
 
   for (const pathTile of pathTiles) {
     for (const direction of LEGACY_STEP_DIRECTIONS) {
       const neighbor = { x: pathTile.x + direction.x, y: pathTile.y + direction.y };
       if (
-        hasFullLegacyNeighborContext(size, neighbor)
+        hasFullLegacyNeighborContext(width, height, neighbor)
         && !isPathAt(pathMask, neighbor)
         && !isSamePoint(neighbor, goal)
       ) {
@@ -1996,12 +2049,15 @@ const createLegacyCheckpointPathMaze = (
 };
 
 export const createLegacyMaze = (
-  scale: number,
+  width: number,
+  height: number,
   seed: number,
   shortcutCount?: number,
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null
 ): LegacyMazeSnapshot => {
-  const size = normalizeGridSize(scale);
+  const normalizedWidth = normalizeGridDimension(width);
+  const normalizedHeight = normalizeGridDimension(height);
+  const linearSize = (normalizedWidth + normalizedHeight) / 2;
   const profile = normalizeLegacyMazeGenerationProfile(generationProfile);
   const {
     grid,
@@ -2010,11 +2066,11 @@ export const createLegacyMaze = (
     generationBuildTrace,
     wallArray,
     pathBuilderStats
-  } = createLegacyCheckpointPathMaze(size, seed, profile);
+  } = createLegacyCheckpointPathMaze(normalizedWidth, normalizedHeight, seed, profile);
   let start = clonePoint(sourceStart);
   const rng = createSeededRng(seed ^ 0x5a17c0de);
-  const baseShortcutCount = size > 35
-    ? (shortcutCount ?? Math.trunc(size * legacyTuning.board.shortcutCountModifier.game))
+  const baseShortcutCount = linearSize > 35
+    ? (shortcutCount ?? Math.trunc(linearSize * legacyTuning.board.shortcutCountModifier.game))
     : 0;
   const resolvedShortcutCount = clampInteger(
     Math.trunc(baseShortcutCount * profile.shortcutCountMultiplier),
@@ -2024,7 +2080,7 @@ export const createLegacyMaze = (
   const shortcutResult = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount, wallArray);
   const shortcutStats = shortcutResult.stats;
   const { goal: normalizedGoal, stats: playableTopologyStats } = normalizeLegacyPlayableTopology(grid, start, sourceGoal);
-  const minimumSolutionPathLength = Math.max(LEGACY_MIN_SCALE, Math.floor(size * 1.5));
+  const minimumSolutionPathLength = Math.max(LEGACY_MIN_SCALE, Math.floor(linearSize * 1.5));
   let {
     goal,
     routeQualityStats,
@@ -2080,14 +2136,16 @@ export const createLegacyMaze = (
   const wrapTopologyDiagnostics = resolveLegacyWrapTopologyDiagnostics({
     goal,
     grid,
-    size,
+    width: normalizedWidth,
+    height: normalizedHeight,
     solutionPath,
     start
   }, profile.requiredOppositeBorderConnections);
 
   return {
     source: 'play-generated',
-    size,
+    width: normalizedWidth,
+    height: normalizedHeight,
     grid,
     start: clonePoint(start),
     goal: clonePoint(goal),
@@ -2115,24 +2173,29 @@ export const createLegacyMaze = (
 };
 
 export const createLegacyGeneratedMenuMaze = (
-  scale: number,
+  width: number,
+  height: number,
   seed: number,
   shortcutCount?: number,
   generationProfile?: Partial<LegacyMazeGenerationProfile> | null
 ): LegacyMazeSnapshot => ({
   ...createLegacyMaze(
-    scale,
+    width,
+    height,
     seed,
-    shortcutCount ?? resolveLegacyGeneratedMenuShortcutCount(scale),
+    shortcutCount ?? resolveLegacyGeneratedMenuShortcutCount(width, height),
     generationProfile
   ),
   source: 'menu-generated'
 });
 
+// The hand-authored snapshot blueprint is a fixed, pre-baked layout (not
+// dynamically fit to the live screen), so it stays square by design --
+// width and height are just both the blueprint's one size.
 export const createLegacyMenuMaze = (seed: number): LegacyMazeSnapshot => {
   const blueprint = resolveLegacyMenuSnapshotBlueprint();
   const size = blueprint.size;
-  const grid = createEmptyGrid(size);
+  const grid = createEmptyGrid(size, size);
   const solutionPath = blueprint.solutionPath.map((point) => ({ ...point }));
 
   carvePolyline(grid, solutionPath);
@@ -2145,7 +2208,8 @@ export const createLegacyMenuMaze = (seed: number): LegacyMazeSnapshot => {
 
   return {
     source: 'menu-snapshot',
-    size,
+    width: size,
+    height: size,
     grid,
     start,
     goal,

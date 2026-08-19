@@ -193,7 +193,7 @@ const createPerimeterOpenings = (
 };
 
 export const createLegacyRoomCandidateMetadata = (
-  maze: Pick<LegacyMazeSnapshot, 'goal' | 'grid' | 'size' | 'solutionPath' | 'start'>,
+  maze: Pick<LegacyMazeSnapshot, 'goal' | 'grid' | 'width' | 'height' | 'solutionPath' | 'start'>,
   band: LegacyProgressionDifficultyBand,
   excludedPoint: LegacyPoint | null = null
 ): LegacyRoomCandidateMetadata | null => {
@@ -211,8 +211,8 @@ export const createLegacyRoomCandidateMetadata = (
   );
   const candidates: RankedLegacyRoomCandidate[] = [];
 
-  for (let y = 1; y < maze.size - 2; y += 1) {
-    for (let x = 1; x < maze.size - 2; x += 1) {
+  for (let y = 1; y < maze.height - 2; y += 1) {
+    for (let x = 1; x < maze.width - 2; x += 1) {
       const footprint = buildFootprint(x, y);
       if (!footprint.every((point) => maze.grid[point.y]?.[point.x] === true)) {
         continue;

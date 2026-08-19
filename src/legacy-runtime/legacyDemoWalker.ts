@@ -87,42 +87,42 @@ export const createLegacyMenuSnapshotDemoWalkerConfig = (seed: number): DemoWalk
 };
 
 export const createLegacyDemoWalkerEpisode = (maze: LegacyMazeSnapshot): MazeEpisode => {
-  const tiles = createGrid(maze.size, maze.size);
+  const tiles = createGrid(maze.width, maze.height);
   let floorCount = 0;
 
-  for (let y = 0; y < maze.size; y += 1) {
-    for (let x = 0; x < maze.size; x += 1) {
+  for (let y = 0; y < maze.height; y += 1) {
+    for (let x = 0; x < maze.width; x += 1) {
       if (maze.grid[y]?.[x] !== true) {
         continue;
       }
 
-      const index = indexFromCoordinates(x, y, maze.size);
+      const index = indexFromCoordinates(x, y, maze.width);
       tiles[index] |= TILE_FLOOR;
       floorCount += 1;
     }
   }
 
-  const pathIndices = Uint32Array.from(maze.solutionPath.map((point) => pointToIndex(point, maze.size)));
+  const pathIndices = Uint32Array.from(maze.solutionPath.map((point) => pointToIndex(point, maze.width)));
   for (const pathIndex of pathIndices) {
     tiles[pathIndex] |= TILE_PATH;
   }
 
-  const startIndex = pointToIndex(maze.start, maze.size);
-  const endIndex = pointToIndex(maze.goal, maze.size);
+  const startIndex = pointToIndex(maze.start, maze.width);
+  const endIndex = pointToIndex(maze.goal, maze.width);
   tiles[endIndex] |= TILE_END;
 
   return {
     seed: maze.seed,
-    size: inferLegacyMazeSize(maze.size),
+    size: inferLegacyMazeSize(Math.max(maze.width, maze.height)),
     generationTrace: {
       rootTileIndex: startIndex,
       uniqueTileCount: pathIndices.length,
       steps: []
     },
     raster: {
-      width: maze.size,
-      height: maze.size,
-      scale: maze.size,
+      width: maze.width,
+      height: maze.height,
+      scale: Math.max(maze.width, maze.height),
       tiles,
       pathIndices,
       startIndex,
