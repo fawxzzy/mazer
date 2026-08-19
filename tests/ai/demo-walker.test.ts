@@ -783,7 +783,7 @@ describe('demo walker', () => {
   test('exposes human bias profiles without changing the balanced default', () => {
     const seeds = [1, 2, 3];
     const profileDiagnostics = seeds.map((seed) => {
-      const maze = createLegacyGeneratedMenuMaze(37, seed);
+      const maze = createLegacyGeneratedMenuMaze(37, 37, seed);
       const episode = createLegacyDemoWalkerEpisode(maze);
       const baseConfig = createLegacyMenuDemoWalkerConfig(seed);
       return {
@@ -1039,7 +1039,7 @@ describe('demo walker', () => {
     ] as const;
 
     for (const testCase of cases) {
-      const maze = createLegacyGeneratedMenuMaze(testCase.scale, testCase.seed);
+      const maze = createLegacyGeneratedMenuMaze(testCase.scale, testCase.scale, testCase.seed);
       const episode = createLegacyDemoWalkerEpisode(maze);
       const config = createLegacyMenuDemoWalkerConfig(testCase.seed);
       const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
@@ -1109,7 +1109,7 @@ describe('demo walker', () => {
     ] as const;
 
     for (const testCase of cases) {
-      const maze = createLegacyGeneratedMenuMaze(testCase.scale, testCase.seed);
+      const maze = createLegacyGeneratedMenuMaze(testCase.scale, testCase.scale, testCase.seed);
       const episode = createLegacyDemoWalkerEpisode(maze);
       const config = createLegacyMenuDemoWalkerConfig(testCase.seed);
       const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);

@@ -15,7 +15,7 @@ describe('human-memory AI recovery diagnostics', () => {
     let frontierRecoveryCount = 0;
 
     for (const seed of seeds) {
-      const maze = createLegacyGeneratedMenuMaze(37, seed);
+      const maze = createLegacyGeneratedMenuMaze(37, 37, seed);
       const episode = createLegacyDemoWalkerEpisode(maze);
       const diagnostics = collectDemoWalkerRouteDiagnostics(
         episode,
@@ -96,7 +96,7 @@ describe('human-memory AI recovery diagnostics', () => {
     let frontierRecoveryCount = 0;
 
     for (const seed of seeds) {
-      const maze = createLegacyGeneratedMenuMaze(75, seed);
+      const maze = createLegacyGeneratedMenuMaze(75, 75, seed);
       const episode = createLegacyDemoWalkerEpisode(maze);
       const baseConfig = createLegacyMenuDemoWalkerConfig(seed);
       const diagnostics = collectDemoWalkerRouteDiagnostics(episode, {
@@ -124,7 +124,7 @@ describe('human-memory AI recovery diagnostics', () => {
 
   test('applies the warmed A/S retarget grace at the decisive one-step comparison', () => {
     const seed = 8;
-    const maze = createLegacyGeneratedMenuMaze(50, seed);
+    const maze = createLegacyGeneratedMenuMaze(50, 50, seed);
     const episode = createLegacyDemoWalkerEpisode(maze);
     const baseConfig = createLegacyMenuDemoWalkerConfig(seed);
     const collectForRank = (aiSkillRank: 'B' | 'A' | 'S') => collectDemoWalkerRouteDiagnostics(
@@ -252,7 +252,7 @@ describe('human-memory AI recovery diagnostics', () => {
 
   test('keeps the S-rank grace blocked before the existing cooldown warm-up', () => {
     const seed = 6765;
-    const maze = createLegacyGeneratedMenuMaze(50, seed);
+    const maze = createLegacyGeneratedMenuMaze(50, 50, seed);
     const episode = createLegacyDemoWalkerEpisode(maze);
     const baseConfig = createLegacyMenuDemoWalkerConfig(seed);
     const collect = () => collectDemoWalkerRouteDiagnostics(

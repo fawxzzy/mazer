@@ -19,7 +19,7 @@ describe('human-memory AI known-frontier recovery', () => {
 
     for (const scale of scales) {
       for (const seed of seeds) {
-        const maze = createLegacyGeneratedMenuMaze(scale, seed);
+        const maze = createLegacyGeneratedMenuMaze(scale, scale, seed);
         const episode = createLegacyDemoWalkerEpisode(maze);
         const config = createLegacyMenuDemoWalkerConfig(seed);
         const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
