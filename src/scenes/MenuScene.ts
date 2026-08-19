@@ -9828,15 +9828,39 @@ export class MenuScene extends Phaser.Scene {
     const knobRadius = Math.round((trackHeight - 6) / 2);
     const knobX = trackX + (input.checked ? knobTravel : -knobTravel);
     const knobGlow = this.add.circle(knobX, titleY, knobRadius + 4, onColor, input.checked ? 0.3 : 0);
-    const knob = this.add.circle(knobX, titleY, knobRadius, input.checked ? onColor : cyberArcadeMaterial.rail.edge, 1);
-    knob.setStrokeStyle(1, cyberArcadeMaterial.rail.white, input.checked ? 0.9 : 0.5);
+    // A layered "glass bead" instead of a single flat-filled circle: a soft
+    // drop shadow offset low-right for depth, a base fill, then a bright
+    // specular highlight crescent up-left -- the same lit-gem language as
+    // the title, Start button, and header badges, and legible in the OFF
+    // state (a plain rail.edge fill there used to read as nearly invisible
+    // against the dark track).
+    const knobGraphics = this.add.graphics();
+    knobGraphics.setPosition(knobX, titleY);
+    const drawKnob = (active: boolean): void => {
+      knobGraphics.clear();
+      const baseColor = input.checked ? onColor : cyberArcadeMaterial.rail.muted;
+      knobGraphics.fillStyle(0x000000, 0.35);
+      knobGraphics.fillCircle(1.4, 1.8, knobRadius);
+      knobGraphics.fillStyle(baseColor, 1);
+      knobGraphics.fillCircle(0, 0, knobRadius);
+      knobGraphics.fillStyle(cyberArcadeMaterial.rail.white, active ? 0.55 : 0.4);
+      knobGraphics.fillCircle(
+        -Math.round(knobRadius * 0.32),
+        -Math.round(knobRadius * 0.32),
+        Math.max(1, Math.round(knobRadius * 0.4))
+      );
+      knobGraphics.lineStyle(1, cyberArcadeMaterial.rail.white, input.checked ? 0.9 : 0.55);
+      knobGraphics.strokeCircle(0, 0, knobRadius);
+    };
+    drawKnob(false);
     let pressStart: { x: number; y: number } | null = null;
 
     const setActive = (active: boolean): void => {
       drawPanel(active);
       track.setStrokeStyle(2, accentColor, active ? 1 : (input.checked ? 0.85 : 0.55));
       trackGlow.setAlpha(input.checked ? (active ? 0.26 : 0.16) : 0);
-      knob.setScale(active ? 1.1 : 1);
+      drawKnob(active);
+      knobGraphics.setScale(active ? 1.1 : 1);
       knobGlow.setAlpha(input.checked ? (active ? 0.42 : 0.3) : (active ? 0.14 : 0));
       label.setAlpha(active ? 1 : 0.96);
       stateLabel.setAlpha(active ? 1 : 0.92);
@@ -9876,7 +9900,7 @@ export class MenuScene extends Phaser.Scene {
         trackGlow.destroy();
         track.destroy();
         knobGlow.destroy();
-        knob.destroy();
+        knobGraphics.destroy();
       }
     };
   }
