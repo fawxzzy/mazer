@@ -8709,8 +8709,13 @@ export class MenuScene extends Phaser.Scene {
     });
     guideGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
     guideGraphics.strokeRoundedRect(cardLeft + 4, cardTop + 4, cardWidth - 8, cardHeight - 8, 9);
-    guideGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.26);
-    guideGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);
+    // Two-line "rail" under the title instead of one flat divider -- a
+    // bright inset line plus a fainter full-width line reads as a small
+    // HUD console header rather than a plain section break.
+    guideGraphics.lineStyle(1.5, cyberArcadeMaterial.rail.cyan, 0.5);
+    guideGraphics.lineBetween(cardCenterX - 22, titleRuleY, cardCenterX + 22, titleRuleY);
+    guideGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.2);
+    guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);
 
     const addText = (
       copy: string,
@@ -8743,27 +8748,52 @@ export class MenuScene extends Phaser.Scene {
       return label;
     };
 
-    addText('QUICK PLAY', cardCenterX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);
+    addText(
+      'QUICK PLAY',
+      cardCenterX,
+      titleY,
+      cardWidth - (inset * 2),
+      toCyberArcadeCssHex(cyberArcadeMaterial.rail.mint),
+      guideTitleFontSize,
+      0.5,
+      1,
+      guideRowMinFontSize
+    );
+
+    const legendCopyColor = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
+
+    // Each row gets a colored icon badge (fill disc + accent ring) behind its
+    // glyph instead of a bare icon on the panel background -- ties the
+    // legend visually to the same accent-badge language as the toggle rows,
+    // and the ring color doubles as the row's semantic color-key.
+    const drawLegendBadge = (glyphX: number, glyphY: number, badgeRadius: number, accentColor: number): void => {
+      guideGraphics.fillStyle(accentColor, 0.16);
+      guideGraphics.fillCircle(glyphX, glyphY, badgeRadius);
+      guideGraphics.lineStyle(1.2, accentColor, 0.7);
+      guideGraphics.strokeCircle(glyphX, glyphY, badgeRadius);
+    };
 
     const drawLegendRow = (
       index: number,
       kind: 'compass' | 'start' | 'end',
       title: string,
       copy: string,
-      color: string
+      accentColor: number
     ): void => {
       const rowTop = legendTop + (index * rowHeight);
       const glyphX = detailLeft + (compact ? 14 : 16);
       const glyphY = rowTop + (rowHeight / 2);
       const labelX = detailLeft + (compact ? 28 : 34);
+      const titleColor = toCyberArcadeCssHex(accentColor);
       if (compact) {
+        drawLegendBadge(glyphX, glyphY, 11, accentColor);
         this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, 12, guideGraphics);
         addText(
           `${title}: ${copy}`,
           labelX,
           glyphY,
           Math.max(96, detailRight - labelX),
-          color,
+          titleColor,
           guideRowFontSize,
           0,
           0.96,
@@ -8774,14 +8804,15 @@ export class MenuScene extends Phaser.Scene {
       const labelWidth = Math.min(compact ? 76 : 118, Math.round(detailWidth * (compact ? 0.32 : 0.36)));
       const copyX = labelX + labelWidth + (compact ? 4 : 8);
       const copyWidth = Math.max(compact ? 82 : 104, detailRight - copyX);
+      drawLegendBadge(glyphX, glyphY, 12, accentColor);
       this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, 13, guideGraphics);
-      addText(title, labelX, glyphY, labelWidth, color, guideRowFontSize, 0, 1, guideRowMinFontSize);
+      addText(title, labelX, glyphY, labelWidth, titleColor, guideRowFontSize, 0, 1, guideRowMinFontSize);
       addText(
         copy,
         copyX,
         glyphY,
         copyWidth,
-        '#d9fff5',
+        legendCopyColor,
         guideRowFontSize,
         0,
         0.92,
@@ -8789,9 +8820,9 @@ export class MenuScene extends Phaser.Scene {
       );
     };
 
-    drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', '#b7f2ff');
-    drawLegendRow(1, 'start', 'Start', 'begin at gold', '#fff05a');
-    drawLegendRow(2, 'end', 'Exit', 'finish at red', '#ff5264');
+    drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', cyberArcadeMaterial.rail.cyan);
+    drawLegendRow(1, 'start', 'Start', 'begin at gold', cyberArcadeMaterial.signal.start);
+    drawLegendRow(2, 'end', 'Exit', 'finish at red', cyberArcadeMaterial.signal.goal);
     return contentCardTop + cardHeight + (options.exactTop === true ? 0 : (compact ? 14 : 16));
   }
 

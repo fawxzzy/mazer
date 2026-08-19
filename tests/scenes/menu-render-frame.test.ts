@@ -86,7 +86,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
     expect(menuSceneSource).toContain('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {');
-    expect(menuSceneSource).toContain("addText('QUICK PLAY'");
+    expect(menuSceneSource).toContain("'QUICK PLAY',");
     expect(buildOptionsSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
       buildOptionsSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel')
     );
@@ -1495,9 +1495,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const guideTitleFontSize = guideLayout.titleFontSize;');
     expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
     expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
-    expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY, cardLeft + cardWidth - inset, titleRuleY);');
-    expect(menuSceneSource).toContain("addText('QUICK PLAY', cardCenterX, titleY, cardWidth - (inset * 2), '#9dffd5', guideTitleFontSize, 0.5, 1, guideRowMinFontSize);");
-    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', '#b7f2ff');");
+    expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);');
+    expect(menuSceneSource).toContain("'QUICK PLAY',");
+    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', cyberArcadeMaterial.rail.cyan);");
     expect(menuSceneSource).not.toContain("'Player • green trail'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
     expect(menuSceneSource).not.toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`");
