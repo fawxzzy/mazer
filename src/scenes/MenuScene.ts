@@ -8434,7 +8434,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);
   }
 
-  private resolveOverlayPanelFrame(_kind: OverlayKind = this.overlay): OverlayPanelFrame {
+  private resolveOverlayPanelFrame(): OverlayPanelFrame {
     return resolveLegacyOverlayPanelLayout(this.layout.width, this.layout.height);
   }
 
@@ -8543,7 +8543,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private buildOptionsOverlay(): void {
-    const panel = this.resolveOverlayPanelFrame('options');
+    const panel = this.resolveOverlayPanelFrame();
     const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const showAdvancedOptions = this.shouldShowLegacyAdvancedOptions();
     const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
@@ -8837,7 +8837,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private buildPauseOverlay(): void {
-    const panel = this.resolveOverlayPanelFrame('pause');
+    const panel = this.resolveOverlayPanelFrame();
     const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
     const hasOverlayMessage = visibleMessages.length > 0;
@@ -8918,7 +8918,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private buildProgressionResetConfirmationOverlay(): void {
-    const panel = this.resolveOverlayPanelFrame('confirm-progression-reset');
+    const panel = this.resolveOverlayPanelFrame();
     const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const buttonHeight = compact ? 44 : 48;
     const buttonWidth = Math.min(panel.width - 72, compact ? 240 : 280);
@@ -8954,7 +8954,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private buildAuthOverlay(): void {
-    const panel = this.resolveOverlayPanelFrame('auth');
+    const panel = this.resolveOverlayPanelFrame();
     const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const fieldWidth = Math.min(panel.width - 56, stacked ? 330 : 420);
     const fieldHeight = stacked ? 48 : 52;
@@ -11596,7 +11596,7 @@ export class MenuScene extends Phaser.Scene {
       ? titleVisiblePieces
       : Math.max(0, titlePieceCount - titleVisiblePieces);
     const touchControls = this.resolveLegacyPlayTouchControlDiagnostics();
-    const overlayPanel = this.overlay === 'none' ? null : this.resolveOverlayPanelFrame(this.overlay);
+    const overlayPanel = this.overlay === 'none' ? null : this.resolveOverlayPanelFrame();
     const playerMarkerMetrics = resolveLegacyPlayerMarkerRenderMetrics(
       mazeRenderFrame.tileSize,
       this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO : LEGACY_PLAYER_MARKER_RADIUS_RATIO,
