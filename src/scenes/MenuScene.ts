@@ -7522,11 +7522,30 @@ export class MenuScene extends Phaser.Scene {
       graphics.fillPath();
       graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha);
       graphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
+      this.drawLegacyMarkerGemCatchlight(graphics, centerX, centerY, markerMetrics.outerRadius, alpha);
       return;
     }
 
     graphics.fillStyle(LEGACY_PLAY_START_MARKER_CORE, alpha);
     graphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
+    this.drawLegacyMarkerGemCatchlight(graphics, centerX, centerY, markerMetrics.outerRadius, alpha);
+  }
+
+  // A small bright arc on the upper-left of a circular marker, as if a
+  // single light source were catching a cut facet -- same "light hits one
+  // corner" convention as drawLegacyPathTileFacet, applied to the round
+  // start/goal markers instead of square tiles.
+  private drawLegacyMarkerGemCatchlight(
+    graphics: Phaser.GameObjects.Graphics,
+    centerX: number,
+    centerY: number,
+    outerRadius: number,
+    alpha: number
+  ): void {
+    graphics.lineStyle(Math.max(1, outerRadius * 0.16), cyberArcadeMaterial.rail.white, Math.min(0.85, alpha * 0.9));
+    graphics.beginPath();
+    graphics.arc(centerX, centerY, outerRadius * 0.62, Phaser.Math.DegToRad(200), Phaser.Math.DegToRad(260));
+    graphics.strokePath();
   }
 
   private fillLegacyPlayerMarkerTile(
@@ -7595,6 +7614,15 @@ export class MenuScene extends Phaser.Scene {
       Math.min(0.86, alpha * 0.86)
     );
     this.boardDynamicGraphics.strokePath();
+    // Same facet-catchlight convention as the tiles/endpoint markers, cut
+    // into the top-left edge of the player's own diamond core.
+    this.boardDynamicGraphics.fillStyle(cyberArcadeMaterial.rail.white, Math.min(0.6, alpha * 0.65));
+    this.boardDynamicGraphics.beginPath();
+    this.boardDynamicGraphics.moveTo(centerX, centerY - playerMetrics.coreRadius);
+    this.boardDynamicGraphics.lineTo(centerX - (playerMetrics.coreRadius * 0.32), centerY - (playerMetrics.coreRadius * 0.32));
+    this.boardDynamicGraphics.lineTo(centerX - playerMetrics.coreRadius, centerY);
+    this.boardDynamicGraphics.closePath();
+    this.boardDynamicGraphics.fillPath();
 
     if (!showLocatorTicks) {
       return;
