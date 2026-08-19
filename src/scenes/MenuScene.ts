@@ -1653,9 +1653,13 @@ export class MenuScene extends Phaser.Scene {
       this.applyGenerationRequest(nextRequest, time);
     }
 
+    // The demo walker used to freeze the instant any overlay (Settings,
+    // Pause, Auth) opened on the main menu -- there's no gameplay to
+    // protect there, it's just ambient background motion, so it now keeps
+    // playing behind the overlay instead of visibly freezing/hitching each
+    // time Settings is opened or a setting is changed.
     if (
       this.mode === 'menu'
-      && this.overlay === 'none'
       && this.pendingGenerationRequest === null
       && this.pendingResetRequest === null
     ) {
