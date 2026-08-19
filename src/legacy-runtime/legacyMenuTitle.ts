@@ -135,6 +135,117 @@ const buildLegacyMenuPathTitleGrid = (): boolean[][] => {
 
 export const LEGACY_MENU_PATH_TITLE_GRID = buildLegacyMenuPathTitleGrid();
 
+// The Start button's label is drawn as a second, smaller wordmark using
+// this exact same blocky maze-path-tile technique, rendered as a themed
+// backdrop behind the button's real (accessible, QA-visible) text label --
+// see drawLegacyMenuPulsingStartGlow in MenuScene.ts. Kept as a fully
+// separate pattern set (S/T/A/R/T duplicates the A and T patterns above)
+// rather than generalizing LEGACY_MENU_PATH_TITLE_PATTERNS into a shared
+// word builder, so nothing here can affect the title's own behavior.
+const LEGACY_BUTTON_GLYPH_PATTERNS = [
+  [
+    '01111',
+    '10000',
+    '10000',
+    '01110',
+    '00001',
+    '00001',
+    '11110'
+  ],
+  [
+    '11111',
+    '00100',
+    '00100',
+    '00100',
+    '00100',
+    '00100',
+    '00100'
+  ],
+  [
+    '01110',
+    '10001',
+    '10001',
+    '11111',
+    '10001',
+    '10001',
+    '10001'
+  ],
+  [
+    '11110',
+    '10001',
+    '10001',
+    '11110',
+    '10100',
+    '10010',
+    '10001'
+  ],
+  [
+    '11111',
+    '00100',
+    '00100',
+    '00100',
+    '00100',
+    '00100',
+    '00100'
+  ]
+] as const;
+
+const buildLegacyButtonGlyphCells = (): LegacyMenuPathTitleCell[] => {
+  const cells: LegacyMenuPathTitleCell[] = [];
+  let order = 0;
+
+  LEGACY_BUTTON_GLYPH_PATTERNS.forEach((pattern, letterIndex) => {
+    const columnOffset = letterIndex * (LEGACY_MENU_PATH_TITLE_LETTER_COLUMNS + LEGACY_MENU_PATH_TITLE_LETTER_GAP_COLUMNS);
+    pattern.forEach((rowPattern, row) => {
+      [...rowPattern].forEach((value, column) => {
+        if (value !== '1') {
+          return;
+        }
+        cells.push({
+          column: columnOffset + column,
+          row,
+          order
+        });
+        order += 1;
+      });
+    });
+  });
+
+  return cells;
+};
+
+export const LEGACY_BUTTON_GLYPH_CELLS = buildLegacyButtonGlyphCells();
+export const LEGACY_BUTTON_GLYPH_COLUMNS = (LEGACY_BUTTON_GLYPH_PATTERNS.length * LEGACY_MENU_PATH_TITLE_LETTER_COLUMNS)
+  + ((LEGACY_BUTTON_GLYPH_PATTERNS.length - 1) * LEGACY_MENU_PATH_TITLE_LETTER_GAP_COLUMNS);
+export const LEGACY_BUTTON_GLYPH_ROWS = LEGACY_MENU_PATH_TITLE_ROWS;
+
+export interface LegacyButtonGlyphLayout {
+  cellSize: number;
+  cells: LegacyMenuPathTitleCell[];
+  height: number;
+  left: number;
+  top: number;
+  width: number;
+}
+
+export const resolveLegacyButtonGlyphLayout = (
+  centerX: number,
+  centerY: number,
+  cellSize: number
+): LegacyButtonGlyphLayout => {
+  const width = LEGACY_BUTTON_GLYPH_COLUMNS * cellSize;
+  const height = LEGACY_BUTTON_GLYPH_ROWS * cellSize;
+
+  return {
+    cellSize,
+    cells: LEGACY_BUTTON_GLYPH_CELLS,
+    height,
+    left: Math.round(centerX - (width / 2)),
+    top: Math.round(centerY - (height / 2)),
+    width
+  };
+};
+
 export const resolveLegacyMenuTitlePresentation = (
   titleReserveHeight: number,
   tileSize: number,
