@@ -30,8 +30,8 @@ const countDetachedFloorTiles = (maze: ReturnType<typeof createLegacyMaze>): num
   }
 
   let detached = 0;
-  for (let y = 0; y < maze.size; y += 1) {
-    for (let x = 0; x < maze.size; x += 1) {
+  for (let y = 0; y < maze.height; y += 1) {
+    for (let x = 0; x < maze.width; x += 1) {
       if (maze.grid[y]?.[x] === true && !visited.has(`${x},${y}`)) {
         detached += 1;
       }
@@ -49,14 +49,14 @@ const isBorderPoint = (
   maze: ReturnType<typeof createLegacyMaze>,
   point: { x: number; y: number }
 ): boolean => (
-  point.x === 0 || point.y === 0 || point.x === maze.size - 1 || point.y === maze.size - 1
+  point.x === 0 || point.y === 0 || point.x === maze.width - 1 || point.y === maze.height - 1
 );
 
 const isCornerBorderPoint = (
   maze: ReturnType<typeof createLegacyMaze>,
   point: { x: number; y: number }
 ): boolean => (
-  (point.x === 0 || point.x === maze.size - 1) && (point.y === 0 || point.y === maze.size - 1)
+  (point.x === 0 || point.x === maze.width - 1) && (point.y === 0 || point.y === maze.height - 1)
 );
 
 const isNonCornerBorderFloor = (
@@ -77,13 +77,13 @@ const resolveOppositeBorderPoint = (
   }
 
   if (point.x === 0) {
-    return { x: maze.size - 1, y: point.y };
+    return { x: maze.width - 1, y: point.y };
   }
-  if (point.x === maze.size - 1) {
+  if (point.x === maze.width - 1) {
     return { x: 0, y: point.y };
   }
   if (point.y === 0) {
-    return { x: point.x, y: maze.size - 1 };
+    return { x: point.x, y: maze.height - 1 };
   }
   return { x: point.x, y: 0 };
 };
@@ -99,13 +99,13 @@ const resolveInwardBorderNeighbor = (
   if (point.x === 0) {
     return { x: 1, y: point.y };
   }
-  if (point.x === maze.size - 1) {
-    return { x: maze.size - 2, y: point.y };
+  if (point.x === maze.width - 1) {
+    return { x: maze.width - 2, y: point.y };
   }
   if (point.y === 0) {
     return { x: point.x, y: 1 };
   }
-  return { x: point.x, y: maze.size - 2 };
+  return { x: point.x, y: maze.height - 2 };
 };
 
 const auditBorderFloorContinuity = (
@@ -121,8 +121,8 @@ const auditBorderFloorContinuity = (
   let borderFloorCount = 0;
   const walkableFloorTiles = countWalkableFloorTiles(maze);
 
-  for (let y = 0; y < maze.size; y += 1) {
-    for (let x = 0; x < maze.size; x += 1) {
+  for (let y = 0; y < maze.height; y += 1) {
+    for (let x = 0; x < maze.width; x += 1) {
       const point = { x, y };
       if (!isNonCornerBorderFloor(maze, point)) {
         continue;
@@ -143,7 +143,7 @@ const auditBorderFloorContinuity = (
 
   return {
     borderFloorCount,
-    floorRatio: walkableFloorTiles / Math.max(1, maze.size * maze.size),
+    floorRatio: walkableFloorTiles / Math.max(1, maze.width * maze.height),
     unpairedBorderBleeds,
     borderFloorsWithoutInwardConnection
   };
@@ -158,14 +158,14 @@ const auditOppositeBorderAxes = (
   let horizontal = 0;
   let vertical = 0;
 
-  for (let y = 1; y < maze.size - 1; y += 1) {
-    if (maze.grid[y]?.[0] === true && maze.grid[y]?.[maze.size - 1] === true) {
+  for (let y = 1; y < maze.height - 1; y += 1) {
+    if (maze.grid[y]?.[0] === true && maze.grid[y]?.[maze.width - 1] === true) {
       horizontal += 1;
     }
   }
 
-  for (let x = 1; x < maze.size - 1; x += 1) {
-    if (maze.grid[0]?.[x] === true && maze.grid[maze.size - 1]?.[x] === true) {
+  for (let x = 1; x < maze.width - 1; x += 1) {
+    if (maze.grid[0]?.[x] === true && maze.grid[maze.height - 1]?.[x] === true) {
       vertical += 1;
     }
   }
@@ -176,11 +176,11 @@ const auditOppositeBorderAxes = (
   };
 };
 
-const isReservedCutoutLine = (maze: ReturnType<typeof createLegacyMaze>, line: number): boolean => {
-  const center = Math.floor(maze.size / 2);
-  const centerReserve = Math.max(2, Math.ceil(maze.size * 0.045));
+const isReservedCutoutLine = (axisLength: number, line: number): boolean => {
+  const center = Math.floor(axisLength / 2);
+  const centerReserve = Math.max(2, Math.ceil(axisLength * 0.045));
   return line <= 1
-    || line >= maze.size - 2
+    || line >= axisLength - 2
     || Math.abs(line - center) <= centerReserve;
 };
 
@@ -201,8 +201,8 @@ const auditBorderFeederSides = (
     top: 0
   };
 
-  for (let y = 0; y < maze.size; y += 1) {
-    for (let x = 0; x < maze.size; x += 1) {
+  for (let y = 0; y < maze.height; y += 1) {
+    for (let x = 0; x < maze.width; x += 1) {
       const point = { x, y };
       if (!isNonCornerBorderFloor(maze, point)) {
         continue;
@@ -210,22 +210,22 @@ const auditBorderFeederSides = (
 
       if (point.x === 0) {
         result.left += 1;
-        if (isReservedCutoutLine(maze, point.y)) {
+        if (isReservedCutoutLine(maze.height, point.y)) {
           result.reservedBorderFloors.push(point);
         }
-      } else if (point.x === maze.size - 1) {
+      } else if (point.x === maze.width - 1) {
         result.right += 1;
-        if (isReservedCutoutLine(maze, point.y)) {
+        if (isReservedCutoutLine(maze.height, point.y)) {
           result.reservedBorderFloors.push(point);
         }
       } else if (point.y === 0) {
         result.top += 1;
-        if (isReservedCutoutLine(maze, point.x)) {
+        if (isReservedCutoutLine(maze.width, point.x)) {
           result.reservedBorderFloors.push(point);
         }
-      } else if (point.y === maze.size - 1) {
+      } else if (point.y === maze.height - 1) {
         result.bottom += 1;
-        if (isReservedCutoutLine(maze, point.x)) {
+        if (isReservedCutoutLine(maze.width, point.x)) {
           result.reservedBorderFloors.push(point);
         }
       }
@@ -249,9 +249,9 @@ describe('legacy topology scale audit', () => {
           ['play', createLegacyMaze],
           ['menu', createLegacyGeneratedMenuMaze]
         ] as const) {
-          const maze = buildMaze(scale, seed);
+          const maze = buildMaze(scale, scale, seed);
           const routeQualityStats = maze.routeQualityStats;
-          const minimumSolutionPathLength = Math.floor(maze.size * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
+          const minimumSolutionPathLength = Math.floor(((maze.width + maze.height) / 2) * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
           const detachedFloorTiles = countDetachedFloorTiles(maze);
           const borderContinuity = auditBorderFloorContinuity(maze);
           const oppositeBorderAxes = auditOppositeBorderAxes(maze);
@@ -288,7 +288,8 @@ describe('legacy topology scale audit', () => {
               scale,
               seed,
               shortcutStats: maze.shortcutStats,
-              size: maze.size,
+              width: maze.width,
+              height: maze.height,
               solutionPathLength: maze.solutionPath.length
             });
           }
@@ -308,9 +309,9 @@ describe('legacy topology scale audit', () => {
         ['play', createLegacyMaze],
         ['menu', createLegacyGeneratedMenuMaze]
       ] as const) {
-        const maze = buildMaze(99, seed);
+        const maze = buildMaze(99, 99, seed);
         const routeQualityStats = maze.routeQualityStats;
-        const minimumSolutionPathLength = Math.floor(maze.size * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
+        const minimumSolutionPathLength = Math.floor(((maze.width + maze.height) / 2) * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
         const detachedFloorTiles = countDetachedFloorTiles(maze);
         const borderContinuity = auditBorderFloorContinuity(maze);
         const oppositeBorderAxes = auditOppositeBorderAxes(maze);
@@ -347,7 +348,8 @@ describe('legacy topology scale audit', () => {
             scale: 99,
             seed,
             shortcutStats: maze.shortcutStats,
-            size: maze.size,
+            width: maze.width,
+              height: maze.height,
             solutionPathLength: maze.solutionPath.length
           });
         }
@@ -364,9 +366,9 @@ describe('legacy topology scale audit', () => {
       ['play', createLegacyMaze],
       ['menu', createLegacyGeneratedMenuMaze]
     ] as const) {
-      const maze = buildMaze(149, 55);
+      const maze = buildMaze(149, 149, 55);
       const routeQualityStats = maze.routeQualityStats;
-      const minimumSolutionPathLength = Math.floor(maze.size * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
+      const minimumSolutionPathLength = Math.floor(((maze.width + maze.height) / 2) * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
       const detachedFloorTiles = countDetachedFloorTiles(maze);
       const borderContinuity = auditBorderFloorContinuity(maze);
       const oppositeBorderAxes = auditOppositeBorderAxes(maze);
@@ -403,7 +405,8 @@ describe('legacy topology scale audit', () => {
           scale: 149,
           seed: 55,
           shortcutStats: maze.shortcutStats,
-          size: maze.size,
+          width: maze.width,
+              height: maze.height,
           solutionPathLength: maze.solutionPath.length
         });
       }
