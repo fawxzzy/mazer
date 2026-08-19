@@ -6266,10 +6266,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawLegacyMenuDeconstructHandoffBurst(
-    boardLeft: number,
-    boardTop: number,
-    boardWidth: number,
-    boardHeight: number,
+    viewportWidth: number,
+    viewportHeight: number,
     progress: number
   ): void {
     if (progress <= 0 || progress >= 1) {
@@ -6277,12 +6275,12 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const inset = 2;
-    const left = boardLeft - inset;
-    const top = boardTop - inset;
-    const right = boardLeft + boardWidth + inset;
-    const bottom = boardTop + boardHeight + inset;
-    const centerX = boardLeft + (boardWidth / 2);
-    const centerY = boardTop + (boardHeight / 2);
+    const left = inset;
+    const top = inset;
+    const right = viewportWidth - inset;
+    const bottom = viewportHeight - inset;
+    const centerX = viewportWidth / 2;
+    const centerY = viewportHeight / 2;
     const burstPoints = [
       { x: left, y: top },
       { x: centerX, y: top },
@@ -6514,17 +6512,13 @@ export class MenuScene extends Phaser.Scene {
 
     if (this.mode === 'menu' || this.mode === 'play') {
       this.drawLegacyMenuDeconstructHandoffBurst(
-        boardLeft,
-        boardTop,
-        boardWidth,
-        boardHeight,
+        this.layout.width,
+        this.layout.height,
         this.resolveLegacyMenuDeconstructHandoffProgress(time)
       );
       this.drawLegacyMenuDeconstructHandoffBurst(
-        boardLeft,
-        boardTop,
-        boardWidth,
-        boardHeight,
+        this.layout.width,
+        this.layout.height,
         this.resolveLegacyMenuBuildPrerollProgress(time)
       );
     }
