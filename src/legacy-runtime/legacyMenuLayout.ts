@@ -1,7 +1,26 @@
 import { clampInteger } from './legacyDefaults';
 import { resolveLegacyHeaderControlFrame } from './legacyHeaderControl';
-import { resolveLegacyMenuTitleFootprintWidth } from './legacyMenuTitle';
+import {
+  resolveLegacyMenuPathTitleLayout,
+  resolveLegacyMenuPathTitleOrbitGeometry,
+  resolveLegacyMenuTitleFootprintWidth
+} from './legacyMenuTitle';
 import { LEGACY_UI_MIN_TOUCH_TARGET } from './legacyUiStandards';
+
+// The lowest point the title's animated orbit diamonds travel to, when the
+// title sits inline in the header at the given center/font size. The board
+// must not start above this or the diamonds sweep across the maze's top
+// edge.
+const resolveInlineTitleOrbitBottom = (centerX: number, centerY: number, fontSize: number): number => {
+  const titleLayout = resolveLegacyMenuPathTitleLayout(centerX, centerY, fontSize);
+  return resolveLegacyMenuPathTitleOrbitGeometry(
+    titleLayout.left,
+    titleLayout.top,
+    titleLayout.width,
+    titleLayout.height,
+    titleLayout.cellSize
+  ).bottom;
+};
 
 export interface LegacyMenuLayout {
   width: number;
@@ -130,11 +149,17 @@ export const resolveLegacyMenuBoardAspectRatio = (
   // Mirrors resolveLegacyMenuLayout's real header-icon-bottom measurement
   // (not the abstract touch-target lane) so the probed box height -- and
   // therefore the requested aspect ratio -- matches what the real layout
-  // will actually produce.
+  // will actually produce. Also accounts for the title's orbit diamonds,
+  // which can sweep lower than the header icons themselves.
   const menuHeaderContentBottom = menuTopHudReserve > 0
     ? Math.max(
       resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: 0, placement: 'leading', width }).bottom,
-      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: 0, placement: 'trailing', width }).bottom
+      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: 0, placement: 'trailing', width }).bottom,
+      resolveInlineTitleOrbitBottom(
+        Math.round(width / 2),
+        Math.round(resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: 0, placement: 'leading', width }).centerY),
+        Math.max(22, Math.round(menuTopHudReserve * 0.68))
+      )
     )
     : menuStackTop;
   const menuBoardTop = menuTopHudReserve > 0
@@ -270,6 +295,13 @@ export const resolveLegacyMenuLayout = (
       menuTitleFitsInHeader = true;
       menuHeaderTitleCenterX = Math.round((leadingHeaderFrame.right + trailingHeaderFrame.left) / 2);
       menuHeaderTitleCenterY = Math.round(leadingHeaderFrame.centerY);
+      // The board's cutoff must clear whichever sits lower: the header
+      // icons themselves, or the title's animated orbit diamonds sweeping
+      // beneath it.
+      menuHeaderContentBottom = Math.max(
+        menuHeaderContentBottom,
+        resolveInlineTitleOrbitBottom(menuHeaderTitleCenterX, menuHeaderTitleCenterY, inlineTitleFontSize)
+      );
     }
   }
   // Title is deliberately compact and sized purely from viewport dimensions
