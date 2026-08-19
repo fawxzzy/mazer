@@ -38,7 +38,8 @@ describe('legacy wrap topology diagnostics', () => {
     carve(horizontalGrid, horizontalRoute);
     const horizontal = resolveLegacyWrapTopologyDiagnostics({
       grid: horizontalGrid,
-      size,
+      width: size,
+      height: size,
       start: horizontalRoute[0]!,
       goal: horizontalRoute.at(-1)!,
       solutionPath: horizontalRoute
@@ -62,7 +63,8 @@ describe('legacy wrap topology diagnostics', () => {
     carve(verticalGrid, verticalRoute);
     const vertical = resolveLegacyWrapTopologyDiagnostics({
       grid: verticalGrid,
-      size,
+      width: size,
+      height: size,
       start: verticalRoute[0]!,
       goal: verticalRoute.at(-1)!,
       solutionPath: verticalRoute
@@ -75,7 +77,8 @@ describe('legacy wrap topology diagnostics', () => {
     carve(multiRouteGrid, verticalRoute);
     const multiRoute = resolveLegacyWrapTopologyDiagnostics({
       grid: multiRouteGrid,
-      size,
+      width: size,
+      height: size,
       start: horizontalRoute[0]!,
       goal: horizontalRoute.at(-1)!,
       solutionPath: horizontalRoute
@@ -89,7 +92,8 @@ describe('legacy wrap topology diagnostics', () => {
     carve(oneSidedGrid, oneSidedRoute);
     const oneSided = resolveLegacyWrapTopologyDiagnostics({
       grid: oneSidedGrid,
-      size,
+      width: size,
+      height: size,
       start: oneSidedRoute[0]!,
       goal: oneSidedRoute.at(-1)!,
       solutionPath: oneSidedRoute
@@ -174,7 +178,7 @@ describe('legacy wrap topology diagnostics', () => {
             ['play', createLegacyMaze],
             ['menu', createLegacyGeneratedMenuMaze]
           ] as const) {
-            const maze = build(scale, seed, undefined, generationProfile);
+            const maze = build(scale, scale, seed, undefined, generationProfile);
             const diagnostics = maze.wrapTopologyDiagnostics;
             const recomputed = resolveLegacyWrapTopologyDiagnostics(
               maze,
@@ -214,7 +218,7 @@ describe('legacy wrap topology diagnostics', () => {
     const failures: unknown[] = [];
 
     for (let seed = 1; seed <= 60; seed += 1) {
-      const maze = createLegacyMaze(39, seed, undefined, starterProfile);
+      const maze = createLegacyMaze(39, 39, seed, undefined, starterProfile);
       const diagnostics = maze.wrapTopologyDiagnostics;
       if (
         !diagnostics
@@ -239,8 +243,8 @@ describe('legacy wrap topology diagnostics', () => {
     expect(failures).toEqual([]);
 
     for (const seed of [577196704, 577196705, 577196706]) {
-      const first = createLegacyMaze(39, seed, undefined, starterProfile);
-      const second = createLegacyMaze(39, seed, undefined, starterProfile);
+      const first = createLegacyMaze(39, 39, seed, undefined, starterProfile);
+      const second = createLegacyMaze(39, 39, seed, undefined, starterProfile);
       expect(second).toEqual(first);
     }
   }, 30_000);
