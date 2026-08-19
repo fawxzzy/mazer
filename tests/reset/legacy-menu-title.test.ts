@@ -12,23 +12,23 @@ describe('legacy menu title presentation', () => {
   // reserved layout lane height (see legacyMenuLayout.ts's menuTitleReserve),
   // not from board size -- board size and the title reserve are computed
   // independently so the title can stay compact regardless of how large the
-  // board grows to fill available space. fontSize = max(20, round(reserve *
-  // 0.55)); surface/isPortrait no longer change fontSize itself (only the
+  // board grows to fill available space. fontSize = max(22, round(reserve *
+  // 0.68)); surface/isPortrait no longer change fontSize itself (only the
   // shadow offsets and alpha channels still branch on them).
 
   test('scales font size directly from the title reserve height, not board size', () => {
     const compact = resolveLegacyMenuTitlePresentation(40, 17, false);
     const roomier = resolveLegacyMenuTitlePresentation(56, 17, false);
 
-    expect(compact.fontSize).toBe(22);
-    expect(roomier.fontSize).toBe(31);
+    expect(compact.fontSize).toBe(27);
+    expect(roomier.fontSize).toBe(38);
     expect(roomier.fontSize).toBeGreaterThan(compact.fontSize);
   });
 
-  test('floors font size at 20 even for a near-zero reserve', () => {
+  test('floors font size at 22 even for a near-zero reserve', () => {
     const presentation = resolveLegacyMenuTitlePresentation(1, 3, true);
 
-    expect(presentation.fontSize).toBe(20);
+    expect(presentation.fontSize).toBe(22);
   });
 
   test('surface and portrait no longer change font size for the same reserve height (only alpha/shadow do)', () => {

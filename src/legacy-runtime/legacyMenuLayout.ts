@@ -145,7 +145,10 @@ export const resolveLegacyMenuLayout = (
       width
     });
     const headerGap = trailingHeaderFrame.left - leadingHeaderFrame.right;
-    const inlineTitleFontSize = Math.max(20, Math.round(menuTopHudReserve * 0.55));
+    // Keep this formula identical to resolveLegacyMenuTitlePresentation's
+    // fontSize in legacyMenuTitle.ts, or the fit-check here and the actual
+    // rendered size will drift apart.
+    const inlineTitleFontSize = Math.max(22, Math.round(menuTopHudReserve * 0.68));
     const inlineTitleWidth = resolveLegacyMenuTitleFootprintWidth(inlineTitleFontSize);
     const inlineTitlePadding = 24;
     if (headerGap >= inlineTitleWidth + inlineTitlePadding) {

@@ -150,11 +150,14 @@ export const resolveLegacyMenuTitlePresentation = (
   // independently now (legacyMenuLayout.ts deliberately keeps the title
   // compact regardless of how large the board grows), so deriving from
   // board size would make the title grow right along with the board again.
-  // 0.55 leaves the rendered glyph grid plus its orbit/crown decorations
+  // 0.68 leaves the rendered glyph grid plus its orbit/crown decorations
   // (which extend roughly another ~1.4 cell-widths above and below the core
   // 7-row grid -- see resolveLegacyMenuPathTitleOrbitGeometry) comfortably
   // inside the reserved lane with real margin, not sized right to the edge.
-  const fontSize = Math.max(20, Math.round(titleReserveHeight * 0.55));
+  // Bumped up from 0.55 per feedback that the title read as too small next
+  // to the (now also smaller) header badges -- keep this in sync with the
+  // identical formula in legacyMenuLayout.ts's inline-header fit check.
+  const fontSize = Math.max(22, Math.round(titleReserveHeight * 0.68));
   const shadowOffsetX = isUltraNarrow
     ? Math.max(2, Math.round(fontSize * 0.07))
     : Math.max(isPortrait ? 4 : 5, Math.round(tileSize * 0.12));
