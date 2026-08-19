@@ -55,7 +55,7 @@ const LEGACY_DIAGNOSTIC_PANEL_HEIGHT = 407;
 const LEGACY_PLAY_ULTRA_NARROW_WIDTH = 360;
 const LEGACY_PHONE_CLEAN_ZOOM_WIDTH = 420;
 const LEGACY_PHONE_CLEAN_SAFE_INSET = 7;
-const LEGACY_PHONE_CLEAN_OUTER_MARGIN = 8;
+const LEGACY_PHONE_CLEAN_OUTER_MARGIN = 4;
 // Play now uses a compact level glyph, centered timer, and icon-only Pause
 // control. Keep the HUD lane slim so the maze earns the reclaimed space.
 const LEGACY_PLAY_TOP_HUD_MIN = 56;
@@ -200,7 +200,11 @@ export const resolveLegacyMenuLayout = (
   const baseBoardScale = isPortrait ? 0.92 : 0.62;
   const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
-  const menuEdgeMargin = isUltraNarrow ? 6 : (shouldUseCleanPhoneCadence ? LEGACY_PHONE_CLEAN_OUTER_MARGIN : 12);
+  // Tightened from 6/8/12 per feedback wanting the board to sit closer to
+  // the screen's left/right edges -- the maze render frame's own safe
+  // inset (LEGACY_BOARD_MAZE_SAFE_INSET_*, 4-7px) still keeps the actual
+  // tiles a little clear of the literal edge, so this isn't pixel-zero.
+  const menuEdgeMargin = isUltraNarrow ? 4 : (shouldUseCleanPhoneCadence ? 4 : 8);
   const menuMaxBoardByWidth = Math.max(60, width - (menuEdgeMargin * 2));
   const maxBoardSize = isPlaySurface
     ? Math.min(

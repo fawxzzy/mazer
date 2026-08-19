@@ -230,11 +230,11 @@ describe('legacy menu layout', () => {
     const menuLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 'menu');
     const playLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 'play');
 
-    expect(menuLayout.tileSize).toBeCloseTo(7.653, 3);
-    expect(playLayout.tileSize).toBeCloseTo(7.653, 3);
-    expect(menuLayout.boardSize).toBe(389);
-    expect(playLayout.boardSize).toBe(389);
-    expect(menuLayout.boardLeft).toBe(8);
+    expect(menuLayout.tileSize).toBeCloseTo(7.816, 3);
+    expect(playLayout.tileSize).toBeCloseTo(7.816, 3);
+    expect(menuLayout.boardSize).toBe(397);
+    expect(playLayout.boardSize).toBe(397);
+    expect(menuLayout.boardLeft).toBe(4);
     expect(playLayout.boardLeft).toBe(menuLayout.boardLeft);
     // A row of three buttons doesn't fit 405px width once rowButtonOffset
     // correctly reserves the center button's own width (see the fix
@@ -248,10 +248,10 @@ describe('legacy menu layout', () => {
   test('lets phone menu mazes reach the screen edge when progression scale permits fewer cells', () => {
     const layout = resolveLegacyMenuLayout(405, 958, 50, 46, 'menu');
 
-    expect(layout.tileSize).toBeCloseTo(8.152, 3);
-    expect(layout.boardSize).toBe(389);
-    expect(layout.boardLeft).toBe(8);
-    expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width - 8);
+    expect(layout.tileSize).toBeCloseTo(8.326, 3);
+    expect(layout.boardSize).toBe(397);
+    expect(layout.boardLeft).toBe(4);
+    expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(layout.width - 4);
     expect(layout.titleY).toBeLessThan(layout.boardTop);
     expect(layout.buttonLayout).toBe('stack');
   });
@@ -261,8 +261,8 @@ describe('legacy menu layout', () => {
       resolveLegacyMenuLayout(390, 844, 50, mazeSize, 'menu')
     ));
 
-    expect(layouts.map((layout) => layout.boardSize)).toEqual([374, 374, 374]);
-    expect(layouts.map((layout) => layout.boardLeft)).toEqual([8, 8, 8]);
+    expect(layouts.map((layout) => layout.boardSize)).toEqual([382, 382, 382]);
+    expect(layouts.map((layout) => layout.boardLeft)).toEqual([4, 4, 4]);
     expect(layouts[0]!.tileSize).toBeGreaterThan(layouts[1]!.tileSize);
     expect(layouts[1]!.tileSize).toBeGreaterThan(layouts[2]!.tileSize);
   });

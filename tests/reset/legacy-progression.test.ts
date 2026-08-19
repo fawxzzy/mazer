@@ -1324,9 +1324,9 @@ describe('legacy progression', () => {
     expect(unrestrictedScale).toBeGreaterThan(viewportCap);
     expect(phoneScale).toBe(viewportCap);
     expect(narrowScale).toBe(narrowViewportCap);
-    expect(narrowScale).toBe(38);
-    expect(phoneScale).toBe(42);
-    expect(normalPhoneViewportCap).toBe(46);
+    expect(narrowScale).toBe(39);
+    expect(phoneScale).toBe(43);
+    expect(normalPhoneViewportCap).toBe(47);
     expect(playViewportCap).toBeGreaterThan(narrowViewportCap);
 
     const normalPhoneLayout = resolveLegacyMenuLayout(
@@ -1336,9 +1336,9 @@ describe('legacy progression', () => {
       normalPhoneViewportCap,
       'menu'
     );
-    expect(normalPhoneLayout.tileSize).toBeCloseTo(8.152, 3);
-    expect(normalPhoneLayout.boardLeft).toBeGreaterThanOrEqual(8);
-    expect(normalPhoneLayout.boardLeft + normalPhoneLayout.boardSize).toBeLessThanOrEqual(normalPhoneViewport.width - 8);
+    expect(normalPhoneLayout.tileSize).toBeCloseTo(8.149, 3);
+    expect(normalPhoneLayout.boardLeft).toBeGreaterThanOrEqual(4);
+    expect(normalPhoneLayout.boardLeft + normalPhoneLayout.boardSize).toBeLessThanOrEqual(normalPhoneViewport.width - 4);
 
     for (const targetComplexity of [0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 220, 300, LEGACY_PROGRESSION_MAX_COMPLEXITY]) {
       const scale = resolveLegacyProgressionGenerationScale(50, {
@@ -1356,10 +1356,10 @@ describe('legacy progression', () => {
         'menu'
       );
 
-      expect(layout.tileSize).toBeGreaterThanOrEqual(8.15);
-      expect(layout.boardSize).toBe(389);
-      expect(layout.boardLeft).toBe(8);
-      expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(normalPhoneViewport.width - 8);
+      expect(layout.tileSize).toBeGreaterThanOrEqual(8.149);
+      expect(layout.boardSize).toBe(397);
+      expect(layout.boardLeft).toBe(4);
+      expect(layout.boardLeft + layout.boardSize).toBeLessThanOrEqual(normalPhoneViewport.width - 4);
     }
   });
 

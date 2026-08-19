@@ -63,8 +63,8 @@ describe('legacy browser mobile parity', () => {
       controlMode: 'stick'
     });
 
-    expect(browserMenu.boardLeft).toBe(8);
-    expect(browserMenu.boardSize).toBe(483);
+    expect(browserMenu.boardLeft).toBe(4);
+    expect(browserMenu.boardSize).toBe(491);
     expect(browserMenu.tileSize).toBeGreaterThan(defaultMenu.tileSize);
     expect(browserControls.frame.top).toBeGreaterThan(defaultControls.frame.top);
     expect(browserControls.stick?.outer.width).toBeLessThan(defaultControls.stick?.outer.width ?? Number.POSITIVE_INFINITY);
