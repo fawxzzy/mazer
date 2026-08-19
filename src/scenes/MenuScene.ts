@@ -963,8 +963,11 @@ const LEGACY_MENU_ACTION_GREEN = toCyberArcadeCssHex(cyberArcadeMaterial.signal.
 // of a filled/bordered panel -- see drawLegacyMenuPulsingStartGlow.
 const LEGACY_MENU_START_GLOW_COLOR = cyberArcadeMaterial.rail.white;
 const LEGACY_MENU_START_GLOW_PULSE_MS = 1600;
-const LEGACY_MENU_START_GLOW_MIN_ALPHA = 0.32;
-const LEGACY_MENU_START_GLOW_MAX_ALPHA = 0.82;
+// Wider dim-to-bright swing and thicker strokes than a first pass -- per
+// feedback the original glow (0.32-0.82 alpha, 1.75px core line) read as
+// too weak/insubstantial for the primary action button.
+const LEGACY_MENU_START_GLOW_MIN_ALPHA = 0.22;
+const LEGACY_MENU_START_GLOW_MAX_ALPHA = 0.98;
 const LEGACY_MENU_PATH_TITLE_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_MENU_PATH_TITLE_ACCENT = cyberArcadeMaterial.signal.player;
 const LEGACY_MENU_PATH_TITLE_PRISM = cyberArcadeMaterial.rail.cyan;
@@ -7579,17 +7582,19 @@ export class MenuScene extends Phaser.Scene {
     const pulseAlpha = clamp(
       LEGACY_MENU_START_GLOW_MIN_ALPHA
         + (phase * (LEGACY_MENU_START_GLOW_MAX_ALPHA - LEGACY_MENU_START_GLOW_MIN_ALPHA))
-        + (active ? 0.14 : 0),
+        + (active ? 0.18 : 0),
       0,
       1
     );
     const left = x - (width / 2);
     const top = y - (height / 2);
     const baseRadius = this.resolveLegacyRoundedRectRadius(width, height, height / 2);
+    // Thicker at every layer than a first pass, plus a wider outer wash --
+    // a bolder, more visible glow rather than a thin outline.
     const layers = [
-      { alphaScale: 0.16, inset: -7, lineWidth: 6 },
-      { alphaScale: 0.34, inset: -3.5, lineWidth: 3 },
-      { alphaScale: 1, inset: 0, lineWidth: 1.75 }
+      { alphaScale: 0.24, inset: -10, lineWidth: 9 },
+      { alphaScale: 0.46, inset: -5, lineWidth: 5 },
+      { alphaScale: 1, inset: 0, lineWidth: 3 }
     ];
     for (const layer of layers) {
       graphics.lineStyle(layer.lineWidth, LEGACY_MENU_START_GLOW_COLOR, Math.min(1, pulseAlpha * layer.alphaScale));
