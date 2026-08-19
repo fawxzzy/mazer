@@ -318,11 +318,9 @@ import {
   resolveLegacyPointFromDemoIndex,
 } from '../legacy-runtime/legacyDemoWalker';
 import {
-  resolveLegacyEndpointMarkerRenderMetrics,
   resolveLegacyMenuBorderDockDirections,
   resolveLegacyMenuBorderDockRenderAreas,
   resolveLegacyMenuPathRenderFrames,
-  resolveLegacyMenuPathRenderSegments,
   resolveLegacyPlayerLocatorRenderMetrics,
   resolveLegacyPlayerMarkerRenderMetrics,
   type LegacyMenuBorderDockDirection
@@ -2250,7 +2248,7 @@ export class MenuScene extends Phaser.Scene {
         markerStyle: {
           goalCoreColor: LEGACY_PLAY_GOAL_MARKER_CORE,
           goalEdgeColor: LEGACY_PLAY_GOAL_MARKER_EDGE,
-          playerCoreColor: resolveLegacyIridescentPlayerCoreColor(),
+          playerCoreColor: resolveLegacyIridescentPlayerCoreColor(time),
           playerCoreRadius: playerMarkerMetrics.coreRadius,
           playerBeaconAccentColor: LEGACY_PLAY_PLAYER_BEACON_ACCENT,
           playerBeaconColor: LEGACY_PLAY_PLAYER_BEACON_COLOR,
@@ -5402,6 +5400,16 @@ export class MenuScene extends Phaser.Scene {
     this.boardStaticDirty = false;
   }
 
+  // A flat, full-bleed fill -- no inset core, no separate edge ring, no
+  // seam patches bridging the gap between them. Those were the previous
+  // "trench" material's job, but stacked with a per-tile facet cut it made
+  // a run of connected corridor tiles read as a checkerboard of separate
+  // beveled chiclets instead of one clean path. This version fills the
+  // entire physical tile edge-to-edge (so adjacent tiles abut with zero
+  // gap) and leaves all the accenting to the connection-aware rim in
+  // drawLegacyPathTileFacet, which only lights the corridor's true outer
+  // boundary. Title cells route through this same function, so they read
+  // as the same material as the corridor tiles by construction.
   private drawLegacyPathMaterialTile(
     graphics: Phaser.GameObjects.Graphics,
     point: LegacyPoint,
@@ -5416,45 +5424,14 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
-    const materialTileSize = Math.max(1, Math.round(tileSize));
-    const segments = resolveLegacyMenuPathRenderSegments(pathSource, point, materialTileSize);
-    const frames = resolveLegacyMenuPathRenderFrames(pathSource, point, materialTileSize);
-    const fillMaterialFrame = (
-      frame: { height: number; leftInset: number; topInset: number; width: number }
-    ): void => {
-      const left = tileRect.left + Math.floor((frame.leftInset / materialTileSize) * tileRect.width);
-      const top = tileRect.top + Math.floor((frame.topInset / materialTileSize) * tileRect.height);
-      const right = tileRect.left + Math.ceil(((frame.leftInset + frame.width) / materialTileSize) * tileRect.width);
-      const bottom = tileRect.top + Math.ceil(((frame.topInset + frame.height) / materialTileSize) * tileRect.height);
-
-      graphics.fillRect(
-        left,
-        top,
-        Math.max(1, right - left),
-        Math.max(1, bottom - top)
-      );
-    };
-
-    graphics.fillStyle(options.edgeColor, options.edgeAlpha);
-    for (const segment of segments.edge) {
-      fillMaterialFrame(segment);
-    }
 
     graphics.fillStyle(options.coreColor, options.coreAlpha);
-    fillMaterialFrame(frames.core);
-    this.fillLegacyPathConnectorSeams(
-      graphics,
-      point,
-      pathSource,
-      tileRect,
-      frames,
-      materialTileSize,
-      options
-    );
+    graphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
     this.drawLegacyPathTileFacet(
       graphics,
       tileRect,
       options.coreAlpha,
+      options.edgeColor,
       pathSource.grid[point.y - 1]?.[point.x] === true,
       pathSource.grid[point.y]?.[point.x - 1] === true,
       pathSource.grid[point.y + 1]?.[point.x] === true,
@@ -5478,17 +5455,19 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  // A cyan rim-light along the corridor's true outer boundary -- only on
-  // edges that do NOT connect to a neighboring path tile. Drawing it per
-  // physical tile unconditionally (the first version of this) put a hard
-  // diagonal cut on every single cell, so a run of connected corridor tiles
-  // read as a checkerboard of separate glass chiclets instead of one
-  // corridor. Skipping connected edges keeps interior seams flat and lets
-  // the rim trace one continuous line around the whole shape instead.
+  // A single-tone rim-light along the corridor's true outer boundary --
+  // only on edges that do NOT connect to a neighboring path tile. Drawing
+  // it per physical tile unconditionally (an earlier version of this) put a
+  // hard cut on every single cell, so a run of connected corridor tiles
+  // read as a checkerboard of separate chiclets instead of one corridor.
+  // Skipping connected edges keeps interior seams flat and lets the rim
+  // trace one continuous line around the whole shape instead -- flat fill,
+  // one outline, nothing else, so it reads as clean rather than busy.
   private drawLegacyPathTileFacet(
     graphics: Phaser.GameObjects.Graphics,
     tileRect: LegacyPixelTileRect,
     intensity: number,
+    rimColor: number,
     hasTop: boolean,
     hasLeft: boolean,
     hasBottom: boolean,
@@ -5498,9 +5477,9 @@ export class MenuScene extends Phaser.Scene {
     const top = tileRect.top;
     const width = tileRect.width;
     const height = tileRect.height;
-    const lineWidth = Math.max(1, Math.round(Math.min(width, height) * 0.09));
+    const lineWidth = Math.max(1, Math.round(Math.min(width, height) * 0.1));
 
-    graphics.lineStyle(lineWidth, cyberArcadeMaterial.rail.cyan, Math.min(0.85, intensity * 0.9));
+    graphics.lineStyle(lineWidth, rimColor, Math.min(0.95, intensity + 0.1));
     if (!hasTop) {
       graphics.beginPath();
       graphics.moveTo(left, top);
@@ -5513,8 +5492,6 @@ export class MenuScene extends Phaser.Scene {
       graphics.lineTo(left, top + height);
       graphics.strokePath();
     }
-
-    graphics.lineStyle(lineWidth, cyberArcadeMaterial.rail.edge, Math.min(0.4, intensity * 0.4));
     if (!hasBottom) {
       graphics.beginPath();
       graphics.moveTo(left, top + height);
@@ -5526,87 +5503,6 @@ export class MenuScene extends Phaser.Scene {
       graphics.moveTo(left + width, top);
       graphics.lineTo(left + width, top + height);
       graphics.strokePath();
-    }
-  }
-
-  private fillLegacyPathConnectorSeams(
-    graphics: Phaser.GameObjects.Graphics,
-    point: LegacyPoint,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
-    tileRect: LegacyPixelTileRect,
-    frames: ReturnType<typeof resolveLegacyMenuPathRenderFrames>,
-    materialTileSize: number,
-    options: LegacyPathMaterialOptions
-  ): void {
-    const coreFrame = frames.core;
-    const coreLeft = tileRect.left + Math.floor((coreFrame.leftInset / materialTileSize) * tileRect.width);
-    const coreTop = tileRect.top + Math.floor((coreFrame.topInset / materialTileSize) * tileRect.height);
-    const coreRight = tileRect.left + Math.ceil(((coreFrame.leftInset + coreFrame.width) / materialTileSize) * tileRect.width);
-    const coreBottom = tileRect.top + Math.ceil(((coreFrame.topInset + coreFrame.height) / materialTileSize) * tileRect.height);
-    const coreWidth = Math.max(1, coreRight - coreLeft);
-    const coreHeight = Math.max(1, coreBottom - coreTop);
-    const tileRight = tileRect.left + tileRect.width;
-    const tileBottom = tileRect.top + tileRect.height;
-    const seamPad = Math.max(1, Math.round(Math.min(tileRect.width, tileRect.height) * LEGACY_PATH_CONNECTOR_SEAM_PAD_RATIO));
-    const seamEdgeAlpha = Math.min(options.edgeAlpha, options.edgeAlpha * LEGACY_PATH_CONNECTOR_SEAM_EDGE_ALPHA_RATIO);
-    const seamCoreAlpha = Math.min(options.coreAlpha, options.coreAlpha * LEGACY_PATH_CONNECTOR_SEAM_CORE_ALPHA_RATIO);
-    const hasConnectedNeighbor = (deltaX: number, deltaY: number): boolean =>
-      pathSource.grid[point.y + deltaY]?.[point.x + deltaX] === true;
-    const fillRect = (left: number, top: number, width: number, height: number): void => {
-      graphics.fillRect(left, top, Math.max(1, width), Math.max(1, height));
-    };
-    const seamRects: Array<{ height: number; left: number; top: number; width: number }> = [];
-
-    if (hasConnectedNeighbor(-1, 0)) {
-      seamRects.push({
-        left: tileRect.left,
-        top: coreTop,
-        width: (coreLeft - tileRect.left) + seamPad,
-        height: coreHeight
-      });
-    }
-    if (hasConnectedNeighbor(1, 0)) {
-      seamRects.push({
-        left: coreRight - seamPad,
-        top: coreTop,
-        width: (tileRight - coreRight) + seamPad,
-        height: coreHeight
-      });
-    }
-    if (hasConnectedNeighbor(0, -1)) {
-      seamRects.push({
-        left: coreLeft,
-        top: tileRect.top,
-        width: coreWidth,
-        height: (coreTop - tileRect.top) + seamPad
-      });
-    }
-    if (hasConnectedNeighbor(0, 1)) {
-      seamRects.push({
-        left: coreLeft,
-        top: coreBottom - seamPad,
-        width: coreWidth,
-        height: (tileBottom - coreBottom) + seamPad
-      });
-    }
-
-    if (seamRects.length <= 0) {
-      return;
-    }
-
-    graphics.fillStyle(options.edgeColor, seamEdgeAlpha);
-    for (const seam of seamRects) {
-      fillRect(
-        seam.left - seamPad,
-        seam.top - seamPad,
-        seam.width + (seamPad * 2),
-        seam.height + (seamPad * 2)
-      );
-    }
-
-    graphics.fillStyle(options.coreColor, seamCoreAlpha);
-    for (const seam of seamRects) {
-      fillRect(seam.left, seam.top, seam.width, seam.height);
     }
   }
 
@@ -7547,6 +7443,10 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
+  // A colored-in version of the corridor tile itself -- same flat fill +
+  // rim treatment as every other tile (drawLegacyPathTileFacet), just in
+  // the start/goal accent color, instead of a circle-and-diamond marker
+  // shape that belonged to a different visual language than the board.
   private drawLegacyEndpointMarker(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
@@ -7555,38 +7455,25 @@ export class MenuScene extends Phaser.Scene {
     alpha: number,
     kind: 'start' | 'goal'
   ): void {
-    const markerMetrics = resolveLegacyEndpointMarkerRenderMetrics(tileSize);
-    const shadowRadius = Math.min(tileSize * 0.52, markerMetrics.outerRadius + markerMetrics.strokeWidth);
+    const coreColor = kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_CORE : LEGACY_PLAY_START_MARKER_CORE;
+    const rimColor = kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_EDGE : LEGACY_PLAY_START_MARKER_EDGE;
+    const tileRect: LegacyPixelTileRect = {
+      height: tileSize,
+      left: centerX - (tileSize / 2),
+      top: centerY - (tileSize / 2),
+      width: tileSize
+    };
 
-    graphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.48, alpha * 0.48));
-    graphics.fillCircle(centerX, centerY, shadowRadius);
-    graphics.lineStyle(markerMetrics.strokeWidth, kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_EDGE : LEGACY_PLAY_START_MARKER_EDGE, Math.min(0.96, alpha));
-    graphics.strokeCircle(centerX, centerY, markerMetrics.outerRadius);
-
-    if (kind === 'goal') {
-      graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_EDGE, Math.min(0.86, alpha * 0.86));
-      graphics.beginPath();
-      graphics.moveTo(centerX, centerY - markerMetrics.outerRadius);
-      graphics.lineTo(centerX + markerMetrics.outerRadius, centerY);
-      graphics.lineTo(centerX, centerY + markerMetrics.outerRadius);
-      graphics.lineTo(centerX - markerMetrics.outerRadius, centerY);
-      graphics.closePath();
-      graphics.fillPath();
-      graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, alpha);
-      graphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
-      this.drawLegacyMarkerGemCatchlight(graphics, centerX, centerY, markerMetrics.outerRadius, alpha);
-      return;
-    }
-
-    graphics.fillStyle(LEGACY_PLAY_START_MARKER_CORE, alpha);
-    graphics.fillCircle(centerX, centerY, markerMetrics.coreRadius);
-    this.drawLegacyMarkerGemCatchlight(graphics, centerX, centerY, markerMetrics.outerRadius, alpha);
+    graphics.fillStyle(coreColor, alpha);
+    graphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
+    this.drawLegacyPathTileFacet(graphics, tileRect, alpha, rimColor, false, false, false, false);
   }
 
-  // A small bright arc on the upper-left of a circular marker, as if a
+  // A small bright arc on the upper-left of a circular shape, as if a
   // single light source were catching a cut facet -- same "light hits one
-  // corner" convention as drawLegacyPathTileFacet, applied to the round
-  // start/goal markers instead of square tiles.
+  // corner" convention as drawLegacyPathTileFacet, for the round settings
+  // gear icon (the start/goal markers are square now and use the tile rim
+  // treatment directly instead of this).
   private drawLegacyMarkerGemCatchlight(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
@@ -7624,7 +7511,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.boardDynamicGraphics.fillStyle(LEGACY_PLAYER_MARKER_SHADOW, Math.min(0.36, alpha * 0.36));
     this.boardDynamicGraphics.fillCircle(centerX, centerY, shadowRadius);
-    const playerCoreColor = resolveLegacyIridescentPlayerCoreColor();
+    const playerCoreColor = resolveLegacyIridescentPlayerCoreColor(time);
     const iridescentAccentColor = resolveLegacyIridescentPlayerAccentColor(time, playerCoreColor);
     const beaconPhase = (Math.sin((time / LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS) * Math.PI * 2) + 1) / 2;
     const beaconRadiusOffset = showLocatorTicks
@@ -7745,7 +7632,7 @@ export class MenuScene extends Phaser.Scene {
     time: number,
     palette: LegacyProgressionPalette
   ): LegacyIridescentMaterialDiagnostics {
-    const playerCoreColor = resolveLegacyIridescentPlayerCoreColor();
+    const playerCoreColor = resolveLegacyIridescentPlayerCoreColor(time);
     const trailLength = Math.max(1, this.trail.length);
     const trailTailIndex = 0;
     const trailHeadIndex = Math.max(0, this.trail.length - 1);
@@ -12353,7 +12240,7 @@ export class MenuScene extends Phaser.Scene {
       markerStyle: {
         goalCoreColor: LEGACY_PLAY_GOAL_MARKER_CORE,
         goalEdgeColor: LEGACY_PLAY_GOAL_MARKER_EDGE,
-        playerCoreColor: resolveLegacyIridescentPlayerCoreColor(),
+        playerCoreColor: resolveLegacyIridescentPlayerCoreColor(time),
         playerCoreRadius: playerMarkerMetrics.coreRadius,
         playerBeaconAccentColor: LEGACY_PLAY_PLAYER_BEACON_ACCENT,
         playerBeaconColor: LEGACY_PLAY_PLAYER_BEACON_COLOR,
