@@ -6998,6 +6998,10 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
+  // Draws an actual compass: a circular bezel with cardinal tick marks and a
+  // two-tone needle (the tip half reads in the same color as the goal
+  // marker it points toward, matching a real compass needle's red/white
+  // convention while staying semantically tied to what it's pointing at).
   private drawLegacyCompassGlyph(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
@@ -7009,52 +7013,58 @@ export class MenuScene extends Phaser.Scene {
     isLifecycleSpinActive: boolean
   ): void {
     const pulse = 0.5 + (0.5 * Math.sin(time / 380));
-    const arrowLength = Math.max(8, size * 0.58);
-    const wing = Math.max(3, size * 0.26);
-    const tailLength = Math.max(4, size * 0.34);
+    const emphasis = isLifecycleSpinActive ? 0.6 : 0.4;
+    const ringRadius = size * 0.86;
+    const majorTickInner = ringRadius - (size * 0.17);
+    const minorTickInner = ringRadius - (size * 0.09);
+    const needleLength = Math.max(8, size * 0.62);
+    const tailLength = needleLength * 0.6;
+    const needleWidth = Math.max(2, size * 0.15);
+    const hubRadius = Math.max(2, size * 0.15);
+
+    graphics.fillStyle(0x03070b, 0.55);
+    graphics.fillCircle(centerX, centerY, ringRadius);
+    graphics.lineStyle(1.4, palette.rankColor, emphasis + (pulse * 0.2));
+    graphics.strokeCircle(centerX, centerY, ringRadius);
+
+    for (let tickIndex = 0; tickIndex < 8; tickIndex += 1) {
+      const tickAngle = (tickIndex * Math.PI) / 4;
+      const isMajor = tickIndex % 2 === 0;
+      const inner = isMajor ? majorTickInner : minorTickInner;
+      graphics.lineStyle(isMajor ? 1.4 : 1, palette.rankColor, isMajor ? emphasis + 0.24 : emphasis - 0.04);
+      graphics.beginPath();
+      graphics.moveTo(centerX + (Math.cos(tickAngle) * ringRadius), centerY + (Math.sin(tickAngle) * ringRadius));
+      graphics.lineTo(centerX + (Math.cos(tickAngle) * inner), centerY + (Math.sin(tickAngle) * inner));
+      graphics.strokePath();
+    }
+
     const tip = {
-      x: centerX + (Math.cos(angle) * arrowLength),
-      y: centerY + (Math.sin(angle) * arrowLength)
+      x: centerX + (Math.cos(angle) * needleLength),
+      y: centerY + (Math.sin(angle) * needleLength)
     };
     const tail = {
       x: centerX - (Math.cos(angle) * tailLength),
       y: centerY - (Math.sin(angle) * tailLength)
     };
-    const left = {
-      x: centerX + (Math.cos(angle + 2.36) * wing),
-      y: centerY + (Math.sin(angle + 2.36) * wing)
-    };
-    const right = {
-      x: centerX + (Math.cos(angle - 2.36) * wing),
-      y: centerY + (Math.sin(angle - 2.36) * wing)
-    };
-    const hubRadius = Math.max(2, size * 0.16);
+    const wingAngle = angle + (Math.PI / 2);
+    const wingX = Math.cos(wingAngle) * needleWidth;
+    const wingY = Math.sin(wingAngle) * needleWidth;
+    const wingLeft = { x: centerX + wingX, y: centerY + wingY };
+    const wingRight = { x: centerX - wingX, y: centerY - wingY };
 
-    graphics.lineStyle(1, palette.rankColor, (isLifecycleSpinActive ? 0.5 : 0.34) + (pulse * 0.22));
-    graphics.beginPath();
-    graphics.moveTo(centerX - (size * 0.43), centerY - (size * 0.08));
-    graphics.lineTo(centerX, centerY + (size * 0.38));
-    graphics.lineTo(centerX + (size * 0.43), centerY - (size * 0.08));
-    graphics.strokePath();
-    graphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.14 + (pulse * 0.12));
-    graphics.fillTriangle(tip.x, tip.y, left.x, left.y, right.x, right.y);
-    graphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW_SHADOW, 0.32);
-    graphics.beginPath();
-    graphics.moveTo(tail.x + 1, tail.y + 1);
-    graphics.lineTo(centerX + 1, centerY + 1);
-    graphics.lineTo(tip.x + 1, tip.y + 1);
-    graphics.strokePath();
-    graphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW, 0.86);
-    graphics.beginPath();
-    graphics.moveTo(tail.x, tail.y);
-    graphics.lineTo(centerX, centerY);
-    graphics.lineTo(tip.x, tip.y);
-    graphics.strokePath();
-    graphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.78);
-    graphics.fillTriangle(tip.x, tip.y, left.x, left.y, right.x, right.y);
-    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, 0.82);
-    graphics.fillTriangle(centerX, centerY - hubRadius, centerX + hubRadius, centerY, centerX, centerY + hubRadius);
-    graphics.fillTriangle(centerX, centerY - hubRadius, centerX - hubRadius, centerY, centerX, centerY + hubRadius);
+    graphics.fillStyle(LEGACY_PLAY_HUD_ARROW_SHADOW, 0.3);
+    graphics.fillTriangle(tip.x + 1, tip.y + 1, wingLeft.x + 1, wingLeft.y + 1, wingRight.x + 1, wingRight.y + 1);
+    graphics.fillTriangle(tail.x + 1, tail.y + 1, wingLeft.x + 1, wingLeft.y + 1, wingRight.x + 1, wingRight.y + 1);
+
+    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, 0.9 + (pulse * 0.1));
+    graphics.fillTriangle(tip.x, tip.y, wingLeft.x, wingLeft.y, wingRight.x, wingRight.y);
+    graphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.82);
+    graphics.fillTriangle(tail.x, tail.y, wingLeft.x, wingLeft.y, wingRight.x, wingRight.y);
+
+    graphics.fillStyle(0x03070b, 0.92);
+    graphics.fillCircle(centerX, centerY, hubRadius);
+    graphics.lineStyle(1, palette.rankColor, 0.82 + (pulse * 0.18));
+    graphics.strokeCircle(centerX, centerY, hubRadius);
   }
 
   private resolveBoardOffset(): Phaser.Math.Vector2 {
@@ -9713,6 +9723,13 @@ export class MenuScene extends Phaser.Scene {
     return contentTop + 4;
   }
 
+  // Toggle rows are drawn as their own rounded cyber-panel (matching the
+  // Quick Play card's chrome) with a left accent bar that reads ON/OFF at a
+  // glance, instead of the old plain flat rectangle. The interactive hit
+  // target stays a separate invisible Rectangle on top so pointer events
+  // work exactly as before -- Phaser's Rectangle game object can't have
+  // rounded corners, so the visual panel is a Graphics draw redone on every
+  // hover/press state change instead of a fillStyle() call.
   private createToggleSwitchRow(input: {
     checked: boolean;
     compact: boolean;
@@ -9728,21 +9745,24 @@ export class MenuScene extends Phaser.Scene {
     y: number;
   }): UiButton {
     const left = input.x - (input.width / 2);
-    const rowFill = input.checked ? 0x10251e : LEGACY_CYBER_PANEL_FILL;
-    const rowStroke = input.checked ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
-    const stateColor = input.checked ? '#72e0bf' : '#b7f2ff';
+    const top = input.y - (input.height / 2);
+    const onColor = cyberArcadeMaterial.signal.player;
+    const offColor = cyberArcadeMaterial.rail.muted;
+    const accentColor = input.checked ? onColor : offColor;
+    const stateColor = input.checked ? toCyberArcadeCssHex(onColor) : toCyberArcadeCssHex(offColor);
     const hasDescription = Boolean(input.description);
     const uiLayout = resolveLegacyToggleRowLayout(input.width, input.height, hasDescription, input.compact);
+    const accentBarWidth = 3;
     const rowPaddingX = uiLayout.rowPaddingX;
-    const trackWidth = uiLayout.trackWidth;
-    const trackHeight = uiLayout.trackHeight;
+    const trackWidth = uiLayout.trackWidth + 4;
+    const trackHeight = uiLayout.trackHeight + 2;
     const trackX = left + input.width - rowPaddingX - Math.round(trackWidth / 2);
     const trackLeft = trackX - Math.round(trackWidth / 2);
     const trackGap = uiLayout.trackGap;
     const showStateLabel = uiLayout.showStateLabel;
     const stateLaneWidth = uiLayout.stateLaneWidth;
     const stateLabelRight = trackLeft - trackGap;
-    const labelX = left + rowPaddingX;
+    const labelX = left + rowPaddingX + accentBarWidth;
     const labelRight = showStateLabel
       ? stateLabelRight - stateLaneWidth - trackGap
       : stateLabelRight - trackGap;
@@ -9756,23 +9776,43 @@ export class MenuScene extends Phaser.Scene {
     const visibleLabelText = showStateLabel || !displayStateText
       ? input.label
       : `${input.label}: ${displayStateText}`;
-    const background = this.add.rectangle(input.x, input.y, input.width, input.height, rowFill, input.checked ? 0.62 : 0.5);
-    background.setStrokeStyle(1, rowStroke, input.checked ? 0.56 : 0.38);
+
+    const panelGraphics = this.add.graphics();
+    const drawPanel = (active: boolean): void => {
+      panelGraphics.clear();
+      this.drawLegacyCyberPanel(panelGraphics, {
+        active,
+        alpha: input.checked ? 0.62 : 0.46,
+        fill: input.checked ? 0x0f2c22 : LEGACY_CYBER_PANEL_FILL,
+        height: input.height,
+        left,
+        radius: 10,
+        stroke: accentColor,
+        top,
+        width: input.width
+      });
+      panelGraphics.fillStyle(accentColor, input.checked ? 0.95 : 0.5);
+      panelGraphics.fillRoundedRect(left + 5, top + 6, accentBarWidth, input.height - 12, accentBarWidth / 2);
+    };
+    drawPanel(false);
+
+    const background = this.add.rectangle(input.x, input.y, input.width, input.height, 0x000000, 0);
     background.setInteractive({ useHandCursor: true });
 
     const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(labelX, titleY, visibleLabelText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${uiLayout.labelFontSize}px`,
-      color: '#ecfff5'
-    })), labelMaxWidth, uiLayout.labelFontSize, 11).setOrigin(0, 0.5).setAlpha(0.94);
+      color: toCyberArcadeCssHex(cyberArcadeMaterial.rail.white)
+    })), labelMaxWidth, uiLayout.labelFontSize, 11).setOrigin(0, 0.5).setAlpha(0.96);
 
     const stateLabel = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(stateLabelRight, titleY, displayStateText || input.stateText, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${uiLayout.stateFontSize}px`,
+      fontStyle: 'bold',
       color: stateColor
     })), stateLaneWidth, uiLayout.stateFontSize, 9)
       .setOrigin(1, 0.5)
-      .setAlpha(showStateLabel ? 0.92 : 0)
+      .setAlpha(showStateLabel ? 1 : 0)
       .setVisible(showStateLabel);
     this.uiTexts.push(label);
     if (showStateLabel) {
@@ -9783,30 +9823,37 @@ export class MenuScene extends Phaser.Scene {
     const descriptionMaxWidth = Math.max(72, labelRight - labelX);
     const description = hasDescription
       ? this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(labelX, input.y + Math.round(input.height * 0.18), input.description!, {
-        color: '#bfe9de',
+        color: toCyberArcadeCssHex(cyberArcadeMaterial.rail.muted),
         fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: `${descriptionFontSize}px`
       })), descriptionMaxWidth, descriptionFontSize, 9, 0.9)
         .setOrigin(0, 0.5)
-        .setAlpha(0.84)
+        .setAlpha(0.88)
       : null;
     if (description) {
       this.uiTexts.push(description);
     }
 
-    const track = this.add.ellipse(trackX, titleY, trackWidth, trackHeight, input.checked ? 0x123a2d : 0x07131d, 0.9);
-    track.setStrokeStyle(2, rowStroke, input.checked ? 0.66 : 0.52);
-    const knobX = trackX + (input.checked ? 9 : -9);
-    const knob = this.add.circle(knobX, titleY, 8, input.checked ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.98);
-    knob.setStrokeStyle(1, 0xecfff5, input.checked ? 0.7 : 0.46);
+    // Soft glow ring behind the track when ON -- a second, larger, low-alpha
+    // ellipse instead of a real blur filter (canvas renderer has none).
+    const trackGlow = this.add.ellipse(trackX, titleY, trackWidth + 10, trackHeight + 10, onColor, input.checked ? 0.16 : 0);
+    const track = this.add.ellipse(trackX, titleY, trackWidth, trackHeight, input.checked ? 0x0f2c22 : 0x050c11, 0.95);
+    track.setStrokeStyle(2, accentColor, input.checked ? 0.85 : 0.55);
+    const knobTravel = Math.round((trackWidth - trackHeight) / 2) - 1;
+    const knobRadius = Math.round((trackHeight - 6) / 2);
+    const knobX = trackX + (input.checked ? knobTravel : -knobTravel);
+    const knobGlow = this.add.circle(knobX, titleY, knobRadius + 4, onColor, input.checked ? 0.3 : 0);
+    const knob = this.add.circle(knobX, titleY, knobRadius, input.checked ? onColor : cyberArcadeMaterial.rail.edge, 1);
+    knob.setStrokeStyle(1, cyberArcadeMaterial.rail.white, input.checked ? 0.9 : 0.5);
     let pressStart: { x: number; y: number } | null = null;
 
     const setActive = (active: boolean): void => {
-      background.setFillStyle(rowFill, active ? 0.7 : (input.checked ? 0.58 : 0.5));
-      background.setStrokeStyle(1, rowStroke, active ? 0.72 : (input.checked ? 0.42 : 0.34));
-      track.setStrokeStyle(2, rowStroke, active ? 0.88 : (input.checked ? 0.66 : 0.52));
-      knob.setScale(active ? 1.08 : 1);
-      label.setAlpha(active ? 1 : 0.94);
+      drawPanel(active);
+      track.setStrokeStyle(2, accentColor, active ? 1 : (input.checked ? 0.85 : 0.55));
+      trackGlow.setAlpha(input.checked ? (active ? 0.26 : 0.16) : 0);
+      knob.setScale(active ? 1.1 : 1);
+      knobGlow.setAlpha(input.checked ? (active ? 0.42 : 0.3) : (active ? 0.14 : 0));
+      label.setAlpha(active ? 1 : 0.96);
       stateLabel.setAlpha(active ? 1 : 0.92);
     };
 
@@ -9831,16 +9878,19 @@ export class MenuScene extends Phaser.Scene {
 
     return {
       background,
-      bounds: createVisualRect(left, input.y - (input.height / 2), input.width, input.height),
+      bounds: createVisualRect(left, top, input.width, input.height),
       label,
       setActive,
       text: input.label,
       destroy: () => {
         background.destroy();
+        panelGraphics.destroy();
         label.destroy();
         stateLabel.destroy();
         description?.destroy();
+        trackGlow.destroy();
         track.destroy();
+        knobGlow.destroy();
         knob.destroy();
       }
     };

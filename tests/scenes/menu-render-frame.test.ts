@@ -792,9 +792,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('mazeRenderFrame.tileSize * 2.15');
     expect(menuSceneSource).toContain('const centerY = Math.round(notchBounds.top + (notchBounds.height * 0.43));');
     expect(menuSceneSource).toContain('this.menuCompassBounds = createVisualRect(centerX - (size / 2), centerY - (size / 2), size, size);');
-    expect(menuSceneSource).toContain('const wing = Math.max(3, size * 0.26);');
-    expect(menuSceneSource).toContain('const tailLength = Math.max(4, size * 0.34);');
-    expect(menuSceneSource).toContain('const hubRadius = Math.max(2, size * 0.16);');
+    expect(menuSceneSource).toContain('const ringRadius = size * 0.86;');
+    expect(menuSceneSource).toContain('const needleWidth = Math.max(2, size * 0.15);');
+    expect(menuSceneSource).toContain('const hubRadius = Math.max(2, size * 0.15);');
     expect(menuSceneSource).toContain('private drawLegacyCompassGlyph(');
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, radius);');
     expect(menuSceneSource).toContain('progressionBadge: {');
@@ -1718,7 +1718,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
     expect(menuSceneSource).toContain('const visibleLabelText = showStateLabel || !displayStateText');
     expect(menuSceneSource).toContain('`${input.label}: ${displayStateText}`');
-    expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 0.92 : 0)');
+    expect(menuSceneSource).toContain('setAlpha(showStateLabel ? 1 : 0)');
     expect(menuSceneSource).toContain('setVisible(showStateLabel)');
     expect(menuSceneSource).not.toContain("const tightWidth = input.width < 260;");
     expect(menuSceneSource).not.toContain("tightWidth && input.label !== 'Controls'");
