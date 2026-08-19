@@ -39,8 +39,12 @@ export interface LegacyOverlayShellLayout {
   contentTop: number;
   contentWidth: number;
   messageCenterY: number;
-  titleCenterY: number;
 }
+
+// Header chrome for Settings/Pause is now just the corner back button --
+// no title text -- so this is the button's own footprint (fixed top
+// margin + diameter), not a band sized to fit a heading.
+export const LEGACY_OVERLAY_HEADER_RESERVE = 46;
 
 export const resolveLegacyOverlayShellLayout = ({
   actionHeight,
@@ -59,9 +63,10 @@ export const resolveLegacyOverlayShellLayout = ({
   const actionBottomInset = compact ? 20 : 24;
   const actionRowGap = compact ? 10 : 14;
   const actionContentGap = compact ? 12 : 16;
-  const titleCenterY = panel.top + (compact ? 52 : 56);
-  const messageCenterY = panel.top + (compact ? 82 : 88);
-  const contentTop = panel.top + (compact ? 76 : 84) + (hasMessage ? 22 : 0);
+  const messageCenterY = panel.top + LEGACY_OVERLAY_HEADER_RESERVE + (compact ? 12 : 14);
+  const contentTop = panel.top + LEGACY_OVERLAY_HEADER_RESERVE + (hasMessage
+    ? (compact ? 26 : 30)
+    : (compact ? 6 : 8));
   const panelBottom = panel.top + panel.height;
   const actionCenterY = panelBottom - actionBottomInset - (resolvedActionHeight / 2);
   const actionStackTop = actionCenterY
@@ -75,8 +80,7 @@ export const resolveLegacyOverlayShellLayout = ({
     contentLeft: panel.left + contentHorizontalInset,
     contentTop,
     contentWidth: Math.max(1, panel.width - (contentHorizontalInset * 2)),
-    messageCenterY,
-    titleCenterY
+    messageCenterY
   };
 };
 

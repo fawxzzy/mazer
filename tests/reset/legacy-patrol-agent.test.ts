@@ -194,9 +194,6 @@ interface DirectionalIntentFailureHarness {
   playPatrolAgent: LegacyPatrolAgentState | null;
   player: LegacyPoint;
   publishInteractionDiagnostics: () => void;
-  settings: {
-    smartSteering: boolean;
-  };
   time?: {
     now: number;
   };
@@ -518,10 +515,7 @@ describe('legacy Mythic patrol agent', () => {
       },
       playPatrolAgent: queued,
       player: maze.start,
-      publishInteractionDiagnostics,
-      settings: {
-        smartSteering: false
-      }
+      publishInteractionDiagnostics
     };
 
     expect(performDirectionalIntentStep.call(harness)).toBe(false);
@@ -530,7 +524,7 @@ describe('legacy Mythic patrol agent', () => {
     expect(publishInteractionDiagnostics).toHaveBeenCalledOnce();
   });
 
-  test('clears the older pending intent when the real resolver continues past a blocked newest turn', () => {
+  test('clears the older pending intent, then resolves the newest turn via an assisted lane shift', () => {
     const maze = createMythicMaze();
     const player = maze.solutionPath.find((point) => (
       resolveLegacyNavigationTarget(maze, point, 1, 0) !== null
@@ -574,9 +568,6 @@ describe('legacy Mythic patrol agent', () => {
       playPatrolAgent: queued,
       player: player!,
       publishInteractionDiagnostics,
-      settings: {
-        smartSteering: false
-      },
       time: {
         now: 1_100
       },
@@ -592,22 +583,26 @@ describe('legacy Mythic patrol agent', () => {
     });
     expect(resolveLegacyPatrolAgentCollisionIntent(harness.playPatrolAgent, 1_440).intent).toBeNull();
 
+    // Smart steering is always on now, so this newest "up" turn -- which
+    // used to stay blocked while assistance was off -- now resolves via a
+    // one-tile assisted lane shift and actually moves the player.
     harness.time!.now = 1_440;
     resolver.request(['up']);
-    expect(performDirectionalIntentStep.call(harness)).toBe(false);
+    expect(performDirectionalIntentStep.call(harness)).toBe(true);
     expect(resolver.getDiagnostics()).toMatchObject({
       activeDirection: 'up',
+      lastDecision: 'assisted-lane-shift',
       queuedDirection: null,
       requestedDirections: ['up']
     });
     expect(harness.playPatrolAgent?.pendingCollisionIntent).toBeNull();
-    expect(tryMovePlayer).not.toHaveBeenCalled();
-    expect(playerMovement).not.toHaveBeenCalled();
+    expect(tryMovePlayer).toHaveBeenCalledOnce();
+    expect(playerMovement).toHaveBeenCalledOnce();
     expect(worldTurnHost.getDiagnostics()).toMatchObject({
-      acceptedTurnCount: 0,
-      lastReceipt: null
+      acceptedTurnCount: 1,
+      lastReceipt: expect.objectContaining({ admitted: true })
     });
-    expect(publishInteractionDiagnostics).toHaveBeenCalledTimes(2);
+    expect(publishInteractionDiagnostics).toHaveBeenCalledTimes(1);
   });
 
   test('shows collision feedback only for the first 220 ms of the existing delay', () => {

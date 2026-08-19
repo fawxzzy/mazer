@@ -323,20 +323,13 @@ describe('menu runtime diagnostics', () => {
           switchIsOn: false,
           stateText: 'Stagnant'
         },
-        cameraFollow: {
-          enabled: false,
-          switchIsOn: false,
-          stateText: 'Off'
-        },
         controlMode: {
           mode: 'arrows',
           switchIsOn: false,
           stateText: 'Arrows'
         },
         darkMode: {
-          enabled: false,
-          switchIsOn: false,
-          stateText: 'Off'
+          enabled: false
         },
         movementSpeed: {
           label: '30%',
@@ -655,8 +648,8 @@ describe('menu runtime diagnostics', () => {
       )?.auth?.userIdPresent).toBe(true);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.animatedBackdrop.stateText)
         .toBe('Stagnant');
-      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.darkMode.stateText)
-        .toBe('Off');
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.darkMode.enabled)
+        .toBe(false);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.trailPulse.enabled)
         .toBe(true);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.gameToggles?.trailPulse.switchIsOn)

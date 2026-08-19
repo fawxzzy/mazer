@@ -1975,29 +1975,17 @@ export class MenuScene extends Phaser.Scene {
           switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
           stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'
         },
-        cameraFollow: {
-          enabled: this.settings.toggleCameraFollow,
-          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings),
-          stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'
-        },
         controlMode: {
           mode: this.settings.controlMode,
           switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings),
           stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'
         },
         darkMode: {
-          enabled: this.settings.darkMode,
-          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings),
-          stateText: resolveLegacyOverlayToggleStateText('darkMode', this.settings.darkMode) ?? 'Off'
+          enabled: this.settings.darkMode
         },
         movementSpeed: {
           label: formatLegacyMovementSpeedPercent(this.settings.movementSpeed),
           value: normalizeLegacyMovementSpeed(this.settings.movementSpeed)
-        },
-        smartSteering: {
-          enabled: this.settings.smartSteering,
-          switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('smartSteering', this.settings),
-          stateText: resolveLegacyOverlayToggleStateText('smartSteering', this.settings.smartSteering) ?? 'Off'
         },
         trailFade: {
           enabled: this.settings.toggleTrailFade,
@@ -3672,7 +3660,7 @@ export class MenuScene extends Phaser.Scene {
   private performLegacyPlayDirectionalIntentStep(): boolean {
     const latestRequestedDirection = this.playDirectionalIntent.getDiagnostics().requestedDirections[0] ?? null;
     const step = this.playDirectionalIntent.step(this.maze, this.player, {
-      assistedLaneShiftEnabled: this.settings.smartSteering
+      assistedLaneShiftEnabled: true
     });
     if (
       step.moved
@@ -4940,10 +4928,6 @@ export class MenuScene extends Phaser.Scene {
       this.playStartedAtMs
     );
     this.playStaticSlowTile = slowTileEntry.state;
-    if (this.settings.toggleCameraFollow) {
-      this.boardStaticDirty = true;
-      this.boardPathDirty = true;
-    }
 
     if (nextStep.reachedGoal) {
       this.playCompletedAtMs ??= this.time.now;
@@ -7009,15 +6993,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveBoardOffset(): Phaser.Math.Vector2 {
-    if (this.mode !== 'play' || !this.settings.toggleCameraFollow) {
-      return new Phaser.Math.Vector2(0, 0);
-    }
-
-    const xRatio = this.player.x / Math.max(1, this.maze.width - 1);
-    const yRatio = this.player.y / Math.max(1, this.maze.height - 1);
-    const offsetX = Math.round((0.5 - xRatio) * Math.min(42, this.layout.tileSize * 4));
-    const offsetY = Math.round((0.5 - yRatio) * Math.min(42, this.layout.tileSize * 4));
-    return new Phaser.Math.Vector2(offsetX, offsetY);
+    return new Phaser.Math.Vector2(0, 0);
   }
 
   private fillLegacyMenuDynamicPathTile(
@@ -8508,7 +8484,6 @@ export class MenuScene extends Phaser.Scene {
     });
     let rowY = shell.contentTop;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    this.createOverlayTitle('Settings', shell.titleCenterY);
     if (visibleMessages.length > 0) {
       this.createOverlayPlayerMessageStack(visibleMessages, shell.messageCenterY, panel);
       rowY += Math.max(0, visibleMessages.length - 1) * (compact ? 18 : 19);
@@ -8832,7 +8807,6 @@ export class MenuScene extends Phaser.Scene {
       panel
     });
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand('resume')));
-    this.createOverlayTitle('Paused', shell.titleCenterY);
     if (hasOverlayMessage) {
       this.createOverlayPlayerMessageStack(visibleMessages, shell.messageCenterY, panel);
     }
@@ -9540,30 +9514,6 @@ export class MenuScene extends Phaser.Scene {
         stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'
       },
       {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('smartSteering', this.settings),
-        description: this.settings.smartSteering
-          ? 'Shifts 1 tile at walls.'
-          : 'Stops when a wall blocks you.',
-        label: 'Smart Steering',
-        offLabel: 'Off',
-        onClick: () => this.applyOverlayToggleFieldChange('smartSteering'),
-        onLabel: 'On',
-        section: 'controls',
-        stateText: resolveLegacyOverlayToggleStateText('smartSteering', this.settings.smartSteering) ?? 'Off'
-      },
-      {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings),
-        description: this.settings.toggleCameraFollow
-          ? 'Camera follows you.'
-          : 'Full maze view.',
-        label: 'Camera Follow',
-        offLabel: 'Off',
-        onClick: () => this.applyOverlayToggleFieldChange('toggleCameraFollow'),
-        onLabel: 'On',
-        section: 'controls',
-        stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'
-      },
-      {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
         description: this.settings.toggleTrailFade
           ? 'Old trail fades.'
@@ -9598,18 +9548,6 @@ export class MenuScene extends Phaser.Scene {
         onLabel: 'Animated',
         section: 'display',
         stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Still'
-      },
-      {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings),
-        description: this.settings.darkMode
-          ? 'Darker contrast.'
-          : 'Brighter view.',
-        label: 'High Contrast',
-        offLabel: 'Off',
-        onClick: () => this.applyOverlayToggleFieldChange('darkMode'),
-        onLabel: 'On',
-        section: 'display',
-        stateText: resolveLegacyOverlayToggleStateText('darkMode', this.settings.darkMode) ?? 'Off'
       }
     ];
     const controlsSection = controls.filter((control) => control.section === 'controls');
@@ -10512,8 +10450,11 @@ export class MenuScene extends Phaser.Scene {
       cyberArcadeMaterial.controls.minimumTouchTarget,
       this.layout.width < 480 ? 42 : 46
     );
-    const x = panel.left + Math.round(size * 0.86);
-    const y = panel.top + Math.round(size * 0.82);
+    // Always top-right, tucked into the corner with a small fixed margin --
+    // matches the app-wide back-button placement pattern (no title text to
+    // vertically align against, so it hugs the panel edge instead).
+    const x = panel.left + panel.width - Math.round(size * 0.86);
+    const y = panel.top + 8 + Math.round(size / 2);
     const chrome = this.add.graphics();
     const drawChevronChrome = (active: boolean): void => {
       chrome.clear();
@@ -10935,9 +10876,6 @@ export class MenuScene extends Phaser.Scene {
       this.resetLegacyPlayInputBuffer();
       this.hudDirty = true;
     }
-    if (fieldId === 'smartSteering') {
-      this.resetLegacyPlayDirectionalInputBuffer();
-    }
     if (fieldId === 'toggleTrailPulse') {
       this.legacyPlayTrailPulseNextFrameAtMs = 0;
     }
@@ -10959,9 +10897,6 @@ export class MenuScene extends Phaser.Scene {
     }
     if (result.affectsBoardDynamic) {
       this.boardDynamicDirty = true;
-    }
-    if (fieldId === 'toggleCameraFollow') {
-      this.hudDirty = true;
     }
 
     this.uiDirty = true;

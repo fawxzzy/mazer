@@ -41,12 +41,11 @@ describe('legacy UI standards', () => {
       panel
     })).toEqual({
       actionCenterY: 794,
-      contentHeight: 622,
+      contentHeight: 646,
       contentLeft: 24,
-      contentTop: 84,
+      contentTop: 60,
       contentWidth: 342,
-      messageCenterY: 90,
-      titleCenterY: 60
+      messageCenterY: 66
     });
     expect(LEGACY_UI_MIN_TOUCH_TARGET).toBe(44);
   });

@@ -109,7 +109,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("addSectionHeading('Controls'");
     expect(menuSceneSource).toContain("addSectionHeading('Display'");
     expect(menuSceneSource).toContain("label: 'Animated Background'");
-    expect(menuSceneSource).toContain("label: 'High Contrast'");
+    expect(menuSceneSource).not.toContain("label: 'High Contrast'");
   });
 
   test('aligns title orbit diamonds through the fixed top and bottom crown diamonds', () => {
@@ -1090,7 +1090,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
     expect(menuSceneSource).toContain('this.playDirectionalIntent.step(this.maze, this.player, {');
-    expect(menuSceneSource).toContain('assistedLaneShiftEnabled: this.settings.smartSteering');
+    expect(menuSceneSource).toContain('assistedLaneShiftEnabled: true');
     expect(menuSceneSource).toContain('private tryMovePlayerFromInput(');
     expect(menuSceneSource).toContain('const directions = resolveLegacyCardinalDirectionsFromVector(deltaX, deltaY);');
     expect(menuSceneSource).toContain('return this.performLegacyPlayDirectionalIntentStep();');
@@ -1106,9 +1106,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('worldTurn: {');
   });
 
-  test('keeps camera-follow static and dynamic board layers on the same offset', () => {
+  test('keeps static and dynamic board layers on the same board offset', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
-    const toggleFieldSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyOverlayToggleFields.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardWidth, boardHeight } = this.layout;');
     expect(menuSceneSource).toContain('const boardOffset = this.resolveBoardOffset();');
@@ -1117,9 +1116,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardWidth, boardHeight);');
     expect(menuSceneSource).toContain('this.layout.boardLeft + boardOffset.x');
     expect(menuSceneSource).toContain('this.layout.boardTop + boardOffset.y');
-    expect(menuSceneSource).toContain('if (this.settings.toggleCameraFollow) {');
-    expect(menuSceneSource).toContain('this.boardStaticDirty = true;');
-    expect(toggleFieldSource).toContain('affectsBoardStatic: true');
+    expect(menuSceneSource).not.toContain('toggleCameraFollow');
   });
 
   test('uses rendered play board bounds for compact touch-control avoidance', () => {
@@ -1176,11 +1173,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(toggleFieldSource).toContain('export const resolveLegacyOverlayToggleSwitchIsOn = (');
     expect(toggleFieldSource).toContain("case 'controlMode':");
     expect(toggleFieldSource).toContain("return settings.controlMode === 'stick';");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings)");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings)");
     expect(menuSceneSource).toContain("switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
   });
@@ -1299,8 +1294,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps settings semantic while the compact active-track level baseline stays free of board decorations', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain("this.createOverlayTitle('Settings', shell.titleCenterY);");
-    expect(menuSceneSource).not.toContain("this.createOverlayTitle('Options', shell.titleCenterY);");
+    expect(menuSceneSource).not.toContain("this.createOverlayTitle('Settings'");
+    expect(menuSceneSource).not.toContain("this.createOverlayTitle('Paused'");
     expect(menuSceneSource).toContain("semanticAction: 'Settings'");
     expect(menuSceneSource).toContain("text: 'Settings'");
     expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');

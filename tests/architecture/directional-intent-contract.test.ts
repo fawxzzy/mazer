@@ -27,7 +27,7 @@ describe('directional intent architecture contract', () => {
     expect(intentSource).toContain("type LegacyQueuedDirectionRole = 'turn' | 'fallback';");
     expect(intentSource).toContain('resolveLegacyNavigationTarget(maze, player, delta.x, delta.y)');
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
-    expect(menuSceneSource).toContain('assistedLaneShiftEnabled: this.settings.smartSteering');
+    expect(menuSceneSource).toContain('assistedLaneShiftEnabled: true');
     expect(menuSceneSource).toContain('return this.tryMovePlayer(step.deltaX, step.deltaY);');
     expect(menuSceneSource).toContain('directionalIntent: this.playDirectionalIntent.getDiagnostics()');
   });
