@@ -6912,6 +6912,29 @@ export class MenuScene extends Phaser.Scene {
     this.progressionBadgeLabelText.setVisible(false);
   }
 
+  // "LVL" reads immediately left of the level number as one intuitive pair
+  // instead of the number centered under a label floating up in the corner.
+  // The label shrinks first (via fitLegacyUiTextToWidth) if the pair would
+  // overflow the small square badge frame at wider (two-digit) levels.
+  private layoutLegacyHeaderMetricPair(
+    frame: LegacyHeaderControlFrame,
+    numberText: Phaser.GameObjects.Text,
+    labelText: Phaser.GameObjects.Text,
+    numberScale: number
+  ): void {
+    const inset = Math.max(3, Math.round(frame.width * 0.08));
+    const gap = Math.max(2, Math.round(frame.width * 0.06));
+    const numberWidth = numberText.width * numberScale;
+    const maxLabelFontSize = Math.max(7, Math.round(frame.height * 0.22));
+    const availableLabelWidth = Math.max(8, frame.width - (inset * 2) - gap - numberWidth);
+    this.fitLegacyUiTextToWidth(labelText, availableLabelWidth, maxLabelFontSize, 6, 1);
+    const pairWidth = labelText.width + gap + numberWidth;
+    const pairLeft = frame.centerX - (pairWidth / 2);
+    const centerY = frame.centerY + Math.round(frame.height * 0.06);
+    labelText.setPosition(pairLeft + (labelText.width / 2), centerY);
+    numberText.setPosition(pairLeft + labelText.width + gap + (numberWidth / 2), centerY);
+  }
+
   private drawLegacyProgressionGlyph(
     track: LegacyProgressionState['tracks'][LegacyProgressionTrackId],
     palette: LegacyProgressionPalette
@@ -6934,15 +6957,13 @@ export class MenuScene extends Phaser.Scene {
       .setLineSpacing(0)
       .setPadding(0)
       .setColor(palette.badgeColor)
-      .setPosition(frame.centerX, frame.centerY + Math.round(frame.height * 0.06))
       .setScale(badgePulse)
       .setVisible(true);
     this.progressionBadgeLabelText
       .setText('LVL')
-      .setFontSize(Math.max(9, Math.round(frame.height * 0.2)))
       .setColor(palette.badgeColor)
-      .setPosition(frame.left + Math.round(frame.width * 0.24), frame.top + Math.round(frame.height * 0.2))
       .setVisible(true);
+    this.layoutLegacyHeaderMetricPair(frame, this.progressionBadgeText, this.progressionBadgeLabelText, badgePulse);
 
     const badgeBounds = createVisualRect(frame.left, frame.top, frame.width, frame.height);
     const rawLabelBounds = this.progressionBadgeLabelText.getBounds();
@@ -6994,14 +7015,12 @@ export class MenuScene extends Phaser.Scene {
       .setLineSpacing(0)
       .setPadding(0)
       .setColor(palette.badgeColor)
-      .setPosition(frame.centerX, frame.centerY + Math.round(frame.height * 0.06))
       .setVisible(true);
     this.menuAiProgressionBadgeLabelText
       .setText('LVL')
-      .setFontSize(Math.max(9, Math.round(frame.height * 0.2)))
       .setColor(palette.badgeColor)
-      .setPosition(frame.left + Math.round(frame.width * 0.24), frame.top + Math.round(frame.height * 0.2))
       .setVisible(true);
+    this.layoutLegacyHeaderMetricPair(frame, this.menuAiProgressionBadgeText, this.menuAiProgressionBadgeLabelText, 1);
 
     const badgeBounds = createVisualRect(frame.left, frame.top, frame.width, frame.height);
     const rawLabelBounds = this.menuAiProgressionBadgeLabelText.getBounds();
@@ -8357,9 +8376,9 @@ export class MenuScene extends Phaser.Scene {
     const radius = Math.min(8, Math.max(6, Math.round(Math.min(rect.width, rect.height) * 0.18)));
     graphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, active ? 0.64 : 0.46);
     graphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
-    graphics.lineStyle(2, accentColor, active ? 0.96 : 0.86);
-    graphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
     if (!sparkle) {
+      graphics.lineStyle(2, accentColor, active ? 0.96 : 0.86);
+      graphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
       const notchWidth = Math.max(4, Math.round(rect.width * 0.13));
       const notchHeight = Math.max(2, Math.round(rect.height * 0.07));
       graphics.fillStyle(accentColor, active ? 0.88 : 0.62);
@@ -8373,10 +8392,10 @@ export class MenuScene extends Phaser.Scene {
       );
       return;
     }
-    // Viewfinder-style corner brackets just outside the panel instead of
-    // the plain tech-panel notch -- ties this badge into the same
-    // crystalline/faceted visual family as the title wordmark and the
-    // Start button's facet glints, for the menu-surface header controls
+    // Viewfinder-style corner brackets just outside the panel instead of a
+    // stroked border or the plain tech-panel notch -- ties this badge into
+    // the same crystalline/faceted visual family as the title wordmark and
+    // the Start button's facet glints, for the menu-surface header controls
     // (LVL badge, AI badge, settings cog).
     const gap = 3;
     const facetSize = Math.max(4, Math.round(Math.min(rect.width, rect.height) * 0.22));
@@ -8517,6 +8536,10 @@ export class MenuScene extends Phaser.Scene {
     graphics.fillCircle(rect.centerX, rect.centerY, hubRadius);
     graphics.lineStyle(Math.max(1, Math.round(lineWidth * 0.72)), color, active ? 0.9 : 0.76);
     graphics.strokeCircle(rect.centerX, rect.centerY, hubRadius);
+    // Same cut-gem catchlight as the player/start/goal markers -- ties the
+    // gear into the crystal-facet family instead of reading as a plain
+    // generic tech icon.
+    this.drawLegacyMarkerGemCatchlight(graphics, rect.centerX, rect.centerY, radius, active ? 0.9 : 0.7);
   }
 
   private clearHudTexts(): void {
@@ -10954,7 +10977,12 @@ export class MenuScene extends Phaser.Scene {
     options: { labelRole?: LegacyUiLabelRole } = {}
   ): UiButton {
     const isMenuFrontDoor = this.mode === 'menu' && this.overlay === 'none';
-    const isPrimaryFrontDoorButton = isMenuFrontDoor && text === 'Start';
+    // Both the Start and Login front-door actions share the same borderless
+    // pulsing-glow treatment (drawLegacyMenuPulsingStartGlow) instead of the
+    // bordered cyber panel every other button keeps -- ties the primary menu
+    // action into the title wordmark's crystal/glow language regardless of
+    // which label is showing (signed-out vs signed-in).
+    const isPrimaryFrontDoorButton = isMenuFrontDoor && (text === 'Start' || text === 'Login');
     const frontDoorChrome = isMenuFrontDoor
       ? resolveLegacyMenuButtonChrome({
         width,
