@@ -231,9 +231,9 @@ export interface LegacyToggleRowLayout {
 export const resolveLegacyToggleRowLayout = (
   width: number,
   height: number,
-  hasDescription: boolean
+  hasDescription: boolean,
+  compact: boolean
 ): LegacyToggleRowLayout => {
-  const compact = width < 340;
   const showStateLabel = width >= 286;
   return {
     labelFontSize: hasDescription

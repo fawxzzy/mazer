@@ -1484,7 +1484,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("from '../legacy-runtime/legacyUiStandards';");
     expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, buttonFontSize, options.labelRole ?? 'button')");
     expect(menuSceneSource).toContain("resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title')");
-    expect(menuSceneSource).toContain('resolveLegacyToggleRowLayout(input.width, input.height, hasDescription)');
+    expect(menuSceneSource).toContain('resolveLegacyToggleRowLayout(input.width, input.height, hasDescription, input.compact)');
   });
 
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {

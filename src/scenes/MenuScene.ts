@@ -119,6 +119,7 @@ import {
   type LegacyHeaderControlFrame
 } from '../legacy-runtime/legacyHeaderControl';
 import {
+  LEGACY_UI_COMPACT_BREAKPOINT,
   resolveLegacyFeatureControlLayout,
   resolveLegacyOverlayContentFlowLayout,
   resolveLegacyOverlayPanelLayout,
@@ -8456,7 +8457,7 @@ export class MenuScene extends Phaser.Scene {
     panel: OverlayPanelFrame,
     options: { includeMovementSpeed?: boolean; showDescriptions?: boolean } = {}
   ): number {
-    const stacked = panel.width < 420;
+    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const controlLayout = resolveLegacyFeatureControlLayout(panel.width, options.showDescriptions === true);
     const rowHeight = controlLayout.rowHeight;
     const rowGap = controlLayout.rowGap;
@@ -8543,7 +8544,7 @@ export class MenuScene extends Phaser.Scene {
 
   private buildOptionsOverlay(): void {
     const panel = this.resolveOverlayPanelFrame('options');
-    const compact = panel.width < 420;
+    const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const showAdvancedOptions = this.shouldShowLegacyAdvancedOptions();
     const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
     const actionButtonHeight = compact ? 44 : 48;
@@ -8630,7 +8631,7 @@ export class MenuScene extends Phaser.Scene {
       viewport?: VisualRect | null;
     } = {}
   ): number {
-    const compact = panel.width < 420;
+    const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const guideLayout = resolveLegacyOptionsGuideLayout(panel.width);
     const cardHeight = guideLayout.cardHeight;
     const rightGutter = options.rightGutter ?? 0;
@@ -8805,7 +8806,7 @@ export class MenuScene extends Phaser.Scene {
       viewport?: VisualRect | null;
     } = {}
   ): void {
-    const compact = panel.width < 420;
+    const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const label = 'Account';
     const buttonWidth = Math.min(panel.width - 72, compact ? 190 : 220);
     const buttonHeight = compact ? 44 : 48;
@@ -8837,7 +8838,7 @@ export class MenuScene extends Phaser.Scene {
 
   private buildPauseOverlay(): void {
     const panel = this.resolveOverlayPanelFrame('pause');
-    const stacked = panel.width < 420;
+    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
     const hasOverlayMessage = visibleMessages.length > 0;
     const actionButtonHeight = stacked ? cyberArcadeMaterial.controls.minimumTouchTarget : 48;
@@ -8918,7 +8919,7 @@ export class MenuScene extends Phaser.Scene {
 
   private buildProgressionResetConfirmationOverlay(): void {
     const panel = this.resolveOverlayPanelFrame('confirm-progression-reset');
-    const compact = panel.width < 420;
+    const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const buttonHeight = compact ? 44 : 48;
     const buttonWidth = Math.min(panel.width - 72, compact ? 240 : 280);
     const bodyWidth = Math.min(panel.width - 72, compact ? 300 : 440);
@@ -8954,7 +8955,7 @@ export class MenuScene extends Phaser.Scene {
 
   private buildAuthOverlay(): void {
     const panel = this.resolveOverlayPanelFrame('auth');
-    const stacked = panel.width < 420;
+    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const fieldWidth = Math.min(panel.width - 56, stacked ? 330 : 420);
     const fieldHeight = stacked ? 48 : 52;
     const buttonHeight = stacked ? 46 : 50;
@@ -9198,7 +9199,7 @@ export class MenuScene extends Phaser.Scene {
     y: number,
     panel: OverlayPanelFrame
   ): void {
-    const stacked = panel.width < 420;
+    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const cardGap = stacked ? 34 : 38;
     const firstY = y - (((messages.length - 1) * cardGap) / 2);
 
@@ -9219,7 +9220,7 @@ export class MenuScene extends Phaser.Scene {
       align: 'center',
       color,
       fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${fontSize ?? (panel.width < 420 ? 16 : 18)}px`,
+      fontSize: `${fontSize ?? (panel.width < LEGACY_UI_COMPACT_BREAKPOINT ? 16 : 18)}px`,
       wordWrap: { width: maxWidth, useAdvancedWrap: true }
     })), maxWidth, fontSize ?? 18, 11).setOrigin(0.5);
     this.uiTexts.push(label);
@@ -9230,7 +9231,7 @@ export class MenuScene extends Phaser.Scene {
     y: number,
     panel: OverlayPanelFrame
   ): void {
-    const stacked = panel.width < 420;
+    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const width = Math.min(panel.width - 56, stacked ? 330 : 420);
     const height = stacked ? 56 : 62;
     const background = this.add.rectangle(panel.centerX, y, width, height, 0x07131d, 1);
@@ -9329,7 +9330,7 @@ export class MenuScene extends Phaser.Scene {
     y: number,
     panel: OverlayPanelFrame
   ): void {
-    const stacked = panel.width < 420;
+    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const cardWidth = Math.min(panel.width - (stacked ? 56 : 92), stacked ? 330 : 430);
     const cardHeight = stacked ? 30 : 34;
     const cardLeft = panel.centerX - (cardWidth / 2);
@@ -9489,7 +9490,7 @@ export class MenuScene extends Phaser.Scene {
       viewport?: VisualRect | null;
     } = {}
   ): number {
-    const stacked = panel.width < 420;
+    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const left = panel.left + 28;
     const width = panel.width - 56 - (options.rightGutter ?? 0);
     const showDescriptions = options.showDescriptions === true;
@@ -9619,6 +9620,7 @@ export class MenuScene extends Phaser.Scene {
         this.uiButtons.push(
           this.createToggleSwitchRow({
             checked: control.checked,
+            compact: stacked,
             description: showDescriptions ? control.description : undefined,
             label: control.label,
             offLabel: control.offLabel,
@@ -9677,6 +9679,7 @@ export class MenuScene extends Phaser.Scene {
 
   private createToggleSwitchRow(input: {
     checked: boolean;
+    compact: boolean;
     description?: string;
     height: number;
     label: string;
@@ -9693,7 +9696,7 @@ export class MenuScene extends Phaser.Scene {
     const rowStroke = input.checked ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
     const stateColor = input.checked ? '#72e0bf' : '#b7f2ff';
     const hasDescription = Boolean(input.description);
-    const uiLayout = resolveLegacyToggleRowLayout(input.width, input.height, hasDescription);
+    const uiLayout = resolveLegacyToggleRowLayout(input.width, input.height, hasDescription, input.compact);
     const rowPaddingX = uiLayout.rowPaddingX;
     const trackWidth = uiLayout.trackWidth;
     const trackHeight = uiLayout.trackHeight;
@@ -10326,7 +10329,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private createOverlayTitle(text: string, y: number): void {
-    const fontSize = this.layout.width < 420 ? 24 : (this.layout.width < 480 ? 28 : 34);
+    const fontSize = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT ? 24 : (this.layout.width < 480 ? 28 : 34);
     const label = this.padLegacyUiText(this.add.text(
       this.layout.width / 2,
       resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title'),
@@ -10345,7 +10348,7 @@ export class MenuScene extends Phaser.Scene {
     y: number,
     panel: OverlayPanelFrame
   ): number {
-    const stacked = panel.width < 420;
+    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const labelX = panel.left + 28;
     const rowLabel = this.padLegacyUiText(this.add.text(labelX, y, label, {
       fontFamily: LEGACY_UI_FONT_FAMILY,
@@ -10373,7 +10376,7 @@ export class MenuScene extends Phaser.Scene {
     panel: OverlayPanelFrame,
     color: { r: number; g: number; b: number }
   ): number {
-    const stacked = panel.width < 420;
+    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const swatch = linearColorToHex(color);
 
     const rowLabel = this.padLegacyUiText(this.add.text(panel.left + 28, y, label, {

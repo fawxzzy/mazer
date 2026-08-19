@@ -86,9 +86,9 @@ describe('legacy UI standards', () => {
   });
 
   test('shows state copy on normal phone rows and keeps an inline fallback for narrower rows', () => {
-    const narrow = resolveLegacyToggleRowLayout(283, 46, false);
-    const compact = resolveLegacyToggleRowLayout(300, 46, false);
-    const wide = resolveLegacyToggleRowLayout(380, 70, true);
+    const narrow = resolveLegacyToggleRowLayout(283, 46, false, true);
+    const compact = resolveLegacyToggleRowLayout(300, 46, false, true);
+    const wide = resolveLegacyToggleRowLayout(380, 70, true, false);
 
     expect(narrow.showStateLabel).toBe(false);
     expect(narrow.stateLaneWidth).toBe(0);
