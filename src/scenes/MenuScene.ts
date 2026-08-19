@@ -958,13 +958,13 @@ const LEGACY_UI_FONT_FAMILY = cyberArcadeMaterial.typography.ui;
 const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
 const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
-// Pulsating glow ring drawn around the primary Start button in place of a
-// filled/bordered panel -- see drawLegacyMenuPulsingStartGlow. Uses the same
+// Pulsating text glow applied directly to the Start/Login label in place of
+// any button shape -- see applyLegacyMenuFrontDoorTextGlow. Uses the same
 // cyan the title's prism sweep uses (LEGACY_MENU_PATH_TITLE_PRISM, defined
-// below) so the button reads as part of the same gem/crystal family instead
+// below) so the label reads as part of the same gem/crystal family instead
 // of a generic white outline.
 const LEGACY_MENU_START_GLOW_COLOR = cyberArcadeMaterial.rail.cyan;
-const LEGACY_MENU_START_GLOW_FILL_COLOR = cyberArcadeMaterial.path.core;
+const LEGACY_MENU_START_GLOW_COLOR_CSS = toCyberArcadeCssHex(LEGACY_MENU_START_GLOW_COLOR);
 const LEGACY_MENU_START_GLOW_PULSE_MS = 1600;
 // Wider dim-to-bright swing and thicker strokes than a first pass -- per
 // feedback the original glow (0.32-0.82 alpha, 1.75px core line) read as
@@ -6915,19 +6915,24 @@ export class MenuScene extends Phaser.Scene {
   // "LVL" reads immediately left of the level number as one intuitive pair
   // instead of the number centered under a label floating up in the corner.
   // The label shrinks first (via fitLegacyUiTextToWidth) if the pair would
-  // overflow the small square badge frame at wider (two-digit) levels.
+  // overflow the small square badge frame at wider (two-digit) levels. There
+  // is no background panel behind this pair any more -- a dark stroke on
+  // both texts is what keeps them readable over the animated board instead.
   private layoutLegacyHeaderMetricPair(
     frame: LegacyHeaderControlFrame,
     numberText: Phaser.GameObjects.Text,
     labelText: Phaser.GameObjects.Text,
     numberScale: number
   ): void {
-    const inset = Math.max(3, Math.round(frame.width * 0.08));
+    const inset = Math.max(2, Math.round(frame.width * 0.04));
     const gap = Math.max(2, Math.round(frame.width * 0.06));
+    const strokeThickness = Math.max(2, Math.round(frame.width * 0.09));
+    numberText.setStroke('#02040a', strokeThickness);
+    labelText.setStroke('#02040a', Math.max(1, Math.round(strokeThickness * 0.7)));
     const numberWidth = numberText.width * numberScale;
-    const maxLabelFontSize = Math.max(7, Math.round(frame.height * 0.22));
+    const maxLabelFontSize = Math.max(9, Math.round(frame.height * 0.3));
     const availableLabelWidth = Math.max(8, frame.width - (inset * 2) - gap - numberWidth);
-    this.fitLegacyUiTextToWidth(labelText, availableLabelWidth, maxLabelFontSize, 6, 1);
+    this.fitLegacyUiTextToWidth(labelText, availableLabelWidth, maxLabelFontSize, 7, 1);
     const pairWidth = labelText.width + gap + numberWidth;
     const pairLeft = frame.centerX - (pairWidth / 2);
     const centerY = frame.centerY + Math.round(frame.height * 0.06);
@@ -6949,7 +6954,9 @@ export class MenuScene extends Phaser.Scene {
       width: this.layout.width
     });
     const badgePulse = this.resolveLegacyProgressionBadgePulse();
-    this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false, true);
+    // No background panel, tint, or border here any more -- the level
+    // number and its "LVL" label are the whole control, sized to fill the
+    // frame instead of sitting inside a chrome-bordered box.
     this.progressionBadgeText
       .setText(String(track.level))
       .setFontSize(resolveLegacyHeaderControlMetricFontSize(track.level, frame.width))
@@ -7007,7 +7014,6 @@ export class MenuScene extends Phaser.Scene {
       slot: 0,
       width: this.layout.width
     });
-    this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false, true);
     this.menuAiProgressionBadgeText
       .setText(String(aiTrack.level))
       .setFontSize(resolveLegacyHeaderControlMetricFontSize(aiTrack.level, frame.width))
@@ -7056,14 +7062,11 @@ export class MenuScene extends Phaser.Scene {
       placement: 'trailing',
       width: this.layout.width
     });
-    this.drawLegacyHeaderControlChrome(
-      this.boardDynamicGraphics,
-      frame,
-      this.menuSettingsCogActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,
-      this.menuSettingsCogActive,
-      true
-    );
-    this.drawLegacySettingsCog(this.boardDynamicGraphics, frame, this.menuSettingsCogActive);
+    // No background panel, tint, or border -- the gear is the whole control,
+    // enlarged to fill the frame instead of sitting inside a chrome-bordered
+    // box (the in-play touch pause cog keeps its smaller default ratio,
+    // since that one still has a panel behind it to leave room inside).
+    this.drawLegacySettingsCog(this.boardDynamicGraphics, frame, this.menuSettingsCogActive, 0.42);
   }
 
   private hasLegacyProgressionBadgePulsePendingFrame(time: number): boolean {
@@ -7800,24 +7803,17 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  // The primary Start button has no fill or solid stroke -- just a soft
-  // white glow tracing its outline that breathes continuously. Phaser's
-  // canvas renderer has no native blur/glow filter, so the "glow" is faked
-  // with a few concentric strokes offset outward from the button's edge at
-  // decreasing opacity (wide + faint furthest out, thin + crisp right at the
-  // edge), redrawn every frame from updateFrame with a time-based sine pulse.
-  // Uses the same standard corner radius as every other button/panel rather
-  // than a full pill, so it reads as one of the family, not a one-off shape.
-  private drawLegacyMenuPulsingStartGlow(
-    graphics: Phaser.GameObjects.Graphics,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
+  // The primary Start/Login action has no button shape at all -- no fill, no
+  // stroke, no panel -- it is glowing TEXT, full stop, matching the title
+  // wordmark's own borderless look. The glow is a stroke directly on the
+  // text glyphs plus a soft blurred shadow (Phaser's built-in text shadow
+  // doubles as a cheap glow since the canvas renderer has no blur filter),
+  // both breathing continuously via a time-based sine pulse from updateFrame.
+  private applyLegacyMenuFrontDoorTextGlow(
+    label: Phaser.GameObjects.Text,
     time: number,
     active: boolean
   ): void {
-    graphics.clear();
     const phase = (Math.sin((time / LEGACY_MENU_START_GLOW_PULSE_MS) * Math.PI * 2) + 1) / 2;
     const pulseAlpha = clamp(
       LEGACY_MENU_START_GLOW_MIN_ALPHA
@@ -7826,67 +7822,9 @@ export class MenuScene extends Phaser.Scene {
       0,
       1
     );
-    const left = x - (width / 2);
-    const top = y - (height / 2);
-    const baseRadius = this.resolveLegacyRoundedRectRadius(width, height, LEGACY_UI_CONTROL_RADIUS);
-    // A faint pale-mint fill wash first -- the same path.core tone the
-    // title's glyph cells use -- so the button reads as a lit gem panel
-    // instead of a hollow outline floating over the void.
-    graphics.fillStyle(LEGACY_MENU_START_GLOW_FILL_COLOR, Math.min(0.16, 0.05 + (pulseAlpha * 0.09)));
-    graphics.fillRoundedRect(left, top, width, height, baseRadius);
-    // Thicker at every layer than a first pass, plus a wider outer wash --
-    // a bolder, more visible glow rather than a thin outline.
-    const layers = [
-      { alphaScale: 0.24, inset: -10, lineWidth: 9 },
-      { alphaScale: 0.46, inset: -5, lineWidth: 5 },
-      { alphaScale: 1, inset: 0, lineWidth: 3 }
-    ];
-    for (const layer of layers) {
-      graphics.lineStyle(layer.lineWidth, LEGACY_MENU_START_GLOW_COLOR, Math.min(1, pulseAlpha * layer.alphaScale));
-      graphics.strokeRoundedRect(
-        left + layer.inset,
-        top + layer.inset,
-        Math.max(1, width - (layer.inset * 2)),
-        Math.max(1, height - (layer.inset * 2)),
-        Math.max(1, baseRadius - layer.inset)
-      );
-    }
-    this.drawLegacyMenuStartGlowFacets(graphics, left, top, width, height, baseRadius, time, pulseAlpha);
-  }
-
-  // Small corner facet glints, echoing the title glyph's gem-facet sparkle
-  // language (drawLegacyMenuPathTitleGemFacets) at a much smaller scale --
-  // ties the Start button into the same crystalline visual family instead
-  // of leaving it as a plain glowing outline.
-  private drawLegacyMenuStartGlowFacets(
-    graphics: Phaser.GameObjects.Graphics,
-    left: number,
-    top: number,
-    width: number,
-    height: number,
-    radius: number,
-    time: number,
-    pulseAlpha: number
-  ): void {
-    const facetLength = Math.max(6, Math.min(16, Math.round(Math.min(width, height) * 0.14)));
-    const facetInset = Math.max(4, Math.round(radius * 0.7));
-    const corners = [
-      { x: left + facetInset, y: top + facetInset, dx: 1, dy: 1, phaseOffset: 0 },
-      { x: (left + width) - facetInset, y: top + facetInset, dx: -1, dy: 1, phaseOffset: 0.5 },
-      { x: left + facetInset, y: (top + height) - facetInset, dx: 1, dy: -1, phaseOffset: 0.75 },
-      { x: (left + width) - facetInset, y: (top + height) - facetInset, dx: -1, dy: -1, phaseOffset: 0.25 }
-    ];
-    for (const corner of corners) {
-      const glintPhase = (Math.sin((time / 900) + (corner.phaseOffset * Math.PI * 2)) + 1) / 2;
-      const glintAlpha = Math.min(0.85, pulseAlpha * (0.3 + (glintPhase * 0.55)));
-      graphics.lineStyle(1.4, LEGACY_MENU_START_GLOW_COLOR, glintAlpha);
-      graphics.beginPath();
-      graphics.moveTo(corner.x, corner.y);
-      graphics.lineTo(corner.x + (corner.dx * facetLength), corner.y);
-      graphics.moveTo(corner.x, corner.y);
-      graphics.lineTo(corner.x, corner.y + (corner.dy * facetLength));
-      graphics.strokePath();
-    }
+    const strokeThickness = Math.max(2, Math.round(2 + (phase * 2) + (active ? 1 : 0)));
+    label.setStroke(LEGACY_MENU_START_GLOW_COLOR_CSS, strokeThickness);
+    label.setShadow(0, 0, LEGACY_MENU_START_GLOW_COLOR_CSS, 6 + (pulseAlpha * 10) + (active ? 4 : 0), false, true);
   }
 
   private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number {
@@ -8506,9 +8444,10 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacySettingsCog(
     graphics: Phaser.GameObjects.Graphics,
     rect: Pick<VisualRect, 'centerX' | 'centerY' | 'height' | 'width'>,
-    active = false
+    active = false,
+    radiusRatio = 0.2
   ): void {
-    const radius = Math.max(7, Math.round(Math.min(rect.width, rect.height) * 0.2));
+    const radius = Math.max(7, Math.round(Math.min(rect.width, rect.height) * radiusRatio));
     const toothInnerRadius = Math.max(5, Math.round(radius * 0.72));
     const toothOuterRadius = Math.max(toothInnerRadius + 3, Math.round(radius * 1.26));
     const hubRadius = Math.max(3, Math.round(radius * 0.38));
@@ -11016,11 +10955,13 @@ export class MenuScene extends Phaser.Scene {
       });
     };
     let primaryButtonActive = false;
-    if (isPrimaryFrontDoorButton) {
-      this.drawLegacyMenuPulsingStartGlow(panel, x, y, width, height, 0, false);
-    } else {
+    if (!isPrimaryFrontDoorButton) {
       drawButtonPanel(false);
     }
+    // The primary front-door button has no panel shape at all -- panel stays
+    // empty and the glow lives on the label text itself instead (see
+    // applyLegacyMenuFrontDoorTextGlow), so it reads as glowing text rather
+    // than text sitting inside a bordered/pill-shaped button.
 
     const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
@@ -11048,6 +10989,9 @@ export class MenuScene extends Phaser.Scene {
       0.96
     );
     this.uiTexts.push(label);
+    if (isPrimaryFrontDoorButton) {
+      this.applyLegacyMenuFrontDoorTextGlow(label, 0, false);
+    }
 
     const setActive = (active: boolean): void => {
       background.setFillStyle(
@@ -11076,7 +11020,7 @@ export class MenuScene extends Phaser.Scene {
       text,
       updateFrame: isPrimaryFrontDoorButton
         ? (time: number) => {
-          this.drawLegacyMenuPulsingStartGlow(panel, x, y, width, height, time, primaryButtonActive);
+          this.applyLegacyMenuFrontDoorTextGlow(label, time, primaryButtonActive);
         }
         : undefined,
       destroy: () => {

@@ -1281,7 +1281,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,');
     expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(): void');
     expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog();');
-    expect(menuSceneSource).toContain('this.drawLegacySettingsCog(this.boardDynamicGraphics, frame, this.menuSettingsCogActive);');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCog(this.boardDynamicGraphics, frame, this.menuSettingsCogActive, 0.42);');
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
@@ -1428,7 +1428,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.progressionBadgeText');
     expect(menuSceneSource).toContain('.setText(String(track.level))');
     expect(menuSceneSource).toContain('.setColor(palette.badgeColor)');
-    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false, true);');
+    expect(menuSceneSource).toContain('this.layoutLegacyHeaderMetricPair(frame, this.progressionBadgeText, this.progressionBadgeLabelText, badgePulse);');
     expect(menuSceneSource).toContain('resolveLegacyHeaderControlMetricFontSize(track.level, frame.width)');
   });
 
@@ -1459,7 +1459,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const laneHeight = this.layout.lanes.hud?.height ?? 64;');
     expect(menuSceneSource).toContain('const frame = resolveLegacyHeaderControlFrame({');
     expect(menuSceneSource).toContain("placement: 'leading'");
-    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false, true);');
+    expect(menuSceneSource).toContain('this.layoutLegacyHeaderMetricPair(frame, this.progressionBadgeText, this.progressionBadgeLabelText, badgePulse);');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayProgressionBadgeCenterY');
     expect(menuSceneSource).not.toContain('resolveLegacyMenuProgressionBadgeCenterY');
     expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');

@@ -88,7 +88,7 @@ const LEGACY_MENU_PATH_TITLE_PATTERNS = [
 ] as const;
 
 const LEGACY_MENU_PATH_TITLE_LETTER_COLUMNS = 5;
-const LEGACY_MENU_PATH_TITLE_LETTER_GAP_COLUMNS = 2;
+const LEGACY_MENU_PATH_TITLE_LETTER_GAP_COLUMNS = 4;
 const LEGACY_MENU_PATH_TITLE_ROWS = 7;
 
 const buildLegacyMenuPathTitleCells = (): LegacyMenuPathTitleCell[] => {

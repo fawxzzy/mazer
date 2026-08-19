@@ -92,20 +92,20 @@ describe('legacy menu title presentation', () => {
   test('builds the menu title from reusable maze path cells', () => {
     const layout = resolveLegacyMenuPathTitleLayout(200, 72, 72);
 
-    expect(LEGACY_MENU_PATH_TITLE_COLUMNS).toBe(33);
+    expect(LEGACY_MENU_PATH_TITLE_COLUMNS).toBe(41);
     expect(LEGACY_MENU_PATH_TITLE_CELLS).toHaveLength(87);
     expect(layout.cells).toBe(LEGACY_MENU_PATH_TITLE_CELLS);
     expect(layout.grid).toBe(LEGACY_MENU_PATH_TITLE_GRID);
     expect(layout.cellSize).toBe(8);
     expect(layout.coreInset).toBe(1);
-    expect(layout.width).toBe(264);
+    expect(layout.width).toBe(328);
     expect(layout.height).toBe(56);
-    expect(layout.left).toBe(68);
+    expect(layout.left).toBe(36);
     expect(layout.top).toBe(44);
     expect(layout.cells[0]).toEqual({ column: 0, row: 0, order: 0 });
-    expect(layout.cells.at(-1)).toEqual({ column: 32, row: 6, order: 86 });
+    expect(layout.cells.at(-1)).toEqual({ column: 40, row: 6, order: 86 });
     expect(layout.grid[0]?.[0]).toBe(true);
     expect(layout.grid[0]?.[1]).toBe(false);
-    expect(layout.grid[6]?.[32]).toBe(true);
+    expect(layout.grid[6]?.[40]).toBe(true);
   });
 });
