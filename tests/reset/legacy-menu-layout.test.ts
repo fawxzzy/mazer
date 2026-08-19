@@ -49,11 +49,12 @@ describe('legacy menu layout', () => {
     expect(layout.boardSize).toBeGreaterThanOrEqual(700);
     expect(layout.leftButtonX).toBeLessThan(layout.centerButtonX);
     expect(layout.rightButtonX).toBeGreaterThan(layout.centerButtonX);
-    // The primary Start button is now a wide bottom-docked pill (see
-    // MenuScene.ts's primaryButtonWidth), not derived from this row-of-three
-    // geometry at all -- that geometry (buttonWidth/leftButtonX/rightButtonX)
-    // is preserved correctly (verified overlap-free) for any future
-    // three-button row consumer, but no longer describes what's on screen.
+    // The primary Start button now reuses centerButtonWidth directly (see
+    // MenuScene.ts's primaryButtonWidth) as a normal compact button rather
+    // than the row-of-three geometry's flanking buttons -- leftButtonX/
+    // rightButtonX/buttonWidth are preserved correctly (verified
+    // overlap-free) for any future three-button row consumer, but no longer
+    // describe what's on screen.
     expect(layout.buttonWidth).toBeGreaterThanOrEqual(220);
     expect(layout.buttonWidth).toBeLessThanOrEqual(238);
     // This wide desktop viewport has plenty of header-row gap, so the title

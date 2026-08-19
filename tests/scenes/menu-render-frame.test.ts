@@ -1265,9 +1265,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('frontDoorChrome?.hoverFillColor ?? cyberArcadeMaterial.substrate.panelActive');
     expect(menuSceneSource).toContain('frontDoorChrome?.fillColor ?? LEGACY_CYBER_PANEL_FILL');
     expect(menuSceneSource).toContain('stroke: frontDoorChrome?.strokeColor');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_ACTION_GREEN = toCyberArcadeCssHex(cyberArcadeMaterial.signal.player);');
     expect(menuSceneSource).toContain('const buttonTextColor = isPrimaryFrontDoorButton');
-    expect(menuSceneSource).toContain('? LEGACY_MENU_ACTION_GREEN');
+    expect(menuSceneSource).toContain('? MENU_TEXT_COLOR');
     expect(menuSceneSource).toContain('private createLegacyMenuSettingsCogButton(onClick: () => void): UiButton');
     expect(menuSceneSource).toContain("semanticAction: 'Settings'");
     expect(menuSceneSource).toContain("text: 'Settings'");

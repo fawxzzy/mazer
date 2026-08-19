@@ -958,7 +958,6 @@ const LEGACY_UI_FONT_FAMILY = cyberArcadeMaterial.typography.ui;
 const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
 const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
-const LEGACY_MENU_ACTION_GREEN = toCyberArcadeCssHex(cyberArcadeMaterial.signal.player);
 // Pulsating white glow ring drawn around the primary Start button in place
 // of a filled/bordered panel -- see drawLegacyMenuPulsingStartGlow.
 const LEGACY_MENU_START_GLOW_COLOR = cyberArcadeMaterial.rail.white;
@@ -7563,11 +7562,13 @@ export class MenuScene extends Phaser.Scene {
   }
 
   // The primary Start button has no fill or solid stroke -- just a soft
-  // white glow tracing its pill outline that breathes continuously. Phaser's
+  // white glow tracing its outline that breathes continuously. Phaser's
   // canvas renderer has no native blur/glow filter, so the "glow" is faked
-  // with a few concentric strokes offset outward from the pill edge at
+  // with a few concentric strokes offset outward from the button's edge at
   // decreasing opacity (wide + faint furthest out, thin + crisp right at the
   // edge), redrawn every frame from updateFrame with a time-based sine pulse.
+  // Uses the same standard corner radius as every other button/panel rather
+  // than a full pill, so it reads as one of the family, not a one-off shape.
   private drawLegacyMenuPulsingStartGlow(
     graphics: Phaser.GameObjects.Graphics,
     x: number,
@@ -7588,7 +7589,7 @@ export class MenuScene extends Phaser.Scene {
     );
     const left = x - (width / 2);
     const top = y - (height / 2);
-    const baseRadius = this.resolveLegacyRoundedRectRadius(width, height, height / 2);
+    const baseRadius = this.resolveLegacyRoundedRectRadius(width, height, LEGACY_UI_CONTROL_RADIUS);
     // Thicker at every layer than a first pass, plus a wider outer wash --
     // a bolder, more visible glow rather than a thin outline.
     const layers = [
@@ -8267,14 +8268,10 @@ export class MenuScene extends Phaser.Scene {
       if (this.mode === 'menu') {
         const [startLabel] = MAIN_MENU_BUTTONS;
         const isAuthenticated = this.authSnapshot.status === 'authenticated';
-        // Bottom-dock button: wide like the Fitness app's full-width
-        // BottomDockButton, not the old ~34%-of-width centered button.
-        // Capped so it doesn't look absurd on a wide desktop window.
-        const primaryButtonWidth = Math.round(clamp(
-          this.layout.width - (this.layout.width > this.layout.height ? 64 : 32),
-          160,
-          520
-        ));
+        // A normal compact button (the same width the row-of-three action
+        // geometry already computes), not a full-width bottom-dock bar --
+        // per feedback that the wide dock-style bar didn't work.
+        const primaryButtonWidth = this.layout.centerButtonWidth;
 
         if (!isAuthenticated) {
           this.uiButtons.push(
@@ -10469,7 +10466,7 @@ export class MenuScene extends Phaser.Scene {
       Math.min(40, Math.min(Math.round(height * 0.46), textFitSize))
     );
     const buttonTextColor = isPrimaryFrontDoorButton
-      ? LEGACY_MENU_ACTION_GREEN
+      ? MENU_TEXT_COLOR
       : frontDoorChrome?.textColor ?? MENU_TEXT_COLOR;
 
     const labelY = resolveLegacyUiLabelCenterY(y, buttonFontSize, options.labelRole ?? 'button');
