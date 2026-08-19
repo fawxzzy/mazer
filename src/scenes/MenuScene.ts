@@ -2740,7 +2740,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (lowerKey === 't' && this.mode === 'play' && (this.overlay === 'none' || this.overlay === 'pause')) {
       event.preventDefault();
-      this.applyLegacyOverlayToggleField('toggleTrailFade');
+      this.applyOverlayToggleFieldChange('toggleTrailFade');
       return true;
     }
 
@@ -9525,7 +9525,7 @@ export class MenuScene extends Phaser.Scene {
           : 'Full maze view.',
         label: 'Camera Follow',
         offLabel: 'Off',
-        onClick: () => this.applyLegacyOverlayToggleField('toggleCameraFollow'),
+        onClick: () => this.applyOverlayToggleFieldChange('toggleCameraFollow'),
         onLabel: 'On',
         stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'
       },
@@ -9536,7 +9536,7 @@ export class MenuScene extends Phaser.Scene {
           : 'Trail stays.',
         label: 'Trail Fade',
         offLabel: 'Off',
-        onClick: () => this.applyLegacyOverlayToggleField('toggleTrailFade'),
+        onClick: () => this.applyOverlayToggleFieldChange('toggleTrailFade'),
         onLabel: 'On',
         stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'
       },
@@ -9547,7 +9547,7 @@ export class MenuScene extends Phaser.Scene {
           : 'No trail shine.',
         label: 'Trail Shine',
         offLabel: 'Off',
-        onClick: () => this.applyLegacyOverlayToggleField('toggleTrailPulse'),
+        onClick: () => this.applyOverlayToggleFieldChange('toggleTrailPulse'),
         onLabel: 'On',
         stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'
       },
@@ -9558,7 +9558,7 @@ export class MenuScene extends Phaser.Scene {
           : 'Background still.',
         label: 'Animated Background',
         offLabel: 'Still',
-        onClick: () => this.applyLegacyOverlayToggleField('toggleAnimatedBackdrop'),
+        onClick: () => this.applyOverlayToggleFieldChange('toggleAnimatedBackdrop'),
         onLabel: 'Animated',
         stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Still'
       },
@@ -9569,7 +9569,7 @@ export class MenuScene extends Phaser.Scene {
           : 'Brighter view.',
         label: 'High Contrast',
         offLabel: 'Off',
-        onClick: () => this.applyLegacyOverlayToggleField('darkMode'),
+        onClick: () => this.applyOverlayToggleFieldChange('darkMode'),
         onLabel: 'On',
         stateText: resolveLegacyOverlayToggleStateText('darkMode', this.settings.darkMode) ?? 'Off'
       },
@@ -9580,7 +9580,7 @@ export class MenuScene extends Phaser.Scene {
           : 'Tap arrows to move.',
         label: 'Control Style',
         offLabel: 'Arrows',
-        onClick: () => this.applyLegacyOverlayToggleField('controlMode'),
+        onClick: () => this.applyOverlayToggleFieldChange('controlMode'),
         onLabel: 'Stick',
         stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'
       },
@@ -9591,7 +9591,7 @@ export class MenuScene extends Phaser.Scene {
           : 'Stops when a wall blocks you.',
         label: 'Smart Steering',
         offLabel: 'Off',
-        onClick: () => this.applyLegacyOverlayToggleField('smartSteering'),
+        onClick: () => this.applyOverlayToggleFieldChange('smartSteering'),
         onLabel: 'On',
         stateText: resolveLegacyOverlayToggleStateText('smartSteering', this.settings.smartSteering) ?? 'Off'
       }
@@ -10869,7 +10869,7 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
-  private applyLegacyOverlayToggleField(fieldId: LegacyOverlayToggleFieldId): void {
+  private applyOverlayToggleFieldChange(fieldId: LegacyOverlayToggleFieldId): void {
     const result = applyLegacyOverlayToggleField(this.settings, fieldId);
     this.settings = writeLegacyGameToggleSettings(this.resolveLegacyGameToggleStorage(), result.settings);
     this.syncLegacyRemoteSettings();
