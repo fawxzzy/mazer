@@ -1234,6 +1234,7 @@ export class MenuScene extends Phaser.Scene {
   private uiButtons: UiButton[] = [];
   private overlayBackChevronBounds: VisualRect | null = null;
   private overlayGuideBounds: VisualRect | null = null;
+  private overlayGuideExpanded = false;
   private overlayScrollOffset = 0;
   private overlayScrollMax = 0;
   private overlayScrollContentHeight = 0;
@@ -8579,7 +8580,7 @@ export class MenuScene extends Phaser.Scene {
       const contentFlow = resolveLegacyOverlayContentFlowLayout({
         contentTop: viewport.top,
         controlsHeight: controlContentHeight,
-        guideHeight: resolveLegacyOptionsGuideLayout(panel.width).cardHeight,
+        guideHeight: this.resolveLegacyOptionsGuideEffectiveHeight(panel.width),
         panelWidth: panel.width
       });
       const scrollMetrics = resolveLegacyOverlayScrollMetrics({
@@ -8623,6 +8624,15 @@ export class MenuScene extends Phaser.Scene {
     this.createLegacyOptionsAccountActionRow(panel);
   }
 
+  // The Guide card's actual on-screen height depends on overlayGuideExpanded
+  // -- callers computing where content below it should start must use this
+  // instead of the layout's cardHeight (which is always the expanded size),
+  // or they'd reserve extra space above the toggle list while collapsed.
+  private resolveLegacyOptionsGuideEffectiveHeight(panelWidth: number): number {
+    const guideLayout = resolveLegacyOptionsGuideLayout(panelWidth);
+    return this.overlayGuideExpanded ? guideLayout.cardHeight : guideLayout.collapsedHeight;
+  }
+
   private createLegacyOptionsInfoSection(
     rowY: number,
     panel: OverlayPanelFrame,
@@ -8635,7 +8645,8 @@ export class MenuScene extends Phaser.Scene {
   ): number {
     const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const guideLayout = resolveLegacyOptionsGuideLayout(panel.width);
-    const cardHeight = guideLayout.cardHeight;
+    const expanded = this.overlayGuideExpanded;
+    const cardHeight = expanded ? guideLayout.cardHeight : guideLayout.collapsedHeight;
     const rightGutter = options.rightGutter ?? 0;
     const cardWidth = Math.min(
       panel.width - guideLayout.horizontalMargin - rightGutter,
@@ -8669,7 +8680,8 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const inset = guideLayout.inset;
-    const titleY = cardTop + guideLayout.titleOffset;
+    const headerCenterY = cardTop + Math.round(guideLayout.collapsedHeight / 2);
+    const titleY = expanded ? cardTop + guideLayout.titleOffset : headerCenterY;
     const titleRuleY = cardTop + guideLayout.titleRuleOffset;
     const legendTop = cardTop + guideLayout.legendTopOffset;
     const rowHeight = guideLayout.rowHeight;
@@ -8682,7 +8694,7 @@ export class MenuScene extends Phaser.Scene {
     const visibleCardTop = viewport === null ? cardTop : Math.max(cardTop, viewport.top);
     const visibleCardBottom = viewport === null ? cardTop + cardHeight : Math.min(cardTop + cardHeight, viewport.bottom);
     const visibleCardHeight = Math.max(0, visibleCardBottom - visibleCardTop);
-    if (visibleCardHeight < 44) {
+    if (visibleCardHeight < 30) {
       this.overlayGuideBounds = null;
       return contentCardTop + cardHeight + (options.exactTop === true ? 0 : (compact ? 14 : 16));
     }
@@ -8700,13 +8712,6 @@ export class MenuScene extends Phaser.Scene {
     });
     guideGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.62);
     guideGraphics.strokeRoundedRect(cardLeft + 4, cardTop + 4, cardWidth - 8, cardHeight - 8, 9);
-    // Two-line "rail" under the title instead of one flat divider -- a
-    // bright inset line plus a fainter full-width line reads as a small
-    // HUD console header rather than a plain section break.
-    guideGraphics.lineStyle(1.5, cyberArcadeMaterial.rail.cyan, 0.5);
-    guideGraphics.lineBetween(cardCenterX - 22, titleRuleY, cardCenterX + 22, titleRuleY);
-    guideGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.2);
-    guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);
 
     const addText = (
       copy: string,
@@ -8739,17 +8744,53 @@ export class MenuScene extends Phaser.Scene {
       return label;
     };
 
+    const chevronX = cardLeft + cardWidth - inset - 5;
+    const drawHeaderChevron = (): void => {
+      const chevronSize = 4;
+      guideGraphics.lineStyle(1.6, cyberArcadeMaterial.rail.cyan, 0.85);
+      guideGraphics.beginPath();
+      if (expanded) {
+        guideGraphics.moveTo(chevronX - chevronSize, headerCenterY + Math.round(chevronSize * 0.4));
+        guideGraphics.lineTo(chevronX, headerCenterY - Math.round(chevronSize * 0.4));
+        guideGraphics.lineTo(chevronX + chevronSize, headerCenterY + Math.round(chevronSize * 0.4));
+      } else {
+        guideGraphics.moveTo(chevronX - chevronSize, headerCenterY - Math.round(chevronSize * 0.4));
+        guideGraphics.lineTo(chevronX, headerCenterY + Math.round(chevronSize * 0.4));
+        guideGraphics.lineTo(chevronX + chevronSize, headerCenterY - Math.round(chevronSize * 0.4));
+      }
+      guideGraphics.strokePath();
+    };
+    drawHeaderChevron();
+
     addText(
-      'QUICK PLAY',
-      cardCenterX,
+      'GUIDE',
+      expanded ? cardCenterX : detailLeft,
       titleY,
-      cardWidth - (inset * 2),
+      cardWidth - (inset * 2) - (expanded ? 0 : 28),
       toCyberArcadeCssHex(cyberArcadeMaterial.rail.mint),
       guideTitleFontSize,
-      0.5,
+      expanded ? 0.5 : 0,
       1,
       guideRowMinFontSize
     );
+
+    // Collapsed by default -- a tap-to-expand header row is enough of a
+    // reference that it doesn't need to permanently occupy space above the
+    // toggle list every time Settings/Pause opens.
+    const headerButton = this.createLegacyOptionsGuideHeaderButton(cardCenterX, headerCenterY, cardWidth, guideLayout.collapsedHeight);
+    this.uiButtons.push(headerButton);
+
+    if (!expanded) {
+      return contentCardTop + cardHeight + (options.exactTop === true ? 0 : (compact ? 14 : 16));
+    }
+
+    // Two-line "rail" under the title instead of one flat divider -- a
+    // bright inset line plus a fainter full-width line reads as a small
+    // HUD console header rather than a plain section break.
+    guideGraphics.lineStyle(1.5, cyberArcadeMaterial.rail.cyan, 0.5);
+    guideGraphics.lineBetween(cardCenterX - 22, titleRuleY, cardCenterX + 22, titleRuleY);
+    guideGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.2);
+    guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);
 
     const legendCopyColor = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 
@@ -8766,7 +8807,7 @@ export class MenuScene extends Phaser.Scene {
 
     const drawLegendRow = (
       index: number,
-      kind: 'compass' | 'start' | 'end',
+      kind: 'compass' | 'start' | 'end' | 'move',
       title: string,
       copy: string,
       accentColor: number
@@ -8814,11 +8855,66 @@ export class MenuScene extends Phaser.Scene {
     drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', cyberArcadeMaterial.rail.cyan);
     drawLegendRow(1, 'start', 'Start', 'begin at gold', cyberArcadeMaterial.signal.start);
     drawLegendRow(2, 'end', 'Exit', 'finish at red', cyberArcadeMaterial.signal.goal);
+    drawLegendRow(
+      3,
+      'move',
+      'Move',
+      this.settings.controlMode === 'stick' ? 'drag the stick' : 'tap the arrows',
+      cyberArcadeMaterial.rail.mint
+    );
     return contentCardTop + cardHeight + (options.exactTop === true ? 0 : (compact ? 14 : 16));
   }
 
+  // Invisible tap target spanning the Guide card's header row -- toggles
+  // overlayGuideExpanded and marks the UI dirty so the next rebuild redraws
+  // the card (and reflows everything below it) at the new height.
+  private createLegacyOptionsGuideHeaderButton(
+    centerX: number,
+    centerY: number,
+    width: number,
+    height: number
+  ): UiButton {
+    const background = this.add.rectangle(centerX, centerY, width, height, 0x000000, 0);
+    background.setInteractive({ useHandCursor: true });
+    const label = this.padLegacyUiText(this.add.text(centerX, centerY, '', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '1px',
+      color: MENU_TEXT_COLOR
+    })).setOrigin(0.5).setAlpha(0);
+    let pressStart: { x: number; y: number } | null = null;
+    background.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      pressStart = { x: pointer.x, y: pointer.y };
+    });
+    background.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+      if (pressStart === null) {
+        return;
+      }
+      const dragDistance = Math.hypot(pointer.x - pressStart.x, pointer.y - pressStart.y);
+      pressStart = null;
+      if (dragDistance <= 8) {
+        this.overlayGuideExpanded = !this.overlayGuideExpanded;
+        this.uiDirty = true;
+      }
+    });
+    background.on('pointerout', () => {
+      pressStart = null;
+    });
+
+    return {
+      background,
+      bounds: createVisualRect(centerX - (width / 2), centerY - (height / 2), width, height),
+      label,
+      setActive: () => undefined,
+      text: 'Guide',
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+      }
+    };
+  }
+
   private drawLegacyOptionsGuideGlyph(
-    kind: 'compass' | 'start' | 'end',
+    kind: 'compass' | 'start' | 'end' | 'move',
     centerX: number,
     centerY: number,
     size: number,
@@ -8828,7 +8924,44 @@ export class MenuScene extends Phaser.Scene {
       this.drawLegacyCompassGlyph(graphics, centerX, centerY, size, -Math.PI / 2, this.resolveActiveLegacyProgressionPalette(), this.time.now, false);
       return;
     }
+    if (kind === 'move') {
+      this.drawLegacyOptionsGuideMoveGlyph(graphics, centerX, centerY, size);
+      return;
+    }
     this.drawLegacyEndpointMarker(graphics, centerX, centerY, size * 2, 0.94, kind === 'start' ? 'start' : 'goal');
+  }
+
+  // A small 4-way arrow cross for the Guide card's "Move" row -- distinct
+  // from the compass/endpoint glyphs and legible at legend-row scale
+  // without borrowing the full HUD directional-arrow geometry.
+  private drawLegacyOptionsGuideMoveGlyph(
+    graphics: Phaser.GameObjects.Graphics,
+    centerX: number,
+    centerY: number,
+    size: number
+  ): void {
+    const armLength = size * 0.72;
+    const headSize = size * 0.26;
+    const arms: Array<[number, number]> = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+    graphics.lineStyle(Math.max(1.2, size * 0.11), cyberArcadeMaterial.rail.mint, 0.92);
+    for (const [dx, dy] of arms) {
+      const tipX = centerX + (dx * armLength);
+      const tipY = centerY + (dy * armLength);
+      graphics.beginPath();
+      graphics.moveTo(centerX, centerY);
+      graphics.lineTo(tipX, tipY);
+      graphics.strokePath();
+      const perpX = -dy;
+      const perpY = dx;
+      graphics.fillStyle(cyberArcadeMaterial.rail.mint, 0.92);
+      graphics.fillTriangle(
+        tipX + (dx * headSize), tipY + (dy * headSize),
+        tipX - (dx * headSize * 0.2) + (perpX * headSize), tipY - (dy * headSize * 0.2) + (perpY * headSize),
+        tipX - (dx * headSize * 0.2) - (perpX * headSize), tipY - (dy * headSize * 0.2) - (perpY * headSize)
+      );
+    }
+    graphics.fillStyle(0x03070b, 0.85);
+    graphics.fillCircle(centerX, centerY, Math.max(1.5, size * 0.14));
   }
 
   private createLegacyOptionsAccountActionRow(
@@ -8899,7 +9032,7 @@ export class MenuScene extends Phaser.Scene {
     const contentFlow = resolveLegacyOverlayContentFlowLayout({
       contentTop: viewport.top,
       controlsHeight: controlContentHeight,
-      guideHeight: resolveLegacyOptionsGuideLayout(panel.width).cardHeight,
+      guideHeight: this.resolveLegacyOptionsGuideEffectiveHeight(panel.width),
       panelWidth: panel.width
     });
     const scrollMetrics = resolveLegacyOverlayScrollMetrics({

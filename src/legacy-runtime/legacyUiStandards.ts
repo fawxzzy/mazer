@@ -122,10 +122,12 @@ export const resolveLegacyUiLabelCenterY = (
 export interface LegacyOptionsGuideLayout {
   cardHeight: number;
   cardWidthLimit: number;
+  collapsedHeight: number;
   horizontalMargin: number;
   inset: number;
   legendTopOffset: number;
   rowHeight: number;
+  rowCount: number;
   rowFontSize: number;
   rowMinFontSize: number;
   textWidthSafetyRatio: number;
@@ -134,18 +136,26 @@ export interface LegacyOptionsGuideLayout {
   titleRuleOffset: number;
 }
 
+// The Guide card collapses to a single tappable header row by default (a
+// "compass/start/exit + move" legend doesn't need to stay pinned open the
+// whole time a player is in Settings) and expands to the full 4-row legend
+// (compass, start, exit, move) on tap.
 export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptionsGuideLayout => {
   const compact = panelWidth < LEGACY_UI_COMPACT_BREAKPOINT;
   const titleFontSize = compact ? 15 : 17;
   const titleOffset = compact ? 16 : 18;
+  const rowHeight = compact ? 18 : 20;
+  const rowCount = 4;
 
   return {
-    cardHeight: compact ? 112 : 122,
+    cardHeight: (compact ? 112 : 122) + rowHeight,
     cardWidthLimit: compact ? 350 : 540,
+    collapsedHeight: compact ? 40 : 46,
     horizontalMargin: compact ? 48 : 64,
     inset: compact ? 18 : 22,
     legendTopOffset: compact ? 43 : 47,
-    rowHeight: compact ? 18 : 20,
+    rowHeight,
+    rowCount,
     rowFontSize: compact ? 11 : 12,
     rowMinFontSize: compact ? 10 : 10,
     textWidthSafetyRatio: compact ? 0.9 : 0.92,

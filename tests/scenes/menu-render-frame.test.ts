@@ -86,7 +86,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
     expect(menuSceneSource).toContain('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {');
-    expect(menuSceneSource).toContain("'QUICK PLAY',");
+    expect(menuSceneSource).toContain("'GUIDE',");
     expect(buildOptionsSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
       buildOptionsSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel')
     );
@@ -1486,7 +1486,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
     expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
     expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);');
-    expect(menuSceneSource).toContain("'QUICK PLAY',");
+    expect(menuSceneSource).toContain("'GUIDE',");
     expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', cyberArcadeMaterial.rail.cyan);");
     expect(menuSceneSource).not.toContain("'Player • green trail'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
