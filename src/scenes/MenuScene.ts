@@ -538,6 +538,8 @@ interface MenuSceneVisualDiagnostics {
   progression: LegacyProgressionDiagnostics;
   progressionBadge: {
     bounds: VisualRect | null;
+    label: string | null;
+    labelBounds: VisualRect | null;
     text: string | null;
     textBounds: VisualRect | null;
     textFontSize: number | null;
@@ -990,7 +992,6 @@ const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;
 const LEGACY_MENU_PATH_EDGE_ALPHA = 0.58;
 const LEGACY_MENU_WALL_FILL = cyberArcadeMaterial.substrate.field;
 const LEGACY_MENU_WALL_GLASS_ALPHA = 0.18;
-const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.1;
 const LEGACY_PLAY_PATH_CORE = cyberArcadeMaterial.path.core;
 const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;
 const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
@@ -1206,7 +1207,9 @@ export class MenuScene extends Phaser.Scene {
   private titleGraphics!: Phaser.GameObjects.Graphics;
   private footerText!: Phaser.GameObjects.Text;
   private progressionBadgeText!: Phaser.GameObjects.Text;
+  private progressionBadgeLabelText!: Phaser.GameObjects.Text;
   private progressionBadgeBounds: VisualRect | null = null;
+  private progressionBadgeLabelBounds: VisualRect | null = null;
   private progressionBadgeTextBounds: VisualRect | null = null;
   private progressionBadgeTextFits = false;
   private menuAiProgressionBadgeText!: Phaser.GameObjects.Text;
@@ -1368,6 +1371,13 @@ export class MenuScene extends Phaser.Scene {
       color: '#36ff7d',
       align: 'center'
     })).setOrigin(0.5).setAlpha(0.96).setVisible(false);
+    this.progressionBadgeLabelText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
+      fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
+      fontSize: '9px',
+      fontStyle: 'bold',
+      color: '#36ff7d',
+      align: 'center'
+    })).setOrigin(0.5).setAlpha(0.82).setVisible(false);
     this.menuAiProgressionBadgeText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
       fontSize: '13px',
@@ -5311,13 +5321,14 @@ export class MenuScene extends Phaser.Scene {
       this.boardStaticGraphics.fillStyle(0x000000, boardShadowAlpha);
       this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardSize, boardSize);
     }
-    // Menu board intentionally has no slab backdrop or edge frame: the maze
-    // tiles should read as floating directly on the scene, not boxed in.
+    // Menu board intentionally has no slab backdrop, edge frame, or glass
+    // tint: the maze tiles should read as floating directly on the scene,
+    // not boxed in by anything, however faint.
     if (!isMenuMode) {
       this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardSize, boardEdge);
+      this.boardStaticGraphics.fillStyle(boardFill, LEGACY_PLAY_BOARD_GLASS_ALPHA);
+      this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
     }
-    this.boardStaticGraphics.fillStyle(boardFill, isMenuMode ? LEGACY_MENU_BOARD_GLASS_ALPHA : LEGACY_PLAY_BOARD_GLASS_ALPHA);
-    this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
     // Keep the board top-down: no pseudo bevel/highlight pass over the maze.
     if (this.settings.darkMode) {
       this.boardStaticGraphics.fillStyle(0x000000, 0.12);
@@ -6691,9 +6702,11 @@ export class MenuScene extends Phaser.Scene {
 
   private clearLegacyPlayerProgressionBadge(): void {
     this.progressionBadgeBounds = null;
+    this.progressionBadgeLabelBounds = null;
     this.progressionBadgeTextBounds = null;
     this.progressionBadgeTextFits = false;
     this.progressionBadgeText.setVisible(false);
+    this.progressionBadgeLabelText.setVisible(false);
   }
 
   private drawLegacyProgressionGlyph(
@@ -6718,13 +6731,26 @@ export class MenuScene extends Phaser.Scene {
       .setLineSpacing(0)
       .setPadding(0)
       .setColor(palette.badgeColor)
-      .setPosition(frame.centerX, frame.centerY)
+      .setPosition(frame.centerX, frame.centerY + Math.round(frame.height * 0.06))
       .setScale(badgePulse)
+      .setVisible(true);
+    this.progressionBadgeLabelText
+      .setText('LVL')
+      .setFontSize(Math.max(9, Math.round(frame.height * 0.2)))
+      .setColor(palette.badgeColor)
+      .setPosition(frame.left + Math.round(frame.width * 0.24), frame.top + Math.round(frame.height * 0.2))
       .setVisible(true);
 
     const badgeBounds = createVisualRect(frame.left, frame.top, frame.width, frame.height);
+    const rawLabelBounds = this.progressionBadgeLabelText.getBounds();
     const rawTextBounds = this.progressionBadgeText.getBounds();
     this.progressionBadgeBounds = badgeBounds;
+    this.progressionBadgeLabelBounds = createVisualRect(
+      rawLabelBounds.x,
+      rawLabelBounds.y,
+      rawLabelBounds.width,
+      rawLabelBounds.height
+    );
     this.progressionBadgeTextBounds = createVisualRect(
       rawTextBounds.x,
       rawTextBounds.y,
@@ -6768,7 +6794,7 @@ export class MenuScene extends Phaser.Scene {
       .setPosition(frame.centerX, frame.centerY + Math.round(frame.height * 0.06))
       .setVisible(true);
     this.menuAiProgressionBadgeLabelText
-      .setText('AI')
+      .setText('LVL')
       .setFontSize(Math.max(9, Math.round(frame.height * 0.2)))
       .setColor(palette.badgeColor)
       .setPosition(frame.left + Math.round(frame.width * 0.24), frame.top + Math.round(frame.height * 0.2))
@@ -8261,6 +8287,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayScrollTopFadeAlpha = 0;
     this.overlayScrollBottomFadeAlpha = 0;
     this.progressionBadgeText.setVisible(this.mode === 'play' && this.overlay === 'none');
+    this.progressionBadgeLabelText.setVisible(this.mode === 'play' && this.overlay === 'none');
     this.menuAiProgressionBadgeText.setVisible(this.mode === 'menu' && this.overlay === 'none');
     this.menuAiProgressionBadgeLabelText.setVisible(this.mode === 'menu' && this.overlay === 'none');
 
@@ -11827,6 +11854,8 @@ export class MenuScene extends Phaser.Scene {
       progression: progressionDiagnostics,
       progressionBadge: {
         bounds: cloneVisualRect(this.progressionBadgeBounds),
+        label: this.progressionBadgeLabelText.visible ? this.progressionBadgeLabelText.text : null,
+        labelBounds: cloneVisualRect(this.progressionBadgeLabelBounds),
         text: this.progressionBadgeText.visible ? this.progressionBadgeText.text : null,
         textBounds: cloneVisualRect(this.progressionBadgeTextBounds),
         textFontSize: Number.isFinite(Number.parseFloat(String(this.progressionBadgeText.style.fontSize)))

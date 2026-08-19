@@ -520,7 +520,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('LEGACY_MENU_PATH_RELIEF_OFFSET_RATIO');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_WALL_GLASS_ALPHA = 0.18;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_BOARD_GLASS_ALPHA = 0.1;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = cyberArcadeMaterial.rail.mint;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = cyberArcadeMaterial.rail.cyan;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;');
@@ -565,7 +564,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('renderBounds: mazeRenderBounds');
     expect(menuSceneSource).toContain('renderSafeInset: mazeRenderFrame.safeInset');
-    expect(menuSceneSource).toContain('isMenuMode ? LEGACY_MENU_BOARD_GLASS_ALPHA : LEGACY_PLAY_BOARD_GLASS_ALPHA');
+    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(boardFill, LEGACY_PLAY_BOARD_GLASS_ALPHA);');
     expect(menuSceneSource).toContain('isMenuMode ? LEGACY_MENU_WALL_GLASS_ALPHA : LEGACY_PLAY_WALL_GLASS_ALPHA');
     expect(menuSceneSource).not.toContain('drawLegacyBoardSigilBorder');
     expect(menuSceneSource).not.toContain('drawLegacyBoardCornerFacetShimmer');
@@ -792,7 +791,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyMenuAiProgressionBadge(');
     expect(menuSceneSource).toContain("const aiTrack = this.progressionState.tracks['ai-runner'];");
     expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(aiTrack, 'ai-runner')");
-    expect(menuSceneSource).toContain(".setText('AI')");
+    expect(menuSceneSource).toContain(".setText('LVL')");
     expect(menuSceneSource).toContain('slot: 0,');
     expect(menuSceneSource).toContain('menuAiProgressionBadge: {');
     expect(menuSceneSource).toContain("placement: 'leading'");
@@ -1439,7 +1438,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("if (this.mode === 'menu') {");
     expect(menuSceneSource).toContain('this.drawLegacyMenuAiProgressionBadge();');
     expect(menuSceneSource).toContain('this.clearLegacyMenuAiProgressionBadge();');
-    expect(menuSceneSource).toContain(".setText('AI')");
+    expect(menuSceneSource).toContain(".setText('LVL')");
     expect(menuSceneSource).toContain('.setText(String(track.level))');
     expect(menuSceneSource).toContain('.setText(String(aiTrack.level))');
     expect(menuSceneSource).not.toContain('publishLegacyPlayerProgressionCompletion');

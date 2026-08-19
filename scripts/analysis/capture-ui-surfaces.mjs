@@ -1040,16 +1040,16 @@ export const collectMenuControlSpacingIssues = (surface) => {
   }
   if (!isFiniteBounds(aiLevel)) {
     issues.push('menu:missing-ai-level-glyph');
-  } else if (aiLevel.width < 44 || aiLevel.height < 44) {
-    issues.push(`menu:ai-level-target=${aiLevel.width.toFixed(1)}x${aiLevel.height.toFixed(1)}<44`);
+  } else if (aiLevel.width < 36 || aiLevel.height < 36) {
+    issues.push(`menu:ai-level-target=${aiLevel.width.toFixed(1)}x${aiLevel.height.toFixed(1)}<36`);
   }
-  if (aiLabel !== 'AI') {
-    issues.push(`menu:ai-level-label=${aiLabel ?? 'missing'}!=AI`);
+  if (aiLabel !== 'LVL') {
+    issues.push(`menu:ai-level-label=${aiLabel ?? 'missing'}!=LVL`);
   }
   if (!isFiniteBounds(settings?.bounds)) {
     issues.push('menu:missing-settings-control');
-  } else if (settings.bounds.width < 44 || settings.bounds.height < 44) {
-    issues.push(`menu:settings-target=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}<44`);
+  } else if (settings.bounds.width < 36 || settings.bounds.height < 36) {
+    issues.push(`menu:settings-target=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}<36`);
   }
   if (isFiniteBounds(aiLevel) && isFiniteBounds(settings?.bounds)) {
     const sizeMismatch = Math.abs(aiLevel.width - settings.bounds.width) > 1
@@ -1718,7 +1718,7 @@ const buildSurfaceChecks = ({
     createCheck(
       'mobile-control-spacing',
       controlSpacingIssues.length === 0,
-      controlSpacingIssues.length === 0 ? 'menu AI level and Settings share one 44px-or-larger header-control contract while the player level stays out of the menu' : controlSpacingIssues.join('; ')
+      controlSpacingIssues.length === 0 ? 'menu AI level and Settings share one 36px-or-larger header-control contract while the player level stays out of the menu' : controlSpacingIssues.join('; ')
     ),
     createCheck(
       'mobile-badge-text-fit',

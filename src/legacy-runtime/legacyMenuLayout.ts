@@ -253,7 +253,21 @@ export const resolveLegacyMenuLayout = (
     ? Math.round(cleanPhoneBoardSize)
     : Math.round(tileSize * mazeSize * 1000) / 1000;
   const boardLeft = Math.round((width - snappedBoardSize) / 2);
-  const boardTop = Math.round(isPlaySurface ? (playTopHudReserve + laneGap) : menuBoardTop);
+  // The board claims its full width-constrained size regardless of how much
+  // vertical room is actually available (laneBoardLimit already bounds it
+  // safely) -- on most portrait phones that leaves real slack between the
+  // title/header above and the dock button below. Center the board within
+  // that slack instead of leaving it pinned to the top with a large empty
+  // gap beneath it and above the dock button.
+  const menuBoardZoneTop = menuBoardTop;
+  const menuBoardZoneBottom = height - menuBottomReserve;
+  const menuBoardZoneHeight = Math.max(0, menuBoardZoneBottom - menuBoardZoneTop);
+  const menuBoardCenterOffset = !isPlaySurface
+    ? Math.max(0, (menuBoardZoneHeight - snappedBoardSize) / 2)
+    : 0;
+  const boardTop = Math.round(
+    isPlaySurface ? (playTopHudReserve + laneGap) : (menuBoardZoneTop + menuBoardCenterOffset)
+  );
   const menuDockButtonY = height - dockBottomMargin - Math.round(buttonHeight / 2);
   const playRowButtonY = isPortrait
     ? boardTop + snappedBoardSize + Math.round(buttonHeight * 0.86)
@@ -292,10 +306,17 @@ export const resolveLegacyMenuLayout = (
   const rowFitsWidth = ((buttonWidth * 2) + (rowButtonGap * 2) + centerButtonWidth) <= (width - 16);
   const resolvedUsesStackedButtons = usesStackedButtons || !rowFitsWidth;
   const stackHeight = (buttonHeight * 2) + stackGap;
+  // clamp(value, min, max) inverts (returns min instead of the safe max) if
+  // min ends up greater than max -- now that the board can sit lower in its
+  // zone (see menuBoardCenterOffset above), boardTop + snappedBoardSize + 12
+  // can exceed height - stackHeight - 18 in tight ultra-narrow cases. Cap
+  // the lower bound at the upper bound so it never inverts.
+  const stackTopMax = height - stackHeight - 18;
+  const stackTopMin = Math.min(boardTop + snappedBoardSize + 12, stackTopMax);
   const stackTop = Math.round(clamp(
     boardTop + snappedBoardSize + 18,
-    boardTop + snappedBoardSize + 12,
-    height - stackHeight - 18
+    stackTopMin,
+    stackTopMax
   ));
   const leftButtonY = resolvedUsesStackedButtons ? stackTop + Math.round(buttonHeight / 2) : rowButtonY;
   const rightButtonY = resolvedUsesStackedButtons ? leftButtonY + buttonHeight + stackGap : rowButtonY;
