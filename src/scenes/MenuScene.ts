@@ -990,8 +990,6 @@ const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;
 const LEGACY_MENU_PATH_CORE = cyberArcadeMaterial.path.core;
 const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;
 const LEGACY_MENU_PATH_EDGE_ALPHA = 0.58;
-const LEGACY_MENU_WALL_FILL = cyberArcadeMaterial.substrate.field;
-const LEGACY_MENU_WALL_GLASS_ALPHA = 0.18;
 const LEGACY_PLAY_PATH_CORE = cyberArcadeMaterial.path.core;
 const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;
 const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
@@ -5309,9 +5307,6 @@ export class MenuScene extends Phaser.Scene {
     const mazeSize = mazeRenderFrame.boardSize;
     const tileSize = mazeRenderFrame.tileSize;
     const isMenuMode = this.mode === 'menu';
-    const wallColor = isMenuMode
-      ? LEGACY_MENU_WALL_FILL
-      : LEGACY_PLAY_WALL_FILL;
     const boardFill = LEGACY_PLAY_BOARD_FILL;
     const boardEdge = LEGACY_PLAY_BOARD_EDGE;
 
@@ -5330,7 +5325,11 @@ export class MenuScene extends Phaser.Scene {
       this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
     }
     // Keep the board top-down: no pseudo bevel/highlight pass over the maze.
-    if (this.settings.darkMode) {
+    // Dark-mode dimming is a gameplay-readability pass for the active play
+    // board; menu mode has no fill/background of its own for it to dim, and
+    // painting it there just reintroduces a faint boxed-in square (dark mode
+    // is on by default) distinguishable from the starfield around it.
+    if (this.settings.darkMode && !isMenuMode) {
       this.boardStaticGraphics.fillStyle(0x000000, 0.12);
       this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardSize, boardSize);
     }
@@ -5347,13 +5346,21 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    for (let y = 0; y < this.maze.size; y += 1) {
-      for (let x = 0; x < this.maze.size; x += 1) {
-        const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });
-        this.boardStaticGraphics.fillStyle(wallColor, isMenuMode ? LEGACY_MENU_WALL_GLASS_ALPHA : LEGACY_PLAY_WALL_GLASS_ALPHA);
-        this.boardStaticGraphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
-
-        // Keep wall cells flat and glassy so the backdrop shows through without fake bevel/depth.
+    // This pass fills every grid cell (not just walls) at low alpha -- on
+    // menu mode it uses substrate.field, the same color as the scene
+    // background, so it never added a visible wall look (the actual visible
+    // corridor comes from drawBoardPaths on a separate graphics layer). All
+    // it did was tint the whole square grid area a hair off from the true
+    // background outside it, reading as a faint "box" distinguishable from
+    // the starfield -- skip it entirely in menu mode. Play mode's gameplay
+    // wall rendering is untouched.
+    if (!isMenuMode) {
+      for (let y = 0; y < this.maze.size; y += 1) {
+        for (let x = 0; x < this.maze.size; x += 1) {
+          const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });
+          this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);
+          this.boardStaticGraphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
+        }
       }
     }
 
