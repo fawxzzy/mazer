@@ -9516,63 +9516,12 @@ export class MenuScene extends Phaser.Scene {
       offLabel: string;
       onClick: () => void;
       onLabel: string;
+      // Which section this row renders under -- filtered below by tag
+      // instead of by array position, so reordering this list can never
+      // silently move a row into the wrong section.
+      section: 'controls' | 'display';
       stateText: string;
     }> = [
-      {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings),
-        description: this.settings.toggleCameraFollow
-          ? 'Camera follows you.'
-          : 'Full maze view.',
-        label: 'Camera Follow',
-        offLabel: 'Off',
-        onClick: () => this.applyOverlayToggleFieldChange('toggleCameraFollow'),
-        onLabel: 'On',
-        stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'
-      },
-      {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
-        description: this.settings.toggleTrailFade
-          ? 'Old trail fades.'
-          : 'Trail stays.',
-        label: 'Trail Fade',
-        offLabel: 'Off',
-        onClick: () => this.applyOverlayToggleFieldChange('toggleTrailFade'),
-        onLabel: 'On',
-        stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'
-      },
-      {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
-        description: this.settings.toggleTrailPulse
-          ? 'Slow white shine.'
-          : 'No trail shine.',
-        label: 'Trail Shine',
-        offLabel: 'Off',
-        onClick: () => this.applyOverlayToggleFieldChange('toggleTrailPulse'),
-        onLabel: 'On',
-        stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'
-      },
-      {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
-        description: this.settings.toggleAnimatedBackdrop
-          ? 'Moving background.'
-          : 'Background still.',
-        label: 'Animated Background',
-        offLabel: 'Still',
-        onClick: () => this.applyOverlayToggleFieldChange('toggleAnimatedBackdrop'),
-        onLabel: 'Animated',
-        stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Still'
-      },
-      {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings),
-        description: this.settings.darkMode
-          ? 'Darker contrast.'
-          : 'Brighter view.',
-        label: 'High Contrast',
-        offLabel: 'Off',
-        onClick: () => this.applyOverlayToggleFieldChange('darkMode'),
-        onLabel: 'On',
-        stateText: resolveLegacyOverlayToggleStateText('darkMode', this.settings.darkMode) ?? 'Off'
-      },
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings),
         description: this.settings.controlMode === 'stick'
@@ -9582,6 +9531,7 @@ export class MenuScene extends Phaser.Scene {
         offLabel: 'Arrows',
         onClick: () => this.applyOverlayToggleFieldChange('controlMode'),
         onLabel: 'Stick',
+        section: 'controls',
         stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'
       },
       {
@@ -9593,9 +9543,72 @@ export class MenuScene extends Phaser.Scene {
         offLabel: 'Off',
         onClick: () => this.applyOverlayToggleFieldChange('smartSteering'),
         onLabel: 'On',
+        section: 'controls',
         stateText: resolveLegacyOverlayToggleStateText('smartSteering', this.settings.smartSteering) ?? 'Off'
+      },
+      {
+        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleCameraFollow', this.settings),
+        description: this.settings.toggleCameraFollow
+          ? 'Camera follows you.'
+          : 'Full maze view.',
+        label: 'Camera Follow',
+        offLabel: 'Off',
+        onClick: () => this.applyOverlayToggleFieldChange('toggleCameraFollow'),
+        onLabel: 'On',
+        section: 'controls',
+        stateText: resolveLegacyOverlayToggleStateText('toggleCameraFollow', this.settings.toggleCameraFollow) ?? 'Off'
+      },
+      {
+        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
+        description: this.settings.toggleTrailFade
+          ? 'Old trail fades.'
+          : 'Trail stays.',
+        label: 'Trail Fade',
+        offLabel: 'Off',
+        onClick: () => this.applyOverlayToggleFieldChange('toggleTrailFade'),
+        onLabel: 'On',
+        section: 'display',
+        stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'
+      },
+      {
+        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings),
+        description: this.settings.toggleTrailPulse
+          ? 'Slow white shine.'
+          : 'No trail shine.',
+        label: 'Trail Shine',
+        offLabel: 'Off',
+        onClick: () => this.applyOverlayToggleFieldChange('toggleTrailPulse'),
+        onLabel: 'On',
+        section: 'display',
+        stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'
+      },
+      {
+        checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings),
+        description: this.settings.toggleAnimatedBackdrop
+          ? 'Moving background.'
+          : 'Background still.',
+        label: 'Animated Background',
+        offLabel: 'Still',
+        onClick: () => this.applyOverlayToggleFieldChange('toggleAnimatedBackdrop'),
+        onLabel: 'Animated',
+        section: 'display',
+        stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Still'
+      },
+      {
+        checked: resolveLegacyOverlayToggleSwitchIsOn('darkMode', this.settings),
+        description: this.settings.darkMode
+          ? 'Darker contrast.'
+          : 'Brighter view.',
+        label: 'High Contrast',
+        offLabel: 'Off',
+        onClick: () => this.applyOverlayToggleFieldChange('darkMode'),
+        onLabel: 'On',
+        section: 'display',
+        stateText: resolveLegacyOverlayToggleStateText('darkMode', this.settings.darkMode) ?? 'Off'
       }
     ];
+    const controlsSection = controls.filter((control) => control.section === 'controls');
+    const displaySection = controls.filter((control) => control.section === 'display');
 
     const addSectionHeading = (copy: string, contentTop: number): number => {
       const centerY = contentTop + Math.round(sectionHeaderHeight / 2);
@@ -9639,9 +9652,9 @@ export class MenuScene extends Phaser.Scene {
 
     let contentTop = y + (stacked ? 4 : 6);
     contentTop = addSectionHeading('Controls', contentTop);
-    [controls[5], controls[6], controls[0]].forEach((control, index) => {
+    controlsSection.forEach((control, index) => {
       contentTop = addToggleRow(control, contentTop);
-      if (index < 2 || options.includeMovementSpeed === true) {
+      if (index < controlsSection.length - 1 || options.includeMovementSpeed === true) {
         contentTop += rowGap;
       }
     });
@@ -9667,9 +9680,9 @@ export class MenuScene extends Phaser.Scene {
 
     contentTop += sectionGap;
     contentTop = addSectionHeading('Display', contentTop);
-    [controls[1], controls[2], controls[3], controls[4]].forEach((control, index) => {
+    displaySection.forEach((control, index) => {
       contentTop = addToggleRow(control, contentTop);
-      if (index < 3) {
+      if (index < displaySection.length - 1) {
         contentTop += rowGap;
       }
     });
