@@ -120,8 +120,8 @@ const selectPriorCandidate = (
   );
   const candidates = [];
 
-  for (let y = 1; y < maze.size - 2; y += 1) {
-    for (let x = 1; x < maze.size - 2; x += 1) {
+  for (let y = 1; y < maze.height - 2; y += 1) {
+    for (let x = 1; x < maze.width - 2; x += 1) {
       const footprint = footprintPoints({ x, y });
       if (!footprint.every((point) => maze.grid[point.y]?.[point.x] === true)) {
         continue;
@@ -355,7 +355,7 @@ const runCorpusPass = (seeds: number[], assertContracts: boolean) => {
         sideClosureCount: metadata!.sideClosureCount,
         sideClosureEdges: metadata!.sideClosureEdges,
         seed,
-        size: maze.size,
+        size: maze.width,
         source: metadata!.source
       });
     }
