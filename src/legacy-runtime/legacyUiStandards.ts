@@ -252,3 +252,32 @@ export const resolveLegacyToggleRowLayout = (
     trackWidth: compact ? 36 : 40
   };
 };
+
+export interface LegacyTwoUpButtonLayout {
+  buttonWidth: number;
+  leftX: number;
+  rightX: number;
+}
+
+// Two side-by-side buttons, each capped to maxButtonWidth, filling the
+// panel width minus horizontalMargin and centered on centerX with gap
+// between them. Shared by every overlay that lays out an even pair of
+// buttons this way (e.g. Pause's Reset/Menu row) -- callers with a
+// genuinely different sizing rule (like a pair split from one pre-capped
+// total width) should keep their own formula rather than force-fit this one.
+export const resolveLegacyTwoUpButtonLayout = (
+  centerX: number,
+  panelWidth: number,
+  maxButtonWidth: number,
+  horizontalMargin: number,
+  gap: number
+): LegacyTwoUpButtonLayout => {
+  const buttonWidth = Math.min(maxButtonWidth, Math.floor((panelWidth - horizontalMargin) / 2));
+  const offset = (buttonWidth + gap) / 2;
+
+  return {
+    buttonWidth,
+    leftX: centerX - offset,
+    rightX: centerX + offset
+  };
+};

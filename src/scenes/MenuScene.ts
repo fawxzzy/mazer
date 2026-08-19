@@ -126,6 +126,7 @@ import {
   resolveLegacyOverlayShellLayout,
   resolveLegacyOptionsGuideLayout,
   resolveLegacyToggleRowLayout,
+  resolveLegacyTwoUpButtonLayout,
   resolveLegacyUiLabelCenterY,
   type LegacyUiLabelRole
 } from '../legacy-runtime/legacyUiStandards';
@@ -8896,23 +8897,19 @@ export class MenuScene extends Phaser.Scene {
     const progressionResetAction = (): void => this.openOverlay('confirm-progression-reset');
 
     if (stacked) {
-      const compactActionWidth = Math.min(128, Math.floor((panel.width - 64) / 2));
-      const compactActionGap = 14;
-      const compactOffset = compactActionWidth + compactActionGap;
+      const compactRow = resolveLegacyTwoUpButtonLayout(panel.centerX, panel.width, 128, 64, 14);
       this.uiButtons.push(
-        this.createButton(panel.centerX - (compactOffset / 2), actionY, compactActionWidth, actionButtonHeight, 'Reset', resetAction),
-        this.createButton(panel.centerX + (compactOffset / 2), actionY, compactActionWidth, actionButtonHeight, 'Menu', mainMenuAction),
+        this.createButton(compactRow.leftX, actionY, compactRow.buttonWidth, actionButtonHeight, 'Reset', resetAction),
+        this.createButton(compactRow.rightX, actionY, compactRow.buttonWidth, actionButtonHeight, 'Menu', mainMenuAction),
         this.createButton(panel.centerX, actionY - actionButtonHeight - 10, Math.min(232, panel.width - 72), actionButtonHeight, 'Reset Progress', progressionResetAction)
       );
       return;
     }
 
-    const desktopActionWidth = Math.min(140, Math.floor((panel.width - 72) / 2));
-    const desktopActionGap = 14;
-    const desktopOffset = (desktopActionWidth + desktopActionGap) / 2;
+    const desktopRow = resolveLegacyTwoUpButtonLayout(panel.centerX, panel.width, 140, 72, 14);
     this.uiButtons.push(
-      this.createButton(panel.centerX - desktopOffset, actionY, desktopActionWidth, actionButtonHeight, 'Reset', resetAction),
-      this.createButton(panel.centerX + desktopOffset, actionY, desktopActionWidth, actionButtonHeight, 'Menu', mainMenuAction),
+      this.createButton(desktopRow.leftX, actionY, desktopRow.buttonWidth, actionButtonHeight, 'Reset', resetAction),
+      this.createButton(desktopRow.rightX, actionY, desktopRow.buttonWidth, actionButtonHeight, 'Menu', mainMenuAction),
       this.createButton(panel.centerX, actionY - actionButtonHeight - 14, Math.min(252, panel.width - 88), actionButtonHeight, 'Reset Progress', progressionResetAction)
     );
   }
