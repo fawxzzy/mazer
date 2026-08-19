@@ -5451,6 +5451,7 @@ export class MenuScene extends Phaser.Scene {
       materialTileSize,
       options
     );
+    this.drawLegacyPathTileFacet(graphics, tileRect, options.coreAlpha);
 
     if (options.drawCue === true) {
       const cueSize = Math.max(1, Math.floor(Math.min(tileRect.width, tileRect.height) * 0.22));
@@ -5467,6 +5468,45 @@ export class MenuScene extends Phaser.Scene {
         cueSize
       );
     }
+  }
+
+  // The "crystal facet" tile treatment: a cut-corner highlight plus a
+  // cyan rim-light on the top/left edges, same technique as the Start
+  // button's facet glints and the title glyph's gem facets -- applied per
+  // physical tile cell (not the connector-merged corridor frame) so it
+  // reads as a property of the tile material itself.
+  private drawLegacyPathTileFacet(
+    graphics: Phaser.GameObjects.Graphics,
+    tileRect: LegacyPixelTileRect,
+    intensity: number
+  ): void {
+    const left = tileRect.left;
+    const top = tileRect.top;
+    const width = tileRect.width;
+    const height = tileRect.height;
+
+    graphics.fillStyle(cyberArcadeMaterial.rail.cyan, Math.min(0.4, intensity * 0.46));
+    graphics.beginPath();
+    graphics.moveTo(left, top);
+    graphics.lineTo(left + (width * 0.58), top);
+    graphics.lineTo(left, top + (height * 0.58));
+    graphics.closePath();
+    graphics.fillPath();
+
+    graphics.fillStyle(cyberArcadeMaterial.rail.edge, Math.min(0.4, intensity * 0.46));
+    graphics.beginPath();
+    graphics.moveTo(left + width, top + height);
+    graphics.lineTo(left + width - (width * 0.5), top + height);
+    graphics.lineTo(left + width, top + height - (height * 0.5));
+    graphics.closePath();
+    graphics.fillPath();
+
+    graphics.lineStyle(Math.max(1, Math.round(Math.min(width, height) * 0.09)), cyberArcadeMaterial.rail.cyan, Math.min(0.85, intensity * 0.9));
+    graphics.beginPath();
+    graphics.moveTo(left, top + height);
+    graphics.lineTo(left, top);
+    graphics.lineTo(left + width, top);
+    graphics.strokePath();
   }
 
   private fillLegacyPathConnectorSeams(
