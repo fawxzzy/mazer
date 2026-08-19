@@ -130,9 +130,13 @@ import {
   type LegacyUiLabelRole
 } from '../legacy-runtime/legacyUiStandards';
 import {
+  isLegacyGlyphWordRenderable,
+  resolveLegacyGlyphWordColumns,
+  resolveLegacyGlyphWordLayout,
   resolveLegacyMenuPathTitleLayout,
   resolveLegacyMenuPathTitleOrbitPoint,
   resolveLegacyMenuTitlePresentation,
+  type LegacyGlyphWordLayout,
   type LegacyMenuPathTitleCell,
   type LegacyMenuPathTitleOrbitGeometry
 } from '../legacy-runtime/legacyMenuTitle';
@@ -956,19 +960,9 @@ const LEGACY_UI_FONT_FAMILY = cyberArcadeMaterial.typography.ui;
 const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
 const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
-// Pulsating text glow applied directly to the Start/Login label in place of
-// any button shape -- see applyLegacyMenuFrontDoorTextGlow. Uses the same
-// cyan the title's prism sweep uses (LEGACY_MENU_PATH_TITLE_PRISM, defined
-// below) so the label reads as part of the same gem/crystal family instead
-// of a generic white outline.
-const LEGACY_MENU_START_GLOW_COLOR = cyberArcadeMaterial.rail.cyan;
-const LEGACY_MENU_START_GLOW_COLOR_CSS = toCyberArcadeCssHex(LEGACY_MENU_START_GLOW_COLOR);
+// Pulse period for the Start/Login glyph tiles' rim brightness -- see
+// drawLegacyMenuFrontDoorGlyphButton.
 const LEGACY_MENU_START_GLOW_PULSE_MS = 1600;
-// Wider dim-to-bright swing and thicker strokes than a first pass -- per
-// feedback the original glow (0.32-0.82 alpha, 1.75px core line) read as
-// too weak/insubstantial for the primary action button.
-const LEGACY_MENU_START_GLOW_MIN_ALPHA = 0.22;
-const LEGACY_MENU_START_GLOW_MAX_ALPHA = 0.98;
 const LEGACY_MENU_PATH_TITLE_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_MENU_PATH_TITLE_ACCENT = cyberArcadeMaterial.signal.player;
 const LEGACY_MENU_PATH_TITLE_PRISM = cyberArcadeMaterial.rail.cyan;
@@ -5463,6 +5457,11 @@ export class MenuScene extends Phaser.Scene {
   // Skipping connected edges keeps interior seams flat and lets the rim
   // trace one continuous line around the whole shape instead -- flat fill,
   // one outline, nothing else, so it reads as clean rather than busy.
+  // Two passes per edge -- a soft wide halo, then a crisp core line on top
+  // -- so the corridor's outer boundary reads as a lit tube with real glow
+  // instead of a flat, plain outline. Still connection-aware (only drawn on
+  // edges that don't border another path tile), so it stays one continuous
+  // line around the shape rather than reintroducing per-tile busyness.
   private drawLegacyPathTileFacet(
     graphics: Phaser.GameObjects.Graphics,
     tileRect: LegacyPixelTileRect,
@@ -5478,31 +5477,34 @@ export class MenuScene extends Phaser.Scene {
     const width = tileRect.width;
     const height = tileRect.height;
     const lineWidth = Math.max(1, Math.round(Math.min(width, height) * 0.1));
+    const glowWidth = lineWidth * 3;
+    const glowAlpha = Math.min(0.3, intensity * 0.32);
+    const coreAlpha = Math.min(0.95, intensity + 0.1);
 
-    graphics.lineStyle(lineWidth, rimColor, Math.min(0.95, intensity + 0.1));
-    if (!hasTop) {
+    const strokeEdge = (x1: number, y1: number, x2: number, y2: number): void => {
+      graphics.lineStyle(glowWidth, rimColor, glowAlpha);
       graphics.beginPath();
-      graphics.moveTo(left, top);
-      graphics.lineTo(left + width, top);
+      graphics.moveTo(x1, y1);
+      graphics.lineTo(x2, y2);
       graphics.strokePath();
+      graphics.lineStyle(lineWidth, rimColor, coreAlpha);
+      graphics.beginPath();
+      graphics.moveTo(x1, y1);
+      graphics.lineTo(x2, y2);
+      graphics.strokePath();
+    };
+
+    if (!hasTop) {
+      strokeEdge(left, top, left + width, top);
     }
     if (!hasLeft) {
-      graphics.beginPath();
-      graphics.moveTo(left, top);
-      graphics.lineTo(left, top + height);
-      graphics.strokePath();
+      strokeEdge(left, top, left, top + height);
     }
     if (!hasBottom) {
-      graphics.beginPath();
-      graphics.moveTo(left, top + height);
-      graphics.lineTo(left + width, top + height);
-      graphics.strokePath();
+      strokeEdge(left, top + height, left + width, top + height);
     }
     if (!hasRight) {
-      graphics.beginPath();
-      graphics.moveTo(left + width, top);
-      graphics.lineTo(left + width, top + height);
-      graphics.strokePath();
+      strokeEdge(left + width, top, left + width, top + height);
     }
   }
 
@@ -6417,13 +6419,6 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyProgressionBadge();
     this.drawLegacyMenuSettingsCog();
 
-    if (this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
-      this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');
-    }
-    if (this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
-      this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95, 'goal');
-    }
-
     for (let index = 0; index < visibleTrail.length; index += 1) {
       const point = visibleTrail[index];
       if (!point) {
@@ -6506,6 +6501,16 @@ export class MenuScene extends Phaser.Scene {
           dynamicTrailPathSource
         );
       }
+    }
+
+    // Drawn after the trail (not before) so the start/goal tiles always sit
+    // on top of the trail's coloring instead of getting painted over
+    // whenever the trail passes through those cells.
+    if (this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
+      this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');
+    }
+    if (this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
+      this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95, 'goal');
     }
 
     this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize, time);
@@ -6982,15 +6987,15 @@ export class MenuScene extends Phaser.Scene {
     // sized to roughly match the LVL badge's visual weight instead of
     // sitting inside a chrome-bordered box (the in-play touch pause cog
     // keeps its smaller default ratio, since that one still has a panel
-    // behind it to leave room inside). Cyan instead of the generic
-    // white/mint touch-icon colors so it reads as the same crystal/cyan
-    // family as the title and Start/Login text, not a mismatched icon.
+    // behind it to leave room inside). The Mazer signature green instead of
+    // the generic white/mint touch-icon colors or cyan, matching the LVL
+    // badge/player/trail green that reads as "Mazer" everywhere else.
     this.drawLegacySettingsCog(
       this.boardDynamicGraphics,
       frame,
       this.menuSettingsCogActive,
       0.34,
-      LEGACY_MENU_START_GLOW_COLOR,
+      cyberArcadeMaterial.signal.player,
       cyberArcadeMaterial.rail.mint
     );
   }
@@ -7243,11 +7248,12 @@ export class MenuScene extends Phaser.Scene {
       originY,
       tileSize,
       {
+        // No center cue square any more -- the pulsing yellow tile fill
+        // itself is the "AI is considering this tile" signal, per feedback
+        // that the little dot in the middle looked off.
         coreAlpha: clamp(0.7 + (targetPulse * 0.22 * thoughtStyle.pulseScale), 0.62, 0.96) * alphaMultiplier,
         coreColor: thoughtStyle.coreColor,
-        cueAlpha: clamp(0.56 + (targetPulse * 0.24 * thoughtStyle.pulseScale), 0.52, 0.92) * alphaMultiplier,
-        cueColor: thoughtStyle.edgeColor,
-        drawCue: true,
+        drawCue: false,
         edgeAlpha: clamp(0.66 + (targetPulse * 0.22 * thoughtStyle.pulseScale), 0.58, 0.94) * alphaMultiplier,
         edgeColor: thoughtStyle.edgeColor
       }
@@ -7431,16 +7437,12 @@ export class MenuScene extends Phaser.Scene {
     alpha: number,
     kind: 'start' | 'goal'
   ): void {
-    const centerX = originX + ((point.x + 0.5) * tileSize);
-    const centerY = originY + ((point.y + 0.5) * tileSize);
-    this.drawLegacyEndpointMarker(
-      this.boardDynamicGraphics,
-      centerX,
-      centerY,
-      tileSize,
-      alpha,
-      kind
-    );
+    // Uses the exact same rounded tile-rect math as every corridor tile
+    // (resolveLegacyPixelTileRect) instead of re-deriving one from a center
+    // point, so the marker is pixel-identical in size to a regular tile
+    // rather than drifting a fraction of a pixel off from rounding.
+    const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
+    this.drawLegacyEndpointMarker(this.boardDynamicGraphics, tileRect, alpha, kind);
   }
 
   // A colored-in version of the corridor tile itself -- same flat fill +
@@ -7449,20 +7451,12 @@ export class MenuScene extends Phaser.Scene {
   // shape that belonged to a different visual language than the board.
   private drawLegacyEndpointMarker(
     graphics: Phaser.GameObjects.Graphics,
-    centerX: number,
-    centerY: number,
-    tileSize: number,
+    tileRect: LegacyPixelTileRect,
     alpha: number,
     kind: 'start' | 'goal'
   ): void {
     const coreColor = kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_CORE : LEGACY_PLAY_START_MARKER_CORE;
     const rimColor = kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_EDGE : LEGACY_PLAY_START_MARKER_EDGE;
-    const tileRect: LegacyPixelTileRect = {
-      height: tileSize,
-      left: centerX - (tileSize / 2),
-      top: centerY - (tileSize / 2),
-      width: tileSize
-    };
 
     graphics.fillStyle(coreColor, alpha);
     graphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
@@ -7720,32 +7714,45 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  // The primary Start/Login action has no button shape at all -- no fill, no
-  // stroke, no panel -- it is glowing TEXT, full stop, matching the title
-  // wordmark's own borderless look. The glow is a stroke directly on the
-  // text glyphs plus a soft blurred shadow (Phaser's built-in text shadow
-  // doubles as a cheap glow since the canvas renderer has no blur filter),
-  // both breathing continuously via a time-based sine pulse from updateFrame.
-  // Exactly two layers, not a third: a crisp static stroke is the border
-  // (always on, never animates), and a single sine pulse drives the shadow
-  // blur/alpha as the glow (the one blink). Hover just widens the pulse's
-  // intensity a little rather than adding another independently-animating
-  // property, so it never reads as multiple overlapping effects.
-  private applyLegacyMenuFrontDoorTextGlow(
-    label: Phaser.GameObjects.Text,
+  // The primary Start/Login action has no button shape at all -- no fill,
+  // stroke, or panel -- and no rendered-font text either: the word itself is
+  // built from the exact same tile material as the title and the maze
+  // corridor (drawLegacyPathMaterialTile, same core/edge colors), so it
+  // reads as made of the same substance as everything else on the board
+  // instead of separately-rendered text. It's static -- no build animation
+  // -- but the rim brightness breathes on a slow, faint sine pulse so it
+  // still feels alive; the core fill stays put so the shape stays crisp.
+  private drawLegacyMenuFrontDoorGlyphButton(
+    graphics: Phaser.GameObjects.Graphics,
+    layout: LegacyGlyphWordLayout,
     time: number,
     active: boolean
   ): void {
+    graphics.clear();
+    const pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'> = {
+      grid: layout.grid,
+      height: layout.rows,
+      width: layout.columns
+    };
     const phase = (Math.sin((time / LEGACY_MENU_START_GLOW_PULSE_MS) * Math.PI * 2) + 1) / 2;
-    const pulseAlpha = clamp(
-      LEGACY_MENU_START_GLOW_MIN_ALPHA
-        + (phase * (LEGACY_MENU_START_GLOW_MAX_ALPHA - LEGACY_MENU_START_GLOW_MIN_ALPHA))
-        + (active ? 0.12 : 0),
-      0,
-      1
-    );
-    label.setStroke(LEGACY_MENU_START_GLOW_COLOR_CSS, 2);
-    label.setShadow(0, 0, LEGACY_MENU_START_GLOW_COLOR_CSS, 6 + (pulseAlpha * 14), false, true);
+    const rimAlpha = clamp(0.3 + (phase * 0.28) + (active ? 0.16 : 0), 0, 0.92);
+    for (const cell of layout.cells) {
+      this.drawLegacyPathMaterialTile(
+        graphics,
+        { x: cell.column, y: cell.row },
+        pathSource,
+        layout.left,
+        layout.top,
+        layout.cellSize,
+        {
+          coreAlpha: active ? 0.98 : 0.92,
+          coreColor: LEGACY_MENU_PATH_CORE,
+          drawCue: false,
+          edgeAlpha: rimAlpha,
+          edgeColor: LEGACY_MENU_PATH_EDGE
+        }
+      );
+    }
   }
 
   private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number {
@@ -9010,7 +9017,12 @@ export class MenuScene extends Phaser.Scene {
       this.drawLegacyOptionsGuideMoveGlyph(graphics, centerX, centerY, size);
       return;
     }
-    this.drawLegacyEndpointMarker(graphics, centerX, centerY, size * 2, 0.94, kind === 'start' ? 'start' : 'goal');
+    this.drawLegacyEndpointMarker(
+      graphics,
+      { height: size * 2, left: centerX - size, top: centerY - size, width: size * 2 },
+      0.94,
+      kind === 'start' ? 'start' : 'goal'
+    );
   }
 
   // A small 4-way arrow cross for the Guide card's "Move" row -- distinct
@@ -10780,21 +10792,14 @@ export class MenuScene extends Phaser.Scene {
     const x = panel.left + panel.width - Math.round(size * 0.86);
     const y = panel.top + 8 + Math.round(size / 2);
     const chrome = this.add.graphics();
+    // No ring, panel, or background tint behind the arrow -- just the
+    // chevron itself, sized up to use more of the touch target so it's
+    // easier to spot and hit instead of a small glyph lost inside a circle.
     const drawChevronChrome = (active: boolean): void => {
       chrome.clear();
-      this.drawLegacyCyberPanel(chrome, {
-        active,
-        alpha: active ? 0.76 : 0.56,
-        fill: active ? cyberArcadeMaterial.substrate.panelActive : LEGACY_CYBER_PANEL_FILL,
-        height: size,
-        left: x - (size / 2),
-        radius: 999,
-        top: y - (size / 2),
-        width: size
-      });
-      const chevronInset = Math.round(size * 0.31);
-      const chevronLeft = x - Math.round(size * 0.12);
-      chrome.lineStyle(Math.max(3, Math.round(size * 0.08)), active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON, active ? 0.98 : 0.9);
+      const chevronInset = Math.round(size * 0.4);
+      const chevronLeft = x - Math.round(size * 0.06);
+      chrome.lineStyle(Math.max(4, Math.round(size * 0.11)), active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON, active ? 1 : 0.94);
       chrome.beginPath();
       chrome.moveTo(chevronLeft + chevronInset, y - chevronInset);
       chrome.lineTo(chevronLeft - chevronInset, y);
@@ -10888,10 +10893,10 @@ export class MenuScene extends Phaser.Scene {
     if (!isPrimaryFrontDoorButton) {
       drawButtonPanel(false);
     }
-    // The primary front-door button has no panel shape at all -- panel stays
-    // empty and the glow lives on the label text itself instead (see
-    // applyLegacyMenuFrontDoorTextGlow), so it reads as glowing text rather
-    // than text sitting inside a bordered/pill-shaped button.
+    // The primary front-door button has no panel shape at all -- the word
+    // itself is drawn onto `panel` as tile glyphs instead (see
+    // drawLegacyMenuFrontDoorGlyphButton, wired up below once the button's
+    // final width/height are known).
 
     const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
@@ -10919,14 +10924,20 @@ export class MenuScene extends Phaser.Scene {
       0.96
     );
     this.uiTexts.push(label);
-    if (isPrimaryFrontDoorButton) {
-      // padLegacyCompactUiText's 1px vertical padding is meant for plain
-      // bordered labels -- a blurred glow needs real headroom around the
-      // glyphs or Phaser clips the shadow at the text texture's edge and it
-      // renders as no glow at all. Widened after fitLegacyUiTextToWidth so
-      // the fit calculation isn't thrown off by the larger padding.
-      label.setPadding(18, 18, 18, 18);
-      this.applyLegacyMenuFrontDoorTextGlow(label, 0, false);
+    // The rendered-font label stays in the scene graph (bounds/diagnostics
+    // still read from it) but is invisible -- the visible word is the tile
+    // glyphs drawn onto `panel` below.
+    let glyphLayout: LegacyGlyphWordLayout | null = null;
+    if (isPrimaryFrontDoorButton && isLegacyGlyphWordRenderable(text)) {
+      label.setAlpha(0);
+      const glyphColumns = resolveLegacyGlyphWordColumns(text);
+      const glyphPaddingX = Math.max(10, Math.round(width * 0.1));
+      const glyphPaddingY = Math.max(6, Math.round(height * 0.14));
+      const cellSizeFromWidth = Math.floor(Math.max(1, width - (glyphPaddingX * 2)) / Math.max(1, glyphColumns));
+      const cellSizeFromHeight = Math.floor(Math.max(1, height - (glyphPaddingY * 2)) / 7);
+      const glyphCellSize = Math.max(2, Math.min(10, cellSizeFromWidth, cellSizeFromHeight));
+      glyphLayout = resolveLegacyGlyphWordLayout(text, x, y, glyphCellSize);
+      this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout, 0, false);
     }
 
     const setActive = (active: boolean): void => {
@@ -10939,9 +10950,11 @@ export class MenuScene extends Phaser.Scene {
       } else {
         drawButtonPanel(active);
       }
-      label.setAlpha(
-        active ? (frontDoorChrome?.hoverLabelAlpha ?? 0.98) : (frontDoorChrome?.labelAlpha ?? 0.92)
-      );
+      if (!glyphLayout) {
+        label.setAlpha(
+          active ? (frontDoorChrome?.hoverLabelAlpha ?? 0.98) : (frontDoorChrome?.labelAlpha ?? 0.92)
+        );
+      }
     };
 
     background.on('pointerover', () => setActive(true));
@@ -10954,9 +10967,9 @@ export class MenuScene extends Phaser.Scene {
       label,
       setActive,
       text,
-      updateFrame: isPrimaryFrontDoorButton
+      updateFrame: glyphLayout
         ? (time: number) => {
-          this.applyLegacyMenuFrontDoorTextGlow(label, time, primaryButtonActive);
+          this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout as LegacyGlyphWordLayout, time, primaryButtonActive);
         }
         : undefined,
       destroy: () => {

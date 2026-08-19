@@ -469,9 +469,10 @@ export const resolveLegacyMenuLayout = (
   const menuPortraitTitleY = menuTitleFitsInHeader
     ? menuHeaderTitleCenterY
     : Math.round(titleLaneTop + (menuTitleReserve / 2));
-  const titleX = menuTitleFitsInHeader
-    ? menuHeaderTitleCenterX
-    : (!isPlaySurface && isPortrait ? boardLeft + (snappedBoardWidth / 2) : Math.round(width / 2));
+  // Always the true screen midpoint outside the header-fit case -- centering
+  // on the board instead (the previous portrait behavior) drifted off the
+  // actual screen center whenever the board itself sat off-center.
+  const titleX = menuTitleFitsInHeader ? menuHeaderTitleCenterX : Math.round(width / 2);
   const rankLane = null;
   const actionsLane = isPlaySurface
     ? null
