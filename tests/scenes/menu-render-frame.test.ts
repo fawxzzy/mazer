@@ -1428,7 +1428,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.progressionBadgeText');
     expect(menuSceneSource).toContain('.setText(String(track.level))');
     expect(menuSceneSource).toContain('.setColor(palette.badgeColor)');
-    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);');
+    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false, true);');
     expect(menuSceneSource).toContain('resolveLegacyHeaderControlMetricFontSize(track.level, frame.width)');
   });
 
@@ -1459,7 +1459,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const laneHeight = this.layout.lanes.hud?.height ?? 64;');
     expect(menuSceneSource).toContain('const frame = resolveLegacyHeaderControlFrame({');
     expect(menuSceneSource).toContain("placement: 'leading'");
-    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);');
+    expect(menuSceneSource).toContain('this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false, true);');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayProgressionBadgeCenterY');
     expect(menuSceneSource).not.toContain('resolveLegacyMenuProgressionBadgeCenterY');
     expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');

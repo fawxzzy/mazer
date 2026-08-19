@@ -958,9 +958,13 @@ const LEGACY_UI_FONT_FAMILY = cyberArcadeMaterial.typography.ui;
 const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
 const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
-// Pulsating white glow ring drawn around the primary Start button in place
-// of a filled/bordered panel -- see drawLegacyMenuPulsingStartGlow.
-const LEGACY_MENU_START_GLOW_COLOR = cyberArcadeMaterial.rail.white;
+// Pulsating glow ring drawn around the primary Start button in place of a
+// filled/bordered panel -- see drawLegacyMenuPulsingStartGlow. Uses the same
+// cyan the title's prism sweep uses (LEGACY_MENU_PATH_TITLE_PRISM, defined
+// below) so the button reads as part of the same gem/crystal family instead
+// of a generic white outline.
+const LEGACY_MENU_START_GLOW_COLOR = cyberArcadeMaterial.rail.cyan;
+const LEGACY_MENU_START_GLOW_FILL_COLOR = cyberArcadeMaterial.path.core;
 const LEGACY_MENU_START_GLOW_PULSE_MS = 1600;
 // Wider dim-to-bright swing and thicker strokes than a first pass -- per
 // feedback the original glow (0.32-0.82 alpha, 1.75px core line) read as
@@ -6764,7 +6768,7 @@ export class MenuScene extends Phaser.Scene {
       width: this.layout.width
     });
     const badgePulse = this.resolveLegacyProgressionBadgePulse();
-    this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);
+    this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false, true);
     this.progressionBadgeText
       .setText(String(track.level))
       .setFontSize(resolveLegacyHeaderControlMetricFontSize(track.level, frame.width))
@@ -6824,7 +6828,7 @@ export class MenuScene extends Phaser.Scene {
       slot: 0,
       width: this.layout.width
     });
-    this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false);
+    this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.rankColor, false, true);
     this.menuAiProgressionBadgeText
       .setText(String(aiTrack.level))
       .setFontSize(resolveLegacyHeaderControlMetricFontSize(aiTrack.level, frame.width))
@@ -6879,7 +6883,8 @@ export class MenuScene extends Phaser.Scene {
       this.boardDynamicGraphics,
       frame,
       this.menuSettingsCogActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,
-      this.menuSettingsCogActive
+      this.menuSettingsCogActive,
+      true
     );
     this.drawLegacySettingsCog(this.boardDynamicGraphics, frame, this.menuSettingsCogActive);
   }
@@ -7619,6 +7624,11 @@ export class MenuScene extends Phaser.Scene {
     const left = x - (width / 2);
     const top = y - (height / 2);
     const baseRadius = this.resolveLegacyRoundedRectRadius(width, height, LEGACY_UI_CONTROL_RADIUS);
+    // A faint pale-mint fill wash first -- the same path.core tone the
+    // title's glyph cells use -- so the button reads as a lit gem panel
+    // instead of a hollow outline floating over the void.
+    graphics.fillStyle(LEGACY_MENU_START_GLOW_FILL_COLOR, Math.min(0.16, 0.05 + (pulseAlpha * 0.09)));
+    graphics.fillRoundedRect(left, top, width, height, baseRadius);
     // Thicker at every layer than a first pass, plus a wider outer wash --
     // a bolder, more visible glow rather than a thin outline.
     const layers = [
@@ -7635,6 +7645,42 @@ export class MenuScene extends Phaser.Scene {
         Math.max(1, height - (layer.inset * 2)),
         Math.max(1, baseRadius - layer.inset)
       );
+    }
+    this.drawLegacyMenuStartGlowFacets(graphics, left, top, width, height, baseRadius, time, pulseAlpha);
+  }
+
+  // Small corner facet glints, echoing the title glyph's gem-facet sparkle
+  // language (drawLegacyMenuPathTitleGemFacets) at a much smaller scale --
+  // ties the Start button into the same crystalline visual family instead
+  // of leaving it as a plain glowing outline.
+  private drawLegacyMenuStartGlowFacets(
+    graphics: Phaser.GameObjects.Graphics,
+    left: number,
+    top: number,
+    width: number,
+    height: number,
+    radius: number,
+    time: number,
+    pulseAlpha: number
+  ): void {
+    const facetLength = Math.max(6, Math.min(16, Math.round(Math.min(width, height) * 0.14)));
+    const facetInset = Math.max(4, Math.round(radius * 0.7));
+    const corners = [
+      { x: left + facetInset, y: top + facetInset, dx: 1, dy: 1, phaseOffset: 0 },
+      { x: (left + width) - facetInset, y: top + facetInset, dx: -1, dy: 1, phaseOffset: 0.5 },
+      { x: left + facetInset, y: (top + height) - facetInset, dx: 1, dy: -1, phaseOffset: 0.75 },
+      { x: (left + width) - facetInset, y: (top + height) - facetInset, dx: -1, dy: -1, phaseOffset: 0.25 }
+    ];
+    for (const corner of corners) {
+      const glintPhase = (Math.sin((time / 900) + (corner.phaseOffset * Math.PI * 2)) + 1) / 2;
+      const glintAlpha = Math.min(0.85, pulseAlpha * (0.3 + (glintPhase * 0.55)));
+      graphics.lineStyle(1.4, LEGACY_MENU_START_GLOW_COLOR, glintAlpha);
+      graphics.beginPath();
+      graphics.moveTo(corner.x, corner.y);
+      graphics.lineTo(corner.x + (corner.dx * facetLength), corner.y);
+      graphics.moveTo(corner.x, corner.y);
+      graphics.lineTo(corner.x, corner.y + (corner.dy * facetLength));
+      graphics.strokePath();
     }
   }
 
@@ -8119,24 +8165,53 @@ export class MenuScene extends Phaser.Scene {
     graphics: Phaser.GameObjects.Graphics,
     rect: Pick<LegacyHeaderControlFrame, 'height' | 'left' | 'top' | 'width'>,
     accentColor: number,
-    active = false
+    active = false,
+    sparkle = false
   ): void {
     const radius = Math.min(8, Math.max(6, Math.round(Math.min(rect.width, rect.height) * 0.18)));
-    const notchWidth = Math.max(4, Math.round(rect.width * 0.13));
-    const notchHeight = Math.max(2, Math.round(rect.height * 0.07));
     graphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, active ? 0.64 : 0.46);
     graphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
     graphics.lineStyle(2, accentColor, active ? 0.96 : 0.86);
     graphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
-    graphics.fillStyle(accentColor, active ? 0.88 : 0.62);
-    graphics.fillRect(rect.left + rect.width - notchWidth - 7, rect.top + 6, notchWidth, notchHeight);
-    graphics.lineStyle(1, 0xffffff, active ? 0.3 : 0.18);
-    graphics.lineBetween(
-      rect.left + 8,
-      rect.top + rect.height - 7,
-      rect.left + Math.round(rect.width * 0.42),
-      rect.top + rect.height - 7
-    );
+    if (!sparkle) {
+      const notchWidth = Math.max(4, Math.round(rect.width * 0.13));
+      const notchHeight = Math.max(2, Math.round(rect.height * 0.07));
+      graphics.fillStyle(accentColor, active ? 0.88 : 0.62);
+      graphics.fillRect(rect.left + rect.width - notchWidth - 7, rect.top + 6, notchWidth, notchHeight);
+      graphics.lineStyle(1, 0xffffff, active ? 0.3 : 0.18);
+      graphics.lineBetween(
+        rect.left + 8,
+        rect.top + rect.height - 7,
+        rect.left + Math.round(rect.width * 0.42),
+        rect.top + rect.height - 7
+      );
+      return;
+    }
+    // Viewfinder-style corner brackets just outside the panel instead of
+    // the plain tech-panel notch -- ties this badge into the same
+    // crystalline/faceted visual family as the title wordmark and the
+    // Start button's facet glints, for the menu-surface header controls
+    // (LVL badge, AI badge, settings cog).
+    const gap = 3;
+    const facetSize = Math.max(4, Math.round(Math.min(rect.width, rect.height) * 0.22));
+    const corners: Array<[number, number, number, number]> = [
+      [rect.left, rect.top, -1, -1],
+      [rect.left + rect.width, rect.top, 1, -1],
+      [rect.left, rect.top + rect.height, -1, 1],
+      [rect.left + rect.width, rect.top + rect.height, 1, 1]
+    ];
+    graphics.lineStyle(1.4, accentColor, active ? 0.85 : 0.6);
+    for (const [cx, cy, ox, oy] of corners) {
+      const anchorX = cx + (ox * gap);
+      const anchorY = cy + (oy * gap);
+      graphics.beginPath();
+      graphics.moveTo(anchorX - (ox * facetSize), anchorY);
+      graphics.lineTo(anchorX, anchorY);
+      graphics.lineTo(anchorX, anchorY - (oy * facetSize));
+      graphics.strokePath();
+    }
+    graphics.fillStyle(0xffffff, active ? 0.32 : 0.2);
+    graphics.fillCircle(rect.left + Math.round(rect.width * 0.78), rect.top + Math.round(rect.height * 0.24), 1.4);
   }
 
   private drawLegacyPlayTouchArrow(
