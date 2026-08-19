@@ -5546,6 +5546,45 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  // A normal corridor stays a tile away from the board edge (the existing
+  // safeInset in resolveLegacyMazeRenderFrame). A wraparound dock corridor
+  // -- one whose path genuinely continues off-grid -- reads better bleeding
+  // all the way to the real screen edge instead of stopping at a small
+  // fixed continuation past the board rect. Left/right have nothing else
+  // reserved there and can reach the true edge; top/bottom have to stay
+  // clear of the header icons and the bottom dock button/touch-control
+  // lane, so they bleed only as far as those reserves allow.
+  private resolveLegacyPathBorderDockContinuation(
+    direction: LegacyMenuBorderDockDirection,
+    boardLeft: number,
+    boardTop: number,
+    boardWidth: number,
+    boardHeight: number,
+    tileSize: number
+  ): number {
+    const edgeInset = 2;
+    const fallback = Math.max(2, Math.round(tileSize * 0.32));
+
+    if (direction === 'left') {
+      return Math.max(fallback, boardLeft - edgeInset);
+    }
+    if (direction === 'right') {
+      const boardRight = boardLeft + boardWidth;
+      return Math.max(fallback, (this.layout.width - edgeInset) - boardRight);
+    }
+    if (direction === 'top') {
+      const safeTop = Math.max(edgeInset, this.layout.lanes.hud?.bottom ?? edgeInset);
+      return Math.max(fallback, boardTop - safeTop);
+    }
+
+    const boardBottom = boardTop + boardHeight;
+    const safeBottomBoundary = this.mode === 'play'
+      ? this.layout.lanes.controls?.top
+      : this.layout.lanes.actions?.top;
+    const safeBottom = Math.min(this.layout.height - edgeInset, safeBottomBoundary ?? this.layout.height - edgeInset);
+    return Math.max(fallback, safeBottom - boardBottom);
+  }
+
   private drawLegacyPathBorderDock(
     graphics: Phaser.GameObjects.Graphics,
     point: LegacyPoint,
@@ -5583,7 +5622,14 @@ export class MenuScene extends Phaser.Scene {
         boardWidth,
         boardHeight,
         cornerGuardSize,
-        continuationLength: Math.max(2, Math.round(tileSize * 0.32)),
+        continuationLength: this.resolveLegacyPathBorderDockContinuation(
+          direction,
+          boardLeft,
+          boardTop,
+          boardWidth,
+          boardHeight,
+          tileSize
+        ),
         materialTileSize,
         mazeLeft,
         mazeTop,
