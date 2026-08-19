@@ -127,8 +127,18 @@ export const resolveLegacyMenuBoardAspectRatio = (
   // requested ratio slightly, it never breaks generation.
   const menuStackTop = menuTopHudReserve + menuTopReserve;
   const menuInlineTitleBoardGap = isUltraNarrow ? 2 : 4;
+  // Mirrors resolveLegacyMenuLayout's real header-icon-bottom measurement
+  // (not the abstract touch-target lane) so the probed box height -- and
+  // therefore the requested aspect ratio -- matches what the real layout
+  // will actually produce.
+  const menuHeaderContentBottom = menuTopHudReserve > 0
+    ? Math.max(
+      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: 0, placement: 'leading', width }).bottom,
+      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: 0, placement: 'trailing', width }).bottom
+    )
+    : menuStackTop;
   const menuBoardTop = menuTopHudReserve > 0
-    ? menuStackTop + menuInlineTitleBoardGap
+    ? menuHeaderContentBottom + menuInlineTitleBoardGap
     : menuStackTop + laneGap + menuTitleReserve + laneGap;
   const menuBottomReserve = laneGap + dockReserve;
   const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
@@ -225,6 +235,14 @@ export const resolveLegacyMenuLayout = (
   let menuTitleFitsInHeader = false;
   let menuHeaderTitleCenterX = Math.round(width / 2);
   let menuHeaderTitleCenterY = 0;
+  // menuTopHudReserve is a touch-target-sized lane (clamped to a 56-72px
+  // floor for tap-target compliance), but the actual header icons rendered
+  // inside it are only ~36-40px tall and vertically centered -- leaving a
+  // lot of dead reserved space below them that the old menuStackTop-based
+  // board position paid for unnecessarily. Track the icons' real bottom
+  // edge so the board can sit right under the visible content instead of
+  // under the abstract lane.
+  let menuHeaderContentBottom = menuTopHudReserve + menuTopReserve;
   if (!isPlaySurface && menuTopHudReserve > 0) {
     const leadingHeaderFrame = resolveLegacyHeaderControlFrame({
       height,
@@ -240,6 +258,7 @@ export const resolveLegacyMenuLayout = (
       placement: 'trailing',
       width
     });
+    menuHeaderContentBottom = Math.max(leadingHeaderFrame.bottom, trailingHeaderFrame.bottom);
     const headerGap = trailingHeaderFrame.left - leadingHeaderFrame.right;
     // Keep this formula identical to resolveLegacyMenuTitlePresentation's
     // fontSize in legacyMenuTitle.ts, or the fit-check here and the actual
@@ -288,7 +307,7 @@ export const resolveLegacyMenuLayout = (
   // touching.
   const menuInlineTitleBoardGap = isUltraNarrow ? 2 : 4;
   const menuBoardTop = menuTitleFitsInHeader
-    ? menuStackTop + menuInlineTitleBoardGap
+    ? menuHeaderContentBottom + menuInlineTitleBoardGap
     : menuTitleTop + menuTitleReserve + laneGap;
   const menuBottomReserve = laneGap + dockReserve;
   const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
