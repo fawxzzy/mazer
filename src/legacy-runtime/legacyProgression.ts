@@ -609,12 +609,18 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
         // finally bleed-off/wrap paths (borderFeederTargetPerSide /
         // requiredOppositeBorderConnections.vertical, both still gated to
         // starterDepth >= 4 i.e. level 6+, unchanged from before).
+        // minCheckpoints must never sit above checkpointCountOverride --
+        // normalizeLegacyMazeGenerationProfile clamps the override up to
+        // minCheckpoints, so a flat minCheckpoints: 4 floor was silently
+        // pushing the intended 2/3 checkpoint counts (starterDepth 0/1)
+        // back up to 4, undoing the early part of this exact ramp.
+        const checkpointCountOverride = [2, 3, 5, 8][starterDepth] ?? null;
         return {
           borderFeederTargetPerSide: starterDepth >= 4 ? 1 : 0,
           checkpointCountMultiplier: 0.44 + (starterDepth * (0.2 / 6)),
-          checkpointCountOverride: [2, 3, 5, 8][starterDepth] ?? null,
+          checkpointCountOverride,
           maxDeadEndCount: [0, 1, 2, 3, 5][starterDepth] ?? null,
-          minCheckpoints: 4,
+          minCheckpoints: Math.min(4, checkpointCountOverride ?? 4),
           requiredOppositeBorderConnections: { horizontal: false, vertical: starterDepth >= 4 },
           routeQualityReinforcementMultiplier: Math.min(0.35, starterDepth * (0.35 / 6)),
           shortcutCountMultiplier: Math.min(0.35, starterDepth * (0.35 / 6)),
@@ -623,7 +629,12 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
       }
     case 'explorer':
       return {
-        borderFeederTargetPerSide: 2,
+        // Bleed-off density stays low and grows slowly across the higher
+        // bands too (1/1/2/2 instead of the old 2/2/3/4) -- per-side
+        // feeder counts compound with the always-on mandatory
+        // opposite-border connection, so even "2 per side" meant a lot of
+        // simultaneous bleed-off points on one maze.
+        borderFeederTargetPerSide: 1,
         checkpointCountMultiplier: 0.86,
         checkpointCountOverride: null,
         maxDeadEndCount: null,
@@ -635,7 +646,7 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
       };
     case 'navigator':
       return {
-        borderFeederTargetPerSide: 2,
+        borderFeederTargetPerSide: 1,
         checkpointCountMultiplier: 1,
         checkpointCountOverride: null,
         maxDeadEndCount: null,
@@ -647,7 +658,7 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
       };
     case 'architect':
       return {
-        borderFeederTargetPerSide: 3,
+        borderFeederTargetPerSide: 2,
         checkpointCountMultiplier: 1.16,
         checkpointCountOverride: null,
         maxDeadEndCount: null,
@@ -659,7 +670,7 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
       };
     case 'mythic':
       return {
-        borderFeederTargetPerSide: 4,
+        borderFeederTargetPerSide: 2,
         checkpointCountMultiplier: 1.32,
         checkpointCountOverride: null,
         maxDeadEndCount: null,

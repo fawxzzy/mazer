@@ -3,6 +3,7 @@ import type { LegacyPoint } from './legacyMaze';
 export const LEGACY_ANIMATION_CADENCE_VERSION = 'legacy-animation-cadence-v2' as const;
 export const LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS = 8000;
 export const LEGACY_TRAIL_SHINE_CYCLE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS * 2;
+export const LEGACY_TRAIL_PULSE_SWEEP_PERIOD_MS = 2600;
 export const LEGACY_MAZE_REVEAL_STRATEGY_VERSION = 'interleaved-non-solution-v1' as const;
 export const LEGACY_MAZE_REVEAL_NON_SOLUTION_BURST = 2;
 
@@ -88,6 +89,38 @@ export const resolveLegacyTrailShineMotion = ({
     distanceProgress,
     oneWayPeriodMs: safeOneWayPeriodMs,
     speedTilesPerSecond: maxTrailIndex / (safeOneWayPeriodMs / 1000)
+  };
+};
+
+export interface LegacyTrailPulseSweepMotion {
+  cadenceVersion: typeof LEGACY_ANIMATION_CADENCE_VERSION;
+  centerIndex: number;
+  periodMs: number;
+  progress: number;
+}
+
+// Single-direction pulse: always sweeps from the player's tile (the trail's
+// last index) back to the start tile (index 0), then loops -- no ping-pong,
+// unlike resolveLegacyTrailShineMotion above.
+export const resolveLegacyTrailPulseSweepMotion = ({
+  timeMs,
+  trailLength,
+  periodMs = LEGACY_TRAIL_PULSE_SWEEP_PERIOD_MS
+}: {
+  timeMs: number;
+  trailLength: number;
+  periodMs?: number;
+}): LegacyTrailPulseSweepMotion => {
+  const safePeriodMs = Math.max(1, periodMs);
+  const elapsedMs = normalizeElapsed(timeMs, safePeriodMs);
+  const progress = clamp01(elapsedMs / safePeriodMs);
+  const maxTrailIndex = Math.max(0, Math.floor(trailLength) - 1);
+
+  return {
+    cadenceVersion: LEGACY_ANIMATION_CADENCE_VERSION,
+    centerIndex: maxTrailIndex * (1 - progress),
+    periodMs: safePeriodMs,
+    progress
   };
 };
 

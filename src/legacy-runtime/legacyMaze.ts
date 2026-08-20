@@ -1490,6 +1490,11 @@ const resolveLegacyBorderFeederTargetPerSide = (axisLength: number): number => (
   Math.max(2, Math.min(6, Math.floor(axisLength / 18)))
 );
 
+// Hard floor on how close two bleed-off/wrap openings on the same side can
+// land -- "never side by side" has no fallback exception, unlike minSpacing
+// above (which is a soft preference that relaxes under pressure).
+const LEGACY_BORDER_FEEDER_MIN_ADJACENT_SPACING = 2;
+
 const isLegacyBorderFeederPresent = (
   grid: boolean[][],
   side: LegacyBorderFeederSide,
@@ -1588,13 +1593,13 @@ const resolveLegacyBorderFeederCandidateLines = (
     .map((candidate) => candidate.line);
 };
 
-const countLegacyBorderFeedersOnSide = (
+const collectLegacyBorderFeederLinesOnSide = (
   grid: boolean[][],
   side: LegacyBorderFeederSide
-): number => {
+): number[] => {
   const width = grid[0]?.length ?? 0;
   const axisLength = resolveLegacyBorderFeederSideAxisLength(side, width, grid.length);
-  let count = 0;
+  const lines: number[] = [];
 
   for (let line = 2; line < axisLength - 2; line += 1) {
     if (
@@ -1602,11 +1607,11 @@ const countLegacyBorderFeedersOnSide = (
       && isLegacyBorderFeederPresent(grid, side, line)
       && hasLegacyBorderFeederInnerAnchor(grid, side, line)
     ) {
-      count += 1;
+      lines.push(line);
     }
   }
 
-  return count;
+  return lines;
 };
 
 const applyLegacyPerimeterFeederConnections = (
@@ -1629,7 +1634,19 @@ const applyLegacyPerimeterFeederConnections = (
       continue;
     }
 
-    let currentCount = countLegacyBorderFeedersOnSide(grid, side);
+    // Same total budget as before this rule existed -- existing bleed-off
+    // points already on this side (e.g. ones the separate mandatory
+    // opposite-border connection mechanism placed before this runs) still
+    // count against targetPerSide, exactly like the old currentCount did.
+    // Deliberately not folded into the spacing checks below (tried that --
+    // it over-constrained candidate selection enough to reshape route
+    // topology for some seeds, e.g. collapsing seed 28's menu maze from
+    // multi-route down to single-route even though the raw feeder count
+    // went up). "Never side by side" only needs to hold for feeders THIS
+    // pass places relative to each other, which the fallback loop below now
+    // enforces with a hard floor it never had before.
+    const existingLines = collectLegacyBorderFeederLinesOnSide(grid, side);
+    let currentCount = existingLines.length;
     if (currentCount >= targetPerSide) {
       continue;
     }
@@ -1651,6 +1668,12 @@ const applyLegacyPerimeterFeederConnections = (
       currentCount += 1;
     }
 
+    // Falls back to relaxed spacing when minSpacing left the side under
+    // target, but "never side by side" is a hard rule with no exceptions --
+    // LEGACY_BORDER_FEEDER_MIN_ADJACENT_SPACING is the absolute floor
+    // (guarantees at least one empty border tile between any two feeders),
+    // so this only relaxes how close together they can land, never all the
+    // way to touching/adjacent.
     for (const line of candidates) {
       if (currentCount >= targetPerSide) {
         break;
@@ -1660,7 +1683,12 @@ const applyLegacyPerimeterFeederConnections = (
         continue;
       }
 
+      if (chosenLines.some((chosenLine) => Math.abs(chosenLine - line) < LEGACY_BORDER_FEEDER_MIN_ADJACENT_SPACING)) {
+        continue;
+      }
+
       carveLegacyBorderFeeder(grid, side, line, createdTiles, seen);
+      chosenLines.push(line);
       currentCount += 1;
     }
   }

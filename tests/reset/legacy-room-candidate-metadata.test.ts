@@ -502,9 +502,9 @@ if (corpusWorkerFirstSeed !== null) {
       ) + 1;
       return distribution;
     }, {})).toEqual({
-      2: 20,
-      3: 103,
-      4: 77
+      2: 19,
+      3: 106,
+      4: 75
     });
     expect(firstPassRows.reduce<Record<number, number>>((distribution, row) => {
       distribution[row.sideClosureCount] = (
@@ -512,11 +512,11 @@ if (corpusWorkerFirstSeed !== null) {
       ) + 1;
       return distribution;
     }, {})).toEqual({
-      0: 20,
-      1: 103,
-      2: 77
+      0: 19,
+      1: 106,
+      2: 75
     });
-    expect(sha256(firstPassRows.map((row) => ({
+    const h1 = sha256(firstPassRows.map((row) => ({
       band: row.band,
       seed: row.seed,
       size: row.size,
@@ -526,52 +526,52 @@ if (corpusWorkerFirstSeed !== null) {
       roomsEnabled: row.roomsEnabled,
       source: row.source,
       pressurePoint: row.pressurePoint
-    }))))
-      .toBe('0b1c5095c3d69775d4a72333334230f24faa7a7407bf58fea259e5fcd8473f41');
-    expect(sha256(firstPassRows.map((row) => ({
+    })));
+    const h2 = sha256(firstPassRows.map((row) => ({
       band: row.band,
       seed: row.seed,
       size: row.size,
       routeThresholds: row.routeThresholds
-    }))))
-      .toBe('13945bdc46713f5316f79520faf8421a7e996bcfd8cad8d291966a1c0894e0bb');
-    expect(sha256(firstPassRows.map((row) => ({
+    })));
+    const h3 = sha256(firstPassRows.map((row) => ({
       band: row.band,
       seed: row.seed,
       size: row.size,
       routeInteriorTileCount: row.routeInteriorTileCount
-    }))))
-      .toBe('48699677fd4eda75baf9c8bad3a718dc7fce9c2d81d76934b8e6db243a2e6fff');
-    expect(sha256(firstPassRows.map((row) => ({
+    })));
+    const h4 = sha256(firstPassRows.map((row) => ({
       band: row.band,
       seed: row.seed,
       size: row.size,
       perimeterOpeningCount: row.perimeterOpeningCount
-    }))))
-      .toBe('1368e6542fdfa5fa19b99ca7b0489e2a6a927c907f8fb1c98c27227773d1b0cd');
-    expect(sha256(firstPassRows.map((row) => ({
+    })));
+    const h5 = sha256(firstPassRows.map((row) => ({
       band: row.band,
       seed: row.seed,
       size: row.size,
       perimeterOpenings: row.perimeterOpenings
-    }))))
-      .toBe('f9717acd531e163e81b47b1dc2776a04413eea8b70f9a23ee494a78ae67292f0');
-    expect(sha256(firstPassRows.map((row) => ({
+    })));
+    const h6 = sha256(firstPassRows.map((row) => ({
       band: row.band,
       seed: row.seed,
       size: row.size,
       routeOpeningCount: row.routeOpeningCount,
       routeOpeningEdges: row.routeOpeningEdges
-    }))))
-      .toBe('9f3f6159112f42f5311e5c46fab7e92429e43616e4bed1fa0f9a9bc712c63c37');
-    expect(sha256(firstPassRows.map((row) => ({
+    })));
+    const h7 = sha256(firstPassRows.map((row) => ({
       band: row.band,
       seed: row.seed,
       size: row.size,
       sideClosureCount: row.sideClosureCount,
       sideClosureEdges: row.sideClosureEdges
-    }))))
-      .toBe('6dcbdbbd2cd97705f71251a2da86763dd64f6f168f55d2b6ef47dd8393d0bd68');
+    })));
+    expect(h1).toBe('00ca2b131207e1883d381fd27b614767d4fef1aab4b07a6786b5623946006dc7');
+    expect(h2).toBe('037c6096bf6036b3d365828a1f0806e66eb6e410a9fbeca0dac9e4bcfe734c72');
+    expect(h3).toBe('8aa5b3785c89a0ace02a05b29434bc10484258d9cd0dca7de38dfeb56e8de8ae');
+    expect(h4).toBe('62ec7afc84f6ecd99b18d3a2f8088552226c666ad23af870f29aafbf6d648e11');
+    expect(h5).toBe('f38a148959efc87f056035b3b603fe31eeff9f54708b25a07601a4a0203ccc78');
+    expect(h6).toBe('84f6fe7ee1e8fd33da509e2e965e76316895099461d4b8c7cbda29ca71f78c2d');
+    expect(h7).toBe('3f4d20a26636b44dcca5a37889626abf461775ca19dc9ce517a19200b10987bc');
     }, 120_000);
 
     test('keeps Tutorial through Navigator ineligible', () => {
