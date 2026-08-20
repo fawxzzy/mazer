@@ -1023,6 +1023,15 @@ const LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO = 0.066;
 const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;
+// Bleed-off/wrap corridors are just a small strip past the board's own
+// edge -- easy to miss. A soft pulse travels from where the corridor meets
+// the grid (progress 0) out to the true screen edge (progress 1), fading in
+// and out via the sine envelope so the loop has no visible seam, instead of
+// snapping back to the start mid-brightness.
+const LEGACY_BLEED_GLOW_PERIOD_MS = 1900;
+const LEGACY_BLEED_GLOW_BAND_HALF_WIDTH = 0.24;
+const LEGACY_BLEED_GLOW_MAX_ALPHA = 0.5;
+const LEGACY_BLEED_GLOW_STEPS = 8;
 const LEGACY_PLAY_HUD_TIMER_PANE = cyberArcadeMaterial.substrate.panel;
 const LEGACY_PLAY_HUD_ARROW = cyberArcadeMaterial.signal.goal;
 const LEGACY_PLAY_HUD_ARROW_TAIL = cyberArcadeMaterial.rail.white;
@@ -1700,6 +1709,9 @@ export class MenuScene extends Phaser.Scene {
       this.hudDirty = true;
     }
     if (this.hasLegacyPlayTrailPulsePendingFrame(time)) {
+      this.boardDynamicDirty = true;
+    }
+    if (this.hasLegacyBleedOffGlowPendingFrame()) {
       this.boardDynamicDirty = true;
     }
     if (this.hasLegacyPlayerVisualMotionPendingFrame(time)) {
@@ -4218,10 +4230,24 @@ export class MenuScene extends Phaser.Scene {
       : null;
   }
 
+  // Row-slice builds arm BOTH the row-based counter and the tile-order-based
+  // counter together (see armLegacyMenuStaticDrawStage), and they finish at
+  // independent rates (different batch sizes/step intervals). The tile-order
+  // one -- the interleaved, prettier reveal -- typically finishes first.
+  // Preferring it exclusively while non-null, then falling back to the
+  // stricter row check the instant it nulls out, meant any already-shown
+  // tile in a not-yet-reached row would briefly vanish and reappear right as
+  // the build finished, reading as "it rebuilds the bottom" (later rows are
+  // exactly what the row check hasn't caught up to yet). A tile that either
+  // check already considers revealed must stay revealed regardless of which
+  // counter happens to finish first, so this is a union of both checks
+  // instead of "prefer one, fall back to the other."
   private isLegacyMenuPointVisibleInStaticDraw(point: LegacyPoint): boolean {
     const tileLimit = this.resolveLegacyMenuStaticDrawTileLimit();
-    if (tileLimit !== null) {
-      return this.menuStaticDrawVisibleTileKeys.has(legacyScenePointKey(point));
+    const visibleByTileLimit = tileLimit === null
+      || this.menuStaticDrawVisibleTileKeys.has(legacyScenePointKey(point));
+    if (visibleByTileLimit) {
+      return true;
     }
 
     const rowLimit = this.resolveLegacyMenuStaticDrawRowLimit();
@@ -5794,6 +5820,144 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyPathTileFacet(graphics, facetRect, intensity, rimColor, hasTop, hasLeft, hasBottom, hasRight);
   }
 
+  private hasLegacyBleedOffGlowPendingFrame(): boolean {
+    const wrap = this.maze.wrapTopologyDiagnostics;
+    return (wrap?.horizontal.endpointCount ?? 0) > 0 || (wrap?.vertical.endpointCount ?? 0) > 0;
+  }
+
+  // Bleed-off/wrap corridors are drawn as one more real tile past the
+  // board's own edge (drawLegacyPathBorderDock), same color as every other
+  // corridor tile -- which reads as "structurally there" but doesn't call
+  // attention to the fact that this specific tile is special (it's the
+  // player's way off the visible grid entirely). This overlays a traveling
+  // green pulse on top of that base tile, from the inner end (where the
+  // corridor meets the grid) out to the true screen edge, on a loop, purely
+  // to draw the eye -- it never changes the corridor's own base color/shape.
+  private drawLegacyBleedOffGlow(
+    time: number,
+    boardLeft: number,
+    boardTop: number,
+    boardWidth: number,
+    boardHeight: number,
+    mazeLeft: number,
+    mazeTop: number,
+    tileSize: number,
+    glowColor: number
+  ): void {
+    if (!this.hasLegacyBleedOffGlowPendingFrame()) {
+      return;
+    }
+
+    const progress = (((time % LEGACY_BLEED_GLOW_PERIOD_MS) + LEGACY_BLEED_GLOW_PERIOD_MS) % LEGACY_BLEED_GLOW_PERIOD_MS)
+      / LEGACY_BLEED_GLOW_PERIOD_MS;
+    const envelope = Math.sin(Math.PI * progress);
+    if (envelope <= 0.01) {
+      return;
+    }
+
+    const materialTileSize = Math.max(1, Math.round(tileSize));
+    const cornerGuardSize = Math.max(
+      mazeLeft - boardLeft,
+      Math.round(Math.min(boardWidth, boardHeight) * LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO)
+    );
+    const width = this.maze.width;
+    const height = this.maze.height;
+    // Bleed-off tiles only ever sit on the grid's own perimeter (see
+    // isNonCornerBorderPoint in legacyMenuRender.ts) -- scanning just the
+    // border ring instead of the full grid keeps this a per-frame-safe cost
+    // even on the largest mazes.
+    const perimeterPoints: LegacyPoint[] = [];
+    for (let x = 0; x < width; x += 1) {
+      perimeterPoints.push({ x, y: 0 }, { x, y: height - 1 });
+    }
+    for (let y = 1; y < height - 1; y += 1) {
+      perimeterPoints.push({ x: 0, y }, { x: width - 1, y });
+    }
+
+    for (const point of perimeterPoints) {
+      if (this.maze.grid[point.y]?.[point.x] !== true || !this.isLegacyMenuPointVisibleInStaticDraw(point)) {
+        continue;
+      }
+      const dockDirections = resolveLegacyMenuBorderDockDirections(this.maze, point);
+      if (dockDirections.length <= 0) {
+        continue;
+      }
+
+      const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, point);
+      const frames = resolveLegacyMenuPathRenderFrames(this.maze, point, materialTileSize);
+      for (const direction of dockDirections) {
+        const dockAreas = resolveLegacyMenuBorderDockRenderAreas(direction, frames.core, {
+          boardLeft,
+          boardTop,
+          boardWidth,
+          boardHeight,
+          cornerGuardSize,
+          continuationLength: this.resolveLegacyPathBorderDockContinuation(
+            direction,
+            boardLeft,
+            boardTop,
+            boardWidth,
+            boardHeight,
+            tileSize
+          ),
+          materialTileSize,
+          mazeLeft,
+          mazeTop,
+          mazeWidth: width,
+          mazeHeight: height,
+          tileRect,
+          topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth)
+        });
+
+        const isVertical = direction === 'top' || direction === 'bottom';
+        for (const area of dockAreas) {
+          const spanStart = isVertical
+            ? (direction === 'top' ? area.bottom : area.top)
+            : (direction === 'left' ? area.right : area.left);
+          const spanEnd = isVertical
+            ? (direction === 'top' ? area.top : area.bottom)
+            : (direction === 'left' ? area.left : area.right);
+          const span = spanEnd - spanStart;
+          if (Math.abs(span) < 1) {
+            continue;
+          }
+
+          for (let step = 0; step < LEGACY_BLEED_GLOW_STEPS; step += 1) {
+            const t0 = step / LEGACY_BLEED_GLOW_STEPS;
+            const t1 = (step + 1) / LEGACY_BLEED_GLOW_STEPS;
+            const dist = Math.abs(((t0 + t1) / 2) - progress);
+            const bandIntensity = Math.max(0, 1 - (dist / LEGACY_BLEED_GLOW_BAND_HALF_WIDTH));
+            if (bandIntensity <= 0.02) {
+              continue;
+            }
+
+            const alpha = LEGACY_BLEED_GLOW_MAX_ALPHA * envelope * bandIntensity;
+            const p0 = spanStart + (span * t0);
+            const p1 = spanStart + (span * t1);
+            const lo = Math.min(p0, p1);
+            const hi = Math.max(p0, p1);
+            this.boardDynamicGraphics.fillStyle(glowColor, alpha);
+            if (isVertical) {
+              this.boardDynamicGraphics.fillRect(
+                Math.round(area.left),
+                Math.round(lo),
+                Math.round(area.right - area.left),
+                Math.round(hi - lo)
+              );
+            } else {
+              this.boardDynamicGraphics.fillRect(
+                Math.round(lo),
+                Math.round(area.top),
+                Math.round(hi - lo),
+                Math.round(area.bottom - area.top)
+              );
+            }
+          }
+        }
+      }
+    }
+  }
+
   private drawBoardPaths(time: number): void {
     const { boardLeft: layoutBoardLeft, boardTop: layoutBoardTop, boardWidth, boardHeight } = this.layout;
     const boardOffset = this.resolveBoardOffset();
@@ -6690,6 +6854,17 @@ export class MenuScene extends Phaser.Scene {
     const progressionPalette = this.resolveActiveLegacyProgressionPalette();
     const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
 
+    this.drawLegacyBleedOffGlow(
+      time,
+      resolvedBoardLeft,
+      resolvedBoardTop,
+      boardWidth,
+      boardHeight,
+      mazeLeft,
+      mazeTop,
+      mazeTileSize,
+      progressionPalette.trailColor
+    );
     this.drawLegacyProgressionBadge();
     this.drawLegacyMenuSettingsCog(time);
 
