@@ -566,10 +566,23 @@ export const resolveLegacyMenuLayout = (
     lanes: {
       actions: actionsLane,
       controls: controlsLane,
+      // Lane starts at safeAreaTop (not 0) so resolveLegacyHeaderControlFrame
+      // -- which vertically centers header icons within [hudTop,
+      // hudTop+hudHeight] -- centers them in the region AFTER the device
+      // safe-area inset, not across it. playTopHudReserve already has
+      // safeAreaTop folded into its total size (see its own definition
+      // above), so subtracting it back out of the height here keeps this
+      // lane's bottom edge identical to before; only the top/height split
+      // changes. Previously both branches started at 0, which meant a
+      // notched/pilled device only pushed the settings cog and level badge
+      // down by half of the safe-area inset instead of the full amount,
+      // even though the title (a separate, already-correct calculation)
+      // pushed down fully -- see the leadingHeaderFrame/trailingHeaderFrame
+      // calls above, which pass hudTop: safeAreaTop for the same reason.
       hud: isPlaySurface
-        ? createLane(0, playTopHudReserve)
+        ? createLane(safeAreaTop, Math.max(0, playTopHudReserve - safeAreaTop))
         : menuTopHudReserve > 0
-          ? createLane(0, menuTopHudReserve)
+          ? createLane(safeAreaTop, menuTopHudReserve)
           : null,
       maze: createLane(boardTop, snappedBoardHeight),
       rank: rankLane,
