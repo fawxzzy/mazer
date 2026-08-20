@@ -626,7 +626,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.hudBounds = touchCompassBounds');
     expect(menuSceneSource).toContain(': mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).toContain('private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame, options: { showPane: boolean } = { showPane: true }): void');
-    expect(menuSceneSource).toContain("showPane: touchControlLayout.controlMode !== 'stick'");
+    expect(menuSceneSource).toContain('showPane: this.playFloatingStickOrigin === null');
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
     expect(menuSceneSource).toContain('this.schedulePlayResetReturn();');
     expect(menuSceneSource).toContain('private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();');
@@ -945,7 +945,11 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("? 'Slow white shine.'");
     expect(menuSceneSource).toContain("label: 'Animated Background'");
     expect(menuSceneSource).not.toContain("label: 'High Contrast'");
-    expect(menuSceneSource).toContain("label: 'Control Style'");
+    // Play touch movement only has one control scheme now -- the floating
+    // stick that spawns wherever the player touches down (see
+    // playFloatingStickOrigin) -- so a settings row toggling between two
+    // schemes no longer means anything to surface.
+    expect(menuSceneSource).not.toContain("label: 'Control Style'");
     expect(menuSceneSource).not.toContain("label: 'Smart Steering'");
     expect(menuSceneSource).toContain("label: 'Move Speed'");
     expect(menuSceneSource).toContain('private createMovementSpeedSliderRow(');
@@ -953,11 +957,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleTrailFade', this.settings.toggleTrailFade) ?? 'Off'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleTrailPulse', this.settings.toggleTrailPulse) ?? 'Off'");
     expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('toggleAnimatedBackdrop', this.settings.toggleAnimatedBackdrop) ?? 'Stagnant'");
-    expect(menuSceneSource).toContain("stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings)");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings)");
     expect(menuSceneSource).toContain('private fitLegacyUiTextToWidth<T extends Phaser.GameObjects.Text>');
     expect(menuSceneSource).toContain('const showStateLabel = uiLayout.showStateLabel;');
     expect(menuSceneSource).toContain('const labelMaxWidth = Math.max(54, labelRight - labelX);');
@@ -969,7 +971,6 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('toggleTrailFade')");
     expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('toggleTrailPulse')");
     expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('toggleAnimatedBackdrop')");
-    expect(menuSceneSource).toContain("this.applyOverlayToggleFieldChange('controlMode')");
     expect(menuSceneSource).toContain('this.applyLegacyMovementSpeed(nextSpeed);');
     expect(menuSceneSource).toContain('private applyOverlayToggleFieldChange(fieldId: LegacyOverlayToggleFieldId): void {');
     expect(menuSceneSource).not.toContain("this.openNestedOverlay('features'");

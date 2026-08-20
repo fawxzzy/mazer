@@ -55,6 +55,15 @@ export interface LegacyMenuLayoutOptions {
    * instead of shrinking the whole canvas.
    */
   safeArea?: { top?: number; right?: number; bottom?: number; left?: number };
+  /**
+   * The play surface's touch movement control is a floating stick that
+   * spawns wherever the player first touches down and draws on top of the
+   * board, instead of a fixed D-pad/stick sitting in a permanently reserved
+   * bottom lane. When true, the play board drops that big reserved lane
+   * (playControlReserve) for the same hair-of-margin full-bleed treatment
+   * the menu surface already uses.
+   */
+  useFloatingTouchControls?: boolean;
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
@@ -116,7 +125,9 @@ export const resolveLegacyMenuBoardAspectRatio = (
     ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
     : 56) + safeAreaTop;
   const playControlReserve = isPlaySurface
-    ? Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230))
+    ? (options.useFloatingTouchControls === true
+      ? safeAreaBottom + (isUltraNarrow ? 2 : 4)
+      : Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230)))
     : 0;
   // The menu board is full-bleed top-to-bottom -- the header icons
   // (level/settings), title wordmark, and Login/Start dock button float
@@ -138,8 +149,17 @@ export const resolveLegacyMenuBoardAspectRatio = (
   const maxBoardWidthBound = isPlaySurface
     ? width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)))
     : menuMaxBoardByWidth;
+  // These height ratios (0.74/0.86 max, 0.64/0.84 raw) predate the floating
+  // stick and independently capped the board well short of laneBoardLimit,
+  // on the assumption there always had to be visible breathing room below
+  // the board for a fixed control widget. With useFloatingTouchControls
+  // there's no such widget to leave room for -- laneBoardLimit (which
+  // already accounts for the top HUD and a hair of bottom margin) is the
+  // real constraint, so both ratios collapse to the same near-1 ceiling
+  // instead of an independent, tighter one.
+  const playFullBleedHeightScale = options.useFloatingTouchControls === true ? 0.97 : null;
   const maxBoardHeightBound = isPlaySurface
-    ? Math.min(height * (isPortrait ? 0.74 : 0.86), laneBoardLimit)
+    ? Math.min(height * (playFullBleedHeightScale ?? (isPortrait ? 0.74 : 0.86)), laneBoardLimit)
     : laneBoardLimit;
   const minBoardWidthBound = Math.min(maxBoardWidthBound, 300);
   const minBoardHeightBound = Math.min(maxBoardHeightBound, 300);
@@ -147,7 +167,7 @@ export const resolveLegacyMenuBoardAspectRatio = (
     ? width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias
     : menuMaxBoardByWidth * scaleBias;
   const rawBoardHeightBound = isPlaySurface
-    ? Math.min(height * (isPortrait ? 0.64 : 0.84) * scaleBias, laneBoardLimit)
+    ? Math.min(height * (playFullBleedHeightScale ?? (isPortrait ? 0.64 : 0.84)) * scaleBias, laneBoardLimit)
     : laneBoardLimit * scaleBias;
   const boardWidthTarget = Math.round(clamp(rawBoardWidthBound, minBoardWidthBound, maxBoardWidthBound));
   const boardHeightTarget = Math.round(clamp(rawBoardHeightBound, minBoardHeightBound, maxBoardHeightBound));
@@ -292,7 +312,9 @@ export const resolveLegacyMenuLayout = (
     ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
     : 56) + safeAreaTop;
   const playControlReserve = isPlaySurface
-    ? Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230))
+    ? (options.useFloatingTouchControls === true
+      ? safeAreaBottom + (isUltraNarrow ? 2 : 4)
+      : Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230)))
     : 0;
   // Menu surface: the header icons (level/settings), title wordmark, and
   // Login/Start dock button all float above the board as an overlay instead
@@ -336,8 +358,17 @@ export const resolveLegacyMenuLayout = (
   const maxBoardWidthBound = isPlaySurface
     ? width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)))
     : menuMaxBoardByWidth;
+  // These height ratios (0.74/0.86 max, 0.64/0.84 raw) predate the floating
+  // stick and independently capped the board well short of laneBoardLimit,
+  // on the assumption there always had to be visible breathing room below
+  // the board for a fixed control widget. With useFloatingTouchControls
+  // there's no such widget to leave room for -- laneBoardLimit (which
+  // already accounts for the top HUD and a hair of bottom margin) is the
+  // real constraint, so both ratios collapse to the same near-1 ceiling
+  // instead of an independent, tighter one.
+  const playFullBleedHeightScale = options.useFloatingTouchControls === true ? 0.97 : null;
   const maxBoardHeightBound = isPlaySurface
-    ? Math.min(height * (isPortrait ? 0.74 : 0.86), laneBoardLimit)
+    ? Math.min(height * (playFullBleedHeightScale ?? (isPortrait ? 0.74 : 0.86)), laneBoardLimit)
     : laneBoardLimit;
   // Must never exceed the max bound -- the old `Math.max(120, maxBoardSize)`
   // could force a 120px floor even when maxBoardSize (the safe fill bound)
@@ -353,7 +384,7 @@ export const resolveLegacyMenuLayout = (
     ? width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias
     : menuMaxBoardByWidth * scaleBias;
   const rawBoardHeightBound = isPlaySurface
-    ? Math.min(height * (isPortrait ? 0.64 : 0.84) * scaleBias, laneBoardLimit)
+    ? Math.min(height * (playFullBleedHeightScale ?? (isPortrait ? 0.64 : 0.84)) * scaleBias, laneBoardLimit)
     // scaleBias is the user's own board-scale preference (Options); let it
     // shrink the board below the max fill, but the maxBoardHeightBound clamp
     // below guarantees it can never grow past the safe fill bound and
