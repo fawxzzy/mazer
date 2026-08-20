@@ -6991,8 +6991,13 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (this.mode === 'menu') {
+      // The front door no longer surfaces the demo AI's own level -- it was
+      // read as "your level" by players even though it tracks an
+      // independent, invisible AI progression track, not anything the
+      // player has done.
       this.clearLegacyPlayerProgressionBadge();
-      return this.drawLegacyMenuAiProgressionBadge();
+      this.clearLegacyMenuAiProgressionBadge();
+      return null;
     }
 
     const playerTrack = this.progressionState.tracks.player;
@@ -7101,53 +7106,6 @@ export class MenuScene extends Phaser.Scene {
     this.menuAiProgressionBadgeTextFits = false;
     this.menuAiProgressionBadgeText.setVisible(false);
     this.menuAiProgressionBadgeLabelText.setVisible(false);
-  }
-
-  private drawLegacyMenuAiProgressionBadge(): VisualRect {
-    const aiTrack = this.progressionState.tracks['ai-runner'];
-    const palette = resolveLegacyProgressionPalette(aiTrack, 'ai-runner');
-    const laneTop = this.layout.lanes.hud?.top ?? 0;
-    const frame = resolveLegacyHeaderControlFrame({
-      height: this.layout.height,
-      hudHeight: this.layout.lanes.hud?.height ?? 64,
-      hudTop: laneTop,
-      placement: 'leading',
-      slot: 0,
-      width: this.layout.width
-    });
-    this.menuAiProgressionBadgeText
-      .setText(String(aiTrack.level))
-      .setFontSize(resolveLegacyHeaderControlMetricFontSize(aiTrack.level, frame.width))
-      .setAlign('center')
-      .setLineSpacing(0)
-      .setPadding(0)
-      .setColor(palette.badgeColor)
-      .setVisible(true);
-    this.menuAiProgressionBadgeLabelText
-      .setText('LVL')
-      .setColor(palette.badgeColor)
-      .setVisible(true);
-    this.layoutLegacyHeaderMetricPair(frame, this.menuAiProgressionBadgeText, this.menuAiProgressionBadgeLabelText, 1);
-
-    const badgeBounds = createVisualRect(frame.left, frame.top, frame.width, frame.height);
-    const rawLabelBounds = this.menuAiProgressionBadgeLabelText.getBounds();
-    const rawTextBounds = this.menuAiProgressionBadgeText.getBounds();
-    this.menuAiProgressionBadgeBounds = badgeBounds;
-    this.menuAiProgressionBadgeLabelBounds = createVisualRect(
-      rawLabelBounds.x,
-      rawLabelBounds.y,
-      rawLabelBounds.width,
-      rawLabelBounds.height
-    );
-    this.menuAiProgressionBadgeTextBounds = createVisualRect(
-      rawTextBounds.x,
-      rawTextBounds.y,
-      rawTextBounds.width,
-      rawTextBounds.height
-    );
-    this.menuAiProgressionBadgeTextFits = true;
-
-    return badgeBounds;
   }
 
   private drawLegacyMenuSettingsCog(time: number): void {
@@ -8708,8 +8666,11 @@ export class MenuScene extends Phaser.Scene {
     this.overlayScrollBottomFadeAlpha = 0;
     this.progressionBadgeText.setVisible(this.mode === 'play' && this.overlay === 'none');
     this.progressionBadgeLabelText.setVisible(this.mode === 'play' && this.overlay === 'none');
-    this.menuAiProgressionBadgeText.setVisible(this.mode === 'menu' && this.overlay === 'none');
-    this.menuAiProgressionBadgeLabelText.setVisible(this.mode === 'menu' && this.overlay === 'none');
+    // The menu front door no longer shows the demo AI's level badge (see
+    // drawLegacyProgressionBadge) -- keep these permanently hidden here too
+    // instead of relying on frame ordering against that per-frame clear.
+    this.menuAiProgressionBadgeText.setVisible(false);
+    this.menuAiProgressionBadgeLabelText.setVisible(false);
 
     if (this.overlay === 'none') {
       if (this.mode === 'menu') {

@@ -10,6 +10,19 @@ export const MAZE_CYCLE_RUN_QUALITY_AI_CHALLENGE_SCORE_THRESHOLD = 58;
 export const MAZE_CYCLE_RUN_QUALITY_AI_EASE_SCORE_THRESHOLD = 34;
 export const MAZE_CYCLE_RUN_QUALITY_AI_CHAOTIC_PRESSURE_THRESHOLD = 60;
 export const MAZE_CYCLE_RUN_QUALITY_AI_SEARCHING_EXHAUSTION_SCORE_CAP = 56;
+// routeEfficiencyPressureScore saturates at 100 once a run overruns the
+// shortest path by 1.5x (it's shared with the player scorer's tighter
+// tolerance) -- it can't tell a 2x overrun apart from a 5x one. A low-rank
+// "human-like" AI (see demoWalker.ts's rank-scaled perception) routinely
+// overruns 2-4x by design at E/D rank, so gating on the saturated score
+// meant almost every run got force-capped regardless of how clean the rest
+// of it was -- the AI could never earn enough challenge signals to rank up,
+// and a low rank is exactly what keeps it overrunning. These compare
+// against the raw, unclamped overrun ratio instead so only genuinely
+// extreme runs get force-capped, and moderate-but-real overruns are judged
+// by the weighted total like everything else.
+export const MAZE_CYCLE_RUN_QUALITY_AI_EXTREME_OVERRUN_RATIO_THRESHOLD = 4.5;
+export const MAZE_CYCLE_RUN_QUALITY_AI_CHALLENGE_OVERRUN_RATIO_THRESHOLD = 2.5;
 // The player-facing HUD publishes this total, so it must be the primary
 // advancement threshold for a completed player maze. Route mistakes are
 // already reflected in the weighted score; only explicit failure conditions
@@ -217,7 +230,7 @@ export const scoreMazeCycleRunQuality = (input) => {
           ? MAZE_CYCLE_RUN_QUALITY_AI_SEARCHING_EXHAUSTION_SCORE_CAP
           : 38
         : 100,
-      base.routeEfficiencyPressureScore >= 88 ? 45 : 100,
+      base.routeOverrunRatio >= MAZE_CYCLE_RUN_QUALITY_AI_EXTREME_OVERRUN_RATIO_THRESHOLD ? 45 : 100,
       base.stabilityScore <= 25 ? 62 : 100
     ));
     let signal = 'hold';
@@ -226,14 +239,14 @@ export const scoreMazeCycleRunQuality = (input) => {
     } else if (
       aiScore.pressureScore >= MAZE_CYCLE_RUN_QUALITY_AI_CHAOTIC_PRESSURE_THRESHOLD
       || (total <= MAZE_CYCLE_RUN_QUALITY_AI_EASE_SCORE_THRESHOLD && !isSearchingExhaustion)
-      || (base.routeEfficiencyPressureScore >= 88 && !isSearchingExhaustion)
+      || (base.routeOverrunRatio >= MAZE_CYCLE_RUN_QUALITY_AI_EXTREME_OVERRUN_RATIO_THRESHOLD && !isSearchingExhaustion)
     ) {
       signal = 'ease';
     } else if (
       total >= MAZE_CYCLE_RUN_QUALITY_AI_CHALLENGE_SCORE_THRESHOLD
       && !isSearchingExhaustion
       && aiScore.pressureScore < MAZE_CYCLE_RUN_QUALITY_AI_CHAOTIC_PRESSURE_THRESHOLD
-      && base.routeEfficiencyPressureScore <= 70
+      && base.routeOverrunRatio <= MAZE_CYCLE_RUN_QUALITY_AI_CHALLENGE_OVERRUN_RATIO_THRESHOLD
     ) {
       signal = 'challenge';
     }
