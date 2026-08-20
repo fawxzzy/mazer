@@ -5588,9 +5588,14 @@ export class MenuScene extends Phaser.Scene {
   // an arbitrary line all the way to fill whatever gap happens to be left.
   // The effect is "one more real tile, drawn past the edge of the grid" --
   // not a decorative line extension unrelated to the tile size. Left/right
-  // have nothing else reserved there and can reach close to the true edge;
-  // top/bottom still have to stay clear of the header icons and the bottom
-  // dock button/touch-control lane, so they cap at whichever is smaller.
+  // have nothing else reserved there and can reach close to the true edge.
+  // Play mode's board still has a real reserved lane for the HUD/touch
+  // controls that top/bottom must stay clear of. The menu surface's board
+  // is full-bleed now (the header icons, title, and Login/Start button
+  // float above it rather than it leaving room for them -- see
+  // legacyMenuLayout.ts), so its top/bottom bleed reaches toward the true
+  // screen edge the same way left/right already do, instead of clamping
+  // against those now-overlapping lanes.
   private resolveLegacyPathBorderDockContinuation(
     direction: LegacyMenuBorderDockDirection,
     boardLeft: number,
@@ -5601,6 +5606,7 @@ export class MenuScene extends Phaser.Scene {
   ): number {
     const edgeInset = 2;
     const oneTileWidth = Math.max(2, Math.round(tileSize));
+    const isPlaySurface = this.mode === 'play';
 
     if (direction === 'left') {
       return Math.min(oneTileWidth, Math.max(2, boardLeft - edgeInset));
@@ -5610,15 +5616,17 @@ export class MenuScene extends Phaser.Scene {
       return Math.min(oneTileWidth, Math.max(2, (this.layout.width - edgeInset) - boardRight));
     }
     if (direction === 'top') {
-      const safeTop = Math.max(edgeInset, this.layout.lanes.hud?.bottom ?? edgeInset);
+      const safeTop = isPlaySurface
+        ? Math.max(edgeInset, this.layout.lanes.hud?.bottom ?? edgeInset)
+        : edgeInset;
       return Math.min(oneTileWidth, Math.max(2, boardTop - safeTop));
     }
 
     const boardBottom = boardTop + boardHeight;
-    const safeBottomBoundary = this.mode === 'play'
-      ? this.layout.lanes.controls?.top
-      : this.layout.lanes.actions?.top;
-    const safeBottom = Math.min(this.layout.height - edgeInset, safeBottomBoundary ?? this.layout.height - edgeInset);
+    const safeBottomBoundary = isPlaySurface
+      ? (this.layout.lanes.controls?.top ?? this.layout.height - edgeInset)
+      : this.layout.height - edgeInset;
+    const safeBottom = Math.min(this.layout.height - edgeInset, safeBottomBoundary);
     return Math.min(oneTileWidth, Math.max(2, safeBottom - boardBottom));
   }
 
