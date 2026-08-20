@@ -962,7 +962,9 @@ const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 // Pulse period for the classic "PRESS START" blink -- see
 // applyLegacyMenuBlinkPulse.
-const LEGACY_MENU_BLINK_PULSE_MS = 900;
+// Slowed way down from an initial 900ms -- per feedback that pace read as
+// too fast/flickery for a deliberate classic-menu blink.
+const LEGACY_MENU_BLINK_PULSE_MS = 2400;
 const LEGACY_MENU_PATH_TITLE_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_MENU_PATH_TITLE_ACCENT = cyberArcadeMaterial.signal.player;
 const LEGACY_MENU_PATH_TITLE_PRISM = cyberArcadeMaterial.rail.cyan;
@@ -3908,8 +3910,13 @@ export class MenuScene extends Phaser.Scene {
 
   private refreshLayout(): void {
     const viewportGeometry = readMazerViewportGeometry();
-    const width = viewportGeometry.content.width;
-    const height = viewportGeometry.content.height;
+    // The canvas itself is full-bleed (no safe-area reduction) so background
+    // and board art reach the true device edges -- safeArea is instead
+    // passed into resolveLegacyMenuLayout below, which insets just the
+    // individual UI lanes (header, title, bottom actions) away from
+    // notches/home-indicators without shrinking the whole canvas.
+    const width = viewportGeometry.fullBleed.width;
+    const height = viewportGeometry.fullBleed.height;
     const backingResolution = resolveMazerCanvasBackingResolution({
       canvasCssHeight: height,
       canvasCssWidth: width
@@ -3936,7 +3943,8 @@ export class MenuScene extends Phaser.Scene {
       layoutSurface,
       {
         browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height),
-        menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest'
+        menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest',
+        safeArea: viewportGeometry.safeArea
       }
     );
     this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
@@ -3955,8 +3963,8 @@ export class MenuScene extends Phaser.Scene {
   // after the fact (see resolveLegacyMenuBoardAspectRatio for the box math).
   private resolveLegacyBoardAspectRatioForMode(mode: RuntimeMode): number {
     const viewportGeometry = readMazerViewportGeometry();
-    const width = viewportGeometry.content.width;
-    const height = viewportGeometry.content.height;
+    const width = viewportGeometry.fullBleed.width;
+    const height = viewportGeometry.fullBleed.height;
     const layoutSurface = mode === 'play' ? 'play' : 'menu';
     return resolveLegacyMenuBoardAspectRatio(
       width,
@@ -3965,7 +3973,8 @@ export class MenuScene extends Phaser.Scene {
       layoutSurface,
       {
         browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height),
-        menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest'
+        menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest',
+        safeArea: viewportGeometry.safeArea
       }
     );
   }
@@ -5545,12 +5554,15 @@ export class MenuScene extends Phaser.Scene {
 
   // A normal corridor stays a tile away from the board edge (the existing
   // safeInset in resolveLegacyMazeRenderFrame). A wraparound dock corridor
-  // -- one whose path genuinely continues off-grid -- reads better bleeding
-  // all the way to the real screen edge instead of stopping at a small
-  // fixed continuation past the board rect. Left/right have nothing else
-  // reserved there and can reach the true edge; top/bottom have to stay
-  // clear of the header icons and the bottom dock button/touch-control
-  // lane, so they bleed only as far as those reserves allow.
+  // -- one whose path genuinely continues off-grid -- bleeds exactly one
+  // additional tile width past the board edge, reaching (or nearly
+  // reaching) the true screen edge for that one tile, instead of stretching
+  // an arbitrary line all the way to fill whatever gap happens to be left.
+  // The effect is "one more real tile, drawn past the edge of the grid" --
+  // not a decorative line extension unrelated to the tile size. Left/right
+  // have nothing else reserved there and can reach close to the true edge;
+  // top/bottom still have to stay clear of the header icons and the bottom
+  // dock button/touch-control lane, so they cap at whichever is smaller.
   private resolveLegacyPathBorderDockContinuation(
     direction: LegacyMenuBorderDockDirection,
     boardLeft: number,
@@ -5560,18 +5572,18 @@ export class MenuScene extends Phaser.Scene {
     tileSize: number
   ): number {
     const edgeInset = 2;
-    const fallback = Math.max(2, Math.round(tileSize * 0.32));
+    const oneTileWidth = Math.max(2, Math.round(tileSize));
 
     if (direction === 'left') {
-      return Math.max(fallback, boardLeft - edgeInset);
+      return Math.min(oneTileWidth, Math.max(2, boardLeft - edgeInset));
     }
     if (direction === 'right') {
       const boardRight = boardLeft + boardWidth;
-      return Math.max(fallback, (this.layout.width - edgeInset) - boardRight);
+      return Math.min(oneTileWidth, Math.max(2, (this.layout.width - edgeInset) - boardRight));
     }
     if (direction === 'top') {
       const safeTop = Math.max(edgeInset, this.layout.lanes.hud?.bottom ?? edgeInset);
-      return Math.max(fallback, boardTop - safeTop);
+      return Math.min(oneTileWidth, Math.max(2, boardTop - safeTop));
     }
 
     const boardBottom = boardTop + boardHeight;
@@ -5579,7 +5591,7 @@ export class MenuScene extends Phaser.Scene {
       ? this.layout.lanes.controls?.top
       : this.layout.lanes.actions?.top;
     const safeBottom = Math.min(this.layout.height - edgeInset, safeBottomBoundary ?? this.layout.height - edgeInset);
-    return Math.max(fallback, safeBottom - boardBottom);
+    return Math.min(oneTileWidth, Math.max(2, safeBottom - boardBottom));
   }
 
   private drawLegacyPathBorderDock(
@@ -6065,16 +6077,20 @@ export class MenuScene extends Phaser.Scene {
     const bottom = rotate(0, radius);
     const left = rotate(-radius, 0);
 
+    // A tiny crystal-facet tile (the same flat-fill-plus-rim material as
+    // the maze corridor/title cells) rotated into a diamond, instead of a
+    // generic two-tone gem shape -- reads as a small maze tile orbiting the
+    // screen edge rather than jewelry.
     this.titleGraphics.fillStyle(fillColor, fillAlpha);
     this.titleGraphics.fillTriangle(top.x, top.y, right.x, right.y, bottom.x, bottom.y);
     this.titleGraphics.fillTriangle(top.x, top.y, left.x, left.y, bottom.x, bottom.y);
-    this.titleGraphics.lineStyle(1, edgeColor, edgeAlpha);
+    this.titleGraphics.lineStyle(Math.max(1, radius * 0.16), edgeColor, edgeAlpha);
     this.strokeLegacyPolyline(this.titleGraphics, [top, right, bottom, left, top]);
-    this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, edgeAlpha * 0.42);
-    const innerLeft = rotate(-(radius * 0.52), 0);
-    const innerTop = rotate(0, -(radius * 0.52));
-    const innerRight = rotate(radius * 0.52, 0);
-    this.strokeLegacyPolyline(this.titleGraphics, [innerLeft, innerTop, innerRight]);
+    // Small white catchlight on the leading upper edge, the same convention
+    // every other crystal-facet element (tiles, markers, the settings gear)
+    // uses for its highlight.
+    this.titleGraphics.lineStyle(Math.max(1, radius * 0.14), cyberArcadeMaterial.rail.white, edgeAlpha * 0.68);
+    this.strokeLegacyPolyline(this.titleGraphics, [left, top, right]);
   }
 
   // Eases the orbit sigils from wherever they were spinning down to their
@@ -6139,23 +6155,20 @@ export class MenuScene extends Phaser.Scene {
       const wave = isLifecycleSpinActive
         ? 0.62 + (Math.sin((orbitPhase * Math.PI * 2) + (index * 1.38)) * 0.28)
         : 0.62;
-      // Sized for legibility along the screen edge now, not scaled to the
-      // title glyph's tiny cell size -- at the old title-hugging scale
-      // these were only 4-5px and effectively invisible once spread around
-      // the much larger viewport perimeter.
-      const radius = Math.max(6, Math.round(9 + (wave * 6)));
+      // Smaller than the previous pass and using the same pale-core/teal-rim
+      // colors as the actual corridor and title tiles instead of the
+      // warm/gem gem-tone alternation, so these read as small maze tiles
+      // orbiting the edge rather than jewelry.
+      const radius = Math.max(4, Math.round(6 + (wave * 3)));
       const alpha = clamp((0.22 + (wave * 0.3)) * alphaScale, 0.16, 0.56);
-      const fillColor = index % 3 === 0
-        ? LEGACY_MENU_PATH_TITLE_FACET_WARM
-        : LEGACY_MENU_PATH_TITLE_GEM;
 
       this.drawLegacyMenuPathTitleDiamond(
         x,
         y,
         radius,
-        fillColor,
-        alpha * 0.6,
-        LEGACY_MENU_PATH_TITLE_ACCENT,
+        LEGACY_MENU_PATH_CORE,
+        alpha * 0.85,
+        LEGACY_MENU_PATH_EDGE,
         alpha,
         facing
       );
@@ -10877,13 +10890,15 @@ export class MenuScene extends Phaser.Scene {
     const y = panel.top + 8 + Math.round(size / 2);
     const chrome = this.add.graphics();
     // No ring, panel, or background tint behind the arrow -- just the
-    // chevron itself, sized up to use more of the touch target so it's
-    // easier to spot and hit instead of a small glyph lost inside a circle.
+    // chevron itself. The invisible hit rectangle below still uses the full
+    // accessible touch-target size, but the visible glyph is drawn much
+    // smaller within it -- per feedback the enlarged arrow read as way too
+    // big next to the rest of the UI.
     const drawChevronChrome = (active: boolean): void => {
       chrome.clear();
-      const chevronInset = Math.round(size * 0.4);
-      const chevronLeft = x - Math.round(size * 0.06);
-      chrome.lineStyle(Math.max(4, Math.round(size * 0.11)), active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON, active ? 1 : 0.94);
+      const chevronInset = Math.round(size * 0.22);
+      const chevronLeft = x - Math.round(size * 0.03);
+      chrome.lineStyle(Math.max(2.5, Math.round(size * 0.075)), active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON, active ? 1 : 0.94);
       chrome.beginPath();
       chrome.moveTo(chevronLeft + chevronInset, y - chevronInset);
       chrome.lineTo(chevronLeft - chevronInset, y);

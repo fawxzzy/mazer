@@ -134,10 +134,14 @@ describe('Mazer viewport geometry', () => {
 
     applyMazerViewportCssVariables(geometry, root as never);
 
+    // #app/canvas is sized to the full-bleed rect (no safe-area reduction)
+    // so the app background reaches the true device edges -- only the
+    // safeArea values (below) and geometry.content (asserted separately)
+    // carry the safe-reduced numbers now.
     expect(cssValues.get('--mazer-viewport-width')).toBe('390px');
-    expect(cssValues.get('--mazer-viewport-height')).toBe('722px');
+    expect(cssValues.get('--mazer-viewport-height')).toBe('780px');
     expect(cssValues.get('--mazer-viewport-left')).toBe('0px');
-    expect(cssValues.get('--mazer-viewport-top')).toBe('36px');
+    expect(cssValues.get('--mazer-viewport-top')).toBe('12px');
     expect(cssValues.get('--mazer-safe-area-top')).toBe('24px');
     expect(cssValues.get('--mazer-safe-area-bottom')).toBe('34px');
     expect(root.dataset).toMatchObject({ mazerViewportRevision: '3' });
@@ -184,8 +188,8 @@ describe('Mazer viewport geometry', () => {
       }
     };
 
-    expect(syncMazerGameToViewport(game as never, { content: { width: 390, height: 844 } })).toBe(false);
-    expect(syncMazerGameToViewport(game as never, { content: { width: 844, height: 390 } })).toBe(true);
+    expect(syncMazerGameToViewport(game as never, { fullBleed: { width: 390, height: 844 } })).toBe(false);
+    expect(syncMazerGameToViewport(game as never, { fullBleed: { width: 844, height: 390 } })).toBe(true);
     expect(parentSizeCalls).toEqual([
       [390, 844],
       [844, 390]
@@ -205,7 +209,7 @@ describe('Mazer viewport geometry', () => {
     };
 
     expect(syncMazerGameToViewport({ scale } as never, {
-      content: { width: 360, height: 720 }
+      fullBleed: { width: 360, height: 720 }
     })).toBe(false);
     expect([scale.parentWidth, scale.parentHeight]).toEqual([360, 720]);
   });
@@ -223,10 +227,10 @@ describe('Mazer viewport geometry', () => {
     };
     const game = { scale };
 
-    expect(syncMazerGameToViewport(game as never, { content: { width: 1440, height: 900 } })).toBe(true);
-    expect(syncMazerGameToViewport(game as never, { content: { width: 360, height: 720 } })).toBe(true);
-    expect(syncMazerGameToViewport(game as never, { content: { width: 405, height: 958 } })).toBe(true);
-    expect(syncMazerGameToViewport(game as never, { content: { width: 360, height: 720 } })).toBe(true);
+    expect(syncMazerGameToViewport(game as never, { fullBleed: { width: 1440, height: 900 } })).toBe(true);
+    expect(syncMazerGameToViewport(game as never, { fullBleed: { width: 360, height: 720 } })).toBe(true);
+    expect(syncMazerGameToViewport(game as never, { fullBleed: { width: 405, height: 958 } })).toBe(true);
+    expect(syncMazerGameToViewport(game as never, { fullBleed: { width: 360, height: 720 } })).toBe(true);
 
     expect(parentSizeCalls).toEqual([
       [1440, 900],
@@ -257,8 +261,11 @@ describe('Mazer viewport geometry', () => {
       content: { left: 0, top: 42, width: 390, height: 722 },
       visual: { height: 780, offsetTop: 18, usedForContent: true }
     });
-    expect(observed.cssValues.get('--mazer-viewport-top')).toBe('42px');
-    expect(observed.cssValues.get('--mazer-viewport-height')).toBe('722px');
+    // The published CSS vars follow fullBleed (no safe-area reduction) --
+    // content (asserted above) keeps the safe-reduced numbers for callers
+    // that still want them.
+    expect(observed.cssValues.get('--mazer-viewport-top')).toBe('18px');
+    expect(observed.cssValues.get('--mazer-viewport-height')).toBe('780px');
     expect(snapshots).toHaveLength(2);
 
     controller.dispose();

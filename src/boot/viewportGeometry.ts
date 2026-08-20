@@ -15,7 +15,10 @@ export interface MazerViewportRect {
 }
 
 export interface MazerViewportGeometry {
+  /** Safe-area-reduced rect -- kept for callers that still want it, but the game canvas itself uses `fullBleed` (see below) so the app's background/border reach the true device edges. */
   content: MazerViewportRect;
+  /** The entire visual viewport with no safe-area reduction -- what the canvas/#app element are sized to, so background and board art reach the true screen edges. Individual UI elements (title, buttons, header icons) are the ones that inset by `safeArea` in the scene's own layout math, not the canvas. */
+  fullBleed: MazerViewportRect;
   devicePixelRatio: number;
   isLandscape: boolean;
   isPhoneLike: boolean;
@@ -148,6 +151,7 @@ export const resolveMazerViewportGeometryFromRuntime = (
       layout: { width: DEFAULT_VIEWPORT_WIDTH, height: DEFAULT_VIEWPORT_HEIGHT },
       visual: { width: DEFAULT_VIEWPORT_WIDTH, height: DEFAULT_VIEWPORT_HEIGHT, offsetLeft: 0, offsetTop: 0, scale: 1, usedForContent: false },
       content: { left: 0, top: 0, width: DEFAULT_VIEWPORT_WIDTH, height: DEFAULT_VIEWPORT_HEIGHT },
+      fullBleed: { left: 0, top: 0, width: DEFAULT_VIEWPORT_WIDTH, height: DEFAULT_VIEWPORT_HEIGHT },
       safeArea: { top: 0, right: 0, bottom: 0, left: 0 },
       devicePixelRatio: 1,
       isPhoneLike: false,
@@ -195,6 +199,12 @@ export const resolveMazerViewportGeometryFromRuntime = (
       width: Math.max(1, effectiveWidth - safeArea.left - safeArea.right),
       height: Math.max(1, effectiveHeight - safeArea.top - safeArea.bottom)
     },
+    fullBleed: {
+      left: effectiveLeft,
+      top: effectiveTop,
+      width: effectiveWidth,
+      height: effectiveHeight
+    },
     safeArea,
     devicePixelRatio,
     isPhoneLike: isMazerPhoneLikeRuntime(runtime),
@@ -227,10 +237,14 @@ export const applyMazerViewportCssVariables = (
     return;
   }
 
-  root.style.setProperty('--mazer-viewport-width', `${geometry.content.width}px`);
-  root.style.setProperty('--mazer-viewport-height', `${geometry.content.height}px`);
-  root.style.setProperty('--mazer-viewport-left', `${geometry.content.left}px`);
-  root.style.setProperty('--mazer-viewport-top', `${geometry.content.top}px`);
+  // #app is sized to the full-bleed rect (no safe-area reduction) so the
+  // app's background/border reach the true device edges -- individual UI
+  // elements inset from safeArea in the scene's own layout instead of the
+  // whole canvas being shrunk and left floating away from the screen edge.
+  root.style.setProperty('--mazer-viewport-width', `${geometry.fullBleed.width}px`);
+  root.style.setProperty('--mazer-viewport-height', `${geometry.fullBleed.height}px`);
+  root.style.setProperty('--mazer-viewport-left', `${geometry.fullBleed.left}px`);
+  root.style.setProperty('--mazer-viewport-top', `${geometry.fullBleed.top}px`);
   root.style.setProperty('--mazer-safe-area-top', `${geometry.safeArea.top}px`);
   root.style.setProperty('--mazer-safe-area-right', `${geometry.safeArea.right}px`);
   root.style.setProperty('--mazer-safe-area-bottom', `${geometry.safeArea.bottom}px`);
@@ -246,10 +260,10 @@ export const readMazerViewportGeometry = (): MazerViewportGeometry => (
 
 export const syncMazerGameToViewport = (
   game: Pick<Phaser.Game, 'scale'>,
-  geometry: Pick<MazerViewportGeometry, 'content'>
+  geometry: Pick<MazerViewportGeometry, 'fullBleed'>
 ): boolean => {
-  const width = geometry.content.width;
-  const height = geometry.content.height;
+  const width = geometry.fullBleed.width;
+  const height = geometry.fullBleed.height;
   const sizeChanged = game.scale.width !== width || game.scale.height !== height;
 
   // RESIZE mode normally re-measures its parent during refresh. That DOM

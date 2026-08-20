@@ -47,6 +47,14 @@ export type LegacyMenuLayoutSurface = 'menu' | 'play';
 export interface LegacyMenuLayoutOptions {
   browserMobileParity?: boolean;
   menuActionMode?: 'authenticated' | 'guest';
+  /**
+   * Device safe-area insets (notch, dynamic island, home indicator). The
+   * canvas itself is always full-bleed to the true screen edges (background
+   * and board art are never inset) -- these push just the individual UI
+   * lanes (header icons, title, bottom dock button) clear of the obstacle
+   * instead of shrinking the whole canvas.
+   */
+  safeArea?: { top?: number; right?: number; bottom?: number; left?: number };
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
@@ -99,6 +107,10 @@ export const resolveLegacyMenuBoardAspectRatio = (
   const shouldUseCleanPhoneCadence = isPortrait
     && !isUltraNarrow
     && (width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH || options.browserMobileParity === true);
+  const safeAreaTop = Math.max(0, Math.round(options.safeArea?.top ?? 0));
+  const safeAreaRight = Math.max(0, Math.round(options.safeArea?.right ?? 0));
+  const safeAreaBottom = Math.max(0, Math.round(options.safeArea?.bottom ?? 0));
+  const safeAreaLeft = Math.max(0, Math.round(options.safeArea?.left ?? 0));
   const minimumMenuActionHeight = isPortrait ? LEGACY_UI_MIN_TOUCH_TARGET : 58;
   const buttonHeight = Math.round(clamp(
     height * (isPortrait ? 0.05 : 0.066),
@@ -113,11 +125,11 @@ export const resolveLegacyMenuBoardAspectRatio = (
   const menuTitleReserve = isUltraNarrow
     ? 32
     : Math.round(clamp(Math.min(height * 0.055, width * 0.11), 34, 56));
-  const dockBottomMargin = isUltraNarrow ? 10 : 20;
+  const dockBottomMargin = (isUltraNarrow ? 10 : 20) + safeAreaBottom;
   const dockReserve = buttonHeight + dockBottomMargin;
-  const playTopHudReserve = isPlaySurface && isPortrait
+  const playTopHudReserve = (isPlaySurface && isPortrait
     ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
-    : 56;
+    : 56) + safeAreaTop;
   const playControlReserve = isPlaySurface
     ? Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230))
     : 0;
@@ -125,7 +137,7 @@ export const resolveLegacyMenuBoardAspectRatio = (
   // own lane) as "true" whenever there's a top HUD reserve at all -- close
   // enough for an aspect-ratio probe; a one-lane miss here only nudges the
   // requested ratio slightly, it never breaks generation.
-  const menuStackTop = menuTopHudReserve + menuTopReserve;
+  const menuStackTop = safeAreaTop + menuTopHudReserve + menuTopReserve;
   const menuInlineTitleBoardGap = isUltraNarrow ? 2 : 4;
   // Mirrors resolveLegacyMenuLayout's real header-icon-bottom measurement
   // (not the abstract touch-target lane) so the probed box height -- and
@@ -133,8 +145,8 @@ export const resolveLegacyMenuBoardAspectRatio = (
   // will actually produce.
   const menuHeaderContentBottom = menuTopHudReserve > 0
     ? Math.max(
-      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: 0, placement: 'leading', width }).bottom,
-      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: 0, placement: 'trailing', width }).bottom
+      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: safeAreaTop, placement: 'leading', width }).bottom,
+      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: safeAreaTop, placement: 'trailing', width }).bottom
     )
     : menuStackTop;
   const menuBoardTop = menuTopHudReserve > 0
@@ -142,13 +154,13 @@ export const resolveLegacyMenuBoardAspectRatio = (
     : menuStackTop + laneGap + menuTitleReserve + laneGap;
   const menuBottomReserve = laneGap + dockReserve;
   const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
-  const playVerticalBoardLimit = height - playTopHudReserve - (playControlReserve + (laneGap * 2));
+  const playVerticalBoardLimit = height - playTopHudReserve - (playControlReserve + (laneGap * 2)) - safeAreaBottom;
   const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuAvailableBoardHeight);
   const baseBoardScale = isPortrait ? 0.92 : 0.62;
   const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const menuEdgeMargin = isUltraNarrow ? 4 : (shouldUseCleanPhoneCadence ? 4 : 8);
-  const menuMaxBoardByWidth = Math.max(60, width - (menuEdgeMargin * 2));
+  const menuMaxBoardByWidth = Math.max(60, width - (menuEdgeMargin * 2) - safeAreaLeft - safeAreaRight);
   const maxBoardWidthBound = isPlaySurface
     ? width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)))
     : menuMaxBoardByWidth;
@@ -203,6 +215,10 @@ export const resolveLegacyMenuLayout = (
   const shouldUseCleanPhoneCadence = isPortrait
     && !isUltraNarrow
     && (width <= LEGACY_PHONE_CLEAN_ZOOM_WIDTH || options.browserMobileParity === true);
+  const safeAreaTop = Math.max(0, Math.round(options.safeArea?.top ?? 0));
+  const safeAreaRight = Math.max(0, Math.round(options.safeArea?.right ?? 0));
+  const safeAreaBottom = Math.max(0, Math.round(options.safeArea?.bottom ?? 0));
+  const safeAreaLeft = Math.max(0, Math.round(options.safeArea?.left ?? 0));
   // The exact 172px diagnostic side panel cannot fit two 44px actions plus the
   // maze without overlap. Preserve that constrained fallback; normal narrow
   // phone and split-screen layouts use the canonical touch target below.
@@ -242,19 +258,19 @@ export const resolveLegacyMenuLayout = (
   // board position paid for unnecessarily. Track the icons' real bottom
   // edge so the board can sit right under the visible content instead of
   // under the abstract lane.
-  let menuHeaderContentBottom = menuTopHudReserve + menuTopReserve;
+  let menuHeaderContentBottom = safeAreaTop + menuTopHudReserve + menuTopReserve;
   if (!isPlaySurface && menuTopHudReserve > 0) {
     const leadingHeaderFrame = resolveLegacyHeaderControlFrame({
       height,
       hudHeight: menuTopHudReserve,
-      hudTop: 0,
+      hudTop: safeAreaTop,
       placement: 'leading',
       width
     });
     const trailingHeaderFrame = resolveLegacyHeaderControlFrame({
       height,
       hudHeight: menuTopHudReserve,
-      hudTop: 0,
+      hudTop: safeAreaTop,
       placement: 'trailing',
       width
     });
@@ -283,11 +299,11 @@ export const resolveLegacyMenuLayout = (
   // Bottom-docked primary button (Fitness-app BottomDockButton style): a
   // wide pill sitting near the bottom edge with its own margin, not tightly
   // hugging the board like the old row/stack action lane did.
-  const dockBottomMargin = isUltraNarrow ? 10 : 20;
+  const dockBottomMargin = (isUltraNarrow ? 10 : 20) + safeAreaBottom;
   const dockReserve = buttonHeight + dockBottomMargin;
-  const playTopHudReserve = isPlaySurface && isPortrait
+  const playTopHudReserve = (isPlaySurface && isPortrait
     ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
-    : 56;
+    : 56) + safeAreaTop;
   const playControlReserve = isPlaySurface
     ? Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230))
     : 0;
@@ -297,7 +313,7 @@ export const resolveLegacyMenuLayout = (
   // ratios that happened to usually avoid colliding. The board gets ALL
   // remaining space after the other (deliberately small) reserves -- that is
   // the "fill to the edges" requirement.
-  const menuStackTop = menuTopHudReserve + menuTopReserve;
+  const menuStackTop = safeAreaTop + menuTopHudReserve + menuTopReserve;
   const menuTitleTop = menuStackTop + laneGap;
   // When the title fits inline in the header row, no separate title lane is
   // reserved at all -- the board reclaims that space, matching the "fill to
@@ -314,7 +330,8 @@ export const resolveLegacyMenuLayout = (
 
   const playVerticalBoardLimit = height
     - playTopHudReserve
-    - (playControlReserve + (laneGap * 2));
+    - (playControlReserve + (laneGap * 2))
+    - safeAreaBottom;
   const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuAvailableBoardHeight);
   const baseBoardScale = isPortrait ? 0.92 : 0.62;
   const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
@@ -324,7 +341,7 @@ export const resolveLegacyMenuLayout = (
   // inset (LEGACY_BOARD_MAZE_SAFE_INSET_*, 4-7px) still keeps the actual
   // tiles a little clear of the literal edge, so this isn't pixel-zero.
   const menuEdgeMargin = isUltraNarrow ? 4 : (shouldUseCleanPhoneCadence ? 4 : 8);
-  const menuMaxBoardByWidth = Math.max(60, width - (menuEdgeMargin * 2));
+  const menuMaxBoardByWidth = Math.max(60, width - (menuEdgeMargin * 2) - safeAreaLeft - safeAreaRight);
   // Width-bound and height-bound board limits are resolved independently --
   // each axis gets its own max/min/raw target -- so a non-square maze
   // (mazeWidth !== mazeHeight) can genuinely fill both the full available
@@ -392,7 +409,7 @@ export const resolveLegacyMenuLayout = (
   const snappedBoardHeight = shouldUseCleanPhoneCadence
     ? Math.round((tileSize * mazeHeight) + cleanPhoneInsetPad)
     : Math.round(tileSize * mazeHeight * 1000) / 1000;
-  const boardLeft = Math.round((width - snappedBoardWidth) / 2);
+  const boardLeft = Math.round(safeAreaLeft + ((width - safeAreaLeft - safeAreaRight - snappedBoardWidth) / 2));
   // The board claims its full width-constrained size regardless of how much
   // vertical room is actually available (laneBoardLimit already bounds it
   // safely) -- on most portrait phones that leaves real slack between the
