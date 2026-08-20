@@ -111,49 +111,23 @@ export const resolveLegacyMenuBoardAspectRatio = (
   const safeAreaRight = Math.max(0, Math.round(options.safeArea?.right ?? 0));
   const safeAreaBottom = Math.max(0, Math.round(options.safeArea?.bottom ?? 0));
   const safeAreaLeft = Math.max(0, Math.round(options.safeArea?.left ?? 0));
-  const minimumMenuActionHeight = isPortrait ? LEGACY_UI_MIN_TOUCH_TARGET : 58;
-  const buttonHeight = Math.round(clamp(
-    height * (isPortrait ? 0.05 : 0.066),
-    minimumMenuActionHeight,
-    isPortrait ? 62 : 78
-  ));
   const laneGap = isUltraNarrow ? 4 : 8;
-  const menuTopReserve = isUltraNarrow ? 6 : Math.round(clamp(height * 0.02, 16, 20));
-  const menuTopHudReserve = !isPlaySurface
-    ? Math.round(clamp(height * 0.072, isUltraNarrow ? 44 : LEGACY_MENU_TOP_HUD_MIN, LEGACY_MENU_TOP_HUD_MAX))
-    : 0;
-  const menuTitleReserve = isUltraNarrow
-    ? 32
-    : Math.round(clamp(Math.min(height * 0.055, width * 0.11), 34, 56));
-  const dockBottomMargin = (isUltraNarrow ? 10 : 20) + safeAreaBottom;
-  const dockReserve = buttonHeight + dockBottomMargin;
   const playTopHudReserve = (isPlaySurface && isPortrait
     ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
     : 56) + safeAreaTop;
   const playControlReserve = isPlaySurface
     ? Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230))
     : 0;
-  // Approximates whether the title fits inline in the header (skipping its
-  // own lane) as "true" whenever there's a top HUD reserve at all -- close
-  // enough for an aspect-ratio probe; a one-lane miss here only nudges the
-  // requested ratio slightly, it never breaks generation.
-  const menuStackTop = safeAreaTop + menuTopHudReserve + menuTopReserve;
-  const menuInlineTitleBoardGap = isUltraNarrow ? 2 : 4;
-  // Mirrors resolveLegacyMenuLayout's real header-icon-bottom measurement
-  // (not the abstract touch-target lane) so the probed box height -- and
-  // therefore the requested aspect ratio -- matches what the real layout
-  // will actually produce.
-  const menuHeaderContentBottom = menuTopHudReserve > 0
-    ? Math.max(
-      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: safeAreaTop, placement: 'leading', width }).bottom,
-      resolveLegacyHeaderControlFrame({ height, hudHeight: menuTopHudReserve, hudTop: safeAreaTop, placement: 'trailing', width }).bottom
-    )
-    : menuStackTop;
-  const menuBoardTop = menuTopHudReserve > 0
-    ? menuHeaderContentBottom + menuInlineTitleBoardGap
-    : menuStackTop + laneGap + menuTitleReserve + laneGap;
-  const menuBottomReserve = laneGap + dockReserve;
-  const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
+  // The menu board is full-bleed top-to-bottom -- the header icons
+  // (level/settings), title wordmark, and Login/Start dock button float
+  // above it as an overlay instead of the board leaving a dedicated lane
+  // clear for them. Only a hair of margin (plus any device safe-area inset)
+  // keeps tiles off the literal screen edge. Mirrors
+  // resolveLegacyMenuLayout's own menuBoardTop/menuBottomReserve -- keep
+  // both in sync if either changes.
+  const menuFullBleedTopMargin = safeAreaTop + (isUltraNarrow ? 2 : 4);
+  const menuFullBleedBottomMargin = safeAreaBottom + (isUltraNarrow ? 2 : 4);
+  const menuAvailableBoardHeight = Math.max(60, height - menuFullBleedTopMargin - menuFullBleedBottomMargin);
   const playVerticalBoardLimit = height - playTopHudReserve - (playControlReserve + (laneGap * 2)) - safeAreaBottom;
   const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuAvailableBoardHeight);
   const baseBoardScale = isPortrait ? 0.92 : 0.62;
@@ -251,14 +225,6 @@ export const resolveLegacyMenuLayout = (
   let menuTitleFitsInHeader = false;
   let menuHeaderTitleCenterX = Math.round(width / 2);
   let menuHeaderTitleCenterY = 0;
-  // menuTopHudReserve is a touch-target-sized lane (clamped to a 56-72px
-  // floor for tap-target compliance), but the actual header icons rendered
-  // inside it are only ~36-40px tall and vertically centered -- leaving a
-  // lot of dead reserved space below them that the old menuStackTop-based
-  // board position paid for unnecessarily. Track the icons' real bottom
-  // edge so the board can sit right under the visible content instead of
-  // under the abstract lane.
-  let menuHeaderContentBottom = safeAreaTop + menuTopHudReserve + menuTopReserve;
   if (!isPlaySurface && menuTopHudReserve > 0) {
     const leadingHeaderFrame = resolveLegacyHeaderControlFrame({
       height,
@@ -274,7 +240,6 @@ export const resolveLegacyMenuLayout = (
       placement: 'trailing',
       width
     });
-    menuHeaderContentBottom = Math.max(leadingHeaderFrame.bottom, trailingHeaderFrame.bottom);
     const headerGap = trailingHeaderFrame.left - leadingHeaderFrame.right;
     // Keep this formula identical to resolveLegacyMenuTitlePresentation's
     // fontSize in legacyMenuTitle.ts, or the fit-check here and the actual
@@ -300,32 +265,26 @@ export const resolveLegacyMenuLayout = (
   // wide pill sitting near the bottom edge with its own margin, not tightly
   // hugging the board like the old row/stack action lane did.
   const dockBottomMargin = (isUltraNarrow ? 10 : 20) + safeAreaBottom;
-  const dockReserve = buttonHeight + dockBottomMargin;
   const playTopHudReserve = (isPlaySurface && isPortrait
     ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
     : 56) + safeAreaTop;
   const playControlReserve = isPlaySurface
     ? Math.round(clamp(width * 0.52, isUltraNarrow ? 160 : 188, 230))
     : 0;
-  // Menu surface: explicit top-to-bottom stack (header -> title -> board ->
-  // dock button), each section computed from the one above it so nothing can
-  // ever overlap by construction, instead of several independently-guessed
-  // ratios that happened to usually avoid colliding. The board gets ALL
-  // remaining space after the other (deliberately small) reserves -- that is
-  // the "fill to the edges" requirement.
+  // Menu surface: the header icons (level/settings), title wordmark, and
+  // Login/Start dock button all float above the board as an overlay instead
+  // of the board leaving a dedicated lane clear for them -- the board is
+  // full-bleed top-to-bottom, only clipped by a hair of margin (plus any
+  // device safe-area inset) so tiles stay off the literal screen edge.
+  // menuStackTop/menuTitleTop still anchor the title's own position when it
+  // doesn't fit inline in the header (see titleLaneTop below) -- they no
+  // longer feed the board's bound.
   const menuStackTop = safeAreaTop + menuTopHudReserve + menuTopReserve;
   const menuTitleTop = menuStackTop + laneGap;
-  // When the title fits inline in the header row, no separate title lane is
-  // reserved at all -- the board reclaims that space, matching the "fill to
-  // the edges" requirement. This junction uses a tighter gap than the
-  // general laneGap: the header row already has its own internal padding
-  // around the title/icons, so the board can sit closer beneath it without
-  // touching.
-  const menuInlineTitleBoardGap = isUltraNarrow ? 2 : 4;
-  const menuBoardTop = menuTitleFitsInHeader
-    ? menuHeaderContentBottom + menuInlineTitleBoardGap
-    : menuTitleTop + menuTitleReserve + laneGap;
-  const menuBottomReserve = laneGap + dockReserve;
+  const menuFullBleedTopMargin = safeAreaTop + (isUltraNarrow ? 2 : 4);
+  const menuFullBleedBottomMargin = safeAreaBottom + (isUltraNarrow ? 2 : 4);
+  const menuBoardTop = menuFullBleedTopMargin;
+  const menuBottomReserve = menuFullBleedBottomMargin;
   const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
 
   const playVerticalBoardLimit = height
@@ -478,7 +437,11 @@ export const resolveLegacyMenuLayout = (
   const leftButtonY = resolvedUsesStackedButtons ? stackTop + Math.round(buttonHeight / 2) : rowButtonY;
   const rightButtonY = resolvedUsesStackedButtons ? leftButtonY + buttonHeight + stackGap : rowButtonY;
   const centerButtonY = rowButtonY;
-  const titleLaneTop = menuTitleFitsInHeader ? 0 : Math.max(0, boardTop - laneGap - menuTitleReserve);
+  // Anchored from the header reserve (menuTitleTop), not from boardTop --
+  // the board no longer reserves room above itself for the title, so
+  // deriving this from boardTop would place the fallback title lane at (or
+  // above) the literal top edge instead of just under the header icons.
+  const titleLaneTop = menuTitleFitsInHeader ? 0 : menuTitleTop;
   // Simple mid-lane centering. The old formula's extra -16px portrait nudge
   // was tuned against the previous ~140-156px title reserve; against the new
   // much smaller compact reserve that same fixed offset would push the
