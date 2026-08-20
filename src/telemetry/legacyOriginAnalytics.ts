@@ -32,11 +32,6 @@ export const installLegacyOriginAnalytics = (): void => {
   }
 
   const body = JSON.stringify(buildMazerLegacyOriginAnalyticsPayload());
-  if (navigator.sendBeacon) {
-    navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
-    return;
-  }
-
   void fetch(endpoint, {
     body,
     credentials: 'omit',

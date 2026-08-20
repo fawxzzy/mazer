@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
   buildMazerLegacyOriginAnalyticsPayload,
@@ -12,6 +14,15 @@ describe('Mazer legacy origin analytics', () => {
       product: 'mazer',
       route: 'app'
     });
+  });
+
+  test('uses only explicit credentialless transport', () => {
+    const client = readFileSync(
+      resolve(process.cwd(), 'src/telemetry/legacyOriginAnalytics.ts'),
+      'utf8'
+    );
+    expect(client).toMatch(/credentials:\s*['"]omit['"]/);
+    expect(client).not.toContain('sendBeacon');
   });
 
   test('consumes the exact marker once while preserving other URL state', () => {
