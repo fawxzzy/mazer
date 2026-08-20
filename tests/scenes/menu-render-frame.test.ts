@@ -795,11 +795,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.clearLegacyPlayerProgressionBadge();');
     expect(menuSceneSource).toContain("if (this.mode === 'menu') {");
     expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
-    expect(menuSceneSource).toContain('private drawLegacyMenuAiProgressionBadge(');
-    expect(menuSceneSource).toContain("const aiTrack = this.progressionState.tracks['ai-runner'];");
-    expect(menuSceneSource).toContain("resolveLegacyProgressionPalette(aiTrack, 'ai-runner')");
+    // The front door no longer shows the demo AI's own level badge (it read
+    // as "your level" even though it tracks an independent, invisible AI
+    // progression, not anything the player has done) -- the drawing method
+    // is gone; the underlying bounds fields/diagnostics key remain (always
+    // null now) since other diagnostics code still references them.
+    expect(menuSceneSource).not.toContain('private drawLegacyMenuAiProgressionBadge(');
     expect(menuSceneSource).toContain(".setText('LVL')");
-    expect(menuSceneSource).toContain('slot: 0,');
     expect(menuSceneSource).toContain('menuAiProgressionBadge: {');
     expect(menuSceneSource).toContain("placement: 'leading'");
     expect(menuSceneSource).toContain("placement: 'trailing'");
@@ -1426,19 +1428,24 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
 
-  test('keeps player progression quiet while the menu exposes the independent AI level in its own compact glyph', () => {
+  test('keeps both the player level and the independent menu-demo AI level quiet on the front door', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
     expect(menuSceneSource).toContain("return resolveLegacyProgressionTrackIdForSurface(this.mode === 'play' ? 'play' : 'menu-demo');");
     expect(menuSceneSource).toContain("if (this.overlay !== 'none') {");
     expect(menuSceneSource).toContain('private clearLegacyPlayerProgressionBadge(): void');
+    // The front door no longer shows a level badge at all -- neither the
+    // player's own level nor the menu-demo AI's independent level, which
+    // used to read as "your level" even though it tracked something the
+    // player never did. Both clear helpers still run for the menu branch;
+    // there's just no draw call left to pair with them.
     expect(menuSceneSource).toContain("if (this.mode === 'menu') {");
-    expect(menuSceneSource).toContain('this.drawLegacyMenuAiProgressionBadge();');
+    expect(menuSceneSource).not.toContain('this.drawLegacyMenuAiProgressionBadge();');
     expect(menuSceneSource).toContain('this.clearLegacyMenuAiProgressionBadge();');
     expect(menuSceneSource).toContain(".setText('LVL')");
     expect(menuSceneSource).toContain('.setText(String(track.level))');
-    expect(menuSceneSource).toContain('.setText(String(aiTrack.level))');
+    expect(menuSceneSource).not.toContain('.setText(String(aiTrack.level))');
     expect(menuSceneSource).not.toContain('publishLegacyPlayerProgressionCompletion');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayerProgressionOutcomeReason');
     expect(menuSceneSource).not.toContain('progression.player.cycle.');
@@ -1456,7 +1463,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('resolveLegacyPlayProgressionBadgeCenterY');
     expect(menuSceneSource).not.toContain('resolveLegacyMenuProgressionBadgeCenterY');
     expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');
-    expect(menuSceneSource).toContain('slot: 0,');
     expect(menuSceneSource).toContain('menu-ai-progression-badge');
     expect(menuSceneSource).toContain('player-menu-ai-progression-badge');
   });

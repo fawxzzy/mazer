@@ -1043,8 +1043,19 @@ const resolveLegacyProgressionTargetAdjustment = (
   const recentEaseCount = countSignals(nextSignals, 'ease');
 
   if (signal === 'ease') {
+    // track.struggleCycles is a lifetime counter that never resets (unlike
+    // cleanCycles' modulo-based streak bonus, there's no periodic decay) --
+    // using it here meant that once an ai-runner track crossed 2 lifetime
+    // eases (typically within its first few minutes of running), every
+    // future ease permanently applied the bigger pressure step, for the
+    // rest of that track's life. Combined with the challenge step normally
+    // being +1 against a -2 pressure ease, a "human-like" AI that wins only
+    // half its runs nets negative progress forever and never climbs past
+    // the level it happened to be at when the lock-in triggered -- this was
+    // the actual cause of the AI getting stuck a couple levels in. The
+    // windowed recentEaseCount check below already covers "you've been
+    // struggling recently" without permanently escalating.
     return complexity > track.targetComplexity + 18
-      || track.struggleCycles >= 2
       || recentEaseCount >= LEGACY_PROGRESSION_CONSISTENT_SIGNAL_THRESHOLD
       ? LEGACY_PROGRESSION_EASE_PRESSURE_STEP
       : LEGACY_PROGRESSION_EASE_STEP;
