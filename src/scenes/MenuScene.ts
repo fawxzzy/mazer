@@ -7521,16 +7521,44 @@ export class MenuScene extends Phaser.Scene {
   ): void {
     // Uses the exact same rounded tile-rect math as every corridor tile
     // (resolveLegacyPixelTileRect) instead of re-deriving one from a center
-    // point, so the marker is pixel-identical in size to a regular tile
-    // rather than drifting a fraction of a pixel off from rounding.
+    // point, so the glow lands pixel-identical in size/position to the real
+    // tile underneath it.
     const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
-    this.drawLegacyEndpointMarker(this.boardDynamicGraphics, tileRect, alpha, kind);
+    this.drawLegacyEndpointGlow(this.boardDynamicGraphics, tileRect, alpha, kind);
   }
 
-  // A colored-in version of the corridor tile itself -- same flat fill +
-  // rim treatment as every other tile (drawLegacyPathTileFacet), just in
-  // the start/goal accent color, instead of a circle-and-diamond marker
-  // shape that belonged to a different visual language than the board.
+  // The actual maze tile underneath is left completely alone (drawBoardPaths
+  // already renders it as a normal corridor tile) -- this just lays a soft
+  // colored glow plus a small bright catchlight on top for visibility,
+  // instead of recoloring the whole tile. Per feedback that restyling the
+  // entire tile was more than needed; a simple glow reads as "marked" just
+  // as clearly without fighting the corridor's own material underneath it.
+  private drawLegacyEndpointGlow(
+    graphics: Phaser.GameObjects.Graphics,
+    tileRect: LegacyPixelTileRect,
+    alpha: number,
+    kind: 'start' | 'goal'
+  ): void {
+    const color = kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_CORE : LEGACY_PLAY_START_MARKER_CORE;
+    const centerX = tileRect.left + (tileRect.width / 2);
+    const centerY = tileRect.top + (tileRect.height / 2);
+    const maxRadius = Math.min(tileRect.width, tileRect.height) * 0.5;
+
+    graphics.fillStyle(color, Math.min(0.9, alpha) * 0.22);
+    graphics.fillCircle(centerX, centerY, maxRadius * 1.2);
+    graphics.fillStyle(color, Math.min(0.9, alpha) * 0.45);
+    graphics.fillCircle(centerX, centerY, maxRadius * 0.78);
+    graphics.fillStyle(color, Math.min(0.96, alpha));
+    graphics.fillCircle(centerX, centerY, maxRadius * 0.4);
+    graphics.fillStyle(cyberArcadeMaterial.rail.white, Math.min(0.75, alpha * 0.8));
+    graphics.fillCircle(centerX - (maxRadius * 0.14), centerY - (maxRadius * 0.14), maxRadius * 0.13);
+  }
+
+  // The Guide legend's Start/Exit swatches have no real board tile behind
+  // them (they're standalone icons in a settings panel), so they still get
+  // the full colored-in-tile treatment -- same flat fill + rim as any
+  // corridor tile (drawLegacyPathTileFacet), just in the marker's accent
+  // color, so the swatch itself is legible without anything underneath it.
   private drawLegacyEndpointMarker(
     graphics: Phaser.GameObjects.Graphics,
     tileRect: LegacyPixelTileRect,
