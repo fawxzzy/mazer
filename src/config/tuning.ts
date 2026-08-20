@@ -411,11 +411,6 @@ export const legacyTuning = {
       compactTopReservePx: 50,
       bottomPaddingPx: 20,
       sidePaddingPx: 14
-    },
-    playerMovement: {
-      cooldownMs: 76,
-      directionSwitchBypassMs: 18,
-      minSwipeDistancePx: 24
     }
   },
   hud: {

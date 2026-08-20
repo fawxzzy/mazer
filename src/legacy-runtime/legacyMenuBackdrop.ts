@@ -56,7 +56,7 @@ interface LegacyMenuBackdropShardTemplate {
 
 const roundBackdropNumber = (value: number): number => Math.round(value * 1000) / 1000;
 
-export const LEGACY_MENU_STAR_COUNT = 180;
+export const LEGACY_MENU_STAR_COUNT = 240;
 export const LEGACY_MENU_BACKDROP_SHARD_COUNT = 8;
 export const LEGACY_MENU_GLASS_SHARD_COUNT = 5;
 export const LEGACY_MENU_DRIFT_RUNE_COUNT = 14;
@@ -108,14 +108,24 @@ const GLASS_SHARD_TEMPLATES: LegacyMenuBackdropShardTemplate[] = [
 export function createLegacyMenuBackdropStars(
   random: () => number = Math.random
 ): LegacyMenuBackdropStar[] {
-  return Array.from({ length: LEGACY_MENU_STAR_COUNT }, () => ({
-    x: random(),
-    y: random(),
-    radius: 0.72 + (random() * 2.18),
-    speed: 0.01 + (random() * 0.034),
-    alpha: 0.24 + (random() * 0.64),
-    drift: -0.03 + (random() * 0.06)
-  }));
+  return Array.from({ length: LEGACY_MENU_STAR_COUNT }, () => {
+    // Radius, speed, and alpha all key off one shared "depth" value instead
+    // of rolling independently -- a real warp field reads as three-
+    // dimensional because near stars are simultaneously bigger, faster, and
+    // brighter, not because any single one of those varies on its own. The
+    // square bias (depth * depth) keeps the distribution mostly small/dim/
+    // far stars with a handful of standout near ones, matching how an actual
+    // starfield's brightness histogram looks rather than a flat spread.
+    const depth = random() * random();
+    return {
+      x: random(),
+      y: random(),
+      radius: 0.6 + (depth * 2.7) + (random() * 0.35),
+      speed: 0.009 + (depth * 0.052) + (random() * 0.006),
+      alpha: 0.16 + (depth * 0.74) + (random() * 0.1),
+      drift: -0.03 + (random() * 0.06)
+    };
+  });
 }
 
 export function advanceLegacyMenuBackdropStars(

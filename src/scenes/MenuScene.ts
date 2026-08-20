@@ -3573,6 +3573,20 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
+  // The player-move visual glide has to stay under the actual per-step
+  // cadence or a new grid step lands mid-tween and rendering snaps/overlaps
+  // instead of gliding. The fixed 190ms LEGACY_PLAY_PLAYER_VISUAL_MOVE_MS
+  // only ever fit the slow end of the Move Speed range -- at the fast end
+  // the repeat interval can be as low as ~78ms (or 104ms capped on the
+  // stick), well under the tween's own runtime. Scaling the glide with the
+  // live repeatIntervalMs (same pattern the menu-demo AI's visual motion
+  // already uses) keeps it honest at every speed instead of only the one it
+  // happened to be tuned for.
+  private resolveLegacyPlayerVisualMoveDurationMs(): number {
+    const repeatIntervalMs = this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs;
+    return clamp(Math.round(repeatIntervalMs * 0.85), 90, LEGACY_PLAY_PLAYER_VISUAL_MOVE_MS);
+  }
+
   private normalizeLegacyPlayTouchPointerId(pointerId: number | null | undefined): number | null {
     return Number.isFinite(pointerId ?? NaN) ? Math.round(pointerId ?? 0) : null;
   }
@@ -4936,7 +4950,7 @@ export class MenuScene extends Phaser.Scene {
 
     const previousPlayer = copyPoint(this.player);
     this.player = nextStep.player;
-    this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, LEGACY_PLAY_PLAYER_VISUAL_MOVE_MS);
+    this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, this.resolveLegacyPlayerVisualMoveDurationMs());
     this.trail = nextStep.trail;
     this.appendLegacyPlayCyclePoint(nextStep.player);
     const slowTileEntry = applyLegacyStaticSlowTileEntry(
@@ -4952,6 +4966,7 @@ export class MenuScene extends Phaser.Scene {
       this.recordMazeCycleCompletion('play');
       this.schedulePlayResetReturn();
       this.boardDynamicDirty = true;
+      this.triggerLegacyHapticPulse([18, 40, 18, 40, 32]);
       return {
         accepted: true,
         events: [{ type: 'player-reached-goal', entityId: 'player' }]
@@ -4959,6 +4974,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.boardDynamicDirty = true;
+    this.triggerLegacyHapticPulse(6);
     return {
       accepted: true,
       events: [
@@ -5100,6 +5116,14 @@ export class MenuScene extends Phaser.Scene {
         : 0.5;
       const twinkleAlpha = star.alpha * (0.68 + (twinklePhase * 0.32));
       const starColor = starSeed > 0.82 ? 0xbfe3ff : (starSeed < 0.16 ? 0xffe9c2 : 0xffffff);
+      // The nearest, biggest stars get an extra outer bloom pass -- a single
+      // halo size read as flat once depth-correlated radii introduced real
+      // standout-bright stars; a wider third pass gives those a genuine glow
+      // instead of just a bigger flat square.
+      if (coreSize > 3) {
+        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.12);
+        this.backdropGraphics.fillRect(pixelX - 4, pixelY - 4, coreSize + 8, coreSize + 8);
+      }
       if (coreSize > 1) {
         this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.22);
         this.backdropGraphics.fillRect(pixelX - 2, pixelY - 2, coreSize + 4, coreSize + 4);
@@ -5108,8 +5132,12 @@ export class MenuScene extends Phaser.Scene {
       }
       this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale);
       this.backdropGraphics.fillRect(pixelX, pixelY, coreSize, coreSize);
+      // Fading tail instead of a uniform-alpha dashed line -- brightest
+      // where it meets the star core, tapering to nothing at the far end, so
+      // fast/near stars read as a warp streak rather than a dotted trail.
       for (let index = 1; index <= streakLength; index += 1) {
-        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.4);
+        const tailFade = 1 - (index / (streakLength + 1));
+        this.backdropGraphics.fillStyle(starColor, twinkleAlpha * palette.starAlphaScale * 0.5 * tailFade);
         this.backdropGraphics.fillRect(
           Math.round(pixelX + (step.x * index)),
           Math.round(pixelY + (step.y * index)),
@@ -7761,6 +7789,25 @@ export class MenuScene extends Phaser.Scene {
     drawLocatorTick(centerX, centerY + locatorMetrics.innerRadius, centerX, centerY + locatorMetrics.outerRadius);
   }
 
+  // Movement had zero tactile feedback anywhere in the codebase (confirmed
+  // no navigator.vibrate call existed before this). The Vibration API is a
+  // no-op where unsupported (desktop, iOS Safari) so this is a pure
+  // progressive enhancement -- guarded defensively since calling a missing
+  // method (rather than just reading an undefined property) throws.
+  private triggerLegacyHapticPulse(pattern: number | number[]): void {
+    if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') {
+      return;
+    }
+
+    try {
+      navigator.vibrate(pattern);
+    } catch {
+      // Some browsers throw when vibration is blocked (no user gesture yet,
+      // permissions policy, etc.) -- movement itself must never fail over a
+      // missing tactile nicety.
+    }
+  }
+
   private syncLegacyPlayerVisualMotionTo(
     point: LegacyPoint,
     snapReason: LegacyPlayerVisualMotionSnapReason = null
@@ -8380,6 +8427,12 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.fillCircle(centerX, centerY, innerRadius);
     this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.38);
     this.hudGraphics.strokeCircle(centerX, centerY, innerRadius);
+    // The deadzone was invisible before -- it existed only in the hit-test
+    // math (resolveStickPullVector), so a small pull near center registered
+    // nothing with no visual explanation why. A faint boundary ring makes
+    // the dead center legible without competing with the hub/outer rings.
+    this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ICON, 0.22);
+    this.hudGraphics.strokeCircle(centerX, centerY, stick.deadzoneRadius);
     this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, activeControl === null ? 0.28 : 0.5);
     this.hudGraphics.fillCircle(knobX, knobY, knobRadius);
     this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_ICON, activeControl === null ? 0.52 : 0.86);
