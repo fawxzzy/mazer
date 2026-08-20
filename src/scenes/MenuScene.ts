@@ -35,6 +35,7 @@ import {
 import { resolveLegacyAdvancedOptionsVisible } from '../legacy-runtime/legacyAdvancedOptions';
 import {
   isLegacyWrappedStepTransition,
+  resolveLegacyPlayableShortestPath,
   type LegacyMazeGenerationProfile,
   type LegacyMazeSnapshot,
   type LegacyPoint
@@ -171,6 +172,7 @@ import {
 import {
   LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS,
   buildLegacyMazeRevealOrder,
+  resolveLegacyTrailPulseSweepMotion,
   resolveLegacyTrailShineMotion,
   summarizeLegacyMazeRevealOrder,
   type LegacyTrailShineDirection
@@ -1087,7 +1089,6 @@ const LEGACY_PLAY_PATROL_COLLISION_RECOVERY = cyberArcadeMaterial.rail.mint;
 const LEGACY_PLAY_PATROL_PENDING_INTENT = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
-const LEGACY_MENU_AI_MEMORY_TARGET_CORE = cyberArcadeMaterial.signal.warning;
 const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = cyberArcadeMaterial.signal.warningEdge;
 const LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS = 64;
 const LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS = 44;
@@ -5730,6 +5731,17 @@ export class MenuScene extends Phaser.Scene {
     boardHeight: number,
     mazeLeft: number,
     mazeTop: number,
+    // Pixel size of the rendered maze content area (mazeRenderFrame.board-
+    // Width/boardHeight) -- NOT the grid's cell counts (this.maze.width/
+    // height). resolveLegacyMenuBorderDockRenderAreas uses this to compute
+    // mazeRight/mazeBottom (mazeLeft/Top + this), so passing the cell count
+    // here previously put mazeRight/mazeBottom a few dozen px from mazeLeft/
+    // Top instead of near the board's far edge -- every dock area's "off
+    // the grid" side then stretched nearly the full board width/height
+    // instead of one tile, which is exactly the stray line across the
+    // screen this was producing.
+    mazePixelWidth: number,
+    mazePixelHeight: number,
     tileSize: number,
     glowColor: number
   ): void {
@@ -5773,9 +5785,18 @@ export class MenuScene extends Phaser.Scene {
       }
 
       const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, point);
-      const frames = resolveLegacyMenuPathRenderFrames(this.maze, point, materialTileSize);
+      // Deliberately NOT resolveLegacyMenuPathRenderFrames here: that frame
+      // is connectivity-aware and stretches to merge with connected
+      // neighbor tiles (so ordinary corridor rendering reads as one
+      // continuous slab, not a grid of disconnected boxes) -- exactly the
+      // wrong shape for this glow, which needs the dock's OWN tile-sized
+      // footprint. Reusing the merged frame produced glow bands tens of
+      // tiles tall/wide on any bleed point whose tile also happens to
+      // connect to several interior neighbors, reading as a stray line
+      // shooting across the board instead of a glow on the dock itself.
+      const singleTileFrame = { height: materialTileSize, leftInset: 0, topInset: 0, width: materialTileSize };
       for (const direction of dockDirections) {
-        const dockAreas = resolveLegacyMenuBorderDockRenderAreas(direction, frames.core, {
+        const dockAreas = resolveLegacyMenuBorderDockRenderAreas(direction, singleTileFrame, {
           boardLeft,
           boardTop,
           boardWidth,
@@ -5792,8 +5813,8 @@ export class MenuScene extends Phaser.Scene {
           materialTileSize,
           mazeLeft,
           mazeTop,
-          mazeWidth: width,
-          mazeHeight: height,
+          mazeWidth: mazePixelWidth,
+          mazeHeight: mazePixelHeight,
           tileRect,
           topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth)
         });
@@ -6716,13 +6737,26 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  // Play mode's trail/pulse should only ever show the perfect route from the
+  // start tile to wherever the player currently stands -- not the player's
+  // raw, append-only move history (which grows to cover dead ends and
+  // backtracks and was the source of both the "colored in weird" look and
+  // the messy ping-pong pulse the player actually walked).
+  private resolveLegacyPlayPerfectPathTrail(): LegacyPoint[] {
+    const result = resolveLegacyPlayableShortestPath(this.maze.grid, this.maze.start, this.player);
+    if (result.found && result.path.length > 0) {
+      return result.path;
+    }
+    return [copyPoint(this.player)];
+  }
+
   private drawDynamicBoard(time: number): void {
     const { boardLeft, boardTop, boardWidth, boardHeight } = this.layout;
     this.boardDynamicGraphics.clear();
 
     const trail = this.mode === 'menu'
       ? this.trail
-      : buildPathTrail(this.trail, this.settings.toggleTrailFade ? TRAIL_FADE_TAIL : null);
+      : buildPathTrail(this.resolveLegacyPlayPerfectPathTrail(), this.settings.toggleTrailFade ? TRAIL_FADE_TAIL : null);
     const visibleTrail = trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point));
     const menuTrailAlphaMultiplier = this.mode === 'menu'
       ? this.resolveLegacyMenuDeconstructTrailAlpha(time)
@@ -6751,6 +6785,8 @@ export class MenuScene extends Phaser.Scene {
       boardHeight,
       mazeLeft,
       mazeTop,
+      mazeRenderFrame.boardWidth,
+      mazeRenderFrame.boardHeight,
       mazeTileSize,
       progressionPalette.trailColor
     );
@@ -6880,7 +6916,8 @@ export class MenuScene extends Phaser.Scene {
         mazeTileSize,
         time,
         dynamicTrailPathSource,
-          progressionPalette
+          progressionPalette,
+          this.mode === 'play'
         );
       }
     }
@@ -7500,27 +7537,6 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private resolveLegacyMenuAiThoughtStyle(
-    thoughtState: DemoWalkerThoughtState,
-    choiceClass: DemoWalkerChoiceClass | null,
-    confidence: number
-  ): {
-    coreColor: number;
-    edgeColor: number;
-    pulseScale: number;
-  } {
-    const confidenceScale = clamp(confidence / 100, 0, 1);
-    const isHighConfidenceTarget = thoughtState === 'goal-confirming'
-      || thoughtState === 'committing'
-      || thoughtState === 'shortcut-testing'
-      || choiceClass === 'shortcut-looking';
-    return {
-      coreColor: LEGACY_MENU_AI_MEMORY_TARGET_CORE,
-      edgeColor: LEGACY_MENU_AI_MEMORY_TARGET_EDGE,
-      pulseScale: (isHighConfidenceTarget ? 1.02 : 0.82) + (confidenceScale * 0.16)
-    };
-  }
-
   private drawLegacyMenuAiMemoryOverlay(
     originX: number,
     originY: number,
@@ -7529,7 +7545,7 @@ export class MenuScene extends Phaser.Scene {
     pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
     time: number
   ): void {
-    const { choiceClass, confidence, optionPoints, targetPoint, thoughtState } = this.resolveLegacyMenuAiMemoryPoints();
+    const { optionPoints, targetPoint } = this.resolveLegacyMenuAiMemoryPoints();
     const optionAlpha = clamp(0.34 + (0.08 * Math.sin(time / 240)), 0.28, 0.44) * alphaMultiplier;
     for (const point of optionPoints) {
       this.fillLegacyDynamicPathTile(
@@ -7550,25 +7566,38 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const thoughtStyle = this.resolveLegacyMenuAiThoughtStyle(thoughtState, choiceClass, confidence);
     const targetPulse = 0.5 + (0.5 * Math.sin(time / 150));
-    this.drawLegacyPathMaterialTile(
+    // Edges only, no fill -- the AI's current tile should read as an outline
+    // marking its position, not a solid color wash over the whole cell.
+    this.drawLegacyTileEdgeOutline(
       this.boardDynamicGraphics,
       targetPoint,
-      pathSource,
       originX,
       originY,
       tileSize,
-      {
-        // No center cue square any more -- the pulsing yellow tile fill
-        // itself is the "AI is considering this tile" signal, per feedback
-        // that the little dot in the middle looked off.
-        coreAlpha: clamp(0.7 + (targetPulse * 0.22 * thoughtStyle.pulseScale), 0.62, 0.96) * alphaMultiplier,
-        coreColor: thoughtStyle.coreColor,
-        drawCue: false,
-        edgeAlpha: clamp(0.66 + (targetPulse * 0.22 * thoughtStyle.pulseScale), 0.58, 0.94) * alphaMultiplier,
-        edgeColor: thoughtStyle.edgeColor
-      }
+      LEGACY_MENU_AI_MEMORY_TARGET_EDGE,
+      clamp(0.66 + (targetPulse * 0.28), 0.58, 0.98) * alphaMultiplier
+    );
+  }
+
+  private drawLegacyTileEdgeOutline(
+    graphics: Phaser.GameObjects.Graphics,
+    point: LegacyPoint,
+    originX: number,
+    originY: number,
+    tileSize: number,
+    color: number,
+    alpha: number
+  ): void {
+    const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
+    const lineWidth = Math.max(1, Math.round(Math.min(tileRect.width, tileRect.height) * 0.12));
+    const inset = lineWidth / 2;
+    graphics.lineStyle(lineWidth, color, alpha);
+    graphics.strokeRect(
+      tileRect.left + inset,
+      tileRect.top + inset,
+      tileRect.width - lineWidth,
+      tileRect.height - lineWidth
     );
   }
 
@@ -7608,17 +7637,23 @@ export class MenuScene extends Phaser.Scene {
     tileSize: number,
     time: number,
     pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
-    palette: LegacyProgressionPalette
+    palette: LegacyProgressionPalette,
+    useOneWaySweep: boolean
   ): void {
     if (trail.length < 2) {
       return;
     }
 
-    const pulseCenterIndex = resolveLegacyTrailShineMotion({
-      timeMs: time,
-      trailLength: trail.length,
-      oneWayPeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
-    }).centerIndex;
+    const pulseCenterIndex = useOneWaySweep
+      ? resolveLegacyTrailPulseSweepMotion({
+        timeMs: time,
+        trailLength: trail.length
+      }).centerIndex
+      : resolveLegacyTrailShineMotion({
+        timeMs: time,
+        trailLength: trail.length,
+        oneWayPeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS
+      }).centerIndex;
 
     for (let index = trail.length - 1; index >= 0; index -= 1) {
       const point = trail[index];
@@ -8079,14 +8114,23 @@ export class MenuScene extends Phaser.Scene {
   // built from the exact same tile material as the title and the maze
   // corridor (drawLegacyPathMaterialTile, same core/edge colors), so it
   // reads as made of the same substance as everything else on the board
-  // instead of separately-rendered text. Drawn once in LOCAL coordinates
-  // (the containing Graphics object is positioned at the button's x/y) --
-  // the classic "PRESS START" blink/grow-shrink pulse is applied on top via
-  // applyLegacyMenuBlinkPulse, which just scales/fades the whole object
-  // instead of redrawing the tiles every frame.
+  // instead of separately-rendered text. Drawn fresh every frame in LOCAL
+  // coordinates (the containing Graphics object is positioned at the
+  // button's x/y).
+  // Mirrors the title's own build/glow/deconstruct treatment (see
+  // drawLegacyMenuPathTitle) so Login/Start read as made of the same
+  // animated material -- pieces reveal in the same shared lifecycle
+  // progress the title uses (this.resolveLegacyMenuPathTitleProgress isn't
+  // actually title-specific, just named for its original caller) and the
+  // same looping green trail-color wash sweeps across whatever's currently
+  // visible. Deliberately skips the title's extra flourishes (gem facets,
+  // prism sweep, orbit sigils, leading-edge cursor accent) -- just the
+  // three behaviors asked for: build out, glow green, deconstruct.
   private drawLegacyMenuFrontDoorGlyphButton(
     graphics: Phaser.GameObjects.Graphics,
-    layout: LegacyGlyphWordLayout
+    layout: LegacyGlyphWordLayout,
+    time: number,
+    active = false
   ): void {
     graphics.clear();
     const pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'> = {
@@ -8094,7 +8138,32 @@ export class MenuScene extends Phaser.Scene {
       height: layout.rows,
       width: layout.columns
     };
-    for (const cell of layout.cells) {
+    const visiblePieceCount = this.resolveLegacyMenuPathTitleVisiblePieces(layout.cells.length);
+    const visibleCells = layout.cells.slice(0, visiblePieceCount);
+    if (visibleCells.length <= 0) {
+      return;
+    }
+
+    const trailSweepFrame = this.resolveLegacyMenuTitleTrailSweepFrame(time);
+    const trailColor = resolveLegacyIridescentTrailColor(
+      0,
+      1,
+      time,
+      this.resolveActiveLegacyProgressionPalette().trailColor
+    );
+    for (const cell of visibleCells) {
+      const cellMetric = this.resolveLegacyMenuTitleTrailCellMetric(
+        { column: cell.column, order: 0, row: cell.row },
+        layout.columns,
+        layout.rows
+      );
+      const fillAmount = this.resolveLegacyMenuTitleTrailCellFillAmount(cellMetric, trailSweepFrame);
+      const cellCoreColor = fillAmount > 0
+        ? mixLegacyIridescentColor(LEGACY_MENU_PATH_CORE, trailColor, fillAmount)
+        : LEGACY_MENU_PATH_CORE;
+      const cellEdgeColor = fillAmount > 0
+        ? mixLegacyIridescentColor(LEGACY_MENU_PATH_EDGE, trailColor, fillAmount)
+        : LEGACY_MENU_PATH_EDGE;
       this.drawLegacyPathMaterialTile(
         graphics,
         { x: cell.column, y: cell.row },
@@ -8103,29 +8172,14 @@ export class MenuScene extends Phaser.Scene {
         layout.top,
         layout.cellSize,
         {
-          coreAlpha: 0.95,
-          coreColor: LEGACY_MENU_PATH_CORE,
+          coreAlpha: active ? 1 : 0.95,
+          coreColor: cellCoreColor,
           drawCue: false,
-          edgeAlpha: 0.85,
-          edgeColor: LEGACY_MENU_PATH_EDGE
+          edgeAlpha: active ? 0.94 : 0.85,
+          edgeColor: cellEdgeColor
         }
       );
     }
-  }
-
-  // Shared "classic menu blink" pulse -- alpha fades most of the way out and
-  // back, with a small synced grow/shrink, on a slow sine so it reads as a
-  // deliberate blink rather than a flicker. Used by the Start/Login glyph
-  // buttons and the menu settings gear so the front-door controls share one
-  // consistent pace.
-  private applyLegacyMenuBlinkPulse(
-    target: Phaser.GameObjects.Graphics,
-    time: number,
-    active: boolean
-  ): void {
-    const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
-    target.setAlpha(clamp(0.22 + (phase * 0.78) + (active ? 0.08 : 0), 0.14, 1));
-    target.setScale(0.92 + (phase * 0.08) + (active ? 0.02 : 0));
   }
 
   private resolveLegacyRoundedRectRadius(width: number, height: number, requestedRadius?: number): number {
@@ -11250,8 +11304,7 @@ export class MenuScene extends Phaser.Scene {
       // pulse, instead of scaling around the scene's (0,0) corner.
       panel.setPosition(x, y);
       glyphLayout = resolveLegacyGlyphWordLayout(text, 0, 0, glyphCellSize);
-      this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout);
-      this.applyLegacyMenuBlinkPulse(panel, 0, false);
+      this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout, 0, false);
     }
 
     const setActive = (active: boolean): void => {
@@ -11283,7 +11336,7 @@ export class MenuScene extends Phaser.Scene {
       text,
       updateFrame: glyphLayout
         ? (time: number) => {
-          this.applyLegacyMenuBlinkPulse(panel, time, primaryButtonActive);
+          this.drawLegacyMenuFrontDoorGlyphButton(panel, glyphLayout!, time, primaryButtonActive);
         }
         : undefined,
       destroy: () => {

@@ -858,7 +858,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('palette.trailPulseColor');
     expect(menuSceneSource).toContain('palette.trailPulseEdgeColor');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS;');
-    expect(menuSceneSource).toContain('const pulseCenterIndex = resolveLegacyTrailShineMotion({');
+    expect(menuSceneSource).toContain('const pulseCenterIndex = useOneWaySweep');
+    expect(menuSceneSource).toContain('resolveLegacyTrailPulseSweepMotion({');
     expect(menuSceneSource).toContain('trailShineDirection: trailShineMotion.direction');
     expect(menuSceneSource).toContain('trailShineCyclePeriodMs: trailShineMotion.cyclePeriodMs');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;');
@@ -878,7 +879,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('mazeRenderFrame.boardHeight,');
     expect(menuSceneSource).toContain("const active = this.isLegacyTrailShineVisible() && this.overlay === 'none' && this.trail.length > 1;");
     expect(menuSceneSource).toContain('this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;');
-    expect(menuSceneSource).toContain('const pulseCenterIndex = resolveLegacyTrailShineMotion({');
+    expect(menuSceneSource).toContain('this.resolveLegacyPlayPerfectPathTrail()');
     expect(menuSceneSource).toContain('oneWayPeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
     expect(menuSceneSource).not.toContain('private resolveLegacyPointPathSource(');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');");
@@ -1298,7 +1299,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(time: number): void');
     expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog(time);');
     expect(menuSceneSource).toContain('cyberArcadeMaterial.signal.player,\n      cyberArcadeMaterial.rail.mint,\n      blinkAlpha\n    );');
-    expect(menuSceneSource).toContain('private applyLegacyMenuBlinkPulse(');
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
@@ -1622,10 +1622,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(aiSource).toContain('memoryFrames: readonly DemoWalkerMemoryFrame[];');
     expect(aiSource).toContain('optionIndices: resolveMemoryOptionIndices()');
     expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_TARGET_CORE = cyberArcadeMaterial.signal.warning;');
-    expect(menuSceneSource).toContain('private resolveLegacyMenuAiThoughtStyle(');
-    expect(menuSceneSource).toContain('coreColor: LEGACY_MENU_AI_MEMORY_TARGET_CORE');
-    expect(menuSceneSource).toContain('edgeColor: LEGACY_MENU_AI_MEMORY_TARGET_EDGE');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = cyberArcadeMaterial.signal.warningEdge;');
+    expect(menuSceneSource).toContain('private drawLegacyTileEdgeOutline(');
+    expect(menuSceneSource).toContain('LEGACY_MENU_AI_MEMORY_TARGET_EDGE,');
     expect(menuSceneSource).toContain('private resolveLegacyMenuAiMemoryPoints()');
     expect(menuSceneSource).toContain('const endIndex = this.menuDemoEpisode.raster.endIndex;');
     expect(menuSceneSource).toContain('targetIndex === null || targetIndex === endIndex');
