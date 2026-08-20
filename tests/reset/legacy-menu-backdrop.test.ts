@@ -26,9 +26,9 @@ describe('legacyMenuBackdrop', () => {
     expect(stars[0]).toEqual({
       x: 0.5,
       y: 0.5,
-      radius: 1.81,
-      speed: 0.027000000000000003,
-      alpha: 0.56,
+      radius: 1.45,
+      speed: 0.024999999999999998,
+      alpha: 0.39499999999999996,
       drift: 0
     });
   });
