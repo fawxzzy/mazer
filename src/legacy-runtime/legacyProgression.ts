@@ -582,55 +582,92 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
 
   switch (profile.band) {
     case 'tutorial':
+      // The very first maze: a single checkpoint (so there's only ever one
+      // leg to walk, no waypoint-to-waypoint zig-zagging), a strong
+      // straightness bias on top of that single leg, and zero dead ends --
+      // as close to "the longest straightest possible line" as the
+      // checkpoint-chasing path builder can produce.
       return {
         borderFeederTargetPerSide: 0,
         checkpointCountMultiplier: 0.42,
+        checkpointCountOverride: 1,
+        maxDeadEndCount: 0,
+        minCheckpoints: 1,
         requiredOppositeBorderConnections: { horizontal: false, vertical: false },
         routeQualityReinforcementMultiplier: 0,
-        shortcutCountMultiplier: 0
+        shortcutCountMultiplier: 0,
+        straightnessBias: 0.88
       };
     case 'starter':
       {
         const starterDepth = clampInteger(level - 2, 0, 6);
-      return {
-        borderFeederTargetPerSide: starterDepth >= 4 ? 1 : 0,
-        checkpointCountMultiplier: 0.44 + (starterDepth * (0.2 / 6)),
-        requiredOppositeBorderConnections: { horizontal: false, vertical: starterDepth >= 4 },
-        routeQualityReinforcementMultiplier: Math.min(0.35, starterDepth * (0.35 / 6)),
-        shortcutCountMultiplier: Math.min(0.35, starterDepth * (0.35 / 6))
-      };
+        // Modifiers are introduced one at a time and ramp in gradually as
+        // starterDepth climbs: split paths first (checkpoint count rising
+        // off the tutorial's single leg), then dead ends (maxDeadEndCount
+        // rising off zero), then multiple routes to the goal
+        // (routeQualityReinforcementMultiplier, already present below) and
+        // finally bleed-off/wrap paths (borderFeederTargetPerSide /
+        // requiredOppositeBorderConnections.vertical, both still gated to
+        // starterDepth >= 4 i.e. level 6+, unchanged from before).
+        return {
+          borderFeederTargetPerSide: starterDepth >= 4 ? 1 : 0,
+          checkpointCountMultiplier: 0.44 + (starterDepth * (0.2 / 6)),
+          checkpointCountOverride: [2, 3, 5, 8][starterDepth] ?? null,
+          maxDeadEndCount: [0, 1, 2, 3, 5][starterDepth] ?? null,
+          minCheckpoints: 4,
+          requiredOppositeBorderConnections: { horizontal: false, vertical: starterDepth >= 4 },
+          routeQualityReinforcementMultiplier: Math.min(0.35, starterDepth * (0.35 / 6)),
+          shortcutCountMultiplier: Math.min(0.35, starterDepth * (0.35 / 6)),
+          straightnessBias: Math.max(0.1, 0.6 - (starterDepth * 0.08))
+        };
       }
     case 'explorer':
       return {
         borderFeederTargetPerSide: 2,
         checkpointCountMultiplier: 0.86,
+        checkpointCountOverride: null,
+        maxDeadEndCount: null,
+        minCheckpoints: 4,
         requiredOppositeBorderConnections: { horizontal: true, vertical: true },
         routeQualityReinforcementMultiplier: 0.7,
-        shortcutCountMultiplier: 0.62
+        shortcutCountMultiplier: 0.62,
+        straightnessBias: 0
       };
     case 'navigator':
       return {
         borderFeederTargetPerSide: 2,
         checkpointCountMultiplier: 1,
+        checkpointCountOverride: null,
+        maxDeadEndCount: null,
+        minCheckpoints: 4,
         requiredOppositeBorderConnections: { horizontal: true, vertical: true },
         routeQualityReinforcementMultiplier: 1,
-        shortcutCountMultiplier: 1
+        shortcutCountMultiplier: 1,
+        straightnessBias: 0
       };
     case 'architect':
       return {
         borderFeederTargetPerSide: 3,
         checkpointCountMultiplier: 1.16,
+        checkpointCountOverride: null,
+        maxDeadEndCount: null,
+        minCheckpoints: 4,
         requiredOppositeBorderConnections: { horizontal: true, vertical: true },
         routeQualityReinforcementMultiplier: 1.22,
-        shortcutCountMultiplier: 1.28
+        shortcutCountMultiplier: 1.28,
+        straightnessBias: 0
       };
     case 'mythic':
       return {
         borderFeederTargetPerSide: 4,
         checkpointCountMultiplier: 1.32,
+        checkpointCountOverride: null,
+        maxDeadEndCount: null,
+        minCheckpoints: 4,
         requiredOppositeBorderConnections: { horizontal: true, vertical: true },
         routeQualityReinforcementMultiplier: 1.45,
-        shortcutCountMultiplier: 1.58
+        shortcutCountMultiplier: 1.58,
+        straightnessBias: 0
       };
     default:
       return profile.band satisfies never;

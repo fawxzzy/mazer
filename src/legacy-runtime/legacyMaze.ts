@@ -55,12 +55,31 @@ export interface LegacyWrapTopologyDiagnostics {
 export interface LegacyMazeGenerationProfile {
   borderFeederTargetPerSide: number | null;
   checkpointCountMultiplier: number;
+  // Bypasses the multiplier formula entirely when set, so very-low difficulty
+  // bands (e.g. a single-leg "straight line" tutorial maze) aren't at the
+  // mercy of checkpointCountMultiplier's 0.2 floor, which alone can never
+  // produce fewer than several checkpoints on a real-sized board.
+  checkpointCountOverride: number | null;
+  // Post-carve cap on dead-end tile count; null leaves dead ends fully
+  // emergent (today's behavior). When set, excess dead-end leaves are pruned
+  // back (never touching the solution path), which also collapses most of
+  // the junctions those leaves hung off of as a side effect.
+  maxDeadEndCount: number | null;
+  // Replaces the hardcoded lower clamp of 4 on requestedCheckpoints so low
+  // bands can request as few as 1.
+  minCheckpoints: number;
   requiredOppositeBorderConnections: {
     horizontal: boolean;
     vertical: boolean;
   };
   routeQualityReinforcementMultiplier: number;
   shortcutCountMultiplier: number;
+  // 0-1 chance, evaluated at every forward carving step, of continuing in the
+  // previous step's direction instead of the normal goal-seeking/random
+  // selector shuffle. The base path builder has no notion of heading at all
+  // (see findLegacyNextTile), so this is the only lever that makes corridors
+  // read as "straight" rather than constantly zig-zagging.
+  straightnessBias: number;
 }
 
 export interface LegacyMazeSnapshot {
@@ -75,6 +94,7 @@ export interface LegacyMazeSnapshot {
   wrapTopologyDiagnostics?: LegacyWrapTopologyDiagnostics;
   generationBuildTrace?: {
     checkpointTiles: LegacyPoint[];
+    deadEndPrunedTiles: LegacyPoint[];
     finalGoal: LegacyPoint;
     pathTiles: LegacyPoint[];
     reinforcementShortcutTiles: LegacyPoint[];
@@ -211,12 +231,16 @@ const LEGACY_MENU_MIN_SHORTCUT_COUNT = 6;
 const DEFAULT_LEGACY_MAZE_GENERATION_PROFILE: LegacyMazeGenerationProfile = {
   borderFeederTargetPerSide: null,
   checkpointCountMultiplier: 1,
+  checkpointCountOverride: null,
+  maxDeadEndCount: null,
+  minCheckpoints: 4,
   requiredOppositeBorderConnections: {
     horizontal: true,
     vertical: true
   },
   routeQualityReinforcementMultiplier: 1,
-  shortcutCountMultiplier: 1
+  shortcutCountMultiplier: 1,
+  straightnessBias: 0
 };
 
 export const normalizeLegacyMazeGenerationProfile = (
@@ -226,12 +250,20 @@ export const normalizeLegacyMazeGenerationProfile = (
     ? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.borderFeederTargetPerSide
     : clampInteger(profile.borderFeederTargetPerSide, 0, 8),
   checkpointCountMultiplier: Math.max(0.2, Math.min(1.6, profile?.checkpointCountMultiplier ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.checkpointCountMultiplier)),
+  checkpointCountOverride: profile?.checkpointCountOverride === null || profile?.checkpointCountOverride === undefined
+    ? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.checkpointCountOverride
+    : clampInteger(profile.checkpointCountOverride, 1, 400),
+  maxDeadEndCount: profile?.maxDeadEndCount === null || profile?.maxDeadEndCount === undefined
+    ? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.maxDeadEndCount
+    : clampInteger(profile.maxDeadEndCount, 0, 999),
+  minCheckpoints: clampInteger(profile?.minCheckpoints ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.minCheckpoints, 1, 50),
   requiredOppositeBorderConnections: {
     horizontal: profile?.requiredOppositeBorderConnections?.horizontal ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.requiredOppositeBorderConnections.horizontal,
     vertical: profile?.requiredOppositeBorderConnections?.vertical ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.requiredOppositeBorderConnections.vertical
   },
   routeQualityReinforcementMultiplier: Math.max(0, Math.min(2, profile?.routeQualityReinforcementMultiplier ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.routeQualityReinforcementMultiplier)),
-  shortcutCountMultiplier: Math.max(0, Math.min(2, profile?.shortcutCountMultiplier ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.shortcutCountMultiplier))
+  shortcutCountMultiplier: Math.max(0, Math.min(2, profile?.shortcutCountMultiplier ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.shortcutCountMultiplier)),
+  straightnessBias: Math.max(0, Math.min(1, profile?.straightnessBias ?? DEFAULT_LEGACY_MAZE_GENERATION_PROFILE.straightnessBias))
 });
 
 const createSeededRng = (seed: number): (() => number) => {
@@ -1788,8 +1820,17 @@ const findLegacyNextTile = (
   checkpoint: LegacyPoint,
   start: LegacyPoint,
   backtracking: boolean,
-  rng: () => number
+  rng: () => number,
+  preferredDirection: LegacyPoint | null = null,
+  straightnessBias = 0
 ): LegacyPoint | null => {
+  if (!backtracking && preferredDirection && straightnessBias > 0 && rng() < straightnessBias) {
+    const next = { x: current.x + preferredDirection.x, y: current.y + preferredDirection.y };
+    if (canUseLegacyNextTile(width, height, pathMask, current, next, start, checkpoint, backtracking)) {
+      return next;
+    }
+  }
+
   const selectors = [0, 1, 2];
 
   while (selectors.length > 0) {
@@ -1928,8 +1969,9 @@ const createLegacyCheckpointPathMaze = (
   // width and height reduces to the exact old value when they're equal.
   const linearSize = (width + height) / 2;
   const requestedCheckpoints = clampInteger(
-    Math.trunc((linearSize + (linearSize * legacyTuning.board.checkPointModifier)) * profile.checkpointCountMultiplier),
-    4,
+    profile.checkpointCountOverride
+      ?? Math.trunc((linearSize + (linearSize * legacyTuning.board.checkPointModifier)) * profile.checkpointCountMultiplier),
+    profile.minCheckpoints,
     Math.trunc(linearSize * 2)
   );
   const pathMask = createEmptyGrid(width, height);
@@ -1949,6 +1991,10 @@ const createLegacyCheckpointPathMaze = (
   let pathLengthCount = 0;
   let safetyIterations = 0;
   const safetyIterationLimit = Math.max(width * height * 8, requestedCheckpoints * linearSize * 4);
+  // Reset whenever a checkpoint is reached (new leg, no heading to continue)
+  // or a backtrack fires (current teleports to a different tile, so the
+  // previous heading is no longer meaningful).
+  let lastDirection: LegacyPoint | null = null;
 
   while (remainingCheckpoints > 0 && safetyIterations < safetyIterationLimit) {
     const checkpointResult = resolveLegacyCheckpoint(width, height, pathMask, start, remainingCheckpoints, rng);
@@ -1960,6 +2006,7 @@ const createLegacyCheckpointPathMaze = (
 
     acceptedCheckpoints += 1;
     checkpointTiles.push(clonePoint(checkpoint));
+    lastDirection = null;
 
     while (safetyIterations < safetyIterationLimit) {
       safetyIterations += 1;
@@ -1974,8 +2021,12 @@ const createLegacyCheckpointPathMaze = (
       }
 
       const previous = clonePoint(current);
-      const next = findLegacyNextTile(width, height, pathMask, current, checkpoint, start, false, rng);
+      const next = findLegacyNextTile(
+        width, height, pathMask, current, checkpoint, start, false, rng,
+        lastDirection, profile.straightnessBias
+      );
       if (next) {
+        lastDirection = { x: next.x - current.x, y: next.y - current.y };
         current = next;
         pathLengthCount += 1;
         continue;
@@ -1992,6 +2043,7 @@ const createLegacyCheckpointPathMaze = (
         break;
       }
 
+      lastDirection = null;
       current = backtracked;
       pathLengthCount = pathLengths.get(keyForPoint(current)) ?? 0;
     }
@@ -2046,6 +2098,69 @@ const createLegacyCheckpointPathMaze = (
       deterministicSafetyStart
     }
   };
+};
+
+// Walls off dead-end leaf tiles (<=1 walkable neighbor) one at a time, down
+// to maxDeadEndCount, retreating naturally: removing a leaf can expose its
+// former only-neighbor as a new leaf, so the dead-end set is recomputed each
+// iteration. Never touches start/goal/solutionPath tiles, so the solution
+// route's reachability and length are unaffected by pruning.
+const pruneLegacyDeadEnds = (
+  grid: boolean[][],
+  start: LegacyPoint,
+  goal: LegacyPoint,
+  solutionPath: readonly LegacyPoint[],
+  maxDeadEndCount: number,
+  rng: () => number
+): LegacyPoint[] => {
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const protectedTiles = new Set<string>([
+    keyForPoint(start),
+    keyForPoint(goal),
+    ...solutionPath.map(keyForPoint)
+  ]);
+  const prunedTiles: LegacyPoint[] = [];
+
+  const countWalkableNeighbors = (point: LegacyPoint): number => (
+    LEGACY_STEP_DIRECTIONS.filter((direction) => {
+      const neighbor = { x: point.x + direction.x, y: point.y + direction.y };
+      return hasFullLegacyNeighborContext(width, height, neighbor) && grid[neighbor.y]![neighbor.x] === true;
+    }).length
+  );
+
+  const collectDeadEnds = (): LegacyPoint[] => {
+    const deadEnds: LegacyPoint[] = [];
+    for (let y = 1; y < height - 1; y += 1) {
+      for (let x = 1; x < width - 1; x += 1) {
+        if (!grid[y]![x] || protectedTiles.has(keyForPoint({ x, y }))) {
+          continue;
+        }
+        if (countWalkableNeighbors({ x, y }) <= 1) {
+          deadEnds.push({ x, y });
+        }
+      }
+    }
+    return deadEnds;
+  };
+
+  let deadEnds = collectDeadEnds();
+  let guard = 0;
+  const guardLimit = width * height * 4;
+
+  while (deadEnds.length > maxDeadEndCount && guard < guardLimit) {
+    guard += 1;
+    const tile = deadEnds[Math.floor(rng() * deadEnds.length)];
+    if (!tile) {
+      break;
+    }
+
+    grid[tile.y]![tile.x] = false;
+    prunedTiles.push(clonePoint(tile));
+    deadEnds = collectDeadEnds();
+  }
+
+  return prunedTiles;
 };
 
 export const createLegacyMaze = (
@@ -2114,6 +2229,18 @@ export const createLegacyMaze = (
     } = resolveLegacyFinalRouteState(grid, start, goal, minimumSolutionPathLength, playableTopologyStats));
   }
 
+  // Dead-end pruning must run before the border-wrap/feeder stages below:
+  // those stages carve single-tile-deep spokes from the border inward, which
+  // can legitimately look like a dead end (<=1 walkable neighbor) until the
+  // wrap pairing on the far side is accounted for. Pruning after them would
+  // wall off freshly-carved wrap connectors and break wrap-topology
+  // diagnostics; pruning before them only ever touches interior tiles from
+  // the checkpoint/shortcut/reinforcement stages, which the wrap stages then
+  // carve around normally.
+  const deadEndPruneTiles = profile.maxDeadEndCount === null
+    ? []
+    : pruneLegacyDeadEnds(grid, start, goal, solutionPath, profile.maxDeadEndCount, rng);
+
   const feederPairingConnections = (
     profile.borderFeederTargetPerSide === 1
     && !profile.requiredOppositeBorderConnections.horizontal
@@ -2154,6 +2281,7 @@ export const createLegacyMaze = (
     wrapTopologyDiagnostics,
     generationBuildTrace: {
       ...generationBuildTrace,
+      deadEndPrunedTiles: deadEndPruneTiles.map(clonePoint),
       finalGoal: clonePoint(goal),
       reinforcementShortcutTiles: [
         ...reinforcementStats.createdTiles,
