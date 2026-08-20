@@ -17,15 +17,19 @@ import {
 // (see legacyMenuLayout.ts's menuTitleFitsInHeader). `lanes.title` is null
 // in the inline case -- assert against whichever mode a given layout is
 // actually in rather than assuming one or the other.
+//
+// The board itself is full-bleed (near-full height, see menuFullBleedTop/
+// BottomMargin) -- the header/title/dock button float above it rather than
+// the board leaving a lane clear for them, so there is no longer a
+// meaningful "title sits above boardTop" invariant to check here; only the
+// title's own position relative to its header/banner lane matters.
 const expectTitlePlacedSafely = (layout: ReturnType<typeof resolveLegacyMenuLayout>): void => {
   if (layout.lanes.title) {
     expect(layout.lanes.hud?.bottom ?? 0).toBeLessThanOrEqual(layout.lanes.title.top);
-    expect(layout.lanes.title.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
   } else if (layout.lanes.hud) {
     expect(layout.titleY).toBeGreaterThanOrEqual(layout.lanes.hud.top);
     expect(layout.titleY).toBeLessThanOrEqual(layout.lanes.hud.bottom);
   }
-  expect(layout.titleY).toBeLessThan(layout.boardTop);
 };
 
 describe('legacy menu layout', () => {
@@ -39,13 +43,16 @@ describe('legacy menu layout', () => {
     expect(layout.rightButtonY).toBe(layout.buttonY);
     expect(layout.centerButtonY).toBe(layout.buttonY);
     expect(layout.buttonLayout).toBe('row');
-    expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardWidth);
+    // The board is full-bleed now -- it extends past the dock button
+    // instead of stopping short above it, so the button floats over the
+    // board's lower edge rather than sitting below it.
+    expect(layout.boardTop + layout.boardHeight).toBeGreaterThan(layout.buttonY);
     expect(layout.buttonHeight).toBeGreaterThanOrEqual(58);
     expect(layout.buttonHeight).toBeLessThanOrEqual(78);
-    // The board now fills essentially all the vertical room left after the
-    // deliberately small header/title/dock reserves, not a conservative
-    // fixed ratio -- it should dominate the screen, not just occupy a
-    // comfortable middle chunk of it.
+    // The board now fills essentially all the vertical room (full-bleed,
+    // only a hair of margin at top/bottom), not a conservative fixed ratio
+    // -- it should dominate the screen, not just occupy a comfortable
+    // middle chunk of it.
     expect(layout.boardWidth).toBeGreaterThanOrEqual(700);
     expect(layout.leftButtonX).toBeLessThan(layout.centerButtonX);
     expect(layout.rightButtonX).toBeGreaterThan(layout.centerButtonX);
@@ -108,8 +115,9 @@ describe('legacy menu layout', () => {
     expect(guestDesktop.lanes.title).toBeNull();
     expect(title.top).toBeGreaterThanOrEqual(guestDesktop.lanes.hud?.top ?? 0);
     expect(title.top + title.height).toBeLessThanOrEqual(guestDesktop.lanes.hud?.bottom ?? 0);
-    expect(title.top).toBeLessThan(guestDesktop.boardTop);
-    expect(guestDesktop.centerButtonY).toBeGreaterThan(guestDesktop.boardTop + guestDesktop.boardWidth);
+    // The board is full-bleed -- it extends past the dock button instead of
+    // stopping above it, so the button floats over the board's lower edge.
+    expect(guestDesktop.boardTop + guestDesktop.boardHeight).toBeGreaterThan(guestDesktop.centerButtonY);
     expect(guestDesktop.height - guestDesktop.centerButtonY).toBeLessThanOrEqual(60);
     expect(guestDesktop).toEqual(authenticatedDesktop);
     expect(guestPhone).toEqual(authenticatedPhone);
@@ -126,7 +134,10 @@ describe('legacy menu layout', () => {
 
       expect(layout.lanes.hud).not.toBeNull();
       expectTitlePlacedSafely(layout);
-      expect(layout.lanes.maze.bottom).toBeLessThanOrEqual(layout.lanes.actions?.top ?? 0);
+      // The board is full-bleed now -- whether it actually reaches the dock
+      // button's action lane depends on how well this (fixed, square-ish)
+      // test maze shape fills the available box, not a layout invariant
+      // this function still guarantees on its own.
     }
   });
 
@@ -157,12 +168,14 @@ describe('legacy menu layout', () => {
 
       // Inline mode: the orbit shell lives inside the header lane alongside
       // the icons. Banner mode: it lives in its own lane below the header.
+      // The board is full-bleed now, so it no longer guarantees staying
+      // clear of the orbit shell below it -- that's the point (the title
+      // floats above the board rather than the board leaving room for it).
       if (layout.lanes.title) {
         expect(orbit.top).toBeGreaterThanOrEqual((layout.lanes.hud?.bottom ?? 0));
       } else {
         expect(orbit.top).toBeGreaterThanOrEqual((layout.lanes.hud?.top ?? 0));
       }
-      expect(orbit.bottom).toBeLessThanOrEqual(layout.lanes.maze.top);
     }
   });
 
@@ -319,9 +332,11 @@ describe('legacy menu layout', () => {
 
       expect(authenticated).toEqual(guest);
       expect(authenticated.centerButtonX).toBe(Math.round(viewport.width / 2));
-      expect(authenticated.centerButtonY - (authenticated.buttonHeight / 2)).toBeGreaterThan(
-        authenticated.boardTop + authenticated.boardWidth
-      );
+      // The board is full-bleed now, so it no longer guarantees stopping
+      // short above the button -- that's the point (the button floats over
+      // the board rather than the board leaving room for it). Whether it
+      // actually reaches this deep depends on how well this (fixed,
+      // square-ish) test maze shape fills the available box at each width.
       expect(authenticated.centerButtonY + (authenticated.buttonHeight / 2)).toBeLessThanOrEqual(
         authenticated.footerY
       );
@@ -515,7 +530,9 @@ describe('legacy menu layout', () => {
       expect(restored).toEqual(first);
       expectTitlePlacedSafely(first);
       expect(first.lanes.rank).toBeNull();
-      expect(first.lanes.maze.bottom).toBeLessThanOrEqual(first.lanes.actions?.top ?? 0);
+      // The board is full-bleed now, so it no longer guarantees stopping
+      // short of the dock button's action lane -- see expectTitlePlacedSafely's
+      // comment above.
       expect(first.lanes.actions?.bottom).toBeLessThanOrEqual(first.footerY);
     }
   });
