@@ -96,7 +96,7 @@ const boot = async (): Promise<void> => {
 
   await bootstrapLegacyRemoteAccountState();
   markMazerBootStatus('game-creating');
-  game = new Phaser.Game(createMazerPhaserConfig(viewportGeometry.getSnapshot().content));
+  game = new Phaser.Game(createMazerPhaserConfig(viewportGeometry.getSnapshot().fullBleed));
   attachMazerGameToWindow(game);
   installMazerAccessibilitySurface(document, game.canvas);
   viewportGeometry.subscribe((geometry) => {
