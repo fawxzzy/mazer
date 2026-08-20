@@ -5,7 +5,7 @@ import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { installMazerPortraitLock, shouldBlockMazerLandscape } from './orientationLock';
 import { createMazerPhaserConfig } from './phaserConfig';
-import { installMazerProductionServiceWorker } from './serviceWorkerLifecycle';
+import { installMazerProductionServiceWorker, installMazerServiceWorkerControllerReload } from './serviceWorkerLifecycle';
 import { installMazerViewportGeometry, syncMazerGameToViewport } from './viewportGeometry';
 
 const LOCALHOST_SW_RESET_KEY = 'mazer:localhost-sw-reset:v1';
@@ -61,6 +61,13 @@ const registerProductionServiceWorker = (): void => {
   }, (message) => {
     markMazerBootStatus('service-worker-error', message);
   });
+
+  if (!isLocalhostRuntime() && 'serviceWorker' in navigator) {
+    installMazerServiceWorkerControllerReload({
+      addControllerChangeListener: (listener) => navigator.serviceWorker.addEventListener('controllerchange', listener),
+      reload: () => window.location.reload()
+    });
+  }
 };
 
 const boot = async (): Promise<void> => {

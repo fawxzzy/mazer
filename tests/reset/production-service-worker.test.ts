@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import {
   installMazerProductionServiceWorker,
+  installMazerServiceWorkerControllerReload,
   type MazerServiceWorkerLifecycleRuntime
 } from '../../src/boot/serviceWorkerLifecycle';
 
@@ -99,5 +100,39 @@ describe('production service worker lifecycle', () => {
 
     await vi.waitFor(() => expect(onError).toHaveBeenCalledWith('registration unavailable'));
     expect(runtime).not.toHaveProperty('reload');
+  });
+});
+
+describe('service worker controller reload', () => {
+  test('reloads once when a new service worker takes control', () => {
+    const listeners: Array<() => void> = [];
+    const reload = vi.fn();
+
+    installMazerServiceWorkerControllerReload({
+      addControllerChangeListener: (listener) => listeners.push(listener),
+      reload
+    });
+
+    expect(listeners).toHaveLength(1);
+    expect(reload).not.toHaveBeenCalled();
+
+    listeners[0]();
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  test('never reloads more than once even if the controller changes again', () => {
+    const listeners: Array<() => void> = [];
+    const reload = vi.fn();
+
+    installMazerServiceWorkerControllerReload({
+      addControllerChangeListener: (listener) => listeners.push(listener),
+      reload
+    });
+
+    listeners[0]();
+    listeners[0]();
+    listeners[0]();
+
+    expect(reload).toHaveBeenCalledOnce();
   });
 });
