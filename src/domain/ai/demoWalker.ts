@@ -1539,6 +1539,13 @@ const buildHumanLocalMemoryRunnerPlan = (
   // and walk it using the same backtrack/reacquire step vocabulary as any
   // other recovery, so the personality-driven exploration is unaffected and
   // only the guaranteed-unstuck fallback changes.
+  //
+  // Mirrors backtrackToBestLocalMemorySplit's own multi-hop recovery
+  // convention: every intermediate hop bumps backtrackCount (not
+  // recoveryCount), and only the final step that actually lands the walker
+  // is recorded as the one recovery -- one telemetry.recoveryCount
+  // increment paired with exactly one recoveryDecisions entry, matching the
+  // invariant every other recovery path in this file maintains.
   if (currentIndex !== episode.raster.endIndex) {
     const rescuePath = findFloorPath(
       currentIndex,
@@ -1547,18 +1554,42 @@ const buildHumanLocalMemoryRunnerPlan = (
       episode.raster.height,
       episode.raster.tiles
     );
-    for (let cursor = 1; cursor < rescuePath.length; cursor += 1) {
-      const nextRescueIndex = rescuePath[cursor]!;
+    if (rescuePath.length > 1) {
+      const rescueFromIndex = currentIndex;
+      for (let cursor = 1; cursor < rescuePath.length - 1; cursor += 1) {
+        const nextRescueIndex = rescuePath[cursor]!;
+        appendStep(
+          nextRescueIndex,
+          'backtrack',
+          cursor === 1 ? 'reacquire' : 'backtrack',
+          createMemoryFrame(nextRescueIndex, 'recovering')
+        );
+        telemetry.backtrackCount += 1;
+        currentIndex = nextRescueIndex;
+      }
+      const rescueTargetIndex = rescuePath[rescuePath.length - 1]!;
       appendStep(
-        nextRescueIndex,
+        rescueTargetIndex,
         'backtrack',
-        cursor === 1 ? 'reacquire' : 'backtrack',
-        nextRescueIndex === episode.raster.endIndex
-          ? createGoalMemoryFrame()
-          : createMemoryFrame(nextRescueIndex, 'recovering')
+        rescuePath.length === 2 ? 'reacquire' : 'backtrack',
+        createGoalMemoryFrame()
       );
       telemetry.recoveryCount += 1;
-      currentIndex = nextRescueIndex;
+      recoveryDecisions.push({
+        candidateCount: 1,
+        choiceClass: 'promising',
+        confidence: 100,
+        evaluatedCandidateCount: 1,
+        fromIndex: rescueFromIndex,
+        kind: 'frontier-recovery',
+        knownRouteStepCount: rescuePath.length - 1,
+        routeCursor: Math.max(0, routeIndices.length - 1),
+        selectedScoreMargin: null,
+        splitIndex: rescueFromIndex,
+        targetIndex: rescueTargetIndex,
+        thoughtState: 'goal-confirming'
+      });
+      currentIndex = rescueTargetIndex;
     }
   }
 
