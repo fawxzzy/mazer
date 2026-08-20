@@ -338,21 +338,44 @@ export const resolveLegacyMenuLayout = (
     : laneBoardLimit * scaleBias;
   const boardWidthTarget = Math.round(clamp(rawBoardWidthBound, minBoardWidthBound, maxBoardWidthBound));
   const boardHeightTarget = Math.round(clamp(rawBoardHeightBound, minBoardHeightBound, maxBoardHeightBound));
+  // Reserve a full tile of margin on every side of the menu surface's board,
+  // the same way the left/right edges already effectively got one from
+  // menuEdgeMargin/cleanPhoneInsetPad -- so a bleed-off dock corridor always
+  // has exactly one tile of room to reach the true screen edge, and a
+  // non-bleed corridor never ends up sitting flush against it. The previous
+  // per-axis margins were small fixed pixel values unrelated to tile size (a
+  // few px), and the vertical axis in particular could land far more than a
+  // tile away purely from centering slack when the maze's cell aspect ratio
+  // didn't perfectly match the viewport -- neither was a deliberate,
+  // consistent "one tile" reservation. Estimate the tile size from the
+  // un-margined box first (a single-pass approximation, the same pattern
+  // resolveLegacyMazeRenderFrame's own render-time inset already uses) --
+  // landing within a pixel or two of one tile is the goal, not perfect
+  // precision. Play surface is untouched: its board size is already tuned
+  // against the touch-control layout below it, and play's board doesn't use
+  // this same bleed-off dock decoration language.
+  const estimatedTileSize = Math.min(
+    boardWidthTarget / Math.max(1, mazeWidth),
+    boardHeightTarget / Math.max(1, mazeHeight)
+  );
+  const bleedMargin = isPlaySurface ? 0 : Math.max(2, Math.round(estimatedTileSize));
+  const marginedBoardWidthTarget = Math.max(minBoardWidthBound, boardWidthTarget - (bleedMargin * 2));
+  const marginedBoardHeightTarget = Math.max(minBoardHeightBound, boardHeightTarget - (bleedMargin * 2));
   // A uniform tileSize (square cells) is the smaller of the two axis-derived
   // tile sizes, so the board never overflows either bound -- whichever axis
   // is the tighter constraint fills its bound exactly, and the other axis
   // gets centered slack (see menuBoardCenterOffset/boardLeft below).
-  const rawTileSizeFromWidth = boardWidthTarget / Math.max(1, mazeWidth);
-  const rawTileSizeFromHeight = boardHeightTarget / Math.max(1, mazeHeight);
+  const rawTileSizeFromWidth = marginedBoardWidthTarget / Math.max(1, mazeWidth);
+  const rawTileSizeFromHeight = marginedBoardHeightTarget / Math.max(1, mazeHeight);
   const rawTileSize = Math.min(rawTileSizeFromWidth, rawTileSizeFromHeight);
   const cleanPhoneBoardWidth = Math.max(
     1,
-    Math.min(boardWidthTarget, width - (LEGACY_PHONE_CLEAN_OUTER_MARGIN * 2))
+    Math.min(marginedBoardWidthTarget, width - (LEGACY_PHONE_CLEAN_OUTER_MARGIN * 2))
   );
   const cleanPhoneInsetPad = LEGACY_PHONE_CLEAN_SAFE_INSET * 2;
   const cleanPhoneTileSize = Math.min(
     (cleanPhoneBoardWidth - cleanPhoneInsetPad) / Math.max(1, mazeWidth),
-    boardHeightTarget / Math.max(1, mazeHeight)
+    marginedBoardHeightTarget / Math.max(1, mazeHeight)
   );
   const tileSize = isUltraNarrow
     ? Math.max(3, Number(rawTileSize.toFixed(3)))

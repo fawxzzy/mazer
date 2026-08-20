@@ -239,16 +239,25 @@ describe('legacy menu layout', () => {
     expect(titleLayout.width).toBeLessThanOrEqual(layout.width - 48);
   });
 
-  test('uses one edge-tight board frame while scaling maze tiles on normal portrait phones', () => {
+  test('reserves one tile of bleed margin on the menu board while play stays edge-tight, scaling maze tiles on normal portrait phones', () => {
     const menuLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 49, 'menu');
     const playLayout = resolveLegacyMenuLayout(405, 958, 50, 49, 49, 'play');
 
-    expect(menuLayout.tileSize).toBeCloseTo(7.816, 3);
+    // Menu's board leaves roughly one tile of margin from the true edge now
+    // (so a bleed-off dock corridor has somewhere to reach) -- boardLeft is
+    // no longer pinned to the tiny fixed edge margin play still uses.
+    expect(menuLayout.tileSize).toBeCloseTo(7.49, 3);
     expect(playLayout.tileSize).toBeCloseTo(7.816, 3);
-    expect(menuLayout.boardWidth).toBe(397);
+    expect(menuLayout.boardWidth).toBe(381);
     expect(playLayout.boardWidth).toBe(397);
-    expect(menuLayout.boardLeft).toBe(4);
-    expect(playLayout.boardLeft).toBe(menuLayout.boardLeft);
+    expect(menuLayout.boardLeft).toBe(12);
+    expect(playLayout.boardLeft).toBe(4);
+    // "Roughly one tile" is the single-pass estimate's goal, not exact
+    // precision (the margin is estimated from the un-margined box, before
+    // the shrink slightly reduces the final tileSize) -- a loose half-to-
+    // double bound catches a genuinely broken margin without being brittle.
+    expect(menuLayout.boardLeft).toBeGreaterThan(menuLayout.tileSize * 0.5);
+    expect(menuLayout.boardLeft).toBeLessThan(menuLayout.tileSize * 2);
     // A row of three buttons doesn't fit 405px width once rowButtonOffset
     // correctly reserves the center button's own width (see the fix
     // above) -- both surfaces fall back to the stacked layout via the
@@ -258,24 +267,33 @@ describe('legacy menu layout', () => {
     expect(playLayout.buttonLayout).toBe('stack');
   });
 
-  test('lets phone menu mazes reach the screen edge when progression scale permits fewer cells', () => {
+  test('lets phone menu mazes reach the screen edge (minus one tile of bleed margin) when progression scale permits fewer cells', () => {
     const layout = resolveLegacyMenuLayout(405, 958, 50, 46, 46, 'menu');
 
-    expect(layout.tileSize).toBeCloseTo(8.326, 3);
-    expect(layout.boardWidth).toBe(397);
-    expect(layout.boardLeft).toBe(4);
+    expect(layout.tileSize).toBeCloseTo(7.935, 3);
+    expect(layout.boardWidth).toBe(379);
+    expect(layout.boardLeft).toBe(13);
+    expect(layout.boardLeft).toBeGreaterThan(layout.tileSize * 0.5);
+    expect(layout.boardLeft).toBeLessThan(layout.tileSize * 2);
     expect(layout.boardLeft + layout.boardWidth).toBeLessThanOrEqual(layout.width - 4);
     expect(layout.titleY).toBeLessThan(layout.boardTop);
     expect(layout.buttonLayout).toBe('stack');
   });
 
-  test('holds the same phone maze border across small and large cell counts', () => {
+  test('holds a roughly one-tile phone maze border across small and large cell counts', () => {
     const layouts = [37, 45, 49].map((mazeSize) => (
       resolveLegacyMenuLayout(390, 844, 50, mazeSize, mazeSize, 'menu')
     ));
 
-    expect(layouts.map((layout) => layout.boardWidth)).toEqual([382, 382, 382]);
-    expect(layouts.map((layout) => layout.boardLeft)).toEqual([4, 4, 4]);
+    // The border is sized in tile units now (one tile of bleed margin), not
+    // a fixed pixel value -- so it tracks tileSize (which shrinks as cell
+    // count grows) instead of staying pixel-identical across cell counts.
+    expect(layouts.map((layout) => layout.boardWidth)).toEqual([362, 366, 366]);
+    expect(layouts.map((layout) => layout.boardLeft)).toEqual([14, 12, 12]);
+    for (const layout of layouts) {
+      expect(layout.boardLeft).toBeGreaterThan(layout.tileSize * 0.5);
+      expect(layout.boardLeft).toBeLessThan(layout.tileSize * 2);
+    }
     expect(layouts[0]!.tileSize).toBeGreaterThan(layouts[1]!.tileSize);
     expect(layouts[1]!.tileSize).toBeGreaterThan(layouts[2]!.tileSize);
   });
