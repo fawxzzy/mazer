@@ -1531,6 +1531,37 @@ const buildHumanLocalMemoryRunnerPlan = (
     }
   }
 
+  // The human-memory model can run out of remembered frontiers (or hit the
+  // step/route-length cap) before reaching the exit -- unlike the legacy
+  // runner, it has no scripted replay to fall back on, so the walker would
+  // otherwise freeze at its last tile forever (see advanceDemoWalker's
+  // cursor clamp). Once genuinely stuck, "recall" a real route to the exit
+  // and walk it using the same backtrack/reacquire step vocabulary as any
+  // other recovery, so the personality-driven exploration is unaffected and
+  // only the guaranteed-unstuck fallback changes.
+  if (currentIndex !== episode.raster.endIndex) {
+    const rescuePath = findFloorPath(
+      currentIndex,
+      episode.raster.endIndex,
+      episode.raster.width,
+      episode.raster.height,
+      episode.raster.tiles
+    );
+    for (let cursor = 1; cursor < rescuePath.length; cursor += 1) {
+      const nextRescueIndex = rescuePath[cursor]!;
+      appendStep(
+        nextRescueIndex,
+        'backtrack',
+        cursor === 1 ? 'reacquire' : 'backtrack',
+        nextRescueIndex === episode.raster.endIndex
+          ? createGoalMemoryFrame()
+          : createMemoryFrame(nextRescueIndex, 'recovering')
+      );
+      telemetry.recoveryCount += 1;
+      currentIndex = nextRescueIndex;
+    }
+  }
+
   for (let cursor = 1; cursor < routeIndices.length;) {
     if (routeIndices[cursor] !== routeIndices[cursor - 1]) {
       cursor += 1;
