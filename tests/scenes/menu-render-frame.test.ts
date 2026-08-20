@@ -761,11 +761,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
     expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
     expect(menuSceneSource).toContain('this.drawLegacyPlayCompass(hudFrame, {');
-    expect(menuSceneSource).toContain("showPane: touchControlLayout.controlMode !== 'stick'");
+    expect(menuSceneSource).toContain('showPane: this.playFloatingStickOrigin === null');
     expect(menuSceneSource).toContain('if (options.showPane) {');
     expect(menuSceneSource).toContain('this.hudGraphics.fillTriangle(');
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
-    expect(menuSceneSource).not.toContain('this.drawLegacyPlayTouchButton(controls.restart_attempt, true, false);');
+    expect(menuSceneSource).not.toContain('this.drawLegacyPlayTouchButton(');
     expect(menuSceneSource).not.toContain('this.hudGraphics.strokeRect(');
   });
 
@@ -1005,26 +1005,33 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('resolveTouchControlKindAtPoint');
-    expect(menuSceneSource).toContain('resolveTouchArrowMovementKindAtPoint');
     expect(menuSceneSource).toContain('resolveTouchControlLayout');
     expect(menuSceneSource).toContain('private resolveLegacyPlayTouchControlLayout()');
     expect(menuSceneSource).toContain('private handleLegacyPlayTouchControl');
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchControls(');
     expect(menuSceneSource).toContain('private resolveLegacyPlayActiveTouchControls()');
     expect(menuSceneSource).toContain('activeControls: this.resolveLegacyPlayActiveTouchControls()');
-    expect(menuSceneSource).toContain("this.drawLegacyPlayTouchButton(controls.move_up, false, activeControls.has('move_up'));");
+    // Play movement no longer has a fixed-position on-screen widget of any
+    // kind (arrows or otherwise) -- every touch starts a floating stick
+    // centered on wherever it landed instead, so the board can be
+    // full-bleed. resolveTouchArrowMovementKindAtPoint, the fixed dpad
+    // button drawing, and the controlMode arrows/stick branching are gone.
+    expect(menuSceneSource).not.toContain('resolveTouchArrowMovementKindAtPoint');
+    expect(menuSceneSource).not.toContain('this.drawLegacyPlayTouchButton(');
+    expect(menuSceneSource).not.toContain("touchControlLayout.controlMode === 'arrows'");
     expect(menuSceneSource).toContain('private legacyPlayTouchControlPointerUpHandler: ((event: PointerEvent) => void) | null = null;');
     expect(menuSceneSource).toContain('target.addEventListener(\'pointerup\', this.legacyPlayTouchControlPointerUpHandler as EventListener');
     expect(menuSceneSource).toContain('target.addEventListener(\'pointercancel\', this.legacyPlayTouchControlPointerUpHandler as EventListener');
     expect(menuSceneSource).toContain('this.handleLegacyPlayTouchControlClientPoint(event.clientX, event.clientY, event.pointerId)');
     expect(menuSceneSource).toContain('this.handleLegacyPlayTouchControlClientMove(event.clientX, event.clientY, event.pointerId)');
     expect(menuSceneSource).toContain('this.releaseLegacyPlayTouchPointer(event.pointerId)');
-    expect(menuSceneSource).toContain("controlMode: this.settings.controlMode");
-    expect(menuSceneSource).toContain("touchControlLayout.controlMode === 'stick'");
-    expect(menuSceneSource).toContain("touchControlLayout.controlMode === 'arrows'");
     expect(menuSceneSource).toContain('this.playTouchArrowPointerId === normalizedPointerId');
-    expect(menuSceneSource).toContain('this.setLegacyPlayHeldTouchMoveCandidates([movement], pointerId');
-    expect(menuSceneSource).toContain('this.setLegacyPlayHeldTouchMoveCandidates(this.playTouchStickPull.movementCandidates');
+    // Every touch starts a floating stick, centered on the touch point
+    // itself -- see playFloatingStickOrigin and
+    // resolveLegacyPlayFloatingStickGeometry -- instead of dispatching an
+    // immediate pull vector against a fixed layout stick at touch-down.
+    expect(menuSceneSource).toContain('this.playFloatingStickOrigin = { x, y };');
+    expect(menuSceneSource).toContain('private resolveLegacyPlayFloatingStickGeometry(');
     expect(menuSceneSource).toContain('this.setLegacyPlayHeldTouchMoveCandidates(pullVector.movementCandidates');
     expect(menuSceneSource).toContain('movementCandidates: [...this.playTouchStickPull.movementCandidates]');
     expect(menuSceneSource).toContain('angleRadians: this.playTouchStickPull.angleRadians');
@@ -1033,8 +1040,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private resolveLegacyInputPointerPoint(pointer: Phaser.Input.Pointer)');
     expect(menuSceneSource).toContain('return this.resolveLegacyPlayTouchClientPoint(touch.clientX, touch.clientY);');
     expect(menuSceneSource).toContain('keepWhenBlocked: true');
-    expect(menuSceneSource).toContain('allowBeyondFrame: true');
-    expect(menuSceneSource).toContain('centerFallback: existingMovement');
+    expect(menuSceneSource).not.toContain('allowBeyondFrame: true');
+    expect(menuSceneSource).not.toContain('centerFallback: existingMovement');
     expect(menuSceneSource).toContain('const candidates = resolveHumanMovementPriorityCandidates(');
     expect(menuSceneSource).toContain('this.requestLegacyPlayDirectionalIntent(candidates);');
     expect(menuSceneSource).toContain('this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay(\'repeat\'));');
@@ -1042,13 +1049,20 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchStick(');
     expect(menuSceneSource).toContain('const knobRadius = stick.knobRadius;');
     expect(menuSceneSource).toContain('const travel = stick.travelRadius;');
+    // The visual rework: a soft halo in the player's own trail color behind
+    // the stick, brighter while actively pulled.
+    expect(menuSceneSource).toContain('private drawLegacyPlayFloatingStickGlow(');
     expect(menuSceneSource).toContain('deadzoneRadius: touchControlLayout.stick.deadzoneRadius');
     expect(menuSceneSource).toContain('knobRadius: touchControlLayout.stick.knobRadius');
     expect(menuSceneSource).toContain('travelRadius: touchControlLayout.stick.travelRadius');
     expect(menuSceneSource).toContain('private setLegacyPlayHeldTouchMoveCandidates(');
     expect(menuSceneSource).toContain('const wasHeld = this.playMoveFlags[direction];');
-    expect(menuSceneSource).toContain('const sameControlIndex = this.playHeldTouchMoves.findIndex((move) => move.control === control);');
-    expect(menuSceneSource).toContain('if (this.playHeldTouchMoves.length >= LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT) {');
+    // beginLegacyPlayHeldTouchMove -- the discrete-button-press path only
+    // the fixed arrows widget used -- is gone along with the widget itself;
+    // setLegacyPlayHeldTouchMoveCandidates (the floating stick's own path)
+    // still guards the same held-move limit, just via a slot-count subtraction.
+    expect(menuSceneSource).not.toContain('private beginLegacyPlayHeldTouchMove(');
+    expect(menuSceneSource).toContain('const availableCandidateSlots = Math.max(0, LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT - remainingMoves.length);');
     expect(menuSceneSource).toContain('private resolveLegacyPlayHeldTouchDelay(kind:');
     expect(menuSceneSource).toContain('private resolveLegacyPlayMovementSpeedProfile()');
     expect(menuSceneSource).toContain('completedCycles: playerTrack.completedCycles');
@@ -1062,7 +1076,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('turnDelayMs: movementSpeedProfile.turnDelayMs');
     expect(menuSceneSource).toContain('Math.min(profile.repeatIntervalMs, LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS)');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
-    expect(menuSceneSource).toContain("showPane: touchControlLayout.controlMode !== 'stick'");
+    // The compass's own background pane hides while the floating stick is
+    // actually on screen (it already grounds that area visually) instead of
+    // branching on the now-single-scheme controlMode setting.
+    expect(menuSceneSource).toContain('showPane: this.playFloatingStickOrigin === null');
     expect(menuSceneSource).toContain('this.hudBounds = touchCompassBounds');
     expect(menuSceneSource).toContain(': mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).toContain('touchControls');
@@ -1071,14 +1088,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchLabel');
     expect(menuSceneSource).not.toContain("this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');");
     expect(menuSceneSource).not.toContain("this.drawLegacyPlayTouchLabel(controls.toggle_thoughts, 'TRAIL');");
-    expect(menuSceneSource).toContain("this.hudGraphics.moveTo(cx, cy + stem);");
-    expect(menuSceneSource).toContain("this.hudGraphics.lineTo(cx, cy - size);");
+    // The fixed dpad's directional arrow glyphs (drawLegacyPlayTouchArrow)
+    // are gone along with the rest of the fixed-widget drawing.
+    expect(menuSceneSource).not.toContain('private drawLegacyPlayTouchArrow(');
     expect(menuSceneSource).toContain('installLegacyPlayTouchControlFallback');
     expect(menuSceneSource).toContain("event.pointerType === 'touch'");
     expect(menuSceneSource).toContain('event.target === this.game.canvas');
     expect(menuSceneSource).toContain('event.stopImmediatePropagation()');
     expect(menuSceneSource).toContain("case 'pause':");
-    expect(menuSceneSource).toContain("case 'restart_attempt':");
     expect(menuSceneSource).toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
     expect(menuSceneSource).toContain("'Reset', resetAction");
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
@@ -1170,7 +1187,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
     expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('toggleAnimatedBackdrop', this.settings)");
-    expect(menuSceneSource).toContain("checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings)");
+    // Play touch movement only has one control scheme now (the floating
+    // stick), so the settings list no longer surfaces a meaningless
+    // arrows-vs-stick row for it -- the underlying resolver keeps the
+    // 'controlMode' case (asserted above) for the settings field itself,
+    // just unrendered.
+    expect(menuSceneSource).not.toContain("label: 'Control Style'");
     expect(menuSceneSource).toContain("switchIsOn: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailPulse', this.settings)");
   });
 

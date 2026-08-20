@@ -354,7 +354,6 @@ import {
 import {
   resolveStickPullVector,
   resolveTouchClientPoint,
-  resolveTouchArrowMovementKindAtPoint,
   resolveTouchControlKindAtPoint,
   resolveTouchControlLayout,
   type TouchStickPullVector
@@ -1224,6 +1223,12 @@ export class MenuScene extends Phaser.Scene {
   private playTouchArrowPointerId: number | null = null;
   private playTouchStickPointerId: number | null = null;
   private playTouchStickPull: TouchStickPullVector | null = null;
+  // Where the floating movement stick is centered, in canvas pixels -- null
+  // means no touch is currently down, so nothing is drawn. Set on touch-down
+  // to wherever the player's thumb actually landed (see
+  // handleLegacyPlayTouchControl) instead of a fixed on-screen position, so
+  // the board never has to reserve permanent space for a control widget.
+  private playFloatingStickOrigin: { x: number; y: number } | null = null;
   private playPointerStart: LegacyPlayPointerStart | null = null;
   private titleGraphics!: Phaser.GameObjects.Graphics;
   private footerText!: Phaser.GameObjects.Text;
@@ -3152,75 +3157,85 @@ export class MenuScene extends Phaser.Scene {
     return this.handleLegacyPlayTouchControlMove(point.x, point.y, pointer.id);
   }
 
+  private clearLegacyPlayFloatingStick(): void {
+    this.playTouchStickPointerId = null;
+    this.playTouchStickPull = null;
+    this.playFloatingStickOrigin = null;
+  }
+
+  // A fixed-size ring centered wherever the touch actually landed, instead
+  // of a fixed screen position -- resolveStickPullVector only cares about
+  // outer.centerX/centerY and the radii below, so this plugs straight into
+  // the exact same pull-vector math the old fixed stick used.
+  private resolveLegacyPlayFloatingStickGeometry(
+    origin: { x: number; y: number }
+  ): NonNullable<ReturnType<typeof resolveTouchControlLayout>['stick']> {
+    const minDim = Math.max(1, Math.min(this.layout.width, this.layout.height));
+    const outerSize = clamp(Math.round(minDim * 0.34), 128, 220);
+    const innerSize = clamp(Math.round(outerSize * 0.34), 34, 54);
+    const knobRadius = clamp(Math.round(outerSize * 0.075), 10, 16);
+    const deadzoneRadius = Math.max(12, Math.round(outerSize * 0.12));
+    const travelRadius = Math.round(Math.max(
+      outerSize * 0.3,
+      (outerSize / 2) - knobRadius - Math.max(5, Math.round(outerSize * 0.04))
+    ));
+    const toRect = (size: number): NonNullable<ReturnType<typeof resolveTouchControlLayout>['stick']>['outer'] => ({
+      left: origin.x - (size / 2),
+      top: origin.y - (size / 2),
+      width: size,
+      height: size,
+      right: origin.x + (size / 2),
+      bottom: origin.y + (size / 2),
+      centerX: origin.x,
+      centerY: origin.y
+    });
+
+    return {
+      deadzoneRadius,
+      inner: toRect(innerSize),
+      knobRadius,
+      outer: toRect(outerSize),
+      travelRadius
+    };
+  }
+
   private handleLegacyPlayTouchControl(x: number, y: number, pointerId: number | null = null): boolean {
     if (this.mode !== 'play' || hasPendingLegacyResetRequest(this.pendingResetRequest)) {
       return false;
     }
 
     const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
-    const control = resolveTouchControlKindAtPoint(
-      touchControlLayout,
-      x,
-      y
-    );
-    const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
-    if (touchControlLayout.controlMode === 'stick' && this.isLegacyPlayTouchStickPoint(touchControlLayout, x, y)) {
-      if (this.overlay !== 'none') {
-        return false;
-      }
+    const control = resolveTouchControlKindAtPoint(touchControlLayout, x, y);
 
-      this.resetLegacyPlayDirectionalInputBuffer();
-      this.playTouchArrowPointerId = null;
-      this.playTouchStickPointerId = normalizedPointerId;
-      this.playHeldTouchMoves = [];
-      this.clearLegacyPlayHeldTouchRepeat();
-      this.playTouchStickPull = touchControlLayout.stick === null
-        ? null
-        : resolveStickPullVector(touchControlLayout.stick, x, y, {
-          allowBeyondOuter: true
-        });
-      if (this.playTouchStickPull !== null) {
-        this.setLegacyPlayHeldTouchMoveCandidates(this.playTouchStickPull.movementCandidates, pointerId, { keepWhenBlocked: true });
+    if (control === 'pause') {
+      if (this.overlay === 'pause') {
+        this.closeOverlay();
+      } else if (this.overlay === 'none') {
+        this.openOverlay('pause');
       } else {
-        this.releaseLegacyPlayHeldTouchMove(pointerId);
-        this.publishInteractionDiagnostics();
+        return false;
       }
-      this.boardDynamicDirty = true;
       return true;
     }
 
-    if (isMovementActionKind(control)) {
-      if (this.overlay !== 'none') {
-        return false;
-      }
-
-      this.resetLegacyPlayDirectionalInputBuffer();
-      this.playTouchArrowPointerId = normalizedPointerId;
-      this.playTouchStickPointerId = null;
-      this.playTouchStickPull = null;
-      this.beginLegacyPlayHeldTouchMove(control, pointerId, { keepWhenBlocked: true });
-      return true;
+    if (this.overlay !== 'none') {
+      return false;
     }
 
-    switch (control) {
-      case 'pause':
-        if (this.overlay === 'pause') {
-          this.closeOverlay();
-        } else if (this.overlay === 'none') {
-          this.openOverlay('pause');
-        } else {
-          return false;
-        }
-        return true;
-      case 'restart_attempt':
-        return false;
-      case 'toggle_thoughts':
-        return false;
-      case null:
-        return false;
-      default:
-        return control satisfies never;
-    }
+    // Every other touch starts a floating stick centered wherever the
+    // player's thumb actually landed, instead of requiring them to find a
+    // fixed on-screen widget -- see playFloatingStickOrigin.
+    const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
+    this.resetLegacyPlayDirectionalInputBuffer();
+    this.playTouchArrowPointerId = null;
+    this.playTouchStickPointerId = normalizedPointerId;
+    this.playFloatingStickOrigin = { x, y };
+    this.playHeldTouchMoves = [];
+    this.clearLegacyPlayHeldTouchRepeat();
+    this.playTouchStickPull = null;
+    this.boardDynamicDirty = true;
+    this.hudDirty = true;
+    return true;
   }
 
   private handleLegacyPlayTouchControlMove(x: number, y: number, pointerId: number | null = null): boolean {
@@ -3229,38 +3244,12 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
-    const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
-    if (
-      touchControlLayout.controlMode === 'arrows'
-      && this.playTouchArrowPointerId === normalizedPointerId
-    ) {
-      const existingMovement = this.playHeldTouchMoves.find(
-        (move) => move.pointerId === normalizedPointerId
-      )?.control ?? null;
-      const movement = resolveTouchArrowMovementKindAtPoint(touchControlLayout, x, y, {
-        allowBeyondFrame: true,
-        centerFallback: existingMovement
-      });
-      if (movement !== null) {
-        this.setLegacyPlayHeldTouchMoveCandidates([movement], pointerId, {
-          keepWhenBlocked: true,
-          smoothRetarget: true
-        });
-      }
-      this.boardDynamicDirty = true;
-      return true;
-    }
-
-    if (this.playTouchStickPointerId !== normalizedPointerId) {
+    if (this.playTouchStickPointerId !== normalizedPointerId || this.playFloatingStickOrigin === null) {
       return false;
     }
 
-    if (touchControlLayout.controlMode !== 'stick' || touchControlLayout.stick === null) {
-      this.releaseLegacyPlayTouchPointer(pointerId);
-      return true;
-    }
-
-    const pullVector = resolveStickPullVector(touchControlLayout.stick, x, y, {
+    const stick = this.resolveLegacyPlayFloatingStickGeometry(this.playFloatingStickOrigin);
+    const pullVector = resolveStickPullVector(stick, x, y, {
       allowBeyondOuter: true
     });
     const pullChanged = this.hasLegacyPlayTouchStickPullChanged(pullVector);
@@ -3278,19 +3267,6 @@ export class MenuScene extends Phaser.Scene {
       this.publishInteractionDiagnostics(false);
     }
     return true;
-  }
-
-  private isLegacyPlayTouchStickPoint(
-    touchControlLayout: ReturnType<typeof resolveTouchControlLayout>,
-    x: number,
-    y: number
-  ): boolean {
-    const stick = touchControlLayout.stick;
-    if (stick === null) {
-      return false;
-    }
-
-    return Math.hypot(x - stick.outer.centerX, y - stick.outer.centerY) <= stick.outer.width / 2;
   }
 
   private setLegacyPlayHeldTouchMoveCandidates(
@@ -3380,90 +3356,6 @@ export class MenuScene extends Phaser.Scene {
     return true;
   }
 
-  private beginLegacyPlayHeldTouchMove(
-    control: HumanMovementActionKind,
-    pointerId: number | null,
-    options: { keepWhenBlocked?: boolean } = {}
-  ): boolean {
-    const normalizedPointerId = this.normalizeLegacyPlayTouchPointerId(pointerId);
-    const hadActiveMove = this.playHeldTouchMoves.length > 0;
-    const existingIndex = this.playHeldTouchMoves.findIndex((move) => move.pointerId === normalizedPointerId);
-    let existingControlChanged = false;
-    if (existingIndex >= 0) {
-      existingControlChanged = this.playHeldTouchMoves[existingIndex]?.control !== control;
-      this.playHeldTouchMoves[existingIndex] = {
-        ...this.playHeldTouchMoves[existingIndex],
-        control
-      };
-    } else {
-      const sameControlIndex = this.playHeldTouchMoves.findIndex((move) => move.control === control);
-      if (sameControlIndex >= 0) {
-        const sameControlMove = this.playHeldTouchMoves[sameControlIndex];
-        if (sameControlMove?.pointerId === null && normalizedPointerId !== null) {
-          this.playHeldTouchMoves[sameControlIndex] = {
-            ...sameControlMove,
-            pointerId: normalizedPointerId
-          };
-        }
-        this.boardDynamicDirty = true;
-        this.publishInteractionDiagnostics();
-        return true;
-      }
-
-      if (this.playHeldTouchMoves.length >= LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT) {
-        return false;
-      }
-
-      this.playHeldTouchSequence += 1;
-      this.playHeldTouchMoves.push({
-        control,
-        pointerId: normalizedPointerId,
-        sequence: this.playHeldTouchSequence
-      });
-    }
-
-    this.sortLegacyPlayHeldTouchMoves();
-    this.requestLegacyPlayDirectionalIntent([control]);
-    this.boardDynamicDirty = true;
-    if (hadActiveMove && existingControlChanged) {
-      this.clearLegacyPlayHeldTouchRepeat();
-      const moved = this.performLegacyPlayHeldTouchMove();
-      if (moved) {
-        this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('turn'));
-      } else if (!options.keepWhenBlocked) {
-        this.releaseLegacyPlayHeldTouchMove(normalizedPointerId);
-        return false;
-      }
-      this.publishInteractionDiagnostics();
-      return true;
-    }
-
-    if (hadActiveMove) {
-      if (this.playHeldTouchRepeatTimer === null) {
-        this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
-      }
-      this.publishInteractionDiagnostics();
-      return true;
-    }
-
-    this.clearLegacyPlayHeldTouchRepeat();
-    const moved = this.performLegacyPlayHeldTouchMove();
-    if (!moved) {
-      if (options.keepWhenBlocked) {
-        this.publishInteractionDiagnostics();
-        return true;
-      }
-      this.releaseLegacyPlayHeldTouchMove(normalizedPointerId);
-      return false;
-    }
-
-    if (moved) {
-      this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('initial'));
-      this.publishInteractionDiagnostics();
-    }
-    return moved;
-  }
-
   private releaseLegacyPlayHeldTouchMove(pointerId: number | null = null): boolean {
     if (this.playHeldTouchMoves.length === 0) {
       return false;
@@ -3499,9 +3391,9 @@ export class MenuScene extends Phaser.Scene {
     }
     const releasedStick = this.playTouchStickPointerId === normalizedPointerId;
     if (releasedStick) {
-      this.playTouchStickPointerId = null;
-      this.playTouchStickPull = null;
+      this.clearLegacyPlayFloatingStick();
       this.boardDynamicDirty = true;
+      this.hudDirty = true;
       this.publishInteractionDiagnostics();
     }
     const releasedMove = this.releaseLegacyPlayHeldTouchMove(pointerId);
@@ -3564,9 +3456,9 @@ export class MenuScene extends Phaser.Scene {
     ) {
       this.playHeldTouchMoves = [];
       this.playTouchArrowPointerId = null;
-      this.playTouchStickPointerId = null;
-      this.playTouchStickPull = null;
+      this.clearLegacyPlayFloatingStick();
       this.clearLegacyPlayHeldTouchRepeat();
+      this.hudDirty = true;
       this.publishInteractionDiagnostics();
       return;
     }
@@ -3580,9 +3472,9 @@ export class MenuScene extends Phaser.Scene {
       }
       this.playHeldTouchMoves = [];
       this.playTouchArrowPointerId = null;
-      this.playTouchStickPointerId = null;
-      this.playTouchStickPull = null;
+      this.clearLegacyPlayFloatingStick();
       this.clearLegacyPlayHeldTouchRepeat();
+      this.hudDirty = true;
       this.publishInteractionDiagnostics();
       return;
     }
@@ -3652,10 +3544,6 @@ export class MenuScene extends Phaser.Scene {
     }
 
     return activeControls;
-  }
-
-  private resolveLegacyPlayActiveTouchControlSet(): Set<HumanMovementActionKind> {
-    return new Set(this.resolveLegacyPlayActiveTouchControls());
   }
 
   private performLegacyPlayHeldTouchMove(): boolean {
@@ -3840,8 +3728,7 @@ export class MenuScene extends Phaser.Scene {
     this.clearLegacyPlayHeldTouchRepeat();
     this.playHeldTouchMoves = [];
     this.playTouchArrowPointerId = null;
-    this.playTouchStickPointerId = null;
-    this.playTouchStickPull = null;
+    this.clearLegacyPlayFloatingStick();
     this.playMoveFlags = createLegacyPlayMoveFlags();
     this.playKeyboardRepeatGate.reset();
     this.playDirectionalIntent.reset();
@@ -3985,7 +3872,8 @@ export class MenuScene extends Phaser.Scene {
       {
         browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height),
         menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest',
-        safeArea: viewportGeometry.safeArea
+        safeArea: viewportGeometry.safeArea,
+        useFloatingTouchControls: true
       }
     );
     this.footerText.setPosition(this.layout.width / 2, this.layout.footerY);
@@ -4015,7 +3903,8 @@ export class MenuScene extends Phaser.Scene {
       {
         browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height),
         menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest',
-        safeArea: viewportGeometry.safeArea
+        safeArea: viewportGeometry.safeArea,
+        useFloatingTouchControls: true
       }
     );
   }
@@ -7329,9 +7218,17 @@ export class MenuScene extends Phaser.Scene {
       width: this.layout.width
     });
     const badgePulse = this.resolveLegacyProgressionBadgePulse();
-    // No background panel, tint, or border here any more -- the level
-    // number and its "LVL" label are the whole control, sized to fill the
-    // frame instead of sitting inside a chrome-bordered box.
+    // Bare stroked text read as "floating label," not a HUD element with its
+    // own identity -- give it the same rounded chrome panel the in-play
+    // pause cog already uses (drawLegacyHeaderControlChrome's fill/border,
+    // without that control's button notch since this isn't tappable),
+    // tinted with the player's own progression color so it visually reads
+    // as "this player's level" at a glance.
+    const badgePanelRadius = Math.min(10, Math.max(6, Math.round(Math.min(frame.width, frame.height) * 0.16)));
+    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, 0.5);
+    this.boardDynamicGraphics.fillRoundedRect(frame.left, frame.top, frame.width, frame.height, badgePanelRadius);
+    this.boardDynamicGraphics.lineStyle(2, palette.playerCoreColor, 0.68);
+    this.boardDynamicGraphics.strokeRoundedRect(frame.left, frame.top, frame.width, frame.height, badgePanelRadius);
     this.progressionBadgeText
       .setText(String(track.level))
       .setFontSize(resolveLegacyHeaderControlMetricFontSize(track.level, frame.width))
@@ -8325,8 +8222,11 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);
+    // Hide the compass's own background pane while the floating stick is
+    // actually on screen (it already grounds that area visually); show it
+    // otherwise, same as it did for the old fixed stick control.
     this.drawLegacyPlayCompass(hudFrame, {
-      showPane: touchControlLayout.controlMode !== 'stick'
+      showPane: this.playFloatingStickOrigin === null
     });
     this.drawLegacyPlayPlayerMessageStack(hudFrame);
     const compassVisualFrame = this.resolveLegacyPlayCompassVisualFrame(hudFrame, time);
@@ -8585,6 +8485,12 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.fillCircle(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y, 2);
   }
 
+  // Movement no longer has a fixed on-screen widget at all -- the board is
+  // full-bleed (see legacyMenuLayout.ts's useFloatingTouchControls) and a
+  // stick only appears, centered exactly where the touch landed, while a
+  // finger is actually down (playFloatingStickOrigin). The pause cog is the
+  // one control that stays fixed, since it's a discrete tap target the
+  // player needs to be able to find reliably rather than a drag surface.
   private drawLegacyPlayTouchControls(
     touchControlLayout = this.resolveLegacyPlayTouchControlLayout()
   ): VisualRect | null {
@@ -8592,34 +8498,42 @@ export class MenuScene extends Phaser.Scene {
       return null;
     }
 
-    const { controls, frame } = touchControlLayout;
-    const activeControls = this.resolveLegacyPlayActiveTouchControlSet();
-
-    if (touchControlLayout.controlMode === 'stick' && touchControlLayout.stick !== null) {
-      this.drawLegacyPlayTouchStick(touchControlLayout.stick, this.resolveLegacyPlayHeldTouchControl(), this.playTouchStickPull);
-      this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);
-      return createVisualRect(frame.left, frame.top, frame.width, frame.height);
-    }
-
-    this.drawLegacyPlayTouchButton(controls.move_up, false, activeControls.has('move_up'));
-    this.drawLegacyPlayTouchButton(controls.move_up_right, false, activeControls.has('move_up_right'));
-    this.drawLegacyPlayTouchButton(controls.move_right, false, activeControls.has('move_right'));
-    this.drawLegacyPlayTouchButton(controls.move_down_right, false, activeControls.has('move_down_right'));
-    this.drawLegacyPlayTouchButton(controls.move_down, false, activeControls.has('move_down'));
-    this.drawLegacyPlayTouchButton(controls.move_down_left, false, activeControls.has('move_down_left'));
-    this.drawLegacyPlayTouchButton(controls.move_left, false, activeControls.has('move_left'));
-    this.drawLegacyPlayTouchButton(controls.move_up_left, false, activeControls.has('move_up_left'));
+    const { controls } = touchControlLayout;
     this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);
 
-    this.drawLegacyPlayTouchArrow(controls.move_up, 'up', activeControls.has('move_up'));
-    this.drawLegacyPlayTouchArrow(controls.move_up_right, 'up-right', activeControls.has('move_up_right'));
-    this.drawLegacyPlayTouchArrow(controls.move_right, 'right', activeControls.has('move_right'));
-    this.drawLegacyPlayTouchArrow(controls.move_down_right, 'down-right', activeControls.has('move_down_right'));
-    this.drawLegacyPlayTouchArrow(controls.move_down, 'down', activeControls.has('move_down'));
-    this.drawLegacyPlayTouchArrow(controls.move_down_left, 'down-left', activeControls.has('move_down_left'));
-    this.drawLegacyPlayTouchArrow(controls.move_left, 'left', activeControls.has('move_left'));
-    this.drawLegacyPlayTouchArrow(controls.move_up_left, 'up-left', activeControls.has('move_up_left'));
-    return createVisualRect(frame.left, frame.top, frame.width, frame.height);
+    if (this.playFloatingStickOrigin === null) {
+      return createVisualRect(controls.pause.left, controls.pause.top, controls.pause.width, controls.pause.height);
+    }
+
+    const stick = this.resolveLegacyPlayFloatingStickGeometry(this.playFloatingStickOrigin);
+    this.drawLegacyPlayFloatingStickGlow(stick, this.playTouchStickPull);
+    this.drawLegacyPlayTouchStick(stick, this.resolveLegacyPlayHeldTouchControl(), this.playTouchStickPull);
+    return createVisualRect(
+      stick.outer.left,
+      stick.outer.top,
+      stick.outer.width,
+      stick.outer.height
+    );
+  }
+
+  // The visual rework: a soft halo in the player's own trail color instead
+  // of the old fixed dpad's generic touch-icon palette, so the floating
+  // stick reads as "this game's" control rather than a boilerplate virtual
+  // joystick, and brightens slightly whenever it's actually being pulled in
+  // a direction so the feedback loop between thumb and knob is legible.
+  private drawLegacyPlayFloatingStickGlow(
+    stick: NonNullable<ReturnType<typeof resolveTouchControlLayout>['stick']>,
+    pullVector: TouchStickPullVector | null
+  ): void {
+    const glowColor = this.resolveActiveLegacyProgressionPalette().trailColor;
+    const centerX = stick.outer.centerX;
+    const centerY = stick.outer.centerY;
+    const haloRadius = (stick.outer.width / 2) + Math.max(6, Math.round(stick.outer.width * 0.08));
+    const pulled = pullVector !== null;
+    this.hudGraphics.fillStyle(glowColor, pulled ? 0.16 : 0.09);
+    this.hudGraphics.fillCircle(centerX, centerY, haloRadius);
+    this.hudGraphics.lineStyle(pulled ? 3 : 2, glowColor, pulled ? 0.55 : 0.3);
+    this.hudGraphics.strokeCircle(centerX, centerY, haloRadius);
   }
 
   private drawLegacyPlayTouchStick(
@@ -8672,32 +8586,6 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.fillCircle(knobX, knobY, knobRadius);
     this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_ICON, activeControl === null ? 0.52 : 0.86);
     this.hudGraphics.strokeCircle(knobX, knobY, knobRadius);
-  }
-
-  private drawLegacyPlayTouchButton(
-    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['move_up'],
-    accented: boolean,
-    active = false
-  ): void {
-    this.drawLegacyTouchButtonChrome(this.hudGraphics, rect, accented, active);
-  }
-
-  private drawLegacyTouchButtonChrome(
-    graphics: Phaser.GameObjects.Graphics,
-    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['move_up'],
-    accented: boolean,
-    active = false
-  ): void {
-    this.drawLegacyCyberPanel(graphics, {
-      active: active || accented,
-      alpha: active ? 0.7 : (accented ? 0.56 : 0.44),
-      fill: active ? cyberArcadeMaterial.substrate.panelActive : LEGACY_PLAY_TOUCH_BUTTON_FILL,
-      height: rect.height,
-      left: rect.left,
-      radius: LEGACY_UI_CONTROL_RADIUS,
-      top: rect.top,
-      width: rect.width
-    });
   }
 
   private drawLegacySettingsCogControl(
@@ -8765,90 +8653,6 @@ export class MenuScene extends Phaser.Scene {
     }
     graphics.fillStyle(0xffffff, active ? 0.32 : 0.2);
     graphics.fillCircle(rect.left + Math.round(rect.width * 0.78), rect.top + Math.round(rect.height * 0.24), 1.4);
-  }
-
-  private drawLegacyPlayTouchArrow(
-    rect: ReturnType<typeof resolveTouchControlLayout>['controls']['move_up'],
-    direction: 'up' | 'up-right' | 'right' | 'down-right' | 'down' | 'down-left' | 'left' | 'up-left',
-    active = false
-  ): void {
-    const diagonal = direction.includes('-');
-    const size = Math.round(Math.min(rect.width, rect.height) * (diagonal ? 0.2 : 0.24));
-    const stem = Math.max(8, Math.round(size * (diagonal ? 0.86 : 1.05)));
-    const cx = rect.centerX;
-    const cy = rect.centerY;
-
-    this.hudGraphics.lineStyle(Math.max(active ? 4 : 3, Math.round(rect.width * 0.06)), LEGACY_PLAY_TOUCH_ICON, active ? 1 : 0.9);
-    this.hudGraphics.beginPath();
-    switch (direction) {
-      case 'up':
-        this.hudGraphics.moveTo(cx, cy + stem);
-        this.hudGraphics.lineTo(cx, cy - size);
-        this.hudGraphics.moveTo(cx, cy - size);
-        this.hudGraphics.lineTo(cx - size, cy + Math.round(size * 0.28));
-        this.hudGraphics.moveTo(cx, cy - size);
-        this.hudGraphics.lineTo(cx + size, cy + Math.round(size * 0.28));
-        break;
-      case 'right':
-        this.hudGraphics.moveTo(cx - stem, cy);
-        this.hudGraphics.lineTo(cx + size, cy);
-        this.hudGraphics.moveTo(cx + size, cy);
-        this.hudGraphics.lineTo(cx - Math.round(size * 0.28), cy - size);
-        this.hudGraphics.moveTo(cx + size, cy);
-        this.hudGraphics.lineTo(cx - Math.round(size * 0.28), cy + size);
-        break;
-      case 'up-right':
-        this.hudGraphics.moveTo(cx - stem, cy + stem);
-        this.hudGraphics.lineTo(cx + size, cy - size);
-        this.hudGraphics.moveTo(cx + size, cy - size);
-        this.hudGraphics.lineTo(cx - Math.round(size * 0.16), cy - size);
-        this.hudGraphics.moveTo(cx + size, cy - size);
-        this.hudGraphics.lineTo(cx + size, cy + Math.round(size * 0.16));
-        break;
-      case 'down-right':
-        this.hudGraphics.moveTo(cx - stem, cy - stem);
-        this.hudGraphics.lineTo(cx + size, cy + size);
-        this.hudGraphics.moveTo(cx + size, cy + size);
-        this.hudGraphics.lineTo(cx - Math.round(size * 0.16), cy + size);
-        this.hudGraphics.moveTo(cx + size, cy + size);
-        this.hudGraphics.lineTo(cx + size, cy - Math.round(size * 0.16));
-        break;
-      case 'down':
-        this.hudGraphics.moveTo(cx, cy - stem);
-        this.hudGraphics.lineTo(cx, cy + size);
-        this.hudGraphics.moveTo(cx, cy + size);
-        this.hudGraphics.lineTo(cx - size, cy - Math.round(size * 0.28));
-        this.hudGraphics.moveTo(cx, cy + size);
-        this.hudGraphics.lineTo(cx + size, cy - Math.round(size * 0.28));
-        break;
-      case 'down-left':
-        this.hudGraphics.moveTo(cx + stem, cy - stem);
-        this.hudGraphics.lineTo(cx - size, cy + size);
-        this.hudGraphics.moveTo(cx - size, cy + size);
-        this.hudGraphics.lineTo(cx + Math.round(size * 0.16), cy + size);
-        this.hudGraphics.moveTo(cx - size, cy + size);
-        this.hudGraphics.lineTo(cx - size, cy - Math.round(size * 0.16));
-        break;
-      case 'left':
-        this.hudGraphics.moveTo(cx + stem, cy);
-        this.hudGraphics.lineTo(cx - size, cy);
-        this.hudGraphics.moveTo(cx - size, cy);
-        this.hudGraphics.lineTo(cx + Math.round(size * 0.28), cy - size);
-        this.hudGraphics.moveTo(cx - size, cy);
-        this.hudGraphics.lineTo(cx + Math.round(size * 0.28), cy + size);
-        break;
-      case 'up-left':
-        this.hudGraphics.moveTo(cx + stem, cy + stem);
-        this.hudGraphics.lineTo(cx - size, cy - size);
-        this.hudGraphics.moveTo(cx - size, cy - size);
-        this.hudGraphics.lineTo(cx + Math.round(size * 0.16), cy - size);
-        this.hudGraphics.moveTo(cx - size, cy - size);
-        this.hudGraphics.lineTo(cx - size, cy + Math.round(size * 0.16));
-        break;
-      default:
-        direction satisfies never;
-    }
-    this.hudGraphics.strokePath();
   }
 
   // A solid filled gear silhouette (fillPath over an alternating
@@ -9448,7 +9252,7 @@ export class MenuScene extends Phaser.Scene {
       legendRowIndex,
       'move',
       'Move',
-      this.settings.controlMode === 'stick' ? 'drag the stick' : 'tap the arrows',
+      'touch and drag anywhere',
       cyberArcadeMaterial.rail.mint
     );
     return contentCardTop + cardHeight + (options.exactTop === true ? 0 : (compact ? 14 : 16));
@@ -10304,18 +10108,11 @@ export class MenuScene extends Phaser.Scene {
       section: 'controls' | 'display';
       stateText: string;
     }> = [
-      {
-        checked: resolveLegacyOverlayToggleSwitchIsOn('controlMode', this.settings),
-        description: this.settings.controlMode === 'stick'
-          ? 'Drag the stick to move.'
-          : 'Tap arrows to move.',
-        label: 'Control Style',
-        offLabel: 'Arrows',
-        onClick: () => this.applyOverlayToggleFieldChange('controlMode'),
-        onLabel: 'Stick',
-        section: 'controls',
-        stateText: resolveLegacyOverlayToggleStateText('controlMode', this.settings.controlMode === 'stick') ?? 'Arrows'
-      },
+      // Control Style (arrows vs stick) used to live here -- now that play
+      // touch movement is always the floating stick that spawns wherever
+      // the player touches down (see playFloatingStickOrigin), there's only
+      // one control scheme, so a toggle between two options no longer means
+      // anything to surface.
       {
         checked: resolveLegacyOverlayToggleSwitchIsOn('toggleTrailFade', this.settings),
         description: this.settings.toggleTrailFade
