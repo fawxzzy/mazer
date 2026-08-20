@@ -156,11 +156,34 @@ export const resolveLegacyMenuBoardAspectRatio = (
     return 1;
   }
 
+  // resolveLegacyMenuLayout shrinks boardWidthTarget/boardHeightTarget by a
+  // one-tile bleedMargin on every side (see marginedBoardWidthTarget there)
+  // before it actually lays the maze out -- but that shrink depends on
+  // mazeWidth/mazeHeight, which this function is the one choosing, before
+  // generation. Picking the aspect ratio from the un-margined box while the
+  // real layout fits it into the margined one lets the two boxes' aspect
+  // ratios drift apart on non-square viewports (portrait phones especially,
+  // since the same absolute margin shaves proportionally more off the
+  // narrower width axis than the taller height axis), which is exactly what
+  // left the vertical axis with more than one tile of leftover centering
+  // slack -- more than the bleed-off dock corridor (capped at one tile, see
+  // resolveLegacyPathBorderDockContinuation in MenuScene.ts) can bridge, so
+  // it stopped short of the true top/bottom screen edge. mazeWidth/
+  // mazeHeight aren't known yet here, so approximate the same tile-size
+  // estimate using `scale` (the target linear cell count) as a stand-in for
+  // both axes' eventual cell counts -- close enough to keep the two
+  // functions' box aspect ratios in sync within about a tile, which is the
+  // dock corridor's own tolerance.
+  const estimatedAspectTileSize = Math.min(boardWidthTarget, boardHeightTarget) / Math.max(1, normalizedScale);
+  const aspectBleedMargin = isPlaySurface ? 0 : Math.max(2, Math.round(estimatedAspectTileSize));
+  const marginedAspectBoardWidthTarget = Math.max(minBoardWidthBound, boardWidthTarget - (aspectBleedMargin * 2));
+  const marginedAspectBoardHeightTarget = Math.max(minBoardHeightBound, boardHeightTarget - (aspectBleedMargin * 2));
+
   // Clamp to a sane range so an extreme viewport (very tall phone in
   // split-screen, ultra-wide monitor) can't request a degenerate 1-wide or
   // 1-tall maze -- the generation pipeline's checkpoint/shortcut budgets are
   // tuned for roughly square-ish grids and get unreliable well outside this.
-  return clamp(boardWidthTarget / boardHeightTarget, 0.45, 2.2);
+  return clamp(marginedAspectBoardWidthTarget / marginedAspectBoardHeightTarget, 0.45, 2.2);
 };
 
 export const resolveLegacyMenuLayout = (

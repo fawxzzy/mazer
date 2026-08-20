@@ -5597,20 +5597,21 @@ export class MenuScene extends Phaser.Scene {
 
   // A normal corridor stays a tile away from the board edge (the existing
   // safeInset in resolveLegacyMazeRenderFrame). A wraparound dock corridor
-  // -- one whose path genuinely continues off-grid -- bleeds exactly one
-  // additional tile width past the board edge, reaching (or nearly
-  // reaching) the true screen edge for that one tile, instead of stretching
-  // an arbitrary line all the way to fill whatever gap happens to be left.
-  // The effect is "one more real tile, drawn past the edge of the grid" --
-  // not a decorative line extension unrelated to the tile size. Left/right
-  // have nothing else reserved there and can reach close to the true edge.
-  // Play mode's board still has a real reserved lane for the HUD/touch
-  // controls that top/bottom must stay clear of. The menu surface's board
-  // is full-bleed now (the header icons, title, and Login/Start button
-  // float above it rather than it leaving room for them -- see
-  // legacyMenuLayout.ts), so its top/bottom bleed reaches toward the true
-  // screen edge the same way left/right already do, instead of clamping
-  // against those now-overlapping lanes.
+  // -- one whose path genuinely continues off-grid -- bleeds past the board
+  // edge to the true screen edge on every side. Play mode still caps this at
+  // one tile: its board keeps a real reserved lane for the HUD/touch
+  // controls that top/bottom must stay clear of, and its board was never
+  // meant to be full-bleed the same way the menu's is (bleedMargin is 0 for
+  // play in legacyMenuLayout.ts). The menu surface's board IS full-bleed
+  // (the header icons, title, and Login/Start button float above it as an
+  // overlay instead of it leaving room for them), so a menu dock consumes
+  // the entire actual gap on its side rather than a fixed one-tile budget --
+  // whatever slack is left over from board centering/tile-size rounding on
+  // that axis, so the corridor always terminates at the true edge instead of
+  // stopping short of it when that slack happens to exceed one tile (this
+  // was previously capped at one tile uniformly, which worked when the
+  // leftover slack was itself close to one tile but visibly fell short on
+  // axes where it wasn't).
   private resolveLegacyPathBorderDockContinuation(
     direction: LegacyMenuBorderDockDirection,
     boardLeft: number,
@@ -5622,19 +5623,22 @@ export class MenuScene extends Phaser.Scene {
     const edgeInset = 2;
     const oneTileWidth = Math.max(2, Math.round(tileSize));
     const isPlaySurface = this.mode === 'play';
+    const resolveContinuation = (availableGap: number): number => (
+      isPlaySurface ? Math.min(oneTileWidth, Math.max(2, availableGap)) : Math.max(2, availableGap)
+    );
 
     if (direction === 'left') {
-      return Math.min(oneTileWidth, Math.max(2, boardLeft - edgeInset));
+      return resolveContinuation(boardLeft - edgeInset);
     }
     if (direction === 'right') {
       const boardRight = boardLeft + boardWidth;
-      return Math.min(oneTileWidth, Math.max(2, (this.layout.width - edgeInset) - boardRight));
+      return resolveContinuation((this.layout.width - edgeInset) - boardRight);
     }
     if (direction === 'top') {
       const safeTop = isPlaySurface
         ? Math.max(edgeInset, this.layout.lanes.hud?.bottom ?? edgeInset)
         : edgeInset;
-      return Math.min(oneTileWidth, Math.max(2, boardTop - safeTop));
+      return resolveContinuation(boardTop - safeTop);
     }
 
     const boardBottom = boardTop + boardHeight;
@@ -5642,7 +5646,7 @@ export class MenuScene extends Phaser.Scene {
       ? (this.layout.lanes.controls?.top ?? this.layout.height - edgeInset)
       : this.layout.height - edgeInset;
     const safeBottom = Math.min(this.layout.height - edgeInset, safeBottomBoundary);
-    return Math.min(oneTileWidth, Math.max(2, safeBottom - boardBottom));
+    return resolveContinuation(safeBottom - boardBottom);
   }
 
   private drawLegacyPathBorderDock(
