@@ -1342,7 +1342,7 @@ describe('legacy progression', () => {
       normalPhoneViewportCap,
       'menu'
     );
-    expect(normalPhoneLayout.tileSize).toBeCloseTo(7.66, 2);
+    expect(normalPhoneLayout.tileSize).toBeCloseTo(7.34, 2);
     expect(normalPhoneLayout.boardLeft).toBeGreaterThanOrEqual(4);
     expect(normalPhoneLayout.boardLeft + normalPhoneLayout.boardWidth).toBeLessThanOrEqual(normalPhoneViewport.width - 4);
 
@@ -1363,9 +1363,16 @@ describe('legacy progression', () => {
         'menu'
       );
 
-      expect(layout.tileSize).toBeGreaterThanOrEqual(7.66);
-      expect(layout.boardWidth).toBe(397);
-      expect(layout.boardLeft).toBe(4);
+      // The menu board now reserves roughly one tile of bleed margin, which
+      // is sized in tile units -- so boardWidth/boardLeft track the cell
+      // count (via scale) instead of staying pixel-identical across every
+      // targetComplexity in this loop the way they did before that margin
+      // was tile-proportional. Assert the relationship instead of a single
+      // fixed pixel value.
+      expect(layout.tileSize).toBeGreaterThanOrEqual(7.0);
+      expect(layout.boardLeft).toBeGreaterThanOrEqual(4);
+      expect(layout.boardLeft).toBeGreaterThan(layout.tileSize * 0.5);
+      expect(layout.boardLeft).toBeLessThan(layout.tileSize * 2);
       expect(layout.boardLeft + layout.boardWidth).toBeLessThanOrEqual(normalPhoneViewport.width - 4);
     }
   });

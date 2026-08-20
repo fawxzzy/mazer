@@ -63,9 +63,11 @@ describe('legacy browser mobile parity', () => {
       controlMode: 'stick'
     });
 
-    expect(browserMenu.boardLeft).toBe(4);
-    expect(browserMenu.boardWidth).toBe(491);
-    expect(browserMenu.boardHeight).toBe(491);
+    // boardLeft is roughly one tile now (the menu board's deliberate
+    // bleed-off margin), not the tiny fixed edge margin it used to be.
+    expect(browserMenu.boardLeft).toBe(14);
+    expect(browserMenu.boardWidth).toBe(471);
+    expect(browserMenu.boardHeight).toBe(471);
     expect(browserMenu.tileSize).toBeGreaterThan(defaultMenu.tileSize);
     expect(browserControls.frame.top).toBeGreaterThan(defaultControls.frame.top);
     expect(browserControls.stick?.outer.width).toBeLessThan(defaultControls.stick?.outer.width ?? Number.POSITIVE_INFINITY);
