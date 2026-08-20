@@ -5,6 +5,7 @@ import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { installMazerPortraitLock, shouldBlockMazerLandscape } from './orientationLock';
 import { createMazerPhaserConfig } from './phaserConfig';
+import { installLegacyOriginAnalytics } from '../telemetry/legacyOriginAnalytics';
 import { installMazerProductionServiceWorker, installMazerServiceWorkerControllerReload } from './serviceWorkerLifecycle';
 import { installMazerViewportGeometry, syncMazerGameToViewport } from './viewportGeometry';
 
@@ -72,6 +73,7 @@ const registerProductionServiceWorker = (): void => {
 
 const boot = async (): Promise<void> => {
   markMazerBootStatus('boot-start');
+  installLegacyOriginAnalytics();
   let game: Phaser.Game | null = null;
   const syncLandscapeBlock = (blocked: boolean): void => {
     if (!game) {

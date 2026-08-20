@@ -26,7 +26,7 @@ describe('Mazer installable PWA contract', () => {
             value: 'fawxzzy-mazer.vercel.app'
           }
         ],
-        destination: 'https://mazer.fawxzzy.com/:path',
+        destination: 'https://mazer.fawxzzy.com/:path?compatibility=mazer_legacy_origin',
         permanent: true
       }
     ]);
