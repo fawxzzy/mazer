@@ -3625,6 +3625,13 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyPlayTouchControlLayout(): ReturnType<typeof resolveTouchControlLayout> {
     const boardBounds = this.resolveLegacyPlayBoardBounds();
     const browserMobileParity = this.resolveLegacyBrowserMobileParity();
+    // Was never threading the device safe-area insets through -- every other
+    // play-mode lane (resolveLegacyMenuLayout's hud/controls lanes) gets
+    // safeArea from readMazerViewportGeometry(), but this call site dropped
+    // it, so resolveTouchControlLayout always saw zero insets and placed the
+    // D-pad/stick/pause button as if the home indicator / notch didn't
+    // exist.
+    const safeArea = readMazerViewportGeometry().safeArea;
 
     return resolveTouchControlLayout({
       width: this.layout.width,
@@ -3636,6 +3643,7 @@ export class MenuScene extends Phaser.Scene {
       placement: this.layout.width >= 720 && this.layout.height >= 600
         ? 'bottom-centered'
         : undefined,
+      safeInsets: safeArea,
       avoidRect: {
         left: boardBounds.left,
         top: boardBounds.top,
