@@ -161,6 +161,7 @@ import {
 } from '../legacy-runtime/legacyMenuBackdrop';
 import {
   LEGACY_IRIDESCENT_MIN_PATH_COLOR_DISTANCE,
+  mixLegacyIridescentColor,
   resolveLegacyIridescentPlayerCoreColor,
   resolveLegacyIridescentPlayerAccentColor,
   resolveLegacyIridescentPlayerHaloColor,
@@ -976,6 +977,20 @@ const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;
 const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
 const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 6200;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;
+// A trail-color wipe across the title tiles: fills bottom-left to top-right
+// (combining "left to right" and "bottom to top" into one diagonal sweep
+// instead of two independent passes), holds, wipes back to the tiles' own
+// core/edge color in the same order, holds, and loops. Fill runs slightly
+// slower than the revert -- reads as "the trail catches up to it" rather
+// than a mechanically symmetric blink.
+const LEGACY_MENU_TITLE_TRAIL_SWEEP_FILL_MS = 2200;
+const LEGACY_MENU_TITLE_TRAIL_SWEEP_HOLD_MS = 340;
+const LEGACY_MENU_TITLE_TRAIL_SWEEP_REVERT_MS = 1500;
+// Fraction of the total sweep span each tile takes to transition, centered
+// on the moment the sweep front reaches it -- a soft-edged band instead of
+// every tile snapping instantly, so the wipe reads as a gradient front
+// moving across the word rather than a hard step.
+const LEGACY_MENU_TITLE_TRAIL_SWEEP_SOFT_BAND = 0.16;
 // 8 so the frozen (idle) position lands exactly on the 4 corners and 4
 // edge midpoints of the viewport -- see drawLegacyMenuPathTitleOrbitSigils.
 const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 8;
@@ -6323,6 +6338,59 @@ export class MenuScene extends Phaser.Scene {
     return lerpAngleShortest(tangent, centerFacing, cornerProximity * 0.55);
   }
 
+  // One continuous loop: fill (0..1), hold, revert (0..1), hold. Fill and
+  // revert share the same bottom-left-to-top-right ordering (see
+  // resolveLegacyMenuTitleTrailCellFillAmount) -- revert isn't a mirrored
+  // sweep, it's the same front erasing the color behind it.
+  private resolveLegacyMenuTitleTrailSweepFrame(time: number): {
+    phase: 'filling' | 'reverting';
+    progress: number;
+  } {
+    const fillMs = LEGACY_MENU_TITLE_TRAIL_SWEEP_FILL_MS;
+    const holdMs = LEGACY_MENU_TITLE_TRAIL_SWEEP_HOLD_MS;
+    const revertMs = LEGACY_MENU_TITLE_TRAIL_SWEEP_REVERT_MS;
+    const cycleMs = fillMs + holdMs + revertMs + holdMs;
+    const cursor = ((time % cycleMs) + cycleMs) % cycleMs;
+
+    if (cursor < fillMs) {
+      return { phase: 'filling', progress: cursor / fillMs };
+    }
+    if (cursor < fillMs + holdMs) {
+      return { phase: 'filling', progress: 1 };
+    }
+    if (cursor < fillMs + holdMs + revertMs) {
+      return { phase: 'reverting', progress: (cursor - fillMs - holdMs) / revertMs };
+    }
+    return { phase: 'reverting', progress: 1 };
+  }
+
+  // 0 at the bottom-left cell, 1 at the top-right cell -- a single diagonal
+  // metric that embodies "left to right" (rising with column) and "bottom
+  // to top" (rising as row decreases, since row 0 is the top) at once,
+  // instead of two independent sweeps.
+  private resolveLegacyMenuTitleTrailCellMetric(
+    cell: LegacyMenuPathTitleCell,
+    columns: number,
+    rows: number
+  ): number {
+    const maxColumn = Math.max(1, columns - 1);
+    const maxRow = Math.max(1, rows - 1);
+    const raw = cell.column + (maxRow - cell.row);
+    return clamp(raw / (maxColumn + maxRow), 0, 1);
+  }
+
+  // How "trail-colored" this cell is right now, 0 (its own core/edge color)
+  // to 1 (fully the trail color) -- soft-banded around the sweep front so
+  // tiles cross-fade instead of snapping.
+  private resolveLegacyMenuTitleTrailCellFillAmount(
+    cellMetric: number,
+    sweepFrame: { phase: 'filling' | 'reverting'; progress: number }
+  ): number {
+    const band = LEGACY_MENU_TITLE_TRAIL_SWEEP_SOFT_BAND;
+    const edgeAmount = clamp(((sweepFrame.progress - cellMetric) / band) + 0.5, 0, 1);
+    return sweepFrame.phase === 'filling' ? edgeAmount : 1 - edgeAmount;
+  }
+
   private drawLegacyMenuPathTitle(time: number): void {
     this.titleGraphics.clear();
     const visible = this.mode === 'menu' && this.overlay === 'none';
@@ -6370,7 +6438,29 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (visibleCells.length > 0) {
+      // A trail-color wipe loops across the title tiles while it's on
+      // screen -- see resolveLegacyMenuTitleTrailSweepFrame's comment for
+      // the fill/hold/revert/hold cycle this drives.
+      const trailSweepFrame = this.resolveLegacyMenuTitleTrailSweepFrame(time);
+      const trailColor = resolveLegacyIridescentTrailColor(
+        0,
+        1,
+        time,
+        this.resolveActiveLegacyProgressionPalette().trailColor
+      );
       for (const cell of visibleCells) {
+        const cellMetric = this.resolveLegacyMenuTitleTrailCellMetric(
+          cell,
+          titleLayout.columns,
+          titleLayout.rows
+        );
+        const fillAmount = this.resolveLegacyMenuTitleTrailCellFillAmount(cellMetric, trailSweepFrame);
+        const cellCoreColor = fillAmount > 0
+          ? mixLegacyIridescentColor(LEGACY_MENU_PATH_CORE, trailColor, fillAmount)
+          : LEGACY_MENU_PATH_CORE;
+        const cellEdgeColor = fillAmount > 0
+          ? mixLegacyIridescentColor(LEGACY_MENU_PATH_EDGE, trailColor, fillAmount)
+          : LEGACY_MENU_PATH_EDGE;
         this.drawLegacyMenuPathTitleCell(
           cell,
           titlePathSource,
@@ -6379,9 +6469,9 @@ export class MenuScene extends Phaser.Scene {
           titleLayout.cellSize,
           {
             coreAlpha: 0.92 * titlePresentation.titleAlpha,
-            coreColor: LEGACY_MENU_PATH_CORE,
+            coreColor: cellCoreColor,
             edgeAlpha: LEGACY_MENU_PATH_EDGE_ALPHA * titlePresentation.titleAlpha,
-            edgeColor: LEGACY_MENU_PATH_EDGE
+            edgeColor: cellEdgeColor
           }
         );
       }
