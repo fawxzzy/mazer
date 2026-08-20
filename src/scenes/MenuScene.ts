@@ -5667,6 +5667,76 @@ export class MenuScene extends Phaser.Scene {
     for (const direction of dockDirections) {
       fillDockFrame(direction, frames.core);
     }
+
+    // The flat-filled bands above give the continuation the right two-tone
+    // coloring, but nothing else about it read as a tile -- it was just a
+    // plain color bar. Giving its outward-facing edges the same soft-halo +
+    // crisp-line rim as every other corridor tile (drawLegacyPathTileFacet),
+    // connected only on the side that meets the board's real edge tile,
+    // makes it read as "one more tile poking past the border" instead.
+    for (const direction of dockDirections) {
+      this.drawLegacyPathBorderDockFacet(
+        graphics,
+        direction,
+        tileRect,
+        materialTileSize,
+        frames.edge,
+        boardLeft,
+        boardTop,
+        boardWidth,
+        boardHeight,
+        this.resolveLegacyPathBorderDockContinuation(direction, boardLeft, boardTop, boardWidth, boardHeight, tileSize),
+        options.edgeColor,
+        options.coreAlpha
+      );
+    }
+  }
+
+  private drawLegacyPathBorderDockFacet(
+    graphics: Phaser.GameObjects.Graphics,
+    direction: LegacyMenuBorderDockDirection,
+    tileRect: LegacyPixelTileRect,
+    materialTileSize: number,
+    frame: { height: number; leftInset: number; topInset: number; width: number },
+    boardLeft: number,
+    boardTop: number,
+    boardWidth: number,
+    boardHeight: number,
+    continuationLength: number,
+    rimColor: number,
+    intensity: number
+  ): void {
+    const bandLeft = tileRect.left + Math.round((frame.leftInset / materialTileSize) * tileRect.width);
+    const bandTop = tileRect.top + Math.round((frame.topInset / materialTileSize) * tileRect.height);
+    const bandRight = tileRect.left + Math.round(((frame.leftInset + frame.width) / materialTileSize) * tileRect.width);
+    const bandBottom = tileRect.top + Math.round(((frame.topInset + frame.height) / materialTileSize) * tileRect.height);
+    const length = Math.max(1, Math.round(continuationLength));
+
+    let facetRect: LegacyPixelTileRect;
+    let hasTop = false;
+    let hasLeft = false;
+    let hasBottom = false;
+    let hasRight = false;
+
+    if (direction === 'left') {
+      facetRect = { height: bandBottom - bandTop, left: boardLeft - length, top: bandTop, width: length };
+      hasRight = true;
+    } else if (direction === 'right') {
+      facetRect = { height: bandBottom - bandTop, left: boardLeft + boardWidth, top: bandTop, width: length };
+      hasLeft = true;
+    } else if (direction === 'top') {
+      facetRect = { height: length, left: bandLeft, top: boardTop - length, width: bandRight - bandLeft };
+      hasBottom = true;
+    } else {
+      facetRect = { height: length, left: bandLeft, top: boardTop + boardHeight, width: bandRight - bandLeft };
+      hasTop = true;
+    }
+
+    if (facetRect.width <= 0 || facetRect.height <= 0) {
+      return;
+    }
+
+    this.drawLegacyPathTileFacet(graphics, facetRect, intensity, rimColor, hasTop, hasLeft, hasBottom, hasRight);
   }
 
   private drawBoardPaths(time: number): void {
@@ -8597,7 +8667,8 @@ export class MenuScene extends Phaser.Scene {
               primaryButtonWidth,
               this.layout.buttonHeight,
               'Login',
-              () => this.openOverlay('auth')
+              () => this.openOverlay('auth'),
+              { fullScreenHitArea: true }
             )
           );
         } else {
@@ -8608,7 +8679,8 @@ export class MenuScene extends Phaser.Scene {
               primaryButtonWidth,
               this.layout.buttonHeight,
               startLabel,
-              () => this.startPlayMode()
+              () => this.startPlayMode(),
+              { fullScreenHitArea: true }
             )
           );
         }
@@ -8793,7 +8865,7 @@ export class MenuScene extends Phaser.Scene {
       const contentFlow = resolveLegacyOverlayContentFlowLayout({
         contentTop: viewport.top,
         controlsHeight: controlContentHeight,
-        guideHeight: this.resolveLegacyOptionsGuideEffectiveHeight(panel.width),
+        guideHeight: this.resolveLegacyOptionsGuideEffectiveHeight(panel.width, false),
         panelWidth: panel.width
       });
       const scrollMetrics = resolveLegacyOverlayScrollMetrics({
@@ -8805,6 +8877,7 @@ export class MenuScene extends Phaser.Scene {
       const renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);
       this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {
         exactTop: true,
+        includeCompassRow: false,
         rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
         scrollOffset: scrollMetrics.offset,
         viewport: renderViewport
@@ -8821,7 +8894,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    rowY = this.createLegacyOptionsInfoSection(rowY, panel);
+    rowY = this.createLegacyOptionsInfoSection(rowY, panel, { includeCompassRow: false });
 
     if (showAdvancedOptions) {
       rowY = this.createInputRow('Maze Scale', 'scale', rowY, panel);
@@ -8842,8 +8915,8 @@ export class MenuScene extends Phaser.Scene {
   // -- callers computing where content below it should start must use this
   // instead of the layout's cardHeight (which is always the expanded size),
   // or they'd reserve extra space above the toggle list while collapsed.
-  private resolveLegacyOptionsGuideEffectiveHeight(panelWidth: number): number {
-    const guideLayout = resolveLegacyOptionsGuideLayout(panelWidth);
+  private resolveLegacyOptionsGuideEffectiveHeight(panelWidth: number, includeCompassRow = true): number {
+    const guideLayout = resolveLegacyOptionsGuideLayout(panelWidth, includeCompassRow ? 4 : 3);
     return this.overlayGuideExpanded ? guideLayout.cardHeight : guideLayout.collapsedHeight;
   }
 
@@ -8852,13 +8925,18 @@ export class MenuScene extends Phaser.Scene {
     panel: OverlayPanelFrame,
     options: {
       exactTop?: boolean;
+      includeCompassRow?: boolean;
       rightGutter?: number;
       scrollOffset?: number;
       viewport?: VisualRect | null;
     } = {}
   ): number {
     const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const guideLayout = resolveLegacyOptionsGuideLayout(panel.width);
+    // The main menu never shows the real compass (it's Play-only, see
+    // drawLegacyPlayCompass's mode gate), so its Guide omits the compass
+    // row entirely rather than documenting a feature that isn't on screen.
+    const includeCompassRow = options.includeCompassRow ?? true;
+    const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, includeCompassRow ? 4 : 3);
     const expanded = this.overlayGuideExpanded;
     const cardHeight = expanded ? guideLayout.cardHeight : guideLayout.collapsedHeight;
     const rightGutter = options.rightGutter ?? 0;
@@ -9066,11 +9144,17 @@ export class MenuScene extends Phaser.Scene {
       );
     };
 
-    drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', cyberArcadeMaterial.rail.cyan);
-    drawLegendRow(1, 'start', 'Start', 'begin at gold', cyberArcadeMaterial.signal.start);
-    drawLegendRow(2, 'end', 'Exit', 'finish at red', cyberArcadeMaterial.signal.goal);
+    let legendRowIndex = 0;
+    if (includeCompassRow) {
+      drawLegendRow(legendRowIndex, 'compass', 'Compass', 'follow it to the exit', cyberArcadeMaterial.rail.cyan);
+      legendRowIndex += 1;
+    }
+    drawLegendRow(legendRowIndex, 'start', 'Start', 'begin at gold', cyberArcadeMaterial.signal.start);
+    legendRowIndex += 1;
+    drawLegendRow(legendRowIndex, 'end', 'Exit', 'finish at red', cyberArcadeMaterial.signal.goal);
+    legendRowIndex += 1;
     drawLegendRow(
-      3,
+      legendRowIndex,
       'move',
       'Move',
       this.settings.controlMode === 'stick' ? 'drag the stick' : 'tap the arrows',
@@ -10975,7 +11059,7 @@ export class MenuScene extends Phaser.Scene {
     height: number,
     text: string,
     onClick: () => void,
-    options: { labelRole?: LegacyUiLabelRole } = {}
+    options: { fullScreenHitArea?: boolean; labelRole?: LegacyUiLabelRole } = {}
   ): UiButton {
     const isMenuFrontDoor = this.mode === 'menu' && this.overlay === 'none';
     // Both the Start and Login front-door actions share the same borderless
@@ -11025,7 +11109,16 @@ export class MenuScene extends Phaser.Scene {
     // drawLegacyMenuFrontDoorGlyphButton, wired up below once the button's
     // final width/height are known).
 
-    const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);
+    // The primary front-door action (Login/Start) can optionally trade its
+    // normal button-sized tap target for the entire screen -- there's no
+    // maze interaction to protect on the front door, so tapping anywhere
+    // (background stars, the demo maze, empty space) should log in/start
+    // instead of requiring a precise tap on the small glyph word. Explicitly
+    // left at the default (lower) depth so the settings gear's own hit
+    // rectangle -- set to a higher depth below -- still wins on overlap.
+    const background = options.fullScreenHitArea === true
+      ? this.add.rectangle(this.layout.width / 2, this.layout.height / 2, this.layout.width, this.layout.height, 0x000000, 0.001)
+      : this.add.rectangle(x, y, width, height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     const textFitSize = Math.floor((width * (isMenuFrontDoor ? 1.08 : 1.45)) / Math.max(4, text.length));
     const buttonFontSize = frontDoorChrome?.fontSize ?? Math.max(
@@ -11133,6 +11226,11 @@ export class MenuScene extends Phaser.Scene {
       0.001
     );
     background.setInteractive({ useHandCursor: true });
+    // The front-door Login/Start hit target now spans the full screen (see
+    // createButton's fullScreenHitArea) and would otherwise swallow taps on
+    // the gear -- a higher depth keeps this smaller, precise hit rectangle
+    // topmost so settings still opens instead of falling through to login.
+    background.setDepth(3);
     const label = this.add.text(pauseRect.centerX, pauseRect.centerY, '', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '18px'

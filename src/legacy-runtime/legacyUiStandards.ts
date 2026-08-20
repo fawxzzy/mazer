@@ -138,9 +138,11 @@ export interface LegacyOptionsGuideLayout {
 
 // The Guide card collapses to a single tappable header row by default (a
 // "compass/start/exit + move" legend doesn't need to stay pinned open the
-// whole time a player is in Settings) and expands to the full 4-row legend
-// (compass, start, exit, move) on tap.
-export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptionsGuideLayout => {
+// whole time a player is in Settings) and expands to the full legend on
+// tap. The compass row only makes sense where the compass itself is on
+// screen (Play mode's pause menu) -- the menu-context Guide passes
+// rowCount 3 to omit it, since the main menu never shows a compass.
+export const resolveLegacyOptionsGuideLayout = (panelWidth: number, rowCount = 4): LegacyOptionsGuideLayout => {
   const compact = panelWidth < LEGACY_UI_COMPACT_BREAKPOINT;
   const titleFontSize = compact ? 15 : 17;
   const titleOffset = compact ? 16 : 18;
@@ -149,7 +151,6 @@ export const resolveLegacyOptionsGuideLayout = (panelWidth: number): LegacyOptio
   // plus real padding or adjacent rows' badges overlap vertically. The
   // previous 18/20px rows were shorter than the badge itself.
   const rowHeight = compact ? 30 : 32;
-  const rowCount = 4;
   const legendTopOffset = compact ? 43 : 47;
   const legendBottomPadding = 15;
 

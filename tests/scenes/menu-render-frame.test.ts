@@ -93,9 +93,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(buildPauseSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
       buildPauseSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel, {')
     );
-    expect(guideSource).toContain("drawLegendRow(0, 'compass', 'Compass'");
-    expect(guideSource).toContain("drawLegendRow(1, 'start', 'Start'");
-    expect(guideSource).toContain("drawLegendRow(2, 'end', 'Exit'");
+    expect(guideSource).toContain("drawLegendRow(legendRowIndex, 'compass', 'Compass'");
+    expect(guideSource).toContain("drawLegendRow(legendRowIndex, 'start', 'Start'");
+    expect(guideSource).toContain("drawLegendRow(legendRowIndex, 'end', 'Exit'");
+    expect(guideSource).toContain('includeCompassRow');
     expect(guideSource).toContain("'follow it to the exit'");
     expect(guideSource).toContain("'begin at gold'");
     expect(guideSource).toContain("'finish at red'");
@@ -1472,14 +1473,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width);');
+    expect(menuSceneSource).toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, includeCompassRow ? 4 : 3);');
     expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
     expect(menuSceneSource).toContain('const guideTitleFontSize = guideLayout.titleFontSize;');
     expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
     expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
     expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);');
     expect(menuSceneSource).toContain("'GUIDE',");
-    expect(menuSceneSource).toContain("drawLegendRow(0, 'compass', 'Compass', 'follow it to the exit', cyberArcadeMaterial.rail.cyan);");
+    expect(menuSceneSource).toContain("drawLegendRow(legendRowIndex, 'compass', 'Compass', 'follow it to the exit', cyberArcadeMaterial.rail.cyan);");
     expect(menuSceneSource).not.toContain("'Player • green trail'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
     expect(menuSceneSource).not.toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`");
