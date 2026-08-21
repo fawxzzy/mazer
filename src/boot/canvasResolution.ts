@@ -1,5 +1,11 @@
 export const MAZER_CANVAS_RESOLUTION_MIN = 1;
-export const MAZER_CANVAS_RESOLUTION_MAX = 2;
+// Raised from 2 to 3 -- most modern phones report a devicePixelRatio of 3
+// (iPhone 12+, most flagship Android), and capping at 2 meant the maze was
+// rendered under-resolution and upscaled by the browser on exactly those
+// devices, reading as soft/blurry. Still capped, not uncapped, to bound the
+// GPU/battery cost of this app's frequent redraws on the highest-DPI
+// devices beyond 3x.
+export const MAZER_CANVAS_RESOLUTION_MAX = 3;
 export const MAZER_CANVAS_RESOLUTION_STATUS_EPSILON = 0.05;
 
 export type MazerRenderResolutionStatus = 'native' | 'undersampled' | 'oversampled' | 'unavailable';
