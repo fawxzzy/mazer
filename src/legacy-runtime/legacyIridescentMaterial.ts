@@ -12,17 +12,18 @@ export const LEGACY_IRIDESCENT_GREEN_ANCHOR = cyberArcadeMaterial.signal.player;
 export const LEGACY_TRAIL_SHINE_COLOR = cyberArcadeMaterial.shine.core;
 export const LEGACY_TRAIL_SHINE_EDGE_COLOR = cyberArcadeMaterial.shine.edge;
 
-// Deep, saturated jewel tones -- violet through indigo, blue, teal, emerald,
-// and orchid -- instead of the bright primary-color rainbow. Modeled on
-// Terraria's Midnight Rainbow dye: the same continuous hue cycle as a
-// regular rainbow shift, just moodier/richer instead of neon-bright.
+// Violet through indigo, blue, teal, emerald, and orchid -- the same
+// Terraria Midnight Rainbow dye hue sequence as before, pushed to a more
+// saturated/brighter version of each stop (was capped near 0x8c per
+// channel; now reaches ~0xe0) after players asked for the player's own
+// rainbow shift to be more vibrant and easier to notice against the board.
 export const LEGACY_IRIDESCENT_MIDNIGHT_STOPS = [
-  0x6a2c8c,
-  0x3b2c8c,
-  0x2c5c8c,
-  0x2c8c7a,
-  0x2c8c4e,
-  0x8c2c6a
+  0x8b2fe0,
+  0x4a2fe0,
+  0x2f7fe0,
+  0x2fe0c0,
+  0x2fe06a,
+  0xe02f9c
 ] as const;
 
 export const LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS = 6400;
