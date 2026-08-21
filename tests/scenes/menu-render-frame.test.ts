@@ -569,7 +569,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, { x, y });');
     expect(menuSceneSource).toContain('const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);');
     expect(menuSceneSource).toContain('graphics.fillStyle(options.coreColor, options.coreAlpha);');
-    expect(menuSceneSource).toContain('graphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);');
+    expect(menuSceneSource).toContain('graphics.fillRect(fillLeft, fillTop, fillRight - fillLeft, fillBottom - fillTop);');
     expect(menuSceneSource).toContain('private drawLegacyPathTileFacet(');
     expect(menuSceneSource).not.toContain('this.fillLegacyPathConnectorSeams(');
     expect(menuSceneSource).not.toContain('private fillLegacyPathConnectorSeams(');
@@ -915,8 +915,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('playerBeaconColor: LEGACY_PLAY_PLAYER_BEACON_COLOR');
     expect(menuSceneSource).toContain('playerBeaconPeriodMs: LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS');
     expect(menuSceneSource).toContain('playerHaloRadius: playerMarkerMetrics.haloRadius');
-    expect(menuSceneSource).toContain('private drawLegacyEndpointMarker(');
-    expect(menuSceneSource).toContain('this.drawLegacyPathTileFacet(graphics, tileRect, alpha, rimColor, false, false, false, false);');
+    expect(menuSceneSource).toContain('private drawLegacyEndpointGlow(');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(renderedPlayerPoint');
     expect(menuSceneSource).toContain('const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== \'building\';');
     expect(menuSceneSource).toContain('this.fillLegacyPlayerMarkerTile(renderedPlayerPoint, mazeLeft, mazeTop, mazeTileSize, playerAlpha, true, progressionPalette, time);');
