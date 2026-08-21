@@ -1735,6 +1735,14 @@ export class MenuScene extends Phaser.Scene {
     if (this.hasLegacyProgressionBadgePulsePendingFrame(time)) {
       this.boardDynamicDirty = true;
     }
+    // The LVL number's new ambient blink (drawLegacyProgressionGlyph) is
+    // purely time-driven, same as the settings cog's blink -- without this
+    // it would freeze between whatever else happens to re-arm
+    // boardDynamicDirty, the exact "glitchy while idle" bug the cog itself
+    // had before its own always-armed fix.
+    if (this.mode === 'play' && this.overlay === 'none' && !this.prefersLegacyReducedMotion()) {
+      this.boardDynamicDirty = true;
+    }
     const slowTilePhase = resolveLegacyStaticSlowTilePhase(
       this.playStaticSlowTile,
       time,
@@ -5733,6 +5741,13 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hasLegacyBleedOffGlowPendingFrame(): boolean {
+    // Gated to 'settled' only -- the glow shouldn't appear while the maze
+    // is still building in, and should vanish the instant deconstruction
+    // starts (ahead of the trail/AI-memory coloring above it, which fade
+    // out over the deconstruct duration instead of cutting immediately).
+    if (this.menuStaticDrawLifecyclePhase !== 'settled') {
+      return false;
+    }
     const wrap = this.maze.wrapTopologyDiagnostics;
     return (wrap?.horizontal.endpointCount ?? 0) > 0 || (wrap?.vertical.endpointCount ?? 0) > 0;
   }
@@ -7295,6 +7310,12 @@ export class MenuScene extends Phaser.Scene {
       width: this.layout.width
     });
     const badgePulse = this.resolveLegacyProgressionBadgePulse();
+    // Same classic blink phase/rate as the play HUD's own settings cog
+    // (drawLegacySettingsCogControl) -- the LVL number should read as
+    // "alive" at the same cadence as the cog beside it, not sit static
+    // while only its rare level-up scale pulse (badgePulse above) moves it.
+    const blinkPhase = (Math.sin((this.time.now / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+    const blinkAlpha = clamp(0.22 + (blinkPhase * 0.78), 0.14, 1);
     // No panel, border, or corner brackets at all -- matches the menu
     // surface's own settings cog (zero chrome). layoutLegacyHeaderMetricPair
     // below already gives both texts a dark stroke, which is what actually
@@ -7307,6 +7328,7 @@ export class MenuScene extends Phaser.Scene {
       .setPadding(0)
       .setColor(palette.badgeColor)
       .setScale(badgePulse)
+      .setAlpha(blinkAlpha)
       .setVisible(true);
     this.progressionBadgeLabelText
       .setText('LVL')
@@ -7433,7 +7455,13 @@ export class MenuScene extends Phaser.Scene {
     angle: number,
     palette: LegacyProgressionPalette,
     time: number,
-    isLifecycleSpinActive: boolean
+    isLifecycleSpinActive: boolean,
+    // While the player is actively holding the movement toggle, the ring
+    // hides so it doesn't compete with the touch feedback under their
+    // thumb -- it returns the instant they let go. Every other caller
+    // (menu, Guide legend icon) has nothing to hide it for, so this
+    // defaults to always-on.
+    ringVisible = true
   ): void {
     const pulse = 0.5 + (0.5 * Math.sin(time / 380));
     const emphasis = isLifecycleSpinActive ? 0.6 : 0.4;
@@ -7447,8 +7475,10 @@ export class MenuScene extends Phaser.Scene {
 
     graphics.fillStyle(0x03070b, 0.55);
     graphics.fillCircle(centerX, centerY, ringRadius);
-    graphics.lineStyle(1.4, palette.rankColor, emphasis + (pulse * 0.2));
-    graphics.strokeCircle(centerX, centerY, ringRadius);
+    if (ringVisible) {
+      graphics.lineStyle(1.4, palette.rankColor, emphasis + (pulse * 0.2));
+      graphics.strokeCircle(centerX, centerY, ringRadius);
+    }
 
     for (let tickIndex = 0; tickIndex < 8; tickIndex += 1) {
       const tickAngle = (tickIndex * Math.PI) / 4;
@@ -8317,9 +8347,10 @@ export class MenuScene extends Phaser.Scene {
     // Same compass design as the menu surface and the Guide overlay's
     // legend icon (drawLegacyCompassGlyph) -- ring, cardinal ticks, and a
     // two-tone needle -- instead of a separately hand-drawn crosshair and
-    // arrow. isLifecycleSpinActive keeps the green highlight on/off touch
-    // the user asked to preserve, driven by the real spin-up animation
-    // instead of always being static.
+    // arrow. The ring itself hides while a finger is actually down on the
+    // movement toggle (playFloatingStickOrigin set) and returns on
+    // release, so it doesn't compete with the touch feedback under the
+    // player's thumb.
     this.drawLegacyCompassGlyph(
       this.hudGraphics,
       hudFrame.arrowOrigin.x,
@@ -8328,7 +8359,8 @@ export class MenuScene extends Phaser.Scene {
       compassVisualFrame.angleRadians,
       this.resolveActiveLegacyProgressionPalette(),
       time,
-      compassVisualFrame.active
+      compassVisualFrame.active,
+      this.playFloatingStickOrigin === null
     );
 
     this.hudTimerBounds = createVisualRect(
