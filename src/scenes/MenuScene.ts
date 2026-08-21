@@ -6811,11 +6811,15 @@ export class MenuScene extends Phaser.Scene {
     this.titleGraphics.clear();
     // The orbit sigils (4 corners + 4 edge midpoints) are a screen-wide
     // ambient decoration, not really part of the title itself -- they now
-    // render in play mode too (still gated off during overlays), even
+    // render in play mode too (still gated off during most overlays), even
     // though play mode has no "MAZER" wordmark to go with them, since the
     // edge diamonds were the specific thing reported missing there. The
-    // actual title glyphs stay menu-only below.
-    const sigilsVisible = (this.mode === 'menu' || this.mode === 'play') && this.overlay === 'none';
+    // auth overlay is the one exception: it keeps the same title/sigil/
+    // starfield backdrop the menu already shows instead of a bare card, so
+    // login/create-account/account screens share the app's actual visual
+    // identity rather than looking like a separate, disconnected surface.
+    const sigilsVisible = (this.mode === 'menu' || this.mode === 'play')
+      && (this.overlay === 'none' || this.overlay === 'auth');
     this.titleGraphics.setVisible(sigilsVisible);
     if (!sigilsVisible) {
       return;

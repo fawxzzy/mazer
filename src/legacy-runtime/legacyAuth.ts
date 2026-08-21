@@ -340,7 +340,18 @@ export const getLegacyAuthClient = async (): Promise<SupabaseClient | null> => {
         autoRefreshToken: true,
         detectSessionInUrl: true,
         persistSession: true,
-        storage: typeof window === 'undefined' ? undefined : window.localStorage
+        storage: typeof window === 'undefined' ? undefined : window.localStorage,
+        // auth-js defaults to a navigator.locks-backed mutex in any browser
+        // that has the Web Locks API, coordinating session refresh across
+        // tabs -- and every internal call site acquires it with an
+        // unbounded (-1) timeout, so a lock left held by a crashed tab,
+        // killed service worker, or a stale session from before a backend
+        // migration blocks every future auth call (sign-in included)
+        // forever, with no error ever thrown. Mazer doesn't need cross-tab
+        // refresh coordination badly enough to risk an unrecoverable hang
+        // for it -- this is the library's own no-op fallback (used
+        // automatically outside a browser), forced on unconditionally.
+        lock: async (_name, _acquireTimeout, fn) => fn()
       }
     });
     installLegacyAuthPersistenceListener(legacyAuthClient);
