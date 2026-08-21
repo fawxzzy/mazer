@@ -1032,9 +1032,7 @@ const LEGACY_BLEED_GLOW_MAX_ALPHA = 0.5;
 const LEGACY_BLEED_GLOW_STEPS = 8;
 const LEGACY_PLAY_HUD_TIMER_PANE = cyberArcadeMaterial.substrate.panel;
 const LEGACY_PLAY_HUD_ARROW = cyberArcadeMaterial.signal.goal;
-const LEGACY_PLAY_HUD_ARROW_TAIL = cyberArcadeMaterial.rail.white;
 const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;
-const LEGACY_PLAY_TOUCH_FRAME_FILL = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_TOUCH_BUTTON_FILL = cyberArcadeMaterial.substrate.panelRaised;
 const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_TOUCH_BUTTON_STROKE = cyberArcadeMaterial.rail.cyan;
@@ -8271,59 +8269,24 @@ export class MenuScene extends Phaser.Scene {
       playerScreen: { x: playerScreenX, y: playerScreenY }
     });
 
-    this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);
-    // No background pane -- bare compass over the maze, consistent with
-    // the rest of the top HUD (level badge, settings cog) having no panel
-    // or border either.
-    this.drawLegacyPlayCompass(hudFrame, {
-      showPane: false
-    });
+    this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);
     this.drawLegacyPlayPlayerMessageStack(hudFrame);
     const compassVisualFrame = this.resolveLegacyPlayCompassVisualFrame(hudFrame, time);
-    const visualArrow = this.resolveLegacyPlayCompassArrowGeometry(hudFrame, compassVisualFrame.angleRadians);
-
-    this.hudGraphics.lineStyle(3, LEGACY_PLAY_HUD_ARROW_SHADOW, 0.36);
-    this.hudGraphics.beginPath();
-    this.hudGraphics.moveTo(hudFrame.arrowOrigin.x + 1, hudFrame.arrowOrigin.y + 1);
-    this.hudGraphics.lineTo(
-      visualArrow.tip.x + 1,
-      visualArrow.tip.y + 1
-    );
-    this.hudGraphics.strokePath();
-    this.hudGraphics.fillStyle(LEGACY_PLAY_HUD_ARROW_SHADOW, 0.36);
-    this.hudGraphics.fillTriangle(
-      visualArrow.tip.x + 1,
-      visualArrow.tip.y + 1,
-      visualArrow.left.x + 1,
-      visualArrow.left.y + 1,
-      visualArrow.right.x + 1,
-      visualArrow.right.y + 1
-    );
-
-    this.hudGraphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW_TAIL, 0.86);
-    this.hudGraphics.beginPath();
-    this.hudGraphics.moveTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y);
-    this.hudGraphics.lineTo(
-      hudFrame.arrowOrigin.x - (Math.cos(compassVisualFrame.angleRadians) * 9),
-      hudFrame.arrowOrigin.y - (Math.sin(compassVisualFrame.angleRadians) * 9)
-    );
-    this.hudGraphics.strokePath();
-    this.hudGraphics.lineStyle(2, LEGACY_PLAY_HUD_ARROW, 0.9);
-    this.hudGraphics.beginPath();
-    this.hudGraphics.moveTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y);
-    this.hudGraphics.lineTo(
-      visualArrow.tip.x,
-      visualArrow.tip.y
-    );
-    this.hudGraphics.strokePath();
-    this.hudGraphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.9);
-    this.hudGraphics.fillTriangle(
-      visualArrow.tip.x,
-      visualArrow.tip.y,
-      visualArrow.left.x,
-      visualArrow.left.y,
-      visualArrow.right.x,
-      visualArrow.right.y
+    // Same compass design as the menu surface and the Guide overlay's
+    // legend icon (drawLegacyCompassGlyph) -- ring, cardinal ticks, and a
+    // two-tone needle -- instead of a separately hand-drawn crosshair and
+    // arrow. isLifecycleSpinActive keeps the green highlight on/off touch
+    // the user asked to preserve, driven by the real spin-up animation
+    // instead of always being static.
+    this.drawLegacyCompassGlyph(
+      this.hudGraphics,
+      hudFrame.arrowOrigin.x,
+      hudFrame.arrowOrigin.y,
+      hudFrame.arrowBounds.width * 0.45,
+      compassVisualFrame.angleRadians,
+      this.resolveActiveLegacyProgressionPalette(),
+      time,
+      compassVisualFrame.active
     );
 
     this.hudTimerBounds = createVisualRect(
@@ -8456,54 +8419,6 @@ export class MenuScene extends Phaser.Scene {
     return frame;
   }
 
-  private resolveLegacyPlayCompassArrowGeometry(
-    hudFrame: LegacyPlayHudFrame,
-    angleRadians: number
-  ): {
-    left: { x: number; y: number };
-    right: { x: number; y: number };
-    tip: { x: number; y: number };
-  } {
-    const length = 14;
-
-    return {
-      left: {
-        x: hudFrame.arrowOrigin.x + (Math.cos(angleRadians + 2.42) * 6),
-        y: hudFrame.arrowOrigin.y + (Math.sin(angleRadians + 2.42) * 6)
-      },
-      right: {
-        x: hudFrame.arrowOrigin.x + (Math.cos(angleRadians - 2.42) * 6),
-        y: hudFrame.arrowOrigin.y + (Math.sin(angleRadians - 2.42) * 6)
-      },
-      tip: {
-        x: hudFrame.arrowOrigin.x + (Math.cos(angleRadians) * length),
-        y: hudFrame.arrowOrigin.y + (Math.sin(angleRadians) * length)
-      }
-    };
-  }
-
-  private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame, options: { showPane: boolean } = { showPane: true }): void {
-    const { arrowBounds } = hudFrame;
-    const radius = Math.max(8, Math.min(arrowBounds.width, arrowBounds.height) * 0.34);
-
-    if (options.showPane) {
-      this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_FRAME_FILL, 0.36);
-      this.hudGraphics.fillRoundedRect(arrowBounds.left, arrowBounds.top, arrowBounds.width, arrowBounds.height, 10);
-      this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.42);
-      this.hudGraphics.strokeRoundedRect(arrowBounds.left, arrowBounds.top, arrowBounds.width, arrowBounds.height, 10);
-    }
-    this.hudGraphics.lineStyle(1, LEGACY_PLAY_HUD_ARROW, 0.28);
-    this.hudGraphics.strokeCircle(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y, radius);
-    this.hudGraphics.beginPath();
-    this.hudGraphics.moveTo(hudFrame.arrowOrigin.x - radius + 3, hudFrame.arrowOrigin.y);
-    this.hudGraphics.lineTo(hudFrame.arrowOrigin.x + radius - 3, hudFrame.arrowOrigin.y);
-    this.hudGraphics.moveTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y - radius + 3);
-    this.hudGraphics.lineTo(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y + radius - 3);
-    this.hudGraphics.strokePath();
-    this.hudGraphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, 0.92);
-    this.hudGraphics.fillCircle(hudFrame.arrowOrigin.x, hudFrame.arrowOrigin.y, 2);
-  }
-
   // Movement no longer has a fixed on-screen widget at all -- the board is
   // full-bleed (see legacyMenuLayout.ts's useFloatingTouchControls) and a
   // stick only appears, centered exactly where the touch landed, while a
@@ -8511,6 +8426,7 @@ export class MenuScene extends Phaser.Scene {
   // one control that stays fixed, since it's a discrete tap target the
   // player needs to be able to find reliably rather than a drag surface.
   private drawLegacyPlayTouchControls(
+    time: number,
     touchControlLayout = this.resolveLegacyPlayTouchControlLayout()
   ): VisualRect | null {
     if (!this.shouldRenderLegacyPlayTouchControls(touchControlLayout)) {
@@ -8518,7 +8434,10 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const { controls } = touchControlLayout;
-    this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);
+    // No live pressed-state tracking for this control (matches the
+    // pre-existing behavior) -- always idle-colored, just now with the
+    // same blink pulse as the menu cog.
+    this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause, false, time);
 
     if (this.playFloatingStickOrigin === null) {
       return createVisualRect(controls.pause.left, controls.pause.top, controls.pause.width, controls.pause.height);
@@ -8607,17 +8526,30 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.strokeCircle(knobX, knobY, knobRadius);
   }
 
-  // No background panel, tint, or border -- matches the menu surface's own
-  // settings cog exactly (see drawLegacyMenuSettingsCog), which is just the
-  // gear silhouette with nothing framing it. The corner-bracket "sparkle"
-  // chrome tried here first was still a visible box around the icon, which
-  // wasn't the ask -- the menu cog has zero chrome, not lighter chrome.
+  // Matches the menu surface's own settings cog exactly -- same green/mint
+  // colors, same size (radiusRatio 0.34), and the same classic blink pulse
+  // -- not just "no panel/border" but the actual same icon. See
+  // drawLegacyMenuSettingsCog; this duplicates its blink-phase math instead
+  // of sharing it since the two live on different graphics layers
+  // (boardDynamicGraphics vs hudGraphics) with independent active state.
   private drawLegacySettingsCogControl(
     graphics: Phaser.GameObjects.Graphics,
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
-    active = false
+    active: boolean,
+    time: number
   ): void {
-    this.drawLegacySettingsCog(graphics, rect, active);
+    const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+    const blinkAlpha = clamp(0.22 + (phase * 0.78) + (active ? 0.08 : 0), 0.14, 1);
+    const blinkScale = 0.92 + (phase * 0.08) + (active ? 0.02 : 0);
+    this.drawLegacySettingsCog(
+      graphics,
+      rect,
+      active,
+      0.34 * blinkScale,
+      cyberArcadeMaterial.signal.player,
+      cyberArcadeMaterial.rail.mint,
+      blinkAlpha
+    );
   }
 
   // A solid filled gear silhouette (fillPath over an alternating

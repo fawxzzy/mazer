@@ -121,24 +121,33 @@ export const resolveLegacyCompassSpinFrame = ({
   };
 };
 
-// A compact size sitting immediately beside the timer pill, both centered
-// as one HUD cluster at the true top-middle of the screen -- not tucked
-// into a screen corner or embedded inside the touch D-pad/stick, which is
-// where this used to default to/get pinned from.
+// The compass itself sits at the true horizontal center of the screen (the
+// literal "centered middle" ask) -- the timer moves beside it instead of
+// the other way around, since the compass is the one thing that needs to
+// read as centered at a glance, not just adjacent to whatever else is
+// centered.
 const LEGACY_COMPASS_DEFAULT_SIZE = 40;
 const LEGACY_COMPASS_TIMER_GAP = 10;
+const LEGACY_TIMER_HEIGHT = 38;
+const LEGACY_TIMER_WIDTH = 112;
+const LEGACY_HUD_TOP = 10;
 
 export const resolveLegacyPlayHudFrame = (input: LegacyPlayHudFrameInput): LegacyPlayHudFrame => {
   const timerText = formatLegacyHudClock(input.elapsedMs);
-  const timerBounds = createLegacyHudRect(Math.round((input.layoutWidth - 112) / 2), 10, 112, 38);
   const compassBounds = input.compassBounds
     ? createLegacyHudRect(input.compassBounds.left, input.compassBounds.top, input.compassBounds.width, input.compassBounds.height)
     : createLegacyHudRect(
-      Math.round(timerBounds.right + LEGACY_COMPASS_TIMER_GAP),
-      Math.round(timerBounds.centerY - (LEGACY_COMPASS_DEFAULT_SIZE / 2)),
+      Math.round((input.layoutWidth - LEGACY_COMPASS_DEFAULT_SIZE) / 2),
+      LEGACY_HUD_TOP + Math.round((LEGACY_TIMER_HEIGHT - LEGACY_COMPASS_DEFAULT_SIZE) / 2),
       LEGACY_COMPASS_DEFAULT_SIZE,
       LEGACY_COMPASS_DEFAULT_SIZE
     );
+  const timerBounds = createLegacyHudRect(
+    Math.round(compassBounds.left - LEGACY_COMPASS_TIMER_GAP - LEGACY_TIMER_WIDTH),
+    LEGACY_HUD_TOP,
+    LEGACY_TIMER_WIDTH,
+    LEGACY_TIMER_HEIGHT
+  );
   const arrowOrigin = {
     x: compassBounds.centerX,
     y: compassBounds.centerY

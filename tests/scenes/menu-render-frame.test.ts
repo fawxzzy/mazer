@@ -754,16 +754,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_PANE =');
     expect(menuSceneSource).toContain('const LEGACY_CYBER_PANEL_STROKE = cyberArcadeMaterial.rail.mint;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW = cyberArcadeMaterial.signal.goal;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_TAIL = cyberArcadeMaterial.rail.white;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
     expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
-    expect(menuSceneSource).toContain('this.drawLegacyPlayCompass(hudFrame, {');
-    expect(menuSceneSource).toContain('showPane: false');
-    expect(menuSceneSource).toContain('if (options.showPane) {');
-    expect(menuSceneSource).toContain('this.hudGraphics.fillTriangle(');
-    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
+    // The compass is drawn with the same rich glyph (ring/ticks/needle) as
+    // the menu surface and the Guide overlay's legend icon now, not a
+    // separately hand-drawn crosshair+arrow with its own background pane.
+    expect(menuSceneSource).toContain('this.drawLegacyCompassGlyph(');
+    expect(menuSceneSource).not.toContain('private drawLegacyPlayCompass(');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause, false, time);');
     expect(menuSceneSource).not.toContain('this.drawLegacyPlayTouchButton(');
     expect(menuSceneSource).not.toContain('this.hudGraphics.strokeRect(');
   });
@@ -1078,11 +1078,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('stickRepeatIntervalMaxMs: LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS');
     expect(menuSceneSource).toContain('turnDelayMs: movementSpeedProfile.turnDelayMs');
     expect(menuSceneSource).toContain('Math.min(profile.repeatIntervalMs, LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS)');
-    expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
-    // The compass now always sits at its own top-middle HUD position
-    // (independent of the D-pad/floating stick), bare with no background
-    // pane -- consistent with the rest of the top HUD having no chrome.
-    expect(menuSceneSource).toContain('showPane: false');
+    expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);');
+    // The compass now always sits at its own centered top HUD position
+    // (independent of the D-pad/floating stick), drawn with the same
+    // glyph as the menu surface/Guide compass -- no separate pane concept.
+    expect(menuSceneSource).toContain('this.drawLegacyCompassGlyph(');
     expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).toContain('touchControls');
     expect(menuSceneSource).toContain('LEGACY_CYBER_PANEL_FILL');
@@ -1295,14 +1295,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).not.toContain('fillStyle(0x05070a');
     expect(menuSceneSource).toContain('private drawLegacySettingsCogControl(');
-    // No panel/border chrome behind the play cog at all -- matches the
-    // menu surface's own settings cog exactly (bare gear, nothing framing
-    // it).
-    expect(menuSceneSource).toMatch(/drawLegacySettingsCogControl\([\s\S]*?this\.drawLegacySettingsCog\(graphics, rect, active\);/);
+    // No panel/border chrome behind the play cog at all, and now the same
+    // color/size/blink pulse as the menu surface's own settings cog too --
+    // not just "no box" but the actual same icon.
+    expect(menuSceneSource).toMatch(/drawLegacySettingsCogControl\([\s\S]*?this\.drawLegacySettingsCog\(\s*graphics,\s*rect,\s*active,\s*0\.34 \* blinkScale,/);
     expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(time: number): void');
     expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog(time);');
     expect(menuSceneSource).toContain('cyberArcadeMaterial.signal.player,\n      cyberArcadeMaterial.rail.mint,\n      blinkAlpha\n    );');
-    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
+    expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause, false, time);');
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
     expect(menuSceneSource).toContain('const background = this.add.rectangle(\n      pauseRect.centerX,');
