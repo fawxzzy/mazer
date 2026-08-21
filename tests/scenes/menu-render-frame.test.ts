@@ -51,7 +51,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     const baseCssSource = readFileSync(resolve(process.cwd(), 'src/styles/base.css'), 'utf8');
 
     expect(phaserConfigSource).toContain('type: Phaser.CANVAS');
-    expect(canvasResolutionSource).toContain('export const MAZER_CANVAS_RESOLUTION_MAX = 2;');
+    expect(canvasResolutionSource).toContain('export const MAZER_CANVAS_RESOLUTION_MAX = 3;');
     expect(canvasResolutionSource).toContain('export const resolveMazerCanvasResolution =');
     expect(canvasResolutionSource).toContain('export const resolveMazerCanvasBackingResolution =');
     expect(canvasResolutionSource).toContain('export const applyMazerCanvasBackingResolution =');

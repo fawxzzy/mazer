@@ -10,12 +10,13 @@ import {
 describe('resolveMazerCanvasResolution', () => {
   test('caps mobile render target resolution without uncapped DPR cost', () => {
     expect(MAZER_CANVAS_RESOLUTION_MIN).toBe(1);
-    expect(MAZER_CANVAS_RESOLUTION_MAX).toBe(2);
+    expect(MAZER_CANVAS_RESOLUTION_MAX).toBe(3);
     expect(resolveMazerCanvasResolution(0.5)).toBe(1);
     expect(resolveMazerCanvasResolution(1)).toBe(1);
     expect(resolveMazerCanvasResolution(1.375)).toBe(1.38);
     expect(resolveMazerCanvasResolution(2)).toBe(2);
-    expect(resolveMazerCanvasResolution(3)).toBe(2);
+    expect(resolveMazerCanvasResolution(3)).toBe(3);
+    expect(resolveMazerCanvasResolution(4)).toBe(3);
     expect(resolveMazerCanvasResolution(Number.NaN)).toBe(1);
   });
 });
@@ -41,9 +42,21 @@ describe('resolveMazerCanvasBackingResolution', () => {
     })).toEqual({
       canvasCssHeight: 958,
       canvasCssWidth: 405,
-      canvasPixelHeight: 1916,
-      canvasPixelWidth: 810,
-      resolution: 2
+      canvasPixelHeight: 2874,
+      canvasPixelWidth: 1215,
+      resolution: 3
+    });
+
+    expect(resolveMazerCanvasBackingResolution({
+      canvasCssHeight: 958,
+      canvasCssWidth: 405,
+      devicePixelRatio: 4
+    })).toEqual({
+      canvasCssHeight: 958,
+      canvasCssWidth: 405,
+      canvasPixelHeight: 2874,
+      canvasPixelWidth: 1215,
+      resolution: 3
     });
   });
 });
