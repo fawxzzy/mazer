@@ -6093,7 +6093,16 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private hasLegacyMenuTitleAnimationPendingFrame(time: number): boolean {
-    if (this.mode !== 'menu' || this.overlay !== 'none' || this.prefersLegacyReducedMotion()) {
+    // Play mode has no title text to animate, but it now shares the same
+    // orbit-sigil decoration drawn by the same function -- without this,
+    // the sigils would only redraw whenever boardPathDirty happened to be
+    // set for some unrelated reason, freezing in place the rest of the
+    // time instead of orbiting smoothly.
+    if (
+      (this.mode !== 'menu' && this.mode !== 'play')
+      || this.overlay !== 'none'
+      || this.prefersLegacyReducedMotion()
+    ) {
       return false;
     }
     if (time < this.legacyMenuTitleAnimationNextFrameAtMs) {
@@ -6579,11 +6588,18 @@ export class MenuScene extends Phaser.Scene {
 
   private drawLegacyMenuPathTitle(time: number): void {
     this.titleGraphics.clear();
-    const visible = this.mode === 'menu' && this.overlay === 'none';
-    this.titleGraphics.setVisible(visible);
-    if (!visible) {
+    // The orbit sigils (4 corners + 4 edge midpoints) are a screen-wide
+    // ambient decoration, not really part of the title itself -- they now
+    // render in play mode too (still gated off during overlays), even
+    // though play mode has no "MAZER" wordmark to go with them, since the
+    // edge diamonds were the specific thing reported missing there. The
+    // actual title glyphs stay menu-only below.
+    const sigilsVisible = (this.mode === 'menu' || this.mode === 'play') && this.overlay === 'none';
+    this.titleGraphics.setVisible(sigilsVisible);
+    if (!sigilsVisible) {
       return;
     }
+    const titleTextVisible = this.mode === 'menu';
 
     const titlePresentation = resolveLegacyMenuTitlePresentation(
       this.layout.titleReserveHeight,
@@ -6605,7 +6621,7 @@ export class MenuScene extends Phaser.Scene {
       height: titleLayout.rows
     };
 
-    if (visibleCells.length > 0) {
+    if (titleTextVisible && visibleCells.length > 0) {
       for (const cell of visibleCells) {
         this.drawLegacyMenuPathTitleCell(
           cell,
@@ -6623,7 +6639,7 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    if (visibleCells.length > 0) {
+    if (titleTextVisible && visibleCells.length > 0) {
       // A trail-color wipe loops across the title tiles while it's on
       // screen -- see resolveLegacyMenuTitleTrailSweepFrame's comment for
       // the fill/hold/revert/hold cycle this drives.
