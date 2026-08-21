@@ -7263,17 +7263,11 @@ export class MenuScene extends Phaser.Scene {
       width: this.layout.width
     });
     const badgePulse = this.resolveLegacyProgressionBadgePulse();
-    // Bare stroked text read as "floating label," not a HUD element with its
-    // own identity -- give it the same rounded chrome panel the in-play
-    // pause cog already uses (drawLegacyHeaderControlChrome's fill/border,
-    // without that control's button notch since this isn't tappable),
-    // tinted with the player's own progression color so it visually reads
-    // as "this player's level" at a glance.
-    const badgePanelRadius = Math.min(10, Math.max(6, Math.round(Math.min(frame.width, frame.height) * 0.16)));
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, 0.5);
-    this.boardDynamicGraphics.fillRoundedRect(frame.left, frame.top, frame.width, frame.height, badgePanelRadius);
-    this.boardDynamicGraphics.lineStyle(2, palette.playerCoreColor, 0.68);
-    this.boardDynamicGraphics.strokeRoundedRect(frame.left, frame.top, frame.width, frame.height, badgePanelRadius);
+    // Same crystalline corner-bracket chrome as the play settings cog -- no
+    // filled panel or stroked border box around the badge, matching the
+    // menu surface's header-control treatment instead of standing out as
+    // its own separate bordered box.
+    this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.playerCoreColor, false, true);
     this.progressionBadgeText
       .setText(String(track.level))
       .setFontSize(resolveLegacyHeaderControlMetricFontSize(track.level, frame.width))
@@ -8655,11 +8649,15 @@ export class MenuScene extends Phaser.Scene {
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
     active = false
   ): void {
+    // sparkle: true -- matches the menu surface's header controls (no
+    // filled panel or stroked border, just the crystalline corner
+    // brackets); was built but never actually wired up anywhere until now.
     this.drawLegacyHeaderControlChrome(
       graphics,
       rect,
       active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,
-      active
+      active,
+      true
     );
     this.drawLegacySettingsCog(graphics, rect, active);
   }
@@ -8672,9 +8670,9 @@ export class MenuScene extends Phaser.Scene {
     sparkle = false
   ): void {
     const radius = Math.min(8, Math.max(6, Math.round(Math.min(rect.width, rect.height) * 0.18)));
-    graphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, active ? 0.64 : 0.46);
-    graphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
     if (!sparkle) {
+      graphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, active ? 0.64 : 0.46);
+      graphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
       graphics.lineStyle(2, accentColor, active ? 0.96 : 0.86);
       graphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
       const notchWidth = Math.max(4, Math.round(rect.width * 0.13));
