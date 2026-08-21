@@ -139,15 +139,32 @@ export const resolveLegacyMenuBoardAspectRatio = (
   const menuFullBleedTopMargin = safeAreaTop + (isUltraNarrow ? 2 : 4);
   const menuFullBleedBottomMargin = safeAreaBottom + (isUltraNarrow ? 2 : 4);
   const menuAvailableBoardHeight = Math.max(60, height - menuFullBleedTopMargin - menuFullBleedBottomMargin);
-  const playVerticalBoardLimit = height - playTopHudReserve - (playControlReserve + (laneGap * 2)) - safeAreaBottom;
+  // Play's HUD (level/compass/settings) already floats over the board the
+  // same way menu's header does -- useFloatingTouchControls means there's
+  // no fixed control widget below it either, so once that flag is set play
+  // gets the exact same tiny full-bleed top margin as menu instead of a
+  // real reserved lane pushing the board down by playTopHudReserve. Mirrors
+  // resolveLegacyMenuLayout's own playTopBoardMargin -- keep both in sync.
+  const playTopBoardMargin = options.useFloatingTouchControls === true
+    ? menuFullBleedTopMargin
+    : playTopHudReserve + laneGap;
+  const playBottomGapCount = options.useFloatingTouchControls === true ? 1 : 2;
+  const playVerticalBoardLimit = height - playTopBoardMargin - (playControlReserve + (laneGap * playBottomGapCount)) - safeAreaBottom;
   const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuAvailableBoardHeight);
   const baseBoardScale = isPortrait ? 0.92 : 0.62;
   const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
   const scaleBias = 1 + ((normalizedScale - 50) / 500);
   const menuEdgeMargin = isUltraNarrow ? 4 : (shouldUseCleanPhoneCadence ? 4 : 8);
   const menuMaxBoardByWidth = Math.max(60, width - (menuEdgeMargin * 2) - safeAreaLeft - safeAreaRight);
+  // Same floating-controls-implies-full-bleed reasoning as the top margin
+  // above, applied to the left/right edges -- when true, play gets the
+  // identical tight pixel margin menu already uses instead of a generous
+  // percentage-of-width scale. Mirrors resolveLegacyMenuLayout's own
+  // playMaxBoardByWidth -- keep both in sync.
   const maxBoardWidthBound = isPlaySurface
-    ? width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)))
+    ? (options.useFloatingTouchControls === true
+      ? menuMaxBoardByWidth
+      : width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78))))
     : menuMaxBoardByWidth;
   // These height ratios (0.74/0.86 max, 0.64/0.84 raw) predate the floating
   // stick and independently capped the board well short of laneBoardLimit,
@@ -164,7 +181,9 @@ export const resolveLegacyMenuBoardAspectRatio = (
   const minBoardWidthBound = Math.min(maxBoardWidthBound, 300);
   const minBoardHeightBound = Math.min(maxBoardHeightBound, 300);
   const rawBoardWidthBound = isPlaySurface
-    ? width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias
+    ? (options.useFloatingTouchControls === true
+      ? menuMaxBoardByWidth * scaleBias
+      : width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias)
     : menuMaxBoardByWidth * scaleBias;
   const rawBoardHeightBound = isPlaySurface
     ? Math.min(height * (playFullBleedHeightScale ?? (isPortrait ? 0.64 : 0.84)) * scaleBias, laneBoardLimit)
@@ -332,9 +351,20 @@ export const resolveLegacyMenuLayout = (
   const menuBottomReserve = menuFullBleedBottomMargin;
   const menuAvailableBoardHeight = Math.max(60, height - menuBoardTop - menuBottomReserve);
 
+  // Play's HUD (level/compass/settings) already floats over the board the
+  // same way menu's header does -- useFloatingTouchControls means there's
+  // no fixed control widget below it either, so once that flag is set play
+  // gets the exact same tiny full-bleed top margin as menu instead of a
+  // real reserved lane pushing the board down by playTopHudReserve. Mirrors
+  // resolveLegacyMenuBoardAspectRatio's own playTopBoardMargin -- keep both
+  // in sync.
+  const playTopBoardMargin = options.useFloatingTouchControls === true
+    ? menuFullBleedTopMargin
+    : playTopHudReserve + laneGap;
+  const playBottomGapCount = options.useFloatingTouchControls === true ? 1 : 2;
   const playVerticalBoardLimit = height
-    - playTopHudReserve
-    - (playControlReserve + (laneGap * 2))
+    - playTopBoardMargin
+    - (playControlReserve + (laneGap * playBottomGapCount))
     - safeAreaBottom;
   const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuAvailableBoardHeight);
   const baseBoardScale = isPortrait ? 0.92 : 0.62;
@@ -355,8 +385,14 @@ export const resolveLegacyMenuLayout = (
   // mazeHeight (the pre-rectangular default), taking Math.min() of the two
   // axis tile sizes below reduces to exactly the old combined-min formula --
   // this is a pure axis split, not a behavior change, for the square case.
+  // Same floating-controls-implies-full-bleed reasoning as the top margin
+  // above, applied to the left/right edges -- mirrors
+  // resolveLegacyMenuBoardAspectRatio's own maxBoardWidthBound -- keep both
+  // in sync.
   const maxBoardWidthBound = isPlaySurface
-    ? width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78)))
+    ? (options.useFloatingTouchControls === true
+      ? menuMaxBoardByWidth
+      : width * (cleanPhoneWidthScale ?? (isUltraNarrow ? 0.98 : (isPortrait ? 0.92 : 0.78))))
     : menuMaxBoardByWidth;
   // These height ratios (0.74/0.86 max, 0.64/0.84 raw) predate the floating
   // stick and independently capped the board well short of laneBoardLimit,
@@ -378,10 +414,12 @@ export const resolveLegacyMenuLayout = (
   const minBoardWidthBound = Math.min(maxBoardWidthBound, 300);
   const minBoardHeightBound = Math.min(maxBoardHeightBound, 300);
   const rawBoardWidthBound = isPlaySurface
-    // cleanPhoneWidthScale must override baseBoardScale here exactly like it
-    // does in maxBoardWidthBound above -- dropping it silently shrank the
-    // play-surface board on clean-phone-cadence widths (<=420px portrait).
-    ? width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias
+    ? (options.useFloatingTouchControls === true
+      ? menuMaxBoardByWidth * scaleBias
+      // cleanPhoneWidthScale must override baseBoardScale here exactly like it
+      // does in maxBoardWidthBound above -- dropping it silently shrank the
+      // play-surface board on clean-phone-cadence widths (<=420px portrait).
+      : width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias)
     : menuMaxBoardByWidth * scaleBias;
   const rawBoardHeightBound = isPlaySurface
     ? Math.min(height * (playFullBleedHeightScale ?? (isPortrait ? 0.64 : 0.84)) * scaleBias, laneBoardLimit)
@@ -459,7 +497,7 @@ export const resolveLegacyMenuLayout = (
     ? Math.max(0, (menuBoardZoneHeight - snappedBoardHeight) / 2)
     : 0;
   const boardTop = Math.round(
-    isPlaySurface ? (playTopHudReserve + laneGap) : (menuBoardZoneTop + menuBoardCenterOffset)
+    isPlaySurface ? playTopBoardMargin : (menuBoardZoneTop + menuBoardCenterOffset)
   );
   const menuDockButtonY = height - dockBottomMargin - Math.round(buttonHeight / 2);
   const playRowButtonY = isPortrait
