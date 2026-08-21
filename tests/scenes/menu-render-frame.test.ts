@@ -1159,6 +1159,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("type MazerRenderResolutionDiagnostics,");
     expect(menuSceneSource).toContain("type MazerRenderResolutionStatus");
     expect(menuSceneSource).toContain('const renderResolutionDiagnostics = summarizeMazerRenderResolution({');
+    // refreshLayout() must force Phaser's own Scale Manager back in sync
+    // with our authoritative width/height BEFORE mutating the canvas here --
+    // otherwise a stale automatic resize from Phaser's own observer can
+    // leave pointer transforms (which read Phaser's canvasBounds/displayScale,
+    // never the backing-store pixel count this sets) offset from what's
+    // actually drawn. See the back-chevron hit-box investigation.
+    expect(menuSceneSource).toContain('if (this.scale.width !== width || this.scale.height !== height) {');
+    expect(menuSceneSource).toContain('syncMazerGameToViewport(this.game, viewportGeometry);');
     expect(menuSceneSource).toContain('const backingResolution = resolveMazerCanvasBackingResolution({');
     expect(menuSceneSource).toContain('applyMazerCanvasBackingResolution({');
     expect(menuSceneSource).toContain('canvas: this.game.canvas');

@@ -6,7 +6,7 @@ import {
   type MazerRenderResolutionDiagnostics,
   type MazerRenderResolutionStatus
 } from '../boot/canvasResolution';
-import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry } from '../boot/viewportGeometry';
+import { MAZER_VIEWPORT_CHANGE_EVENT, readMazerViewportGeometry, syncMazerGameToViewport } from '../boot/viewportGeometry';
 import {
   collectDemoWalkerRouteDiagnostics,
   type DemoRunnerTelemetry,
@@ -4054,6 +4054,26 @@ export class MenuScene extends Phaser.Scene {
     // notches/home-indicators without shrinking the whole canvas.
     const width = viewportGeometry.fullBleed.width;
     const height = viewportGeometry.fullBleed.height;
+    // Phaser's own Scale Manager tracks canvas bounds/displayScale
+    // independently of this scene, and pointer coordinates are transformed
+    // through THAT state (baseSize vs the canvas's real getBoundingClientRect,
+    // never the backing-store pixel count applyMazerCanvasBackingResolution
+    // sets below). refreshLayout() runs from plenty of triggers that aren't
+    // an actual geometry change (overlay open/close, mode switches) using a
+    // cached geometry snapshot -- if Phaser's own automatic resize observer
+    // independently re-measured the parent in between with a slightly
+    // different value, its scale state would silently drift out of sync with
+    // what we're about to apply here, offsetting every pointer/tap
+    // coordinate on the canvas until the next real geometry-change event
+    // self-corrected it. Only re-sync when Phaser's own state has actually
+    // drifted from ours -- calling this unconditionally would fire Phaser's
+    // resize event even on a no-op sync, and this scene's own
+    // this.scale.on('resize', ...) listener calls refreshLayout() right back,
+    // an infinite loop for the (very common) case where refreshLayout() was
+    // itself invoked BY that same resize event.
+    if (this.scale.width !== width || this.scale.height !== height) {
+      syncMazerGameToViewport(this.game, viewportGeometry);
+    }
     const backingResolution = resolveMazerCanvasBackingResolution({
       canvasCssHeight: height,
       canvasCssWidth: width
