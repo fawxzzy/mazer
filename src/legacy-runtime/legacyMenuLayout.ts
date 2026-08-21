@@ -148,7 +148,11 @@ export const resolveLegacyMenuBoardAspectRatio = (
   const playTopBoardMargin = options.useFloatingTouchControls === true
     ? menuFullBleedTopMargin
     : playTopHudReserve + laneGap;
-  const playBottomGapCount = options.useFloatingTouchControls === true ? 1 : 2;
+  // Mirrors resolveLegacyMenuLayout's own playBottomGapCount -- floating-
+  // controls playControlReserve already equals the full-bleed bottom
+  // margin exactly (see its own definition above), not a lane that still
+  // needs a laneGap in front of it; keep both in sync.
+  const playBottomGapCount = options.useFloatingTouchControls === true ? 0 : 2;
   // playControlReserve already folds safeAreaBottom in for the floating-
   // controls case (see its own definition above) -- subtracting it again
   // here double-counted the inset, starving the board of up to a full
@@ -183,11 +187,19 @@ export const resolveLegacyMenuBoardAspectRatio = (
   // the board for a fixed control widget. With useFloatingTouchControls
   // there's no such widget to leave room for -- laneBoardLimit (which
   // already accounts for the top HUD and a hair of bottom margin) is the
-  // real constraint, so both ratios collapse to the same near-1 ceiling
-  // instead of an independent, tighter one.
-  const playFullBleedHeightScale = options.useFloatingTouchControls === true ? 0.97 : null;
+  // real constraint. The width axis already dropped its equivalent scale
+  // entirely for this case (maxBoardWidthBound above uses menuMaxBoardByWidth
+  // directly, no multiplier) -- height kept a leftover 0.97 "near-1 ceiling"
+  // that measured live as the actual binding constraint (height*0.97 landing
+  // below the now-correct laneBoardLimit), silently re-introducing the same
+  // few-px bottom shortfall laneBoardLimit's own playBottomGapCount fix just
+  // removed. Dropped to match width's treatment exactly: no separate scale
+  // for the floating-controls case, laneBoardLimit alone governs.
+  const playFullBleedHeightScale = isPortrait ? 0.74 : 0.86;
   const maxBoardHeightBound = isPlaySurface
-    ? Math.min(height * (playFullBleedHeightScale ?? (isPortrait ? 0.74 : 0.86)), laneBoardLimit)
+    ? (options.useFloatingTouchControls === true
+      ? laneBoardLimit
+      : Math.min(height * playFullBleedHeightScale, laneBoardLimit))
     : laneBoardLimit;
   const minBoardWidthBound = Math.min(maxBoardWidthBound, 300);
   const minBoardHeightBound = Math.min(maxBoardHeightBound, 300);
@@ -197,7 +209,9 @@ export const resolveLegacyMenuBoardAspectRatio = (
       : width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias)
     : menuMaxBoardByWidth * scaleBias;
   const rawBoardHeightBound = isPlaySurface
-    ? Math.min(height * (playFullBleedHeightScale ?? (isPortrait ? 0.64 : 0.84)) * scaleBias, laneBoardLimit)
+    ? (options.useFloatingTouchControls === true
+      ? laneBoardLimit * scaleBias
+      : Math.min(height * (isPortrait ? 0.64 : 0.84) * scaleBias, laneBoardLimit))
     : laneBoardLimit * scaleBias;
   const boardWidthTarget = Math.round(clamp(rawBoardWidthBound, minBoardWidthBound, maxBoardWidthBound));
   const boardHeightTarget = Math.round(clamp(rawBoardHeightBound, minBoardHeightBound, maxBoardHeightBound));
@@ -372,7 +386,18 @@ export const resolveLegacyMenuLayout = (
   const playTopBoardMargin = options.useFloatingTouchControls === true
     ? menuFullBleedTopMargin
     : playTopHudReserve + laneGap;
-  const playBottomGapCount = options.useFloatingTouchControls === true ? 1 : 2;
+  // Floating-controls playControlReserve already equals exactly
+  // menuFullBleedBottomMargin (safeAreaBottom + a hair of margin) -- it IS
+  // the full-bleed bottom margin, not a lane that still needs its own gap
+  // in front of it the way the old fixed-widget lane did. Adding a whole
+  // extra laneGap on top of it (the old "1" here) reserved real additional
+  // space at the bottom with no equivalent reservation at the top, which
+  // is exactly why the board's measured top margin and bottom margin
+  // weren't actually equal despite every comment near here claiming
+  // "the exact same tiny full-bleed top margin" -- confirmed live: 4px top
+  // vs 14px bottom on an otherwise safe-area-free viewport (4px hair
+  // margin + 8px stray laneGap + ~2px tile-snap rounding).
+  const playBottomGapCount = options.useFloatingTouchControls === true ? 0 : 2;
   // Mirrors resolveLegacyMenuBoardAspectRatio's own playVerticalBoardLimit --
   // playControlReserve already folds safeAreaBottom in for the floating-
   // controls case, so subtracting it again here double-counted the inset.
@@ -415,11 +440,19 @@ export const resolveLegacyMenuLayout = (
   // the board for a fixed control widget. With useFloatingTouchControls
   // there's no such widget to leave room for -- laneBoardLimit (which
   // already accounts for the top HUD and a hair of bottom margin) is the
-  // real constraint, so both ratios collapse to the same near-1 ceiling
-  // instead of an independent, tighter one.
-  const playFullBleedHeightScale = options.useFloatingTouchControls === true ? 0.97 : null;
+  // real constraint. The width axis already dropped its equivalent scale
+  // entirely for this case (maxBoardWidthBound above uses menuMaxBoardByWidth
+  // directly, no multiplier) -- height kept a leftover 0.97 "near-1 ceiling"
+  // that measured live as the actual binding constraint (height*0.97 landing
+  // below the now-correct laneBoardLimit), silently re-introducing the same
+  // few-px bottom shortfall laneBoardLimit's own playBottomGapCount fix just
+  // removed. Dropped to match width's treatment exactly: no separate scale
+  // for the floating-controls case, laneBoardLimit alone governs.
+  const playFullBleedHeightScale = isPortrait ? 0.74 : 0.86;
   const maxBoardHeightBound = isPlaySurface
-    ? Math.min(height * (playFullBleedHeightScale ?? (isPortrait ? 0.74 : 0.86)), laneBoardLimit)
+    ? (options.useFloatingTouchControls === true
+      ? laneBoardLimit
+      : Math.min(height * playFullBleedHeightScale, laneBoardLimit))
     : laneBoardLimit;
   // Must never exceed the max bound -- the old `Math.max(120, maxBoardSize)`
   // could force a 120px floor even when maxBoardSize (the safe fill bound)
@@ -437,7 +470,9 @@ export const resolveLegacyMenuLayout = (
       : width * (cleanPhoneWidthScale ?? baseBoardScale) * scaleBias)
     : menuMaxBoardByWidth * scaleBias;
   const rawBoardHeightBound = isPlaySurface
-    ? Math.min(height * (playFullBleedHeightScale ?? (isPortrait ? 0.64 : 0.84)) * scaleBias, laneBoardLimit)
+    ? (options.useFloatingTouchControls === true
+      ? laneBoardLimit * scaleBias
+      : Math.min(height * (isPortrait ? 0.64 : 0.84) * scaleBias, laneBoardLimit))
     // scaleBias is the user's own board-scale preference (Options); let it
     // shrink the board below the max fill, but the maxBoardHeightBound clamp
     // below guarantees it can never grow past the safe fill bound and
