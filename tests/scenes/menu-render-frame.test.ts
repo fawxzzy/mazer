@@ -1364,7 +1364,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.createLegacyAuthActionButton(');
     expect(menuSceneSource).toContain('presentation.primaryActionLabel');
     expect(menuSceneSource).toContain('presentation.recoveryActionLabel');
-    expect(menuSceneSource).toContain('this.createLegacyBottomActionBar(panel, stacked, {');
+    expect(menuSceneSource).toContain('this.createLegacyBottomActionBar(\n      panel,\n      stacked,');
+    expect(menuSceneSource).toContain("text: 'Play as guest',");
+    expect(menuSceneSource).toContain('onClick: () => this.handleLegacyGuestPlay()');
+    expect(menuSceneSource).toContain('private handleLegacyGuestPlay(): void');
     expect(menuSceneSource).toContain('private createAuthFooterLink(');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSubmit(): Promise<void>');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSignOut(): Promise<void>');

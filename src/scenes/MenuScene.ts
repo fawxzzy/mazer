@@ -10169,11 +10169,23 @@ export class MenuScene extends Phaser.Scene {
     const primaryLabel = this.authSubmitting
       ? 'Working'
       : presentation.primaryActionLabel;
-    this.createLegacyBottomActionBar(panel, stacked, {
-      onClick: () => { void this.handleLegacyAuthSubmit(); },
-      text: primaryLabel,
-      tone: 'primary'
-    });
+    // Guest play is deliberately a local-only escape hatch from account entry:
+    // the left slot starts the existing guest-scoped play mode directly; it
+    // neither creates an account nor calls any remote auth/data operation.
+    this.createLegacyBottomActionBar(
+      panel,
+      stacked,
+      {
+        onClick: () => { void this.handleLegacyAuthSubmit(); },
+        text: primaryLabel,
+        tone: 'primary'
+      },
+      {
+        onClick: () => this.handleLegacyGuestPlay(),
+        text: 'Play as guest',
+        tone: 'secondary'
+      }
+    );
   }
 
   private createAuthFooterLink(x: number, y: number, text: string, onClick: () => void): void {
@@ -11493,6 +11505,30 @@ export class MenuScene extends Phaser.Scene {
       this.authSubmitting = false;
       this.uiDirty = true;
     }
+  }
+
+  private handleLegacyGuestPlay(): void {
+    // An authenticated player already has an account-scoped progression lane;
+    // this control only exits a sign-in form for the local guest scope. It
+    // never signs a player out or changes provider/session state.
+    if (
+      this.authSubmitting
+      || this.authGateAwaitingResolution
+      || this.authSnapshot.status === 'authenticated'
+      || !isLegacyPlayAccessAllowed(this.authSnapshot.status)
+    ) {
+      return;
+    }
+
+    this.pendingBootPlayStart = false;
+    this.activeAuthField = null;
+    this.destroyLegacyAuthNativeInput();
+    this.destroyAccountUsernameNativeInput();
+    this.accountUsernameActive = false;
+    this.startPlayMode();
+    this.rebuildUi();
+    this.publishVisualDiagnostics(this.time.now, true);
+    this.publishRuntimeDiagnostics(this.time.now, true);
   }
 
   private applyLegacyAuthSubmitResult(

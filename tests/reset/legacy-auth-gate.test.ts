@@ -19,6 +19,22 @@ describe('legacy full auth gate', () => {
     expect(menuSceneSource).toContain('if (!isLegacyPlayAccessAllowed(this.authSnapshot.status)) {');
   });
 
+  test('keeps an explicit local guest-play exit in the login bottom bar without touching auth state', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const guestPlayStart = menuSceneSource.indexOf('  private handleLegacyGuestPlay(): void {');
+    const guestPlayEnd = menuSceneSource.indexOf('  private applyLegacyAuthSubmitResult(', guestPlayStart);
+    const guestPlaySource = menuSceneSource.slice(guestPlayStart, guestPlayEnd);
+
+    expect(menuSceneSource).toContain("text: 'Play as guest',");
+    expect(menuSceneSource).toContain("tone: 'secondary'");
+    expect(guestPlayStart).toBeGreaterThanOrEqual(0);
+    expect(guestPlaySource).toContain("this.authSnapshot.status === 'authenticated'");
+    expect(guestPlaySource).toContain('this.startPlayMode();');
+    expect(guestPlaySource).toContain('this.destroyLegacyAuthNativeInput();');
+    expect(guestPlaySource).not.toContain('signOutLegacyAuth');
+    expect(guestPlaySource).not.toContain('signInLegacyAuth');
+  });
+
   test('a direct-to-play boot waits for the gate to actually clear before starting play mode', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
