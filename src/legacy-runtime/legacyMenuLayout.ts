@@ -304,10 +304,6 @@ export const resolveLegacyMenuLayout = (
   const menuTitleReserve = isUltraNarrow
     ? 32
     : Math.round(clamp(Math.min(height * 0.055, width * 0.11), 34, 56));
-  // Bottom-docked primary button (Fitness-app BottomDockButton style): a
-  // wide pill sitting near the bottom edge with its own margin, not tightly
-  // hugging the board like the old row/stack action lane did.
-  const dockBottomMargin = (isUltraNarrow ? 10 : 20) + safeAreaBottom;
   const playTopHudReserve = (isPlaySurface && isPortrait
     ? Math.round(clamp(height * 0.072, LEGACY_PLAY_TOP_HUD_MIN, LEGACY_PLAY_TOP_HUD_MAX))
     : 56) + safeAreaTop;
@@ -461,7 +457,11 @@ export const resolveLegacyMenuLayout = (
   const boardTop = Math.round(
     isPlaySurface ? (playTopHudReserve + laneGap) : (menuBoardZoneTop + menuBoardCenterOffset)
   );
-  const menuDockButtonY = height - dockBottomMargin - Math.round(buttonHeight / 2);
+  // Sits at the true vertical screen center (not bottom-docked) -- the
+  // front door has only this one button left (Login/Start; Options moved to
+  // the header settings cog), floating over the demo maze background like a
+  // hero CTA rather than pinned to the bottom edge.
+  const menuDockButtonY = Math.round(height / 2);
   const playRowButtonY = isPortrait
     ? boardTop + snappedBoardHeight + Math.round(buttonHeight * 0.86)
     : boardTop + snappedBoardHeight + Math.round(buttonHeight * 0.54);
