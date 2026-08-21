@@ -152,7 +152,16 @@ export const resolveLegacyAuthFeedbackMessage = (
     const normalizedError = rawError.toLowerCase();
     const isNetworkError = normalizedError === 'failed to fetch'
       || normalizedError.includes('network')
-      || normalizedError.includes('fetch');
+      || normalizedError.includes('fetch')
+      // Chrome throws "Failed to fetch" for a connectivity failure, but
+      // Safari throws "Load failed" and "A server with the specified
+      // hostname could not be found" for the same underlying condition --
+      // neither contains "network" or "fetch", so they fell through to the
+      // generic "did not finish" copy instead of the network-specific one.
+      || normalizedError.includes('load failed')
+      || normalizedError.includes('could not be found')
+      || normalizedError.includes('internet connection')
+      || normalizedError.includes('cannot connect to the server');
     const copy = isNetworkError
       ? LEGACY_AUTH_MESSAGE_COPY.networkUnavailable
       : normalizedError.includes('invalid login credentials') || normalizedError.includes('invalid credentials')
