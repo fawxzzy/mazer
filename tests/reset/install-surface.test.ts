@@ -6,6 +6,7 @@ import {
   promptInstallSurface,
   resetInstallSurfaceRuntimeForTests,
   resolveInstallSurfaceState,
+  resolveIsIOSInAppBrowser,
   resolveManualInstallInstruction,
   subscribeInstallSurface,
   type DeferredInstallPromptEvent,
@@ -211,6 +212,57 @@ describe('install surface runtime', () => {
       installed: false,
       standalone: false,
       instruction: 'Use Share > Add to Home Screen'
+    });
+  });
+
+  test('detects iOS in-app browsers (TikTok, Instagram, etc.) that cannot install PWAs at all', () => {
+    expect(resolveIsIOSInAppBrowser({
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) ... [FBAN/FBIOS]',
+      platform: 'iPhone'
+    })).toBe(true);
+    expect(resolveIsIOSInAppBrowser({
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1',
+      platform: 'iPhone'
+    })).toBe(false);
+    // Android in-app browsers aren't the same technical block -- Android's
+    // Chrome Custom Tabs and WebView still expose a real install path, so
+    // this only ever applies to iOS.
+    expect(resolveIsIOSInAppBrowser({
+      userAgent: 'Mozilla/5.0 (Linux; Android 14) ... Instagram',
+      platform: 'Linux armv8l'
+    })).toBe(false);
+  });
+
+  test('iOS in-app browser hard-blocks with its own mode and ignores the dismissed preference', () => {
+    const runtime = new FakeWindow(false);
+    runtime.navigator = {
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) ... [FBAN/FBIOS]',
+      platform: 'iPhone'
+    };
+
+    expect(initializeInstallSurface(runtime)).toEqual<InstallSurfaceState>({
+      mode: 'ios-open-in-browser',
+      canPrompt: false,
+      installed: false,
+      standalone: false
+    });
+    // Unlike the manual-instruction case, this can't be dismissed away --
+    // the player has to actually leave the in-app browser first.
+    expect(dismissInstallSurface().mode).toBe('ios-open-in-browser');
+  });
+
+  test('resolveInstallSurfaceState still treats the in-app-browser snapshot flag as a hard block ahead of dismissed', () => {
+    expect(resolveInstallSurfaceState({
+      standalone: false,
+      installed: false,
+      canPrompt: false,
+      dismissed: true,
+      isIOSInAppBrowser: true
+    })).toEqual<InstallSurfaceState>({
+      mode: 'ios-open-in-browser',
+      canPrompt: false,
+      installed: false,
+      standalone: false
     });
   });
 });
