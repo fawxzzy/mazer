@@ -623,7 +623,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);');
-    expect(menuSceneSource).toContain('this.startLegacyPlayCompassSpin(this.time.now);');
+    expect(menuSceneSource).toContain('this.startLegacyPlayCompassSpin(time);');
     expect(menuSceneSource).toContain('private resolveLegacyPlayCompassVisualFrame(');
     expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     // The compass now draws with the same rich glyph used by the menu

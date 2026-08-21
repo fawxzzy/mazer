@@ -9,7 +9,11 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Mazer" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- iOS home-screen PWAs misplace bottom-anchored UI when black-translucent
+         is combined with viewport-fit=cover (confirmed root cause ported from
+         the Fitness app, which hit and fixed the exact same bug) -- default
+         keeps the status bar from throwing off bottom safe-area positioning. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="icon" href="/icons/mazer-app-icon.ico" sizes="any" />
     <link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png" />
     <link rel="icon" href="/icons/icon-512.png" sizes="512x512" type="image/png" />
