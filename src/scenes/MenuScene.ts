@@ -8937,10 +8937,13 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawOverlayPanel(): void {
-    // Settings and pause retain the calm animated-board dimmer. Account entry
-    // is intentionally opaque: credentials and account identity never share a
-    // translucent surface with the moving game board behind it.
-    this.overlayGraphics.fillStyle(0x02040a, this.overlay === 'auth' ? 1 : 0.82);
+    // Same calm animated-backdrop dimmer every overlay uses -- the auth
+    // screen used to be fully opaque here specifically so credentials never
+    // shared a surface with the moving maze board, but the board itself
+    // isn't part of this dimmer (just the ambient starfield/sigil backdrop),
+    // so matching the rest of the app's translucency doesn't reintroduce
+    // that concern.
+    this.overlayGraphics.fillStyle(0x02040a, 0.82);
     this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);
   }
 
