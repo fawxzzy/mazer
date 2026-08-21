@@ -967,6 +967,14 @@ const LEGACY_OVERLAY_BACK_CHEVRON_DEPTH = 1000;
 // unresolved) has to sit above the menu front door, since that content
 // keeps rendering underneath it rather than being suppressed.
 const LEGACY_AUTH_GATE_LOADING_DEPTH = 5000;
+// Mirrors Fitness's own login-pending timeout: if the Supabase call never
+// settles (seen live -- the button flips to "Working" and never recovers,
+// with no thrown error to catch), the submit button must still come back
+// to life so the player isn't permanently stuck. A late response that
+// eventually does arrive is still applied when it lands (see
+// handleLegacyAuthSubmit's attempt-id guard) -- this only bounds how long
+// the UI waits before letting the player try again.
+const LEGACY_AUTH_SUBMIT_TIMEOUT_MS = 12000;
 // Extra forgiveness beyond the chevron's own drawn touch-target size when
 // resolving which hit box a tap belongs to first -- corner buttons are
 // statistically the hardest to land a precise tap on.
@@ -1217,6 +1225,7 @@ export class MenuScene extends Phaser.Scene {
   private authPasswordVisible = false;
   private authAccountHydrationSequence = 0;
   private authSubmitting = false;
+  private authSubmitAttemptId = 0;
   // Deliberately NOT part of authForm/LegacyAuthFieldId -- that state
   // machine is scoped to the signed-out sign-in/sign-up credential form
   // (its Enter key submits sign-in, its fields reset on sign-in/out). The
@@ -11262,14 +11271,50 @@ export class MenuScene extends Phaser.Scene {
     });
     writeLegacyRememberedIdentity(this.resolveBrowserLocalStorage(), this.authForm.email);
 
-    let result: Awaited<ReturnType<typeof signInLegacyAuth | typeof signUpLegacyAuth>>;
-    try {
-      result = this.authForm.mode === 'signup'
-        ? await signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.displayName)
-        : await signInLegacyAuth(this.authForm.email, this.authForm.password);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+    const attemptId = ++this.authSubmitAttemptId;
+    const authCall = this.authForm.mode === 'signup'
+      ? signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.displayName)
+      : signInLegacyAuth(this.authForm.email, this.authForm.password);
+
+    // Whatever authCall eventually does, apply it once it settles -- the
+    // attemptId guard inside makes this a no-op if a newer submit already
+    // started (or a real response already landed) by the time it resolves.
+    void authCall.then(
+      (result) => this.applyLegacyAuthSubmitResult(attemptId, result, null),
+      (error) => this.applyLegacyAuthSubmitResult(attemptId, null, error)
+    );
+
+    const timedOut = await Promise.race<boolean>([
+      authCall.then(() => false, () => false),
+      new Promise<boolean>((resolve) => {
+        this.time.delayedCall(LEGACY_AUTH_SUBMIT_TIMEOUT_MS, () => resolve(true));
+      })
+    ]);
+
+    if (timedOut && attemptId === this.authSubmitAttemptId && this.authSubmitting) {
+      this.recordLegacyAuthActionDiagnostics({
+        error: 'submit-timeout',
+        stage: 'exception',
+        status: this.authSnapshot.status
+      });
       this.authSubmitting = false;
+      this.uiDirty = true;
+    }
+  }
+
+  private applyLegacyAuthSubmitResult(
+    attemptId: number,
+    result: Awaited<ReturnType<typeof signInLegacyAuth | typeof signUpLegacyAuth>> | null,
+    error: unknown
+  ): void {
+    if (attemptId !== this.authSubmitAttemptId) {
+      return;
+    }
+
+    this.authSubmitting = false;
+
+    if (result === null) {
+      const message = error instanceof Error ? error.message : String(error);
       this.authSnapshot = {
         ...this.authSnapshot,
         error: message,
@@ -11285,7 +11330,6 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    this.authSubmitting = false;
     this.authForm = {
       ...this.authForm,
       password: result.snapshot.status === 'authenticated' ? '' : this.authForm.password
