@@ -751,7 +751,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_PANE =');
     expect(menuSceneSource).toContain('const LEGACY_CYBER_PANEL_STROKE = cyberArcadeMaterial.rail.mint;');
-    expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
     expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
     // The compass idea was removed from the app entirely.
@@ -760,6 +759,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause, false, time);');
     expect(menuSceneSource).not.toContain('this.drawLegacyPlayTouchButton(');
     expect(menuSceneSource).not.toContain('this.hudGraphics.strokeRect(');
+    // Player-facing toast/message cards were removed from the game entirely
+    // -- no message box should ever appear on screen, in the play HUD or
+    // in any overlay.
+    expect(menuSceneSource).not.toContain('private drawLegacyPlayPlayerMessageStack(');
+    expect(menuSceneSource).not.toContain('this.drawLegacyPlayPlayerMessageStack(hudFrame);');
   });
 
   test('keeps menu dynamic trail overlays in the legacy corridor frame instead of full square cells', () => {
@@ -830,8 +834,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private hasLegacyPlayerVisualMotionPendingFrame(time: number): boolean');
     expect(menuSceneSource).toContain('const centerX = originX + ((point.x + 0.5) * tileSize);');
     expect(menuSceneSource).toContain('resolveLegacyPlayerMarkerRenderMetrics(');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.lineTo(centerX + coreRadiusX, centerY);');
-    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillPath();');
+    // The player is a square filling LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO
+    // of the tile, not the old diamond.
+    expect(menuSceneSource).toContain('const LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO = 0.85;');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.fillRect(');
+    expect(menuSceneSource).toContain('this.boardDynamicGraphics.strokeRect(');
     expect(menuSceneSource).toContain('this.isLegacyMenuPointVisibleInStaticDraw(this.player)');
   });
 
@@ -1071,7 +1078,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.hudBounds = this.hudTimerBounds;');
     expect(menuSceneSource).toContain('touchControls');
     expect(menuSceneSource).toContain('LEGACY_CYBER_PANEL_FILL');
-    expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchLabel');
     expect(menuSceneSource).not.toContain("this.drawLegacyPlayTouchLabel(controls.restart_attempt, 'RESET');");
     expect(menuSceneSource).not.toContain("this.drawLegacyPlayTouchLabel(controls.toggle_thoughts, 'TRAIL');");
@@ -1380,18 +1386,20 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('latestAuthMessage: this.latestAuthMessage');
     expect(menuSceneSource).toContain('resolveLegacyAuthFeedbackMessage');
     expect(menuSceneSource).toContain('resolveLegacyAuthValidationMessage');
+    // The on-screen message/toast system was removed entirely -- no message
+    // box of any kind is ever drawn to the player, in an overlay or the play
+    // HUD. The queue/diagnostics plumbing underneath stays internal-only
+    // (still exercised by QA diagnostics), but nothing renders it.
     expect(menuSceneSource).toContain('private playerMessageQueue: LegacyQueuedPlayerMessage[] = [];');
     expect(menuSceneSource).toContain('private pushLegacyPlayerMessage(message: LegacyPlayerMessage | null): void');
     expect(menuSceneSource).toContain('private markLegacyPlayerMessagesDirty(): void');
     expect(menuSceneSource).toContain('enqueueLegacyPlayerMessage(');
     expect(menuSceneSource).toContain('expireLegacyPlayerMessageQueue(this.playerMessageQueue, time)');
-    expect(menuSceneSource).toContain('private createOverlayPlayerMessageStack(');
-    expect(menuSceneSource).toContain('this.createOverlayPlayerMessageStack(visibleMessages');
-    expect(menuSceneSource).toContain('private createOverlayPlayerMessageCard(');
-    expect(menuSceneSource).toContain('private drawLegacyPlayPlayerMessageStack(hudFrame: LegacyPlayHudFrame): void');
-    expect(menuSceneSource).toContain('this.drawLegacyPlayPlayerMessageStack(hudFrame);');
-    expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
-    expect(menuSceneSource).toContain("label.setData('hud', true);");
+    expect(menuSceneSource).not.toContain('private createOverlayPlayerMessageStack(');
+    expect(menuSceneSource).not.toContain('this.createOverlayPlayerMessageStack(visibleMessages');
+    expect(menuSceneSource).not.toContain('private createOverlayPlayerMessageCard(');
+    expect(menuSceneSource).not.toContain('private drawLegacyPlayPlayerMessageStack(hudFrame: LegacyPlayHudFrame): void');
+    expect(menuSceneSource).not.toContain('this.drawLegacyPlayPlayerMessageStack(hudFrame);');
     expect(menuSceneSource).toContain('private latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;');
     expect(menuSceneSource).toContain('private latestOverlayMessageExpiresAtMs = Number.NEGATIVE_INFINITY;');
     expect(menuSceneSource).toContain('private expireLegacyPlayerMessages(time: number): void');
