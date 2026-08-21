@@ -6764,8 +6764,26 @@ export class MenuScene extends Phaser.Scene {
   // raw, append-only move history (which grows to cover dead ends and
   // backtracks and was the source of both the "colored in weird" look and
   // the messy ping-pong pulse the player actually walked).
+  // Restricted to tiles the player has actually stepped on -- searching the
+  // full maze grid (as this originally did) can route the "perfect path"
+  // through a shortcut the player never walked, which reads as the trail
+  // jumping onto tiles they didn't visit. Building a visited-only grid and
+  // running the same shortest-path search against that instead guarantees
+  // every tile in the result is one the player's own trail already covers.
   private resolveLegacyPlayPerfectPathTrail(): LegacyPoint[] {
-    const result = resolveLegacyPlayableShortestPath(this.maze.grid, this.maze.start, this.player);
+    const visitedGrid = this.maze.grid.map((row) => row.map(() => false));
+    const markVisited = (point: LegacyPoint): void => {
+      if (visitedGrid[point.y]?.[point.x] !== undefined) {
+        visitedGrid[point.y]![point.x] = true;
+      }
+    };
+    for (const point of this.trail) {
+      markVisited(point);
+    }
+    markVisited(this.maze.start);
+    markVisited(this.player);
+
+    const result = resolveLegacyPlayableShortestPath(visitedGrid, this.maze.start, this.player);
     if (result.found && result.path.length > 0) {
       return result.path;
     }
@@ -8289,7 +8307,8 @@ export class MenuScene extends Phaser.Scene {
       elapsedMs: this.resolveLegacyPlayElapsedMs(),
       goalScreen: { x: goalScreenX, y: goalScreenY },
       layoutWidth: this.layout.width,
-      playerScreen: { x: playerScreenX, y: playerScreenY }
+      playerScreen: { x: playerScreenX, y: playerScreenY },
+      safeAreaTop: readMazerViewportGeometry().safeArea.top
     });
 
     this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);
@@ -8735,7 +8754,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveOverlayPanelFrame(): OverlayPanelFrame {
-    return resolveLegacyOverlayPanelLayout(this.layout.width, this.layout.height);
+    return resolveLegacyOverlayPanelLayout(
+      this.layout.width,
+      this.layout.height,
+      readMazerViewportGeometry().safeArea
+    );
   }
 
   private visualRectToLegacyOverlayScrollRect(rect: VisualRect): LegacyOverlayScrollRect {
