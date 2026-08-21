@@ -1009,9 +1009,6 @@ const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;
 const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
 const LEGACY_PLAY_WALL_FILL = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;
-const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.1;
-const LEGACY_PLAY_BOARD_FILL = cyberArcadeMaterial.substrate.field;
-const LEGACY_PLAY_BOARD_EDGE = 0x031022;
 const LEGACY_PATH_TILE_CUE_COLOR = cyberArcadeMaterial.path.edge;
 const LEGACY_PATH_TILE_CUE_ALPHA = 0.42;
 const LEGACY_PATH_CONNECTOR_SEAM_PAD_RATIO = 0.16;
@@ -5318,8 +5315,6 @@ export class MenuScene extends Phaser.Scene {
     const mazeHeight = mazeRenderFrame.boardHeight;
     const tileSize = mazeRenderFrame.tileSize;
     const isMenuMode = this.mode === 'menu';
-    const boardFill = LEGACY_PLAY_BOARD_FILL;
-    const boardEdge = LEGACY_PLAY_BOARD_EDGE;
 
     this.boardStaticGraphics.clear();
     const boardShadowAlpha = isMenuMode ? LEGACY_MENU_PANEL_SHADOW_ALPHA : 0;
@@ -5327,14 +5322,12 @@ export class MenuScene extends Phaser.Scene {
       this.boardStaticGraphics.fillStyle(0x000000, boardShadowAlpha);
       this.boardStaticGraphics.fillRect(boardLeft + BOARD_SHADOW_OFFSET, boardTop + BOARD_SHADOW_OFFSET, boardWidth, boardHeight);
     }
-    // Menu board intentionally has no slab backdrop, edge frame, or glass
-    // tint: the maze tiles should read as floating directly on the scene,
-    // not boxed in by anything, however faint.
-    if (!isMenuMode) {
-      this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardWidth, boardHeight, boardEdge);
-      this.boardStaticGraphics.fillStyle(boardFill, LEGACY_PLAY_BOARD_GLASS_ALPHA);
-      this.boardStaticGraphics.fillRect(boardLeft, boardTop, boardWidth, boardHeight);
-    }
+    // Neither surface gets a slab backdrop, edge frame, or glass tint: the
+    // maze tiles should read as floating directly on the scene, not boxed
+    // in by anything, however faint -- play mode used to be the exception
+    // here (a dedicated edge-frame helper plus a translucent glass fill
+    // behind the whole board), which is exactly the border/background box
+    // that was already removed from the menu surface.
     // Keep the board top-down: no pseudo bevel/highlight pass over the maze.
     // Dark-mode dimming is a gameplay-readability pass for the active play
     // board; menu mode has no fill/background of its own for it to dim, and
@@ -6663,21 +6656,6 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private fillLegacyBoardEdgeFrame(
-    boardLeft: number,
-    boardTop: number,
-    boardWidth: number,
-    boardHeight: number,
-    color: number
-  ): void {
-    const frameWidth = boardWidth + 2;
-    this.boardStaticGraphics.fillStyle(color, 1);
-    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop - 1, frameWidth, 1);
-    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop + boardHeight, frameWidth, 1);
-    this.boardStaticGraphics.fillRect(boardLeft - 1, boardTop, 1, boardHeight);
-    this.boardStaticGraphics.fillRect(boardLeft + boardWidth, boardTop, 1, boardHeight);
-  }
-
   private strokeLegacyPolyline(
     graphics: Phaser.GameObjects.Graphics,
     points: Array<{ x: number; y: number }>
@@ -7278,11 +7256,10 @@ export class MenuScene extends Phaser.Scene {
       width: this.layout.width
     });
     const badgePulse = this.resolveLegacyProgressionBadgePulse();
-    // Same crystalline corner-bracket chrome as the play settings cog -- no
-    // filled panel or stroked border box around the badge, matching the
-    // menu surface's header-control treatment instead of standing out as
-    // its own separate bordered box.
-    this.drawLegacyHeaderControlChrome(this.boardDynamicGraphics, frame, palette.playerCoreColor, false, true);
+    // No panel, border, or corner brackets at all -- matches the menu
+    // surface's own settings cog (zero chrome). layoutLegacyHeaderMetricPair
+    // below already gives both texts a dark stroke, which is what actually
+    // keeps this legible over the animated board without a background box.
     this.progressionBadgeText
       .setText(String(track.level))
       .setFontSize(resolveLegacyHeaderControlMetricFontSize(track.level, frame.width))
@@ -8283,9 +8260,11 @@ export class MenuScene extends Phaser.Scene {
     const playerScreenX = mazeRenderFrame.boardLeft + ((renderedPlayerPoint.x + 0.5) * mazeRenderFrame.tileSize);
     const playerScreenY = mazeRenderFrame.boardTop + ((renderedPlayerPoint.y + 0.5) * mazeRenderFrame.tileSize);
     const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
-    const touchCompassBounds = this.resolveLegacyPlayTouchCompassBounds(touchControlLayout);
+    // The compass no longer pins to wherever the D-pad/floating stick
+    // happens to be -- it always sits at the top-middle HUD cluster beside
+    // the timer (resolveLegacyPlayHudFrame's own default), independent of
+    // touch control layout or whether a finger is currently down.
     const hudFrame = resolveLegacyPlayHudFrame({
-      compassBounds: touchCompassBounds ?? undefined,
       elapsedMs: this.resolveLegacyPlayElapsedMs(),
       goalScreen: { x: goalScreenX, y: goalScreenY },
       layoutWidth: this.layout.width,
@@ -8293,11 +8272,11 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);
-    // Hide the compass's own background pane while the floating stick is
-    // actually on screen (it already grounds that area visually); show it
-    // otherwise, same as it did for the old fixed stick control.
+    // No background pane -- bare compass over the maze, consistent with
+    // the rest of the top HUD (level badge, settings cog) having no panel
+    // or border either.
     this.drawLegacyPlayCompass(hudFrame, {
-      showPane: this.playFloatingStickOrigin === null
+      showPane: false
     });
     this.drawLegacyPlayPlayerMessageStack(hudFrame);
     const compassVisualFrame = this.resolveLegacyPlayCompassVisualFrame(hudFrame, time);
@@ -8359,9 +8338,7 @@ export class MenuScene extends Phaser.Scene {
       hudFrame.arrowBounds.width,
       hudFrame.arrowBounds.height
     );
-    this.hudBounds = touchCompassBounds
-      ? this.hudTimerBounds
-      : mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);
+    this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);
     this.hudFrame = hudFrame;
   }
 
@@ -8505,35 +8482,6 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  private resolveLegacyPlayTouchCompassBounds(
-    touchControlLayout = this.resolveLegacyPlayTouchControlLayout()
-  ): { height: number; left: number; top: number; width: number } | null {
-    if (!this.shouldRenderLegacyPlayTouchControls(touchControlLayout)) {
-      return null;
-    }
-
-    if (touchControlLayout.controlMode === 'stick' && touchControlLayout.stick !== null) {
-      return {
-        height: touchControlLayout.stick.inner.height,
-        left: touchControlLayout.stick.inner.left,
-        top: touchControlLayout.stick.inner.top,
-        width: touchControlLayout.stick.inner.width
-      };
-    }
-
-    const { move_down, move_left, move_right, move_up } = touchControlLayout.controls;
-    const centerX = (move_left.centerX + move_right.centerX) / 2;
-    const centerY = (move_up.centerY + move_down.centerY) / 2;
-    const size = Math.max(32, Math.min(44, Math.min(move_up.width, move_down.width, move_left.width, move_right.width) - 8));
-
-    return {
-      height: size,
-      left: Math.round(centerX - (size / 2)),
-      top: Math.round(centerY - (size / 2)),
-      width: size
-    };
-  }
-
   private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame, options: { showPane: boolean } = { showPane: true }): void {
     const { arrowBounds } = hudFrame;
     const radius = Math.max(8, Math.min(arrowBounds.width, arrowBounds.height) * 0.34);
@@ -8659,75 +8607,17 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.strokeCircle(knobX, knobY, knobRadius);
   }
 
+  // No background panel, tint, or border -- matches the menu surface's own
+  // settings cog exactly (see drawLegacyMenuSettingsCog), which is just the
+  // gear silhouette with nothing framing it. The corner-bracket "sparkle"
+  // chrome tried here first was still a visible box around the icon, which
+  // wasn't the ask -- the menu cog has zero chrome, not lighter chrome.
   private drawLegacySettingsCogControl(
     graphics: Phaser.GameObjects.Graphics,
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
     active = false
   ): void {
-    // sparkle: true -- matches the menu surface's header controls (no
-    // filled panel or stroked border, just the crystalline corner
-    // brackets); was built but never actually wired up anywhere until now.
-    this.drawLegacyHeaderControlChrome(
-      graphics,
-      rect,
-      active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,
-      active,
-      true
-    );
     this.drawLegacySettingsCog(graphics, rect, active);
-  }
-
-  private drawLegacyHeaderControlChrome(
-    graphics: Phaser.GameObjects.Graphics,
-    rect: Pick<LegacyHeaderControlFrame, 'height' | 'left' | 'top' | 'width'>,
-    accentColor: number,
-    active = false,
-    sparkle = false
-  ): void {
-    const radius = Math.min(8, Math.max(6, Math.round(Math.min(rect.width, rect.height) * 0.18)));
-    if (!sparkle) {
-      graphics.fillStyle(LEGACY_PLAY_HUD_TIMER_PANE, active ? 0.64 : 0.46);
-      graphics.fillRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
-      graphics.lineStyle(2, accentColor, active ? 0.96 : 0.86);
-      graphics.strokeRoundedRect(rect.left, rect.top, rect.width, rect.height, radius);
-      const notchWidth = Math.max(4, Math.round(rect.width * 0.13));
-      const notchHeight = Math.max(2, Math.round(rect.height * 0.07));
-      graphics.fillStyle(accentColor, active ? 0.88 : 0.62);
-      graphics.fillRect(rect.left + rect.width - notchWidth - 7, rect.top + 6, notchWidth, notchHeight);
-      graphics.lineStyle(1, 0xffffff, active ? 0.3 : 0.18);
-      graphics.lineBetween(
-        rect.left + 8,
-        rect.top + rect.height - 7,
-        rect.left + Math.round(rect.width * 0.42),
-        rect.top + rect.height - 7
-      );
-      return;
-    }
-    // Viewfinder-style corner brackets just outside the panel instead of a
-    // stroked border or the plain tech-panel notch -- ties this badge into
-    // the same crystalline/faceted visual family as the title wordmark and
-    // the Start button's facet glints, for the menu-surface header controls
-    // (LVL badge, AI badge, settings cog).
-    const gap = 3;
-    const facetSize = Math.max(4, Math.round(Math.min(rect.width, rect.height) * 0.22));
-    const corners: Array<[number, number, number, number]> = [
-      [rect.left, rect.top, -1, -1],
-      [rect.left + rect.width, rect.top, 1, -1],
-      [rect.left, rect.top + rect.height, -1, 1],
-      [rect.left + rect.width, rect.top + rect.height, 1, 1]
-    ];
-    graphics.lineStyle(1.4, accentColor, active ? 0.85 : 0.6);
-    for (const [cx, cy, ox, oy] of corners) {
-      const anchorX = cx + (ox * gap);
-      const anchorY = cy + (oy * gap);
-      graphics.beginPath();
-      graphics.moveTo(anchorX - (ox * facetSize), anchorY);
-      graphics.lineTo(anchorX, anchorY);
-      graphics.lineTo(anchorX, anchorY - (oy * facetSize));
-      graphics.strokePath();
-    }
-    graphics.fillStyle(0xffffff, active ? 0.32 : 0.2);
-    graphics.fillCircle(rect.left + Math.round(rect.width * 0.78), rect.top + Math.round(rect.height * 0.24), 1.4);
   }
 
   // A solid filled gear silhouette (fillPath over an alternating
