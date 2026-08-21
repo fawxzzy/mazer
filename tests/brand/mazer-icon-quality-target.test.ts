@@ -82,6 +82,15 @@ describe('Mazer icon-quality target', () => {
     expect(indexSource).toContain(MAZER_ICON_QUALITY_TARGET.canonicalAsset.publicUrl.replace('.png', '.ico'));
     expect(indexSource).toContain('/icons/apple-touch-icon.png');
     expect(indexSource).toContain('/manifest.webmanifest');
+    expect(indexSource).toContain('<meta property="og:title" content="Mazer" />');
+    expect(indexSource).toContain('<meta property="og:description" content="Mazer: a mobile-clean maze game built for browser and installable PWA play." />');
+    expect(indexSource).toContain('<meta property="og:url" content="https://mazer.fawxzzy.com/" />');
+    expect(indexSource).toContain('<meta property="og:image" content="https://mazer.fawxzzy.com/icons/mazer-app-icon.png" />');
+    expect(indexSource).toContain('<meta property="og:image:width" content="1024" />');
+    expect(indexSource).toContain('<meta property="og:image:height" content="1024" />');
+    expect(indexSource).toContain('<meta property="og:image:alt" content="Mazer app icon" />');
+    expect(indexSource).toContain('<meta name="twitter:card" content="summary_large_image" />');
+    expect(indexSource).toContain('<meta name="twitter:image" content="https://mazer.fawxzzy.com/icons/mazer-app-icon.png" />');
     expect(manifest.icons.map((icon) => icon.src)).toEqual([
       '/icons/icon-192.png',
       '/icons/icon-512.png',
