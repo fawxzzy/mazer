@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { resolveLegacyAuthPresentation } from '../../src/legacy-runtime/legacyAuthPresentation';
 
 describe('legacy auth presentation', () => {
-  test('gives a first-time player clear login labels without implying that guest play is blocked', () => {
+  test('gives a first-time player clear login labels with no descriptive copy on a fresh load', () => {
     expect(resolveLegacyAuthPresentation({
       mode: 'login',
       rememberedIdentity: null,
@@ -10,15 +10,15 @@ describe('legacy auth presentation', () => {
     })).toEqual(expect.objectContaining({
       alternateActionLabel: 'Create Account',
       emailLabel: 'Email',
-      helper: 'Sign in with the account you use for Mazer. Guest play is always available.',
+      helper: '',
       passwordLabel: 'Password',
       primaryActionLabel: 'Sign In',
       recoveryActionLabel: 'Forgot Password?',
-      title: 'Sign In'
+      title: 'Welcome'
     }));
   });
 
-  test('makes a remembered account explicit without echoing its email address into supporting copy', () => {
+  test('makes a remembered account explicit without echoing its email address or name into supporting copy', () => {
     const presentation = resolveLegacyAuthPresentation({
       mode: 'login',
       rememberedIdentity: {
@@ -31,8 +31,9 @@ describe('legacy auth presentation', () => {
     });
 
     expect(presentation.title).toBe('Welcome Back');
-    expect(presentation.helper).toBe('Welcome back, Maze Runner. Enter your password to continue.');
+    expect(presentation.helper).toBe('Continue with this account to log in.');
     expect(presentation.helper).not.toContain('runner@example.com');
+    expect(presentation.helper).not.toContain('Maze Runner');
   });
 
   test('explains a required reauthentication without implying that saved progress was lost', () => {
@@ -47,10 +48,10 @@ describe('legacy auth presentation', () => {
       snapshot: { configured: true, status: 'guest' }
     });
 
-    expect(presentation.title).toBe('Sign In Again');
-    expect(presentation.helper).toContain('restore your saved progress');
-    expect(presentation.helper).toContain('Forgot Password');
+    expect(presentation.title).toBe('Welcome');
+    expect(presentation.helper).toBe('Your session ended. Enter your password to continue.');
     expect(presentation.helper).not.toContain('runner@example.com');
+    expect(presentation.helper).not.toContain('Maze Runner');
   });
 
   test('presents an authenticated session as an account surface instead of a second sign-in form', () => {

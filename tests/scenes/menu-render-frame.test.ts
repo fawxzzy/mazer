@@ -1364,7 +1364,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.createLegacyAuthActionButton(');
     expect(menuSceneSource).toContain('presentation.primaryActionLabel');
     expect(menuSceneSource).toContain('presentation.recoveryActionLabel');
-    expect(menuSceneSource).toContain('const bottomStartY = rowY + (stacked ? 24 : 28);');
+    expect(menuSceneSource).toContain('this.createLegacyBottomActionBar(panel, stacked, {');
+    expect(menuSceneSource).toContain('private createAuthFooterLink(');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSubmit(): Promise<void>');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSignOut(): Promise<void>');
     expect(menuSceneSource).toContain('interface LegacyAuthActionDiagnostics');
@@ -1679,7 +1680,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("ease: 'Sine.easeInOut'");
     expect(menuSceneSource).toContain('this.syncLegacyAuthNativeInputValue();');
     expect(menuSceneSource).toContain('this.destroyLegacyAuthNativeInput();');
-    expect(menuSceneSource).toContain('const secondaryModeLabel = presentation.alternateActionLabel;');
+    expect(menuSceneSource).toContain('presentation.alternateActionLabel,');
     expect(menuSceneSource).not.toContain('Guest mode is active. Sign in to keep account progress separate.');
   });
 

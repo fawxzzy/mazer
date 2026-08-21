@@ -64,9 +64,13 @@ const resolveLegacyAuthPresentationState = ({
   return 'fresh-sign-in';
 };
 
+// Deliberately terse -- no descriptive/explanatory copy on a fresh load,
+// matching the Fitness app's own sign-in screen (a small wordmark, a short
+// generic headline, straight into the fields). A one-line helper only
+// appears for the handful of states where it's actually load-bearing
+// information the title alone can't carry.
 const resolveLegacyAuthTitleAndHelper = (
-  state: LegacyAuthPresentationState,
-  rememberedName: string
+  state: LegacyAuthPresentationState
 ): { helper: string; title: string } => {
   switch (state) {
     case 'authenticated':
@@ -74,22 +78,13 @@ const resolveLegacyAuthTitleAndHelper = (
     case 'account-unavailable':
       return { helper: LEGACY_AUTH_MESSAGE_COPY.authUnavailable, title: 'Account Unavailable' };
     case 'signup':
-      return { helper: 'Create a Mazer profile with your email and password.', title: 'Create Account' };
+      return { helper: '', title: 'Create Account' };
     case 'reauth-required':
-      return {
-        helper: `Welcome back, ${rememberedName}. Enter your password to restore your saved progress. If you need it, use Forgot Password.`,
-        title: 'Sign In Again'
-      };
+      return { helper: 'Your session ended. Enter your password to continue.', title: 'Welcome' };
     case 'remembered-identity':
-      return {
-        helper: `Welcome back, ${rememberedName}. Enter your password to continue.`,
-        title: 'Welcome Back'
-      };
+      return { helper: 'Continue with this account to log in.', title: 'Welcome Back' };
     case 'fresh-sign-in':
-      return {
-        helper: 'Sign in with the account you use for Mazer. Guest play is always available.',
-        title: 'Sign In'
-      };
+      return { helper: '', title: 'Welcome' };
     default:
       return state satisfies never;
   }
@@ -114,7 +109,7 @@ export const resolveLegacyAuthPresentation = (
     isSignup,
     requiresReauthentication
   });
-  const { helper, title } = resolveLegacyAuthTitleAndHelper(state, input.rememberedIdentity?.displayName ?? 'Player');
+  const { helper, title } = resolveLegacyAuthTitleAndHelper(state);
 
   return {
     alternateActionLabel: isSignup ? 'Use Sign In' : 'Create Account',

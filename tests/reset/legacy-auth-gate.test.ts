@@ -27,7 +27,7 @@ describe('legacy full auth gate', () => {
     // The back-chevron button itself isn't even created while locked, so
     // there's no visual affordance suggesting a way back exists.
     const authOverlayStart = menuSceneSource.indexOf('private buildAuthOverlay(): void {');
-    const authOverlaySnippet = menuSceneSource.slice(authOverlayStart, authOverlayStart + 800);
+    const authOverlaySnippet = menuSceneSource.slice(authOverlayStart, authOverlayStart + 1200);
     expect(authOverlaySnippet).toContain("if (!(this.authGateLocked && this.overlay === 'auth')) {");
   });
 
