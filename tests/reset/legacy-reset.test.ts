@@ -902,7 +902,6 @@ describe('legacy reset lane', () => {
     expect(pauseLifecycleSource).toContain("export type LegacyPauseCommand = 'reset-player' | 'return-menu' | 'resume' | 'reset-progression';");
     expect(pauseLifecycleSource).toContain('resolveLegacyPauseCommand');
     expect(menuSceneSource).toContain("this.applyLegacyPauseCommand('resume')");
-    expect(menuSceneSource).toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
     expect(menuSceneSource).toContain("const mainMenuAction = (): void => this.applyLegacyPauseCommand('return-menu');");
     expect(menuSceneSource).toContain('private applyLegacyPauseCommand(command: LegacyPauseCommand): void {');
     expect(menuSceneSource).toContain('const result = resolveLegacyPauseCommand(command, this.maze.start, this.trail);');

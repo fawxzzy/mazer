@@ -1083,8 +1083,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('event.target === this.game.canvas');
     expect(menuSceneSource).toContain('event.stopImmediatePropagation()');
     expect(menuSceneSource).toContain("case 'pause':");
-    expect(menuSceneSource).toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
-    expect(menuSceneSource).toContain("'Reset', resetAction");
+    // Reset (reset-player) was removed from the game entirely; the pause
+    // overlay's one remaining action row pairs Account with Menu instead.
+    expect(menuSceneSource).not.toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
+    expect(menuSceneSource).toContain("const accountAction = (): void => this.openOverlay('auth');");
+    expect(menuSceneSource).toContain("'Account', accountAction");
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
     expect(menuSceneSource).toContain('this.playDirectionalIntent.step(this.maze, this.player, {');

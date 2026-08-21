@@ -9402,12 +9402,13 @@ export class MenuScene extends Phaser.Scene {
     const actionButtonHeight = stacked ? cyberArcadeMaterial.controls.minimumTouchTarget : 48;
     const shell = resolveLegacyOverlayShellLayout({
       actionHeight: actionButtonHeight,
-      // Was 2 (Reset/Menu + Reset Progress) -- the menu's own settings
-      // overlay has always had an Account row that this one never did, so
-      // there was no way to reach account/sign-out from an active play
-      // session without fully exiting to the menu first. Third row reserves
-      // room for it below.
-      actionRows: 3,
+      // Down from 3 -- Reset (reset-player) was removed from the game
+      // entirely, and Reset Progress moved into the account screen with
+      // the rest of the account actions (it resets account-level
+      // progression, not just the current attempt, so it belongs there).
+      // Account now pairs with Menu in the one remaining row instead of
+      // getting its own row underneath.
+      actionRows: 1,
       hasMessage: hasOverlayMessage,
       panel
     });
@@ -9453,32 +9454,23 @@ export class MenuScene extends Phaser.Scene {
     });
     this.drawLegacyOverlayScrollFacade(scrollMetrics);
 
-    const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');
+    const accountAction = (): void => this.openOverlay('auth');
     const mainMenuAction = (): void => this.applyLegacyPauseCommand('return-menu');
-    const progressionResetAction = (): void => this.openOverlay('confirm-progression-reset');
 
     if (stacked) {
       const compactRow = resolveLegacyTwoUpButtonLayout(panel.centerX, panel.width, 128, 64, 14);
       this.uiButtons.push(
-        this.createButton(compactRow.leftX, actionY, compactRow.buttonWidth, actionButtonHeight, 'Reset', resetAction),
-        this.createButton(compactRow.rightX, actionY, compactRow.buttonWidth, actionButtonHeight, 'Menu', mainMenuAction),
-        this.createButton(panel.centerX, actionY - actionButtonHeight - 10, Math.min(232, panel.width - 72), actionButtonHeight, 'Reset Progress', progressionResetAction)
+        this.createButton(compactRow.leftX, actionY, compactRow.buttonWidth, actionButtonHeight, 'Account', accountAction, { labelRole: 'overlay-action' }),
+        this.createButton(compactRow.rightX, actionY, compactRow.buttonWidth, actionButtonHeight, 'Menu', mainMenuAction)
       );
-      this.createLegacyOptionsAccountActionRow(panel, {
-        contentCenterY: actionY - ((actionButtonHeight + 10) * 2)
-      });
       return;
     }
 
     const desktopRow = resolveLegacyTwoUpButtonLayout(panel.centerX, panel.width, 140, 72, 14);
     this.uiButtons.push(
-      this.createButton(desktopRow.leftX, actionY, desktopRow.buttonWidth, actionButtonHeight, 'Reset', resetAction),
-      this.createButton(desktopRow.rightX, actionY, desktopRow.buttonWidth, actionButtonHeight, 'Menu', mainMenuAction),
-      this.createButton(panel.centerX, actionY - actionButtonHeight - 14, Math.min(252, panel.width - 88), actionButtonHeight, 'Reset Progress', progressionResetAction)
+      this.createButton(desktopRow.leftX, actionY, desktopRow.buttonWidth, actionButtonHeight, 'Account', accountAction, { labelRole: 'overlay-action' }),
+      this.createButton(desktopRow.rightX, actionY, desktopRow.buttonWidth, actionButtonHeight, 'Menu', mainMenuAction)
     );
-    this.createLegacyOptionsAccountActionRow(panel, {
-      contentCenterY: actionY - ((actionButtonHeight + 14) * 2)
-    });
   }
 
   private buildProgressionResetConfirmationOverlay(): void {
@@ -9577,6 +9569,19 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.uiButtons.push(
+      // Reset Progress used to live in the play-mode pause overlay's action
+      // row; it's account-level data (resets the signed-in player's whole
+      // progression, not just the current attempt), so it belongs on the
+      // account screen with the rest of the account actions instead.
+      this.createLegacyAuthActionButton(
+        centerX,
+        panelBottom - (stacked ? 170 : 184),
+        buttonWidth,
+        buttonHeight,
+        'Reset Progress',
+        () => this.openOverlay('confirm-progression-reset'),
+        'danger'
+      ),
       this.createLegacyAuthActionButton(
         centerX,
         panelBottom - (stacked ? 116 : 126),
