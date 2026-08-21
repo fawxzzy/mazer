@@ -29,6 +29,26 @@ body {
   max-height: 100%;
 }
 
+/* Dynamic viewport units (dvh/dvw) track the browser's own live chrome
+   state (address bar, standalone-PWA status bar/home-indicator) natively --
+   window.innerHeight/visualViewport.height are the JS-measured approximation
+   viewportGeometry.ts falls back on and have historically under-reported
+   the true available height in iOS standalone PWA mode, leaving a real gap
+   of this same background color below the app. Same fix the Fitness app
+   shipped for the identical bug. Guarded behind @supports since dvh has no
+   effect in browsers that don't parse it (they keep the 100% rule above),
+   and documentElement.clientHeight -- what viewportGeometry.ts now prefers
+   -- naturally reflects whichever one actually applied.
+ */
+@supports (height: 100dvh) {
+  html,
+  body {
+    height: 100dvh;
+    min-height: 100dvh;
+    max-height: 100dvh;
+  }
+}
+
 #app {
   width: var(--mazer-viewport-width);
   height: var(--mazer-viewport-height);
