@@ -960,6 +960,11 @@ const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
 // region, and a tied/lower depth there is exactly what made the chevron
 // "difficult to click": nothing else should ever be able to out-rank it.
 const LEGACY_OVERLAY_BACK_CHEVRON_DEPTH = 1000;
+// Higher than literally everything else, including overlays -- the boot-
+// time loading screen (while the auth gate's first snapshot is still
+// unresolved) has to sit above the menu front door, since that content
+// keeps rendering underneath it rather than being suppressed.
+const LEGACY_AUTH_GATE_LOADING_DEPTH = 5000;
 // Extra forgiveness beyond the chevron's own drawn touch-target size when
 // resolving which hit box a tap belongs to first -- corner buttons are
 // statistically the hardest to land a precise tap on.
@@ -1171,6 +1176,30 @@ export class MenuScene extends Phaser.Scene {
   // but boot deferred that until the real auth session resolves instead of
   // racing it. Consumed once in applyLegacyAuthSnapshot.
   private pendingBootPlayStart = false;
+  // Full auth gate: nothing (menu or play) is reachable until the player is
+  // signed in. authGateAwaitingResolution covers the real async gap before
+  // the very first snapshot arrives (avoids a false "please sign in" flash
+  // for a returning player who actually has a valid session -- the default
+  // snapshot before that first resolution is 'guest', indistinguishable
+  // from a genuinely signed-out player without this flag). authGateLocked
+  // is the actual gate: true once resolved to signed-out AND the auth
+  // backend is configured at all -- if it isn't configured (local dev
+  // without real credentials, or a genuine backend outage), locking
+  // everyone out entirely would be worse than falling back to guest
+  // access, so that case is deliberately left ungated.
+  private authGateAwaitingResolution = true;
+  private authGateLocked = false;
+  private authGateGraphics!: Phaser.GameObjects.Graphics;
+  private authGateLoadingText!: Phaser.GameObjects.Text;
+  private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
+  // Same deferred-to-update() pattern as pendingBootPlayStart above, for
+  // the same reason -- applyLegacyAuthSnapshot can run synchronously mid-
+  // create() (the runtime auth fixture resolves immediately), before
+  // objects declared later in create() exist yet. Set here only ever
+  // assigns plain fields, never touches scene objects, so it's safe
+  // regardless of timing; the actual overlay/UI mutation happens once in
+  // update(), which is guaranteed to run only after create() has returned.
+  private pendingAuthGateTransition = false;
   private authForm: LegacyAuthFormState = createEmptyLegacyAuthFormState('login');
   private activeAuthField: LegacyAuthFieldId | null = null;
   private authNativeInput: HTMLInputElement | null = null;
@@ -1416,6 +1445,12 @@ export class MenuScene extends Phaser.Scene {
     this.titleGraphics = this.add.graphics();
     this.overlayGraphics = this.add.graphics();
     this.hudGraphics = this.add.graphics();
+    this.authGateGraphics = this.add.graphics();
+    this.authGateLoadingText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, 'Signing you in…', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '15px',
+      color: '#d7fff8'
+    })).setOrigin(0.5).setVisible(false).setDepth(LEGACY_AUTH_GATE_LOADING_DEPTH);
 
     this.footerText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
@@ -1694,11 +1729,32 @@ export class MenuScene extends Phaser.Scene {
   }
 
   public update(time: number, delta: number): void {
-    if (this.pendingBootPlayStart) {
+    if (this.pendingAuthGateTransition) {
+      this.pendingAuthGateTransition = false;
+      if (this.authGateLocked && this.overlay !== 'auth') {
+        this.overlay = 'auth';
+        this.uiDirty = true;
+        this.rebuildUi();
+      } else if (!this.authGateLocked && !this.authGateAwaitingResolution && this.overlay === 'auth') {
+        // Signed in successfully (or the gate was never actually locking,
+        // e.g. the auth backend isn't configured) -- if the auth overlay is
+        // still open because the gate put it there, let it close now that
+        // there's nothing left to gate on.
+        this.overlay = 'none';
+        this.uiDirty = true;
+        this.rebuildUi();
+      }
+    }
+    // pendingBootPlayStart intentionally stays pending (not cleared) until
+    // the auth gate has actually resolved and isn't locked -- a direct-to-
+    // play boot (e.g. the "Play Mazer" home-screen shortcut) while signed
+    // out should land in play mode once signed in, not before.
+    if (this.pendingBootPlayStart && !this.authGateAwaitingResolution && !this.authGateLocked) {
       this.pendingBootPlayStart = false;
       this.startPlayMode();
       this.rebuildUi();
     }
+    this.syncLegacyAuthGateLoadingScreen(time);
     this.recordRuntimeFrame(delta);
     this.updateStars(time, delta);
     this.expireLegacyPlayerMessages(time);
@@ -9520,7 +9576,12 @@ export class MenuScene extends Phaser.Scene {
     });
     let rowY = panel.top + (stacked ? 150 : 168);
 
-    this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
+    // No way out while the full auth gate has this locked -- handleBackAction
+    // already refuses to close it too (defense in depth for Escape), but
+    // the button itself shouldn't even suggest there's a way back.
+    if (!(this.authGateLocked && this.overlay === 'auth')) {
+      this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
+    }
     this.createOverlayTitle(presentation.title, panel.top + (stacked ? 46 : 54));
 
     const accountLabel = resolveLegacyAuthAccountLabel(this.authSnapshot);
@@ -11691,6 +11752,9 @@ export class MenuScene extends Phaser.Scene {
     const previousUserId = this.authSnapshot.userId;
 
     this.authSnapshot = snapshot;
+    this.authGateAwaitingResolution = false;
+    this.authGateLocked = snapshot.status === 'guest' && snapshot.configured === true;
+    this.pendingAuthGateTransition = true;
     const menuActionMode = snapshot.status === 'authenticated' ? 'authenticated' : 'guest';
     this.armLegacyAuthFeedbackMessage();
     if (snapshot.email !== null) {
@@ -12048,6 +12112,12 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleBackAction(): void {
+    // Full auth gate: no back-chevron, no Escape key, no route around this
+    // -- the account overlay can only close by actually signing in (see
+    // pendingAuthGateTransition in update()).
+    if (this.authGateLocked && this.overlay === 'auth') {
+      return;
+    }
     const action = resolveLegacyOverlayBackAction({
       mode: this.mode,
       overlay: this.overlay,
@@ -12064,6 +12134,58 @@ export class MenuScene extends Phaser.Scene {
         this.closeOverlay();
         return;
     }
+  }
+
+  // Covers the real gap before the very first auth snapshot arrives (see
+  // authGateAwaitingResolution's own comment for why that's tracked
+  // separately from authSnapshot.status itself). A full-screen, maximum-
+  // depth interactive rectangle blocks every click from reaching whatever
+  // the menu front door is doing underneath -- simplest way to guarantee
+  // nothing is reachable during this window without auditing every place
+  // create()'s own boot sequence might otherwise make a button clickable.
+  private syncLegacyAuthGateLoadingScreen(time: number): void {
+    if (!this.authGateAwaitingResolution) {
+      if (this.authGateLoadingBlocker !== null) {
+        this.authGateLoadingBlocker.destroy();
+        this.authGateLoadingBlocker = null;
+      }
+      this.authGateLoadingText.setVisible(false);
+      this.authGateGraphics.clear();
+      return;
+    }
+
+    const width = this.layout.width;
+    const height = this.layout.height;
+    if (this.authGateLoadingBlocker === null) {
+      this.authGateLoadingBlocker = this.add.rectangle(0, 0, width, height, 0x000000, 0.001).setOrigin(0, 0);
+      this.authGateLoadingBlocker.setInteractive();
+      this.authGateLoadingBlocker.setDepth(LEGACY_AUTH_GATE_LOADING_DEPTH);
+    } else {
+      this.authGateLoadingBlocker.setSize(width, height);
+    }
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+    this.authGateGraphics.clear();
+    this.authGateGraphics.setDepth(LEGACY_AUTH_GATE_LOADING_DEPTH - 1);
+    this.authGateGraphics.fillStyle(0x02080f, 0.96);
+    this.authGateGraphics.fillRect(0, 0, width, height);
+
+    const pulse = 0.5 + (0.5 * Math.sin(time / 420));
+    const radius = 16 + (pulse * 4);
+    this.authGateGraphics.fillStyle(cyberArcadeMaterial.signal.player, 0.82 + (pulse * 0.14));
+    this.authGateGraphics.beginPath();
+    this.authGateGraphics.moveTo(centerX, centerY - radius);
+    this.authGateGraphics.lineTo(centerX + radius, centerY);
+    this.authGateGraphics.lineTo(centerX, centerY + radius);
+    this.authGateGraphics.lineTo(centerX - radius, centerY);
+    this.authGateGraphics.closePath();
+    this.authGateGraphics.fillPath();
+    this.authGateGraphics.lineStyle(2, cyberArcadeMaterial.rail.cyan, 0.5 + (pulse * 0.3));
+    this.authGateGraphics.strokePath();
+
+    this.authGateLoadingText.setPosition(centerX, centerY + radius + 26);
+    this.authGateLoadingText.setVisible(true);
   }
 
   private resolveLegacyPlayTouchControlDiagnostics(): MenuSceneVisualDiagnostics['touchControls'] {
