@@ -5716,14 +5716,23 @@ export class MenuScene extends Phaser.Scene {
     boardTop: number,
     boardWidth: number,
     boardHeight: number,
-    tileSize: number
+    _tileSize: number
   ): number {
     const edgeInset = 2;
-    const oneTileWidth = Math.max(2, Math.round(tileSize));
-    const isPlaySurface = this.mode === 'play';
-    const resolveContinuation = (availableGap: number): number => (
-      isPlaySurface ? Math.min(oneTileWidth, Math.max(2, availableGap)) : Math.max(2, availableGap)
-    );
+    // Both surfaces are full-bleed now -- play's top HUD and (floating)
+    // touch controls float over the board exactly like menu's header/dock
+    // button do, rather than reserving fixed lanes the corridor needs to
+    // stop short of. This used to special-case play mode to stop at
+    // layout.lanes.hud/controls instead of the true screen edge, and cap
+    // the length at one tile -- but those lanes are constructed as
+    // "board edge + a few px", not "where a fixed control actually sits",
+    // so the cap always won trivially and left the corridor stopping only
+    // a handful of px past the board on play while menu's identical
+    // corridor reached the full remaining gap to the true edge. Dropping
+    // the play-only branch makes both surfaces resolve identically, which
+    // is what actually reaching the screen edge (and matching between
+    // menu and play) requires.
+    const resolveContinuation = (availableGap: number): number => Math.max(2, availableGap);
 
     if (direction === 'left') {
       return resolveContinuation(boardLeft - edgeInset);
@@ -5733,18 +5742,11 @@ export class MenuScene extends Phaser.Scene {
       return resolveContinuation((this.layout.width - edgeInset) - boardRight);
     }
     if (direction === 'top') {
-      const safeTop = isPlaySurface
-        ? Math.max(edgeInset, this.layout.lanes.hud?.bottom ?? edgeInset)
-        : edgeInset;
-      return resolveContinuation(boardTop - safeTop);
+      return resolveContinuation(boardTop - edgeInset);
     }
 
     const boardBottom = boardTop + boardHeight;
-    const safeBottomBoundary = isPlaySurface
-      ? (this.layout.lanes.controls?.top ?? this.layout.height - edgeInset)
-      : this.layout.height - edgeInset;
-    const safeBottom = Math.min(this.layout.height - edgeInset, safeBottomBoundary);
-    return resolveContinuation(safeBottom - boardBottom);
+    return resolveContinuation((this.layout.height - edgeInset) - boardBottom);
   }
 
   private drawLegacyPathBorderDock(
