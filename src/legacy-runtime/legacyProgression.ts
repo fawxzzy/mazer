@@ -1083,7 +1083,15 @@ const resolveLegacyProgressionTargetAdjustment = (
   trackId: LegacyProgressionTrackId = 'ai-runner'
 ): number => {
   if (trackId === 'player') {
-    return 4;
+    // A flat +4 here meant every single completed maze advanced exactly
+    // one level (resolveLegacyProgressionLevel buckets every 4 complexity
+    // points into one level) -- a perfectly linear ramp that never
+    // decelerated no matter how far the player got. Per feedback that
+    // difficulty climbs too fast: taper the per-completion gain down as
+    // level rises, so the first ~9 levels still feel snappy (unchanged
+    // pace) but later ones take progressively more completions to advance
+    // a single level, instead of always exactly one.
+    return clampInteger(4 - Math.floor(track.level / 10), 1, 4);
   }
 
   const nextSignals = appendLegacyProgressionSignal(track, signal);

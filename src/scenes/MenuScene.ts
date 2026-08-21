@@ -3246,8 +3246,10 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyPlayFloatingStickGeometry(
     origin: { x: number; y: number }
   ): NonNullable<ReturnType<typeof resolveTouchControlLayout>['stick']> {
+    // Shrunk from 0.34/128-220 -- per feedback the stick read as too big and
+    // visually obstructive sitting over the maze.
     const minDim = Math.max(1, Math.min(this.layout.width, this.layout.height));
-    const outerSize = clamp(Math.round(minDim * 0.34), 128, 220);
+    const outerSize = clamp(Math.round(minDim * 0.24), 92, 160);
     const innerSize = clamp(Math.round(outerSize * 0.34), 34, 54);
     const knobRadius = clamp(Math.round(outerSize * 0.075), 10, 16);
     const deadzoneRadius = Math.max(12, Math.round(outerSize * 0.12));
@@ -8662,9 +8664,11 @@ export class MenuScene extends Phaser.Scene {
     const centerY = stick.outer.centerY;
     const haloRadius = (stick.outer.width / 2) + Math.max(6, Math.round(stick.outer.width * 0.08));
     const pulled = pullVector !== null;
-    this.hudGraphics.fillStyle(glowColor, pulled ? 0.16 : 0.09);
+    // Lightened along with the size shrink above -- less visual weight
+    // sitting over the maze while idle, still brightens on an active pull.
+    this.hudGraphics.fillStyle(glowColor, pulled ? 0.12 : 0.06);
     this.hudGraphics.fillCircle(centerX, centerY, haloRadius);
-    this.hudGraphics.lineStyle(pulled ? 3 : 2, glowColor, pulled ? 0.55 : 0.3);
+    this.hudGraphics.lineStyle(pulled ? 2.5 : 1.5, glowColor, pulled ? 0.46 : 0.22);
     this.hudGraphics.strokeCircle(centerX, centerY, haloRadius);
   }
 
@@ -8692,11 +8696,14 @@ export class MenuScene extends Phaser.Scene {
       knobY += (vector.deltaY / length) * travel;
     }
 
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_BUTTON_FILL, 0.3);
+    // Fill and spokes lightened -- less visual weight sitting over the maze
+    // while idle; the stroke/knob (the parts that actually carry state)
+    // keep their original strength so legibility doesn't suffer.
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_BUTTON_FILL, 0.18);
     this.hudGraphics.fillCircle(centerX, centerY, outerRadius);
     this.hudGraphics.lineStyle(3, activeControl === null ? LEGACY_PLAY_TOUCH_BUTTON_STROKE : LEGACY_PLAY_TOUCH_ACCENT, activeControl === null ? 0.42 : 0.76);
     this.hudGraphics.strokeCircle(centerX, centerY, outerRadius);
-    this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ICON, 0.18);
+    this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ICON, 0.11);
     for (let index = 0; index < 8; index += 1) {
       const angle = (index / 8) * Math.PI * 2;
       this.hudGraphics.beginPath();
