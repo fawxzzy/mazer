@@ -296,8 +296,7 @@ import {
   resolveLegacyAuthFeedbackMessage,
   resolveLegacyAuthValidationMessage,
   type LegacyQueuedPlayerMessage,
-  type LegacyPlayerMessage,
-  type LegacyPlayerMessageTone
+  type LegacyPlayerMessage
 } from '../legacy-runtime/legacyPlayerMessage';
 import {
   hydrateLegacyRemoteAccountState,
@@ -9583,7 +9582,8 @@ export class MenuScene extends Phaser.Scene {
       rememberedIdentity: readLegacyRememberedIdentityState(this.resolveBrowserLocalStorage()),
       snapshot: this.authSnapshot
     });
-    let rowY = panel.top + (stacked ? 150 : 168);
+    const hasHelper = presentation.helper.length > 0;
+    let rowY = panel.top + (hasHelper ? (stacked ? 150 : 168) : (stacked ? 108 : 122));
 
     // No way out while the full auth gate has this locked -- handleBackAction
     // already refuses to close it too (defense in depth for Escape), but
@@ -9591,16 +9591,24 @@ export class MenuScene extends Phaser.Scene {
     if (!(this.authGateLocked && this.overlay === 'auth')) {
       this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
     }
-    this.createOverlayTitle(presentation.title, panel.top + (stacked ? 46 : 54));
+    this.createAuthWordmark(panel.top + (stacked ? 28 : 34));
+    this.createOverlayTitle(presentation.title, panel.top + (stacked ? 56 : 64));
 
     const accountLabel = resolveLegacyAuthAccountLabel(this.authSnapshot);
-    this.createAuthInfoText(
-      presentation.helper,
-      panel.top + (stacked ? 90 : 104),
-      panel,
-      '#b7f2ff',
-      stacked ? 13 : 15
-    );
+    // Fitness keeps this slot empty on a fresh sign-in/create-account load --
+    // no descriptive/explanatory copy at all, straight from the headline to
+    // the fields. Only specific states (remembered identity, reauth,
+    // account-unavailable, the authenticated account screen) carry a short
+    // one-line helper.
+    if (hasHelper) {
+      this.createAuthInfoText(
+        presentation.helper,
+        panel.top + (stacked ? 96 : 108),
+        panel,
+        '#b7f2ff',
+        stacked ? 13 : 15
+      );
+    }
 
     if (this.authSnapshot.status === 'authenticated') {
       this.buildAuthenticatedAccountSection(panel, stacked, rowY, accountLabel);
@@ -9994,8 +10002,6 @@ export class MenuScene extends Phaser.Scene {
   ): void {
     const fieldWidth = Math.min(panel.width - 56, stacked ? 330 : 420);
     const fieldHeight = stacked ? 48 : 52;
-    const buttonHeight = stacked ? 46 : 50;
-    const buttonWidth = Math.min(panel.width - 72, stacked ? 260 : 320);
     let rowY = startY;
 
     this.createAuthFieldBox(
@@ -10024,54 +10030,68 @@ export class MenuScene extends Phaser.Scene {
       rowY += stacked ? 66 : 72;
     }
 
-    const authMessage = this.resolveLegacyCurrentAuthMessage();
-    if (authMessage) {
-      this.createAuthInfoText(
-        authMessage.copy,
-        rowY + (stacked ? 14 : 16),
-        panel,
-        this.resolveLegacyAuthMessageColor(authMessage.tone),
-        stacked ? 13 : 14
+    // Footer links (mode switch, password reset) sit inline below the
+    // fields as small text -- not full-width buttons -- mirroring
+    // Fitness's AuthFooter. The one actual action (submit) lives in the
+    // bottom-pinned action bar below, matching Fitness's AuthDock instead
+    // of stacking three same-sized buttons in the form flow.
+    const footerY = rowY + (stacked ? 22 : 26);
+    this.createAuthFooterLink(
+      centerX,
+      footerY,
+      presentation.alternateActionLabel,
+      () => this.setLegacyAuthFormMode(this.authForm.mode === 'signup' ? 'login' : 'signup')
+    );
+    if (this.authForm.mode !== 'signup') {
+      this.createAuthFooterLink(
+        centerX,
+        footerY + (stacked ? 26 : 28),
+        presentation.recoveryActionLabel,
+        () => { void this.handleLegacyAuthPasswordReset(); }
       );
-      rowY += stacked ? 34 : 38;
     }
 
     const primaryLabel = this.authSubmitting
       ? 'Working'
       : presentation.primaryActionLabel;
-    const secondaryModeLabel = presentation.alternateActionLabel;
-    const bottomButtonGap = stacked ? 54 : 58;
-    const bottomStartY = rowY + (stacked ? 24 : 28);
+    this.createLegacyBottomActionBar(panel, stacked, {
+      onClick: () => { void this.handleLegacyAuthSubmit(); },
+      text: primaryLabel,
+      tone: 'primary'
+    });
+  }
 
-    this.uiButtons.push(
-      this.createLegacyAuthActionButton(
-        centerX,
-        bottomStartY,
-        buttonWidth,
-        buttonHeight,
-        primaryLabel,
-        () => { void this.handleLegacyAuthSubmit(); },
-        'primary'
-      ),
-      this.createLegacyAuthActionButton(
-        centerX,
-        bottomStartY + bottomButtonGap,
-        buttonWidth,
-        buttonHeight,
-        secondaryModeLabel,
-        () => this.setLegacyAuthFormMode(this.authForm.mode === 'signup' ? 'login' : 'signup'),
-        'secondary'
-      ),
-      this.createLegacyAuthActionButton(
-        centerX,
-        bottomStartY + (bottomButtonGap * 2),
-        buttonWidth,
-        buttonHeight,
-        presentation.recoveryActionLabel,
-        () => { void this.handleLegacyAuthPasswordReset(); },
-        'secondary'
-      )
-    );
+  private createAuthFooterLink(x: number, y: number, text: string, onClick: () => void): void {
+    const fontSize = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT ? 13 : 14;
+    const label = this.padLegacyCompactUiText(this.add.text(x, y, text, {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${fontSize}px`,
+      color: '#72e0bf'
+    })).setOrigin(0.5).setAlpha(0.82);
+    this.uiTexts.push(label);
+
+    const hitWidth = label.displayWidth + 24;
+    const hitHeight = label.displayHeight + 16;
+    const background = this.add.rectangle(x, y, hitWidth, hitHeight, 0x000000, 0.001);
+    background.setInteractive({ useHandCursor: true });
+    const setActive = (active: boolean): void => {
+      label.setAlpha(active ? 1 : 0.82);
+    };
+    background.on('pointerover', () => setActive(true));
+    background.on('pointerout', () => setActive(false));
+    background.on('pointerdown', onClick);
+
+    this.uiButtons.push({
+      background,
+      bounds: createVisualRect(x - (hitWidth / 2), y - (hitHeight / 2), hitWidth, hitHeight),
+      label,
+      setActive,
+      text,
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+      }
+    });
   }
 
   private resolveLegacyCurrentAuthMessage(): LegacyPlayerMessage | null {
@@ -10180,19 +10200,6 @@ export class MenuScene extends Phaser.Scene {
 
     if (expired) {
       this.markLegacyPlayerMessagesDirty();
-    }
-  }
-
-  private resolveLegacyAuthMessageColor(tone: LegacyPlayerMessageTone): string {
-    switch (tone) {
-      case 'error':
-        return '#ff9d9d';
-      case 'warning':
-        return '#ffd166';
-      case 'success':
-        return '#72e0bf';
-      default:
-        return '#b7f2ff';
     }
   }
 
@@ -11391,6 +11398,15 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.activeInputField = null;
+  }
+
+  private createAuthWordmark(y: number): void {
+    const label = this.padLegacyCompactUiText(this.add.text(this.layout.width / 2, y, 'MAZER', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '11px',
+      color: '#72e0bf'
+    })).setOrigin(0.5).setAlpha(0.85).setDepth(3);
+    this.uiTexts.push(label);
   }
 
   private createOverlayTitle(text: string, y: number): void {
