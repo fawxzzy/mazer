@@ -1379,7 +1379,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('authAction: this.latestAuthActionDiagnostics');
     expect(menuSceneSource).toContain('const shouldReturnToMainMenuAfterLogin = this.authForm.mode === \'login\'');
     expect(menuSceneSource).toContain('private closeLegacyAuthOverlayToMainMenu(): void');
-    expect(menuSceneSource).toContain("const isAuthenticated = this.authSnapshot.status === 'authenticated';");
+    expect(menuSceneSource).toContain('const playAccessAllowed = isLegacyPlayAccessAllowed(this.authSnapshot.status);');
+    expect(menuSceneSource).toContain('if (!playAccessAllowed) {');
+    expect(menuSceneSource).toContain('startLabel,\n              () => this.startPlayMode()');
     expect(menuSceneSource).toContain("menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest'");
     expect(menuSceneSource).toContain("const previousMenuActionMode = this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest';");
     expect(menuSceneSource).toContain("const menuActionMode = snapshot.status === 'authenticated' ? 'authenticated' : 'guest';");

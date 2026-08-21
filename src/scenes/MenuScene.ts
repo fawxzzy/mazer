@@ -287,6 +287,7 @@ import {
 } from '../legacy-runtime/legacyAuth';
 import { resolveLegacyAuthPresentation, type LegacyAuthPresentation } from '../legacy-runtime/legacyAuthPresentation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
+import { isLegacyPlayAccessAllowed } from '../legacy-runtime/legacyGuestAccess';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_REMOTE_MESSAGE_COPY,
@@ -1193,8 +1194,10 @@ export class MenuScene extends Phaser.Scene {
   // but boot deferred that until the real auth session resolves instead of
   // racing it. Consumed once in applyLegacyAuthSnapshot.
   private pendingBootPlayStart = false;
-  // Full auth gate: nothing (menu or play) is reachable until the player is
-  // signed in. authGateAwaitingResolution covers the real async gap before
+  // Auth gate state is retained for the eventual account-required product
+  // boundary. While local guest access is enabled, ordinary menu/play access
+  // stays available and the auth overlay remains an optional Account action.
+  // authGateAwaitingResolution covers the real async gap before
   // the very first snapshot arrives (avoids a false "please sign in" flash
   // for a returning player who actually has a valid session -- the default
   // snapshot before that first resolution is 'guest', indistinguishable
@@ -1723,7 +1726,7 @@ export class MenuScene extends Phaser.Scene {
       overlay: this.overlay
     };
 
-    if (this.authSnapshot.status !== 'authenticated') {
+    if (!isLegacyPlayAccessAllowed(this.authSnapshot.status)) {
       return {
         ...base,
         accepted: false,
@@ -8948,13 +8951,13 @@ export class MenuScene extends Phaser.Scene {
     if (this.overlay === 'none') {
       if (this.mode === 'menu') {
         const [startLabel] = MAIN_MENU_BUTTONS;
-        const isAuthenticated = this.authSnapshot.status === 'authenticated';
+        const playAccessAllowed = isLegacyPlayAccessAllowed(this.authSnapshot.status);
         // A normal compact button (the same width the row-of-three action
         // geometry already computes), not a full-width bottom-dock bar --
         // per feedback that the wide dock-style bar didn't work.
         const primaryButtonWidth = this.layout.centerButtonWidth;
 
-        if (!isAuthenticated) {
+        if (!playAccessAllowed) {
           this.uiButtons.push(
             this.createButton(
               this.layout.centerButtonX,
@@ -12415,7 +12418,7 @@ export class MenuScene extends Phaser.Scene {
 
     this.authSnapshot = snapshot;
     this.authGateAwaitingResolution = false;
-    this.authGateLocked = snapshot.status === 'guest' && snapshot.configured === true;
+    this.authGateLocked = !isLegacyPlayAccessAllowed(snapshot.status);
     this.pendingAuthGateTransition = true;
     const menuActionMode = snapshot.status === 'authenticated' ? 'authenticated' : 'guest';
     this.armLegacyAuthFeedbackMessage();

@@ -1,34 +1,22 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
+import {
+  LEGACY_GUEST_PLAY_ACCESS_ENABLED,
+  isLegacyPlayAccessAllowed
+} from '../../src/legacy-runtime/legacyGuestAccess';
 
 describe('legacy full auth gate', () => {
-  test('locks the account overlay open until signed in, with no way to back out of it', () => {
+  test('keeps the existing local guest scope playable while account access is optional', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    // authGateLocked is only ever true for a resolved, genuinely signed-out
-    // player on a configured auth backend -- never while still awaiting the
-    // first snapshot, and never when the backend itself isn't configured
-    // (an outage or missing local-dev credentials must fall back to guest
-    // access, not lock everyone out entirely).
-    expect(menuSceneSource).toContain("this.authGateLocked = snapshot.status === 'guest' && snapshot.configured === true;");
-    expect(menuSceneSource).toContain('this.authGateAwaitingResolution = false;');
-    expect(menuSceneSource).toContain('this.pendingAuthGateTransition = true;');
-
-    // handleBackAction is the single choke point both the back-chevron
-    // button and the Escape key route through -- guarding it there covers
-    // both without needing to special-case each caller.
-    const backActionStart = menuSceneSource.indexOf('private handleBackAction(): void {');
-    const backActionEnd = menuSceneSource.indexOf('\n  }', backActionStart);
-    const backActionSource = menuSceneSource.slice(backActionStart, backActionEnd);
-    expect(backActionSource).toContain("if (this.authGateLocked && this.overlay === 'auth') {");
-    expect(backActionSource).toContain('return;');
-
-    // The back-chevron button itself isn't even created while locked, so
-    // there's no visual affordance suggesting a way back exists.
-    const authOverlayStart = menuSceneSource.indexOf('private buildAuthOverlay(): void {');
-    const authOverlaySnippet = menuSceneSource.slice(authOverlayStart, authOverlayStart + 1200);
-    expect(authOverlaySnippet).toContain("if (!(this.authGateLocked && this.overlay === 'auth')) {");
+    expect(LEGACY_GUEST_PLAY_ACCESS_ENABLED).toBe(true);
+    expect(isLegacyPlayAccessAllowed('guest')).toBe(true);
+    expect(isLegacyPlayAccessAllowed('unavailable')).toBe(true);
+    expect(isLegacyPlayAccessAllowed('authenticated')).toBe(true);
+    expect(menuSceneSource).toContain('this.authGateLocked = !isLegacyPlayAccessAllowed(snapshot.status);');
+    expect(menuSceneSource).toContain('const playAccessAllowed = isLegacyPlayAccessAllowed(this.authSnapshot.status);');
+    expect(menuSceneSource).toContain('if (!isLegacyPlayAccessAllowed(this.authSnapshot.status)) {');
   });
 
   test('a direct-to-play boot waits for the gate to actually clear before starting play mode', () => {
