@@ -8069,32 +8069,6 @@ export class MenuScene extends Phaser.Scene {
     graphics.fillCircle(centerX - (maxRadius * 0.14), centerY - (maxRadius * 0.14), maxRadius * 0.13);
   }
 
-  // The Guide legend's Start/Exit swatches have no real board tile behind
-  // them (they're standalone icons in a settings panel), so they still get
-  // the full colored-in-tile treatment -- same flat fill + rim as any
-  // corridor tile (drawLegacyPathTileFacet), just in the marker's accent
-  // color, so the swatch itself is legible without anything underneath it.
-  private drawLegacyEndpointMarker(
-    graphics: Phaser.GameObjects.Graphics,
-    tileRect: LegacyPixelTileRect,
-    alpha: number,
-    kind: 'start' | 'goal'
-  ): void {
-    const coreColor = kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_CORE : LEGACY_PLAY_START_MARKER_CORE;
-    // LEGACY_PLAY_START/GOAL_MARKER_EDGE are literally the same value as
-    // their own core color (semantic.reward/semantic.danger have no
-    // separate "edge" tone), so using them as the rim color drew a same-
-    // color-on-same-color outline with zero contrast -- the marker read as
-    // a flat, undefined blob instead of a lit tile like the rest of the
-    // board. A bright white rim (the same tone the catchlight sparkles use
-    // elsewhere) gives it real glow definition against either color.
-    const rimColor = cyberArcadeMaterial.rail.white;
-
-    graphics.fillStyle(coreColor, alpha);
-    graphics.fillRect(tileRect.left, tileRect.top, tileRect.width, tileRect.height);
-    this.drawLegacyPathTileFacet(graphics, tileRect, alpha, rimColor, false, false, false, false);
-  }
-
   // A small bright arc on the upper-left of a circular shape, as if a
   // single light source were catching a cut facet -- same "light hits one
   // corner" convention as drawLegacyPathTileFacet, for the round settings
@@ -9517,7 +9491,13 @@ export class MenuScene extends Phaser.Scene {
       this.drawLegacyOptionsGuideMoveGlyph(graphics, centerX, centerY, size);
       return;
     }
-    this.drawLegacyEndpointMarker(
+    // Was drawLegacyEndpointMarker -- a flat colored-in tile, a completely
+    // different shape from the soft circular glow the real start/goal
+    // markers actually render as in game (drawLegacyEndpointGlow). Per
+    // feedback that the Guide's icons don't match what the app actually
+    // shows: use the exact same glow now, so the legend always reflects
+    // reality and future changes to the real marker auto-propagate here.
+    this.drawLegacyEndpointGlow(
       graphics,
       { height: size * 2, left: centerX - size, top: centerY - size, width: size * 2 },
       0.94,
@@ -9525,37 +9505,30 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
-  // A small 4-way arrow cross for the Guide card's "Move" row -- distinct
-  // from the compass/endpoint glyphs and legible at legend-row scale
-  // without borrowing the full HUD directional-arrow geometry.
+  // A miniature version of the real floating movement stick (ring + knob,
+  // same color language as drawLegacyPlayTouchStick) instead of a bespoke
+  // arrow-cross glyph that looked nothing like the actual on-screen
+  // control -- same "Guide should reflect reality" fix as the start/goal
+  // glow above. Genuinely re-rendering the real stick at legend-icon scale
+  // isn't practical (its own geometry is derived from the live viewport
+  // size, not a size parameter), so this hand-draws the same shape/colors
+  // at the small scale instead of sharing the draw call directly.
   private drawLegacyOptionsGuideMoveGlyph(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
     centerY: number,
     size: number
   ): void {
-    const armLength = size * 0.72;
-    const headSize = size * 0.26;
-    const arms: Array<[number, number]> = [[0, -1], [0, 1], [-1, 0], [1, 0]];
-    graphics.lineStyle(Math.max(1.2, size * 0.11), cyberArcadeMaterial.rail.mint, 0.92);
-    for (const [dx, dy] of arms) {
-      const tipX = centerX + (dx * armLength);
-      const tipY = centerY + (dy * armLength);
-      graphics.beginPath();
-      graphics.moveTo(centerX, centerY);
-      graphics.lineTo(tipX, tipY);
-      graphics.strokePath();
-      const perpX = -dy;
-      const perpY = dx;
-      graphics.fillStyle(cyberArcadeMaterial.rail.mint, 0.92);
-      graphics.fillTriangle(
-        tipX + (dx * headSize), tipY + (dy * headSize),
-        tipX - (dx * headSize * 0.2) + (perpX * headSize), tipY - (dy * headSize * 0.2) + (perpY * headSize),
-        tipX - (dx * headSize * 0.2) - (perpX * headSize), tipY - (dy * headSize * 0.2) - (perpY * headSize)
-      );
-    }
-    graphics.fillStyle(0x03070b, 0.85);
-    graphics.fillCircle(centerX, centerY, Math.max(1.5, size * 0.14));
+    const outerRadius = size * 0.86;
+    const knobRadius = size * 0.34;
+    graphics.fillStyle(LEGACY_PLAY_TOUCH_BUTTON_FILL, 0.28);
+    graphics.fillCircle(centerX, centerY, outerRadius);
+    graphics.lineStyle(Math.max(1, size * 0.1), LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.55);
+    graphics.strokeCircle(centerX, centerY, outerRadius);
+    graphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.38);
+    graphics.fillCircle(centerX, centerY, knobRadius);
+    graphics.lineStyle(Math.max(1, size * 0.08), LEGACY_PLAY_TOUCH_ICON, 0.72);
+    graphics.strokeCircle(centerX, centerY, knobRadius);
   }
 
   private createLegacyOptionsAccountActionRow(
