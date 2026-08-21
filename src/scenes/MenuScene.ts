@@ -1227,6 +1227,16 @@ export class MenuScene extends Phaser.Scene {
   private authAccountHydrationSequence = 0;
   private authSubmitting = false;
   private authSubmitAttemptId = 0;
+  // Check-only (never auto-saves -- there's no account to save to yet
+  // until sign-up actually succeeds). A signup with a checked-available
+  // username saves it right after account creation in
+  // applyLegacyAuthSubmitResult; anything else (empty, unchecked, taken,
+  // invalid) is silently skipped and can be set later from the account
+  // screen instead.
+  private authUsernameStatus: 'available' | 'checking' | 'error' | 'idle' | 'taken' = 'idle';
+  private authUsernameStatusMessage: string | null = null;
+  private authUsernameSequence = 0;
+  private authUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   // Deliberately NOT part of authForm/LegacyAuthFieldId -- that state
   // machine is scoped to the signed-out sign-in/sign-up credential form
   // (its Enter key submits sign-in, its fields reset on sign-in/out). The
@@ -10104,6 +10114,32 @@ export class MenuScene extends Phaser.Scene {
         this.authForm.displayName.length === 0
       );
       rowY += stacked ? 66 : 72;
+
+      this.createAuthFieldBox(
+        centerX,
+        rowY,
+        fieldWidth,
+        fieldHeight,
+        'username',
+        this.authForm.username || 'Username (optional)',
+        this.authForm.username.length === 0
+      );
+      const usernameStatusText = this.resolveAuthUsernameStatusText();
+      if (usernameStatusText) {
+        const statusColor = this.authUsernameStatus === 'available'
+          ? '#72e0bf'
+          : this.authUsernameStatus === 'taken' || this.authUsernameStatus === 'error'
+            ? '#ff9d9d'
+            : '#7894a0';
+        this.createAuthInfoText(
+          usernameStatusText,
+          rowY + (fieldHeight / 2) + 14,
+          panel,
+          statusColor,
+          stacked ? 11 : 12
+        );
+      }
+      rowY += stacked ? 66 : 72;
     }
 
     // Footer links (mode switch, password reset) sit inline below the
@@ -10478,7 +10514,9 @@ export class MenuScene extends Phaser.Scene {
       ? 'DISPLAY NAME'
       : fieldId === 'password'
         ? 'PASSWORD'
-        : 'EMAIL';
+        : fieldId === 'username'
+          ? 'USERNAME'
+          : 'EMAIL';
     const hasPasswordToggle = fieldId === 'password';
     const contentLeft = x - (width / 2) + 16;
     const contentRightInset = hasPasswordToggle ? 54 : 16;
@@ -11098,10 +11136,10 @@ export class MenuScene extends Phaser.Scene {
     this.destroyLegacyAuthNativeInput();
     const input = document.createElement('input');
     input.type = fieldId === 'password' ? 'password' : fieldId === 'email' ? 'email' : 'text';
-    input.autocomplete = fieldId === 'password' ? 'current-password' : fieldId === 'email' ? 'email' : 'name';
+    input.autocomplete = fieldId === 'password' ? 'current-password' : fieldId === 'email' ? 'email' : fieldId === 'username' ? 'username' : 'name';
     input.inputMode = fieldId === 'email' ? 'email' : 'text';
     input.enterKeyHint = fieldId === 'password' ? 'done' : 'next';
-    input.autocapitalize = fieldId === 'email' || fieldId === 'password' ? 'none' : 'words';
+    input.autocapitalize = fieldId === 'displayName' ? 'words' : 'none';
     input.spellcheck = false;
     input.setAttribute('aria-label', fieldId === 'displayName' ? 'display name' : fieldId);
     input.setAttribute('data-mazer-auth-input', fieldId);
@@ -11131,6 +11169,9 @@ export class MenuScene extends Phaser.Scene {
       };
       this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
       this.clearQueuedLegacyPlayerMessagesBySource('auth');
+      if (fieldId === 'username') {
+        this.scheduleAuthUsernameEvaluation();
+      }
       this.uiDirty = true;
     };
     this.authNativeKeyDownHandler = (event: KeyboardEvent) => {
@@ -11235,7 +11276,7 @@ export class MenuScene extends Phaser.Scene {
 
   private selectNextLegacyAuthField(direction: -1 | 1): void {
     const fields: LegacyAuthFieldId[] = this.authForm.mode === 'signup'
-      ? ['email', 'password', 'displayName']
+      ? ['email', 'password', 'displayName', 'username']
       : ['email', 'password'];
     const currentIndex = Math.max(0, fields.indexOf(this.activeAuthField ?? 'email'));
     const nextIndex = (currentIndex + direction + fields.length) % fields.length;
@@ -11250,7 +11291,8 @@ export class MenuScene extends Phaser.Scene {
     const maxLengthByField: Record<LegacyAuthFieldId, number> = {
       displayName: 32,
       email: 96,
-      password: 72
+      password: 72,
+      username: 15
     };
     const nextValue = update(this.authForm[fieldId]).slice(0, maxLengthByField[fieldId]);
     this.authForm = {
@@ -11267,17 +11309,98 @@ export class MenuScene extends Phaser.Scene {
     };
     this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
     this.clearQueuedLegacyPlayerMessagesBySource('auth');
+    if (fieldId === 'username') {
+      this.scheduleAuthUsernameEvaluation();
+    }
     this.uiDirty = true;
+  }
+
+  private scheduleAuthUsernameEvaluation(): void {
+    if (this.authUsernameDebounceTimer !== null) {
+      clearTimeout(this.authUsernameDebounceTimer);
+      this.authUsernameDebounceTimer = null;
+    }
+    this.authUsernameSequence += 1;
+    const sequence = this.authUsernameSequence;
+
+    const candidate = this.authForm.username.trim();
+    if (candidate.length === 0) {
+      this.authUsernameStatus = 'idle';
+      this.authUsernameStatusMessage = null;
+      this.uiDirty = true;
+      return;
+    }
+
+    if (!LEGACY_USERNAME_PATTERN.test(candidate)) {
+      this.authUsernameStatus = 'error';
+      this.authUsernameStatusMessage = '2-15 characters: letters, numbers, periods, underscores, or hyphens.';
+      this.uiDirty = true;
+      return;
+    }
+
+    this.authUsernameStatus = 'checking';
+    this.authUsernameStatusMessage = null;
+    this.uiDirty = true;
+
+    this.authUsernameDebounceTimer = setTimeout(() => {
+      this.authUsernameDebounceTimer = null;
+      void this.evaluateAuthUsername(candidate, sequence);
+    }, 700);
+  }
+
+  private async evaluateAuthUsername(candidate: string, sequence: number): Promise<void> {
+    const availability = await checkLegacyUsernameAvailable(candidate);
+    if (sequence !== this.authUsernameSequence) {
+      return;
+    }
+
+    if (availability.error) {
+      this.authUsernameStatus = 'error';
+      this.authUsernameStatusMessage = 'Could not check that username right now.';
+      this.uiDirty = true;
+      return;
+    }
+
+    this.authUsernameStatus = availability.available === false ? 'taken' : 'available';
+    this.authUsernameStatusMessage = availability.available === false ? 'That username is already taken.' : null;
+    this.uiDirty = true;
+  }
+
+  private resolveAuthUsernameStatusText(): string | null {
+    switch (this.authUsernameStatus) {
+      case 'checking':
+        return 'Checking availability...';
+      case 'available':
+        return 'Username available.';
+      case 'taken':
+        return this.authUsernameStatusMessage ?? 'That username is already taken.';
+      case 'error':
+        return this.authUsernameStatusMessage ?? 'Something went wrong.';
+      default:
+        return null;
+    }
+  }
+
+  private resetAuthUsernameEvaluation(): void {
+    if (this.authUsernameDebounceTimer !== null) {
+      clearTimeout(this.authUsernameDebounceTimer);
+      this.authUsernameDebounceTimer = null;
+    }
+    this.authUsernameSequence += 1;
+    this.authUsernameStatus = 'idle';
+    this.authUsernameStatusMessage = null;
   }
 
   private setLegacyAuthFormMode(mode: LegacyAuthFormState['mode']): void {
     this.authForm = {
       ...this.authForm,
-      mode
+      mode,
+      username: ''
     };
     this.authPasswordVisible = false;
     this.activeAuthField = this.authForm.email.length > 0 ? 'password' : 'email';
     this.destroyLegacyAuthNativeInput();
+    this.resetAuthUsernameEvaluation();
     this.authSnapshot = {
       ...this.authSnapshot,
       error: null,
@@ -11409,6 +11532,29 @@ export class MenuScene extends Phaser.Scene {
     });
     const shouldReturnToMainMenuAfterLogin = this.authForm.mode === 'login'
       && result.snapshot.status === 'authenticated';
+    // A confirmed-available username typed during signup only ever gets
+    // this far as a checked candidate, never auto-saved (there was no
+    // account to save it to until this exact result came back) -- now
+    // that one exists, save it. Anything else (empty, unchecked, taken,
+    // invalid) is silently skipped; it can still be set later from the
+    // account screen.
+    if (
+      this.authForm.mode === 'signup'
+      && result.snapshot.status === 'authenticated'
+      && result.snapshot.userId
+      && this.authUsernameStatus === 'available'
+    ) {
+      const usernameToSave = this.authForm.username.trim();
+      void saveLegacyAccountUsername(result.snapshot.userId, usernameToSave).then((saveResult) => {
+        if (saveResult.ok) {
+          this.accountUsernameDraft = usernameToSave;
+          this.accountUsernameSavedValue = usernameToSave;
+          this.accountUsernameLoadedForUserId = result.snapshot.userId;
+          this.uiDirty = true;
+        }
+      });
+    }
+    this.resetAuthUsernameEvaluation();
     this.applyLegacyAuthSnapshot(result.snapshot);
     if (shouldReturnToMainMenuAfterLogin) {
       this.closeLegacyAuthOverlayToMainMenu();
