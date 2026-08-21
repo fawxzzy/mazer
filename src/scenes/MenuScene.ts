@@ -6571,14 +6571,6 @@ export class MenuScene extends Phaser.Scene {
         alpha,
         facing
       );
-      this.titleGraphics.lineStyle(1, LEGACY_MENU_PATH_TITLE_PRISM, alpha * 0.32);
-      this.strokeLegacyPolyline(this.titleGraphics, [
-        { x, y },
-        {
-          x: x + ((orbitGeometry.centerX - x) * 0.12),
-          y: y + ((orbitGeometry.centerY - y) * 0.12)
-        }
-      ]);
     }
   }
 
@@ -7012,6 +7004,17 @@ export class MenuScene extends Phaser.Scene {
       if (!point) {
         continue;
       }
+      // Never color the start/goal tiles or whichever tile the player is
+      // currently standing on -- the start/goal markers already draw their
+      // own glow on top (a trail fill underneath just muddies it), and
+      // leaving the player's own tile uncolored reads as "you are here"
+      // more clearly than a solid trail-colored square the marker sits on.
+      const isStartTile = point.x === this.maze.start.x && point.y === this.maze.start.y;
+      const isGoalTile = point.x === this.maze.goal.x && point.y === this.maze.goal.y;
+      const isCurrentPlayerTile = point.x === renderedPlayerPoint.x && point.y === renderedPlayerPoint.y;
+      if (isStartTile || isGoalTile || isCurrentPlayerTile) {
+        continue;
+      }
 
       const shouldFadeTrailByAge = this.mode === 'play' || this.settings.toggleTrailFade;
       const alpha = shouldFadeTrailByAge
@@ -7039,8 +7042,7 @@ export class MenuScene extends Phaser.Scene {
           mazeLeft,
           mazeTop,
           mazeTileSize,
-          resolvedTrailAlpha,
-          dynamicTrailPathSource
+          resolvedTrailAlpha
         );
         this.drawLegacyDynamicTrailBorderDock(
           point,
@@ -7067,8 +7069,7 @@ export class MenuScene extends Phaser.Scene {
           mazeLeft,
           mazeTop,
           mazeTileSize,
-          resolvedTrailAlpha,
-          dynamicTrailPathSource
+          resolvedTrailAlpha
         );
         this.drawLegacyDynamicTrailBorderDock(
           point,
@@ -7621,26 +7622,59 @@ export class MenuScene extends Phaser.Scene {
     return new Phaser.Math.Vector2(0, 0);
   }
 
+  // The trail used to fill the whole tile (drawLegacyPathMaterialTile, the
+  // same connectivity-aware material every corridor tile uses); it now
+  // draws a diamond in the tile's center instead, matching the player
+  // marker's own shape/size (fillLegacyPlayerMarkerTile) at each surface's
+  // own radius ratio -- reads as "the player's own mark left behind" rather
+  // than a flat color wash. No corridor-connectivity framing is needed for
+  // a fixed-size centered shape, so this doesn't touch pathSource at all.
+  private drawLegacyTrailDiamond(
+    graphics: Phaser.GameObjects.Graphics,
+    point: LegacyPoint,
+    originX: number,
+    originY: number,
+    tileSize: number,
+    coreColor: number,
+    coreAlpha: number,
+    edgeColor: number,
+    edgeAlpha: number,
+    radiusRatio: number
+  ): void {
+    const centerX = originX + ((point.x + 0.5) * tileSize);
+    const centerY = originY + ((point.y + 0.5) * tileSize);
+    const radius = Math.max(1, tileSize * radiusRatio);
+    graphics.fillStyle(coreColor, coreAlpha);
+    graphics.beginPath();
+    graphics.moveTo(centerX, centerY - radius);
+    graphics.lineTo(centerX + radius, centerY);
+    graphics.lineTo(centerX, centerY + radius);
+    graphics.lineTo(centerX - radius, centerY);
+    graphics.closePath();
+    graphics.fillPath();
+    graphics.lineStyle(Math.max(1, radius * 0.16), edgeColor, edgeAlpha);
+    graphics.strokePath();
+  }
+
   private fillLegacyMenuDynamicPathTile(
     point: LegacyPoint,
     color: number,
     originX: number,
     originY: number,
     tileSize: number,
-    alpha: number,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>
+    alpha: number
   ): void {
-    this.fillLegacyDynamicPathTile(
+    this.drawLegacyTrailDiamond(
+      this.boardDynamicGraphics,
       point,
-      color,
       originX,
       originY,
       tileSize,
-      alpha,
-      pathSource,
+      color,
+      Math.min(0.92, 0.92 * alpha),
       LEGACY_MENU_PATH_EDGE,
-      LEGACY_MENU_PATH_EDGE_ALPHA,
-      0.92
+      Math.min(LEGACY_MENU_PATH_EDGE_ALPHA, LEGACY_MENU_PATH_EDGE_ALPHA * alpha),
+      LEGACY_PLAYER_MARKER_RADIUS_RATIO
     );
   }
 
@@ -7767,20 +7801,19 @@ export class MenuScene extends Phaser.Scene {
     originX: number,
     originY: number,
     tileSize: number,
-    alpha: number,
-    pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>
+    alpha: number
   ): void {
-    this.fillLegacyDynamicPathTile(
+    this.drawLegacyTrailDiamond(
+      this.boardDynamicGraphics,
       point,
-      color,
       originX,
       originY,
       tileSize,
-      alpha,
-      pathSource,
+      color,
+      Math.min(0.96, 0.96 * alpha),
       LEGACY_PLAY_PATH_EDGE,
-      LEGACY_PLAY_PATH_EDGE_ALPHA,
-      0.96
+      Math.min(LEGACY_PLAY_PATH_EDGE_ALPHA, LEGACY_PLAY_PATH_EDGE_ALPHA * alpha),
+      LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO
     );
   }
 

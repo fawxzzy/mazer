@@ -111,12 +111,24 @@ export const resolveLegacyIridescentMidnightColor = (
   );
 };
 
+// The trail now carries the midnight-rainbow material that used to belong
+// to the player marker (see resolveLegacyIridescentPlayerCoreColor below --
+// the two were swapped per feedback). Position along the trail spreads the
+// cycle across LEGACY_TRAIL_IRIDESCENT_SPREAD of a full rotation on top of
+// the same time-based shift, so it reads as a single rainbow gradient
+// slowly flowing along the trail rather than every tile flashing the same
+// color in lockstep.
+const LEGACY_TRAIL_IRIDESCENT_SPREAD = 0.6;
+
 export const resolveLegacyIridescentTrailColor = (
-  _index: number,
-  _total: number,
-  _timeMs: number,
+  index: number,
+  total: number,
+  timeMs: number,
   _anchorColor: number = LEGACY_IRIDESCENT_GREEN_ANCHOR
-): number => LEGACY_IRIDESCENT_GREEN_ANCHOR;
+): number => {
+  const positionPhase = total > 1 ? (index / (total - 1)) * LEGACY_TRAIL_IRIDESCENT_SPREAD : 0;
+  return resolveLegacyIridescentMidnightColor((timeMs / LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS) + positionPhase);
+};
 
 export const resolveLegacyIridescentPulseColor = (
   _index: number,
@@ -130,17 +142,19 @@ export const resolveLegacyIridescentPlayerHaloColor = (
   _anchorColor: number = cyberArcadeMaterial.signal.playerHalo
 ): number => cyberArcadeMaterial.signal.playerHalo;
 
-// Cycles the player's own diamond core through the midnight-rainbow stops
-// continuously over time -- a "Terraria Midnight Rainbow dye" effect for the
-// player marker instead of a fixed color.
+// The player's own diamond core is the flat green anchor now -- the
+// midnight-rainbow material it used to cycle through moved to the trail
+// instead (see resolveLegacyIridescentTrailColor above; the two were
+// swapped per feedback so the player reads as a single, stable, always-
+// identifiable color while the trail carries the rainbow shimmer).
 export const resolveLegacyIridescentPlayerCoreColor = (
-  timeMs = 0
-): number => resolveLegacyIridescentMidnightColor(timeMs / LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS);
+  _timeMs = 0
+): number => LEGACY_IRIDESCENT_GREEN_ANCHOR;
 
-// The core's outline/accent rides the same cycle a quarter-phase ahead, so
-// the two rims of the diamond are always two adjacent hues rather than a
-// single flat color -- a subtle shimmer instead of a plain solid shift.
+// A slightly darker rim of the same green, for a hint of facet depth
+// between the core fill and its outline -- no more animated phase shift
+// now that the core itself is flat, not cycling.
 export const resolveLegacyIridescentPlayerAccentColor = (
-  timeMs: number,
-  _anchorColor: number = LEGACY_IRIDESCENT_GREEN_ANCHOR
-): number => resolveLegacyIridescentMidnightColor((timeMs / LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS) + 0.25);
+  _timeMs: number,
+  anchorColor: number = LEGACY_IRIDESCENT_GREEN_ANCHOR
+): number => mixLegacyIridescentColor(anchorColor, 0x000000, 0.25);
