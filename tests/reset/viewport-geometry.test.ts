@@ -306,6 +306,11 @@ describe('Mazer viewport geometry', () => {
 
     observed.runtime.innerWidth = 1440;
     observed.runtime.innerHeight = 900;
+    // documentElement.clientWidth/Height are the primary size source now
+    // (see viewportGeometry.ts) -- a real browser always keeps these in
+    // sync with innerWidth/Height on resize, so the fixture must too.
+    observed.runtime.document.documentElement.clientWidth = 1440;
+    observed.runtime.document.documentElement.clientHeight = 900;
     observed.runtime.visualViewport.width = 1440;
     observed.runtime.visualViewport.height = 900;
     observed.runtime.visualViewport.offsetTop = 0;
@@ -320,6 +325,8 @@ describe('Mazer viewport geometry', () => {
 
     observed.runtime.innerWidth = 360;
     observed.runtime.innerHeight = 720;
+    observed.runtime.document.documentElement.clientWidth = 360;
+    observed.runtime.document.documentElement.clientHeight = 720;
     observed.runtime.visualViewport.width = 360;
     observed.runtime.visualViewport.height = 720;
     observed.runtime.visualViewport.offsetTop = 12;

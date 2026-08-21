@@ -228,17 +228,33 @@ const keyForLegacyPoint = (point: LegacyPoint): string => `${point.x},${point.y}
 // this can't suppress that at the generation layer without breaking
 // connectivity guarantees. What it CAN do safely is decide, purely for the
 // decorative "poking-out corridor" dock rendering (drawLegacyPathBorderDock,
-// drawLegacyBleedOffGlow), which of two close-together openings actually
-// gets that treatment -- the tile stays a normal, fully walkable, correctly
-// wrapping corridor tile either way; it just doesn't also grow a second
-// protruding dock bar right next to the first one.
+// drawLegacyBleedOffGlow), which openings actually get that treatment -- the
+// tile stays a normal, fully walkable, correctly wrapping corridor tile
+// either way; it just doesn't also grow a protruding dock bar for every
+// single one of them.
 const LEGACY_BLEED_OFF_DOCK_VISUAL_MIN_ADJACENT_SPACING = 2;
+// Hard ceiling, independent of spacing -- at most this many decorated dock
+// corridors per axis (an axis pairs two opposite sides, e.g. left+right, so
+// this is also the max per individual side, since every wrap connection
+// opens exactly one tile on each of its two sides together).
+const LEGACY_BLEED_OFF_DOCK_VISUAL_MAX_PER_AXIS = 2;
 
 export const resolveLegacyBleedOffDockVisualEligibility = (
   maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>
 ): Set<string> => {
   const { width, height } = maze;
   const usedLines: { horizontal: number[]; vertical: number[] } = { horizontal: [], vertical: [] };
+  // A wrap connection's two openings (e.g. left x=0 and right x=width-1)
+  // always share the exact same line number by construction -- they're
+  // mirrored at the same row/column. Scanning point-by-point and recording
+  // "used" lines as we go treated a pair's own opposite side as if it were
+  // a second, too-close opening and always suppressed it, since whichever
+  // side scans first (left, top) is always visited before its partner
+  // (right, bottom) in row-major order. That's why right/bottom bleed
+  // corridors were silently never rendering at all. Deciding once per
+  // PAIR (keyed by axis+line, not by individual point) and reusing that
+  // same decision for both of its openings fixes this.
+  const pairDecisions = new Map<string, boolean>();
   const eligible = new Set<string>();
 
   for (let y = 0; y < height; y += 1) {
@@ -251,12 +267,21 @@ export const resolveLegacyBleedOffDockVisualEligibility = (
       const isHorizontalAxis = x === 0 || x === width - 1;
       const axis = isHorizontalAxis ? 'horizontal' : 'vertical';
       const line = isHorizontalAxis ? y : x;
-      if (usedLines[axis].some((usedLine) => Math.abs(usedLine - line) < LEGACY_BLEED_OFF_DOCK_VISUAL_MIN_ADJACENT_SPACING)) {
-        continue;
+      const pairKey = `${axis}:${line}`;
+
+      let decision = pairDecisions.get(pairKey);
+      if (decision === undefined) {
+        decision = usedLines[axis].length < LEGACY_BLEED_OFF_DOCK_VISUAL_MAX_PER_AXIS
+          && !usedLines[axis].some((usedLine) => Math.abs(usedLine - line) < LEGACY_BLEED_OFF_DOCK_VISUAL_MIN_ADJACENT_SPACING);
+        pairDecisions.set(pairKey, decision);
+        if (decision) {
+          usedLines[axis].push(line);
+        }
       }
 
-      usedLines[axis].push(line);
-      eligible.add(keyForLegacyPoint(point));
+      if (decision) {
+        eligible.add(keyForLegacyPoint(point));
+      }
     }
   }
 

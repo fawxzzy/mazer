@@ -160,8 +160,17 @@ export const resolveMazerViewportGeometryFromRuntime = (
   }
 
   const root = runtime.document?.documentElement;
-  const layoutWidth = normalizeDimension(runtime.innerWidth ?? root?.clientWidth, DEFAULT_VIEWPORT_WIDTH);
-  const layoutHeight = normalizeDimension(runtime.innerHeight ?? root?.clientHeight, DEFAULT_VIEWPORT_HEIGHT);
+  // documentElement.clientHeight/Width is preferred over window.innerHeight/
+  // Width -- html/body are styled with 100dvh/100dvw (see base.css), a unit
+  // the browser recalculates natively as its own chrome changes (address
+  // bar, standalone-PWA status bar/home-indicator). innerHeight is a JS-
+  // measured approximation that has historically under-reported the true
+  // available height in iOS standalone PWA mode specifically, leaving a
+  // real gap of background color below the app -- the same bug the Fitness
+  // app hit and fixed the same way. Falls back to innerHeight/Width first
+  // only when there's no root element to measure (e.g. non-DOM test runtimes).
+  const layoutWidth = normalizeDimension(root?.clientWidth ?? runtime.innerWidth, DEFAULT_VIEWPORT_WIDTH);
+  const layoutHeight = normalizeDimension(root?.clientHeight ?? runtime.innerHeight, DEFAULT_VIEWPORT_HEIGHT);
   const visualWidth = normalizeDimension(runtime.visualViewport?.width, layoutWidth);
   const visualHeight = normalizeDimension(runtime.visualViewport?.height, layoutHeight);
   const visualScale = normalizeScale(runtime.visualViewport?.scale);
