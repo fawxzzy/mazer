@@ -1684,7 +1684,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand(\'resume\')));');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));');
-    expect(menuSceneSource).toContain('return resolveLegacyOverlayPanelLayout(this.layout.width, this.layout.height);');
+    expect(menuSceneSource).toContain('return resolveLegacyOverlayPanelLayout(\r\n      this.layout.width,\r\n      this.layout.height,\r\n      readMazerViewportGeometry().safeArea\r\n    );');
     expect(menuSceneSource).toContain('const shell = resolveLegacyOverlayShellLayout({');
     expect(menuSceneSource).not.toContain("if (kind === 'pause' && this.mode === 'play')");
     expect(menuSceneSource).toContain('rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER');

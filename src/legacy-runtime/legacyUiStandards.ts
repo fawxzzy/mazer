@@ -13,21 +13,25 @@ export interface LegacyOverlayPanelLayout {
 
 export const resolveLegacyOverlayPanelLayout = (
   viewportWidth: number,
-  viewportHeight: number
+  viewportHeight: number,
+  safeArea: { top?: number; bottom?: number } = {}
 ): LegacyOverlayPanelLayout => {
+  const safeAreaTop = Math.max(0, Math.round(safeArea.top ?? 0));
+  const safeAreaBottom = Math.max(0, Math.round(safeArea.bottom ?? 0));
   const compact = viewportWidth < 480;
   const horizontalInset = compact ? 8 : 16;
   const verticalInset = compact ? 8 : 16;
   const availableWidth = Math.max(1, viewportWidth - (horizontalInset * 2));
   const width = Math.min(720, availableWidth);
-  const height = Math.max(1, viewportHeight - (verticalInset * 2));
+  const top = verticalInset + safeAreaTop;
+  const height = Math.max(1, viewportHeight - top - verticalInset - safeAreaBottom);
   const left = Math.round((viewportWidth - width) / 2);
 
   return {
     centerX: left + Math.round(width / 2),
     height,
     left,
-    top: verticalInset,
+    top,
     width
   };
 };

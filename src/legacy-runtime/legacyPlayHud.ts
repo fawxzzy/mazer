@@ -25,6 +25,8 @@ export interface LegacyPlayHudFrameInput {
   goalScreen: LegacyHudPoint;
   layoutWidth: number;
   playerScreen: LegacyHudPoint;
+  /** Device safe-area inset (notch/dynamic-island) -- pushes the whole top HUD row down below it, same as the title and header icons already do. */
+  safeAreaTop?: number;
 }
 
 export interface LegacyPlayHudFrame {
@@ -134,17 +136,18 @@ const LEGACY_HUD_TOP = 10;
 
 export const resolveLegacyPlayHudFrame = (input: LegacyPlayHudFrameInput): LegacyPlayHudFrame => {
   const timerText = formatLegacyHudClock(input.elapsedMs);
+  const hudTop = LEGACY_HUD_TOP + Math.max(0, Math.round(input.safeAreaTop ?? 0));
   const compassBounds = input.compassBounds
     ? createLegacyHudRect(input.compassBounds.left, input.compassBounds.top, input.compassBounds.width, input.compassBounds.height)
     : createLegacyHudRect(
       Math.round((input.layoutWidth - LEGACY_COMPASS_DEFAULT_SIZE) / 2),
-      LEGACY_HUD_TOP + Math.round((LEGACY_TIMER_HEIGHT - LEGACY_COMPASS_DEFAULT_SIZE) / 2),
+      hudTop + Math.round((LEGACY_TIMER_HEIGHT - LEGACY_COMPASS_DEFAULT_SIZE) / 2),
       LEGACY_COMPASS_DEFAULT_SIZE,
       LEGACY_COMPASS_DEFAULT_SIZE
     );
   const timerBounds = createLegacyHudRect(
     Math.round(compassBounds.left - LEGACY_COMPASS_TIMER_GAP - LEGACY_TIMER_WIDTH),
-    LEGACY_HUD_TOP,
+    hudTop,
     LEGACY_TIMER_WIDTH,
     LEGACY_TIMER_HEIGHT
   );
