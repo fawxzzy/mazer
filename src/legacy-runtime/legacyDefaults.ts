@@ -22,7 +22,7 @@ export interface LegacySettings {
 export const LEGACY_DEFAULTS: LegacySettings = {
   scale: 50,
   camScale: 0,
-  movementSpeed: 0.3,
+  movementSpeed: 0.05,
   pathColor: {
     r: 0.19099,
     g: 0.192708,

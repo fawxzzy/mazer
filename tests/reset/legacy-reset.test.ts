@@ -252,7 +252,7 @@ describe('legacy reset lane', () => {
   test('preserves legacy default settings', () => {
     expect(LEGACY_DEFAULTS.scale).toBe(50);
     expect(LEGACY_DEFAULTS.camScale).toBe(0);
-    expect(LEGACY_DEFAULTS.movementSpeed).toBe(0.3);
+    expect(LEGACY_DEFAULTS.movementSpeed).toBe(0.05);
     expect(linearColorToHex(LEGACY_DEFAULTS.pathColor)).toBe('#797978');
     expect(linearColorToHex(LEGACY_DEFAULTS.wallColor)).toBe('#4a4a4a');
     expect(LEGACY_DEFAULTS.toggleTrailPulse).toBe(true);

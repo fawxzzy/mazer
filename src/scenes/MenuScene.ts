@@ -1409,6 +1409,11 @@ export class MenuScene extends Phaser.Scene {
   // drawLegacyMenuPathTitleOrbitSigils.
   private menuOrbitSettleStartedAtMs: number | null = null;
   private menuOrbitSettlePhaseStart = 0;
+  // The most recent phase actually drawn while building/deconstructing was
+  // active, so the settle transition below can start from where the sigils
+  // really were instead of recomputing a phase after the lifecycle state
+  // that phase depended on has already moved on.
+  private menuOrbitLastActivePhase = 0;
   private visualDiagnosticsRevision = 0;
   private visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   private visualDiagnosticsPlayLifecycleSignature: string | null = null;
@@ -6686,7 +6691,16 @@ export class MenuScene extends Phaser.Scene {
     const settleDurationMs = 480;
     if (this.menuOrbitSettleStartedAtMs === null) {
       this.menuOrbitSettleStartedAtMs = time;
-      this.menuOrbitSettlePhaseStart = this.resolveLegacyMenuPathTitleOrbitPhase(time);
+      // Reads the cached last-drawn active phase (see
+      // drawLegacyMenuPathTitleOrbitSigils), not a freshly recomputed one --
+      // by the time this runs, isLifecycleSpinActive is already false, so
+      // recomputing from current lifecycle state would read whatever it
+      // moved on to, not where the sigils actually were. Reading the wrong
+      // phase here was exactly the bug this settle transition exists to
+      // prevent: it captured a "start" position the sigils were never
+      // really at, then visibly yanked them from that bogus point back to
+      // 0 even though they were already resting there.
+      this.menuOrbitSettlePhaseStart = this.menuOrbitLastActivePhase;
     }
     const elapsed = time - this.menuOrbitSettleStartedAtMs;
     const t = clamp(elapsed / settleDurationMs, 0, 1);
@@ -6712,6 +6726,7 @@ export class MenuScene extends Phaser.Scene {
       : this.resolveLegacyMenuPathTitleOrbitSettlePhase(time);
     if (isLifecycleSpinActive) {
       this.menuOrbitSettleStartedAtMs = null;
+      this.menuOrbitLastActivePhase = orbitPhase;
     }
     // Orbits the viewport's own edge instead of hugging the title glyph --
     // same relocation the deconstruct handoff burst got earlier, just for
