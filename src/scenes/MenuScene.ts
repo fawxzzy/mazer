@@ -996,6 +996,7 @@ const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;
 const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;
 const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
 const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 6200;
+const LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE = 2;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;
 // A trail-color wipe across the title tiles: fills bottom-left to top-right
 // (combining "left to right" and "bottom to top" into one diagonal sweep
@@ -6357,6 +6358,42 @@ export class MenuScene extends Phaser.Scene {
     return (time % LEGACY_MENU_PATH_TITLE_ORBIT_MS) / LEGACY_MENU_PATH_TITLE_ORBIT_MS;
   }
 
+  // 0 at the start of the current building/deconstructing pass, 1 once its
+  // tile animation actually finishes -- reusing the same tile-visibility
+  // counter that drives the reveal itself, not wall-clock time, so this
+  // reaches exactly 1 (and the orbit lands in its resting position) exactly
+  // when generation finishes, never early or late regardless of maze size.
+  private resolveLegacyMenuPathTitleOrbitLifecycleProgress(): number {
+    const total = this.menuStaticDrawTileOrder.length;
+    if (total <= 0) {
+      return 1;
+    }
+
+    if (this.menuStaticDrawLifecyclePhase === 'deconstructing') {
+      const visible = this.menuStaticDrawTilesVisible ?? 0;
+      return clamp(1 - (visible / total), 0, 1);
+    }
+
+    const visible = this.menuStaticDrawTilesVisible ?? total;
+    return clamp(visible / total, 0, 1);
+  }
+
+  // Building spins clockwise, deconstructing spins counter-clockwise --
+  // opposite signs on the same progress-driven phase, so both directions
+  // land on the same resting points (phase 0) and neither ever needs an
+  // explicit reversal partway through. The cosine ease means velocity is
+  // zero at both ends of every pass, so a direction switch (deconstruct
+  // finishing into the next build starting) never reads as a hard flip --
+  // it decelerates into the switch and accelerates back out the same way
+  // it would ease into resting.
+  private resolveLegacyMenuPathTitleOrbitLifecyclePhase(): number {
+    const progress = this.resolveLegacyMenuPathTitleOrbitLifecycleProgress();
+    const eased = 0.5 - (0.5 * Math.cos(progress * Math.PI));
+    const direction = this.menuStaticDrawLifecyclePhase === 'deconstructing' ? -1 : 1;
+    const rotated = direction * eased * LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE;
+    return ((rotated % 1) + 1) % 1;
+  }
+
   private resolveLegacyMenuPathTitleSweepTravel(columns: number, rows: number): number {
     return columns + (rows * 0.72) + (LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS * 2);
   }
@@ -6671,7 +6708,7 @@ export class MenuScene extends Phaser.Scene {
     const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'
       || this.menuStaticDrawLifecyclePhase === 'deconstructing';
     const orbitPhase = isLifecycleSpinActive
-      ? this.resolveLegacyMenuPathTitleOrbitPhase(time)
+      ? this.resolveLegacyMenuPathTitleOrbitLifecyclePhase()
       : this.resolveLegacyMenuPathTitleOrbitSettlePhase(time);
     if (isLifecycleSpinActive) {
       this.menuOrbitSettleStartedAtMs = null;
@@ -6695,7 +6732,8 @@ export class MenuScene extends Phaser.Scene {
     for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
       const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
       const { x, y } = resolveLegacyMenuPathTitleOrbitPoint(orbitGeometry, orbit);
-      const facing = this.resolveLegacyMenuPathTitleOrbitFacing(orbit, x, y, orbitGeometry, isLifecycleSpinActive);
+      const travelReversed = this.menuStaticDrawLifecyclePhase === 'deconstructing';
+      const facing = this.resolveLegacyMenuPathTitleOrbitFacing(orbit, x, y, orbitGeometry, isLifecycleSpinActive, travelReversed);
 
       const wave = isLifecycleSpinActive
         ? 0.62 + (Math.sin((orbitPhase * Math.PI * 2) + (index * 1.38)) * 0.28)
@@ -6725,12 +6763,18 @@ export class MenuScene extends Phaser.Scene {
   // corner (the perimeter is a sharp rectangle, not a rounded track, so
   // this is what makes the turn read as a curve instead of a snap) --
   // and while frozen (idle), every sigil just points straight at center.
+  // travelReversed flips the tangent 180 degrees for the counter-clockwise
+  // deconstruct spin, whose position still traces the same clockwise
+  // perimeter parametrization -- without this every sigil would face
+  // backward (its clockwise "forward") while actually travelling the
+  // other way.
   private resolveLegacyMenuPathTitleOrbitFacing(
     orbit: number,
     x: number,
     y: number,
     geometry: LegacyMenuPathTitleOrbitGeometry,
-    isLifecycleSpinActive: boolean
+    isLifecycleSpinActive: boolean,
+    travelReversed: boolean
   ): number {
     const centerFacing = Math.atan2(geometry.centerY - y, geometry.centerX - x);
     if (!isLifecycleSpinActive) {
@@ -6741,6 +6785,7 @@ export class MenuScene extends Phaser.Scene {
     const segment = Math.floor(perimeter) % 4;
     const segmentTangents = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
     const tangent = segmentTangents[segment] ?? 0;
+    const travelTangent = travelReversed ? tangent + Math.PI : tangent;
     const withinSegment = perimeter - Math.floor(perimeter);
     const distanceToCorner = Math.min(withinSegment, 1 - withinSegment);
     const cornerWindow = 0.15;
@@ -6751,7 +6796,7 @@ export class MenuScene extends Phaser.Scene {
       return from + (diff * t);
     };
 
-    return lerpAngleShortest(tangent, centerFacing, cornerProximity * 0.55);
+    return lerpAngleShortest(travelTangent, centerFacing, cornerProximity * 0.55);
   }
 
   // One continuous loop: fill (0..1), hold, revert (0..1), hold. Fill and
