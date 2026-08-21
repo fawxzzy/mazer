@@ -1,5 +1,5 @@
 export interface InstallSurfaceState {
-  mode: 'hidden' | 'available' | 'manual';
+  mode: 'hidden' | 'ios-open-in-browser' | 'available' | 'manual';
   canPrompt: boolean;
   installed: boolean;
   standalone: boolean;
@@ -12,6 +12,15 @@ export interface InstallSurfaceSnapshot {
   canPrompt: boolean;
   dismissed?: boolean;
   instruction?: string;
+  /**
+   * iOS PWA installs literally cannot happen from inside an in-app browser
+   * (TikTok, Instagram, etc. sandbox their WebView and don't expose "Add to
+   * Home Screen") -- this is the one case that hard-blocks and ignores the
+   * dismissed preference, since it's a technical impossibility, not a
+   * preference the player can dismiss their way past. They have to actually
+   * leave the in-app browser first.
+   */
+  isIOSInAppBrowser?: boolean;
 }
 
 export interface DeferredInstallPromptChoice {
@@ -43,6 +52,10 @@ export type InstallPromptOutcome = DeferredInstallPromptChoice['outcome'] | 'una
 
 const IOS_MANUAL_INSTALL_INSTRUCTION = 'Use Share > Add to Home Screen';
 const INSTALL_SURFACE_DISMISSED_STORAGE_KEY = 'mazer-install-surface-dismissed-v1';
+// Ported from the Fitness app's own in-app-browser detection (same list of
+// sandboxed WebView user agents that block PWA install).
+const IOS_IN_APP_BROWSER_PATTERN =
+  /(TikTok|musical_ly|Instagram|FBAN|FBAV|Messenger|Twitter|Line|LinkedInApp|Pinterest|Snapchat|Discord|WhatsApp|Telegram|MicroMessenger|LinkMe|Linktree|Beacons)/i;
 
 let installState: InstallSurfaceState = {
   mode: 'hidden',
@@ -103,6 +116,13 @@ const resolveStandaloneState = (runtime: InstallSurfaceWindowLike | undefined): 
   }
 };
 
+const detectIOSFromNavigator = (navigatorLike: InstallSurfaceNavigatorLike): boolean => {
+  const userAgent = (navigatorLike.userAgent ?? '').toLowerCase();
+  const platform = (navigatorLike.platform ?? '').toLowerCase();
+  return /iphone|ipad|ipod/.test(userAgent)
+    || (platform.includes('mac') && (navigatorLike.maxTouchPoints ?? 0) > 1);
+};
+
 export const resolveManualInstallInstruction = (
   navigatorLike: InstallSurfaceNavigatorLike | undefined
 ): string | undefined => {
@@ -110,12 +130,17 @@ export const resolveManualInstallInstruction = (
     return undefined;
   }
 
-  const userAgent = (navigatorLike.userAgent ?? '').toLowerCase();
-  const platform = (navigatorLike.platform ?? '').toLowerCase();
-  const isIOS = /iphone|ipad|ipod/.test(userAgent)
-    || (platform.includes('mac') && (navigatorLike.maxTouchPoints ?? 0) > 1);
+  return detectIOSFromNavigator(navigatorLike) ? IOS_MANUAL_INSTALL_INSTRUCTION : undefined;
+};
 
-  return isIOS ? IOS_MANUAL_INSTALL_INSTRUCTION : undefined;
+export const resolveIsIOSInAppBrowser = (
+  navigatorLike: InstallSurfaceNavigatorLike | undefined
+): boolean => {
+  if (!navigatorLike || !detectIOSFromNavigator(navigatorLike)) {
+    return false;
+  }
+
+  return IOS_IN_APP_BROWSER_PATTERN.test(navigatorLike.userAgent ?? '');
 };
 
 export const resolveInstallSurfaceState = (snapshot: InstallSurfaceSnapshot): InstallSurfaceState => {
@@ -125,6 +150,15 @@ export const resolveInstallSurfaceState = (snapshot: InstallSurfaceSnapshot): In
       canPrompt: false,
       installed: true,
       standalone: snapshot.standalone
+    };
+  }
+
+  if (snapshot.isIOSInAppBrowser) {
+    return {
+      mode: 'ios-open-in-browser',
+      canPrompt: false,
+      installed: false,
+      standalone: false
     };
   }
 
@@ -171,7 +205,8 @@ const publishInstallSurfaceState = (): InstallSurfaceState => {
     installed: installed || standalone,
     dismissed: dismissed && !standalone && !installed,
     canPrompt: !standalone && !installed && deferredPrompt !== undefined,
-    instruction: standalone || installed ? undefined : resolveManualInstallInstruction(installRuntimeWindow?.navigator)
+    instruction: standalone || installed ? undefined : resolveManualInstallInstruction(installRuntimeWindow?.navigator),
+    isIOSInAppBrowser: standalone || installed ? false : resolveIsIOSInAppBrowser(installRuntimeWindow?.navigator)
   });
 
   for (const subscriber of subscribers) {

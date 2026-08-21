@@ -10,6 +10,7 @@ export const MAZER_GAME_WINDOW_KEY = '__MAZER_GAME__' as const;
 export type MazerBootStage =
   | 'boot-start'
   | 'reload-requested'
+  | 'install-gate-checking'
   | 'game-creating'
   | 'game-created'
   | 'service-worker-error'

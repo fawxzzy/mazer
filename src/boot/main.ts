@@ -3,6 +3,8 @@ import '../styles/base.css';
 import { bootstrapLegacyRemoteAccountState } from '../legacy-runtime/legacyRemoteProgression';
 import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
+import { runMazerInstallGate } from './installGate';
+import { initializeInstallSurface } from './installSurface';
 import { installMazerPortraitLock, shouldBlockMazerLandscape } from './orientationLock';
 import { createMazerPhaserConfig } from './phaserConfig';
 import { installMazerProductionServiceWorker, installMazerServiceWorkerControllerReload } from './serviceWorkerLifecycle';
@@ -99,6 +101,18 @@ const boot = async (): Promise<void> => {
     }
 
     window.sessionStorage.removeItem(LOCALHOST_SW_RESET_KEY);
+  }
+
+  initializeInstallSurface(window);
+  // The install gate is meaningless during local dev (no real production
+  // URL to install, and localhost PWA installs behave strangely) -- it'd
+  // otherwise block every single local test run behind a screen with
+  // nothing useful to do. ?forceInstallGate=1 opts back in when the gate
+  // itself is what needs testing.
+  const forceInstallGate = new URLSearchParams(window.location.search).get('forceInstallGate') === '1';
+  if (!isLocalhostRuntime() || forceInstallGate) {
+    markMazerBootStatus('install-gate-checking');
+    await runMazerInstallGate(document);
   }
 
   await bootstrapLegacyRemoteAccountState();
