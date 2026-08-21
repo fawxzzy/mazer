@@ -43,19 +43,20 @@ describe('legacy play HUD', () => {
     });
 
     expect(frame.timerText).toBe('1:02');
+    // The compass itself now sits at the true horizontal screen center
+    // ("centered middle of the screen") -- the timer moves beside it
+    // instead of the compass being pinned to the timer's position.
     expect(frame.timerBounds).toMatchObject({
-      left: 584,
+      left: 498,
       top: 10,
       width: 112,
       height: 38
     });
-    // The compass now sits immediately beside the centered timer (top-middle
-    // HUD cluster) instead of pinned to the top-right corner.
-    expect(frame.arrowOrigin).toEqual({ x: 726, y: 29 });
+    expect(frame.arrowOrigin).toEqual({ x: 640, y: 29 });
     expect(frame.arrowAngleRadians).toBeCloseTo(0);
     expect(frame.arrowAngleDegrees).toBeCloseTo(0);
     expect(frame.arrowBounds).toMatchObject({
-      left: 706,
+      left: 620,
       top: 9,
       width: 40,
       height: 40

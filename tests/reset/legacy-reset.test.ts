@@ -611,23 +611,26 @@ describe('legacy reset lane', () => {
     expect(legacyPlayHudSource).toContain('const arrowAngleDegrees = (arrowAngleRadians * 180) / Math.PI;');
     expect(menuSceneSource).not.toContain('WASD or arrows to move   P to pause');
     expect(legacyPlayHudSource).toContain('const compassBounds = input.compassBounds');
-    // Compass defaults to sitting beside the centered timer (top-middle HUD
-    // cluster) instead of pinned to the top-right screen corner.
-    expect(legacyPlayHudSource).toContain('Math.round(timerBounds.right + LEGACY_COMPASS_TIMER_GAP),');
+    // The compass itself now sits at the true horizontal screen center
+    // ("centered middle of the screen"); the timer moves beside it instead.
+    expect(legacyPlayHudSource).toContain('Math.round((input.layoutWidth - LEGACY_COMPASS_DEFAULT_SIZE) / 2),');
     expect(legacyPlayHudSource).toContain('x: compassBounds.centerX');
     expect(legacyPlayHudSource).toContain('y: compassBounds.centerY');
     expect(legacyPlayHudSource).toContain('const length = 14;');
-    expect(legacyPlayHudSource).toContain('const timerBounds = createLegacyHudRect(Math.round((input.layoutWidth - 112) / 2), 10, 112, 38);');
+    expect(legacyPlayHudSource).toContain('Math.round(compassBounds.left - LEGACY_COMPASS_TIMER_GAP - LEGACY_TIMER_WIDTH),');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
     expect(menuSceneSource).toContain('timerText: this.hudFrame?.timerText ?? null');
     expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
-    expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
+    expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);');
     expect(menuSceneSource).toContain('this.startLegacyPlayCompassSpin(this.time.now);');
     expect(menuSceneSource).toContain('private resolveLegacyPlayCompassVisualFrame(');
     expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
-    expect(menuSceneSource).toContain('private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame, options: { showPane: boolean } = { showPane: true }): void');
-    expect(menuSceneSource).toContain('showPane: false');
+    // The compass now draws with the same rich glyph used by the menu
+    // surface and the Guide overlay's legend icon (ring/ticks/needle),
+    // instead of a separately hand-drawn crosshair with its own pane.
+    expect(menuSceneSource).toContain('this.drawLegacyCompassGlyph(');
+    expect(menuSceneSource).not.toContain('private drawLegacyPlayCompass(');
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
     expect(menuSceneSource).toContain('this.schedulePlayResetReturn();');
     expect(menuSceneSource).toContain('private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();');
