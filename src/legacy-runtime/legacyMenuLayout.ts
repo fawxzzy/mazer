@@ -149,7 +149,18 @@ export const resolveLegacyMenuBoardAspectRatio = (
     ? menuFullBleedTopMargin
     : playTopHudReserve + laneGap;
   const playBottomGapCount = options.useFloatingTouchControls === true ? 1 : 2;
-  const playVerticalBoardLimit = height - playTopBoardMargin - (playControlReserve + (laneGap * playBottomGapCount)) - safeAreaBottom;
+  // playControlReserve already folds safeAreaBottom in for the floating-
+  // controls case (see its own definition above) -- subtracting it again
+  // here double-counted the inset, starving the board of up to a full
+  // safeAreaBottom worth of height and leaving a real gap between the
+  // board's bottom edge and the true safe screen edge on any device with a
+  // nonzero bottom inset (home-indicator phones especially). Only the
+  // non-floating branch (whose playControlReserve has no safeAreaBottom
+  // component) still needs it subtracted separately.
+  const playVerticalBoardLimit = height
+    - playTopBoardMargin
+    - (playControlReserve + (laneGap * playBottomGapCount))
+    - (options.useFloatingTouchControls === true ? 0 : safeAreaBottom);
   const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuAvailableBoardHeight);
   const baseBoardScale = isPortrait ? 0.92 : 0.62;
   const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
@@ -362,10 +373,14 @@ export const resolveLegacyMenuLayout = (
     ? menuFullBleedTopMargin
     : playTopHudReserve + laneGap;
   const playBottomGapCount = options.useFloatingTouchControls === true ? 1 : 2;
+  // Mirrors resolveLegacyMenuBoardAspectRatio's own playVerticalBoardLimit --
+  // playControlReserve already folds safeAreaBottom in for the floating-
+  // controls case, so subtracting it again here double-counted the inset.
+  // Keep both in sync.
   const playVerticalBoardLimit = height
     - playTopBoardMargin
     - (playControlReserve + (laneGap * playBottomGapCount))
-    - safeAreaBottom;
+    - (options.useFloatingTouchControls === true ? 0 : safeAreaBottom);
   const laneBoardLimit = Math.max(96, isPlaySurface ? playVerticalBoardLimit : menuAvailableBoardHeight);
   const baseBoardScale = isPortrait ? 0.92 : 0.62;
   const cleanPhoneWidthScale = shouldUseCleanPhoneCadence ? 0.98 : null;
