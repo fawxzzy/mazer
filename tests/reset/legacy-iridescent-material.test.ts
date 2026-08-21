@@ -32,14 +32,24 @@ describe('legacy iridescent material', () => {
     }
   });
 
-  test('pins trail colors to the green readability anchor while rainbow material is deferred', () => {
-    const headColor = resolveLegacyIridescentTrailColor(0, 12, 0, LEGACY_IRIDESCENT_GREEN_ANCHOR);
-    const tailColor = resolveLegacyIridescentTrailColor(11, 12, 0, LEGACY_IRIDESCENT_GREEN_ANCHOR);
-    const laterHeadColor = resolveLegacyIridescentTrailColor(0, 12, 3600, LEGACY_IRIDESCENT_GREEN_ANCHOR);
+  test('cycles the trail through the midnight-rainbow material, varying by both position and time', () => {
+    // Swapped with the player per feedback -- the trail now carries the
+    // moving rainbow material the player used to have, and the player is
+    // the flat green anchor instead (see the player-core test below).
+    const headAtStart = resolveLegacyIridescentTrailColor(0, 12, 0, LEGACY_IRIDESCENT_GREEN_ANCHOR);
+    const tailAtStart = resolveLegacyIridescentTrailColor(11, 12, 0, LEGACY_IRIDESCENT_GREEN_ANCHOR);
+    const headLater = resolveLegacyIridescentTrailColor(0, 12, LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS / 4, LEGACY_IRIDESCENT_GREEN_ANCHOR);
 
-    expect(headColor).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
-    expect(tailColor).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
-    expect(laterHeadColor).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
+    expect(headAtStart).toBe(LEGACY_IRIDESCENT_MIDNIGHT_STOPS[0]);
+    // Different position along the trail at the same instant reads a
+    // different point in the color cycle than the head does.
+    expect(tailAtStart).not.toBe(headAtStart);
+    // The same position (the head) reads a different color once time has
+    // moved on -- the whole gradient flows, it isn't a static per-tile hue.
+    expect(headLater).not.toBe(headAtStart);
+    // A single-tile trail has no position spread to vary by -- still time-
+    // driven only.
+    expect(resolveLegacyIridescentTrailColor(0, 1, 0)).toBe(LEGACY_IRIDESCENT_MIDNIGHT_STOPS[0]);
   });
 
   test('uses the canonical halo and quiet path shine', () => {
@@ -64,20 +74,21 @@ describe('legacy iridescent material', () => {
       .toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
   });
 
-  test('cycles the player core through the midnight-rainbow jewel-tone stops over time (Terraria Midnight Rainbow dye style)', () => {
+  test('pins the player core to the flat green anchor regardless of time -- the rainbow material moved to the trail', () => {
     const start = resolveLegacyIridescentPlayerCoreColor(0);
     const quarterWay = resolveLegacyIridescentPlayerCoreColor(LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS / 4);
     const fullCycle = resolveLegacyIridescentPlayerCoreColor(LEGACY_IRIDESCENT_PLAYER_SHIFT_PERIOD_MS);
 
-    expect(start).toBe(LEGACY_IRIDESCENT_MIDNIGHT_STOPS[0]);
-    expect(quarterWay).not.toBe(start);
-    expect(fullCycle).toBe(start);
+    expect(start).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
+    expect(quarterWay).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
+    expect(fullCycle).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
   });
 
-  test('keeps the accent rim a quarter-phase ahead of the core so they read as two adjacent hues, not one flat color', () => {
+  test('keeps the accent rim a darker shade of the same green, distinct from the flat core', () => {
     const core = resolveLegacyIridescentPlayerCoreColor(1000);
     const accent = resolveLegacyIridescentPlayerAccentColor(1000);
 
+    expect(core).toBe(LEGACY_IRIDESCENT_GREEN_ANCHOR);
     expect(accent).not.toBe(core);
   });
 
