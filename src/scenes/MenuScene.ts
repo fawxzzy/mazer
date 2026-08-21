@@ -1089,6 +1089,13 @@ const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
 const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.46;
 const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.72;
+// The menu's demo AI is always visibly gliding between tiles on a loop, so
+// its squash-and-stretch-on-move animation alone is enough to read as
+// alive. The real play-mode player sits still between moves far more often
+// (deciding, looking around) -- this gives it its own continuous idle
+// breathing pulse so it never flattens into a static icon.
+const LEGACY_PLAY_PLAYER_IDLE_BREATHE_PERIOD_MS = 1500;
+const LEGACY_PLAY_PLAYER_IDLE_BREATHE_AMOUNT = 0.07;
 const LEGACY_PLAY_PLAYER_BEACON_COLOR = cyberArcadeMaterial.signal.player;
 const LEGACY_PLAY_PLAYER_BEACON_ACCENT = cyberArcadeMaterial.signal.playerAccent;
 const LEGACY_PLAY_PLAYER_BEACON_PERIOD_MS = 1150;
@@ -6985,14 +6992,21 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
+    // Start/end and the player marker are the "cast" of the maze, and all
+    // three now fade out together on the exact same deconstruct timer, well
+    // ahead of the tile-by-tile grid removal below -- previously the player
+    // faded first but start/goal stayed at full opacity until whichever
+    // moment the tile-sweep happened to reach their specific cell, often
+    // one of the very last things left on screen instead of the first.
+    const markerDeconstructAlpha = this.resolveLegacyMenuDeconstructPlayerAlpha(time);
     // Drawn after the trail (not before) so the start/goal tiles always sit
     // on top of the trail's coloring instead of getting painted over
     // whenever the trail passes through those cells.
-    if (this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
-      this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9, 'start');
+    if (markerDeconstructAlpha > 0 && this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
+      this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start');
     }
-    if (this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
-      this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95, 'goal');
+    if (markerDeconstructAlpha > 0 && this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
+      this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal');
     }
 
     this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize, time);
@@ -7030,7 +7044,7 @@ export class MenuScene extends Phaser.Scene {
       }
     }
 
-    const playerAlpha = this.resolveLegacyMenuDeconstructPlayerAlpha(time);
+    const playerAlpha = markerDeconstructAlpha;
     if (this.mode === 'menu') {
       if (
         this.menuStaticDrawLifecyclePhase !== 'deconstructing'
@@ -8020,6 +8034,15 @@ export class MenuScene extends Phaser.Scene {
       const horizontalMove = Math.abs(dx) >= Math.abs(dy);
       coreRadiusX = playerMetrics.coreRadius * (horizontalMove ? along : across);
       coreRadiusY = playerMetrics.coreRadius * (horizontalMove ? across : along);
+    }
+
+    // Continuous idle breathing pulse, on top of whatever the squash-
+    // stretch above already did -- see LEGACY_PLAY_PLAYER_IDLE_BREATHE_*.
+    if (showLocatorTicks && !this.prefersLegacyReducedMotion()) {
+      const breathePhase = Math.sin((time / LEGACY_PLAY_PLAYER_IDLE_BREATHE_PERIOD_MS) * Math.PI * 2);
+      const breatheScale = 1 + (breathePhase * LEGACY_PLAY_PLAYER_IDLE_BREATHE_AMOUNT);
+      coreRadiusX *= breatheScale;
+      coreRadiusY *= breatheScale;
     }
 
     // No more shadow disc or halo/beacon rings -- the diamond (which
