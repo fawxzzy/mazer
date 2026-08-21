@@ -547,9 +547,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;');
     expect(menuSceneSource).toContain('if (isMenuMode && LEGACY_BOARD_GRID_ALPHA > 0) {');
     expect(menuSceneSource).toContain('Keep the board top-down: no pseudo bevel/highlight pass over the maze.');
-    expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
-    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardWidth, boardHeight, boardEdge);');
-    expect(menuSceneSource).toContain('private fillLegacyBoardEdgeFrame(');
+    // Play mode no longer gets a slab backdrop/edge frame/glass tint either
+    // -- that was the border-and-translucent-background box around the
+    // whole maze that menu had already dropped; both surfaces now read as
+    // tiles floating directly on the scene.
+    expect(menuSceneSource).not.toContain('fillLegacyBoardEdgeFrame');
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_BOARD_FILL');
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_BOARD_EDGE');
+    expect(menuSceneSource).not.toContain('LEGACY_PLAY_BOARD_GLASS_ALPHA');
     expect(menuSceneSource).toContain('private resolveLegacyMazeRenderFrame(');
     expect(menuSceneSource).toContain('const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(boardLeft, boardTop, boardWidth, boardHeight);');
     expect(menuSceneSource).toContain('const mazeLeft = mazeRenderFrame.boardLeft;');
@@ -576,7 +581,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('renderBounds: mazeRenderBounds');
     expect(menuSceneSource).toContain('renderSafeInset: mazeRenderFrame.safeInset');
-    expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(boardFill, LEGACY_PLAY_BOARD_GLASS_ALPHA);');
     expect(menuSceneSource).toContain('this.boardStaticGraphics.fillStyle(LEGACY_PLAY_WALL_FILL, LEGACY_PLAY_WALL_GLASS_ALPHA);');
     expect(menuSceneSource).not.toContain('drawLegacyBoardSigilBorder');
     expect(menuSceneSource).not.toContain('drawLegacyBoardCornerFacetShimmer');
@@ -655,7 +659,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_FILL = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_WALL_GLASS_ALPHA = 0.18;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_GLASS_ALPHA = 0.1;');
     expect(menuSceneSource).toContain("private pathVisualStyle: LegacyPathVisualStyle = 'corridor';");
     expect(menuSceneSource).toContain('this.pathVisualStyle = resolveLegacyPathVisualStyle(runtimeSearch);');
     expect(menuSceneSource).toContain('drawCue: false');
@@ -666,8 +669,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('buttons: this.uiButtons');
     expect(menuSceneSource).toContain('text: button.text');
     expect(menuSceneSource).toContain('this.uiTexts.push(label, stateLabel);');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_FILL = cyberArcadeMaterial.substrate.field;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_BOARD_EDGE = 0x031022;');
     expect(menuSceneSource).not.toContain('LEGACY_PLAY_PATH_RELIEF_SHADOW');
     expect(menuSceneSource).toContain('isMenuMode ? pathGlow : LEGACY_PLAY_PATH_EDGE');
     expect(menuSceneSource).toContain('private boardPathGraphics!: Phaser.GameObjects.Graphics;');
@@ -744,8 +745,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.drawLegacyPathMaterialTile(');
     expect(menuSceneSource).toContain('coreAlpha: isMenuMode ? 0.92 : 0.96,');
     expect(menuSceneSource).toContain(': LEGACY_PLAY_PATH_CORE;');
-    expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
-    expect(menuSceneSource).toContain('const boardEdge = LEGACY_PLAY_BOARD_EDGE;');
     expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor');
   });
 
@@ -761,7 +760,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
     expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
     expect(menuSceneSource).toContain('this.drawLegacyPlayCompass(hudFrame, {');
-    expect(menuSceneSource).toContain('showPane: this.playFloatingStickOrigin === null');
+    expect(menuSceneSource).toContain('showPane: false');
     expect(menuSceneSource).toContain('if (options.showPane) {');
     expect(menuSceneSource).toContain('this.hudGraphics.fillTriangle(');
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause);');
@@ -806,7 +805,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("placement: 'leading'");
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).toContain('resolveLegacyHeaderControlMetricFontSize(track.level, frame.width)');
-    expect(menuSceneSource).toContain('private drawLegacyHeaderControlChrome(');
+    // No panel/border chrome function at all any more -- both the level
+    // badge and the play settings cog are bare, matching the menu surface's
+    // own settings cog exactly (zero chrome, not lighter chrome).
+    expect(menuSceneSource).not.toContain('private drawLegacyHeaderControlChrome(');
     expect(menuSceneSource).toContain('private menuSettingsCogActive = false;');
     expect(menuSceneSource).toContain('this.menuSettingsCogActive = active;');
     expect(menuSceneSource).toContain('this.boardDynamicDirty = true;');
@@ -1077,12 +1079,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('turnDelayMs: movementSpeedProfile.turnDelayMs');
     expect(menuSceneSource).toContain('Math.min(profile.repeatIntervalMs, LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS)');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
-    // The compass's own background pane hides while the floating stick is
-    // actually on screen (it already grounds that area visually) instead of
-    // branching on the now-single-scheme controlMode setting.
-    expect(menuSceneSource).toContain('showPane: this.playFloatingStickOrigin === null');
-    expect(menuSceneSource).toContain('this.hudBounds = touchCompassBounds');
-    expect(menuSceneSource).toContain(': mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
+    // The compass now always sits at its own top-middle HUD position
+    // (independent of the D-pad/floating stick), bare with no background
+    // pane -- consistent with the rest of the top HUD having no chrome.
+    expect(menuSceneSource).toContain('showPane: false');
+    expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).toContain('touchControls');
     expect(menuSceneSource).toContain('LEGACY_CYBER_PANEL_FILL');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
@@ -1294,8 +1295,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;');
     expect(menuSceneSource).not.toContain('fillStyle(0x05070a');
     expect(menuSceneSource).toContain('private drawLegacySettingsCogControl(');
-    expect(menuSceneSource).toMatch(/this\.drawLegacyHeaderControlChrome\(\s+graphics,\s+rect,/);
-    expect(menuSceneSource).toContain('active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON,');
+    // No panel/border chrome behind the play cog at all -- matches the
+    // menu surface's own settings cog exactly (bare gear, nothing framing
+    // it).
+    expect(menuSceneSource).toMatch(/drawLegacySettingsCogControl\([\s\S]*?this\.drawLegacySettingsCog\(graphics, rect, active\);/);
     expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(time: number): void');
     expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog(time);');
     expect(menuSceneSource).toContain('cyberArcadeMaterial.signal.player,\n      cyberArcadeMaterial.rail.mint,\n      blinkAlpha\n    );');
@@ -1746,9 +1749,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE,');
     expect(menuSceneSource).toContain('LEGACY_MENU_PATH_EDGE_ALPHA,');
     expect(menuSceneSource).toContain('this.drawLegacyPathMaterialTile(');
-    expect(menuSceneSource).toContain('const boardFill = LEGACY_PLAY_BOARD_FILL;');
-    expect(menuSceneSource).toContain('const boardEdge = LEGACY_PLAY_BOARD_EDGE;');
-    expect(menuSceneSource).toContain('this.fillLegacyBoardEdgeFrame(boardLeft, boardTop, boardWidth, boardHeight, boardEdge);');
     expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.start');
     expect(menuSceneSource).not.toContain('this.fillMenuDynamicMarkerTile(this.maze.goal');
     expect(menuSceneSource).toContain('const trailColor = resolveLegacyIridescentTrailColor(');

@@ -611,7 +611,9 @@ describe('legacy reset lane', () => {
     expect(legacyPlayHudSource).toContain('const arrowAngleDegrees = (arrowAngleRadians * 180) / Math.PI;');
     expect(menuSceneSource).not.toContain('WASD or arrows to move   P to pause');
     expect(legacyPlayHudSource).toContain('const compassBounds = input.compassBounds');
-    expect(legacyPlayHudSource).toContain(': createLegacyHudRect(input.layoutWidth - 56, 8, 44, 44);');
+    // Compass defaults to sitting beside the centered timer (top-middle HUD
+    // cluster) instead of pinned to the top-right screen corner.
+    expect(legacyPlayHudSource).toContain('Math.round(timerBounds.right + LEGACY_COMPASS_TIMER_GAP),');
     expect(legacyPlayHudSource).toContain('x: compassBounds.centerX');
     expect(legacyPlayHudSource).toContain('y: compassBounds.centerY');
     expect(legacyPlayHudSource).toContain('const length = 14;');
@@ -623,10 +625,9 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(touchControlLayout);');
     expect(menuSceneSource).toContain('this.startLegacyPlayCompassSpin(this.time.now);');
     expect(menuSceneSource).toContain('private resolveLegacyPlayCompassVisualFrame(');
-    expect(menuSceneSource).toContain('this.hudBounds = touchCompassBounds');
-    expect(menuSceneSource).toContain(': mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
+    expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
     expect(menuSceneSource).toContain('private drawLegacyPlayCompass(hudFrame: LegacyPlayHudFrame, options: { showPane: boolean } = { showPane: true }): void');
-    expect(menuSceneSource).toContain('showPane: this.playFloatingStickOrigin === null');
+    expect(menuSceneSource).toContain('showPane: false');
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
     expect(menuSceneSource).toContain('this.schedulePlayResetReturn();');
     expect(menuSceneSource).toContain('private playMoveFlags: LegacyPlayMoveFlags = createLegacyPlayMoveFlags();');

@@ -49,14 +49,16 @@ describe('legacy play HUD', () => {
       width: 112,
       height: 38
     });
-    expect(frame.arrowOrigin).toEqual({ x: 1246, y: 30 });
+    // The compass now sits immediately beside the centered timer (top-middle
+    // HUD cluster) instead of pinned to the top-right corner.
+    expect(frame.arrowOrigin).toEqual({ x: 726, y: 29 });
     expect(frame.arrowAngleRadians).toBeCloseTo(0);
     expect(frame.arrowAngleDegrees).toBeCloseTo(0);
     expect(frame.arrowBounds).toMatchObject({
-      left: 1224,
-      top: 8,
-      width: 44,
-      height: 44
+      left: 706,
+      top: 9,
+      width: 40,
+      height: 40
     });
     expect(frame.arrowBounds.left).toBeLessThanOrEqual(frame.arrowOrigin.x);
     expect(frame.arrowBounds.right).toBeGreaterThan(frame.arrowTip.x);
