@@ -6,7 +6,7 @@ export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
 
 export type LegacyAuthStatus = 'guest' | 'authenticated' | 'unavailable';
 export type LegacyAuthFormMode = 'login' | 'signup';
-export type LegacyAuthFieldId = 'email' | 'password' | 'displayName';
+export type LegacyAuthFieldId = 'email' | 'password' | 'displayName' | 'username';
 export type LegacyRememberedIdentitySessionState = 'ready' | 'reauth-required';
 
 export interface LegacyAuthConfig {
@@ -29,6 +29,7 @@ export interface LegacyAuthFormState {
   email: string;
   mode: LegacyAuthFormMode;
   password: string;
+  username: string;
 }
 
 export interface LegacyAuthSubmitState {
@@ -542,7 +543,8 @@ export const createEmptyLegacyAuthFormState = (
   displayName: '',
   email: rememberedEmail,
   mode,
-  password: ''
+  password: '',
+  username: ''
 });
 
 export const resolveLegacyAuthSubmitState = (
