@@ -1063,6 +1063,15 @@ const LEGACY_CYBER_PANEL_SHADOW = cyberArcadeMaterial.substrate.shadow;
 const LEGACY_OVERLAY_SCROLL_WHEEL_STEP = 42;
 const LEGACY_OVERLAY_SCROLL_DRAG_START_PX = 3;
 const LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER = 20;
+// Momentum/flick scrolling tuning. Below MIN_PX_PER_MS a release just stops
+// (a slow, deliberate drag shouldn't keep gliding); FRICTION_PER_MS decays
+// the coast velocity multiplicatively every millisecond -- ~0.994 lands
+// a typical flick's glide in the same few-hundred-ms range native scroll
+// views use, not an abrupt stop or an endless drift. STOP_PX_PER_MS ends
+// the coast once it's too slow to produce a visible per-frame move.
+const LEGACY_OVERLAY_SCROLL_MOMENTUM_MIN_PX_PER_MS = 0.12;
+const LEGACY_OVERLAY_SCROLL_MOMENTUM_FRICTION_PER_MS = 0.994;
+const LEGACY_OVERLAY_SCROLL_MOMENTUM_STOP_PX_PER_MS = 0.02;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PERIOD_MS;
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
 const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;
@@ -1300,6 +1309,17 @@ export class MenuScene extends Phaser.Scene {
   private overlayScrollPointerStartOffset = 0;
   private overlayScrollPointerHasMoved = false;
   private overlayScrollGestureLockPointerId: number | null = null;
+  // Momentum/flick scrolling -- a drag-release used to stop the content
+  // dead in place, unlike literally every native scroll view, which was
+  // the actual substance of "the custom scroll behavior feels weird."
+  // overlayScrollVelocityPxPerMs tracks a smoothed recent drag speed while
+  // a finger is down; on release, if it's above a real-flick threshold, it
+  // seeds a decaying coast (see hasLegacyOverlayScrollMomentumPendingFrame)
+  // instead of a hard stop.
+  private overlayScrollLastMoveY = 0;
+  private overlayScrollLastMoveAtMs = 0;
+  private overlayScrollVelocityPxPerMs = 0;
+  private overlayScrollMomentumActive = false;
   private overlayMovementSpeedSliderBounds: VisualRect | null = null;
   private viewportGeometryListener: (() => void) | null = null;
   /** Cached OS accessibility preference; never read from the render loop. */
@@ -1687,6 +1707,7 @@ export class MenuScene extends Phaser.Scene {
     this.recordRuntimeFrame(delta);
     this.updateStars(time, delta);
     this.expireLegacyPlayerMessages(time);
+    this.advanceLegacyOverlayScrollMomentum(delta);
     for (const button of this.uiButtons) {
       button.updateFrame?.(time);
     }
@@ -3104,10 +3125,16 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
+    // A fresh touch-down always takes over immediately, same as flicking a
+    // native scroll view mid-glide and catching it with a finger.
+    this.overlayScrollMomentumActive = false;
+    this.overlayScrollVelocityPxPerMs = 0;
     this.overlayScrollPointerId = pointerId;
     this.overlayScrollPointerStartY = point.y;
     this.overlayScrollPointerStartOffset = this.overlayScrollOffset;
     this.overlayScrollPointerHasMoved = false;
+    this.overlayScrollLastMoveY = point.y;
+    this.overlayScrollLastMoveAtMs = this.time.now;
     return true;
   }
 
@@ -3128,6 +3155,18 @@ export class MenuScene extends Phaser.Scene {
 
     this.overlayScrollPointerHasMoved = true;
     this.setLegacyOverlayScrollOffset(this.overlayScrollPointerStartOffset - deltaY);
+    // Smoothed recent drag speed, in offset-px/ms (note the sign flip --
+    // dragging the pointer up increases the offset, see the line above) --
+    // this is what a release either seeds a momentum coast from or discards
+    // as too slow to have been a real flick.
+    const time = this.time.now;
+    const dt = time - this.overlayScrollLastMoveAtMs;
+    if (dt > 0) {
+      const instantVelocity = -(point.y - this.overlayScrollLastMoveY) / dt;
+      this.overlayScrollVelocityPxPerMs = (this.overlayScrollVelocityPxPerMs * 0.7) + (instantVelocity * 0.3);
+    }
+    this.overlayScrollLastMoveY = point.y;
+    this.overlayScrollLastMoveAtMs = time;
     return true;
   }
 
@@ -3141,8 +3180,39 @@ export class MenuScene extends Phaser.Scene {
       return false;
     }
 
+    this.overlayScrollMomentumActive = this.overlayScrollPointerHasMoved
+      && Math.abs(this.overlayScrollVelocityPxPerMs) >= LEGACY_OVERLAY_SCROLL_MOMENTUM_MIN_PX_PER_MS;
+    if (!this.overlayScrollMomentumActive) {
+      this.overlayScrollVelocityPxPerMs = 0;
+    }
     this.releaseOverlayScrollPointer();
     return true;
+  }
+
+  // Ongoing decaying coast after a fast drag release -- see the momentum
+  // fields/constants near overlayScrollPointerHasMoved for why this exists.
+  // Called unconditionally every frame (not gated behind another dirty
+  // check) so it can keep running after the frame that stops being dirty.
+  private advanceLegacyOverlayScrollMomentum(delta: number): void {
+    if (!this.overlayScrollMomentumActive) {
+      return;
+    }
+    if (this.overlay === 'none' || this.overlayScrollMax <= 0 || this.overlayScrollPointerId !== null) {
+      this.overlayScrollMomentumActive = false;
+      this.overlayScrollVelocityPxPerMs = 0;
+      return;
+    }
+
+    const decay = Math.pow(LEGACY_OVERLAY_SCROLL_MOMENTUM_FRICTION_PER_MS, delta);
+    this.overlayScrollVelocityPxPerMs *= decay;
+    const requestedOffset = this.overlayScrollOffset + (this.overlayScrollVelocityPxPerMs * delta);
+    const clampedOffset = clampLegacyOverlayScrollOffset(requestedOffset, this.overlayScrollMax);
+    const hitBound = clampedOffset !== requestedOffset;
+    this.setLegacyOverlayScrollOffset(clampedOffset);
+    if (hitBound || Math.abs(this.overlayScrollVelocityPxPerMs) < LEGACY_OVERLAY_SCROLL_MOMENTUM_STOP_PX_PER_MS) {
+      this.overlayScrollMomentumActive = false;
+      this.overlayScrollVelocityPxPerMs = 0;
+    }
   }
 
   private resolveLegacyPlayMovementDirection(event: KeyboardEvent): keyof LegacyPlayMoveFlags | null {
@@ -9510,7 +9580,12 @@ export class MenuScene extends Phaser.Scene {
     const actionButtonHeight = stacked ? cyberArcadeMaterial.controls.minimumTouchTarget : 48;
     const shell = resolveLegacyOverlayShellLayout({
       actionHeight: actionButtonHeight,
-      actionRows: 2,
+      // Was 2 (Reset/Menu + Reset Progress) -- the menu's own settings
+      // overlay has always had an Account row that this one never did, so
+      // there was no way to reach account/sign-out from an active play
+      // session without fully exiting to the menu first. Third row reserves
+      // room for it below.
+      actionRows: 3,
       hasMessage: hasOverlayMessage,
       panel
     });
@@ -9567,6 +9642,9 @@ export class MenuScene extends Phaser.Scene {
         this.createButton(compactRow.rightX, actionY, compactRow.buttonWidth, actionButtonHeight, 'Menu', mainMenuAction),
         this.createButton(panel.centerX, actionY - actionButtonHeight - 10, Math.min(232, panel.width - 72), actionButtonHeight, 'Reset Progress', progressionResetAction)
       );
+      this.createLegacyOptionsAccountActionRow(panel, {
+        contentCenterY: actionY - ((actionButtonHeight + 10) * 2)
+      });
       return;
     }
 
@@ -9576,6 +9654,9 @@ export class MenuScene extends Phaser.Scene {
       this.createButton(desktopRow.rightX, actionY, desktopRow.buttonWidth, actionButtonHeight, 'Menu', mainMenuAction),
       this.createButton(panel.centerX, actionY - actionButtonHeight - 14, Math.min(252, panel.width - 88), actionButtonHeight, 'Reset Progress', progressionResetAction)
     );
+    this.createLegacyOptionsAccountActionRow(panel, {
+      contentCenterY: actionY - ((actionButtonHeight + 14) * 2)
+    });
   }
 
   private buildProgressionResetConfirmationOverlay(): void {
