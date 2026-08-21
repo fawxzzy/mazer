@@ -219,6 +219,50 @@ export const resolveLegacyBleedOffPaths = (
   return [{ destination, direction: direction.name, source: { ...point } }];
 };
 
+const keyForLegacyPoint = (point: LegacyPoint): string => `${point.x},${point.y}`;
+
+// A maze can legitimately generate two bleed-off/wrap openings close
+// together on the same border edge -- the underlying grid topology and its
+// "every open border tile has a walkable opposite" pairing invariant
+// require every one of them to stay fully walkable and wrap-navigable, so
+// this can't suppress that at the generation layer without breaking
+// connectivity guarantees. What it CAN do safely is decide, purely for the
+// decorative "poking-out corridor" dock rendering (drawLegacyPathBorderDock,
+// drawLegacyBleedOffGlow), which of two close-together openings actually
+// gets that treatment -- the tile stays a normal, fully walkable, correctly
+// wrapping corridor tile either way; it just doesn't also grow a second
+// protruding dock bar right next to the first one.
+const LEGACY_BLEED_OFF_DOCK_VISUAL_MIN_ADJACENT_SPACING = 2;
+
+export const resolveLegacyBleedOffDockVisualEligibility = (
+  maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>
+): Set<string> => {
+  const { width, height } = maze;
+  const usedLines: { horizontal: number[]; vertical: number[] } = { horizontal: [], vertical: [] };
+  const eligible = new Set<string>();
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const point = { x, y };
+      if (resolveLegacyBleedOffPaths(maze, point).length <= 0) {
+        continue;
+      }
+
+      const isHorizontalAxis = x === 0 || x === width - 1;
+      const axis = isHorizontalAxis ? 'horizontal' : 'vertical';
+      const line = isHorizontalAxis ? y : x;
+      if (usedLines[axis].some((usedLine) => Math.abs(usedLine - line) < LEGACY_BLEED_OFF_DOCK_VISUAL_MIN_ADJACENT_SPACING)) {
+        continue;
+      }
+
+      usedLines[axis].push(line);
+      eligible.add(keyForLegacyPoint(point));
+    }
+  }
+
+  return eligible;
+};
+
 const isLegacyMenuPathConnected = (
   maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>,
   point: LegacyPoint,

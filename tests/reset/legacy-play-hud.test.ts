@@ -1,9 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   formatLegacyHudClock,
-  resolveLegacyCompassSpinFrame,
   resolveLegacyFrozenElapsedMs,
-  resolveLegacyHudArrowAngle,
   resolveLegacyPlayHudFrame
 } from '../../src/legacy-runtime/legacyPlayHud';
 
@@ -28,90 +26,32 @@ describe('legacy play HUD', () => {
     })).toBe(6_240);
   });
 
-  test('points the goal arrow from player screen position toward the end tile', () => {
-    expect(resolveLegacyHudArrowAngle({ x: 10, y: 10 }, { x: 20, y: 10 })).toBeCloseTo(0);
-    expect(resolveLegacyHudArrowAngle({ x: 10, y: 10 }, { x: 10, y: 20 })).toBeCloseTo(Math.PI / 2);
-    expect(resolveLegacyHudArrowAngle({ x: 10, y: 10 }, { x: 0, y: 10 })).toBeCloseTo(Math.PI);
-  });
-
-  test('returns bounded timer and arrow proof rectangles for diagnostics', () => {
+  test('centers the timer at the true horizontal screen center', () => {
     const frame = resolveLegacyPlayHudFrame({
       elapsedMs: 62_100,
-      layoutWidth: 1280,
-      playerScreen: { x: 100, y: 100 },
-      goalScreen: { x: 160, y: 100 }
+      layoutWidth: 1280
     });
 
     expect(frame.timerText).toBe('1:02');
-    // The compass itself now sits at the true horizontal screen center
-    // ("centered middle of the screen") -- the timer moves beside it
-    // instead of the compass being pinned to the timer's position.
+    // The compass used to anchor the true horizontal center, with the timer
+    // sitting beside it -- now that the compass is gone, the timer itself
+    // takes the centered slot.
     expect(frame.timerBounds).toMatchObject({
-      left: 498,
+      left: 584,
       top: 10,
       width: 112,
       height: 38
     });
-    expect(frame.arrowOrigin).toEqual({ x: 640, y: 29 });
-    expect(frame.arrowAngleRadians).toBeCloseTo(0);
-    expect(frame.arrowAngleDegrees).toBeCloseTo(0);
-    expect(frame.arrowBounds).toMatchObject({
-      left: 620,
-      top: 9,
-      width: 40,
-      height: 40
-    });
-    expect(frame.arrowBounds.left).toBeLessThanOrEqual(frame.arrowOrigin.x);
-    expect(frame.arrowBounds.right).toBeGreaterThan(frame.arrowTip.x);
-    expect(frame.bounds.left).toBe(frame.timerBounds.left);
-    expect(frame.bounds.right).toBe(frame.arrowBounds.right);
+    expect(frame.bounds).toEqual(frame.timerBounds);
   });
 
-  test('can pin the compass to an explicit touch-control center', () => {
+  test('pushes the HUD row below the device safe-area top inset', () => {
     const frame = resolveLegacyPlayHudFrame({
-      compassBounds: { left: 179, top: 719, width: 32, height: 32 },
-      elapsedMs: 12_000,
-      layoutWidth: 390,
-      playerScreen: { x: 100, y: 100 },
-      goalScreen: { x: 100, y: 160 }
-    });
-
-    expect(frame.arrowBounds).toMatchObject({
-      left: 179,
-      top: 719,
-      width: 32,
-      height: 32
-    });
-    expect(frame.arrowOrigin).toEqual({ x: 195, y: 735 });
-    expect(frame.arrowAngleRadians).toBeCloseTo(Math.PI / 2);
-  });
-
-  test('eases the compass spin onto the true goal angle', () => {
-    const start = resolveLegacyCompassSpinFrame({
-      durationMs: 1_800,
       elapsedMs: 0,
-      targetAngleRadians: Math.PI / 2,
-      turns: 3.25
-    });
-    const middle = resolveLegacyCompassSpinFrame({
-      durationMs: 1_800,
-      elapsedMs: 900,
-      targetAngleRadians: Math.PI / 2,
-      turns: 3.25
-    });
-    const settled = resolveLegacyCompassSpinFrame({
-      durationMs: 1_800,
-      elapsedMs: 1_800,
-      targetAngleRadians: Math.PI / 2,
-      turns: 3.25
+      layoutWidth: 390,
+      safeAreaTop: 44
     });
 
-    expect(start.active).toBe(true);
-    expect(start.progress).toBe(0);
-    expect(middle.active).toBe(true);
-    expect(middle.angleRadians).not.toBeCloseTo(Math.PI / 2);
-    expect(settled.active).toBe(false);
-    expect(settled.progress).toBe(1);
-    expect(settled.angleRadians).toBeCloseTo(Math.PI / 2);
+    expect(frame.timerBounds.top).toBe(54);
   });
 });

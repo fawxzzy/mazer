@@ -157,7 +157,6 @@ export interface MenuSceneRuntimeDiagnostics {
       renderTileSize?: number;
     };
     lifecycle?: {
-      compassSpinExpected: boolean;
       drawPhase: 'idle' | 'building' | 'settled' | 'deconstructing';
       generationPending: boolean;
       inputLocked: boolean;
