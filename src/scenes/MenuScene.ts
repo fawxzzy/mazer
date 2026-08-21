@@ -259,9 +259,12 @@ import {
   type LegacyPatrolAgentState
 } from '../legacy-runtime/legacyPatrolAgent';
 import {
+  LEGACY_USERNAME_PATTERN,
+  checkLegacyUsernameAvailable,
   createEmptyLegacyAuthFormState,
   createLegacyAuthScopedStorage,
   createLegacyGuestAuthSnapshot,
+  readLegacyAccountUsername,
   readLegacyAuthSessionSnapshot,
   readLegacyRememberedIdentity,
   readLegacyRememberedIdentityState,
@@ -270,6 +273,7 @@ import {
   resolveLegacyAuthAccountLabel,
   resolveLegacyAuthScopedStorageKey,
   resolveLegacyAuthSubmitState,
+  saveLegacyAccountUsername,
   signInLegacyAuth,
   signOutLegacyAuth,
   signUpLegacyAuth,
@@ -1213,6 +1217,23 @@ export class MenuScene extends Phaser.Scene {
   private authPasswordVisible = false;
   private authAccountHydrationSequence = 0;
   private authSubmitting = false;
+  // Deliberately NOT part of authForm/LegacyAuthFieldId -- that state
+  // machine is scoped to the signed-out sign-in/sign-up credential form
+  // (its Enter key submits sign-in, its fields reset on sign-in/out). The
+  // account-screen username field edits an already-signed-in profile, a
+  // different concern with its own save/availability-check lifecycle, so
+  // it gets its own small parallel state instead of conflating the two.
+  private accountUsernameDraft = '';
+  private accountUsernameSavedValue = '';
+  private accountUsernameLoadedForUserId: string | null = null;
+  private accountUsernameActive = false;
+  private accountUsernameStatus: 'available' | 'checking' | 'error' | 'idle' | 'loading' | 'saved' | 'saving' | 'taken' = 'idle';
+  private accountUsernameStatusMessage: string | null = null;
+  private accountUsernameSequence = 0;
+  private accountUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private accountUsernameNativeInput: HTMLInputElement | null = null;
+  private accountUsernameNativeInputHandler: ((event: Event) => void) | null = null;
+  private accountUsernameNativeKeyDownHandler: ((event: KeyboardEvent) => void) | null = null;
   private authUnsubscribe: (() => void) | null = null;
   private mazeSeed = DEFAULT_LEGACY_RUNTIME_SEED;
   private explicitRuntimeMazeSeed = false;
@@ -1537,6 +1558,11 @@ export class MenuScene extends Phaser.Scene {
       this.authUnsubscribe?.();
       this.authUnsubscribe = null;
       this.destroyLegacyAuthNativeInput();
+      this.destroyAccountUsernameNativeInput();
+      if (this.accountUsernameDebounceTimer !== null) {
+        clearTimeout(this.accountUsernameDebounceTimer);
+        this.accountUsernameDebounceTimer = null;
+      }
       this.detachRuntimeDiagnostics();
       this.detachLegacyPlayFocusGuards();
       this.detachLegacyPlayKeyboardFallback();
@@ -2879,7 +2905,7 @@ export class MenuScene extends Phaser.Scene {
 
     if (
       this.overlay !== 'none'
-      && (this.handleOverlayFieldInput(event) || this.handleLegacyAuthFieldInput(event))
+      && (this.handleOverlayFieldInput(event) || this.handleLegacyAuthFieldInput(event) || this.handleAccountUsernameFieldInput(event))
     ) {
       event.preventDefault();
       return true;
@@ -9577,6 +9603,12 @@ export class MenuScene extends Phaser.Scene {
       rowY += stacked ? 46 : 54;
     }
 
+    this.loadAccountUsernameIfNeeded();
+    const usernameFieldWidth = Math.min(panel.width - 72, stacked ? 260 : 320);
+    const usernameFieldHeight = stacked ? 46 : 50;
+    this.createAccountUsernameField(panel.centerX, rowY + (usernameFieldHeight / 2), usernameFieldWidth, usernameFieldHeight);
+    rowY += usernameFieldHeight + (stacked ? 26 : 30);
+
     // No "Done" button -- closing this overlay is what the back chevron is
     // for. Reset Progress (account-level, resets the whole signed-in
     // player's progression, not just the current attempt -- it used to live
@@ -9590,6 +9622,344 @@ export class MenuScene extends Phaser.Scene {
       { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Log out', tone: 'danger' },
       { onClick: () => this.openOverlay('confirm-progression-reset'), text: 'Reset Progress', tone: 'danger' }
     );
+  }
+
+  private loadAccountUsernameIfNeeded(): void {
+    const userId = this.authSnapshot.userId;
+    if (userId === null || this.accountUsernameLoadedForUserId === userId) {
+      return;
+    }
+
+    this.accountUsernameLoadedForUserId = userId;
+    this.accountUsernameStatus = 'loading';
+    this.accountUsernameStatusMessage = null;
+    this.accountUsernameSequence += 1;
+    const sequence = this.accountUsernameSequence;
+
+    void readLegacyAccountUsername(userId).then((result) => {
+      // The user may have signed out, switched accounts, or started typing
+      // (which bumps the sequence itself) while this was in flight -- a
+      // stale response must never stomp newer state.
+      if (sequence !== this.accountUsernameSequence || this.authSnapshot.userId !== userId) {
+        return;
+      }
+
+      if (result.error) {
+        this.accountUsernameStatus = 'error';
+        this.accountUsernameStatusMessage = 'Could not load your username.';
+        this.uiDirty = true;
+        return;
+      }
+
+      this.accountUsernameDraft = result.username ?? '';
+      this.accountUsernameSavedValue = result.username ?? '';
+      this.accountUsernameStatus = 'idle';
+      this.accountUsernameStatusMessage = null;
+      if (this.accountUsernameNativeInput) {
+        this.accountUsernameNativeInput.value = this.accountUsernameDraft;
+      }
+      this.uiDirty = true;
+    });
+  }
+
+  private handleAccountUsernameChange(nextValue: string): void {
+    this.accountUsernameDraft = nextValue;
+    this.uiDirty = true;
+    this.scheduleAccountUsernameEvaluation();
+  }
+
+  private scheduleAccountUsernameEvaluation(): void {
+    if (this.accountUsernameDebounceTimer !== null) {
+      clearTimeout(this.accountUsernameDebounceTimer);
+      this.accountUsernameDebounceTimer = null;
+    }
+    // Bumped unconditionally (even on the early-return branches below) so
+    // any in-flight check/save from a previous keystroke is invalidated
+    // the instant the field changes again, not just when a new debounced
+    // check is actually scheduled.
+    this.accountUsernameSequence += 1;
+    const sequence = this.accountUsernameSequence;
+
+    const candidate = this.accountUsernameDraft.trim();
+    if (candidate.length === 0 || candidate === this.accountUsernameSavedValue) {
+      this.accountUsernameStatus = 'idle';
+      this.accountUsernameStatusMessage = null;
+      this.uiDirty = true;
+      return;
+    }
+
+    if (!LEGACY_USERNAME_PATTERN.test(candidate)) {
+      this.accountUsernameStatus = 'error';
+      this.accountUsernameStatusMessage = '2-15 characters: letters, numbers, periods, underscores, or hyphens.';
+      this.uiDirty = true;
+      return;
+    }
+
+    this.accountUsernameStatus = 'checking';
+    this.accountUsernameStatusMessage = null;
+    this.uiDirty = true;
+
+    this.accountUsernameDebounceTimer = setTimeout(() => {
+      this.accountUsernameDebounceTimer = null;
+      void this.evaluateAndSaveAccountUsername(candidate, sequence);
+    }, 700);
+  }
+
+  private async evaluateAndSaveAccountUsername(candidate: string, sequence: number): Promise<void> {
+    const userId = this.authSnapshot.userId;
+    if (userId === null) {
+      return;
+    }
+
+    const availability = await checkLegacyUsernameAvailable(candidate);
+    if (sequence !== this.accountUsernameSequence) {
+      return;
+    }
+
+    if (availability.error) {
+      this.accountUsernameStatus = 'error';
+      this.accountUsernameStatusMessage = this.resolveAccountUsernameFriendlyError(availability.error);
+      this.uiDirty = true;
+      return;
+    }
+
+    if (availability.available === false) {
+      this.accountUsernameStatus = 'taken';
+      this.accountUsernameStatusMessage = 'That username is already taken.';
+      this.uiDirty = true;
+      return;
+    }
+
+    this.accountUsernameStatus = 'saving';
+    this.uiDirty = true;
+    const saveResult = await saveLegacyAccountUsername(userId, candidate);
+    if (sequence !== this.accountUsernameSequence) {
+      return;
+    }
+
+    if (!saveResult.ok) {
+      this.accountUsernameStatus = saveResult.error === 'That username is already taken.' ? 'taken' : 'error';
+      this.accountUsernameStatusMessage = saveResult.error === null
+        ? 'Could not save your username.'
+        : saveResult.error === 'That username is already taken.'
+          ? saveResult.error
+          : this.resolveAccountUsernameFriendlyError(saveResult.error);
+      this.uiDirty = true;
+      return;
+    }
+
+    this.accountUsernameSavedValue = candidate;
+    this.accountUsernameStatus = 'saved';
+    this.accountUsernameStatusMessage = null;
+    this.uiDirty = true;
+  }
+
+  private resolveAccountUsernameFriendlyError(rawError: string): string {
+    const normalized = rawError.toLowerCase();
+    if (normalized.includes('fetch') || normalized.includes('network')) {
+      return 'Could not reach the account service. Check your connection and try again.';
+    }
+    return 'Could not check that username right now. Try again shortly.';
+  }
+
+  private resolveAccountUsernameStatusText(): string | null {
+    switch (this.accountUsernameStatus) {
+      case 'loading':
+        return 'Loading...';
+      case 'checking':
+        return 'Checking availability...';
+      case 'saving':
+        return 'Saving...';
+      case 'saved':
+        return 'Username saved.';
+      case 'taken':
+        return this.accountUsernameStatusMessage ?? 'That username is already taken.';
+      case 'error':
+        return this.accountUsernameStatusMessage ?? 'Something went wrong.';
+      default:
+        return null;
+    }
+  }
+
+  private createAccountUsernameField(x: number, y: number, width: number, height: number): void {
+    const isActive = this.accountUsernameActive;
+    const contentLeft = x - (width / 2) + 16;
+    const valueWidth = width - 32;
+    const background = this.add.rectangle(x, y, width, height, 0x07131d, 1);
+    background.setStrokeStyle(2, isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, isActive ? 0.95 : 0.68);
+    background.setInteractive({ useHandCursor: true });
+    background.on('pointerdown', () => {
+      this.accountUsernameActive = true;
+      this.positionAccountUsernameNativeInput({ height, width, x, y });
+      this.uiDirty = true;
+    });
+    if (isActive) {
+      this.positionAccountUsernameNativeInput({ height, width, x, y });
+    }
+
+    const eyebrow = this.padLegacyCompactUiText(this.add.text(contentLeft, y - (height * 0.25), 'USERNAME', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${Math.max(8, Math.min(10, Math.round(height * 0.19)))}px`,
+      color: isActive ? '#72e0bf' : '#9bcdbd'
+    })).setOrigin(0, 0.5);
+    this.uiTexts.push(eyebrow);
+
+    const hasValue = this.accountUsernameDraft.length > 0;
+    const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(
+      contentLeft,
+      y + (height * 0.14),
+      hasValue ? this.accountUsernameDraft : 'Set a username',
+      {
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: `${Math.max(14, Math.min(19, Math.round(height * 0.34)))}px`,
+        color: hasValue ? (isActive ? '#72e0bf' : '#ecfff5') : '#7894a0'
+      }
+    )), valueWidth, Math.max(14, Math.min(19, Math.round(height * 0.34))), 10).setOrigin(0, 0.5);
+    this.uiTexts.push(label);
+
+    this.uiButtons.push({
+      background,
+      bounds: createVisualRect(x - (width / 2), y - (height / 2), width, height),
+      label,
+      setActive: () => undefined,
+      text: 'username',
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+      }
+    });
+
+    const statusText = this.resolveAccountUsernameStatusText();
+    if (statusText !== null) {
+      const statusColor = this.accountUsernameStatus === 'saved'
+        ? '#72e0bf'
+        : this.accountUsernameStatus === 'taken' || this.accountUsernameStatus === 'error'
+          ? '#ff9d9d'
+          : '#7894a0';
+      const status = this.padLegacyCompactUiText(this.add.text(contentLeft, y + (height / 2) + 14, statusText, {
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: '11px',
+        color: statusColor
+      })).setOrigin(0, 0.5);
+      this.uiTexts.push(status);
+    }
+  }
+
+  private createAccountUsernameNativeInput(): HTMLInputElement | null {
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
+      return null;
+    }
+
+    if (this.accountUsernameNativeInput) {
+      return this.accountUsernameNativeInput;
+    }
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.autocomplete = 'username';
+    input.inputMode = 'text';
+    input.enterKeyHint = 'done';
+    input.autocapitalize = 'none';
+    input.spellcheck = false;
+    input.maxLength = 15;
+    input.setAttribute('aria-label', 'username');
+    input.setAttribute('data-mazer-account-username-input', 'true');
+    input.value = this.accountUsernameDraft;
+    Object.assign(input.style, {
+      position: 'fixed',
+      zIndex: '2147483647',
+      opacity: '0.01',
+      background: 'transparent',
+      color: 'transparent',
+      caretColor: 'transparent',
+      border: '0',
+      outline: '0',
+      padding: '0',
+      margin: '0'
+    });
+
+    this.accountUsernameNativeInputHandler = () => {
+      this.handleAccountUsernameChange(input.value);
+    };
+    this.accountUsernameNativeKeyDownHandler = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === 'Escape') {
+        event.preventDefault();
+        this.accountUsernameActive = false;
+        this.destroyAccountUsernameNativeInput();
+        this.uiDirty = true;
+      }
+    };
+    input.addEventListener('input', this.accountUsernameNativeInputHandler);
+    input.addEventListener('keydown', this.accountUsernameNativeKeyDownHandler);
+    document.body.appendChild(input);
+    this.accountUsernameNativeInput = input;
+    return input;
+  }
+
+  private positionAccountUsernameNativeInput(
+    bounds: { height: number; width: number; x: number; y: number }
+  ): void {
+    const input = this.createAccountUsernameNativeInput();
+    const canvas = this.game.canvas;
+    if (!input || !canvas) {
+      return;
+    }
+
+    input.value = this.accountUsernameDraft;
+    const rect = canvas.getBoundingClientRect();
+    const cssRect = resolveLegacyAuthInputCssRect(bounds, rect, this.layout);
+    input.style.left = `${cssRect.left}px`;
+    input.style.top = `${cssRect.top}px`;
+    input.style.width = `${Math.max(1, cssRect.width)}px`;
+    input.style.height = `${cssRect.height}px`;
+    window.setTimeout(() => input.focus({ preventScroll: true }), 0);
+  }
+
+  private destroyAccountUsernameNativeInput(): void {
+    if (this.accountUsernameNativeInput) {
+      if (this.accountUsernameNativeInputHandler) {
+        this.accountUsernameNativeInput.removeEventListener('input', this.accountUsernameNativeInputHandler);
+      }
+      if (this.accountUsernameNativeKeyDownHandler) {
+        this.accountUsernameNativeInput.removeEventListener('keydown', this.accountUsernameNativeKeyDownHandler);
+      }
+      this.accountUsernameNativeInput.remove();
+    }
+    this.accountUsernameNativeInput = null;
+    this.accountUsernameNativeInputHandler = null;
+    this.accountUsernameNativeKeyDownHandler = null;
+  }
+
+  // Desktop keyboard fallback, mirroring handleLegacyAuthFieldInput --
+  // the native shadow input above is the primary mechanism (real mobile
+  // keyboards/autofill), this covers keydown events reaching the canvas
+  // directly.
+  private handleAccountUsernameFieldInput(event: KeyboardEvent): boolean {
+    if (this.overlay !== 'auth' || !this.accountUsernameActive) {
+      return false;
+    }
+
+    if (event.key === 'Enter' || event.key === 'Escape') {
+      this.accountUsernameActive = false;
+      this.uiDirty = true;
+      return true;
+    }
+
+    if (event.key === 'Backspace') {
+      this.handleAccountUsernameChange(this.accountUsernameDraft.slice(0, -1));
+      return true;
+    }
+
+    if (event.key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) {
+      return false;
+    }
+
+    if (this.accountUsernameDraft.length >= 15) {
+      return true;
+    }
+
+    this.handleAccountUsernameChange(`${this.accountUsernameDraft}${event.key}`);
+    return true;
   }
 
   private buildAuthCredentialsForm(
@@ -11431,6 +11801,8 @@ export class MenuScene extends Phaser.Scene {
     }
     if (this.overlay === 'auth') {
       this.destroyLegacyAuthNativeInput();
+      this.destroyAccountUsernameNativeInput();
+      this.accountUsernameActive = false;
     }
     const returnOverlay = this.overlay === 'auth' ? this.overlayReturn : 'none';
     this.resetLegacyOverlayScrollState();
@@ -11463,6 +11835,8 @@ export class MenuScene extends Phaser.Scene {
 
   private closeLegacyAuthOverlayToMainMenu(): void {
     this.destroyLegacyAuthNativeInput();
+    this.destroyAccountUsernameNativeInput();
+    this.accountUsernameActive = false;
     this.resetLegacyOverlayScrollState();
     if (this.mode !== 'menu') {
       this.enterMenuMode();
@@ -11696,6 +12070,21 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (previousUserId !== snapshot.userId) {
+      // Signed out, or a different account signed in on the same session --
+      // either way, any loaded/drafted username belonged to the PREVIOUS
+      // account and must not leak into the next one's account screen, even
+      // for a single frame before loadAccountUsernameIfNeeded re-fetches.
+      this.accountUsernameLoadedForUserId = null;
+      this.accountUsernameDraft = '';
+      this.accountUsernameSavedValue = '';
+      this.accountUsernameStatus = 'idle';
+      this.accountUsernameStatusMessage = null;
+      this.accountUsernameActive = false;
+      this.destroyAccountUsernameNativeInput();
+      if (this.accountUsernameDebounceTimer !== null) {
+        clearTimeout(this.accountUsernameDebounceTimer);
+        this.accountUsernameDebounceTimer = null;
+      }
       const hydrationSequence = ++this.authAccountHydrationSequence;
       this.loadPersistedLegacyGameToggleSettings();
       this.loadPersistedMazeCycleTelemetryHistory();

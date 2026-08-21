@@ -616,3 +616,78 @@ export const createLegacyAuthScopedStorage = (
     setItem: (key: string, value: string) => storage.setItem(key === baseKey ? scopedKey : key, value)
   };
 };
+
+// Matches the mazer_profiles.username check constraint exactly (2-15
+// chars, alphanumeric plus ._- ) -- same shape as Fitness's own username
+// pattern, for instant client-side feedback before ever calling the
+// availability RPC.
+export const LEGACY_USERNAME_PATTERN = /^[A-Za-z0-9._-]{2,15}$/;
+
+export const readLegacyAccountUsername = async (
+  userId: string
+): Promise<{ error: string | null; username: string | null }> => {
+  const client = await getLegacyAuthClient();
+  if (!client) {
+    return { error: LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured, username: null };
+  }
+
+  const { data, error } = await client
+    .from('mazer_profiles')
+    .select('username')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  return {
+    error: error?.message ?? null,
+    username: typeof data?.username === 'string' ? data.username : null
+  };
+};
+
+// Best-effort UX only -- mazer_is_username_available is a SECURITY DEFINER
+// RPC that bypasses RLS just enough to answer "is this taken" without
+// exposing any other user's actual profile row. The unique index on
+// mazer_profiles(lower(username)) is the real source of truth; a race
+// between two clients checking the same name still resolves correctly at
+// save time below (whichever save lands second gets error code 23505).
+export const checkLegacyUsernameAvailable = async (
+  candidate: string
+): Promise<{ available: boolean | null; error: string | null }> => {
+  const client = await getLegacyAuthClient();
+  if (!client) {
+    return { available: null, error: LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured };
+  }
+
+  const { data, error } = await client.rpc('mazer_is_username_available', { candidate });
+  if (error) {
+    return { available: null, error: error.message };
+  }
+
+  return { available: data === true, error: null };
+};
+
+export const saveLegacyAccountUsername = async (
+  userId: string,
+  username: string
+): Promise<{ error: string | null; ok: boolean }> => {
+  const client = await getLegacyAuthClient();
+  if (!client) {
+    return { error: LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured, ok: false };
+  }
+
+  // Payload only carries user_id/username, so this upsert only ever
+  // touches those two columns on conflict -- it can't clobber the
+  // revision-guarded settings sync in legacyRemoteProgression.ts, which
+  // writes disjoint columns on the same row.
+  const { error } = await client
+    .from('mazer_profiles')
+    .upsert({ user_id: userId, username }, { onConflict: 'user_id' });
+
+  if (error) {
+    if (error.code === '23505') {
+      return { error: 'That username is already taken.', ok: false };
+    }
+    return { error: error.message, ok: false };
+  }
+
+  return { error: null, ok: true };
+};
