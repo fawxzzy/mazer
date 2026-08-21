@@ -8626,7 +8626,6 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const stick = this.resolveLegacyPlayFloatingStickGeometry(this.playFloatingStickOrigin);
-    this.drawLegacyPlayFloatingStickGlow(stick, this.playTouchStickPull);
     this.drawLegacyPlayTouchStick(stick, this.resolveLegacyPlayHeldTouchControl(), this.playTouchStickPull);
     return createVisualRect(
       stick.outer.left,
@@ -8641,30 +8640,17 @@ export class MenuScene extends Phaser.Scene {
   // stick reads as "this game's" control rather than a boilerplate virtual
   // joystick, and brightens slightly whenever it's actually being pulled in
   // a direction so the feedback loop between thumb and knob is legible.
-  private drawLegacyPlayFloatingStickGlow(
-    stick: NonNullable<ReturnType<typeof resolveTouchControlLayout>['stick']>,
-    pullVector: TouchStickPullVector | null
-  ): void {
-    const glowColor = this.resolveActiveLegacyProgressionPalette().trailColor;
-    const centerX = stick.outer.centerX;
-    const centerY = stick.outer.centerY;
-    const haloRadius = (stick.outer.width / 2) + Math.max(6, Math.round(stick.outer.width * 0.08));
-    const pulled = pullVector !== null;
-    // Lightened along with the size shrink above -- less visual weight
-    // sitting over the maze while idle, still brightens on an active pull.
-    this.hudGraphics.fillStyle(glowColor, pulled ? 0.12 : 0.06);
-    this.hudGraphics.fillCircle(centerX, centerY, haloRadius);
-    this.hudGraphics.lineStyle(pulled ? 2.5 : 1.5, glowColor, pulled ? 0.46 : 0.22);
-    this.hudGraphics.strokeCircle(centerX, centerY, haloRadius);
-  }
-
+  // Just the knob now -- no stationary outer ring, spokes, hub, deadzone
+  // ring, or glow halo. The knob still appears exactly where the touch
+  // landed (stick.outer is centered there, per
+  // resolveLegacyPlayFloatingStickGeometry) and still travels with the
+  // drag exactly as before; only the always-visible chrome around it is
+  // gone.
   private drawLegacyPlayTouchStick(
     stick: NonNullable<ReturnType<typeof resolveTouchControlLayout>['stick']>,
     activeControl: HumanMovementActionKind | null,
     pullVector: TouchStickPullVector | null
   ): void {
-    const outerRadius = stick.outer.width / 2;
-    const innerRadius = stick.inner.width / 2;
     const centerX = stick.outer.centerX;
     const centerY = stick.outer.centerY;
     const knobRadius = stick.knobRadius;
@@ -8682,32 +8668,9 @@ export class MenuScene extends Phaser.Scene {
       knobY += (vector.deltaY / length) * travel;
     }
 
-    // Fill and spokes lightened -- less visual weight sitting over the maze
-    // while idle; the stroke/knob (the parts that actually carry state)
-    // keep their original strength so legibility doesn't suffer.
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_BUTTON_FILL, 0.18);
-    this.hudGraphics.fillCircle(centerX, centerY, outerRadius);
-    this.hudGraphics.lineStyle(3, activeControl === null ? LEGACY_PLAY_TOUCH_BUTTON_STROKE : LEGACY_PLAY_TOUCH_ACCENT, activeControl === null ? 0.42 : 0.76);
-    this.hudGraphics.strokeCircle(centerX, centerY, outerRadius);
-    this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ICON, 0.11);
-    for (let index = 0; index < 8; index += 1) {
-      const angle = (index / 8) * Math.PI * 2;
-      this.hudGraphics.beginPath();
-      this.hudGraphics.moveTo(centerX + (Math.cos(angle) * (innerRadius + 8)), centerY + (Math.sin(angle) * (innerRadius + 8)));
-      this.hudGraphics.lineTo(centerX + (Math.cos(angle) * (outerRadius - 8)), centerY + (Math.sin(angle) * (outerRadius - 8)));
-      this.hudGraphics.strokePath();
-    }
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_COG_HUB, 0.45);
-    this.hudGraphics.fillCircle(centerX, centerY, innerRadius);
-    this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.38);
-    this.hudGraphics.strokeCircle(centerX, centerY, innerRadius);
-    // The deadzone was invisible before -- it existed only in the hit-test
-    // math (resolveStickPullVector), so a small pull near center registered
-    // nothing with no visual explanation why. A faint boundary ring makes
-    // the dead center legible without competing with the hub/outer rings.
-    this.hudGraphics.lineStyle(1, LEGACY_PLAY_TOUCH_ICON, 0.22);
-    this.hudGraphics.strokeCircle(centerX, centerY, stick.deadzoneRadius);
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, activeControl === null ? 0.28 : 0.5);
+    // Grey, not the green accent -- a quiet neutral knob instead of a
+    // colored control competing with the maze/trail for attention.
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_BUTTON_FILL, activeControl === null ? 0.55 : 0.78);
     this.hudGraphics.fillCircle(knobX, knobY, knobRadius);
     this.hudGraphics.lineStyle(2, LEGACY_PLAY_TOUCH_ICON, activeControl === null ? 0.52 : 0.86);
     this.hudGraphics.strokeCircle(knobX, knobY, knobRadius);
@@ -9164,7 +9127,6 @@ export class MenuScene extends Phaser.Scene {
     const guideRowMinFontSize = guideLayout.rowMinFontSize;
     const detailLeft = cardLeft + inset;
     const detailWidth = cardWidth - (inset * 2);
-    const detailRight = detailLeft + detailWidth;
     const visibleCardTop = viewport === null ? cardTop : Math.max(cardTop, viewport.top);
     const visibleCardBottom = viewport === null ? cardTop + cardHeight : Math.min(cardTop + cardHeight, viewport.bottom);
     const visibleCardHeight = Math.max(0, visibleCardBottom - visibleCardTop);
@@ -9279,6 +9241,13 @@ export class MenuScene extends Phaser.Scene {
       guideGraphics.strokeCircle(glyphX, glyphY, badgeRadius);
     };
 
+    // Only the icon + row label center as a block within the card's
+    // content width -- the description text after it stays left-flowing
+    // at a fixed gap, not folded into the centering (centering the
+    // description too read wrong once seen live). Title text is created
+    // first, off at detailLeft, purely to measure its real post-fit
+    // displayWidth, then the icon+title group is repositioned around that
+    // measured width and the description picks up right after it.
     const drawLegendRow = (
       index: number,
       kind: 'start' | 'end' | 'move',
@@ -9287,32 +9256,25 @@ export class MenuScene extends Phaser.Scene {
       accentColor: number
     ): void => {
       const rowTop = legendTop + (index * rowHeight);
-      const glyphX = detailLeft + (compact ? 14 : 16);
       const glyphY = rowTop + (rowHeight / 2);
-      const labelX = detailLeft + (compact ? 28 : 34);
       const titleColor = toCyberArcadeCssHex(accentColor);
-      if (compact) {
-        drawLegendBadge(glyphX, glyphY, 11, accentColor);
-        this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, 12, guideGraphics);
-        addText(
-          `${title}: ${copy}`,
-          labelX,
-          glyphY,
-          Math.max(96, detailRight - labelX),
-          titleColor,
-          guideRowFontSize,
-          0,
-          0.96,
-          guideRowMinFontSize
-        );
-        return;
-      }
-      const labelWidth = Math.min(compact ? 76 : 118, Math.round(detailWidth * (compact ? 0.32 : 0.36)));
-      const copyX = labelX + labelWidth + (compact ? 4 : 8);
-      const copyWidth = Math.max(compact ? 82 : 104, detailRight - copyX);
-      drawLegendBadge(glyphX, glyphY, 12, accentColor);
-      this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, 13, guideGraphics);
-      addText(title, labelX, glyphY, labelWidth, titleColor, guideRowFontSize, 0, 1, guideRowMinFontSize);
+      const badgeRadius = compact ? 11 : 12;
+      const badgeToTextGap = compact ? 14 : 18;
+      const titleCopyGap = compact ? 6 : 8;
+      const titleFontSize = guideRowFontSize;
+      const titleMaxWidth = Math.round(detailWidth * (compact ? 0.4 : 0.36));
+      const titleLabel = addText(`${title}:`, detailLeft, glyphY, titleMaxWidth, titleColor, titleFontSize, 0, compact ? 0.96 : 1, guideRowMinFontSize);
+      const titleWidth = titleLabel?.displayWidth ?? 0;
+      const titleBlockWidth = (badgeRadius * 2) + badgeToTextGap + titleWidth;
+      const contentLeft = detailLeft + Math.max(0, (detailWidth - titleBlockWidth) / 2);
+      const glyphX = contentLeft + badgeRadius;
+      const labelX = contentLeft + (badgeRadius * 2) + badgeToTextGap;
+      drawLegendBadge(glyphX, glyphY, badgeRadius, accentColor);
+      this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, compact ? 12 : 13, guideGraphics);
+      titleLabel?.setX(labelX);
+
+      const copyX = labelX + titleWidth + titleCopyGap;
+      const copyWidth = Math.max(compact ? 82 : 104, detailLeft + detailWidth - copyX);
       addText(
         copy,
         copyX,
@@ -9613,14 +9575,13 @@ export class MenuScene extends Phaser.Scene {
     // for. Reset Progress (account-level, resets the whole signed-in
     // player's progression, not just the current attempt -- it used to live
     // in the play-mode pause overlay's action row before moving here) and
-    // Log out are the bottom action bar, matching Fitness's account screen:
-    // the smaller/rarer/more severe action (Reset Progress) on the left,
-    // the bigger/more routine one (Log out) on the right.
+    // Log out are the bottom action bar: Log out on the left (secondary),
+    // Reset Progress on the right (primary).
     this.createLegacyBottomActionBar(
       panel,
       stacked,
-      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Log out', tone: 'danger' },
-      { onClick: () => this.openOverlay('confirm-progression-reset'), text: 'Reset Progress', tone: 'danger' }
+      { onClick: () => this.openOverlay('confirm-progression-reset'), text: 'Reset Progress', tone: 'danger' },
+      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Log out', tone: 'danger' }
     );
   }
 
@@ -10207,7 +10168,8 @@ export class MenuScene extends Phaser.Scene {
     height: number,
     text: string,
     onClick: () => void,
-    tone: 'primary' | 'secondary' | 'danger'
+    tone: 'primary' | 'secondary' | 'danger',
+    fontSizeOverride?: number
   ): UiButton {
     const chrome = this.add.graphics();
     const colors = tone === 'primary'
@@ -10234,7 +10196,7 @@ export class MenuScene extends Phaser.Scene {
 
     const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
-    const fontSize = Math.max(15, Math.min(22, Math.round(height * 0.4)));
+    const fontSize = fontSizeOverride ?? Math.max(15, Math.min(22, Math.round(height * 0.4)));
     const label = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(
       x,
       resolveLegacyUiLabelCenterY(y, fontSize, 'button'),
@@ -10302,9 +10264,33 @@ export class MenuScene extends Phaser.Scene {
     const secondaryX = barLeft + (secondaryWidth / 2);
     const primaryX = barLeft + secondaryWidth + gap + (primaryWidth / 2);
 
+    // Both buttons share one font size, not each fit independently to its
+    // own width -- the secondary slot is much narrower than the primary
+    // one, so independently-fit text (e.g. "Account" squeezed into the
+    // narrow slot next to "Menu" sitting comfortably at full size in the
+    // wide one) reads as visibly inconsistent even though both start from
+    // the same height-based base size. Measured against each button's own
+    // width via a throwaway text object, then the smaller (more
+    // constrained) of the two wins for both.
+    const baseFontSize = Math.max(15, Math.min(22, Math.round(barHeight * 0.4)));
+    const measureFitFontSize = (text: string, availableWidth: number): number => {
+      const probe = this.add.text(0, 0, text, {
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: `${baseFontSize}px`
+      });
+      this.fitLegacyUiTextToWidth(probe, availableWidth - 32, baseFontSize, 12);
+      const fitSize = String(probe.style.fontSize);
+      probe.destroy();
+      return Number.parseInt(fitSize, 10) || baseFontSize;
+    };
+    const sharedFontSize = Math.min(
+      measureFitFontSize(secondary.text, secondaryWidth),
+      measureFitFontSize(primary.text, primaryWidth)
+    );
+
     this.uiButtons.push(
-      this.createLegacyAuthActionButton(secondaryX, barY, secondaryWidth, barHeight, secondary.text, secondary.onClick, secondary.tone),
-      this.createLegacyAuthActionButton(primaryX, barY, primaryWidth, barHeight, primary.text, primary.onClick, primary.tone)
+      this.createLegacyAuthActionButton(secondaryX, barY, secondaryWidth, barHeight, secondary.text, secondary.onClick, secondary.tone, sharedFontSize),
+      this.createLegacyAuthActionButton(primaryX, barY, primaryWidth, barHeight, primary.text, primary.onClick, primary.tone, sharedFontSize)
     );
   }
 
@@ -12009,7 +11995,27 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    this.authUnsubscribe = await subscribeLegacyAuthState((snapshot) => {
+    this.authUnsubscribe = await subscribeLegacyAuthState((snapshot, event) => {
+      // INITIAL_SESSION is Supabase's own "here's what the session already
+      // was when you registered this listener" event -- redundant with the
+      // explicit readLegacyAuthSessionSnapshot() call right below, which is
+      // the deliberate, authoritative boot-time read. Applying BOTH was a
+      // real race: subscribeLegacyAuthState's own onAuthStateChange
+      // registration (plus a second, separate one inside the auth client's
+      // first-construction persistence listener) could each fire their own
+      // INITIAL_SESSION at any point relative to the explicit read below,
+      // sometimes landing AFTER it with a momentarily different snapshot --
+      // a spurious guest<->authenticated flicker a second or two after
+      // boot. That flicker re-triggered the "account changed" path
+      // (reloading progression from the guest-scoped storage key instead
+      // of the real one, and re-locking the auth gate mid-launch), which is
+      // almost certainly what "kicks back to the menu a second after
+      // Start" and "progress looks reset" on a fresh load actually were --
+      // it only ever showed up once, on the very first boot, because by a
+      // second attempt every one of these races had already settled.
+      if (event === 'INITIAL_SESSION') {
+        return;
+      }
       this.applyLegacyAuthSnapshot(snapshot);
     });
 

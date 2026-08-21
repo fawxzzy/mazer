@@ -1045,9 +1045,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchStick(');
     expect(menuSceneSource).toContain('const knobRadius = stick.knobRadius;');
     expect(menuSceneSource).toContain('const travel = stick.travelRadius;');
-    // The visual rework: a soft halo in the player's own trail color behind
-    // the stick, brighter while actively pulled.
-    expect(menuSceneSource).toContain('private drawLegacyPlayFloatingStickGlow(');
+    // Stripped down to just the knob -- no stationary outer ring, spokes,
+    // hub, deadzone ring, or glow halo, per feedback that the "huge green
+    // circle" wasn't wanted, only the small knob that tracks the touch.
+    expect(menuSceneSource).not.toContain('private drawLegacyPlayFloatingStickGlow(');
+    expect(menuSceneSource).not.toContain('this.hudGraphics.fillCircle(centerX, centerY, outerRadius);');
     expect(menuSceneSource).toContain('deadzoneRadius: touchControlLayout.stick.deadzoneRadius');
     expect(menuSceneSource).toContain('knobRadius: touchControlLayout.stick.knobRadius');
     expect(menuSceneSource).toContain('travelRadius: touchControlLayout.stick.travelRadius');
