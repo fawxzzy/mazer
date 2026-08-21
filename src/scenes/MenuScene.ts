@@ -1847,6 +1847,18 @@ export class MenuScene extends Phaser.Scene {
     if (this.mode === 'play' && this.overlay === 'none' && !this.prefersLegacyReducedMotion()) {
       this.boardDynamicDirty = true;
     }
+    // Menu mode's settings cog (drawLegacyMenuSettingsCog) has the exact
+    // same time-driven blink as play mode's, but it's drawn inside
+    // drawBoardPaths, gated by boardPathDirty -- a flag neither of the two
+    // play-mode fixes above ever re-arms. The menu demo AI's own movement
+    // keeps it mostly covered, but during any hold/pause between moves
+    // nothing else touches boardPathDirty, so the cog freezes and then
+    // jumps on the next AI-move redraw -- the identical "glitchy while
+    // idle" symptom the play-mode cog had before its own fix, just gated
+    // on a dirty flag that fix never covered.
+    if (this.mode === 'menu' && this.overlay === 'none' && !this.prefersLegacyReducedMotion()) {
+      this.boardPathDirty = true;
+    }
     const slowTilePhase = resolveLegacyStaticSlowTilePhase(
       this.playStaticSlowTile,
       time,

@@ -361,8 +361,18 @@ export const legacyTuning = {
       postHiddenRecoveryMs: 2200,
       spikeFrameMs: 50,
       lowPowerHardwareConcurrencyMax: 4,
+      // full was 83ms (~12fps) -- a deliberate battery-saving throttle, but
+      // far too coarse for the starfield's fast/near "warp streak" stars and
+      // the continuously-time-driven glass shard/drift rune motion, both of
+      // which sample raw current time on every actual redraw: at 12fps that
+      // reads as visibly choppy/glitchy rather than smooth drift. update()
+      // already drives this at the real per-frame rate regardless -- this
+      // was purely an extra throttle on top, so lowering it to match a
+      // real frame is a straight smoothness win, not new per-frame cost.
+      // throttled/hidden are real performance-degradation fallbacks, left
+      // as-is.
       ambientUpdateIntervalMs: {
-        full: 83,
+        full: 16,
         throttled: 250,
         hidden: 1000
       },

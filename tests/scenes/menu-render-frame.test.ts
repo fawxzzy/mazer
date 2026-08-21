@@ -1253,7 +1253,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const uiRebuilt = this.uiDirty;');
     expect(menuSceneSource).toContain('this.publishVisualDiagnostics(time, uiRebuilt);');
     expect(tuningSource).toContain('diagnosticsPublishIntervalMs: 1500,');
-    expect(tuningSource).toContain('full: 83,');
+    expect(tuningSource).toContain('full: 16,');
     expect(tuningSource).toContain('throttled: 250,');
   });
 
@@ -1302,6 +1302,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toMatch(/drawLegacySettingsCogControl\([\s\S]*?this\.drawLegacySettingsCog\(\s*graphics,\s*visualRect,\s*active,\s*0\.34 \* blinkScale,/);
     expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(time: number): void');
     expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog(time);');
+    // The menu cog's blink is drawn inside drawBoardPaths, gated by
+    // boardPathDirty -- update() must re-arm that flag every menu-mode
+    // frame the same way it already does for play mode's cog (hudDirty)
+    // and LVL badge (boardDynamicDirty), or the blink freezes between
+    // whatever else happens to touch boardPathDirty and jumps on the next
+    // unrelated redraw instead of pulsing smoothly.
+    expect(menuSceneSource).toContain("if (this.mode === 'menu' && this.overlay === 'none' && !this.prefersLegacyReducedMotion()) {\n      this.boardPathDirty = true;\n    }");
     expect(menuSceneSource).toContain('cyberArcadeMaterial.signal.player,\n      cyberArcadeMaterial.rail.mint,\n      blinkAlpha\n    );');
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause, false, time);');
     expect(menuSceneSource).toContain("placement: 'trailing'");
