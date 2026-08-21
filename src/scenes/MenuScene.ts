@@ -296,7 +296,8 @@ import {
   resolveLegacyAuthFeedbackMessage,
   resolveLegacyAuthValidationMessage,
   type LegacyQueuedPlayerMessage,
-  type LegacyPlayerMessage
+  type LegacyPlayerMessage,
+  type LegacyPlayerMessageTone
 } from '../legacy-runtime/legacyPlayerMessage';
 import {
   hydrateLegacyRemoteAccountState,
@@ -6254,6 +6255,25 @@ export class MenuScene extends Phaser.Scene {
       return clamp(tileLimit / this.menuStaticDrawTileOrder.length, 0, 1);
     }
 
+    // The tile-order reveal (what this progress value tracks) and the
+    // row-slice reveal are armed together but finish at independent rates
+    // -- see isLegacyMenuPointVisibleInStaticDraw's own comment on this
+    // same race for the board tiles. The tile-order one typically finishes
+    // first, nulling tileLimit above while menuStaticDrawLifecyclePhase is
+    // still 'building' until the slower row counter also catches up.
+    // Falling straight through to the phase check in that window read the
+    // title as "not built yet" for however many frames the gap lasted,
+    // then snapping back to fully built once the phase actually settled --
+    // exactly the reported "flickers, disappears for a second, then the
+    // full word appears" bug. Once tileLimit itself has gone null, the
+    // tile-order reveal is done regardless of what the still-catching-up
+    // row counter or phase flag say. (Both counters are always armed
+    // together, so rowsVisible being non-null here can only mean the tile
+    // counter just finished mid-build, never "build never started".)
+    if (this.menuStaticDrawTilesVisible === null && this.menuStaticDrawRowsVisible !== null) {
+      return 1;
+    }
+
     return this.menuStaticDrawLifecyclePhase === 'building' ? 0 : 1;
   }
 
@@ -7074,9 +7094,15 @@ export class MenuScene extends Phaser.Scene {
     const { boardLeft, boardTop, boardWidth, boardHeight } = this.layout;
     this.boardDynamicGraphics.clear();
 
-    const trail = this.mode === 'menu'
-      ? this.trail
-      : buildPathTrail(this.resolveLegacyPlayPerfectPathTrail(), this.settings.toggleTrailFade ? TRAIL_FADE_TAIL : null);
+    // resolveLegacyPlayPerfectPathTrail only ever reads this.maze/this.trail/
+    // this.player -- the exact same shared fields the menu demo AI already
+    // populates every step, so it was never actually play-specific, just
+    // wired to only run there. The menu AI's own raw movement history could
+    // include backtracking/dead-ends the player never needed on the real
+    // shortest route back to start; deriving the same shortest-path-through-
+    // visited-tiles trail for both surfaces carries play's exact trail
+    // behavior over to the menu demo, as asked.
+    const trail = buildPathTrail(this.resolveLegacyPlayPerfectPathTrail(), this.settings.toggleTrailFade ? TRAIL_FADE_TAIL : null);
     const visibleTrail = trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point));
     // resolveLegacyMenuDeconstructTrailAlpha only reads menuStaticDrawLifecyclePhase
     // (shared by both surfaces, "menu" in the name is just legacy) -- it was
@@ -7127,9 +7153,19 @@ export class MenuScene extends Phaser.Scene {
       // own glow on top (a trail fill underneath just muddies it), and
       // leaving the player's own tile uncolored reads as "you are here"
       // more clearly than a solid trail-colored square the marker sits on.
+      // This must compare against the LOGICAL position (this.player, always
+      // a whole tile) and not the animated glide position
+      // (renderedPlayerPoint, a fractional in-between point while moving) --
+      // comparing against the fractional point meant it never exactly
+      // equaled either tile's integer coordinates for virtually the entire
+      // glide, so neither the departure nor the destination tile was
+      // excluded while the player visually traveled between them: the
+      // destination tile's trail mark was popping in the instant the move
+      // was made (while still visually entering it) instead of waiting
+      // until the player had genuinely moved on.
       const isStartTile = point.x === this.maze.start.x && point.y === this.maze.start.y;
       const isGoalTile = point.x === this.maze.goal.x && point.y === this.maze.goal.y;
-      const isCurrentPlayerTile = point.x === renderedPlayerPoint.x && point.y === renderedPlayerPoint.y;
+      const isCurrentPlayerTile = point.x === this.player.x && point.y === this.player.y;
       if (isStartTile || isGoalTile || isCurrentPlayerTile) {
         continue;
       }
@@ -7994,17 +8030,15 @@ export class MenuScene extends Phaser.Scene {
         time + 340,
         palette.trailPulseEdgeColor
       );
-      this.fillLegacyDynamicPathTile(
+      this.fillLegacyTrailPulseInnerSquare(
         point,
         pulseColor,
         originX,
         originY,
         tileSize,
-        alpha,
-        pathSource,
+        Math.min(0.96, 0.96 * alpha),
         pulseEdgeColor,
-        LEGACY_PLAY_PATH_EDGE_ALPHA,
-        0.96
+        Math.min(LEGACY_PLAY_PATH_EDGE_ALPHA, LEGACY_PLAY_PATH_EDGE_ALPHA * alpha)
       );
       this.drawLegacyDynamicTrailBorderDock(
         point,
@@ -8093,6 +8127,34 @@ export class MenuScene extends Phaser.Scene {
         edgeColor
       }
     );
+  }
+
+  // The traveling trail pulse used to fill the whole connectivity-aware
+  // tile (the same material every regular corridor tile uses), stacking a
+  // second full-tile color wash on top of the border trail already drawn
+  // there. Per feedback, it should only tint the same inner square the
+  // player marker itself fills (LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO) --
+  // exactly the "hole" drawLegacyTrailBorder leaves open -- so the pulse
+  // reads as the player's own mark lighting up as it passes, with the
+  // static border color staying visible around it the whole time instead
+  // of being briefly overwritten.
+  private fillLegacyTrailPulseInnerSquare(
+    point: LegacyPoint,
+    coreColor: number,
+    originX: number,
+    originY: number,
+    tileSize: number,
+    coreAlpha: number,
+    edgeColor: number,
+    edgeAlpha: number
+  ): void {
+    const centerX = originX + ((point.x + 0.5) * tileSize);
+    const centerY = originY + ((point.y + 0.5) * tileSize);
+    const halfSide = (tileSize * LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO) / 2;
+    this.boardDynamicGraphics.fillStyle(coreColor, coreAlpha);
+    this.boardDynamicGraphics.fillRect(centerX - halfSide, centerY - halfSide, halfSide * 2, halfSide * 2);
+    this.boardDynamicGraphics.lineStyle(Math.max(1, halfSide * 0.14), edgeColor, edgeAlpha);
+    this.boardDynamicGraphics.strokeRect(centerX - halfSide, centerY - halfSide, halfSide * 2, halfSide * 2);
   }
 
   private fillPlayDynamicMarkerTile(
@@ -9962,6 +10024,18 @@ export class MenuScene extends Phaser.Scene {
       rowY += stacked ? 66 : 72;
     }
 
+    const authMessage = this.resolveLegacyCurrentAuthMessage();
+    if (authMessage) {
+      this.createAuthInfoText(
+        authMessage.copy,
+        rowY + (stacked ? 14 : 16),
+        panel,
+        this.resolveLegacyAuthMessageColor(authMessage.tone),
+        stacked ? 13 : 14
+      );
+      rowY += stacked ? 34 : 38;
+    }
+
     const primaryLabel = this.authSubmitting
       ? 'Working'
       : presentation.primaryActionLabel;
@@ -10106,6 +10180,19 @@ export class MenuScene extends Phaser.Scene {
 
     if (expired) {
       this.markLegacyPlayerMessagesDirty();
+    }
+  }
+
+  private resolveLegacyAuthMessageColor(tone: LegacyPlayerMessageTone): string {
+    switch (tone) {
+      case 'error':
+        return '#ff9d9d';
+      case 'warning':
+        return '#ffd166';
+      case 'success':
+        return '#72e0bf';
+      default:
+        return '#b7f2ff';
     }
   }
 
