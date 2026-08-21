@@ -1709,6 +1709,17 @@ export class MenuScene extends Phaser.Scene {
     if (this.hasLegacyPlayCompassSpinPendingFrame()) {
       this.hudDirty = true;
     }
+    // The play HUD isn't just static chrome -- the settings cog blinks, the
+    // compass ring pulses, and the timer ticks every second, all driven
+    // directly off `time` inside drawHud. None of those had their own
+    // "pending frame" trigger here, so once nothing else re-armed hudDirty
+    // (i.e. the player stood still), every one of them visibly froze until
+    // the next unrelated redraw -- which is what actually made the cog's
+    // blink look "glitchy while idle, then jumps when the player moves":
+    // it wasn't glitching, it just wasn't being redrawn at all in between.
+    if (this.mode === 'play' && this.overlay === 'none' && !this.prefersLegacyReducedMotion()) {
+      this.hudDirty = true;
+    }
     if (this.hasLegacyPlayTrailPulsePendingFrame(time)) {
       this.boardDynamicDirty = true;
     }
@@ -3016,6 +3027,18 @@ export class MenuScene extends Phaser.Scene {
     if (this.isPointInVisualRect(this.overlayMovementSpeedSliderBounds, point.x, point.y, 2)) {
       this.releaseOverlayScrollPointer();
       this.overlayScrollGestureLockPointerId = pointerId;
+      return false;
+    }
+    // The scroll rail's hit test is padded generously (20px) since it's a
+    // thin visual strip that still needs to be an easy touch target -- but
+    // the rail runs the full scrollable height, including right past the
+    // back chevron tucked in the panel's top-right corner. Without this
+    // exclusion, a tap on the chevron also registered as "on the rail",
+    // kicking off a scroll-drag gesture that raced with (and sometimes
+    // ate) the chevron's own click -- this was the actual cause of "the
+    // back button hit box feels off" that reproduction from source alone
+    // never turned up.
+    if (this.isPointInVisualRect(this.overlayBackChevronBounds, point.x, point.y, 0)) {
       return false;
     }
     const onViewport = this.isPointInVisualRect(this.overlayScrollViewportBounds, point.x, point.y, 0);
