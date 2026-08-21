@@ -7015,13 +7015,20 @@ export class MenuScene extends Phaser.Scene {
     // moment the tile-sweep happened to reach their specific cell, often
     // one of the very last things left on screen instead of the first.
     const markerDeconstructAlpha = this.resolveLegacyMenuDeconstructPlayerAlpha(time);
+    // Held back during 'building' so start/goal appear together with the
+    // player once the maze finishes building out, instead of popping in
+    // individually the moment the tile-by-tile reveal happens to reach
+    // their own cell -- the whole "cast" places at once, same as it now
+    // also all clears at once on deconstruct (see markerDeconstructAlpha
+    // above).
+    const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== 'building';
     // Drawn after the trail (not before) so the start/goal tiles always sit
     // on top of the trail's coloring instead of getting painted over
     // whenever the trail passes through those cells.
-    if (markerDeconstructAlpha > 0 && this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
+    if (markersBuiltIn && markerDeconstructAlpha > 0 && this.maze.start && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.start)) {
       this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start');
     }
-    if (markerDeconstructAlpha > 0 && this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
+    if (markersBuiltIn && markerDeconstructAlpha > 0 && this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
       this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal');
     }
 
@@ -7063,7 +7070,8 @@ export class MenuScene extends Phaser.Scene {
     const playerAlpha = markerDeconstructAlpha;
     if (this.mode === 'menu') {
       if (
-        this.menuStaticDrawLifecyclePhase !== 'deconstructing'
+        markersBuiltIn
+        && this.menuStaticDrawLifecyclePhase !== 'deconstructing'
         && this.isLegacyMenuPointVisibleInStaticDraw(this.player)
       ) {
         this.fillLegacyPlayerMarkerTile(renderedPlayerPoint, mazeLeft, mazeTop, mazeTileSize, 0.94 * playerAlpha, false, progressionPalette, time);
@@ -7071,7 +7079,7 @@ export class MenuScene extends Phaser.Scene {
     } else {
       if (
         playerAlpha > 0
-        && this.menuStaticDrawLifecyclePhase !== 'building'
+        && markersBuiltIn
         && this.isLegacyMenuPointVisibleInStaticDraw(this.player)
       ) {
         this.fillLegacyPlayerMarkerTile(renderedPlayerPoint, mazeLeft, mazeTop, mazeTileSize, playerAlpha, true, progressionPalette, time);
