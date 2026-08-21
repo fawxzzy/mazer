@@ -33,7 +33,7 @@ const expectTitlePlacedSafely = (layout: ReturnType<typeof resolveLegacyMenuLayo
 };
 
 describe('legacy menu layout', () => {
-  test('keeps the board centered with a vertically-centered action floating over it on desktop', () => {
+  test('keeps the board centered with a bottom-docked action beneath it on desktop', () => {
     const layout = resolveLegacyMenuLayout(1920, 1080, 50, 49, 49);
 
     const boardCenter = layout.boardLeft + (layout.boardWidth / 2);
@@ -69,10 +69,9 @@ describe('legacy menu layout', () => {
     expect(layout.lanes.title).toBeNull();
     expectTitlePlacedSafely(layout);
     expect(layout.lanes.rank).toBeNull();
-    // The primary action sits at the true vertical screen center, floating
-    // over the demo maze background like a hero CTA -- not docked near
-    // either edge.
-    expect(Math.abs(layout.buttonY - (layout.height / 2))).toBeLessThanOrEqual(2);
+    // The dock button sits near the bottom edge, not tucked immediately
+    // under the board -- that reclaimed space went to the board instead.
+    expect(layout.height - layout.buttonY).toBeLessThanOrEqual(60);
   });
 
   test('keeps menu geometry stable across account states', () => {
@@ -115,11 +114,10 @@ describe('legacy menu layout', () => {
     expect(guestDesktop.lanes.title).toBeNull();
     expect(title.top).toBeGreaterThanOrEqual(guestDesktop.lanes.hud?.top ?? 0);
     expect(title.top + title.height).toBeLessThanOrEqual(guestDesktop.lanes.hud?.bottom ?? 0);
-    // The board is full-bleed -- it extends past the button instead of
-    // stopping above it, and the button itself floats at the true vertical
-    // screen center rather than docked near an edge.
+    // The board is full-bleed -- it extends past the dock button instead of
+    // stopping above it, so the button floats over the board's lower edge.
     expect(guestDesktop.boardTop + guestDesktop.boardHeight).toBeGreaterThan(guestDesktop.centerButtonY);
-    expect(Math.abs(guestDesktop.centerButtonY - (guestDesktop.height / 2))).toBeLessThanOrEqual(2);
+    expect(guestDesktop.height - guestDesktop.centerButtonY).toBeLessThanOrEqual(60);
     expect(guestDesktop).toEqual(authenticatedDesktop);
     expect(guestPhone).toEqual(authenticatedPhone);
     expect(guestPlay).toEqual(authenticatedPlay);
@@ -190,9 +188,8 @@ describe('legacy menu layout', () => {
     expect(layout.rightButtonY).toBe(layout.buttonY);
     expect(layout.centerButtonY).toBe(layout.buttonY);
     expect(layout.buttonLayout).toBe('row');
-    // The button floats over the full-bleed board at the true vertical
-    // screen center now, rather than sitting in a dedicated lane below it.
-    expect(Math.abs(layout.buttonY - (layout.height / 2))).toBeLessThanOrEqual(2);
+    expect(layout.leftButtonY).toBeGreaterThan(layout.boardTop + layout.boardWidth);
+    expect(layout.buttonY).toBeGreaterThan(layout.boardTop + layout.boardWidth);
     expect(layout.buttonY - layout.leftButtonY).toBe(0);
     expect(layout.buttonY + (layout.buttonHeight / 2)).toBeLessThan(layout.footerY);
     expect(layout.buttonWidth).toBeLessThanOrEqual(144);
@@ -200,9 +197,9 @@ describe('legacy menu layout', () => {
     expect(layout.leftButtonX).toBeLessThan(layout.centerButtonX);
     expect(layout.rightButtonX).toBeGreaterThan(layout.centerButtonX);
     expect(layout.titleY).toBeLessThan(layout.boardTop);
-    // The button floats at the true vertical screen center over the
-    // full-bleed board, not docked near either edge.
-    expect(Math.abs(layout.buttonY - (layout.height / 2))).toBeLessThanOrEqual(2);
+    // The dock button now sits near the bottom edge, not tucked immediately
+    // under the board -- that reclaimed space went to the board instead.
+    expect(layout.height - layout.buttonY).toBeLessThanOrEqual(60);
     // Title is compact and clear of the board below it -- whether it sits
     // inline in the header row or in its own banner lane depends on width.
     expectTitlePlacedSafely(layout);
