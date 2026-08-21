@@ -1001,10 +1001,17 @@ const LEGACY_BOARD_GRID_ALPHA = 0;
 const INITIAL_MENU_DEMO_HOLD_MS = 1800;
 const TRAIL_FADE_TAIL = 16;
 const LEGACY_MENU_PANEL_SHADOW_ALPHA = 0;
-const LEGACY_MENU_PATH_CORE = cyberArcadeMaterial.path.core;
+// Dimmed ~22% off the raw token (which is a near-pure #E9FFF1 white) --
+// players called the raw tile color "blinding" to stare at for a whole
+// session. Mixed at the render layer rather than editing the token itself,
+// since world.pathCore is a protected design-token path with its own
+// decision-registry process; this keeps the fix scoped to how Mazer's own
+// tile rendering consumes the token instead of touching the shared token.
+const LEGACY_PATH_CORE_EYE_COMFORT_DIM_AMOUNT = 0.22;
+const LEGACY_MENU_PATH_CORE = mixLegacyIridescentColor(cyberArcadeMaterial.path.core, 0x000000, LEGACY_PATH_CORE_EYE_COMFORT_DIM_AMOUNT);
 const LEGACY_MENU_PATH_EDGE = cyberArcadeMaterial.path.edge;
 const LEGACY_MENU_PATH_EDGE_ALPHA = 0.58;
-const LEGACY_PLAY_PATH_CORE = cyberArcadeMaterial.path.core;
+const LEGACY_PLAY_PATH_CORE = mixLegacyIridescentColor(cyberArcadeMaterial.path.core, 0x000000, LEGACY_PATH_CORE_EYE_COMFORT_DIM_AMOUNT);
 const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;
 const LEGACY_PLAY_PATH_EDGE_ALPHA = 0.58;
 const LEGACY_PLAY_WALL_FILL = cyberArcadeMaterial.substrate.field;
