@@ -609,7 +609,9 @@ describe('legacy reset lane', () => {
     expect(legacyPlayHudSource).not.toContain('resolveLegacyCompassSpinFrame');
     expect(menuSceneSource).not.toContain('drawLegacyCompassGlyph');
     expect(menuSceneSource).not.toContain('hudCompass');
-    expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
+    // Player-facing toast/message cards were removed entirely -- nothing
+    // draws a message box on the play HUD.
+    expect(menuSceneSource).not.toContain('private drawLegacyPlayPlayerMessageStack(');
     expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);');

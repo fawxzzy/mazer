@@ -292,7 +292,6 @@ import {
   expireLegacyPlayerMessageQueue,
   resolveLegacyAuthFeedbackMessage,
   resolveLegacyAuthValidationMessage,
-  resolveLegacyPlayerMessageColor,
   type LegacyQueuedPlayerMessage,
   type LegacyPlayerMessage
 } from '../legacy-runtime/legacyPlayerMessage';
@@ -1087,6 +1086,12 @@ const LEGACY_PLAYER_MARKER_RADIUS_RATIO = 0.34;
 const LEGACY_PLAYER_MARKER_HALO_RATIO = 0.54;
 const LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO = 0.46;
 const LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO = 0.72;
+// The player's on-screen shape is a square filling this fraction of the
+// tile on each axis (both menu-demo and real play use the same fill, so
+// the two surfaces read identically) -- independent of the diamond-era
+// radius ratios above, which only remain as inputs to the halo/locator
+// metrics and diagnostics below.
+const LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO = 0.85;
 // The menu's demo AI is always visibly gliding between tiles on a loop, so
 // its squash-and-stretch-on-move animation alone is enough to read as
 // alive. The real play-mode player sits still between moves far more often
@@ -7679,13 +7684,17 @@ export class MenuScene extends Phaser.Scene {
   }
 
   // The trail used to fill the whole tile (drawLegacyPathMaterialTile, the
-  // same connectivity-aware material every corridor tile uses); it now
-  // draws a diamond in the tile's center instead, matching the player
-  // marker's own shape/size (fillLegacyPlayerMarkerTile) at each surface's
-  // own radius ratio -- reads as "the player's own mark left behind" rather
-  // than a flat color wash. No corridor-connectivity framing is needed for
-  // a fixed-size centered shape, so this doesn't touch pathSource at all.
-  private drawLegacyTrailDiamond(
+  // same connectivity-aware material every corridor tile uses), then a
+  // centered diamond matching the player marker's old shape. Now that the
+  // player is an 85%-fill square (LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO),
+  // the trail instead colors in the border margin around that same-sized
+  // square -- the strip of tile that would be visible "white space" around
+  // the player if it were standing there. Drawn as two opposite-wound
+  // rects in one fill path (outer tile bounds, inner square hole), which
+  // the canvas nonzero winding rule renders as a hollow frame. No corridor-
+  // connectivity framing is needed for a fixed-size centered hole, so this
+  // doesn't touch pathSource at all.
+  private drawLegacyTrailBorder(
     graphics: Phaser.GameObjects.Graphics,
     point: LegacyPoint,
     originX: number,
@@ -7694,22 +7703,28 @@ export class MenuScene extends Phaser.Scene {
     coreColor: number,
     coreAlpha: number,
     edgeColor: number,
-    edgeAlpha: number,
-    radiusRatio: number
+    edgeAlpha: number
   ): void {
-    const centerX = originX + ((point.x + 0.5) * tileSize);
-    const centerY = originY + ((point.y + 0.5) * tileSize);
-    const radius = Math.max(1, tileSize * radiusRatio);
+    const left = originX + (point.x * tileSize);
+    const top = originY + (point.y * tileSize);
+    const innerSide = tileSize * LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO;
+    const inset = Math.max(1, (tileSize - innerSide) / 2);
+
     graphics.fillStyle(coreColor, coreAlpha);
     graphics.beginPath();
-    graphics.moveTo(centerX, centerY - radius);
-    graphics.lineTo(centerX + radius, centerY);
-    graphics.lineTo(centerX, centerY + radius);
-    graphics.lineTo(centerX - radius, centerY);
+    graphics.moveTo(left, top);
+    graphics.lineTo(left + tileSize, top);
+    graphics.lineTo(left + tileSize, top + tileSize);
+    graphics.lineTo(left, top + tileSize);
+    graphics.closePath();
+    graphics.moveTo(left + inset, top + inset);
+    graphics.lineTo(left + inset, top + tileSize - inset);
+    graphics.lineTo(left + tileSize - inset, top + tileSize - inset);
+    graphics.lineTo(left + tileSize - inset, top + inset);
     graphics.closePath();
     graphics.fillPath();
-    graphics.lineStyle(Math.max(1, radius * 0.16), edgeColor, edgeAlpha);
-    graphics.strokePath();
+    graphics.lineStyle(Math.max(1, inset * 0.4), edgeColor, edgeAlpha);
+    graphics.strokeRect(left + inset, top + inset, tileSize - (inset * 2), tileSize - (inset * 2));
   }
 
   private fillLegacyMenuDynamicPathTile(
@@ -7720,7 +7735,7 @@ export class MenuScene extends Phaser.Scene {
     tileSize: number,
     alpha: number
   ): void {
-    this.drawLegacyTrailDiamond(
+    this.drawLegacyTrailBorder(
       this.boardDynamicGraphics,
       point,
       originX,
@@ -7729,8 +7744,7 @@ export class MenuScene extends Phaser.Scene {
       color,
       Math.min(0.92, 0.92 * alpha),
       LEGACY_MENU_PATH_EDGE,
-      Math.min(LEGACY_MENU_PATH_EDGE_ALPHA, LEGACY_MENU_PATH_EDGE_ALPHA * alpha),
-      LEGACY_PLAYER_MARKER_RADIUS_RATIO
+      Math.min(LEGACY_MENU_PATH_EDGE_ALPHA, LEGACY_MENU_PATH_EDGE_ALPHA * alpha)
     );
   }
 
@@ -7859,7 +7873,7 @@ export class MenuScene extends Phaser.Scene {
     tileSize: number,
     alpha: number
   ): void {
-    this.drawLegacyTrailDiamond(
+    this.drawLegacyTrailBorder(
       this.boardDynamicGraphics,
       point,
       originX,
@@ -7868,8 +7882,7 @@ export class MenuScene extends Phaser.Scene {
       color,
       Math.min(0.96, 0.96 * alpha),
       LEGACY_PLAY_PATH_EDGE,
-      Math.min(LEGACY_PLAY_PATH_EDGE_ALPHA, LEGACY_PLAY_PATH_EDGE_ALPHA * alpha),
-      LEGACY_PLAY_PLAYER_MARKER_RADIUS_RATIO
+      Math.min(LEGACY_PLAY_PATH_EDGE_ALPHA, LEGACY_PLAY_PATH_EDGE_ALPHA * alpha)
     );
   }
 
@@ -8123,13 +8136,14 @@ export class MenuScene extends Phaser.Scene {
     const iridescentAccentColor = resolveLegacyIridescentPlayerAccentColor(time, playerCoreColor);
 
     // A small squash-and-stretch along the direction of travel while the
-    // player is gliding between tiles -- the diamond is the only shape left
+    // player is gliding between tiles -- the square is the only shape left
     // now that the halo/beacon rings are gone, so tying ITS animation
     // directly to movement is what gives the marker any sense of motion
     // instead of a rigid icon sliding in a straight line.
     const motion = this.playerVisualMotion;
-    let coreRadiusX = playerMetrics.coreRadius;
-    let coreRadiusY = playerMetrics.coreRadius;
+    const halfSide = (tileSize * LEGACY_PLAYER_MARKER_SQUARE_FILL_RATIO) / 2;
+    let coreRadiusX = halfSide;
+    let coreRadiusY = halfSide;
     if (motion !== null && motion.durationMs > 0 && time < motion.startedAtMs + motion.durationMs) {
       const progress = clamp((time - motion.startedAtMs) / motion.durationMs, 0, 1);
       const dx = motion.to.x - motion.from.x;
@@ -8138,8 +8152,8 @@ export class MenuScene extends Phaser.Scene {
       const along = 1 + stretchAmount;
       const across = 1 - (stretchAmount * 0.6);
       const horizontalMove = Math.abs(dx) >= Math.abs(dy);
-      coreRadiusX = playerMetrics.coreRadius * (horizontalMove ? along : across);
-      coreRadiusY = playerMetrics.coreRadius * (horizontalMove ? across : along);
+      coreRadiusX = halfSide * (horizontalMove ? along : across);
+      coreRadiusY = halfSide * (horizontalMove ? across : along);
     }
 
     // Continuous idle breathing pulse, on top of whatever the squash-
@@ -8151,30 +8165,34 @@ export class MenuScene extends Phaser.Scene {
       coreRadiusY *= breatheScale;
     }
 
-    // No more shadow disc or halo/beacon rings -- the diamond (which
-    // already color-shifts through the midnight-rainbow cycle) is the whole
-    // marker now, plus its cut-gem catchlight.
+    // No more shadow disc or halo/beacon rings -- the square (which already
+    // color-shifts through the midnight-rainbow cycle) is the whole marker
+    // now, plus its cut-gem catchlight.
     this.boardDynamicGraphics.fillStyle(playerCoreColor, alpha);
-    this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(centerX, centerY - coreRadiusY);
-    this.boardDynamicGraphics.lineTo(centerX + coreRadiusX, centerY);
-    this.boardDynamicGraphics.lineTo(centerX, centerY + coreRadiusY);
-    this.boardDynamicGraphics.lineTo(centerX - coreRadiusX, centerY);
-    this.boardDynamicGraphics.closePath();
-    this.boardDynamicGraphics.fillPath();
+    this.boardDynamicGraphics.fillRect(
+      centerX - coreRadiusX,
+      centerY - coreRadiusY,
+      coreRadiusX * 2,
+      coreRadiusY * 2
+    );
     this.boardDynamicGraphics.lineStyle(
       Math.max(1, playerMetrics.strokeWidth * 0.58),
       showLocatorTicks ? LEGACY_PLAY_PLAYER_BEACON_ACCENT : iridescentAccentColor,
       Math.min(0.86, alpha * 0.86)
     );
-    this.boardDynamicGraphics.strokePath();
+    this.boardDynamicGraphics.strokeRect(
+      centerX - coreRadiusX,
+      centerY - coreRadiusY,
+      coreRadiusX * 2,
+      coreRadiusY * 2
+    );
     // Same facet-catchlight convention as the tiles/endpoint markers, cut
-    // into the top-left edge of the player's own diamond core.
+    // into the top-left corner of the player's own square core.
     this.boardDynamicGraphics.fillStyle(cyberArcadeMaterial.rail.white, Math.min(0.6, alpha * 0.65));
     this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(centerX, centerY - coreRadiusY);
-    this.boardDynamicGraphics.lineTo(centerX - (coreRadiusX * 0.32), centerY - (coreRadiusY * 0.32));
-    this.boardDynamicGraphics.lineTo(centerX - coreRadiusX, centerY);
+    this.boardDynamicGraphics.moveTo(centerX - coreRadiusX, centerY - coreRadiusY);
+    this.boardDynamicGraphics.lineTo(centerX - (coreRadiusX * 0.35), centerY - coreRadiusY);
+    this.boardDynamicGraphics.lineTo(centerX - coreRadiusX, centerY - (coreRadiusY * 0.35));
     this.boardDynamicGraphics.closePath();
     this.boardDynamicGraphics.fillPath();
 
@@ -8501,7 +8519,6 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);
-    this.drawLegacyPlayPlayerMessageStack(hudFrame);
 
     this.hudTimerBounds = createVisualRect(
       hudFrame.timerBounds.left,
@@ -8511,48 +8528,6 @@ export class MenuScene extends Phaser.Scene {
     );
     this.hudBounds = this.hudTimerBounds;
     this.hudFrame = hudFrame;
-  }
-
-  private drawLegacyPlayPlayerMessageStack(hudFrame: LegacyPlayHudFrame): void {
-    const messages = this.resolveVisibleLegacyPlayerMessages();
-    if (messages.length <= 0) {
-      return;
-    }
-
-    const compact = this.layout.width < 520;
-    const cardWidth = Math.min(this.layout.width - (compact ? 30 : 64), compact ? 342 : 430);
-    const cardHeight = compact ? 28 : 32;
-    const cardGap = cardHeight + 5;
-    const centerX = this.layout.width / 2;
-    const topY = hudFrame.timerBounds.top + hudFrame.timerBounds.height + (compact ? 12 : 16);
-
-    messages.forEach((message, index) => {
-      const cardTop = topY + (index * cardGap);
-      const cardLeft = centerX - (cardWidth / 2);
-      const toneColor = Phaser.Display.Color.HexStringToColor(resolveLegacyPlayerMessageColor(message)).color;
-
-      this.drawLegacyCyberPanel(this.hudGraphics, {
-        active: true,
-        alpha: message.tone === 'error' ? 0.9 : 0.78,
-        fill: message.tone === 'error' ? 0x211019 : LEGACY_CYBER_PANEL_FILL,
-        height: cardHeight,
-        left: cardLeft,
-        radius: 9,
-        top: cardTop,
-        width: cardWidth
-      });
-      this.hudGraphics.lineStyle(1, toneColor, message.tone === 'error' ? 0.82 : 0.58);
-      this.hudGraphics.strokeRoundedRect(cardLeft + 3, cardTop + 3, cardWidth - 6, cardHeight - 6, 7);
-
-      const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(centerX, cardTop + (cardHeight / 2), message.copy, {
-        align: 'center',
-        color: resolveLegacyPlayerMessageColor(message),
-        fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: compact ? '12px' : '14px'
-      })), cardWidth - 24, compact ? 12 : 14, 10).setOrigin(0.5);
-      label.setData('hud', true);
-      this.uiTexts.push(label);
-    });
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
@@ -8994,20 +8969,14 @@ export class MenuScene extends Phaser.Scene {
     const panel = this.resolveOverlayPanelFrame();
     const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const showAdvancedOptions = this.shouldShowLegacyAdvancedOptions();
-    const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
     const actionButtonHeight = compact ? 44 : 48;
     const shell = resolveLegacyOverlayShellLayout({
       actionHeight: actionButtonHeight,
       actionRows: 1,
-      hasMessage: visibleMessages.length > 0,
       panel
     });
     let rowY = shell.contentTop;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    if (visibleMessages.length > 0) {
-      this.createOverlayPlayerMessageStack(visibleMessages, shell.messageCenterY, panel);
-      rowY += Math.max(0, visibleMessages.length - 1) * (compact ? 18 : 19);
-    }
 
     if (!showAdvancedOptions) {
       const actionY = shell.actionCenterY;
@@ -9453,8 +9422,6 @@ export class MenuScene extends Phaser.Scene {
   private buildPauseOverlay(): void {
     const panel = this.resolveOverlayPanelFrame();
     const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
-    const hasOverlayMessage = visibleMessages.length > 0;
     const actionButtonHeight = stacked ? cyberArcadeMaterial.controls.minimumTouchTarget : 48;
     const shell = resolveLegacyOverlayShellLayout({
       actionHeight: actionButtonHeight,
@@ -9465,13 +9432,9 @@ export class MenuScene extends Phaser.Scene {
       // Account now pairs with Menu in the one remaining row instead of
       // getting its own row underneath.
       actionRows: 1,
-      hasMessage: hasOverlayMessage,
       panel
     });
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand('resume')));
-    if (hasOverlayMessage) {
-      this.createOverlayPlayerMessageStack(visibleMessages, shell.messageCenterY, panel);
-    }
     const actionY = shell.actionCenterY;
     const viewportTop = shell.contentTop;
     const viewport = createVisualRect(
@@ -9585,20 +9548,13 @@ export class MenuScene extends Phaser.Scene {
     this.createOverlayTitle(presentation.title, panel.top + (stacked ? 46 : 54));
 
     const accountLabel = resolveLegacyAuthAccountLabel(this.authSnapshot);
-    this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
-    const visibleMessages = this.resolveVisibleLegacyPlayerMessages();
-    if (visibleMessages.length > 0) {
-      this.createOverlayPlayerMessageStack(visibleMessages, panel.top + (stacked ? 98 : 112), panel);
-      rowY += visibleMessages.length * (stacked ? 18 : 20);
-    } else {
-      this.createAuthInfoText(
-        presentation.helper,
-        panel.top + (stacked ? 90 : 104),
-        panel,
-        '#b7f2ff',
-        stacked ? 13 : 15
-      );
-    }
+    this.createAuthInfoText(
+      presentation.helper,
+      panel.top + (stacked ? 90 : 104),
+      panel,
+      '#b7f2ff',
+      stacked ? 13 : 15
+    );
 
     if (this.authSnapshot.status === 'authenticated') {
       this.buildAuthenticatedAccountSection(panel, stacked, centerX, rowY, accountLabel);
@@ -9850,20 +9806,6 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private createOverlayPlayerMessageStack(
-    messages: readonly LegacyPlayerMessage[],
-    y: number,
-    panel: OverlayPanelFrame
-  ): void {
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const cardGap = stacked ? 34 : 38;
-    const firstY = y - (((messages.length - 1) * cardGap) / 2);
-
-    messages.forEach((message, index) => {
-      this.createOverlayPlayerMessageCard(message, firstY + (index * cardGap), panel);
-    });
-  }
-
   private createAuthInfoText(
     copy: string,
     y: number,
@@ -9979,41 +9921,6 @@ export class MenuScene extends Phaser.Scene {
         label.destroy();
       }
     };
-  }
-
-  private createOverlayPlayerMessageCard(
-    message: LegacyPlayerMessage,
-    y: number,
-    panel: OverlayPanelFrame
-  ): void {
-    const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const cardWidth = Math.min(panel.width - (stacked ? 56 : 92), stacked ? 330 : 430);
-    const cardHeight = stacked ? 30 : 34;
-    const cardLeft = panel.centerX - (cardWidth / 2);
-    const cardTop = y - (cardHeight / 2);
-    const toneColor = Phaser.Display.Color.HexStringToColor(resolveLegacyPlayerMessageColor(message)).color;
-
-    this.drawLegacyCyberPanel(this.overlayGraphics, {
-      active: true,
-      alpha: message.tone === 'error' ? 0.94 : 0.86,
-      fill: message.tone === 'error' ? 0x211019 : LEGACY_CYBER_PANEL_FILL,
-      height: cardHeight,
-      left: cardLeft,
-      radius: 10,
-      top: cardTop,
-      width: cardWidth
-    });
-    this.overlayGraphics.lineStyle(1, toneColor, message.tone === 'error' ? 0.84 : 0.62);
-    this.overlayGraphics.strokeRoundedRect(cardLeft + 3, cardTop + 3, cardWidth - 6, cardHeight - 6, 8);
-
-    const maxWidth = cardWidth - 24;
-    const text = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(panel.centerX, y, message.copy, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: stacked ? '13px' : '15px',
-      color: resolveLegacyPlayerMessageColor(message),
-      align: 'center'
-    })), maxWidth, stacked ? 13 : 15, 11).setOrigin(0.5);
-    this.uiTexts.push(text);
   }
 
   private createAuthFieldBox(

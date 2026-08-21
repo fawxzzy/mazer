@@ -37,15 +37,13 @@ describe('legacy UI standards', () => {
     expect(resolveLegacyOverlayShellLayout({
       actionHeight: 42,
       actionRows: 2,
-      hasMessage: false,
       panel
     })).toEqual({
       actionCenterY: 794,
       contentHeight: 646,
       contentLeft: 24,
       contentTop: 60,
-      contentWidth: 342,
-      messageCenterY: 66
+      contentWidth: 342
     });
     expect(LEGACY_UI_MIN_TOUCH_TARGET).toBe(44);
   });

@@ -42,7 +42,6 @@ export interface LegacyOverlayShellLayout {
   contentLeft: number;
   contentTop: number;
   contentWidth: number;
-  messageCenterY: number;
 }
 
 // Header chrome for Settings/Pause is now just the corner back button --
@@ -53,12 +52,10 @@ export const LEGACY_OVERLAY_HEADER_RESERVE = 46;
 export const resolveLegacyOverlayShellLayout = ({
   actionHeight,
   actionRows,
-  hasMessage,
   panel
 }: {
   actionHeight: number;
   actionRows: number;
-  hasMessage: boolean;
   panel: LegacyOverlayPanelLayout;
 }): LegacyOverlayShellLayout => {
   const resolvedActionHeight = Math.max(LEGACY_UI_MIN_TOUCH_TARGET, Math.round(actionHeight));
@@ -67,10 +64,7 @@ export const resolveLegacyOverlayShellLayout = ({
   const actionBottomInset = compact ? 20 : 24;
   const actionRowGap = compact ? 10 : 14;
   const actionContentGap = compact ? 12 : 16;
-  const messageCenterY = panel.top + LEGACY_OVERLAY_HEADER_RESERVE + (compact ? 12 : 14);
-  const contentTop = panel.top + LEGACY_OVERLAY_HEADER_RESERVE + (hasMessage
-    ? (compact ? 26 : 30)
-    : (compact ? 6 : 8));
+  const contentTop = panel.top + LEGACY_OVERLAY_HEADER_RESERVE + (compact ? 6 : 8);
   const panelBottom = panel.top + panel.height;
   const actionCenterY = panelBottom - actionBottomInset - (resolvedActionHeight / 2);
   const actionStackTop = actionCenterY
@@ -83,8 +77,7 @@ export const resolveLegacyOverlayShellLayout = ({
     contentHeight: Math.max(0, contentBottom - contentTop),
     contentLeft: panel.left + contentHorizontalInset,
     contentTop,
-    contentWidth: Math.max(1, panel.width - (contentHorizontalInset * 2)),
-    messageCenterY
+    contentWidth: Math.max(1, panel.width - (contentHorizontalInset * 2))
   };
 };
 
