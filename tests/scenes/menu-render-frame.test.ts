@@ -1692,7 +1692,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(overlayPanelStart).toBeGreaterThanOrEqual(0);
     expect(overlayPanelEnd).toBeGreaterThan(overlayPanelStart);
-    expect(overlayPanelSource).toContain("this.overlay === 'auth' ? 1 : 0.82");
+    expect(overlayPanelSource).toContain('this.overlayGraphics.fillStyle(0x02040a, 0.82);');
     expect(overlayPanelSource).toContain('this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);');
     expect(overlayPanelSource).not.toContain('drawLegacyCyberPanel');
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');
