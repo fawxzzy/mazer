@@ -1093,7 +1093,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // overlay's one remaining action row pairs Account with Menu instead.
     expect(menuSceneSource).not.toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
     expect(menuSceneSource).toContain("const accountAction = (): void => this.openOverlay('auth');");
-    expect(menuSceneSource).toContain("'Account', accountAction");
+    expect(menuSceneSource).toContain("{ onClick: accountAction, text: 'Account', tone: 'secondary' }");
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
     expect(menuSceneSource).toContain('this.playDirectionalIntent.step(this.maze, this.player, {');
@@ -1386,11 +1386,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.layout.centerButtonX,');
     expect(menuSceneSource).toContain('this.layout.centerButtonY,');
     expect(menuSceneSource).not.toContain('const accountActionLabel =');
-    expect(menuSceneSource).toContain('private createLegacyOptionsAccountActionRow(');
-    expect(menuSceneSource).toContain('this.createLegacyOptionsAccountActionRow(panel);');
-    expect(menuSceneSource).toContain('contentCenterY: actionY');
-    expect(menuSceneSource).toContain("const label = 'Account';");
-    expect(menuSceneSource).toContain("const action = (): void => this.openOverlay('auth');");
+    // The Options overlay's Account action is a bottom action bar button
+    // now (Fitness-style), pinned to the panel bottom instead of scrolling
+    // with the toggle content -- same call in both the simple and advanced
+    // branches.
+    expect(menuSceneSource).not.toContain('private createLegacyOptionsAccountActionRow(');
+    expect(menuSceneSource).toContain(
+      "this.createLegacyBottomActionBar(panel, compact, { onClick: () => this.openOverlay('auth'), text: 'Account', tone: 'primary' });"
+    );
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain('Account access is unavailable right now. You can still play as a guest.');
     expect(playerMessageSource).toContain('export interface LegacyQueuedPlayerMessage');

@@ -125,7 +125,6 @@ import {
   resolveLegacyOverlayShellLayout,
   resolveLegacyOptionsGuideLayout,
   resolveLegacyToggleRowLayout,
-  resolveLegacyTwoUpButtonLayout,
   resolveLegacyUiLabelCenterY,
   type LegacyUiLabelRole
 } from '../legacy-runtime/legacyUiStandards';
@@ -9001,7 +9000,10 @@ export class MenuScene extends Phaser.Scene {
     const panel = this.resolveOverlayPanelFrame();
     const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const showAdvancedOptions = this.shouldShowLegacyAdvancedOptions();
-    const actionButtonHeight = compact ? 44 : 48;
+    // Matches createLegacyBottomActionBar's own height exactly, so the
+    // scrollable content above reserves precisely the space the bar
+    // actually occupies.
+    const actionButtonHeight = compact ? 48 : 52;
     const shell = resolveLegacyOverlayShellLayout({
       actionHeight: actionButtonHeight,
       actionRows: 1,
@@ -9011,7 +9013,6 @@ export class MenuScene extends Phaser.Scene {
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
 
     if (!showAdvancedOptions) {
-      const actionY = shell.actionCenterY;
       const viewportTop = rowY + (compact ? 4 : 6);
       const viewport = createVisualRect(
         shell.contentLeft,
@@ -9049,8 +9050,8 @@ export class MenuScene extends Phaser.Scene {
         scrollOffset: scrollMetrics.offset,
         viewport: renderViewport
       });
-      this.createLegacyOptionsAccountActionRow(panel, { contentCenterY: actionY });
       this.drawLegacyOverlayScrollFacade(scrollMetrics);
+      this.createLegacyBottomActionBar(panel, compact, { onClick: () => this.openOverlay('auth'), text: 'Account', tone: 'primary' });
       return;
     }
 
@@ -9068,7 +9069,7 @@ export class MenuScene extends Phaser.Scene {
       rowY = this.createColorInputRow('Wall RGB 0-255', ['wallR', 'wallG', 'wallB'], rowY, panel, this.settings.wallColor);
     }
 
-    this.createLegacyOptionsAccountActionRow(panel);
+    this.createLegacyBottomActionBar(panel, compact, { onClick: () => this.openOverlay('auth'), text: 'Account', tone: 'primary' });
   }
 
   // The Guide card's actual on-screen height depends on overlayGuideExpanded
@@ -9413,40 +9414,6 @@ export class MenuScene extends Phaser.Scene {
     graphics.strokeCircle(centerX, centerY, knobRadius);
   }
 
-  private createLegacyOptionsAccountActionRow(
-    panel: OverlayPanelFrame,
-    options: {
-      contentCenterY?: number | null;
-      scrollOffset?: number;
-      viewport?: VisualRect | null;
-    } = {}
-  ): void {
-    const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const label = 'Account';
-    const buttonWidth = Math.min(panel.width - 72, compact ? 190 : 220);
-    const buttonHeight = compact ? 44 : 48;
-    const contentCenterY = options.contentCenterY ?? panel.top + panel.height - (compact ? 48 : 56);
-    const buttonY = contentCenterY - (options.scrollOffset ?? 0);
-    const viewport = options.viewport ?? null;
-    if (viewport !== null && (
-      buttonY - (buttonHeight / 2) < viewport.top + 2
-      || buttonY + (buttonHeight / 2) > viewport.bottom - 2
-    )) {
-      return;
-    }
-    const action = (): void => this.openOverlay('auth');
-
-    this.uiButtons.push(this.createButton(
-      panel.centerX,
-      buttonY,
-      buttonWidth,
-      buttonHeight,
-      label,
-      action,
-      { labelRole: 'overlay-action' }
-    ));
-  }
-
   private shouldShowLegacyAdvancedOptions(): boolean {
     return resolveLegacyAdvancedOptionsVisible(typeof window === 'undefined' ? '' : window.location.search);
   }
@@ -9454,7 +9421,10 @@ export class MenuScene extends Phaser.Scene {
   private buildPauseOverlay(): void {
     const panel = this.resolveOverlayPanelFrame();
     const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const actionButtonHeight = stacked ? cyberArcadeMaterial.controls.minimumTouchTarget : 48;
+    // Matches createLegacyBottomActionBar's own height exactly (both above
+    // the standard 44px touch-target minimum) so the scrollable content
+    // above reserves precisely the space the bar actually occupies.
+    const actionButtonHeight = stacked ? 48 : 52;
     const shell = resolveLegacyOverlayShellLayout({
       actionHeight: actionButtonHeight,
       // Down from 3 -- Reset (reset-player) was removed from the game
@@ -9467,7 +9437,6 @@ export class MenuScene extends Phaser.Scene {
       panel
     });
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand('resume')));
-    const actionY = shell.actionCenterY;
     const viewportTop = shell.contentTop;
     const viewport = createVisualRect(
       shell.contentLeft,
@@ -9508,19 +9477,14 @@ export class MenuScene extends Phaser.Scene {
     const accountAction = (): void => this.openOverlay('auth');
     const mainMenuAction = (): void => this.applyLegacyPauseCommand('return-menu');
 
-    if (stacked) {
-      const compactRow = resolveLegacyTwoUpButtonLayout(panel.centerX, panel.width, 128, 64, 14);
-      this.uiButtons.push(
-        this.createButton(compactRow.leftX, actionY, compactRow.buttonWidth, actionButtonHeight, 'Account', accountAction, { labelRole: 'overlay-action' }),
-        this.createButton(compactRow.rightX, actionY, compactRow.buttonWidth, actionButtonHeight, 'Menu', mainMenuAction)
-      );
-      return;
-    }
-
-    const desktopRow = resolveLegacyTwoUpButtonLayout(panel.centerX, panel.width, 140, 72, 14);
-    this.uiButtons.push(
-      this.createButton(desktopRow.leftX, actionY, desktopRow.buttonWidth, actionButtonHeight, 'Account', accountAction, { labelRole: 'overlay-action' }),
-      this.createButton(desktopRow.rightX, actionY, desktopRow.buttonWidth, actionButtonHeight, 'Menu', mainMenuAction)
+    // Bottom action bar, same as the account screen: Account (the rarer of
+    // the two -- most pauses end in Resume/Menu, not a detour to settings)
+    // is the smaller secondary slot, Menu the bigger primary one.
+    this.createLegacyBottomActionBar(
+      panel,
+      stacked,
+      { onClick: mainMenuAction, text: 'Menu', tone: 'primary' },
+      { onClick: accountAction, text: 'Account', tone: 'secondary' }
     );
   }
 
@@ -9589,7 +9553,7 @@ export class MenuScene extends Phaser.Scene {
     );
 
     if (this.authSnapshot.status === 'authenticated') {
-      this.buildAuthenticatedAccountSection(panel, stacked, centerX, rowY, accountLabel);
+      this.buildAuthenticatedAccountSection(panel, stacked, rowY, accountLabel);
       return;
     }
 
@@ -9600,13 +9564,9 @@ export class MenuScene extends Phaser.Scene {
   private buildAuthenticatedAccountSection(
     panel: OverlayPanelFrame,
     stacked: boolean,
-    centerX: number,
     startY: number,
     accountLabel: string
   ): void {
-    const panelBottom = panel.top + panel.height;
-    const buttonHeight = stacked ? 46 : 50;
-    const buttonWidth = Math.min(panel.width - 72, stacked ? 260 : 320);
     let rowY = startY;
 
     this.createAuthAccountSummaryCard(`Signed in as ${accountLabel}`, rowY, panel);
@@ -9617,38 +9577,18 @@ export class MenuScene extends Phaser.Scene {
       rowY += stacked ? 46 : 54;
     }
 
-    this.uiButtons.push(
-      // Reset Progress used to live in the play-mode pause overlay's action
-      // row; it's account-level data (resets the signed-in player's whole
-      // progression, not just the current attempt), so it belongs on the
-      // account screen with the rest of the account actions instead.
-      this.createLegacyAuthActionButton(
-        centerX,
-        panelBottom - (stacked ? 170 : 184),
-        buttonWidth,
-        buttonHeight,
-        'Reset Progress',
-        () => this.openOverlay('confirm-progression-reset'),
-        'danger'
-      ),
-      this.createLegacyAuthActionButton(
-        centerX,
-        panelBottom - (stacked ? 116 : 126),
-        buttonWidth,
-        buttonHeight,
-        'Log out',
-        () => { void this.handleLegacyAuthSignOut(); },
-        'danger'
-      ),
-      this.createLegacyAuthActionButton(
-        centerX,
-        panelBottom - (stacked ? 62 : 68),
-        buttonWidth,
-        buttonHeight,
-        'Done',
-        () => this.closeOverlay(),
-        'secondary'
-      )
+    // No "Done" button -- closing this overlay is what the back chevron is
+    // for. Reset Progress (account-level, resets the whole signed-in
+    // player's progression, not just the current attempt -- it used to live
+    // in the play-mode pause overlay's action row before moving here) and
+    // Log out are the bottom action bar, matching Fitness's account screen:
+    // the smaller/rarer/more severe action (Reset Progress) on the left,
+    // the bigger/more routine one (Log out) on the right.
+    this.createLegacyBottomActionBar(
+      panel,
+      stacked,
+      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Log out', tone: 'danger' },
+      { onClick: () => this.openOverlay('confirm-progression-reset'), text: 'Reset Progress', tone: 'danger' }
     );
   }
 
@@ -9953,6 +9893,49 @@ export class MenuScene extends Phaser.Scene {
         label.destroy();
       }
     };
+  }
+
+  // Fitness's bottom action bar: one or two pill buttons pinned to the very
+  // bottom edge of the surface, a smaller "secondary" action on the left
+  // and a larger "primary" action on the right (a single action just fills
+  // the full width). Reuses createLegacyAuthActionButton for the actual
+  // pill chrome -- this only owns the shared bottom-anchored split layout.
+  private createLegacyBottomActionBar(
+    panel: OverlayPanelFrame,
+    stacked: boolean,
+    primary: { onClick: () => void; text: string; tone: 'danger' | 'primary' | 'secondary' },
+    secondary: { onClick: () => void; text: string; tone: 'danger' | 'primary' | 'secondary' } | null = null
+  ): void {
+    const panelBottom = panel.top + panel.height;
+    const barHeight = stacked ? 48 : 52;
+    const barY = panelBottom - (stacked ? 20 : 24) - (barHeight / 2);
+    const sideMargin = stacked ? 20 : 28;
+    const barLeft = panel.left + sideMargin;
+    const barWidth = panel.width - (sideMargin * 2);
+
+    if (secondary === null) {
+      this.uiButtons.push(this.createLegacyAuthActionButton(
+        barLeft + (barWidth / 2),
+        barY,
+        barWidth,
+        barHeight,
+        primary.text,
+        primary.onClick,
+        primary.tone
+      ));
+      return;
+    }
+
+    const gap = 10;
+    const secondaryWidth = Math.round(barWidth * 0.34);
+    const primaryWidth = barWidth - secondaryWidth - gap;
+    const secondaryX = barLeft + (secondaryWidth / 2);
+    const primaryX = barLeft + secondaryWidth + gap + (primaryWidth / 2);
+
+    this.uiButtons.push(
+      this.createLegacyAuthActionButton(secondaryX, barY, secondaryWidth, barHeight, secondary.text, secondary.onClick, secondary.tone),
+      this.createLegacyAuthActionButton(primaryX, barY, primaryWidth, barHeight, primary.text, primary.onClick, primary.tone)
+    );
   }
 
   private createAuthFieldBox(

@@ -46,8 +46,11 @@ describe('legacy pause lifecycle', () => {
     expect(pauseOverlaySource).not.toContain("'Reset', resetAction");
     expect(pauseOverlaySource).not.toContain("'Reset Progress'");
     expect(pauseOverlaySource).not.toContain("'Log out'");
-    expect(pauseOverlaySource).toContain("'Account', accountAction");
-    expect(pauseOverlaySource).toContain("'Menu', mainMenuAction");
+    // Account/Menu are now a bottom action bar (Fitness-style split pill
+    // row) instead of two equal-width buttons.
+    expect(pauseOverlaySource).toContain('this.createLegacyBottomActionBar(');
+    expect(pauseOverlaySource).toContain("{ onClick: mainMenuAction, text: 'Menu', tone: 'primary' }");
+    expect(pauseOverlaySource).toContain("{ onClick: accountAction, text: 'Account', tone: 'secondary' }");
     expect(pauseOverlaySource).not.toContain("'Resume'");
     expect(pauseOverlaySource).not.toContain('resumeAction');
     expect(menuSceneSource).toContain("this.createLegacyAuthActionButton(");
