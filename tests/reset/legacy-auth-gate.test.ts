@@ -7,15 +7,16 @@ import {
 } from '../../src/legacy-runtime/legacyGuestAccess';
 
 describe('legacy full auth gate', () => {
-  test('keeps the existing local guest scope playable while account access is optional', () => {
+  test('keeps local guest play explicit while the default resolved entry is login-first', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(LEGACY_GUEST_PLAY_ACCESS_ENABLED).toBe(true);
     expect(isLegacyPlayAccessAllowed('guest')).toBe(true);
     expect(isLegacyPlayAccessAllowed('unavailable')).toBe(true);
     expect(isLegacyPlayAccessAllowed('authenticated')).toBe(true);
-    expect(menuSceneSource).toContain('this.authGateLocked = !isLegacyPlayAccessAllowed(snapshot.status);');
-    expect(menuSceneSource).toContain('const playAccessAllowed = isLegacyPlayAccessAllowed(this.authSnapshot.status);');
+    expect(menuSceneSource).toContain('private guestPlayGranted = false;');
+    expect(menuSceneSource).toContain("this.authGateLocked = snapshot.status !== 'authenticated' && !this.guestPlayGranted;");
+    expect(menuSceneSource).toContain('const playAccessAllowed = !this.authGateLocked');
     expect(menuSceneSource).toContain('if (!isLegacyPlayAccessAllowed(this.authSnapshot.status)) {');
   });
 
@@ -29,6 +30,8 @@ describe('legacy full auth gate', () => {
     expect(menuSceneSource).toContain("tone: 'secondary'");
     expect(guestPlayStart).toBeGreaterThanOrEqual(0);
     expect(guestPlaySource).toContain("this.authSnapshot.status === 'authenticated'");
+    expect(guestPlaySource).toContain('this.guestPlayGranted = true;');
+    expect(guestPlaySource).toContain('this.authGateLocked = false;');
     expect(guestPlaySource).toContain('this.startPlayMode();');
     expect(guestPlaySource).toContain('this.destroyLegacyAuthNativeInput();');
     expect(guestPlaySource).not.toContain('signOutLegacyAuth');
