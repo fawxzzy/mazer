@@ -55,7 +55,6 @@ export interface LegacyPlayLifecycleSnapshot {
   timerRunning: boolean;
   playerVisible: boolean;
   trailVisible: boolean;
-  compassSpinExpected: boolean;
   resetPending: boolean;
   generationPending: boolean;
   nextSeedQueued: boolean;
@@ -249,7 +248,6 @@ export const resolveLegacyPlayLifecycleSnapshot = ({
       timerRunning: false,
       playerVisible: false,
       trailVisible: false,
-      compassSpinExpected: false,
       resetPending,
       generationPending,
       nextSeedQueued,
@@ -289,7 +287,6 @@ export const resolveLegacyPlayLifecycleSnapshot = ({
     timerRunning: timerStarted && !inputLocked,
     playerVisible: !isBuilding && playerAlpha > 0.01,
     trailVisible: !isBuilding && normalizedTrailLength > 0 && trailAlpha > 0.01,
-    compassSpinExpected: isBuilding || isDeconstructing,
     resetPending,
     generationPending,
     nextSeedQueued,

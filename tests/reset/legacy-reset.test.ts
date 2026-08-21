@@ -600,36 +600,19 @@ describe('legacy reset lane', () => {
 
     expect(menuSceneSource).toContain('resolveLegacyPlayHudFrame({');
     expect(menuSceneSource).toContain('timerText: this.hudFrame?.timerText ?? null');
-    expect(menuSceneSource).toContain('arrowAngleDegrees: this.hudFrame?.arrowAngleDegrees ?? null');
-    expect(menuSceneSource).toContain('arrowAngleRadians: this.hudFrame?.arrowAngleRadians ?? null');
-    expect(menuSceneSource).toContain('compassSpinActive: this.hudCompassSpinActive');
-    expect(menuSceneSource).toContain('compassVisualAngleRadians: this.hudCompassVisualAngleRadians');
     expect(legacyPlayHudSource).toContain('const timerText = formatLegacyHudClock(input.elapsedMs);');
-    expect(legacyPlayHudSource).toContain('Math.atan2(goalScreen.y - playerScreen.y, goalScreen.x - playerScreen.x)');
-    expect(legacyPlayHudSource).toContain('resolveLegacyCompassSpinFrame');
     expect(legacyPlayHudSource).toContain('const minutes = Math.floor(totalSeconds / 60) % 10;');
-    expect(legacyPlayHudSource).toContain('const arrowAngleDegrees = (arrowAngleRadians * 180) / Math.PI;');
     expect(menuSceneSource).not.toContain('WASD or arrows to move   P to pause');
-    expect(legacyPlayHudSource).toContain('const compassBounds = input.compassBounds');
-    // The compass itself now sits at the true horizontal screen center
-    // ("centered middle of the screen"); the timer moves beside it instead.
-    expect(legacyPlayHudSource).toContain('Math.round((input.layoutWidth - LEGACY_COMPASS_DEFAULT_SIZE) / 2),');
-    expect(legacyPlayHudSource).toContain('x: compassBounds.centerX');
-    expect(legacyPlayHudSource).toContain('y: compassBounds.centerY');
-    expect(legacyPlayHudSource).toContain('const length = 14;');
-    expect(legacyPlayHudSource).toContain('Math.round(compassBounds.left - LEGACY_COMPASS_TIMER_GAP - LEGACY_TIMER_WIDTH),');
+    // The compass idea was removed from the app entirely -- the timer now
+    // takes the centered slot it used to share space beside.
+    expect(legacyPlayHudSource).not.toContain('compassBounds');
+    expect(legacyPlayHudSource).not.toContain('resolveLegacyCompassSpinFrame');
+    expect(menuSceneSource).not.toContain('drawLegacyCompassGlyph');
+    expect(menuSceneSource).not.toContain('hudCompass');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
-    expect(menuSceneSource).toContain('timerText: this.hudFrame?.timerText ?? null');
     expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);');
-    expect(menuSceneSource).toContain('this.startLegacyPlayCompassSpin(time);');
-    expect(menuSceneSource).toContain('private resolveLegacyPlayCompassVisualFrame(');
-    expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
-    // The compass now draws with the same rich glyph used by the menu
-    // surface and the Guide overlay's legend icon (ring/ticks/needle),
-    // instead of a separately hand-drawn crosshair with its own pane.
-    expect(menuSceneSource).toContain('this.drawLegacyCompassGlyph(');
     expect(menuSceneSource).not.toContain('private drawLegacyPlayCompass(');
     expect(menuSceneSource).not.toContain('fillRoundedRect(20, 18, 184, 44, 8)');
     expect(menuSceneSource).toContain('this.schedulePlayResetReturn();');

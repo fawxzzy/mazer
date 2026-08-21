@@ -93,11 +93,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(buildPauseSource.indexOf('this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {')).toBeLessThan(
       buildPauseSource.indexOf('this.createFeatureControlRows(contentFlow.controlsTop, panel, {')
     );
-    expect(guideSource).toContain("drawLegendRow(legendRowIndex, 'compass', 'Compass'");
     expect(guideSource).toContain("drawLegendRow(legendRowIndex, 'start', 'Start'");
     expect(guideSource).toContain("drawLegendRow(legendRowIndex, 'end', 'Exit'");
-    expect(guideSource).toContain('includeCompassRow');
-    expect(guideSource).toContain("'follow it to the exit'");
+    expect(guideSource).not.toContain('includeCompassRow');
     expect(guideSource).toContain("'begin at gold'");
     expect(guideSource).toContain("'finish at red'");
     expect(guideSource).not.toContain("'Player • green trail'");
@@ -105,7 +103,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(guideSource).not.toContain('activeTargetComplexity');
     expect(guideSource).not.toContain('measuredMazeComplexity');
     expect(guideSource).not.toContain('drawChip(');
-    expect(menuSceneSource).toContain('private drawLegacyCompassGlyph(');
+    expect(menuSceneSource).not.toContain('drawLegacyCompassGlyph');
     expect(menuSceneSource).toContain('drawLegacyOptionsGuideGlyph');
     expect(menuSceneSource).toContain("addSectionHeading('Controls'");
     expect(menuSceneSource).toContain("addSectionHeading('Display'");
@@ -748,20 +746,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.boardStaticGraphics.fillStyle(walkable ? pathGlow : wallColor');
   });
 
-  test('keeps active play HUD focused on compass controls while the level glyph stays separate', () => {
+  test('keeps active play HUD minimal, with the level glyph staying separate', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_TIMER_PANE =');
     expect(menuSceneSource).toContain('const LEGACY_CYBER_PANEL_STROKE = cyberArcadeMaterial.rail.mint;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW = cyberArcadeMaterial.signal.goal;');
-    expect(menuSceneSource).toContain('const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
     expect(menuSceneSource).not.toContain('timerShadow.setAlpha(0.7);');
     expect(menuSceneSource).not.toContain('hudFrame.timerBounds.centerX + 1');
-    // The compass is drawn with the same rich glyph (ring/ticks/needle) as
-    // the menu surface and the Guide overlay's legend icon now, not a
-    // separately hand-drawn crosshair+arrow with its own background pane.
-    expect(menuSceneSource).toContain('this.drawLegacyCompassGlyph(');
+    // The compass idea was removed from the app entirely.
+    expect(menuSceneSource).not.toContain('drawLegacyCompassGlyph');
     expect(menuSceneSource).not.toContain('private drawLegacyPlayCompass(');
     expect(menuSceneSource).toContain('this.drawLegacySettingsCogControl(this.hudGraphics, controls.pause, false, time);');
     expect(menuSceneSource).not.toContain('this.drawLegacyPlayTouchButton(');
@@ -776,19 +770,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('const LEGACY_MENU_DYNAMIC_TRAIL_EDGE_RATIO =');
     expect(menuSceneSource).toContain('const progressionPalette = this.resolveActiveLegacyProgressionPalette();');
     expect(menuSceneSource).toContain('this.drawLegacyProgressionBadge();');
-    // The title-screen board-notch compass was removed entirely (it duplicated
-    // the play-mode HUD compass without serving real navigation on the menu
-    // surface) -- only the shared glyph-drawing helper remains, now used
-    // solely by the Quick Play guide card's legend icon.
+    // The compass idea (title-screen board-notch AND play-mode HUD AND the
+    // Guide legend icon) was removed from the app entirely.
     expect(menuSceneSource).not.toContain('private drawLegacyMenuCompass(');
     expect(menuSceneSource).not.toContain('this.drawLegacyMenuCompass(');
     expect(menuSceneSource).not.toContain('menuCompassBounds');
     expect(menuSceneSource).not.toContain('menuCompass: {');
+    expect(menuSceneSource).not.toContain('drawLegacyCompassGlyph');
     expect(menuSceneSource).toContain('topCenterNotch: this.resolveLegacyBoardTopCenterNotchBounds(boardLeft, boardTop, boardWidth)');
-    expect(menuSceneSource).toContain('const ringRadius = size * 0.86;');
-    expect(menuSceneSource).toContain('const needleWidth = Math.max(2, size * 0.15);');
-    expect(menuSceneSource).toContain('const hubRadius = Math.max(2, size * 0.15);');
-    expect(menuSceneSource).toContain('private drawLegacyCompassGlyph(');
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, radius);');
     expect(menuSceneSource).toContain('progressionBadge: {');
     expect(menuSceneSource).toContain('this.clearLegacyPlayerProgressionBadge();');
@@ -885,7 +874,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('oneWayPeriodMs: LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS');
     expect(menuSceneSource).not.toContain('private resolveLegacyPointPathSource(');
     expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start');");
-    expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal');");
+    expect(menuSceneSource).toContain("this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal', time);");
     expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;');
@@ -932,8 +921,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.boardDynamicGraphics.strokeCircle(centerX, centerY, beaconRadius);');
     expect(menuSceneSource).toContain('resolveLegacyPlayerLocatorRenderMetrics(');
     expect(menuSceneSource).toContain('drawLocatorTick(centerX - locatorMetrics.outerRadius, centerY, centerX - locatorMetrics.innerRadius, centerY);');
-    expect(menuSceneSource).toContain('const playerScreenX = mazeRenderFrame.boardLeft + ((renderedPlayerPoint.x + 0.5) * mazeRenderFrame.tileSize);');
-    expect(menuSceneSource).toContain('const goalScreenX = mazeRenderFrame.boardLeft + ((this.maze.goal.x + 0.5) * mazeRenderFrame.tileSize);');
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, point, trailColor, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, trailAlpha, 1);');
     expect(menuSceneSource).not.toContain('this.fillTile(this.boardDynamicGraphics, this.player, 0xf2f4f8, boardLeft + boardOffset.x, boardTop + boardOffset.y, tileSize, 1, 0);');
   });
@@ -1078,11 +1065,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('turnDelayMs: movementSpeedProfile.turnDelayMs');
     expect(menuSceneSource).toContain('Math.min(profile.repeatIntervalMs, LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS)');
     expect(menuSceneSource).toContain('this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);');
-    // The compass now always sits at its own centered top HUD position
-    // (independent of the D-pad/floating stick), drawn with the same
-    // glyph as the menu surface/Guide compass -- no separate pane concept.
-    expect(menuSceneSource).toContain('this.drawLegacyCompassGlyph(');
-    expect(menuSceneSource).toContain('this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);');
+    // The compass idea was removed from the app entirely -- the timer takes
+    // the centered top HUD slot it used to share space beside.
+    expect(menuSceneSource).not.toContain('drawLegacyCompassGlyph');
+    expect(menuSceneSource).toContain('this.hudBounds = this.hudTimerBounds;');
     expect(menuSceneSource).toContain('touchControls');
     expect(menuSceneSource).toContain('LEGACY_CYBER_PANEL_FILL');
     expect(menuSceneSource).toContain('this.drawLegacyCyberPanel(this.hudGraphics, {');
@@ -1269,7 +1255,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(preferenceSource).toContain("mediaQuery.addEventListener('change', this.legacyReducedMotionMediaQueryListener)");
     expect(preferenceSource).toContain("mediaQuery.removeEventListener('change', listener)");
     expect(preferenceSource).toContain('this.syncLegacyPlayerVisualMotionTo(this.playerVisualMotion.to);');
-    expect(preferenceSource).toContain('this.hudCompassSpinStartedAtMs = null;');
     expect(preferenceSource).toContain('this.backdropDirty = true;');
     expect(preferenceSource).toContain('this.boardDynamicDirty = true;');
     expect(preferenceSource).toContain('this.hudDirty = true;');
@@ -1297,7 +1282,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // No panel/border chrome behind the play cog at all, and now the same
     // color/size/blink pulse as the menu surface's own settings cog too --
     // not just "no box" but the actual same icon.
-    expect(menuSceneSource).toMatch(/drawLegacySettingsCogControl\([\s\S]*?this\.drawLegacySettingsCog\(\s*graphics,\s*rect,\s*active,\s*0\.34 \* blinkScale,/);
+    expect(menuSceneSource).toMatch(/drawLegacySettingsCogControl\([\s\S]*?this\.drawLegacySettingsCog\(\s*graphics,\s*visualRect,\s*active,\s*0\.34 \* blinkScale,/);
     expect(menuSceneSource).toContain('private drawLegacyMenuSettingsCog(time: number): void');
     expect(menuSceneSource).toContain('this.drawLegacyMenuSettingsCog(time);');
     expect(menuSceneSource).toContain('cyberArcadeMaterial.signal.player,\n      cyberArcadeMaterial.rail.mint,\n      blinkAlpha\n    );');
@@ -1503,14 +1488,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, includeCompassRow ? 4 : 3);');
+    expect(menuSceneSource).toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, 3);');
     expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
     expect(menuSceneSource).toContain('const guideTitleFontSize = guideLayout.titleFontSize;');
     expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
     expect(menuSceneSource).toContain('const guideRowMinFontSize = guideLayout.rowMinFontSize;');
     expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);');
     expect(menuSceneSource).toContain("'GUIDE',");
-    expect(menuSceneSource).toContain("drawLegendRow(legendRowIndex, 'compass', 'Compass', 'follow it to the exit', cyberArcadeMaterial.rail.cyan);");
+    expect(menuSceneSource).toContain("drawLegendRow(legendRowIndex, 'start', 'Start', 'begin at gold', cyberArcadeMaterial.signal.start);");
     expect(menuSceneSource).not.toContain("'Player • green trail'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
     expect(menuSceneSource).not.toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`");

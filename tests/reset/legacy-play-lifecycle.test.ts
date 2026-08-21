@@ -133,8 +133,7 @@ describe('legacy play lifecycle', () => {
       phase: 'building',
       inputLocked: true,
       timerRunning: false,
-      playerVisible: false,
-      compassSpinExpected: true
+      playerVisible: false
     });
 
     expect(resolveLegacyPlayLifecycleSnapshot({
@@ -195,8 +194,7 @@ describe('legacy play lifecycle', () => {
       inputLocked: true,
       nextSeedQueued: true,
       playerVisible: false,
-      trailVisible: false,
-      compassSpinExpected: true
+      trailVisible: false
     });
 
     expect(resolveLegacyPlayLifecycleSnapshot({
@@ -215,8 +213,7 @@ describe('legacy play lifecycle', () => {
     })).toMatchObject({
       phase: 'deconstructing',
       inputLocked: true,
-      nextSeedQueued: true,
-      compassSpinExpected: true
+      nextSeedQueued: true
     });
   });
 

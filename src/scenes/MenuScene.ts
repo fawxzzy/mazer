@@ -91,7 +91,6 @@ import {
   type LegacyCardinalDirection
 } from '../legacy-runtime/legacyDirectionalIntent';
 import {
-  resolveLegacyCompassSpinFrame,
   resolveLegacyFrozenElapsedMs,
   resolveLegacyPlayHudFrame,
   type LegacyPlayHudFrame
@@ -325,6 +324,7 @@ import {
   resolveLegacyPointFromDemoIndex,
 } from '../legacy-runtime/legacyDemoWalker';
 import {
+  resolveLegacyBleedOffDockVisualEligibility,
   resolveLegacyMenuBorderDockDirections,
   resolveLegacyMenuBorderDockRenderAreas,
   resolveLegacyMenuPathRenderFrames,
@@ -634,14 +634,7 @@ interface MenuSceneVisualDiagnostics {
     visible: boolean;
     bounds: VisualRect | null;
     timerBounds: VisualRect | null;
-    arrowBounds: VisualRect | null;
-    arrowAngleDegrees: number | null;
     timerText: string | null;
-    arrowAngleRadians: number | null;
-    compassSpinActive: boolean;
-    compassSpinProgress: number | null;
-    compassVisualAngleDegrees: number | null;
-    compassVisualAngleRadians: number | null;
   };
   touchControls: {
     visible: boolean;
@@ -1049,8 +1042,6 @@ const LEGACY_BLEED_GLOW_BAND_HALF_WIDTH = 0.24;
 const LEGACY_BLEED_GLOW_MAX_ALPHA = 0.5;
 const LEGACY_BLEED_GLOW_STEPS = 8;
 const LEGACY_PLAY_HUD_TIMER_PANE = cyberArcadeMaterial.substrate.panel;
-const LEGACY_PLAY_HUD_ARROW = cyberArcadeMaterial.signal.goal;
-const LEGACY_PLAY_HUD_ARROW_SHADOW = 0x06080a;
 const LEGACY_PLAY_TOUCH_BUTTON_FILL = cyberArcadeMaterial.substrate.panelRaised;
 const LEGACY_PLAY_TOUCH_COG_HUB = cyberArcadeMaterial.substrate.field;
 const LEGACY_PLAY_TOUCH_BUTTON_STROKE = cyberArcadeMaterial.rail.cyan;
@@ -1081,13 +1072,6 @@ const LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS = 16;
 const LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS = 144;
 const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = 104;
 const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = 144;
-const LEGACY_PLAY_COMPASS_SPIN_DURATION_MS = 1800;
-const LEGACY_PLAY_COMPASS_SPIN_TURNS = 3.25;
-// Same rotational speed as the decel spin above (turns / duration), just
-// unbounded -- used while the maze is mid-deconstruct/rebuild so the
-// compass keeps spinning the whole time instead of a brief flourish that
-// only plays once the new maze has already swapped in.
-const LEGACY_PLAY_COMPASS_LIFECYCLE_SPIN_PERIOD_MS = LEGACY_PLAY_COMPASS_SPIN_DURATION_MS / LEGACY_PLAY_COMPASS_SPIN_TURNS;
 // Bumped up from 116ms -- at that duration the eased glide between tiles
 // only spans ~7 frames at 60fps, which read as a quick snap-slide rather
 // than smooth motion. A slower tween still feels responsive for a maze
@@ -1164,20 +1148,6 @@ const visualRectFromBounds = (rect: { left: number; top: number; width: number; 
   createVisualRect(rect.left, rect.top, rect.width, rect.height)
 );
 
-const mergeVisualRects = (...rects: Array<VisualRect | null>): VisualRect | null => {
-  const presentRects = rects.filter((rect): rect is VisualRect => rect !== null);
-  if (presentRects.length === 0) {
-    return null;
-  }
-
-  const left = Math.min(...presentRects.map((rect) => rect.left));
-  const top = Math.min(...presentRects.map((rect) => rect.top));
-  const right = Math.max(...presentRects.map((rect) => rect.right));
-  const bottom = Math.max(...presentRects.map((rect) => rect.bottom));
-
-  return createVisualRect(left, top, right - left, bottom - top);
-};
-
 const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
 
 const buildPathTrail = (
@@ -1214,6 +1184,13 @@ export class MenuScene extends Phaser.Scene {
   private mazeSeed = DEFAULT_LEGACY_RUNTIME_SEED;
   private explicitRuntimeMazeSeed = false;
   private maze!: LegacyMazeSnapshot;
+  // Cache keyed by object identity -- this.maze is replaced wholesale on
+  // every regeneration (never mutated in place), so a reference check is
+  // enough to know the cached set still matches. Recomputing this is an
+  // O(perimeter) scan; drawLegacyPathBorderDock runs it once per tile per
+  // redraw, so caching keeps that from becoming O(perimeter * cellCount).
+  private bleedOffDockVisualEligibilityForMaze: LegacyMazeSnapshot | null = null;
+  private bleedOffDockVisualEligibilityKeys: Set<string> = new Set();
   private player!: LegacyPoint;
   private trail: LegacyPoint[] = [];
   private mode: RuntimeMode = 'menu';
@@ -1335,14 +1312,8 @@ export class MenuScene extends Phaser.Scene {
   private layout!: LegacyMenuLayout;
   private hudBounds: VisualRect | null = null;
   private hudTimerBounds: VisualRect | null = null;
-  private hudArrowBounds: VisualRect | null = null;
   private hudTouchControlBounds: VisualRect | null = null;
   private hudFrame: LegacyPlayHudFrame | null = null;
-  private hudCompassSpinStartedAtMs: number | null = null;
-  private hudCompassSpinActive = false;
-  private hudCompassSpinProgress: number | null = null;
-  private hudCompassVisualAngleRadians: number | null = null;
-  private hudCompassVisualAngleDegrees: number | null = null;
   private playerVisualMotion: {
     durationMs: number;
     from: LegacyPoint;
@@ -1781,17 +1752,14 @@ export class MenuScene extends Phaser.Scene {
     if (this.isLegacyMenuBuildPrerollActive(time)) {
       this.boardDynamicDirty = true;
     }
-    if (this.hasLegacyPlayCompassSpinPendingFrame()) {
-      this.hudDirty = true;
-    }
-    // The play HUD isn't just static chrome -- the settings cog blinks, the
-    // compass ring pulses, and the timer ticks every second, all driven
-    // directly off `time` inside drawHud. None of those had their own
-    // "pending frame" trigger here, so once nothing else re-armed hudDirty
-    // (i.e. the player stood still), every one of them visibly froze until
-    // the next unrelated redraw -- which is what actually made the cog's
-    // blink look "glitchy while idle, then jumps when the player moves":
-    // it wasn't glitching, it just wasn't being redrawn at all in between.
+    // The play HUD isn't just static chrome -- the settings cog blinks and
+    // the timer ticks every second, both driven directly off `time` inside
+    // drawHud. Neither had its own "pending frame" trigger here, so once
+    // nothing else re-armed hudDirty (i.e. the player stood still), both
+    // visibly froze until the next unrelated redraw -- which is what
+    // actually made the cog's blink look "glitchy while idle, then jumps
+    // when the player moves": it wasn't glitching, it just wasn't being
+    // redrawn at all in between.
     if (this.mode === 'play' && this.overlay === 'none' && !this.prefersLegacyReducedMotion()) {
       this.hudDirty = true;
     }
@@ -4614,9 +4582,6 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticBuildPrerollStartedAtMs = null;
     this.refreshLegacyMenuStaticDrawVisibleTileKeys();
     this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);
-    if (this.mode === 'play') {
-      this.startLegacyPlayCompassSpin(time);
-    }
   }
 
   private advanceLegacyMenuStaticDrawStage(time: number): void {
@@ -5323,9 +5288,6 @@ export class MenuScene extends Phaser.Scene {
       if (this.playerVisualMotion !== null) {
         this.syncLegacyPlayerVisualMotionTo(this.playerVisualMotion.to);
       }
-      this.hudCompassSpinStartedAtMs = null;
-      this.hudCompassSpinActive = false;
-      this.hudCompassSpinProgress = null;
     }
     this.backdropDirty = true;
     this.boardDynamicDirty = true;
@@ -5749,6 +5711,20 @@ export class MenuScene extends Phaser.Scene {
     return resolveContinuation((this.layout.height - edgeInset) - boardBottom);
   }
 
+  // Eligibility is keyed to the coordinate itself, computed once from the
+  // full maze (this.maze) regardless of which pathSource is actually being
+  // drawn (the real board, or the player-visited-only trail subset) -- a
+  // subset grid can only ever be walkable where the full maze already is,
+  // so a coordinate the full maze doesn't consider dock-eligible never
+  // needs to render as one for a subset either.
+  private resolveBleedOffDockVisualEligibility(): Set<string> {
+    if (this.bleedOffDockVisualEligibilityForMaze !== this.maze) {
+      this.bleedOffDockVisualEligibilityForMaze = this.maze;
+      this.bleedOffDockVisualEligibilityKeys = resolveLegacyBleedOffDockVisualEligibility(this.maze);
+    }
+    return this.bleedOffDockVisualEligibilityKeys;
+  }
+
   private drawLegacyPathBorderDock(
     graphics: Phaser.GameObjects.Graphics,
     point: LegacyPoint,
@@ -5766,6 +5742,15 @@ export class MenuScene extends Phaser.Scene {
   ): void {
     const dockDirections = resolveLegacyMenuBorderDockDirections(pathSource, point);
     if (dockDirections.length <= 0) {
+      return;
+    }
+    // Two bleed-off openings sitting right next to each other on the same
+    // edge are both fully valid, walkable, correctly-wrapping tiles -- the
+    // grid topology's pairing invariant requires that. This purely decides
+    // which of two close-together ones gets the decorative "poking past
+    // the border" dock treatment, so they don't visually read as one
+    // corridor accidentally split in two right next to itself.
+    if (!this.resolveBleedOffDockVisualEligibility().has(`${point.x},${point.y}`)) {
       return;
     }
 
@@ -5971,7 +5956,7 @@ export class MenuScene extends Phaser.Scene {
         continue;
       }
       const dockDirections = resolveLegacyMenuBorderDockDirections(this.maze, point);
-      if (dockDirections.length <= 0) {
+      if (dockDirections.length <= 0 || !this.resolveBleedOffDockVisualEligibility().has(`${point.x},${point.y}`)) {
         continue;
       }
 
@@ -7127,7 +7112,7 @@ export class MenuScene extends Phaser.Scene {
       this.fillPlayDynamicMarkerTile(this.maze.start, mazeLeft, mazeTop, mazeTileSize, 0.9 * markerDeconstructAlpha, 'start');
     }
     if (markersBuiltIn && markerDeconstructAlpha > 0 && this.maze.goal && this.isLegacyMenuPointVisibleInStaticDraw(this.maze.goal)) {
-      this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal');
+      this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal', time);
     }
 
     this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize, time);
@@ -7632,83 +7617,6 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  // Draws an actual compass: a circular bezel with cardinal tick marks and a
-  // two-tone needle (the tip half reads in the same color as the goal
-  // marker it points toward, matching a real compass needle's red/white
-  // convention while staying semantically tied to what it's pointing at).
-  private drawLegacyCompassGlyph(
-    graphics: Phaser.GameObjects.Graphics,
-    centerX: number,
-    centerY: number,
-    size: number,
-    angle: number,
-    palette: LegacyProgressionPalette,
-    time: number,
-    isLifecycleSpinActive: boolean,
-    // While the player is actively holding the movement toggle, the ring
-    // hides so it doesn't compete with the touch feedback under their
-    // thumb -- it returns the instant they let go. Every other caller
-    // (menu, Guide legend icon) has nothing to hide it for, so this
-    // defaults to always-on.
-    ringVisible = true
-  ): void {
-    const pulse = 0.5 + (0.5 * Math.sin(time / 380));
-    const emphasis = isLifecycleSpinActive ? 0.6 : 0.4;
-    const ringRadius = size * 0.86;
-    const majorTickInner = ringRadius - (size * 0.17);
-    const minorTickInner = ringRadius - (size * 0.09);
-    const needleLength = Math.max(8, size * 0.62);
-    const tailLength = needleLength * 0.6;
-    const needleWidth = Math.max(2, size * 0.15);
-    const hubRadius = Math.max(2, size * 0.15);
-
-    graphics.fillStyle(0x03070b, 0.55);
-    graphics.fillCircle(centerX, centerY, ringRadius);
-    if (ringVisible) {
-      graphics.lineStyle(1.4, palette.rankColor, emphasis + (pulse * 0.2));
-      graphics.strokeCircle(centerX, centerY, ringRadius);
-    }
-
-    for (let tickIndex = 0; tickIndex < 8; tickIndex += 1) {
-      const tickAngle = (tickIndex * Math.PI) / 4;
-      const isMajor = tickIndex % 2 === 0;
-      const inner = isMajor ? majorTickInner : minorTickInner;
-      graphics.lineStyle(isMajor ? 1.4 : 1, palette.rankColor, isMajor ? emphasis + 0.24 : emphasis - 0.04);
-      graphics.beginPath();
-      graphics.moveTo(centerX + (Math.cos(tickAngle) * ringRadius), centerY + (Math.sin(tickAngle) * ringRadius));
-      graphics.lineTo(centerX + (Math.cos(tickAngle) * inner), centerY + (Math.sin(tickAngle) * inner));
-      graphics.strokePath();
-    }
-
-    const tip = {
-      x: centerX + (Math.cos(angle) * needleLength),
-      y: centerY + (Math.sin(angle) * needleLength)
-    };
-    const tail = {
-      x: centerX - (Math.cos(angle) * tailLength),
-      y: centerY - (Math.sin(angle) * tailLength)
-    };
-    const wingAngle = angle + (Math.PI / 2);
-    const wingX = Math.cos(wingAngle) * needleWidth;
-    const wingY = Math.sin(wingAngle) * needleWidth;
-    const wingLeft = { x: centerX + wingX, y: centerY + wingY };
-    const wingRight = { x: centerX - wingX, y: centerY - wingY };
-
-    graphics.fillStyle(LEGACY_PLAY_HUD_ARROW_SHADOW, 0.3);
-    graphics.fillTriangle(tip.x + 1, tip.y + 1, wingLeft.x + 1, wingLeft.y + 1, wingRight.x + 1, wingRight.y + 1);
-    graphics.fillTriangle(tail.x + 1, tail.y + 1, wingLeft.x + 1, wingLeft.y + 1, wingRight.x + 1, wingRight.y + 1);
-
-    graphics.fillStyle(LEGACY_PLAY_GOAL_MARKER_CORE, 0.9 + (pulse * 0.1));
-    graphics.fillTriangle(tip.x, tip.y, wingLeft.x, wingLeft.y, wingRight.x, wingRight.y);
-    graphics.fillStyle(LEGACY_PLAY_HUD_ARROW, 0.82);
-    graphics.fillTriangle(tail.x, tail.y, wingLeft.x, wingLeft.y, wingRight.x, wingRight.y);
-
-    graphics.fillStyle(0x03070b, 0.92);
-    graphics.fillCircle(centerX, centerY, hubRadius);
-    graphics.lineStyle(1, palette.rankColor, 0.82 + (pulse * 0.18));
-    graphics.strokeCircle(centerX, centerY, hubRadius);
-  }
-
   private resolveBoardOffset(): Phaser.Math.Vector2 {
     return new Phaser.Math.Vector2(0, 0);
   }
@@ -8034,14 +7942,15 @@ export class MenuScene extends Phaser.Scene {
     originY: number,
     tileSize: number,
     alpha: number,
-    kind: 'start' | 'goal'
+    kind: 'start' | 'goal',
+    time?: number
   ): void {
     // Uses the exact same rounded tile-rect math as every corridor tile
     // (resolveLegacyPixelTileRect) instead of re-deriving one from a center
     // point, so the glow lands pixel-identical in size/position to the real
     // tile underneath it.
     const tileRect = this.resolveLegacyPixelTileRect(originX, originY, tileSize, point);
-    this.drawLegacyEndpointGlow(this.boardDynamicGraphics, tileRect, alpha, kind);
+    this.drawLegacyEndpointGlow(this.boardDynamicGraphics, tileRect, alpha, kind, time);
   }
 
   // The actual maze tile underneath is left completely alone (drawBoardPaths
@@ -8054,19 +7963,31 @@ export class MenuScene extends Phaser.Scene {
     graphics: Phaser.GameObjects.Graphics,
     tileRect: LegacyPixelTileRect,
     alpha: number,
-    kind: 'start' | 'goal'
+    kind: 'start' | 'goal',
+    time?: number
   ): void {
     const color = kind === 'goal' ? LEGACY_PLAY_GOAL_MARKER_CORE : LEGACY_PLAY_START_MARKER_CORE;
     const centerX = tileRect.left + (tileRect.width / 2);
     const centerY = tileRect.top + (tileRect.height / 2);
     const maxRadius = Math.min(tileRect.width, tileRect.height) * 0.5;
+    // A slight continuous pulse on the goal marker only, for extra
+    // visibility -- same sine-blink cadence as the LVL badge/settings cog.
+    // Callers that don't pass `time` (e.g. the Guide overlay's static
+    // legend icon) get no pulse. boardDynamicDirty is already re-armed
+    // every play-mode frame (see the LVL badge's own comment on this in
+    // update()), so this animates continuously for free.
+    const pulse = kind === 'goal' && time !== undefined
+      ? (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2
+      : 0;
+    const pulseScale = 1 + (pulse * 0.12);
+    const pulseAlphaBoost = pulse * 0.12;
 
-    graphics.fillStyle(color, Math.min(0.9, alpha) * 0.22);
-    graphics.fillCircle(centerX, centerY, maxRadius * 1.2);
-    graphics.fillStyle(color, Math.min(0.9, alpha) * 0.45);
-    graphics.fillCircle(centerX, centerY, maxRadius * 0.78);
-    graphics.fillStyle(color, Math.min(0.96, alpha));
-    graphics.fillCircle(centerX, centerY, maxRadius * 0.4);
+    graphics.fillStyle(color, Math.min(0.9, alpha + pulseAlphaBoost) * 0.22);
+    graphics.fillCircle(centerX, centerY, maxRadius * 1.2 * pulseScale);
+    graphics.fillStyle(color, Math.min(0.9, alpha + pulseAlphaBoost) * 0.45);
+    graphics.fillCircle(centerX, centerY, maxRadius * 0.78 * pulseScale);
+    graphics.fillStyle(color, Math.min(0.96, alpha + pulseAlphaBoost));
+    graphics.fillCircle(centerX, centerY, maxRadius * 0.4 * pulseScale);
     graphics.fillStyle(cyberArcadeMaterial.rail.white, Math.min(0.75, alpha * 0.8));
     graphics.fillCircle(centerX - (maxRadius * 0.14), centerY - (maxRadius * 0.14), maxRadius * 0.13);
   }
@@ -8475,65 +8396,23 @@ export class MenuScene extends Phaser.Scene {
     this.clearHudTexts();
     this.hudBounds = null;
     this.hudTimerBounds = null;
-    this.hudArrowBounds = null;
     this.hudTouchControlBounds = null;
     this.hudFrame = null;
-    this.hudCompassSpinActive = false;
-    this.hudCompassSpinProgress = null;
-    this.hudCompassVisualAngleRadians = null;
-    this.hudCompassVisualAngleDegrees = null;
     if (this.mode !== 'play' || this.overlay !== 'none') {
       this.footerText.setText('');
       return;
     }
     this.footerText.setText('');
 
-    const boardOffset = this.resolveBoardOffset();
-    const mazeRenderFrame = this.resolveLegacyMazeRenderFrame(
-      this.layout.boardLeft + boardOffset.x,
-      this.layout.boardTop + boardOffset.y,
-      this.layout.boardWidth,
-      this.layout.boardHeight
-    );
-    const goalScreenX = mazeRenderFrame.boardLeft + ((this.maze.goal.x + 0.5) * mazeRenderFrame.tileSize);
-    const goalScreenY = mazeRenderFrame.boardTop + ((this.maze.goal.y + 0.5) * mazeRenderFrame.tileSize);
-    const renderedPlayerPoint = this.resolveLegacyRenderedPlayerPoint(time);
-    const playerScreenX = mazeRenderFrame.boardLeft + ((renderedPlayerPoint.x + 0.5) * mazeRenderFrame.tileSize);
-    const playerScreenY = mazeRenderFrame.boardTop + ((renderedPlayerPoint.y + 0.5) * mazeRenderFrame.tileSize);
     const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
-    // The compass no longer pins to wherever the D-pad/floating stick
-    // happens to be -- it always sits at the top-middle HUD cluster beside
-    // the timer (resolveLegacyPlayHudFrame's own default), independent of
-    // touch control layout or whether a finger is currently down.
     const hudFrame = resolveLegacyPlayHudFrame({
       elapsedMs: this.resolveLegacyPlayElapsedMs(),
-      goalScreen: { x: goalScreenX, y: goalScreenY },
       layoutWidth: this.layout.width,
-      playerScreen: { x: playerScreenX, y: playerScreenY },
       safeAreaTop: readMazerViewportGeometry().safeArea.top
     });
 
     this.hudTouchControlBounds = this.drawLegacyPlayTouchControls(time, touchControlLayout);
     this.drawLegacyPlayPlayerMessageStack(hudFrame);
-    const compassVisualFrame = this.resolveLegacyPlayCompassVisualFrame(hudFrame, time);
-    // Same compass design as the menu surface and the Guide overlay's
-    // legend icon (drawLegacyCompassGlyph) -- ring, cardinal ticks, and a
-    // two-tone needle -- instead of a separately hand-drawn crosshair and
-    // arrow. The ring itself hides while a finger is actually down on the
-    // movement toggle (playFloatingStickOrigin set) and returns on
-    // release, so it doesn't compete with the touch feedback under the
-    // player's thumb.
-    this.drawLegacyCompassGlyph(
-      this.hudGraphics,
-      hudFrame.arrowOrigin.x,
-      hudFrame.arrowOrigin.y,
-      hudFrame.arrowBounds.width * 0.45,
-      compassVisualFrame.angleRadians,
-      this.resolveActiveLegacyProgressionPalette(),
-      time,
-      compassVisualFrame.active,
-      this.playFloatingStickOrigin === null
-    );
 
     this.hudTimerBounds = createVisualRect(
       hudFrame.timerBounds.left,
@@ -8541,28 +8420,8 @@ export class MenuScene extends Phaser.Scene {
       hudFrame.timerBounds.width,
       hudFrame.timerBounds.height
     );
-    this.hudArrowBounds = createVisualRect(
-      hudFrame.arrowBounds.left,
-      hudFrame.arrowBounds.top,
-      hudFrame.arrowBounds.width,
-      hudFrame.arrowBounds.height
-    );
-    this.hudBounds = mergeVisualRects(this.hudTimerBounds, this.hudArrowBounds);
+    this.hudBounds = this.hudTimerBounds;
     this.hudFrame = hudFrame;
-  }
-
-  private startLegacyPlayCompassSpin(time: number): void {
-    if (this.prefersLegacyReducedMotion()) {
-      this.hudCompassSpinStartedAtMs = null;
-      this.hudCompassSpinActive = false;
-      this.hudCompassSpinProgress = null;
-      this.hudDirty = true;
-      return;
-    }
-    this.hudCompassSpinStartedAtMs = time;
-    this.hudCompassSpinActive = true;
-    this.hudCompassSpinProgress = 0;
-    this.hudDirty = true;
   }
 
   private drawLegacyPlayPlayerMessageStack(hudFrame: LegacyPlayHudFrame): void {
@@ -8607,10 +8466,6 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
-  private hasLegacyPlayCompassSpinPendingFrame(): boolean {
-    return !this.prefersLegacyReducedMotion() && this.hudCompassSpinStartedAtMs !== null;
-  }
-
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
     const active = this.isLegacyTrailShineVisible() && this.overlay === 'none' && this.trail.length > 1;
     if (!active) {
@@ -8623,66 +8478,6 @@ export class MenuScene extends Phaser.Scene {
 
     this.legacyPlayTrailPulseNextFrameAtMs = time + LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS;
     return true;
-  }
-
-  private resolveLegacyPlayCompassVisualFrame(
-    hudFrame: LegacyPlayHudFrame,
-    time: number
-  ): {
-    active: boolean;
-    angleDegrees: number;
-    angleRadians: number;
-    progress: number;
-  } {
-    // Keeps spinning for the whole window between the old maze finishing
-    // and the new one finishing building out, not just a brief flourish
-    // after the swap -- the decel-to-target spin below still plays once
-    // settleLegacyMenuStaticDrawStageIfComplete starts it, so this only
-    // covers the "still mid-transition" stretch in between.
-    if (this.menuStaticDrawLifecyclePhase !== 'settled' && !this.prefersLegacyReducedMotion()) {
-      const angleRadians = (time / LEGACY_PLAY_COMPASS_LIFECYCLE_SPIN_PERIOD_MS) * Math.PI * 2;
-      const angleDegrees = (angleRadians * 180) / Math.PI;
-      this.hudCompassSpinActive = true;
-      this.hudCompassSpinProgress = 0;
-      this.hudCompassVisualAngleRadians = angleRadians;
-      this.hudCompassVisualAngleDegrees = angleDegrees;
-      return {
-        active: true,
-        angleDegrees,
-        angleRadians,
-        progress: 0
-      };
-    }
-
-    if (this.hudCompassSpinStartedAtMs === null) {
-      this.hudCompassSpinActive = false;
-      this.hudCompassSpinProgress = null;
-      this.hudCompassVisualAngleRadians = hudFrame.arrowAngleRadians;
-      this.hudCompassVisualAngleDegrees = hudFrame.arrowAngleDegrees;
-      return {
-        active: false,
-        angleDegrees: hudFrame.arrowAngleDegrees,
-        angleRadians: hudFrame.arrowAngleRadians,
-        progress: 1
-      };
-    }
-
-    const frame = resolveLegacyCompassSpinFrame({
-      durationMs: LEGACY_PLAY_COMPASS_SPIN_DURATION_MS,
-      elapsedMs: time - this.hudCompassSpinStartedAtMs,
-      targetAngleRadians: hudFrame.arrowAngleRadians,
-      turns: LEGACY_PLAY_COMPASS_SPIN_TURNS
-    });
-    this.hudCompassSpinActive = frame.active;
-    this.hudCompassSpinProgress = frame.progress;
-    this.hudCompassVisualAngleRadians = frame.angleRadians;
-    this.hudCompassVisualAngleDegrees = frame.angleDegrees;
-
-    if (!frame.active) {
-      this.hudCompassSpinStartedAtMs = null;
-    }
-
-    return frame;
   }
 
   // Movement no longer has a fixed on-screen widget at all -- the board is
@@ -8797,12 +8592,15 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.strokeCircle(knobX, knobY, knobRadius);
   }
 
-  // Matches the menu surface's own settings cog exactly -- same green/mint
-  // colors, same size (radiusRatio 0.34), and the same classic blink pulse
-  // -- not just "no panel/border" but the actual same icon. See
-  // drawLegacyMenuSettingsCog; this duplicates its blink-phase math instead
-  // of sharing it since the two live on different graphics layers
-  // (boardDynamicGraphics vs hudGraphics) with independent active state.
+  // Matches the menu surface's own settings cog's colors and blink pulse
+  // exactly. Size does NOT come along for free just from sharing the
+  // radiusRatio (0.34): the menu cog draws inside resolveLegacyHeaderControl-
+  // Frame's compact 36-40px icon box, while `rect` here is the real touch
+  // hit-target (tuned for thumb reach, deliberately bigger for ergonomics) --
+  // the same ratio applied to a bigger box drew a visibly bigger gear. Drawn
+  // size is pinned to the menu cog's own formula, centered within the real
+  // (unchanged) touch target, so the tap region stays generous while the
+  // glyph itself matches menu.
   private drawLegacySettingsCogControl(
     graphics: Phaser.GameObjects.Graphics,
     rect: ReturnType<typeof resolveTouchControlLayout>['controls']['pause'],
@@ -8812,9 +8610,16 @@ export class MenuScene extends Phaser.Scene {
     const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
     const blinkAlpha = clamp(0.22 + (phase * 0.78) + (active ? 0.08 : 0), 0.14, 1);
     const blinkScale = 0.92 + (phase * 0.08) + (active ? 0.02 : 0);
+    const visualSize = clamp(Math.round(Math.min(this.layout.width, this.layout.height) * 0.085), 36, 40);
+    const visualRect = {
+      centerX: rect.centerX,
+      centerY: rect.centerY,
+      width: visualSize,
+      height: visualSize
+    };
     this.drawLegacySettingsCog(
       graphics,
-      rect,
+      visualRect,
       active,
       0.34 * blinkScale,
       cyberArcadeMaterial.signal.player,
@@ -8886,7 +8691,6 @@ export class MenuScene extends Phaser.Scene {
     this.hudGraphics.clear();
     this.hudBounds = null;
     this.hudTimerBounds = null;
-    this.hudArrowBounds = null;
     this.hudTouchControlBounds = null;
     this.hudFrame = null;
     this.clearHudTexts();
@@ -9132,7 +8936,7 @@ export class MenuScene extends Phaser.Scene {
       const contentFlow = resolveLegacyOverlayContentFlowLayout({
         contentTop: viewport.top,
         controlsHeight: controlContentHeight,
-        guideHeight: this.resolveLegacyOptionsGuideEffectiveHeight(panel.width, false),
+        guideHeight: this.resolveLegacyOptionsGuideEffectiveHeight(panel.width),
         panelWidth: panel.width
       });
       const scrollMetrics = resolveLegacyOverlayScrollMetrics({
@@ -9144,7 +8948,6 @@ export class MenuScene extends Phaser.Scene {
       const renderViewport = this.resolveLegacyOverlayScrollRenderViewport(scrollMetrics);
       this.createLegacyOptionsInfoSection(contentFlow.guideTop, panel, {
         exactTop: true,
-        includeCompassRow: false,
         rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
         scrollOffset: scrollMetrics.offset,
         viewport: renderViewport
@@ -9161,7 +8964,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    rowY = this.createLegacyOptionsInfoSection(rowY, panel, { includeCompassRow: false });
+    rowY = this.createLegacyOptionsInfoSection(rowY, panel);
 
     if (showAdvancedOptions) {
       rowY = this.createInputRow('Maze Scale', 'scale', rowY, panel);
@@ -9182,8 +8985,8 @@ export class MenuScene extends Phaser.Scene {
   // -- callers computing where content below it should start must use this
   // instead of the layout's cardHeight (which is always the expanded size),
   // or they'd reserve extra space above the toggle list while collapsed.
-  private resolveLegacyOptionsGuideEffectiveHeight(panelWidth: number, includeCompassRow = true): number {
-    const guideLayout = resolveLegacyOptionsGuideLayout(panelWidth, includeCompassRow ? 4 : 3);
+  private resolveLegacyOptionsGuideEffectiveHeight(panelWidth: number): number {
+    const guideLayout = resolveLegacyOptionsGuideLayout(panelWidth, 3);
     return this.overlayGuideExpanded ? guideLayout.cardHeight : guideLayout.collapsedHeight;
   }
 
@@ -9192,18 +8995,13 @@ export class MenuScene extends Phaser.Scene {
     panel: OverlayPanelFrame,
     options: {
       exactTop?: boolean;
-      includeCompassRow?: boolean;
       rightGutter?: number;
       scrollOffset?: number;
       viewport?: VisualRect | null;
     } = {}
   ): number {
     const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    // The main menu never shows the real compass (it's Play-only, see
-    // drawLegacyPlayCompass's mode gate), so its Guide omits the compass
-    // row entirely rather than documenting a feature that isn't on screen.
-    const includeCompassRow = options.includeCompassRow ?? true;
-    const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, includeCompassRow ? 4 : 3);
+    const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, 3);
     const expanded = this.overlayGuideExpanded;
     const cardHeight = expanded ? guideLayout.cardHeight : guideLayout.collapsedHeight;
     const rightGutter = options.rightGutter ?? 0;
@@ -9366,7 +9164,7 @@ export class MenuScene extends Phaser.Scene {
 
     const drawLegendRow = (
       index: number,
-      kind: 'compass' | 'start' | 'end' | 'move',
+      kind: 'start' | 'end' | 'move',
       title: string,
       copy: string,
       accentColor: number
@@ -9412,10 +9210,6 @@ export class MenuScene extends Phaser.Scene {
     };
 
     let legendRowIndex = 0;
-    if (includeCompassRow) {
-      drawLegendRow(legendRowIndex, 'compass', 'Compass', 'follow it to the exit', cyberArcadeMaterial.rail.cyan);
-      legendRowIndex += 1;
-    }
     drawLegendRow(legendRowIndex, 'start', 'Start', 'begin at gold', cyberArcadeMaterial.signal.start);
     legendRowIndex += 1;
     drawLegendRow(legendRowIndex, 'end', 'Exit', 'finish at red', cyberArcadeMaterial.signal.goal);
@@ -9479,16 +9273,12 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawLegacyOptionsGuideGlyph(
-    kind: 'compass' | 'start' | 'end' | 'move',
+    kind: 'start' | 'end' | 'move',
     centerX: number,
     centerY: number,
     size: number,
     graphics: Phaser.GameObjects.Graphics = this.overlayGraphics
   ): void {
-    if (kind === 'compass') {
-      this.drawLegacyCompassGlyph(graphics, centerX, centerY, size, -Math.PI / 2, this.resolveActiveLegacyProgressionPalette(), this.time.now, false);
-      return;
-    }
     if (kind === 'move') {
       this.drawLegacyOptionsGuideMoveGlyph(graphics, centerX, centerY, size);
       return;
@@ -12871,14 +12661,7 @@ export class MenuScene extends Phaser.Scene {
         visible: this.mode === 'play' && this.overlay === 'none',
         bounds: cloneVisualRect(this.hudBounds),
         timerBounds: cloneVisualRect(this.hudTimerBounds),
-        arrowBounds: cloneVisualRect(this.hudArrowBounds),
-        arrowAngleDegrees: this.hudFrame?.arrowAngleDegrees ?? null,
-        timerText: this.hudFrame?.timerText ?? null,
-        arrowAngleRadians: this.hudFrame?.arrowAngleRadians ?? null,
-        compassSpinActive: this.hudCompassSpinActive,
-        compassSpinProgress: this.hudCompassSpinProgress,
-        compassVisualAngleDegrees: this.hudCompassVisualAngleDegrees,
-        compassVisualAngleRadians: this.hudCompassVisualAngleRadians
+        timerText: this.hudFrame?.timerText ?? null
       },
       touchControls,
       overlayUi: {
