@@ -1063,6 +1063,11 @@ const LEGACY_PLAY_STICK_REPEAT_INTERVAL_MAX_MS = 104;
 const LEGACY_PLAY_STICK_TURN_DELAY_MAX_MS = 144;
 const LEGACY_PLAY_COMPASS_SPIN_DURATION_MS = 1800;
 const LEGACY_PLAY_COMPASS_SPIN_TURNS = 3.25;
+// Same rotational speed as the decel spin above (turns / duration), just
+// unbounded -- used while the maze is mid-deconstruct/rebuild so the
+// compass keeps spinning the whole time instead of a brief flourish that
+// only plays once the new maze has already swapped in.
+const LEGACY_PLAY_COMPASS_LIFECYCLE_SPIN_PERIOD_MS = LEGACY_PLAY_COMPASS_SPIN_DURATION_MS / LEGACY_PLAY_COMPASS_SPIN_TURNS;
 // Bumped up from 116ms -- at that duration the eased glide between tiles
 // only spans ~7 frames at 60fps, which read as a quick snap-slide rather
 // than smooth motion. A slower tween still feels responsive for a maze
@@ -3993,7 +3998,11 @@ export class MenuScene extends Phaser.Scene {
         this.playStaticSlowTile.placement?.point ?? null
       );
       this.playPatrolAgent = this.createLegacyPlayPatrolAgent(progressionBand);
-      this.startLegacyPlayCompassSpin(this.time.now);
+      // The decel-to-target spin itself now starts once the new maze
+      // actually finishes settling (settleLegacyMenuStaticDrawStageIfComplete),
+      // not here at the moment the maze data swaps in -- resolveLegacy
+      // PlayCompassVisualFrame keeps the compass spinning continuously for
+      // everything in between (deconstruct through build-out).
     }
     this.resetLegacyWorldTurnHost();
     this.nextDemoMoveAtMs = nextDemoMoveAtMs;
@@ -4472,6 +4481,9 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticBuildPrerollStartedAtMs = null;
     this.refreshLegacyMenuStaticDrawVisibleTileKeys();
     this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);
+    if (this.mode === 'play') {
+      this.startLegacyPlayCompassSpin(time);
+    }
   }
 
   private advanceLegacyMenuStaticDrawStage(time: number): void {
@@ -6820,9 +6832,13 @@ export class MenuScene extends Phaser.Scene {
       ? this.trail
       : buildPathTrail(this.resolveLegacyPlayPerfectPathTrail(), this.settings.toggleTrailFade ? TRAIL_FADE_TAIL : null);
     const visibleTrail = trail.filter((point) => this.isLegacyMenuPointVisibleInStaticDraw(point));
-    const menuTrailAlphaMultiplier = this.mode === 'menu'
-      ? this.resolveLegacyMenuDeconstructTrailAlpha(time)
-      : 1;
+    // resolveLegacyMenuDeconstructTrailAlpha only reads menuStaticDrawLifecyclePhase
+    // (shared by both surfaces, "menu" in the name is just legacy) -- it was
+    // gated to menu mode here for no reason tied to the function itself, which
+    // meant play mode's trail sat at full brightness through the whole
+    // deconstruct animation and only vanished abruptly once the new maze
+    // swapped in, instead of fading out with the tiles like the menu does.
+    const menuTrailAlphaMultiplier = this.resolveLegacyMenuDeconstructTrailAlpha(time);
     const dynamicTrailPathSource = this.maze;
     const boardOffset = this.resolveBoardOffset();
     const resolvedBoardLeft = boardLeft + boardOffset.x;
@@ -8469,6 +8485,26 @@ export class MenuScene extends Phaser.Scene {
     angleRadians: number;
     progress: number;
   } {
+    // Keeps spinning for the whole window between the old maze finishing
+    // and the new one finishing building out, not just a brief flourish
+    // after the swap -- the decel-to-target spin below still plays once
+    // settleLegacyMenuStaticDrawStageIfComplete starts it, so this only
+    // covers the "still mid-transition" stretch in between.
+    if (this.menuStaticDrawLifecyclePhase !== 'settled' && !this.prefersLegacyReducedMotion()) {
+      const angleRadians = (time / LEGACY_PLAY_COMPASS_LIFECYCLE_SPIN_PERIOD_MS) * Math.PI * 2;
+      const angleDegrees = (angleRadians * 180) / Math.PI;
+      this.hudCompassSpinActive = true;
+      this.hudCompassSpinProgress = 0;
+      this.hudCompassVisualAngleRadians = angleRadians;
+      this.hudCompassVisualAngleDegrees = angleDegrees;
+      return {
+        active: true,
+        angleDegrees,
+        angleRadians,
+        progress: 0
+      };
+    }
+
     if (this.hudCompassSpinStartedAtMs === null) {
       this.hudCompassSpinActive = false;
       this.hudCompassSpinProgress = null;
