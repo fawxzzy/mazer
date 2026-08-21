@@ -1196,6 +1196,11 @@ export class MenuScene extends Phaser.Scene {
   private optionFieldDrafts: LegacyOptionFieldDrafts = createLegacyOptionFieldDrafts(LEGACY_DEFAULTS);
   private activeInputField: LegacyOptionFieldId | null = null;
   private authSnapshot: LegacyAuthSessionSnapshot = createLegacyGuestAuthSnapshot();
+  // See create()'s boot-mode handling -- true only when the URL asked to
+  // launch straight into play (e.g. the "Play Mazer" home-screen shortcut)
+  // but boot deferred that until the real auth session resolves instead of
+  // racing it. Consumed once in applyLegacyAuthSnapshot.
+  private pendingBootPlayStart = false;
   private authForm: LegacyAuthFormState = createEmptyLegacyAuthFormState('login');
   private activeAuthField: LegacyAuthFieldId | null = null;
   private authNativeInput: HTMLInputElement | null = null;
@@ -1420,6 +1425,12 @@ export class MenuScene extends Phaser.Scene {
     });
     this.mazeSeed = initialSeed.seed;
     this.explicitRuntimeMazeSeed = initialSeed.explicit;
+    // Set before initializeLegacyAuth() below, not after -- the runtime
+    // diagnostics auth fixture resolves synchronously inside that call
+    // (no real network/storage round trip), so applyLegacyAuthSnapshot can
+    // run and check this flag before this function ever reaches the line
+    // that used to set it, leaving it permanently unconsumed.
+    this.pendingBootPlayStart = resolveInitialRuntimeMode(runtimeSearch) === 'play';
     this.loadPersistedLegacyAuthForm();
     this.loadPersistedLegacyGameToggleSettings();
     this.loadPersistedMazeCycleTelemetryHistory();
@@ -1471,9 +1482,17 @@ export class MenuScene extends Phaser.Scene {
     })).setOrigin(0.5).setAlpha(0.82).setVisible(false);
 
     this.createStars();
-    if (resolveInitialRuntimeMode(runtimeSearch) === 'play') {
-      this.startPlayMode();
-    } else {
+    // A direct-to-play boot (pendingBootPlayStart) no longer starts play
+    // synchronously here -- see that field's own comment. If the runtime
+    // diagnostics auth fixture resolved synchronously above,
+    // applyLegacyAuthSnapshot has already called startPlayMode() and
+    // this.mode is 'play' by this point; skip the menu placeholder
+    // entirely in that case rather than clobbering it. Otherwise (a still-
+    // pending real async auth check, or an ordinary menu boot), generate
+    // the usual menu placeholder -- immediately, no demo-hold delay, when
+    // a play start is still pending, since it's about to be replaced
+    // anyway the moment auth resolves.
+    if (this.mode !== 'play') {
       this.applyGenerationRequest(
         createLegacyGenerationRequest({
           aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu'),
@@ -1486,7 +1505,7 @@ export class MenuScene extends Phaser.Scene {
           scale: this.resolveLegacyProgressionScaleForMode('menu'),
           targetComplexity: this.resolveLegacyTargetComplexityForMode('menu')
         }),
-        this.time.now + INITIAL_MENU_DEMO_HOLD_MS
+        this.pendingBootPlayStart ? this.time.now : this.time.now + INITIAL_MENU_DEMO_HOLD_MS
       );
     }
     this.installInput();
@@ -1704,6 +1723,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   public update(time: number, delta: number): void {
+    if (this.pendingBootPlayStart) {
+      this.pendingBootPlayStart = false;
+      this.startPlayMode();
+      this.rebuildUi();
+    }
     this.recordRuntimeFrame(delta);
     this.updateStars(time, delta);
     this.expireLegacyPlayerMessages(time);
@@ -11290,7 +11314,28 @@ export class MenuScene extends Phaser.Scene {
     };
 
     drawChevronChrome(false);
-    const background = this.add.rectangle(x, y, size, size, 0x000000, 0.001);
+    // The actual clickable rect is deliberately bigger than the drawn icon
+    // AND biased upward (more slack above than below) -- repeated feedback
+    // that taps aimed right at the visible chevron were missing and only
+    // registered a bit below it, on real devices this can't be reproduced
+    // on here to pin down exactly (a coordinate-mapping quirk this
+    // environment doesn't hit). Generously over-covering upward is a real
+    // fix for that specific symptom regardless of the exact root cause.
+    const hitPadTop = 24;
+    const hitPadBottom = 8;
+    const hitPadSides = 10;
+    const hitLeft = x - (size / 2) - hitPadSides;
+    const hitTop = y - (size / 2) - hitPadTop;
+    const hitWidth = size + (hitPadSides * 2);
+    const hitHeight = size + hitPadTop + hitPadBottom;
+    const background = this.add.rectangle(
+      hitLeft + (hitWidth / 2),
+      hitTop + (hitHeight / 2),
+      hitWidth,
+      hitHeight,
+      0x000000,
+      0.001
+    );
     chrome.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
     background.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
     background.setInteractive({ useHandCursor: true });
@@ -11299,7 +11344,7 @@ export class MenuScene extends Phaser.Scene {
       fontSize: '1px',
       color: MENU_TEXT_COLOR
     })).setOrigin(0.5).setAlpha(0).setDepth(3);
-    this.overlayBackChevronBounds = createVisualRect(x - (size / 2), y - (size / 2), size, size);
+    this.overlayBackChevronBounds = createVisualRect(hitLeft, hitTop, hitWidth, hitHeight);
 
     const setActive = (active: boolean): void => {
       drawChevronChrome(active);
@@ -11881,6 +11926,13 @@ export class MenuScene extends Phaser.Scene {
     ) {
       this.refreshLayout();
     }
+    // Deliberately NOT calling startPlayMode() here -- the runtime
+    // diagnostics auth fixture resolves synchronously, which meant this
+    // could run in the middle of create() itself, before footerText and
+    // other scene objects refreshLayout() touches even exist yet (a hard
+    // crash that silently aborted the rest of boot). update() can't fire
+    // until create() has fully returned, so consuming the flag there
+    // instead guarantees everything it needs already exists.
   }
 
   private async hydrateLegacyAccountDataAfterAuth(
