@@ -960,6 +960,17 @@ const BOARD_SHADOW_OFFSET = 0;
 const MENU_BUTTON_ALPHA = 0.34;
 const LEGACY_UI_FONT_FAMILY = cyberArcadeMaterial.typography.ui;
 const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
+// Unambiguously above every other depth used in the scene (everything else
+// is either default 0 or the shared "3" a couple of unrelated corner
+// controls also use) -- the overlay back chevron sits in the same general
+// top-right corner as play mode's always-present fixed pause-cog touch
+// region, and a tied/lower depth there is exactly what made the chevron
+// "difficult to click": nothing else should ever be able to out-rank it.
+const LEGACY_OVERLAY_BACK_CHEVRON_DEPTH = 1000;
+// Extra forgiveness beyond the chevron's own drawn touch-target size when
+// resolving which hit box a tap belongs to first -- corner buttons are
+// statistically the hardest to land a precise tap on.
+const LEGACY_OVERLAY_BACK_CHEVRON_PRIORITY_PADDING = 10;
 const LEGACY_UI_CONTROL_RADIUS = cyberArcadeMaterial.controls.radius;
 const MENU_TEXT_COLOR = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 // Pulse period for the classic "PRESS START" blink -- see
@@ -2669,6 +2680,15 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // Checked before anything else in this pipeline, generously padded --
+      // the overlay back chevron sits in the same corner as play mode's
+      // always-present fixed pause-cog touch region (handleLegacyPlayTouchControl
+      // checks for that regardless of which overlay is open), and a tap
+      // there was landing on whichever of the two logic paths happened to
+      // run first instead of reliably resolving to the button itself.
+      if (this.isPointerOnOverlayBackChevron(pointer)) {
+        return;
+      }
       if (this.handleOverlayScrollPointerDown(pointer)) {
         return;
       }
@@ -3038,6 +3058,25 @@ export class MenuScene extends Phaser.Scene {
     return this.setLegacyOverlayScrollOffset(this.overlayScrollOffset + (Math.sign(deltaY) * wheelStep));
   }
 
+  // Checked first, ahead of every other pointerdown handler -- a tap here
+  // should always resolve to the back button itself (Phaser's own
+  // object-level pointerdown on the chevron's background still fires the
+  // real onClick independently; this just guarantees nothing else in the
+  // custom scroll/touch-control pipeline below gets a chance to also treat
+  // the same tap as a scroll-drag start or a fixed pause-cog press).
+  private isPointerOnOverlayBackChevron(pointer: Phaser.Input.Pointer): boolean {
+    if (this.overlay === 'none' || this.overlayBackChevronBounds === null) {
+      return false;
+    }
+    const point = this.resolveLegacyInputPointerPoint(pointer);
+    return this.isPointInVisualRect(
+      this.overlayBackChevronBounds,
+      point.x,
+      point.y,
+      LEGACY_OVERLAY_BACK_CHEVRON_PRIORITY_PADDING
+    );
+  }
+
   private handleOverlayScrollPointerDown(pointer: Phaser.Input.Pointer): boolean {
     if (this.overlay === 'none' || this.overlayScrollMax <= 0) {
       return false;
@@ -3049,18 +3088,9 @@ export class MenuScene extends Phaser.Scene {
       this.overlayScrollGestureLockPointerId = pointerId;
       return false;
     }
-    // The scroll rail's hit test is padded generously (20px) since it's a
-    // thin visual strip that still needs to be an easy touch target -- but
-    // the rail runs the full scrollable height, including right past the
-    // back chevron tucked in the panel's top-right corner. Without this
-    // exclusion, a tap on the chevron also registered as "on the rail",
-    // kicking off a scroll-drag gesture that raced with (and sometimes
-    // ate) the chevron's own click -- this was the actual cause of "the
-    // back button hit box feels off" that reproduction from source alone
-    // never turned up.
-    if (this.isPointInVisualRect(this.overlayBackChevronBounds, point.x, point.y, 0)) {
-      return false;
-    }
+    // A back-chevron tap never reaches here at all now -- isPointerOnOverlayBackChevron
+    // (checked first in installInput's pointerdown handler, with generous
+    // padding) claims it before the scroll rail's own hit test gets a look.
     const onViewport = this.isPointInVisualRect(this.overlayScrollViewportBounds, point.x, point.y, 0);
     const onRail = this.isPointInVisualRect(this.overlayScrollTrackBounds, point.x, point.y, 20);
     if (!onViewport && !onRail) {
@@ -11126,8 +11156,8 @@ export class MenuScene extends Phaser.Scene {
 
     drawChevronChrome(false);
     const background = this.add.rectangle(x, y, size, size, 0x000000, 0.001);
-    chrome.setDepth(3);
-    background.setDepth(3);
+    chrome.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
+    background.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
     background.setInteractive({ useHandCursor: true });
     const label = this.padLegacyUiText(this.add.text(x, y, '', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
