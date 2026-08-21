@@ -33,16 +33,16 @@ describe('Mazer install gate', () => {
     expect(copy.title).toContain('Safari');
   });
 
-  test('a native install prompt offers Install plus an explicit skip', () => {
+  test('a native install prompt offers Install and nothing else -- no skip, the gate is a real block here', () => {
     const copy = resolveMazerInstallGateCopy({ ...hiddenState, mode: 'available', canPrompt: true });
 
     expect(copy.primaryAction).toBe('install');
     expect(copy.primaryLabel).toBe('Install');
-    expect(copy.showSkip).toBe(true);
+    expect(copy.showSkip).toBe(false);
     expect(copy.showCopyLink).toBe(false);
   });
 
-  test('the iOS Safari manual-instruction case surfaces the real instruction text and a single continue action', () => {
+  test('iOS Safari gets the real instruction text and no button at all -- only actually adding to the Home Screen gets past it', () => {
     const copy = resolveMazerInstallGateCopy({
       ...hiddenState,
       mode: 'manual',
@@ -50,8 +50,10 @@ describe('Mazer install gate', () => {
     });
 
     expect(copy.subtitle).toBe('Use Share > Add to Home Screen');
-    expect(copy.primaryAction).toBe('continue');
+    expect(copy.primaryAction).toBeNull();
+    expect(copy.primaryLabel).toBeNull();
     expect(copy.showSkip).toBe(false);
+    expect(copy.showCopyLink).toBe(false);
   });
 
   test('wires the install gate into boot before the Phaser game is created, and skips it on localhost', () => {

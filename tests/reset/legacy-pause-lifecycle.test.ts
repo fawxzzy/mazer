@@ -35,13 +35,23 @@ describe('legacy pause lifecycle', () => {
     const authOverlayStart = menuSceneSource.indexOf('private buildAuthOverlay(): void {');
     const pauseOverlaySource = menuSceneSource.slice(pauseOverlayStart, authOverlayStart);
 
-    expect(menuSceneSource).toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
-    expect(menuSceneSource).toContain("'Reset', resetAction");
+    // Reset (the reset-player button) was removed from the game entirely --
+    // the underlying resolveLegacyPauseCommand/'reset-player' contract
+    // above still exists and is still exercised by the tests around it,
+    // there's just no UI button wired to it anymore. Reset Progress moved
+    // to the account screen (buildAuthOverlay's authenticated section,
+    // account-level data, not a per-attempt reset) and the pause overlay's
+    // one remaining row pairs Account with Menu instead.
+    expect(pauseOverlaySource).not.toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
+    expect(pauseOverlaySource).not.toContain("'Reset', resetAction");
+    expect(pauseOverlaySource).not.toContain("'Reset Progress'");
     expect(pauseOverlaySource).not.toContain("'Log out'");
-    expect(pauseOverlaySource).not.toContain("'Account'");
+    expect(pauseOverlaySource).toContain("'Account', accountAction");
     expect(pauseOverlaySource).toContain("'Menu', mainMenuAction");
     expect(pauseOverlaySource).not.toContain("'Resume'");
     expect(pauseOverlaySource).not.toContain('resumeAction');
+    expect(menuSceneSource).toContain("this.createLegacyAuthActionButton(");
+    expect(menuSceneSource).toContain("() => this.openOverlay('confirm-progression-reset')");
     expect(menuSceneSource).toContain('this.playCyclePath = [copyPoint(result.nextPlayer)];');
     expect(menuSceneSource).toContain('this.playCycleResetUsed = true;');
     expect(menuSceneSource).toContain('this.playStartedAtMs = this.time.now;');

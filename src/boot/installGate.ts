@@ -68,6 +68,10 @@ export const resolveMazerInstallGateCopy = (state: InstallSurfaceState): MazerIn
   }
 
   if (state.mode === 'available') {
+    // Native beforeinstallprompt support (Android/desktop Chrome/Edge) --
+    // the one case that gets an actual Install button. No skip: the gate
+    // is a real block for this surface, not a dismissible nudge -- the
+    // only way through is to actually install.
     return {
       title: 'Install Mazer',
       subtitle: 'Play full-screen, offline-ready, right from your Home Screen.',
@@ -78,33 +82,28 @@ export const resolveMazerInstallGateCopy = (state: InstallSurfaceState): MazerIn
       ],
       primaryLabel: 'Install',
       primaryAction: 'install',
-      showSkip: true,
-      showCopyLink: false
-    };
-  }
-
-  if (state.mode === 'manual') {
-    return {
-      title: 'Add Mazer to your Home Screen',
-      subtitle: state.instruction ?? 'Use your browser menu to add Mazer to your Home Screen.',
-      steps: [
-        'Tap the Share button',
-        'Choose "Add to Home Screen"',
-        'Open Mazer from the new Home Screen icon'
-      ],
-      primaryLabel: 'Continue to Mazer',
-      primaryAction: 'continue',
       showSkip: false,
       showCopyLink: false
     };
   }
 
+  // iOS Safari never gets an install button (there's no native prompt to
+  // trigger) and no continue/skip either -- the gate only goes away once
+  // they've actually added Mazer to their Home Screen and relaunched it
+  // standalone (installSurface reports 'hidden' at that point and this
+  // whole gate is skipped). Instructions only, no button.
   return {
-    title: 'Install Mazer',
-    subtitle: 'Play full-screen, offline-ready, right from your Home Screen.',
-    steps: [],
-    primaryLabel: 'Continue to Mazer',
-    primaryAction: 'continue',
+    title: 'Add Mazer to your Home Screen',
+    subtitle: state.mode === 'manual'
+      ? state.instruction ?? 'Use your browser menu to add Mazer to your Home Screen.'
+      : 'Use your browser menu to add Mazer to your Home Screen.',
+    steps: [
+      'Tap the Share button',
+      'Choose "Add to Home Screen"',
+      'Open Mazer from the new Home Screen icon'
+    ],
+    primaryLabel: null,
+    primaryAction: null,
     showSkip: false,
     showCopyLink: false
   };
