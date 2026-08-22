@@ -681,7 +681,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 6200;');
+    expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 9600;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 8;');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(time: number): void');
@@ -1095,11 +1095,14 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('event.target === this.game.canvas');
     expect(menuSceneSource).toContain('event.stopImmediatePropagation()');
     expect(menuSceneSource).toContain("case 'pause':");
-    // Reset (reset-player) was removed from the game entirely; the pause
-    // overlay's one remaining action row pairs Account with Menu instead.
+    // Reset (reset-player) was removed from the game entirely; Account and
+    // Menu no longer live in a bottom action bar at all -- they're the
+    // username label and a home icon sharing the header row with the back
+    // chevron instead (see createLegacyOverlayUsernameButton /
+    // createLegacyOverlayHomeButton).
     expect(menuSceneSource).not.toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
-    expect(menuSceneSource).toContain("const accountAction = (): void => this.openOverlay('auth');");
-    expect(menuSceneSource).toContain("{ onClick: accountAction, text: 'Account', tone: 'secondary' }");
+    expect(menuSceneSource).toContain("this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth'))");
+    expect(menuSceneSource).toContain("this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu'))");
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
     expect(menuSceneSource).toContain('this.playDirectionalIntent.step(this.maze, this.player, {');
@@ -1398,13 +1401,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.layout.centerButtonX,');
     expect(menuSceneSource).toContain('this.layout.centerButtonY,');
     expect(menuSceneSource).not.toContain('const accountActionLabel =');
-    // The Options overlay's Account action is a bottom action bar button
-    // now (Fitness-style), pinned to the panel bottom instead of scrolling
-    // with the toggle content -- same call in both the simple and advanced
-    // branches.
+    // The Options overlay's Account action is the username label in the
+    // header row now (next to the back chevron), not a bottom action bar
+    // button -- there's no "go to main menu" equivalent here since you're
+    // already at the main menu, so the bottom of the panel is simply empty.
     expect(menuSceneSource).not.toContain('private createLegacyOptionsAccountActionRow(');
     expect(menuSceneSource).toContain(
-      "this.createLegacyBottomActionBar(panel, compact, { onClick: () => this.openOverlay('auth'), text: 'Account', tone: 'primary' });"
+      "this.uiButtons.push(this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth')));"
     );
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain('Account access is unavailable right now. You can still play as a guest.');
@@ -1529,7 +1532,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   test('keeps the options and pause player guide readable while explaining visible badge fields', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, 3);');
+    expect(menuSceneSource).toContain('const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, 5);');
     expect(menuSceneSource).toContain('const contentFlow = resolveLegacyOverlayContentFlowLayout({');
     expect(menuSceneSource).toContain('const guideTitleFontSize = guideLayout.titleFontSize;');
     expect(menuSceneSource).toContain('const guideRowFontSize = guideLayout.rowFontSize;');
