@@ -1252,6 +1252,7 @@ export class MenuScene extends Phaser.Scene {
   private authUsernameSequence = 0;
   private authUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private menuLeaderboardActive = false;
+  private menuUsernameActive = false;
   private leaderboardStatus: 'empty' | 'error' | 'idle' | 'loading' | 'ready' = 'idle';
   private leaderboardErrorMessage: string | null = null;
   private leaderboardEntries: readonly LegacyLeaderboardEntry[] = [];
@@ -9110,6 +9111,7 @@ export class MenuScene extends Phaser.Scene {
         }
         this.uiButtons.push(this.createLegacyMenuSettingsCogButton(() => this.openOverlay('options')));
         this.uiButtons.push(this.createLegacyMenuLeaderboardButton(() => this.openOverlay('leaderboard')));
+        this.uiButtons.push(this.createLegacyMenuUsernameButton(() => this.openOverlay('auth')));
       }
 
       this.uiDirty = false;
@@ -12397,6 +12399,169 @@ export class MenuScene extends Phaser.Scene {
         label.destroy();
       }
     };
+  }
+
+  // Front-door-only account readout: signed-in players see their own
+  // username sitting in the same header row as the settings cog, immediately
+  // left of the leaderboard icon (the trailing cluster is the one spot that
+  // doesn't collide with the LVL badge already anchored to the leading
+  // side). Tapping it opens the same account screen the auth overlay already
+  // shows once authenticated. Prefers the title's own tile-glyph material
+  // (drawLegacyPathMaterialTile) when every character in the username has a
+  // glyph -- LEGACY_GLYPH_LETTER_PATTERNS only covers a subset of uppercase
+  // letters used elsewhere in this game's own vocabulary, so most real
+  // usernames (digits, punctuation, most consonants) fall back to plain
+  // animated text instead. This mirrors createButton's own primary
+  // Start/Login glyph-vs-text fallback rather than inventing a new rule.
+  private createLegacyMenuUsernameButton(onClick: () => void): UiButton {
+    const panel = this.add.graphics();
+    const label = this.padLegacyCompactUiText(this.add.text(0, 0, '', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '13px',
+      color: '#72e0bf'
+    })).setOrigin(1, 0.5).setVisible(false);
+    this.uiTexts.push(label);
+
+    const background = this.add.rectangle(0, 0, 1, 1, 0x000000, 0.001);
+    background.setInteractive({ useHandCursor: true });
+    background.setDepth(3);
+    background.setVisible(false);
+    this.menuUsernameActive = false;
+
+    const setActive = (active: boolean): void => {
+      if (this.menuUsernameActive === active) {
+        return;
+      }
+      this.menuUsernameActive = active;
+      this.boardDynamicDirty = true;
+    };
+    background.on('pointerover', () => setActive(true));
+    background.on('pointerout', () => setActive(false));
+    background.on('pointerdown', onClick);
+
+    return {
+      background,
+      bounds: createVisualRect(0, 0, 1, 1),
+      iconOnly: true,
+      label,
+      semanticAction: 'Account',
+      setActive,
+      text: 'Account',
+      updateFrame: (time: number) => {
+        this.drawLegacyMenuUsernameLabel(panel, label, background, time);
+      },
+      destroy: () => {
+        panel.destroy();
+        background.destroy();
+        label.destroy();
+      }
+    };
+  }
+
+  private drawLegacyMenuUsernameLabel(
+    panel: Phaser.GameObjects.Graphics,
+    label: Phaser.GameObjects.Text,
+    background: Phaser.GameObjects.Rectangle,
+    time: number
+  ): void {
+    const hide = (): void => {
+      panel.clear();
+      panel.setVisible(false);
+      label.setVisible(false);
+      background.setVisible(false);
+    };
+
+    if (this.mode !== 'menu' || this.overlay !== 'none' || this.authSnapshot.status !== 'authenticated') {
+      hide();
+      return;
+    }
+
+    // Idempotent per signed-in user id (see loadAccountUsernameIfNeeded) --
+    // safe to call every frame, it only actually fetches once.
+    this.loadAccountUsernameIfNeeded();
+    const username = this.accountUsernameSavedValue;
+    if (username.length === 0) {
+      hide();
+      return;
+    }
+
+    const laneTop = this.layout.lanes.hud?.top ?? 0;
+    const leaderboardFrame = resolveLegacyHeaderControlFrame({
+      height: this.layout.height,
+      hudHeight: this.layout.lanes.hud?.height ?? 64,
+      hudTop: laneTop,
+      placement: 'trailing',
+      slot: 1,
+      width: this.layout.width
+    });
+    const gap = Math.max(8, Math.round(leaderboardFrame.width * 0.32));
+    const anchorRight = leaderboardFrame.left - gap;
+    const anchorY = leaderboardFrame.centerY;
+
+    const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+    const blinkAlpha = clamp(0.55 + (phase * 0.45) + (this.menuUsernameActive ? 0.05 : 0), 0.4, 1);
+    const trailColor = resolveLegacyIridescentTrailColor(
+      0,
+      1,
+      time,
+      this.resolveActiveLegacyProgressionPalette().trailColor
+    );
+
+    // Much smaller than the title/front-door glyph scale (cellSize up to
+    // 10px there) -- this is a header readout, not a second title. Falls
+    // back to plain text if the glyph word would still run wider than a
+    // reasonable header slot even at this reduced size (very long
+    // usernames), same reasoning as the alphabet-coverage fallback below.
+    const glyphCellSize = 3;
+    const maxGlyphWidth = Math.max(60, Math.round(this.layout.width * 0.3));
+    const useGlyphs = isLegacyGlyphWordRenderable(username)
+      && (resolveLegacyGlyphWordColumns(username) * glyphCellSize) <= maxGlyphWidth;
+
+    panel.clear();
+
+    if (useGlyphs) {
+      label.setVisible(false);
+      const layout = resolveLegacyGlyphWordLayout(username, 0, 0, glyphCellSize);
+      panel.setPosition(anchorRight - layout.width, anchorY - (layout.height / 2));
+      panel.setVisible(true);
+      const pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'> = {
+        grid: layout.grid,
+        height: layout.rows,
+        width: layout.columns
+      };
+      const cellCoreColor = mixLegacyIridescentColor(LEGACY_MENU_PATH_CORE, trailColor, 1);
+      const cellEdgeColor = mixLegacyIridescentColor(LEGACY_MENU_PATH_EDGE, trailColor, 1);
+      for (const cell of layout.cells) {
+        this.drawLegacyPathMaterialTile(
+          panel,
+          { x: cell.column, y: cell.row },
+          pathSource,
+          0,
+          0,
+          layout.cellSize,
+          {
+            coreAlpha: blinkAlpha,
+            coreColor: cellCoreColor,
+            drawCue: false,
+            edgeAlpha: blinkAlpha * 0.92,
+            edgeColor: cellEdgeColor
+          }
+        );
+      }
+      background.setPosition(anchorRight - (layout.width / 2), anchorY);
+      background.setSize(layout.width + 16, Math.max(28, layout.height + 12));
+      background.setVisible(true);
+    } else {
+      panel.setVisible(false);
+      label.setText(username);
+      label.setColor(`#${trailColor.toString(16).padStart(6, '0')}`);
+      label.setAlpha(blinkAlpha);
+      label.setPosition(anchorRight, anchorY);
+      label.setVisible(true);
+      background.setPosition(anchorRight - (label.displayWidth / 2), anchorY);
+      background.setSize(label.displayWidth + 16, label.displayHeight + 12);
+      background.setVisible(true);
+    }
   }
 
   private clearUi(): void {
