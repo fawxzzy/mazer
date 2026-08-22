@@ -377,6 +377,51 @@ describe('legacy progression', () => {
     });
   });
 
+  test('survives crossing the level-10 difficulty taper without rebasing real progress back to level 1', () => {
+    // resolveLegacyProgressionTargetAdjustment tapers the player's per-
+    // completion gain from +4 down to +3 once level reaches 10. The
+    // coherence check that guards against corrupted saves used to assume a
+    // flat +4/cycle for every completed cycle, so the very first genuine
+    // completion at level 10 (the 10th total) made a correctly-earned save
+    // look "impossible" and wiped it back to level 1 on the next read or
+    // write -- reproduce that exact crossing here to lock in the fix.
+    const storage = new MemoryStorage();
+    let state = createEmptyLegacyProgressionState();
+    for (let cycle = 1; cycle <= 10; cycle += 1) {
+      state = recordLegacyProgressionCycle(
+        storage,
+        state,
+        createMazeCycleTelemetryReceipt({
+          averageFrameMs: 16,
+          completedAt: `2026-08-2${cycle % 9}T12:00:00.000Z`,
+          completionTimeMs: 8_000,
+          controlMode: 'stick',
+          maze: createProgressionTestMaze(),
+          playerPath: createProgressionTestMaze().solutionPath,
+          resetUsed: false,
+          surface: 'play',
+          backtracks: 0,
+          wrongTurns: 0
+        }),
+        createProgressionTestMaze()
+      );
+      // Every intermediate write must also survive its own re-normalization
+      // (readLegacyProgressionState runs the same coherence check) -- not
+      // just the final tenth one.
+      expect(readLegacyProgressionState(storage).tracks.player.completedCycles).toBe(cycle);
+    }
+
+    expect(state.tracks.player).toMatchObject({
+      completedCycles: 10,
+      level: 10,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + (9 * 4) + 3
+    });
+    expect(readLegacyProgressionState(storage).tracks.player).toMatchObject({
+      completedCycles: 10,
+      level: 10
+    });
+  });
+
   test('scores completion time against route and complexity pressure for level pacing', () => {
     const maze = createProgressionTestMaze();
     const fastReceipt = createMazeCycleTelemetryReceipt({
