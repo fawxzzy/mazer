@@ -134,21 +134,35 @@ export const fetchLegacyLeaderboardSelfRank = async (): Promise<LegacyLeaderboar
   }
 
   const candidate = row as Record<string, unknown>;
-  const rank = typeof candidate.rank === 'number' ? candidate.rank : Number(candidate.rank);
+  const hasUsername = candidate.has_username === true;
+  // rank is genuinely null (not just absent) for a caller without a
+  // username -- mazer_leaderboard_self_rank only ranks over the same
+  // named-only population mazer_leaderboard_page shows, so there is no
+  // number to report yet. Number(null) is 0, which would otherwise pass
+  // Number.isFinite and silently masquerade as a real "#0" rank.
+  const rank = candidate.rank === null
+    ? null
+    : (typeof candidate.rank === 'number' ? candidate.rank : Number(candidate.rank));
   const playerLevel = typeof candidate.player_level === 'number'
     ? candidate.player_level
     : Number(candidate.player_level);
 
-  if (!Number.isFinite(rank) || !Number.isFinite(playerLevel)) {
+  if (!Number.isFinite(playerLevel) || (rank !== null && !Number.isFinite(rank))) {
+    return { error: null, selfRank: null };
+  }
+  if (hasUsername && rank === null) {
+    // A named caller should always have a real rank -- if the server ever
+    // disagrees, treat it as "no usable self-rank" rather than displaying
+    // a broken state.
     return { error: null, selfRank: null };
   }
 
   return {
     error: null,
     selfRank: {
-      hasUsername: candidate.has_username === true,
+      hasUsername,
       playerLevel,
-      rank
+      rank: rank ?? 0
     }
   };
 };

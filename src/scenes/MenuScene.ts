@@ -9838,23 +9838,71 @@ export class MenuScene extends Phaser.Scene {
   // actually fit a typical overlay panel instead.
   private static readonly LEADERBOARD_VISIBLE_ROWS = 8;
 
+  // Rank-tier accent for the top three rows on the current page -- gold for
+  // #1 (the same reward color the start marker uses), cyan for #2, mint for
+  // #3, then every row below falls back to the standard rail white/mint
+  // pairing everything else in this overlay already uses. Deliberately
+  // page-relative (row 1 of whatever page is showing), not globally tied to
+  // rank 1/2/3 specifically -- there is no real design reason a page-2 #11
+  // should read as visually unranked next to a page-1 #1.
+  private resolveLegacyLeaderboardRowAccent(rowIndex: number): number {
+    if (rowIndex === 0) {
+      return cyberArcadeMaterial.signal.start;
+    }
+    if (rowIndex === 1) {
+      return cyberArcadeMaterial.rail.cyan;
+    }
+    if (rowIndex === 2) {
+      return cyberArcadeMaterial.rail.mint;
+    }
+    return cyberArcadeMaterial.rail.white;
+  }
+
+  // The exact 3-ascending-bars glyph the header leaderboard icon draws
+  // (drawLegacyMenuLeaderboardIcon), reused here as a static decorative
+  // accent next to the title instead of a bespoke trophy/medal shape --
+  // this screen should read as "the thing that icon opens," not a
+  // different visual language.
+  private drawLegacyLeaderboardTitleGlyph(centerX: number, centerY: number, outerRadius: number): void {
+    const color = cyberArcadeMaterial.signal.player;
+    const barCount = 3;
+    const barGap = Math.max(1, Math.round(outerRadius * 0.22));
+    const barWidth = Math.max(2, Math.round(((outerRadius * 2) - (barGap * (barCount - 1))) / barCount));
+    const heights = [0.52, 1, 0.74].map((ratio) => Math.max(3, Math.round(outerRadius * 1.7 * ratio)));
+    const totalWidth = (barWidth * barCount) + (barGap * (barCount - 1));
+    const left = centerX - (totalWidth / 2);
+    const baseline = centerY + outerRadius * 0.72;
+
+    this.overlayGraphics.fillStyle(color, 0.88);
+    this.overlayGraphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, 0.92);
+    for (let index = 0; index < barCount; index += 1) {
+      const barHeight = heights[index] ?? heights[0] ?? 1;
+      const x = left + (index * (barWidth + barGap));
+      const y = baseline - barHeight;
+      this.overlayGraphics.fillRect(x, y, barWidth, barHeight);
+      this.overlayGraphics.strokeRect(x, y, barWidth, barHeight);
+    }
+  }
+
   private buildLeaderboardOverlay(): void {
     const panel = this.resolveOverlayPanelFrame();
     const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const centerX = panel.centerX;
 
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.closeOverlay()));
-    this.createOverlayTitle('Leaderboard', panel.top + (compact ? 46 : 54));
+    const titleY = panel.top + (compact ? 46 : 54);
+    this.drawLegacyLeaderboardTitleGlyph(centerX, titleY - (compact ? 30 : 34), compact ? 11 : 12);
+    this.createOverlayTitle('Leaderboard', titleY);
 
-    let rowY = panel.top + (compact ? 96 : 110);
+    let rowY = panel.top + (compact ? 100 : 116);
 
     if (this.leaderboardSelfRank) {
       const selfRank = this.leaderboardSelfRank;
       const selfRankText = selfRank.hasUsername
-        ? `You: #${selfRank.rank.toLocaleString()} · Level ${selfRank.playerLevel}`
-        : 'Set a username on the account screen to appear on the leaderboard.';
-      this.createAuthInfoText(selfRankText, rowY, panel, '#72e0bf', compact ? 13 : 14);
-      rowY += compact ? 34 : 38;
+        ? `#${selfRank.rank.toLocaleString()} · Level ${selfRank.playerLevel}`
+        : 'Set a username on the account screen to appear here.';
+      this.createAuthAccountSummaryCard(selfRankText, rowY + (compact ? 26 : 29), panel, 'YOUR RANK');
+      rowY += compact ? 66 : 74;
     }
 
     if (this.leaderboardStatus === 'loading') {
@@ -9878,40 +9926,84 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const rowHeight = compact ? 30 : 34;
-    const rankColumnLeft = panel.left + (compact ? 22 : 30);
-    const levelColumnRight = panel.left + panel.width - (compact ? 22 : 30);
-    const usernameColumnLeft = rankColumnLeft + (compact ? 44 : 54);
+    const listLeft = panel.left + (compact ? 20 : 28);
+    const listRight = panel.left + panel.width - (compact ? 20 : 28);
+    const listWidth = listRight - listLeft;
+    const badgeRadius = compact ? 13 : 15;
+    const rankColumnLeft = listLeft + badgeRadius;
+    const usernameColumnLeft = listLeft + (badgeRadius * 2) + (compact ? 12 : 16);
+    const levelColumnRight = listRight - (compact ? 4 : 6);
+
+    // A small uppercase column header, matching the Guide/Options overlays'
+    // own section-heading treatment, instead of the list starting with no
+    // explanation of what the two numbers mean.
+    const headerY = rowY + (compact ? 8 : 10);
+    const headerLabel = this.padLegacyCompactUiText(this.add.text(usernameColumnLeft, headerY, 'PLAYER', {
+      color: '#5d7a72',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${compact ? 9 : 10}px`
+    })).setOrigin(0, 0.5);
+    const levelHeaderLabel = this.padLegacyCompactUiText(this.add.text(levelColumnRight, headerY, 'LEVEL', {
+      color: '#5d7a72',
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: `${compact ? 9 : 10}px`
+    })).setOrigin(1, 0.5);
+    this.uiTexts.push(headerLabel, levelHeaderLabel);
+    this.overlayGraphics.lineStyle(1, LEGACY_CYBER_PANEL_STROKE_ALT, 0.28);
+    this.overlayGraphics.lineBetween(listLeft, headerY + (compact ? 12 : 14), listRight, headerY + (compact ? 12 : 14));
+    rowY = headerY + (compact ? 24 : 28);
+
+    const rowHeight = compact ? 40 : 44;
     const visibleEntries = this.leaderboardEntries.slice(0, MenuScene.LEADERBOARD_VISIBLE_ROWS);
 
-    for (const entry of visibleEntries) {
+    visibleEntries.forEach((entry, index) => {
       const isSelf = entry.isRequestingUser;
-      const rowColor = isSelf ? '#72e0bf' : '#d7f7ee';
-      const rankLabel = this.padLegacyCompactUiText(this.add.text(rankColumnLeft, rowY, `#${entry.rank}`, {
+      const accentColor = this.resolveLegacyLeaderboardRowAccent(index);
+      const accentCss = toCyberArcadeCssHex(accentColor);
+
+      if (isSelf) {
+        // Same dark-fill-plus-mint-stroke card language as the account
+        // summary card and the highest-tier guide badges, instead of just a
+        // text-color swap -- your own row should be unmistakable at a
+        // glance while scanning past everyone else's.
+        this.overlayGraphics.fillStyle(0x07131d, 0.9);
+        this.overlayGraphics.fillRoundedRect(listLeft - 8, rowY - (rowHeight / 2) + 3, listWidth + 16, rowHeight - 6, 8);
+        this.overlayGraphics.lineStyle(1.5, LEGACY_PLAY_TOUCH_ACCENT, 0.7);
+        this.overlayGraphics.strokeRoundedRect(listLeft - 8, rowY - (rowHeight / 2) + 3, listWidth + 16, rowHeight - 6, 8);
+      }
+
+      this.overlayGraphics.fillStyle(accentColor, isSelf ? 0.22 : 0.14);
+      this.overlayGraphics.fillCircle(rankColumnLeft, rowY, badgeRadius);
+      this.overlayGraphics.lineStyle(1.2, accentColor, 0.85);
+      this.overlayGraphics.strokeCircle(rankColumnLeft, rowY, badgeRadius);
+      const rankBadgeLabel = this.padLegacyCompactUiText(this.add.text(rankColumnLeft, rowY, String(entry.rank), {
         fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: `${compact ? 13 : 14}px`,
-        color: isSelf ? '#72e0bf' : '#7894a0'
-      })).setOrigin(0, 0.5);
+        fontSize: `${compact ? 11 : 12}px`,
+        color: accentCss
+      })).setOrigin(0.5);
+      this.fitLegacyUiTextToWidth(rankBadgeLabel, badgeRadius * 1.7, compact ? 11 : 12, 8);
+
+      const rowColor = isSelf ? '#ecfff5' : '#d7f7ee';
       const usernameLabel = this.fitLegacyUiTextToWidth(
-        this.padLegacyCompactUiText(this.add.text(usernameColumnLeft, rowY, entry.username, {
+        this.padLegacyUiText(this.add.text(usernameColumnLeft, rowY, entry.username, {
           fontFamily: LEGACY_UI_FONT_FAMILY,
-          fontSize: `${compact ? 13 : 14}px`,
+          fontSize: `${compact ? 14 : 15}px`,
           color: rowColor
         })),
         levelColumnRight - usernameColumnLeft - (compact ? 48 : 56),
-        compact ? 13 : 14,
+        compact ? 14 : 15,
         10
       ).setOrigin(0, 0.5);
       const levelLabel = this.padLegacyCompactUiText(this.add.text(levelColumnRight, rowY, String(entry.playerLevel), {
         fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: `${compact ? 13 : 14}px`,
+        fontSize: `${compact ? 14 : 15}px`,
         color: rowColor
       })).setOrigin(1, 0.5);
-      this.uiTexts.push(rankLabel, usernameLabel, levelLabel);
+      this.uiTexts.push(rankBadgeLabel, usernameLabel, levelLabel);
       rowY += rowHeight;
-    }
+    });
 
-    const paginationY = rowY + (compact ? 14 : 18);
+    const paginationY = rowY + (compact ? 10 : 14);
     if (this.leaderboardOffset > 0) {
       this.createAuthFooterLink(
         centerX - (compact ? 60 : 70),
@@ -10655,14 +10747,15 @@ export class MenuScene extends Phaser.Scene {
   private createAuthAccountSummaryCard(
     copy: string,
     y: number,
-    panel: OverlayPanelFrame
+    panel: OverlayPanelFrame,
+    eyebrowText = 'ACCOUNT'
   ): void {
     const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const width = Math.min(panel.width - 56, stacked ? 330 : 420);
     const height = stacked ? 56 : 62;
     const background = this.add.rectangle(panel.centerX, y, width, height, 0x07131d, 1);
     background.setStrokeStyle(2, LEGACY_PLAY_TOUCH_ACCENT, 0.76);
-    const eyebrow = this.padLegacyCompactUiText(this.add.text(panel.centerX - (width / 2) + 16, y - (height * 0.24), 'ACCOUNT', {
+    const eyebrow = this.padLegacyCompactUiText(this.add.text(panel.centerX - (width / 2) + 16, y - (height * 0.24), eyebrowText, {
       color: '#72e0bf',
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: `${stacked ? 9 : 10}px`

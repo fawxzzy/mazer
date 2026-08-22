@@ -81,20 +81,32 @@ security definer
 set search_path = public
 stable
 as $$
+  -- Ranked over the exact same population mazer_leaderboard_page counts
+  -- (only rows with a username) -- an earlier version of this query ranked
+  -- over every progression row via a bare left join, so a caller's number
+  -- here could disagree with where they actually sit on the public page
+  -- (counting no-username accounts against them that the page itself never
+  -- shows). base is the caller's own row; ranked only ever matches it when
+  -- they have a username, leaving rank null otherwise.
   with ranked as (
     select
       s.user_id,
-      s.player_level,
-      p.username is not null as has_username,
       row_number() over (
         order by s.player_level desc, s.level_reached_at asc nulls last, s.user_id asc
       ) as rank
     from public.mazer_progression_states s
+    join public.mazer_profiles p on p.user_id = s.user_id
+    where p.username is not null
+  ),
+  base as (
+    select s.user_id, s.player_level, p.username is not null as has_username
+    from public.mazer_progression_states s
     left join public.mazer_profiles p on p.user_id = s.user_id
+    where s.user_id = auth.uid()
   )
-  select ranked.rank, ranked.player_level, ranked.has_username
-  from ranked
-  where ranked.user_id = auth.uid();
+  select ranked.rank, base.player_level, base.has_username
+  from base
+  left join ranked on ranked.user_id = base.user_id;
 $$;
 
 revoke all on function public.mazer_leaderboard_self_rank() from public;
