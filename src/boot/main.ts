@@ -5,7 +5,6 @@ import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
 import { runMazerInstallGate } from './installGate';
 import { initializeInstallSurface } from './installSurface';
-import { installMazerPortraitLock, shouldBlockMazerLandscape } from './orientationLock';
 import { createMazerPhaserConfig } from './phaserConfig';
 import { installMazerProductionServiceWorker, installMazerServiceWorkerControllerReload } from './serviceWorkerLifecycle';
 import { installMazerViewportGeometry, syncMazerGameToViewport } from './viewportGeometry';
@@ -75,19 +74,7 @@ const registerProductionServiceWorker = (): void => {
 const boot = async (): Promise<void> => {
   markMazerBootStatus('boot-start');
   let game: Phaser.Game | null = null;
-  const syncLandscapeBlock = (blocked: boolean): void => {
-    if (!game) {
-      return;
-    }
-
-    if (blocked) {
-      game.loop.sleep();
-    } else {
-      game.loop.wake();
-    }
-  };
   const viewportGeometry = installMazerViewportGeometry();
-  installMazerPortraitLock(window, syncLandscapeBlock);
 
   if (isLocalhostRuntime()) {
     const changed = await resetLocalhostServiceWorkers();
@@ -125,7 +112,6 @@ const boot = async (): Promise<void> => {
       syncMazerGameToViewport(game, geometry);
     }
   });
-  syncLandscapeBlock(shouldBlockMazerLandscape(window));
   registerProductionServiceWorker();
   markMazerBootStatus('game-created');
 };

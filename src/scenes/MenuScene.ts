@@ -9579,7 +9579,11 @@ export class MenuScene extends Phaser.Scene {
       const badgeToTextGap = compact ? 14 : 18;
       const titleCopyGap = compact ? 6 : 8;
       const titleFontSize = guideRowFontSize;
-      const titleMaxWidth = Math.round(detailWidth * (compact ? 0.4 : 0.36));
+      // Titles are the same fixed short strings ("Start:", "Trail:", ...) on
+      // every screen size -- they don't need a bigger proportional share on
+      // compact just because the card is narrower. Giving them one on mobile
+      // used to squeeze the copy column exactly where space was tightest.
+      const titleMaxWidth = Math.round(detailWidth * (compact ? 0.32 : 0.36));
       const glyphX = detailLeft + badgeRadius;
       const labelX = detailLeft + (badgeRadius * 2) + badgeToTextGap;
       const titleLabel = addText(`${title}:`, labelX, glyphY, titleMaxWidth, titleColor, titleFontSize, 0, compact ? 0.96 : 1, guideRowMinFontSize);
@@ -9613,7 +9617,11 @@ export class MenuScene extends Phaser.Scene {
       }
 
       const copyX = labelX + titleWidth + titleCopyGap;
-      const copyWidth = Math.max(compact ? 82 : 104, detailLeft + detailWidth - copyX);
+      // Floor is just a zero/negative-width guard, not a minimum promise --
+      // addText shrinks font size to fit but never wraps or clips, so a
+      // requested width bigger than the real remaining room let the copy
+      // text render straight past the card's right edge on narrow phones.
+      const copyWidth = Math.max(24, detailLeft + detailWidth - copyX);
       addText(
         copy,
         copyX,
@@ -9623,7 +9631,7 @@ export class MenuScene extends Phaser.Scene {
         guideRowFontSize,
         0,
         0.92,
-        compact ? 11 : guideRowMinFontSize
+        compact ? 8 : guideRowMinFontSize
       );
     };
 

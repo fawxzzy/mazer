@@ -108,9 +108,9 @@ describe('legacy remote progression', () => {
       ...state.tracks.player,
       completedCycles: 10,
       lastCompletedAt: '2026-07-09T01:00:00.000Z',
-      level: 11,
+      level: 10,
       rank: 'C',
-      targetComplexity: 48
+      targetComplexity: 47
     };
     state.tracks['ai-runner'] = {
       ...state.tracks['ai-runner'],
@@ -167,9 +167,9 @@ describe('legacy remote progression', () => {
     expect(from).toHaveBeenNthCalledWith(3, LEGACY_REMOTE_AI_PROGRESSION_TABLE);
     expect(updatePayloads[0]).toEqual(expect.objectContaining({
       player_completed_cycles: 10,
-      player_level: 11,
+      player_level: 10,
       player_rank: 'C',
-      player_target_complexity: 48,
+      player_target_complexity: 47,
       revision: 5,
       user_id: 'user-456'
     }));
@@ -187,7 +187,7 @@ describe('legacy remote progression', () => {
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-07-16T12:00:00.000Z';
     remote.tracks.player.completedCycles = 11;
-    remote.tracks.player.targetComplexity = 52;
+    remote.tracks.player.targetComplexity = 50;
     const local = createEmptyLegacyProgressionState();
     local.updatedAt = '2026-07-16T13:00:00.000Z';
     local.tracks.player.completedCycles = 3;
@@ -197,7 +197,7 @@ describe('legacy remote progression', () => {
     const merged = mergeLegacyProgressionStateAdvancements(remote, local);
 
     expect(merged.tracks.player.completedCycles).toBe(11);
-    expect(merged.tracks.player.targetComplexity).toBe(52);
+    expect(merged.tracks.player.targetComplexity).toBe(50);
     expect(merged.tracks['ai-runner'].completedCycles).toBe(18);
     expect(merged.tracks['ai-runner'].targetComplexity).toBe(64);
     expect(merged.updatedAt).toBe('2026-07-16T13:00:00.000Z');
@@ -207,7 +207,7 @@ describe('legacy remote progression', () => {
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-07-16T14:00:00.000Z';
     remote.tracks.player.completedCycles = 11;
-    remote.tracks.player.targetComplexity = 52;
+    remote.tracks.player.targetComplexity = 50;
     const values = new Map<string, string>();
     const storage = {
       getItem: (key: string) => values.get(key) ?? null,
@@ -240,7 +240,7 @@ describe('legacy remote progression', () => {
 
     expect(result.error).toBeNull();
     expect(result.progressionState?.tracks.player.completedCycles).toBe(11);
-    expect(result.progressionState?.tracks.player.targetComplexity).toBe(52);
+    expect(result.progressionState?.tracks.player.targetComplexity).toBe(50);
     expect(result.settings?.controlMode).toBe('arrows');
     expect(result.settings?.movementSpeed).toBe(0.65);
     expect(values.has('mazer.progression.v1:user:user-hydrate')).toBe(true);
@@ -256,7 +256,7 @@ describe('legacy remote progression', () => {
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-08-16T18:00:00.000Z';
     remote.tracks.player.completedCycles = 11;
-    remote.tracks.player.targetComplexity = 52;
+    remote.tracks.player.targetComplexity = 50;
     const guest = createEmptyLegacyProgressionState();
     guest.updatedAt = '2026-08-16T18:10:00.000Z';
     guest.tracks.player.completedCycles = 21;
@@ -316,7 +316,7 @@ describe('legacy remote progression', () => {
     const local = createEmptyLegacyProgressionState();
     local.updatedAt = '2026-08-21T08:19:24.915Z';
     local.tracks.player.completedCycles = 11;
-    local.tracks.player.targetComplexity = 52;
+    local.tracks.player.targetComplexity = 50;
     const values = new Map<string, string>([
       ['mazer.progression.v1:user:user-refresh', JSON.stringify(local)]
     ]);
@@ -347,7 +347,7 @@ describe('legacy remote progression', () => {
 
     expect(result.error).toBeNull();
     expect(result.progressionState?.tracks.player.completedCycles).toBe(11);
-    expect(result.progressionState?.tracks.player.targetComplexity).toBe(52);
+    expect(result.progressionState?.tracks.player.targetComplexity).toBe(50);
   });
 
   test('syncs compact completed-cycle receipts when enabled and authenticated', async () => {

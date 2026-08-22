@@ -819,11 +819,30 @@ const hasLegacyPlayerBaselineV5Provenance = (track: LegacyProgressionTrack): boo
   track.struggleCycles >= LEGACY_PROGRESSION_PLAYER_BASELINE_V5_PROVENANCE_STRUGGLE_CYCLES
 );
 
-const resolveLegacyPlayerTargetComplexityForCompletedCycles = (completedCycles: number): number => clampInteger(
-  LEGACY_PROGRESSION_MIN_COMPLEXITY + (normalizeNonNegativeInteger(completedCycles) * 4),
-  LEGACY_PROGRESSION_MIN_COMPLEXITY,
-  LEGACY_PROGRESSION_MAX_COMPLEXITY
-);
+// Mirrors applyTrackSignal's actual per-completion accumulation for the
+// player track (resolveLegacyProgressionTargetAdjustment's 'player' branch)
+// step by step, instead of assuming a flat +4/cycle. The real gain tapers to
+// +3/+2/+1 once level crosses 10/20/30, so a flat-rate formula here silently
+// disagreed with genuine, correctly-earned progress the moment any player
+// completed a cycle past level 10 -- hasCoherentLegacyPlayerProgression below
+// would then see a "mismatch" and rebase (wipe) real progress back to level 1
+// on the very next read or write. See the mazer_leaderboard-adjacent taper
+// comment above resolveLegacyProgressionTargetAdjustment for why the gain
+// isn't flat any more.
+const resolveLegacyPlayerTargetComplexityForCompletedCycles = (completedCycles: number): number => {
+  let targetComplexity = LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY;
+  const cycles = normalizeNonNegativeInteger(completedCycles);
+  for (let cycle = 0; cycle < cycles; cycle += 1) {
+    const level = resolveLegacyProgressionLevel(targetComplexity);
+    const gain = clampInteger(4 - Math.floor(level / 10), 1, 4);
+    targetComplexity = clampInteger(
+      targetComplexity + gain,
+      LEGACY_PROGRESSION_MIN_COMPLEXITY,
+      LEGACY_PROGRESSION_MAX_COMPLEXITY
+    );
+  }
+  return targetComplexity;
+};
 
 const hasCoherentLegacyPlayerProgression = (track: LegacyProgressionTrack): boolean => (
   track.targetComplexity === resolveLegacyPlayerTargetComplexityForCompletedCycles(track.completedCycles)

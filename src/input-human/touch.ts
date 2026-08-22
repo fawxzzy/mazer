@@ -103,6 +103,14 @@ export type TouchControlMode = 'arrows' | 'stick';
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
+// The outer ring has no chrome of its own (nothing is drawn at the actual
+// edge), so dragging all the way out to it before the stick registers full
+// speed reads as "the control needs way more travel than it should." Reaching
+// max pull at a fraction of the way there keeps the knob's visual travel
+// (driven by distanceRatio, unchanged) exactly the same while cutting the
+// physical thumb distance needed to get there.
+const STICK_MAX_PULL_REACH_RATIO = 0.6;
+
 const createRect = (left: number, top: number, width: number, height: number): TouchRect => ({
   left,
   top,
@@ -255,8 +263,10 @@ export const resolveStickPullVector = (
   const intent = resolveStickMovementIntent(angle);
 
   const outerRadius = stick.outer.width / 2;
-  const usableRadius = Math.max(1, outerRadius - stick.deadzoneRadius);
-  const clampedDistance = Math.min(distance, outerRadius);
+  const maxPullRadius = stick.deadzoneRadius
+    + ((outerRadius - stick.deadzoneRadius) * STICK_MAX_PULL_REACH_RATIO);
+  const usableRadius = Math.max(1, maxPullRadius - stick.deadzoneRadius);
+  const clampedDistance = Math.min(distance, maxPullRadius);
   const distanceRatio = clamp((clampedDistance - stick.deadzoneRadius) / usableRadius, 0, 1);
   const unitX = dx / distance;
   const unitY = dy / distance;
