@@ -379,10 +379,12 @@ export const resolveTouchControlLayout = (
       stickInnerSize
     );
     const stickKnobRadius = clamp(Math.round(stickOuterSize * 0.075), 10, 14);
-    const stickTravelRadius = Math.round(Math.max(
-      stickOuterSize * 0.3,
-      (stickOuterSize / 2) - stickKnobRadius - Math.max(5, Math.round(stickOuterSize * 0.04))
-    ));
+    // How far the knob visually travels from the anchor dot at full pull --
+    // was effectively the whole outer half-radius (~40%+ of the control),
+    // which read as dragging way further than a thumb needs to. Heavily
+    // cut down and decoupled from the outer/deadzone geometry so it stays
+    // a short, tight throw regardless of how big the touch zone itself is.
+    const stickTravelRadius = Math.round(clamp(stickOuterSize * 0.16, 18, 34));
 
     return {
       compact,
@@ -456,10 +458,12 @@ export const resolveTouchControlLayout = (
       stickInnerSize
     );
     const stickKnobRadius = clamp(Math.round(stickOuterSize * 0.075), 10, 14);
-    const stickTravelRadius = Math.round(Math.max(
-      stickOuterSize * 0.3,
-      (stickOuterSize / 2) - stickKnobRadius - Math.max(5, Math.round(stickOuterSize * 0.04))
-    ));
+    // How far the knob visually travels from the anchor dot at full pull --
+    // was effectively the whole outer half-radius (~40%+ of the control),
+    // which read as dragging way further than a thumb needs to. Heavily
+    // cut down and decoupled from the outer/deadzone geometry so it stays
+    // a short, tight throw regardless of how big the touch zone itself is.
+    const stickTravelRadius = Math.round(clamp(stickOuterSize * 0.16, 18, 34));
 
     return {
       compact,
