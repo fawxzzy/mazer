@@ -12500,7 +12500,7 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '13px',
       color: '#72e0bf'
-    })).setOrigin(1, 0.5).setVisible(false);
+    })).setOrigin(0, 0.5).setVisible(false);
     this.uiTexts.push(label);
 
     const background = this.add.rectangle(0, 0, 1, 1, 0x000000, 0.001);
@@ -12568,18 +12568,21 @@ export class MenuScene extends Phaser.Scene {
     // signed-in player with no way to reach their account at all.
     const username = this.accountUsernameSavedValue.length > 0 ? this.accountUsernameSavedValue : 'Account';
 
+    // Top-left of the screen, its own leading-side anchor -- not tied to
+    // the leaderboard/settings cluster on the trailing side. The menu front
+    // door never shows the LVL badge that otherwise occupies this corner
+    // during play (see drawLegacyProgressionBadge's mode === 'menu' clear),
+    // so this corner is free here.
     const laneTop = this.layout.lanes.hud?.top ?? 0;
-    const leaderboardFrame = resolveLegacyHeaderControlFrame({
+    const leadingFrame = resolveLegacyHeaderControlFrame({
       height: this.layout.height,
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
-      placement: 'trailing',
-      slot: 1,
+      placement: 'leading',
       width: this.layout.width
     });
-    const gap = Math.max(8, Math.round(leaderboardFrame.width * 0.32));
-    const anchorRight = leaderboardFrame.left - gap;
-    const anchorY = leaderboardFrame.centerY;
+    const anchorLeft = leadingFrame.left;
+    const anchorY = leadingFrame.centerY;
 
     const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
     const blinkAlpha = clamp(0.55 + (phase * 0.45) + (this.menuUsernameActive ? 0.05 : 0), 0.4, 1);
@@ -12600,48 +12603,33 @@ export class MenuScene extends Phaser.Scene {
     const useGlyphs = isLegacyGlyphWordRenderable(username)
       && (resolveLegacyGlyphWordColumns(username) * glyphCellSize) <= maxGlyphWidth;
 
-    panel.clear();
-
     if (useGlyphs) {
       label.setVisible(false);
-      const layout = resolveLegacyGlyphWordLayout(username, 0, 0, glyphCellSize);
-      panel.setPosition(anchorRight - layout.width, anchorY - (layout.height / 2));
+      // Same tile-glyph material, same build-in reveal tied to the maze's
+      // own generation progress, and the same trail-sweep color wipe the
+      // title and the Start/Login front-door glyphs use -- just at a much
+      // smaller cell size. Reuses drawLegacyMenuFrontDoorGlyphButton
+      // directly rather than a bespoke always-fully-drawn loop, so this
+      // reads as "the same material, smaller" instead of a look-alike.
+      const glyphColumns = resolveLegacyGlyphWordColumns(username);
+      const glyphWidth = glyphColumns * glyphCellSize;
+      const glyphHeight = 7 * glyphCellSize;
+      panel.setPosition(anchorLeft + (glyphWidth / 2), anchorY);
       panel.setVisible(true);
-      const pathSource: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'> = {
-        grid: layout.grid,
-        height: layout.rows,
-        width: layout.columns
-      };
-      const cellCoreColor = mixLegacyIridescentColor(LEGACY_MENU_PATH_CORE, trailColor, 1);
-      const cellEdgeColor = mixLegacyIridescentColor(LEGACY_MENU_PATH_EDGE, trailColor, 1);
-      for (const cell of layout.cells) {
-        this.drawLegacyPathMaterialTile(
-          panel,
-          { x: cell.column, y: cell.row },
-          pathSource,
-          0,
-          0,
-          layout.cellSize,
-          {
-            coreAlpha: blinkAlpha,
-            coreColor: cellCoreColor,
-            drawCue: false,
-            edgeAlpha: blinkAlpha * 0.92,
-            edgeColor: cellEdgeColor
-          }
-        );
-      }
-      background.setPosition(anchorRight - (layout.width / 2), anchorY);
-      background.setSize(layout.width + 16, Math.max(28, layout.height + 12));
+      const layout = resolveLegacyGlyphWordLayout(username, 0, 0, glyphCellSize);
+      this.drawLegacyMenuFrontDoorGlyphButton(panel, layout, time, this.menuUsernameActive);
+      background.setPosition(anchorLeft + (glyphWidth / 2), anchorY);
+      background.setSize(glyphWidth + 16, Math.max(28, glyphHeight + 12));
       background.setVisible(true);
     } else {
+      panel.clear();
       panel.setVisible(false);
       label.setText(username);
       label.setColor(`#${trailColor.toString(16).padStart(6, '0')}`);
       label.setAlpha(blinkAlpha);
-      label.setPosition(anchorRight, anchorY);
+      label.setPosition(anchorLeft, anchorY);
       label.setVisible(true);
-      background.setPosition(anchorRight - (label.displayWidth / 2), anchorY);
+      background.setPosition(anchorLeft + (label.displayWidth / 2), anchorY);
       background.setSize(label.displayWidth + 16, label.displayHeight + 12);
       background.setVisible(true);
     }
