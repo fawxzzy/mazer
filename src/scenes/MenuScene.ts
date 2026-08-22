@@ -12560,11 +12560,13 @@ export class MenuScene extends Phaser.Scene {
     // Idempotent per signed-in user id (see loadAccountUsernameIfNeeded) --
     // safe to call every frame, it only actually fetches once.
     this.loadAccountUsernameIfNeeded();
-    const username = this.accountUsernameSavedValue;
-    if (username.length === 0) {
-      hide();
-      return;
-    }
+    // Falls back to a literal "Account" label when there's no username yet
+    // -- still loading, never set, or the fetch failed (e.g. a misconfigured
+    // remote project). This is the only entry point to the account screen
+    // now that the account overlay's own Account button is gone -- hiding
+    // it entirely whenever the username fetch doesn't succeed would leave a
+    // signed-in player with no way to reach their account at all.
+    const username = this.accountUsernameSavedValue.length > 0 ? this.accountUsernameSavedValue : 'Account';
 
     const laneTop = this.layout.lanes.hud?.top ?? 0;
     const leaderboardFrame = resolveLegacyHeaderControlFrame({
@@ -12695,12 +12697,13 @@ export class MenuScene extends Phaser.Scene {
           return;
         }
         this.loadAccountUsernameIfNeeded();
-        const username = this.accountUsernameSavedValue;
-        if (username.length === 0) {
-          label.setVisible(false);
-          background.setVisible(false);
-          return;
-        }
+        // Falls back to "Account" when there's no username yet -- still
+        // loading, never set, or the fetch failed -- rather than hiding.
+        // This is the only entry point to the account screen now that the
+        // account overlay's own Account button is gone; hiding it whenever
+        // the username fetch doesn't succeed would leave a signed-in player
+        // with no way to reach their account at all.
+        const username = this.accountUsernameSavedValue.length > 0 ? this.accountUsernameSavedValue : 'Account';
         const trailColor = resolveLegacyIridescentTrailColor(
           0,
           1,
