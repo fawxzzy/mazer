@@ -120,16 +120,44 @@ describe('fetchLegacyLeaderboardSelfRank', () => {
     expect(result.error).toBeTruthy();
   });
 
-  test('parses a successful self-rank response, including a user with no username yet', async () => {
+  test('parses a successful self-rank response for a named user', async () => {
     const rpc = vi.fn(async () => ({
-      data: [{ rank: 4213, player_level: 12, has_username: false }],
+      data: [{ rank: 4213, player_level: 12, has_username: true }],
       error: null
     }));
     vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
 
     const result = await fetchLegacyLeaderboardSelfRank();
     expect(result.error).toBeNull();
-    expect(result.selfRank).toEqual({ rank: 4213, playerLevel: 12, hasUsername: false });
+    expect(result.selfRank).toEqual({ rank: 4213, playerLevel: 12, hasUsername: true });
+  });
+
+  test('a user with no username yet gets a null-rank response, not a fabricated number', async () => {
+    // mazer_leaderboard_self_rank only ranks over the same named-only
+    // population mazer_leaderboard_page shows -- a caller without a
+    // username genuinely has no rank to report, not "rank 0" (Number(null)
+    // would otherwise silently produce that).
+    const rpc = vi.fn(async () => ({
+      data: [{ rank: null, player_level: 12, has_username: false }],
+      error: null
+    }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+    const result = await fetchLegacyLeaderboardSelfRank();
+    expect(result.error).toBeNull();
+    expect(result.selfRank).toEqual({ rank: 0, playerLevel: 12, hasUsername: false });
+  });
+
+  test('discards a server response claiming a username but no rank, rather than displaying a broken state', async () => {
+    const rpc = vi.fn(async () => ({
+      data: [{ rank: null, player_level: 12, has_username: true }],
+      error: null
+    }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+    const result = await fetchLegacyLeaderboardSelfRank();
+    expect(result.error).toBeNull();
+    expect(result.selfRank).toBeNull();
   });
 
   test('returns a null self-rank without erroring when no progression row exists yet', async () => {
