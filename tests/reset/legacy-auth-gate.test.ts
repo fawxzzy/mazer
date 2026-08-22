@@ -11,13 +11,15 @@ describe('legacy full auth gate', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(LEGACY_GUEST_PLAY_ACCESS_ENABLED).toBe(true);
-    expect(isLegacyPlayAccessAllowed('guest')).toBe(true);
-    expect(isLegacyPlayAccessAllowed('unavailable')).toBe(true);
-    expect(isLegacyPlayAccessAllowed('authenticated')).toBe(true);
+    expect(isLegacyPlayAccessAllowed('guest', { authResolved: false, guestPlayGranted: false })).toBe(false);
+    expect(isLegacyPlayAccessAllowed('unavailable', { authResolved: true, guestPlayGranted: false })).toBe(false);
+    expect(isLegacyPlayAccessAllowed('guest', { authResolved: true, guestPlayGranted: true })).toBe(true);
+    expect(isLegacyPlayAccessAllowed('authenticated', { authResolved: true, guestPlayGranted: false })).toBe(true);
     expect(menuSceneSource).toContain('private guestPlayGranted = false;');
     expect(menuSceneSource).toContain("this.authGateLocked = snapshot.status !== 'authenticated' && !this.guestPlayGranted;");
-    expect(menuSceneSource).toContain('const playAccessAllowed = !this.authGateLocked');
-    expect(menuSceneSource).toContain('if (!isLegacyPlayAccessAllowed(this.authSnapshot.status)) {');
+    expect(menuSceneSource).toContain('const playAccessAllowed = this.hasLegacyPlayAccess();');
+    expect(menuSceneSource).toContain('if (!this.hasLegacyPlayAccess()) {');
+    expect(menuSceneSource).toContain('if (this.hasLegacyPlayAccess()) {\n        this.startPlayMode();\n      }');
   });
 
   test('keeps an explicit local guest-play exit in the login bottom bar without touching auth state', () => {

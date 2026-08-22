@@ -287,7 +287,10 @@ import {
 } from '../legacy-runtime/legacyAuth';
 import { resolveLegacyAuthPresentation, type LegacyAuthPresentation } from '../legacy-runtime/legacyAuthPresentation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
-import { isLegacyPlayAccessAllowed } from '../legacy-runtime/legacyGuestAccess';
+import {
+  LEGACY_GUEST_PLAY_ACCESS_ENABLED,
+  isLegacyPlayAccessAllowed
+} from '../legacy-runtime/legacyGuestAccess';
 import {
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_REMOTE_MESSAGE_COPY,
@@ -1728,7 +1731,7 @@ export class MenuScene extends Phaser.Scene {
       overlay: this.overlay
     };
 
-    if (!isLegacyPlayAccessAllowed(this.authSnapshot.status)) {
+    if (!this.hasLegacyPlayAccess()) {
       return {
         ...base,
         accepted: false,
@@ -2960,7 +2963,9 @@ export class MenuScene extends Phaser.Scene {
 
     if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'none') {
       event.preventDefault();
-      this.startPlayMode();
+      if (this.hasLegacyPlayAccess()) {
+        this.startPlayMode();
+      }
       return true;
     }
 
@@ -4831,6 +4836,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startPlayMode(): void {
+    if (!this.hasLegacyPlayAccess()) {
+      return;
+    }
     this.resetLegacyPlayInputBuffer();
     this.mode = 'play';
     this.pendingOverlayMazeRebuild = false;
@@ -8952,8 +8960,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.overlay === 'none') {
       if (this.mode === 'menu') {
         const [startLabel] = MAIN_MENU_BUTTONS;
-        const playAccessAllowed = !this.authGateLocked
-          && isLegacyPlayAccessAllowed(this.authSnapshot.status);
+        const playAccessAllowed = this.hasLegacyPlayAccess();
         // A normal compact button (the same width the row-of-three action
         // geometry already computes), not a full-width bottom-dock bar --
         // per feedback that the wide dock-style bar didn't work.
@@ -11510,7 +11517,7 @@ export class MenuScene extends Phaser.Scene {
       this.authSubmitting
       || this.authGateAwaitingResolution
       || this.authSnapshot.status === 'authenticated'
-      || !isLegacyPlayAccessAllowed(this.authSnapshot.status)
+      || !LEGACY_GUEST_PLAY_ACCESS_ENABLED
     ) {
       return;
     }
@@ -12513,6 +12520,13 @@ export class MenuScene extends Phaser.Scene {
     // crash that silently aborted the rest of boot). update() can't fire
     // until create() has fully returned, so consuming the flag there
     // instead guarantees everything it needs already exists.
+  }
+
+  private hasLegacyPlayAccess(): boolean {
+    return isLegacyPlayAccessAllowed(this.authSnapshot.status, {
+      authResolved: !this.authGateAwaitingResolution,
+      guestPlayGranted: this.guestPlayGranted
+    });
   }
 
   private async hydrateLegacyAccountDataAfterAuth(

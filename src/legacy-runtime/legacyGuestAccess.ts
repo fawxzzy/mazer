@@ -9,6 +9,20 @@ import type { LegacyAuthStatus } from './legacyAuth';
  */
 export const LEGACY_GUEST_PLAY_ACCESS_ENABLED = true;
 
-export const isLegacyPlayAccessAllowed = (status: LegacyAuthStatus): boolean => (
-  LEGACY_GUEST_PLAY_ACCESS_ENABLED || status === 'authenticated'
+export interface LegacyPlayAccessState {
+  authResolved: boolean;
+  guestPlayGranted: boolean;
+}
+
+/**
+ * Play must never be inferred merely because guest play is enabled. The feature
+ * flag makes the local guest action available; it does not grant entry until a
+ * player chooses that action after the auth snapshot has resolved.
+ */
+export const isLegacyPlayAccessAllowed = (
+  status: LegacyAuthStatus,
+  { authResolved, guestPlayGranted }: LegacyPlayAccessState
+): boolean => (
+  authResolved
+  && (status === 'authenticated' || (LEGACY_GUEST_PLAY_ACCESS_ENABLED && guestPlayGranted))
 );
