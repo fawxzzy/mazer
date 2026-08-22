@@ -558,10 +558,29 @@ export const bootstrapLegacyRemoteAccountState = async (
 };
 
 /**
- * Reloads the signed-in account's persisted state without merging guest state
- * or writing to Supabase. This is deliberately separate from bootstrapping:
- * bootstrapping may reconcile first-contact local progress, whereas a completed
- * sign-in must immediately present the account that was actually selected.
+ * Reloads the signed-in account's persisted state without inheriting *guest*
+ * progress or writing to Supabase. This is deliberately separate from
+ * bootstrapping: bootstrapping may reconcile first-contact local progress
+ * (including a guest session's), whereas a completed sign-in must
+ * immediately present the account that was actually selected -- so guest
+ * storage is never read here.
+ *
+ * It does still merge against this exact account's own existing local
+ * storage (never guest storage) rather than blindly trusting the remote
+ * row, same comparison bootstrapLegacyRemoteAccountState uses. This
+ * function's caller (applyLegacyAuthSnapshot's "account changed" branch)
+ * fires whenever userId transitions from null to a real id -- which
+ * includes a genuine fresh sign-in, but ALSO fires if
+ * bootstrapLegacyRemoteAccountState itself hiccups on a cold boot (a
+ * transient network stall leaves legacyRemoteAccountBootstrap holding a
+ * guest snapshot) and the explicit readLegacyAuthSessionSnapshot() call
+ * right after it then resolves the real session moments later. Blindly
+ * trusting remote in that second case could silently regress a device
+ * that already has more advanced local progress for this same account --
+ * the exact "reads as reset" symptom reported after a fresh/first load.
+ * Merging protects both cases: an actually-fresh sign-in has no local
+ * history to lose (remote wins the comparison naturally), and a bootstrap
+ * hiccup can't regress progress that was already safely on-device.
  */
 export const hydrateLegacyRemoteAccountState = async (
   snapshot: LegacyAuthSessionSnapshot,
@@ -607,7 +626,13 @@ export const hydrateLegacyRemoteAccountState = async (
 
   const errors = [progressionRead.error, profileRead.error].filter((value): value is string => Boolean(value));
   const progressionState = progressionRead.row
-    ? writeLegacyProgressionState(progressionStorage, normalizeLegacyProgressionState(progressionRead.row.state))
+    ? writeLegacyProgressionState(
+      progressionStorage,
+      mergeLegacyProgressionStateAdvancements(
+        normalizeLegacyProgressionState(progressionRead.row.state),
+        localProgression
+      )
+    )
     : localProgression;
   const settings = profileRead.row
     ? writeLegacyGameToggleSettings(

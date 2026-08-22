@@ -37,7 +37,7 @@ describe('legacy game toggle preferences', () => {
     expect(pickLegacyGameTogglePreferences(settings)).toEqual({
       controlMode: 'stick',
       darkMode: true,
-      movementSpeed: 0.05,
+      movementSpeed: 0.04,
       toggleAnimatedBackdrop: true,
       toggleTrailFade: false,
       toggleTrailPulse: true
