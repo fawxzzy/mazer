@@ -188,15 +188,23 @@ describe('legacy auth runtime', () => {
     expect(authSource).toContain("event === 'SIGNED_OUT'");
   });
 
-  test('binds browser data queries to the migrated Mazer schema', () => {
+  test('binds browser data queries to a schema resolved per-project, not a hardcoded constant', () => {
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
     const progressionSource = readFileSync(
       resolve(process.cwd(), 'src/legacy-runtime/legacyRemoteProgression.ts'),
       'utf8'
     );
 
-    expect(authSource).toMatch(/db:\s*\{\s*schema:\s*'mazer'\s*\}/);
-    expect(authSource).not.toMatch(/schema:\s*'public'/);
+    // A single project-wide `db: { schema: 'mazer' }` was correct only for
+    // the shared consolidation-target project and silently wrong for the
+    // legacy/rollback project (whose tables still live in `public`) --
+    // see legacySupabaseSchemaBinding.ts. The schema is now resolved from
+    // the configured project's URL instead of assumed.
+    expect(authSource).not.toMatch(/db:\s*\{\s*schema:\s*'mazer'\s*\}/);
+    expect(authSource).toContain(
+      "import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';"
+    );
+    expect(authSource).toContain('const schema = resolveLegacySupabaseSchemaForUrl(config.url);');
     expect(progressionSource).toContain('.from(');
     expect(progressionSource).not.toContain('.schema(');
   });

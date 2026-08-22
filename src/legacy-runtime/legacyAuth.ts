@@ -1,5 +1,6 @@
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
 import { LEGACY_AUTH_MESSAGE_COPY } from './legacyPlayerMessage';
+import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
 export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
@@ -336,6 +337,19 @@ export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> =>
   }
 
   if (legacyAuthClient === null) {
+    // Fail closed: which schema holds Mazer's tables is project-specific
+    // (see legacySupabaseSchemaBinding.ts) and must never be assumed. An
+    // unrecognized project ref -- e.g. VITE_SUPABASE_URL pointing at a
+    // project this table doesn't know about -- means "cannot safely
+    // construct a client", treated identically to "not configured" rather
+    // than guessing a schema and silently reading/writing the wrong data
+    // (or, as happened in production, asking a project for a schema it was
+    // never configured to expose and getting a blanket 406 on every call).
+    const schema = resolveLegacySupabaseSchemaForUrl(config.url);
+    if (schema === null) {
+      return null;
+    }
+
     const { createClient } = await import('@supabase/supabase-js');
     legacyAuthClient = createClient(config.url, config.anonKey, {
       auth: {
@@ -356,7 +370,7 @@ export const getLegacyAuthClient = async (): Promise<LegacyAuthClient | null> =>
         lock: async (_name, _acquireTimeout, fn) => fn()
       },
       db: {
-        schema: 'mazer'
+        schema
       }
     });
     installLegacyAuthPersistenceListener(legacyAuthClient);
