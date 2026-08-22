@@ -44,13 +44,34 @@ describe('fetchLegacyLeaderboardPage', () => {
     ]);
   });
 
-  test('surfaces the RPC error message and an empty page on failure', async () => {
-    const rpc = vi.fn(async () => ({ data: null, error: { message: 'function does not exist' } }));
+  test('maps an RPC-not-deployed-yet error to friendly copy and an empty page', async () => {
+    const rpc = vi.fn(async () => ({
+      data: null,
+      error: { message: 'function public.mazer_leaderboard_page(integer, integer) does not exist' }
+    }));
     vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
 
     const result = await fetchLegacyLeaderboardPage(0);
-    expect(result.error).toBe('function does not exist');
+    expect(result.error).toBe('The leaderboard is not set up yet.');
     expect(result.entries).toEqual([]);
+  });
+
+  test('maps cross-browser network-failure wording to one friendly message', async () => {
+    for (const rawMessage of ['Failed to fetch', 'Load failed', 'NetworkError when attempting to fetch resource']) {
+      const rpc = vi.fn(async () => ({ data: null, error: { message: rawMessage } }));
+      vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+      const result = await fetchLegacyLeaderboardPage(0);
+      expect(result.error).toBe('Could not reach the leaderboard. Check your connection and try again.');
+    }
+  });
+
+  test('falls back to a generic message for an unrecognized error', async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: { message: 'unexpected 500' } }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+    const result = await fetchLegacyLeaderboardPage(0);
+    expect(result.error).toBe('The leaderboard is not available right now.');
   });
 
   test('drops malformed rows instead of throwing', async () => {

@@ -288,6 +288,12 @@ import {
 import { resolveLegacyAuthPresentation, type LegacyAuthPresentation } from '../legacy-runtime/legacyAuthPresentation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
 import {
+  fetchLegacyLeaderboardPage,
+  fetchLegacyLeaderboardSelfRank,
+  type LegacyLeaderboardEntry,
+  type LegacyLeaderboardSelfRank
+} from '../legacy-runtime/legacyLeaderboard';
+import {
   LEGACY_GUEST_PLAY_ACCESS_ENABLED,
   isLegacyPlayAccessAllowed
 } from '../legacy-runtime/legacyGuestAccess';
@@ -1245,6 +1251,14 @@ export class MenuScene extends Phaser.Scene {
   private authUsernameStatusMessage: string | null = null;
   private authUsernameSequence = 0;
   private authUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private menuLeaderboardActive = false;
+  private leaderboardStatus: 'empty' | 'error' | 'idle' | 'loading' | 'ready' = 'idle';
+  private leaderboardErrorMessage: string | null = null;
+  private leaderboardEntries: readonly LegacyLeaderboardEntry[] = [];
+  private leaderboardOffset = 0;
+  private leaderboardHasNextPage = false;
+  private leaderboardSelfRank: LegacyLeaderboardSelfRank | null = null;
+  private leaderboardSequence = 0;
   // Deliberately NOT part of authForm/LegacyAuthFieldId -- that state
   // machine is scoped to the signed-out sign-in/sign-up credential form
   // (its Enter key submits sign-in, its fields reset on sign-in/out). The
@@ -7288,6 +7302,7 @@ export class MenuScene extends Phaser.Scene {
     );
     this.drawLegacyProgressionBadge();
     this.drawLegacyMenuSettingsCog(time);
+    this.drawLegacyMenuLeaderboardIcon(time);
 
     for (let index = 0; index < visibleTrail.length; index += 1) {
       const point = visibleTrail[index];
@@ -7877,6 +7892,55 @@ export class MenuScene extends Phaser.Scene {
       cyberArcadeMaterial.rail.mint,
       blinkAlpha
     );
+  }
+
+  // Shares the settings cog's header slot on the same (trailing) side via
+  // slot 1, flowing inward from it with the header-control system's own
+  // built-in spacing -- the LVL badge already occupies the leading side, so
+  // pairing leaderboard with settings on the trailing side (rather than the
+  // brief's abstract leading/trailing split) is the one that doesn't
+  // collide with existing, load-bearing UI.
+  private drawLegacyMenuLeaderboardIcon(time: number): void {
+    if (this.mode !== 'menu' || this.overlay !== 'none') {
+      return;
+    }
+
+    const laneTop = this.layout.lanes.hud?.top ?? 0;
+    const frame = resolveLegacyHeaderControlFrame({
+      height: this.layout.height,
+      hudHeight: this.layout.lanes.hud?.height ?? 64,
+      hudTop: laneTop,
+      placement: 'trailing',
+      slot: 1,
+      width: this.layout.width
+    });
+    const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+    const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuLeaderboardActive ? 0.08 : 0), 0.14, 1);
+    const blinkScale = 0.92 + (phase * 0.08) + (this.menuLeaderboardActive ? 0.02 : 0);
+    const color = this.menuLeaderboardActive ? cyberArcadeMaterial.rail.mint : cyberArcadeMaterial.signal.player;
+    const outerRadius = Math.max(7, Math.round(Math.min(frame.width, frame.height) * 0.34 * blinkScale));
+    // Three ascending bars, like a small podium/bar-chart -- the simplest
+    // unambiguous "ranking" glyph that hand-draws cleanly at this size with
+    // the same solid-fill-plus-rim material every other icon here uses,
+    // rather than attempting a trophy or podium silhouette at 36-40px.
+    const barCount = 3;
+    const barGap = Math.max(1, Math.round(outerRadius * 0.22));
+    const barWidth = Math.max(2, Math.round(((outerRadius * 2) - (barGap * (barCount - 1))) / barCount));
+    const heights = [0.52, 1, 0.74].map((ratio) => Math.max(3, Math.round(outerRadius * 1.7 * ratio)));
+    const totalWidth = (barWidth * barCount) + (barGap * (barCount - 1));
+    const left = frame.centerX - (totalWidth / 2);
+    const baseline = frame.centerY + outerRadius * 0.72;
+
+    this.boardDynamicGraphics.fillStyle(color, blinkAlpha * 0.86);
+    this.boardDynamicGraphics.lineStyle(Math.max(1, Math.round(outerRadius * 0.08)), color, blinkAlpha * 0.9);
+    for (let index = 0; index < barCount; index += 1) {
+      const barHeight = heights[index] ?? heights[0] ?? 1;
+      const x = left + (index * (barWidth + barGap));
+      const y = baseline - barHeight;
+      this.boardDynamicGraphics.fillRect(x, y, barWidth, barHeight);
+      this.boardDynamicGraphics.strokeRect(x, y, barWidth, barHeight);
+    }
+    this.drawLegacyMarkerGemCatchlight(this.boardDynamicGraphics, frame.centerX, frame.centerY, outerRadius, blinkAlpha * 0.6);
   }
 
   private hasLegacyProgressionBadgePulsePendingFrame(time: number): boolean {
@@ -9045,6 +9109,7 @@ export class MenuScene extends Phaser.Scene {
           );
         }
         this.uiButtons.push(this.createLegacyMenuSettingsCogButton(() => this.openOverlay('options')));
+        this.uiButtons.push(this.createLegacyMenuLeaderboardButton(() => this.openOverlay('leaderboard')));
       }
 
       this.uiDirty = false;
@@ -9065,6 +9130,9 @@ export class MenuScene extends Phaser.Scene {
         break;
       case 'confirm-progression-reset':
         this.buildProgressionResetConfirmationOverlay();
+        break;
+      case 'leaderboard':
+        this.buildLeaderboardOverlay();
         break;
     }
 
@@ -9679,6 +9747,104 @@ export class MenuScene extends Phaser.Scene {
       { onClick: mainMenuAction, text: 'Menu', tone: 'primary' },
       { onClick: accountAction, text: 'Account', tone: 'secondary' }
     );
+  }
+
+  // Fewer rows than the data module's own default page size -- that default
+  // is a reasonable general API page size, but this overlay has no scroll
+  // facade wired in, so it shows a small, non-scrolling page sized to
+  // actually fit a typical overlay panel instead.
+  private static readonly LEADERBOARD_VISIBLE_ROWS = 8;
+
+  private buildLeaderboardOverlay(): void {
+    const panel = this.resolveOverlayPanelFrame();
+    const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
+    const centerX = panel.centerX;
+
+    this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.closeOverlay()));
+    this.createOverlayTitle('Leaderboard', panel.top + (compact ? 46 : 54));
+
+    let rowY = panel.top + (compact ? 96 : 110);
+
+    if (this.leaderboardSelfRank) {
+      const selfRank = this.leaderboardSelfRank;
+      const selfRankText = selfRank.hasUsername
+        ? `You: #${selfRank.rank.toLocaleString()} · Level ${selfRank.playerLevel}`
+        : 'Set a username on the account screen to appear on the leaderboard.';
+      this.createAuthInfoText(selfRankText, rowY, panel, '#72e0bf', compact ? 13 : 14);
+      rowY += compact ? 34 : 38;
+    }
+
+    if (this.leaderboardStatus === 'loading') {
+      this.createAuthInfoText('Loading...', rowY + 20, panel, '#b7f2ff', compact ? 14 : 15);
+      return;
+    }
+
+    if (this.leaderboardStatus === 'error') {
+      this.createAuthInfoText(
+        this.leaderboardErrorMessage ?? 'The leaderboard is not available right now.',
+        rowY + 20,
+        panel,
+        '#ff9d9d',
+        compact ? 14 : 15
+      );
+      return;
+    }
+
+    if (this.leaderboardStatus === 'empty') {
+      this.createAuthInfoText('No one has a public rank yet.', rowY + 20, panel, '#7894a0', compact ? 14 : 15);
+      return;
+    }
+
+    const rowHeight = compact ? 30 : 34;
+    const rankColumnLeft = panel.left + (compact ? 22 : 30);
+    const levelColumnRight = panel.left + panel.width - (compact ? 22 : 30);
+    const usernameColumnLeft = rankColumnLeft + (compact ? 44 : 54);
+    const visibleEntries = this.leaderboardEntries.slice(0, MenuScene.LEADERBOARD_VISIBLE_ROWS);
+
+    for (const entry of visibleEntries) {
+      const isSelf = entry.isRequestingUser;
+      const rowColor = isSelf ? '#72e0bf' : '#d7f7ee';
+      const rankLabel = this.padLegacyCompactUiText(this.add.text(rankColumnLeft, rowY, `#${entry.rank}`, {
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: `${compact ? 13 : 14}px`,
+        color: isSelf ? '#72e0bf' : '#7894a0'
+      })).setOrigin(0, 0.5);
+      const usernameLabel = this.fitLegacyUiTextToWidth(
+        this.padLegacyCompactUiText(this.add.text(usernameColumnLeft, rowY, entry.username, {
+          fontFamily: LEGACY_UI_FONT_FAMILY,
+          fontSize: `${compact ? 13 : 14}px`,
+          color: rowColor
+        })),
+        levelColumnRight - usernameColumnLeft - (compact ? 48 : 56),
+        compact ? 13 : 14,
+        10
+      ).setOrigin(0, 0.5);
+      const levelLabel = this.padLegacyCompactUiText(this.add.text(levelColumnRight, rowY, String(entry.playerLevel), {
+        fontFamily: LEGACY_UI_FONT_FAMILY,
+        fontSize: `${compact ? 13 : 14}px`,
+        color: rowColor
+      })).setOrigin(1, 0.5);
+      this.uiTexts.push(rankLabel, usernameLabel, levelLabel);
+      rowY += rowHeight;
+    }
+
+    const paginationY = rowY + (compact ? 14 : 18);
+    if (this.leaderboardOffset > 0) {
+      this.createAuthFooterLink(
+        centerX - (compact ? 60 : 70),
+        paginationY,
+        'Previous',
+        () => { void this.loadLeaderboardPage(Math.max(0, this.leaderboardOffset - MenuScene.LEADERBOARD_VISIBLE_ROWS)); }
+      );
+    }
+    if (this.leaderboardHasNextPage) {
+      this.createAuthFooterLink(
+        centerX + (compact ? 60 : 70),
+        paginationY,
+        'Next',
+        () => { void this.loadLeaderboardPage(this.leaderboardOffset + MenuScene.LEADERBOARD_VISIBLE_ROWS); }
+      );
+    }
   }
 
   private buildProgressionResetConfirmationOverlay(): void {
@@ -12188,6 +12354,51 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
+  private createLegacyMenuLeaderboardButton(onClick: () => void): UiButton {
+    const laneTop = this.layout.lanes.hud?.top ?? 0;
+    const rect = resolveLegacyHeaderControlFrame({
+      height: this.layout.height,
+      hudHeight: this.layout.lanes.hud?.height ?? 64,
+      hudTop: laneTop,
+      placement: 'trailing',
+      slot: 1,
+      width: this.layout.width
+    });
+    this.menuLeaderboardActive = false;
+
+    const background = this.add.rectangle(rect.centerX, rect.centerY, rect.width, rect.height, 0x000000, 0.001);
+    background.setInteractive({ useHandCursor: true });
+    background.setDepth(3);
+    const label = this.add.text(rect.centerX, rect.centerY, '', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '18px'
+    }).setOrigin(0.5).setVisible(false);
+    const setActive = (active: boolean): void => {
+      if (this.menuLeaderboardActive === active) {
+        return;
+      }
+      this.menuLeaderboardActive = active;
+      this.boardDynamicDirty = true;
+    };
+    background.on('pointerover', () => setActive(true));
+    background.on('pointerout', () => setActive(false));
+    background.on('pointerdown', onClick);
+
+    return {
+      background,
+      bounds: createVisualRect(rect.left, rect.top, rect.width, rect.height),
+      iconOnly: true,
+      label,
+      semanticAction: 'Leaderboard',
+      setActive,
+      text: 'Leaderboard',
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+      }
+    };
+  }
+
   private clearUi(): void {
     this.overlayScrollGraphics?.destroy();
     this.overlayScrollGraphics = null;
@@ -12215,11 +12426,51 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGuideGraphics = null;
   }
 
+  private async loadLeaderboardPage(offset: number): Promise<void> {
+    const sequence = ++this.leaderboardSequence;
+    this.leaderboardStatus = 'loading';
+    this.leaderboardErrorMessage = null;
+    this.uiDirty = true;
+
+    const [pageResult, selfRankResult] = await Promise.all([
+      fetchLegacyLeaderboardPage(offset, MenuScene.LEADERBOARD_VISIBLE_ROWS),
+      offset === 0 ? fetchLegacyLeaderboardSelfRank() : Promise.resolve(null)
+    ]);
+    if (sequence !== this.leaderboardSequence) {
+      // A newer page request (or the overlay closing and reopening) has
+      // already started -- this response is stale, discard it rather than
+      // letting it clobber whatever the newer request already resolved.
+      return;
+    }
+
+    if (pageResult.error) {
+      this.leaderboardStatus = 'error';
+      this.leaderboardErrorMessage = pageResult.error;
+      this.leaderboardEntries = [];
+      this.leaderboardHasNextPage = false;
+      this.uiDirty = true;
+      return;
+    }
+
+    this.leaderboardOffset = offset;
+    this.leaderboardEntries = pageResult.entries;
+    this.leaderboardHasNextPage = pageResult.entries.length === MenuScene.LEADERBOARD_VISIBLE_ROWS;
+    this.leaderboardStatus = pageResult.entries.length === 0 && offset === 0 ? 'empty' : 'ready';
+    if (selfRankResult) {
+      this.leaderboardSelfRank = selfRankResult.selfRank;
+    }
+    this.uiDirty = true;
+  }
+
   private openOverlay(kind: OverlayKind): void {
     const previousOverlay = this.overlay;
     if (kind === 'options' || kind === 'pause') {
       this.optionFieldDrafts = createLegacyOptionFieldDrafts(this.settings);
       this.pendingOverlayMazeRebuild = false;
+    }
+    if (kind === 'leaderboard') {
+      this.leaderboardOffset = 0;
+      void this.loadLeaderboardPage(0);
     }
     if (kind === 'auth') {
       // Opening account entry from a guest play session is an explicit change

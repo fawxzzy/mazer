@@ -40,6 +40,30 @@ const resolveLegacyLeaderboardUnavailableMessage = (): string => (
   'The leaderboard is not available right now.'
 );
 
+// Same cross-browser network-failure wording this codebase already had to
+// learn the hard way for auth (see resolveLegacyAuthFeedbackMessage) --
+// Chrome says "Failed to fetch", Safari says "Load failed", neither is
+// something a player should ever see verbatim. "function ... does not
+// exist" / PGRST-style codes cover the RPC genuinely not being deployed yet
+// (the actual current state until the leaderboard migrations are applied),
+// which is a distinct, non-alarming case worth its own copy.
+const resolveLegacyLeaderboardFriendlyError = (rawError: string): string => {
+  const normalized = rawError.trim().toLowerCase();
+  if (
+    normalized.includes('failed to fetch')
+    || normalized.includes('load failed')
+    || normalized.includes('network')
+    || normalized.includes('could not be found')
+    || normalized.includes('internet connection')
+  ) {
+    return 'Could not reach the leaderboard. Check your connection and try again.';
+  }
+  if (normalized.includes('does not exist') || normalized.includes('pgrst')) {
+    return 'The leaderboard is not set up yet.';
+  }
+  return resolveLegacyLeaderboardUnavailableMessage();
+};
+
 const parseLegacyLeaderboardRow = (row: unknown): LegacyLeaderboardEntry | null => {
   if (row === null || typeof row !== 'object') {
     return null;
@@ -82,7 +106,7 @@ export const fetchLegacyLeaderboardPage = async (
   });
 
   if (error) {
-    return { entries: [], error: error.message };
+    return { entries: [], error: resolveLegacyLeaderboardFriendlyError(error.message) };
   }
 
   const rows = Array.isArray(data) ? data : [];
@@ -101,7 +125,7 @@ export const fetchLegacyLeaderboardSelfRank = async (): Promise<LegacyLeaderboar
 
   const { data, error } = await client.rpc('mazer_leaderboard_self_rank');
   if (error) {
-    return { error: error.message, selfRank: null };
+    return { error: resolveLegacyLeaderboardFriendlyError(error.message), selfRank: null };
   }
 
   const row = Array.isArray(data) ? data[0] : data;
