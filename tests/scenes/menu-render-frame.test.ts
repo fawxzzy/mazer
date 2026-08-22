@@ -1004,6 +1004,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('resolveTouchControlLayout');
     expect(menuSceneSource).toContain('private resolveLegacyPlayTouchControlLayout()');
     expect(menuSceneSource).toContain('private handleLegacyPlayTouchControl');
+    expect(menuSceneSource).toContain("|| this.overlay !== 'none'");
+    expect(menuSceneSource).toContain("// The fixed play controls must not intercept an overlay action.");
+    expect(menuSceneSource).toContain('private handleOverlayBackChevronPointerDown(pointer: Phaser.Input.Pointer): boolean');
+    expect(menuSceneSource).toContain('this.overlayBackChevronAction();');
     expect(menuSceneSource).toContain('private drawLegacyPlayTouchControls(');
     expect(menuSceneSource).toContain('private resolveLegacyPlayActiveTouchControls()');
     expect(menuSceneSource).toContain('activeControls: this.resolveLegacyPlayActiveTouchControls()');
@@ -1364,7 +1368,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.createLegacyAuthActionButton(');
     expect(menuSceneSource).toContain('presentation.primaryActionLabel');
     expect(menuSceneSource).toContain('presentation.recoveryActionLabel');
-    expect(menuSceneSource).toContain('this.createLegacyBottomActionBar(panel, stacked, {');
+    expect(menuSceneSource).toContain('this.createLegacyBottomActionBar(\n      panel,\n      stacked,');
+    expect(menuSceneSource).toContain("text: 'Play as guest',");
+    expect(menuSceneSource).toContain('onClick: () => this.handleLegacyGuestPlay()');
+    expect(menuSceneSource).toContain('private handleLegacyGuestPlay(): void');
     expect(menuSceneSource).toContain('private createAuthFooterLink(');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSubmit(): Promise<void>');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSignOut(): Promise<void>');
@@ -1379,7 +1386,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('authAction: this.latestAuthActionDiagnostics');
     expect(menuSceneSource).toContain('const shouldReturnToMainMenuAfterLogin = this.authForm.mode === \'login\'');
     expect(menuSceneSource).toContain('private closeLegacyAuthOverlayToMainMenu(): void');
-    expect(menuSceneSource).toContain("const isAuthenticated = this.authSnapshot.status === 'authenticated';");
+    expect(menuSceneSource).toContain('const playAccessAllowed = this.hasLegacyPlayAccess();');
+    expect(menuSceneSource).toContain('if (!playAccessAllowed) {');
+    expect(menuSceneSource).toContain('startLabel,\n              () => this.startPlayMode()');
     expect(menuSceneSource).toContain("menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest'");
     expect(menuSceneSource).toContain("const previousMenuActionMode = this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest';");
     expect(menuSceneSource).toContain("const menuActionMode = snapshot.status === 'authenticated' ? 'authenticated' : 'guest';");
@@ -1528,6 +1537,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);');
     expect(menuSceneSource).toContain("'GUIDE',");
     expect(menuSceneSource).toContain("drawLegendRow(legendRowIndex, 'start', 'Start', 'begin at gold', cyberArcadeMaterial.signal.start);");
+    expect(menuSceneSource).toContain("'GUIDE',\n      detailLeft,");
+    expect(menuSceneSource).toContain('const glyphX = detailLeft + badgeRadius;');
+    expect(menuSceneSource).toContain('const labelX = detailLeft + (badgeRadius * 2) + badgeToTextGap;');
+    expect(menuSceneSource).not.toContain('const contentLeft = detailLeft + Math.max(0, (detailWidth - titleBlockWidth) / 2);');
     expect(menuSceneSource).not.toContain("'Player • green trail'");
     expect(menuSceneSource).not.toContain("'AI marker + trail'");
     expect(menuSceneSource).not.toContain("`${this.mode === 'play' ? 'Rank' : 'AI Rank'} • public tier`");

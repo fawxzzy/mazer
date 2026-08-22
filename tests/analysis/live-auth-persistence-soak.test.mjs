@@ -5,6 +5,8 @@ import { resolve } from 'node:path';
 
 const passingSteps = [
   'guest-entry',
+  'guest-account-entry',
+  'guest-account-validation-stays-gated',
   'authenticated-entry',
   'authenticated-setting-change',
   'authenticated-reload',
@@ -19,6 +21,10 @@ describe('live auth persistence soak summary', () => {
     const source = readFileSync(resolve(process.cwd(), 'scripts/analysis/live-auth-persistence-soak.mjs'), 'utf8');
     expect(source).toContain("if (options.skipBuild !== true) {");
     expect(source).toContain('runBuild();');
+    expect(source).toContain("authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'");
+    expect(source).toContain("authenticated: false, buttons: ['Play as guest', 'Sign In'], mode: 'menu', overlay: 'auth'");
+    expect(source).toContain("id: 'guest-account-validation-stays-gated'");
+    expect(source).toContain('an invalid local form must');
   });
 
   test('requires the complete visible mobile account-state sequence', () => {

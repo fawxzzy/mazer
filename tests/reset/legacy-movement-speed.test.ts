@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   formatLegacyMovementSpeedPercent,
+  LEGACY_MOVEMENT_SPEED_DEFAULT,
   LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
   normalizeLegacyMovementSpeed,
   quantizeLegacyMovementSpeed,
@@ -11,7 +12,7 @@ describe('legacy movement speed profile', () => {
   test('normalizes slider values into a safe range', () => {
     expect(normalizeLegacyMovementSpeed(-1)).toBe(0);
     expect(normalizeLegacyMovementSpeed(2)).toBe(1);
-    expect(normalizeLegacyMovementSpeed(Number.NaN)).toBe(0.3);
+    expect(normalizeLegacyMovementSpeed(Number.NaN)).toBe(LEGACY_MOVEMENT_SPEED_DEFAULT);
     expect(formatLegacyMovementSpeedPercent(0.625)).toBe('63%');
   });
 

@@ -288,6 +288,10 @@ import {
 import { resolveLegacyAuthPresentation, type LegacyAuthPresentation } from '../legacy-runtime/legacyAuthPresentation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
 import {
+  LEGACY_GUEST_PLAY_ACCESS_ENABLED,
+  isLegacyPlayAccessAllowed
+} from '../legacy-runtime/legacyGuestAccess';
+import {
   LEGACY_AUTH_MESSAGE_COPY,
   LEGACY_REMOTE_MESSAGE_COPY,
   createLegacyPlayerMessage,
@@ -933,6 +937,7 @@ interface LegacyQaDiagnosticsApi {
   openSettingsOverlay(): LegacyQaOverlayResult;
   openOptionsOverlay(): LegacyQaOverlayResult;
   openPauseOverlay(): LegacyQaOverlayResult;
+  startGuestPlayMode(): LegacyQaOverlayResult;
   startPlayMode(): LegacyQaOverlayResult;
 }
 
@@ -1193,19 +1198,22 @@ export class MenuScene extends Phaser.Scene {
   // but boot deferred that until the real auth session resolves instead of
   // racing it. Consumed once in applyLegacyAuthSnapshot.
   private pendingBootPlayStart = false;
-  // Full auth gate: nothing (menu or play) is reachable until the player is
-  // signed in. authGateAwaitingResolution covers the real async gap before
+  // Login is the default entry boundary. A player may explicitly choose the
+  // local guest lane from that screen, but an unresolved/signed-out snapshot
+  // must never silently turn into game access just because the local guest
+  // runtime exists.
+  // authGateAwaitingResolution covers the real async gap before
   // the very first snapshot arrives (avoids a false "please sign in" flash
   // for a returning player who actually has a valid session -- the default
   // snapshot before that first resolution is 'guest', indistinguishable
   // from a genuinely signed-out player without this flag). authGateLocked
-  // is the actual gate: true once resolved to signed-out AND the auth
-  // backend is configured at all -- if it isn't configured (local dev
-  // without real credentials, or a genuine backend outage), locking
-  // everyone out entirely would be worse than falling back to guest
-  // access, so that case is deliberately left ungated.
+  // is the actual gate: true until a valid account session arrives or the
+  // player has pressed the explicit local-guest action for this runtime.
+  // It intentionally resets on reload; guest play is not an implicit
+  // replacement for account entry.
   private authGateAwaitingResolution = true;
   private authGateLocked = false;
+  private guestPlayGranted = false;
   private authGateGraphics!: Phaser.GameObjects.Graphics;
   private authGateLoadingText!: Phaser.GameObjects.Text;
   private authGateLoadingBlocker: Phaser.GameObjects.Rectangle | null = null;
@@ -1350,6 +1358,7 @@ export class MenuScene extends Phaser.Scene {
   private uiTexts: Phaser.GameObjects.Text[] = [];
   private uiButtons: UiButton[] = [];
   private overlayBackChevronBounds: VisualRect | null = null;
+  private overlayBackChevronAction: (() => void) | null = null;
   private overlayGuideBounds: VisualRect | null = null;
   private overlayGuideExpanded = false;
   private overlayScrollOffset = 0;
@@ -1615,6 +1624,7 @@ export class MenuScene extends Phaser.Scene {
       openSettingsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenSettingsOverlay(),
       openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay(),
       openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay(),
+      startGuestPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartGuestPlayMode(),
       startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode()
     };
   }
@@ -1723,7 +1733,7 @@ export class MenuScene extends Phaser.Scene {
       overlay: this.overlay
     };
 
-    if (this.authSnapshot.status !== 'authenticated') {
+    if (!this.hasLegacyPlayAccess()) {
       return {
         ...base,
         accepted: false,
@@ -2823,13 +2833,7 @@ export class MenuScene extends Phaser.Scene {
     });
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      // Checked before anything else in this pipeline, generously padded --
-      // the overlay back chevron sits in the same corner as play mode's
-      // always-present fixed pause-cog touch region (handleLegacyPlayTouchControl
-      // checks for that regardless of which overlay is open), and a tap
-      // there was landing on whichever of the two logic paths happened to
-      // run first instead of reliably resolving to the button itself.
-      if (this.isPointerOnOverlayBackChevron(pointer)) {
+      if (this.handleOverlayBackChevronPointerDown(pointer)) {
         return;
       }
       if (this.handleOverlayScrollPointerDown(pointer)) {
@@ -2961,7 +2965,15 @@ export class MenuScene extends Phaser.Scene {
 
     if (event.key === 'Enter' && this.mode === 'menu' && this.overlay === 'none') {
       event.preventDefault();
-      this.startPlayMode();
+      if (this.hasLegacyPlayAccess()) {
+        this.startPlayMode();
+      }
+      return true;
+    }
+
+    if (lowerKey === 'g' && this.mode === 'menu' && this.overlay === 'auth') {
+      event.preventDefault();
+      this.handleLegacyGuestPlay();
       return true;
     }
 
@@ -3201,23 +3213,67 @@ export class MenuScene extends Phaser.Scene {
     return this.setLegacyOverlayScrollOffset(this.overlayScrollOffset + (Math.sign(deltaY) * wheelStep));
   }
 
-  // Checked first, ahead of every other pointerdown handler -- a tap here
-  // should always resolve to the back button itself (Phaser's own
-  // object-level pointerdown on the chevron's background still fires the
-  // real onClick independently; this just guarantees nothing else in the
-  // custom scroll/touch-control pipeline below gets a chance to also treat
-  // the same tap as a scroll-drag start or a fixed pause-cog press).
-  private isPointerOnOverlayBackChevron(pointer: Phaser.Input.Pointer): boolean {
-    if (this.overlay === 'none' || this.overlayBackChevronBounds === null) {
+  // One scene-level route owns the back action. Phaser's object hit testing
+  // and the fixed pause-control fallback disagree on the top-right canvas
+  // edge on some real devices, so leaving the callback on the invisible
+  // rectangle made the visible arrow's upper half unreliable.
+  private handleOverlayBackChevronPointerDown(pointer: Phaser.Input.Pointer): boolean {
+    if (
+      this.overlay === 'none'
+      || this.overlayBackChevronBounds === null
+      || this.overlayBackChevronAction === null
+    ) {
       return false;
     }
     const point = this.resolveLegacyInputPointerPoint(pointer);
-    return this.isPointInVisualRect(
+    if (!this.isPointInVisualRect(
       this.overlayBackChevronBounds,
       point.x,
       point.y,
       LEGACY_OVERLAY_BACK_CHEVRON_PRIORITY_PADDING
-    );
+    )) {
+      return false;
+    }
+    this.overlayBackChevronAction();
+    return true;
+  }
+
+  private handleLegacyQaStartGuestPlayMode(): LegacyQaOverlayResult {
+    const base = {
+      mode: this.mode,
+      overlay: this.overlay
+    };
+
+    if (this.mode !== 'menu' || this.overlay !== 'auth') {
+      return {
+        ...base,
+        accepted: false,
+        reason: this.mode !== 'menu' ? 'not-menu-mode' : 'auth-overlay-required'
+      };
+    }
+
+    if (
+      this.authSubmitting
+      || this.authGateAwaitingResolution
+      || this.authSnapshot.status === 'authenticated'
+      || !LEGACY_GUEST_PLAY_ACCESS_ENABLED
+    ) {
+      return {
+        ...base,
+        accepted: false,
+        reason: 'guest-action-unavailable'
+      };
+    }
+
+    // The diagnostics bridge intentionally calls the same user-facing action
+    // as the visible guest button; it never grants access on its own.
+    this.handleLegacyGuestPlay();
+    return {
+      accepted: true,
+      mode: this.mode,
+      overlay: this.overlay,
+      reason: null
+    };
   }
 
   private handleOverlayScrollPointerDown(pointer: Phaser.Input.Pointer): boolean {
@@ -3463,7 +3519,15 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private handleLegacyPlayTouchControl(x: number, y: number, pointerId: number | null = null): boolean {
-    if (this.mode !== 'play' || hasPendingLegacyResetRequest(this.pendingResetRequest)) {
+    // The fixed play controls must not intercept an overlay action. In
+    // particular, the pause cog's top-right footprint overlaps the Settings
+    // back chevron; letting this handler run first made a tap on the visible
+    // arrow register only below it on real devices.
+    if (
+      this.mode !== 'play'
+      || this.overlay !== 'none'
+      || hasPendingLegacyResetRequest(this.pendingResetRequest)
+    ) {
       return false;
     }
 
@@ -3471,18 +3535,8 @@ export class MenuScene extends Phaser.Scene {
     const control = resolveTouchControlKindAtPoint(touchControlLayout, x, y);
 
     if (control === 'pause') {
-      if (this.overlay === 'pause') {
-        this.closeOverlay();
-      } else if (this.overlay === 'none') {
-        this.openOverlay('pause');
-      } else {
-        return false;
-      }
+      this.openOverlay('pause');
       return true;
-    }
-
-    if (this.overlay !== 'none') {
-      return false;
     }
 
     // Every other touch starts a floating stick centered wherever the
@@ -4805,6 +4859,13 @@ export class MenuScene extends Phaser.Scene {
 
   private enterMenuMode(): void {
     this.resetLegacyPlayInputBuffer();
+    // Guest play is an active, local-only session—not a durable account
+    // state. Returning to the menu ends that session so a later launch/menu
+    // view always returns to the login boundary instead of presenting an
+    // implicit guest continuation.
+    if (this.authSnapshot.status !== 'authenticated') {
+      this.revokeLegacyGuestPlayGrant();
+    }
     this.mode = 'menu';
     this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
@@ -4828,6 +4889,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private startPlayMode(): void {
+    if (!this.hasLegacyPlayAccess()) {
+      return;
+    }
     this.resetLegacyPlayInputBuffer();
     this.mode = 'play';
     this.pendingOverlayMazeRebuild = false;
@@ -8929,6 +8993,7 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGraphics.clear();
     this.clearUi();
     this.overlayBackChevronBounds = null;
+    this.overlayBackChevronAction = null;
     this.overlayGuideBounds = null;
     this.overlayScrollViewportBounds = null;
     this.overlayScrollTrackBounds = null;
@@ -8948,13 +9013,13 @@ export class MenuScene extends Phaser.Scene {
     if (this.overlay === 'none') {
       if (this.mode === 'menu') {
         const [startLabel] = MAIN_MENU_BUTTONS;
-        const isAuthenticated = this.authSnapshot.status === 'authenticated';
+        const playAccessAllowed = this.hasLegacyPlayAccess();
         // A normal compact button (the same width the row-of-three action
         // geometry already computes), not a full-width bottom-dock bar --
         // per feedback that the wide dock-style bar didn't work.
         const primaryButtonWidth = this.layout.centerButtonWidth;
 
-        if (!isAuthenticated) {
+        if (!playAccessAllowed) {
           this.uiButtons.push(
             this.createButton(
               this.layout.centerButtonX,
@@ -9347,12 +9412,12 @@ export class MenuScene extends Phaser.Scene {
 
     addText(
       'GUIDE',
-      expanded ? cardCenterX : detailLeft,
+      detailLeft,
       titleY,
-      cardWidth - (inset * 2) - (expanded ? 0 : 28),
+      cardWidth - (inset * 2) - 28,
       toCyberArcadeCssHex(cyberArcadeMaterial.rail.mint),
       guideTitleFontSize,
-      expanded ? 0.5 : 0,
+      0,
       1,
       guideRowMinFontSize
     );
@@ -9388,13 +9453,9 @@ export class MenuScene extends Phaser.Scene {
       guideGraphics.strokeCircle(glyphX, glyphY, badgeRadius);
     };
 
-    // Only the icon + row label center as a block within the card's
-    // content width -- the description text after it stays left-flowing
-    // at a fixed gap, not folded into the centering (centering the
-    // description too read wrong once seen live). Title text is created
-    // first, off at detailLeft, purely to measure its real post-fit
-    // displayWidth, then the icon+title group is repositioned around that
-    // measured width and the description picks up right after it.
+    // All guide rows share the card's left content edge. This keeps the
+    // expanded guide stable as descriptions vary in length instead of
+    // visually drifting toward the centre of the dropdown.
     const drawLegendRow = (
       index: number,
       kind: 'start' | 'end' | 'move',
@@ -9410,15 +9471,12 @@ export class MenuScene extends Phaser.Scene {
       const titleCopyGap = compact ? 6 : 8;
       const titleFontSize = guideRowFontSize;
       const titleMaxWidth = Math.round(detailWidth * (compact ? 0.4 : 0.36));
-      const titleLabel = addText(`${title}:`, detailLeft, glyphY, titleMaxWidth, titleColor, titleFontSize, 0, compact ? 0.96 : 1, guideRowMinFontSize);
+      const glyphX = detailLeft + badgeRadius;
+      const labelX = detailLeft + (badgeRadius * 2) + badgeToTextGap;
+      const titleLabel = addText(`${title}:`, labelX, glyphY, titleMaxWidth, titleColor, titleFontSize, 0, compact ? 0.96 : 1, guideRowMinFontSize);
       const titleWidth = titleLabel?.displayWidth ?? 0;
-      const titleBlockWidth = (badgeRadius * 2) + badgeToTextGap + titleWidth;
-      const contentLeft = detailLeft + Math.max(0, (detailWidth - titleBlockWidth) / 2);
-      const glyphX = contentLeft + badgeRadius;
-      const labelX = contentLeft + (badgeRadius * 2) + badgeToTextGap;
       drawLegendBadge(glyphX, glyphY, badgeRadius, accentColor);
       this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, compact ? 12 : 13, guideGraphics);
-      titleLabel?.setX(labelX);
 
       const copyX = labelX + titleWidth + titleCopyGap;
       const copyWidth = Math.max(compact ? 82 : 104, detailLeft + detailWidth - copyX);
@@ -10166,11 +10224,23 @@ export class MenuScene extends Phaser.Scene {
     const primaryLabel = this.authSubmitting
       ? 'Working'
       : presentation.primaryActionLabel;
-    this.createLegacyBottomActionBar(panel, stacked, {
-      onClick: () => { void this.handleLegacyAuthSubmit(); },
-      text: primaryLabel,
-      tone: 'primary'
-    });
+    // Guest play is deliberately a local-only escape hatch from account entry:
+    // the left slot starts the existing guest-scoped play mode directly; it
+    // neither creates an account nor calls any remote auth/data operation.
+    this.createLegacyBottomActionBar(
+      panel,
+      stacked,
+      {
+        onClick: () => { void this.handleLegacyAuthSubmit(); },
+        text: primaryLabel,
+        tone: 'primary'
+      },
+      {
+        onClick: () => this.handleLegacyGuestPlay(),
+        text: 'Play as guest',
+        tone: 'secondary'
+      }
+    );
   }
 
   private createAuthFooterLink(x: number, y: number, text: string, onClick: () => void): void {
@@ -11434,6 +11504,13 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    // Choosing the account form ends any temporary guest admission before
+    // validation or a provider call begins. Otherwise a guest grant from an
+    // earlier play session can survive a failed/unavailable sign-in and leave
+    // the game looking as though the submitted credentials entered guest
+    // mode. Account submission must either establish an authenticated session
+    // or keep the auth gate closed.
+    this.revokeLegacyGuestPlayGrant();
     this.syncLegacyAuthNativeInputValue();
     this.recordLegacyAuthActionDiagnostics({ stage: 'started' });
     const submitState = resolveLegacyAuthSubmitState(this.authForm, this.authSnapshot.configured);
@@ -11490,6 +11567,43 @@ export class MenuScene extends Phaser.Scene {
       this.authSubmitting = false;
       this.uiDirty = true;
     }
+  }
+
+  private handleLegacyGuestPlay(): void {
+    // An authenticated player already has an account-scoped progression lane;
+    // this control only exits a sign-in form for the local guest scope. It
+    // never signs a player out or changes provider/session state.
+    if (
+      this.authSubmitting
+      || this.authGateAwaitingResolution
+      || this.authSnapshot.status === 'authenticated'
+      || !LEGACY_GUEST_PLAY_ACCESS_ENABLED
+    ) {
+      return;
+    }
+
+    this.pendingBootPlayStart = false;
+    this.guestPlayGranted = true;
+    this.authGateLocked = false;
+    this.pendingAuthGateTransition = false;
+    this.activeAuthField = null;
+    this.destroyLegacyAuthNativeInput();
+    this.destroyAccountUsernameNativeInput();
+    this.accountUsernameActive = false;
+    this.startPlayMode();
+    this.rebuildUi();
+    this.publishVisualDiagnostics(this.time.now, true);
+    this.publishRuntimeDiagnostics(this.time.now, true);
+  }
+
+  private revokeLegacyGuestPlayGrant(): void {
+    if (!this.guestPlayGranted) {
+      return;
+    }
+
+    this.guestPlayGranted = false;
+    this.pendingBootPlayStart = false;
+    this.authGateLocked = this.authSnapshot.status !== 'authenticated';
   }
 
   private applyLegacyAuthSubmitResult(
@@ -11816,16 +11930,12 @@ export class MenuScene extends Phaser.Scene {
     };
 
     drawChevronChrome(false);
-    // The actual clickable rect is deliberately bigger than the drawn icon
-    // AND biased upward (more slack above than below) -- repeated feedback
-    // that taps aimed right at the visible chevron were missing and only
-    // registered a bit below it, on real devices this can't be reproduced
-    // on here to pin down exactly (a coordinate-mapping quirk this
-    // environment doesn't hit). Generously over-covering upward is a real
-    // fix for that specific symptom regardless of the exact root cause.
-    const hitPadTop = 24;
-    const hitPadBottom = 8;
-    const hitPadSides = 10;
+    // Real-device input showed the old target registering below the visible
+    // arrow. Keep the glyph small, but give its actual target a wider, lower
+    // weighted envelope so taps on the arrow and just beneath it both land.
+    const hitPadTop = 12;
+    const hitPadBottom = 24;
+    const hitPadSides = 14;
     const hitLeft = x - (size / 2) - hitPadSides;
     const hitTop = y - (size / 2) - hitPadTop;
     const hitWidth = size + (hitPadSides * 2);
@@ -11841,6 +11951,7 @@ export class MenuScene extends Phaser.Scene {
     chrome.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
     background.setDepth(LEGACY_OVERLAY_BACK_CHEVRON_DEPTH);
     background.setInteractive({ useHandCursor: true });
+    this.overlayBackChevronAction = onClick;
     const label = this.padLegacyUiText(this.add.text(x, y, '', {
       fontFamily: LEGACY_UI_FONT_FAMILY,
       fontSize: '1px',
@@ -11854,7 +11965,6 @@ export class MenuScene extends Phaser.Scene {
 
     background.on('pointerover', () => setActive(true));
     background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', onClick);
 
     return {
       background,
@@ -12112,6 +12222,10 @@ export class MenuScene extends Phaser.Scene {
       this.pendingOverlayMazeRebuild = false;
     }
     if (kind === 'auth') {
+      // Opening account entry from a guest play session is an explicit change
+      // of intent. Re-lock immediately so neither a form validation failure
+      // nor a provider error can leave a stale guest grant in control.
+      this.revokeLegacyGuestPlayGrant();
       const rememberedIdentity = readLegacyRememberedIdentity(this.resolveBrowserLocalStorage());
       this.authForm = {
         ...this.authForm,
@@ -12415,7 +12529,10 @@ export class MenuScene extends Phaser.Scene {
 
     this.authSnapshot = snapshot;
     this.authGateAwaitingResolution = false;
-    this.authGateLocked = snapshot.status === 'guest' && snapshot.configured === true;
+    if (snapshot.status === 'authenticated') {
+      this.guestPlayGranted = false;
+    }
+    this.authGateLocked = snapshot.status !== 'authenticated' && !this.guestPlayGranted;
     this.pendingAuthGateTransition = true;
     const menuActionMode = snapshot.status === 'authenticated' ? 'authenticated' : 'guest';
     this.armLegacyAuthFeedbackMessage();
@@ -12477,6 +12594,13 @@ export class MenuScene extends Phaser.Scene {
     // crash that silently aborted the rest of boot). update() can't fire
     // until create() has fully returned, so consuming the flag there
     // instead guarantees everything it needs already exists.
+  }
+
+  private hasLegacyPlayAccess(): boolean {
+    return isLegacyPlayAccessAllowed(this.authSnapshot.status, {
+      authResolved: !this.authGateAwaitingResolution,
+      guestPlayGranted: this.guestPlayGranted
+    });
   }
 
   private async hydrateLegacyAccountDataAfterAuth(
