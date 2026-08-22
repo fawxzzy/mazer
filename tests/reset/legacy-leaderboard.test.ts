@@ -1,0 +1,122 @@
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { getLegacyAuthClient } from '../../src/legacy-runtime/legacyAuth';
+import {
+  LEGACY_LEADERBOARD_MAX_PAGE_SIZE,
+  fetchLegacyLeaderboardPage,
+  fetchLegacyLeaderboardSelfRank
+} from '../../src/legacy-runtime/legacyLeaderboard';
+
+vi.mock('../../src/legacy-runtime/legacyAuth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/legacy-runtime/legacyAuth')>();
+  return {
+    ...actual,
+    getLegacyAuthClient: vi.fn(async () => null)
+  };
+});
+
+beforeEach(() => {
+  vi.mocked(getLegacyAuthClient).mockReset();
+});
+
+describe('fetchLegacyLeaderboardPage', () => {
+  test('reports unavailable when there is no client (feature flag off, misconfigured, or unreachable)', async () => {
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce(null);
+    const result = await fetchLegacyLeaderboardPage(0);
+    expect(result.entries).toEqual([]);
+    expect(result.error).toBeTruthy();
+  });
+
+  test('parses a successful page response into typed entries', async () => {
+    const rpc = vi.fn(async () => ({
+      data: [
+        { rank: 1, username: 'maze_runner', player_level: 184, is_requesting_user: false },
+        { rank: 2, username: 'fawxzzy', player_level: 141, is_requesting_user: true }
+      ],
+      error: null
+    }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+    const result = await fetchLegacyLeaderboardPage(0);
+    expect(result.error).toBeNull();
+    expect(result.entries).toEqual([
+      { rank: 1, username: 'maze_runner', playerLevel: 184, isRequestingUser: false },
+      { rank: 2, username: 'fawxzzy', playerLevel: 141, isRequestingUser: true }
+    ]);
+  });
+
+  test('surfaces the RPC error message and an empty page on failure', async () => {
+    const rpc = vi.fn(async () => ({ data: null, error: { message: 'function does not exist' } }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+    const result = await fetchLegacyLeaderboardPage(0);
+    expect(result.error).toBe('function does not exist');
+    expect(result.entries).toEqual([]);
+  });
+
+  test('drops malformed rows instead of throwing', async () => {
+    const rpc = vi.fn(async () => ({
+      data: [
+        { rank: 1, username: 'ok', player_level: 5, is_requesting_user: false },
+        { rank: 'not-a-number', username: 'broken', player_level: 5, is_requesting_user: false },
+        { rank: 2, username: null, player_level: 5, is_requesting_user: false }
+      ],
+      error: null
+    }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+    const result = await fetchLegacyLeaderboardPage(0);
+    expect(result.error).toBeNull();
+    expect(result.entries).toEqual([
+      { rank: 1, username: 'ok', playerLevel: 5, isRequestingUser: false }
+    ]);
+  });
+
+  test('clamps the requested page size to the server-enforced maximum', async () => {
+    const rpc = vi.fn(async () => ({ data: [], error: null }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+    await fetchLegacyLeaderboardPage(0, 10_000);
+    expect(rpc).toHaveBeenCalledWith('mazer_leaderboard_page', {
+      p_limit: LEGACY_LEADERBOARD_MAX_PAGE_SIZE,
+      p_offset: 0
+    });
+  });
+
+  test('never sends a negative offset', async () => {
+    const rpc = vi.fn(async () => ({ data: [], error: null }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+    await fetchLegacyLeaderboardPage(-50);
+    expect(rpc).toHaveBeenCalledWith('mazer_leaderboard_page', expect.objectContaining({ p_offset: 0 }));
+  });
+});
+
+describe('fetchLegacyLeaderboardSelfRank', () => {
+  test('reports unavailable when there is no client', async () => {
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce(null);
+    const result = await fetchLegacyLeaderboardSelfRank();
+    expect(result.selfRank).toBeNull();
+    expect(result.error).toBeTruthy();
+  });
+
+  test('parses a successful self-rank response, including a user with no username yet', async () => {
+    const rpc = vi.fn(async () => ({
+      data: [{ rank: 4213, player_level: 12, has_username: false }],
+      error: null
+    }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+    const result = await fetchLegacyLeaderboardSelfRank();
+    expect(result.error).toBeNull();
+    expect(result.selfRank).toEqual({ rank: 4213, playerLevel: 12, hasUsername: false });
+  });
+
+  test('returns a null self-rank without erroring when no progression row exists yet', async () => {
+    const rpc = vi.fn(async () => ({ data: [], error: null }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+    const result = await fetchLegacyLeaderboardSelfRank();
+    expect(result.error).toBeNull();
+    expect(result.selfRank).toBeNull();
+  });
+});
