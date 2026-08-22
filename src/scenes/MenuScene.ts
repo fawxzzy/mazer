@@ -8955,12 +8955,15 @@ export class MenuScene extends Phaser.Scene {
     // a quiet marker: a small static dot plus one tiny tick slowly orbiting
     // it, so the anchor point stays legible without competing with the knob
     // itself for attention.
+    // The accent color, not the same grey as the knob below -- against a
+    // grey knob (especially once it's resting right back on the anchor)
+    // a grey-on-grey dot was nearly invisible.
     const anchorDotRadius = Math.max(2, Math.round(knobRadius * 0.16));
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_BUTTON_FILL, 0.42);
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.62);
     this.hudGraphics.fillCircle(centerX, centerY, anchorDotRadius);
     const anchorOrbitRadius = anchorDotRadius * 2.6;
     const anchorOrbitAngle = (time / LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS) * Math.PI * 2;
-    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.4);
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, 0.55);
     this.hudGraphics.fillCircle(
       centerX + (Math.cos(anchorOrbitAngle) * anchorOrbitRadius),
       centerY + (Math.sin(anchorOrbitAngle) * anchorOrbitRadius),
@@ -9536,15 +9539,27 @@ export class MenuScene extends Phaser.Scene {
 
     const legendCopyColor = toCyberArcadeCssHex(cyberArcadeMaterial.rail.white);
 
-    // Each row gets a colored icon badge (fill disc + accent ring) behind its
-    // glyph instead of a bare icon on the panel background -- ties the
-    // legend visually to the same accent-badge language as the toggle rows,
-    // and the ring color doubles as the row's semantic color-key.
+    // Each row gets a colored icon badge behind its glyph instead of a bare
+    // icon on the panel background -- ties the legend visually to the same
+    // accent-badge language as the toggle rows, and the ring color doubles
+    // as the row's semantic color-key. A circular frame fits the rows whose
+    // real on-screen counterpart is itself round-ish (the start/exit glow,
+    // the move stick, the level number) -- but the trail row's real asset
+    // is a square maze tile, and forcing that into a circle just clipped
+    // it. Badge shape now matches what's actually being shown instead of
+    // defaulting every row to the same disc.
     const drawLegendBadge = (glyphX: number, glyphY: number, badgeRadius: number, accentColor: number): void => {
       guideGraphics.fillStyle(accentColor, 0.16);
       guideGraphics.fillCircle(glyphX, glyphY, badgeRadius);
       guideGraphics.lineStyle(1.2, accentColor, 0.7);
       guideGraphics.strokeCircle(glyphX, glyphY, badgeRadius);
+    };
+    const drawLegendTileBadge = (glyphX: number, glyphY: number, badgeRadius: number, accentColor: number): void => {
+      const half = badgeRadius * 0.92;
+      guideGraphics.fillStyle(accentColor, 0.16);
+      guideGraphics.fillRect(glyphX - half, glyphY - half, half * 2, half * 2);
+      guideGraphics.lineStyle(1.2, accentColor, 0.7);
+      guideGraphics.strokeRect(glyphX - half, glyphY - half, half * 2, half * 2);
     };
 
     // All guide rows share the card's left content edge. This keeps the
@@ -9569,7 +9584,11 @@ export class MenuScene extends Phaser.Scene {
       const labelX = detailLeft + (badgeRadius * 2) + badgeToTextGap;
       const titleLabel = addText(`${title}:`, labelX, glyphY, titleMaxWidth, titleColor, titleFontSize, 0, compact ? 0.96 : 1, guideRowMinFontSize);
       const titleWidth = titleLabel?.displayWidth ?? 0;
-      drawLegendBadge(glyphX, glyphY, badgeRadius, accentColor);
+      if (kind === 'trail') {
+        drawLegendTileBadge(glyphX, glyphY, badgeRadius, accentColor);
+      } else {
+        drawLegendBadge(glyphX, glyphY, badgeRadius, accentColor);
+      }
       if (kind === 'level') {
         // The real LVL badge is a number, not a shape -- Graphics can't draw
         // text, so this is the one row whose icon is a Text object instead
@@ -12273,10 +12292,16 @@ export class MenuScene extends Phaser.Scene {
 
     drawChevronChrome(false);
     // Real-device input showed the old target registering below the visible
-    // arrow. Keep the glyph small, but give its actual target a wider, lower
-    // weighted envelope so taps on the arrow and just beneath it both land.
+    // arrow, so this keeps a wider, lower-weighted envelope than the glyph
+    // itself -- but hitPadBottom was cut from 24 to 8: at 24 this control's
+    // own hit rect reached far enough down to overlap the Guide dropdown
+    // header's hit rect on several overlays (Options/Pause both stack the
+    // Guide card immediately below this button), so a tap aimed at the top
+    // of the Guide bar could land on Back instead and exit the overlay --
+    // reported twice. A smaller bottom pad still comfortably beats the bare
+    // glyph while clearing that overlap.
     const hitPadTop = 12;
-    const hitPadBottom = 24;
+    const hitPadBottom = 8;
     const hitPadSides = 14;
     const hitLeft = x - (size / 2) - hitPadSides;
     const hitTop = y - (size / 2) - hitPadTop;

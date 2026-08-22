@@ -248,18 +248,21 @@ describe('legacy remote progression', () => {
     expect(values.has('mazer.remote-account-sync.v1:user:user-hydrate')).toBe(true);
   });
 
-  test('reloads the selected account after sign-in without merging guest or writing remote progress', async () => {
+  test('reloads the selected account after sign-in, still ignoring guest progress entirely', async () => {
+    // Remote is the more-advanced side here -- a genuinely fresh sign-in
+    // (or this device's own local copy for this account is behind) should
+    // present the real account's remote progress, not the unrelated guest
+    // session sitting under a completely different storage key.
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-08-16T18:00:00.000Z';
     remote.tracks.player.completedCycles = 11;
     remote.tracks.player.targetComplexity = 52;
-    const local = createEmptyLegacyProgressionState();
-    local.updatedAt = '2026-08-16T18:10:00.000Z';
-    local.tracks.player.completedCycles = 21;
-    local.tracks.player.targetComplexity = 72;
+    const guest = createEmptyLegacyProgressionState();
+    guest.updatedAt = '2026-08-16T18:10:00.000Z';
+    guest.tracks.player.completedCycles = 21;
+    guest.tracks.player.targetComplexity = 72;
     const values = new Map<string, string>([
-      ['mazer.progression.v1:user:user-refresh', JSON.stringify(local)],
-      ['mazer.progression.v1:guest', JSON.stringify(local)]
+      ['mazer.progression.v1:guest', JSON.stringify(guest)]
     ]);
     const storage = {
       getItem: (key: string) => values.get(key) ?? null,
@@ -287,6 +290,8 @@ describe('legacy remote progression', () => {
     }, storage, { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' });
 
     expect(result.error).toBeNull();
+    // Remote (11), not the guest session's 21 -- the guest key is never
+    // even read for this account-scoped storage key.
     expect(result.progressionState?.tracks.player.completedCycles).toBe(11);
     expect(result.settings?.controlMode).toBe('arrows');
     expect(result.settings?.movementSpeed).toBe(0.65);
@@ -294,6 +299,55 @@ describe('legacy remote progression', () => {
     expect(JSON.parse(values.get('mazer.progression.v1:user:user-refresh') ?? '{}')).toEqual(
       expect.objectContaining({ tracks: expect.any(Object) })
     );
+  });
+
+  test('never regresses this same account own more-advanced local progress on a hydrate (boot-race protection)', async () => {
+    // hydrateLegacyRemoteAccountState's caller (applyLegacyAuthSnapshot's
+    // "account changed" branch) can fire not just on a genuine fresh
+    // sign-in but also if bootstrapLegacyRemoteAccountState itself hiccups
+    // on a cold boot -- if this device's own local copy for THIS account is
+    // already ahead of a possibly-stale remote read, hydrate must not
+    // silently regress it. This is the exact "reads as reset after a fresh
+    // load" symptom the merge here protects against.
+    const remote = createEmptyLegacyProgressionState();
+    remote.updatedAt = '2026-08-16T18:00:00.000Z';
+    remote.tracks.player.completedCycles = 9;
+    remote.tracks.player.targetComplexity = 44;
+    const local = createEmptyLegacyProgressionState();
+    local.updatedAt = '2026-08-21T08:19:24.915Z';
+    local.tracks.player.completedCycles = 11;
+    local.tracks.player.targetComplexity = 52;
+    const values = new Map<string, string>([
+      ['mazer.progression.v1:user:user-refresh', JSON.stringify(local)]
+    ]);
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value)
+    };
+    const from = vi.fn((table: string) => ({
+      select: () => ({
+        eq: () => ({
+          maybeSingle: async () => table === LEGACY_REMOTE_PROGRESSION_TABLE
+            ? { data: { revision: 8, state: remote }, error: null }
+            : { data: null, error: null }
+        })
+      })
+    }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ from } as never);
+
+    const result = await hydrateLegacyRemoteAccountState({
+      configured: true,
+      displayName: 'Player',
+      email: 'player@example.test',
+      error: null,
+      info: null,
+      status: 'authenticated',
+      userId: 'user-refresh'
+    }, storage, { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' });
+
+    expect(result.error).toBeNull();
+    expect(result.progressionState?.tracks.player.completedCycles).toBe(11);
+    expect(result.progressionState?.tracks.player.targetComplexity).toBe(52);
   });
 
   test('syncs compact completed-cycle receipts when enabled and authenticated', async () => {
