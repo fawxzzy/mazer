@@ -1006,7 +1006,12 @@ const LEGACY_MENU_PATH_TITLE_FACET_WARM = cyberArcadeMaterial.signal.warning;
 const LEGACY_MENU_PATH_TITLE_SWEEP_MS = 2600;
 const LEGACY_MENU_PATH_TITLE_SWEEP_OVERSCAN_COLUMNS = 3;
 const LEGACY_MENU_PATH_TITLE_GEM_PULSE_MS = 3400;
-const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 6200;
+// Slowed from 6200 per feedback the orbiting diamonds read as too fast --
+// every sigil reads its phase off this same period (see
+// resolveLegacyMenuPathTitleOrbitPhase), so raising it slows all of them by
+// the same factor and their relative spacing (and thus synchronous timing)
+// is unaffected.
+const LEGACY_MENU_PATH_TITLE_ORBIT_MS = 9600;
 const LEGACY_MENU_PATH_TITLE_ORBIT_ROTATIONS_PER_PHASE = 2;
 const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;
 // A trail-color wipe across the title tiles: fills bottom-left to top-right
@@ -1094,6 +1099,7 @@ const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_PERIOD_MS = LEGACY_TRAIL_SHINE_ONE_WAY_PER
 const LEGACY_PLAY_DYNAMIC_TRAIL_PULSE_WINDOW = 3.6;
 const LEGACY_PLAY_TRAIL_PULSE_FRAME_INTERVAL_MS = 33;
 const LEGACY_PLAY_HELD_TOUCH_MOVE_LIMIT = 2;
+const LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS = 3200;
 const LEGACY_PLAY_STICK_RETARGET_STEP_MS = 32;
 const LEGACY_PLAY_STICK_RETARGET_RESCHEDULE_GRACE_MS = 16;
 const LEGACY_PLAY_STICK_INITIAL_DELAY_MAX_MS = 144;
@@ -1253,6 +1259,8 @@ export class MenuScene extends Phaser.Scene {
   private authUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private menuLeaderboardActive = false;
   private menuUsernameActive = false;
+  private overlayUsernameActive = false;
+  private overlayHomeActive = false;
   private leaderboardStatus: 'empty' | 'error' | 'idle' | 'loading' | 'ready' = 'idle';
   private leaderboardErrorMessage: string | null = null;
   private leaderboardEntries: readonly LegacyLeaderboardEntry[] = [];
@@ -8899,7 +8907,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const stick = this.resolveLegacyPlayFloatingStickGeometry(this.playFloatingStickOrigin);
-    this.drawLegacyPlayTouchStick(stick, this.resolveLegacyPlayHeldTouchControl(), this.playTouchStickPull);
+    this.drawLegacyPlayTouchStick(stick, this.resolveLegacyPlayHeldTouchControl(), this.playTouchStickPull, time);
     return createVisualRect(
       stick.outer.left,
       stick.outer.top,
@@ -8922,7 +8930,8 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyPlayTouchStick(
     stick: NonNullable<ReturnType<typeof resolveTouchControlLayout>['stick']>,
     activeControl: HumanMovementActionKind | null,
-    pullVector: TouchStickPullVector | null
+    pullVector: TouchStickPullVector | null,
+    time: number
   ): void {
     const centerX = stick.outer.centerX;
     const centerY = stick.outer.centerY;
@@ -8940,6 +8949,23 @@ export class MenuScene extends Phaser.Scene {
       knobX += (vector.deltaX / length) * travel;
       knobY += (vector.deltaY / length) * travel;
     }
+
+    // The anchor (where the touch first landed, i.e. "home" for the knob)
+    // has no chrome of its own once the knob drags away from it -- add back
+    // a quiet marker: a small static dot plus one tiny tick slowly orbiting
+    // it, so the anchor point stays legible without competing with the knob
+    // itself for attention.
+    const anchorDotRadius = Math.max(2, Math.round(knobRadius * 0.16));
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_BUTTON_FILL, 0.42);
+    this.hudGraphics.fillCircle(centerX, centerY, anchorDotRadius);
+    const anchorOrbitRadius = anchorDotRadius * 2.6;
+    const anchorOrbitAngle = (time / LEGACY_PLAY_TOUCH_STICK_ANCHOR_ORBIT_MS) * Math.PI * 2;
+    this.hudGraphics.fillStyle(LEGACY_PLAY_TOUCH_ICON, 0.4);
+    this.hudGraphics.fillCircle(
+      centerX + (Math.cos(anchorOrbitAngle) * anchorOrbitRadius),
+      centerY + (Math.sin(anchorOrbitAngle) * anchorOrbitRadius),
+      Math.max(1, Math.round(anchorDotRadius * 0.6))
+    );
 
     // Grey, not the green accent -- a quiet neutral knob instead of a
     // colored control competing with the maze/trail for attention.
@@ -9282,6 +9308,7 @@ export class MenuScene extends Phaser.Scene {
     });
     let rowY = shell.contentTop;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
+    this.uiButtons.push(this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth')));
 
     if (!showAdvancedOptions) {
       const viewportTop = rowY + (compact ? 4 : 6);
@@ -9322,7 +9349,6 @@ export class MenuScene extends Phaser.Scene {
         viewport: renderViewport
       });
       this.drawLegacyOverlayScrollFacade(scrollMetrics);
-      this.createLegacyBottomActionBar(panel, compact, { onClick: () => this.openOverlay('auth'), text: 'Account', tone: 'primary' });
       return;
     }
 
@@ -9339,8 +9365,6 @@ export class MenuScene extends Phaser.Scene {
       rowY = this.createColorInputRow('Path RGB 0-255', ['pathR', 'pathG', 'pathB'], rowY, panel, this.settings.pathColor);
       rowY = this.createColorInputRow('Wall RGB 0-255', ['wallR', 'wallG', 'wallB'], rowY, panel, this.settings.wallColor);
     }
-
-    this.createLegacyBottomActionBar(panel, compact, { onClick: () => this.openOverlay('auth'), text: 'Account', tone: 'primary' });
   }
 
   // The Guide card's actual on-screen height depends on overlayGuideExpanded
@@ -9348,7 +9372,7 @@ export class MenuScene extends Phaser.Scene {
   // instead of the layout's cardHeight (which is always the expanded size),
   // or they'd reserve extra space above the toggle list while collapsed.
   private resolveLegacyOptionsGuideEffectiveHeight(panelWidth: number): number {
-    const guideLayout = resolveLegacyOptionsGuideLayout(panelWidth, 3);
+    const guideLayout = resolveLegacyOptionsGuideLayout(panelWidth, 5);
     return this.overlayGuideExpanded ? guideLayout.cardHeight : guideLayout.collapsedHeight;
   }
 
@@ -9363,7 +9387,7 @@ export class MenuScene extends Phaser.Scene {
     } = {}
   ): number {
     const compact = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
-    const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, 3);
+    const guideLayout = resolveLegacyOptionsGuideLayout(panel.width, 5);
     const expanded = this.overlayGuideExpanded;
     const cardHeight = expanded ? guideLayout.cardHeight : guideLayout.collapsedHeight;
     const rightGutter = options.rightGutter ?? 0;
@@ -9528,7 +9552,7 @@ export class MenuScene extends Phaser.Scene {
     // visually drifting toward the centre of the dropdown.
     const drawLegendRow = (
       index: number,
-      kind: 'start' | 'end' | 'move',
+      kind: 'end' | 'level' | 'move' | 'start' | 'trail',
       title: string,
       copy: string,
       accentColor: number
@@ -9546,7 +9570,28 @@ export class MenuScene extends Phaser.Scene {
       const titleLabel = addText(`${title}:`, labelX, glyphY, titleMaxWidth, titleColor, titleFontSize, 0, compact ? 0.96 : 1, guideRowMinFontSize);
       const titleWidth = titleLabel?.displayWidth ?? 0;
       drawLegendBadge(glyphX, glyphY, badgeRadius, accentColor);
-      this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, compact ? 12 : 13, guideGraphics);
+      if (kind === 'level') {
+        // The real LVL badge is a number, not a shape -- Graphics can't draw
+        // text, so this is the one row whose icon is a Text object instead
+        // of a hand-drawn glyph. Shows the player's actual current level
+        // (not a placeholder), same "guide reflects reality" rule the
+        // start/exit/move rows already follow.
+        addText(
+          String(this.progressionState.tracks.player.level),
+          glyphX,
+          glyphY,
+          badgeRadius * 2,
+          titleColor,
+          compact ? 12 : 13,
+          0.5,
+          1,
+          8
+        );
+      } else if (kind === 'trail') {
+        this.drawLegacyOptionsGuideTrailGlyph(guideGraphics, glyphX, glyphY, badgeRadius);
+      } else {
+        this.drawLegacyOptionsGuideGlyph(kind, glyphX, glyphY, compact ? 12 : 13, guideGraphics);
+      }
 
       const copyX = labelX + titleWidth + titleCopyGap;
       const copyWidth = Math.max(compact ? 82 : 104, detailLeft + detailWidth - copyX);
@@ -9574,6 +9619,23 @@ export class MenuScene extends Phaser.Scene {
       'Move',
       'touch and drag anywhere',
       cyberArcadeMaterial.rail.mint
+    );
+    const playerPalette = resolveLegacyProgressionPalette(this.progressionState.tracks.player, 'player');
+    legendRowIndex += 1;
+    drawLegendRow(
+      legendRowIndex,
+      'trail',
+      'Trail',
+      'marks where you have walked',
+      playerPalette.trailColor
+    );
+    legendRowIndex += 1;
+    drawLegendRow(
+      legendRowIndex,
+      'level',
+      'Level',
+      'climbs as you clear mazes',
+      playerPalette.playerCoreColor
     );
     return contentCardTop + cardHeight + (options.exactTop === true ? 0 : (compact ? 14 : 16));
   }
@@ -9677,6 +9739,36 @@ export class MenuScene extends Phaser.Scene {
     graphics.strokeCircle(centerX, centerY, knobRadius);
   }
 
+  // Literally one real corridor tile, filled with the player's own trail
+  // color instead of a bespoke swatch shape -- same "guide reflects
+  // reality" rule as the start/exit/move rows: this is the actual material
+  // drawLegacyPathMaterialTile paints the maze with, just recolored to the
+  // player's trail palette and rendered as a single isolated cell.
+  private drawLegacyOptionsGuideTrailGlyph(
+    graphics: Phaser.GameObjects.Graphics,
+    centerX: number,
+    centerY: number,
+    badgeRadius: number
+  ): void {
+    const trailPalette = resolveLegacyProgressionPalette(this.progressionState.tracks.player, 'player');
+    const tileSize = Math.round(badgeRadius * 1.5);
+    this.drawLegacyPathMaterialTile(
+      graphics,
+      { x: 0, y: 0 },
+      { grid: [[true]], height: 1, width: 1 },
+      centerX - (tileSize / 2),
+      centerY - (tileSize / 2),
+      tileSize,
+      {
+        coreAlpha: 0.95,
+        coreColor: mixLegacyIridescentColor(LEGACY_PLAY_PATH_CORE, trailPalette.trailColor, 1),
+        drawCue: false,
+        edgeAlpha: LEGACY_PLAY_PATH_EDGE_ALPHA,
+        edgeColor: mixLegacyIridescentColor(LEGACY_PLAY_PATH_EDGE, trailPalette.trailColor, 1)
+      }
+    );
+  }
+
   private shouldShowLegacyAdvancedOptions(): boolean {
     return resolveLegacyAdvancedOptionsVisible(typeof window === 'undefined' ? '' : window.location.search);
   }
@@ -9700,6 +9792,8 @@ export class MenuScene extends Phaser.Scene {
       panel
     });
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand('resume')));
+    this.uiButtons.push(this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth')));
+    this.uiButtons.push(this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu')));
     const viewportTop = shell.contentTop;
     const viewport = createVisualRect(
       shell.contentLeft,
@@ -9708,7 +9802,7 @@ export class MenuScene extends Phaser.Scene {
       Math.max(120, shell.contentHeight)
     );
     const controlContentHeight = this.resolveFeatureControlRowsContentHeight(panel, {
-      includeMovementSpeed: true
+      includeMovementSpeed: false
     });
     const contentFlow = resolveLegacyOverlayContentFlowLayout({
       contentTop: viewport.top,
@@ -9730,25 +9824,12 @@ export class MenuScene extends Phaser.Scene {
       viewport: renderViewport
     });
     this.createFeatureControlRows(contentFlow.controlsTop, panel, {
-      includeMovementSpeed: true,
+      includeMovementSpeed: false,
       rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER,
       scrollOffset: scrollMetrics.offset,
       viewport: renderViewport
     });
     this.drawLegacyOverlayScrollFacade(scrollMetrics);
-
-    const accountAction = (): void => this.openOverlay('auth');
-    const mainMenuAction = (): void => this.applyLegacyPauseCommand('return-menu');
-
-    // Bottom action bar, same as the account screen: Account (the rarer of
-    // the two -- most pauses end in Resume/Menu, not a detour to settings)
-    // is the smaller secondary slot, Menu the bigger primary one.
-    this.createLegacyBottomActionBar(
-      panel,
-      stacked,
-      { onClick: mainMenuAction, text: 'Menu', tone: 'primary' },
-      { onClick: accountAction, text: 'Account', tone: 'secondary' }
-    );
   }
 
   // Fewer rows than the data module's own default page size -- that default
@@ -12562,6 +12643,151 @@ export class MenuScene extends Phaser.Scene {
       background.setSize(label.displayWidth + 16, label.displayHeight + 12);
       background.setVisible(true);
     }
+  }
+
+  // Same header row the back chevron sits on, toward the left side (the
+  // account screen's own Account button is gone -- this is the one entry
+  // point to it now, from both the menu-context Options screen and the
+  // in-play Pause screen). Plain animated text rather than the front door's
+  // tile-glyph treatment -- this is a secondary in-line label next to a
+  // small chevron, not a hero element, and most usernames can't render as
+  // glyphs anyway (see createLegacyMenuUsernameButton).
+  private createLegacyOverlayUsernameButton(panel: OverlayPanelFrame, onClick: () => void): UiButton {
+    const chevronSize = Math.max(cyberArcadeMaterial.controls.minimumTouchTarget, this.layout.width < 480 ? 42 : 46);
+    const rowY = panel.top + 8 + Math.round(chevronSize / 2);
+    const anchorX = panel.left + 20;
+
+    const label = this.padLegacyCompactUiText(this.add.text(anchorX, rowY, '', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '13px',
+      color: '#72e0bf'
+    })).setOrigin(0, 0.5).setVisible(false);
+    this.uiTexts.push(label);
+
+    const background = this.add.rectangle(anchorX, rowY, 1, 1, 0x000000, 0.001);
+    background.setInteractive({ useHandCursor: true });
+    background.setDepth(3);
+    background.setVisible(false);
+    this.overlayUsernameActive = false;
+
+    const setActive = (active: boolean): void => {
+      if (this.overlayUsernameActive === active) {
+        return;
+      }
+      this.overlayUsernameActive = active;
+      label.setAlpha(active ? 1 : 0.86);
+    };
+    background.on('pointerover', () => setActive(true));
+    background.on('pointerout', () => setActive(false));
+    background.on('pointerdown', onClick);
+
+    return {
+      background,
+      bounds: createVisualRect(anchorX, rowY - 10, 1, 20),
+      label,
+      semanticAction: 'Account',
+      setActive,
+      text: 'Account',
+      updateFrame: (time: number) => {
+        if (this.authSnapshot.status !== 'authenticated') {
+          label.setVisible(false);
+          background.setVisible(false);
+          return;
+        }
+        this.loadAccountUsernameIfNeeded();
+        const username = this.accountUsernameSavedValue;
+        if (username.length === 0) {
+          label.setVisible(false);
+          background.setVisible(false);
+          return;
+        }
+        const trailColor = resolveLegacyIridescentTrailColor(
+          0,
+          1,
+          time,
+          this.resolveActiveLegacyProgressionPalette().trailColor
+        );
+        label.setText(username);
+        label.setColor(`#${trailColor.toString(16).padStart(6, '0')}`);
+        label.setAlpha(this.overlayUsernameActive ? 1 : 0.86);
+        label.setPosition(anchorX, rowY);
+        label.setVisible(true);
+        background.setPosition(anchorX + (label.displayWidth / 2), rowY);
+        background.setSize(label.displayWidth + 16, label.displayHeight + 16);
+        background.setVisible(true);
+      },
+      destroy: () => {
+        background.destroy();
+        label.destroy();
+      }
+    };
+  }
+
+  // Play-mode-only: centered in the same header row as the back chevron and
+  // the account username. Replaces the old bottom-bar "Menu" button -- the
+  // menu-context Options screen has no equivalent (you're already at the
+  // main menu there), so this is never created for that overlay.
+  private createLegacyOverlayHomeButton(panel: OverlayPanelFrame, onClick: () => void): UiButton {
+    const chevronSize = Math.max(cyberArcadeMaterial.controls.minimumTouchTarget, this.layout.width < 480 ? 42 : 46);
+    const rowY = panel.top + 8 + Math.round(chevronSize / 2);
+    const centerX = panel.centerX;
+    const iconSize = Math.max(18, Math.round(chevronSize * 0.42));
+
+    const graphics = this.add.graphics();
+    const background = this.add.rectangle(centerX, rowY, iconSize + 24, iconSize + 24, 0x000000, 0.001);
+    background.setInteractive({ useHandCursor: true });
+    background.setDepth(3);
+    this.overlayHomeActive = false;
+
+    const drawHome = (active: boolean): void => {
+      graphics.clear();
+      const color = active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON;
+      const alpha = active ? 1 : 0.85;
+      const halfWidth = iconSize * 0.5;
+      const roofTop = rowY - (iconSize * 0.5);
+      const baseTop = rowY - (iconSize * 0.06);
+      const baseBottom = rowY + (iconSize * 0.42);
+      graphics.lineStyle(Math.max(1.6, iconSize * 0.12), color, alpha);
+      graphics.beginPath();
+      graphics.moveTo(centerX - halfWidth, baseTop);
+      graphics.lineTo(centerX, roofTop);
+      graphics.lineTo(centerX + halfWidth, baseTop);
+      graphics.strokePath();
+      graphics.strokeRect(centerX - (halfWidth * 0.6), baseTop, halfWidth * 1.2, baseBottom - baseTop);
+    };
+    drawHome(false);
+
+    const setActive = (active: boolean): void => {
+      if (this.overlayHomeActive === active) {
+        return;
+      }
+      this.overlayHomeActive = active;
+      drawHome(active);
+    };
+    background.on('pointerover', () => setActive(true));
+    background.on('pointerout', () => setActive(false));
+    background.on('pointerdown', onClick);
+
+    const label = this.add.text(centerX, rowY, '', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '1px'
+    }).setOrigin(0.5).setVisible(false);
+    this.uiTexts.push(label);
+
+    return {
+      background,
+      bounds: createVisualRect(centerX - (iconSize / 2) - 12, rowY - (iconSize / 2) - 12, iconSize + 24, iconSize + 24),
+      iconOnly: true,
+      label,
+      semanticAction: 'Main Menu',
+      setActive,
+      text: 'Main Menu',
+      destroy: () => {
+        graphics.destroy();
+        background.destroy();
+        label.destroy();
+      }
+    };
   }
 
   private clearUi(): void {
