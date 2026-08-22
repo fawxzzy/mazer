@@ -1,0 +1,132 @@
+import { describe, expect, test } from 'vitest';
+import {
+  LEGACY_ENDLESS_DEFAULT_MODIFIER_POLICY,
+  LEGACY_ENDLESS_LEVEL_BOUNDARY,
+  LEGACY_ENDLESS_MODIFIER_REGISTRY,
+  resolveLegacyEndlessLevelRecipe,
+  resolveLegacyProgressionRulesetId
+} from '../../src/legacy-runtime/legacyEndlessProgression';
+
+describe('legacy endless progression ruleset boundary', () => {
+  test('levels below the boundary resolve to the unchanged legacy ruleset', () => {
+    expect(resolveLegacyProgressionRulesetId(1)).toBe('legacy-v1');
+    expect(resolveLegacyProgressionRulesetId(99)).toBe('legacy-v1');
+  });
+
+  test('levels at or above the boundary resolve to the endless ruleset', () => {
+    expect(resolveLegacyProgressionRulesetId(LEGACY_ENDLESS_LEVEL_BOUNDARY)).toBe('endless-v1');
+    expect(resolveLegacyProgressionRulesetId(1_000_000)).toBe('endless-v1');
+  });
+});
+
+describe('legacy endless level recipe resolution', () => {
+  test('rejects levels below the endless boundary', () => {
+    expect(() => resolveLegacyEndlessLevelRecipe(99)).toThrow();
+    expect(() => resolveLegacyEndlessLevelRecipe(1.5 + LEGACY_ENDLESS_LEVEL_BOUNDARY)).toThrow();
+  });
+
+  test('the same level always resolves to an identical recipe', () => {
+    const first = resolveLegacyEndlessLevelRecipe(142);
+    const second = resolveLegacyEndlessLevelRecipe(142);
+    expect(second).toEqual(first);
+  });
+
+  test('resolves successfully for representative large levels without overflow or throwing', () => {
+    for (const level of [100, 101, 250, 1_000, 100_000, 2_000_000_000]) {
+      const recipe = resolveLegacyEndlessLevelRecipe(level);
+      expect(recipe.level).toBe(level);
+      expect(Number.isFinite(recipe.complexityBudget)).toBe(true);
+      expect(Number.isFinite(recipe.difficultyBudget)).toBe(true);
+    }
+  });
+
+  test('level 101 differs from level 100 (not a flat repeat)', () => {
+    const level100 = resolveLegacyEndlessLevelRecipe(100);
+    const level101 = resolveLegacyEndlessLevelRecipe(101);
+    expect(level101).not.toEqual({ ...level100, level: 101, seed: level101.seed });
+    expect(level101.seed).not.toBe(level100.seed);
+  });
+
+  test('geometry and generation cost stay bounded across a huge level range -- never grows without bound', () => {
+    const sampledLevels = [100, 500, 5_000, 50_000, 500_000, 5_000_000, 50_000_000];
+    const budgets = sampledLevels.map((level) => resolveLegacyEndlessLevelRecipe(level));
+    for (const recipe of budgets) {
+      expect(recipe.complexityBudget).toBeGreaterThanOrEqual(280);
+      expect(recipe.complexityBudget).toBeLessThanOrEqual(400);
+      expect(recipe.difficultyBudget).toBeGreaterThanOrEqual(40);
+      expect(recipe.difficultyBudget).toBeLessThanOrEqual(100);
+      for (const modifier of recipe.modifiers) {
+        expect(modifier.intensity).toBeGreaterThanOrEqual(0);
+        expect(modifier.intensity).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  test('every enabled registry modifier appears on a level using the default policy', () => {
+    const recipe = resolveLegacyEndlessLevelRecipe(100);
+    const modifierIds = recipe.modifiers.map((modifier) => modifier.id).sort();
+    const expectedIds = LEGACY_ENDLESS_MODIFIER_REGISTRY.map((definition) => definition.id).sort();
+    expect(modifierIds).toEqual(expectedIds);
+  });
+
+  test('modifier ordering is deterministic and matches registry order', () => {
+    const recipe = resolveLegacyEndlessLevelRecipe(500);
+    const modifierIds = recipe.modifiers.map((modifier) => modifier.id);
+    const registryIds = LEGACY_ENDLESS_MODIFIER_REGISTRY.map((definition) => definition.id);
+    expect(modifierIds).toEqual(registryIds);
+  });
+
+  test('a disabled modifier never appears in the recipe', () => {
+    const disabledId = LEGACY_ENDLESS_MODIFIER_REGISTRY[0]?.id;
+    expect(disabledId).toBeDefined();
+    const policy = {
+      ...LEGACY_ENDLESS_DEFAULT_MODIFIER_POLICY,
+      [disabledId as string]: { enabled: false }
+    };
+    const recipe = resolveLegacyEndlessLevelRecipe(100, policy);
+    expect(recipe.modifiers.some((modifier) => modifier.id === disabledId)).toBe(false);
+    expect(recipe.modifiers.length).toBe(LEGACY_ENDLESS_MODIFIER_REGISTRY.length - 1);
+  });
+
+  test('an enabled modifier stays within a configured tighter intensity bound', () => {
+    const targetId = LEGACY_ENDLESS_MODIFIER_REGISTRY[0]?.id;
+    expect(targetId).toBeDefined();
+    const policy = {
+      ...LEGACY_ENDLESS_DEFAULT_MODIFIER_POLICY,
+      [targetId as string]: { enabled: true, maximumIntensity: 0.2, minimumIntensity: 0.1 }
+    };
+    for (let level = LEGACY_ENDLESS_LEVEL_BOUNDARY; level < LEGACY_ENDLESS_LEVEL_BOUNDARY + 30; level += 1) {
+      const recipe = resolveLegacyEndlessLevelRecipe(level, policy);
+      const modifier = recipe.modifiers.find((entry) => entry.id === targetId);
+      expect(modifier).toBeDefined();
+      expect(modifier!.intensity).toBeGreaterThanOrEqual(0.1);
+      expect(modifier!.intensity).toBeLessThanOrEqual(0.2);
+    }
+  });
+
+  test('empty enemy and obstacle collections serialize and deserialize safely', () => {
+    const recipe = resolveLegacyEndlessLevelRecipe(100);
+    expect(recipe.enemies).toEqual([]);
+    expect(recipe.obstacles).toEqual([]);
+    const roundTripped = JSON.parse(JSON.stringify(recipe));
+    expect(roundTripped.enemies).toEqual([]);
+    expect(roundTripped.obstacles).toEqual([]);
+  });
+
+  test('the last level of every challenge cycle is a capstone at maximum budget and intensity', () => {
+    const capstoneLevel = LEGACY_ENDLESS_LEVEL_BOUNDARY + 22;
+    const recipe = resolveLegacyEndlessLevelRecipe(capstoneLevel);
+    expect(recipe.complexityBudget).toBe(400);
+    expect(recipe.difficultyBudget).toBe(100);
+    for (const modifier of recipe.modifiers) {
+      expect(modifier.intensity).toBe(1);
+    }
+  });
+
+  test('the level after a capstone resets to a lower budget rather than continuing to climb', () => {
+    const capstoneLevel = LEGACY_ENDLESS_LEVEL_BOUNDARY + 22;
+    const capstone = resolveLegacyEndlessLevelRecipe(capstoneLevel);
+    const afterCapstone = resolveLegacyEndlessLevelRecipe(capstoneLevel + 1);
+    expect(afterCapstone.complexityBudget).toBeLessThan(capstone.complexityBudget);
+  });
+});
