@@ -14,11 +14,12 @@ describe('Mazer accessibility shell', () => {
       { command: 'start', key: 'Enter', label: 'Start maze' },
       { command: 'settings', key: 'O', label: 'Open settings' },
       { command: 'pause', key: 'P', label: 'Pause or resume game' },
-      { command: 'back', key: 'Escape', label: 'Close dialog or go back' }
+      { command: 'back', key: 'Escape', label: 'Close dialog or go back' },
+      { command: 'guest', key: 'G', label: 'Play as guest' }
     ]);
     expect(describeMazerAccessibilityCanvas()).toEqual({
       ariaDescriptionId: MAZER_ACCESSIBILITY_DESCRIPTION_ID,
-      ariaKeyShortcuts: 'Enter O P Escape',
+      ariaKeyShortcuts: 'Enter O P Escape G',
       ariaLabel: 'Mazer precision maze game',
       role: 'application',
       tabIndex: 0
@@ -37,7 +38,7 @@ describe('Mazer accessibility shell', () => {
     expect(canvas.tabIndex).toBe(0);
     expect(attributes).toEqual(new Map([
       ['aria-describedby', MAZER_ACCESSIBILITY_DESCRIPTION_ID],
-      ['aria-keyshortcuts', 'Enter O P Escape'],
+      ['aria-keyshortcuts', 'Enter O P Escape G'],
       ['aria-label', 'Mazer precision maze game'],
       ['role', 'application']
     ]));

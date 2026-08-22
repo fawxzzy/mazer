@@ -937,6 +937,7 @@ interface LegacyQaDiagnosticsApi {
   openSettingsOverlay(): LegacyQaOverlayResult;
   openOptionsOverlay(): LegacyQaOverlayResult;
   openPauseOverlay(): LegacyQaOverlayResult;
+  startGuestPlayMode(): LegacyQaOverlayResult;
   startPlayMode(): LegacyQaOverlayResult;
 }
 
@@ -1623,6 +1624,7 @@ export class MenuScene extends Phaser.Scene {
       openSettingsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenSettingsOverlay(),
       openOptionsOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenOptionsOverlay(),
       openPauseOverlay: (): LegacyQaOverlayResult => this.handleLegacyQaOpenPauseOverlay(),
+      startGuestPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartGuestPlayMode(),
       startPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartPlayMode()
     };
   }
@@ -2969,6 +2971,12 @@ export class MenuScene extends Phaser.Scene {
       return true;
     }
 
+    if (lowerKey === 'g' && this.mode === 'menu' && this.overlay === 'auth') {
+      event.preventDefault();
+      this.handleLegacyGuestPlay();
+      return true;
+    }
+
     if (lowerKey === 'o' && this.mode === 'menu' && this.overlay === 'none') {
       event.preventDefault();
       this.openOverlay('options');
@@ -3228,6 +3236,44 @@ export class MenuScene extends Phaser.Scene {
     }
     this.overlayBackChevronAction();
     return true;
+  }
+
+  private handleLegacyQaStartGuestPlayMode(): LegacyQaOverlayResult {
+    const base = {
+      mode: this.mode,
+      overlay: this.overlay
+    };
+
+    if (this.mode !== 'menu' || this.overlay !== 'auth') {
+      return {
+        ...base,
+        accepted: false,
+        reason: this.mode !== 'menu' ? 'not-menu-mode' : 'auth-overlay-required'
+      };
+    }
+
+    if (
+      this.authSubmitting
+      || this.authGateAwaitingResolution
+      || this.authSnapshot.status === 'authenticated'
+      || !LEGACY_GUEST_PLAY_ACCESS_ENABLED
+    ) {
+      return {
+        ...base,
+        accepted: false,
+        reason: 'guest-action-unavailable'
+      };
+    }
+
+    // The diagnostics bridge intentionally calls the same user-facing action
+    // as the visible guest button; it never grants access on its own.
+    this.handleLegacyGuestPlay();
+    return {
+      accepted: true,
+      mode: this.mode,
+      overlay: this.overlay,
+      reason: null
+    };
   }
 
   private handleOverlayScrollPointerDown(pointer: Phaser.Input.Pointer): boolean {
@@ -4813,6 +4859,13 @@ export class MenuScene extends Phaser.Scene {
 
   private enterMenuMode(): void {
     this.resetLegacyPlayInputBuffer();
+    // Guest play is an active, local-only session—not a durable account
+    // state. Returning to the menu ends that session so a later launch/menu
+    // view always returns to the login boundary instead of presenting an
+    // implicit guest continuation.
+    if (this.authSnapshot.status !== 'authenticated') {
+      this.revokeLegacyGuestPlayGrant();
+    }
     this.mode = 'menu';
     this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
@@ -11451,6 +11504,13 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    // Choosing the account form ends any temporary guest admission before
+    // validation or a provider call begins. Otherwise a guest grant from an
+    // earlier play session can survive a failed/unavailable sign-in and leave
+    // the game looking as though the submitted credentials entered guest
+    // mode. Account submission must either establish an authenticated session
+    // or keep the auth gate closed.
+    this.revokeLegacyGuestPlayGrant();
     this.syncLegacyAuthNativeInputValue();
     this.recordLegacyAuthActionDiagnostics({ stage: 'started' });
     const submitState = resolveLegacyAuthSubmitState(this.authForm, this.authSnapshot.configured);
@@ -11534,6 +11594,16 @@ export class MenuScene extends Phaser.Scene {
     this.rebuildUi();
     this.publishVisualDiagnostics(this.time.now, true);
     this.publishRuntimeDiagnostics(this.time.now, true);
+  }
+
+  private revokeLegacyGuestPlayGrant(): void {
+    if (!this.guestPlayGranted) {
+      return;
+    }
+
+    this.guestPlayGranted = false;
+    this.pendingBootPlayStart = false;
+    this.authGateLocked = this.authSnapshot.status !== 'authenticated';
   }
 
   private applyLegacyAuthSubmitResult(
@@ -12152,6 +12222,10 @@ export class MenuScene extends Phaser.Scene {
       this.pendingOverlayMazeRebuild = false;
     }
     if (kind === 'auth') {
+      // Opening account entry from a guest play session is an explicit change
+      // of intent. Re-lock immediately so neither a form validation failure
+      // nor a provider error can leave a stale guest grant in control.
+      this.revokeLegacyGuestPlayGrant();
       const rememberedIdentity = readLegacyRememberedIdentity(this.resolveBrowserLocalStorage());
       this.authForm = {
         ...this.authForm,

@@ -47,37 +47,25 @@ describe('UI surface capture menu header controls', () => {
 
   const menuSurface = ({
     playerLevel = null,
-    aiLevel = bounds(9, 13, 36, 36),
-    aiLabel = 'LVL',
     settings = bounds(352, 13, 36, 36)
   } = {}) => ({
     mode: 'menu',
     overlay: 'none',
     progressionBadge: { bounds: playerLevel },
-    menuAiProgressionBadge: { bounds: aiLevel, label: aiLabel },
     buttons: [{ bounds: settings, iconOnly: true, text: 'Settings' }]
   });
 
-  test('accepts the AI-only menu glyph paired with the same square settings cog', () => {
+  test('accepts the standalone settings control when no menu level glyph is rendered', () => {
     expect(collectMenuControlSpacingIssues(menuSurface())).toEqual([]);
   });
 
-  test('rejects missing, undersized, or misaligned menu header controls', () => {
+  test('rejects a visible player glyph or undersized settings control', () => {
     expect(collectMenuControlSpacingIssues(menuSurface({ playerLevel: bounds(9, 13, 44, 44) })))
       .toContain('menu:player-level-glyph-visible');
     expect(collectMenuControlSpacingIssues(menuSurface({ settings: bounds(350, 15, 30, 30) })))
       .toEqual(expect.arrayContaining([
-        'menu:settings-target=30.0x30.0<36',
-        'menu:ai-level-settings-size-mismatch=36.0x36.0!=30.0x30.0',
-        'menu:ai-level-settings-top-mismatch=13.0!=15.0'
+        'menu:settings-target=30.0x30.0<36'
       ]));
-    expect(collectMenuControlSpacingIssues(menuSurface({ aiLevel: null, aiLabel: null })))
-      .toEqual(expect.arrayContaining([
-        'menu:missing-ai-level-glyph',
-        'menu:ai-level-label=missing!=LVL'
-      ]));
-    expect(collectMenuControlSpacingIssues(menuSurface({ aiLevel: bounds(301, 13, 44, 44) })))
-      .toContain('menu:ai-level-to-settings-gap=7.0<8');
   });
 });
 
@@ -110,13 +98,15 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('requireReadableTitle = false');
     expect(source).toContain('visual?.title?.visible === true && visual?.title?.progressPercent >= 95');
     expect(source).toContain("drawStage?.complete === true || drawStage?.lifecyclePhase === 'settled'");
+    expect(source).toContain("visual?.runtime?.playLifecycle?.inputLocked === false");
     expect(source).toContain('const waitForAuthenticatedFixtureReady = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
     expect(source).toContain("runtime?.auth?.status === 'authenticated'");
     expect(source).toContain("labels.has('Start')");
-    expect(source).toContain('const playGeometrySettled = expectedMode !== \'play\'');
-    expect(source).toContain('badge.bottom <= board.top - 8');
-    expect(source).toContain('Number.isFinite(badge?.bottom)');
+    expect(source).toContain('const playGeometrySettled = !requireSettledPlayGeometry');
+    expect(source).toContain('Number.isFinite(board?.left)');
     expect(source).toContain('Number.isFinite(board?.top)');
+    expect(source).toContain('Number.isFinite(board?.right)');
+    expect(source).toContain('Number.isFinite(board?.bottom)');
     expect(source).toContain("button?.text === 'Settings' && button?.iconOnly === true");
     expect(source).toContain("if (authFixture === 'authenticated') {");
     expect(source).toContain('await waitForAuthenticatedFixtureReady(page, { timeoutMs });');
@@ -148,10 +138,6 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("start: getVisualButtonPoint(visual, 'Start') ?? {");
     expect(source).toContain("options: getVisualButtonPoint(visual, 'Settings') ?? {");
     expect(source).toContain("hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })");
-    expect(source).toContain('const openOptionsOverlayFromMenu = async (page, point, expectedLabels, timeoutMs) => {');
-    expect(source).toContain("await clickPoint(page, point, 'Settings');");
-    expect(source).toContain('await page.touchscreen.tap(point.x, point.y);');
-    expect(source).toContain('timeoutMs: Math.min(timeoutMs, 10_000)');
     expect(source).toContain('const openOptionsOverlayViaQa = async (page, timeoutMs) => {');
     expect(source).toContain('window.__MAZER_QA__?.openSettingsOverlay');
     expect(source).toContain('api.openSettingsOverlay()');
@@ -190,12 +176,10 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("reason: 'focused-topology-proof'");
     expect(source).toContain("const seedTopologyFixture = async (page, fixture) => {");
     expect(source).toContain("fixture !== 'wrap-enabled'");
-    expect(source).toContain('const latestMenuDiagnostics = await readDiagnostics(page);');
-    expect(source).toContain('const latestMenuButtons = getMenuButtonPoints(latestMenuDiagnostics.visual);');
     expect(source).toContain('markerStyle: menu.diagnostics.visual?.markerStyle');
     expect(source).toContain('hud: play.diagnostics.visual?.hud');
     expect(source).toContain('expectedLabels: []');
-    expect(source).toContain("expectedLabels: ['Paused', 'QUICK PLAY', 'Reset', 'Menu']");
+    expect(source).toContain("expectedLabels: ['GUIDE', 'Move Speed', 'Trail Fade', 'Trail Shine', 'Animated Background', 'Menu', 'Account']");
     expect(source).toContain("url.searchParams.set('mazeSeed', mazeSeed);");
     expect(source).toContain("url.searchParams.set('authFixture', authFixture);");
     expect(source).not.toContain("url.searchParams.set('pathStyle', pathStyle);");
@@ -225,6 +209,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'auth-surface'");
     expect(source).toContain("createCheck(\n      'auth-text-labels'");
     expect(source).toContain('const AUTH_EXPECTED_LABELS = Object.freeze([');
+    expect(source).toContain("'Play as guest'");
     expect(source).toContain("'EMAIL'");
     expect(source).toContain("'PASSWORD'");
     expect(source).toContain('hasLabels(surfaces.auth, AUTH_EXPECTED_LABELS)');
@@ -234,13 +219,13 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('export const collectMenuControlSpacingIssues = (surface) => {');
     expect(source).toContain('const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => {');
     expect(source).toContain("issues.push('menu:player-level-glyph-visible');");
-    expect(source).toContain('menu:ai-level-settings-size-mismatch=');
-    expect(source).toContain('menu:ai-level-settings-top-mismatch=');
-    expect(source).toContain("issues.push('menu:missing-ai-level-glyph');");
-    expect(source).toContain('menu:ai-level-to-settings-gap=');
+    expect(source).not.toContain('menu:ai-level-settings-size-mismatch=');
+    expect(source).not.toContain('menu:ai-level-settings-top-mismatch=');
+    expect(source).not.toContain("issues.push('menu:missing-ai-level-glyph');");
+    expect(source).not.toContain('menu:ai-level-to-settings-gap=');
     expect(source).toContain("surface?.mode !== 'play'");
     expect(source).toContain('badge.width > board.width + 1');
-    expect(source).toContain('progression-badge-not-above-play-board');
+    expect(source).not.toContain('progression-badge-not-above-play-board');
     expect(source).not.toContain('progression-badge-not-above-menu-board');
     expect(source).toContain('progression-badge-to-pause-gap=');
     expect(source).toContain("'progression-badge-geometry'");
@@ -278,7 +263,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const wheelDelta = Math.max(scroll.maxOffset * 4, dragDistance);');
     expect(source).toContain('await page.mouse.wheel(0, wheelDelta);');
     expect(source).toContain('expectedLabels: optionsBottomExpectedLabels');
-    expect(source).toContain("expectedLabels: ['Move Speed', 'Reset Progress', 'Reset', 'Menu']");
+    expect(source).toContain("expectedLabels: ['Menu', 'Account']");
     expect(source).toContain('optionsSurface.diagnostics.visual?.overlayUi');
     expect(source).toContain('pause.diagnostics.visual?.overlayUi');
     expect(source).toContain("nativeInputs: authSurface.nativeInputs");
@@ -315,14 +300,17 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("'reduced-motion-preference-change'");
     expect(source).toContain('reducedMotionToggle.initial === false');
     expect(source).toContain('// Restoring the operating-system motion preference redraws the canvas UI.');
-    expect(source).toContain('requireReadableTitle: true,\n      timeoutMs\n    });\n    const menu = await captureSurface({');
+    expect(source).toContain("const startsAtAuthOverlay = initialDiagnostics.visual?.runtime?.mode === 'menu'");
+    expect(source).toContain('window.__MAZER_QA__?.startGuestPlayMode?.() ?? null');
+    expect(source).toContain('Guest visual fixture action rejected');
+    expect(source).toContain("await clickPoint(page, getVisualButtonPoint(paused.visual, 'Menu'), 'Menu');");
+    expect(source).toContain('surfaces.auth.captured === true');
+    expect(source).toContain('const menu = await captureSurface({');
     expect(source).not.toContain("expectedLabels: ['Exit', 'Start', 'Options']");
-    expect(source).toContain("hasLabels(surfaces.menu, ['Start']) && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })");
+    expect(source).toContain("hasVisualButton(surfaces.menu, 'Start') && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })");
     expect(source).toContain("surfaces.options.mode === 'menu' && surfaces.options.overlay === 'options'");
     expect(source).toContain('const optionsCaptureExpectedLabels = [...OPTIONS_BASE_EXPECTED_LABELS];');
     expect(source).toContain('expectedLabels: optionsBottomExpectedLabels');
-    expect(source).toContain('await openOptionsOverlayFromMenu(page, latestMenuButtons.options, optionsCaptureExpectedLabels, timeoutMs);');
-    expect(source).toContain("if (authFixture === 'authenticated') {");
     expect(source).toContain('skipWait = false');
     expect(source).toContain('skipWait ? await readDiagnostics(page)');
     expect(source).toContain('return expected.every(({ allowStateSuffix, expectedLabel }) => currentLabels.some((actualLabel) => (');
@@ -334,8 +322,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("!hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale'])");
     expect(source).toContain("'play-settings-cog'");
     expect(source).toContain("!hasLabels(surfaces.play, ['PAUSE', 'RESET'])");
-    expect(source).toContain("hasLabels(surfaces.pause, ['Paused', 'QUICK PLAY', 'Reset', 'Menu'])");
-    expect(source).toContain("!hasLabels(surfaces.pause, ['Game Toggles', 'Account', 'Resume'])");
+    expect(source).toContain("hasLabels(surfaces.pause, ['GUIDE', 'Move Speed', 'Trail Fade', 'Trail Shine', 'Animated Background', 'Menu', 'Account'])");
+    expect(source).toContain("!hasLabels(surfaces.pause, ['Game Toggles', 'Resume'])");
     expect(source).toContain('const reportPath = resolve(outputDir, \'report.md\');');
     expect(source).toContain('![Menu](${summary.screenshots.menu})');
     expect(source).toContain('![Auth](${summary.screenshots.auth})');

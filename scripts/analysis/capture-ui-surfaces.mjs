@@ -56,7 +56,8 @@ const AUTH_EXPECTED_LABELS = Object.freeze([
   'PASSWORD',
   'Sign In',
   'Create Account',
-  'Forgot Password?'
+  'Forgot Password?',
+  'Play as guest'
 ]);
 
 const buildExpectedTextLabelDescriptors = (expectedLabels) => (
@@ -126,10 +127,11 @@ const waitForSurface = async (page, {
   expectedLabels = [],
   mode,
   overlay,
+  requireSettledPlayGeometry = true,
   timeoutMs = DEFAULT_TIMEOUT_MS
 }) => {
   await page.waitForFunction(
-    ({ runtimeAttribute, visualAttribute, mode: expectedMode, overlay: expectedOverlay }) => {
+    ({ runtimeAttribute, visualAttribute, mode: expectedMode, overlay: expectedOverlay, requireSettledPlayGeometry }) => {
       const runtimeRaw = document.documentElement.getAttribute(runtimeAttribute);
       const visualRaw = document.documentElement.getAttribute(visualAttribute);
       if (!runtimeRaw || !visualRaw) {
@@ -138,16 +140,18 @@ const waitForSurface = async (page, {
 
       try {
         const visual = JSON.parse(visualRaw);
-        const badge = visual?.progressionBadge?.bounds;
         const board = visual?.board?.bounds;
         // Starting a game changes the mode before the next layout publication.
         // Do not capture that transitional diagnostics frame as active play UI.
-        const playGeometrySettled = expectedMode !== 'play'
+        const playGeometrySettled = !requireSettledPlayGeometry
+          || expectedMode !== 'play'
           || expectedOverlay !== 'none'
           || (
-            Number.isFinite(badge?.bottom)
+            Number.isFinite(board?.left)
             && Number.isFinite(board?.top)
-            && badge.bottom <= board.top - 8
+            && Number.isFinite(board?.right)
+            && Number.isFinite(board?.bottom)
+            && visual?.runtime?.playLifecycle?.inputLocked === false
           );
         return visual?.runtime?.mode === expectedMode
           && visual?.runtime?.overlay === expectedOverlay
@@ -159,8 +163,9 @@ const waitForSurface = async (page, {
     {
       runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
       visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE,
-      mode,
-      overlay
+       mode,
+       overlay,
+       requireSettledPlayGeometry
     },
     { timeout: timeoutMs }
   );
@@ -213,6 +218,9 @@ const waitForVisualBuildSettled = async (page, { requireReadableTitle = false, t
         const drawSettled = drawStage?.complete === true || drawStage?.lifecyclePhase === 'settled';
         if (!drawSettled) {
           return false;
+        }
+        if (visual?.runtime?.mode === 'play') {
+          return drawSettled && visual?.runtime?.playLifecycle?.inputLocked === false;
         }
         if (!shouldRequireReadableTitle || visual?.runtime?.mode !== 'menu' || visual?.runtime?.overlay !== 'none') {
           return true;
@@ -354,31 +362,6 @@ const clickPoint = async (page, point, label) => {
   await page.mouse.click(point.x, point.y);
 };
 
-const openOptionsOverlayFromMenu = async (page, point, expectedLabels, timeoutMs) => {
-  let lastError = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (attempt === 1) {
-      await page.touchscreen.tap(point.x, point.y);
-    } else {
-      await clickPoint(page, point, 'Settings');
-    }
-    try {
-      await waitForSurface(page, {
-        expectedLabels,
-        mode: 'menu',
-        overlay: 'options',
-        timeoutMs: Math.min(timeoutMs, 10_000)
-      });
-      return;
-    } catch (error) {
-      lastError = error;
-      await page.waitForTimeout(150);
-    }
-  }
-
-  throw lastError ?? new Error('Unable to open Settings from the menu cog.');
-};
-
 const openOptionsOverlayViaQa = async (page, timeoutMs) => {
   await page.waitForFunction(
     () => Boolean(window.__MAZER_QA__?.openSettingsOverlay),
@@ -429,13 +412,21 @@ const seedPlayTrailForVisualProof = async (
       };
     }
 
+    const attempts = [];
     for (const move of moves) {
       const moveResult = api.movePlayPlayer(move);
+      attempts.push({
+        accepted: moveResult?.accepted === true,
+        lifecycleLocked: moveResult?.lifecycleLocked === true,
+        move,
+        reason: moveResult?.reason ?? null
+      });
       if (moveResult?.accepted === true) {
         return {
           accepted: true,
           move,
-          reason: moveResult.reason ?? null
+          reason: moveResult.reason ?? null,
+          attempts
         };
       }
     }
@@ -443,12 +434,13 @@ const seedPlayTrailForVisualProof = async (
     return {
       accepted: false,
       move: null,
-      reason: 'no-cardinal-move-accepted'
+      reason: 'no-cardinal-move-accepted',
+      attempts
     };
   }, PLAY_TRAIL_SEED_MOVES);
 
   if (!result.accepted) {
-    throw new Error(`Unable to seed play trail for visual proof: ${result.reason ?? 'unknown'}`);
+    throw new Error(`Unable to seed play trail for visual proof: ${result.reason ?? 'unknown'}; attempts=${JSON.stringify(result.attempts ?? [])}`);
   }
 
   await page.waitForFunction(
@@ -792,13 +784,13 @@ const hasTextLabels = (surface, expectedLabels) => {
 };
 
 const OPTIONS_BASE_EXPECTED_LABELS = Object.freeze([
-  'Settings',
-  'QUICK PLAY',
-  'Control Style'
+  'GUIDE',
+  'Trail Fade',
+  'Trail Shine',
+  'Animated Background'
 ]);
 
 const OPTIONS_BOTTOM_EXPECTED_LABELS = Object.freeze([
-  'High Contrast',
   'Account'
 ]);
 
@@ -1031,38 +1023,15 @@ export const collectMenuControlSpacingIssues = (surface) => {
   }
 
   const playerLevel = surface.progressionBadge?.bounds;
-  const aiLevel = surface.menuAiProgressionBadge?.bounds;
-  const aiLabel = surface.menuAiProgressionBadge?.label;
   const settings = (surface.buttons ?? []).find((button) => button?.text === 'Settings' && button?.iconOnly === true);
   const issues = [];
   if (isFiniteBounds(playerLevel)) {
     issues.push('menu:player-level-glyph-visible');
   }
-  if (!isFiniteBounds(aiLevel)) {
-    issues.push('menu:missing-ai-level-glyph');
-  } else if (aiLevel.width < 36 || aiLevel.height < 36) {
-    issues.push(`menu:ai-level-target=${aiLevel.width.toFixed(1)}x${aiLevel.height.toFixed(1)}<36`);
-  }
-  if (aiLabel !== 'LVL') {
-    issues.push(`menu:ai-level-label=${aiLabel ?? 'missing'}!=LVL`);
-  }
   if (!isFiniteBounds(settings?.bounds)) {
     issues.push('menu:missing-settings-control');
   } else if (settings.bounds.width < 36 || settings.bounds.height < 36) {
     issues.push(`menu:settings-target=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}<36`);
-  }
-  if (isFiniteBounds(aiLevel) && isFiniteBounds(settings?.bounds)) {
-    const sizeMismatch = Math.abs(aiLevel.width - settings.bounds.width) > 1
-      || Math.abs(aiLevel.height - settings.bounds.height) > 1;
-    if (sizeMismatch) {
-      issues.push(`menu:ai-level-settings-size-mismatch=${aiLevel.width.toFixed(1)}x${aiLevel.height.toFixed(1)}!=${settings.bounds.width.toFixed(1)}x${settings.bounds.height.toFixed(1)}`);
-    }
-    if (Math.abs(aiLevel.top - settings.bounds.top) > 1) {
-      issues.push(`menu:ai-level-settings-top-mismatch=${aiLevel.top.toFixed(1)}!=${settings.bounds.top.toFixed(1)}`);
-    }
-    if (settings.bounds.left - aiLevel.right < 8) {
-      issues.push(`menu:ai-level-to-settings-gap=${(settings.bounds.left - aiLevel.right).toFixed(1)}<8`);
-    }
   }
   return issues;
 };
@@ -1087,9 +1056,6 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
     issues.push(`${surfaceId}:progression-badge-width=${badge.width.toFixed(1)}>board=${board.width.toFixed(1)}`);
   }
   const pause = surface.touchControls?.controls?.pause;
-  if (badge.bottom > board.top - 8) {
-    issues.push(`${surfaceId}:progression-badge-not-above-play-board`);
-  }
   if (isFiniteBounds(pause) && pause.left - badge.right < 8) {
     issues.push(`${surfaceId}:progression-badge-to-pause-gap=${(pause.left - badge.right).toFixed(1)}<8`);
   }
@@ -1491,7 +1457,7 @@ const buildSurfaceChecks = ({
   ];
   const overlayScrollBottomIssues = includeOverlayBottom ? [
     ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, optionsBottomExpectedLabels),
-    ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Move Speed', 'Reset Progress', 'Reset', 'Menu'])
+    ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Menu', 'Account'])
   ] : [];
   const overlayScrollFadeTextIssues = [
     ...collectOverlayScrollCueTextIssues('options', surfaces.options),
@@ -1560,10 +1526,10 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'auth-surface',
-      authGated
+      surfaces.auth.captured === true
         ? surfaces.auth.mode === 'menu' && surfaces.auth.overlay === 'auth'
         : surfaces.auth.skipped === true,
-      authGated
+      surfaces.auth.captured === true
         ? `auth mode=${surfaces.auth.mode ?? 'missing'} overlay=${surfaces.auth.overlay ?? 'missing'}`
         : `skipped=${surfaces.auth.skipped === true} reason=${surfaces.auth.reason ?? 'missing'}`
     ),
@@ -1632,7 +1598,7 @@ const buildSurfaceChecks = ({
       'menu-text-labels',
       authGated
         ? hasLabels(surfaces.menu, ['Login']) && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })
-        : hasLabels(surfaces.menu, ['Start']) && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true }),
+        : hasVisualButton(surfaces.menu, 'Start') && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true }),
       `labels=${labelDetail(surfaces.menu)}`
     ),
     createCheck(
@@ -1648,10 +1614,10 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'auth-text-labels',
-      authGated
+      surfaces.auth.captured === true
         ? hasLabels(surfaces.auth, AUTH_EXPECTED_LABELS)
         : surfaces.auth.skipped === true,
-      authGated
+      surfaces.auth.captured === true
         ? `labels=${labelDetail(surfaces.auth)}`
         : `skipped=${surfaces.auth.skipped === true} reason=${surfaces.auth.reason ?? 'missing'}`
     ),
@@ -1696,8 +1662,8 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'pause-text-labels',
-      hasLabels(surfaces.pause, ['Paused', 'QUICK PLAY', 'Reset', 'Menu'])
-        && !hasLabels(surfaces.pause, ['Game Toggles', 'Account', 'Resume']),
+      hasLabels(surfaces.pause, ['GUIDE', 'Move Speed', 'Trail Fade', 'Trail Shine', 'Animated Background', 'Menu', 'Account'])
+        && !hasLabels(surfaces.pause, ['Game Toggles', 'Resume']),
       `labels=${labelDetail(surfaces.pause)}`
     ),
     createCheck(
@@ -1718,7 +1684,7 @@ const buildSurfaceChecks = ({
     createCheck(
       'mobile-control-spacing',
       controlSpacingIssues.length === 0,
-      controlSpacingIssues.length === 0 ? 'menu AI level and Settings share one 36px-or-larger header-control contract while the player level stays out of the menu' : controlSpacingIssues.join('; ')
+      controlSpacingIssues.length === 0 ? 'menu keeps the player level out of its header and exposes a 36px-or-larger Settings target' : controlSpacingIssues.join('; ')
     ),
     createCheck(
       'mobile-badge-text-fit',
@@ -1954,6 +1920,67 @@ export const runUiSurfaceCapture = async (options = {}) => {
       requireReadableTitle: true,
       timeoutMs
     });
+    let initialDiagnostics = await readDiagnostics(page);
+    // A signed-out fixture resolves asynchronously. Waiting for its actual
+    // auth overlay prevents the visual harness from invoking guest play during
+    // the short pre-gate menu frame.
+    if (
+      authFixture !== 'authenticated'
+      && initialDiagnostics.visual?.runtime?.mode === 'menu'
+      && initialDiagnostics.visual?.runtime?.overlay !== 'auth'
+    ) {
+      initialDiagnostics = await waitForSurface(page, {
+        expectedLabels: AUTH_EXPECTED_LABELS,
+        mode: 'menu',
+        overlay: 'auth',
+        timeoutMs
+      });
+    }
+    const startsAtAuthOverlay = initialDiagnostics.visual?.runtime?.mode === 'menu'
+      && initialDiagnostics.visual?.runtime?.overlay === 'auth';
+    const authSurface = startsAtAuthOverlay
+      ? await (async () => {
+        const captured = await captureSurface({
+          page,
+          outputDir,
+          expectedLabels: AUTH_EXPECTED_LABELS,
+          id: '02-auth',
+          mode: 'menu',
+          overlay: 'auth',
+          route,
+          timeoutMs,
+          viewport
+        });
+        captured.transition = transition
+          ? await captureViewportTransition({
+            id: '02-auth', mode: 'menu', overlay: 'auth', page, route, timeoutMs, transition
+        })
+          : null;
+        // The real touch path is exercised by live-auth-persistence-soak. The
+        // diagnostics bridge invokes that same explicit guest action, instead
+        // of granting any independent test-only bypass.
+        const guestResult = await page.evaluate(() => window.__MAZER_QA__?.startGuestPlayMode?.() ?? null);
+        if (guestResult?.accepted !== true) {
+          throw new Error(`Guest visual fixture action rejected: ${guestResult?.reason ?? 'missing-qa-surface'}`);
+        }
+        // This is only a transit state on the way to the captured pause/menu
+        // surfaces. Do not require play geometry that is irrelevant here.
+        await waitForSurface(page, {
+          mode: 'play', overlay: 'none', requireSettledPlayGeometry: false, timeoutMs
+        });
+        await page.keyboard.press('P');
+        const paused = await waitForSurface(page, { mode: 'play', overlay: 'pause', timeoutMs });
+        await clickPoint(page, getVisualButtonPoint(paused.visual, 'Menu'), 'Menu');
+        await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs });
+        return captured;
+      })()
+      : {
+        diagnostics: { runtime: null, visual: null },
+        screenContract: null,
+        screenshotPath: null,
+        skipped: true,
+        reason: 'already-authenticated'
+      };
     const reducedMotionToggle = options.reducedMotion
       ? null
       : await exerciseReducedMotionPreferenceChange(page, timeoutMs);
@@ -1985,50 +2012,14 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const currentMenuDiagnostics = transition ? await readDiagnostics(page) : menu.diagnostics;
     const menuButtons = getMenuButtonPoints(currentMenuDiagnostics.visual);
     await waitForVisualBuildSettled(page, { timeoutMs });
-    const authSurface = authGatedMenu
-      ? await (async () => {
-        await openAuthOverlayFromMenu(page, timeoutMs);
-        const captured = await captureSurface({
-          page,
-          outputDir,
-          expectedLabels: AUTH_EXPECTED_LABELS,
-          id: '02-auth',
-          mode: 'menu',
-          overlay: 'auth',
-          route,
-          timeoutMs,
-          viewport
-        });
-        captured.transition = transition
-          ? await captureViewportTransition({
-            id: '02-auth', mode: 'menu', overlay: 'auth', page, route, timeoutMs, transition
-          })
-          : null;
-        await closeOverlayToMenu(page, timeoutMs);
-        return captured;
-      })()
-      : {
-        diagnostics: {
-          runtime: null,
-          visual: null
-        },
-        screenContract: null,
-        screenshotPath: null,
-        skipped: true,
-        reason: 'already-authenticated'
-      };
-
     let optionsBottomSurface = null;
     const optionsSurface = await (async () => {
         await waitForVisualBuildSettled(page, { timeoutMs });
         const optionsCaptureExpectedLabels = [...OPTIONS_BASE_EXPECTED_LABELS];
-        if (authFixture === 'authenticated') {
-          await openOptionsOverlayViaQa(page, timeoutMs);
-        } else {
-          const latestMenuDiagnostics = await readDiagnostics(page);
-          const latestMenuButtons = getMenuButtonPoints(latestMenuDiagnostics.visual);
-          await openOptionsOverlayFromMenu(page, latestMenuButtons.options, optionsCaptureExpectedLabels, timeoutMs);
-        }
+        // The separate live-auth-persistence soak drives the real control.
+        // This capture is a deterministic visual-state harness, so it uses the
+        // existing diagnostics bridge for every fixture.
+        await openOptionsOverlayViaQa(page, timeoutMs);
         const captured = await captureSurface({
           page,
           outputDir,
@@ -2115,7 +2106,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
     const pause = await captureSurface({
       page,
       outputDir,
-      expectedLabels: ['Paused', 'QUICK PLAY', 'Reset', 'Menu'],
+      expectedLabels: ['GUIDE', 'Move Speed', 'Trail Fade', 'Trail Shine', 'Animated Background', 'Menu', 'Account'],
       id: '04-pause',
       mode: 'play',
       overlay: 'pause',
@@ -2135,7 +2126,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         return captureSurface({
           page,
           outputDir,
-          expectedLabels: ['Move Speed', 'Reset Progress', 'Reset', 'Menu'],
+          expectedLabels: ['Menu', 'Account'],
           id: '04-pause-bottom',
           mode: 'play',
           overlay: 'pause',
@@ -2165,7 +2156,8 @@ export const runUiSurfaceCapture = async (options = {}) => {
         authStatus: menu.diagnostics.runtime?.auth?.status ?? null,
         materialSystem: menu.diagnostics.visual?.materialSystem
       },
-      auth: authGatedMenu ? {
+      auth: startsAtAuthOverlay ? {
+        captured: true,
         mode: authSurface.diagnostics.visual?.runtime?.mode ?? authSurface.diagnostics.runtime?.surface?.mode,
         overlay: authSurface.diagnostics.visual?.runtime?.overlay ?? authSurface.diagnostics.runtime?.surface?.overlay,
         board: authSurface.diagnostics.visual?.board,
@@ -2177,6 +2169,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         screenContract: authSurface.screenContract,
         materialSystem: authSurface.diagnostics.visual?.materialSystem
       } : {
+        captured: false,
         skipped: true,
         reason: 'already-authenticated',
         screenContract: null,
@@ -2264,7 +2257,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
     };
     const transitions = transition ? {
       menu: menuTransition,
-      ...(authGatedMenu ? { auth: authSurface.transition } : {}),
+      ...(startsAtAuthOverlay ? { auth: authSurface.transition } : {}),
       options: optionsSurface.transition,
       play: playTransition,
       pause: pauseTransition

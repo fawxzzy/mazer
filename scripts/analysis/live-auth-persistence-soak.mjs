@@ -137,6 +137,8 @@ const buildRoute = (authenticated) => (
 export const summarizeAuthPersistenceSoak = (steps, consoleMessages, pageErrors) => {
   const required = [
     'guest-entry',
+    'guest-account-entry',
+    'guest-account-validation-stays-gated',
     'authenticated-entry',
     'authenticated-setting-change',
     'authenticated-reload',
@@ -193,19 +195,63 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
   try {
     await page.goto(`${preview.baseUrl}${buildRoute(false)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
     const guestEntry = await waitForSurface(page, {
+      authenticated: false, buttons: ['Play as guest', 'Sign In'], mode: 'menu', overlay: 'auth'
+    });
+    const guestEntryPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Play as guest');
+    await page.mouse.click(guestEntryPoint.x, guestEntryPoint.y);
+    const guestPlay = await waitForSurface(page, {
+      authenticated: false, buttons: [], mode: 'play', overlay: 'none'
+    });
+    steps.push({
+      id: 'guest-entry',
+      pass: guestEntry.overlay === 'auth' && guestPlay.mode === 'play' && guestPlay.overlay === 'none',
+      surface: { entry: guestEntry, play: guestPlay }
+    });
+
+    // A guest choice is temporary. Re-entering Account must revoke that
+    // admission before a credential attempt, and an invalid local form must
+    // remain on the auth overlay without issuing any provider request.
+    await openPauseViaQa(page);
+    await waitForSurface(page, {
+      authenticated: false, buttons: ['Menu', 'Account'], mode: 'play', overlay: 'pause'
+    });
+    const guestMenuPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Menu');
+    await page.mouse.click(guestMenuPoint.x, guestMenuPoint.y);
+    await waitForSurface(page, {
       authenticated: false, buttons: ['Login'], mode: 'menu', overlay: 'none'
     });
-    steps.push({ id: 'guest-entry', pass: guestEntry.buttons.length === 1 && guestEntry.buttons[0] === 'Login', surface: guestEntry });
+    const guestAccountPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Login');
+    await page.mouse.click(guestAccountPoint.x, guestAccountPoint.y);
+    const guestAccountEntry = await waitForSurface(page, {
+      authenticated: false, buttons: ['Play as guest', 'Sign In'], mode: 'menu', overlay: 'auth'
+    });
+    steps.push({
+      id: 'guest-account-entry',
+      pass: guestAccountEntry.mode === 'menu' && guestAccountEntry.overlay === 'auth' && !guestAccountEntry.userIdPresent,
+      surface: guestAccountEntry
+    });
+    const emptySubmitPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Sign In');
+    await page.mouse.click(emptySubmitPoint.x, emptySubmitPoint.y);
+    const invalidGuestAccountSubmit = await waitForSurface(page, {
+      authenticated: false, buttons: ['Play as guest', 'Sign In'], mode: 'menu', overlay: 'auth'
+    });
+    steps.push({
+      id: 'guest-account-validation-stays-gated',
+      pass: invalidGuestAccountSubmit.mode === 'menu'
+        && invalidGuestAccountSubmit.overlay === 'auth'
+        && !invalidGuestAccountSubmit.userIdPresent,
+      surface: invalidGuestAccountSubmit
+    });
 
     await page.goto(`${preview.baseUrl}${buildRoute(true)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
     const authenticatedEntry = await waitForSurface(page, {
-      authenticated: true, buttons: ['Start', 'Options'], mode: 'menu', overlay: 'none'
+      authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
     steps.push({ id: 'authenticated-entry', pass: authenticatedEntry.userIdPresent, surface: authenticatedEntry });
 
     await openOptionsViaQa(page);
     const options = await waitForSurface(page, {
-      authenticated: true, buttons: ['Trail Shine', 'Log out'], mode: 'menu', overlay: 'options'
+      authenticated: true, buttons: ['Trail Shine', 'Account'], mode: 'menu', overlay: 'options'
     });
     const initialTrailShine = options.trailShineEnabled;
     if (typeof initialTrailShine !== 'boolean') {
@@ -222,7 +268,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     await page.reload({ waitUntil: 'networkidle', timeout: TIMEOUT_MS });
     const authenticatedReload = await waitForSurface(page, {
-      authenticated: true, buttons: ['Start', 'Options'], mode: 'menu', overlay: 'none'
+      authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
     steps.push({
       id: 'authenticated-reload',
@@ -232,7 +278,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     await openOptionsViaQa(page);
     const authenticatedOptionsReload = await waitForSurface(page, {
-      authenticated: true, buttons: ['Log out'], mode: 'menu', overlay: 'options'
+      authenticated: true, buttons: ['Account'], mode: 'menu', overlay: 'options'
     });
     steps.push({
       id: 'authenticated-options-reload',
@@ -244,13 +290,13 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
     await page.screenshot({ path: screenshots.authenticatedOptions });
     await page.keyboard.press('Escape');
     await waitForSurface(page, {
-      authenticated: true, buttons: ['Start', 'Options'], mode: 'menu', overlay: 'none'
+      authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
 
     await startPlayViaQa(page);
     await openPauseViaQa(page);
     const authenticatedPauseReentry = await waitForSurface(page, {
-      authenticated: true, buttons: ['Back', 'Trail Shine', 'Reset', 'Menu'], mode: 'play', overlay: 'pause'
+      authenticated: true, buttons: ['Back', 'Guide', 'Trail Shine', 'Menu'], mode: 'play', overlay: 'pause'
     });
     steps.push({
       id: 'authenticated-pause-reentry',
@@ -263,16 +309,21 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     await page.goto(`${preview.baseUrl}${buildRoute(true)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
     await waitForSurface(page, {
-      authenticated: true, buttons: ['Start', 'Options'], mode: 'menu', overlay: 'none'
+      authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
     await openOptionsViaQa(page);
     await waitForSurface(page, {
-      authenticated: true, buttons: ['Log out'], mode: 'menu', overlay: 'options'
+      authenticated: true, buttons: ['Account'], mode: 'menu', overlay: 'options'
+    });
+    const accountPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Account');
+    await page.mouse.click(accountPoint.x, accountPoint.y);
+    await waitForSurface(page, {
+      authenticated: true, buttons: ['Log out'], mode: 'menu', overlay: 'auth'
     });
     const logoutPoint = findVisualButtonCenter((await readDiagnostics(page)).visual, 'Log out');
     await page.mouse.click(logoutPoint.x, logoutPoint.y);
     const logout = await waitForSurface(page, {
-      authenticated: false, buttons: ['Account'], mode: 'menu', overlay: 'options'
+      authenticated: false, buttons: ['Play as guest', 'Sign In'], mode: 'menu', overlay: 'auth'
     });
     steps.push({
       id: 'logout-to-guest',
@@ -284,7 +335,7 @@ export const runLiveAuthPersistenceSoak = async (options = {}) => {
 
     await page.goto(`${preview.baseUrl}${buildRoute(true)}`, { waitUntil: 'networkidle', timeout: TIMEOUT_MS });
     const reentry = await waitForSurface(page, {
-      authenticated: true, buttons: ['Start', 'Options'], mode: 'menu', overlay: 'none'
+      authenticated: true, buttons: ['Start', 'Settings'], mode: 'menu', overlay: 'none'
     });
     steps.push({
       id: 'fixture-reentry',

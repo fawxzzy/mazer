@@ -20,6 +20,10 @@ describe('legacy full auth gate', () => {
     expect(menuSceneSource).toContain('const playAccessAllowed = this.hasLegacyPlayAccess();');
     expect(menuSceneSource).toContain('if (!this.hasLegacyPlayAccess()) {');
     expect(menuSceneSource).toContain('if (this.hasLegacyPlayAccess()) {\n        this.startPlayMode();\n      }');
+    expect(menuSceneSource).toContain("if (lowerKey === 'g' && this.mode === 'menu' && this.overlay === 'auth') {");
+    expect(menuSceneSource).toContain('this.handleLegacyGuestPlay();');
+    expect(menuSceneSource).toContain('startGuestPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartGuestPlayMode()');
+    expect(menuSceneSource).toContain('private handleLegacyQaStartGuestPlayMode(): LegacyQaOverlayResult {');
   });
 
   test('keeps an explicit local guest-play exit in the login bottom bar without touching auth state', () => {
@@ -38,6 +42,28 @@ describe('legacy full auth gate', () => {
     expect(guestPlaySource).toContain('this.destroyLegacyAuthNativeInput();');
     expect(guestPlaySource).not.toContain('signOutLegacyAuth');
     expect(guestPlaySource).not.toContain('signInLegacyAuth');
+    expect(menuSceneSource).toContain('The diagnostics bridge intentionally calls the same user-facing action');
+  });
+
+  test('revokes a prior guest grant before returning to menu, account entry, or credential submission', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const submitStart = menuSceneSource.indexOf('  private async handleLegacyAuthSubmit(): Promise<void> {');
+    const submitSource = menuSceneSource.slice(submitStart, menuSceneSource.indexOf('  private handleLegacyGuestPlay(): void {', submitStart));
+    const openOverlayStart = menuSceneSource.indexOf('  private openOverlay(kind: OverlayKind): void {');
+    const openOverlaySource = menuSceneSource.slice(openOverlayStart, menuSceneSource.indexOf('  private closeOverlay(): void {', openOverlayStart));
+    const enterMenuStart = menuSceneSource.indexOf('  private enterMenuMode(): void {');
+    const enterMenuSource = menuSceneSource.slice(enterMenuStart, menuSceneSource.indexOf('  private startPlayMode(): void {', enterMenuStart));
+    const revokeStart = menuSceneSource.indexOf('  private revokeLegacyGuestPlayGrant(): void {');
+    const revokeSource = menuSceneSource.slice(revokeStart, menuSceneSource.indexOf('  private applyLegacyAuthSubmitResult(', revokeStart));
+
+    expect(submitSource).toContain('this.revokeLegacyGuestPlayGrant();');
+    expect(openOverlaySource).toContain("if (kind === 'auth') {");
+    expect(openOverlaySource).toContain('this.revokeLegacyGuestPlayGrant();');
+    expect(enterMenuSource).toContain("if (this.authSnapshot.status !== 'authenticated') {");
+    expect(enterMenuSource).toContain('this.revokeLegacyGuestPlayGrant();');
+    expect(revokeSource).toContain('this.guestPlayGranted = false;');
+    expect(revokeSource).toContain('this.pendingBootPlayStart = false;');
+    expect(revokeSource).toContain("this.authGateLocked = this.authSnapshot.status !== 'authenticated';");
   });
 
   test('a direct-to-play boot waits for the gate to actually clear before starting play mode', () => {
