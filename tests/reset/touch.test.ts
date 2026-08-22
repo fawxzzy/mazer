@@ -118,7 +118,11 @@ describe('input-human touch bridge', () => {
     expect(layout.stick).not.toBeNull();
     expect(layout.stick!.deadzoneRadius).toBeLessThan(layout.stick!.inner.width / 2);
     expect(layout.stick!.knobRadius).toBeGreaterThanOrEqual(10);
-    expect(layout.stick!.travelRadius).toBeGreaterThan(layout.stick!.outer.width * 0.3);
+    // Deliberately a short, tight throw -- not tied to the outer control's
+    // own size -- so dragging the knob out doesn't need to travel anywhere
+    // near the full touch zone before hitting its visual max.
+    expect(layout.stick!.travelRadius).toBeGreaterThanOrEqual(18);
+    expect(layout.stick!.travelRadius).toBeLessThan(layout.stick!.outer.width * 0.25);
     expect(layout.stick!.travelRadius + layout.stick!.knobRadius).toBeLessThan(layout.stick!.outer.width / 2);
     expect(Math.abs(layout.stick!.inner.centerX - layout.stick!.outer.centerX)).toBeLessThanOrEqual(1);
     expect(Math.abs(layout.stick!.inner.centerY - layout.stick!.outer.centerY)).toBeLessThanOrEqual(1);
