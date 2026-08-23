@@ -682,6 +682,7 @@ export const advanceDemoWalker = (
   const runnerPlan = resolveDemoRunnerPlan(episode, config);
   const route = runnerPlan.routeIndices;
   const lastCursor = Math.max(0, route.length - 1);
+  const routeReachesGoal = isDemoRunnerRouteComplete(episode, route);
 
   if (state.phase === 'goal-hold' && state.reachedGoal) {
     return {
@@ -740,14 +741,17 @@ export const advanceDemoWalker = (
   }
 
   const nextCursor = Math.min(state.pathCursor + 1, lastCursor);
-  const nextIndex = route[nextCursor] ?? episode.raster.endIndex;
-  const reachedGoal = nextCursor >= lastCursor && nextIndex === episode.raster.endIndex;
+  const nextIndex = route[nextCursor] ?? state.currentIndex;
+  const routeExhausted = nextCursor >= lastCursor;
+  const reachedGoal = routeReachesGoal && routeExhausted && nextIndex === episode.raster.endIndex;
   const segmentIndex = Math.max(0, nextCursor - 1);
   const trailMode: DemoTrailMode = reachedGoal
     ? 'goal'
     : runnerPlan.segmentTrailModes[segmentIndex] ?? 'explore';
   const cue = reachedGoal
     ? 'goal'
+    : routeExhausted && !routeReachesGoal
+      ? 'dead-end'
     : resolveSegmentCue(segmentIndex, lastCursor, 1, config, runnerPlan);
   const segmentDelayMs = resolveSegmentDelayMs(segmentIndex, lastCursor, config, runnerPlan);
 
@@ -798,20 +802,21 @@ export const resolveDemoWalkerViewFrame = (
   const visibleWindow = Math.max(1, trailWindow);
   const lastPathIndex = Math.max(0, path.length - 1);
   const segmentDurations = resolveSegmentDurations(lastPathIndex, config, runnerPlan);
+  const routeReachesGoal = isDemoRunnerRouteComplete(episode, path);
 
   if (path.length <= 1) {
     return {
       currentIndex: startIndex,
-      nextIndex: endIndex,
+      nextIndex: startIndex,
       previousIndex: startIndex,
       direction: null,
-      progress: 1,
-      cue: elapsedMs < spawnHoldMs ? 'spawn' : 'goal',
+      progress: 0,
+      cue: elapsedMs < spawnHoldMs ? 'spawn' : routeReachesGoal ? 'goal' : 'dead-end',
       trailStart: 0,
       trailLimit: Math.min(1, path.length),
       canonicalCursor: runnerPlan.canonicalCursors[0] ?? 0,
       telemetry: runnerPlan.telemetry,
-      cycleComplete: elapsedMs >= spawnHoldMs + goalHoldMs + resetHoldMs
+      cycleComplete: routeReachesGoal && elapsedMs >= spawnHoldMs + goalHoldMs + resetHoldMs
     };
   }
 
@@ -864,6 +869,24 @@ export const resolveDemoWalkerViewFrame = (
       trailStart: 0,
       trailLimit,
       canonicalCursor: runnerPlan.canonicalCursors[visibleCursor] ?? 0,
+      telemetry: runnerPlan.telemetry,
+      cycleComplete: false
+    };
+  }
+
+  if (!routeReachesGoal) {
+    const routeTail = path[lastPathIndex] ?? startIndex;
+    const routePrevious = path[Math.max(0, lastPathIndex - 1)] ?? routeTail;
+    return {
+      currentIndex: routeTail,
+      nextIndex: routeTail,
+      previousIndex: routePrevious,
+      direction: null,
+      progress: 0,
+      cue: 'dead-end',
+      trailStart: 0,
+      trailLimit: path.length,
+      canonicalCursor: runnerPlan.canonicalCursors[lastPathIndex] ?? 0,
       telemetry: runnerPlan.telemetry,
       cycleComplete: false
     };
@@ -936,6 +959,51 @@ const buildPreciseRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
   };
 };
 
+const buildUnavailableRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => ({
+  routeIndices: Uint32Array.of(episode.raster.startIndex),
+  canonicalCursors: Uint32Array.of(0),
+  segmentTrailModes: [],
+  cueOverrides: [],
+  telemetry: EMPTY_TELEMETRY,
+  aiResetPathCursor: null,
+  branchDecisions: [],
+  memoryFrames: [EMPTY_MEMORY_FRAME],
+  optionalRetargetEvaluations: [],
+  recoveryDecisions: []
+});
+
+const isDemoRunnerRouteComplete = (
+  episode: MazeEpisode,
+  route: ArrayLike<number>
+): boolean => {
+  if (
+    route.length === 0
+    || route[0] !== episode.raster.startIndex
+    || route[route.length - 1] !== episode.raster.endIndex
+  ) {
+    return false;
+  }
+
+  for (let cursor = 1; cursor < route.length; cursor += 1) {
+    const previous = route[cursor - 1];
+    const next = route[cursor];
+    if (
+      previous === undefined
+      || next === undefined
+      || !collectFloorNeighbors(
+        previous,
+        episode.raster.width,
+        episode.raster.height,
+        episode.raster.tiles
+      ).includes(next)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 const buildPlayableShortestRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
   const route = findFloorPath(
     episode.raster.startIndex,
@@ -944,8 +1012,8 @@ const buildPlayableShortestRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan =
     episode.raster.height,
     episode.raster.tiles
   );
-  if (route.length === 0) {
-    return buildPreciseRunnerPlan(episode);
+  if (!isDemoRunnerRouteComplete(episode, route)) {
+    return buildUnavailableRunnerPlan(episode);
   }
 
   const canonicalPath = Array.from(episode.raster.pathIndices);
@@ -2669,7 +2737,7 @@ const findKnownFloorPath = (
     }
   }
 
-  return [startIndex];
+  return [];
 };
 
 const resolveNearestCanonicalCursor = (

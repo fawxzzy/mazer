@@ -210,6 +210,58 @@ const createCompassTrapEpisode = (): MazeEpisode => {
   };
 };
 
+const createUnreachableGoalEpisode = (): MazeEpisode => {
+  const width = 5;
+  const height = 3;
+  const tiles = new Uint8Array(width * height);
+  const startIndex = 6;
+  const endIndex = 8;
+  tiles[startIndex] |= TILE_FLOOR | TILE_PATH;
+  tiles[endIndex] |= TILE_FLOOR | TILE_PATH | TILE_END;
+
+  return {
+    accepted: true,
+    difficulty: 'standard',
+    difficultyScore: 0,
+    family: 'classic',
+    generationTrace: {
+      rootTileIndex: startIndex,
+      uniqueTileCount: 2,
+      steps: [{ phase: 'seed', tileIndices: [startIndex, endIndex] }]
+    },
+    metrics: {
+      solutionLength: 2,
+      deadEnds: 2,
+      junctions: 0,
+      branchDensity: 0,
+      straightness: 1,
+      coverage: 2 / tiles.length
+    },
+    placementStrategy: 'farthest-pair',
+    presentationPreset: 'classic',
+    raster: {
+      width,
+      height,
+      tiles,
+      startIndex,
+      endIndex,
+      // The nominal path is intentionally invalid. The playable planner must
+      // fail closed rather than trust this disconnected construction trail.
+      pathIndices: Uint32Array.of(startIndex, endIndex)
+    },
+    routeMotifs: {
+      falseShortcutBranches: 0,
+      nearGoalBranches: 0,
+      hubJunctions: 0,
+      chokeCorridors: 0,
+      loopDetours: 0
+    },
+    seed: 90_001,
+    shortcutsCreated: 0,
+    size: 'small'
+  };
+};
+
 const createVisitedUndoEpisode = (): MazeEpisode => {
   const width = 7;
   const height = 7;
@@ -793,6 +845,41 @@ describe('demo walker', () => {
       wrongBranchCount: 0
     });
   }, 15_000);
+
+  test('fails closed when the goal is unreachable instead of reporting a false one-node completion', () => {
+    const episode = createUnreachableGoalEpisode();
+    const baseConfig = createLegacyMenuDemoWalkerConfig(episode.seed);
+    const config = {
+      ...baseConfig,
+      behavior: {
+        ...baseConfig.behavior,
+        aiSkillLevel: 99,
+        aiSkillRank: 'S' as const
+      }
+    };
+
+    const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
+    const initialState = createDemoWalkerState(episode, config);
+    const advance = advanceDemoWalker(episode, initialState, config);
+    const lateFrame = resolveDemoWalkerViewFrame(episode, 60_000, config);
+
+    expect(diagnostics.routeLength).toBe(1);
+    expect(diagnostics.segmentCount).toBe(0);
+    expect(initialState.currentIndex).toBe(episode.raster.startIndex);
+    expect(advance.state).toMatchObject({
+      currentIndex: episode.raster.startIndex,
+      cue: 'dead-end',
+      phase: 'explore',
+      reachedGoal: false
+    });
+    expect(advance.shouldRegenerateMaze).toBeUndefined();
+    expect(lateFrame).toMatchObject({
+      currentIndex: episode.raster.startIndex,
+      nextIndex: episode.raster.startIndex,
+      cue: 'dead-end',
+      cycleComplete: false
+    });
+  });
 
   test('keeps bias-profile diagnostics while rank-guaranteed shortest navigation wins', () => {
     const seeds = [1, 2, 3];
