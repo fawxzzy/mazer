@@ -7,7 +7,7 @@ import type { LegacyAuthStatus } from './legacyAuth';
  * account. Keep this explicit and isolated so re-enabling account-required
  * play is one deliberate, reviewed change rather than another menu rewrite.
  */
-export const LEGACY_GUEST_PLAY_ACCESS_ENABLED = true;
+export const LEGACY_GUEST_PLAY_ACCESS_ENABLED = false;
 
 export interface LegacyPlayAccessState {
   authResolved: boolean;
@@ -21,8 +21,8 @@ export interface LegacyPlayAccessState {
  */
 export const isLegacyPlayAccessAllowed = (
   status: LegacyAuthStatus,
-  { authResolved, guestPlayGranted }: LegacyPlayAccessState
+  { authResolved }: LegacyPlayAccessState
 ): boolean => (
   authResolved
-  && (status === 'authenticated' || (LEGACY_GUEST_PLAY_ACCESS_ENABLED && guestPlayGranted))
+  && status === 'authenticated'
 );

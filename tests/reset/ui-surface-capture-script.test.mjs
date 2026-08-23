@@ -170,7 +170,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const closeOverlayToMenu = async (page, timeoutMs) => {');
     expect(source).toContain("await clickPoint(page, {\n    x: Math.round(bounds.centerX),\n    y: Math.round(bounds.centerY)\n  }, 'Back');");
     expect(source).toContain("const pathStyleSurfaceIds = ['menu', 'options', 'play', 'pause'];");
-    expect(source).toContain("const playRoute = authGatedMenu ? resolveRouteWithParams(route, { mode: 'play', overlay: null }) : route;");
+    expect(source).toContain("resolveRouteWithParams(route, { authFixture: 'authenticated' })");
+    expect(source).toContain("await page.keyboard.press('P');");
     expect(source).toContain('const playTrailSeed = options.skipPlayTrailSeed');
     expect(source).toContain('expectTrailShineEnabled: !options.reducedMotion');
     expect(source).toContain("reason: 'focused-topology-proof'");
@@ -209,7 +210,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("createCheck(\n      'auth-surface'");
     expect(source).toContain("createCheck(\n      'auth-text-labels'");
     expect(source).toContain('const AUTH_EXPECTED_LABELS = Object.freeze([');
-    expect(source).toContain("'Play as guest'");
+    expect(source).not.toContain("'Play as guest'");
     expect(source).toContain("'EMAIL'");
     expect(source).toContain("'PASSWORD'");
     expect(source).toContain('hasLabels(surfaces.auth, AUTH_EXPECTED_LABELS)');
@@ -301,11 +302,13 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('reducedMotionToggle.initial === false');
     expect(source).toContain('// Restoring the operating-system motion preference redraws the canvas UI.');
     expect(source).toContain("const startsAtAuthOverlay = initialDiagnostics.visual?.runtime?.mode === 'menu'");
-    expect(source).toContain('window.__MAZER_QA__?.startGuestPlayMode?.() ?? null');
-    expect(source).toContain('Guest visual fixture action rejected');
-    expect(source).toContain("await clickPoint(page, getVisualButtonPoint(paused.visual, 'Menu'), 'Menu');");
+    expect(source).toContain("authenticatedUrl.searchParams.set('runtimeDiagnostics', '1');");
+    expect(source).toContain("authenticatedUrl.searchParams.set('authFixture', 'authenticated');");
+    expect(source).not.toContain('window.__MAZER_QA__?.startGuestPlayMode?.() ?? null');
+    expect(source).not.toContain('Guest visual fixture action rejected');
     expect(source).toContain('surfaces.auth.captured === true');
     expect(source).toContain('const menu = await captureSurface({');
+    expect(source).toContain("resolveRouteWithParams(route, { authFixture: 'authenticated' })");
     expect(source).not.toContain("expectedLabels: ['Exit', 'Start', 'Options']");
     expect(source).toContain("hasVisualButton(surfaces.menu, 'Start') && hasVisualButton(surfaces.menu, 'Settings', { iconOnly: true })");
     expect(source).toContain("surfaces.options.mode === 'menu' && surfaces.options.overlay === 'options'");

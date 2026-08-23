@@ -54,10 +54,9 @@ const INLINE_STATE_TEXT_LABELS = Object.freeze([
 const AUTH_EXPECTED_LABELS = Object.freeze([
   'EMAIL',
   'PASSWORD',
-  'Sign In',
-  'Create Account',
-  'Forgot Password?',
-  'Play as guest'
+  'Sign in',
+  'Create account',
+  'Reset password'
 ]);
 
 const buildExpectedTextLabelDescriptors = (expectedLabels) => (
@@ -1167,7 +1166,7 @@ const collectButtonLabelContainmentIssues = (surfaceId, surface) => (surface?.bu
     'Forgot Password?',
     'Log out',
     'Login',
-    'Sign In',
+    'Sign in',
     'Menu',
     'Settings',
     'Reset',
@@ -1194,7 +1193,7 @@ const collectButtonLabelFillIssues = (surfaceId, surface) => (surface?.buttons ?
     'Forgot Password?',
     'Log out',
     'Login',
-    'Sign In',
+    'Sign in',
     'Menu',
     'Settings',
     'Reset',
@@ -1913,22 +1912,18 @@ export const runUiSurfaceCapture = async (options = {}) => {
     await seedTopologyFixture(page, topologyFixture);
 
     await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: timeoutMs });
+    let initialDiagnostics;
     if (authFixture === 'authenticated') {
       await waitForAuthenticatedFixtureReady(page, { timeoutMs });
-    }
-    await waitForVisualBuildSettled(page, {
-      requireReadableTitle: true,
-      timeoutMs
-    });
-    let initialDiagnostics = await readDiagnostics(page);
-    // A signed-out fixture resolves asynchronously. Waiting for its actual
-    // auth overlay prevents the visual harness from invoking guest play during
-    // the short pre-gate menu frame.
-    if (
-      authFixture !== 'authenticated'
-      && initialDiagnostics.visual?.runtime?.mode === 'menu'
-      && initialDiagnostics.visual?.runtime?.overlay !== 'auth'
-    ) {
+      await waitForVisualBuildSettled(page, {
+        requireReadableTitle: true,
+        timeoutMs
+      });
+      initialDiagnostics = await readDiagnostics(page);
+    } else {
+      // The signed-out auth gate intentionally freezes the game before its
+      // ambient board build can settle. Wait for the auth surface itself;
+      // requiring gameplay settlement here would contradict the product gate.
       initialDiagnostics = await waitForSurface(page, {
         expectedLabels: AUTH_EXPECTED_LABELS,
         mode: 'menu',
@@ -1956,21 +1951,14 @@ export const runUiSurfaceCapture = async (options = {}) => {
             id: '02-auth', mode: 'menu', overlay: 'auth', page, route, timeoutMs, transition
         })
           : null;
-        // The real touch path is exercised by live-auth-persistence-soak. The
-        // diagnostics bridge invokes that same explicit guest action, instead
-        // of granting any independent test-only bypass.
-        const guestResult = await page.evaluate(() => window.__MAZER_QA__?.startGuestPlayMode?.() ?? null);
-        if (guestResult?.accepted !== true) {
-          throw new Error(`Guest visual fixture action rejected: ${guestResult?.reason ?? 'missing-qa-surface'}`);
-        }
-        // This is only a transit state on the way to the captured pause/menu
-        // surfaces. Do not require play geometry that is irrelevant here.
-        await waitForSurface(page, {
-          mode: 'play', overlay: 'none', requireSettledPlayGeometry: false, timeoutMs
-        });
-        await page.keyboard.press('P');
-        const paused = await waitForSurface(page, { mode: 'play', overlay: 'pause', timeoutMs });
-        await clickPoint(page, getVisualButtonPoint(paused.visual, 'Menu'), 'Menu');
+        // Guest entry is not a product path. After preserving the signed-out
+        // auth capture, reload under the existing diagnostics-only authenticated
+        // fixture so the remaining menu/play surfaces can be inspected without
+        // creating or mutating any provider account.
+        const authenticatedUrl = new URL(targetUrl);
+        authenticatedUrl.searchParams.set('runtimeDiagnostics', '1');
+        authenticatedUrl.searchParams.set('authFixture', 'authenticated');
+        await page.goto(authenticatedUrl.toString(), { waitUntil: 'domcontentloaded' });
         await waitForSurface(page, { mode: 'menu', overlay: 'none', timeoutMs });
         return captured;
       })()
@@ -2065,13 +2053,11 @@ export const runUiSurfaceCapture = async (options = {}) => {
         return captured;
       })();
 
-    const playRoute = authGatedMenu ? resolveRouteWithParams(route, { mode: 'play', overlay: null }) : route;
-    if (authGatedMenu) {
-      await page.goto(new URL(playRoute, resolvedBaseUrl).toString(), { waitUntil: 'networkidle', timeout: timeoutMs });
-    } else {
-      await waitForVisualBuildSettled(page, { timeoutMs });
-      await clickPoint(page, menuButtons.start, 'Start');
-    }
+    const playRoute = authGatedMenu
+      ? resolveRouteWithParams(route, { authFixture: 'authenticated' })
+      : route;
+    await waitForVisualBuildSettled(page, { timeoutMs });
+    await clickPoint(page, menuButtons.start, 'Start');
     await waitForVisualBuildSettled(page, { timeoutMs });
     const playTrailSeed = options.skipPlayTrailSeed
       ? {
@@ -2101,8 +2087,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
       })
       : null;
 
-    const currentPlayDiagnostics = transition ? await readDiagnostics(page) : play.diagnostics;
-    await clickPoint(page, getPauseButtonPoint(currentPlayDiagnostics.visual), 'Pause');
+    await page.keyboard.press('P');
     const pause = await captureSurface({
       page,
       outputDir,

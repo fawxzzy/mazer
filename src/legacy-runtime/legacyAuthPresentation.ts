@@ -3,11 +3,9 @@ import type {
   LegacyAuthSessionSnapshot,
   LegacyRememberedIdentityState
 } from './legacyAuth';
-import { LEGACY_AUTH_MESSAGE_COPY } from './legacyPlayerMessage';
 
 export interface LegacyAuthPresentation {
   alternateActionLabel: string;
-  displayNameLabel: string;
   emailLabel: string;
   helper: string;
   passwordLabel: string;
@@ -64,25 +62,24 @@ const resolveLegacyAuthPresentationState = ({
   return 'fresh-sign-in';
 };
 
-// Deliberately terse -- no descriptive/explanatory copy on a fresh load,
-// matching the Fitness app's own sign-in screen (a small wordmark, a short
-// generic headline, straight into the fields). A one-line helper only
-// appears for the handful of states where it's actually load-bearing
-// information the title alone can't carry.
+// Auth entry is intentionally presentation-only: one product label, one short
+// title, then the form. Status and provider failures use the existing
+// categorical feedback channel instead of changing the screen into explanatory
+// prose or a different visual hierarchy.
 const resolveLegacyAuthTitleAndHelper = (
   state: LegacyAuthPresentationState
 ): { helper: string; title: string } => {
   switch (state) {
     case 'authenticated':
-      return { helper: 'Review your saved Mazer account or sign out on this device.', title: 'Account' };
+      return { helper: '', title: 'Account' };
     case 'account-unavailable':
-      return { helper: LEGACY_AUTH_MESSAGE_COPY.authUnavailable, title: 'Account Unavailable' };
+      return { helper: '', title: 'Welcome' };
     case 'signup':
       return { helper: '', title: 'Create Account' };
     case 'reauth-required':
-      return { helper: 'Your session ended. Enter your password to continue.', title: 'Welcome' };
+      return { helper: '', title: 'Welcome' };
     case 'remembered-identity':
-      return { helper: 'Continue with this account to log in.', title: 'Welcome Back' };
+      return { helper: '', title: 'Welcome' };
     case 'fresh-sign-in':
       return { helper: '', title: 'Welcome' };
     default:
@@ -113,11 +110,10 @@ export const resolveLegacyAuthPresentation = (
 
   return {
     alternateActionLabel: isSignup ? 'Log in' : 'Create account',
-    displayNameLabel: 'Display name',
     emailLabel: 'Email',
     helper,
     passwordLabel: 'Password',
-    primaryActionLabel: isSignup ? 'Create account' : 'Log in',
+    primaryActionLabel: isSignup ? 'Create account' : 'Sign in',
     recoveryActionLabel: 'Reset password',
     title
   };
