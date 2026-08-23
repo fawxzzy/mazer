@@ -404,6 +404,33 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(areas).toEqual([{ left: 105, top: 50, right: 114, bottom: 56 }]);
   });
 
+  test('anchors a bottom bleed-off continuation to the rendered tile edge at rounded board sizes', () => {
+    const areas = resolveLegacyMenuBorderDockRenderAreas('bottom', {
+      leftInset: 0,
+      topInset: 0,
+      width: 6,
+      height: 6
+    }, {
+      boardLeft: 10,
+      boardTop: 20,
+      boardWidth: 100,
+      boardHeight: 100,
+      cornerGuardSize: 18,
+      continuationLength: 4,
+      materialTileSize: 6,
+      // The aggregate maze bottom is 116, while the final pixel row for this
+      // 5px bottom tile ends at 115. Starting from mazeBottom creates the
+      // one-pixel gap reported in play mode.
+      mazeLeft: 15,
+      mazeTop: 25,
+      mazeWidth: 90,
+      mazeHeight: 91,
+      tileRect: { left: 50, top: 110, width: 6, height: 5 }
+    });
+
+    expect(areas).toEqual([{ left: 50, top: 115, right: 56, bottom: 124 }]);
+  });
+
   test('bridges the light core across connected neighbors for a less checkerboarded slab read', () => {
     const maze = {
       width: 3,

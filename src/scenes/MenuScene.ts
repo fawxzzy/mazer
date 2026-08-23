@@ -13109,12 +13109,13 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  // Front-door-only account readout: signed-in players see their own
-  // username sitting in the same header row as the settings cog, immediately
-  // left of the leaderboard icon (the trailing cluster is the one spot that
-  // doesn't collide with the LVL badge already anchored to the leading
-  // side). Tapping it opens the same account screen the auth overlay already
-  // shows once authenticated. Prefers the title's own tile-glyph material
+  // Front-door-only account readout: signed-in players see their own username,
+  // and a local guest sees the explicit Guest label rather than an anonymous
+  // or account-looking placeholder. It sits in the same header row as the
+  // settings cog, immediately left of the leaderboard icon (the trailing
+  // cluster is the one spot that doesn't collide with the LVL badge already
+  // anchored to the leading side). Tapping it opens the same account screen
+  // the auth overlay already shows once authenticated. Prefers the title's own tile-glyph material
   // (drawLegacyPathMaterialTile) when every character in the username has a
   // glyph -- LEGACY_GLYPH_LETTER_PATTERNS only covers a subset of uppercase
   // letters used elsewhere in this game's own vocabulary, so most real
@@ -13179,21 +13180,27 @@ export class MenuScene extends Phaser.Scene {
       background.setVisible(false);
     };
 
-    if (this.mode !== 'menu' || this.overlay !== 'none' || this.authSnapshot.status !== 'authenticated') {
+    if (
+      this.mode !== 'menu'
+      || this.overlay !== 'none'
+      || this.authSnapshot.status === 'unavailable'
+    ) {
       hide();
       return;
     }
 
-    // Idempotent per signed-in user id (see loadAccountUsernameIfNeeded) --
-    // safe to call every frame, it only actually fetches once.
-    this.loadAccountUsernameIfNeeded();
-    // Falls back to a literal "Account" label when there's no username yet
-    // -- still loading, never set, or the fetch failed (e.g. a misconfigured
-    // remote project). This is the only entry point to the account screen
-    // now that the account overlay's own Account button is gone -- hiding
-    // it entirely whenever the username fetch doesn't succeed would leave a
-    // signed-in player with no way to reach their account at all.
-    const username = this.accountUsernameSavedValue.length > 0 ? this.accountUsernameSavedValue : 'Account';
+    let username: string;
+    if (this.authSnapshot.status === 'guest') {
+      username = resolveLegacyAuthAccountLabel(this.authSnapshot);
+    } else {
+      // Idempotent per signed-in user id (see loadAccountUsernameIfNeeded) --
+      // safe to call every frame, it only actually fetches once.
+      this.loadAccountUsernameIfNeeded();
+      // Falls back to a literal "Account" label when there's no username yet
+      // -- still loading, never set, or the fetch failed. This remains the one
+      // entry point to the account screen for a signed-in player.
+      username = this.accountUsernameSavedValue.length > 0 ? this.accountUsernameSavedValue : 'Account';
+    }
 
     // Top-left of the screen, its own leading-side anchor -- not tied to
     // the leaderboard/settings cluster on the trailing side. The menu front
