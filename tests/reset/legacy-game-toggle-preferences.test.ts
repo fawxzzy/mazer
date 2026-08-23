@@ -35,6 +35,7 @@ describe('legacy game toggle preferences', () => {
 
     expect(LEGACY_DEFAULTS.controlMode).toBe('stick');
     expect(pickLegacyGameTogglePreferences(settings)).toEqual({
+      camScale: 0,
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.04,
@@ -48,6 +49,7 @@ describe('legacy game toggle preferences', () => {
     const storage = new MemoryStorage();
     const settings = copyLegacySettings(LEGACY_DEFAULTS);
     settings.scale = 75;
+    settings.camScale = 25;
     settings.controlMode = 'stick';
     settings.darkMode = true;
     settings.movementSpeed = 0.82;
@@ -59,6 +61,7 @@ describe('legacy game toggle preferences', () => {
 
     expect(written.scale).toBe(75);
     expect(JSON.parse(storage.getItem(LEGACY_GAME_TOGGLE_STORAGE_KEY) ?? '{}')).toEqual({
+      camScale: 25,
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.82,
@@ -73,6 +76,7 @@ describe('legacy game toggle preferences', () => {
     const fallback = copyLegacySettings(LEGACY_DEFAULTS);
     fallback.scale = 37;
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
+      camScale: -35,
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.33,
@@ -84,7 +88,9 @@ describe('legacy game toggle preferences', () => {
     const settings = readLegacyGameToggleSettings(storage, fallback);
 
     expect(settings.scale).toBe(37);
+    expect(settings.camScale).toBe(-35);
     expect(pickLegacyGameTogglePreferences(settings)).toEqual({
+      camScale: -35,
       controlMode: 'stick',
       darkMode: true,
       movementSpeed: 0.33,
@@ -110,6 +116,7 @@ describe('legacy game toggle preferences', () => {
     const storage = new MemoryStorage();
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
       controlMode: 'teleport',
+      camScale: '500',
       darkMode: 'yes',
       movementSpeed: '1.4',
       toggleAnimatedBackdrop: 'no',
@@ -120,6 +127,7 @@ describe('legacy game toggle preferences', () => {
     const settings = readLegacyGameToggleSettings(storage, LEGACY_DEFAULTS);
 
     expect(settings.controlMode).toBe('stick');
+    expect(settings.camScale).toBe(50);
     expect(settings.darkMode).toBe(true);
     expect(settings.movementSpeed).toBe(1);
     expect(settings.toggleAnimatedBackdrop).toBe(false);
@@ -190,6 +198,7 @@ describe('legacy game toggle preferences', () => {
       { userId: 'user-456' }
     );
     storage.setItem(LEGACY_GAME_TOGGLE_STORAGE_KEY, JSON.stringify({
+      camScale: 15,
       controlMode: 'arrows',
       darkMode: false,
       movementSpeed: 0.72,
@@ -202,6 +211,7 @@ describe('legacy game toggle preferences', () => {
 
     const migrated = readLegacyGameToggleSettings(guestStorage, LEGACY_DEFAULTS);
     expect(pickLegacyGameTogglePreferences(migrated)).toEqual({
+      camScale: 15,
       controlMode: 'arrows',
       darkMode: false,
       movementSpeed: 0.72,
