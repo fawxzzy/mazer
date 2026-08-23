@@ -6,6 +6,7 @@ import {
   resolveLegacyBleedOffDockVisualEligibility,
   resolveLegacyBleedOffPaths,
   resolveLegacyMenuBorderDockDirections,
+  resolveLegacyMenuBorderDockFacetRect,
   resolveLegacyMenuBorderDockRenderAreas,
   resolveLegacyMenuPathRenderFrame,
   resolveLegacyMenuPathRenderFrames,
@@ -461,6 +462,46 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(areas).toEqual([{ left: 50, top: 115, right: 56, bottom: 124 }]);
   });
 
+  test('anchors every rendered dock facet to the exact rounded terminal-tile band', () => {
+    const frame = { leftInset: 1, topInset: 1, width: 4, height: 4 };
+    const options = {
+      boardLeft: 10,
+      boardTop: 20,
+      boardWidth: 100,
+      boardHeight: 100,
+      continuationLength: 4,
+      materialTileSize: 6,
+      // Fractional source geometry reproduces the rounding split that let a
+      // flat dock and its visible 3D facet begin on different pixel rows.
+      tileRect: { left: 49.5, top: 109.5, width: 6.25, height: 5.25 }
+    };
+
+    expect(resolveLegacyMenuBorderDockFacetRect('left', frame, options)).toEqual({
+      height: 3,
+      left: 6,
+      top: 110.5,
+      width: 44.5
+    });
+    expect(resolveLegacyMenuBorderDockFacetRect('right', frame, options)).toEqual({
+      height: 3,
+      left: 54.5,
+      top: 110.5,
+      width: 59.5
+    });
+    expect(resolveLegacyMenuBorderDockFacetRect('top', frame, options)).toEqual({
+      height: 94.5,
+      left: 50.5,
+      top: 16,
+      width: 4
+    });
+    expect(resolveLegacyMenuBorderDockFacetRect('bottom', frame, options)).toEqual({
+      height: 10.5,
+      left: 50.5,
+      top: 113.5,
+      width: 4
+    });
+  });
+
   test('bridges the light core across connected neighbors for a less checkerboarded slab read', () => {
     const maze = {
       width: 3,
@@ -626,6 +667,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('graphics.fillStyle(options.coreColor, options.coreAlpha);');
     expect(menuSceneSource).toContain('graphics.fillRect(fillLeft, fillTop, fillRight - fillLeft, fillBottom - fillTop);');
     expect(menuSceneSource).toContain('private drawLegacyPathTileFacet(');
+    expect(menuSceneSource).toContain('const facetRect = resolveLegacyMenuBorderDockFacetRect(direction, frame, {');
+    expect(menuSceneSource).not.toContain('const top = mazeBottom;');
     expect(menuSceneSource).not.toContain('this.fillLegacyPathConnectorSeams(');
     expect(menuSceneSource).not.toContain('private fillLegacyPathConnectorSeams(');
     expect(menuSceneSource).toContain('const LEGACY_PATH_CONNECTOR_SEAM_PAD_RATIO = 0.16;');
