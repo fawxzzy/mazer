@@ -487,7 +487,16 @@ export const resolveLegacyProgressionDifficultyProfile = (
     ? trackOrTargetComplexity
     : trackOrTargetComplexity.targetComplexity;
   const level = resolveLegacyProgressionLevel(targetComplexity);
-  const normalizedLevel = clampInteger(level, 1, 99);
+  // Maze size/difficulty now climbs at HALF the rate the player's own level
+  // number does. Level itself is a guaranteed, un-tapered +1/completion
+  // reward (resolveLegacyProgressionTargetAdjustment) -- per feedback that
+  // mazes were getting hard too fast, this decouples "how rewarding each
+  // completion feels" (the real level, shown everywhere else, unaffected)
+  // from "how much bigger/harder the next maze actually is" instead of
+  // tying both to the same raw level number. resolveLegacyMazeGenerationProfileForProgression
+  // below applies the identical halving to the level it re-derives for its
+  // own within-band ramps (starterDepth etc), so the two stay in lockstep.
+  const normalizedLevel = clampInteger(Math.ceil(level / 2), 1, 99);
 
   if (normalizedLevel <= 1) {
     return {
@@ -586,9 +595,15 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
   trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number
 ): LegacyMazeGenerationProfile => {
   const profile = resolveLegacyProgressionDifficultyProfile(trackOrTargetComplexity);
-  const level = typeof trackOrTargetComplexity === 'number'
+  const realLevel = typeof trackOrTargetComplexity === 'number'
     ? resolveLegacyProgressionLevel(trackOrTargetComplexity)
     : trackOrTargetComplexity.level;
+  // Same halving resolveLegacyProgressionDifficultyProfile applies for band
+  // selection -- starterDepth below indexes into this band's own gradual
+  // ramp (checkpoint/dead-end/shortcut pressure), so it needs to stay
+  // paced against the same slowed-down level or it would front-load that
+  // ramp against the real (faster) level instead.
+  const level = clampInteger(Math.ceil(realLevel / 2), 1, 99);
 
   switch (profile.band) {
     case 'tutorial':

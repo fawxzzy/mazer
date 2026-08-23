@@ -214,7 +214,11 @@ describe('legacy wrap topology diagnostics', () => {
   }, 30_000);
 
   test('pairs the starter optional horizontal feeders before independent side filling', () => {
-    const starterProfile = resolveLegacyMazeGenerationProfileForProgression(28);
+    // 52, not the 28 this used to be -- resolveLegacyMazeGenerationProfileForProgression's
+    // within-band ramp (starterDepth) now advances at half the real-level
+    // rate too, so reaching the same starterDepth (4, where the optional
+    // horizontal feeder turns on) takes roughly double the real level.
+    const starterProfile = resolveLegacyMazeGenerationProfileForProgression(52);
     const failures: unknown[] = [];
 
     for (let seed = 1; seed <= 60; seed += 1) {
