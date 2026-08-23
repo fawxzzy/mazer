@@ -763,8 +763,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS = 1000;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS = 220;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_TRAIL_FADE_MS = 860;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_BURST_COLOR = 0xb7f2ff;');
-    expect(menuSceneSource).toContain('const LEGACY_MENU_DECONSTRUCT_BURST_ALT = 0x72e0bf;');
+    expect(menuSceneSource).toContain("from '../legacy-runtime/legacyPlayerTransfer';");
+    expect(menuSceneSource).toContain('private playerTransferEnergyArmed = false;');
     expect(menuSceneSource).toContain("private menuStaticDrawLifecyclePhase: LegacyMenuStaticDrawLifecyclePhase = 'idle';");
     expect(menuSceneSource).toContain('private menuStaticDeconstructStartedAtMs: number | null = null;');
     expect(menuSceneSource).toContain('private menuStaticDeconstructZeroHoldStartedAtMs: number | null = null;');
@@ -805,7 +805,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('private deferLegacyMenuDeconstructRebuildUntil(dueAtMs: number): void');
     expect(menuSceneSource).toContain('private resolveLegacyMenuBuildPrerollProgress(time: number): number');
     expect(menuSceneSource).toContain('private isLegacyMenuBuildPrerollActive(time: number): boolean');
-    expect(menuSceneSource).toContain('private drawLegacyMenuDeconstructHandoffBurst(');
+    expect(menuSceneSource).toContain('private drawLegacyPlayerTransferEnergy(');
     expect(menuSceneSource).toContain('private armLegacyMenuStaticDeconstructStage(time: number): void');
     expect(menuSceneSource).toContain('private shouldStartLegacyMenuDeconstructOnGoalArrival(nextFrame: LegacyMenuDemoAdvance): boolean');
     expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase = 'deconstructing';");
