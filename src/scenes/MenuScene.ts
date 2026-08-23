@@ -1581,16 +1581,17 @@ export class MenuScene extends Phaser.Scene {
     // a play start is still pending, since it's about to be replaced
     // anyway the moment auth resolves.
     if (this.mode !== 'play') {
+      const menuGenerationScale = this.resolveLegacyProgressionScaleForMode('menu');
       this.applyGenerationRequest(
         createLegacyGenerationRequest({
-          aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu'),
+          aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu', menuGenerationScale),
           currentSeed: this.mazeSeed,
           dueAtMs: this.time.now,
           generationProfile: this.resolveLegacyMazeGenerationProfileForMode('menu'),
           mode: 'menu',
           queuedAtMs: this.time.now,
           reason: 'boot-menu',
-          scale: this.resolveLegacyProgressionScaleForMode('menu'),
+          scale: menuGenerationScale,
           targetComplexity: this.resolveLegacyTargetComplexityForMode('menu')
         }),
         this.pendingBootPlayStart ? this.time.now : this.time.now + INITIAL_MENU_DEMO_HOLD_MS
@@ -4258,23 +4259,50 @@ export class MenuScene extends Phaser.Scene {
   // freshly generated maze should target so it naturally fills that box on
   // both axes, instead of being square and then fit into a non-square box
   // after the fact (see resolveLegacyMenuBoardAspectRatio for the box math).
-  private resolveLegacyBoardAspectRatioForMode(mode: RuntimeMode): number {
+  // knownCellScale should be this same mode's resolveLegacyProgressionScaleForMode()
+  // result, computed by the caller first. Without it this returns only the
+  // pre-generation estimate (a guess at the eventual bleedMargin using a
+  // rough cell-count stand-in) -- the same guess resolveLegacyMenuLayout's
+  // own real, post-generation margin can drift away from on narrow
+  // viewports with a real safe-area-bottom inset, since the estimate has no
+  // way to know the box's real proportions ahead of generation. With it,
+  // this refines once more: seed a candidate mazeWidth/mazeHeight from that
+  // estimate (the exact same conversion real generation itself performs,
+  // see resolveLegacyMazeDimensionsForScale), run those candidates through
+  // the REAL resolveLegacyMenuLayout, and return the actual resulting
+  // board's own proportions instead of the estimate -- self-consistent
+  // with what will really be drawn, not a guess about it. Omit
+  // knownCellScale only where scale genuinely isn't known yet (e.g. scale's
+  // own internal viewport cap search, which needs an aspect ratio to seed
+  // ITS candidate search before it has resolved a real scale itself).
+  private resolveLegacyBoardAspectRatioForMode(mode: RuntimeMode, knownCellScale?: number): number {
     const viewportGeometry = readMazerViewportGeometry();
     const width = viewportGeometry.fullBleed.width;
     const height = viewportGeometry.fullBleed.height;
     const layoutSurface = mode === 'play' ? 'play' : 'menu';
-    return resolveLegacyMenuBoardAspectRatio(
-      width,
-      height,
-      this.settings.scale + this.settings.camScale,
-      layoutSurface,
-      {
-        browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height),
-        menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest',
-        safeArea: viewportGeometry.safeArea,
-        useFloatingTouchControls: true
-      }
-    );
+    const boardScale = this.settings.scale + this.settings.camScale;
+    const layoutOptions = {
+      browserMobileParity: this.resolveLegacyBrowserMobileParity(width, height),
+      knownCellScale,
+      menuActionMode: this.authSnapshot.status === 'authenticated' ? 'authenticated' : 'guest',
+      safeArea: viewportGeometry.safeArea,
+      useFloatingTouchControls: true
+    } as const;
+    const seedAspectRatio = resolveLegacyMenuBoardAspectRatio(width, height, boardScale, layoutSurface, layoutOptions);
+
+    if (knownCellScale === undefined) {
+      return seedAspectRatio;
+    }
+
+    const ratioRoot = Math.sqrt(seedAspectRatio);
+    const candidateWidth = Math.max(1, Math.round(knownCellScale * ratioRoot));
+    const candidateHeight = Math.max(1, Math.round(knownCellScale / ratioRoot));
+    const candidateLayout = resolveLegacyMenuLayout(width, height, boardScale, candidateWidth, candidateHeight, layoutSurface, layoutOptions);
+    if (candidateLayout.boardWidth <= 0 || candidateLayout.boardHeight <= 0) {
+      return seedAspectRatio;
+    }
+
+    return clamp(candidateLayout.boardWidth / candidateLayout.boardHeight, 0.45, 2.2);
   }
 
   private applyGenerationRequest(request: LegacyGenerationRequest, nextDemoMoveAtMs = 0): void {
@@ -4363,16 +4391,17 @@ export class MenuScene extends Phaser.Scene {
     const seedOverride = mode === 'play'
       ? this.createFreshLegacyPlayGenerationSeed()
       : undefined;
+    const generationScale = this.resolveLegacyProgressionScaleForMode(mode);
     this.applyGenerationRequest(
         createLegacyGenerationRequest({
-          aspectRatio: this.resolveLegacyBoardAspectRatioForMode(mode),
+          aspectRatio: this.resolveLegacyBoardAspectRatioForMode(mode, generationScale),
           currentSeed: this.mazeSeed,
           dueAtMs: this.time.now,
           generationProfile: this.resolveLegacyMazeGenerationProfileForMode(mode),
           mode,
           queuedAtMs: this.time.now,
           reason: mode === 'play' ? 'play-start' : 'boot-menu',
-          scale: this.resolveLegacyProgressionScaleForMode(mode),
+          scale: generationScale,
           seedOverride,
           targetComplexity: this.resolveLegacyTargetComplexityForMode(mode)
         }),
@@ -4443,15 +4472,16 @@ export class MenuScene extends Phaser.Scene {
     } = {}
   ): void {
     const mode = options.mode ?? this.mode;
+    const generationScale = this.resolveLegacyProgressionScaleForMode(mode);
     this.pendingGenerationRequest = createLegacyGenerationRequest({
-      aspectRatio: this.resolveLegacyBoardAspectRatioForMode(mode),
+      aspectRatio: this.resolveLegacyBoardAspectRatioForMode(mode, generationScale),
       currentSeed: this.mazeSeed,
       dueAtMs: this.time.now + Math.max(0, delayMs),
       generationProfile: this.resolveLegacyMazeGenerationProfileForMode(mode),
       mode,
       queuedAtMs: this.time.now,
       reason,
-      scale: this.resolveLegacyProgressionScaleForMode(mode),
+      scale: generationScale,
       seedOverride: options.seedOverride,
       stepSeed: options.stepSeed === true,
       targetComplexity: this.resolveLegacyTargetComplexityForMode(mode)
@@ -4741,13 +4771,14 @@ export class MenuScene extends Phaser.Scene {
     this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
     if (this.mode === 'play') {
+      const playGenerationScale = this.resolveLegacyProgressionScaleForMode('play');
       this.pendingGenerationRequest = createLegacyPlayResetGenerationRequest({
-        aspectRatio: this.resolveLegacyBoardAspectRatioForMode('play'),
+        aspectRatio: this.resolveLegacyBoardAspectRatioForMode('play', playGenerationScale),
         currentSeed: this.mazeSeed,
         generationProfile: this.resolveLegacyMazeGenerationProfileForMode('play'),
         nowMs: time + this.resolveLegacyMenuStaticDeconstructDurationMs() + LEGACY_MENU_STATIC_DECONSTRUCT_REBUILD_HANDOFF_MS,
         seedOverride: this.createFreshLegacyPlayGenerationSeed(),
-        scale: this.resolveLegacyProgressionScaleForMode('play'),
+        scale: playGenerationScale,
         targetComplexity: this.resolveLegacyTargetComplexityForMode('play')
       });
     } else {
@@ -4895,16 +4926,17 @@ export class MenuScene extends Phaser.Scene {
     this.overlay = 'none';
     this.overlayReturn = 'none';
     this.refreshRuntimeMazeSeedIfUnpinned();
+    const menuReturnGenerationScale = this.resolveLegacyProgressionScaleForMode('menu');
     this.applyGenerationRequest(
       createLegacyGenerationRequest({
-        aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu'),
+        aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu', menuReturnGenerationScale),
         currentSeed: this.mazeSeed,
         dueAtMs: this.time.now,
         generationProfile: this.resolveLegacyMazeGenerationProfileForMode('menu'),
         mode: 'menu',
         queuedAtMs: this.time.now,
         reason: 'menu-return',
-        scale: this.resolveLegacyProgressionScaleForMode('menu'),
+        scale: menuReturnGenerationScale,
         targetComplexity: this.resolveLegacyTargetComplexityForMode('menu')
       }),
       this.time.now + INITIAL_MENU_DEMO_HOLD_MS
@@ -5345,12 +5377,13 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    const menuResetGenerationScale = this.resolveLegacyProgressionScaleForMode('menu');
     this.pendingGenerationRequest = createLegacyMenuResetGenerationRequest({
-      aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu'),
+      aspectRatio: this.resolveLegacyBoardAspectRatioForMode('menu', menuResetGenerationScale),
       currentSeed: this.mazeSeed,
       generationProfile: this.resolveLegacyMazeGenerationProfileForMode('menu'),
       nowMs: time,
-      scale: this.resolveLegacyProgressionScaleForMode('menu'),
+      scale: menuResetGenerationScale,
       targetComplexity: this.resolveLegacyTargetComplexityForMode('menu')
     });
   }
@@ -13471,7 +13504,15 @@ export class MenuScene extends Phaser.Scene {
       surface: mode === 'play' ? 'play' : 'menu-demo',
       viewport: {
         width: browserMobileParity ? LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH : this.scale.width,
-        height: this.scale.height
+        height: this.scale.height,
+        // Mirrors resolveLegacyBoardAspectRatioForMode's own safeArea/
+        // useFloatingTouchControls -- without these the tile-size cap this
+        // feeds into simulated a bigger, safe-area-free box than the real
+        // render ever gets, capping the cell count for a box larger than
+        // actually exists and leaving the true board short of the bottom
+        // safe edge. Keep both in sync.
+        safeArea: readMazerViewportGeometry().safeArea,
+        useFloatingTouchControls: true
       }
     });
   }

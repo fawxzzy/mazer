@@ -963,8 +963,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(menuSceneSource).toContain('private resolveLegacyProgressionScaleForMode(mode: RuntimeMode): number');
     expect(menuSceneSource).toContain("surface: mode === 'play' ? 'play' : 'menu-demo'");
-    expect(menuSceneSource).toContain("scale: this.resolveLegacyProgressionScaleForMode('menu')");
-    expect(menuSceneSource).toContain('scale: this.resolveLegacyProgressionScaleForMode(mode)');
+    expect(menuSceneSource).toContain("this.resolveLegacyProgressionScaleForMode('menu')");
+    expect(menuSceneSource).toContain('this.resolveLegacyProgressionScaleForMode(mode)');
   });
 
   test('keeps larger desktop tiles visibly weighted after responsive overlay sizing', () => {
@@ -1635,7 +1635,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('targetComplexity: this.resolveLegacyTargetComplexityForMode(mode)');
     expect(menuSceneSource).toContain("targetComplexity: this.resolveLegacyTargetComplexityForMode('play')");
     expect(menuSceneSource).toContain("targetComplexity: this.resolveLegacyTargetComplexityForMode('menu')");
-    expect(menuSceneSource).toContain("scale: this.resolveLegacyProgressionScaleForMode('play')");
+    expect(menuSceneSource).toContain("this.resolveLegacyProgressionScaleForMode('play')");
     expect(menuSceneSource).toContain("seedSource: this.mode === 'play' || !this.explicitRuntimeMazeSeed ? 'runtime-random' : 'query'");
     expect(generationLifecycleSource).toContain('seedOverride?: number;');
     expect(generationLifecycleSource).toContain('targetComplexity?: number;');

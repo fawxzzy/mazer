@@ -64,6 +64,22 @@ export interface LegacyMenuLayoutOptions {
    * the menu surface already uses.
    */
   useFloatingTouchControls?: boolean;
+  /**
+   * resolveLegacyMenuBoardAspectRatio only, and only as a pre-generation
+   * approximation aid: the real mazeWidth/mazeHeight this call is choosing
+   * the aspect ratio FOR aren't known yet (real generation hasn't run), so
+   * it has to guess how many tiles will fit per axis to estimate the same
+   * one-tile bleedMargin shrink resolveLegacyMenuLayout applies afterward
+   * with the real cell counts. Passing the actual complexity-driven
+   * generation scale here (once known) replaces a much rougher stand-in
+   * (the user's boardScale/zoom preference, a different quantity in the
+   * same numeric range) and keeps the pre-estimate and the real post-
+   * generation margin from drifting apart on narrow viewports, where the
+   * same absolute margin error shifts the width axis's proportion far more
+   * than the height axis's. Omit when the real scale genuinely isn't known
+   * yet (falls back to the boardScale approximation, as before).
+   */
+  knownCellScale?: number;
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
@@ -237,8 +253,13 @@ export const resolveLegacyMenuBoardAspectRatio = (
   // estimate using `scale` (the target linear cell count) as a stand-in for
   // both axes' eventual cell counts -- close enough to keep the two
   // functions' box aspect ratios in sync within about a tile, which is the
-  // dock corridor's own tolerance.
-  const estimatedAspectTileSize = Math.min(boardWidthTarget, boardHeightTarget) / Math.max(1, normalizedScale);
+  // dock corridor's own tolerance. Prefer the real generation scale
+  // (options.knownCellScale) once the caller has it -- normalizedScale is
+  // the user's boardScale/zoom preference (25-150), a different quantity
+  // that happens to share the same rough numeric range as real cell counts,
+  // not an actual stand-in for them.
+  const cellCountEstimate = options.knownCellScale ?? normalizedScale;
+  const estimatedAspectTileSize = Math.min(boardWidthTarget, boardHeightTarget) / Math.max(1, cellCountEstimate);
   const aspectBleedMargin = isPlaySurface ? 0 : Math.max(2, Math.round(estimatedAspectTileSize));
   const marginedAspectBoardWidthTarget = Math.max(minBoardWidthBound, boardWidthTarget - (aspectBleedMargin * 2));
   const marginedAspectBoardHeightTarget = Math.max(minBoardHeightBound, boardHeightTarget - (aspectBleedMargin * 2));

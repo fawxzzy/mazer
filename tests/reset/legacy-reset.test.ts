@@ -744,8 +744,8 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain('const nextRequest = this.pendingGenerationRequest;');
     expect(menuSceneSource).toContain('&& shouldConsumeLegacyGenerationRequest(nextRequest, time)');
     expect(menuSceneSource).toContain('const generationState = consumeLegacyGenerationRequestState(request, request.budget.scale);');
-    expect(menuSceneSource).toContain("scale: this.resolveLegacyProgressionScaleForMode('menu')");
-    expect(menuSceneSource).toContain('scale: this.resolveLegacyProgressionScaleForMode(mode)');
+    expect(menuSceneSource).toContain("this.resolveLegacyProgressionScaleForMode('menu')");
+    expect(menuSceneSource).toContain('this.resolveLegacyProgressionScaleForMode(mode)');
     expect(menuSceneSource).toContain('if (generationState.startsPlayTimer) {');
     expect(menuSceneSource).toContain('this.playStartedAtMs = this.time.now;');
     expect(menuSceneSource).toContain('const settledPlayStartedAtMs = resolveLegacyStaticDrawPlayTimerStartAtMs({');
@@ -843,7 +843,7 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("this.queueGenerationRequest('menu-demo-missing-episode', 0, { stepSeed: true });");
     expect(menuSceneSource).toContain("this.queueGenerationRequest('overlay-rebuild', 0, { stepSeed: true });");
     expect(menuSceneSource).toContain('createLegacyPlayResetGenerationRequest({');
-    expect(menuSceneSource).toContain("scale: this.resolveLegacyProgressionScaleForMode('play')");
+    expect(menuSceneSource).toContain("this.resolveLegacyProgressionScaleForMode('play')");
     expect(menuSceneSource).toContain("if (request.mode === 'play') {");
     expect(menuSceneSource).toContain('this.armLegacyMenuStaticDeconstructStage(time);');
     expect(menuSceneSource).toContain("reason === 'menu-demo-goal-reset' || reason === 'play-goal-reset'");
