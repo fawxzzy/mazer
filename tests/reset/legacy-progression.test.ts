@@ -377,17 +377,15 @@ describe('legacy progression', () => {
     });
   });
 
-  test('survives crossing the level-10 difficulty taper without rebasing real progress back to level 1', () => {
-    // resolveLegacyProgressionTargetAdjustment tapers the player's per-
-    // completion gain from +4 down to +3 once level reaches 10. The
-    // coherence check that guards against corrupted saves used to assume a
-    // flat +4/cycle for every completed cycle, so the very first genuine
-    // completion at level 10 (the 10th total) made a correctly-earned save
-    // look "impossible" and wiped it back to level 1 on the next read or
-    // write -- reproduce that exact crossing here to lock in the fix.
+  test('advances the player exactly one level per completed maze with no taper, even past level 10', () => {
+    // resolveLegacyProgressionTargetAdjustment's player branch is a flat +4
+    // per completion (resolveLegacyProgressionLevel buckets every 4
+    // complexity points into one level) -- no deceleration at any level, per
+    // feedback that progress should be a guaranteed, uniform +1 level every
+    // time now that there's no timer/score to weigh a completion against.
     const storage = new MemoryStorage();
     let state = createEmptyLegacyProgressionState();
-    for (let cycle = 1; cycle <= 10; cycle += 1) {
+    for (let cycle = 1; cycle <= 12; cycle += 1) {
       state = recordLegacyProgressionCycle(
         storage,
         state,
@@ -405,20 +403,71 @@ describe('legacy progression', () => {
         }),
         createProgressionTestMaze()
       );
+      expect(state.tracks.player.level).toBe(cycle + 1);
       // Every intermediate write must also survive its own re-normalization
-      // (readLegacyProgressionState runs the same coherence check) -- not
-      // just the final tenth one.
-      expect(readLegacyProgressionState(storage).tracks.player.completedCycles).toBe(cycle);
+      // (readLegacyProgressionState runs the same coherence check).
+      expect(readLegacyProgressionState(storage).tracks.player.level).toBe(cycle + 1);
     }
 
     expect(state.tracks.player).toMatchObject({
-      completedCycles: 10,
-      level: 10,
-      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + (9 * 4) + 3
+      completedCycles: 12,
+      level: 13,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + (12 * 4)
     });
-    expect(readLegacyProgressionState(storage).tracks.player).toMatchObject({
-      completedCycles: 10,
-      level: 10
+  });
+
+  test('does not rebase a real account whose progress was earned under a previous, lower-rate formula', () => {
+    // The per-completion gain has changed over time (a taper was added, then
+    // removed -- see resolveLegacyProgressionTargetAdjustment). The
+    // coherence check guards against corrupted/tampered saves by capping
+    // targetComplexity at what the CURRENT formula could produce for that
+    // many completed cycles, rather than exact-matching a specific
+    // formula's trace -- so an account that earned real progress under a
+    // strictly-lower-rate formula than today's must still read back intact,
+    // not get treated as "impossible" and wiped to level 1 just because the
+    // formula it actually earned its level under no longer matches the
+    // live one.
+    const storage = new MemoryStorage();
+    const baseline = createEmptyLegacyProgressionState();
+    const legitimateLowerRateComplexity = LEGACY_PROGRESSION_MIN_COMPLEXITY + 42; // 11 cycles, never above +4/cycle
+    storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify({
+      ...baseline,
+      tracks: {
+        ...baseline.tracks,
+        player: {
+          ...baseline.tracks.player,
+          completedCycles: 11,
+          targetComplexity: legitimateLowerRateComplexity
+        }
+      }
+    }));
+
+    const preserved = readLegacyProgressionState(storage);
+    expect(preserved.tracks.player).toMatchObject({
+      completedCycles: 11,
+      targetComplexity: legitimateLowerRateComplexity
+    });
+
+    // An impossible value (more than +4/cycle could ever produce) must
+    // still be rejected -- this isn't a blanket amnesty, only a floor-vs-
+    // ceiling relaxation.
+    const tamperedStorage = new MemoryStorage();
+    tamperedStorage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify({
+      ...baseline,
+      tracks: {
+        ...baseline.tracks,
+        player: {
+          ...baseline.tracks.player,
+          completedCycles: 11,
+          targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + (11 * 4) + 1
+        }
+      }
+    }));
+    const rebased = readLegacyProgressionState(tamperedStorage);
+    expect(rebased.tracks.player).toMatchObject({
+      completedCycles: 0,
+      level: 1,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
     });
   });
 
