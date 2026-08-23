@@ -1164,6 +1164,7 @@ const LEGACY_MENU_DECONSTRUCT_BURST_ALT = 0x72e0bf;
 // pace the next maze's tiles are actually appearing, not on some unrelated
 // fixed clock that finishes before or after the build really does.
 const LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS = 560;
+const LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS = 700;
 const LEGACY_LEVEL_ANNOUNCER_MIN_SCALE = 0.72;
 // How long the bleed-off dock corridors (resolveLegacyPathBorderDockContinuation)
 // take to grow from the maze's own edge out to the true screen edge, and to
@@ -1412,6 +1413,15 @@ export class MenuScene extends Phaser.Scene {
   private levelAnnouncerBuildFadeOutArmed = false;
   private playerSpawnBurstStartedAtMs: number | null = null;
   private playerSpawnBurstPreviousMarkersBuiltIn = false;
+  // Play mode's top-left corner used to belong to the persistent LVL badge
+  // (see drawLegacyProgressionBadge, now retired) and so never carried the
+  // username the way the menu front door's header does -- now that corner
+  // is free, this is a passive (non-interactive) echo of it for play mode,
+  // drawn from drawHud. Deliberately its own object rather than reusing
+  // createLegacyMenuUsernameButton's panel/label/background: those live and
+  // die with rebuildUi's menu-only button, while this needs to persist and
+  // draw every play-mode frame regardless of the UI rebuild cycle.
+  private playUsernameText!: Phaser.GameObjects.Text;
   private footerText!: Phaser.GameObjects.Text;
   private progressionBadgeText!: Phaser.GameObjects.Text;
   private progressionBadgeLabelText!: Phaser.GameObjects.Text;
@@ -1509,6 +1519,13 @@ export class MenuScene extends Phaser.Scene {
   private menuStaticDeconstructStartedAtMs: number | null = null;
   private menuStaticDeconstructZeroHoldStartedAtMs: number | null = null;
   private menuStaticBuildPrerollStartedAtMs: number | null = null;
+  // menuStaticBuildPrerollStartedAtMs nulls out ~500ms into 'building' (see
+  // advanceLegacyMenuStaticDrawStage) -- it's a preroll-window flag, not a
+  // "when did this build start" anchor. Anything that needs to track
+  // progress across the WHOLE building phase (the level announcer's
+  // fade-out, the bleed-off dock regrowth) needs its own timestamp that
+  // persists for the full phase instead of reusing that one.
+  private menuStaticBuildPhaseStartedAtMs: number | null = null;
   private legacyPlayTrailPulseNextFrameAtMs = 0;
   private legacyMenuTitleAnimationNextFrameAtMs = 0;
   // Orbit sigils ease into their frozen resting positions instead of
@@ -1653,6 +1670,16 @@ export class MenuScene extends Phaser.Scene {
       color: '#8ac6ff',
       align: 'center'
     })).setOrigin(0.5).setAlpha(0.96).setVisible(false);
+    // Same color/font-size as the menu header's username label
+    // (createLegacyMenuUsernameButton) for visual continuity between the two
+    // surfaces -- plain text only, no glyph-word rendering and no click
+    // target, this is a passive readout drawn every play-mode frame from
+    // drawHud rather than a rebuildUi-owned button.
+    this.playUsernameText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '13px',
+      color: '#72e0bf'
+    })).setOrigin(0, 0.5).setAlpha(0.85).setVisible(false);
     this.menuAiProgressionBadgeLabelText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
       fontSize: '9px',
@@ -4859,6 +4886,7 @@ export class MenuScene extends Phaser.Scene {
       this.menuStaticDeconstructStartedAtMs = null;
       this.menuStaticDeconstructZeroHoldStartedAtMs = null;
       this.menuStaticBuildPrerollStartedAtMs = buildPrerollStartedAtMs;
+      this.menuStaticBuildPhaseStartedAtMs = buildPrerollStartedAtMs;
       this.menuStaticDrawRowsVisible = 0;
       this.menuStaticDrawNextRowAtMs = buildPrerollStartedAtMs + LEGACY_MENU_STATIC_BUILD_PREROLL_BURST_MS;
       this.menuStaticDrawTileOrder = this.buildLegacyMenuStaticDrawTileOrder();
@@ -4879,6 +4907,7 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticDeconstructStartedAtMs = null;
     this.menuStaticDeconstructZeroHoldStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
+    this.menuStaticBuildPhaseStartedAtMs = null;
   }
 
   private armLegacyMenuStaticDeconstructStage(time: number): void {
@@ -4894,6 +4923,7 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticDeconstructStartedAtMs = time;
     this.menuStaticDeconstructZeroHoldStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
+    this.menuStaticBuildPhaseStartedAtMs = null;
     this.menuStaticDrawRowsVisible = null;
     this.menuStaticDrawNextRowAtMs = 0;
     this.menuStaticDrawTilesVisible = this.menuStaticDrawTileOrder.length;
@@ -4962,6 +4992,7 @@ export class MenuScene extends Phaser.Scene {
     this.menuStaticDrawLifecyclePhase = 'settled';
     this.menuStaticDeconstructStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
+    this.menuStaticBuildPhaseStartedAtMs = null;
     this.refreshLegacyMenuStaticDrawVisibleTileKeys();
     this.releaseLegacyMenuDemoGateOnStaticDrawSettled(time);
   }
@@ -6064,12 +6095,12 @@ export class MenuScene extends Phaser.Scene {
       return 1 - smoothstep(elapsedMs / LEGACY_BLEED_DOCK_GROWTH_MS);
     }
 
-    if (phase === 'building' && this.menuStaticBuildPrerollStartedAtMs !== null) {
+    if (phase === 'building' && this.menuStaticBuildPhaseStartedAtMs !== null) {
       const buildDurationMs = this.resolveLegacyMenuStaticBuildDurationEstimateMs();
       if (buildDurationMs === null) {
         return 1;
       }
-      const elapsedMs = time - this.menuStaticBuildPrerollStartedAtMs;
+      const elapsedMs = time - this.menuStaticBuildPhaseStartedAtMs;
       const remainingMs = buildDurationMs - elapsedMs;
       return 1 - smoothstep(remainingMs / LEGACY_BLEED_DOCK_GROWTH_MS);
     }
@@ -7986,15 +8017,18 @@ export class MenuScene extends Phaser.Scene {
   // same transition.
   // Fades/scales in across the deconstruct phase's own opening span (holding
   // at full size for whatever's left of that phase), then fades/scales back
-  // out across the ENTIRE estimated build-phase duration -- so the
-  // announcement dissolves at the same pace the next maze's tiles are
-  // genuinely appearing, not disappearing into blank space before the build
-  // even starts. levelAnnouncerBuildFadeOutArmed is what stops a completely
-  // fresh maze build (initial boot, a forced QA reset) that never went
-  // through 'deconstructing' from getting a phantom fade-out of a number
-  // that was never actually shown -- it's set only by observing the real
-  // deconstruct phase, and consumed the moment the armed build's fade-out
-  // finishes (or the phase moves on to anything else).
+  // out only once the build is CLOSE to done -- full opacity is held
+  // through the bulk of the build (menuStaticBuildPhaseStartedAtMs anchors
+  // the whole phase, unlike the preroll-only menuStaticBuildPrerollStartedAtMs
+  // -- see its declaration), then it dissolves across a fixed closing window
+  // timed to land on zero right as the last tiles settle in, per feedback
+  // that fading across the whole build made it disappear almost immediately
+  // for anything but the shortest builds. levelAnnouncerBuildFadeOutArmed is
+  // what stops a completely fresh maze build (initial boot, a forced QA
+  // reset) that never went through 'deconstructing' from getting a phantom
+  // fade-out of a number that was never actually shown -- it's set only by
+  // observing the real deconstruct phase, and consumed the moment the armed
+  // build's fade-out finishes (or the phase moves on to anything else).
   private resolveLegacyLevelAnnouncerVisualState(time: number): { alpha: number; scale: number } {
     const HIDDEN = { alpha: 0, scale: 1 };
     if (this.overlay !== 'none') {
@@ -8016,20 +8050,22 @@ export class MenuScene extends Phaser.Scene {
       };
     }
 
-    if (phase === 'building' && this.levelAnnouncerBuildFadeOutArmed && this.menuStaticBuildPrerollStartedAtMs !== null) {
+    if (phase === 'building' && this.levelAnnouncerBuildFadeOutArmed && this.menuStaticBuildPhaseStartedAtMs !== null) {
       const buildDurationMs = this.resolveLegacyMenuStaticBuildDurationEstimateMs();
       if (buildDurationMs === null) {
         this.levelAnnouncerBuildFadeOutArmed = false;
         return HIDDEN;
       }
 
-      const elapsedMs = time - this.menuStaticBuildPrerollStartedAtMs;
-      const progress = smoothstep(1 - (elapsedMs / buildDurationMs));
-      if (progress <= 0) {
+      const elapsedMs = time - this.menuStaticBuildPhaseStartedAtMs;
+      const remainingMs = buildDurationMs - elapsedMs;
+      if (remainingMs <= 0) {
         this.levelAnnouncerBuildFadeOutArmed = false;
         return HIDDEN;
       }
 
+      const fadeOutWindowMs = Math.min(LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS, buildDurationMs);
+      const progress = remainingMs >= fadeOutWindowMs ? 1 : smoothstep(remainingMs / fadeOutWindowMs);
       return {
         alpha: progress,
         scale: LEGACY_LEVEL_ANNOUNCER_MIN_SCALE + (progress * (1 - LEGACY_LEVEL_ANNOUNCER_MIN_SCALE))
@@ -8112,37 +8148,59 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  // Four beams, one from each screen corner (the same viewport-edge inset
-  // the orbiting title sigils rest at, so this reads as those exact corners
-  // firing rather than an unrelated new set of points), growing outward
-  // from their corner toward the target tile as travelProgress advances,
-  // then a single expanding ring "impact" flash at the tile once they
-  // arrive. Both game modes funnel through the one drawDynamicBoard call
-  // site that invokes this, so menu and play get the identical effect with
-  // no mode branch here.
+  // One beam per orbit sigil -- the actual "diamond" decorations
+  // (drawLegacyMenuPathTitleOrbitSigils) rest at LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS
+  // evenly-spaced points around the viewport edge (4 corners + 4 edge
+  // midpoints at their settled phase-0 positions), so this reuses that exact
+  // geometry rather than a hardcoded 4-corner subset -- every diamond fires,
+  // not just the ones that happen to sit on a true corner. Each beam's
+  // travel is staggered slightly by index so they converge with a bit of
+  // spread instead of perfect lockstep, then a double-ring "impact" flash
+  // lands at the tile once they arrive. Both game modes funnel through the
+  // one drawDynamicBoard call site that invokes this, so menu and play get
+  // the identical effect with no mode branch here.
   private drawLegacyPlayerSpawnBurst(
     targetX: number,
     targetY: number,
     state: ReturnType<typeof this.resolveLegacyPlayerSpawnBurstState>
   ): void {
     const inset = 2;
-    const corners = [
-      { x: inset, y: inset },
-      { x: this.layout.width - inset, y: inset },
-      { x: inset, y: this.layout.height - inset },
-      { x: this.layout.width - inset, y: this.layout.height - inset }
-    ];
+    const orbitGeometry: LegacyMenuPathTitleOrbitGeometry = {
+      bottom: this.layout.height - inset,
+      centerX: this.layout.width / 2,
+      centerY: this.layout.height / 2,
+      crownBottom: this.layout.height - inset,
+      crownHalf: 0,
+      crownTop: inset,
+      left: inset,
+      right: this.layout.width - inset,
+      top: inset
+    };
+    const origins = Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, (_, index) => (
+      resolveLegacyMenuPathTitleOrbitPoint(orbitGeometry, index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)
+    ));
+    // +-0.06 spread across the 8 origins so the beams arrive within a short
+    // window of each other instead of a single flat instant -- reads as a
+    // converging volley instead of a rigid, mechanical snap.
+    const staggerFor = (index: number): number => (
+      ((index / Math.max(1, LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS - 1)) - 0.5) * 0.12
+    );
 
     if (state.travelProgress < 1) {
-      const beamAlpha = 0.85 * (1 - (state.travelProgress * 0.25));
-      this.playerSpawnBurstGraphics.lineStyle(2, LEGACY_PLAYER_SPAWN_BEAM_COLOR, beamAlpha);
-      for (const corner of corners) {
-        const tipX = corner.x + ((targetX - corner.x) * state.travelProgress);
-        const tipY = corner.y + ((targetY - corner.y) * state.travelProgress);
-        this.playerSpawnBurstGraphics.lineBetween(corner.x, corner.y, tipX, tipY);
+      origins.forEach((origin, index) => {
+        const localProgress = clamp(state.travelProgress - staggerFor(index), 0, 1);
+        const tipX = origin.x + ((targetX - origin.x) * localProgress);
+        const tipY = origin.y + ((targetY - origin.y) * localProgress);
+        const beamAlpha = 0.9 * (1 - (localProgress * 0.25));
+        // Dim wide glow pass first, bright thin core pass on top -- reads as
+        // a hotter beam than a single flat-color stroke.
+        this.playerSpawnBurstGraphics.lineStyle(4, LEGACY_PLAYER_SPAWN_BEAM_COLOR, beamAlpha * 0.35);
+        this.playerSpawnBurstGraphics.lineBetween(origin.x, origin.y, tipX, tipY);
+        this.playerSpawnBurstGraphics.lineStyle(1.5, LEGACY_PLAYER_SPAWN_BEAM_COLOR, beamAlpha);
+        this.playerSpawnBurstGraphics.lineBetween(origin.x, origin.y, tipX, tipY);
         this.playerSpawnBurstGraphics.fillStyle(LEGACY_PLAYER_SPAWN_BEAM_COLOR, beamAlpha);
         this.playerSpawnBurstGraphics.fillCircle(tipX, tipY, 2.5);
-      }
+      });
       return;
     }
 
@@ -8150,11 +8208,19 @@ export class MenuScene extends Phaser.Scene {
     if (flashAlpha <= 0) {
       return;
     }
-    const flashRadius = 4 + (state.flashProgress * 22);
+    const flashRadius = 4 + (state.flashProgress * 26);
+    // A second, larger trailing ring a beat behind the main one -- reads as
+    // a shockwave instead of one flat circle stroking outward.
+    const trailProgress = clamp(state.flashProgress - 0.18, 0, 1);
+    const trailAlpha = (1 - trailProgress) * 0.5;
+    if (trailAlpha > 0) {
+      this.playerSpawnBurstGraphics.lineStyle(Math.max(1, 2 * (1 - trailProgress)), LEGACY_PLAYER_SPAWN_BEAM_COLOR, trailAlpha);
+      this.playerSpawnBurstGraphics.strokeCircle(targetX, targetY, 4 + (trailProgress * 26));
+    }
     this.playerSpawnBurstGraphics.lineStyle(Math.max(1, 3 * (1 - state.flashProgress)), LEGACY_PLAYER_SPAWN_BEAM_COLOR, flashAlpha);
     this.playerSpawnBurstGraphics.strokeCircle(targetX, targetY, flashRadius);
-    this.playerSpawnBurstGraphics.fillStyle(LEGACY_PLAYER_SPAWN_BEAM_COLOR, flashAlpha * 0.6);
-    this.playerSpawnBurstGraphics.fillCircle(targetX, targetY, Math.max(1, 6 * (1 - state.flashProgress)));
+    this.playerSpawnBurstGraphics.fillStyle(LEGACY_PLAYER_SPAWN_BEAM_COLOR, flashAlpha * 0.7);
+    this.playerSpawnBurstGraphics.fillCircle(targetX, targetY, Math.max(1, 7 * (1 - state.flashProgress)));
   }
 
   // Small early mazes get a genuine close-up instead of a few oversized
@@ -9193,9 +9259,11 @@ export class MenuScene extends Phaser.Scene {
     this.hudFrame = null;
     if (this.mode !== 'play' || this.overlay !== 'none') {
       this.footerText.setText('');
+      this.playUsernameText.setVisible(false);
       return;
     }
     this.footerText.setText('');
+    this.drawLegacyPlayUsernameReadout();
 
     const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
     const hudFrame = resolveLegacyPlayHudFrame({
@@ -9214,6 +9282,31 @@ export class MenuScene extends Phaser.Scene {
     );
     this.hudBounds = this.hudTimerBounds;
     this.hudFrame = hudFrame;
+  }
+
+  // Passive play-mode echo of the menu header's username label (see
+  // playUsernameText's declaration) -- only shown once a real username is
+  // loaded, since there's no click target here to send an unset player to
+  // go create one the way the menu version's "Account" fallback does.
+  private drawLegacyPlayUsernameReadout(): void {
+    if (this.authSnapshot.status !== 'authenticated' || this.accountUsernameSavedValue.length <= 0) {
+      this.playUsernameText.setVisible(false);
+      return;
+    }
+
+    this.loadAccountUsernameIfNeeded();
+    const laneTop = this.layout.lanes.hud?.top ?? 0;
+    const leadingFrame = resolveLegacyHeaderControlFrame({
+      height: this.layout.height,
+      hudHeight: this.layout.lanes.hud?.height ?? 64,
+      hudTop: laneTop,
+      placement: 'leading',
+      width: this.layout.width
+    });
+    this.playUsernameText
+      .setText(this.accountUsernameSavedValue)
+      .setPosition(leadingFrame.left, leadingFrame.centerY)
+      .setVisible(true);
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
