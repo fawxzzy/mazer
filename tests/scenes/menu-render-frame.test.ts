@@ -21,6 +21,8 @@ import { resolveLegacyNavigationTarget } from '../../src/legacy-runtime/legacyMa
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+const normalizeSourceLineEndings = (source: string): string => source.replace(/\r\n?/g, '\n');
+
 const readPngDimensions = (path: string): { height: number; width: number } => {
   const bytes = readFileSync(resolve(process.cwd(), path));
   expect(bytes.subarray(1, 4).toString('ascii')).toBe('PNG');
@@ -46,6 +48,14 @@ vi.mock('phaser', () => ({
 }));
 
 describe('resolveLegacyMenuPathRenderFrame', () => {
+  test('keeps semantic source assertions identical across LF and CRLF checkouts', () => {
+    const semanticSource = 'first line\nsecond line\n';
+
+    expect(normalizeSourceLineEndings(semanticSource)).toBe(semanticSource);
+    expect(normalizeSourceLineEndings(semanticSource.replaceAll('\n', '\r\n'))).toBe(semanticSource);
+    expect(normalizeSourceLineEndings('first line\r\nchanged line\r\n')).not.toBe(semanticSource);
+  });
+
   test('caps active Phaser rendering to mobile-friendly 60 FPS', () => {
     const phaserConfigSource = readFileSync(resolve(process.cwd(), 'src/boot/phaserConfig.ts'), 'utf8');
     const canvasResolutionSource = readFileSync(resolve(process.cwd(), 'src/boot/canvasResolution.ts'), 'utf8');
@@ -698,6 +708,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps active play maze rendering on connected corridors instead of square debug cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const normalizedMenuSceneSource = normalizeSourceLineEndings(menuSceneSource);
+    const menuTitleDrawSource = normalizedMenuSceneSource.slice(
+      normalizedMenuSceneSource.indexOf('private drawLegacyMenuPathTitle(time: number): void'),
+      normalizedMenuSceneSource.indexOf('private resolveLegacyMazeRenderFrame(')
+    );
 
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_CORE = mixLegacyIridescentColor(cyberArcadeMaterial.path.core, 0x000000, LEGACY_PATH_CORE_EYE_COMFORT_DIM_AMOUNT);');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;');
@@ -733,7 +748,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 8;');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(time: number): void');
     expect(menuSceneSource).toContain('return resolveLegacyMenuTitleFontSize(this.layout.titleReserveHeight);');
-    expect(menuSceneSource).not.toContain('if (visibleCells.length <= 0) {\n      return;\n    }');
+    expect(menuTitleDrawSource).not.toMatch(/if \(visibleCells\.length <= 0\) \{\n\s*return;\n\s*\}/);
     expect(menuSceneSource).not.toContain('drawLegacyMenuPathTitleSigilRails');
     expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);');
     expect(menuSceneSource).toContain("type LegacyMenuPathTitleSweepMode = 'build' | 'deconstruct' | 'idle';");
@@ -1776,7 +1791,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand(\'resume\')));');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));');
-    expect(menuSceneSource).toContain('return resolveLegacyOverlayPanelLayout(\r\n      this.layout.width,\r\n      this.layout.height,\r\n      readMazerViewportGeometry().safeArea\r\n    );');
+    expect(normalizeSourceLineEndings(menuSceneSource)).toContain('return resolveLegacyOverlayPanelLayout(\n      this.layout.width,\n      this.layout.height,\n      readMazerViewportGeometry().safeArea\n    );');
     expect(menuSceneSource).toContain('const shell = resolveLegacyOverlayShellLayout({');
     expect(menuSceneSource).not.toContain("if (kind === 'pause' && this.mode === 'play')");
     expect(menuSceneSource).toContain('rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER');
