@@ -65,6 +65,17 @@ export interface LegacyMenuBorderDockRenderOptions {
   };
 }
 
+export type LegacyMenuBorderDockFacetOptions = Pick<
+  LegacyMenuBorderDockRenderOptions,
+  | 'boardHeight'
+  | 'boardLeft'
+  | 'boardTop'
+  | 'boardWidth'
+  | 'continuationLength'
+  | 'materialTileSize'
+  | 'tileRect'
+>;
+
 export interface LegacyPlayerMarkerRenderMetrics {
   coreRadius: number;
   haloRadius: number;
@@ -402,6 +413,35 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
   }
 
   return areas;
+};
+
+export const resolveLegacyMenuBorderDockFacetRect = (
+  direction: LegacyMenuBorderDockDirection,
+  frame: LegacyMenuPathRenderFrame,
+  options: LegacyMenuBorderDockFacetOptions
+): LegacyMenuPixelRect | null => {
+  const materialTileSize = Math.max(1, options.materialTileSize);
+  const bandLeft = options.tileRect.left + Math.round((frame.leftInset / materialTileSize) * options.tileRect.width);
+  const bandTop = options.tileRect.top + Math.round((frame.topInset / materialTileSize) * options.tileRect.height);
+  const bandRight = options.tileRect.left + Math.round(((frame.leftInset + frame.width) / materialTileSize) * options.tileRect.width);
+  const bandBottom = options.tileRect.top + Math.round(((frame.topInset + frame.height) / materialTileSize) * options.tileRect.height);
+  const boardRight = options.boardLeft + options.boardWidth;
+  const boardBottom = options.boardTop + options.boardHeight;
+  const continuationLength = Math.max(1, Math.round(options.continuationLength ?? 1));
+
+  const edges = direction === 'left'
+    ? { left: options.boardLeft - continuationLength, top: bandTop, right: bandLeft, bottom: bandBottom }
+    : direction === 'right'
+      ? { left: bandRight, top: bandTop, right: boardRight + continuationLength, bottom: bandBottom }
+      : direction === 'top'
+        ? { left: bandLeft, top: options.boardTop - continuationLength, right: bandRight, bottom: bandTop }
+        : { left: bandLeft, top: bandBottom, right: bandRight, bottom: boardBottom + continuationLength };
+
+  const width = edges.right - edges.left;
+  const height = edges.bottom - edges.top;
+  return width > 0 && height > 0
+    ? { height, left: edges.left, top: edges.top, width }
+    : null;
 };
 
 const resolveLegacyMenuPathStrokeSegments = (

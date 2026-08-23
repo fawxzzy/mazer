@@ -336,6 +336,7 @@ import {
 import {
   resolveLegacyBleedOffDockVisualEligibility,
   resolveLegacyMenuBorderDockDirections,
+  resolveLegacyMenuBorderDockFacetRect,
   resolveLegacyMenuBorderDockRenderAreas,
   resolveLegacyMenuPathRenderFrames,
   resolveLegacyPlayerLocatorRenderMetrics,
@@ -6290,10 +6291,6 @@ export class MenuScene extends Phaser.Scene {
         boardTop,
         boardWidth,
         boardHeight,
-        mazeLeft,
-        mazeTop,
-        mazeWidth,
-        mazeHeight,
         this.resolveLegacyPathBorderDockContinuation(direction, boardLeft, boardTop, boardWidth, boardHeight, tileSize),
         options.edgeColor,
         options.coreAlpha
@@ -6311,68 +6308,39 @@ export class MenuScene extends Phaser.Scene {
     boardTop: number,
     boardWidth: number,
     boardHeight: number,
-    // The maze's own rendered content edges -- NOT necessarily flush with
-    // the board box edges above. Whenever the generated maze's own aspect
-    // ratio doesn't perfectly match the reserved board box (routine --
-    // resolveLegacyBoardAspectRatioForMode is only an estimate ahead of
-    // real generation), one axis is left with real leftover slack between
-    // the grid's last tile and the board box edge. The flat-color fill pass
-    // (fillDockFrame above, via resolveLegacyMenuBorderDockRenderAreas)
-    // already anchors to these maze edges and so already spans any such
-    // slack -- this facet/rim overlay used to anchor to the board box edge
-    // instead, which is only ever correct when there's zero slack. Anywhere
-    // there was slack (play mode especially, whose board is never centered
-    // -- see boardTop in legacyMenuLayout.ts -- so ALL of it pools on one
-    // side), the rim's soft-halo + crisp-line "one more tile" treatment
-    // stopped short of the actual dock tile, leaving a plain, undetailed
-    // flat-fill seam between the last real maze tile and the rim -- exactly
-    // the visible "gap in the bleed-off path" this fixes.
-    mazeLeft: number,
-    mazeTop: number,
-    mazeWidth: number,
-    mazeHeight: number,
     continuationLength: number,
     rimColor: number,
     intensity: number
   ): void {
-    const bandLeft = tileRect.left + Math.round((frame.leftInset / materialTileSize) * tileRect.width);
-    const bandTop = tileRect.top + Math.round((frame.topInset / materialTileSize) * tileRect.height);
-    const bandRight = tileRect.left + Math.round(((frame.leftInset + frame.width) / materialTileSize) * tileRect.width);
-    const bandBottom = tileRect.top + Math.round(((frame.topInset + frame.height) / materialTileSize) * tileRect.height);
-    const mazeRight = mazeLeft + mazeWidth;
-    const mazeBottom = mazeTop + mazeHeight;
-    const length = Math.max(1, Math.round(continuationLength));
+    // Reuse the exact rounded terminal-tile band that owns the flat dock fill.
+    // Reconstructing this from aggregate maze/board bounds was the remaining
+    // source of the visible one-tile seam after PR #252.
+    const facetRect = resolveLegacyMenuBorderDockFacetRect(direction, frame, {
+      boardHeight,
+      boardLeft,
+      boardTop,
+      boardWidth,
+      continuationLength,
+      materialTileSize,
+      tileRect
+    });
+    if (!facetRect) {
+      return;
+    }
 
-    let facetRect: LegacyPixelTileRect;
     let hasTop = false;
     let hasLeft = false;
     let hasBottom = false;
     let hasRight = false;
 
     if (direction === 'left') {
-      const right = mazeLeft;
-      const left = (boardLeft - length);
-      facetRect = { height: bandBottom - bandTop, left, top: bandTop, width: right - left };
       hasRight = true;
     } else if (direction === 'right') {
-      const left = mazeRight;
-      const right = (boardLeft + boardWidth + length);
-      facetRect = { height: bandBottom - bandTop, left, top: bandTop, width: right - left };
       hasLeft = true;
     } else if (direction === 'top') {
-      const bottom = mazeTop;
-      const top = (boardTop - length);
-      facetRect = { height: bottom - top, left: bandLeft, top, width: bandRight - bandLeft };
       hasBottom = true;
     } else {
-      const top = mazeBottom;
-      const bottom = (boardTop + boardHeight + length);
-      facetRect = { height: bottom - top, left: bandLeft, top, width: bandRight - bandLeft };
       hasTop = true;
-    }
-
-    if (facetRect.width <= 0 || facetRect.height <= 0) {
-      return;
     }
 
     this.drawLegacyPathTileFacet(graphics, facetRect, intensity, rimColor, hasTop, hasLeft, hasBottom, hasRight);
