@@ -792,7 +792,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // drive the same menuStaticDrawLifecyclePhase transition.
     expect(menuSceneSource).not.toContain('private drawLegacyProgressionGlyph(');
     expect(menuSceneSource).toContain('private drawLegacyLevelAnnouncer(time: number): void');
-    expect(menuSceneSource).toContain('private resolveLegacyLevelAnnouncerAlpha(time: number): number');
+    expect(menuSceneSource).toContain('private resolveLegacyLevelAnnouncerVisualState(time: number): { alpha: number; scale: number }');
     expect(menuSceneSource).toContain('this.drawLegacyLevelAnnouncer(time);');
     // The front door no longer shows the demo AI's own level badge (it read
     // as "your level" even though it tracks an independent, invisible AI
