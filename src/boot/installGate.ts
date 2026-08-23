@@ -51,7 +51,6 @@ export interface MazerInstallGateCopy {
 export const shouldShowMazerInstallGate = (state: InstallSurfaceState): boolean => state.mode !== 'hidden';
 
 export const resolveMazerInstallGateCopy = (state: InstallSurfaceState): MazerInstallGateCopy => {
-  void state;
   return {
     title: '',
     subtitle: '',
@@ -60,8 +59,12 @@ export const resolveMazerInstallGateCopy = (state: InstallSurfaceState): MazerIn
       'Tap Share, then choose More.',
       'Select Add to Home Screen, Install app, or Download.'
     ],
-    primaryLabel: null,
-    primaryAction: null,
+    // `available` means installSurface has already intercepted and retained
+    // the browser's beforeinstallprompt event. The boot gate must expose the
+    // one action that can replay that native prompt or Chrome/Edge players
+    // have no way through the otherwise blocking screen.
+    primaryLabel: state.mode === 'available' && state.canPrompt ? 'Install' : null,
+    primaryAction: state.mode === 'available' && state.canPrompt ? 'install' : null,
     showSkip: false,
     showCopyLink: false
   };

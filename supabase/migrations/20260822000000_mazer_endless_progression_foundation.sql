@@ -37,6 +37,16 @@ alter table public.mazer_progression_states
   add constraint mazer_progression_states_player_level_check
     check (player_level >= 1);
 
+-- The completion ordinal is unbounded, but the separate difficulty pressure
+-- remains in the same client-owned 8..400 envelope. Widen the legacy 1..240
+-- constraints before the completion RPC starts advancing this field by the
+-- canonical +4 step.
+alter table public.mazer_progression_states
+  drop constraint if exists mazer_progression_states_player_target_complexity_check;
+alter table public.mazer_progression_states
+  add constraint mazer_progression_states_player_target_complexity_check
+    check (player_target_complexity between 8 and 400);
+
 alter table public.mazer_ai_progression_states
   alter column level type bigint,
   alter column completed_cycles type bigint;
@@ -46,6 +56,12 @@ alter table public.mazer_ai_progression_states
 alter table public.mazer_ai_progression_states
   add constraint mazer_ai_progression_states_level_check
     check (level >= 1);
+
+alter table public.mazer_ai_progression_states
+  drop constraint if exists mazer_ai_progression_states_target_complexity_check;
+alter table public.mazer_ai_progression_states
+  add constraint mazer_ai_progression_states_target_complexity_check
+    check (target_complexity between 8 and 400);
 
 -- 2. Leaderboard tie-breaking needs a timestamp of when the current level
 -- was actually reached (existing rows have no trustworthy equivalent --

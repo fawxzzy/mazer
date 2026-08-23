@@ -35,6 +35,8 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(foundation).toContain('check (level >= 1)');
     expect(foundation).toContain('alter column player_level type bigint');
     expect(foundation).toContain('alter column level type bigint');
+    expect(foundation).toContain('check (player_target_complexity between 8 and 400)');
+    expect(foundation).toContain('check (target_complexity between 8 and 400)');
     expect(foundation).toContain('on public.mazer_cycle_receipts (user_id, client_run_id)');
     expect(completionRpc).toContain('v_next_level := v_current.player_level + 1');
     expect(completionRpc).toContain('create or replace function public.mazer_complete_ai_level');
@@ -46,6 +48,16 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(completionRpc).toContain('v_completed_level := p_completed_level::bigint');
     expect(completionRpc).toContain("'completedCycles', v_next_completed_cycles::text");
     expect(completionRpc).toContain("'level', v_next_level::text");
+    expect(completionRpc).toContain('v_current.player_target_complexity + 4');
+    expect(completionRpc).toContain('v_current.target_complexity + 4');
+    expect(completionRpc).toContain("when v_next_target_complexity >= 125 then 'S'");
+    expect(completionRpc).toContain("'colorTier', v_next_color_tier");
+    expect(completionRpc).toContain("'rank', v_next_rank");
+    expect(completionRpc).toContain("'targetComplexity', v_next_target_complexity");
+    expect(completionRpc).toContain('player_rank = v_next_rank');
+    expect(completionRpc).toContain('player_target_complexity = v_next_target_complexity');
+    expect(completionRpc).toContain('rank = v_next_rank');
+    expect(completionRpc).toContain('target_complexity = v_next_target_complexity');
     expect(completionRpc).not.toContain('p_completed_level integer');
     expect(completionRpc).not.toContain('p_completed_level bigint');
     expect(completionRpc).toContain("raise exception 'client_run_id is required for idempotent completion'");

@@ -23,7 +23,7 @@ describe('Mazer install gate', () => {
     expect(shouldShowMazerInstallGate({ ...hiddenState, mode: 'manual', instruction: 'Use Share > Add to Home Screen' })).toBe(true);
   });
 
-  test('all browser modes use the same three-step, no-action install contract', () => {
+  test('keeps one shared three-step contract while restoring the native action only for prompt-capable browsers', () => {
     const copy = resolveMazerInstallGateCopy({ ...hiddenState, mode: 'ios-open-in-browser' });
 
     expect(copy.primaryLabel).toBeNull();
@@ -38,7 +38,12 @@ describe('Mazer install gate', () => {
       'Select Add to Home Screen, Install app, or Download.'
     ]);
 
-    expect(resolveMazerInstallGateCopy({ ...hiddenState, mode: 'available', canPrompt: true })).toEqual(copy);
+    expect(resolveMazerInstallGateCopy({ ...hiddenState, mode: 'available', canPrompt: true })).toEqual({
+      ...copy,
+      primaryAction: 'install',
+      primaryLabel: 'Install'
+    });
+    expect(resolveMazerInstallGateCopy({ ...hiddenState, mode: 'available', canPrompt: false })).toEqual(copy);
     expect(resolveMazerInstallGateCopy({ ...hiddenState, mode: 'manual', instruction: 'ignored' })).toEqual(copy);
   });
 

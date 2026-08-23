@@ -64,6 +64,9 @@ declare
   v_completed_level bigint;
   v_next_level bigint;
   v_next_completed_cycles bigint;
+  v_next_target_complexity integer;
+  v_next_rank text;
+  v_next_color_tier integer;
   v_now timestamp with time zone := pg_catalog.now();
   v_state jsonb;
   v_tracks jsonb;
@@ -143,6 +146,22 @@ begin
 
   v_next_level := v_current.player_level + 1;
   v_next_completed_cycles := v_current.player_completed_cycles + 1;
+  v_next_target_complexity := least(
+    400,
+    greatest(8, v_current.player_target_complexity + 4)
+  );
+  v_next_rank := case
+    when v_next_target_complexity >= 125 then 'S'
+    when v_next_target_complexity >= 96 then 'A'
+    when v_next_target_complexity >= 70 then 'B'
+    when v_next_target_complexity >= 46 then 'C'
+    when v_next_target_complexity >= 28 then 'D'
+    else 'E'
+  end;
+  v_next_color_tier := least(
+    5,
+    greatest(0, ((v_next_target_complexity - 8) / 4) / 5)
+  );
 
   insert into public.mazer_cycle_receipts (
     user_id,
@@ -195,10 +214,13 @@ begin
     else '{}'::jsonb
   end;
   v_player_track := v_player_track || pg_catalog.jsonb_build_object(
+    'colorTier', v_next_color_tier,
     'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
     'lastReceiptId', p_client_run_id::text,
-    'level', v_next_level::text
+    'level', v_next_level::text,
+    'rank', v_next_rank,
+    'targetComplexity', v_next_target_complexity
   );
   v_state := pg_catalog.jsonb_set(
     pg_catalog.jsonb_set(
@@ -215,6 +237,8 @@ begin
   update public.mazer_progression_states s
   set
     player_level = v_next_level,
+    player_rank = v_next_rank,
+    player_target_complexity = v_next_target_complexity,
     player_completed_cycles = v_next_completed_cycles,
     revision = v_current.revision + 1,
     state = v_state,
@@ -272,6 +296,9 @@ declare
   v_completed_level bigint;
   v_next_level bigint;
   v_next_completed_cycles bigint;
+  v_next_target_complexity integer;
+  v_next_rank text;
+  v_next_color_tier integer;
   v_now timestamp with time zone := pg_catalog.now();
   v_state jsonb;
   v_summary jsonb;
@@ -340,6 +367,22 @@ begin
 
   v_next_level := v_current.level + 1;
   v_next_completed_cycles := v_current.completed_cycles + 1;
+  v_next_target_complexity := least(
+    400,
+    greatest(8, v_current.target_complexity + 4)
+  );
+  v_next_rank := case
+    when v_next_target_complexity >= 125 then 'S'
+    when v_next_target_complexity >= 96 then 'A'
+    when v_next_target_complexity >= 70 then 'B'
+    when v_next_target_complexity >= 46 then 'C'
+    when v_next_target_complexity >= 28 then 'D'
+    else 'E'
+  end;
+  v_next_color_tier := least(
+    5,
+    greatest(0, ((v_next_target_complexity - 8) / 4) / 5)
+  );
 
   insert into public.mazer_cycle_receipts (
     user_id,
@@ -386,21 +429,29 @@ begin
     else '{}'::jsonb
   end;
   v_state := v_state || pg_catalog.jsonb_build_object(
+    'colorTier', v_next_color_tier,
     'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
     'lastReceiptId', p_client_run_id::text,
-    'level', v_next_level::text
+    'level', v_next_level::text,
+    'rank', v_next_rank,
+    'targetComplexity', v_next_target_complexity
   );
   v_summary := v_summary || pg_catalog.jsonb_build_object(
+    'colorTier', v_next_color_tier,
     'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
     'lastReceiptId', p_client_run_id::text,
-    'level', v_next_level::text
+    'level', v_next_level::text,
+    'rank', v_next_rank,
+    'targetComplexity', v_next_target_complexity
   );
 
   update public.mazer_ai_progression_states s
   set
     level = v_next_level,
+    rank = v_next_rank,
+    target_complexity = v_next_target_complexity,
     completed_cycles = v_next_completed_cycles,
     state = v_state,
     summary = v_summary,
