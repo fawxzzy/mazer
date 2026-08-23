@@ -7,42 +7,49 @@ import {
 } from '../../src/legacy-runtime/legacyGuestAccess';
 
 describe('legacy full auth gate', () => {
-  test('keeps local guest play explicit while the default resolved entry is login-first', () => {
+  test('requires authentication and exposes no guest entry route', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
 
-    expect(LEGACY_GUEST_PLAY_ACCESS_ENABLED).toBe(true);
+    expect(LEGACY_GUEST_PLAY_ACCESS_ENABLED).toBe(false);
     expect(isLegacyPlayAccessAllowed('guest', { authResolved: false, guestPlayGranted: false })).toBe(false);
     expect(isLegacyPlayAccessAllowed('unavailable', { authResolved: true, guestPlayGranted: false })).toBe(false);
-    expect(isLegacyPlayAccessAllowed('guest', { authResolved: true, guestPlayGranted: true })).toBe(true);
+    expect(isLegacyPlayAccessAllowed('guest', { authResolved: true, guestPlayGranted: true })).toBe(false);
     expect(isLegacyPlayAccessAllowed('authenticated', { authResolved: true, guestPlayGranted: false })).toBe(true);
     expect(menuSceneSource).toContain('private guestPlayGranted = false;');
     expect(menuSceneSource).toContain("this.authGateLocked = snapshot.status !== 'authenticated' && !this.guestPlayGranted;");
     expect(menuSceneSource).toContain('const playAccessAllowed = this.hasLegacyPlayAccess();');
     expect(menuSceneSource).toContain('if (!this.hasLegacyPlayAccess()) {');
     expect(menuSceneSource).toContain('if (this.hasLegacyPlayAccess()) {\n        this.startPlayMode();\n      }');
-    expect(menuSceneSource).toContain("if (lowerKey === 'g' && this.mode === 'menu' && this.overlay === 'auth') {");
-    expect(menuSceneSource).toContain('this.handleLegacyGuestPlay();');
+    expect(menuSceneSource).not.toContain("if (lowerKey === 'g' && this.mode === 'menu' && this.overlay === 'auth') {");
+    expect(menuSceneSource).not.toContain("text: 'Play as guest'");
     expect(menuSceneSource).toContain('startGuestPlayMode: (): LegacyQaOverlayResult => this.handleLegacyQaStartGuestPlayMode()');
     expect(menuSceneSource).toContain('private handleLegacyQaStartGuestPlayMode(): LegacyQaOverlayResult {');
   });
 
-  test('keeps an explicit local guest-play exit in the login bottom bar without touching auth state', () => {
+  test('uses one full-width submit action and no guest action in the auth bottom bar', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
-    const guestPlayStart = menuSceneSource.indexOf('  private handleLegacyGuestPlay(): void {');
-    const guestPlayEnd = menuSceneSource.indexOf('  private applyLegacyAuthSubmitResult(', guestPlayStart);
-    const guestPlaySource = menuSceneSource.slice(guestPlayStart, guestPlayEnd);
+    const formStart = menuSceneSource.indexOf('  private buildAuthCredentialsForm(');
+    const formEnd = menuSceneSource.indexOf('  private createAuthFooterLink(', formStart);
+    const formSource = menuSceneSource.slice(formStart, formEnd);
 
-    expect(menuSceneSource).toContain("text: 'Play as guest',");
-    expect(menuSceneSource).toContain("tone: 'secondary'");
-    expect(guestPlayStart).toBeGreaterThanOrEqual(0);
-    expect(guestPlaySource).toContain("this.authSnapshot.status === 'authenticated'");
-    expect(guestPlaySource).toContain('this.guestPlayGranted = true;');
-    expect(guestPlaySource).toContain('this.authGateLocked = false;');
-    expect(guestPlaySource).toContain('this.startPlayMode();');
-    expect(guestPlaySource).toContain('this.destroyLegacyAuthNativeInput();');
-    expect(guestPlaySource).not.toContain('signOutLegacyAuth');
-    expect(guestPlaySource).not.toContain('signInLegacyAuth');
-    expect(menuSceneSource).toContain('The diagnostics bridge intentionally calls the same user-facing action');
+    expect(formSource).toContain('this.createLegacyBottomActionBar(');
+    expect(formSource).toContain("tone: 'primary'");
+    expect(formSource).toContain('      null\n    );');
+    expect(formSource).not.toContain('Play as guest');
+    expect(formSource).not.toContain('handleLegacyGuestPlay');
+  });
+
+  test('halts gameplay and ambient updates while the forced auth screen is open', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const updateStart = menuSceneSource.indexOf('  public update(time: number, delta: number): void {');
+    const updateEnd = menuSceneSource.indexOf('  private initializeRuntimeDiagnostics(): void {', updateStart);
+    const updateSource = menuSceneSource.slice(updateStart, updateEnd);
+    const freezeAt = updateSource.indexOf("if (this.overlay === 'auth') {");
+
+    expect(freezeAt).toBeGreaterThanOrEqual(0);
+    expect(updateSource.indexOf('this.updateStars(time, delta);')).toBeGreaterThan(freezeAt);
+    expect(updateSource.indexOf('this.updateMenuDemo(time);')).toBeGreaterThan(freezeAt);
+    expect(updateSource.slice(freezeAt, updateSource.indexOf('this.updateStars(time, delta);'))).toContain('return;');
   });
 
   test('revokes a prior guest grant before returning to menu, account entry, or credential submission', () => {

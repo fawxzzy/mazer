@@ -1487,9 +1487,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('presentation.primaryActionLabel');
     expect(menuSceneSource).toContain('presentation.recoveryActionLabel');
     expect(menuSceneSource).toContain('this.createLegacyBottomActionBar(\n      panel,\n      stacked,');
-    expect(menuSceneSource).toContain("text: 'Play as guest',");
-    expect(menuSceneSource).toContain('onClick: () => this.handleLegacyGuestPlay()');
-    expect(menuSceneSource).toContain('private handleLegacyGuestPlay(): void');
+    expect(menuSceneSource).not.toContain("text: 'Play as guest',");
+    expect(menuSceneSource).not.toContain('onClick: () => this.handleLegacyGuestPlay()');
+    expect(menuSceneSource).toContain("? ['username', 'email', 'password']");
+    expect(menuSceneSource).not.toContain("'displayName',\n        this.authForm.displayName");
+    expect(menuSceneSource).toContain('? signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.username)');
+    expect(menuSceneSource).toContain("if (this.overlay === 'auth') {");
+    expect(menuSceneSource.indexOf("if (this.overlay === 'auth') {")).toBeLessThan(menuSceneSource.indexOf('this.updateStars(time, delta);'));
     expect(menuSceneSource).toContain('private createAuthFooterLink(');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSubmit(): Promise<void>');
     expect(menuSceneSource).toContain('private async handleLegacyAuthSignOut(): Promise<void>');
@@ -1597,6 +1601,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("fontFamily: unifiedAuthPrimary ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY");
     expect(menuSceneSource).toContain("const barHeight = this.overlay === 'auth' ? 56");
     expect(menuSceneSource).not.toContain('EMAIL OR USERNAME');
+    expect(menuSceneSource).toContain('this.levelAnnouncerNumberText.setVisible(false);');
+    expect(menuSceneSource).toContain("this.authForm.mode === 'login' && rememberedIdentity?.displayName");
     expect(authSource).toContain('signInWithPassword({');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");
   });

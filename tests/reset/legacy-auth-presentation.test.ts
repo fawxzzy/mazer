@@ -12,7 +12,7 @@ describe('legacy auth presentation', () => {
       emailLabel: 'Email',
       helper: '',
       passwordLabel: 'Password',
-      primaryActionLabel: 'Log in',
+      primaryActionLabel: 'Sign in',
       recoveryActionLabel: 'Reset password',
       title: 'Welcome'
     }));
@@ -29,7 +29,7 @@ describe('legacy auth presentation', () => {
     }));
   });
 
-  test('makes a remembered account explicit without echoing its email address or name into supporting copy', () => {
+  test('keeps a remembered account on the same clean sign-in presentation', () => {
     const presentation = resolveLegacyAuthPresentation({
       mode: 'login',
       rememberedIdentity: {
@@ -41,13 +41,13 @@ describe('legacy auth presentation', () => {
       snapshot: { configured: true, status: 'guest' }
     });
 
-    expect(presentation.title).toBe('Welcome Back');
-    expect(presentation.helper).toBe('Continue with this account to log in.');
+    expect(presentation.title).toBe('Welcome');
+    expect(presentation.helper).toBe('');
     expect(presentation.helper).not.toContain('runner@example.com');
     expect(presentation.helper).not.toContain('Maze Runner');
   });
 
-  test('explains a required reauthentication without implying that saved progress was lost', () => {
+  test('keeps reauthentication detail out of the visual subtitle slot', () => {
     const presentation = resolveLegacyAuthPresentation({
       mode: 'login',
       rememberedIdentity: {
@@ -60,7 +60,7 @@ describe('legacy auth presentation', () => {
     });
 
     expect(presentation.title).toBe('Welcome');
-    expect(presentation.helper).toBe('Your session ended. Enter your password to continue.');
+    expect(presentation.helper).toBe('');
     expect(presentation.helper).not.toContain('runner@example.com');
     expect(presentation.helper).not.toContain('Maze Runner');
   });
@@ -71,19 +71,30 @@ describe('legacy auth presentation', () => {
       rememberedIdentity: null,
       snapshot: { configured: true, status: 'authenticated' }
     })).toEqual(expect.objectContaining({
-      helper: 'Review your saved Mazer account or sign out on this device.',
+      helper: '',
       title: 'Account'
     }));
   });
 
-  test('uses plain language when the client cannot reach an account configuration', () => {
+  test('keeps account configuration failures in categorical feedback instead of subtitle copy', () => {
     expect(resolveLegacyAuthPresentation({
       mode: 'signup',
       rememberedIdentity: null,
       snapshot: { configured: false, status: 'unavailable' }
     })).toEqual(expect.objectContaining({
-      helper: 'Account access is unavailable right now. You can still play as a guest.',
-      title: 'Account Unavailable'
+      helper: '',
+      title: 'Welcome'
+    }));
+  });
+
+  test('uses the approved action copy and one email field label', () => {
+    expect(resolveLegacyAuthPresentation({
+      mode: 'login',
+      rememberedIdentity: null,
+      snapshot: { configured: true, status: 'guest' }
+    })).toEqual(expect.objectContaining({
+      emailLabel: 'Email',
+      primaryActionLabel: 'Sign in'
     }));
   });
 });

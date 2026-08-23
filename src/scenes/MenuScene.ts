@@ -1979,6 +1979,24 @@ export class MenuScene extends Phaser.Scene {
     }
     this.syncLegacyAuthGateLoadingScreen(time);
     this.recordRuntimeFrame(delta);
+    if (this.overlay === 'auth') {
+      // Auth owns the full screen. The level announcer sits above the normal
+      // overlay depth, so freezing simulation alone can strand its current
+      // frame over an input field. Hide both announcer layers explicitly.
+      this.levelAnnouncerLabelText.setVisible(false);
+      this.levelAnnouncerNumberText.setVisible(false);
+      this.expireLegacyPlayerMessages(time);
+      for (const button of this.uiButtons) {
+        button.updateFrame?.(time);
+      }
+      const uiRebuilt = this.uiDirty;
+      if (uiRebuilt) {
+        this.rebuildUi();
+      }
+      this.publishVisualDiagnostics(time, uiRebuilt);
+      this.publishRuntimeDiagnostics(time);
+      return;
+    }
     this.updateStars(time, delta);
     this.expireLegacyPlayerMessages(time);
     this.advanceLegacyOverlayScrollMomentum(delta);
@@ -2003,11 +2021,11 @@ export class MenuScene extends Phaser.Scene {
       this.applyGenerationRequest(nextRequest, time);
     }
 
-    // The demo walker used to freeze the instant any overlay (Settings,
-    // Pause, Auth) opened on the main menu -- there's no gameplay to
+    // The demo walker keeps moving behind non-auth menu overlays -- there's no gameplay to
     // protect there, it's just ambient background motion, so it now keeps
-    // playing behind the overlay instead of visibly freezing/hitching each
-    // time Settings is opened or a setting is changed.
+    // playing behind Settings instead of visibly freezing/hitching each time a
+    // setting changes. Auth returns above: no game or ambient simulation runs
+    // behind the forced account screen.
     if (
       this.mode === 'menu'
       && this.pendingGenerationRequest === null
@@ -3149,12 +3167,6 @@ export class MenuScene extends Phaser.Scene {
       if (this.hasLegacyPlayAccess()) {
         this.startPlayMode();
       }
-      return true;
-    }
-
-    if (lowerKey === 'g' && this.mode === 'menu' && this.overlay === 'auth') {
-      event.preventDefault();
-      this.handleLegacyGuestPlay();
       return true;
     }
 
@@ -8385,6 +8397,10 @@ export class MenuScene extends Phaser.Scene {
     this.menuAiProgressionBadgeTextFits = false;
     this.menuAiProgressionBadgeText.setVisible(false);
     this.menuAiProgressionBadgeLabelText.setVisible(false);
+    if (this.overlay === 'auth') {
+      this.levelAnnouncerLabelText.setVisible(false);
+      this.levelAnnouncerNumberText.setVisible(false);
+    }
   }
 
   private drawLegacyMenuSettingsCog(time: number): void {
@@ -10634,13 +10650,13 @@ export class MenuScene extends Phaser.Scene {
     const panel = this.resolveOverlayPanelFrame();
     const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const centerX = panel.centerX;
+    const rememberedIdentity = readLegacyRememberedIdentityState(this.resolveBrowserLocalStorage());
     const presentation = resolveLegacyAuthPresentation({
       mode: this.authForm.mode,
-      rememberedIdentity: readLegacyRememberedIdentityState(this.resolveBrowserLocalStorage()),
+      rememberedIdentity,
       snapshot: this.authSnapshot
     });
-    const hasHelper = presentation.helper.length > 0;
-    let rowY = panel.top + (this.authForm.mode === 'signup' ? panel.height * 0.29 : panel.height * 0.41);
+    const rowY = panel.top + (panel.height * 0.42);
 
     // No way out while the full auth gate has this locked -- handleBackAction
     // already refuses to close it too (defense in depth for Escape), but
@@ -10653,23 +10669,17 @@ export class MenuScene extends Phaser.Scene {
       this.authForm.mode === 'signup' ? 'Create account' : presentation.title,
       panel.top + (stacked ? 103 : 110)
     );
-
-    const accountLabel = resolveLegacyAuthAccountLabel(this.authSnapshot);
-    // Fitness keeps this slot empty on a fresh sign-in/create-account load --
-    // no descriptive/explanatory copy at all, straight from the headline to
-    // the fields. Only specific states (remembered identity, reauth,
-    // account-unavailable, the authenticated account screen) carry a short
-    // one-line helper.
-    if (hasHelper) {
+    if (this.authForm.mode === 'login' && rememberedIdentity?.displayName) {
       this.createAuthInfoText(
-        presentation.helper,
-        panel.top + (stacked ? 96 : 108),
+        rememberedIdentity.displayName,
+        panel.top + (stacked ? 164 : 176),
         panel,
-        '#b7f2ff',
-        stacked ? 13 : 15
+        '#d7f7ee',
+        stacked ? 15 : 17
       );
     }
 
+    const accountLabel = resolveLegacyAuthAccountLabel(this.authSnapshot);
     if (this.authSnapshot.status === 'authenticated') {
       this.buildAuthenticatedAccountSection(panel, stacked, rowY, accountLabel);
       return;
@@ -11109,39 +11119,7 @@ export class MenuScene extends Phaser.Scene {
     const fieldHeight = 54;
     let rowY = startY;
 
-    this.createAuthFieldBox(
-      centerX,
-      rowY,
-      fieldWidth,
-      fieldHeight,
-      'email',
-      this.authForm.email,
-      this.authForm.email.length === 0
-    );
-    rowY += 64;
-    this.createAuthFieldBox(
-      centerX,
-      rowY,
-      fieldWidth,
-      fieldHeight,
-      'password',
-      this.authForm.password.length === 0 ? '' : this.maskLegacyAuthPassword(),
-      this.authForm.password.length === 0
-    );
-    rowY += 64;
-
     if (this.authForm.mode === 'signup') {
-      this.createAuthFieldBox(
-        centerX,
-        rowY,
-        fieldWidth,
-        fieldHeight,
-        'displayName',
-        this.authForm.displayName,
-        this.authForm.displayName.length === 0
-      );
-      rowY += 64;
-
       this.createAuthFieldBox(
         centerX,
         rowY,
@@ -11168,6 +11146,26 @@ export class MenuScene extends Phaser.Scene {
       }
       rowY += 64;
     }
+
+    this.createAuthFieldBox(
+      centerX,
+      rowY,
+      fieldWidth,
+      fieldHeight,
+      'email',
+      this.authForm.email,
+      this.authForm.email.length === 0
+    );
+    rowY += 64;
+    this.createAuthFieldBox(
+      centerX,
+      rowY,
+      fieldWidth,
+      fieldHeight,
+      'password',
+      this.authForm.password.length === 0 ? '' : this.maskLegacyAuthPassword(),
+      this.authForm.password.length === 0
+    );
 
     // Footer links (mode switch, password reset) sit inline below the
     // fields as small text -- not full-width buttons -- mirroring
@@ -11211,9 +11209,6 @@ export class MenuScene extends Phaser.Scene {
     const primaryLabel = this.authSubmitting
       ? 'Working'
       : presentation.primaryActionLabel;
-    // Guest play is deliberately a local-only escape hatch from account entry:
-    // the left slot starts the existing guest-scoped play mode directly; it
-    // neither creates an account nor calls any remote auth/data operation.
     this.createLegacyBottomActionBar(
       panel,
       stacked,
@@ -11222,11 +11217,7 @@ export class MenuScene extends Phaser.Scene {
         text: primaryLabel,
         tone: 'primary'
       },
-      {
-        onClick: () => this.handleLegacyGuestPlay(),
-        text: 'Play as guest',
-        tone: 'secondary'
-      }
+      null
     );
   }
 
@@ -12570,7 +12561,7 @@ export class MenuScene extends Phaser.Scene {
 
   private selectNextLegacyAuthField(direction: -1 | 1): void {
     const fields: LegacyAuthFieldId[] = this.authForm.mode === 'signup'
-      ? ['email', 'password', 'displayName', 'username']
+      ? ['username', 'email', 'password']
       : ['email', 'password'];
     const currentIndex = Math.max(0, fields.indexOf(this.activeAuthField ?? 'email'));
     const nextIndex = (currentIndex + direction + fields.length) % fields.length;
@@ -12764,7 +12755,7 @@ export class MenuScene extends Phaser.Scene {
 
     const attemptId = ++this.authSubmitAttemptId;
     const authCall = this.authForm.mode === 'signup'
-      ? signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.displayName)
+      ? signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.username)
       : signInLegacyAuth(this.authForm.email, this.authForm.password);
 
     // Whatever authCall eventually does, apply it once it settles -- the
