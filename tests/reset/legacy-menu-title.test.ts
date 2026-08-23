@@ -4,6 +4,7 @@ import {
   LEGACY_MENU_PATH_TITLE_COLUMNS,
   LEGACY_MENU_PATH_TITLE_GRID,
   resolveLegacyMenuPathTitleLayout,
+  resolveLegacyMenuTitleFontSize,
   resolveLegacyMenuTitlePresentation
 } from '../../src/legacy-runtime/legacyMenuTitle';
 
@@ -12,7 +13,7 @@ describe('legacy menu title presentation', () => {
   // reserved layout lane height (see legacyMenuLayout.ts's menuTitleReserve),
   // not from board size -- board size and the title reserve are computed
   // independently so the title can stay compact regardless of how large the
-  // board grows to fill available space. fontSize = max(22, round(reserve *
+  // board grows to fill available space. fontSize = max(13, round(reserve *
   // 0.68)); surface/isPortrait no longer change fontSize itself (only the
   // shadow offsets and alpha channels still branch on them).
 
@@ -25,10 +26,20 @@ describe('legacy menu title presentation', () => {
     expect(roomier.fontSize).toBeGreaterThan(compact.fontSize);
   });
 
-  test('floors font size at 22 even for a near-zero reserve', () => {
+  test('uses one shared compact floor for the renderer and header fit calculation', () => {
     const presentation = resolveLegacyMenuTitlePresentation(1, 3, true);
 
-    expect(presentation.fontSize).toBe(22);
+    expect(resolveLegacyMenuTitleFontSize(1)).toBe(13);
+    expect(presentation.fontSize).toBe(13);
+  });
+
+  test('keeps the normal-phone inline fallback readable while allowing it to fit', () => {
+    const fontSize = resolveLegacyMenuTitleFontSize(32);
+    const layout = resolveLegacyMenuPathTitleLayout(160, 28, fontSize);
+
+    expect(fontSize).toBe(22);
+    expect(layout.cellSize).toBe(2);
+    expect(layout.width).toBe(82);
   });
 
   test('surface and portrait no longer change font size for the same reserve height (only alpha/shadow do)', () => {
