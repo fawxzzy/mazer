@@ -203,6 +203,47 @@ describe('legacy remote progression', () => {
     expect(merged.updatedAt).toBe('2026-07-16T13:00:00.000Z');
   });
 
+  test('never lets a stale higher completion count lower either visible progression track', () => {
+    const remote = createEmptyLegacyProgressionState();
+    const local = createEmptyLegacyProgressionState();
+    const levelTwentyEightTarget = 8 + (27 * 4);
+    const levelThirtyTwoTarget = 8 + (31 * 4);
+
+    remote.tracks.player = {
+      ...remote.tracks.player,
+      completedCycles: 40,
+      targetComplexity: levelTwentyEightTarget
+    };
+    remote.tracks['ai-runner'] = {
+      ...remote.tracks['ai-runner'],
+      completedCycles: 40,
+      targetComplexity: levelTwentyEightTarget
+    };
+    local.tracks.player = {
+      ...local.tracks.player,
+      completedCycles: 39,
+      targetComplexity: levelThirtyTwoTarget
+    };
+    local.tracks['ai-runner'] = {
+      ...local.tracks['ai-runner'],
+      completedCycles: 39,
+      targetComplexity: levelThirtyTwoTarget
+    };
+
+    const merged = mergeLegacyProgressionStateAdvancements(remote, local);
+
+    expect(merged.tracks.player).toMatchObject({
+      completedCycles: 39,
+      level: 32,
+      targetComplexity: levelThirtyTwoTarget
+    });
+    expect(merged.tracks['ai-runner']).toMatchObject({
+      completedCycles: 39,
+      level: 32,
+      targetComplexity: levelThirtyTwoTarget
+    });
+  });
+
   test('hydrates canonical progression and settings into account-scoped storage before scene creation', async () => {
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-07-16T14:00:00.000Z';

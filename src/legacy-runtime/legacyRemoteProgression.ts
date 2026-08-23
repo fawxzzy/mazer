@@ -191,8 +191,12 @@ const compareTrackAdvancement = (
   right: LegacyProgressionTrack
 ): number => {
   const comparisons = [
-    left.completedCycles - right.completedCycles,
+    // A completed run must never make a visible level fall back during
+    // cross-device reconciliation. Older clients could accumulate a larger
+    // completion count while their quality pacing reduced targetComplexity;
+    // target complexity therefore takes precedence over the historical count.
     left.targetComplexity - right.targetComplexity,
+    left.completedCycles - right.completedCycles,
     left.peakComplexity - right.peakComplexity,
     (Date.parse(left.lastCompletedAt ?? '') || 0) - (Date.parse(right.lastCompletedAt ?? '') || 0)
   ];
