@@ -39,6 +39,15 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(completionRpc).toContain('v_next_level := v_current.player_level + 1');
     expect(completionRpc).toContain('create or replace function public.mazer_complete_ai_level');
     expect(completionRpc).toContain('v_next_level := v_current.level + 1');
+    expect(completionRpc).toContain('p_completed_level text');
+    expect(completionRpc).toContain('player_level text');
+    expect(completionRpc).toContain('player_completed_cycles text');
+    expect(completionRpc).toContain('completed_cycles text');
+    expect(completionRpc).toContain('v_completed_level := p_completed_level::bigint');
+    expect(completionRpc).toContain("'completedCycles', v_next_completed_cycles::text");
+    expect(completionRpc).toContain("'level', v_next_level::text");
+    expect(completionRpc).not.toContain('p_completed_level integer');
+    expect(completionRpc).not.toContain('p_completed_level bigint');
     expect(completionRpc).toContain("raise exception 'client_run_id is required for idempotent completion'");
     expect(completionRpc).toContain('security invoker');
     expect(completionRpc).not.toContain('security definer');
@@ -60,7 +69,7 @@ describe('legacy endless level recipe resolution', () => {
   });
 
   test('resolves successfully for representative large levels without overflow or throwing', () => {
-    for (const level of [100, 101, 250, 1_000, 100_000, 2_000_000_000]) {
+    for (const level of ['100', '101', '250', '1000', '100000', '2000000000', '9007199254740993']) {
       const recipe = resolveLegacyEndlessLevelRecipe(level);
       expect(recipe.level).toBe(level);
       expect(Number.isFinite(recipe.complexityBudget)).toBe(true);
@@ -71,7 +80,7 @@ describe('legacy endless level recipe resolution', () => {
   test('level 101 differs from level 100 (not a flat repeat)', () => {
     const level100 = resolveLegacyEndlessLevelRecipe(100);
     const level101 = resolveLegacyEndlessLevelRecipe(101);
-    expect(level101).not.toEqual({ ...level100, level: 101, seed: level101.seed });
+    expect(level101).not.toEqual({ ...level100, level: '101', seed: level101.seed });
     expect(level101.seed).not.toBe(level100.seed);
   });
 

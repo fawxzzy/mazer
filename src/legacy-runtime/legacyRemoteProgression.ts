@@ -20,6 +20,8 @@ import {
 } from './legacyGameTogglePreferences';
 import {
   LEGACY_PROGRESSION_STORAGE_KEY,
+  compareLegacyProgressionOrdinals,
+  maxLegacyProgressionOrdinal,
   normalizeLegacyProgressionState,
   readLegacyProgressionState,
   writeLegacyProgressionState,
@@ -206,8 +208,8 @@ const mergeTrackAdvancements = (
     ...recent,
     bestCompletionTimeMs: bestTimes.length > 0 ? Math.min(...bestTimes) : null,
     cleanCycles: Math.max(left.cleanCycles, right.cleanCycles),
-    completedCycles: Math.max(left.completedCycles, right.completedCycles),
-    level: Math.max(left.level, right.level),
+    completedCycles: maxLegacyProgressionOrdinal(left.completedCycles, right.completedCycles),
+    level: maxLegacyProgressionOrdinal(left.level, right.level),
     peakComplexity: Math.max(left.peakComplexity, right.peakComplexity),
     struggleCycles: Math.max(left.struggleCycles, right.struggleCycles),
     targetComplexity: Math.max(left.targetComplexity, right.targetComplexity)
@@ -238,7 +240,7 @@ export const mergeLegacyProgressionStateAdvancements = (
 };
 
 const hasProgressionCycles = (state: LegacyProgressionState): boolean => (
-  Object.values(state.tracks).some((track) => track.completedCycles > 0)
+  Object.values(state.tracks).some((track) => compareLegacyProgressionOrdinals(track.completedCycles, '0') > 0)
 );
 
 const progressionStatesMatch = (

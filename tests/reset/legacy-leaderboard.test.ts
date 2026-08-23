@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { getLegacyAuthClient } from '../../src/legacy-runtime/legacyAuth';
 import {
@@ -19,6 +20,20 @@ beforeEach(() => {
 });
 
 describe('fetchLegacyLeaderboardPage', () => {
+  test('keeps database ordering numeric while transporting unbounded ranks and levels as text', () => {
+    const leaderboardRpc = readFileSync(
+      new URL('../../supabase/migrations/20260822000200_mazer_leaderboard_rpc.sql', import.meta.url),
+      'utf8'
+    );
+
+    expect(leaderboardRpc).toContain('player_level text');
+    expect(leaderboardRpc).toContain('ranked.rank_value::text');
+    expect(leaderboardRpc).toContain('ranked.player_level::text');
+    expect(leaderboardRpc).toContain('base.player_level::text');
+    expect(leaderboardRpc).toContain('order by s.player_level desc');
+    expect(leaderboardRpc).not.toContain('player_level integer');
+  });
+
   test('reports unavailable when there is no client (feature flag off, misconfigured, or unreachable)', async () => {
     vi.mocked(getLegacyAuthClient).mockResolvedValueOnce(null);
     const result = await fetchLegacyLeaderboardPage(0);
@@ -39,9 +54,30 @@ describe('fetchLegacyLeaderboardPage', () => {
     const result = await fetchLegacyLeaderboardPage(0);
     expect(result.error).toBeNull();
     expect(result.entries).toEqual([
-      { rank: 1, username: 'maze_runner', playerLevel: 184, isRequestingUser: false },
-      { rank: 2, username: 'fawxzzy', playerLevel: 141, isRequestingUser: true }
+      { rank: '1', username: 'maze_runner', playerLevel: '184', isRequestingUser: false },
+      { rank: '2', username: 'fawxzzy', playerLevel: '141', isRequestingUser: true }
     ]);
+  });
+
+  test('preserves leaderboard levels beyond Number.MAX_SAFE_INTEGER as decimal text', async () => {
+    const rpc = vi.fn(async () => ({
+      data: [{
+        rank: '9007199254740992',
+        username: 'endless_runner',
+        player_level: '9007199254740993',
+        is_requesting_user: true
+      }],
+      error: null
+    }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ rpc } as never);
+
+    const result = await fetchLegacyLeaderboardPage(0);
+    expect(result.entries).toEqual([{
+      rank: '9007199254740992',
+      username: 'endless_runner',
+      playerLevel: '9007199254740993',
+      isRequestingUser: true
+    }]);
   });
 
   test('maps an RPC-not-deployed-yet error to friendly copy and an empty page', async () => {
@@ -88,7 +124,7 @@ describe('fetchLegacyLeaderboardPage', () => {
     const result = await fetchLegacyLeaderboardPage(0);
     expect(result.error).toBeNull();
     expect(result.entries).toEqual([
-      { rank: 1, username: 'ok', playerLevel: 5, isRequestingUser: false }
+      { rank: '1', username: 'ok', playerLevel: '5', isRequestingUser: false }
     ]);
   });
 
@@ -129,7 +165,7 @@ describe('fetchLegacyLeaderboardSelfRank', () => {
 
     const result = await fetchLegacyLeaderboardSelfRank();
     expect(result.error).toBeNull();
-    expect(result.selfRank).toEqual({ rank: 4213, playerLevel: 12, hasUsername: true });
+    expect(result.selfRank).toEqual({ rank: '4213', playerLevel: '12', hasUsername: true });
   });
 
   test('a user with no username yet gets a null-rank response, not a fabricated number', async () => {
@@ -145,7 +181,7 @@ describe('fetchLegacyLeaderboardSelfRank', () => {
 
     const result = await fetchLegacyLeaderboardSelfRank();
     expect(result.error).toBeNull();
-    expect(result.selfRank).toEqual({ rank: 0, playerLevel: 12, hasUsername: false });
+    expect(result.selfRank).toEqual({ rank: null, playerLevel: '12', hasUsername: false });
   });
 
   test('discards a server response claiming a username but no rank, rather than displaying a broken state', async () => {

@@ -226,12 +226,12 @@ describe('player progression completion flow', () => {
     recordMazeCycleCompletion.call(scene, 'play');
 
     expect(scene.progressionState.tracks.player).toMatchObject({
-      completedCycles: 1,
+      completedCycles: '1',
       lastSignal: 'challenge',
-      level: 2,
+      level: '2',
       targetComplexity: 12
     });
-    expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}').tracks.player.completedCycles).toBe(1);
+    expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}').tracks.player.completedCycles).toBe('1');
     expect(scene.pushLegacyPlayerMessage).not.toHaveBeenCalled();
 
     armLegacyMenuStaticDeconstructStage.call(scene, scene.time.now);
@@ -256,9 +256,9 @@ describe('player progression completion flow', () => {
     recordMazeCycleCompletion.call(scene, 'play');
 
     expect(scene.progressionState.tracks.player).toMatchObject({
-      completedCycles: 1,
+      completedCycles: '1',
       lastSignal: 'challenge',
-      level: 2,
+      level: '2',
       targetComplexity: 12
     });
     expect(scene.pushLegacyPlayerMessage).not.toHaveBeenCalled();
@@ -273,9 +273,9 @@ describe('player progression completion flow', () => {
     recordMazeCycleCompletion.call(scene, 'play');
 
     expect(scene.progressionState.tracks.player).toMatchObject({
-      completedCycles: 1,
+      completedCycles: '1',
       lastSignal: 'challenge',
-      level: 2,
+      level: '2',
       targetComplexity: 12
     });
     expect(scene.pushLegacyPlayerMessage).not.toHaveBeenCalled();

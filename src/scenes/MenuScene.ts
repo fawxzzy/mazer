@@ -204,11 +204,14 @@ import {
   LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH,
   LEGACY_PROGRESSION_STORAGE_KEY,
   createEmptyLegacyProgressionState,
+  formatLegacyProgressionOrdinal,
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
   resolveLegacyMazeGenerationProfileForProgression,
   resolveLegacyProgressionDifficultyProfile,
   resolveLegacyProgressionGenerationScale,
+  resolveLegacyProgressionLevel,
+  resolveLegacyProgressionOrdinalSeedComponent,
   resolveLegacyProgressionPalette,
   resolveLegacyProgressionTrackIdForSurface,
   summarizeLegacyProgressionDiagnostics,
@@ -3964,7 +3967,7 @@ export class MenuScene extends Phaser.Scene {
     const playerTrack = this.progressionState.tracks.player;
     return resolveLegacyMovementSpeedProfile(this.settings.movementSpeed, {
       completedCycles: playerTrack.completedCycles,
-      level: playerTrack.level,
+      level: resolveLegacyProgressionLevel(playerTrack.targetComplexity),
       paceScore: playerTrack.paceScore
     });
   }
@@ -4563,10 +4566,12 @@ export class MenuScene extends Phaser.Scene {
 
   private createFreshLegacyPlayGenerationSeed(): number {
     const playerTrack = this.progressionState.tracks.player;
+    const completedCyclesSeed = resolveLegacyProgressionOrdinalSeedComponent(playerTrack.completedCycles, 1_000_003);
+    const levelSeed = resolveLegacyProgressionOrdinalSeedComponent(playerTrack.level, 1_000_033);
     const progressionSalt = (
       (playerTrack.targetComplexity * 1009)
-      + (playerTrack.completedCycles * 9176)
-      + (playerTrack.level * 313)
+      + (completedCyclesSeed * 9176)
+      + (levelSeed * 313)
       + (playerTrack.paceScore * 37)
     );
     const seed = createLegacyRuntimeRandomSeed({
@@ -4584,10 +4589,12 @@ export class MenuScene extends Phaser.Scene {
 
   private createFreshLegacyMenuGenerationSeed(): number {
     const aiTrack = this.progressionState.tracks['ai-runner'];
+    const completedCyclesSeed = resolveLegacyProgressionOrdinalSeedComponent(aiTrack.completedCycles, 1_000_003);
+    const levelSeed = resolveLegacyProgressionOrdinalSeedComponent(aiTrack.level, 1_000_033);
     const progressionSalt = (
       (aiTrack.targetComplexity * 1151)
-      + (aiTrack.completedCycles * 7219)
-      + (aiTrack.level * 433)
+      + (completedCyclesSeed * 7219)
+      + (levelSeed * 433)
       + (aiTrack.paceScore * 41)
     );
     const seed = createLegacyRuntimeRandomSeed({
@@ -10419,7 +10426,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.leaderboardSelfRank) {
       const selfRank = this.leaderboardSelfRank;
       const selfRankText = selfRank.hasUsername
-        ? `#${selfRank.rank.toLocaleString()} · Level ${selfRank.playerLevel}`
+        ? `#${formatLegacyProgressionOrdinal(selfRank.rank ?? '0')} · Level ${formatLegacyProgressionOrdinal(selfRank.playerLevel)}`
         : 'Set a username on the account screen to appear here.';
       this.createAuthAccountSummaryCard(selfRankText, rowY + (compact ? 26 : 29), panel, 'YOUR RANK');
       rowY += compact ? 66 : 74;
@@ -10496,7 +10503,7 @@ export class MenuScene extends Phaser.Scene {
       this.overlayGraphics.fillCircle(rankColumnLeft, rowY, badgeRadius);
       this.overlayGraphics.lineStyle(1.2, accentColor, 0.85);
       this.overlayGraphics.strokeCircle(rankColumnLeft, rowY, badgeRadius);
-      const rankBadgeLabel = this.padLegacyCompactUiText(this.add.text(rankColumnLeft, rowY, String(entry.rank), {
+      const rankBadgeLabel = this.padLegacyCompactUiText(this.add.text(rankColumnLeft, rowY, formatLegacyProgressionOrdinal(entry.rank), {
         fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: `${compact ? 11 : 12}px`,
         color: accentCss
@@ -10514,7 +10521,7 @@ export class MenuScene extends Phaser.Scene {
         compact ? 14 : 15,
         10
       ).setOrigin(0, 0.5);
-      const levelLabel = this.padLegacyCompactUiText(this.add.text(levelColumnRight, rowY, String(entry.playerLevel), {
+      const levelLabel = this.padLegacyCompactUiText(this.add.text(levelColumnRight, rowY, formatLegacyProgressionOrdinal(entry.playerLevel), {
         fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: `${compact ? 14 : 15}px`,
         color: rowColor

@@ -106,17 +106,17 @@ describe('legacy remote progression', () => {
     state.updatedAt = '2026-07-09T01:00:00.000Z';
     state.tracks.player = {
       ...state.tracks.player,
-      completedCycles: 10,
+      completedCycles: '10',
       lastCompletedAt: '2026-07-09T01:00:00.000Z',
-      level: 10,
+      level: '10',
       rank: 'C',
       targetComplexity: 47
     };
     state.tracks['ai-runner'] = {
       ...state.tracks['ai-runner'],
-      completedCycles: 9,
+      completedCycles: '9',
       lastCompletedAt: '2026-07-09T01:01:00.000Z',
-      level: 5,
+      level: '5',
       rank: 'E',
       targetComplexity: 36
     };
@@ -166,16 +166,16 @@ describe('legacy remote progression', () => {
     expect(from).toHaveBeenNthCalledWith(2, LEGACY_REMOTE_PROGRESSION_TABLE);
     expect(from).toHaveBeenNthCalledWith(3, LEGACY_REMOTE_AI_PROGRESSION_TABLE);
     expect(updatePayloads[0]).toEqual(expect.objectContaining({
-      player_completed_cycles: 10,
-      player_level: 10,
+      player_completed_cycles: '10',
+      player_level: '10',
       player_rank: 'C',
       player_target_complexity: 47,
       revision: 5,
       user_id: 'user-456'
     }));
     expect(aiUpsert).toHaveBeenCalledWith(expect.objectContaining({
-      completed_cycles: 9,
-      level: 5,
+      completed_cycles: '9',
+      level: '5',
       rank: 'D',
       runner_key: LEGACY_REMOTE_AI_RUNNER_KEY,
       target_complexity: 36,
@@ -186,23 +186,53 @@ describe('legacy remote progression', () => {
   test('merges first-contact device progress without lowering a newer canonical track', () => {
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-07-16T12:00:00.000Z';
-    remote.tracks.player.completedCycles = 11;
-    remote.tracks.player.level = 12;
+    remote.tracks.player.completedCycles = '11';
+    remote.tracks.player.level = '12';
     remote.tracks.player.targetComplexity = 50;
     const local = createEmptyLegacyProgressionState();
     local.updatedAt = '2026-07-16T13:00:00.000Z';
-    local.tracks.player.completedCycles = 3;
-    local.tracks['ai-runner'].completedCycles = 18;
-    local.tracks['ai-runner'].level = 19;
+    local.tracks.player.completedCycles = '3';
+    local.tracks['ai-runner'].completedCycles = '18';
+    local.tracks['ai-runner'].level = '19';
     local.tracks['ai-runner'].targetComplexity = 64;
 
     const merged = mergeLegacyProgressionStateAdvancements(remote, local);
 
-    expect(merged.tracks.player.completedCycles).toBe(11);
+    expect(merged.tracks.player.completedCycles).toBe('11');
     expect(merged.tracks.player.targetComplexity).toBe(50);
-    expect(merged.tracks['ai-runner'].completedCycles).toBe(18);
+    expect(merged.tracks['ai-runner'].completedCycles).toBe('18');
     expect(merged.tracks['ai-runner'].targetComplexity).toBe(64);
     expect(merged.updatedAt).toBe('2026-07-16T13:00:00.000Z');
+  });
+
+  test('merges player and ai ordinals losslessly beyond Number.MAX_SAFE_INTEGER', () => {
+    const remote = createEmptyLegacyProgressionState();
+    const local = createEmptyLegacyProgressionState();
+    remote.tracks.player.completedCycles = '9007199254740992';
+    remote.tracks.player.level = '9007199254740993';
+    remote.tracks['ai-runner'].completedCycles = '9007199254740993';
+    remote.tracks['ai-runner'].level = '9007199254740994';
+    local.tracks.player.completedCycles = '9007199254740993';
+    local.tracks.player.level = '9007199254740994';
+    local.tracks['ai-runner'].completedCycles = '9007199254740992';
+    local.tracks['ai-runner'].level = '9007199254740993';
+
+    const merged = mergeLegacyProgressionStateAdvancements(remote, local);
+
+    expect(merged.tracks.player.completedCycles).toBe('9007199254740993');
+    expect(merged.tracks.player.level).toBe('9007199254740994');
+    expect(merged.tracks['ai-runner'].completedCycles).toBe('9007199254740993');
+    expect(merged.tracks['ai-runner'].level).toBe('9007199254740994');
+    expect(JSON.parse(JSON.stringify(merged)).tracks).toMatchObject({
+      player: {
+        completedCycles: '9007199254740993',
+        level: '9007199254740994'
+      },
+      'ai-runner': {
+        completedCycles: '9007199254740993',
+        level: '9007199254740994'
+      }
+    });
   });
 
   test('never lets a stale higher completion count lower either visible progression track', () => {
@@ -213,39 +243,39 @@ describe('legacy remote progression', () => {
 
     remote.tracks.player = {
       ...remote.tracks.player,
-      completedCycles: 40,
-      level: 28,
+      completedCycles: '40',
+      level: '28',
       targetComplexity: levelTwentyEightTarget
     };
     remote.tracks['ai-runner'] = {
       ...remote.tracks['ai-runner'],
-      completedCycles: 40,
-      level: 28,
+      completedCycles: '40',
+      level: '28',
       targetComplexity: levelTwentyEightTarget
     };
     local.tracks.player = {
       ...local.tracks.player,
-      completedCycles: 39,
-      level: 32,
+      completedCycles: '39',
+      level: '32',
       targetComplexity: levelThirtyTwoTarget
     };
     local.tracks['ai-runner'] = {
       ...local.tracks['ai-runner'],
-      completedCycles: 39,
-      level: 32,
+      completedCycles: '39',
+      level: '32',
       targetComplexity: levelThirtyTwoTarget
     };
 
     const merged = mergeLegacyProgressionStateAdvancements(remote, local);
 
     expect(merged.tracks.player).toMatchObject({
-      completedCycles: 40,
-      level: 32,
+      completedCycles: '40',
+      level: '32',
       targetComplexity: levelThirtyTwoTarget
     });
     expect(merged.tracks['ai-runner']).toMatchObject({
-      completedCycles: 40,
-      level: 32,
+      completedCycles: '40',
+      level: '32',
       targetComplexity: levelThirtyTwoTarget
     });
   });
@@ -255,22 +285,22 @@ describe('legacy remote progression', () => {
     const local = createEmptyLegacyProgressionState();
     remote.tracks.player = {
       ...remote.tracks.player,
-      completedCycles: 200,
-      level: 141,
+      completedCycles: '200',
+      level: '141',
       targetComplexity: 240
     };
     local.tracks.player = {
       ...local.tracks.player,
-      completedCycles: 183,
-      level: 184,
+      completedCycles: '183',
+      level: '184',
       targetComplexity: 220
     };
 
     const merged = mergeLegacyProgressionStateAdvancements(remote, local);
 
     expect(merged.tracks.player).toMatchObject({
-      completedCycles: 200,
-      level: 184,
+      completedCycles: '200',
+      level: '184',
       targetComplexity: 240
     });
   });
@@ -278,7 +308,7 @@ describe('legacy remote progression', () => {
   test('hydrates canonical progression and settings into account-scoped storage before scene creation', async () => {
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-07-16T14:00:00.000Z';
-    remote.tracks.player.completedCycles = 11;
+    remote.tracks.player.completedCycles = '11';
     remote.tracks.player.targetComplexity = 50;
     const values = new Map<string, string>();
     const storage = {
@@ -311,7 +341,7 @@ describe('legacy remote progression', () => {
     );
 
     expect(result.error).toBeNull();
-    expect(result.progressionState?.tracks.player.completedCycles).toBe(11);
+    expect(result.progressionState?.tracks.player.completedCycles).toBe('11');
     expect(result.progressionState?.tracks.player.targetComplexity).toBe(50);
     expect(result.settings?.controlMode).toBe('arrows');
     expect(result.settings?.movementSpeed).toBe(0.65);
@@ -327,11 +357,11 @@ describe('legacy remote progression', () => {
     // session sitting under a completely different storage key.
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-08-16T18:00:00.000Z';
-    remote.tracks.player.completedCycles = 11;
+    remote.tracks.player.completedCycles = '11';
     remote.tracks.player.targetComplexity = 50;
     const guest = createEmptyLegacyProgressionState();
     guest.updatedAt = '2026-08-16T18:10:00.000Z';
-    guest.tracks.player.completedCycles = 21;
+    guest.tracks.player.completedCycles = '21';
     guest.tracks.player.targetComplexity = 72;
     const values = new Map<string, string>([
       ['mazer.progression.v1:guest', JSON.stringify(guest)]
@@ -364,7 +394,7 @@ describe('legacy remote progression', () => {
     expect(result.error).toBeNull();
     // Remote (11), not the guest session's 21 -- the guest key is never
     // even read for this account-scoped storage key.
-    expect(result.progressionState?.tracks.player.completedCycles).toBe(11);
+    expect(result.progressionState?.tracks.player.completedCycles).toBe('11');
     expect(result.settings?.controlMode).toBe('arrows');
     expect(result.settings?.movementSpeed).toBe(0.65);
     expect(from).toHaveBeenCalledTimes(2);
@@ -383,11 +413,11 @@ describe('legacy remote progression', () => {
     // load" symptom the merge here protects against.
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-08-16T18:00:00.000Z';
-    remote.tracks.player.completedCycles = 9;
+    remote.tracks.player.completedCycles = '9';
     remote.tracks.player.targetComplexity = 44;
     const local = createEmptyLegacyProgressionState();
     local.updatedAt = '2026-08-21T08:19:24.915Z';
-    local.tracks.player.completedCycles = 11;
+    local.tracks.player.completedCycles = '11';
     local.tracks.player.targetComplexity = 50;
     const values = new Map<string, string>([
       ['mazer.progression.v1:user:user-refresh', JSON.stringify(local)]
@@ -418,7 +448,7 @@ describe('legacy remote progression', () => {
     }, storage, { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' });
 
     expect(result.error).toBeNull();
-    expect(result.progressionState?.tracks.player.completedCycles).toBe(11);
+    expect(result.progressionState?.tracks.player.completedCycles).toBe('11');
     expect(result.progressionState?.tracks.player.targetComplexity).toBe(50);
   });
 

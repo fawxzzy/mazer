@@ -1,4 +1,9 @@
 import { getLegacyAuthClient } from './legacyAuth';
+import {
+  compareLegacyProgressionOrdinals,
+  resolveLegacyProgressionOrdinal,
+  type LegacyProgressionOrdinal
+} from './legacyProgression';
 
 // Mirrors checkLegacyUsernameAvailable's exact pattern: both RPCs
 // (mazer_leaderboard_page, mazer_leaderboard_self_rank -- see
@@ -15,8 +20,8 @@ export const LEGACY_LEADERBOARD_MAX_PAGE_SIZE = 100;
 
 export interface LegacyLeaderboardEntry {
   readonly isRequestingUser: boolean;
-  readonly playerLevel: number;
-  readonly rank: number;
+  readonly playerLevel: LegacyProgressionOrdinal;
+  readonly rank: LegacyProgressionOrdinal;
   readonly username: string;
 }
 
@@ -27,8 +32,8 @@ export interface LegacyLeaderboardPageResult {
 
 export interface LegacyLeaderboardSelfRank {
   readonly hasUsername: boolean;
-  readonly playerLevel: number;
-  readonly rank: number;
+  readonly playerLevel: LegacyProgressionOrdinal;
+  readonly rank: LegacyProgressionOrdinal | null;
 }
 
 export interface LegacyLeaderboardSelfRankResult {
@@ -70,13 +75,17 @@ const parseLegacyLeaderboardRow = (row: unknown): LegacyLeaderboardEntry | null 
   }
 
   const candidate = row as Record<string, unknown>;
-  const rank = typeof candidate.rank === 'number' ? candidate.rank : Number(candidate.rank);
-  const playerLevel = typeof candidate.player_level === 'number'
-    ? candidate.player_level
-    : Number(candidate.player_level);
+  const rank = resolveLegacyProgressionOrdinal(candidate.rank);
+  const playerLevel = resolveLegacyProgressionOrdinal(candidate.player_level);
   const username = typeof candidate.username === 'string' ? candidate.username : null;
 
-  if (!Number.isFinite(rank) || !Number.isFinite(playerLevel) || username === null) {
+  if (
+    rank === null
+    || playerLevel === null
+    || compareLegacyProgressionOrdinals(rank, '1') < 0
+    || compareLegacyProgressionOrdinals(playerLevel, '1') < 0
+    || username === null
+  ) {
     return null;
   }
 
@@ -142,12 +151,14 @@ export const fetchLegacyLeaderboardSelfRank = async (): Promise<LegacyLeaderboar
   // Number.isFinite and silently masquerade as a real "#0" rank.
   const rank = candidate.rank === null
     ? null
-    : (typeof candidate.rank === 'number' ? candidate.rank : Number(candidate.rank));
-  const playerLevel = typeof candidate.player_level === 'number'
-    ? candidate.player_level
-    : Number(candidate.player_level);
+    : resolveLegacyProgressionOrdinal(candidate.rank);
+  const playerLevel = resolveLegacyProgressionOrdinal(candidate.player_level);
 
-  if (!Number.isFinite(playerLevel) || (rank !== null && !Number.isFinite(rank))) {
+  if (
+    playerLevel === null
+    || compareLegacyProgressionOrdinals(playerLevel, '1') < 0
+    || (rank !== null && compareLegacyProgressionOrdinals(rank, '1') < 0)
+  ) {
     return { error: null, selfRank: null };
   }
   if (hasUsername && rank === null) {
@@ -162,7 +173,7 @@ export const fetchLegacyLeaderboardSelfRank = async (): Promise<LegacyLeaderboar
     selfRank: {
       hasUsername,
       playerLevel,
-      rank: rank ?? 0
+      rank
     }
   };
 };

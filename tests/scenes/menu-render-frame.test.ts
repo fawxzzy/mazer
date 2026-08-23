@@ -1289,6 +1289,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(runtimeDiagnosticsSource).toContain("encoding: 'walkable-rows-v1';");
     expect(runtimeDiagnosticsSource).toContain('walkableRows: string[];');
+    expect(runtimeDiagnosticsSource).toContain('progressionCompletedCycles: string;');
     expect(menuSceneSource).toContain("encoding: 'walkable-rows-v1'");
     expect(menuSceneSource).toContain("walkableRows: this.maze.grid.map((row) => row.map((walkable) => (walkable ? '1' : '0')).join(''))");
   });
@@ -1684,8 +1685,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createFreshLegacyPlayGenerationSeed(): number');
     expect(menuSceneSource).toContain('const playerTrack = this.progressionState.tracks.player;');
     expect(menuSceneSource).toContain('playerTrack.targetComplexity * 1009');
-    expect(menuSceneSource).toContain('playerTrack.completedCycles * 9176');
-    expect(menuSceneSource).toContain('playerTrack.level * 313');
+    expect(menuSceneSource).toContain('resolveLegacyProgressionOrdinalSeedComponent(playerTrack.completedCycles, 1_000_003)');
+    expect(menuSceneSource).toContain('resolveLegacyProgressionOrdinalSeedComponent(playerTrack.level, 1_000_033)');
     expect(menuSceneSource).toContain('playerTrack.paceScore * 37');
     expect(menuSceneSource).toContain("const seedOverride = mode === 'play'");
     expect(menuSceneSource).toContain('seedOverride');

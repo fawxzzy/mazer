@@ -14,11 +14,12 @@ The legacy visual 1:1 screenshot target is retired unless explicitly reopened. F
 
 - Player and menu-AI levels are separate, unbounded completion ordinals.
 - Every accepted completion advances only its active ordinal by exactly one; retrying the same persisted receipt advances zero additional levels.
+- Every local, JSON, RPC, diagnostics, leaderboard, and UI ordinal boundary uses canonical unsigned decimal text, with exact `bigint` arithmetic/comparison internally. Unsafe numeric inputs are rejected; values beyond `Number.MAX_SAFE_INTEGER` are never rounded or clamped.
 - Local/account reconciliation is monotonic for level, completed history, and bounded difficulty pressure.
 - Difficulty remains a separate `8..400` target-complexity track and uses the current half-speed interpretation, so increasing the displayed ordinal cannot grow maze geometry without bound.
 - The source migration removes both database `99` caps only when paired with the RLS-protected, idempotent player and menu-AI completion RPCs. Its integer-to-bigint conversion needs target-schema, lock, rollback, and authenticated replay proof before application. No migration has been applied by this source lane.
 
-Verification on the current PR #253 integration head passed the focused progression/cloud/endless packet at `3` files / `64` tests, the complete affected progression/topology packet at `11` files / `129` tests, canonical verification at `81` files / `679` tests plus the isolated legacy fixture at `1` file / `12` tests, TypeScript, and a `241`-module Vite/PWA build with `35` precache entries. This is source-only evidence: the database migrations, ready transition, merge, deployment, production, and master-database cutover remain separately gated.
+Verification on the current PR #253 correction worktree passed the focused progression/cloud/endless/render packet at `8` files / `145` tests, canonical verification at `81` files / `683` tests plus the isolated legacy fixture at `1` file / `12` tests, TypeScript, and a `241`-module Vite/PWA build with `35` precache entries. The proof includes exact decimal-string normalization, JSON round-trip, remote merge, duplicate receipt, independent player/AI advancement, deterministic recipe modulo/seed, leaderboard transport, diagnostics, and SQL boundary checks across `9007199254740990` through `9007199254740993`. This is source-only evidence: the database migrations, ready transition, merge, deployment, production, and master-database cutover remain separately gated.
 
 ## What counts as 100%
 

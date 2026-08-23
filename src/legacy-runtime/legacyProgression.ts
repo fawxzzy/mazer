@@ -46,6 +46,7 @@ export const LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH = 430;
 export type LegacyProgressionTrackId = 'player' | 'ai-runner';
 export type LegacyProgressionRank = 'E' | 'D' | 'C' | 'B' | 'A' | 'S';
 export type LegacyProgressionSignal = 'challenge' | 'ease' | 'hold';
+export type LegacyProgressionOrdinal = string;
 export type LegacyProgressionDifficultyBand =
   | 'tutorial'
   | 'starter'
@@ -58,13 +59,13 @@ export interface LegacyProgressionTrack {
   bestCompletionTimeMs: number | null;
   cleanCycles: number;
   colorTier: number;
-  completedCycles: number;
+  completedCycles: LegacyProgressionOrdinal;
   lastCompletedAt: string | null;
   lastCompletionTimeMs: number | null;
   lastMazeSeed: number | null;
   lastReceiptId: string | null;
   lastSignal: LegacyProgressionSignal;
-  level: number;
+  level: LegacyProgressionOrdinal;
   paceScore: number;
   peakComplexity: number;
   rank: LegacyProgressionRank;
@@ -146,7 +147,7 @@ export interface LegacyProgressionDifficultyProfile {
 }
 
 export interface LegacyProgressionPacingSummary {
-  activeLevel: number;
+  activeLevel: LegacyProgressionOrdinal;
   activeRank: LegacyProgressionRank;
   activeTargetComplexity: number;
   challengeStep: number;
@@ -271,6 +272,98 @@ const LEGACY_PROGRESS_MIN_PATH_COLOR_DISTANCE = 145;
 const LEGACY_PROGRESS_FALLBACK_PLAYER_COLOR = 0x36ff7d;
 const LEGACY_PROGRESS_FALLBACK_TRAIL_COLOR = 0x36ff7d;
 const LEGACY_PROGRESS_FALLBACK_TRAIL_PULSE_COLOR = LEGACY_TRAIL_SHINE_COLOR;
+const LEGACY_PROGRESSION_ORDINAL_PATTERN = /^(0|[1-9]\d*)$/;
+
+const isCanonicalLegacyProgressionOrdinal = (value: unknown): value is LegacyProgressionOrdinal => (
+  typeof value === 'string' && LEGACY_PROGRESSION_ORDINAL_PATTERN.test(value)
+);
+
+const parseLegacyProgressionOrdinal = (value: unknown): bigint | null => {
+  if (
+    typeof value === 'number'
+    && Number.isSafeInteger(value)
+    && value >= 0
+  ) {
+    return BigInt(value);
+  }
+  if (typeof value === 'string' && LEGACY_PROGRESSION_ORDINAL_PATTERN.test(value)) {
+    return BigInt(value);
+  }
+  return null;
+};
+
+export const resolveLegacyProgressionOrdinal = (
+  value: unknown
+): LegacyProgressionOrdinal | null => parseLegacyProgressionOrdinal(value)?.toString() ?? null;
+
+/**
+ * Canonical lossless representation for every persisted or transported
+ * completion ordinal. Legacy numeric inputs are accepted only while they are
+ * exact safe integers; unsafe numbers are rejected instead of rounded.
+ */
+export const normalizeLegacyProgressionOrdinal = (
+  value: unknown,
+  fallback: LegacyProgressionOrdinal = '0'
+): LegacyProgressionOrdinal => (
+  (parseLegacyProgressionOrdinal(value) ?? parseLegacyProgressionOrdinal(fallback) ?? 0n).toString()
+);
+
+export const normalizeLegacyPositiveProgressionOrdinal = (
+  value: unknown,
+  fallback: LegacyProgressionOrdinal = '1'
+): LegacyProgressionOrdinal => {
+  const normalized = parseLegacyProgressionOrdinal(value);
+  if (normalized !== null && normalized >= 1n) {
+    return normalized.toString();
+  }
+  const normalizedFallback = parseLegacyProgressionOrdinal(fallback);
+  return normalizedFallback !== null && normalizedFallback >= 1n
+    ? normalizedFallback.toString()
+    : '1';
+};
+
+export const compareLegacyProgressionOrdinals = (
+  left: unknown,
+  right: unknown
+): number => {
+  const leftValue = BigInt(normalizeLegacyProgressionOrdinal(left));
+  const rightValue = BigInt(normalizeLegacyProgressionOrdinal(right));
+  return leftValue === rightValue ? 0 : leftValue > rightValue ? 1 : -1;
+};
+
+export const maxLegacyProgressionOrdinal = (
+  left: unknown,
+  right: unknown
+): LegacyProgressionOrdinal => (
+  compareLegacyProgressionOrdinals(left, right) >= 0
+    ? normalizeLegacyProgressionOrdinal(left)
+    : normalizeLegacyProgressionOrdinal(right)
+);
+
+export const incrementLegacyProgressionOrdinal = (
+  value: unknown
+): LegacyProgressionOrdinal => (
+  (BigInt(normalizeLegacyProgressionOrdinal(value)) + 1n).toString()
+);
+
+export const resolveLegacyProgressionOrdinalModulo = (
+  value: unknown,
+  modulus: number
+): number => {
+  if (!Number.isSafeInteger(modulus) || modulus <= 0) {
+    throw new Error(`Progression ordinal modulus must be a positive safe integer, got ${modulus}`);
+  }
+  return Number(BigInt(normalizeLegacyProgressionOrdinal(value)) % BigInt(modulus));
+};
+
+export const resolveLegacyProgressionOrdinalSeedComponent = (
+  value: unknown,
+  modulus = 2_147_483_647
+): number => resolveLegacyProgressionOrdinalModulo(value, modulus);
+
+export const formatLegacyProgressionOrdinal = (value: unknown): string => (
+  BigInt(normalizeLegacyProgressionOrdinal(value)).toLocaleString('en-US')
+);
 
 const copyTrack = (track: LegacyProgressionTrack): LegacyProgressionTrack => ({
   ...track,
@@ -718,13 +811,13 @@ const createTrack = (targetComplexity = LEGACY_PROGRESSION_BASE_TARGET_COMPLEXIT
     bestCompletionTimeMs: null,
     cleanCycles: 0,
     colorTier: resolveLegacyProgressionColorTier(normalizedTarget),
-    completedCycles: 0,
+    completedCycles: '0',
     lastCompletedAt: null,
     lastCompletionTimeMs: null,
     lastMazeSeed: null,
     lastReceiptId: null,
     lastSignal: 'hold',
-    level: resolveLegacyProgressionLevel(normalizedTarget),
+    level: String(resolveLegacyProgressionLevel(normalizedTarget)),
     paceScore: 0,
     peakComplexity: normalizedTarget,
     rank: resolveLegacyProgressionRank(normalizedTarget),
@@ -739,9 +832,10 @@ const createPlayerBaselineTrack = (): LegacyProgressionTrack => ({
   struggleCycles: LEGACY_PROGRESSION_PLAYER_BASELINE_V5_PROVENANCE_STRUGGLE_CYCLES
 });
 
-const formatLegacyProgressionCycleCount = (completedCycles: number): string => (
-  `${Math.min(99_999, Math.max(0, Math.round(completedCycles)))}${completedCycles > 99_999 ? '+' : ''}`
-);
+const formatLegacyProgressionCycleCount = (completedCycles: LegacyProgressionOrdinal): string => {
+  const normalized = normalizeLegacyProgressionOrdinal(completedCycles);
+  return compareLegacyProgressionOrdinals(normalized, '99999') > 0 ? '99999+' : normalized;
+};
 
 export const createEmptyLegacyProgressionState = (): LegacyProgressionState => ({
   version: 1,
@@ -762,10 +856,6 @@ const normalizeNonNegativeInteger = (value: unknown, fallback = 0): number => (
   typeof value === 'number' && Number.isFinite(value)
     ? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.round(value)))
     : fallback
-);
-
-const normalizePositiveInteger = (value: unknown, fallback = 1): number => (
-  Math.max(1, normalizeNonNegativeInteger(value, fallback))
 );
 
 const normalizeNullableNonNegativeInteger = (value: unknown, fallback: number | null = null): number | null => (
@@ -815,7 +905,7 @@ const normalizeTrack = (value: unknown, fallback: LegacyProgressionTrack): Legac
     bestCompletionTimeMs: normalizeNullableNonNegativeInteger(value.bestCompletionTimeMs, fallback.bestCompletionTimeMs),
     cleanCycles: normalizeNonNegativeInteger(value.cleanCycles, fallback.cleanCycles),
     colorTier: resolveLegacyProgressionColorTier(targetComplexity),
-    completedCycles: normalizeNonNegativeInteger(value.completedCycles, fallback.completedCycles),
+    completedCycles: normalizeLegacyProgressionOrdinal(value.completedCycles, fallback.completedCycles),
     lastCompletedAt: typeof value.lastCompletedAt === 'string' ? value.lastCompletedAt : fallback.lastCompletedAt,
     lastCompletionTimeMs: normalizeNullableNonNegativeInteger(value.lastCompletionTimeMs, fallback.lastCompletionTimeMs),
     lastMazeSeed: typeof value.lastMazeSeed === 'number' && Number.isFinite(value.lastMazeSeed)
@@ -828,7 +918,7 @@ const normalizeTrack = (value: unknown, fallback: LegacyProgressionTrack): Legac
     // `level` is the player-facing completion ordinal. Old states that do
     // not carry it fall back to their bounded difficulty-derived value, but
     // a present positive integer is never recomputed from difficulty.
-    level: normalizePositiveInteger(value.level, resolveLegacyProgressionLevel(targetComplexity)),
+    level: normalizeLegacyPositiveProgressionOrdinal(value.level, String(resolveLegacyProgressionLevel(targetComplexity))),
     paceScore: clampInteger(normalizeNonNegativeInteger(value.paceScore, fallback.paceScore), 0, 100),
     peakComplexity,
     rank: resolveLegacyProgressionRank(targetComplexity),
@@ -863,17 +953,31 @@ const hasLegacyPlayerBaselineV5Provenance = (track: LegacyProgressionTrack): boo
 // every account that leveled up before this formula last changed as
 // "impossible" and wipe it back to level 1 the next time it's read or
 // written -- see hasCoherentLegacyPlayerProgression below.
-const resolveLegacyPlayerMaxTargetComplexityForCompletedCycles = (completedCycles: number): number => (
-  clampInteger(
-    LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY + (normalizeNonNegativeInteger(completedCycles) * 4),
+const resolveLegacyPlayerMaxTargetComplexityForCompletedCycles = (
+  completedCycles: LegacyProgressionOrdinal
+): number => {
+  const cyclesToMaximum = Math.ceil(
+    (LEGACY_PROGRESSION_MAX_COMPLEXITY - LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY)
+    / LEGACY_PROGRESSION_COMPLETION_DIFFICULTY_STEP
+  );
+  if (compareLegacyProgressionOrdinals(completedCycles, String(cyclesToMaximum)) >= 0) {
+    return LEGACY_PROGRESSION_MAX_COMPLEXITY;
+  }
+  const boundedCycles = resolveLegacyProgressionOrdinalModulo(completedCycles, cyclesToMaximum + 1);
+  return clampInteger(
+    LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY
+    + (boundedCycles * LEGACY_PROGRESSION_COMPLETION_DIFFICULTY_STEP),
     LEGACY_PROGRESSION_MIN_COMPLEXITY,
     LEGACY_PROGRESSION_MAX_COMPLEXITY
-  )
-);
+  );
+};
 
 const hasCoherentLegacyPlayerProgression = (track: LegacyProgressionTrack): boolean => (
   track.targetComplexity <= resolveLegacyPlayerMaxTargetComplexityForCompletedCycles(track.completedCycles)
-  && track.level <= track.completedCycles + 1
+  && compareLegacyProgressionOrdinals(
+    track.level,
+    incrementLegacyProgressionOrdinal(track.completedCycles)
+  ) <= 0
 );
 
 export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressionState => {
@@ -921,10 +1025,20 @@ export const readLegacyProgressionState = (
     const normalized = raw ? normalizeLegacyProgressionState(JSON.parse(raw)) : createEmptyLegacyProgressionState();
     if (raw) {
       const parsed = JSON.parse(raw);
+      const parsedTracks = isRecord(parsed) && isRecord(parsed.tracks) ? parsed.tracks : null;
+      const parsedPlayer = parsedTracks && isRecord(parsedTracks.player) ? parsedTracks.player : null;
+      const parsedAiRunner = parsedTracks && isRecord(parsedTracks['ai-runner']) ? parsedTracks['ai-runner'] : null;
+      const ordinalsAreCanonical = parsedPlayer !== null
+        && parsedAiRunner !== null
+        && isCanonicalLegacyProgressionOrdinal(parsedPlayer.completedCycles)
+        && isCanonicalLegacyProgressionOrdinal(parsedPlayer.level)
+        && isCanonicalLegacyProgressionOrdinal(parsedAiRunner.completedCycles)
+        && isCanonicalLegacyProgressionOrdinal(parsedAiRunner.level);
       if (
         !isRecord(parsed)
         || normalizeNonNegativeInteger(parsed.aiRunnerBaselineVersion) < LEGACY_PROGRESSION_AI_BASELINE_VERSION
         || normalizeNonNegativeInteger(parsed.playerProgressionBaselineVersion) < LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION
+        || !ordinalsAreCanonical
       ) {
         storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify(normalized));
       }
@@ -1156,13 +1270,13 @@ const applyTrackSignal = (
     bestCompletionTimeMs,
     cleanCycles: track.cleanCycles + (signal === 'challenge' ? 1 : 0),
     colorTier: resolveLegacyProgressionColorTier(targetComplexity),
-    completedCycles: track.completedCycles + 1,
+    completedCycles: incrementLegacyProgressionOrdinal(track.completedCycles),
     lastCompletedAt: receipt.completedAt,
     lastCompletionTimeMs,
     lastMazeSeed: receipt.mazeSeed,
     lastReceiptId: receipt.id,
     lastSignal: signal,
-    level: Math.min(Number.MAX_SAFE_INTEGER, track.level + 1),
+    level: incrementLegacyProgressionOrdinal(track.level),
     paceScore: performanceScore.total,
     peakComplexity: Math.max(track.peakComplexity, complexity, targetComplexity),
     rank: resolveLegacyProgressionRank(targetComplexity),
@@ -1180,8 +1294,9 @@ export const summarizeLegacyProgressionPacing = (
   const signalWindow = normalizeSignalWindow(track.recentSignals);
   const recentChallengeCount = countSignals(signalWindow, 'challenge');
   const recentEaseCount = countSignals(signalWindow, 'ease');
-  const levelBaseTargetComplexity = resolveLegacyProgressionLevelBaseTargetComplexity(track.level);
-  const nextLevelTargetComplexity = resolveLegacyProgressionNextLevelTargetComplexity(track.level);
+  const difficultyLevel = resolveLegacyProgressionLevel(track.targetComplexity);
+  const levelBaseTargetComplexity = resolveLegacyProgressionLevelBaseTargetComplexity(difficultyLevel);
+  const nextLevelTargetComplexity = resolveLegacyProgressionNextLevelTargetComplexity(difficultyLevel);
   const levelRange = Math.max(1, nextLevelTargetComplexity - levelBaseTargetComplexity);
   const complexityUntilNextLevel = Math.max(0, nextLevelTargetComplexity - track.targetComplexity);
   const skillTrend = recentChallengeCount > recentEaseCount

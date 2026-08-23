@@ -32,10 +32,12 @@
 -- exact obsolete overload if a partial provider rehearsal ever created it;
 -- PostgREST does not support exposing ambiguous overloaded RPCs.
 drop function if exists public.mazer_complete_level(bigint, integer, integer, integer, uuid, text, integer, text);
+drop function if exists public.mazer_complete_level(bigint, bigint, integer, integer, uuid, text, integer, text);
+drop function if exists public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text);
 
 create or replace function public.mazer_complete_level(
   p_expected_revision bigint,
-  p_completed_level bigint,
+  p_completed_level text,
   p_maze_seed integer,
   p_maze_size integer,
   p_client_run_id uuid,
@@ -44,10 +46,10 @@ create or replace function public.mazer_complete_level(
   p_recipe_hash text default null
 )
 returns table (
-  player_level bigint,
+  player_level text,
   player_rank text,
   player_target_complexity integer,
-  player_completed_cycles bigint,
+  player_completed_cycles text,
   revision bigint,
   level_reached_at timestamp with time zone
 )
@@ -59,6 +61,7 @@ declare
   v_user_id uuid := (select auth.uid());
   v_current record;
   v_inserted_receipt_id uuid;
+  v_completed_level bigint;
   v_next_level bigint;
   v_next_completed_cycles bigint;
   v_now timestamp with time zone := pg_catalog.now();
@@ -70,9 +73,10 @@ begin
     raise exception 'mazer_complete_level requires an authenticated caller' using errcode = '28000';
   end if;
 
-  if p_completed_level is null or p_completed_level < 1 then
+  if p_completed_level is null or p_completed_level !~ '^[1-9][0-9]*$' then
     raise exception 'completed_level must be a positive integer' using errcode = '22023';
   end if;
+  v_completed_level := p_completed_level::bigint;
 
   if p_maze_size is null or p_maze_size < 1 then
     raise exception 'maze_size must be a positive integer' using errcode = '22023';
@@ -113,10 +117,10 @@ begin
   ) then
     return query
       select
-        s.player_level,
+        s.player_level::text,
         s.player_rank,
         s.player_target_complexity,
-        s.player_completed_cycles,
+        s.player_completed_cycles::text,
         s.revision,
         s.level_reached_at
       from public.mazer_progression_states s
@@ -132,7 +136,7 @@ begin
   -- Sequential-only: the client must be completing exactly its current
   -- level, never skipping ahead or resubmitting a stale earlier level as if
   -- it were new progress.
-  if p_completed_level <> v_current.player_level then
+  if v_completed_level <> v_current.player_level then
     raise exception 'completed_level (%) does not match the account''s current level (%)', p_completed_level, v_current.player_level
       using errcode = '22023';
   end if;
@@ -167,10 +171,10 @@ begin
   if v_inserted_receipt_id is null then
     return query
       select
-        s.player_level,
+        s.player_level::text,
         s.player_rank,
         s.player_target_complexity,
-        s.player_completed_cycles,
+        s.player_completed_cycles::text,
         s.revision,
         s.level_reached_at
       from public.mazer_progression_states s
@@ -191,10 +195,10 @@ begin
     else '{}'::jsonb
   end;
   v_player_track := v_player_track || pg_catalog.jsonb_build_object(
-    'completedCycles', v_next_completed_cycles,
+    'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
     'lastReceiptId', p_client_run_id::text,
-    'level', v_next_level
+    'level', v_next_level::text
   );
   v_state := pg_catalog.jsonb_set(
     pg_catalog.jsonb_set(
@@ -221,10 +225,10 @@ begin
 
   return query
     select
-      s.player_level,
+      s.player_level::text,
       s.player_rank,
       s.player_target_complexity,
-      s.player_completed_cycles,
+      s.player_completed_cycles::text,
       s.revision,
       s.level_reached_at
     from public.mazer_progression_states s
@@ -232,14 +236,17 @@ begin
 end;
 $$;
 
-revoke all on function public.mazer_complete_level(bigint, bigint, integer, integer, uuid, text, integer, text) from public;
-grant execute on function public.mazer_complete_level(bigint, bigint, integer, integer, uuid, text, integer, text) to authenticated;
+revoke all on function public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text) from public;
+grant execute on function public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text) to authenticated;
 
 comment on function public.mazer_complete_level is
   'RLS-protected, idempotent player level-completion transaction. Not yet called by client code; direct-write retirement remains a separately verified cutover.';
 
+drop function if exists public.mazer_complete_ai_level(bigint, integer, integer, uuid, text, integer, text);
+drop function if exists public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text);
+
 create or replace function public.mazer_complete_ai_level(
-  p_completed_level bigint,
+  p_completed_level text,
   p_maze_seed integer,
   p_maze_size integer,
   p_client_run_id uuid,
@@ -248,10 +255,10 @@ create or replace function public.mazer_complete_ai_level(
   p_recipe_hash text default null
 )
 returns table (
-  level bigint,
+  level text,
   rank text,
   target_complexity integer,
-  completed_cycles bigint,
+  completed_cycles text,
   last_completed_cycle_at timestamp with time zone
 )
 language plpgsql
@@ -262,6 +269,7 @@ declare
   v_user_id uuid := (select auth.uid());
   v_current record;
   v_inserted_receipt_id uuid;
+  v_completed_level bigint;
   v_next_level bigint;
   v_next_completed_cycles bigint;
   v_now timestamp with time zone := pg_catalog.now();
@@ -272,9 +280,10 @@ begin
     raise exception 'mazer_complete_ai_level requires an authenticated caller' using errcode = '28000';
   end if;
 
-  if p_completed_level is null or p_completed_level < 1 then
+  if p_completed_level is null or p_completed_level !~ '^[1-9][0-9]*$' then
     raise exception 'completed_level must be a positive integer' using errcode = '22023';
   end if;
+  v_completed_level := p_completed_level::bigint;
 
   if p_maze_size is null or p_maze_size < 1 then
     raise exception 'maze_size must be a positive integer' using errcode = '22023';
@@ -313,10 +322,10 @@ begin
   ) then
     return query
       select
-        s.level,
+        s.level::text,
         s.rank,
         s.target_complexity,
-        s.completed_cycles,
+        s.completed_cycles::text,
         s.last_completed_cycle_at
       from public.mazer_ai_progression_states s
       where s.user_id = v_user_id
@@ -324,7 +333,7 @@ begin
     return;
   end if;
 
-  if p_completed_level <> v_current.level then
+  if v_completed_level <> v_current.level then
     raise exception 'completed_level (%) does not match the menu AI''s current level (%)', p_completed_level, v_current.level
       using errcode = '22023';
   end if;
@@ -357,10 +366,10 @@ begin
   if v_inserted_receipt_id is null then
     return query
       select
-        s.level,
+        s.level::text,
         s.rank,
         s.target_complexity,
-        s.completed_cycles,
+        s.completed_cycles::text,
         s.last_completed_cycle_at
       from public.mazer_ai_progression_states s
       where s.user_id = v_user_id
@@ -377,16 +386,16 @@ begin
     else '{}'::jsonb
   end;
   v_state := v_state || pg_catalog.jsonb_build_object(
-    'completedCycles', v_next_completed_cycles,
+    'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
     'lastReceiptId', p_client_run_id::text,
-    'level', v_next_level
+    'level', v_next_level::text
   );
   v_summary := v_summary || pg_catalog.jsonb_build_object(
-    'completedCycles', v_next_completed_cycles,
+    'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
     'lastReceiptId', p_client_run_id::text,
-    'level', v_next_level
+    'level', v_next_level::text
   );
 
   update public.mazer_ai_progression_states s
@@ -402,10 +411,10 @@ begin
 
   return query
     select
-      s.level,
+      s.level::text,
       s.rank,
       s.target_complexity,
-      s.completed_cycles,
+      s.completed_cycles::text,
       s.last_completed_cycle_at
     from public.mazer_ai_progression_states s
     where s.user_id = v_user_id
@@ -413,8 +422,8 @@ begin
 end;
 $$;
 
-revoke all on function public.mazer_complete_ai_level(bigint, integer, integer, uuid, text, integer, text) from public;
-grant execute on function public.mazer_complete_ai_level(bigint, integer, integer, uuid, text, integer, text) to authenticated;
+revoke all on function public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text) from public;
+grant execute on function public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text) to authenticated;
 
 comment on function public.mazer_complete_ai_level is
   'RLS-protected, idempotent menu-AI level-completion transaction. Not yet called by client code; direct-write retirement remains a separately verified cutover.';

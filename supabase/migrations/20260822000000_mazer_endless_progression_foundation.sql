@@ -20,6 +20,9 @@
 -- and menu-AI completion ordinals to continue beyond 99. Applying it remains
 -- paired with the idempotent completion contract and current-schema provider
 -- proof; source presence alone is not permission to run it.
+-- PostgreSQL stores these values as bigint for exact arithmetic and ordering.
+-- The Data API/client boundary transports them as canonical unsigned decimal
+-- text so JavaScript never rounds values beyond Number.MAX_SAFE_INTEGER.
 
 -- 1. Replace both 1-99 completion-ordinal ceilings with lower-bound-only
 -- checks. Player and AI remain separate tracks, but both advance +1 for each
