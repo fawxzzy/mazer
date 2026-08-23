@@ -362,8 +362,6 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
 ): LegacyMenuBorderDockRenderArea[] => {
   const boardRight = options.boardLeft + options.boardWidth;
   const boardBottom = options.boardTop + options.boardHeight;
-  const mazeRight = options.mazeLeft + options.mazeWidth;
-  const mazeBottom = options.mazeTop + options.mazeHeight;
   const materialTileSize = Math.max(1, options.materialTileSize);
   const bandLeft = options.tileRect.left + Math.round((frame.leftInset / materialTileSize) * options.tileRect.width);
   const bandTop = options.tileRect.top + Math.round((frame.topInset / materialTileSize) * options.tileRect.height);
@@ -397,7 +395,10 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
 
   if (direction === 'left') {
     const left = options.boardLeft - continuationLength;
-    const right = options.mazeLeft;
+    // The dock must begin at the same rounded edge the material tile used.
+    // A separately calculated maze bound can round a fraction of a pixel the
+    // other way, leaving a visible one-pixel seam at some mobile board sizes.
+    const right = bandLeft;
     pushArea({ left, top: bandTop, right, bottom: bandBottom });
     if (bandTop < topGuard) {
       pushArea({ left, top: bandTop, right, bottom: topGuard });
@@ -409,7 +410,7 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
   }
 
   if (direction === 'right') {
-    const left = mazeRight;
+    const left = bandRight;
     const right = boardRight + continuationLength;
     pushArea({ left, top: bandTop, right, bottom: bandBottom });
     if (bandTop < topGuard) {
@@ -423,7 +424,7 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
 
   if (direction === 'top') {
     const top = options.boardTop - continuationLength;
-    const bottom = options.mazeTop;
+    const bottom = bandTop;
     pushTopArea({ left: bandLeft, top, right: bandRight, bottom });
     if (bandLeft < leftGuard) {
       pushTopArea({ left: bandLeft, top, right: leftGuard, bottom });
@@ -434,7 +435,7 @@ export const resolveLegacyMenuBorderDockRenderAreas = (
     return areas;
   }
 
-  const top = mazeBottom;
+  const top = bandBottom;
   const bottom = boardBottom + continuationLength;
   pushArea({ left: bandLeft, top, right: bandRight, bottom });
   if (bandLeft < leftGuard) {
