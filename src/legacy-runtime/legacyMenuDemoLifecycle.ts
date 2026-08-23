@@ -10,7 +10,8 @@ import {
   createLegacyMenuDemoWalkerConfig,
   createLegacyMenuSnapshotDemoWalkerConfig,
   resolveLegacyPointFromDemoIndex,
-  resolveLegacyTrailFromDemoSteps
+  resolveLegacyTrailFromDemoSteps,
+  type LegacyMenuDemoWalkerSkill
 } from './legacyDemoWalker';
 import type { LegacyMazeSnapshot, LegacyPoint } from './legacyMaze';
 
@@ -73,13 +74,14 @@ const isStableSnapshotBootstrapState = (
 export const createLegacyMenuDemoBootstrap = (
   maze: LegacyMazeSnapshot,
   toggleTrailFade: boolean,
-  trailFadeTail: number
+  trailFadeTail: number,
+  skill?: LegacyMenuDemoWalkerSkill
 ): LegacyMenuDemoBootstrap => {
   const episode = createLegacyDemoWalkerEpisode(maze);
   const isFixedSnapshot = isFixedLegacyMenuSnapshot(maze);
   const config = isFixedSnapshot
     ? createLegacyMenuSnapshotDemoWalkerConfig(maze.seed)
-    : createLegacyMenuDemoWalkerConfig(maze.seed);
+    : createLegacyMenuDemoWalkerConfig(maze.seed, skill);
   let state = createDemoWalkerState(episode, config);
   const shouldBootstrapSnapshotRoute = isFixedSnapshot && config.behavior.enableRunnerMistakes === true;
   const basePrerollSteps = Math.max(0, config.behavior.prerollSteps ?? legacyTuning.demo.behavior.prerollSteps ?? 0);

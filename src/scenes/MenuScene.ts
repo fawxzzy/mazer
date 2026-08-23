@@ -4463,7 +4463,16 @@ export class MenuScene extends Phaser.Scene {
     this.titleGraphics.setVisible(generationState.titleVisible);
     this.menuDemoEpisode = this.mode === 'menu' ? createLegacyDemoWalkerEpisode(this.maze) : null;
     if (this.mode === 'menu') {
-      const bootstrap = createLegacyMenuDemoBootstrap(this.maze, this.settings.toggleTrailFade, TRAIL_FADE_TAIL);
+      const aiTrack = this.progressionState.tracks['ai-runner'];
+      const bootstrap = createLegacyMenuDemoBootstrap(
+        this.maze,
+        this.settings.toggleTrailFade,
+        TRAIL_FADE_TAIL,
+        {
+          aiSkillLevel: resolveLegacyProgressionLevel(aiTrack.targetComplexity),
+          aiSkillRank: aiTrack.rank
+        }
+      );
       this.menuDemoEpisode = bootstrap.episode;
       this.menuDemoConfig = bootstrap.config;
       this.menuDemoState = bootstrap.state;

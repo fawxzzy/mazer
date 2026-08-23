@@ -634,10 +634,13 @@ describe('legacy reset lane', () => {
     expect(menuSceneSource).toContain("window.removeEventListener('blur', this.legacyPlayWindowBlurHandler);");
     expect(menuSceneSource).toContain("document.addEventListener('visibilitychange', this.legacyPlayVisibilityChangeHandler);");
     expect(menuSceneSource).toContain('private handleLegacyPlayInputFocusLoss(): void {');
-    expect(menuSceneSource).toContain('createLegacyMenuDemoBootstrap(this.maze, this.settings.toggleTrailFade, TRAIL_FADE_TAIL)');
+    expect(menuSceneSource).toContain("const aiTrack = this.progressionState.tracks['ai-runner'];");
+    expect(menuSceneSource).toContain('createLegacyMenuDemoBootstrap(');
+    expect(menuSceneSource).toContain('aiSkillLevel: resolveLegacyProgressionLevel(aiTrack.targetComplexity)');
+    expect(menuSceneSource).toContain('aiSkillRank: aiTrack.rank');
     expect(menuSceneSource).toContain('advanceLegacyMenuDemoFrame(');
     expect(demoLifecycleSource).toContain('createLegacyMenuSnapshotDemoWalkerConfig(maze.seed)');
-    expect(demoLifecycleSource).toContain('createLegacyMenuDemoWalkerConfig(maze.seed)');
+    expect(demoLifecycleSource).toContain('createLegacyMenuDemoWalkerConfig(maze.seed, skill)');
     expect(demoLifecycleSource).toContain('advanceDemoWalker(episode, state, config)');
   });
 
