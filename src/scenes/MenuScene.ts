@@ -6128,20 +6128,14 @@ export class MenuScene extends Phaser.Scene {
   // A normal corridor stays a tile away from the board edge (the existing
   // safeInset in resolveLegacyMazeRenderFrame). A wraparound dock corridor
   // -- one whose path genuinely continues off-grid -- bleeds past the board
-  // edge to the true screen edge on every side. Play mode still caps this at
-  // one tile: its board keeps a real reserved lane for the HUD/touch
-  // controls that top/bottom must stay clear of, and its board was never
-  // meant to be full-bleed the same way the menu's is (bleedMargin is 0 for
-  // play in legacyMenuLayout.ts). The menu surface's board IS full-bleed
-  // (the header icons, title, and Login/Start button float above it as an
-  // overlay instead of it leaving room for them), so a menu dock consumes
-  // the entire actual gap on its side rather than a fixed one-tile budget --
-  // whatever slack is left over from board centering/tile-size rounding on
-  // that axis, so the corridor always terminates at the true edge instead of
-  // stopping short of it when that slack happens to exceed one tile (this
-  // was previously capped at one tile uniformly, which worked when the
-  // leftover slack was itself close to one tile but visibly fell short on
-  // axes where it wasn't).
+  // edge to the true screen edge on every side, on both surfaces (see the
+  // comment on this function's own body below -- play used to special-case
+  // stopping short at a fixed one-tile budget, since dropped so both
+  // surfaces resolve identically). Both consume the entire actual gap on
+  // their side rather than a fixed budget -- whatever slack is left over
+  // from board centering/tile-size rounding on that axis, so the corridor
+  // always terminates at the true edge instead of stopping short of it when
+  // that slack happens to exceed one tile.
   private resolveLegacyPathBorderDockContinuation(
     direction: LegacyMenuBorderDockDirection,
     boardLeft: number,
@@ -6303,6 +6297,10 @@ export class MenuScene extends Phaser.Scene {
         boardTop,
         boardWidth,
         boardHeight,
+        mazeLeft,
+        mazeTop,
+        mazeWidth,
+        mazeHeight,
         this.resolveLegacyPathBorderDockContinuation(direction, boardLeft, boardTop, boardWidth, boardHeight, tileSize),
         options.edgeColor,
         options.coreAlpha
@@ -6320,6 +6318,26 @@ export class MenuScene extends Phaser.Scene {
     boardTop: number,
     boardWidth: number,
     boardHeight: number,
+    // The maze's own rendered content edges -- NOT necessarily flush with
+    // the board box edges above. Whenever the generated maze's own aspect
+    // ratio doesn't perfectly match the reserved board box (routine --
+    // resolveLegacyBoardAspectRatioForMode is only an estimate ahead of
+    // real generation), one axis is left with real leftover slack between
+    // the grid's last tile and the board box edge. The flat-color fill pass
+    // (fillDockFrame above, via resolveLegacyMenuBorderDockRenderAreas)
+    // already anchors to these maze edges and so already spans any such
+    // slack -- this facet/rim overlay used to anchor to the board box edge
+    // instead, which is only ever correct when there's zero slack. Anywhere
+    // there was slack (play mode especially, whose board is never centered
+    // -- see boardTop in legacyMenuLayout.ts -- so ALL of it pools on one
+    // side), the rim's soft-halo + crisp-line "one more tile" treatment
+    // stopped short of the actual dock tile, leaving a plain, undetailed
+    // flat-fill seam between the last real maze tile and the rim -- exactly
+    // the visible "gap in the bleed-off path" this fixes.
+    mazeLeft: number,
+    mazeTop: number,
+    mazeWidth: number,
+    mazeHeight: number,
     continuationLength: number,
     rimColor: number,
     intensity: number
@@ -6328,6 +6346,8 @@ export class MenuScene extends Phaser.Scene {
     const bandTop = tileRect.top + Math.round((frame.topInset / materialTileSize) * tileRect.height);
     const bandRight = tileRect.left + Math.round(((frame.leftInset + frame.width) / materialTileSize) * tileRect.width);
     const bandBottom = tileRect.top + Math.round(((frame.topInset + frame.height) / materialTileSize) * tileRect.height);
+    const mazeRight = mazeLeft + mazeWidth;
+    const mazeBottom = mazeTop + mazeHeight;
     const length = Math.max(1, Math.round(continuationLength));
 
     let facetRect: LegacyPixelTileRect;
@@ -6337,16 +6357,24 @@ export class MenuScene extends Phaser.Scene {
     let hasRight = false;
 
     if (direction === 'left') {
-      facetRect = { height: bandBottom - bandTop, left: boardLeft - length, top: bandTop, width: length };
+      const right = mazeLeft;
+      const left = (boardLeft - length);
+      facetRect = { height: bandBottom - bandTop, left, top: bandTop, width: right - left };
       hasRight = true;
     } else if (direction === 'right') {
-      facetRect = { height: bandBottom - bandTop, left: boardLeft + boardWidth, top: bandTop, width: length };
+      const left = mazeRight;
+      const right = (boardLeft + boardWidth + length);
+      facetRect = { height: bandBottom - bandTop, left, top: bandTop, width: right - left };
       hasLeft = true;
     } else if (direction === 'top') {
-      facetRect = { height: length, left: bandLeft, top: boardTop - length, width: bandRight - bandLeft };
+      const bottom = mazeTop;
+      const top = (boardTop - length);
+      facetRect = { height: bottom - top, left: bandLeft, top, width: bandRight - bandLeft };
       hasBottom = true;
     } else {
-      facetRect = { height: length, left: bandLeft, top: boardTop + boardHeight, width: bandRight - bandLeft };
+      const top = mazeBottom;
+      const bottom = (boardTop + boardHeight + length);
+      facetRect = { height: bottom - top, left: bandLeft, top, width: bandRight - bandLeft };
       hasTop = true;
     }
 
