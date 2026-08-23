@@ -2,12 +2,14 @@ import { describe, expect, test } from 'vitest';
 import { resolveTouchControlLayout } from '../../src/input-human';
 import { resolveLegacyHeaderControlFrame } from '../../src/legacy-runtime/legacyHeaderControl';
 import {
+  resolveLegacyMenuHeaderUsernameReserve,
   resolveLegacyMenuLayout
 } from '../../src/legacy-runtime/legacyMenuLayout';
 import { LEGACY_UI_MIN_TOUCH_TARGET } from '../../src/legacy-runtime/legacyUiStandards';
 import {
   resolveLegacyMenuPathTitleLayout,
   resolveLegacyMenuPathTitleOrbitGeometry,
+  resolveLegacyMenuTitleFootprintWidth,
   resolveLegacyMenuTitlePresentation
 } from '../../src/legacy-runtime/legacyMenuTitle';
 
@@ -240,12 +242,12 @@ describe('legacy menu layout', () => {
       slot: 1,
       width: layout.width
     });
-    const accountReserve = Math.round(Math.max(64, Math.min(100, layout.width * 0.22)));
-    const expectedCenterX = Math.round((leadingFrame.right + accountReserve + trailingFrame.left) / 2);
+    const accountReserve = resolveLegacyMenuHeaderUsernameReserve(layout.width);
+    const expectedCenterX = layout.width / 2;
 
-    // The header account label makes its available title interval asymmetric.
-    // Center in that actual interval, keep the decorative orbit inside the
-    // HUD, and do not let it intrude into either reserved control region.
+    // The title stays on the actual screen center while the username and
+    // controls adapt around it. The decorative orbit remains inside the HUD
+    // and clear of both occupied regions.
     expect(orbitGeometry.centerX).toBe(expectedCenterX);
     expect(orbitGeometry.left).toBeGreaterThanOrEqual(leadingFrame.right + accountReserve);
     expect(orbitGeometry.right).toBeLessThanOrEqual(trailingFrame.left);
@@ -430,16 +432,18 @@ describe('legacy menu layout', () => {
         slot: 1,
         width: layout.width
       });
-      const accountReserve = Math.round(Math.max(64, Math.min(100, layout.width * 0.22)));
-      const expectedCenterX = Math.round((leadingFrame.right + accountReserve + trailingFrame.left) / 2);
+      const accountReserve = resolveLegacyMenuHeaderUsernameReserve(layout.width);
+      const expectedCenterX = layout.width / 2;
+      const presentation = resolveLegacyMenuTitlePresentation(layout.titleReserveHeight);
+      const titleFootprintWidth = resolveLegacyMenuTitleFootprintWidth(presentation.fontSize);
 
       // Every one of these viewports has enough header-row gap to fit the
       // title inline -- confirmed live, not assumed (only the 172x407
       // diagnostic panel above falls back to the banner lane).
       expect(layout.lanes.title).toBeNull();
-      expect(layout.titleX).toBeGreaterThan(leadingFrame.right + accountReserve);
-      expect(layout.titleX).toBeLessThan(trailingFrame.left);
       expect(layout.titleX).toBe(expectedCenterX);
+      expect(layout.titleX - (titleFootprintWidth / 2)).toBeGreaterThanOrEqual(leadingFrame.right + accountReserve);
+      expect(layout.titleX + (titleFootprintWidth / 2)).toBeLessThanOrEqual(trailingFrame.left);
       expect(layout.titleY).toBe(Math.round(leadingFrame.centerY));
       expect(layout.titleReserveHeight).toBe(hudHeight);
     }

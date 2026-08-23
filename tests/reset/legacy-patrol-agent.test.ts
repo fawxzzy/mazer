@@ -685,7 +685,7 @@ describe('legacy Mythic patrol agent', () => {
     expect(scene.boardDynamicDirty).toBe(false);
   });
 
-  test('re-arms on Pause Reset and clears on Reset Progression without maze regeneration', () => {
+  test('keeps pressure objects dormant across Pause Reset and Reset Progression without maze regeneration', () => {
     const maze = createMythicMaze();
     const before = JSON.stringify(maze);
     const progressionState = createEmptyLegacyProgressionState();
@@ -732,14 +732,13 @@ describe('legacy Mythic patrol agent', () => {
     };
 
     applyPauseCommand.call(pauseScene, 'reset-player');
-    expect(pauseScene.playPatrolAgent).toEqual(createFreshPatrol('mythic'));
-    expect(pauseScene.playPatrolAgent).toMatchObject({
-      collisionCount: 0,
-      collisionDelayUntilMs: null,
-      currentRouteIndex: 0,
-      penaltyCount: 0,
-      stepCount: 0
-    });
+    expect(pauseScene.playPatrolAgent).toBeNull();
+    expect(pauseScene.playStaticSlowTile).toBeNull();
+    expect(pauseScene.playRoomCandidateMetadata).toEqual(createLegacyRoomCandidateMetadata(
+      maze,
+      'mythic',
+      null
+    ));
     expect(pauseScene.resetLegacyWorldTurnHost).toHaveBeenCalledOnce();
 
     const progressionScene: ProgressionResetHarness = {
@@ -818,8 +817,8 @@ describe('legacy Mythic patrol agent', () => {
       scale: 96,
       targetComplexity: 180
     }));
-    expect(readback().playPatrolAgent).not.toBeNull();
-    expect(readback().legacyWorldTurnHost.getDiagnostics().timedModeEnabled).toBe(true);
+    expect(readback().playPatrolAgent).toBeNull();
+    expect(readback().legacyWorldTurnHost.getDiagnostics().timedModeEnabled).toBe(false);
 
     applyGenerationRequest.call(scene, createLegacyGenerationRequest({
       currentSeed: 577_196_705,

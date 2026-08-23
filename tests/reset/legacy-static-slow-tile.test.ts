@@ -374,18 +374,11 @@ describe('legacy static slow tile', () => {
     });
     applyPauseCommand.call(scene, 'reset-player');
 
-    expect(scene.playStaticSlowTile).toEqual(createLegacyStaticSlowTileState(maze, 'architect'));
-    expect(scene.playStaticSlowTile).toMatchObject({
-      blockedMoveCount: 0,
-      consumed: false,
-      delayUntilMs: null,
-      enteredAtMs: null,
-      entryCount: 0
-    });
+    expect(scene.playStaticSlowTile).toBeNull();
     expect(scene.playRoomCandidateMetadata).toEqual(createLegacyRoomCandidateMetadata(
       maze,
       'architect',
-      scene.playStaticSlowTile?.placement?.point ?? null
+      null
     ));
     expect(scene.playPatrolAgent).toBeNull();
     expect(scene.player).toEqual(maze.start);
@@ -393,19 +386,11 @@ describe('legacy static slow tile', () => {
     expect(scene.playStartedAtMs).toBe(resetAtMs);
     expect(scene.closeOverlay).toHaveBeenCalledOnce();
 
-    const freshEntry = applyLegacyStaticSlowTileEntry(
-      scene.playStaticSlowTile,
-      scene.playStaticSlowTile!.placement!.point,
-      resetAtMs + 10
-    );
-    expect(freshEntry).toMatchObject({
-      triggered: true,
-      state: {
-        consumed: true,
-        delayUntilMs: resetAtMs + 450,
-        entryCount: 1,
-        penaltyMs: 440
-      }
+    expect(applyLegacyStaticSlowTileEntry(scene.playStaticSlowTile, maze.start, resetAtMs + 10)).toEqual({
+      penaltyAppliedMs: 0,
+      phase: null,
+      state: null,
+      triggered: false
     });
   });
 
@@ -464,17 +449,7 @@ describe('legacy static slow tile', () => {
     expect(scene.progressionState.tracks['ai-runner']).toEqual(
       createEmptyLegacyProgressionState().tracks['ai-runner']
     );
-    expect(scene.playStaticSlowTile).toEqual(createLegacyStaticSlowTileState(maze, 'tutorial'));
-    expect(scene.playStaticSlowTile).toMatchObject({
-      band: 'tutorial',
-      blockedMoveCount: 0,
-      consumed: false,
-      delayUntilMs: null,
-      eligible: false,
-      enteredAtMs: null,
-      entryCount: 0,
-      placement: null
-    });
+    expect(scene.playStaticSlowTile).toBeNull();
     expect(isLegacyStaticSlowTileDelayActive(scene.playStaticSlowTile, resetAtMs)).toBe(false);
     expect(scene.playRoomCandidateMetadata).toBeNull();
     expect(scene.playPatrolAgent).toBeNull();
@@ -513,7 +488,7 @@ describe('legacy static slow tile', () => {
     }
   }, 30_000);
 
-  test('wires placement, movement admission, diagnostics, and drawing through the play scene only', () => {
+  test('keeps pressure-object contracts dormant with no automatic play-scene placement', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const diagnosticsSource = readFileSync(
       resolve(process.cwd(), 'src/scenes/menuRuntimeDiagnostics.ts'),
@@ -521,7 +496,7 @@ describe('legacy static slow tile', () => {
     );
 
     expect(menuSceneSource).toContain('this.playStaticSlowTile = null;');
-    expect(menuSceneSource).toContain('this.playStaticSlowTile = createLegacyStaticSlowTileState(');
+    expect(menuSceneSource).not.toContain('this.playStaticSlowTile = createLegacyStaticSlowTileState(');
     expect(menuSceneSource).toContain('const slowTileDelayActive = isLegacyStaticSlowTileDelayActive(');
     expect(menuSceneSource).toContain("type: 'static-slow-tile-entered'");
     expect(menuSceneSource).toContain('this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize, time);');

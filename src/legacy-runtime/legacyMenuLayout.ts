@@ -93,6 +93,10 @@ export interface LegacyMenuLayoutOptions {
 }
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+
+export const resolveLegacyMenuHeaderUsernameReserve = (width: number): number => (
+  Math.round(clamp(width * 0.2, 56, 100))
+);
 const LEGACY_MENU_SIDE_PANEL_WIDTH = 300;
 const LEGACY_DIAGNOSTIC_PANEL_WIDTH = 172;
 const LEGACY_DIAGNOSTIC_PANEL_HEIGHT = 407;
@@ -349,7 +353,7 @@ export const resolveLegacyMenuLayout = (
   // sizeScale so every header control shares one squeeze factor instead of
   // the title alone visibly getting smaller while its neighbors don't.
   let menuTitleFitsInHeader = false;
-  let menuHeaderTitleCenterX = Math.round(width / 2);
+  let menuHeaderTitleCenterX = width / 2;
   let menuHeaderTitleCenterY = 0;
   let menuInlineTitleFontSize = resolveLegacyMenuTitleFontSize(menuTopHudReserve);
   // Only true once the fit-check actually had to shrink below the preferred
@@ -367,7 +371,7 @@ export const resolveLegacyMenuLayout = (
     // fit check measured only the settings slot while the scene rendered the
     // leaderboard inside that supposed title gap, then the scene rendered the
     // title from unrelated Start-button dimensions.
-    const leadingUsernameReserve = Math.round(clamp(width * 0.22, 64, 100));
+    const leadingUsernameReserve = resolveLegacyMenuHeaderUsernameReserve(width);
     const inlineTitlePreferredFontSize = resolveLegacyMenuTitleFontSize(menuTopHudReserve);
     const inlineTitleMinFontSize = 13;
     const inlineTitlePadding = 8;
@@ -399,9 +403,14 @@ export const resolveLegacyMenuLayout = (
         slot: 1,
         width
       });
-      const headerGap = trailingHeaderFrame.left - leadingHeaderFrame.right - leadingUsernameReserve;
       const inlineTitleWidth = resolveLegacyMenuTitleFootprintWidth(candidateFontSize);
-      if (headerGap < inlineTitleWidth + inlineTitlePadding) {
+      const centeredTitleLeft = (width - inlineTitleWidth) / 2;
+      const centeredTitleRight = (width + inlineTitleWidth) / 2;
+      const leadingOccupiedRight = leadingHeaderFrame.right + leadingUsernameReserve;
+      if (
+        centeredTitleLeft < leadingOccupiedRight + inlineTitlePadding
+        || centeredTitleRight > trailingHeaderFrame.left - inlineTitlePadding
+      ) {
         continue;
       }
 
@@ -409,15 +418,12 @@ export const resolveLegacyMenuLayout = (
       menuInlineTitleFontSize = candidateFontSize;
       menuTitleSqueezed = candidateFontSize < inlineTitlePreferredFontSize;
       headerIconScale = Math.round(candidateIconScale * 100) / 100;
-      // The account label starts just after the leading badge. Center inside
-      // the *actual* title interval rather than the bare icon-to-icon gap,
-      // otherwise a long signed-in name could still collide with a correctly
-      // measured wordmark on the smallest normal phones.
-      menuHeaderTitleCenterX = Math.round((
-        leadingHeaderFrame.right
-        + leadingUsernameReserve
-        + trailingHeaderFrame.left
-      ) / 2);
+      // The title is a screen anchor, not a filler for whichever asymmetric
+      // space the neighboring controls happen to leave. Keep its geometric
+      // center pinned to the viewport midpoint and let the shared squeeze
+      // loop reduce the title and control scale until that centered footprint
+      // clears both occupied sides.
+      menuHeaderTitleCenterX = width / 2;
       menuHeaderTitleCenterY = Math.round(leadingHeaderFrame.centerY);
       break;
     }
@@ -699,7 +705,7 @@ export const resolveLegacyMenuLayout = (
   // Always the true screen midpoint outside the header-fit case -- centering
   // on the board instead (the previous portrait behavior) drifted off the
   // actual screen center whenever the board itself sat off-center.
-  const titleX = menuTitleFitsInHeader ? menuHeaderTitleCenterX : Math.round(width / 2);
+  const titleX = menuTitleFitsInHeader ? menuHeaderTitleCenterX : width / 2;
   const rankLane = null;
   const actionsLane = isPlaySurface
     ? null

@@ -103,6 +103,7 @@ import {
 } from '../legacy-runtime/legacyMenuDemoLifecycle';
 import {
   resolveLegacyMenuBoardAspectRatio,
+  resolveLegacyMenuHeaderUsernameReserve,
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
 } from '../legacy-runtime/legacyMenuLayout';
@@ -213,14 +214,12 @@ import {
   summarizeLegacyProgressionDiagnostics,
   writeLegacyProgressionState,
   type LegacyProgressionDiagnostics,
-  type LegacyProgressionDifficultyBand,
   type LegacyProgressionPalette,
   type LegacyProgressionState,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
 import {
   applyLegacyStaticSlowTileEntry,
-  createLegacyStaticSlowTileState,
   isLegacyStaticSlowTileDelayActive,
   recordLegacyStaticSlowTileBlockedMove,
   resolveLegacyStaticSlowTilePhase,
@@ -242,7 +241,6 @@ import {
   advanceLegacyPatrolAgent,
   applyLegacyPatrolAgentCollision,
   clearLegacyPatrolAgentCollisionIntent,
-  createLegacyPatrolAgentState,
   isLegacyPatrolAgentDelayActive,
   queueLegacyPatrolAgentCollisionIntent,
   recordLegacyPatrolAgentBlockedMove,
@@ -4477,13 +4475,18 @@ export class MenuScene extends Phaser.Scene {
       const progressionBand = resolveLegacyProgressionDifficultyProfile(
         this.progressionState.tracks.player
       ).band;
-      this.playStaticSlowTile = createLegacyStaticSlowTileState(this.maze, progressionBand);
+      // Pressure objects remain source-proven experiments, not live gameplay.
+      // The red/grey slow tile and patrol agent were appearing automatically
+      // in later difficulty bands even though rooms and object gameplay have
+      // not been activated. Keep the dormant contracts available for a future
+      // explicit mechanic lane, but do not place any runtime object now.
+      this.playStaticSlowTile = null;
       this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
         this.maze,
         progressionBand,
-        this.playStaticSlowTile.placement?.point ?? null
+        null
       );
-      this.playPatrolAgent = this.createLegacyPlayPatrolAgent(progressionBand);
+      this.playPatrolAgent = null;
       // The decel-to-target spin itself now starts once the new maze
       // actually finishes settling (settleLegacyMenuStaticDrawStageIfComplete),
       // not here at the moment the maze data swaps in -- resolveLegacy
@@ -5143,9 +5146,10 @@ export class MenuScene extends Phaser.Scene {
     // land (see markerRevealAlpha in resolveLegacyPlayerSpawnBurstState) --
     // but without this, the demo walker's own move timer was free to fire
     // the instant the phase settled, stepping the AI before its marker had
-    // even appeared. Holding the walker here until the burst finishes means
-    // it visibly starts moving only once it's actually on screen.
-    if (this.resolveLegacyPlayerSpawnBurstState(time).active) {
+    // even appeared. Hold only until the beams arrive and reveal the marker;
+    // the trailing impact flash is visible activity and must not add a stale
+    // post-spawn pause after the player is already on screen.
+    if (this.resolveLegacyPlayerSpawnBurstState(time).markerRevealAlpha <= 0) {
       return;
     }
     if (time < this.nextDemoMoveAtMs) {
@@ -5257,25 +5261,6 @@ export class MenuScene extends Phaser.Scene {
       patrolCollisionRecovery.active ? 'patrol-recovery' : 'no-patrol-recovery',
       this.playPatrolAgent?.pendingCollisionIntent ? 'patrol-input-pending' : 'no-patrol-input-pending'
     ].join(':');
-  }
-
-  private createLegacyPlayPatrolAgent(
-    progressionBand: LegacyProgressionDifficultyBand
-  ): LegacyPatrolAgentState | null {
-    const excludedPoints: LegacyPoint[] = [];
-    if (this.playStaticSlowTile?.placement) {
-      excludedPoints.push({ ...this.playStaticSlowTile.placement.point });
-    }
-    if (this.playRoomCandidateMetadata) {
-      const { x, y } = this.playRoomCandidateMetadata.candidate.topLeft;
-      excludedPoints.push(
-        { x, y },
-        { x: x + 1, y },
-        { x, y: y + 1 },
-        { x: x + 1, y: y + 1 }
-      );
-    }
-    return createLegacyPatrolAgentState(this.maze, progressionBand, excludedPoints);
   }
 
   private createLegacyWorldTurnHost(): WorldTurnHost {
@@ -13233,7 +13218,7 @@ export class MenuScene extends Phaser.Scene {
     // reasonable header slot even at this reduced size (very long
     // usernames), same reasoning as the alphabet-coverage fallback below.
     const glyphCellSize = 3;
-    const maxGlyphWidth = Math.max(60, Math.round(this.layout.width * 0.3));
+    const maxGlyphWidth = resolveLegacyMenuHeaderUsernameReserve(this.layout.width);
     const useGlyphs = isLegacyGlyphWordRenderable(username)
       && (resolveLegacyGlyphWordColumns(username) * glyphCellSize) <= maxGlyphWidth;
 
@@ -13259,6 +13244,7 @@ export class MenuScene extends Phaser.Scene {
       panel.clear();
       panel.setVisible(false);
       label.setText(username);
+      this.fitLegacyUiTextToWidth(label, maxGlyphWidth, 13, 9);
       label.setColor(`#${trailColor.toString(16).padStart(6, '0')}`);
       label.setAlpha(blinkAlpha);
       label.setPosition(anchorLeft, anchorY);
@@ -13666,13 +13652,13 @@ export class MenuScene extends Phaser.Scene {
       const progressionBand = resolveLegacyProgressionDifficultyProfile(
         this.progressionState.tracks.player
       ).band;
-      this.playStaticSlowTile = createLegacyStaticSlowTileState(this.maze, progressionBand);
+      this.playStaticSlowTile = null;
       this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
         this.maze,
         progressionBand,
-        this.playStaticSlowTile.placement?.point ?? null
+        null
       );
-      this.playPatrolAgent = this.createLegacyPlayPatrolAgent(progressionBand);
+      this.playPatrolAgent = null;
       this.resetLegacyWorldTurnHost();
       this.resetLegacyPlayInputBuffer();
       this.boardDynamicDirty = true;
@@ -13698,11 +13684,11 @@ export class MenuScene extends Phaser.Scene {
     const progressionBand = resolveLegacyProgressionDifficultyProfile(
       this.progressionState.tracks.player
     ).band;
-    this.playStaticSlowTile = createLegacyStaticSlowTileState(this.maze, progressionBand);
+    this.playStaticSlowTile = null;
     this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
       this.maze,
       progressionBand,
-      this.playStaticSlowTile.placement?.point ?? null
+      null
     );
     this.playPatrolAgent = null;
     this.resetLegacyWorldTurnHost();

@@ -3,6 +3,7 @@ import {
   resolveLegacyDynamicMarkerInset,
   resolveLegacyDynamicTrailStrokeWidth,
   resolveLegacyEndpointMarkerRenderMetrics,
+  resolveLegacyBleedOffDockVisualEligibility,
   resolveLegacyBleedOffPaths,
   resolveLegacyMenuBorderDockDirections,
   resolveLegacyMenuBorderDockRenderAreas,
@@ -235,6 +236,25 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     ]);
     expect(resolveLegacyNavigationTarget(maze, { x: 2, y: 0 }, 0, -1)).toEqual({ x: 2, y: 4 });
     expect(resolveLegacyBleedOffPaths(maze, { x: 0, y: 0 })).toEqual([]);
+  });
+
+  test('renders every legal bleed-off opening even when several share one side or sit adjacently', () => {
+    const maze = {
+      width: 7,
+      height: 7,
+      grid: Array.from({ length: 7 }, (_, y) => Array.from({ length: 7 }, (_, x) => (
+        ((x === 0 || x === 6) && [1, 2, 4].includes(y))
+        || ((y === 0 || y === 6) && [1, 3, 4].includes(x))
+      )))
+    };
+
+    expect([...resolveLegacyBleedOffDockVisualEligibility(maze)].sort()).toEqual([
+      '0,1', '0,2', '0,4',
+      '1,0', '1,6',
+      '3,0', '3,6',
+      '4,0', '4,6',
+      '6,1', '6,2', '6,4'
+    ]);
   });
 
   test('keeps folded-corner border cells capped so the corner facets stay clean', () => {

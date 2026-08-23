@@ -221,65 +221,21 @@ export const resolveLegacyBleedOffPaths = (
 
 const keyForLegacyPoint = (point: LegacyPoint): string => `${point.x},${point.y}`;
 
-// A maze can legitimately generate two bleed-off/wrap openings close
-// together on the same border edge -- the underlying grid topology and its
-// "every open border tile has a walkable opposite" pairing invariant
-// require every one of them to stay fully walkable and wrap-navigable, so
-// this can't suppress that at the generation layer without breaking
-// connectivity guarantees. What it CAN do safely is decide, purely for the
-// decorative "poking-out corridor" dock rendering (drawLegacyPathBorderDock,
-// drawLegacyBleedOffGlow), which openings actually get that treatment -- the
-// tile stays a normal, fully walkable, correctly wrapping corridor tile
-// either way; it just doesn't also grow a protruding dock bar for every
-// single one of them.
-const LEGACY_BLEED_OFF_DOCK_VISUAL_MIN_ADJACENT_SPACING = 2;
-// Hard ceiling, independent of spacing -- at most this many decorated dock
-// corridors per axis (an axis pairs two opposite sides, e.g. left+right, so
-// this is also the max per individual side, since every wrap connection
-// opens exactly one tile on each of its two sides together).
-const LEGACY_BLEED_OFF_DOCK_VISUAL_MAX_PER_AXIS = 2;
-
 export const resolveLegacyBleedOffDockVisualEligibility = (
   maze: Pick<LegacyMazeSnapshot, 'grid' | 'width' | 'height'>
 ): Set<string> => {
   const { width, height } = maze;
-  const usedLines: { horizontal: number[]; vertical: number[] } = { horizontal: [], vertical: [] };
-  // A wrap connection's two openings (e.g. left x=0 and right x=width-1)
-  // always share the exact same line number by construction -- they're
-  // mirrored at the same row/column. Scanning point-by-point and recording
-  // "used" lines as we go treated a pair's own opposite side as if it were
-  // a second, too-close opening and always suppressed it, since whichever
-  // side scans first (left, top) is always visited before its partner
-  // (right, bottom) in row-major order. That's why right/bottom bleed
-  // corridors were silently never rendering at all. Deciding once per
-  // PAIR (keyed by axis+line, not by individual point) and reusing that
-  // same decision for both of its openings fixes this.
-  const pairDecisions = new Map<string, boolean>();
   const eligible = new Set<string>();
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const point = { x, y };
-      if (resolveLegacyBleedOffPaths(maze, point).length <= 0) {
-        continue;
-      }
-
-      const isHorizontalAxis = x === 0 || x === width - 1;
-      const axis = isHorizontalAxis ? 'horizontal' : 'vertical';
-      const line = isHorizontalAxis ? y : x;
-      const pairKey = `${axis}:${line}`;
-
-      let decision = pairDecisions.get(pairKey);
-      if (decision === undefined) {
-        decision = usedLines[axis].length < LEGACY_BLEED_OFF_DOCK_VISUAL_MAX_PER_AXIS
-          && !usedLines[axis].some((usedLine) => Math.abs(usedLine - line) < LEGACY_BLEED_OFF_DOCK_VISUAL_MIN_ADJACENT_SPACING);
-        pairDecisions.set(pairKey, decision);
-        if (decision) {
-          usedLines[axis].push(line);
-        }
-      }
-
-      if (decision) {
+      // Visual truth follows navigation truth exactly. Suppressing nearby or
+      // additional legal openings made real wrap corridors appear to end at
+      // the maze border, including valid bottom exits, even though movement
+      // still wrapped through them. Every legal bleed-off path therefore gets
+      // its matching edge strip and glow.
+      if (resolveLegacyBleedOffPaths(maze, point).length > 0) {
         eligible.add(keyForLegacyPoint(point));
       }
     }
