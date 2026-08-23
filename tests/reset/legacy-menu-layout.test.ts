@@ -389,12 +389,8 @@ describe('legacy menu layout', () => {
     expectTitlePlacedSafely(layout);
   });
 
-  test('places the title inline in the header row, centered between the leading and trailing icons, whenever the gap allows it', () => {
+  test('places the title inline in the header row, centered between the leading and trailing icons, whenever the gap allows it at full (unsqueezed) size', () => {
     for (const viewport of [
-      { width: 320, height: 568 },
-      { width: 390, height: 844 },
-      { width: 405, height: 958 },
-      { width: 430, height: 932 },
       { width: 1280, height: 720 },
       { width: 1920, height: 1080 }
     ]) {
@@ -424,6 +420,41 @@ describe('legacy menu layout', () => {
       expect(Math.abs(layout.titleX - ((leadingFrame.right + trailingFrame.left) / 2))).toBeLessThanOrEqual(1);
       expect(layout.titleY).toBe(Math.round(leadingFrame.centerY));
       expect(layout.titleReserveHeight).toBe(hudHeight);
+    }
+  });
+
+  test('shrinks the inline title toward the header squeeze floor instead of always dropping to the fallback lane, and never overlaps the leading username reserve when it does fall back', () => {
+    // The header's leading side carries an icon PLUS the signed-in player's
+    // own username text (createLegacyMenuUsernameButton), not a bare icon --
+    // the fit-check reserves conservative room for that (leadingUsernameReserve),
+    // so genuinely common phone widths (320-375px) legitimately can't fit an
+    // inline title alongside it and correctly use the fallback lane instead
+    // of squeezing the title down to something illegible or overlapping the
+    // username.
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 360, height: 780 },
+      { width: 375, height: 812 }
+    ]) {
+      const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 49, 'menu');
+      expectTitlePlacedSafely(layout);
+    }
+
+    // Larger phones/small tablets (390-430px) have just enough room to stay
+    // inline, but only once the title shrinks a bit below its preferred
+    // size -- headerIconScale (fed into the settings cog/leaderboard/
+    // username icon sizing too) should reflect that same modest squeeze
+    // instead of staying at 1 the way it does for a genuinely roomy header
+    // (see the desktop-width test above, which stays fully unsqueezed).
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 405, height: 958 },
+      { width: 430, height: 932 }
+    ]) {
+      const squeezedLayout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 49, 'menu');
+      expect(squeezedLayout.lanes.title).toBeNull();
+      expect(squeezedLayout.headerIconScale).toBeLessThan(1);
+      expect(squeezedLayout.headerIconScale).toBeGreaterThanOrEqual(0.85);
     }
   });
 

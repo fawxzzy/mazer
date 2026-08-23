@@ -22,6 +22,14 @@ interface ResolveLegacyHeaderControlFrameInput {
    * slots flow inward with the same safe gap.
    */
   slot?: number;
+  /**
+   * 1 by default. Pass LegacyMenuLayout's headerIconScale here to shrink
+   * this control by the same modest amount the inline title had to shrink
+   * by to keep fitting in a tight header row, instead of only the title
+   * visibly responding. Still floored well above the already-reduced
+   * 36-40px band below (see the size clamp), never below a usable tap size.
+   */
+  sizeScale?: number;
   width: number;
 }
 
@@ -52,7 +60,15 @@ export const resolveLegacyHeaderControlFrame = (
   input: ResolveLegacyHeaderControlFrameInput
 ): LegacyHeaderControlFrame => {
   const minDimension = Math.max(1, Math.min(input.width, input.height));
-  const size = clamp(Math.round(minDimension * 0.085), 36, 40);
+  // Scale applied AFTER the existing 36-40 clamp, not folded into the same
+  // formula the clamp floor was tuned against -- at sizeScale 1 (the
+  // overwhelming majority of frames) this must equal the unscaled result
+  // exactly, not a rounded-through-1x copy of it, so an unsqueezed header
+  // keeps its already-tuned 36-40px icons unchanged. Only a real squeeze
+  // (sizeScale < 1) is allowed to go below that floor, down to 32.
+  const baseSize = clamp(Math.round(minDimension * 0.085), 36, 40);
+  const sizeScale = input.sizeScale ?? 1;
+  const size = sizeScale >= 1 ? baseSize : Math.max(32, Math.round(baseSize * sizeScale));
   const inset = Math.max(8, Math.round(size * 0.2));
   const slot = Math.max(0, Math.round(input.slot ?? 0));
   const gap = Math.max(8, Math.round(size * 0.18));

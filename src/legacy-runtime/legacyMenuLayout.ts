@@ -14,6 +14,13 @@ export interface LegacyMenuLayout {
   titleX: number;
   titleY: number;
   titleReserveHeight: number;
+  // 1 when the header row has room to spare; shrinks toward 0.85 as the
+  // inline title has to shrink to keep fitting in that same row (see the
+  // menuTitleFitsInHeader block) -- feed into resolveLegacyHeaderControlFrame's
+  // sizeScale so the settings cog, leaderboard, and username controls
+  // shrink by the same modest amount instead of only the title visibly
+  // responding to a tight header.
+  headerIconScale: number;
   footerY: number;
   buttonLayout: 'row' | 'stack';
   buttonY: number;
@@ -327,12 +334,29 @@ export const resolveLegacyMenuLayout = (
     : 0;
   // The title prefers to sit inline in the header row, centered in the gap
   // between the leading (AI/level) badge and the trailing settings cog --
-  // not as a separate banner lane above the board. Only fall back to the
-  // banner lane below when that gap is too narrow to hold the wordmark
-  // legibly (e.g. the diagnostic side panel and other very narrow widths).
+  // not as a separate banner lane above the board. It used to fall back to
+  // a whole separate banner lane below whenever that gap got too narrow for
+  // the title at its preferred size -- per feedback that reads as a jarring
+  // layout jump, it now shrinks the title (down to inlineTitleMinFontSize)
+  // to keep it inline instead, and only drops to the fallback lane in the
+  // genuinely-extreme case where even the minimum size wouldn't fit. The
+  // header's OTHER controls (settings cog, leaderboard, the leading
+  // username/badge) shrink a little too as this happens -- see
+  // headerIconScale below, threaded into resolveLegacyHeaderControlFrame's
+  // sizeScale so every header control shares one squeeze factor instead of
+  // the title alone visibly getting smaller while its neighbors don't.
   let menuTitleFitsInHeader = false;
   let menuHeaderTitleCenterX = Math.round(width / 2);
   let menuHeaderTitleCenterY = 0;
+  let menuInlineTitleFontSize = Math.max(22, Math.round(menuTopHudReserve * 0.68));
+  // Only true once the fit-check actually had to shrink below the preferred
+  // size -- titleReserveHeight below stays the exact, un-round-tripped
+  // menuTopHudReserve in the (overwhelmingly common) unsqueezed case, so an
+  // ordinary header keeps the identical value it always has, down to the
+  // pixel, instead of picking up rounding jitter from a font-size round trip
+  // (round(x*0.68) then round(that/0.68) doesn't always land back on x).
+  let menuTitleSqueezed = false;
+  let headerIconScale = 1;
   if (!isPlaySurface && menuTopHudReserve > 0) {
     const leadingHeaderFrame = resolveLegacyHeaderControlFrame({
       height,
@@ -348,15 +372,43 @@ export const resolveLegacyMenuLayout = (
       placement: 'trailing',
       width
     });
-    const headerGap = trailingHeaderFrame.left - leadingHeaderFrame.right;
+    // leadingHeaderFrame is a bare single-icon slot, but the menu surface's
+    // actual leading-side content (createLegacyMenuUsernameButton) is that
+    // icon PLUS the signed-in player's own username text -- a geometry-only
+    // layout pass has no way to know that string's real rendered width, so
+    // this reserves a conservative worst-case allowance for it instead of
+    // measuring the bare icon alone and letting a long username silently
+    // run under the title.
+    const leadingUsernameReserve = 100;
+    const headerGap = trailingHeaderFrame.left - leadingHeaderFrame.right - leadingUsernameReserve;
     // Keep this formula identical to resolveLegacyMenuTitlePresentation's
     // fontSize in legacyMenuTitle.ts, or the fit-check here and the actual
     // rendered size will drift apart.
-    const inlineTitleFontSize = Math.max(22, Math.round(menuTopHudReserve * 0.68));
-    const inlineTitleWidth = resolveLegacyMenuTitleFootprintWidth(inlineTitleFontSize);
+    const inlineTitlePreferredFontSize = Math.max(22, Math.round(menuTopHudReserve * 0.68));
+    // 22 matches resolveLegacyMenuTitlePresentation's own Math.max(22, ...)
+    // floor -- titleReserveHeight below is reverse-derived from whatever
+    // font size wins here (titleReserveHeight * 0.68 = fontSize), so the
+    // two formulas only stay identical if this never asks for something
+    // that floor would silently override anyway.
+    const inlineTitleMinFontSize = 22;
     const inlineTitlePadding = 24;
+    let candidateFontSize = inlineTitlePreferredFontSize;
+    while (
+      candidateFontSize > inlineTitleMinFontSize
+      && resolveLegacyMenuTitleFootprintWidth(candidateFontSize) + inlineTitlePadding > headerGap
+    ) {
+      candidateFontSize -= 1;
+    }
+    const inlineTitleWidth = resolveLegacyMenuTitleFootprintWidth(candidateFontSize);
     if (headerGap >= inlineTitleWidth + inlineTitlePadding) {
       menuTitleFitsInHeader = true;
+      menuInlineTitleFontSize = candidateFontSize;
+      menuTitleSqueezed = candidateFontSize < inlineTitlePreferredFontSize;
+      headerIconScale = clampInteger(
+        Math.round((candidateFontSize / inlineTitlePreferredFontSize) * 100),
+        85,
+        100
+      ) / 100;
       menuHeaderTitleCenterX = Math.round((leadingHeaderFrame.right + trailingHeaderFrame.left) / 2);
       menuHeaderTitleCenterY = Math.round(leadingHeaderFrame.centerY);
     }
@@ -659,7 +711,10 @@ export const resolveLegacyMenuLayout = (
     titleY: Math.round(!isPlaySurface ? menuPortraitTitleY : boardTop),
     titleReserveHeight: isPlaySurface
       ? Math.round(height * 0.055)
-      : (menuTitleFitsInHeader ? menuTopHudReserve : menuTitleReserve),
+      : (menuTitleFitsInHeader
+        ? (menuTitleSqueezed ? Math.round(menuInlineTitleFontSize / 0.68) : menuTopHudReserve)
+        : menuTitleReserve),
+    headerIconScale,
     footerY: height - 18,
     buttonLayout: resolvedUsesStackedButtons ? 'stack' : 'row',
     buttonY: rowButtonY,
