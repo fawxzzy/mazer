@@ -1166,6 +1166,14 @@ const LEGACY_MENU_DECONSTRUCT_BURST_ALT = 0x72e0bf;
 const LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS = 560;
 const LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS = 700;
 const LEGACY_LEVEL_ANNOUNCER_MIN_SCALE = 0.72;
+// Slow ambient breathing while the number is fully up, blended in only once
+// the fade envelope reaches its held plateau -- same sin-driven alpha+scale
+// technique as the header icons' blink pulse (LEGACY_MENU_BLINK_PULSE_MS =
+// 2400), just noticeably slower per feedback that this one should read
+// calmer than the icons.
+const LEGACY_LEVEL_ANNOUNCER_PULSE_PERIOD_MS = 3600;
+const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA = 0.78;
+const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE = 0.94;
 // How long the bleed-off dock corridors (resolveLegacyPathBorderDockContinuation)
 // take to grow from the maze's own edge out to the true screen edge, and to
 // shrink back the same way -- a smooth extend/retract instead of the full-
@@ -4776,12 +4784,22 @@ export class MenuScene extends Phaser.Scene {
     return clamp(1 - (removeElapsedMs / LEGACY_MENU_DECONSTRUCT_PLAYER_REMOVE_MS), 0, 1);
   }
 
+  // Deliberately does NOT require pendingGenerationRequest to already carry
+  // a deconstruct reason (resolveLegacyMenuDeconstructHandoffEndsAtMs below
+  // still factors it in when present, via Math.max) -- the follow-up
+  // generation request isn't always queued in the same frame tiles hit
+  // zero, and gating the animation on its presence meant the burst sat
+  // frozen at progress 0 for however long that gap lasted, then jumped
+  // straight to whatever the elapsed-time formula already worked out to
+  // the instant the request appeared, instead of ticking up smoothly the
+  // whole time. menuStaticDeconstructZeroHoldStartedAtMs is only ever set
+  // from the one call site that means "tile removal just hit zero", so it's
+  // sufficient on its own to know this hold has genuinely started.
   private resolveLegacyMenuDeconstructHandoffProgress(time: number): number {
     if (
       this.menuStaticDrawLifecyclePhase !== 'deconstructing'
       || !this.isLegacyMenuDeconstructVisualHandoffReady()
       || this.menuStaticDeconstructZeroHoldStartedAtMs === null
-      || !this.isLegacyDeconstructGenerationReason(this.pendingGenerationRequest?.reason ?? null)
     ) {
       return 0;
     }
@@ -4811,7 +4829,6 @@ export class MenuScene extends Phaser.Scene {
     return this.menuStaticDrawLifecyclePhase === 'deconstructing'
       && this.isLegacyMenuDeconstructVisualHandoffReady()
       && this.menuStaticDeconstructZeroHoldStartedAtMs !== null
-      && this.isLegacyDeconstructGenerationReason(this.pendingGenerationRequest?.reason ?? null)
       && time < this.resolveLegacyMenuDeconstructHandoffEndsAtMs();
   }
 
@@ -5129,6 +5146,15 @@ export class MenuScene extends Phaser.Scene {
       || this.menuStaticDrawRowsVisible !== null
       || this.menuStaticDrawTilesVisible !== null
     ) {
+      return;
+    }
+    // The player marker itself stays hidden until the spawn burst's beams
+    // land (see markerRevealAlpha in resolveLegacyPlayerSpawnBurstState) --
+    // but without this, the demo walker's own move timer was free to fire
+    // the instant the phase settled, stepping the AI before its marker had
+    // even appeared. Holding the walker here until the burst finishes means
+    // it visibly starts moving only once it's actually on screen.
+    if (this.resolveLegacyPlayerSpawnBurstState(time).active) {
       return;
     }
     if (time < this.nextDemoMoveAtMs) {
@@ -8044,10 +8070,7 @@ export class MenuScene extends Phaser.Scene {
         return HIDDEN;
       }
       const progress = smoothstep(elapsedMs / LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS);
-      return {
-        alpha: progress,
-        scale: LEGACY_LEVEL_ANNOUNCER_MIN_SCALE + (progress * (1 - LEGACY_LEVEL_ANNOUNCER_MIN_SCALE))
-      };
+      return this.applyLegacyLevelAnnouncerPulse(progress, time);
     }
 
     if (phase === 'building' && this.levelAnnouncerBuildFadeOutArmed && this.menuStaticBuildPhaseStartedAtMs !== null) {
@@ -8066,16 +8089,32 @@ export class MenuScene extends Phaser.Scene {
 
       const fadeOutWindowMs = Math.min(LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS, buildDurationMs);
       const progress = remainingMs >= fadeOutWindowMs ? 1 : smoothstep(remainingMs / fadeOutWindowMs);
-      return {
-        alpha: progress,
-        scale: LEGACY_LEVEL_ANNOUNCER_MIN_SCALE + (progress * (1 - LEGACY_LEVEL_ANNOUNCER_MIN_SCALE))
-      };
+      return this.applyLegacyLevelAnnouncerPulse(progress, time);
     }
 
     if (phase !== 'building') {
       this.levelAnnouncerBuildFadeOutArmed = false;
     }
     return HIDDEN;
+  }
+
+  // progress < 1 means the fade-in/fade-out envelope is still transitioning
+  // -- keep that motion clean, no pulse blended in yet. Once it reaches its
+  // held plateau (progress >= 1, i.e. fully up and not yet closing), swap
+  // to the slow breathing pulse instead of sitting perfectly static.
+  private applyLegacyLevelAnnouncerPulse(progress: number, time: number): { alpha: number; scale: number } {
+    if (progress < 1) {
+      return {
+        alpha: progress,
+        scale: LEGACY_LEVEL_ANNOUNCER_MIN_SCALE + (progress * (1 - LEGACY_LEVEL_ANNOUNCER_MIN_SCALE))
+      };
+    }
+
+    const pulsePhase = (Math.sin((time / LEGACY_LEVEL_ANNOUNCER_PULSE_PERIOD_MS) * Math.PI * 2) + 1) / 2;
+    return {
+      alpha: LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA + (pulsePhase * (1 - LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_ALPHA)),
+      scale: LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE + (pulsePhase * (1 - LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE))
+    };
   }
 
   // Centered, between-mazes level announcement -- replaces the old
@@ -8085,32 +8124,27 @@ export class MenuScene extends Phaser.Scene {
   // branch of its own beyond picking which track's level to show.
   private drawLegacyLevelAnnouncer(time: number): void {
     const { alpha, scale } = this.resolveLegacyLevelAnnouncerVisualState(time);
+    this.levelAnnouncerLabelText.setVisible(false);
     if (alpha <= 0) {
       this.levelAnnouncerNumberText.setVisible(false);
-      this.levelAnnouncerLabelText.setVisible(false);
       return;
     }
 
     const trackId = this.resolveActiveLegacyProgressionTrackId();
     const track = this.progressionState.tracks[trackId];
-    const palette = resolveLegacyProgressionPalette(track, trackId);
     const centerX = this.layout.width / 2;
     const centerY = this.layout.height / 2;
     const numberFontSize = Math.round(Math.min(this.layout.width, this.layout.height) * 0.16);
-    const labelFontSize = Math.max(10, Math.round(numberFontSize * 0.28));
-    const labelGap = Math.round(numberFontSize * 0.62);
-
-    this.levelAnnouncerLabelText
-      .setFontSize(labelFontSize)
-      .setColor(palette.badgeColor)
-      .setPosition(centerX, centerY - labelGap)
-      .setScale(scale)
-      .setAlpha(alpha * 0.85)
-      .setVisible(true);
+    // Rainbow instead of the track's own difficulty-tier color -- this is
+    // purely a "here's your level" moment now, not a place that still needs
+    // to communicate difficulty color-coding. Same midnight-rainbow material
+    // (and the same cycle speed) the trail already carries elsewhere, so it
+    // reads as the same "Mazer" rainbow rather than a new, unrelated effect.
+    const rainbowColor = toCyberArcadeCssHex(resolveLegacyIridescentTrailColor(0, 1, time));
     this.levelAnnouncerNumberText
       .setText(String(track.level))
       .setFontSize(numberFontSize)
-      .setColor(palette.badgeColor)
+      .setColor(rainbowColor)
       .setPosition(centerX, centerY)
       .setScale(scale)
       .setAlpha(alpha)
@@ -10531,7 +10565,7 @@ export class MenuScene extends Phaser.Scene {
     const actionY = panel.top + panel.height - (compact ? 72 : 84);
 
     this.createOverlayTitle('Reset Progress?', panel.top + (compact ? 52 : 58));
-    const body = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(panel.centerX, bodyY, 'This resets your rank progress, score, runs, and maze level to the starting baseline. Your menu AI progression stays unchanged.', {
+    const body = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(panel.centerX, bodyY, 'This resets your rank progress, score, runs, and maze level to the starting baseline, including the menu AI\'s progression.', {
       align: 'center',
       color: '#d9fff5',
       fontFamily: LEGACY_UI_FONT_FAMILY,
@@ -13606,11 +13640,7 @@ export class MenuScene extends Phaser.Scene {
     const baseline = createEmptyLegacyProgressionState();
     this.progressionState = writeLegacyProgressionState(this.resolveLegacyProgressionStorage(), {
       ...baseline,
-      updatedAt: new Date().toISOString(),
-      tracks: {
-        player: baseline.tracks.player,
-        'ai-runner': this.progressionState.tracks['ai-runner']
-      }
+      updatedAt: new Date().toISOString()
     });
     const progressionBand = resolveLegacyProgressionDifficultyProfile(
       this.progressionState.tracks.player
@@ -13624,7 +13654,7 @@ export class MenuScene extends Phaser.Scene {
     this.playPatrolAgent = null;
     this.resetLegacyWorldTurnHost();
     this.setLatestOverlayMessage(createLegacyPlayerMessage({
-      copy: 'Player progression reset. AI progression was kept.',
+      copy: 'Progression reset.',
       id: 'progression.player.reset',
       source: 'progression',
       tone: 'success'
