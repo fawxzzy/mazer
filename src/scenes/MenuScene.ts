@@ -13301,76 +13301,93 @@ export class MenuScene extends Phaser.Scene {
   // Same header row the back chevron sits on, toward the left side (the
   // account screen's own Account button is gone -- this is the one entry
   // point to it now, from both the menu-context Options screen and the
-  // in-play Pause screen). Plain animated text rather than the front door's
-  // tile-glyph treatment -- this is a secondary in-line label next to a
-  // small chevron, not a hero element, and most usernames can't render as
-  // glyphs anyway (see createLegacyMenuUsernameButton).
+  // in-play Pause screen, where it sits right next to createLegacyOverlayHomeButton).
+  // A profile glyph in the same rainbow-ring/Mazer-green/blink-pulse
+  // treatment as that home icon instead of plain username text, per
+  // feedback that the two should read as a matched pair -- most usernames
+  // couldn't render as the front door's tile-glyph material anyway (see
+  // createLegacyMenuUsernameButton), so this was never going to carry the
+  // same material as that treatment either way.
   private createLegacyOverlayUsernameButton(panel: OverlayPanelFrame, onClick: () => void): UiButton {
     const chevronSize = Math.max(cyberArcadeMaterial.controls.minimumTouchTarget, this.layout.width < 480 ? 42 : 46);
     const rowY = panel.top + 8 + Math.round(chevronSize / 2);
-    const anchorX = panel.left + 20;
+    const iconSize = Math.max(18, Math.round(chevronSize * 0.42));
+    const ringRadius = (iconSize * 0.62) + 8;
+    const centerX = panel.left + 20 + (iconSize / 2);
 
-    const label = this.padLegacyCompactUiText(this.add.text(anchorX, rowY, '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '13px',
-      color: '#72e0bf'
-    })).setOrigin(0, 0.5).setVisible(false);
-    this.uiTexts.push(label);
-
-    const background = this.add.rectangle(anchorX, rowY, 1, 1, 0x000000, 0.001);
+    const graphics = this.add.graphics();
+    const background = this.add.rectangle(centerX, rowY, iconSize + 24, iconSize + 24, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     background.setDepth(3);
     background.setVisible(false);
     this.overlayUsernameActive = false;
 
-    const setActive = (active: boolean): void => {
-      if (this.overlayUsernameActive === active) {
+    const drawProfile = (time: number): void => {
+      if (this.authSnapshot.status !== 'authenticated') {
+        graphics.clear();
+        background.setVisible(false);
         return;
       }
+      // Idempotent per signed-in user id -- safe to call every frame, it
+      // only actually fetches once. Nothing here reads the result: the
+      // icon doesn't display the username itself, but the account screen
+      // this button opens still wants it preloaded by the time it lands.
+      this.loadAccountUsernameIfNeeded();
+      background.setVisible(true);
+
+      graphics.clear();
+      const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+      const pulseAlpha = clamp(0.5 + (phase * 0.5) + (this.overlayUsernameActive ? 0.1 : 0), 0.4, 1);
+      const pulseScale = 0.94 + (phase * 0.06) + (this.overlayUsernameActive ? 0.02 : 0);
+
+      const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
+      graphics.lineStyle(Math.max(1.6, iconSize * 0.1), ringColor, pulseAlpha * 0.82);
+      graphics.strokeCircle(centerX, rowY, ringRadius * pulseScale);
+
+      const color = cyberArcadeMaterial.signal.player;
+      const strokeWidth = Math.max(1.6, iconSize * 0.12);
+      const headRadius = iconSize * 0.2 * pulseScale;
+      const headCenterY = rowY - (iconSize * 0.24 * pulseScale);
+      graphics.lineStyle(strokeWidth, color, pulseAlpha);
+      graphics.strokeCircle(centerX, headCenterY, headRadius);
+
+      const shoulderHalfWidth = iconSize * 0.32 * pulseScale;
+      const shoulderRadius = iconSize * 0.26 * pulseScale;
+      const shoulderTop = rowY + (iconSize * 0.06 * pulseScale);
+      const shoulderBottom = rowY + (iconSize * 0.46 * pulseScale);
+      graphics.beginPath();
+      graphics.arc(centerX, shoulderTop + shoulderRadius, shoulderRadius, Math.PI, 0, false);
+      graphics.lineTo(centerX + shoulderHalfWidth, shoulderBottom);
+      graphics.lineTo(centerX - shoulderHalfWidth, shoulderBottom);
+      graphics.closePath();
+      graphics.strokePath();
+    };
+    drawProfile(this.time.now);
+
+    const setActive = (active: boolean): void => {
       this.overlayUsernameActive = active;
-      label.setAlpha(active ? 1 : 0.86);
     };
     background.on('pointerover', () => setActive(true));
     background.on('pointerout', () => setActive(false));
     background.on('pointerdown', onClick);
 
+    const label = this.add.text(centerX, rowY, '', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '1px'
+    }).setOrigin(0.5).setVisible(false);
+    this.uiTexts.push(label);
+
     return {
       background,
-      bounds: createVisualRect(anchorX, rowY - 10, 1, 20),
+      bounds: createVisualRect(centerX - (iconSize / 2) - 12, rowY - (iconSize / 2) - 12, iconSize + 24, iconSize + 24),
+      iconOnly: true,
       label,
       semanticAction: 'Account',
       setActive,
       text: 'Account',
-      updateFrame: (time: number) => {
-        if (this.authSnapshot.status !== 'authenticated') {
-          label.setVisible(false);
-          background.setVisible(false);
-          return;
-        }
-        this.loadAccountUsernameIfNeeded();
-        // Falls back to "Account" when there's no username yet -- still
-        // loading, never set, or the fetch failed -- rather than hiding.
-        // This is the only entry point to the account screen now that the
-        // account overlay's own Account button is gone; hiding it whenever
-        // the username fetch doesn't succeed would leave a signed-in player
-        // with no way to reach their account at all.
-        const username = this.accountUsernameSavedValue.length > 0 ? this.accountUsernameSavedValue : 'Account';
-        const trailColor = resolveLegacyIridescentTrailColor(
-          0,
-          1,
-          time,
-          this.resolveActiveLegacyProgressionPalette().trailColor
-        );
-        label.setText(username);
-        label.setColor(`#${trailColor.toString(16).padStart(6, '0')}`);
-        label.setAlpha(this.overlayUsernameActive ? 1 : 0.86);
-        label.setPosition(anchorX, rowY);
-        label.setVisible(true);
-        background.setPosition(anchorX + (label.displayWidth / 2), rowY);
-        background.setSize(label.displayWidth + 16, label.displayHeight + 16);
-        background.setVisible(true);
-      },
+      updateFrame: (time: number) => drawProfile(time),
       destroy: () => {
+        graphics.destroy();
         background.destroy();
         label.destroy();
       }
