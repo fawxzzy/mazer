@@ -135,6 +135,16 @@ const buildLegacyMenuPathTitleGrid = (): boolean[][] => {
 
 export const LEGACY_MENU_PATH_TITLE_GRID = buildLegacyMenuPathTitleGrid();
 
+/**
+ * The title's renderer and its header-fit calculation must use this same
+ * value. Keeping it here prevents a layout pass from approving a compact
+ * header title while the scene silently redraws it at a larger button-derived
+ * size.
+ */
+export const resolveLegacyMenuTitleFontSize = (titleReserveHeight: number): number => (
+  Math.max(13, Math.round(titleReserveHeight * 0.68))
+);
+
 export const resolveLegacyMenuTitlePresentation = (
   titleReserveHeight: number,
   tileSize: number,
@@ -157,7 +167,7 @@ export const resolveLegacyMenuTitlePresentation = (
   // Bumped up from 0.55 per feedback that the title read as too small next
   // to the (now also smaller) header badges -- keep this in sync with the
   // identical formula in legacyMenuLayout.ts's inline-header fit check.
-  const fontSize = Math.max(22, Math.round(titleReserveHeight * 0.68));
+  const fontSize = resolveLegacyMenuTitleFontSize(titleReserveHeight);
   const shadowOffsetX = isUltraNarrow
     ? Math.max(2, Math.round(fontSize * 0.07))
     : Math.max(isPortrait ? 4 : 5, Math.round(tileSize * 0.12));
@@ -181,7 +191,10 @@ export const resolveLegacyMenuTitlePresentation = (
  * inline between the header's leading/trailing icon frames.
  */
 export const resolveLegacyMenuTitleFootprintWidth = (fontSize: number): number => {
-  const cellSize = Math.max(4, Math.round(fontSize / 9));
+  // A two-pixel cell is the named normal-phone fallback. It is used only
+  // after the header fit contract has already shrunk both title and controls;
+  // regular phone and desktop sizes retain their existing larger cells.
+  const cellSize = Math.max(2, Math.round(fontSize / 9));
   const coreWidth = LEGACY_MENU_PATH_TITLE_COLUMNS * cellSize;
   const orbitGap = Math.max(7, Math.round(cellSize * 1.08));
   return coreWidth + (orbitGap * 2);
@@ -192,7 +205,7 @@ export const resolveLegacyMenuPathTitleLayout = (
   centerY: number,
   fontSize: number
 ): LegacyMenuPathTitleLayout => {
-  const cellSize = Math.max(4, Math.round(fontSize / 9));
+  const cellSize = Math.max(2, Math.round(fontSize / 9));
   const width = LEGACY_MENU_PATH_TITLE_COLUMNS * cellSize;
   const height = LEGACY_MENU_PATH_TITLE_ROWS * cellSize;
 

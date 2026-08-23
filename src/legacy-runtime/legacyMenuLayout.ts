@@ -1,6 +1,9 @@
 import { clampInteger } from './legacyDefaults';
 import { resolveLegacyHeaderControlFrame } from './legacyHeaderControl';
-import { resolveLegacyMenuTitleFootprintWidth } from './legacyMenuTitle';
+import {
+  resolveLegacyMenuTitleFontSize,
+  resolveLegacyMenuTitleFootprintWidth
+} from './legacyMenuTitle';
 import { LEGACY_UI_MIN_TOUCH_TARGET } from './legacyUiStandards';
 
 export interface LegacyMenuLayout {
@@ -14,7 +17,7 @@ export interface LegacyMenuLayout {
   titleX: number;
   titleY: number;
   titleReserveHeight: number;
-  // 1 when the header row has room to spare; shrinks toward 0.85 as the
+  // 1 when the header row has room to spare; shrinks toward 0.78 as the
   // inline title has to shrink to keep fitting in that same row (see the
   // menuTitleFitsInHeader block) -- feed into resolveLegacyHeaderControlFrame's
   // sizeScale so the settings cog, leaderboard, and username controls
@@ -348,7 +351,7 @@ export const resolveLegacyMenuLayout = (
   let menuTitleFitsInHeader = false;
   let menuHeaderTitleCenterX = Math.round(width / 2);
   let menuHeaderTitleCenterY = 0;
-  let menuInlineTitleFontSize = Math.max(22, Math.round(menuTopHudReserve * 0.68));
+  let menuInlineTitleFontSize = resolveLegacyMenuTitleFontSize(menuTopHudReserve);
   // Only true once the fit-check actually had to shrink below the preferred
   // size -- titleReserveHeight below stays the exact, un-round-tripped
   // menuTopHudReserve in the (overwhelmingly common) unsqueezed case, so an
@@ -358,59 +361,65 @@ export const resolveLegacyMenuLayout = (
   let menuTitleSqueezed = false;
   let headerIconScale = 1;
   if (!isPlaySurface && menuTopHudReserve > 0) {
-    const leadingHeaderFrame = resolveLegacyHeaderControlFrame({
-      height,
-      hudHeight: menuTopHudReserve,
-      hudTop: safeAreaTop,
-      placement: 'leading',
-      width
-    });
-    const trailingHeaderFrame = resolveLegacyHeaderControlFrame({
-      height,
-      hudHeight: menuTopHudReserve,
-      hudTop: safeAreaTop,
-      placement: 'trailing',
-      width
-    });
-    // leadingHeaderFrame is a bare single-icon slot, but the menu surface's
-    // actual leading-side content (createLegacyMenuUsernameButton) is that
-    // icon PLUS the signed-in player's own username text -- a geometry-only
-    // layout pass has no way to know that string's real rendered width, so
-    // this reserves a conservative worst-case allowance for it instead of
-    // measuring the bare icon alone and letting a long username silently
-    // run under the title.
-    const leadingUsernameReserve = 100;
-    const headerGap = trailingHeaderFrame.left - leadingHeaderFrame.right - leadingUsernameReserve;
-    // Keep this formula identical to resolveLegacyMenuTitlePresentation's
-    // fontSize in legacyMenuTitle.ts, or the fit-check here and the actual
-    // rendered size will drift apart.
-    const inlineTitlePreferredFontSize = Math.max(22, Math.round(menuTopHudReserve * 0.68));
-    // 22 matches resolveLegacyMenuTitlePresentation's own Math.max(22, ...)
-    // floor -- titleReserveHeight below is reverse-derived from whatever
-    // font size wins here (titleReserveHeight * 0.68 = fontSize), so the
-    // two formulas only stay identical if this never asks for something
-    // that floor would silently override anyway.
-    const inlineTitleMinFontSize = 22;
-    const inlineTitlePadding = 24;
-    let candidateFontSize = inlineTitlePreferredFontSize;
-    while (
-      candidateFontSize > inlineTitleMinFontSize
-      && resolveLegacyMenuTitleFootprintWidth(candidateFontSize) + inlineTitlePadding > headerGap
-    ) {
-      candidateFontSize -= 1;
-    }
-    const inlineTitleWidth = resolveLegacyMenuTitleFootprintWidth(candidateFontSize);
-    if (headerGap >= inlineTitleWidth + inlineTitlePadding) {
+    // The header has four concrete neighbors: account text on the leading
+    // side, plus the leaderboard and settings actions on the trailing side.
+    // Solve all of them from the same candidate scale as the title. The old
+    // fit check measured only the settings slot while the scene rendered the
+    // leaderboard inside that supposed title gap, then the scene rendered the
+    // title from unrelated Start-button dimensions.
+    const leadingUsernameReserve = Math.round(clamp(width * 0.22, 64, 100));
+    const inlineTitlePreferredFontSize = resolveLegacyMenuTitleFontSize(menuTopHudReserve);
+    const inlineTitleMinFontSize = 13;
+    const inlineTitlePadding = 8;
+
+    for (let candidateFontSize = inlineTitlePreferredFontSize; candidateFontSize >= inlineTitleMinFontSize; candidateFontSize -= 1) {
+      // Header controls never fall below 32px (enforced by
+      // resolveLegacyHeaderControlFrame), while this scale keeps them visibly
+      // proportional to a compact title instead of leaving the wordmark alone
+      // to absorb all of the compression.
+      const candidateIconScale = clamp(
+        candidateFontSize / Math.max(1, inlineTitlePreferredFontSize),
+        0.78,
+        1
+      );
+      const leadingHeaderFrame = resolveLegacyHeaderControlFrame({
+        height,
+        hudHeight: menuTopHudReserve,
+        hudTop: safeAreaTop,
+        placement: 'leading',
+        sizeScale: candidateIconScale,
+        width
+      });
+      const trailingHeaderFrame = resolveLegacyHeaderControlFrame({
+        height,
+        hudHeight: menuTopHudReserve,
+        hudTop: safeAreaTop,
+        placement: 'trailing',
+        sizeScale: candidateIconScale,
+        slot: 1,
+        width
+      });
+      const headerGap = trailingHeaderFrame.left - leadingHeaderFrame.right - leadingUsernameReserve;
+      const inlineTitleWidth = resolveLegacyMenuTitleFootprintWidth(candidateFontSize);
+      if (headerGap < inlineTitleWidth + inlineTitlePadding) {
+        continue;
+      }
+
       menuTitleFitsInHeader = true;
       menuInlineTitleFontSize = candidateFontSize;
       menuTitleSqueezed = candidateFontSize < inlineTitlePreferredFontSize;
-      headerIconScale = clampInteger(
-        Math.round((candidateFontSize / inlineTitlePreferredFontSize) * 100),
-        85,
-        100
-      ) / 100;
-      menuHeaderTitleCenterX = Math.round((leadingHeaderFrame.right + trailingHeaderFrame.left) / 2);
+      headerIconScale = Math.round(candidateIconScale * 100) / 100;
+      // The account label starts just after the leading badge. Center inside
+      // the *actual* title interval rather than the bare icon-to-icon gap,
+      // otherwise a long signed-in name could still collide with a correctly
+      // measured wordmark on the smallest normal phones.
+      menuHeaderTitleCenterX = Math.round((
+        leadingHeaderFrame.right
+        + leadingUsernameReserve
+        + trailingHeaderFrame.left
+      ) / 2);
       menuHeaderTitleCenterY = Math.round(leadingHeaderFrame.centerY);
+      break;
     }
   }
   // Title is deliberately compact and sized purely from viewport dimensions

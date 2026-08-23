@@ -130,6 +130,7 @@ import {
   resolveLegacyGlyphWordLayout,
   resolveLegacyMenuPathTitleLayout,
   resolveLegacyMenuPathTitleOrbitPoint,
+  resolveLegacyMenuTitleFontSize,
   resolveLegacyMenuTitlePresentation,
   type LegacyGlyphWordLayout,
   type LegacyMenuPathTitleCell,
@@ -6635,26 +6636,11 @@ export class MenuScene extends Phaser.Scene {
     return this.menuStaticDrawLifecyclePhase === 'building' ? 0 : 1;
   }
 
-  // The title, Login, and Start words are all built from the same tile-glyph
-  // material and should read as one consistent size -- Start/Login derive
-  // their cell size from the primary button's own width/height (see
-  // createButton's glyphCellSize), so that's the reference the title's own,
-  // otherwise-independent fontSize-driven sizing gets overridden to match.
-  // Only affects layout (cell/pixel size); titlePresentation's own fontSize
-  // still governs unrelated things like shadow offset and alpha.
-  private resolveLegacyMenuGlyphReferenceCellSize(): number {
-    const glyphColumns = resolveLegacyGlyphWordColumns('Start');
-    const glyphPaddingX = Math.max(10, Math.round(this.layout.centerButtonWidth * 0.1));
-    const glyphPaddingY = Math.max(6, Math.round(this.layout.buttonHeight * 0.14));
-    const cellSizeFromWidth = Math.floor(
-      Math.max(1, this.layout.centerButtonWidth - (glyphPaddingX * 2)) / Math.max(1, glyphColumns)
-    );
-    const cellSizeFromHeight = Math.floor(Math.max(1, this.layout.buttonHeight - (glyphPaddingY * 2)) / 7);
-    return Math.max(2, Math.min(10, cellSizeFromWidth, cellSizeFromHeight));
-  }
-
   private resolveLegacyMenuPathTitleFontSize(): number {
-    return this.resolveLegacyMenuGlyphReferenceCellSize() * 9;
+    // Layout owns the header-fit decision. Rendering must consume the same
+    // reserve-derived value rather than a Start-button size, or a narrow
+    // header can be approved as one line and then visibly overflow at draw.
+    return resolveLegacyMenuTitleFontSize(this.layout.titleReserveHeight);
   }
 
   private resolveLegacyMenuPathTitlePieceCount(): number {

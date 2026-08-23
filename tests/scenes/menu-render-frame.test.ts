@@ -685,6 +685,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_FRAME_MS = 33;');
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 8;');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(time: number): void');
+    expect(menuSceneSource).toContain('return resolveLegacyMenuTitleFontSize(this.layout.titleReserveHeight);');
     expect(menuSceneSource).not.toContain('if (visibleCells.length <= 0) {\n      return;\n    }');
     expect(menuSceneSource).not.toContain('drawLegacyMenuPathTitleSigilRails');
     expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);');
@@ -1535,7 +1536,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('guideGraphics.lineBetween(cardLeft + inset, titleRuleY + 3, cardLeft + cardWidth - inset, titleRuleY + 3);');
     expect(menuSceneSource).toContain("'GUIDE',");
     expect(menuSceneSource).toContain("drawLegendRow(legendRowIndex, 'start', 'Start', 'begin at gold', cyberArcadeMaterial.signal.start);");
-    expect(menuSceneSource).toContain("'GUIDE',\n      detailLeft,");
+    expect(menuSceneSource.replace(/\r\n/g, '\n')).toContain("'GUIDE',\n      detailLeft,\n      titleY,");
     expect(menuSceneSource).toContain('const glyphX = detailLeft + badgeRadius;');
     expect(menuSceneSource).toContain('const labelX = detailLeft + (badgeRadius * 2) + badgeToTextGap;');
     expect(menuSceneSource).not.toContain('const contentLeft = detailLeft + Math.max(0, (detailWidth - titleBlockWidth) / 2);');

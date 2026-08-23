@@ -205,7 +205,7 @@ describe('legacy menu layout', () => {
     expectTitlePlacedSafely(layout);
   });
 
-  test('centers the portrait title diamond on the board top notch while clearing the border', () => {
+  test('places the portrait title inside the solved header interval without crowding its neighbors', () => {
     const layout = resolveLegacyMenuLayout(405, 958, 50, 49, 49, 'menu');
     const presentation = resolveLegacyMenuTitlePresentation(
       layout.titleReserveHeight,
@@ -222,18 +222,35 @@ describe('legacy menu layout', () => {
       titleLayout.height,
       titleLayout.cellSize
     );
-    // Title is compact (fontSize derives from its reserved height, not board
-    // size -- see legacyMenuTitle.ts), so its footprint is much smaller than
-    // the old design's. What still matters: it's centered on the board
-    // (the header row is symmetric about the same centerline the board is)
-    // and its animated orbit shell stays fully clear of the board below it.
-    expect(Math.abs(orbitGeometry.centerX - (layout.boardLeft + (layout.boardWidth / 2)))).toBeLessThanOrEqual(1);
-    expect(orbitGeometry.crownBottom).toBeLessThanOrEqual(layout.boardTop);
-    if (layout.lanes.title) {
-      expect(orbitGeometry.top).toBeGreaterThanOrEqual(layout.lanes.hud?.bottom ?? 0);
-    } else {
-      expect(orbitGeometry.top).toBeGreaterThanOrEqual(layout.lanes.hud?.top ?? 0);
-    }
+    const hudHeight = layout.lanes.hud?.height ?? 0;
+    const leadingFrame = resolveLegacyHeaderControlFrame({
+      height: layout.height,
+      hudHeight,
+      hudTop: 0,
+      placement: 'leading',
+      sizeScale: layout.headerIconScale,
+      width: layout.width
+    });
+    const trailingFrame = resolveLegacyHeaderControlFrame({
+      height: layout.height,
+      hudHeight,
+      hudTop: 0,
+      placement: 'trailing',
+      sizeScale: layout.headerIconScale,
+      slot: 1,
+      width: layout.width
+    });
+    const accountReserve = Math.round(Math.max(64, Math.min(100, layout.width * 0.22)));
+    const expectedCenterX = Math.round((leadingFrame.right + accountReserve + trailingFrame.left) / 2);
+
+    // The header account label makes its available title interval asymmetric.
+    // Center in that actual interval, keep the decorative orbit inside the
+    // HUD, and do not let it intrude into either reserved control region.
+    expect(orbitGeometry.centerX).toBe(expectedCenterX);
+    expect(orbitGeometry.left).toBeGreaterThanOrEqual(leadingFrame.right + accountReserve);
+    expect(orbitGeometry.right).toBeLessThanOrEqual(trailingFrame.left);
+    expect(orbitGeometry.top).toBeGreaterThanOrEqual(layout.lanes.hud?.top ?? 0);
+    expect(orbitGeometry.bottom).toBeLessThanOrEqual(layout.lanes.hud?.bottom ?? 0);
     expect(titleLayout.width).toBeGreaterThan(0);
     expect(titleLayout.width).toBeLessThanOrEqual(layout.width - 48);
   });
@@ -401,6 +418,7 @@ describe('legacy menu layout', () => {
         hudHeight,
         hudTop: 0,
         placement: 'leading',
+        sizeScale: layout.headerIconScale,
         width: layout.width
       });
       const trailingFrame = resolveLegacyHeaderControlFrame({
@@ -408,29 +426,29 @@ describe('legacy menu layout', () => {
         hudHeight,
         hudTop: 0,
         placement: 'trailing',
+        sizeScale: layout.headerIconScale,
+        slot: 1,
         width: layout.width
       });
+      const accountReserve = Math.round(Math.max(64, Math.min(100, layout.width * 0.22)));
+      const expectedCenterX = Math.round((leadingFrame.right + accountReserve + trailingFrame.left) / 2);
 
       // Every one of these viewports has enough header-row gap to fit the
       // title inline -- confirmed live, not assumed (only the 172x407
       // diagnostic panel above falls back to the banner lane).
       expect(layout.lanes.title).toBeNull();
-      expect(layout.titleX).toBeGreaterThan(leadingFrame.right);
+      expect(layout.titleX).toBeGreaterThan(leadingFrame.right + accountReserve);
       expect(layout.titleX).toBeLessThan(trailingFrame.left);
-      expect(Math.abs(layout.titleX - ((leadingFrame.right + trailingFrame.left) / 2))).toBeLessThanOrEqual(1);
+      expect(layout.titleX).toBe(expectedCenterX);
       expect(layout.titleY).toBe(Math.round(leadingFrame.centerY));
       expect(layout.titleReserveHeight).toBe(hudHeight);
     }
   });
 
   test('shrinks the inline title toward the header squeeze floor instead of always dropping to the fallback lane, and never overlaps the leading username reserve when it does fall back', () => {
-    // The header's leading side carries an icon PLUS the signed-in player's
-    // own username text (createLegacyMenuUsernameButton), not a bare icon --
-    // the fit-check reserves conservative room for that (leadingUsernameReserve),
-    // so genuinely common phone widths (320-375px) legitimately can't fit an
-    // inline title alongside it and correctly use the fallback lane instead
-    // of squeezing the title down to something illegible or overlapping the
-    // username.
+    // The title, account label, leaderboard, and settings cog now solve as
+    // one compact header unit. Normal phone widths stay in one row by
+    // shrinking both the title and controls to their explicit safe floors.
     for (const viewport of [
       { width: 320, height: 568 },
       { width: 360, height: 780 },
@@ -438,6 +456,9 @@ describe('legacy menu layout', () => {
     ]) {
       const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 49, 'menu');
       expectTitlePlacedSafely(layout);
+      expect(layout.lanes.title).toBeNull();
+      expect(layout.headerIconScale).toBeGreaterThanOrEqual(0.78);
+      expect(layout.headerIconScale).toBeLessThan(1);
     }
 
     // Larger phones/small tablets (390-430px) have just enough room to stay
@@ -454,7 +475,7 @@ describe('legacy menu layout', () => {
       const squeezedLayout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 49, 'menu');
       expect(squeezedLayout.lanes.title).toBeNull();
       expect(squeezedLayout.headerIconScale).toBeLessThan(1);
-      expect(squeezedLayout.headerIconScale).toBeGreaterThanOrEqual(0.85);
+      expect(squeezedLayout.headerIconScale).toBeGreaterThanOrEqual(0.78);
     }
   });
 
