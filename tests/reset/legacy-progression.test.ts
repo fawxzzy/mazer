@@ -1233,12 +1233,17 @@ describe('legacy progression', () => {
   test('uses target complexity to tune future maze scale while player and trail stay green', () => {
     const state = createEmptyLegacyProgressionState();
     const basePalette = resolveLegacyProgressionPalette(state.tracks.player, 'player');
+    // level/targetComplexity doubled from what used to represent "clearly
+    // advanced" -- resolveLegacyProgressionDifficultyProfile now halves the
+    // real level before picking a difficulty band, so reaching the same
+    // band this test wants (comfortably past baseline, generating a maze
+    // bigger than the 50 baseScale) takes roughly twice the real level.
     const advancedTrack = {
       ...state.tracks.player,
       colorTier: 4,
-      level: 31,
+      level: 61,
       rank: 'A' as const,
-      targetComplexity: 132
+      targetComplexity: 248
     };
     const advancedPalette = resolveLegacyProgressionPalette(advancedTrack, 'player');
 
@@ -1292,12 +1297,16 @@ describe('legacy progression', () => {
   });
 
   test('maps progression bands to increasing procedural pressure', () => {
+    // Complexity values doubled (in real-level terms) from what used to hit
+    // each band -- resolveLegacyProgressionDifficultyProfile now halves the
+    // real level before selecting a band, so mazes get harder at half the
+    // rate the player's own level number does (see its own comment for why).
     const tutorial = resolveLegacyProgressionDifficultyProfile(8);
-    const starter = resolveLegacyProgressionDifficultyProfile(28);
-    const explorer = resolveLegacyProgressionDifficultyProfile(64);
-    const navigator = resolveLegacyProgressionDifficultyProfile(104);
-    const architect = resolveLegacyProgressionDifficultyProfile(152);
-    const mythic = resolveLegacyProgressionDifficultyProfile(180);
+    const starter = resolveLegacyProgressionDifficultyProfile(48);
+    const explorer = resolveLegacyProgressionDifficultyProfile(120);
+    const navigator = resolveLegacyProgressionDifficultyProfile(200);
+    const architect = resolveLegacyProgressionDifficultyProfile(296);
+    const mythic = resolveLegacyProgressionDifficultyProfile(352);
 
     expect([
       tutorial.band,
@@ -1319,7 +1328,10 @@ describe('legacy progression', () => {
 
   test('turns higher difficulty bands into stronger generation pressure', () => {
     const tutorialProfile = resolveLegacyMazeGenerationProfileForProgression(8);
-    const mythicProfile = resolveLegacyMazeGenerationProfileForProgression(180);
+    // 352, not the 180 this used to be -- resolveLegacyMazeGenerationProfileForProgression
+    // now halves the real level before picking a band, so it takes twice the
+    // real level to reach mythic.
+    const mythicProfile = resolveLegacyMazeGenerationProfileForProgression(352);
     const tutorialBudget = resolveLegacyGenerationBudgetContract('menu', 29, tutorialProfile);
     const mythicBudget = resolveLegacyGenerationBudgetContract('menu', 96, mythicProfile);
     const mythicMaze = createLegacyRuntimeMazeForMode('menu', 96, 3749, mythicProfile);
