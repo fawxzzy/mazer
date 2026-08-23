@@ -107,7 +107,33 @@ describe('legacy maze cycle telemetry', () => {
       surface: 'play'
     });
     expect(history.receipts[0]?.playerPath).toHaveLength(MAZE_CYCLE_TELEMETRY_PLAYER_PATH_LIMIT);
+    expect(history.receipts[0]?.clientRunId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[45][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
     expect(JSON.parse(storage.getItem(MAZE_CYCLE_TELEMETRY_STORAGE_KEY) ?? '{}').receipts).toHaveLength(1);
+  });
+
+  test('backfills a stable UUID for legacy receipts without inventing a new retry identity on each read', () => {
+    const storage = new MemoryStorage();
+    const receipt = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 16,
+      completedAt: '2026-07-08T12:00:00.000Z',
+      completionTimeMs: 1_000,
+      controlMode: 'arrows',
+      maze: createTestMaze(),
+      playerPath: createTestMaze().solutionPath,
+      resetUsed: false,
+      surface: 'play'
+    });
+    const legacyReceipt = { ...receipt } as Partial<typeof receipt>;
+    delete legacyReceipt.clientRunId;
+    storage.setItem(MAZE_CYCLE_TELEMETRY_STORAGE_KEY, JSON.stringify({ receipts: [legacyReceipt] }));
+
+    const first = readMazeCycleTelemetryHistory(storage).receipts[0]?.clientRunId;
+    const second = readMazeCycleTelemetryHistory(storage).receipts[0]?.clientRunId;
+
+    expect(first).toBe(second);
+    expect(first).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   });
 
   test('uses the legal wrap-aware path length for route-efficiency telemetry', () => {

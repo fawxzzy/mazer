@@ -313,7 +313,7 @@ import {
 import {
   hydrateLegacyRemoteAccountState,
   readLegacyBootstrappedAuthSnapshot,
-  writeLegacyRemoteCycleReceipt,
+  writeLegacyRemoteCompletion,
   writeLegacyRemoteProgressionState,
   writeLegacyRemoteSettings,
   type LegacyRemoteProgressionSyncResult
@@ -583,10 +583,13 @@ interface MenuSceneVisualDiagnostics {
     textFits: boolean;
   };
   remoteSync: {
+    completionSyncState: LegacyRemoteProgressionSyncResult['completionSyncState'] | null;
     lastError: string | null;
     lastMessage: LegacyPlayerMessage | null;
     lastSkippedReason: LegacyRemoteProgressionSyncResult['skippedReason'] | null;
     lastSynced: boolean | null;
+    pendingCompletionCount: number;
+    recoveredCompletionCount: number;
   };
   authAction: LegacyAuthActionDiagnostics | null;
   layout: {
@@ -14330,6 +14333,9 @@ export class MenuScene extends Phaser.Scene {
     if (result.progressionState) {
       this.progressionState = result.progressionState;
     }
+    if (result.remoteSyncResult) {
+      this.publishLegacyRemoteSyncResult(result.remoteSyncResult);
+    }
     if (result.settings) {
       this.settings = result.settings;
       this.optionFieldDrafts = createLegacyOptionFieldDrafts(result.settings);
@@ -14506,20 +14512,33 @@ export class MenuScene extends Phaser.Scene {
     );
     const latestReceipt = this.mazeCycleTelemetryHistory.receipts[0] ?? null;
     if (latestReceipt) {
+      const previousProgressionState = this.progressionState;
       this.progressionState = recordLegacyProgressionCycle(
         this.resolveLegacyProgressionStorage(),
         this.progressionState,
         latestReceipt,
         this.maze
       );
-      void writeLegacyRemoteCycleReceipt(this.authSnapshot, latestReceipt)
+      void writeLegacyRemoteCompletion(
+        this.authSnapshot,
+        previousProgressionState,
+        this.progressionState,
+        latestReceipt,
+        undefined,
+        this.resolveBrowserLocalStorage()
+      )
         .then((result) => {
+          if (result.progressionState) {
+            this.progressionState = writeLegacyProgressionState(
+              this.resolveLegacyProgressionStorage(),
+              result.progressionState
+            );
+          }
           this.publishLegacyRemoteSyncResult(result);
         })
         .catch((error: unknown) => {
-          this.publishLegacyRemoteSyncException('cycle-receipt', error);
+          this.publishLegacyRemoteSyncException('progression', error);
         });
-      this.syncLegacyRemoteProgressionState();
       this.boardDynamicDirty = true;
       this.uiDirty = true;
       this.visualDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
@@ -14531,7 +14550,7 @@ export class MenuScene extends Phaser.Scene {
     this.runtimeDiagnosticsLastPublishedAtMs = Number.NEGATIVE_INFINITY;
   }
 
-  private syncLegacyRemoteProgressionState(mode: 'advance' | 'replace' = 'advance'): void {
+  private syncLegacyRemoteProgressionState(mode: 'replace'): void {
     void writeLegacyRemoteProgressionState(this.authSnapshot, this.progressionState, undefined, mode)
       .then((result) => {
         if (result.progressionState) {
@@ -14604,7 +14623,9 @@ export class MenuScene extends Phaser.Scene {
       ? error.message
       : String(error);
     this.publishLegacyRemoteSyncResult({
+      completionSyncState: 'pending',
       error: technicalDetail,
+      pendingCompletionCount: 0,
       playerMessage: createLegacyPlayerMessage({
         copy: context === 'cycle-receipt'
           ? LEGACY_REMOTE_MESSAGE_COPY.cycleReceiptFailed
@@ -14617,6 +14638,7 @@ export class MenuScene extends Phaser.Scene {
         tone: 'warning'
       }),
       skippedReason: null,
+      recoveredCompletionCount: 0,
       synced: false
     });
   }
@@ -15283,10 +15305,13 @@ export class MenuScene extends Phaser.Scene {
         textFits: this.menuAiProgressionBadgeTextFits
       },
       remoteSync: {
+        completionSyncState: this.latestRemoteSyncResult?.completionSyncState ?? null,
         lastError: this.latestRemoteSyncResult?.error ?? null,
         lastMessage: this.latestRemoteSyncResult?.playerMessage ?? null,
         lastSkippedReason: this.latestRemoteSyncResult?.skippedReason ?? null,
-        lastSynced: this.latestRemoteSyncResult?.synced ?? null
+        lastSynced: this.latestRemoteSyncResult?.synced ?? null,
+        pendingCompletionCount: this.latestRemoteSyncResult?.pendingCompletionCount ?? 0,
+        recoveredCompletionCount: this.latestRemoteSyncResult?.recoveredCompletionCount ?? 0
       },
       authAction: this.latestAuthActionDiagnostics,
       layout: {

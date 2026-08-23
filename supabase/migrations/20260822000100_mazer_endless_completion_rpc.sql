@@ -7,14 +7,9 @@
 --
 -- Deliberately additive and non-disruptive: this does NOT revoke the
 -- existing direct `update`/`insert` grants on mazer_progression_states, and
--- does NOT change any RLS policy. The app's current sync path
--- (legacyRemoteProgression.ts) still writes progression directly today, and
--- nothing about level advancement is actually driven by this function yet --
--- wiring the client over to call this instead of writing player_level
--- directly is a separate, deliberate follow-up (blocking any lock-down of
--- direct writes is correct: revoking direct write access before the client
--- is updated to use this function would break the currently-working sync
--- path outright).
+-- does NOT change any RLS policy. Completion advancement is load-bearing
+-- through these RPCs; direct writes remain only for the separately verified
+-- reset/settings compatibility path until a later least-privilege migration.
 --
 -- What this buys once that follow-up lands: both displayed completion
 -- ordinals advance exactly once per accepted run, never regress, and remain
@@ -34,6 +29,7 @@
 drop function if exists public.mazer_complete_level(bigint, integer, integer, integer, uuid, text, integer, text);
 drop function if exists public.mazer_complete_level(bigint, bigint, integer, integer, uuid, text, integer, text);
 drop function if exists public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text);
+drop function if exists public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
 
 create or replace function public.mazer_complete_level(
   p_expected_revision bigint,
@@ -43,7 +39,9 @@ create or replace function public.mazer_complete_level(
   p_client_run_id uuid,
   p_ruleset_id text default null,
   p_recipe_version integer default null,
-  p_recipe_hash text default null
+  p_recipe_hash text default null,
+  p_completed_at timestamp with time zone default null,
+  p_receipt jsonb default '{}'::jsonb
 )
 returns table (
   player_level text,
@@ -51,7 +49,9 @@ returns table (
   player_target_complexity integer,
   player_completed_cycles text,
   revision bigint,
-  level_reached_at timestamp with time zone
+  level_reached_at timestamp with time zone,
+  state jsonb,
+  updated_at timestamp with time zone
 )
 language plpgsql
 security invoker
@@ -67,7 +67,7 @@ declare
   v_next_target_complexity integer;
   v_next_rank text;
   v_next_color_tier integer;
-  v_now timestamp with time zone := pg_catalog.now();
+  v_now timestamp with time zone := pg_catalog.coalesce(p_completed_at, pg_catalog.now());
   v_state jsonb;
   v_tracks jsonb;
   v_player_track jsonb;
@@ -91,6 +91,10 @@ begin
 
   if p_client_run_id is null then
     raise exception 'client_run_id is required for idempotent completion' using errcode = '22023';
+  end if;
+
+  if pg_catalog.jsonb_typeof(p_receipt) <> 'object' or pg_catalog.octet_length(p_receipt::text) > 8192 then
+    raise exception 'receipt must be a JSON object no larger than 8192 bytes' using errcode = '22023';
   end if;
 
   -- Lock the one player row before reading the receipt. Two retries for the
@@ -125,7 +129,9 @@ begin
         s.player_target_complexity,
         s.player_completed_cycles::text,
         s.revision,
-        s.level_reached_at
+        s.level_reached_at,
+        s.state,
+        s.updated_at
       from public.mazer_progression_states s
       where s.user_id = v_user_id;
     return;
@@ -171,7 +177,9 @@ begin
     client_run_id,
     ruleset_id,
     recipe_version,
-    recipe_hash
+    recipe_hash,
+    completed_at,
+    receipt
   ) values (
     v_user_id,
     'play',
@@ -180,7 +188,9 @@ begin
     p_client_run_id,
     p_ruleset_id,
     p_recipe_version,
-    p_recipe_hash
+    p_recipe_hash,
+    v_now,
+    p_receipt
   )
   on conflict (user_id, client_run_id) where client_run_id is not null do nothing
   returning id into v_inserted_receipt_id;
@@ -195,7 +205,9 @@ begin
         s.player_target_complexity,
         s.player_completed_cycles::text,
         s.revision,
-        s.level_reached_at
+        s.level_reached_at,
+        s.state,
+        s.updated_at
       from public.mazer_progression_states s
       where s.user_id = v_user_id;
     return;
@@ -217,7 +229,7 @@ begin
     'colorTier', v_next_color_tier,
     'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
-    'lastReceiptId', p_client_run_id::text,
+    'lastReceiptId', pg_catalog.coalesce(pg_catalog.nullif(p_receipt ->> 'id', ''), p_client_run_id::text),
     'level', v_next_level::text,
     'rank', v_next_rank,
     'targetComplexity', v_next_target_complexity
@@ -254,20 +266,23 @@ begin
       s.player_target_complexity,
       s.player_completed_cycles::text,
       s.revision,
-      s.level_reached_at
+      s.level_reached_at,
+      s.state,
+      s.updated_at
     from public.mazer_progression_states s
     where s.user_id = v_user_id;
 end;
 $$;
 
-revoke all on function public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text) from public;
-grant execute on function public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text) to authenticated;
+revoke all on function public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
+grant execute on function public.mazer_complete_level(bigint, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
 
 comment on function public.mazer_complete_level is
-  'RLS-protected, idempotent player level-completion transaction. Not yet called by client code; direct-write retirement remains a separately verified cutover.';
+  'RLS-protected, idempotent, load-bearing player completion transaction. The client keeps the same run UUID in a durable outbox until this function returns the canonical state.';
 
 drop function if exists public.mazer_complete_ai_level(bigint, integer, integer, uuid, text, integer, text);
 drop function if exists public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text);
+drop function if exists public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb);
 
 create or replace function public.mazer_complete_ai_level(
   p_completed_level text,
@@ -276,14 +291,18 @@ create or replace function public.mazer_complete_ai_level(
   p_client_run_id uuid,
   p_ruleset_id text default null,
   p_recipe_version integer default null,
-  p_recipe_hash text default null
+  p_recipe_hash text default null,
+  p_completed_at timestamp with time zone default null,
+  p_receipt jsonb default '{}'::jsonb
 )
 returns table (
   level text,
   rank text,
   target_complexity integer,
   completed_cycles text,
-  last_completed_cycle_at timestamp with time zone
+  last_completed_cycle_at timestamp with time zone,
+  state jsonb,
+  updated_at timestamp with time zone
 )
 language plpgsql
 security invoker
@@ -299,7 +318,7 @@ declare
   v_next_target_complexity integer;
   v_next_rank text;
   v_next_color_tier integer;
-  v_now timestamp with time zone := pg_catalog.now();
+  v_now timestamp with time zone := pg_catalog.coalesce(p_completed_at, pg_catalog.now());
   v_state jsonb;
   v_summary jsonb;
 begin
@@ -322,6 +341,10 @@ begin
 
   if p_client_run_id is null then
     raise exception 'client_run_id is required for idempotent completion' using errcode = '22023';
+  end if;
+
+  if pg_catalog.jsonb_typeof(p_receipt) <> 'object' or pg_catalog.octet_length(p_receipt::text) > 8192 then
+    raise exception 'receipt must be a JSON object no larger than 8192 bytes' using errcode = '22023';
   end if;
 
   select
@@ -353,7 +376,9 @@ begin
         s.rank,
         s.target_complexity,
         s.completed_cycles::text,
-        s.last_completed_cycle_at
+        s.last_completed_cycle_at,
+        s.state,
+        s.updated_at
       from public.mazer_ai_progression_states s
       where s.user_id = v_user_id
         and s.runner_key = 'menu-runner';
@@ -392,7 +417,9 @@ begin
     client_run_id,
     ruleset_id,
     recipe_version,
-    recipe_hash
+    recipe_hash,
+    completed_at,
+    receipt
   ) values (
     v_user_id,
     'menu-demo',
@@ -401,7 +428,9 @@ begin
     p_client_run_id,
     p_ruleset_id,
     p_recipe_version,
-    p_recipe_hash
+    p_recipe_hash,
+    v_now,
+    p_receipt
   )
   on conflict (user_id, client_run_id) where client_run_id is not null do nothing
   returning id into v_inserted_receipt_id;
@@ -413,7 +442,9 @@ begin
         s.rank,
         s.target_complexity,
         s.completed_cycles::text,
-        s.last_completed_cycle_at
+        s.last_completed_cycle_at,
+        s.state,
+        s.updated_at
       from public.mazer_ai_progression_states s
       where s.user_id = v_user_id
         and s.runner_key = 'menu-runner';
@@ -432,7 +463,7 @@ begin
     'colorTier', v_next_color_tier,
     'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
-    'lastReceiptId', p_client_run_id::text,
+    'lastReceiptId', pg_catalog.coalesce(pg_catalog.nullif(p_receipt ->> 'id', ''), p_client_run_id::text),
     'level', v_next_level::text,
     'rank', v_next_rank,
     'targetComplexity', v_next_target_complexity
@@ -441,7 +472,7 @@ begin
     'colorTier', v_next_color_tier,
     'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
-    'lastReceiptId', p_client_run_id::text,
+    'lastReceiptId', pg_catalog.coalesce(pg_catalog.nullif(p_receipt ->> 'id', ''), p_client_run_id::text),
     'level', v_next_level::text,
     'rank', v_next_rank,
     'targetComplexity', v_next_target_complexity
@@ -466,15 +497,17 @@ begin
       s.rank,
       s.target_complexity,
       s.completed_cycles::text,
-      s.last_completed_cycle_at
+      s.last_completed_cycle_at,
+      s.state,
+      s.updated_at
     from public.mazer_ai_progression_states s
     where s.user_id = v_user_id
       and s.runner_key = 'menu-runner';
 end;
 $$;
 
-revoke all on function public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text) from public;
-grant execute on function public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text) to authenticated;
+revoke all on function public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
+grant execute on function public.mazer_complete_ai_level(text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
 
 comment on function public.mazer_complete_ai_level is
-  'RLS-protected, idempotent menu-AI level-completion transaction. Not yet called by client code; direct-write retirement remains a separately verified cutover.';
+  'RLS-protected, idempotent, load-bearing menu-AI completion transaction. The client keeps the same run UUID in a durable outbox until this function returns the canonical state.';

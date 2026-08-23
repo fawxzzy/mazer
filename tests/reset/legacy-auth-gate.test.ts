@@ -27,7 +27,8 @@ describe('legacy full auth gate', () => {
   });
 
   test('uses one full-width submit action and no guest action in the auth bottom bar', () => {
-    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
+      .replace(/\r\n/g, '\n');
     const formStart = menuSceneSource.indexOf('  private buildAuthCredentialsForm(');
     const formEnd = menuSceneSource.indexOf('  private createAuthFooterLink(', formStart);
     const formSource = menuSceneSource.slice(formStart, formEnd);

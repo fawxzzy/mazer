@@ -73,6 +73,7 @@ export interface MazeCycleAiDecisionSummary {
 
 export interface MazeCycleTelemetryReceipt {
   id: string;
+  clientRunId: string;
   surface: MazeCycleTelemetrySurface;
   aiDecisionSummary: MazeCycleAiDecisionSummary | null;
   mazeComplexity: LegacyMazeComplexityBreakdown | null;
@@ -109,6 +110,7 @@ export interface MazeCycleTelemetryHistory {
 export interface MazeCycleTelemetryRecordInput {
   aiDecisionSummary?: MazeCycleAiDecisionSummary | null;
   averageFrameMs: number;
+  clientRunId?: string;
   completedAt?: string;
   completionTimeMs: number;
   controlMode: LegacyControlMode;
@@ -163,6 +165,64 @@ export interface MazeCycleTelemetryDiagnostics {
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   value !== null && typeof value === 'object'
 );
+
+const LEGACY_COMPLETION_CLIENT_RUN_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const hashLegacyCompletionIdentityPart = (value: string, seed: number): string => {
+  let hash = seed >>> 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+};
+
+/**
+ * Older local telemetry receipts predate the server idempotency UUID. Derive
+ * one stable compatibility UUID from their already-persisted receipt id so a
+ * retry after reload can never mint a second logical completion. This is an
+ * identity checksum, not a security token.
+ */
+export const deriveLegacyCompletionClientRunId = (receiptId: string): string => {
+  const value = `mazer-completion:${receiptId}`;
+  const raw = [
+    hashLegacyCompletionIdentityPart(value, 0x811c9dc5),
+    hashLegacyCompletionIdentityPart(value, 0x9e3779b9),
+    hashLegacyCompletionIdentityPart(value, 0x85ebca6b),
+    hashLegacyCompletionIdentityPart(value, 0xc2b2ae35)
+  ].join('').split('');
+  raw[12] = '5';
+  raw[16] = ((Number.parseInt(raw[16] ?? '0', 16) & 0x3) | 0x8).toString(16);
+  const hex = raw.join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+};
+
+export const normalizeLegacyCompletionClientRunId = (
+  value: unknown,
+  receiptId: string
+): string => (
+  typeof value === 'string' && LEGACY_COMPLETION_CLIENT_RUN_ID_PATTERN.test(value)
+    ? value.toLowerCase()
+    : deriveLegacyCompletionClientRunId(receiptId)
+);
+
+export const createLegacyCompletionClientRunId = (): string => {
+  try {
+    if (typeof globalThis.crypto?.randomUUID === 'function') {
+      return globalThis.crypto.randomUUID().toLowerCase();
+    }
+    if (typeof globalThis.crypto?.getRandomValues === 'function') {
+      const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+      bytes[6] = (bytes[6]! & 0x0f) | 0x40;
+      bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+      const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+    }
+  } catch {
+    // A stable receipt-scoped fallback is created below.
+  }
+  return deriveLegacyCompletionClientRunId(`${Date.now()}:${Math.random()}:${globalThis.performance?.now?.() ?? 0}`);
+};
 
 const copyPoint = (point: LegacyPoint): LegacyPoint => ({ x: point.x, y: point.y });
 
@@ -345,6 +405,7 @@ const normalizeReceipt = (value: unknown): MazeCycleTelemetryReceipt | null => {
 
   return {
     id: value.id,
+    clientRunId: normalizeLegacyCompletionClientRunId(value.clientRunId, value.id),
     surface,
     aiDecisionSummary: normalizeAiDecisionSummary(value.aiDecisionSummary),
     mazeComplexity: normalizeMazeComplexityBreakdown(value.mazeComplexity),
@@ -501,9 +562,14 @@ export const createMazeCycleTelemetryReceipt = (
     sourcePathComplete: true,
     wrongTurns
   });
+  const id = `${input.surface}-${input.maze.seed}-${Date.parse(completedAt) || Date.now()}`;
 
   return {
-    id: `${input.surface}-${input.maze.seed}-${Date.parse(completedAt) || Date.now()}`,
+    id,
+    clientRunId: normalizeLegacyCompletionClientRunId(
+      input.clientRunId ?? createLegacyCompletionClientRunId(),
+      id
+    ),
     surface: input.surface,
     aiDecisionSummary,
     mazeComplexity,
@@ -553,6 +619,7 @@ const toDiagnosticReceipt = (
   const previewStart = Math.max(0, receipt.playerPath.length - MAZE_CYCLE_TELEMETRY_PATH_PREVIEW_LIMIT);
   return {
     id: receipt.id,
+    clientRunId: receipt.clientRunId,
     surface: receipt.surface,
     aiDecisionSummary: receipt.aiDecisionSummary
       ? { ...receipt.aiDecisionSummary }

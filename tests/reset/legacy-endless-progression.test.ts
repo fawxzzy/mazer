@@ -42,9 +42,13 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(completionRpc).toContain('create or replace function public.mazer_complete_ai_level');
     expect(completionRpc).toContain('v_next_level := v_current.level + 1');
     expect(completionRpc).toContain('p_completed_level text');
+    expect(completionRpc).toContain('p_completed_at timestamp with time zone default null');
+    expect(completionRpc).toContain("p_receipt jsonb default '{}'::jsonb");
     expect(completionRpc).toContain('player_level text');
     expect(completionRpc).toContain('player_completed_cycles text');
     expect(completionRpc).toContain('completed_cycles text');
+    expect(completionRpc).toContain('state jsonb');
+    expect(completionRpc).toContain('updated_at timestamp with time zone');
     expect(completionRpc).toContain('v_completed_level := p_completed_level::bigint');
     expect(completionRpc).toContain("'completedCycles', v_next_completed_cycles::text");
     expect(completionRpc).toContain("'level', v_next_level::text");
@@ -65,6 +69,13 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(completionRpc).not.toContain('security definer');
     expect(completionRpc).toContain('and r.client_run_id = p_client_run_id');
     expect(completionRpc).toContain('on conflict (user_id, client_run_id) where client_run_id is not null do nothing');
+    expect(completionRpc).toContain('completed_at,');
+    expect(completionRpc).toContain('receipt');
+    expect(completionRpc).toContain("pg_catalog.octet_length(p_receipt::text) > 8192");
+    expect(completionRpc).toContain("pg_catalog.nullif(p_receipt ->> 'id', '')");
+    expect(completionRpc).toContain('load-bearing player completion transaction');
+    expect(completionRpc).toContain('load-bearing menu-AI completion transaction');
+    expect(completionRpc).not.toContain('Not yet called by client code');
   });
 });
 
