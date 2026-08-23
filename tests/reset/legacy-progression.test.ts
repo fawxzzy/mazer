@@ -222,7 +222,7 @@ describe('legacy progression', () => {
     expect(state.tracks['ai-runner'].lastCompletionTimeMs).toBe(32_000);
     expect(state.tracks['ai-runner'].bestCompletionTimeMs).toBe(32_000);
     expect(state.tracks['ai-runner'].recentSignals).toEqual(['ease']);
-    expect(state.tracks['ai-runner'].targetComplexity).toBe(LEGACY_PROGRESSION_MIN_COMPLEXITY);
+    expect(state.tracks['ai-runner'].targetComplexity).toBe(LEGACY_PROGRESSION_MIN_COMPLEXITY + 4);
     expect(readLegacyProgressionState(storage).tracks['ai-runner'].completedCycles).toBe(1);
   });
 
@@ -587,7 +587,7 @@ describe('legacy progression', () => {
     expect(aiTrack.completedCycles).toBe(6);
     expect(aiTrack.level).toBeGreaterThan(1);
     expect(aiTrack.targetComplexity).toBeGreaterThan(LEGACY_PROGRESSION_MIN_COMPLEXITY + 8);
-    expect(aiTrack.rank).toBe('E');
+    expect(aiTrack.rank).toBe('D');
     expect(pacing.skillTrend).toBe('rising');
     expect(pacing.levelProgressPercent).toBeGreaterThanOrEqual(0);
     expect(pacing.levelProgressPercent).toBeLessThanOrEqual(100);
@@ -632,7 +632,7 @@ describe('legacy progression', () => {
     expect(aiTrack.recentSignals.every((signal) => signal === 'challenge')).toBe(true);
   });
 
-  test('holds or eases AI progression when decision pressure is chaotic', () => {
+  test('keeps chaotic AI telemetry without penalizing a completed maze', () => {
     const storage = new MemoryStorage();
     const maze = createProgressionTestMaze();
     const chaoticAiReceipt = createMazeCycleTelemetryReceipt({
@@ -664,10 +664,14 @@ describe('legacy progression', () => {
 
     expect(state.tracks['ai-runner'].lastSignal).toBe('ease');
     expect(state.tracks['ai-runner'].paceScore).toBeLessThanOrEqual(LEGACY_PROGRESSION_AI_EASE_SCORE_THRESHOLD);
-    expect(state.tracks['ai-runner'].targetComplexity).toBe(LEGACY_PROGRESSION_MIN_COMPLEXITY);
+    expect(state.tracks['ai-runner']).toMatchObject({
+      completedCycles: 1,
+      level: 2,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4
+    });
   });
 
-  test('holds AI maze level when local-memory search exhausts without chaotic pressure', () => {
+  test('keeps searching AI telemetry without holding back a completed maze', () => {
     const storage = new MemoryStorage();
     const maze = createProgressionTestMaze();
     const searchingExhaustionReceipt = createMazeCycleTelemetryReceipt({
@@ -707,8 +711,96 @@ describe('legacy progression', () => {
     );
 
     expect(state.tracks['ai-runner'].lastSignal).toBe('hold');
-    expect(state.tracks['ai-runner'].targetComplexity).toBe(LEGACY_PROGRESSION_MIN_COMPLEXITY);
+    expect(state.tracks['ai-runner']).toMatchObject({
+      completedCycles: 1,
+      level: 2,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4
+    });
     expect(state.tracks['ai-runner'].struggleCycles).toBe(0);
+  });
+
+  test('advances a high-level AI exactly one level after an ease-classified completion', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    const chaoticAiReceipt = createMazeCycleTelemetryReceipt({
+      aiDecisionSummary: {
+        backtrackCount: 12,
+        decisionCount: 24,
+        optionalRetargetCount: 5,
+        recoveryCount: 7,
+        thinkingModel: 'human-local-memory',
+        visitedUndoCount: 4,
+        wrongBranchCount: 10
+      },
+      averageFrameMs: 16,
+      completedAt: '2026-08-23T17:00:00.000Z',
+      completionTimeMs: 30_000,
+      controlMode: 'stick',
+      maze,
+      playerPath: [...maze.solutionPath, ...maze.solutionPath],
+      resetUsed: false,
+      surface: 'menu-demo',
+      backtracks: 12,
+      wrongTurns: 10
+    });
+    const baseline = createEmptyLegacyProgressionState();
+    const levelThirtyTwoTarget = LEGACY_PROGRESSION_MIN_COMPLEXITY + (31 * 4);
+    const state = recordLegacyProgressionCycle(storage, {
+      ...baseline,
+      tracks: {
+        ...baseline.tracks,
+        'ai-runner': {
+          ...baseline.tracks['ai-runner'],
+          completedCycles: 31,
+          level: 32,
+          targetComplexity: levelThirtyTwoTarget
+        }
+      }
+    }, chaoticAiReceipt, maze);
+
+    expect(state.tracks['ai-runner']).toMatchObject({
+      completedCycles: 32,
+      lastSignal: 'ease',
+      level: 33,
+      targetComplexity: levelThirtyTwoTarget + 4
+    });
+  });
+
+  test('advances a high-level player exactly one level after every completed maze', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    const completedMaze = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 34,
+      completedAt: '2026-08-23T17:01:00.000Z',
+      completionTimeMs: 30_000,
+      controlMode: 'stick',
+      maze,
+      playerPath: [...maze.solutionPath, ...maze.solutionPath, ...maze.solutionPath],
+      resetUsed: true,
+      surface: 'play',
+      backtracks: 12,
+      wrongTurns: 10
+    });
+    const baseline = createEmptyLegacyProgressionState();
+    const levelThirtyTwoTarget = LEGACY_PROGRESSION_MIN_COMPLEXITY + (31 * 4);
+    const state = recordLegacyProgressionCycle(storage, {
+      ...baseline,
+      tracks: {
+        ...baseline.tracks,
+        player: {
+          ...baseline.tracks.player,
+          completedCycles: 31,
+          level: 32,
+          targetComplexity: levelThirtyTwoTarget
+        }
+      }
+    }, completedMaze, maze);
+
+    expect(state.tracks.player).toMatchObject({
+      completedCycles: 32,
+      level: 33,
+      targetComplexity: levelThirtyTwoTarget + 4
+    });
   });
 
   test('keeps route-quality telemetry for players while every completed maze advances', () => {
@@ -1165,8 +1257,8 @@ describe('legacy progression', () => {
       levelBaseTargetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY,
       levelProgressPercent: 0,
       measuredMazeLevel: resolveLegacyProgressionLevel(92),
-      nextChallengeTargetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 2,
-      nextEaseTargetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY,
+      nextChallengeTargetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4,
+      nextEaseTargetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4,
       nextLevelTargetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + 4,
       recentChallengeCount: 0,
       recentEaseCount: 0,

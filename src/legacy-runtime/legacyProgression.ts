@@ -27,14 +27,12 @@ export const LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION = 5;
 // field so a stale tab cannot erase baseline provenance when it rewrites the
 // top-level baseline version during remote sync.
 const LEGACY_PROGRESSION_PLAYER_BASELINE_V5_PROVENANCE_STRUGGLE_CYCLES = Number.MAX_SAFE_INTEGER;
-export const LEGACY_PROGRESSION_CHALLENGE_STEP = 1;
-export const LEGACY_PROGRESSION_CHALLENGE_PRESSURE_BONUS = 1;
-export const LEGACY_PROGRESSION_CHALLENGE_STREAK_BONUS_EVERY = 3;
+// Four complexity points map to one visible level. Completion advancement is
+// deliberately independent from run-quality telemetry: finishing a maze is
+// the player-facing accomplishment for both tracks.
+export const LEGACY_PROGRESSION_COMPLETION_LEVEL_STEP = 4;
 export const LEGACY_PROGRESSION_SIGNAL_WINDOW_LIMIT = 6;
 export const LEGACY_PROGRESSION_CONSISTENT_SIGNAL_THRESHOLD = 2;
-export const LEGACY_PROGRESSION_MAX_CHALLENGE_STEP = 3;
-export const LEGACY_PROGRESSION_EASE_STEP = -1;
-export const LEGACY_PROGRESSION_EASE_PRESSURE_STEP = -2;
 export const LEGACY_PROGRESSION_AI_CHALLENGE_SCORE_THRESHOLD = MAZE_CYCLE_RUN_QUALITY_AI_CHALLENGE_SCORE_THRESHOLD;
 export const LEGACY_PROGRESSION_AI_EASE_SCORE_THRESHOLD = MAZE_CYCLE_RUN_QUALITY_AI_EASE_SCORE_THRESHOLD;
 export const LEGACY_PROGRESSION_MENU_MIN_TILE_PX = 5.35;
@@ -830,9 +828,8 @@ const hasLegacyPlayerBaselineV5Provenance = (track: LegacyProgressionTrack): boo
 );
 
 // The maximum targetComplexity a player track could possibly have legitimately
-// earned in this many completed cycles -- the current player-track gain is a
-// flat +4/cycle (resolveLegacyProgressionTargetAdjustment's 'player' branch),
-// but this is deliberately an UPPER BOUND rather than an exact-match
+// earned in this many completed cycles -- every completion now gains a flat
+// +4/cycle, but this is deliberately an UPPER BOUND rather than an exact-match
 // simulation of that formula. A previous version of the game tapered the
 // per-cycle gain down at higher levels; real accounts that earned their
 // progress under that taper have a targetComplexity BELOW what a flat +4/cycle
@@ -1101,74 +1098,14 @@ export const resolveLegacyProgressionPerformanceScoreForReceipt = (
   complexity: number
 ): LegacyProgressionPerformanceScore => scoreLegacyProgressionReceipt(receipt, complexity);
 
-const resolveLegacyProgressionTargetAdjustment = (
-  track: LegacyProgressionTrack,
-  complexity: number,
-  signal: LegacyProgressionSignal,
-  trackId: LegacyProgressionTrackId = 'ai-runner'
-): number => {
-  if (trackId === 'player') {
-    // Flat +4 -- resolveLegacyProgressionLevel buckets every 4 complexity
-    // points into one level, so this is exactly one level per completed
-    // maze, always, with no taper as level rises. (A previous pass tapered
-    // this down at higher levels per feedback that difficulty climbed too
-    // fast; per later feedback that guaranteed, uniform forward progress
-    // matters more now that there's no timer/score to weigh completions
-    // against, that taper was removed.)
-    return 4;
-  }
-
-  const nextSignals = appendLegacyProgressionSignal(track, signal);
-  const recentChallengeCount = countSignals(nextSignals, 'challenge');
-  const recentEaseCount = countSignals(nextSignals, 'ease');
-
-  if (signal === 'ease') {
-    // track.struggleCycles is a lifetime counter that never resets (unlike
-    // cleanCycles' modulo-based streak bonus, there's no periodic decay) --
-    // using it here meant that once an ai-runner track crossed 2 lifetime
-    // eases (typically within its first few minutes of running), every
-    // future ease permanently applied the bigger pressure step, for the
-    // rest of that track's life. Combined with the challenge step normally
-    // being +1 against a -2 pressure ease, a "human-like" AI that wins only
-    // half its runs nets negative progress forever and never climbs past
-    // the level it happened to be at when the lock-in triggered -- this was
-    // the actual cause of the AI getting stuck a couple levels in. The
-    // windowed recentEaseCount check below already covers "you've been
-    // struggling recently" without permanently escalating.
-    return complexity > track.targetComplexity + 18
-      || recentEaseCount >= LEGACY_PROGRESSION_CONSISTENT_SIGNAL_THRESHOLD
-      ? LEGACY_PROGRESSION_EASE_PRESSURE_STEP
-      : LEGACY_PROGRESSION_EASE_STEP;
-  }
-
-  if (signal !== 'challenge') {
-    return 0;
-  }
-
-  const nextCleanCycles = track.cleanCycles + 1;
-  const measuredPressureBonus = complexity >= track.targetComplexity + 8
-    ? LEGACY_PROGRESSION_CHALLENGE_PRESSURE_BONUS
-    : 0;
-  const consistencyBonus = recentChallengeCount >= LEGACY_PROGRESSION_CONSISTENT_SIGNAL_THRESHOLD
-    ? 1
-    : 0;
-  const longStreakBonus = nextCleanCycles % LEGACY_PROGRESSION_CHALLENGE_STREAK_BONUS_EVERY === 0
-    ? 1
-    : 0;
-
-  return Math.min(
-    LEGACY_PROGRESSION_MAX_CHALLENGE_STEP,
-    LEGACY_PROGRESSION_CHALLENGE_STEP + measuredPressureBonus + consistencyBonus + longStreakBonus
-  );
-};
+const resolveLegacyProgressionTargetAdjustment = (): number => (
+  LEGACY_PROGRESSION_COMPLETION_LEVEL_STEP
+);
 
 const resolveLegacyProgressionPacedTarget = (
-  track: LegacyProgressionTrack,
-  complexity: number,
-  signal: LegacyProgressionSignal,
-  trackId: LegacyProgressionTrackId = 'ai-runner'
+  track: LegacyProgressionTrack
 ): number => clampInteger(
-  track.targetComplexity + resolveLegacyProgressionTargetAdjustment(track, complexity, signal, trackId),
+  track.targetComplexity + resolveLegacyProgressionTargetAdjustment(),
   LEGACY_PROGRESSION_MIN_COMPLEXITY,
   LEGACY_PROGRESSION_MAX_COMPLEXITY
 );
@@ -1177,10 +1114,9 @@ const applyTrackSignal = (
   track: LegacyProgressionTrack,
   receipt: MazeCycleTelemetryReceipt,
   complexity: number,
-  signal: LegacyProgressionSignal,
-  trackId: LegacyProgressionTrackId
+  signal: LegacyProgressionSignal
 ): LegacyProgressionTrack => {
-  const targetComplexity = resolveLegacyProgressionPacedTarget(track, complexity, signal, trackId);
+  const targetComplexity = resolveLegacyProgressionPacedTarget(track);
   const recentSignals = appendLegacyProgressionSignal(track, signal);
   const lastCompletionTimeMs = Math.max(0, Math.round(receipt.completionTimeMs));
   const previousBest = track.bestCompletionTimeMs;
@@ -1213,7 +1149,7 @@ const applyTrackSignal = (
 export const summarizeLegacyProgressionPacing = (
   track: LegacyProgressionTrack,
   measuredMazeComplexity: number,
-  trackId: LegacyProgressionTrackId = 'ai-runner'
+  _trackId: LegacyProgressionTrackId = 'ai-runner'
 ): LegacyProgressionPacingSummary => {
   const signalWindow = normalizeSignalWindow(track.recentSignals);
   const recentChallengeCount = countSignals(signalWindow, 'challenge');
@@ -1234,9 +1170,9 @@ export const summarizeLegacyProgressionPacing = (
     activeLevel: track.level,
     activeRank: track.rank,
     activeTargetComplexity: track.targetComplexity,
-    challengeStep: resolveLegacyProgressionTargetAdjustment(track, measuredMazeComplexity, 'challenge', trackId),
+    challengeStep: resolveLegacyProgressionTargetAdjustment(),
     complexityUntilNextLevel,
-    easeStep: resolveLegacyProgressionTargetAdjustment(track, measuredMazeComplexity, 'ease', trackId),
+    easeStep: resolveLegacyProgressionTargetAdjustment(),
     lastCompletionTimeMs: track.lastCompletionTimeMs,
     levelBaseTargetComplexity,
     levelProgressPercent: clampInteger(
@@ -1247,8 +1183,8 @@ export const summarizeLegacyProgressionPacing = (
     measuredMazeComplexity,
     measuredMazeLevel: resolveLegacyProgressionLevel(measuredMazeComplexity),
     measuredMazeRank: resolveLegacyProgressionRank(measuredMazeComplexity),
-    nextChallengeTargetComplexity: resolveLegacyProgressionPacedTarget(track, measuredMazeComplexity, 'challenge', trackId),
-    nextEaseTargetComplexity: resolveLegacyProgressionPacedTarget(track, measuredMazeComplexity, 'ease', trackId),
+    nextChallengeTargetComplexity: resolveLegacyProgressionPacedTarget(track),
+    nextEaseTargetComplexity: resolveLegacyProgressionPacedTarget(track),
     nextLevelTargetComplexity,
     paceScore: track.paceScore,
     recentChallengeCount,
@@ -1299,7 +1235,7 @@ export const recordLegacyProgressionCycle = (
     updatedAt: receipt.completedAt,
     tracks: {
       ...normalized.tracks,
-      [trackId]: applyTrackSignal(normalized.tracks[trackId], receipt, complexity.total, signal, trackId)
+      [trackId]: applyTrackSignal(normalized.tracks[trackId], receipt, complexity.total, signal)
     }
   });
 };
