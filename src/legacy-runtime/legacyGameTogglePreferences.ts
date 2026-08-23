@@ -10,10 +10,12 @@ import {
   LEGACY_MOVEMENT_SPEED_MIN,
   normalizeLegacyMovementSpeed
 } from './legacyMovementSpeed';
+import { normalizeLegacyCameraZoom } from './legacyCameraZoom';
 
 export const LEGACY_GAME_TOGGLE_STORAGE_KEY = 'mazer.game-toggles.v1';
 
 export interface LegacyGameTogglePreferences {
+  camScale: number;
   controlMode: LegacyControlMode;
   darkMode: boolean;
   movementSpeed: number;
@@ -57,6 +59,11 @@ const isMigratableMovementSpeed = (value: unknown): boolean => (
   || (typeof value === 'string' && value.trim().length > 0 && Number.isFinite(Number(value)))
 );
 
+const isMigratableCameraZoom = (value: unknown): boolean => (
+  (typeof value === 'number' && Number.isFinite(value))
+  || (typeof value === 'string' && value.trim().length > 0 && Number.isFinite(Number(value)))
+);
+
 const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Partial<LegacyGameTogglePreferences> => {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
@@ -67,6 +74,7 @@ const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Parti
     Object.prototype.hasOwnProperty.call(record, key)
   );
   const presentKeys = [
+    'camScale',
     'controlMode',
     'darkMode',
     'movementSpeed',
@@ -81,18 +89,22 @@ const isMigratableLegacyGameTogglePreferences = (value: unknown): value is Parti
   if (hasOwn('controlMode') && !isControlMode(record.controlMode)) {
     return false;
   }
+  if (hasOwn('camScale') && !isMigratableCameraZoom(record.camScale)) {
+    return false;
+  }
   if (hasOwn('movementSpeed') && !isMigratableMovementSpeed(record.movementSpeed)) {
     return false;
   }
 
   return presentKeys
-    .filter((key) => key !== 'controlMode' && key !== 'movementSpeed' && hasOwn(key))
+    .filter((key) => key !== 'camScale' && key !== 'controlMode' && key !== 'movementSpeed' && hasOwn(key))
     .every((key) => isMigratableBoolean(record[key]));
 };
 
 export const pickLegacyGameTogglePreferences = (
   settings: LegacySettings
 ): LegacyGameTogglePreferences => ({
+  camScale: normalizeLegacyCameraZoom(settings.camScale),
   controlMode: settings.controlMode,
   darkMode: settings.darkMode,
   movementSpeed: normalizeLegacyMovementSpeed(settings.movementSpeed),
@@ -105,6 +117,7 @@ export const normalizeLegacyGameTogglePreferences = (
   value?: Partial<LegacyGameTogglePreferences> | null,
   fallback: LegacySettings = LEGACY_DEFAULTS
 ): LegacyGameTogglePreferences => ({
+  camScale: normalizeLegacyCameraZoom(value?.camScale, fallback.camScale),
   controlMode: isControlMode(value?.controlMode) ? value.controlMode : fallback.controlMode,
   darkMode: normalizeBoolean(value?.darkMode, fallback.darkMode),
   movementSpeed: normalizeLegacyMovementSpeed(

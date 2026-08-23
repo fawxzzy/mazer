@@ -24,6 +24,10 @@ describe('legacy advanced options visibility', () => {
     expect(source).toContain('if (showAdvancedOptions) {');
     expect(source).toContain("this.createInputRow('Maze Scale'");
     expect(source).toContain("this.createInputRow('Camera Scale'");
+    expect(source).toContain("label: 'Board Zoom'");
+    expect(source).toContain('formatLegacyCameraZoomPercent(this.settings.camScale)');
+    expect(source).toContain('resolveLegacyCameraZoomPosition(this.settings.camScale)');
+    expect(source).toContain('private applyLegacyCameraZoom(value: number): void {');
     expect(source).toContain('if (showAdvancedOptions && !compact) {');
     expect(source).toContain("this.createColorInputRow('Path RGB 0-255'");
     expect(source).toContain("this.createColorInputRow('Wall RGB 0-255'");
