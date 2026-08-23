@@ -786,18 +786,24 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('progressionBadge: {');
     expect(menuSceneSource).toContain('this.clearLegacyPlayerProgressionBadge();');
     expect(menuSceneSource).toContain("if (this.mode === 'menu') {");
-    expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
+    // The old persistent top-left level badge (drawLegacyProgressionGlyph)
+    // is retired in favor of drawLegacyLevelAnnouncer's centered,
+    // between-mazes announcement -- shared by both surfaces since both
+    // drive the same menuStaticDrawLifecyclePhase transition.
+    expect(menuSceneSource).not.toContain('private drawLegacyProgressionGlyph(');
+    expect(menuSceneSource).toContain('private drawLegacyLevelAnnouncer(time: number): void');
+    expect(menuSceneSource).toContain('private resolveLegacyLevelAnnouncerAlpha(time: number): number');
+    expect(menuSceneSource).toContain('this.drawLegacyLevelAnnouncer(time);');
     // The front door no longer shows the demo AI's own level badge (it read
     // as "your level" even though it tracks an independent, invisible AI
     // progression, not anything the player has done) -- the drawing method
     // is gone; the underlying bounds fields/diagnostics key remain (always
     // null now) since other diagnostics code still references them.
     expect(menuSceneSource).not.toContain('private drawLegacyMenuAiProgressionBadge(');
-    expect(menuSceneSource).toContain(".setText('LVL')");
+    expect(menuSceneSource).toContain("this.levelAnnouncerLabelText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, 'LEVEL',");
     expect(menuSceneSource).toContain('menuAiProgressionBadge: {');
     expect(menuSceneSource).toContain("placement: 'leading'");
     expect(menuSceneSource).toContain("placement: 'trailing'");
-    expect(menuSceneSource).toContain('resolveLegacyHeaderControlMetricFontSize(track.level, frame.width)');
     // No panel/border chrome function at all any more -- both the level
     // badge and the play settings cog are bare, matching the menu surface's
     // own settings cog exactly (zero chrome, not lighter chrome).
@@ -1219,7 +1225,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private applyLegacyUiTextCrispness<T extends Phaser.GameObjects.Text>(text: T): T');
     expect(menuSceneSource).toContain('return applyTextResolution(text, this.resolveLegacyUiTextResolution());');
     expect(menuSceneSource).toContain('this.footerText = this.applyLegacyUiTextCrispness(this.add.text');
-    expect(menuSceneSource).toContain('this.progressionBadgeText = this.applyLegacyUiTextCrispness(this.add.text');
+    expect(menuSceneSource).toContain('this.levelAnnouncerNumberText = this.applyLegacyUiTextCrispness(this.add.text');
     expect(menuSceneSource).toContain('this.applyLegacyUiTextCrispness(text);');
     expect(menuSceneSource).toContain('textTextureResolution: this.resolveLegacyUiTextResolution()');
     expect(menuSceneSource).toContain("textTransformOwner: 'game-canvas-only'");
@@ -1470,34 +1476,23 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authReuseContract).toContain('No shared React component import into Phaser.');
   });
 
-  test('uses a player-facing level number with a consistent progression color tier', () => {
+  test('keeps both the player level and the independent menu-demo AI level off the front door as persistent chrome', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('this.progressionBadgeText');
-    expect(menuSceneSource).toContain('.setText(String(track.level))');
-    expect(menuSceneSource).toContain('.setColor(palette.badgeColor)');
-    expect(menuSceneSource).toContain('this.layoutLegacyHeaderMetricPair(frame, this.progressionBadgeText, this.progressionBadgeLabelText, badgePulse);');
-    expect(menuSceneSource).toContain('resolveLegacyHeaderControlMetricFontSize(track.level, frame.width)');
-  });
-
-
-  test('keeps both the player level and the independent menu-demo AI level quiet on the front door', () => {
-    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
-
-    expect(menuSceneSource).toContain('private drawLegacyProgressionGlyph(');
     expect(menuSceneSource).toContain("return resolveLegacyProgressionTrackIdForSurface(this.mode === 'play' ? 'play' : 'menu-demo');");
     expect(menuSceneSource).toContain("if (this.overlay !== 'none') {");
     expect(menuSceneSource).toContain('private clearLegacyPlayerProgressionBadge(): void');
-    // The front door no longer shows a level badge at all -- neither the
-    // player's own level nor the menu-demo AI's independent level, which
-    // used to read as "your level" even though it tracked something the
-    // player never did. Both clear helpers still run for the menu branch;
-    // there's just no draw call left to pair with them.
+    // Neither the player's own level nor the menu-demo AI's independent
+    // level (which used to read as "your level" even though it tracked
+    // something the player never did) sits as permanent corner chrome any
+    // more -- both surfaces instead get the same centered, between-mazes
+    // announcement (drawLegacyLevelAnnouncer), gated on the shared
+    // menuStaticDrawLifecyclePhase transition, not on mode.
     expect(menuSceneSource).toContain("if (this.mode === 'menu') {");
     expect(menuSceneSource).not.toContain('this.drawLegacyMenuAiProgressionBadge();');
     expect(menuSceneSource).toContain('this.clearLegacyMenuAiProgressionBadge();');
-    expect(menuSceneSource).toContain(".setText('LVL')");
-    expect(menuSceneSource).toContain('.setText(String(track.level))');
+    expect(menuSceneSource).toContain('private drawLegacyLevelAnnouncer(time: number): void');
+    expect(menuSceneSource).toContain(".setText(String(track.level))");
     expect(menuSceneSource).not.toContain('.setText(String(aiTrack.level))');
     expect(menuSceneSource).not.toContain('publishLegacyPlayerProgressionCompletion');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayerProgressionOutcomeReason');
@@ -1505,19 +1500,20 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('No unlock.');
   });
 
-  test('places the shared player level glyph in the compact top HUD lane', () => {
+  test('centers the level announcer on screen and scales board content with a dedicated zoom container', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
-    expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');
-    expect(menuSceneSource).toContain('const laneHeight = this.layout.lanes.hud?.height ?? 64;');
-    expect(menuSceneSource).toContain('const frame = resolveLegacyHeaderControlFrame({');
-    expect(menuSceneSource).toContain("placement: 'leading'");
-    expect(menuSceneSource).toContain('this.layoutLegacyHeaderMetricPair(frame, this.progressionBadgeText, this.progressionBadgeLabelText, badgePulse);');
-    expect(menuSceneSource).not.toContain('resolveLegacyPlayProgressionBadgeCenterY');
-    expect(menuSceneSource).not.toContain('resolveLegacyMenuProgressionBadgeCenterY');
-    expect(menuSceneSource).toContain('const laneTop = this.layout.lanes.hud?.top ?? 0;');
-    expect(menuSceneSource).toContain('menu-ai-progression-badge');
-    expect(menuSceneSource).toContain('player-menu-ai-progression-badge');
+    expect(menuSceneSource).toContain('const centerX = this.layout.width / 2;');
+    expect(menuSceneSource).toContain('const centerY = this.layout.height / 2;');
+    expect(menuSceneSource).toContain('private boardZoomContainer!: Phaser.GameObjects.Container;');
+    expect(menuSceneSource).toContain('private resolveLegacyBoardZoomTargetScale(): number');
+    expect(menuSceneSource).toContain('private updateLegacyBoardZoom(time: number): void');
+    // The zoom container only ever holds board CONTENT (tiles/path/trail/
+    // title lettering) -- HUD, header icons, overlays, and the announcer
+    // itself are never added to it, so they stay fixed regardless of zoom.
+    expect(menuSceneSource).toContain('this.boardZoomContainer.add([');
+    expect(menuSceneSource).toContain('this.boardZoomContainer.setScale(scale);');
+    expect(menuSceneSource).toContain('this.boardZoomContainer.setPosition(centerX * (1 - scale), centerY * (1 - scale));');
   });
 
   test('consumes shared UI standards for buttons, titles, guides, and toggles', () => {
