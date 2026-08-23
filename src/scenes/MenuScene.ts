@@ -13415,7 +13415,12 @@ export class MenuScene extends Phaser.Scene {
     // cycle through) plus the Mazer signature green for the house glyph
     // itself, both breathing on the classic blink/grow-shrink pulse the
     // settings cog and Start/Login glyphs already use -- redrawn every
-    // frame via updateFrame instead of the old static once-drawn icon.
+    // frame via updateFrame instead of the old static once-drawn icon. The
+    // house itself is filled with a darker-rim edge, a cut door, and the
+    // same cut-gem catchlight the settings cog and player/goal markers use
+    // (drawLegacyMarkerGemCatchlight), instead of a flat two-stroke outline
+    // -- ties it into the same "crystal-facet" icon family as everything
+    // else in the header instead of reading as a plain line glyph.
     const drawHome = (time: number): void => {
       graphics.clear();
       const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
@@ -13427,17 +13432,35 @@ export class MenuScene extends Phaser.Scene {
       graphics.strokeCircle(centerX, rowY, ringRadius * pulseScale);
 
       const color = cyberArcadeMaterial.signal.player;
+      const rimColor = mixLegacyIridescentColor(color, 0x000000, 0.32);
       const halfWidth = iconSize * 0.5 * pulseScale;
       const roofTop = rowY - (iconSize * 0.5 * pulseScale);
       const baseTop = rowY - (iconSize * 0.06 * pulseScale);
       const baseBottom = rowY + (iconSize * 0.42 * pulseScale);
-      graphics.lineStyle(Math.max(1.6, iconSize * 0.12), color, pulseAlpha);
+      const wallHalfWidth = halfWidth * 0.6;
+
+      graphics.fillStyle(color, pulseAlpha * 0.92);
+      graphics.fillTriangle(centerX - halfWidth, baseTop, centerX, roofTop, centerX + halfWidth, baseTop);
+      graphics.fillRect(centerX - wallHalfWidth, baseTop, wallHalfWidth * 2, baseBottom - baseTop);
+      graphics.lineStyle(Math.max(1.2, iconSize * 0.07), rimColor, pulseAlpha);
       graphics.beginPath();
       graphics.moveTo(centerX - halfWidth, baseTop);
       graphics.lineTo(centerX, roofTop);
       graphics.lineTo(centerX + halfWidth, baseTop);
       graphics.strokePath();
-      graphics.strokeRect(centerX - (halfWidth * 0.6), baseTop, halfWidth * 1.2, baseBottom - baseTop);
+      graphics.strokeRect(centerX - wallHalfWidth, baseTop, wallHalfWidth * 2, baseBottom - baseTop);
+
+      // Door cutout -- a small dark notch instead of a solid block reads as
+      // an opening in the wall, the same way the settings cog's hub reads
+      // as a socket rather than a second gear.
+      const doorHalfWidth = wallHalfWidth * 0.42;
+      const doorTop = baseBottom - ((baseBottom - baseTop) * 0.56);
+      graphics.fillStyle(LEGACY_PLAY_TOUCH_COG_HUB, pulseAlpha * 0.85);
+      graphics.fillRect(centerX - doorHalfWidth, doorTop, doorHalfWidth * 2, baseBottom - doorTop);
+      graphics.lineStyle(Math.max(1, iconSize * 0.05), rimColor, pulseAlpha * 0.8);
+      graphics.strokeRect(centerX - doorHalfWidth, doorTop, doorHalfWidth * 2, baseBottom - doorTop);
+
+      this.drawLegacyMarkerGemCatchlight(graphics, centerX, rowY - (iconSize * 0.06 * pulseScale), halfWidth, pulseAlpha * 0.8);
     };
     drawHome(this.time.now);
 

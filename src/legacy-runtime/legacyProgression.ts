@@ -829,33 +829,29 @@ const hasLegacyPlayerBaselineV5Provenance = (track: LegacyProgressionTrack): boo
   track.struggleCycles >= LEGACY_PROGRESSION_PLAYER_BASELINE_V5_PROVENANCE_STRUGGLE_CYCLES
 );
 
-// Mirrors applyTrackSignal's actual per-completion accumulation for the
-// player track (resolveLegacyProgressionTargetAdjustment's 'player' branch)
-// step by step, instead of assuming a flat +4/cycle. The real gain tapers to
-// +3/+2/+1 once level crosses 10/20/30, so a flat-rate formula here silently
-// disagreed with genuine, correctly-earned progress the moment any player
-// completed a cycle past level 10 -- hasCoherentLegacyPlayerProgression below
-// would then see a "mismatch" and rebase (wipe) real progress back to level 1
-// on the very next read or write. See the mazer_leaderboard-adjacent taper
-// comment above resolveLegacyProgressionTargetAdjustment for why the gain
-// isn't flat any more.
-const resolveLegacyPlayerTargetComplexityForCompletedCycles = (completedCycles: number): number => {
-  let targetComplexity = LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY;
-  const cycles = normalizeNonNegativeInteger(completedCycles);
-  for (let cycle = 0; cycle < cycles; cycle += 1) {
-    const level = resolveLegacyProgressionLevel(targetComplexity);
-    const gain = clampInteger(4 - Math.floor(level / 10), 1, 4);
-    targetComplexity = clampInteger(
-      targetComplexity + gain,
-      LEGACY_PROGRESSION_MIN_COMPLEXITY,
-      LEGACY_PROGRESSION_MAX_COMPLEXITY
-    );
-  }
-  return targetComplexity;
-};
+// The maximum targetComplexity a player track could possibly have legitimately
+// earned in this many completed cycles -- the current player-track gain is a
+// flat +4/cycle (resolveLegacyProgressionTargetAdjustment's 'player' branch),
+// but this is deliberately an UPPER BOUND rather than an exact-match
+// simulation of that formula. A previous version of the game tapered the
+// per-cycle gain down at higher levels; real accounts that earned their
+// progress under that taper have a targetComplexity BELOW what a flat +4/cycle
+// run of the same length would reach (taper only ever gives <=4/cycle), so
+// they still satisfy this bound and read as coherent. An exact-match check
+// against whichever formula happens to be live today would instead treat
+// every account that leveled up before this formula last changed as
+// "impossible" and wipe it back to level 1 the next time it's read or
+// written -- see hasCoherentLegacyPlayerProgression below.
+const resolveLegacyPlayerMaxTargetComplexityForCompletedCycles = (completedCycles: number): number => (
+  clampInteger(
+    LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY + (normalizeNonNegativeInteger(completedCycles) * 4),
+    LEGACY_PROGRESSION_MIN_COMPLEXITY,
+    LEGACY_PROGRESSION_MAX_COMPLEXITY
+  )
+);
 
 const hasCoherentLegacyPlayerProgression = (track: LegacyProgressionTrack): boolean => (
-  track.targetComplexity === resolveLegacyPlayerTargetComplexityForCompletedCycles(track.completedCycles)
+  track.targetComplexity <= resolveLegacyPlayerMaxTargetComplexityForCompletedCycles(track.completedCycles)
 );
 
 export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressionState => {
@@ -1112,15 +1108,14 @@ const resolveLegacyProgressionTargetAdjustment = (
   trackId: LegacyProgressionTrackId = 'ai-runner'
 ): number => {
   if (trackId === 'player') {
-    // A flat +4 here meant every single completed maze advanced exactly
-    // one level (resolveLegacyProgressionLevel buckets every 4 complexity
-    // points into one level) -- a perfectly linear ramp that never
-    // decelerated no matter how far the player got. Per feedback that
-    // difficulty climbs too fast: taper the per-completion gain down as
-    // level rises, so the first ~9 levels still feel snappy (unchanged
-    // pace) but later ones take progressively more completions to advance
-    // a single level, instead of always exactly one.
-    return clampInteger(4 - Math.floor(track.level / 10), 1, 4);
+    // Flat +4 -- resolveLegacyProgressionLevel buckets every 4 complexity
+    // points into one level, so this is exactly one level per completed
+    // maze, always, with no taper as level rises. (A previous pass tapered
+    // this down at higher levels per feedback that difficulty climbed too
+    // fast; per later feedback that guaranteed, uniform forward progress
+    // matters more now that there's no timer/score to weigh completions
+    // against, that taper was removed.)
+    return 4;
   }
 
   const nextSignals = appendLegacyProgressionSignal(track, signal);
