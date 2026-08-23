@@ -175,7 +175,7 @@ describe('legacy remote progression', () => {
     }));
     expect(aiUpsert).toHaveBeenCalledWith(expect.objectContaining({
       completed_cycles: 9,
-      level: 8,
+      level: 5,
       rank: 'D',
       runner_key: LEGACY_REMOTE_AI_RUNNER_KEY,
       target_complexity: 36,
@@ -187,11 +187,13 @@ describe('legacy remote progression', () => {
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-07-16T12:00:00.000Z';
     remote.tracks.player.completedCycles = 11;
+    remote.tracks.player.level = 12;
     remote.tracks.player.targetComplexity = 50;
     const local = createEmptyLegacyProgressionState();
     local.updatedAt = '2026-07-16T13:00:00.000Z';
     local.tracks.player.completedCycles = 3;
     local.tracks['ai-runner'].completedCycles = 18;
+    local.tracks['ai-runner'].level = 19;
     local.tracks['ai-runner'].targetComplexity = 64;
 
     const merged = mergeLegacyProgressionStateAdvancements(remote, local);
@@ -212,35 +214,64 @@ describe('legacy remote progression', () => {
     remote.tracks.player = {
       ...remote.tracks.player,
       completedCycles: 40,
+      level: 28,
       targetComplexity: levelTwentyEightTarget
     };
     remote.tracks['ai-runner'] = {
       ...remote.tracks['ai-runner'],
       completedCycles: 40,
+      level: 28,
       targetComplexity: levelTwentyEightTarget
     };
     local.tracks.player = {
       ...local.tracks.player,
       completedCycles: 39,
+      level: 32,
       targetComplexity: levelThirtyTwoTarget
     };
     local.tracks['ai-runner'] = {
       ...local.tracks['ai-runner'],
       completedCycles: 39,
+      level: 32,
       targetComplexity: levelThirtyTwoTarget
     };
 
     const merged = mergeLegacyProgressionStateAdvancements(remote, local);
 
     expect(merged.tracks.player).toMatchObject({
-      completedCycles: 39,
+      completedCycles: 40,
       level: 32,
       targetComplexity: levelThirtyTwoTarget
     });
     expect(merged.tracks['ai-runner']).toMatchObject({
-      completedCycles: 39,
+      completedCycles: 40,
       level: 32,
       targetComplexity: levelThirtyTwoTarget
+    });
+  });
+
+  test('merges each monotonic progression field without lowering level, rank pressure, or history', () => {
+    const remote = createEmptyLegacyProgressionState();
+    const local = createEmptyLegacyProgressionState();
+    remote.tracks.player = {
+      ...remote.tracks.player,
+      completedCycles: 200,
+      level: 141,
+      targetComplexity: 240
+    };
+    local.tracks.player = {
+      ...local.tracks.player,
+      completedCycles: 183,
+      level: 184,
+      targetComplexity: 220
+    };
+
+    const merged = mergeLegacyProgressionStateAdvancements(remote, local);
+
+    expect(merged.tracks.player).toMatchObject({
+      completedCycles: 200,
+      level: 184,
+      targetComplexity: 240
     });
   });
 

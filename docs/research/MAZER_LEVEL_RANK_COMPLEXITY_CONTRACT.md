@@ -1,10 +1,22 @@
 # Mazer Level, Rank, Complexity, And AI Progression Contract
 
-Last updated: 2026-07-09
+Last updated: 2026-08-23
 
-Status: planning contract / implementation target.
+Status: implemented source contract; provider migration and server-owned cutover remain separately gated.
 
 This document defines how Mazer should connect player performance, AI-runner performance, maze complexity, rank, level, and future Atlas/playbook learning. It is intentionally narrow: no enemies, traps, obstacles, items, Stripe licensing, or diagonal graph work are included in this contract yet.
+
+## 2026-08-23 Superseding Progression Contract
+
+- `player.level` and `ai-runner.level` are independent positive completion ordinals. Each accepted completion advances its active track by exactly `+1`; neither ordinal has an application-level `99` ceiling.
+- The completion receipt id is persisted on the track. Retrying the same receipt is idempotent and cannot advance twice.
+- Local/account reconciliation takes the maximum independently for ordinal, completed-cycle history, target complexity, and peak complexity, so a stale device cannot lower visible progress or its bounded difficulty history.
+- `targetComplexity` remains a separate bounded difficulty input (`8..400`). It still owns rank, palette tier, maze scale, topology pressure, and hazard eligibility; it no longer owns the displayed ordinal.
+- Difficulty advances through the existing bounded complexity step and is interpreted at half speed. A very large displayed ordinal therefore does not make geometry grow without bound.
+- The deterministic `endless-v1` recipe cycle remains source-proven but non-load-bearing until the server-owned completion path can verify recipe provenance.
+- The paired provider migration widens both ordinals to `bigint` and removes both player and AI `99` constraints. The source-only RPC pair records a mandatory per-account run UUID, serializes each owned progression row, advances the matching ordinal/cycle count once, and updates both indexed and JSON state under existing RLS. It must not be applied or made production-load-bearing without exact current-schema proof, migration-lock and rollback rehearsal, authenticated duplicate/concurrency replay, client cutover, and separately authorized retirement of direct writes.
+
+The older implementation narrative below is retained as design history where useful. Any statement below that derives displayed level from target complexity, allows a completion to hold/ease the displayed ordinal, or caps either track at 99 is superseded by this section.
 
 ## Current Implemented Truth
 

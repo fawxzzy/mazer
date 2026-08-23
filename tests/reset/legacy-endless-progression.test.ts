@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import {
   LEGACY_ENDLESS_DEFAULT_MODIFIER_POLICY,
@@ -16,6 +17,33 @@ describe('legacy endless progression ruleset boundary', () => {
   test('levels at or above the boundary resolve to the endless ruleset', () => {
     expect(resolveLegacyProgressionRulesetId(LEGACY_ENDLESS_LEVEL_BOUNDARY)).toBe('endless-v1');
     expect(resolveLegacyProgressionRulesetId(1_000_000)).toBe('endless-v1');
+  });
+
+  test('keeps both persisted completion ordinals uncapped behind the idempotent server contract', () => {
+    const foundation = readFileSync(
+      new URL('../../supabase/migrations/20260822000000_mazer_endless_progression_foundation.sql', import.meta.url),
+      'utf8'
+    );
+    const completionRpc = readFileSync(
+      new URL('../../supabase/migrations/20260822000100_mazer_endless_completion_rpc.sql', import.meta.url),
+      'utf8'
+    );
+
+    expect(foundation).toContain('drop constraint if exists mazer_progression_states_player_level_check');
+    expect(foundation).toContain('drop constraint if exists mazer_ai_progression_states_level_check');
+    expect(foundation).toContain('check (player_level >= 1)');
+    expect(foundation).toContain('check (level >= 1)');
+    expect(foundation).toContain('alter column player_level type bigint');
+    expect(foundation).toContain('alter column level type bigint');
+    expect(foundation).toContain('on public.mazer_cycle_receipts (user_id, client_run_id)');
+    expect(completionRpc).toContain('v_next_level := v_current.player_level + 1');
+    expect(completionRpc).toContain('create or replace function public.mazer_complete_ai_level');
+    expect(completionRpc).toContain('v_next_level := v_current.level + 1');
+    expect(completionRpc).toContain("raise exception 'client_run_id is required for idempotent completion'");
+    expect(completionRpc).toContain('security invoker');
+    expect(completionRpc).not.toContain('security definer');
+    expect(completionRpc).toContain('and r.client_run_id = p_client_run_id');
+    expect(completionRpc).toContain('on conflict (user_id, client_run_id) where client_run_id is not null do nothing');
   });
 });
 

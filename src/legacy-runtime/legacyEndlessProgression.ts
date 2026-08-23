@@ -1,19 +1,15 @@
 import { createSeededRng } from '../domain/rng/seededRng';
 
-// Additive, dormant module: nothing here is wired into the live generation
-// path yet. player_level is still derived from targetComplexity everywhere
-// else in the codebase (see resolveLegacyProgressionLevel in
-// legacyProgression.ts) -- flipping that over to treat level as a permanent,
-// independent ordinal is a real migration (existing rows, the AI-runner
-// track, the database check constraints) that needs to happen in one
-// deliberate, reviewed step, not silently here. This module exists so that
-// step has a tested, deterministic engine ready to integrate against.
+// Additive recipe module: visible player/AI levels are now independent,
+// unbounded completion ordinals in legacyProgression.ts. This deterministic
+// recipe engine remains non-load-bearing until the server-owned completion
+// contract can verify recipe provenance; live generation continues to use
+// the separately bounded, half-speed difficulty track in the meantime.
 
 /**
- * Levels 1-99 keep exactly their current behavior (see
- * resolveLegacyProgressionDifficultyProfile's band table, which is itself
- * hard-clamped to this range). Levels at or above this boundary resolve
- * through the endless ruleset instead.
+ * Levels 1-99 identify the legacy recipe family. Levels at or above this
+ * boundary can resolve a bounded endless recipe without imposing a ceiling
+ * on the displayed completion ordinal.
  */
 export const LEGACY_ENDLESS_LEVEL_BOUNDARY = 100;
 export const LEGACY_ENDLESS_RULESET_ID = 'endless-v1';

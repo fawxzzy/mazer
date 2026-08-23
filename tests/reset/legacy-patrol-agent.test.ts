@@ -110,7 +110,10 @@ const createMythicMaze = (seed = 1): LegacyMazeSnapshot => createLegacyRuntimeMa
   'play',
   96,
   seed,
-  resolveLegacyMazeGenerationProfileForProgression(180)
+  // 352, not the 180 this used to be -- resolveLegacyMazeGenerationProfileForProgression
+  // now halves the real level before picking a band, so it takes twice the
+  // real level to reach mythic.
+  resolveLegacyMazeGenerationProfileForProgression(352)
 );
 
 interface PauseResetHarness {
@@ -689,7 +692,11 @@ describe('legacy Mythic patrol agent', () => {
     const maze = createMythicMaze();
     const before = JSON.stringify(maze);
     const progressionState = createEmptyLegacyProgressionState();
-    progressionState.tracks.player.targetComplexity = 180;
+    // 352, not the 180 this used to be -- resolveLegacyProgressionDifficultyProfile
+    // now halves the real level before picking a band, so this must still
+    // land in 'mythic' under that slower pacing (the scene's own reset path
+    // re-derives its band from this same targetComplexity).
+    progressionState.tracks.player.targetComplexity = 352;
     const dependencies = createPatrolDependencies(maze);
     const fresh = createLegacyPatrolAgentState(maze, 'mythic', dependencies.excludedPoints)!;
     const consumed = applyLegacyPatrolAgentCollision(
@@ -766,7 +773,8 @@ describe('legacy Mythic patrol agent', () => {
 
   test('recreates the immutable timed-mode host after play-to-menu patrol state settles', () => {
     const progressionState = createEmptyLegacyProgressionState();
-    progressionState.tracks.player.targetComplexity = 180;
+    // 352, not the 180 this used to be -- see the identical note above.
+    progressionState.tracks.player.targetComplexity = 352;
     const scene = {
       activeInputField: null,
       armLegacyMenuStaticDrawStage: vi.fn(),
@@ -806,7 +814,8 @@ describe('legacy Mythic patrol agent', () => {
       legacyWorldTurnHost: WorldTurnHost;
       playPatrolAgent: LegacyPatrolAgentState | null;
     };
-    const generationProfile = resolveLegacyMazeGenerationProfileForProgression(180);
+    // 352, not the 180 this used to be -- see the identical note above.
+    const generationProfile = resolveLegacyMazeGenerationProfileForProgression(352);
 
     applyGenerationRequest.call(scene, createLegacyGenerationRequest({
       currentSeed: 577_196_705,
@@ -815,7 +824,7 @@ describe('legacy Mythic patrol agent', () => {
       mode: 'play',
       reason: 'play-start',
       scale: 96,
-      targetComplexity: 180
+      targetComplexity: 352
     }));
     expect(readback().playPatrolAgent).toBeNull();
     expect(readback().legacyWorldTurnHost.getDiagnostics().timedModeEnabled).toBe(false);
@@ -827,7 +836,7 @@ describe('legacy Mythic patrol agent', () => {
       mode: 'menu',
       reason: 'boot-menu',
       scale: 96,
-      targetComplexity: 180
+      targetComplexity: 352
     }));
     readback().legacyWorldTurnHost.setState('stopped');
     expect(readback().playPatrolAgent).toBeNull();

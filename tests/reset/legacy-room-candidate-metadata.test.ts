@@ -166,9 +166,15 @@ const sha256 = (value: unknown): string => createHash('sha256')
   .update(JSON.stringify(value))
   .digest('hex');
 
+// targetComplexity values doubled (in real-level terms) from what used to
+// reach each band -- resolveLegacyProgressionDifficultyProfile now halves
+// the real level before picking a band, so mazes get harder at half the
+// rate the player's own level number does. scale (the band's own
+// targetScale) is unchanged -- only how much real level it takes to reach
+// that band moved, not the band's own generation pressure.
 const corpusBands = [
-  { band: 'architect' as const, targetComplexity: 132, scale: 71, minimumEvaluated: 1 },
-  { band: 'mythic' as const, targetComplexity: 180, scale: 96, minimumEvaluated: 2 }
+  { band: 'architect' as const, targetComplexity: 256, scale: 71, minimumEvaluated: 1 },
+  { band: 'mythic' as const, targetComplexity: 352, scale: 96, minimumEvaluated: 2 }
 ];
 
 const corpusSeedChunks = Array.from({ length: 10 }, (_, chunkIndex) => {
@@ -575,11 +581,12 @@ if (corpusWorkerFirstSeed !== null) {
     }, 120_000);
 
     test('keeps Tutorial through Navigator ineligible', () => {
+      // 256, not the 132 this used to be -- see the identical note above.
       const maze = createLegacyRuntimeMazeForMode(
         'play',
         71,
         1,
-        resolveLegacyMazeGenerationProfileForProgression(132)
+        resolveLegacyMazeGenerationProfileForProgression(256)
       );
 
       for (const band of ['tutorial', 'starter', 'explorer', 'navigator'] as const) {

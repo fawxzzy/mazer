@@ -378,11 +378,9 @@ describe('legacy progression', () => {
   });
 
   test('advances the player exactly one level per completed maze with no taper, even past level 10', () => {
-    // resolveLegacyProgressionTargetAdjustment's player branch is a flat +4
-    // per completion (resolveLegacyProgressionLevel buckets every 4
-    // complexity points into one level) -- no deceleration at any level, per
-    // feedback that progress should be a guaranteed, uniform +1 level every
-    // time now that there's no timer/score to weigh a completion against.
+    // Visible level is a completion ordinal. Difficulty still advances by a
+    // bounded +4 target-complexity step, but it no longer owns the number the
+    // player sees.
     const storage = new MemoryStorage();
     let state = createEmptyLegacyProgressionState();
     for (let cycle = 1; cycle <= 12; cycle += 1) {
@@ -414,6 +412,107 @@ describe('legacy progression', () => {
       level: 13,
       targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + (12 * 4)
     });
+  });
+
+  test('continues both completion ordinals past 99 while bounded difficulty stays capped', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    const baseline = createEmptyLegacyProgressionState();
+    const createReceipt = (surface: 'play' | 'menu-demo', minute: number) => createMazeCycleTelemetryReceipt({
+      averageFrameMs: 16,
+      completedAt: `2026-08-23T18:${String(minute).padStart(2, '0')}:00.000Z`,
+      completionTimeMs: 8_000,
+      controlMode: 'stick',
+      maze,
+      playerPath: maze.solutionPath,
+      resetUsed: false,
+      surface,
+      backtracks: 0,
+      wrongTurns: 0
+    });
+    let state = {
+      ...baseline,
+      tracks: {
+        player: {
+          ...baseline.tracks.player,
+          completedCycles: 98,
+          level: 99,
+          targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
+        },
+        'ai-runner': {
+          ...baseline.tracks['ai-runner'],
+          completedCycles: 98,
+          level: 99,
+          targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
+        }
+      }
+    };
+
+    state = recordLegacyProgressionCycle(storage, state, createReceipt('play', 0), maze);
+    state = recordLegacyProgressionCycle(storage, state, createReceipt('menu-demo', 1), maze);
+    state = recordLegacyProgressionCycle(storage, state, createReceipt('play', 2), maze);
+    state = recordLegacyProgressionCycle(storage, state, createReceipt('menu-demo', 3), maze);
+
+    expect(state.tracks.player).toMatchObject({
+      completedCycles: 100,
+      level: 101,
+      targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
+    });
+    expect(state.tracks['ai-runner']).toMatchObject({
+      completedCycles: 100,
+      level: 101,
+      targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
+    });
+    expect(readLegacyProgressionState(storage).tracks.player.level).toBe(101);
+    expect(resolveLegacyProgressionDifficultyProfile(state.tracks.player).band).toBe('mythic');
+  });
+
+  test('applies the same completion receipt at most once', () => {
+    const storage = new MemoryStorage();
+    const maze = createProgressionTestMaze();
+    const receipt = createMazeCycleTelemetryReceipt({
+      averageFrameMs: 16,
+      completedAt: '2026-08-23T19:00:00.000Z',
+      completionTimeMs: 8_000,
+      controlMode: 'stick',
+      maze,
+      playerPath: maze.solutionPath,
+      resetUsed: false,
+      surface: 'play',
+      backtracks: 0,
+      wrongTurns: 0
+    });
+
+    const once = recordLegacyProgressionCycle(storage, createEmptyLegacyProgressionState(), receipt, maze);
+    const retried = recordLegacyProgressionCycle(storage, once, receipt, maze);
+
+    expect(retried).toEqual(once);
+    expect(retried.tracks.player).toMatchObject({
+      completedCycles: 1,
+      lastReceiptId: receipt.id,
+      level: 2
+    });
+  });
+
+  test('keeps maze geometry independent from a very large completion ordinal', () => {
+    const baseline = createEmptyLegacyProgressionState().tracks.player;
+    const lowOrdinal = {
+      ...baseline,
+      level: 99,
+      targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
+    };
+    const highOrdinal = {
+      ...lowOrdinal,
+      completedCycles: 999_999,
+      level: 1_000_000
+    };
+
+    expect(resolveLegacyProgressionDifficultyProfile(highOrdinal))
+      .toEqual(resolveLegacyProgressionDifficultyProfile(lowOrdinal));
+    expect(resolveLegacyMazeGenerationProfileForProgression(highOrdinal))
+      .toEqual(resolveLegacyMazeGenerationProfileForProgression(lowOrdinal));
+    expect(resolveLegacyProgressionGenerationScale(50, highOrdinal))
+      .toBe(resolveLegacyProgressionGenerationScale(50, lowOrdinal));
   });
 
   test('does not rebase a real account whose progress was earned under a previous, lower-rate formula', () => {
@@ -1325,12 +1424,17 @@ describe('legacy progression', () => {
   test('uses target complexity to tune future maze scale while player and trail stay green', () => {
     const state = createEmptyLegacyProgressionState();
     const basePalette = resolveLegacyProgressionPalette(state.tracks.player, 'player');
+    // level/targetComplexity doubled from what used to represent "clearly
+    // advanced" -- resolveLegacyProgressionDifficultyProfile now halves the
+    // real level before picking a difficulty band, so reaching the same
+    // band this test wants (comfortably past baseline, generating a maze
+    // bigger than the 50 baseScale) takes roughly twice the real level.
     const advancedTrack = {
       ...state.tracks.player,
       colorTier: 4,
-      level: 31,
+      level: 61,
       rank: 'A' as const,
-      targetComplexity: 132
+      targetComplexity: 248
     };
     const advancedPalette = resolveLegacyProgressionPalette(advancedTrack, 'player');
 
@@ -1384,12 +1488,16 @@ describe('legacy progression', () => {
   });
 
   test('maps progression bands to increasing procedural pressure', () => {
+    // Complexity values doubled (in real-level terms) from what used to hit
+    // each band -- resolveLegacyProgressionDifficultyProfile now halves the
+    // real level before selecting a band, so mazes get harder at half the
+    // rate the player's own level number does (see its own comment for why).
     const tutorial = resolveLegacyProgressionDifficultyProfile(8);
-    const starter = resolveLegacyProgressionDifficultyProfile(28);
-    const explorer = resolveLegacyProgressionDifficultyProfile(64);
-    const navigator = resolveLegacyProgressionDifficultyProfile(104);
-    const architect = resolveLegacyProgressionDifficultyProfile(152);
-    const mythic = resolveLegacyProgressionDifficultyProfile(180);
+    const starter = resolveLegacyProgressionDifficultyProfile(48);
+    const explorer = resolveLegacyProgressionDifficultyProfile(120);
+    const navigator = resolveLegacyProgressionDifficultyProfile(200);
+    const architect = resolveLegacyProgressionDifficultyProfile(296);
+    const mythic = resolveLegacyProgressionDifficultyProfile(352);
 
     expect([
       tutorial.band,
@@ -1411,7 +1519,10 @@ describe('legacy progression', () => {
 
   test('turns higher difficulty bands into stronger generation pressure', () => {
     const tutorialProfile = resolveLegacyMazeGenerationProfileForProgression(8);
-    const mythicProfile = resolveLegacyMazeGenerationProfileForProgression(180);
+    // 352, not the 180 this used to be -- resolveLegacyMazeGenerationProfileForProgression
+    // now halves the real level before picking a band, so it takes twice the
+    // real level to reach mythic.
+    const mythicProfile = resolveLegacyMazeGenerationProfileForProgression(352);
     const tutorialBudget = resolveLegacyGenerationBudgetContract('menu', 29, tutorialProfile);
     const mythicBudget = resolveLegacyGenerationBudgetContract('menu', 96, mythicProfile);
     const mythicMaze = createLegacyRuntimeMazeForMode('menu', 96, 3749, mythicProfile);
@@ -1458,18 +1569,18 @@ describe('legacy progression', () => {
     }
   });
 
-  test('keeps maxed progression badge readable while surfacing completed cycles', () => {
+  test('keeps large progression ordinals readable while surfacing completed cycles', () => {
     const state = createEmptyLegacyProgressionState();
     const maxedTrack = {
       ...state.tracks['ai-runner'],
       completedCycles: 5180,
-      level: 99,
+      level: 5181,
       rank: 'S' as const,
       targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
     };
     const palette = resolveLegacyProgressionPalette(maxedTrack, 'ai-runner');
 
-    expect(palette.label).toBe('AI Skill Lv 99 Rank S Runs 5180');
+    expect(palette.label).toBe('AI Skill Lv 5181 Rank S Runs 5180');
     expect(palette.label).not.toContain('S400');
     expect(palette.label).not.toContain('R:');
   });

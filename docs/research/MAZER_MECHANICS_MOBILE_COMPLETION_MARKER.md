@@ -10,6 +10,16 @@ This is the active completion marker for the current Mazer direction.
 
 The legacy visual 1:1 screenshot target is retired unless explicitly reopened. Future work should preserve and improve the old project's mechanics, while allowing the browser game to look cleaner, flatter, clearer, and more mobile-friendly than the old prototype.
 
+## Current progression contract
+
+- Player and menu-AI levels are separate, unbounded completion ordinals.
+- Every accepted completion advances only its active ordinal by exactly one; retrying the same persisted receipt advances zero additional levels.
+- Local/account reconciliation is monotonic for level, completed history, and bounded difficulty pressure.
+- Difficulty remains a separate `8..400` target-complexity track and uses the current half-speed interpretation, so increasing the displayed ordinal cannot grow maze geometry without bound.
+- The source migration removes both database `99` caps only when paired with the RLS-protected, idempotent player and menu-AI completion RPCs. Its integer-to-bigint conversion needs target-schema, lock, rollback, and authenticated replay proof before application. No migration has been applied by this source lane.
+
+Verification on the current PR #253 integration head passed the focused progression/cloud/endless packet at `3` files / `64` tests, the complete affected progression/topology packet at `11` files / `129` tests, canonical verification at `81` files / `679` tests plus the isolated legacy fixture at `1` file / `12` tests, TypeScript, and a `241`-module Vite/PWA build with `35` precache entries. This is source-only evidence: the database migrations, ready transition, merge, deployment, production, and master-database cutover remain separately gated.
+
 ## What counts as 100%
 
 For this lane, `100%` means:

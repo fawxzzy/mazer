@@ -12,9 +12,13 @@ import {
 import { resolveLegacyMazeGenerationProfileForProgression } from '../../src/legacy-runtime/legacyProgression';
 import { createLegacyStaticSlowTileState } from '../../src/legacy-runtime/legacyStaticSlowTile';
 
+// targetComplexity doubled (in real-level terms) from what used to reach
+// each band -- resolveLegacyProgressionDifficultyProfile now halves the
+// real level before picking a band, so it takes twice the real level to
+// reach the same band. scale (the band's own targetScale) is unchanged.
 const bands = [
-  { band: 'architect' as const, scale: 71, targetComplexity: 132 },
-  { band: 'mythic' as const, scale: 96, targetComplexity: 180 }
+  { band: 'architect' as const, scale: 71, targetComplexity: 256 },
+  { band: 'mythic' as const, scale: 96, targetComplexity: 352 }
 ];
 
 const createFixture = (bandIndex = 0, seed = 1) => {

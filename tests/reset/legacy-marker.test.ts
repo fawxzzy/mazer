@@ -248,7 +248,9 @@ describe('Mazer completion markers', () => {
     expect(markerDoc).toContain('noAutoTuningWithoutValidator');
     expect(markerDoc).toContain('--atlas-consumer-root');
     expect(markerDoc).toContain('screenContract.pass');
-    expect(contractDoc).toContain('`targetComplexity` remains the only numeric source of truth for level and rank.');
+    expect(contractDoc).toContain('`player.level` and `ai-runner.level` are independent positive completion ordinals.');
+    expect(contractDoc).toContain('neither ordinal has an application-level `99` ceiling');
+    expect(contractDoc).toContain('`targetComplexity` remains a separate bounded difficulty input (`8..400`)');
     expect(contractDoc).toContain('Player and AI progression are separate.');
     expect(contractDoc).toContain('AI-runner performance acts as the tuning test dummy');
     expect(contractDoc).toContain('edgeWrapScore');
@@ -267,7 +269,7 @@ describe('Mazer completion markers', () => {
     expect(contractDoc).toContain('numeric run-quality score');
     expect(contractDoc).toContain('Route waste can force an `ease` signal');
     expect(contractDoc).toContain('Unsafe frame timing forces `hold`');
-    expect(contractDoc).toContain('AI completed cycles can increase while visible level/rank do not move on every single cycle');
+    expect(contractDoc).toContain('Retrying the same receipt is idempotent and cannot advance twice.');
     expect(markerDoc).toContain('searching-but-competent local-memory runs can advance skill without requiring perfect pathing');
     expect(markerDoc).toContain('deterministic multi-run calibration proof');
     expect(markerDoc).toContain('`npm run ai:calibrate -- --summary-only` now runs a maintained generated-seed calibration sample');

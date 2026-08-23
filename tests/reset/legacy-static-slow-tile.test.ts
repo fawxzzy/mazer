@@ -328,7 +328,12 @@ describe('legacy static slow tile', () => {
   ])('re-arms the actual pause Reset path from $label', ({ resetAtMs }) => {
     const maze = createBypassableMaze();
     const progressionState = createEmptyLegacyProgressionState();
-    progressionState.tracks.player.targetComplexity = 132;
+    // 256, not the 132 this used to be -- resolveLegacyProgressionDifficultyProfile
+    // now halves the real level before picking a band, so this must still
+    // land in 'architect' under that slower pacing (the scene's own reset
+    // path re-derives its band from this same targetComplexity, and needs
+    // to agree with the 'architect' passed explicitly below).
+    progressionState.tracks.player.targetComplexity = 256;
     const initial = createLegacyStaticSlowTileState(maze, 'architect');
     const entered = applyLegacyStaticSlowTileEntry(initial, initial.placement!.point, 1_000).state;
     const initialRoomMetadata = createLegacyRoomCandidateMetadata(
@@ -460,9 +465,11 @@ describe('legacy static slow tile', () => {
   });
 
   test('finds deterministic bypassable placements across the fixed Architect/Mythic corpus', () => {
+    // targetComplexity doubled (in real-level terms) from what used to reach
+    // each band -- see the identical note near the top of this file.
     const bands = [
-      { band: 'architect' as const, targetComplexity: 132 },
-      { band: 'mythic' as const, targetComplexity: 180 }
+      { band: 'architect' as const, targetComplexity: 256 },
+      { band: 'mythic' as const, targetComplexity: 352 }
     ];
     const seeds = Array.from({ length: 20 }, (_, index) => index + 1);
 

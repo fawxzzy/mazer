@@ -38,9 +38,8 @@ const clamp = (value: number, minimum: number, maximum: number): number => (
 );
 
 /**
- * The single-number progression contract tops out at level 99 today, but the
- * metric type still reserves room for a future three-digit display without
- * changing the paired settings control's footprint.
+ * Progression is an unbounded completion ordinal, so the glyph scales its
+ * digits inside the fixed control frame instead of widening the header row.
  */
 export const resolveLegacyHeaderControlMetricFontSize = (level: number, size: number): number => {
   const digits = String(Math.max(1, Math.round(level))).length;

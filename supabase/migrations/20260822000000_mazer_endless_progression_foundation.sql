@@ -13,24 +13,36 @@
 -- empty `public` schema while the app queries `mazer` would silently do
 -- nothing useful.
 --
--- Everything below is additive and preserves every existing row:
--- no column is dropped, no existing constraint is tightened, and no
--- existing value is rewritten. This does NOT change what any current
--- user's level displays as -- player_level's meaning does not change in
--- this migration; only its permitted range does, and only once the
--- application code that reads/writes it is ready (a separate, deliberate
--- follow-up).
+-- Everything below preserves every existing row and completion value, but the
+-- integer-to-bigint conversions can take an ACCESS EXCLUSIVE table lock and
+-- may rewrite storage depending on the target Postgres version. Provider-time
+-- lock/rehearsal proof is therefore mandatory. This allows the app's player
+-- and menu-AI completion ordinals to continue beyond 99. Applying it remains
+-- paired with the idempotent completion contract and current-schema provider
+-- proof; source presence alone is not permission to run it.
 
--- 1. Replace the 1-99 player level ceiling with a lower-bound-only check.
--- The AI-runner track's level constraint is deliberately left untouched --
--- no decision has been made yet to extend the AI runner past level 99, and
--- the brief this migration supports explicitly allows keeping that
--- separation intentional and explicit rather than assuming parity.
+-- 1. Replace both 1-99 completion-ordinal ceilings with lower-bound-only
+-- checks. Player and AI remain separate tracks, but both advance +1 for each
+-- accepted completion and neither has an application-level ceiling.
+alter table public.mazer_progression_states
+  alter column player_level type bigint,
+  alter column player_completed_cycles type bigint;
+
 alter table public.mazer_progression_states
   drop constraint if exists mazer_progression_states_player_level_check;
 alter table public.mazer_progression_states
   add constraint mazer_progression_states_player_level_check
     check (player_level >= 1);
+
+alter table public.mazer_ai_progression_states
+  alter column level type bigint,
+  alter column completed_cycles type bigint;
+
+alter table public.mazer_ai_progression_states
+  drop constraint if exists mazer_ai_progression_states_level_check;
+alter table public.mazer_ai_progression_states
+  add constraint mazer_ai_progression_states_level_check
+    check (level >= 1);
 
 -- 2. Leaderboard tie-breaking needs a timestamp of when the current level
 -- was actually reached (existing rows have no trustworthy equivalent --
@@ -75,9 +87,12 @@ comment on column public.mazer_cycle_receipts.recipe_hash is
 alter table public.mazer_cycle_receipts
   add column if not exists client_run_id uuid;
 
-create unique index if not exists mazer_cycle_receipts_client_run_id_unique_idx
-  on public.mazer_cycle_receipts (client_run_id)
+-- Scope idempotency to one account. A caller must not be able to reserve a
+-- globally-known UUID and block another account's otherwise valid receipt.
+drop index if exists public.mazer_cycle_receipts_client_run_id_unique_idx;
+create unique index if not exists mazer_cycle_receipts_user_client_run_id_unique_idx
+  on public.mazer_cycle_receipts (user_id, client_run_id)
   where client_run_id is not null;
 
 comment on column public.mazer_cycle_receipts.client_run_id is
-  'Client-generated idempotency key for one play/menu-demo attempt. Null for receipts recorded before this column existed. The partial unique index only enforces uniqueness where it is actually set.';
+  'Client-generated idempotency key for one play/menu-demo attempt. Null for receipts recorded before this column existed. New completion RPC calls require it and enforce uniqueness per account.';
