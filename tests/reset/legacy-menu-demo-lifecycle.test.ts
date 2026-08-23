@@ -49,6 +49,17 @@ describe('legacy menu demo lifecycle', () => {
     expect(isTileFloor(bootstrap.episode.raster.tiles, bootstrap.state.currentIndex)).toBe(true);
   });
 
+  test('binds generated-menu navigation skill to the independent AI progression inputs', () => {
+    const playMaze = createLegacyMaze(37, 90210);
+    const bootstrap = createLegacyMenuDemoBootstrap(playMaze, true, 16, {
+      aiSkillLevel: 23,
+      aiSkillRank: 'A'
+    });
+
+    expect(bootstrap.config.behavior.aiSkillLevel).toBe(23);
+    expect(bootstrap.config.behavior.aiSkillRank).toBe('A');
+  });
+
   test('advances the menu demo frame through the shared trail/player projection', () => {
     const menuMaze = createLegacyMenuMaze(3749);
     const bootstrap = createLegacyMenuDemoBootstrap(menuMaze, true, 16);

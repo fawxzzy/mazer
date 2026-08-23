@@ -210,6 +210,58 @@ const createCompassTrapEpisode = (): MazeEpisode => {
   };
 };
 
+const createUnreachableGoalEpisode = (): MazeEpisode => {
+  const width = 5;
+  const height = 3;
+  const tiles = new Uint8Array(width * height);
+  const startIndex = 6;
+  const endIndex = 8;
+  tiles[startIndex] |= TILE_FLOOR | TILE_PATH;
+  tiles[endIndex] |= TILE_FLOOR | TILE_PATH | TILE_END;
+
+  return {
+    accepted: true,
+    difficulty: 'standard',
+    difficultyScore: 0,
+    family: 'classic',
+    generationTrace: {
+      rootTileIndex: startIndex,
+      uniqueTileCount: 2,
+      steps: [{ phase: 'seed', tileIndices: [startIndex, endIndex] }]
+    },
+    metrics: {
+      solutionLength: 2,
+      deadEnds: 2,
+      junctions: 0,
+      branchDensity: 0,
+      straightness: 1,
+      coverage: 2 / tiles.length
+    },
+    placementStrategy: 'farthest-pair',
+    presentationPreset: 'classic',
+    raster: {
+      width,
+      height,
+      tiles,
+      startIndex,
+      endIndex,
+      // The nominal path is intentionally invalid. The playable planner must
+      // fail closed rather than trust this disconnected construction trail.
+      pathIndices: Uint32Array.of(startIndex, endIndex)
+    },
+    routeMotifs: {
+      falseShortcutBranches: 0,
+      nearGoalBranches: 0,
+      hubJunctions: 0,
+      chokeCorridors: 0,
+      loopDetours: 0
+    },
+    seed: 90_001,
+    shortcutsCreated: 0,
+    size: 'small'
+  };
+};
+
 const createVisitedUndoEpisode = (): MazeEpisode => {
   const width = 7;
   const height = 7;
@@ -610,9 +662,14 @@ describe('demo walker', () => {
     expect(state.trailSteps.some((trailStep) => trailStep.index === 10)).toBe(false);
   });
 
-  test('uses compass-local pressure instead of solved goal-distance when a branch looks tempting', () => {
+  test('keeps the bounded E-rank human-error bucket without leaking the solved goal target', () => {
     const episode = createCompassTrapEpisode();
-    const config = createLegacyMenuDemoWalkerConfig(episode.seed);
+    const config = {
+      ...createLegacyMenuDemoWalkerConfig(episode.seed),
+      // This deterministic seed places the first split in E's one unassisted
+      // bucket. The other four buckets use shortest-path assistance.
+      seed: 42_432
+    };
     let state = createDemoWalkerState(episode, config);
     const firstAdvance = advanceDemoWalker(episode, state, config);
     state = firstAdvance.state;
@@ -638,7 +695,9 @@ describe('demo walker', () => {
 
     expect(sawBacktrack).toBe(true);
     expect(sawReacquire).toBe(true);
-    expect(state.telemetry.wrongBranchCount).toBeGreaterThan(0);
+    // The local-memory scan still backtracks and reacquires, but the corrected
+    // graph-distance telemetry does not mislabel that search as a wrong move.
+    expect(state.telemetry.wrongBranchCount).toBe(0);
     expect(state.telemetry.backtrackCount).toBeGreaterThan(0);
     expect(state.telemetry.recoveryCount).toBeGreaterThan(0);
     expect(state.phase).toBe('goal-hold');
@@ -763,6 +822,7 @@ describe('demo walker', () => {
     });
 
     expect(defaultDiagnostics.perception).toMatchObject({
+      shortestPathAssistBuckets: 4,
       confidenceNoisePenalty: 14,
       level: 1,
       lookaheadDepth: 5,
@@ -774,13 +834,54 @@ describe('demo walker', () => {
     });
     expect(highRankDiagnostics.perception.rank).toBe('S');
     expect(highRankDiagnostics.perception.level).toBe(99);
+    expect(highRankDiagnostics.perception.shortestPathAssistBuckets).toBe(5);
     expect(highRankDiagnostics.perception.lookaheadDepth).toBeGreaterThan(defaultDiagnostics.perception.lookaheadDepth);
-    expect(highRankDiagnostics.perception.optionalRetargetLimit).toBe(defaultDiagnostics.perception.optionalRetargetLimit);
+    expect(highRankDiagnostics.perception.optionalRetargetLimit).toBe(0);
     expect(highRankDiagnostics.perception.wrapMentalCost).toBeLessThan(defaultDiagnostics.perception.wrapMentalCost);
     expect(highRankDiagnostics.perception.solvePreviewBudget).toBeGreaterThan(0);
+    expect(highRankDiagnostics.telemetry).toMatchObject({
+      backtrackCount: 0,
+      recoveryCount: 0,
+      wrongBranchCount: 0
+    });
   }, 15_000);
 
-  test('exposes human bias profiles without changing the balanced default', () => {
+  test('fails closed when the goal is unreachable instead of reporting a false one-node completion', () => {
+    const episode = createUnreachableGoalEpisode();
+    const baseConfig = createLegacyMenuDemoWalkerConfig(episode.seed);
+    const config = {
+      ...baseConfig,
+      behavior: {
+        ...baseConfig.behavior,
+        aiSkillLevel: 99,
+        aiSkillRank: 'S' as const
+      }
+    };
+
+    const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
+    const initialState = createDemoWalkerState(episode, config);
+    const advance = advanceDemoWalker(episode, initialState, config);
+    const lateFrame = resolveDemoWalkerViewFrame(episode, 60_000, config);
+
+    expect(diagnostics.routeLength).toBe(1);
+    expect(diagnostics.segmentCount).toBe(0);
+    expect(initialState.currentIndex).toBe(episode.raster.startIndex);
+    expect(advance.state).toMatchObject({
+      currentIndex: episode.raster.startIndex,
+      cue: 'dead-end',
+      phase: 'explore',
+      reachedGoal: false
+    });
+    expect(advance.shouldRegenerateMaze).toBeUndefined();
+    expect(lateFrame).toMatchObject({
+      currentIndex: episode.raster.startIndex,
+      nextIndex: episode.raster.startIndex,
+      cue: 'dead-end',
+      cycleComplete: false
+    });
+  });
+
+  test('keeps bias-profile diagnostics while rank-guaranteed shortest navigation wins', () => {
     const seeds = [1, 2, 3];
     const profileDiagnostics = seeds.map((seed) => {
       const maze = createLegacyGeneratedMenuMaze(37, 37, seed);
@@ -837,9 +938,15 @@ describe('demo walker', () => {
     expect(speedrunnerDiagnostics.perception.biasProfile).toBe('speedrunner');
     expect(shortcutGamblerDiagnostics.perception.biasProfile).toBe('shortcut-gambler');
     expect(cautiousMapperDiagnostics.perception.biasProfile).toBe('cautious-mapper');
-    expect(averageRouteLength((entry) => entry.speedrunner.routeLength)).toBeLessThan(
+    expect(averageRouteLength((entry) => entry.speedrunner.routeLength)).toBe(
       averageRouteLength((entry) => entry.cautiousMapper.routeLength)
     );
+    for (const entry of profileDiagnostics) {
+      expect(entry.balanced.telemetry).toMatchObject({ backtrackCount: 0, recoveryCount: 0, wrongBranchCount: 0 });
+      expect(entry.speedrunner.routeLength).toBe(entry.balanced.routeLength);
+      expect(entry.shortcutGambler.routeLength).toBe(entry.balanced.routeLength);
+      expect(entry.cautiousMapper.routeLength).toBe(entry.balanced.routeLength);
+    }
   });
 
   test('exercises the legacy visited-undo side effect while backtracking toward a potential target', () => {

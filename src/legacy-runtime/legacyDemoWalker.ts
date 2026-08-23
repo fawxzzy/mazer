@@ -1,4 +1,4 @@
-import type { DemoTrailStep, DemoWalkerConfig } from '../domain/ai';
+import type { DemoTrailStep, DemoWalkerAiSkillRank, DemoWalkerConfig } from '../domain/ai';
 import type { MazeDifficulty, MazeEpisode, MazeSize } from '../domain/maze';
 import { TILE_END, TILE_FLOOR, TILE_PATH, createGrid, indexFromCoordinates, xFromIndex, yFromIndex } from '../domain/maze/grid';
 import { legacyTuning } from '../config/tuning';
@@ -45,7 +45,15 @@ const inferLegacyMazeDifficulty = (maze: LegacyMazeSnapshot): MazeDifficulty => 
   return 'standard';
 };
 
-export const createLegacyMenuDemoWalkerConfig = (seed: number): DemoWalkerConfig => ({
+export interface LegacyMenuDemoWalkerSkill {
+  aiSkillLevel: number;
+  aiSkillRank: DemoWalkerAiSkillRank;
+}
+
+export const createLegacyMenuDemoWalkerConfig = (
+  seed: number,
+  skill?: LegacyMenuDemoWalkerSkill
+): DemoWalkerConfig => ({
   ...legacyTuning.demo,
   seed,
   cadence: {
@@ -61,6 +69,8 @@ export const createLegacyMenuDemoWalkerConfig = (seed: number): DemoWalkerConfig
     enableRunnerMistakes: true,
     emulateLogicSwitchPotentialCheckBug: false,
     runnerThinkingModel: 'human-local-memory',
+    aiSkillLevel: skill?.aiSkillLevel,
+    aiSkillRank: skill?.aiSkillRank,
     prerollSteps: 0
   }
 });

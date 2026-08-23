@@ -17,6 +17,7 @@ export type DemoWalkerAiBiasProfile =
 
 export interface DemoWalkerAiPerceptionProfile {
   biasProfile: DemoWalkerAiBiasProfile;
+  shortestPathAssistBuckets: number;
   confidenceNoisePenalty: number;
   level: number;
   lookaheadDepth: number;
@@ -282,12 +283,14 @@ const A_RANK_OPTIONAL_RETARGET_GRACE = 0.3;
 const S_RANK_OPTIONAL_RETARGET_GRACE = 0.48;
 const LOCAL_MEMORY_RECOVERY_PATH_PENALTY = 0.55;
 const D_RANK_RECOVERY_CANDIDATE_LIMIT = 16;
+const AI_SHORTEST_PATH_ASSIST_BUCKET_COUNT = 5;
 
 const AI_SKILL_RANK_ORDER: readonly DemoWalkerAiSkillRank[] = ['E', 'D', 'C', 'B', 'A', 'S'];
 
 const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerceptionProfile, 'level' | 'rank'>> = {
   E: {
     biasProfile: 'balanced',
+    shortestPathAssistBuckets: 4,
     confidenceNoisePenalty: 14,
     lookaheadDepth: 5,
     optionalRetargetLimit: 2,
@@ -299,6 +302,7 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
   },
   D: {
     biasProfile: 'balanced',
+    shortestPathAssistBuckets: 5,
     confidenceNoisePenalty: 10,
     lookaheadDepth: 9,
     optionalRetargetLimit: 2,
@@ -310,9 +314,10 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
   },
   C: {
     biasProfile: 'balanced',
+    shortestPathAssistBuckets: 5,
     confidenceNoisePenalty: 8,
     lookaheadDepth: 10,
-    optionalRetargetLimit: 2,
+    optionalRetargetLimit: 1,
     rankedLookaheadAmbiguityWeight: 1,
     rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 0,
@@ -321,9 +326,10 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
   },
   B: {
     biasProfile: 'balanced',
+    shortestPathAssistBuckets: 5,
     confidenceNoisePenalty: 6,
     lookaheadDepth: 10,
-    optionalRetargetLimit: 2,
+    optionalRetargetLimit: 1,
     rankedLookaheadAmbiguityWeight: 1,
     rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 1,
@@ -332,9 +338,10 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
   },
   A: {
     biasProfile: 'balanced',
+    shortestPathAssistBuckets: 5,
     confidenceNoisePenalty: 4,
     lookaheadDepth: 12,
-    optionalRetargetLimit: 2,
+    optionalRetargetLimit: 0,
     rankedLookaheadAmbiguityWeight: 1,
     rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 2,
@@ -343,9 +350,10 @@ const AI_PERCEPTION_BY_RANK: Record<DemoWalkerAiSkillRank, Omit<DemoWalkerAiPerc
   },
   S: {
     biasProfile: 'balanced',
+    shortestPathAssistBuckets: 5,
     confidenceNoisePenalty: 2,
     lookaheadDepth: 13,
-    optionalRetargetLimit: 2,
+    optionalRetargetLimit: 0,
     rankedLookaheadAmbiguityWeight: 1,
     rankedLookaheadProgressWeight: 1,
     solvePreviewBudget: 4,
@@ -674,6 +682,7 @@ export const advanceDemoWalker = (
   const runnerPlan = resolveDemoRunnerPlan(episode, config);
   const route = runnerPlan.routeIndices;
   const lastCursor = Math.max(0, route.length - 1);
+  const routeReachesGoal = isDemoRunnerRouteComplete(episode, route);
 
   if (state.phase === 'goal-hold' && state.reachedGoal) {
     return {
@@ -732,14 +741,17 @@ export const advanceDemoWalker = (
   }
 
   const nextCursor = Math.min(state.pathCursor + 1, lastCursor);
-  const nextIndex = route[nextCursor] ?? episode.raster.endIndex;
-  const reachedGoal = nextCursor >= lastCursor && nextIndex === episode.raster.endIndex;
+  const nextIndex = route[nextCursor] ?? state.currentIndex;
+  const routeExhausted = nextCursor >= lastCursor;
+  const reachedGoal = routeReachesGoal && routeExhausted && nextIndex === episode.raster.endIndex;
   const segmentIndex = Math.max(0, nextCursor - 1);
   const trailMode: DemoTrailMode = reachedGoal
     ? 'goal'
     : runnerPlan.segmentTrailModes[segmentIndex] ?? 'explore';
   const cue = reachedGoal
     ? 'goal'
+    : routeExhausted && !routeReachesGoal
+      ? 'dead-end'
     : resolveSegmentCue(segmentIndex, lastCursor, 1, config, runnerPlan);
   const segmentDelayMs = resolveSegmentDelayMs(segmentIndex, lastCursor, config, runnerPlan);
 
@@ -790,20 +802,21 @@ export const resolveDemoWalkerViewFrame = (
   const visibleWindow = Math.max(1, trailWindow);
   const lastPathIndex = Math.max(0, path.length - 1);
   const segmentDurations = resolveSegmentDurations(lastPathIndex, config, runnerPlan);
+  const routeReachesGoal = isDemoRunnerRouteComplete(episode, path);
 
   if (path.length <= 1) {
     return {
       currentIndex: startIndex,
-      nextIndex: endIndex,
+      nextIndex: startIndex,
       previousIndex: startIndex,
       direction: null,
-      progress: 1,
-      cue: elapsedMs < spawnHoldMs ? 'spawn' : 'goal',
+      progress: 0,
+      cue: elapsedMs < spawnHoldMs ? 'spawn' : routeReachesGoal ? 'goal' : 'dead-end',
       trailStart: 0,
       trailLimit: Math.min(1, path.length),
       canonicalCursor: runnerPlan.canonicalCursors[0] ?? 0,
       telemetry: runnerPlan.telemetry,
-      cycleComplete: elapsedMs >= spawnHoldMs + goalHoldMs + resetHoldMs
+      cycleComplete: routeReachesGoal && elapsedMs >= spawnHoldMs + goalHoldMs + resetHoldMs
     };
   }
 
@@ -856,6 +869,24 @@ export const resolveDemoWalkerViewFrame = (
       trailStart: 0,
       trailLimit,
       canonicalCursor: runnerPlan.canonicalCursors[visibleCursor] ?? 0,
+      telemetry: runnerPlan.telemetry,
+      cycleComplete: false
+    };
+  }
+
+  if (!routeReachesGoal) {
+    const routeTail = path[lastPathIndex] ?? startIndex;
+    const routePrevious = path[Math.max(0, lastPathIndex - 1)] ?? routeTail;
+    return {
+      currentIndex: routeTail,
+      nextIndex: routeTail,
+      previousIndex: routePrevious,
+      direction: null,
+      progress: 0,
+      cue: 'dead-end',
+      trailStart: 0,
+      trailLimit: path.length,
+      canonicalCursor: runnerPlan.canonicalCursors[lastPathIndex] ?? 0,
       telemetry: runnerPlan.telemetry,
       cycleComplete: false
     };
@@ -928,10 +959,105 @@ const buildPreciseRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
   };
 };
 
+const buildUnavailableRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => ({
+  routeIndices: Uint32Array.of(episode.raster.startIndex),
+  canonicalCursors: Uint32Array.of(0),
+  segmentTrailModes: [],
+  cueOverrides: [],
+  telemetry: EMPTY_TELEMETRY,
+  aiResetPathCursor: null,
+  branchDecisions: [],
+  memoryFrames: [EMPTY_MEMORY_FRAME],
+  optionalRetargetEvaluations: [],
+  recoveryDecisions: []
+});
+
+const isDemoRunnerRouteComplete = (
+  episode: MazeEpisode,
+  route: ArrayLike<number>
+): boolean => {
+  if (
+    route.length === 0
+    || route[0] !== episode.raster.startIndex
+    || route[route.length - 1] !== episode.raster.endIndex
+  ) {
+    return false;
+  }
+
+  for (let cursor = 1; cursor < route.length; cursor += 1) {
+    const previous = route[cursor - 1];
+    const next = route[cursor];
+    if (
+      previous === undefined
+      || next === undefined
+      || !collectFloorNeighbors(
+        previous,
+        episode.raster.width,
+        episode.raster.height,
+        episode.raster.tiles
+      ).includes(next)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const buildPlayableShortestRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
+  const route = findFloorPath(
+    episode.raster.startIndex,
+    episode.raster.endIndex,
+    episode.raster.width,
+    episode.raster.height,
+    episode.raster.tiles
+  );
+  if (!isDemoRunnerRouteComplete(episode, route)) {
+    return buildUnavailableRunnerPlan(episode);
+  }
+
+  const canonicalPath = Array.from(episode.raster.pathIndices);
+  const canonicalCursorByIndex = new Map<number, number>();
+  canonicalPath.forEach((index, cursor) => {
+    if (!canonicalCursorByIndex.has(index)) {
+      canonicalCursorByIndex.set(index, cursor);
+    }
+  });
+  const segmentCount = Math.max(0, route.length - 1);
+
+  return {
+    routeIndices: Uint32Array.from(route),
+    canonicalCursors: Uint32Array.from(route.map((index) => resolveNearestCanonicalCursor(
+      index,
+      canonicalPath,
+      canonicalCursorByIndex,
+      episode.raster.width,
+      episode.raster.height
+    ))),
+    segmentTrailModes: Array.from({ length: segmentCount }, (_value, index) => (
+      index >= segmentCount - 1 ? 'goal' : 'explore'
+    )),
+    cueOverrides: Array.from({ length: segmentCount }, () => null),
+    telemetry: EMPTY_TELEMETRY,
+    aiResetPathCursor: null,
+    branchDecisions: [],
+    memoryFrames: Array.from({ length: route.length }, () => EMPTY_MEMORY_FRAME),
+    optionalRetargetEvaluations: [],
+    recoveryDecisions: []
+  };
+};
+
 const buildHumanizedRunnerPlan = (
   episode: MazeEpisode,
   config: DemoWalkerConfig
 ): DemoRunnerPlan => {
+  if (
+    !shouldUseLegacySourceHumanizedPlan(config)
+    && resolveDemoWalkerAiPerceptionProfile(config).shortestPathAssistBuckets
+      >= AI_SHORTEST_PATH_ASSIST_BUCKET_COUNT
+  ) {
+    return buildPlayableShortestRunnerPlan(episode);
+  }
   return shouldUseLegacySourceHumanizedPlan(config)
     ? buildLegacyAiRunnerPlan(episode)
     : buildHumanLocalMemoryRunnerPlan(episode, config);
@@ -1165,6 +1291,12 @@ const buildHumanLocalMemoryRunnerPlan = (
   const pathStack: number[] = [episode.raster.startIndex];
   const splitRecords = new Map<number, LocalMemorySplit>();
   const perception = resolveDemoWalkerAiPerceptionProfile(config);
+  const goalDistanceByIndex = buildGoalDistanceMap(
+    episode.raster.endIndex,
+    episode.raster.width,
+    episode.raster.height,
+    episode.raster.tiles
+  );
   const maxRouteLength = Math.max(canonicalPath.length + 16, episode.raster.tiles.length * 4);
   const maxSteps = maxRouteLength;
   const optionalRetargetCooldownSteps = Math.max(6, Math.floor(canonicalPath.length * 0.06));
@@ -1270,7 +1402,9 @@ const buildHumanLocalMemoryRunnerPlan = (
   };
 
   const markWrongBranchIfNeeded = (fromIndex: number, nextIndex: number): void => {
-    if (!canonicalCursorByIndex.has(fromIndex) || !canonicalCursorByIndex.has(nextIndex)) {
+    const fromDistance = goalDistanceByIndex[fromIndex] ?? -1;
+    const nextDistance = goalDistanceByIndex[nextIndex] ?? -1;
+    if (fromDistance < 0 || nextDistance < 0 || nextDistance >= fromDistance) {
       telemetry.wrongBranchCount += 1;
     }
   };
@@ -1472,10 +1606,16 @@ const buildHumanLocalMemoryRunnerPlan = (
       break;
     }
 
-    const choices = sortLocalMemoryChoices(
+    const choices = prioritizeShortestPathChoiceForRank(
       currentIndex,
-      collectLocalMemoryChoices(episode, currentIndex, visited, deadEnds),
-      episode,
+      sortLocalMemoryChoices(
+        currentIndex,
+        collectLocalMemoryChoices(episode, currentIndex, visited, deadEnds),
+        episode,
+        config.seed,
+        perception
+      ),
+      goalDistanceByIndex,
       config.seed,
       perception
     );
@@ -1671,6 +1811,51 @@ const sortLocalMemoryChoices = (
   scoreLocalMemoryChoice(fromIndex, left, episode, seed, perception)
   - scoreLocalMemoryChoice(fromIndex, right, episode, seed, perception)
 ));
+
+const prioritizeShortestPathChoiceForRank = (
+  fromIndex: number,
+  choices: readonly number[],
+  goalDistanceByIndex: Int32Array,
+  seed: number,
+  perception: DemoWalkerAiPerceptionProfile
+): number[] => {
+  const rankedChoices = [...choices];
+  const shortestPathChoice = rankedChoices.reduce<number | null>((best, choice) => {
+    const distance = goalDistanceByIndex[choice] ?? -1;
+    if (distance < 0) {
+      return best;
+    }
+    if (best === null) {
+      return choice;
+    }
+    const bestDistance = goalDistanceByIndex[best] ?? -1;
+    return bestDistance < 0 || distance < bestDistance ? choice : best;
+  }, null);
+  if (
+    shortestPathChoice === null
+    || rankedChoices[0] === shortestPathChoice
+    || perception.shortestPathAssistBuckets <= 0
+  ) {
+    return rankedChoices;
+  }
+
+  // E keeps one deterministic human-error bucket so the menu runner still
+  // reads as an imperfect learner. D and every higher rank always choose a
+  // real playable-shortest continuation, making advancement non-regressive
+  // while preserving the separate rank-specific perception presentation.
+  const branchBucket = (
+    Math.imul(fromIndex + 1, 31)
+    ^ Math.imul(seed + 1, 17)
+  ) >>> 0;
+  if (
+    perception.shortestPathAssistBuckets < AI_SHORTEST_PATH_ASSIST_BUCKET_COUNT
+    && branchBucket % AI_SHORTEST_PATH_ASSIST_BUCKET_COUNT >= perception.shortestPathAssistBuckets
+  ) {
+    return rankedChoices;
+  }
+
+  return [shortestPathChoice, ...rankedChoices.filter((choice) => choice !== shortestPathChoice)];
+};
 
 const scoreLocalMemoryChoice = (
   fromIndex: number,
@@ -2462,6 +2647,40 @@ const findFloorPath = (
   return findKnownFloorPath(startIndex, targetIndex, width, height, tiles);
 };
 
+const buildGoalDistanceMap = (
+  goalIndex: number,
+  width: number,
+  height: number,
+  tiles: Uint8Array
+): Int32Array => {
+  const distances = new Int32Array(tiles.length);
+  distances.fill(-1);
+  if (!isTileFloor(tiles, goalIndex)) {
+    return distances;
+  }
+
+  const queue = new Uint32Array(tiles.length);
+  let read = 0;
+  let write = 1;
+  queue[0] = goalIndex;
+  distances[goalIndex] = 0;
+
+  while (read < write) {
+    const current = queue[read]!;
+    read += 1;
+    for (const neighbor of collectFloorNeighbors(current, width, height, tiles)) {
+      if (distances[neighbor] !== -1) {
+        continue;
+      }
+      distances[neighbor] = distances[current]! + 1;
+      queue[write] = neighbor;
+      write += 1;
+    }
+  }
+
+  return distances;
+};
+
 const findKnownFloorPath = (
   startIndex: number,
   targetIndex: number,
@@ -2518,7 +2737,7 @@ const findKnownFloorPath = (
     }
   }
 
-  return [startIndex];
+  return [];
 };
 
 const resolveNearestCanonicalCursor = (
