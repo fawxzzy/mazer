@@ -112,6 +112,17 @@ describe('Mazer completion markers', () => {
     expect(currentTruth).not.toContain('Menu and active play each use only a color-tiered numeric player-level glyph at the top-left');
   });
 
+  test('records the bounded goal-to-sigil player transfer and its visual proof', () => {
+    const markerDoc = readRepoFile('docs/research/MAZER_MECHANICS_MOBILE_COMPLETION_MARKER.md');
+
+    expect(markerDoc).toContain('`goal-to-sigil-to-player` energy transfer');
+    expect(markerDoc).toContain('eight edge sigils');
+    expect(markerDoc).toContain('adds zero additional gameplay delay');
+    expect(markerDoc).toContain('goal-transfer-midphases.summary.json');
+    expect(markerDoc).toContain('phone `405x958` DPR-2 and desktop `1440x900` DPR-2');
+    expect(markerDoc).toContain('publication, review, merge, deployment, and production remain separately gated');
+  });
+
   test('keeps the level/rank/complexity progression contract tracked', () => {
     const markerDoc = readRepoFile('docs/research/MAZER_AUTH_AI_VISUAL_COMPLETION_MARKER.md');
     const contractDoc = readRepoFile('docs/research/MAZER_LEVEL_RANK_COMPLEXITY_CONTRACT.md');
