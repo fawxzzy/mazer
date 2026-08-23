@@ -8,13 +8,24 @@ describe('legacy auth presentation', () => {
       rememberedIdentity: null,
       snapshot: { configured: true, status: 'guest' }
     })).toEqual(expect.objectContaining({
-      alternateActionLabel: 'Create Account',
+      alternateActionLabel: 'Create account',
       emailLabel: 'Email',
       helper: '',
       passwordLabel: 'Password',
-      primaryActionLabel: 'Sign In',
-      recoveryActionLabel: 'Forgot Password?',
+      primaryActionLabel: 'Log in',
+      recoveryActionLabel: 'Reset password',
       title: 'Welcome'
+    }));
+  });
+
+  test('uses the canonical login label when switching from account creation', () => {
+    expect(resolveLegacyAuthPresentation({
+      mode: 'signup',
+      rememberedIdentity: null,
+      snapshot: { configured: true, status: 'guest' }
+    })).toEqual(expect.objectContaining({
+      alternateActionLabel: 'Log in',
+      primaryActionLabel: 'Create account'
     }));
   });
 

@@ -112,13 +112,13 @@ export const resolveLegacyAuthPresentation = (
   const { helper, title } = resolveLegacyAuthTitleAndHelper(state);
 
   return {
-    alternateActionLabel: isSignup ? 'Use Sign In' : 'Create Account',
+    alternateActionLabel: isSignup ? 'Log in' : 'Create account',
     displayNameLabel: 'Display name',
     emailLabel: 'Email',
     helper,
     passwordLabel: 'Password',
-    primaryActionLabel: isSignup ? 'Create Account' : 'Sign In',
-    recoveryActionLabel: 'Forgot Password?',
+    primaryActionLabel: isSignup ? 'Create account' : 'Log in',
+    recoveryActionLabel: 'Reset password',
     title
   };
 };

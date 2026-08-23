@@ -1523,6 +1523,22 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authReuseContract).toContain('No shared React component import into Phaser.');
   });
 
+  test('adopts the opaque Fitness-derived auth visual family without changing Mazer auth semantics', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('const LEGACY_AUTH_UI_FONT_FAMILY');
+    expect(menuSceneSource).toContain("this.overlay === 'auth' ? 0x031f20 : 0x02040a");
+    expect(menuSceneSource).toContain("&& this.overlay === 'none';");
+    expect(menuSceneSource).toContain('border.lineStyle(1, borderColor, borderAlpha);');
+    expect(menuSceneSource).toContain('new Phaser.Curves.CubicBezier(');
+    expect(menuSceneSource).toContain("fontFamily: unifiedAuthPrimary ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY");
+    expect(menuSceneSource).toContain("const barHeight = this.overlay === 'auth' ? 56");
+    expect(menuSceneSource).not.toContain('EMAIL OR USERNAME');
+    expect(authSource).toContain('signInWithPassword({');
+    expect(authSource).not.toContain("reason: 'Enter a valid username.'");
+  });
+
   test('keeps both the player level and the independent menu-demo AI level off the front door as persistent chrome', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
@@ -1751,7 +1767,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(overlayPanelStart).toBeGreaterThanOrEqual(0);
     expect(overlayPanelEnd).toBeGreaterThan(overlayPanelStart);
-    expect(overlayPanelSource).toContain('this.overlayGraphics.fillStyle(0x02040a, 0.82);');
+    expect(overlayPanelSource).toContain("this.overlayGraphics.fillStyle(this.overlay === 'auth' ? 0x031f20 : 0x02040a, this.overlay === 'auth' ? 1 : 0.82);");
     expect(overlayPanelSource).toContain('this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);');
     expect(overlayPanelSource).not.toContain('drawLegacyCyberPanel');
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');
