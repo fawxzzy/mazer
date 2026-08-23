@@ -8049,12 +8049,14 @@ export class MenuScene extends Phaser.Scene {
   // -- see its declaration), then it dissolves across a fixed closing window
   // timed to land on zero right as the last tiles settle in, per feedback
   // that fading across the whole build made it disappear almost immediately
-  // for anything but the shortest builds. levelAnnouncerBuildFadeOutArmed is
-  // what stops a completely fresh maze build (initial boot, a forced QA
-  // reset) that never went through 'deconstructing' from getting a phantom
-  // fade-out of a number that was never actually shown -- it's set only by
-  // observing the real deconstruct phase, and consumed the moment the armed
-  // build's fade-out finishes (or the phase moves on to anything else).
+  // for anything but the shortest builds. levelAnnouncerBuildFadeOutArmed
+  // tracks whether THIS build's fade-in already happened during a preceding
+  // 'deconstructing' phase -- true for every normal maze-to-maze cycle. A
+  // build that starts without one (initial page load, first entry into play
+  // mode, a settings change that regenerates the board -- nothing to
+  // deconstruct FROM) still gets the announcement, just via its own
+  // self-contained fade-in-hold-fade-out entirely inside the build phase
+  // instead of borrowing the deconstruct phase's opening span.
   private resolveLegacyLevelAnnouncerVisualState(time: number): { alpha: number; scale: number } {
     const HIDDEN = { alpha: 0, scale: 1 };
     if (this.overlay !== 'none') {
@@ -8073,7 +8075,7 @@ export class MenuScene extends Phaser.Scene {
       return this.applyLegacyLevelAnnouncerPulse(progress, time);
     }
 
-    if (phase === 'building' && this.levelAnnouncerBuildFadeOutArmed && this.menuStaticBuildPhaseStartedAtMs !== null) {
+    if (phase === 'building' && this.menuStaticBuildPhaseStartedAtMs !== null) {
       const buildDurationMs = this.resolveLegacyMenuStaticBuildDurationEstimateMs();
       if (buildDurationMs === null) {
         this.levelAnnouncerBuildFadeOutArmed = false;
@@ -8082,14 +8084,25 @@ export class MenuScene extends Phaser.Scene {
 
       const elapsedMs = time - this.menuStaticBuildPhaseStartedAtMs;
       const remainingMs = buildDurationMs - elapsedMs;
-      if (remainingMs <= 0) {
+      if (elapsedMs < 0 || remainingMs <= 0) {
         this.levelAnnouncerBuildFadeOutArmed = false;
         return HIDDEN;
       }
 
       const fadeOutWindowMs = Math.min(LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS, buildDurationMs);
-      const progress = remainingMs >= fadeOutWindowMs ? 1 : smoothstep(remainingMs / fadeOutWindowMs);
-      return this.applyLegacyLevelAnnouncerPulse(progress, time);
+      const fadeOutProgress = remainingMs >= fadeOutWindowMs ? 1 : smoothstep(remainingMs / fadeOutWindowMs);
+
+      if (this.levelAnnouncerBuildFadeOutArmed) {
+        return this.applyLegacyLevelAnnouncerPulse(fadeOutProgress, time);
+      }
+
+      // Cold-start case -- also ramp UP from this build's own beginning
+      // (nothing to fade in from) instead of assuming it's already at full
+      // size the way an armed build (which already faded in during its
+      // preceding deconstruct) can.
+      const fadeInWindowMs = Math.min(LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS, buildDurationMs);
+      const fadeInProgress = smoothstep(elapsedMs / fadeInWindowMs);
+      return this.applyLegacyLevelAnnouncerPulse(Math.min(fadeInProgress, fadeOutProgress), time);
     }
 
     if (phase !== 'building') {
@@ -13373,6 +13386,7 @@ export class MenuScene extends Phaser.Scene {
     const rowY = panel.top + 8 + Math.round(chevronSize / 2);
     const centerX = panel.centerX;
     const iconSize = Math.max(18, Math.round(chevronSize * 0.42));
+    const ringRadius = (iconSize * 0.62) + 8;
 
     const graphics = this.add.graphics();
     const background = this.add.rectangle(centerX, rowY, iconSize + 24, iconSize + 24, 0x000000, 0.001);
@@ -13380,15 +13394,27 @@ export class MenuScene extends Phaser.Scene {
     background.setDepth(3);
     this.overlayHomeActive = false;
 
-    const drawHome = (active: boolean): void => {
+    // Rainbow ring (same midnight-rainbow material the trail/level number
+    // cycle through) plus the Mazer signature green for the house glyph
+    // itself, both breathing on the classic blink/grow-shrink pulse the
+    // settings cog and Start/Login glyphs already use -- redrawn every
+    // frame via updateFrame instead of the old static once-drawn icon.
+    const drawHome = (time: number): void => {
       graphics.clear();
-      const color = active ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_ICON;
-      const alpha = active ? 1 : 0.85;
-      const halfWidth = iconSize * 0.5;
-      const roofTop = rowY - (iconSize * 0.5);
-      const baseTop = rowY - (iconSize * 0.06);
-      const baseBottom = rowY + (iconSize * 0.42);
-      graphics.lineStyle(Math.max(1.6, iconSize * 0.12), color, alpha);
+      const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+      const pulseAlpha = clamp(0.5 + (phase * 0.5) + (this.overlayHomeActive ? 0.1 : 0), 0.4, 1);
+      const pulseScale = 0.94 + (phase * 0.06) + (this.overlayHomeActive ? 0.02 : 0);
+
+      const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
+      graphics.lineStyle(Math.max(1.6, iconSize * 0.1), ringColor, pulseAlpha * 0.82);
+      graphics.strokeCircle(centerX, rowY, ringRadius * pulseScale);
+
+      const color = cyberArcadeMaterial.signal.player;
+      const halfWidth = iconSize * 0.5 * pulseScale;
+      const roofTop = rowY - (iconSize * 0.5 * pulseScale);
+      const baseTop = rowY - (iconSize * 0.06 * pulseScale);
+      const baseBottom = rowY + (iconSize * 0.42 * pulseScale);
+      graphics.lineStyle(Math.max(1.6, iconSize * 0.12), color, pulseAlpha);
       graphics.beginPath();
       graphics.moveTo(centerX - halfWidth, baseTop);
       graphics.lineTo(centerX, roofTop);
@@ -13396,14 +13422,10 @@ export class MenuScene extends Phaser.Scene {
       graphics.strokePath();
       graphics.strokeRect(centerX - (halfWidth * 0.6), baseTop, halfWidth * 1.2, baseBottom - baseTop);
     };
-    drawHome(false);
+    drawHome(this.time.now);
 
     const setActive = (active: boolean): void => {
-      if (this.overlayHomeActive === active) {
-        return;
-      }
       this.overlayHomeActive = active;
-      drawHome(active);
     };
     background.on('pointerover', () => setActive(true));
     background.on('pointerout', () => setActive(false));
@@ -13423,6 +13445,7 @@ export class MenuScene extends Phaser.Scene {
       semanticAction: 'Main Menu',
       setActive,
       text: 'Main Menu',
+      updateFrame: (time: number) => drawHome(time),
       destroy: () => {
         graphics.destroy();
         background.destroy();
