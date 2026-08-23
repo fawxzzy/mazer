@@ -183,6 +183,16 @@ export interface LegacyProgressionPerformanceScore {
 export interface LegacyProgressionViewport {
   height: number;
   width: number;
+  // Without these, the tile-size cap search below simulates a layout with
+  // zero safe-area inset and no floating touch controls -- always more
+  // generous than the real render (which does account for both) -- so the
+  // cap (and the cell count it ultimately allows) came out sized for a
+  // bigger box than actually exists on any device with a nonzero bottom
+  // inset, leaving the real board short of the true safe edge once actual
+  // margins were applied. Optional so existing non-scene callers (tests,
+  // offline tooling) aren't forced to supply device geometry they don't have.
+  safeArea?: { top?: number; right?: number; bottom?: number; left?: number };
+  useFloatingTouchControls?: boolean;
 }
 
 export interface LegacyProgressionGenerationScaleOptions {
@@ -1358,11 +1368,22 @@ export const resolveLegacyProgressionViewportScaleCap = (
       ? LEGACY_PROGRESSION_PHONE_MENU_TARGET_TILE_PX
       : LEGACY_PROGRESSION_MENU_MIN_TILE_PX;
 
+  // Real device geometry the actual render will use -- without this, every
+  // call below simulates zero safe-area inset and no floating touch
+  // controls, always more generous than reality, so the cap this search
+  // returns (and the cell count it allows through) came out sized for a
+  // bigger box than genuinely exists on any device with a nonzero bottom
+  // inset. See LegacyProgressionViewport's own comment.
+  const layoutOptions = {
+    safeArea: viewport.safeArea,
+    useFloatingTouchControls: viewport.useFloatingTouchControls
+  };
+
   // Probe with the same width:height aspect ratio the real generation call
   // will request for this viewport (see resolveLegacyMenuBoardAspectRatio),
   // instead of a square candidate grid -- so the cap search reflects the
   // actual rectangular board that gets built, not a square stand-in for it.
-  const aspectRatio = resolveLegacyMenuBoardAspectRatio(viewport.width, viewport.height, boardScale, layoutSurface);
+  const aspectRatio = resolveLegacyMenuBoardAspectRatio(viewport.width, viewport.height, boardScale, layoutSurface, layoutOptions);
   const ratioRoot = Math.sqrt(aspectRatio);
 
   for (let candidateScale = 96; candidateScale >= 25; candidateScale -= 1) {
@@ -1374,7 +1395,8 @@ export const resolveLegacyProgressionViewportScaleCap = (
       boardScale,
       candidateWidth,
       candidateHeight,
-      layoutSurface
+      layoutSurface,
+      layoutOptions
     );
     const boardSizeForInset = Math.min(layout.boardWidth, layout.boardHeight);
     const safeInset = clampInteger(
