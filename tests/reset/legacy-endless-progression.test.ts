@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import {
   LEGACY_ENDLESS_DEFAULT_MODIFIER_POLICY,
@@ -17,6 +18,54 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(resolveLegacyProgressionRulesetId(LEGACY_ENDLESS_LEVEL_BOUNDARY)).toBe('endless-v1');
     expect(resolveLegacyProgressionRulesetId(1_000_000)).toBe('endless-v1');
   });
+
+  test('keeps both persisted completion ordinals uncapped behind the idempotent server contract', () => {
+    const foundation = readFileSync(
+      new URL('../../supabase/migrations/20260822000000_mazer_endless_progression_foundation.sql', import.meta.url),
+      'utf8'
+    );
+    const completionRpc = readFileSync(
+      new URL('../../supabase/migrations/20260822000100_mazer_endless_completion_rpc.sql', import.meta.url),
+      'utf8'
+    );
+
+    expect(foundation).toContain('drop constraint if exists mazer_progression_states_player_level_check');
+    expect(foundation).toContain('drop constraint if exists mazer_ai_progression_states_level_check');
+    expect(foundation).toContain('check (player_level >= 1)');
+    expect(foundation).toContain('check (level >= 1)');
+    expect(foundation).toContain('alter column player_level type bigint');
+    expect(foundation).toContain('alter column level type bigint');
+    expect(foundation).toContain('check (player_target_complexity between 8 and 400)');
+    expect(foundation).toContain('check (target_complexity between 8 and 400)');
+    expect(foundation).toContain('on public.mazer_cycle_receipts (user_id, client_run_id)');
+    expect(completionRpc).toContain('v_next_level := v_current.player_level + 1');
+    expect(completionRpc).toContain('create or replace function public.mazer_complete_ai_level');
+    expect(completionRpc).toContain('v_next_level := v_current.level + 1');
+    expect(completionRpc).toContain('p_completed_level text');
+    expect(completionRpc).toContain('player_level text');
+    expect(completionRpc).toContain('player_completed_cycles text');
+    expect(completionRpc).toContain('completed_cycles text');
+    expect(completionRpc).toContain('v_completed_level := p_completed_level::bigint');
+    expect(completionRpc).toContain("'completedCycles', v_next_completed_cycles::text");
+    expect(completionRpc).toContain("'level', v_next_level::text");
+    expect(completionRpc).toContain('v_current.player_target_complexity + 4');
+    expect(completionRpc).toContain('v_current.target_complexity + 4');
+    expect(completionRpc).toContain("when v_next_target_complexity >= 125 then 'S'");
+    expect(completionRpc).toContain("'colorTier', v_next_color_tier");
+    expect(completionRpc).toContain("'rank', v_next_rank");
+    expect(completionRpc).toContain("'targetComplexity', v_next_target_complexity");
+    expect(completionRpc).toContain('player_rank = v_next_rank');
+    expect(completionRpc).toContain('player_target_complexity = v_next_target_complexity');
+    expect(completionRpc).toContain('rank = v_next_rank');
+    expect(completionRpc).toContain('target_complexity = v_next_target_complexity');
+    expect(completionRpc).not.toContain('p_completed_level integer');
+    expect(completionRpc).not.toContain('p_completed_level bigint');
+    expect(completionRpc).toContain("raise exception 'client_run_id is required for idempotent completion'");
+    expect(completionRpc).toContain('security invoker');
+    expect(completionRpc).not.toContain('security definer');
+    expect(completionRpc).toContain('and r.client_run_id = p_client_run_id');
+    expect(completionRpc).toContain('on conflict (user_id, client_run_id) where client_run_id is not null do nothing');
+  });
 });
 
 describe('legacy endless level recipe resolution', () => {
@@ -32,7 +81,7 @@ describe('legacy endless level recipe resolution', () => {
   });
 
   test('resolves successfully for representative large levels without overflow or throwing', () => {
-    for (const level of [100, 101, 250, 1_000, 100_000, 2_000_000_000]) {
+    for (const level of ['100', '101', '250', '1000', '100000', '2000000000', '9007199254740993']) {
       const recipe = resolveLegacyEndlessLevelRecipe(level);
       expect(recipe.level).toBe(level);
       expect(Number.isFinite(recipe.complexityBudget)).toBe(true);
@@ -43,7 +92,7 @@ describe('legacy endless level recipe resolution', () => {
   test('level 101 differs from level 100 (not a flat repeat)', () => {
     const level100 = resolveLegacyEndlessLevelRecipe(100);
     const level101 = resolveLegacyEndlessLevelRecipe(101);
-    expect(level101).not.toEqual({ ...level100, level: 101, seed: level101.seed });
+    expect(level101).not.toEqual({ ...level100, level: '101', seed: level101.seed });
     expect(level101.seed).not.toBe(level100.seed);
   });
 

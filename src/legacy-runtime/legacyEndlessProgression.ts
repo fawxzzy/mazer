@@ -1,19 +1,20 @@
 import { createSeededRng } from '../domain/rng/seededRng';
+import {
+  compareLegacyProgressionOrdinals,
+  normalizeLegacyProgressionOrdinal,
+  type LegacyProgressionOrdinal
+} from './legacyProgression';
 
-// Additive, dormant module: nothing here is wired into the live generation
-// path yet. player_level is still derived from targetComplexity everywhere
-// else in the codebase (see resolveLegacyProgressionLevel in
-// legacyProgression.ts) -- flipping that over to treat level as a permanent,
-// independent ordinal is a real migration (existing rows, the AI-runner
-// track, the database check constraints) that needs to happen in one
-// deliberate, reviewed step, not silently here. This module exists so that
-// step has a tested, deterministic engine ready to integrate against.
+// Additive recipe module: visible player/AI levels are now independent,
+// unbounded completion ordinals in legacyProgression.ts. This deterministic
+// recipe engine remains non-load-bearing until the server-owned completion
+// contract can verify recipe provenance; live generation continues to use
+// the separately bounded, half-speed difficulty track in the meantime.
 
 /**
- * Levels 1-99 keep exactly their current behavior (see
- * resolveLegacyProgressionDifficultyProfile's band table, which is itself
- * hard-clamped to this range). Levels at or above this boundary resolve
- * through the endless ruleset instead.
+ * Levels 1-99 identify the legacy recipe family. Levels at or above this
+ * boundary can resolve a bounded endless recipe without imposing a ceiling
+ * on the displayed completion ordinal.
  */
 export const LEGACY_ENDLESS_LEVEL_BOUNDARY = 100;
 export const LEGACY_ENDLESS_RULESET_ID = 'endless-v1';
@@ -29,9 +30,11 @@ export type LegacyProgressionRulesetId =
  * every positive integer -- there is no ceiling on the input.
  */
 export const resolveLegacyProgressionRulesetId = (
-  level: number
+  level: LegacyProgressionOrdinal | number
 ): LegacyProgressionRulesetId => (
-  level >= LEGACY_ENDLESS_LEVEL_BOUNDARY ? LEGACY_ENDLESS_RULESET_ID : LEGACY_LEGACY_RULESET_ID
+  compareLegacyProgressionOrdinals(level, String(LEGACY_ENDLESS_LEVEL_BOUNDARY)) >= 0
+    ? LEGACY_ENDLESS_RULESET_ID
+    : LEGACY_LEGACY_RULESET_ID
 );
 
 export type LegacyModifierCategory = 'complexity' | 'difficulty';
@@ -79,7 +82,7 @@ export interface LegacyEndlessLevelRecipe {
   readonly complexityBudget: number;
   readonly difficultyBudget: number;
   readonly enemies: readonly LegacyEnemyRecipeInstance[];
-  readonly level: number;
+  readonly level: LegacyProgressionOrdinal;
   readonly modifiers: readonly LegacyModifierInstance[];
   readonly obstacles: readonly LegacyObstacleRecipeInstance[];
   readonly recipeVersion: number;
@@ -191,17 +194,21 @@ const resolveLegacyModifierBounds = (
  * unchanged legacy-v1 band system in legacyProgression.ts.
  */
 export const resolveLegacyEndlessLevelRecipe = (
-  level: number,
+  level: LegacyProgressionOrdinal | number,
   policy: LegacyModifierPolicyMap = LEGACY_ENDLESS_DEFAULT_MODIFIER_POLICY
 ): LegacyEndlessLevelRecipe => {
-  if (!Number.isInteger(level) || level < LEGACY_ENDLESS_LEVEL_BOUNDARY) {
+  const normalizedLevel = normalizeLegacyProgressionOrdinal(level);
+  if (compareLegacyProgressionOrdinals(normalizedLevel, String(LEGACY_ENDLESS_LEVEL_BOUNDARY)) < 0) {
     throw new Error(`resolveLegacyEndlessLevelRecipe requires an integer level >= ${LEGACY_ENDLESS_LEVEL_BOUNDARY}, got ${level}`);
   }
 
-  const seed = `${LEGACY_ENDLESS_RULESET_ID}:${LEGACY_ENDLESS_RECIPE_VERSION}:${level}`;
+  const seed = `${LEGACY_ENDLESS_RULESET_ID}:${LEGACY_ENDLESS_RECIPE_VERSION}:${normalizedLevel}`;
   const rng = createSeededRng(hashLegacySeedString(seed));
 
-  const cyclePosition = (level - LEGACY_ENDLESS_LEVEL_BOUNDARY) % LEGACY_ENDLESS_CHALLENGE_CYCLE_LENGTH;
+  const cyclePosition = Number(
+    (BigInt(normalizedLevel) - BigInt(LEGACY_ENDLESS_LEVEL_BOUNDARY))
+    % BigInt(LEGACY_ENDLESS_CHALLENGE_CYCLE_LENGTH)
+  );
   const isCapstone = cyclePosition === LEGACY_ENDLESS_CHALLENGE_CYCLE_LENGTH - 1;
   const cycleProgress = cyclePosition / (LEGACY_ENDLESS_CHALLENGE_CYCLE_LENGTH - 1);
 
@@ -245,7 +252,7 @@ export const resolveLegacyEndlessLevelRecipe = (
     complexityBudget,
     difficultyBudget,
     enemies: [],
-    level,
+    level: normalizedLevel,
     modifiers,
     obstacles: [],
     recipeVersion: LEGACY_ENDLESS_RECIPE_VERSION,

@@ -103,6 +103,7 @@ import {
 } from '../legacy-runtime/legacyMenuDemoLifecycle';
 import {
   resolveLegacyMenuBoardAspectRatio,
+  resolveLegacyMenuHeaderUsernameReserve,
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
 } from '../legacy-runtime/legacyMenuLayout';
@@ -203,24 +204,25 @@ import {
   LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH,
   LEGACY_PROGRESSION_STORAGE_KEY,
   createEmptyLegacyProgressionState,
+  formatLegacyProgressionOrdinal,
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
   resolveLegacyMazeGenerationProfileForProgression,
   resolveLegacyProgressionDifficultyProfile,
   resolveLegacyProgressionGenerationScale,
+  resolveLegacyProgressionLevel,
+  resolveLegacyProgressionOrdinalSeedComponent,
   resolveLegacyProgressionPalette,
   resolveLegacyProgressionTrackIdForSurface,
   summarizeLegacyProgressionDiagnostics,
   writeLegacyProgressionState,
   type LegacyProgressionDiagnostics,
-  type LegacyProgressionDifficultyBand,
   type LegacyProgressionPalette,
   type LegacyProgressionState,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
 import {
   applyLegacyStaticSlowTileEntry,
-  createLegacyStaticSlowTileState,
   isLegacyStaticSlowTileDelayActive,
   recordLegacyStaticSlowTileBlockedMove,
   resolveLegacyStaticSlowTilePhase,
@@ -242,7 +244,6 @@ import {
   advanceLegacyPatrolAgent,
   applyLegacyPatrolAgentCollision,
   clearLegacyPatrolAgentCollisionIntent,
-  createLegacyPatrolAgentState,
   isLegacyPatrolAgentDelayActive,
   queueLegacyPatrolAgentCollisionIntent,
   recordLegacyPatrolAgentBlockedMove,
@@ -962,6 +963,7 @@ export const MENU_SCENE_VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagno
 const BOARD_SHADOW_OFFSET = 0;
 const MENU_BUTTON_ALPHA = 0.34;
 const LEGACY_UI_FONT_FAMILY = cyberArcadeMaterial.typography.ui;
+const LEGACY_AUTH_UI_FONT_FAMILY = '"Segoe UI Variable", "Helvetica Neue", Arial, sans-serif';
 const LEGACY_UI_MONO_FONT_FAMILY = cyberArcadeMaterial.typography.metrics;
 // Unambiguously above every other depth used in the scene (everything else
 // is either default 0 or the shared "3" a couple of unrelated corner
@@ -3965,7 +3967,7 @@ export class MenuScene extends Phaser.Scene {
     const playerTrack = this.progressionState.tracks.player;
     return resolveLegacyMovementSpeedProfile(this.settings.movementSpeed, {
       completedCycles: playerTrack.completedCycles,
-      level: playerTrack.level,
+      level: resolveLegacyProgressionLevel(playerTrack.targetComplexity),
       paceScore: playerTrack.paceScore
     });
   }
@@ -4477,13 +4479,18 @@ export class MenuScene extends Phaser.Scene {
       const progressionBand = resolveLegacyProgressionDifficultyProfile(
         this.progressionState.tracks.player
       ).band;
-      this.playStaticSlowTile = createLegacyStaticSlowTileState(this.maze, progressionBand);
+      // Pressure objects remain source-proven experiments, not live gameplay.
+      // The red/grey slow tile and patrol agent were appearing automatically
+      // in later difficulty bands even though rooms and object gameplay have
+      // not been activated. Keep the dormant contracts available for a future
+      // explicit mechanic lane, but do not place any runtime object now.
+      this.playStaticSlowTile = null;
       this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
         this.maze,
         progressionBand,
-        this.playStaticSlowTile.placement?.point ?? null
+        null
       );
-      this.playPatrolAgent = this.createLegacyPlayPatrolAgent(progressionBand);
+      this.playPatrolAgent = null;
       // The decel-to-target spin itself now starts once the new maze
       // actually finishes settling (settleLegacyMenuStaticDrawStageIfComplete),
       // not here at the moment the maze data swaps in -- resolveLegacy
@@ -4559,10 +4566,12 @@ export class MenuScene extends Phaser.Scene {
 
   private createFreshLegacyPlayGenerationSeed(): number {
     const playerTrack = this.progressionState.tracks.player;
+    const completedCyclesSeed = resolveLegacyProgressionOrdinalSeedComponent(playerTrack.completedCycles, 1_000_003);
+    const levelSeed = resolveLegacyProgressionOrdinalSeedComponent(playerTrack.level, 1_000_033);
     const progressionSalt = (
       (playerTrack.targetComplexity * 1009)
-      + (playerTrack.completedCycles * 9176)
-      + (playerTrack.level * 313)
+      + (completedCyclesSeed * 9176)
+      + (levelSeed * 313)
       + (playerTrack.paceScore * 37)
     );
     const seed = createLegacyRuntimeRandomSeed({
@@ -4580,10 +4589,12 @@ export class MenuScene extends Phaser.Scene {
 
   private createFreshLegacyMenuGenerationSeed(): number {
     const aiTrack = this.progressionState.tracks['ai-runner'];
+    const completedCyclesSeed = resolveLegacyProgressionOrdinalSeedComponent(aiTrack.completedCycles, 1_000_003);
+    const levelSeed = resolveLegacyProgressionOrdinalSeedComponent(aiTrack.level, 1_000_033);
     const progressionSalt = (
       (aiTrack.targetComplexity * 1151)
-      + (aiTrack.completedCycles * 7219)
-      + (aiTrack.level * 433)
+      + (completedCyclesSeed * 7219)
+      + (levelSeed * 433)
       + (aiTrack.paceScore * 41)
     );
     const seed = createLegacyRuntimeRandomSeed({
@@ -5143,9 +5154,10 @@ export class MenuScene extends Phaser.Scene {
     // land (see markerRevealAlpha in resolveLegacyPlayerSpawnBurstState) --
     // but without this, the demo walker's own move timer was free to fire
     // the instant the phase settled, stepping the AI before its marker had
-    // even appeared. Holding the walker here until the burst finishes means
-    // it visibly starts moving only once it's actually on screen.
-    if (this.resolveLegacyPlayerSpawnBurstState(time).active) {
+    // even appeared. Hold only until the beams arrive and reveal the marker;
+    // the trailing impact flash is visible activity and must not add a stale
+    // post-spawn pause after the player is already on screen.
+    if (this.resolveLegacyPlayerSpawnBurstState(time).markerRevealAlpha <= 0) {
       return;
     }
     if (time < this.nextDemoMoveAtMs) {
@@ -5257,25 +5269,6 @@ export class MenuScene extends Phaser.Scene {
       patrolCollisionRecovery.active ? 'patrol-recovery' : 'no-patrol-recovery',
       this.playPatrolAgent?.pendingCollisionIntent ? 'patrol-input-pending' : 'no-patrol-input-pending'
     ].join(':');
-  }
-
-  private createLegacyPlayPatrolAgent(
-    progressionBand: LegacyProgressionDifficultyBand
-  ): LegacyPatrolAgentState | null {
-    const excludedPoints: LegacyPoint[] = [];
-    if (this.playStaticSlowTile?.placement) {
-      excludedPoints.push({ ...this.playStaticSlowTile.placement.point });
-    }
-    if (this.playRoomCandidateMetadata) {
-      const { x, y } = this.playRoomCandidateMetadata.candidate.topLeft;
-      excludedPoints.push(
-        { x, y },
-        { x: x + 1, y },
-        { x, y: y + 1 },
-        { x: x + 1, y: y + 1 }
-      );
-    }
-    return createLegacyPatrolAgentState(this.maze, progressionBand, excludedPoints);
   }
 
   private createLegacyWorldTurnHost(): WorldTurnHost {
@@ -7232,12 +7225,8 @@ export class MenuScene extends Phaser.Scene {
     // render in play mode too (still gated off during most overlays), even
     // though play mode has no "MAZER" wordmark to go with them, since the
     // edge diamonds were the specific thing reported missing there. The
-    // auth overlay is the one exception: it keeps the same title/sigil/
-    // starfield backdrop the menu already shows instead of a bare card, so
-    // login/create-account/account screens share the app's actual visual
-    // identity rather than looking like a separate, disconnected surface.
     const sigilsVisible = (this.mode === 'menu' || this.mode === 'play')
-      && (this.overlay === 'none' || this.overlay === 'auth');
+      && this.overlay === 'none';
     this.titleGraphics.setVisible(sigilsVisible);
     if (!sigilsVisible) {
       return;
@@ -9652,7 +9641,9 @@ export class MenuScene extends Phaser.Scene {
     // isn't part of this dimmer (just the ambient starfield/sigil backdrop),
     // so matching the rest of the app's translucency doesn't reintroduce
     // that concern.
-    this.overlayGraphics.fillStyle(0x02040a, 0.82);
+    // Auth is an intentionally opaque application surface. It must not compete
+    // with the animated maze/menu content underneath the input controls.
+    this.overlayGraphics.fillStyle(this.overlay === 'auth' ? 0x031f20 : 0x02040a, this.overlay === 'auth' ? 1 : 0.82);
     this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);
   }
 
@@ -10435,7 +10426,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.leaderboardSelfRank) {
       const selfRank = this.leaderboardSelfRank;
       const selfRankText = selfRank.hasUsername
-        ? `#${selfRank.rank.toLocaleString()} · Level ${selfRank.playerLevel}`
+        ? `#${formatLegacyProgressionOrdinal(selfRank.rank ?? '0')} · Level ${formatLegacyProgressionOrdinal(selfRank.playerLevel)}`
         : 'Set a username on the account screen to appear here.';
       this.createAuthAccountSummaryCard(selfRankText, rowY + (compact ? 26 : 29), panel, 'YOUR RANK');
       rowY += compact ? 66 : 74;
@@ -10512,7 +10503,7 @@ export class MenuScene extends Phaser.Scene {
       this.overlayGraphics.fillCircle(rankColumnLeft, rowY, badgeRadius);
       this.overlayGraphics.lineStyle(1.2, accentColor, 0.85);
       this.overlayGraphics.strokeCircle(rankColumnLeft, rowY, badgeRadius);
-      const rankBadgeLabel = this.padLegacyCompactUiText(this.add.text(rankColumnLeft, rowY, String(entry.rank), {
+      const rankBadgeLabel = this.padLegacyCompactUiText(this.add.text(rankColumnLeft, rowY, formatLegacyProgressionOrdinal(entry.rank), {
         fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: `${compact ? 11 : 12}px`,
         color: accentCss
@@ -10530,7 +10521,7 @@ export class MenuScene extends Phaser.Scene {
         compact ? 14 : 15,
         10
       ).setOrigin(0, 0.5);
-      const levelLabel = this.padLegacyCompactUiText(this.add.text(levelColumnRight, rowY, String(entry.playerLevel), {
+      const levelLabel = this.padLegacyCompactUiText(this.add.text(levelColumnRight, rowY, formatLegacyProgressionOrdinal(entry.playerLevel), {
         fontFamily: LEGACY_UI_FONT_FAMILY,
         fontSize: `${compact ? 14 : 15}px`,
         color: rowColor
@@ -10604,7 +10595,7 @@ export class MenuScene extends Phaser.Scene {
       snapshot: this.authSnapshot
     });
     const hasHelper = presentation.helper.length > 0;
-    let rowY = panel.top + (hasHelper ? (stacked ? 150 : 168) : (stacked ? 108 : 122));
+    let rowY = panel.top + (this.authForm.mode === 'signup' ? panel.height * 0.29 : panel.height * 0.41);
 
     // No way out while the full auth gate has this locked -- handleBackAction
     // already refuses to close it too (defense in depth for Escape), but
@@ -10612,8 +10603,11 @@ export class MenuScene extends Phaser.Scene {
     if (!(this.authGateLocked && this.overlay === 'auth')) {
       this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
     }
-    this.createAuthWordmark(panel.top + (stacked ? 28 : 34));
-    this.createOverlayTitle(presentation.title, panel.top + (stacked ? 56 : 64));
+    this.createAuthWordmark(panel.top + (stacked ? 42 : 48));
+    this.createOverlayTitle(
+      this.authForm.mode === 'signup' ? 'Create account' : presentation.title,
+      panel.top + (stacked ? 103 : 110)
+    );
 
     const accountLabel = resolveLegacyAuthAccountLabel(this.authSnapshot);
     // Fitness keeps this slot empty on a fresh sign-in/create-account load --
@@ -10853,10 +10847,9 @@ export class MenuScene extends Phaser.Scene {
 
   private createAccountUsernameField(x: number, y: number, width: number, height: number): void {
     const isActive = this.accountUsernameActive;
-    const contentLeft = x - (width / 2) + 16;
-    const valueWidth = width - 32;
-    const background = this.add.rectangle(x, y, width, height, 0x07131d, 1);
-    background.setStrokeStyle(2, isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, isActive ? 0.95 : 0.68);
+    const contentLeft = x - (width / 2) + 18;
+    const valueWidth = width - 36;
+    const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     background.on('pointerdown', () => {
       this.accountUsernameActive = true;
@@ -10867,11 +10860,38 @@ export class MenuScene extends Phaser.Scene {
       this.positionAccountUsernameNativeInput({ height, width, x, y });
     }
 
-    const eyebrow = this.padLegacyCompactUiText(this.add.text(contentLeft, y - (height * 0.25), 'USERNAME', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${Math.max(8, Math.min(10, Math.round(height * 0.19)))}px`,
+    const borderColor = isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
+    const borderAlpha = isActive ? 0.95 : 0.68;
+    const border = this.add.graphics();
+    const left = x - (width / 2);
+    const right = x + (width / 2);
+    const top = y - (height / 2);
+    const bottom = y + (height / 2);
+    const radius = Math.min(18, height * 0.36);
+    const labelWidth = 84;
+    const labelRight = right - radius - 8;
+    const gapStart = labelRight - labelWidth - 7;
+    const gapEnd = labelRight + 7;
+    border.lineStyle(1, borderColor, borderAlpha);
+    border.beginPath();
+    border.moveTo(left + radius, top);
+    border.lineTo(gapStart, top);
+    border.moveTo(gapEnd, top);
+    border.lineTo(right - radius, top);
+    border.arc(right - radius, top + radius, radius, -Math.PI / 2, 0);
+    border.lineTo(right, bottom - radius);
+    border.arc(right - radius, bottom - radius, radius, 0, Math.PI / 2);
+    border.lineTo(left + radius, bottom);
+    border.arc(left + radius, bottom - radius, radius, Math.PI / 2, Math.PI);
+    border.lineTo(left, top + radius);
+    border.arc(left + radius, top + radius, radius, Math.PI, (Math.PI * 3) / 2);
+    border.strokePath();
+
+    const eyebrow = this.padLegacyCompactUiText(this.add.text(labelRight - (labelWidth / 2), top, 'USERNAME', {
+      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+      fontSize: '11px',
       color: isActive ? '#72e0bf' : '#9bcdbd'
-    })).setOrigin(0, 0.5);
+    })).setOrigin(0.5);
     this.uiTexts.push(eyebrow);
 
     const hasValue = this.accountUsernameDraft.length > 0;
@@ -10880,11 +10900,11 @@ export class MenuScene extends Phaser.Scene {
       y + (height * 0.14),
       hasValue ? this.accountUsernameDraft : 'Set a username',
       {
-        fontFamily: LEGACY_UI_FONT_FAMILY,
-        fontSize: `${Math.max(14, Math.min(19, Math.round(height * 0.34)))}px`,
+          fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+          fontSize: '14px',
         color: hasValue ? (isActive ? '#72e0bf' : '#ecfff5') : '#7894a0'
       }
-    )), valueWidth, Math.max(14, Math.min(19, Math.round(height * 0.34))), 10).setOrigin(0, 0.5);
+    )), valueWidth, 14, 14).setOrigin(0, 0.5);
     this.uiTexts.push(label);
 
     this.uiButtons.push({
@@ -10894,6 +10914,7 @@ export class MenuScene extends Phaser.Scene {
       setActive: () => undefined,
       text: 'username',
       destroy: () => {
+        border.destroy();
         background.destroy();
         label.destroy();
       }
@@ -11039,8 +11060,8 @@ export class MenuScene extends Phaser.Scene {
     startY: number,
     presentation: LegacyAuthPresentation
   ): void {
-    const fieldWidth = Math.min(panel.width - 56, stacked ? 330 : 420);
-    const fieldHeight = stacked ? 48 : 52;
+    const fieldWidth = Math.min(panel.width - 32, 280);
+    const fieldHeight = 54;
     let rowY = startY;
 
     this.createAuthFieldBox(
@@ -11049,12 +11070,20 @@ export class MenuScene extends Phaser.Scene {
       fieldWidth,
       fieldHeight,
       'email',
-      this.authForm.email || 'Email address',
+      this.authForm.email,
       this.authForm.email.length === 0
     );
-    rowY += stacked ? 66 : 72;
-    this.createAuthFieldBox(centerX, rowY, fieldWidth, fieldHeight, 'password', this.maskLegacyAuthPassword(), this.authForm.password.length === 0);
-    rowY += stacked ? 66 : 72;
+    rowY += 64;
+    this.createAuthFieldBox(
+      centerX,
+      rowY,
+      fieldWidth,
+      fieldHeight,
+      'password',
+      this.authForm.password.length === 0 ? '' : this.maskLegacyAuthPassword(),
+      this.authForm.password.length === 0
+    );
+    rowY += 64;
 
     if (this.authForm.mode === 'signup') {
       this.createAuthFieldBox(
@@ -11063,10 +11092,10 @@ export class MenuScene extends Phaser.Scene {
         fieldWidth,
         fieldHeight,
         'displayName',
-        this.authForm.displayName || 'display name',
+        this.authForm.displayName,
         this.authForm.displayName.length === 0
       );
-      rowY += stacked ? 66 : 72;
+      rowY += 64;
 
       this.createAuthFieldBox(
         centerX,
@@ -11074,7 +11103,7 @@ export class MenuScene extends Phaser.Scene {
         fieldWidth,
         fieldHeight,
         'username',
-        this.authForm.username || 'Username (optional)',
+        this.authForm.username,
         this.authForm.username.length === 0
       );
       const usernameStatusText = this.resolveAuthUsernameStatusText();
@@ -11092,7 +11121,7 @@ export class MenuScene extends Phaser.Scene {
           stacked ? 11 : 12
         );
       }
-      rowY += stacked ? 66 : 72;
+      rowY += 64;
     }
 
     // Footer links (mode switch, password reset) sit inline below the
@@ -11100,20 +11129,38 @@ export class MenuScene extends Phaser.Scene {
     // Fitness's AuthFooter. The one actual action (submit) lives in the
     // bottom-pinned action bar below, matching Fitness's AuthDock instead
     // of stacking three same-sized buttons in the form flow.
-    const footerY = rowY + (stacked ? 22 : 26);
+    const footerY = panel.top + panel.height - 104;
+    const modeLinkWidth = this.measureAuthFooterLinkWidth(presentation.alternateActionLabel);
+    const recoveryLinkWidth = this.authForm.mode === 'signup'
+      ? 0
+      : this.measureAuthFooterLinkWidth(presentation.recoveryActionLabel);
+    const separatorWidth = 0.465 * 16;
+    const separatorHeight = 0.94 * 14;
+    const footerGap = 8;
+    const footerGroupWidth = this.authForm.mode === 'signup'
+      ? modeLinkWidth
+      : modeLinkWidth + footerGap + separatorWidth + footerGap + recoveryLinkWidth;
+    let footerCursorX = centerX - (footerGroupWidth / 2);
     this.createAuthFooterLink(
-      centerX,
+      footerCursorX + (modeLinkWidth / 2),
       footerY,
       presentation.alternateActionLabel,
       () => this.setLegacyAuthFormMode(this.authForm.mode === 'signup' ? 'login' : 'signup')
     );
     if (this.authForm.mode !== 'signup') {
+      footerCursorX += modeLinkWidth + footerGap;
+      const separatorX = footerCursorX + (separatorWidth / 2);
+      footerCursorX += separatorWidth + footerGap;
       this.createAuthFooterLink(
-        centerX,
-        footerY + (stacked ? 26 : 28),
+        footerCursorX + (recoveryLinkWidth / 2),
+        footerY,
         presentation.recoveryActionLabel,
         () => { void this.handleLegacyAuthPasswordReset(); }
       );
+      this.overlayGraphics.lineStyle(7, LEGACY_PLAY_TOUCH_ACCENT, 0.12);
+      this.overlayGraphics.lineBetween(separatorX, footerY - (separatorHeight / 2), separatorX, footerY + (separatorHeight / 2));
+      this.overlayGraphics.lineStyle(3, LEGACY_PLAY_TOUCH_ACCENT, 0.96);
+      this.overlayGraphics.lineBetween(separatorX, footerY - (separatorHeight / 2), separatorX, footerY + (separatorHeight / 2));
     }
 
     const primaryLabel = this.authSubmitting
@@ -11138,10 +11185,20 @@ export class MenuScene extends Phaser.Scene {
     );
   }
 
+  private measureAuthFooterLinkWidth(text: string): number {
+    const label = this.padLegacyCompactUiText(this.add.text(0, 0, text, {
+      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+      fontSize: '14px'
+    }));
+    const width = label.displayWidth;
+    label.destroy();
+    return width;
+  }
+
   private createAuthFooterLink(x: number, y: number, text: string, onClick: () => void): void {
     const fontSize = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT ? 13 : 14;
     const label = this.padLegacyCompactUiText(this.add.text(x, y, text, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
       fontSize: `${fontSize}px`,
       color: '#72e0bf'
     })).setOrigin(0.5).setAlpha(0.82);
@@ -11344,13 +11401,54 @@ export class MenuScene extends Phaser.Scene {
     fontSizeOverride?: number
   ): UiButton {
     const chrome = this.add.graphics();
-    const colors = tone === 'primary'
+    const unifiedAuthPrimary = this.overlay === 'auth' && tone === 'primary';
+    const unifiedAuthDisabled = unifiedAuthPrimary && (
+      this.authSubmitting
+      || !resolveLegacyAuthSubmitState(this.authForm, this.authSnapshot.configured).canSubmit
+    );
+    const colors = unifiedAuthPrimary
+      ? { fill: 0xf4f4f5, stroke: LEGACY_PLAY_TOUCH_ACCENT, text: '#050505' }
+      : tone === 'primary'
       ? { fill: 0x063a28, stroke: LEGACY_PLAY_TOUCH_ACCENT, text: '#ecfff5' }
       : tone === 'danger'
         ? { fill: 0x260f1a, stroke: cyberArcadeMaterial.signal.goal, text: '#ffdce6' }
         : { fill: 0x07131d, stroke: LEGACY_PLAY_TOUCH_BUTTON_STROKE, text: '#d7f7ee' };
     const draw = (active: boolean): void => {
       chrome.clear();
+      if (unifiedAuthPrimary) {
+        const surfaceAlpha = unifiedAuthDisabled ? 0.68 : (active ? 0.94 : 1);
+        const left = x - (width / 2);
+        const top = y - (height / 2);
+        const radius = height / 2;
+        chrome.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, (active ? 0.08 : 0.035) * surfaceAlpha);
+        chrome.fillRoundedRect(left - 2, top + 7, width + 4, height + 4, radius + 2);
+        chrome.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, (active ? 0.12 : 0.065) * surfaceAlpha);
+        chrome.fillRoundedRect(left, top + 4, width, height + 1, radius);
+        const gradientStart = { blue: 0xf5, green: 0xf4, red: 0xf4 };
+        const gradientEnd = { blue: 0xb9, green: 0xf4, red: 0xc3 };
+        for (let bandTop = 0; bandTop < height; bandTop += 1) {
+          const bandCenterY = bandTop + 0.5;
+          const gradientProgress = Math.min(1, (bandCenterY / height) / 1.8);
+          const mixChannel = (start: number, end: number): number => Math.round(start + ((end - start) * gradientProgress));
+          const bandColor = (
+            (mixChannel(gradientStart.red, gradientEnd.red) << 16)
+            | (mixChannel(gradientStart.green, gradientEnd.green) << 8)
+            | mixChannel(gradientStart.blue, gradientEnd.blue)
+          );
+          const circleY = bandCenterY - radius;
+          const edgeInset = radius - Math.sqrt(Math.max(0, (radius * radius) - (circleY * circleY)));
+          chrome.fillStyle(bandColor, surfaceAlpha);
+          chrome.fillRect(left + edgeInset, top + bandTop, width - (edgeInset * 2), 1.25);
+        }
+        chrome.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.32 * surfaceAlpha);
+        chrome.strokeRoundedRect(left, top, width, height, radius);
+        chrome.lineStyle(1, 0xffffff, 0.82 * surfaceAlpha);
+        chrome.beginPath();
+        chrome.moveTo(left + radius, top + 1);
+        chrome.lineTo(left + width - radius, top + 1);
+        chrome.strokePath();
+        return;
+      }
       this.drawLegacyCyberPanel(chrome, {
         active: active || tone === 'primary',
         alpha: 1,
@@ -11367,23 +11465,36 @@ export class MenuScene extends Phaser.Scene {
     draw(false);
 
     const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);
-    background.setInteractive({ useHandCursor: true });
-    const fontSize = fontSizeOverride ?? Math.max(15, Math.min(22, Math.round(height * 0.4)));
+    if (!unifiedAuthDisabled) {
+      background.setInteractive({ useHandCursor: true });
+    }
+    const fontSize = fontSizeOverride ?? (unifiedAuthPrimary ? 15 : Math.max(15, Math.min(22, Math.round(height * 0.4))));
     const label = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(
       x,
       resolveLegacyUiLabelCenterY(y, fontSize, 'button'),
       text,
-      { color: colors.text, fontFamily: LEGACY_UI_FONT_FAMILY, fontSize: `${fontSize}px` }
-    )), width - 32, fontSize, 12).setOrigin(0.5).setAlpha(0.96);
+      {
+        color: colors.text,
+        fontFamily: unifiedAuthPrimary ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY,
+        fontSize: `${fontSize}px`,
+        fontStyle: unifiedAuthPrimary ? '600' : 'normal',
+        letterSpacing: unifiedAuthPrimary ? fontSize * 0.01 : 0
+      }
+    )), width - 32, fontSize, 12).setOrigin(0.5).setAlpha(unifiedAuthDisabled ? 0.68 : 0.96);
     this.uiTexts.push(label);
 
     const setActive = (active: boolean): void => {
+      if (unifiedAuthDisabled) {
+        return;
+      }
       draw(active);
       label.setAlpha(active ? 1 : 0.96);
     };
-    background.on('pointerover', () => setActive(true));
-    background.on('pointerout', () => setActive(false));
-    background.on('pointerdown', onClick);
+    if (!unifiedAuthDisabled) {
+      background.on('pointerover', () => setActive(true));
+      background.on('pointerout', () => setActive(false));
+      background.on('pointerdown', onClick);
+    }
 
     return {
       background,
@@ -11411,9 +11522,9 @@ export class MenuScene extends Phaser.Scene {
     secondary: { onClick: () => void; text: string; tone: 'danger' | 'primary' | 'secondary' } | null = null
   ): void {
     const panelBottom = panel.top + panel.height;
-    const barHeight = stacked ? 48 : 52;
-    const barY = panelBottom - (stacked ? 20 : 24) - (barHeight / 2);
-    const sideMargin = stacked ? 20 : 28;
+    const barHeight = this.overlay === 'auth' ? 56 : (stacked ? 48 : 52);
+    const barY = panelBottom - (this.overlay === 'auth' ? 16 : (stacked ? 20 : 24)) - (barHeight / 2);
+    const sideMargin = this.overlay === 'auth' ? 16 : (stacked ? 20 : 28);
     const barLeft = panel.left + sideMargin;
     const barWidth = panel.width - (sideMargin * 2);
 
@@ -11484,28 +11595,55 @@ export class MenuScene extends Phaser.Scene {
           ? 'USERNAME'
           : 'EMAIL';
     const hasPasswordToggle = fieldId === 'password';
-    const contentLeft = x - (width / 2) + 16;
+    const contentLeft = x - (width / 2) + 18;
     const contentRightInset = hasPasswordToggle ? 54 : 16;
-    const valueWidth = width - 16 - contentRightInset;
-    const background = this.add.rectangle(x, y, width, height, 0x07131d, 1);
-    background.setStrokeStyle(2, isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE, isActive ? 0.95 : 0.68);
+    const valueWidth = width - 18 - contentRightInset;
+    const background = this.add.rectangle(x, y, width, height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     background.on('pointerdown', () => this.selectLegacyAuthField(fieldId, { height, width, x, y }));
     if (isActive) {
       this.positionLegacyAuthNativeInput(fieldId, { height, width, x, y });
     }
 
-    const eyebrow = this.padLegacyCompactUiText(this.add.text(contentLeft, y - (height * 0.25), fieldLabel, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${Math.max(8, Math.min(10, Math.round(height * 0.19)))}px`,
+    const borderColor = isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
+    const borderAlpha = isActive ? 0.95 : 0.68;
+    const border = this.add.graphics();
+    const left = x - (width / 2);
+    const right = x + (width / 2);
+    const top = y - (height / 2);
+    const bottom = y + (height / 2);
+    const radius = Math.min(18, height * 0.36);
+    const labelWidth = Math.max(58, (fieldLabel.length * 7) + 18);
+    const labelRight = right - radius - 8;
+    const gapStart = labelRight - labelWidth - 7;
+    const gapEnd = labelRight + 7;
+    border.lineStyle(1, borderColor, borderAlpha);
+    border.beginPath();
+    border.moveTo(left + radius, top);
+    border.lineTo(gapStart, top);
+    border.moveTo(gapEnd, top);
+    border.lineTo(right - radius, top);
+    border.arc(right - radius, top + radius, radius, -Math.PI / 2, 0);
+    border.lineTo(right, bottom - radius);
+    border.arc(right - radius, bottom - radius, radius, 0, Math.PI / 2);
+    border.lineTo(left + radius, bottom);
+    border.arc(left + radius, bottom - radius, radius, Math.PI / 2, Math.PI);
+    border.lineTo(left, top + radius);
+    border.arc(left + radius, top + radius, radius, Math.PI, (Math.PI * 3) / 2);
+    border.strokePath();
+
+    const eyebrow = this.padLegacyCompactUiText(this.add.text(labelRight - (labelWidth / 2), top, fieldLabel, {
+      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+      fontSize: '11px',
       color: isActive ? '#72e0bf' : '#9bcdbd'
-    })).setOrigin(0, 0.5);
+    })).setOrigin(0.5);
     this.uiTexts.push(eyebrow);
+    const valueFontSize = 14;
     const label = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(contentLeft, y + (height * 0.14), value, {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: `${Math.max(14, Math.min(19, Math.round(height * 0.34)))}px`,
+      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+      fontSize: `${valueFontSize}px`,
       color: placeholder ? '#7894a0' : (isActive ? '#72e0bf' : '#ecfff5')
-    })), valueWidth, Math.max(14, Math.min(19, Math.round(height * 0.34))), 10).setOrigin(0, 0.5);
+    })), valueWidth, valueFontSize, valueFontSize).setOrigin(0, 0.5);
     const caret = isActive
       ? this.add.rectangle(
         placeholder ? contentLeft + 5 : Math.min(x + (width / 2) - contentRightInset + 2, label.x + label.displayWidth + 6),
@@ -11538,6 +11676,7 @@ export class MenuScene extends Phaser.Scene {
           this.tweens.killTweensOf(caret);
           caret.destroy();
         }
+        border.destroy();
         background.destroy();
         label.destroy();
       }
@@ -11555,11 +11694,24 @@ export class MenuScene extends Phaser.Scene {
     const icon = this.add.graphics();
     const drawIcon = (active: boolean): void => {
       icon.clear();
-      icon.lineStyle(2, LEGACY_PLAY_TOUCH_ACCENT, active ? 1 : 0.82);
-      icon.strokeEllipse(x, y, size * 0.58, size * 0.36);
-      icon.strokeCircle(x, y, Math.max(2, size * 0.105));
+      const iconViewportSize = 20;
+      const iconScale = iconViewportSize / 24;
+      icon.lineStyle(2.15 * iconScale, LEGACY_PLAY_TOUCH_ACCENT, active ? 1 : 0.82);
+      const point = (px: number, py: number) => new Phaser.Math.Vector2(
+        x + ((px - 12) * iconScale),
+        y + ((py - 12) * iconScale)
+      );
+      const eyeSegments = [
+        new Phaser.Curves.CubicBezier(point(2, 12), point(4.5, 8), point(7.8, 6), point(12, 6)),
+        new Phaser.Curves.CubicBezier(point(12, 6), point(16.2, 6), point(19.5, 8), point(22, 12)),
+        new Phaser.Curves.CubicBezier(point(22, 12), point(19.5, 16), point(16.2, 18), point(12, 18)),
+        new Phaser.Curves.CubicBezier(point(12, 18), point(7.8, 18), point(4.5, 16), point(2, 12))
+      ];
+      const eyePoints = eyeSegments.flatMap((segment, index) => segment.getPoints(8).slice(index === 0 ? 0 : 1));
+      icon.strokePoints(eyePoints, true, true);
+      icon.strokeCircle(x, y, 3 * iconScale);
       if (!this.authPasswordVisible) {
-        icon.lineBetween(x - (size * 0.3), y - (size * 0.3), x + (size * 0.3), y + (size * 0.3));
+        icon.lineBetween(x - (8 * iconScale), y - (8 * iconScale), x + (8 * iconScale), y + (8 * iconScale));
       }
     };
     drawIcon(false);
@@ -12669,23 +12821,24 @@ export class MenuScene extends Phaser.Scene {
 
   private createAuthWordmark(y: number): void {
     const label = this.padLegacyCompactUiText(this.add.text(this.layout.width / 2, y, 'MAZER', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '11px',
-      color: '#72e0bf'
-    })).setOrigin(0.5).setAlpha(0.85).setDepth(3);
+      fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+      fontSize: '14px',
+      color: '#3ddbd4',
+      letterSpacing: 4
+    })).setOrigin(0.5).setAlpha(1).setDepth(3);
     this.uiTexts.push(label);
   }
 
   private createOverlayTitle(text: string, y: number): void {
-    const fontSize = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT ? 24 : (this.layout.width < 480 ? 28 : 34);
+    const fontSize = this.overlay === 'auth' ? 48 : (this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT ? 24 : (this.layout.width < 480 ? 28 : 34));
     const label = this.padLegacyUiText(this.add.text(
       this.layout.width / 2,
       resolveLegacyUiLabelCenterY(y, fontSize, 'overlay-title'),
       text,
       {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontFamily: this.overlay === 'auth' ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY,
       fontSize: `${fontSize}px`,
-      color: '#6bc96f'
+      color: this.overlay === 'auth' ? '#f5f5f7' : '#6bc96f'
     })).setOrigin(0.5).setDepth(3);
     this.uiTexts.push(label);
   }
@@ -13261,7 +13414,7 @@ export class MenuScene extends Phaser.Scene {
     // reasonable header slot even at this reduced size (very long
     // usernames), same reasoning as the alphabet-coverage fallback below.
     const glyphCellSize = 3;
-    const maxGlyphWidth = Math.max(60, Math.round(this.layout.width * 0.3));
+    const maxGlyphWidth = resolveLegacyMenuHeaderUsernameReserve(this.layout.width);
     const useGlyphs = isLegacyGlyphWordRenderable(username)
       && (resolveLegacyGlyphWordColumns(username) * glyphCellSize) <= maxGlyphWidth;
 
@@ -13287,6 +13440,7 @@ export class MenuScene extends Phaser.Scene {
       panel.clear();
       panel.setVisible(false);
       label.setText(username);
+      this.fitLegacyUiTextToWidth(label, maxGlyphWidth, 13, 9);
       label.setColor(`#${trailColor.toString(16).padStart(6, '0')}`);
       label.setAlpha(blinkAlpha);
       label.setPosition(anchorLeft, anchorY);
@@ -13694,13 +13848,13 @@ export class MenuScene extends Phaser.Scene {
       const progressionBand = resolveLegacyProgressionDifficultyProfile(
         this.progressionState.tracks.player
       ).band;
-      this.playStaticSlowTile = createLegacyStaticSlowTileState(this.maze, progressionBand);
+      this.playStaticSlowTile = null;
       this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
         this.maze,
         progressionBand,
-        this.playStaticSlowTile.placement?.point ?? null
+        null
       );
-      this.playPatrolAgent = this.createLegacyPlayPatrolAgent(progressionBand);
+      this.playPatrolAgent = null;
       this.resetLegacyWorldTurnHost();
       this.resetLegacyPlayInputBuffer();
       this.boardDynamicDirty = true;
@@ -13726,11 +13880,11 @@ export class MenuScene extends Phaser.Scene {
     const progressionBand = resolveLegacyProgressionDifficultyProfile(
       this.progressionState.tracks.player
     ).band;
-    this.playStaticSlowTile = createLegacyStaticSlowTileState(this.maze, progressionBand);
+    this.playStaticSlowTile = null;
     this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
       this.maze,
       progressionBand,
-      this.playStaticSlowTile.placement?.point ?? null
+      null
     );
     this.playPatrolAgent = null;
     this.resetLegacyWorldTurnHost();

@@ -20,6 +20,8 @@ import {
 } from './legacyGameTogglePreferences';
 import {
   LEGACY_PROGRESSION_STORAGE_KEY,
+  compareLegacyProgressionOrdinals,
+  maxLegacyProgressionOrdinal,
   normalizeLegacyProgressionState,
   readLegacyProgressionState,
   writeLegacyProgressionState,
@@ -186,17 +188,32 @@ const normalizeRemoteProfileSettings = (
   }, fallback);
 };
 
-const compareTrackAdvancement = (
+const resolveMostRecentTrack = (
   left: LegacyProgressionTrack,
   right: LegacyProgressionTrack
-): number => {
-  const comparisons = [
-    left.completedCycles - right.completedCycles,
-    left.targetComplexity - right.targetComplexity,
-    left.peakComplexity - right.peakComplexity,
-    (Date.parse(left.lastCompletedAt ?? '') || 0) - (Date.parse(right.lastCompletedAt ?? '') || 0)
-  ];
-  return comparisons.find((value) => value !== 0) ?? 0;
+): LegacyProgressionTrack => (
+  (Date.parse(left.lastCompletedAt ?? '') || 0) >= (Date.parse(right.lastCompletedAt ?? '') || 0)
+    ? left
+    : right
+);
+
+const mergeTrackAdvancements = (
+  left: LegacyProgressionTrack,
+  right: LegacyProgressionTrack
+): LegacyProgressionTrack => {
+  const recent = resolveMostRecentTrack(left, right);
+  const bestTimes = [left.bestCompletionTimeMs, right.bestCompletionTimeMs]
+    .filter((value): value is number => value !== null);
+  return {
+    ...recent,
+    bestCompletionTimeMs: bestTimes.length > 0 ? Math.min(...bestTimes) : null,
+    cleanCycles: Math.max(left.cleanCycles, right.cleanCycles),
+    completedCycles: maxLegacyProgressionOrdinal(left.completedCycles, right.completedCycles),
+    level: maxLegacyProgressionOrdinal(left.level, right.level),
+    peakComplexity: Math.max(left.peakComplexity, right.peakComplexity),
+    struggleCycles: Math.max(left.struggleCycles, right.struggleCycles),
+    targetComplexity: Math.max(left.targetComplexity, right.targetComplexity)
+  };
 };
 
 export const mergeLegacyProgressionStateAdvancements = (
@@ -205,12 +222,8 @@ export const mergeLegacyProgressionStateAdvancements = (
 ): LegacyProgressionState => {
   const remote = normalizeLegacyProgressionState(remoteState);
   const local = normalizeLegacyProgressionState(localState);
-  const player = compareTrackAdvancement(local.tracks.player, remote.tracks.player) > 0
-    ? local.tracks.player
-    : remote.tracks.player;
-  const aiRunner = compareTrackAdvancement(local.tracks['ai-runner'], remote.tracks['ai-runner']) > 0
-    ? local.tracks['ai-runner']
-    : remote.tracks['ai-runner'];
+  const player = mergeTrackAdvancements(local.tracks.player, remote.tracks.player);
+  const aiRunner = mergeTrackAdvancements(local.tracks['ai-runner'], remote.tracks['ai-runner']);
   const updatedAt = [remote.updatedAt, local.updatedAt]
     .filter((value): value is string => typeof value === 'string')
     .sort()
@@ -227,7 +240,7 @@ export const mergeLegacyProgressionStateAdvancements = (
 };
 
 const hasProgressionCycles = (state: LegacyProgressionState): boolean => (
-  Object.values(state.tracks).some((track) => track.completedCycles > 0)
+  Object.values(state.tracks).some((track) => compareLegacyProgressionOrdinals(track.completedCycles, '0') > 0)
 );
 
 const progressionStatesMatch = (
@@ -266,6 +279,7 @@ const createRemoteProgressionTrackSummary = (
   colorTier: track.colorTier,
   completedCycles: track.completedCycles,
   lastMazeSeed: track.lastMazeSeed,
+  lastReceiptId: track.lastReceiptId,
   lastSignal: track.lastSignal,
   level: track.level,
   peakComplexity: track.peakComplexity,

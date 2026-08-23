@@ -31,7 +31,7 @@ describe('legacy movement speed profile', () => {
 
     expect(slow).toEqual({
       baseSpeed: 0,
-      completedCycles: 0,
+      completedCycles: '0',
       contextApplied: false,
       effectiveSpeed: 0,
       formulaVersion: LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
@@ -45,7 +45,7 @@ describe('legacy movement speed profile', () => {
     });
     expect(defaultSpeed).toEqual({
       baseSpeed: 0.3,
-      completedCycles: 0,
+      completedCycles: '0',
       contextApplied: false,
       effectiveSpeed: 0.3,
       formulaVersion: LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
@@ -59,7 +59,7 @@ describe('legacy movement speed profile', () => {
     });
     expect(fast).toEqual({
       baseSpeed: 1,
-      completedCycles: 0,
+      completedCycles: '0',
       contextApplied: false,
       effectiveSpeed: 1,
       formulaVersion: LEGACY_MOVEMENT_PACE_PROFILE_VERSION,
@@ -79,17 +79,17 @@ describe('legacy movement speed profile', () => {
 
   test('applies bounded level and established-pace adjustments without overriding speed endpoints', () => {
     const newPlayer = resolveLegacyMovementSpeedProfile(0.3, {
-      completedCycles: 0,
+      completedCycles: '0',
       level: 99,
       paceScore: 100
     });
     const establishedFast = resolveLegacyMovementSpeedProfile(0.3, {
-      completedCycles: 12,
+      completedCycles: '12',
       level: 99,
       paceScore: 100
     });
     const establishedSlow = resolveLegacyMovementSpeedProfile(0.3, {
-      completedCycles: 12,
+      completedCycles: '12',
       level: 1,
       paceScore: 0
     });
@@ -115,12 +115,12 @@ describe('legacy movement speed profile', () => {
     expect(establishedFast.repeatIntervalMs).toBeLessThan(newPlayer.repeatIntervalMs);
     expect(establishedSlow.repeatIntervalMs).toBeGreaterThan(newPlayer.repeatIntervalMs);
     expect(resolveLegacyMovementSpeedProfile(0, {
-      completedCycles: 12,
+      completedCycles: '12',
       level: 99,
       paceScore: 100
     }).effectiveSpeed).toBe(0);
     expect(resolveLegacyMovementSpeedProfile(1, {
-      completedCycles: 12,
+      completedCycles: '12',
       level: 1,
       paceScore: 0
     }).effectiveSpeed).toBe(1);

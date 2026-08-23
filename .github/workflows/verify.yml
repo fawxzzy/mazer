@@ -1,0 +1,47 @@
+name: Verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: TypeScript, contracts, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npm run lint
+
+      - name: Verify progression, RPC, leaderboard, and UI boundaries
+        run: >-
+          npx --no-install vitest run
+          tests/reset/legacy-progression.test.ts
+          tests/reset/legacy-player-progression-flow.test.ts
+          tests/reset/legacy-remote-progression.test.ts
+          tests/reset/legacy-endless-progression.test.ts
+          tests/reset/legacy-leaderboard.test.ts
+          tests/scenes/menu-runtime-diagnostics.test.ts
+          tests/scenes/menu-render-frame.test.ts
+          --maxWorkers=1
+
+      - name: Build production bundle and PWA assets
+        run: npm run build

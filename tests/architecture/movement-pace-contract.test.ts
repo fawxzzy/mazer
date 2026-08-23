@@ -15,7 +15,7 @@ describe('movement pace architecture contract', () => {
     expect(contract).toContain('No input path may reimplement the pace formula.');
     expect(contract).toContain('does not write progression, telemetry, settings, account data, or remote state');
     expect(source).toContain("export const LEGACY_MOVEMENT_PACE_PROFILE_VERSION = 'legacy-movement-pace-v1';");
-    expect(source).toContain('const contextApplied = completedCycles > 0;');
+    expect(source).toContain("const contextApplied = compareLegacyProgressionOrdinals(completedCycles, '0') > 0;");
     expect(source).toContain('const preferenceEnvelope = 4 * baseSpeed * (1 - baseSpeed);');
     expect(menuScene).toContain('private resolveLegacyPlayMovementSpeedProfile()');
     expect(menuScene).toContain('moveRepeatMinIntervalMs: this.resolveLegacyPlayMovementSpeedProfile().repeatIntervalMs');

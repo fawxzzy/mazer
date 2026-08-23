@@ -23,37 +23,28 @@ describe('Mazer install gate', () => {
     expect(shouldShowMazerInstallGate({ ...hiddenState, mode: 'manual', instruction: 'Use Share > Add to Home Screen' })).toBe(true);
   });
 
-  test('the iOS in-app-browser block has no forward action and offers a copy-link fallback instead', () => {
+  test('keeps one shared three-step contract while restoring the native action only for prompt-capable browsers', () => {
     const copy = resolveMazerInstallGateCopy({ ...hiddenState, mode: 'ios-open-in-browser' });
 
     expect(copy.primaryLabel).toBeNull();
     expect(copy.primaryAction).toBeNull();
     expect(copy.showSkip).toBe(false);
-    expect(copy.showCopyLink).toBe(true);
-    expect(copy.title).toContain('Safari');
-  });
-
-  test('a native install prompt offers Install and nothing else -- no skip, the gate is a real block here', () => {
-    const copy = resolveMazerInstallGateCopy({ ...hiddenState, mode: 'available', canPrompt: true });
-
-    expect(copy.primaryAction).toBe('install');
-    expect(copy.primaryLabel).toBe('Install');
-    expect(copy.showSkip).toBe(false);
     expect(copy.showCopyLink).toBe(false);
-  });
+    expect(copy.title).toBe('');
+    expect(copy.subtitle).toBe('');
+    expect(copy.steps).toEqual([
+      "Open this page in your device's default browser.",
+      'Tap Share, then choose More.',
+      'Select Add to Home Screen, Install app, or Download.'
+    ]);
 
-  test('iOS Safari gets the real instruction text and no button at all -- only actually adding to the Home Screen gets past it', () => {
-    const copy = resolveMazerInstallGateCopy({
-      ...hiddenState,
-      mode: 'manual',
-      instruction: 'Use Share > Add to Home Screen'
+    expect(resolveMazerInstallGateCopy({ ...hiddenState, mode: 'available', canPrompt: true })).toEqual({
+      ...copy,
+      primaryAction: 'install',
+      primaryLabel: 'Install'
     });
-
-    expect(copy.subtitle).toBe('Use Share > Add to Home Screen');
-    expect(copy.primaryAction).toBeNull();
-    expect(copy.primaryLabel).toBeNull();
-    expect(copy.showSkip).toBe(false);
-    expect(copy.showCopyLink).toBe(false);
+    expect(resolveMazerInstallGateCopy({ ...hiddenState, mode: 'available', canPrompt: false })).toEqual(copy);
+    expect(resolveMazerInstallGateCopy({ ...hiddenState, mode: 'manual', instruction: 'ignored' })).toEqual(copy);
   });
 
   test('wires the install gate into boot before the Phaser game is created, and skips it on localhost', () => {
@@ -69,5 +60,6 @@ describe('Mazer install gate', () => {
     expect(mainSource).toContain('initializeInstallSurface(window);');
     expect(mainSource).toContain("!isLocalhostRuntime() || forceInstallGate");
     expect(cssSource).toContain(`#${MAZER_INSTALL_GATE_OVERLAY_ID}`);
+    expect(cssSource).toContain('"Space Grotesk", ui-sans-serif, system-ui');
   });
 });

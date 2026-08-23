@@ -27,14 +27,12 @@ export const LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION = 5;
 // field so a stale tab cannot erase baseline provenance when it rewrites the
 // top-level baseline version during remote sync.
 const LEGACY_PROGRESSION_PLAYER_BASELINE_V5_PROVENANCE_STRUGGLE_CYCLES = Number.MAX_SAFE_INTEGER;
-export const LEGACY_PROGRESSION_CHALLENGE_STEP = 1;
-export const LEGACY_PROGRESSION_CHALLENGE_PRESSURE_BONUS = 1;
-export const LEGACY_PROGRESSION_CHALLENGE_STREAK_BONUS_EVERY = 3;
+// Difficulty pressure remains bounded and advances independently from the
+// visible completion ordinal. Every accepted completion increments `level`
+// by exactly one; this step only controls the next maze's bounded pressure.
+export const LEGACY_PROGRESSION_COMPLETION_DIFFICULTY_STEP = 4;
 export const LEGACY_PROGRESSION_SIGNAL_WINDOW_LIMIT = 6;
 export const LEGACY_PROGRESSION_CONSISTENT_SIGNAL_THRESHOLD = 2;
-export const LEGACY_PROGRESSION_MAX_CHALLENGE_STEP = 3;
-export const LEGACY_PROGRESSION_EASE_STEP = -1;
-export const LEGACY_PROGRESSION_EASE_PRESSURE_STEP = -2;
 export const LEGACY_PROGRESSION_AI_CHALLENGE_SCORE_THRESHOLD = MAZE_CYCLE_RUN_QUALITY_AI_CHALLENGE_SCORE_THRESHOLD;
 export const LEGACY_PROGRESSION_AI_EASE_SCORE_THRESHOLD = MAZE_CYCLE_RUN_QUALITY_AI_EASE_SCORE_THRESHOLD;
 export const LEGACY_PROGRESSION_MENU_MIN_TILE_PX = 5.35;
@@ -48,6 +46,7 @@ export const LEGACY_PROGRESSION_PHONE_MENU_MAX_WIDTH = 430;
 export type LegacyProgressionTrackId = 'player' | 'ai-runner';
 export type LegacyProgressionRank = 'E' | 'D' | 'C' | 'B' | 'A' | 'S';
 export type LegacyProgressionSignal = 'challenge' | 'ease' | 'hold';
+export type LegacyProgressionOrdinal = string;
 export type LegacyProgressionDifficultyBand =
   | 'tutorial'
   | 'starter'
@@ -60,12 +59,13 @@ export interface LegacyProgressionTrack {
   bestCompletionTimeMs: number | null;
   cleanCycles: number;
   colorTier: number;
-  completedCycles: number;
+  completedCycles: LegacyProgressionOrdinal;
   lastCompletedAt: string | null;
   lastCompletionTimeMs: number | null;
   lastMazeSeed: number | null;
+  lastReceiptId: string | null;
   lastSignal: LegacyProgressionSignal;
-  level: number;
+  level: LegacyProgressionOrdinal;
   paceScore: number;
   peakComplexity: number;
   rank: LegacyProgressionRank;
@@ -147,7 +147,7 @@ export interface LegacyProgressionDifficultyProfile {
 }
 
 export interface LegacyProgressionPacingSummary {
-  activeLevel: number;
+  activeLevel: LegacyProgressionOrdinal;
   activeRank: LegacyProgressionRank;
   activeTargetComplexity: number;
   challengeStep: number;
@@ -272,6 +272,98 @@ const LEGACY_PROGRESS_MIN_PATH_COLOR_DISTANCE = 145;
 const LEGACY_PROGRESS_FALLBACK_PLAYER_COLOR = 0x36ff7d;
 const LEGACY_PROGRESS_FALLBACK_TRAIL_COLOR = 0x36ff7d;
 const LEGACY_PROGRESS_FALLBACK_TRAIL_PULSE_COLOR = LEGACY_TRAIL_SHINE_COLOR;
+const LEGACY_PROGRESSION_ORDINAL_PATTERN = /^(0|[1-9]\d*)$/;
+
+const isCanonicalLegacyProgressionOrdinal = (value: unknown): value is LegacyProgressionOrdinal => (
+  typeof value === 'string' && LEGACY_PROGRESSION_ORDINAL_PATTERN.test(value)
+);
+
+const parseLegacyProgressionOrdinal = (value: unknown): bigint | null => {
+  if (
+    typeof value === 'number'
+    && Number.isSafeInteger(value)
+    && value >= 0
+  ) {
+    return BigInt(value);
+  }
+  if (typeof value === 'string' && LEGACY_PROGRESSION_ORDINAL_PATTERN.test(value)) {
+    return BigInt(value);
+  }
+  return null;
+};
+
+export const resolveLegacyProgressionOrdinal = (
+  value: unknown
+): LegacyProgressionOrdinal | null => parseLegacyProgressionOrdinal(value)?.toString() ?? null;
+
+/**
+ * Canonical lossless representation for every persisted or transported
+ * completion ordinal. Legacy numeric inputs are accepted only while they are
+ * exact safe integers; unsafe numbers are rejected instead of rounded.
+ */
+export const normalizeLegacyProgressionOrdinal = (
+  value: unknown,
+  fallback: LegacyProgressionOrdinal = '0'
+): LegacyProgressionOrdinal => (
+  (parseLegacyProgressionOrdinal(value) ?? parseLegacyProgressionOrdinal(fallback) ?? 0n).toString()
+);
+
+export const normalizeLegacyPositiveProgressionOrdinal = (
+  value: unknown,
+  fallback: LegacyProgressionOrdinal = '1'
+): LegacyProgressionOrdinal => {
+  const normalized = parseLegacyProgressionOrdinal(value);
+  if (normalized !== null && normalized >= 1n) {
+    return normalized.toString();
+  }
+  const normalizedFallback = parseLegacyProgressionOrdinal(fallback);
+  return normalizedFallback !== null && normalizedFallback >= 1n
+    ? normalizedFallback.toString()
+    : '1';
+};
+
+export const compareLegacyProgressionOrdinals = (
+  left: unknown,
+  right: unknown
+): number => {
+  const leftValue = BigInt(normalizeLegacyProgressionOrdinal(left));
+  const rightValue = BigInt(normalizeLegacyProgressionOrdinal(right));
+  return leftValue === rightValue ? 0 : leftValue > rightValue ? 1 : -1;
+};
+
+export const maxLegacyProgressionOrdinal = (
+  left: unknown,
+  right: unknown
+): LegacyProgressionOrdinal => (
+  compareLegacyProgressionOrdinals(left, right) >= 0
+    ? normalizeLegacyProgressionOrdinal(left)
+    : normalizeLegacyProgressionOrdinal(right)
+);
+
+export const incrementLegacyProgressionOrdinal = (
+  value: unknown
+): LegacyProgressionOrdinal => (
+  (BigInt(normalizeLegacyProgressionOrdinal(value)) + 1n).toString()
+);
+
+export const resolveLegacyProgressionOrdinalModulo = (
+  value: unknown,
+  modulus: number
+): number => {
+  if (!Number.isSafeInteger(modulus) || modulus <= 0) {
+    throw new Error(`Progression ordinal modulus must be a positive safe integer, got ${modulus}`);
+  }
+  return Number(BigInt(normalizeLegacyProgressionOrdinal(value)) % BigInt(modulus));
+};
+
+export const resolveLegacyProgressionOrdinalSeedComponent = (
+  value: unknown,
+  modulus = 2_147_483_647
+): number => resolveLegacyProgressionOrdinalModulo(value, modulus);
+
+export const formatLegacyProgressionOrdinal = (value: unknown): string => (
+  BigInt(normalizeLegacyProgressionOrdinal(value)).toLocaleString('en-US')
+);
 
 const copyTrack = (track: LegacyProgressionTrack): LegacyProgressionTrack => ({
   ...track,
@@ -486,17 +578,11 @@ export const resolveLegacyProgressionDifficultyProfile = (
   const targetComplexity = typeof trackOrTargetComplexity === 'number'
     ? trackOrTargetComplexity
     : trackOrTargetComplexity.targetComplexity;
-  const level = resolveLegacyProgressionLevel(targetComplexity);
-  // Maze size/difficulty now climbs at HALF the rate the player's own level
-  // number does. Level itself is a guaranteed, un-tapered +1/completion
-  // reward (resolveLegacyProgressionTargetAdjustment) -- per feedback that
-  // mazes were getting hard too fast, this decouples "how rewarding each
-  // completion feels" (the real level, shown everywhere else, unaffected)
-  // from "how much bigger/harder the next maze actually is" instead of
-  // tying both to the same raw level number. resolveLegacyMazeGenerationProfileForProgression
-  // below applies the identical halving to the level it re-derives for its
-  // own within-band ramps (starterDepth etc), so the two stay in lockstep.
-  const normalizedLevel = clampInteger(Math.ceil(level / 2), 1, 99);
+  const difficultyLevel = resolveLegacyProgressionLevel(targetComplexity);
+  // Maze pressure climbs at half the bounded difficulty index. The player/AI
+  // completion ordinal is intentionally not read here: it can grow forever,
+  // while generation remains bounded and independently paced.
+  const normalizedLevel = clampInteger(Math.ceil(difficultyLevel / 2), 1, 99);
 
   if (normalizedLevel <= 1) {
     return {
@@ -595,15 +681,16 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
   trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number
 ): LegacyMazeGenerationProfile => {
   const profile = resolveLegacyProgressionDifficultyProfile(trackOrTargetComplexity);
-  const realLevel = typeof trackOrTargetComplexity === 'number'
-    ? resolveLegacyProgressionLevel(trackOrTargetComplexity)
-    : trackOrTargetComplexity.level;
-  // Same halving resolveLegacyProgressionDifficultyProfile applies for band
-  // selection -- starterDepth below indexes into this band's own gradual
-  // ramp (checkpoint/dead-end/shortcut pressure), so it needs to stay
-  // paced against the same slowed-down level or it would front-load that
-  // ramp against the real (faster) level instead.
-  const level = clampInteger(Math.ceil(realLevel / 2), 1, 99);
+  const targetComplexity = typeof trackOrTargetComplexity === 'number'
+    ? trackOrTargetComplexity
+    : trackOrTargetComplexity.targetComplexity;
+  // Use the same bounded difficulty index as band selection. Never feed the
+  // unbounded completion ordinal back into maze geometry.
+  const level = clampInteger(
+    Math.ceil(resolveLegacyProgressionLevel(targetComplexity) / 2),
+    1,
+    99
+  );
 
   switch (profile.band) {
     case 'tutorial':
@@ -724,12 +811,13 @@ const createTrack = (targetComplexity = LEGACY_PROGRESSION_BASE_TARGET_COMPLEXIT
     bestCompletionTimeMs: null,
     cleanCycles: 0,
     colorTier: resolveLegacyProgressionColorTier(normalizedTarget),
-    completedCycles: 0,
+    completedCycles: '0',
     lastCompletedAt: null,
     lastCompletionTimeMs: null,
     lastMazeSeed: null,
+    lastReceiptId: null,
     lastSignal: 'hold',
-    level: resolveLegacyProgressionLevel(normalizedTarget),
+    level: String(resolveLegacyProgressionLevel(normalizedTarget)),
     paceScore: 0,
     peakComplexity: normalizedTarget,
     rank: resolveLegacyProgressionRank(normalizedTarget),
@@ -744,9 +832,10 @@ const createPlayerBaselineTrack = (): LegacyProgressionTrack => ({
   struggleCycles: LEGACY_PROGRESSION_PLAYER_BASELINE_V5_PROVENANCE_STRUGGLE_CYCLES
 });
 
-const formatLegacyProgressionCycleCount = (completedCycles: number): string => (
-  `${Math.min(99_999, Math.max(0, Math.round(completedCycles)))}${completedCycles > 99_999 ? '+' : ''}`
-);
+const formatLegacyProgressionCycleCount = (completedCycles: LegacyProgressionOrdinal): string => {
+  const normalized = normalizeLegacyProgressionOrdinal(completedCycles);
+  return compareLegacyProgressionOrdinals(normalized, '99999') > 0 ? '99999+' : normalized;
+};
 
 export const createEmptyLegacyProgressionState = (): LegacyProgressionState => ({
   version: 1,
@@ -764,7 +853,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
 );
 
 const normalizeNonNegativeInteger = (value: unknown, fallback = 0): number => (
-  typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : fallback
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.round(value)))
+    : fallback
 );
 
 const normalizeNullableNonNegativeInteger = (value: unknown, fallback: number | null = null): number | null => (
@@ -814,14 +905,20 @@ const normalizeTrack = (value: unknown, fallback: LegacyProgressionTrack): Legac
     bestCompletionTimeMs: normalizeNullableNonNegativeInteger(value.bestCompletionTimeMs, fallback.bestCompletionTimeMs),
     cleanCycles: normalizeNonNegativeInteger(value.cleanCycles, fallback.cleanCycles),
     colorTier: resolveLegacyProgressionColorTier(targetComplexity),
-    completedCycles: normalizeNonNegativeInteger(value.completedCycles, fallback.completedCycles),
+    completedCycles: normalizeLegacyProgressionOrdinal(value.completedCycles, fallback.completedCycles),
     lastCompletedAt: typeof value.lastCompletedAt === 'string' ? value.lastCompletedAt : fallback.lastCompletedAt,
     lastCompletionTimeMs: normalizeNullableNonNegativeInteger(value.lastCompletionTimeMs, fallback.lastCompletionTimeMs),
     lastMazeSeed: typeof value.lastMazeSeed === 'number' && Number.isFinite(value.lastMazeSeed)
       ? Math.max(0, Math.round(value.lastMazeSeed))
       : fallback.lastMazeSeed,
+    lastReceiptId: typeof value.lastReceiptId === 'string' && value.lastReceiptId.length > 0
+      ? value.lastReceiptId
+      : fallback.lastReceiptId,
     lastSignal: normalizeSignal(value.lastSignal),
-    level: resolveLegacyProgressionLevel(targetComplexity),
+    // `level` is the player-facing completion ordinal. Old states that do
+    // not carry it fall back to their bounded difficulty-derived value, but
+    // a present positive integer is never recomputed from difficulty.
+    level: normalizeLegacyPositiveProgressionOrdinal(value.level, String(resolveLegacyProgressionLevel(targetComplexity))),
     paceScore: clampInteger(normalizeNonNegativeInteger(value.paceScore, fallback.paceScore), 0, 100),
     peakComplexity,
     rank: resolveLegacyProgressionRank(targetComplexity),
@@ -845,9 +942,8 @@ const hasLegacyPlayerBaselineV5Provenance = (track: LegacyProgressionTrack): boo
 );
 
 // The maximum targetComplexity a player track could possibly have legitimately
-// earned in this many completed cycles -- the current player-track gain is a
-// flat +4/cycle (resolveLegacyProgressionTargetAdjustment's 'player' branch),
-// but this is deliberately an UPPER BOUND rather than an exact-match
+// earned in this many completed cycles -- every completion now gains a flat
+// +4/cycle, but this is deliberately an UPPER BOUND rather than an exact-match
 // simulation of that formula. A previous version of the game tapered the
 // per-cycle gain down at higher levels; real accounts that earned their
 // progress under that taper have a targetComplexity BELOW what a flat +4/cycle
@@ -857,16 +953,31 @@ const hasLegacyPlayerBaselineV5Provenance = (track: LegacyProgressionTrack): boo
 // every account that leveled up before this formula last changed as
 // "impossible" and wipe it back to level 1 the next time it's read or
 // written -- see hasCoherentLegacyPlayerProgression below.
-const resolveLegacyPlayerMaxTargetComplexityForCompletedCycles = (completedCycles: number): number => (
-  clampInteger(
-    LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY + (normalizeNonNegativeInteger(completedCycles) * 4),
+const resolveLegacyPlayerMaxTargetComplexityForCompletedCycles = (
+  completedCycles: LegacyProgressionOrdinal
+): number => {
+  const cyclesToMaximum = Math.ceil(
+    (LEGACY_PROGRESSION_MAX_COMPLEXITY - LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY)
+    / LEGACY_PROGRESSION_COMPLETION_DIFFICULTY_STEP
+  );
+  if (compareLegacyProgressionOrdinals(completedCycles, String(cyclesToMaximum)) >= 0) {
+    return LEGACY_PROGRESSION_MAX_COMPLEXITY;
+  }
+  const boundedCycles = resolveLegacyProgressionOrdinalModulo(completedCycles, cyclesToMaximum + 1);
+  return clampInteger(
+    LEGACY_PROGRESSION_PLAYER_BASE_TARGET_COMPLEXITY
+    + (boundedCycles * LEGACY_PROGRESSION_COMPLETION_DIFFICULTY_STEP),
     LEGACY_PROGRESSION_MIN_COMPLEXITY,
     LEGACY_PROGRESSION_MAX_COMPLEXITY
-  )
-);
+  );
+};
 
 const hasCoherentLegacyPlayerProgression = (track: LegacyProgressionTrack): boolean => (
   track.targetComplexity <= resolveLegacyPlayerMaxTargetComplexityForCompletedCycles(track.completedCycles)
+  && compareLegacyProgressionOrdinals(
+    track.level,
+    incrementLegacyProgressionOrdinal(track.completedCycles)
+  ) <= 0
 );
 
 export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressionState => {
@@ -914,10 +1025,20 @@ export const readLegacyProgressionState = (
     const normalized = raw ? normalizeLegacyProgressionState(JSON.parse(raw)) : createEmptyLegacyProgressionState();
     if (raw) {
       const parsed = JSON.parse(raw);
+      const parsedTracks = isRecord(parsed) && isRecord(parsed.tracks) ? parsed.tracks : null;
+      const parsedPlayer = parsedTracks && isRecord(parsedTracks.player) ? parsedTracks.player : null;
+      const parsedAiRunner = parsedTracks && isRecord(parsedTracks['ai-runner']) ? parsedTracks['ai-runner'] : null;
+      const ordinalsAreCanonical = parsedPlayer !== null
+        && parsedAiRunner !== null
+        && isCanonicalLegacyProgressionOrdinal(parsedPlayer.completedCycles)
+        && isCanonicalLegacyProgressionOrdinal(parsedPlayer.level)
+        && isCanonicalLegacyProgressionOrdinal(parsedAiRunner.completedCycles)
+        && isCanonicalLegacyProgressionOrdinal(parsedAiRunner.level);
       if (
         !isRecord(parsed)
         || normalizeNonNegativeInteger(parsed.aiRunnerBaselineVersion) < LEGACY_PROGRESSION_AI_BASELINE_VERSION
         || normalizeNonNegativeInteger(parsed.playerProgressionBaselineVersion) < LEGACY_PROGRESSION_PLAYER_BASELINE_VERSION
+        || !ordinalsAreCanonical
       ) {
         storage.setItem(LEGACY_PROGRESSION_STORAGE_KEY, JSON.stringify(normalized));
       }
@@ -1116,74 +1237,14 @@ export const resolveLegacyProgressionPerformanceScoreForReceipt = (
   complexity: number
 ): LegacyProgressionPerformanceScore => scoreLegacyProgressionReceipt(receipt, complexity);
 
-const resolveLegacyProgressionTargetAdjustment = (
-  track: LegacyProgressionTrack,
-  complexity: number,
-  signal: LegacyProgressionSignal,
-  trackId: LegacyProgressionTrackId = 'ai-runner'
-): number => {
-  if (trackId === 'player') {
-    // Flat +4 -- resolveLegacyProgressionLevel buckets every 4 complexity
-    // points into one level, so this is exactly one level per completed
-    // maze, always, with no taper as level rises. (A previous pass tapered
-    // this down at higher levels per feedback that difficulty climbed too
-    // fast; per later feedback that guaranteed, uniform forward progress
-    // matters more now that there's no timer/score to weigh completions
-    // against, that taper was removed.)
-    return 4;
-  }
-
-  const nextSignals = appendLegacyProgressionSignal(track, signal);
-  const recentChallengeCount = countSignals(nextSignals, 'challenge');
-  const recentEaseCount = countSignals(nextSignals, 'ease');
-
-  if (signal === 'ease') {
-    // track.struggleCycles is a lifetime counter that never resets (unlike
-    // cleanCycles' modulo-based streak bonus, there's no periodic decay) --
-    // using it here meant that once an ai-runner track crossed 2 lifetime
-    // eases (typically within its first few minutes of running), every
-    // future ease permanently applied the bigger pressure step, for the
-    // rest of that track's life. Combined with the challenge step normally
-    // being +1 against a -2 pressure ease, a "human-like" AI that wins only
-    // half its runs nets negative progress forever and never climbs past
-    // the level it happened to be at when the lock-in triggered -- this was
-    // the actual cause of the AI getting stuck a couple levels in. The
-    // windowed recentEaseCount check below already covers "you've been
-    // struggling recently" without permanently escalating.
-    return complexity > track.targetComplexity + 18
-      || recentEaseCount >= LEGACY_PROGRESSION_CONSISTENT_SIGNAL_THRESHOLD
-      ? LEGACY_PROGRESSION_EASE_PRESSURE_STEP
-      : LEGACY_PROGRESSION_EASE_STEP;
-  }
-
-  if (signal !== 'challenge') {
-    return 0;
-  }
-
-  const nextCleanCycles = track.cleanCycles + 1;
-  const measuredPressureBonus = complexity >= track.targetComplexity + 8
-    ? LEGACY_PROGRESSION_CHALLENGE_PRESSURE_BONUS
-    : 0;
-  const consistencyBonus = recentChallengeCount >= LEGACY_PROGRESSION_CONSISTENT_SIGNAL_THRESHOLD
-    ? 1
-    : 0;
-  const longStreakBonus = nextCleanCycles % LEGACY_PROGRESSION_CHALLENGE_STREAK_BONUS_EVERY === 0
-    ? 1
-    : 0;
-
-  return Math.min(
-    LEGACY_PROGRESSION_MAX_CHALLENGE_STEP,
-    LEGACY_PROGRESSION_CHALLENGE_STEP + measuredPressureBonus + consistencyBonus + longStreakBonus
-  );
-};
+const resolveLegacyProgressionTargetAdjustment = (): number => (
+  LEGACY_PROGRESSION_COMPLETION_DIFFICULTY_STEP
+);
 
 const resolveLegacyProgressionPacedTarget = (
-  track: LegacyProgressionTrack,
-  complexity: number,
-  signal: LegacyProgressionSignal,
-  trackId: LegacyProgressionTrackId = 'ai-runner'
+  track: LegacyProgressionTrack
 ): number => clampInteger(
-  track.targetComplexity + resolveLegacyProgressionTargetAdjustment(track, complexity, signal, trackId),
+  track.targetComplexity + resolveLegacyProgressionTargetAdjustment(),
   LEGACY_PROGRESSION_MIN_COMPLEXITY,
   LEGACY_PROGRESSION_MAX_COMPLEXITY
 );
@@ -1192,10 +1253,9 @@ const applyTrackSignal = (
   track: LegacyProgressionTrack,
   receipt: MazeCycleTelemetryReceipt,
   complexity: number,
-  signal: LegacyProgressionSignal,
-  trackId: LegacyProgressionTrackId
+  signal: LegacyProgressionSignal
 ): LegacyProgressionTrack => {
-  const targetComplexity = resolveLegacyProgressionPacedTarget(track, complexity, signal, trackId);
+  const targetComplexity = resolveLegacyProgressionPacedTarget(track);
   const recentSignals = appendLegacyProgressionSignal(track, signal);
   const lastCompletionTimeMs = Math.max(0, Math.round(receipt.completionTimeMs));
   const previousBest = track.bestCompletionTimeMs;
@@ -1210,12 +1270,13 @@ const applyTrackSignal = (
     bestCompletionTimeMs,
     cleanCycles: track.cleanCycles + (signal === 'challenge' ? 1 : 0),
     colorTier: resolveLegacyProgressionColorTier(targetComplexity),
-    completedCycles: track.completedCycles + 1,
+    completedCycles: incrementLegacyProgressionOrdinal(track.completedCycles),
     lastCompletedAt: receipt.completedAt,
     lastCompletionTimeMs,
     lastMazeSeed: receipt.mazeSeed,
+    lastReceiptId: receipt.id,
     lastSignal: signal,
-    level: resolveLegacyProgressionLevel(targetComplexity),
+    level: incrementLegacyProgressionOrdinal(track.level),
     paceScore: performanceScore.total,
     peakComplexity: Math.max(track.peakComplexity, complexity, targetComplexity),
     rank: resolveLegacyProgressionRank(targetComplexity),
@@ -1228,13 +1289,14 @@ const applyTrackSignal = (
 export const summarizeLegacyProgressionPacing = (
   track: LegacyProgressionTrack,
   measuredMazeComplexity: number,
-  trackId: LegacyProgressionTrackId = 'ai-runner'
+  _trackId: LegacyProgressionTrackId = 'ai-runner'
 ): LegacyProgressionPacingSummary => {
   const signalWindow = normalizeSignalWindow(track.recentSignals);
   const recentChallengeCount = countSignals(signalWindow, 'challenge');
   const recentEaseCount = countSignals(signalWindow, 'ease');
-  const levelBaseTargetComplexity = resolveLegacyProgressionLevelBaseTargetComplexity(track.level);
-  const nextLevelTargetComplexity = resolveLegacyProgressionNextLevelTargetComplexity(track.level);
+  const difficultyLevel = resolveLegacyProgressionLevel(track.targetComplexity);
+  const levelBaseTargetComplexity = resolveLegacyProgressionLevelBaseTargetComplexity(difficultyLevel);
+  const nextLevelTargetComplexity = resolveLegacyProgressionNextLevelTargetComplexity(difficultyLevel);
   const levelRange = Math.max(1, nextLevelTargetComplexity - levelBaseTargetComplexity);
   const complexityUntilNextLevel = Math.max(0, nextLevelTargetComplexity - track.targetComplexity);
   const skillTrend = recentChallengeCount > recentEaseCount
@@ -1249,9 +1311,9 @@ export const summarizeLegacyProgressionPacing = (
     activeLevel: track.level,
     activeRank: track.rank,
     activeTargetComplexity: track.targetComplexity,
-    challengeStep: resolveLegacyProgressionTargetAdjustment(track, measuredMazeComplexity, 'challenge', trackId),
+    challengeStep: resolveLegacyProgressionTargetAdjustment(),
     complexityUntilNextLevel,
-    easeStep: resolveLegacyProgressionTargetAdjustment(track, measuredMazeComplexity, 'ease', trackId),
+    easeStep: resolveLegacyProgressionTargetAdjustment(),
     lastCompletionTimeMs: track.lastCompletionTimeMs,
     levelBaseTargetComplexity,
     levelProgressPercent: clampInteger(
@@ -1262,8 +1324,8 @@ export const summarizeLegacyProgressionPacing = (
     measuredMazeComplexity,
     measuredMazeLevel: resolveLegacyProgressionLevel(measuredMazeComplexity),
     measuredMazeRank: resolveLegacyProgressionRank(measuredMazeComplexity),
-    nextChallengeTargetComplexity: resolveLegacyProgressionPacedTarget(track, measuredMazeComplexity, 'challenge', trackId),
-    nextEaseTargetComplexity: resolveLegacyProgressionPacedTarget(track, measuredMazeComplexity, 'ease', trackId),
+    nextChallengeTargetComplexity: resolveLegacyProgressionPacedTarget(track),
+    nextEaseTargetComplexity: resolveLegacyProgressionPacedTarget(track),
     nextLevelTargetComplexity,
     paceScore: track.paceScore,
     recentChallengeCount,
@@ -1281,6 +1343,9 @@ export const recordLegacyProgressionCycle = (
 ): LegacyProgressionState => {
   const normalized = normalizeLegacyProgressionState(state);
   const trackId = resolveLegacyProgressionTrackIdForSurface(receipt.surface);
+  if (normalized.tracks[trackId].lastReceiptId === receipt.id) {
+    return writeLegacyProgressionState(storage, normalized);
+  }
   const complexity = resolveLegacyMazeComplexity(maze ?? {
     source: receipt.surface === 'play' ? 'play-generated' : 'menu-generated',
     // Telemetry only carries one representative size figure (see
@@ -1314,7 +1379,7 @@ export const recordLegacyProgressionCycle = (
     updatedAt: receipt.completedAt,
     tracks: {
       ...normalized.tracks,
-      [trackId]: applyTrackSignal(normalized.tracks[trackId], receipt, complexity.total, signal, trackId)
+      [trackId]: applyTrackSignal(normalized.tracks[trackId], receipt, complexity.total, signal)
     }
   });
 };
@@ -1342,7 +1407,8 @@ export const resolveLegacyProgressionGenerationScale = (
   options: LegacyProgressionGenerationScaleOptions = {}
 ): number => {
   const profile = resolveLegacyProgressionDifficultyProfile(track);
-  const progressionScale = profile.targetScale + Math.min(8, Math.max(0, track.targetComplexity - resolveLegacyProgressionLevelBaseTargetComplexity(track.level)) * 0.8);
+  const difficultyLevel = resolveLegacyProgressionLevel(track.targetComplexity);
+  const progressionScale = profile.targetScale + Math.min(8, Math.max(0, track.targetComplexity - resolveLegacyProgressionLevelBaseTargetComplexity(difficultyLevel)) * 0.8);
   const blendedScale = (baseScale * 0.28) + (progressionScale * 0.72);
   const progressionMaxScale = Math.min(96, baseScale + 28);
   const viewportMaxScale = resolveLegacyProgressionViewportScaleCap({

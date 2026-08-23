@@ -3,6 +3,7 @@ import {
   resolveLegacyDynamicMarkerInset,
   resolveLegacyDynamicTrailStrokeWidth,
   resolveLegacyEndpointMarkerRenderMetrics,
+  resolveLegacyBleedOffDockVisualEligibility,
   resolveLegacyBleedOffPaths,
   resolveLegacyMenuBorderDockDirections,
   resolveLegacyMenuBorderDockRenderAreas,
@@ -19,6 +20,8 @@ import {
 import { resolveLegacyNavigationTarget } from '../../src/legacy-runtime/legacyMaze';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
+const normalizeSourceLineEndings = (source: string): string => source.replace(/\r\n?/g, '\n');
 
 const readPngDimensions = (path: string): { height: number; width: number } => {
   const bytes = readFileSync(resolve(process.cwd(), path));
@@ -45,6 +48,14 @@ vi.mock('phaser', () => ({
 }));
 
 describe('resolveLegacyMenuPathRenderFrame', () => {
+  test('keeps semantic source assertions identical across LF and CRLF checkouts', () => {
+    const semanticSource = 'first line\nsecond line\n';
+
+    expect(normalizeSourceLineEndings(semanticSource)).toBe(semanticSource);
+    expect(normalizeSourceLineEndings(semanticSource.replaceAll('\n', '\r\n'))).toBe(semanticSource);
+    expect(normalizeSourceLineEndings('first line\r\nchanged line\r\n')).not.toBe(semanticSource);
+  });
+
   test('caps active Phaser rendering to mobile-friendly 60 FPS', () => {
     const phaserConfigSource = readFileSync(resolve(process.cwd(), 'src/boot/phaserConfig.ts'), 'utf8');
     const canvasResolutionSource = readFileSync(resolve(process.cwd(), 'src/boot/canvasResolution.ts'), 'utf8');
@@ -235,6 +246,25 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     ]);
     expect(resolveLegacyNavigationTarget(maze, { x: 2, y: 0 }, 0, -1)).toEqual({ x: 2, y: 4 });
     expect(resolveLegacyBleedOffPaths(maze, { x: 0, y: 0 })).toEqual([]);
+  });
+
+  test('renders every legal bleed-off opening even when several share one side or sit adjacently', () => {
+    const maze = {
+      width: 7,
+      height: 7,
+      grid: Array.from({ length: 7 }, (_, y) => Array.from({ length: 7 }, (_, x) => (
+        ((x === 0 || x === 6) && [1, 2, 4].includes(y))
+        || ((y === 0 || y === 6) && [1, 3, 4].includes(x))
+      )))
+    };
+
+    expect([...resolveLegacyBleedOffDockVisualEligibility(maze)].sort()).toEqual([
+      '0,1', '0,2', '0,4',
+      '1,0', '1,6',
+      '3,0', '3,6',
+      '4,0', '4,6',
+      '6,1', '6,2', '6,4'
+    ]);
   });
 
   test('keeps folded-corner border cells capped so the corner facets stay clean', () => {
@@ -678,6 +708,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
   test('keeps active play maze rendering on connected corridors instead of square debug cells', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const normalizedMenuSceneSource = normalizeSourceLineEndings(menuSceneSource);
+    const menuTitleDrawSource = normalizedMenuSceneSource.slice(
+      normalizedMenuSceneSource.indexOf('private drawLegacyMenuPathTitle(time: number): void'),
+      normalizedMenuSceneSource.indexOf('private resolveLegacyMazeRenderFrame(')
+    );
 
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_CORE = mixLegacyIridescentColor(cyberArcadeMaterial.path.core, 0x000000, LEGACY_PATH_CORE_EYE_COMFORT_DIM_AMOUNT);');
     expect(menuSceneSource).toContain('const LEGACY_PLAY_PATH_EDGE = cyberArcadeMaterial.path.edge;');
@@ -713,7 +748,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS = 8;');
     expect(menuSceneSource).toContain('private drawLegacyMenuPathTitle(time: number): void');
     expect(menuSceneSource).toContain('return resolveLegacyMenuTitleFontSize(this.layout.titleReserveHeight);');
-    expect(menuSceneSource).not.toContain('if (visibleCells.length <= 0) {\n      return;\n    }');
+    expect(menuTitleDrawSource).not.toMatch(/if \(visibleCells\.length <= 0\) \{\n\s*return;\n\s*\}/);
     expect(menuSceneSource).not.toContain('drawLegacyMenuPathTitleSigilRails');
     expect(menuSceneSource).toContain('this.drawLegacyMenuPathTitleOrbitSigils(titleLayout, time, titlePresentation.titleAlpha);');
     expect(menuSceneSource).toContain("type LegacyMenuPathTitleSweepMode = 'build' | 'deconstruct' | 'idle';");
@@ -1269,6 +1304,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(runtimeDiagnosticsSource).toContain("encoding: 'walkable-rows-v1';");
     expect(runtimeDiagnosticsSource).toContain('walkableRows: string[];');
+    expect(runtimeDiagnosticsSource).toContain('progressionCompletedCycles: string;');
     expect(menuSceneSource).toContain("encoding: 'walkable-rows-v1'");
     expect(menuSceneSource).toContain("walkableRows: this.maze.grid.map((row) => row.map((walkable) => (walkable ? '1' : '0')).join(''))");
   });
@@ -1503,6 +1539,22 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(authReuseContract).toContain('No shared React component import into Phaser.');
   });
 
+  test('adopts the opaque Fitness-derived auth visual family without changing Mazer auth semantics', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('const LEGACY_AUTH_UI_FONT_FAMILY');
+    expect(menuSceneSource).toContain("this.overlay === 'auth' ? 0x031f20 : 0x02040a");
+    expect(menuSceneSource).toContain("&& this.overlay === 'none';");
+    expect(menuSceneSource).toContain('border.lineStyle(1, borderColor, borderAlpha);');
+    expect(menuSceneSource).toContain('new Phaser.Curves.CubicBezier(');
+    expect(menuSceneSource).toContain("fontFamily: unifiedAuthPrimary ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY");
+    expect(menuSceneSource).toContain("const barHeight = this.overlay === 'auth' ? 56");
+    expect(menuSceneSource).not.toContain('EMAIL OR USERNAME');
+    expect(authSource).toContain('signInWithPassword({');
+    expect(authSource).not.toContain("reason: 'Enter a valid username.'");
+  });
+
   test('keeps both the player level and the independent menu-demo AI level off the front door as persistent chrome', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
@@ -1648,8 +1700,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createFreshLegacyPlayGenerationSeed(): number');
     expect(menuSceneSource).toContain('const playerTrack = this.progressionState.tracks.player;');
     expect(menuSceneSource).toContain('playerTrack.targetComplexity * 1009');
-    expect(menuSceneSource).toContain('playerTrack.completedCycles * 9176');
-    expect(menuSceneSource).toContain('playerTrack.level * 313');
+    expect(menuSceneSource).toContain('resolveLegacyProgressionOrdinalSeedComponent(playerTrack.completedCycles, 1_000_003)');
+    expect(menuSceneSource).toContain('resolveLegacyProgressionOrdinalSeedComponent(playerTrack.level, 1_000_033)');
     expect(menuSceneSource).toContain('playerTrack.paceScore * 37');
     expect(menuSceneSource).toContain("const seedOverride = mode === 'play'");
     expect(menuSceneSource).toContain('seedOverride');
@@ -1731,7 +1783,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(overlayPanelStart).toBeGreaterThanOrEqual(0);
     expect(overlayPanelEnd).toBeGreaterThan(overlayPanelStart);
-    expect(overlayPanelSource).toContain('this.overlayGraphics.fillStyle(0x02040a, 0.82);');
+    expect(overlayPanelSource).toContain("this.overlayGraphics.fillStyle(this.overlay === 'auth' ? 0x031f20 : 0x02040a, this.overlay === 'auth' ? 1 : 0.82);");
     expect(overlayPanelSource).toContain('this.overlayGraphics.fillRect(0, 0, this.layout.width, this.layout.height);');
     expect(overlayPanelSource).not.toContain('drawLegacyCyberPanel');
     expect(menuSceneSource).toContain('resolveLegacyOverlayScrollMetrics');
@@ -1739,7 +1791,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private createOverlayBackChevronButton(panel: OverlayPanelFrame, onClick: () => void): UiButton');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand(\'resume\')));');
     expect(menuSceneSource).toContain('this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));');
-    expect(menuSceneSource).toContain('return resolveLegacyOverlayPanelLayout(\r\n      this.layout.width,\r\n      this.layout.height,\r\n      readMazerViewportGeometry().safeArea\r\n    );');
+    expect(normalizeSourceLineEndings(menuSceneSource)).toContain('return resolveLegacyOverlayPanelLayout(\n      this.layout.width,\n      this.layout.height,\n      readMazerViewportGeometry().safeArea\n    );');
     expect(menuSceneSource).toContain('const shell = resolveLegacyOverlayShellLayout({');
     expect(menuSceneSource).not.toContain("if (kind === 'pause' && this.mode === 'play')");
     expect(menuSceneSource).toContain('rightGutter: LEGACY_OVERLAY_SCROLL_RIGHT_GUTTER');

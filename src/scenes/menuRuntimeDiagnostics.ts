@@ -396,7 +396,7 @@ export interface MenuSceneRuntimeDiagnostics {
         heldControl: string | null;
         movementSpeed: number;
         movementSpeedLabel: string;
-        progressionCompletedCycles: number;
+        progressionCompletedCycles: string;
         progressionContextApplied: boolean;
         progressionLevel: number;
         progressionPaceScore: number;

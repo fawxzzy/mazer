@@ -8,7 +8,7 @@ import {
 
 describe('legacy full auth gate', () => {
   test('keeps local guest play explicit while the default resolved entry is login-first', () => {
-    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
 
     expect(LEGACY_GUEST_PLAY_ACCESS_ENABLED).toBe(true);
     expect(isLegacyPlayAccessAllowed('guest', { authResolved: false, guestPlayGranted: false })).toBe(false);

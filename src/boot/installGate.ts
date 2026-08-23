@@ -51,59 +51,20 @@ export interface MazerInstallGateCopy {
 export const shouldShowMazerInstallGate = (state: InstallSurfaceState): boolean => state.mode !== 'hidden';
 
 export const resolveMazerInstallGateCopy = (state: InstallSurfaceState): MazerInstallGateCopy => {
-  if (state.mode === 'ios-open-in-browser') {
-    return {
-      title: 'Open Mazer in Safari',
-      subtitle: 'This link opened inside another app, which can’t install Mazer to your Home Screen.',
-      steps: [
-        'Tap the ••• or Share icon',
-        'Choose "Open in Safari"',
-        'Then add Mazer to your Home Screen from there'
-      ],
-      primaryLabel: null,
-      primaryAction: null,
-      showSkip: false,
-      showCopyLink: true
-    };
-  }
-
-  if (state.mode === 'available') {
-    // Native beforeinstallprompt support (Android/desktop Chrome/Edge) --
-    // the one case that gets an actual Install button. No skip: the gate
-    // is a real block for this surface, not a dismissible nudge -- the
-    // only way through is to actually install.
-    return {
-      title: 'Install Mazer',
-      subtitle: 'Play full-screen, offline-ready, right from your Home Screen.',
-      steps: [
-        'Tap Install below',
-        'Confirm the browser prompt',
-        'Open Mazer from its new Home Screen icon'
-      ],
-      primaryLabel: 'Install',
-      primaryAction: 'install',
-      showSkip: false,
-      showCopyLink: false
-    };
-  }
-
-  // iOS Safari never gets an install button (there's no native prompt to
-  // trigger) and no continue/skip either -- the gate only goes away once
-  // they've actually added Mazer to their Home Screen and relaunched it
-  // standalone (installSurface reports 'hidden' at that point and this
-  // whole gate is skipped). Instructions only, no button.
   return {
-    title: 'Add Mazer to your Home Screen',
-    subtitle: state.mode === 'manual'
-      ? state.instruction ?? 'Use your browser menu to add Mazer to your Home Screen.'
-      : 'Use your browser menu to add Mazer to your Home Screen.',
+    title: '',
+    subtitle: '',
     steps: [
-      'Tap the Share button',
-      'Choose "Add to Home Screen"',
-      'Open Mazer from the new Home Screen icon'
+      "Open this page in your device's default browser.",
+      'Tap Share, then choose More.',
+      'Select Add to Home Screen, Install app, or Download.'
     ],
-    primaryLabel: null,
-    primaryAction: null,
+    // `available` means installSurface has already intercepted and retained
+    // the browser's beforeinstallprompt event. The boot gate must expose the
+    // one action that can replay that native prompt or Chrome/Edge players
+    // have no way through the otherwise blocking screen.
+    primaryLabel: state.mode === 'available' && state.canPrompt ? 'Install' : null,
+    primaryAction: state.mode === 'available' && state.canPrompt ? 'install' : null,
     showSkip: false,
     showCopyLink: false
   };
@@ -179,8 +140,8 @@ export const installMazerInstallGate = (
 
     overlay.innerHTML = `
       <div class="mazer-install-gate-card">
-        <strong class="mazer-install-gate-title">${escapeHtml(copy.title)}</strong>
-        <span class="mazer-install-gate-subtitle">${escapeHtml(copy.subtitle)}</span>
+        <strong class="mazer-install-gate-brand">MAZER</strong>
+        <h1 class="mazer-install-gate-title">Install</h1>
         ${renderStepsHtml(copy.steps)}
         <div class="mazer-install-gate-actions">${buttonsHtml}</div>
       </div>

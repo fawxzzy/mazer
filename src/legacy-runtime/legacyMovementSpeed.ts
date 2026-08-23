@@ -1,4 +1,9 @@
 import { clampNumber } from './legacyDefaults';
+import {
+  compareLegacyProgressionOrdinals,
+  normalizeLegacyProgressionOrdinal,
+  type LegacyProgressionOrdinal
+} from './legacyProgression';
 
 export const LEGACY_MOVEMENT_SPEED_MIN = 0;
 export const LEGACY_MOVEMENT_SPEED_MAX = 1;
@@ -10,14 +15,16 @@ const LEGACY_MOVEMENT_LEVEL_ADJUSTMENT_MAX = 0.1;
 const LEGACY_MOVEMENT_PACE_ADJUSTMENT_MAX = 0.05;
 
 export interface LegacyMovementSpeedProgressionContext {
-  readonly completedCycles: number;
+  readonly completedCycles: LegacyProgressionOrdinal;
+  // Bounded difficulty level derived from targetComplexity, never the
+  // unbounded player-facing completion ordinal.
   readonly level: number;
   readonly paceScore: number;
 }
 
 export interface LegacyMovementSpeedProfile {
   readonly baseSpeed: number;
-  readonly completedCycles: number;
+  readonly completedCycles: LegacyProgressionOrdinal;
   readonly contextApplied: boolean;
   readonly effectiveSpeed: number;
   readonly formulaVersion: typeof LEGACY_MOVEMENT_PACE_PROFILE_VERSION;
@@ -64,9 +71,7 @@ export const resolveLegacyMovementSpeedProfile = (
   const rawCompletedCycles = context?.completedCycles;
   const rawLevel = context?.level;
   const rawPaceScore = context?.paceScore;
-  const completedCycles = Math.max(0, Math.round(typeof rawCompletedCycles === 'number' && Number.isFinite(rawCompletedCycles)
-    ? rawCompletedCycles
-    : 0));
+  const completedCycles = normalizeLegacyProgressionOrdinal(rawCompletedCycles);
   const level = Math.round(clampNumber(
     typeof rawLevel === 'number' && Number.isFinite(rawLevel) ? rawLevel : 1,
     1,
@@ -77,7 +82,7 @@ export const resolveLegacyMovementSpeedProfile = (
     0,
     100
   ));
-  const contextApplied = completedCycles > 0;
+  const contextApplied = compareLegacyProgressionOrdinals(completedCycles, '0') > 0;
   const levelAdjustment = contextApplied
     ? ((level - 1) / 98) * LEGACY_MOVEMENT_LEVEL_ADJUSTMENT_MAX
     : 0;

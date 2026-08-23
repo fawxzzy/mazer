@@ -23,14 +23,16 @@
 -- as a final deterministic tiebreaker for rows with neither -- e.g. legacy
 -- rows that predate the level_reached_at column.
 
+drop function if exists public.mazer_leaderboard_page(integer, integer);
+
 create or replace function public.mazer_leaderboard_page(
   p_limit integer default 25,
   p_offset integer default 0
 )
 returns table (
-  rank bigint,
+  rank text,
   username text,
-  player_level integer,
+  player_level text,
   is_requesting_user boolean
 )
 language sql
@@ -45,18 +47,18 @@ as $$
       s.user_id,
       row_number() over (
         order by s.player_level desc, s.level_reached_at asc nulls last, s.user_id asc
-      ) as rank
+      ) as rank_value
     from public.mazer_progression_states s
     join public.mazer_profiles p on p.user_id = s.user_id
     where p.username is not null
   )
   select
-    ranked.rank,
+    ranked.rank_value::text,
     ranked.username,
-    ranked.player_level,
+    ranked.player_level::text,
     ranked.user_id = auth.uid() as is_requesting_user
   from ranked
-  order by ranked.rank
+  order by ranked.rank_value
   limit least(greatest(coalesce(p_limit, 25), 1), 100)
   offset greatest(coalesce(p_offset, 0), 0);
 $$;
@@ -70,10 +72,12 @@ comment on function public.mazer_leaderboard_page is
 -- A caller needs its own rank even when it falls outside the requested
 -- page (e.g. showing "you are #4,213" without downloading 4,213 rows to
 -- find that out client-side).
+drop function if exists public.mazer_leaderboard_self_rank();
+
 create or replace function public.mazer_leaderboard_self_rank()
 returns table (
-  rank bigint,
-  player_level integer,
+  rank text,
+  player_level text,
   has_username boolean
 )
 language sql
@@ -93,7 +97,7 @@ as $$
       s.user_id,
       row_number() over (
         order by s.player_level desc, s.level_reached_at asc nulls last, s.user_id asc
-      ) as rank
+      ) as rank_value
     from public.mazer_progression_states s
     join public.mazer_profiles p on p.user_id = s.user_id
     where p.username is not null
@@ -104,7 +108,7 @@ as $$
     left join public.mazer_profiles p on p.user_id = s.user_id
     where s.user_id = auth.uid()
   )
-  select ranked.rank, base.player_level, base.has_username
+  select ranked.rank_value::text, base.player_level::text, base.has_username
   from base
   left join ranked on ranked.user_id = base.user_id;
 $$;

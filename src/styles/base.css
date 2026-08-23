@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: "Courier New", monospace;
+  font-family: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mazer-environment-safe-area-top: env(safe-area-inset-top, 0px);
   --mazer-environment-safe-area-right: env(safe-area-inset-right, 0px);
   --mazer-environment-safe-area-bottom: env(safe-area-inset-bottom, 0px);
@@ -146,68 +146,84 @@ canvas:focus-visible {
 
 #mazer-install-gate-overlay {
   align-items: center;
-  background: rgba(2, 8, 15, 0.97);
+  background: radial-gradient(circle at 50% 34%, rgba(36, 210, 204, 0.10), transparent 40%), #031f20;
   color: #d7fff8;
   display: grid;
   inset: 0;
   justify-items: center;
-  padding: max(24px, var(--mazer-safe-area-top)) max(20px, var(--mazer-safe-area-right)) max(24px, var(--mazer-safe-area-bottom)) max(20px, var(--mazer-safe-area-left));
+  padding: max(40px, var(--mazer-safe-area-top)) max(24px, var(--mazer-safe-area-right)) max(24px, var(--mazer-safe-area-bottom)) max(24px, var(--mazer-safe-area-left));
   position: fixed;
   text-align: center;
   z-index: 40;
 }
 
 .mazer-install-gate-card {
-  border: 1px solid rgba(117, 245, 224, 0.82);
-  box-shadow: 0 0 26px rgba(89, 242, 221, 0.22);
   display: grid;
-  gap: 14px;
-  max-width: 360px;
-  padding: 26px 22px;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 0;
+  height: 100%;
+  max-width: 342px;
+  padding: 0;
   width: 100%;
 }
 
-.mazer-install-gate-title {
-  color: #72f5de;
-  font-size: 1.28rem;
-  letter-spacing: 0.01em;
+.mazer-install-gate-brand {
+  color: #3ddbd4;
+  font-family: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.32em;
 }
 
-.mazer-install-gate-subtitle {
-  color: #d7fff8;
-  font-size: 0.92rem;
-  line-height: 1.45;
+.mazer-install-gate-title {
+  color: #f5f5f7;
+  font-family: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
+  font-size: 48px;
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 1;
+  margin: 26px 0 0;
 }
 
 .mazer-install-gate-steps {
+  align-self: start;
   display: grid;
-  gap: 10px;
+  gap: 0;
   list-style: none;
-  margin: 0;
+  margin: 118px 0 0;
   padding: 0;
   text-align: left;
 }
 
 .mazer-install-gate-steps li {
-  align-items: flex-start;
-  color: #d7fff8;
-  display: flex;
-  font-size: 0.86rem;
-  gap: 10px;
-  line-height: 1.4;
+  align-items: center;
+  color: #d4dcda;
+  display: grid;
+  font-family: "Segoe UI Variable", "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  gap: 14px;
+  grid-template-columns: 42px 1fr;
+  line-height: 1.5;
+  min-height: 82px;
+  padding: 0;
+}
+
+.mazer-install-gate-steps li + li {
+  border-top: 1px solid rgba(164, 190, 184, 0.32);
 }
 
 .mazer-install-gate-step-index {
   align-items: center;
-  border: 1px solid rgba(117, 245, 224, 0.55);
+  border: 1px solid currentColor;
   border-radius: 999px;
-  color: #72f5de;
+  color: #3ddbd4;
   display: flex;
   flex: none;
-  font-size: 0.76rem;
-  height: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  height: 34px;
   justify-content: center;
-  width: 20px;
+  width: 34px;
 }
 
 .mazer-install-gate-actions {
