@@ -1163,8 +1163,11 @@ const LEGACY_MENU_DECONSTRUCT_BURST_ALT = 0x72e0bf;
 // (see resolveLegacyLevelAnnouncerVisualState) so it dissolves at the same
 // pace the next maze's tiles are actually appearing, not on some unrelated
 // fixed clock that finishes before or after the build really does.
-const LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS = 560;
-const LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS = 700;
+// Slowed down considerably (from 560/700) and given an extra ease pass
+// (see smootherstep below) per feedback that the grow/shrink-fade should
+// read as a good deal more gradual and smoother, not just quicker/snappier.
+const LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS = 1100;
+const LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS = 1300;
 const LEGACY_LEVEL_ANNOUNCER_MIN_SCALE = 0.72;
 // Slow ambient breathing while the number is fully up, blended in only once
 // the fade envelope reaches its held plateau -- same sin-driven alpha+scale
@@ -1210,6 +1213,12 @@ const smoothstep = (value: number): number => {
   const x = clamp(value, 0, 1);
   return x * x * (3 - (2 * x));
 };
+// A gentler S-curve than smoothstep alone -- flatter tangents at both ends,
+// used where an effect specifically needs to read as extra-smooth (the
+// level announcer's grow/shrink fade) rather than the standard ease every
+// other transition in this file uses. Deliberately its own helper instead
+// of changing smoothstep itself, which many unrelated effects share.
+const smootherstep = (value: number): number => smoothstep(smoothstep(value));
 const legacyScenePointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
 
 const createVisualRect = (left: number, top: number, width: number, height: number): VisualRect => ({
@@ -1421,15 +1430,6 @@ export class MenuScene extends Phaser.Scene {
   private levelAnnouncerBuildFadeOutArmed = false;
   private playerSpawnBurstStartedAtMs: number | null = null;
   private playerSpawnBurstPreviousMarkersBuiltIn = false;
-  // Play mode's top-left corner used to belong to the persistent LVL badge
-  // (see drawLegacyProgressionBadge, now retired) and so never carried the
-  // username the way the menu front door's header does -- now that corner
-  // is free, this is a passive (non-interactive) echo of it for play mode,
-  // drawn from drawHud. Deliberately its own object rather than reusing
-  // createLegacyMenuUsernameButton's panel/label/background: those live and
-  // die with rebuildUi's menu-only button, while this needs to persist and
-  // draw every play-mode frame regardless of the UI rebuild cycle.
-  private playUsernameText!: Phaser.GameObjects.Text;
   private footerText!: Phaser.GameObjects.Text;
   private progressionBadgeText!: Phaser.GameObjects.Text;
   private progressionBadgeLabelText!: Phaser.GameObjects.Text;
@@ -1678,16 +1678,6 @@ export class MenuScene extends Phaser.Scene {
       color: '#8ac6ff',
       align: 'center'
     })).setOrigin(0.5).setAlpha(0.96).setVisible(false);
-    // Same color/font-size as the menu header's username label
-    // (createLegacyMenuUsernameButton) for visual continuity between the two
-    // surfaces -- plain text only, no glyph-word rendering and no click
-    // target, this is a passive readout drawn every play-mode frame from
-    // drawHud rather than a rebuildUi-owned button.
-    this.playUsernameText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '13px',
-      color: '#72e0bf'
-    })).setOrigin(0, 0.5).setAlpha(0.85).setVisible(false);
     this.menuAiProgressionBadgeLabelText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
       fontSize: '9px',
@@ -7570,8 +7560,6 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyProgressionBadge();
     this.drawLegacyLevelAnnouncer(time);
     this.updateLegacyBoardZoom(time);
-    this.drawLegacyMenuSettingsCog(time);
-    this.drawLegacyMenuLeaderboardIcon(time);
 
     for (let index = 0; index < visibleTrail.length; index += 1) {
       const point = visibleTrail[index];
@@ -7799,6 +7787,16 @@ export class MenuScene extends Phaser.Scene {
         this.resolveLegacyMenuBuildPrerollProgress(time)
       );
     }
+    // Drawn last, after the trail/board content above -- the bleed-off dock
+    // corridors reach the true screen edge (including the corners these
+    // icons occupy), so the player's trail can visibly reach the exact same
+    // pixels the settings cog and leaderboard icon sit on. Both are drawn
+    // to this same boardDynamicGraphics layer (see their own comments for
+    // why -- no separate depth-ordered GameObject for either), so draw
+    // ORDER is what keeps them on top instead of getting painted over by
+    // trail that reaches that corner, not a z-index.
+    this.drawLegacyMenuSettingsCog(time);
+    this.drawLegacyMenuLeaderboardIcon(time);
     this.boardDynamicDirty = false;
   }
 
@@ -8071,7 +8069,7 @@ export class MenuScene extends Phaser.Scene {
       if (elapsedMs < 0) {
         return HIDDEN;
       }
-      const progress = smoothstep(elapsedMs / LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS);
+      const progress = smootherstep(elapsedMs / LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS);
       return this.applyLegacyLevelAnnouncerPulse(progress, time);
     }
 
@@ -8090,7 +8088,7 @@ export class MenuScene extends Phaser.Scene {
       }
 
       const fadeOutWindowMs = Math.min(LEGACY_LEVEL_ANNOUNCER_FADE_OUT_MS, buildDurationMs);
-      const fadeOutProgress = remainingMs >= fadeOutWindowMs ? 1 : smoothstep(remainingMs / fadeOutWindowMs);
+      const fadeOutProgress = remainingMs >= fadeOutWindowMs ? 1 : smootherstep(remainingMs / fadeOutWindowMs);
 
       if (this.levelAnnouncerBuildFadeOutArmed) {
         return this.applyLegacyLevelAnnouncerPulse(fadeOutProgress, time);
@@ -8101,7 +8099,7 @@ export class MenuScene extends Phaser.Scene {
       // size the way an armed build (which already faded in during its
       // preceding deconstruct) can.
       const fadeInWindowMs = Math.min(LEGACY_LEVEL_ANNOUNCER_FADE_IN_MS, buildDurationMs);
-      const fadeInProgress = smoothstep(elapsedMs / fadeInWindowMs);
+      const fadeInProgress = smootherstep(elapsedMs / fadeInWindowMs);
       return this.applyLegacyLevelAnnouncerPulse(Math.min(fadeInProgress, fadeOutProgress), time);
     }
 
@@ -8357,6 +8355,7 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
     // No background panel, tint, or border -- the gear is the whole control,
@@ -8401,6 +8400,7 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      sizeScale: this.layout.headerIconScale,
       slot: 1,
       width: this.layout.width
     });
@@ -9306,11 +9306,9 @@ export class MenuScene extends Phaser.Scene {
     this.hudFrame = null;
     if (this.mode !== 'play' || this.overlay !== 'none') {
       this.footerText.setText('');
-      this.playUsernameText.setVisible(false);
       return;
     }
     this.footerText.setText('');
-    this.drawLegacyPlayUsernameReadout();
 
     const touchControlLayout = this.resolveLegacyPlayTouchControlLayout();
     const hudFrame = resolveLegacyPlayHudFrame({
@@ -9329,31 +9327,6 @@ export class MenuScene extends Phaser.Scene {
     );
     this.hudBounds = this.hudTimerBounds;
     this.hudFrame = hudFrame;
-  }
-
-  // Passive play-mode echo of the menu header's username label (see
-  // playUsernameText's declaration) -- only shown once a real username is
-  // loaded, since there's no click target here to send an unset player to
-  // go create one the way the menu version's "Account" fallback does.
-  private drawLegacyPlayUsernameReadout(): void {
-    if (this.authSnapshot.status !== 'authenticated' || this.accountUsernameSavedValue.length <= 0) {
-      this.playUsernameText.setVisible(false);
-      return;
-    }
-
-    this.loadAccountUsernameIfNeeded();
-    const laneTop = this.layout.lanes.hud?.top ?? 0;
-    const leadingFrame = resolveLegacyHeaderControlFrame({
-      height: this.layout.height,
-      hudHeight: this.layout.lanes.hud?.height ?? 64,
-      hudTop: laneTop,
-      placement: 'leading',
-      width: this.layout.width
-    });
-    this.playUsernameText
-      .setText(this.accountUsernameSavedValue)
-      .setPosition(leadingFrame.left, leadingFrame.centerY)
-      .setVisible(true);
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
@@ -9799,7 +9772,7 @@ export class MenuScene extends Phaser.Scene {
     });
     let rowY = shell.contentTop;
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.handleBackAction()));
-    this.uiButtons.push(this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth')));
+    this.uiButtons.push(this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth'), panel.centerX));
 
     if (!showAdvancedOptions) {
       const viewportTop = rowY + (compact ? 4 : 6);
@@ -10307,8 +10280,11 @@ export class MenuScene extends Phaser.Scene {
       panel
     });
     this.uiButtons.push(this.createOverlayBackChevronButton(panel, () => this.applyLegacyPauseCommand('resume')));
-    this.uiButtons.push(this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth')));
-    this.uiButtons.push(this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu')));
+    // Account is not an entry point from the in-play Pause screen -- home
+    // (return to menu) is the only header icon here, centered alone the
+    // same way the menu-context Options screen centers its own profile
+    // icon (see createLegacyOverlayUsernameButton's Options call site).
+    this.uiButtons.push(this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu'), panel.centerX));
     const viewportTop = shell.contentTop;
     const viewport = createVisualRect(
       shell.contentLeft,
@@ -13052,6 +13028,7 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
     this.menuSettingsCogActive = false;
@@ -13107,6 +13084,7 @@ export class MenuScene extends Phaser.Scene {
       hudHeight: this.layout.lanes.hud?.height ?? 64,
       hudTop: laneTop,
       placement: 'trailing',
+      sizeScale: this.layout.headerIconScale,
       slot: 1,
       width: this.layout.width
     });
@@ -13298,6 +13276,46 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  // Shared by the overlay header's profile button and the menu front
+  // door's header username -- a small person glyph (head + shoulders) in
+  // the rainbow-ring/Mazer-green treatment, alpha/scale already resolved
+  // by the caller so this stays a pure draw with no pulse-timing opinion
+  // of its own (the two callers drive their pulse from different active-
+  // hover state fields).
+  private drawLegacyProfileIcon(
+    graphics: Phaser.GameObjects.Graphics,
+    centerX: number,
+    centerY: number,
+    iconSize: number,
+    time: number,
+    alpha: number,
+    scale: number
+  ): void {
+    graphics.clear();
+    const ringRadius = (iconSize * 0.62) + 8;
+    const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
+    graphics.lineStyle(Math.max(1.6, iconSize * 0.1), ringColor, alpha * 0.82);
+    graphics.strokeCircle(centerX, centerY, ringRadius * scale);
+
+    const color = cyberArcadeMaterial.signal.player;
+    const strokeWidth = Math.max(1.6, iconSize * 0.12);
+    const headRadius = iconSize * 0.2 * scale;
+    const headCenterY = centerY - (iconSize * 0.24 * scale);
+    graphics.lineStyle(strokeWidth, color, alpha);
+    graphics.strokeCircle(centerX, headCenterY, headRadius);
+
+    const shoulderHalfWidth = iconSize * 0.32 * scale;
+    const shoulderRadius = iconSize * 0.26 * scale;
+    const shoulderTop = centerY + (iconSize * 0.06 * scale);
+    const shoulderBottom = centerY + (iconSize * 0.46 * scale);
+    graphics.beginPath();
+    graphics.arc(centerX, shoulderTop + shoulderRadius, shoulderRadius, Math.PI, 0, false);
+    graphics.lineTo(centerX + shoulderHalfWidth, shoulderBottom);
+    graphics.lineTo(centerX - shoulderHalfWidth, shoulderBottom);
+    graphics.closePath();
+    graphics.strokePath();
+  }
+
   // Same header row the back chevron sits on, toward the left side (the
   // account screen's own Account button is gone -- this is the one entry
   // point to it now, from both the menu-context Options screen and the
@@ -13307,13 +13325,15 @@ export class MenuScene extends Phaser.Scene {
   // feedback that the two should read as a matched pair -- most usernames
   // couldn't render as the front door's tile-glyph material anyway (see
   // createLegacyMenuUsernameButton), so this was never going to carry the
-  // same material as that treatment either way.
-  private createLegacyOverlayUsernameButton(panel: OverlayPanelFrame, onClick: () => void): UiButton {
+  // same material as that treatment either way. centerX is supplied by the
+  // caller rather than computed here: alone (the menu-context Options
+  // overlay, no home button) it's dead-centered same as the home icon;
+  // paired with the home icon (Pause) the two need to split evenly around
+  // center instead of both landing on the same point.
+  private createLegacyOverlayUsernameButton(panel: OverlayPanelFrame, onClick: () => void, centerX: number): UiButton {
     const chevronSize = Math.max(cyberArcadeMaterial.controls.minimumTouchTarget, this.layout.width < 480 ? 42 : 46);
     const rowY = panel.top + 8 + Math.round(chevronSize / 2);
     const iconSize = Math.max(18, Math.round(chevronSize * 0.42));
-    const ringRadius = (iconSize * 0.62) + 8;
-    const centerX = panel.left + 20 + (iconSize / 2);
 
     const graphics = this.add.graphics();
     const background = this.add.rectangle(centerX, rowY, iconSize + 24, iconSize + 24, 0x000000, 0.001);
@@ -13335,32 +13355,10 @@ export class MenuScene extends Phaser.Scene {
       this.loadAccountUsernameIfNeeded();
       background.setVisible(true);
 
-      graphics.clear();
       const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
       const pulseAlpha = clamp(0.5 + (phase * 0.5) + (this.overlayUsernameActive ? 0.1 : 0), 0.4, 1);
       const pulseScale = 0.94 + (phase * 0.06) + (this.overlayUsernameActive ? 0.02 : 0);
-
-      const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
-      graphics.lineStyle(Math.max(1.6, iconSize * 0.1), ringColor, pulseAlpha * 0.82);
-      graphics.strokeCircle(centerX, rowY, ringRadius * pulseScale);
-
-      const color = cyberArcadeMaterial.signal.player;
-      const strokeWidth = Math.max(1.6, iconSize * 0.12);
-      const headRadius = iconSize * 0.2 * pulseScale;
-      const headCenterY = rowY - (iconSize * 0.24 * pulseScale);
-      graphics.lineStyle(strokeWidth, color, pulseAlpha);
-      graphics.strokeCircle(centerX, headCenterY, headRadius);
-
-      const shoulderHalfWidth = iconSize * 0.32 * pulseScale;
-      const shoulderRadius = iconSize * 0.26 * pulseScale;
-      const shoulderTop = rowY + (iconSize * 0.06 * pulseScale);
-      const shoulderBottom = rowY + (iconSize * 0.46 * pulseScale);
-      graphics.beginPath();
-      graphics.arc(centerX, shoulderTop + shoulderRadius, shoulderRadius, Math.PI, 0, false);
-      graphics.lineTo(centerX + shoulderHalfWidth, shoulderBottom);
-      graphics.lineTo(centerX - shoulderHalfWidth, shoulderBottom);
-      graphics.closePath();
-      graphics.strokePath();
+      this.drawLegacyProfileIcon(graphics, centerX, rowY, iconSize, time, pulseAlpha, pulseScale);
     };
     drawProfile(this.time.now);
 
@@ -13398,10 +13396,9 @@ export class MenuScene extends Phaser.Scene {
   // the account username. Replaces the old bottom-bar "Menu" button -- the
   // menu-context Options screen has no equivalent (you're already at the
   // main menu there), so this is never created for that overlay.
-  private createLegacyOverlayHomeButton(panel: OverlayPanelFrame, onClick: () => void): UiButton {
+  private createLegacyOverlayHomeButton(panel: OverlayPanelFrame, onClick: () => void, centerX: number): UiButton {
     const chevronSize = Math.max(cyberArcadeMaterial.controls.minimumTouchTarget, this.layout.width < 480 ? 42 : 46);
     const rowY = panel.top + 8 + Math.round(chevronSize / 2);
-    const centerX = panel.centerX;
     const iconSize = Math.max(18, Math.round(chevronSize * 0.42));
     const ringRadius = (iconSize * 0.62) + 8;
 

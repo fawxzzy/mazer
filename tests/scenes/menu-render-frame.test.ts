@@ -1101,14 +1101,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('event.target === this.game.canvas');
     expect(menuSceneSource).toContain('event.stopImmediatePropagation()');
     expect(menuSceneSource).toContain("case 'pause':");
-    // Reset (reset-player) was removed from the game entirely; Account and
-    // Menu no longer live in a bottom action bar at all -- they're the
-    // username label and a home icon sharing the header row with the back
-    // chevron instead (see createLegacyOverlayUsernameButton /
-    // createLegacyOverlayHomeButton).
+    // Reset (reset-player) was removed from the game entirely; Menu no
+    // longer lives in a bottom action bar at all -- it's a home icon
+    // sharing the header row with the back chevron instead (see
+    // createLegacyOverlayHomeButton). Account is not an entry point from
+    // Pause at all.
     expect(menuSceneSource).not.toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
-    expect(menuSceneSource).toContain("this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth'))");
-    expect(menuSceneSource).toContain("this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu'))");
+    expect(menuSceneSource).toContain("this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu'), panel.centerX)");
     expect(menuSceneSource).toContain('private readonly playDirectionalIntent = new LegacyDirectionalIntentResolver();');
     expect(menuSceneSource).toContain('private requestLegacyPlayDirectionalIntent(controls: readonly HumanMovementActionKind[]): void');
     expect(menuSceneSource).toContain('this.playDirectionalIntent.step(this.maze, this.player, {');
@@ -1413,7 +1412,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     // already at the main menu, so the bottom of the panel is simply empty.
     expect(menuSceneSource).not.toContain('private createLegacyOptionsAccountActionRow(');
     expect(menuSceneSource).toContain(
-      "this.uiButtons.push(this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth')));"
+      "this.uiButtons.push(this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth'), panel.centerX));"
     );
     expect(authSource).toContain('LEGACY_AUTH_MESSAGE_COPY.authUnavailable');
     expect(playerMessageSource).toContain('Account access is unavailable right now. You can still play as a guest.');

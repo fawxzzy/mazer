@@ -40,18 +40,17 @@ describe('legacy pause lifecycle', () => {
     // above still exists and is still exercised by the tests around it,
     // there's just no UI button wired to it anymore. Reset Progress moved
     // to the account screen (buildAuthOverlay's authenticated section,
-    // account-level data, not a per-attempt reset) and the pause overlay's
-    // one remaining row pairs Account with Menu instead.
+    // account-level data, not a per-attempt reset). Account is not an entry
+    // point from the in-play Pause screen at all -- Menu (home) is the only
+    // remaining header icon there, centered alone.
     expect(pauseOverlaySource).not.toContain("const resetAction = (): void => this.applyLegacyPauseCommand('reset-player');");
     expect(pauseOverlaySource).not.toContain("'Reset', resetAction");
     expect(pauseOverlaySource).not.toContain("'Reset Progress'");
     expect(pauseOverlaySource).not.toContain("'Log out'");
-    // Account/Menu no longer live in a bottom action bar at all -- they're
-    // the username label and a home icon sharing the header row with the
-    // back chevron instead (see createLegacyOverlayUsernameButton /
+    // Menu no longer lives in a bottom action bar at all -- it's a home
+    // icon sharing the header row with the back chevron instead (see
     // createLegacyOverlayHomeButton), leaving the bottom of the panel empty.
-    expect(pauseOverlaySource).toContain("this.createLegacyOverlayUsernameButton(panel, () => this.openOverlay('auth'))");
-    expect(pauseOverlaySource).toContain("this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu'))");
+    expect(pauseOverlaySource).toContain("this.createLegacyOverlayHomeButton(panel, () => this.applyLegacyPauseCommand('return-menu'), panel.centerX)");
     expect(pauseOverlaySource).not.toContain("'Resume'");
     expect(pauseOverlaySource).not.toContain('resumeAction');
     expect(menuSceneSource).toContain("this.createLegacyAuthActionButton(");
