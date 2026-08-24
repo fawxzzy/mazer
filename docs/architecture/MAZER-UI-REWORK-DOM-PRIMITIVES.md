@@ -18,6 +18,9 @@ The source boundary is deliberately narrow:
   one-pixel outline/label notch, transparent field interiors, error semantics,
   and an in-field password visibility control.
 - `MazerSlider` provides a labelled native range input and bound output.
+- Wave 2A.1 adds `SettingRow`, `SettingsSection`, `MazerSwitch`,
+  `MazerSegmentedControl`, `MazerScrollArea`, `StatusBanner`, and
+  `ConfirmDialog` as stateless settings composition primitives.
 
 Every factory accepts an explicit `Document` for deterministic tests. The
 default remains the current browser document. None mounts itself or retains
@@ -50,6 +53,13 @@ deferred to the route-aware wave that mounts each primitive family.
   alert role.
 - Keyboard focus remains visible and reduced-motion preferences disable
   decorative primitive transitions.
+- Boolean settings use a native checkbox with `role="switch"`; finite settings
+  use native radios inside a radiogroup rather than tab semantics.
+- Settings overflow has one native `pan-y` scroll owner that consumes shell
+  safe-area and dock-clearance variables.
+- Status banners remain nonblocking polite live regions unless explicitly
+  urgent, while confirmation dialogs start on Cancel, trap focus, close safely
+  on Escape, and restore the invoking control.
 
 ## Visual contracts
 
@@ -70,6 +80,22 @@ deferred to the route-aware wave that mounts each primitive family.
 | Field outline and floating label | ADAPT | Retain the clean one-pixel notch while using Mazer semantic tokens and typography. |
 | Fitness state/auth hooks | N/A | Wave 2A is state-, network-, persistence-, and provider-free. |
 | Fitness route composition | N/A | Mazer composition remains owned by later dependency-ordered UI waves. |
+
+Wave 2A.1 additionally **adopts** safe-default responsive layouts and the
+one-overlay/recoverable-interaction rule; **adapts** Fitness switch, segmented
+control, safe-area, persistent-dock, and reduced-motion lessons to framework-free
+Mazer DOM semantics; and marks install capability, persistent-state versioning,
+Fitness auth/workout schemas, React components, and Fitness visual tokens as
+**not applicable** to this source-only lane.
+
+## Wave 2A.1 settings boundary
+
+The settings tranche is implemented and registered, but remains deliberately
+unmounted. It owns native semantics, controlled presentation, safe scrolling,
+safe-default confirmation focus, and component styling only. It does not read or
+write preferences, dispatch commands, call providers, mount a settings route, or
+change `MenuScene`. Later Wave 3C wiring owns view-model projection, persistence,
+one-overlay enforcement, and route-aware visual acceptance.
 
 ## Verification and follow-on
 
