@@ -19,7 +19,7 @@ flowchart TD
   C --> D["createLegacyMenuDemoBootstrap(...)"]
   D --> E["createDemoWalkerState(episode, config)"]
   E --> F["resolveDemoRunnerPlan(...)"]
-  F --> G["buildPreciseRunnerPlan or buildLegacyAiRunnerPlan"]
+  F --> G["buildPlayableShortestRunnerPlan or buildHumanLocalMemoryRunnerPlan"]
   G --> H["MenuScene.update(time)"]
   H --> I["advanceLegacyMenuStaticDrawStage(time)"]
   H --> J["advanceLegacyMenuDemoFrame(...)"]
@@ -47,10 +47,13 @@ flowchart TD
 
 ## Current AI Shape
 
-The web menu AI has two route modes:
+The web menu AI has two maintained route modes:
 
-- `buildPreciseRunnerPlan()` follows the canonical path exactly.
-- `buildLegacyAiRunnerPlan()` is the restored menu-facing humanized lane.
+- `buildPlayableShortestRunnerPlan()` follows the real floor graph's playable
+  shortest route for ranks D through S and as E's bounded fallback.
+- `buildHumanLocalMemoryRunnerPlan()` is rank E's menu-facing humanized lane.
+  It remains admissible only while the completed route is at most `1.25x` the
+  playable shortest route.
 
 The humanized lane owns:
 
@@ -66,6 +69,12 @@ The humanized lane owns:
 - `createVisitedUndoEpisode()`: test-only fixture proving a deterministic route where `_AiBackTrackUndoVisitedFlag`-equivalent behavior increments `visitedUndoCount`.
 - first-mistake route construction stops after emitted `dead-end`, `backtrack`, and `reacquire` cues are represented, then returns to canonical replay instead of continuing exploratory route construction.
 - cue-specific labels remain presentation/readback state, but movement, backtrack, dead-end, branch, and reacquire beats now resolve through one `exploreStepMs` timer because extracted C++ reschedules `AiPlayerLogic()` with one `_PlayerAiDelayDuration`.
+
+The deterministic acceptance gate covers scales `25/29/37/43/50/55/63/71/83/95`
+and seeds `1..1000`. Its 10,000 mazes are evaluated at all six ranks for 60,000
+rank cases. CI runs the same corpus as ten non-overlapping 100-seed shards so
+the adversarial high-scale tail stays inside the hosted timeout; a full local
+aggregate emits one deterministic case digest for exact reconciliation.
 
 ## Current Generation Shape
 
@@ -101,3 +110,16 @@ Menu generation shares the active play topology owner but uses a menu-specific b
 1. Validate whether the current menu row reveal cadence should stay fixed at one row per gate or be tuned against recovered video/screenshot evidence.
 2. Compare `buildLegacyAiRunnerPlan()` telemetry against longer menu soak captures and only then adjust wrong-branch frequency or route-quality thresholds.
 3. Keep play shortcut/topology changes isolated in `legacyMaze.ts`; do not mix them into menu fixed-snapshot work.
+
+## Navigation Acceptance Readback
+
+The pre-correction aggregate completed every route legally at the shared `88ms`
+cadence, but E measured mean `3.014641x`, p95 `8.03125x`, and max `43.788618x`
+over playable shortest while D-S were exact. Digest:
+`b21fb54ab10c3a626d714a223e60e4422a4139e3baf089a6d4e8227c5168c02a`.
+
+The bounded-admission aggregate keeps `1,133/10,000` E cases intentionally
+non-shortest while improving E to mean `1.018051x`, p95 `1.176991x`, and max
+`1.25x`. D-S remain exact in `50,000/50,000` cases; all `60,000/60,000` cases
+complete with zero invalid moves and zero cadence mismatches. Digest:
+`a2594638bc7ca2c83a5360d80ca0164f48474faf3c33751ed06a9d1a5a90dbf5`.

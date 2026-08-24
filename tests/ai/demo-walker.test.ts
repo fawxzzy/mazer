@@ -662,7 +662,7 @@ describe('demo walker', () => {
     expect(state.trailSteps.some((trailStep) => trailStep.index === 10)).toBe(false);
   });
 
-  test('keeps the bounded E-rank human-error bucket without leaking the solved goal target', () => {
+  test('keeps the handcrafted E-rank human-error fixture without leaking the solved goal target', () => {
     const episode = createCompassTrapEpisode();
     const config = {
       ...createLegacyMenuDemoWalkerConfig(episode.seed),
@@ -1011,7 +1011,7 @@ describe('demo walker', () => {
     expect(seenCues.has('reacquire')).toBe(true);
   });
 
-  test('can retarget to a remembered optional split without jumping', () => {
+  test('keeps handcrafted optional-split retargeting local and adjacent', () => {
     const episode = createOptionalRetargetEpisode();
     const config = createLegacyMenuDemoWalkerConfig(1988);
     const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);

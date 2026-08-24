@@ -49,6 +49,7 @@
     "ai:calibrate:biases": "vite-node ./scripts/analysis/ai-runner-calibration.ts --summary-only --bias-sweep",
     "ai:calibrate:ranks": "vite-node ./scripts/analysis/ai-runner-calibration.ts --summary-only --rank-sweep",
     "ai:calibrate:ranks:fast": "vite-node ./scripts/analysis/ai-runner-calibration.ts --summary-only --rank-sweep --scales=37 --seeds=1,2,3,5,8",
+    "ai:navigation:acceptance": "vite-node --script ./scripts/analysis/ai-navigation-acceptance.ts",
     "live:menu-ai-qa": "node ./scripts/analysis/live-menu-ai-qa.mjs",
     "live:play-qa": "node ./scripts/analysis/live-play-qa.mjs",
     "live:play-soak": "node ./scripts/analysis/live-play-soak.mjs",

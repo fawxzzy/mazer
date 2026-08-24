@@ -127,7 +127,13 @@ export const createLegacyDemoWalkerEpisode = (maze: LegacyMazeSnapshot): MazeEpi
     generationTrace: {
       rootTileIndex: startIndex,
       uniqueTileCount: pathIndices.length,
-      steps: []
+      // The fixed front-door snapshot is a preserved authored fixture, not a
+      // production generated-menu corpus case. Retain that provenance at the
+      // episode boundary so bounded generated navigation cannot silently erase
+      // the snapshot's deliberate human-memory recovery cues.
+      steps: maze.source === 'menu-snapshot'
+        ? [{ phase: 'seed', tileIndices: [startIndex] }]
+        : []
     },
     raster: {
       width: maze.width,

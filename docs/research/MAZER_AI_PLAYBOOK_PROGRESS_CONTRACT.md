@@ -31,9 +31,21 @@ The menu-demo runner uses `human-local-memory`:
 - it scores split choices by distance-to-goal plus deterministic human-like noise
 - it accounts for wrapped/off-border neighbor distance when those paths exist
 - it falls back to a legal path only if the bounded local-memory route cannot finish
+- rank E admits a fallible local-memory route only when its length is at most
+  `1.25x` the playable shortest route; longer exploration falls back to that
+  validated legal route before playback
+- ranks D through S use the playable shortest route exactly, while every rank
+  keeps the same `88ms` per-move cadence so navigation skill never becomes a
+  hidden movement-speed advantage
 
 The model is intentionally not omniscient. It should feel like a top-down human
 tracing a route with memory, not a perfect solver and not a random walker.
+
+The phrase "100x better navigation" is represented by a measurable acceptance
+contract, not a literal speed multiplier: `npm run ai:navigation:acceptance`
+evaluates 10,000 deterministic generated mazes across E/D/C/B/A/S (60,000 rank
+cases), requires 100% completion and zero invalid moves, pins D-S to exact
+playable-shortest paths, and caps E at p95 `1.25x` and hard max `1.75x`.
 
 ## Decision Receipt
 

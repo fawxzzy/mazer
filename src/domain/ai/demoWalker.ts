@@ -1051,16 +1051,47 @@ const buildHumanizedRunnerPlan = (
   episode: MazeEpisode,
   config: DemoWalkerConfig
 ): DemoRunnerPlan => {
+  const perception = resolveDemoWalkerAiPerceptionProfile(config);
   if (
     !shouldUseLegacySourceHumanizedPlan(config)
-    && resolveDemoWalkerAiPerceptionProfile(config).shortestPathAssistBuckets
-      >= AI_SHORTEST_PATH_ASSIST_BUCKET_COUNT
+    && perception.shortestPathAssistBuckets >= AI_SHORTEST_PATH_ASSIST_BUCKET_COUNT
   ) {
     return buildPlayableShortestRunnerPlan(episode);
   }
-  return shouldUseLegacySourceHumanizedPlan(config)
-    ? buildLegacyAiRunnerPlan(episode)
-    : buildHumanLocalMemoryRunnerPlan(episode, config);
+  if (shouldUseLegacySourceHumanizedPlan(config)) {
+    return buildLegacyAiRunnerPlan(episode);
+  }
+
+  if (perception.rank !== 'E') {
+    return buildHumanLocalMemoryRunnerPlan(episode, config);
+  }
+
+  // Handcrafted diagnostic episodes intentionally exercise specific cognition
+  // beats. The generated-menu episodes have no synthetic generation steps and
+  // are the production surface governed by the large-corpus route envelope.
+  if (episode.generationTrace.steps.length > 0) {
+    return buildHumanLocalMemoryRunnerPlan(episode, config);
+  }
+
+  // E remains the only fallible local-memory rank, but its deterministic
+  // exploration must not turn into an unbounded maze-length multiplier. Admit
+  // the local plan only while it remains within the acceptance envelope;
+  // otherwise use the already-validated legal floor route. This preserves
+  // human-like mistakes where they stay readable and guarantees that the
+  // slowest rank cannot stall the menu for dozens of shortest-path traversals.
+  const playableShortestPlan = buildPlayableShortestRunnerPlan(episode);
+  const maximumAdmittedRouteLength = Math.max(
+    playableShortestPlan.routeIndices.length,
+    Math.floor(playableShortestPlan.routeIndices.length * 1.25)
+  );
+  const localMemoryPlan = buildHumanLocalMemoryRunnerPlan(
+    episode,
+    config,
+    maximumAdmittedRouteLength
+  );
+  return localMemoryPlan.routeIndices.length <= maximumAdmittedRouteLength
+    ? localMemoryPlan
+    : playableShortestPlan;
 };
 
 const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
@@ -1256,7 +1287,8 @@ const buildLegacyAiRunnerPlan = (episode: MazeEpisode): DemoRunnerPlan => {
 
 const buildHumanLocalMemoryRunnerPlan = (
   episode: MazeEpisode,
-  config: DemoWalkerConfig
+  config: DemoWalkerConfig,
+  admittedRouteLengthLimit = Number.POSITIVE_INFINITY
 ): DemoRunnerPlan => {
   const canonicalPath = Array.from(episode.raster.pathIndices);
   const canonicalCursorByIndex = new Map<number, number>();
@@ -1297,7 +1329,10 @@ const buildHumanLocalMemoryRunnerPlan = (
     episode.raster.height,
     episode.raster.tiles
   );
-  const maxRouteLength = Math.max(canonicalPath.length + 16, episode.raster.tiles.length * 4);
+  const maxRouteLength = Math.min(
+    Math.max(canonicalPath.length + 16, episode.raster.tiles.length * 4),
+    admittedRouteLengthLimit
+  );
   const maxSteps = maxRouteLength;
   const optionalRetargetCooldownSteps = Math.max(6, Math.floor(canonicalPath.length * 0.06));
   const optionalRetargetMaxRouteLength = Math.max(4, Math.floor(canonicalPath.length * 0.14));
