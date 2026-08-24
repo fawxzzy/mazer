@@ -8,6 +8,8 @@ import {
   resolveLegacyProgressionRulesetId
 } from '../../src/legacy-runtime/legacyEndlessProgression';
 
+const normalizeSourceLineEndings = (source: string): string => source.replace(/\r\n?/g, '\n');
+
 describe('legacy endless progression ruleset boundary', () => {
   test('levels below the boundary resolve to the unchanged legacy ruleset', () => {
     expect(resolveLegacyProgressionRulesetId(1)).toBe('legacy-v1');
@@ -20,18 +22,18 @@ describe('legacy endless progression ruleset boundary', () => {
   });
 
   test('keeps both persisted completion ordinals uncapped behind the idempotent server contract', () => {
-    const foundation = readFileSync(
+    const foundation = normalizeSourceLineEndings(readFileSync(
       new URL('../../supabase/migrations/20260822000000_mazer_endless_progression_foundation.sql', import.meta.url),
       'utf8'
-    );
-    const completionRpc = readFileSync(
+    ));
+    const completionRpc = normalizeSourceLineEndings(readFileSync(
       new URL('../../supabase/migrations/20260822000100_mazer_endless_completion_rpc.sql', import.meta.url),
       'utf8'
-    );
-    const remoteProgressionSource = readFileSync(
+    ));
+    const remoteProgressionSource = normalizeSourceLineEndings(readFileSync(
       new URL('../../src/legacy-runtime/legacyRemoteProgression.ts', import.meta.url),
       'utf8'
-    );
+    ));
 
     expect(foundation).toContain('drop constraint if exists mazer_progression_states_player_level_check');
     expect(foundation).toContain('drop constraint if exists mazer_ai_progression_states_level_check');
@@ -105,10 +107,10 @@ describe('legacy endless progression ruleset boundary', () => {
   });
 
   test('strips forged or unbounded client timestamps before retaining bounded metadata', () => {
-    const completionRpc = readFileSync(
+    const completionRpc = normalizeSourceLineEndings(readFileSync(
       new URL('../../supabase/migrations/20260822000100_mazer_endless_completion_rpc.sql', import.meta.url),
       'utf8'
-    );
+    ));
     const playerBody = completionRpc.slice(
       completionRpc.indexOf('create or replace function public.mazer_complete_level'),
       completionRpc.indexOf('create or replace function public.mazer_complete_ai_level')
@@ -129,6 +131,12 @@ describe('legacy endless progression ruleset boundary', () => {
       expect(boundedAddIndex).toBeGreaterThan(staleIndex);
       expect(body).not.toContain("jsonb_build_object('completedAt'");
     }
+  });
+
+  test('keeps migration source assertions identical across LF and CRLF checkouts', () => {
+    const semanticSource = "v_receipt := p_receipt\n  - 'completedAt'\n  - 'clientCompletedAt';\n";
+    expect(normalizeSourceLineEndings(semanticSource.replace(/\n/g, '\r\n'))).toBe(semanticSource);
+    expect(normalizeSourceLineEndings(semanticSource)).toBe(semanticSource);
   });
 });
 
