@@ -75,10 +75,12 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(completionRpc).toContain('p_expected_user_id is distinct from v_user_id');
     expect(completionRpc).toContain('v_now timestamp with time zone := pg_catalog.clock_timestamp()');
     expect(completionRpc).not.toContain('pg_catalog.coalesce(p_completed_at, pg_catalog.now())');
-    expect(completionRpc).toContain("pg_catalog.jsonb_build_object('clientCompletedAt', p_completed_at)");
+    expect(completionRpc.match(/v_receipt := p_receipt\s+- 'completedAt'\s+- 'clientCompletedAt';/g)).toHaveLength(2);
+    expect(completionRpc.match(/v_receipt := v_receipt \|\| pg_catalog\.jsonb_build_object\('clientCompletedAt', p_completed_at\);/g)).toHaveLength(2);
     expect(completionRpc).toContain("p_completed_at between v_now - interval '90 days' and v_now + interval '5 minutes'");
     expect(completionRpc.match(/if pg_catalog\.octet_length\(v_receipt::text\) > 8192 then/g)).toHaveLength(2);
-    expect(completionRpc.match(/v_receipt := p_receipt;/g)).toHaveLength(2);
+    expect(completionRpc.match(/v_receipt := v_receipt - 'clientCompletedAt';/g)).toHaveLength(2);
+    expect(completionRpc).not.toContain('v_receipt := p_receipt || case');
     expect(completionRpc).toContain('and r.client_run_id = p_client_run_id');
     expect(completionRpc).toContain('on conflict (user_id, client_run_id) where client_run_id is not null do nothing');
     expect(completionRpc).toContain('completed_at,');
@@ -100,6 +102,33 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(remoteProgressionSource).not.toContain('createRemoteProgressionPayload');
     expect(remoteProgressionSource).not.toContain('createRemoteAiProgressionPayload');
     expect(remoteProgressionSource).not.toContain('.from(LEGACY_REMOTE_CYCLE_RECEIPTS_TABLE)');
+  });
+
+  test('strips forged or unbounded client timestamps before retaining bounded metadata', () => {
+    const completionRpc = readFileSync(
+      new URL('../../supabase/migrations/20260822000100_mazer_endless_completion_rpc.sql', import.meta.url),
+      'utf8'
+    );
+    const playerBody = completionRpc.slice(
+      completionRpc.indexOf('create or replace function public.mazer_complete_level'),
+      completionRpc.indexOf('create or replace function public.mazer_complete_ai_level')
+    );
+    const aiBody = completionRpc.slice(
+      completionRpc.indexOf('create or replace function public.mazer_complete_ai_level'),
+      completionRpc.indexOf('create function public.mazer_reset_progression')
+    );
+
+    for (const body of [playerBody, aiBody]) {
+      const stripIndex = body.indexOf("v_receipt := p_receipt\n    - 'completedAt'\n    - 'clientCompletedAt';");
+      const presenceIndex = body.indexOf('if p_completed_at is not null');
+      const staleIndex = body.indexOf("p_completed_at between v_now - interval '90 days' and v_now + interval '5 minutes'");
+      const boundedAddIndex = body.indexOf("jsonb_build_object('clientCompletedAt', p_completed_at)");
+      expect(stripIndex).toBeGreaterThan(-1);
+      expect(presenceIndex).toBeGreaterThan(stripIndex);
+      expect(staleIndex).toBeGreaterThan(presenceIndex);
+      expect(boundedAddIndex).toBeGreaterThan(staleIndex);
+      expect(body).not.toContain("jsonb_build_object('completedAt'");
+    }
   });
 });
 

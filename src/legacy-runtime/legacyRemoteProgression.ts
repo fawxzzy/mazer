@@ -691,7 +691,6 @@ const createRemoteCycleReceiptPayload = (
     aiDecisionSummary: receipt.aiDecisionSummary,
     averageFrameMs: receipt.averageFrameMs,
     backtracks: receipt.backtracks,
-    completedAt: receipt.completedAt,
     completionTimeMs: receipt.completionTimeMs,
     controlMode: receipt.controlMode,
     goal: receipt.goal,

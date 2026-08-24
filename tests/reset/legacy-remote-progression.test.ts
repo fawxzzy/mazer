@@ -384,6 +384,11 @@ describe('legacy remote progression', () => {
         p_expected_user_id: 'user-lossless'
       })
     ]);
+    for (const [, parameters] of rpc.mock.calls) {
+      expect(parameters).toMatchObject({ p_completed_at: receipt.completedAt });
+      expect(parameters.p_receipt).not.toHaveProperty('completedAt');
+      expect(parameters.p_receipt).not.toHaveProperty('clientCompletedAt');
+    }
   });
 
   test('reconstructs the exact proven 59-to-64 cloud gap as five idempotent completions', async () => {

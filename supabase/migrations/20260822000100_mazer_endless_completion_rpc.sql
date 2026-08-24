@@ -167,14 +167,19 @@ begin
   if pg_catalog.jsonb_typeof(p_receipt) <> 'object' or pg_catalog.octet_length(p_receipt::text) > 8192 then
     raise exception 'receipt must be a JSON object no larger than 8192 bytes' using errcode = '22023';
   end if;
-  v_receipt := p_receipt || case
-    when p_completed_at is not null
-      and p_completed_at between v_now - interval '90 days' and v_now + interval '5 minutes'
-      then pg_catalog.jsonb_build_object('clientCompletedAt', p_completed_at)
-    else '{}'::jsonb
-  end;
-  if pg_catalog.octet_length(v_receipt::text) > 8192 then
-    v_receipt := p_receipt;
+  -- Never trust timestamp-shaped keys inside the caller-controlled receipt.
+  -- Only the separately typed parameter may reintroduce noncanonical client
+  -- time, and only inside the bounded window below.
+  v_receipt := p_receipt
+    - 'completedAt'
+    - 'clientCompletedAt';
+  if p_completed_at is not null
+    and p_completed_at between v_now - interval '90 days' and v_now + interval '5 minutes'
+  then
+    v_receipt := v_receipt || pg_catalog.jsonb_build_object('clientCompletedAt', p_completed_at);
+    if pg_catalog.octet_length(v_receipt::text) > 8192 then
+      v_receipt := v_receipt - 'clientCompletedAt';
+    end if;
   end if;
 
   -- Lock the one player row before reading the receipt. Two retries for the
@@ -429,14 +434,16 @@ begin
   if pg_catalog.jsonb_typeof(p_receipt) <> 'object' or pg_catalog.octet_length(p_receipt::text) > 8192 then
     raise exception 'receipt must be a JSON object no larger than 8192 bytes' using errcode = '22023';
   end if;
-  v_receipt := p_receipt || case
-    when p_completed_at is not null
-      and p_completed_at between v_now - interval '90 days' and v_now + interval '5 minutes'
-      then pg_catalog.jsonb_build_object('clientCompletedAt', p_completed_at)
-    else '{}'::jsonb
-  end;
-  if pg_catalog.octet_length(v_receipt::text) > 8192 then
-    v_receipt := p_receipt;
+  v_receipt := p_receipt
+    - 'completedAt'
+    - 'clientCompletedAt';
+  if p_completed_at is not null
+    and p_completed_at between v_now - interval '90 days' and v_now + interval '5 minutes'
+  then
+    v_receipt := v_receipt || pg_catalog.jsonb_build_object('clientCompletedAt', p_completed_at);
+    if pg_catalog.octet_length(v_receipt::text) > 8192 then
+      v_receipt := v_receipt - 'clientCompletedAt';
+    end if;
   end if;
 
   select
