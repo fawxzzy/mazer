@@ -3,9 +3,118 @@ import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
   collectMenuControlSpacingIssues,
+  evaluateAuthenticatedFixtureReadiness,
   hasExpectedTextLabels,
-  matchesExpectedTextLabel
+  matchesExpectedTextLabel,
+  waitForAuthenticatedFixtureReady
 } from '../../scripts/analysis/capture-ui-surfaces.mjs';
+
+const bounds = (left = 0, top = 0, width = 44, height = 44) => ({
+  bottom: top + height,
+  centerX: left + (width / 2),
+  centerY: top + (height / 2),
+  height,
+  left,
+  right: left + width,
+  top,
+  width
+});
+
+const authenticatedMenuDiagnostics = ({ buttons } = {}) => ({
+  runtime: { auth: { status: 'authenticated' } },
+  visual: {
+    buttons: buttons ?? [
+      { active: true, bounds: bounds(100, 200, 120, 48), iconOnly: false, semanticAction: 'Start', text: 'Start' },
+      { active: true, bounds: bounds(340, 12, 44, 44), iconOnly: true, semanticAction: 'Settings', text: 'Settings' }
+    ],
+    runtime: { mode: 'menu', overlay: 'none' }
+  }
+});
+
+describe('UI surface authenticated fixture readiness', () => {
+  test('prefers stable semantic actions when visible labels change equivalently', () => {
+    const evaluation = evaluateAuthenticatedFixtureReadiness(authenticatedMenuDiagnostics({
+      buttons: [
+        { active: true, bounds: bounds(100, 200, 120, 48), iconOnly: false, semanticAction: 'Start', text: 'Play maze' },
+        { active: true, bounds: bounds(340, 12, 44, 44), iconOnly: true, semanticAction: 'Settings', text: 'Options' }
+      ]
+    }));
+
+    expect(evaluation.ready).toBe(true);
+    expect(evaluation.failedClauses).toEqual([]);
+    expect(evaluation.state.buttons.start.text).toBe('Play maze');
+    expect(evaluation.state.buttons.settings.text).toBe('Options');
+  });
+
+  test('uses exact legacy text only when semantic actions have not been published yet', () => {
+    const evaluation = evaluateAuthenticatedFixtureReadiness(authenticatedMenuDiagnostics({
+      buttons: [
+        { bounds: bounds(100, 200, 120, 48), iconOnly: false, text: 'Start' },
+        { bounds: bounds(340, 12, 44, 44), iconOnly: true, text: 'Settings' }
+      ]
+    }));
+
+    expect(evaluation.ready).toBe(true);
+    expect(evaluation.state.buttons.start.activeDeclared).toBe(false);
+    expect(evaluation.state.buttons.settings.activeDeclared).toBe(false);
+  });
+
+  test('waits through delayed diagnostics publication', async () => {
+    const diagnostics = [
+      { runtime: null, visual: null },
+      {
+        runtime: { auth: { status: 'authenticated' } },
+        visual: { buttons: [], runtime: { mode: 'menu', overlay: 'none' } }
+      },
+      authenticatedMenuDiagnostics()
+    ];
+    let reads = 0;
+
+    const evaluation = await waitForAuthenticatedFixtureReady({}, {
+      now: () => 0,
+      pollIntervalMs: 0,
+      readDiagnosticsFn: async () => diagnostics[Math.min(reads++, diagnostics.length - 1)],
+      timeoutMs: 100,
+      waitFn: async () => {}
+    });
+
+    expect(evaluation.ready).toBe(true);
+    expect(reads).toBe(3);
+  });
+
+  test('fails with clause-level last-state evidence when a required action is genuinely missing', async () => {
+    const missingSettings = authenticatedMenuDiagnostics({
+      buttons: [
+        { active: true, bounds: bounds(100, 200, 120, 48), iconOnly: false, semanticAction: 'Start', text: 'Play maze' }
+      ]
+    });
+
+    await expect(waitForAuthenticatedFixtureReady({}, {
+      now: () => 0,
+      readDiagnosticsFn: async () => missingSettings,
+      timeoutMs: 0,
+      waitFn: async () => {}
+    })).rejects.toMatchObject({
+      code: 'AUTHENTICATED_FIXTURE_READINESS_TIMEOUT',
+      evidence: {
+        failedClauses: ['settingsAction'],
+        lastState: {
+          authStatus: 'authenticated',
+          buttons: {
+            settings: {
+              active: false,
+              geometry: { finite: false },
+              semanticAction: null,
+              text: null
+            }
+          },
+          mode: 'menu',
+          overlay: 'none'
+        }
+      }
+    });
+  });
+});
 
 describe('UI surface capture label matching', () => {
   test('accepts explicit inline state labels without weakening unrelated label matching', () => {
@@ -34,17 +143,6 @@ describe('UI surface capture label matching', () => {
 });
 
 describe('UI surface capture menu header controls', () => {
-  const bounds = (left, top, width, height) => ({
-    left,
-    top,
-    width,
-    height,
-    right: left + width,
-    bottom: top + height,
-    centerX: left + (width / 2),
-    centerY: top + (height / 2)
-  });
-
   const menuSurface = ({
     playerLevel = null,
     settings = bounds(352, 13, 36, 36)
@@ -99,15 +197,16 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('visual?.title?.visible === true && visual?.title?.progressPercent >= 95');
     expect(source).toContain("drawStage?.complete === true || drawStage?.lifecyclePhase === 'settled'");
     expect(source).toContain("visual?.runtime?.playLifecycle?.inputLocked === false");
-    expect(source).toContain('const waitForAuthenticatedFixtureReady = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {');
-    expect(source).toContain("runtime?.auth?.status === 'authenticated'");
-    expect(source).toContain("labels.has('Start')");
+    expect(source).toContain('export const evaluateAuthenticatedFixtureReadiness = ({ runtime = null, visual = null } = {}) => {');
+    expect(source).toContain('export const waitForAuthenticatedFixtureReady = async (page, {');
+    expect(source).toContain("button?.semanticAction === semanticAction");
+    expect(source).toContain("error.code = 'AUTHENTICATED_FIXTURE_READINESS_TIMEOUT';");
     expect(source).toContain('const playGeometrySettled = !requireSettledPlayGeometry');
     expect(source).toContain('Number.isFinite(board?.left)');
     expect(source).toContain('Number.isFinite(board?.top)');
     expect(source).toContain('Number.isFinite(board?.right)');
     expect(source).toContain('Number.isFinite(board?.bottom)');
-    expect(source).toContain("button?.text === 'Settings' && button?.iconOnly === true");
+    expect(source).toContain("findAuthenticatedFixtureAction(buttons, 'Settings', 'Settings')");
     expect(source).toContain("if (authFixture === 'authenticated') {");
     expect(source).toContain('await waitForAuthenticatedFixtureReady(page, { timeoutMs });');
     expect(source).toContain('expectedOverlay: overlay');
@@ -171,7 +270,8 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("await clickPoint(page, {\n    x: Math.round(bounds.centerX),\n    y: Math.round(bounds.centerY)\n  }, 'Back');");
     expect(source).toContain("const pathStyleSurfaceIds = ['menu', 'options', 'play', 'pause'];");
     expect(source).toContain("resolveRouteWithParams(route, { authFixture: 'authenticated' })");
-    expect(source).toContain("await page.keyboard.press('P');");
+    expect(source).toContain('const openPauseOverlayViaQa = async (page, timeoutMs) => {');
+    expect(source).toContain('await openPauseOverlayViaQa(page, timeoutMs);');
     expect(source).toContain('const playTrailSeed = options.skipPlayTrailSeed');
     expect(source).toContain('expectTrailShineEnabled: !options.reducedMotion');
     expect(source).toContain("reason: 'focused-topology-proof'");
@@ -180,7 +280,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('markerStyle: menu.diagnostics.visual?.markerStyle');
     expect(source).toContain('hud: play.diagnostics.visual?.hud');
     expect(source).toContain('expectedLabels: []');
-    expect(source).toContain("expectedLabels: ['GUIDE', 'Move Speed', 'Trail Fade', 'Trail Shine', 'Animated Background', 'Menu', 'Account']");
+    expect(source).toContain("? []\n        : ['GUIDE', 'Board Zoom', 'Trail Fade', 'Trail Shine', 'Animated Background']");
     expect(source).toContain("url.searchParams.set('mazeSeed', mazeSeed);");
     expect(source).toContain("url.searchParams.set('authFixture', authFixture);");
     expect(source).not.toContain("url.searchParams.set('pathStyle', pathStyle);");
@@ -264,7 +364,7 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('const wheelDelta = Math.max(scroll.maxOffset * 4, dragDistance);');
     expect(source).toContain('await page.mouse.wheel(0, wheelDelta);');
     expect(source).toContain('expectedLabels: optionsBottomExpectedLabels');
-    expect(source).toContain("expectedLabels: ['Menu', 'Account']");
+    expect(source).toContain("collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, [])");
     expect(source).toContain('optionsSurface.diagnostics.visual?.overlayUi');
     expect(source).toContain('pause.diagnostics.visual?.overlayUi');
     expect(source).toContain("nativeInputs: authSurface.nativeInputs");
@@ -316,22 +416,24 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('expectedLabels: optionsBottomExpectedLabels');
     expect(source).toContain('skipWait = false');
     expect(source).toContain('skipWait ? await readDiagnostics(page)');
-    expect(source).toContain('return expected.every(({ allowStateSuffix, expectedLabel }) => currentLabels.some((actualLabel) => (');
-    expect(source).toContain('Surface ${id} missing labels after direct diagnostics read');
+    expect(source).toContain('return expected.every(({ allowStateSuffix, expectedLabel }) => labels.some((actualLabel) => (');
+    expect(source).not.toContain('Surface ${id} missing labels after direct diagnostics read');
+    expect(source).toContain('const diagnostics = skipWait ? await readDiagnostics(page) : await waitForSurface(page, {');
     expect(source).toContain('await openOptionsOverlayViaQa(page, timeoutMs);');
-    expect(source).toContain("skipWait: authFixture === 'authenticated'");
+    expect(source).toContain("skipWait: authFixture === 'authenticated' || startsAtAuthOverlay");
     expect(source).toContain('expectedLabels: optionsCaptureExpectedLabels');
     expect(source).toContain('hasLabels(surfaces.options, OPTIONS_BASE_EXPECTED_LABELS)');
     expect(source).toContain("!hasLabels(surfaces.options, ['Game Toggles', 'Maze Scale', 'Camera Scale'])");
     expect(source).toContain("'play-settings-cog'");
     expect(source).toContain("!hasLabels(surfaces.play, ['PAUSE', 'RESET'])");
-    expect(source).toContain("hasLabels(surfaces.pause, ['GUIDE', 'Move Speed', 'Trail Fade', 'Trail Shine', 'Animated Background', 'Menu', 'Account'])");
+    expect(source).toContain("hasLabels(surfaces.pause, ['GUIDE', 'Board Zoom', 'Trail Fade', 'Trail Shine', 'Animated Background'])");
     expect(source).toContain("!hasLabels(surfaces.pause, ['Game Toggles', 'Resume'])");
     expect(source).toContain('const reportPath = resolve(outputDir, \'report.md\');');
     expect(source).toContain('![Menu](${summary.screenshots.menu})');
     expect(source).toContain('![Auth](${summary.screenshots.auth})');
     expect(source).toContain('const DEFAULT_TRANSITION_VIEWPORTS = Object.freeze({');
     expect(source).toContain('const captureViewportTransition = async ({');
+    expect(source).toContain("if (overlay === 'none') {");
     expect(source).toContain('const stableBoardDiagnostics = (board) => board ? {');
     expect(source).toContain('await page.setViewportSize(viewport);');
     expect(source).toContain('restoredDiagnosticsMatch: JSON.stringify(initial.diagnostics) === JSON.stringify(restored.diagnostics)');
