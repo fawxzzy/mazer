@@ -1,3 +1,5 @@
+@import "../theme/tokens.css";
+
 :root {
   color-scheme: dark;
   font-family: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -94,7 +96,7 @@ canvas {
 }
 
 canvas:focus-visible {
-  outline: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-focus, #6be8e1);
+  outline: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-semantic-info, #6be8e1);
   outline-offset: -6px;
 }
 
@@ -128,18 +130,18 @@ canvas:focus-visible {
 
 .mazer-accessibility-shortcut:focus-visible {
   background: #071a22;
-  border: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-focus, #6be8e1);
+  border: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-semantic-info, #6be8e1);
   border-radius: var(--mazer-token-radius-control, 8px);
-  box-shadow: 0 0 0 2px #03070b;
+  box-shadow: 0 0 0 var(--mazer-token-stroke-normal, 2px) var(--mazer-token-color-bg-canvas, #03070b);
   clip: auto;
   clip-path: none;
   color: #f3f4f8;
   height: auto;
-  left: max(12px, var(--mazer-safe-area-left));
+  left: max(var(--mazer-token-spacing-12, 12px), var(--mazer-safe-area-left));
   overflow: visible;
-  padding: 12px 16px;
+  padding: var(--mazer-token-spacing-12, 12px) var(--mazer-token-spacing-16, 16px);
   pointer-events: auto;
-  top: max(12px, var(--mazer-safe-area-top));
+  top: max(var(--mazer-token-spacing-12, 12px), var(--mazer-safe-area-top));
   white-space: normal;
   width: auto;
 }
@@ -151,7 +153,7 @@ canvas:focus-visible {
   display: grid;
   inset: 0;
   justify-items: center;
-  padding: max(40px, var(--mazer-safe-area-top)) max(24px, var(--mazer-safe-area-right)) max(24px, var(--mazer-safe-area-bottom)) max(24px, var(--mazer-safe-area-left));
+  padding: max(40px, var(--mazer-safe-area-top)) max(var(--mazer-token-spacing-24, 24px), var(--mazer-safe-area-right)) max(var(--mazer-token-spacing-24, 24px), var(--mazer-safe-area-bottom)) max(var(--mazer-token-spacing-24, 24px), var(--mazer-safe-area-left));
   position: fixed;
   text-align: center;
   z-index: 40;
@@ -209,13 +211,13 @@ canvas:focus-visible {
 }
 
 .mazer-install-gate-steps li + li {
-  border-top: 1px solid rgba(164, 190, 184, 0.32);
+  border-top: var(--mazer-token-stroke-hairline, 1px) solid rgba(164, 190, 184, 0.32);
 }
 
 .mazer-install-gate-step-index {
   align-items: center;
-  border: 1px solid currentColor;
-  border-radius: 999px;
+  border: var(--mazer-token-stroke-hairline, 1px) solid currentColor;
+  border-radius: var(--mazer-token-radius-round, 999px);
   color: #3ddbd4;
   display: flex;
   flex: none;
@@ -229,18 +231,18 @@ canvas:focus-visible {
 .mazer-install-gate-actions {
   display: grid;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: var(--mazer-token-spacing-4, 4px);
 }
 
 .mazer-install-gate-button {
   background: transparent;
-  border: 1px solid rgba(117, 245, 224, 0.55);
-  border-radius: 8px;
+  border: var(--mazer-token-stroke-hairline, 1px) solid rgba(117, 245, 224, 0.55);
+  border-radius: var(--mazer-token-radius-control, 8px);
   color: #d7fff8;
   cursor: pointer;
   font-family: inherit;
   font-size: 0.92rem;
-  padding: 12px 16px;
+  padding: var(--mazer-token-spacing-12, 12px) var(--mazer-token-spacing-16, 16px);
   pointer-events: auto;
   touch-action: manipulation;
 }

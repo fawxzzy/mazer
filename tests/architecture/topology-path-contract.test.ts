@@ -252,7 +252,7 @@ describe('Mazer UI rework topology/path contract', () => {
       expect(violations).toEqual([]);
     });
 
-    it('runs the same checker against this working tree\'s real committed-and-uncommitted changed files and finds no protected path touched', async () => {
+    it('keeps this working tree\'s real changed files within one registered integrator wave', async () => {
       const {
         readDecisionRegistryForTopologyPathContract,
         collectProtectedPathViolationsForTopologyPathContract,
@@ -267,7 +267,13 @@ describe('Mazer UI rework topology/path contract', () => {
         return;
       }
 
-      const violations = collectProtectedPathViolationsForTopologyPathContract(changedFiles, decisionRegistry);
+      const { collectIntegratorWaveMixViolations } = await import('../../scripts/check-decision-registry.mjs') as {
+        collectIntegratorWaveMixViolations: (
+          changedFiles: string[],
+          registry: Record<string, unknown>
+        ) => TopologyPathContractViolation[];
+      };
+      const violations = collectIntegratorWaveMixViolations(changedFiles, decisionRegistry);
       expect(violations).toEqual([]);
     });
 

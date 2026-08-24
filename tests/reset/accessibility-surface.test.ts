@@ -55,5 +55,7 @@ describe('Mazer accessibility shell', () => {
     expect(surfaceSource).toContain("surface.setAttribute('aria-label', 'Mazer keyboard controls');");
     expect(styleSource).toContain('canvas:focus-visible');
     expect(styleSource).toContain('.mazer-accessibility-shortcut:focus-visible');
+    expect(styleSource).toContain('var(--mazer-token-color-semantic-info, #6be8e1)');
+    expect(styleSource).not.toContain('--mazer-token-color-focus');
   });
 });

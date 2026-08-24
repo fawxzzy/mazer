@@ -8,6 +8,11 @@ import {
   type MazeSize,
   type PatternEngineMode
 } from '../domain/maze';
+import {
+  CANONICAL_THEME_ID,
+  legacyThemeAliases,
+  resolveCanonicalThemeId
+} from '../theme/tokens';
 
 export type AmbientPresentationVariant = 'title' | 'ambient' | 'loading';
 export type PresentationChrome = 'full' | 'minimal' | 'none';
@@ -17,8 +22,10 @@ export type PresentationContentProfile = 'core-only' | 'full';
 export type PresentationDeploymentProfile = 'tv' | 'obs' | 'mobile' | 'recovery';
 export type PresentationDesignProfile = 'recovery';
 export type PresentationMode = 'watch' | 'play';
-export type PresentationTheme = 'auto' | 'noir' | 'ember' | 'aurora' | 'vellum' | 'monolith';
-export type PresentationThemeFamily = Exclude<PresentationTheme, 'auto'>;
+export type PresentationTheme = 'auto' | 'precision-arcade';
+export type AmbientMazeStyle = 'noir' | 'ember' | 'aurora' | 'vellum' | 'monolith';
+/** @deprecated Offline maze-variety label. It is not a player-facing theme. */
+export type PresentationThemeFamily = AmbientMazeStyle;
 
 export interface PresentationLaunchConfig {
   presentation: AmbientPresentationVariant;
@@ -282,12 +289,7 @@ export const isPresentationMood = (value: string | null | undefined): value is P
 );
 
 export const isPresentationTheme = (value: string | null | undefined): value is PresentationTheme => (
-  value === 'auto'
-  || value === 'noir'
-  || value === 'ember'
-  || value === 'aurora'
-  || value === 'vellum'
-  || value === 'monolith'
+  value === 'auto' || value === CANONICAL_THEME_ID
 );
 
 export const isPresentationThemeFamily = (value: string | null | undefined): value is PresentationThemeFamily => (
@@ -367,7 +369,15 @@ export const sanitizePresentationMode = (value: unknown): PresentationMode => {
 
 export const sanitizePresentationTheme = (value: unknown): PresentationTheme => {
   const normalized = normalizeString(value);
-  return isPresentationTheme(normalized) ? normalized : DEFAULT_PRESENTATION_THEME;
+  if (isPresentationTheme(normalized)) {
+    return normalized;
+  }
+  if (normalized && legacyThemeAliases.includes(normalized)) {
+    return resolveCanonicalThemeId(normalized) === CANONICAL_THEME_ID
+      ? CANONICAL_THEME_ID
+      : DEFAULT_PRESENTATION_THEME;
+  }
+  return DEFAULT_PRESENTATION_THEME;
 };
 
 export const sanitizePresentationTitleMode = (value: unknown): PresentationTitleMode => {

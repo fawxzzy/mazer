@@ -390,6 +390,31 @@ export const collectIntegratorWaveOwnershipViolations = (changedFiles, registry,
   return violations;
 };
 
+// Wave-agnostic live-diff guard for shared CI and local architecture suites. A generic repository
+// check cannot truthfully claim one historical wave for every future branch, but it can fail closed
+// when one change set crosses two or more registered integrator owners. Packet-level exact path
+// ceilings still bind the specific active wave; the pure claimed-wave checker above remains the
+// authoritative unit for testing an explicit wave claim.
+export const collectIntegratorWaveMixViolations = (changedFiles, registry) => {
+  const assignments = registry?.integratorWaveOwnership?.assignments ?? [];
+  const owners = new Map(assignments.flatMap((assignment) => (
+    (assignment.paths ?? []).map((path) => [path, assignment.wave])
+  )));
+  const ownedChanges = changedFiles
+    .map((file) => file.replace(/\\/g, '/'))
+    .map((path) => ({ path, wave: owners.get(path) }))
+    .filter((entry) => typeof entry.wave === 'string');
+  const waves = Array.from(new Set(ownedChanges.map((entry) => entry.wave))).sort();
+  if (waves.length <= 1) {
+    return [];
+  }
+  return ownedChanges.map(({ path, wave }) => violation(
+    'integrator-wave-mix',
+    path,
+    `"${path}" belongs to Wave ${wave}; this change set spans registered Waves ${waves.join(', ')}.`
+  ));
+};
+
 // Resolves which ref to diff HEAD against for *committed*-change detection. Tried in order:
 // an explicit caller-supplied override, a manual `PROTECTED_PATH_BASE_REF` env var escape hatch,
 // a CI-provided base ref (`GITHUB_BASE_REF`, set by GitHub Actions on `pull_request` events, in

@@ -7,6 +7,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TOKENS_PATH = 'docs/contracts/mazer-ui-rework-design-tokens.v1.json';
 const DECISION_REGISTRY_PATH = 'docs/contracts/mazer-ui-rework-decision-registry.v1.json';
 const CSS_PATH = 'src/theme/tokens.css';
+const LIVE_BASE_CSS_PATH = 'src/styles/base.css';
 
 export const readDesignTokens = (tokensPath = TOKENS_PATH, root = repoRoot) => (
   JSON.parse(readFileSync(resolve(root, tokensPath), 'utf8'))
@@ -168,15 +169,50 @@ const checkCssFile = (registry, root) => {
   return violations;
 };
 
+const checkLiveBaseCss = (root) => {
+  const violations = [];
+  const baseCssPath = resolve(root, LIVE_BASE_CSS_PATH);
+  if (!existsSync(baseCssPath)) {
+    return [violation('live-base-css-missing', LIVE_BASE_CSS_PATH, `expected live stylesheet at ${LIVE_BASE_CSS_PATH}.`)];
+  }
+
+  const baseCss = readFileSync(baseCssPath, 'utf8');
+  const tokenImports = baseCss.match(/@import\s+["']\.\.\/theme\/tokens\.css["']\s*;/g) ?? [];
+  if (tokenImports.length !== 1 || !baseCss.startsWith(tokenImports[0])) {
+    violations.push(violation(
+      'live-token-import-not-first-and-once',
+      LIVE_BASE_CSS_PATH,
+      `${LIVE_BASE_CSS_PATH} must import ../theme/tokens.css exactly once as its first statement.`
+    ));
+  }
+  if (baseCss.includes('--mazer-token-color-focus')) {
+    violations.push(violation(
+      'unregistered-focus-token',
+      LIVE_BASE_CSS_PATH,
+      'focus treatment must use the registered semantic-info token, not --mazer-token-color-focus.'
+    ));
+  }
+  if (!baseCss.includes('var(--mazer-token-color-semantic-info, #6be8e1)')) {
+    violations.push(violation(
+      'semantic-focus-token-missing',
+      LIVE_BASE_CSS_PATH,
+      'live focus treatment must consume semantic-info with the visually identical #6be8e1 fallback.'
+    ));
+  }
+
+  return violations;
+};
+
 export const collectDesignTokenViolations = (registry, root = repoRoot) => ([
   ...checkTokenShape(registry),
   ...checkDecisionRefs(registry, root),
-  ...checkCssFile(registry, root)
+  ...checkCssFile(registry, root),
+  ...checkLiveBaseCss(root)
 ]);
 
-// Enforce the current dependency-ordered wave ownership registry. The former PR #83/#131
-// protected-path list was intentionally retired; falling back to that removed property would turn
-// this guard into an empty set and silently permit every cross-wave integration touch.
+// Enforce the current dependency-ordered wave ownership registry. Falling back to the retired
+// branch-specific protected-path property would turn this guard into an empty set and silently
+// permit every cross-wave integration touch.
 export const collectProtectedPathViolationsForTokens = (changedFiles, decisionRegistry) => {
   const assignments = decisionRegistry?.integratorWaveOwnership?.assignments;
   const violations = [];

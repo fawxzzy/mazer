@@ -6,9 +6,9 @@
  * same source of truth, `docs/contracts/mazer-ui-rework-design-tokens.v1.json`, per decision
  * `renderer-ownership-split` (tokens are a shared contract owned by neither renderer alone).
  *
- * This module is not imported by src/scenes/MenuScene.ts, src/boot/*, or any other live-render
- * path yet -- see docs/architecture/MAZER-UI-REWORK-DESIGN-TOKENS.md for what this wave does and
- * does not do.
+ * The live Phaser material imports this module directly, while the boot presentation resolver uses
+ * only its canonical-theme/archived-alias boundary. The DOM shell consumes the matching CSS export
+ * through src/styles/base.css. See docs/architecture/MAZER-UI-REWORK-DESIGN-TOKENS.md.
  */
 import tokenRegistry from '../../docs/contracts/mazer-ui-rework-design-tokens.v1.json';
 
@@ -43,7 +43,8 @@ export interface DesignTokens {
   fonts: { ui: string; metrics: string; title: string };
 }
 
-export const CANONICAL_THEME_ID = tokenRegistry.canonicalThemeId;
+export type CanonicalThemeId = 'precision-arcade';
+export const CANONICAL_THEME_ID: CanonicalThemeId = tokenRegistry.canonicalThemeId as CanonicalThemeId;
 
 export const designTokens = tokenRegistry.tokens as DesignTokens;
 
@@ -54,9 +55,11 @@ export const archivedThemeAliasMap: Readonly<Record<string, string>> = Object.fr
 
 export const legacyThemeAliases: readonly string[] = Object.freeze([...tokenRegistry.legacyThemeAliases]);
 
-/** Resolves any legacy/archived theme name (or the canonical id itself) to the canonical theme id. */
-export const resolveCanonicalThemeId = (themeName: string): string => (
-  themeName === CANONICAL_THEME_ID ? CANONICAL_THEME_ID : (archivedThemeAliasMap[themeName] ?? CANONICAL_THEME_ID)
+/** Resolves a registered legacy/archived alias (or the canonical id itself) to the canonical id. */
+export const resolveCanonicalThemeId = (themeName: string): CanonicalThemeId | null => (
+  themeName === CANONICAL_THEME_ID || archivedThemeAliasMap[themeName] === CANONICAL_THEME_ID
+    ? CANONICAL_THEME_ID
+    : null
 );
 
 const hexToPhaserNumber = (hex: string): number => parseInt(hex.replace(/^#/, ''), 16);
