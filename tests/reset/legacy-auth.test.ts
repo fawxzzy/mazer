@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import {
   LEGACY_AUTH_GUEST_SCOPE,
   LEGACY_AUTH_REMEMBERED_IDENTITY_KEY,
+  buildLegacySignUpMetadata,
   buildLegacyRememberedIdentityState,
   createEmptyLegacyAuthFormState,
   createLegacyAuthScopedStorage,
@@ -18,6 +19,7 @@ import {
   resolveLegacyAuthScopedStorageKey,
   resolveLegacyAuthStorageScope,
   resolveLegacyAuthSubmitState,
+  resolveLegacySignUpInfo,
   syncLegacyRememberedIdentityFromAuthenticatedSession,
   writeLegacyRememberedIdentityState,
   writeLegacyRememberedIdentity,
@@ -113,6 +115,26 @@ describe('legacy auth runtime', () => {
       password: 'secret1',
       username: 'fawxzzy'
     }, true)).toEqual({ canSubmit: true, reason: null });
+  });
+
+  test('builds canonical Mazer signup metadata without deriving a username from email', () => {
+    expect(buildLegacySignUpMetadata(' Fawxzzy-1 ')).toEqual({
+      app_namespace: 'mazer',
+      display_name: 'Fawxzzy-1',
+      username: 'Fawxzzy-1'
+    });
+
+    for (const invalid of ['', 'a', 'sixteen_chars____', 'space name', 'unicode-☃', 'mail@example.com']) {
+      expect(buildLegacySignUpMetadata(invalid)).toBeNull();
+    }
+    for (const nonString of [null, undefined, 123, {}, { trim: () => { throw new Error('must not run'); } }]) {
+      expect(() => buildLegacySignUpMetadata(nonString)).not.toThrow();
+      expect(buildLegacySignUpMetadata(nonString)).toBeNull();
+    }
+
+    expect(resolveLegacySignUpInfo(false, true)).toBe('Your account is ready.');
+    expect(resolveLegacySignUpInfo(false, false)).toBe('Check your email to finish account setup.');
+    expect(resolveLegacySignUpInfo(true, true)).toBeNull();
   });
 
   test('normalizes remembered identity without making it required for guest play', () => {

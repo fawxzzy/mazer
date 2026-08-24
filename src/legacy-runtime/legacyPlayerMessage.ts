@@ -42,8 +42,14 @@ export const LEGACY_PLAYER_MESSAGE_COLORS: Record<LegacyPlayerMessageTone, strin
   warning: '#ffcf91'
 };
 
+// Stable server/client sentinels for the Before User Created username gate.
+// Player copy is resolved below; raw provider text remains technical detail.
+export const LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL = 'MAZER_SIGNUP_USERNAME_INVALID';
+export const LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL = 'MAZER_SIGNUP_USERNAME_TAKEN';
+
 export const LEGACY_AUTH_MESSAGE_COPY = {
   accountCreated: 'Your account is ready.',
+  accountUnavailable: 'Account service is unavailable right now. Try again shortly.',
   authUnavailable: 'Account access is unavailable right now. You can still play as a guest.',
   createReady: 'Details look good. Create your account when you are ready.',
   enterEmail: 'Enter an email.',
@@ -56,6 +62,7 @@ export const LEGACY_AUTH_MESSAGE_COPY = {
   passwordResetSent: 'Password reset email sent.',
   usernameInvalid: 'Use 2-15 letters, numbers, periods, underscores, or hyphens.',
   usernameRequired: 'Enter a username.',
+  usernameTaken: 'That username is already taken.',
   signupNotConfigured: 'Account creation is unavailable right now. You can still play as a guest.',
   signedIn: 'Signed in.',
   signedOut: 'Signed out. Guest progress is active.',
@@ -166,15 +173,19 @@ export const resolveLegacyAuthFeedbackMessage = (
       || normalizedError.includes('cannot connect to the server');
     const copy = isNetworkError
       ? LEGACY_AUTH_MESSAGE_COPY.networkUnavailable
-      : normalizedError.includes('invalid login credentials') || normalizedError.includes('invalid credentials')
-        ? 'That email and password do not match. Check them or use Forgot Password.'
-        : normalizedError.includes('email not confirmed')
-          ? 'Confirm your email, then sign in again.'
-          : normalizedError.includes('rate limit')
-            ? 'Too many attempts. Wait a moment, then try again.'
-            : normalizedError.includes('already registered')
-              ? 'That email already has an account. Sign in instead.'
-              : 'Account sign-in did not finish. Check your details and try again.';
+      : normalizedError.includes(LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL.toLowerCase())
+        ? LEGACY_AUTH_MESSAGE_COPY.usernameInvalid
+        : normalizedError.includes(LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL.toLowerCase())
+          ? LEGACY_AUTH_MESSAGE_COPY.usernameTaken
+          : normalizedError.includes('invalid login credentials') || normalizedError.includes('invalid credentials')
+            ? 'That email and password do not match. Check them or use Forgot Password.'
+            : normalizedError.includes('email not confirmed')
+              ? 'Confirm your email, then sign in again.'
+              : normalizedError.includes('rate limit')
+                ? 'Too many attempts. Wait a moment, then try again.'
+                : normalizedError.includes('already registered')
+                  ? 'That email already has an account. Sign in instead.'
+                  : LEGACY_AUTH_MESSAGE_COPY.accountUnavailable;
     return createLegacyPlayerMessage({
       copy,
       id: 'auth.feedback.error',

@@ -4,6 +4,8 @@ import {
   LEGACY_REMOTE_MESSAGE_COPY,
   LEGACY_PLAYER_MESSAGE_DEFAULT_DURATION_MS,
   LEGACY_PLAYER_MESSAGE_MAX_VISIBLE,
+  LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL,
+  LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL,
   createLegacyPlayerMessage,
   enqueueLegacyPlayerMessage,
   expireLegacyPlayerMessageQueue,
@@ -84,6 +86,21 @@ describe('legacy player-facing message system', () => {
     });
     expect(resolveLegacyAuthFeedbackMessage('User already registered', null)).toMatchObject({
       copy: 'That email already has an account. Sign in instead.',
+      tone: 'error'
+    });
+    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL, null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.usernameInvalid,
+      technicalDetail: LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL,
+      tone: 'error'
+    });
+    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL, null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.usernameTaken,
+      technicalDetail: LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL,
+      tone: 'error'
+    });
+    expect(resolveLegacyAuthFeedbackMessage('unexpected hook response', null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.accountUnavailable,
+      technicalDetail: 'unexpected hook response',
       tone: 'error'
     });
   });

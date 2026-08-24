@@ -1,5 +1,8 @@
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
-import { LEGACY_AUTH_MESSAGE_COPY } from './legacyPlayerMessage';
+import {
+  LEGACY_AUTH_MESSAGE_COPY,
+  LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL
+} from './legacyPlayerMessage';
 import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding';
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
@@ -36,6 +39,12 @@ export interface LegacyAuthFormState {
 export interface LegacyAuthSubmitState {
   canSubmit: boolean;
   reason: string | null;
+}
+
+export interface LegacySignUpMetadata {
+  app_namespace: 'mazer';
+  display_name: string;
+  username: string;
 }
 
 export const resolveLegacyAuthInvalidFields = (
@@ -457,7 +466,7 @@ export const signInLegacyAuth = async (
 export const signUpLegacyAuth = async (
   email: string,
   password: string,
-  displayName: string
+  username: string
 ): Promise<LegacyAuthActionResult> => {
   const client = await getLegacyAuthClient();
   if (!client) {
@@ -468,20 +477,22 @@ export const signUpLegacyAuth = async (
     };
   }
 
-  const normalizedDisplayName = displayName.trim();
+  const metadata = buildLegacySignUpMetadata(username);
+  if (!metadata) {
+    return {
+      snapshot: createGuestSnapshot(true, {
+        error: LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL
+      })
+    };
+  }
+
   const { data, error } = await client.auth.signUp({
     email: normalizeLegacyAuthEmail(email),
     password,
-    options: normalizedDisplayName.length > 0
-      ? { data: { display_name: normalizedDisplayName } }
-      : undefined
+    options: { data: metadata }
   });
 
-  const info = error
-    ? null
-    : data.session
-      ? LEGACY_AUTH_MESSAGE_COPY.accountCreated
-      : LEGACY_AUTH_MESSAGE_COPY.verifyEmail;
+  const info = resolveLegacySignUpInfo(Boolean(error), Boolean(data.session));
   const snapshot = createLegacyAuthSessionSnapshot(data.session, undefined, {
     error: error?.message ?? null,
     info
@@ -685,6 +696,33 @@ export const createLegacyAuthScopedStorage = (
 // pattern, for instant client-side feedback before ever calling the
 // availability RPC.
 export const LEGACY_USERNAME_PATTERN = /^[A-Za-z0-9._-]{2,15}$/;
+
+export const buildLegacySignUpMetadata = (
+  username: unknown
+): LegacySignUpMetadata | null => {
+  if (typeof username !== 'string') {
+    return null;
+  }
+  const candidate = username.trim();
+  if (!LEGACY_USERNAME_PATTERN.test(candidate)) {
+    return null;
+  }
+
+  return {
+    app_namespace: 'mazer',
+    display_name: candidate,
+    username: candidate
+  };
+};
+
+export const resolveLegacySignUpInfo = (
+  hasError: boolean,
+  hasSession: boolean
+): string | null => hasError
+  ? null
+  : hasSession
+    ? LEGACY_AUTH_MESSAGE_COPY.accountCreated
+    : LEGACY_AUTH_MESSAGE_COPY.verifyEmail;
 
 export const readLegacyAccountUsername = async (
   userId: string
