@@ -4,6 +4,8 @@ import {
   LEGACY_REMOTE_MESSAGE_COPY,
   LEGACY_PLAYER_MESSAGE_DEFAULT_DURATION_MS,
   LEGACY_PLAYER_MESSAGE_MAX_VISIBLE,
+  LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL,
+  LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL,
   createLegacyPlayerMessage,
   enqueueLegacyPlayerMessage,
   expireLegacyPlayerMessageQueue,
@@ -83,8 +85,99 @@ describe('legacy player-facing message system', () => {
       tone: 'error'
     });
     expect(resolveLegacyAuthFeedbackMessage('User already registered', null)).toMatchObject({
-      copy: 'That email already has an account. Sign in instead.',
+      copy: LEGACY_AUTH_MESSAGE_COPY.accountRecovery,
+      technicalDetail: 'User already registered',
       tone: 'error'
+    });
+    expect(LEGACY_AUTH_MESSAGE_COPY.accountRecovery.toLowerCase()).not.toMatch(
+      /already|registered|exists|has an account/
+    );
+    expect(LEGACY_AUTH_MESSAGE_COPY.accountRecovery).toContain('Forgot Password');
+    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL, null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.usernameInvalid,
+      technicalDetail: LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL,
+      tone: 'error'
+    });
+    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL, null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.usernameTaken,
+      technicalDetail: LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL,
+      tone: 'error'
+    });
+    expect(resolveLegacyAuthFeedbackMessage('unexpected hook response', null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.accountUnavailable,
+      technicalDetail: 'unexpected hook response',
+      tone: 'error'
+    });
+  });
+
+  test('maps provider-side email validation failures to actionable non-technical copy', () => {
+    const malformedEmailErrors = [
+      'email_address_invalid',
+      'Invalid email',
+      'Email address is invalid',
+      'Unable to validate email address: invalid format',
+      'Email address has invalid format'
+    ];
+
+    for (const providerError of malformedEmailErrors) {
+      const message = resolveLegacyAuthFeedbackMessage(providerError, null);
+      expect(message).toMatchObject({
+        copy: LEGACY_AUTH_MESSAGE_COPY.emailInvalid,
+        technicalDetail: providerError,
+        tone: 'error'
+      });
+      expect(message?.copy).not.toContain(providerError);
+    }
+  });
+
+  test('does not echo the submitted address from a dynamic hosted validation error', () => {
+    const submittedAddress = 'player@example.invalid';
+    const providerError = `Email address ${submittedAddress} is invalid`;
+
+    const message = resolveLegacyAuthFeedbackMessage(providerError, null);
+
+    expect(message).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.emailInvalid,
+      technicalDetail: providerError,
+      tone: 'error'
+    });
+    expect(message?.copy).not.toContain(submittedAddress);
+    expect(message?.copy).not.toContain(providerError);
+  });
+
+  test('maps hosted password-policy failures before the service-unavailable fallback', () => {
+    const passwordPolicyErrors = [
+      'weak_password',
+      'Weak password',
+      'Password should be at least 8 characters',
+      'Password should contain at least one character of each: lowercase, uppercase, digits, symbols.',
+      'Password must be at least 12 characters',
+      'Password does not meet requirements',
+      'Password is too weak',
+      'Password is known to be weak and easy to guess, please choose a different one.',
+      'Password strength requirements were not met',
+      'Password cannot be longer than 72 characters',
+      'Password must contain uppercase, lowercase, digits, and symbols'
+    ];
+
+    for (const providerError of passwordPolicyErrors) {
+      const message = resolveLegacyAuthFeedbackMessage(providerError, null);
+      expect(message).toMatchObject({
+        copy: LEGACY_AUTH_MESSAGE_COPY.passwordPolicy,
+        technicalDetail: providerError,
+        tone: 'error'
+      });
+      expect(message?.copy).not.toContain(providerError);
+    }
+
+    expect(resolveLegacyAuthFeedbackMessage('User already registered', null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.accountRecovery
+    });
+    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL, null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.usernameInvalid
+    });
+    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL, null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.usernameTaken
     });
   });
 
