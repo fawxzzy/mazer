@@ -36,7 +36,7 @@ const checkDuplicateAndUnknownDecisionIds = (registry) => {
     ['watchPass.decisionRef', registry?.watchPass?.decisionRef],
     ['planet3d.decisionRef', registry?.planet3d?.decisionRef],
     ['menuSceneDecomposition.decisionRef', registry?.menuSceneDecomposition?.decisionRef],
-    ['prProtection.decisionRef', registry?.prProtection?.decisionRef],
+    ['integratorWaveOwnership.decisionRef', registry?.integratorWaveOwnership?.decisionRef],
     ['redesignComplete.decisionRef', registry?.redesignComplete?.decisionRef]
   ];
   for (const [path, ref] of refSources) {
@@ -244,6 +244,102 @@ const checkRedesignComplete = (registry) => {
   return violations;
 };
 
+const REQUIRED_INTEGRATOR_WAVE_BY_PATH = Object.freeze({
+  'scripts/analysis/capture-auth-capability-surfaces.mjs': '0C',
+  'scripts/analysis/capture-ui-surfaces.mjs': '0C',
+  'scripts/analysis/live-auth-persistence-soak.mjs': '0C',
+  'src/scenes/menuRuntimeDiagnostics.ts': '1C',
+  'src/scenes/MenuScene.ts': '3A',
+  'src/legacy-runtime/legacyAuth.ts': '3B',
+  'src/legacy-runtime/legacyPlayerMessage.ts': '3B',
+  'vite.config.ts': '5B',
+  'package.json': '5B'
+});
+
+const INTEGRATOR_WAVE_ORDER = Object.freeze(['0C', '1C', '3A', '3B', '5B']);
+
+const checkIntegratorWaveOwnership = (registry) => {
+  const violations = [];
+  const staleDecisionPresent = (registry?.decisions ?? []).some((entry) => entry?.id === 'pr83-protected-paths-hold');
+  if (staleDecisionPresent || registry?.prProtection !== undefined) {
+    violations.push(violation(
+      'obsolete-pr-hold-present',
+      staleDecisionPresent ? 'decisions' : 'prProtection',
+      'the superseded PR #83/#131 hold must not remain an active registry gate.'
+    ));
+  }
+
+  const ownership = registry?.integratorWaveOwnership;
+  if (!ownership || ownership.mode !== 'dependency-ordered-single-owner' || !Array.isArray(ownership.assignments)) {
+    violations.push(violation(
+      'integrator-wave-ownership-missing',
+      'integratorWaveOwnership',
+      'shared UI/auth paths require dependency-ordered single-owner wave assignments.'
+    ));
+    return violations;
+  }
+
+  const serializedOwnership = JSON.stringify(ownership);
+  if (/claude\/mazer-pr83-fitness-auth-parity-successor/i.test(serializedOwnership)) {
+    violations.push(violation(
+      'obsolete-branch-binding',
+      'integratorWaveOwnership',
+      'current wave ownership must not require the obsolete PR #131 branch.'
+    ));
+  }
+
+  const branchBindingKeys = new Set(['branch', 'branches', 'branchName', 'branchBinding']);
+  for (const assignment of ownership.assignments) {
+    const branchKey = Object.keys(assignment ?? {}).find((key) => branchBindingKeys.has(key));
+    if (branchKey) {
+      violations.push(violation(
+        'branch-specific-wave-exception',
+        `integratorWaveOwnership.assignments[${assignment?.wave ?? 'unknown'}].${branchKey}`,
+        'integrator ownership is wave-bound, not branch-bound.'
+      ));
+    }
+  }
+
+  const pathAssignments = new Map();
+  let priorWaveIndex = -1;
+  for (const assignment of ownership.assignments) {
+    const waveIndex = INTEGRATOR_WAVE_ORDER.indexOf(assignment?.wave);
+    if (waveIndex === -1 || waveIndex < priorWaveIndex) {
+      violations.push(violation(
+        'integrator-wave-order-invalid',
+        `integratorWaveOwnership.assignments[${assignment?.wave ?? 'unknown'}]`,
+        'integrator assignments must follow the locked 0C -> 1C -> 3A -> 3B -> 5B dependency order.'
+      ));
+    }
+    priorWaveIndex = Math.max(priorWaveIndex, waveIndex);
+
+    for (const path of (assignment?.paths ?? [])) {
+      if (pathAssignments.has(path)) {
+        violations.push(violation(
+          'duplicate-integrator-path-owner',
+          `integratorWaveOwnership.assignments[${assignment.wave}]`,
+          `"${path}" is assigned to both Wave ${pathAssignments.get(path)} and Wave ${assignment.wave}.`
+        ));
+      } else {
+        pathAssignments.set(path, assignment.wave);
+      }
+    }
+  }
+
+  for (const [path, expectedWave] of Object.entries(REQUIRED_INTEGRATOR_WAVE_BY_PATH)) {
+    const actualWave = pathAssignments.get(path);
+    if (actualWave !== expectedWave) {
+      violations.push(violation(
+        'integrator-path-wave-mismatch',
+        path,
+        `"${path}" must belong to Wave ${expectedWave}, found ${actualWave ?? 'unassigned'}.`
+      ));
+    }
+  }
+
+  return violations;
+};
+
 export const collectDecisionRegistryViolations = (registry) => ([
   ...checkDuplicateAndUnknownDecisionIds(registry),
   ...checkThemesAndProfiles(registry),
@@ -251,6 +347,7 @@ export const collectDecisionRegistryViolations = (registry) => ([
   ...checkPlanet3d(registry),
   ...checkShippingPresentation(registry),
   ...checkEntrypointReclassification(registry),
+  ...checkIntegratorWaveOwnership(registry),
   ...checkRedesignComplete(registry)
 ]);
 
@@ -269,18 +366,22 @@ export const collectEntrypointExistenceViolations = (registry, root = repoRoot) 
   return violations;
 };
 
-// Pure, independently-testable: given a list of changed/untracked file paths (repo-relative,
-// forward-slash), flag any that match a protected path from the registry's prProtection list.
-export const collectProtectedPathViolations = (changedFiles, registry) => {
-  const protectedPaths = new Set(registry?.prProtection?.protectedPaths ?? []);
+// Pure, independently-testable: an assigned path may change only in its declared dependency-
+// ordered integrator wave. Ownership is deliberately independent of branch names and old PRs.
+export const collectIntegratorWaveOwnershipViolations = (changedFiles, registry, claimedWave) => {
+  const assignments = registry?.integratorWaveOwnership?.assignments ?? [];
+  const owners = new Map(assignments.flatMap((assignment) => (
+    (assignment.paths ?? []).map((path) => [path, assignment.wave])
+  )));
   const violations = [];
   for (const file of changedFiles) {
     const normalized = file.replace(/\\/g, '/');
-    if (protectedPaths.has(normalized)) {
+    const assignedWave = owners.get(normalized);
+    if (assignedWave && assignedWave !== claimedWave) {
       violations.push(violation(
-        'protected-path-touched',
+        'integrator-wave-ownership-mismatch',
         normalized,
-        `"${normalized}" is a PR #83/#82 protected path (prProtection.protectedPaths) and must not be modified by Wave 0A.`
+        `"${normalized}" belongs to integrator Wave ${assignedWave}, not ${claimedWave ?? 'an unspecified wave'}.`
       ));
     }
   }
