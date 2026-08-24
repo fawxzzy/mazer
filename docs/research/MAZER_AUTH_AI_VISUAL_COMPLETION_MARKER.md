@@ -6,7 +6,7 @@ This marker tracks the current multi-pass chunk requested after the production a
 
 ## Room-subsystem override
 
-The dormant room-candidate metadata, activation-plan, preview-cue, and preview-edge contracts were retired on 2026-08-24. Older references to rooms being disabled or deferred are historical only: no room state or future room lane remains in the current runtime contract. Natural open maze geometry is preserved, and this decision does not change auth, AI, progression, static slow tiles, patrol agents, rendering, or provider behavior.
+The dormant room-candidate metadata, activation-plan, preview-cue, and preview-edge contracts were retired on 2026-08-24. Older references to rooms being disabled or deferred are historical only: no room state or future room lane remains in the current runtime contract. Natural open maze geometry is preserved, and the room decision itself did not change auth, AI, progression, rendering, or provider behavior. A later explicit decision on the same date retired static slow tiles and patrol agents from live play source; that separate retirement also preserves auth, AI, progression, maze topology, and provider behavior.
 
 ## Current Overall Marker
 

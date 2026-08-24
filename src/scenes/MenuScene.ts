@@ -20,7 +20,6 @@ import { markMazerBootStatus } from '../boot/bootStatus';
 import {
   WorldTurnHost,
   type WorldTurnHostState,
-  type WorldTurnPhaseContext,
   type WorldTurnPhaseResult,
   type WorldTurnReceipt
 } from '../mazer-core/world';
@@ -224,37 +223,6 @@ import {
   type LegacyProgressionState,
   type LegacyProgressionTrackId
 } from '../legacy-runtime/legacyProgression';
-import {
-  applyLegacyStaticSlowTileEntry,
-  isLegacyStaticSlowTileDelayActive,
-  recordLegacyStaticSlowTileBlockedMove,
-  resolveLegacyStaticSlowTilePhase,
-  resolveLegacyStaticSlowTileRemainingMs,
-  type LegacyStaticSlowTileState
-} from '../legacy-runtime/legacyStaticSlowTile';
-import {
-  LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
-  LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
-  LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS,
-  LEGACY_PATROL_AGENT_MAXIMUM_PENDING_COLLISION_INTENTS,
-  LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
-  LEGACY_PATROL_AGENT_STEP_MS,
-  LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS,
-  advanceLegacyPatrolAgent,
-  applyLegacyPatrolAgentCollision,
-  clearLegacyPatrolAgentCollisionIntent,
-  isLegacyPatrolAgentDelayActive,
-  queueLegacyPatrolAgentCollisionIntent,
-  recordLegacyPatrolAgentBlockedMove,
-  resolveLegacyPatrolAgentPoint,
-  resolveLegacyPatrolAgentCollisionFeedback,
-  resolveLegacyPatrolAgentCollisionIntent,
-  resolveLegacyPatrolAgentCollisionRecovery,
-  resolveLegacyPatrolAgentRemainingMs,
-  resolveLegacyPatrolAgentTelegraph,
-  resolveLegacyPatrolAgentTick,
-  type LegacyPatrolAgentState
-} from '../legacy-runtime/legacyPatrolAgent';
 import {
   LEGACY_USERNAME_PATTERN,
   checkLegacyUsernameAvailable,
@@ -1152,15 +1120,6 @@ const LEGACY_PLAY_START_MARKER_CORE = cyberArcadeMaterial.signal.start;
 const LEGACY_PLAY_START_MARKER_EDGE = cyberArcadeMaterial.signal.startEdge;
 const LEGACY_PLAY_GOAL_MARKER_CORE = cyberArcadeMaterial.signal.goal;
 const LEGACY_PLAY_GOAL_MARKER_EDGE = cyberArcadeMaterial.signal.goalEdge;
-const LEGACY_PLAY_SLOW_TILE_CORE = cyberArcadeMaterial.signal.warning;
-const LEGACY_PLAY_SLOW_TILE_EDGE = cyberArcadeMaterial.signal.warningEdge;
-const LEGACY_PLAY_SLOW_TILE_SPENT = cyberArcadeMaterial.rail.muted;
-const LEGACY_PLAY_PATROL_CORE = cyberArcadeMaterial.signal.violet;
-const LEGACY_PLAY_PATROL_EDGE = cyberArcadeMaterial.signal.memory;
-const LEGACY_PLAY_PATROL_TELEGRAPH = cyberArcadeMaterial.rail.mint;
-const LEGACY_PLAY_PATROL_COLLISION_FEEDBACK = cyberArcadeMaterial.signal.warning;
-const LEGACY_PLAY_PATROL_COLLISION_RECOVERY = cyberArcadeMaterial.rail.mint;
-const LEGACY_PLAY_PATROL_PENDING_INTENT = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_CORE = cyberArcadeMaterial.signal.memory;
 const LEGACY_MENU_AI_MEMORY_OPTION_EDGE = cyberArcadeMaterial.rail.mint;
 const LEGACY_MENU_AI_MEMORY_TARGET_EDGE = cyberArcadeMaterial.signal.warningEdge;
@@ -1383,8 +1342,6 @@ export class MenuScene extends Phaser.Scene {
   private playCompletedAtMs: number | null = null;
   private playCyclePath: LegacyPoint[] = [];
   private playCycleResetUsed = false;
-  private playStaticSlowTile: LegacyStaticSlowTileState | null = null;
-  private playPatrolAgent: LegacyPatrolAgentState | null = null;
   private menuDemoCycleStartedAtMs = 0;
   private menuDemoCompletedAtMs: number | null = null;
   private menuDemoCycleRecorded = false;
@@ -1537,7 +1494,6 @@ export class MenuScene extends Phaser.Scene {
   private boardStaticDirty = true;
   private boardPathDirty = true;
   private boardDynamicDirty = true;
-  private playPatrolCollisionVisualActive = false;
   private hudDirty = true;
   private backdropDirty = true;
   private uiDirty = true;
@@ -2042,8 +1998,6 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.advanceLegacyMenuStaticDrawStage(time);
-    this.advanceLegacyPatrolTimer(time);
-    this.flushLegacyPatrolCollisionIntent(time);
     if (
       this.menuStaticDrawLifecyclePhase === 'deconstructing'
       && (
@@ -2125,38 +2079,6 @@ export class MenuScene extends Phaser.Scene {
     if (this.mode === 'menu' && this.overlay === 'none' && !this.prefersLegacyReducedMotion()) {
       this.boardPathDirty = true;
     }
-    const slowTilePhase = resolveLegacyStaticSlowTilePhase(
-      this.playStaticSlowTile,
-      time,
-      this.playStartedAtMs
-    );
-    if (
-      this.mode === 'play'
-      && slowTilePhase.mode === 'timed'
-      && this.playStaticSlowTile?.consumed === false
-    ) {
-      this.boardDynamicDirty = true;
-    }
-    const patrolTelegraph = resolveLegacyPatrolAgentTelegraph(
-      this.playPatrolAgent,
-      time,
-      this.playStartedAtMs,
-      this.resolveLegacyWorldTurnHostState() === 'running'
-    );
-    if (this.mode === 'play' && patrolTelegraph.active) {
-      this.boardDynamicDirty = true;
-    }
-    const patrolCollisionFeedback = resolveLegacyPatrolAgentCollisionFeedback(
-      this.playPatrolAgent,
-      time
-    );
-    const patrolCollisionRecovery = resolveLegacyPatrolAgentCollisionRecovery(
-      this.playPatrolAgent,
-      time
-    );
-    this.refreshLegacyPatrolCollisionVisualState(
-      patrolCollisionFeedback.active || patrolCollisionRecovery.active
-    );
     if (this.isLegacyMenuHandoffAnimationActive(time)) {
       this.boardDynamicDirty = true;
       this.backdropDirty = true;
@@ -2359,28 +2281,8 @@ export class MenuScene extends Phaser.Scene {
       this.mode === 'play' ? LEGACY_PLAY_PLAYER_MARKER_HALO_RATIO : undefined
     );
     const playLifecycle = this.resolveLegacyPlayLifecycleDiagnostics(time);
-    const slowTilePhase = resolveLegacyStaticSlowTilePhase(
-      this.playStaticSlowTile,
-      time,
-      this.playStartedAtMs
-    );
-    const patrolPoint = resolveLegacyPatrolAgentPoint(this.playPatrolAgent);
     this.legacyWorldTurnHost.setState(this.resolveLegacyWorldTurnHostState());
     const worldTurnDiagnostics = this.legacyWorldTurnHost.getDiagnostics();
-    const patrolTelegraph = resolveLegacyPatrolAgentTelegraph(
-      this.playPatrolAgent,
-      time,
-      this.playStartedAtMs,
-      worldTurnDiagnostics.state === 'running'
-    );
-    const patrolCollisionFeedback = resolveLegacyPatrolAgentCollisionFeedback(
-      this.playPatrolAgent,
-      time
-    );
-    const patrolCollisionRecovery = resolveLegacyPatrolAgentCollisionRecovery(
-      this.playPatrolAgent,
-      time
-    );
 
     publishMenuSceneRuntimeDiagnostics({
       revision: this.runtimeDiagnosticsRevision,
@@ -2455,92 +2357,6 @@ export class MenuScene extends Phaser.Scene {
           renderTileSize: mazeRenderFrame.tileSize
         },
         lifecycle: playLifecycle,
-        patrol: this.playPatrolAgent && patrolPoint
-          ? {
-              alternateRouteStepCount: this.playPatrolAgent.placement.alternateRouteStepCount,
-              blockedMoveCount: this.playPatrolAgent.blockedMoveCount,
-              collisionCount: this.playPatrolAgent.collisionCount,
-              collisionDelayActive: isLegacyPatrolAgentDelayActive(this.playPatrolAgent, time),
-              collisionDelayMs: LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
-              collisionDelayUntilMs: this.playPatrolAgent.collisionDelayUntilMs,
-              collisionEpisodeActive: this.playPatrolAgent.collisionEpisodeActive,
-              collisionFeedbackActive: patrolCollisionFeedback.active,
-              collisionFeedbackElapsedMs: patrolCollisionFeedback.elapsedMs,
-              collisionFeedbackWindowMs: LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
-              collisionRecoveryActive: patrolCollisionRecovery.active,
-              collisionRecoveryElapsedMs: patrolCollisionRecovery.elapsedMs,
-              collisionRecoveryRemainingMs: patrolCollisionRecovery.remainingMs,
-              collisionRecoveryWindowMs: LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS,
-              contractVersion: this.playPatrolAgent.contractVersion,
-              currentRouteIndex: this.playPatrolAgent.currentRouteIndex,
-              elapsedInStepMs: patrolTelegraph.elapsedInStepMs ?? 0,
-              lastResolvedTickIndex: this.playPatrolAgent.lastResolvedTickIndex,
-              lastStepAtMs: this.playPatrolAgent.lastStepAtMs,
-              maximumAgents: 1,
-              maximumPendingCollisionIntents: LEGACY_PATROL_AGENT_MAXIMUM_PENDING_COLLISION_INTENTS,
-              msUntilStep: patrolTelegraph.msUntilStep ?? LEGACY_PATROL_AGENT_STEP_MS,
-              nextPoint: {
-                screenX: mazeRenderFrame.boardLeft + (((patrolTelegraph.nextPoint?.x ?? patrolPoint.x) + 0.5) * mazeRenderFrame.tileSize),
-                screenY: mazeRenderFrame.boardTop + (((patrolTelegraph.nextPoint?.y ?? patrolPoint.y) + 0.5) * mazeRenderFrame.tileSize),
-                x: patrolTelegraph.nextPoint?.x ?? patrolPoint.x,
-                y: patrolTelegraph.nextPoint?.y ?? patrolPoint.y
-              },
-              nextRouteIndex: patrolTelegraph.nextRouteIndex ?? this.playPatrolAgent.currentRouteIndex,
-              pendingCollisionIntent: this.playPatrolAgent.pendingCollisionIntent
-                ? { ...this.playPatrolAgent.pendingCollisionIntent }
-                : null,
-              pendingCollisionIntentCount: this.playPatrolAgent.pendingCollisionIntent === null ? 0 : 1,
-              penaltyCount: this.playPatrolAgent.penaltyCount,
-              remainingMs: resolveLegacyPatrolAgentRemainingMs(this.playPatrolAgent, time),
-              roundTripMs: LEGACY_PATROL_AGENT_ROUND_TRIP_MS,
-              route: this.playPatrolAgent.placement.route.map((point) => ({ ...point })),
-              screenPoint: {
-                screenX: mazeRenderFrame.boardLeft + ((patrolPoint.x + 0.5) * mazeRenderFrame.tileSize),
-                screenY: mazeRenderFrame.boardTop + ((patrolPoint.y + 0.5) * mazeRenderFrame.tileSize),
-                x: patrolPoint.x,
-                y: patrolPoint.y
-              },
-              solutionPathIndices: [...this.playPatrolAgent.placement.solutionPathIndices],
-              stepCount: this.playPatrolAgent.stepCount,
-              stepMs: LEGACY_PATROL_AGENT_STEP_MS,
-              telegraphActive: patrolTelegraph.active,
-              telegraphWindowMs: LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS
-            }
-          : null,
-        pressure: this.playStaticSlowTile
-          ? {
-              activeWindowMs: slowTilePhase.activeWindowMs,
-              alternateRouteStepCount: this.playStaticSlowTile.placement?.alternateRouteStepCount ?? null,
-              armed: slowTilePhase.armed,
-              band: this.playStaticSlowTile.band,
-              blockedMoveCount: this.playStaticSlowTile.blockedMoveCount,
-              consumed: this.playStaticSlowTile.consumed,
-              contractVersion: this.playStaticSlowTile.contractVersion,
-              cycleElapsedMs: slowTilePhase.cycleElapsedMs,
-              cycleMs: slowTilePhase.cycleMs,
-              delayActive: isLegacyStaticSlowTileDelayActive(this.playStaticSlowTile, time),
-              delayUntilMs: this.playStaticSlowTile.delayUntilMs,
-              eligible: this.playStaticSlowTile.eligible,
-              enteredAtMs: this.playStaticSlowTile.enteredAtMs,
-              entryCount: this.playStaticSlowTile.entryCount,
-              penaltyMs: this.playStaticSlowTile.penaltyMs,
-              phaseActive: slowTilePhase.active,
-              remainingMs: resolveLegacyStaticSlowTileRemainingMs(this.playStaticSlowTile, time),
-              safeWindowMs: slowTilePhase.safeWindowMs,
-              solutionPathIndex: this.playStaticSlowTile.placement?.solutionPathIndex ?? null,
-              tile: this.playStaticSlowTile.placement
-                ? {
-                    screenX: mazeRenderFrame.boardLeft
-                      + ((this.playStaticSlowTile.placement.point.x + 0.5) * mazeRenderFrame.tileSize),
-                    screenY: mazeRenderFrame.boardTop
-                      + ((this.playStaticSlowTile.placement.point.y + 0.5) * mazeRenderFrame.tileSize),
-                    x: this.playStaticSlowTile.placement.point.x,
-                    y: this.playStaticSlowTile.placement.point.y
-                  }
-                : null,
-              timingMode: slowTilePhase.mode
-            }
-          : null,
         timer: {
           completedAtMs: this.playCompletedAtMs,
           elapsedMs: this.resolveLegacyPlayElapsedMs(),
@@ -3898,8 +3714,6 @@ export class MenuScene extends Phaser.Scene {
   private resolveLegacyPlayHeldTouchDelay(kind: 'initial' | 'repeat' | 'turn'): number {
     const profile = this.resolveLegacyPlayMovementSpeedProfile();
     const stickActive = this.playTouchStickPointerId !== null;
-    const pressureDelayMs = resolveLegacyStaticSlowTileRemainingMs(this.playStaticSlowTile, this.time.now);
-    const patrolDelayMs = resolveLegacyPatrolAgentRemainingMs(this.playPatrolAgent, this.time.now);
     let movementDelayMs: number;
     switch (kind) {
       case 'initial':
@@ -3921,7 +3735,7 @@ export class MenuScene extends Phaser.Scene {
         return kind satisfies never;
     }
 
-    return Math.max(movementDelayMs, pressureDelayMs, patrolDelayMs);
+    return movementDelayMs;
   }
 
   private repeatLegacyPlayHeldTouchMove(): void {
@@ -4075,23 +3889,10 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private performLegacyPlayDirectionalIntentStep(): boolean {
-    const latestRequestedDirection = this.playDirectionalIntent.getDiagnostics().requestedDirections[0] ?? null;
     const step = this.playDirectionalIntent.step(this.maze, this.player, {
       assistedLaneShiftEnabled: true
     });
-    if (
-      step.moved
-      && isLegacyPatrolAgentDelayActive(this.playPatrolAgent, this.time.now)
-      && latestRequestedDirection !== null
-      && step.direction !== latestRequestedDirection
-    ) {
-      this.playDirectionalIntent.reset();
-      this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
-      this.publishInteractionDiagnostics();
-      return false;
-    }
     if (!step.moved) {
-      this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
       this.publishInteractionDiagnostics();
       return false;
     }
@@ -4218,7 +4019,6 @@ export class MenuScene extends Phaser.Scene {
     this.playKeyboardRepeatGate.reset();
     this.playDirectionalIntent.reset();
     this.playPointerStart = null;
-    this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
   }
 
   private resetLegacyPlayDirectionalInputBuffer(): void {
@@ -4228,7 +4028,6 @@ export class MenuScene extends Phaser.Scene {
     this.playKeyboardRepeatGate.reset();
     this.playDirectionalIntent.reset();
     this.playPointerStart = null;
-    this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
   }
 
   private handleLegacyPlayInputFocusLoss(): void {
@@ -4470,8 +4269,6 @@ export class MenuScene extends Phaser.Scene {
       this.menuDemoCycleRecorded = false;
       this.playCyclePath = [];
       this.playCycleResetUsed = false;
-      this.playStaticSlowTile = null;
-      this.playPatrolAgent = null;
     } else {
       this.menuDemoConfig = createLegacyMenuDemoWalkerConfig(this.maze.seed);
       this.menuDemoState = null;
@@ -4481,13 +4278,6 @@ export class MenuScene extends Phaser.Scene {
       this.playCyclePath = generationState.initialTrail.map(copyPoint);
       this.playCycleResetUsed = false;
       this.playCompletedAtMs = null;
-      // Pressure objects remain source-proven experiments, not live gameplay.
-      // The red/grey slow tile and patrol agent were appearing automatically
-      // in later difficulty bands before object gameplay had been activated.
-      // Keep those contracts available for a future explicit mechanic lane,
-      // but do not place either runtime object now.
-      this.playStaticSlowTile = null;
-      this.playPatrolAgent = null;
       // The decel-to-target spin itself now starts once the new maze
       // actually finishes settling (settleLegacyMenuStaticDrawStageIfComplete),
       // not here at the moment the maze data swaps in -- resolveLegacy
@@ -5243,20 +5033,6 @@ export class MenuScene extends Phaser.Scene {
 
   private resolveLegacyPlayLifecycleDiagnosticsSignature(time: number): string {
     const lifecycle = this.resolveLegacyPlayLifecycleDiagnostics(time);
-    const patrolTelegraph = resolveLegacyPatrolAgentTelegraph(
-      this.playPatrolAgent,
-      time,
-      this.playStartedAtMs,
-      this.resolveLegacyWorldTurnHostState() === 'running'
-    );
-    const patrolCollisionFeedback = resolveLegacyPatrolAgentCollisionFeedback(
-      this.playPatrolAgent,
-      time
-    );
-    const patrolCollisionRecovery = resolveLegacyPatrolAgentCollisionRecovery(
-      this.playPatrolAgent,
-      time
-    );
     return [
       lifecycle.phase,
       lifecycle.drawPhase,
@@ -5264,23 +5040,15 @@ export class MenuScene extends Phaser.Scene {
       lifecycle.nextSeedQueued ? 'seed' : 'no-seed',
       lifecycle.timerRunning ? 'timer' : 'no-timer',
       lifecycle.playerVisible ? 'player' : 'no-player',
-      lifecycle.trailVisible ? 'trail' : 'no-trail',
-      patrolTelegraph.active ? 'patrol-intent' : 'no-patrol-intent',
-      patrolCollisionFeedback.active ? 'patrol-impact' : 'no-patrol-impact',
-      patrolCollisionRecovery.active ? 'patrol-recovery' : 'no-patrol-recovery',
-      this.playPatrolAgent?.pendingCollisionIntent ? 'patrol-input-pending' : 'no-patrol-input-pending'
+      lifecycle.trailVisible ? 'trail' : 'no-trail'
     ].join(':');
   }
 
   private createLegacyWorldTurnHost(): WorldTurnHost {
     return new WorldTurnHost({
-      'player-movement': (): WorldTurnPhaseResult => this.applyLegacyWorldTurnPlayerMovement(),
-      'enemy-movement': (
-        context: Readonly<WorldTurnPhaseContext>
-      ): WorldTurnPhaseResult => this.applyLegacyWorldTurnPatrolMovement(context),
-      collisions: (): WorldTurnPhaseResult => this.applyLegacyWorldTurnPatrolCollision()
+      'player-movement': (): WorldTurnPhaseResult => this.applyLegacyWorldTurnPlayerMovement()
     }, {
-      timedModeEnabled: this.playPatrolAgent !== null
+      timedModeEnabled: false
     });
   }
 
@@ -5300,94 +5068,7 @@ export class MenuScene extends Phaser.Scene {
     return 'running';
   }
 
-  private advanceLegacyPatrolTimer(time: number): void {
-    const hostState = this.resolveLegacyWorldTurnHostState();
-    const tick = resolveLegacyPatrolAgentTick(
-      this.playPatrolAgent,
-      time,
-      this.playStartedAtMs,
-      hostState === 'running'
-    );
-    this.playPatrolAgent = tick.state;
-    if (!tick.triggered) {
-      return;
-    }
-
-    this.legacyWorldTurnCommandSequence += 1;
-    this.legacyWorldTurnHost.setState(hostState);
-    const diagnostics = this.legacyWorldTurnHost.getDiagnostics();
-    const receipt = this.legacyWorldTurnHost.advance({
-      expectedTurn: diagnostics.nextTurn,
-      id: `${this.mazeSeed}:patrol:${tick.tickIndex}:${this.legacyWorldTurnCommandSequence}`,
-      kind: 'timed-mode-tick',
-      tickId: `${this.mazeSeed}:${tick.tickIndex}`
-    });
-    if (receipt.admitted) {
-      this.boardDynamicDirty = true;
-      this.publishRuntimeDiagnostics(time, true);
-    }
-  }
-
-  private flushLegacyPatrolCollisionIntent(time: number): void {
-    if (this.resolveLegacyWorldTurnHostState() !== 'running') {
-      this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
-      return;
-    }
-    const resolution = resolveLegacyPatrolAgentCollisionIntent(this.playPatrolAgent, time);
-    this.playPatrolAgent = resolution.state;
-    if (resolution.intent === null) {
-      return;
-    }
-
-    const heldTouchActive = this.playHeldTouchMoves.length > 0;
-    if (heldTouchActive) {
-      this.clearLegacyPlayHeldTouchRepeat();
-    }
-    this.tryMovePlayerFromInput(
-      resolution.intent.deltaX,
-      resolution.intent.deltaY,
-      { releaseAfterStep: true }
-    );
-    if (heldTouchActive && this.playHeldTouchMoves.length > 0) {
-      this.scheduleLegacyPlayHeldTouchRepeat(this.resolveLegacyPlayHeldTouchDelay('repeat'));
-    }
-    this.publishRuntimeDiagnostics(time, true);
-  }
-
   private tryMovePlayer(deltaX: number, deltaY: number): boolean {
-    const slowTileDelayActive = isLegacyStaticSlowTileDelayActive(
-      this.playStaticSlowTile,
-      this.time.now
-    );
-    const patrolDelayActive = isLegacyPatrolAgentDelayActive(
-      this.playPatrolAgent,
-      this.time.now
-    );
-    if (slowTileDelayActive || patrolDelayActive) {
-      if (slowTileDelayActive) {
-        this.playStaticSlowTile = recordLegacyStaticSlowTileBlockedMove(
-          this.playStaticSlowTile,
-          this.time.now
-        );
-      }
-      if (patrolDelayActive) {
-        this.playPatrolAgent = queueLegacyPatrolAgentCollisionIntent(
-          this.playPatrolAgent,
-          deltaX,
-          deltaY,
-          this.time.now
-        );
-        this.playPatrolAgent = recordLegacyPatrolAgentBlockedMove(
-          this.playPatrolAgent,
-          this.time.now
-        );
-      }
-      this.boardDynamicDirty = true;
-      this.publishRuntimeDiagnostics(this.time.now, true);
-      return false;
-    }
-
-    this.playPatrolAgent = clearLegacyPatrolAgentCollisionIntent(this.playPatrolAgent);
     this.legacyWorldTurnCommandSequence += 1;
     this.legacyWorldTurnHost.setState(this.resolveLegacyWorldTurnHostState());
     const diagnostics = this.legacyWorldTurnHost.getDiagnostics();
@@ -5405,45 +5086,6 @@ export class MenuScene extends Phaser.Scene {
     }
     this.publishInteractionDiagnostics();
     return receipt.admitted;
-  }
-
-  private applyLegacyWorldTurnPatrolMovement(
-    context: Readonly<WorldTurnPhaseContext>
-  ): WorldTurnPhaseResult {
-    if (context.command.kind !== 'timed-mode-tick' || this.playPatrolAgent === null) {
-      return {};
-    }
-
-    this.playPatrolAgent = advanceLegacyPatrolAgent(this.playPatrolAgent, this.time.now);
-    return {
-      events: [{
-        type: 'patrol-agent-stepped',
-        entityId: 'patrol-agent'
-      }]
-    };
-  }
-
-  private applyLegacyWorldTurnPatrolCollision(): WorldTurnPhaseResult {
-    const collision = applyLegacyPatrolAgentCollision(
-      this.playPatrolAgent,
-      this.player,
-      this.time.now
-    );
-    this.playPatrolAgent = collision.state;
-    if (!collision.triggered) {
-      return {};
-    }
-
-    this.boardDynamicDirty = true;
-    return {
-      events: [{
-        type: 'patrol-agent-collision-delay',
-        entityId: 'player',
-        payload: {
-          delayMs: collision.penaltyAppliedMs
-        }
-      }]
-    };
   }
 
   private applyLegacyWorldTurnPlayerMovement(): WorldTurnPhaseResult {
@@ -5470,13 +5112,6 @@ export class MenuScene extends Phaser.Scene {
     this.armLegacyPlayerVisualMotion(previousPlayer, nextStep.player, this.time.now, this.resolveLegacyPlayerVisualMoveDurationMs());
     this.trail = nextStep.trail;
     this.appendLegacyPlayCyclePoint(nextStep.player);
-    const slowTileEntry = applyLegacyStaticSlowTileEntry(
-      this.playStaticSlowTile,
-      nextStep.player,
-      this.time.now,
-      this.playStartedAtMs
-    );
-    this.playStaticSlowTile = slowTileEntry.state;
 
     if (nextStep.reachedGoal) {
       this.playCompletedAtMs ??= this.time.now;
@@ -5495,20 +5130,7 @@ export class MenuScene extends Phaser.Scene {
     this.triggerLegacyHapticPulse(6);
     return {
       accepted: true,
-      events: [
-        { type: 'player-moved', entityId: 'player' },
-        ...(slowTileEntry.triggered
-          ? [{
-              type: 'static-slow-tile-entered',
-              entityId: 'player',
-              payload: {
-                penaltyMs: slowTileEntry.penaltyAppliedMs,
-                phaseActive: slowTileEntry.phase?.active ?? false,
-                timingMode: slowTileEntry.phase?.mode ?? 'disabled'
-              }
-            }]
-          : [])
-      ]
+      events: [{ type: 'player-moved', entityId: 'player' }]
     };
   }
 
@@ -7722,9 +7344,6 @@ export class MenuScene extends Phaser.Scene {
       this.fillPlayDynamicMarkerTile(this.maze.goal, mazeLeft, mazeTop, mazeTileSize, 0.95 * markerDeconstructAlpha, 'goal', time);
     }
 
-    this.drawLegacyPlayStaticSlowTile(mazeLeft, mazeTop, mazeTileSize, time);
-    this.drawLegacyPlayPatrolAgent(mazeLeft, mazeTop, mazeTileSize, time);
-
     if (this.mode === 'menu' && menuTrailAlphaMultiplier > 0 && this.menuStaticDrawLifecyclePhase !== 'deconstructing') {
       this.drawLegacyMenuAiMemoryOverlay(
         mazeLeft,
@@ -7807,9 +7426,6 @@ export class MenuScene extends Phaser.Scene {
       this.drawLegacyPlayerSpawnBurst(targetX, targetY, playerSpawnBurst);
     }
 
-    this.drawLegacyPlayPatrolCollisionRecovery(mazeLeft, mazeTop, mazeTileSize, time);
-    this.drawLegacyPlayPatrolPendingIntent(mazeLeft, mazeTop, mazeTileSize, time);
-
     // Drawn last, after the trail/board content above -- the bleed-off dock
     // corridors reach the true screen edge (including the corners these
     // icons occupy), so the player's trail can visibly reach the exact same
@@ -7821,223 +7437,6 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyMenuSettingsCog(time);
     this.drawLegacyMenuLeaderboardIcon(time);
     this.boardDynamicDirty = false;
-  }
-
-  private refreshLegacyPatrolCollisionVisualState(active: boolean): void {
-    const nextActive = this.mode === 'play' && active;
-    if (nextActive || this.playPatrolCollisionVisualActive !== nextActive) {
-      this.boardDynamicDirty = true;
-    }
-    this.playPatrolCollisionVisualActive = nextActive;
-  }
-
-  private drawLegacyPlayStaticSlowTile(
-    mazeLeft: number,
-    mazeTop: number,
-    tileSize: number,
-    time: number
-  ): void {
-    const placement = this.playStaticSlowTile?.placement;
-    if (this.mode !== 'play' || placement === null || placement === undefined) {
-      return;
-    }
-
-    const centerX = mazeLeft + ((placement.point.x + 0.5) * tileSize);
-    const centerY = mazeTop + ((placement.point.y + 0.5) * tileSize);
-    const radius = Math.max(1.5, tileSize * 0.34);
-    const phase = resolveLegacyStaticSlowTilePhase(
-      this.playStaticSlowTile,
-      time,
-      this.playStartedAtMs
-    );
-    const color = this.playStaticSlowTile?.consumed
-      ? LEGACY_PLAY_SLOW_TILE_SPENT
-      : phase.active
-        ? LEGACY_PLAY_SLOW_TILE_CORE
-        : LEGACY_PLAY_SLOW_TILE_EDGE;
-    const edge = this.playStaticSlowTile?.consumed
-      ? LEGACY_PLAY_SLOW_TILE_SPENT
-      : phase.active
-        ? LEGACY_PLAY_SLOW_TILE_EDGE
-        : LEGACY_PLAY_SLOW_TILE_CORE;
-    const alpha = this.playStaticSlowTile?.consumed
-      ? 0.58
-      : phase.active
-        ? 0.96
-        : 0.48;
-
-    this.boardDynamicGraphics.fillStyle(color, alpha * 0.32);
-    this.boardDynamicGraphics.fillCircle(centerX, centerY, radius);
-    this.boardDynamicGraphics.fillStyle(color, alpha);
-    this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(centerX, centerY - radius);
-    this.boardDynamicGraphics.lineTo(centerX + radius, centerY);
-    this.boardDynamicGraphics.lineTo(centerX, centerY + radius);
-    this.boardDynamicGraphics.lineTo(centerX - radius, centerY);
-    this.boardDynamicGraphics.closePath();
-    this.boardDynamicGraphics.fillPath();
-    this.boardDynamicGraphics.lineStyle(Math.max(1, tileSize * 0.08), edge, alpha);
-    this.boardDynamicGraphics.strokePath();
-    this.boardDynamicGraphics.lineStyle(Math.max(1, tileSize * 0.07), cyberArcadeMaterial.substrate.field, alpha);
-    this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(centerX - (radius * 0.42), centerY);
-    this.boardDynamicGraphics.lineTo(centerX + (radius * 0.42), centerY);
-    this.boardDynamicGraphics.strokePath();
-  }
-
-  private drawLegacyPlayPatrolAgent(
-    mazeLeft: number,
-    mazeTop: number,
-    tileSize: number,
-    time: number
-  ): void {
-    const point = resolveLegacyPatrolAgentPoint(this.playPatrolAgent);
-    if (this.mode !== 'play' || point === null) {
-      return;
-    }
-
-    const telegraph = resolveLegacyPatrolAgentTelegraph(
-      this.playPatrolAgent,
-      time,
-      this.playStartedAtMs,
-      this.resolveLegacyWorldTurnHostState() === 'running'
-    );
-    const collisionFeedback = resolveLegacyPatrolAgentCollisionFeedback(
-      this.playPatrolAgent,
-      time
-    );
-    if (collisionFeedback.active) {
-      const playerX = mazeLeft + ((this.player.x + 0.5) * tileSize);
-      const playerY = mazeTop + ((this.player.y + 0.5) * tileSize);
-      const elapsedRatio = (collisionFeedback.elapsedMs ?? 0)
-        / LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS;
-      const impactRadius = Math.max(2, tileSize * (0.34 + (elapsedRatio * 0.24)));
-      this.boardDynamicGraphics.lineStyle(
-        Math.max(1, tileSize * 0.1),
-        LEGACY_PLAY_PATROL_COLLISION_FEEDBACK,
-        Math.max(0.24, 0.92 - (elapsedRatio * 0.68))
-      );
-      this.boardDynamicGraphics.strokeCircle(playerX, playerY, impactRadius);
-    }
-    if (telegraph.active && telegraph.nextPoint) {
-      const targetX = mazeLeft + ((telegraph.nextPoint.x + 0.5) * tileSize);
-      const targetY = mazeTop + ((telegraph.nextPoint.y + 0.5) * tileSize);
-      const targetRadius = Math.max(1.5, tileSize * 0.28);
-      const urgency = 1 - ((telegraph.msUntilStep ?? LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS)
-        / LEGACY_PATROL_AGENT_TELEGRAPH_WINDOW_MS);
-      const alpha = 0.34 + (urgency * 0.42);
-      this.boardDynamicGraphics.lineStyle(
-        Math.max(1, tileSize * 0.08),
-        LEGACY_PLAY_PATROL_TELEGRAPH,
-        alpha
-      );
-      this.boardDynamicGraphics.strokeCircle(targetX, targetY, targetRadius * 1.24);
-      this.boardDynamicGraphics.beginPath();
-      this.boardDynamicGraphics.moveTo(targetX, targetY - targetRadius);
-      this.boardDynamicGraphics.lineTo(targetX + targetRadius, targetY);
-      this.boardDynamicGraphics.lineTo(targetX, targetY + targetRadius);
-      this.boardDynamicGraphics.lineTo(targetX - targetRadius, targetY);
-      this.boardDynamicGraphics.closePath();
-      this.boardDynamicGraphics.strokePath();
-    }
-
-    const centerX = mazeLeft + ((point.x + 0.5) * tileSize);
-    const centerY = mazeTop + ((point.y + 0.5) * tileSize);
-    const radius = Math.max(1.5, tileSize * 0.3);
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_PATROL_CORE, 0.24);
-    this.boardDynamicGraphics.fillCircle(centerX, centerY, radius * 1.42);
-    this.boardDynamicGraphics.fillStyle(LEGACY_PLAY_PATROL_CORE, 0.94);
-    this.boardDynamicGraphics.fillCircle(centerX, centerY, radius);
-    this.boardDynamicGraphics.lineStyle(
-      Math.max(1, tileSize * 0.08),
-      LEGACY_PLAY_PATROL_EDGE,
-      0.96
-    );
-    this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(centerX, centerY - radius);
-    this.boardDynamicGraphics.lineTo(centerX + radius, centerY);
-    this.boardDynamicGraphics.lineTo(centerX, centerY + radius);
-    this.boardDynamicGraphics.lineTo(centerX - radius, centerY);
-    this.boardDynamicGraphics.closePath();
-    this.boardDynamicGraphics.strokePath();
-    this.boardDynamicGraphics.lineStyle(
-      Math.max(1, tileSize * 0.06),
-      cyberArcadeMaterial.substrate.field,
-      0.94
-    );
-    this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(centerX - (radius * 0.45), centerY);
-    this.boardDynamicGraphics.lineTo(centerX + (radius * 0.45), centerY);
-    this.boardDynamicGraphics.moveTo(centerX, centerY - (radius * 0.45));
-    this.boardDynamicGraphics.lineTo(centerX, centerY + (radius * 0.45));
-    this.boardDynamicGraphics.strokePath();
-  }
-
-  private drawLegacyPlayPatrolCollisionRecovery(
-    mazeLeft: number,
-    mazeTop: number,
-    tileSize: number,
-    time: number
-  ): void {
-    const collisionRecovery = resolveLegacyPatrolAgentCollisionRecovery(
-      this.playPatrolAgent,
-      time
-    );
-    if (this.mode !== 'play' || !collisionRecovery.active) {
-      return;
-    }
-
-    const playerX = mazeLeft + ((this.player.x + 0.5) * tileSize);
-    const playerY = mazeTop + ((this.player.y + 0.5) * tileSize);
-    const recoveryRatio = (collisionRecovery.elapsedMs ?? 0)
-      / LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS;
-    const recoveryRadius = Math.max(2, tileSize * (0.58 - (recoveryRatio * 0.24)));
-    this.boardDynamicGraphics.lineStyle(
-      Math.max(1, tileSize * 0.08),
-      LEGACY_PLAY_PATROL_COLLISION_RECOVERY,
-      Math.min(0.92, 0.32 + (recoveryRatio * 0.6))
-    );
-    this.boardDynamicGraphics.strokeCircle(playerX, playerY, recoveryRadius);
-  }
-
-  private drawLegacyPlayPatrolPendingIntent(
-    mazeLeft: number,
-    mazeTop: number,
-    tileSize: number,
-    time: number
-  ): void {
-    const pendingIntent = this.playPatrolAgent?.pendingCollisionIntent ?? null;
-    if (
-      this.mode !== 'play'
-      || pendingIntent === null
-      || !isLegacyPatrolAgentDelayActive(this.playPatrolAgent, time)
-      || Math.abs(pendingIntent.deltaX) + Math.abs(pendingIntent.deltaY) !== 1
-    ) {
-      return;
-    }
-
-    const playerX = mazeLeft + ((this.player.x + 0.5) * tileSize);
-    const playerY = mazeTop + ((this.player.y + 0.5) * tileSize);
-    const tipDistance = Math.max(3, tileSize * 0.48);
-    const chevronDepth = Math.max(2, tileSize * 0.2);
-    const chevronWidth = Math.max(2, tileSize * 0.16);
-    const tipX = playerX + (pendingIntent.deltaX * tipDistance);
-    const tipY = playerY + (pendingIntent.deltaY * tipDistance);
-    const baseX = tipX - (pendingIntent.deltaX * chevronDepth);
-    const baseY = tipY - (pendingIntent.deltaY * chevronDepth);
-    const perpendicularX = -pendingIntent.deltaY * chevronWidth;
-    const perpendicularY = pendingIntent.deltaX * chevronWidth;
-
-    this.boardDynamicGraphics.lineStyle(
-      Math.max(1, tileSize * 0.1),
-      LEGACY_PLAY_PATROL_PENDING_INTENT,
-      0.96
-    );
-    this.boardDynamicGraphics.beginPath();
-    this.boardDynamicGraphics.moveTo(baseX + perpendicularX, baseY + perpendicularY);
-    this.boardDynamicGraphics.lineTo(tipX, tipY);
-    this.boardDynamicGraphics.lineTo(baseX - perpendicularX, baseY - perpendicularY);
-    this.boardDynamicGraphics.strokePath();
   }
 
   // Permanently retired in favor of drawLegacyLevelAnnouncer's centered,
@@ -14091,8 +13490,6 @@ export class MenuScene extends Phaser.Scene {
       this.playCycleResetUsed = true;
       this.playStartedAtMs = this.time.now;
       this.playCompletedAtMs = null;
-      this.playStaticSlowTile = null;
-      this.playPatrolAgent = null;
       this.resetLegacyWorldTurnHost();
       this.resetLegacyPlayInputBuffer();
       this.boardDynamicDirty = true;
@@ -14115,8 +13512,6 @@ export class MenuScene extends Phaser.Scene {
       ...baseline,
       updatedAt: new Date().toISOString()
     });
-    this.playStaticSlowTile = null;
-    this.playPatrolAgent = null;
     this.resetLegacyWorldTurnHost();
     this.setLatestOverlayMessage(createLegacyPlayerMessage({
       copy: 'Progression reset.',

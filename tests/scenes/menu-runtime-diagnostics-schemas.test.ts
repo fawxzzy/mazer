@@ -165,6 +165,24 @@ describe('versioned menu runtime diagnostic schemas', () => {
     expect(compatibility?.diagnosticsEnvelope.schemas).toHaveProperty('surfaceState');
     expect(parseMenuSceneRuntimeDiagnosticsAttribute(JSON.stringify(compatibility))).toEqual(compatibility);
     expect(parseMenuSceneRuntimeDiagnosticsAttribute(JSON.stringify(fixture))).toEqual(fixture);
+    expect(createMenuWorldSemanticDiagnosticsV1(fixture)).toMatchObject({
+      payload: { patrol: null, pressure: null }
+    });
+  });
+
+  test('preserves retired play objects only as forced-null world-semantic v1 tombstones', () => {
+    const fixture = createFixture() as MenuSceneRuntimeDiagnostics & {
+      play: NonNullable<MenuSceneRuntimeDiagnostics['play']> & {
+        patrol: unknown;
+        pressure: unknown;
+      };
+    };
+    fixture.play.patrol = { contractVersion: 'retired-hostile-patrol' };
+    fixture.play.pressure = { contractVersion: 'retired-hostile-pressure' };
+
+    expect(createMenuWorldSemanticDiagnosticsV1(fixture)).toMatchObject({
+      payload: { patrol: null, pressure: null }
+    });
   });
 
   test('rejects unknown keys and versions on every new schema', () => {

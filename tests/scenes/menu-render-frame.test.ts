@@ -19,7 +19,7 @@ import {
   resolveLegacyMenuPathTitleOrbitPoint
 } from '../../src/legacy-runtime/legacyMenuTitle';
 import { resolveLegacyNavigationTarget } from '../../src/legacy-runtime/legacyMaze';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const normalizeSourceLineEndings = (source: string): string => source.replace(/\r\n?/g, '\n');
@@ -1261,6 +1261,50 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('registeredPhases: [...worldTurnDiagnostics.registeredPhases]');
     expect(menuSceneSource).toContain('timedModeEnabled: worldTurnDiagnostics.timedModeEnabled');
     expect(menuSceneSource).toContain('worldTurn: {');
+  });
+
+  test('retains only player movement in the live play world and no dormant object seam', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const diagnosticsSource = readFileSync(resolve(process.cwd(), 'src/scenes/menuRuntimeDiagnostics.ts'), 'utf8');
+    const semanticSource = readFileSync(
+      resolve(process.cwd(), 'src/scenes/diagnostics/menuWorldSemanticDiagnostics.ts'),
+      'utf8'
+    );
+    const captureSource = readFileSync(
+      resolve(process.cwd(), 'scripts/analysis/capture-play-object-retirement.mjs'),
+      'utf8'
+    );
+    const worldTurnSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private createLegacyWorldTurnHost(): WorldTurnHost'),
+      menuSceneSource.indexOf('private resetLegacyWorldTurnHost(): void')
+    );
+
+    expect(existsSync(resolve(process.cwd(), 'src/legacy-runtime/legacyPatrolAgent.ts'))).toBe(false);
+    expect(existsSync(resolve(process.cwd(), 'src/legacy-runtime/legacyStaticSlowTile.ts'))).toBe(false);
+    expect(existsSync(resolve(process.cwd(), 'tests/reset/legacy-patrol-agent.test.ts'))).toBe(false);
+    expect(existsSync(resolve(process.cwd(), 'tests/reset/legacy-static-slow-tile.test.ts'))).toBe(false);
+    expect(menuSceneSource).not.toContain('legacyPatrolAgent');
+    expect(menuSceneSource).not.toContain('legacyStaticSlowTile');
+    expect(menuSceneSource).not.toContain('playPatrolAgent');
+    expect(menuSceneSource).not.toContain('playStaticSlowTile');
+    expect(menuSceneSource).not.toContain('static-slow-tile-entered');
+    expect(worldTurnSource).toContain("'player-movement': (): WorldTurnPhaseResult => this.applyLegacyWorldTurnPlayerMovement()");
+    expect(worldTurnSource).toContain('timedModeEnabled: false');
+    expect(worldTurnSource).not.toContain("'enemy-movement'");
+    expect(worldTurnSource).not.toContain('collisions:');
+    expect(diagnosticsSource).not.toContain('patrol?:');
+    expect(diagnosticsSource).not.toContain('pressure?:');
+    expect(semanticSource).toContain('patrol: null');
+    expect(semanticSource).toContain('pressure: null');
+    expect(menuSceneSource).not.toContain("from '../ui/boardRenderer'");
+    expect(menuSceneSource).not.toContain("from '../ui/menuIntentRuntime'");
+    expect(captureSource).toContain("level: '9007199254740993'");
+    expect(captureSource).toContain('targetComplexity: 400');
+    expect(captureSource).toContain('requestedSeed: 3749');
+    expect(captureSource).toContain("issues.push('raw-patrol-present')");
+    expect(captureSource).toContain("issues.push('raw-pressure-present')");
+    expect(captureSource).toContain("JSON.stringify(['player-movement'])");
+    expect(captureSource).toContain("issues.push('timed-mode-enabled')");
   });
 
   test('keeps static and dynamic board layers on the same board offset', () => {

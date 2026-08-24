@@ -2,8 +2,6 @@ import { describe, expect, test } from 'vitest';
 import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import { createLegacyRuntimeMazeForMode, resolveLegacyGenerationBudgetContract } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import type { LegacyMazeSnapshot } from '../../src/legacy-runtime/legacyMaze';
-import { createLegacyPatrolAgentState } from '../../src/legacy-runtime/legacyPatrolAgent';
-import { createLegacyStaticSlowTileState } from '../../src/legacy-runtime/legacyStaticSlowTile';
 import {
   LEGACY_PROGRESSION_MENU_MIN_TILE_PX,
   LEGACY_PROGRESSION_AI_CHALLENGE_SCORE_THRESHOLD,
@@ -332,9 +330,6 @@ describe('legacy progression', () => {
 
     const profile = resolveLegacyProgressionDifficultyProfile(repaired.tracks.player);
     expect(profile.band).toBe('tutorial');
-    expect(createLegacyStaticSlowTileState(createProgressionTestMaze(), profile.band))
-      .toMatchObject({ eligible: false, placement: null });
-    expect(createLegacyPatrolAgentState(createProgressionTestMaze(), profile.band)).toBeNull();
 
     const advanced = recordLegacyProgressionCycle(
       storage,
@@ -415,9 +410,6 @@ describe('legacy progression', () => {
 
     const profile = resolveLegacyProgressionDifficultyProfile(repaired.tracks.player);
     expect(profile.band).toBe('tutorial');
-    expect(createLegacyStaticSlowTileState(createProgressionTestMaze(), profile.band))
-      .toMatchObject({ eligible: false, placement: null });
-    expect(createLegacyPatrolAgentState(createProgressionTestMaze(), profile.band)).toBeNull();
   });
 
   test('keeps a coherent earned player trajectory when it migrates to the current baseline', () => {
