@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE,
   MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY,
+  MENU_RUNTIME_DIAGNOSTICS_COMPATIBILITY_SCHEMA_ID,
   clearMenuSceneRuntimeDiagnostics,
   parseMenuSceneRuntimeDiagnosticsAttribute,
   publishMenuSceneRuntimeDiagnostics,
@@ -612,10 +613,22 @@ describe('menu runtime diagnostics', () => {
 
     try {
       publishMenuSceneRuntimeDiagnostics(diagnostics);
-      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]).toEqual(diagnostics);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]).toMatchObject(diagnostics);
+      expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.diagnosticsEnvelope?.schemaId)
+        .toBe(MENU_RUNTIME_DIAGNOSTICS_COMPATIBILITY_SCHEMA_ID);
+      expect(Object.keys(
+        runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.diagnosticsEnvelope?.schemas ?? {}
+      )).toEqual([
+        'surfaceState',
+        'layoutBounds',
+        'renderDpr',
+        'input',
+        'worldSemantic',
+        'captureMetadata'
+      ]);
       expect(parseMenuSceneRuntimeDiagnosticsAttribute(
         documentAttributes.get(MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE)
-      )).toEqual(diagnostics);
+      )).toMatchObject(diagnostics);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.play?.player.screenX).toBe(35);
       expect(runtimeWindow[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY]?.play?.inputBuffer.resolvedVector)
         .toEqual({ deltaX: 1, deltaY: 1 });

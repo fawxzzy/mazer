@@ -192,8 +192,8 @@ describe('Mazer UI rework design token contract', () => {
       expect(violations).toEqual([]);
     });
 
-    it('requires every real changed path to remain inside the admitted Wave 1B integration ceiling', async () => {
-      const { readDecisionRegistryForTokens, collectProtectedPathViolationsForTokens, readGitChangedFilesForTokens } = await loadChecker();
+    it('keeps this working tree\'s real changed files within one registered integrator wave', async () => {
+      const { readDecisionRegistryForTokens, readGitChangedFilesForTokens } = await loadChecker();
       const decisionRegistry = await readDecisionRegistryForTokens();
 
       let changedFiles: string[];
@@ -203,24 +203,13 @@ describe('Mazer UI rework design token contract', () => {
         return;
       }
 
-      const violations = collectProtectedPathViolationsForTokens(changedFiles, decisionRegistry);
-      const admittedWavePaths = new Set([
-        'docs/architecture/MAZER-UI-REWORK-DESIGN-TOKENS.md',
-        'docs/contracts/mazer-ui-rework-design-tokens.v1.json',
-        'scripts/check-design-tokens.mjs',
-        'src/theme/tokens.ts',
-        'src/theme/tokens.css',
-        'tests/architecture/design-tokens-contract.test.ts',
-        'scripts/check-decision-registry.mjs',
-        'tests/architecture/decision-registry-contract.test.ts',
-        'tests/architecture/topology-path-contract.test.ts',
-        'tests/architecture/ui-state-model-contract.test.ts',
-        'src/styles/base.css',
-        'src/boot/presentation.ts',
-        'tests/reset/boot-presentation.test.ts',
-        'tests/reset/accessibility-surface.test.ts'
-      ]);
-      expect(changedFiles.filter((path) => !admittedWavePaths.has(path))).toEqual([]);
+      const { collectIntegratorWaveMixViolations } = await import('../../scripts/check-decision-registry.mjs') as {
+        collectIntegratorWaveMixViolations: (
+          changedFiles: string[],
+          registry: Record<string, unknown>
+        ) => DesignTokenViolation[];
+      };
+      const violations = collectIntegratorWaveMixViolations(changedFiles, decisionRegistry);
       expect(violations).toEqual([]);
     });
 
