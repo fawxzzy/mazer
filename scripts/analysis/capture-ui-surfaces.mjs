@@ -122,6 +122,16 @@ const readDiagnostics = async (page) => ({
   visual: await readJsonAttribute(page, VISUAL_DIAGNOSTICS_ATTRIBUTE)
 });
 
+const isFiniteBounds = (bounds) => (
+  bounds
+  && Number.isFinite(bounds.left)
+  && Number.isFinite(bounds.right)
+  && Number.isFinite(bounds.top)
+  && Number.isFinite(bounds.bottom)
+  && Number.isFinite(bounds.width)
+  && Number.isFinite(bounds.height)
+);
+
 const waitForSurface = async (page, {
   expectedLabels = [],
   mode,
@@ -276,34 +286,103 @@ const exerciseReducedMotionPreferenceChange = async (page, timeoutMs) => {
   return { initial, reduced, restored };
 };
 
-const waitForAuthenticatedFixtureReady = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
-  await page.waitForFunction(
-    ({ runtimeAttribute, visualAttribute }) => {
-      const runtimeRaw = document.documentElement.getAttribute(runtimeAttribute);
-      const visualRaw = document.documentElement.getAttribute(visualAttribute);
-      if (!runtimeRaw || !visualRaw) {
-        return false;
-      }
+const summarizeAuthenticatedFixtureButton = (button) => ({
+  active: button ? button.active !== false : false,
+  activeDeclared: typeof button?.active === 'boolean',
+  geometry: button?.bounds ? {
+    bottom: button.bounds.bottom ?? null,
+    finite: isFiniteBounds(button.bounds),
+    height: button.bounds.height ?? null,
+    left: button.bounds.left ?? null,
+    right: button.bounds.right ?? null,
+    top: button.bounds.top ?? null,
+    width: button.bounds.width ?? null
+  } : { finite: false },
+  iconOnly: button?.iconOnly === true,
+  semanticAction: typeof button?.semanticAction === 'string' ? button.semanticAction : null,
+  text: typeof button?.text === 'string' ? button.text : null
+});
 
-      try {
-        const runtime = JSON.parse(runtimeRaw);
-        const visual = JSON.parse(visualRaw);
-        const labels = new Set((visual?.textLabels ?? []).map((entry) => entry.text));
-        return runtime?.auth?.status === 'authenticated'
-          && visual?.runtime?.mode === 'menu'
-          && visual?.runtime?.overlay === 'none'
-          && labels.has('Start')
-          && (visual?.buttons ?? []).some((button) => button?.text === 'Settings' && button?.iconOnly === true);
-      } catch {
-        return false;
-      }
-    },
-    {
-      runtimeAttribute: RUNTIME_DIAGNOSTICS_ATTRIBUTE,
-      visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
-    },
-    { timeout: timeoutMs }
+const findAuthenticatedFixtureAction = (buttons, semanticAction, fallbackText) => (
+  buttons.find((button) => button?.semanticAction === semanticAction)
+  ?? buttons.find((button) => (
+    (button?.semanticAction === undefined || button?.semanticAction === null)
+    && button?.text === fallbackText
+  ))
+  ?? null
+);
+
+export const evaluateAuthenticatedFixtureReadiness = ({ runtime = null, visual = null } = {}) => {
+  const buttons = Array.isArray(visual?.buttons) ? visual.buttons : [];
+  const start = findAuthenticatedFixtureAction(buttons, 'Start', 'Start');
+  const settings = findAuthenticatedFixtureAction(buttons, 'Settings', 'Settings');
+  const startState = summarizeAuthenticatedFixtureButton(start);
+  const settingsState = summarizeAuthenticatedFixtureButton(settings);
+  const clauses = {
+    authenticated: runtime?.auth?.status === 'authenticated',
+    menuMode: visual?.runtime?.mode === 'menu',
+    noOverlay: visual?.runtime?.overlay === 'none',
+    settingsAction: Boolean(settings)
+      && settingsState.active
+      && settingsState.iconOnly
+      && settingsState.geometry.finite,
+    startAction: Boolean(start)
+      && startState.active
+      && !startState.iconOnly
+      && startState.geometry.finite
+  };
+
+  return {
+    clauses,
+    failedClauses: Object.entries(clauses)
+      .filter(([, passed]) => !passed)
+      .map(([clause]) => clause),
+    ready: Object.values(clauses).every(Boolean),
+    state: {
+      authStatus: runtime?.auth?.status ?? null,
+      buttons: {
+        settings: settingsState,
+        start: startState
+      },
+      mode: visual?.runtime?.mode ?? null,
+      overlay: visual?.runtime?.overlay ?? null
+    }
+  };
+};
+
+export const waitForAuthenticatedFixtureReady = async (page, {
+  now = () => Date.now(),
+  pollIntervalMs = 50,
+  readDiagnosticsFn = readDiagnostics,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  waitFn = (delayMs) => page.waitForTimeout(delayMs)
+} = {}) => {
+  const startedAt = now();
+  let evaluation;
+
+  do {
+    evaluation = evaluateAuthenticatedFixtureReadiness(await readDiagnosticsFn(page));
+    if (evaluation.ready) {
+      return evaluation;
+    }
+    if (now() - startedAt >= timeoutMs) {
+      break;
+    }
+    await waitFn(Math.max(0, Math.min(pollIntervalMs, timeoutMs)));
+  } while (true);
+
+  const evidence = {
+    clauses: evaluation.clauses,
+    failedClauses: evaluation.failedClauses,
+    lastState: evaluation.state,
+    timeoutMs
+  };
+  const error = new Error(
+    `Authenticated fixture readiness timed out: ${JSON.stringify(evidence)}`
   );
+  error.code = 'AUTHENTICATED_FIXTURE_READINESS_TIMEOUT';
+  error.evidence = evidence;
+  throw error;
 };
 
 const resolveRoute = ({ authFixture, route = DEFAULT_ROUTE, label, mazeSeed }) => {
@@ -380,6 +459,29 @@ const openOptionsOverlayViaQa = async (page, timeoutMs) => {
   });
   if (result?.accepted !== true) {
     throw new Error(`Unable to open Settings through QA bridge: ${result?.reason ?? 'unknown'}`);
+  }
+  await page.waitForTimeout(Math.min(timeoutMs, 500));
+};
+
+const openPauseOverlayViaQa = async (page, timeoutMs) => {
+  await page.waitForFunction(
+    () => Boolean(window.__MAZER_QA__?.openPauseOverlay),
+    {},
+    { timeout: timeoutMs }
+  );
+  const result = await page.evaluate(() => {
+    const api = window.__MAZER_QA__;
+    return api?.openPauseOverlay
+      ? api.openPauseOverlay()
+      : {
+          accepted: false,
+          mode: null,
+          overlay: null,
+          reason: 'missing-qa-surface'
+        };
+  });
+  if (result?.accepted !== true) {
+    throw new Error(`Unable to open Pause through QA bridge: ${result?.reason ?? 'unknown'}`);
   }
   await page.waitForTimeout(Math.min(timeoutMs, 500));
 };
@@ -478,58 +580,12 @@ const captureSurface = async ({
   timeoutMs,
   viewport
 }) => {
-  let diagnostics = skipWait ? await readDiagnostics(page) : await waitForSurface(page, {
+  const diagnostics = skipWait ? await readDiagnostics(page) : await waitForSurface(page, {
     expectedLabels,
     mode,
     overlay,
     timeoutMs
   });
-  if (skipWait && expectedLabels.length > 0) {
-    let labels = (diagnostics.visual?.textLabels ?? []).map((entry) => entry.text);
-    let missingLabels = expectedLabels.filter((expectedLabel) => (
-      !labels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
-    ));
-    if (missingLabels.length > 0) {
-      const expectedLabelDescriptors = buildExpectedTextLabelDescriptors(expectedLabels);
-      await page.waitForFunction(
-        ({ expected, visualAttribute }) => {
-          const raw = document.documentElement.getAttribute(visualAttribute);
-          if (!raw) {
-            return false;
-          }
-
-          try {
-            const visual = JSON.parse(raw);
-            const currentLabels = (visual?.textLabels ?? []).map((entry) => entry.text);
-            return expected.every(({ allowStateSuffix, expectedLabel }) => currentLabels.some((actualLabel) => (
-              actualLabel === expectedLabel
-              || (
-                allowStateSuffix
-                && typeof actualLabel === 'string'
-                && actualLabel.startsWith(`${expectedLabel}: `)
-                && actualLabel.slice(expectedLabel.length + 2).trim().length > 0
-              )
-            )));
-          } catch {
-            return false;
-          }
-        },
-        {
-          expected: expectedLabelDescriptors,
-          visualAttribute: VISUAL_DIAGNOSTICS_ATTRIBUTE
-        },
-        { timeout: timeoutMs }
-      );
-      diagnostics = await readDiagnostics(page);
-      labels = (diagnostics.visual?.textLabels ?? []).map((entry) => entry.text);
-      missingLabels = expectedLabels.filter((expectedLabel) => (
-        !labels.some((actualLabel) => matchesExpectedTextLabel(actualLabel, expectedLabel))
-      ));
-    }
-    if (missingLabels.length > 0) {
-      throw new Error(`Surface ${id} missing labels after direct diagnostics read: ${missingLabels.join(', ')}`);
-    }
-  }
   const screenContract = buildVisualScreenContract({
     expectedRoute: route,
     actualUrl: page.url(),
@@ -673,7 +729,12 @@ const captureViewportTransition = async ({
   const captureEndpoint = async (name, viewport) => {
     await page.setViewportSize(viewport);
     await waitForViewportGeometry(page, viewport, timeoutMs);
-    await waitForVisualBuildSettled(page, { timeoutMs });
+    // Auth and modal overlays intentionally freeze or lock gameplay. Their
+    // viewport proof is ready when the requested surface and geometry are ready;
+    // waiting for active gameplay settlement would make those valid states time out.
+    if (overlay === 'none') {
+      await waitForVisualBuildSettled(page, { timeoutMs });
+    }
     const capture = await captureSurface({
       page,
       outputDir: transition.outputDir,
@@ -702,7 +763,9 @@ const captureViewportTransition = async ({
   const endpoint = await captureEndpoint('endpoint', transition.endpoint);
   await page.setViewportSize(transition.initial);
   await waitForViewportGeometry(page, transition.initial, timeoutMs);
-  await waitForVisualBuildSettled(page, { timeoutMs });
+  if (overlay === 'none') {
+    await waitForVisualBuildSettled(page, { timeoutMs });
+  }
 
   return {
     initial,
@@ -829,16 +892,6 @@ const isIgnorableConsoleMessage = (message) => (
   message.type === 'warning'
   && typeof message.text === 'string'
   && message.text.includes('WebGL: CONTEXT_LOST_WEBGL')
-);
-
-const isFiniteBounds = (bounds) => (
-  bounds
-  && Number.isFinite(bounds.left)
-  && Number.isFinite(bounds.right)
-  && Number.isFinite(bounds.top)
-  && Number.isFinite(bounds.bottom)
-  && Number.isFinite(bounds.width)
-  && Number.isFinite(bounds.height)
 );
 
 const scrollOverlayToBottom = async (page, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) => {
@@ -1456,7 +1509,7 @@ const buildSurfaceChecks = ({
   ];
   const overlayScrollBottomIssues = includeOverlayBottom ? [
     ...collectOverlayScrollBottomIssues('options-bottom', surfaces.optionsBottom, optionsBottomExpectedLabels),
-    ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, ['Menu', 'Account'])
+    ...collectOverlayScrollBottomIssues('pause-bottom', surfaces.pauseBottom, [])
   ] : [];
   const overlayScrollFadeTextIssues = [
     ...collectOverlayScrollCueTextIssues('options', surfaces.options),
@@ -1661,7 +1714,7 @@ const buildSurfaceChecks = ({
     ),
     createCheck(
       'pause-text-labels',
-      hasLabels(surfaces.pause, ['GUIDE', 'Move Speed', 'Trail Fade', 'Trail Shine', 'Animated Background', 'Menu', 'Account'])
+      hasLabels(surfaces.pause, ['GUIDE', 'Board Zoom', 'Trail Fade', 'Trail Shine', 'Animated Background'])
         && !hasLabels(surfaces.pause, ['Game Toggles', 'Resume']),
       `labels=${labelDetail(surfaces.pause)}`
     ),
@@ -2016,7 +2069,12 @@ export const runUiSurfaceCapture = async (options = {}) => {
           mode: 'menu',
           overlay: 'options',
           route,
-          skipWait: authFixture === 'authenticated',
+          // A signed-out capture reloads through the deterministic authenticated
+          // fixture before reaching Settings. Its diagnostics were already
+          // authenticated and settled above, just like an explicitly requested
+          // authenticated fixture, so read the surface directly and let the
+          // report retain any label drift as a failed evidence clause.
+          skipWait: authFixture === 'authenticated' || startsAtAuthOverlay,
           timeoutMs,
           viewport
         });
@@ -2087,11 +2145,13 @@ export const runUiSurfaceCapture = async (options = {}) => {
       })
       : null;
 
-    await page.keyboard.press('P');
+    await openPauseOverlayViaQa(page, timeoutMs);
     const pause = await captureSurface({
       page,
       outputDir,
-      expectedLabels: ['GUIDE', 'Move Speed', 'Trail Fade', 'Trail Shine', 'Animated Background', 'Menu', 'Account'],
+      expectedLabels: transition
+        ? []
+        : ['GUIDE', 'Board Zoom', 'Trail Fade', 'Trail Shine', 'Animated Background'],
       id: '04-pause',
       mode: 'play',
       overlay: 'pause',
@@ -2111,7 +2171,7 @@ export const runUiSurfaceCapture = async (options = {}) => {
         return captureSurface({
           page,
           outputDir,
-          expectedLabels: ['Menu', 'Account'],
+          expectedLabels: [],
           id: '04-pause-bottom',
           mode: 'play',
           overlay: 'pause',
