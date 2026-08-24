@@ -10,6 +10,12 @@ const readSource = (name) => readFileSync(sourcePath(name), 'utf8').replace(/\r\
 const bindMasterSchema = (sql) => sql
   .replace(/\bpublic\./g, 'mazer.')
   .replaceAll('set search_path = public', "set search_path = ''");
+const replaceRequired = (source, search, replacement, label) => {
+  if (!source.includes(search)) {
+    throw new Error(`Required generated migration transform is missing: ${label}`);
+  }
+  return source.replace(search, replacement);
+};
 
 const requireMasterTables = `do $preflight$
 begin
@@ -62,8 +68,49 @@ revoke all on function mazer.mazer_is_username_available(text) from public, anon
 grant execute on function mazer.mazer_is_username_available(text) to authenticated;
 `;
 
-const completionRpc = bindMasterSchema(readSource('20260822000100_mazer_endless_completion_rpc.sql'));
+let completionRpc = bindMasterSchema(readSource('20260822000100_mazer_endless_completion_rpc.sql'));
+completionRpc = replaceRequired(
+  completionRpc,
+  `-- Same schema-location caveat as the prior migration in this pair
+-- (20260822000000_mazer_endless_progression_foundation.sql): written
+-- against \`public\`, confirm the real live schema before applying and
+-- requalify to \`mazer.\` if that is where the tables actually live.`,
+  `-- Bound specifically to the authoritative master project schema \`mazer\`.
+-- The generator fails if the reviewed source contract can no longer be transformed exactly.`,
+  'completion schema guidance'
+);
+completionRpc = replaceRequired(
+  completionRpc,
+  'if v_current.revision <> p_expected_revision then',
+  'if p_expected_revision is null or v_current.revision is distinct from p_expected_revision then',
+  'player completion revision guard'
+);
+completionRpc = replaceRequired(
+  completionRpc,
+  'if v_current_revision <> p_expected_revision then',
+  'if p_expected_revision is null or v_current_revision is distinct from p_expected_revision then',
+  'progression reset revision guard'
+);
 let leaderboardRpc = bindMasterSchema(readSource('20260822000200_mazer_leaderboard_rpc.sql'));
+leaderboardRpc = replaceRequired(
+  leaderboardRpc,
+  `-- Same schema-location caveat as the two prior migrations in this set:
+-- written against \`public\`, confirm the real live schema before applying.
+--
+-- Follows the exact pattern mazer_is_username_available already
+-- established (20260821000000_mazer_profile_username.sql): RLS on
+-- mazer_profiles/mazer_progression_states restricts every authenticated
+-- user to their own row, so there is no way for a client to read anyone
+-- else's data directly. This function runs as its definer (bypassing RLS
+-- internally) but returns only rank/username/level -- never email, auth
+-- UUID, provider identity, progression JSON, receipts, or settings -- so it
+-- is safe to expose to any authenticated caller.`,
+  `-- Bound specifically to the authoritative master project schema \`mazer\`.
+-- The definer returns only public rank/username/level fields and is intentionally
+-- callable by guests and authenticated users; private identity, progression JSON,
+-- receipts, and settings remain unreachable.`,
+  'leaderboard schema and guest guidance'
+);
 leaderboardRpc = leaderboardRpc.replace(
   'grant execute on function mazer.mazer_leaderboard_page(integer, integer) to authenticated;',
   'revoke all on function mazer.mazer_leaderboard_page(integer, integer) from anon;\n' +

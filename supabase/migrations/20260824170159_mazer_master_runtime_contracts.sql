@@ -20,10 +20,8 @@ $preflight$;
 
 -- Server-transactional player and menu-AI completion contracts.
 --
--- Same schema-location caveat as the prior migration in this pair
--- (20260822000000_mazer_endless_progression_foundation.sql): written
--- against `public`, confirm the real live schema before applying and
--- requalify to `mazer.` if that is where the tables actually live.
+-- Bound specifically to the authoritative master project schema `mazer`.
+-- The generator fails if the reviewed source contract can no longer be transformed exactly.
 --
 -- Progression mutation is RPC-only after this migration. Ownership RLS still
 -- governs reads, while the SECURITY DEFINER functions below re-check the
@@ -243,7 +241,7 @@ begin
     return;
   end if;
 
-  if v_current.revision <> p_expected_revision then
+  if p_expected_revision is null or v_current.revision is distinct from p_expected_revision then
     raise exception 'Progression changed on another device (expected revision %, found %)', p_expected_revision, v_current.revision
       using errcode = '40001';
   end if;
@@ -689,7 +687,7 @@ begin
   where s.user_id = v_user_id
   for update;
 
-  if v_current_revision <> p_expected_revision then
+  if p_expected_revision is null or v_current_revision is distinct from p_expected_revision then
     raise exception 'Progression changed on another device (expected revision %, found %)', p_expected_revision, v_current_revision
       using errcode = '40001';
   end if;
@@ -776,17 +774,10 @@ revoke insert on table mazer.mazer_cycle_receipts from authenticated;
 
 -- Public paginated leaderboard read path.
 --
--- Same schema-location caveat as the two prior migrations in this set:
--- written against `public`, confirm the real live schema before applying.
---
--- Follows the exact pattern mazer_is_username_available already
--- established (20260821000000_mazer_profile_username.sql): RLS on
--- mazer_profiles/mazer_progression_states restricts every authenticated
--- user to their own row, so there is no way for a client to read anyone
--- else's data directly. This function runs as its definer (bypassing RLS
--- internally) but returns only rank/username/level -- never email, auth
--- UUID, provider identity, progression JSON, receipts, or settings -- so it
--- is safe to expose to any authenticated caller.
+-- Bound specifically to the authoritative master project schema `mazer`.
+-- The definer returns only public rank/username/level fields and is intentionally
+-- callable by guests and authenticated users; private identity, progression JSON,
+-- receipts, and settings remain unreachable.
 --
 -- Inclusion rule: a row appears only if it has a non-null, non-empty
 -- username. No email-derived fallback handle is invented for accounts

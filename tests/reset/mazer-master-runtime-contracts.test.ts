@@ -25,6 +25,13 @@ describe('master Mazer runtime contracts migration', () => {
     expect(migration).toContain('security definer');
     expect(migration).toContain("set search_path = ''");
     expect(migration).toContain('v_completed_level <> v_current.player_level');
+    expect(migration).toContain(
+      'p_expected_revision is null or v_current.revision is distinct from p_expected_revision'
+    );
+    expect(migration).toContain(
+      'p_expected_revision is null or v_current_revision is distinct from p_expected_revision'
+    );
+    expect(migration).not.toMatch(/revision\s*<>\s*p_expected_revision/);
     expect(migration).toContain('p_client_run_id');
     expect(migration).toContain('revoke insert, update on table mazer.mazer_progression_states from authenticated');
     expect(migration).toContain('revoke insert, update on table mazer.mazer_ai_progression_states from authenticated');
@@ -44,6 +51,9 @@ describe('master Mazer runtime contracts migration', () => {
     );
     expect(migration).not.toMatch(/grant execute on function mazer\.mazer_leaderboard_self_rank\(\) to anon/);
     expect(migration).not.toContain('set search_path = public');
+    expect(migration).not.toContain('confirm the real live schema before applying');
+    expect(migration).not.toContain('safe to expose to any authenticated caller');
+    expect(migration).toContain('callable by guests and authenticated users');
   });
 
   test('pins function ownership and forced RLS', () => {
