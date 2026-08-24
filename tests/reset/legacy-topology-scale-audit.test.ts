@@ -202,6 +202,7 @@ const isReservedCutoutLine = (axisLength: number, line: number): boolean => {
 const auditBorderFeederSides = (
   maze: ReturnType<typeof createLegacyMaze>
 ): {
+  adjacentBorderFloors: Array<{ first: number; second: number; side: 'bottom' | 'left' | 'right' | 'top' }>;
   bottom: number;
   left: number;
   reservedBorderFloors: Array<{ x: number; y: number }>;
@@ -209,6 +210,7 @@ const auditBorderFeederSides = (
   top: number;
 } => {
   const result = {
+    adjacentBorderFloors: [] as Array<{ first: number; second: number; side: 'bottom' | 'left' | 'right' | 'top' }>,
     bottom: 0,
     left: 0,
     reservedBorderFloors: [] as Array<{ x: number; y: number }>,
@@ -243,6 +245,41 @@ const auditBorderFeederSides = (
         if (isReservedCutoutLine(maze.width, point.x)) {
           result.reservedBorderFloors.push(point);
         }
+      }
+    }
+  }
+
+  const sideLines: Record<'bottom' | 'left' | 'right' | 'top', number[]> = {
+    bottom: [],
+    left: [],
+    right: [],
+    top: []
+  };
+  for (let y = 1; y < maze.height - 1; y += 1) {
+    if (maze.grid[y]?.[0] === true) {
+      sideLines.left.push(y);
+    }
+    if (maze.grid[y]?.[maze.width - 1] === true) {
+      sideLines.right.push(y);
+    }
+  }
+  for (let x = 1; x < maze.width - 1; x += 1) {
+    if (maze.grid[0]?.[x] === true) {
+      sideLines.top.push(x);
+    }
+    if (maze.grid[maze.height - 1]?.[x] === true) {
+      sideLines.bottom.push(x);
+    }
+  }
+  for (const [side, lines] of Object.entries(sideLines) as Array<[
+    keyof typeof sideLines,
+    number[]
+  ]>) {
+    for (let index = 1; index < lines.length; index += 1) {
+      const first = lines[index - 1];
+      const second = lines[index];
+      if (first !== undefined && second !== undefined && second - first < 2) {
+        result.adjacentBorderFloors.push({ first, second, side });
       }
     }
   }
@@ -295,9 +332,32 @@ describe('legacy topology scale audit', () => {
     }
   }, 20_000);
 
+  test('keeps supplemental border feeders separated from every existing opening', () => {
+    const reportedCases = [
+      { scale: 39, seed: 1 },
+      { scale: 37, seed: 4 },
+      { scale: 37, seed: 10 },
+      { scale: 39, seed: 12 },
+      { scale: 37, seed: 13 }
+    ];
+
+    for (const { scale, seed } of reportedCases) {
+      for (const [kind, buildMaze] of [
+        ['play', createLegacyMaze],
+        ['menu', createLegacyGeneratedMenuMaze]
+      ] as const) {
+        const maze = buildMaze(scale, scale, seed);
+        expect(
+          auditBorderFeederSides(maze).adjacentBorderFloors,
+          `${kind} scale ${scale} seed ${seed}`
+        ).toEqual([]);
+      }
+    }
+  }, 20_000);
+
   test('keeps play and generated-menu topology meaningful across shortcut-enabled scale bands', () => {
     const scales = [37, 50, 75];
-    const seeds = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233];
+    const seeds = [1, 2, 3, 4, 5, 8, 10, 12, 13, 21, 34, 55, 89, 144, 233];
     const failures: unknown[] = [];
 
     for (const scale of scales) {
@@ -322,6 +382,7 @@ describe('legacy topology scale audit', () => {
             || borderFeederSides.right < 2
             || borderFeederSides.top < 2
             || borderFeederSides.bottom < 2
+            || borderFeederSides.adjacentBorderFloors.length > 0
             || borderFeederSides.reservedBorderFloors.length > 0
             || borderContinuity.borderFloorCount < 2
             || borderContinuity.floorRatio < 0.28
@@ -382,6 +443,7 @@ describe('legacy topology scale audit', () => {
           || borderFeederSides.right < 2
           || borderFeederSides.top < 2
           || borderFeederSides.bottom < 2
+          || borderFeederSides.adjacentBorderFloors.length > 0
           || borderFeederSides.reservedBorderFloors.length > 0
           || borderContinuity.borderFloorCount < 2
           || borderContinuity.floorRatio < 0.28
@@ -439,6 +501,7 @@ describe('legacy topology scale audit', () => {
         || borderFeederSides.right < 2
         || borderFeederSides.top < 2
         || borderFeederSides.bottom < 2
+        || borderFeederSides.adjacentBorderFloors.length > 0
         || borderFeederSides.reservedBorderFloors.length > 0
         || borderContinuity.borderFloorCount < 2
         || borderContinuity.floorRatio < 0.28

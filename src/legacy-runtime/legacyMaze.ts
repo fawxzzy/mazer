@@ -1614,10 +1614,24 @@ const collectLegacyBorderFeederLinesOnSide = (
   return lines;
 };
 
+const resolveLegacyOppositeBorderFeederSide = (side: LegacyBorderFeederSide): LegacyBorderFeederSide => {
+  if (side === 'left') {
+    return 'right';
+  }
+  if (side === 'right') {
+    return 'left';
+  }
+  if (side === 'top') {
+    return 'bottom';
+  }
+  return 'top';
+};
+
 const applyLegacyPerimeterFeederConnections = (
   grid: boolean[][],
   seed: number,
-  targetPerSideOverride?: number | null
+  targetPerSideOverride: number | null | undefined,
+  pairedConnections: LegacyMazeGenerationProfile['requiredOppositeBorderConnections']
 ): LegacyPoint[] => {
   const height = grid.length;
   const width = grid[0]?.length ?? 0;
@@ -1634,19 +1648,25 @@ const applyLegacyPerimeterFeederConnections = (
       continue;
     }
 
-    // Same total budget as before this rule existed -- existing bleed-off
-    // points already on this side (e.g. ones the separate mandatory
-    // opposite-border connection mechanism placed before this runs) still
-    // count against targetPerSide, exactly like the old currentCount did.
-    // Deliberately not folded into the spacing checks below (tried that --
-    // it over-constrained candidate selection enough to reshape route
-    // topology for some seeds, e.g. collapsing seed 28's menu maze from
-    // multi-route down to single-route even though the raw feeder count
-    // went up). "Never side by side" only needs to hold for feeders THIS
-    // pass places relative to each other, which the fallback loop below now
-    // enforces with a hard floor it never had before.
-    const existingLines = collectLegacyBorderFeederLinesOnSide(grid, side);
-    let currentCount = existingLines.length;
+    // Existing bleed-off points already on this side (for example, ones the
+    // mandatory opposite-border connection mechanism placed before this
+    // pass) count against this side's feeder budget. For paired axes, spacing
+    // must also account for the opposite side because the pairing pass below
+    // unions both sets of lines onto both borders. Keep the side-local budget
+    // so this correction does not halve feeder density; if the remaining
+    // candidates cannot satisfy the hard spacing floor, leave the side below
+    // its supplemental target rather than create adjacent exits.
+    const sideExistingLines = collectLegacyBorderFeederLinesOnSide(grid, side);
+    const axisIsPaired = side === 'left' || side === 'right'
+      ? pairedConnections.horizontal
+      : pairedConnections.vertical;
+    const spacingLines = axisIsPaired
+      ? Array.from(new Set([
+          ...sideExistingLines,
+          ...collectLegacyBorderFeederLinesOnSide(grid, resolveLegacyOppositeBorderFeederSide(side))
+        ])).sort((left, right) => left - right)
+      : sideExistingLines;
+    let currentCount = sideExistingLines.length;
     if (currentCount >= targetPerSide) {
       continue;
     }
@@ -1659,7 +1679,16 @@ const applyLegacyPerimeterFeederConnections = (
         break;
       }
 
-      if (chosenLines.some((chosenLine) => Math.abs(chosenLine - line) < minSpacing)) {
+      // Existing (including opposite-side lines that will be paired) enforce
+      // the hard no-adjacency contract. The wider distribution preference is
+      // applied only among supplemental choices from this pass; applying it
+      // to established topology can unnecessarily suppress useful routes.
+      if (
+        spacingLines.some(
+          (selectedLine) => Math.abs(selectedLine - line) < LEGACY_BORDER_FEEDER_MIN_ADJACENT_SPACING
+        )
+        || chosenLines.some((chosenLine) => Math.abs(chosenLine - line) < minSpacing)
+      ) {
         continue;
       }
 
@@ -1683,7 +1712,10 @@ const applyLegacyPerimeterFeederConnections = (
         continue;
       }
 
-      if (chosenLines.some((chosenLine) => Math.abs(chosenLine - line) < LEGACY_BORDER_FEEDER_MIN_ADJACENT_SPACING)) {
+      if (
+        [...spacingLines, ...chosenLines]
+          .some((selectedLine) => Math.abs(selectedLine - line) < LEGACY_BORDER_FEEDER_MIN_ADJACENT_SPACING)
+      ) {
         continue;
       }
 
@@ -2280,7 +2312,12 @@ export const createLegacyMaze = (
       }
     : profile.requiredOppositeBorderConnections;
   const mandatoryBorderWrapTiles = applyLegacyMandatoryOppositeBorderConnections(grid, seed, feederPairingConnections);
-  const perimeterFeederTiles = applyLegacyPerimeterFeederConnections(grid, seed, profile.borderFeederTargetPerSide);
+  const perimeterFeederTiles = applyLegacyPerimeterFeederConnections(
+    grid,
+    seed,
+    profile.borderFeederTargetPerSide,
+    profile.requiredOppositeBorderConnections
+  );
   const borderWrapTiles = applyLegacyOppositeBorderConnections(grid, profile.requiredOppositeBorderConnections);
   if (mandatoryBorderWrapTiles.length > 0 || perimeterFeederTiles.length > 0 || borderWrapTiles.length > 0) {
     solutionPath = buildShortestPath(grid, start, goal);
