@@ -163,6 +163,10 @@ describe('Wave 2A DOM primitives', () => {
   });
 
   it('binds a native range control to its label and output', () => {
+    const onInput = vi.fn((event: Event) => {
+      const target = event.target as unknown as TestElement;
+      expect(target.getAttribute('aria-valuetext')).toBe('75 percent');
+    });
     const slider = createMazerSlider({
       id: 'board-zoom',
       label: 'Board zoom',
@@ -170,7 +174,9 @@ describe('Wave 2A DOM primitives', () => {
       max: 150,
       step: 10,
       value: 100,
-      valueText: '100 percent'
+      valueText: '100 percent',
+      formatValue: (value) => `${value} percent`,
+      onInput
     }, makeDocument());
 
     expect(asTestElement(slider.label)).toMatchObject({ tagName: 'LABEL', htmlFor: 'board-zoom' });
@@ -179,6 +185,35 @@ describe('Wave 2A DOM primitives', () => {
     });
     expect(asTestElement(slider.input).getAttribute('aria-valuetext')).toBe('100 percent');
     expect(asTestElement(slider.output).getAttribute('for')).toBe('board-zoom');
+    expect(asTestElement(slider.output).value).toBe('100 percent');
+
+    const input = asTestElement(slider.input);
+    input.value = '75';
+    for (const listener of input.listeners.get('input') ?? []) {
+      listener({ type: 'input', target: slider.input } as unknown as Event);
+    }
+    expect(asTestElement(slider.output).value).toBe('75 percent');
+    expect(input.getAttribute('aria-valuetext')).toBe('75 percent');
+    expect(onInput).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces one-time slider value text with the truthful raw value on later input', () => {
+    const slider = createMazerSlider({
+      id: 'volume',
+      label: 'Volume',
+      min: 0,
+      max: 10,
+      value: 5,
+      valueText: 'Medium'
+    }, makeDocument());
+    const input = asTestElement(slider.input);
+    input.value = '7';
+    for (const listener of input.listeners.get('input') ?? []) {
+      listener({ type: 'input', target: slider.input } as unknown as Event);
+    }
+
+    expect(asTestElement(slider.output).value).toBe('7');
+    expect(input.getAttribute('aria-valuetext')).toBe('7');
   });
 
   it('renders immutable line-only 20px icon definitions', () => {
@@ -222,5 +257,11 @@ describe('Wave 2A DOM primitives', () => {
 
     const valid = createMazerIcon({ name: 'eye' }, ownerDocument);
     expect(asTestElement(valid).childNodes).toHaveLength(2);
+  });
+
+  it('preserves explicit icon dimensions for stylesheet consumption', () => {
+    const icon = asTestElement(createMazerIcon({ name: 'settings', size: 32 }, makeDocument()));
+    expect(icon.getAttribute('width')).toBe('32');
+    expect(icon.getAttribute('height')).toBe('32');
   });
 });

@@ -113,9 +113,7 @@
 .mazer-icon {
   display: block;
   flex: none;
-  height: 20px;
   pointer-events: none;
-  width: 20px;
 }
 
 .mazer-field {
