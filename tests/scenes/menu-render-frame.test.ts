@@ -1617,8 +1617,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
   test('adopts the opaque Fitness-derived auth visual family without changing Mazer auth semantics', () => {
-    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const menuSceneSource = normalizeSourceLineEndings(
+      readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
+    );
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
+
+    expect(normalizeSourceLineEndings(menuSceneSource)).toBe(menuSceneSource);
+    expect(normalizeSourceLineEndings(menuSceneSource.replaceAll('\n', '\r\n'))).toBe(menuSceneSource);
 
     expect(menuSceneSource).toContain('const LEGACY_AUTH_UI_FONT_FAMILY');
     expect(menuSceneSource).toContain("this.overlay === 'auth' ? 0x031f20 : 0x02040a");
