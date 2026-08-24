@@ -14,6 +14,7 @@ import {
   readLegacyRememberedIdentity,
   resolveLegacyAuthAccountLabel,
   resolveLegacyAuthConfig,
+  resolveLegacyAuthInvalidFields,
   resolveLegacyAuthScopedStorageKey,
   resolveLegacyAuthStorageScope,
   resolveLegacyAuthSubmitState,
@@ -98,6 +99,20 @@ describe('legacy auth runtime', () => {
       email: 'player@example.com',
       password: 'short'
     }, true).reason).toBe('Password needs 6+ characters.');
+
+    const signup = createEmptyLegacyAuthFormState('signup');
+    expect(resolveLegacyAuthInvalidFields(signup)).toEqual(['username', 'email', 'password']);
+    expect(resolveLegacyAuthSubmitState({
+      ...signup,
+      email: 'player@example.com',
+      password: 'secret1'
+    }, true).reason).toBe('Enter a username.');
+    expect(resolveLegacyAuthSubmitState({
+      ...signup,
+      email: 'player@example.com',
+      password: 'secret1',
+      username: 'fawxzzy'
+    }, true)).toEqual({ canSubmit: true, reason: null });
   });
 
   test('normalizes remembered identity without making it required for guest play', () => {

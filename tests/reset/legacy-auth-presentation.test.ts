@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'vitest';
-import { resolveLegacyAuthPresentation } from '../../src/legacy-runtime/legacyAuthPresentation';
+import {
+  resolveLegacyAuthBottomFeedbackLabel,
+  resolveLegacyAuthPresentation
+} from '../../src/legacy-runtime/legacyAuthPresentation';
 
 describe('legacy auth presentation', () => {
   test('gives a first-time player clear login labels with no descriptive copy on a fresh load', () => {
@@ -96,5 +99,12 @@ describe('legacy auth presentation', () => {
       emailLabel: 'Email',
       primaryActionLabel: 'Sign in'
     }));
+  });
+
+  test('compresses provider feedback into the temporary bottom action label', () => {
+    expect(resolveLegacyAuthBottomFeedbackLabel(null, 'Password reset email sent.')).toBe('Reset email sent');
+    expect(resolveLegacyAuthBottomFeedbackLabel('Invalid login credentials', null)).toBe('Email or password does not match');
+    expect(resolveLegacyAuthBottomFeedbackLabel('Failed to fetch', null)).toBe('Account service unavailable');
+    expect(resolveLegacyAuthBottomFeedbackLabel(null, null)).toBeNull();
   });
 });

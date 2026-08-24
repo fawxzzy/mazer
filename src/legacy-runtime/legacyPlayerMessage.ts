@@ -54,6 +54,8 @@ export const LEGACY_AUTH_MESSAGE_COPY = {
   passwordResetEmailRequired: 'Enter an email before reset.',
   passwordResetNotConfigured: 'Password reset is unavailable right now. You can still play as a guest.',
   passwordResetSent: 'Password reset email sent.',
+  usernameInvalid: 'Use 2-15 letters, numbers, periods, underscores, or hyphens.',
+  usernameRequired: 'Enter a username.',
   signupNotConfigured: 'Account creation is unavailable right now. You can still play as a guest.',
   signedIn: 'Signed in.',
   signedOut: 'Signed out. Guest progress is active.',

@@ -1630,6 +1630,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('EMAIL OR USERNAME');
     expect(menuSceneSource).toContain('this.levelAnnouncerNumberText.setVisible(false);');
     expect(menuSceneSource).toContain("this.authForm.mode === 'login' && rememberedIdentity?.displayName");
+    expect(menuSceneSource).toContain('private authInvalidFields: ReadonlySet<LegacyAuthFieldId> = new Set();');
+    expect(menuSceneSource).toContain('this.authInvalidFields = new Set(resolveLegacyAuthInvalidFields(this.authForm));');
+    expect(menuSceneSource).toContain("? 0xff7d7d");
+    expect(menuSceneSource).toContain('resolveLegacyAuthBottomFeedbackLabel(this.authSnapshot.error, this.authSnapshot.info)');
+    expect(menuSceneSource).toContain('const LEGACY_AUTH_BOTTOM_FEEDBACK_DURATION_MS = 5000;');
+    expect(menuSceneSource).toContain('const separatorCenterY = footerY + 2;');
     expect(authSource).toContain('signInWithPassword({');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");
   });
