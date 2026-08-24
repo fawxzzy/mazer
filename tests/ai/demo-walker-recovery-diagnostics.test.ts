@@ -12,7 +12,7 @@ import {
 } from '../../src/legacy-runtime/legacyMaze';
 
 describe('human-memory AI recovery diagnostics', () => {
-  test('records every recovery decision without exposing a solver route', () => {
+  test('keeps bounded generated E diagnostics internally consistent without exposing a solver route', () => {
     const seeds = [1, 2, 3, 5, 8] as const;
     let branchDecisionCount = 0;
     let frontierRecoveryCount = 0;
@@ -24,7 +24,10 @@ describe('human-memory AI recovery diagnostics', () => {
         episode,
         createLegacyMenuDemoWalkerConfig(seed)
       );
+      const shortestPath = resolveLegacyPlayableShortestPath(maze.grid, maze.start, maze.goal);
 
+      expect(shortestPath.found).toBe(true);
+      expect(diagnostics.routeLength / shortestPath.path.length).toBeLessThanOrEqual(1.25);
       expect(diagnostics.recoveryDecisions).toHaveLength(diagnostics.telemetry.recoveryCount);
 
       for (const evaluation of diagnostics.optionalRetargetEvaluations) {
@@ -90,7 +93,11 @@ describe('human-memory AI recovery diagnostics', () => {
       }
     }
 
-    expect(frontierRecoveryCount).toBeGreaterThan(0);
+    // The generated routes keep locally observed branch decisions, but the
+    // bounded envelope prevents the old long-tail frontier-recovery detour.
+    // Handcrafted fixtures in demo-walker.test.ts continue to prove real
+    // recovery and optional-retarget cognition without fabricating telemetry.
+    expect(frontierRecoveryCount).toBe(0);
     expect(branchDecisionCount).toBeGreaterThan(0);
   });
 

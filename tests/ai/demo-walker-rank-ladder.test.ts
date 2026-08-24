@@ -38,6 +38,9 @@ describe('human-memory AI rank ladder', () => {
           const diagnostics = collectDemoWalkerRouteDiagnostics(episode, config);
 
           expect(diagnostics.aiResetPathCursor).toBeNull();
+          expect(config.cadence.exploreStepMs).toBe(88);
+          expect(config.cadence.backtrackStepMs).toBe(88);
+          expect(diagnostics.traverseMs).toBe(diagnostics.segmentCount * 88);
           expect(shortestPath.found).toBe(true);
           expect(diagnostics.routeLength).toBeGreaterThanOrEqual(shortestPath.path.length);
           perceptions.set(rank, diagnostics.perception);

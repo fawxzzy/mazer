@@ -45,3 +45,34 @@ jobs:
 
       - name: Build production bundle and PWA assets
         run: npm run build
+
+  ai-navigation-acceptance:
+    name: AI navigation acceptance shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify deterministic AI navigation shard
+        shell: bash
+        run: |
+          seed_start=$((matrix_shard * 100 + 1))
+          seed_end=$(((matrix_shard + 1) * 100))
+          npm run ai:navigation:acceptance -- --seed-start="$seed_start" --seed-end="$seed_end"
+        env:
+          matrix_shard: ${{ matrix.shard }}

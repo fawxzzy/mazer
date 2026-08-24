@@ -11,6 +11,7 @@ const TEST_SPINE = [
   'tests/ai/demo-walker-known-frontier.test.ts',
   'tests/ai/demo-walker-rank-ladder.test.ts',
   'tests/ai/demo-walker-recovery-diagnostics.test.ts',
+  'tests/analysis/ai-navigation-acceptance.test.ts',
   'tests/scenes/menu-render-frame.test.ts',
   'tests/analysis/maze-cycle-telemetry-report.test.mjs',
   'tests/analysis/ai-run-corpus-audit.test.mjs'
