@@ -79,14 +79,14 @@
       "id": "no-big-bang-menuscene-rewrite",
       "category": "migration-strategy",
       "locked": true,
-      "statement": "MenuScene.ts is decomposed through characterization and adapters across later waves, not replaced in one rewrite. A big-bang rewrite is rejected because PR #83 overlaps core ownership and mechanics are already proof-backed.",
+      "statement": "MenuScene.ts is decomposed through characterization and adapters across later waves, not replaced in one rewrite. A big-bang rewrite is rejected because core scene ownership is migration-sensitive and mechanics are already proof-backed.",
       "sourceRef": "blueprint/00_EXECUTIVE_DECISIONS.md#rejected-alternatives (Big-bang rewrite)"
     },
     {
-      "id": "pr83-protected-paths-hold",
+      "id": "dependency-ordered-integrator-wave-ownership",
       "category": "governance",
       "locked": true,
-      "statement": "PR #83's listed collision paths (MenuScene.ts, menuRuntimeDiagnostics.ts, legacyAuth.ts, legacyPlayerMessage.ts, shared capture scripts, plus the always-protected vite.config.ts and package.json) are protected and single-owner until PR #83's disposition clears, to be reconciled via a separate later integrator-exclusive PR (Wave 0B), not any parallel lane including this one.",
+      "statement": "The former PR #83 and PR #131 implementation vehicles are superseded. Shared UI and authentication paths are no longer held behind a branch-specific exception; each path may change only in its assigned dependency-ordered integrator wave with a fresh current-main preflight and exclusive writer ownership.",
       "sourceRef": "blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md#file-ownership-guardrails"
     },
     {
@@ -283,28 +283,58 @@
     "approach": "characterization-and-adapters-across-later-waves",
     "decisionRef": "no-big-bang-menuscene-rewrite"
   },
-  "prProtection": {
-    "openPrsAtWaveTime": [82, 83],
-    "protectedPaths": [
-      "src/scenes/MenuScene.ts",
-      "src/scenes/menuRuntimeDiagnostics.ts",
-      "src/legacy-runtime/legacyAuth.ts",
-      "src/legacy-runtime/legacyPlayerMessage.ts",
-      "scripts/analysis/capture-auth-capability-surfaces.mjs",
-      "scripts/analysis/capture-ui-surfaces.mjs",
-      "scripts/analysis/live-auth-persistence-soak.mjs",
-      "vite.config.ts",
-      "package.json"
+  "integratorWaveOwnership": {
+    "mode": "dependency-ordered-single-owner",
+    "assignments": [
+      {
+        "wave": "0C",
+        "owner": "measured-baseline-integrator",
+        "paths": [
+          "scripts/analysis/capture-auth-capability-surfaces.mjs",
+          "scripts/analysis/capture-ui-surfaces.mjs",
+          "scripts/analysis/live-auth-persistence-soak.mjs"
+        ]
+      },
+      {
+        "wave": "1C",
+        "owner": "diagnostics-integrator",
+        "paths": [
+          "src/scenes/menuRuntimeDiagnostics.ts"
+        ]
+      },
+      {
+        "wave": "3A",
+        "owner": "command-bridge-integrator",
+        "paths": [
+          "src/scenes/MenuScene.ts"
+        ]
+      },
+      {
+        "wave": "3B",
+        "owner": "auth-migration-integrator",
+        "paths": [
+          "src/legacy-runtime/legacyAuth.ts",
+          "src/legacy-runtime/legacyPlayerMessage.ts"
+        ]
+      },
+      {
+        "wave": "5B",
+        "owner": "system-pwa-integrator",
+        "paths": [
+          "vite.config.ts",
+          "package.json"
+        ]
+      }
     ],
-    "note": "protectedPaths is a snapshot of PR #83's file-ownership collision list (per blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md file ownership guardrails) plus the always-protected vite.config.ts and package.json. Reconciliation is Wave 0B, integrator-exclusive, not this lane (0A has exclusiveFiles: [] per spec/pr-lanes.json).",
+    "note": "Assignments preserve the handoff packet's single-owner guardrails while replacing the obsolete pull-request hold with current dependency-ordered wave ownership. An assigned path requires its named wave and one exclusive writer; no branch name or stale pull-request state grants an exception.",
     "additionalOwnershipGuardrails": [
       {
         "surface": "shared token exports",
         "status": "not-yet-created",
-        "note": "Listed as a single-owner/integrator surface in blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md's file ownership guardrails table, alongside the paths above. No concrete file exists yet -- Wave 1B (PR 1B, semantic tokens and cross-renderer consumption) is what creates it. Recorded here so the exact path can be added to protectedPaths the moment it exists, rather than the guardrail being silently dropped."
+        "note": "Listed as a single-owner/integrator surface in blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md's file ownership guardrails table, alongside the paths above. No concrete file exists yet -- Wave 1B (PR 1B, semantic tokens and cross-renderer consumption) is what creates it. Recorded here so the exact path can be assigned to Wave 1B the moment it exists, rather than the guardrail being silently dropped."
       }
     ],
-    "decisionRef": "pr83-protected-paths-hold"
+    "decisionRef": "dependency-ordered-integrator-wave-ownership"
   },
   "redesignComplete": {
     "claimed": false,

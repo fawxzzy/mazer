@@ -14,7 +14,7 @@ interface DecisionRegistryCheckerModule {
   readDecisionRegistry: (registryPath?: string) => Record<string, unknown>;
   collectDecisionRegistryViolations: (registry: Record<string, unknown>) => DecisionRegistryViolation[];
   collectEntrypointExistenceViolations: (registry: Record<string, unknown>, root?: string) => DecisionRegistryViolation[];
-  collectProtectedPathViolations: (changedFiles: string[], registry: Record<string, unknown>) => DecisionRegistryViolation[];
+  collectIntegratorWaveOwnershipViolations: (changedFiles: string[], registry: Record<string, unknown>, claimedWave?: string) => DecisionRegistryViolation[];
   readGitChangedFiles: (root?: string, options?: { baseRef?: string }) => string[];
   formatViolations: (violations: DecisionRegistryViolation[]) => string;
   checkDecisionRegistry: (registry?: Record<string, unknown>, root?: string) => true;
@@ -206,44 +206,69 @@ describe('Mazer UI rework decision registry contract', () => {
     expect(violations.some((entry) => entry.rule === 'unknown-decision-reference')).toBe(true);
   });
 
-  describe('PR #83 / PR #82 protected-path self-check', () => {
-    it('flags a synthetic changed-file list that touches a protected path', async () => {
-      const { readDecisionRegistry, collectProtectedPathViolations } = await loadChecker();
+  describe('dependency-ordered integrator ownership', () => {
+    it('retires the stale pull-request hold and carries no branch-specific exception', async () => {
+      const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
+      const registry = await readDecisionRegistry();
+      const serialized = JSON.stringify(registry);
+
+      expect((registry as any).prProtection).toBeUndefined();
+      expect(serialized).not.toContain('pr83-protected-paths-hold');
+      expect(serialized).not.toContain('claude/mazer-pr83-fitness-auth-parity-successor');
+      expect(collectDecisionRegistryViolations(registry)).toEqual([]);
+    });
+
+    it('binds each shared path to its current dependency-ordered integrator wave', async () => {
+      const { readDecisionRegistry } = await loadChecker();
+      const registry: any = await readDecisionRegistry();
+      const assignments = new Map<string, string>(registry.integratorWaveOwnership.assignments.flatMap((assignment: any) => (
+        assignment.paths.map((path: string) => [path, assignment.wave])
+      )));
+
+      expect(Object.fromEntries(assignments)).toEqual({
+        'scripts/analysis/capture-auth-capability-surfaces.mjs': '0C',
+        'scripts/analysis/capture-ui-surfaces.mjs': '0C',
+        'scripts/analysis/live-auth-persistence-soak.mjs': '0C',
+        'src/scenes/menuRuntimeDiagnostics.ts': '1C',
+        'src/scenes/MenuScene.ts': '3A',
+        'src/legacy-runtime/legacyAuth.ts': '3B',
+        'src/legacy-runtime/legacyPlayerMessage.ts': '3B',
+        'vite.config.ts': '5B',
+        'package.json': '5B'
+      });
+    });
+
+    it('flags a path touched by the wrong integrator wave', async () => {
+      const { readDecisionRegistry, collectIntegratorWaveOwnershipViolations } = await loadChecker();
       const registry = await readDecisionRegistry();
 
-      const violations = collectProtectedPathViolations([
+      const violations = collectIntegratorWaveOwnershipViolations([
         'docs/contracts/mazer-ui-rework-decision-registry.v1.json',
         'src/scenes/MenuScene.ts'
-      ], registry);
+      ], registry, '0A');
 
-      expect(violations.some((entry) => entry.rule === 'protected-path-touched' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
+      expect(violations.some((entry) => entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
     });
 
-    it('flags package.json specifically if it were ever touched', async () => {
-      const { readDecisionRegistry, collectProtectedPathViolations } = await loadChecker();
+    it('allows an assigned path only in its declared wave', async () => {
+      const { readDecisionRegistry, collectIntegratorWaveOwnershipViolations } = await loadChecker();
       const registry = await readDecisionRegistry();
 
-      const violations = collectProtectedPathViolations(['package.json'], registry);
-      expect(violations.some((entry) => entry.rule === 'protected-path-touched' && entry.path === 'package.json')).toBe(true);
+      expect(collectIntegratorWaveOwnershipViolations(['src/scenes/MenuScene.ts'], registry, '3A')).toEqual([]);
     });
 
-    it('does not flag Wave 0A\'s own new files', async () => {
-      const { readDecisionRegistry, collectProtectedPathViolations } = await loadChecker();
-      const registry = await readDecisionRegistry();
+    it('rejects branch-specific exceptions even when their wave mapping is otherwise valid', async () => {
+      const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
+      const registry: any = cloneRegistry(await readDecisionRegistry());
+      registry.integratorWaveOwnership.assignments[0].branch = 'claude/mazer-pr83-fitness-auth-parity-successor';
 
-      const violations = collectProtectedPathViolations([
-        'docs/contracts/mazer-ui-rework-decision-registry.v1.json',
-        'docs/architecture/MAZER-UI-REWORK-DECISION-REGISTRY.md',
-        'scripts/check-decision-registry.mjs',
-        'tests/architecture/decision-registry-contract.test.ts',
-        'docs/PLAYBOOK_NOTES.md'
-      ], registry);
-
-      expect(violations).toEqual([]);
+      const violations = collectDecisionRegistryViolations(registry);
+      expect(violations.some((entry) => entry.rule === 'obsolete-branch-binding')).toBe(true);
+      expect(violations.some((entry) => entry.rule === 'branch-specific-wave-exception')).toBe(true);
     });
 
-    it('runs the same checker against this working tree\'s real committed-and-uncommitted changed files and finds no protected path touched', async () => {
-      const { readDecisionRegistry, collectProtectedPathViolations, readGitChangedFiles } = await loadChecker();
+    it('runs the ownership checker against this lane\'s real changed files without claiming another wave', async () => {
+      const { readDecisionRegistry, collectIntegratorWaveOwnershipViolations, readGitChangedFiles } = await loadChecker();
       const registry = await readDecisionRegistry();
 
       let changedFiles: string[];
@@ -255,16 +280,16 @@ describe('Mazer UI rework decision registry contract', () => {
         return;
       }
 
-      const violations = collectProtectedPathViolations(changedFiles, registry);
+      const violations = collectIntegratorWaveOwnershipViolations(changedFiles, registry, '0A');
       expect(violations).toEqual([]);
     });
   });
 
-  describe('protected-path guard closes the committed-diff gap (regression)', () => {
+  describe('integrator ownership guard includes committed diffs (regression)', () => {
     // Builds a throwaway, isolated git repository under the OS temp dir -- never the real mazer
     // repo, never a real branch, never a real PR -- that reproduces exactly the shape of a real,
     // pushed, mergeable PR head: a base commit on "main", then a feature branch that COMMITS a
-    // change to a path matching the registry's protectedPaths list, ending with a fully clean
+    // change to a path carrying an integrator-wave assignment, ending with a fully clean
     // working tree (`git status --short` empty). Before this fix, readGitChangedFiles ignored
     // committed history entirely and read only `git status --short`, so this exact scenario would
     // have produced an empty changed-file list and a false "zero violations" pass -- exactly the
@@ -282,8 +307,8 @@ describe('Mazer UI rework decision registry contract', () => {
       runGit(root, 'commit', '-q', '-m', 'baseline');
     };
 
-    it('detects a fully-committed protected-path change even though `git status --short` is clean', async () => {
-      const { readGitChangedFiles, collectProtectedPathViolations, readDecisionRegistry } = await loadChecker();
+    it('detects a fully-committed wrong-wave path even though `git status --short` is clean', async () => {
+      const { readGitChangedFiles, collectIntegratorWaveOwnershipViolations, readDecisionRegistry } = await loadChecker();
       const registry = readDecisionRegistry();
 
       const root = mkdtempSync(join(tmpdir(), 'mazer-protected-path-fixture-'));
@@ -303,17 +328,17 @@ describe('Mazer UI rework decision registry contract', () => {
         const changedFiles = readGitChangedFiles(root, { baseRef: 'main' });
         expect(changedFiles).toContain('src/scenes/MenuScene.ts');
 
-        const violations = collectProtectedPathViolations(changedFiles, registry);
+        const violations = collectIntegratorWaveOwnershipViolations(changedFiles, registry, '0A');
         expect(violations.some((entry) => (
-          entry.rule === 'protected-path-touched' && entry.path === 'src/scenes/MenuScene.ts'
+          entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/scenes/MenuScene.ts'
         ))).toBe(true);
       } finally {
         rmSync(root, { recursive: true, force: true });
       }
     });
 
-    it('still returns zero violations for a fixture branch whose committed changes never touch a protected path', async () => {
-      const { readGitChangedFiles, collectProtectedPathViolations, readDecisionRegistry } = await loadChecker();
+    it('still returns zero violations for a fixture branch whose committed changes never touch an assigned path', async () => {
+      const { readGitChangedFiles, collectIntegratorWaveOwnershipViolations, readDecisionRegistry } = await loadChecker();
       const registry = readDecisionRegistry();
 
       const root = mkdtempSync(join(tmpdir(), 'mazer-protected-path-fixture-clean-'));
@@ -330,7 +355,7 @@ describe('Mazer UI rework decision registry contract', () => {
         const changedFiles = readGitChangedFiles(root, { baseRef: 'main' });
         expect(changedFiles).toContain('unrelated.txt');
 
-        const violations = collectProtectedPathViolations(changedFiles, registry);
+        const violations = collectIntegratorWaveOwnershipViolations(changedFiles, registry, '0A');
         expect(violations).toEqual([]);
       } finally {
         rmSync(root, { recursive: true, force: true });
