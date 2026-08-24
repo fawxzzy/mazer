@@ -4,10 +4,9 @@
  * Source of truth: docs/contracts/mazer-ui-rework-design-tokens.v1.json
  * Cross-checked by: scripts/check-design-tokens.mjs / tests/architecture/design-tokens-contract.test.ts
  *
- * This file is NOT imported by index.html, vite.config.ts, src/styles/base.css, or any other
- * live-render path yet. It is registered and contract-tested plumbing for later waves (2A DOM
- * foundation, 4D shared path renderer/title) to consume -- wiring it into the shipping shell is
- * explicitly out of scope for this wave. See docs/architecture/MAZER-UI-REWORK-DESIGN-TOKENS.md.
+ * Imported exactly once by src/styles/base.css so existing DOM shell surfaces and future DOM
+ * extraction share the same registry-backed values. Phaser consumes the equivalent numeric aliases
+ * from src/theme/tokens.ts. See docs/architecture/MAZER-UI-REWORK-DESIGN-TOKENS.md.
  */
 
 :root {

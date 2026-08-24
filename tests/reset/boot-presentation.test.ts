@@ -146,7 +146,7 @@ describe('boot presentation config resolution', () => {
       presentation: 'loading',
       chrome: 'minimal',
       mood: 'scan',
-      theme: 'aurora',
+      theme: 'precision-arcade',
       mode: 'watch',
       seed: 42,
       size: 'large',
@@ -169,7 +169,7 @@ describe('boot presentation config resolution', () => {
       chrome: 'minimal',
       mood: 'auto',
       title: 'hide',
-      theme: 'noir',
+      theme: 'precision-arcade',
       mode: 'watch',
       profile: 'obs'
     });
@@ -187,7 +187,10 @@ describe('boot presentation config resolution', () => {
     );
     expect(resolveBootPresentationConfig('?profile=nope&presentation=nope&chrome=loud&mood=chaos&theme=radioactive&seed=-4&size=massive&difficulty=nightmare&title=gone'))
       .toEqual(DEFAULT_PRESENTATION_LAUNCH_CONFIG);
-    expect(resolveBootPresentationConfig('?theme=monolith').theme).toBe('monolith');
+    for (const alias of ['root', 'noir', 'ember', 'vellum', 'aurora', 'monolith']) {
+      expect(resolveBootPresentationConfig(`?theme=${alias}`).theme).toBe('precision-arcade');
+    }
+    expect(resolveBootPresentationConfig('?theme=precision-arcade').theme).toBe('precision-arcade');
     expect(resolveBootPresentationConfig('?theme=bad-value').theme).toBe('auto');
     expect(resolveBootPresentationConfig('?mode=play').mode).toBe('play');
     expect(resolveBootPresentationConfig('?mode=nope').mode).toBe('watch');

@@ -3,13 +3,13 @@
   "wave": "1B",
   "themeId": "precision-arcade",
   "canonicalThemeId": "precision-arcade",
-  "status": "live-phaser-material",
+  "status": "live-shared-token-contract",
   "sourceRef": "01_FINAL_AUTHORITATIVE_HANDOFF/spec/design-tokens.json (mazer-everything-bundle-20260803)",
   "decisionRefs": [
     "single-canonical-theme",
     "renderer-ownership-split"
   ],
-  "notes": "Wave 1B ('Tokens/theme/profile aliases') established the source of truth for the Fawxzzy Precision Arcade palette. The live Phaser material now imports phaserMaterialAliases from src/theme/tokens.ts, so the board, title, panels, HUD, and controls consume this registry instead of a parallel hard-coded palette. This integration is render-only: maze topology, progression, input, collision, persistence, and lifecycle behavior remain outside the token contract. DOM-shell extraction remains a separately staged future renderer-ownership migration.",
+  "notes": "Wave 1B ('Tokens/theme/profile aliases') establishes one shared Fawxzzy Precision Arcade token source. Phaser consumes numeric aliases from src/theme/tokens.ts; the live DOM shell imports src/theme/tokens.css exactly once through src/styles/base.css. Archived query aliases normalize to the canonical theme without becoming public themes. Offline ambient maze-family scheduling remains a separate variety concept. This integration is presentation-only: maze topology, progression, input, collision, persistence, and lifecycle behavior remain outside the token contract.",
   "cssVariablePrefix": "--mazer-token-",
   "tokens": {
     "color": {

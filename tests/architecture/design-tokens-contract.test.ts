@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   archivedThemeAliasMap,
   CANONICAL_THEME_ID,
   designTokens,
   legacyThemeAliases,
-  phaserMaterialAliases
+  phaserMaterialAliases,
+  resolveCanonicalThemeId
 } from '../../src/theme/tokens';
 
 interface DesignTokenViolation {
@@ -147,7 +148,18 @@ describe('Mazer UI rework design token contract', () => {
       expect([...legacyThemeAliases].sort()).toEqual([...registry.legacyThemeAliases].sort());
       for (const alias of legacyThemeAliases) {
         expect(archivedThemeAliasMap[alias]).toBe(registry.canonicalThemeId);
+        expect(resolveCanonicalThemeId(alias)).toBe(registry.canonicalThemeId);
       }
+      expect(resolveCanonicalThemeId(registry.canonicalThemeId)).toBe(registry.canonicalThemeId);
+      expect(resolveCanonicalThemeId('not-a-theme')).toBeNull();
+    });
+
+    it('imports the CSS token contract exactly once before the live base stylesheet rules', () => {
+      const baseCss = readFileSync(resolve(process.cwd(), 'src/styles/base.css'), 'utf8');
+      expect(baseCss.startsWith('@import "../theme/tokens.css";')).toBe(true);
+      expect(baseCss.match(/@import\s+["']\.\.\/theme\/tokens\.css["']\s*;/g)).toHaveLength(1);
+      expect(baseCss).toContain('var(--mazer-token-color-semantic-info, #6be8e1)');
+      expect(baseCss).not.toContain('--mazer-token-color-focus');
     });
   });
 
@@ -180,7 +192,7 @@ describe('Mazer UI rework design token contract', () => {
       expect(violations).toEqual([]);
     });
 
-    it('requires every real protected-path touch to be one of the admitted live material integration surfaces', async () => {
+    it('requires every real changed path to remain inside the admitted Wave 1B integration ceiling', async () => {
       const { readDecisionRegistryForTokens, collectProtectedPathViolationsForTokens, readGitChangedFilesForTokens } = await loadChecker();
       const decisionRegistry = await readDecisionRegistryForTokens();
 
@@ -192,11 +204,24 @@ describe('Mazer UI rework design token contract', () => {
       }
 
       const violations = collectProtectedPathViolationsForTokens(changedFiles, decisionRegistry);
-      const admittedLiveIntegrationPaths = new Set([
-        'src/scenes/MenuScene.ts',
-        'scripts/analysis/capture-ui-surfaces.mjs'
+      const admittedWavePaths = new Set([
+        'docs/architecture/MAZER-UI-REWORK-DESIGN-TOKENS.md',
+        'docs/contracts/mazer-ui-rework-design-tokens.v1.json',
+        'scripts/check-design-tokens.mjs',
+        'src/theme/tokens.ts',
+        'src/theme/tokens.css',
+        'tests/architecture/design-tokens-contract.test.ts',
+        'scripts/check-decision-registry.mjs',
+        'tests/architecture/decision-registry-contract.test.ts',
+        'tests/architecture/topology-path-contract.test.ts',
+        'tests/architecture/ui-state-model-contract.test.ts',
+        'src/styles/base.css',
+        'src/boot/presentation.ts',
+        'tests/reset/boot-presentation.test.ts',
+        'tests/reset/accessibility-surface.test.ts'
       ]);
-      expect(violations.filter((entry) => !admittedLiveIntegrationPaths.has(entry.path))).toEqual([]);
+      expect(changedFiles.filter((path) => !admittedWavePaths.has(path))).toEqual([]);
+      expect(violations).toEqual([]);
     });
 
     // Confirms readGitChangedFilesForTokens (this module) actually delegates to the fixed,

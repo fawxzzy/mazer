@@ -15,6 +15,7 @@ interface DecisionRegistryCheckerModule {
   collectDecisionRegistryViolations: (registry: Record<string, unknown>) => DecisionRegistryViolation[];
   collectEntrypointExistenceViolations: (registry: Record<string, unknown>, root?: string) => DecisionRegistryViolation[];
   collectIntegratorWaveOwnershipViolations: (changedFiles: string[], registry: Record<string, unknown>, claimedWave?: string) => DecisionRegistryViolation[];
+  collectIntegratorWaveMixViolations: (changedFiles: string[], registry: Record<string, unknown>) => DecisionRegistryViolation[];
   readGitChangedFiles: (root?: string, options?: { baseRef?: string }) => string[];
   formatViolations: (violations: DecisionRegistryViolation[]) => string;
   checkDecisionRegistry: (registry?: Record<string, unknown>, root?: string) => true;
@@ -259,6 +260,19 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(collectIntegratorWaveOwnershipViolations(['src/scenes/MenuScene.ts'], registry, '3A')).toEqual([]);
     });
 
+    it('fails closed when one change set spans multiple registered integrator waves', async () => {
+      const { readDecisionRegistry, collectIntegratorWaveMixViolations } = await loadChecker();
+      const registry = await readDecisionRegistry();
+
+      const violations = collectIntegratorWaveMixViolations([
+        'src/theme/tokens.ts',
+        'src/scenes/MenuScene.ts'
+      ], registry);
+
+      expect(violations.some((entry) => entry.rule === 'integrator-wave-mix' && entry.path === 'src/theme/tokens.ts')).toBe(true);
+      expect(violations.some((entry) => entry.rule === 'integrator-wave-mix' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
+    });
+
     it('rejects branch-specific exceptions even when their wave mapping is otherwise valid', async () => {
       const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
       const registry: any = cloneRegistry(await readDecisionRegistry());
@@ -269,8 +283,8 @@ describe('Mazer UI rework decision registry contract', () => {
       expect(violations.some((entry) => entry.rule === 'branch-specific-wave-exception')).toBe(true);
     });
 
-    it('runs the ownership checker against this lane\'s real changed files without claiming another wave', async () => {
-      const { readDecisionRegistry, collectIntegratorWaveOwnershipViolations, readGitChangedFiles } = await loadChecker();
+    it('keeps this working tree\'s real changed files within one registered integrator wave', async () => {
+      const { readDecisionRegistry, collectIntegratorWaveMixViolations, readGitChangedFiles } = await loadChecker();
       const registry = await readDecisionRegistry();
 
       let changedFiles: string[];
@@ -282,7 +296,7 @@ describe('Mazer UI rework decision registry contract', () => {
         return;
       }
 
-      const violations = collectIntegratorWaveOwnershipViolations(changedFiles, registry, '0A');
+      const violations = collectIntegratorWaveMixViolations(changedFiles, registry);
       expect(violations).toEqual([]);
     });
   });
