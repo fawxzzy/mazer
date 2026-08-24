@@ -306,11 +306,19 @@ describe('Wave 2A.1 settings DOM primitives', () => {
     const document = makeDocument();
     const customTarget = asElement(document.createElement('div'));
     const control = asElement(document.createElement('div'));
-    const activation = vi.fn();
+    const activations = {
+      keyup: vi.fn(),
+      pointerup: vi.fn(),
+      click: vi.fn(),
+      input: vi.fn(),
+      change: vi.fn()
+    };
     let customDisabled = false;
     customTarget.tabIndex = 0;
     customTarget.setAttribute('role', 'button');
-    customTarget.addEventListener('click', activation);
+    Object.entries(activations).forEach(([eventName, callback]) => {
+      customTarget.addEventListener(eventName, callback);
+    });
     control.append(customTarget);
     const row = createSettingRow({
       id: 'custom-row',
@@ -320,29 +328,45 @@ describe('Wave 2A.1 settings DOM primitives', () => {
         element: customTarget as unknown as HTMLElement,
         disableAdapter: {
           getDisabled: () => customDisabled,
-          setDisabled: (disabled) => {
-            customDisabled = disabled;
-            customTarget.tabIndex = disabled ? -1 : 0;
+          prepareDisabled: (disabled) => {
+            const beforeDisabled = customDisabled;
+            const beforeTabIndex = customTarget.tabIndex;
+            return {
+              commit: () => {
+                customDisabled = disabled;
+                customTarget.tabIndex = disabled ? -1 : beforeTabIndex;
+              },
+              rollback: () => {
+                customDisabled = beforeDisabled;
+                customTarget.tabIndex = beforeTabIndex;
+              }
+            };
           }
         }
       }]
     }, document);
 
     expect(row).not.toBeNull();
-    expect(activation).not.toHaveBeenCalled();
+    Object.values(activations).forEach((callback) => expect(callback).not.toHaveBeenCalled());
     expect(row!.setDisabled(true)).toBe(true);
     expect(customDisabled).toBe(true);
     expect(customTarget.tabIndex).toBe(-1);
+    customTarget.fire('keyup');
+    customTarget.fire('pointerup');
     customTarget.click();
-    expect(activation).not.toHaveBeenCalled();
+    customTarget.fire('input');
+    customTarget.fire('change');
+    Object.values(activations).forEach((callback) => expect(callback).not.toHaveBeenCalled());
     expect(row!.setDisabled(false)).toBe(true);
     expect(customDisabled).toBe(false);
     expect(customTarget.tabIndex).toBe(0);
+    customTarget.fire('keyup');
+    customTarget.fire('pointerup');
     customTarget.click();
-    expect(activation).toHaveBeenCalledTimes(1);
-    row!.destroy();
-    customTarget.click();
-    expect(activation).toHaveBeenCalledTimes(2);
+    customTarget.fire('input');
+    customTarget.fire('change');
+    Object.values(activations).forEach((callback) => expect(callback).toHaveBeenCalledTimes(1));
+    expect(row!.destroy()).toBe(true);
   });
 
   it('fails closed without guessing descendants or accepting non-disable-capable targets', () => {
@@ -385,11 +409,13 @@ describe('Wave 2A.1 settings DOM primitives', () => {
     expect(nestedButton.getAttribute('aria-labelledby')).toBeNull();
   });
 
-  it('rolls back every target when a disable adapter fails', () => {
+  it('uses an established undo when a custom commit mutates and then throws', () => {
     const document = makeDocument();
     const control = asElement(document.createElement('div'));
     const native = asElement(document.createElement('button'));
     const custom = asElement(document.createElement('div'));
+    let customDisabled = false;
+    custom.tabIndex = 4;
     control.append(native, custom);
     const row = createSettingRow({
       id: 'rollback-row',
@@ -400,10 +426,18 @@ describe('Wave 2A.1 settings DOM primitives', () => {
         {
           element: custom as unknown as HTMLElement,
           disableAdapter: {
-            getDisabled: () => false,
-            setDisabled: () => {
-              throw new Error('adapter failed');
-            }
+            getDisabled: () => customDisabled,
+            prepareDisabled: () => ({
+              commit: () => {
+                customDisabled = true;
+                custom.tabIndex = -1;
+                throw new Error('adapter failed after mutation');
+              },
+              rollback: () => {
+                customDisabled = false;
+                custom.tabIndex = 4;
+              }
+            })
           }
         }
       ]
@@ -412,8 +446,153 @@ describe('Wave 2A.1 settings DOM primitives', () => {
     expect(row).not.toBeNull();
     expect(row!.setDisabled(true)).toBe(false);
     expect(native.disabled).toBe(false);
+    expect(customDisabled).toBe(false);
+    expect(custom.tabIndex).toBe(4);
     expect(native.getAttribute('aria-disabled')).toBeNull();
+    expect(custom.getAttribute('aria-disabled')).toBeNull();
     expect(asElement(row!.root).dataset.disabled).toBe('false');
+    expect(row!.destroy()).toBe(true);
+  });
+
+  it('rejects an unprovable rollback before any custom or native commit runs', () => {
+    const document = makeDocument();
+    const control = asElement(document.createElement('div'));
+    const native = asElement(document.createElement('button'));
+    const custom = asElement(document.createElement('div'));
+    const nativeBefore = native.disabled;
+    let customDisabled = false;
+    const nativeActivation = vi.fn();
+    const customCommit = vi.fn(() => {
+      customDisabled = true;
+    });
+    native.addEventListener('click', nativeActivation);
+    control.append(native, custom);
+    const row = createSettingRow({
+      id: 'rollback-refusal-row',
+      label: 'Rollback refusal',
+      control: control as unknown as HTMLElement,
+      interactionTargets: [
+        { element: native as unknown as HTMLElement },
+        {
+          element: custom as unknown as HTMLElement,
+          disableAdapter: {
+            getDisabled: () => customDisabled,
+            prepareDisabled: () => ({
+              commit: customCommit,
+              rollback: () => {
+                throw new Error('rollback unavailable');
+              }
+            })
+          }
+        }
+      ]
+    }, document);
+
+    expect(row).not.toBeNull();
+    expect(row!.setDisabled(true)).toBe(false);
+    expect(customCommit).not.toHaveBeenCalled();
+    expect(customDisabled).toBe(false);
+    expect(native.disabled).toBe(nativeBefore);
+    expect(asElement(row!.root).dataset.disabled).toBe('false');
+    native.click();
+    expect(nativeActivation).toHaveBeenCalledTimes(1);
+    expect(row!.destroy()).toBe(true);
+  });
+
+  it('uses the active custom undo during destroy and restores the exact preimage', () => {
+    const document = makeDocument();
+    const custom = asElement(document.createElement('div'));
+    const control = asElement(document.createElement('div'));
+    let customDisabled = false;
+    custom.tabIndex = 7;
+    custom.setAttribute('aria-disabled', 'mixed');
+    control.append(custom);
+    const row = createSettingRow({
+      id: 'destroy-undo-row',
+      label: 'Destroy undo',
+      control: control as unknown as HTMLElement,
+      interactionTargets: [{
+        element: custom as unknown as HTMLElement,
+        disableAdapter: {
+          getDisabled: () => customDisabled,
+          prepareDisabled: () => {
+            const beforeDisabled = customDisabled;
+            const beforeTabIndex = custom.tabIndex;
+            return {
+              commit: () => {
+                customDisabled = true;
+                custom.tabIndex = -1;
+              },
+              rollback: () => {
+                customDisabled = beforeDisabled;
+                custom.tabIndex = beforeTabIndex;
+              }
+            }
+          }
+        }
+      }]
+    }, document);
+
+    expect(row).not.toBeNull();
+    expect(row!.setDisabled(true)).toBe(true);
+    expect(customDisabled).toBe(true);
+    expect(custom.tabIndex).toBe(-1);
+    expect(row!.destroy()).toBe(true);
+    expect(customDisabled).toBe(false);
+    expect(custom.tabIndex).toBe(7);
+    expect(custom.getAttribute('aria-disabled')).toBe('mixed');
+    expect(custom.getAttribute('aria-labelledby')).toBeNull();
+  });
+
+  it('keeps a failed destroy mounted and disabled until its established undo recovers', () => {
+    const document = makeDocument();
+    const custom = asElement(document.createElement('div'));
+    const control = asElement(document.createElement('div'));
+    const activation = vi.fn();
+    let customDisabled = false;
+    let rollbackCalls = 0;
+    custom.tabIndex = 2;
+    custom.addEventListener('keyup', activation);
+    control.append(custom);
+    const row = createSettingRow({
+      id: 'recoverable-destroy-row',
+      label: 'Recoverable destroy',
+      control: control as unknown as HTMLElement,
+      interactionTargets: [{
+        element: custom as unknown as HTMLElement,
+        disableAdapter: {
+          getDisabled: () => customDisabled,
+          prepareDisabled: () => ({
+            commit: () => {
+              customDisabled = true;
+              custom.tabIndex = -1;
+            },
+            rollback: () => {
+              rollbackCalls += 1;
+              if (rollbackCalls === 2) throw new Error('temporary rollback failure');
+              customDisabled = false;
+              custom.tabIndex = 2;
+            }
+          })
+        }
+      }]
+    }, document);
+
+    expect(row).not.toBeNull();
+    expect(row!.setDisabled(true)).toBe(true);
+    expect(rollbackCalls).toBe(1);
+    expect(row!.destroy()).toBe(false);
+    expect(customDisabled).toBe(true);
+    expect(custom.tabIndex).toBe(-1);
+    expect(asElement(row!.root).dataset.disabled).toBe('true');
+    custom.fire('keyup');
+    expect(activation).not.toHaveBeenCalled();
+
+    expect(row!.destroy()).toBe(true);
+    expect(rollbackCalls).toBe(3);
+    expect(customDisabled).toBe(false);
+    expect(custom.tabIndex).toBe(2);
+    expect(custom.getAttribute('aria-labelledby')).toBeNull();
   });
 
   it('groups settings with a unique heading and optional description', () => {

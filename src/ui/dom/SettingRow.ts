@@ -1,6 +1,17 @@
+export interface SettingRowDisableTransaction {
+  /** Applies the prepared disabled state. Rollback already exists before this runs. */
+  commit: () => void;
+  /** Idempotently restores the exact state captured by prepareDisabled. */
+  rollback: () => void;
+}
+
 export interface SettingRowDisableAdapter {
   getDisabled: () => boolean;
-  setDisabled: (disabled: boolean) => void;
+  /**
+   * Prepares a non-mutating transaction. Returning null, throwing, or omitting a
+   * callable rollback rejects the transition before any target commit runs.
+   */
+  prepareDisabled: (disabled: boolean) => SettingRowDisableTransaction | null;
 }
 
 export interface SettingRowInteractionTarget {
@@ -30,10 +41,16 @@ export interface SettingRowElements {
   label: HTMLElement;
   controlSlot: HTMLDivElement;
   interactionTargets: readonly HTMLElement[];
-  /** Returns false without changing row state when a target cannot be updated safely. */
+  /**
+   * Returns false when a transition cannot finish. If an established undo is
+   * temporarily unhealthy, the row stays mounted and safely disabled for retry.
+   */
   setDisabled: (disabled: boolean) => boolean;
-  /** Restores target attributes/state and removes every listener owned by the row. */
-  destroy: () => void;
+  /**
+   * Restores target attributes/state and removes every listener owned by the row.
+   * A failed custom undo leaves the row intact and safely disabled for a later retry.
+   */
+  destroy: () => boolean;
 }
 
 interface AttributeSnapshot {
@@ -45,14 +62,36 @@ interface AttributeSnapshot {
 interface ResolvedInteractionTarget {
   element: HTMLElement;
   getDisabled: () => boolean;
-  setDisabled: (disabled: boolean) => void;
+  prepareDisabled: (disabled: boolean) => SettingRowDisableTransaction | null;
   initialDisabled: boolean;
   attributes: AttributeSnapshot;
   suppress: (event: Event) => void;
 }
 
+interface PreparedDisableTransaction extends SettingRowDisableTransaction {
+  target: ResolvedInteractionTarget;
+  beforeDisabled: boolean;
+}
+
 const NATIVE_DIRECT_CONTROL_TAGS = new Set(['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA']);
-const SUPPRESSED_EVENTS = ['pointerdown', 'click', 'dblclick', 'auxclick', 'keydown', 'input', 'change'] as const;
+const SUPPRESSED_EVENTS = [
+  'pointerdown',
+  'pointerup',
+  'pointercancel',
+  'mousedown',
+  'mouseup',
+  'touchstart',
+  'touchend',
+  'keydown',
+  'keypress',
+  'keyup',
+  'click',
+  'dblclick',
+  'auxclick',
+  'beforeinput',
+  'input',
+  'change'
+] as const;
 
 const appendTokens = (current: string | null, tokens: readonly string[]): string => (
   [...new Set([...(current?.split(/\s+/).filter(Boolean) ?? []), ...tokens])].join(' ')
@@ -77,14 +116,22 @@ const isDirectNativeControl = (element: HTMLElement): element is HTMLElement & {
 
 const resolveDisableBoundary = (
   target: SettingRowInteractionTarget
-): Pick<ResolvedInteractionTarget, 'getDisabled' | 'setDisabled' | 'initialDisabled'> | null => {
+): Pick<ResolvedInteractionTarget, 'getDisabled' | 'prepareDisabled' | 'initialDisabled'> | null => {
   const element = target.element;
   try {
     if (isDirectNativeControl(element)) {
       return {
         getDisabled: () => element.disabled,
-        setDisabled: (disabled) => {
-          element.disabled = disabled;
+        prepareDisabled: (disabled) => {
+          const beforeDisabled = element.disabled;
+          return {
+            commit: () => {
+              element.disabled = disabled;
+            },
+            rollback: () => {
+              element.disabled = beforeDisabled;
+            }
+          };
         },
         initialDisabled: element.disabled
       };
@@ -93,7 +140,7 @@ const resolveDisableBoundary = (
     if (
       !adapter
       || typeof adapter.getDisabled !== 'function'
-      || typeof adapter.setDisabled !== 'function'
+      || typeof adapter.prepareDisabled !== 'function'
     ) {
       return null;
     }
@@ -101,7 +148,7 @@ const resolveDisableBoundary = (
     if (typeof initialDisabled !== 'boolean') return null;
     return {
       getDisabled: () => adapter.getDisabled(),
-      setDisabled: (disabled) => adapter.setDisabled(disabled),
+      prepareDisabled: (disabled) => adapter.prepareDisabled(disabled),
       initialDisabled
     };
   } catch {
@@ -121,14 +168,10 @@ export const createSettingRow = (
   let root: HTMLDivElement | undefined;
   let rowDisabled = false;
   let destroyed = false;
+  let activeDisableTransactions: PreparedDisableTransaction[] | null = null;
 
   const restoreTargets = (): void => {
     for (const target of resolved) {
-      try {
-        target.setDisabled(target.initialDisabled);
-      } catch {
-        // Best-effort cleanup must continue across every target.
-      }
       try {
         restoreAttribute(target.element, 'aria-labelledby', target.attributes.labelledBy);
         restoreAttribute(target.element, 'aria-describedby', target.attributes.describedBy);
@@ -143,6 +186,69 @@ export const createSettingRow = (
           // Best-effort cleanup must continue across every target.
         }
       }
+    }
+  };
+
+  const prepareDisableTransactions = (): PreparedDisableTransaction[] | null => {
+    const prepared: PreparedDisableTransaction[] = [];
+    try {
+      for (const target of resolved) {
+        const beforeDisabled = target.getDisabled();
+        if (typeof beforeDisabled !== 'boolean' || beforeDisabled !== target.initialDisabled) {
+          return null;
+        }
+        const candidate = target.prepareDisabled(true);
+        if (!candidate || typeof candidate !== 'object') return null;
+        const commit = candidate.commit;
+        const rollback = candidate.rollback;
+        if (typeof commit !== 'function' || typeof rollback !== 'function') return null;
+
+        // Prove the already-established undo is callable and leaves the captured
+        // preimage exact before any commit in the target set is allowed to run.
+        rollback();
+        if (target.getDisabled() !== beforeDisabled) return null;
+        prepared.push({ target, beforeDisabled, commit, rollback });
+      }
+      return prepared;
+    } catch {
+      return null;
+    }
+  };
+
+  const restoreActiveDisable = (): boolean => {
+    const transactions = activeDisableTransactions;
+    if (!transactions) return true;
+    let restored = true;
+    for (let index = transactions.length - 1; index >= 0; index -= 1) {
+      const transaction = transactions[index];
+      try {
+        transaction.rollback();
+      } catch {
+        restored = false;
+      }
+      try {
+        if (transaction.target.getDisabled() !== transaction.beforeDisabled) restored = false;
+      } catch {
+        restored = false;
+      }
+    }
+    if (restored) activeDisableTransactions = null;
+    return restored;
+  };
+
+  const setDisabledPresentation = (disabled: boolean): boolean => {
+    try {
+      for (const target of resolved) {
+        if (disabled) {
+          target.element.setAttribute('aria-disabled', 'true');
+        } else {
+          restoreAttribute(target.element, 'aria-disabled', target.attributes.ariaDisabled);
+        }
+      }
+      root!.dataset.disabled = String(disabled);
+      return true;
+    } catch {
+      return false;
     }
   };
 
@@ -256,47 +362,47 @@ export const createSettingRow = (
     const setDisabled = (disabled: boolean): boolean => {
       if (destroyed || typeof disabled !== 'boolean') return false;
       if (disabled === rowDisabled) return true;
-      const beforeStates: boolean[] = [];
-      const beforeAria: Array<string | null> = [];
-      try {
-        for (const target of resolved) {
-          const before = target.getDisabled();
-          if (typeof before !== 'boolean') throw new TypeError('Invalid disabled state');
-          beforeStates.push(before);
-          beforeAria.push(target.element.getAttribute('aria-disabled'));
+      if (!disabled) {
+        if (!restoreActiveDisable()) return false;
+        if (!setDisabledPresentation(false)) return false;
+        rowDisabled = false;
+        return true;
+      }
+
+      const prepared = prepareDisableTransactions();
+      if (!prepared) return false;
+      activeDisableTransactions = prepared;
+      let committed = true;
+      for (const transaction of prepared) {
+        try {
+          transaction.commit();
+          if (transaction.target.getDisabled() !== true) committed = false;
+        } catch {
+          committed = false;
         }
-        resolved.forEach((target) => {
-          target.setDisabled(disabled ? true : target.initialDisabled);
-          if (disabled) {
-            target.element.setAttribute('aria-disabled', 'true');
-          } else {
-            restoreAttribute(target.element, 'aria-disabled', target.attributes.ariaDisabled);
-          }
-        });
-      } catch {
-        resolved.forEach((target, index) => {
-          try {
-            if (index < beforeStates.length) target.setDisabled(beforeStates[index]);
-          } catch {
-            // Best-effort rollback must continue across every target.
-          }
-          try {
-            if (index < beforeAria.length) {
-              restoreAttribute(target.element, 'aria-disabled', beforeAria[index]);
-            }
-          } catch {
-            // Best-effort rollback must continue across every target.
-          }
-        });
+        if (!committed) break;
+      }
+
+      if (!committed || !setDisabledPresentation(true)) {
+        if (restoreActiveDisable()) {
+          setDisabledPresentation(false);
+          rowDisabled = false;
+        } else {
+          // The row stays mounted, marked disabled, and capture-suppressed. The
+          // caller can retry setDisabled(false) or destroy once undo is healthy.
+          setDisabledPresentation(true);
+          rowDisabled = true;
+        }
         return false;
       }
-      rowDisabled = disabled;
-      root!.dataset.disabled = String(disabled);
+
+      rowDisabled = true;
       return true;
     };
 
-    const destroy = (): void => {
-      if (destroyed) return;
+    const destroy = (): boolean => {
+      if (destroyed) return true;
+      if (rowDisabled && !setDisabled(false)) return false;
       destroyed = true;
       restoreTargets();
       try {
@@ -304,9 +410,22 @@ export const createSettingRow = (
       } catch {
         // A detached or hostile host must not make cleanup throw.
       }
+      return true;
     };
 
     if ((options.disabled ?? false) && !setDisabled(true)) {
+      if (rowDisabled) {
+        // A failed undo must keep the recoverable disabled row reachable instead
+        // of removing its suppression boundary and stranding the custom target.
+        return {
+          root,
+          label,
+          controlSlot,
+          interactionTargets: resolved.map(({ element }) => element),
+          setDisabled,
+          destroy
+        };
+      }
       destroy();
       return null;
     }
@@ -320,6 +439,7 @@ export const createSettingRow = (
       destroy
     };
   } catch {
+    restoreActiveDisable();
     destroyed = true;
     restoreTargets();
     try {
