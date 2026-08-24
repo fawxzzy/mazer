@@ -10,6 +10,12 @@ This is the active completion marker for the current Mazer direction.
 
 The legacy visual 1:1 screenshot target is retired unless explicitly reopened. Future work should preserve and improve the old project's mechanics, while allowing the browser game to look cleaner, flatter, clearer, and more mobile-friendly than the old prototype.
 
+## Current room contract
+
+- The dormant room-candidate, feasibility-plan, preview-cue, and preview-edge subsystem is retired. There is no runtime room state, diagnostic surface, activation, renderer, or persistence contract.
+- Natural branches, intersections, and open floor patches remain valid maze geometry. Retirement does not impose a no-`2x2` generator rule or alter the generated grid, solution path, difficulty, static slow tile, or patrol agent.
+- Historical room entries below remain as implementation history only and do not describe current or planned source contracts.
+
 ## Current progression contract
 
 - Player and menu-AI levels are separate, unbounded completion ordinals.

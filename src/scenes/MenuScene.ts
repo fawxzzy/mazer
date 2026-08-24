@@ -212,7 +212,6 @@ import {
   readLegacyProgressionState,
   recordLegacyProgressionCycle,
   resolveLegacyMazeGenerationProfileForProgression,
-  resolveLegacyProgressionDifficultyProfile,
   resolveLegacyProgressionGenerationScale,
   resolveLegacyProgressionLevel,
   resolveLegacyProgressionOrdinalSeedComponent,
@@ -233,10 +232,6 @@ import {
   resolveLegacyStaticSlowTileRemainingMs,
   type LegacyStaticSlowTileState
 } from '../legacy-runtime/legacyStaticSlowTile';
-import {
-  createLegacyRoomCandidateMetadata,
-  type LegacyRoomCandidateMetadata
-} from '../legacy-runtime/legacyRoomCandidateMetadata';
 import {
   LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
   LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
@@ -1389,7 +1384,6 @@ export class MenuScene extends Phaser.Scene {
   private playCyclePath: LegacyPoint[] = [];
   private playCycleResetUsed = false;
   private playStaticSlowTile: LegacyStaticSlowTileState | null = null;
-  private playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null = null;
   private playPatrolAgent: LegacyPatrolAgentState | null = null;
   private menuDemoCycleStartedAtMs = 0;
   private menuDemoCompletedAtMs: number | null = null;
@@ -2461,51 +2455,6 @@ export class MenuScene extends Phaser.Scene {
           renderTileSize: mazeRenderFrame.tileSize
         },
         lifecycle: playLifecycle,
-        roomCandidate: this.playRoomCandidateMetadata
-          ? {
-              band: this.playRoomCandidateMetadata.band,
-              candidate: {
-                footprintHeight: this.playRoomCandidateMetadata.candidate.footprintHeight,
-                footprintWidth: this.playRoomCandidateMetadata.candidate.footprintWidth,
-                solutionPathIndex: this.playRoomCandidateMetadata.candidate.solutionPathIndex,
-                topLeft: { ...this.playRoomCandidateMetadata.candidate.topLeft }
-              },
-              candidateCount: this.playRoomCandidateMetadata.candidateCount,
-              contractVersion: this.playRoomCandidateMetadata.contractVersion,
-              evaluatedCandidateCount: this.playRoomCandidateMetadata.evaluatedCandidateCount,
-              perimeterOpeningCount: this.playRoomCandidateMetadata.perimeterOpeningCount,
-              perimeterOpenings: this.playRoomCandidateMetadata.perimeterOpenings.map((opening) => ({
-                inside: { ...opening.inside },
-                kind: opening.kind,
-                outside: { ...opening.outside },
-                side: opening.side
-              })),
-              routeInteriorTileCount: this.playRoomCandidateMetadata.routeInteriorTileCount,
-              routeOpeningCount: this.playRoomCandidateMetadata.routeOpeningCount,
-              routeOpeningEdges: this.playRoomCandidateMetadata.routeOpeningEdges.map((edge) => ({
-                inside: { ...edge.inside },
-                kind: edge.kind,
-                outside: { ...edge.outside },
-                side: edge.side
-              })),
-              routeThresholds: this.playRoomCandidateMetadata.routeThresholds.map((threshold) => ({
-                from: { ...threshold.from },
-                fromSolutionPathIndex: threshold.fromSolutionPathIndex,
-                kind: threshold.kind,
-                to: { ...threshold.to },
-                toSolutionPathIndex: threshold.toSolutionPathIndex
-              })),
-              roomsEnabled: this.playRoomCandidateMetadata.roomsEnabled,
-              sideClosureCount: this.playRoomCandidateMetadata.sideClosureCount,
-              sideClosureEdges: this.playRoomCandidateMetadata.sideClosureEdges.map((edge) => ({
-                inside: { ...edge.inside },
-                kind: edge.kind,
-                outside: { ...edge.outside },
-                side: edge.side
-              })),
-              source: this.playRoomCandidateMetadata.source
-            }
-          : null,
         patrol: this.playPatrolAgent && patrolPoint
           ? {
               alternateRouteStepCount: this.playPatrolAgent.placement.alternateRouteStepCount,
@@ -4522,7 +4471,6 @@ export class MenuScene extends Phaser.Scene {
       this.playCyclePath = [];
       this.playCycleResetUsed = false;
       this.playStaticSlowTile = null;
-      this.playRoomCandidateMetadata = null;
       this.playPatrolAgent = null;
     } else {
       this.menuDemoConfig = createLegacyMenuDemoWalkerConfig(this.maze.seed);
@@ -4533,20 +4481,12 @@ export class MenuScene extends Phaser.Scene {
       this.playCyclePath = generationState.initialTrail.map(copyPoint);
       this.playCycleResetUsed = false;
       this.playCompletedAtMs = null;
-      const progressionBand = resolveLegacyProgressionDifficultyProfile(
-        this.progressionState.tracks.player
-      ).band;
       // Pressure objects remain source-proven experiments, not live gameplay.
       // The red/grey slow tile and patrol agent were appearing automatically
-      // in later difficulty bands even though rooms and object gameplay have
-      // not been activated. Keep the dormant contracts available for a future
-      // explicit mechanic lane, but do not place any runtime object now.
+      // in later difficulty bands before object gameplay had been activated.
+      // Keep those contracts available for a future explicit mechanic lane,
+      // but do not place either runtime object now.
       this.playStaticSlowTile = null;
-      this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
-        this.maze,
-        progressionBand,
-        null
-      );
       this.playPatrolAgent = null;
       // The decel-to-target spin itself now starts once the new maze
       // actually finishes settling (settleLegacyMenuStaticDrawStageIfComplete),
@@ -14142,15 +14082,7 @@ export class MenuScene extends Phaser.Scene {
       this.playCycleResetUsed = true;
       this.playStartedAtMs = this.time.now;
       this.playCompletedAtMs = null;
-      const progressionBand = resolveLegacyProgressionDifficultyProfile(
-        this.progressionState.tracks.player
-      ).band;
       this.playStaticSlowTile = null;
-      this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
-        this.maze,
-        progressionBand,
-        null
-      );
       this.playPatrolAgent = null;
       this.resetLegacyWorldTurnHost();
       this.resetLegacyPlayInputBuffer();
@@ -14174,15 +14106,7 @@ export class MenuScene extends Phaser.Scene {
       ...baseline,
       updatedAt: new Date().toISOString()
     });
-    const progressionBand = resolveLegacyProgressionDifficultyProfile(
-      this.progressionState.tracks.player
-    ).band;
     this.playStaticSlowTile = null;
-    this.playRoomCandidateMetadata = createLegacyRoomCandidateMetadata(
-      this.maze,
-      progressionBand,
-      null
-    );
     this.playPatrolAgent = null;
     this.resetLegacyWorldTurnHost();
     this.setLatestOverlayMessage(createLegacyPlayerMessage({

@@ -27,10 +27,6 @@ import {
   type LegacyStaticSlowTileState
 } from '../../src/legacy-runtime/legacyStaticSlowTile';
 import {
-  createLegacyRoomCandidateMetadata,
-  type LegacyRoomCandidateMetadata
-} from '../../src/legacy-runtime/legacyRoomCandidateMetadata';
-import {
   createLegacyPatrolAgentState,
   type LegacyPatrolAgentState
 } from '../../src/legacy-runtime/legacyPatrolAgent';
@@ -59,7 +55,6 @@ interface PauseResetSceneHarness {
   playCyclePath: Array<{ x: number; y: number }>;
   playCycleResetUsed: boolean;
   playPatrolAgent: LegacyPatrolAgentState | null;
-  playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
   playStartedAtMs: number;
   playStaticSlowTile: LegacyStaticSlowTileState | null;
   player: { x: number; y: number };
@@ -80,7 +75,6 @@ interface ProgressionResetSceneHarness {
   maze: LegacyMazeSnapshot;
   openOverlay: (overlay: 'pause') => void;
   playPatrolAgent: LegacyPatrolAgentState | null;
-  playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
   playStaticSlowTile: LegacyStaticSlowTileState | null;
   progressionState: LegacyProgressionState;
   resolveLegacyProgressionStorage: () => undefined;
@@ -135,21 +129,11 @@ const createBypassableMaze = (): LegacyMazeSnapshot => ({
 const createPatrolForState = (
   maze: LegacyMazeSnapshot,
   band: LegacyProgressionDifficultyBand,
-  slowTile: LegacyStaticSlowTileState | null,
-  roomMetadata: LegacyRoomCandidateMetadata | null
+  slowTile: LegacyStaticSlowTileState | null
 ): LegacyPatrolAgentState | null => {
   const excludedPoints = [];
   if (slowTile?.placement) {
     excludedPoints.push(slowTile.placement.point);
-  }
-  if (roomMetadata) {
-    const { x, y } = roomMetadata.candidate.topLeft;
-    excludedPoints.push(
-      { x, y },
-      { x: x + 1, y },
-      { x, y: y + 1 },
-      { x: x + 1, y: y + 1 }
-    );
   }
   return createLegacyPatrolAgentState(maze, band, excludedPoints);
 };
@@ -336,30 +320,19 @@ describe('legacy static slow tile', () => {
     progressionState.tracks.player.targetComplexity = 256;
     const initial = createLegacyStaticSlowTileState(maze, 'architect');
     const entered = applyLegacyStaticSlowTileEntry(initial, initial.placement!.point, 1_000).state;
-    const initialRoomMetadata = createLegacyRoomCandidateMetadata(
-      maze,
-      'architect',
-      initial.placement?.point ?? null
-    );
     const scene: PauseResetSceneHarness = {
       boardDynamicDirty: false,
       closeOverlay: vi.fn(),
       createLegacyPlayPatrolAgent: (band) => createPatrolForState(
         maze,
         band,
-        createLegacyStaticSlowTileState(maze, band),
-        createLegacyRoomCandidateMetadata(
-          maze,
-          band,
-          createLegacyStaticSlowTileState(maze, band).placement?.point ?? null
-        )
+        createLegacyStaticSlowTileState(maze, band)
       ),
       maze,
       playCompletedAtMs: 1_500,
       playCyclePath: [{ x: 4, y: 2 }],
       playCycleResetUsed: false,
-      playPatrolAgent: createPatrolForState(maze, 'architect', entered, initialRoomMetadata),
-      playRoomCandidateMetadata: initialRoomMetadata,
+      playPatrolAgent: createPatrolForState(maze, 'architect', entered),
       playStartedAtMs: 500,
       playStaticSlowTile: entered,
       player: { x: 4, y: 2 },
@@ -380,11 +353,6 @@ describe('legacy static slow tile', () => {
     applyPauseCommand.call(scene, 'reset-player');
 
     expect(scene.playStaticSlowTile).toBeNull();
-    expect(scene.playRoomCandidateMetadata).toEqual(createLegacyRoomCandidateMetadata(
-      maze,
-      'architect',
-      null
-    ));
     expect(scene.playPatrolAgent).toBeNull();
     expect(scene.player).toEqual(maze.start);
     expect(scene.trail).toEqual([maze.start]);
@@ -421,17 +389,7 @@ describe('legacy static slow tile', () => {
       playPatrolAgent: createPatrolForState(
         maze,
         'mythic',
-        entered,
-        createLegacyRoomCandidateMetadata(
-          maze,
-          'mythic',
-          initial.placement?.point ?? null
-        )
-      ),
-      playRoomCandidateMetadata: createLegacyRoomCandidateMetadata(
-        maze,
-        'architect',
-        initial.placement?.point ?? null
+        entered
       ),
       playStaticSlowTile: entered,
       player,
@@ -456,7 +414,6 @@ describe('legacy static slow tile', () => {
     );
     expect(scene.playStaticSlowTile).toBeNull();
     expect(isLegacyStaticSlowTileDelayActive(scene.playStaticSlowTile, resetAtMs)).toBe(false);
-    expect(scene.playRoomCandidateMetadata).toBeNull();
     expect(scene.playPatrolAgent).toBeNull();
     expect(scene.player).toBe(player);
     expect(scene.trail).toBe(trail);

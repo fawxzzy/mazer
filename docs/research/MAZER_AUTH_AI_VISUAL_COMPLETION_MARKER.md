@@ -4,6 +4,10 @@ Last updated: 2026-07-14
 
 This marker tracks the current multi-pass chunk requested after the production auth/progression setup: player-facing login gate, remote cycle receipts, AI/playbook progression contracts, and visual polish. It is separate from the completed mechanics/mobile marker.
 
+## Room-subsystem override
+
+The dormant room-candidate metadata, activation-plan, preview-cue, and preview-edge contracts were retired on 2026-08-24. Older references to rooms being disabled or deferred are historical only: no room state or future room lane remains in the current runtime contract. Natural open maze geometry is preserved, and this decision does not change auth, AI, progression, static slow tiles, patrol agents, rendering, or provider behavior.
+
 ## Current Overall Marker
 
 Overall: 96%

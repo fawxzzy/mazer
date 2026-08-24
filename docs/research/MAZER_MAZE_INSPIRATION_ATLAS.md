@@ -5,6 +5,7 @@
 - The walker is non-interactive, so structure must create interest through silhouette, rhythm, and route drama, not through player decision complexity.
 - The current scorer already improves endpoint variety, but it still leans region-opposed. New inspiration should widen route character, not just push endpoints farther apart.
 - Wilson generation truth and the current family system stay intact.
+- The dormant room subsystem is retired. Open patches may occur naturally, but room/chamber activation, metadata, previews, and room-led generation families are not current design targets.
 
 ## Useful Maze Families
 ### 1. Unicursal labyrinths
@@ -43,23 +44,23 @@ Fit for Mazer:
 - Excellent for `monolith`, `noir`, and future “blueprint” or “signal-map” variants.
 - Good source for orthogonal authority, nested frames, and symbolic endpoint placement.
 
-### 5. Dungeon-map hybrids
-Room clusters, choke points, loops, and furnished destinations create strong route character.
+### 5. Survey-map hybrids
+Choke points, loops, and layered corridor destinations create strong route character without requiring room semantics.
 
 Fit for Mazer:
-- Good for future family variation so long as the board stays tile-legible and room language stays simple.
-- Works especially well if split into two phases: architectural layout first, meaningful furnishing second.
+- Good for future family variation so long as the board stays tile-legible and corridor hierarchy remains simple.
+- Works especially well when route structure, rather than furnishing or activated spaces, creates the hierarchy.
 
 ## Visual Archetypes Worth Borrowing
 - Cathedral / ceremonial: centered, solemn, symbolic, low branch complexity.
 - Garden / hedge: broad sweeps, clear silhouette, scenic dead ends.
 - Mechanical / circuit: orthogonal, dense, system-like, excellent for monochrome or tech themes.
 - Mirror / optical: high atmosphere and disorientation, but better as shell mood than board truth.
-- Dungeon / survey map: chambers, thresholds, loops, and hierarchy.
+- Survey map: thresholds, loops, corridor hierarchy, and route layers.
 
 ## Structural Archetypes Worth Borrowing
 - Spine with barbs: a dominant route with short side teeth. Good for readable ambient movement.
-- Chamber chain: alternating rooms and corridors. Good for rhythm changes.
+- Corridor cadence: alternating compressed and open route segments. Good for rhythm changes.
 - Braided route: repeated near-rejoins that feel smart without becoming visually noisy.
 - Outer ring with inner locks: readable perimeter plus delayed access to center mass.
 - False culmination: a route that appears to conclude, then opens into a second act.
@@ -68,10 +69,10 @@ Fit for Mazer:
 - Strong negative-space silhouettes.
 - Route rhythms that are readable from a thumbnail.
 - Architectural families that visibly differ even before the walker moves.
-- Endpoint placement that creates different story shapes: ascent, descent, near-miss, perimeter chase, chamber break.
+- Endpoint placement that creates different story shapes: ascent, descent, near-miss, perimeter chase, late break.
 
 ## What Does Not Fit Ambient Mazer
-- Dense room dressing that makes the board look like gameplay UI.
+- Dense spatial dressing that makes the board look like gameplay UI.
 - Puzzle language that requires textual explanation.
 - Heavy perspective tricks inside the board plane.
 - Mirror-maze confusion as the main board structure.
@@ -80,7 +81,7 @@ Fit for Mazer:
 ## Top 5 Maze-Structure Ideas To Explore Later
 1. A “spine-and-crown” family where most branch drama happens near one destination, not evenly everywhere.
 2. A “perimeter tension” family where the walker spends long stretches tracing the outer wall before cutting inward late.
-3. A “chamber punctuation” family with a few small room-like expansions that break corridor monotony without becoming a dungeon crawler map.
+3. An “open-corridor punctuation” family that varies corridor spacing without introducing room metadata or activated spaces.
 4. A “false goal” scorer modifier that rewards near-arrival reversals and second-act routes without previewing the answer.
 5. A “diagram maze” family for `monolith` and `blueprint` moods, using orthogonal authority and nested frame structures instead of organic branching.
 

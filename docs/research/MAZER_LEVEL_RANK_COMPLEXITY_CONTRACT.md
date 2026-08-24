@@ -6,6 +6,12 @@ Status: implemented source contract; provider migration and server-owned cutover
 
 This document defines how Mazer should connect player performance, AI-runner performance, maze complexity, rank, level, and future Atlas/playbook learning. It is intentionally narrow: no enemies, traps, obstacles, items, Stripe licensing, or diagonal graph work are included in this contract yet.
 
+## 2026-08-24 Room-subsystem retirement
+
+- Room eligibility is removed from the difficulty profile and progression vocabulary. No level, rank, target-complexity, or recipe-cycle value activates a room contract.
+- Naturally open floor geometry remains valid maze topology; this is not a no-`2x2` generation rule.
+- Older room-off and future-room passages below are retained as design history and are superseded by this section.
+
 ## 2026-08-23 Superseding Progression Contract
 
 - `player.level` and `ai-runner.level` are independent positive completion ordinals. Each accepted completion advances its active track by exactly `+1`; neither ordinal has an application-level `99` ceiling.
