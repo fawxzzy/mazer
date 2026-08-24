@@ -260,4 +260,40 @@ describe('Wave 2A.1 settings DOM primitives', () => {
     first.destroy();
     second.destroy();
   });
+
+  it('captures and restores the owner-document active element without the host HTMLElement realm', () => {
+    const alternateDocument = makeDocument();
+    const alternateInvoker = asElement(alternateDocument.createElement('button'));
+    alternateInvoker.focus();
+    const dialog = createConfirmDialog({
+      id: 'alternate-realm-dialog',
+      title: 'Leave run?',
+      description: 'The run will end.',
+      confirmLabel: 'Leave',
+      onConfirm: vi.fn()
+    }, alternateDocument);
+
+    expect(() => dialog.open()).not.toThrow();
+    expect((alternateDocument as unknown as TestDocument).activeElement).toBe(dialog.cancelButton);
+    dialog.close();
+    expect((alternateDocument as unknown as TestDocument).activeElement).toBe(alternateInvoker);
+    dialog.destroy();
+  });
+
+  it('opens without throwing when the owner document has no focusable active element', () => {
+    const alternateDocument = makeDocument();
+    (alternateDocument as unknown as TestDocument).activeElement = {} as TestElement;
+    const dialog = createConfirmDialog({
+      id: 'no-focus-target-dialog',
+      title: 'Reset run?',
+      description: 'Current progress will be cleared.',
+      confirmLabel: 'Reset',
+      onConfirm: vi.fn()
+    }, alternateDocument);
+
+    expect(() => dialog.open()).not.toThrow();
+    expect((alternateDocument as unknown as TestDocument).activeElement).toBe(dialog.cancelButton);
+    expect(() => dialog.close()).not.toThrow();
+    dialog.destroy();
+  });
 });

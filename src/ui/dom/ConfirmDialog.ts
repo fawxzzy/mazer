@@ -25,6 +25,21 @@ export interface ConfirmDialogElements {
 
 const activeDialogs = new WeakMap<Document, HTMLElement>();
 
+interface FocusTarget {
+  focus(): void;
+}
+
+const resolveFocusTarget = (value: unknown): FocusTarget | undefined => {
+  if (typeof value !== 'object' || value === null) return undefined;
+  try {
+    return typeof (value as { focus?: unknown }).focus === 'function'
+      ? value as FocusTarget
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * Creates an unmounted, caller-controlled confirmation dialog.
  * Confirm never closes or mutates state implicitly; only the explicit callback runs.
@@ -49,7 +64,7 @@ export const createConfirmDialog = (
   }, ownerDocument);
   const titleId = `${options.id}-title`;
   const descriptionId = `${options.id}-description`;
-  let restoreTarget: HTMLElement | undefined;
+  let restoreTarget: FocusTarget | undefined;
 
   root.id = options.id;
   root.className = ['mazer-dialog-layer', options.className].filter(Boolean).join(' ');
@@ -110,9 +125,7 @@ export const createConfirmDialog = (
     const active = activeDialogs.get(ownerDocument);
     if (active && active !== root) return false;
     if (active === root) return true;
-    restoreTarget = invoker ?? (
-      ownerDocument.activeElement instanceof HTMLElement ? ownerDocument.activeElement : undefined
-    );
+    restoreTarget = resolveFocusTarget(invoker) ?? resolveFocusTarget(ownerDocument.activeElement);
     activeDialogs.set(ownerDocument, root);
     root.hidden = false;
     root.dataset.open = 'true';
