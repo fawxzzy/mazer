@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { chromium } from 'playwright';
+import { ModuleKind, ScriptTarget, transpileModule } from 'typescript';
 import {
   createConfirmDialog,
   createMazerScrollArea,
   createMazerSegmentedControl,
+  createMazerSlider,
   createMazerSwitch,
   createSettingRow,
   createSettingsSection,
@@ -10,6 +14,11 @@ import {
 } from '../../src/ui/dom';
 
 type Listener = (event: Event) => void;
+
+interface ListenerRegistration {
+  listener: Listener;
+  capture: boolean;
+}
 
 class TestDocument {
   activeElement: TestElement | null = null;
@@ -23,20 +32,29 @@ class TestElement {
   readonly attributes = new Map<string, string>();
   readonly childNodes: TestElement[] = [];
   readonly dataset: Record<string, string> = {};
-  readonly listeners = new Map<string, Listener[]>();
+  readonly listeners = new Map<string, ListenerRegistration[]>();
   checked = false;
   className = '';
-  disabled = false;
+  disabled: boolean | undefined;
   hidden = false;
   htmlFor = '';
   id = '';
   name = '';
+  parentNode: TestElement | null = null;
   tabIndex = 0;
   textContent = '';
   type = '';
   value = '';
 
-  constructor(readonly tagName: string, private readonly document: TestDocument) {}
+  constructor(readonly tagName: string, private readonly document: TestDocument) {
+    this.disabled = ['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(tagName)
+      ? false
+      : undefined;
+  }
+
+  get ownerDocument(): TestDocument {
+    return this.document;
+  }
 
   readonly classList = {
     add: (...names: string[]): void => {
@@ -46,7 +64,14 @@ class TestElement {
   };
 
   append(...children: TestElement[]): void {
+    children.forEach((child) => {
+      child.parentNode = this;
+    });
     this.childNodes.push(...children);
+  }
+
+  contains(candidate: TestElement): boolean {
+    return this === candidate || this.childNodes.some((child) => child.contains(candidate));
   }
 
   setAttribute(name: string, value: string): void {
@@ -57,12 +82,31 @@ class TestElement {
     return this.attributes.get(name) ?? null;
   }
 
-  addEventListener(name: string, listener: Listener): void {
-    this.listeners.set(name, [...(this.listeners.get(name) ?? []), listener]);
+  removeAttribute(name: string): void {
+    this.attributes.delete(name);
   }
 
-  removeEventListener(name: string, listener: Listener): void {
-    this.listeners.set(name, (this.listeners.get(name) ?? []).filter((entry) => entry !== listener));
+  addEventListener(
+    name: string,
+    listener: Listener,
+    options?: boolean | AddEventListenerOptions
+  ): void {
+    const capture = typeof options === 'boolean' ? options : options?.capture ?? false;
+    this.listeners.set(name, [...(this.listeners.get(name) ?? []), { listener, capture }]);
+  }
+
+  removeEventListener(
+    name: string,
+    listener: Listener,
+    options?: boolean | EventListenerOptions
+  ): void {
+    const capture = typeof options === 'boolean' ? options : options?.capture ?? false;
+    this.listeners.set(
+      name,
+      (this.listeners.get(name) ?? []).filter((entry) => (
+        entry.listener !== listener || entry.capture !== capture
+      ))
+    );
   }
 
   focus(): void {
@@ -70,43 +114,631 @@ class TestElement {
   }
 
   fire(name: string, event: Record<string, unknown> = {}): void {
+    const path: TestElement[] = [];
+    for (let cursor: TestElement | null = this; cursor; cursor = cursor.parentNode) {
+      path.push(cursor);
+    }
+    let immediatePropagationStopped = false;
+    let propagationStopped = false;
     const payload = {
       type: name,
       target: this,
       preventDefault: vi.fn(),
-      stopPropagation: vi.fn(),
+      composedPath: () => [...path],
+      stopPropagation: vi.fn(() => {
+        propagationStopped = true;
+      }),
+      stopImmediatePropagation: vi.fn(() => {
+        propagationStopped = true;
+        immediatePropagationStopped = true;
+      }),
       ...event
     } as unknown as Event;
-    for (const listener of this.listeners.get(name) ?? []) listener(payload);
+
+    const invoke = (element: TestElement, capture: boolean): void => {
+      for (const registration of [...(element.listeners.get(name) ?? [])]) {
+        if (immediatePropagationStopped) break;
+        if (registration.capture === capture) registration.listener(payload);
+      }
+    };
+    for (const element of [...path].reverse()) {
+      invoke(element, true);
+      if (propagationStopped) return;
+    }
+    for (const element of path) {
+      invoke(element, false);
+      if (propagationStopped) return;
+    }
   }
 
   click(): void {
+    if (this.disabled) return;
+    const toggles = this.tagName === 'INPUT' && (this.type === 'checkbox' || this.type === 'radio');
+    if (toggles) this.checked = this.type === 'radio' ? true : !this.checked;
     this.fire('click');
+    if (toggles) this.fire('change');
   }
+
+  remove(): void {}
 }
 
 const makeDocument = (): Document => new TestDocument() as unknown as Document;
 const asElement = (value: unknown): TestElement => value as TestElement;
 
 describe('Wave 2A.1 settings DOM primitives', () => {
-  it('associates setting labels, helper text, status, and controls without nesting the control', () => {
+  it('targets a direct native control, preserves tokens and labelFor, and restores row-owned state', () => {
     const document = makeDocument();
     const control = asElement(document.createElement('button'));
-    const row = asElement(createSettingRow({
+    const onClick = vi.fn();
+    control.id = 'motion-button';
+    control.setAttribute('aria-labelledby', 'existing-label motion-row-label');
+    control.setAttribute('aria-describedby', 'existing-help motion-row-description');
+    control.setAttribute('aria-disabled', 'false');
+    control.addEventListener('click', onClick);
+    const result = createSettingRow({
       id: 'motion-row',
       label: 'Reduced motion',
+      labelFor: 'motion-button',
       description: 'Limits decorative travel.',
       status: 'Saved locally',
       control: control as unknown as HTMLElement,
       disabled: true
-    }, document));
+    }, document);
+    expect(result).not.toBeNull();
+    const row = asElement(result!.root);
 
     expect(row.tagName).toBe('DIV');
     expect(row.dataset.disabled).toBe('true');
-    expect(control.getAttribute('aria-labelledby')).toBe('motion-row-label');
-    expect(control.getAttribute('aria-describedby')).toBe('motion-row-description motion-row-status');
+    expect(asElement(result!.label).htmlFor).toBe('motion-button');
+    expect(control.getAttribute('aria-labelledby')).toBe('existing-label motion-row-label');
+    expect(control.getAttribute('aria-describedby')).toBe(
+      'existing-help motion-row-description motion-row-status'
+    );
     expect(control.getAttribute('aria-disabled')).toBe('true');
+    expect(control.disabled).toBe(true);
     expect(row.childNodes[1].childNodes).toEqual([control]);
+    control.click();
+    expect(onClick).not.toHaveBeenCalled();
+
+    expect(result!.setDisabled(false)).toBe(true);
+    expect(control.disabled).toBe(false);
+    expect(control.getAttribute('aria-disabled')).toBe('false');
+    expect(row.dataset.disabled).toBe('false');
+    expect(onClick).not.toHaveBeenCalled();
+    control.click();
+    expect(onClick).toHaveBeenCalledTimes(1);
+
+    result!.destroy();
+    expect(control.getAttribute('aria-labelledby')).toBe('existing-label motion-row-label');
+    expect(control.getAttribute('aria-describedby')).toBe('existing-help motion-row-description');
+    expect(control.getAttribute('aria-disabled')).toBe('false');
+    expect(control.disabled).toBe(false);
+    control.click();
+    expect(onClick).toHaveBeenCalledTimes(2);
+  });
+
+  it('targets arbitrarily nested switch and slider inputs without mutating their visual roots', () => {
+    const document = makeDocument();
+    const switchChange = vi.fn();
+    const sliderInput = vi.fn();
+    const switchControl = createMazerSwitch({
+      id: 'nested-switch',
+      label: 'Guide trail',
+      checked: false,
+      onChange: switchChange
+    }, document);
+    const sliderControl = createMazerSlider({
+      id: 'nested-slider',
+      label: 'Board zoom',
+      min: 50,
+      max: 150,
+      value: 100,
+      onInput: sliderInput
+    }, document);
+    const switchVisualRoot = asElement(document.createElement('div'));
+    const switchInner = asElement(document.createElement('div'));
+    switchInner.append(asElement(switchControl.root));
+    switchVisualRoot.append(switchInner);
+    const sliderVisualRoot = asElement(document.createElement('div'));
+    const sliderInner = asElement(document.createElement('div'));
+    sliderInner.append(asElement(sliderControl.root));
+    sliderVisualRoot.append(sliderInner);
+
+    const switchRow = createSettingRow({
+      id: 'switch-row',
+      label: 'Trail',
+      description: 'Shows the solved route.',
+      control: switchVisualRoot as unknown as HTMLElement,
+      interactionTargets: [{ element: switchControl.input }]
+    }, document);
+    const sliderRow = createSettingRow({
+      id: 'slider-row',
+      label: 'Zoom',
+      status: '100 percent',
+      control: sliderVisualRoot as unknown as HTMLElement,
+      interactionTargets: [{ element: sliderControl.input }]
+    }, document);
+
+    expect(switchRow).not.toBeNull();
+    expect(sliderRow).not.toBeNull();
+    expect(asElement(switchControl.root).getAttribute('aria-describedby')).toBeNull();
+    expect(asElement(switchControl.input).getAttribute('aria-describedby')).toBe('switch-row-description');
+    expect(asElement(sliderControl.root).getAttribute('aria-describedby')).toBeNull();
+    expect(asElement(sliderControl.input).getAttribute('aria-describedby')).toBe('slider-row-status');
+    expect(switchRow!.setDisabled(true)).toBe(true);
+    expect(sliderRow!.setDisabled(true)).toBe(true);
+    asElement(switchControl.input).click();
+    asElement(sliderControl.input).fire('input');
+    expect(switchChange).not.toHaveBeenCalled();
+    expect(sliderInput).not.toHaveBeenCalled();
+
+    expect(switchRow!.setDisabled(false)).toBe(true);
+    expect(sliderRow!.setDisabled(false)).toBe(true);
+    asElement(switchControl.input).click();
+    asElement(sliderControl.input).fire('input');
+    expect(switchChange).toHaveBeenCalledTimes(1);
+    expect(sliderInput).toHaveBeenCalledTimes(1);
+  });
+
+  it('targets every radio, preserves pre-disabled state, and restores all semantics on destroy', () => {
+    const document = makeDocument();
+    const control = asElement(document.createElement('div'));
+    const nested = asElement(document.createElement('div'));
+    const radios = [0, 1, 2].map((index) => {
+      const radio = asElement(document.createElement('input'));
+      radio.id = `mode-${index}`;
+      radio.type = 'radio';
+      radio.setAttribute('aria-labelledby', `existing-label-${index}`);
+      radio.setAttribute('aria-describedby', `existing-help-${index}`);
+      nested.append(radio);
+      return radio;
+    });
+    radios[1].disabled = true;
+    control.append(nested);
+    const row = createSettingRow({
+      id: 'mode-row',
+      label: 'Mode',
+      labelFor: 'mode-0',
+      description: 'Choose a mode.',
+      status: 'Classic selected',
+      control: control as unknown as HTMLElement,
+      interactionTargets: radios.map((element) => ({ element: element as unknown as HTMLElement }))
+    }, document);
+
+    expect(row).not.toBeNull();
+    expect(asElement(row!.label).htmlFor).toBe('mode-0');
+    radios.forEach((radio, index) => {
+      expect(radio.getAttribute('aria-labelledby')).toBe(`existing-label-${index} mode-row-label`);
+      expect(radio.getAttribute('aria-describedby')).toBe(
+        `existing-help-${index} mode-row-description mode-row-status`
+      );
+    });
+    expect(row!.setDisabled(true)).toBe(true);
+    expect(radios.map(({ disabled }) => disabled)).toEqual([true, true, true]);
+    expect(row!.setDisabled(false)).toBe(true);
+    expect(radios.map(({ disabled }) => disabled)).toEqual([false, true, false]);
+
+    row!.destroy();
+    radios.forEach((radio, index) => {
+      expect(radio.getAttribute('aria-labelledby')).toBe(`existing-label-${index}`);
+      expect(radio.getAttribute('aria-describedby')).toBe(`existing-help-${index}`);
+      expect(radio.getAttribute('aria-disabled')).toBeNull();
+    });
+    expect(radios.map(({ disabled }) => disabled)).toEqual([false, true, false]);
+  });
+
+  it('suppresses pre-existing target capture handlers from an earlier row boundary', () => {
+    const document = makeDocument();
+    const customTarget = asElement(document.createElement('div'));
+    const unrelatedSibling = asElement(document.createElement('button'));
+    const control = asElement(document.createElement('div'));
+    const activations = {
+      keyup: vi.fn(),
+      pointerup: vi.fn(),
+      click: vi.fn(),
+      input: vi.fn(),
+      change: vi.fn()
+    };
+    let customDisabled = false;
+    const siblingActivation = vi.fn();
+    customTarget.tabIndex = 0;
+    customTarget.setAttribute('role', 'button');
+    Object.entries(activations).forEach(([eventName, callback]) => {
+      customTarget.addEventListener(eventName, callback, true);
+    });
+    unrelatedSibling.addEventListener('click', siblingActivation, true);
+    control.append(customTarget, unrelatedSibling);
+    const row = createSettingRow({
+      id: 'custom-row',
+      label: 'Custom action',
+      control: control as unknown as HTMLElement,
+      interactionTargets: [{
+        element: customTarget as unknown as HTMLElement,
+        disableAdapter: {
+          getDisabled: () => customDisabled,
+          prepareDisabled: (disabled) => {
+            const beforeDisabled = customDisabled;
+            const beforeTabIndex = customTarget.tabIndex;
+            return {
+              commit: () => {
+                customDisabled = disabled;
+                customTarget.tabIndex = disabled ? -1 : beforeTabIndex;
+              },
+              rollback: () => {
+                customDisabled = beforeDisabled;
+                customTarget.tabIndex = beforeTabIndex;
+              }
+            };
+          }
+        }
+      }]
+    }, document);
+
+    expect(row).not.toBeNull();
+    Object.values(activations).forEach((callback) => expect(callback).not.toHaveBeenCalled());
+    expect(row!.setDisabled(true)).toBe(true);
+    expect(customDisabled).toBe(true);
+    expect(customTarget.tabIndex).toBe(-1);
+    customTarget.fire('keyup');
+    customTarget.fire('pointerup');
+    customTarget.click();
+    customTarget.fire('input');
+    customTarget.fire('change');
+    Object.values(activations).forEach((callback) => expect(callback).not.toHaveBeenCalled());
+    unrelatedSibling.click();
+    expect(siblingActivation).toHaveBeenCalledTimes(1);
+    expect(row!.setDisabled(false)).toBe(true);
+    expect(customDisabled).toBe(false);
+    expect(customTarget.tabIndex).toBe(0);
+    customTarget.fire('keyup');
+    customTarget.fire('pointerup');
+    customTarget.click();
+    customTarget.fire('input');
+    customTarget.fire('change');
+    Object.values(activations).forEach((callback) => expect(callback).toHaveBeenCalledTimes(1));
+    expect(row!.destroy()).toBe(true);
+    customTarget.fire('keyup');
+    expect(activations.keyup).toHaveBeenCalledTimes(2);
+  });
+
+  it('blocks pre-existing capture activation at the ancestor boundary in real Chromium', async () => {
+    const source = await readFile(
+      new URL('../../src/ui/dom/SettingRow.ts', import.meta.url),
+      'utf8'
+    );
+    const moduleUrl = `data:text/javascript;base64,${Buffer.from(transpileModule(source, {
+      compilerOptions: { module: ModuleKind.ESNext, target: ScriptTarget.ES2022 }
+    }).outputText).toString('base64')}`;
+    const browser = await chromium.launch({ headless: true });
+
+    try {
+      const page = await browser.newPage();
+      const result = await page.evaluate(async (url) => {
+        const importModule = new Function('moduleUrl', 'return import(moduleUrl)') as (
+          moduleUrl: string
+        ) => Promise<typeof import('../../src/ui/dom/SettingRow')>;
+        const { createSettingRow } = await importModule(url);
+        const eventNames = ['pointerup', 'keyup', 'click', 'input', 'change'] as const;
+        const activations = Object.fromEntries(eventNames.map((name) => [name, 0])) as Record<
+          (typeof eventNames)[number],
+          number
+        >;
+        const target = document.createElement('div');
+        const sibling = document.createElement('button');
+        const control = document.createElement('div');
+        let adapterDisabled = false;
+        let siblingActivations = 0;
+
+        target.tabIndex = 0;
+        target.setAttribute('role', 'button');
+        eventNames.forEach((name) => {
+          target.addEventListener(name, () => {
+            activations[name] += 1;
+          }, { capture: true });
+        });
+        sibling.addEventListener('click', () => {
+          siblingActivations += 1;
+        }, { capture: true });
+        control.append(target, sibling);
+        const row = createSettingRow({
+          id: 'chromium-custom-row',
+          label: 'Chromium custom target',
+          control,
+          interactionTargets: [{
+            element: target,
+            disableAdapter: {
+              getDisabled: () => adapterDisabled,
+              prepareDisabled: (disabled) => {
+                const before = adapterDisabled;
+                return {
+                  commit: () => {
+                    adapterDisabled = disabled;
+                  },
+                  rollback: () => {
+                    adapterDisabled = before;
+                  }
+                };
+              }
+            }
+          }]
+        });
+        if (!row) throw new Error('SettingRow failed to construct');
+        document.body.append(row.root);
+        if (!row.setDisabled(true)) throw new Error('SettingRow failed to disable');
+
+        const disabledDispatchResults = eventNames.map((name) => target.dispatchEvent(new Event(name, {
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        })));
+        sibling.click();
+        const whileDisabled = { ...activations };
+
+        if (!row.setDisabled(false)) throw new Error('SettingRow failed to re-enable');
+        eventNames.forEach((name) => target.dispatchEvent(new Event(name, {
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        })));
+        const afterEnable = { ...activations };
+        if (!row.destroy()) throw new Error('SettingRow failed to destroy');
+        target.dispatchEvent(new Event('keyup', { bubbles: true, cancelable: true }));
+
+        return {
+          afterDestroyKeyup: activations.keyup,
+          afterEnable,
+          disabledDispatchResults,
+          siblingActivations,
+          whileDisabled
+        };
+      }, moduleUrl);
+
+      expect(result.whileDisabled).toEqual({
+        pointerup: 0,
+        keyup: 0,
+        click: 0,
+        input: 0,
+        change: 0
+      });
+      expect(result.disabledDispatchResults).toEqual([false, false, false, false, false]);
+      expect(result.siblingActivations).toBe(1);
+      expect(result.afterEnable).toEqual({
+        pointerup: 1,
+        keyup: 1,
+        click: 1,
+        input: 1,
+        change: 1
+      });
+      expect(result.afterDestroyKeyup).toBe(2);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  it('fails closed without guessing descendants or accepting non-disable-capable targets', () => {
+    const document = makeDocument();
+    const composite = asElement(document.createElement('div'));
+    const nestedButton = asElement(document.createElement('button'));
+    const customTarget = asElement(document.createElement('div'));
+    const outsideButton = asElement(document.createElement('button'));
+    composite.append(nestedButton, customTarget);
+
+    expect(() => createSettingRow({
+      id: 'implicit-composite-row',
+      label: 'Implicit composite',
+      control: composite as unknown as HTMLElement
+    }, document)).not.toThrow();
+    expect(createSettingRow({
+      id: 'implicit-composite-row',
+      label: 'Implicit composite',
+      control: composite as unknown as HTMLElement
+    }, document)).toBeNull();
+    expect(createSettingRow({
+      id: 'empty-target-row',
+      label: 'Empty targets',
+      control: composite as unknown as HTMLElement,
+      interactionTargets: []
+    }, document)).toBeNull();
+    expect(createSettingRow({
+      id: 'custom-without-adapter-row',
+      label: 'Custom without adapter',
+      control: composite as unknown as HTMLElement,
+      interactionTargets: [{ element: customTarget as unknown as HTMLElement }]
+    }, document)).toBeNull();
+    expect(createSettingRow({
+      id: 'outside-target-row',
+      label: 'Outside target',
+      control: composite as unknown as HTMLElement,
+      interactionTargets: [{ element: outsideButton as unknown as HTMLElement }]
+    }, document)).toBeNull();
+    expect(customTarget.getAttribute('aria-labelledby')).toBeNull();
+    expect(nestedButton.getAttribute('aria-labelledby')).toBeNull();
+  });
+
+  it('uses an established undo when a custom commit mutates and then throws', () => {
+    const document = makeDocument();
+    const control = asElement(document.createElement('div'));
+    const native = asElement(document.createElement('button'));
+    const custom = asElement(document.createElement('div'));
+    let customDisabled = false;
+    custom.tabIndex = 4;
+    control.append(native, custom);
+    const row = createSettingRow({
+      id: 'rollback-row',
+      label: 'Rollback',
+      control: control as unknown as HTMLElement,
+      interactionTargets: [
+        { element: native as unknown as HTMLElement },
+        {
+          element: custom as unknown as HTMLElement,
+          disableAdapter: {
+            getDisabled: () => customDisabled,
+            prepareDisabled: () => ({
+              commit: () => {
+                customDisabled = true;
+                custom.tabIndex = -1;
+                throw new Error('adapter failed after mutation');
+              },
+              rollback: () => {
+                customDisabled = false;
+                custom.tabIndex = 4;
+              }
+            })
+          }
+        }
+      ]
+    }, document);
+
+    expect(row).not.toBeNull();
+    expect(row!.setDisabled(true)).toBe(false);
+    expect(native.disabled).toBe(false);
+    expect(customDisabled).toBe(false);
+    expect(custom.tabIndex).toBe(4);
+    expect(native.getAttribute('aria-disabled')).toBeNull();
+    expect(custom.getAttribute('aria-disabled')).toBeNull();
+    expect(asElement(row!.root).dataset.disabled).toBe('false');
+    expect(row!.destroy()).toBe(true);
+  });
+
+  it('rejects an unprovable rollback before any custom or native commit runs', () => {
+    const document = makeDocument();
+    const control = asElement(document.createElement('div'));
+    const native = asElement(document.createElement('button'));
+    const custom = asElement(document.createElement('div'));
+    const nativeBefore = native.disabled;
+    let customDisabled = false;
+    const nativeActivation = vi.fn();
+    const customCommit = vi.fn(() => {
+      customDisabled = true;
+    });
+    native.addEventListener('click', nativeActivation);
+    control.append(native, custom);
+    const row = createSettingRow({
+      id: 'rollback-refusal-row',
+      label: 'Rollback refusal',
+      control: control as unknown as HTMLElement,
+      interactionTargets: [
+        { element: native as unknown as HTMLElement },
+        {
+          element: custom as unknown as HTMLElement,
+          disableAdapter: {
+            getDisabled: () => customDisabled,
+            prepareDisabled: () => ({
+              commit: customCommit,
+              rollback: () => {
+                throw new Error('rollback unavailable');
+              }
+            })
+          }
+        }
+      ]
+    }, document);
+
+    expect(row).not.toBeNull();
+    expect(row!.setDisabled(true)).toBe(false);
+    expect(customCommit).not.toHaveBeenCalled();
+    expect(customDisabled).toBe(false);
+    expect(native.disabled).toBe(nativeBefore);
+    expect(asElement(row!.root).dataset.disabled).toBe('false');
+    native.click();
+    expect(nativeActivation).toHaveBeenCalledTimes(1);
+    expect(row!.destroy()).toBe(true);
+  });
+
+  it('uses the active custom undo during destroy and restores the exact preimage', () => {
+    const document = makeDocument();
+    const custom = asElement(document.createElement('div'));
+    const control = asElement(document.createElement('div'));
+    let customDisabled = false;
+    custom.tabIndex = 7;
+    custom.setAttribute('aria-disabled', 'mixed');
+    control.append(custom);
+    const row = createSettingRow({
+      id: 'destroy-undo-row',
+      label: 'Destroy undo',
+      control: control as unknown as HTMLElement,
+      interactionTargets: [{
+        element: custom as unknown as HTMLElement,
+        disableAdapter: {
+          getDisabled: () => customDisabled,
+          prepareDisabled: () => {
+            const beforeDisabled = customDisabled;
+            const beforeTabIndex = custom.tabIndex;
+            return {
+              commit: () => {
+                customDisabled = true;
+                custom.tabIndex = -1;
+              },
+              rollback: () => {
+                customDisabled = beforeDisabled;
+                custom.tabIndex = beforeTabIndex;
+              }
+            }
+          }
+        }
+      }]
+    }, document);
+
+    expect(row).not.toBeNull();
+    expect(row!.setDisabled(true)).toBe(true);
+    expect(customDisabled).toBe(true);
+    expect(custom.tabIndex).toBe(-1);
+    expect(row!.destroy()).toBe(true);
+    expect(customDisabled).toBe(false);
+    expect(custom.tabIndex).toBe(7);
+    expect(custom.getAttribute('aria-disabled')).toBe('mixed');
+    expect(custom.getAttribute('aria-labelledby')).toBeNull();
+  });
+
+  it('keeps a failed destroy mounted and disabled until its established undo recovers', () => {
+    const document = makeDocument();
+    const custom = asElement(document.createElement('div'));
+    const control = asElement(document.createElement('div'));
+    const activation = vi.fn();
+    let customDisabled = false;
+    let rollbackCalls = 0;
+    custom.tabIndex = 2;
+    custom.addEventListener('keyup', activation);
+    control.append(custom);
+    const row = createSettingRow({
+      id: 'recoverable-destroy-row',
+      label: 'Recoverable destroy',
+      control: control as unknown as HTMLElement,
+      interactionTargets: [{
+        element: custom as unknown as HTMLElement,
+        disableAdapter: {
+          getDisabled: () => customDisabled,
+          prepareDisabled: () => ({
+            commit: () => {
+              customDisabled = true;
+              custom.tabIndex = -1;
+            },
+            rollback: () => {
+              rollbackCalls += 1;
+              if (rollbackCalls === 2) throw new Error('temporary rollback failure');
+              customDisabled = false;
+              custom.tabIndex = 2;
+            }
+          })
+        }
+      }]
+    }, document);
+
+    expect(row).not.toBeNull();
+    expect(row!.setDisabled(true)).toBe(true);
+    expect(rollbackCalls).toBe(1);
+    expect(row!.destroy()).toBe(false);
+    expect(customDisabled).toBe(true);
+    expect(custom.tabIndex).toBe(-1);
+    expect(asElement(row!.root).dataset.disabled).toBe('true');
+    custom.fire('keyup');
+    expect(activation).not.toHaveBeenCalled();
+
+    expect(row!.destroy()).toBe(true);
+    expect(rollbackCalls).toBe(3);
+    expect(customDisabled).toBe(false);
+    expect(custom.tabIndex).toBe(2);
+    expect(custom.getAttribute('aria-labelledby')).toBeNull();
   });
 
   it('groups settings with a unique heading and optional description', () => {
