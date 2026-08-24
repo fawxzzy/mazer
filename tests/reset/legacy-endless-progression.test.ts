@@ -88,7 +88,9 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(completionRpc).toContain('completed_at,');
     expect(completionRpc).toContain('receipt');
     expect(completionRpc).toContain("pg_catalog.octet_length(p_receipt::text) > 8192");
-    expect(completionRpc).toContain("pg_catalog.nullif(p_receipt ->> 'id', '')");
+    expect(completionRpc.match(/coalesce\(nullif\(p_receipt ->> 'id', ''\), p_client_run_id::text\)/g)).toHaveLength(3);
+    expect(completionRpc).not.toContain('pg_catalog.coalesce');
+    expect(completionRpc).not.toContain('pg_catalog.nullif');
     expect(completionRpc).toContain('load-bearing player completion transaction');
     expect(completionRpc).toContain('load-bearing menu-AI completion transaction');
     expect(completionRpc).toContain('create function public.mazer_initialize_progression');
@@ -130,6 +132,38 @@ describe('legacy endless progression ruleset boundary', () => {
       expect(staleIndex).toBeGreaterThan(presenceIndex);
       expect(boundedAddIndex).toBeGreaterThan(staleIndex);
       expect(body).not.toContain("jsonb_build_object('completedAt'");
+    }
+  });
+
+  test('keeps all auth-bound progression RPCs inaccessible to anon after fresh or forward migration', () => {
+    const completionRpc = normalizeSourceLineEndings(readFileSync(
+      new URL('../../supabase/migrations/20260822000100_mazer_endless_completion_rpc.sql', import.meta.url),
+      'utf8'
+    ));
+    const forwardRepair = normalizeSourceLineEndings(readFileSync(
+      new URL('../../supabase/migrations/20260824013611_repair_progression_rpc_acl_and_conditionals.sql', import.meta.url),
+      'utf8'
+    ));
+    const signatures = [
+      'public.mazer_initialize_progression(uuid)',
+      'public.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb)',
+      'public.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb)',
+      'public.mazer_reset_progression(bigint, uuid)'
+    ];
+
+    for (const source of [completionRpc, forwardRepair]) {
+      for (const signature of signatures) {
+        expect(source).toContain(`revoke all on function ${signature} from public;`);
+        expect(source).toContain(`revoke all on function ${signature} from anon;`);
+        expect(source).toContain(`grant execute on function ${signature} to authenticated;`);
+      }
+    }
+
+    expect(forwardRepair).toContain("pg_catalog.replace(v_definition, 'pg_catalog.' || 'coalesce', 'coalesce')");
+    expect(forwardRepair).toContain("pg_catalog.replace(v_definition, 'pg_catalog.' || 'nullif', 'nullif')");
+    for (const source of [completionRpc, forwardRepair]) {
+      expect(source).not.toContain('pg_catalog.coalesce');
+      expect(source).not.toContain('pg_catalog.nullif');
     }
   });
 
