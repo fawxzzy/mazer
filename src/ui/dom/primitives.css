@@ -1,0 +1,230 @@
+/*
+ * Mazer UI rework Wave 2A — stateless DOM primitive foundation.
+ *
+ * This sheet is intentionally not imported by a shipping entrypoint in Wave 2A.
+ * Later product waves mount the primitives and own route/surface composition.
+ */
+
+.mazer-app-shell {
+  background: var(--mazer-token-color-bg-shell, #07131a);
+  box-sizing: border-box;
+  color: var(--mazer-token-color-text-primary, #f1faf6);
+  display: flex;
+  height: var(--mazer-viewport-height, 100dvh);
+  inset: var(--mazer-viewport-top, 0) auto auto var(--mazer-viewport-left, 0);
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding:
+    max(var(--mazer-token-spacing-12, 12px), var(--mazer-safe-area-top, 0px))
+    max(var(--mazer-token-spacing-12, 12px), var(--mazer-safe-area-right, 0px))
+    max(var(--mazer-token-spacing-12, 12px), var(--mazer-safe-area-bottom, 0px))
+    max(var(--mazer-token-spacing-12, 12px), var(--mazer-safe-area-left, 0px));
+  position: fixed;
+  width: var(--mazer-viewport-width, 100vw);
+}
+
+.mazer-app-shell * {
+  box-sizing: border-box;
+}
+
+.mazer-stage-shell {
+  align-items: stretch;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+
+.mazer-panel {
+  --mazer-control-notch-background: var(--mazer-token-color-bg-panel, #0b1a22);
+  background: var(--mazer-control-notch-background);
+  border: var(--mazer-token-stroke-hairline, 1px) solid var(--mazer-token-color-line-subtle, #23434a);
+  border-radius: var(--mazer-token-radius-panel, 12px);
+  color: var(--mazer-token-color-text-primary, #f1faf6);
+  min-width: 0;
+  padding: var(--mazer-token-spacing-20, 20px);
+}
+
+.mazer-panel--elevated {
+  --mazer-control-notch-background: var(--mazer-token-color-bg-elevated, #10242b);
+}
+
+.mazer-button,
+.mazer-icon-button {
+  align-items: center;
+  border-radius: var(--mazer-token-radius-control, 8px);
+  cursor: pointer;
+  display: inline-flex;
+  font: 600 1rem/1 var(--mazer-token-font-ui, sans-serif);
+  justify-content: center;
+  min-height: var(--mazer-token-touch-target-min, 44px);
+  min-width: var(--mazer-token-touch-target-min, 44px);
+  touch-action: manipulation;
+}
+
+.mazer-button {
+  border: var(--mazer-token-stroke-hairline, 1px) solid var(--mazer-token-color-line-normal, #5d9f98);
+  gap: var(--mazer-token-spacing-8, 8px);
+  padding: 0 var(--mazer-token-spacing-16, 16px);
+}
+
+.mazer-button--primary {
+  background: var(--mazer-token-color-brand-mint, #c3f4b9);
+  border-color: var(--mazer-token-color-brand-mint, #c3f4b9);
+  color: var(--mazer-token-color-bg-canvas, #03070b);
+}
+
+.mazer-button--secondary,
+.mazer-button--quiet,
+.mazer-icon-button {
+  background: transparent;
+  color: var(--mazer-token-color-text-primary, #f1faf6);
+}
+
+.mazer-button--quiet,
+.mazer-icon-button {
+  border: var(--mazer-token-stroke-hairline, 1px) solid transparent;
+}
+
+.mazer-button--danger {
+  background: transparent;
+  border-color: var(--mazer-token-color-semantic-danger, #ff405d);
+  color: var(--mazer-token-color-semantic-danger, #ff405d);
+}
+
+.mazer-button:disabled,
+.mazer-icon-button:disabled {
+  color: var(--mazer-token-color-text-disabled, #5d7478);
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.mazer-button:focus-visible,
+.mazer-icon-button:focus-visible,
+.mazer-field:focus-within,
+.mazer-slider__input:focus-visible {
+  outline: var(--mazer-token-stroke-focus, 3px) solid var(--mazer-token-color-semantic-info, #6be8e1);
+  outline-offset: 2px;
+}
+
+.mazer-icon {
+  display: block;
+  flex: none;
+  height: 20px;
+  pointer-events: none;
+  width: 20px;
+}
+
+.mazer-field {
+  background: transparent;
+  border: var(--mazer-token-stroke-hairline, 1px) solid var(--mazer-token-color-line-normal, #5d9f98);
+  border-radius: var(--mazer-token-radius-control, 8px);
+  display: grid;
+  min-width: 0;
+  position: relative;
+}
+
+.mazer-field__label {
+  background: var(--mazer-control-notch-background, var(--mazer-token-color-bg-panel, #0b1a22));
+  color: var(--mazer-token-color-text-muted, #94aaa8);
+  font: 500 0.78rem/1 var(--mazer-token-font-ui, sans-serif);
+  left: var(--mazer-token-spacing-12, 12px);
+  padding: 0 var(--mazer-token-spacing-4, 4px);
+  position: absolute;
+  top: 0;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.mazer-field__input {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+  color: var(--mazer-token-color-text-primary, #f1faf6);
+  font: 400 1rem/1.35 var(--mazer-token-font-ui, sans-serif);
+  min-height: var(--mazer-token-touch-target-min, 44px);
+  min-width: 0;
+  outline: 0;
+  padding: var(--mazer-token-spacing-12, 12px);
+  width: 100%;
+}
+
+.mazer-field__input::placeholder {
+  color: var(--mazer-token-color-text-disabled, #5d7478);
+}
+
+.mazer-field--password .mazer-field__input {
+  padding-right: calc(var(--mazer-token-touch-target-min, 44px) + var(--mazer-token-spacing-8, 8px));
+}
+
+.mazer-field__reveal {
+  border: 0;
+  height: var(--mazer-token-touch-target-min, 44px);
+  min-height: var(--mazer-token-touch-target-min, 44px);
+  min-width: var(--mazer-token-touch-target-min, 44px);
+  padding: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: var(--mazer-token-touch-target-min, 44px);
+}
+
+.mazer-field__description,
+.mazer-field__error {
+  font: 400 0.78rem/1.35 var(--mazer-token-font-ui, sans-serif);
+  margin: 0;
+  padding: 0 var(--mazer-token-spacing-12, 12px) var(--mazer-token-spacing-8, 8px);
+}
+
+.mazer-field__description {
+  color: var(--mazer-token-color-text-muted, #94aaa8);
+}
+
+.mazer-field__error {
+  color: var(--mazer-token-color-semantic-danger, #ff405d);
+}
+
+.mazer-field:has(.mazer-field__input[aria-invalid="true"]) {
+  border-color: var(--mazer-token-color-semantic-danger, #ff405d);
+}
+
+.mazer-slider {
+  align-items: center;
+  display: grid;
+  gap: var(--mazer-token-spacing-8, 8px);
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.mazer-slider__label,
+.mazer-slider__output {
+  color: var(--mazer-token-color-text-primary, #f1faf6);
+  font: 500 0.9rem/1.2 var(--mazer-token-font-ui, sans-serif);
+}
+
+.mazer-slider__output {
+  font-family: var(--mazer-token-font-metrics, monospace);
+}
+
+.mazer-slider__input {
+  accent-color: var(--mazer-token-color-semantic-energy, #39f58a);
+  cursor: pointer;
+  grid-column: 1 / -1;
+  min-height: var(--mazer-token-touch-target-min, 44px);
+  touch-action: manipulation;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mazer-button,
+  .mazer-icon-button,
+  .mazer-field,
+  .mazer-slider__input {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}

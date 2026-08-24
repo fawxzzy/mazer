@@ -90,6 +90,13 @@
       "sourceRef": "blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md#file-ownership-guardrails"
     },
     {
+      "id": "wave2a-stateless-dom-primitives",
+      "category": "architecture",
+      "locked": true,
+      "statement": "Wave 2A introduces only stateless, renderer-neutral DOM construction primitives. These modules own native semantics, accessibility, and primitive styling but do not import MenuScene, authentication, stores, commands, network clients, persistence, or runtime state; they remain unmounted until a later assigned integrator wave.",
+      "sourceRef": "docs/architecture/MAZER-UI-REWORK-DOM-PRIMITIVES.md#wave-2a-boundary"
+    },
+    {
       "id": "no-redesign-complete-without-acceptance-matrix",
       "category": "governance",
       "locked": true,
@@ -341,7 +348,7 @@
         ]
       }
     ],
-    "note": "Assignments preserve the handoff packet's single-owner guardrails while replacing the obsolete pull-request hold with current dependency-ordered wave ownership. The Wave 1B token exports are now concrete and assigned; no branch name or stale pull-request state grants an exception.",
+    "note": "Assignments preserve the handoff packet's single-owner guardrails while replacing the obsolete pull-request hold with current dependency-ordered wave ownership. The Wave 1B token exports are concrete and assigned. Wave 2A's new, isolated DOM primitives are governed by wave2a-stateless-dom-primitives and remain unwired; no branch name or stale pull-request state grants an exception.",
     "decisionRef": "dependency-ordered-integrator-wave-ownership"
   },
   "redesignComplete": {

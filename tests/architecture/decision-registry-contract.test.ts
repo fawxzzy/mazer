@@ -197,6 +197,21 @@ describe('Mazer UI rework decision registry contract', () => {
     expect(violations.some((entry) => entry.rule === 'unknown-decision-reference')).toBe(true);
   });
 
+  it('locks Wave 2A to stateless, unwired DOM primitives', async () => {
+    const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
+    const registry: any = await readDecisionRegistry();
+    const decision = registry.decisions.find((entry: any) => entry.id === 'wave2a-stateless-dom-primitives');
+
+    expect(decision).toMatchObject({
+      category: 'architecture',
+      locked: true,
+      sourceRef: 'docs/architecture/MAZER-UI-REWORK-DOM-PRIMITIVES.md#wave-2a-boundary'
+    });
+    expect(decision.statement).toContain('do not import MenuScene');
+    expect(decision.statement).toContain('remain unmounted');
+    expect(collectDecisionRegistryViolations(registry)).toEqual([]);
+  });
+
   it('fails on an unknown decision id reference from an entrypoint', async () => {
     const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
     const registry = cloneRegistry(await readDecisionRegistry());
