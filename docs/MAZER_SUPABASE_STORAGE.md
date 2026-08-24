@@ -75,7 +75,7 @@ It also hydrates authenticated account state before Phaser creates the first maz
 - `revision` on progression and profile rows is a monotonic optimistic-concurrency guard. Normal advancement can rebase forward once after a conflict; destructive replacement/reset refuses to overwrite a newer revision.
 - A scoped local sync envelope records the last observed revision and local fingerprints so offline/local advancement can be reconciled without resurrecting a previously accepted reset.
 
-The app remains playable local-first if Supabase is unavailable or remote progression is disabled. This source binding itself did not change environment values, enable the feature flag, grant client access, expose the schema, deploy, or cut over the application; the bounded access and Data API postimage above was completed and verified through a separate governed provider wave.
+The app remains playable local-first if Supabase is unavailable or remote progression is disabled. This source binding itself did not change environment values, enable the feature flag, grant client access, expose the schema, deploy, or cut over the application; bounded access and the Data API postimage remain incomplete and must be freshly re-certified through a separate governed provider wave before cutover.
 
 In the legacy source project, live migration `account_state_revisions` was applied on 2026-07-16. Readback confirmed the existing three progression rows were preserved at revision `0`; the profile table remained empty until an authenticated client seeds its first settings row. This remains source-contract evidence for the consolidated runtime behavior.
 
