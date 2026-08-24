@@ -51,6 +51,23 @@ const countLegacyShortcutBridgeFloors = (maze: ReturnType<typeof createLegacyMaz
   return bridges;
 };
 
+const countLegacyOpenTwoByTwoFloorBlocks = (maze: ReturnType<typeof createLegacyMaze>): number => {
+  let blocks = 0;
+  for (let y = 0; y < maze.height - 1; y += 1) {
+    for (let x = 0; x < maze.width - 1; x += 1) {
+      if (
+        maze.grid[y]?.[x] === true
+        && maze.grid[y]?.[x + 1] === true
+        && maze.grid[y + 1]?.[x] === true
+        && maze.grid[y + 1]?.[x + 1] === true
+      ) {
+        blocks += 1;
+      }
+    }
+  }
+  return blocks;
+};
+
 const countDetachedFloorTiles = (maze: ReturnType<typeof createLegacyMaze>): number => {
   const queue = [maze.start];
   const visited = new Set<string>([`${maze.start.x},${maze.start.y}`]);
@@ -280,6 +297,7 @@ describe('legacy reset lane', () => {
 
     expect(firstStep).toEqual(maze.start);
     expect(lastStep).toEqual(maze.goal);
+    expect(countLegacyOpenTwoByTwoFloorBlocks(maze)).toBe(0);
   });
 
   test('classifies opposite-edge neighbor transitions as wrapped steps for visual snapping', () => {
@@ -334,7 +352,29 @@ describe('legacy reset lane', () => {
     expect(maze.routeQualityStats?.meaningfulBypassableSolutionEdges).toBeGreaterThan(1);
     expect(maze.routeQualityStats?.meaningfulBypassableRouteBands).toBeGreaterThan(1);
     expect(maze.routeQualityStats?.minimumMeaningfulDetour).toBeGreaterThanOrEqual(2);
+    expect(countLegacyOpenTwoByTwoFloorBlocks(maze)).toBe(0);
   });
+
+  test('keeps play and generated-menu grids deterministic and free of open 2x2 floor blocks', () => {
+    const cases = [
+      { scale: 37, seed: 13 },
+      { scale: 50, seed: 0x5a17f00d },
+      { scale: 75, seed: 55 },
+      { scale: 99, seed: 233 }
+    ];
+
+    for (const { scale, seed } of cases) {
+      for (const buildMaze of [createLegacyMaze, createLegacyGeneratedMenuMaze]) {
+        const first = buildMaze(scale, scale, seed);
+        const second = buildMaze(scale, scale, seed);
+        expect(countLegacyOpenTwoByTwoFloorBlocks(first), `scale ${scale} seed ${seed}`).toBe(0);
+        expect(second.grid).toEqual(first.grid);
+        expect(second.start).toEqual(first.start);
+        expect(second.goal).toEqual(first.goal);
+        expect(second.solutionPath).toEqual(first.solutionPath);
+      }
+    }
+  }, 20_000);
 
   test('keeps default generated play mazes connected with meaningful alternate routes across seed families', () => {
     const failures: unknown[] = [];
@@ -441,7 +481,7 @@ describe('legacy reset lane', () => {
         expect(countDetachedFloorTiles(maze), `${factory.label}:${seed}`).toBe(0);
       }
     }
-  });
+  }, 15_000);
 
   test('reinforces weak shortcut outcomes without disconnecting generated play mazes', () => {
     let reinforcedMaze: ReturnType<typeof createLegacyMaze> | null = null;

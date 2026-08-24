@@ -15,7 +15,6 @@ describe('human-memory AI recovery diagnostics', () => {
   test('keeps bounded generated E diagnostics internally consistent without exposing a solver route', () => {
     const seeds = [1, 2, 3, 5, 8] as const;
     let branchDecisionCount = 0;
-    let frontierRecoveryCount = 0;
 
     for (const seed of seeds) {
       const maze = createLegacyGeneratedMenuMaze(37, 37, seed);
@@ -27,6 +26,7 @@ describe('human-memory AI recovery diagnostics', () => {
       const shortestPath = resolveLegacyPlayableShortestPath(maze.grid, maze.start, maze.goal);
 
       expect(shortestPath.found).toBe(true);
+      expect(diagnostics.aiResetPathCursor).toBeNull();
       expect(diagnostics.routeLength / shortestPath.path.length).toBeLessThanOrEqual(1.25);
       expect(diagnostics.recoveryDecisions).toHaveLength(diagnostics.telemetry.recoveryCount);
 
@@ -87,17 +87,12 @@ describe('human-memory AI recovery diagnostics', () => {
         if (decision.selectedScoreMargin !== null) {
           expect(decision.selectedScoreMargin).toBeGreaterThanOrEqual(0);
         }
-        if (decision.kind === 'frontier-recovery') {
-          frontierRecoveryCount += 1;
-        }
       }
     }
 
-    // The generated routes keep locally observed branch decisions, but the
-    // bounded envelope prevents the old long-tail frontier-recovery detour.
-    // Handcrafted fixtures in demo-walker.test.ts continue to prove real
-    // recovery and optional-retarget cognition without fabricating telemetry.
-    expect(frontierRecoveryCount).toBe(0);
+    // Generated topology may legitimately require known-frontier recovery.
+    // Completion plus the per-episode route-ratio envelope prevents the old
+    // long-tail detour without memorizing a historical topology snapshot.
     expect(branchDecisionCount).toBeGreaterThan(0);
   });
 

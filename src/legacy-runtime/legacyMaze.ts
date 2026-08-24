@@ -824,6 +824,176 @@ const resolveReachableFloorDistances = (
   return reachable;
 };
 
+const wouldCreateLegacyOpenTwoByTwoFloorBlock = (
+  grid: boolean[][],
+  point: LegacyPoint
+): boolean => {
+  for (let top = point.y - 1; top <= point.y; top += 1) {
+    for (let left = point.x - 1; left <= point.x; left += 1) {
+      if (top < 0 || left < 0 || top + 1 >= grid.length || left + 1 >= (grid[0]?.length ?? 0)) {
+        continue;
+      }
+
+      let allWalkable = true;
+      for (let y = top; y <= top + 1 && allWalkable; y += 1) {
+        for (let x = left; x <= left + 1; x += 1) {
+          if ((x !== point.x || y !== point.y) && grid[y]?.[x] !== true) {
+            allWalkable = false;
+            break;
+          }
+        }
+      }
+      if (allWalkable) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
+
+const isLegacyOpenTwoByTwoFloorBlock = (
+  grid: boolean[][],
+  left: number,
+  top: number
+): boolean => (
+  grid[top]?.[left] === true
+  && grid[top]?.[left + 1] === true
+  && grid[top + 1]?.[left] === true
+  && grid[top + 1]?.[left + 1] === true
+);
+
+const canRemoveLegacyFloorWithoutDisconnecting = (
+  grid: boolean[][],
+  point: LegacyPoint
+): boolean => {
+  const neighbors = LEGACY_STEP_DIRECTIONS
+    .map((direction) => ({ x: point.x + direction.x, y: point.y + direction.y }))
+    .filter((neighbor) => grid[neighbor.y]?.[neighbor.x] === true);
+  if (neighbors.length <= 1) {
+    return true;
+  }
+
+  grid[point.y]![point.x] = false;
+  const pending = new Set(neighbors.slice(1).map(keyForPoint));
+  const queue: LegacyPoint[] = [neighbors[0]!];
+  const visited = new Set<string>([keyForPoint(neighbors[0]!)]);
+  for (let index = 0; index < queue.length && pending.size > 0; index += 1) {
+    const current = queue[index];
+    if (!current) {
+      continue;
+    }
+
+    for (const direction of LEGACY_STEP_DIRECTIONS) {
+      const next = { x: current.x + direction.x, y: current.y + direction.y };
+      const key = keyForPoint(next);
+      if (grid[next.y]?.[next.x] !== true || visited.has(key)) {
+        continue;
+      }
+
+      visited.add(key);
+      pending.delete(key);
+      queue.push(next);
+    }
+  }
+  grid[point.y]![point.x] = true;
+  return pending.size === 0;
+};
+
+const resolveLegacyDetachedFloorsAfterRemoval = (
+  grid: boolean[][],
+  point: LegacyPoint,
+  start: LegacyPoint,
+  protectedTiles: ReadonlySet<string>
+): LegacyPoint[] | null => {
+  grid[point.y]![point.x] = false;
+  const reachable = resolveReachableFloorDistances(grid, start);
+  const detached: LegacyPoint[] = [];
+
+  for (const protectedKey of protectedTiles) {
+    if (!reachable.has(protectedKey)) {
+      grid[point.y]![point.x] = true;
+      return null;
+    }
+  }
+
+  for (let y = 0; y < grid.length; y += 1) {
+    for (let x = 0; x < (grid[y]?.length ?? 0); x += 1) {
+      if (grid[y]?.[x] === true && !reachable.has(`${x},${y}`)) {
+        detached.push({ x, y });
+      }
+    }
+  }
+
+  grid[point.y]![point.x] = true;
+  return detached;
+};
+
+const normalizeLegacyOpenTwoByTwoFloorBlocks = (
+  grid: boolean[][],
+  start: LegacyPoint,
+  protectedPoints: readonly LegacyPoint[],
+  preferredRoute: readonly LegacyPoint[],
+  seed: number
+): LegacyPoint[] => {
+  const protectedTiles = new Set([keyForPoint(start), ...protectedPoints.map(keyForPoint)]);
+  const preferredRouteTiles = new Set(preferredRoute.map(keyForPoint));
+  const removedTiles: LegacyPoint[] = [];
+
+  for (let top = 0; top < grid.length - 1; top += 1) {
+    for (let left = 0; left < (grid[top]?.length ?? 0) - 1; left += 1) {
+      if (!isLegacyOpenTwoByTwoFloorBlock(grid, left, top)) {
+        continue;
+      }
+
+      const candidates = [
+        { x: left, y: top },
+        { x: left + 1, y: top },
+        { x: left, y: top + 1 },
+        { x: left + 1, y: top + 1 }
+      ]
+        .filter((candidate) => !protectedTiles.has(keyForPoint(candidate)))
+        .sort((first, second) => {
+          const firstRoutePenalty = preferredRouteTiles.has(keyForPoint(first)) ? 1 : 0;
+          const secondRoutePenalty = preferredRouteTiles.has(keyForPoint(second)) ? 1 : 0;
+          if (firstRoutePenalty !== secondRoutePenalty) {
+            return firstRoutePenalty - secondRoutePenalty;
+          }
+
+          const firstTie = (Math.imul(first.x + 17, 2246822519) ^ Math.imul(first.y + 31, 3266489917) ^ seed) >>> 0;
+          const secondTie = (Math.imul(second.x + 17, 2246822519) ^ Math.imul(second.y + 31, 3266489917) ^ seed) >>> 0;
+          return firstTie - secondTie;
+        });
+      const removable = candidates.find((candidate) => canRemoveLegacyFloorWithoutDisconnecting(grid, candidate));
+      if (removable) {
+        grid[removable.y]![removable.x] = false;
+        removedTiles.push(clonePoint(removable));
+        continue;
+      }
+
+      let fallback: { detached: LegacyPoint[]; point: LegacyPoint } | null = null;
+      for (const candidate of candidates) {
+        const detached = resolveLegacyDetachedFloorsAfterRemoval(grid, candidate, start, protectedTiles);
+        if (detached && (!fallback || detached.length < fallback.detached.length)) {
+          fallback = { detached, point: candidate };
+        }
+      }
+      if (!fallback) {
+        throw new Error(`Unable to normalize open 2x2 floor block at ${left},${top} without disconnecting protected maze topology.`);
+      }
+
+      grid[fallback.point.y]![fallback.point.x] = false;
+      removedTiles.push(clonePoint(fallback.point));
+      for (const detached of fallback.detached) {
+        grid[detached.y]![detached.x] = false;
+        removedTiles.push(clonePoint(detached));
+      }
+    }
+  }
+
+  return removedTiles;
+};
+
 const normalizeLegacyPlayableTopology = (
   grid: boolean[][],
   start: LegacyPoint,
@@ -1020,7 +1190,11 @@ const applyLegacyShortcutBridges = (
     attempts += 1;
     const candidateIndex = Math.floor(rng() * wallArray.length);
     const [candidate] = wallArray.splice(candidateIndex, 1);
-    if (!candidate || !isLegacyShortcutBridgeCandidate(grid, candidate)) {
+    if (
+      !candidate
+      || !isLegacyShortcutBridgeCandidate(grid, candidate)
+      || wouldCreateLegacyOpenTwoByTwoFloorBlock(grid, candidate)
+    ) {
       continue;
     }
 
@@ -1099,7 +1273,11 @@ const reinforceLegacyRouteQuality = (
       attempts += 1;
       const candidateIndex = Math.floor(rng() * wallArray.length);
       const candidate = wallArray[candidateIndex];
-      if (!candidate || !isLegacyShortcutBridgeCandidate(grid, candidate)) {
+      if (
+        !candidate
+        || !isLegacyShortcutBridgeCandidate(grid, candidate)
+        || wouldCreateLegacyOpenTwoByTwoFloorBlock(grid, candidate)
+      ) {
         continue;
       }
 
@@ -1337,6 +1515,36 @@ const hasLegacyOppositeBorderAxisConnection = (
   return false;
 };
 
+const measureLegacyBorderSpokeOpenBlockHazards = (
+  grid: boolean[][],
+  origin: LegacyPoint,
+  step: LegacyPoint
+): number => {
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const opened: LegacyPoint[] = [];
+  let cursor = clonePoint(origin);
+  let hazards = 0;
+
+  while (cursor.x >= 0 && cursor.y >= 0 && cursor.x < width && cursor.y < height) {
+    if (grid[cursor.y]?.[cursor.x] === true) {
+      break;
+    }
+
+    if (wouldCreateLegacyOpenTwoByTwoFloorBlock(grid, cursor)) {
+      hazards += 1;
+    }
+    grid[cursor.y]![cursor.x] = true;
+    opened.push(clonePoint(cursor));
+    cursor = { x: cursor.x + step.x, y: cursor.y + step.y };
+  }
+
+  for (const point of opened) {
+    grid[point.y]![point.x] = false;
+  }
+  return hazards;
+};
+
 const resolveLegacyMandatoryBorderLineCost = (
   grid: boolean[][],
   axis: LegacyOppositeBorderAxis,
@@ -1373,6 +1581,20 @@ const resolveLegacyMandatoryBorderLineCost = (
   return firstDistance + secondDistance;
 };
 
+const resolveLegacyMandatoryBorderLineOpenBlockHazards = (
+  grid: boolean[][],
+  axis: LegacyOppositeBorderAxis,
+  line: number
+): number => {
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  return axis === 'horizontal'
+    ? measureLegacyBorderSpokeOpenBlockHazards(grid, { x: 0, y: line }, { x: 1, y: 0 })
+      + measureLegacyBorderSpokeOpenBlockHazards(grid, { x: width - 1, y: line }, { x: -1, y: 0 })
+    : measureLegacyBorderSpokeOpenBlockHazards(grid, { x: line, y: 0 }, { x: 0, y: 1 })
+      + measureLegacyBorderSpokeOpenBlockHazards(grid, { x: line, y: height - 1 }, { x: 0, y: -1 });
+};
+
 const resolveLegacyMandatoryBorderLine = (
   grid: boolean[][],
   axis: LegacyOppositeBorderAxis,
@@ -1389,7 +1611,8 @@ const resolveLegacyMandatoryBorderLine = (
       continue;
     }
 
-    const cost = resolveLegacyMandatoryBorderLineCost(grid, axis, line);
+    const hazards = resolveLegacyMandatoryBorderLineOpenBlockHazards(grid, axis, line);
+    const cost = resolveLegacyMandatoryBorderLineCost(grid, axis, line) + (hazards * width * height);
     const tie = ((Math.imul(line + 1, axis === 'horizontal' ? 2654435761 : 2246822519) ^ seed) >>> 0) / 0x100000000;
     const score = cost + tie;
     if (score < bestScore) {
@@ -1627,6 +1850,30 @@ const resolveLegacyOppositeBorderFeederSide = (side: LegacyBorderFeederSide): Le
   return 'top';
 };
 
+const measureLegacyPairedBorderFeederOpenBlockHazards = (
+  grid: boolean[][],
+  side: LegacyBorderFeederSide,
+  line: number
+): number => {
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const oppositeSide = resolveLegacyOppositeBorderFeederSide(side);
+  if (hasLegacyBorderFeederInnerAnchor(grid, oppositeSide, line)) {
+    return 0;
+  }
+
+  if (oppositeSide === 'left') {
+    return measureLegacyBorderSpokeOpenBlockHazards(grid, { x: 0, y: line }, { x: 1, y: 0 });
+  }
+  if (oppositeSide === 'right') {
+    return measureLegacyBorderSpokeOpenBlockHazards(grid, { x: width - 1, y: line }, { x: -1, y: 0 });
+  }
+  if (oppositeSide === 'top') {
+    return measureLegacyBorderSpokeOpenBlockHazards(grid, { x: line, y: 0 }, { x: 0, y: 1 });
+  }
+  return measureLegacyBorderSpokeOpenBlockHazards(grid, { x: line, y: height - 1 }, { x: 0, y: -1 });
+};
+
 const applyLegacyPerimeterFeederConnections = (
   grid: boolean[][],
   seed: number,
@@ -1687,6 +1934,7 @@ const applyLegacyPerimeterFeederConnections = (
         spacingLines.some(
           (selectedLine) => Math.abs(selectedLine - line) < LEGACY_BORDER_FEEDER_MIN_ADJACENT_SPACING
         )
+        || (axisIsPaired && measureLegacyPairedBorderFeederOpenBlockHazards(grid, side, line) > 0)
         || chosenLines.some((chosenLine) => Math.abs(chosenLine - line) < minSpacing)
       ) {
         continue;
@@ -1715,6 +1963,7 @@ const applyLegacyPerimeterFeederConnections = (
       if (
         [...spacingLines, ...chosenLines]
           .some((selectedLine) => Math.abs(selectedLine - line) < LEGACY_BORDER_FEEDER_MIN_ADJACENT_SPACING)
+        || (axisIsPaired && measureLegacyPairedBorderFeederOpenBlockHazards(grid, side, line) > 0)
       ) {
         continue;
       }
@@ -1726,6 +1975,82 @@ const applyLegacyPerimeterFeederConnections = (
   }
 
   return createdTiles;
+};
+
+const normalizeLegacyAdjacentBorderOpenings = (grid: boolean[][], seed: number): LegacyPoint[] => {
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const removed: LegacyPoint[] = [];
+  const normalizeAxis = (axis: LegacyOppositeBorderAxis): void => {
+    const axisLength = axis === 'horizontal' ? height : width;
+    const lines: number[] = [];
+    for (let line = 1; line < axisLength - 1; line += 1) {
+      const hasOpening = axis === 'horizontal'
+        ? grid[line]?.[0] === true || grid[line]?.[width - 1] === true
+        : grid[0]?.[line] === true || grid[height - 1]?.[line] === true;
+      if (hasOpening) {
+        lines.push(line);
+      }
+    }
+
+    for (let index = 1; index < lines.length; index += 1) {
+      const previous = lines[index - 1];
+      const current = lines[index];
+      if (previous === undefined || current === undefined || current - previous >= LEGACY_BORDER_FEEDER_MIN_ADJACENT_SPACING) {
+        continue;
+      }
+
+      const closeCurrent = ((Math.imul(current + 1, 2654435761) ^ seed) >>> 0) % 2 === 0;
+      const line = closeCurrent ? current : previous;
+      const points = axis === 'horizontal'
+        ? [{ x: 0, y: line }, { x: width - 1, y: line }]
+        : [{ x: line, y: 0 }, { x: line, y: height - 1 }];
+      for (const point of points) {
+        if (grid[point.y]?.[point.x] === true) {
+          grid[point.y]![point.x] = false;
+          removed.push(point);
+        }
+      }
+
+      lines.splice(closeCurrent ? index : index - 1, 1);
+      index = Math.max(0, index - 1);
+    }
+  };
+
+  normalizeAxis('horizontal');
+  normalizeAxis('vertical');
+  return removed;
+};
+
+const collectLegacyProtectedBorderTopology = (grid: boolean[][]): LegacyPoint[] => {
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
+  const protectedPoints: LegacyPoint[] = [];
+  const seen = new Set<string>();
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const point = { x, y };
+      if (
+        grid[y]?.[x] !== true
+        || !isLegacyBorderPoint(width, height, point)
+        || isLegacyCornerBorderPoint(width, height, point)
+      ) {
+        continue;
+      }
+
+      const inwardStep = resolveLegacyOppositeBorderConnectorStep(width, point);
+      for (const protectedPoint of [point, { x: point.x + inwardStep.x, y: point.y + inwardStep.y }]) {
+        const key = keyForPoint(protectedPoint);
+        if (grid[protectedPoint.y]?.[protectedPoint.x] === true && !seen.has(key)) {
+          seen.add(key);
+          protectedPoints.push(protectedPoint);
+        }
+      }
+    }
+  }
+
+  return protectedPoints;
 };
 
 interface LegacyCheckpointPathBuilderResult {
@@ -2252,8 +2577,6 @@ export const createLegacyMaze = (
     0,
     Math.max(0, baseShortcutCount * 2)
   );
-  const shortcutResult = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount, wallArray);
-  const shortcutStats = shortcutResult.stats;
   const { goal: normalizedGoal, stats: playableTopologyStats } = normalizeLegacyPlayableTopology(grid, start, sourceGoal);
   const minimumSolutionPathLength = Math.max(LEGACY_MIN_SCALE, Math.floor(linearSize * 1.5));
   let {
@@ -2262,6 +2585,30 @@ export const createLegacyMaze = (
     solutionPath
   } = resolveLegacyFinalRouteState(grid, start, normalizedGoal, minimumSolutionPathLength, playableTopologyStats);
 
+  normalizeLegacyOpenTwoByTwoFloorBlocks(
+    grid,
+    start,
+    [goal],
+    solutionPath,
+    seed ^ 0x6d2b79f5
+  );
+  ({
+    goal,
+    routeQualityStats,
+    solutionPath
+  } = resolveLegacyFinalRouteState(grid, start, goal, minimumSolutionPathLength, playableTopologyStats));
+
+  const shortcutResult = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount, wallArray);
+  const shortcutStats = shortcutResult.stats;
+  ({
+    goal,
+    routeQualityStats,
+    solutionPath
+  } = resolveLegacyFinalRouteState(grid, start, goal, minimumSolutionPathLength, playableTopologyStats));
+
+  const routeQualityReinforcementBudget = resolvedShortcutCount > 0
+    ? Math.trunc(Math.max(8, resolvedShortcutCount * 3) * profile.routeQualityReinforcementMultiplier)
+    : 0;
   const reinforcementStats = reinforceLegacyRouteQuality(
     grid,
     rng,
@@ -2269,9 +2616,7 @@ export const createLegacyMaze = (
     goal,
     solutionPath,
     routeQualityStats,
-    resolvedShortcutCount > 0
-      ? Math.trunc(Math.max(8, resolvedShortcutCount * 3) * profile.routeQualityReinforcementMultiplier)
-      : 0
+    routeQualityReinforcementBudget
   );
   if (reinforcementStats.created > 0) {
     solutionPath = reinforcementStats.solutionPath;
@@ -2319,9 +2664,35 @@ export const createLegacyMaze = (
     profile.requiredOppositeBorderConnections
   );
   const borderWrapTiles = applyLegacyOppositeBorderConnections(grid, profile.requiredOppositeBorderConnections);
-  if (mandatoryBorderWrapTiles.length > 0 || perimeterFeederTiles.length > 0 || borderWrapTiles.length > 0) {
-    solutionPath = buildShortestPath(grid, start, goal);
-    routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath);
+  normalizeLegacyAdjacentBorderOpenings(grid, seed ^ 0x4cf5ad43);
+  normalizeLegacyOpenTwoByTwoFloorBlocks(
+    grid,
+    start,
+    [goal, ...collectLegacyProtectedBorderTopology(grid)],
+    solutionPath,
+    seed ^ 0x1b873593
+  );
+  solutionPath = buildShortestPath(grid, start, goal);
+  routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath);
+  const finalReinforcementStats = reinforceLegacyRouteQuality(
+    grid,
+    rng,
+    start,
+    goal,
+    solutionPath,
+    routeQualityStats,
+    routeQualityReinforcementBudget
+  );
+  if (finalReinforcementStats.created > 0) {
+    solutionPath = finalReinforcementStats.solutionPath;
+    routeQualityStats = finalReinforcementStats.routeQualityStats;
+    shortcutStats.created += finalReinforcementStats.created;
+    shortcutStats.qualityReinforcementAttempts = (
+      (shortcutStats.qualityReinforcementAttempts ?? 0) + finalReinforcementStats.attempts
+    );
+    shortcutStats.qualityReinforcementCreated = (
+      (shortcutStats.qualityReinforcementCreated ?? 0) + finalReinforcementStats.created
+    );
   }
   playableTopologyStats.reachableFloors = resolveReachableFloorDistances(grid, start).size;
   playableTopologyStats.resolvedGoalDistance = Math.max(0, solutionPath.length - 1);
@@ -2350,6 +2721,7 @@ export const createLegacyMaze = (
       finalGoal: clonePoint(goal),
       reinforcementShortcutTiles: [
         ...reinforcementStats.createdTiles,
+        ...finalReinforcementStats.createdTiles,
         ...mandatoryBorderWrapTiles,
         ...perimeterFeederTiles,
         ...borderWrapTiles

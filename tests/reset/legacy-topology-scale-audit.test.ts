@@ -60,6 +60,23 @@ const countWalkableFloorTiles = (maze: ReturnType<typeof createLegacyMaze>): num
   maze.grid.reduce((total, row) => total + row.filter(Boolean).length, 0)
 );
 
+const countOpenTwoByTwoFloorBlocks = (maze: ReturnType<typeof createLegacyMaze>): number => {
+  let blocks = 0;
+  for (let y = 0; y < maze.height - 1; y += 1) {
+    for (let x = 0; x < maze.width - 1; x += 1) {
+      if (
+        maze.grid[y]?.[x] === true
+        && maze.grid[y]?.[x + 1] === true
+        && maze.grid[y + 1]?.[x] === true
+        && maze.grid[y + 1]?.[x + 1] === true
+      ) {
+        blocks += 1;
+      }
+    }
+  }
+  return blocks;
+};
+
 const isBorderPoint = (
   maze: ReturnType<typeof createLegacyMaze>,
   point: { x: number; y: number }
@@ -288,6 +305,31 @@ const auditBorderFeederSides = (
 };
 
 const LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE = 1.4;
+const requestedHighVolumeCorpusCases = Number.parseInt(
+  process.env.MAZER_TOPOLOGY_HIGH_VOLUME_CORPUS_CASES ?? '0',
+  10
+);
+const highVolumeCorpusCases = Number.isSafeInteger(requestedHighVolumeCorpusCases)
+  ? Math.max(0, Math.min(20_000, requestedHighVolumeCorpusCases))
+  : 0;
+
+const resolveHighVolumeCorpusDimensions = (index: number): readonly [number, number] => {
+  const band = index % 100;
+  const portrait = index % 2 === 0;
+  if (band < 55) {
+    return portrait ? [25, 31] : [31, 25];
+  }
+  if (band < 82) {
+    return portrait ? [37, 50] : [50, 37];
+  }
+  if (band < 94) {
+    return [50, 50];
+  }
+  if (band < 99) {
+    return portrait ? [75, 99] : [99, 75];
+  }
+  return [99, 99];
+};
 
 describe('legacy topology scale audit', () => {
   test('keeps the fixed-seed early curve nondecreasing with a measurable level-one to level-two step', () => {
@@ -351,9 +393,37 @@ describe('legacy topology scale audit', () => {
           auditBorderFeederSides(maze).adjacentBorderFloors,
           `${kind} scale ${scale} seed ${seed}`
         ).toEqual([]);
+        expect(countOpenTwoByTwoFloorBlocks(maze), `${kind} scale ${scale} seed ${seed}`).toBe(0);
       }
     }
   }, 20_000);
+
+  test('restores meaningful route quality after final open-block normalization', () => {
+    const regressions = [
+      { height: 37, kind: 'menu', seed: 46678335, width: 50 },
+      { height: 50, kind: 'play', seed: 1550022250, width: 50 }
+    ] as const;
+
+    for (const { height, kind, seed, width } of regressions) {
+      const maze = kind === 'play'
+        ? createLegacyMaze(width, height, seed)
+        : createLegacyGeneratedMenuMaze(width, height, seed);
+      expect(countOpenTwoByTwoFloorBlocks(maze), `${kind} ${width}x${height} seed ${seed}`).toBe(0);
+      expect(countDetachedFloorTiles(maze), `${kind} ${width}x${height} seed ${seed}`).toBe(0);
+      expect(auditBorderFeederSides(maze).adjacentBorderFloors).toEqual([]);
+      expect(auditBorderFloorContinuity(maze)).toMatchObject({
+        borderFloorsWithoutInwardConnection: [],
+        unpairedBorderBleeds: []
+      });
+      expect(maze.routeQualityStats).toMatchObject({
+        routeQuality: 'multi-route',
+        meaningfulBypassableRouteBands: expect.any(Number),
+        meaningfulBypassableSolutionEdges: expect.any(Number)
+      });
+      expect(maze.routeQualityStats?.meaningfulBypassableRouteBands).toBeGreaterThan(1);
+      expect(maze.routeQualityStats?.meaningfulBypassableSolutionEdges).toBeGreaterThan(1);
+    }
+  }, 10_000);
 
   test('keeps play and generated-menu topology meaningful across shortcut-enabled scale bands', () => {
     const scales = [37, 50, 75];
@@ -373,9 +443,11 @@ describe('legacy topology scale audit', () => {
           const borderContinuity = auditBorderFloorContinuity(maze);
           const oppositeBorderAxes = auditOppositeBorderAxes(maze);
           const borderFeederSides = auditBorderFeederSides(maze);
+          const openTwoByTwoFloorBlocks = countOpenTwoByTwoFloorBlocks(maze);
 
           if (
             detachedFloorTiles !== 0
+            || openTwoByTwoFloorBlocks !== 0
             || oppositeBorderAxes.horizontal < 1
             || oppositeBorderAxes.vertical < 1
             || borderFeederSides.left < 2
@@ -399,6 +471,7 @@ describe('legacy topology scale audit', () => {
               borderContinuity,
               detachedFloorTiles,
               oppositeBorderAxes,
+              openTwoByTwoFloorBlocks,
               kind,
               minimumSolutionPathLength,
               playableTopologyStats: maze.playableTopologyStats,
@@ -434,9 +507,11 @@ describe('legacy topology scale audit', () => {
         const borderContinuity = auditBorderFloorContinuity(maze);
         const oppositeBorderAxes = auditOppositeBorderAxes(maze);
         const borderFeederSides = auditBorderFeederSides(maze);
+        const openTwoByTwoFloorBlocks = countOpenTwoByTwoFloorBlocks(maze);
 
         if (
           detachedFloorTiles !== 0
+          || openTwoByTwoFloorBlocks !== 0
           || oppositeBorderAxes.horizontal < 1
           || oppositeBorderAxes.vertical < 1
           || borderFeederSides.left < 2
@@ -460,6 +535,7 @@ describe('legacy topology scale audit', () => {
             borderContinuity,
             detachedFloorTiles,
             oppositeBorderAxes,
+            openTwoByTwoFloorBlocks,
             kind,
             minimumSolutionPathLength,
             playableTopologyStats: maze.playableTopologyStats,
@@ -492,9 +568,11 @@ describe('legacy topology scale audit', () => {
       const borderContinuity = auditBorderFloorContinuity(maze);
       const oppositeBorderAxes = auditOppositeBorderAxes(maze);
       const borderFeederSides = auditBorderFeederSides(maze);
+      const openTwoByTwoFloorBlocks = countOpenTwoByTwoFloorBlocks(maze);
 
       if (
         detachedFloorTiles !== 0
+        || openTwoByTwoFloorBlocks !== 0
         || oppositeBorderAxes.horizontal < 1
         || oppositeBorderAxes.vertical < 1
         || borderFeederSides.left < 2
@@ -518,6 +596,7 @@ describe('legacy topology scale audit', () => {
           borderContinuity,
           detachedFloorTiles,
           oppositeBorderAxes,
+          openTwoByTwoFloorBlocks,
           kind,
           minimumSolutionPathLength,
           playableTopologyStats: maze.playableTopologyStats,
@@ -534,4 +613,78 @@ describe('legacy topology scale audit', () => {
 
     expect(failures).toEqual([]);
   }, 60_000);
+
+  test.skipIf(highVolumeCorpusCases === 0)(
+    'keeps the opt-in high-volume play/menu corpus free of open blocks and border bleed regressions',
+    () => {
+      const failures: unknown[] = [];
+
+      for (let index = 0; index < highVolumeCorpusCases; index += 1) {
+        const [width, height] = resolveHighVolumeCorpusDimensions(index);
+        const seed = (Math.imul(index + 1, 2654435761) ^ 0x6d2b79f5) >>> 0;
+        const kind = index % 2 === 0 ? 'play' : 'menu';
+        const buildMaze = kind === 'play' ? createLegacyMaze : createLegacyGeneratedMenuMaze;
+        const maze = buildMaze(width, height, seed);
+        const borderContinuity = auditBorderFloorContinuity(maze);
+        const borderFeederSides = auditBorderFeederSides(maze);
+        const oppositeBorderAxes = auditOppositeBorderAxes(maze);
+        const openTwoByTwoFloorBlocks = countOpenTwoByTwoFloorBlocks(maze);
+        const detachedFloorTiles = countDetachedFloorTiles(maze);
+        const solutionStartsAtStart = maze.solutionPath[0]?.x === maze.start.x
+          && maze.solutionPath[0]?.y === maze.start.y;
+        const solutionEndsAtGoal = maze.solutionPath.at(-1)?.x === maze.goal.x
+          && maze.solutionPath.at(-1)?.y === maze.goal.y;
+        const hasMeaningfulRouteQuality = Math.min(width, height) < 37
+          || (
+            maze.routeQualityStats?.routeQuality === 'multi-route'
+            && maze.routeQualityStats.meaningfulBypassableSolutionEdges > 1
+            && maze.routeQualityStats.meaningfulBypassableRouteBands > 1
+          );
+
+        if (
+          openTwoByTwoFloorBlocks !== 0
+          || detachedFloorTiles !== 0
+          || borderFeederSides.adjacentBorderFloors.length > 0
+          || borderContinuity.unpairedBorderBleeds.length > 0
+          || borderContinuity.borderFloorsWithoutInwardConnection.length > 0
+          || oppositeBorderAxes.horizontal < 1
+          || oppositeBorderAxes.vertical < 1
+          || !solutionStartsAtStart
+          || !solutionEndsAtGoal
+          || !hasMeaningfulRouteQuality
+        ) {
+          if (failures.length < 25) {
+            failures.push({
+              borderContinuity,
+              borderFeederSides,
+              detachedFloorTiles,
+              height,
+              index,
+              kind,
+              openTwoByTwoFloorBlocks,
+              oppositeBorderAxes,
+              routeQualityStats: maze.routeQualityStats,
+              seed,
+              solutionEndsAtGoal,
+              solutionStartsAtStart,
+              width
+            });
+          }
+        }
+
+        if (index % 257 === 0) {
+          const replay = buildMaze(width, height, seed);
+          if (
+            JSON.stringify(replay.grid) !== JSON.stringify(maze.grid)
+            || JSON.stringify(replay.solutionPath) !== JSON.stringify(maze.solutionPath)
+          ) {
+            failures.push({ height, index, kind, seed, determinism: false, width });
+          }
+        }
+      }
+
+      expect(failures).toEqual([]);
+    },
+    Math.max(60_000, highVolumeCorpusCases * 250)
+  );
 });
