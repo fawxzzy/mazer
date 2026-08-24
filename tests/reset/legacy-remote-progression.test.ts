@@ -399,6 +399,86 @@ describe('legacy remote progression', () => {
     }
   });
 
+  test('keeps an accepted receipt pending when durable clear fails, then retries the same run id once', async () => {
+    const previous = createEmptyLegacyProgressionState();
+    const next = createEmptyLegacyProgressionState();
+    next.updatedAt = '2026-08-24T12:00:00.000Z';
+    next.revision = 1;
+    next.tracks.player = {
+      ...previous.tracks.player,
+      completedCycles: '1',
+      lastCompletedAt: next.updatedAt,
+      lastReceiptId: 'durable-clear-run',
+      level: '2',
+      targetComplexity: 12
+    };
+    const receipt = createCompletionReceipt(
+      'durable-clear-run',
+      '21000000-0000-4000-8000-000000000001',
+      'play',
+      next.updatedAt
+    );
+    const values = new Map<string, string>();
+    let rejectEmptyOutbox = true;
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        if (
+          rejectEmptyOutbox
+          && key.startsWith(LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY)
+          && JSON.parse(value).entries.length === 0
+        ) {
+          throw new Error('durable clear rejected');
+        }
+        values.set(key, value);
+      }
+    };
+    const from = vi.fn(() => ({
+      select: () => createMaybeSingleChain({ data: { revision: 1, state: next }, error: null })
+    }));
+    const rpc = vi.fn().mockResolvedValue({ data: [{ revision: 1, state: next }], error: null });
+    vi.mocked(getLegacyAuthClient).mockResolvedValue({ from, rpc } as never);
+    const snapshot = { status: 'authenticated' as const, userId: 'user-durable-clear' };
+    const env = { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' };
+
+    const failedClear = await writeLegacyRemoteCompletion(
+      snapshot,
+      previous,
+      next,
+      receipt,
+      env,
+      storage
+    );
+
+    expect(failedClear).toMatchObject({
+      completionSyncState: 'pending',
+      error: expect.stringContaining('retry receipt could not be cleared'),
+      pendingCompletionCount: 1,
+      synced: false
+    });
+    expect(readLegacyRemoteCompletionOutbox(storage, snapshot).entries).toEqual([
+      expect.objectContaining({ clientRunId: receipt.clientRunId })
+    ]);
+    expect(JSON.parse(
+      values.get(`${LEGACY_REMOTE_ACCOUNT_SYNC_STORAGE_KEY}:user:user-durable-clear`) ?? '{}'
+    ).progressionUpdatedAt).toBeNull();
+
+    rejectEmptyOutbox = false;
+    const replayed = await replayLegacyRemoteCompletions(snapshot, next, storage, env);
+
+    expect(replayed).toMatchObject({
+      completionSyncState: 'synced',
+      pendingCompletionCount: 0,
+      synced: true
+    });
+    expect(readLegacyRemoteCompletionOutbox(storage, snapshot).entries).toEqual([]);
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc.mock.calls.map((call) => call[1]?.p_client_run_id)).toEqual([
+      receipt.clientRunId,
+      receipt.clientRunId
+    ]);
+  });
+
   test('keeps sync metadata pending when a local completion retry receipt cannot be persisted', async () => {
     const previous = createEmptyLegacyProgressionState();
     const next = createEmptyLegacyProgressionState();

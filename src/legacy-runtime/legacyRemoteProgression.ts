@@ -896,7 +896,17 @@ const removeRemoteCompletion = (
     entries: current.entries.filter((entry) => entry.clientRunId !== clientRunId),
     version: 1 as const
   };
-  return { outbox: next, persisted: writeRemoteCompletionOutbox(storage, next) };
+  if (writeRemoteCompletionOutbox(storage, next)) {
+    return { outbox: next, persisted: true };
+  }
+
+  const durable = readRemoteCompletionOutbox(storage);
+  return {
+    outbox: durable.entries.some((entry) => entry.clientRunId === clientRunId)
+      ? durable
+      : current,
+    persisted: false
+  };
 };
 
 interface LegacyRemoteCompletionRecovery {
@@ -1307,11 +1317,12 @@ const flushLegacyRemoteCompletionOutbox = async (
     }
 
     const removal = removeRemoteCompletion(outboxStorage, entry.clientRunId);
-    outbox = removal.outbox;
     if (!removal.persisted) {
+      outbox = removal.outbox;
       lastError = 'The server accepted the completion, but its local retry receipt could not be cleared.';
       break;
     }
+    outbox = removal.outbox;
   }
 
   const metadata = readAccountSyncMetadata(rootStorage, snapshot.userId);
