@@ -451,6 +451,11 @@ export const bootstrapLegacyRemoteAccountState = async (
 
   const progressionStorage = createLegacyAuthScopedStorage(storage, LEGACY_PROGRESSION_STORAGE_KEY, snapshot);
   const guestProgressionStorage = createLegacyAuthScopedStorage(storage, LEGACY_PROGRESSION_STORAGE_KEY, { userId: null });
+  const completionOutboxStorage = createLegacyAuthScopedStorage(
+    storage,
+    LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY,
+    snapshot
+  );
   const settingsStorage = createLegacyAuthScopedStorage(storage, LEGACY_GAME_TOGGLE_STORAGE_KEY, snapshot);
   const accountProgression = readLegacyProgressionState(progressionStorage);
   const guestProgression = readLegacyProgressionState(guestProgressionStorage);
@@ -459,6 +464,7 @@ export const bootstrapLegacyRemoteAccountState = async (
     : accountProgression;
   const localSettings = readLegacyGameToggleSettings(settingsStorage, LEGACY_DEFAULTS);
   const metadata = readAccountSyncMetadata(storage, snapshot.userId);
+  const hasPendingCompletions = readRemoteCompletionOutbox(completionOutboxStorage).entries.length > 0;
   const [progressionRead, profileRead] = await Promise.all([
     readRemoteProgressionRow(client, snapshot.userId),
     readRemoteProfileRow(client, snapshot.userId)
@@ -467,10 +473,11 @@ export const bootstrapLegacyRemoteAccountState = async (
 
   let progressionState = localProgression;
   let progressionRevision: number | null = metadata?.progressionRevision ?? null;
+  let hasUnsyncedLocalProgress = hasPendingCompletions || metadata === null;
   if (progressionRead.row) {
     const remoteProgression = normalizeLegacyProgressionState(progressionRead.row.state);
-    const hasUnsyncedLocalProgress = metadata === null
-      || localProgression.updatedAt !== metadata.progressionUpdatedAt;
+    hasUnsyncedLocalProgress = hasUnsyncedLocalProgress
+      || localProgression.updatedAt !== metadata?.progressionUpdatedAt;
     progressionState = hasUnsyncedLocalProgress
       ? mergeLegacyProgressionStateAdvancements(remoteProgression, localProgression)
       : remoteProgression;
@@ -484,6 +491,7 @@ export const bootstrapLegacyRemoteAccountState = async (
       if (initialized.error || !initialized.row) {
         errors.push(initialized.error ?? 'Progression initialization returned no account row.');
       } else {
+        hasUnsyncedLocalProgress = true;
         progressionState = mergeLegacyProgressionStateAdvancements(
           normalizeLegacyProgressionState(initialized.row.state),
           localProgression
@@ -531,7 +539,7 @@ export const bootstrapLegacyRemoteAccountState = async (
   settings = writeLegacyGameToggleSettings(settingsStorage, settings);
   writeAccountSyncMetadata(storage, snapshot.userId, {
     progressionRevision,
-    progressionUpdatedAt: progressionState.updatedAt,
+    progressionUpdatedAt: hasUnsyncedLocalProgress ? null : progressionState.updatedAt,
     settingsFingerprint: fingerprintSettings(settings),
     settingsRevision
   });
@@ -608,9 +616,15 @@ export const hydrateLegacyRemoteAccountState = async (
   }
 
   const progressionStorage = createLegacyAuthScopedStorage(storage, LEGACY_PROGRESSION_STORAGE_KEY, snapshot);
+  const completionOutboxStorage = createLegacyAuthScopedStorage(
+    storage,
+    LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY,
+    snapshot
+  );
   const settingsStorage = createLegacyAuthScopedStorage(storage, LEGACY_GAME_TOGGLE_STORAGE_KEY, snapshot);
   const localProgression = readLegacyProgressionState(progressionStorage);
   const localSettings = readLegacyGameToggleSettings(settingsStorage, LEGACY_DEFAULTS);
+  const hasPendingCompletions = readRemoteCompletionOutbox(completionOutboxStorage).entries.length > 0;
 
   let progressionRead: Awaited<ReturnType<typeof readRemoteProgressionRow>>;
   let profileRead: Awaited<ReturnType<typeof readRemoteProfileRow>>;
@@ -651,7 +665,11 @@ export const hydrateLegacyRemoteAccountState = async (
 
   writeAccountSyncMetadata(storage, snapshot.userId, {
     progressionRevision: progressionRead.row?.revision ?? null,
-    progressionUpdatedAt: progressionState.updatedAt,
+    progressionUpdatedAt: hasPendingCompletions
+      || (progressionRead.row !== null
+        && localProgression.updatedAt !== normalizeLegacyProgressionState(progressionRead.row.state).updatedAt)
+      ? null
+      : progressionState.updatedAt,
     settingsFingerprint: fingerprintSettings(settings),
     settingsRevision: profileRead.row?.revision ?? null
   });
@@ -824,6 +842,20 @@ export const readLegacyRemoteCompletionOutbox = (
   createLegacyAuthScopedStorage(rootStorage, LEGACY_REMOTE_COMPLETION_OUTBOX_STORAGE_KEY, snapshot)
 );
 
+const markAccountProgressionSyncPending = (
+  rootStorage: LegacyRootStorage | undefined,
+  userId: string,
+  progressionRevision?: number | null
+): void => {
+  const metadata = readAccountSyncMetadata(rootStorage, userId);
+  writeAccountSyncMetadata(rootStorage, userId, {
+    progressionRevision: progressionRevision ?? metadata?.progressionRevision ?? null,
+    progressionUpdatedAt: null,
+    settingsFingerprint: metadata?.settingsFingerprint ?? null,
+    settingsRevision: metadata?.settingsRevision ?? null
+  });
+};
+
 const createRemoteCompletionOutboxEntry = (
   completedLevel: string,
   receipt: MazeCycleTelemetryReceipt
@@ -871,6 +903,57 @@ interface LegacyRemoteCompletionRecovery {
   entries: LegacyRemoteCompletionOutboxEntry[];
   error: string | null;
 }
+
+const completionOutboxExactlyCoversTrackGap = (
+  surface: MazeCycleTelemetryReceipt['surface'],
+  remoteTrack: LegacyProgressionTrack,
+  localTrack: LegacyProgressionTrack,
+  entries: readonly LegacyRemoteCompletionOutboxEntry[]
+): boolean => {
+  const levelComparison = compareLegacyProgressionOrdinals(localTrack.level, remoteTrack.level);
+  const cycleComparison = compareLegacyProgressionOrdinals(
+    localTrack.completedCycles,
+    remoteTrack.completedCycles
+  );
+  if (levelComparison < 0 || cycleComparison < 0 || levelComparison !== cycleComparison) {
+    return false;
+  }
+  if (levelComparison === 0) {
+    return true;
+  }
+
+  let expectedLevel = remoteTrack.level;
+  let expectedCycles = remoteTrack.completedCycles;
+  for (const entry of entries.filter((candidate) => candidate.surface === surface)) {
+    const entryComparison = compareLegacyProgressionOrdinals(entry.completedLevel, expectedLevel);
+    if (entryComparison < 0) {
+      // The server verifies the run UUID before its sequential guard, so an
+      // already-accepted retry is safe to keep ahead of the remaining chain.
+      continue;
+    }
+    if (entryComparison > 0) {
+      return false;
+    }
+    expectedLevel = incrementLegacyProgressionOrdinal(expectedLevel);
+    expectedCycles = incrementLegacyProgressionOrdinal(expectedCycles);
+  }
+
+  return expectedLevel === localTrack.level && expectedCycles === localTrack.completedCycles;
+};
+
+const mergeRecoveredCompletionEntries = (
+  recoveredEntries: readonly LegacyRemoteCompletionOutboxEntry[],
+  existingEntries: readonly LegacyRemoteCompletionOutboxEntry[]
+): LegacyRemoteCompletionOutboxEntry[] => {
+  const seen = new Set<string>();
+  return [...recoveredEntries, ...existingEntries].filter((entry) => {
+    if (seen.has(entry.clientRunId)) {
+      return false;
+    }
+    seen.add(entry.clientRunId);
+    return true;
+  });
+};
 
 const receiptMatchesTrackCursor = (
   receipt: MazeCycleTelemetryReceipt,
@@ -1142,6 +1225,9 @@ const flushLegacyRemoteCompletionOutbox = async (
 
   const client = clientOverride ?? await getLegacyAuthClient();
   if (!client || !snapshot.userId) {
+    if (snapshot.userId) {
+      markAccountProgressionSyncPending(rootStorage, snapshot.userId);
+    }
     return createLegacyRemoteProgressionSyncResult('progression', {
       completionSyncState: 'pending',
       error: client ? 'Completion sync requires an authenticated account.' : null,
@@ -1161,6 +1247,7 @@ const flushLegacyRemoteCompletionOutbox = async (
     : { error: null, state: null };
   const prerequisiteError = playerRow.error ?? aiRow.error;
   if (prerequisiteError) {
+    markAccountProgressionSyncPending(rootStorage, snapshot.userId, playerRow.revision);
     return createLegacyRemoteProgressionSyncResult('progression', {
       completionSyncState: 'pending',
       error: prerequisiteError,
@@ -1230,7 +1317,9 @@ const flushLegacyRemoteCompletionOutbox = async (
   const metadata = readAccountSyncMetadata(rootStorage, snapshot.userId);
   writeAccountSyncMetadata(rootStorage, snapshot.userId, {
     progressionRevision: expectedRevision,
-    progressionUpdatedAt: resolvedState.updatedAt,
+    progressionUpdatedAt: lastError === null && outbox.entries.length === 0
+      ? resolvedState.updatedAt
+      : null,
     settingsFingerprint: metadata?.settingsFingerprint ?? null,
     settingsRevision: metadata?.settingsRevision ?? null
   });
@@ -1274,21 +1363,13 @@ export const replayLegacyRemoteCompletions = async (
     snapshot
   );
   const existingOutbox = readRemoteCompletionOutbox(outboxStorage);
-  if (existingOutbox.entries.length > 0) {
-    return flushLegacyRemoteCompletionOutbox(
-      snapshot,
-      normalizedLocal,
-      rootStorage,
-      0,
-      client
-    );
-  }
   const playerRead = await ensureRemotePlayerProgressionRow(client, snapshot.userId);
   const aiRead = await ensureRemoteAiProgressionRow(client, snapshot.userId);
   const prerequisiteError = playerRead.error ?? aiRead.error;
   if (prerequisiteError) {
+    markAccountProgressionSyncPending(rootStorage, snapshot.userId, playerRead.revision);
     return createLegacyRemoteProgressionSyncResult('progression', {
-      completionSyncState: existingOutbox.entries.length > 0 ? 'pending' : 'idle',
+      completionSyncState: 'pending',
       error: prerequisiteError,
       pendingCompletionCount: existingOutbox.entries.length,
       progressionState: normalizedLocal,
@@ -1308,22 +1389,39 @@ export const replayLegacyRemoteCompletions = async (
     snapshot
   );
   const receipts = readMazeCycleTelemetryHistory(telemetryStorage).receipts;
-  const playerRecovery = deriveExactRemoteCompletionRecovery(
+  const playerOutboxProven = completionOutboxExactlyCoversTrackGap(
     'play',
     remoteState.tracks.player,
     normalizedLocal.tracks.player,
-    receipts
+    existingOutbox.entries
   );
-  const aiRecovery = deriveExactRemoteCompletionRecovery(
+  const aiOutboxProven = completionOutboxExactlyCoversTrackGap(
     'menu-demo',
     remoteState.tracks['ai-runner'],
     normalizedLocal.tracks['ai-runner'],
-    receipts
+    existingOutbox.entries
   );
+  const playerRecovery = playerOutboxProven
+    ? { entries: [], error: null }
+    : deriveExactRemoteCompletionRecovery(
+      'play',
+      remoteState.tracks.player,
+      normalizedLocal.tracks.player,
+      receipts
+    );
+  const aiRecovery = aiOutboxProven
+    ? { entries: [], error: null }
+    : deriveExactRemoteCompletionRecovery(
+      'menu-demo',
+      remoteState.tracks['ai-runner'],
+      normalizedLocal.tracks['ai-runner'],
+      receipts
+    );
   const recoveryError = playerRecovery.error ?? aiRecovery.error;
   if (recoveryError) {
+    markAccountProgressionSyncPending(rootStorage, snapshot.userId, playerRead.revision);
     return createLegacyRemoteProgressionSyncResult('progression', {
-      completionSyncState: existingOutbox.entries.length > 0 ? 'pending' : 'idle',
+      completionSyncState: 'pending',
       error: recoveryError,
       pendingCompletionCount: existingOutbox.entries.length,
       progressionState: mergeLegacyProgressionStateAdvancements(remoteState, normalizedLocal),
@@ -1333,24 +1431,33 @@ export const replayLegacyRemoteCompletions = async (
     });
   }
 
-  let recoveredCompletionCount = 0;
-  for (const entry of [...playerRecovery.entries, ...aiRecovery.entries]) {
-    const before = readRemoteCompletionOutbox(outboxStorage).entries.length;
-    const enqueue = enqueueRemoteCompletion(outboxStorage, entry);
-    if (!enqueue.persisted) {
-      return createLegacyRemoteProgressionSyncResult('progression', {
-        completionSyncState: 'pending',
-        error: 'Recovered completion receipts could not be persisted for retry.',
-        pendingCompletionCount: enqueue.outbox.entries.length,
-        progressionState: normalizedLocal,
-        recoveredCompletionCount,
-        skippedReason: null,
-        synced: false
-      });
-    }
-    if (enqueue.outbox.entries.length > before) {
-      recoveredCompletionCount += 1;
-    }
+  const recoveredEntries = [...playerRecovery.entries, ...aiRecovery.entries];
+  const existingIds = new Set(existingOutbox.entries.map((entry) => entry.clientRunId));
+  const recoveredCompletionCount = recoveredEntries.filter(
+    (entry) => !existingIds.has(entry.clientRunId)
+  ).length;
+  const reconciledEntries = mergeRecoveredCompletionEntries(
+    recoveredEntries,
+    existingOutbox.entries
+  );
+  const mustPersistReconciledOutbox = existingOutbox.entries.length > 0 || recoveredEntries.length > 0;
+  if (
+    mustPersistReconciledOutbox
+    && !writeRemoteCompletionOutbox(outboxStorage, { entries: reconciledEntries, version: 1 })
+  ) {
+    markAccountProgressionSyncPending(rootStorage, snapshot.userId, playerRead.revision);
+    return createLegacyRemoteProgressionSyncResult('progression', {
+      completionSyncState: 'pending',
+      error: 'Recovered completion receipts could not be persisted for retry.',
+      pendingCompletionCount: existingOutbox.entries.length,
+      progressionState: mergeLegacyProgressionStateAdvancements(remoteState, normalizedLocal),
+      recoveredCompletionCount: 0,
+      skippedReason: null,
+      synced: false
+    });
+  }
+  if (reconciledEntries.length > 0) {
+    markAccountProgressionSyncPending(rootStorage, snapshot.userId, playerRead.revision);
   }
 
   return flushLegacyRemoteCompletionOutbox(
@@ -1404,6 +1511,7 @@ export const writeLegacyRemoteCompletion = async (
     createRemoteCompletionOutboxEntry(previous.level, receipt)
   );
   if (!enqueue.persisted) {
+    markAccountProgressionSyncPending(rootStorage, snapshot.userId);
     return createLegacyRemoteProgressionSyncResult('progression', {
       completionSyncState: 'pending',
       error: 'The completion is saved in local progression, but its cloud retry receipt could not be persisted.',
@@ -1414,6 +1522,7 @@ export const writeLegacyRemoteCompletion = async (
       synced: false
     });
   }
+  markAccountProgressionSyncPending(rootStorage, snapshot.userId);
   return flushLegacyRemoteCompletionOutbox(snapshot, state, rootStorage);
 };
 
