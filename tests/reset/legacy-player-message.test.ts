@@ -110,6 +110,62 @@ describe('legacy player-facing message system', () => {
     });
   });
 
+  test('maps provider-side email validation failures to actionable non-technical copy', () => {
+    const malformedEmailErrors = [
+      'email_address_invalid',
+      'Invalid email',
+      'Email address is invalid',
+      'Unable to validate email address: invalid format',
+      'Email address has invalid format'
+    ];
+
+    for (const providerError of malformedEmailErrors) {
+      const message = resolveLegacyAuthFeedbackMessage(providerError, null);
+      expect(message).toMatchObject({
+        copy: LEGACY_AUTH_MESSAGE_COPY.emailInvalid,
+        technicalDetail: providerError,
+        tone: 'error'
+      });
+      expect(message?.copy).not.toContain(providerError);
+    }
+  });
+
+  test('maps hosted password-policy failures before the service-unavailable fallback', () => {
+    const passwordPolicyErrors = [
+      'weak_password',
+      'Weak password',
+      'Password should be at least 8 characters',
+      'Password should contain at least one character of each: lowercase, uppercase, digits, symbols.',
+      'Password must be at least 12 characters',
+      'Password does not meet requirements',
+      'Password is too weak',
+      'Password is known to be weak and easy to guess, please choose a different one.',
+      'Password strength requirements were not met',
+      'Password cannot be longer than 72 characters',
+      'Password must contain uppercase, lowercase, digits, and symbols'
+    ];
+
+    for (const providerError of passwordPolicyErrors) {
+      const message = resolveLegacyAuthFeedbackMessage(providerError, null);
+      expect(message).toMatchObject({
+        copy: LEGACY_AUTH_MESSAGE_COPY.passwordPolicy,
+        technicalDetail: providerError,
+        tone: 'error'
+      });
+      expect(message?.copy).not.toContain(providerError);
+    }
+
+    expect(resolveLegacyAuthFeedbackMessage('User already registered', null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.accountRecovery
+    });
+    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL, null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.usernameInvalid
+    });
+    expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL, null)).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.usernameTaken
+    });
+  });
+
   test('keeps message colors centralized by tone', () => {
     expect(resolveLegacyPlayerMessageColor({ tone: 'error' })).toBe('#ff7d7d');
     expect(resolveLegacyPlayerMessageColor({ tone: 'info' })).toBe('#b7f2ff');

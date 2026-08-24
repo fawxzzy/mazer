@@ -53,11 +53,13 @@ export const LEGACY_AUTH_MESSAGE_COPY = {
   accountUnavailable: 'Account service is unavailable right now. Try again shortly.',
   authUnavailable: 'Account access is unavailable right now. You can still play as a guest.',
   createReady: 'Details look good. Create your account when you are ready.',
+  emailInvalid: 'Enter a valid email address.',
   enterEmail: 'Enter an email.',
   loginNotConfigured: 'Account access is unavailable right now. You can still play as a guest.',
   loginReady: 'Details look good. Sign in when you are ready.',
   networkUnavailable: 'Account service is unreachable. Try again shortly.',
   passwordMinimum: 'Password needs 6+ characters.',
+  passwordPolicy: 'Choose a different, stronger password that meets the account security requirements.',
   passwordResetEmailRequired: 'Enter an email before reset.',
   passwordResetNotConfigured: 'Password reset is unavailable right now. You can still play as a guest.',
   passwordResetSent: 'Password reset email sent.',
@@ -172,21 +174,41 @@ export const resolveLegacyAuthFeedbackMessage = (
       || normalizedError.includes('could not be found')
       || normalizedError.includes('internet connection')
       || normalizedError.includes('cannot connect to the server');
+    const isInvalidEmail = normalizedError.includes('email_address_invalid')
+      || normalizedError.includes('invalid email')
+      || normalizedError.includes('email address is invalid')
+      || normalizedError.includes('unable to validate email address')
+      || (normalizedError.includes('email address') && normalizedError.includes('invalid format'));
+    const isPasswordPolicyError = normalizedError.includes('weak_password')
+      || normalizedError.includes('weak password')
+      || normalizedError.includes('password should be at least')
+      || normalizedError.includes('password should contain')
+      || normalizedError.includes('password must be at least')
+      || normalizedError.includes('password does not meet')
+      || normalizedError.includes('password is too weak')
+      || normalizedError.includes('password is known to be weak')
+      || normalizedError.includes('password strength')
+      || normalizedError.includes('password cannot be longer')
+      || normalizedError.includes('password must contain');
     const copy = isNetworkError
       ? LEGACY_AUTH_MESSAGE_COPY.networkUnavailable
       : normalizedError.includes(LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL.toLowerCase())
         ? LEGACY_AUTH_MESSAGE_COPY.usernameInvalid
         : normalizedError.includes(LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL.toLowerCase())
           ? LEGACY_AUTH_MESSAGE_COPY.usernameTaken
-          : normalizedError.includes('invalid login credentials') || normalizedError.includes('invalid credentials')
-            ? 'That email and password do not match. Check them or use Forgot Password.'
-            : normalizedError.includes('email not confirmed')
-              ? 'Confirm your email, then sign in again.'
-              : normalizedError.includes('rate limit')
-                ? 'Too many attempts. Wait a moment, then try again.'
-                : normalizedError.includes('already registered')
-                  ? LEGACY_AUTH_MESSAGE_COPY.accountRecovery
-                  : LEGACY_AUTH_MESSAGE_COPY.accountUnavailable;
+          : isInvalidEmail
+            ? LEGACY_AUTH_MESSAGE_COPY.emailInvalid
+            : isPasswordPolicyError
+              ? LEGACY_AUTH_MESSAGE_COPY.passwordPolicy
+              : normalizedError.includes('invalid login credentials') || normalizedError.includes('invalid credentials')
+                ? 'That email and password do not match. Check them or use Forgot Password.'
+                : normalizedError.includes('email not confirmed')
+                  ? 'Confirm your email, then sign in again.'
+                  : normalizedError.includes('rate limit')
+                    ? 'Too many attempts. Wait a moment, then try again.'
+                    : normalizedError.includes('already registered')
+                      ? LEGACY_AUTH_MESSAGE_COPY.accountRecovery
+                      : LEGACY_AUTH_MESSAGE_COPY.accountUnavailable;
     return createLegacyPlayerMessage({
       copy,
       id: 'auth.feedback.error',
