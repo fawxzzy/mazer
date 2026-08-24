@@ -13,7 +13,7 @@ export interface MazerIconDefinition {
 
 const icon = (shapes: readonly MazerIconShape[]): MazerIconDefinition => Object.freeze({
   viewBox: '0 0 20 20',
-  shapes: Object.freeze([...shapes])
+  shapes: Object.freeze(shapes.map((shape) => Object.freeze({ ...shape })))
 });
 
 /**
@@ -47,4 +47,11 @@ export const mazerIcons: Readonly<Record<MazerIconName, MazerIconDefinition>> = 
   ])
 });
 
-export const getMazerIconDefinition = (name: MazerIconName): MazerIconDefinition => mazerIcons[name];
+export const isMazerIconName = (name: unknown): name is MazerIconName => (
+  typeof name === 'string' && Object.prototype.hasOwnProperty.call(mazerIcons, name)
+);
+
+/** Total runtime lookup: unknown, inherited, or prototype-like names fail closed. */
+export const getMazerIconDefinition = (name: unknown): MazerIconDefinition | null => (
+  isMazerIconName(name) ? mazerIcons[name] : null
+);

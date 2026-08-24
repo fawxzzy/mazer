@@ -9,6 +9,34 @@ export interface MazerIconOptions {
   size?: number;
 }
 
+interface ParsedMazerIconOptions extends MazerIconOptions {
+  name: MazerIconName;
+}
+
+const readOwnDataValue = (value: object, key: PropertyKey): unknown => {
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor && 'value' in descriptor ? descriptor.value : undefined;
+};
+
+const parseOptions = (value: unknown): ParsedMazerIconOptions | null => {
+  try {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return null;
+    const name = readOwnDataValue(value, 'name');
+    const label = readOwnDataValue(value, 'label');
+    const className = readOwnDataValue(value, 'className');
+    const size = readOwnDataValue(value, 'size');
+    if (!getMazerIconDefinition(name)) return null;
+    if (label !== undefined && typeof label !== 'string') return null;
+    if (className !== undefined && typeof className !== 'string') return null;
+    if (size !== undefined && (typeof size !== 'number' || !Number.isFinite(size) || size <= 0)) return null;
+    return { name: name as MazerIconName, label, className, size };
+  } catch {
+    return null;
+  }
+};
+
 const appendShape = (svg: SVGSVGElement, shape: MazerIconShape, ownerDocument: Document): void => {
   const node = ownerDocument.createElementNS(SVG_NAMESPACE, shape.element);
 
@@ -30,17 +58,22 @@ const appendShape = (svg: SVGSVGElement, shape: MazerIconShape, ownerDocument: D
   svg.append(node);
 };
 
-export const createMazerIcon = (
-  options: MazerIconOptions,
+export function createMazerIcon(options: MazerIconOptions, ownerDocument?: Document): SVGSVGElement;
+export function createMazerIcon(options: unknown, ownerDocument?: Document): SVGSVGElement | null;
+export function createMazerIcon(
+  options: unknown,
   ownerDocument: Document = document
-): SVGSVGElement => {
-  const definition = getMazerIconDefinition(options.name);
-  const size = options.size ?? 20;
+): SVGSVGElement | null {
+  const parsed = parseOptions(options);
+  if (!parsed) return null;
+  const definition = getMazerIconDefinition(parsed.name);
+  if (!definition) return null;
+  const size = parsed.size ?? 20;
   const svg = ownerDocument.createElementNS(SVG_NAMESPACE, 'svg');
 
   svg.classList.add('mazer-icon');
-  if (options.className) {
-    svg.classList.add(...options.className.split(/\s+/).filter(Boolean));
+  if (parsed.className) {
+    svg.classList.add(...parsed.className.split(/\s+/).filter(Boolean));
   }
   svg.setAttribute('viewBox', definition.viewBox);
   svg.setAttribute('width', String(size));
@@ -51,15 +84,15 @@ export const createMazerIcon = (
   svg.setAttribute('stroke-linecap', 'round');
   svg.setAttribute('stroke-linejoin', 'round');
   svg.setAttribute('focusable', 'false');
-  svg.dataset.mazerIcon = options.name;
+  svg.dataset.mazerIcon = parsed.name;
 
-  if (options.label) {
+  if (parsed.label) {
     svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', options.label);
+    svg.setAttribute('aria-label', parsed.label);
   } else {
     svg.setAttribute('aria-hidden', 'true');
   }
 
   definition.shapes.forEach((shape) => appendShape(svg, shape, ownerDocument));
   return svg;
-};
+}

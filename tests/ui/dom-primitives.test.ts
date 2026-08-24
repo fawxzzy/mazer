@@ -9,6 +9,7 @@ import {
   createMazerPasswordField,
   createMazerSlider,
   createStageShell,
+  getMazerIconDefinition,
   mazerIcons
 } from '../../src/ui/dom';
 
@@ -192,5 +193,34 @@ describe('Wave 2A DOM primitives', () => {
     expect(element.getAttribute('stroke')).toBe('currentColor');
     expect(element.getAttribute('aria-hidden')).toBe('true');
     expect(() => (mazerIcons.eye.shapes as unknown[]).push({})).toThrow();
+    expect(() => {
+      (mazerIcons.eye.shapes[0] as unknown as { d: string }).d = 'MUTATED';
+    }).toThrow();
+    expect(getMazerIconDefinition('eye')?.shapes[0]).toMatchObject({
+      element: 'path',
+      d: 'M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z'
+    });
+  });
+
+  it('fails closed without throwing for noncanonical runtime icon inputs', () => {
+    const ownerDocument = makeDocument();
+    const throwingProxy = new Proxy({}, {
+      getPrototypeOf: () => { throw new Error('hostile prototype trap'); }
+    });
+    const inherited = Object.create({ name: 'eye' });
+    const accessor = Object.defineProperty({}, 'name', {
+      get: () => { throw new Error('hostile name accessor'); }
+    });
+
+    expect(getMazerIconDefinition('constructor')).toBeNull();
+    expect(getMazerIconDefinition(Symbol('eye'))).toBeNull();
+    expect(() => createMazerIcon({ name: 'not-an-icon' } as unknown, ownerDocument)).not.toThrow();
+    expect(createMazerIcon({ name: 'not-an-icon' } as unknown, ownerDocument)).toBeNull();
+    expect(createMazerIcon(inherited as unknown, ownerDocument)).toBeNull();
+    expect(createMazerIcon(accessor as unknown, ownerDocument)).toBeNull();
+    expect(createMazerIcon(throwingProxy as unknown, ownerDocument)).toBeNull();
+
+    const valid = createMazerIcon({ name: 'eye' }, ownerDocument);
+    expect(asTestElement(valid).childNodes).toHaveLength(2);
   });
 });
