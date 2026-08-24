@@ -1557,6 +1557,44 @@ describe('legacy progression', () => {
     expect(complexity.edgeWrapCount).toBe(0);
   });
 
+  test('makes the first completion a distinct starter step before resuming half-speed difficulty pacing', () => {
+    const baseline = createEmptyLegacyProgressionState();
+    const targets = [8, 12, 16, 20, 24];
+    const playerProfiles = targets.map((targetComplexity, index) => {
+      const track = {
+        ...baseline.tracks.player,
+        level: String(index + 1),
+        targetComplexity
+      };
+      return {
+        difficulty: resolveLegacyProgressionDifficultyProfile(track),
+        generation: resolveLegacyMazeGenerationProfileForProgression(track),
+        scale: resolveLegacyProgressionGenerationScale(50, track)
+      };
+    });
+    const aiProfiles = targets.map((targetComplexity, index) => {
+      const track = {
+        ...baseline.tracks['ai-runner'],
+        level: String(index + 1),
+        targetComplexity
+      };
+      return {
+        difficulty: resolveLegacyProgressionDifficultyProfile(track),
+        generation: resolveLegacyMazeGenerationProfileForProgression(track),
+        scale: resolveLegacyProgressionGenerationScale(50, track)
+      };
+    });
+
+    expect(playerProfiles[0]?.difficulty.band).toBe('tutorial');
+    expect(playerProfiles[1]?.difficulty.band).toBe('starter');
+    expect(playerProfiles[1]).not.toEqual(playerProfiles[0]);
+    expect(playerProfiles[1]?.scale).toBeGreaterThan(playerProfiles[0]?.scale ?? 0);
+    expect(playerProfiles[2]).toEqual(playerProfiles[1]);
+    expect(playerProfiles[3]?.generation).not.toEqual(playerProfiles[2]?.generation);
+    expect(playerProfiles[4]).toEqual(playerProfiles[3]);
+    expect(aiProfiles).toEqual(playerProfiles);
+  });
+
   test('maps progression bands to increasing procedural pressure', () => {
     // Complexity values doubled (in real-level terms) from what used to hit
     // each band -- resolveLegacyProgressionDifficultyProfile now halves the

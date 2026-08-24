@@ -1,5 +1,20 @@
 import { describe, expect, test } from 'vitest';
+import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
 import { createLegacyGeneratedMenuMaze, createLegacyMaze } from '../../src/legacy-runtime/legacyMaze';
+import {
+  createEmptyLegacyProgressionState,
+  resolveLegacyMazeComplexity,
+  resolveLegacyMazeGenerationProfileForProgression,
+  resolveLegacyProgressionGenerationScale
+} from '../../src/legacy-runtime/legacyProgression';
+
+const resolveMedian = (values: readonly number[]): number => {
+  const sorted = [...values].sort((left, right) => left - right);
+  const center = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? ((sorted[center - 1] ?? 0) + (sorted[center] ?? 0)) / 2
+    : (sorted[center] ?? 0);
+};
 
 const countDetachedFloorTiles = (maze: ReturnType<typeof createLegacyMaze>): number => {
   const queue = [maze.start];
@@ -238,6 +253,48 @@ const auditBorderFeederSides = (
 const LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE = 1.4;
 
 describe('legacy topology scale audit', () => {
+  test('keeps the fixed-seed early curve nondecreasing with a measurable level-one to level-two step', () => {
+    const seeds = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233];
+    const targets = [8, 12, 16, 20, 24];
+    const baseline = createEmptyLegacyProgressionState();
+    const surfaceResults = (['menu', 'play'] as const).map((mode) => {
+      const trackId = mode === 'play' ? 'player' : 'ai-runner';
+      return targets.map((targetComplexity, index) => {
+        const track = {
+          ...baseline.tracks[trackId],
+          level: String(index + 1),
+          targetComplexity
+        };
+        const generationProfile = resolveLegacyMazeGenerationProfileForProgression(track);
+        const scale = resolveLegacyProgressionGenerationScale(50, track, {
+          surface: mode === 'play' ? 'play' : 'menu-demo'
+        });
+        const complexities = seeds.map((seed) => resolveLegacyMazeComplexity(
+          createLegacyRuntimeMazeForMode(
+            mode,
+            scale,
+            seed,
+            generationProfile,
+            { targetComplexity }
+          )
+        ).total);
+        return {
+          mean: complexities.reduce((total, value) => total + value, 0) / complexities.length,
+          median: resolveMedian(complexities)
+        };
+      });
+    });
+
+    for (const results of surfaceResults) {
+      expect(results[1]?.mean).toBeGreaterThan(results[0]?.mean ?? Number.POSITIVE_INFINITY);
+      expect(results[1]?.median).toBeGreaterThan(results[0]?.median ?? Number.POSITIVE_INFINITY);
+      for (let index = 1; index < results.length; index += 1) {
+        expect(results[index]?.mean).toBeGreaterThanOrEqual(results[index - 1]?.mean ?? Number.POSITIVE_INFINITY);
+        expect(results[index]?.median).toBeGreaterThanOrEqual(results[index - 1]?.median ?? Number.POSITIVE_INFINITY);
+      }
+    }
+  }, 20_000);
+
   test('keeps play and generated-menu topology meaningful across shortcut-enabled scale bands', () => {
     const scales = [37, 50, 75];
     const seeds = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233];
