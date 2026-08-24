@@ -130,6 +130,21 @@ describe('legacy player-facing message system', () => {
     }
   });
 
+  test('does not echo the submitted address from a dynamic hosted validation error', () => {
+    const submittedAddress = 'player@example.invalid';
+    const providerError = `Email address ${submittedAddress} is invalid`;
+
+    const message = resolveLegacyAuthFeedbackMessage(providerError, null);
+
+    expect(message).toMatchObject({
+      copy: LEGACY_AUTH_MESSAGE_COPY.emailInvalid,
+      technicalDetail: providerError,
+      tone: 'error'
+    });
+    expect(message?.copy).not.toContain(submittedAddress);
+    expect(message?.copy).not.toContain(providerError);
+  });
+
   test('maps hosted password-policy failures before the service-unavailable fallback', () => {
     const passwordPolicyErrors = [
       'weak_password',

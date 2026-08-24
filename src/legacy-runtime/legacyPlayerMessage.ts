@@ -178,7 +178,11 @@ export const resolveLegacyAuthFeedbackMessage = (
       || normalizedError.includes('invalid email')
       || normalizedError.includes('email address is invalid')
       || normalizedError.includes('unable to validate email address')
-      || (normalizedError.includes('email address') && normalizedError.includes('invalid format'));
+      // Hosted Auth may include the submitted value between the category
+      // and verdict: `Email address <value> is invalid`. Match the stable
+      // category + verdict instead of the dynamic value, and keep the raw
+      // provider text confined to technicalDetail below.
+      || (normalizedError.includes('email address') && normalizedError.includes('invalid'));
     const isPasswordPolicyError = normalizedError.includes('weak_password')
       || normalizedError.includes('weak password')
       || normalizedError.includes('password should be at least')
