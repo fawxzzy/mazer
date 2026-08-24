@@ -85,9 +85,14 @@ describe('legacy player-facing message system', () => {
       tone: 'error'
     });
     expect(resolveLegacyAuthFeedbackMessage('User already registered', null)).toMatchObject({
-      copy: 'That email already has an account. Sign in instead.',
+      copy: LEGACY_AUTH_MESSAGE_COPY.accountRecovery,
+      technicalDetail: 'User already registered',
       tone: 'error'
     });
+    expect(LEGACY_AUTH_MESSAGE_COPY.accountRecovery.toLowerCase()).not.toMatch(
+      /already|registered|exists|has an account/
+    );
+    expect(LEGACY_AUTH_MESSAGE_COPY.accountRecovery).toContain('Forgot Password');
     expect(resolveLegacyAuthFeedbackMessage(LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL, null)).toMatchObject({
       copy: LEGACY_AUTH_MESSAGE_COPY.usernameInvalid,
       technicalDetail: LEGACY_SIGNUP_USERNAME_INVALID_SENTINEL,

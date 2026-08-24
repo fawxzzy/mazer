@@ -49,6 +49,7 @@ export const LEGACY_SIGNUP_USERNAME_TAKEN_SENTINEL = 'MAZER_SIGNUP_USERNAME_TAKE
 
 export const LEGACY_AUTH_MESSAGE_COPY = {
   accountCreated: 'Your account is ready.',
+  accountRecovery: 'Account setup could not be completed. Try signing in or use Forgot Password.',
   accountUnavailable: 'Account service is unavailable right now. Try again shortly.',
   authUnavailable: 'Account access is unavailable right now. You can still play as a guest.',
   createReady: 'Details look good. Create your account when you are ready.',
@@ -184,7 +185,7 @@ export const resolveLegacyAuthFeedbackMessage = (
               : normalizedError.includes('rate limit')
                 ? 'Too many attempts. Wait a moment, then try again.'
                 : normalizedError.includes('already registered')
-                  ? 'That email already has an account. Sign in instead.'
+                  ? LEGACY_AUTH_MESSAGE_COPY.accountRecovery
                   : LEGACY_AUTH_MESSAGE_COPY.accountUnavailable;
     return createLegacyPlayerMessage({
       copy,

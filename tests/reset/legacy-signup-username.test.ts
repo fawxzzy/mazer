@@ -5,6 +5,52 @@ import { describe, expect, test } from 'vitest';
 const readSource = (path: string): string => readFileSync(resolve(process.cwd(), path), 'utf8')
   .replace(/\r\n/g, '\n');
 
+type HookEvent = {
+  user?: {
+    user_metadata?: Record<string, unknown>;
+  };
+};
+
+type HookOutcome =
+  | { error: { http_code: 400 | 409; message: string } }
+  | Record<string, never>;
+
+const expectedHookOutcome = (
+  event: HookEvent,
+  claimedUsernames: readonly string[] = []
+): HookOutcome => {
+  const metadata = event.user?.user_metadata ?? {};
+  if (metadata.app_namespace !== 'mazer') return {};
+
+  const username = metadata.username;
+  const displayName = metadata.display_name;
+  if (
+    typeof username !== 'string'
+    || displayName !== username
+    || username.length < 2
+    || username.length > 15
+    || !/^[A-Za-z0-9._-]+$/.test(username)
+  ) {
+    return {
+      error: {
+        http_code: 400,
+        message: 'MAZER_SIGNUP_USERNAME_INVALID'
+      }
+    };
+  }
+
+  if (claimedUsernames.some((claimed) => claimed.toLowerCase() === username.toLowerCase())) {
+    return {
+      error: {
+        http_code: 409,
+        message: 'MAZER_SIGNUP_USERNAME_TAKEN'
+      }
+    };
+  }
+
+  return {};
+};
+
 describe('legacy signup username server authority', () => {
   const migrationPath = 'supabase/migrations/20260824140215_mazer_signup_username_claim.sql';
   const migrationSource = readSource(migrationPath);
@@ -24,7 +70,11 @@ describe('legacy signup username server authority', () => {
       migrationSource.indexOf('create or replace function public.mazer_claim_signup_username()')
     );
 
-    expect(hookSource).toContain("app_namespace is distinct from 'mazer'");
+    const routeIndex = hookSource.indexOf("if app_namespace is distinct from 'mazer' then\n    return '{}'::jsonb;\n  end if;");
+    const validationIndex = hookSource.indexOf('if candidate is null');
+
+    expect(routeIndex).toBeGreaterThan(-1);
+    expect(validationIndex).toBeGreaterThan(routeIndex);
     expect(hookSource).toContain('display_name is distinct from candidate');
     expect(hookSource).toContain('char_length(candidate) not between 2 and 15');
     expect(hookSource).toContain("candidate !~ '^[A-Za-z0-9._-]+$'");
@@ -34,6 +84,82 @@ describe('legacy signup username server authority', () => {
     expect(hookSource).toContain("set search_path = ''");
     expect(hookSource).not.toContain('security definer');
     expect(hookSource).not.toContain("event -> 'user' -> 'email'");
+  });
+
+  test.each([
+    {
+      event: {},
+      label: 'an absent namespace',
+      outcome: {}
+    },
+    {
+      event: { user: { user_metadata: { app_namespace: 'fitness' } } },
+      label: 'a Fitness signup',
+      outcome: {}
+    },
+    {
+      event: { user: { user_metadata: { app_namespace: 'website' } } },
+      label: 'a Website signup',
+      outcome: {}
+    },
+    {
+      event: {
+        user: {
+          user_metadata: {
+            app_namespace: 'mazer',
+            display_name: 'x',
+            username: 'x'
+          }
+        }
+      },
+      label: 'malformed explicit Mazer metadata',
+      outcome: {
+        error: {
+          http_code: 400,
+          message: 'MAZER_SIGNUP_USERNAME_INVALID'
+        }
+      }
+    },
+    {
+      event: {
+        user: {
+          user_metadata: {
+            app_namespace: 'mazer',
+            display_name: 'Maze.Player-1',
+            username: 'Maze.Player-1'
+          }
+        }
+      },
+      label: 'valid explicit Mazer metadata',
+      outcome: {}
+    }
+  ])('routes $label correctly', ({ event, outcome }) => {
+    expect(expectedHookOutcome(event)).toEqual(outcome);
+  });
+
+  test('returns the exact taken sentinel only for an explicit Mazer username collision', () => {
+    const event = {
+      user: {
+        user_metadata: {
+          app_namespace: 'mazer',
+          display_name: 'Maze.Player-1',
+          username: 'Maze.Player-1'
+        }
+      }
+    };
+
+    expect(expectedHookOutcome(event, ['maze.player-1'])).toEqual({
+      error: {
+        http_code: 409,
+        message: 'MAZER_SIGNUP_USERNAME_TAKEN'
+      }
+    });
+  });
+
+  test('documents app_namespace as routing metadata rather than authorization', () => {
+    expect(migrationSource).toContain('app_namespace routes this shared Auth hook');
+    expect(migrationSource).toContain('not an authorization claim');
+    expect(migrationSource).toContain('app_namespace is a routing marker, not authorization');
   });
 
   test('grants the hook only to Supabase Auth and gives it a narrow RLS-protected username read', () => {

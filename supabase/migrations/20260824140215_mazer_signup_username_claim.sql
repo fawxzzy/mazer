@@ -27,8 +27,15 @@ declare
   candidate text := user_metadata ->> 'username';
   display_name text := user_metadata ->> 'display_name';
 begin
-  if app_namespace is distinct from 'mazer'
-    or candidate is null
+  -- app_namespace routes this shared Auth hook to the owning application. It
+  -- is user-supplied metadata, not an authorization claim. Signups that are
+  -- absent or explicitly owned by Fitness, Website, or another application
+  -- must continue without Mazer validation.
+  if app_namespace is distinct from 'mazer' then
+    return '{}'::jsonb;
+  end if;
+
+  if candidate is null
     or display_name is distinct from candidate
     or char_length(candidate) not between 2 and 15
     or candidate !~ '^[A-Za-z0-9._-]+$'
@@ -60,7 +67,7 @@ end;
 $$;
 
 comment on function public.mazer_before_user_created(jsonb) is
-  'Before User Created hook for Mazer signups. Validates the app marker and canonical username metadata and performs a best-effort case-insensitive availability check. The unique profile index remains final race authority.';
+  'Before User Created hook for explicit Mazer signups. app_namespace is a routing marker, not authorization. Non-Mazer signups pass through; Mazer metadata is validated and checked for best-effort case-insensitive availability. The unique profile index remains final race authority.';
 
 revoke all on function public.mazer_before_user_created(jsonb)
   from public, anon, authenticated, service_role;
