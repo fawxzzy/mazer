@@ -312,6 +312,7 @@ import {
 } from '../legacy-runtime/legacyPlayerMessage';
 import {
   hydrateLegacyRemoteAccountState,
+  isLegacyRemoteCompletionContextCurrent,
   readLegacyBootstrappedAuthSnapshot,
   writeLegacyRemoteCompletion,
   writeLegacyRemoteProgressionState,
@@ -14513,14 +14514,17 @@ export class MenuScene extends Phaser.Scene {
     const latestReceipt = this.mazeCycleTelemetryHistory.receipts[0] ?? null;
     if (latestReceipt) {
       const previousProgressionState = this.progressionState;
+      const completionAuthSnapshot = { ...this.authSnapshot };
+      const completionAuthSequence = this.authAccountHydrationSequence;
+      const completionProgressionStorage = this.resolveLegacyProgressionStorage();
       this.progressionState = recordLegacyProgressionCycle(
-        this.resolveLegacyProgressionStorage(),
+        completionProgressionStorage,
         this.progressionState,
         latestReceipt,
         this.maze
       );
       void writeLegacyRemoteCompletion(
-        this.authSnapshot,
+        completionAuthSnapshot,
         previousProgressionState,
         this.progressionState,
         latestReceipt,
@@ -14528,15 +14532,31 @@ export class MenuScene extends Phaser.Scene {
         this.resolveBrowserLocalStorage()
       )
         .then((result) => {
+          if (!isLegacyRemoteCompletionContextCurrent(
+            completionAuthSnapshot,
+            completionAuthSequence,
+            this.authSnapshot,
+            this.authAccountHydrationSequence
+          )) {
+            return;
+          }
           if (result.progressionState) {
             this.progressionState = writeLegacyProgressionState(
-              this.resolveLegacyProgressionStorage(),
+              completionProgressionStorage,
               result.progressionState
             );
           }
           this.publishLegacyRemoteSyncResult(result);
         })
         .catch((error: unknown) => {
+          if (!isLegacyRemoteCompletionContextCurrent(
+            completionAuthSnapshot,
+            completionAuthSequence,
+            this.authSnapshot,
+            this.authAccountHydrationSequence
+          )) {
+            return;
+          }
           this.publishLegacyRemoteSyncException('progression', error);
         });
       this.boardDynamicDirty = true;
@@ -14551,11 +14571,22 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private syncLegacyRemoteProgressionState(mode: 'replace'): void {
-    void writeLegacyRemoteProgressionState(this.authSnapshot, this.progressionState, undefined, mode)
+    const syncAuthSnapshot = { ...this.authSnapshot };
+    const syncAuthSequence = this.authAccountHydrationSequence;
+    const syncProgressionStorage = this.resolveLegacyProgressionStorage();
+    void writeLegacyRemoteProgressionState(syncAuthSnapshot, this.progressionState, undefined, mode)
       .then((result) => {
+        if (!isLegacyRemoteCompletionContextCurrent(
+          syncAuthSnapshot,
+          syncAuthSequence,
+          this.authSnapshot,
+          this.authAccountHydrationSequence
+        )) {
+          return;
+        }
         if (result.progressionState) {
           this.progressionState = writeLegacyProgressionState(
-            this.resolveLegacyProgressionStorage(),
+            syncProgressionStorage,
             result.progressionState
           );
           this.boardDynamicDirty = true;
@@ -14564,6 +14595,14 @@ export class MenuScene extends Phaser.Scene {
         this.publishLegacyRemoteSyncResult(result);
       })
       .catch((error: unknown) => {
+        if (!isLegacyRemoteCompletionContextCurrent(
+          syncAuthSnapshot,
+          syncAuthSequence,
+          this.authSnapshot,
+          this.authAccountHydrationSequence
+        )) {
+          return;
+        }
         this.publishLegacyRemoteSyncException('progression', error);
       });
   }

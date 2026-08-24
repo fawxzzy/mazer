@@ -49,6 +49,33 @@ vi.mock('phaser', () => ({
 }));
 
 describe('resolveLegacyMenuPathRenderFrame', () => {
+  test('guards deferred completion callbacks against an intervening account switch', () => {
+    const menuSceneSource = normalizeSourceLineEndings(
+      readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
+    );
+    const completionFlow = menuSceneSource.slice(
+      menuSceneSource.indexOf('const completionAuthSnapshot = { ...this.authSnapshot };'),
+      menuSceneSource.indexOf("if (surface === 'menu-demo')")
+    );
+
+    expect(completionFlow).toContain('const completionAuthSequence = this.authAccountHydrationSequence;');
+    expect(completionFlow).toContain('const completionProgressionStorage = this.resolveLegacyProgressionStorage();');
+    expect(completionFlow.match(/isLegacyRemoteCompletionContextCurrent\(/g)).toHaveLength(2);
+    expect(completionFlow).toContain('completionAuthSnapshot,\n            completionAuthSequence,\n            this.authSnapshot,');
+    expect(completionFlow).toContain('this.authAccountHydrationSequence');
+    expect(completionFlow).toContain('writeLegacyProgressionState(\n              completionProgressionStorage,');
+
+    const resetSyncFlow = menuSceneSource.slice(
+      menuSceneSource.indexOf("private syncLegacyRemoteProgressionState(mode: 'replace'): void"),
+      menuSceneSource.indexOf('private publishLegacyRemoteSyncResult')
+    );
+    expect(resetSyncFlow).toContain('const syncAuthSnapshot = { ...this.authSnapshot };');
+    expect(resetSyncFlow).toContain('const syncAuthSequence = this.authAccountHydrationSequence;');
+    expect(resetSyncFlow).toContain('const syncProgressionStorage = this.resolveLegacyProgressionStorage();');
+    expect(resetSyncFlow.match(/isLegacyRemoteCompletionContextCurrent\(/g)).toHaveLength(2);
+    expect(resetSyncFlow).toContain('writeLegacyProgressionState(\n            syncProgressionStorage,');
+  });
+
   test('keeps semantic source assertions identical across LF and CRLF checkouts', () => {
     const semanticSource = 'first line\nsecond line\n';
 

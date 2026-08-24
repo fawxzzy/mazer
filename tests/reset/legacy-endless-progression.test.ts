@@ -28,6 +28,10 @@ describe('legacy endless progression ruleset boundary', () => {
       new URL('../../supabase/migrations/20260822000100_mazer_endless_completion_rpc.sql', import.meta.url),
       'utf8'
     );
+    const remoteProgressionSource = readFileSync(
+      new URL('../../src/legacy-runtime/legacyRemoteProgression.ts', import.meta.url),
+      'utf8'
+    );
 
     expect(foundation).toContain('drop constraint if exists mazer_progression_states_player_level_check');
     expect(foundation).toContain('drop constraint if exists mazer_ai_progression_states_level_check');
@@ -65,8 +69,16 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(completionRpc).not.toContain('p_completed_level integer');
     expect(completionRpc).not.toContain('p_completed_level bigint');
     expect(completionRpc).toContain("raise exception 'client_run_id is required for idempotent completion'");
-    expect(completionRpc).toContain('security invoker');
-    expect(completionRpc).not.toContain('security definer');
+    expect(completionRpc).toContain('security definer');
+    expect(completionRpc).not.toContain('security invoker');
+    expect(completionRpc).toContain('p_expected_user_id uuid');
+    expect(completionRpc).toContain('p_expected_user_id is distinct from v_user_id');
+    expect(completionRpc).toContain('v_now timestamp with time zone := pg_catalog.clock_timestamp()');
+    expect(completionRpc).not.toContain('pg_catalog.coalesce(p_completed_at, pg_catalog.now())');
+    expect(completionRpc).toContain("pg_catalog.jsonb_build_object('clientCompletedAt', p_completed_at)");
+    expect(completionRpc).toContain("p_completed_at between v_now - interval '90 days' and v_now + interval '5 minutes'");
+    expect(completionRpc.match(/if pg_catalog\.octet_length\(v_receipt::text\) > 8192 then/g)).toHaveLength(2);
+    expect(completionRpc.match(/v_receipt := p_receipt;/g)).toHaveLength(2);
     expect(completionRpc).toContain('and r.client_run_id = p_client_run_id');
     expect(completionRpc).toContain('on conflict (user_id, client_run_id) where client_run_id is not null do nothing');
     expect(completionRpc).toContain('completed_at,');
@@ -75,7 +87,19 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(completionRpc).toContain("pg_catalog.nullif(p_receipt ->> 'id', '')");
     expect(completionRpc).toContain('load-bearing player completion transaction');
     expect(completionRpc).toContain('load-bearing menu-AI completion transaction');
+    expect(completionRpc).toContain('create function public.mazer_initialize_progression');
+    expect(completionRpc).toContain('create function public.mazer_reset_progression');
+    expect(completionRpc).toContain('revoke insert, update on table public.mazer_progression_states from authenticated');
+    expect(completionRpc).toContain('revoke insert, update on table public.mazer_ai_progression_states from authenticated');
+    expect(completionRpc).toContain('revoke insert on table public.mazer_cycle_receipts from authenticated');
     expect(completionRpc).not.toContain('Not yet called by client code');
+    expect(remoteProgressionSource).toContain("client.rpc('mazer_initialize_progression'");
+    expect(remoteProgressionSource).toContain("client.rpc('mazer_complete_level'");
+    expect(remoteProgressionSource).toContain("client.rpc('mazer_complete_ai_level'");
+    expect(remoteProgressionSource).toContain("client.rpc('mazer_reset_progression'");
+    expect(remoteProgressionSource).not.toContain('createRemoteProgressionPayload');
+    expect(remoteProgressionSource).not.toContain('createRemoteAiProgressionPayload');
+    expect(remoteProgressionSource).not.toContain('.from(LEGACY_REMOTE_CYCLE_RECEIPTS_TABLE)');
   });
 });
 

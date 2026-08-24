@@ -7,6 +7,7 @@ import {
 import {
   bootstrapLegacyRemoteAccountState,
   hydrateLegacyRemoteAccountState,
+  isLegacyRemoteCompletionContextCurrent,
   LEGACY_REMOTE_AI_PROGRESSION_TABLE,
   LEGACY_REMOTE_AI_RUNNER_KEY,
   LEGACY_REMOTE_CYCLE_RECEIPTS_TABLE,
@@ -89,7 +90,9 @@ const createHydrationFrom = (
       ? { data: remoteProgression, error: null }
       : table === LEGACY_REMOTE_PROFILE_TABLE
         ? { data: remoteProfile, error: null }
-        : { data: null, error: null }
+        : table === LEGACY_REMOTE_AI_PROGRESSION_TABLE
+          ? { data: { state: createEmptyLegacyProgressionState().tracks['ai-runner'] }, error: null }
+          : { data: null, error: null }
   )
 }));
 
@@ -202,6 +205,66 @@ describe('legacy remote progression', () => {
     expect(from).not.toHaveBeenCalled();
   });
 
+  test('discards a deferred completion result after the authenticated account changes', async () => {
+    let currentSnapshot = { status: 'authenticated' as const, userId: 'account-a' };
+    let currentSequence = 4;
+    let appliedLevel = '1';
+    let resolveRemote: ((level: string) => void) | null = null;
+    const initiatingSnapshot = { ...currentSnapshot };
+    const initiatingSequence = currentSequence;
+    const remote = new Promise<string>((resolve) => {
+      resolveRemote = resolve;
+    }).then((level) => {
+      if (isLegacyRemoteCompletionContextCurrent(
+        initiatingSnapshot,
+        initiatingSequence,
+        currentSnapshot,
+        currentSequence
+      )) {
+        appliedLevel = level;
+      }
+    });
+
+    currentSnapshot = { status: 'authenticated', userId: 'account-b' };
+    currentSequence += 1;
+    resolveRemote?.('64');
+    await remote;
+
+    expect(appliedLevel).toBe('1');
+    expect(isLegacyRemoteCompletionContextCurrent(
+      initiatingSnapshot,
+      initiatingSequence,
+      currentSnapshot,
+      currentSequence
+    )).toBe(false);
+  });
+
+  test('resets through the exact authenticated RPC instead of direct table writes', async () => {
+    const baseline = createEmptyLegacyProgressionState();
+    const from = vi.fn(() => ({
+      select: () => createMaybeSingleChain({ data: { revision: 7, state: baseline }, error: null })
+    }));
+    const rpc = vi.fn(async (name: string) => ({
+      data: name === 'mazer_reset_progression'
+        ? [{ revision: 8, state: baseline }]
+        : null,
+      error: null
+    }));
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ from, rpc } as never);
+
+    const result = await writeLegacyRemoteProgressionState({
+      status: 'authenticated',
+      userId: 'user-reset'
+    }, baseline, { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' }, 'replace');
+
+    expect(result).toMatchObject({ progressionState: baseline, synced: true });
+    expect(rpc).toHaveBeenCalledWith('mazer_reset_progression', {
+      p_expected_revision: 7,
+      p_expected_user_id: 'user-reset'
+    });
+    expect(from).toHaveBeenCalledWith(LEGACY_REMOTE_PROGRESSION_TABLE);
+  });
+
   test('merges first-contact device progress without lowering a newer canonical track', () => {
     const remote = createEmptyLegacyProgressionState();
     remote.updatedAt = '2026-07-16T12:00:00.000Z';
@@ -312,11 +375,13 @@ describe('legacy remote progression', () => {
     expect(rpc.mock.calls.map((call) => call[1])).toEqual([
       expect.objectContaining({
         p_client_run_id: receipt.clientRunId,
-        p_completed_level: '9007199254740992'
+        p_completed_level: '9007199254740992',
+        p_expected_user_id: 'user-lossless'
       }),
       expect.objectContaining({
         p_client_run_id: receipt.clientRunId,
-        p_completed_level: '9007199254740992'
+        p_completed_level: '9007199254740992',
+        p_expected_user_id: 'user-lossless'
       })
     ]);
   });
@@ -467,7 +532,8 @@ describe('legacy remote progression', () => {
     });
     expect(rpc).toHaveBeenCalledWith('mazer_complete_ai_level', expect.objectContaining({
       p_client_run_id: receipt.clientRunId,
-      p_completed_level: '1'
+      p_completed_level: '1',
+      p_expected_user_id: 'user-ai'
     }));
     expect(from).toHaveBeenCalledWith(LEGACY_REMOTE_AI_PROGRESSION_TABLE);
     expect(from).not.toHaveBeenCalledWith(LEGACY_REMOTE_PROGRESSION_TABLE);
@@ -674,7 +740,7 @@ describe('legacy remote progression', () => {
     expect(result.progressionState?.tracks.player.targetComplexity).toBe(50);
   });
 
-  test('syncs compact completed-cycle receipts when enabled and authenticated', async () => {
+  test('retires direct cycle-receipt writes in favor of the completion RPC transaction', async () => {
     const insert = vi.fn(async () => ({ error: null }));
     const from = vi.fn(() => ({ insert }));
     vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ from } as never);
@@ -738,54 +804,17 @@ describe('legacy remote progression', () => {
       surface: 'menu-demo',
       wrongTurns: 1
     }, { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' })).resolves.toMatchObject({
-      error: null,
-      playerMessage: null,
+      completionSyncState: 'pending',
+      error: expect.stringContaining('Direct cycle receipt writes are retired'),
       skippedReason: null,
-      synced: true
+      synced: false
     });
 
-    expect(from).toHaveBeenCalledWith(LEGACY_REMOTE_CYCLE_RECEIPTS_TABLE);
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      average_frame_ms: 12.3,
-      backtracks: 2,
-      completion_time_ms: 4321,
-      control_mode: 'stick',
-      maze_seed: 347,
-      maze_size: 44,
-      path_length: 16,
-      route_quality: 'multi-route',
-      surface: 'menu-demo',
-      user_id: 'user-789',
-      wrong_turns: 1
-    }));
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
-      receipt: expect.objectContaining({
-        aiDecisionScore: expect.objectContaining({
-          pressureScore: expect.any(Number),
-          reliabilityScore: expect.any(Number),
-          signal: 'searching'
-        }),
-        aiDecisionSummary: expect.objectContaining({ thinkingModel: 'human-local-memory' }),
-        mazeComplexity: expect.objectContaining({
-          edgeWrapCount: 2,
-          edgeWrapReliefScore: 0,
-          splitCount: 9,
-          total: 87
-        }),
-        playerPathLength: 16,
-        playerPathPreview: expect.arrayContaining([{ x: 15, y: 16 }]),
-        renderSafetyPenaltyScore: 0,
-        routeEfficiencyPressureScore: 12.5,
-        runQualityScore: expect.objectContaining({
-          scorerId: 'mazer.maze-cycle-run-quality',
-          scorerVersion: '1.1.0',
-          shortestPathModel: 'playable-wrap-aware-shortest-path-v1'
-        })
-      })
-    }));
+    expect(from).not.toHaveBeenCalled();
+    expect(insert).not.toHaveBeenCalled();
   });
 
-  test('returns player-safe retry messages when remote writes fail', async () => {
+  test('returns player-safe retry guidance for the retired direct receipt path', async () => {
     const insert = vi.fn(async () => ({ error: { message: 'rls denied' } }));
     const from = vi.fn(() => ({ insert }));
     vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ from } as never);
@@ -817,12 +846,12 @@ describe('legacy remote progression', () => {
       surface: 'play',
       wrongTurns: 0
     }, { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' })).resolves.toMatchObject({
-      error: 'rls denied',
+      error: expect.stringContaining('Direct cycle receipt writes are retired'),
       playerMessage: {
         copy: LEGACY_REMOTE_MESSAGE_COPY.cycleReceiptFailed,
         id: 'remote.cycle-receipt.failed',
         source: 'progression',
-        technicalDetail: 'rls denied',
+        technicalDetail: expect.stringContaining('Direct cycle receipt writes are retired'),
         tone: 'warning'
       },
       skippedReason: null,

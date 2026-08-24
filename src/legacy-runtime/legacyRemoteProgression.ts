@@ -282,11 +282,6 @@ const hasProgressionCycles = (state: LegacyProgressionState): boolean => (
   Object.values(state.tracks).some((track) => compareLegacyProgressionOrdinals(track.completedCycles, '0') > 0)
 );
 
-const progressionStatesMatch = (
-  left: LegacyProgressionState,
-  right: LegacyProgressionState
-): boolean => JSON.stringify(normalizeLegacyProgressionState(left)) === JSON.stringify(normalizeLegacyProgressionState(right));
-
 export const isLegacyRemoteProgressionEnabled = (
   env: Record<string, string | undefined> = readRuntimeEnv()
 ): boolean => {
@@ -315,43 +310,16 @@ export const createLegacyRemoteProgressionDisabledResult = (
   synced: false
 });
 
-const createRemoteProgressionTrackSummary = (
-  track: LegacyProgressionTrack
-): Record<string, unknown> => ({
-  cleanCycles: track.cleanCycles,
-  colorTier: track.colorTier,
-  completedCycles: track.completedCycles,
-  lastMazeSeed: track.lastMazeSeed,
-  lastReceiptId: track.lastReceiptId,
-  lastSignal: track.lastSignal,
-  level: track.level,
-  peakComplexity: track.peakComplexity,
-  rank: track.rank,
-  recentSignals: track.recentSignals,
-  struggleCycles: track.struggleCycles,
-  targetComplexity: track.targetComplexity
-});
-
-const createRemoteProgressionPayload = (
-  userId: string,
-  state: LegacyProgressionState,
-  revision: number
-): Record<string, unknown> => {
-  const normalized = normalizeLegacyProgressionState(state);
-  const playerTrack = normalized.tracks.player;
-  return {
-    last_completed_cycle_at: playerTrack.lastCompletedAt ?? normalized.updatedAt,
-    player_completed_cycles: playerTrack.completedCycles,
-    player_level: playerTrack.level,
-    player_rank: playerTrack.rank,
-    player_target_complexity: playerTrack.targetComplexity,
-    revision,
-    schema_version: normalized.version,
-    state: normalized,
-    updated_at: new Date().toISOString(),
-    user_id: userId
-  };
-};
+export const isLegacyRemoteCompletionContextCurrent = (
+  initiatingSnapshot: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>,
+  initiatingSequence: number,
+  currentSnapshot: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>,
+  currentSequence: number
+): boolean => (
+  initiatingSequence === currentSequence
+  && initiatingSnapshot.status === currentSnapshot.status
+  && initiatingSnapshot.userId === currentSnapshot.userId
+);
 
 const createRemoteProfilePayload = (
   snapshot: Pick<LegacyAuthSessionSnapshot, 'displayName' | 'userId'>,
@@ -365,27 +333,6 @@ const createRemoteProfilePayload = (
   updated_at: new Date().toISOString(),
   user_id: snapshot.userId
 });
-
-const createRemoteAiProgressionPayload = (
-  userId: string,
-  state: LegacyProgressionState
-): Record<string, unknown> => {
-  const normalized = normalizeLegacyProgressionState(state);
-  const aiTrack = normalized.tracks['ai-runner'];
-  return {
-    completed_cycles: aiTrack.completedCycles,
-    last_completed_cycle_at: aiTrack.lastCompletedAt ?? normalized.updatedAt,
-    level: aiTrack.level,
-    rank: aiTrack.rank,
-    runner_key: LEGACY_REMOTE_AI_RUNNER_KEY,
-    schema_version: normalized.version,
-    state: aiTrack,
-    summary: createRemoteProgressionTrackSummary(aiTrack),
-    target_complexity: aiTrack.targetComplexity,
-    updated_at: new Date().toISOString(),
-    user_id: userId
-  };
-};
 
 const readRemoteProgressionRow = async (
   client: SupabaseClient,
@@ -441,24 +388,14 @@ const readRemoteAiProgressionRow = async (
   };
 };
 
-const updateRemoteProgressionRow = async (
+const initializeRemoteProgressionRows = async (
   client: SupabaseClient,
-  userId: string,
-  state: LegacyProgressionState,
-  expectedRevision: number
-): Promise<{ error: string | null; revision: number | null }> => {
-  const nextRevision = expectedRevision + 1;
-  const { data, error } = await client
-    .from(LEGACY_REMOTE_PROGRESSION_TABLE)
-    .update(createRemoteProgressionPayload(userId, state, nextRevision))
-    .eq('user_id', userId)
-    .eq('revision', expectedRevision)
-    .select('revision')
-    .maybeSingle();
-  return {
-    error: error?.message ?? null,
-    revision: data ? normalizeRevision(data.revision) : null
-  };
+  userId: string
+): Promise<string | null> => {
+  const { error } = await client.rpc('mazer_initialize_progression', {
+    p_expected_user_id: userId
+  });
+  return error?.message ?? null;
 };
 
 const updateRemoteProfileRow = async (
@@ -479,19 +416,6 @@ const updateRemoteProfileRow = async (
     error: error?.message ?? null,
     revision: data ? normalizeRevision(data.revision) : null
   };
-};
-
-const syncRemoteAiProgressionMirror = async (
-  client: SupabaseClient,
-  userId: string,
-  state: LegacyProgressionState
-): Promise<string | null> => {
-  const { error } = await client
-    .from(LEGACY_REMOTE_AI_PROGRESSION_TABLE)
-    .upsert(createRemoteAiProgressionPayload(userId, state), {
-      onConflict: 'user_id,runner_key'
-    });
-  return error?.message ?? null;
 };
 
 export const readLegacyBootstrappedAuthSnapshot = (): LegacyAuthSessionSnapshot | null => (
@@ -552,16 +476,20 @@ export const bootstrapLegacyRemoteAccountState = async (
       : remoteProgression;
     progressionRevision = progressionRead.row.revision;
   } else if (!progressionRead.error) {
-    const baseline = createEmptyLegacyProgressionState();
-    const { data, error } = await client
-      .from(LEGACY_REMOTE_PROGRESSION_TABLE)
-      .insert(createRemoteProgressionPayload(snapshot.userId, baseline, 0))
-      .select('revision')
-      .maybeSingle();
-    if (error) {
-      errors.push(error.message);
+    const initializeError = await initializeRemoteProgressionRows(client, snapshot.userId);
+    if (initializeError) {
+      errors.push(initializeError);
     } else {
-      progressionRevision = data ? normalizeRevision(data.revision) : 0;
+      const initialized = await readRemoteProgressionRow(client, snapshot.userId);
+      if (initialized.error || !initialized.row) {
+        errors.push(initialized.error ?? 'Progression initialization returned no account row.');
+      } else {
+        progressionState = mergeLegacyProgressionStateAdvancements(
+          normalizeLegacyProgressionState(initialized.row.state),
+          localProgression
+        );
+        progressionRevision = initialized.row.revision;
+      }
     }
   }
 
@@ -1042,7 +970,7 @@ const deriveExactRemoteCompletionRecovery = (
 
 export const writeLegacyRemoteCycleReceipt = async (
   snapshot: Pick<LegacyAuthSessionSnapshot, 'status' | 'userId'>,
-  receipt: MazeCycleTelemetryReceipt,
+  _receipt: MazeCycleTelemetryReceipt,
   env: Record<string, string | undefined> = readRuntimeEnv()
 ): Promise<LegacyRemoteProgressionSyncResult> => {
   if (!isLegacyRemoteProgressionEnabled(env)) {
@@ -1053,36 +981,11 @@ export const writeLegacyRemoteCycleReceipt = async (
     return createLegacyRemoteProgressionDisabledResult('cycle-receipt', 'guest');
   }
 
-  const client = await getLegacyAuthClient();
-  if (!client) {
-    return createLegacyRemoteProgressionDisabledResult('cycle-receipt', 'missing-client');
-  }
-
-  const { error } = await client
-    .from(LEGACY_REMOTE_CYCLE_RECEIPTS_TABLE)
-    .insert({
-      average_frame_ms: receipt.averageFrameMs,
-      backtracks: receipt.backtracks,
-      completed_at: receipt.completedAt,
-      completion_time_ms: receipt.completionTimeMs,
-      control_mode: receipt.controlMode,
-      goal_cell: receipt.goal,
-      maze_seed: receipt.mazeSeed,
-      maze_size: receipt.mazeSize,
-      path_length: receipt.playerPathLength,
-      receipt: createRemoteCycleReceiptPayload(receipt),
-      reset_used: receipt.resetUsed,
-      route_quality: receipt.routeQuality,
-      start_cell: receipt.start,
-      surface: receipt.surface,
-      user_id: snapshot.userId,
-      wrong_turns: receipt.wrongTurns
-    });
-
   return createLegacyRemoteProgressionSyncResult('cycle-receipt', {
-    error: error?.message ?? null,
+    completionSyncState: 'pending',
+    error: 'Direct cycle receipt writes are retired; accepted completions persist receipts through the idempotent completion RPC.',
     skippedReason: null,
-    synced: !error
+    synced: false
   });
 };
 
@@ -1121,16 +1024,15 @@ const ensureRemotePlayerProgressionRow = async (
     };
   }
 
-  const baseline = createEmptyLegacyProgressionState();
-  const { data, error } = await client
-    .from(LEGACY_REMOTE_PROGRESSION_TABLE)
-    .insert(createRemoteProgressionPayload(userId, baseline, 0))
-    .select('revision,state')
-    .maybeSingle();
+  const initializeError = await initializeRemoteProgressionRows(client, userId);
+  if (initializeError) {
+    return { error: initializeError, revision: null, state: null };
+  }
+  const initialized = await readRemoteProgressionRow(client, userId);
   return {
-    error: error?.message ?? null,
-    revision: data ? normalizeRevision(data.revision) : error ? null : 0,
-    state: error ? null : normalizeLegacyProgressionState(data?.state ?? baseline)
+    error: initialized.error,
+    revision: initialized.row?.revision ?? null,
+    state: initialized.row ? normalizeLegacyProgressionState(initialized.row.state) : null
   };
 };
 
@@ -1142,27 +1044,25 @@ const ensureRemoteAiProgressionRow = async (
   if (current.error || current.row) {
     return { error: current.error, state: current.row?.state ?? null };
   }
-  const baseline = createEmptyLegacyProgressionState();
-  const { data, error } = await client
-    .from(LEGACY_REMOTE_AI_PROGRESSION_TABLE)
-    .insert(createRemoteAiProgressionPayload(userId, baseline))
-    .select('state')
-    .maybeSingle();
-  return {
-    error: error?.message ?? null,
-    state: error ? null : data?.state ?? baseline.tracks['ai-runner']
-  };
+  const initializeError = await initializeRemoteProgressionRows(client, userId);
+  if (initializeError) {
+    return { error: initializeError, state: null };
+  }
+  const initialized = await readRemoteAiProgressionRow(client, userId);
+  return { error: initialized.error, state: initialized.row?.state ?? null };
 };
 
 const invokeRemoteCompletionRpc = async (
   client: SupabaseClient,
   entry: LegacyRemoteCompletionOutboxEntry,
-  expectedRevision: number
+  expectedRevision: number,
+  expectedUserId: string
 ): Promise<{ data: unknown; error: { code?: string; message: string } | null }> => {
   const shared = {
     p_client_run_id: entry.clientRunId,
     p_completed_at: entry.completedAt,
     p_completed_level: entry.completedLevel,
+    p_expected_user_id: expectedUserId,
     p_maze_seed: entry.mazeSeed,
     p_maze_size: entry.mazeSize,
     p_receipt: entry.receipt,
@@ -1287,7 +1187,7 @@ const flushLegacyRemoteCompletionOutbox = async (
   let lastError: string | null = null;
 
   for (const entry of [...outbox.entries]) {
-    let response = await invokeRemoteCompletionRpc(client, entry, expectedRevision);
+    let response = await invokeRemoteCompletionRpc(client, entry, expectedRevision, snapshot.userId);
     if (entry.surface === 'play' && response.error?.code === '40001') {
       const refreshed = await ensureRemotePlayerProgressionRow(client, snapshot.userId);
       if (!refreshed.error && refreshed.revision !== null) {
@@ -1295,7 +1195,7 @@ const flushLegacyRemoteCompletionOutbox = async (
         if (refreshed.state) {
           resolvedState = mergeLegacyProgressionStateAdvancements(resolvedState, refreshed.state);
         }
-        response = await invokeRemoteCompletionRpc(client, entry, expectedRevision);
+        response = await invokeRemoteCompletionRpc(client, entry, expectedRevision, snapshot.userId);
       }
     }
     if (response.error) {
@@ -1551,76 +1451,45 @@ export const writeLegacyRemoteProgressionState = async (
 
   const storage = resolveRootStorage();
   const metadata = readAccountSyncMetadata(storage, snapshot.userId);
-  let expectedRevision = metadata?.progressionRevision;
-  let resolvedState = normalizeLegacyProgressionState(state);
-
-  if (expectedRevision === null || expectedRevision === undefined) {
-    const remote = await readRemoteProgressionRow(client, snapshot.userId);
-    if (remote.error) {
+  let expectedRevision = metadata?.progressionRevision ?? null;
+  if (expectedRevision === null) {
+    const initialized = await ensureRemotePlayerProgressionRow(client, snapshot.userId);
+    if (initialized.error || initialized.revision === null) {
       return createLegacyRemoteProgressionSyncResult('progression', {
-        error: remote.error,
+        error: initialized.error ?? 'Progression initialization returned no account row.',
         skippedReason: null,
         synced: false
       });
     }
-    if (!remote.row) {
-      const { data, error } = await client
-        .from(LEGACY_REMOTE_PROGRESSION_TABLE)
-        .insert(createRemoteProgressionPayload(snapshot.userId, resolvedState, 0))
-        .select('revision')
-        .maybeSingle();
-      if (error) {
-        return createLegacyRemoteProgressionSyncResult('progression', {
-          error: error.message,
-          skippedReason: null,
-          synced: false
-        });
-      }
-      expectedRevision = data ? normalizeRevision(data.revision) : 0;
-    } else {
-      const remoteState = normalizeLegacyProgressionState(remote.row.state);
-      if (mode === 'replace') {
-        return createLegacyRemoteProgressionSyncResult('progression', {
-          error: 'Reload account progress before replacing the canonical save.',
-          progressionState: remoteState,
-          skippedReason: null,
-          synced: false
-        });
-      }
-      resolvedState = mergeLegacyProgressionStateAdvancements(remoteState, resolvedState);
-      expectedRevision = remote.row.revision;
-    }
+    expectedRevision = initialized.revision;
   }
 
-  let update = await updateRemoteProgressionRow(client, snapshot.userId, resolvedState, expectedRevision);
-  if (!update.error && update.revision === null) {
+  const response = await client.rpc('mazer_reset_progression', {
+    p_expected_revision: expectedRevision,
+    p_expected_user_id: snapshot.userId
+  });
+  if (response.error) {
     const remote = await readRemoteProgressionRow(client, snapshot.userId);
-    if (remote.error || !remote.row) {
-      update = { error: remote.error ?? 'Account progression changed on another device.', revision: null };
-    } else if (mode === 'replace') {
-      resolvedState = normalizeLegacyProgressionState(remote.row.state);
-      update = { error: 'Account progression changed on another device. Reloaded the newer save.', revision: null };
-    } else {
-      resolvedState = mergeLegacyProgressionStateAdvancements(
-        normalizeLegacyProgressionState(remote.row.state),
-        resolvedState
-      );
-      update = await updateRemoteProgressionRow(client, snapshot.userId, resolvedState, remote.row.revision);
-    }
-  }
-
-  if (update.error || update.revision === null) {
     return createLegacyRemoteProgressionSyncResult('progression', {
-      error: update.error ?? 'Account progression update was not applied.',
-      ...(progressionStatesMatch(resolvedState, state) ? {} : { progressionState: resolvedState }),
+      error: response.error.message,
+      ...(remote.row ? { progressionState: normalizeLegacyProgressionState(remote.row.state) } : {}),
       skippedReason: null,
       synced: false
     });
   }
 
-  const aiError = await syncRemoteAiProgressionMirror(client, snapshot.userId, resolvedState);
+  const row = readFirstRpcRow(response.data);
+  if (!row || typeof row.revision !== 'number' || !Number.isFinite(row.revision) || !isRecord(row.state)) {
+    return createLegacyRemoteProgressionSyncResult('progression', {
+      error: 'Progression reset RPC returned an invalid canonical state.',
+      skippedReason: null,
+      synced: false
+    });
+  }
+  const resolvedState = normalizeLegacyProgressionState(row.state);
+  const nextRevision = normalizeRevision(row.revision);
   const nextMetadata: LegacyRemoteAccountSyncMetadata = {
-    progressionRevision: update.revision,
+    progressionRevision: nextRevision,
     progressionUpdatedAt: resolvedState.updatedAt,
     settingsFingerprint: metadata?.settingsFingerprint ?? null,
     settingsRevision: metadata?.settingsRevision ?? null
@@ -1631,10 +1500,10 @@ export const writeLegacyRemoteProgressionState = async (
   }
 
   return createLegacyRemoteProgressionSyncResult('progression', {
-    error: aiError,
-    ...(progressionStatesMatch(resolvedState, state) ? {} : { progressionState: resolvedState }),
+    error: null,
+    progressionState: resolvedState,
     skippedReason: null,
-    synced: aiError === null
+    synced: true
   });
 };
 
