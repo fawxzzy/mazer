@@ -11466,14 +11466,18 @@ export class MenuScene extends Phaser.Scene {
     fontSizeOverride?: number
   ): UiButton {
     const chrome = this.add.graphics();
-    const unifiedAuthPrimary = this.overlay === 'auth' && tone === 'primary';
+    const unifiedAuthDockButton = this.overlay === 'auth' && (tone === 'primary' || tone === 'danger');
+    const unifiedAuthPrimary = unifiedAuthDockButton && tone === 'primary';
+    const unifiedAuthDanger = unifiedAuthDockButton && tone === 'danger';
     // Keep the primary auth action available so an attempted empty/invalid
     // submit can reveal the field-level red outline contract. The only hard
     // disabled state is an in-flight provider request, which prevents double
     // submission without hiding validation feedback behind an inert control.
     const unifiedAuthDisabled = unifiedAuthPrimary && this.authSubmitting;
-    const colors = unifiedAuthPrimary
-      ? { fill: 0xf4f4f5, stroke: LEGACY_PLAY_TOUCH_ACCENT, text: '#050505' }
+    const colors = unifiedAuthDockButton
+      ? unifiedAuthDanger
+        ? { fill: 0xfff4f6, stroke: cyberArcadeMaterial.signal.goal, text: '#29030d' }
+        : { fill: 0xf4f4f5, stroke: LEGACY_PLAY_TOUCH_ACCENT, text: '#050505' }
       : tone === 'primary'
       ? { fill: 0x063a28, stroke: LEGACY_PLAY_TOUCH_ACCENT, text: '#ecfff5' }
       : tone === 'danger'
@@ -11481,17 +11485,22 @@ export class MenuScene extends Phaser.Scene {
         : { fill: 0x07131d, stroke: LEGACY_PLAY_TOUCH_BUTTON_STROKE, text: '#d7f7ee' };
     const draw = (active: boolean): void => {
       chrome.clear();
-      if (unifiedAuthPrimary) {
+      if (unifiedAuthDockButton) {
         const surfaceAlpha = unifiedAuthDisabled ? 0.68 : (active ? 0.94 : 1);
         const left = x - (width / 2);
         const top = y - (height / 2);
         const radius = height / 2;
-        chrome.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, (active ? 0.08 : 0.035) * surfaceAlpha);
+        const accentColor = unifiedAuthDanger ? cyberArcadeMaterial.signal.goal : LEGACY_PLAY_TOUCH_ACCENT;
+        chrome.fillStyle(accentColor, (active ? 0.08 : 0.035) * surfaceAlpha);
         chrome.fillRoundedRect(left - 2, top + 7, width + 4, height + 4, radius + 2);
-        chrome.fillStyle(LEGACY_PLAY_TOUCH_ACCENT, (active ? 0.12 : 0.065) * surfaceAlpha);
+        chrome.fillStyle(accentColor, (active ? 0.12 : 0.065) * surfaceAlpha);
         chrome.fillRoundedRect(left, top + 4, width, height + 1, radius);
-        const gradientStart = { blue: 0xf5, green: 0xf4, red: 0xf4 };
-        const gradientEnd = { blue: 0xb9, green: 0xf4, red: 0xc3 };
+        const gradientStart = unifiedAuthDanger
+          ? { blue: 0xf6, green: 0xf4, red: 0xff }
+          : { blue: 0xf5, green: 0xf4, red: 0xf4 };
+        const gradientEnd = unifiedAuthDanger
+          ? { blue: 0xc3, green: 0xb4, red: 0xff }
+          : { blue: 0xb9, green: 0xf4, red: 0xc3 };
         for (let bandTop = 0; bandTop < height; bandTop += 1) {
           const bandCenterY = bandTop + 0.5;
           const gradientProgress = Math.min(1, (bandCenterY / height) / 1.8);
@@ -11506,7 +11515,7 @@ export class MenuScene extends Phaser.Scene {
           chrome.fillStyle(bandColor, surfaceAlpha);
           chrome.fillRect(left + edgeInset, top + bandTop, width - (edgeInset * 2), 1.25);
         }
-        chrome.lineStyle(1, LEGACY_PLAY_TOUCH_ACCENT, 0.32 * surfaceAlpha);
+        chrome.lineStyle(1, accentColor, 0.32 * surfaceAlpha);
         chrome.strokeRoundedRect(left, top, width, height, radius);
         chrome.lineStyle(1, 0xffffff, 0.82 * surfaceAlpha);
         chrome.beginPath();
@@ -11534,17 +11543,17 @@ export class MenuScene extends Phaser.Scene {
     if (!unifiedAuthDisabled) {
       background.setInteractive({ useHandCursor: true });
     }
-    const fontSize = fontSizeOverride ?? (unifiedAuthPrimary ? 15 : Math.max(15, Math.min(22, Math.round(height * 0.4))));
+    const fontSize = fontSizeOverride ?? (unifiedAuthDockButton ? 15 : Math.max(15, Math.min(22, Math.round(height * 0.4))));
     const label = this.fitLegacyUiTextToWidth(this.padLegacyCompactUiText(this.add.text(
       x,
       resolveLegacyUiLabelCenterY(y, fontSize, 'button'),
       text,
       {
         color: colors.text,
-        fontFamily: unifiedAuthPrimary ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY,
+        fontFamily: unifiedAuthDockButton ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY,
         fontSize: `${fontSize}px`,
-        fontStyle: unifiedAuthPrimary ? '600' : 'normal',
-        letterSpacing: unifiedAuthPrimary ? fontSize * 0.01 : 0
+        fontStyle: unifiedAuthDockButton ? '600' : 'normal',
+        letterSpacing: unifiedAuthDockButton ? fontSize * 0.01 : 0
       }
     )), width - 32, fontSize, 12).setOrigin(0.5).setAlpha(unifiedAuthDisabled ? 0.68 : 0.96);
     this.uiTexts.push(label);

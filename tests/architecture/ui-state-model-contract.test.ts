@@ -337,6 +337,22 @@ describe('Mazer UI rework state model contract', () => {
       }
     });
 
+    it('freezes a canonical descriptor clone without invoking an untrusted get trap', () => {
+      let getCalls = 0;
+      const candidate = new Proxy({ ...DEFAULT_UI_STATE_SNAPSHOT }, {
+        get: (_target, property) => {
+          getCalls += 1;
+          throw new Error(`get trap:${String(property)}`);
+        }
+      });
+
+      expect(collectUiStateSnapshotViolations(candidate)).toEqual([]);
+      expect(() => freezeUiStateSnapshot(candidate)).not.toThrow();
+      expect(freezeUiStateSnapshot(candidate)).toEqual(DEFAULT_UI_STATE_SNAPSHOT);
+      expect(Object.isFrozen(freezeUiStateSnapshot(candidate))).toBe(true);
+      expect(getCalls).toBe(0);
+    });
+
     it('fans out an immutable normalized command so subscribers cannot rewrite intent', () => {
       const bus = createUiCommandBus();
       const observed: UiCommand[] = [];

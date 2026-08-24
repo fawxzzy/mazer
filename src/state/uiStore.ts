@@ -1,5 +1,5 @@
 import { createUiCommandBus, type UiCommand, type UiCommandBus } from './uiCommands';
-import { collectUiStateSnapshotViolations, type UiStateSnapshot } from './uiState';
+import { inspectUiStateSnapshot, type UiStateSnapshot } from './uiState';
 
 export const DEFAULT_UI_STATE_SNAPSHOT: UiStateSnapshot = Object.freeze({
   primarySurface: 'boot',
@@ -32,11 +32,11 @@ export class UiStateContractError extends Error {
 }
 
 export const freezeUiStateSnapshot = (snapshot: unknown): UiStateSnapshot => {
-  const violations = collectUiStateSnapshotViolations(snapshot);
-  if (violations.length > 0) {
-    throw new UiStateContractError('UI state snapshot failed closed.', violations);
+  const inspection = inspectUiStateSnapshot(snapshot);
+  if (inspection.snapshot === null) {
+    throw new UiStateContractError('UI state snapshot failed closed.', inspection.violations);
   }
-  return Object.freeze({ ...(snapshot as UiStateSnapshot) });
+  return Object.freeze(inspection.snapshot);
 };
 
 const patchSnapshot = (snapshot: UiStateSnapshot, patch: Partial<UiStateSnapshot>): UiStateSnapshot => (

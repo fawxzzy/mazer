@@ -1629,7 +1629,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("&& this.overlay === 'none';");
     expect(menuSceneSource).toContain('border.lineStyle(1, borderColor, borderAlpha);');
     expect(menuSceneSource).toContain('new Phaser.Curves.CubicBezier(');
-    expect(menuSceneSource).toContain("fontFamily: unifiedAuthPrimary ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY");
+    expect(menuSceneSource).toContain("fontFamily: unifiedAuthDockButton ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY");
     expect(menuSceneSource).toContain("const barHeight = this.overlay === 'auth' ? 56");
     expect(menuSceneSource).not.toContain('EMAIL OR USERNAME');
     expect(menuSceneSource).toContain('this.levelAnnouncerNumberText.setVisible(false);');
@@ -1657,6 +1657,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(clearUiSource).toContain('this.uiGraphics = [];');
     expect(menuSceneSource).toContain("panel.top + panel.height - 104,\n      'Reset progress'");
     expect(menuSceneSource).toContain("text: 'Sign out', tone: 'danger'");
+    expect(menuSceneSource).toContain("const unifiedAuthDockButton = this.overlay === 'auth' && (tone === 'primary' || tone === 'danger');");
+    expect(menuSceneSource).toContain("const unifiedAuthDanger = unifiedAuthDockButton && tone === 'danger';");
+    expect(menuSceneSource).toContain('if (unifiedAuthDockButton) {');
+    expect(menuSceneSource).toContain('const accentColor = unifiedAuthDanger ? cyberArcadeMaterial.signal.goal : LEGACY_PLAY_TOUCH_ACCENT;');
     expect(menuSceneSource).not.toContain("text: 'Log out'");
     expect(menuSceneSource).not.toContain("return 'Username saved.';");
     expect(authSource).toContain('signInWithPassword({');

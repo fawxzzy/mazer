@@ -148,23 +148,36 @@ const memberCheck = <T extends string>(
  * `null`/`undefined` throw on property access (`Cannot read properties of null/undefined`) rather
  * than producing a violation, which this top-level guard closes.
  */
-export const collectUiStateSnapshotViolations = (snapshot: unknown): UiStateSnapshotViolation[] => {
+export interface UiStateSnapshotInspection {
+  snapshot: UiStateSnapshot | null;
+  violations: UiStateSnapshotViolation[];
+}
+
+const rejectedSnapshotInspection = (
+  value: unknown,
+  message: string
+): UiStateSnapshotInspection => ({
+  snapshot: null,
+  violations: [{ field: SNAPSHOT_ROOT_FIELD, value, message }]
+});
+
+/**
+ * Inspects and canonicalizes an untrusted snapshot in one descriptor-safe pass. The returned
+ * snapshot is a new plain object built only from the inspected data descriptors, so downstream
+ * consumers never need to read the untrusted input again.
+ */
+export const inspectUiStateSnapshot = (snapshot: unknown): UiStateSnapshotInspection => {
   if (typeof snapshot !== 'object' || snapshot === null) {
-    return [{
-      field: SNAPSHOT_ROOT_FIELD,
-      value: snapshot,
-      message: `snapshot must be a non-null object, received ${snapshot === null ? 'null' : typeof snapshot}.`
-    }];
+    return rejectedSnapshotInspection(
+      snapshot,
+      `snapshot must be a non-null object, received ${snapshot === null ? 'null' : typeof snapshot}.`
+    );
   }
 
   let descriptors: PropertyDescriptorMap;
   try {
     if (Array.isArray(snapshot) || Object.getPrototypeOf(snapshot) !== Object.prototype) {
-      return [{
-        field: SNAPSHOT_ROOT_FIELD,
-        value: snapshot,
-        message: 'snapshot must be a canonical plain object.'
-      }];
+      return rejectedSnapshotInspection(snapshot, 'snapshot must be a canonical plain object.');
     }
 
     const ownKeys = Reflect.ownKeys(snapshot);
@@ -172,11 +185,7 @@ export const collectUiStateSnapshotViolations = (snapshot: unknown): UiStateSnap
       ownKeys.length !== UI_STATE_SNAPSHOT_FIELDS.length
       || ownKeys.some((key) => typeof key !== 'string' || !UI_STATE_SNAPSHOT_FIELDS.includes(key as keyof UiStateSnapshot))
     ) {
-      return [{
-        field: SNAPSHOT_ROOT_FIELD,
-        value: ownKeys,
-        message: 'snapshot must contain exactly the registered fields.'
-      }];
+      return rejectedSnapshotInspection(ownKeys, 'snapshot must contain exactly the registered fields.');
     }
 
     descriptors = Object.getOwnPropertyDescriptors(snapshot);
@@ -184,24 +193,16 @@ export const collectUiStateSnapshotViolations = (snapshot: unknown): UiStateSnap
       const descriptor = descriptors[field];
       return !descriptor || !descriptor.enumerable || !('value' in descriptor);
     })) {
-      return [{
-        field: SNAPSHOT_ROOT_FIELD,
-        value: snapshot,
-        message: 'snapshot fields must be enumerable own data properties.'
-      }];
+      return rejectedSnapshotInspection(snapshot, 'snapshot fields must be enumerable own data properties.');
     }
   } catch {
-    return [{
-      field: SNAPSHOT_ROOT_FIELD,
-      value: snapshot,
-      message: 'snapshot representation could not be inspected safely.'
-    }];
+    return rejectedSnapshotInspection(snapshot, 'snapshot representation could not be inspected safely.');
   }
 
   const candidate = Object.fromEntries(
     UI_STATE_SNAPSHOT_FIELDS.map((field) => [field, descriptors[field]?.value])
-  ) as Record<keyof UiStateSnapshot, unknown>;
-  return [
+  ) as UiStateSnapshot;
+  const violations = [
     memberCheck('primarySurface', candidate.primarySurface, PRIMARY_SURFACES),
     memberCheck('modalSurface', candidate.modalSurface, MODAL_SURFACES),
     memberCheck('gamePhase', candidate.gamePhase, GAME_PHASES),
@@ -212,4 +213,13 @@ export const collectUiStateSnapshotViolations = (snapshot: unknown): UiStateSnap
     memberCheck('motionMode', candidate.motionMode, MOTION_MODES),
     memberCheck('effectsQuality', candidate.effectsQuality, EFFECTS_QUALITY)
   ].filter((entry): entry is UiStateSnapshotViolation => entry !== null);
+
+  return {
+    snapshot: violations.length === 0 ? candidate : null,
+    violations
+  };
 };
+
+export const collectUiStateSnapshotViolations = (snapshot: unknown): UiStateSnapshotViolation[] => (
+  inspectUiStateSnapshot(snapshot).violations
+);
