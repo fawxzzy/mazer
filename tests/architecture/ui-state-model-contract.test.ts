@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -16,6 +16,22 @@ import {
   collectUiStateSnapshotViolations,
   type UiStateSnapshot
 } from '../../src/state/uiState';
+import {
+  UI_COMMAND_TYPES,
+  UiCommandContractError,
+  collectUiCommandViolations,
+  createUiCommandBus,
+  type UiCommand
+} from '../../src/state/uiCommands';
+import {
+  DEFAULT_UI_STATE_SNAPSHOT,
+  UiStateContractError,
+  createUiStore,
+  freezeUiStateSnapshot
+} from '../../src/state/uiStore';
+import { PLATFORM_PROFILES } from '../../src/state/uiProfiles';
+import { UI_VIEW_MODEL_NAMES, createUiViewModels } from '../../src/state/uiViewModels';
+import { projectLegacyUiState } from '../../src/state/uiLegacyProjection';
 
 interface StateModelViolation {
   rule: string;
@@ -216,10 +232,240 @@ describe('Mazer UI rework state model contract', () => {
       ]);
     });
 
-    it('collectUiStateSnapshotViolations reports one violation per field for a well-formed-but-empty object', () => {
+    it('collectUiStateSnapshotViolations rejects an empty object at the exact-shape boundary', () => {
       const violations = collectUiStateSnapshotViolations({} as unknown as UiStateSnapshot);
-      expect(violations).toHaveLength(9);
-      expect(violations.every((entry) => entry.value === undefined)).toBe(true);
+      expect(violations).toEqual([
+        expect.objectContaining({ field: '(snapshot)', message: expect.stringContaining('exactly') })
+      ]);
+    });
+  });
+
+  describe('exhaustive command and sole-dispatch store contract', () => {
+    it('mirrors every authoritative command and view-model name', async () => {
+      const { readUiStateModel } = await loadChecker();
+      const model = readUiStateModel() as Record<string, string[]>;
+      expect([...UI_COMMAND_TYPES]).toEqual(model.commands);
+      expect([...UI_VIEW_MODEL_NAMES]).toEqual(model.viewModels);
+    });
+
+    it('fails closed on unknown, malformed, or over-posted commands', () => {
+      expect(collectUiCommandViolations({ type: 'NOT_A_COMMAND' })).toEqual([
+        expect.objectContaining({ path: 'type' })
+      ]);
+      expect(collectUiCommandViolations({ type: 'NAVIGATE', surface: 'home', surprise: true })).toEqual([
+        expect.objectContaining({ path: '(command)' })
+      ]);
+      expect(collectUiCommandViolations({ type: 'OPEN_MODAL', modal: 'none' })).toEqual([
+        expect.objectContaining({ path: 'modal' })
+      ]);
+      expect(collectUiCommandViolations({ type: 'SET_PREFERENCE', key: 'quality', value: Number.NaN })).toEqual([
+        expect.objectContaining({ path: 'key' })
+      ]);
+      const throwingPrototype = new Proxy({}, { getPrototypeOf: () => { throw new Error('trap'); } });
+      expect(() => collectUiCommandViolations(throwingPrototype)).not.toThrow();
+      expect(collectUiCommandViolations(throwingPrototype)).toEqual([
+        expect.objectContaining({ path: '(command)' })
+      ]);
+    });
+
+    it('implements a fail-closed subscribe/dispatch command bus', () => {
+      const bus = createUiCommandBus();
+      const commands: UiCommand[] = [];
+      const unsubscribe = bus.subscribe((command) => commands.push(command));
+      bus.dispatch({ type: 'START_RUN' });
+      expect(commands).toEqual([{ type: 'START_RUN' }]);
+      unsubscribe();
+      bus.dispatch({ type: 'RETURN_HOME' });
+      expect(commands).toHaveLength(1);
+      expect(() => bus.dispatch({ type: 'UNKNOWN' } as unknown as UiCommand)).toThrow(UiCommandContractError);
+    });
+
+    it('advances UI-owned immutable snapshots only through store dispatch and notifies subscribers', () => {
+      const bus = createUiCommandBus();
+      const emitted: UiCommand[] = [];
+      bus.subscribe((command) => emitted.push(command));
+      const store = createUiStore(DEFAULT_UI_STATE_SNAPSHOT, bus);
+      const initial = store.getSnapshot();
+      const calls: Array<{ next: UiStateSnapshot; previous: UiStateSnapshot; command: UiCommand }> = [];
+      const unsubscribe = store.subscribe((next, previous, command) => calls.push({ next, previous, command }));
+
+      const next = store.dispatch({ type: 'NAVIGATE', surface: 'settings' });
+      expect(next).toEqual(expect.objectContaining({ primarySurface: 'settings', gamePhase: 'idle' }));
+      expect(next).not.toBe(initial);
+      expect(Object.isFrozen(next)).toBe(true);
+      expect(initial).toEqual(DEFAULT_UI_STATE_SNAPSHOT);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].previous).toBe(initial);
+      expect(calls[0].command).toEqual({ type: 'NAVIGATE', surface: 'settings' });
+
+      const afterPreference = store.dispatch({ type: 'SET_PREFERENCE', key: 'motionMode', value: 'reduced' });
+      expect(afterPreference.motionMode).toBe('reduced');
+
+      const beforeDomainCommand = store.getSnapshot();
+      const afterDomainCommand = store.dispatch({ type: 'START_RUN' });
+      expect(afterDomainCommand).toBe(beforeDomainCommand);
+      expect(afterDomainCommand.gamePhase).toBe('idle');
+      expect(emitted.at(-1)).toEqual({ type: 'START_RUN' });
+      unsubscribe();
+    });
+
+    it('rejects an invalid runtime command instead of silently transitioning', () => {
+      const store = createUiStore(DEFAULT_UI_STATE_SNAPSHOT);
+      expect(() => store.dispatch({ type: 'UNKNOWN' } as unknown as UiCommand)).toThrow(UiCommandContractError);
+    });
+
+    it('rejects noncanonical snapshot representations without throwing or preserving extra fields', () => {
+      const valid = { ...DEFAULT_UI_STATE_SNAPSHOT };
+      const arraySnapshot = Object.assign([], valid);
+      const customPrototypeSnapshot = Object.assign(Object.create({ inherited: true }), valid);
+      const overPostedSnapshot = { ...valid, admin: true };
+      const accessorSnapshot = { ...valid } as Record<string, unknown>;
+      Object.defineProperty(accessorSnapshot, 'primarySurface', {
+        enumerable: true,
+        get: () => { throw new Error('trap'); }
+      });
+      const proxySnapshot = new Proxy({ ...valid }, {
+        ownKeys: () => { throw new Error('trap'); }
+      });
+
+      for (const candidate of [arraySnapshot, customPrototypeSnapshot, overPostedSnapshot, accessorSnapshot, proxySnapshot]) {
+        expect(() => collectUiStateSnapshotViolations(candidate)).not.toThrow();
+        expect(collectUiStateSnapshotViolations(candidate)).toEqual([
+          expect.objectContaining({ field: '(snapshot)' })
+        ]);
+        expect(() => freezeUiStateSnapshot(candidate)).toThrow(UiStateContractError);
+      }
+    });
+
+    it('freezes a canonical descriptor clone without invoking an untrusted get trap', () => {
+      let getCalls = 0;
+      const candidate = new Proxy({ ...DEFAULT_UI_STATE_SNAPSHOT }, {
+        get: (_target, property) => {
+          getCalls += 1;
+          throw new Error(`get trap:${String(property)}`);
+        }
+      });
+
+      expect(collectUiStateSnapshotViolations(candidate)).toEqual([]);
+      expect(() => freezeUiStateSnapshot(candidate)).not.toThrow();
+      expect(freezeUiStateSnapshot(candidate)).toEqual(DEFAULT_UI_STATE_SNAPSHOT);
+      expect(Object.isFrozen(freezeUiStateSnapshot(candidate))).toBe(true);
+      expect(getCalls).toBe(0);
+    });
+
+    it('fans out an immutable normalized command so subscribers cannot rewrite intent', () => {
+      const bus = createUiCommandBus();
+      const observed: UiCommand[] = [];
+      bus.subscribe((command) => {
+        try {
+          (command as { surface?: string }).surface = 'settings';
+          if (command.type === 'SUBMIT_AUTH') {
+            (command.payload as Record<string, string>).username = 'mutated';
+          }
+        } catch {
+          // Frozen input is the expected boundary; later listeners must still receive the original.
+        }
+      });
+      bus.subscribe((command) => observed.push(command));
+
+      bus.dispatch({ type: 'NAVIGATE', surface: 'home' });
+      bus.dispatch({ type: 'SUBMIT_AUTH', intent: 'sign-in', payload: { username: 'original' } });
+
+      expect(observed[0]).toEqual({ type: 'NAVIGATE', surface: 'home' });
+      expect(Object.isFrozen(observed[0])).toBe(true);
+      expect(observed[1]).toEqual({
+        type: 'SUBMIT_AUTH',
+        intent: 'sign-in',
+        payload: { username: 'original' }
+      });
+      expect(Object.isFrozen(observed[1])).toBe(true);
+      expect(observed[1].type === 'SUBMIT_AUTH' && Object.isFrozen(observed[1].payload)).toBe(true);
+    });
+  });
+
+  describe('immutable renderer-independent view models and legacy projection', () => {
+    it('builds geometry-free frozen view models for all registered families', () => {
+      const snapshot: UiStateSnapshot = Object.freeze({
+        ...DEFAULT_UI_STATE_SNAPSHOT,
+        primarySurface: 'play',
+        gamePhase: 'active',
+        authPhase: 'authenticated',
+        installPhase: 'available',
+        controlMode: 'stick'
+      });
+      const viewModels = createUiViewModels(snapshot, PLATFORM_PROFILES.mobile);
+      expect(viewModels.gameplayHud).toEqual({ visible: true, gamePhase: 'active', paused: false });
+      expect(viewModels.controlSurface).toEqual({ visible: true, mode: 'stick', enabled: true });
+      expect(Object.isFrozen(viewModels)).toBe(true);
+      expect(Object.isFrozen(viewModels.gameplayHud)).toBe(true);
+      expect(JSON.stringify(viewModels)).not.toMatch(/\b(?:x|y|width|height|bounds)\b/);
+    });
+
+    it('projects explicit legacy facts without mutation and fails closed on malformed facts', () => {
+      const input = Object.freeze({
+        mode: 'play',
+        overlay: 'pause',
+        gamePhase: 'active',
+        authPhase: 'authenticated',
+        connectionPhase: 'online',
+        installPhase: 'hidden',
+        controlMode: 'keyboard',
+        motionMode: 'system',
+        effectsQuality: 'balanced'
+      });
+      const result = projectLegacyUiState(input);
+      expect(result).toEqual({
+        ok: true,
+        snapshot: {
+          primarySurface: 'play',
+          modalSurface: 'none',
+          gamePhase: 'paused',
+          authPhase: 'authenticated',
+          connectionPhase: 'online',
+          installPhase: 'hidden',
+          controlMode: 'keyboard',
+          motionMode: 'system',
+          effectsQuality: 'balanced'
+        }
+      });
+      expect(Object.isFrozen(result)).toBe(true);
+      expect(input.gamePhase).toBe('active');
+
+      const malformed = projectLegacyUiState({ ...input, overlay: 'two-overlays' });
+      expect(malformed).toEqual({ ok: false, violations: [expect.objectContaining({ field: 'overlay' })] });
+
+      expect(projectLegacyUiState({ ...input, mode: 'menu', overlay: 'auth' })).toEqual({
+        ok: true,
+        snapshot: expect.objectContaining({ primarySurface: 'account', modalSurface: 'none' })
+      });
+      expect(projectLegacyUiState({ ...input, mode: 'menu', overlay: 'confirm-progression-reset' })).toEqual({
+        ok: true,
+        snapshot: expect.objectContaining({ primarySurface: 'home', modalSurface: 'confirm-reset-progress' })
+      });
+      expect(projectLegacyUiState({ ...input, mode: 'menu', overlay: 'leaderboard' })).toEqual({
+        ok: true,
+        snapshot: expect.objectContaining({ primarySurface: 'leaderboard', modalSurface: 'none' })
+      });
+      const throwingPrototype = new Proxy({}, { getPrototypeOf: () => { throw new Error('trap'); } });
+      expect(() => projectLegacyUiState(throwingPrototype)).not.toThrow();
+      expect(projectLegacyUiState(throwingPrototype)).toEqual({
+        ok: false,
+        violations: [expect.objectContaining({ field: '(input)' })]
+      });
+    });
+
+    it('keeps shared state modules renderer-independent', () => {
+      for (const path of [
+        'src/state/uiCommands.ts',
+        'src/state/uiStore.ts',
+        'src/state/uiProfiles.ts',
+        'src/state/uiViewModels.ts',
+        'src/state/uiLegacyProjection.ts'
+      ]) {
+        const source = readFileSync(path, 'utf8');
+        expect(source).not.toMatch(/from\s+['"][^'"]*(?:phaser|MenuScene|\/dom\/)[^'"]*['"]/i);
+        expect(source).not.toMatch(/\b(?:document|window|HTMLElement)\b/);
+      }
     });
   });
 

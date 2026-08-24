@@ -4,7 +4,7 @@
 
 Wave 0A ("Decision registry and architecture guardrails") of the Mazer UI rework. This document and its machine-readable companion, `docs/contracts/mazer-ui-rework-decision-registry.v1.json`, register the locked planning decisions from the `mazer-everything-bundle-20260803` authoritative handoff. Wave 0A's ownership is new docs/specs/tests only, with no runtime visual mutation — none of the decisions below are implemented by this wave. They are registered so later waves (1 through 7) and their architecture tests have a single source of truth to build against and be checked against.
 
-Per `spec/pr-lanes.json` in the bundle, lane 0A has `exclusiveFiles: []` — it owns nothing exclusively and must not touch any file another lane needs, including every file PR #83 and PR #82 currently own.
+The obsolete PR #83/#131 branch hold is retired. Shared paths now follow explicit dependency-ordered wave ownership; a branch name never grants an exception. Wave 1B's concrete token exports (`src/theme/tokens.ts` and `src/theme/tokens.css`) are registered rather than described as future/nonexistent.
 
 ## Decisions registered
 
@@ -20,7 +20,7 @@ Each decision below has a stable ID in the registry JSON (`decisions[].id`).
 8. `planet3d-isolated-lab-excluded-from-core-v1` — `planet3d.html` is an isolated lab, excluded from core-v1 release acceptance.
 9. `future-phaser-retire-after-adapter-extraction` — `future-phaser.html` is slated for adapter-lesson extraction into tests, then entrypoint retirement.
 10. `no-big-bang-menuscene-rewrite` — `MenuScene.ts` is decomposed through characterization and adapters across later waves, never replaced in one rewrite.
-11. `pr83-protected-paths-hold` — PR #83's collision paths stay protected/single-owner until its disposition clears via a later, integrator-exclusive reconciliation PR (Wave 0B) — not this lane.
+11. `dependency-ordered-integrator-wave-ownership` — Former PR #83/#131 vehicles are superseded; shared paths move only in their declared wave under one exclusive writer and a fresh current-main preflight.
 12. `no-redesign-complete-without-acceptance-matrix` — No lane may claim the redesign complete before the bundle's nine-point Definition of Complete passes.
 
 ## Registry shape
@@ -33,7 +33,7 @@ Each decision below has a stable ID in the registry JSON (`decisions[].id`).
 - `shippingPresentation` — `default: "corridor"`, `tileSquareIsDefault: false`.
 - `entrypoints` — the bundle's `spec/surface-disposition.json` classifications, reused directly and cross-checked against the live repository's HTML entrypoints by the architecture-contract test.
 - `coreReleaseAcceptanceSet` — explicitly `["index.html"]` only; `planet3d.html` must never appear here.
-- `watchPass`, `planet3d`, `menuSceneDecomposition`, `prProtection`, `redesignComplete` — typed sections mirroring decisions 7, 8, 10, 11, and 12 respectively, in a shape a validator can check directly instead of re-parsing prose.
+- `watchPass`, `planet3d`, `menuSceneDecomposition`, `integratorWaveOwnership`, `redesignComplete` — typed sections mirroring decisions 7, 8, 10, 11, and 12 respectively, in a shape a validator can check directly instead of re-parsing prose.
 
 ## Verification spine
 
@@ -41,7 +41,7 @@ Each decision below has a stable ID in the registry JSON (`decisions[].id`).
 
 - asserts it currently passes with zero violations against the live repository (including live entrypoint-existence cross-checks);
 - constructs mutated in-memory copies of the registry that each violate exactly one rule (a second public canonical theme, a profile mislabeled as a theme, Watch Pass claiming production billing, Planet 3D added to the core release acceptance set, tile-square marked as the shipping default, a proof/lab entrypoint reclassified to `product`/`releaseGate: true` without a justifying decision reference, a duplicate decision ID, and an unknown decision-ID reference) and asserts the checker rejects each one;
-- runs the same protected-path checker against the real `git status --short` output of this working tree and asserts none of `prProtection.protectedPaths` appear as modified/untracked.
+- runs the dependency-ordered ownership checker against the real committed and uncommitted changed-file set and rejects any path assigned to a different `integratorWaveOwnership` wave.
 
 Run in isolation with `npx vitest run tests/architecture/decision-registry-contract.test.ts`, or as part of `npm run test:architecture` (`vitest run tests/architecture`).
 

@@ -29,6 +29,20 @@ const CATEGORY_KEYS = [
   'effectsQuality'
 ];
 
+const EXPECTED_COMMANDS = Object.freeze([
+  'NAVIGATE', 'OPEN_MODAL', 'CLOSE_MODAL', 'START_RUN', 'CANCEL_GENERATION',
+  'PAUSE_RUN', 'RESUME_RUN', 'RESET_RUN', 'RESET_PROGRESS', 'RETURN_HOME',
+  'SET_PREFERENCE', 'SET_CONTROL_MODE', 'SUBMIT_AUTH', 'LOG_OUT', 'INSTALL_APP',
+  'DISMISS_INSTALL', 'APPLY_UPDATE', 'RETRY_SYSTEM_ACTION',
+  'DISPATCH_DIRECTIONAL_INTENT', 'RELEASE_DIRECTIONAL_INTENT'
+]);
+
+const EXPECTED_VIEW_MODELS = Object.freeze([
+  'HomeViewModel', 'AuthViewModel', 'GameplayHudViewModel', 'ControlSurfaceViewModel',
+  'SettingsViewModel', 'GuideViewModel', 'LeaderboardViewModel', 'ResultViewModel', 'SystemStatusViewModel',
+  'WatchPassViewModel'
+]);
+
 const checkCategoryShape = (model) => {
   const violations = [];
   for (const key of CATEGORY_KEYS) {
@@ -100,6 +114,12 @@ const checkInvariants = (model) => {
   return violations;
 };
 
+const checkExactOrderedList = (model, key, expected) => (
+  JSON.stringify(model?.[key]) === JSON.stringify(expected)
+    ? []
+    : [violation(`${key}-contract-drift`, key, `"${key}" must exactly match the authoritative Wave 1A contract.`)]
+);
+
 const checkDecisionRefs = (model, root) => {
   const violations = [];
   let decisionRegistry;
@@ -131,6 +151,8 @@ export const collectUiStateModelViolations = (model, root = repoRoot) => ([
   ...checkCategoryShape(model),
   ...checkModalSurfacesIncludesNone(model),
   ...checkInvariants(model),
+  ...checkExactOrderedList(model, 'commands', EXPECTED_COMMANDS),
+  ...checkExactOrderedList(model, 'viewModels', EXPECTED_VIEW_MODELS),
   ...checkDecisionRefs(model, root)
 ]);
 

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "wave": "1A",
+  "status": "registered-not-wired",
+  "sourceRef": "01_FINAL_AUTHORITATIVE_HANDOFF/spec/platform-profiles.json (mazer-everything-bundle-20260803)",
+  "decisionRefs": [
+    "profiles-not-themes",
+    "renderer-ownership-split"
+  ],
+  "profiles": {
+    "web": { "auth": true, "sync": true, "input": ["keyboard", "pointer", "touch"], "chrome": "full" },
+    "mobile": { "auth": true, "sync": true, "input": ["touch", "keyboard"], "chrome": "compact" },
+    "desktop": { "auth": true, "sync": true, "input": ["keyboard", "pointer"], "chrome": "full" },
+    "tv": { "auth": "configurable", "sync": "optional", "input": ["controller", "remote"], "chrome": "distance" },
+    "obs": { "auth": false, "sync": "optional", "input": ["external"], "chrome": "minimal" },
+    "arcade": { "auth": false, "sync": "optional", "input": ["hardware"], "chrome": "kiosk" },
+    "cyberdeck": { "auth": "optional", "sync": "optional", "input": ["hardware", "touch", "keyboard"], "chrome": "configurable" }
+  }
+}

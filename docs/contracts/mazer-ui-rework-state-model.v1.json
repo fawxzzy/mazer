@@ -1,19 +1,20 @@
 {
   "schemaVersion": 1,
   "wave": "1A",
-  "status": "registered-not-wired",
+  "status": "shared-foundation-complete-not-wired",
   "sourceRef": "01_FINAL_AUTHORITATIVE_HANDOFF/spec/ui-state-model.json (mazer-everything-bundle-20260803)",
   "decisionRefs": [
     "renderer-ownership-split",
     "no-big-bang-menuscene-rewrite"
   ],
-  "notes": "Wave 1A ('State/commands/view models') per blueprint/09_MIGRATION_WAVES_AND_PR_LANES.md and spec/pr-lanes.json lane 1A ('shared contract exports'). This registry is the single source of truth src/state/uiState.ts is hand-derived from, and scripts/check-ui-state-model.mjs cross-checks the TS side against. It defines the renderer-independent UI state snapshot shape (primary surface, modal surface, game/auth/connection/install phases, control/motion modes, effects quality) that both the existing Phaser MenuScene and any future DOM UI layer can consume identically, per the 'Phaser owns the world; DOM owns application UI' split (decision renderer-ownership-split). No file in this wave is wired into index.html, vite.config.ts, MenuScene.ts, or any other protected/live-render path -- per Wave 1's own acceptance criteria ('no gameplay/UI behavior change; old captures remain structurally equivalent'), the still-open PR83_PROTECTED_HOLD status of src/scenes/MenuScene.ts, and decision no-big-bang-menuscene-rewrite ('MenuScene.ts is decomposed through characterization and adapters, not replaced in one rewrite'). This is registration and shared-contract plumbing only, not a state migration.",
+  "notes": "Wave 1A completes the renderer-independent state, command, store, profile, view-model, component-registry, and pure legacy-projection foundation declared by the authoritative handoff. Nothing in this wave imports or changes MenuScene, Phaser, DOM APIs, live rendering, gameplay, Auth/provider behavior, or persistence. The former PR #83/#131 branch hold is superseded by dependency-ordered wave ownership; real scene wiring remains Wave 3A.",
   "primarySurfaces": [
     "boot",
     "home",
     "account",
     "settings",
     "guide",
+    "leaderboard",
     "play",
     "result",
     "system-error",
@@ -81,6 +82,40 @@
     "low",
     "balanced",
     "high"
+  ],
+  "commands": [
+    "NAVIGATE",
+    "OPEN_MODAL",
+    "CLOSE_MODAL",
+    "START_RUN",
+    "CANCEL_GENERATION",
+    "PAUSE_RUN",
+    "RESUME_RUN",
+    "RESET_RUN",
+    "RESET_PROGRESS",
+    "RETURN_HOME",
+    "SET_PREFERENCE",
+    "SET_CONTROL_MODE",
+    "SUBMIT_AUTH",
+    "LOG_OUT",
+    "INSTALL_APP",
+    "DISMISS_INSTALL",
+    "APPLY_UPDATE",
+    "RETRY_SYSTEM_ACTION",
+    "DISPATCH_DIRECTIONAL_INTENT",
+    "RELEASE_DIRECTIONAL_INTENT"
+  ],
+  "viewModels": [
+    "HomeViewModel",
+    "AuthViewModel",
+    "GameplayHudViewModel",
+    "ControlSurfaceViewModel",
+    "SettingsViewModel",
+    "GuideViewModel",
+    "LeaderboardViewModel",
+    "ResultViewModel",
+    "SystemStatusViewModel",
+    "WatchPassViewModel"
   ],
   "invariants": [
     "exactly-one-primary-surface",

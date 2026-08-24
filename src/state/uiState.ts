@@ -10,7 +10,8 @@
  *
  * This module is not imported by src/scenes/MenuScene.ts, src/boot/*, or any other live-render
  * path yet -- see docs/architecture/MAZER-UI-REWORK-STATE-MODEL.md for what this wave does and
- * does not do. No legacy state is mapped into this shape yet; that mapping is a later wave's work.
+ * does not do. A pure legacy projection fixture exists in this wave, but live scene wiring remains
+ * a later wave's work.
  *
  * Deliberately NOT implemented as `stateModelJson.primarySurfaces as PrimarySurfaceLiteral[]`
  * (casting the JSON import straight into a typed array): a bare `as` cast between an array typed
@@ -26,7 +27,7 @@
 import stateModel from '../../docs/contracts/mazer-ui-rework-state-model.v1.json';
 
 export const PRIMARY_SURFACES = [
-  'boot', 'home', 'account', 'settings', 'guide', 'play', 'result', 'system-error',
+  'boot', 'home', 'account', 'settings', 'guide', 'leaderboard', 'play', 'result', 'system-error',
   'watch-pass-setup', 'watch-pass-preview'
 ] as const;
 export type PrimarySurfaceLiteral = (typeof PRIMARY_SURFACES)[number];
@@ -99,6 +100,18 @@ export interface UiStateSnapshot {
 // "one field's value was out of range" if they need to.
 const SNAPSHOT_ROOT_FIELD = '(snapshot)' as const;
 
+const UI_STATE_SNAPSHOT_FIELDS = [
+  'primarySurface',
+  'modalSurface',
+  'gamePhase',
+  'authPhase',
+  'connectionPhase',
+  'installPhase',
+  'controlMode',
+  'motionMode',
+  'effectsQuality'
+] as const satisfies readonly (keyof UiStateSnapshot)[];
+
 export interface UiStateSnapshotViolation {
   field: keyof UiStateSnapshot | typeof SNAPSHOT_ROOT_FIELD;
   value: unknown;
@@ -112,7 +125,7 @@ const memberCheck = <T extends string>(
 ): UiStateSnapshotViolation | null => (
   (allowed as readonly unknown[]).includes(value)
     ? null
-    : { field, value, message: `"${field}" value ${JSON.stringify(value)} is not one of ${JSON.stringify(allowed)}.` }
+    : { field, value, message: `"${field}" must be one of the registered values.` }
 );
 
 /**
@@ -135,17 +148,61 @@ const memberCheck = <T extends string>(
  * `null`/`undefined` throw on property access (`Cannot read properties of null/undefined`) rather
  * than producing a violation, which this top-level guard closes.
  */
-export const collectUiStateSnapshotViolations = (snapshot: unknown): UiStateSnapshotViolation[] => {
+export interface UiStateSnapshotInspection {
+  snapshot: UiStateSnapshot | null;
+  violations: UiStateSnapshotViolation[];
+}
+
+const rejectedSnapshotInspection = (
+  value: unknown,
+  message: string
+): UiStateSnapshotInspection => ({
+  snapshot: null,
+  violations: [{ field: SNAPSHOT_ROOT_FIELD, value, message }]
+});
+
+/**
+ * Inspects and canonicalizes an untrusted snapshot in one descriptor-safe pass. The returned
+ * snapshot is a new plain object built only from the inspected data descriptors, so downstream
+ * consumers never need to read the untrusted input again.
+ */
+export const inspectUiStateSnapshot = (snapshot: unknown): UiStateSnapshotInspection => {
   if (typeof snapshot !== 'object' || snapshot === null) {
-    return [{
-      field: SNAPSHOT_ROOT_FIELD,
-      value: snapshot,
-      message: `snapshot must be a non-null object, received ${snapshot === null ? 'null' : typeof snapshot}.`
-    }];
+    return rejectedSnapshotInspection(
+      snapshot,
+      `snapshot must be a non-null object, received ${snapshot === null ? 'null' : typeof snapshot}.`
+    );
   }
 
-  const candidate = snapshot as Record<keyof UiStateSnapshot, unknown>;
-  return [
+  let descriptors: PropertyDescriptorMap;
+  try {
+    if (Array.isArray(snapshot) || Object.getPrototypeOf(snapshot) !== Object.prototype) {
+      return rejectedSnapshotInspection(snapshot, 'snapshot must be a canonical plain object.');
+    }
+
+    const ownKeys = Reflect.ownKeys(snapshot);
+    if (
+      ownKeys.length !== UI_STATE_SNAPSHOT_FIELDS.length
+      || ownKeys.some((key) => typeof key !== 'string' || !UI_STATE_SNAPSHOT_FIELDS.includes(key as keyof UiStateSnapshot))
+    ) {
+      return rejectedSnapshotInspection(ownKeys, 'snapshot must contain exactly the registered fields.');
+    }
+
+    descriptors = Object.getOwnPropertyDescriptors(snapshot);
+    if (UI_STATE_SNAPSHOT_FIELDS.some((field) => {
+      const descriptor = descriptors[field];
+      return !descriptor || !descriptor.enumerable || !('value' in descriptor);
+    })) {
+      return rejectedSnapshotInspection(snapshot, 'snapshot fields must be enumerable own data properties.');
+    }
+  } catch {
+    return rejectedSnapshotInspection(snapshot, 'snapshot representation could not be inspected safely.');
+  }
+
+  const candidate = Object.fromEntries(
+    UI_STATE_SNAPSHOT_FIELDS.map((field) => [field, descriptors[field]?.value])
+  ) as UiStateSnapshot;
+  const violations = [
     memberCheck('primarySurface', candidate.primarySurface, PRIMARY_SURFACES),
     memberCheck('modalSurface', candidate.modalSurface, MODAL_SURFACES),
     memberCheck('gamePhase', candidate.gamePhase, GAME_PHASES),
@@ -156,4 +213,13 @@ export const collectUiStateSnapshotViolations = (snapshot: unknown): UiStateSnap
     memberCheck('motionMode', candidate.motionMode, MOTION_MODES),
     memberCheck('effectsQuality', candidate.effectsQuality, EFFECTS_QUALITY)
   ].filter((entry): entry is UiStateSnapshotViolation => entry !== null);
+
+  return {
+    snapshot: violations.length === 0 ? candidate : null,
+    violations
+  };
 };
+
+export const collectUiStateSnapshotViolations = (snapshot: unknown): UiStateSnapshotViolation[] => (
+  inspectUiStateSnapshot(snapshot).violations
+);
