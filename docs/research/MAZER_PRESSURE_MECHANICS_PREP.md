@@ -1,47 +1,28 @@
 # Mazer Pressure Mechanics Prep
 
-Date: 2026-07-07
-Status: preparation
+Date: 2026-08-24
+Status: superseded by explicit no-play-object product decision
 
 ## Goal
 
-Prepare the current mobile maze game for timed play with bounded hazards, enemies, and fast control decisions without breaking the existing grid-movement proof spine.
+Record the retired pressure-mechanics direction without leaving dormant gameplay objects or an implied activation lane in current source.
 
 ## Current Decision
 
-Keep movement grid-legal and predictable. The stick may resolve a richer intent wheel, but the player still commits to one-tile cardinal or ordered cardinal-diagonal steps. This matters because future enemies, hazards, and timed routes need deterministic collision and replayable proof.
+Live play contains only the player, goal, trail, and presentation effects. The static slow tile and patrol agent are retired from source, tests, scene state, timing, collision, rendering, and raw runtime diagnostics. Fixed world-semantic v1 `pressure` and `patrol` fields remain forced-null tombstones for capture compatibility.
 
-The dormant room-candidate and room-preview subsystem is retired. Natural open floor patches remain ordinary maze topology, but rooms are no longer a pressure-mechanics prerequisite or planned source lane.
+Maze generation, naturally open floor geometry, player/menu-AI progression, bounded difficulty, input, the player/goal/trail, and the generic non-live UI projection modules remain unchanged. A future gameplay object requires a new product contract and source lane; it cannot reactivate retired code.
 
-## Safe Next Lanes
+## Reopening Gate
 
-1. Control pressure lane
-   - Add stick hysteresis so small thumb jitter near segment boundaries does not flip directions.
-   - Keep ordered fallback candidates for branch selection.
-   - Verify with live diagnostics: active controls, pull segment, release clearing, frame spikes.
-
-2. Hazard and obstacle lane
-   - Start with static hazards or slow timed gates before mobile enemies.
-   - Hazards should occupy legal floor tiles and expose diagnostics for position, active state, and collision effect.
-   - Avoid random unavoidable damage; every hazard placement needs an escape or alternate route check.
-
-3. Enemy lane
-   - Start with one predictable patrol agent using the existing graph/floor topology.
-   - Enemy movement should be slower than player held movement and publish route diagnostics.
-   - Collision semantics should be explicit: reset, time penalty, stun, or trail cut. Do not mix these until one model is chosen.
-
-4. Timing lane
-   - Keep the current timer as the source of pressure.
-   - Add objective timing only after controls and hazards are stable.
-   - Any score/rank system should be derived from deterministic attempt state, not rendering frames.
+Any future object mechanic must start as a new bounded proposal with explicit visual identity, collision semantics, fairness/escape proof, lifecycle timing, diagnostics, accessibility, and player-facing acceptance. No retired module is a reusable activation dependency.
 
 ## Risks
 
-- Treating naturally open floor patches as activated rooms would reintroduce a retired contract and blur maze identity.
-- Adding enemies before control feel is stable will make input bugs feel like enemy unfairness.
-- Adding 16/32-way movement to a grid maze would break collision clarity; use richer intent only to choose valid grid moves.
-- More animated actors can reintroduce frame spikes unless runtime diagnostics track entity counts and update cadence.
+- A stale build or cached service worker can still show the historical red-to-grey slow tile; source proof must therefore bind the exact built asset and diagnostics.
+- Generic `boardRenderer` / `menuIntentRuntime` object projections are non-live architecture and must not become `MenuScene` imports without a new product decision.
+- New object mechanics could collide with input fairness, performance, maze readability, and lifecycle timing unless independently specified and proved.
 
 ## Next Best Build Packet
 
-Keep stick hysteresis proof current, then advance only one independently designed hazard or enemy packet at a time. That order protects play feel without reviving the retired room subsystem.
+Keep play object-free. Continue the dependency-ordered UI/runtime bridge and player-centered zoom work; treat any future object concept as a separately authorized product lane.

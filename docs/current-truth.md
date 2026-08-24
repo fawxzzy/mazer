@@ -15,7 +15,8 @@ This supersedes the prior screenshot-grade visual 1:1 target as the main impleme
 - the dormant room-candidate metadata, activation-plan, preview-cue, and preview-edge contracts are retired from source, tests, and runtime diagnostics
 - Mazer does not generate, activate, render, or persist rooms, and room eligibility is not a difficulty-band property
 - naturally occurring branches, intersections, and open `2x2` floor areas remain ordinary maze topology; this decision does not authorize rewriting the generator to eliminate them
-- static slow-tile and patrol-agent contracts remain independent pressure mechanics, and no provider, persistence, progression, or gameplay boundary changes with this retirement
+- the dormant static slow-tile and patrol-agent modules, tests, play state, timers, collisions, rendering, and raw runtime diagnostics are retired; fixed world-semantic v1 `patrol` / `pressure` keys remain forced-null compatibility tombstones only
+- live play contains no non-player/non-goal gameplay object at any ordinal, bounded difficulty, or maze seed; maze generation, progression, menu AI, player/goal/trail rendering, provider state, and production are unchanged by this source retirement
 
 2026-07-03 operator pivot:
 

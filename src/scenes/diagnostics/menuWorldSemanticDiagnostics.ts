@@ -25,16 +25,18 @@ export const createMenuWorldSemanticDiagnosticsV1 = (
 ): MenuWorldSemanticDiagnosticsV1 | null => {
   try {
     const cloned = cloneDiagnosticsValue({
-    lifecycle: source.play?.lifecycle ?? null,
-    patrol: source.play?.patrol ?? null,
-    pressure: source.play?.pressure ?? null,
-    timer: source.play?.timer ?? null,
-    playtest: source.play?.playtest ?? null,
-    menuDemo: source.menuDemo ?? null,
-    generation: source.generation ?? null,
-    projection: source.projection,
-    progression: source.progression ?? null
-  });
+      lifecycle: source.play?.lifecycle ?? null,
+      // Fixed v1 compatibility tombstones. The underlying play-object contracts
+      // are retired and can no longer be populated by runtime state.
+      patrol: null,
+      pressure: null,
+      timer: source.play?.timer ?? null,
+      playtest: source.play?.playtest ?? null,
+      menuDemo: source.menuDemo ?? null,
+      generation: source.generation ?? null,
+      projection: source.projection,
+      progression: source.progression ?? null
+    });
     if (!cloned.ok) return null;
     return {
       schemaId: MENU_WORLD_SEMANTIC_DIAGNOSTICS_SCHEMA_ID,
