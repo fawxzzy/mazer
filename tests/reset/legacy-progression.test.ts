@@ -1520,7 +1520,7 @@ describe('legacy progression', () => {
     expect(resolveLegacyProgressionGenerationScale(50, advancedTrack)).toBeGreaterThan(50);
   });
 
-  test('defines level-one mazes as small simple no-room routes', () => {
+  test('defines level-one mazes as small simple routes', () => {
     const state = createEmptyLegacyProgressionState();
     const playerTrack = state.tracks.player;
     const aiTrack = state.tracks['ai-runner'];
@@ -1546,7 +1546,6 @@ describe('legacy progression', () => {
       deadEndPressure: 'minimal',
       expectedEdgeWraps: { horizontal: 0, vertical: 0 },
       fillPressure: 'open',
-      roomsEnabled: false,
       shortcutPressure: 'off'
     });
     expect(scale).toBeLessThanOrEqual(35);
@@ -1583,7 +1582,6 @@ describe('legacy progression', () => {
     expect(explorer.targetScale).toBeLessThan(navigator.targetScale);
     expect(navigator.targetScale).toBeLessThan(architect.targetScale);
     expect(architect.targetScale).toBeLessThan(mythic.targetScale);
-    expect(mythic.roomsEnabled).toBe(false);
     expect(mythic.expectedEdgeWraps.horizontal).toBeGreaterThan(tutorial.expectedEdgeWraps.horizontal);
     expect(mythic.expectedEdgeWraps.vertical).toBeGreaterThan(tutorial.expectedEdgeWraps.vertical);
   });

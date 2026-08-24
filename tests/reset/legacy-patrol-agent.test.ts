@@ -11,10 +11,6 @@ import {
   copyLegacySettings
 } from '../../src/legacy-runtime/legacyDefaults';
 import {
-  createLegacyRoomCandidateMetadata,
-  type LegacyRoomCandidateMetadata
-} from '../../src/legacy-runtime/legacyRoomCandidateMetadata';
-import {
   LEGACY_PATROL_AGENT_COLLISION_DELAY_MS,
   LEGACY_PATROL_AGENT_COLLISION_FEEDBACK_WINDOW_MS,
   LEGACY_PATROL_AGENT_COLLISION_RECOVERY_WINDOW_MS,
@@ -75,33 +71,13 @@ vi.mock('phaser', () => ({
 
 const pointKey = (point: LegacyPoint): string => `${point.x},${point.y}`;
 
-const roomFootprint = (room: LegacyRoomCandidateMetadata | null): LegacyPoint[] => {
-  if (!room) {
-    return [];
-  }
-  const { x, y } = room.candidate.topLeft;
-  return [
-    { x, y },
-    { x: x + 1, y },
-    { x, y: y + 1 },
-    { x: x + 1, y: y + 1 }
-  ];
-};
-
 const createPatrolDependencies = (maze: LegacyMazeSnapshot) => {
   const slowTile = createLegacyStaticSlowTileState(maze, 'mythic');
-  const room = createLegacyRoomCandidateMetadata(
-    maze,
-    'mythic',
-    slowTile.placement?.point ?? null
-  );
   const excludedPoints = [
-    ...(slowTile.placement ? [slowTile.placement.point] : []),
-    ...roomFootprint(room)
+    ...(slowTile.placement ? [slowTile.placement.point] : [])
   ];
   return {
     excludedPoints,
-    room,
     slowTile
   };
 };
@@ -127,7 +103,6 @@ interface PauseResetHarness {
   playCyclePath: LegacyPoint[];
   playCycleResetUsed: boolean;
   playPatrolAgent: LegacyPatrolAgentState | null;
-  playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
   playStartedAtMs: number;
   playStaticSlowTile: LegacyStaticSlowTileState | null;
   player: LegacyPoint;
@@ -145,7 +120,6 @@ interface ProgressionResetHarness {
   maze: LegacyMazeSnapshot;
   openOverlay: (overlay: 'pause') => void;
   playPatrolAgent: LegacyPatrolAgentState | null;
-  playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
   playStaticSlowTile: LegacyStaticSlowTileState | null;
   progressionState: LegacyProgressionState;
   resetLegacyWorldTurnHost: () => void;
@@ -704,28 +678,22 @@ describe('legacy Mythic patrol agent', () => {
       fresh.placement.route[1],
       1_000
     ).state;
-    const createFreshPatrol = (band: LegacyProgressionDifficultyBand) => {
-      const slowTile = createLegacyStaticSlowTileState(maze, band);
-      const room = createLegacyRoomCandidateMetadata(
-        maze,
-        band,
-        slowTile.placement?.point ?? null
-      );
-      return createLegacyPatrolAgentState(maze, band, [
-        ...(slowTile.placement ? [slowTile.placement.point] : []),
-        ...roomFootprint(room)
-      ]);
-    };
     const pauseScene: PauseResetHarness = {
       boardDynamicDirty: false,
       closeOverlay: vi.fn(),
-      createLegacyPlayPatrolAgent: createFreshPatrol,
+      createLegacyPlayPatrolAgent: (band) => {
+        const slowTile = createLegacyStaticSlowTileState(maze, band);
+        return createLegacyPatrolAgentState(
+          maze,
+          band,
+          slowTile.placement ? [slowTile.placement.point] : []
+        );
+      },
       maze,
       playCompletedAtMs: 1_500,
       playCyclePath: [{ x: 3, y: 3 }],
       playCycleResetUsed: false,
       playPatrolAgent: consumed,
-      playRoomCandidateMetadata: dependencies.room,
       playStartedAtMs: 500,
       playStaticSlowTile: dependencies.slowTile,
       player: { x: 3, y: 3 },
@@ -741,11 +709,6 @@ describe('legacy Mythic patrol agent', () => {
     applyPauseCommand.call(pauseScene, 'reset-player');
     expect(pauseScene.playPatrolAgent).toBeNull();
     expect(pauseScene.playStaticSlowTile).toBeNull();
-    expect(pauseScene.playRoomCandidateMetadata).toEqual(createLegacyRoomCandidateMetadata(
-      maze,
-      'mythic',
-      null
-    ));
     expect(pauseScene.resetLegacyWorldTurnHost).toHaveBeenCalledOnce();
 
     const progressionScene: ProgressionResetHarness = {
@@ -753,7 +716,6 @@ describe('legacy Mythic patrol agent', () => {
       maze,
       openOverlay: vi.fn(),
       playPatrolAgent: pauseScene.playPatrolAgent,
-      playRoomCandidateMetadata: pauseScene.playRoomCandidateMetadata,
       playStaticSlowTile: pauseScene.playStaticSlowTile,
       progressionState,
       resetLegacyWorldTurnHost: vi.fn(),
@@ -766,7 +728,6 @@ describe('legacy Mythic patrol agent', () => {
 
     resetPlayerProgression.call(progressionScene);
     expect(progressionScene.playPatrolAgent).toBeNull();
-    expect(progressionScene.playRoomCandidateMetadata).toBeNull();
     expect(progressionScene.resetLegacyWorldTurnHost).toHaveBeenCalledOnce();
     expect(JSON.stringify(maze)).toBe(before);
   });
@@ -781,19 +742,6 @@ describe('legacy Mythic patrol agent', () => {
       boardDynamicDirty: false,
       boardPathDirty: false,
       boardStaticDirty: false,
-      createLegacyPlayPatrolAgent(
-        this: {
-          maze: LegacyMazeSnapshot;
-          playRoomCandidateMetadata: LegacyRoomCandidateMetadata | null;
-          playStaticSlowTile: LegacyStaticSlowTileState;
-        },
-        band: LegacyProgressionDifficultyBand
-      ) {
-        return createLegacyPatrolAgentState(this.maze, band, [
-          ...(this.playStaticSlowTile.placement ? [this.playStaticSlowTile.placement.point] : []),
-          ...roomFootprint(this.playRoomCandidateMetadata)
-        ]);
-      },
       createLegacyWorldTurnHost: createWorldTurnHost,
       legacyWorldTurnCommandSequence: 0,
       legacyWorldTurnHost: new WorldTurnHost({}, { timedModeEnabled: false }),

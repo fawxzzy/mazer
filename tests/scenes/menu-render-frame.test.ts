@@ -1480,7 +1480,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('legacyPrecisionArcadeDecorationsEnabled');
     expect(menuSceneSource).toContain('const trackId = this.resolveActiveLegacyProgressionTrackId();');
     expect(menuSceneSource).toContain('this.progressionState.tracks[trackId]');
-    expect(menuSceneSource).not.toContain('createLegacyRoomActivationPreviewCue(');
   });
 
   test('keeps account login/logout inside the shared player-facing overlay system', () => {

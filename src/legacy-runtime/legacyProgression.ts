@@ -141,7 +141,6 @@ export interface LegacyProgressionDifficultyProfile {
     max: number;
     min: number;
   };
-  roomsEnabled: false;
   shortcutPressure: 'off' | 'rare' | 'light' | 'moderate' | 'high' | 'extreme';
   targetScale: number;
 }
@@ -593,7 +592,6 @@ export const resolveLegacyProgressionDifficultyProfile = (
       fillPressure: 'open',
       label: 'Level 1 / first clear',
       levelRange: { min: 1, max: 1 },
-      roomsEnabled: false,
       shortcutPressure: 'off',
       targetScale: 29
     };
@@ -612,7 +610,6 @@ export const resolveLegacyProgressionDifficultyProfile = (
       fillPressure: 'open',
       label: 'Starter maze',
       levelRange: { min: 2, max: 8 },
-      roomsEnabled: false,
       shortcutPressure: starterDepth <= 2 ? 'off' : starterDepth <= 4 ? 'rare' : 'light',
       targetScale: 29 + Math.min(6, starterDepth + 1)
     };
@@ -627,7 +624,6 @@ export const resolveLegacyProgressionDifficultyProfile = (
       fillPressure: 'balanced',
       label: 'Explorer maze',
       levelRange: { min: 9, max: 18 },
-      roomsEnabled: false,
       shortcutPressure: 'light',
       targetScale: 43
     };
@@ -642,7 +638,6 @@ export const resolveLegacyProgressionDifficultyProfile = (
       fillPressure: 'balanced',
       label: 'Navigator maze',
       levelRange: { min: 19, max: 29 },
-      roomsEnabled: false,
       shortcutPressure: 'moderate',
       targetScale: 55
     };
@@ -657,7 +652,6 @@ export const resolveLegacyProgressionDifficultyProfile = (
       fillPressure: 'dense',
       label: 'Architect maze',
       levelRange: { min: 30, max: 41 },
-      roomsEnabled: false,
       shortcutPressure: 'high',
       targetScale: 71
     };
@@ -671,7 +665,6 @@ export const resolveLegacyProgressionDifficultyProfile = (
     fillPressure: 'maze-dense',
     label: 'Mythic maze',
     levelRange: { min: 42, max: 99 },
-    roomsEnabled: false,
     shortcutPressure: 'extreme',
     targetScale: 96
   };
