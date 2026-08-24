@@ -1562,6 +1562,19 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("? ['username', 'email', 'password']");
     expect(menuSceneSource).not.toContain("'displayName',\n        this.authForm.displayName");
     expect(menuSceneSource).toContain('? signUpLegacyAuth(this.authForm.email, this.authForm.password, this.authForm.username)');
+    const signupUsernameEvaluationSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private scheduleAuthUsernameEvaluation(): void'),
+      menuSceneSource.indexOf("private setLegacyAuthFormMode(mode: LegacyAuthFormState['mode']): void")
+    );
+    const authSubmitResultSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private applyLegacyAuthSubmitResult('),
+      menuSceneSource.indexOf('private async handleLegacyAuthPasswordReset(): Promise<void>')
+    );
+    expect(signupUsernameEvaluationSource).not.toContain('checkLegacyUsernameAvailable');
+    expect(signupUsernameEvaluationSource).not.toContain('setTimeout');
+    expect(signupUsernameEvaluationSource).not.toContain('Username available.');
+    expect(authSubmitResultSource).not.toContain('saveLegacyAccountUsername');
+    expect(authSubmitResultSource).toContain('this.applyLegacyAuthSnapshot(result.snapshot);');
     expect(menuSceneSource).toContain("if (this.overlay === 'auth') {");
     expect(menuSceneSource.indexOf("if (this.overlay === 'auth') {")).toBeLessThan(menuSceneSource.indexOf('this.updateStars(time, delta);'));
     expect(menuSceneSource).toContain('private createAuthFooterLink(');
