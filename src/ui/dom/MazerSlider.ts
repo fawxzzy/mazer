@@ -8,7 +8,9 @@ export interface MazerSliderOptions {
   name?: string;
   disabled?: boolean;
   className?: string;
+  /** Initial accessible value text. Use formatValue when later input values need units. */
   valueText?: string;
+  formatValue?: (value: number) => string;
   onInput?: (event: Event) => void;
 }
 
@@ -43,12 +45,23 @@ export const createMazerSlider = (
   input.step = String(options.step ?? 1);
   input.value = String(options.value);
   input.disabled = options.disabled ?? false;
-  if (options.valueText) input.setAttribute('aria-valuetext', options.valueText);
-  if (options.onInput) input.addEventListener('input', options.onInput);
 
   output.className = 'mazer-slider__output';
   output.setAttribute('for', options.id);
-  output.value = options.valueText ?? String(options.value);
+
+  const synchronizePresentation = (initial = false): void => {
+    const numericValue = Number(input.value);
+    const formattedValue = initial && options.valueText !== undefined
+      ? options.valueText
+      : options.formatValue?.(numericValue) ?? input.value;
+    output.value = formattedValue;
+    input.setAttribute('aria-valuetext', formattedValue);
+  };
+  synchronizePresentation(true);
+  input.addEventListener('input', (event) => {
+    synchronizePresentation();
+    options.onInput?.(event);
+  });
 
   root.append(label, output, input);
   return { root, label, input, output };

@@ -15,9 +15,15 @@ describe('Wave 2A primitive styling and isolation', () => {
   it('guarantees 44px action targets and a 20px line-only password eye', () => {
     expect(CSS).toMatch(/--mazer-token-touch-target-min, 44px/);
     expect(CSS).toMatch(/\.mazer-field__reveal\s*\{[\s\S]*?height:\s*var\(--mazer-token-touch-target-min, 44px\)/);
-    expect(CSS).toMatch(/\.mazer-icon\s*\{[\s\S]*?height:\s*20px;[\s\S]*?width:\s*20px;/);
+    const iconBlock = CSS.match(/\.mazer-icon\s*\{([\s\S]*?)\}/)?.[1] ?? '';
+    expect(iconBlock).not.toMatch(/(?:height|width):\s*20px/);
 
     const iconSource = readFileSync(join(DOM_ROOT, 'MazerIcon.ts'), 'utf8');
+    const passwordSource = readFileSync(join(DOM_ROOT, 'MazerPasswordField.ts'), 'utf8');
+    expect(iconSource).toContain('const size = parsed.size ?? 20');
+    expect(iconSource).toContain("svg.setAttribute('width', String(size))");
+    expect(iconSource).toContain("svg.setAttribute('height', String(size))");
+    expect(passwordSource).toMatch(/name:\s*revealed \? 'eye-off' : 'eye',[\s\S]*?size:\s*20/);
     expect(iconSource).toContain("svg.setAttribute('fill', 'none')");
     expect(iconSource).toContain("svg.setAttribute('stroke', 'currentColor')");
   });
