@@ -3,6 +3,45 @@ import type { TelemetryEvent, TelemetrySemanticSummary } from '../telemetry';
 import type { MazeCycleTelemetryDiagnostics } from '../legacy-runtime/mazeCycleTelemetry';
 import type { LegacyProgressionDiagnostics } from '../legacy-runtime/legacyProgression';
 import type { HumanInputTimingSnapshot } from '../input-human';
+import {
+  createMenuCaptureMetadataDiagnosticsV1,
+  parseMenuCaptureMetadataDiagnosticsV1
+} from './diagnostics/menuCaptureMetadataDiagnostics.ts';
+import {
+  createMenuInputDiagnosticsV1,
+  parseMenuInputDiagnosticsV1
+} from './diagnostics/menuInputDiagnostics.ts';
+import {
+  createMenuLayoutBoundsDiagnosticsV1,
+  parseMenuLayoutBoundsDiagnosticsV1
+} from './diagnostics/menuLayoutBoundsDiagnostics.ts';
+import {
+  createMenuRenderDprDiagnosticsV1,
+  parseMenuRenderDprDiagnosticsV1
+} from './diagnostics/menuRenderDprDiagnostics.ts';
+import {
+  cloneDiagnosticsValue,
+  createMenuRuntimeDiagnosticsCompatibilityEnvelope,
+  parseMenuRuntimeDiagnosticsCompatibilityEnvelope,
+  type DiagnosticsJsonValue,
+  type MenuRuntimeDiagnosticsCompatibilityEnvelope
+} from './diagnostics/menuRuntimeDiagnosticsCompatibility.ts';
+import {
+  createMenuSurfaceStateDiagnosticsV1,
+  parseMenuSurfaceStateDiagnosticsV1
+} from './diagnostics/menuSurfaceStateDiagnostics.ts';
+import {
+  createMenuWorldSemanticDiagnosticsV1,
+  parseMenuWorldSemanticDiagnosticsV1
+} from './diagnostics/menuWorldSemanticDiagnostics.ts';
+
+export * from './diagnostics/menuCaptureMetadataDiagnostics.ts';
+export * from './diagnostics/menuInputDiagnostics.ts';
+export * from './diagnostics/menuLayoutBoundsDiagnostics.ts';
+export * from './diagnostics/menuRenderDprDiagnostics.ts';
+export * from './diagnostics/menuRuntimeDiagnosticsCompatibility.ts';
+export * from './diagnostics/menuSurfaceStateDiagnostics.ts';
+export * from './diagnostics/menuWorldSemanticDiagnostics.ts';
 
 export const MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY = '__MAZER_RUNTIME_DIAGNOSTICS__' as const;
 export const MENU_SCENE_RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics' as const;
@@ -654,6 +693,11 @@ export interface MenuSceneRuntimeDiagnostics {
       limitBytes?: number;
     };
   };
+  diagnosticsEnvelope?: MenuRuntimeDiagnosticsCompatibilityEnvelope;
+}
+
+export interface MenuSceneRuntimeDiagnosticsV1 extends MenuSceneRuntimeDiagnostics {
+  diagnosticsEnvelope: MenuRuntimeDiagnosticsCompatibilityEnvelope;
 }
 
 declare global {
@@ -946,11 +990,26 @@ export const parseMenuSceneRuntimeDiagnosticsAttribute = (
     const parsed = JSON.parse(value) as Partial<MenuSceneRuntimeDiagnostics> | null;
     if (
       parsed
-      && parsed.sceneInstanceId
+      && Number.isInteger(parsed.sceneInstanceId)
+      && (parsed.sceneInstanceId ?? -1) >= 0
       && parsed.performance
       && parsed.resources
     ) {
-      return parsed as MenuSceneRuntimeDiagnostics;
+      if (Object.prototype.hasOwnProperty.call(parsed, 'diagnosticsEnvelope')) {
+        const envelope = parseMenuRuntimeDiagnosticsCompatibilityEnvelope(parsed.diagnosticsEnvelope);
+        if (!envelope) return null;
+        const schemas = envelope.schemas;
+        if (
+          !parseMenuSurfaceStateDiagnosticsV1(schemas.surfaceState)
+          || !parseMenuLayoutBoundsDiagnosticsV1(schemas.layoutBounds)
+          || !parseMenuRenderDprDiagnosticsV1(schemas.renderDpr)
+          || !parseMenuInputDiagnosticsV1(schemas.input)
+          || !parseMenuWorldSemanticDiagnosticsV1(schemas.worldSemantic)
+          || !parseMenuCaptureMetadataDiagnosticsV1(schemas.captureMetadata)
+        ) return null;
+      }
+      const cloned = cloneDiagnosticsValue(parsed as unknown as DiagnosticsJsonValue);
+      return cloned.ok ? cloned.value as unknown as MenuSceneRuntimeDiagnostics : null;
     }
   } catch {
     return null;
@@ -959,8 +1018,39 @@ export const parseMenuSceneRuntimeDiagnosticsAttribute = (
   return null;
 };
 
+export const createMenuSceneRuntimeDiagnosticsV1 = (
+  diagnostics: MenuSceneRuntimeDiagnostics
+): MenuSceneRuntimeDiagnosticsV1 | null => {
+  const surfaceState = createMenuSurfaceStateDiagnosticsV1(diagnostics);
+  const layoutBounds = createMenuLayoutBoundsDiagnosticsV1(diagnostics);
+  const renderDpr = createMenuRenderDprDiagnosticsV1(diagnostics);
+  const input = createMenuInputDiagnosticsV1(diagnostics);
+  const worldSemantic = createMenuWorldSemanticDiagnosticsV1(diagnostics);
+  const captureMetadata = createMenuCaptureMetadataDiagnosticsV1(diagnostics);
+  if (!surfaceState || !layoutBounds || !renderDpr || !input || !worldSemantic || !captureMetadata) {
+    return null;
+  }
+
+  const envelope = createMenuRuntimeDiagnosticsCompatibilityEnvelope({
+    surfaceState: surfaceState as unknown as DiagnosticsJsonValue,
+    layoutBounds: layoutBounds as unknown as DiagnosticsJsonValue,
+    renderDpr: renderDpr as unknown as DiagnosticsJsonValue,
+    input: input as unknown as DiagnosticsJsonValue,
+    worldSemantic: worldSemantic as unknown as DiagnosticsJsonValue,
+    captureMetadata: captureMetadata as unknown as DiagnosticsJsonValue
+  });
+  const legacy = cloneDiagnosticsValue(diagnostics as unknown as DiagnosticsJsonValue);
+  if (!envelope || !legacy.ok || !legacy.value || Array.isArray(legacy.value) || typeof legacy.value !== 'object') {
+    return null;
+  }
+  return {
+    ...(legacy.value as unknown as MenuSceneRuntimeDiagnostics),
+    diagnosticsEnvelope: envelope
+  };
+};
+
 const publishMenuSceneRuntimeDiagnosticsInstallSurface = (
-  diagnostics?: MenuSceneRuntimeDiagnostics
+  diagnostics?: MenuSceneRuntimeDiagnosticsV1
 ): void => {
   const runtimeDocument = resolveRuntimeDocument();
   if (!runtimeDocument) {
@@ -981,15 +1071,16 @@ const publishMenuSceneRuntimeDiagnosticsInstallSurface = (
 export const publishMenuSceneRuntimeDiagnostics = (
   diagnostics?: MenuSceneRuntimeDiagnostics
 ): void => {
+  const publishedDiagnostics = diagnostics ? createMenuSceneRuntimeDiagnosticsV1(diagnostics) ?? undefined : undefined;
   const runtime = resolveRuntimeWindow();
   if (runtime) {
-    if (!diagnostics) {
+    if (!publishedDiagnostics) {
       delete runtime[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY];
     } else {
-      runtime[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY] = diagnostics;
+      runtime[MENU_SCENE_RUNTIME_DIAGNOSTICS_KEY] = publishedDiagnostics;
     }
   }
-  publishMenuSceneRuntimeDiagnosticsInstallSurface(diagnostics);
+  publishMenuSceneRuntimeDiagnosticsInstallSurface(publishedDiagnostics);
 };
 
 export const clearMenuSceneRuntimeDiagnostics = (): void => {

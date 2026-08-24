@@ -307,6 +307,13 @@
         "wave": "1C",
         "owner": "diagnostics-integrator",
         "paths": [
+          "src/scenes/diagnostics/menuSurfaceStateDiagnostics.ts",
+          "src/scenes/diagnostics/menuLayoutBoundsDiagnostics.ts",
+          "src/scenes/diagnostics/menuRenderDprDiagnostics.ts",
+          "src/scenes/diagnostics/menuInputDiagnostics.ts",
+          "src/scenes/diagnostics/menuWorldSemanticDiagnostics.ts",
+          "src/scenes/diagnostics/menuCaptureMetadataDiagnostics.ts",
+          "src/scenes/diagnostics/menuRuntimeDiagnosticsCompatibility.ts",
           "src/scenes/menuRuntimeDiagnostics.ts"
         ]
       },
