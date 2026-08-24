@@ -10730,17 +10730,19 @@ export class MenuScene extends Phaser.Scene {
       );
     }
 
-    // No "Done" button -- closing this overlay is what the back chevron is
-    // for. Reset Progress (account-level, resets the whole signed-in
-    // player's progression, not just the current attempt -- it used to live
-    // in the play-mode pause overlay's action row before moving here) and
-    // Log out are the bottom action bar: Log out on the left (secondary),
-    // Reset progress on the right (danger).
+    // Match the auth-screen hierarchy: the lower-frequency destructive action
+    // is a compact text control above one full-width primary dock action.
+    this.createAuthFooterLink(
+      panel.centerX,
+      panel.top + panel.height - 104,
+      'Reset progress',
+      () => this.openOverlay('confirm-progression-reset'),
+      '#ff9bb5'
+    );
     this.createLegacyBottomActionBar(
       panel,
       stacked,
-      { onClick: () => this.openOverlay('confirm-progression-reset'), text: 'Reset progress', tone: 'danger' },
-      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Log out', tone: 'secondary' }
+      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'primary' }
     );
   }
 
@@ -11310,12 +11312,18 @@ export class MenuScene extends Phaser.Scene {
     return width;
   }
 
-  private createAuthFooterLink(x: number, y: number, text: string, onClick: () => void): void {
+  private createAuthFooterLink(
+    x: number,
+    y: number,
+    text: string,
+    onClick: () => void,
+    color = '#72e0bf'
+  ): void {
     const fontSize = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT ? 13 : 14;
     const label = this.padLegacyCompactUiText(this.add.text(x, y, text, {
       fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
       fontSize: `${fontSize}px`,
-      color: '#72e0bf'
+      color
     })).setOrigin(0.5).setAlpha(0.82);
     this.uiTexts.push(label);
 

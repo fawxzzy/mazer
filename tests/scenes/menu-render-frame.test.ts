@@ -1639,8 +1639,9 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const separatorCenterY = footerY + 2;');
     expect(menuSceneSource).not.toContain('this.createAuthAccountSummaryCard(`Signed in as ${accountLabel}`');
     expect(menuSceneSource).toContain("this.createAccountReadOnlyField(");
-    expect(menuSceneSource).toContain("text: 'Log out', tone: 'secondary'");
-    expect(menuSceneSource).toContain("text: 'Reset progress', tone: 'danger'");
+    expect(menuSceneSource).toContain("panel.top + panel.height - 104,\n      'Reset progress'");
+    expect(menuSceneSource).toContain("text: 'Sign out', tone: 'primary'");
+    expect(menuSceneSource).not.toContain("text: 'Log out'");
     expect(menuSceneSource).not.toContain("return 'Username saved.';");
     expect(authSource).toContain('signInWithPassword({');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");
