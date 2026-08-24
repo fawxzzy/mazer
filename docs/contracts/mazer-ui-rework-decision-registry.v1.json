@@ -97,6 +97,13 @@
       "sourceRef": "docs/architecture/MAZER-UI-REWORK-DOM-PRIMITIVES.md#wave-2a-boundary"
     },
     {
+      "id": "wave2a1-stateless-settings-primitives",
+      "category": "architecture",
+      "locked": true,
+      "statement": "Wave 2A.1 extends the unmounted DOM foundation with controlled settings rows, sections, switches, radio segments, native scroll ownership, nonblocking status, and safe-default confirmation primitives. Persistence, commands, runtime mounting, provider access, and product appearance remain owned by later integrator waves.",
+      "sourceRef": "docs/architecture/MAZER-UI-REWORK-DOM-PRIMITIVES.md#wave-2a1-settings-boundary"
+    },
+    {
       "id": "no-redesign-complete-without-acceptance-matrix",
       "category": "governance",
       "locked": true,
@@ -348,7 +355,7 @@
         ]
       }
     ],
-    "note": "Assignments preserve the handoff packet's single-owner guardrails while replacing the obsolete pull-request hold with current dependency-ordered wave ownership. The Wave 1B token exports are concrete and assigned. Wave 2A's new, isolated DOM primitives are governed by wave2a-stateless-dom-primitives and remain unwired; no branch name or stale pull-request state grants an exception.",
+    "note": "Assignments preserve the handoff packet's single-owner guardrails while replacing the obsolete pull-request hold with current dependency-ordered wave ownership. The Wave 1B token exports are concrete and assigned. Wave 2A's base DOM primitives and Wave 2A.1's settings extensions remain stateless and unwired; no branch name or stale pull-request state grants an exception.",
     "decisionRef": "dependency-ordered-integrator-wave-ownership"
   },
   "redesignComplete": {

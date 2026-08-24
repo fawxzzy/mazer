@@ -212,6 +212,20 @@ describe('Mazer UI rework decision registry contract', () => {
     expect(collectDecisionRegistryViolations(registry)).toEqual([]);
   });
 
+  it('locks Wave 2A.1 to stateless, unwired settings primitives', async () => {
+    const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
+    const registry: any = await readDecisionRegistry();
+    const decision = registry.decisions.find((entry: any) => entry.id === 'wave2a1-stateless-settings-primitives');
+
+    expect(decision).toMatchObject({
+      category: 'architecture',
+      locked: true,
+      sourceRef: 'docs/architecture/MAZER-UI-REWORK-DOM-PRIMITIVES.md#wave-2a1-settings-boundary'
+    });
+    expect(decision.statement).toContain('Persistence, commands, runtime mounting');
+    expect(collectDecisionRegistryViolations(registry)).toEqual([]);
+  });
+
   it('fails on an unknown decision id reference from an entrypoint', async () => {
     const { readDecisionRegistry, collectDecisionRegistryViolations } = await loadChecker();
     const registry = cloneRegistry(await readDecisionRegistry());
