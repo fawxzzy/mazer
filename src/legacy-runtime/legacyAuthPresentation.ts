@@ -28,6 +28,17 @@ export const resolveLegacyAuthBottomFeedbackLabel = (
   error: string | null | undefined,
   info: string | null | undefined
 ): string | null => {
+  const normalizedError = error?.trim();
+  if (normalizedError === LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured) {
+    return 'Account access unavailable';
+  }
+  if (normalizedError === LEGACY_AUTH_MESSAGE_COPY.signupNotConfigured) {
+    return 'Account creation unavailable';
+  }
+  if (normalizedError === LEGACY_AUTH_MESSAGE_COPY.passwordResetNotConfigured) {
+    return 'Password reset unavailable';
+  }
+
   const message = resolveLegacyAuthFeedbackMessage(error, info);
   if (!message) {
     return null;

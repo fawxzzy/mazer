@@ -1490,6 +1490,7 @@ export class MenuScene extends Phaser.Scene {
   // already runs in both modes.
   private playerSpawnBurstGraphics!: Phaser.GameObjects.Graphics;
   private uiTexts: Phaser.GameObjects.Text[] = [];
+  private uiGraphics: Phaser.GameObjects.Graphics[] = [];
   private uiButtons: UiButton[] = [];
   private overlayBackChevronBounds: VisualRect | null = null;
   private overlayBackChevronAction: (() => void) | null = null;
@@ -10742,7 +10743,7 @@ export class MenuScene extends Phaser.Scene {
     this.createLegacyBottomActionBar(
       panel,
       stacked,
-      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'primary' }
+      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'danger' }
     );
   }
 
@@ -11044,6 +11045,7 @@ export class MenuScene extends Phaser.Scene {
     border.lineTo(left, top + radius);
     border.arc(left + radius, top + radius, radius, Math.PI, (Math.PI * 3) / 2);
     border.strokePath();
+    this.uiGraphics.push(border);
 
     const eyebrow = this.padLegacyCompactUiText(this.add.text(
       labelRight - (labelWidth / 2),
@@ -13966,6 +13968,11 @@ export class MenuScene extends Phaser.Scene {
     this.overlayGuideMask = null;
     this.overlayGuideMaskGraphics?.destroy();
     this.overlayGuideMaskGraphics = null;
+
+    for (const graphic of this.uiGraphics) {
+      graphic.destroy();
+    }
+    this.uiGraphics = [];
 
     for (const button of this.uiButtons) {
       button.destroy();

@@ -105,6 +105,18 @@ describe('legacy auth presentation', () => {
     expect(resolveLegacyAuthBottomFeedbackLabel(null, 'Password reset email sent.')).toBe('Reset email sent');
     expect(resolveLegacyAuthBottomFeedbackLabel('Invalid login credentials', null)).toBe('Email or password does not match');
     expect(resolveLegacyAuthBottomFeedbackLabel('Failed to fetch', null)).toBe('Account service unavailable');
+    expect(resolveLegacyAuthBottomFeedbackLabel(
+      'Account access is unavailable right now. You can still play as a guest.',
+      null
+    )).toBe('Account access unavailable');
+    expect(resolveLegacyAuthBottomFeedbackLabel(
+      'Account creation is unavailable right now. You can still play as a guest.',
+      null
+    )).toBe('Account creation unavailable');
+    expect(resolveLegacyAuthBottomFeedbackLabel(
+      'Password reset is unavailable right now. You can still play as a guest.',
+      null
+    )).toBe('Password reset unavailable');
     expect(resolveLegacyAuthBottomFeedbackLabel(null, null)).toBeNull();
   });
 });
