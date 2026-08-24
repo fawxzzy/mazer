@@ -134,18 +134,34 @@ export const collectUiStateModelViolations = (model, root = repoRoot) => ([
   ...checkDecisionRefs(model, root)
 ]);
 
-// Reused from scripts/check-decision-registry.mjs's protected-path convention: this wave must not
-// touch any of PR #83/#82's collision files either, so the self-check is applied here too.
+// Enforce the current dependency-ordered wave ownership registry. The former PR #83/#131
+// protected-path list was intentionally retired; falling back to that removed property would turn
+// this guard into an empty set and silently permit every cross-wave integration touch.
 export const collectProtectedPathViolationsForStateModel = (changedFiles, decisionRegistry) => {
-  const protectedPaths = new Set(decisionRegistry?.prProtection?.protectedPaths ?? []);
+  const assignments = decisionRegistry?.integratorWaveOwnership?.assignments;
   const violations = [];
+  if (!Array.isArray(assignments)) {
+    return [violation(
+      'integrator-wave-ownership-missing',
+      'integratorWaveOwnership.assignments',
+      'Wave 1A requires the canonical dependency-ordered integrator ownership assignments.'
+    )];
+  }
+
+  const assignedWaveByPath = new Map();
+  for (const assignment of assignments) {
+    for (const path of assignment?.paths ?? []) {
+      assignedWaveByPath.set(path.replace(/\\/g, '/'), assignment.wave);
+    }
+  }
   for (const file of changedFiles) {
     const normalized = file.replace(/\\/g, '/');
-    if (protectedPaths.has(normalized)) {
+    const assignedWave = assignedWaveByPath.get(normalized);
+    if (assignedWave !== undefined && assignedWave !== '1A') {
       violations.push(violation(
-        'protected-path-touched',
+        'integrator-wave-ownership-mismatch',
         normalized,
-        `"${normalized}" is a PR #83/#82 protected path (prProtection.protectedPaths) and must not be modified by Wave 1A.`
+        `"${normalized}" belongs to Wave ${assignedWave} and must not be modified by Wave 1A.`
       ));
     }
   }

@@ -151,8 +151,8 @@ describe('Mazer UI rework design token contract', () => {
     });
   });
 
-  describe('PR #83 / PR #82 protected-path self-check (reused from Wave 0A)', () => {
-    it('flags a synthetic changed-file list that touches a protected path', async () => {
+  describe('dependency-ordered integrator-wave ownership', () => {
+    it('rejects a synthetic changed-file list that touches another wave\'s assigned path', async () => {
       const { readDecisionRegistryForTokens, collectProtectedPathViolationsForTokens } = await loadChecker();
       const decisionRegistry = await readDecisionRegistryForTokens();
 
@@ -161,7 +161,7 @@ describe('Mazer UI rework design token contract', () => {
         'src/scenes/MenuScene.ts'
       ], decisionRegistry);
 
-      expect(violations.some((entry) => entry.rule === 'protected-path-touched' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
+      expect(violations.some((entry) => entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
     });
 
     it('does not flag Wave 1B\'s own new files', async () => {
@@ -231,7 +231,7 @@ describe('Mazer UI rework design token contract', () => {
 
         const violations = collectProtectedPathViolationsForTokens(changedFiles, decisionRegistry);
         expect(violations.some((entry) => (
-          entry.rule === 'protected-path-touched' && entry.path === 'src/scenes/MenuScene.ts'
+          entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/scenes/MenuScene.ts'
         ))).toBe(true);
       } finally {
         rmSync(root, { recursive: true, force: true });

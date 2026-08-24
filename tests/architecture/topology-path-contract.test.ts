@@ -224,8 +224,8 @@ describe('Mazer UI rework topology/path contract', () => {
     });
   });
 
-  describe('PR #83 / PR #82 protected-path self-check (reused from Wave 0A/1A/1B)', () => {
-    it('flags a synthetic changed-file list that touches a protected path', async () => {
+  describe('dependency-ordered integrator-wave ownership', () => {
+    it('rejects a synthetic changed-file list that touches another wave\'s assigned path', async () => {
       const { readDecisionRegistryForTopologyPathContract, collectProtectedPathViolationsForTopologyPathContract } = await loadChecker();
       const decisionRegistry = await readDecisionRegistryForTopologyPathContract();
 
@@ -234,7 +234,7 @@ describe('Mazer UI rework topology/path contract', () => {
         'src/scenes/MenuScene.ts'
       ], decisionRegistry);
 
-      expect(violations.some((entry) => entry.rule === 'protected-path-touched' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
+      expect(violations.some((entry) => entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'src/scenes/MenuScene.ts')).toBe(true);
     });
 
     it('does not flag Wave 2B\'s own new files', async () => {
@@ -307,7 +307,7 @@ describe('Mazer UI rework topology/path contract', () => {
 
         const violations = collectProtectedPathViolationsForTopologyPathContract(changedFiles, decisionRegistry);
         expect(violations.some((entry) => (
-          entry.rule === 'protected-path-touched' && entry.path === 'package.json'
+          entry.rule === 'integrator-wave-ownership-mismatch' && entry.path === 'package.json'
         ))).toBe(true);
       } finally {
         rmSync(root, { recursive: true, force: true });
