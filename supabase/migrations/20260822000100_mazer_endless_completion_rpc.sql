@@ -86,6 +86,7 @@ end;
 $$;
 
 revoke all on function public.mazer_initialize_progression(uuid) from public;
+revoke all on function public.mazer_initialize_progression(uuid) from anon;
 grant execute on function public.mazer_initialize_progression(uuid) to authenticated;
 
 comment on function public.mazer_initialize_progression is
@@ -314,7 +315,7 @@ begin
     'colorTier', v_next_color_tier,
     'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
-    'lastReceiptId', pg_catalog.coalesce(pg_catalog.nullif(p_receipt ->> 'id', ''), p_client_run_id::text),
+    'lastReceiptId', coalesce(nullif(p_receipt ->> 'id', ''), p_client_run_id::text),
     'level', v_next_level::text,
     'rank', v_next_rank,
     'targetComplexity', v_next_target_complexity
@@ -360,6 +361,7 @@ end;
 $$;
 
 revoke all on function public.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
+revoke all on function public.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from anon;
 grant execute on function public.mazer_complete_level(bigint, uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
 
 comment on function public.mazer_complete_level is
@@ -562,7 +564,7 @@ begin
     'colorTier', v_next_color_tier,
     'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
-    'lastReceiptId', pg_catalog.coalesce(pg_catalog.nullif(p_receipt ->> 'id', ''), p_client_run_id::text),
+    'lastReceiptId', coalesce(nullif(p_receipt ->> 'id', ''), p_client_run_id::text),
     'level', v_next_level::text,
     'rank', v_next_rank,
     'targetComplexity', v_next_target_complexity
@@ -571,7 +573,7 @@ begin
     'colorTier', v_next_color_tier,
     'completedCycles', v_next_completed_cycles::text,
     'lastCompletedAt', v_now,
-    'lastReceiptId', pg_catalog.coalesce(pg_catalog.nullif(p_receipt ->> 'id', ''), p_client_run_id::text),
+    'lastReceiptId', coalesce(nullif(p_receipt ->> 'id', ''), p_client_run_id::text),
     'level', v_next_level::text,
     'rank', v_next_rank,
     'targetComplexity', v_next_target_complexity
@@ -606,6 +608,7 @@ end;
 $$;
 
 revoke all on function public.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from public;
+revoke all on function public.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) from anon;
 grant execute on function public.mazer_complete_ai_level(uuid, text, integer, integer, uuid, text, integer, text, timestamp with time zone, jsonb) to authenticated;
 
 comment on function public.mazer_complete_ai_level is
@@ -738,6 +741,7 @@ end;
 $$;
 
 revoke all on function public.mazer_reset_progression(bigint, uuid) from public;
+revoke all on function public.mazer_reset_progression(bigint, uuid) from anon;
 grant execute on function public.mazer_reset_progression(bigint, uuid) to authenticated;
 
 comment on function public.mazer_reset_progression is
