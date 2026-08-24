@@ -229,6 +229,8 @@ describe('Mazer UI rework decision registry contract', () => {
         'scripts/analysis/capture-auth-capability-surfaces.mjs': '0C',
         'scripts/analysis/capture-ui-surfaces.mjs': '0C',
         'scripts/analysis/live-auth-persistence-soak.mjs': '0C',
+        'src/theme/tokens.ts': '1B',
+        'src/theme/tokens.css': '1B',
         'src/scenes/menuRuntimeDiagnostics.ts': '1C',
         'src/scenes/MenuScene.ts': '3A',
         'src/legacy-runtime/legacyAuth.ts': '3B',

@@ -10,7 +10,8 @@
  *
  * This module is not imported by src/scenes/MenuScene.ts, src/boot/*, or any other live-render
  * path yet -- see docs/architecture/MAZER-UI-REWORK-STATE-MODEL.md for what this wave does and
- * does not do. No legacy state is mapped into this shape yet; that mapping is a later wave's work.
+ * does not do. A pure legacy projection fixture exists in this wave, but live scene wiring remains
+ * a later wave's work.
  *
  * Deliberately NOT implemented as `stateModelJson.primarySurfaces as PrimarySurfaceLiteral[]`
  * (casting the JSON import straight into a typed array): a bare `as` cast between an array typed
@@ -26,7 +27,7 @@
 import stateModel from '../../docs/contracts/mazer-ui-rework-state-model.v1.json';
 
 export const PRIMARY_SURFACES = [
-  'boot', 'home', 'account', 'settings', 'guide', 'play', 'result', 'system-error',
+  'boot', 'home', 'account', 'settings', 'guide', 'leaderboard', 'play', 'result', 'system-error',
   'watch-pass-setup', 'watch-pass-preview'
 ] as const;
 export type PrimarySurfaceLiteral = (typeof PRIMARY_SURFACES)[number];

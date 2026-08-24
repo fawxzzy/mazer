@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "wave": "1A",
+  "status": "registered-not-rendered",
+  "sourceRef": "01_FINAL_AUTHORITATIVE_HANDOFF/spec/component-registry.json (mazer-everything-bundle-20260803)",
+  "decisionRefs": [
+    "renderer-ownership-split",
+    "no-big-bang-menuscene-rewrite"
+  ],
+  "shared": ["UiStore", "UiCommandBus", "ViewModels", "ProfileResolver", "DiagnosticsSnapshot", "ViewportLayoutSolver", "PathGeometry"],
+  "domFoundation": ["AppShell", "StageShell", "MazerPanel", "MazerFrame", "MazerText", "MazerIcon", "MazerButton", "MazerIconButton", "MazerField", "MazerPasswordField", "SettingRow", "SettingsSection", "MazerSwitch", "MazerSegmentedControl", "MazerSlider", "MazerSelect", "MazerScrollArea", "StatusChip", "StatusBanner", "Toast", "ConfirmDialog", "BottomSheet"],
+  "domProduct": ["HomeActions", "PreviousRunSummary", "AccountScreen", "SettingsScreen", "PlayerGuide", "LeaderboardScreen", "GameplayHUD", "PauseButton", "ControlSurface", "RadialStick", "DirectionPad", "CompassControl", "ResultScreen", "InstallPrompt", "ConnectionBanner", "UpdatePrompt"],
+  "phaser": ["MazeStage", "CorridorRenderer", "TitleRenderer", "WorldMarkerRenderer", "TrailRenderer", "AmbientRenderer", "WorldEffectsRenderer"],
+  "internal": ["FixtureToolbar", "ScenarioHeader", "GateList", "DiagnosticTable", "PreviewStage", "ProjectionCard", "CanaryControl", "CaptureMetadata"]
+}

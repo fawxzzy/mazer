@@ -248,6 +248,8 @@ const REQUIRED_INTEGRATOR_WAVE_BY_PATH = Object.freeze({
   'scripts/analysis/capture-auth-capability-surfaces.mjs': '0C',
   'scripts/analysis/capture-ui-surfaces.mjs': '0C',
   'scripts/analysis/live-auth-persistence-soak.mjs': '0C',
+  'src/theme/tokens.ts': '1B',
+  'src/theme/tokens.css': '1B',
   'src/scenes/menuRuntimeDiagnostics.ts': '1C',
   'src/scenes/MenuScene.ts': '3A',
   'src/legacy-runtime/legacyAuth.ts': '3B',
@@ -256,7 +258,7 @@ const REQUIRED_INTEGRATOR_WAVE_BY_PATH = Object.freeze({
   'package.json': '5B'
 });
 
-const INTEGRATOR_WAVE_ORDER = Object.freeze(['0C', '1C', '3A', '3B', '5B']);
+const INTEGRATOR_WAVE_ORDER = Object.freeze(['0C', '1B', '1C', '3A', '3B', '5B']);
 
 const checkIntegratorWaveOwnership = (registry) => {
   const violations = [];
@@ -308,7 +310,7 @@ const checkIntegratorWaveOwnership = (registry) => {
       violations.push(violation(
         'integrator-wave-order-invalid',
         `integratorWaveOwnership.assignments[${assignment?.wave ?? 'unknown'}]`,
-        'integrator assignments must follow the locked 0C -> 1C -> 3A -> 3B -> 5B dependency order.'
+        'integrator assignments must follow the locked 0C -> 1B -> 1C -> 3A -> 3B -> 5B dependency order.'
       ));
     }
     priorWaveIndex = Math.max(priorWaveIndex, waveIndex);
