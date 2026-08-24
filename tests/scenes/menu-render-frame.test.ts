@@ -1644,8 +1644,20 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const separatorCenterY = footerY + 2;');
     expect(menuSceneSource).not.toContain('this.createAuthAccountSummaryCard(`Signed in as ${accountLabel}`');
     expect(menuSceneSource).toContain("this.createAccountReadOnlyField(");
+    const readOnlyFieldSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private createAccountReadOnlyField('),
+      menuSceneSource.indexOf('private createAccountUsernameNativeInput(')
+    );
+    const clearUiSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private clearUi(): void'),
+      menuSceneSource.indexOf('private async loadLeaderboardPage(')
+    );
+    expect(readOnlyFieldSource).toContain('this.uiGraphics.push(border);');
+    expect(clearUiSource).toContain('for (const graphic of this.uiGraphics) {');
+    expect(clearUiSource).toContain('graphic.destroy();');
+    expect(clearUiSource).toContain('this.uiGraphics = [];');
     expect(menuSceneSource).toContain("panel.top + panel.height - 104,\n      'Reset progress'");
-    expect(menuSceneSource).toContain("text: 'Sign out', tone: 'primary'");
+    expect(menuSceneSource).toContain("text: 'Sign out', tone: 'danger'");
     expect(menuSceneSource).not.toContain("text: 'Log out'");
     expect(menuSceneSource).not.toContain("return 'Username saved.';");
     expect(authSource).toContain('signInWithPassword({');
