@@ -571,17 +571,27 @@ const resolveLegacyProgressionNextLevelTargetComplexity = (level: number): numbe
   LEGACY_PROGRESSION_MAX_COMPLEXITY
 );
 
+const resolveLegacyProgressionDifficultyStep = (targetComplexity: number): number => {
+  const difficultyLevel = resolveLegacyProgressionLevel(targetComplexity);
+  // The first accepted completion must produce a visible generation step:
+  // difficulty levels 1 and 2 map to distinct tutorial/starter profiles.
+  // After that first handoff, every two bounded difficulty levels share one
+  // pressure step so the intentionally slower curve remains intact.
+  return clampInteger(Math.floor(difficultyLevel / 2) + 1, 1, 99);
+};
+
 export const resolveLegacyProgressionDifficultyProfile = (
   trackOrTargetComplexity: Pick<LegacyProgressionTrack, 'level' | 'targetComplexity'> | number
 ): LegacyProgressionDifficultyProfile => {
   const targetComplexity = typeof trackOrTargetComplexity === 'number'
     ? trackOrTargetComplexity
     : trackOrTargetComplexity.targetComplexity;
-  const difficultyLevel = resolveLegacyProgressionLevel(targetComplexity);
   // Maze pressure climbs at half the bounded difficulty index. The player/AI
   // completion ordinal is intentionally not read here: it can grow forever,
-  // while generation remains bounded and independently paced.
-  const normalizedLevel = clampInteger(Math.ceil(difficultyLevel / 2), 1, 99);
+  // while generation remains bounded and independently paced. The one
+  // exception to sharing pairs is the first handoff: Level 2 must not reuse
+  // the Level-1 tutorial profile.
+  const normalizedLevel = resolveLegacyProgressionDifficultyStep(targetComplexity);
 
   if (normalizedLevel <= 1) {
     return {
@@ -679,11 +689,7 @@ export const resolveLegacyMazeGenerationProfileForProgression = (
     : trackOrTargetComplexity.targetComplexity;
   // Use the same bounded difficulty index as band selection. Never feed the
   // unbounded completion ordinal back into maze geometry.
-  const level = clampInteger(
-    Math.ceil(resolveLegacyProgressionLevel(targetComplexity) / 2),
-    1,
-    99
-  );
+  const level = resolveLegacyProgressionDifficultyStep(targetComplexity);
 
   switch (profile.band) {
     case 'tutorial':

@@ -17,7 +17,12 @@ import {
   shouldConsumeLegacyGenerationRequest,
   stepLegacyGenerationSeed
 } from '../../src/legacy-runtime/legacyGenerationLifecycle';
-import { resolveLegacyMazeComplexity } from '../../src/legacy-runtime/legacyProgression';
+import {
+  createEmptyLegacyProgressionState,
+  resolveLegacyMazeComplexity,
+  resolveLegacyMazeGenerationProfileForProgression,
+  resolveLegacyProgressionGenerationScale
+} from '../../src/legacy-runtime/legacyProgression';
 
 describe('legacy generation lifecycle', () => {
   test('keeps the required process-count stages in legacy order', () => {
@@ -290,6 +295,41 @@ describe('legacy generation lifecycle', () => {
     expect(stepLegacyGenerationSeed(0)).toBe(1);
     expect(stepLegacyGenerationSeed(3749)).toBe(3750);
     expect(stepLegacyGenerationSeed(0xffffffff)).toBe(0);
+  });
+
+  test('carries a distinct first-completion generation profile through queued player and AI requests', () => {
+    const baseline = createEmptyLegacyProgressionState();
+    const createTrackRequest = (trackId: 'player' | 'ai-runner', targetComplexity: number) => {
+      const track = {
+        ...baseline.tracks[trackId],
+        level: targetComplexity === 8 ? '1' : '2',
+        targetComplexity
+      };
+      const mode = trackId === 'player' ? 'play' : 'menu';
+      const scale = resolveLegacyProgressionGenerationScale(50, track, {
+        surface: mode === 'play' ? 'play' : 'menu-demo'
+      });
+      return createLegacyGenerationRequest({
+        currentSeed: 3749,
+        dueAtMs: 0,
+        generationProfile: resolveLegacyMazeGenerationProfileForProgression(track),
+        mode,
+        reason: mode === 'play' ? 'play-start' : 'boot-menu',
+        scale,
+        targetComplexity
+      });
+    };
+
+    const playerLevelOne = createTrackRequest('player', 8);
+    const playerLevelTwo = createTrackRequest('player', 12);
+    const aiLevelOne = createTrackRequest('ai-runner', 8);
+    const aiLevelTwo = createTrackRequest('ai-runner', 12);
+
+    expect(playerLevelOne.seed).toBe(playerLevelTwo.seed);
+    expect(playerLevelTwo.generationProfile).not.toEqual(playerLevelOne.generationProfile);
+    expect(playerLevelTwo.budget.scale).toBeGreaterThan(playerLevelOne.budget.scale);
+    expect(playerLevelTwo.generationProfile).toEqual(aiLevelTwo.generationProfile);
+    expect(playerLevelOne.generationProfile).toEqual(aiLevelOne.generationProfile);
   });
 
   test('creates explicit queued generation requests instead of collapsing every branch into immediate rebuilds', () => {
