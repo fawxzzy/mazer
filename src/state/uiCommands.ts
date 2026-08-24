@@ -236,6 +236,16 @@ export class UiCommandContractError extends Error {
   }
 }
 
+const cloneAndFreezeUiCommand = (command: UiCommand): UiCommand => {
+  if (command.type === 'SUBMIT_AUTH') {
+    return Object.freeze({
+      ...command,
+      payload: Object.freeze({ ...command.payload })
+    });
+  }
+  return Object.freeze({ ...command });
+};
+
 export const createUiCommandBus = (): UiCommandBus => {
   const listeners = new Set<UiCommandListener>();
   return Object.freeze({
@@ -244,8 +254,9 @@ export const createUiCommandBus = (): UiCommandBus => {
       if (violations.length > 0) {
         throw new UiCommandContractError(violations);
       }
+      const immutableCommand = cloneAndFreezeUiCommand(command);
       for (const listener of [...listeners]) {
-        listener(command);
+        listener(immutableCommand);
       }
     },
     subscribe: (listener: UiCommandListener): (() => void) => {

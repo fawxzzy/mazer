@@ -25,7 +25,9 @@ import {
 } from '../../src/state/uiCommands';
 import {
   DEFAULT_UI_STATE_SNAPSHOT,
-  createUiStore
+  UiStateContractError,
+  createUiStore,
+  freezeUiStateSnapshot
 } from '../../src/state/uiStore';
 import { PLATFORM_PROFILES } from '../../src/state/uiProfiles';
 import { UI_VIEW_MODEL_NAMES, createUiViewModels } from '../../src/state/uiViewModels';
@@ -230,10 +232,11 @@ describe('Mazer UI rework state model contract', () => {
       ]);
     });
 
-    it('collectUiStateSnapshotViolations reports one violation per field for a well-formed-but-empty object', () => {
+    it('collectUiStateSnapshotViolations rejects an empty object at the exact-shape boundary', () => {
       const violations = collectUiStateSnapshotViolations({} as unknown as UiStateSnapshot);
-      expect(violations).toHaveLength(9);
-      expect(violations.every((entry) => entry.value === undefined)).toBe(true);
+      expect(violations).toEqual([
+        expect.objectContaining({ field: '(snapshot)', message: expect.stringContaining('exactly') })
+      ]);
     });
   });
 
@@ -309,6 +312,58 @@ describe('Mazer UI rework state model contract', () => {
     it('rejects an invalid runtime command instead of silently transitioning', () => {
       const store = createUiStore(DEFAULT_UI_STATE_SNAPSHOT);
       expect(() => store.dispatch({ type: 'UNKNOWN' } as unknown as UiCommand)).toThrow(UiCommandContractError);
+    });
+
+    it('rejects noncanonical snapshot representations without throwing or preserving extra fields', () => {
+      const valid = { ...DEFAULT_UI_STATE_SNAPSHOT };
+      const arraySnapshot = Object.assign([], valid);
+      const customPrototypeSnapshot = Object.assign(Object.create({ inherited: true }), valid);
+      const overPostedSnapshot = { ...valid, admin: true };
+      const accessorSnapshot = { ...valid } as Record<string, unknown>;
+      Object.defineProperty(accessorSnapshot, 'primarySurface', {
+        enumerable: true,
+        get: () => { throw new Error('trap'); }
+      });
+      const proxySnapshot = new Proxy({ ...valid }, {
+        ownKeys: () => { throw new Error('trap'); }
+      });
+
+      for (const candidate of [arraySnapshot, customPrototypeSnapshot, overPostedSnapshot, accessorSnapshot, proxySnapshot]) {
+        expect(() => collectUiStateSnapshotViolations(candidate)).not.toThrow();
+        expect(collectUiStateSnapshotViolations(candidate)).toEqual([
+          expect.objectContaining({ field: '(snapshot)' })
+        ]);
+        expect(() => freezeUiStateSnapshot(candidate)).toThrow(UiStateContractError);
+      }
+    });
+
+    it('fans out an immutable normalized command so subscribers cannot rewrite intent', () => {
+      const bus = createUiCommandBus();
+      const observed: UiCommand[] = [];
+      bus.subscribe((command) => {
+        try {
+          (command as { surface?: string }).surface = 'settings';
+          if (command.type === 'SUBMIT_AUTH') {
+            (command.payload as Record<string, string>).username = 'mutated';
+          }
+        } catch {
+          // Frozen input is the expected boundary; later listeners must still receive the original.
+        }
+      });
+      bus.subscribe((command) => observed.push(command));
+
+      bus.dispatch({ type: 'NAVIGATE', surface: 'home' });
+      bus.dispatch({ type: 'SUBMIT_AUTH', intent: 'sign-in', payload: { username: 'original' } });
+
+      expect(observed[0]).toEqual({ type: 'NAVIGATE', surface: 'home' });
+      expect(Object.isFrozen(observed[0])).toBe(true);
+      expect(observed[1]).toEqual({
+        type: 'SUBMIT_AUTH',
+        intent: 'sign-in',
+        payload: { username: 'original' }
+      });
+      expect(Object.isFrozen(observed[1])).toBe(true);
+      expect(observed[1].type === 'SUBMIT_AUTH' && Object.isFrozen(observed[1].payload)).toBe(true);
     });
   });
 

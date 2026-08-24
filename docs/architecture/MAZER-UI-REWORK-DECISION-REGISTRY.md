@@ -41,7 +41,7 @@ Each decision below has a stable ID in the registry JSON (`decisions[].id`).
 
 - asserts it currently passes with zero violations against the live repository (including live entrypoint-existence cross-checks);
 - constructs mutated in-memory copies of the registry that each violate exactly one rule (a second public canonical theme, a profile mislabeled as a theme, Watch Pass claiming production billing, Planet 3D added to the core release acceptance set, tile-square marked as the shipping default, a proof/lab entrypoint reclassified to `product`/`releaseGate: true` without a justifying decision reference, a duplicate decision ID, and an unknown decision-ID reference) and asserts the checker rejects each one;
-- runs the same protected-path checker against the real `git status --short` output of this working tree and asserts none of `prProtection.protectedPaths` appear as modified/untracked.
+- runs the dependency-ordered ownership checker against the real committed and uncommitted changed-file set and rejects any path assigned to a different `integratorWaveOwnership` wave.
 
 Run in isolation with `npx vitest run tests/architecture/decision-registry-contract.test.ts`, or as part of `npm run test:architecture` (`vitest run tests/architecture`).
 

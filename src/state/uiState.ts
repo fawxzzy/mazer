@@ -100,6 +100,18 @@ export interface UiStateSnapshot {
 // "one field's value was out of range" if they need to.
 const SNAPSHOT_ROOT_FIELD = '(snapshot)' as const;
 
+const UI_STATE_SNAPSHOT_FIELDS = [
+  'primarySurface',
+  'modalSurface',
+  'gamePhase',
+  'authPhase',
+  'connectionPhase',
+  'installPhase',
+  'controlMode',
+  'motionMode',
+  'effectsQuality'
+] as const satisfies readonly (keyof UiStateSnapshot)[];
+
 export interface UiStateSnapshotViolation {
   field: keyof UiStateSnapshot | typeof SNAPSHOT_ROOT_FIELD;
   value: unknown;
@@ -113,7 +125,7 @@ const memberCheck = <T extends string>(
 ): UiStateSnapshotViolation | null => (
   (allowed as readonly unknown[]).includes(value)
     ? null
-    : { field, value, message: `"${field}" value ${JSON.stringify(value)} is not one of ${JSON.stringify(allowed)}.` }
+    : { field, value, message: `"${field}" must be one of the registered values.` }
 );
 
 /**
@@ -145,7 +157,50 @@ export const collectUiStateSnapshotViolations = (snapshot: unknown): UiStateSnap
     }];
   }
 
-  const candidate = snapshot as Record<keyof UiStateSnapshot, unknown>;
+  let descriptors: PropertyDescriptorMap;
+  try {
+    if (Array.isArray(snapshot) || Object.getPrototypeOf(snapshot) !== Object.prototype) {
+      return [{
+        field: SNAPSHOT_ROOT_FIELD,
+        value: snapshot,
+        message: 'snapshot must be a canonical plain object.'
+      }];
+    }
+
+    const ownKeys = Reflect.ownKeys(snapshot);
+    if (
+      ownKeys.length !== UI_STATE_SNAPSHOT_FIELDS.length
+      || ownKeys.some((key) => typeof key !== 'string' || !UI_STATE_SNAPSHOT_FIELDS.includes(key as keyof UiStateSnapshot))
+    ) {
+      return [{
+        field: SNAPSHOT_ROOT_FIELD,
+        value: ownKeys,
+        message: 'snapshot must contain exactly the registered fields.'
+      }];
+    }
+
+    descriptors = Object.getOwnPropertyDescriptors(snapshot);
+    if (UI_STATE_SNAPSHOT_FIELDS.some((field) => {
+      const descriptor = descriptors[field];
+      return !descriptor || !descriptor.enumerable || !('value' in descriptor);
+    })) {
+      return [{
+        field: SNAPSHOT_ROOT_FIELD,
+        value: snapshot,
+        message: 'snapshot fields must be enumerable own data properties.'
+      }];
+    }
+  } catch {
+    return [{
+      field: SNAPSHOT_ROOT_FIELD,
+      value: snapshot,
+      message: 'snapshot representation could not be inspected safely.'
+    }];
+  }
+
+  const candidate = Object.fromEntries(
+    UI_STATE_SNAPSHOT_FIELDS.map((field) => [field, descriptors[field]?.value])
+  ) as Record<keyof UiStateSnapshot, unknown>;
   return [
     memberCheck('primarySurface', candidate.primarySurface, PRIMARY_SURFACES),
     memberCheck('modalSurface', candidate.modalSurface, MODAL_SURFACES),
