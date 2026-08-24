@@ -10682,7 +10682,11 @@ export class MenuScene extends Phaser.Scene {
       this.authForm.mode === 'signup' ? 'Create account' : presentation.title,
       panel.top + (stacked ? 103 : 110)
     );
-    if (this.authForm.mode === 'login' && rememberedIdentity?.displayName) {
+    if (
+      this.authSnapshot.status !== 'authenticated'
+      && this.authForm.mode === 'login'
+      && rememberedIdentity?.displayName
+    ) {
       this.createAuthInfoText(
         rememberedIdentity.displayName,
         panel.top + (stacked ? 164 : 176),
@@ -10692,9 +10696,8 @@ export class MenuScene extends Phaser.Scene {
       );
     }
 
-    const accountLabel = resolveLegacyAuthAccountLabel(this.authSnapshot);
     if (this.authSnapshot.status === 'authenticated') {
-      this.buildAuthenticatedAccountSection(panel, stacked, rowY, accountLabel);
+      this.buildAuthenticatedAccountSection(panel, stacked, rowY);
       return;
     }
 
@@ -10705,36 +10708,39 @@ export class MenuScene extends Phaser.Scene {
   private buildAuthenticatedAccountSection(
     panel: OverlayPanelFrame,
     stacked: boolean,
-    startY: number,
-    accountLabel: string
+    startY: number
   ): void {
     let rowY = startY;
 
-    this.createAuthAccountSummaryCard(`Signed in as ${accountLabel}`, rowY, panel);
-    rowY += stacked ? 64 : 72;
-    const detail = this.authSnapshot.email ?? this.authSnapshot.userId ?? '';
-    if (detail.length > 0) {
-      this.createAuthInfoText(detail, rowY, panel, '#d7f7ee', stacked ? 14 : 16);
-      rowY += stacked ? 46 : 54;
-    }
-
     this.loadAccountUsernameIfNeeded();
-    const usernameFieldWidth = Math.min(panel.width - 72, stacked ? 260 : 320);
-    const usernameFieldHeight = stacked ? 46 : 50;
+    const usernameFieldWidth = Math.min(panel.width - 32, 280);
+    const usernameFieldHeight = 54;
     this.createAccountUsernameField(panel.centerX, rowY + (usernameFieldHeight / 2), usernameFieldWidth, usernameFieldHeight);
-    rowY += usernameFieldHeight + (stacked ? 26 : 30);
+    rowY += 74;
+
+    const accountEmail = this.authSnapshot.email ?? '';
+    if (accountEmail.length > 0) {
+      this.createAccountReadOnlyField(
+        panel.centerX,
+        rowY + (usernameFieldHeight / 2),
+        usernameFieldWidth,
+        usernameFieldHeight,
+        'EMAIL',
+        accountEmail
+      );
+    }
 
     // No "Done" button -- closing this overlay is what the back chevron is
     // for. Reset Progress (account-level, resets the whole signed-in
     // player's progression, not just the current attempt -- it used to live
     // in the play-mode pause overlay's action row before moving here) and
     // Log out are the bottom action bar: Log out on the left (secondary),
-    // Reset Progress on the right (primary).
+    // Reset progress on the right (danger).
     this.createLegacyBottomActionBar(
       panel,
       stacked,
-      { onClick: () => this.openOverlay('confirm-progression-reset'), text: 'Reset Progress', tone: 'danger' },
-      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Log out', tone: 'danger' }
+      { onClick: () => this.openOverlay('confirm-progression-reset'), text: 'Reset progress', tone: 'danger' },
+      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Log out', tone: 'secondary' }
     );
   }
 
@@ -10903,7 +10909,7 @@ export class MenuScene extends Phaser.Scene {
       case 'saving':
         return 'Saving...';
       case 'saved':
-        return 'Username saved.';
+        return null;
       case 'taken':
         return this.accountUsernameStatusMessage ?? 'That username is already taken.';
       case 'error':
@@ -11002,6 +11008,62 @@ export class MenuScene extends Phaser.Scene {
       })).setOrigin(0, 0.5);
       this.uiTexts.push(status);
     }
+  }
+
+  private createAccountReadOnlyField(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    fieldLabel: string,
+    value: string
+  ): void {
+    const left = x - (width / 2);
+    const right = x + (width / 2);
+    const top = y - (height / 2);
+    const bottom = y + (height / 2);
+    const radius = Math.min(18, height * 0.36);
+    const labelWidth = Math.max(58, (fieldLabel.length * 7) + 18);
+    const labelRight = right - radius - 8;
+    const gapStart = labelRight - labelWidth - 7;
+    const gapEnd = labelRight + 7;
+    const border = this.add.graphics();
+    border.lineStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.68);
+    border.beginPath();
+    border.moveTo(left + radius, top);
+    border.lineTo(gapStart, top);
+    border.moveTo(gapEnd, top);
+    border.lineTo(right - radius, top);
+    border.arc(right - radius, top + radius, radius, -Math.PI / 2, 0);
+    border.lineTo(right, bottom - radius);
+    border.arc(right - radius, bottom - radius, radius, 0, Math.PI / 2);
+    border.lineTo(left + radius, bottom);
+    border.arc(left + radius, bottom - radius, radius, Math.PI / 2, Math.PI);
+    border.lineTo(left, top + radius);
+    border.arc(left + radius, top + radius, radius, Math.PI, (Math.PI * 3) / 2);
+    border.strokePath();
+
+    const eyebrow = this.padLegacyCompactUiText(this.add.text(
+      labelRight - (labelWidth / 2),
+      top,
+      fieldLabel,
+      {
+        color: '#9bcdbd',
+        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+        fontSize: '11px'
+      }
+    )).setOrigin(0.5);
+    const valueText = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(
+      left + 18,
+      y + (height * 0.14),
+      value,
+      {
+        color: '#ecfff5',
+        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+        fontSize: '14px'
+      }
+    )), width - 36, 14, 12).setOrigin(0, 0.5);
+    this.uiTexts.push(eyebrow, valueText);
   }
 
   private createAccountUsernameNativeInput(): HTMLInputElement | null {
