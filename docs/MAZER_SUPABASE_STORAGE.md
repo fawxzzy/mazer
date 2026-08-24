@@ -9,16 +9,26 @@ Master consolidation target:
 - project ref: `bxtcuhkotumitoqtrcej`
 - schema: `mazer`
 - materialized tables: `mazer_profiles`, `mazer_progression_states`, `mazer_ai_progression_states`, and `mazer_cycle_receipts`
-- materialized rows: 1,300 across the four tables, mapped to eight canonical users
-- access posture: forced RLS, 11 authenticated client privileges, 11 owner-only RLS policies, authenticated schema usage, and Data API exposure limited to the four Mazer table paths plus the PostgREST root
+- 2026-08-24 pre-cutover aggregate: `5` profiles, `7` player rows, `7` AI rows, and `1,290` receipts
+- current limitation: this is an older partial snapshot, not current application-data truth; its last observed Mazer write predates current legacy writes
+- access posture: forced RLS, 11 authenticated client privileges, 11 owner-only RLS policies, and authenticated schema usage are present; custom-schema Data API exposure must be re-certified before cutover
 
 Legacy source/rollback project:
 
 - project name: `Mazer`
 - project ref: `geknvnrmktchljnyddwp`
+- 2026-08-24 aggregate: `9` profiles, `13` player rows, `13` AI rows, and `1,865` receipts
 - retirement status: held; it is not safe to delete
 
-The master schema and bounded client-access layer are active. Postapply proof confirmed the exact five-entry Data API allowlist, 13 rows visible to the authenticated owner, and zero rows visible to an unknown or cross-owner identity. Environment configuration, deployment, production cutover, observation, rollback expiry, credential retirement, and legacy deletion remain separate protected gates. Stripe/license tables remain deferred.
+The master table/RLS foundation exists, but source parity, identity mapping, Data API exposure, runtime RPCs, signup hook activation, and final delta reconciliation are not yet complete. Production still uses the legacy project. The legacy project remains current rollback and source-data truth until a frozen, classified, monotonic master reconciliation passes. Stripe/license tables remain deferred.
+
+Three generated additive migrations define the master-side source contract in dependency order:
+
+1. `20260824170156_mazer_master_schema_parity.sql` — bigint ordinals, `8..400` bounded difficulty, revisions, usernames, level timestamps, receipt provenance/idempotency, forced RLS.
+2. `20260824170159_mazer_master_runtime_contracts.sql` — server-authoritative completion/reset RPCs plus guest-readable public leaderboard and authenticated-only self rank.
+3. `20260824170202_mazer_master_signup_username_claim.sql` — shared-project non-Mazer pass-through, Mazer-only username validation, and same-transaction profile creation.
+
+`scripts/build/compose-master-migrations.mjs` deterministically derives those migrations from the reviewed legacy contracts while replacing only schema ownership and the intentional leaderboard-page guest ACL. Generated drift is a test failure.
 
 ## Tables
 
@@ -34,10 +44,9 @@ Deferred Stripe/payment-wall tables:
 
 ## Access Rules
 
-- `anon` receives no direct table access.
+- `anon` receives no direct table access. It receives only the bounded public leaderboard-page function after runtime-contract activation.
 - `authenticated` has 11 scoped table privileges guarded by 11 owner-only RLS policies and one schema-usage grant.
-- The Data API exposes only the four required Mazer table paths plus the PostgREST root; no additional Mazer path is allowlisted.
-- Live aggregate proof confirms 13 rows visible to the authenticated owner, zero rows visible to an unknown owner, and zero cross-owner visibility.
+- The intended Data API exposure is the `mazer` schema with owner-RLS tables and the bounded RPC surface. Current exposure must be re-certified from browser-safe keys before production cutover.
 - Authenticated users can read or write only their own profile, progression, AI progression, and cycle receipts within those grants and policies.
 - Future authenticated users can only read their own license account and entitlement rows after the Stripe lane is unlocked.
 - Future license account, entitlement, and webhook-event writes are server-only through `service_role`.
@@ -45,13 +54,13 @@ Deferred Stripe/payment-wall tables:
 
 ## Current App Wiring
 
-Remote progression sync is feature-gated by:
+Remote progression sync remains feature-gated by:
 
 ```env
 VITE_MAZER_REMOTE_PROGRESSION=false
 ```
 
-The shared browser Supabase client binds data queries to `db.schema = 'mazer'`. Auth remains project-level; unqualified `.from(...)` calls in the remote progression adapter therefore target the custom Mazer schema without duplicating schema selection at every query site.
+The shared browser Supabase client resolves the schema from the exact allowlisted project URL: legacy maps to `public`, master maps to `mazer`, and unknown projects fail closed. Auth remains project-level; unqualified `.from(...)` calls use the selected project-specific data schema without duplicating schema selection at every query site.
 
 When enabled, `src/legacy-runtime/legacyRemoteProgression.ts` writes:
 
@@ -78,16 +87,19 @@ Remaining UI proof gap: browser automation did not inject typed characters into 
 
 ## Apply Order
 
-1. The master project contains the forced-RLS `mazer` schema and the verified 1,300-row postimage.
-2. The governed access wave applied 11 authenticated privileges, 11 owner-only policies, authenticated schema usage, and the exact five-entry Data API allowlist; aggregate owner-isolation proof passed.
-3. The browser client source binds data queries to the `mazer` schema while remote sync stays disabled.
-4. Configure nonproduction environment values for the master project and run authenticated QA before any production cutover:
+1. Preserve exact preimages for both projects and classify every legacy app-linked/Auth-only identity without emitting raw account data.
+2. Rehearse the three generated master migrations in order on a disposable provider branch or inside a fully rolled-back transaction, including lock/rewrite timing and disable-hook-first rollback.
+3. Apply schema parity, runtime contracts, then signup contracts to master; verify owners, empty search paths, function/table ACLs, forced RLS, indexes, constraints, and trigger identity.
+4. Import only missing master Auth identities with supported password hashes, then create a durable legacy-to-master identity map. Existing master identities win; ambiguous or duplicate mappings fail closed.
+5. Transactionally reconcile profiles/player/AI by mapped identity. Never lower ordinals or discard a target-newer row. Preserve receipt IDs/timestamps and dedupe by receipt identity plus mapped-user/client-run identity.
+6. Freeze or drain the final legacy delta and prove all `1,865` source receipts are classified with zero orphans, username collisions, or idempotency duplicates.
+7. Re-certify the `mazer` Data API/OpenAPI surface, RLS isolation, exact RPC behavior, guest leaderboard, authenticated self rank, signup hook, email-confirmation/no-session flow, and existing-user re-authentication.
+8. Configure nonproduction environment values for the master project and run authenticated QA before any production cutover:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
    - `VITE_MAZER_REMOTE_PROGRESSION=true` only after access proof passes.
-5. Observe the bounded nonproduction lane, preserve rollback, and require separate deployment and production-cutover authority.
-6. Close observation, rollback-expiry, credential-retirement, and deletion-readiness gates independently before any legacy retirement.
-7. Keep Stripe/license tables deferred until the payment wall lane is explicitly unlocked; add future server-only Stripe webhook env vars only to backend/server contexts, never browser env.
+9. Cut production once, verify the deployed commit and master project identity, and retain reverse-delta/legacy rollback until the observation window closes.
+10. Close rollback expiry, credential retirement, restore proof, and legacy deletion under separate destructive gates. Keep Stripe/license tables deferred.
 
 ## Stripe Boundary
 

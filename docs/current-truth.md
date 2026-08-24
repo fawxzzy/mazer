@@ -43,6 +43,15 @@ Read the repo in this order:
 
 If the current web app disagrees with restored gameplay/mechanics truth, restored legacy logic wins for this lane. If the current visual direction disagrees with old screenshot composition, the active mobile-clean direction wins.
 
+### Supabase master cutover truth — 2026-08-24
+
+- The authoritative consolidation target is project `bxtcuhkotumitoqtrcej`, schema `mazer`.
+- Production still uses the legacy project `geknvnrmktchljnyddwp`; do not mutate or retire that rollback source during source preparation.
+- Master currently holds an older partial Mazer snapshot and is not a safe environment-only cutover. Legacy-to-master identity mapping, monotonic app-data reconciliation, the final legacy delta, and browser-safe Data API/Auth proof are required first.
+- The browser client already selects `public` for the exact legacy URL and `mazer` for the exact master URL, failing closed for unknown projects.
+- The generated master migration sequence is schema parity, runtime RPC/leaderboard contracts, then shared-project signup username authority. The Before User Created hook is activated only after those database contracts and rollback proof pass.
+- Existing sessions are project-specific. Master cutover must prove existing-user re-authentication and must never lower player or AI ordinals, discard receipts, expose usernames through anonymous availability probing, or derive a username from email.
+
 ## Current implementation truth
 
 ### Current Precision Arcade visual integration
