@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFile } from 'node:fs/promises';
+import { chromium } from 'playwright';
+import { ModuleKind, ScriptTarget, transpileModule } from 'typescript';
 import {
   createConfirmDialog,
   createMazerScrollArea,
@@ -37,6 +40,7 @@ class TestElement {
   htmlFor = '';
   id = '';
   name = '';
+  parentNode: TestElement | null = null;
   tabIndex = 0;
   textContent = '';
   type = '';
@@ -60,6 +64,9 @@ class TestElement {
   };
 
   append(...children: TestElement[]): void {
+    children.forEach((child) => {
+      child.parentNode = this;
+    });
     this.childNodes.push(...children);
   }
 
@@ -107,22 +114,40 @@ class TestElement {
   }
 
   fire(name: string, event: Record<string, unknown> = {}): void {
+    const path: TestElement[] = [];
+    for (let cursor: TestElement | null = this; cursor; cursor = cursor.parentNode) {
+      path.push(cursor);
+    }
     let immediatePropagationStopped = false;
+    let propagationStopped = false;
     const payload = {
       type: name,
       target: this,
       preventDefault: vi.fn(),
-      stopPropagation: vi.fn(),
+      composedPath: () => [...path],
+      stopPropagation: vi.fn(() => {
+        propagationStopped = true;
+      }),
       stopImmediatePropagation: vi.fn(() => {
+        propagationStopped = true;
         immediatePropagationStopped = true;
       }),
       ...event
     } as unknown as Event;
-    const registrations = [...(this.listeners.get(name) ?? [])]
-      .sort((left, right) => Number(right.capture) - Number(left.capture));
-    for (const { listener } of registrations) {
-      if (immediatePropagationStopped) break;
-      listener(payload);
+
+    const invoke = (element: TestElement, capture: boolean): void => {
+      for (const registration of [...(element.listeners.get(name) ?? [])]) {
+        if (immediatePropagationStopped) break;
+        if (registration.capture === capture) registration.listener(payload);
+      }
+    };
+    for (const element of [...path].reverse()) {
+      invoke(element, true);
+      if (propagationStopped) return;
+    }
+    for (const element of path) {
+      invoke(element, false);
+      if (propagationStopped) return;
     }
   }
 
@@ -302,9 +327,10 @@ describe('Wave 2A.1 settings DOM primitives', () => {
     expect(radios.map(({ disabled }) => disabled)).toEqual([false, true, false]);
   });
 
-  it('requires an explicit adapter for custom targets and suppresses activation reversibly', () => {
+  it('suppresses pre-existing target capture handlers from an earlier row boundary', () => {
     const document = makeDocument();
     const customTarget = asElement(document.createElement('div'));
+    const unrelatedSibling = asElement(document.createElement('button'));
     const control = asElement(document.createElement('div'));
     const activations = {
       keyup: vi.fn(),
@@ -314,12 +340,14 @@ describe('Wave 2A.1 settings DOM primitives', () => {
       change: vi.fn()
     };
     let customDisabled = false;
+    const siblingActivation = vi.fn();
     customTarget.tabIndex = 0;
     customTarget.setAttribute('role', 'button');
     Object.entries(activations).forEach(([eventName, callback]) => {
-      customTarget.addEventListener(eventName, callback);
+      customTarget.addEventListener(eventName, callback, true);
     });
-    control.append(customTarget);
+    unrelatedSibling.addEventListener('click', siblingActivation, true);
+    control.append(customTarget, unrelatedSibling);
     const row = createSettingRow({
       id: 'custom-row',
       label: 'Custom action',
@@ -357,6 +385,8 @@ describe('Wave 2A.1 settings DOM primitives', () => {
     customTarget.fire('input');
     customTarget.fire('change');
     Object.values(activations).forEach((callback) => expect(callback).not.toHaveBeenCalled());
+    unrelatedSibling.click();
+    expect(siblingActivation).toHaveBeenCalledTimes(1);
     expect(row!.setDisabled(false)).toBe(true);
     expect(customDisabled).toBe(false);
     expect(customTarget.tabIndex).toBe(0);
@@ -367,6 +397,122 @@ describe('Wave 2A.1 settings DOM primitives', () => {
     customTarget.fire('change');
     Object.values(activations).forEach((callback) => expect(callback).toHaveBeenCalledTimes(1));
     expect(row!.destroy()).toBe(true);
+    customTarget.fire('keyup');
+    expect(activations.keyup).toHaveBeenCalledTimes(2);
+  });
+
+  it('blocks pre-existing capture activation at the ancestor boundary in real Chromium', async () => {
+    const source = await readFile(
+      new URL('../../src/ui/dom/SettingRow.ts', import.meta.url),
+      'utf8'
+    );
+    const moduleUrl = `data:text/javascript;base64,${Buffer.from(transpileModule(source, {
+      compilerOptions: { module: ModuleKind.ESNext, target: ScriptTarget.ES2022 }
+    }).outputText).toString('base64')}`;
+    const browser = await chromium.launch({ headless: true });
+
+    try {
+      const page = await browser.newPage();
+      const result = await page.evaluate(async (url) => {
+        const importModule = new Function('moduleUrl', 'return import(moduleUrl)') as (
+          moduleUrl: string
+        ) => Promise<typeof import('../../src/ui/dom/SettingRow')>;
+        const { createSettingRow } = await importModule(url);
+        const eventNames = ['pointerup', 'keyup', 'click', 'input', 'change'] as const;
+        const activations = Object.fromEntries(eventNames.map((name) => [name, 0])) as Record<
+          (typeof eventNames)[number],
+          number
+        >;
+        const target = document.createElement('div');
+        const sibling = document.createElement('button');
+        const control = document.createElement('div');
+        let adapterDisabled = false;
+        let siblingActivations = 0;
+
+        target.tabIndex = 0;
+        target.setAttribute('role', 'button');
+        eventNames.forEach((name) => {
+          target.addEventListener(name, () => {
+            activations[name] += 1;
+          }, { capture: true });
+        });
+        sibling.addEventListener('click', () => {
+          siblingActivations += 1;
+        }, { capture: true });
+        control.append(target, sibling);
+        const row = createSettingRow({
+          id: 'chromium-custom-row',
+          label: 'Chromium custom target',
+          control,
+          interactionTargets: [{
+            element: target,
+            disableAdapter: {
+              getDisabled: () => adapterDisabled,
+              prepareDisabled: (disabled) => {
+                const before = adapterDisabled;
+                return {
+                  commit: () => {
+                    adapterDisabled = disabled;
+                  },
+                  rollback: () => {
+                    adapterDisabled = before;
+                  }
+                };
+              }
+            }
+          }]
+        });
+        if (!row) throw new Error('SettingRow failed to construct');
+        document.body.append(row.root);
+        if (!row.setDisabled(true)) throw new Error('SettingRow failed to disable');
+
+        const disabledDispatchResults = eventNames.map((name) => target.dispatchEvent(new Event(name, {
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        })));
+        sibling.click();
+        const whileDisabled = { ...activations };
+
+        if (!row.setDisabled(false)) throw new Error('SettingRow failed to re-enable');
+        eventNames.forEach((name) => target.dispatchEvent(new Event(name, {
+          bubbles: true,
+          cancelable: true,
+          composed: true
+        })));
+        const afterEnable = { ...activations };
+        if (!row.destroy()) throw new Error('SettingRow failed to destroy');
+        target.dispatchEvent(new Event('keyup', { bubbles: true, cancelable: true }));
+
+        return {
+          afterDestroyKeyup: activations.keyup,
+          afterEnable,
+          disabledDispatchResults,
+          siblingActivations,
+          whileDisabled
+        };
+      }, moduleUrl);
+
+      expect(result.whileDisabled).toEqual({
+        pointerup: 0,
+        keyup: 0,
+        click: 0,
+        input: 0,
+        change: 0
+      });
+      expect(result.disabledDispatchResults).toEqual([false, false, false, false, false]);
+      expect(result.siblingActivations).toBe(1);
+      expect(result.afterEnable).toEqual({
+        pointerup: 1,
+        keyup: 1,
+        click: 1,
+        input: 1,
+        change: 1
+      });
+      expect(result.afterDestroyKeyup).toBe(2);
+    } finally {
+      await browser.close();
+    }
   });
 
   it('fails closed without guessing descendants or accepting non-disable-capable targets', () => {

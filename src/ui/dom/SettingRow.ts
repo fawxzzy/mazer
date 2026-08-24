@@ -65,7 +65,6 @@ interface ResolvedInteractionTarget {
   prepareDisabled: (disabled: boolean) => SettingRowDisableTransaction | null;
   initialDisabled: boolean;
   attributes: AttributeSnapshot;
-  suppress: (event: Event) => void;
 }
 
 interface PreparedDisableTransaction extends SettingRowDisableTransaction {
@@ -102,6 +101,23 @@ const restoreAttribute = (element: HTMLElement, name: string, value: string | nu
     element.removeAttribute(name);
   } else {
     element.setAttribute(name, value);
+  }
+};
+
+const eventTouchesTarget = (event: Event, target: HTMLElement): boolean => {
+  try {
+    if (typeof event.composedPath === 'function' && event.composedPath().includes(target)) {
+      return true;
+    }
+  } catch {
+    // Fall back to the ordinary event target for older or hostile event objects.
+  }
+  try {
+    const origin = event.target;
+    return origin === target
+      || (origin !== null && typeof origin === 'object' && target.contains(origin as Node));
+  } catch {
+    return false;
   }
 };
 
@@ -169,8 +185,29 @@ export const createSettingRow = (
   let rowDisabled = false;
   let destroyed = false;
   let activeDisableTransactions: PreparedDisableTransaction[] | null = null;
+  const suppressFromRowBoundary = (event: Event): void => {
+    if (
+      !rowDisabled
+      || destroyed
+      || !resolved.some(({ element }) => eventTouchesTarget(event, element))
+    ) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+  };
 
   const restoreTargets = (): void => {
+    if (root) {
+      for (const eventName of SUPPRESSED_EVENTS) {
+        try {
+          root.removeEventListener(eventName, suppressFromRowBoundary, true);
+        } catch {
+          // Best-effort cleanup must continue across every event boundary.
+        }
+      }
+    }
     for (const target of resolved) {
       try {
         restoreAttribute(target.element, 'aria-labelledby', target.attributes.labelledBy);
@@ -178,13 +215,6 @@ export const createSettingRow = (
         restoreAttribute(target.element, 'aria-disabled', target.attributes.ariaDisabled);
       } catch {
         // Best-effort cleanup must continue across every target.
-      }
-      for (const eventName of SUPPRESSED_EVENTS) {
-        try {
-          target.element.removeEventListener(eventName, target.suppress, true);
-        } catch {
-          // Best-effort cleanup must continue across every target.
-        }
       }
     }
   };
@@ -286,8 +316,7 @@ export const createSettingRow = (
           labelledBy: element.getAttribute('aria-labelledby'),
           describedBy: element.getAttribute('aria-describedby'),
           ariaDisabled: element.getAttribute('aria-disabled')
-        },
-        suppress: () => undefined
+        }
       });
     }
 
@@ -343,21 +372,15 @@ export const createSettingRow = (
           appendTokens(target.attributes.describedBy, descriptionTokens)
         );
       }
-      target.suppress = (event: Event): void => {
-        if (!rowDisabled || destroyed) return;
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation?.();
-      };
-      for (const eventName of SUPPRESSED_EVENTS) {
-        target.element.addEventListener(eventName, target.suppress, true);
-      }
     }
 
     const controlSlot = ownerDocument.createElement('div');
     controlSlot.className = 'mazer-setting-row__control';
     controlSlot.append(control);
     root.append(copy, controlSlot);
+    for (const eventName of SUPPRESSED_EVENTS) {
+      root.addEventListener(eventName, suppressFromRowBoundary, true);
+    }
 
     const setDisabled = (disabled: boolean): boolean => {
       if (destroyed || typeof disabled !== 'boolean') return false;
