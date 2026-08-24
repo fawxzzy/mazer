@@ -247,6 +247,29 @@ describe('player progression completion flow', () => {
     expect(scene.boardPathDirty).toBe(true);
   });
 
+  test('advances exactly one player ordinal for every accepted completion without regression', () => {
+    const { scene } = createScene();
+
+    vi.useFakeTimers();
+    try {
+      for (let completion = 0; completion < 4; completion += 1) {
+        // Each accepted completion is a distinct run receipt in production.
+        // Make that identity boundary deterministic here instead of depending
+        // on how many wall-clock milliseconds the surrounding suite consumes.
+        vi.setSystemTime(new Date(Date.UTC(2026, 7, 24, 12, 0, 0, completion)));
+        recordMazeCycleCompletion.call(scene, 'play');
+        expect(scene.progressionState.tracks.player.level).toBe(String(completion + 2));
+        expect(scene.progressionState.tracks.player.completedCycles).toBe(String(completion + 1));
+        expect(scene.progressionState.tracks['ai-runner']).toMatchObject({
+          completedCycles: '0',
+          level: '1'
+        });
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
 
   test('keeps a completed maze visible even when the route contains an extreme detour', () => {
     const { scene } = createScene();
