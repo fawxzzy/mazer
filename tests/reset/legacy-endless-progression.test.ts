@@ -8,6 +8,8 @@ import {
   resolveLegacyProgressionRulesetId
 } from '../../src/legacy-runtime/legacyEndlessProgression';
 
+const normalizeSourceLineEndings = (source: string): string => source.replace(/\r\n?/g, '\n');
+
 describe('legacy endless progression ruleset boundary', () => {
   test('levels below the boundary resolve to the unchanged legacy ruleset', () => {
     expect(resolveLegacyProgressionRulesetId(1)).toBe('legacy-v1');
@@ -20,14 +22,18 @@ describe('legacy endless progression ruleset boundary', () => {
   });
 
   test('keeps both persisted completion ordinals uncapped behind the idempotent server contract', () => {
-    const foundation = readFileSync(
+    const foundation = normalizeSourceLineEndings(readFileSync(
       new URL('../../supabase/migrations/20260822000000_mazer_endless_progression_foundation.sql', import.meta.url),
       'utf8'
-    );
-    const completionRpc = readFileSync(
+    ));
+    const completionRpc = normalizeSourceLineEndings(readFileSync(
       new URL('../../supabase/migrations/20260822000100_mazer_endless_completion_rpc.sql', import.meta.url),
       'utf8'
-    );
+    ));
+    const remoteProgressionSource = normalizeSourceLineEndings(readFileSync(
+      new URL('../../src/legacy-runtime/legacyRemoteProgression.ts', import.meta.url),
+      'utf8'
+    ));
 
     expect(foundation).toContain('drop constraint if exists mazer_progression_states_player_level_check');
     expect(foundation).toContain('drop constraint if exists mazer_ai_progression_states_level_check');
@@ -42,9 +48,13 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(completionRpc).toContain('create or replace function public.mazer_complete_ai_level');
     expect(completionRpc).toContain('v_next_level := v_current.level + 1');
     expect(completionRpc).toContain('p_completed_level text');
+    expect(completionRpc).toContain('p_completed_at timestamp with time zone default null');
+    expect(completionRpc).toContain("p_receipt jsonb default '{}'::jsonb");
     expect(completionRpc).toContain('player_level text');
     expect(completionRpc).toContain('player_completed_cycles text');
     expect(completionRpc).toContain('completed_cycles text');
+    expect(completionRpc).toContain('state jsonb');
+    expect(completionRpc).toContain('updated_at timestamp with time zone');
     expect(completionRpc).toContain('v_completed_level := p_completed_level::bigint');
     expect(completionRpc).toContain("'completedCycles', v_next_completed_cycles::text");
     expect(completionRpc).toContain("'level', v_next_level::text");
@@ -61,10 +71,72 @@ describe('legacy endless progression ruleset boundary', () => {
     expect(completionRpc).not.toContain('p_completed_level integer');
     expect(completionRpc).not.toContain('p_completed_level bigint');
     expect(completionRpc).toContain("raise exception 'client_run_id is required for idempotent completion'");
-    expect(completionRpc).toContain('security invoker');
-    expect(completionRpc).not.toContain('security definer');
+    expect(completionRpc).toContain('security definer');
+    expect(completionRpc).not.toContain('security invoker');
+    expect(completionRpc).toContain('p_expected_user_id uuid');
+    expect(completionRpc).toContain('p_expected_user_id is distinct from v_user_id');
+    expect(completionRpc).toContain('v_now timestamp with time zone := pg_catalog.clock_timestamp()');
+    expect(completionRpc).not.toContain('pg_catalog.coalesce(p_completed_at, pg_catalog.now())');
+    expect(completionRpc.match(/v_receipt := p_receipt\s+- 'completedAt'\s+- 'clientCompletedAt';/g)).toHaveLength(2);
+    expect(completionRpc.match(/v_receipt := v_receipt \|\| pg_catalog\.jsonb_build_object\('clientCompletedAt', p_completed_at\);/g)).toHaveLength(2);
+    expect(completionRpc).toContain("p_completed_at between v_now - interval '90 days' and v_now + interval '5 minutes'");
+    expect(completionRpc.match(/if pg_catalog\.octet_length\(v_receipt::text\) > 8192 then/g)).toHaveLength(2);
+    expect(completionRpc.match(/v_receipt := v_receipt - 'clientCompletedAt';/g)).toHaveLength(2);
+    expect(completionRpc).not.toContain('v_receipt := p_receipt || case');
     expect(completionRpc).toContain('and r.client_run_id = p_client_run_id');
     expect(completionRpc).toContain('on conflict (user_id, client_run_id) where client_run_id is not null do nothing');
+    expect(completionRpc).toContain('completed_at,');
+    expect(completionRpc).toContain('receipt');
+    expect(completionRpc).toContain("pg_catalog.octet_length(p_receipt::text) > 8192");
+    expect(completionRpc).toContain("pg_catalog.nullif(p_receipt ->> 'id', '')");
+    expect(completionRpc).toContain('load-bearing player completion transaction');
+    expect(completionRpc).toContain('load-bearing menu-AI completion transaction');
+    expect(completionRpc).toContain('create function public.mazer_initialize_progression');
+    expect(completionRpc).toContain('create function public.mazer_reset_progression');
+    expect(completionRpc).toContain('revoke insert, update on table public.mazer_progression_states from authenticated');
+    expect(completionRpc).toContain('revoke insert, update on table public.mazer_ai_progression_states from authenticated');
+    expect(completionRpc).toContain('revoke insert on table public.mazer_cycle_receipts from authenticated');
+    expect(completionRpc).not.toContain('Not yet called by client code');
+    expect(remoteProgressionSource).toContain("client.rpc('mazer_initialize_progression'");
+    expect(remoteProgressionSource).toContain("client.rpc('mazer_complete_level'");
+    expect(remoteProgressionSource).toContain("client.rpc('mazer_complete_ai_level'");
+    expect(remoteProgressionSource).toContain("client.rpc('mazer_reset_progression'");
+    expect(remoteProgressionSource).not.toContain('createRemoteProgressionPayload');
+    expect(remoteProgressionSource).not.toContain('createRemoteAiProgressionPayload');
+    expect(remoteProgressionSource).not.toContain('.from(LEGACY_REMOTE_CYCLE_RECEIPTS_TABLE)');
+  });
+
+  test('strips forged or unbounded client timestamps before retaining bounded metadata', () => {
+    const completionRpc = normalizeSourceLineEndings(readFileSync(
+      new URL('../../supabase/migrations/20260822000100_mazer_endless_completion_rpc.sql', import.meta.url),
+      'utf8'
+    ));
+    const playerBody = completionRpc.slice(
+      completionRpc.indexOf('create or replace function public.mazer_complete_level'),
+      completionRpc.indexOf('create or replace function public.mazer_complete_ai_level')
+    );
+    const aiBody = completionRpc.slice(
+      completionRpc.indexOf('create or replace function public.mazer_complete_ai_level'),
+      completionRpc.indexOf('create function public.mazer_reset_progression')
+    );
+
+    for (const body of [playerBody, aiBody]) {
+      const stripIndex = body.indexOf("v_receipt := p_receipt\n    - 'completedAt'\n    - 'clientCompletedAt';");
+      const presenceIndex = body.indexOf('if p_completed_at is not null');
+      const staleIndex = body.indexOf("p_completed_at between v_now - interval '90 days' and v_now + interval '5 minutes'");
+      const boundedAddIndex = body.indexOf("jsonb_build_object('clientCompletedAt', p_completed_at)");
+      expect(stripIndex).toBeGreaterThan(-1);
+      expect(presenceIndex).toBeGreaterThan(stripIndex);
+      expect(staleIndex).toBeGreaterThan(presenceIndex);
+      expect(boundedAddIndex).toBeGreaterThan(staleIndex);
+      expect(body).not.toContain("jsonb_build_object('completedAt'");
+    }
+  });
+
+  test('keeps migration source assertions identical across LF and CRLF checkouts', () => {
+    const semanticSource = "v_receipt := p_receipt\n  - 'completedAt'\n  - 'clientCompletedAt';\n";
+    expect(normalizeSourceLineEndings(semanticSource.replace(/\n/g, '\r\n'))).toBe(semanticSource);
+    expect(normalizeSourceLineEndings(semanticSource)).toBe(semanticSource);
   });
 });
 

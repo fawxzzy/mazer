@@ -95,6 +95,7 @@ interface PlayerProgressionSceneHarness {
   resolveLegacyMenuStaticDeconstructDurationMs: () => number;
   resolveLegacyMenuStaticDeconstructTileStartAtMs: (time: number) => number;
   resolveLegacyBoardAspectRatioForMode: () => number;
+  resolveBrowserLocalStorage: () => MemoryStorage;
   resolveLegacyMazeGenerationProfileForMode: () => object;
   resolveLegacyProgressionScaleForMode: () => number;
   resolveLegacyProgressionStorage: () => MemoryStorage;
@@ -202,6 +203,7 @@ const createScene = (): { scene: PlayerProgressionSceneHarness; storage: MemoryS
     resolveLegacyMenuStaticDeconstructDurationMs: () => 120,
     resolveLegacyMenuStaticDeconstructTileStartAtMs: (time) => time,
     resolveLegacyBoardAspectRatioForMode: () => 1,
+    resolveBrowserLocalStorage: () => storage,
     resolveLegacyMazeGenerationProfileForMode: () => ({}),
     resolveLegacyProgressionScaleForMode: () => 37,
     resolveLegacyProgressionStorage: () => storage,
@@ -233,6 +235,7 @@ describe('player progression completion flow', () => {
     });
     expect(JSON.parse(storage.getItem(LEGACY_PROGRESSION_STORAGE_KEY) ?? '{}').tracks.player.completedCycles).toBe('1');
     expect(scene.pushLegacyPlayerMessage).not.toHaveBeenCalled();
+    expect(scene.syncLegacyRemoteProgressionState).not.toHaveBeenCalled();
 
     armLegacyMenuStaticDeconstructStage.call(scene, scene.time.now);
 
@@ -284,7 +287,9 @@ describe('player progression completion flow', () => {
   test('keeps local and cloud persistence outcomes out of player messaging while retaining diagnostics', () => {
     const { scene } = createScene();
     const result: LegacyRemoteProgressionSyncResult = {
+      completionSyncState: 'pending',
       error: 'network unavailable',
+      pendingCompletionCount: 1,
       playerMessage: {
         copy: 'Progress saved locally. Cloud sync will retry later.',
         durationMs: 2_400,
@@ -294,6 +299,7 @@ describe('player progression completion flow', () => {
         tone: 'warning'
       },
       skippedReason: null,
+      recoveredCompletionCount: 0,
       synced: false
     };
 
