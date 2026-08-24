@@ -1617,8 +1617,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
   });
 
   test('adopts the opaque Fitness-derived auth visual family without changing Mazer auth semantics', () => {
-    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const menuSceneSource = normalizeSourceLineEndings(
+      readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8')
+    );
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
+
+    expect(normalizeSourceLineEndings(menuSceneSource)).toBe(menuSceneSource);
+    expect(normalizeSourceLineEndings(menuSceneSource.replaceAll('\n', '\r\n'))).toBe(menuSceneSource);
 
     expect(menuSceneSource).toContain('const LEGACY_AUTH_UI_FONT_FAMILY');
     expect(menuSceneSource).toContain("this.overlay === 'auth' ? 0x031f20 : 0x02040a");
@@ -1629,7 +1634,20 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("const barHeight = this.overlay === 'auth' ? 56");
     expect(menuSceneSource).not.toContain('EMAIL OR USERNAME');
     expect(menuSceneSource).toContain('this.levelAnnouncerNumberText.setVisible(false);');
-    expect(menuSceneSource).toContain("this.authForm.mode === 'login' && rememberedIdentity?.displayName");
+    expect(menuSceneSource).toContain("this.authSnapshot.status !== 'authenticated'");
+    expect(menuSceneSource).toContain("&& rememberedIdentity?.displayName");
+    expect(menuSceneSource).toContain('private authInvalidFields: ReadonlySet<LegacyAuthFieldId> = new Set();');
+    expect(menuSceneSource).toContain('this.authInvalidFields = new Set(resolveLegacyAuthInvalidFields(this.authForm));');
+    expect(menuSceneSource).toContain("? 0xff7d7d");
+    expect(menuSceneSource).toContain('resolveLegacyAuthBottomFeedbackLabel(this.authSnapshot.error, this.authSnapshot.info)');
+    expect(menuSceneSource).toContain('const LEGACY_AUTH_BOTTOM_FEEDBACK_DURATION_MS = 5000;');
+    expect(menuSceneSource).toContain('const separatorCenterY = footerY + 2;');
+    expect(menuSceneSource).not.toContain('this.createAuthAccountSummaryCard(`Signed in as ${accountLabel}`');
+    expect(menuSceneSource).toContain("this.createAccountReadOnlyField(");
+    expect(menuSceneSource).toContain("panel.top + panel.height - 104,\n      'Reset progress'");
+    expect(menuSceneSource).toContain("text: 'Sign out', tone: 'primary'");
+    expect(menuSceneSource).not.toContain("text: 'Log out'");
+    expect(menuSceneSource).not.toContain("return 'Username saved.';");
     expect(authSource).toContain('signInWithPassword({');
     expect(authSource).not.toContain("reason: 'Enter a valid username.'");
   });

@@ -3,6 +3,10 @@ import type {
   LegacyAuthSessionSnapshot,
   LegacyRememberedIdentityState
 } from './legacyAuth';
+import {
+  LEGACY_AUTH_MESSAGE_COPY,
+  resolveLegacyAuthFeedbackMessage
+} from './legacyPlayerMessage';
 
 export interface LegacyAuthPresentation {
   alternateActionLabel: string;
@@ -19,6 +23,46 @@ export interface LegacyAuthPresentationInput {
   rememberedIdentity: LegacyRememberedIdentityState | null;
   snapshot: Pick<LegacyAuthSessionSnapshot, 'configured' | 'status'>;
 }
+
+export const resolveLegacyAuthBottomFeedbackLabel = (
+  error: string | null | undefined,
+  info: string | null | undefined
+): string | null => {
+  const message = resolveLegacyAuthFeedbackMessage(error, info);
+  if (!message) {
+    return null;
+  }
+
+  if (message.copy === LEGACY_AUTH_MESSAGE_COPY.passwordResetSent) {
+    return 'Reset email sent';
+  }
+  if (message.copy === LEGACY_AUTH_MESSAGE_COPY.networkUnavailable) {
+    return 'Account service unavailable';
+  }
+  if (message.copy.includes('email and password do not match')) {
+    return 'Email or password does not match';
+  }
+  if (message.copy.includes('Confirm your email')) {
+    return 'Confirm your email first';
+  }
+  if (message.copy.includes('Too many attempts')) {
+    return 'Wait a moment, then try again';
+  }
+  if (message.copy.includes('already has an account')) {
+    return 'Account already exists';
+  }
+  if (message.tone === 'error') {
+    return 'Could not finish — try again';
+  }
+  if (message.copy === LEGACY_AUTH_MESSAGE_COPY.verifyEmail) {
+    return 'Check your email';
+  }
+  if (message.copy === LEGACY_AUTH_MESSAGE_COPY.accountCreated) {
+    return 'Account created';
+  }
+
+  return message.copy.replace(/\.$/, '');
+};
 
 type LegacyAuthPresentationState =
   | 'account-unavailable'

@@ -273,6 +273,7 @@ import {
   requestLegacyPasswordReset,
   normalizeLegacyAuthEmail,
   resolveLegacyAuthAccountLabel,
+  resolveLegacyAuthInvalidFields,
   resolveLegacyAuthScopedStorageKey,
   resolveLegacyAuthSubmitState,
   saveLegacyAccountUsername,
@@ -287,7 +288,11 @@ import {
   type LegacyAuthSessionSnapshot,
   type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
-import { resolveLegacyAuthPresentation, type LegacyAuthPresentation } from '../legacy-runtime/legacyAuthPresentation';
+import {
+  resolveLegacyAuthBottomFeedbackLabel,
+  resolveLegacyAuthPresentation,
+  type LegacyAuthPresentation
+} from '../legacy-runtime/legacyAuthPresentation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
 import {
   fetchLegacyLeaderboardPage,
@@ -926,6 +931,7 @@ interface LegacyAuthActionDiagnostics {
   emailPresent: boolean;
   error: string | null;
   info: string | null;
+  invalidFields: LegacyAuthFieldId[];
   mode: LegacyAuthFormState['mode'];
   passwordLength: number;
   reason: string | null;
@@ -1001,6 +1007,7 @@ const LEGACY_AUTH_GATE_LOADING_DEPTH = 5000;
 // handleLegacyAuthSubmit's attempt-id guard) -- this only bounds how long
 // the UI waits before letting the player try again.
 const LEGACY_AUTH_SUBMIT_TIMEOUT_MS = 12000;
+const LEGACY_AUTH_BOTTOM_FEEDBACK_DURATION_MS = 5000;
 // Extra forgiveness beyond the chevron's own drawn touch-target size when
 // resolving which hit box a tap belongs to first -- corner buttons are
 // statistically the hardest to land a precise tap on.
@@ -1317,6 +1324,7 @@ export class MenuScene extends Phaser.Scene {
   private authAccountHydrationSequence = 0;
   private authSubmitting = false;
   private authSubmitAttemptId = 0;
+  private authInvalidFields: ReadonlySet<LegacyAuthFieldId> = new Set();
   // Check-only (never auto-saves -- there's no account to save to yet
   // until sign-up actually succeeds). A signup with a checked-available
   // username saves it right after account creation in
@@ -2394,6 +2402,7 @@ export class MenuScene extends Phaser.Scene {
         email: this.authSnapshot.email,
         emailPresent: this.authSnapshot.email !== null,
         formMode: this.authForm.mode,
+        invalidFields: [...this.authInvalidFields],
         rememberedIdentity: rememberedAuthIdentity,
         status: this.authSnapshot.status,
         userIdPresent: this.authSnapshot.userId !== null,
@@ -10673,7 +10682,11 @@ export class MenuScene extends Phaser.Scene {
       this.authForm.mode === 'signup' ? 'Create account' : presentation.title,
       panel.top + (stacked ? 103 : 110)
     );
-    if (this.authForm.mode === 'login' && rememberedIdentity?.displayName) {
+    if (
+      this.authSnapshot.status !== 'authenticated'
+      && this.authForm.mode === 'login'
+      && rememberedIdentity?.displayName
+    ) {
       this.createAuthInfoText(
         rememberedIdentity.displayName,
         panel.top + (stacked ? 164 : 176),
@@ -10683,9 +10696,8 @@ export class MenuScene extends Phaser.Scene {
       );
     }
 
-    const accountLabel = resolveLegacyAuthAccountLabel(this.authSnapshot);
     if (this.authSnapshot.status === 'authenticated') {
-      this.buildAuthenticatedAccountSection(panel, stacked, rowY, accountLabel);
+      this.buildAuthenticatedAccountSection(panel, stacked, rowY);
       return;
     }
 
@@ -10696,36 +10708,41 @@ export class MenuScene extends Phaser.Scene {
   private buildAuthenticatedAccountSection(
     panel: OverlayPanelFrame,
     stacked: boolean,
-    startY: number,
-    accountLabel: string
+    startY: number
   ): void {
     let rowY = startY;
 
-    this.createAuthAccountSummaryCard(`Signed in as ${accountLabel}`, rowY, panel);
-    rowY += stacked ? 64 : 72;
-    const detail = this.authSnapshot.email ?? this.authSnapshot.userId ?? '';
-    if (detail.length > 0) {
-      this.createAuthInfoText(detail, rowY, panel, '#d7f7ee', stacked ? 14 : 16);
-      rowY += stacked ? 46 : 54;
+    this.loadAccountUsernameIfNeeded();
+    const usernameFieldWidth = Math.min(panel.width - 32, 280);
+    const usernameFieldHeight = 54;
+    this.createAccountUsernameField(panel.centerX, rowY + (usernameFieldHeight / 2), usernameFieldWidth, usernameFieldHeight);
+    rowY += 74;
+
+    const accountEmail = this.authSnapshot.email ?? '';
+    if (accountEmail.length > 0) {
+      this.createAccountReadOnlyField(
+        panel.centerX,
+        rowY + (usernameFieldHeight / 2),
+        usernameFieldWidth,
+        usernameFieldHeight,
+        'EMAIL',
+        accountEmail
+      );
     }
 
-    this.loadAccountUsernameIfNeeded();
-    const usernameFieldWidth = Math.min(panel.width - 72, stacked ? 260 : 320);
-    const usernameFieldHeight = stacked ? 46 : 50;
-    this.createAccountUsernameField(panel.centerX, rowY + (usernameFieldHeight / 2), usernameFieldWidth, usernameFieldHeight);
-    rowY += usernameFieldHeight + (stacked ? 26 : 30);
-
-    // No "Done" button -- closing this overlay is what the back chevron is
-    // for. Reset Progress (account-level, resets the whole signed-in
-    // player's progression, not just the current attempt -- it used to live
-    // in the play-mode pause overlay's action row before moving here) and
-    // Log out are the bottom action bar: Log out on the left (secondary),
-    // Reset Progress on the right (primary).
+    // Match the auth-screen hierarchy: the lower-frequency destructive action
+    // is a compact text control above one full-width primary dock action.
+    this.createAuthFooterLink(
+      panel.centerX,
+      panel.top + panel.height - 104,
+      'Reset progress',
+      () => this.openOverlay('confirm-progression-reset'),
+      '#ff9bb5'
+    );
     this.createLegacyBottomActionBar(
       panel,
       stacked,
-      { onClick: () => this.openOverlay('confirm-progression-reset'), text: 'Reset Progress', tone: 'danger' },
-      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Log out', tone: 'danger' }
+      { onClick: () => { void this.handleLegacyAuthSignOut(); }, text: 'Sign out', tone: 'primary' }
     );
   }
 
@@ -10894,7 +10911,7 @@ export class MenuScene extends Phaser.Scene {
       case 'saving':
         return 'Saving...';
       case 'saved':
-        return 'Username saved.';
+        return null;
       case 'taken':
         return this.accountUsernameStatusMessage ?? 'That username is already taken.';
       case 'error':
@@ -10993,6 +11010,62 @@ export class MenuScene extends Phaser.Scene {
       })).setOrigin(0, 0.5);
       this.uiTexts.push(status);
     }
+  }
+
+  private createAccountReadOnlyField(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    fieldLabel: string,
+    value: string
+  ): void {
+    const left = x - (width / 2);
+    const right = x + (width / 2);
+    const top = y - (height / 2);
+    const bottom = y + (height / 2);
+    const radius = Math.min(18, height * 0.36);
+    const labelWidth = Math.max(58, (fieldLabel.length * 7) + 18);
+    const labelRight = right - radius - 8;
+    const gapStart = labelRight - labelWidth - 7;
+    const gapEnd = labelRight + 7;
+    const border = this.add.graphics();
+    border.lineStyle(1, LEGACY_PLAY_TOUCH_BUTTON_STROKE, 0.68);
+    border.beginPath();
+    border.moveTo(left + radius, top);
+    border.lineTo(gapStart, top);
+    border.moveTo(gapEnd, top);
+    border.lineTo(right - radius, top);
+    border.arc(right - radius, top + radius, radius, -Math.PI / 2, 0);
+    border.lineTo(right, bottom - radius);
+    border.arc(right - radius, bottom - radius, radius, 0, Math.PI / 2);
+    border.lineTo(left + radius, bottom);
+    border.arc(left + radius, bottom - radius, radius, Math.PI / 2, Math.PI);
+    border.lineTo(left, top + radius);
+    border.arc(left + radius, top + radius, radius, Math.PI, (Math.PI * 3) / 2);
+    border.strokePath();
+
+    const eyebrow = this.padLegacyCompactUiText(this.add.text(
+      labelRight - (labelWidth / 2),
+      top,
+      fieldLabel,
+      {
+        color: '#9bcdbd',
+        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+        fontSize: '11px'
+      }
+    )).setOrigin(0.5);
+    const valueText = this.fitLegacyUiTextToWidth(this.padLegacyUiText(this.add.text(
+      left + 18,
+      y + (height * 0.14),
+      value,
+      {
+        color: '#ecfff5',
+        fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
+        fontSize: '14px'
+      }
+    )), width - 36, 14, 12).setOrigin(0, 0.5);
+    this.uiTexts.push(eyebrow, valueText);
   }
 
   private createAccountUsernameNativeInput(): HTMLInputElement | null {
@@ -11197,6 +11270,7 @@ export class MenuScene extends Phaser.Scene {
     if (this.authForm.mode !== 'signup') {
       footerCursorX += modeLinkWidth + footerGap;
       const separatorX = footerCursorX + (separatorWidth / 2);
+      const separatorCenterY = footerY + 2;
       footerCursorX += separatorWidth + footerGap;
       this.createAuthFooterLink(
         footerCursorX + (recoveryLinkWidth / 2),
@@ -11205,14 +11279,17 @@ export class MenuScene extends Phaser.Scene {
         () => { void this.handleLegacyAuthPasswordReset(); }
       );
       this.overlayGraphics.lineStyle(7, LEGACY_PLAY_TOUCH_ACCENT, 0.12);
-      this.overlayGraphics.lineBetween(separatorX, footerY - (separatorHeight / 2), separatorX, footerY + (separatorHeight / 2));
+      this.overlayGraphics.lineBetween(separatorX, separatorCenterY - (separatorHeight / 2), separatorX, separatorCenterY + (separatorHeight / 2));
       this.overlayGraphics.lineStyle(3, LEGACY_PLAY_TOUCH_ACCENT, 0.96);
-      this.overlayGraphics.lineBetween(separatorX, footerY - (separatorHeight / 2), separatorX, footerY + (separatorHeight / 2));
+      this.overlayGraphics.lineBetween(separatorX, separatorCenterY - (separatorHeight / 2), separatorX, separatorCenterY + (separatorHeight / 2));
     }
 
+    const feedbackLabel = this.time.now < this.latestAuthFeedbackMessageExpiresAtMs
+      ? resolveLegacyAuthBottomFeedbackLabel(this.authSnapshot.error, this.authSnapshot.info)
+      : null;
     const primaryLabel = this.authSubmitting
       ? 'Working'
-      : presentation.primaryActionLabel;
+      : feedbackLabel ?? presentation.primaryActionLabel;
     this.createLegacyBottomActionBar(
       panel,
       stacked,
@@ -11235,12 +11312,18 @@ export class MenuScene extends Phaser.Scene {
     return width;
   }
 
-  private createAuthFooterLink(x: number, y: number, text: string, onClick: () => void): void {
+  private createAuthFooterLink(
+    x: number,
+    y: number,
+    text: string,
+    onClick: () => void,
+    color = '#72e0bf'
+  ): void {
     const fontSize = this.layout.width < LEGACY_UI_COMPACT_BREAKPOINT ? 13 : 14;
     const label = this.padLegacyCompactUiText(this.add.text(x, y, text, {
       fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
       fontSize: `${fontSize}px`,
-      color: '#72e0bf'
+      color
     })).setOrigin(0.5).setAlpha(0.82);
     this.uiTexts.push(label);
 
@@ -11335,7 +11418,7 @@ export class MenuScene extends Phaser.Scene {
   private armLegacyAuthFeedbackMessage(): void {
     const message = resolveLegacyAuthFeedbackMessage(this.authSnapshot.error, this.authSnapshot.info);
     this.latestAuthFeedbackMessageExpiresAtMs = message
-      ? this.time.now + message.durationMs
+      ? this.time.now + LEGACY_AUTH_BOTTOM_FEEDBACK_DURATION_MS
       : Number.NEGATIVE_INFINITY;
     this.pushLegacyPlayerMessage(message);
   }
@@ -11442,10 +11525,11 @@ export class MenuScene extends Phaser.Scene {
   ): UiButton {
     const chrome = this.add.graphics();
     const unifiedAuthPrimary = this.overlay === 'auth' && tone === 'primary';
-    const unifiedAuthDisabled = unifiedAuthPrimary && (
-      this.authSubmitting
-      || !resolveLegacyAuthSubmitState(this.authForm, this.authSnapshot.configured).canSubmit
-    );
+    // Keep the primary auth action available so an attempted empty/invalid
+    // submit can reveal the field-level red outline contract. The only hard
+    // disabled state is an in-flight provider request, which prevents double
+    // submission without hiding validation feedback behind an inert control.
+    const unifiedAuthDisabled = unifiedAuthPrimary && this.authSubmitting;
     const colors = unifiedAuthPrimary
       ? { fill: 0xf4f4f5, stroke: LEGACY_PLAY_TOUCH_ACCENT, text: '#050505' }
       : tone === 'primary'
@@ -11645,8 +11729,11 @@ export class MenuScene extends Phaser.Scene {
       this.positionLegacyAuthNativeInput(fieldId, { height, width, x, y });
     }
 
-    const borderColor = isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
-    const borderAlpha = isActive ? 0.95 : 0.68;
+    const isInvalid = this.authInvalidFields.has(fieldId);
+    const borderColor = isInvalid
+      ? 0xff7d7d
+      : isActive ? LEGACY_PLAY_TOUCH_ACCENT : LEGACY_PLAY_TOUCH_BUTTON_STROKE;
+    const borderAlpha = isInvalid ? 1 : isActive ? 0.95 : 0.68;
     const border = this.add.graphics();
     const left = x - (width / 2);
     const right = x + (width / 2);
@@ -11675,7 +11762,7 @@ export class MenuScene extends Phaser.Scene {
     const eyebrow = this.padLegacyCompactUiText(this.add.text(labelRight - (labelWidth / 2), top, fieldLabel, {
       fontFamily: LEGACY_AUTH_UI_FONT_FAMILY,
       fontSize: '11px',
-      color: isActive ? '#72e0bf' : '#9bcdbd'
+      color: isInvalid ? '#ff7d7d' : isActive ? '#72e0bf' : '#9bcdbd'
     })).setOrigin(0.5);
     this.uiTexts.push(eyebrow);
     const valueFontSize = 14;
@@ -12451,6 +12538,9 @@ export class MenuScene extends Phaser.Scene {
         ...this.authForm,
         [fieldId]: input.value
       };
+      this.authInvalidFields = new Set(
+        [...this.authInvalidFields].filter((invalidField) => invalidField !== fieldId)
+      );
       this.authSnapshot = {
         ...this.authSnapshot,
         error: null,
@@ -12509,6 +12599,7 @@ export class MenuScene extends Phaser.Scene {
       emailPresent: input.emailPresent ?? normalizeLegacyAuthEmail(this.authForm.email).includes('@'),
       error: input.error ?? null,
       info: input.info ?? null,
+      invalidFields: [...this.authInvalidFields],
       mode: input.mode ?? this.authForm.mode,
       passwordLength: input.passwordLength ?? this.authForm.password.length,
       reason: input.reason ?? null,
@@ -12588,6 +12679,9 @@ export class MenuScene extends Phaser.Scene {
       ...this.authForm,
       [fieldId]: nextValue
     };
+    this.authInvalidFields = new Set(
+      [...this.authInvalidFields].filter((invalidField) => invalidField !== fieldId)
+    );
     if (this.authNativeInput && this.authNativeInputField === fieldId && this.authNativeInput.value !== nextValue) {
       this.authNativeInput.value = nextValue;
     }
@@ -12687,6 +12781,7 @@ export class MenuScene extends Phaser.Scene {
       username: ''
     };
     this.authPasswordVisible = false;
+    this.authInvalidFields = new Set();
     this.activeAuthField = this.authForm.email.length > 0 ? 'password' : 'email';
     this.destroyLegacyAuthNativeInput();
     this.resetAuthUsernameEvaluation();
@@ -12732,6 +12827,7 @@ export class MenuScene extends Phaser.Scene {
     this.revokeLegacyGuestPlayGrant();
     this.syncLegacyAuthNativeInputValue();
     this.recordLegacyAuthActionDiagnostics({ stage: 'started' });
+    this.authInvalidFields = new Set(resolveLegacyAuthInvalidFields(this.authForm));
     const submitState = resolveLegacyAuthSubmitState(this.authForm, this.authSnapshot.configured);
     if (!submitState.canSubmit) {
       this.recordLegacyAuthActionDiagnostics({
@@ -12739,16 +12835,27 @@ export class MenuScene extends Phaser.Scene {
         reason: submitState.reason,
         stage: 'blocked'
       });
-      this.authSnapshot = {
-        ...this.authSnapshot,
-        error: submitState.reason,
-        info: null
-      };
-      this.armLegacyAuthFeedbackMessage();
+      if (this.authInvalidFields.size === 0) {
+        this.authSnapshot = {
+          ...this.authSnapshot,
+          error: submitState.reason,
+          info: null
+        };
+        this.armLegacyAuthFeedbackMessage();
+      } else {
+        this.authSnapshot = {
+          ...this.authSnapshot,
+          error: null,
+          info: null
+        };
+        this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
+        this.clearQueuedLegacyPlayerMessagesBySource('auth');
+      }
       this.uiDirty = true;
       return;
     }
 
+    this.authInvalidFields = new Set();
     this.authSubmitting = true;
     this.uiDirty = true;
     this.recordLegacyAuthActionDiagnostics({
@@ -12784,6 +12891,12 @@ export class MenuScene extends Phaser.Scene {
         status: this.authSnapshot.status
       });
       this.authSubmitting = false;
+      this.authSnapshot = {
+        ...this.authSnapshot,
+        error: 'Request timed out.',
+        info: null
+      };
+      this.armLegacyAuthFeedbackMessage();
       this.uiDirty = true;
     }
   }
@@ -12835,6 +12948,7 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.authSubmitting = false;
+    this.authInvalidFields = new Set();
 
     if (result === null) {
       const message = error instanceof Error ? error.message : String(error);
@@ -12901,6 +13015,20 @@ export class MenuScene extends Phaser.Scene {
     }
 
     this.syncLegacyAuthNativeInputValue();
+    if (!this.authForm.email.includes('@')) {
+      this.authInvalidFields = new Set(['email']);
+      this.authSnapshot = {
+        ...this.authSnapshot,
+        error: null,
+        info: null
+      };
+      this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
+      this.clearQueuedLegacyPlayerMessagesBySource('auth');
+      this.activeAuthField = 'email';
+      this.uiDirty = true;
+      return;
+    }
+
     if (!this.authSnapshot.configured) {
       this.authSnapshot = {
         ...this.authSnapshot,
@@ -12912,18 +13040,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    if (!this.authForm.email.includes('@')) {
-      this.authSnapshot = {
-        ...this.authSnapshot,
-        error: LEGACY_AUTH_MESSAGE_COPY.passwordResetEmailRequired,
-        info: null
-      };
-      this.armLegacyAuthFeedbackMessage();
-      this.activeAuthField = 'email';
-      this.uiDirty = true;
-      return;
-    }
-
+    this.authInvalidFields = new Set();
     this.authSubmitting = true;
     this.uiDirty = true;
     const result = await requestLegacyPasswordReset(this.authForm.email);
@@ -12946,6 +13063,7 @@ export class MenuScene extends Phaser.Scene {
       'login',
       readLegacyRememberedIdentity(this.resolveBrowserLocalStorage())
     );
+    this.authInvalidFields = new Set();
     this.activeAuthField = null;
     this.applyLegacyAuthSnapshot(result.snapshot);
     this.uiDirty = true;

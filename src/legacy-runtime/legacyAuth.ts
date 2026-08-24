@@ -38,6 +38,24 @@ export interface LegacyAuthSubmitState {
   reason: string | null;
 }
 
+export const resolveLegacyAuthInvalidFields = (
+  form: LegacyAuthFormState
+): LegacyAuthFieldId[] => {
+  const invalidFields: LegacyAuthFieldId[] = [];
+
+  if (form.mode === 'signup' && !LEGACY_USERNAME_PATTERN.test(form.username.trim())) {
+    invalidFields.push('username');
+  }
+  if (!normalizeLegacyAuthEmail(form.email).includes('@')) {
+    invalidFields.push('email');
+  }
+  if (form.password.length < 6) {
+    invalidFields.push('password');
+  }
+
+  return invalidFields;
+};
+
 export interface LegacyAuthActionResult {
   snapshot: LegacyAuthSessionSnapshot;
 }
@@ -569,6 +587,20 @@ export const resolveLegacyAuthSubmitState = (
     return {
       canSubmit: false,
       reason: LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured
+    };
+  }
+
+  if (form.mode === 'signup' && form.username.trim().length === 0) {
+    return {
+      canSubmit: false,
+      reason: LEGACY_AUTH_MESSAGE_COPY.usernameRequired
+    };
+  }
+
+  if (form.mode === 'signup' && !LEGACY_USERNAME_PATTERN.test(form.username.trim())) {
+    return {
+      canSubmit: false,
+      reason: LEGACY_AUTH_MESSAGE_COPY.usernameInvalid
     };
   }
 

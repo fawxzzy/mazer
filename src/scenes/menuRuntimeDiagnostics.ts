@@ -94,6 +94,7 @@ export interface MenuSceneRuntimeDiagnostics {
     email: string | null;
     emailPresent: boolean;
     formMode: 'login' | 'signup';
+    invalidFields: string[];
     rememberedIdentity: {
       displayName: string;
       email: string;
