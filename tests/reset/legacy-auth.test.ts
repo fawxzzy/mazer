@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   LEGACY_AUTH_GUEST_SCOPE,
   LEGACY_AUTH_REMEMBERED_IDENTITY_KEY,
   buildLegacySignUpMetadata,
   buildLegacyRememberedIdentityState,
+  captureLegacyPasswordRecoveryBootUrlState,
+  clearLegacyPasswordRecoveryUrl,
   createEmptyLegacyAuthFormState,
   createLegacyAuthScopedStorage,
   deriveLegacyRememberedIdentityDisplayName,
@@ -13,6 +15,12 @@ import {
   normalizeLegacyAuthEmail,
   readLegacyRememberedIdentityState,
   readLegacyRememberedIdentity,
+  readLegacyPasswordRecoveryBootUrlState,
+  resolveLegacyPasswordRecoveryCleanUrl,
+  resolveLegacyPasswordRecoveryEnterAction,
+  resolveLegacyPasswordRecoveryRedirectUrl,
+  resolveLegacyPasswordRecoveryUrlState,
+  resolveLegacyPasswordUpdateSubmitState,
   resolveLegacyAuthAccountLabel,
   resolveLegacyAuthConfig,
   resolveLegacyAuthInvalidFields,
@@ -21,6 +29,7 @@ import {
   resolveLegacyAuthSubmitState,
   resolveLegacySignUpInfo,
   syncLegacyRememberedIdentityFromAuthenticatedSession,
+  updateLegacyPasswordWithClient,
   writeLegacyRememberedIdentityState,
   writeLegacyRememberedIdentity,
   type LegacyAuthSessionSnapshot
@@ -115,6 +124,171 @@ describe('legacy auth runtime', () => {
       password: 'secret1',
       username: 'fawxzzy'
     }, true)).toEqual({ canSubmit: true, reason: null });
+  });
+
+  test('binds password reset email callbacks to the exact recovery route', () => {
+    expect(resolveLegacyPasswordRecoveryRedirectUrl('https://mazer.fawxzzy.com')).toBe(
+      'https://mazer.fawxzzy.com/update-password'
+    );
+    expect(resolveLegacyPasswordRecoveryRedirectUrl('https://mazer.fawxzzy.com/')).toBe(
+      'https://mazer.fawxzzy.com/update-password'
+    );
+    expect(resolveLegacyPasswordRecoveryCleanUrl('https://mazer.fawxzzy.com', 'invalid')).toBe(
+      'https://mazer.fawxzzy.com/update-password'
+    );
+    expect(resolveLegacyPasswordRecoveryCleanUrl('https://mazer.fawxzzy.com', 'continue')).toBe(
+      'https://mazer.fawxzzy.com/'
+    );
+  });
+
+  test('recognizes direct recovery paths and categorical provider failures without exposing details', () => {
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#access_token=secret',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: true });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#code=secret&type=recovery',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: true });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#type=signup',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: false });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#type=recovery',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: false });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#',
+      pathname: '/update-password',
+      search: '?code=secret'
+    })).toEqual({ hasProviderError: false, requested: true });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: false });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#error=access_denied&error_code=otp_expired&error_description=secret-detail',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: true, requested: true });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '',
+      pathname: '/',
+      search: '?error_code=otp_expired'
+    })).toEqual({ hasProviderError: true, requested: false });
+  });
+
+  test('retains a real recovery callback through auth bootstrap URL cleanup', () => {
+    expect(captureLegacyPasswordRecoveryBootUrlState({
+      hash: '#access_token=secret&type=recovery',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: true });
+    expect(readLegacyPasswordRecoveryBootUrlState({
+      hash: '',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: true });
+
+    clearLegacyPasswordRecoveryUrl('continue');
+    expect(readLegacyPasswordRecoveryBootUrlState({
+      hash: '',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: false });
+  });
+
+  test('updates a password only when both policy-valid fields match', async () => {
+    const updateUser = vi.fn(async () => ({ error: null }));
+    const client = { auth: { updateUser } };
+
+    expect(resolveLegacyPasswordUpdateSubmitState('short', 'short', true)).toEqual({
+      canSubmit: false,
+      invalidFields: ['password'],
+      reason: 'Password needs 6+ characters.'
+    });
+    expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret2', true)).toEqual({
+      canSubmit: false,
+      invalidFields: ['confirmPassword'],
+      reason: 'Passwords do not match.'
+    });
+    expect(await updateLegacyPasswordWithClient(client, 'short', 'short')).toEqual({
+      error: 'Password needs 6+ characters.',
+      ok: false
+    });
+    expect(await updateLegacyPasswordWithClient(client, 'secret1', 'secret2')).toEqual({
+      error: 'Passwords do not match.',
+      ok: false
+    });
+    expect(updateUser).not.toHaveBeenCalled();
+
+    await expect(updateLegacyPasswordWithClient(client, 'secret1', 'secret1')).resolves.toEqual({
+      error: null,
+      ok: true
+    });
+    expect(updateUser).toHaveBeenCalledOnce();
+    expect(updateUser).toHaveBeenCalledWith({ password: 'secret1' });
+  });
+
+  test('advances Enter from the first recovery field and reserves submission for valid confirmation', () => {
+    expect(resolveLegacyPasswordRecoveryEnterAction('password')).toBeNull();
+    expect(resolveLegacyPasswordRecoveryEnterAction('password', true)).toBe('focus-confirmation');
+    expect(resolveLegacyPasswordRecoveryEnterAction('confirmPassword', true)).toBe('submit');
+    expect(resolveLegacyPasswordRecoveryEnterAction('email', true)).toBeNull();
+    expect(resolveLegacyPasswordRecoveryEnterAction('username', true)).toBeNull();
+    expect(resolveLegacyPasswordRecoveryEnterAction('displayName', true)).toBeNull();
+
+    expect(resolveLegacyPasswordUpdateSubmitState('secret1', '', true).canSubmit).toBe(false);
+    expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret2', true).canSubmit).toBe(false);
+    expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret1', true).canSubmit).toBe(true);
+  });
+
+  test('bounds recovery-password updates and shares an unresolved mutation with manual retry', async () => {
+    let settleUpdate: ((value: { error: null }) => void) | null = null;
+    const timeoutClient = {
+      auth: {
+        updateUser: vi.fn(async () => new Promise<{ error: null }>((resolve) => {
+          settleUpdate = resolve;
+        }))
+      }
+    };
+    const timeoutResult = await updateLegacyPasswordWithClient(timeoutClient, 'secret1', 'secret1', {
+      timeoutMs: 1
+    });
+    expect(timeoutResult.ok).toBe(false);
+    expect(timeoutResult.error).toBe('Password update timed out.');
+    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
+
+    const retry = updateLegacyPasswordWithClient(timeoutClient, 'secret1', 'secret1', { timeoutMs: 100 });
+    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
+
+    await expect(updateLegacyPasswordWithClient(timeoutClient, 'secret2', 'secret2', {
+      timeoutMs: 100
+    })).resolves.toEqual({
+      error: 'A previous password update is still pending. Please wait before trying a different password.',
+      ok: false
+    });
+    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
+
+    settleUpdate?.({ error: null });
+    await expect(retry).resolves.toEqual({ error: null, ok: true });
+    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
+
+    const rejectClient = {
+      auth: { updateUser: vi.fn(async () => Promise.reject(new Error('bad network'))) }
+    };
+    const rejectResult = await updateLegacyPasswordWithClient(rejectClient, 'secret1', 'secret1', {
+      timeoutMs: 1
+    });
+    expect(rejectResult.ok).toBe(false);
+    expect(rejectResult.error).toBe('bad network');
+    expect(rejectClient.auth.updateUser).toHaveBeenCalledOnce();
   });
 
   test('builds canonical Mazer signup metadata without deriving a username from email', () => {

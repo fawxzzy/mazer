@@ -226,6 +226,7 @@ import {
 import {
   LEGACY_USERNAME_PATTERN,
   checkLegacyUsernameAvailable,
+  clearLegacyPasswordRecoveryUrl,
   createEmptyLegacyAuthFormState,
   createLegacyAuthScopedStorage,
   createLegacyGuestAuthSnapshot,
@@ -233,8 +234,11 @@ import {
   readLegacyAuthSessionSnapshot,
   readLegacyRememberedIdentity,
   readLegacyRememberedIdentityState,
-  requestLegacyPasswordReset,
+  readLegacyPasswordRecoveryBootUrlState,
   normalizeLegacyAuthEmail,
+  requestLegacyPasswordReset,
+  resolveLegacyPasswordRecoveryEnterAction,
+  resolveLegacyPasswordUpdateSubmitState,
   resolveLegacyAuthAccountLabel,
   resolveLegacyAuthInvalidFields,
   resolveLegacyAuthScopedStorageKey,
@@ -245,6 +249,7 @@ import {
   signUpLegacyAuth,
   subscribeLegacyAuthState,
   syncLegacyRememberedIdentityFromAuthenticatedSession,
+  updateLegacyPassword,
   writeLegacyRememberedIdentity,
   type LegacyAuthFieldId,
   type LegacyAuthFormState,
@@ -252,9 +257,13 @@ import {
   type LegacyAuthStatus
 } from '../legacy-runtime/legacyAuth';
 import {
+  createLegacyPasswordRecoveryState,
   resolveLegacyAuthBottomFeedbackLabel,
   resolveLegacyAuthPresentation,
-  type LegacyAuthPresentation
+  resolveLegacyPasswordRecoveryEntry,
+  resolveLegacyPasswordRecoveryPresentation,
+  type LegacyAuthPresentation,
+  type LegacyPasswordRecoveryState
 } from '../legacy-runtime/legacyAuthPresentation';
 import { resolveLegacyAuthInputCssRect } from '../legacy-runtime/legacyAuthInputGeometry';
 import {
@@ -274,6 +283,7 @@ import {
   enqueueLegacyPlayerMessage,
   expireLegacyPlayerMessageQueue,
   resolveLegacyAuthFeedbackMessage,
+  resolveLegacyPasswordRecoveryError,
   resolveLegacyAuthValidationMessage,
   type LegacyQueuedPlayerMessage,
   type LegacyPlayerMessage
@@ -1263,12 +1273,15 @@ export class MenuScene extends Phaser.Scene {
   // Same deferred-to-update() pattern as pendingBootPlayStart above, for
   // the same reason -- applyLegacyAuthSnapshot can run synchronously mid-
   // create() (the runtime auth fixture resolves immediately), before
-  // objects declared later in create() exist yet. Set here only ever
+    // objects declared later in create() exist yet. Set here only ever
   // assigns plain fields, never touches scene objects, so it's safe
   // regardless of timing; the actual overlay/UI mutation happens once in
   // update(), which is guaranteed to run only after create() has returned.
   private pendingAuthGateTransition = false;
   private authForm: LegacyAuthFormState = createEmptyLegacyAuthFormState('login');
+  private passwordRecoveryState: LegacyPasswordRecoveryState = createLegacyPasswordRecoveryState();
+  private passwordRecoveryUrlState = readLegacyPasswordRecoveryBootUrlState();
+  private passwordRecoveryFeedback: string | null = null;
   private activeAuthField: LegacyAuthFieldId | null = null;
   private authNativeInput: HTMLInputElement | null = null;
   private authNativeInputField: LegacyAuthFieldId | null = null;
@@ -1583,6 +1596,20 @@ export class MenuScene extends Phaser.Scene {
     // run and check this flag before this function ever reaches the line
     // that used to set it, leaving it permanently unconsumed.
     this.pendingBootPlayStart = resolveInitialRuntimeMode(runtimeSearch) === 'play';
+    this.passwordRecoveryUrlState = readLegacyPasswordRecoveryBootUrlState();
+    this.passwordRecoveryState = resolveLegacyPasswordRecoveryEntry(
+      createLegacyPasswordRecoveryState(),
+      {
+        authenticated: false,
+        bootstrapComplete: false,
+        event: 'BOOTSTRAP_PATH',
+        hasProviderError: this.passwordRecoveryUrlState.hasProviderError,
+        pathRequested: this.passwordRecoveryUrlState.requested
+      }
+    );
+    if (this.passwordRecoveryState.phase === 'error') {
+      clearLegacyPasswordRecoveryUrl('invalid');
+    }
     this.loadPersistedLegacyAuthForm();
     this.loadPersistedLegacyGameToggleSettings();
     this.loadPersistedMazeCycleTelemetryHistory();
@@ -1917,18 +1944,27 @@ export class MenuScene extends Phaser.Scene {
   public update(time: number, delta: number): void {
     if (this.pendingAuthGateTransition) {
       this.pendingAuthGateTransition = false;
-      if (this.authGateLocked && this.overlay !== 'auth') {
+      if (this.isLegacyPasswordRecoveryActive() && this.overlay !== 'auth') {
+        this.overlay = 'auth';
+        this.uiDirty = true;
+        this.rebuildUi();
+      } else if (this.authGateLocked && this.overlay !== 'auth') {
         this.overlay = 'auth';
         this.uiDirty = true;
         this.rebuildUi();
       } else if (!this.authGateLocked && !this.authGateAwaitingResolution && this.overlay === 'auth') {
-        // Signed in successfully (or the gate was never actually locking,
-        // e.g. the auth backend isn't configured) -- if the auth overlay is
-        // still open because the gate put it there, let it close now that
-        // there's nothing left to gate on.
-        this.overlay = 'none';
-        this.uiDirty = true;
-        this.rebuildUi();
+        if (this.isLegacyPasswordRecoveryActive()) {
+          this.uiDirty = true;
+          this.rebuildUi();
+        } else {
+          // Signed in successfully (or the gate was never actually locking,
+          // e.g. the auth backend isn't configured) -- if the auth overlay is
+          // still open because the gate put it there, let it close now that
+          // there's nothing left to gate on.
+          this.overlay = 'none';
+          this.uiDirty = true;
+          this.rebuildUi();
+        }
       }
     }
     // pendingBootPlayStart intentionally stays pending (not cleared) until
@@ -4092,7 +4128,11 @@ export class MenuScene extends Phaser.Scene {
     }
 
     if (event.key === 'Enter') {
-      void this.handleLegacyAuthSubmit();
+      if (this.isLegacyPasswordRecoveryActive()) {
+        void this.handleLegacyPasswordRecoveryPrimaryAction();
+      } else {
+        void this.handleLegacyAuthSubmit();
+      }
       return true;
     }
 
@@ -10003,6 +10043,10 @@ export class MenuScene extends Phaser.Scene {
     const panel = this.resolveOverlayPanelFrame();
     const stacked = panel.width < LEGACY_UI_COMPACT_BREAKPOINT;
     const centerX = panel.centerX;
+    if (this.isLegacyPasswordRecoveryActive()) {
+      this.buildPasswordRecoveryOverlay(panel, stacked);
+      return;
+    }
     const rememberedIdentity = readLegacyRememberedIdentityState(this.resolveBrowserLocalStorage());
     const presentation = resolveLegacyAuthPresentation({
       mode: this.authForm.mode,
@@ -10043,6 +10087,66 @@ export class MenuScene extends Phaser.Scene {
 
     this.buildAuthCredentialsForm(panel, stacked, centerX, rowY, presentation);
     this.latestAuthMessage = this.resolveLegacyCurrentAuthMessage();
+  }
+
+  private isLegacyPasswordRecoveryActive(): boolean {
+    return this.passwordRecoveryState.phase !== 'inactive';
+  }
+
+  private buildPasswordRecoveryOverlay(panel: OverlayPanelFrame, stacked: boolean): void {
+    const presentation = resolveLegacyPasswordRecoveryPresentation(this.passwordRecoveryState);
+    const fieldWidth = Math.min(panel.width - 32, 280);
+    const fieldHeight = 54;
+    const startY = panel.top + (panel.height * 0.42);
+
+    this.createAuthWordmark(panel.top + (stacked ? 42 : 48));
+    this.createOverlayTitle(presentation.title, panel.top + (stacked ? 103 : 110));
+
+    if (this.passwordRecoveryState.phase === 'ready' || this.passwordRecoveryState.phase === 'submitting') {
+      this.createAuthFieldBox(
+        panel.centerX,
+        startY,
+        fieldWidth,
+        fieldHeight,
+        'password',
+        this.authForm.password.length === 0 ? '' : this.maskLegacyAuthPassword('password'),
+        this.authForm.password.length === 0
+      );
+      this.createAuthFieldBox(
+        panel.centerX,
+        startY + 68,
+        fieldWidth,
+        fieldHeight,
+        'confirmPassword',
+        this.authForm.confirmPassword.length === 0 ? '' : this.maskLegacyAuthPassword('confirmPassword'),
+        this.authForm.confirmPassword.length === 0
+      );
+    }
+
+    const helper = this.passwordRecoveryFeedback ?? presentation.helper;
+    if (helper) {
+      this.createAuthInfoText(
+        helper,
+        this.passwordRecoveryState.phase === 'ready' || this.passwordRecoveryState.phase === 'submitting'
+          ? startY + 124
+          : startY,
+        panel,
+        this.passwordRecoveryState.phase === 'error' || this.passwordRecoveryFeedback ? '#ff9d9d' : '#d7f7ee',
+        stacked ? 13 : 14
+      );
+    }
+
+    if (presentation.primaryActionLabel) {
+      this.createLegacyBottomActionBar(
+        panel,
+        stacked,
+        {
+          onClick: () => { void this.handleLegacyPasswordRecoveryPrimaryAction(); },
+          text: presentation.primaryActionLabel,
+          tone: 'primary'
+        }
+      );
+    }
   }
 
   private buildAuthenticatedAccountSection(
@@ -11063,12 +11167,14 @@ export class MenuScene extends Phaser.Scene {
     const isActive = this.activeAuthField === fieldId;
     const fieldLabel = fieldId === 'displayName'
       ? 'DISPLAY NAME'
-      : fieldId === 'password'
+      : fieldId === 'confirmPassword'
+        ? 'CONFIRM PASSWORD'
+        : fieldId === 'password'
         ? 'PASSWORD'
         : fieldId === 'username'
           ? 'USERNAME'
           : 'EMAIL';
-    const hasPasswordToggle = fieldId === 'password';
+    const hasPasswordToggle = fieldId === 'password' || fieldId === 'confirmPassword';
     const contentLeft = x - (width / 2) + 18;
     const contentRightInset = hasPasswordToggle ? 54 : 16;
     const valueWidth = width - 18 - contentRightInset;
@@ -11861,10 +11967,13 @@ export class MenuScene extends Phaser.Scene {
 
     this.destroyLegacyAuthNativeInput();
     const input = document.createElement('input');
-    input.type = fieldId === 'password' ? 'password' : fieldId === 'email' ? 'email' : 'text';
-    input.autocomplete = fieldId === 'password' ? 'current-password' : fieldId === 'email' ? 'email' : fieldId === 'username' ? 'username' : 'name';
+    const isPasswordField = fieldId === 'password' || fieldId === 'confirmPassword';
+    input.type = isPasswordField ? 'password' : fieldId === 'email' ? 'email' : 'text';
+    input.autocomplete = isPasswordField
+      ? (this.isLegacyPasswordRecoveryActive() ? 'new-password' : 'current-password')
+      : fieldId === 'email' ? 'email' : fieldId === 'username' ? 'username' : 'name';
     input.inputMode = fieldId === 'email' ? 'email' : 'text';
-    input.enterKeyHint = fieldId === 'password' ? 'done' : 'next';
+    input.enterKeyHint = fieldId === 'password' && this.isLegacyPasswordRecoveryActive() ? 'next' : isPasswordField ? 'done' : 'next';
     input.autocapitalize = fieldId === 'displayName' ? 'words' : 'none';
     input.spellcheck = false;
     input.setAttribute('aria-label', fieldId === 'displayName' ? 'display name' : fieldId);
@@ -11897,6 +12006,7 @@ export class MenuScene extends Phaser.Scene {
         info: null
       };
       this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
+      this.passwordRecoveryFeedback = null;
       this.clearQueuedLegacyPlayerMessagesBySource('auth');
       if (fieldId === 'username') {
         this.scheduleAuthUsernameEvaluation();
@@ -11906,7 +12016,20 @@ export class MenuScene extends Phaser.Scene {
     this.authNativeKeyDownHandler = (event: KeyboardEvent) => {
       if (event.key === 'Enter') {
         event.preventDefault();
-        void this.handleLegacyAuthSubmit();
+        event.stopPropagation();
+        if (this.isLegacyPasswordRecoveryActive()) {
+          const recoveryEnterAction = resolveLegacyPasswordRecoveryEnterAction(
+            fieldId,
+            this.passwordRecoveryUrlState.requested
+          );
+          if (recoveryEnterAction === 'focus-confirmation') {
+            this.selectLegacyAuthField('confirmPassword');
+          } else if (recoveryEnterAction === 'submit') {
+            void this.handleLegacyPasswordRecoveryPrimaryAction();
+          }
+        } else {
+          void this.handleLegacyAuthSubmit();
+        }
         return;
       }
       if (event.key === 'Escape') {
@@ -11970,7 +12093,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    input.type = fieldId === 'password'
+    input.type = fieldId === 'password' || fieldId === 'confirmPassword'
       ? (this.authPasswordVisible ? 'text' : 'password')
       : fieldId === 'email' ? 'email' : 'text';
     input.value = this.authForm[fieldId];
@@ -11980,7 +12103,7 @@ export class MenuScene extends Phaser.Scene {
     input.style.top = `${cssRect.top}px`;
     // Keep the canvas eye control outside the native input hit target so the
     // password visibility affordance remains tappable on mobile browsers.
-    const passwordToggleReserve = fieldId === 'password'
+    const passwordToggleReserve = fieldId === 'password' || fieldId === 'confirmPassword'
       ? Math.max(30, Math.round(cssRect.height * 0.92))
       : 0;
     input.style.width = `${Math.max(1, cssRect.width - passwordToggleReserve)}px`;
@@ -12005,9 +12128,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private selectNextLegacyAuthField(direction: -1 | 1): void {
-    const fields: LegacyAuthFieldId[] = this.authForm.mode === 'signup'
-      ? ['username', 'email', 'password']
-      : ['email', 'password'];
+    const fields: LegacyAuthFieldId[] = this.isLegacyPasswordRecoveryActive()
+      ? ['password', 'confirmPassword']
+      : this.authForm.mode === 'signup'
+        ? ['username', 'email', 'password']
+        : ['email', 'password'];
     const currentIndex = Math.max(0, fields.indexOf(this.activeAuthField ?? 'email'));
     const nextIndex = (currentIndex + direction + fields.length) % fields.length;
     this.activeAuthField = fields[nextIndex] ?? fields[0] ?? null;
@@ -12022,6 +12147,7 @@ export class MenuScene extends Phaser.Scene {
       displayName: 32,
       email: 96,
       password: 72,
+      confirmPassword: 72,
       username: 15
     };
     const nextValue = update(this.authForm[fieldId]).slice(0, maxLengthByField[fieldId]);
@@ -12041,6 +12167,7 @@ export class MenuScene extends Phaser.Scene {
       info: null
     };
     this.latestAuthFeedbackMessageExpiresAtMs = Number.NEGATIVE_INFINITY;
+    this.passwordRecoveryFeedback = null;
     this.clearQueuedLegacyPlayerMessagesBySource('auth');
     if (fieldId === 'username') {
       this.scheduleAuthUsernameEvaluation();
@@ -12128,6 +12255,7 @@ export class MenuScene extends Phaser.Scene {
     this.authForm = {
       ...this.authForm,
       mode,
+      confirmPassword: '',
       username: ''
     };
     this.authPasswordVisible = false;
@@ -12145,20 +12273,113 @@ export class MenuScene extends Phaser.Scene {
     this.uiDirty = true;
   }
 
-  private maskLegacyAuthPassword(): string {
-    if (this.authForm.password.length === 0) {
+  private maskLegacyAuthPassword(fieldId: 'confirmPassword' | 'password' = 'password'): string {
+    const password = this.authForm[fieldId];
+    if (password.length === 0) {
       return 'Enter password';
     }
 
     return this.authPasswordVisible
-      ? this.authForm.password
-      : '*'.repeat(Math.min(24, this.authForm.password.length));
+      ? password
+      : '*'.repeat(Math.min(24, password.length));
   }
 
   private toggleLegacyAuthPasswordVisibility(): void {
     this.authPasswordVisible = !this.authPasswordVisible;
-    if (this.authNativeInput && this.authNativeInputField === 'password') {
+    if (
+      this.authNativeInput
+      && (this.authNativeInputField === 'password' || this.authNativeInputField === 'confirmPassword')
+    ) {
       this.authNativeInput.type = this.authPasswordVisible ? 'text' : 'password';
+    }
+    this.uiDirty = true;
+  }
+
+  private async handleLegacyPasswordRecoveryPrimaryAction(): Promise<void> {
+    if (this.passwordRecoveryState.phase === 'success') {
+      this.passwordRecoveryState = createLegacyPasswordRecoveryState();
+      this.passwordRecoveryFeedback = null;
+      clearLegacyPasswordRecoveryUrl('continue');
+      this.closeLegacyAuthOverlayToMainMenu();
+      return;
+    }
+
+    if (this.passwordRecoveryState.phase === 'error') {
+      this.passwordRecoveryState = createLegacyPasswordRecoveryState();
+      this.passwordRecoveryFeedback = null;
+      this.authForm = {
+        ...this.authForm,
+        confirmPassword: '',
+        mode: 'login',
+        password: ''
+      };
+      this.authInvalidFields = new Set();
+      this.activeAuthField = this.authForm.email.length > 0 ? 'password' : 'email';
+      this.destroyLegacyAuthNativeInput();
+      clearLegacyPasswordRecoveryUrl('continue');
+      this.uiDirty = true;
+      return;
+    }
+
+    if (this.passwordRecoveryState.phase !== 'ready' || this.authSubmitting) {
+      return;
+    }
+
+    this.syncLegacyAuthNativeInputValue();
+    const submitState = resolveLegacyPasswordUpdateSubmitState(
+      this.authForm.password,
+      this.authForm.confirmPassword,
+      this.authSnapshot.configured
+    );
+    this.authInvalidFields = new Set(submitState.invalidFields);
+    if (!submitState.canSubmit) {
+      this.passwordRecoveryFeedback = submitState.reason;
+      this.activeAuthField = submitState.invalidFields[0] ?? 'password';
+      this.uiDirty = true;
+      return;
+    }
+
+    this.authSubmitting = true;
+    this.passwordRecoveryFeedback = null;
+    this.passwordRecoveryState = { error: null, phase: 'submitting' };
+    this.uiDirty = true;
+
+    let result: Awaited<ReturnType<typeof updateLegacyPassword>>;
+    try {
+      result = await updateLegacyPassword(this.authForm.password);
+    } catch (error) {
+      result = {
+        error: error instanceof Error ? error.message : String(error),
+        ok: false
+      };
+    }
+
+    this.authSubmitting = false;
+    if (result.ok) {
+      this.authForm = {
+        ...this.authForm,
+        confirmPassword: '',
+        password: ''
+      };
+      this.authInvalidFields = new Set();
+      this.activeAuthField = null;
+      this.destroyLegacyAuthNativeInput();
+      this.passwordRecoveryState = { error: null, phase: 'success' };
+      clearLegacyPasswordRecoveryUrl('continue');
+      this.uiDirty = true;
+      return;
+    }
+
+    const feedback = resolveLegacyPasswordRecoveryError(result.error);
+    this.passwordRecoveryFeedback = feedback.copy;
+    this.passwordRecoveryState = feedback.requiresNewLink
+      ? { error: feedback.copy, phase: 'error' }
+      : { error: null, phase: 'ready' };
+    if (feedback.requiresNewLink) {
+      this.authInvalidFields = new Set();
+      this.activeAuthField = null;
+      this.destroyLegacyAuthNativeInput();
+      clearLegacyPasswordRecoveryUrl('invalid');
     }
     this.uiDirty = true;
   }
@@ -13627,6 +13848,7 @@ export class MenuScene extends Phaser.Scene {
     const runtimeAuthFixtureSnapshot = this.resolveLegacyRuntimeAuthFixtureSnapshot();
     if (runtimeAuthFixtureSnapshot) {
       this.applyLegacyAuthSnapshot(runtimeAuthFixtureSnapshot);
+      this.applyLegacyPasswordRecoveryEntry(runtimeAuthFixtureSnapshot, 'BOOTSTRAP_PATH', true);
       return;
     }
 
@@ -13652,10 +13874,51 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
       this.applyLegacyAuthSnapshot(snapshot);
+      if (event === 'PASSWORD_RECOVERY') {
+        this.applyLegacyPasswordRecoveryEntry(snapshot, 'PASSWORD_RECOVERY', true);
+      }
     });
 
     const snapshot = await readLegacyAuthSessionSnapshot();
     this.applyLegacyAuthSnapshot(snapshot);
+    this.applyLegacyPasswordRecoveryEntry(snapshot, 'BOOTSTRAP_PATH', true);
+  }
+
+  private applyLegacyPasswordRecoveryEntry(
+    snapshot: LegacyAuthSessionSnapshot,
+    event: 'BOOTSTRAP_PATH' | 'PASSWORD_RECOVERY',
+    bootstrapComplete: boolean
+  ): void {
+    const nextState = resolveLegacyPasswordRecoveryEntry(this.passwordRecoveryState, {
+      authenticated: snapshot.status === 'authenticated',
+      bootstrapComplete,
+      event,
+      hasProviderError: this.passwordRecoveryUrlState.hasProviderError,
+      pathRequested: this.passwordRecoveryUrlState.requested
+    });
+    if (nextState === this.passwordRecoveryState) {
+      return;
+    }
+
+    this.passwordRecoveryState = nextState;
+    this.passwordRecoveryFeedback = null;
+    if (this.isLegacyPasswordRecoveryActive()) {
+      this.overlay = 'auth';
+      this.overlayReturn = 'none';
+      this.authForm = {
+        ...this.authForm,
+        confirmPassword: '',
+        password: ''
+      };
+      this.authInvalidFields = new Set();
+      this.activeAuthField = nextState.phase === 'ready' ? 'password' : null;
+      this.destroyLegacyAuthNativeInput();
+      if (nextState.phase === 'error') {
+        clearLegacyPasswordRecoveryUrl('invalid');
+      }
+    }
+    this.pendingAuthGateTransition = true;
+    this.uiDirty = true;
   }
 
   private resolveLegacyRuntimeAuthFixtureSnapshot(): LegacyAuthSessionSnapshot | null {
@@ -14139,7 +14402,7 @@ export class MenuScene extends Phaser.Scene {
     // Full auth gate: no back-chevron, no Escape key, no route around this
     // -- the account overlay can only close by actually signing in (see
     // pendingAuthGateTransition in update()).
-    if (this.authGateLocked && this.overlay === 'auth') {
+    if ((this.authGateLocked || this.isLegacyPasswordRecoveryActive()) && this.overlay === 'auth') {
       return;
     }
     const action = resolveLegacyOverlayBackAction({

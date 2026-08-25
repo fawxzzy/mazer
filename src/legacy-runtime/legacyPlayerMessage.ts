@@ -59,7 +59,10 @@ export const LEGACY_AUTH_MESSAGE_COPY = {
   loginReady: 'Details look good. Sign in when you are ready.',
   networkUnavailable: 'Account service is unreachable. Try again shortly.',
   passwordMinimum: 'Password needs 6+ characters.',
+  passwordMismatch: 'Passwords do not match.',
   passwordPolicy: 'Choose a different, stronger password that meets the account security requirements.',
+  passwordRecoveryInvalid: 'This reset link is invalid or has expired. Request a new link.',
+  passwordRecoveryUpdated: 'Password updated. You can continue to Mazer.',
   passwordResetEmailRequired: 'Enter an email before reset.',
   passwordResetNotConfigured: 'Password reset is unavailable right now. You can still play as a guest.',
   passwordResetSent: 'Password reset email sent.',
@@ -228,6 +231,34 @@ export const resolveLegacyAuthFeedbackMessage = (
     source: 'auth',
     tone: 'success'
   });
+};
+
+export const resolveLegacyPasswordRecoveryError = (
+  error: string | null | undefined
+): { copy: string; requiresNewLink: boolean; technicalDetail: string | null } => {
+  const rawError = error?.trim() ?? '';
+  const normalizedError = rawError.toLowerCase();
+  const requiresNewLink = normalizedError.includes('expired')
+    || normalizedError.includes('invalid token')
+    || normalizedError.includes('invalid jwt')
+    || normalizedError.includes('session missing')
+    || normalizedError.includes('session_not_found')
+    || normalizedError.includes('otp_expired');
+
+  if (requiresNewLink) {
+    return {
+      copy: LEGACY_AUTH_MESSAGE_COPY.passwordRecoveryInvalid,
+      requiresNewLink: true,
+      technicalDetail: rawError || null
+    };
+  }
+
+  return {
+    copy: resolveLegacyAuthFeedbackMessage(rawError, null)?.copy
+      ?? LEGACY_AUTH_MESSAGE_COPY.accountUnavailable,
+    requiresNewLink: false,
+    technicalDetail: rawError || null
+  };
 };
 
 export const resolveLegacyBootMessage = (

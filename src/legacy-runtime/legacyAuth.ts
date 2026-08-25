@@ -7,10 +7,11 @@ import { resolveLegacySupabaseSchemaForUrl } from './legacySupabaseSchemaBinding
 
 export const LEGACY_AUTH_REMEMBERED_IDENTITY_KEY = 'mazer.auth.remembered-identity.v1';
 export const LEGACY_AUTH_GUEST_SCOPE = 'guest';
+export const LEGACY_PASSWORD_RECOVERY_PATH = '/update-password';
 
 export type LegacyAuthStatus = 'guest' | 'authenticated' | 'unavailable';
 export type LegacyAuthFormMode = 'login' | 'signup';
-export type LegacyAuthFieldId = 'email' | 'password' | 'displayName' | 'username';
+export type LegacyAuthFieldId = 'email' | 'password' | 'confirmPassword' | 'displayName' | 'username';
 export type LegacyRememberedIdentitySessionState = 'ready' | 'reauth-required';
 
 export interface LegacyAuthConfig {
@@ -29,11 +30,37 @@ export interface LegacyAuthSessionSnapshot {
 }
 
 export interface LegacyAuthFormState {
+  confirmPassword: string;
   displayName: string;
   email: string;
   mode: LegacyAuthFormMode;
   password: string;
   username: string;
+}
+
+export interface LegacyPasswordRecoveryUrlState {
+  hasProviderError: boolean;
+  requested: boolean;
+}
+
+let legacyPasswordRecoveryBootUrlState: LegacyPasswordRecoveryUrlState | null = null;
+interface LegacyPasswordUpdateInFlight {
+  password: string;
+  promise: Promise<{ error: { message?: string | null } | null }>;
+}
+
+const legacyPasswordUpdatesInFlight = new WeakMap<LegacyPasswordUpdateClient, LegacyPasswordUpdateInFlight>();
+
+export interface LegacyPasswordUpdateSubmitState extends LegacyAuthSubmitState {
+  invalidFields: LegacyAuthFieldId[];
+}
+
+interface LegacyPasswordUpdateClient {
+  auth: {
+    updateUser: (attributes: { password: string }) => Promise<{
+      error: { message?: string | null } | null;
+    }>;
+  };
 }
 
 export interface LegacyAuthSubmitState {
@@ -519,7 +546,9 @@ export const requestLegacyPasswordReset = async (email: string): Promise<LegacyA
     };
   }
 
-  const redirectTo = typeof window === 'undefined' ? undefined : window.location.origin;
+  const redirectTo = typeof window === 'undefined'
+    ? undefined
+    : resolveLegacyPasswordRecoveryRedirectUrl(window.location.origin);
   const { error } = await client.auth.resetPasswordForEmail(normalizeLegacyAuthEmail(email), {
     redirectTo
   });
@@ -530,6 +559,210 @@ export const requestLegacyPasswordReset = async (email: string): Promise<LegacyA
       info: error ? null : LEGACY_AUTH_MESSAGE_COPY.passwordResetSent
     })
   };
+};
+
+export const resolveLegacyPasswordRecoveryRedirectUrl = (origin: string): string => (
+  `${origin.replace(/\/$/, '')}${LEGACY_PASSWORD_RECOVERY_PATH}`
+);
+
+export const resolveLegacyPasswordRecoveryUrlState = (
+  location: Pick<Location, 'hash' | 'pathname' | 'search'> | undefined = (
+    typeof window === 'undefined' ? undefined : window.location
+  )
+): LegacyPasswordRecoveryUrlState => {
+  if (!location) {
+    return { hasProviderError: false, requested: false };
+  }
+
+  const query = new URLSearchParams(location.search);
+  const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const isRecoveryPath = location.pathname.replace(/\/+$/, '') === LEGACY_PASSWORD_RECOVERY_PATH;
+  const hasProviderError = [query, fragment].some((params) => (
+    params.has('error') || params.has('error_code') || params.has('error_description')
+  ));
+  const hasRecoveryCredential = [query, fragment].some((params) => (
+    params.has('code')
+    || params.has('access_token')
+    || params.has('refresh_token')
+  ));
+
+  return {
+    hasProviderError,
+    requested: isRecoveryPath && (hasRecoveryCredential || hasProviderError)
+  };
+};
+
+export const captureLegacyPasswordRecoveryBootUrlState = (
+  location: Pick<Location, 'hash' | 'pathname' | 'search'> | undefined = (
+    typeof window === 'undefined' ? undefined : window.location
+  )
+): LegacyPasswordRecoveryUrlState => {
+  const state = resolveLegacyPasswordRecoveryUrlState(location);
+  legacyPasswordRecoveryBootUrlState = state.requested ? state : null;
+  return state;
+};
+
+export const readLegacyPasswordRecoveryBootUrlState = (
+  location: Pick<Location, 'hash' | 'pathname' | 'search'> | undefined = (
+    typeof window === 'undefined' ? undefined : window.location
+  )
+): LegacyPasswordRecoveryUrlState => {
+  const liveState = resolveLegacyPasswordRecoveryUrlState(location);
+  return liveState.requested ? liveState : legacyPasswordRecoveryBootUrlState ?? liveState;
+};
+
+export const resolveLegacyPasswordRecoveryCleanUrl = (
+  origin: string,
+  outcome: 'continue' | 'invalid'
+): string => outcome === 'continue'
+  ? `${origin.replace(/\/$/, '')}/`
+  : resolveLegacyPasswordRecoveryRedirectUrl(origin);
+
+export const resolveLegacyPasswordRecoveryEnterAction = (
+  fieldId: LegacyAuthFieldId,
+  requested = false
+): 'focus-confirmation' | 'submit' | null => {
+  if (!requested) {
+    return null;
+  }
+
+  return fieldId === 'password'
+    ? 'focus-confirmation'
+    : fieldId === 'confirmPassword'
+      ? 'submit'
+      : null;
+};
+
+interface LegacyPasswordUpdateOptions {
+  timeoutMs?: number;
+}
+
+const invokeLegacyPasswordUpdateWithTimeout = async (
+  client: LegacyPasswordUpdateClient,
+  password: string,
+  timeoutMs: number
+): Promise<{ error: { message?: string | null } | null }> => new Promise((resolve) => {
+  let inFlight = legacyPasswordUpdatesInFlight.get(client);
+  if (inFlight && inFlight.password !== password) {
+    resolve({ error: { message: 'A previous password update is still pending. Please wait before trying a different password.' } });
+    return;
+  }
+
+  if (!inFlight) {
+    const update = Promise.resolve().then(() => client.auth.updateUser({ password })).catch((caught: unknown) => ({
+      error: {
+        message: caught instanceof Error
+          ? caught.message
+          : 'Failed to update password. Please try again.'
+      }
+    }));
+    inFlight = { password, promise: update };
+    legacyPasswordUpdatesInFlight.set(client, inFlight);
+    void update.then(() => {
+      if (legacyPasswordUpdatesInFlight.get(client)?.promise === update) {
+        legacyPasswordUpdatesInFlight.delete(client);
+      }
+    });
+  }
+
+  const update = inFlight.promise;
+
+  let settled = false;
+  const timeout = setTimeout(() => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    resolve({ error: { message: 'Password update timed out.' } });
+  }, timeoutMs);
+
+  void update.then((result) => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    clearTimeout(timeout);
+    resolve(result);
+  });
+});
+
+export const clearLegacyPasswordRecoveryUrl = (outcome: 'continue' | 'invalid'): void => {
+  legacyPasswordRecoveryBootUrlState = null;
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.history.replaceState(
+    window.history.state,
+    '',
+    resolveLegacyPasswordRecoveryCleanUrl(window.location.origin, outcome)
+  );
+};
+
+export const resolveLegacyPasswordUpdateSubmitState = (
+  password: string,
+  confirmPassword: string,
+  configured: boolean
+): LegacyPasswordUpdateSubmitState => {
+  if (!configured) {
+    return {
+      canSubmit: false,
+      invalidFields: [],
+      reason: LEGACY_AUTH_MESSAGE_COPY.passwordResetNotConfigured
+    };
+  }
+
+  const invalidFields: LegacyAuthFieldId[] = [];
+  if (password.length < 6) {
+    invalidFields.push('password');
+  }
+  if (confirmPassword !== password) {
+    invalidFields.push('confirmPassword');
+  }
+
+  return {
+    canSubmit: invalidFields.length === 0,
+    invalidFields,
+    reason: password.length < 6
+      ? LEGACY_AUTH_MESSAGE_COPY.passwordMinimum
+      : confirmPassword !== password
+        ? LEGACY_AUTH_MESSAGE_COPY.passwordMismatch
+        : null
+  };
+};
+
+export const updateLegacyPasswordWithClient = async (
+  client: LegacyPasswordUpdateClient,
+  password: string,
+  confirmPassword = password,
+  options: LegacyPasswordUpdateOptions = {}
+): Promise<{ error: string | null; ok: boolean }> => {
+  const submitState = resolveLegacyPasswordUpdateSubmitState(password, confirmPassword, true);
+  if (!submitState.canSubmit) {
+    return { error: submitState.reason, ok: false };
+  }
+
+  const { timeoutMs = 3000 } = options;
+  const { error } = await invokeLegacyPasswordUpdateWithTimeout(client, password, timeoutMs);
+
+  return {
+    error: error?.message ?? null,
+    ok: error === null
+  };
+};
+
+export const updateLegacyPassword = async (
+  password: string
+): Promise<{ error: string | null; ok: boolean }> => {
+  const client = await getLegacyAuthClient();
+  if (!client) {
+    return {
+      error: LEGACY_AUTH_MESSAGE_COPY.passwordResetNotConfigured,
+      ok: false
+    };
+  }
+
+  return updateLegacyPasswordWithClient(client, password);
 };
 
 export const signOutLegacyAuth = async (): Promise<LegacyAuthActionResult> => {
@@ -583,6 +816,7 @@ export const createEmptyLegacyAuthFormState = (
   mode: LegacyAuthFormMode,
   rememberedEmail = ''
 ): LegacyAuthFormState => ({
+  confirmPassword: '',
   displayName: '',
   email: rememberedEmail,
   mode,

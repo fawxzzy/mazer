@@ -1,4 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   installMazerProductionServiceWorker,
   installMazerServiceWorkerControllerReload,
@@ -26,6 +28,17 @@ const createRuntime = (
 };
 
 describe('production service worker lifecycle', () => {
+  test('keeps update-password inside the app-shell navigation fallback for installed PWAs', () => {
+    const viteConfig = readFileSync(resolve(process.cwd(), 'vite.config.ts'), 'utf8');
+    const vercelConfig = readFileSync(resolve(process.cwd(), 'vercel.json'), 'utf8');
+
+    expect(viteConfig).toContain("filename: 'app-sw.js'");
+    expect(viteConfig).toContain('navigateFallbackDenylist: [/^\\/__/, /^\\/@vite\\//]');
+    expect(viteConfig).not.toMatch(/navigateFallbackDenylist:[^\n]*update-password/);
+    expect(vercelConfig).toContain('"source": "/update-password"');
+    expect(vercelConfig).toContain('"destination": "/index.html"');
+  });
+
   test.each(['localhost', '127.0.0.1', '::1'])(
     'never registers on local development host %s',
     (hostname) => {
