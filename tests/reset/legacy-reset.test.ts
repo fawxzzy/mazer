@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'vitest';
+import { createHash } from 'node:crypto';
 import { LEGACY_DEFAULTS, MAIN_MENU_BUTTONS, linearColorToHex } from '../../src/legacy-runtime/legacyDefaults';
 import {
   createLegacyGeneratedMenuMaze,
   createLegacyMaze,
   createLegacyMenuMaze,
-  isLegacyWrappedStepTransition
+  isLegacyWrappedStepTransition,
+  readLegacyMazeSearchDiagnostics
 } from '../../src/legacy-runtime/legacyMaze';
 import {
   createLegacyDemoWalkerEpisode,
@@ -49,6 +51,23 @@ const countLegacyShortcutBridgeFloors = (maze: ReturnType<typeof createLegacyMaz
   }
 
   return bridges;
+};
+
+const countLegacyOpenTwoByTwoFloorBlocks = (maze: ReturnType<typeof createLegacyMaze>): number => {
+  let blocks = 0;
+  for (let y = 0; y < maze.height - 1; y += 1) {
+    for (let x = 0; x < maze.width - 1; x += 1) {
+      if (
+        maze.grid[y]?.[x] === true
+        && maze.grid[y]?.[x + 1] === true
+        && maze.grid[y + 1]?.[x] === true
+        && maze.grid[y + 1]?.[x + 1] === true
+      ) {
+        blocks += 1;
+      }
+    }
+  }
+  return blocks;
 };
 
 const countDetachedFloorTiles = (maze: ReturnType<typeof createLegacyMaze>): number => {
@@ -280,6 +299,7 @@ describe('legacy reset lane', () => {
 
     expect(firstStep).toEqual(maze.start);
     expect(lastStep).toEqual(maze.goal);
+    expect(countLegacyOpenTwoByTwoFloorBlocks(maze)).toBe(0);
   });
 
   test('classifies opposite-edge neighbor transitions as wrapped steps for visual snapping', () => {
@@ -334,7 +354,78 @@ describe('legacy reset lane', () => {
     expect(maze.routeQualityStats?.meaningfulBypassableSolutionEdges).toBeGreaterThan(1);
     expect(maze.routeQualityStats?.meaningfulBypassableRouteBands).toBeGreaterThan(1);
     expect(maze.routeQualityStats?.minimumMeaningfulDetour).toBeGreaterThanOrEqual(2);
+    expect(countLegacyOpenTwoByTwoFloorBlocks(maze)).toBe(0);
   });
+
+  test('keeps play and generated-menu grids deterministic and free of open 2x2 floor blocks', () => {
+    const cases = [
+      { scale: 37, seed: 13 },
+      { scale: 50, seed: 0x5a17f00d },
+      { scale: 75, seed: 55 },
+      { scale: 99, seed: 233 }
+    ];
+
+    for (const { scale, seed } of cases) {
+      for (const buildMaze of [createLegacyMaze, createLegacyGeneratedMenuMaze]) {
+        const first = buildMaze(scale, scale, seed);
+        const second = buildMaze(scale, scale, seed);
+        expect(countLegacyOpenTwoByTwoFloorBlocks(first), `scale ${scale} seed ${seed}`).toBe(0);
+        expect(second.grid).toEqual(first.grid);
+        expect(second.start).toEqual(first.start);
+        expect(second.goal).toEqual(first.goal);
+        expect(second.solutionPath).toEqual(first.solutionPath);
+      }
+    }
+  }, 20_000);
+
+  test('preserves corrected PR #284 fast-path maze outputs while reusing one typed search workspace', () => {
+    const cases = [
+      {
+        build: createLegacyMaze,
+        expectedHash: '5991f3060be8e2da9bcf1972c2dafc4807baf4a39b6a5629a0516f2245c927ac',
+        kind: 'play',
+        scale: 25,
+        seed: 13
+      },
+      {
+        build: createLegacyGeneratedMenuMaze,
+        expectedHash: '4140a1de9ea55d1bf818b758c56a86005a1639560b2ecfbd323e8d59aeccab9f',
+        kind: 'menu',
+        scale: 37,
+        seed: 3
+      },
+      {
+        build: createLegacyMaze,
+        expectedHash: '8851d6b3bb706659d2b5653d85cf517b154ee77a681c0075d19dbdd9e253bc0c',
+        kind: 'play',
+        scale: 50,
+        seed: 52
+      }
+    ] as const;
+
+    for (const { build, expectedHash, kind, scale, seed } of cases) {
+      const maze = build(scale, scale, seed);
+      const diagnostics = readLegacyMazeSearchDiagnostics();
+      const snapshotHash = createHash('sha256').update(JSON.stringify(maze)).digest('hex');
+
+      expect(snapshotHash, `${kind}:${scale}:${seed}`).toBe(expectedHash);
+      expect(diagnostics).toMatchObject({
+        contractVersion: 'legacy-maze-search-workspace-v1',
+        normalizerPasses: 2,
+        workspaceAllocations: 1,
+        workspaceCellCapacity: maze.width * maze.height
+      });
+      expect(diagnostics.normalizerCandidateAudits).toBeGreaterThan(0);
+      expect(diagnostics.normalizerCandidateVisitedCells).toBeGreaterThanOrEqual(
+        diagnostics.normalizerCandidateAudits
+      );
+      expect(diagnostics.routeQualityMeasurements).toBeGreaterThan(0);
+      expect(diagnostics.routeQualityEdgeAudits).toBeGreaterThan(0);
+      expect(diagnostics.routeQualityVisitedCells).toBeGreaterThanOrEqual(
+        diagnostics.routeQualityEdgeAudits
+      );
+    }
+  }, 30_000);
 
   test('keeps default generated play mazes connected with meaningful alternate routes across seed families', () => {
     const failures: unknown[] = [];
@@ -441,7 +532,7 @@ describe('legacy reset lane', () => {
         expect(countDetachedFloorTiles(maze), `${factory.label}:${seed}`).toBe(0);
       }
     }
-  });
+  }, 15_000);
 
   test('reinforces weak shortcut outcomes without disconnecting generated play mazes', () => {
     let reinforcedMaze: ReturnType<typeof createLegacyMaze> | null = null;
@@ -487,7 +578,8 @@ describe('legacy reset lane', () => {
       wallArrayEntries: 0,
       uniqueWallCandidates: 0,
       created: 0,
-      exhaustedWallArray: false
+      exhaustedWallArray: false,
+      qualityReinforcementBudget: 0
     });
   });
 

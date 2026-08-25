@@ -43,6 +43,18 @@ jobs:
           tests/scenes/menu-render-frame.test.ts
           --maxWorkers=1
 
+      - name: Verify PR 284 maze output parity and search-work diagnostics
+        shell: bash
+        run: |
+          npx --no-install vitest run \
+            tests/reset/legacy-reset.test.ts \
+            tests/reset/legacy-topology-scale-audit.test.ts \
+            --maxWorkers=1 \
+            -t "PR #284"
+          npx --no-install vitest run \
+            tests/reset/legacy-unreal-source-fixture.test.ts \
+            --maxWorkers=1
+
       - name: Build production bundle and PWA assets
         run: npm run build
 
