@@ -3,7 +3,7 @@ import '../styles/base.css';
 import { bootstrapLegacyRemoteAccountState } from '../legacy-runtime/legacyRemoteProgression';
 import { installMazerAccessibilitySurface } from './accessibilitySurface';
 import { attachMazerGameToWindow, markMazerBootStatus } from './bootStatus';
-import { runMazerInstallGate } from './installGate';
+import { runMazerInstallGate, shouldRunMazerInstallGateForBoot } from './installGate';
 import { initializeInstallSurface } from './installSurface';
 import { createMazerPhaserConfig } from './phaserConfig';
 import { installMazerProductionServiceWorker, installMazerServiceWorkerControllerReload } from './serviceWorkerLifecycle';
@@ -97,7 +97,11 @@ const boot = async (): Promise<void> => {
   // nothing useful to do. ?forceInstallGate=1 opts back in when the gate
   // itself is what needs testing.
   const forceInstallGate = new URLSearchParams(window.location.search).get('forceInstallGate') === '1';
-  if (!isLocalhostRuntime() || forceInstallGate) {
+  if (shouldRunMazerInstallGateForBoot({
+    forceInstallGate,
+    isLocalhostRuntime: isLocalhostRuntime(),
+    location: window.location
+  })) {
     markMazerBootStatus('install-gate-checking');
     await runMazerInstallGate(document);
   }

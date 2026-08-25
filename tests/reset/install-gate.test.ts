@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import {
   MAZER_INSTALL_GATE_OVERLAY_ID,
   resolveMazerInstallGateCopy,
+  shouldRunMazerInstallGateForBoot,
   shouldShowMazerInstallGate
 } from '../../src/boot/installGate';
 import type { InstallSurfaceState } from '../../src/boot/installSurface';
@@ -58,8 +59,46 @@ describe('Mazer install gate', () => {
     expect(gameCreateIndex).toBeGreaterThan(-1);
     expect(installGateCallIndex).toBeLessThan(gameCreateIndex);
     expect(mainSource).toContain('initializeInstallSurface(window);');
-    expect(mainSource).toContain("!isLocalhostRuntime() || forceInstallGate");
+    expect(mainSource).toContain('shouldRunMazerInstallGateForBoot({');
+    expect(mainSource).toContain('location: window.location');
     expect(cssSource).toContain(`#${MAZER_INSTALL_GATE_OVERLAY_ID}`);
     expect(cssSource).toContain('"Space Grotesk", ui-sans-serif, system-ui');
+  });
+
+  test.each([
+    {
+      forceInstallGate: false,
+      isLocalhostRuntime: false,
+      label: 'uninstalled iOS Safari manual-install browser',
+      location: { hash: '#access_token=opaque&type=recovery', pathname: '/update-password', search: '' },
+      state: { ...hiddenState, mode: 'manual' as const, instruction: 'Use Share > Add to Home Screen' }
+    },
+    {
+      forceInstallGate: false,
+      isLocalhostRuntime: false,
+      label: 'installed iOS standalone PWA',
+      location: { hash: '#access_token=opaque&type=recovery', pathname: '/update-password/', search: '' },
+      state: { ...hiddenState, installed: true, standalone: true }
+    },
+    {
+      forceInstallGate: true,
+      isLocalhostRuntime: true,
+      label: 'prompt-capable desktop browser',
+      location: { hash: '', pathname: '/update-password', search: '?code=opaque' },
+      state: { ...hiddenState, mode: 'available' as const, canPrompt: true }
+    }
+  ])('bypasses the install gate for a direct recovery route in a $label', ({ forceInstallGate, isLocalhostRuntime, location, state }) => {
+    expect(shouldRunMazerInstallGateForBoot({ forceInstallGate, isLocalhostRuntime, location })).toBe(false);
+    expect(shouldShowMazerInstallGate(state)).toBe(state.mode !== 'hidden');
+  });
+
+  test('keeps ordinary browser and PWA entry routes behind their existing install decision', () => {
+    for (const pathname of ['/', '/play', '/update-password-preview']) {
+      expect(shouldRunMazerInstallGateForBoot({
+        forceInstallGate: false,
+        isLocalhostRuntime: false,
+        location: { hash: '', pathname, search: '' }
+      })).toBe(true);
+    }
   });
 });

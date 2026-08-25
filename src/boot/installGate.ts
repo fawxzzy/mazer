@@ -1,4 +1,16 @@
 import { getInstallSurfaceState, promptInstallSurface, subscribeInstallSurface, type InstallSurfaceState } from './installSurface';
+import { resolveLegacyPasswordRecoveryUrlState } from '../legacy-runtime/legacyAuth';
+
+export interface MazerInstallGateBootContext {
+  forceInstallGate: boolean;
+  isLocalhostRuntime: boolean;
+  location: Pick<Location, 'hash' | 'pathname' | 'search'>;
+}
+
+export const shouldRunMazerInstallGateForBoot = (context: MazerInstallGateBootContext): boolean => (
+  (!context.isLocalhostRuntime || context.forceInstallGate)
+  && !resolveLegacyPasswordRecoveryUrlState(context.location).requested
+);
 
 export const copyMazerInstallLink = async (url: string): Promise<boolean> => {
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {

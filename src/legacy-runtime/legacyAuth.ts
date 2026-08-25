@@ -585,6 +585,14 @@ export const resolveLegacyPasswordRecoveryCleanUrl = (
   ? `${origin.replace(/\/$/, '')}/`
   : resolveLegacyPasswordRecoveryRedirectUrl(origin);
 
+export const resolveLegacyPasswordRecoveryEnterAction = (
+  fieldId: LegacyAuthFieldId
+): 'focus-confirmation' | 'submit' | null => fieldId === 'password'
+  ? 'focus-confirmation'
+  : fieldId === 'confirmPassword'
+    ? 'submit'
+    : null;
+
 export const clearLegacyPasswordRecoveryUrl = (outcome: 'continue' | 'invalid'): void => {
   if (typeof window === 'undefined') {
     return;

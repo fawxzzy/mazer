@@ -236,6 +236,7 @@ import {
   readLegacyRememberedIdentityState,
   normalizeLegacyAuthEmail,
   requestLegacyPasswordReset,
+  resolveLegacyPasswordRecoveryEnterAction,
   resolveLegacyPasswordRecoveryUrlState,
   resolveLegacyPasswordUpdateSubmitState,
   resolveLegacyAuthAccountLabel,
@@ -12007,7 +12008,12 @@ export class MenuScene extends Phaser.Scene {
       if (event.key === 'Enter') {
         event.preventDefault();
         if (this.isLegacyPasswordRecoveryActive()) {
-          void this.handleLegacyPasswordRecoveryPrimaryAction();
+          const recoveryEnterAction = resolveLegacyPasswordRecoveryEnterAction(fieldId);
+          if (recoveryEnterAction === 'focus-confirmation') {
+            this.selectLegacyAuthField('confirmPassword');
+          } else if (recoveryEnterAction === 'submit') {
+            void this.handleLegacyPasswordRecoveryPrimaryAction();
+          }
         } else {
           void this.handleLegacyAuthSubmit();
         }

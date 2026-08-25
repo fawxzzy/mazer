@@ -1960,6 +1960,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("input.autocomplete = isPasswordField");
     expect(menuSceneSource).toContain("? (this.isLegacyPasswordRecoveryActive() ? 'new-password' : 'current-password')");
     expect(menuSceneSource).toContain('resolveLegacyPasswordUpdateSubmitState(');
+    expect(menuSceneSource).toContain("const recoveryEnterAction = resolveLegacyPasswordRecoveryEnterAction(fieldId);");
+    expect(menuSceneSource).toContain("if (recoveryEnterAction === 'focus-confirmation') {");
+    expect(menuSceneSource).toContain("this.selectLegacyAuthField('confirmPassword');");
+    expect(menuSceneSource).toContain("} else if (recoveryEnterAction === 'submit') {");
     expect(menuSceneSource).toContain('clearLegacyPasswordRecoveryUrl(\'continue\');');
     expect(menuSceneSource).toContain("this.passwordRecoveryState = { error: null, phase: 'success' };");
     expect(vercelConfig.rewrites).toContainEqual({

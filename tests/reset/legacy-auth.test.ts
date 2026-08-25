@@ -14,6 +14,7 @@ import {
   readLegacyRememberedIdentityState,
   readLegacyRememberedIdentity,
   resolveLegacyPasswordRecoveryCleanUrl,
+  resolveLegacyPasswordRecoveryEnterAction,
   resolveLegacyPasswordRecoveryRedirectUrl,
   resolveLegacyPasswordRecoveryUrlState,
   resolveLegacyPasswordUpdateSubmitState,
@@ -185,6 +186,18 @@ describe('legacy auth runtime', () => {
     });
     expect(updateUser).toHaveBeenCalledOnce();
     expect(updateUser).toHaveBeenCalledWith({ password: 'secret1' });
+  });
+
+  test('advances Enter from the first recovery field and reserves submission for valid confirmation', () => {
+    expect(resolveLegacyPasswordRecoveryEnterAction('password')).toBe('focus-confirmation');
+    expect(resolveLegacyPasswordRecoveryEnterAction('confirmPassword')).toBe('submit');
+    expect(resolveLegacyPasswordRecoveryEnterAction('email')).toBeNull();
+    expect(resolveLegacyPasswordRecoveryEnterAction('username')).toBeNull();
+    expect(resolveLegacyPasswordRecoveryEnterAction('displayName')).toBeNull();
+
+    expect(resolveLegacyPasswordUpdateSubmitState('secret1', '', true).canSubmit).toBe(false);
+    expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret2', true).canSubmit).toBe(false);
+    expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret1', true).canSubmit).toBe(true);
   });
 
   test('builds canonical Mazer signup metadata without deriving a username from email', () => {
