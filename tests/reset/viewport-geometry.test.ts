@@ -384,6 +384,26 @@ describe('Mazer viewport geometry', () => {
     controller.dispose();
   });
 
+  test('does not publish a queued forced resume after the controller is disposed', () => {
+    const observed = createObservableRuntime();
+    const controller = installMazerViewportGeometry(observed.runtime as never);
+    const snapshots = [] as ReturnType<typeof controller.getSnapshot>[];
+    controller.subscribe((snapshot) => snapshots.push(snapshot), false);
+
+    observed.runtime.document.visibilityState = 'hidden';
+    observed.emitDocument('visibilitychange');
+    observed.runtime.document.visibilityState = 'visible';
+    observed.emitDocument('visibilitychange');
+    expect(observed.scheduledFrameCount()).toBe(1);
+
+    controller.dispose();
+    observed.flushAnimationFrame();
+
+    expect(controller.getSnapshot().revision).toBe(1);
+    expect(snapshots).toEqual([]);
+    expect(observed.cssValues.get('--mazer-viewport-height')).toBe('844px');
+  });
+
   test('recomputes desktop maximize and restore from the current runtime snapshot', () => {
     const observed = createObservableRuntime({ height: 720, visualHeight: 720, visualWidth: 360, width: 360 });
     const controller = installMazerViewportGeometry(observed.runtime as never);

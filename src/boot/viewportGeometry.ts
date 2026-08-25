@@ -301,6 +301,7 @@ export const installMazerViewportGeometry = (
   let scheduled = false;
   let forceScheduledPublication = false;
   let hiddenResumeArmed = runtime.document?.visibilityState === 'hidden';
+  let disposed = false;
 
   const publish = (): void => {
     applyMazerViewportCssVariables(snapshot, runtime.document?.documentElement);
@@ -316,6 +317,9 @@ export const installMazerViewportGeometry = (
   };
 
   const syncSnapshot = (forcePublication = false): MazerViewportGeometry => {
+    if (disposed) {
+      return snapshot;
+    }
     const candidate = resolveMazerViewportGeometryFromRuntime(runtime, snapshot.revision + 1);
     if (!forcePublication && sameGeometry(snapshot, candidate)) {
       return snapshot;
@@ -329,6 +333,9 @@ export const installMazerViewportGeometry = (
   const sync = (): MazerViewportGeometry => syncSnapshot();
 
   const scheduleSync = (forcePublication = false): void => {
+    if (disposed) {
+      return;
+    }
     forceScheduledPublication ||= forcePublication;
     if (scheduled) {
       return;
@@ -336,6 +343,10 @@ export const installMazerViewportGeometry = (
     scheduled = true;
     const flush = (): void => {
       scheduled = false;
+      if (disposed) {
+        forceScheduledPublication = false;
+        return;
+      }
       const shouldForcePublication = forceScheduledPublication;
       forceScheduledPublication = false;
       if (runtime.document?.visibilityState === 'hidden') {
@@ -383,6 +394,10 @@ export const installMazerViewportGeometry = (
 
   return {
     dispose: () => {
+      disposed = true;
+      scheduled = false;
+      forceScheduledPublication = false;
+      hiddenResumeArmed = false;
       runtime.removeEventListener('resize', handleGeometryEvent);
       runtime.removeEventListener('orientationchange', handleGeometryEvent);
       runtime.document?.removeEventListener('visibilitychange', handleVisibilityChange);

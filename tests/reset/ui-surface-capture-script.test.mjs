@@ -144,6 +144,17 @@ describe('UI surface capture label matching', () => {
 });
 
 describe('UI surface standalone first-visible home readiness', () => {
+  const accountSurface = ({
+    active = true,
+    bounds: accountBounds = bounds(8, 8, 96, 32),
+    inputEnabled = true,
+    visible = true
+  } = {}) => ({
+    active,
+    bounds: accountBounds,
+    inputEnabled,
+    visible
+  });
   const firstVisibleDiagnostics = ({ buttons, title } = {}) => ({
     runtime: { auth: { status: 'authenticated' } },
     visual: {
@@ -161,9 +172,12 @@ describe('UI surface standalone first-visible home readiness', () => {
 
   test('requires the exact one-step resume revision and every first-frame home surface', () => {
     const evaluation = evaluateStandaloneFirstVisibleHomeReadiness({
+      accountSurface: accountSurface(),
       beforeViewportRevision: 7,
       diagnostics: firstVisibleDiagnostics(),
+      interactions: [],
       standalone: true,
+      viewport: { width: 390, height: 844 },
       viewportRevision: 8
     });
 
@@ -183,9 +197,12 @@ describe('UI surface standalone first-visible home readiness', () => {
       (button) => button.semanticAction !== 'Account'
     );
     const evaluation = evaluateStandaloneFirstVisibleHomeReadiness({
+      accountSurface: accountSurface(),
       beforeViewportRevision: 7,
       diagnostics,
+      interactions: [],
       standalone: true,
+      viewport: { width: 390, height: 844 },
       viewportRevision: 9
     });
 
@@ -194,6 +211,53 @@ describe('UI surface standalone first-visible home readiness', () => {
       'accountAction',
       'viewportRevisionAdvanced'
     ]));
+  });
+
+  test('fails closed for the production-shaped 1x1 account placeholder without active truth', () => {
+    const diagnostics = firstVisibleDiagnostics();
+    const account = diagnostics.visual.buttons.find(
+      (button) => button.semanticAction === 'Account'
+    );
+    delete account.active;
+    account.bounds = bounds(0, 0, 1, 1);
+    const evaluation = evaluateStandaloneFirstVisibleHomeReadiness({
+      accountSurface: accountSurface({
+        active: false,
+        bounds: bounds(0, 0, 1, 1),
+        inputEnabled: false,
+        visible: false
+      }),
+      beforeViewportRevision: 7,
+      diagnostics,
+      interactions: [],
+      standalone: true,
+      viewport: { width: 390, height: 844 },
+      viewportRevision: 8
+    });
+
+    expect(evaluation.ready).toBe(false);
+    expect(evaluation.failedClauses).toContain('accountAction');
+    expect(evaluation.state.actions.account).toMatchObject({
+      active: true,
+      activeDeclared: false,
+      geometry: { height: 1, width: 1 }
+    });
+  });
+
+  test('fails closed when a trusted interaction occurs before the first-visible capture completes', () => {
+    const evaluation = evaluateStandaloneFirstVisibleHomeReadiness({
+      accountSurface: accountSurface(),
+      beforeViewportRevision: 7,
+      diagnostics: firstVisibleDiagnostics(),
+      interactions: [{ key: null, type: 'pointerdown', x: 195, y: 802 }],
+      standalone: true,
+      viewport: { width: 390, height: 844 },
+      viewportRevision: 8
+    });
+
+    expect(evaluation.ready).toBe(false);
+    expect(evaluation.failedClauses).toContain('noInteractions');
+    expect(evaluation.state.interactions).toHaveLength(1);
   });
 });
 
@@ -245,7 +309,9 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain('window.__MAZER_SIMULATED_HIDDEN__ = true;');
     expect(source).toContain("document.dispatchEvent(new Event('visibilitychange'));");
     expect(source).toContain("id: '01-standalone-first-visible-home'");
-    expect(source).toContain('interactionTransitions: []');
+    expect(source).toContain("window.addEventListener('pointerdown', recordInteraction, true);");
+    expect(source).toContain("window.addEventListener('keydown', recordInteraction, true);");
+    expect(source).toContain('interactionTransitions: readiness.state.interactions');
     expect(source).toContain("firstVisibleHomeOnly: args['first-visible-home'] === true || args['first-visible-home'] === 'true'");
     expect(source).toContain('const gameScale = window.__MAZER_GAME__?.scale;');
     expect(source).toContain('gameScale?.width === width');
