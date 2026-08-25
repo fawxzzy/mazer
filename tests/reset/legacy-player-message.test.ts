@@ -10,6 +10,7 @@ import {
   enqueueLegacyPlayerMessage,
   expireLegacyPlayerMessageQueue,
   resolveLegacyAuthFeedbackMessage,
+  resolveLegacyPasswordRecoveryError,
   resolveLegacyAuthValidationMessage,
   resolveLegacyBootMessage,
   resolveLegacyOverlayFieldCommitMessage,
@@ -75,6 +76,24 @@ describe('legacy player-facing message system', () => {
       id: 'auth.feedback.info',
       source: 'auth',
       tone: 'success'
+    });
+  });
+
+  test('keeps password recovery errors categorical while retaining technical detail off-screen', () => {
+    expect(resolveLegacyPasswordRecoveryError('Auth session missing!')).toEqual({
+      copy: 'This reset link is invalid or has expired. Request a new link.',
+      requiresNewLink: true,
+      technicalDetail: 'Auth session missing!'
+    });
+    expect(resolveLegacyPasswordRecoveryError('Weak password')).toEqual({
+      copy: 'Choose a different, stronger password that meets the account security requirements.',
+      requiresNewLink: false,
+      technicalDetail: 'Weak password'
+    });
+    expect(resolveLegacyPasswordRecoveryError('Failed to fetch')).toEqual({
+      copy: 'Account service is unreachable. Try again shortly.',
+      requiresNewLink: false,
+      technicalDetail: 'Failed to fetch'
     });
   });
 

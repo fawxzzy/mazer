@@ -1,4 +1,6 @@
 import { createServer } from 'node:net';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 interface PreviewReservation {
@@ -40,6 +42,19 @@ const loadPreviewHelpers = async (): Promise<{
 };
 
 describe('health preview port acquisition', () => {
+  test('routes direct browser recovery navigation to the application shell', () => {
+    const vercelConfig = JSON.parse(readFileSync(resolve(process.cwd(), 'vercel.json'), 'utf8')) as {
+      rewrites?: Array<{ destination: string; source: string }>;
+    };
+    const index = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
+
+    expect(vercelConfig.rewrites).toContainEqual({
+      destination: '/index.html',
+      source: '/update-password'
+    });
+    expect(index).toContain('<script type="module" src="/src/boot/main.ts"></script>');
+  });
+
   test('keeps the requested port when it is free', async () => {
     const { acquirePreviewPort } = await loadPreviewHelpers();
     const probe = await listen(0);

@@ -15,5 +15,11 @@
       "destination": "https://mazer.fawxzzy.com/:path",
       "permanent": true
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/update-password",
+      "destination": "/index.html"
+    }
   ]
 }

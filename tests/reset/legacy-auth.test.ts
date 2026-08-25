@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   LEGACY_AUTH_GUEST_SCOPE,
   LEGACY_AUTH_REMEMBERED_IDENTITY_KEY,
@@ -13,6 +13,10 @@ import {
   normalizeLegacyAuthEmail,
   readLegacyRememberedIdentityState,
   readLegacyRememberedIdentity,
+  resolveLegacyPasswordRecoveryCleanUrl,
+  resolveLegacyPasswordRecoveryRedirectUrl,
+  resolveLegacyPasswordRecoveryUrlState,
+  resolveLegacyPasswordUpdateSubmitState,
   resolveLegacyAuthAccountLabel,
   resolveLegacyAuthConfig,
   resolveLegacyAuthInvalidFields,
@@ -21,6 +25,7 @@ import {
   resolveLegacyAuthSubmitState,
   resolveLegacySignUpInfo,
   syncLegacyRememberedIdentityFromAuthenticatedSession,
+  updateLegacyPasswordWithClient,
   writeLegacyRememberedIdentityState,
   writeLegacyRememberedIdentity,
   type LegacyAuthSessionSnapshot
@@ -115,6 +120,71 @@ describe('legacy auth runtime', () => {
       password: 'secret1',
       username: 'fawxzzy'
     }, true)).toEqual({ canSubmit: true, reason: null });
+  });
+
+  test('binds password reset email callbacks to the exact recovery route', () => {
+    expect(resolveLegacyPasswordRecoveryRedirectUrl('https://mazer.fawxzzy.com')).toBe(
+      'https://mazer.fawxzzy.com/update-password'
+    );
+    expect(resolveLegacyPasswordRecoveryRedirectUrl('https://mazer.fawxzzy.com/')).toBe(
+      'https://mazer.fawxzzy.com/update-password'
+    );
+    expect(resolveLegacyPasswordRecoveryCleanUrl('https://mazer.fawxzzy.com', 'invalid')).toBe(
+      'https://mazer.fawxzzy.com/update-password'
+    );
+    expect(resolveLegacyPasswordRecoveryCleanUrl('https://mazer.fawxzzy.com', 'continue')).toBe(
+      'https://mazer.fawxzzy.com/'
+    );
+  });
+
+  test('recognizes direct recovery paths and categorical provider failures without exposing details', () => {
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#access_token=secret',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: true });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#error=access_denied&error_code=otp_expired&error_description=secret-detail',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: true, requested: true });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '',
+      pathname: '/',
+      search: '?error_code=otp_expired'
+    })).toEqual({ hasProviderError: true, requested: false });
+  });
+
+  test('updates a password only when both policy-valid fields match', async () => {
+    const updateUser = vi.fn(async () => ({ error: null }));
+    const client = { auth: { updateUser } };
+
+    expect(resolveLegacyPasswordUpdateSubmitState('short', 'short', true)).toEqual({
+      canSubmit: false,
+      invalidFields: ['password'],
+      reason: 'Password needs 6+ characters.'
+    });
+    expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret2', true)).toEqual({
+      canSubmit: false,
+      invalidFields: ['confirmPassword'],
+      reason: 'Passwords do not match.'
+    });
+    expect(await updateLegacyPasswordWithClient(client, 'short', 'short')).toEqual({
+      error: 'Password needs 6+ characters.',
+      ok: false
+    });
+    expect(await updateLegacyPasswordWithClient(client, 'secret1', 'secret2')).toEqual({
+      error: 'Passwords do not match.',
+      ok: false
+    });
+    expect(updateUser).not.toHaveBeenCalled();
+
+    await expect(updateLegacyPasswordWithClient(client, 'secret1', 'secret1')).resolves.toEqual({
+      error: null,
+      ok: true
+    });
+    expect(updateUser).toHaveBeenCalledOnce();
+    expect(updateUser).toHaveBeenCalledWith({ password: 'secret1' });
   });
 
   test('builds canonical Mazer signup metadata without deriving a username from email', () => {
