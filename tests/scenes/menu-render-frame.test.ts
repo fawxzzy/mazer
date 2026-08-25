@@ -7,6 +7,7 @@ import {
   resolveLegacyBleedOffPaths,
   resolveLegacyMenuBorderDockDirections,
   resolveLegacyMenuBorderDockFacetRect,
+  resolveLegacyMenuBorderDockRenderFrames,
   resolveLegacyMenuBorderDockRenderAreas,
   resolveLegacyMenuPathRenderFrame,
   resolveLegacyMenuPathRenderFrames,
@@ -348,6 +349,63 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
 
     expect(areas.length).toBe(2);
     expect(areas.every((area) => area.right <= 42 || area.left >= 58)).toBe(true);
+  });
+
+  test('keeps every border dock in one direction-owned corridor frame across tile sizes', () => {
+    for (const tileSize of [1, 2, 3, 7, 20, 31]) {
+      for (const direction of ['left', 'right', 'top', 'bottom'] as const) {
+        const frames = resolveLegacyMenuBorderDockRenderFrames(direction, tileSize);
+        const horizontalTravel = direction === 'left' || direction === 'right';
+        const edgeCrossStart = horizontalTravel ? frames.edge.topInset : frames.edge.leftInset;
+        const edgeCrossSpan = horizontalTravel ? frames.edge.height : frames.edge.width;
+        const coreCrossStart = horizontalTravel ? frames.core.topInset : frames.core.leftInset;
+        const coreCrossSpan = horizontalTravel ? frames.core.height : frames.core.width;
+
+        expect(horizontalTravel ? frames.edge.leftInset : frames.edge.topInset).toBe(0);
+        expect(horizontalTravel ? frames.core.leftInset : frames.core.topInset).toBe(0);
+        expect(horizontalTravel ? frames.edge.width : frames.edge.height).toBe(tileSize);
+        expect(horizontalTravel ? frames.core.width : frames.core.height).toBe(tileSize);
+        expect(edgeCrossSpan).toBeGreaterThanOrEqual(1);
+        expect(coreCrossSpan).toBeGreaterThanOrEqual(1);
+        expect(coreCrossStart).toBeGreaterThanOrEqual(edgeCrossStart);
+        expect(coreCrossStart + coreCrossSpan).toBeLessThanOrEqual(edgeCrossStart + edgeCrossSpan);
+        expect(coreCrossStart * 2 + coreCrossSpan).toBe(tileSize);
+      }
+    }
+  });
+
+  test('projects base, facet, and glow onto the exact same one-corridor dock band at DPR 1, 2, and 3', () => {
+    const direction = 'left' as const;
+    const frame = resolveLegacyMenuBorderDockRenderFrames(direction, 20).edge;
+
+    for (const dpr of [1, 2, 3]) {
+      const tileRect = { left: 20 * dpr, top: 40 * dpr, width: 20 * dpr, height: 20 * dpr };
+      const options = {
+        boardLeft: 0,
+        boardTop: 0,
+        boardWidth: 200 * dpr,
+        boardHeight: 200 * dpr,
+        continuationLength: 20 * dpr,
+        materialTileSize: 20,
+        tileRect
+      };
+      const [outer] = resolveLegacyMenuBorderDockRenderAreas(direction, frame, {
+        ...options,
+        cornerGuardSize: 0,
+        mazeLeft: tileRect.left,
+        mazeTop: tileRect.top,
+        mazeWidth: 160 * dpr,
+        mazeHeight: 160 * dpr
+      });
+      const facet = resolveLegacyMenuBorderDockFacetRect(direction, frame, options);
+
+      expect(outer).toBeDefined();
+      expect(facet).not.toBeNull();
+      expect([outer!.top, outer!.bottom]).toEqual([facet!.top, facet!.top + facet!.height]);
+      expect(outer!.bottom - outer!.top).toBe(16 * dpr);
+      expect(outer!.left).toBe(-20 * dpr);
+      expect(outer!.right).toBe(tileRect.left);
+    }
   });
   test('extends border docks into the board edge frame and rails near folded corners', () => {
     const commonOptions = {
