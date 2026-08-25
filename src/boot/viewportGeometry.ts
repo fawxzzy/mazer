@@ -56,7 +56,7 @@ type MazerOrientationLike = {
 };
 
 type MazerViewportRuntime = Pick<Window, 'addEventListener' | 'devicePixelRatio' | 'innerHeight' | 'innerWidth' | 'matchMedia' | 'navigator' | 'removeEventListener'> & {
-  document?: Pick<Document, 'addEventListener' | 'documentElement' | 'removeEventListener'>;
+  document?: Pick<Document, 'addEventListener' | 'documentElement' | 'removeEventListener' | 'visibilityState'>;
   getComputedStyle?: (element: Element) => Pick<CSSStyleDeclaration, 'getPropertyValue'>;
   requestAnimationFrame?: (callback: FrameRequestCallback) => number;
   screen?: Pick<Screen, 'orientation'> & { orientation?: MazerOrientationLike };
@@ -299,6 +299,8 @@ export const installMazerViewportGeometry = (
   let snapshot = resolveMazerViewportGeometryFromRuntime(runtime);
   const listeners = new Set<MazerViewportListener>();
   let scheduled = false;
+  let forceScheduledPublication = false;
+  let hiddenResumeArmed = runtime.document?.visibilityState === 'hidden';
 
   const publish = (): void => {
     applyMazerViewportCssVariables(snapshot, runtime.document?.documentElement);
@@ -313,9 +315,9 @@ export const installMazerViewportGeometry = (
     }
   };
 
-  const sync = (): MazerViewportGeometry => {
+  const syncSnapshot = (forcePublication = false): MazerViewportGeometry => {
     const candidate = resolveMazerViewportGeometryFromRuntime(runtime, snapshot.revision + 1);
-    if (sameGeometry(snapshot, candidate)) {
+    if (!forcePublication && sameGeometry(snapshot, candidate)) {
       return snapshot;
     }
 
@@ -324,14 +326,23 @@ export const installMazerViewportGeometry = (
     return snapshot;
   };
 
-  const scheduleSync = (): void => {
+  const sync = (): MazerViewportGeometry => syncSnapshot();
+
+  const scheduleSync = (forcePublication = false): void => {
+    forceScheduledPublication ||= forcePublication;
     if (scheduled) {
       return;
     }
     scheduled = true;
     const flush = (): void => {
       scheduled = false;
-      sync();
+      const shouldForcePublication = forceScheduledPublication;
+      forceScheduledPublication = false;
+      if (runtime.document?.visibilityState === 'hidden') {
+        hiddenResumeArmed ||= shouldForcePublication;
+        return;
+      }
+      syncSnapshot(shouldForcePublication);
     };
     if (typeof runtime.requestAnimationFrame === 'function') {
       runtime.requestAnimationFrame(flush);
@@ -340,25 +351,45 @@ export const installMazerViewportGeometry = (
     }
   };
 
+  const handleVisibilityChange = (): void => {
+    const visibilityState = runtime.document?.visibilityState;
+    if (visibilityState === 'hidden') {
+      hiddenResumeArmed = true;
+      return;
+    }
+
+    if (visibilityState === 'visible' && hiddenResumeArmed) {
+      hiddenResumeArmed = false;
+      scheduleSync(true);
+      return;
+    }
+
+    // Some embedded runtimes do not expose visibilityState. Preserve the
+    // existing geometry refresh behavior for those hosts without treating an
+    // unclassified event as a forced redraw.
+    scheduleSync();
+  };
+  const handleGeometryEvent = (): void => scheduleSync();
+
   const visualViewport = runtime.visualViewport;
   publish();
-  runtime.addEventListener('resize', scheduleSync, { passive: true });
-  runtime.addEventListener('orientationchange', scheduleSync, { passive: true });
-  runtime.document?.addEventListener('visibilitychange', scheduleSync, { passive: true });
-  runtime.document?.addEventListener('fullscreenchange', scheduleSync, { passive: true });
-  visualViewport?.addEventListener?.('resize', scheduleSync, { passive: true });
-  visualViewport?.addEventListener?.('scroll', scheduleSync, { passive: true });
-  runtime.screen?.orientation?.addEventListener?.('change', scheduleSync);
+  runtime.addEventListener('resize', handleGeometryEvent, { passive: true });
+  runtime.addEventListener('orientationchange', handleGeometryEvent, { passive: true });
+  runtime.document?.addEventListener('visibilitychange', handleVisibilityChange, { passive: true });
+  runtime.document?.addEventListener('fullscreenchange', handleGeometryEvent, { passive: true });
+  visualViewport?.addEventListener?.('resize', handleGeometryEvent, { passive: true });
+  visualViewport?.addEventListener?.('scroll', handleGeometryEvent, { passive: true });
+  runtime.screen?.orientation?.addEventListener?.('change', handleGeometryEvent);
 
   return {
     dispose: () => {
-      runtime.removeEventListener('resize', scheduleSync);
-      runtime.removeEventListener('orientationchange', scheduleSync);
-      runtime.document?.removeEventListener('visibilitychange', scheduleSync);
-      runtime.document?.removeEventListener('fullscreenchange', scheduleSync);
-      visualViewport?.removeEventListener?.('resize', scheduleSync);
-      visualViewport?.removeEventListener?.('scroll', scheduleSync);
-      runtime.screen?.orientation?.removeEventListener?.('change', scheduleSync);
+      runtime.removeEventListener('resize', handleGeometryEvent);
+      runtime.removeEventListener('orientationchange', handleGeometryEvent);
+      runtime.document?.removeEventListener('visibilitychange', handleVisibilityChange);
+      runtime.document?.removeEventListener('fullscreenchange', handleGeometryEvent);
+      visualViewport?.removeEventListener?.('resize', handleGeometryEvent);
+      visualViewport?.removeEventListener?.('scroll', handleGeometryEvent);
+      runtime.screen?.orientation?.removeEventListener?.('change', handleGeometryEvent);
       listeners.clear();
     },
     getSnapshot: () => snapshot,

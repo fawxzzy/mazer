@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import {
   collectMenuControlSpacingIssues,
   evaluateAuthenticatedFixtureReadiness,
+  evaluateStandaloneFirstVisibleHomeReadiness,
   hasExpectedTextLabels,
   matchesExpectedTextLabel,
   waitForAuthenticatedFixtureReady
@@ -142,6 +143,60 @@ describe('UI surface capture label matching', () => {
   });
 });
 
+describe('UI surface standalone first-visible home readiness', () => {
+  const firstVisibleDiagnostics = ({ buttons, title } = {}) => ({
+    runtime: { auth: { status: 'authenticated' } },
+    visual: {
+      board: { bounds: bounds(24, 160, 342, 520) },
+      buttons: buttons ?? [
+        { active: true, bounds: bounds(120, 720, 150, 48), iconOnly: false, semanticAction: 'Start', text: 'Start' },
+        { active: true, bounds: bounds(342, 16, 44, 44), iconOnly: true, semanticAction: 'Settings', text: 'Settings' },
+        { active: true, bounds: bounds(288, 16, 44, 44), iconOnly: true, semanticAction: 'Leaderboard', text: 'Leaderboard' },
+        { active: true, bounds: bounds(234, 16, 44, 44), iconOnly: true, semanticAction: 'Account', text: 'Account' }
+      ],
+      runtime: { mode: 'menu', overlay: 'none' },
+      title: title ?? { progressPercent: 100, visible: true }
+    }
+  });
+
+  test('requires the exact one-step resume revision and every first-frame home surface', () => {
+    const evaluation = evaluateStandaloneFirstVisibleHomeReadiness({
+      beforeViewportRevision: 7,
+      diagnostics: firstVisibleDiagnostics(),
+      standalone: true,
+      viewportRevision: 8
+    });
+
+    expect(evaluation.ready).toBe(true);
+    expect(evaluation.failedClauses).toEqual([]);
+    expect(evaluation.state.actions).toMatchObject({
+      account: { active: true },
+      leaderboard: { active: true },
+      settings: { active: true },
+      start: { active: true }
+    });
+  });
+
+  test('fails closed for a duplicate publication or a missing profile surface', () => {
+    const diagnostics = firstVisibleDiagnostics();
+    diagnostics.visual.buttons = diagnostics.visual.buttons.filter(
+      (button) => button.semanticAction !== 'Account'
+    );
+    const evaluation = evaluateStandaloneFirstVisibleHomeReadiness({
+      beforeViewportRevision: 7,
+      diagnostics,
+      standalone: true,
+      viewportRevision: 9
+    });
+
+    expect(evaluation.ready).toBe(false);
+    expect(evaluation.failedClauses).toEqual(expect.arrayContaining([
+      'accountAction',
+      'viewportRevisionAdvanced'
+    ]));
+  });
+});
+
 describe('UI surface capture menu header controls', () => {
   const menuSurface = ({
     playerLevel = null,
@@ -184,6 +239,14 @@ describe('UI surface capture script contract', () => {
     expect(source).toContain("const WRAP_TOPOLOGY_PROGRESSION_STORAGE_KEY = 'mazer.progression.v1:user:runtime-diagnostics-auth-fixture';");
     expect(source).toContain("const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';");
     expect(source).toContain('const DEFAULT_DEVICE_SCALE_FACTOR = 2;');
+    expect(source).toContain('export const evaluateStandaloneFirstVisibleHomeReadiness = ({');
+    expect(source).toContain('const installStandaloneFirstVisibleHarness = async (page) => {');
+    expect(source).toContain("query !== '(display-mode: standalone)'");
+    expect(source).toContain('window.__MAZER_SIMULATED_HIDDEN__ = true;');
+    expect(source).toContain("document.dispatchEvent(new Event('visibilitychange'));");
+    expect(source).toContain("id: '01-standalone-first-visible-home'");
+    expect(source).toContain('interactionTransitions: []');
+    expect(source).toContain("firstVisibleHomeOnly: args['first-visible-home'] === true || args['first-visible-home'] === 'true'");
     expect(source).toContain('const gameScale = window.__MAZER_GAME__?.scale;');
     expect(source).toContain('gameScale?.width === width');
     expect(source).toContain('gameScale?.height === height');
