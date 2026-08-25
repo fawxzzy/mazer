@@ -322,6 +322,51 @@ export const resolveLegacyMenuPathRenderFrames = (
   };
 };
 
+export const resolveLegacyMenuBorderDockRenderFrames = (
+  direction: LegacyMenuBorderDockDirection,
+  tileSize: number
+): LegacyMenuPathRenderFrames => {
+  const materialTileSize = Math.max(1, Math.round(tileSize));
+  const edgeInset = resolveLegacyMenuTrenchInset(materialTileSize, LEGACY_MENU_TRENCH_EDGE_INSET_RATIO);
+  const coreInset = resolveLegacyMenuTrenchInset(materialTileSize, LEGACY_MENU_TRENCH_CORE_INSET_RATIO);
+  const outerCrossInset = Math.min(edgeInset, Math.floor((materialTileSize - 1) / 2));
+  const coreCrossInset = Math.min(
+    outerCrossInset + coreInset,
+    Math.floor((materialTileSize - 1) / 2)
+  );
+  const isHorizontalTravel = direction === 'left' || direction === 'right';
+
+  return isHorizontalTravel
+    ? {
+        edge: {
+          leftInset: 0,
+          topInset: outerCrossInset,
+          width: materialTileSize,
+          height: Math.max(1, materialTileSize - (outerCrossInset * 2))
+        },
+        core: {
+          leftInset: 0,
+          topInset: coreCrossInset,
+          width: materialTileSize,
+          height: Math.max(1, materialTileSize - (coreCrossInset * 2))
+        }
+      }
+    : {
+        edge: {
+          leftInset: outerCrossInset,
+          topInset: 0,
+          width: Math.max(1, materialTileSize - (outerCrossInset * 2)),
+          height: materialTileSize
+        },
+        core: {
+          leftInset: coreCrossInset,
+          topInset: 0,
+          width: Math.max(1, materialTileSize - (coreCrossInset * 2)),
+          height: materialTileSize
+        }
+      };
+};
+
 export const resolveLegacyMenuBorderDockRenderAreas = (
   direction: LegacyMenuBorderDockDirection,
   frame: LegacyMenuPathRenderFrame,
