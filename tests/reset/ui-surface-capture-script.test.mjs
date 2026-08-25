@@ -7,6 +7,7 @@ import {
   evaluateStandaloneFirstVisibleHomeReadiness,
   hasExpectedTextLabels,
   matchesExpectedTextLabel,
+  resolveCaptureTarget,
   waitForAuthenticatedFixtureReady
 } from '../../scripts/analysis/capture-ui-surfaces.mjs';
 
@@ -144,6 +145,24 @@ describe('UI surface capture label matching', () => {
 });
 
 describe('UI surface standalone first-visible home readiness', () => {
+  test('forces the authenticated fixture when first-visible mode receives a custom route', () => {
+    const target = resolveCaptureTarget({
+      authFixture: undefined,
+      firstVisibleHomeOnly: true,
+      label: 'custom-first-visible',
+      mazeSeed: 'seed-17',
+      route: '/?surface=home'
+    });
+    const route = new URL(target.route, 'http://local.test');
+
+    expect(target.authFixture).toBe('authenticated');
+    expect(route.pathname).toBe('/');
+    expect(route.searchParams.get('surface')).toBe('home');
+    expect(route.searchParams.get('authFixture')).toBe('authenticated');
+    expect(route.searchParams.get('runtimeDiagnostics')).toBe('1');
+    expect(route.searchParams.get('mazeSeed')).toBe('seed-17');
+  });
+
   const accountSurface = ({
     active = true,
     bounds: accountBounds = bounds(8, 8, 96, 32),

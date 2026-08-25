@@ -614,6 +614,28 @@ const resolveRoute = ({ authFixture, route = DEFAULT_ROUTE, label, mazeSeed }) =
   return `${url.pathname}${url.search}`;
 };
 
+export const resolveCaptureTarget = ({
+  authFixture,
+  firstVisibleHomeOnly = false,
+  label = DEFAULT_LABEL,
+  mazeSeed,
+  route = DEFAULT_ROUTE
+} = {}) => {
+  const resolvedAuthFixture = firstVisibleHomeOnly
+    ? 'authenticated'
+    : typeof authFixture === 'string' ? authFixture : undefined;
+
+  return {
+    authFixture: resolvedAuthFixture,
+    route: resolveRoute({
+      authFixture: resolvedAuthFixture,
+      route,
+      label,
+      mazeSeed
+    })
+  };
+};
+
 const resolveRouteWithParams = (route, params) => {
   const url = new URL(route, 'http://local.test');
   for (const [key, value] of Object.entries(params)) {
@@ -2111,17 +2133,16 @@ export const runUiSurfaceCapture = async (options = {}) => {
   const deviceScaleFactor = options.deviceScaleFactor ?? DEFAULT_DEVICE_SCALE_FACTOR;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const firstVisibleHomeOnly = options.firstVisibleHomeOnly === true;
-  const authFixture = firstVisibleHomeOnly
-    ? 'authenticated'
-    : typeof options.authFixture === 'string' ? options.authFixture : undefined;
+  const captureTarget = resolveCaptureTarget({
+    authFixture: options.authFixture,
+    firstVisibleHomeOnly,
+    label,
+    mazeSeed: options.mazeSeed,
+    route: options.route
+  });
+  const { authFixture, route } = captureTarget;
   const preferenceFixture = typeof options.preferenceFixture === 'string' ? options.preferenceFixture : undefined;
   const topologyFixture = typeof options.topologyFixture === 'string' ? options.topologyFixture : undefined;
-  const route = options.route ?? resolveRoute({
-    authFixture,
-    route: DEFAULT_ROUTE,
-    label,
-    mazeSeed: options.mazeSeed
-  });
   const consoleMessages = [];
   const pageErrors = [];
 
