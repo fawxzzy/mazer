@@ -44,7 +44,12 @@ export interface LegacyPasswordRecoveryUrlState {
 }
 
 let legacyPasswordRecoveryBootUrlState: LegacyPasswordRecoveryUrlState | null = null;
-const legacyPasswordUpdatesInFlight = new WeakMap<LegacyPasswordUpdateClient, Promise<{ error: { message?: string | null } | null }>>();
+interface LegacyPasswordUpdateInFlight {
+  password: string;
+  promise: Promise<{ error: { message?: string | null } | null }>;
+}
+
+const legacyPasswordUpdatesInFlight = new WeakMap<LegacyPasswordUpdateClient, LegacyPasswordUpdateInFlight>();
 
 export interface LegacyPasswordUpdateSubmitState extends LegacyAuthSubmitState {
   invalidFields: LegacyAuthFieldId[];
@@ -637,22 +642,30 @@ const invokeLegacyPasswordUpdateWithTimeout = async (
   password: string,
   timeoutMs: number
 ): Promise<{ error: { message?: string | null } | null }> => new Promise((resolve) => {
-  let update = legacyPasswordUpdatesInFlight.get(client);
-  if (!update) {
-    update = Promise.resolve().then(() => client.auth.updateUser({ password })).catch((caught: unknown) => ({
+  let inFlight = legacyPasswordUpdatesInFlight.get(client);
+  if (inFlight && inFlight.password !== password) {
+    resolve({ error: { message: 'A previous password update is still pending. Please wait before trying a different password.' } });
+    return;
+  }
+
+  if (!inFlight) {
+    const update = Promise.resolve().then(() => client.auth.updateUser({ password })).catch((caught: unknown) => ({
       error: {
         message: caught instanceof Error
           ? caught.message
           : 'Failed to update password. Please try again.'
       }
     }));
-    legacyPasswordUpdatesInFlight.set(client, update);
+    inFlight = { password, promise: update };
+    legacyPasswordUpdatesInFlight.set(client, inFlight);
     void update.then(() => {
-      if (legacyPasswordUpdatesInFlight.get(client) === update) {
+      if (legacyPasswordUpdatesInFlight.get(client)?.promise === update) {
         legacyPasswordUpdatesInFlight.delete(client);
       }
     });
   }
+
+  const update = inFlight.promise;
 
   let settled = false;
   const timeout = setTimeout(() => {

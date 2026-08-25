@@ -267,6 +267,15 @@ describe('legacy auth runtime', () => {
 
     const retry = updateLegacyPasswordWithClient(timeoutClient, 'secret1', 'secret1', { timeoutMs: 100 });
     expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
+
+    await expect(updateLegacyPasswordWithClient(timeoutClient, 'secret2', 'secret2', {
+      timeoutMs: 100
+    })).resolves.toEqual({
+      error: 'A previous password update is still pending. Please wait before trying a different password.',
+      ok: false
+    });
+    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
+
     settleUpdate?.({ error: null });
     await expect(retry).resolves.toEqual({ error: null, ok: true });
     expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
