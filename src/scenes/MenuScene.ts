@@ -11951,8 +11951,12 @@ export class MenuScene extends Phaser.Scene {
     this.authNativeKeyDownHandler = (event: KeyboardEvent) => {
       if (event.key === 'Enter') {
         event.preventDefault();
+        event.stopPropagation();
         if (this.isLegacyPasswordRecoveryActive()) {
-          const recoveryEnterAction = resolveLegacyPasswordRecoveryEnterAction(fieldId);
+          const recoveryEnterAction = resolveLegacyPasswordRecoveryEnterAction(
+            fieldId,
+            this.passwordRecoveryUrlState.requested
+          );
           if (recoveryEnterAction === 'focus-confirmation') {
             this.selectLegacyAuthField('confirmPassword');
           } else if (recoveryEnterAction === 'submit') {

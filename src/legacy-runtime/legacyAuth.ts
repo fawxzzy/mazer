@@ -568,13 +568,20 @@ export const resolveLegacyPasswordRecoveryUrlState = (
 
   const query = new URLSearchParams(location.search);
   const fragment = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const isRecoveryPath = location.pathname.replace(/\/+$/, '') === LEGACY_PASSWORD_RECOVERY_PATH;
   const hasProviderError = [query, fragment].some((params) => (
     params.has('error') || params.has('error_code') || params.has('error_description')
+  ));
+  const hasRecoverySignal = isRecoveryPath && [query, fragment].some((params) => (
+    params.has('code')
+    || params.has('access_token')
+    || params.has('refresh_token')
+    || params.get('type') === 'recovery'
   ));
 
   return {
     hasProviderError,
-    requested: location.pathname.replace(/\/+$/, '') === LEGACY_PASSWORD_RECOVERY_PATH
+    requested: isRecoveryPath && (hasRecoverySignal || hasProviderError)
   };
 };
 
@@ -586,12 +593,37 @@ export const resolveLegacyPasswordRecoveryCleanUrl = (
   : resolveLegacyPasswordRecoveryRedirectUrl(origin);
 
 export const resolveLegacyPasswordRecoveryEnterAction = (
-  fieldId: LegacyAuthFieldId
-): 'focus-confirmation' | 'submit' | null => fieldId === 'password'
-  ? 'focus-confirmation'
-  : fieldId === 'confirmPassword'
-    ? 'submit'
-    : null;
+  fieldId: LegacyAuthFieldId,
+  requested = false
+): 'focus-confirmation' | 'submit' | null => {
+  if (!requested) {
+    return null;
+  }
+
+  return fieldId === 'password'
+    ? 'focus-confirmation'
+    : fieldId === 'confirmPassword'
+      ? 'submit'
+      : null;
+};
+
+interface LegacyPasswordUpdateOptions {
+  maxAttempts?: number;
+  timeoutMs?: number;
+}
+
+const invokeLegacyPasswordUpdateWithTimeout = async (
+  client: LegacyPasswordUpdateClient,
+  password: string,
+  timeoutMs: number
+): Promise<{ error: { message?: string | null } | null }> => Promise.race([
+  client.auth.updateUser({ password }),
+  new Promise<{ error: { message?: string | null } | null }>((resolve) => {
+    setTimeout(() => {
+      resolve({ error: { message: 'Password update timed out.' } });
+    }, timeoutMs);
+  })
+]);
 
 export const clearLegacyPasswordRecoveryUrl = (outcome: 'continue' | 'invalid'): void => {
   if (typeof window === 'undefined') {
@@ -640,17 +672,39 @@ export const resolveLegacyPasswordUpdateSubmitState = (
 export const updateLegacyPasswordWithClient = async (
   client: LegacyPasswordUpdateClient,
   password: string,
-  confirmPassword = password
+  confirmPassword = password,
+  options: LegacyPasswordUpdateOptions = {}
 ): Promise<{ error: string | null; ok: boolean }> => {
   const submitState = resolveLegacyPasswordUpdateSubmitState(password, confirmPassword, true);
   if (!submitState.canSubmit) {
     return { error: submitState.reason, ok: false };
   }
 
-  const { error } = await client.auth.updateUser({ password });
+  const {
+    maxAttempts = 2,
+    timeoutMs = 3000
+  } = options;
+  const attempts = Math.max(1, maxAttempts);
+  let lastError: { message?: string | null } | null = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const { error } = await invokeLegacyPasswordUpdateWithTimeout(client, password, timeoutMs).catch((caught) => ({
+      error: { message: caught?.message ?? 'Failed to update password. Please try again.' }
+    }));
+    lastError = error;
+    if (!error) {
+      return { error: null, ok: true };
+    }
+    if (attempt < attempts - 1) {
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10);
+      });
+    }
+  }
+
   return {
-    error: error?.message ?? null,
-    ok: error === null
+    error: lastError?.message ?? 'Failed to update password. Please try again.',
+    ok: false
   };
 };
 

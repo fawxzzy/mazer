@@ -145,6 +145,26 @@ describe('legacy auth runtime', () => {
       search: ''
     })).toEqual({ hasProviderError: false, requested: true });
     expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#code=secret&type=recovery',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: true });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#type=signup',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: false });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#',
+      pathname: '/update-password',
+      search: '?code=secret'
+    })).toEqual({ hasProviderError: false, requested: true });
+    expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: false });
+    expect(resolveLegacyPasswordRecoveryUrlState({
       hash: '#error=access_denied&error_code=otp_expired&error_description=secret-detail',
       pathname: '/update-password',
       search: ''
@@ -189,15 +209,40 @@ describe('legacy auth runtime', () => {
   });
 
   test('advances Enter from the first recovery field and reserves submission for valid confirmation', () => {
-    expect(resolveLegacyPasswordRecoveryEnterAction('password')).toBe('focus-confirmation');
-    expect(resolveLegacyPasswordRecoveryEnterAction('confirmPassword')).toBe('submit');
-    expect(resolveLegacyPasswordRecoveryEnterAction('email')).toBeNull();
-    expect(resolveLegacyPasswordRecoveryEnterAction('username')).toBeNull();
-    expect(resolveLegacyPasswordRecoveryEnterAction('displayName')).toBeNull();
+    expect(resolveLegacyPasswordRecoveryEnterAction('password')).toBeNull();
+    expect(resolveLegacyPasswordRecoveryEnterAction('password', true)).toBe('focus-confirmation');
+    expect(resolveLegacyPasswordRecoveryEnterAction('confirmPassword', true)).toBe('submit');
+    expect(resolveLegacyPasswordRecoveryEnterAction('email', true)).toBeNull();
+    expect(resolveLegacyPasswordRecoveryEnterAction('username', true)).toBeNull();
+    expect(resolveLegacyPasswordRecoveryEnterAction('displayName', true)).toBeNull();
 
     expect(resolveLegacyPasswordUpdateSubmitState('secret1', '', true).canSubmit).toBe(false);
     expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret2', true).canSubmit).toBe(false);
     expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret1', true).canSubmit).toBe(true);
+  });
+
+  test('retries recovery-password updates and returns a bounded timeout error', async () => {
+    const timeoutClient = {
+      auth: { updateUser: vi.fn(async () => new Promise<never>(() => undefined)) }
+    };
+    const timeoutResult = await updateLegacyPasswordWithClient(timeoutClient, 'secret1', 'secret1', {
+      maxAttempts: 2,
+      timeoutMs: 1
+    });
+    expect(timeoutResult.ok).toBe(false);
+    expect(timeoutResult.error).toBe('Password update timed out.');
+    expect(timeoutClient.auth.updateUser).toHaveBeenCalledTimes(2);
+
+    const rejectClient = {
+      auth: { updateUser: vi.fn(async () => Promise.reject(new Error('bad network'))) }
+    };
+    const rejectResult = await updateLegacyPasswordWithClient(rejectClient, 'secret1', 'secret1', {
+      maxAttempts: 2,
+      timeoutMs: 1
+    });
+    expect(rejectResult.ok).toBe(false);
+    expect(rejectResult.error).toBe('bad network');
+    expect(rejectClient.auth.updateUser).toHaveBeenCalledTimes(2);
   });
 
   test('builds canonical Mazer signup metadata without deriving a username from email', () => {
