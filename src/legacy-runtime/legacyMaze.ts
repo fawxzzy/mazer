@@ -82,6 +82,20 @@ export interface LegacyMazeGenerationProfile {
   straightnessBias: number;
 }
 
+export interface LegacyMazeSearchDiagnostics {
+  contractVersion: 'legacy-maze-search-workspace-v1';
+  normalizerCandidateAudits: number;
+  normalizerCandidateVisitedCells: number;
+  normalizerFallbackAudits: number;
+  normalizerFallbackVisitedCells: number;
+  normalizerPasses: number;
+  routeQualityEdgeAudits: number;
+  routeQualityMeasurements: number;
+  routeQualityVisitedCells: number;
+  workspaceAllocations: 1;
+  workspaceCellCapacity: number;
+}
+
 export interface LegacyMazeSnapshot {
   source: 'menu-snapshot' | 'menu-generated' | 'play-generated';
   width: number;
@@ -634,7 +648,9 @@ const buildShortestPath = (grid: boolean[][], start: LegacyPoint, goal: LegacyPo
   resolveLegacyShortestPath(grid, start, goal, 'direct-floor').path
 );
 
-type LegacyRouteQualityBfsWorkspace = {
+type LegacyGridSearchWorkspace = {
+  candidateNeighbors: Int32Array;
+  diagnostics: LegacyMazeSearchDiagnostics;
   height: number;
   queueDistances: Int32Array;
   queueIndices: Int32Array;
@@ -643,14 +659,38 @@ type LegacyRouteQualityBfsWorkspace = {
   width: number;
 };
 
-const createLegacyRouteQualityBfsWorkspace = (
+const createEmptyLegacyMazeSearchDiagnostics = (
+  cellCapacity: number
+): LegacyMazeSearchDiagnostics => ({
+  contractVersion: 'legacy-maze-search-workspace-v1',
+  normalizerCandidateAudits: 0,
+  normalizerCandidateVisitedCells: 0,
+  normalizerFallbackAudits: 0,
+  normalizerFallbackVisitedCells: 0,
+  normalizerPasses: 0,
+  routeQualityEdgeAudits: 0,
+  routeQualityMeasurements: 0,
+  routeQualityVisitedCells: 0,
+  workspaceAllocations: 1,
+  workspaceCellCapacity: cellCapacity
+});
+
+let latestLegacyMazeSearchDiagnostics = createEmptyLegacyMazeSearchDiagnostics(0);
+
+export const readLegacyMazeSearchDiagnostics = (): LegacyMazeSearchDiagnostics => ({
+  ...latestLegacyMazeSearchDiagnostics
+});
+
+const createLegacyGridSearchWorkspace = (
   grid: boolean[][]
-): LegacyRouteQualityBfsWorkspace => {
+): LegacyGridSearchWorkspace => {
   const height = grid.length;
   const width = grid[0]?.length ?? 0;
   const cellCount = width * height;
 
   return {
+    candidateNeighbors: new Int32Array(4),
+    diagnostics: createEmptyLegacyMazeSearchDiagnostics(cellCount),
     height,
     queueDistances: new Int32Array(cellCount),
     queueIndices: new Int32Array(cellCount),
@@ -660,25 +700,30 @@ const createLegacyRouteQualityBfsWorkspace = (
   };
 };
 
+const beginLegacyGridSearchVisit = (workspace: LegacyGridSearchWorkspace): number => {
+  workspace.visitId = (workspace.visitId + 1) >>> 0;
+  if (workspace.visitId === 0) {
+    workspace.visitedAt.fill(0);
+    workspace.visitId = 1;
+  }
+  return workspace.visitId;
+};
+
 const measureAlternativeRouteDistanceWithoutEdge = (
   grid: boolean[][],
   start: LegacyPoint,
   goal: LegacyPoint,
   blockedFrom: LegacyPoint,
   blockedTo: LegacyPoint,
-  workspace: LegacyRouteQualityBfsWorkspace
+  workspace: LegacyGridSearchWorkspace
 ): number | null => {
   const { height, queueDistances, queueIndices, visitedAt, width } = workspace;
   if (width === 0 || height === 0) {
     return null;
   }
 
-  workspace.visitId = (workspace.visitId + 1) >>> 0;
-  if (workspace.visitId === 0) {
-    visitedAt.fill(0);
-    workspace.visitId = 1;
-  }
-  const visitId = workspace.visitId;
+  workspace.diagnostics.routeQualityEdgeAudits += 1;
+  const visitId = beginLegacyGridSearchVisit(workspace);
   const startIndex = (start.y * width) + start.x;
   const goalIndex = (goal.y * width) + goal.x;
   const blockedFromIndex = (blockedFrom.y * width) + blockedFrom.x;
@@ -693,6 +738,7 @@ const measureAlternativeRouteDistanceWithoutEdge = (
     const currentIndex = queueIndices[head] ?? -1;
     const currentDistance = queueDistances[head] ?? 0;
     head += 1;
+    workspace.diagnostics.routeQualityVisitedCells += 1;
 
     if (currentIndex === goalIndex) {
       return currentDistance;
@@ -730,10 +776,11 @@ const measureLegacyRouteQuality = (
   grid: boolean[][],
   start: LegacyPoint,
   goal: LegacyPoint,
-  solutionPath: readonly LegacyPoint[]
+  solutionPath: readonly LegacyPoint[],
+  workspace: LegacyGridSearchWorkspace
 ): NonNullable<LegacyMazeSnapshot['routeQualityStats']> => {
   const sampledSolutionEdges = Math.max(0, solutionPath.length - 1);
-  const bfsWorkspace = createLegacyRouteQualityBfsWorkspace(grid);
+  workspace.diagnostics.routeQualityMeasurements += 1;
   const bypassableBands = new Set<number>();
   const meaningfulBypassableBands = new Set<number>();
   let bypassableSolutionEdges = 0;
@@ -753,7 +800,7 @@ const measureLegacyRouteQuality = (
       goal,
       from,
       to,
-      bfsWorkspace
+      workspace
     );
     if (alternativeDistance === null) {
       continue;
@@ -865,61 +912,116 @@ const isLegacyOpenTwoByTwoFloorBlock = (
 
 const canRemoveLegacyFloorWithoutDisconnecting = (
   grid: boolean[][],
-  point: LegacyPoint
+  point: LegacyPoint,
+  workspace: LegacyGridSearchWorkspace
 ): boolean => {
-  const neighbors = LEGACY_STEP_DIRECTIONS
-    .map((direction) => ({ x: point.x + direction.x, y: point.y + direction.y }))
-    .filter((neighbor) => grid[neighbor.y]?.[neighbor.x] === true);
-  if (neighbors.length <= 1) {
+  const { candidateNeighbors, height, queueIndices, visitedAt, width } = workspace;
+  let neighborCount = 0;
+  for (const direction of LEGACY_STEP_DIRECTIONS) {
+    const nextX = point.x + direction.x;
+    const nextY = point.y + direction.y;
+    if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height || grid[nextY]?.[nextX] !== true) {
+      continue;
+    }
+    candidateNeighbors[neighborCount] = (nextY * width) + nextX;
+    neighborCount += 1;
+  }
+  if (neighborCount <= 1) {
     return true;
   }
 
+  workspace.diagnostics.normalizerCandidateAudits += 1;
   grid[point.y]![point.x] = false;
-  const pending = new Set(neighbors.slice(1).map(keyForPoint));
-  const queue: LegacyPoint[] = [neighbors[0]!];
-  const visited = new Set<string>([keyForPoint(neighbors[0]!)]);
-  for (let index = 0; index < queue.length && pending.size > 0; index += 1) {
-    const current = queue[index];
-    if (!current) {
-      continue;
-    }
-
+  const visitId = beginLegacyGridSearchVisit(workspace);
+  const firstNeighborIndex = candidateNeighbors[0] ?? -1;
+  let pendingNeighborCount = neighborCount - 1;
+  let head = 0;
+  let tail = 1;
+  queueIndices[0] = firstNeighborIndex;
+  visitedAt[firstNeighborIndex] = visitId;
+  while (head < tail && pendingNeighborCount > 0) {
+    const currentIndex = queueIndices[head] ?? -1;
+    head += 1;
+    workspace.diagnostics.normalizerCandidateVisitedCells += 1;
+    const currentX = currentIndex % width;
+    const currentY = Math.floor(currentIndex / width);
     for (const direction of LEGACY_STEP_DIRECTIONS) {
-      const next = { x: current.x + direction.x, y: current.y + direction.y };
-      const key = keyForPoint(next);
-      if (grid[next.y]?.[next.x] !== true || visited.has(key)) {
+      const nextX = currentX + direction.x;
+      const nextY = currentY + direction.y;
+      if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height || grid[nextY]?.[nextX] !== true) {
         continue;
       }
-
-      visited.add(key);
-      pending.delete(key);
-      queue.push(next);
+      const nextIndex = (nextY * width) + nextX;
+      if (visitedAt[nextIndex] === visitId) {
+        continue;
+      }
+      visitedAt[nextIndex] = visitId;
+      queueIndices[tail] = nextIndex;
+      tail += 1;
+      for (let neighborIndex = 1; neighborIndex < neighborCount; neighborIndex += 1) {
+        if (candidateNeighbors[neighborIndex] === nextIndex) {
+          pendingNeighborCount -= 1;
+          break;
+        }
+      }
     }
   }
   grid[point.y]![point.x] = true;
-  return pending.size === 0;
+  return pendingNeighborCount === 0;
 };
 
 const resolveLegacyDetachedFloorsAfterRemoval = (
   grid: boolean[][],
   point: LegacyPoint,
   start: LegacyPoint,
-  protectedTiles: ReadonlySet<string>
+  protectedTiles: ReadonlySet<number>,
+  workspace: LegacyGridSearchWorkspace
 ): LegacyPoint[] | null => {
+  const { height, queueIndices, visitedAt, width } = workspace;
   grid[point.y]![point.x] = false;
-  const reachable = resolveReachableFloorDistances(grid, start);
+  workspace.diagnostics.normalizerFallbackAudits += 1;
+  const visitId = beginLegacyGridSearchVisit(workspace);
+  let head = 0;
+  let tail = 0;
+  if (grid[start.y]?.[start.x] === true) {
+    const startIndex = (start.y * width) + start.x;
+    queueIndices[tail] = startIndex;
+    tail += 1;
+    visitedAt[startIndex] = visitId;
+  }
+  while (head < tail) {
+    const currentIndex = queueIndices[head] ?? -1;
+    head += 1;
+    workspace.diagnostics.normalizerFallbackVisitedCells += 1;
+    const currentX = currentIndex % width;
+    const currentY = Math.floor(currentIndex / width);
+    for (const direction of LEGACY_STEP_DIRECTIONS) {
+      const nextX = currentX + direction.x;
+      const nextY = currentY + direction.y;
+      if (nextX < 0 || nextX >= width || nextY < 0 || nextY >= height || grid[nextY]?.[nextX] !== true) {
+        continue;
+      }
+      const nextIndex = (nextY * width) + nextX;
+      if (visitedAt[nextIndex] === visitId) {
+        continue;
+      }
+      visitedAt[nextIndex] = visitId;
+      queueIndices[tail] = nextIndex;
+      tail += 1;
+    }
+  }
   const detached: LegacyPoint[] = [];
 
-  for (const protectedKey of protectedTiles) {
-    if (!reachable.has(protectedKey)) {
+  for (const protectedIndex of protectedTiles) {
+    if (visitedAt[protectedIndex] !== visitId) {
       grid[point.y]![point.x] = true;
       return null;
     }
   }
 
-  for (let y = 0; y < grid.length; y += 1) {
-    for (let x = 0; x < (grid[y]?.length ?? 0); x += 1) {
-      if (grid[y]?.[x] === true && !reachable.has(`${x},${y}`)) {
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (grid[y]?.[x] === true && visitedAt[(y * width) + x] !== visitId) {
         detached.push({ x, y });
       }
     }
@@ -934,11 +1036,15 @@ const normalizeLegacyOpenTwoByTwoFloorBlocks = (
   start: LegacyPoint,
   protectedPoints: readonly LegacyPoint[],
   preferredRoute: readonly LegacyPoint[],
-  seed: number
+  seed: number,
+  workspace: LegacyGridSearchWorkspace
 ): LegacyPoint[] => {
-  const protectedTiles = new Set([keyForPoint(start), ...protectedPoints.map(keyForPoint)]);
-  const preferredRouteTiles = new Set(preferredRoute.map(keyForPoint));
+  const width = workspace.width;
+  const indexForPoint = (point: LegacyPoint): number => (point.y * width) + point.x;
+  const protectedTiles = new Set([indexForPoint(start), ...protectedPoints.map(indexForPoint)]);
+  const preferredRouteTiles = new Set(preferredRoute.map(indexForPoint));
   const removedTiles: LegacyPoint[] = [];
+  workspace.diagnostics.normalizerPasses += 1;
 
   for (let top = 0; top < grid.length - 1; top += 1) {
     for (let left = 0; left < (grid[top]?.length ?? 0) - 1; left += 1) {
@@ -952,10 +1058,10 @@ const normalizeLegacyOpenTwoByTwoFloorBlocks = (
         { x: left, y: top + 1 },
         { x: left + 1, y: top + 1 }
       ]
-        .filter((candidate) => !protectedTiles.has(keyForPoint(candidate)))
+        .filter((candidate) => !protectedTiles.has(indexForPoint(candidate)))
         .sort((first, second) => {
-          const firstRoutePenalty = preferredRouteTiles.has(keyForPoint(first)) ? 1 : 0;
-          const secondRoutePenalty = preferredRouteTiles.has(keyForPoint(second)) ? 1 : 0;
+          const firstRoutePenalty = preferredRouteTiles.has(indexForPoint(first)) ? 1 : 0;
+          const secondRoutePenalty = preferredRouteTiles.has(indexForPoint(second)) ? 1 : 0;
           if (firstRoutePenalty !== secondRoutePenalty) {
             return firstRoutePenalty - secondRoutePenalty;
           }
@@ -964,7 +1070,7 @@ const normalizeLegacyOpenTwoByTwoFloorBlocks = (
           const secondTie = (Math.imul(second.x + 17, 2246822519) ^ Math.imul(second.y + 31, 3266489917) ^ seed) >>> 0;
           return firstTie - secondTie;
         });
-      const removable = candidates.find((candidate) => canRemoveLegacyFloorWithoutDisconnecting(grid, candidate));
+      const removable = candidates.find((candidate) => canRemoveLegacyFloorWithoutDisconnecting(grid, candidate, workspace));
       if (removable) {
         grid[removable.y]![removable.x] = false;
         removedTiles.push(clonePoint(removable));
@@ -973,7 +1079,7 @@ const normalizeLegacyOpenTwoByTwoFloorBlocks = (
 
       let fallback: { detached: LegacyPoint[]; point: LegacyPoint } | null = null;
       for (const candidate of candidates) {
-        const detached = resolveLegacyDetachedFloorsAfterRemoval(grid, candidate, start, protectedTiles);
+        const detached = resolveLegacyDetachedFloorsAfterRemoval(grid, candidate, start, protectedTiles, workspace);
         if (detached && (!fallback || detached.length < fallback.detached.length)) {
           fallback = { detached, point: candidate };
         }
@@ -1223,7 +1329,8 @@ const reinforceLegacyRouteQuality = (
   goal: LegacyPoint,
   solutionPath: LegacyPoint[],
   routeQualityStats: NonNullable<LegacyMazeSnapshot['routeQualityStats']>,
-  maxExtraShortcuts: number
+  maxExtraShortcuts: number,
+  workspace: LegacyGridSearchWorkspace
 ): {
   routeQualityStats: NonNullable<LegacyMazeSnapshot['routeQualityStats']>;
   solutionPath: LegacyPoint[];
@@ -1283,7 +1390,13 @@ const reinforceLegacyRouteQuality = (
 
       grid[candidate.y]![candidate.x] = true;
       const candidateSolutionPath = buildShortestPath(grid, start, goal);
-      const candidateRouteQualityStats = measureLegacyRouteQuality(grid, start, goal, candidateSolutionPath);
+      const candidateRouteQualityStats = measureLegacyRouteQuality(
+        grid,
+        start,
+        goal,
+        candidateSolutionPath,
+        workspace
+      );
       grid[candidate.y]![candidate.x] = false;
 
       const candidateScore = scoreRouteQualityStats(candidateRouteQualityStats);
@@ -1345,7 +1458,8 @@ const resolveLegacyFinalRouteState = (
   start: LegacyPoint,
   goal: LegacyPoint,
   minimumSolutionPathLength: number,
-  playableTopologyStats: NonNullable<LegacyMazeSnapshot['playableTopologyStats']>
+  playableTopologyStats: NonNullable<LegacyMazeSnapshot['playableTopologyStats']>,
+  workspace: LegacyGridSearchWorkspace
 ): {
   goal: LegacyPoint;
   routeQualityStats: NonNullable<LegacyMazeSnapshot['routeQualityStats']>;
@@ -1369,7 +1483,7 @@ const resolveLegacyFinalRouteState = (
 
   return {
     goal: resolvedGoal,
-    routeQualityStats: measureLegacyRouteQuality(grid, start, resolvedGoal, solutionPath),
+    routeQualityStats: measureLegacyRouteQuality(grid, start, resolvedGoal, solutionPath, workspace),
     solutionPath
   };
 };
@@ -2567,6 +2681,7 @@ export const createLegacyMaze = (
     wallArray,
     pathBuilderStats
   } = createLegacyCheckpointPathMaze(normalizedWidth, normalizedHeight, seed, profile);
+  const searchWorkspace = createLegacyGridSearchWorkspace(grid);
   let start = clonePoint(sourceStart);
   const rng = createSeededRng(seed ^ 0x5a17c0de);
   const baseShortcutCount = linearSize > 35
@@ -2583,20 +2698,35 @@ export const createLegacyMaze = (
     goal,
     routeQualityStats,
     solutionPath
-  } = resolveLegacyFinalRouteState(grid, start, normalizedGoal, minimumSolutionPathLength, playableTopologyStats);
+  } = resolveLegacyFinalRouteState(
+    grid,
+    start,
+    normalizedGoal,
+    minimumSolutionPathLength,
+    playableTopologyStats,
+    searchWorkspace
+  );
 
   normalizeLegacyOpenTwoByTwoFloorBlocks(
     grid,
     start,
     [goal],
     solutionPath,
-    seed ^ 0x6d2b79f5
+    seed ^ 0x6d2b79f5,
+    searchWorkspace
   );
   ({
     goal,
     routeQualityStats,
     solutionPath
-  } = resolveLegacyFinalRouteState(grid, start, goal, minimumSolutionPathLength, playableTopologyStats));
+  } = resolveLegacyFinalRouteState(
+    grid,
+    start,
+    goal,
+    minimumSolutionPathLength,
+    playableTopologyStats,
+    searchWorkspace
+  ));
 
   const shortcutResult = applyLegacyShortcutBridges(grid, rng, resolvedShortcutCount, wallArray);
   const shortcutStats = shortcutResult.stats;
@@ -2604,7 +2734,14 @@ export const createLegacyMaze = (
     goal,
     routeQualityStats,
     solutionPath
-  } = resolveLegacyFinalRouteState(grid, start, goal, minimumSolutionPathLength, playableTopologyStats));
+  } = resolveLegacyFinalRouteState(
+    grid,
+    start,
+    goal,
+    minimumSolutionPathLength,
+    playableTopologyStats,
+    searchWorkspace
+  ));
 
   const routeQualityReinforcementBudget = resolvedShortcutCount > 0
     ? Math.trunc(Math.max(8, resolvedShortcutCount * 3) * profile.routeQualityReinforcementMultiplier)
@@ -2616,7 +2753,8 @@ export const createLegacyMaze = (
     goal,
     solutionPath,
     routeQualityStats,
-    routeQualityReinforcementBudget
+    routeQualityReinforcementBudget,
+    searchWorkspace
   );
   if (reinforcementStats.created > 0) {
     solutionPath = reinforcementStats.solutionPath;
@@ -2631,7 +2769,14 @@ export const createLegacyMaze = (
       goal,
       routeQualityStats,
       solutionPath
-    } = resolveLegacyFinalRouteState(grid, start, goal, minimumSolutionPathLength, playableTopologyStats));
+    } = resolveLegacyFinalRouteState(
+      grid,
+      start,
+      goal,
+      minimumSolutionPathLength,
+      playableTopologyStats,
+      searchWorkspace
+    ));
   }
 
   // Dead-end pruning must run before the border-wrap/feeder stages below:
@@ -2670,10 +2815,11 @@ export const createLegacyMaze = (
     start,
     [goal, ...collectLegacyProtectedBorderTopology(grid)],
     solutionPath,
-    seed ^ 0x1b873593
+    seed ^ 0x1b873593,
+    searchWorkspace
   );
   solutionPath = buildShortestPath(grid, start, goal);
-  routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath);
+  routeQualityStats = measureLegacyRouteQuality(grid, start, goal, solutionPath, searchWorkspace);
   const finalReinforcementStats = reinforceLegacyRouteQuality(
     grid,
     rng,
@@ -2681,7 +2827,8 @@ export const createLegacyMaze = (
     goal,
     solutionPath,
     routeQualityStats,
-    routeQualityReinforcementBudget
+    routeQualityReinforcementBudget,
+    searchWorkspace
   );
   if (finalReinforcementStats.created > 0) {
     solutionPath = finalReinforcementStats.solutionPath;
@@ -2704,6 +2851,9 @@ export const createLegacyMaze = (
     solutionPath,
     start
   }, profile.requiredOppositeBorderConnections);
+  latestLegacyMazeSearchDiagnostics = {
+    ...searchWorkspace.diagnostics
+  };
 
   return {
     source: 'play-generated',

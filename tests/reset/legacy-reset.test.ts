@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'vitest';
+import { createHash } from 'node:crypto';
 import { LEGACY_DEFAULTS, MAIN_MENU_BUTTONS, linearColorToHex } from '../../src/legacy-runtime/legacyDefaults';
 import {
   createLegacyGeneratedMenuMaze,
   createLegacyMaze,
   createLegacyMenuMaze,
-  isLegacyWrappedStepTransition
+  isLegacyWrappedStepTransition,
+  readLegacyMazeSearchDiagnostics
 } from '../../src/legacy-runtime/legacyMaze';
 import {
   createLegacyDemoWalkerEpisode,
@@ -375,6 +377,55 @@ describe('legacy reset lane', () => {
       }
     }
   }, 20_000);
+
+  test('preserves immutable PR #284 fast-path maze outputs while reusing one typed search workspace', () => {
+    const cases = [
+      {
+        build: createLegacyMaze,
+        expectedHash: '54a1d91597fe7cc5bb7c306a76355c626df4a04043a39ffbaff9c56e35893702',
+        kind: 'play',
+        scale: 25,
+        seed: 13
+      },
+      {
+        build: createLegacyGeneratedMenuMaze,
+        expectedHash: '051bc8b54a6922e30cfc118afc9a371038b4970e2b9cbed0f105e1ab205d883d',
+        kind: 'menu',
+        scale: 37,
+        seed: 3
+      },
+      {
+        build: createLegacyMaze,
+        expectedHash: '992a4310b3ffa390df39e859c4be08ab67562799cf516fac79375067c182dc1d',
+        kind: 'play',
+        scale: 50,
+        seed: 52
+      }
+    ] as const;
+
+    for (const { build, expectedHash, kind, scale, seed } of cases) {
+      const maze = build(scale, scale, seed);
+      const diagnostics = readLegacyMazeSearchDiagnostics();
+      const snapshotHash = createHash('sha256').update(JSON.stringify(maze)).digest('hex');
+
+      expect(snapshotHash, `${kind}:${scale}:${seed}`).toBe(expectedHash);
+      expect(diagnostics).toMatchObject({
+        contractVersion: 'legacy-maze-search-workspace-v1',
+        normalizerPasses: 2,
+        workspaceAllocations: 1,
+        workspaceCellCapacity: maze.width * maze.height
+      });
+      expect(diagnostics.normalizerCandidateAudits).toBeGreaterThan(0);
+      expect(diagnostics.normalizerCandidateVisitedCells).toBeGreaterThanOrEqual(
+        diagnostics.normalizerCandidateAudits
+      );
+      expect(diagnostics.routeQualityMeasurements).toBeGreaterThan(0);
+      expect(diagnostics.routeQualityEdgeAudits).toBeGreaterThan(0);
+      expect(diagnostics.routeQualityVisitedCells).toBeGreaterThanOrEqual(
+        diagnostics.routeQualityEdgeAudits
+      );
+    }
+  }, 30_000);
 
   test('keeps default generated play mazes connected with meaningful alternate routes across seed families', () => {
     const failures: unknown[] = [];

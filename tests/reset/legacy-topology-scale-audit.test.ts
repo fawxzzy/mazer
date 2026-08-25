@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest';
+import { createHash } from 'node:crypto';
 import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
-import { createLegacyGeneratedMenuMaze, createLegacyMaze } from '../../src/legacy-runtime/legacyMaze';
+import {
+  createLegacyGeneratedMenuMaze,
+  createLegacyMaze,
+  readLegacyMazeSearchDiagnostics
+} from '../../src/legacy-runtime/legacyMaze';
 import {
   createEmptyLegacyProgressionState,
   resolveLegacyMazeComplexity,
@@ -332,6 +337,72 @@ const resolveHighVolumeCorpusDimensions = (index: number): readonly [number, num
 };
 
 describe('legacy topology scale audit', () => {
+  test('reports PR #284 production-scale search work without changing immutable outputs', () => {
+    const cases = [
+      {
+        build: createLegacyGeneratedMenuMaze,
+        expectedHash: '377ae8ea9f1cf7184f4c141687783083dad3f6d8f23fdef1c3f84d3cae985b53',
+        kind: 'menu',
+        scale: 63,
+        seed: 233
+      },
+      {
+        build: createLegacyMaze,
+        expectedHash: '418083e35edb8ae6cab263e6195fbd05cb862e5f4d6c148ac556c0501bbcb4b6',
+        kind: 'play',
+        scale: 95,
+        seed: 13
+      },
+      {
+        build: createLegacyGeneratedMenuMaze,
+        expectedHash: '9820474d7c79862cae258402894646e928b7519160fd4d05f66bf2ecb2255656',
+        kind: 'menu',
+        scale: 99,
+        seed: 233
+      },
+      {
+        build: createLegacyMaze,
+        expectedHash: 'ba20b018650bd5b0006d4da5ba5e180c250cd00b8743b0d0540bcce8fe1ed8c7',
+        kind: 'play',
+        scale: 149,
+        seed: 233
+      }
+    ] as const;
+    const timingDiagnostics: unknown[] = [];
+
+    for (const { build, expectedHash, kind, scale, seed } of cases) {
+      const startedAt = performance.now();
+      const maze = build(scale, scale, seed);
+      const elapsedMs = performance.now() - startedAt;
+      const diagnostics = readLegacyMazeSearchDiagnostics();
+      const snapshotHash = createHash('sha256').update(JSON.stringify(maze)).digest('hex');
+
+      expect(snapshotHash, `${kind}:${scale}:${seed}`).toBe(expectedHash);
+      expect(diagnostics.workspaceAllocations).toBe(1);
+      expect(diagnostics.workspaceCellCapacity).toBe(maze.width * maze.height);
+      expect(diagnostics.normalizerCandidateAudits).toBeLessThan(maze.width * maze.height);
+      expect(diagnostics.normalizerFallbackAudits).toBeLessThanOrEqual(
+        diagnostics.normalizerCandidateAudits * 4
+      );
+      expect(diagnostics.routeQualityEdgeAudits).toBeLessThan(maze.width * maze.height * 2);
+      expect(diagnostics.normalizerCandidateVisitedCells).toBeLessThanOrEqual(
+        diagnostics.normalizerCandidateAudits * diagnostics.workspaceCellCapacity
+      );
+      expect(diagnostics.routeQualityVisitedCells).toBeLessThanOrEqual(
+        diagnostics.routeQualityEdgeAudits * diagnostics.workspaceCellCapacity
+      );
+      timingDiagnostics.push({
+        diagnostics,
+        elapsedMs: Math.round(elapsedMs * 100) / 100,
+        kind,
+        scale,
+        seed
+      });
+    }
+
+    console.info('PR284_SEARCH_DIAGNOSTICS', JSON.stringify(timingDiagnostics));
+  }, 120_000);
+
   test('keeps the fixed-seed early curve nondecreasing with a measurable level-one to level-two step', () => {
     const seeds = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233];
     const targets = [8, 12, 16, 20, 24];
