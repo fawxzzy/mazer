@@ -132,6 +132,18 @@ const isFiniteBounds = (bounds) => (
   && Number.isFinite(bounds.height)
 );
 
+const isUsableInViewportBounds = (bounds, viewport, minimumSize = 16) => (
+  isFiniteBounds(bounds)
+  && Number.isFinite(viewport?.width)
+  && Number.isFinite(viewport?.height)
+  && bounds.width >= minimumSize
+  && bounds.height >= minimumSize
+  && bounds.left >= 0
+  && bounds.top >= 0
+  && bounds.right <= viewport.width
+  && bounds.bottom <= viewport.height
+);
+
 const waitForSurface = async (page, {
   expectedLabels = [],
   mode,
@@ -385,6 +397,205 @@ export const waitForAuthenticatedFixtureReady = async (page, {
   throw error;
 };
 
+const findFirstVisibleHomeAction = (buttons, semanticAction) => (
+  buttons.find((button) => button?.semanticAction === semanticAction) ?? null
+);
+
+export const evaluateStandaloneFirstVisibleHomeReadiness = ({
+  accountSurface = null,
+  beforeViewportRevision = null,
+  diagnostics = null,
+  interactions = [],
+  standalone = false,
+  viewport = null,
+  viewportRevision = null
+} = {}) => {
+  const buttons = Array.isArray(diagnostics?.visual?.buttons) ? diagnostics.visual.buttons : [];
+  const summarizeAction = (semanticAction) => summarizeAuthenticatedFixtureButton(
+    findFirstVisibleHomeAction(buttons, semanticAction)
+  );
+  const actions = {
+    account: summarizeAction('Account'),
+    leaderboard: summarizeAction('Leaderboard'),
+    settings: summarizeAction('Settings'),
+    start: summarizeAction('Start')
+  };
+  const boardBounds = diagnostics?.visual?.board?.bounds;
+  const clauses = {
+    accountAction: actions.account.semanticAction === 'Account'
+      && accountSurface?.active === true
+      && accountSurface?.visible === true
+      && accountSurface?.inputEnabled === true
+      && isUsableInViewportBounds(accountSurface?.bounds, viewport),
+    authenticated: diagnostics?.runtime?.auth?.status === 'authenticated',
+    leaderboardAction: actions.leaderboard.active && actions.leaderboard.geometry.finite,
+    mazeVisible: isFiniteBounds(boardBounds),
+    menuMode: diagnostics?.visual?.runtime?.mode === 'menu',
+    noInteractions: Array.isArray(interactions) && interactions.length === 0,
+    noOverlay: diagnostics?.visual?.runtime?.overlay === 'none',
+    settingsAction: actions.settings.active && actions.settings.iconOnly && actions.settings.geometry.finite,
+    standalone,
+    startAction: actions.start.active && !actions.start.iconOnly && actions.start.geometry.finite,
+    titleReadable: diagnostics?.visual?.title?.visible === true
+      && diagnostics.visual.title.progressPercent >= 95,
+    viewportRevisionAdvanced: Number.isInteger(beforeViewportRevision)
+      && Number.isInteger(viewportRevision)
+      && viewportRevision === beforeViewportRevision + 1
+  };
+
+  return {
+    clauses,
+    failedClauses: Object.entries(clauses)
+      .filter(([, passed]) => !passed)
+      .map(([clause]) => clause),
+    ready: Object.values(clauses).every(Boolean),
+    state: {
+      accountSurface,
+      actions,
+      authStatus: diagnostics?.runtime?.auth?.status ?? null,
+      beforeViewportRevision,
+      boardBounds: boardBounds ?? null,
+      mode: diagnostics?.visual?.runtime?.mode ?? null,
+      interactions: Array.isArray(interactions) ? interactions : null,
+      overlay: diagnostics?.visual?.runtime?.overlay ?? null,
+      standalone,
+      title: diagnostics?.visual?.title ?? null,
+      viewport,
+      viewportRevision
+    }
+  };
+};
+
+const installStandaloneFirstVisibleHarness = async (page) => {
+  await page.addInitScript(() => {
+    const nativeMatchMedia = window.matchMedia.bind(window);
+    window.__MAZER_FIRST_VISIBLE_INTERACTIONS__ = [];
+    const recordInteraction = (event) => {
+      if (event.isTrusted !== true) {
+        return;
+      }
+      window.__MAZER_FIRST_VISIBLE_INTERACTIONS__.push({
+        key: typeof event.key === 'string' ? event.key : null,
+        type: event.type,
+        x: Number.isFinite(event.clientX) ? event.clientX : null,
+        y: Number.isFinite(event.clientY) ? event.clientY : null
+      });
+    };
+    window.addEventListener('pointerdown', recordInteraction, true);
+    window.addEventListener('keydown', recordInteraction, true);
+    window.__MAZER_SIMULATED_HIDDEN__ = true;
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      get: () => Boolean(window.__MAZER_SIMULATED_HIDDEN__)
+    });
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => window.__MAZER_SIMULATED_HIDDEN__ ? 'hidden' : 'visible'
+    });
+    Object.defineProperty(navigator, 'standalone', {
+      configurable: true,
+      get: () => true
+    });
+    window.matchMedia = (query) => {
+      if (query !== '(display-mode: standalone)') {
+        return nativeMatchMedia(query);
+      }
+      return {
+        addEventListener: () => {},
+        addListener: () => {},
+        dispatchEvent: () => true,
+        matches: true,
+        media: query,
+        onchange: null,
+        removeEventListener: () => {},
+        removeListener: () => {}
+      };
+    };
+  });
+};
+
+const setStandaloneEquivalentVisibility = async (page, hidden) => {
+  await page.evaluate((value) => {
+    window.__MAZER_SIMULATED_HIDDEN__ = value;
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, hidden);
+};
+
+const readStandaloneFirstVisibleHomeState = async (page, beforeViewportRevision) => {
+  const [diagnostics, runtimeState] = await Promise.all([
+    readDiagnostics(page),
+    page.evaluate(() => {
+      const scenes = window.__MAZER_GAME__?.scene?.getScenes?.(true) ?? [];
+      const menuScene = scenes.find((scene) => Array.isArray(scene?.uiButtons));
+      const accountButton = menuScene?.uiButtons?.find(
+        (button) => button?.semanticAction === 'Account'
+      );
+      const accountBackground = accountButton?.background;
+      const accountBounds = accountBackground?.getBounds?.();
+      const root = document.documentElement;
+      return {
+        accountSurface: accountBackground && accountBounds ? {
+          active: accountBackground.active === true,
+          bounds: {
+            bottom: accountBounds.bottom,
+            height: accountBounds.height,
+            left: accountBounds.left,
+            right: accountBounds.right,
+            top: accountBounds.top,
+            width: accountBounds.width
+          },
+          inputEnabled: accountBackground.input?.enabled === true,
+          visible: accountBackground.visible === true
+        } : null,
+        interactions: Array.isArray(window.__MAZER_FIRST_VISIBLE_INTERACTIONS__)
+          ? [...window.__MAZER_FIRST_VISIBLE_INTERACTIONS__]
+          : null,
+        standalone: window.matchMedia('(display-mode: standalone)').matches
+          || navigator.standalone === true,
+        viewport: {
+          height: root.clientHeight,
+          width: root.clientWidth
+        },
+        viewportRevision: window.__MAZER_VIEWPORT_GEOMETRY__?.revision ?? null
+      };
+    })
+  ]);
+  return evaluateStandaloneFirstVisibleHomeReadiness({
+    accountSurface: runtimeState.accountSurface,
+    beforeViewportRevision,
+    diagnostics,
+    interactions: runtimeState.interactions,
+    standalone: runtimeState.standalone,
+    viewport: runtimeState.viewport,
+    viewportRevision: runtimeState.viewportRevision
+  });
+};
+
+const waitForStandaloneFirstVisibleHomeReady = async (page, {
+  beforeViewportRevision,
+  timeoutMs = DEFAULT_TIMEOUT_MS
+}) => {
+  const startedAt = Date.now();
+  let evaluation;
+  do {
+    evaluation = await readStandaloneFirstVisibleHomeState(page, beforeViewportRevision);
+    if (evaluation.ready) {
+      return evaluation;
+    }
+    if (Date.now() - startedAt >= timeoutMs) {
+      break;
+    }
+    await page.waitForTimeout(50);
+  } while (true);
+
+  const error = new Error(
+    `Standalone first-visible home readiness timed out: ${JSON.stringify(evaluation)}`
+  );
+  error.code = 'STANDALONE_FIRST_VISIBLE_HOME_TIMEOUT';
+  error.evidence = evaluation;
+  throw error;
+};
+
 const resolveRoute = ({ authFixture, route = DEFAULT_ROUTE, label, mazeSeed }) => {
   const url = new URL(route, 'http://local.test');
   if (!url.searchParams.has('runtimeDiagnostics')) {
@@ -401,6 +612,28 @@ const resolveRoute = ({ authFixture, route = DEFAULT_ROUTE, label, mazeSeed }) =
   }
 
   return `${url.pathname}${url.search}`;
+};
+
+export const resolveCaptureTarget = ({
+  authFixture,
+  firstVisibleHomeOnly = false,
+  label = DEFAULT_LABEL,
+  mazeSeed,
+  route = DEFAULT_ROUTE
+} = {}) => {
+  const resolvedAuthFixture = firstVisibleHomeOnly
+    ? 'authenticated'
+    : typeof authFixture === 'string' ? authFixture : undefined;
+
+  return {
+    authFixture: resolvedAuthFixture,
+    route: resolveRoute({
+      authFixture: resolvedAuthFixture,
+      route,
+      label,
+      mazeSeed
+    })
+  };
 };
 
 const resolveRouteWithParams = (route, params) => {
@@ -1899,15 +2132,17 @@ export const runUiSurfaceCapture = async (options = {}) => {
   const viewport = transition?.initial ?? options.viewport ?? DEFAULT_VIEWPORT;
   const deviceScaleFactor = options.deviceScaleFactor ?? DEFAULT_DEVICE_SCALE_FACTOR;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  const authFixture = typeof options.authFixture === 'string' ? options.authFixture : undefined;
+  const firstVisibleHomeOnly = options.firstVisibleHomeOnly === true;
+  const captureTarget = resolveCaptureTarget({
+    authFixture: options.authFixture,
+    firstVisibleHomeOnly,
+    label,
+    mazeSeed: options.mazeSeed,
+    route: options.route
+  });
+  const { authFixture, route } = captureTarget;
   const preferenceFixture = typeof options.preferenceFixture === 'string' ? options.preferenceFixture : undefined;
   const topologyFixture = typeof options.topologyFixture === 'string' ? options.topologyFixture : undefined;
-  const route = options.route ?? resolveRoute({
-    authFixture,
-    route: DEFAULT_ROUTE,
-    label,
-    mazeSeed: options.mazeSeed
-  });
   const consoleMessages = [];
   const pageErrors = [];
 
@@ -1938,6 +2173,9 @@ export const runUiSurfaceCapture = async (options = {}) => {
       viewport
     });
     const page = await context.newPage();
+    if (firstVisibleHomeOnly) {
+      await installStandaloneFirstVisibleHarness(page);
+    }
     page.on('console', (message) => {
       const entry = {
         type: message.type(),
@@ -1965,6 +2203,92 @@ export const runUiSurfaceCapture = async (options = {}) => {
     await seedTopologyFixture(page, topologyFixture);
 
     await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: timeoutMs });
+    if (firstVisibleHomeOnly) {
+      await page.waitForFunction(() => Number.isInteger(window.__MAZER_VIEWPORT_GEOMETRY__?.revision), null, {
+        timeout: timeoutMs
+      });
+      const beforeViewportRevision = await page.evaluate(
+        () => window.__MAZER_VIEWPORT_GEOMETRY__?.revision ?? null
+      );
+      await setStandaloneEquivalentVisibility(page, false);
+      let readiness = await waitForStandaloneFirstVisibleHomeReady(page, {
+        beforeViewportRevision,
+        timeoutMs
+      });
+      await waitForVisualBuildSettled(page, {
+        requireReadableTitle: true,
+        timeoutMs
+      });
+      const menu = await captureSurface({
+        page,
+        outputDir,
+        expectedLabels: [],
+        id: '01-standalone-first-visible-home',
+        mode: 'menu',
+        overlay: 'none',
+        route,
+        skipWait: true,
+        timeoutMs,
+        viewport
+      });
+      readiness = await readStandaloneFirstVisibleHomeState(page, beforeViewportRevision);
+      if (!readiness.ready) {
+        const error = new Error(
+          `Standalone first-visible home changed before capture completed: ${JSON.stringify(readiness)}`
+        );
+        error.code = 'STANDALONE_FIRST_VISIBLE_HOME_CHANGED';
+        error.evidence = readiness;
+        throw error;
+      }
+      const checks = [
+        ...Object.entries(readiness.clauses).map(([id, passed]) => createCheck(
+          `standalone-first-visible-${id}`,
+          passed,
+          JSON.stringify(readiness.state)
+        )),
+        createCheck('console-clean', consoleMessages.length === 0, `${consoleMessages.length} console warnings/errors`),
+        createCheck('page-errors-clean', pageErrors.length === 0, `${pageErrors.length} page errors`)
+      ];
+      const summary = {
+        pass: checks.every((check) => check.passed),
+        label,
+        sessionId,
+        targetUrl,
+        viewport,
+        deviceScaleFactor,
+        authFixture,
+        firstVisibleHomeOnly: true,
+        interactionTransitions: readiness.state.interactions,
+        repo: {
+          commit: getCommitSha(),
+          dirty: isWorktreeDirty()
+        },
+        screenshots: { menu: menu.screenshotPath },
+        surfaces: { menu: toSurfaceState(menu) },
+        readiness,
+        checks,
+        consoleMessages,
+        pageErrors
+      };
+      const summaryPath = resolve(outputDir, 'summary.json');
+      const reportPath = resolve(outputDir, 'report.md');
+      summary.reportPath = reportPath;
+      await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+      await writeFile(reportPath, `${[
+        '# Mazer standalone first-visible home proof',
+        '',
+        `- Result: ${summary.pass ? 'PASS' : 'FAIL'}`,
+        `- Viewport: ${viewport.width}x${viewport.height} @ ${deviceScaleFactor}x DPR`,
+        `- Viewport revision: ${readiness.state.beforeViewportRevision} -> ${readiness.state.viewportRevision}`,
+        `- Interaction transitions: ${summary.interactionTransitions.length}`,
+        `- Console warnings/errors: ${consoleMessages.length}`,
+        `- Page errors: ${pageErrors.length}`,
+        '',
+        `![Standalone first-visible home](${summary.screenshots.menu})`,
+        ''
+      ].join('\n')}\n`, 'utf8');
+      return { ...summary, summaryPath };
+    }
     let initialDiagnostics;
     if (authFixture === 'authenticated') {
       await waitForAuthenticatedFixtureReady(page, { timeoutMs });
@@ -2384,6 +2708,7 @@ if (isDirectRun) {
     authFixture: typeof args['auth-fixture'] === 'string' ? args['auth-fixture'] : undefined,
     deviceScaleFactor: parseIntegerArg(args['device-scale-factor'], DEFAULT_DEVICE_SCALE_FACTOR),
     headless: args.headless !== 'false',
+    firstVisibleHomeOnly: args['first-visible-home'] === true || args['first-visible-home'] === 'true',
     label: typeof args.label === 'string' ? args.label : DEFAULT_LABEL,
     mazeSeed: typeof args['maze-seed'] === 'string'
       ? args['maze-seed']

@@ -43,7 +43,8 @@ const createRuntime = ({
     document: {
       addEventListener: (): void => {},
       documentElement: root,
-      removeEventListener: (): void => {}
+      removeEventListener: (): void => {},
+      visibilityState: 'visible' as DocumentVisibilityState
     },
     getComputedStyle: () => ({
       getPropertyValue: (name: string): string => cssValues.get(name) ?? '0px'
@@ -68,6 +69,7 @@ const createRuntime = ({
 const createObservableRuntime = (dimensions?: Parameters<typeof createRuntime>[0]) => {
   const { cssValues, root, runtime } = createRuntime(dimensions);
   const runtimeListeners = new Map<string, Set<() => void>>();
+  const documentListeners = new Map<string, Set<() => void>>();
   const visualViewportListeners = new Map<string, Set<() => void>>();
   const animationFrames: FrameRequestCallback[] = [];
   const register = (listeners: Map<string, Set<() => void>>, type: string, listener: () => void): void => {
@@ -92,6 +94,10 @@ const createObservableRuntime = (dimensions?: Parameters<typeof createRuntime>[0
       return animationFrames.length;
     }
   });
+  Object.assign(runtime.document, {
+    addEventListener: (type: string, listener: () => void): void => register(documentListeners, type, listener),
+    removeEventListener: (type: string, listener: () => void): void => unregister(documentListeners, type, listener)
+  });
   Object.assign(runtime.visualViewport, {
     addEventListener: (type: string, listener: () => void): void => register(visualViewportListeners, type, listener),
     removeEventListener: (type: string, listener: () => void): void => unregister(visualViewportListeners, type, listener)
@@ -102,6 +108,7 @@ const createObservableRuntime = (dimensions?: Parameters<typeof createRuntime>[0
     root,
     runtime,
     emitRuntime: (type: string): void => emit(runtimeListeners, type),
+    emitDocument: (type: string): void => emit(documentListeners, type),
     emitVisualViewport: (type: string): void => emit(visualViewportListeners, type),
     flushAnimationFrame: (): void => {
       const callbacks = animationFrames.splice(0);
@@ -297,6 +304,104 @@ describe('Mazer viewport geometry', () => {
     expect(observed.cssValues.get('--mazer-safe-area-top')).toBe('59px');
     expect(observed.cssValues.get('--mazer-safe-area-bottom')).toBe('21px');
     controller.dispose();
+  });
+
+  test('publishes exactly once when a hidden app becomes visible with unchanged geometry', () => {
+    const observed = createObservableRuntime();
+    const controller = installMazerViewportGeometry(observed.runtime as never);
+    const snapshots = [] as ReturnType<typeof controller.getSnapshot>[];
+    controller.subscribe((snapshot) => snapshots.push(snapshot), false);
+
+    observed.runtime.document.visibilityState = 'hidden';
+    observed.emitDocument('visibilitychange');
+    expect(observed.scheduledFrameCount()).toBe(0);
+    expect(snapshots).toEqual([]);
+
+    observed.runtime.document.visibilityState = 'visible';
+    observed.emitDocument('visibilitychange');
+    observed.emitDocument('visibilitychange');
+    expect(observed.scheduledFrameCount()).toBe(1);
+    observed.flushAnimationFrame();
+
+    expect(controller.getSnapshot().revision).toBe(2);
+    expect(snapshots).toHaveLength(1);
+
+    observed.emitDocument('visibilitychange');
+    expect(observed.scheduledFrameCount()).toBe(1);
+    observed.flushAnimationFrame();
+    expect(controller.getSnapshot().revision).toBe(2);
+    expect(snapshots).toHaveLength(1);
+    controller.dispose();
+  });
+
+  test('combines a visibility resume with current geometry without duplicate publications', () => {
+    const observed = createObservableRuntime({ height: 844, visualHeight: 844, visualWidth: 390, width: 390 });
+    const controller = installMazerViewportGeometry(observed.runtime as never);
+    const snapshots = [] as ReturnType<typeof controller.getSnapshot>[];
+    controller.subscribe((snapshot) => snapshots.push(snapshot), false);
+
+    observed.runtime.document.visibilityState = 'hidden';
+    observed.emitDocument('visibilitychange');
+    observed.runtime.document.documentElement.clientHeight = 900;
+    observed.runtime.innerHeight = 900;
+    observed.runtime.visualViewport.height = 900;
+    observed.runtime.document.visibilityState = 'visible';
+    observed.emitDocument('visibilitychange');
+    observed.emitRuntime('resize');
+    observed.flushAnimationFrame();
+
+    expect(controller.getSnapshot()).toMatchObject({
+      revision: 2,
+      layout: { width: 390, height: 900 },
+      visual: { width: 390, height: 900 }
+    });
+    expect(snapshots).toHaveLength(1);
+    controller.dispose();
+  });
+
+  test('does not publish a queued resume after the document becomes hidden again', () => {
+    const observed = createObservableRuntime();
+    const controller = installMazerViewportGeometry(observed.runtime as never);
+    const snapshots = [] as ReturnType<typeof controller.getSnapshot>[];
+    controller.subscribe((snapshot) => snapshots.push(snapshot), false);
+
+    observed.runtime.document.visibilityState = 'hidden';
+    observed.emitDocument('visibilitychange');
+    observed.runtime.document.visibilityState = 'visible';
+    observed.emitDocument('visibilitychange');
+    observed.runtime.document.visibilityState = 'hidden';
+    observed.emitDocument('visibilitychange');
+    observed.flushAnimationFrame();
+
+    expect(controller.getSnapshot().revision).toBe(1);
+    expect(snapshots).toEqual([]);
+
+    observed.runtime.document.visibilityState = 'visible';
+    observed.emitDocument('visibilitychange');
+    observed.flushAnimationFrame();
+    expect(controller.getSnapshot().revision).toBe(2);
+    expect(snapshots).toHaveLength(1);
+    controller.dispose();
+  });
+
+  test('does not publish a queued forced resume after the controller is disposed', () => {
+    const observed = createObservableRuntime();
+    const controller = installMazerViewportGeometry(observed.runtime as never);
+    const snapshots = [] as ReturnType<typeof controller.getSnapshot>[];
+    controller.subscribe((snapshot) => snapshots.push(snapshot), false);
+
+    observed.runtime.document.visibilityState = 'hidden';
+    observed.emitDocument('visibilitychange');
+    observed.runtime.document.visibilityState = 'visible';
+    observed.emitDocument('visibilitychange');
+    expect(observed.scheduledFrameCount()).toBe(1);
+
+    controller.dispose();
+    observed.flushAnimationFrame();
+
+    expect(controller.getSnapshot().revision).toBe(1);
+    expect(snapshots).toEqual([]);
+    expect(observed.cssValues.get('--mazer-viewport-height')).toBe('844px');
   });
 
   test('recomputes desktop maximize and restore from the current runtime snapshot', () => {
