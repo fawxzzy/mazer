@@ -234,10 +234,10 @@ import {
   readLegacyAuthSessionSnapshot,
   readLegacyRememberedIdentity,
   readLegacyRememberedIdentityState,
+  readLegacyPasswordRecoveryBootUrlState,
   normalizeLegacyAuthEmail,
   requestLegacyPasswordReset,
   resolveLegacyPasswordRecoveryEnterAction,
-  resolveLegacyPasswordRecoveryUrlState,
   resolveLegacyPasswordUpdateSubmitState,
   resolveLegacyAuthAccountLabel,
   resolveLegacyAuthInvalidFields,
@@ -1280,7 +1280,7 @@ export class MenuScene extends Phaser.Scene {
   private pendingAuthGateTransition = false;
   private authForm: LegacyAuthFormState = createEmptyLegacyAuthFormState('login');
   private passwordRecoveryState: LegacyPasswordRecoveryState = createLegacyPasswordRecoveryState();
-  private passwordRecoveryUrlState = resolveLegacyPasswordRecoveryUrlState();
+  private passwordRecoveryUrlState = readLegacyPasswordRecoveryBootUrlState();
   private passwordRecoveryFeedback: string | null = null;
   private activeAuthField: LegacyAuthFieldId | null = null;
   private authNativeInput: HTMLInputElement | null = null;
@@ -1596,7 +1596,7 @@ export class MenuScene extends Phaser.Scene {
     // run and check this flag before this function ever reaches the line
     // that used to set it, leaving it permanently unconsumed.
     this.pendingBootPlayStart = resolveInitialRuntimeMode(runtimeSearch) === 'play';
-    this.passwordRecoveryUrlState = resolveLegacyPasswordRecoveryUrlState();
+    this.passwordRecoveryUrlState = readLegacyPasswordRecoveryBootUrlState();
     this.passwordRecoveryState = resolveLegacyPasswordRecoveryEntry(
       createLegacyPasswordRecoveryState(),
       {

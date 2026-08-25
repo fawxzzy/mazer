@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import {
   MAZER_INSTALL_GATE_OVERLAY_ID,
   resolveMazerInstallGateCopy,
+  shouldRunMazerInstallGateForBoot,
   shouldShowMazerInstallGate
 } from '../../src/boot/installGate';
 import type { InstallSurfaceState } from '../../src/boot/installSurface';
@@ -21,6 +22,24 @@ describe('Mazer install gate', () => {
     expect(shouldShowMazerInstallGate({ ...hiddenState, mode: 'ios-open-in-browser' })).toBe(true);
     expect(shouldShowMazerInstallGate({ ...hiddenState, mode: 'available', canPrompt: true })).toBe(true);
     expect(shouldShowMazerInstallGate({ ...hiddenState, mode: 'manual', instruction: 'Use Share > Add to Home Screen' })).toBe(true);
+  });
+
+  test('bypasses the install gate only for a captured recovery callback', () => {
+    expect(shouldRunMazerInstallGateForBoot({
+      forceInstallGate: false,
+      isLocalhostRuntime: false,
+      passwordRecoveryRequested: true
+    })).toBe(false);
+    expect(shouldRunMazerInstallGateForBoot({
+      forceInstallGate: false,
+      isLocalhostRuntime: false,
+      passwordRecoveryRequested: false
+    })).toBe(true);
+    expect(shouldRunMazerInstallGateForBoot({
+      forceInstallGate: true,
+      isLocalhostRuntime: true,
+      passwordRecoveryRequested: false
+    })).toBe(true);
   });
 
   test('keeps one shared three-step contract while restoring the native action only for prompt-capable browsers', () => {
@@ -58,7 +77,8 @@ describe('Mazer install gate', () => {
     expect(gameCreateIndex).toBeGreaterThan(-1);
     expect(installGateCallIndex).toBeLessThan(gameCreateIndex);
     expect(mainSource).toContain('initializeInstallSurface(window);');
-    expect(mainSource).toContain("!isLocalhostRuntime() || forceInstallGate");
+    expect(mainSource).toContain('captureLegacyPasswordRecoveryBootUrlState(window.location)');
+    expect(mainSource).toContain('shouldRunMazerInstallGateForBoot({');
     expect(cssSource).toContain(`#${MAZER_INSTALL_GATE_OVERLAY_ID}`);
     expect(cssSource).toContain('"Space Grotesk", ui-sans-serif, system-ui');
   });

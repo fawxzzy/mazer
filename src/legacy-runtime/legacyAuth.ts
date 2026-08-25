@@ -43,6 +43,8 @@ export interface LegacyPasswordRecoveryUrlState {
   requested: boolean;
 }
 
+let legacyPasswordRecoveryBootUrlState: LegacyPasswordRecoveryUrlState | null = null;
+
 export interface LegacyPasswordUpdateSubmitState extends LegacyAuthSubmitState {
   invalidFields: LegacyAuthFieldId[];
 }
@@ -585,6 +587,25 @@ export const resolveLegacyPasswordRecoveryUrlState = (
   };
 };
 
+export const captureLegacyPasswordRecoveryBootUrlState = (
+  location: Pick<Location, 'hash' | 'pathname' | 'search'> | undefined = (
+    typeof window === 'undefined' ? undefined : window.location
+  )
+): LegacyPasswordRecoveryUrlState => {
+  const state = resolveLegacyPasswordRecoveryUrlState(location);
+  legacyPasswordRecoveryBootUrlState = state.requested ? state : null;
+  return state;
+};
+
+export const readLegacyPasswordRecoveryBootUrlState = (
+  location: Pick<Location, 'hash' | 'pathname' | 'search'> | undefined = (
+    typeof window === 'undefined' ? undefined : window.location
+  )
+): LegacyPasswordRecoveryUrlState => {
+  const liveState = resolveLegacyPasswordRecoveryUrlState(location);
+  return liveState.requested ? liveState : legacyPasswordRecoveryBootUrlState ?? liveState;
+};
+
 export const resolveLegacyPasswordRecoveryCleanUrl = (
   origin: string,
   outcome: 'continue' | 'invalid'
@@ -608,7 +629,6 @@ export const resolveLegacyPasswordRecoveryEnterAction = (
 };
 
 interface LegacyPasswordUpdateOptions {
-  maxAttempts?: number;
   timeoutMs?: number;
 }
 
@@ -616,16 +636,41 @@ const invokeLegacyPasswordUpdateWithTimeout = async (
   client: LegacyPasswordUpdateClient,
   password: string,
   timeoutMs: number
-): Promise<{ error: { message?: string | null } | null }> => Promise.race([
-  client.auth.updateUser({ password }),
-  new Promise<{ error: { message?: string | null } | null }>((resolve) => {
-    setTimeout(() => {
-      resolve({ error: { message: 'Password update timed out.' } });
-    }, timeoutMs);
-  })
-]);
+): Promise<{ error: { message?: string | null } | null }> => new Promise((resolve) => {
+  let settled = false;
+  const timeout = setTimeout(() => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    resolve({ error: { message: 'Password update timed out.' } });
+  }, timeoutMs);
+
+  void client.auth.updateUser({ password }).then((result) => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    clearTimeout(timeout);
+    resolve(result);
+  }, (caught: unknown) => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    clearTimeout(timeout);
+    resolve({
+      error: {
+        message: caught instanceof Error
+          ? caught.message
+          : 'Failed to update password. Please try again.'
+      }
+    });
+  });
+});
 
 export const clearLegacyPasswordRecoveryUrl = (outcome: 'continue' | 'invalid'): void => {
+  legacyPasswordRecoveryBootUrlState = null;
   if (typeof window === 'undefined') {
     return;
   }
@@ -680,31 +725,12 @@ export const updateLegacyPasswordWithClient = async (
     return { error: submitState.reason, ok: false };
   }
 
-  const {
-    maxAttempts = 2,
-    timeoutMs = 3000
-  } = options;
-  const attempts = Math.max(1, maxAttempts);
-  let lastError: { message?: string | null } | null = null;
-
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const { error } = await invokeLegacyPasswordUpdateWithTimeout(client, password, timeoutMs).catch((caught) => ({
-      error: { message: caught?.message ?? 'Failed to update password. Please try again.' }
-    }));
-    lastError = error;
-    if (!error) {
-      return { error: null, ok: true };
-    }
-    if (attempt < attempts - 1) {
-      await new Promise((resolve) => {
-        setTimeout(resolve, 10);
-      });
-    }
-  }
+  const { timeoutMs = 3000 } = options;
+  const { error } = await invokeLegacyPasswordUpdateWithTimeout(client, password, timeoutMs);
 
   return {
-    error: lastError?.message ?? 'Failed to update password. Please try again.',
-    ok: false
+    error: error?.message ?? null,
+    ok: error === null
   };
 };
 

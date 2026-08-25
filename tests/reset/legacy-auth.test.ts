@@ -6,6 +6,8 @@ import {
   LEGACY_AUTH_REMEMBERED_IDENTITY_KEY,
   buildLegacySignUpMetadata,
   buildLegacyRememberedIdentityState,
+  captureLegacyPasswordRecoveryBootUrlState,
+  clearLegacyPasswordRecoveryUrl,
   createEmptyLegacyAuthFormState,
   createLegacyAuthScopedStorage,
   deriveLegacyRememberedIdentityDisplayName,
@@ -13,6 +15,7 @@ import {
   normalizeLegacyAuthEmail,
   readLegacyRememberedIdentityState,
   readLegacyRememberedIdentity,
+  readLegacyPasswordRecoveryBootUrlState,
   resolveLegacyPasswordRecoveryCleanUrl,
   resolveLegacyPasswordRecoveryEnterAction,
   resolveLegacyPasswordRecoveryRedirectUrl,
@@ -176,6 +179,26 @@ describe('legacy auth runtime', () => {
     })).toEqual({ hasProviderError: true, requested: false });
   });
 
+  test('retains a real recovery callback through auth bootstrap URL cleanup', () => {
+    expect(captureLegacyPasswordRecoveryBootUrlState({
+      hash: '#access_token=secret&type=recovery',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: true });
+    expect(readLegacyPasswordRecoveryBootUrlState({
+      hash: '',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: true });
+
+    clearLegacyPasswordRecoveryUrl('continue');
+    expect(readLegacyPasswordRecoveryBootUrlState({
+      hash: '',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: false });
+  });
+
   test('updates a password only when both policy-valid fields match', async () => {
     const updateUser = vi.fn(async () => ({ error: null }));
     const client = { auth: { updateUser } };
@@ -221,28 +244,26 @@ describe('legacy auth runtime', () => {
     expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret1', true).canSubmit).toBe(true);
   });
 
-  test('retries recovery-password updates and returns a bounded timeout error', async () => {
+  test('bounds recovery-password updates without starting concurrent retries', async () => {
     const timeoutClient = {
       auth: { updateUser: vi.fn(async () => new Promise<never>(() => undefined)) }
     };
     const timeoutResult = await updateLegacyPasswordWithClient(timeoutClient, 'secret1', 'secret1', {
-      maxAttempts: 2,
       timeoutMs: 1
     });
     expect(timeoutResult.ok).toBe(false);
     expect(timeoutResult.error).toBe('Password update timed out.');
-    expect(timeoutClient.auth.updateUser).toHaveBeenCalledTimes(2);
+    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
 
     const rejectClient = {
       auth: { updateUser: vi.fn(async () => Promise.reject(new Error('bad network'))) }
     };
     const rejectResult = await updateLegacyPasswordWithClient(rejectClient, 'secret1', 'secret1', {
-      maxAttempts: 2,
       timeoutMs: 1
     });
     expect(rejectResult.ok).toBe(false);
     expect(rejectResult.error).toBe('bad network');
-    expect(rejectClient.auth.updateUser).toHaveBeenCalledTimes(2);
+    expect(rejectClient.auth.updateUser).toHaveBeenCalledOnce();
   });
 
   test('builds canonical Mazer signup metadata without deriving a username from email', () => {

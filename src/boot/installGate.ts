@@ -1,5 +1,16 @@
 import { getInstallSurfaceState, promptInstallSurface, subscribeInstallSurface, type InstallSurfaceState } from './installSurface';
 
+export interface MazerInstallGateBootContext {
+  forceInstallGate: boolean;
+  isLocalhostRuntime: boolean;
+  passwordRecoveryRequested: boolean;
+}
+
+export const shouldRunMazerInstallGateForBoot = (context: MazerInstallGateBootContext): boolean => (
+  (!context.isLocalhostRuntime || context.forceInstallGate)
+  && !context.passwordRecoveryRequested
+);
+
 export const copyMazerInstallLink = async (url: string): Promise<boolean> => {
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
     try {
