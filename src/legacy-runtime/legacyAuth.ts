@@ -44,6 +44,7 @@ export interface LegacyPasswordRecoveryUrlState {
 }
 
 let legacyPasswordRecoveryBootUrlState: LegacyPasswordRecoveryUrlState | null = null;
+const legacyPasswordUpdatesInFlight = new WeakMap<LegacyPasswordUpdateClient, Promise<{ error: { message?: string | null } | null }>>();
 
 export interface LegacyPasswordUpdateSubmitState extends LegacyAuthSubmitState {
   invalidFields: LegacyAuthFieldId[];
@@ -574,16 +575,15 @@ export const resolveLegacyPasswordRecoveryUrlState = (
   const hasProviderError = [query, fragment].some((params) => (
     params.has('error') || params.has('error_code') || params.has('error_description')
   ));
-  const hasRecoverySignal = isRecoveryPath && [query, fragment].some((params) => (
+  const hasRecoveryCredential = [query, fragment].some((params) => (
     params.has('code')
     || params.has('access_token')
     || params.has('refresh_token')
-    || params.get('type') === 'recovery'
   ));
 
   return {
     hasProviderError,
-    requested: isRecoveryPath && (hasRecoverySignal || hasProviderError)
+    requested: isRecoveryPath && (hasRecoveryCredential || hasProviderError)
   };
 };
 
@@ -637,6 +637,23 @@ const invokeLegacyPasswordUpdateWithTimeout = async (
   password: string,
   timeoutMs: number
 ): Promise<{ error: { message?: string | null } | null }> => new Promise((resolve) => {
+  let update = legacyPasswordUpdatesInFlight.get(client);
+  if (!update) {
+    update = Promise.resolve().then(() => client.auth.updateUser({ password })).catch((caught: unknown) => ({
+      error: {
+        message: caught instanceof Error
+          ? caught.message
+          : 'Failed to update password. Please try again.'
+      }
+    }));
+    legacyPasswordUpdatesInFlight.set(client, update);
+    void update.then(() => {
+      if (legacyPasswordUpdatesInFlight.get(client) === update) {
+        legacyPasswordUpdatesInFlight.delete(client);
+      }
+    });
+  }
+
   let settled = false;
   const timeout = setTimeout(() => {
     if (settled) {
@@ -646,26 +663,13 @@ const invokeLegacyPasswordUpdateWithTimeout = async (
     resolve({ error: { message: 'Password update timed out.' } });
   }, timeoutMs);
 
-  void client.auth.updateUser({ password }).then((result) => {
+  void update.then((result) => {
     if (settled) {
       return;
     }
     settled = true;
     clearTimeout(timeout);
     resolve(result);
-  }, (caught: unknown) => {
-    if (settled) {
-      return;
-    }
-    settled = true;
-    clearTimeout(timeout);
-    resolve({
-      error: {
-        message: caught instanceof Error
-          ? caught.message
-          : 'Failed to update password. Please try again.'
-      }
-    });
   });
 });
 

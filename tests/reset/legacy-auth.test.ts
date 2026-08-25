@@ -158,6 +158,11 @@ describe('legacy auth runtime', () => {
       search: ''
     })).toEqual({ hasProviderError: false, requested: false });
     expect(resolveLegacyPasswordRecoveryUrlState({
+      hash: '#type=recovery',
+      pathname: '/update-password',
+      search: ''
+    })).toEqual({ hasProviderError: false, requested: false });
+    expect(resolveLegacyPasswordRecoveryUrlState({
       hash: '#',
       pathname: '/update-password',
       search: '?code=secret'
@@ -244,15 +249,26 @@ describe('legacy auth runtime', () => {
     expect(resolveLegacyPasswordUpdateSubmitState('secret1', 'secret1', true).canSubmit).toBe(true);
   });
 
-  test('bounds recovery-password updates without starting concurrent retries', async () => {
+  test('bounds recovery-password updates and shares an unresolved mutation with manual retry', async () => {
+    let settleUpdate: ((value: { error: null }) => void) | null = null;
     const timeoutClient = {
-      auth: { updateUser: vi.fn(async () => new Promise<never>(() => undefined)) }
+      auth: {
+        updateUser: vi.fn(async () => new Promise<{ error: null }>((resolve) => {
+          settleUpdate = resolve;
+        }))
+      }
     };
     const timeoutResult = await updateLegacyPasswordWithClient(timeoutClient, 'secret1', 'secret1', {
       timeoutMs: 1
     });
     expect(timeoutResult.ok).toBe(false);
     expect(timeoutResult.error).toBe('Password update timed out.');
+    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
+
+    const retry = updateLegacyPasswordWithClient(timeoutClient, 'secret1', 'secret1', { timeoutMs: 100 });
+    expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
+    settleUpdate?.({ error: null });
+    await expect(retry).resolves.toEqual({ error: null, ok: true });
     expect(timeoutClient.auth.updateUser).toHaveBeenCalledOnce();
 
     const rejectClient = {
