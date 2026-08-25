@@ -1944,6 +1944,43 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('Guest mode is active. Sign in to keep account progress separate.');
   });
 
+  test('owns password recovery as an opaque game-pausing auth state without changing login or signup', () => {
+    const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+    const vercelConfig = JSON.parse(readFileSync(resolve(process.cwd(), 'vercel.json'), 'utf8')) as {
+      rewrites?: Array<{ destination: string; source: string }>;
+    };
+
+    expect(authSource).toContain("export const LEGACY_PASSWORD_RECOVERY_PATH = '/update-password';");
+    expect(authSource).toContain('resolveLegacyPasswordRecoveryRedirectUrl(window.location.origin)');
+    expect(authSource).toContain('client.auth.updateUser({ password })');
+    expect(menuSceneSource).toContain("if (event === 'PASSWORD_RECOVERY') {");
+    expect(menuSceneSource).toContain("this.applyLegacyPasswordRecoveryEntry(snapshot, 'BOOTSTRAP_PATH', true);");
+    expect(menuSceneSource).toContain("'confirmPassword'");
+    expect(menuSceneSource).toContain("input.autocomplete = isPasswordField");
+    expect(menuSceneSource).toContain("? (this.isLegacyPasswordRecoveryActive() ? 'new-password' : 'current-password')");
+    expect(menuSceneSource).toContain('resolveLegacyPasswordUpdateSubmitState(');
+    expect(menuSceneSource).toContain('clearLegacyPasswordRecoveryUrl(\'continue\');');
+    expect(menuSceneSource).toContain("this.passwordRecoveryState = { error: null, phase: 'success' };");
+    expect(vercelConfig.rewrites).toContainEqual({
+      destination: '/index.html',
+      source: '/update-password'
+    });
+
+    const updateStart = menuSceneSource.indexOf('  public update(time: number, delta: number): void {');
+    const updateEnd = menuSceneSource.indexOf('  private recordRuntimeFrame(', updateStart);
+    const updateSource = menuSceneSource.slice(updateStart, updateEnd);
+    expect(updateSource).toContain("if (this.overlay === 'auth') {");
+    expect(updateSource.indexOf("if (this.overlay === 'auth') {")).toBeLessThan(
+      updateSource.indexOf('this.updateStars(time, delta);')
+    );
+    expect(menuSceneSource).toContain(
+      "this.overlayGraphics.fillStyle(this.overlay === 'auth' ? 0x031f20 : 0x02040a, this.overlay === 'auth' ? 1 : 0.82);"
+    );
+    expect(menuSceneSource).toContain("this.authForm.mode === 'signup'");
+    expect(menuSceneSource).toContain('signInLegacyAuth(this.authForm.email, this.authForm.password)');
+  });
+
   test('keeps full-height overlay content behind one mobile scroll facade and icon-only back control', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
     const overlayPanelStart = menuSceneSource.indexOf('  private drawOverlayPanel(): void {');
