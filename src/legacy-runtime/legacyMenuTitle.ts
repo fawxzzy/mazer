@@ -39,6 +39,24 @@ export interface LegacyMenuPathTitleOrbitGeometry {
   top: number;
 }
 
+export interface LegacyMenuPathTitleOrbitPose {
+  facing: number;
+  x: number;
+  y: number;
+}
+
+export interface LegacyMenuPathTitleDiamondPoint {
+  x: number;
+  y: number;
+}
+
+export type LegacyMenuPathTitleDiamondVertices = readonly [
+  LegacyMenuPathTitleDiamondPoint,
+  LegacyMenuPathTitleDiamondPoint,
+  LegacyMenuPathTitleDiamondPoint,
+  LegacyMenuPathTitleDiamondPoint
+];
+
 const LEGACY_MENU_PATH_TITLE_PATTERNS = [
   [
     '10001',
@@ -254,37 +272,75 @@ export const resolveLegacyMenuPathTitleOrbitGeometry = (
   };
 };
 
+export const resolveLegacyMenuPathTitleOrbitPose = (
+  geometry: LegacyMenuPathTitleOrbitGeometry,
+  orbit: number,
+  isLifecycleSpinActive = false,
+  travelReversed = false
+): LegacyMenuPathTitleOrbitPose => {
+  const perimeter = (((orbit % 1) + 1) % 1) * 4;
+  let x: number;
+  let y: number;
+
+  if (perimeter < 1) {
+    x = geometry.left + ((geometry.right - geometry.left) * perimeter);
+    y = geometry.top;
+  } else if (perimeter < 2) {
+    x = geometry.right;
+    y = geometry.top + ((geometry.bottom - geometry.top) * (perimeter - 1));
+  } else if (perimeter < 3) {
+    x = geometry.right - ((geometry.right - geometry.left) * (perimeter - 2));
+    y = geometry.bottom;
+  } else {
+    x = geometry.left;
+    y = geometry.bottom - ((geometry.bottom - geometry.top) * (perimeter - 3));
+  }
+
+  const centerFacing = Math.atan2(geometry.centerY - y, geometry.centerX - x);
+  if (!isLifecycleSpinActive) {
+    return { facing: centerFacing, x, y };
+  }
+
+  const segment = Math.floor(perimeter) % 4;
+  const segmentTangents = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+  const tangent = segmentTangents[segment] ?? 0;
+  const travelTangent = travelReversed ? tangent + Math.PI : tangent;
+  const withinSegment = perimeter - Math.floor(perimeter);
+  const distanceToCorner = Math.min(withinSegment, 1 - withinSegment);
+  const cornerWindow = 0.15;
+  const cornerProximity = Math.max(0, Math.min(1, 1 - (distanceToCorner / cornerWindow)));
+  const twoPi = Math.PI * 2;
+  const diff = (((centerFacing - travelTangent) % twoPi) + (twoPi * 1.5)) % twoPi - Math.PI;
+
+  return {
+    facing: travelTangent + (diff * cornerProximity * 0.55),
+    x,
+    y
+  };
+};
+
 export const resolveLegacyMenuPathTitleOrbitPoint = (
   geometry: LegacyMenuPathTitleOrbitGeometry,
   orbit: number
 ): { x: number; y: number } => {
-  const perimeter = (((orbit % 1) + 1) % 1) * 4;
+  const { x, y } = resolveLegacyMenuPathTitleOrbitPose(geometry, orbit);
+  return { x, y };
+};
 
-  if (perimeter < 1) {
-    return {
-      x: geometry.left + ((geometry.right - geometry.left) * perimeter),
-      y: geometry.top
-    };
-  }
-
-  if (perimeter < 2) {
-    return {
-      x: geometry.right,
-      y: geometry.top + ((geometry.bottom - geometry.top) * (perimeter - 1))
-    };
-  }
-
-  if (perimeter < 3) {
-    return {
-      x: geometry.right - ((geometry.right - geometry.left) * (perimeter - 2)),
-      y: geometry.bottom
-    };
-  }
-
-  return {
-    x: geometry.left,
-    y: geometry.bottom - ((geometry.bottom - geometry.top) * (perimeter - 3))
-  };
+export const resolveLegacyMenuPathTitleDiamondVertices = (
+  centerX: number,
+  centerY: number,
+  radius: number,
+  facing: number
+): LegacyMenuPathTitleDiamondVertices => {
+  const cos = Math.cos(facing);
+  const sin = Math.sin(facing);
+  return [
+    { x: centerX + (radius * cos), y: centerY + (radius * sin) },
+    { x: centerX - (radius * sin), y: centerY + (radius * cos) },
+    { x: centerX - (radius * cos), y: centerY - (radius * sin) },
+    { x: centerX + (radius * sin), y: centerY - (radius * cos) }
+  ];
 };
 
 // A general-purpose version of the title's letter-cell system, for the

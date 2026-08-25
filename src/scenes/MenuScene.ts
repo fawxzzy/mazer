@@ -133,7 +133,8 @@ import {
   resolveLegacyGlyphWordColumns,
   resolveLegacyGlyphWordLayout,
   resolveLegacyMenuPathTitleLayout,
-  resolveLegacyMenuPathTitleOrbitPoint,
+  resolveLegacyMenuPathTitleDiamondVertices,
+  resolveLegacyMenuPathTitleOrbitPose,
   resolveLegacyMenuTitleFontSize,
   resolveLegacyMenuTitlePresentation,
   type LegacyGlyphWordLayout,
@@ -326,8 +327,8 @@ import {
   resolveLegacyBleedOffDockVisualEligibility,
   resolveLegacyMenuBorderDockDirections,
   resolveLegacyMenuBorderDockFacetRect,
+  resolveLegacyMenuBorderDockRenderFrames,
   resolveLegacyMenuBorderDockRenderAreas,
-  resolveLegacyMenuPathRenderFrames,
   resolveLegacyPlayerLocatorRenderMetrics,
   resolveLegacyPlayerMarkerRenderMetrics,
   type LegacyMenuBorderDockDirection
@@ -5881,7 +5882,6 @@ export class MenuScene extends Phaser.Scene {
 
     const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, point);
     const materialTileSize = Math.max(1, Math.round(tileSize));
-    const frames = resolveLegacyMenuPathRenderFrames(pathSource, point, materialTileSize);
     const cornerGuardSize = Math.max(
       mazeLeft - boardLeft,
       Math.round(Math.min(boardWidth, boardHeight) * LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO)
@@ -5923,29 +5923,26 @@ export class MenuScene extends Phaser.Scene {
       }
     };
 
-    graphics.fillStyle(options.edgeColor, options.edgeAlpha);
     for (const direction of dockDirections) {
-      fillDockFrame(direction, frames.edge);
-    }
+      const dockFrames = resolveLegacyMenuBorderDockRenderFrames(direction, materialTileSize);
+      graphics.fillStyle(options.edgeColor, options.edgeAlpha);
+      fillDockFrame(direction, dockFrames.edge);
 
-    graphics.fillStyle(options.coreColor, options.coreAlpha);
-    for (const direction of dockDirections) {
-      fillDockFrame(direction, frames.core);
-    }
+      graphics.fillStyle(options.coreColor, options.coreAlpha);
+      fillDockFrame(direction, dockFrames.core);
 
-    // The flat-filled bands above give the continuation the right two-tone
-    // coloring, but nothing else about it read as a tile -- it was just a
-    // plain color bar. Giving its outward-facing edges the same soft-halo +
-    // crisp-line rim as every other corridor tile (drawLegacyPathTileFacet),
-    // connected only on the side that meets the board's real edge tile,
-    // makes it read as "one more tile poking past the border" instead.
-    for (const direction of dockDirections) {
+      // The flat-filled bands above give the continuation the right two-tone
+      // coloring, but nothing else about it read as a tile -- it was just a
+      // plain color bar. Giving its outward-facing edges the same soft-halo +
+      // crisp-line rim as every other corridor tile (drawLegacyPathTileFacet),
+      // connected only on the side that meets the board's real edge tile,
+      // makes it read as "one more tile poking past the border" instead.
       this.drawLegacyPathBorderDockFacet(
         graphics,
         direction,
         tileRect,
         materialTileSize,
-        frames.edge,
+        dockFrames.edge,
         boardLeft,
         boardTop,
         boardWidth,
@@ -6087,18 +6084,9 @@ export class MenuScene extends Phaser.Scene {
       }
 
       const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, point);
-      // Deliberately NOT resolveLegacyMenuPathRenderFrames here: that frame
-      // is connectivity-aware and stretches to merge with connected
-      // neighbor tiles (so ordinary corridor rendering reads as one
-      // continuous slab, not a grid of disconnected boxes) -- exactly the
-      // wrong shape for this glow, which needs the dock's OWN tile-sized
-      // footprint. Reusing the merged frame produced glow bands tens of
-      // tiles tall/wide on any bleed point whose tile also happens to
-      // connect to several interior neighbors, reading as a stray line
-      // shooting across the board instead of a glow on the dock itself.
-      const singleTileFrame = { height: materialTileSize, leftInset: 0, topInset: 0, width: materialTileSize };
       for (const direction of dockDirections) {
-        const dockAreas = resolveLegacyMenuBorderDockRenderAreas(direction, singleTileFrame, {
+        const dockFrame = resolveLegacyMenuBorderDockRenderFrames(direction, materialTileSize).edge;
+        const dockAreas = resolveLegacyMenuBorderDockRenderAreas(direction, dockFrame, {
           boardLeft,
           boardTop,
           boardWidth,
@@ -6628,19 +6616,12 @@ export class MenuScene extends Phaser.Scene {
     edgeAlpha: number,
     facing = -Math.PI / 2
   ): void {
-    // "facing" points the diamond's long axis (its top vertex) toward a
-    // direction of travel or, when frozen, toward the viewport center --
-    // rotate all 4 vertices around the center by that angle instead of the
-    // old fixed axis-aligned diamond.
-    const rotate = (dx: number, dy: number): { x: number; y: number } => {
-      const cos = Math.cos(facing + (Math.PI / 2));
-      const sin = Math.sin(facing + (Math.PI / 2));
-      return { x: centerX + (dx * cos) - (dy * sin), y: centerY + (dx * sin) + (dy * cos) };
-    };
-    const top = rotate(0, -radius);
-    const right = rotate(radius, 0);
-    const bottom = rotate(0, radius);
-    const left = rotate(-radius, 0);
+    const [top, right, bottom, left] = resolveLegacyMenuPathTitleDiamondVertices(
+      centerX,
+      centerY,
+      radius,
+      facing
+    );
 
     // A tiny crystal-facet tile (the same flat-fill-plus-rim material as
     // the maze corridor/title cells) rotated into a diamond, instead of a
@@ -6724,9 +6705,13 @@ export class MenuScene extends Phaser.Scene {
 
     for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
       const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
-      const { x, y } = resolveLegacyMenuPathTitleOrbitPoint(orbitGeometry, orbit);
       const travelReversed = this.menuStaticDrawLifecyclePhase === 'deconstructing';
-      const facing = this.resolveLegacyMenuPathTitleOrbitFacing(orbit, x, y, orbitGeometry, isLifecycleSpinActive, travelReversed);
+      const { facing, x, y } = resolveLegacyMenuPathTitleOrbitPose(
+        orbitGeometry,
+        orbit,
+        isLifecycleSpinActive,
+        travelReversed
+      );
 
       const wave = isLifecycleSpinActive
         ? 0.62 + (Math.sin((orbitPhase * Math.PI * 2) + (index * 1.38)) * 0.28)
@@ -6749,47 +6734,6 @@ export class MenuScene extends Phaser.Scene {
         facing
       );
     }
-  }
-
-  // Points each sigil in its direction of travel along the perimeter, but
-  // banks it inward toward the viewport center while it's rounding a
-  // corner (the perimeter is a sharp rectangle, not a rounded track, so
-  // this is what makes the turn read as a curve instead of a snap) --
-  // and while frozen (idle), every sigil just points straight at center.
-  // travelReversed flips the tangent 180 degrees for the counter-clockwise
-  // deconstruct spin, whose position still traces the same clockwise
-  // perimeter parametrization -- without this every sigil would face
-  // backward (its clockwise "forward") while actually travelling the
-  // other way.
-  private resolveLegacyMenuPathTitleOrbitFacing(
-    orbit: number,
-    x: number,
-    y: number,
-    geometry: LegacyMenuPathTitleOrbitGeometry,
-    isLifecycleSpinActive: boolean,
-    travelReversed: boolean
-  ): number {
-    const centerFacing = Math.atan2(geometry.centerY - y, geometry.centerX - x);
-    if (!isLifecycleSpinActive) {
-      return centerFacing;
-    }
-
-    const perimeter = (((orbit % 1) + 1) % 1) * 4;
-    const segment = Math.floor(perimeter) % 4;
-    const segmentTangents = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
-    const tangent = segmentTangents[segment] ?? 0;
-    const travelTangent = travelReversed ? tangent + Math.PI : tangent;
-    const withinSegment = perimeter - Math.floor(perimeter);
-    const distanceToCorner = Math.min(withinSegment, 1 - withinSegment);
-    const cornerWindow = 0.15;
-    const cornerProximity = clamp(1 - (distanceToCorner / cornerWindow), 0, 1);
-    const lerpAngleShortest = (from: number, to: number, t: number): number => {
-      const twoPi = Math.PI * 2;
-      const diff = (((to - from) % twoPi) + (twoPi * 1.5)) % twoPi - Math.PI;
-      return from + (diff * t);
-    };
-
-    return lerpAngleShortest(travelTangent, centerFacing, cornerProximity * 0.55);
   }
 
   // One continuous loop: fill (0..1), hold, revert (0..1), hold. Fill and
@@ -7075,7 +7019,7 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private resolveLegacyPlayerTransferOrbitOrigins(): Array<{ x: number; y: number }> {
+  private resolveLegacyPlayerTransferOrbitPoses(): ReturnType<typeof resolveLegacyMenuPathTitleOrbitPose>[] {
     const inset = 2;
     const orbitGeometry: LegacyMenuPathTitleOrbitGeometry = {
       bottom: this.layout.height - inset,
@@ -7089,7 +7033,7 @@ export class MenuScene extends Phaser.Scene {
       top: inset
     };
     return Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, (_, index) => (
-      resolveLegacyMenuPathTitleOrbitPoint(orbitGeometry, index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)
+      resolveLegacyMenuPathTitleOrbitPose(orbitGeometry, index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)
     ));
   }
 
@@ -7102,7 +7046,7 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
-    const origins = this.resolveLegacyPlayerTransferOrbitOrigins();
+    const origins = this.resolveLegacyPlayerTransferOrbitPoses();
     if (state.phase === 'outbound') {
       origins.forEach((origin, index) => {
         const stagger = (index / Math.max(1, origins.length - 1)) * 0.12;
@@ -7133,15 +7077,15 @@ export class MenuScene extends Phaser.Scene {
       this.playerSpawnBurstGraphics.fillStyle(LEGACY_PLAYER_SPAWN_BEAM_COLOR, alpha * 0.12);
       this.playerSpawnBurstGraphics.fillCircle(origin.x, origin.y, pulseRadius + 4);
       this.playerSpawnBurstGraphics.lineStyle(1.4, LEGACY_PLAYER_SPAWN_BEAM_COLOR, alpha * 0.76);
-      this.strokeLegacyPolyline(this.playerSpawnBurstGraphics, [
-        { x: origin.x, y: origin.y - pulseRadius },
-        { x: origin.x + pulseRadius, y: origin.y },
-        { x: origin.x, y: origin.y + pulseRadius },
-        { x: origin.x - pulseRadius, y: origin.y },
-        { x: origin.x, y: origin.y - pulseRadius }
-      ]);
+      const diamondVertices = resolveLegacyMenuPathTitleDiamondVertices(
+        origin.x,
+        origin.y,
+        pulseRadius,
+        origin.facing
+      );
+      this.strokeLegacyPolyline(this.playerSpawnBurstGraphics, [...diamondVertices, diamondVertices[0]]);
       for (let particle = 0; particle < 3; particle += 1) {
-        const angle = baseAngle + (particle * ((Math.PI * 2) / 3)) + (index * 0.31);
+        const angle = origin.facing + baseAngle + (particle * ((Math.PI * 2) / 3));
         const radius = 2.2 + (particle * 1.35);
         this.playerSpawnBurstGraphics.fillStyle(LEGACY_PLAYER_SPAWN_BEAM_COLOR, alpha * (0.9 - (particle * 0.18)));
         this.playerSpawnBurstGraphics.fillCircle(
@@ -7667,7 +7611,7 @@ export class MenuScene extends Phaser.Scene {
     targetY: number,
     state: ReturnType<typeof this.resolveLegacyPlayerSpawnBurstState>
   ): void {
-    const origins = this.resolveLegacyPlayerTransferOrbitOrigins();
+    const origins = this.resolveLegacyPlayerTransferOrbitPoses();
     // +-0.06 spread across the 8 origins so the beams arrive within a short
     // window of each other instead of a single flat instant -- reads as a
     // converging volley instead of a rigid, mechanical snap.

@@ -3,7 +3,9 @@ import {
   LEGACY_MENU_PATH_TITLE_CELLS,
   LEGACY_MENU_PATH_TITLE_COLUMNS,
   LEGACY_MENU_PATH_TITLE_GRID,
+  resolveLegacyMenuPathTitleDiamondVertices,
   resolveLegacyMenuPathTitleLayout,
+  resolveLegacyMenuPathTitleOrbitPose,
   resolveLegacyMenuTitleFontSize,
   resolveLegacyMenuTitlePresentation
 } from '../../src/legacy-runtime/legacyMenuTitle';
@@ -118,5 +120,82 @@ describe('legacy menu title presentation', () => {
     expect(layout.grid[0]?.[0]).toBe(true);
     expect(layout.grid[0]?.[1]).toBe(false);
     expect(layout.grid[6]?.[40]).toBe(true);
+  });
+
+  test('points all eight settled viewport-edge poses inward on phone and desktop geometry', () => {
+    for (const [width, height] of [[390, 844], [1440, 900]]) {
+      const geometry = {
+        bottom: height - 2,
+        centerX: width / 2,
+        centerY: height / 2,
+        crownBottom: height - 2,
+        crownHalf: 0,
+        crownTop: 2,
+        left: 2,
+        right: width - 2,
+        top: 2
+      };
+      const poses = Array.from({ length: 8 }, (_, index) => (
+        resolveLegacyMenuPathTitleOrbitPose(geometry, index / 8)
+      ));
+
+      expect(poses.map(({ x, y }) => [x, y])).toEqual([
+        [2, 2],
+        [width / 2, 2],
+        [width - 2, 2],
+        [width - 2, height / 2],
+        [width - 2, height - 2],
+        [width / 2, height - 2],
+        [2, height - 2],
+        [2, height / 2]
+      ]);
+
+      for (const pose of poses) {
+        const centerDx = geometry.centerX - pose.x;
+        const centerDy = geometry.centerY - pose.y;
+        const centerLength = Math.hypot(centerDx, centerDy);
+        const facingDot = ((Math.cos(pose.facing) * centerDx) + (Math.sin(pose.facing) * centerDy)) / centerLength;
+        expect(facingDot).toBeGreaterThanOrEqual(0.999999);
+      }
+    }
+  });
+
+  test('shares exact diamond vertices between ambient and transfer renderers', () => {
+    const centerX = 27;
+    const centerY = 41;
+    const radius = 7;
+    const facing = Math.atan2(19, 13);
+    const ambient = resolveLegacyMenuPathTitleDiamondVertices(centerX, centerY, radius, facing);
+    const transfer = resolveLegacyMenuPathTitleDiamondVertices(centerX, centerY, radius, facing);
+    const [leading] = ambient;
+    const leadingDx = leading.x - centerX;
+    const leadingDy = leading.y - centerY;
+
+    expect(transfer).toEqual(ambient);
+    expect(Math.hypot(leadingDx, leadingDy)).toBeCloseTo(radius, 12);
+    expect(leadingDx / radius).toBeCloseTo(Math.cos(facing), 12);
+    expect(leadingDy / radius).toBeCloseTo(Math.sin(facing), 12);
+  });
+
+  test('preserves clockwise, reversed, corner-bank, and settled orbit facing', () => {
+    const geometry = {
+      bottom: 98,
+      centerX: 50,
+      centerY: 50,
+      crownBottom: 98,
+      crownHalf: 0,
+      crownTop: 2,
+      left: 2,
+      right: 98,
+      top: 2
+    };
+
+    expect(resolveLegacyMenuPathTitleOrbitPose(geometry, 0.125, true, false).facing).toBeCloseTo(0, 12);
+    expect(resolveLegacyMenuPathTitleOrbitPose(geometry, 0.125, true, true).facing).toBeCloseTo(Math.PI, 12);
+    expect(resolveLegacyMenuPathTitleOrbitPose(geometry, 0.25, true, false).facing).toBeCloseTo(
+      (Math.PI / 2) + ((Math.PI / 4) * 0.55),
+      12
+    );
+    expect(resolveLegacyMenuPathTitleOrbitPose(geometry, 0).facing).toBeCloseTo(Math.PI / 4, 12);
   });
 });
