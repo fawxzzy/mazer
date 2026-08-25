@@ -378,25 +378,25 @@ describe('legacy reset lane', () => {
     }
   }, 20_000);
 
-  test('preserves immutable PR #284 fast-path maze outputs while reusing one typed search workspace', () => {
+  test('preserves corrected PR #284 fast-path maze outputs while reusing one typed search workspace', () => {
     const cases = [
       {
         build: createLegacyMaze,
-        expectedHash: '54a1d91597fe7cc5bb7c306a76355c626df4a04043a39ffbaff9c56e35893702',
+        expectedHash: '5991f3060be8e2da9bcf1972c2dafc4807baf4a39b6a5629a0516f2245c927ac',
         kind: 'play',
         scale: 25,
         seed: 13
       },
       {
         build: createLegacyGeneratedMenuMaze,
-        expectedHash: '051bc8b54a6922e30cfc118afc9a371038b4970e2b9cbed0f105e1ab205d883d',
+        expectedHash: '4140a1de9ea55d1bf818b758c56a86005a1639560b2ecfbd323e8d59aeccab9f',
         kind: 'menu',
         scale: 37,
         seed: 3
       },
       {
         build: createLegacyMaze,
-        expectedHash: '992a4310b3ffa390df39e859c4be08ab67562799cf516fac79375067c182dc1d',
+        expectedHash: '8851d6b3bb706659d2b5653d85cf517b154ee77a681c0075d19dbdd9e253bc0c',
         kind: 'play',
         scale: 50,
         seed: 52
@@ -578,7 +578,8 @@ describe('legacy reset lane', () => {
       wallArrayEntries: 0,
       uniqueWallCandidates: 0,
       created: 0,
-      exhaustedWallArray: false
+      exhaustedWallArray: false,
+      qualityReinforcementBudget: 0
     });
   });
 

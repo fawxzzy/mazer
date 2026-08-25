@@ -337,32 +337,32 @@ const resolveHighVolumeCorpusDimensions = (index: number): readonly [number, num
 };
 
 describe('legacy topology scale audit', () => {
-  test('reports PR #284 production-scale search work without changing immutable outputs', () => {
+  test('reports PR #284 production-scale search work for corrected immutable outputs', () => {
     const cases = [
       {
         build: createLegacyGeneratedMenuMaze,
-        expectedHash: '377ae8ea9f1cf7184f4c141687783083dad3f6d8f23fdef1c3f84d3cae985b53',
+        expectedHash: '8a9c6e1a78159a8b42d83c459c9a6fa35411e56ea173912419fa13aa61958ec6',
         kind: 'menu',
         scale: 63,
         seed: 233
       },
       {
         build: createLegacyMaze,
-        expectedHash: '418083e35edb8ae6cab263e6195fbd05cb862e5f4d6c148ac556c0501bbcb4b6',
+        expectedHash: '8e9ed8e886d2634c3100086a51e77f855987d7dc2cb6b9c9e9bcdad30999dbfb',
         kind: 'play',
         scale: 95,
         seed: 13
       },
       {
         build: createLegacyGeneratedMenuMaze,
-        expectedHash: '9820474d7c79862cae258402894646e928b7519160fd4d05f66bf2ecb2255656',
+        expectedHash: '54ddd22f8032f654f5d3edf40fe9ba9a0a0a223052fd576a24f3bcc91c6c1045',
         kind: 'menu',
         scale: 99,
         seed: 233
       },
       {
         build: createLegacyMaze,
-        expectedHash: 'ba20b018650bd5b0006d4da5ba5e180c250cd00b8743b0d0540bcce8fe1ed8c7',
+        expectedHash: '516d04797cabcb07cd8fb45d418c6482a69b837d5a330fe476b0e2bb6f60b91a',
         kind: 'play',
         scale: 149,
         seed: 233
@@ -445,6 +445,22 @@ describe('legacy topology scale audit', () => {
     }
   }, 20_000);
 
+  test('PR #284 spends the route-quality reinforcement budget only once across normalization passes', () => {
+    const generationProfile = resolveLegacyMazeGenerationProfileForProgression(36);
+    const maze = createLegacyMaze(37, 37, 5, undefined, generationProfile);
+
+    expect(generationProfile).toMatchObject({
+      routeQualityReinforcementMultiplier: 0.175,
+      shortcutCountMultiplier: 0.175
+    });
+    expect(maze.shortcutStats).toMatchObject({
+      requested: 1,
+      qualityReinforcementBudget: 1,
+      qualityReinforcementCreated: 1
+    });
+    expect(maze.shortcutsCreated).toBeLessThanOrEqual(2);
+  });
+
   test('keeps supplemental border feeders separated from every existing opening', () => {
     const reportedCases = [
       { scale: 39, seed: 1 },
@@ -509,12 +525,20 @@ describe('legacy topology scale audit', () => {
         ] as const) {
           const maze = buildMaze(scale, scale, seed);
           const routeQualityStats = maze.routeQualityStats;
+          const reinforcementBudget = maze.shortcutStats?.qualityReinforcementBudget ?? 0;
           const minimumSolutionPathLength = Math.floor(((maze.width + maze.height) / 2) * LEGACY_WRAPPED_ROUTE_MINIMUM_SCALE);
           const detachedFloorTiles = countDetachedFloorTiles(maze);
           const borderContinuity = auditBorderFloorContinuity(maze);
           const oppositeBorderAxes = auditOppositeBorderAxes(maze);
           const borderFeederSides = auditBorderFeederSides(maze);
           const openTwoByTwoFloorBlocks = countOpenTwoByTwoFloorBlocks(maze);
+
+          expect(maze.shortcutStats?.qualityReinforcementCreated ?? 0).toBeLessThanOrEqual(
+            reinforcementBudget
+          );
+          expect(maze.shortcutsCreated ?? 0).toBeLessThanOrEqual(
+            (maze.shortcutStats?.requested ?? 0) + reinforcementBudget
+          );
 
           if (
             detachedFloorTiles !== 0

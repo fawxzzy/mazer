@@ -152,6 +152,7 @@ export interface LegacyMazeSnapshot {
     uniqueWallCandidates: number;
     created: number;
     exhaustedWallArray: boolean;
+    qualityReinforcementBudget?: number;
     qualityReinforcementAttempts?: number;
     qualityReinforcementCreated?: number;
   };
@@ -2746,6 +2747,11 @@ export const createLegacyMaze = (
   const routeQualityReinforcementBudget = resolvedShortcutCount > 0
     ? Math.trunc(Math.max(8, resolvedShortcutCount * 3) * profile.routeQualityReinforcementMultiplier)
     : 0;
+  shortcutStats.qualityReinforcementBudget = routeQualityReinforcementBudget;
+  const resolveRemainingRouteQualityReinforcementBudget = (created: number): number => Math.max(
+    0,
+    routeQualityReinforcementBudget - created
+  );
   const reinforcementStats = reinforceLegacyRouteQuality(
     grid,
     rng,
@@ -2753,7 +2759,7 @@ export const createLegacyMaze = (
     goal,
     solutionPath,
     routeQualityStats,
-    routeQualityReinforcementBudget,
+    resolveRemainingRouteQualityReinforcementBudget(0),
     searchWorkspace
   );
   if (reinforcementStats.created > 0) {
@@ -2827,7 +2833,7 @@ export const createLegacyMaze = (
     goal,
     solutionPath,
     routeQualityStats,
-    routeQualityReinforcementBudget,
+    resolveRemainingRouteQualityReinforcementBudget(reinforcementStats.created),
     searchWorkspace
   );
   if (finalReinforcementStats.created > 0) {
