@@ -20,7 +20,7 @@ export interface LegacyMenuLayout {
   // 1 when the header row has room to spare; shrinks toward 0.78 as the
   // inline title has to shrink to keep fitting in that same row (see the
   // menuTitleFitsInHeader block) -- feed into resolveLegacyHeaderControlFrame's
-  // sizeScale so the settings cog, leaderboard, and username controls
+  // sizeScale so the settings cog, leaderboard, and profile controls
   // shrink by the same modest amount instead of only the title visibly
   // responding to a tight header.
   headerIconScale: number;
@@ -94,9 +94,6 @@ export interface LegacyMenuLayoutOptions {
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
-export const resolveLegacyMenuHeaderUsernameReserve = (width: number): number => (
-  Math.round(clamp(width * 0.2, 56, 100))
-);
 const LEGACY_MENU_SIDE_PANEL_WIDTH = 300;
 const LEGACY_DIAGNOSTIC_PANEL_WIDTH = 172;
 const LEGACY_DIAGNOSTIC_PANEL_HEIGHT = 407;
@@ -348,7 +345,7 @@ export const resolveLegacyMenuLayout = (
   // to keep it inline instead, and only drops to the fallback lane in the
   // genuinely-extreme case where even the minimum size wouldn't fit. The
   // header's OTHER controls (settings cog, leaderboard, the leading
-  // username/badge) shrink a little too as this happens -- see
+  // profile icon) shrink a little too as this happens -- see
   // headerIconScale below, threaded into resolveLegacyHeaderControlFrame's
   // sizeScale so every header control shares one squeeze factor instead of
   // the title alone visibly getting smaller while its neighbors don't.
@@ -365,13 +362,12 @@ export const resolveLegacyMenuLayout = (
   let menuTitleSqueezed = false;
   let headerIconScale = 1;
   if (!isPlaySurface && menuTopHudReserve > 0) {
-    // The header has four concrete neighbors: account text on the leading
-    // side, plus the leaderboard and settings actions on the trailing side.
+    // The header has three concrete neighbors: the profile icon on the
+    // leading side, plus leaderboard and settings on the trailing side.
     // Solve all of them from the same candidate scale as the title. The old
     // fit check measured only the settings slot while the scene rendered the
     // leaderboard inside that supposed title gap, then the scene rendered the
     // title from unrelated Start-button dimensions.
-    const leadingUsernameReserve = resolveLegacyMenuHeaderUsernameReserve(width);
     const inlineTitlePreferredFontSize = resolveLegacyMenuTitleFontSize(menuTopHudReserve);
     const inlineTitleMinFontSize = 13;
     const inlineTitlePadding = 8;
@@ -406,7 +402,7 @@ export const resolveLegacyMenuLayout = (
       const inlineTitleWidth = resolveLegacyMenuTitleFootprintWidth(candidateFontSize);
       const centeredTitleLeft = (width - inlineTitleWidth) / 2;
       const centeredTitleRight = (width + inlineTitleWidth) / 2;
-      const leadingOccupiedRight = leadingHeaderFrame.right + leadingUsernameReserve;
+      const leadingOccupiedRight = leadingHeaderFrame.right;
       if (
         centeredTitleLeft < leadingOccupiedRight + inlineTitlePadding
         || centeredTitleRight > trailingHeaderFrame.left - inlineTitlePadding

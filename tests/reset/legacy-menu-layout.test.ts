@@ -1,10 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { resolveTouchControlLayout } from '../../src/input-human';
 import { resolveLegacyHeaderControlFrame } from '../../src/legacy-runtime/legacyHeaderControl';
-import {
-  resolveLegacyMenuHeaderUsernameReserve,
-  resolveLegacyMenuLayout
-} from '../../src/legacy-runtime/legacyMenuLayout';
+import { resolveLegacyMenuLayout } from '../../src/legacy-runtime/legacyMenuLayout';
 import { LEGACY_UI_MIN_TOUCH_TARGET } from '../../src/legacy-runtime/legacyUiStandards';
 import {
   resolveLegacyMenuPathTitleLayout,
@@ -242,14 +239,13 @@ describe('legacy menu layout', () => {
       slot: 1,
       width: layout.width
     });
-    const accountReserve = resolveLegacyMenuHeaderUsernameReserve(layout.width);
     const expectedCenterX = layout.width / 2;
 
-    // The title stays on the actual screen center while the username and
+    // The title stays on the actual screen center while the profile icon and
     // controls adapt around it. The decorative orbit remains inside the HUD
     // and clear of both occupied regions.
     expect(orbitGeometry.centerX).toBe(expectedCenterX);
-    expect(orbitGeometry.left).toBeGreaterThanOrEqual(leadingFrame.right + accountReserve);
+    expect(orbitGeometry.left).toBeGreaterThanOrEqual(leadingFrame.right);
     expect(orbitGeometry.right).toBeLessThanOrEqual(trailingFrame.left);
     expect(orbitGeometry.top).toBeGreaterThanOrEqual(layout.lanes.hud?.top ?? 0);
     expect(orbitGeometry.bottom).toBeLessThanOrEqual(layout.lanes.hud?.bottom ?? 0);
@@ -432,7 +428,6 @@ describe('legacy menu layout', () => {
         slot: 1,
         width: layout.width
       });
-      const accountReserve = resolveLegacyMenuHeaderUsernameReserve(layout.width);
       const expectedCenterX = layout.width / 2;
       const presentation = resolveLegacyMenuTitlePresentation(layout.titleReserveHeight);
       const titleFootprintWidth = resolveLegacyMenuTitleFootprintWidth(presentation.fontSize);
@@ -442,17 +437,18 @@ describe('legacy menu layout', () => {
       // diagnostic panel above falls back to the banner lane).
       expect(layout.lanes.title).toBeNull();
       expect(layout.titleX).toBe(expectedCenterX);
-      expect(layout.titleX - (titleFootprintWidth / 2)).toBeGreaterThanOrEqual(leadingFrame.right + accountReserve);
+      expect(layout.titleX - (titleFootprintWidth / 2)).toBeGreaterThanOrEqual(leadingFrame.right);
       expect(layout.titleX + (titleFootprintWidth / 2)).toBeLessThanOrEqual(trailingFrame.left);
       expect(layout.titleY).toBe(Math.round(leadingFrame.centerY));
       expect(layout.titleReserveHeight).toBe(hudHeight);
     }
   });
 
-  test('shrinks the inline title toward the header squeeze floor instead of always dropping to the fallback lane, and never overlaps the leading username reserve when it does fall back', () => {
-    // The title, account label, leaderboard, and settings cog now solve as
-    // one compact header unit. Normal phone widths stay in one row by
-    // shrinking both the title and controls to their explicit safe floors.
+  test('keeps the inline title and profile icon in one uncluttered header row across phone widths', () => {
+    // The title, profile icon, leaderboard, and settings cog now solve as
+    // one compact header unit. Replacing the old variable-width username
+    // reserve with one fixed icon keeps the title on that row; the existing
+    // bounded squeeze remains available only where the viewport needs it.
     for (const viewport of [
       { width: 320, height: 568 },
       { width: 360, height: 780 },
@@ -462,24 +458,19 @@ describe('legacy menu layout', () => {
       expectTitlePlacedSafely(layout);
       expect(layout.lanes.title).toBeNull();
       expect(layout.headerIconScale).toBeGreaterThanOrEqual(0.78);
-      expect(layout.headerIconScale).toBeLessThan(1);
+      expect(layout.headerIconScale).toBeLessThanOrEqual(1);
     }
 
-    // Larger phones/small tablets (390-430px) have just enough room to stay
-    // inline, but only once the title shrinks a bit below its preferred
-    // size -- headerIconScale (fed into the settings cog/leaderboard/
-    // username icon sizing too) should reflect that same modest squeeze
-    // instead of staying at 1 the way it does for a genuinely roomy header
-    // (see the desktop-width test above, which stays fully unsqueezed).
+    // Larger phones/small tablets retain the same one-row contract.
     for (const viewport of [
       { width: 390, height: 844 },
       { width: 405, height: 958 },
       { width: 430, height: 932 }
     ]) {
-      const squeezedLayout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 49, 'menu');
-      expect(squeezedLayout.lanes.title).toBeNull();
-      expect(squeezedLayout.headerIconScale).toBeLessThan(1);
-      expect(squeezedLayout.headerIconScale).toBeGreaterThanOrEqual(0.78);
+      const layout = resolveLegacyMenuLayout(viewport.width, viewport.height, 50, 49, 49, 'menu');
+      expect(layout.lanes.title).toBeNull();
+      expect(layout.headerIconScale).toBeGreaterThanOrEqual(0.78);
+      expect(layout.headerIconScale).toBeLessThanOrEqual(1);
     }
   });
 
