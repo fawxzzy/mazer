@@ -290,6 +290,7 @@ import {
 import {
   hydrateLegacyRemoteAccountState,
   isLegacyRemoteCompletionContextCurrent,
+  readLegacyBootstrappedAccountState,
   readLegacyBootstrappedAuthSnapshot,
   writeLegacyRemoteCompletion,
   writeLegacyRemoteProgressionState,
@@ -495,11 +496,17 @@ interface MenuSceneVisualDiagnostics {
   };
   board: {
     bounds: VisualRect;
+    implicitZoomApplied: false;
     renderBounds: VisualRect;
     renderSafeInset: number;
     safeBounds: VisualRect;
     pathVisualStyle: LegacyPathVisualStyle;
     tileSize: number;
+    userBoardZoom: number;
+    visualScale: {
+      x: number;
+      y: number;
+    };
     cornerFacet: {
       alpha: number;
       animated: boolean;
@@ -1184,17 +1191,6 @@ const LEGACY_BLEED_DOCK_GROWTH_MS = 420;
 const LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS = 260;
 const LEGACY_PLAYER_SPAWN_FLASH_MS = 240;
 const LEGACY_PLAYER_SPAWN_BEAM_COLOR = 0x36ff7d;
-// Board content (see boardZoomContainer) scales between these two extremes
-// as the active maze's linear cell count moves between the reference
-// thresholds below -- small early mazes read as a genuine close-up instead
-// of a handful of oversized tiles politely filling the same box every other
-// level does.
-const LEGACY_BOARD_ZOOM_MAX_SCALE = 1.55;
-const LEGACY_BOARD_ZOOM_MIN_SCALE = 1;
-const LEGACY_BOARD_ZOOM_REFERENCE_MIN_CELLS = 9;
-const LEGACY_BOARD_ZOOM_REFERENCE_MAX_CELLS = 46;
-const LEGACY_BOARD_ZOOM_EASE_MS = 900;
-
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const smoothstep = (value: number): number => {
   const x = clamp(value, 0, 1);
@@ -1394,24 +1390,11 @@ export class MenuScene extends Phaser.Scene {
   private playFloatingStickOrigin: { x: number; y: number } | null = null;
   private playPointerStart: LegacyPlayPointerStart | null = null;
   private titleGraphics!: Phaser.GameObjects.Graphics;
-  // Every board-content Graphics layer (static tiles, path, dynamic
-  // trail/markers, title lettering) lives inside this container so the zoom
-  // feature (resolveLegacyBoardZoomTargetScale/updateLegacyBoardZoom) can
-  // scale just the board visually, centered on the board's own center point,
-  // without touching a single one of their existing absolute-layout-pixel
-  // draw calls or Phaser's real Camera (which would also remap touch input
-  // coordinates -- this project's touch handling is entirely custom math
-  // against layout pixels, independent of GameObject/camera transforms, so
-  // a container-only visual scale is the one approach that cannot desync
-  // taps from what's on screen). Everything NOT added to this container --
-  // HUD, header icons, overlays, the level announcer -- stays fixed exactly
-  // as before.
+  // Board layers share one untransformed container for stable draw ordering.
+  // User-controlled Board Zoom changes generation/layout through camScale;
+  // the container itself must remain at 1x so a fresh maze never applies an
+  // implicit zoom or desynchronizes visual and input coordinates.
   private boardZoomContainer!: Phaser.GameObjects.Container;
-  private boardZoomCurrentScale = 1;
-  private boardZoomTargetScale = 1;
-  private boardZoomEaseFromScale = 1;
-  private boardZoomEaseStartedAtMs: number | null = null;
-  private boardZoomMazeRef: LegacyMazeSnapshot | null = null;
   private levelAnnouncerNumberText!: Phaser.GameObjects.Text;
   private levelAnnouncerLabelText!: Phaser.GameObjects.Text;
   private levelAnnouncerWasVisible = false;
@@ -1613,6 +1596,7 @@ export class MenuScene extends Phaser.Scene {
     this.loadPersistedLegacyGameToggleSettings();
     this.loadPersistedMazeCycleTelemetryHistory();
     this.loadPersistedLegacyProgressionState();
+    this.applyBootstrappedLegacyAccountState();
     this.installLegacyReducedMotionPreference();
     void this.initializeLegacyAuth();
     this.initializeRuntimeDiagnostics();
@@ -2068,14 +2052,11 @@ export class MenuScene extends Phaser.Scene {
         this.hudDirty = true;
       }
     }
-    // The centered level announcer's fade and the board zoom's ease are both
-    // purely time-driven, same class of bug as the settings cog's blink
-    // above -- without this they'd freeze between whatever else happens to
-    // re-arm boardDynamicDirty instead of animating smoothly. Unlike the
-    // zoom ease (which nulls its own started-at timestamp mid-draw, so the
-    // very frame that reads it as active is guaranteed to still run and
-    // settle it), the announcer's alpha is a pure function of external
-    // phase state this code doesn't control the transition frame of -- the
+    // The centered level announcer is purely time-driven, same class of bug
+    // as the settings cog's blink above -- without this it would freeze
+    // between whatever else happens to re-arm boardDynamicDirty. Its alpha
+    // is a pure function of external phase state this code doesn't control
+    // the transition frame of -- the
     // read right here can already see 0 the instant phase flips away from
     // 'deconstructing', with no draw ever having run to actually hide the
     // text that was left visible. levelAnnouncerWasVisible carries the
@@ -2086,7 +2067,6 @@ export class MenuScene extends Phaser.Scene {
     if (
       levelAnnouncerActive
       || this.levelAnnouncerWasVisible
-      || this.boardZoomEaseStartedAtMs !== null
     ) {
       this.boardDynamicDirty = true;
     }
@@ -4877,6 +4857,13 @@ export class MenuScene extends Phaser.Scene {
 
     if (this.menuStaticDrawTilesVisible !== null && time >= this.menuStaticDrawNextTileAtMs) {
       if (this.menuStaticDrawLifecyclePhase === 'deconstructing') {
+        if (
+          this.playerTransferEnergyArmed
+          && this.playerTransferEnergyOutboundStartedAtMs === null
+          && this.menuStaticDrawTilesVisible <= this.resolveLegacyMenuStaticDrawTileBatchSize()
+        ) {
+          this.playerTransferEnergyOutboundStartedAtMs = time;
+        }
         this.menuStaticDrawTilesVisible = Math.max(
           0,
           this.menuStaticDrawTilesVisible - this.resolveLegacyMenuStaticDrawTileBatchSize()
@@ -4911,6 +4898,10 @@ export class MenuScene extends Phaser.Scene {
       this.boardPathDirty = true;
       this.boardDynamicDirty = true;
       if (this.menuStaticDrawTilesVisible >= this.menuStaticDrawTileOrder.length) {
+        this.playerSpawnBurstStartedAtMs ??= time;
+        if (this.playerTransferEnergyArmed && this.playerTransferEnergyDeliveryStartedAtMs === null) {
+          this.playerTransferEnergyDeliveryStartedAtMs = time;
+        }
         this.menuStaticDrawTilesVisible = null;
         this.menuStaticDrawNextTileAtMs = 0;
         this.settleLegacyMenuStaticDrawStageIfComplete(time);
@@ -6671,15 +6662,11 @@ export class MenuScene extends Phaser.Scene {
     return ((start + (shortestDelta * eased)) % 1 + 1) % 1;
   }
 
-  private drawLegacyMenuPathTitleOrbitSigils(
-    titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
-    time: number,
-    alphaScale: number
-  ): void {
-    // Only orbit while the maze is actively building or deconstructing --
-    // otherwise freeze at phase 0, which (with 8 evenly-spaced sigils)
-    // lands exactly on the 4 corners and 4 edge midpoints instead of
-    // drifting continuously while the board sits idle.
+  private resolveLegacyMenuPathTitleOrbitFrame(time: number): {
+    isLifecycleSpinActive: boolean;
+    orbitPhase: number;
+    travelReversed: boolean;
+  } {
     const isLifecycleSpinActive = this.menuStaticDrawLifecyclePhase === 'building'
       || this.menuStaticDrawLifecyclePhase === 'deconstructing';
     const orbitPhase = isLifecycleSpinActive
@@ -6689,6 +6676,23 @@ export class MenuScene extends Phaser.Scene {
       this.menuOrbitSettleStartedAtMs = null;
       this.menuOrbitLastActivePhase = orbitPhase;
     }
+    return {
+      isLifecycleSpinActive,
+      orbitPhase,
+      travelReversed: this.menuStaticDrawLifecyclePhase === 'deconstructing'
+    };
+  }
+
+  private drawLegacyMenuPathTitleOrbitSigils(
+    titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
+    time: number,
+    alphaScale: number
+  ): void {
+    // Only orbit while the maze is actively building or deconstructing --
+    // otherwise freeze at phase 0, which (with 8 evenly-spaced sigils)
+    // lands exactly on the 4 corners and 4 edge midpoints instead of
+    // drifting continuously while the board sits idle.
+    const { isLifecycleSpinActive, orbitPhase, travelReversed } = this.resolveLegacyMenuPathTitleOrbitFrame(time);
     // Orbits the viewport's own edge instead of hugging the title glyph --
     // same relocation the deconstruct handoff burst got earlier, just for
     // the title's sparkle sigils.
@@ -6707,7 +6711,6 @@ export class MenuScene extends Phaser.Scene {
 
     for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
       const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
-      const travelReversed = this.menuStaticDrawLifecyclePhase === 'deconstructing';
       const { facing, x, y } = resolveLegacyMenuPathTitleOrbitPose(
         orbitGeometry,
         orbit,
@@ -6986,9 +6989,9 @@ export class MenuScene extends Phaser.Scene {
     graphics.strokePath();
   }
 
-  private armLegacyPlayerTransferEnergy(time: number): void {
+  private armLegacyPlayerTransferEnergy(_time: number): void {
     this.playerTransferEnergyArmed = true;
-    this.playerTransferEnergyOutboundStartedAtMs = time;
+    this.playerTransferEnergyOutboundStartedAtMs = null;
     this.playerTransferEnergyDeliveryStartedAtMs = null;
     this.boardDynamicDirty = true;
   }
@@ -7021,7 +7024,7 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  private resolveLegacyPlayerTransferOrbitPoses(): ReturnType<typeof resolveLegacyMenuPathTitleOrbitPose>[] {
+  private resolveLegacyPlayerTransferOrbitPoses(time: number): ReturnType<typeof resolveLegacyMenuPathTitleOrbitPose>[] {
     const inset = 2;
     const orbitGeometry: LegacyMenuPathTitleOrbitGeometry = {
       bottom: this.layout.height - inset,
@@ -7034,21 +7037,28 @@ export class MenuScene extends Phaser.Scene {
       right: this.layout.width - inset,
       top: inset
     };
+    const { isLifecycleSpinActive, orbitPhase, travelReversed } = this.resolveLegacyMenuPathTitleOrbitFrame(time);
     return Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, (_, index) => (
-      resolveLegacyMenuPathTitleOrbitPose(orbitGeometry, index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)
+      resolveLegacyMenuPathTitleOrbitPose(
+        orbitGeometry,
+        (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1,
+        isLifecycleSpinActive,
+        travelReversed
+      )
     ));
   }
 
   private drawLegacyPlayerTransferEnergy(
     targetX: number,
     targetY: number,
-    state: LegacyPlayerTransferVisualState
+    state: LegacyPlayerTransferVisualState,
+    time: number
   ): void {
     if (!state.active) {
       return;
     }
 
-    const origins = this.resolveLegacyPlayerTransferOrbitPoses();
+    const origins = this.resolveLegacyPlayerTransferOrbitPoses(time);
     if (state.phase === 'outbound') {
       origins.forEach((origin, index) => {
         const stagger = (index / Math.max(1, origins.length - 1)) * 0.12;
@@ -7183,7 +7193,6 @@ export class MenuScene extends Phaser.Scene {
     );
     this.drawLegacyProgressionBadge();
     this.drawLegacyLevelAnnouncer(time);
-    this.updateLegacyBoardZoom(time);
 
     for (let index = 0; index < visibleTrail.length; index += 1) {
       const point = visibleTrail[index];
@@ -7308,7 +7317,7 @@ export class MenuScene extends Phaser.Scene {
     // stays timed with the real placement instead of some approximation of
     // it.
     if (markersBuiltIn && !this.playerSpawnBurstPreviousMarkersBuiltIn) {
-      this.playerSpawnBurstStartedAtMs = time;
+      this.playerSpawnBurstStartedAtMs ??= time;
       if (this.playerTransferEnergyArmed && this.playerTransferEnergyDeliveryStartedAtMs === null) {
         this.playerTransferEnergyDeliveryStartedAtMs = time;
       }
@@ -7388,7 +7397,7 @@ export class MenuScene extends Phaser.Scene {
       const boardRelativeY = mazeTop + ((transferPoint.y + 0.5) * mazeTileSize);
       const targetX = this.boardZoomContainer.x + (boardRelativeX * this.boardZoomContainer.scaleX);
       const targetY = this.boardZoomContainer.y + (boardRelativeY * this.boardZoomContainer.scaleY);
-      this.drawLegacyPlayerTransferEnergy(targetX, targetY, playerTransferEnergy);
+      this.drawLegacyPlayerTransferEnergy(targetX, targetY, playerTransferEnergy, time);
     }
 
     if (playerSpawnBurst.active && this.isLegacyMenuPointVisibleInStaticDraw(this.player)) {
@@ -7405,7 +7414,7 @@ export class MenuScene extends Phaser.Scene {
       const boardRelativeY = mazeTop + ((renderedPlayerPoint.y + 0.5) * mazeTileSize);
       const targetX = this.boardZoomContainer.x + (boardRelativeX * this.boardZoomContainer.scaleX);
       const targetY = this.boardZoomContainer.y + (boardRelativeY * this.boardZoomContainer.scaleY);
-      this.drawLegacyPlayerSpawnBurst(targetX, targetY, playerSpawnBurst);
+      this.drawLegacyPlayerSpawnBurst(targetX, targetY, playerSpawnBurst, time);
     }
 
     // Drawn last, after the trail/board content above -- the bleed-off dock
@@ -7611,9 +7620,10 @@ export class MenuScene extends Phaser.Scene {
   private drawLegacyPlayerSpawnBurst(
     targetX: number,
     targetY: number,
-    state: ReturnType<typeof this.resolveLegacyPlayerSpawnBurstState>
+    state: ReturnType<typeof this.resolveLegacyPlayerSpawnBurstState>,
+    time: number
   ): void {
-    const origins = this.resolveLegacyPlayerTransferOrbitPoses();
+    const origins = this.resolveLegacyPlayerTransferOrbitPoses(time);
     // +-0.06 spread across the 8 origins so the beams arrive within a short
     // window of each other instead of a single flat instant -- reads as a
     // converging volley instead of a rigid, mechanical snap.
@@ -7656,64 +7666,6 @@ export class MenuScene extends Phaser.Scene {
     this.playerSpawnBurstGraphics.strokeCircle(targetX, targetY, flashRadius);
     this.playerSpawnBurstGraphics.fillStyle(LEGACY_PLAYER_SPAWN_BEAM_COLOR, flashAlpha * 0.7);
     this.playerSpawnBurstGraphics.fillCircle(targetX, targetY, Math.max(1, 7 * (1 - state.flashProgress)));
-  }
-
-  // Small early mazes get a genuine close-up instead of a few oversized
-  // tiles filling the same box every level does; large ones settle back to
-  // the normal 1x board-fill scale already governed by the layout math
-  // elsewhere. Purely a function of the CURRENT maze's own cell counts, so
-  // it's naturally stable within a maze and only changes when this.maze
-  // itself does (detected by reference in updateLegacyBoardZoom).
-  private resolveLegacyBoardZoomTargetScale(): number {
-    const linearCells = Math.max(this.maze.width, this.maze.height);
-    const progress = clamp(
-      (linearCells - LEGACY_BOARD_ZOOM_REFERENCE_MIN_CELLS)
-        / (LEGACY_BOARD_ZOOM_REFERENCE_MAX_CELLS - LEGACY_BOARD_ZOOM_REFERENCE_MIN_CELLS),
-      0,
-      1
-    );
-    return LEGACY_BOARD_ZOOM_MAX_SCALE - (progress * (LEGACY_BOARD_ZOOM_MAX_SCALE - LEGACY_BOARD_ZOOM_MIN_SCALE));
-  }
-
-  // Applies boardZoomCurrentScale to boardZoomContainer, centered on the
-  // board's own center point instead of the container's local (0,0) origin
-  // -- every child Graphics object still draws with the exact same absolute
-  // layout-pixel coordinates it always has, so the container's position has
-  // to counter-shift by centerX/centerY*(1-scale) for that same point to
-  // stay visually put as scale changes instead of the whole board drifting
-  // toward the top-left corner. Re-arms a new ease (from the current,
-  // possibly mid-ease, scale) whenever this.maze changes -- comparing by
-  // reference, the same cheap-cache pattern resolveBleedOffDockVisualEligibility
-  // already uses -- rather than a maze-swap hook of its own, so this stays
-  // decoupled from exactly where/how generation swaps this.maze in.
-  private updateLegacyBoardZoom(time: number): void {
-    if (this.boardZoomMazeRef !== this.maze) {
-      this.boardZoomMazeRef = this.maze;
-      const nextTarget = this.resolveLegacyBoardZoomTargetScale();
-      if (nextTarget !== this.boardZoomTargetScale) {
-        this.boardZoomEaseFromScale = this.boardZoomCurrentScale;
-        this.boardZoomTargetScale = nextTarget;
-        this.boardZoomEaseStartedAtMs = time;
-      }
-    }
-
-    if (this.boardZoomEaseStartedAtMs === null) {
-      this.boardZoomCurrentScale = this.boardZoomTargetScale;
-    } else {
-      const easeProgress = clamp((time - this.boardZoomEaseStartedAtMs) / LEGACY_BOARD_ZOOM_EASE_MS, 0, 1);
-      const eased = easeProgress * easeProgress * (3 - (2 * easeProgress));
-      this.boardZoomCurrentScale = this.boardZoomEaseFromScale
-        + ((this.boardZoomTargetScale - this.boardZoomEaseFromScale) * eased);
-      if (easeProgress >= 1) {
-        this.boardZoomEaseStartedAtMs = null;
-      }
-    }
-
-    const scale = this.boardZoomCurrentScale;
-    const centerX = this.layout.width / 2;
-    const centerY = this.layout.height / 2;
-    this.boardZoomContainer.setScale(scale);
-    this.boardZoomContainer.setPosition(centerX * (1 - scale), centerY * (1 - scale));
   }
 
   private clearLegacyPlayerProgressionBadge(): void {
@@ -9724,11 +9676,10 @@ export class MenuScene extends Phaser.Scene {
     this.drawLegacyOverlayScrollFacade(scrollMetrics);
   }
 
-  // Fewer rows than the data module's own default page size -- that default
-  // is a reasonable general API page size, but this overlay has no scroll
-  // facade wired in, so it shows a small, non-scrolling page sized to
-  // actually fit a typical overlay panel instead.
-  private static readonly LEADERBOARD_VISIBLE_ROWS = 8;
+  // Product page size: exactly ten public users per page. Pagination uses
+  // this same value for fetch, render, Previous, and Next so no row is skipped
+  // or repeated between pages.
+  private static readonly LEADERBOARD_VISIBLE_ROWS = 10;
 
   // Rank-tier accent for the top three rows on the current page -- gold for
   // #1 (the same reward color the start marker uses), cyan for #2, mint for
@@ -13933,6 +13884,30 @@ export class MenuScene extends Phaser.Scene {
     this.progressionState = readLegacyProgressionState(this.resolveLegacyProgressionStorage());
   }
 
+  private applyBootstrappedLegacyAccountState(): void {
+    const bootstrapped = readLegacyBootstrappedAccountState();
+    if (
+      !bootstrapped
+      || bootstrapped.snapshot.status !== 'authenticated'
+      || bootstrapped.snapshot.userId === null
+      || bootstrapped.snapshot.userId !== this.authSnapshot.userId
+    ) {
+      return;
+    }
+
+    if (bootstrapped.progressionState) {
+      this.progressionState = writeLegacyProgressionState(
+        this.resolveLegacyProgressionStorage(),
+        bootstrapped.progressionState
+      );
+    }
+    if (bootstrapped.settings) {
+      this.settings = bootstrapped.settings;
+      this.optionFieldDrafts = createLegacyOptionFieldDrafts(bootstrapped.settings);
+    }
+    this.latestRemoteSyncResult = bootstrapped.remoteSyncResult;
+  }
+
   private resolveLegacyGameToggleStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
     return createLegacyAuthScopedStorage(
       this.resolveBrowserLocalStorage(),
@@ -14844,11 +14819,17 @@ export class MenuScene extends Phaser.Scene {
       },
       board: {
         bounds: boardBounds,
+        implicitZoomApplied: false,
         renderBounds: mazeRenderBounds,
         renderSafeInset: mazeRenderFrame.safeInset,
         safeBounds,
         pathVisualStyle: this.pathVisualStyle,
         tileSize: mazeRenderFrame.tileSize,
+        userBoardZoom: this.settings.camScale,
+        visualScale: {
+          x: this.boardZoomContainer.scaleX,
+          y: this.boardZoomContainer.scaleY
+        },
         cornerFacet: {
           alpha: 0,
           animated: false,

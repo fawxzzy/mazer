@@ -1009,13 +1009,14 @@ export const saveLegacyAccountUsername = async (
     return { error: LEGACY_AUTH_MESSAGE_COPY.loginNotConfigured, ok: false };
   }
 
-  // Payload only carries user_id/username, so this upsert only ever
-  // touches those two columns on conflict -- it can't clobber the
-  // revision-guarded settings sync in legacyRemoteProgression.ts, which
-  // writes disjoint columns on the same row.
-  const { error } = await client
-    .from('mazer_profiles')
-    .upsert({ user_id: userId, username }, { onConflict: 'user_id' });
+  // Direct authenticated writes to mazer_profiles are intentionally revoked.
+  // Route the rename through the auth-bound definer so it can update only the
+  // caller's row, preserve every unrelated profile field, and let the unique
+  // index remain the final collision authority.
+  const { error } = await client.rpc('mazer_set_username', {
+    p_expected_user_id: userId,
+    p_username: username
+  });
 
   if (error) {
     if (error.code === '23505') {

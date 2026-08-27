@@ -43,14 +43,23 @@ describe('legacy player transfer visual state', () => {
     }
   });
 
-  test('holds a bounded green-energy envelope while rebuild is between clocks', () => {
+  test('waits invisibly until the final deconstruct step starts the outbound beam', () => {
     const state = resolve({ outboundElapsedMs: null, nowMs: 600 });
+
+    expect(state.phase).toBe('pending');
+    expect(state.active).toBe(false);
+    expect(state.outboundProgress).toBe(0);
+    expect(state.energyAlpha).toBe(0);
+    expect(state.swirlPhase).toBe(0.5);
+  });
+
+  test('holds a bounded green-energy envelope after outbound travel completes', () => {
+    const state = resolve({ outboundElapsedMs: LEGACY_PLAYER_TRANSFER_OUTBOUND_MS, nowMs: 600 });
 
     expect(state.phase).toBe('stored');
     expect(state.active).toBe(true);
     expect(state.outboundProgress).toBe(1);
-    expect(state.energyAlpha).toBeCloseTo(0.9);
-    expect(state.swirlPhase).toBe(0.5);
+    expect(state.energyAlpha).toBeCloseTo(0.88);
   });
 
   test('disperses stored energy monotonically while the existing spawn volley travels', () => {
@@ -85,7 +94,7 @@ describe('legacy player transfer visual state', () => {
       nowMs: Number.NaN,
       outboundElapsedMs: Number.NEGATIVE_INFINITY
     });
-    expect(malformed).toMatchObject({ active: true, phase: 'stored', swirlPhase: 0 });
+    expect(malformed).toMatchObject({ active: false, phase: 'pending', swirlPhase: 0 });
 
     const reduced = resolve({
       nowMs: 875,

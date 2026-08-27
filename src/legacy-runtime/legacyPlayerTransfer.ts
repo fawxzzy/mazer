@@ -1,4 +1,4 @@
-export type LegacyPlayerTransferPhase = 'idle' | 'outbound' | 'stored' | 'delivering' | 'complete';
+export type LegacyPlayerTransferPhase = 'idle' | 'pending' | 'outbound' | 'stored' | 'delivering' | 'complete';
 
 export interface LegacyPlayerTransferVisualState {
   active: boolean;
@@ -92,11 +92,11 @@ export const resolveLegacyPlayerTransferVisualState = (
   const outboundElapsedMs = normalizeElapsedMs(input.outboundElapsedMs);
   if (outboundElapsedMs === null) {
     return {
-      active: true,
+      active: false,
       deliveryProgress: 0,
-      energyAlpha: 0.9,
-      outboundProgress: 1,
-      phase: 'stored',
+      energyAlpha: 0,
+      outboundProgress: 0,
+      phase: 'pending',
       swirlPhase
     };
   }
