@@ -9,18 +9,18 @@ Master consolidation target:
 - project ref: `bxtcuhkotumitoqtrcej`
 - schema: `mazer`
 - materialized tables: `mazer_profiles`, `mazer_progression_states`, `mazer_ai_progression_states`, and `mazer_cycle_receipts`
-- 2026-08-24 pre-cutover aggregate: `5` profiles, `7` player rows, `7` AI rows, and `1,290` receipts
-- current limitation: this is an older partial snapshot, not current application-data truth; its last observed Mazer write predates current legacy writes
-- access posture: forced RLS, 11 authenticated client privileges, 11 owner-only RLS policies, and authenticated schema usage are present; custom-schema Data API exposure must be re-certified before cutover
+- 2026-08-27 production aggregate: `13` profiles, `17` player rows, `17` AI rows, and `1,888` receipts
+- production status: R017 cutover and observation are terminal; the deployed browser bundle targets this project and resolves its data client to schema `mazer`
+- access posture: forced RLS, authenticated owner-only table access, bounded RPCs, and custom-schema Data API exposure are production-proven
 
 Legacy source/rollback project:
 
 - project name: `Mazer`
 - project ref: `geknvnrmktchljnyddwp`
 - 2026-08-24 aggregate: `9` profiles, `13` player rows, `13` AI rows, and `1,865` receipts
-- retirement status: held; it is not safe to delete
+- retirement status: retained as the exact rollback source; it is not safe to mutate or delete
 
-The master table/RLS foundation exists, but source parity, identity mapping, Data API exposure, runtime RPCs, signup hook activation, and final delta reconciliation are not yet complete. Production still uses the legacy project. The legacy project remains current rollback and source-data truth until a frozen, classified, monotonic master reconciliation passes. Stripe/license tables remain deferred.
+The master cutover is complete. Source parity, identity mapping, Data API exposure, runtime RPCs, signup authority, final-delta reconciliation, production observation, and exact legacy restoration are settled R017 evidence. The master project is current application-data truth; the legacy project remains rollback evidence only. Stripe/license tables remain deferred.
 
 Three generated additive migrations define the master-side source contract in dependency order:
 
@@ -46,7 +46,7 @@ Deferred Stripe/payment-wall tables:
 
 - `anon` receives no direct table access. It receives only the bounded public leaderboard-page function after runtime-contract activation.
 - `authenticated` has 11 scoped table privileges guarded by 11 owner-only RLS policies and one schema-usage grant.
-- The intended Data API exposure is the `mazer` schema with owner-RLS tables and the bounded RPC surface. Current exposure must be re-certified from browser-safe keys before production cutover.
+- The production Data API exposure is the `mazer` schema with owner-RLS tables and the bounded RPC surface. Re-certify it before any future project or credential cutover.
 - Authenticated users can read or write only their own profile, progression, AI progression, and cycle receipts within those grants and policies.
 - Future authenticated users can only read their own license account and entitlement rows after the Stripe lane is unlocked.
 - Future license account, entitlement, and webhook-event writes are server-only through `service_role`.
@@ -75,7 +75,7 @@ It also hydrates authenticated account state before Phaser creates the first maz
 - `revision` on progression and profile rows is a monotonic optimistic-concurrency guard. Normal advancement can rebase forward once after a conflict; destructive replacement/reset refuses to overwrite a newer revision.
 - A scoped local sync envelope records the last observed revision and local fingerprints so offline/local advancement can be reconciled without resurrecting a previously accepted reset.
 
-The app remains playable local-first if Supabase is unavailable or remote progression is disabled. This source binding itself did not change environment values, enable the feature flag, grant client access, expose the schema, deploy, or cut over the application; bounded access and the Data API postimage remain incomplete and must be freshly re-certified through a separate governed provider wave before cutover.
+The app remains playable local-first if Supabase is unavailable or remote progression is disabled. Production currently binds to master project `bxtcuhkotumitoqtrcej` and schema `mazer`; future environment or project changes still require fresh browser-safe binding, RLS, and Data API proof.
 
 In the legacy source project, live migration `account_state_revisions` was applied on 2026-07-16. Readback confirmed the existing three progression rows were preserved at revision `0`; the profile table remained empty until an authenticated client seeds its first settings row. This remains source-contract evidence for the consolidated runtime behavior.
 
