@@ -5,6 +5,10 @@ const migration = readFileSync(
   new URL('../../supabase/migrations/20260827170000_mazer_progression_ordinal_closure.sql', import.meta.url),
   'utf8'
 ).replace(/\r\n/g, '\n');
+const pg17Verifier = readFileSync(
+  new URL('../../scripts/analysis/verify-progression-ordinal-closure-pg17.ps1', import.meta.url),
+  'utf8'
+).replace(/\r\n/g, '\n');
 
 const closeOrdinals = (level: string, completedCycles: string) => {
   const currentLevel = BigInt(level);
@@ -53,5 +57,14 @@ describe('Mazer progression ordinal closure', () => {
     expect(migration).toContain("r.surface = 'play'");
     expect(migration).toContain('select max(r.completed_at)');
     expect(migration).toContain('when closure.canonical_level > s.player_level then closure.canonical_level_reached_at');
+  });
+
+  test('makes the PostgreSQL fixture prove cluster identity before any SQL mutation', () => {
+    expect(pg17Verifier).toContain('[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)');
+    expect(pg17Verifier).toContain("'show data_directory'");
+    expect(pg17Verifier).toContain("throw 'PG_CLUSTER_IDENTITY_MISMATCH'");
+    expect(pg17Verifier.indexOf("'show data_directory'")).toBeLessThan(pg17Verifier.indexOf('Invoke-PsqlFile $setup'));
+    expect(pg17Verifier).toContain("$ErrorActionPreference = 'Continue'");
+    expect(pg17Verifier).toContain('if ($server -and -not $server.HasExited)');
   });
 });

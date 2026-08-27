@@ -14,8 +14,16 @@ $setup = Join-Path $root 'setup.sql'
 $verify = Join-Path $root 'verify.sql'
 $rollback = Join-Path $root 'rollback.sql'
 $migration = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')) 'supabase\migrations\20260827170000_mazer_progression_ordinal_closure.sql'
-$port = 55481
+$portLease = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+try {
+  $portLease.Start()
+  $port = ([Net.IPEndPoint] $portLease.LocalEndpoint).Port
+}
+finally {
+  $portLease.Stop()
+}
 $started = $false
+$server = $null
 
 $setupSql = @'
 create schema mazer;
@@ -157,11 +165,27 @@ end;
 $rollback$;
 '@
 
-function Invoke-PsqlFile([string] $path) {
-  $output = & (Join-Path $pg 'psql.exe') -X -v ON_ERROR_STOP=1 -h 127.0.0.1 -p $port -U postgres -d postgres -f $path 2>&1
-  if ($LASTEXITCODE -ne 0) {
-    throw "PSQL_FAILED:$([IO.Path]::GetFileName($path)):$($output -join ' ')"
+function Invoke-Psql([string[]] $arguments, [string] $label) {
+  # Windows PowerShell 5.1 wraps native stderr (including successful psql
+  # NOTICE output) as non-terminating ErrorRecord objects. Capture it under a
+  # local Continue policy and decide solely from the native exit code.
+  $previousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $output = @(& (Join-Path $pg 'psql.exe') @arguments 2>&1)
+    $exitCode = $LASTEXITCODE
   }
+  finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
+  if ($exitCode -ne 0) {
+    throw "PSQL_FAILED:${label}:$($output -join ' ')"
+  }
+  return @($output | ForEach-Object { [string] $_ })
+}
+
+function Invoke-PsqlFile([string] $path) {
+  $null = Invoke-Psql @('-X', '-v', 'ON_ERROR_STOP=1', '-h', '127.0.0.1', '-p', [string] $port, '-U', 'postgres', '-d', 'postgres', '-f', $path) ([IO.Path]::GetFileName($path))
 }
 
 try {
@@ -175,12 +199,19 @@ try {
 
   $server = Start-Process -FilePath (Join-Path $pg 'postgres.exe') -ArgumentList "-D `"$data`" -h 127.0.0.1 -p $port" -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $root 'postgres.log') -RedirectStandardError (Join-Path $root 'postgres-error.log')
   for ($attempt = 0; $attempt -lt 100; $attempt += 1) {
+    if ($server.HasExited) { break }
     & (Join-Path $pg 'pg_isready.exe') -h 127.0.0.1 -p $port -d postgres | Out-Null
     if ($LASTEXITCODE -eq 0) { $started = $true; break }
-    if ($server.HasExited) { break }
     Start-Sleep -Milliseconds 100
   }
   if (-not $started) { throw 'PG_START_FAILED' }
+
+  # An ephemeral port minimizes collisions; this identity readback makes a
+  # residual bind race fail closed before any fixture SQL can mutate a server.
+  $reportedData = (Invoke-Psql @('-X', '-A', '-t', '-h', '127.0.0.1', '-p', [string] $port, '-U', 'postgres', '-d', 'postgres', '-c', 'show data_directory') 'DATA_DIRECTORY_READBACK' | Select-Object -Last 1).Trim()
+  if ([IO.Path]::GetFullPath($reportedData) -ne [IO.Path]::GetFullPath($data)) {
+    throw 'PG_CLUSTER_IDENTITY_MISMATCH'
+  }
 
   Invoke-PsqlFile $setup
   Invoke-PsqlFile $migration
@@ -200,8 +231,11 @@ try {
   } | ConvertTo-Json -Compress
 }
 finally {
-  if ($started) {
+  if ($server -and -not $server.HasExited) {
     & (Join-Path $pg 'pg_ctl.exe') -D $data -m immediate -w stop | Out-Null
+    if ($LASTEXITCODE -ne 0 -and -not $server.HasExited) {
+      Stop-Process -Id $server.Id
+    }
   }
   if (Test-Path -LiteralPath $root) {
     $resolvedRoot = [IO.Path]::GetFullPath($root)

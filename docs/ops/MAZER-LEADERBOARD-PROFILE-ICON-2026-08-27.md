@@ -37,8 +37,8 @@ The menu miss is separate and source-local: the front-door account control still
 
 ## Verification and release gates
 
-1. Focused UI/layout, leaderboard, remote-progression, migration, and capture-contract tests: `133/133` passed.
-2. PostgreSQL 17 apply/rollback fixture: monotonic closure, JSON projection, sibling JSON preservation, validated constraint, and exact rollback passed with zero provider calls/live writes.
+1. Focused UI/layout, leaderboard, remote-progression, migration, and capture-contract tests: `134/134` passed.
+2. PostgreSQL 17 apply/rollback fixture passed under PowerShell 7 and Windows PowerShell 5.1: unique-cluster identity, monotonic closure, JSON projection, sibling JSON preservation, validated constraint, and exact rollback all passed with zero provider calls/live writes.
 3. Canonical `npm run verify`: `759/759` runnable tests passed (`1` explicitly skipped), followed by the production build (`main-BHhIrHDh.js`).
 4. Desktop and phone built-app menu captures passed with zero browser page errors; the inner-only profile glyph occupies the leading title row and opens the existing Account surface.
 5. Exact live aggregate preflight before the protected database repair; private preimage retained for exact rollback.
