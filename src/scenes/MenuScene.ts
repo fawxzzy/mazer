@@ -63,6 +63,7 @@ import {
   createLegacyResetRequest,
   hasPendingLegacyResetRequest,
   resolveLegacyPlayLifecycleSnapshot,
+  resolveLegacyStaticDrawBuildRemainingMs,
   resolveLegacyStaticDrawPlayTimerStartAtMs,
   shouldFreezeLegacyPlayElapsedForStaticDraw,
   shouldSettleLegacyStaticDrawStage,
@@ -1061,7 +1062,6 @@ const LEGACY_PATH_CONNECTOR_SEAM_CORE_ALPHA_RATIO = 0.94;
 const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = cyberArcadeMaterial.rail.mint;
 const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = cyberArcadeMaterial.rail.cyan;
 const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;
-const LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO = 0.066;
 const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MIN = 4;
 const LEGACY_BOARD_MAZE_SAFE_INSET_MAX = 7;
@@ -1184,10 +1184,9 @@ const LEGACY_LEVEL_ANNOUNCER_PULSE_MIN_SCALE = 0.94;
 // isn't there yet.
 const LEGACY_BLEED_DOCK_GROWTH_MS = 420;
 // The four corner sigils fire a beam toward wherever the player marker is
-// about to appear, exactly on the frame it does (see
-// playerSpawnBurstPreviousMarkersBuiltIn) -- a short travel span for the
-// beams to reach the tile, then a brief impact flash the marker itself
-// pops in under.
+// about to appear once the final generation stage settles -- a short travel
+// span for the beams to reach the tile, then a brief impact flash the marker
+// itself pops in under.
 const LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS = 260;
 const LEGACY_PLAYER_SPAWN_FLASH_MS = 240;
 const LEGACY_PLAYER_SPAWN_BEAM_COLOR = 0x36ff7d;
@@ -1400,7 +1399,6 @@ export class MenuScene extends Phaser.Scene {
   private levelAnnouncerWasVisible = false;
   private levelAnnouncerBuildFadeOutArmed = false;
   private playerSpawnBurstStartedAtMs: number | null = null;
-  private playerSpawnBurstPreviousMarkersBuiltIn = false;
   private playerTransferEnergyArmed = false;
   private playerTransferEnergyOutboundStartedAtMs: number | null = null;
   private playerTransferEnergyDeliveryStartedAtMs: number | null = null;
@@ -4339,7 +4337,9 @@ export class MenuScene extends Phaser.Scene {
   private rebuildMaze(nextDemoMoveAtMs = 0): void {
     const mode = this.mode;
     const seedOverride = mode === 'play'
-      ? this.createFreshLegacyPlayGenerationSeed()
+      ? this.explicitRuntimeMazeSeed
+        ? this.mazeSeed
+        : this.createFreshLegacyPlayGenerationSeed()
       : undefined;
     const generationScale = this.resolveLegacyProgressionScaleForMode(mode);
     this.applyGenerationRequest(
@@ -4707,6 +4707,11 @@ export class MenuScene extends Phaser.Scene {
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     if (drawStage?.executionKind === 'row-slice') {
       const buildPrerollStartedAtMs = this.time.now - 1;
+      // Each completed build owns one fresh inbound volley. Leaving the old
+      // timestamp in place makes every maze after the first inherit an
+      // already-expired burst, so no lasers are visible at the real final
+      // construction step.
+      this.playerSpawnBurstStartedAtMs = null;
       this.menuStaticDrawLifecyclePhase = 'building';
       this.menuStaticDeconstructStartedAtMs = null;
       this.menuStaticDeconstructZeroHoldStartedAtMs = null;
@@ -4797,6 +4802,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private settleLegacyMenuStaticDrawStageIfComplete(time: number): void {
+    const settlingFromBuild = this.menuStaticDrawLifecyclePhase === 'building';
     const settledPlayStartedAtMs = resolveLegacyStaticDrawPlayTimerStartAtMs({
       currentStartedAtMs: this.playStartedAtMs,
       drawPhase: this.menuStaticDrawLifecyclePhase,
@@ -4815,6 +4821,12 @@ export class MenuScene extends Phaser.Scene {
 
     this.playStartedAtMs = settledPlayStartedAtMs;
     this.menuStaticDrawLifecyclePhase = 'settled';
+    if (settlingFromBuild) {
+      // Normal frames arm during the last travel window below. This fallback
+      // handles a throttled/skipped frame by placing convergence on this exact
+      // final generation boundary instead of firing the beam after the maze.
+      this.armLegacyPlayerArrivalForFinalBuildStep(time, 0);
+    }
     this.menuStaticDeconstructStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
     this.menuStaticBuildPhaseStartedAtMs = null;
@@ -4839,6 +4851,23 @@ export class MenuScene extends Phaser.Scene {
 
     const drawStage = this.resolveLegacyMenuStaticDrawStage();
     const batchSize = Math.max(1, drawStage?.batchSize ?? 1);
+    const buildRemainingMs = resolveLegacyStaticDrawBuildRemainingMs({
+      drawPhase: this.menuStaticDrawLifecyclePhase,
+      mazeHeight: this.maze.height,
+      nextRowAtMs: this.menuStaticDrawNextRowAtMs,
+      nextTileAtMs: this.menuStaticDrawNextTileAtMs,
+      nowMs: time,
+      rowBatchSize: batchSize,
+      rowStepMs: LEGACY_MENU_STATIC_DRAW_ROW_STEP_MS,
+      rowsVisible: this.menuStaticDrawRowsVisible,
+      tileBatchSize: this.resolveLegacyMenuStaticDrawTileBatchSize(),
+      tileCount: this.menuStaticDrawTileOrder.length,
+      tileStepMs: LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS,
+      tilesVisible: this.menuStaticDrawTilesVisible
+    });
+    if (buildRemainingMs !== null && buildRemainingMs <= LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS) {
+      this.armLegacyPlayerArrivalForFinalBuildStep(time, buildRemainingMs);
+    }
     if (
       this.menuStaticDrawLifecyclePhase === 'building'
       && this.menuStaticDrawRowsVisible !== null
@@ -4898,10 +4927,6 @@ export class MenuScene extends Phaser.Scene {
       this.boardPathDirty = true;
       this.boardDynamicDirty = true;
       if (this.menuStaticDrawTilesVisible >= this.menuStaticDrawTileOrder.length) {
-        this.playerSpawnBurstStartedAtMs ??= time;
-        if (this.playerTransferEnergyArmed && this.playerTransferEnergyDeliveryStartedAtMs === null) {
-          this.playerTransferEnergyDeliveryStartedAtMs = time;
-        }
         this.menuStaticDrawTilesVisible = null;
         this.menuStaticDrawNextTileAtMs = 0;
         this.settleLegacyMenuStaticDrawStageIfComplete(time);
@@ -4909,9 +4934,23 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
+  private armLegacyPlayerArrivalForFinalBuildStep(time: number, buildRemainingMs: number): void {
+    const alignedStartedAtMs = time - Math.max(
+      0,
+      LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS - Math.max(0, buildRemainingMs)
+    );
+    this.playerSpawnBurstStartedAtMs ??= alignedStartedAtMs;
+    if (this.playerTransferEnergyArmed) {
+      this.playerTransferEnergyDeliveryStartedAtMs ??= alignedStartedAtMs;
+    }
+  }
+
   private enterMenuMode(): void {
     this.resetLegacyPlayInputBuffer();
     this.resetLegacyPlayerTransferEnergy();
+    // A delayed request owns the mode it was created for. If it survives a
+    // mode switch, update() can later consume it and overwrite the new surface.
+    this.pendingGenerationRequest = null;
     // Guest play is an active, local-only session—not a durable account
     // state. Returning to the menu ends that session so a later launch/menu
     // view always returns to the login boundary instead of presenting an
@@ -4948,6 +4987,9 @@ export class MenuScene extends Phaser.Scene {
     }
     this.resetLegacyPlayInputBuffer();
     this.resetLegacyPlayerTransferEnergy();
+    // Cancel any delayed menu-demo rebuild before installing the immediate
+    // play request. This is the Start -> loading -> menu race.
+    this.pendingGenerationRequest = null;
     this.mode = 'play';
     this.pendingOverlayMazeRebuild = false;
     this.pendingResetRequest = null;
@@ -5875,10 +5917,6 @@ export class MenuScene extends Phaser.Scene {
 
     const tileRect = this.resolveLegacyPixelTileRect(mazeLeft, mazeTop, tileSize, point);
     const materialTileSize = Math.max(1, Math.round(tileSize));
-    const cornerGuardSize = Math.max(
-      mazeLeft - boardLeft,
-      Math.round(Math.min(boardWidth, boardHeight) * LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO)
-    );
     const fillDockFrame = (
       direction: LegacyMenuBorderDockDirection,
       frame: { height: number; leftInset: number; topInset: number; width: number }
@@ -5888,7 +5926,6 @@ export class MenuScene extends Phaser.Scene {
         boardTop,
         boardWidth,
         boardHeight,
-        cornerGuardSize,
         continuationLength: this.resolveLegacyPathBorderDockContinuation(
           direction,
           boardLeft,
@@ -6049,10 +6086,6 @@ export class MenuScene extends Phaser.Scene {
     }
 
     const materialTileSize = Math.max(1, Math.round(tileSize));
-    const cornerGuardSize = Math.max(
-      mazeLeft - boardLeft,
-      Math.round(Math.min(boardWidth, boardHeight) * LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO)
-    );
     const width = this.maze.width;
     const height = this.maze.height;
     // Bleed-off tiles only ever sit on the grid's own perimeter (see
@@ -6084,7 +6117,6 @@ export class MenuScene extends Phaser.Scene {
           boardTop,
           boardWidth,
           boardHeight,
-          cornerGuardSize,
           continuationLength: this.resolveLegacyPathBorderDockContinuation(
             direction,
             boardLeft,
@@ -6683,6 +6715,27 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
+  private resolveLegacyMenuPathTitleOrbitGeometry(
+    titleLayout = resolveLegacyMenuPathTitleLayout(
+      this.layout.titleX,
+      this.layout.titleY,
+      this.resolveLegacyMenuPathTitleFontSize()
+    )
+  ): LegacyMenuPathTitleOrbitGeometry {
+    const inset = 2;
+    return {
+      bottom: this.layout.height - inset,
+      centerX: this.layout.width / 2,
+      centerY: this.layout.height / 2,
+      crownBottom: this.layout.height - inset,
+      crownHalf: titleLayout.cellSize * 0.56,
+      crownTop: inset,
+      left: inset,
+      right: this.layout.width - inset,
+      top: inset
+    };
+  }
+
   private drawLegacyMenuPathTitleOrbitSigils(
     titleLayout: ReturnType<typeof resolveLegacyMenuPathTitleLayout>,
     time: number,
@@ -6696,18 +6749,7 @@ export class MenuScene extends Phaser.Scene {
     // Orbits the viewport's own edge instead of hugging the title glyph --
     // same relocation the deconstruct handoff burst got earlier, just for
     // the title's sparkle sigils.
-    const inset = 2;
-    const orbitGeometry: LegacyMenuPathTitleOrbitGeometry = {
-      bottom: this.layout.height - inset,
-      centerX: this.layout.width / 2,
-      centerY: this.layout.height / 2,
-      crownBottom: this.layout.height - inset,
-      crownHalf: titleLayout.cellSize * 0.56,
-      crownTop: inset,
-      left: inset,
-      right: this.layout.width - inset,
-      top: inset
-    };
+    const orbitGeometry = this.resolveLegacyMenuPathTitleOrbitGeometry(titleLayout);
 
     for (let index = 0; index < LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS; index += 1) {
       const orbit = (orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1;
@@ -7025,18 +7067,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private resolveLegacyPlayerTransferOrbitPoses(time: number): ReturnType<typeof resolveLegacyMenuPathTitleOrbitPose>[] {
-    const inset = 2;
-    const orbitGeometry: LegacyMenuPathTitleOrbitGeometry = {
-      bottom: this.layout.height - inset,
-      centerX: this.layout.width / 2,
-      centerY: this.layout.height / 2,
-      crownBottom: this.layout.height - inset,
-      crownHalf: 0,
-      crownTop: inset,
-      left: inset,
-      right: this.layout.width - inset,
-      top: inset
-    };
+    const orbitGeometry = this.resolveLegacyMenuPathTitleOrbitGeometry();
     const { isLifecycleSpinActive, orbitPhase, travelReversed } = this.resolveLegacyMenuPathTitleOrbitFrame(time);
     return Array.from({ length: LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS }, (_, index) => (
       resolveLegacyMenuPathTitleOrbitPose(
@@ -7311,18 +7342,6 @@ export class MenuScene extends Phaser.Scene {
     // also all clears at once on deconstruct (see markerDeconstructAlpha
     // above).
     const markersBuiltIn = this.menuStaticDrawLifecyclePhase !== 'building';
-    // The exact frame markersBuiltIn flips false->true is the one moment
-    // the player marker actually appears (both surfaces gate on it above,
-    // menu and play alike) -- arm the spawn burst right on that edge so it
-    // stays timed with the real placement instead of some approximation of
-    // it.
-    if (markersBuiltIn && !this.playerSpawnBurstPreviousMarkersBuiltIn) {
-      this.playerSpawnBurstStartedAtMs ??= time;
-      if (this.playerTransferEnergyArmed && this.playerTransferEnergyDeliveryStartedAtMs === null) {
-        this.playerTransferEnergyDeliveryStartedAtMs = time;
-      }
-    }
-    this.playerSpawnBurstPreviousMarkersBuiltIn = markersBuiltIn;
     const playerSpawnBurst = this.resolveLegacyPlayerSpawnBurstState(time);
     const playerTransferEnergy = this.resolveLegacyPlayerTransferState(time);
     // Drawn after the trail (not before) so the start/goal tiles always sit
@@ -7371,11 +7390,22 @@ export class MenuScene extends Phaser.Scene {
     // marker itself pops in exactly as the beams converge (under the
     // flash, see drawLegacyPlayerSpawnBurst below), instead of sitting
     // there fully visible the whole time the beams are still arriving.
-    const playerAlpha = markerDeconstructAlpha * playerSpawnBurst.markerRevealAlpha;
+    const transferPlayerAlpha = playerTransferEnergy.phase === 'pending'
+      ? 1
+      : playerTransferEnergy.phase === 'outbound'
+        ? 1 - playerTransferEnergy.outboundProgress
+        : 0;
+    const playerAlpha = this.menuStaticDrawLifecyclePhase === 'deconstructing' && this.playerTransferEnergyArmed
+      ? transferPlayerAlpha
+      : markerDeconstructAlpha * playerSpawnBurst.markerRevealAlpha;
     if (this.mode === 'menu') {
       if (
         markersBuiltIn
-        && this.menuStaticDrawLifecyclePhase !== 'deconstructing'
+        && (
+          this.menuStaticDrawLifecyclePhase !== 'deconstructing'
+          || playerTransferEnergy.phase === 'pending'
+          || playerTransferEnergy.phase === 'outbound'
+        )
         && this.isLegacyMenuPointVisibleInStaticDraw(this.player)
       ) {
         this.fillLegacyPlayerMarkerTile(renderedPlayerPoint, mazeLeft, mazeTop, mazeTileSize, 0.94 * playerAlpha, false, progressionPalette, time);
@@ -12951,13 +12981,20 @@ export class MenuScene extends Phaser.Scene {
       sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
+    const hitSize = Math.max(36, pauseRect.width, pauseRect.height);
+    const hitBounds = createVisualRect(
+      pauseRect.centerX - (hitSize / 2),
+      pauseRect.centerY - (hitSize / 2),
+      hitSize,
+      hitSize
+    );
     this.menuSettingsCogActive = false;
 
     const background = this.add.rectangle(
       pauseRect.centerX,
       pauseRect.centerY,
-      pauseRect.width,
-      pauseRect.height,
+      hitSize,
+      hitSize,
       0x000000,
       0.001
     );
@@ -12984,7 +13021,7 @@ export class MenuScene extends Phaser.Scene {
 
     return {
       background,
-      bounds: createVisualRect(pauseRect.left, pauseRect.top, pauseRect.width, pauseRect.height),
+      bounds: hitBounds,
       iconOnly: true,
       label,
       semanticAction: 'Settings',
@@ -13008,9 +13045,16 @@ export class MenuScene extends Phaser.Scene {
       slot: 1,
       width: this.layout.width
     });
+    const hitSize = Math.max(36, rect.width, rect.height);
+    const hitBounds = createVisualRect(
+      rect.centerX - (hitSize / 2),
+      rect.centerY - (hitSize / 2),
+      hitSize,
+      hitSize
+    );
     this.menuLeaderboardActive = false;
 
-    const background = this.add.rectangle(rect.centerX, rect.centerY, rect.width, rect.height, 0x000000, 0.001);
+    const background = this.add.rectangle(rect.centerX, rect.centerY, hitSize, hitSize, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     background.setDepth(3);
     const label = this.add.text(rect.centerX, rect.centerY, '', {
@@ -13030,7 +13074,7 @@ export class MenuScene extends Phaser.Scene {
 
     return {
       background,
-      bounds: createVisualRect(rect.left, rect.top, rect.width, rect.height),
+      bounds: hitBounds,
       iconOnly: true,
       label,
       semanticAction: 'Leaderboard',
@@ -13060,7 +13104,14 @@ export class MenuScene extends Phaser.Scene {
       sizeScale: this.layout.headerIconScale,
       width: this.layout.width
     });
-    const background = this.add.rectangle(frame.centerX, frame.centerY, frame.width, frame.height, 0x000000, 0.001);
+    const hitSize = Math.max(36, frame.width, frame.height);
+    const hitBounds = createVisualRect(
+      frame.centerX - (hitSize / 2),
+      frame.centerY - (hitSize / 2),
+      hitSize,
+      hitSize
+    );
+    const background = this.add.rectangle(frame.centerX, frame.centerY, hitSize, hitSize, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     background.setDepth(3);
     this.menuProfileActive = false;
@@ -13080,7 +13131,7 @@ export class MenuScene extends Phaser.Scene {
 
     return {
       background,
-      bounds: createVisualRect(frame.left, frame.top, frame.width, frame.height),
+      bounds: hitBounds,
       iconOnly: true,
       label,
       semanticAction: 'Account',

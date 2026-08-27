@@ -8,6 +8,7 @@ import {
   resolveLegacyPlayLifecycleSnapshot,
   resolveLegacyResetEntryContract,
   resolveLegacyResetAction,
+  resolveLegacyStaticDrawBuildRemainingMs,
   resolveLegacyStaticDrawPlayTimerStartAtMs,
   shouldConsumeLegacyResetRequest,
   shouldFreezeLegacyPlayElapsedForStaticDraw,
@@ -238,6 +239,34 @@ describe('legacy play lifecycle', () => {
       rowsVisible: null,
       tilesVisible: null
     })).toBe(false);
+  });
+
+  test('times final-step effects against whichever build counter finishes last', () => {
+    const base = {
+      drawPhase: 'building' as const,
+      mazeHeight: 20,
+      nextRowAtMs: 1000,
+      nextTileAtMs: 1000,
+      nowMs: 1000,
+      rowBatchSize: 1,
+      rowStepMs: 64,
+      rowsVisible: 17,
+      tileBatchSize: 5,
+      tileCount: 100,
+      tileStepMs: 44,
+      tilesVisible: 80
+    };
+
+    expect(resolveLegacyStaticDrawBuildRemainingMs(base)).toBe(132);
+    expect(resolveLegacyStaticDrawBuildRemainingMs({
+      ...base,
+      rowsVisible: null,
+      tilesVisible: 70
+    })).toBe(220);
+    expect(resolveLegacyStaticDrawBuildRemainingMs({
+      ...base,
+      drawPhase: 'settled'
+    })).toBeNull();
   });
 
   test('rebinds the play timer only at order-independent dual-stage settlement', () => {

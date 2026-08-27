@@ -36,14 +36,14 @@ describe('Mazer account username and progression repair', () => {
     expect(saveSource).not.toContain('.upsert(');
   });
 
-  test('uses the completion RPC client-run invariant without requiring nullable recipe metadata', () => {
+  test('treats every conserved play receipt as historical completion evidence', () => {
     expect(migration).toContain("r.surface = 'play'");
-    expect(migration).toContain('r.client_run_id is not null');
+    expect(migration).not.toContain('r.client_run_id is not null');
     expect(migration).not.toContain('r.ruleset_id is not null');
     expect(migration).not.toContain('r.recipe_version is not null');
     expect(migration).not.toContain('r.recipe_hash is not null');
-    expect(migration).toContain('legacy-v1 correctly');
-    expect(migration).toContain('endless-v1 currently');
+    expect(migration).toContain('Historical receipts legitimately predate');
+    expect(migration).toContain('nullable idempotency metadata');
     expect(migration).toContain('where not exists (');
   });
 
@@ -66,6 +66,8 @@ describe('Mazer account username and progression repair', () => {
     expect(pg17Verifier.indexOf("'show data_directory'")).toBeLessThan(pg17Verifier.indexOf('Invoke-PsqlFile $migrationPath'));
     expect(pg17Verifier).toContain("'legacy-v1', null, null");
     expect(pg17Verifier).toContain("'endless-v1', 1, null");
+    expect(pg17Verifier).toContain("raise exception 'PRE_IDEMPOTENCY_RECEIPT_ACCOUNT_WAS_MUTATED'");
+    expect(pg17Verifier).toContain("raise exception 'ZERO_RECEIPT_BASELINE_REPAIR_FAILED'");
     expect(pg17Verifier).toContain("raise exception 'LEGACY_V1_ACCEPTED_RECEIPT_ACCOUNT_WAS_MUTATED'");
     expect(pg17Verifier).toContain("raise exception 'ENDLESS_V1_ACCEPTED_RECEIPT_ACCOUNT_WAS_MUTATED'");
     expect(pg17Verifier).toContain("raise exception 'RECEIPT_CONSERVATION_FAILED'");
@@ -73,6 +75,9 @@ describe('Mazer account username and progression repair', () => {
     expect(pg17Verifier).toContain("raise exception 'USERNAME_COLLISION_WAS_ACCEPTED'");
     expect(pg17Verifier).toContain("raise exception 'INVALID_USERNAME_WAS_ACCEPTED'");
     expect(pg17Verifier).toContain("raise exception 'USERNAME_RENAME_FAILED'");
+    expect(pg17Verifier).toContain("raise exception 'R020_LOCAL_POSTIMAGE_FAILED'");
+    expect(pg17Verifier).toContain("raise exception 'R020_LOCAL_EXACT_ROLLBACK_FAILED'");
+    expect(pg17Verifier).toContain('MAZER_R020_PROGRESSION_RESTORE_APPLY_ROLLBACK_PASS');
     expect(pg17Verifier).toContain("raise exception 'EXACT_ROLLBACK_FAILED'");
     expect(pg17Verifier).toContain('drop function mazer.mazer_set_username(uuid, text)');
     expect(pg17Verifier).toContain("raise exception 'FUNCTION_ROLLBACK_FAILED'");

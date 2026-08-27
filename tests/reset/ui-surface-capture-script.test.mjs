@@ -311,13 +311,23 @@ describe('UI surface capture script contract', () => {
       .replace(/\r\n/g, '\n');
     const transitionSource = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-ui-transitions.mjs'), 'utf8')
       .replace(/\r\n/g, '\n');
+    const startTransitionStressSource = readFileSync(
+      resolve(process.cwd(), 'scripts/analysis/verify-start-transition-stability.mjs'),
+      'utf8'
+    ).replace(/\r\n/g, '\n');
     const packageJson = JSON.parse(readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'));
 
     expect(packageJson.scripts['visual:ui-surfaces']).toBe('node ./scripts/analysis/capture-ui-surfaces.mjs');
     expect(packageJson.scripts['visual:cyber-arcade-matrix']).toBe('node ./scripts/analysis/capture-cyber-arcade-matrix.mjs');
     expect(packageJson.scripts['visual:cyber-arcade-compare']).toBe('node ./scripts/analysis/build-cyber-arcade-comparison.mjs');
     expect(packageJson.scripts['visual:ui-transitions']).toBe('node ./scripts/analysis/capture-ui-transitions.mjs');
+    expect(packageJson.scripts['runtime:start-transition:stress'])
+      .toBe('node ./scripts/analysis/verify-start-transition-stability.mjs');
     expect(transitionSource).toContain('skipTopologyDiagnostics: true');
+    expect(startTransitionStressSource).toContain("diagnostics?.generation?.pendingRequest?.mode === 'menu'");
+    expect(startTransitionStressSource).toContain("issues.push('returned-to-menu-after-start')");
+    expect(startTransitionStressSource).toContain("issues.push('stale-menu-request-survived-start')");
+    expect(startTransitionStressSource).toContain("schema: 'mazer.start-transition-stability.v1'");
     expect(source).toContain("const RUNTIME_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-runtime-diagnostics';");
     expect(source).toContain("const WRAP_TOPOLOGY_PROGRESSION_STORAGE_KEY = 'mazer.progression.v1:user:runtime-diagnostics-auth-fixture';");
     expect(source).toContain("const VISUAL_DIAGNOSTICS_ATTRIBUTE = 'data-mazer-visual-diagnostics';");

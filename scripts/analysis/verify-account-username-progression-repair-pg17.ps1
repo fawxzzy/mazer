@@ -12,6 +12,7 @@ $fixtureRoot = Join-Path ([IO.Path]::GetTempPath()) ($fixturePrefix + [guid]::Ne
 $dataPath = Join-Path $fixtureRoot 'data'
 $setupPath = Join-Path $fixtureRoot 'setup.sql'
 $verifyPath = Join-Path $fixtureRoot 'verify.sql'
+$r020Path = Join-Path $fixtureRoot 'r020.sql'
 $rollbackPath = Join-Path $fixtureRoot 'rollback.sql'
 $migrationPath = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')) 'supabase\migrations\20260827190000_mazer_account_username_and_progression_repair.sql'
 $portLease = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
@@ -95,13 +96,13 @@ insert into mazer.mazer_progression_states(
 ) values
   (
     '00000000-0000-0000-0000-000000000001',
-    '{"root":"keep","tracks":{"player":{"level":"110","completedCycles":"109","targetComplexity":26,"rank":"E","struggleCycles":9007199254740991,"cleanCycles":0,"lastReceiptId":null,"lastCompletedAt":null},"ai-runner":{"level":"39","completedCycles":"108","keep":true}}}',
+    '{"root":"keep","tracks":{"player":{"level":"110","completedCycles":"109","struggleCycles":9007199254740991,"cleanCycles":0,"lastReceiptId":null,"lastCompletedAt":null},"ai-runner":{"level":"39","completedCycles":"108","keep":true}}}',
     110, 'E', 26, 109, 1050, '2026-08-23T00:00:00Z', '2026-08-23T00:00:00Z', '2026-08-27T00:00:00Z'
   ),
   (
     '00000000-0000-0000-0000-000000000002',
-    '{"tracks":{"player":{"level":"1","completedCycles":"0","targetComplexity":8,"rank":"E","struggleCycles":0},"ai-runner":{"keep":true}}}',
-    1, 'E', 8, 0, 2, null, '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z'
+    '{"tracks":{"player":{"level":"5","completedCycles":"4","targetComplexity":24,"rank":"D","struggleCycles":0},"ai-runner":{"keep":true}}}',
+    5, 'D', 24, 4, 2, null, '2026-08-01T00:00:00Z', '2026-08-01T00:00:00Z'
   ),
   (
     '00000000-0000-0000-0000-000000000003',
@@ -131,6 +132,21 @@ begin
   if not exists (
     select 1 from mazer.mazer_progression_states
     where user_id = '00000000-0000-0000-0000-000000000001'
+      and player_level = 110
+      and player_completed_cycles = 109
+      and player_target_complexity = 26
+      and state #>> '{tracks,player,level}' = '110'
+      and state #>> '{tracks,player,completedCycles}' = '109'
+      and state #>> '{tracks,player,struggleCycles}' = '9007199254740991'
+      and state #>> '{tracks,ai-runner,keep}' = 'true'
+      and state ->> 'root' = 'keep'
+  ) then
+    raise exception 'PRE_IDEMPOTENCY_RECEIPT_ACCOUNT_WAS_MUTATED';
+  end if;
+
+  if not exists (
+    select 1 from mazer.mazer_progression_states
+    where user_id = '00000000-0000-0000-0000-000000000002'
       and player_level = 1
       and player_completed_cycles = 0
       and player_target_complexity = 8
@@ -139,9 +155,8 @@ begin
       and state #>> '{tracks,player,completedCycles}' = '0'
       and state #>> '{tracks,player,struggleCycles}' = '9007199254740991'
       and state #>> '{tracks,ai-runner,keep}' = 'true'
-      and state ->> 'root' = 'keep'
   ) then
-    raise exception 'LEGACY_BASELINE_REPAIR_FAILED';
+    raise exception 'ZERO_RECEIPT_BASELINE_REPAIR_FAILED';
   end if;
 
   if not exists (
@@ -228,6 +243,179 @@ end;
 $verify$;
 '@
 
+$r020Sql = @'
+-- Reproduce the R019 failure shape, restore the exact retained values with the
+-- R020 algorithm, and then prove an exact targeted rollback. This is entirely
+-- inside the disposable local PostgreSQL 17 cluster.
+create table fixture_r020_restore_input as
+select *
+from fixture_progression_preimage
+where user_id in (
+  '00000000-0000-0000-0000-000000000001',
+  '00000000-0000-0000-0000-000000000003',
+  '00000000-0000-0000-0000-000000000004'
+);
+
+update mazer.mazer_progression_states s
+set
+  player_level = 1,
+  player_rank = 'E',
+  player_target_complexity = 8,
+  player_completed_cycles = 0,
+  revision = s.revision + 1,
+  state = jsonb_set(
+    jsonb_set(
+      s.state,
+      '{tracks,player}',
+      coalesce(s.state #> '{tracks,player}', '{}'::jsonb)
+        || jsonb_build_object(
+          'level', '1',
+          'completedCycles', '0',
+          'rank', 'E',
+          'targetComplexity', 8,
+          'struggleCycles', 9007199254740991
+        ),
+      true
+    ),
+    '{playerProgressionBaselineVersion}',
+    '5'::jsonb,
+    true
+  ),
+  last_completed_cycle_at = null,
+  level_reached_at = null,
+  updated_at = clock_timestamp()
+from fixture_r020_restore_input i
+where s.user_id = i.user_id;
+
+create table fixture_r020_apply_preimage as
+select s.*
+from mazer.mazer_progression_states s
+join fixture_r020_restore_input i using (user_id);
+
+create temp table r020_counts_before as
+select
+  (select count(*) from mazer.mazer_progression_states) as progression_rows,
+  (select count(*) from mazer.mazer_profiles) as profile_rows,
+  (select count(*) from mazer.mazer_cycle_receipts) as receipt_rows;
+
+with restored as (
+  update mazer.mazer_progression_states s
+  set
+    player_level = i.player_level,
+    player_rank = i.player_rank,
+    player_target_complexity = i.player_target_complexity,
+    player_completed_cycles = i.player_completed_cycles,
+    revision = s.revision + 1,
+    state = jsonb_set(
+      jsonb_set(
+        case when jsonb_typeof(s.state) = 'object' then s.state else '{}'::jsonb end,
+        '{tracks,player}',
+        coalesce(s.state #> '{tracks,player}', '{}'::jsonb)
+          || coalesce(i.state #> '{tracks,player}', '{}'::jsonb)
+          || jsonb_build_object(
+            'level', i.player_level::text,
+            'completedCycles', i.player_completed_cycles::text,
+            'rank', i.player_rank,
+            'targetComplexity', i.player_target_complexity,
+            'peakComplexity', greatest(
+              coalesce((s.state #>> '{tracks,player,peakComplexity}')::integer, 8),
+              coalesce((i.state #>> '{tracks,player,peakComplexity}')::integer, 8),
+              i.player_target_complexity
+            ),
+            'colorTier', coalesce(
+              (i.state #>> '{tracks,player,colorTier}')::integer,
+              floor(((i.player_target_complexity - 8) / 4.0) / 5.0)::integer
+            ),
+            'lastCompletedAt', case
+              when i.last_completed_cycle_at is null then null
+              else to_jsonb(i.last_completed_cycle_at::text)
+            end,
+            'struggleCycles', coalesce(
+              (i.state #>> '{tracks,player,struggleCycles}')::bigint,
+              (s.state #>> '{tracks,player,struggleCycles}')::bigint,
+              9007199254740991
+            )
+          ),
+        true
+      ),
+      '{playerProgressionBaselineVersion}',
+      '5'::jsonb,
+      true
+    ),
+    last_completed_cycle_at = i.last_completed_cycle_at,
+    level_reached_at = i.level_reached_at,
+    updated_at = clock_timestamp()
+  from fixture_r020_restore_input i
+  where s.user_id = i.user_id
+  returning s.user_id
+)
+select count(*) as restored_rows into temporary table r020_result from restored;
+
+do $r020$
+begin
+  if (select restored_rows from r020_result) <> 3
+    or exists (
+      select 1
+      from mazer.mazer_progression_states s
+      join fixture_r020_restore_input i using (user_id)
+      where s.player_level <> i.player_level
+        or s.player_rank <> i.player_rank
+        or s.player_target_complexity <> i.player_target_complexity
+        or s.player_completed_cycles <> i.player_completed_cycles
+        or s.revision <> i.revision + 2
+        or s.state #>> '{tracks,player,level}' <> i.player_level::text
+        or s.state #>> '{tracks,player,completedCycles}' <> i.player_completed_cycles::text
+        or s.state #>> '{tracks,player,rank}' <> i.player_rank
+        or s.state #>> '{tracks,player,targetComplexity}' <> i.player_target_complexity::text
+        or s.state #>> '{tracks,player,struggleCycles}' <> '9007199254740991'
+        or s.state #>> '{tracks,ai-runner,keep}' <> 'true'
+    )
+    or (select progression_rows from r020_counts_before) <> (select count(*) from mazer.mazer_progression_states)
+    or (select profile_rows from r020_counts_before) <> (select count(*) from mazer.mazer_profiles)
+    or (select receipt_rows from r020_counts_before) <> (select count(*) from mazer.mazer_cycle_receipts)
+  then
+    raise exception 'R020_LOCAL_POSTIMAGE_FAILED';
+  end if;
+end;
+$r020$;
+
+-- Exact targeted rollback from the action-time preimage. This intentionally
+-- restores the reset state, proving that the bounded live repair is reversible.
+update mazer.mazer_progression_states s
+set
+  state = p.state,
+  player_level = p.player_level,
+  player_rank = p.player_rank,
+  player_target_complexity = p.player_target_complexity,
+  player_completed_cycles = p.player_completed_cycles,
+  revision = p.revision,
+  last_completed_cycle_at = p.last_completed_cycle_at,
+  level_reached_at = p.level_reached_at,
+  updated_at = p.updated_at
+from fixture_r020_apply_preimage p
+where s.user_id = p.user_id;
+
+do $r020$
+begin
+  if exists (
+    (select s.* from mazer.mazer_progression_states s join fixture_r020_apply_preimage p using (user_id)
+     except select * from fixture_r020_apply_preimage)
+    union all
+    (select * from fixture_r020_apply_preimage
+     except select s.* from mazer.mazer_progression_states s join fixture_r020_apply_preimage p using (user_id))
+  )
+    or (select progression_rows from r020_counts_before) <> (select count(*) from mazer.mazer_progression_states)
+    or (select profile_rows from r020_counts_before) <> (select count(*) from mazer.mazer_profiles)
+    or (select receipt_rows from r020_counts_before) <> (select count(*) from mazer.mazer_cycle_receipts)
+  then
+    raise exception 'R020_LOCAL_EXACT_ROLLBACK_FAILED';
+  end if;
+end;
+$r020$;
+
+select 'MAZER_R020_PROGRESSION_RESTORE_APPLY_ROLLBACK_PASS';
+'@
+
 $rollbackSql = @'
 truncate table mazer.mazer_progression_states;
 insert into mazer.mazer_progression_states select * from fixture_progression_preimage;
@@ -264,6 +452,7 @@ try {
   New-Item -ItemType Directory -Path $fixtureRoot | Out-Null
   Set-Content -LiteralPath $setupPath -Value $setupSql -Encoding utf8
   Set-Content -LiteralPath $verifyPath -Value $verifySql -Encoding utf8
+  Set-Content -LiteralPath $r020Path -Value $r020Sql -Encoding utf8
   Set-Content -LiteralPath $rollbackPath -Value $rollbackSql -Encoding utf8
 
   & (Join-Path $pg 'initdb.exe') -D $dataPath -U postgres -A trust --no-locale --encoding=UTF8 | Out-Null
@@ -282,6 +471,7 @@ try {
   if ((Resolve-Path $dataDirectory).Path -ne (Resolve-Path $dataPath).Path) { throw 'PG_CLUSTER_IDENTITY_MISMATCH' }
   Invoke-PsqlFile $migrationPath
   Invoke-PsqlFile $verifyPath
+  Invoke-PsqlFile $r020Path
   Invoke-PsqlFile $rollbackPath
   Write-Output 'MAZER_ACCOUNT_USERNAME_PROGRESSION_REPAIR_PG17_PASS'
 }
