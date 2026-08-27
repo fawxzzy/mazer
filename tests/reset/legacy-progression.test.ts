@@ -1587,6 +1587,84 @@ describe('legacy progression', () => {
     expect(aiProfiles).toEqual(playerProfiles);
   });
 
+  test('keeps the actual Level 1-10 play boards small, monotonic, bounded, and free of geometry skips', () => {
+    const storage = new MemoryStorage();
+    let state = createEmptyLegacyProgressionState();
+    const desktop = { width: 1440, height: 900 };
+    const mobile = { width: 390, height: 844 };
+    const samples = Array.from({ length: 10 }, (_, index) => {
+      const track = state.tracks.player;
+      const level = Number(track.level);
+      const profile = resolveLegacyMazeGenerationProfileForProgression(track);
+      const scale = resolveLegacyProgressionGenerationScale(50, track, {
+        surface: 'play',
+        viewport: desktop
+      });
+      const maze = createLegacyRuntimeMazeForMode('play', scale, 7419, profile);
+      const layouts = [desktop, mobile].map((viewport) => ({
+        viewport,
+        layout: resolveLegacyMenuLayout(
+          viewport.width,
+          viewport.height,
+          50,
+          maze.width,
+          maze.height,
+          'play',
+          { useFloatingTouchControls: true }
+        )
+      }));
+      const sample = {
+        level,
+        linearCells: Math.max(maze.width, maze.height),
+        profile: resolveLegacyProgressionDifficultyProfile(track),
+        scale,
+        targetComplexity: track.targetComplexity,
+        layouts
+      };
+
+      const receipt = createMazeCycleTelemetryReceipt({
+        averageFrameMs: 16,
+        backtracks: 0,
+        completedAt: `2026-08-27T12:${String(index).padStart(2, '0')}:00.000Z`,
+        completionTimeMs: 8_000,
+        controlMode: 'stick',
+        maze,
+        playerPath: maze.solutionPath,
+        resetUsed: false,
+        surface: 'play',
+        wrongTurns: 0
+      });
+      state = recordLegacyProgressionCycle(storage, state, receipt, maze);
+      return sample;
+    });
+
+    expect(samples.map((sample) => sample.level)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(samples.map((sample) => sample.targetComplexity)).toEqual([8, 12, 16, 20, 24, 28, 32, 36, 40, 44]);
+    expect(samples[0]).toMatchObject({
+      level: 1,
+      profile: { band: 'tutorial', branchPressure: 'minimal', shortcutPressure: 'off' }
+    });
+    expect(samples.slice(1).every((sample) => sample.profile.band === 'starter')).toBe(true);
+
+    for (let index = 1; index < samples.length; index += 1) {
+      const previous = samples[index - 1]!;
+      const current = samples[index]!;
+      expect(current.scale).toBeGreaterThanOrEqual(previous.scale);
+      expect(current.scale - previous.scale).toBeLessThanOrEqual(2);
+      expect(current.linearCells).toBeGreaterThanOrEqual(previous.linearCells);
+      expect(current.linearCells - previous.linearCells).toBeLessThanOrEqual(2);
+    }
+
+    for (const sample of samples) {
+      for (const { layout, viewport } of sample.layouts) {
+        expect(layout.boardLeft).toBeGreaterThanOrEqual(0);
+        expect(layout.boardTop).toBeGreaterThanOrEqual(0);
+        expect(layout.boardLeft + layout.boardWidth).toBeLessThanOrEqual(viewport.width);
+        expect(layout.boardTop + layout.boardHeight).toBeLessThanOrEqual(viewport.height);
+      }
+    }
+  });
+
   test('maps progression bands to increasing procedural pressure', () => {
     // Complexity values doubled (in real-level terms) from what used to hit
     // each band -- resolveLegacyProgressionDifficultyProfile now halves the

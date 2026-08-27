@@ -1813,20 +1813,45 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('No unlock.');
   });
 
-  test('centers the level announcer on screen and scales board content with a dedicated zoom container', () => {
+  test('centers the level announcer and keeps board content at neutral visual scale until the user changes Board Zoom', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
 
     expect(menuSceneSource).toContain('const centerX = this.layout.width / 2;');
     expect(menuSceneSource).toContain('const centerY = this.layout.height / 2;');
     expect(menuSceneSource).toContain('private boardZoomContainer!: Phaser.GameObjects.Container;');
-    expect(menuSceneSource).toContain('private resolveLegacyBoardZoomTargetScale(): number');
-    expect(menuSceneSource).toContain('private updateLegacyBoardZoom(time: number): void');
-    // The zoom container only ever holds board CONTENT (tiles/path/trail/
-    // title lettering) -- HUD, header icons, overlays, and the announcer
-    // itself are never added to it, so they stay fixed regardless of zoom.
     expect(menuSceneSource).toContain('this.boardZoomContainer.add([');
-    expect(menuSceneSource).toContain('this.boardZoomContainer.setScale(scale);');
-    expect(menuSceneSource).toContain('this.boardZoomContainer.setPosition(centerX * (1 - scale), centerY * (1 - scale));');
+    expect(menuSceneSource).not.toContain('resolveLegacyBoardZoomTargetScale');
+    expect(menuSceneSource).not.toContain('updateLegacyBoardZoom');
+    expect(menuSceneSource).not.toContain('this.boardZoomContainer.setScale(');
+    expect(menuSceneSource).not.toContain('this.boardZoomContainer.setPosition(');
+    expect(menuSceneSource).toContain('this.settings.scale + this.settings.camScale');
+    expect(menuSceneSource).toContain('implicitZoomApplied: false');
+    expect(menuSceneSource).toContain('userBoardZoom: this.settings.camScale');
+    expect(menuSceneSource).toContain('x: this.boardZoomContainer.scaleX');
+    expect(menuSceneSource).toContain('y: this.boardZoomContainer.scaleY');
+  });
+
+  test('hydrates the scene from the already-fetched account bootstrap instead of leaving the local Level-1 placeholder active', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('readLegacyBootstrappedAccountState,');
+    expect(menuSceneSource).toContain('this.applyBootstrappedLegacyAccountState();');
+    expect(menuSceneSource).toContain('private applyBootstrappedLegacyAccountState(): void');
+    expect(menuSceneSource).toContain('bootstrapped.snapshot.userId !== this.authSnapshot.userId');
+    expect(menuSceneSource).toContain('bootstrapped.progressionState');
+    expect(menuSceneSource).toContain('bootstrapped.settings');
+  });
+
+  test('uses ten leaderboard users per page and binds transfer beams to the same moving diamond frame', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+    expect(menuSceneSource).toContain('private static readonly LEADERBOARD_VISIBLE_ROWS = 10;');
+    expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleOrbitFrame(time: number)');
+    expect(menuSceneSource).toContain('this.resolveLegacyPlayerTransferOrbitPoses(time)');
+    expect(menuSceneSource).toContain('(orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1');
+    expect(menuSceneSource).toContain('this.playerTransferEnergyOutboundStartedAtMs === null');
+    expect(menuSceneSource).toContain('this.menuStaticDrawTilesVisible <= this.resolveLegacyMenuStaticDrawTileBatchSize()');
+    expect(menuSceneSource).toContain('this.playerSpawnBurstStartedAtMs ??= time;');
   });
 
   test('consumes shared UI standards for buttons, titles, guides, and toggles', () => {
