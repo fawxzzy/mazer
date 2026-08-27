@@ -24,6 +24,7 @@ import {
   createEmptyLegacyProgressionState,
   incrementLegacyProgressionOrdinal,
   maxLegacyProgressionOrdinal,
+  normalizeLegacyAuthoritativeProgressionState,
   normalizeLegacyPositiveProgressionOrdinal,
   normalizeLegacyProgressionState,
   readLegacyProgressionState,
@@ -475,7 +476,7 @@ export const bootstrapLegacyRemoteAccountState = async (
   let progressionRevision: number | null = metadata?.progressionRevision ?? null;
   let hasUnsyncedLocalProgress = hasPendingCompletions || metadata === null;
   if (progressionRead.row) {
-    const remoteProgression = normalizeLegacyProgressionState(progressionRead.row.state);
+    const remoteProgression = normalizeLegacyAuthoritativeProgressionState(progressionRead.row.state);
     hasUnsyncedLocalProgress = hasUnsyncedLocalProgress
       || localProgression.updatedAt !== metadata?.progressionUpdatedAt;
     progressionState = hasUnsyncedLocalProgress
@@ -493,7 +494,7 @@ export const bootstrapLegacyRemoteAccountState = async (
       } else {
         hasUnsyncedLocalProgress = true;
         progressionState = mergeLegacyProgressionStateAdvancements(
-          normalizeLegacyProgressionState(initialized.row.state),
+          normalizeLegacyAuthoritativeProgressionState(initialized.row.state),
           localProgression
         );
         progressionRevision = initialized.row.revision;
@@ -648,7 +649,7 @@ export const hydrateLegacyRemoteAccountState = async (
     ? writeLegacyProgressionState(
       progressionStorage,
       mergeLegacyProgressionStateAdvancements(
-        normalizeLegacyProgressionState(progressionRead.row.state),
+        normalizeLegacyAuthoritativeProgressionState(progressionRead.row.state),
         localProgression
       )
     )
@@ -667,7 +668,7 @@ export const hydrateLegacyRemoteAccountState = async (
     progressionRevision: progressionRead.row?.revision ?? null,
     progressionUpdatedAt: hasPendingCompletions
       || (progressionRead.row !== null
-        && localProgression.updatedAt !== normalizeLegacyProgressionState(progressionRead.row.state).updatedAt)
+        && localProgression.updatedAt !== normalizeLegacyAuthoritativeProgressionState(progressionRead.row.state).updatedAt)
       ? null
       : progressionState.updatedAt,
     settingsFingerprint: fingerprintSettings(settings),
@@ -1132,7 +1133,7 @@ const ensureRemotePlayerProgressionRow = async (
     return {
       error: null,
       revision: current.row.revision,
-      state: normalizeLegacyProgressionState(current.row.state)
+      state: normalizeLegacyAuthoritativeProgressionState(current.row.state)
     };
   }
 
@@ -1144,7 +1145,7 @@ const ensureRemotePlayerProgressionRow = async (
   return {
     error: initialized.error,
     revision: initialized.row?.revision ?? null,
-    state: initialized.row ? normalizeLegacyProgressionState(initialized.row.state) : null
+    state: initialized.row ? normalizeLegacyAuthoritativeProgressionState(initialized.row.state) : null
   };
 };
 
@@ -1233,7 +1234,7 @@ const applyPlayerCompletionRpcRow = (
     revision: normalizeRevision(row.revision),
     state: mergeLegacyProgressionStateAdvancements(
       state,
-      normalizeLegacyProgressionState(row.state)
+      normalizeLegacyAuthoritativeProgressionState(row.state)
     )
   };
 };
@@ -1487,7 +1488,7 @@ const flushLegacyRemoteCompletionOutbox = async (
     if (entry.surface === 'play' && appliedPlayer) {
       expectedRevision = appliedPlayer.revision;
       resolvedState = appliedPlayer.state;
-      playerCursor = normalizeLegacyProgressionState(row?.state).tracks.player;
+      playerCursor = normalizeLegacyAuthoritativeProgressionState(row?.state).tracks.player;
     } else if (entry.surface === 'menu-demo' && appliedAi) {
       resolvedState = appliedAi;
       aiCursor = mergeRemoteAiTrackIntoProgression(
@@ -1803,7 +1804,7 @@ export const writeLegacyRemoteProgressionState = async (
     const remote = await readRemoteProgressionRow(client, snapshot.userId);
     return createLegacyRemoteProgressionSyncResult('progression', {
       error: response.error.message,
-      ...(remote.row ? { progressionState: normalizeLegacyProgressionState(remote.row.state) } : {}),
+      ...(remote.row ? { progressionState: normalizeLegacyAuthoritativeProgressionState(remote.row.state) } : {}),
       skippedReason: null,
       synced: false
     });
@@ -1817,7 +1818,7 @@ export const writeLegacyRemoteProgressionState = async (
       synced: false
     });
   }
-  const resolvedState = normalizeLegacyProgressionState(row.state);
+  const resolvedState = normalizeLegacyAuthoritativeProgressionState(row.state);
   const nextRevision = normalizeRevision(row.revision);
   const nextMetadata: LegacyRemoteAccountSyncMetadata = {
     progressionRevision: nextRevision,

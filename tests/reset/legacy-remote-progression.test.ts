@@ -1361,6 +1361,61 @@ describe('legacy remote progression', () => {
     expect(values.has('mazer.remote-account-sync.v1:user:user-hydrate')).toBe(true);
   });
 
+  test('hydrates a coherent production-shaped historical row instead of rebasing it to Level 1', async () => {
+    const remote = createEmptyLegacyProgressionState();
+    remote.updatedAt = '2026-08-27T21:43:51.052Z';
+    remote.tracks.player = {
+      ...remote.tracks.player,
+      completedCycles: '109',
+      level: '110',
+      struggleCycles: 84,
+      targetComplexity: 26
+    };
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value)
+    };
+    const from = createHydrationFrom(
+      { revision: 9, state: remote },
+      { revision: 3, selected_control_mode: 'arrows', settings: {} }
+    );
+    vi.mocked(readLegacyAuthSessionSnapshot).mockResolvedValueOnce({
+      configured: true,
+      displayName: 'Historical player',
+      email: 'historical@example.test',
+      error: null,
+      info: null,
+      status: 'authenticated',
+      userId: 'user-historical-remote'
+    });
+    vi.mocked(getLegacyAuthClient).mockResolvedValueOnce({ from } as never);
+
+    const result = await bootstrapLegacyRemoteAccountState(
+      storage,
+      { [LEGACY_REMOTE_PROGRESSION_ENABLED_ENV_KEY]: 'true' }
+    );
+
+    expect(result.error).toBeNull();
+    expect(result.progressionState?.tracks.player).toMatchObject({
+      completedCycles: '109',
+      level: '110',
+      struggleCycles: Number.MAX_SAFE_INTEGER,
+      targetComplexity: 26
+    });
+    expect(JSON.parse(values.get('mazer.progression.v1:user:user-historical-remote') ?? '{}'))
+      .toMatchObject({
+        tracks: {
+          player: {
+            completedCycles: '109',
+            level: '110',
+            struggleCycles: Number.MAX_SAFE_INTEGER,
+            targetComplexity: 26
+          }
+        }
+      });
+  });
+
   test('reloads the selected account after sign-in, still ignoring guest progress entirely', async () => {
     // Remote is the more-advanced side here -- a genuinely fresh sign-in
     // (or this device's own local copy for this account is behind) should

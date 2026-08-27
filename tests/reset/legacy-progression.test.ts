@@ -14,6 +14,7 @@ import {
   createEmptyLegacyProgressionState,
   compareLegacyProgressionOrdinals,
   incrementLegacyProgressionOrdinal,
+  normalizeLegacyAuthoritativeProgressionState,
   normalizeLegacyProgressionOrdinal,
   normalizeLegacyProgressionState,
   readLegacyProgressionState,
@@ -410,6 +411,67 @@ describe('legacy progression', () => {
 
     const profile = resolveLegacyProgressionDifficultyProfile(repaired.tracks.player);
     expect(profile.band).toBe('tutorial');
+  });
+
+  test('accepts coherent historical progress only from an authoritative remote row and stamps local provenance', () => {
+    const baseline = createEmptyLegacyProgressionState();
+    const historical = {
+      ...baseline,
+      playerProgressionBaselineVersion: 5,
+      tracks: {
+        ...baseline.tracks,
+        player: {
+          ...baseline.tracks.player,
+          completedCycles: '109',
+          level: '110',
+          struggleCycles: 84,
+          targetComplexity: 26
+        }
+      }
+    };
+
+    expect(normalizeLegacyProgressionState(historical).tracks.player).toMatchObject({
+      completedCycles: '0',
+      level: '1'
+    });
+
+    const authoritative = normalizeLegacyAuthoritativeProgressionState(historical);
+    expect(authoritative.tracks.player).toMatchObject({
+      completedCycles: '109',
+      level: '110',
+      struggleCycles: Number.MAX_SAFE_INTEGER,
+      targetComplexity: 26
+    });
+    expect(normalizeLegacyProgressionState(authoritative).tracks.player).toMatchObject({
+      completedCycles: '109',
+      level: '110',
+      struggleCycles: Number.MAX_SAFE_INTEGER,
+      targetComplexity: 26
+    });
+  });
+
+  test('still rejects impossible player progression from an authoritative remote row', () => {
+    const baseline = createEmptyLegacyProgressionState();
+    const impossible = {
+      ...baseline,
+      tracks: {
+        ...baseline.tracks,
+        player: {
+          ...baseline.tracks.player,
+          completedCycles: '3',
+          level: '99',
+          struggleCycles: 84,
+          targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
+        }
+      }
+    };
+
+    expect(normalizeLegacyAuthoritativeProgressionState(impossible).tracks.player).toMatchObject({
+      completedCycles: '0',
+      level: '1',
+      struggleCycles: Number.MAX_SAFE_INTEGER,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY
+    });
   });
 
   test('keeps a coherent earned player trajectory when it migrates to the current baseline', () => {
