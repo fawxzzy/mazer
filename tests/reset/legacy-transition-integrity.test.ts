@@ -59,9 +59,20 @@ describe('legacy scene transition integrity', () => {
     expect(settleBuild).toContain("const settlingFromBuild = this.menuStaticDrawLifecyclePhase === 'building';");
     expect(settleBuild).toContain('this.armLegacyPlayerArrivalForFinalBuildStep(time, 0);');
     expect(advanceBuild).toContain('resolveLegacyStaticDrawBuildRemainingMs({');
-    expect(advanceBuild).toContain('buildRemainingMs <= LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS');
+    // Widened from the beam's own travel time to the bleed-dock corridor's
+    // full growth window (LEGACY_BLEED_DOCK_GROWTH_MS is longer) so this
+    // reliably arms before the corridor's outward growth actually reaches
+    // the screen edge -- arming early only gives the future-pinned delivery
+    // timestamp below more lead time, it does not fire the beam early.
+    expect(advanceBuild).toContain('buildRemainingMs <= LEGACY_BLEED_DOCK_GROWTH_MS');
     expect(arrival).toContain('this.playerSpawnBurstStartedAtMs ??= alignedStartedAtMs;');
-    expect(arrival).toContain('this.playerTransferEnergyDeliveryStartedAtMs ??= alignedStartedAtMs;');
+    // Pinned to the future instant buildRemainingMs reaches 0 (when the
+    // corridor's own growth genuinely touches the edge) rather than
+    // back-dated to make the beam's travel time finish at build end --
+    // deliveryElapsedMs stays clamped at 0 (no visible progress) until that
+    // instant, matching "once the bleed paths touch the screen's edge,
+    // that's when the lasers shoot the player back in".
+    expect(arrival).toContain('this.playerTransferEnergyDeliveryStartedAtMs ??= time + Math.max(0, buildRemainingMs);');
   });
 
   test('pins proof-route seeds and shares exact orbit geometry between diamonds and transferred energy', () => {

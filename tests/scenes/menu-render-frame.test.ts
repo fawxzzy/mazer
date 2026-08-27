@@ -764,7 +764,10 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyPlayerTransferEnergy(');
     expect(menuSceneSource).toContain('this.drawLegacyPlayerTransferEnergy(');
     expect(menuSceneSource).toContain('resolveLegacyPlayerTransferVisualState({');
-    expect(menuSceneSource).toContain('this.playerTransferEnergyDeliveryStartedAtMs ??= alignedStartedAtMs;');
+    // Pinned to the future instant the corridor's own outward growth
+    // actually touches the screen edge (buildRemainingMs reaches 0), not
+    // back-dated to make the beam's travel time finish at build end.
+    expect(menuSceneSource).toContain('this.playerTransferEnergyDeliveryStartedAtMs ??= time + Math.max(0, buildRemainingMs);');
     expect(menuSceneSource).toContain('playerTransfer: LegacyPlayerTransferVisualState;');
     expect(menuSceneSource).toContain('playerTransfer,');
     expect(menuSceneSource).toContain('this.isLegacyMenuDeconstructHandoffActive(time)');
@@ -1839,8 +1842,13 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private resolveLegacyMenuPathTitleOrbitFrame(time: number)');
     expect(menuSceneSource).toContain('this.resolveLegacyPlayerTransferOrbitPoses(time)');
     expect(menuSceneSource).toContain('(orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1');
-    expect(menuSceneSource).toContain('this.playerTransferEnergyOutboundStartedAtMs === null');
-    expect(menuSceneSource).toContain('this.menuStaticDrawTilesVisible <= this.resolveLegacyMenuStaticDrawTileBatchSize()');
+    // Outbound now arms on the same clock as the bleed-dock corridor's own
+    // retraction (menuStaticDeconstructStartedAtMs, set in
+    // armLegacyMenuStaticDeconstructStage) instead of waiting for the
+    // tile-count-based grid clear to nearly finish -- that mismatch was the
+    // visible "corridor retracts, pauses, then the laser finally fires" bug.
+    expect(menuSceneSource).toContain("this.menuStaticDrawLifecyclePhase = 'deconstructing';");
+    expect(menuSceneSource).toContain('if (this.playerTransferEnergyArmed && this.playerTransferEnergyOutboundStartedAtMs === null) {');
     expect(menuSceneSource).toContain('resolveLegacyStaticDrawBuildRemainingMs({');
     expect(menuSceneSource).toContain('this.playerSpawnBurstStartedAtMs ??= alignedStartedAtMs;');
   });
