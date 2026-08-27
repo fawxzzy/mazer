@@ -54,11 +54,14 @@ Deferred Stripe/payment-wall tables:
 
 ## Current App Wiring
 
-Remote progression sync remains feature-gated by:
+Production remote progression is enabled against the master project:
 
 ```env
-VITE_MAZER_REMOTE_PROGRESSION=false
+VITE_SUPABASE_URL=https://bxtcuhkotumitoqtrcej.supabase.co
+VITE_MAZER_REMOTE_PROGRESSION=true
 ```
+
+Local or fixture environments may deliberately set the flag to `false`; that is not the production contract.
 
 The shared browser Supabase client resolves the schema from the exact allowlisted project URL: legacy maps to `public`, master maps to `mazer`, and unknown projects fail closed. Auth remains project-level; unqualified `.from(...)` calls use the selected project-specific data schema without duplicating schema selection at every query site.
 
@@ -85,21 +88,17 @@ The legacy source project previously verified browser-safe env wiring with `VITE
 
 Remaining UI proof gap: browser automation did not inject typed characters into the Phaser canvas auth fields, so visible app form-entry persistence still needs manual QA or a dedicated hidden test hook. Backend auth and storage are proven with browser-safe keys under authenticated RLS.
 
-## Apply Order
+## Future Project Or Credential Changes
 
-1. Preserve exact preimages for both projects and classify every legacy app-linked/Auth-only identity without emitting raw account data.
-2. Rehearse the three generated master migrations in order on a disposable provider branch or inside a fully rolled-back transaction, including lock/rewrite timing and disable-hook-first rollback.
-3. Apply schema parity, runtime contracts, then signup contracts to master; verify owners, empty search paths, function/table ACLs, forced RLS, indexes, constraints, and trigger identity.
-4. Import only missing master Auth identities with supported password hashes, then create a durable legacy-to-master identity map. Existing master identities win; ambiguous or duplicate mappings fail closed.
-5. Transactionally reconcile profiles/player/AI by mapped identity. Never lower ordinals or discard a target-newer row. Preserve receipt IDs/timestamps and dedupe by receipt identity plus mapped-user/client-run identity.
-6. Freeze or drain the final legacy delta and prove all `1,865` source receipts are classified with zero orphans, username collisions, or idempotency duplicates.
-7. Re-certify the `mazer` Data API/OpenAPI surface, RLS isolation, exact RPC behavior, guest leaderboard, authenticated self rank, signup hook, email-confirmation/no-session flow, and existing-user re-authentication.
-8. Configure nonproduction environment values for the master project and run authenticated QA before any production cutover:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_MAZER_REMOTE_PROGRESSION=true` only after access proof passes.
-9. Cut production once, verify the deployed commit and master project identity, and retain reverse-delta/legacy rollback until the observation window closes.
-10. Close rollback expiry, credential retirement, restore proof, and legacy deletion under separate destructive gates. Keep Stripe/license tables deferred.
+R017 completed the former legacy-to-master apply sequence. Do not replay its import, reconciliation, cutover, observation, or restoration steps.
+
+For any future Supabase project or credential change:
+
+1. Preserve exact current master and rollback preimages without emitting private rows.
+2. Re-certify identity ownership, monotonic progression, receipt conservation, username uniqueness, RLS/ACL, Data API exposure, and exact rollback against the proposed target.
+3. Prove nonproduction browser Auth and storage behavior before changing production environment values.
+4. Cut production once at an explicitly authorized boundary, then verify the deployed commit, project identity, authenticated persistence, leaderboard, and rollback readiness.
+5. Keep legacy deletion, credential retirement, and Stripe/license work behind separate protected decisions.
 
 ## Stripe Boundary
 
