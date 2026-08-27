@@ -1584,6 +1584,26 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('this.progressionState.tracks[trackId]');
   });
 
+  test('replaces the menu username with the inner-only animated green profile control', () => {
+    const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const profileButtonSource = menuSceneSource.slice(
+      menuSceneSource.indexOf('private createLegacyMenuProfileButton('),
+      menuSceneSource.indexOf('private drawLegacyProfileIcon(')
+    );
+
+    expect(menuSceneSource).toContain('this.createLegacyMenuProfileButton(() => this.openOverlay(\'auth\'))');
+    expect(menuSceneSource).not.toContain('createLegacyMenuUsernameButton');
+    expect(menuSceneSource).not.toContain('drawLegacyMenuUsernameLabel');
+    expect(profileButtonSource).toContain("placement: 'leading'");
+    expect(profileButtonSource).toContain('sizeScale: this.layout.headerIconScale');
+    expect(profileButtonSource).toContain('bounds: createVisualRect(frame.left, frame.top, frame.width, frame.height)');
+    expect(profileButtonSource).toContain('const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuProfileActive ? 0.08 : 0), 0.14, 1);');
+    expect(profileButtonSource).toContain('const blinkScale = 0.92 + (phase * 0.08) + (this.menuProfileActive ? 0.02 : 0);');
+    expect(profileButtonSource).toMatch(/this\.drawLegacyProfileIcon\([\s\S]*?blinkScale,\s*false\s*\);/);
+    expect(menuSceneSource).toContain('if (showOuterRing) {');
+    expect(menuSceneSource).toContain('const color = cyberArcadeMaterial.signal.player;');
+  });
+
   test('keeps account login/logout inside the shared player-facing overlay system', () => {
     const menuSceneSource = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8').replace(/\r\n/g, '\n');
     const authSource = readFileSync(resolve(process.cwd(), 'src/legacy-runtime/legacyAuth.ts'), 'utf8');

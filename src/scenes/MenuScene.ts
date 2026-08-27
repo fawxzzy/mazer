@@ -106,7 +106,6 @@ import {
 } from '../legacy-runtime/legacyMenuDemoLifecycle';
 import {
   resolveLegacyMenuBoardAspectRatio,
-  resolveLegacyMenuHeaderUsernameReserve,
   resolveLegacyMenuLayout,
   type LegacyMenuLayout
 } from '../legacy-runtime/legacyMenuLayout';
@@ -240,7 +239,6 @@ import {
   requestLegacyPasswordReset,
   resolveLegacyPasswordRecoveryEnterAction,
   resolveLegacyPasswordUpdateSubmitState,
-  resolveLegacyAuthAccountLabel,
   resolveLegacyAuthInvalidFields,
   resolveLegacyAuthScopedStorageKey,
   resolveLegacyAuthSubmitState,
@@ -1304,7 +1302,7 @@ export class MenuScene extends Phaser.Scene {
   private authUsernameSequence = 0;
   private authUsernameDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private menuLeaderboardActive = false;
-  private menuUsernameActive = false;
+  private menuProfileActive = false;
   private overlayUsernameActive = false;
   private overlayHomeActive = false;
   private leaderboardStatus: 'empty' | 'error' | 'idle' | 'loading' | 'ready' = 'idle';
@@ -8997,7 +8995,7 @@ export class MenuScene extends Phaser.Scene {
         }
         this.uiButtons.push(this.createLegacyMenuSettingsCogButton(() => this.openOverlay('options')));
         this.uiButtons.push(this.createLegacyMenuLeaderboardButton(() => this.openOverlay('leaderboard')));
-        this.uiButtons.push(this.createLegacyMenuUsernameButton(() => this.openOverlay('auth')));
+        this.uiButtons.push(this.createLegacyMenuProfileButton(() => this.openOverlay('auth')));
       }
 
       this.uiDirty = false;
@@ -13094,173 +13092,89 @@ export class MenuScene extends Phaser.Scene {
     };
   }
 
-  // Front-door-only account readout: signed-in players see their own username,
-  // and a local guest sees the explicit Guest label rather than an anonymous
-  // or account-looking placeholder. It sits in the same header row as the
-  // settings cog, immediately left of the leaderboard icon (the trailing
-  // cluster is the one spot that doesn't collide with the LVL badge already
-  // anchored to the leading side). Tapping it opens the same account screen
-  // the auth overlay already shows once authenticated. Prefers the title's own tile-glyph material
-  // (drawLegacyPathMaterialTile) when every character in the username has a
-  // glyph -- LEGACY_GLYPH_LETTER_PATTERNS only covers a subset of uppercase
-  // letters used elsewhere in this game's own vocabulary, so most real
-  // usernames (digits, punctuation, most consonants) fall back to plain
-  // animated text instead. This mirrors createButton's own primary
-  // Start/Login glyph-vs-text fallback rather than inventing a new rule.
-  private createLegacyMenuUsernameButton(onClick: () => void): UiButton {
-    const panel = this.add.graphics();
-    const label = this.padLegacyCompactUiText(this.add.text(0, 0, '', {
-      fontFamily: LEGACY_UI_FONT_FAMILY,
-      fontSize: '13px',
-      color: '#72e0bf'
-    })).setOrigin(0, 0.5).setVisible(false);
-    this.uiTexts.push(label);
-
-    const background = this.add.rectangle(0, 0, 1, 1, 0x000000, 0.001);
+  // Main-menu account entry: the old username text is intentionally gone.
+  // The control now occupies the same leading header slot, on the same row
+  // as the title, but renders only the inner Mazer-green profile glyph. The
+  // transparent square remains the complete touch target; no outer visual
+  // circle or panel is drawn. Its pulse and hover response use the exact
+  // settings-cog envelope so the two header actions feel like one family.
+  private createLegacyMenuProfileButton(onClick: () => void): UiButton {
+    const graphics = this.add.graphics();
+    const laneTop = this.layout.lanes.hud?.top ?? 0;
+    const frame = resolveLegacyHeaderControlFrame({
+      height: this.layout.height,
+      hudHeight: this.layout.lanes.hud?.height ?? 64,
+      hudTop: laneTop,
+      placement: 'leading',
+      sizeScale: this.layout.headerIconScale,
+      width: this.layout.width
+    });
+    const background = this.add.rectangle(frame.centerX, frame.centerY, frame.width, frame.height, 0x000000, 0.001);
     background.setInteractive({ useHandCursor: true });
     background.setDepth(3);
-    background.setVisible(false);
-    this.menuUsernameActive = false;
+    this.menuProfileActive = false;
 
     const setActive = (active: boolean): void => {
-      if (this.menuUsernameActive === active) {
-        return;
-      }
-      this.menuUsernameActive = active;
-      this.boardDynamicDirty = true;
+      this.menuProfileActive = active;
     };
     background.on('pointerover', () => setActive(true));
     background.on('pointerout', () => setActive(false));
     background.on('pointerdown', onClick);
 
+    const label = this.add.text(frame.centerX, frame.centerY, '', {
+      fontFamily: LEGACY_UI_FONT_FAMILY,
+      fontSize: '1px'
+    }).setOrigin(0.5).setVisible(false);
+    this.uiTexts.push(label);
+
     return {
       background,
-      bounds: createVisualRect(0, 0, 1, 1),
+      bounds: createVisualRect(frame.left, frame.top, frame.width, frame.height),
       iconOnly: true,
       label,
       semanticAction: 'Account',
       setActive,
       text: 'Account',
       updateFrame: (time: number) => {
-        this.drawLegacyMenuUsernameLabel(panel, label, background, time);
+        if (
+          this.mode !== 'menu'
+          || this.overlay !== 'none'
+          || this.authSnapshot.status === 'unavailable'
+        ) {
+          graphics.clear();
+          background.setVisible(false);
+          return;
+        }
+        if (this.authSnapshot.status === 'authenticated') {
+          this.loadAccountUsernameIfNeeded();
+        }
+        background.setVisible(true);
+        const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
+        const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuProfileActive ? 0.08 : 0), 0.14, 1);
+        const blinkScale = 0.92 + (phase * 0.08) + (this.menuProfileActive ? 0.02 : 0);
+        const iconSize = Math.max(18, Math.round(Math.min(frame.width, frame.height) * 0.48));
+        this.drawLegacyProfileIcon(
+          graphics,
+          frame.centerX,
+          frame.centerY,
+          iconSize,
+          time,
+          blinkAlpha,
+          blinkScale,
+          false
+        );
       },
       destroy: () => {
-        panel.destroy();
+        graphics.destroy();
         background.destroy();
         label.destroy();
       }
     };
   }
 
-  private drawLegacyMenuUsernameLabel(
-    panel: Phaser.GameObjects.Graphics,
-    label: Phaser.GameObjects.Text,
-    background: Phaser.GameObjects.Rectangle,
-    time: number
-  ): void {
-    const hide = (): void => {
-      panel.clear();
-      panel.setVisible(false);
-      label.setVisible(false);
-      background.setVisible(false);
-    };
-
-    if (
-      this.mode !== 'menu'
-      || this.overlay !== 'none'
-      || this.authSnapshot.status === 'unavailable'
-    ) {
-      hide();
-      return;
-    }
-
-    let username: string;
-    if (this.authSnapshot.status === 'guest') {
-      username = resolveLegacyAuthAccountLabel(this.authSnapshot);
-    } else {
-      // Idempotent per signed-in user id (see loadAccountUsernameIfNeeded) --
-      // safe to call every frame, it only actually fetches once.
-      this.loadAccountUsernameIfNeeded();
-      // Falls back to a literal "Account" label when there's no username yet
-      // -- still loading, never set, or the fetch failed. This remains the one
-      // entry point to the account screen for a signed-in player.
-      username = this.accountUsernameSavedValue.length > 0 ? this.accountUsernameSavedValue : 'Account';
-    }
-
-    // Top-left of the screen, its own leading-side anchor -- not tied to
-    // the leaderboard/settings cluster on the trailing side. The menu front
-    // door never shows the LVL badge that otherwise occupies this corner
-    // during play (see drawLegacyProgressionBadge's mode === 'menu' clear),
-    // so this corner is free here.
-    const laneTop = this.layout.lanes.hud?.top ?? 0;
-    const leadingFrame = resolveLegacyHeaderControlFrame({
-      height: this.layout.height,
-      hudHeight: this.layout.lanes.hud?.height ?? 64,
-      hudTop: laneTop,
-      placement: 'leading',
-      width: this.layout.width
-    });
-    const anchorLeft = leadingFrame.left;
-    const anchorY = leadingFrame.centerY;
-
-    const phase = (Math.sin((time / LEGACY_MENU_BLINK_PULSE_MS) * Math.PI * 2) + 1) / 2;
-    const blinkAlpha = clamp(0.55 + (phase * 0.45) + (this.menuUsernameActive ? 0.05 : 0), 0.4, 1);
-    const trailColor = resolveLegacyIridescentTrailColor(
-      0,
-      1,
-      time,
-      this.resolveActiveLegacyProgressionPalette().trailColor
-    );
-
-    // Much smaller than the title/front-door glyph scale (cellSize up to
-    // 10px there) -- this is a header readout, not a second title. Falls
-    // back to plain text if the glyph word would still run wider than a
-    // reasonable header slot even at this reduced size (very long
-    // usernames), same reasoning as the alphabet-coverage fallback below.
-    const glyphCellSize = 3;
-    const maxGlyphWidth = resolveLegacyMenuHeaderUsernameReserve(this.layout.width);
-    const useGlyphs = isLegacyGlyphWordRenderable(username)
-      && (resolveLegacyGlyphWordColumns(username) * glyphCellSize) <= maxGlyphWidth;
-
-    if (useGlyphs) {
-      label.setVisible(false);
-      // Same tile-glyph material, same build-in reveal tied to the maze's
-      // own generation progress, and the same trail-sweep color wipe the
-      // title and the Start/Login front-door glyphs use -- just at a much
-      // smaller cell size. Reuses drawLegacyMenuFrontDoorGlyphButton
-      // directly rather than a bespoke always-fully-drawn loop, so this
-      // reads as "the same material, smaller" instead of a look-alike.
-      const glyphColumns = resolveLegacyGlyphWordColumns(username);
-      const glyphWidth = glyphColumns * glyphCellSize;
-      const glyphHeight = 7 * glyphCellSize;
-      panel.setPosition(anchorLeft + (glyphWidth / 2), anchorY);
-      panel.setVisible(true);
-      const layout = resolveLegacyGlyphWordLayout(username, 0, 0, glyphCellSize);
-      this.drawLegacyMenuFrontDoorGlyphButton(panel, layout, time, this.menuUsernameActive);
-      background.setPosition(anchorLeft + (glyphWidth / 2), anchorY);
-      background.setSize(glyphWidth + 16, Math.max(28, glyphHeight + 12));
-      background.setVisible(true);
-    } else {
-      panel.clear();
-      panel.setVisible(false);
-      label.setText(username);
-      this.fitLegacyUiTextToWidth(label, maxGlyphWidth, 13, 9);
-      label.setColor(`#${trailColor.toString(16).padStart(6, '0')}`);
-      label.setAlpha(blinkAlpha);
-      label.setPosition(anchorLeft, anchorY);
-      label.setVisible(true);
-      background.setPosition(anchorLeft + (label.displayWidth / 2), anchorY);
-      background.setSize(label.displayWidth + 16, label.displayHeight + 12);
-      background.setVisible(true);
-    }
-  }
-
-  // Shared by the overlay header's profile button and the menu front
-  // door's header username -- a small person glyph (head + shoulders) in
-  // the rainbow-ring/Mazer-green treatment, alpha/scale already resolved
-  // by the caller so this stays a pure draw with no pulse-timing opinion
-  // of its own (the two callers drive their pulse from different active-
-  // hover state fields).
+  // Shared by the overlay and main-menu profile buttons. Overlay callers
+  // retain the rainbow ring; the menu caller explicitly suppresses it so
+  // only the inner green head-and-shoulders glyph is visible.
   private drawLegacyProfileIcon(
     graphics: Phaser.GameObjects.Graphics,
     centerX: number,
@@ -13268,13 +13182,16 @@ export class MenuScene extends Phaser.Scene {
     iconSize: number,
     time: number,
     alpha: number,
-    scale: number
+    scale: number,
+    showOuterRing = true
   ): void {
     graphics.clear();
-    const ringRadius = (iconSize * 0.62) + 8;
-    const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
-    graphics.lineStyle(Math.max(1.6, iconSize * 0.1), ringColor, alpha * 0.82);
-    graphics.strokeCircle(centerX, centerY, ringRadius * scale);
+    if (showOuterRing) {
+      const ringRadius = (iconSize * 0.62) + 8;
+      const ringColor = resolveLegacyIridescentTrailColor(0, 1, time);
+      graphics.lineStyle(Math.max(1.6, iconSize * 0.1), ringColor, alpha * 0.82);
+      graphics.strokeCircle(centerX, centerY, ringRadius * scale);
+    }
 
     const color = cyberArcadeMaterial.signal.player;
     const strokeWidth = Math.max(1.6, iconSize * 0.12);
@@ -13301,10 +13218,7 @@ export class MenuScene extends Phaser.Scene {
   // in-play Pause screen, where it sits right next to createLegacyOverlayHomeButton).
   // A profile glyph in the same rainbow-ring/Mazer-green/blink-pulse
   // treatment as that home icon instead of plain username text, per
-  // feedback that the two should read as a matched pair -- most usernames
-  // couldn't render as the front door's tile-glyph material anyway (see
-  // createLegacyMenuUsernameButton), so this was never going to carry the
-  // same material as that treatment either way. centerX is supplied by the
+  // feedback that the two should read as a matched pair. centerX is supplied by the
   // caller rather than computed here: alone (the menu-context Options
   // overlay, no home button) it's dead-centered same as the home icon;
   // paired with the home icon (Pause) the two need to split evenly around
