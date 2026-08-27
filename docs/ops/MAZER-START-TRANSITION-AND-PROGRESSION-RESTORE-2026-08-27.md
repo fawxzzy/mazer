@@ -54,16 +54,20 @@ DPR 1, 2, and 3.
 R019 classified a historical play receipt as accepted evidence only when
 `client_run_id` was non-null. Valid pre-idempotency receipts intentionally have
 null `client_run_id`, so nine accounts with exact retained progression were
-incorrectly reset to the Level-1 baseline. The source migration now treats any
+incorrectly reset to the Level-1 baseline. R019's already-applied migration
+bytes remain immutable. A forward-only, internal classifier now treats any
 conserved `surface = 'play'` receipt as historical completion evidence and never
 uses nullable metadata as proof that play did not happen.
 
 The bounded R020 restore uses the encrypted R019 preimage to restore the exact
 nine retained scalar/JSON player tracks. It does not infer levels from receipt
 counts, touch usernames/profiles/Auth/AI state, insert or delete rows, or change
-receipt denominators. Action-time gates require the exact R019 postimage and
-zero newer targeted play receipts. A private action-time preimage plus a
-PostgreSQL 17 fixture prove exact targeted rollback.
+receipt denominators. The apply transaction locks the exact nine rows before it
+rechecks the R019 postimage and newer targeted play receipts. Encrypted exact
+action-time preimage/postimage artifacts bind automatic rollback, which is
+allowed only while all nine rows still equal the applied postimage and no newer
+targeted play receipt exists. A PostgreSQL 17 fixture proves apply and exact
+rollback.
 
 Historical player JSON is normalized explicitly: retained keys win, exact
 scalar columns supply missing `rank`/`targetComplexity`, timestamp columns

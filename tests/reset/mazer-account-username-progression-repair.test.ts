@@ -5,6 +5,10 @@ const migration = readFileSync(
   new URL('../../supabase/migrations/20260827190000_mazer_account_username_and_progression_repair.sql', import.meta.url),
   'utf8'
 ).replace(/\r\n/g, '\n');
+const historicalEvidenceContract = readFileSync(
+  new URL('../../supabase/migrations/20260827200000_mazer_historical_play_evidence_contract.sql', import.meta.url),
+  'utf8'
+).replace(/\r\n/g, '\n');
 const authSource = readFileSync(
   new URL('../../src/legacy-runtime/legacyAuth.ts', import.meta.url),
   'utf8'
@@ -36,15 +40,18 @@ describe('Mazer account username and progression repair', () => {
     expect(saveSource).not.toContain('.upsert(');
   });
 
-  test('treats every conserved play receipt as historical completion evidence', () => {
+  test('keeps the applied R019 bytes immutable and supersedes its classifier forward-only', () => {
     expect(migration).toContain("r.surface = 'play'");
-    expect(migration).not.toContain('r.client_run_id is not null');
+    expect(migration).toContain('r.client_run_id is not null');
     expect(migration).not.toContain('r.ruleset_id is not null');
     expect(migration).not.toContain('r.recipe_version is not null');
     expect(migration).not.toContain('r.recipe_hash is not null');
-    expect(migration).toContain('Historical receipts legitimately predate');
-    expect(migration).toContain('nullable idempotency metadata');
     expect(migration).toContain('where not exists (');
+    expect(historicalEvidenceContract).toContain('create or replace function mazer.mazer_has_historical_play_receipt(');
+    expect(historicalEvidenceContract).toContain("r.surface = 'play'");
+    expect(historicalEvidenceContract).not.toContain('r.client_run_id is not null');
+    expect(historicalEvidenceContract).toContain('Receipt count never implies a level.');
+    expect(historicalEvidenceContract).not.toMatch(/(insert|update|delete)\s+(into|mazer\.)/i);
   });
 
   test('restores scalar and JSON progression to the exact runtime baseline without deleting receipts', () => {
@@ -66,7 +73,8 @@ describe('Mazer account username and progression repair', () => {
     expect(pg17Verifier.indexOf("'show data_directory'")).toBeLessThan(pg17Verifier.indexOf('Invoke-PsqlFile $migrationPath'));
     expect(pg17Verifier).toContain("'legacy-v1', null, null");
     expect(pg17Verifier).toContain("'endless-v1', 1, null");
-    expect(pg17Verifier).toContain("raise exception 'PRE_IDEMPOTENCY_RECEIPT_ACCOUNT_WAS_MUTATED'");
+    expect(pg17Verifier).toContain("raise exception 'IMMUTABLE_R019_PRE_IDEMPOTENCY_CLASSIFICATION_NOT_REPRODUCED'");
+    expect(pg17Verifier).toContain("raise exception 'HISTORICAL_PLAY_EVIDENCE_CLASSIFIER_FAILED'");
     expect(pg17Verifier).toContain("raise exception 'ZERO_RECEIPT_BASELINE_REPAIR_FAILED'");
     expect(pg17Verifier).toContain("raise exception 'LEGACY_V1_ACCEPTED_RECEIPT_ACCOUNT_WAS_MUTATED'");
     expect(pg17Verifier).toContain("raise exception 'ENDLESS_V1_ACCEPTED_RECEIPT_ACCOUNT_WAS_MUTATED'");
@@ -81,6 +89,7 @@ describe('Mazer account username and progression repair', () => {
     expect(pg17Verifier).toContain("raise exception 'EXACT_ROLLBACK_FAILED'");
     expect(pg17Verifier).toContain('drop function mazer.mazer_set_username(uuid, text)');
     expect(pg17Verifier).toContain("raise exception 'FUNCTION_ROLLBACK_FAILED'");
+    expect(pg17Verifier).toContain("raise exception 'CLASSIFIER_FUNCTION_ROLLBACK_FAILED'");
     expect(pg17Verifier).toContain("Write-Output 'MAZER_ACCOUNT_USERNAME_PROGRESSION_REPAIR_PG17_PASS'");
   });
 });

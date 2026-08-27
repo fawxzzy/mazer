@@ -15,6 +15,7 @@ $verifyPath = Join-Path $fixtureRoot 'verify.sql'
 $r020Path = Join-Path $fixtureRoot 'r020.sql'
 $rollbackPath = Join-Path $fixtureRoot 'rollback.sql'
 $migrationPath = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')) 'supabase\migrations\20260827190000_mazer_account_username_and_progression_repair.sql'
+$classifierMigrationPath = Join-Path (Resolve-Path (Join-Path $PSScriptRoot '..\..')) 'supabase\migrations\20260827200000_mazer_historical_play_evidence_contract.sql'
 $portLease = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
 try {
   $portLease.Start()
@@ -30,6 +31,7 @@ create schema auth;
 create schema mazer;
 create role anon nologin;
 create role authenticated nologin;
+create role service_role nologin;
 
 create function auth.uid() returns uuid
 language sql stable
@@ -132,16 +134,16 @@ begin
   if not exists (
     select 1 from mazer.mazer_progression_states
     where user_id = '00000000-0000-0000-0000-000000000001'
-      and player_level = 110
-      and player_completed_cycles = 109
-      and player_target_complexity = 26
-      and state #>> '{tracks,player,level}' = '110'
-      and state #>> '{tracks,player,completedCycles}' = '109'
+      and player_level = 1
+      and player_completed_cycles = 0
+      and player_target_complexity = 8
+      and state #>> '{tracks,player,level}' = '1'
+      and state #>> '{tracks,player,completedCycles}' = '0'
       and state #>> '{tracks,player,struggleCycles}' = '9007199254740991'
       and state #>> '{tracks,ai-runner,keep}' = 'true'
       and state ->> 'root' = 'keep'
   ) then
-    raise exception 'PRE_IDEMPOTENCY_RECEIPT_ACCOUNT_WAS_MUTATED';
+    raise exception 'IMMUTABLE_R019_PRE_IDEMPOTENCY_CLASSIFICATION_NOT_REPRODUCED';
   end if;
 
   if not exists (
@@ -183,6 +185,11 @@ begin
 
   if (select count(*) from mazer.mazer_cycle_receipts) <> 3 then
     raise exception 'RECEIPT_CONSERVATION_FAILED';
+  end if;
+  if not mazer.mazer_has_historical_play_receipt('00000000-0000-0000-0000-000000000001')
+    or mazer.mazer_has_historical_play_receipt('00000000-0000-0000-0000-000000000002')
+  then
+    raise exception 'HISTORICAL_PLAY_EVIDENCE_CLASSIFIER_FAILED';
   end if;
 end;
 $verify$;
@@ -285,7 +292,14 @@ set
   level_reached_at = null,
   updated_at = clock_timestamp()
 from fixture_r020_restore_input i
-where s.user_id = i.user_id;
+where s.user_id = i.user_id
+  and not (
+    s.player_level = 1
+    and s.player_rank = 'E'
+    and s.player_target_complexity = 8
+    and s.player_completed_cycles = 0
+    and s.revision = i.revision + 1
+  );
 
 create table fixture_r020_apply_preimage as
 select s.*
@@ -422,6 +436,7 @@ insert into mazer.mazer_progression_states select * from fixture_progression_pre
 truncate table mazer.mazer_profiles;
 insert into mazer.mazer_profiles select * from fixture_profile_preimage;
 drop function mazer.mazer_set_username(uuid, text);
+drop function mazer.mazer_has_historical_play_receipt(uuid);
 
 do $rollback$
 begin
@@ -438,6 +453,9 @@ begin
   end if;
   if to_regprocedure('mazer.mazer_set_username(uuid,text)') is not null then
     raise exception 'FUNCTION_ROLLBACK_FAILED';
+  end if;
+  if to_regprocedure('mazer.mazer_has_historical_play_receipt(uuid)') is not null then
+    raise exception 'CLASSIFIER_FUNCTION_ROLLBACK_FAILED';
   end if;
 end;
 $rollback$;
@@ -470,6 +488,7 @@ try {
   $dataDirectory = & (Join-Path $pg 'psql.exe') -X -At -h 127.0.0.1 -p $port -U postgres -d postgres -c 'show data_directory'
   if ((Resolve-Path $dataDirectory).Path -ne (Resolve-Path $dataPath).Path) { throw 'PG_CLUSTER_IDENTITY_MISMATCH' }
   Invoke-PsqlFile $migrationPath
+  Invoke-PsqlFile $classifierMigrationPath
   Invoke-PsqlFile $verifyPath
   Invoke-PsqlFile $r020Path
   Invoke-PsqlFile $rollbackPath
