@@ -4751,6 +4751,22 @@ export class MenuScene extends Phaser.Scene {
 
     this.menuStaticDrawLifecyclePhase = 'deconstructing';
     this.menuStaticDeconstructStartedAtMs = time;
+    // The bleed-dock corridor's own outward-to-inward retraction
+    // (resolveLegacyBleedDockGrowthProgress's deconstructing branch) reads
+    // menuStaticDeconstructStartedAtMs directly and finishes retracting
+    // within LEGACY_BLEED_DOCK_GROWTH_MS of it -- fast, and fixed-length.
+    // The outbound laser/diamond-spin used to arm on a completely different,
+    // much later clock (tilesVisible dropping to within one batch of zero,
+    // which for the full tile-count-based grid clear can take far longer
+    // than the corridor's own retraction). That mismatch is exactly the
+    // visible "pause" bug report: the corridor finishes its quick shrink,
+    // its last jutting tile just sits there, and only much later does the
+    // laser/spin finally kick in. Arming it here, on the same instant and
+    // the same clock as the corridor itself, makes both start together with
+    // no gap -- if a transfer is armed for this deconstruct at all.
+    if (this.playerTransferEnergyArmed && this.playerTransferEnergyOutboundStartedAtMs === null) {
+      this.playerTransferEnergyOutboundStartedAtMs = time;
+    }
     this.menuStaticDeconstructZeroHoldStartedAtMs = null;
     this.menuStaticBuildPrerollStartedAtMs = null;
     this.menuStaticBuildPhaseStartedAtMs = null;
@@ -4865,7 +4881,13 @@ export class MenuScene extends Phaser.Scene {
       tileStepMs: LEGACY_MENU_STATIC_DRAW_TILE_STEP_MS,
       tilesVisible: this.menuStaticDrawTilesVisible
     });
-    if (buildRemainingMs !== null && buildRemainingMs <= LEGACY_PLAYER_SPAWN_BEAM_TRAVEL_MS) {
+    // Widened to LEGACY_BLEED_DOCK_GROWTH_MS (the corridor's own full growth
+    // window, longer than the beam's travel time) so this reliably arms
+    // before the corridor finishes touching the edge -- armLegacyPlayerArrivalForFinalBuildStep
+    // pins the beam's own start to the future instant buildRemainingMs
+    // reaches 0, so arming early just gives that pin more lead time; it
+    // does not make the beam fire early.
+    if (buildRemainingMs !== null && buildRemainingMs <= LEGACY_BLEED_DOCK_GROWTH_MS) {
       this.armLegacyPlayerArrivalForFinalBuildStep(time, buildRemainingMs);
     }
     if (
@@ -4886,13 +4908,10 @@ export class MenuScene extends Phaser.Scene {
 
     if (this.menuStaticDrawTilesVisible !== null && time >= this.menuStaticDrawNextTileAtMs) {
       if (this.menuStaticDrawLifecyclePhase === 'deconstructing') {
-        if (
-          this.playerTransferEnergyArmed
-          && this.playerTransferEnergyOutboundStartedAtMs === null
-          && this.menuStaticDrawTilesVisible <= this.resolveLegacyMenuStaticDrawTileBatchSize()
-        ) {
-          this.playerTransferEnergyOutboundStartedAtMs = time;
-        }
+        // Outbound arming now happens once, in armLegacyMenuStaticDeconstructStage,
+        // on the same clock as the bleed-dock corridor's own retraction --
+        // see the comment there. Arming it again here on tile-count would
+        // just reintroduce the mismatch.
         this.menuStaticDrawTilesVisible = Math.max(
           0,
           this.menuStaticDrawTilesVisible - this.resolveLegacyMenuStaticDrawTileBatchSize()
@@ -4941,7 +4960,19 @@ export class MenuScene extends Phaser.Scene {
     );
     this.playerSpawnBurstStartedAtMs ??= alignedStartedAtMs;
     if (this.playerTransferEnergyArmed) {
-      this.playerTransferEnergyDeliveryStartedAtMs ??= alignedStartedAtMs;
+      // The bleed-dock corridor's own outward growth
+      // (resolveLegacyBleedDockGrowthProgress's building branch) only
+      // reaches the true screen edge (progress 1) exactly when this build
+      // completes (buildRemainingMs 0) -- it does not arrive early. Pinning
+      // the inbound beam's own start to that same future instant, rather
+      // than back-dating it so the beam's travel time finishes at build end,
+      // means the beam visually holds at zero progress (normalizeElapsedMs
+      // clamps a negative elapsed to 0) right up until the corridor has
+      // genuinely touched the edge, then fires -- matching "once the bleed
+      // paths touch the screen's edge, that's when the lasers shoot the
+      // player back in" instead of firing partway through the corridor's
+      // own growth.
+      this.playerTransferEnergyDeliveryStartedAtMs ??= time + Math.max(0, buildRemainingMs);
     }
   }
 
