@@ -971,12 +971,16 @@ const resolveLegacyPlayerMaxTargetComplexityForCompletedCycles = (
   );
 };
 
-const hasCoherentLegacyPlayerProgression = (track: LegacyProgressionTrack): boolean => (
-  track.targetComplexity <= resolveLegacyPlayerMaxTargetComplexityForCompletedCycles(track.completedCycles)
-  && compareLegacyProgressionOrdinals(
+const hasCoherentLegacyPlayerOrdinal = (track: LegacyProgressionTrack): boolean => (
+  compareLegacyProgressionOrdinals(
     track.level,
     incrementLegacyProgressionOrdinal(track.completedCycles)
   ) <= 0
+);
+
+const hasCoherentLegacyPlayerProgression = (track: LegacyProgressionTrack): boolean => (
+  hasCoherentLegacyPlayerOrdinal(track)
+  && track.targetComplexity <= resolveLegacyPlayerMaxTargetComplexityForCompletedCycles(track.completedCycles)
 );
 
 type LegacyProgressionNormalizationSource = 'authoritative-remote' | 'local-unproven';
@@ -997,18 +1001,17 @@ const normalizeLegacyProgressionStateForSource = (
   );
   const shouldResetLegacyAiRunner = aiRunnerBaselineVersion < LEGACY_PROGRESSION_AI_BASELINE_VERSION;
   const normalizedPlayer = normalizeTrack(tracks.player, fallback.tracks.player);
+  const playerOrdinalIsCoherent = hasCoherentLegacyPlayerOrdinal(normalizedPlayer);
   const playerProgressionIsCoherent = hasCoherentLegacyPlayerProgression(normalizedPlayer);
   const shouldRebaseLegacyPlayerProgression = (
-    !playerProgressionIsCoherent
-    || (
-      source === 'local-unproven'
-      && !hasLegacyPlayerBaselineV5Provenance(normalizedPlayer)
-    )
+    source === 'authoritative-remote'
+      ? !playerOrdinalIsCoherent
+      : !playerProgressionIsCoherent || !hasLegacyPlayerBaselineV5Provenance(normalizedPlayer)
   );
   const player = shouldRebaseLegacyPlayerProgression
     ? rebaseLegacyPlayerProgressionBaseline()
     : source === 'authoritative-remote'
-      ? {
+      ? normalizeTrack({
         ...normalizedPlayer,
         // A coherent own-row Supabase read is authoritative evidence that
         // historical progression belongs to this account. Stamp the existing
@@ -1017,8 +1020,15 @@ const normalizeLegacyProgressionStateForSource = (
         struggleCycles: Math.max(
           normalizedPlayer.struggleCycles,
           LEGACY_PROGRESSION_PLAYER_BASELINE_V5_PROVENANCE_STRUGGLE_CYCLES
+        ),
+        // Historical difficulty formulas changed independently from the
+        // visible completion ordinal. Keep the server-proven level/cycles but
+        // cap obsolete difficulty pressure at today's safe earned ceiling.
+        targetComplexity: Math.min(
+          normalizedPlayer.targetComplexity,
+          resolveLegacyPlayerMaxTargetComplexityForCompletedCycles(normalizedPlayer.completedCycles)
         )
-      }
+      }, fallback.tracks.player)
       : normalizedPlayer;
   return {
     version: 1,
@@ -1045,8 +1055,9 @@ export const normalizeLegacyProgressionState = (value: unknown): LegacyProgressi
 /**
  * Normalizes an authenticated, own-row Supabase progression response.
  * Coherent historical progression is retained even when it predates the
- * browser-only provenance sentinel; impossible ordinals or difficulty still
- * fail closed through the same coherence checks as local state.
+ * browser-only provenance sentinel. Impossible ordinals still fail closed;
+ * obsolete difficulty above today's earned ceiling is clamped without erasing
+ * the server-proven completion ordinal.
  */
 export const normalizeLegacyAuthoritativeProgressionState = (value: unknown): LegacyProgressionState => (
   normalizeLegacyProgressionStateForSource(value, 'authoritative-remote')

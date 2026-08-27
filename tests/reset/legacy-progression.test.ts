@@ -474,6 +474,30 @@ describe('legacy progression', () => {
     });
   });
 
+  test('preserves an authoritative remote ordinal while clamping obsolete difficulty pressure', () => {
+    const baseline = createEmptyLegacyProgressionState();
+    const historicalDifficulty = {
+      ...baseline,
+      tracks: {
+        ...baseline.tracks,
+        player: {
+          ...baseline.tracks.player,
+          completedCycles: '3',
+          level: '4',
+          struggleCycles: 2,
+          targetComplexity: LEGACY_PROGRESSION_MAX_COMPLEXITY
+        }
+      }
+    };
+
+    expect(normalizeLegacyAuthoritativeProgressionState(historicalDifficulty).tracks.player).toMatchObject({
+      completedCycles: '3',
+      level: '4',
+      struggleCycles: Number.MAX_SAFE_INTEGER,
+      targetComplexity: LEGACY_PROGRESSION_MIN_COMPLEXITY + (3 * 4)
+    });
+  });
+
   test('keeps a coherent earned player trajectory when it migrates to the current baseline', () => {
     const storage = new MemoryStorage();
     const baseline = createEmptyLegacyProgressionState();
