@@ -61,11 +61,14 @@ comment on function mazer.mazer_set_username(uuid, text) is
   'Auth-bound username rename. Updates only the caller profile; the case-insensitive unique index remains final collision authority and the username-origin trigger marks the value claimed.';
 
 -- The current runtime deliberately rebases historical player counters that
--- lack post-baseline proof. Legacy receipts have no client_run_id/ruleset/
--- recipe tuple, so they remain retained history but cannot prove a current
--- player level. Exclude any account that has since produced a modern accepted
--- play receipt, then restore every remaining player track to the exact Level-1
--- source baseline. This repairs leaderboard columns and JSON together.
+-- lack post-baseline proof. Pre-idempotency legacy receipts have no
+-- client_run_id, so they remain retained history but cannot prove a current
+-- player level. A non-null play client_run_id is the completion RPC's accepted
+-- receipt invariant. Do not require recipe metadata here: legacy-v1 correctly
+-- writes null recipe_version/recipe_hash, and endless-v1 currently writes a
+-- null recipe_hash. Exclude any account with an accepted play receipt, then
+-- restore every remaining player track to the exact Level-1 source baseline.
+-- This repairs leaderboard columns and JSON together.
 with baseline_candidates as (
   select
     s.user_id,
@@ -77,9 +80,6 @@ with baseline_candidates as (
     where r.user_id = s.user_id
       and r.surface = 'play'
       and r.client_run_id is not null
-      and r.ruleset_id is not null
-      and r.recipe_version is not null
-      and r.recipe_hash is not null
   )
 ), normalized as (
   select
@@ -159,9 +159,6 @@ begin
       where r.user_id = s.user_id
         and r.surface = 'play'
         and r.client_run_id is not null
-        and r.ruleset_id is not null
-        and r.recipe_version is not null
-        and r.recipe_hash is not null
     )
       and (
         s.player_level <> 1

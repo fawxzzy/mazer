@@ -86,7 +86,8 @@ grant usage on schema mazer to authenticated;
 insert into mazer.mazer_profiles(user_id, username, username_origin) values
   ('00000000-0000-0000-0000-000000000001', 'Mazer-100001', 'generated'),
   ('00000000-0000-0000-0000-000000000002', 'Mazer-100002', 'generated'),
-  ('00000000-0000-0000-0000-000000000003', 'Mazer-100003', 'generated');
+  ('00000000-0000-0000-0000-000000000003', 'Mazer-100003', 'generated'),
+  ('00000000-0000-0000-0000-000000000004', 'Mazer-100004', 'generated');
 
 insert into mazer.mazer_progression_states(
   user_id, state, player_level, player_rank, player_target_complexity,
@@ -106,13 +107,19 @@ insert into mazer.mazer_progression_states(
     '00000000-0000-0000-0000-000000000003',
     '{"tracks":{"player":{"level":"4","completedCycles":"3","targetComplexity":20,"rank":"E","struggleCycles":9007199254740991},"ai-runner":{"keep":true}}}',
     4, 'E', 20, 3, 7, '2026-08-27T00:00:00Z', '2026-08-27T00:00:00Z', '2026-08-27T00:00:00Z'
+  ),
+  (
+    '00000000-0000-0000-0000-000000000004',
+    '{"tracks":{"player":{"level":"101","completedCycles":"100","targetComplexity":400,"rank":"S","struggleCycles":9007199254740991},"ai-runner":{"keep":true}}}',
+    101, 'S', 400, 100, 11, '2026-08-27T00:00:00Z', '2026-08-27T00:00:00Z', '2026-08-27T00:00:00Z'
   );
 
 insert into mazer.mazer_cycle_receipts(
   id, user_id, surface, client_run_id, ruleset_id, recipe_version, recipe_hash
 ) values
   ('10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'play', null, null, null, null),
-  ('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003', 'play', '20000000-0000-4000-8000-000000000003', 'rules-v1', 1, 'hash-v1');
+  ('10000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003', 'play', '20000000-0000-4000-8000-000000000003', 'legacy-v1', null, null),
+  ('10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000004', 'play', '20000000-0000-4000-8000-000000000004', 'endless-v1', 1, null);
 
 create table fixture_progression_preimage as table mazer.mazer_progression_states;
 create table fixture_profile_preimage as table mazer.mazer_profiles;
@@ -145,10 +152,21 @@ begin
       and player_target_complexity = 20
       and revision = 7
   ) then
-    raise exception 'MODERN_RECEIPT_ACCOUNT_WAS_MUTATED';
+    raise exception 'LEGACY_V1_ACCEPTED_RECEIPT_ACCOUNT_WAS_MUTATED';
   end if;
 
-  if (select count(*) from mazer.mazer_cycle_receipts) <> 2 then
+  if not exists (
+    select 1 from mazer.mazer_progression_states
+    where user_id = '00000000-0000-0000-0000-000000000004'
+      and player_level = 101
+      and player_completed_cycles = 100
+      and player_target_complexity = 400
+      and revision = 11
+  ) then
+    raise exception 'ENDLESS_V1_ACCEPTED_RECEIPT_ACCOUNT_WAS_MUTATED';
+  end if;
+
+  if (select count(*) from mazer.mazer_cycle_receipts) <> 3 then
     raise exception 'RECEIPT_CONSERVATION_FAILED';
   end if;
 end;

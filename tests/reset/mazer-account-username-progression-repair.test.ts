@@ -36,12 +36,14 @@ describe('Mazer account username and progression repair', () => {
     expect(saveSource).not.toContain('.upsert(');
   });
 
-  test('treats legacy receipts as retained history and excludes any account with a modern accepted play receipt', () => {
+  test('uses the completion RPC client-run invariant without requiring nullable recipe metadata', () => {
     expect(migration).toContain("r.surface = 'play'");
     expect(migration).toContain('r.client_run_id is not null');
-    expect(migration).toContain('r.ruleset_id is not null');
-    expect(migration).toContain('r.recipe_version is not null');
-    expect(migration).toContain('r.recipe_hash is not null');
+    expect(migration).not.toContain('r.ruleset_id is not null');
+    expect(migration).not.toContain('r.recipe_version is not null');
+    expect(migration).not.toContain('r.recipe_hash is not null');
+    expect(migration).toContain('legacy-v1 correctly');
+    expect(migration).toContain('endless-v1 currently');
     expect(migration).toContain('where not exists (');
   });
 
@@ -62,7 +64,10 @@ describe('Mazer account username and progression repair', () => {
     expect(pg17Verifier).toContain("'show data_directory'");
     expect(pg17Verifier).toContain("throw 'PG_CLUSTER_IDENTITY_MISMATCH'");
     expect(pg17Verifier.indexOf("'show data_directory'")).toBeLessThan(pg17Verifier.indexOf('Invoke-PsqlFile $migrationPath'));
-    expect(pg17Verifier).toContain("raise exception 'MODERN_RECEIPT_ACCOUNT_WAS_MUTATED'");
+    expect(pg17Verifier).toContain("'legacy-v1', null, null");
+    expect(pg17Verifier).toContain("'endless-v1', 1, null");
+    expect(pg17Verifier).toContain("raise exception 'LEGACY_V1_ACCEPTED_RECEIPT_ACCOUNT_WAS_MUTATED'");
+    expect(pg17Verifier).toContain("raise exception 'ENDLESS_V1_ACCEPTED_RECEIPT_ACCOUNT_WAS_MUTATED'");
     expect(pg17Verifier).toContain("raise exception 'RECEIPT_CONSERVATION_FAILED'");
     expect(pg17Verifier).toContain("raise exception 'USERNAME_OWNER_MISMATCH_WAS_ACCEPTED'");
     expect(pg17Verifier).toContain("raise exception 'USERNAME_COLLISION_WAS_ACCEPTED'");
