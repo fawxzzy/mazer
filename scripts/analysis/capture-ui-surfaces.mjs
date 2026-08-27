@@ -46,10 +46,14 @@ const EXPECTED_GOAL_CORE_COLOR = 0xff405d;
 const EXPECTED_TRAIL_SHINE_COLOR = 0xf1faf6;
 const EXPECTED_TRAIL_SHINE_EDGE_COLOR = 0xe9fff1;
 const INLINE_STATE_TEXT_LABELS = Object.freeze([
+  'Animated Background',
+  'Board Zoom',
   'High Contrast',
   'Camera Follow',
   'Control Style',
-  'Smart Steering'
+  'Smart Steering',
+  'Trail Fade',
+  'Trail Shine'
 ]);
 const AUTH_EXPECTED_LABELS = Object.freeze([
   'EMAIL',
@@ -1328,8 +1332,14 @@ const collectProgressionBadgeGeometryIssues = (surfaceId, surface, viewport) => 
 
   const badge = surface.progressionBadge?.bounds;
   const board = surface.board?.bounds;
-  if (!isFiniteBounds(badge) || !isFiniteBounds(board)) {
-    return [`${surfaceId}:missing-progression-badge-or-board-bounds`];
+  // The persistent corner badge was deliberately retired in favor of the
+  // between-maze level announcer. Its diagnostics remain as null-compatible
+  // legacy fields; absence is the expected current contract.
+  if (!isFiniteBounds(badge)) {
+    return [];
+  }
+  if (!isFiniteBounds(board)) {
+    return [`${surfaceId}:missing-board-bounds`];
   }
 
   const issues = [];

@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { access, readFile, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import {
@@ -113,6 +114,21 @@ const readDiagnostics = (page) => page.evaluate((key) => {
   return value === undefined ? null : JSON.parse(JSON.stringify(value));
 }, RUNTIME_DIAGNOSTICS_KEY);
 
+const digestTopology = (diagnostics) => {
+  const playtest = diagnostics?.play?.playtest;
+  if (!Array.isArray(playtest?.walkableRows)) return null;
+  const player = diagnostics?.play?.player;
+  return createHash('sha256').update(JSON.stringify({
+    goal: diagnostics?.play?.goal ?? null,
+    height: playtest.mazeHeight ?? null,
+    rows: playtest.walkableRows,
+    start: player && Number.isFinite(player.x) && Number.isFinite(player.y)
+      ? { x: player.x, y: player.y }
+      : null,
+    width: playtest.mazeWidth ?? null
+  })).digest('hex');
+};
+
 const captureCase = async ({ browser, baseUrl, outputDir, testCase }) => {
   const context = await browser.newContext({
     deviceScaleFactor: DEVICE_SCALE_FACTOR,
@@ -152,6 +168,10 @@ const captureCase = async ({ browser, baseUrl, outputDir, testCase }) => {
       && diagnostics?.play?.lifecycle?.playerVisible === true
       && diagnostics?.generation?.drawStage?.complete === true;
   }, RUNTIME_DIAGNOSTICS_KEY, { timeout: 90_000 });
+  // The arrival flash is intentionally tied to the final build step. Wait
+  // through that short visual-only tail so the gallery compares unobscured
+  // maze topology rather than sampling different animation frames.
+  await page.waitForTimeout(600);
 
   const diagnostics = await readDiagnostics(page);
   const playerTrack = diagnostics?.progression?.tracks?.player;
@@ -160,6 +180,15 @@ const captureCase = async ({ browser, baseUrl, outputDir, testCase }) => {
   if (playerTrack?.targetComplexity !== testCase.targetComplexity) {
     issues.push(`targetComplexity=${playerTrack?.targetComplexity ?? 'missing'}`);
   }
+  // The query seed is the deterministic start of the generation candidate
+  // window. The selected maze records the winning candidate seed, which can
+  // legitimately differ from that base while remaining deterministic.
+  const selectedSeed = diagnostics?.generation?.maze?.seed ?? null;
+  if (!Number.isFinite(selectedSeed)) issues.push('selectedSeed=missing');
+  const mazeSize = diagnostics?.generation?.maze?.size ?? null;
+  if (!Number.isFinite(mazeSize)) issues.push('mazeSize=missing');
+  const topologyDigest = digestTopology(diagnostics);
+  if (topologyDigest === null) issues.push('topologyDigest=missing');
 
   const screenshotPath = resolve(outputDir, `${testCase.id}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: false });
@@ -167,10 +196,16 @@ const captureCase = async ({ browser, baseUrl, outputDir, testCase }) => {
 
   return {
     ...testCase,
-    actualSeed: diagnostics?.generation?.maze?.seed ?? null,
+    selectedSeed,
     browserErrors: { console: consoleErrors, page: pageErrors },
     issues,
-    mazeSize: diagnostics?.generation?.maze?.width ?? null,
+    mazeSize,
+    renderTileSize: diagnostics?.play?.board?.renderTileSize ?? null,
+    topologyDigest,
+    walkableTileCount: diagnostics?.play?.playtest?.walkableRows?.reduce(
+      (count, row) => count + [...row].filter((cell) => cell === '1').length,
+      0
+    ) ?? null,
     progression: {
       level: playerTrack?.level ?? null,
       targetComplexity: playerTrack?.targetComplexity ?? null
@@ -186,59 +221,132 @@ const main = async () => {
   const minLevel = args.minLevel !== undefined ? Number.parseInt(args.minLevel, 10) : DEFAULT_MIN_LEVEL;
   const maxLevel = args.maxLevel !== undefined ? Number.parseInt(args.maxLevel, 10) : DEFAULT_MAX_LEVEL;
   const cases = buildCases(minLevel, maxLevel);
-
-  // Clear the canonical directory first -- one stable gallery, never a
-  // second dated copy sitting next to it.
-  await rm(outputDir, { force: true, recursive: true });
-  await ensureDir(outputDir);
-
-  if (args.skipBuild !== true) runNpmCommand(['run', 'build']);
-
-  const preview = await launchPreviewServer({
-    requestedBaseUrl,
-    previewTimeoutMs: DEFAULT_PREVIEW_TIMEOUT_MS
-  });
-  const browser = await chromium.launch({ headless: true });
+  const summaryPath = resolve(outputDir, 'summary.json');
   const results = [];
+  const currentCommitSha = getCommitSha();
+  let captureCommitSha = currentCommitSha;
+  let capturedAt = null;
+  let reconciliationCommitSha = null;
 
-  try {
-    for (const testCase of cases) {
-      results.push(await captureCase({
-        browser,
-        baseUrl: preview.baseUrl,
-        outputDir,
-        testCase
-      }));
-      process.stdout.write(`captured ${testCase.id} (targetComplexity=${testCase.targetComplexity})\n`);
+  if (args.reconcileExisting === true) {
+    const existing = JSON.parse(await readFile(summaryPath, 'utf8'));
+    captureCommitSha = existing.captureCommitSha ?? existing.commitSha ?? null;
+    capturedAt = existing.capturedAt ?? existing.generatedAt ?? null;
+    if (typeof captureCommitSha !== 'string' || !/^[a-f0-9]{40}$/.test(captureCommitSha)) {
+      throw new Error('Existing gallery is missing an immutable capture commit SHA.');
     }
-  } finally {
-    await browser.close();
-    await stopPreviewServer(preview.child);
+    if (typeof capturedAt !== 'string' || !Number.isFinite(Date.parse(capturedAt))) {
+      throw new Error('Existing gallery is missing an immutable capture timestamp.');
+    }
+    reconciliationCommitSha = currentCommitSha;
+    if (!Array.isArray(existing.results) || existing.results.length !== cases.length) {
+      throw new Error(`Existing gallery case count does not match ${cases.length}.`);
+    }
+    for (const [index, entry] of existing.results.entries()) {
+      if (entry.id !== cases[index]?.id || entry.requestedSeed !== FIXED_SEED) {
+        throw new Error(`Existing gallery identity mismatch at result ${index}.`);
+      }
+      await access(entry.screenshotPath);
+      const selectedSeed = entry.selectedSeed ?? entry.actualSeed ?? null;
+      const evidenceIssues = [];
+      if (!Number.isFinite(selectedSeed)) evidenceIssues.push('selectedSeed=missing');
+      if (!Number.isFinite(entry.mazeSize)) evidenceIssues.push('mazeSize=missing');
+      if (!Number.isFinite(entry.renderTileSize)) evidenceIssues.push('renderTileSize=missing');
+      if (!Number.isFinite(entry.walkableTileCount)) evidenceIssues.push('walkableTileCount=missing');
+      if (typeof entry.topologyDigest !== 'string' || !/^[a-f0-9]{64}$/.test(entry.topologyDigest)) {
+        evidenceIssues.push('topologyDigest=missing');
+      }
+      results.push({
+        ...entry,
+        selectedSeed,
+        issues: [
+          ...entry.issues.filter((issue) => !/^seed=\d+$/.test(issue)),
+          ...evidenceIssues
+        ]
+      });
+    }
+  } else {
+    // Clear the canonical directory first -- one stable gallery, never a
+    // second dated copy sitting next to it.
+    await rm(outputDir, { force: true, recursive: true });
+    await ensureDir(outputDir);
+
+    if (args.skipBuild !== true) runNpmCommand(['run', 'build']);
+
+    const preview = await launchPreviewServer({
+      requestedBaseUrl,
+      previewTimeoutMs: DEFAULT_PREVIEW_TIMEOUT_MS
+    });
+    const browser = await chromium.launch({ headless: true });
+
+    try {
+      for (const testCase of cases) {
+        results.push(await captureCase({
+          browser,
+          baseUrl: preview.baseUrl,
+          outputDir,
+          testCase
+        }));
+        process.stdout.write(`captured ${testCase.id} (targetComplexity=${testCase.targetComplexity})\n`);
+      }
+    } finally {
+      await browser.close();
+      await stopPreviewServer(preview.child);
+    }
   }
 
+  const legacyResults = results.filter((entry) => Number(entry.level) <= 99);
+  const firstTenResults = results.filter((entry) => Number(entry.level) <= 10);
+  const targetStepViolations = legacyResults.slice(1).filter((entry, index) => (
+    entry.targetComplexity - legacyResults[index].targetComplexity !== 4
+  )).map((entry) => entry.id);
+  const firstTenMazeSizeRegressions = firstTenResults.slice(1).filter((entry, index) => (
+    entry.mazeSize < firstTenResults[index].mazeSize
+  )).map((entry) => entry.id);
+  const level99 = results.find((entry) => entry.level === '99') ?? null;
+  const clampMismatches = level99 === null ? [] : results.filter((entry) => Number(entry.level) >= 100 && (
+    entry.targetComplexity !== level99?.targetComplexity
+    || entry.mazeSize !== level99?.mazeSize
+    || entry.topologyDigest !== level99?.topologyDigest
+  )).map((entry) => entry.id);
+  const progressionChecks = {
+    clampMismatches,
+    firstTenMazeSizeRegressions,
+    level99Through110SameTopology: level99 !== null && clampMismatches.length === 0,
+    targetStepViolations
+  };
   const failures = results.filter((entry) => (
     entry.issues.length > 0
     || entry.browserErrors.console.length > 0
     || entry.browserErrors.page.length > 0
   ));
+  const summaryCapturedAt = capturedAt ?? new Date().toISOString();
   const summary = {
-    commitSha: getCommitSha(),
+    commitSha: captureCommitSha,
+    captureCommitSha,
+    reconciliationCommitSha,
     contract: 'mazer-level-progression-gallery-v1',
     endlessProgressionNote: 'legacyEndlessProgression.ts defines a distinct recipe for level >= 100 '
       + '(LEGACY_ENDLESS_LEVEL_BOUNDARY) but is only consumed by legacyRemoteProgression.ts as of this '
       + 'capture -- the client maze-generation path (legacyProgression.ts / MenuScene) is not wired to it '
-      + 'yet, so levels 100-110 render identically to level 99 (targetComplexity clamped to 400). This is '
-      + 'the real, currently-shipped behavior, captured as-is.',
+      + 'yet, so levels 100-110 use the same fixed-seed topology as level 99 (targetComplexity clamped to 400). '
+      + 'This is the real, currently-shipped behavior, captured as-is.',
     fixedSeed: FIXED_SEED,
-    generatedAt: new Date().toISOString(),
+    generatedAt: summaryCapturedAt,
+    capturedAt: summaryCapturedAt,
+    reconciledAt: reconciliationCommitSha === null ? null : new Date().toISOString(),
     levelRange: [minLevel, maxLevel],
-    pass: failures.length === 0,
+    pass: failures.length === 0
+      && targetStepViolations.length === 0
+      && firstTenMazeSizeRegressions.length === 0
+      && clampMismatches.length === 0,
     caseCount: results.length,
     viewport: VIEWPORT,
     deviceScaleFactor: DEVICE_SCALE_FACTOR,
+    progressionChecks,
     results
   };
-  await writeJson(resolve(outputDir, 'summary.json'), summary);
+  await writeJson(summaryPath, summary);
   process.stdout.write(`${JSON.stringify({ ...summary, results: `[${results.length} entries, see summary.json]` }, null, 2)}\n`);
 
   if (!summary.pass) process.exitCode = 1;

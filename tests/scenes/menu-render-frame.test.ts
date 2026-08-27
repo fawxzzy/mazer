@@ -458,12 +458,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
         top: 7,
         right: 5,
         bottom: 11
-      },
-      {
-        left: -1,
-        top: 7,
-        right: 5,
-        bottom: 18
       }
     ]);
 
@@ -485,12 +479,6 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
         left: 7,
         top: -1,
         right: 11,
-        bottom: 5
-      },
-      {
-        left: 7,
-        top: -1,
-        right: 18,
         bottom: 5
       }
     ]);
@@ -720,7 +708,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_PRIMARY = cyberArcadeMaterial.rail.mint;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BORDER_SECONDARY = cyberArcadeMaterial.rail.cyan;');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_BACKGROUND_ALPHA = 0.12;');
-    expect(menuSceneSource).toContain('const LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO = 0.066;');
+    expect(menuSceneSource).not.toContain('LEGACY_BOARD_SIGIL_CORNER_FACET_SIZE_RATIO');
     expect(menuSceneSource).not.toContain('LEGACY_BOARD_SIGIL_CORNER_FACET_SHIMMER_MS');
     expect(menuSceneSource).not.toContain('LEGACY_BOARD_SIGIL_CORNER_FACET_FRAME_MS');
     expect(menuSceneSource).toContain('const LEGACY_BOARD_MAZE_SAFE_INSET_RATIO = 0.018;');
@@ -776,7 +764,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private drawLegacyPlayerTransferEnergy(');
     expect(menuSceneSource).toContain('this.drawLegacyPlayerTransferEnergy(');
     expect(menuSceneSource).toContain('resolveLegacyPlayerTransferVisualState({');
-    expect(menuSceneSource).toContain('this.playerTransferEnergyDeliveryStartedAtMs = time;');
+    expect(menuSceneSource).toContain('this.playerTransferEnergyDeliveryStartedAtMs ??= alignedStartedAtMs;');
     expect(menuSceneSource).toContain('playerTransfer: LegacyPlayerTransferVisualState;');
     expect(menuSceneSource).toContain('playerTransfer,');
     expect(menuSceneSource).toContain('this.isLegacyMenuDeconstructHandoffActive(time)');
@@ -1567,7 +1555,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("placement: 'trailing'");
     expect(menuSceneSource).not.toContain('drawLegacyPlayTouchPauseIcon');
     expect(menuSceneSource).toContain('const background = this.add.rectangle(\n      pauseRect.centerX,');
-    expect(menuSceneSource).toContain('bounds: createVisualRect(pauseRect.left, pauseRect.top, pauseRect.width, pauseRect.height)');
+    expect(menuSceneSource).toContain('const hitSize = Math.max(36, pauseRect.width, pauseRect.height);');
+    expect(menuSceneSource).toContain('bounds: hitBounds');
     expect(menuSceneSource).toContain('text,');
     expect(menuSceneSource).toContain('? Math.max(frontDoorChrome?.hoverAlpha ?? 0.68, 0.68)');
   });
@@ -1596,7 +1585,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('drawLegacyMenuUsernameLabel');
     expect(profileButtonSource).toContain("placement: 'leading'");
     expect(profileButtonSource).toContain('sizeScale: this.layout.headerIconScale');
-    expect(profileButtonSource).toContain('bounds: createVisualRect(frame.left, frame.top, frame.width, frame.height)');
+    expect(profileButtonSource).toContain('const hitSize = Math.max(36, frame.width, frame.height);');
+    expect(profileButtonSource).toContain('bounds: hitBounds');
     expect(profileButtonSource).toContain('const blinkAlpha = clamp(0.22 + (phase * 0.78) + (this.menuProfileActive ? 0.08 : 0), 0.14, 1);');
     expect(profileButtonSource).toContain('const blinkScale = 0.92 + (phase * 0.08) + (this.menuProfileActive ? 0.02 : 0);');
     expect(profileButtonSource).toMatch(/this\.drawLegacyProfileIcon\([\s\S]*?blinkScale,\s*false\s*\);/);
@@ -1851,7 +1841,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('(orbitPhase + (index / LEGACY_MENU_PATH_TITLE_ORBIT_SIGILS)) % 1');
     expect(menuSceneSource).toContain('this.playerTransferEnergyOutboundStartedAtMs === null');
     expect(menuSceneSource).toContain('this.menuStaticDrawTilesVisible <= this.resolveLegacyMenuStaticDrawTileBatchSize()');
-    expect(menuSceneSource).toContain('this.playerSpawnBurstStartedAtMs ??= time;');
+    expect(menuSceneSource).toContain('resolveLegacyStaticDrawBuildRemainingMs({');
+    expect(menuSceneSource).toContain('this.playerSpawnBurstStartedAtMs ??= alignedStartedAtMs;');
   });
 
   test('consumes shared UI standards for buttons, titles, guides, and toggles', () => {

@@ -175,6 +175,86 @@ export const shouldSettleLegacyStaticDrawStage = ({
   && tilesVisible === null
 );
 
+const resolveLegacyStaticDrawCounterRemainingMs = ({
+  batchSize,
+  currentVisible,
+  nextStepAtMs,
+  nowMs,
+  stepMs,
+  total
+}: {
+  batchSize: number;
+  currentVisible: number | null;
+  nextStepAtMs: number;
+  nowMs: number;
+  stepMs: number;
+  total: number;
+}): number => {
+  if (currentVisible === null || currentVisible >= total) {
+    return 0;
+  }
+
+  const safeBatchSize = Math.max(1, Math.round(batchSize));
+  const remainingTicks = Math.ceil(Math.max(0, total - currentVisible) / safeBatchSize);
+  return Math.max(0, nextStepAtMs - nowMs)
+    + (Math.max(0, remainingTicks - 1) * Math.max(0, stepMs));
+};
+
+/**
+ * Projects the later of the independent row and interleaved-tile build
+ * counters. Effects that must arrive with the final draw step use this one
+ * clock instead of attaching to whichever counter happens to finish first.
+ */
+export const resolveLegacyStaticDrawBuildRemainingMs = ({
+  drawPhase,
+  mazeHeight,
+  nextRowAtMs,
+  nextTileAtMs,
+  nowMs,
+  rowBatchSize,
+  rowStepMs,
+  rowsVisible,
+  tileBatchSize,
+  tileCount,
+  tileStepMs,
+  tilesVisible
+}: {
+  drawPhase: LegacyPlayDrawLifecyclePhase;
+  mazeHeight: number;
+  nextRowAtMs: number;
+  nextTileAtMs: number;
+  nowMs: number;
+  rowBatchSize: number;
+  rowStepMs: number;
+  rowsVisible: number | null;
+  tileBatchSize: number;
+  tileCount: number;
+  tileStepMs: number;
+  tilesVisible: number | null;
+}): number | null => {
+  if (drawPhase !== 'building') {
+    return null;
+  }
+
+  const rowRemainingMs = resolveLegacyStaticDrawCounterRemainingMs({
+    batchSize: rowBatchSize,
+    currentVisible: rowsVisible,
+    nextStepAtMs: nextRowAtMs,
+    nowMs,
+    stepMs: rowStepMs,
+    total: Math.max(0, mazeHeight)
+  });
+  const tileRemainingMs = resolveLegacyStaticDrawCounterRemainingMs({
+    batchSize: tileBatchSize,
+    currentVisible: tilesVisible,
+    nextStepAtMs: nextTileAtMs,
+    nowMs,
+    stepMs: tileStepMs,
+    total: Math.max(0, tileCount)
+  });
+  return Math.max(rowRemainingMs, tileRemainingMs);
+};
+
 export const resolveLegacyStaticDrawPlayTimerStartAtMs = ({
   currentStartedAtMs,
   drawPhase,

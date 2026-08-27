@@ -41,5 +41,5 @@ The menu miss is separate and source-local: the front-door account control still
 2. PostgreSQL 17 apply/rollback fixture passed under PowerShell 7 and Windows PowerShell 5.1: unique-cluster identity, monotonic closure, JSON projection, sibling JSON preservation, validated constraint, and exact rollback all passed with zero provider calls/live writes.
 3. Canonical `npm run verify`: `759/759` runnable tests passed (`1` explicitly skipped), followed by the production build (`main-BHhIrHDh.js`).
 4. Desktop and phone built-app menu captures passed with zero browser page errors; the inner-only profile glyph occupies the leading title row and opens the existing Account surface.
-5. Exact live aggregate preflight before the protected database repair; private preimage retained for exact rollback.
+5. Exact live aggregate preflight before the protected database repair; private preimage retained for exact rollback. The superseding R020 repair treats every conserved play receipt, including pre-idempotency null-`client_run_id` rows, as historical completion evidence and restores the exact nine R019-reset preimages rather than inferring levels from receipt counts.
 6. Post-apply zero invariant failures, unchanged row/receipt/ownership denominators, exact leaderboard rank/value readback, merged production deployment, and final route smoke.
