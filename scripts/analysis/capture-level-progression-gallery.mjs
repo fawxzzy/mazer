@@ -235,10 +235,21 @@ const main = async () => {
       }
       await access(entry.screenshotPath);
       const selectedSeed = entry.selectedSeed ?? entry.actualSeed ?? null;
+      const evidenceIssues = [];
+      if (!Number.isFinite(selectedSeed)) evidenceIssues.push('selectedSeed=missing');
+      if (!Number.isFinite(entry.mazeSize)) evidenceIssues.push('mazeSize=missing');
+      if (!Number.isFinite(entry.renderTileSize)) evidenceIssues.push('renderTileSize=missing');
+      if (!Number.isFinite(entry.walkableTileCount)) evidenceIssues.push('walkableTileCount=missing');
+      if (typeof entry.topologyDigest !== 'string' || !/^[a-f0-9]{64}$/.test(entry.topologyDigest)) {
+        evidenceIssues.push('topologyDigest=missing');
+      }
       results.push({
         ...entry,
         selectedSeed,
-        issues: entry.issues.filter((issue) => !/^seed=\d+$/.test(issue))
+        issues: [
+          ...entry.issues.filter((issue) => !/^seed=\d+$/.test(issue)),
+          ...evidenceIssues
+        ]
       });
     }
   } else {

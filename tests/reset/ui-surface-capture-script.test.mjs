@@ -311,6 +311,10 @@ describe('UI surface capture script contract', () => {
       .replace(/\r\n/g, '\n');
     const transitionSource = readFileSync(resolve(process.cwd(), 'scripts/analysis/capture-ui-transitions.mjs'), 'utf8')
       .replace(/\r\n/g, '\n');
+    const levelGallerySource = readFileSync(
+      resolve(process.cwd(), 'scripts/analysis/capture-level-progression-gallery.mjs'),
+      'utf8'
+    ).replace(/\r\n/g, '\n');
     const startTransitionStressSource = readFileSync(
       resolve(process.cwd(), 'scripts/analysis/verify-start-transition-stability.mjs'),
       'utf8'
@@ -324,6 +328,11 @@ describe('UI surface capture script contract', () => {
     expect(packageJson.scripts['runtime:start-transition:stress'])
       .toBe('node ./scripts/analysis/verify-start-transition-stability.mjs');
     expect(transitionSource).toContain('skipTopologyDiagnostics: true');
+    expect(levelGallerySource).toContain("evidenceIssues.push('selectedSeed=missing')");
+    expect(levelGallerySource).toContain("evidenceIssues.push('mazeSize=missing')");
+    expect(levelGallerySource).toContain("evidenceIssues.push('renderTileSize=missing')");
+    expect(levelGallerySource).toContain("evidenceIssues.push('walkableTileCount=missing')");
+    expect(levelGallerySource).toContain("evidenceIssues.push('topologyDigest=missing')");
     expect(startTransitionStressSource).toContain("diagnostics?.generation?.pendingRequest?.mode === 'menu'");
     expect(startTransitionStressSource).toContain("issues.push('returned-to-menu-after-start')");
     expect(startTransitionStressSource).toContain("issues.push('stale-menu-request-survived-start')");
