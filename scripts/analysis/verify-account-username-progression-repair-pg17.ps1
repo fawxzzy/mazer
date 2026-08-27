@@ -61,6 +61,7 @@ for each row execute function mazer.mazer_enforce_username_origin();
 
 create table mazer.mazer_progression_states (
   user_id uuid primary key,
+  schema_version integer not null default 5,
   state jsonb not null default '{}'::jsonb,
   player_level bigint not null,
   player_rank text not null,
@@ -69,6 +70,7 @@ create table mazer.mazer_progression_states (
   revision bigint not null,
   last_completed_cycle_at timestamptz,
   level_reached_at timestamptz,
+  created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint mazer_progression_states_completion_ordinal_check check (player_level - 1 = player_completed_cycles)
 );
@@ -393,19 +395,26 @@ begin
 end;
 $r020$;
 
+create table fixture_r020_apply_postimage as
+select s.*
+from mazer.mazer_progression_states s
+join fixture_r020_restore_input i using (user_id);
+
 -- Exact targeted rollback from the action-time preimage. This intentionally
 -- restores the reset state, proving that the bounded live repair is reversible.
 update mazer.mazer_progression_states s
 set
+  schema_version = p.schema_version,
   state = p.state,
+  last_completed_cycle_at = p.last_completed_cycle_at,
+  created_at = p.created_at,
+  updated_at = p.updated_at,
   player_level = p.player_level,
   player_rank = p.player_rank,
   player_target_complexity = p.player_target_complexity,
   player_completed_cycles = p.player_completed_cycles,
   revision = p.revision,
-  last_completed_cycle_at = p.last_completed_cycle_at,
-  level_reached_at = p.level_reached_at,
-  updated_at = p.updated_at
+  level_reached_at = p.level_reached_at
 from fixture_r020_apply_preimage p
 where s.user_id = p.user_id;
 
@@ -427,7 +436,76 @@ begin
 end;
 $r020$;
 
-select 'MAZER_R020_PROGRESSION_RESTORE_APPLY_ROLLBACK_PASS';
+-- Failure-injection proof for every host boundary. Pre-commit protection and
+-- filesystem faults leave the exact preimage untouched. Every post-commit
+-- parse/assertion/receipt fault can classify the durable expected postimage
+-- and restore the exact action-time preimage without inferring values.
+do $failure_injection$
+declare
+  boundary text;
+begin
+  foreach boundary in array array[
+    'BeforePostimageProtect',
+    'BeforePostimageDescriptorWrite',
+    'BeforeApplyIntentWrite'
+  ] loop
+    if (select count(*) from mazer.mazer_progression_states s join fixture_r020_apply_preimage p using (user_id) where to_jsonb(s) = to_jsonb(p)) <> 3 then
+      raise exception 'R020_PRECOMMIT_FAILURE_INJECTION_FAILED:%', boundary;
+    end if;
+  end loop;
+
+  foreach boundary in array array[
+    'AfterApplyCommitBeforeParse',
+    'AfterApplyAssertion',
+    'BeforeCompleteReceipt'
+  ] loop
+    update mazer.mazer_progression_states s
+    set
+      schema_version = q.schema_version,
+      state = q.state,
+      last_completed_cycle_at = q.last_completed_cycle_at,
+      created_at = q.created_at,
+      updated_at = q.updated_at,
+      player_level = q.player_level,
+      player_rank = q.player_rank,
+      player_target_complexity = q.player_target_complexity,
+      player_completed_cycles = q.player_completed_cycles,
+      revision = q.revision,
+      level_reached_at = q.level_reached_at
+    from fixture_r020_apply_postimage q
+    where s.user_id = q.user_id
+      and exists (select 1 from fixture_r020_apply_preimage p where p.user_id = s.user_id and to_jsonb(s) = to_jsonb(p));
+
+    if (select count(*) from mazer.mazer_progression_states s join fixture_r020_apply_postimage q using (user_id) where to_jsonb(s) = to_jsonb(q)) <> 3 then
+      raise exception 'R020_POSTCOMMIT_FAILURE_INJECTION_POSTIMAGE_FAILED:%', boundary;
+    end if;
+
+    update mazer.mazer_progression_states s
+    set
+      schema_version = p.schema_version,
+      state = p.state,
+      last_completed_cycle_at = p.last_completed_cycle_at,
+      created_at = p.created_at,
+      updated_at = p.updated_at,
+      player_level = p.player_level,
+      player_rank = p.player_rank,
+      player_target_complexity = p.player_target_complexity,
+      player_completed_cycles = p.player_completed_cycles,
+      revision = p.revision,
+      level_reached_at = p.level_reached_at
+    from fixture_r020_apply_preimage p, fixture_r020_apply_postimage q
+    where s.user_id = p.user_id
+      and q.user_id = p.user_id
+      and to_jsonb(s) = to_jsonb(q);
+
+    if (select count(*) from mazer.mazer_progression_states s join fixture_r020_apply_preimage p using (user_id) where to_jsonb(s) = to_jsonb(p)) <> 3 then
+      raise exception 'R020_POSTCOMMIT_FAILURE_INJECTION_ROLLBACK_FAILED:%', boundary;
+    end if;
+  end loop;
+end;
+$failure_injection$;
+
+select 'MAZER_R020_PROGRESSION_RESTORE_APPLY_ROLLBACK_FAILURE_INJECTION_PASS';
 '@
 
 $rollbackSql = @'

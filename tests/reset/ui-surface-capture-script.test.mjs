@@ -333,6 +333,12 @@ describe('UI surface capture script contract', () => {
     expect(levelGallerySource).toContain("evidenceIssues.push('renderTileSize=missing')");
     expect(levelGallerySource).toContain("evidenceIssues.push('walkableTileCount=missing')");
     expect(levelGallerySource).toContain("evidenceIssues.push('topologyDigest=missing')");
+    expect(levelGallerySource).toContain("captureCommitSha = existing.captureCommitSha ?? existing.commitSha ?? null");
+    expect(levelGallerySource).toContain("Existing gallery is missing an immutable capture commit SHA.");
+    expect(levelGallerySource).toContain('reconciliationCommitSha = currentCommitSha');
+    expect(levelGallerySource).toContain('commitSha: captureCommitSha');
+    expect(levelGallerySource).toContain('captureCommitSha,');
+    expect(levelGallerySource).toContain('reconciliationCommitSha,');
     expect(startTransitionStressSource).toContain("diagnostics?.generation?.pendingRequest?.mode === 'menu'");
     expect(startTransitionStressSource).toContain("issues.push('returned-to-menu-after-start')");
     expect(startTransitionStressSource).toContain("issues.push('stale-menu-request-survived-start')");

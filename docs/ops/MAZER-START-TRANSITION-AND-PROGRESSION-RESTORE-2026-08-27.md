@@ -63,11 +63,15 @@ The bounded R020 restore uses the encrypted R019 preimage to restore the exact
 nine retained scalar/JSON player tracks. It does not infer levels from receipt
 counts, touch usernames/profiles/Auth/AI state, insert or delete rows, or change
 receipt denominators. The apply transaction locks the exact nine rows before it
-rechecks the R019 postimage and newer targeted play receipts. Encrypted exact
-action-time preimage/postimage artifacts bind automatic rollback, which is
-allowed only while all nine rows still equal the applied postimage and no newer
-targeted play receipt exists. A PostgreSQL 17 fixture proves apply and exact
-rollback.
+rechecks the R019 postimage and newer targeted play receipts. The exact expected
+postimage is projected from the encrypted action-time preimage, encrypted, and
+persisted with a hash-bound apply intent before the live transaction can commit.
+Every post-commit parse, assertion, or receipt-write failure automatically
+classifies the current nine rows and restores the exact preimage; pre-commit
+protection/filesystem failures leave live state untouched. Rollback is allowed
+only while all nine rows still equal the applied postimage and no newer targeted
+play receipt exists. A PostgreSQL 17 fixture failure-injects all six host
+boundaries and proves exact apply/rollback conservation.
 
 Historical player JSON is normalized explicitly: retained keys win, exact
 scalar columns supply missing `rank`/`targetComplexity`, timestamp columns

@@ -85,11 +85,15 @@ describe('Mazer account username and progression repair', () => {
     expect(pg17Verifier).toContain("raise exception 'USERNAME_RENAME_FAILED'");
     expect(pg17Verifier).toContain("raise exception 'R020_LOCAL_POSTIMAGE_FAILED'");
     expect(pg17Verifier).toContain("raise exception 'R020_LOCAL_EXACT_ROLLBACK_FAILED'");
-    expect(pg17Verifier).toContain('MAZER_R020_PROGRESSION_RESTORE_APPLY_ROLLBACK_PASS');
     expect(pg17Verifier).toContain("raise exception 'EXACT_ROLLBACK_FAILED'");
     expect(pg17Verifier).toContain('drop function mazer.mazer_set_username(uuid, text)');
     expect(pg17Verifier).toContain("raise exception 'FUNCTION_ROLLBACK_FAILED'");
     expect(pg17Verifier).toContain("raise exception 'CLASSIFIER_FUNCTION_ROLLBACK_FAILED'");
+    expect(pg17Verifier).toContain('MAZER_R020_PROGRESSION_RESTORE_APPLY_ROLLBACK_FAILURE_INJECTION_PASS');
+    expect(pg17Verifier).toContain("'BeforePostimageProtect'");
+    expect(pg17Verifier).toContain("'AfterApplyCommitBeforeParse'");
+    expect(pg17Verifier).toContain("'BeforeCompleteReceipt'");
+    expect(pg17Verifier).toContain("raise exception 'R020_POSTCOMMIT_FAILURE_INJECTION_ROLLBACK_FAILED:%', boundary");
     expect(pg17Verifier).toContain("Write-Output 'MAZER_ACCOUNT_USERNAME_PROGRESSION_REPAIR_PG17_PASS'");
   });
 });

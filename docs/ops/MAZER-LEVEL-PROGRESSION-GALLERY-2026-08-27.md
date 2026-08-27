@@ -13,7 +13,7 @@ Saved once, in place, to `C:\ATLAS\tmp\captures\mazer-level-progression-gallery`
 - New reusable script: `scripts/analysis/capture-level-progression-gallery.mjs` (Playwright, follows the existing `capture-play-object-retirement.mjs` pattern -- `npm run build`, launch the real preview server, seed `mazer.progression.v1:user:runtime-diagnostics-auth-fixture` in `localStorage`, load `/?content=core-only&mode=play&theme=aurora&runtimeDiagnostics=1&authFixture=authenticated`, wait on `window.__MAZER_RUNTIME_DIAGNOSTICS__` for a settled/ready play frame, screenshot).
 - Viewport `405x958`, `deviceScaleFactor 2`, mobile/touch context, fixed `mazeSeed=1` for every level (isolates the level->difficulty relationship from seed-driven shape variance). That query seed is the deterministic start of the generation candidate window; the recorded selected-maze seed may legitimately differ when the candidate selector finds a closer complexity match.
 - `targetComplexity` per level mirrors `legacyProgression.ts` exactly: `8 + (min(level, 99) - 1) * 4`.
-- Re-run any time with `node scripts/analysis/capture-level-progression-gallery.mjs` (optional `--minLevel=`, `--maxLevel=`, `--outputDir=`, `--baseUrl=` overrides for spot checks). `--reconcileExisting` only revalidates an already complete current-schema gallery after a non-capture code/documentation change; it verifies every expected image, case identity, and required seed/geometry/topology field, and fails closed rather than upgrading an older evidence shape without recapturing it.
+- Re-run any time with `node scripts/analysis/capture-level-progression-gallery.mjs` (optional `--minLevel=`, `--maxLevel=`, `--outputDir=`, `--baseUrl=` overrides for spot checks). `--reconcileExisting` only revalidates an already complete current-schema gallery after a non-capture code/documentation change; it verifies every expected image, case identity, required seed/geometry/topology field, and immutable capture commit/timestamp. Reconciliation records its own commit/timestamp separately and never relabels prior screenshots as captures from the current head.
 
 ## Finding for Codex: levels 100-110 are not yet distinct
 
@@ -24,7 +24,7 @@ Net effect, confirmed in this gallery: **levels `100` through `110` use the same
 ## Verification
 
 - `summary.json` in the output directory records, per level: requested/observed `level` and `targetComplexity`, the requested base seed, selected candidate seed, actual maze size, topology digest, walkable-tile count, rendered tile size, browser errors, and aggregate progression checks. It fails on missing selected-seed/geometry evidence, a target-step violation, a level 1-10 maze-size regression, or a level 99-110 clamp mismatch.
-- Commit SHA the gallery was captured against is recorded in `summary.json`'s `commitSha` field.
+- The immutable capture commit is recorded in both the backward-compatible `commitSha` and explicit `captureCommitSha` fields. A later evidence-only pass records `reconciliationCommitSha` separately.
 
 ## Decisions and questions
 

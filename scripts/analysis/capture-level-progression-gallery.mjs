@@ -223,9 +223,22 @@ const main = async () => {
   const cases = buildCases(minLevel, maxLevel);
   const summaryPath = resolve(outputDir, 'summary.json');
   const results = [];
+  const currentCommitSha = getCommitSha();
+  let captureCommitSha = currentCommitSha;
+  let capturedAt = null;
+  let reconciliationCommitSha = null;
 
   if (args.reconcileExisting === true) {
     const existing = JSON.parse(await readFile(summaryPath, 'utf8'));
+    captureCommitSha = existing.captureCommitSha ?? existing.commitSha ?? null;
+    capturedAt = existing.capturedAt ?? existing.generatedAt ?? null;
+    if (typeof captureCommitSha !== 'string' || !/^[a-f0-9]{40}$/.test(captureCommitSha)) {
+      throw new Error('Existing gallery is missing an immutable capture commit SHA.');
+    }
+    if (typeof capturedAt !== 'string' || !Number.isFinite(Date.parse(capturedAt))) {
+      throw new Error('Existing gallery is missing an immutable capture timestamp.');
+    }
+    reconciliationCommitSha = currentCommitSha;
     if (!Array.isArray(existing.results) || existing.results.length !== cases.length) {
       throw new Error(`Existing gallery case count does not match ${cases.length}.`);
     }
@@ -307,8 +320,11 @@ const main = async () => {
     || entry.browserErrors.console.length > 0
     || entry.browserErrors.page.length > 0
   ));
+  const summaryCapturedAt = capturedAt ?? new Date().toISOString();
   const summary = {
-    commitSha: getCommitSha(),
+    commitSha: captureCommitSha,
+    captureCommitSha,
+    reconciliationCommitSha,
     contract: 'mazer-level-progression-gallery-v1',
     endlessProgressionNote: 'legacyEndlessProgression.ts defines a distinct recipe for level >= 100 '
       + '(LEGACY_ENDLESS_LEVEL_BOUNDARY) but is only consumed by legacyRemoteProgression.ts as of this '
@@ -316,7 +332,9 @@ const main = async () => {
       + 'yet, so levels 100-110 use the same fixed-seed topology as level 99 (targetComplexity clamped to 400). '
       + 'This is the real, currently-shipped behavior, captured as-is.',
     fixedSeed: FIXED_SEED,
-    generatedAt: new Date().toISOString(),
+    generatedAt: summaryCapturedAt,
+    capturedAt: summaryCapturedAt,
+    reconciledAt: reconciliationCommitSha === null ? null : new Date().toISOString(),
     levelRange: [minLevel, maxLevel],
     pass: failures.length === 0
       && targetStepViolations.length === 0
