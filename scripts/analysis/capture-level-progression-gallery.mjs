@@ -22,14 +22,24 @@ const PROGRESSION_STORAGE_KEY = 'mazer.progression.v1:user:runtime-diagnostics-a
 // duplicate/stale gallery lying around next to the current one.
 const OUTPUT_DIR = 'C:\\ATLAS\\tmp\\captures\\mazer-level-progression-gallery';
 const DEFAULT_MIN_LEVEL = 1;
-const DEFAULT_MAX_LEVEL = 200;
-// Two independent generations per level (different seeds) instead of one --
-// lets a reviewer see real maze-shape variety at a given difficulty, and
-// catch a generation defect that only shows up on one seed's roll, rather
-// than judging each level from a single fixed sample.
-const DEFAULT_SEEDS = Object.freeze([1, 2]);
+const DEFAULT_MAX_LEVEL = 500;
+// One generation per level. An earlier version of this gallery captured two
+// independent seeds per level to surface generation-defect variety, but at
+// 1-500 that doubles an already-large run for a benefit this gallery's
+// actual use (a fast visual/topology-progression check, re-run often as the
+// game changes) doesn't need -- the per-seed generation checks below still
+// catch the same class of regression from a single sample per level.
+const DEFAULT_SEEDS = Object.freeze([1]);
 const VIEWPORT = Object.freeze({ width: 405, height: 958 });
 const DEVICE_SCALE_FACTOR = 2;
+// Each case is one full page load + maze generation + screenshot in its own
+// browser context; running them sequentially is what made a 400-case run
+// slow. Contexts within a single browser instance are cheap to run
+// concurrently in Playwright, so a small worker pool cuts wall-clock time by
+// roughly this factor without materially raising memory/CPU beyond what one
+// dev machine already tolerates from this game's own build. Override with
+// --concurrency=N for a slower/shared machine or a faster dedicated one.
+const DEFAULT_CONCURRENCY = 6;
 
 // Mirrors legacyProgression.ts's own LEGACY_PROGRESSION_MIN_COMPLEXITY (8)
 // and the level<->targetComplexity relationship in
@@ -62,6 +72,25 @@ const buildCases = (minLevel, maxLevel, seeds) => {
     pastLegacyBoundary: level > 99,
     requestedSeed: seed
   })));
+};
+
+// Runs `worker` over every item with at most `concurrency` in flight at
+// once, writing each result to its original index -- callers get results
+// back in request order regardless of which ones finish first, so
+// downstream code that assumes case ordering (the per-seed-group
+// progression checks below) doesn't need to know this ran concurrently.
+const runWithConcurrency = async (items, concurrency, worker) => {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const lane = async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await worker(items[index], index);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, lane));
+  return results;
 };
 
 const runNpmCommand = (args) => {
@@ -290,42 +319,54 @@ const main = async () => {
       previewTimeoutMs: DEFAULT_PREVIEW_TIMEOUT_MS
     });
     const browser = await chromium.launch({ headless: true });
+    const concurrency = args.concurrency !== undefined
+      ? Number.parseInt(args.concurrency, 10)
+      : DEFAULT_CONCURRENCY;
+    let completedCount = 0;
 
     try {
-      for (const testCase of cases) {
+      results.push(...await runWithConcurrency(cases, concurrency, async (testCase) => {
         try {
-          results.push(await captureCase({
+          const result = await captureCase({
             browser,
             baseUrl: preview.baseUrl,
             outputDir,
             testCase
-          }));
-          process.stdout.write(`captured ${testCase.id} (targetComplexity=${testCase.targetComplexity})\n`);
+          });
+          completedCount += 1;
+          process.stdout.write(
+            `captured ${testCase.id} (targetComplexity=${testCase.targetComplexity}) [${completedCount}/${cases.length}]\n`
+          );
+          return result;
         } catch (error) {
           // A single transient failure (this machine routinely runs many
           // concurrent Mazer worktree sessions competing for CPU) shouldn't
           // discard every other case already captured. Record it as a
           // failing result and keep going -- the run-level pass flag below
           // still turns false because of it.
-          results.push({
+          completedCount += 1;
+          process.stdout.write(
+            `FAILED ${testCase.id}: ${error?.message ?? error} [${completedCount}/${cases.length}]\n`
+          );
+          return {
             ...testCase,
             browserErrors: { console: [], page: [String(error?.message ?? error)] },
             issues: ['capture-error']
-          });
-          process.stdout.write(`FAILED ${testCase.id}: ${error?.message ?? error}\n`);
+          };
         }
-      }
+      }));
     } finally {
       await browser.close();
       await stopPreviewServer(preview.child);
     }
   }
 
-  // Every check below runs independently per seed generation -- results are
-  // ordered [level1-gen1, level1-gen2, level2-gen1, level2-gen2, ...], and a
-  // "does complexity climb correctly" or "is 99-110 the same clamp"
-  // question only makes sense within one seed's own progression sequence,
-  // not compared across two unrelated seeds.
+  // Grouping by seedIndex still works with a single default seed (one group
+  // holding every level in order) and also supports passing --seeds=1,2 for
+  // an occasional multi-seed comparison run without special-casing either
+  // shape: a "does complexity climb correctly" or "is 99-110 the same
+  // clamp" question only makes sense within one seed's own progression
+  // sequence, never compared across two unrelated seeds.
   const seedGroups = new Map();
   for (const entry of results) {
     const list = seedGroups.get(entry.seedIndex) ?? [];
