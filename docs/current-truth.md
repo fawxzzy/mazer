@@ -56,6 +56,13 @@ If the current web app disagrees with restored gameplay/mechanics truth, restore
 
 ## Current implementation truth
 
+### Final app-icon authority — 2026-08-28
+
+- `src/brand/source-art/mazer-app-icon-master.png` is the sole Mazer icon design authority: 1024x1024, 1,173,366 bytes, SHA-256 `ede90e596682795d10f97bed615071ca1f60e08e290eacf1ea143006df914d78`.
+- `npm run brand:icons` deterministically fans that master out only to the browser, Apple touch, PWA standard/maskable, Workbox, and Windows-shortcut assets actually consumed by the repository.
+- The maskable assets are intentionally padded to keep the complete rainbow frame and central maze inside the guaranteed safe circle. Older ATLAS icon references and `mazer-emblem` files are superseded, non-authoritative evidence.
+- This is a source contract. It does not by itself establish that production has received the icon.
+
 ### Current Precision Arcade visual integration
 
 The live Phaser renderer now consumes the canonical Fawxzzy Precision Arcade token map. The first shipping visual slice keeps the maze as the hero: a quiet navy canvas, crisp ivory connected corridors, mint/aqua structural rails, one-surface panels, a topology-rendered menu title, one compact color-tiered level glyph per active surface, and one shared cog-button shell for menu Settings and play controls. Header level and Settings controls share the same responsive 44–48px square frame; the numeric metric scales inside that fixed footprint rather than widening the layout. Active play binds its glyph to the player progression track. The main menu instead exposes only the independent menu-AI level, so the animated demo cannot be mistaken for the signed-in player's current difficulty. The Settings cog has a bounded 140ms hover turn and the level glyph has a bounded 420ms progression pulse; operating-system reduced motion suppresses both without removing the controls. A static ambient shard/rune/star layer remains present behind the maze, while the Animated Background preference and operating-system reduced-motion preference control motion. The full-screen rounded perimeter frame is intentionally absent. This is render-only; gameplay topology, progression, inputs, collision, scoring, persistence, tutorial, and menu AI remain unchanged.

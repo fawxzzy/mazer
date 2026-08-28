@@ -37,6 +37,10 @@ export default defineConfig({
       injectRegister: false,
       manifestFilename: 'manifest.webmanifest',
       includeAssets: [
+        'favicon.ico',
+        'icons/mazer-app-icon.ico',
+        'icons/mazer-app-icon.png',
+        'icons/apple-touch-icon.png',
         'icons/icon-192.png',
         'icons/icon-512.png',
         'icons/icon-192-maskable.png',
@@ -49,6 +53,9 @@ export default defineConfig({
       },
       workbox: {
         cacheId: 'mazer-v1',
+        // Versioned icon URLs map to Workbox's content-revisioned precache
+        // entries instead of bypassing the offline install assets.
+        ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^v$/],
         navigateFallbackDenylist: [/^\/__/, /^\/@vite\//],
         skipWaiting: true,
         clientsClaim: true

@@ -2182,16 +2182,16 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
       icons: Array<{ src: string; sizes: string; purpose?: string; type: string }>;
     };
 
-    expect(indexSource).toContain('<link rel="icon" href="/icons/mazer-app-icon.ico" sizes="any" />');
-    expect(indexSource).toContain('<link rel="icon" href="/icons/icon-192.png" sizes="192x192" type="image/png" />');
-    expect(indexSource).toContain('<link rel="icon" href="/icons/icon-512.png" sizes="512x512" type="image/png" />');
-    expect(indexSource).toContain('<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />');
+    expect(indexSource).toContain('<link rel="icon" href="/favicon.ico?v=mazer-final-icon-v2" sizes="any" />');
+    expect(indexSource).toContain('<link rel="icon" href="/icons/icon-192.png?v=mazer-final-icon-v2" sizes="192x192" type="image/png" />');
+    expect(indexSource).toContain('<link rel="icon" href="/icons/icon-512.png?v=mazer-final-icon-v2" sizes="512x512" type="image/png" />');
+    expect(indexSource).toContain('<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=mazer-final-icon-v2" />');
     expect(indexSource).not.toContain('href="/icons/mazer-emblem.svg"');
     expect(readFileSync(resolve(process.cwd(), 'scripts/windows/Prepare-MazerShortcut.ps1'), 'utf8')).toContain(
       "public\\icons\\mazer-app-icon.ico"
     );
     expect(readFileSync(resolve(process.cwd(), 'docs/mobile-plan.md'), 'utf8')).toContain(
-      'data/atlas/brand/mazer/mazer-app-icon-2026-07-09-source.png'
+      'src/brand/source-art/mazer-app-icon-master.png'
     );
     expect(readPngDimensions('public/icons/mazer-app-icon.png')).toEqual({ width: 1024, height: 1024 });
     expect(readPngDimensions('public/icons/icon-512.png')).toEqual({ width: 512, height: 512 });
@@ -2201,11 +2201,11 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(readPngDimensions('public/icons/apple-touch-icon.png')).toEqual({ width: 180, height: 180 });
     expect(readFileSync(resolve(process.cwd(), 'public/icons/mazer-app-icon.ico')).byteLength).toBeGreaterThan(10_000);
     expect(manifest.icons.map((icon) => icon.src)).toEqual([
-      '/icons/icon-192.png',
-      '/icons/icon-512.png',
-      '/icons/icon-192-maskable.png',
-      '/icons/icon-512-maskable.png',
-      '/icons/mazer-app-icon.png'
+      '/icons/icon-192.png?v=mazer-final-icon-v2',
+      '/icons/icon-512.png?v=mazer-final-icon-v2',
+      '/icons/icon-192-maskable.png?v=mazer-final-icon-v2',
+      '/icons/icon-512-maskable.png?v=mazer-final-icon-v2',
+      '/icons/mazer-app-icon.png?v=mazer-final-icon-v2'
     ]);
     expect(manifest.icons.filter((icon) => icon.purpose === 'maskable')).toHaveLength(2);
   });
