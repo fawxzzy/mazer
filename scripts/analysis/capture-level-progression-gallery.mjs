@@ -176,7 +176,7 @@ const captureCase = async ({ browser, baseUrl, outputDir, testCase }) => {
       && (phase === 'ready' || phase === 'playing')
       && diagnostics?.play?.lifecycle?.playerVisible === true
       && diagnostics?.generation?.drawStage?.complete === true;
-  }, RUNTIME_DIAGNOSTICS_KEY, { timeout: 90_000 });
+  }, RUNTIME_DIAGNOSTICS_KEY, { timeout: 180_000 });
   // The arrival flash is intentionally tied to the final build step. Wait
   // through that short visual-only tail so the gallery compares unobscured
   // maze topology rather than sampling different animation frames.
@@ -293,13 +293,27 @@ const main = async () => {
 
     try {
       for (const testCase of cases) {
-        results.push(await captureCase({
-          browser,
-          baseUrl: preview.baseUrl,
-          outputDir,
-          testCase
-        }));
-        process.stdout.write(`captured ${testCase.id} (targetComplexity=${testCase.targetComplexity})\n`);
+        try {
+          results.push(await captureCase({
+            browser,
+            baseUrl: preview.baseUrl,
+            outputDir,
+            testCase
+          }));
+          process.stdout.write(`captured ${testCase.id} (targetComplexity=${testCase.targetComplexity})\n`);
+        } catch (error) {
+          // A single transient failure (this machine routinely runs many
+          // concurrent Mazer worktree sessions competing for CPU) shouldn't
+          // discard every other case already captured. Record it as a
+          // failing result and keep going -- the run-level pass flag below
+          // still turns false because of it.
+          results.push({
+            ...testCase,
+            browserErrors: { console: [], page: [String(error?.message ?? error)] },
+            issues: ['capture-error']
+          });
+          process.stdout.write(`FAILED ${testCase.id}: ${error?.message ?? error}\n`);
+        }
       }
     } finally {
       await browser.close();
