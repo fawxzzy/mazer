@@ -1,0 +1,240 @@
+// Mazer Generation V2 -- Wave 1 offline generation laboratory.
+//
+// Generates a range of levels through TODAY's real generator
+// (legacy-runtime), measures each one against the new mazeV2 metrics
+// contract (src/domain/mazeV2/metrics.ts), and reports:
+//   - the full per-level measured-metrics vector (JSON + CSV)
+//   - summary statistics per axis across the range
+//   - structural-fingerprint collisions (would-be "identical adjacent
+//     recipe" violations under the later-wave novelty rule)
+//   - a plain-HTML data report (no screenshots -- see
+//     capture-level-progression-gallery.mjs for the visual contact sheet;
+//     this is the numeric counterpart Wave 1 needs)
+//
+// This does NOT generate with a new V2 generator -- Wave 2 doesn't exist
+// yet. It measures the CURRENT generator's real output so the metric
+// formulas have a validated baseline before anything depends on them.
+//
+// Usage:
+//   npx tsx scripts/analysis/mazev2-lab.ts [--minLevel=1] [--maxLevel=200]
+//     [--outputDir=C:\ATLAS\tmp\captures\mazev2-lab] [--seed=12345]
+
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { createLegacyRuntimeMazeForMode } from '../../src/legacy-runtime/legacyGenerationLifecycle';
+import {
+  createEmptyLegacyProgressionState,
+  resolveLegacyMazeGenerationProfileForProgression
+} from '../../src/legacy-runtime/legacyProgression';
+import { analyzeLegacyMazeAsMazeV2Metrics } from '../../src/domain/mazeV2/metrics';
+import { MAZE_V2_CONTRACT_VERSION, type MazeV2MeasuredMetrics } from '../../src/domain/mazeV2/types';
+
+const DEFAULT_OUTPUT_DIR = 'C:\\ATLAS\\tmp\\captures\\mazev2-lab';
+const DEFAULT_MIN_LEVEL = 1;
+const DEFAULT_MAX_LEVEL = 200;
+const DEFAULT_SEED = 12345;
+// Mirrors legacyProgression.ts's own targetComplexity formula exactly --
+// see this repo's own gallery script for the same mirrored constant, kept
+// in sync there rather than imported so this lab has no dependency on the
+// gallery script's own module.
+const LEGACY_PROGRESSION_MIN_COMPLEXITY = 8;
+const resolveTargetComplexityForLevel = (level: number): number => (
+  LEGACY_PROGRESSION_MIN_COMPLEXITY + ((Math.min(level, 99) - 1) * 4)
+);
+
+interface CliArgs {
+  minLevel: number;
+  maxLevel: number;
+  outputDir: string;
+  seed: number;
+}
+
+const parseCliArgs = (): CliArgs => {
+  const args: Record<string, string> = {};
+  for (const entry of process.argv.slice(2)) {
+    if (!entry.startsWith('--')) continue;
+    const [key, value] = entry.slice(2).split('=');
+    if (key) args[key] = value ?? 'true';
+  }
+  return {
+    minLevel: args.minLevel !== undefined ? Number.parseInt(args.minLevel, 10) : DEFAULT_MIN_LEVEL,
+    maxLevel: args.maxLevel !== undefined ? Number.parseInt(args.maxLevel, 10) : DEFAULT_MAX_LEVEL,
+    outputDir: args.outputDir ?? DEFAULT_OUTPUT_DIR,
+    seed: args.seed !== undefined ? Number.parseInt(args.seed, 10) : DEFAULT_SEED
+  };
+};
+
+interface LevelSample {
+  level: number;
+  targetComplexity: number;
+  scale: number;
+  metrics: MazeV2MeasuredMetrics;
+}
+
+// Fixed board scale for this lab, deliberately NOT the device-relative
+// scale resolver -- this measures the generator's own recipe response to
+// level, holding the device/viewport variable constant, the same isolation
+// principle the level-progression gallery script already uses.
+const LAB_BOARD_SCALE = 50;
+
+const generateSample = (level: number, baseSeed: number): LevelSample => {
+  const baseline = createEmptyLegacyProgressionState();
+  const targetComplexity = resolveTargetComplexityForLevel(level);
+  const track = { ...baseline.tracks.player, level: String(level), targetComplexity };
+  const profile = resolveLegacyMazeGenerationProfileForProgression(track);
+  // Varies per level by default (real play always steps the seed on
+  // completion -- see legacyGenerationLifecycle.ts's stepLegacyGenerationSeed)
+  // rather than reusing one fixed seed across the whole range. A fixed
+  // seed is still available via --seed=X held constant by the caller if
+  // the point is specifically isolating "does the profile alone vary
+  // enough" from "does seed variety alone paper over a flat profile" --
+  // the two questions want different seed strategies, so this defaults to
+  // the one that matches actual gameplay.
+  const seed = baseSeed + level;
+  const maze = createLegacyRuntimeMazeForMode('play', LAB_BOARD_SCALE, seed, profile, { targetComplexity });
+  return {
+    level,
+    targetComplexity,
+    scale: LAB_BOARD_SCALE,
+    metrics: analyzeLegacyMazeAsMazeV2Metrics(maze)
+  };
+};
+
+type FlatMetricRow = Record<string, number | string>;
+
+const flattenSample = (sample: LevelSample): FlatMetricRow => ({
+  level: sample.level,
+  targetComplexity: sample.targetComplexity,
+  scale: sample.scale,
+  width: sample.metrics.spatial.width,
+  height: sample.metrics.spatial.height,
+  walkableTileCount: sample.metrics.spatial.walkableTileCount,
+  floorRatio: sample.metrics.spatial.floorRatio,
+  shortestPathLength: sample.metrics.route.shortestPathLength,
+  manhattanDistance: sample.metrics.route.manhattanDistance,
+  detourRatio: sample.metrics.route.detourRatio,
+  routeCoverage: sample.metrics.route.routeCoverage,
+  junctionCount: sample.metrics.decision.junctionCount,
+  junctionDensity: sample.metrics.decision.junctionDensity,
+  routeJunctionCount: sample.metrics.decision.routeJunctionCount,
+  meanJunctionDegree: sample.metrics.decision.meanJunctionDegree,
+  maxJunctionDegree: sample.metrics.decision.maxJunctionDegree,
+  deadEndCount: sample.metrics.deadEnd.deadEndCount,
+  meanDeadEndDepth: sample.metrics.deadEnd.meanDeadEndDepth,
+  maxDeadEndDepth: sample.metrics.deadEnd.maxDeadEndDepth,
+  deceptiveBranchFraction: sample.metrics.deadEnd.deceptiveBranchFraction,
+  turnCount: sample.metrics.turning.turnCount,
+  turnRatio: sample.metrics.turning.turnRatio,
+  meanStraightRunLength: sample.metrics.turning.meanStraightRunLength,
+  maxStraightRunLength: sample.metrics.turning.maxStraightRunLength,
+  straightRunLengthVariance: sample.metrics.turning.straightRunLengthVariance,
+  cycleRank: sample.metrics.ambiguity.cycleRank,
+  alternateRouteCount: sample.metrics.ambiguity.alternateRouteCount,
+  shortcutCount: sample.metrics.shortcut.shortcutCount,
+  routeLengthReduction: sample.metrics.shortcut.routeLengthReduction,
+  wrapPairCount: sample.metrics.wrap.wrapPairCount,
+  wrapPairsOnRoute: sample.metrics.wrap.wrapPairsOnRoute,
+  wrapRouteImpact: sample.metrics.wrap.wrapRouteImpact ?? '',
+  structuralFingerprint: sample.metrics.structuralFingerprint
+});
+
+const toCsv = (rows: readonly FlatMetricRow[]): string => {
+  if (rows.length === 0) return '';
+  const headers = Object.keys(rows[0]!);
+  const lines = [headers.join(',')];
+  for (const row of rows) {
+    lines.push(headers.map((header) => String(row[header] ?? '')).join(','));
+  }
+  return lines.join('\n');
+};
+
+interface AxisSummary {
+  min: number;
+  max: number;
+  mean: number;
+  median: number;
+}
+
+const summarizeAxis = (values: readonly number[]): AxisSummary => {
+  const sorted = [...values].sort((left, right) => left - right);
+  const mid = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 === 0 ? ((sorted[mid - 1]! + sorted[mid]!) / 2) : sorted[mid]!;
+  return {
+    min: sorted[0] ?? 0,
+    max: sorted[sorted.length - 1] ?? 0,
+    mean: values.reduce((total, value) => total + value, 0) / Math.max(1, values.length),
+    median
+  };
+};
+
+const buildHtmlReport = (rows: readonly FlatMetricRow[], summaries: Record<string, AxisSummary>, collisions: readonly string[]): string => {
+  const headers = rows.length > 0 ? Object.keys(rows[0]!) : [];
+  const tableRows = rows.map((row) => (
+    `<tr>${headers.map((h) => `<td>${row[h]}</td>`).join('')}</tr>`
+  )).join('\n');
+  const summaryRows = Object.entries(summaries).map(([axis, summary]) => (
+    `<tr><td>${axis}</td><td>${summary.min.toFixed(2)}</td><td>${summary.mean.toFixed(2)}</td><td>${summary.median.toFixed(2)}</td><td>${summary.max.toFixed(2)}</td></tr>`
+  )).join('\n');
+
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Mazer V2 Lab</title>
+<style>
+body { font-family: ui-monospace, monospace; background: #0f1115; color: #e7e9ee; font-size: 12px; }
+table { border-collapse: collapse; margin-bottom: 24px; }
+td, th { border: 1px solid #333; padding: 3px 6px; text-align: right; }
+th { background: #1c212b; position: sticky; top: 0; }
+h1, h2 { font-family: system-ui, sans-serif; }
+.warn { color: #f0a94e; }
+</style></head>
+<body>
+<h1>Mazer V2 Lab -- ${MAZE_V2_CONTRACT_VERSION}</h1>
+<p>${rows.length} levels analyzed. Measures TODAY's real generator against the new mazeV2 metrics contract -- no V2 generator exists yet (Wave 1 only).</p>
+<h2>Fingerprint collisions (${collisions.length})</h2>
+${collisions.length > 0 ? `<p class="warn">${collisions.join(', ')}</p>` : '<p>None -- every level in this range produced a structurally distinct fingerprint.</p>'}
+<h2>Per-axis summary</h2>
+<table><tr><th>axis</th><th>min</th><th>mean</th><th>median</th><th>max</th></tr>${summaryRows}</table>
+<h2>Per-level data</h2>
+<table><tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>${tableRows}</table>
+</body></html>`;
+};
+
+const main = async (): Promise<void> => {
+  const args = parseCliArgs();
+  const outputDir = resolve(args.outputDir);
+  await mkdir(outputDir, { recursive: true });
+
+  const samples: LevelSample[] = [];
+  for (let level = args.minLevel; level <= args.maxLevel; level += 1) {
+    samples.push(generateSample(level, args.seed));
+    if (level % 50 === 0) process.stdout.write(`analyzed level ${level}\n`);
+  }
+
+  const rows = samples.map(flattenSample);
+  const numericAxes = Object.keys(rows[0] ?? {}).filter((key) => typeof rows[0]![key] === 'number' && key !== 'level');
+  const summaries: Record<string, AxisSummary> = {};
+  for (const axis of numericAxes) {
+    summaries[axis] = summarizeAxis(rows.map((row) => row[axis] as number));
+  }
+
+  const fingerprintCounts = new Map<string, number[]>();
+  for (const sample of samples) {
+    const fingerprint = sample.metrics.structuralFingerprint;
+    const levels = fingerprintCounts.get(fingerprint) ?? [];
+    levels.push(sample.level);
+    fingerprintCounts.set(fingerprint, levels);
+  }
+  const collisions = [...fingerprintCounts.entries()]
+    .filter(([, levels]) => levels.length > 1)
+    .map(([fingerprint, levels]) => `${fingerprint}: levels ${levels.join(', ')}`);
+
+  await writeFile(resolve(outputDir, 'metrics.json'), JSON.stringify({ contractVersion: MAZE_V2_CONTRACT_VERSION, samples: rows, summaries, collisions }, null, 2));
+  await writeFile(resolve(outputDir, 'metrics.csv'), toCsv(rows));
+  await writeFile(resolve(outputDir, 'report.html'), buildHtmlReport(rows, summaries, collisions));
+
+  process.stdout.write(`\n${samples.length} levels analyzed -> ${outputDir}\n`);
+  process.stdout.write(`Fingerprint collisions: ${collisions.length}\n`);
+  if (collisions.length > 0) {
+    process.stdout.write(`${collisions.join('\n')}\n`);
+  }
+};
+
+await main();
