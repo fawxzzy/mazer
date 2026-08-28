@@ -364,7 +364,23 @@ const LEGACY_GLYPH_LETTER_PATTERNS: Readonly<Record<string, readonly string[]>> 
   R: ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
   S: ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
   T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
-  Z: ['11111', '00001', '00010', '00100', '01000', '10000', '11111']
+  Z: ['11111', '00001', '00010', '00100', '01000', '10000', '11111'],
+  // Standard 5x7 dot-matrix digit shapes, same stroke weight/convention as
+  // the letters above -- added so the level-announcer's number (see
+  // MenuScene.ts's drawLegacyLevelAnnouncer) can be built from this exact
+  // tile-block glyph system instead of a separately-rendered web font, the
+  // same "reads as made of the same material" reasoning that already
+  // brought Start/Login onto this system.
+  0: ['01110', '10001', '10011', '10101', '11001', '10001', '01110'],
+  1: ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+  2: ['01110', '10001', '00001', '00010', '00100', '01000', '11111'],
+  3: ['11111', '00010', '00100', '00010', '00001', '10001', '01110'],
+  4: ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
+  5: ['11111', '10000', '11110', '00001', '00001', '10001', '01110'],
+  6: ['00110', '01000', '10000', '11110', '10001', '10001', '01110'],
+  7: ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+  8: ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
+  9: ['01110', '10001', '10001', '01111', '00001', '00010', '01100']
 };
 
 const LEGACY_GLYPH_LETTER_COLUMNS = 5;
@@ -388,7 +404,7 @@ export interface LegacyGlyphWordLayout {
   width: number;
 }
 
-/** Every character in `word` must have an entry in LEGACY_GLYPH_LETTER_PATTERNS (letters only, no spaces/punctuation). */
+/** Every character in `word` must have an entry in LEGACY_GLYPH_LETTER_PATTERNS (letters and digits only, no spaces/punctuation). */
 export const isLegacyGlyphWordRenderable = (word: string): boolean => (
   [...word.toUpperCase()].every((letter) => LEGACY_GLYPH_LETTER_PATTERNS[letter] !== undefined)
 );

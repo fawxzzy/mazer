@@ -137,7 +137,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(guideSource).toContain("drawLegendRow(legendRowIndex, 'end', 'Exit'");
     expect(guideSource).not.toContain('includeCompassRow');
     expect(guideSource).toContain("'begin at gold'");
-    expect(guideSource).toContain("'finish at red'");
+    expect(guideSource).toContain("'reach the star'");
     expect(guideSource).not.toContain("'Player • green trail'");
     expect(guideSource).not.toContain("'Score • run quality'");
     expect(guideSource).not.toContain('activeTargetComplexity');
@@ -1459,7 +1459,12 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain('private applyLegacyUiTextCrispness<T extends Phaser.GameObjects.Text>(text: T): T');
     expect(menuSceneSource).toContain('return applyTextResolution(text, this.resolveLegacyUiTextResolution());');
     expect(menuSceneSource).toContain('this.footerText = this.applyLegacyUiTextCrispness(this.add.text');
-    expect(menuSceneSource).toContain('this.levelAnnouncerNumberText = this.applyLegacyUiTextCrispness(this.add.text');
+    // The level-announcer number is no longer a Text object (see the tile-
+    // block glyph rewrite, drawLegacyLevelAnnouncerNumberGlyph) so it has no
+    // text-crispness call of its own -- the label ('LEVEL') sitting right
+    // beside it is still a real Text object and still goes through the same
+    // crispness path, so it stands in for this spot check instead.
+    expect(menuSceneSource).toContain('this.levelAnnouncerLabelText = this.applyLegacyUiTextCrispness(this.add.text');
     expect(menuSceneSource).toContain('this.applyLegacyUiTextCrispness(text);');
     expect(menuSceneSource).toContain('textTextureResolution: this.resolveLegacyUiTextResolution()');
     expect(menuSceneSource).toContain("textTransformOwner: 'game-canvas-only'");
@@ -1753,7 +1758,7 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).toContain("fontFamily: unifiedAuthDockButton ? LEGACY_AUTH_UI_FONT_FAMILY : LEGACY_UI_FONT_FAMILY");
     expect(menuSceneSource).toContain("const barHeight = this.overlay === 'auth' ? 56");
     expect(menuSceneSource).not.toContain('EMAIL OR USERNAME');
-    expect(menuSceneSource).toContain('this.levelAnnouncerNumberText.setVisible(false);');
+    expect(menuSceneSource).toContain('this.levelAnnouncerNumberGraphics.setVisible(false);');
     expect(menuSceneSource).toContain("this.authSnapshot.status !== 'authenticated'");
     expect(menuSceneSource).toContain("&& rememberedIdentity?.displayName");
     expect(menuSceneSource).toContain('private authInvalidFields: ReadonlySet<LegacyAuthFieldId> = new Set();');
@@ -1804,8 +1809,8 @@ describe('resolveLegacyMenuPathRenderFrame', () => {
     expect(menuSceneSource).not.toContain('this.drawLegacyMenuAiProgressionBadge();');
     expect(menuSceneSource).toContain('this.clearLegacyMenuAiProgressionBadge();');
     expect(menuSceneSource).toContain('private drawLegacyLevelAnnouncer(time: number): void');
-    expect(menuSceneSource).toContain(".setText(String(track.level))");
-    expect(menuSceneSource).not.toContain('.setText(String(aiTrack.level))');
+    expect(menuSceneSource).toContain('const levelDigits = String(track.level);');
+    expect(menuSceneSource).not.toContain('const levelDigits = String(aiTrack.level);');
     expect(menuSceneSource).not.toContain('publishLegacyPlayerProgressionCompletion');
     expect(menuSceneSource).not.toContain('resolveLegacyPlayerProgressionOutcomeReason');
     expect(menuSceneSource).not.toContain('progression.player.cycle.');
