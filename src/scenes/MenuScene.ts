@@ -1403,7 +1403,6 @@ export class MenuScene extends Phaser.Scene {
   private playerTransferEnergyOutboundStartedAtMs: number | null = null;
   private playerTransferEnergyDeliveryStartedAtMs: number | null = null;
   private footerText!: Phaser.GameObjects.Text;
-  private hudTimerText!: Phaser.GameObjects.Text;
   private progressionBadgeText!: Phaser.GameObjects.Text;
   private progressionBadgeLabelText!: Phaser.GameObjects.Text;
   private progressionBadgeBounds: VisualRect | null = null;
@@ -1627,22 +1626,6 @@ export class MenuScene extends Phaser.Scene {
       color: '#d7d6de',
       align: 'center'
     })).setOrigin(0.5).setAlpha(0.92);
-    // drawHud computes hudFrame.timerText/timerBounds every frame but never
-    // fed either into an actual rendered object -- clearHudTexts/uiTexts'
-    // own 'hud' data-tag cleanup path (see drawHud, clearPlayHudImmediately)
-    // has no producer anywhere in this file that ever sets that tag, so the
-    // play-mode clock has been computing correctly and reporting itself as
-    // visible in diagnostics while never actually drawing on screen. A
-    // persistent field updated in place each frame, mirroring footerText's
-    // own pattern, is cheaper than recreating a Text object every frame the
-    // way the orphaned uiTexts/hud-tag path implies.
-    this.hudTimerText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
-      fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
-      fontSize: '20px',
-      fontStyle: 'bold',
-      color: '#d7fff8',
-      align: 'center'
-    })).setOrigin(0.5).setVisible(false);
     this.progressionBadgeText = this.applyLegacyUiTextCrispness(this.add.text(0, 0, '', {
       fontFamily: LEGACY_UI_MONO_FONT_FAMILY,
       fontSize: '13px',
@@ -8730,7 +8713,6 @@ export class MenuScene extends Phaser.Scene {
     this.hudFrame = null;
     if (this.mode !== 'play' || this.overlay !== 'none') {
       this.footerText.setText('');
-      this.hudTimerText.setVisible(false);
       return;
     }
     this.footerText.setText('');
@@ -8752,15 +8734,6 @@ export class MenuScene extends Phaser.Scene {
     );
     this.hudBounds = this.hudTimerBounds;
     this.hudFrame = hudFrame;
-    this.hudTimerText.setText(hudFrame.timerText);
-    this.fitLegacyUiTextToWidth(
-      this.hudTimerText,
-      hudFrame.timerBounds.width,
-      20,
-      12
-    );
-    this.hudTimerText.setPosition(hudFrame.timerBounds.centerX, hudFrame.timerBounds.centerY);
-    this.hudTimerText.setVisible(true);
   }
 
   private hasLegacyPlayTrailPulsePendingFrame(time: number): boolean {
@@ -8976,7 +8949,6 @@ export class MenuScene extends Phaser.Scene {
     this.hudFrame = null;
     this.clearHudTexts();
     this.footerText.setText('');
-    this.hudTimerText.setVisible(false);
   }
 
   private rebuildUi(): void {
